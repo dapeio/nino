@@ -2,12 +2,20 @@
 
 *[Deutsch](README.de.md)*
 
-Nino is a PHP micro-framework designed for small to medium-sized websites. It operates entirely file-based and provides all essential functions without external packages or dependencies.
-The Nino.php core consolidates all necessary methods in a single file (~3,800 lines of PHP code) to output multilingual websites with templating and file-based content management.
-Texts and recurring content (such as posts/nodes) are stored in PHP array files, while templates reside in HTML-like .tpl files. A callback, textfill, and shortcode system delivers a compact yet dynamically flexible and powerful templating engine - see `docs/modules.md` for the full callback reference.
-Presentation and logic are always strictly separated, and a per-module permission system (`docs/developer.md`'s "Permission system") lets an admin account be scoped to exactly the modules it needs instead of all-or-nothing.
-The optional `_dev` (for developers) and `_admin` (for administrators) packages extend the frontend with a simple graphical administration app - both are entirely optional and safe to delete outright if a project doesn't need one.
-The frontend includes complete, modern starter themes and comprehensive JavaScript/CSS tools - all entirely dependency-free.
+**Hi, I am Nino.**
+Nino is a lightweight PHP microframework for websites. It is package-independent, works without a database, and provides all the essential features of a modern framework.
+
+### _nino
+The Nino PHP core (*_nino*) consolidates all necessary methods into a single file with just 3,800 lines of PHP code, enabling the creation of multilingual websites—including file-based content management, templating, and comprehensive backend and frontend tools.
+Texts and recurring content (such as posts/nodes) are stored in PHP files, while templates are designed in an HTML-like format. A shortcode system combines logic and presentation into a dynamic, flexible, and high-performance template engine. The Nino core fully handles language/user management and high-performance delivery.
+
+Thanks to a clear single-point-of-data concept and a well-thought-out callback system, customization through your own modules is straightforward. However, the most important tools for modern mobile-first websites (elements, newsletters, image uploads, forms, locale pickers, navigation, and more) are already available as core modules—including the necessary CSS and JavaScript code.
+
+### _dev / _admin
+The Nino core (*_nino*) focuses exclusively on rendering the website. In parallel, *_dev* (for developers) and *_admin* (for administrators) complement the frontend as graphical management tools.
+Both are entirely optional and can be completely removed if needed. They enable efficient and rapid development, while providing operators and administrators with a simple and user-friendly way to maintain ongoing data—without requiring technical expertise.
+
+A well-designed permission system ensures that admin accounts only have the access they need. Compact logging, integrated backups, and a robust security concept complete the toolset for everyday use.
 
 ## Core Nino.php Features
 - HTTP server (request handling and output)
