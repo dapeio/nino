@@ -1,0 +1,1194 @@
+/**
+ *	Nino										A compact filesystembased php framework
+ *	style.css								Admin dashboard design - iOS-inspired, mobile first.
+ *													Placeholder/dummy content styling only, not the public
+ *													site's design (see Phase 5 for that).
+ *
+ *	@package								Dape/Nino
+ *	@author									David Perchermeier <mail@dape.io>
+ *	@link										https://github.com/dapeio/nino
+ */
+
+:root {
+	--admin-blue: 				#4faae8;
+	--admin-red: 					#ff3b30;
+	--admin-green: 				#34c759;
+	--admin-orange: 			#ff9500;
+
+	--admin-bg: 					#f2f2f7;
+	--admin-bg-elevated: #ffffff;
+	--admin-bg-grouped: 	#ffffff;
+	--admin-text: 				#1c1c1e;
+	--admin-text-secondary: #6e6e73;
+	--admin-separator: 	rgba(60,60,67,.29);
+	--admin-border: 			rgba(60,60,67,.18);
+	--admin-bar-bg: 			rgba(255,255,255,.8);
+	--admin-shadow: 			0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.06);
+
+	--admin-radius: 			14px;
+	--admin-radius-sm: 	9px;
+	--admin-gap: 					1rem;
+
+	color-scheme: light;
+}
+
+/*	Follows the OS preference by default, unless overridden by the manual
+ *	switch in the admin bar (adds data-theme="light"/"dark" to <html>,
+ *	persisted in localStorage - see script.js) */
+
+@media (prefers-color-scheme: dark) {
+	:root:not([data-theme="light"]) {
+		--admin-bg: 					#000000;
+		--admin-bg-elevated: #1c1c1e;
+		--admin-bg-grouped: 	#1c1c1e;
+		--admin-text: 				#f2f2f7;
+		--admin-text-secondary: #98989f;
+		--admin-separator: 	rgba(84,84,88,.65);
+		--admin-border: 			rgba(84,84,88,.6);
+		--admin-bar-bg: 			rgba(28,28,30,.75);
+		--admin-shadow: 			0 1px 3px rgba(0,0,0,.5);
+
+		color-scheme: dark;
+	}
+}
+
+:root[data-theme="dark"] {
+	--admin-bg: 					#000000;
+	--admin-bg-elevated: #1c1c1e;
+	--admin-bg-grouped: 	#1c1c1e;
+	--admin-text: 				#f2f2f7;
+	--admin-text-secondary: #98989f;
+	--admin-separator: 	rgba(84,84,88,.65);
+	--admin-border: 			rgba(84,84,88,.6);
+	--admin-bar-bg: 			rgba(28,28,30,.75);
+	--admin-shadow: 			0 1px 3px rgba(0,0,0,.5);
+
+	color-scheme: dark;
+}
+
+* {
+	box-sizing: border-box;
+	-webkit-tap-highlight-color: transparent;
+}
+
+html {
+	-webkit-text-size-adjust: 100%;
+}
+
+body {
+	margin: 0;
+	font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+	font-size: 16px;
+	line-height: 1.45;
+	background: var(--admin-bg);
+	color: var(--admin-text);
+	-webkit-font-smoothing: antialiased;
+}
+
+a {
+	color: var(--admin-blue);
+	text-decoration: none;
+}
+
+button {
+	font: inherit;
+	cursor: pointer;
+	appearance: none;
+	-webkit-appearance: none;
+	border: none;
+	border-radius: 980px;
+	padding: .6rem 1.15rem;
+	min-height: 44px;
+	background: var(--admin-bg-elevated);
+	color: var(--admin-blue);
+	box-shadow: inset 0 0 0 1px var(--admin-border);
+	transition: transform .12s ease, opacity .12s ease, background .15s ease;
+}
+button.admin-danger {
+	background:var(--admin-red);
+	color:#FFF;
+	opacity:.75;
+}
+button.admin-danger:hover, button.admin-danger:active {
+	opacity:1;
+}
+
+button:active {
+	transform: scale(.96);
+	opacity: .8;
+}
+
+button[type="submit"] {
+	background: var(--admin-blue);
+	color: #fff;
+	box-shadow: none;
+	font-weight: 600;
+}
+
+/* ------------------------------------------------------------------ Panels */
+
+/*	The User/Texte/Elemente bar (#admin-nav-wrap) always stays visible - only
+ *	the content panels switch. Drilling into a panel (types -> list -> form,
+ *	or category list -> category form) is handled locally within that panel via
+ *	.admin-hidden, not by hiding the whole panel/nav. */
+
+#admin-content-user,
+#admin-content-text,
+#admin-content-images,
+#admin-content-elements,
+#admin-content-submissions,
+#admin-content-newsletter,
+#admin-content-logs {
+	display: none;
+}
+
+#admin-page-wrap.show-user #admin-content-user,
+#admin-page-wrap.show-text #admin-content-text,
+#admin-page-wrap.show-images #admin-content-images,
+#admin-page-wrap.show-elements #admin-content-elements,
+#admin-page-wrap.show-submissions #admin-content-submissions,
+#admin-page-wrap.show-newsletter #admin-content-newsletter,
+#admin-page-wrap.show-logs #admin-content-logs {
+	display: block;
+}
+
+/*	Utility: force-hide an element regardless of its own display rules (eg. an
+ *	id-selector default like #elements-types{display:flex}) - used to step
+ *	through a panel's types/list/form (or list/form) drill-down levels */
+.admin-hidden {
+	display: none !important;
+}
+
+/* --------------------------------------------------------------------- Bar */
+
+#admin-bar-wrap {
+	position: sticky;
+	top: 0;
+	z-index: 10;
+	display: flex;
+	flex-direction: column;
+	align-items: stretch;
+	gap: .6rem;
+	padding: max(.75rem, env(safe-area-inset-top)) 1.25rem .75rem;
+	background: var(--admin-bar-bg);
+	backdrop-filter: blur(20px) saturate(180%);
+	-webkit-backdrop-filter: blur(20px) saturate(180%);
+	border-bottom: 1px solid var(--admin-separator);
+}
+
+#admin-user {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: .85rem;
+	min-width: 0;
+	font-size: .9rem;
+	color: var(--admin-text-secondary);
+}
+
+#admin-user-email {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+#admin-user-logout {
+	color: var(--admin-red);
+	font-weight: 500;
+	flex-shrink: 0;
+}
+
+/*	Click/tap-toggled (see script.js), not :hover - touch devices have no
+ *	real hover state (only inconsistent tap-simulated ones, with no
+ *	equivalent "un-hover" gesture to close it again), and a :hover-only
+ *	menu is unreachable by keyboard entirely. #admin-nav-ui-menu's open/
+ *	closed state is the .admin-hidden utility class already used for
+ *	every other panel's drill-down levels. */
+#admin-nav-ui {
+	position: relative;
+	flex-shrink: 0;
+}
+
+#admin-nav-ui-toggle {
+	border: none;
+	background: none;
+	font: inherit;
+	font-size: 1rem;
+	line-height: 1;
+	padding: 0;
+	cursor: pointer;
+	box-shadow: none;
+}
+
+#admin-nav-ui-menu {
+	position: absolute;
+	top: 100%;
+	right: 0;
+	z-index: 20;
+	display: flex;
+	align-items: center;
+	gap: .5rem;
+	margin-top: -.4rem;
+	padding: .5rem .75rem;
+	background: var(--admin-bg-elevated);
+	border-radius: var(--admin-radius-sm);
+	box-shadow: var(--admin-shadow);
+}
+
+#admin-theme-toggle {
+	flex-shrink: 0;
+	border: none;
+	background: none;
+	font: inherit;
+	font-size: 1rem;
+	line-height: 1;
+	padding: 0;
+	cursor: pointer;
+	box-shadow:none;
+}
+
+/* Same flat reset as #admin-theme-toggle, so it reads as one family of
+   small bar controls instead of a form field - stays compact no matter
+   how many locales are configured, unlike a row of links would */
+#admin-localepicker {
+	flex-shrink: 0;
+	width: auto;
+	max-width: none;
+	min-height: 0;
+	box-sizing: content-box;
+	appearance: none;
+	border: none;
+	/* Same gradient-arrow trick as the generic select rule below, just
+	   repositioned/sized for a compact toolbar control instead of a form field */
+	background-color: transparent;
+	background-image:
+		linear-gradient(45deg, transparent 50%, #a0a8b2 50%),
+		linear-gradient(135deg, #a0a8b2 50%, transparent 50%);
+	background-position: calc(100% - 4px) 50%, 100% 50%;
+	background-size: 5px 5px;
+	background-repeat: no-repeat;
+	font: inherit;
+	font-size: .85rem;
+	color: var(--admin-text-secondary);
+	margin: 0 16px 0 0;
+	cursor: pointer;
+}
+
+/*	Deliberately styled as tabs, not buttons: a flat row sitting on a shared
+ *	bottom border, only the active one picked out (colored + underlined).
+ *	Buttons look like one-shot actions; tabs read as "you can jump between
+ *	these and each keeps its own place" - which is exactly what they do here
+ *	(see elements.js/text.js's _showTypes/_showList/_showForm state). */
+/*	7 tabs don't fit an equal-width flex split on a narrow phone (each
+ *	label gets squeezed below its own text width, which overflows the
+ *	bar instead of shrinking) - scroll horizontally instead, natural
+ *	width per tab, no wrapping */
+#admin-nav-wrap {
+	display: flex;
+	margin-right:20px;
+	width: 100%;
+	overflow-x: auto;
+	-webkit-overflow-scrolling: touch;
+	scrollbar-width: none;
+	border-bottom: 1px solid var(--admin-separator);
+}
+
+#admin-nav-wrap::-webkit-scrollbar {
+	display: none;
+}
+
+#admin-nav-wrap a {
+	flex: 0 0 auto;
+	white-space: nowrap;
+	text-align: center;
+	padding: .65rem .5rem;
+	margin-bottom: -1px;
+	border-bottom: 2px solid transparent;
+	color: var(--admin-text-secondary);
+	font-size: .85rem;
+	font-weight: 500;
+	transition: color .15s ease, border-color .15s ease;
+}
+
+#admin-nav-wrap a.active {
+	color: var(--admin-blue);
+	font-weight: 600;
+	border-bottom-color: var(--admin-blue);
+}
+
+@media (min-width: 640px) {
+	#admin-bar-wrap {
+		flex-direction: row;
+		align-items: center;
+		justify-content: space-between;
+	}
+	#admin-nav-wrap {
+		width: fit-content;
+		gap: 1.5rem;
+	}
+	#admin-nav-wrap a {
+		padding: .65rem .1rem;
+		font-size: .9rem;
+	}
+}
+
+/*	Local drill-down back link (Elements: list -> types, form -> list; Text:
+ *	category form -> category list) */
+.back-link {
+	display: inline-flex;
+	align-items: center;
+	gap: .2rem;
+	padding: .5rem .25rem;
+	margin-bottom: .5rem;
+	color: var(--admin-blue);
+	font-weight: 500;
+}
+
+.back-link::before {
+	content: "‹";
+	font-size: 1.3rem;
+	line-height: 1;
+}
+
+/* ----------------------------------------------------------------- Content */
+
+#admin-content-wrap {
+	padding: 1.25rem 1rem 4rem;
+	max-width: 40rem;
+	margin: 0 auto;
+}
+
+@media (min-width: 768px) {
+	#admin-content-wrap {
+		max-width: 46rem;
+		padding: 2rem 1.5rem 4rem;
+	}
+}
+
+/* --------------------------------------------------------------- Dashboard */
+
+#admin-dashboard-tiles {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+	gap: var(--admin-gap);
+	margin-bottom: calc(var(--admin-gap) * 1.5);
+}
+
+.admin-dashboard-tile {
+	display: flex;
+	flex-direction: column;
+	gap: .25rem;
+	padding: 1.25rem 1.5rem;
+	border-radius: var(--admin-radius);
+	background: var(--admin-bg-elevated);
+	box-shadow: var(--admin-shadow);
+	border-top: 3px solid var(--admin-blue);
+	text-decoration: none;
+	color: var(--admin-text);
+	transition: transform .15s ease, box-shadow .15s ease;
+}
+.admin-dashboard-tile:hover, .admin-dashboard-tile:active {
+	transform: translateY(-2px);
+	box-shadow: 0 4px 14px rgba(0,0,0,.1);
+}
+.admin-dashboard-tile--newsletter { border-top-color: var(--admin-green); }
+.admin-dashboard-tile--logs 			{ border-top-color: var(--admin-orange); }
+
+.admin-dashboard-tile-value {
+	font-size: 2.25rem;
+	font-weight: 700;
+	line-height: 1.1;
+	font-variant-numeric: normal;
+}
+.admin-dashboard-tile-label {
+	font-size: .85rem;
+	color: var(--admin-text-secondary);
+}
+
+.admin-dashboard-section {
+	margin-bottom: calc(var(--admin-gap) * 1.5);
+}
+.admin-dashboard-section h3 {
+	font-size: 1rem;
+	margin: 0 0 .75rem;
+}
+
+#admin-dashboard-elements {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: flex;
+	flex-direction: column;
+	gap: .6rem;
+}
+#admin-dashboard-elements a {
+	display: block;
+	text-decoration: none;
+	color: inherit;
+}
+.admin-dashboard-meter-row {
+	display: flex;
+	justify-content: space-between;
+	font-size: .9rem;
+	margin-bottom: .3rem;
+}
+.admin-dashboard-meter-count {
+	color: var(--admin-text-secondary);
+	font-weight: 600;
+}
+.admin-dashboard-meter-track {
+	display: block;
+	height: 6px;
+	border-radius: 3px;
+	background: var(--admin-bg);
+	overflow: hidden;
+}
+.admin-dashboard-meter-fill {
+	display: block;
+	height: 100%;
+	background: var(--admin-blue);
+	border-radius: 3px;
+}
+
+#admin-dashboard-activity {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	font-size: .85rem;
+	color: var(--admin-text-secondary);
+	display: flex;
+	flex-direction: column;
+	gap: .4rem;
+}
+#admin-dashboard-activity li {
+	padding-bottom: .4rem;
+	border-bottom: 1px solid var(--admin-separator);
+}
+.admin-dashboard-more {
+	display: inline-block;
+	margin-top: .5rem;
+	font-size: .85rem;
+}
+
+/* -------------------------------------------------------------- Type tabs */
+
+#elements-types, #text-list, #images-list {
+	display: flex;
+	flex-wrap: wrap;
+	gap: .5rem;
+	margin-bottom: 1.25rem;
+}
+
+/* Text tab's "Übersetzung" export/import toolbar - a flex child of
+   #text-list (see above) alongside the category buttons, forced onto its
+   own row via width:100% since it's structurally unrelated to them */
+#text-translate-tools {
+	width: 100%;
+	background: var(--admin-bg-grouped);
+	border-radius: var(--admin-radius);
+	box-shadow: var(--admin-shadow);
+	padding: 1rem;
+}
+.text-translate-row {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: .75rem;
+}
+.text-translate-row + .text-translate-row {
+	margin-top: .75rem;
+}
+.text-translate-row select {
+	width: auto;
+	flex: 0 0 auto;
+	padding-right: 32px;
+}
+#text-import-area {
+	flex: 1 1 240px;
+	min-height: 44px;
+	resize: vertical;
+	font-family: ui-monospace, monospace;
+	font-size: .8rem;
+}
+.text-import-success {
+	color: var(--admin-green);
+	font-size: .85rem;
+	font-weight: 600;
+}
+.text-import-error {
+	color: var(--admin-red);
+	font-size: .85rem;
+	font-weight: 600;
+}
+
+.admin-type-btn{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:.75rem;
+  width:100%;
+  padding:.75rem .75rem 1rem;
+  border-radius:.75rem;
+  border:1px solid rgba(0,0,0,.04);
+  background:var(--admin-bg-grouped);
+  cursor:pointer;
+  margin-bottom: .5rem;
+  text-align:left;
+  color:inherit;
+  text-decoration:none;
+  transition:transform .1s,background-color .2s;
+}
+
+.admin-type-btn:hover{background:rgba(0,122,255,.06)}
+.admin-type-btn:active{transform:scale(.99)}
+.admin-type-btn:focus-visible{outline:none;box-shadow:0 0 0 .25rem rgba(0,122,255,.35)}
+
+.admin-type-btn-descr {
+	font-size: .75rem;
+	opacity: .65;
+}
+
+/* ----------------------------------------------------------- Grouped lists */
+
+#elements-list, #users-list {
+	margin-bottom: 1.5rem;
+}
+
+.main-title--withuri, .main-title {
+	font-size: 1.3rem;
+	font-weight: 700;
+	margin: 0;
+}
+.main-title {
+	margin: 0 0 .75rem;
+}
+.main-uri {
+	font-size: .8rem;
+	color: var(--admin-text-secondary);
+	margin-bottom: .5rem;
+}
+.admin-list-action {
+	width: 100%;
+	margin-top: .75rem;
+	background: var(--admin-blue);
+	color: #fff;
+	box-shadow: none;
+	font-weight: 600;
+}
+
+#elements-list ul, #images-list ul, #users-list ul {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	background: var(--admin-bg-grouped);
+	border-radius: var(--admin-radius);
+	box-shadow: var(--admin-shadow);
+	overflow: hidden;
+}
+
+#elements-list li, #images-list li, #users-list li {
+	border-bottom: 1px solid var(--admin-separator);
+}
+
+#elements-list li:last-child, #images-list li:last-child, #users-list li:last-child {
+	border-bottom: none;
+}
+
+#elements-list li a, #images-list li a, #users-list li a {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: .75rem;
+	padding: .85rem 1rem;
+	min-height: 44px;
+	color: var(--admin-text);
+}
+
+#elements-list li a::after, #images-list li a::after, #users-list li a::after {
+	content: "›";
+	color: var(--admin-text-secondary);
+	font-size: 1.2rem;
+	flex-shrink: 0;
+}
+
+#elements-list li a:active, #images-list li a:active, #users-list li a:active {
+	background: rgba(120,120,128,.12);
+}
+
+#logs-entries {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	background: var(--admin-bg-grouped);
+	border-radius: var(--admin-radius);
+	box-shadow: var(--admin-shadow);
+	overflow: hidden;
+	font-size: .85rem;
+	font-family: ui-monospace, monospace;
+}
+
+#logs-entries li {
+	padding: .6rem 1rem;
+	border-bottom: 1px solid var(--admin-separator);
+}
+
+#logs-entries li:last-child {
+	border-bottom: none;
+}
+
+/* -------------------------------------------------------------------- Form */
+
+form {
+	padding: 0;
+}
+
+fieldset {
+	background: var(--admin-bg-grouped);
+	border-radius: var(--admin-radius);
+	box-shadow: var(--admin-shadow);
+	border: none;
+	margin: 0 0 1rem;
+	padding: 2.75rem 1rem 0;
+	position:relative;
+}
+
+fieldset legend {
+	top:.75rem;
+	padding: 0 0 .5rem;
+	position:absolute;
+	font-size: .8rem;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: .04em;
+	color: var(--admin-text-secondary);
+}
+
+.admin-field, .text-form-key {
+	display: block;
+	margin: 0 0 1rem;
+}
+
+/*	Direct child only - a descendant selector would also catch <span> tags
+ *	the html editor's own "Hervorheben" formatting creates inside its
+ *	content area, forcing them to display:block and breaking the markup */
+.admin-field > span {
+	display: block;
+	font-size: .8rem;
+	color: var(--admin-text-secondary);
+	margin-bottom: .3rem;
+}
+
+.admin-field-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: baseline;
+	gap: .75rem;
+	margin-bottom: .3rem;
+}
+
+.admin-field-name {
+	font-size: .8rem;
+	color: var(--admin-text-secondary);
+	margin:-.5rem 0 1rem;
+	display:block;
+}
+
+.admin-field-header .char-counter {
+	margin: 0;
+}
+
+/*	Only shown on the "insert" form - once an element exists its uri is
+ *	fixed, shown as a plain heading instead (see elements.js) */
+.admin-field-hint {
+	margin: -.65rem 0 1rem;
+	font-size: .75rem;
+	color: var(--admin-text-secondary);
+}
+
+/*	A field with a fixed unit/suffix (eg. a price's "€") next to its input */
+.admin-field-suffixed {
+	display: flex;
+	align-items: center;
+	gap: .5rem;
+}
+
+.admin-field-suffixed input, .admin-field-suffixed textarea {
+	flex: 1;
+	width: auto;
+	min-width: 0;
+}
+
+.admin-field-suffix {
+	flex-shrink: 0;
+	color: var(--admin-text-secondary);
+	font-weight: 600;
+}
+
+.text-form-key {
+	font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+	font-size: 1rem;
+	font-weight: 700;
+	color: var(--admin-text);
+	padding-top: .75rem;
+	word-break: break-all;
+}
+
+input[type="text"], input[type="email"], input[type="password"], input[type="number"], input[type="date"], input[type="url"],
+textarea, input[type="datetime-local" i], select {
+	width: 100%;
+	max-width: 100%;
+	box-sizing: border-box;
+	padding: .65rem .75rem;
+	min-height: 44px;
+	border: 1px solid var(--admin-border);
+	border-radius: var(--admin-radius-sm);
+	background: var(--admin-bg);
+	color: var(--admin-text);
+	font: inherit;
+}
+
+
+
+input:focus, textarea:focus, select:focus, [contenteditable]:focus {
+	outline: 2px solid var(--admin-blue);
+	outline-offset: 1px;
+}
+select {
+	appearance:none;
+  background-image:
+    linear-gradient(45deg,transparent 50%,#a0a8b2 50%),
+    linear-gradient(135deg,#a0a8b2 50%,transparent 50%);
+  background-position:calc(100% - 17px) calc(50% - 0px), calc(100% - 10px) calc(50% - 0px);
+  background-size:7px 7px;
+  background-repeat:no-repeat;
+}
+
+input.error, .pending.error {
+	outline: 2px solid var(--admin-red);
+}
+
+.admin-field input[type="checkbox"] {
+	width: auto;
+	min-height: auto;
+}
+
+/*	A single checkbox + its own inline label text (eg. Users' permissions
+	list) - .admin-field's stacked span-above-input shape doesn't fit a
+	checkbox, same reasoning as _dev's .dev-scan-ignore */
+.admin-checkbox-field {
+	display: flex;
+	align-items: center;
+	gap: .5rem;
+	margin: 0 0 .6rem;
+}
+.admin-checkbox-field input[type="checkbox"] {
+	width: auto;
+	min-height: auto;
+}
+
+.admin-field-radios {
+	display: flex;
+	min-height: 44px;
+	align-items: center;
+}
+
+.admin-field-radio {
+	display: flex;
+	align-items: center;
+	padding-right:25px;
+	min-height: 44px;
+	border: 1px solid var(--admin-border);
+	border-right:0;
+	border-radius: var(--admin-radius-sm);
+	background: var(--admin-bg);
+	color: var(--admin-text);
+	font: inherit;
+	cursor:pointer;
+	transition: all 0.2s ease;
+}
+.admin-field-radio:has(input[type="radio"]:checked) {
+    background-color: var(--admin-blue);
+    color:var(--admin-bg);
+}
+.admin-field-radio input[type="radio"] {
+	opacity:0;
+}
+.admin-field-radios > .admin-field-radio:first-child {
+	border-radius: var(--admin-radius-sm) 0 0 var(--admin-radius-sm);
+}
+.admin-field-radios > .admin-field-radio:last-child {
+	border-radius: 0 var(--admin-radius-sm) var(--admin-radius-sm) 0;
+	border-right: 1px solid var(--admin-border);
+}
+
+
+.admin-field-image-dimensions {
+	margin: -.2rem 0 .5rem;
+	font-size: .75rem;
+	color: var(--admin-text-secondary);
+}
+
+.admin-field-image {
+	display: flex;
+	flex-direction: column;
+	gap: .5rem;
+}
+
+.admin-field-image-preview {
+	max-width: 12rem;
+	max-height: 12rem;
+	border-radius: var(--admin-radius-sm);
+	box-shadow: inset 0 0 0 1px var(--admin-border);
+	object-fit: cover;
+}
+
+.admin-field-image input[type="file"] {
+	padding: .5rem;
+	min-height: auto;
+}
+
+.admin-field-image-msg {
+	margin: 0;
+	font-size: .8rem;
+	color: var(--admin-text-secondary);
+}
+
+.admin-field-image-msg.error {
+	color: var(--admin-red);
+	font-weight: 600;
+}
+
+.admin-field textarea, #text-form-value {
+	min-height: 5rem;
+	resize: vertical;
+}
+
+/*	Set apart from "normal" selects on purpose - a locale switch isn't a form
+ *	field, it's a view control (which translation you're looking at), so it
+ *	sits up with the legend instead of looking like just another input row */
+#elements-form-locale-select, #text-form-locale-select {
+	position: absolute;
+	top: .6rem;
+	right: 1rem;
+	width: auto;
+	max-width: 7rem;
+	min-height: 30px;
+	padding: .25rem 1.5rem .25rem .6rem;
+	background-color: rgba(0,122,255,.1);
+	background-position: calc(100% - 12px) calc(50% - 0px), calc(100% - 6px) calc(50% - 0px);
+	border-color: transparent;
+	color: var(--admin-blue);
+	font-size: .78rem;
+	font-weight: 600;
+}
+
+#elements-form-actions, .admin-form-actions {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: .5rem;
+	margin: 1rem 0;
+}
+.admin-form-actions button, #elements-form-actions button {
+	width:100%;
+}
+
+#elements-form-msg, #text-form-msg {
+	margin: 0;
+	flex-basis: 100%;
+	font-size: .85rem;
+	color: var(--admin-text-secondary);
+}
+
+.admin-error {
+	color: var(--admin-red);
+	font-weight: 600;
+}
+
+/* --------------------------------------------------------- Char counter */
+
+.char-counter {
+	text-align: right;
+	font-size: .75rem;
+	color: var(--admin-text-secondary);
+	margin: .3rem 0 1rem;
+}
+
+.char-counter-limit {
+	color: var(--admin-red);
+	font-weight: 600;
+}
+
+/* ---------------------------------------------------------- Html editor */
+
+.html-editor {
+	margin-bottom: 1rem;
+}
+
+.html-editor-toolbar {
+	display: flex;
+	gap: .3rem;
+	padding: .3rem;
+	margin-bottom: .5rem;
+	background: rgba(120,120,128,.12);
+	border-radius: var(--admin-radius-sm);
+	width: fit-content;
+}
+
+.html-editor-btn {
+	padding: .35rem .7rem;
+	min-height: 34px;
+	font-size: .85rem;
+	font-weight: 600;
+	background: transparent;
+	color: var(--admin-text);
+	box-shadow: none;
+}
+
+.html-editor-btn[data-tag="em"] {
+	font-style: italic;
+	font-weight: 400;
+}
+
+.html-editor-btn.active {
+	background: var(--admin-bg-elevated);
+	color: var(--admin-blue);
+	box-shadow: var(--admin-shadow);
+}
+
+.html-editor-content {
+	min-height: 3rem;
+	padding: .65rem .75rem;
+	border: 1px solid var(--admin-border);
+	border-radius: var(--admin-radius-sm);
+	background: var(--admin-bg);
+}
+
+.html-editor-content strong { font-weight: 700; }
+.html-editor-content em { font-style: italic; }
+.html-editor-content span { background: rgba(255,204,0,.35); border-radius: 3px; }
+.html-editor-content a { color: var(--admin-blue); text-decoration: underline; }
+
+.html-editor-linkbar {
+	display: flex;
+	gap: .4rem;
+	margin-top: .5rem;
+}
+
+.html-editor-linkbar[hidden] {
+	display: none;
+}
+
+.html-editor-linkbar input {
+	flex: 1;
+}
+
+/* ------------------------------------------------------------- Login page */
+
+#form-login {
+	max-width: 22rem;
+	margin: 3rem auto;
+	padding: 1.75rem 1.5rem;
+	background: var(--admin-bg-grouped);
+	border-radius: var(--admin-radius);
+	box-shadow: var(--admin-shadow);
+}
+
+#form-login #admin-localepicker {
+	display: block;
+	margin: 2rem auto 0;
+}
+
+#form-login #form-message {
+	margin: 0 0 1rem;
+}
+
+#form-login #submit {
+	width: 100%;
+	margin-top: .5rem;
+}
+
+#form-message {
+	font-size: .85rem;
+	color: var(--admin-text-secondary);
+	min-height: 1.2rem;
+}
+
+#form-message.pending {
+	color: var(--admin-blue);
+}
+
+#form-message.error {
+	color: var(--admin-red);
+}
+
+/* ------------------------------------------------------------ Submissions tab */
+
+#submissions-export {
+	display: block;
+	margin: 0 0 .75rem;
+}
+
+#submissions-entries {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+
+#submissions-entries li {
+	background: var(--admin-bg-grouped);
+	border-radius: var(--admin-radius);
+	box-shadow: var(--admin-shadow);
+	padding: 1rem;
+	margin: 0 0 .75rem;
+	cursor: pointer;
+}
+
+.submissions-entry-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: .75rem;
+	margin-bottom: .3rem;
+}
+
+.submissions-entry-date {
+	font-size: .8rem;
+	color: var(--admin-text-secondary);
+}
+
+.submissions-entry-cat {
+	display: inline-block;
+	padding: .15rem .5rem;
+	border-radius: 999px;
+	background: var(--admin-blue);
+	color: #fff;
+	font-size: .75rem;
+}
+
+.submissions-entry-name {
+	font-weight: 600;
+	margin-bottom: .3rem;
+}
+
+.submissions-entry-name a {
+	color: var(--admin-text);
+}
+
+.submissions-entry-message {
+	margin: 0;
+	white-space: pre-wrap;
+	color: var(--admin-text-secondary);
+	display: -webkit-box;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 1;
+	overflow: hidden;
+}
+
+.submissions-entry.expanded .submissions-entry-message {
+	display: block;
+	-webkit-line-clamp: unset;
+	overflow: visible;
+}
+
+.submissions-entry-toggle {
+	display: none;
+	margin-top: .4rem;
+	font-size: .8rem;
+	color: var(--admin-blue);
+}
+
+.submissions-entry.has-overflow .submissions-entry-toggle {
+	display: inline-block;
+}
+
+/* -------------------------------------------------------------- Newsletter tab */
+
+#newsletter-summary {
+	margin: 0 0 1rem;
+	font-weight: 600;
+}
+
+#newsletter-bcc {
+	margin: 0 0 1.5rem;
+}
+
+#newsletter-bcc label {
+	display: block;
+	font-size: .8rem;
+	color: var(--admin-text-secondary);
+	margin-bottom: .3rem;
+}
+
+#newsletter-bcc-field {
+	min-height: 80px;
+	resize: vertical;
+	font-family: ui-monospace, monospace;
+	font-size: .85rem;
+}
+
+#newsletter-bcc-actions {
+	display: flex;
+	align-items: center;
+	gap: .75rem;
+	margin-top: .5rem;
+}
+
+#newsletter-bcc-copied {
+	font-size: .85rem;
+	color: var(--admin-green);
+	font-weight: 600;
+}
+
+#newsletter-entries {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	background: var(--admin-bg-grouped);
+	border-radius: var(--admin-radius);
+	box-shadow: var(--admin-shadow);
+	overflow: hidden;
+}
+
+#newsletter-entries li {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: .75rem;
+	padding: .6rem 1rem;
+	border-bottom: 1px solid var(--admin-separator);
+}
+
+#newsletter-entries li:last-child {
+	border-bottom: none;
+}
+
+#newsletter-entries li a {
+	color: var(--admin-text);
+}
+
+.newsletter-entry-meta {
+	display: flex;
+	align-items: center;
+	gap: .75rem;
+	flex-shrink: 0;
+}
+
+.newsletter-entry-date {
+	font-size: .8rem;
+	color: var(--admin-text-secondary);
+}
+
+.newsletter-entry-delete {
+	min-height: auto;
+	padding: .3rem .75rem;
+	font-size: .8rem;
+	background: var(--admin-red);
+	color: #fff;
+	opacity: .75;
+}
+
+.newsletter-entry-delete:hover, .newsletter-entry-delete:active {
+	opacity: 1;
+}

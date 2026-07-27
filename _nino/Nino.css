@@ -1,0 +1,2141 @@
+/****************************************************************************************************
+ *
+ *
+ *			00 Theme
+ *
+ *
+ *			Design tokens as native CSS custom properties. --color-primary defaults
+ *			to _admin's blue - everything else is a project-neutral placeholder.
+ *			A project overrides whatever it needs in its own stylesheet (eg.
+ *			assets/style.theme01.css), loaded after this file, via a plain
+ *			:root { --token: value; } block - no build step, no load-order
+ *			juggling, the cascade resolves var() at compute time.
+ *
+ *			If a token still needs to stay _admin-editable per project, define it
+ *			as --token: [[/nino/path]]; instead of a literal value.
+ *
+ *			--text-1 .. --text-6 is a small type scale for titles/subtitles,
+ *			mirroring the existing --space-1 .. --space-6 numbering. Sizes that
+ *			aren't part of that heading hierarchy (buttons, form fields, badges,
+ *			one-off components) are intentionally left as plain literals.
+ *
+ *			--base-size and --text-4/-5/-6 step up at the 768px breakpoint (see
+ *			the @media block right below :root) - mobile-first fluid type, not
+ *			a fixed size scaled down for small screens. A project overriding
+ *			these needs to repeat the same @media step in its own stylesheet,
+ *			same as assets/style.theme01.css does.
+ *
+ *
+ ****************************************************************************************************/
+
+:root {
+	--color-primary: #4faae8;
+	--color-primary-text: #ffffff;
+	--color-secondary: var(--color-primary);
+	--color-text: #333333;
+	--color-title: var(--color-primary);
+	--color-subtitle: var(--color-text);
+	--color-background: #ffffff;
+	--color-header-bg: #ffffff;
+	--color-footer-bg: #1c1917;
+	--color-footer-text-main: #9ca3af;
+	--color-footer-text-legal: #666b74;
+	--color-border: #dddddd;
+	--color-background-dim: rgb(20 33 61 / 78%);
+	--color-section-default-bg: #ffffff;
+	--color-section-default-text: #222222;
+	--color-section-alt-bg: #eeeeee;
+	--color-section-alt-text: #111111;
+	--color-section-dark-bg: #14213d;
+	--color-section-dark-text: #ffffff;
+	--color-section-black-bg: #0a0e1a;
+	--color-section-black-text: #ffffff;
+	--color-error: #f44336;
+	--color-success: #4caf50;
+
+	--fontfamily-text: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+	--fontfamily-title: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+	--base-size: 16px;
+	--line-height: 1.5;
+	--fontsize-small: .75em;
+	--fontsize-big: 1.25em;
+	--fontsize-btn: 1rem;
+
+	--text-1: 1rem;
+	--text-2: 1.125rem;
+	--text-3: 1.25rem;
+	--text-4: 1.5rem;
+	--text-5: 1.8rem;
+	--text-6: 2.5rem;
+
+	--space-1: .5rem;
+	--space-2: 1rem;
+	--space-3: 2rem;
+	--space-4: 3rem;
+	--space-5: 5rem;
+	--space-6: 8rem;
+
+	--article-img-max-width: 12vw;
+	--article-img-max-height: 20vh;
+	--grid-max-width: 120rem;
+	--radius: .2rem;
+	--radius-small: .1rem
+}
+@media (min-width: 768px){
+  :root{
+		--base-size: 18px;
+    --text-4: 1.6rem;
+    --text-5: 2rem;
+    --text-6: 3rem;
+  }
+}
+
+
+/****************************************************************************************************
+ *
+ *
+ *			01 - Reset
+ *
+ *
+ *			A full cross-browser reset
+ *
+ *
+ ****************************************************************************************************/
+
+html {
+	font-family: var(--fontfamily-text);
+	box-sizing: border-box;
+	font-size: var(--base-size);
+	line-height: var(--line-height);
+	scroll-behavior: smooth;
+	-webkit-text-size-adjust: 100%;
+}
+
+*, *::before, *::after {
+	box-sizing: inherit;
+	margin: 0;
+	padding: 0;
+}
+
+body {
+	min-height: 100vh;
+	line-height: inherit;
+	color: var(--color-text);
+	background-color: var(--color-background);
+	width: 100%;
+	overflow-x: visible;
+}
+
+a {
+	color: inherit;
+	text-decoration: none;
+	background-color: transparent;
+}
+
+img {
+	max-width: 100%;
+	height: auto;
+	display: block;
+	border-style: none;
+}
+
+button,
+input,
+optgroup,
+select,
+textarea {
+	font-family: inherit;
+	font-size: 100%;
+	line-height: 1.15;
+	margin: 0;
+}
+
+button,
+input {
+	overflow: visible;
+}
+
+button,
+select {
+	text-transform: none;
+}
+
+button,
+[type="button"],
+[type="reset"],
+[type="submit"] {
+	-webkit-appearance: button;
+	cursor: pointer;
+}
+
+[type="checkbox"],
+[type="radio"] {
+	box-sizing: border-box;
+	padding: 0;
+}
+
+fieldset {
+	padding: var(--space-3) 0;
+}
+
+legend {
+	box-sizing: border-box;
+	color: var(--color-text);
+	display: table;
+	max-width: 100%;
+	padding: 0;
+	white-space: normal;
+}
+
+progress {
+	vertical-align: baseline;
+	color: var(--color-primary);
+}
+
+textarea {
+	overflow: auto;
+}
+
+li {
+	list-style-type: none;
+}
+
+p {
+	padding: 0;
+	line-height: var(--line-height);
+}
+
+
+/****************************************************************************************************
+ *
+ *
+ *			02 Grid
+ *
+ *
+ *			flexbox, mobile-first designed
+ *
+ *
+ *			.ui-grid-row(--*), .ui-grid(-25, -33, -50, -66, -75, -100)
+ *			.ui-grid(-top, -middle, -bottom, -center)
+ *			.ui-grid(-s,-m, -l, -xl)(-25, -33, -50, -66, -75, -100)
+ *
+ *
+ ****************************************************************************************************/
+
+.ui-grid-row {
+	display: flex;
+	flex-wrap: wrap;
+	padding: 0 var(--space-2);
+	margin: 0 auto;
+	width: 100%;
+	max-width: var(--grid-max-width);
+	box-sizing: border-box;
+}
+
+.ui-grid--fullwidth {
+	padding-left: 0;
+	padding-right: 0;
+	max-width: none;
+}
+
+.ui-grid-25 { width: 25%; }
+.ui-grid-33 { width: calc(100% / 3); }
+.ui-grid-50 { width: 50%; }
+.ui-grid-66 { width: calc(100% / 1.5); }
+.ui-grid-75 { width: 75%; }
+.ui-grid-100 { width: 100%; }
+
+.ui-grid-top { align-items: flex-start; }
+.ui-grid-middle { align-items: center; }
+.ui-grid-bottom { align-items: flex-end; }
+.ui-grid-center { justify-content: center; }
+
+.ui-grid-row > * {
+	min-width: 0;
+	box-sizing: border-box;
+}
+
+@media (min-width: 640px) {
+	.ui-grid-s-25 { width: 25%; }
+	.ui-grid-s-33 { width: calc(100% / 3); }
+	.ui-grid-s-50 { width: 50%; }
+	.ui-grid-s-66 { width: calc(100% / 1.5); }
+	.ui-grid-s-75 { width: 75%; }
+	.ui-grid-s-100 { width: 100%; }
+}
+
+@media (min-width: 768px) {
+	.ui-grid-row {
+		padding: 0 var(--space-3);
+	}
+	.ui-grid--fullwidth {
+		padding-left: 0;
+		padding-right: 0;
+	}
+	.ui-grid-m-25 { width: 25%; }
+	.ui-grid-m-33 { width: calc(100% / 3); }
+	.ui-grid-m-50 { width: 50%; }
+	.ui-grid-m-66 { width: calc(100% / 1.5); }
+	.ui-grid-m-75 { width: 75%; }
+	.ui-grid-m-100 { width: 100%; }
+}
+
+@media (min-width: 1024px) {
+	.ui-grid-l-25 { width: 25%; }
+	.ui-grid-l-33 { width: calc(100% / 3); }
+	.ui-grid-l-50 { width: 50%; }
+	.ui-grid-l-66 { width: calc(100% / 1.5); }
+	.ui-grid-l-75 { width: 75%; }
+	.ui-grid-l-100 { width: 100%; }
+}
+
+@media (min-width: 1280px) {
+	.ui-grid-xl-25 { width: 25%; }
+	.ui-grid-xl-33 { width: calc(100% / 3); }
+	.ui-grid-xl-50 { width: 50%; }
+	.ui-grid-xl-66 { width: calc(100% / 1.5); }
+	.ui-grid-xl-75 { width: 75%; }
+	.ui-grid-xl-100 { width: 100%; }
+}
+
+/****************************************************************************************************
+ *
+ *
+ *			03 HTML Barebone
+ *
+ *
+ *			header, .ui-logo, footer
+ *			.js-scroll-header (fades/hides on scroll, see Nino.ui.js)
+ *
+ *
+ ****************************************************************************************************/
+
+header {
+	box-sizing: border-box;
+	position: fixed;
+	top: 0;
+	left: 0;
+	width: 100%;
+	z-index: 998;
+}
+/* logo + nav side by side, scoped to header so the generic .ui-grid-100
+   utility elsewhere is unaffected */
+header .ui-grid-100 {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--space-2);
+}
+.ui-logo {
+	display: block;
+	width: 10vw;
+	height: 3vw;
+	min-width:150px;
+	min-height:60px;
+	margin: var(--space-1);
+	flex-shrink: 0;
+	background-repeat:no-repeat;
+	background-size:contain;
+	background-position:center;
+}
+.ui-logo img,
+.ui-logo svg {
+	width: 100%;
+	height: auto;
+}
+footer {
+	width: 100%;
+	box-sizing: border-box;
+	background:var(--color-footer-bg);
+	font-size:.8em;
+}
+.ui-footer-main {
+	color:var(--color-footer-text-main);
+	padding: var(--space-3) var(--space-3) 0;
+}
+.ui-footer-legal {
+	color:var(--color-footer-text-legal);
+	padding: var(--space-1) var(--space-3);
+}
+.ui-footer-title {
+	color:var(--color-section-dark-text);
+	font-size:.9rem;
+	text-transform:uppercase;
+	padding-bottom: var(--space-1);
+}
+.ui-footer-logo {
+	opacity:.7;
+	max-width:8rem;
+}
+.ui-footer-getintouch li {
+	padding-bottom: var(--space-1);
+	display:flex;
+}
+.ui-footer-getintouch .ui-icon {
+	fill:var(--color-section-dark-text);
+	margin-right: var(--space-1);
+}
+.ui-footer-localepicker {
+  display: flex;
+  justify-content: flex-end;
+  gap:var(--space-4);
+}
+
+/* header is position:fixed, so main needs top padding to avoid its content
+   being covered - except when the page opens with a cover/parallax hero,
+   which is designed to sit flush behind the (semi-transparent) header */
+main {
+	padding-top: var(--space-6);
+}
+main:has(> .js-cover.ui-atf:first-child),
+main:has(> .js-parallex.ui-atf:first-child),
+main:has(> .ui-atf--fullscreen:first-child) {
+	padding-top: 0;
+}
+
+/* Scroll-driven header show/hide, opt-in via .js-scroll-header */
+.js-scroll-header {
+	overflow: hidden;
+	max-height: 200px;
+	opacity: .6;
+	transition: max-height .4s, opacity .4s;
+	background-color:var(--color-header-bg);
+}
+body.js-scroll-atf .js-scroll-header {
+	opacity: 1;
+	background-color:transparent;
+}
+.js-scroll-header:hover {
+	opacity: 1;
+}
+body.js-scroll-down .js-scroll-header {
+	max-height: 0;
+}
+
+
+/****************************************************************************************************
+ *
+ *
+ *			04 Content
+ *
+ *
+ *			.ui-atf(--fullscreen), .ui-atf(-title, -subtitle, -arrowdown)
+ *			.ui-section(--dark, --black, --primary, --alt, --fullwidth, --border-1/2/3), .ui-section(-title, -subtitle)
+ *			.ui-article(--alt, --fullwidth), .ui-article(-content, -title, -subtitle, -descr, -img, -price)
+ *
+ *
+ ****************************************************************************************************/
+
+.ui-atf {
+	position: relative;
+}
+.ui-atf-title {
+	font-family: var(--fontfamily-title);
+	font-size: calc( var(--text-4) *1.2 );
+	color: var(--color-title);
+	margin-bottom: var(--space-3);
+	line-height: calc( var(--text-4) *1.3 );
+}
+.ui-atf-subtitle {
+	font-family: var(--fontfamily-subtitle);
+	font-size: calc( var(--text-2) *1.2 );
+	color: var(--color-subtitle);
+	opacity: .8;
+	line-height: calc( var(--text-2) *1.3 );
+	margin-bottom: var(--space-3);
+}
+/*	Self-contained: the chevron is a background SVG (currentColor, so it
+ *	always matches the hero's own text color - dark hero, light hero,
+ *	whatever), so using it is just <button class="ui-atf-arrowdown"
+ *	data-arrow-target="#some-id">label</button> - no icon markup, no extra
+ *	CSS file. Click behavior (smooth-scroll to data-arrow-target) is wired
+ *	in Nino.ui.js */
+.ui-atf-arrowdown {
+	position: absolute;
+	bottom: var(--space-2);
+	left: 50%;
+	transform: translateX(-50%);
+	z-index: 100;
+	width: 2.5rem;
+	height: 2.5rem;
+	padding: 0;
+	border: none;
+	background-color: transparent;
+	background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 330 330'%3E%3Cpath fill='%23fff' d='M325.607 79.393c-5.857-5.857-15.355-5.858-21.213.001L165.004 218.787 25.607 79.393c-5.857-5.857-15.355-5.858-21.213.001-5.858 5.858-5.858 15.355 0 21.213l150.004 150c2.813 2.813 6.628 4.393 10.606 4.393s7.794-1.581 10.606-4.394l149.996-150c5.859-5.857 5.859-15.355.001-21.213z'/%3E%3C/svg%3E");
+	background-repeat: no-repeat;
+	background-position: center;
+	background-size: contain;
+	color: inherit;
+	cursor: pointer;
+	animation: ui-atf-arrowdown-bounce 1.8s ease-in-out infinite;
+}
+@keyframes ui-atf-arrowdown-bounce {
+	0%, 100% { transform: translateX(-50%) translateY(0); }
+	50% { transform: translateX(-50%) translateY(.4rem); }
+}
+
+/* Fullscreen hero without an image - js-cover/js-parallex size themselves
+   via data-cover-height (JS), this is the CSS-only equivalent for a plain
+   ui-atf section with no image to size against */
+.ui-atf--fullscreen {
+	min-height: 100vh;
+	display: flex;
+	align-items: center;
+	box-sizing: border-box;
+}
+
+.ui-section {
+	padding: var(--space-4) 0;
+	background-color: var(--color-section-default-bg);
+	color: var(--color-section-default-text);
+	box-sizing: border-box;
+	width: 100%;
+}
+.ui-section--fullwidth {
+	padding-left: 0;
+	padding-right: 0;
+	margin: 0;
+}
+.ui-section--fullwidth {
+	padding-top: 0;
+	padding-bottom: 0;
+	margin: 0;
+}
+.ui-section--dark {
+	background-color: var(--color-section-dark-bg);
+	color: var(--color-section-dark-text);
+}
+.ui-section--black {
+	background-color: var(--color-section-black-bg);
+	color: var(--color-section-black-text);
+}
+.ui-section--primary {
+	background-color: var(--color-primary);
+	color: var(--color-primary-text);
+}
+.ui-section--alt {
+	background-color: var(--color-section-alt-bg);
+	color: var(--color-section-alt-text);
+}
+.ui-section--dark a:not(.ui-btn) {
+	color: var(--color-section-dark-text);
+}
+.ui-section--black a:not(.ui-btn) {
+	color: var(--color-section-black-text);
+}
+.ui-section--alt a:not(.ui-btn) {
+	color: var(--color-section-alt-text);
+}
+.ui-section--primary a:not(.ui-btn) {
+	color: var(--color-primary-text);
+}
+
+.ui-section-title {
+	font-family: var(--fontfamily-title);
+	text-align: center;
+	font-size: var(--text-4);
+	color: var(--color-title);
+	line-height: calc( var(--text-4) *1.3 );
+	margin: var(--space-1) 0;
+}
+.ui-section-subtitle {
+	font-family: var(--fontfamily-subtitle);
+	text-align: center;
+	font-size: var(--text-2);
+	color: var(--color-subtitle);
+	line-height: calc( var(--text-2) *1.3 );
+	opacity: .8;
+	margin-bottom: var(--space-2);
+}
+.ui-section--alt .ui-section-title, .ui-section--alt .ui-section-subtitle,
+.ui-section--alt .ui-atf-title, .ui-section--alt .ui-atf-subtitle, .ui-section--alt .ui-atf-arrowdown {
+	color: var(--color-section-alt-text);
+}
+.ui-section--dark .ui-section-title, .ui-section--dark .ui-section-subtitle,
+.ui-section--dark .ui-atf-title, .ui-section--dark .ui-atf-subtitle, .ui-section--dark .ui-atf-arrowdown {
+	color: var(--color-section-dark-text);
+}
+.ui-section--black .ui-section-title, .ui-section--black .ui-section-subtitle,
+.ui-section--black .ui-atf-title, .ui-section--black .ui-atf-subtitle, .ui-section--black .ui-atf-arrowdown {
+	color: var(--color-section-black-text);
+}
+.ui-section--primary .ui-section-title, .ui-section--primary .ui-section-subtitle,
+.ui-section--primary .ui-atf-title, .ui-section--primary .ui-atf-subtitle, .ui-section--primary .ui-atf-arrowdown {
+	color: var(--color-primary-text);
+}
+.js-cover--dim .ui-section-title, .js-cover--dim .ui-section-subtitle,
+.js-cover--dim .ui-atf-title, .js-cover--dim .ui-atf-subtitle, .js-cover--dim .ui-atf-arrowdown {
+	color: var(--color-section-black-text);
+}
+
+.ui-section--border-1 { border-bottom: 1px solid rgba(0,0,0,.1); }
+.ui-section--border-2 { border-bottom: .25rem solid rgba(0,0,0,.1); }
+.ui-section--border-3 { border-bottom: .5rem solid rgba(0,0,0,.1); }
+.ui-section--dark.ui-section--border-1,
+.ui-section--dark.ui-section--border-2,
+.ui-section--dark.ui-section--border-3,
+.ui-section--black.ui-section--border-1,
+.ui-section--black.ui-section--border-2,
+.ui-section--black.ui-section--border-3 {
+	border-color: rgba(255,255,255,.1);
+}
+
+@media (min-width: 768px) {
+	.ui-atf-title { font-size: var(--text-5); line-height: calc( var(--text-5) *1.2 );}
+	.ui-atf-subtitle { font-size: var(--text-3); line-height: calc( var(--text-3) *1.2 );}
+	.ui-section { padding: var(--space-5) var(--space-3); }
+	.ui-section--fullwidth { padding-left: 0; padding-right: 0; }
+	.ui-section--fullheight { padding-top: 0; padding-bottom: 0; }
+	.ui-section--fullheight .ui-article-content { padding: var(--space-1); }
+}
+
+.ui-article {
+	margin: 0 0 var(--space-1);
+	padding: 0 0 var(--space-1);
+	box-sizing: border-box;
+	border-radius: var(--radius-small);
+}
+.ui-article--fullwidth, .ui-article--fullwidth.ui-article--alt {
+	padding-left: 0;
+	padding-right: 0;
+	padding-top: 0;
+}
+.ui-article--alt {
+	background-color: rgba(0,0,0,.05);
+	color: var(--color-section-alt-text);
+	border: 1px solid var(--color-border);
+	padding: var(--space-1);
+}
+.ui-section--alt .ui-article--alt {
+	background-color: var(--color-section-default-bg);
+	color: var(--color-section-default-text);
+}
+.ui-section--dark .ui-article--alt, .ui-section--dark.ui-article--alt {
+	background-color: rgba(255,255,255,.1);
+	color: var(--color-section-dark-text);
+}
+
+.ui-article-content {
+	padding: var(--space-1) var(--space-2);
+	padding-top: var(--space-1);
+	box-sizing: border-box;
+}
+
+.ui-article-title {
+	font-family: var(--fontfamily-title);
+	color: var(--color-title);
+}
+
+.ui-article-title, .ui-article-subtitle, .ui-article-descr {
+	margin-bottom: var(--space-2);
+}
+.ui-article-title { font-size: var(--text-3); }
+.ui-article-subtitle { font-size: var(--text-2); }
+.ui-article-descr { font-size: var(--text-1); line-height: var(--line-height); }
+
+.ui-article-img {
+	height: auto;
+	width: 100%;
+	object-fit: cover;
+	align-self: stretch;
+	margin-bottom: var(--space-1);
+	border-radius: calc( var(--radius-small) *.7);
+}
+.ui-article-img--maxheight {
+	max-height: var(--article-img-max-height);
+}
+.ui-article--fullwidth .ui-article-img {
+	border-radius:var(--radius-small) var(--radius-small) 0 0;
+}
+.ui-section--fullheight .ui-article-content {
+	padding: var(--space-4) var(--space-2) var(--space-3);
+}
+/* Price display for an .ui-article used as a product/service card - distinct
+   from .ui-pricing-price (used inside .ui-pricing-item, see 05 Helper), for
+   when a priced item is presented as a regular article-grid card instead of
+   a dedicated pricing table */
+.ui-article-price {
+	text-align:center;
+	font-size: 2rem;
+	font-weight: bold;
+	color: var(--color-primary);
+}
+
+/* Multi-column layout, one breakpoint tier at a time (eg. ui-article-cols-m
+   only switches to a row layout from the "m" breakpoint up) */
+.ui-article-cols {
+	display: flex;
+	flex-direction: row;
+	justify-content: center;
+	column-gap: var(--space-2);
+}
+.ui-article-cols > .ui-article-img {
+	max-height: none;
+	max-width: var(--article-img-max-width);
+}
+
+@media (min-width: 640px) {
+	.ui-article-cols-s { display: flex; flex-direction: row; justify-content: center; column-gap: var(--space-2); }
+	.ui-article-cols-s > .ui-article-img { max-height: none; max-width: var(--article-img-max-width); }
+}
+@media (min-width: 768px) {
+	.ui-article { margin: var(--space-1); padding: var(--space-1); }
+	.ui-article-cols-m { display: flex; flex-direction: row; justify-content: center; column-gap: var(--space-2); }
+	.ui-article-cols-m > .ui-article-img { max-height: none; max-width: var(--article-img-max-width); }
+}
+@media (min-width: 1024px) {
+	.ui-article-cols-l { display: flex; flex-direction: row; justify-content: center; column-gap: var(--space-2); }
+	.ui-article-cols-l > .ui-article-img { max-height: none; max-width: var(--article-img-max-width); }
+}
+@media (min-width: 1280px) {
+	.ui-article { padding: var(--space-2); }
+	.ui-article--wide { padding: var(--space-1); }
+	.ui-article--fullwidth { padding:0; }
+	.ui-article--fullwidth .ui-article-content { padding: var(--space-1) var(--space-2); }
+	.ui-article-cols-xl { display: flex; flex-direction: row; justify-content: center; column-gap: var(--space-2); }
+	.ui-article-cols-xl > .ui-article-img { max-height: none; max-width: var(--article-img-max-width); }
+}
+
+
+/****************************************************************************************************
+ *
+ *
+ *			05 Helper
+ *
+ *
+ *			.ui-icon, .ui-btn(--*),
+ *      .ui-form-*, .ui-img-*
+ *			.ui-m-*, .ui-mt-*, .ui-mb-*, .ui-ml-*, .ui-mr-*, .ui-p-*, .ui-pt-*, .ui-pb-*
+ *			.ui-text(*, -s, -m, -l, -xl)(-left, -center, -right), .ui-font(-small, -big)
+ *			.ui-opacity(-10, -20, ..., -90)
+ *			.ui-(-hidden, -visible)(*, -s, -m, -l, -xl)
+ *			.ui-fx(-vertical-bounce)
+ *			.ui-badge(--pill, --primary, --success, --error)
+ *			.ui-breadcrumbs
+ *			.ui-video(--4-3)
+ *			.ui-alert(--success, --error, --info)
+ *			.js-stat-counter, .js-back-to-top
+ *			.ui-pricing-row, .ui-pricing-item(--featured), .ui-pricing-title, .ui-pricing-price
+ *			.ui-accordion, .ui-accordion-trigger, .ui-accordion-panel
+ *			.ui-pagination
+ *			.ui-logos, .ui-logos-item
+ *			.ui-gallery, .ui-gallery-item(--wide, --tall)
+ *			.ui-feature-list, .ui-feature-item
+ *			.ui-timeline, .ui-timeline-step, .ui-timeline-number
+ *			.ui-video-poster, .ui-video-play
+ *			.ui-img-background(--dim), .ui-img-background-content
+ *
+ *
+ ****************************************************************************************************/
+
+/* Icons */
+.ui-icon {
+	width: 32px;
+	height: 32px;
+	position: relative;
+	top: 2px;
+	color: var(--color-text);
+}
+.ui-section--dark .ui-icon, .ui-section--black .ui-icon {
+	fill: var(--color-section-dark-text);
+	color: var(--color-section-dark-text);
+}
+.ui-icon.small {
+	width: 16px;
+	height: 16px;
+}
+
+/* Buttons */
+.ui-btn {
+	display: inline-block;
+	padding: var(--space-1) var(--space-2);
+	border-radius: var(--radius);
+	text-align: center;
+	font-size: var(--fontsize-btn);
+	font-weight:bold;
+	cursor: pointer;
+	transition: background-color .2s ease, color .2s ease, border-color .2s ease;
+}
+.ui-btn--light {
+	background-color: var(--color-background);
+	color: var(--color-text);
+	border: 1px solid var(--color-border);
+}
+.ui-btn--light:hover, .ui-btn--light:focus {
+	background-color: var(--color-border);
+}
+.ui-btn--dark {
+	background-color: var(--color-section-dark-bg);
+	color: var(--color-section-dark-text);
+}
+.ui-btn--dark:hover, .ui-btn--dark:focus {
+	background-color: var(--color-section-black-bg);
+	color: var(--color-section-black-text);
+}
+.ui-btn--primary {
+	background-color: var(--color-primary);
+	color: var(--color-primary-text);
+	border: 1px solid var(--color-primary);
+	transition: opacity .3s;
+}
+.ui-btn--primary:hover, .ui-btn--primary:focus {
+	background-color: var(--color-primary);
+	opacity: .85;
+}
+.ui-btn--outline {
+	background-color: transparent;
+	color: var(--color-primary);
+	border: 1px solid var(--color-primary);
+}
+.ui-btn--outline:hover, .ui-btn--outline:focus {
+	background-color: var(--color-primary);
+	color: var(--color-primary-text);
+}
+.ui-btn--small {
+	padding: calc( var(--space-1) *.7) calc( var(--space-2) * .7 );
+	font-size: calc( var(--fontsize-btn) * .7);
+	border-radius: calc( var(--radius) * .7 );
+}
+.ui-btn--big {
+	padding: calc( var(--space-1) *1.3) calc( var(--space-2) * 1.3 );
+	font-size: calc( var(--fontsize-btn) * 1.3);
+	border-radius: calc( var(--radius) * 1.3 );
+}
+
+/* Form fields - generic input skin, independent of whatever wires the
+   actual submit (see docs/design-system.md re: contact form) */
+.ui-form-input, .ui-form-textarea, .ui-form-select {
+	width: 100%;
+	padding: var(--space-1);
+	border: 1px solid var(--color-border);
+	border-radius: var(--radius-small);
+	font-size: 1rem;
+	box-sizing: border-box;
+	transition: border-color .2s ease;
+	margin-bottom: var(--space-1);
+}
+.ui-form-input:focus, .ui-form-textarea:focus, .ui-form-select:focus {
+	outline: none;
+	border-color: var(--color-primary);
+}
+.ui-form-textarea {
+	min-height: 6rem;
+	resize: vertical;
+}
+.ui-form-select {
+	appearance: none;
+	background-repeat: no-repeat;
+	background-position: right .5rem center;
+	background-size: 1.5rem;
+	padding-right: 2.5rem;
+}
+.ui-form-message {
+	font-size: .875rem;
+	margin-top: .5rem;
+}
+.ui-form.error .ui-form-message { color: var(--color-error); }
+.ui-form.success .ui-form-message, .ui-form.existing .ui-form-message { color: var(--color-success); }
+.ui-form.pending .ui-form-submit { opacity: .6; pointer-events: none; }
+
+.js-newsletter-form .ui-form-input {
+	max-width:45vw;
+	min-width:300px;
+}
+
+/* Img tools */
+.ui-img-cover {
+	position: relative;
+}
+.ui-img-cover > img {
+	object-fit: cover;
+	width: 100%;
+	height: 100%;
+}
+/* A ui-badge placed as a sibling of the img instead of inside it floats
+   free in the top-right corner - eg. "New"/a discount/a category label */
+.ui-img-cover > .ui-badge {
+	position: absolute;
+	top: var(--space-1);
+	right: var(--space-1);
+}
+/* z-index:0 makes this its own stacking context, so the img/overlay/content
+   z-indexes below only ever order against each other - not escape to
+   compete with sibling sections (same reasoning as .js-cover below) */
+.ui-img-background {
+	position: relative;
+	z-index: 0;
+}
+.ui-img-background > img {
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	z-index: 1;
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+
+
+/* Spacing */
+.ui-m-0 { margin: 0; }
+.ui-m-1 { margin: var(--space-1); }
+.ui-m-2 { margin: var(--space-2); }
+.ui-m-3 { margin: var(--space-3); }
+.ui-m-4 { margin: var(--space-4); }
+.ui-m-5 { margin: var(--space-5); }
+.ui-m-6 { margin: var(--space-6); }
+.ui-mt-0 { margin-top: 0; }
+.ui-mt-1 { margin-top: var(--space-1); }
+.ui-mt-2 { margin-top: var(--space-2); }
+.ui-mt-3 { margin-top: var(--space-3); }
+.ui-mt-4 { margin-top: var(--space-4); }
+.ui-mt-5 { margin-top: var(--space-5); }
+.ui-mt-6 { margin-top: var(--space-6); }
+.ui-mb-0 { margin-bottom: 0; }
+.ui-mb-1 { margin-bottom: var(--space-1); }
+.ui-mb-2 { margin-bottom: var(--space-2); }
+.ui-mb-3 { margin-bottom: var(--space-3); }
+.ui-mb-4 { margin-bottom: var(--space-4); }
+.ui-mb-5 { margin-bottom: var(--space-5); }
+.ui-mb-6 { margin-bottom: var(--space-6); }
+.ui-ml-0 { margin-left: 0; }
+.ui-ml-1 { margin-left: var(--space-1); }
+.ui-ml-2 { margin-left: var(--space-2); }
+.ui-ml-3 { margin-left: var(--space-3); }
+.ui-ml-4 { margin-left: var(--space-4); }
+.ui-ml-5 { margin-left: var(--space-5); }
+.ui-ml-6 { margin-left: var(--space-6); }
+.ui-mr-0 { margin-right: 0; }
+.ui-mr-1 { margin-right: var(--space-1); }
+.ui-mr-2 { margin-right: var(--space-2); }
+.ui-mr-3 { margin-right: var(--space-3); }
+.ui-mr-4 { margin-right: var(--space-4); }
+.ui-mr-5 { margin-right: var(--space-5); }
+.ui-mr-6 { margin-right: var(--space-6); }
+.ui-p-0 { padding: 0; }
+.ui-p-1 { padding: var(--space-1); }
+.ui-p-2 { padding: var(--space-2); }
+.ui-p-3 { padding: var(--space-3); }
+.ui-p-4 { padding: var(--space-4); }
+.ui-p-5 { padding: var(--space-5); }
+.ui-p-6 { padding: var(--space-6); }
+.ui-pt-0 { padding-top: 0; }
+.ui-pt-1 { padding-top: var(--space-1); }
+.ui-pt-2 { padding-top: var(--space-2); }
+.ui-pt-3 { padding-top: var(--space-3); }
+.ui-pt-4 { padding-top: var(--space-4); }
+.ui-pt-5 { padding-top: var(--space-5); }
+.ui-pt-6 { padding-top: var(--space-6); }
+.ui-pb-0 { padding-bottom: 0; }
+.ui-pb-1 { padding-bottom: var(--space-1); }
+.ui-pb-2 { padding-bottom: var(--space-2); }
+.ui-pb-3 { padding-bottom: var(--space-3); }
+.ui-pb-4 { padding-bottom: var(--space-4); }
+.ui-pb-5 { padding-bottom: var(--space-5); }
+.ui-pb-6 { padding-bottom: var(--space-6); }
+
+/* Text alignment */
+.ui-text-left { text-align: left; }
+.ui-text-center { text-align: center; }
+.ui-text-right { text-align: right; }
+
+@media (min-width: 640px) {
+	.ui-text-s-left { text-align: left; }
+	.ui-text-s-center { text-align: center; }
+	.ui-text-s-right { text-align: right; }
+}
+@media (min-width: 768px) {
+	.ui-text-m-left { text-align: left; }
+	.ui-text-m-center { text-align: center; }
+	.ui-text-m-right { text-align: right; }
+}
+@media (min-width: 1024px) {
+	.ui-text-l-left { text-align: left; }
+	.ui-text-l-center { text-align: center; }
+	.ui-text-l-right { text-align: right; }
+}
+@media (min-width: 1280px) {
+	.ui-text-xl-left { text-align: left; }
+	.ui-text-xl-center { text-align: center; }
+	.ui-text-xl-right { text-align: right; }
+}
+
+/* Font size */
+.ui-font-small { font-size: var(--fontsize-small); }
+.ui-font-big { font-size: var(--fontsize-big); }
+
+/* Opacity */
+.ui-opacity-10 { opacity: .1; }
+.ui-opacity-20 { opacity: .2; }
+.ui-opacity-30 { opacity: .3; }
+.ui-opacity-40 { opacity: .4; }
+.ui-opacity-50 { opacity: .5; }
+.ui-opacity-60 { opacity: .6; }
+.ui-opacity-70 { opacity: .7; }
+.ui-opacity-80 { opacity: .8; }
+.ui-opacity-90 { opacity: .9; }
+
+/* Visibility */
+.ui-hidden { display: none !important; }
+.ui-invisible { visibility: hidden !important; }
+.ui-sr-only {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	padding: 0;
+	margin: -1px;
+	overflow: hidden;
+	clip: rect(0, 0, 0, 0);
+	white-space: nowrap;
+	border: 0;
+}
+
+.ui-hidden-s { display: none !important; }
+.ui-visible-s { display: block !important; }
+
+@media (min-width: 768px) {
+	.ui-visible-m { display: block !important; }
+	.ui-hidden-m { display: none !important; }
+}
+@media (min-width: 1024px) {
+	.ui-visible-l { display: block !important; }
+	.ui-hidden-l { display: none !important; }
+}
+@media (min-width: 1280px) {
+	.ui-visible-xl { display: block !important; }
+	.ui-hidden-xl { display: none !important; }
+}
+
+/* Animations */
+.ui-fx-verticale_bounce {
+	animation: ui-fx-verticale_bounce 7s cubic-bezier(1, -0.66, 0.31, 1.68) infinite;
+}
+@keyframes ui-fx-verticale_bounce {
+	0%   { transform: translateY(0); }
+	10%  { transform: translateY(var(--space-1)); }
+	20%  { transform: translateY(0); }
+	30%  { transform: translateY(var(--space-1)); }
+	40%  { transform: translateY(0); }
+}
+
+/* Badge / pill */
+.ui-badge {
+	display: inline-block;
+	padding: .2em .6em;
+	border-radius: var(--radius);
+	font-size: var(--fontsize-small);
+	font-weight: bold;
+	line-height: 1.4;
+	background-color: var(--color-border);
+	color: var(--color-text);
+}
+.ui-badge--pill { border-radius: 999px; }
+.ui-badge--primary { background-color: var(--color-primary); color: var(--color-primary-text); }
+.ui-badge--success { background-color: var(--color-success); color: var(--color-primary-text); }
+.ui-badge--error { background-color: var(--color-error); color: var(--color-primary-text); }
+
+/* Breadcrumbs */
+.ui-breadcrumbs {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	font-size: var(--fontsize-small);
+}
+.ui-breadcrumbs li:not(:last-child)::after {
+	content: "\203A";
+	margin: 0 var(--space-1);
+	color: var(--color-border);
+}
+.ui-breadcrumbs a {
+	color: var(--color-text);
+	text-decoration: none;
+}
+.ui-breadcrumbs a:hover {
+	color: var(--color-primary);
+}
+.ui-breadcrumbs li:last-child {
+	color: var(--color-primary);
+	font-weight: bold;
+}
+
+/* List variants - plain content lists (Breadcrumbs/Pagination above are
+   structural nav lists with their own fixed shape, not content) */
+.ui-list {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-1);
+}
+.ui-list--check li {
+	position: relative;
+	padding-left: var(--space-3);
+}
+.ui-list--check li::before {
+	content: "\2713";
+	position: absolute;
+	left: 0;
+	color: var(--color-success);
+	font-weight: bold;
+}
+.ui-list--numbered {
+	counter-reset: ui-list-numbered;
+}
+.ui-list--numbered li {
+	counter-increment: ui-list-numbered;
+	position: relative;
+	min-height: var(--space-3);
+	padding-left: var(--space-4);
+	display: flex;
+	align-items: center;
+}
+.ui-list--numbered li::before {
+	content: counter(ui-list-numbered);
+	position: absolute;
+	left: 0;
+	width: var(--space-3);
+	height: var(--space-3);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: 50%;
+	background-color: var(--color-primary);
+	color: var(--color-primary-text);
+	font-size: var(--fontsize-small);
+	font-weight: bold;
+}
+
+/* Video embed wrapper - responsive iframe/video, default 16:9 */
+.ui-video {
+	position: relative;
+	width: 100%;
+	aspect-ratio: 16 / 9;
+	overflow: hidden;
+}
+.ui-video--4-3 { aspect-ratio: 4 / 3; }
+.ui-video iframe,
+.ui-video video {
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 100%;
+	height: 100%;
+	border: 0;
+}
+
+/* Alert / inline feedback (static - form-specific feedback is .ui-form-message) */
+.ui-alert {
+	padding: var(--space-2);
+	border-radius: var(--radius);
+	border: 1px solid var(--color-border);
+	background-color: var(--color-background);
+	color: var(--color-text);
+}
+.ui-alert--success { border-color: var(--color-success); color: var(--color-success); }
+.ui-alert--error { border-color: var(--color-error); color: var(--color-error); }
+.ui-alert--info { border-color: var(--color-primary); color: var(--color-primary); }
+
+/* Stat counter - see Nino.ui.js for the count-up behavior */
+.js-stat-counter {
+	font-size: 2.5rem;
+	font-weight: bold;
+	color: var(--color-primary);
+	margin-top:var(--space-1);
+}
+
+/* Back-to-top button - visibility driven by body.js-scroll-atf/-btf, see Nino.ui.js */
+.js-back-to-top {
+	position: fixed;
+	right: var(--space-2);
+	bottom: var(--space-2);
+	z-index: 997;
+	opacity: 0;
+	pointer-events: none;
+	transform: translateY(10px);
+	transition: opacity .3s, transform .3s;
+}
+body.js-scroll-btf .js-back-to-top {
+	opacity: 1;
+	pointer-events: auto;
+	transform: translateY(0);
+}
+
+/* Cookie consent banner - shown until Nino.cookie's 'nino_consent' is
+   set, see Nino.ui.js. A bottom bar, not a full-page overlay - the
+   consent choice shouldn't block reading the page while deciding */
+.js-cookie-banner {
+	position: fixed;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	z-index: 9997;
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--space-2);
+	padding: var(--space-2);
+	background-color: var(--color-section-black-bg);
+	color: var(--color-section-black-text);
+	box-shadow: 0 -2px 8px rgba(0, 0, 0, .2);
+	transform: translateY(100%);
+	transition: transform .3s;
+}
+.js-cookie-banner--visible {
+	transform: translateY(0);
+}
+.js-cookie-banner a {
+	text-decoration: underline;
+}
+.js-cookie-banner-actions {
+	display: flex;
+	flex-shrink: 0;
+	gap: var(--space-1);
+}
+
+/* Table - .ui-table-wrap scrolls horizontally on narrow viewports instead
+   of letting a wide table force the whole page wide (same reasoning as the
+   grid: never trust a fixed-width content block on mobile) */
+.ui-table-wrap {
+	width: 100%;
+	overflow-x: auto;
+}
+.ui-table {
+	width: 100%;
+	border-collapse: collapse;
+	text-align: left;
+}
+.ui-table th,
+.ui-table td {
+	padding: var(--space-1) var(--space-2);
+	border-bottom: 1px solid var(--color-border);
+}
+.ui-table th {
+	font-size: var(--fontsize-small);
+	text-transform: uppercase;
+	color: var(--color-text);
+}
+.ui-table--striped tbody tr:nth-child(even) {
+	background-color: var(--color-section-alt-bg);
+}
+.ui-table--bordered th,
+.ui-table--bordered td {
+	border: 1px solid var(--color-border);
+}
+
+/* Pricing table - card per pricelist entry (via the "elements" shortcode) */
+.ui-pricing-row {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--space-2);
+}
+.ui-pricing-item {
+	flex: 1 1 240px;
+	padding: var(--space-2);
+	border: 1px solid var(--color-border);
+	border-radius: var(--radius);
+	text-align: center;
+}
+.ui-pricing-item--featured {
+	border-color: var(--color-primary);
+	border-width: 2px;
+}
+.ui-pricing-title {
+	font-size: 1.125rem;
+	margin-bottom: var(--space-1);
+}
+.ui-pricing-price {
+	font-size: 2rem;
+	font-weight: bold;
+	color: var(--color-primary);
+}
+.ui-pricing-item--featured .ui-pricing-title {
+	font-size: 1.8rem;
+	margin-bottom: var(--space-1);
+}
+.ui-pricing-item--featured .ui-pricing-price {
+	font-size: 2.8rem;
+	color: var(--color-primary);
+}
+
+/* Accordion - plain <details>/<summary>, no JS needed. Multiple <details>
+   sharing the same name="..." attribute behave as an exclusive group
+   natively in current browsers (older browsers just allow several open
+   at once - harmless fallback) */
+.ui-accordion {
+	border-bottom: 1px solid var(--color-border);
+}
+.ui-accordion-trigger {
+	padding: var(--space-2) 0;
+	cursor: pointer;
+	font-weight: bold;
+	list-style: none;
+}
+.ui-accordion-trigger::-webkit-details-marker {
+	display: none;
+}
+.ui-accordion-trigger::before {
+	content: "+";
+	display: inline-block;
+	width: 1em;
+	color: var(--color-primary);
+}
+.ui-accordion[open] > .ui-accordion-trigger::before {
+	content: "\2212";
+}
+.ui-accordion-panel {
+	padding: 0 0 var(--space-2) 1em;
+	transition: opacity .2s ease, transform .2s ease;
+}
+.ui-accordion[open] > .ui-accordion-panel {
+	transform: translateY(0);
+}
+/* Fades the panel in as it's revealed - degrades gracefully (instant show)
+   in browsers without @starting-style support */
+@starting-style {
+	.ui-accordion[open] > .ui-accordion-panel {
+		opacity: 0;
+		transform: translateY(-4px);
+	}
+}
+
+/* Pagination */
+.ui-pagination {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--space-1);
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+.ui-pagination a {
+	display: inline-block;
+	min-width: 2rem;
+	padding: var(--space-1);
+	text-align: center;
+	text-decoration: none;
+	color: var(--color-text);
+	border-radius: var(--radius);
+}
+.ui-pagination a:hover {
+	background-color: var(--color-border);
+}
+.ui-pagination li.active a {
+	background-color: var(--color-primary);
+	color: var(--color-primary-text);
+}
+
+/* Logo/Partner strip - text placeholders standing in for real logo
+   images (SVG/PNG), grayscale-to-color on hover */
+.ui-logos {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: center;
+	gap: var(--space-4);
+}
+.ui-logos-item {
+	font-size: 1.25rem;
+	font-weight: 700;
+	opacity: .5;
+	filter: grayscale(1);
+	transition: opacity .2s ease, filter .2s ease;
+}
+.ui-logos-item:hover {
+	opacity: 1;
+	filter: grayscale(0);
+}
+
+/* Gallery/Mosaic grid - fixed row height, items span extra columns/rows
+   via --wide/--tall to break up the grid */
+.ui-gallery {
+	display: grid;
+	grid-template-columns: repeat(2, 1fr);
+	grid-auto-rows: 160px;
+	gap: var(--space-1);
+	max-width: var(--grid-max-width);
+	margin: 0 auto;
+	padding: 0 var(--space-1);
+	box-sizing: border-box;
+}
+.ui-gallery-item {
+	position: relative;
+	overflow: hidden;
+	border-radius: var(--radius);
+}
+.ui-gallery-item img {
+	display: block;
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	transition: transform .4s ease;
+}
+.ui-gallery-item:hover img {
+	transform: scale(1.05);
+}
+/* A gallery item's img optionally sits inside a js-modal-trigger button
+   instead of being a plain, non-interactive tile - reset the button back to
+   filling the grid cell exactly like the plain-img case did */
+.ui-gallery-item button {
+	display: block;
+	width: 100%;
+	height: 100%;
+	padding: 0;
+	border: none;
+	background: none;
+	cursor: zoom-in;
+}
+.ui-gallery-item--wide {
+	grid-column: span 2;
+}
+@media (min-width: 768px) {
+	.ui-gallery {
+		grid-template-columns: repeat(4, 1fr);
+		grid-auto-rows: 200px;
+	}
+	.ui-gallery-item--tall {
+		grid-row: span 2;
+	}
+}
+
+/* Feature-Split - icon + heading + text rows, paired with an image
+   column via the regular ui-grid-row/ui-grid-m-50 pattern */
+.ui-feature-list {
+	list-style: none;
+	margin: var(--space-2) 0 0;
+	padding: 0;
+}
+.ui-feature-item {
+	display: flex;
+	align-items: flex-start;
+	gap: var(--space-2);
+}
+.ui-feature-item:not(:last-child) {
+	margin-bottom: var(--space-3);
+}
+.ui-feature-item .ui-icon {
+	flex-shrink: 0;
+	top: 0;
+}
+
+/* Process timeline - numbered steps, connected by a horizontal line on
+   "m" and up, stacked without the line on mobile */
+.ui-timeline {
+	display: flex;
+	flex-wrap: wrap;
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+.ui-timeline-step {
+	position: relative;
+	flex: 1 1 100%;
+	text-align: center;
+	padding: 0 var(--space-2);
+	margin-bottom: var(--space-3);
+	box-sizing: border-box;
+}
+.ui-timeline-number {
+	position: relative;
+	z-index: 1;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 40px;
+	height: 40px;
+	margin: 0 auto var(--space-2);
+	border-radius: 50%;
+	background-color: var(--color-primary);
+	color: var(--color-primary-text);
+	font-weight: 700;
+}
+@media (min-width: 768px) {
+	.ui-timeline-step {
+		flex: 1 1 0;
+		margin-bottom: 0;
+	}
+	.ui-timeline-step::before {
+		content: '';
+		position: absolute;
+		top: 20px;
+		left: -50%;
+		width: 100%;
+		height: 2px;
+		background-color: var(--color-border);
+	}
+	.ui-timeline-step:first-child::before {
+		display: none;
+	}
+}
+
+/* Video poster - static image standing in for a video's first frame,
+   opens the actual embed in a js-modal--lightbox (see 08) on click */
+.ui-video-poster {
+	position: relative;
+	display: block;
+	width: 100%;
+	aspect-ratio: 16 / 9;
+	overflow: hidden;
+	border-radius: var(--radius);
+	padding: 0;
+	border: none;
+	background: none;
+	cursor: pointer;
+}
+.ui-video-poster img {
+	display: block;
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+.ui-video-play {
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	width: 64px;
+	height: 64px;
+	color: #fff;
+	transform: translate(-50%,-50%);
+	filter: drop-shadow(0 2px 8px rgba(0,0,0,.5));
+	transition: transform .2s ease;
+}
+.ui-video-poster:hover .ui-video-play {
+	transform: translate(-50%,-50%) scale(1.1);
+}
+
+/* Full-bleed background image with a dark scrim for text contrast -
+   static (no JS), unlike js-cover/js-parallex which are JS-sized */
+.ui-img-background--dim::before {
+	content: '';
+	position: absolute;
+	inset: 0;
+	z-index: 2;
+	background-color: var(--color-background-dim);
+}
+.ui-img-background-content {
+	position: relative;
+	z-index: 3;
+}
+
+
+/****************************************************************************************************
+ *
+ *
+ *			06 Shortcode: Navigation
+ *
+ *
+ *			Styles the [navigation] shortcode's own markup
+ *			(Navigation::doShortcode() in _nino/Nino.php)
+ *
+ *
+ ****************************************************************************************************/
+
+.sc-nav-burger {
+	position: relative;
+}
+.sc-nav-burger label {
+	cursor: pointer;
+	display: flex;
+	align-items: center;
+}
+.sc-nav-burger input[type="checkbox"] {
+	display: none;
+}
+.sc-nav-burger svg {
+	width: 32px;
+	height: 32px;
+	margin-left: auto;
+	position: relative;
+	z-index: 101;
+	transition: transform .3s;
+	fill: var(--color-section-black-text);
+}
+.sc-nav-burger .sc-nav-content {
+	position: fixed;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	max-height: 0;
+	overflow: hidden;
+	background-color: var(--color-background);
+	transition: max-height .4s;
+	z-index: 100;
+}
+.sc-nav-content ul {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+.sc-nav-burger .sc-nav-content > div {
+	display:none;
+}
+
+.sc-nav-burger input:checked ~ .sc-nav-content {
+	max-height: 100vh;
+}
+.sc-nav-burger input:checked ~ .sc-nav-content > div {
+	display:block;
+}
+.sc-nav-burger input:checked ~ svg {
+	transform: rotate(90deg);
+}
+.sc-nav-burger input:checked ~ .sc-nav-bg {
+	position: fixed;
+	inset: 0;
+	z-index: 99;
+}
+/* The open overlay always sits on a plain --color-background surface (see
+   .sc-nav-burger .sc-nav-content's own background-color above), regardless
+   of what color the theme gives the header itself (often dark/semi-
+   transparent) - so its links need the page's normal text color, not
+   whatever a theme sets for header links */
+.sc-nav-burger input:checked ~ .sc-nav-content li a {
+	color: var(--color-text);
+}
+.sc-nav-burger input:checked ~ .sc-nav-content li a.active {
+	color: var(--color-primary);
+}
+
+/* Only the burger variant is a fullscreen overlay (see 'nav-burger' in
+   Navigation::$html) - it needs top padding to clear the fixed header once
+   opened. The 'nav-regular' variant (eg. the footer's nav lists) renders
+   inline, so it must not inherit that offset. */
+.sc-nav-burger .sc-nav-content ul {
+	padding: var(--space-2);
+}
+header .sc-nav-content li a {
+	display: block;
+	padding: var(--space-1) 0;
+	font-size: 1.4rem;
+	border-bottom: 1px solid var(--color-border);
+}
+header .ui-headernav-logo {
+	width:50%;
+	margin:var(--space-3) auto 0;
+}
+
+@media (min-width: 768px) {
+	.sc-nav-burger svg {
+		display: none;
+	}
+	.sc-nav-burger .sc-nav-content {
+		position: static;
+		max-height: none;
+		background-color: transparent;
+	}
+	.sc-nav-content ul {
+		display: flex;
+		gap: var(--space-2);
+	}
+	.sc-nav-burger .sc-nav-content ul {
+		padding: 0;
+	}
+	header .sc-nav-content li a {
+		border: none;
+		padding: 0;
+		font-size: 1rem;
+	}
+}
+
+
+/****************************************************************************************************
+ *
+ *
+ *			07 Shortcode: Localepicker
+ *
+ *
+ *			Styles the [localepicker] shortcode's own markup
+ *			(Localepicker::doShortcode() in _nino/Nino.php)
+ *
+ *
+ ****************************************************************************************************/
+
+.sc-localepicker-wrap {
+	display:inline-block;
+	text-align:center;
+}
+.sc-localepicker-wrap div {
+	display:inline-block;
+}
+
+.sc-localepicker-wrap svg {
+	width:16px;
+	height:16px;
+	margin-right:var(--space-1);
+	position:relative;
+	top:3px;
+}
+.sc-localepicker-wrap input {
+	display:none;
+}
+.sc-localepicker-wrap h6,
+.sc-localepicker-wrap li {
+	display:none;
+	color:var(--color-footer-text);
+	cursor:pointer;
+}
+
+.sc-localepicker-wrap ul {
+	margin: 0;
+	padding: 0;
+	list-style-type: none;
+}
+
+.sc-localepicker-wrap li.active {
+	display:block;
+}
+
+.sc-localepicker-wrap a {
+	text-decoration:none;
+	color:var(--color-footer-text-legal);
+}
+
+.sc-localepicker-wrap input:checked + div {
+	display:block;
+	position:fixed;
+	text-indent: 0;
+	top:0;
+	left:0;
+	right:0;
+	bottom:0;
+	z-index:999;
+	background-color:var(--color-background);
+	border:1px solid var(--color-border);
+}
+.sc-localepicker-wrap input:checked ~ div h6 {
+	display:block;
+	text-align:center;
+	padding:.5rem;
+}
+.sc-localepicker-wrap input:checked ~ div li {
+	display:block;
+	border-top:1px solid var(--color-border);
+}
+.sc-localepicker-wrap input:checked + div li a {
+	color:var(--color-text);
+	font-size:1.2rem;
+	padding:1rem 0;
+	text-align:center;
+	display:block;
+	transition:color .3s;
+}
+
+.sc-localepicker-wrap input:checked + div li a:hover {
+	color:var(--color-primary);
+}
+.sc-localepicker-wrap input:checked + div li.active a:hover {
+	color:var(--color-text);
+	cursor:default;
+}
+.sc-localepicker-wrap input:checked + div li.active {
+	font-weight:bold;
+}
+
+@media(min-width:768px) {
+	.sc-localepicker-wrap input:checked + div {
+		top:25%;
+		left:25%;
+		right:25%;
+		bottom:auto;
+		padding:var(--space-1);
+	}
+	.sc-localepicker-wrap div.sc-localepicker-bg {
+		opacity:0;
+		transition:opacity .2s;
+	}
+
+	.sc-localepicker-wrap input:checked ~ div li {
+		border-bottom:none;
+	}
+	.sc-localepicker-wrap input:checked ~ div.sc-localepicker-bg {
+		z-index:998;
+		opacity:1;
+		display:block;
+		position:fixed;
+		top:0;
+		left:0;
+		right:0;
+		bottom:0;
+	}
+}
+
+/****************************************************************************************************
+ *
+ *
+ *			08 Javascript Elements
+ *
+ *
+ *			Ensure Nino.ui.js functionality.
+ *
+ *			.js-parallex(--dim), .js-cover(--dim), .js-slider, .js-vpa, .js-preloader
+ *			.js-tabs-nav, .js-tabs-tab, .js-tabs-panel
+ *			.js-modal(--lightbox, --video), .js-modal-close
+ *			.js-toast-container, .js-toast(--success, --error)
+ *
+ *
+ ****************************************************************************************************/
+
+
+/* Cover / Parallax - JS-driven sizing (see Nino.ui.js), this only
+   provides the structural CSS the JS behavior depends on */
+.js-parallex,
+.js-cover {
+	position: relative;
+	overflow: hidden;
+}
+.js-parallex {
+	min-height: 60vh;
+}
+.js-parallex > img,
+.js-cover > img {
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	z-index: 1;
+	will-change: transform;
+}
+.js-parallex > img {
+	height: 180%;
+}
+/* Optional dark scrim for text-on-photo contrast - z-index sits between
+   the image (1) and the content (101), no stacking-context trick needed
+   since nothing here goes negative (unlike ui-img-background, see docs) */
+.js-parallex--dim::before,
+.js-cover--dim::before {
+	content: '';
+	position: absolute;
+	inset: 0;
+	z-index: 50;
+	background-color: var(--color-background-dim);
+}
+.js-parallex > .js-cover-content,
+.js-cover > .js-cover-content {
+	position: absolute;
+	padding-top:var(--space-3);
+	z-index: 101;
+	top: 50%;
+	width: 100%;
+	transform: translateY(-50%);
+}
+.js-parallex.js-cover-center > .js-cover-content,
+.js-cover.js-cover-center > .js-cover-content {
+	left: 50%;
+	text-align: center;
+	transform: translate(-50%,-50%);
+}
+.js-parallex.ui-atf,
+.js-cover.ui-atf {
+	margin-top: 0 !important;
+	box-sizing: border-box;
+}
+
+/* Contentslider */
+.js-slider {
+	position: relative;
+	overflow: hidden;
+	padding-bottom: 40px; /* room for .js-slider-controls */
+}
+.js-slider ul {
+	display: flex;
+	position: absolute;
+	padding: 0;
+	margin: 0;
+	transition: left 600ms cubic-bezier(0.4,0,0.2,1);
+}
+.js-slider.touch ul {
+	transition: none;
+}
+.js-slider li {
+	opacity: .6;
+	transition: opacity 200ms;
+}
+.js-slider li.active {
+	opacity: 1;
+}
+.js-slider li img {
+	width: 100%;
+}
+
+/* Controls - prev button, dots, next button, grouped into one centered row
+   regardless of how wide the slider itself is */
+.js-slider-controls {
+	position: absolute;
+	left: 50%;
+	bottom: 0;
+	transform: translateX(-50%);
+	display: flex;
+	align-items: center;
+	gap: var(--space-1);
+}
+.js-slider-button {
+	cursor: pointer;
+	font-size: 1.8rem;
+	line-height: 1rem;
+	padding: 2px 8px 8px 8px;
+}
+/* Specificity note: .js-slider ul (above) matches this too since it's
+   still a <ul> descendant of .js-slider - needs the extra .js-slider-controls
+   ancestor class to actually win over position/display/transition */
+.js-slider-controls .js-slider-points {
+	position: static;
+	display: flex;
+	align-items: center;
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	transition: none;
+}
+.js-slider-points li {
+	width: 12px;
+	height: 12px;
+	border-radius: 50%;
+	background-color: var(--color-border);
+	margin: 0 4px;
+	cursor: pointer;
+	transition: background-color .2s;
+}
+.js-slider-points li.active {
+	background-color: var(--color-primary);
+}
+
+/* Viewport animations (vpa) - default is a subtle fade+rise. --zoom/--zoom-
+   out/--slide-left/--slide-right/--blur/--flip are drop-in alternatives,
+   each split into a -soft/-medium/-hard intensity (e.g. js-vpa--zoom-soft).
+   --speed-slow/-medium/-fast controls the transition duration, independent
+   of which variant is used. Everything is implemented as custom properties
+   (--vpa-t-*/--vpa-f-*/--vpa-origin/--vpa-duration) rather than fixed
+   values, which makes it all inheritable: put a variant and/or speed class
+   on <body> to set the page-wide default, and any .js-vpa element picks it
+   up automatically; an element carrying its own variant/speed class always
+   overrides what it would otherwise inherit, since a property set directly
+   on an element beats one inherited from an ancestor regardless of the
+   ancestor rule's specificity. --repeat/-delay/-duration and the visible/
+   visible-once toggling itself keep working unchanged - see
+   docs/design-system.md */
+:root {
+	--vpa-t-hidden: translateY(.5rem);
+	--vpa-t-visible: translateY(0px);
+	--vpa-f-hidden: none;
+	--vpa-f-visible: none;
+	--vpa-origin: center;
+	--vpa-duration: .5s;
+}
+.js-vpa {
+	transform-origin: var(--vpa-origin);
+}
+.js-vpa, .js-vpa--visible-once.js-vpa--repeat {
+	opacity: 0;
+	transform: var(--vpa-t-hidden);
+	filter: var(--vpa-f-hidden);
+	transition-property: opacity, transform, filter;
+	transition-duration: var(--vpa-duration);
+	transition-timing-function: cubic-bezier(0.5, 0, 0.7, 1);
+}
+.js-vpa--visible-once,
+.js-vpa--visible,
+.js-vpa--visible-once.js-vpa--repeat.js-vpa--visible {
+	opacity: 1;
+	transform: var(--vpa-t-visible);
+	filter: var(--vpa-f-visible);
+}
+
+/* --speed-*: duration only, combine with any variant below (or the plain
+   default) - --speed-slow is deliberately slow, not just "a bit slower" */
+.js-vpa--speed-fast { --vpa-duration: .25s; }
+.js-vpa--speed-medium { --vpa-duration: .5s; }
+.js-vpa--speed-slow { --vpa-duration: 2s; }
+
+/* --zoom-*: scales up into place, a snappier "pop" than the plain
+   fade+rise. soft/medium/hard = how far out the scale starts */
+.js-vpa--zoom-soft { --vpa-t-hidden: scale(.94); --vpa-t-visible: scale(1); }
+.js-vpa--zoom-medium { --vpa-t-hidden: scale(.85); --vpa-t-visible: scale(1); }
+.js-vpa--zoom-hard { --vpa-t-hidden: scale(.7); --vpa-t-visible: scale(1); }
+
+/* --zoom-out-*: the mirror of --zoom-* - starts oversized and settles down
+   to its actual size, reads as the content "arriving" rather than "growing" */
+.js-vpa--zoom-out-soft { --vpa-t-hidden: scale(1.06); --vpa-t-visible: scale(1); }
+.js-vpa--zoom-out-medium { --vpa-t-hidden: scale(1.15); --vpa-t-visible: scale(1); }
+.js-vpa--zoom-out-hard { --vpa-t-hidden: scale(1.35); --vpa-t-visible: scale(1); }
+
+/* --slide-left-*/--slide-right-*: a horizontal travel instead of the
+   default's vertical rise - good for alternating card/timeline layouts
+   where left/right reinforces which "side" a piece of content belongs to */
+.js-vpa--slide-left-soft { --vpa-t-hidden: translateX(1.5rem); --vpa-t-visible: translateX(0); }
+.js-vpa--slide-left-medium { --vpa-t-hidden: translateX(3rem); --vpa-t-visible: translateX(0); }
+.js-vpa--slide-left-hard { --vpa-t-hidden: translateX(6rem); --vpa-t-visible: translateX(0); }
+.js-vpa--slide-right-soft { --vpa-t-hidden: translateX(-1.5rem); --vpa-t-visible: translateX(0); }
+.js-vpa--slide-right-medium { --vpa-t-hidden: translateX(-3rem); --vpa-t-visible: translateX(0); }
+.js-vpa--slide-right-hard { --vpa-t-hidden: translateX(-6rem); --vpa-t-visible: translateX(0); }
+
+/* --blur-*: soft-focus-in, on top of whatever transform is already in
+   effect (the default rise, or a --zoom-*/--slide-*/--flip-* combined on
+   the same element - only --vpa-f-* is set here, --vpa-t-* is left alone,
+   so blur is the one variant that freely combines with any other) */
+.js-vpa--blur-soft { --vpa-f-hidden: blur(6px); --vpa-f-visible: blur(0); }
+.js-vpa--blur-medium { --vpa-f-hidden: blur(12px); --vpa-f-visible: blur(0); }
+.js-vpa--blur-hard { --vpa-f-hidden: blur(24px); --vpa-f-visible: blur(0); }
+
+/* --flip-*: a playful 3D tilt-down into place - the most "auffällig" of the
+   set, best used sparingly (one hero/callout, not a whole repeated grid) */
+.js-vpa--flip-soft { --vpa-t-hidden: perspective(800px) rotateX(-20deg); --vpa-t-visible: perspective(800px) rotateX(0deg); --vpa-origin: top center; }
+.js-vpa--flip-medium { --vpa-t-hidden: perspective(800px) rotateX(-40deg); --vpa-t-visible: perspective(800px) rotateX(0deg); --vpa-origin: top center; }
+.js-vpa--flip-hard { --vpa-t-hidden: perspective(800px) rotateX(-65deg); --vpa-t-visible: perspective(800px) rotateX(0deg); --vpa-origin: top center; }
+
+/* Preloader */
+.js-preloader {
+	position: fixed;
+	top: 0;
+	left: 0;
+	width: 100%;
+	height: 100%;
+	background: var(--color-background);
+	z-index: 9999;
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	opacity: 1;
+	transition: opacity 1s ease;
+}
+.js-preloader::after {
+	content: "";
+	width: 50px;
+	height: 50px;
+	border: 5px solid rgba(0, 0, 0, 0.1);
+	border-radius: 50%;
+	border-top-color: var(--color-primary);
+	animation: ui-fx-spin 1s ease-in-out infinite;
+}
+@keyframes ui-fx-spin {
+	to { transform: rotate(360deg); }
+}
+
+/* Tabs */
+.js-tabs-nav {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--space-1);
+	border-bottom: 1px solid var(--color-border);
+	margin-bottom: var(--space-2);
+}
+.js-tabs-tab {
+	padding: var(--space-1) var(--space-2);
+	cursor: pointer;
+	border: none;
+	background: none;
+	font: inherit;
+	color: var(--color-text);
+	border-bottom: 2px solid transparent;
+}
+.js-tabs-tab.active {
+	color: var(--color-primary);
+	border-bottom-color: var(--color-primary);
+}
+.js-tabs-panel {
+	display: none;
+	opacity: 0;
+	transform: translateY(4px);
+	transition: opacity .2s ease, transform .2s ease, display .2s allow-discrete;
+}
+.js-tabs-panel.active {
+	display: block;
+	opacity: 1;
+	transform: translateY(0);
+}
+/* Fades the panel in on switch - degrades gracefully (instant show) in
+   browsers without @starting-style/allow-discrete support */
+@starting-style {
+	.js-tabs-panel.active {
+		opacity: 0;
+		transform: translateY(4px);
+	}
+}
+
+/* Modal / Lightbox - native <dialog>, JS only opens/closes it (see
+   Nino.ui.js) - focus-trapping, ESC-to-close and the backdrop click target
+   all come from the browser for free */
+.js-modal {
+	/* the global reset zeroes out margin - restore it, since the native
+	   centering (dialog:modal { position:fixed; inset:0 }) relies on it */
+	margin: auto;
+	border: none;
+	border-radius: var(--radius);
+	padding: var(--space-3);
+	max-width: 90vw;
+	width: 480px;
+	background-color: var(--color-background);
+	color: var(--color-text);
+}
+.js-modal::backdrop {
+	background-color: rgba(0, 0, 0, .5);
+}
+.js-modal--lightbox {
+	width: auto;
+	padding: 0;
+	background: none;
+}
+.js-modal--lightbox img {
+	display: block;
+	max-width: 90vw;
+	max-height: 85vh;
+}
+/* Explicit width instead of --lightbox's auto/shrink-to-fit - a .ui-video
+   child has no intrinsic size of its own (percentage width), so shrink-to-fit
+   can't resolve a sensible dialog width the way it does for a plain <img> */
+.js-modal--video {
+	width: min(90vw, 900px);
+}
+.js-modal-close {
+	position: absolute;
+	top: var(--space-1);
+	right: var(--space-1);
+	border: none;
+	background: none;
+	font-size: 1.5rem;
+	line-height: 1;
+	cursor: pointer;
+	color: var(--color-text);
+}
+
+/* Toast - created/removed entirely by JS via Nino.ui.toast(), see
+   Nino.ui.js - no markup to author, nothing to add to a template */
+.js-toast-container {
+	position: fixed;
+	bottom: var(--space-2);
+	right: var(--space-2);
+	z-index: 9998;
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-1);
+}
+.js-toast {
+	padding: var(--space-2);
+	border-radius: var(--radius);
+	background-color: var(--color-section-black-bg);
+	color: var(--color-section-black-text);
+	box-shadow: 0 2px 8px rgba(0, 0, 0, .2);
+	opacity: 0;
+	transform: translateY(10px);
+	transition: opacity .3s, transform .3s;
+}
+.js-toast--visible {
+	opacity: 1;
+	transform: translateY(0);
+}
+.js-toast--success {
+	background-color: var(--color-success);
+	color: var(--color-primary-text);
+}
+.js-toast--error {
+	background-color: var(--color-error);
+	color: var(--color-primary-text);
+}

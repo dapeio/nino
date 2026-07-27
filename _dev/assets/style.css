@@ -1,0 +1,369 @@
+/**
+ *	Nino										A compact filesystembased php framework
+ *	style.css								Dev-tools UI - reuses _admin/assets/style.css's design
+ *													tokens/components (linked before this file in every
+ *													template), only adds what's specific to this tool
+ *
+ *	@package								Dape/Nino
+ *	@author									David Perchermeier <mail@dape.io>
+ *	@link										https://github.com/dapeio/nino
+ */
+
+body {
+	margin: 0;
+	font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+	background: var(--admin-bg);
+	color: var(--admin-text);
+}
+
+.dev-hidden {
+	display: none !important;
+}
+
+/* ------------------------------------------------------------------- Login */
+
+#dev-login-wrap {
+	max-width: 24rem;
+	margin: 4rem auto;
+	padding: 0 1rem;
+}
+
+#dev-login-form {
+	background: var(--admin-bg-grouped);
+	border-radius: var(--admin-radius);
+	box-shadow: var(--admin-shadow);
+	padding: 1.5rem;
+}
+
+#dev-login-msg {
+	margin: 0 0 1rem;
+	font-weight: 600;
+}
+
+/* --------------------------------------------------------------- Dashboard */
+
+#dev-bar-wrap {
+	position: sticky;
+	top: 0;
+	z-index: 10;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 1rem 1.25rem;
+	background: var(--admin-bar-bg);
+	backdrop-filter: blur(20px) saturate(180%);
+	border-bottom: 1px solid var(--admin-separator);
+}
+
+#dev-bar-title {
+	font-weight: 700;
+}
+
+#dev-logout {
+	color: var(--admin-red);
+	font-weight: 500;
+}
+
+#dev-nav-wrap {
+	display: flex;
+	border-bottom: 1px solid var(--admin-separator);
+	padding: 0 1.25rem;
+}
+
+#dev-nav-wrap a {
+	padding: .65rem .1rem;
+	margin-right: 1.5rem;
+	border-bottom: 2px solid transparent;
+	color: var(--admin-text-secondary);
+	font-size: .9rem;
+	font-weight: 500;
+}
+
+#dev-nav-wrap a.active {
+	color: var(--admin-blue);
+	font-weight: 600;
+	border-bottom-color: var(--admin-blue);
+}
+
+#dev-content-wrap {
+	padding: 1.25rem 1rem 4rem;
+	max-width: 40rem;
+	margin: 0 auto;
+}
+
+#dev-content-types > div:not(.dev-hidden) {
+	display: block;
+}
+
+/* Only one module's content pane is visible at a time - #dev-page-wrap's
+   class (set by Nino.dev.selectTab(), see script.js) picks which */
+#dev-content-wrap > div {
+	display: none;
+}
+#dev-page-wrap.show-types #dev-content-types,
+#dev-page-wrap.show-text #dev-content-text,
+#dev-page-wrap.show-images #dev-content-images,
+#dev-page-wrap.show-users #dev-content-users,
+#dev-page-wrap.show-restore #dev-content-restore,
+#dev-page-wrap.show-config #dev-content-config {
+	display: block;
+}
+
+#dev-content-text > div:not(.dev-hidden),
+#dev-content-images > div:not(.dev-hidden),
+#dev-content-config > div:not(.dev-hidden) {
+	display: block;
+}
+
+/* ------------------------------------------------------------- Wiederherstellung */
+
+#restore-dates {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+
+#restore-dates li {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	background: var(--admin-bg-grouped);
+	border-radius: var(--admin-radius);
+	box-shadow: var(--admin-shadow);
+	padding: .75rem 1rem;
+	margin: 0 0 .75rem;
+}
+
+#restore-dates button {
+	background: var(--admin-blue);
+	color: #fff;
+	border: none;
+	border-radius: var(--admin-radius-sm);
+	padding: .5rem .9rem;
+	font: inherit;
+	cursor: pointer;
+}
+
+/* ---------------------------------------------------------------- Type form */
+
+.dev-field-row {
+	background: var(--admin-bg-grouped);
+	border-radius: var(--admin-radius);
+	box-shadow: var(--admin-shadow);
+	border: none;
+	margin: 0 0 1rem;
+	padding: 1rem;
+	display: flex;
+	flex-direction: column;
+	gap: .5rem;
+}
+
+.dev-field-row input[type="text"],
+.dev-field-row input[type="number"],
+.dev-field-row select {
+	width: 100%;
+	padding: .5rem;
+	border-radius: var(--admin-radius-sm);
+	border: 1px solid var(--admin-border);
+	background: var(--admin-bg-elevated);
+	color: var(--admin-text);
+	font: inherit;
+}
+
+.dev-field-options {
+	display: flex;
+	flex-wrap: wrap;
+	gap: .75rem;
+	align-items: center;
+}
+
+.dev-field-options label {
+	display: inline-flex;
+	align-items: center;
+	gap: .3rem;
+	font-size: .85rem;
+	color: var(--admin-text-secondary);
+}
+
+.dev-field-options input[type="text"],
+.dev-field-options input[type="number"] {
+	width: auto;
+	flex: 1 1 10rem;
+}
+
+.dev-error {
+	color: var(--admin-red);
+	font-weight: 600;
+}
+
+/* -------------------------------------------------------------- Config tab */
+
+#config-list > ul,
+#text-list > ul {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	background: var(--admin-bg-grouped);
+	border-radius: var(--admin-radius);
+	box-shadow: var(--admin-shadow);
+	overflow: hidden;
+}
+
+#config-list > ul li,
+#text-list > ul li {
+	border-bottom: 1px solid var(--admin-separator);
+}
+
+#config-list > ul li:last-child,
+#text-list > ul li:last-child {
+	border-bottom: none;
+}
+
+#config-list > ul li a,
+#text-list > ul li a {
+	display: block;
+	padding: .85rem 1rem;
+	font-family: ui-monospace, monospace;
+	font-size: .85rem;
+	color: var(--admin-text);
+}
+
+/* ---------------------------------------------------------------- Users tab */
+
+#users-list > ul {
+	list-style: none;
+	margin: 0 0 .75rem;
+	padding: 0;
+	background: var(--admin-bg-grouped);
+	border-radius: var(--admin-radius);
+	box-shadow: var(--admin-shadow);
+	overflow: hidden;
+}
+
+#users-list > ul li {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: .75rem 1rem;
+	border-bottom: 1px solid var(--admin-separator);
+}
+
+#users-list > ul li:last-child {
+	border-bottom: none;
+}
+
+#users-add-form {
+	background: var(--admin-bg-grouped);
+	border-radius: var(--admin-radius);
+	box-shadow: var(--admin-shadow);
+	padding: 1rem;
+	display: flex;
+	flex-direction: column;
+	gap: .75rem;
+}
+
+#users-add-form input[type="email"],
+#users-add-form input[type="password"] {
+	padding: .5rem;
+	border-radius: var(--admin-radius-sm);
+	border: 1px solid var(--admin-border);
+	background: var(--admin-bg-elevated);
+	color: var(--admin-text);
+	font: inherit;
+}
+
+#users-add-form label {
+	display: inline-flex;
+	align-items: center;
+	gap: .3rem;
+	font-size: .85rem;
+	color: var(--admin-text-secondary);
+}
+
+/* ----------------------------------------------------------------- Text tab */
+
+#text-form label:not(.admin-field) {
+	display: flex;
+	align-items: center;
+	gap: .5rem;
+	font-size: .9rem;
+	margin: 0 0 1rem;
+}
+
+.dev-text-schema {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0 1.5rem;
+	margin: .5rem 0 1rem;
+}
+
+.dev-text-schema label {
+	margin: 0;
+}
+
+.dev-text-key-input {
+	flex: 1 1 auto;
+	min-width: 8rem;
+	padding: .3rem .5rem;
+	border-radius: var(--admin-radius-sm);
+	border: 1px solid var(--admin-border);
+	background: var(--admin-bg-elevated);
+	color: var(--admin-text);
+	font-family: ui-monospace, monospace;
+	font-size: .8rem;
+}
+
+.dev-text-key-btn {
+	flex: 0 0 auto;
+	font-size: .8rem;
+	padding: .3rem .6rem;
+}
+
+.dev-danger-btn {
+	color: var(--admin-red);
+	border-color: var(--admin-red);
+}
+
+.dev-scan-ignore {
+	display: flex;
+	align-items: center;
+	gap: .4rem;
+	margin: .4rem 0 0;
+	font-size: .85rem;
+}
+
+.dev-hint {
+	color: var(--admin-text-secondary);
+	font-size: .85rem;
+	margin: 0 0 .75rem;
+}
+
+#config-form-value {
+	width: 100%;
+	box-sizing: border-box;
+	padding: .75rem;
+	border-radius: var(--admin-radius-sm);
+	border: 1px solid var(--admin-border);
+	background: var(--admin-bg-elevated);
+	color: var(--admin-text);
+	font-family: ui-monospace, monospace;
+	font-size: .85rem;
+	resize: vertical;
+}
+
+#dev-dashboard-summary {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: flex;
+	flex-direction: column;
+	gap: .5rem;
+}
+
+.dev-dashboard-row {
+	padding: .75rem 1rem;
+	border-radius: var(--admin-radius-sm);
+	background: var(--admin-bg-elevated);
+	border: 1px solid var(--admin-border);
+	font-size: .9rem;
+}

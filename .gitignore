@@ -1,0 +1,20 @@
+/.cache/
+/_admin/.cache/
+/_admin/.backups-*/
+/_admin/.logs-*/
+/_dev/.restore-key.php
+/_dev/.lockout.json
+/_dev/Dev.php
+
+# Runtime data (form submissions, newsletter subscribers, rate limits,
+# error logs) contains PII - never track it
+/data/
+
+# Uploaded images are runtime content too - only the bundled demo assets
+# stay tracked
+/images/*
+!/images/.demo/
+
+.DS_Store
+Thumbs.db
+config.php

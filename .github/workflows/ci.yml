@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+
+      - name: Lint all PHP files
+        run: find . -name "*.php" -not -path "./.git/*" -print0 | xargs -0 -n1 php -l
+
+      - name: Lint all JS files
+        run: find . -name "*.js" -not -path "./.git/*" -print0 | xargs -0 -n1 node --check
+
+      - name: Run kernel smoke tests
+        run: php tests/kernel-smoke.php
+
+      - name: Run admin backend smoke tests
+        run: php tests/admin-smoke.php
+
+      - name: Run dev tooling smoke tests
+        run: php tests/dev-smoke.php
