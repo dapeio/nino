@@ -132,6 +132,7 @@ button[type="submit"] {
  *	or category list -> category form) is handled locally within that panel via
  *	.admin-hidden, not by hiding the whole panel/nav. */
 
+#admin-content-dashboard,
 #admin-content-user,
 #admin-content-text,
 #admin-content-images,
@@ -142,6 +143,7 @@ button[type="submit"] {
 	display: none;
 }
 
+#admin-page-wrap.show-dashboard #admin-content-dashboard,
 #admin-page-wrap.show-user #admin-content-user,
 #admin-page-wrap.show-text #admin-content-text,
 #admin-page-wrap.show-images #admin-content-images,

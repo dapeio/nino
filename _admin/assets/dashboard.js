@@ -47,6 +47,7 @@
 		 *	@return		void
 		 */
 		showCurrent : function() {
+			Nino.admin.router.set( 'dashboard', [] );
 			Nino.admin.dashboard.init();
 		},
 
