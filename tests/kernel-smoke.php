@@ -263,7 +263,7 @@ check( 'setSlotFilename persists to config.php (same as Auth::updateUser)', ( $p
 
 $appData['/nino/html/images']['logo'] = [ 'label' => 'Logo', 'width' => 400, 'height' => 400, 'filename' => null ];
 
-\Nino\Images::init( $appData );
+\Nino\Modules\Images::init( $appData );
 check( '[image] shortcode renders an <img> tag for a slot with an uploaded file', str_contains( \Nino\Html::renderHtml( $appData, '[image hero]' ), '<img src="/images/hero.1600x600.jpg" width="1600" height="600"' ) === true );
 check( '[image] shortcode renders nothing for a slot with no file uploaded yet', \Nino\Html::renderHtml( $appData, '[image logo]' ) === '' );
 check( '[image] shortcode renders nothing for an unknown slot', \Nino\Html::renderHtml( $appData, '[image nope]' ) === '' );
