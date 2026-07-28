@@ -263,7 +263,7 @@ check( 'setSlotFilename persists to config.php (same as Auth::updateUser)', ( $p
 
 $appData['/nino/html/images']['logo'] = [ 'label' => 'Logo', 'width' => 400, 'height' => 400, 'filename' => null ];
 
-\Nino\Shortcodes\Images::init( $appData );
+\Nino\Images::init( $appData );
 check( '[image] shortcode renders an <img> tag for a slot with an uploaded file', str_contains( \Nino\Html::renderHtml( $appData, '[image hero]' ), '<img src="/images/hero.1600x600.jpg" width="1600" height="600"' ) === true );
 check( '[image] shortcode renders nothing for a slot with no file uploaded yet', \Nino\Html::renderHtml( $appData, '[image logo]' ) === '' );
 check( '[image] shortcode renders nothing for an unknown slot', \Nino\Html::renderHtml( $appData, '[image nope]' ) === '' );
@@ -426,33 +426,33 @@ echo "\n";
 
 echo "Csrf::getToken / rotateToken / callbackResponse / doShortcode\n";
 
-$token1 = \Nino\Shortcodes\Csrf::getToken( $appData );
+$token1 = \Nino\Modules\Csrf::getToken( $appData );
 check( 'getToken creates a token', is_string( $token1 ) === true && strlen( $token1 ) > 0 );
-check( 'getToken returns the same token on a second call', \Nino\Shortcodes\Csrf::getToken( $appData ) === $token1 );
+check( 'getToken returns the same token on a second call', \Nino\Modules\Csrf::getToken( $appData ) === $token1 );
 
-\Nino\Shortcodes\Csrf::rotateToken( $appData );
-$token2 = \Nino\Shortcodes\Csrf::getToken( $appData );
+\Nino\Modules\Csrf::rotateToken( $appData );
+$token2 = \Nino\Modules\Csrf::getToken( $appData );
 check( 'rotateToken replaces the token', $token2 !== $token1 );
 
 $_POST['_csrf'] = 'wrong-token';
 $fakeRequest = [ '/nino/http/request' => [ 'method' => 'POST' ], '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Shortcodes\Csrf::callbackResponse( $appData, $fakeRequest );
+\Nino\Modules\Csrf::callbackResponse( $appData, $fakeRequest );
 check( 'callbackResponse rejects a wrong token', $fakeRequest['/nino/http/response']['statusCode'] === 403 );
 check( 'callbackResponse sets the blocked flag on rejection', ( $fakeRequest['./nino/csrf/blocked'] ?? false ) === true );
 
 $_POST['_csrf'] = $token2;
 $fakeRequest = [ '/nino/http/request' => [ 'method' => 'POST' ], '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Shortcodes\Csrf::callbackResponse( $appData, $fakeRequest );
+\Nino\Modules\Csrf::callbackResponse( $appData, $fakeRequest );
 check( 'callbackResponse accepts the current token', $fakeRequest['/nino/http/response']['statusCode'] === 200 );
 
-check( 'doShortcode renders a hidden input with the current token', str_contains( \Nino\Shortcodes\Csrf::doShortcode( $appData, [] ), 'value="'. $token2. '"' ) === true );
+check( 'doShortcode renders a hidden input with the current token', str_contains( \Nino\Modules\Csrf::doShortcode( $appData, [] ), 'value="'. $token2. '"' ) === true );
 
 echo "\n";
 
 
-// --- Shortcodes\Form -------------------------------------------------------
+// --- Modules\Form -------------------------------------------------------
 
-echo "Shortcodes\\Form::callbackResponse - validate/send/record a contact submission\n";
+echo "Modules\\Form::callbackResponse - validate/send/record a contact submission\n";
 
 \Nino\Html::addFills( $appData, [
 	'[[/form/email/owner]]' 	=> 'owner@example.com',
@@ -463,7 +463,7 @@ echo "Shortcodes\\Form::callbackResponse - validate/send/record a contact submis
 function submitForm( array &$appData, array $post ): array {
 	$_POST = array_merge( [ 'name' => '', 'email' => '', 'message' => '', 'location' => '', 'cat' => '' ], $post );
 	$request = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-	\Nino\Shortcodes\Form::callbackResponse( $appData, $request );
+	\Nino\Modules\Form::callbackResponse( $appData, $request );
 	return $request;
 }
 
@@ -497,33 +497,33 @@ check( 'the file is a plain, human-readable php array file - not an encoded stub
 $submissionsBefore = count( \Nino\Filesystem::getFileContent( $appData, '/data/forms.'. date( 'Y-m' ). '.php', [] ) );
 $_POST['_csrf'] = 'wrong-token';
 $blockedRequest = [ '/nino/http/request' => [ 'method' => 'POST' ], '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Shortcodes\Csrf::callbackResponse( $appData, $blockedRequest ); // sets 403 + the blocked flag, same as the real POST pipeline
+\Nino\Modules\Csrf::callbackResponse( $appData, $blockedRequest ); // sets 403 + the blocked flag, same as the real POST pipeline
 $_POST = array_merge( $_POST, [ 'name' => 'Attacker', 'email' => 'attacker@example.com', 'message' => 'Hi', 'location' => '', 'cat' => '' ] );
-\Nino\Shortcodes\Form::callbackResponse( $appData, $blockedRequest );
+\Nino\Modules\Form::callbackResponse( $appData, $blockedRequest );
 check( 'a csrf-blocked request is rejected even with otherwise-valid fields', $blockedRequest['/nino/http/response']['statusCode'] === 403 );
 check( 'a csrf-blocked request does not send mail or record a submission', count( \Nino\Filesystem::getFileContent( $appData, '/data/forms.'. date( 'Y-m' ). '.php', [] ) ) === $submissionsBefore );
 
 echo "\n";
 
 
-// --- Shortcodes\Newsletter ---------------------------------------------------
+// --- Modules\Newsletter ---------------------------------------------------
 
-echo "Shortcodes\\Newsletter - double opt-in signup, confirm, unsubscribe\n";
+echo "Modules\\Newsletter - double opt-in signup, confirm, unsubscribe\n";
 
 function submitNewsletter( array &$appData, array $post ): array {
 	$_POST = array_merge( [ 'email' => '', 'location' => '' ], $post );
 	$request = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-	\Nino\Shortcodes\Newsletter::callbackResponse( $appData, $request );
+	\Nino\Modules\Newsletter::callbackResponse( $appData, $request );
 	return $request;
 }
 
 function visitNewsletterLink( array &$appData, array $query ): array {
 	$request = [ '/nino/http/request' => [ 'query' => $query ], '/nino/http/response' => [ 'statusCode' => 200 ] ];
-	\Nino\Shortcodes\Newsletter::callbackAction( $appData, $request );
+	\Nino\Modules\Newsletter::callbackAction( $appData, $request );
 	return $request;
 }
 
-\Nino\Shortcodes\Newsletter::init( $appData );
+\Nino\Modules\Newsletter::init( $appData );
 check( 'init registers the POST route under /.newsletter', isset( $appData['/nino/http/routes']['POST://.newsletter'] ) === true );
 check( 'init registers the GET route (confirm/unsubscribe page) under /.newsletter', isset( $appData['/nino/http/routes']['GET://.newsletter'] ) === true );
 check( 'init does not register the old /newsletter route anymore', isset( $appData['/nino/http/routes']['POST://newsletter'] ) === false );
@@ -541,9 +541,9 @@ check( 'none of the rejected signups created the newsletter file', is_file( \Nin
 
 $_POST['_csrf'] = 'wrong-token';
 $blockedNewsletterRequest = [ '/nino/http/request' => [ 'method' => 'POST' ], '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Shortcodes\Csrf::callbackResponse( $appData, $blockedNewsletterRequest );
+\Nino\Modules\Csrf::callbackResponse( $appData, $blockedNewsletterRequest );
 $_POST = array_merge( $_POST, [ 'email' => 'jo@example.com', 'location' => '' ] );
-\Nino\Shortcodes\Newsletter::callbackResponse( $appData, $blockedNewsletterRequest );
+\Nino\Modules\Newsletter::callbackResponse( $appData, $blockedNewsletterRequest );
 check( 'a csrf-blocked signup is rejected too', $blockedNewsletterRequest['/nino/http/response']['statusCode'] === 403 );
 check( 'a csrf-blocked signup does not create the newsletter file', is_file( \Nino\Filesystem::getPath( $appData ). '/data/newsletter.php' ) === false );
 
@@ -588,10 +588,10 @@ $subscribedRequest = submitNewsletter( $appData, [ 'email' => 'jo@example.com' ]
 check( 'signing up a confirmed subscriber again reports "existing"', $subscribedRequest['/nino/http/response']['body']['status'] === 'existing' );
 check( 'and does not create a duplicate entry', count( \Nino\Filesystem::getFileContent( $appData, $subscribersPath, [] ) ) === 1 );
 
-$unsubscribeLink = \Nino\Shortcodes\Newsletter::getUnsubscribeLink( $appData, 'jo@example.com' );
+$unsubscribeLink = \Nino\Modules\Newsletter::getUnsubscribeLink( $appData, 'jo@example.com' );
 check( 'getUnsubscribeLink builds the /.newsletter unsubscribe url for a subscriber', is_string( $unsubscribeLink ) === true && str_contains( $unsubscribeLink, '/.newsletter?unsubscribe='. $pendingToken ) === true );
-check( 'getUnsubscribeLink is case-insensitive about the email', \Nino\Shortcodes\Newsletter::getUnsubscribeLink( $appData, 'JO@example.com' ) === $unsubscribeLink );
-check( 'getUnsubscribeLink returns false for an unknown email', \Nino\Shortcodes\Newsletter::getUnsubscribeLink( $appData, 'nobody@example.com' ) === false );
+check( 'getUnsubscribeLink is case-insensitive about the email', \Nino\Modules\Newsletter::getUnsubscribeLink( $appData, 'JO@example.com' ) === $unsubscribeLink );
+check( 'getUnsubscribeLink returns false for an unknown email', \Nino\Modules\Newsletter::getUnsubscribeLink( $appData, 'nobody@example.com' ) === false );
 
 $badUnsubscribeRequest = visitNewsletterLink( $appData, [ 'unsubscribe' => 'not-the-token' ] );
 check( 'an unsubscribe link with an unknown token answers 404 and removes nothing', $badUnsubscribeRequest['/nino/http/response']['statusCode'] === 404 && count( \Nino\Filesystem::getFileContent( $appData, $subscribersPath, [] ) ) === 1 );
@@ -669,7 +669,7 @@ $seededCsp = $homeRequest['/nino/http/response']['header']['Content-Security-Pol
 check( 'the response header is seeded with the default csp', str_contains( $seededCsp, "default-src 'self'" ) === true );
 
 $appData['./nino/jstext/nonce'] = base64_encode( random_bytes( 16 ) );
-\Nino\Shortcodes\Jstext::callbackResponse( $appData, $homeRequest );
+\Nino\Modules\Jstext::callbackResponse( $appData, $homeRequest );
 $jstextCsp = $homeRequest['/nino/http/response']['header']['Content-Security-Policy'];
 check( 'Jstext appends its script-src to the csp', str_contains( $jstextCsp, "script-src 'self' 'nonce-" ) === true );
 check( 'Jstext keeps the default-src while doing so', str_contains( $jstextCsp, "default-src 'self'" ) === true );
@@ -688,13 +688,13 @@ check( 'the Location points at the locale variant of the page, without the route
 \Nino\Locales::setCurrentLocale( $appData, 'en_US' );
 $pickerRedirect = fakeRequest( $appData, '/legal?/_nino/localepicker/current=de_DE' );
 \Nino\Http::response( $appData, $pickerRedirect );
-\Nino\Shortcodes\Localepicker::callbackResponse( $appData, $pickerRedirect );
+\Nino\Modules\Localepicker::callbackResponse( $appData, $pickerRedirect );
 check( 'the localepicker redirects with a 302 status code too', $pickerRedirect['/nino/http/response']['statusCode'] === 302 );
 check( 'and its Location points at the locale variant of the page', ( $pickerRedirect['/nino/http/response']['header']['Location'] ?? '' ) === '/rechtliches' );
 
 check( 'Location survives the response header filter', array_key_exists( 'Location', \Nino\Http::filterHeaderFields( [ 'Location' => '/rechtliches' ] ) ) === true );
 
-check( 'a bare [assets] shortcode without argument renders nothing instead of erroring', \Nino\Shortcodes\Assets::doShortcode( $appData, [] ) === '' );
+check( 'a bare [assets] shortcode without argument renders nothing instead of erroring', \Nino\Modules\Assets::doShortcode( $appData, [] ) === '' );
 
 echo "\n";
 

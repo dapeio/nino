@@ -832,9 +832,9 @@ check( 'a stale log file past the retention window gets pruned on the next write
 echo "\n";
 
 
-// --- Submissions: Shortcodes\Form writes, Admin\Submissions reads independently ---
+// --- Submissions: Modules\Form writes, Admin\Submissions reads independently ---
 
-echo "Submissions (Shortcodes\\Form writes, Admin\\Submissions::apiList reads)\n";
+echo "Submissions (Modules\\Form writes, Admin\\Submissions::apiList reads)\n";
 
 \Nino\Html::addFills( $appData, [
 	'[[/form/email/owner]]' 	=> 'owner@example.com',
@@ -844,7 +844,7 @@ echo "Submissions (Shortcodes\\Form writes, Admin\\Submissions::apiList reads)\n
 
 $_POST = [ 'name' => 'Jo Client', 'email' => 'jo@example.com', 'message' => 'Hallo!', 'location' => '', 'cat' => 'General' ];
 $formRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Shortcodes\Form::callbackResponse( $appData, $formRequest );
+\Nino\Modules\Form::callbackResponse( $appData, $formRequest );
 check( 'a valid contact submission succeeds', $formRequest['/nino/http/response']['statusCode'] === 200 );
 
 [ $status, $body ] = callAdminPost( $appData, 'submissions/list' );
@@ -861,18 +861,18 @@ check( 'submissions/list requires an authed admin session too', $status === 401 
 echo "\n";
 
 
-// --- Newsletter: Shortcodes\Newsletter writes, Admin\Newsletter reads/deletes independently ---
+// --- Newsletter: Modules\Newsletter writes, Admin\Newsletter reads/deletes independently ---
 
-echo "Newsletter (Shortcodes\\Newsletter writes, Admin\\Newsletter::apiList/apiDelete)\n";
+echo "Newsletter (Modules\\Newsletter writes, Admin\\Newsletter::apiList/apiDelete)\n";
 
 $_POST = [ 'email' => 'jo@example.com', 'location' => '' ];
 $newsletterRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Shortcodes\Newsletter::callbackResponse( $appData, $newsletterRequest );
+\Nino\Modules\Newsletter::callbackResponse( $appData, $newsletterRequest );
 check( 'a valid newsletter signup succeeds', $newsletterRequest['/nino/http/response']['statusCode'] === 200 );
 
 $_POST = [ 'email' => 'anna@example.com', 'location' => '' ];
 $newsletterRequest2 = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Shortcodes\Newsletter::callbackResponse( $appData, $newsletterRequest2 );
+\Nino\Modules\Newsletter::callbackResponse( $appData, $newsletterRequest2 );
 check( 'a second valid newsletter signup succeeds', $newsletterRequest2['/nino/http/response']['statusCode'] === 200 );
 
 [ $status, $body ] = callAdminPost( $appData, 'newsletter/list' );
