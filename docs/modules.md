@@ -12,7 +12,7 @@ fully-qualified name in `config.php`'s `/nino/modules`:
 
 ```php
 '/nino/modules' => [
-    '\\Nino\\Shortcodes\\Assets',
+    '\\Nino\\Modules\\Assets',
     // ...
     '\\MyProject\\Modules\\Foo',
 ],
@@ -76,7 +76,7 @@ Rules worth internalizing:
 | `/nino/http/response/METHOD:/uri` | only for that exact route | `$request` | no |
 | `/nino/html/render` | once per `renderHtml()` pass | html string | return value replaces it |
 | `/nino/html/shortcode/<name>` | shortcode dispatch (`Html::addShortcode()` registers here) | parsed `$args` | return value is the output |
-| `/nino/shortcodes/assets/output/<css\|js>` | when `[assets]` renders its tag | template string | return value replaces it |
+| `/nino/modules/assets/output/<css\|js>` | when `[assets]` renders its tag | template string | return value replaces it |
 
 ## Testing your module
 

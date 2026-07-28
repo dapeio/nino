@@ -22,7 +22,7 @@ Each major piece is deliberately a single file (related classes stay next
 to each other, one place to grep):
 
 ```
-_nino/Nino.php     Kernel - namespace Nino { ... } and Nino\Shortcodes { ... }
+_nino/Nino.php     Kernel - namespace Nino { ... } and Nino\Modules { ... }
 _admin/Admin.php     Admin dashboard backend (optional)
 _dev/Dev.php         Developer tools backend (optional)
 ```

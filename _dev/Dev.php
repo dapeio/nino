@@ -1405,7 +1405,7 @@ namespace Nino\Dev {
 		 *	<img src="/images/..."> tags not backed by any image slot - the
 		 *	gap this closes: a template built with a placeholder/demo photo
 		 *	hardcoded straight into the markup instead of going through the
-		 *	[image /uri] shortcode (see \Nino\Shortcodes\Images), so an
+		 *	[image /uri] shortcode (see \Nino\Modules\Images), so an
 		 *	admin can never swap it without editing code. Proposes a slot
 		 *	per file (uri guessed from the filename, width/height read off
 		 *	the <img> tag's own attributes or, failing that, probed from the

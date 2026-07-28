@@ -1983,7 +1983,7 @@ namespace Nino\Admin {
 	 *	Nino							A compact filesystembased php framework
 	 *	Admin							Admin dashboard backend
 	 *	Submissions				Read-only view of the contact form's submissions -
-	 *												\Nino\Shortcodes\Form (in _nino/Nino.php) writes these,
+	 *												\Nino\Modules\Form (in _nino/Nino.php) writes these,
 	 *												this reads its storage independently (same shape as
 	 *												Dev\Restore reading Admin\Backup's output: fixed path,
 	 *												never writes anything here). Project-root /data, plain
@@ -2057,7 +2057,7 @@ namespace Nino\Admin {
 	 *	Nino							A compact filesystembased php framework
 	 *	Admin							Admin dashboard backend
 	 *	Newsletter				View + delete of the newsletter signups -
-	 *												\Nino\Shortcodes\Newsletter (in _nino/Nino.php) writes
+	 *												\Nino\Modules\Newsletter (in _nino/Nino.php) writes
 	 *												these, this reads/deletes its storage independently (same
 	 *												shape as Admin\Submissions reading Shortcodes\Form's
 	 *												output: fixed path). Project-root /data, plain array file -

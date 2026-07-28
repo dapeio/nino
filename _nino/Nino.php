@@ -260,7 +260,7 @@ namespace Nino {
 			// cli callers (tests) without an active session working
 			if( session_status() === PHP_SESSION_ACTIVE )
 				session_regenerate_id( true );
-			\Nino\Shortcodes\Csrf::rotateToken( $appData );
+			\Nino\Modules\Csrf::rotateToken( $appData );
 
 			// Rotate the hash if it was created with an outdated algorithm/cost
 			$rehash = password_needs_rehash( $user['pw'], PASSWORD_DEFAULT );
@@ -306,7 +306,7 @@ namespace Nino {
 			\Nino\Runtime::unsetSessionValue( $appData, './nino/auth/current' );
 
 			// Rotate the csrf token now that the session's identity is changing (session-fixation defense)
-			\Nino\Shortcodes\Csrf::rotateToken( $appData );
+			\Nino\Modules\Csrf::rotateToken( $appData );
 
 			$user 	= self::getCurrentUser( $appData );
 			$client	= \Nino\Http::getClientIp();
@@ -479,7 +479,7 @@ namespace Nino {
 
 			if( isset( $appData['./nino/auth/current']['mail'] ) === true && $appData['./nino/auth/current']['mail'] === $username ) {
 				\Nino\Runtime::unsetSessionValue( $appData, './nino/auth/current' );
-				\Nino\Shortcodes\Csrf::rotateToken( $appData );
+				\Nino\Modules\Csrf::rotateToken( $appData );
 				unset( $appData['./nino/auth/current'] );
 			}
 
@@ -2669,7 +2669,7 @@ namespace Nino {
 		 *	Append one error entry to this month's /data/logs.<Y-m>.php -
 		 *	a plain, readable array file (Filesystem::getFileContent()/
 		 *	putFileContent()'s native .php handling), same idea as
-		 *	Shortcodes\Form's forms.<Y-m>.php. Fixed, predictable path -
+		 *	Modules\Form's forms.<Y-m>.php. Fixed, predictable path -
 		 *	no random directory name, unlike _admin's own backups/activity
 		 *	log (see docs/developer.md's "Encryption / stub conventions"):
 		 *	this is public-site kernel data, not a credential-adjacent
@@ -2730,13 +2730,15 @@ namespace Nino {
 
 /**
  *	Nino								A compact filesystembased php framework
- *	Shortcodes					All HTML shortcodes
+ *	Modules							All optional Modules
  */
-namespace Nino\Shortcodes {
+namespace Nino\Modules {
+
+
 
 	/**
 	 *	Nino								A compact filesystembased php framework
-	 *	Shortcodes					HTML shortcodes
+	 *	Modules 						Optional Modules
 	 *	Assets							A html shortcode for including assets
 	 *
 	 *	@package						Dape/Nino
@@ -2924,7 +2926,104 @@ namespace Nino\Shortcodes {
 
 	/**
 	 *	Nino								A compact filesystembased php framework
-	 *	Shortcode						HTML shortcodes
+	 *	Modules							All optional modules
+	 *	Csrf								Cross-site-request-forgery protection
+	 *
+	 *	@package						Dape/Nino
+	 *	@author							David Perchermeier <mail@dape.io>
+	 *	@link								https://github.com/dapeio/nino
+	 */
+
+	class Csrf {
+
+		/**
+		 *	Module initiating. Registered at priority 1 so the check runs
+		 *	before any other global POST handler (eg. Auth's login/logout).
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	void
+		 */
+		public static function init( array &$appData ): void {
+			\Nino\Html::addShortcode( $appData, 'csrf', [ self::class, 'doShortcode' ] );
+			\Nino\Callbacks::registerCallback( $appData, '/nino/http/response', [ self::class, 'callbackResponse' ], 1 );
+		}
+
+		/**
+		 *	Return the current session's csrf token, creating one if missing
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	string									Current csrf token
+		 */
+		public static function getToken( array &$appData ): string {
+
+			$token = \Nino\Runtime::getSessionValue( $appData, './nino/csrf/token' );
+
+			if( is_string( $token ) === false || $token === '' ) {
+				$token = bin2hex( random_bytes( 32 ) );
+				\Nino\Runtime::setSessionValue( $appData, './nino/csrf/token', $token );
+			}
+
+			return $token;
+		}
+
+		/**
+		 *	Replace the current session's csrf token with a fresh one, eg.
+		 *	after login/logout to defend against session fixation
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	void
+		 */
+		public static function rotateToken( array &$appData ): void {
+			\Nino\Runtime::setSessionValue( $appData, './nino/csrf/token', bin2hex( random_bytes( 32 ) ) );
+		}
+
+		/**
+		 *	Reject a POST request with a missing or wrong csrf token. Sets a
+		 *	dedicated './nino/csrf/blocked' flag in addition to the status
+		 *	code, since doCallbacks() always runs every registered callback
+		 *	regardless of outcome - callbacks that run after this one (eg.
+		 *	Auth) must check that flag themselves before acting.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		&$request			(reference) Current server request
+		 *
+		 *	@return 	void
+		 */
+		public static function callbackResponse( array &$appData, array &$request ): void {
+
+			if( $request['/nino/http/request']['method'] !== 'POST' )
+				return;
+
+			$given = $_POST['_csrf'] ?? '';
+
+			if( is_string( $given ) === true && $given !== '' && hash_equals( self::getToken( $appData ), $given ) === true )
+				return;
+
+			$request['./nino/csrf/blocked']									= true;
+			$request['/nino/http/response']['statusCode']	= 403;
+			$request['/nino/http/response']['body']					= false;
+		}
+
+		/**
+		 *	Replace shortcode with a hidden csrf input field
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array			$args					Shortcode arguments
+		 *
+		 *	@return 	string									Hidden input html
+		 */
+		public static function doShortcode( array &$appData, array $args ): string {
+			return '<input type="hidden" name="_csrf" value="'. htmlspecialchars( self::getToken( $appData ), ENT_QUOTES, 'UTF-8' ). '">';
+		}
+	}
+
+
+	/**
+	 *	Nino								A compact filesystembased php framework
+	 *	Modules							All optional modules
 	 *	Elements						A html shortcode for including Elements
 	 *
 	 *	@package						Dape/Nino
@@ -3053,441 +3152,9 @@ namespace Nino\Shortcodes {
 	}
 
 
-		/**
-		 *	Nino								A compact filesystembased php framework
-		 *	Shortcodes					HTML shortcodes
-		 *	Jstext							Provide JS with text translations
-		 *
-		 *	@package						Dape/Nino
-		 *	@author							David Perchermeier <mail@dape.io>
-		 *	@link								https://github.com/dapeio/nino
-		 */
-
-	class Jstext {
-
-		private static
-			$_tpl = [
-				'script'	=> '<script nonce="[[nonce]]">NinoJstext=[[content]];</script>',
-			];
-
-		/**
-		 *	Module initiating
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *
-		 *	@return 	void
-		 */
-		public static function init( array &$appData ): void {
-
-			$appData['./nino/jstext/nonce'] = base64_encode(random_bytes(16));
-
-			\Nino\Html::addShortcode( $appData, 'jstext', [ self::class, 'doShortcode' ] );
-			\Nino\Callbacks::registerCallback( $appData, '/nino/http/response', [ self::class, 'callbackResponse' ] );
-		}
-
-
-		/**
-		 *	Replace shortcode
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		misc			$args					Shortcode arguments
-		 *
-		 *	@return 	array | false 				AppData array or false
-		 */
-		public static function doShortcode( array &$appData, array $args ): string {
-
-			$fills = ['/nino/jstext/nonce'=>$appData['./nino/jstext/nonce']];
-			foreach( \Nino\Html::getFills( $appData ) AS $key => $value )
-				$fills[ substr( $key, 2, -2 ) ] = $value;
-
-			return str_replace(
-				[
-					'[[content]]',
-					'[[nonce]]',
-				], [
-					json_encode( $fills ),
-					$appData['./nino/jstext/nonce'],
-				],
-				self::$_tpl['script'] );
-		}
-
-		/**
-		 *	Prepare a http request
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		array			$request			Current request
-		 *
-		 *	@return 	void
-		 */
-		public static function callbackResponse( array &$appData, array &$request ): void {
-
-			// Append to the seeded default policy (see Http::request()) - never
-			// start from an empty string, that would drop default-src & co
-			$csp = trim( $request['/nino/http/response']['header']['Content-Security-Policy'] ?? '', '; ' );
-
-			$request['/nino/http/response']['header']['Content-Security-Policy'] = ( $csp === '' ? '' : $csp. '; ' ). "script-src 'self' 'nonce-". $appData['./nino/jstext/nonce'] ."'";
-		}
-	}
-
-		/**
-		 *	Nino								A compact filesystembased php framework
-		 *	Shortcodes					HTML shortcodes
-		 *	Localepicker				A simple localepicker shortcode
-		 *
-		 *	@package						Dape/Nino
-		 *	@author							David Perchermeier <mail@dape.io>
-		 *	@link								https://github.com/dapeio/nino
-		 */
-
-	class Localepicker {
-
-		private static
-			$_tpl = [
-				'ul'	=> '<div class="sc-localepicker-wrap"><label><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 16 16" width="32" height="32" color="currentColor" aria-hidden="true"><g><path fill="currentColor" fill-rule="evenodd" d="M.017 7.482a8 8 0 0 1 15.967 0q.025.115.01.225a8 8 0 1 1-15.99 0 .6.6 0 0 1 .013-.225m1.247.951a6.75 6.75 0 0 0 4.197 5.823 7 7 0 0 1-.416-.781c-.555-1.213-.92-2.787-1.018-4.518a29 29 0 0 1-2.763-.524m2.739-.742a28 28 0 0 1-2.7-.535A6.76 6.76 0 0 1 5.46 1.744q-.229.372-.416.781c-.623 1.363-1.006 3.18-1.042 5.166Zm1.286 1.413c.109 1.516.436 2.852.893 3.85.59 1.292 1.28 1.796 1.818 1.796s1.228-.504 1.818-1.795c.457-1 .784-2.335.893-3.85-1.803.17-3.619.17-5.422 0Zm5.46-1.26a27.5 27.5 0 0 1-5.498 0c.018-1.904.38-3.596.93-4.799C6.774 1.755 7.462 1.25 8 1.25s1.228.504 1.818 1.795c.55 1.203.913 2.895.931 4.8Zm1.224 1.113c-.099 1.731-.463 3.305-1.018 4.518a7 7 0 0 1-.416.781 6.75 6.75 0 0 0 4.197-5.823q-1.372.33-2.763.524m2.725-1.801q-1.341.336-2.7.535c-.037-1.985-.42-3.803-1.043-5.166a7 7 0 0 0-.416-.781 6.76 6.76 0 0 1 4.159 5.412" clip-rule="evenodd"></path></g></svg><input type="checkbox"><div><h6>[[/nino/locales/title]]:</h6><ul>[[li]]</ul></div><div class="sc-localepicker-bg"></div></label></div>',
-				'li'	=> '<li class="[[active]]"><a[[link]]>[[/nino/locales/locale/[[locale]]]]</a></li>',
-			];
-
-		/**
-		 *	Module initiating
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *
-		 *	@return 	void
-		 */
-		public static function init( array &$appData ): void {
-			\Nino\Html::addShortcode( $appData, 'localepicker', [ self::class, 'doShortcode' ] );
-			\Nino\Callbacks::registerCallback( $appData, '/nino/http/response', [ self::class, 'callbackResponse' ] );
-		}
-
-		/**
-		 *	Prepare a http request
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		array			$request			Current request
-		 *
-		 *	@return 	void
-		 */
-		public static function callbackResponse( array &$appData, array &$request ): void {
-
-			if( isset( $request['/nino/http/request']['query']['/_nino/localepicker/current'] ) === false )
-				return;
-
-			$locale = \Nino\Locales::setCurrentLocale( $appData, $request['/nino/http/request']['query']['/_nino/localepicker/current'] );
-			$newUri = \Nino\Http::findRouteUri( $appData, $request['/nino/http/response']['uri'], $locale );
-
-			// Redirect via the response array - a direct header() call would be
-			// overwritten by Http::output()'s own http_response_code() pass
-			if( $newUri !== null ) {
-				$request['/nino/http/response']['statusCode'] 					= 302;
-				$request['/nino/http/response']['header']['Location']	= str_replace( $request['/nino/http/request']['method']. ':/', '', $newUri );
-			}
-		}
-
-		/**
-		 *	Replace shortcode
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		misc			$args					Shortcode arguments
-		 *
-		 *	@return 	array | false 				AppData array or false
-		 */
-		public static function doShortcode( array &$appData, array $args ): string {
-
-			$callback	= $args['callback'] ?? '';
-
-			$htmlLi 				= '';
-			$currentLocale	= \Nino\Locales::getCurrentLocale( $appData );
-
-			foreach( \Nino\Locales::getAvailableLocales( $appData ) AS $locale )
-				if( $currentLocale === $locale )
-					$actLi = str_replace( [ '[[locale]]', '[[active]]', '[[link]]' ], [ $locale, ' active', '' ], self::$_tpl['li'] );
-				else
-					$htmlLi .= str_replace( [ '[[locale]]', '[[active]]', '[[link]]' ], [ $locale, '', ' href="?/_nino/localepicker/current='. $locale.'"' ], self::$_tpl['li'] );
-
-			$content = str_replace( [ '[[li]]' ], [ $actLi. $htmlLi ], self::$_tpl['ul'] );
-
-			if( $callback !== '' )
-				\Nino\Callbacks::doCallbacks( $appData, $callback, $content );
-
-			return $content;
-		}
-	}
-
-
 	/**
 	 *	Nino								A compact filesystembased php framework
-	 *	Shortcodes					HTML shortcodes
-	 *	Navigation					A quick & dirty nav renderer
-	 *
-	 *	@package						Dape/Nino
-	 *	@author							David Perchermeier <mail@dape.io>
-	 *	@link								https://github.com/dapeio/nino
-	 */
-
-	class Navigation {
-
-		public static
-			$html = [
-				'li'					=> '<li><a href="[[uri]]"[[attributes]]>[[title]]</a></li>',
-				'nav-burger'	=> '<div class="sc-nav-wrap sc-nav-fullscreen sc-nav-burger [[class]]" id="[[id]]"><label><input type="checkbox"><div class="sc-nav-bg"></div><svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24"><rect y="3" width="24" height="3"/><rect y="10" width="24" height="3"/><rect y="17" width="24" height="3"/></svg><div class="sc-nav-content">[[content]]</div></label></div>',
-				'nav-regular'	=> '<div class="sc-nav-wrap sc-nav-fullscreen sc-nav-regular [[class]]" id="[[id]]"><div class="sc-nav-content">[[content]]</div></div>',
-				'ul'					=> '<ul>[[content]]</ul>',
-				'div'					=> '<div>[[content]]</div>',
-			];
-
-		/**
-		 *	Module initiating
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *
-		 *	@return 	void
-		 */
-		public static function init( array &$appData ): void {
-			\Nino\Html::addShortcode( $appData, 'navigation', [ self::class, 'doShortcode' ] );
-		}
-
-		/**
-		 *	Replace shortcode
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		misc			$args					Shortcode arguments
-		 *
-		 *	@return 	array | false 				AppData array or false
-		 */
-		public static function doShortcode( array &$appData, array $args ): string {
-
-			$content	= $args['content'] ?? '';
-			$callback	= $args['callback'] ?? '';
-			$id				= $args['id'] ?? '';
-			$class		= $args['class'] ?? '';
-			$html 		= '';
-
-			// Render list elements
-			$lis	= '';
-
-			if( $content === '' )
-				return '';
-
-			$lines = explode( PHP_EOL, $content );
-
-			foreach( $lines as $line ) {
-
-				if( $line === '' )
-					continue;
-
-				if( strpos( $line, ':' ) === false ) {
-					$html .= str_replace( '[[content]]', $line, self::$html['div'] );
-					continue;
-				}
-
-				$element		= explode( ':', $line );
-				$uri				= \Nino\Http::getRequest( $appData )['/nino/http/request']['uri'] ?? '/';
-				$attributes = $element[2] ?? '';
-				$element[0]	= trim( $element[0] );
-
-				$attributes	.= ( $uri === $element[0] ) ? ' class="active"' : '';
-				$lis				.= str_replace( [ '[[uri]]', '[[attributes]]', '[[title]]' ], [ $element[0]	, $attributes, $element[1] ], self::$html['li'] );
-			}
-			$html .= str_replace( '[[content]]', $lis, self::$html['ul'] );
-
-
-			$template = ( in_array( 'burger', $args ) === true ) ? 'burger' : 'regular';
-			$result = str_replace( [ '[[content]]', '[[id]]', '[[class]]' ], [ $html, $id, $class ], self::$html['nav-'. $template] );
-
-			if( $callback !== '' )
-				\Nino\Callbacks::doCallbacks( $appData, $callback, $result );
-
-			return $result;
-		}
-	}
-
-
-	/**
-	 *	Nino								A compact filesystembased php framework
-	 *	Shortcodes					HTML shortcodes
-	 *	Template						A html shortcode for including templates
-	 *
-	 *	@package						Dape/Nino
-	 *	@author							David Perchermeier <mail@dape.io>
-	 *	@link								https://github.com/dapeio/nino
-	 */
-
-
-	class Template {
-
-		/**
-		 *	Module initiating
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *
-		 *	@return 	void
-		 */
-		public static function init( array &$appData ): void {
-			\Nino\Html::addShortcode( $appData, 'template', [ self::class, 'doShortcode' ] );
-		}
-
-
-		/**
-		 *	Replace template shortcode
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		misc			$args					Shortcode arguments
-		 *
-		 *	@return 	array | false 				AppData array or false
-		 */
-		public static function doShortcode( array &$appData, array $args ): string {
-			$html = \Nino\Filesystem::getFileContent( $appData, ( $args[0] ?? '' ). '.tpl', '' );
-			return \Nino\Callbacks::doCallbacks( $appData, '/nino/html/render', $html );
-		}
-	}
-
-	/**
-	 *	Nino								A compact filesystembased php framework
-	 *	Shortcodes					HTML shortcodes
-	 *	Csrf								Cross-site-request-forgery protection
-	 *
-	 *	@package						Dape/Nino
-	 *	@author							David Perchermeier <mail@dape.io>
-	 *	@link								https://github.com/dapeio/nino
-	 */
-
-	class Csrf {
-
-		/**
-		 *	Module initiating. Registered at priority 1 so the check runs
-		 *	before any other global POST handler (eg. Auth's login/logout).
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *
-		 *	@return 	void
-		 */
-		public static function init( array &$appData ): void {
-			\Nino\Html::addShortcode( $appData, 'csrf', [ self::class, 'doShortcode' ] );
-			\Nino\Callbacks::registerCallback( $appData, '/nino/http/response', [ self::class, 'callbackResponse' ], 1 );
-		}
-
-		/**
-		 *	Return the current session's csrf token, creating one if missing
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *
-		 *	@return 	string									Current csrf token
-		 */
-		public static function getToken( array &$appData ): string {
-
-			$token = \Nino\Runtime::getSessionValue( $appData, './nino/csrf/token' );
-
-			if( is_string( $token ) === false || $token === '' ) {
-				$token = bin2hex( random_bytes( 32 ) );
-				\Nino\Runtime::setSessionValue( $appData, './nino/csrf/token', $token );
-			}
-
-			return $token;
-		}
-
-		/**
-		 *	Replace the current session's csrf token with a fresh one, eg.
-		 *	after login/logout to defend against session fixation
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *
-		 *	@return 	void
-		 */
-		public static function rotateToken( array &$appData ): void {
-			\Nino\Runtime::setSessionValue( $appData, './nino/csrf/token', bin2hex( random_bytes( 32 ) ) );
-		}
-
-		/**
-		 *	Reject a POST request with a missing or wrong csrf token. Sets a
-		 *	dedicated './nino/csrf/blocked' flag in addition to the status
-		 *	code, since doCallbacks() always runs every registered callback
-		 *	regardless of outcome - callbacks that run after this one (eg.
-		 *	Auth) must check that flag themselves before acting.
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		array 		&$request			(reference) Current server request
-		 *
-		 *	@return 	void
-		 */
-		public static function callbackResponse( array &$appData, array &$request ): void {
-
-			if( $request['/nino/http/request']['method'] !== 'POST' )
-				return;
-
-			$given = $_POST['_csrf'] ?? '';
-
-			if( is_string( $given ) === true && $given !== '' && hash_equals( self::getToken( $appData ), $given ) === true )
-				return;
-
-			$request['./nino/csrf/blocked']									= true;
-			$request['/nino/http/response']['statusCode']	= 403;
-			$request['/nino/http/response']['body']					= false;
-		}
-
-		/**
-		 *	Replace shortcode with a hidden csrf input field
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		array			$args					Shortcode arguments
-		 *
-		 *	@return 	string									Hidden input html
-		 */
-		public static function doShortcode( array &$appData, array $args ): string {
-			return '<input type="hidden" name="_csrf" value="'. htmlspecialchars( self::getToken( $appData ), ENT_QUOTES, 'UTF-8' ). '">';
-		}
-	}
-
-	/**
-	 *	Nino								A compact filesystembased php framework
-	 *	Shortcodes					HTML shortcodes
-	 *	Images							A html shortcode for including a developer-fixed image slot
-	 *
-	 *	@package						Dape/Nino
-	 *	@author							David Perchermeier <mail@dape.io>
-	 *	@link								https://github.com/dapeio/nino
-	 */
-
-	class Images {
-
-		/**
-		 *	Module initiating
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *
-		 *	@return 	void
-		 */
-		public static function init( array &$appData ): void {
-			\Nino\Html::addShortcode( $appData, 'image', [ self::class, 'doShortcode' ] );
-		}
-
-		/**
-		 *	Replace shortcode with an <img> tag for the given slot uri - eg.
-		 *	[image hero] or [image uri="hero" alt="..."]. Renders nothing if
-		 *	the slot doesn't exist or has no image uploaded yet.
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		array			$args					Shortcode arguments
-		 *
-		 *	@return 	string
-		 */
-		public static function doShortcode( array &$appData, array $args ): string {
-
-			$uri 	= (string) ( $args[0] ?? ( $args['uri'] ?? '' ) );
-			$slot	= \Nino\Images::getSlot( $appData, $uri );
-
-			if( $slot === false || empty( $slot['filename'] ) === true )
-				return '';
-
-			$url = \Nino\Images::getUrl( $appData, $slot['filename'] );
-			$alt = (string) ( $args['alt'] ?? ( $slot['label'] ?? '' ) );
-
-			return '<img src="'. htmlspecialchars( $url, ENT_QUOTES, 'UTF-8' ). '" width="'. (int) ( $slot['width'] ?? 0 ). '" height="'. (int) ( $slot['height'] ?? 0 ). '" alt="'. htmlspecialchars( $alt, ENT_QUOTES, 'UTF-8' ). '">';
-		}
-	}
-
-	/**
-	 *	Nino								A compact filesystembased php framework
-	 *	Shortcodes					HTML shortcodes
+	 *	Modules 						Optional Modules
 	 *	Form								Handles the contact form's POST / - sanitizes/validates
 	 *												the posted fields, sends the owner/user mail pair
 	 *												(recipient/subject/message stay Text/template driven -
@@ -3668,6 +3335,303 @@ namespace Nino\Shortcodes {
 				if( $date === false || $date < $cutoff )
 					unlink( $file );
 			}
+		}
+	}
+	
+	/**
+	 *	Nino								A compact filesystembased php framework
+	 *	Modules							All optional modules
+	 *	Images							A html shortcode for including a developer-fixed image slot
+	 *
+	 *	@package						Dape/Nino
+	 *	@author							David Perchermeier <mail@dape.io>
+	 *	@link								https://github.com/dapeio/nino
+	 */
+
+	class Images {
+
+		/**
+		 *	Module initiating
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	void
+		 */
+		public static function init( array &$appData ): void {
+			\Nino\Html::addShortcode( $appData, 'image', [ self::class, 'doShortcode' ] );
+		}
+
+		/**
+		 *	Replace shortcode with an <img> tag for the given slot uri - eg.
+		 *	[image hero] or [image uri="hero" alt="..."]. Renders nothing if
+		 *	the slot doesn't exist or has no image uploaded yet.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array			$args					Shortcode arguments
+		 *
+		 *	@return 	string
+		 */
+		public static function doShortcode( array &$appData, array $args ): string {
+
+			$uri 	= (string) ( $args[0] ?? ( $args['uri'] ?? '' ) );
+			$slot	= \Nino\Images::getSlot( $appData, $uri );
+
+			if( $slot === false || empty( $slot['filename'] ) === true )
+				return '';
+
+			$url = \Nino\Images::getUrl( $appData, $slot['filename'] );
+			$alt = (string) ( $args['alt'] ?? ( $slot['label'] ?? '' ) );
+
+			return '<img src="'. htmlspecialchars( $url, ENT_QUOTES, 'UTF-8' ). '" width="'. (int) ( $slot['width'] ?? 0 ). '" height="'. (int) ( $slot['height'] ?? 0 ). '" alt="'. htmlspecialchars( $alt, ENT_QUOTES, 'UTF-8' ). '">';
+		}
+	}
+
+
+		/**
+		 *	Nino								A compact filesystembased php framework
+		 *	Modules							All optional modules
+		 *	Jstext							Provide JS with text translations
+		 *
+		 *	@package						Dape/Nino
+		 *	@author							David Perchermeier <mail@dape.io>
+		 *	@link								https://github.com/dapeio/nino
+		 */
+
+	class Jstext {
+
+		private static
+			$_tpl = [
+				'script'	=> '<script nonce="[[nonce]]">NinoJstext=[[content]];</script>',
+			];
+
+		/**
+		 *	Module initiating
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	void
+		 */
+		public static function init( array &$appData ): void {
+
+			$appData['./nino/jstext/nonce'] = base64_encode(random_bytes(16));
+
+			\Nino\Html::addShortcode( $appData, 'jstext', [ self::class, 'doShortcode' ] );
+			\Nino\Callbacks::registerCallback( $appData, '/nino/http/response', [ self::class, 'callbackResponse' ] );
+		}
+
+
+		/**
+		 *	Replace shortcode
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		misc			$args					Shortcode arguments
+		 *
+		 *	@return 	array | false 				AppData array or false
+		 */
+		public static function doShortcode( array &$appData, array $args ): string {
+
+			$fills = ['/nino/jstext/nonce'=>$appData['./nino/jstext/nonce']];
+			foreach( \Nino\Html::getFills( $appData ) AS $key => $value )
+				$fills[ substr( $key, 2, -2 ) ] = $value;
+
+			return str_replace(
+				[
+					'[[content]]',
+					'[[nonce]]',
+				], [
+					json_encode( $fills ),
+					$appData['./nino/jstext/nonce'],
+				],
+				self::$_tpl['script'] );
+		}
+
+		/**
+		 *	Prepare a http request
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array			$request			Current request
+		 *
+		 *	@return 	void
+		 */
+		public static function callbackResponse( array &$appData, array &$request ): void {
+
+			// Append to the seeded default policy (see Http::request()) - never
+			// start from an empty string, that would drop default-src & co
+			$csp = trim( $request['/nino/http/response']['header']['Content-Security-Policy'] ?? '', '; ' );
+
+			$request['/nino/http/response']['header']['Content-Security-Policy'] = ( $csp === '' ? '' : $csp. '; ' ). "script-src 'self' 'nonce-". $appData['./nino/jstext/nonce'] ."'";
+		}
+	}
+	
+		/**
+		 *	Nino								A compact filesystembased php framework
+		 *	Modules							All optional modules
+		 *	Localepicker				A simple localepicker shortcode
+		 *
+		 *	@package						Dape/Nino
+		 *	@author							David Perchermeier <mail@dape.io>
+		 *	@link								https://github.com/dapeio/nino
+		 */
+
+	class Localepicker {
+
+		private static
+			$_tpl = [
+				'ul'	=> '<div class="sc-localepicker-wrap"><label><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 16 16" width="32" height="32" color="currentColor" aria-hidden="true"><g><path fill="currentColor" fill-rule="evenodd" d="M.017 7.482a8 8 0 0 1 15.967 0q.025.115.01.225a8 8 0 1 1-15.99 0 .6.6 0 0 1 .013-.225m1.247.951a6.75 6.75 0 0 0 4.197 5.823 7 7 0 0 1-.416-.781c-.555-1.213-.92-2.787-1.018-4.518a29 29 0 0 1-2.763-.524m2.739-.742a28 28 0 0 1-2.7-.535A6.76 6.76 0 0 1 5.46 1.744q-.229.372-.416.781c-.623 1.363-1.006 3.18-1.042 5.166Zm1.286 1.413c.109 1.516.436 2.852.893 3.85.59 1.292 1.28 1.796 1.818 1.796s1.228-.504 1.818-1.795c.457-1 .784-2.335.893-3.85-1.803.17-3.619.17-5.422 0Zm5.46-1.26a27.5 27.5 0 0 1-5.498 0c.018-1.904.38-3.596.93-4.799C6.774 1.755 7.462 1.25 8 1.25s1.228.504 1.818 1.795c.55 1.203.913 2.895.931 4.8Zm1.224 1.113c-.099 1.731-.463 3.305-1.018 4.518a7 7 0 0 1-.416.781 6.75 6.75 0 0 0 4.197-5.823q-1.372.33-2.763.524m2.725-1.801q-1.341.336-2.7.535c-.037-1.985-.42-3.803-1.043-5.166a7 7 0 0 0-.416-.781 6.76 6.76 0 0 1 4.159 5.412" clip-rule="evenodd"></path></g></svg><input type="checkbox"><div><h6>[[/nino/locales/title]]:</h6><ul>[[li]]</ul></div><div class="sc-localepicker-bg"></div></label></div>',
+				'li'	=> '<li class="[[active]]"><a[[link]]>[[/nino/locales/locale/[[locale]]]]</a></li>',
+			];
+
+		/**
+		 *	Module initiating
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	void
+		 */
+		public static function init( array &$appData ): void {
+			\Nino\Html::addShortcode( $appData, 'localepicker', [ self::class, 'doShortcode' ] );
+			\Nino\Callbacks::registerCallback( $appData, '/nino/http/response', [ self::class, 'callbackResponse' ] );
+		}
+
+		/**
+		 *	Prepare a http request
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array			$request			Current request
+		 *
+		 *	@return 	void
+		 */
+		public static function callbackResponse( array &$appData, array &$request ): void {
+
+			if( isset( $request['/nino/http/request']['query']['/_nino/localepicker/current'] ) === false )
+				return;
+
+			$locale = \Nino\Locales::setCurrentLocale( $appData, $request['/nino/http/request']['query']['/_nino/localepicker/current'] );
+			$newUri = \Nino\Http::findRouteUri( $appData, $request['/nino/http/response']['uri'], $locale );
+
+			// Redirect via the response array - a direct header() call would be
+			// overwritten by Http::output()'s own http_response_code() pass
+			if( $newUri !== null ) {
+				$request['/nino/http/response']['statusCode'] 					= 302;
+				$request['/nino/http/response']['header']['Location']	= str_replace( $request['/nino/http/request']['method']. ':/', '', $newUri );
+			}
+		}
+
+		/**
+		 *	Replace shortcode
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		misc			$args					Shortcode arguments
+		 *
+		 *	@return 	array | false 				AppData array or false
+		 */
+		public static function doShortcode( array &$appData, array $args ): string {
+
+			$callback	= $args['callback'] ?? '';
+
+			$htmlLi 				= '';
+			$currentLocale	= \Nino\Locales::getCurrentLocale( $appData );
+
+			foreach( \Nino\Locales::getAvailableLocales( $appData ) AS $locale )
+				if( $currentLocale === $locale )
+					$actLi = str_replace( [ '[[locale]]', '[[active]]', '[[link]]' ], [ $locale, ' active', '' ], self::$_tpl['li'] );
+				else
+					$htmlLi .= str_replace( [ '[[locale]]', '[[active]]', '[[link]]' ], [ $locale, '', ' href="?/_nino/localepicker/current='. $locale.'"' ], self::$_tpl['li'] );
+
+			$content = str_replace( [ '[[li]]' ], [ $actLi. $htmlLi ], self::$_tpl['ul'] );
+
+			if( $callback !== '' )
+				\Nino\Callbacks::doCallbacks( $appData, $callback, $content );
+
+			return $content;
+		}
+	}
+
+
+	/**
+	 *	Nino								A compact filesystembased php framework
+	 *	Modules							All optional modules
+	 *	Navigation					A quick & dirty nav renderer
+	 *
+	 *	@package						Dape/Nino
+	 *	@author							David Perchermeier <mail@dape.io>
+	 *	@link								https://github.com/dapeio/nino
+	 */
+
+	class Navigation {
+
+		public static
+			$html = [
+				'li'					=> '<li><a href="[[uri]]"[[attributes]]>[[title]]</a></li>',
+				'nav-burger'	=> '<div class="sc-nav-wrap sc-nav-fullscreen sc-nav-burger [[class]]" id="[[id]]"><label><input type="checkbox"><div class="sc-nav-bg"></div><svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24"><rect y="3" width="24" height="3"/><rect y="10" width="24" height="3"/><rect y="17" width="24" height="3"/></svg><div class="sc-nav-content">[[content]]</div></label></div>',
+				'nav-regular'	=> '<div class="sc-nav-wrap sc-nav-fullscreen sc-nav-regular [[class]]" id="[[id]]"><div class="sc-nav-content">[[content]]</div></div>',
+				'ul'					=> '<ul>[[content]]</ul>',
+				'div'					=> '<div>[[content]]</div>',
+			];
+
+		/**
+		 *	Module initiating
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	void
+		 */
+		public static function init( array &$appData ): void {
+			\Nino\Html::addShortcode( $appData, 'navigation', [ self::class, 'doShortcode' ] );
+		}
+
+		/**
+		 *	Replace shortcode
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		misc			$args					Shortcode arguments
+		 *
+		 *	@return 	array | false 				AppData array or false
+		 */
+		public static function doShortcode( array &$appData, array $args ): string {
+
+			$content	= $args['content'] ?? '';
+			$callback	= $args['callback'] ?? '';
+			$id				= $args['id'] ?? '';
+			$class		= $args['class'] ?? '';
+			$html 		= '';
+
+			// Render list elements
+			$lis	= '';
+
+			if( $content === '' )
+				return '';
+
+			$lines = explode( PHP_EOL, $content );
+
+			foreach( $lines as $line ) {
+
+				if( $line === '' )
+					continue;
+
+				if( strpos( $line, ':' ) === false ) {
+					$html .= str_replace( '[[content]]', $line, self::$html['div'] );
+					continue;
+				}
+
+				$element		= explode( ':', $line );
+				$uri				= \Nino\Http::getRequest( $appData )['/nino/http/request']['uri'] ?? '/';
+				$attributes = $element[2] ?? '';
+				$element[0]	= trim( $element[0] );
+
+				$attributes	.= ( $uri === $element[0] ) ? ' class="active"' : '';
+				$lis				.= str_replace( [ '[[uri]]', '[[attributes]]', '[[title]]' ], [ $element[0]	, $attributes, $element[1] ], self::$html['li'] );
+			}
+			$html .= str_replace( '[[content]]', $lis, self::$html['ul'] );
+
+
+			$template = ( in_array( 'burger', $args ) === true ) ? 'burger' : 'regular';
+			$result = str_replace( [ '[[content]]', '[[id]]', '[[class]]' ], [ $html, $id, $class ], self::$html['nav-'. $template] );
+
+			if( $callback !== '' )
+				\Nino\Callbacks::doCallbacks( $appData, $callback, $result );
+
+			return $result;
 		}
 	}
 
@@ -3982,4 +3946,45 @@ namespace Nino\Shortcodes {
 			return 'https://'. \Nino\Html::renderHtml( $appData, '[[/website/url]]' ). '/.newsletter?'. $action. '='. rawurlencode( $token );
 		}
 	}
+
+
+	/**
+	 *	Nino								A compact filesystembased php framework
+	 *	Modules							All optional modules
+	 *	Template						A html shortcode for including templates
+	 *
+	 *	@package						Dape/Nino
+	 *	@author							David Perchermeier <mail@dape.io>
+	 *	@link								https://github.com/dapeio/nino
+	 */
+
+
+	class Template {
+
+		/**
+		 *	Module initiating
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	void
+		 */
+		public static function init( array &$appData ): void {
+			\Nino\Html::addShortcode( $appData, 'template', [ self::class, 'doShortcode' ] );
+		}
+
+
+		/**
+		 *	Replace template shortcode
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		misc			$args					Shortcode arguments
+		 *
+		 *	@return 	array | false 				AppData array or false
+		 */
+		public static function doShortcode( array &$appData, array $args ): string {
+			$html = \Nino\Filesystem::getFileContent( $appData, ( $args[0] ?? '' ). '.tpl', '' );
+			return \Nino\Callbacks::doCallbacks( $appData, '/nino/html/render', $html );
+		}
+	}
+
 }
