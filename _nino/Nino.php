@@ -193,7 +193,8 @@ namespace Nino {
 			if( $sessionUser !== false && isset( $sessionUser['mail'] ) === true && isset( $appData['/nino/auth/user'][$sessionUser['mail']] ) === true && isset( $appData['/nino/auth/user'][$sessionUser['mail']]['sessions'][\Nino\Http::getClientIp()] ) === true )
 				$appData['./nino/auth/current'] = $appData['/nino/auth/user'][$sessionUser['mail']];
 
-			\Nino\Callbacks::registerCallback( $appData, '/nino/http/response', [ self::class, 'callbackResponse' ] );
+			\Nino\Callbacks::registerCallback( $appData, '/nino/http/response/POST://.nino/auth/login', [ self::class, 'callbackLoginResponse' ] );
+			\Nino\Callbacks::registerCallback( $appData, '/nino/http/response/POST://.nino/auth/logout', [ self::class, 'callbackLogoutResponse' ] );
 		}
 
 		/**
@@ -204,29 +205,37 @@ namespace Nino {
 		 *
 		 *	@return 	void
 		 */
-		public static function callbackResponse( array &$appData, array &$request ): void {
+		public static function callbackLoginResponse( array &$appData, array &$request ): void {
 
-			if( $request['/nino/http/request']['method'] !== 'POST' )
-				return;
-
-			// Respect a rejection from an earlier global callback (eg. Csrf). Checked via a
-			// dedicated flag rather than statusCode, since this uri has no matching route and
-			// its statusCode already defaults to the unrelated 404 fallback at this point.
 			if( ( $request['./nino/csrf/blocked'] ?? false ) === true )
 				return;
 
-			if( $request['/nino/http/request']['uri'] === '/.nino/auth/logout' )
-				self::logoutUser( $appData );
-			else if( $request['/nino/http/request']['uri'] === '/.nino/auth/login' )
-				self::loginUser( $appData, $request['/nino/http/request']['user'],  $request['/nino/http/request']['pw'] );
-			else
-				return;
+			self::loginUser( $appData, $request['/nino/http/request']['user'],  $request['/nino/http/request']['pw'] );
 
 			$request['/nino/http/response']['statusCode']	= 401;
 			$request['/nino/http/response']['body']				= false;
 
-			if( $request['/nino/http/request']['uri'] === '/.nino/auth/login' && self::getCurrentUser( $appData ) === false )
+			if( self::getCurrentUser( $appData ) === false )
 				return;
+
+			$request['/nino/http/response']['statusCode']	= 200;
+			$request['/nino/http/response']['body']				= true;
+		}
+
+		/**
+		 *	Catch logout response
+		 *
+		 *	@param		array 				&$appData			(reference) Array with current app data
+		 *	@param		array 				$request			Current server request
+		 *
+		 *	@return 	void
+		 */
+		public static function callbackLogoutResponse( array &$appData, array &$request ): void {
+
+			if( ( $request['./nino/csrf/blocked'] ?? false ) === true )
+				return;
+
+			self::logoutUser( $appData );
 
 			$request['/nino/http/response']['statusCode']	= 200;
 			$request['/nino/http/response']['body']				= true;
@@ -1904,6 +1913,7 @@ namespace Nino {
 			$request['/nino/http/response'] = array_merge( $request['/nino/http/response'], $routeData );
 
 			\Nino\Callbacks::doCallbacks( $appData, '/nino/http/response', $request );
+			\Nino\Callbacks::doCallbacks( $appData, '/nino/http/response/'. $request['/nino/http/request']['method']. ':/'. $request['/nino/http/request']['uri'], $request );
 			\Nino\Callbacks::doCallbacks( $appData, '/nino/http/response/'. $request['/nino/http/request']['method']. ':/'. $request['/nino/http/response']['uri'], $request );
 		}
 
@@ -3337,7 +3347,7 @@ namespace Nino\Modules {
 			}
 		}
 	}
-	
+
 	/**
 	 *	Nino								A compact filesystembased php framework
 	 *	Modules							All optional modules
@@ -3462,7 +3472,7 @@ namespace Nino\Modules {
 			$request['/nino/http/response']['header']['Content-Security-Policy'] = ( $csp === '' ? '' : $csp. '; ' ). "script-src 'self' 'nonce-". $appData['./nino/jstext/nonce'] ."'";
 		}
 	}
-	
+
 		/**
 		 *	Nino								A compact filesystembased php framework
 		 *	Modules							All optional modules
