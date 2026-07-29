@@ -351,6 +351,28 @@ body {
 	resize: vertical;
 }
 
+#dev-dashboard-tiles {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+	gap: var(--admin-gap);
+	margin-bottom: calc(var(--admin-gap) * 1.5);
+}
+
+#dev-dashboard-types {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: flex;
+	flex-direction: column;
+	gap: .6rem;
+}
+#dev-dashboard-types a {
+	display: block;
+	text-decoration: none;
+	color: inherit;
+	cursor: pointer;
+}
+
 #dev-dashboard-summary {
 	list-style: none;
 	margin: 0;

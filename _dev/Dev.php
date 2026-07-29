@@ -305,17 +305,14 @@ namespace Nino\Dev {
 		}
 
 		/**
-		 *	List every element type with its title and field count
+		 *	Every element type with its title and field count, sorted by
+		 *	uri - shared by apiList() and Dashboard::apiSummary()
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		array 		&$request			(reference) Current server request
 		 *
-		 *	@return 	void
+		 *	@return 	array										[ [ 'uri', 'title', 'fieldCount' ], ... ]
 		 */
-		public static function apiList( array &$appData, array &$request ): void {
-
-			if( \Nino\Dev\Dev::guard( $appData, $request ) === false )
-				return;
+		public static function summaries( array &$appData ): array {
 
 			$types = [];
 			foreach( glob( \Nino\Filesystem::getPath( $appData ). '/elements/*.php' ) ?: [] as $file ) {
@@ -332,7 +329,23 @@ namespace Nino\Dev {
 
 			usort( $types, fn( array $a, array $b ) => strcmp( $a['uri'], $b['uri'] ) );
 
-			$request['/nino/http/response']['body'] = [ 'types' => $types, 'fieldTypes' => self::FIELD_TYPES ];
+			return $types;
+		}
+
+		/**
+		 *	List every element type with its title and field count
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		&$request			(reference) Current server request
+		 *
+		 *	@return 	void
+		 */
+		public static function apiList( array &$appData, array &$request ): void {
+
+			if( \Nino\Dev\Dev::guard( $appData, $request ) === false )
+				return;
+
+			$request['/nino/http/response']['body'] = [ 'types' => self::summaries( $appData ), 'fieldTypes' => self::FIELD_TYPES ];
 		}
 
 		/**
@@ -708,6 +721,41 @@ namespace Nino\Dev {
 		}
 
 		/**
+		 *	Available backup dates, most recent first - shared by
+		 *	apiList() and Dashboard::apiSummary()
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	array										[ "Y-m-d", ... ]
+		 */
+		public static function dates( array &$appData ): array {
+
+			$dir 	= self::_backupDir( $appData );
+			$dates 	= [];
+
+			if( $dir !== false )
+				foreach( glob( $dir. '/*.php' ) ?: [] as $file )
+					if( preg_match( '/^\d{4}-\d{2}-\d{2}$/', basename( $file, '.php' ) ) === 1 )
+						$dates[] = basename( $file, '.php' );
+
+			rsort( $dates );
+
+			return $dates;
+		}
+
+		/**
+		 *	Most recent backup date on file, if any - shared by
+		 *	Dashboard::apiSummary
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	string|null							"Y-m-d", or null if none exist yet
+		 */
+		public static function lastDate( array &$appData ): ?string {
+			return self::dates( $appData )[0] ?? null;
+		}
+
+		/**
 		 *	List available backup dates, most recent first
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
@@ -720,17 +768,7 @@ namespace Nino\Dev {
 			if( \Nino\Dev\Dev::guard( $appData, $request ) === false )
 				return;
 
-			$dir 	= self::_backupDir( $appData );
-			$dates 	= [];
-
-			if( $dir !== false )
-				foreach( glob( $dir. '/*.php' ) ?: [] as $file )
-					if( preg_match( '/^\d{4}-\d{2}-\d{2}$/', basename( $file, '.php' ) ) === 1 )
-						$dates[] = basename( $file, '.php' );
-
-			rsort( $dates );
-
-			$request['/nino/http/response']['body'] = [ 'dates' => $dates ];
+			$request['/nino/http/response']['body'] = [ 'dates' => self::dates( $appData ) ];
 		}
 
 		/**
@@ -1066,6 +1104,17 @@ namespace Nino\Dev {
 		 */
 		public static function nav(): array {
 			return [ 'users', 'Nutzer' ];
+		}
+
+		/**
+		 *	How many admin accounts exist - shared by Dashboard::apiSummary
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	int
+		 */
+		public static function count( array &$appData ): int {
+			return count( $appData['/nino/auth/user'] ?? [] );
 		}
 
 		/**
@@ -2098,11 +2147,11 @@ namespace Nino\Dev {
 	/**
 	 *	Nino							A compact filesystembased php framework
 	 *	Dev								Dashboard: landing panel with the numbers the other
-	 *												modules already compute (missing text keys, missing
-	 *												image slots), pulled together into one overview
-	 *												instead of having to open Text/Images in turn to
-	 *												find out whether either scan is clean. Doesn't add
-	 *												any storage of its own
+	 *												modules already compute (element types, admin accounts,
+	 *												last backup, missing text keys, missing image slots),
+	 *												pulled together into one overview instead of having to
+	 *												open each tab in turn to find them. Doesn't add any
+	 *												storage of its own
 	 *
 	 *	@package					Dape/Nino
 	 *	@author						David Perchermeier <mail@dape.io>
@@ -2144,6 +2193,9 @@ namespace Nino\Dev {
 				return;
 
 			$request['/nino/http/response']['body'] = [
+				'types' 					=> ElementTypes::summaries( $appData ),
+				'users' 					=> Users::count( $appData ),
+				'lastBackup' 			=> Restore::lastDate( $appData ),
 				'missingText' 		=> Text::missingCount( $appData ),
 				'missingImages' 	=> Images::missingCount( $appData ),
 			];

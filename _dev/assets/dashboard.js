@@ -1,9 +1,11 @@
 /**
  *	Nino										A compact filesystembased php framework
- *	Dev											"Dashboard" module: landing tab with the numbers Text/
- *													Images already compute (missing keys/slots) - see
+ *	Dev											"Dashboard" module: landing tab with the numbers the other
+ *													modules already compute (element types, admin accounts,
+ *													last backup, missing text keys/image slots) - see
  *													_dev/Dev.php's Dashboard class. Doesn't write anything,
- *													the two links just jump to the tab that found them.
+ *													the tiles/rows just jump to the tab they summarize via
+ *													Nino.dev.selectTab().
  *
  *	@package								Dape/Nino
  *	@author									David Perchermeier <mail@dape.io>
@@ -78,10 +80,10 @@
 		},
 
 		/**
-		 *	Render the two scan summaries, each a link that jumps straight
-		 *	to the tab that found them
+		 *	Render the whole panel: a row of stat tiles, an element-type
+		 *	breakdown (by field count), then the missing-content scans
 		 *
-		 *	@param		{Object}	data					{ missingText, missingImages }
+		 *	@param		{Object}	data					{ types, users, lastBackup, missingText, missingImages }
 		 *
 		 *	@return		void
 		 */
@@ -90,13 +92,120 @@
 			const wrap = dc.getElementById('dev-content-dashboard');
 			wrap.innerHTML = '';
 
+			const tiles = dc.createElement('div');
+			tiles.id = 'dev-dashboard-tiles';
+			tiles.appendChild( Nino.dev.dashboard._tile( 'types', String( data.types.length ), data.types.length === 1 ? 'element type' : 'element types' ) );
+			tiles.appendChild( Nino.dev.dashboard._tile( 'users', String( data.users ), data.users === 1 ? 'admin account' : 'admin accounts' ) );
+			tiles.appendChild( Nino.dev.dashboard._tile( 'restore', data.lastBackup || '–', 'last backup' ) );
+			wrap.appendChild( tiles );
+
+			wrap.appendChild( Nino.dev.dashboard._typesSection( data.types ) );
+
 			const ul = dc.createElement('ul');
 			ul.id = 'dev-dashboard-summary';
-
 			ul.appendChild( Nino.dev.dashboard._row( 'text', data.missingText, 'missing text key', 'missing text keys', 'No missing text keys.' ) );
 			ul.appendChild( Nino.dev.dashboard._row( 'images', data.missingImages, 'missing image slot', 'missing image slots', 'No missing image slots.' ) );
-
 			wrap.appendChild( ul );
+		},
+
+		/**
+		 *	One clickable stat tile - jumps to the tab it summarizes via
+		 *	Nino.dev.selectTab(), same reuse of _admin's tile markup/CSS
+		 *
+		 *	@param		{string}	tab						Target tab uri (matches Nino.dev.TABS)
+		 *	@param		{string}	value					Big figure
+		 *	@param		{string}	label					Caption below it
+		 *
+		 *	@return		{Element}
+		 */
+		_tile : function( tab, value, label ) {
+
+			const a = dc.createElement('a');
+			a.href = '#';
+			a.className = 'admin-dashboard-tile admin-dashboard-tile--'+ tab;
+			a.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.dev.selectTab( tab ) } );
+
+			const val = dc.createElement('span');
+			val.className = 'admin-dashboard-tile-value';
+			val.textContent = value;
+			a.appendChild( val );
+
+			const lbl = dc.createElement('span');
+			lbl.className = 'admin-dashboard-tile-label';
+			lbl.textContent = label;
+			a.appendChild( lbl );
+
+			return a;
+		},
+
+		/**
+		 *	"Element types": one meter bar per type, width relative to
+		 *	whichever type has the most fields, clicking a row jumps to
+		 *	the Element Types tab
+		 *
+		 *	@param		{Array}		types					[ { uri, title, fieldCount }, ... ]
+		 *
+		 *	@return		{Element}
+		 */
+		_typesSection : function( types ) {
+
+			const section = dc.createElement('div');
+			section.className = 'admin-dashboard-section';
+
+			const title = dc.createElement('h3');
+			title.textContent = 'Element types';
+			section.appendChild( title );
+
+			if( types.length === 0 ) {
+				const p = dc.createElement('p');
+				p.textContent = 'No element types defined yet.';
+				section.appendChild( p );
+				return section;
+			}
+
+			const max = Math.max.apply( null, types.map( function( t ) { return t.fieldCount } ).concat( [1] ) );
+
+			const ul = dc.createElement('ul');
+			ul.id = 'dev-dashboard-types';
+
+			types.forEach( function( t ) {
+
+				const li = dc.createElement('li');
+
+				const a = dc.createElement('a');
+				a.href = '#';
+				a.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.dev.selectTab( 'types' ) } );
+
+				const row = dc.createElement('span');
+				row.className = 'admin-dashboard-meter-row';
+
+				const label = dc.createElement('span');
+				label.className = 'admin-dashboard-meter-label';
+				label.textContent = t.title;
+				row.appendChild( label );
+
+				const count = dc.createElement('span');
+				count.className = 'admin-dashboard-meter-count';
+				count.textContent = t.fieldCount;
+				row.appendChild( count );
+
+				a.appendChild( row );
+
+				const track = dc.createElement('span');
+				track.className = 'admin-dashboard-meter-track';
+				const fill = dc.createElement('span');
+				fill.className = 'admin-dashboard-meter-fill';
+				fill.style.width = ( t.fieldCount / max * 100 )+ '%';
+				track.appendChild( fill );
+				a.appendChild( track );
+
+				li.appendChild( a );
+				ul.appendChild( li );
+			} );
+
+			section.appendChild( ul );
+
+			return section;
 		},
 
 		/**
