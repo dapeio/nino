@@ -110,10 +110,6 @@
         'Content-Type' => 'text/plain; charset=utf-8',
       ),
     ),
-    'POST://' =>
-    array (
-      'uri' => '/',
-    ),
   ),
   '/nino/auth/user' =>
   array (

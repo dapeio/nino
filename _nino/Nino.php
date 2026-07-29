@@ -193,6 +193,8 @@ namespace Nino {
 			if( $sessionUser !== false && isset( $sessionUser['mail'] ) === true && isset( $appData['/nino/auth/user'][$sessionUser['mail']] ) === true && isset( $appData['/nino/auth/user'][$sessionUser['mail']]['sessions'][\Nino\Http::getClientIp()] ) === true )
 				$appData['./nino/auth/current'] = $appData['/nino/auth/user'][$sessionUser['mail']];
 
+			$appData['/nino/http/routes']['POST://.nino/auth/login'] = [ 'uri' => '/.nino/auth/login' ];
+			$appData['/nino/http/routes']['POST://.nino/auth/logout'] = [ 'uri' => '/.nino/auth/logout' ];
 			\Nino\Callbacks::registerCallback( $appData, '/nino/http/response/POST://.nino/auth/login', [ self::class, 'callbackLoginResponse' ] );
 			\Nino\Callbacks::registerCallback( $appData, '/nino/http/response/POST://.nino/auth/logout', [ self::class, 'callbackLogoutResponse' ] );
 		}
@@ -1913,7 +1915,6 @@ namespace Nino {
 			$request['/nino/http/response'] = array_merge( $request['/nino/http/response'], $routeData );
 
 			\Nino\Callbacks::doCallbacks( $appData, '/nino/http/response', $request );
-			\Nino\Callbacks::doCallbacks( $appData, '/nino/http/response/'. $request['/nino/http/request']['method']. ':/'. $request['/nino/http/request']['uri'], $request );
 			\Nino\Callbacks::doCallbacks( $appData, '/nino/http/response/'. $request['/nino/http/request']['method']. ':/'. $request['/nino/http/response']['uri'], $request );
 		}
 
@@ -3165,7 +3166,7 @@ namespace Nino\Modules {
 	/**
 	 *	Nino								A compact filesystembased php framework
 	 *	Modules 						Optional Modules
-	 *	Form								Handles the contact form's POST / - sanitizes/validates
+	 *	Form								Handles the contact form's POST /.form - sanitizes/validates
 	 *												the posted fields, sends the owner/user mail pair
 	 *												(recipient/subject/message stay Text/template driven -
 	 *												see /form/email/owner, /form/subject/owner, /form/subject/
@@ -3195,7 +3196,8 @@ namespace Nino\Modules {
 		 *	@return 	void
 		 */
 		public static function init( array &$appData ): void {
-			\Nino\Callbacks::registerCallback( $appData, '/nino/http/response/POST://', [ self::class, 'callbackResponse' ] );
+    	$appData['/nino/http/routes']['POST://.form'] = [ 'uri' => '/.form' ];
+			\Nino\Callbacks::registerCallback( $appData, '/nino/http/response/POST://.form', [ self::class, 'callbackResponse' ] );
 		}
 
 		/**
