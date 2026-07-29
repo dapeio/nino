@@ -601,7 +601,7 @@
 						// action defaults to '/' (the contact form's own POST
 						// handler) - a form targeting a different endpoint (eg.
 						// the newsletter signup) sets its own action="..."
-						Nino.http.sendRequest( this.getAttribute('action') || '/', 'POST', formResponse, data );
+						Nino.http.sendRequest( this.getAttribute('action') || '/.form', 'POST', formResponse, data );
 					},
 					/**
 					 *	Toggle the "empty" class on a form field's wrapper,
