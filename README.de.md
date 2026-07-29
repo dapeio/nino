@@ -91,8 +91,8 @@ text/             Texte je Sprache + global.php (inkl. Design-Tokens) + blacklis
 templates/        .tpl-Seiten-/Sektions-Templates
 assets/           Projekt-eigenes style.css/script.js
 images/           Hochgeladene Bilder (admin-verwaltet, bei Bedarf generiert)
-docs/             administrator.md, developer.md, modules.md, setup.md,
-                  design-system.md
+docs/             _admin.md, _dev.md, design.md, development.md,
+									_admin.de.md, _dev.de.md, design.de.md, development.de.md,
 tests/            Abhängigkeitsfreie Smoke-Tests (php tests/*.php)
 data/             Laufzeitdaten (Newsletter-Abonnenten, Formular-Einsendungen,
                   Logs) - entstehen bei Bedarf, nie in git getrackt
