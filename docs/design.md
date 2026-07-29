@@ -4,322 +4,293 @@
 **Links:**
 [README](../README.md) · [Developer Handbook](development.md) · [_admin Handbook](_admin.md) · [_dev Handbook](_dev.md) · [Security Policy](../SECURITY.md) · [Changelog](../CHANGELOG.md)
 
-A catalogue of the built-in frontend building blocks; no external libraries.
-Complements `_nino/Nino.css`/`_nino/Nino.js`/`_nino/Nino.ui.js` as well as
-`docs/development.md` (how the rendering pipeline works under the hood —
-this document assumes that knowledge and describes the design side of it:
-which mechanisms a template author actually touches, and which building
-blocks the built-in UI kit ships with).
+## Introduction
 
-## Part 1: Design-relevant mechanisms
+Everything that becomes visible on a Nino page comes from three combinable mechanisms - text fills, shortcodes, elements - plus a fixed set of CSS classes.
+`docs/development.md` describes these mechanisms from a developer's point of view (classes, callbacks, data flow).
+Here we look at it from the perspective of frontend design.
 
-Everything visible on a Nino page comes out of four mechanisms that can be
-combined. `docs/development.md` describes them from the framework's point of
-view (classes, callbacks, data flow); here the focus is on what they mean in
-practice for a template author.
+### Basic concept of the Nino design system
+Nino works with plain HTML, extended by three mechanisms. Logic is deliberately kept separate from design. Dynamic rendering becomes possible through these additional mechanisms:
+#### Text fills
+Every Nino website has a collection of texts following the pattern
+`[[key]] => value`.
+This is split into **global values** (the same across all languages) and **local values** (different per language). Developers and administrators can edit this text collection at any time via `_dev` and `/_admin`.
+The developer creates text building blocks for this in `_dev` - via `_admin` they can then be filled in, depending on the setting, either globally or for all allowed languages.
+Text fills can be **any length**. They should, however, **not contain HTML markup**.
+In templating, this lets you enter **language-relevant, recurring text** as a fill that gets replaced with the matching client locale on every render.
 
-### Text fills — `[[key]]`
+The convention behind this is - instead of:
+`<h2 class="ui-atf-title">Welcome to: www.example.com.</h2>`
+you write:
+`<h2 class="ui-atf-title">[[/page-home/atf/title]]: [[/company/website]]</h2>`
+A **base set** of global and local text fills already ships in the **starter repo**. Developers/designers are **free to define and create** further text fills as they see fit.
+There is, however, a small number of text fills reserved by Nino:
 
-Fixed pieces of text, manageable via `/_admin` → "Texts". A fill is replaced
-by a simple `str_replace()` against the text set of the current locale — no
-escaping, no Markdown, no logic. A fill can itself contain `[[anotherKey]]`
-(the replacement loop resolves that recursively); this is the pattern that
-`text/global.php` uses for design tokens that reference one another (e.g. an
-accent colour reused in several places).
+**Text fills - kernel / website**
+| Fill | e.g. | Value / defined in | Usage |
+|---|---|---|---|
+| `[[/nino/http/request/uri]]` | `/kontakt` | computed by Nino | the URI actually requested |
+| `[[/nino/http/response/uri]]` | `/contact` | computed by Nino | the internally resolved route URI |
+| `[[/nino/http/response/locale]]` | `de_DE` | computed by Nino | the resolved locale of the response |
+| `[[/nino/auth/user]]` | `changeme@domain.com` | computed by Nino | email of the logged-in user, otherwise `''` |
+| `[[/nino/dir]]` | `/www/nino` | computed by Nino | directory prefix of the installation |
+| `[[/date/year]]` | `2026` | computed by Nino | current year |
+| `[[/website/lang]]` | `de` | `text/{locale}.php` | `<html lang="...">` |
+| `[[/website/charset]]` | `UTF-8` | `text/global.php` | `<meta charset>`/Content-Type (header, mail) |
+| `[[/website/author]]` | `Max Mustermann` | `text/global.php` | `<meta name="author">`, imprint |
+| `[[/website/host]]` | `Meinhost Gbr` | `text/global.php` | hosting details in the imprint |
+| `[[/website/url]]` | `www.max-mustermann.com` | `text/global.php` | base domain for all absolute URLs (canonical, og:url, sitemap.xml, llms.txt, mail subjects) |
 
-**Two nuances that frequently surprise people when building templates:**
+#### Text fills - individual webpage
+Every webpage *(e.g. `/kontakt`)* additionally needs a set of fixed local (!) text fills in order to be fully integrated. These are used in the Nino navigation and in the default HTML head.
 
-- A fill that exists in no `text/*.php` file is **not** replaced — it stays
-  in the rendered HTML as a visible `[[/webpage/xyz/description]]` string.
-  There is no fallback mechanism. Every newly routed page needs its `/title`
-  and `/description` fills in **all** active locale files, otherwise the meta
-  description breaks visibly.
-- Purely technical values (colours, dimensions, `/ui/*` tokens) also arrive
-  through the fill mechanism, but deliberately do **not** appear in the
-  `/_admin` text panel — they live in `text/blacklist.php` and are thereby
-  protected from accidental editing by editors, while remaining editable for
-  developers in `text/global.php`.
+**Note:
+For text content on the page (e.g. `hero-title`), the recommended convention is
+`[[/page-<uri>/category/element]]`
+e.g. `[[/page-home/hero/title]]`**
 
-### Shortcodes — `[name arg]content[/name]`
+| Fill | Example | Value / defined in | Usage |
+|---|---|---|---|
+| `[[/webpage/<uri>/uri]]` | `/contact` | `text/{locale}.php`<br>per page key | route URI of the page (links, navigation, sitemap.xml) |
+| `[[/webpage/<uri>/name]]` | `Contact us!` | `text/{locale}.php`<br>per page key | link text (navigation, footer, llms.txt) |
+| `[[/webpage/<uri>/title]]` | `Contact us - Contact form` | `text/{locale}.php`<br>per page key | `<title>`/og:title/twitter:title, via `[[/webpage[[/nino/http/response/uri]]/title]]` |
+| `[[/webpage/<uri>/description]]` | `Our contact data and contact form.` | `text/{locale}.php`<br>per page key | meta/OG/Twitter description, same nesting pattern |
 
-Anything that needs more than plain text (a loop over content, conditional
-rendering, an embedded sub-template) is a shortcode. Unlike fills, shortcodes
-are **callback invocations** — every shortcode name is ultimately
-`Callbacks::doCallbacks( $appData, '/pino/html/shortcode/<name>', $args )`,
-and the handler's return value is **rendered recursively again** (so fills and
-further shortcodes inside it are resolved as well). That is why `[template x]`
-works without `x.tpl` itself having to be pushed through the rendering
-pipeline manually again — and at the same time the reason why a `[template x]`
-*inside* `x.tpl` runs into an infinite loop (see the "Gotcha" warning below for
-a related trap).
+`<uri>` always stands for the `uri` key from `$appData['/nino/http/routes']`
+*(for `/contact`, e.g. `[[/webpage/contact/uri]]`)*
 
-### Elements — recurring content
+#### Shortcodes
+Nino shortcodes are the **connection between design and logic**. Via PHP, developers can register a shortcode following the convention
+`[myshortcode]` with a callback - its return value is then automatically substituted in the template.
+For example, `[localepicker]`
+automatically becomes, during HTML rendering,
+`<div class="sc-localepicker-wrap">.....</div>`
 
-An element type (e.g. `/services`, `/team`, `/pricelist`) is a field model
-defined by the developer in `/_dev`; the per-language data is maintained by an
-editor via `/_admin` → "Elements". In the template, elements are never
-hardcoded but always included via the shortcodes `[element uri="..."]` (a
-single one) or `[elements uri="..." query="..."]` (a filtered list, rendered
-once per match) — the enclosed content is a small, local mini-template in
-which `[[title]]`, `[[description]]` etc. are the field values of **that
-specific element**, not global text fills. This similarity in syntax
-(`[[key]]` looks identical whether it is a global text fill or an element
-field) is intentional, but the resolution happens at completely different
-points in the pipeline — see the templating section of `docs/development.md`
-for the exact order.
+Nino already ships a small range of modules with shortcodes.
+*(See below, or the `\Nino\Modules` chapter of the [Developer Handbook](development.md))*. To use them, the modules must be enabled by the developer in `config.php`. Details on that are in the handbook.
+Further shortcodes can easily be added via PHP modules.
 
-**Rule of thumb for this repository itself:** articles/cards are always built
-via the `elements` shortcode, never with content hardcoded in the template —
-even on the demo pages. The services and portfolio sections of `page-home.tpl`
-follow this too (backed by the `services`/`portfolio` element types) instead of
-hand-written `<article>` blocks.
+#### Elements
+Elements are Nino's solution for **recurring data** following a fixed data model.
+This is suited, for example, to services, partners, news, blog posts, etc. The developer creates an **element type** via `_dev` with a URI *(e.g. /services)* and fields *(e.g. title, descr, eventdate, price)*. Any number of **elements** can then be created via `_admin`. Every element likewise gets a URI *(e.g. /webdesign)* that combines with the type URI *(/services/webdesign)*.
 
-### Locales — multilingual content
+The template engine provides two shortcodes for rendering elements:
 
-Every route can carry its own locale (`config.php`'s `/pino/http/routes`, key
-`locale`); `[[key]]` fills always resolve against the *current* locale, and
-elements carry their field data separately per locale within the same file.
-The language switch itself runs through two widgets, both of which use the
-same safe redirect mechanism (see the lifecycle section of
-`docs/development.md` for the details on why this must not be a simple
-`header('Location: ...')` call):
+`[element /services/webdesign]...[/element]`
+outputs a **specific element** by its URI. The HTML enclosed by the shortcode tag serves as the template for rendering it. Inside it, the element's fields are **automatically substituted as text fills**. *(e.g. `[[title]]` becomes `Webdesign`)*
 
-- `[localepicker]` — a ready-made language switcher widget
-  (`sc-localepicker-*` classes, see below)
-- The `/_nino/locales/current` query parameter, which `Locales::request()`
-  evaluates directly — for a custom language switcher not styled by the kernel
+`[elements /services limit="4"..]...[/elements]`
+works on the same concept - except that **several elements** of the type at the given URI are shown. The syntax for controlling this is in the [Developer Handbook](development.md).
+In this case, the enclosed HTML is repeated for **every element** and filled in accordingly.
 
-Both find the *equivalent* route in the target language via
-`Http::findRouteUri()` (not simply the same URL with a different locale flag) —
-so `/legal` and `/rechtliches` can be different URLs for the same page in
-different languages.
+**Recommendation for Nino development:** articles/cards are always built via the `elements` shortcode, never with content hardcoded in the template - not even on the demo pages. A services or portfolio section follows the same rule (backed by the `services`/`portfolio` element types) instead of hand-written `<article>` blocks.
 
-## Part 2: Core content in detail
+### Template rendering
 
-### Architecture
+The technical implementation of this simple template engine sits in the kernel method `\Nino\Html::renderHtml( $appData, $html )`.
+This runs **automatically** every time a template is loaded, and in fixed order always does three things:
+
+1. **Resolve text fills** - every `[[key]]` placeholder is replaced via `str_replace()` against the current text set.
+2. **Run shortcodes** - every `[name arg]content[/name]` call is picked up by a regex and passed to the registered callback of that shortcode.
+3. **`/nino/html/render` callbacks** - any further, project-owned callbacks receive the finished HTML string for modification.
+
+After that, `renderHtml()` is **called again, recursively** - regardless of what the shortcode returned - until every bit of content has been resolved and nothing more changes in the HTML.
+There is no compile step and no cache build at development time - every request renders live against the current state of the `.tpl`, `text/*.php` and `elements/*.php` files.
+
+**Important in practice:** a fill or shortcode name that doesn't exist breaks nothing - it simply stays in the delivered HTML as a visible `[[key]]` or `[name]` string. There is no fallback and no error message at this point.
+This means you can work in the design with placeholder text fills, e.g. `[[/page-home/hero/title]]`, or `[my_shortcode]`, and fill them in afterwards.
+
+#### Template files (.tpl)
+To clearly set them apart from `.html`, Nino uses `.tpl` files. These all (!) live in `/templates` and are **plain text files with HTML content** - no PHP, no logic, no syntax of their own beyond text fills (`[[key]]`) and shortcodes (`[name]...[/name]`). A `.tpl` file gets pulled into delivery in two ways:
+
+- **1. As a route body** - `config.php`'s `/nino/http/routes` references a `.tpl` file directly via the `Template` shortcode, e.g. `'body' => '[template /templates/page-home]'`.
+- **2. As an include inside another template** - the same `[template ...]` shortcode, e.g. `[template /templates/html-header]` at the top of every page.
+
+For including other template files inside a `.tpl`, use the
+**shortcode:**
+`[template /path/file]`
+The example includes `/path/file.tpl` (given without extension) and renders it. For technical reasons, `Template` internally calls `Callbacks::doCallbacks( $appData, '/nino/html/render', $html )` directly instead of a full `renderHtml()` pass.
+
+Every page follows the same **convention**:
 
 ```
-_nino/Nino.css       Core: reset, grid, sections, buttons, ui-* behaviour
-                        support CSS. Design tokens (colour/spacing/typography/
-                        radius) live in a :root { --token: value; } block at the
-                        very top of the file — never as hardcoded values
-                        scattered across the rest of the file.
-_nino/Nino.js         Core: client detection, cookies, DOM ready/resize/scroll
-                        events, XHR, auth, jstext. Used by _admin/_dev as well
-                        as by the public site.
-_nino/Nino.ui.js      Core, public site only: cover, parallax, VPA, autoheight,
-                        slider, scroll header, generic .ui-form handling. Never
-                        referenced by _admin/_dev — deliberately split out so
-                        that their bundle stays lean.
+[template /templates/html-header]
 
-assets/style.theme01.css  Theme: project-specific overrides. A project overrides
-assets/script.js           the tokens it needs in its own :root { ... } block
-                            (see the "00 Theme" section of _nino/Nino.css) — CSS
-                            custom properties resolve at computation time via
-                            the cascade, so no separate load-order or build-step
-                            logic is needed, only loading after Nino.css. Which
-                            theme file is active per project is controlled by
-                            config.php (/pino/html/assets).
+... page content (sections) ...
 
-text/global.php         Contains only the handful of /ui/* fills that either
-                        must remain _admin-editable, or that a context without
-                        its own stylesheet (e.g. templates/mail-header.tpl, a
-                        self-contained email document) needs as a literal value.
-                        A token can be declared as --token: [[/pino/path]]; in a
-                        :root block instead of a literal value at any time, as
-                        soon as a project wants it admin-editable — the same
-                        fill mechanism that text content uses. Every remaining
-                        /ui/* key is hidden from the admin text panel by default
-                        (text/blacklist.php), since these are developer design
-                        tokens, not page content.
+[template /templates/html-footer]
 ```
 
-Load order matters: `_nino/Nino.css` before `assets/style.theme01.css`, so that
-a project's `:root` overrides win the cascade. Registered in `config.php`'s
-`/pino/html/assets`.
+`html-header.tpl` opens `<head>`/`<header>`/`<main>`, `html-footer.tpl` closes `</main>` and adds `<footer>`, the cookie banner, the preloader and the asset/text-fill scripts. See "HTML Structure" below for the full layout.
 
-There is deliberately no multi-theme/theme-switching layer — a project has
-exactly one active look, set directly in the `:root` block of its own
-`assets/style*.css` (plus `text/global.php` for the rare token that should
-remain _admin-editable). An earlier version of this framework had one (a
-`/theme/<name>/` directory + a `/pino/theme/fills` config key, merged before
-`global.php`), removed before the alpha release: it was developer tooling
-disguised as a feature — no admin-side switch, never a real second theme
-shipped — and sitting there unused looked more unfinished than flexible. A
-developer who wants to compare two looks can still do so by hand (two copies of
-`assets/style*.css`, swap and diff), with no framework support for it at all.
+### How assets are included
+
+CSS and JS are **not** included individually via `<link>`/`<script>`, but through a bundle defined in `config.php`:
+
+```php
+'/nino/html/assets' => [
+  '/.cache/style.css' => [ '/_nino/Nino.css', '/assets/style.css' ],
+  '/.cache/script.js' => [ '/_nino/Nino.js', '/_nino/Nino.ui.js', '/assets/script.js' ],
+],
+```
+
+Each key is the path of the **generated cache file**, the value the list of source files in include order. `[assets /.cache/style.css]` automatically renders the matching `<link>` or `<script>` tag from that, depending on the file extension. On the first request the bundle is built once: source files are concatenated, in the process **also pushed through the text-fill/shortcode rendering pipeline** (which is why `[[/ui/color-primary]]` also works inside a `.css` file), minified for `.min` filenames, and stored under the cache path - every following request then serves the cache file directly.
+
+**Order is the only rule:** `_nino/Nino.css` must come before the project's own stylesheet, so that its `:root` overrides win in the cascade (see the CSS section below). There is no build step, no bundler tooling, no compilation - just this one list plus filesystem concatenation.
+
+A custom shortcode can bring its own CSS/JS along by simply adding the file to this array - no separate registration is needed.
+
+## HTML Structure
+
+### The Nino structure convention
+
+Every page follows the same nesting, visible in the example `templates/.demo-sections.tpl`:
+
+```
+[template /templates/html-header]      Opens <head>, <header>, <main>
+
+  <section class="ui-section ...">     One content section
+    <div class="ui-grid-row ...">      Flex container, max-width + padding
+      <div class="ui-grid-100 ui-grid-m-50 ...">   One column
+        ... content (heading, text, button, article, ...) ...
+      </div>
+    </div>
+  </section>
+
+  <section class="ui-section ...">     Next section, same pattern
+    ...
+  </section>
+
+[template /templates/html-footer]      Closes </main>, adds <footer>
+```
+
+**Fixed rules of this convention:**
+
+1. **`<section>` always carries `ui-section`** (or `ui-atf` for an above-the-fold page opener) plus, optionally, exactly one colour variant (`--dark`/`--black`/`--primary`/`--alt`) and optionally `--fullwidth`. Sections are never nested inside one another.
+2. **`<div class="ui-grid-row">` is always the direct child of `<section>`** - never text or an `<article>` directly inside `<section>`, except for the JS-driven fullscreen variants (`js-cover`, `js-parallex`), which instead expect `<img>` + a `.js-cover-content` wrapper directly inside `<section>` (see CSS Classes below).
+3. **Grid width classes (`ui-grid-100`, `ui-grid-m-50`, ...) always sit on their own `<div>`**, never directly on `<article>`. An `<article class="ui-article">` sits *inside* a grid div and itself only carries `ui-article` and its modifiers.
+4. **Recurring content always comes via `[elements]`**, never hardcoded - see above. The grid div sits *inside* the `[elements]...[/elements]` loop, so that every element gets its own column:
+   ```
+   <div class="ui-grid-row">
+      [elements /demo-services limit="3"]
+         <div class="ui-grid-100 ui-grid-m-33">
+            <article class="ui-article">
+		       <h4 class="ui-article-title">[[title]]</h4>
+		       <p class="ui-article-descr">[[description]]</p>
+		    </article>
+         </div>
+      [/elements]
+   </div>
+   ```
+5. **A section that appears identically on more than one page can be extracted into its own `templates/section-*.tpl` partial** and included via `[template /templates/section-*]` - the same include mechanism as for `html-header`/`html-footer`. `section-contact.tpl` (address + contact form) is one possible example of this.
+
+### Working with all shortcodes in a template
+
+A realistic page excerpt that shows the shortcodes from the introduction working together:
+
+```
+[template /templates/html-header]
+
+<section class="ui-atf ui-section--fullwidth js-cover js-cover--dim" data-cover-height="100">
+  <img src="[[/nino/dir]]/images/.demo/demo-01.jpg">
+  <div class="js-cover-content">
+    <div class="ui-grid-row">
+      <div class="ui-grid-100">
+        <h2 class="ui-atf-title">[[/page-home/hero/title]]</h2>
+        <p class="ui-atf-subtitle">[[/page-home/hero/subtitle]]</p>
+        <a href="[[/webpage/contact/uri]]" class="ui-btn ui-btn--primary">[[/global/cta]]</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="ui-section">
+  <div class="ui-grid-row">
+    <div class="ui-grid-100 ui-text-center ui-mb-3">
+      <h3 class="ui-section-title">[[/page-home/services/title]]</h3>
+    </div>
+    [elements /services limit="3"]
+    <div class="ui-grid-100 ui-grid-m-33">
+      <article class="ui-article">
+        [image [[.uri]]/teaser alt="[[title]]"]
+        <div class="ui-article-content">
+          <h4 class="ui-article-title">[[title]]</h4>
+          <p class="ui-article-descr">[[description]]</p>
+        </div>
+      </article>
+    </div>
+    [/elements]
+  </div>
+</section>
+
+[template /templates/section-contact]
+
+[template /templates/html-footer]
+```
+
+This order - a hero via `js-cover`, then an `elements` grid, then an extracted section partial - already covers `Elements`, `Images` and `Template` in combination with text-fill syntax. `Navigation`, `Localepicker`, `Jstext` and `Csrf` are already wired up in `html-header.tpl`/`html-footer.tpl` (see the structure convention above) and normally don't need to be called again on individual pages - `Csrf` shows up again directly in a form of its own, see the newsletter example in the CSS section below.
+
+## CSS
+
+### `var()` handling and the concept behind `Nino.css`
+
+All design values - colours, spacing, font sizes, radii - live as native CSS custom properties in a single `:root { --token: value; }` block right at the top of `_nino/Nino.css` (the "00 Theme" section).
+The rest of the file references **exclusively** `var(--token)`, never a hardcoded colour or spacing value anywhere. This has one single, but important, effect: a project never needs to change a single rule in `Nino.css` to get its own look - it's enough to override the same token name in a `:root { }` block that is **loaded later**. The browser resolves `var()` only at computation time, via the normal CSS cascade - no build step, no preprocessor variables, no load-order logic beyond "project stylesheet after `Nino.css`".
+
+```css
+/* assets/style.css - example of the most important tokens */
+:root {
+  --color-primary: #4faae8;
+  --color-primary-text: #ffffff;
+  --color-text: #333333;
+  --color-background: #ffffff;
+  --fontfamily-text: 'Inter', sans-serif;
+  --fontfamily-title: 'Inter', sans-serif;
+  --space-1: .75rem;
+  --space-2: 1.5rem;
+  --radius: .5rem;
+}
+```
+
+As soon as a token also needs to stay editable via `/_admin` (e.g. an accent colour the operator should be able to adjust themselves), it is declared as a text fill instead of a literal - `--color-primary: [[/ui/color-primary]];` - and thereby lands in the same fill mechanism as ordinary page content. All remaining `/ui/*` values are deliberately **not** visible in the `/_admin` text panel (`text/blacklist.php`) - they are developer design tokens, not editorial content.
+
+> **Important: `_nino/Nino.css` is not written to - it gets overridden.**
+> `_nino/Nino.css` is kernel code, exactly like `_nino/Nino.php`. It is **never edited directly** in a project - every adjustment (colours, spacing, custom web fonts, additional components) belongs in a separate, project-owned stylesheet file under `assets/` (per the README convention, `assets/style.css`), which is entered in `config.php`'s `/nino/html/assets` **after** `_nino/Nino.css` into the same bundle:
+> ```php
+> '/.cache/style.css' => [ '/_nino/Nino.css', '/assets/style.css' ],
+> ```
+> This order is the entire mechanism: the project stylesheet's own `:root { }` wins in the cascade against the defaults from `Nino.css`, without a single line there ever being touched. This repository itself wires up three swappable theme files for demonstration purposes (`assets/style.theme01/02/03.css`) - the principle stays the same either way: **a separate file, loaded after the kernel stylesheet**, never a change to `Nino.css` itself. This keeps updating the kernel (replacing `_nino/Nino.css`) conflict-free at all times.
+
+There is deliberately **no multi-theme/theme-switching layer** - a project has exactly one active look, set directly in the `:root` block of its own stylesheet.
 
 ### Naming convention
 
-- `ui-<block>` / `ui-<block>--<modifier>` / `ui-<block>-<element>` — BEM-like,
-  for everything purely CSS-related (sections, buttons, articles, grid).
-- `ui-<property>-<value>` — utilities (spacing, text alignment, opacity).
-- `js-<block>` — JS behaviour hooks, separate from `ui-*` styling, so that a
-  theme can restyle freely without ever risking behaviour, and core JS never
-  relies on a name the theme might rename. **Implemented**: `cover`,
-  `parallex`, `slider`, `vpa` are `js-*` (`Nino.ui.js` looks for
-  `.js-cover`/`.js-parallex`/`.js-slider`/`.js-vpa`, and CSS matches the same
-  classes). `autoheight` and the generic contact form handling deliberately
-  stayed `ui-*` (`.ui-autoheight`, `.ui-form`) — they are markup/styling
-  concerns rather than behaviour toggles, so they were not renamed.
-- `sc-<block>` — markup generated by kernel shortcodes (`[navigation]`,
-  `[localepicker]`), since this HTML ships hardwired with `_nino/Nino.php`
-  itself and is not project-customisable. Both the PHP templates of these two
-  shortcodes and their CSS use this prefix (`sc-nav-wrap`, `sc-nav-content`,
-  `sc-localepicker-wrap`, ...).
+Three prefixes, strictly separated by responsibility:
 
-### Building blocks
-
-Every building block below is fully wired up and ready to use.
-
-**Frame/structure**
-
-| Block | Notes |
+| Prefix | Meaning |
 |---|---|
-| Grid (`ui-grid-row`, `ui-grid-25/33/50/66/75/100`, `-s-/-m-/-l-/-xl-` breakpoints) | Breakpoints at 640/768/1024/1280px |
-| Reset | System font stack as the default (`html { font-family: ... }` in `_nino/Nino.css`) — no font file needs to ship per project. A theme stylesheet can still bring its own `@font-face`/`font-family` rules (`assets/style.theme01.css` does exactly that) |
-| Navigation (burger + regular) | The output of `Navigation::doShortcode()` and the CSS both use the `sc-*` prefix (`sc-nav-wrap`, `sc-nav-burger`, `sc-nav-regular`, `sc-nav-content`, `sc-nav-bg`). A `[navigation]` content line without a `:` renders as a plain `<div>` instead of a nav `<li>` (`Navigation::$html['div']`) — this allows arbitrary markup (e.g. a logo image) to be mixed in between `uri:title` link lines. Within the burger variant these additional `<div>`s are hidden as long as the overlay is closed |
-| ATF/hero (`ui-atf(--fullscreen)`, `ui-cover`) | `--fullscreen` (`min-height:100vh`, flex-centred) is the pure-CSS fullscreen hero variant for an image-less `ui-atf`; `js-cover`/`js-parallex` achieve the same effect via `data-cover-height="100"`, since they are dimensioned by JS anyway |
-| Sections (`ui-section`, `--dark/--black/--primary/--alt/--fullwidth`, `--border-1/2/3`) | Every colour variant additionally sets a normal `a:not(.ui-btn)` link colour — `a { color: inherit }` alone is not specific enough to reliably win against other `a` rules in the cascade |
+| `ui-<block>` / `ui-<block>--<modifier>` / `ui-<block>-<element>` | BEM-like, for everything purely CSS-related (sections, buttons, articles, grid) |
+| `ui-<property>-<value>` | Utilities (spacing, text alignment, opacity) |
+| `js-<block>` | JS behaviour, strictly separate from `ui-*` styling - a theme can restyle freely without ever risking behaviour, and the kernel's own JS never relies on a name a theme might rename |
+| `sc-<block>` | Markup that a kernel shortcode generates itself (`[navigation]`, `[localepicker]`) - this HTML is hardwired to `_nino/Nino.php` and not project-customisable |
 
-**JS-driven behaviour (`Nino.ui.js`)**
+This split is also the guideline for custom shortcodes/components: custom behaviour → `js-*`, custom styling → `ui-*`, `sc-*` stays reserved for the kernel's own shortcodes.
 
-| Block | Notes |
+### The Nino CSS classes
+
+#### Frame & structure
+
+| Class | Note |
 |---|---|
-| Viewport animation (`js-vpa`, `--repeat`, effect `--zoom`/`--zoom-out`/`--slide-left`/`--slide-right`/`--blur`/`--flip` × `-soft`/`-medium`/`-hard`, speed `--speed-fast`/`-medium`/`-slow`) | Effect/speed variants are pure CSS (custom properties); no JS change needed. Demo: `/demo-vpa` |
-| Autoheight (`ui-autoheight`, `data-autoheight-group`) | Deliberately kept the `ui-*` prefix (see naming convention) — more of a markup/styling concern than a behaviour toggle |
-| Cover (`js-cover(--dim)`, `data-cover-height/-width`) | `data-cover-height="100"` for a fullscreen hero. `--dim` lays a dark scrim over it (see Utilities/image tools' `ui-img-background--dim` for the same idea on a static image) — necessary as soon as a hero uses a real (bright) photo instead of a dark placeholder, so that the white `ui-atf-title`/`-subtitle` text stays legible |
-| Parallax (`js-parallex(--dim)`) | The same `--dim` scrim as `js-cover`, for the same reason |
-| Preloader (`js-preloader`) | Fullscreen spinner overlay, removed on `window.load`. The markup sits in `templates/html-footer.tpl` directly before `[jstext]` |
-| Slider (`js-slider`, touch swipe, prev/next `js-slider-button`s) | Prev/next buttons and dot pagination (`js-slider-points`) are generated by JS, not hand-written |
-| Scroll header (`js-scroll-header`, `body.js-scroll-atf/-btf/-up/-down`) | Shows/hides the header depending on scroll position/direction. The scroll state classes on `body` are set unconditionally (not only when `.js-scroll-header` exists), so that other elements — e.g. back-to-top — can hook into them as well |
-| Back-to-top button (`js-back-to-top`) | Visibility is pure CSS, driven by `body.js-scroll-btf` (appears after scrolling past the fold); JS only handles the click (`window.scrollTo` smooth) |
-| Hero scroll arrow (`ui-atf-arrowdown`, `data-arrow-target`) | The chevron is a `currentColor` SVG used as a `background-image` (see `_nino/Nino.css`), so it needs nothing beyond the class and a `data-arrow-target` CSS selector attribute — no icon markup, no separate asset |
-| Stat counter (`js-stat-counter`, `data-stat-counter-to/-suffix/-duration`) | Counts up from 0 once scrolled into the viewport (the same `getBoundingClientRect` check as `js-vpa`), animated via `requestAnimationFrame` |
-| Generic form handling (`ui-form`, posts to `/`) | Kept `ui-*` (see naming convention) — automatically targets the `POST /` endpoint of `Shortcodes\Form`; no shortcode needed |
-| Tabs (`js-tabs`, `js-tabs-nav`/`-tab`, `js-tabs-panel`, `data-tabs-target`) | On switching, the panel fades in via `@starting-style`/`transition-behavior:allow-discrete` (pure CSS) — falls back to an instant show/hide in browsers without support |
-| Modal / lightbox / video (`js-modal`, `--lightbox`, `--video`, `js-modal-trigger`, `js-modal-close`, `data-modal-target`) | Built on the native `<dialog>` element (`showModal()`/`.close()`) instead of hand-rolled JS — focus trapping, escape-to-close and the backdrop click area therefore come for free from the browser |
-| Toast (`js-toast-trigger`, `data-toast-message`/`-type`, or `Nino.ui.toast(message, type)` from your own JS) | Inline `onclick` does not work here — the site sends a `Content-Security-Policy: script-src 'self' 'nonce-...'` header that blocks inline event handlers without a matching nonce, and there is no generally available nonce fill for templates. `js-toast-trigger` is the CSP-safe declarative way to fire a toast from static markup |
+| `ui-grid-row`, `ui-grid-25/33/50/66/75/100` | Flexbox grid, mobile-first. Breakpoints `-s-`/`-m-`/`-l-`/`-xl-` at 640/768/1024/1280px, `ui-grid--fullwidth` removes the row padding |
+| `ui-grid-top/-middle/-bottom`, `-center` | Vertical/horizontal alignment within the row |
+| `header`, `.ui-logo`, `footer`, `.ui-footer-main/-legal/-title/-logo/-getintouch/-localepicker` | Frame of the header/footer area - see HTML Structure above for the full nesting |
+| `js-scroll-header`, `body.js-scroll-atf/-btf/-up/-down` | Header fades in/out depending on scroll position/direction; the scroll-state classes always land on `body`, so that other elements (e.g. back-to-top) can hook into them too |
+| `ui-atf`, `ui-atf--fullscreen` | Page opener (hero). `--fullscreen` (`min-height:100vh`) is the pure-CSS variant without an image; `js-cover`/`js-parallex` achieve the same effect image-based, via JS |
+| `ui-section`, `--dark/--black/--primary/--alt/--fullwidth`, `--border-1/2/3` | Every colour variant also sets a matching link colour (`a:not(.ui-btn)`) |
 
-**Content components**
-
-| Block | Notes |
-|---|---|
-| Article/card (`ui-article`, `--alt`/`--fullwidth`, `-cols`/`-cols-s/m/l/xl`, `-price`) | `-price` is intended for a priced item shown as a regular article grid card — different from `ui-pricing-price` (pricing table, below), which is for a dedicated price table |
-| Buttons (`ui-btn`, `--primary/--outline/--light/--dark/--big/--small`) | `--big`/`--small` scale padding/font size/radius via `calc()` from the same base, instead of separate literal values |
-| Icons (`ui-icon`, `.small`) | |
-| Form field skins (`ui-form-input/-textarea/-select/-message`) | Styling only — see the contact form below for the sending mechanism |
-| Locale picker | The kernel shortcode `[localepicker]` and the CSS both use the `sc-*` prefix (`sc-localepicker-wrap`, `sc-localepicker-bg`) |
-| Contact form | No dedicated shortcode — write a `<form class="ui-form">` with the right field names directly in the template (`page-home.tpl` does exactly that). The generic `.ui-form` handling in `Nino.ui.js` already targets the `POST /` endpoint of `Shortcodes\Form`. One shared mailbox/config per project |
-| Badge/pill (`ui-badge`, `--pill/--primary/--success/--error`) | |
-| Breadcrumbs (`ui-breadcrumbs`) | `›` separator via `::after` content, the last `li` styled as the current page |
-| Alert/inline feedback (`ui-alert`, `--success/--error/--info`) | A static banner for arbitrary page messages — different from `.ui-form-message`, the contact form's own submit feedback paragraph |
-| Video embed wrapper (`ui-video`, `--4-3`) | Responsive iframe/video wrapper, 16:9 by default. Uses `aspect-ratio` instead of the classic `padding-top` percentage hack, since that percentage resolves against the width of the *containing block*, not against the element's own `max-width`-constrained width |
-| Table (`ui-table-wrap` > `ui-table`, `--striped`, `--bordered`) | `ui-table-wrap { overflow-x:auto }` around the `<table>`, so that a wide table scrolls horizontally on a narrow viewport instead of forcing the whole page wide — the same logic as the grid. `--striped` also tints `tbody` rows with `--color-section-alt-bg` — put a striped table on a plain `ui-section`, not on `ui-section--alt`, otherwise the tint disappears into the section background |
-| List (`ui-list`, `--check`, `--numbered`) | Different from breadcrumbs/pagination (structural nav lists with a fixed shape). The `--check`/`--numbered` markers are `::before` (a Unicode `✓` and a CSS `counter()` respectively), not an `<img>`/SVG |
-| Pricing table (`ui-pricing-row`, `ui-pricing-item(--featured)`, `-title`, `-price`) | No fixed markup/shortcode — card styling intended to wrap an `[elements type="pricelist" content="..."]` call |
-| Accordion (`ui-accordion`, `-trigger`, `-panel`) | Pure `<details>`/`<summary>`, no JS — several `<details>` sharing the same `name="..."` attribute behave natively as an exclusive group in current browsers |
-| Pagination (`ui-pagination`) | Page number links only, no JS — which page is active and how many there are is a template/backend concern. Different from the slider dot pagination (`js-slider-points`), which is JS-driven |
-| Logo/partner strip (`ui-logos`, `-item`) | Text placeholders stand in for real logo SVGs/PNGs — greyscale, full colour on hover |
-| Gallery/mosaic grid (`ui-gallery`, `-item`, `--wide`, `--tall`) | CSS grid, fixed `grid-auto-rows`, individual tiles widened/heightened via the modifiers |
-| Feature list (`ui-feature-list`, `-item`) | Icon + heading + text rows, intended for one half of the existing 50/50 grid pattern (image in the other half) |
-| Process timeline (`ui-timeline`, `-step`, `-number`) | Numbered circles connected by a line (`::before` on every step except the first) — the line only renders from the `m` breakpoint upwards |
-| Video poster (`ui-video-poster`, `-play`) | Static poster image with a play icon; opens the real `.ui-video` embed in a `js-modal--video` lightbox on click |
-| Cookie consent banner (`js-cookie-banner`, `-actions`) | Bottom bar, not a fullscreen overlay. State lives in `Nino.cookie` (`Nino.js`) under a `pino_consent` key; `Nino.ui.cookieConsent.get()`/`.isAccepted()`/`.set()` is the public API that a custom analytics/tracking script should gate against before loading anything non-essential |
-
-**Utilities**
-
-| Block |
-|---|
-| Spacing (`ui-m-/-mt-/-mb-/-ml-/-mr-/-p-/-pt-/-pb-0..6`) |
-| Text alignment (`ui-text-left/center/right`, `-s-/-m-/-l-/-xl-`) |
-| Font size (`ui-font-small/-big`) |
-| Opacity (`ui-opacity-10..90`) |
-| Visibility (`ui-hidden`, `ui-invisible`, `ui-sr-only`, `ui-hidden-*`/`ui-visible-*`) |
-| Image tools (`ui-img-cover`, `ui-img-background(--dim)`, `-content`) |
-
-### SEO / social / AI
-
-All of it goes through the same text fill mechanism that content uses (see
-above) — no separate config interface; every key below is automatically
-editable through the existing text panel of `_admin` as soon as it exists in
-`global.php`/`{locale}.php`.
-
-- `<title>`/`og:title`/`twitter:title` and `<meta
-  name="description">`/`og:description`/`twitter:description` in
-  `templates/html-header.tpl` all resolve via
-  `[[/webpage[[/pino/http/response/uri]]/title|description]]` — the same
-  per-page lookup pattern that `/title` already used, extended by a sibling
-  `/description` key. **Every routed page needs both keys** — unlike a missing
-  template variable, there is no fallback: `Html::_renderFills()` is a plain
-  `str_replace()` against known keys, so an undefined one stays in the output
-  as a literal `[[/webpage/.../description]]` string instead of raising an
-  error.
-- `og:image`/`twitter:image` fall back to `/images/logo.png` by default (with
-  `https://` + `/website/url` + `/pino/dir` as the prefix, since social
-  platforms expect an absolute URL) — swap in a real 1200×630 share image per
-  project.
-- `<link rel="canonical">`/`og:url` use `[[/pino/http/request/uri]]` (the path
-  that actually came in, e.g. `/kontakt`), not `/pino/http/response/uri` (the
-  internal routing target, e.g. `/contact` internally for the same request) —
-  the two differ on locale-routed pages, and canonical needs the publicly
-  visible variant.
-- JSON-LD `LocalBusiness` structured data (`templates/html-header.tpl`) — read
-  by search engines and increasingly by AI assistants/agents for structured
-  facts, built from the same `/company/*` fills that the footer already
-  renders.
-- `robots.txt`/`sitemap.xml`/`llms.txt`
-  (`templates/robots.tpl`/`sitemap-xml.tpl`/`llms-txt.tpl`, routed in
-  `config.php` like any other page, only with a `header` → `Content-Type`
-  override instead of the usual `text/html`). By default `robots.txt` allows
-  the major AI crawlers (GPTBot, ClaudeBot, PerplexityBot, Google-Extended,
-  CCBot) so that the site can be found/cited via AI search — switch individual
-  ones to `Disallow: /` to exclude that bot. `sitemap.xml` lists only the
-  site's native locale (`/pino/locales/native`), no locale alternatives.
-
-### Demo pages
-
-- `/demo-elements` (`templates/.demo-elements.tpl`) — every single building
-  block from the tables above, individually. The living version of the
-  "Markup reference" section below.
-- `/demo-sections` (`templates/.demo-sections.tpl`) — realistic,
-  copy-paste-ready, complete sections combining these building blocks
-  (fullscreen hero with and without an image, parallax quote, 50/50
-  image+text grids in both directions plus a full-bleed variant, article
-  grids, statistics row, pricing table, comparison table, feature checklist,
-  contact form, CTA banner, FAQ accordion, logo/partner strip, image
-  gallery/mosaic, feature split, process timeline, video poster + lightbox,
-  full-bleed text banner). The photos come from `/images` — dummy stock photos
-  (`<id>-<width>x<height>.jpg`, five aspect ratios: 16:9, 4:3, 1:1, 3:4, 21:9),
-  to be swapped for real project photos as soon as a section moves from the
-  demo onto a real page.
-
-Both pages link to each other. Neither is intended for live operation of a real
-project — both are pure developer reference tooling and are deliberately
-omitted from `sitemap.xml`.
-
-`.ui-logo` (`templates/html-header.tpl`/`html-footer.tpl`) references
-`images/logo.png`, which does not yet exist in the repository by default — both
-places already point at it (including an `alt` attribute), so dropping a
-`logo.png` into `/images` is the only remaining step once one is available.
-
-### Markup reference
-
-A living, working version of everything below is available at `/demo-elements`
-(`templates/.demo-elements.tpl`) — keep it in sync with `.demo-elements.tpl`
-whenever either one changes.
-
-**Grid**
-
-```html
-<div class="ui-grid-row">
-  <div class="ui-grid-100 ui-grid-m-50 ui-grid-l-25">...</div>
-  <div class="ui-grid-100 ui-grid-m-50 ui-grid-l-25">...</div>
-</div>
-```
-
-50/50 image+text, with the image running to the viewport edge instead of
-sitting inside the row padding:
+**Example - 50/50 grid, image running edge-to-edge to the viewport:**
 
 ```html
 <section class="ui-section ui-section--fullwidth">
@@ -336,69 +307,54 @@ sitting inside the row padding:
 </section>
 ```
 
-**ATF/hero + cover/parallax**
+#### Navigation
+
+| Class | Note |
+|---|---|
+| `sc-nav-wrap`, `-burger`, `-regular`, `-content`, `-bg` | Output of `[navigation]` - the burger variant is a fullscreen overlay, `regular` renders inline (e.g. in the footer) |
+| `ui-headernav-logo` | Logo image inside the burger overlay |
+| `sc-localepicker-wrap`, `-bg` | Output of `[localepicker]` |
 
 ```html
-<!-- h2 if this hero is the page's own headline, h3 when the page has
-     several sections -->
-<section class="ui-atf ui-atf--fullscreen ui-section--fullwidth ui-section--dark ui-text-center">
-  <div class="ui-grid-row">
-    <div class="ui-grid-100">
-      <h2 class="ui-atf-title">...</h2>
-      <p class="ui-atf-subtitle">...</p>
-    </div>
-  </div>
-</section>
+[navigation burger]
+  [[/webpage/home/uri]]:[[/webpage/home/name]]
+  [[/webpage/contact/uri]]:[[/webpage/contact/name]]
+[/navigation]
 ```
 
-Cover/parallax, fullscreen via `data-cover-height="100"`, `--dim` for a dark
-scrim over a real (bright) photo:
+#### ATF/hero + cover/parallax
+
+| Class | Note |
+|---|---|
+| `js-cover(--dim)`, `data-cover-height`/`-width` | `data-cover-height="100"` for a fullscreen hero. `--dim` lays a dark scrim over the image - needed as soon as a hero uses a real (bright) photo instead of a dark placeholder, so that `ui-atf-title`/`-subtitle` in white stays legible |
+| `js-parallex(--dim)` | Same `--dim` scrim, parallax scroll effect instead of a fixed cover |
+| `ui-atf-title`, `-subtitle`, `-arrowdown` | Hero typography; `-arrowdown` is a `currentColor` SVG used as a `background-image` - so it automatically matches the text colour, no icon markup needed |
 
 ```html
-<section class="ui-atf ui-section--fullwidth js-cover js-cover-center js-cover--dim" data-cover-height="100" style="color:var(--color-primary-text);">
+<section class="ui-atf ui-section--fullwidth js-cover js-cover--dim" data-cover-height="100" style="color:var(--color-primary-text);">
   <img src="...">
   <div class="js-cover-content">
     <h2 class="ui-atf-title">...</h2>
     <p class="ui-atf-subtitle">...</p>
   </div>
 </section>
-
-<section class="js-parallex js-parallex--dim" style="color:var(--color-primary-text);">
-  <img src="...">
-  <div class="js-cover-content">...</div>
-</section>
 ```
 
-The inline `color` is the framework-guaranteed way of keeping hero text legible
-over a `--dim` scrim — `_nino/Nino.css` itself only styles the scrim
-(`::before`), not the text.
+The inline `color` is the guaranteed way to keep hero text legible over a `--dim` scrim - `Nino.css` only styles the scrim itself (`::before`), not the text.
 
-**Sections**
+#### Article/card (always via `elements`)
 
-```html
-<section class="ui-section ui-section--alt"> <!-- or --dark / --black / --fullwidth -->
-  <h3 class="ui-section-title">...</h3>
-  <p class="ui-section-subtitle">...</p>
-</section>
-```
+| Class | Note |
+|---|---|
+| `ui-article`, `--alt`, `--fullwidth`, `-cols`/`-cols-s/m/l/xl`, `-price` | `-price` for a priced product shown as a regular article-grid card - different from `ui-pricing-price` (dedicated pricing table, see below) |
+| `ui-article-content`, `-title`, `-subtitle`, `-descr`, `-img`, `-img--maxheight` | |
 
-**Buttons / icons**
-
-```html
-<a href="#" class="ui-btn ui-btn--primary">...</a> <!-- --outline / --light / --dark / --big -->
-<svg class="ui-icon small" ...>...</svg>
-```
-
-**Article/card (always via `elements`)**
-
-**Never put grid width classes directly on `<article>`** — wrap it in a plain
-`<div>` carrying the grid class; `<article>` only carries `ui-article` and its
-modifiers:
+**Never put grid width classes directly on `<article>`** - see HTML Structure, rule 3:
 
 ```html
 [elements /portfolio]
 <div class="ui-grid-100 ui-grid-m-33">
-  <article class="ui-article"> <!-- ui-article--alt for the alt variant -->
+  <article class="ui-article">
     <div class="ui-article-content">
       <h4 class="ui-article-title">[[title]]</h4>
       <p class="ui-article-descr">[[description]]</p>
@@ -408,24 +364,29 @@ modifiers:
 [/elements]
 ```
 
-**Pricing table (via `elements`)**
+#### Buttons / icons
+
+| Class | Note |
+|---|---|
+| `ui-btn`, `--primary/--outline/--light/--dark/--big/--small` | `--big`/`--small` scale padding/font size/radius via `calc()` from the same base |
+| `ui-icon`, `.small` | |
 
 ```html
-<div class="ui-pricing-row">
-  [elements /pricelist query="cat=standard"]
-  <div class="ui-pricing-item">
-    <h4 class="ui-pricing-title">[[title]]</h4>
-    <p class="ui-pricing-price">[[price]] &euro;</p>
-    <span class="ui-badge">[[cat]]</span>
-  </div>
-  [/elements]
-</div>
+<a href="#" class="ui-btn ui-btn--primary">Get started</a>
+<svg class="ui-icon small" ...>...</svg>
 ```
 
-**Form**
+#### Form
+
+| Class | Note |
+|---|---|
+| `ui-form-input/-textarea/-select`, `-message` | Field styling only |
+| `ui-form`, `.error/.success/.existing/.pending` | Generic handling in `Nino.ui.js` - posts automatically to `POST /` (`Modules\Form`), no shortcode needed |
+| `js-newsletter-form` | Its own submit handler instead of the generic `ui-form` handling (new/already-subscribed need different messages), posts to `/.newsletter` |
 
 ```html
 <form class="ui-form">
+  [csrf]
   <label for="name">Name</label>
   <input type="text" id="name" name="name" class="ui-form-input" required>
   <textarea name="message" class="ui-form-textarea" required></textarea>
@@ -434,124 +395,182 @@ modifiers:
 </form>
 ```
 
-**Toast**
+#### Badge, alert, breadcrumbs, list
+
+| Class | Note |
+|---|---|
+| `ui-badge`, `--pill/--primary/--success/--error` | |
+| `ui-alert`, `--success/--error/--info` | A static banner for arbitrary page messages - different from `.ui-form-message` (the form's own feedback) |
+| `ui-breadcrumbs` | `›` separator via `::after`, the last `li` styled as the current page |
+| `ui-list`, `--check`, `--numbered` | `--check`/`--numbered` markers are `::before` (a Unicode checkmark resp. CSS `counter()`), not an image/SVG |
 
 ```html
-<!-- declarative, from static markup -->
+<span class="ui-badge ui-badge--primary">New</span>
+<div class="ui-alert ui-alert--info">Some note</div>
+<ul class="ui-breadcrumbs">
+  <li><a href="#">Home</a></li>
+  <li>Current page</li>
+</ul>
+<ul class="ui-list ui-list--check">
+  <li>Free initial consultation included</li>
+</ul>
+```
+
+#### Table, pricing table, accordion, pagination
+
+| Class | Note |
+|---|---|
+| `ui-table-wrap` > `ui-table`, `--striped`, `--bordered` | `-wrap` scrolls a wide table horizontally instead of forcing the whole page wide. `--striped` tints rows with `--color-section-alt-bg` - so use it on a plain `ui-section`, not `--alt` |
+| `ui-pricing-row`, `ui-pricing-item(--featured)`, `-title`, `-price` | No fixed markup/shortcode - card styling meant to wrap an `[elements]` loop |
+| `ui-accordion`, `-trigger`, `-panel` | Pure `<details>`/`<summary>`, no JS - several `<details>` sharing the same `name="..."` behave natively as an exclusive group |
+| `ui-pagination` | Page-number links only, no JS - different from the slider's dot pagination (`js-slider-points`) |
+
+```html
+<div class="ui-pricing-row">
+  [elements /pricelist query="cat=standard"]
+  <div class="ui-pricing-item">
+    <h4 class="ui-pricing-title">[[title]]</h4>
+    <p class="ui-pricing-price">[[price]] &euro;</p>
+  </div>
+  [/elements]
+</div>
+
+<details class="ui-accordion" name="faq" open>
+  <summary class="ui-accordion-trigger">Question?</summary>
+  <div class="ui-accordion-panel"><p>Answer.</p></div>
+</details>
+```
+
+#### Logo strip, gallery, feature list, timeline, video poster
+
+| Class | Note |
+|---|---|
+| `ui-logos`, `-item` | Text placeholders stand in for real logo SVGs/PNGs - greyscale, full colour on hover |
+| `ui-gallery`, `-item`, `--wide`, `--tall` | CSS grid, fixed `grid-auto-rows`, individual tiles widened/heightened via the modifiers |
+| `ui-feature-list`, `-item` | Icon + heading + text, meant for one half of the 50/50 grid (image in the other half) |
+| `ui-timeline`, `-step`, `-number` | Numbered circles, connected by a line (only from the `m` breakpoint up) |
+| `ui-video-poster`, `-play` | Static poster image with a play icon, opens the real `.ui-video` embed in a `js-modal--video` lightbox |
+| `ui-video`, `--4-3` | Responsive iframe/video wrapper, 16:9 by default |
+
+```html
+<div class="ui-gallery">
+  <div class="ui-gallery-item ui-gallery-item--wide">
+    <button type="button" class="js-modal-trigger" data-modal-target="gallery-1" aria-label="Enlarge image">
+      <img src="..." loading="lazy">
+    </button>
+  </div>
+</div>
+```
+
+#### JS-driven behaviour (`Nino.ui.js`)
+
+| Class | Note |
+|---|---|
+| `js-vpa`, `--repeat`, effect `--zoom(-out)/-slide-left/-right/-blur/-flip` × `-soft/-medium/-hard`, `--speed-fast/-medium/-slow` | Viewport animation. Effect/speed are pure CSS (custom properties `--vpa-*`) - no JS change needed, every class only sets these variables and can therefore also be inherited by setting it on `<body>`. Demo: `/.demo-vpa` |
+| `ui-autoheight`, `data-autoheight-group` | Deliberately kept `ui-*` (a styling/markup concern, not a behaviour toggle) |
+| `js-slider`, touch swipe, `js-slider-button`, `js-slider-points` | Prev/next buttons and dot pagination are generated by JS, not hand-written |
+| `js-preloader` | Fullscreen spinner overlay, removed on `window.load` |
+| `js-tabs`, `-nav`, `-tab`, `-panel`, `data-tabs-target` | Panel switch fades in via `@starting-style` (pure CSS), falls back to an instant show/hide in older browsers |
+| `js-modal`, `--lightbox`, `--video`, `js-modal-trigger`, `-close`, `data-modal-target` | Built on the native `<dialog>` (`showModal()`/`.close()`) - focus trapping, escape-to-close and the backdrop click area therefore come from the browser |
+| `js-toast-trigger`, `data-toast-message`/`-type`, or `Nino.ui.toast(message, type)` | Inline `onclick` doesn't work (CSP `script-src 'self' 'nonce-...'`) - `js-toast-trigger` is the declarative, CSP-safe way to fire one from static markup |
+| `js-stat-counter`, `data-stat-counter-to/-suffix/-duration` | Counts up from 0 once scrolled into the viewport |
+| `js-back-to-top` | Visibility is pure CSS (`body.js-scroll-btf`), JS only handles the click (`scrollTo` smooth) |
+| `js-cookie-banner`, `-actions` | A bottom bar instead of a fullscreen overlay. State lives in `Nino.cookie` under `nino_consent`; `Nino.ui.cookieConsent.get()`/`.isAccepted()`/`.set()` is the public API a custom analytics script should check against before loading anything |
+
+```html
+<div class="js-tabs">
+  <div class="js-tabs-nav">
+    <button type="button" class="js-tabs-tab active" data-tabs-target="tab-1">Services</button>
+    <button type="button" class="js-tabs-tab" data-tabs-target="tab-2">Pricing</button>
+  </div>
+  <div class="js-tabs-panel active" id="tab-1"><p>...</p></div>
+  <div class="js-tabs-panel" id="tab-2"><p>...</p></div>
+</div>
+
+<button type="button" class="js-modal-trigger" data-modal-target="video-modal">Play video</button>
+<dialog class="js-modal js-modal--video" id="video-modal">
+  <button type="button" class="js-modal-close" aria-label="Close">&times;</button>
+  <div class="ui-video"><iframe src="..." allowfullscreen></iframe></div>
+</dialog>
+
 <button type="button" class="js-toast-trigger" data-toast-message="Saved." data-toast-type="success">Save</button>
 ```
 
 ```js
-// or imperative, e.g. after a custom XHR call — from assets/script.js,
-// not from an inline <script> tag (the CSP nonce is internal to the
-// jstext shortcode, so inline script tags in templates will not run)
+// or imperatively, e.g. after a custom XHR call - from assets/script.js,
+// not from an inline <script> tag (the CSP nonce belongs to the jstext shortcode)
 Nino.ui.toast( 'Saved.', 'success' );
 ```
 
-For further building blocks (badge, breadcrumbs, alert, list, table, video
-embed, accordion, tabs, modal/lightbox, slider, viewport animation, autoheight,
-stat counter, back-to-top, preloader, scroll header, cookie banner, pagination)
-see the living reference at `/demo-elements` — the markup and class names
-follow exactly the pattern of the building block tables above.
+#### Utilities
 
-### Site structure: starter pages
+| Class |
+|---|
+| `ui-m-/-mt-/-mb-/-ml-/-mr-/-p-/-pt-/-pb-0..6` (spacing, `--space-1..6`) |
+| `ui-text-left/-center/-right`, breakpoint prefixes `-s-/-m-/-l-/-xl-` |
+| `ui-font-small`/`-big` |
+| `ui-opacity-10..90` |
+| `ui-hidden`, `ui-invisible`, `ui-sr-only`, `ui-hidden-*`/`ui-visible-*` (breakpoint-dependent) |
+| `ui-img-cover`, `ui-img-background(--dim)`, `-content` |
 
-`page-home.tpl`, `page-services.tpl`, `page-about-me.tpl`, `page-contact.tpl`,
-`page-404.tpl` and `page-legal.{de_DE,en_US}.tpl` ship as real routes
-(`config.php`'s `/pino/http/routes`) — a starting point with placeholder
-content for a new project rather than empty stubs, meant to be edited (text via
-`text/*.php`, sections swapped in/extended from `/demo-sections`) rather than
-built from scratch.
-
-A section that appears identically on more than one page is extracted into its
-own `templates/section-*.tpl` partial and included via
-`[template /templates/section-*]`, the same include mechanism that
-`[template /templates/html-header]`/`html-footer` use — `section-contact.tpl`
-(address + contact form) is the first of these, shared between
-`page-contact.tpl` and the closing CTA section of `page-home.tpl`. Prefer this
-over copying a section's markup onto a second page.
-
-## Part 3: Developing your own design shortcodes
-
-A design shortcode is structured exactly like any other module from the
-"Developing your own modules" section of `docs/development.md` — there is no
-separate "frontend shortcode API". A minimal custom shortcode for, say, a team
-member grid with context-dependent markup:
-
-```php
-<?php
-declare(strict_types=1);
-
-namespace MyProject\Modules {
-
-    class TeamGrid {
-
-        public static function init( array &$appData ): void {
-            \Nino\Html::addShortcode( $appData, 'teamgrid', [ self::class, 'doShortcode' ] );
-        }
-
-        public static function doShortcode( array &$appData, array $args ): string {
-
-            $columns = $args['columns'] ?? '3';
-            $html    = '<div class="ui-grid-row ui-team-grid" data-columns="'. htmlspecialchars( $columns ). '">';
-            $html   .= '[elements uri="/team"]'. $args['content']. '[/elements]';
-            $html   .= '</div>';
-
-            return $html;
-        }
-    }
-}
+```html
+<div class="ui-mt-3 ui-p-2 ui-text-center ui-font-big">...</div>
+<div class="ui-img-background ui-img-background--dim ui-text-center">
+  <img src="...">
+  <div class="ui-img-background-content">...</div>
+</div>
 ```
 
-Once registered in `config.php`'s `/pino/modules`, `[teamgrid
-columns="4"]<article class="ui-article">...</article>[/teamgrid]` is usable from
-the next request onwards. Important points to keep in mind, derived directly
-from the templating pipeline (see `docs/development.md`):
+## Shortcode Reference
 
-- **The return value is rendered again automatically.** The handler above
-  returns a raw `[elements uri="/team"]...[/elements]` fragment, not finished
-  HTML — after the call, the shortcode dispatcher calls `renderHtml()` on the
-  return value again by itself, thereby resolving the embedded `[elements]` too.
-  A custom design shortcode can therefore be composed of other shortcodes
-  without ever calling `Html::renderHtml()` itself.
-- **`$args['content']` is the enclosed content raw and unprocessed.** Anyone
-  embedding it directly (as above) gets the automatic post-render pass for
-  free; anyone manipulating it (e.g. extracting a subset) remains responsible
-  for ensuring the result is still valid shortcode/fill markup.
-- **Always escape user data in generated markup** (`htmlspecialchars()`, as
-  with the `columns` argument above) — a shortcode argument can in principle
-  originate from an admin-editable text source, if the template itself inserts
-  values from `[[key]]` into an argument.
-- **Choose CSS classes according to the naming convention** (see part 2 above):
-  `js-*` only for actual behaviour, `ui-*` for styling, no custom `sc-*` —
-  that prefix is reserved for the kernel's own shortcodes.
-- **A custom shortcode can bring its own CSS/JS** — simply add it to
-  `assets/style.theme01.css`/`assets/script.js` (or add your own files to the
-  `/pino/html/assets` bundle in `config.php`); no separate build step is
-  needed, see "Architecture" above.
+#### `Elements`
+Includes one or several elements in a template.
+**Shortcode:**
+`[element /type/uri locale="xx" callback="..."]...[[key]]...[/element]`
+Renders the enclosed content once for a single element; `[[key]]` placeholders inside it are replaced with that element's field values (`locale`/`callback` optional).
+`[elements /type limit="N" query="key=value" locale="xx" callback="..."]...[[key]]...[/elements]`
+Repeats the content for every element of a type - optionally filtered by `query` (`key=value`, `&`-separated for several conditions), capped by `limit`. On top of the field values, the loop also exposes `[[.id]]` (a running index) and `[[.uri]]` (the element's full uri).
 
-## Gotcha: shortcode-shaped text in comments, everywhere
+#### `Template`
+`[template /path/file]` includes another `.tpl` file.
 
-Any comment or string that looks like `[shortcodename ...]` is parsed as a real
-shortcode call — `Html::renderHtml()` neither knows nor cares whether it sits
-inside a `/* CSS comment */` or an `<!-- HTML comment -->`, it simply scans the
-entire content by regex. `Assets::_createCachefile()` therefore pushes the
-**entire** concatenated CSS/JS content through it (fills **and** shortcodes)
-before it is cached, and every `.tpl` template goes through it on every render,
-without exception.
+#### `Images`
+Includes a developer-defined image slot.
+**Shortcode:**
+`[image slotUri alt="..."]`
+Renders an `<img>` tag for an image slot, provided an image has already been uploaded via `/_admin` - otherwise the output stays empty. The available slots (position, target format) are defined in `/_dev`.
 
-This has already happened twice in this project, both times in a comment that
-mentioned the `elements` shortcode in passing with square brackets. Both times
-`elements` ran with an empty/broken type argument and triggered a
-`trigger_error()`, which broke the **entire** page rendering, not just the
-commented section. `[navigation]`/`[localepicker]` appear harmlessly in
-existing section header comments in `Nino.css`, because those two shortcodes
-simply do nothing silently when their args are broken or missing —
-`elements`/`element` do not, so "it worked in this other comment" is not a
-reliable signal.
+#### `Assets`
+Includes a CSS/JS bundle.
+**Shortcode:**
+`[assets /.cache/style.css]`
+Renders the files collected for this bundle via `config.php`'s `/nino/html/assets` as a bundled (and, for `.min` filenames, minified) `<link>` or `<script>` tag.
 
-**Avoid `[word ...]` bracket syntax in comments in any `.tpl`/`.css`/`.js`
-file that passes through the asset pipeline or the template renderer** — write
-"the elements shortcode" in prose instead of `[elements ...]`. If a page
-suddenly 500s with a `trigger_error` dump instead of rendering, search the
-most recently edited file for `\[` first.
+#### `Navigation`
+Renderer for navigation menus (burger or regular variant) from a line-based mini syntax.
+**Shortcode:**
+`[navigation id="..." class="..." callback="..." burger]uri:Title:Attribute[/navigation]`
+Builds a `<ul>` navigation from line-by-line `uri:title:attribute` entries in the content. A content line **without** a `:` is instead rendered as a raw `<div>` - which lets you mix in, say, a logo between the link lines (inside the burger menu this `<div>` stays hidden as long as the overlay is closed). The `burger` flag (without `=`) renders the fullscreen burger variant instead of the regular one; the currently active uri automatically gets `class="active"`.
+
+#### `Localepicker`
+A ready-made language switcher including redirect handling.
+**Shortcode:**
+`[localepicker callback="..."]`
+Renders the language-selection UI with all available locales, current locale marked as the active entry (`callback` optional). The switcher itself works via the `/_nino/locales/current` query parameter, which `Localepicker::callbackResponse()` checks on every response and then - through the internal response mechanism instead of a direct `header('Location: ...')` call - redirects to the equivalent route in the target language (`Http::findRouteUri()`, not the same URL with a different locale flag - `/legal` and `/rechtliches` can therefore be different URLs for the same page in different languages).
+
+#### `Jstext`
+Makes the current text fills available to frontend JavaScript as JSON as well.
+**Shortcode:**
+`[jstext]`
+Renders a `<script>` tag (CSP-nonce protected) that exposes all current text fills as a `NinoJstext` object. Belongs once per page, directly before the asset includes in `html-footer.tpl`.
+**Javascript:**
+`Nino.content.getText( key )`
+Reads a text provided that way (`window.NinoJstext`), e.g. `Nino.content.getText('/form/info/success')`. Returns `''` if the key doesn't exist.
+
+#### `Csrf`
+CSRF protection for forms via a session token.
+**Shortcode:**
+`[csrf]`
+Renders a hidden `_csrf` input field with the current session token - belongs in every form that is checked server-side via the Csrf callback (e.g. the newsletter form, see HTML Structure above).
+
+These eight shortcodes cover everything a template author writes directly in square brackets. Kernel modules without their own shortcode (`Form`, `Newsletter`) are instead addressed through a fixed CSS class (`ui-form` resp. `js-newsletter-form`) - see `docs/development.md`'s module reference as well as the CSS section above.
