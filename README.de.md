@@ -92,7 +92,7 @@ templates/        .tpl-Seiten-/Sektions-Templates
 assets/           Projekt-eigenes style.css/script.js
 images/           Hochgeladene Bilder (admin-verwaltet, bei Bedarf generiert)
 docs/             _admin.md, _dev.md, design.md, development.md,
-									_admin.de.md, _dev.de.md, design.de.md, development.de.md,
+                  _admin.de.md, _dev.de.md, design.de.md, development.de.md,
 tests/            Abhängigkeitsfreie Smoke-Tests (php tests/*.php)
 data/             Laufzeitdaten (Newsletter-Abonnenten, Formular-Einsendungen,
                   Logs) - entstehen bei Bedarf, nie in git getrackt
@@ -100,24 +100,24 @@ data/             Laufzeitdaten (Newsletter-Abonnenten, Formular-Einsendungen,
 
 ## Dokumentation
 
-- **[docs/developer.de.md](docs/developer.de.md)**
-- **[docs/developer.md](docs/developer.md)** (English)
-  Alle Informationen für den **Backend-Entwickler**. Aufbau des Kernels, das AppData-Konzept, das Callback-System, die Init → Request → Output-Pipeline, Templates/Shortcodes/Textfills, das Rechtesystem, die Entwicklung eigener Module. Die Architektur von `_admin`/`_dev`, Testkonventionen.
+- **[docs/development.de.md](docs/development.de.md)**
+- **[docs/development.md](docs/development.md)** (English)
+Alle Informationen für den **Backend-Entwickler**.
+Aufbau des Kernels, das AppData-Konzept, das Callback-System, die Init → Request → Output-Pipeline, Templates/Shortcodes/Textfills, das Rechtesystem, die Entwicklung eigener Module. Die Architektur von `_admin`/`_dev`, Testkonventionen.
 ---
 - **[docs/design.de.md](docs/design.de.md)**
 - **[docs/design.md](docs/design.md)** (English)
-  Alle Informationen für den **Frontend-Designer und -Entwickler**. Der Ablauf von HTML-Rendering, die Architektur/Naming-Conventions des integrierten CSS-Frameworks, die Entwicklung eigener Frontend-Elemente und Shortcodes.
+Alle Informationen für den **Frontend-Designer und -Entwickler**. Der Ablauf von HTML-Rendering, die Architektur/Naming-Conventions des integrierten CSS-Frameworks, die Entwicklung eigener Frontend-Elemente und Shortcodes.
 ---
 - **[docs/_admin.de.md](docs/_admin.de.md)**
 - **[docs/_admin.md](docs/_admin.md)** (English)
-  Das **Benutzerhandbuch** für die _admin Administrator- und Benutzeroberfläche.
+Das **Benutzerhandbuch** für die _admin Administrator- und Benutzeroberfläche.
 ---
 - **[docs/_dev.de.md](docs/_dev.de.md)**
 - **[docs/_dev.md](docs/_dev.md)** (English)
-  Das **Benutzerhandbuch** für die _dev Entwickleroberfläche.
+Das **Benutzerhandbuch** für die _dev Entwickleroberfläche.
 
 ## Tests
-
 ```
 php tests/kernel-smoke.php
 php tests/admin-smoke.php
