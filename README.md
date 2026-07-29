@@ -91,7 +91,7 @@ templates/        .tpl page/section templates
 assets/           Project's own style.css/script.js
 images/           Uploaded images (admin-managed, generated on demand)
 docs/             _admin.md, _dev.md, design.md, development.md,
-									_admin.de.md, _dev.de.md, design.de.md, development.de.md,
+                  _admin.de.md, _dev.de.md, design.de.md, development.de.md,
 tests/            Dependency-free smoke tests (php tests/*.php)
 data/             Runtime data (newsletter subscribers, form submissions,
                   logs) - created on demand, never tracked in git
@@ -99,21 +99,21 @@ data/             Runtime data (newsletter subscribers, form submissions,
 
 ## Documentation
 
-- **[docs/developer.md](docs/developer.md)**
-- **[docs/developer.de.md](docs/developer.de.md)** (German)
-  Everything for the **backend developer**. How the kernel is put together, the AppData concept, the callback system, the init → request → output pipeline, templates/shortcodes/textfills, the permission system, writing your own modules. The architecture of `_admin`/`_dev`, testing conventions.
+- **[docs/development.md](docs/development.md)**
+- **[docs/development.de.md](docs/development.de.md)** (German)
+Everything for the **backend developer**. How the kernel is put together, the AppData concept, the callback system, the init → request → output pipeline, templates/shortcodes/textfills, the permission system, writing your own modules. The architecture of `_admin`/`_dev`, testing conventions.
 ---
 - **[docs/design.md](docs/design.md)**
 - **[docs/design.de.md](docs/design.de.md)** (German)
-  Everything for the **frontend designer/developer**. The HTML rendering flow, the architecture/naming conventions of the built-in CSS framework, building your own frontend elements and shortcodes.
+Everything for the **frontend designer/developer**. The HTML rendering flow, the architecture/naming conventions of the built-in CSS framework, building your own frontend elements and shortcodes.
 ---
 - **[docs/_admin.md](docs/_admin.md)**
 - **[docs/_admin.de.md](docs/_admin.de.md)** (German)
-  A **user guide** for the _admin administration interface.
+A **user guide** for the _admin administration interface.
 ---
 - **[docs/_dev.md](docs/_dev.md)**
 - **[docs/_dev.de.md](docs/_dev.de.md)** (German)
-  A **user guide** for the _dev developer interface.
+A **user guide** for the _dev developer interface.
 
 ## Tests
 
