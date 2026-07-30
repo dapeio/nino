@@ -2648,12 +2648,20 @@ namespace Nino {
 		/**
 		 *	Do event on global error and break execution
 		 *
-		 *	@return 	null
+		 *	@return 	bool										False to let a suppressed (@) error continue
+		 *																			normally; every other path terminates the script.
 		 */
-		public static function handleError(): never {
+		public static function handleError(): bool {
 
 			// Get errorhandler
 			$args = func_get_args();
+
+			// PHP still calls a registered error handler under the @ operator - it's
+			// on the handler to check error_reporting() itself and bail out, or @ has
+			// no effect at all. Exceptions (an object here) aren't affected by @, so
+			// they always fall through to the normal handling below.
+			if( is_object( $args[0] ) === false && ( error_reporting() & $args[0] ) === 0 )
+				return false;
 
 			// Create error array (from exception or error)
 			$errorArray = ( is_object( $args[0] ) === true ) ? [
