@@ -3104,10 +3104,27 @@ namespace Nino\Modules {
 					continue;
 
 				$fills[0][] = '[['. $key. ']]';
-				$fills[1][] = strval( $value );
+				$fills[1][] = self::_escapeFieldValue( $value );
 			}
 
 			return str_replace( $fills[0], $fills[1], $content );
+		}
+
+		/**
+		 *	Escape a single element field value before it is substituted into a
+		 *	template. Values are editor content, not developer-authored markup -
+		 *	htmlspecialchars() neutralizes raw HTML/script (matches
+		 *	Modules\Images::doShortcode()'s existing pattern), and the extra '['
+		 *	swap stops an editor-supplied "[[...]]" or "[shortcode]" string from
+		 *	being interpreted when the surrounding content is re-rendered by
+		 *	Html::_doShortcode() right after this callback returns.
+		 *
+		 *	@param		mixed			$value				Raw scalar field value
+		 *
+		 *	@return 	string									Safe-to-substitute value
+		 */
+		private static function _escapeFieldValue( mixed $value ): string {
+			return str_replace( '[', '&#91;', htmlspecialchars( strval( $value ), ENT_QUOTES, 'UTF-8' ) );
 		}
 
 		/**
@@ -3161,7 +3178,7 @@ namespace Nino\Modules {
 						continue;
 
 					$fills[0][] = '[['. $key. ']]';
-					$fills[1][] = strval( $value );
+					$fills[1][] = self::_escapeFieldValue( $value );
 				}
 
 				$html .= str_replace( $fills[0], $fills[1], $content );
