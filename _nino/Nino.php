@@ -1261,7 +1261,7 @@ namespace Nino {
 
 			return true;
 		}
-		
+
 
 		/**
 		 *	Returns an element type model
@@ -1270,12 +1270,12 @@ namespace Nino {
 		 *	@param		string		$typeUri					Uri of element type
 		 *
 		 *	@return 	array												Type model
-		 */		
+		 */
 		static public function getElementModel( array &$appData, string $typeUri ): array {
-    $typeData = self::getElementFile( $appData, $typeUri );
-    return ( $typeData === false || is_array( $typeData['model'] ?? null ) === false )
-        ? []
-        : $typeData['model'];
+			$typeData = self::getElementFile( $appData, $typeUri );
+			return ( $typeData === false || is_array( $typeData['model'] ?? null ) === false )
+				? []
+				: $typeData['model'];
 		}
 
 		/**
@@ -3135,7 +3135,7 @@ namespace Nino\Modules {
 			foreach( $element as $key => $value ) {
 				if( is_scalar( $value ) === false )
 					continue;
-					
+
 				$isHtml = ( isset( $model[$key] ) && isset( $model[$key]['html'] ) && $model[$key]['html'] === true );
 
 				$fills[0][] = '[['. $key. ']]';
@@ -3203,8 +3203,8 @@ namespace Nino\Modules {
 			$html = '';
 
 			$id = 0;
-			
-			$model = \Phile\Elements::getElementModel( $appData, $uri );
+
+			$model = \Nino\Elements::getElementModel( $appData, $uri );
 
 			foreach( $result as $element ) {
 
@@ -3212,11 +3212,11 @@ namespace Nino\Modules {
 					['[[.id]]'],
 					[$id],
 				];
-				
+
 				foreach( $element as $key => $value ) {
 					if( is_scalar( $value ) === false )
 						continue;
-					
+
 					$isHtml = ( isset( $model[$key] ) && isset( $model[$key]['html'] ) && $model[$key]['html'] === true );
 
 					$fills[0][] = '[['. $key. ']]';
