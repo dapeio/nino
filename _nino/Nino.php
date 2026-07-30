@@ -1153,8 +1153,8 @@ namespace Nino {
 				$locale = \Nino\Locales::getCurrentLocale( $appData );
 
 			// Flush, reload and lock element file
-			$elementUri 	= self::_getElementUriFromUri( $uri );
-			$typeUri			= self::_getElementTypeFromUri( $uri );
+			$elementUri 	= self::getElementUriFromUri( $uri );
+			$typeUri			= self::getElementTypeFromUri( $uri );
 			$typeData			= \Nino\Elements::getElementFile( $appData, $typeUri );
 
 			if( $typeData === false )
@@ -1261,7 +1261,44 @@ namespace Nino {
 
 			return true;
 		}
+		
 
+		/**
+		 *	Returns an element type model
+		 *
+		 *	@param		array 		&$appData					(reference) Array with current app data
+		 *	@param		string		$typeUri					Uri of element type
+		 *
+		 *	@return 	array												Type model
+		 */		
+		static public function getElementModel( array &$appData, string $typeUri ): array {
+    $typeData = self::getElementFile( $appData, $typeUri );
+    return ( $typeData === false || is_array( $typeData['model'] ?? null ) === false )
+        ? []
+        : $typeData['model'];
+		}
+
+		/**
+		 *	Get element type from element uri
+		 *
+		 *	@param		string		$uri					Uri of element
+		 *
+		 *	@return 	string									Element type
+		 */
+		static public function getElementTypeFromUri( string $uri ): string {
+			return substr( $uri, 0, strpos( substr( $uri, 1 ), '/' ) + 1 );
+		}
+
+		/**
+		 *	Get element part from element uri
+		 *
+		 *	@param		string		$uri					Uri of element
+		 *
+		 *	@return 	string									Element uri
+		 */
+		static public function getElementUriFromUri( string $uri ): string {
+			return substr( $uri, strpos( substr( $uri, 1 ), '/' ) + 2 );
+		}
 
 		/**
 		 *	The PHP gettype() a model field's declared type is expected to hold
@@ -1296,7 +1333,7 @@ namespace Nino {
 				$locale = \Nino\Locales::getCurrentLocale( $appData );
 
 			// Flush, reload and lock element file
-			$typeUri			= self::_getElementTypeFromUri( $uri );
+			$typeUri			= self::getElementTypeFromUri( $uri );
 			$typeData			= \Nino\Elements::getElementFile( $appData, $typeUri );
 
 			if( $typeData === false )
@@ -1325,7 +1362,7 @@ namespace Nino {
 			$data = $data + \Nino\Elements::getElement( $appData, $uri, '*' );
 
 			// Render/write new element
-			$elementUri = self::_getElementUriFromUri( $data['.uri'] );
+			$elementUri = self::getElementUriFromUri( $data['.uri'] );
 
 			foreach( $typeData['model'] AS $key => $field ) {
 
@@ -1379,7 +1416,7 @@ namespace Nino {
 			// Check uri change
 			if( $uri !== $data['.uri'] ) {
 				\Nino\Callbacks::doCallbacks( $appData, '/nino/elements'. $typeUri. '/update/uri', $data );
-				$elementUri = self::_getElementUriFromUri( $uri );
+				$elementUri = self::getElementUriFromUri( $uri );
 				foreach( $typeData AS $locale => $localeData )
 					unset( $typeData[$locale][$elementUri] );
 			}
@@ -1413,8 +1450,8 @@ namespace Nino {
 		static private function _cacheElement( array &$appData, string $uri, string &$locale ): void {
 
 			// Get uris
-			$typeUri		= self::_getElementTypeFromUri( $uri );
-			$elementUri	= self::_getElementUriFromUri( $uri );
+			$typeUri		= self::getElementTypeFromUri( $uri );
+			$elementUri	= self::getElementUriFromUri( $uri );
 
 			if( $locale !== '*' && isset( $appData['./nino/elements/cache'][$uri][$locale] ) === true )
 				return;
@@ -1449,27 +1486,6 @@ namespace Nino {
 			$appData['./nino/elements/cache'][$uri][$locale] = $localeData + $globalData + $localeDefaults + $globalDefaults + $defaults;
 		}
 
-		/**
-		 *	Get element type from element uri
-		 *
-		 *	@param		string		$uri					Uri of element
-		 *
-		 *	@return 	string									Element type
-		 */
-		static private function _getElementTypeFromUri( string $uri ): string {
-			return substr( $uri, 0, strpos( substr( $uri, 1 ), '/' ) + 1 );
-		}
-
-		/**
-		 *	Get element part from element uri
-		 *
-		 *	@param		string		$uri					Uri of element
-		 *
-		 *	@return 	string									Element uri
-		 */
-		static private function _getElementUriFromUri( string $uri ): string {
-			return substr( $uri, strpos( substr( $uri, 1 ), '/' ) + 2 );
-		}
 	}
 
 	/**
@@ -3101,6 +3117,7 @@ namespace Nino\Modules {
 			$callback	= $args['callback'] ?? '';
 
 			$element	= \Nino\Elements::getElement( $appData, $uri, $locale );
+			$model = \Nino\Elements::getElementModel( $appData, \Nino\Elements::getElementTypeFromUri( $uri ) );
 
 			if( $element === null || $element === false )
 				return '';
@@ -3118,9 +3135,11 @@ namespace Nino\Modules {
 			foreach( $element as $key => $value ) {
 				if( is_scalar( $value ) === false )
 					continue;
+					
+				$isHtml = ( isset( $model[$key] ) && isset( $model[$key]['html'] ) && $model[$key]['html'] === true );
 
 				$fills[0][] = '[['. $key. ']]';
-				$fills[1][] = self::_escapeFieldValue( $value );
+				$fills[1][] = self::_escapeFieldValue( $value, $isHtml );
 			}
 
 			return str_replace( $fills[0], $fills[1], $content );
@@ -3139,8 +3158,11 @@ namespace Nino\Modules {
 		 *
 		 *	@return 	string									Safe-to-substitute value
 		 */
-		private static function _escapeFieldValue( mixed $value ): string {
-			return str_replace( '[', '&#91;', htmlspecialchars( strval( $value ), ENT_QUOTES, 'UTF-8' ) );
+		private static function _escapeFieldValue( mixed $value, bool $isHtml ): string {
+		    $safe = $isHtml === true
+		        ? \Nino\Html::sanitizeHtml( strval( $value ) )
+		        : htmlspecialchars( strval( $value ), ENT_QUOTES, 'UTF-8' );
+		    return str_replace( '[', '&#91;', $safe );
 		}
 
 		/**
@@ -3181,6 +3203,8 @@ namespace Nino\Modules {
 			$html = '';
 
 			$id = 0;
+			
+			$model = \Phile\Elements::getElementModel( $appData, $uri );
 
 			foreach( $result as $element ) {
 
@@ -3188,13 +3212,15 @@ namespace Nino\Modules {
 					['[[.id]]'],
 					[$id],
 				];
-
+				
 				foreach( $element as $key => $value ) {
 					if( is_scalar( $value ) === false )
 						continue;
+					
+					$isHtml = ( isset( $model[$key] ) && isset( $model[$key]['html'] ) && $model[$key]['html'] === true );
 
 					$fills[0][] = '[['. $key. ']]';
-					$fills[1][] = self::_escapeFieldValue( $value );
+					$fills[1][] = self::_escapeFieldValue( $value, $isHtml );
 				}
 
 				$html .= str_replace( $fills[0], $fills[1], $content );

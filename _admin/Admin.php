@@ -697,8 +697,7 @@ namespace Nino\Admin {
 			}
 
 			// A model field with 'html' => true gets the same whitelist-tag sanitizing Text
-			// uses - never trust the client's html, since element data is inserted raw/
-			// unescaped into page output just like text fills are
+			// uses - never trust the client's html
 			$model = self::typeData( $appData, $type )['model'] ?? [];
 			foreach( $fields as $key => $value )
 				if( is_string( $value ) === true && ( $model[$key]['html'] ?? false ) === true )
