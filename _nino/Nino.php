@@ -744,17 +744,28 @@ namespace Nino {
 
 			self::forceDir( $appData, dirname( ltrim( $filename, '/' ) ) );
 
-			// Create handle
-			$mode = ( $append === true ) ? 'a' : 'w+';
-			$appData['./nino/filesystem/cache'][$filename]['handle'] = fopen( $appData['./nino/filesystem/cache'][$filename]['path'], $mode );
+			// Create handle - reuse one already locked via lockFile() instead of
+			// opening a fresh one: lockFile() stores its locked handle in this same
+			// cache slot, and overwriting it here would drop the only reference to
+			// that resource, closing it and silently releasing the flock before this
+			// write happens. For a fresh handle, open with 'c+' (create, don't
+			// truncate) rather than 'w+' - 'w+' truncates the file the instant it's
+			// opened, before flock() below runs, so a concurrent reader/writer could
+			// observe 0 bytes even though nothing is locked yet.
+			$existingHandle = $appData['./nino/filesystem/cache'][$filename]['handle'] ?? null;
+			$handle = ( $nolock === true && is_resource( $existingHandle ) === true )
+				? $existingHandle
+				: fopen( $appData['./nino/filesystem/cache'][$filename]['path'], ( $append === true ) ? 'a' : 'c+' );
+
+			$appData['./nino/filesystem/cache'][$filename]['handle'] = $handle;
 
 			// Lock file
 			if( $nolock === false )
-				flock( $appData['./nino/filesystem/cache'][$filename]['handle'], LOCK_EX );
+				flock( $handle, LOCK_EX );
 
 			// Update cache
 			$appData['./nino/filesystem/cache'][$filename]['content']	= $content;
-			$appData['./nino/filesystem/cache'][$filename]['fstat']		= fstat( $appData['./nino/filesystem/cache'][$filename]['handle'] );
+			$appData['./nino/filesystem/cache'][$filename]['fstat']		= fstat( $handle );
 
 			// Prepare content
 			if( substr( $filename, -5 ) === '.json' )
@@ -767,10 +778,10 @@ namespace Nino {
 			// so a *different* read of the same path (a different handle/process, or
 			// even this same request via a function that doesn't share this handle)
 			// can still see the pre-write content/size until it's flushed
-			ftruncate( $appData['./nino/filesystem/cache'][$filename]['handle'], 0 );
-			fwrite( $appData['./nino/filesystem/cache'][$filename]['handle'], $content );
-			fflush( $appData['./nino/filesystem/cache'][$filename]['handle'] );
-			flock( $appData['./nino/filesystem/cache'][$filename]['handle'], LOCK_UN );
+			ftruncate( $handle, 0 );
+			fwrite( $handle, $content );
+			fflush( $handle );
+			flock( $handle, LOCK_UN );
 
 			// Reset opcache
 			if( function_exists( 'opcache_invalidate' ) === true && is_file( $appData['./nino/filesystem/cache'][$filename]['path'] ) === true )
