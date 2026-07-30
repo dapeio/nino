@@ -538,7 +538,7 @@ The two applications are built similarly, with clear differences:
 
 **`_dev`** serves a single (!) developer. Login happens via a hardcoded `PASSWORD_HASH` constant, defined directly in the file. Its functions simplify site development and reduce the need to hand-edit `.php` array files. Its potential for structural damage, however, is significant.
 
-**`_admin`** serves the site's administrators/operators. Several admin accounts can be created (via `_dev`), each with different permissions. There's no potential for structural damage here, only to content - and the backup system even provides a degree of protection for that.
+_admin serves the site administrators/operators. Multiple admin accounts can be created (via _dev) with different permissions. The backup system provides basic safeguarding.
 
 **`_dev` is deliberately decoupled from `config.php`**
 Logging in and using `_dev` works independently of `config.php`. That way a backup can be restored even if `config.php` itself is broken.
