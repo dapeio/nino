@@ -2934,7 +2934,15 @@ namespace Nino\Modules {
 			foreach( $assetFiles AS $file )
 				$content .= \Nino\Filesystem::getFileContent( $appData, $file, '' );
 
-			$content = \Nino\Html::renderHtml( $appData, $content );
+			// Deliberately NOT Html::renderHtml(): that pipeline also runs admin-
+			// editable textfills (text/global.php, per-locale text files) and every
+			// registered shortcode - including ones that take admin-controlled
+			// arguments. Since this content is written out as a static file served
+			// straight from the webroot, that would turn any admin-editable fill
+			// into stored XSS on every page that includes the bundle. Only the one
+			// developer/kernel-controlled token the shipped assets actually use is
+			// substituted here.
+			$content = str_replace( '[[/nino/dir]]', \Nino\Filesystem::getDir( $appData ), $content );
 
 			// Minify
 			if( substr( $pathinfo['filename'], -4 ) === '.min' )
