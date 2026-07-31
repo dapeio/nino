@@ -199,10 +199,19 @@ namespace Nino {
 			// so a login survives an ip change (mobile network handover, CGNAT
 			// rotation) and "log out everywhere" can't accidentally hit someone
 			// else sharing the same NAT ip
-			$sessionUser 	= \Nino\Runtime::getSessionValue( $appData, './nino/auth/current', false );
+			// Only mail + token live in $_SESSION (see loginUser()) - the user
+			// array itself, pw hash included, is reloaded fresh from appData's
+			// in-memory content on every request instead
+			// is_string() guards a pre-migration session that still holds the
+			// old full user array under this key (see P1-1/P1-2 above) - an
+			// array used as an array key below would be a TypeError, not a
+			// harmless miss, and would 500 every request from anyone who was
+			// logged in at deploy time instead of just treating them as
+			// logged out
+			$sessionMail 	= \Nino\Runtime::getSessionValue( $appData, './nino/auth/current', '' );
 			$sessionToken	= \Nino\Runtime::getSessionValue( $appData, './nino/auth/token', '' );
-			if( $sessionUser !== false && isset( $sessionUser['mail'] ) === true && isset( $appData['/nino/auth/user'][$sessionUser['mail']] ) === true && $sessionToken !== '' && isset( $appData['/nino/auth/user'][$sessionUser['mail']]['sessions'][$sessionToken] ) === true )
-				$appData['./nino/auth/current'] = $appData['/nino/auth/user'][$sessionUser['mail']];
+			if( is_string( $sessionMail ) === true && $sessionMail !== '' && isset( $appData['/nino/auth/user'][$sessionMail] ) === true && $sessionToken !== '' && isset( $appData['/nino/auth/user'][$sessionMail]['sessions'][$sessionToken] ) === true )
+				$appData['./nino/auth/current'] = $appData['/nino/auth/user'][$sessionMail];
 
 			$appData['/nino/http/routes']['POST://.nino/auth/login'] = [ 'uri' => '/.nino/auth/login' ];
 			$appData['/nino/http/routes']['POST://.nino/auth/logout'] = [ 'uri' => '/.nino/auth/logout' ];
@@ -310,9 +319,11 @@ namespace Nino {
 			$token = bin2hex( random_bytes( 32 ) );
 			\Nino\Runtime::setSessionValue( $appData, './nino/auth/token', $token );
 
-			// Update runtime website data
+			// Update runtime website data - only the mail goes into $_SESSION,
+			// never the user array (it carries the pw hash, and session files
+			// are often world-readable on the shared hosting this targets)
 			$appData['./nino/auth/current'] = $user;
-			\Nino\Runtime::setSessionValue( $appData, './nino/auth/current', $user );
+			\Nino\Runtime::setSessionValue( $appData, './nino/auth/current', $user['mail'] );
 
 			// Run callback - the one hook a module needs to react to a login
 			// (eg. an activity log entry) without having to piggyback on
@@ -500,7 +511,7 @@ namespace Nino {
 			if( isset( $appData['./nino/auth/current']['mail'] ) === true && $appData['./nino/auth/current']['mail'] === $username ) {
 				$updated = self::getUser( $appData, $newUsername );
 				$appData['./nino/auth/current'] = $updated;
-				\Nino\Runtime::setSessionValue( $appData, './nino/auth/current', $updated );
+				\Nino\Runtime::setSessionValue( $appData, './nino/auth/current', $updated['mail'] );
 			}
 
 			// Run callback - eg. syncing the changed mail/password elsewhere
