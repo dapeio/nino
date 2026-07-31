@@ -284,7 +284,8 @@ check( 'loginUser rejects a wrong password', $loginFail === false );
 $loginOk = \Nino\Auth::loginUser( $appData, 'test@example.com', 'correct horse battery staple' );
 check( 'loginUser accepts the right password', is_array( $loginOk ) === true );
 check( 'loginUser sets the current user', \Nino\Auth::getCurrentUser( $appData ) !== false );
-check( 'loginUser records the client ip session', isset( \Nino\Auth::getUser( $appData, 'test@example.com' )['sessions']['127.0.0.1'] ) === true );
+$loginSessions = \Nino\Auth::getUser( $appData, 'test@example.com' )['sessions'];
+check( 'loginUser records a session token carrying the client ip', count( $loginSessions ) === 1 && array_values( $loginSessions )[0]['ip'] === '127.0.0.1' );
 
 // Password hash rotation: force an outdated (low-cost) hash, then log in again and confirm it gets rotated
 $appData['/nino/auth/user']['test@example.com']['pw'] = password_hash( 'correct horse battery staple', PASSWORD_BCRYPT, [ 'cost' => 4 ] );
@@ -476,7 +477,10 @@ check( 'an invalid email is rejected (400)', $invalidEmailRequest['/nino/http/re
 $honeypotRequest = submitForm( $appData, [ 'name' => 'Jo', 'email' => 'jo@example.com', 'message' => 'Hi', 'location' => 'filled-by-a-bot' ] );
 check( 'a filled honeypot is rejected (418)', $honeypotRequest['/nino/http/response']['statusCode'] === 418 );
 
-check( 'neither rejected submission created the data dir', is_dir( \Nino\Filesystem::getPath( $appData ). '/data' ) === false );
+// /data itself already exists at this point (the Auth cooldown test above
+// writes /data/auth-tries.php on a failed login) - check the form's own
+// file specifically instead of the whole directory
+check( 'neither rejected submission created the form data file', is_file( \Nino\Filesystem::getPath( $appData ). '/data/forms.'. date( 'Y-m' ). '.php' ) === false );
 
 $okRequest = submitForm( $appData, [ 'name' => 'Jo Client', 'email' => 'jo@example.com', 'message' => "Line one\nLine two", 'cat' => 'General' ] );
 check( 'a valid submission succeeds (200)', $okRequest['/nino/http/response']['statusCode'] === 200 );
