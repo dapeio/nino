@@ -20,11 +20,28 @@ namespace Nino {
 
 		$appData = [
 			'./nino/uid'	=> dirname(__DIR__),
+			// config.php holds the password hashes and route/module wiring -
+			// letting it live outside the webroot means a webserver
+			// misconfiguration that serves raw .php source (the exact case
+			// the go-live checklist warns about) can't leak it. Defaults to
+			// the project root (old, in-webroot behaviour) unless the site's
+			// index.php defines NINO_CONFIG_DIR before requiring this file.
+			'./nino/filesystem/configpath'	=> defined( 'NINO_CONFIG_DIR' ) ? NINO_CONFIG_DIR : dirname(__DIR__),
 		];
 
 		\Nino\AppData::prepare( $appData );
 
 		\Nino\Runtime::init( $appData );
+
+		// Only for an explicitly-set NINO_CONFIG_DIR - the default (project
+		// root) is already covered by Filesystem::init()'s own checks below.
+		// Checked right after Runtime::init() so this goes through the same
+		// custom error handler as everything else, rather than falling
+		// through to AppData::init()'s later "config.php not found" with no
+		// indication of why the path was wrong in the first place.
+		if( defined( 'NINO_CONFIG_DIR' ) === true && ( is_dir( NINO_CONFIG_DIR ) === false || is_writable( NINO_CONFIG_DIR ) === false ) )
+			trigger_error( 'NINO_CONFIG_DIR (\''. NINO_CONFIG_DIR. '\') does not exist or is not writable.', E_USER_ERROR );
+
 		\Nino\Filesystem::init( $appData );
 		\Nino\AppData::init( $appData );
 		\Nino\Locales::init( $appData );
@@ -111,7 +128,7 @@ namespace Nino {
 		 */
 		public static function prepare( array &$appData ): void {
 
-			$appData = array_merge_recursive( self::$_initialInstance, $appData );
+			$appData = self::_merge( self::$_initialInstance, $appData );
 		}
 
 
@@ -123,12 +140,54 @@ namespace Nino {
 		 *	@return 	void
 		 */
 		public static function init( array &$appData ): void {
+
+			// getFileContent()'s $default is itself an array ([]), so the old
+			// is_array() check below never actually caught a missing file -
+			// this checks existence directly, so a typo'd NINO_CONFIG_DIR (or
+			// a fresh install before the first config.php write) fails loud
+			// and specific instead of silently booting with an empty config
+			if( \Nino\Filesystem::fileExists( $appData, '/config.php' ) === false )
+				trigger_error( 'AppData::init(): config.php was not found under \''. ( $appData['./nino/filesystem/configpath'] ?? $appData['./nino/filesystem/path'] ). '\' - check NINO_CONFIG_DIR if it is set.', E_USER_ERROR );
+
 			$staticAppData = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
 
 			if( is_array( $staticAppData ) === false )
-				trigger_error( 'AppData file \'/config.php\' does not exists or has an error.'  );
+				trigger_error( 'AppData::init(): config.php exists but did not return an array.', E_USER_ERROR );
 
-			$appData = array_merge_recursive( $appData, $staticAppData );
+			$appData = self::_merge( $appData, $staticAppData );
+		}
+
+		/**
+		 *	Merge $overlay into $base: associative arrays are merged
+		 *	key-by-key recursively; a plain list (array_is_list(), eg.
+		 *	'/nino/modules') on either side is replaced wholesale, not
+		 *	merged index-by-index; anything else (including two conflicting
+		 *	scalars) is overwritten by $overlay's value. Unlike
+		 *	array_merge_recursive(), which turns two scalars sharing a key
+		 *	into an array instead of replacing, and appends rather than
+		 *	replaces list sub-arrays. The convention keeping runtime ('./')
+		 *	and persistent ('/') keys from colliding today means this rarely
+		 *	matters yet, but a module writing a persistent key that already
+		 *	exists in the defaults would otherwise silently become an array
+		 *	a callsite discovers far away from here.
+		 *
+		 *	@param		array 		$base					Lower-priority array
+		 *	@param		array 		$overlay			Higher-priority array, wins on conflicts
+		 *
+		 *	@return 	array
+		 */
+		private static function _merge( array $base, array $overlay ): array {
+
+			foreach( $overlay as $key => $value ) {
+
+				$baseValue = $base[$key] ?? null;
+				$bothMergeableArrays = is_array( $value ) === true && array_is_list( $value ) === false
+					&& is_array( $baseValue ) === true && array_is_list( $baseValue ) === false;
+
+				$base[$key] = ( $bothMergeableArrays === true ) ? self::_merge( $baseValue, $value ) : $value;
+			}
+
+			return $base;
 		}
 
 		/**
@@ -177,6 +236,19 @@ namespace Nino {
 
 	class Auth {
 
+		// How long an unused session token survives in a user's 'sessions'
+		// array before loginUser() prunes it - without this, closing the
+		// browser without logging out leaves a token entry that (unlike the
+		// old ip-keyed scheme, which reused the same key on the next login
+		// from that ip) is never removed on its own
+		private const int SESSION_TTL = 60 * 60 * 24 * 30;
+
+		// Failed-attempt counters live here, not in config.php - a login
+		// storm from an unauthenticated attacker would otherwise force a
+		// config.php rewrite (routes, module wiring, every user's hash) on
+		// every single failure. Same layout Mail::_hit() already uses for
+		// its own rate limit.
+		private const string TRIES_PATH = '/data/auth-tries.php';
 
 		/**
 		 *	Init auth
@@ -187,11 +259,35 @@ namespace Nino {
 		 */
 		public static function init( array &$appData ): void {
 
+			// Login/logout are only safe against CSRF if the Csrf module is
+			// actually enabled - config.php's module list is already loaded
+			// at this point (see \Nino\init()). This used to trigger_error()
+			// right here, but that runs on *every* request incl. plain GETs,
+			// and Runtime's error handler always terminates the request (see
+			// its docblock) - one missing module entry would 500 the entire
+			// site, not just the login form. The flag is checked once an
+			// actual POST hits login/logout below instead, so this only ever
+			// blocks the one feature that's actually unsafe.
+			$appData['./nino/auth/csrf-enabled'] = self::_csrfModuleEnabled( $appData );
 
-			// Read session user
-			$sessionUser = \Nino\Runtime::getSessionValue( $appData, './nino/auth/current', false );
-			if( $sessionUser !== false && isset( $sessionUser['mail'] ) === true && isset( $appData['/nino/auth/user'][$sessionUser['mail']] ) === true && isset( $appData['/nino/auth/user'][$sessionUser['mail']]['sessions'][\Nino\Http::getClientIp()] ) === true )
-				$appData['./nino/auth/current'] = $appData['/nino/auth/user'][$sessionUser['mail']];
+			// Read session user - the session token (not the client ip) is what
+			// ties a php session to one entry in the user's 'sessions' array,
+			// so a login survives an ip change (mobile network handover, CGNAT
+			// rotation) and "log out everywhere" can't accidentally hit someone
+			// else sharing the same NAT ip
+			// Only mail + token live in $_SESSION (see loginUser()) - the user
+			// array itself, pw hash included, is reloaded fresh from appData's
+			// in-memory content on every request instead
+			// is_string() guards a pre-migration session that still holds the
+			// old full user array under this key (see P1-1/P1-2 above) - an
+			// array used as an array key below would be a TypeError, not a
+			// harmless miss, and would 500 every request from anyone who was
+			// logged in at deploy time instead of just treating them as
+			// logged out
+			$sessionMail 	= \Nino\Runtime::getSessionValue( $appData, './nino/auth/current', '' );
+			$sessionToken	= \Nino\Runtime::getSessionValue( $appData, './nino/auth/token', '' );
+			if( is_string( $sessionMail ) === true && $sessionMail !== '' && isset( $appData['/nino/auth/user'][$sessionMail] ) === true && $sessionToken !== '' && isset( $appData['/nino/auth/user'][$sessionMail]['sessions'][$sessionToken] ) === true )
+				$appData['./nino/auth/current'] = $appData['/nino/auth/user'][$sessionMail];
 
 			$appData['/nino/http/routes']['POST://.nino/auth/login'] = [ 'uri' => '/.nino/auth/login' ];
 			$appData['/nino/http/routes']['POST://.nino/auth/logout'] = [ 'uri' => '/.nino/auth/logout' ];
@@ -208,6 +304,9 @@ namespace Nino {
 		 *	@return 	void
 		 */
 		public static function callbackLoginResponse( array &$appData, array &$request ): void {
+
+			if( ( $appData['./nino/auth/csrf-enabled'] ?? false ) === false )
+				trigger_error( 'Auth::callbackLoginResponse(): refused a login POST because the Csrf module is not enabled in config.php\'s /nino/modules - add "\Nino\Modules\Csrf" to run login/logout at all.', E_USER_ERROR );
 
 			if( ( $request['./nino/csrf/blocked'] ?? false ) === true )
 				return;
@@ -234,6 +333,9 @@ namespace Nino {
 		 */
 		public static function callbackLogoutResponse( array &$appData, array &$request ): void {
 
+			if( ( $appData['./nino/auth/csrf-enabled'] ?? false ) === false )
+				trigger_error( 'Auth::callbackLogoutResponse(): refused a logout POST because the Csrf module is not enabled in config.php\'s /nino/modules - add "\Nino\Modules\Csrf" to run login/logout at all.', E_USER_ERROR );
+
 			if( ( $request['./nino/csrf/blocked'] ?? false ) === true )
 				return;
 
@@ -259,7 +361,7 @@ namespace Nino {
 			$user	= self::getUser( $appData, $username );
 
 			// Check status / cooldown
-			if( $user === false || $user['status'] !== 2 || $user['tries'] < 0 - time() )
+			if( $user === false || $user['status'] !== 2 || self::_getTries( $appData, $username ) < 0 - time() )
 				return false;
 
 			// Verify and login
@@ -273,29 +375,57 @@ namespace Nino {
 				session_regenerate_id( true );
 			\Nino\Modules\Csrf::rotateToken( $appData );
 
-			// Rotate the hash if it was created with an outdated algorithm/cost
-			$rehash = password_needs_rehash( $user['pw'], PASSWORD_DEFAULT );
-			if( $rehash === true )
-				$user['pw'] = password_hash( $pw, PASSWORD_DEFAULT );
+			// Rotate the hash if it was created with an outdated algorithm/cost -
+			// computed now (while $user still holds the verified pw context),
+			// applied further down to the freshly re-read $user
+			$rehash 	= password_needs_rehash( $user['pw'], PASSWORD_DEFAULT );
+			$newHash	= ( $rehash === true ) ? password_hash( $pw, PASSWORD_DEFAULT ) : null;
 
-			// Login
+			// Login - logoutUser() removes the previous session's token from
+			// this same user's persisted 'sessions' entry, so $user has to be
+			// re-read afterwards: reusing the pre-logout copy below would
+			// write that just-deleted token straight back in
 			if( isset( $appData['./nino/auth/current'] ) === true && is_array( $appData['./nino/auth/current'] ) === true )
 				self::logoutUser( $appData );
 
-			// Update runtime website data
+			$user = self::getUser( $appData, $username );
+			if( $user === false )
+				return false;
+			if( $rehash === true )
+				$user['pw'] = $newHash;
+
+			// Issue a fresh, unguessable session token - this (not the client ip)
+			// is the key under which the session lives in $user['sessions'], so
+			// the login stays valid across ip changes. The ip is still recorded,
+			// but purely as a display value for the admin's session list.
+			$token = bin2hex( random_bytes( 32 ) );
+			\Nino\Runtime::setSessionValue( $appData, './nino/auth/token', $token );
+
+			// Update runtime website data - only the mail goes into $_SESSION,
+			// never the user array (it carries the pw hash, and session files
+			// are often world-readable on the shared hosting this targets)
 			$appData['./nino/auth/current'] = $user;
-			\Nino\Runtime::setSessionValue( $appData, './nino/auth/current', $user );
+			\Nino\Runtime::setSessionValue( $appData, './nino/auth/current', $user['mail'] );
 
 			// Run callback - the one hook a module needs to react to a login
 			// (eg. an activity log entry) without having to piggyback on
 			// some unrelated per-route callback instead
 			\Nino\Callbacks::doCallbacks( $appData, '/nino/auth/login', $user );
 
-			// Update user in content (new session ip, or a rotated hash)
-			if( $rehash === false && isset( $user['sessions'][\Nino\Http::getClientIp()] ) === true )
-				return $user;
+			// Prune stale/legacy session entries opportunistically, on the
+			// one write this method was already going to make - same "clean
+			// up on write" idea as Mail::_hit(). is_array() also catches any
+			// pre-migration ip-keyed entry (a plain int timestamp, not the
+			// current ['time','ip'] shape) left over from before this fix.
+			$now = time();
+			foreach( $user['sessions'] as $sessionToken => $sessionData )
+				if( is_array( $sessionData ) === false || ( $sessionData['time'] ?? 0 ) < $now - self::SESSION_TTL )
+					unset( $user['sessions'][$sessionToken] );
 
-			$user['sessions'][\Nino\Http::getClientIp()] = time();
+			// Every login mints a new token, so - unlike the old ip-keyed
+			// bucket - there is no "already have a session for this key" case
+			// to skip the write for
+			$user['sessions'][$token] = [ 'time' => $now, 'ip' => \Nino\Http::getClientIp() ];
 			$appData['/nino/auth/user'][$user['mail']] = $user;
 			\Nino\AppData::writeContentData( $appData, [ '/nino/auth/user' ] );
 
@@ -320,7 +450,8 @@ namespace Nino {
 			\Nino\Modules\Csrf::rotateToken( $appData );
 
 			$user 	= self::getCurrentUser( $appData );
-			$client	= \Nino\Http::getClientIp();
+			$token	= \Nino\Runtime::getSessionValue( $appData, './nino/auth/token', '' );
+			\Nino\Runtime::unsetSessionValue( $appData, './nino/auth/token' );
 
 			if( $user === false )
 				return;
@@ -328,9 +459,10 @@ namespace Nino {
 			// Run callback - same reasoning as loginUser()'s '/nino/auth/login'
 			\Nino\Callbacks::doCallbacks( $appData, '/nino/auth/logout', $user );
 
-			// Logout ip in auth element
-			if( isset( $user['sessions'][$client] ) === true ) {
-				unset( $user['sessions'][$client] );
+			// Drop this one session token, not "whatever key matches the
+			// current ip" - the whole point is that the two no longer coincide
+			if( $token !== '' && isset( $user['sessions'][$token] ) === true ) {
+				unset( $user['sessions'][$token] );
 				$appData['/nino/auth/user'][$user['mail']] = $user;
 				\Nino\AppData::writeContentData( $appData, [ '/nino/auth/user' ] );
 			}
@@ -389,7 +521,6 @@ namespace Nino {
 				'status'		=> 2,
 				'sessions'	=> [],
 				'perms'			=> $perms,
-				'tries'			=> 0,
 			];
 
 			\Nino\AppData::writeContentData( $appData, [ '/nino/auth/user' ] );
@@ -419,6 +550,7 @@ namespace Nino {
 			unset( $appData['./nino/auth/current'] );
 
 			\Nino\AppData::writeContentData( $appData, [ '/nino/auth/user' ] );
+			self::_dropTries( $appData, $username );
 
 			// Run callback - eg. cleaning up the now-deleted account elsewhere
 			\Nino\Callbacks::doCallbacks( $appData, '/nino/auth/user/delete', $user );
@@ -428,8 +560,10 @@ namespace Nino {
 
 
 		/**
-		 *	Update a user's mail and/or password. Perms/sessions/tries/status
-		 *	are left untouched - those stay a developer-only, direct-json task.
+		 *	Update a user's mail and/or password. Perms/sessions/status are
+		 *	left untouched - those stay a developer-only, direct-json task.
+		 *	A tries counter (see TRIES_PATH) follows a mail change so an
+		 *	in-progress cooldown survives a rename.
 		 *
 		 *	@param		array 				&$appData			(reference) Array with current app data
 		 *	@param		string				$username 		Current mail
@@ -456,12 +590,14 @@ namespace Nino {
 			$appData['/nino/auth/user'][$newUsername] = $user;
 
 			\Nino\AppData::writeContentData( $appData, [ '/nino/auth/user' ] );
+			if( $newUsername !== $username )
+				self::_renameTries( $appData, $username, $newUsername );
 
 			// Keep the current session pointed at the right identity if this was a self-rename
 			if( isset( $appData['./nino/auth/current']['mail'] ) === true && $appData['./nino/auth/current']['mail'] === $username ) {
 				$updated = self::getUser( $appData, $newUsername );
 				$appData['./nino/auth/current'] = $updated;
-				\Nino\Runtime::setSessionValue( $appData, './nino/auth/current', $updated );
+				\Nino\Runtime::setSessionValue( $appData, './nino/auth/current', $updated['mail'] );
 			}
 
 			// Run callback - eg. syncing the changed mail/password elsewhere
@@ -490,6 +626,7 @@ namespace Nino {
 
 			if( isset( $appData['./nino/auth/current']['mail'] ) === true && $appData['./nino/auth/current']['mail'] === $username ) {
 				\Nino\Runtime::unsetSessionValue( $appData, './nino/auth/current' );
+				\Nino\Runtime::unsetSessionValue( $appData, './nino/auth/token' );
 				\Nino\Modules\Csrf::rotateToken( $appData );
 				unset( $appData['./nino/auth/current'] );
 			}
@@ -534,6 +671,93 @@ namespace Nino {
 
 
 		/**
+		 *	Whether the Csrf module is listed in config.php's /nino/modules -
+		 *	case-insensitively, since PHP class names are too (Modules::
+		 *	callModules() resolves them via class_exists(), which doesn't
+		 *	care about case either - a strict, case-sensitive match here
+		 *	could report the module "missing" even though it actually loads
+		 *	and runs fine).
+		 *
+		 *	@param		array 				&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	bool
+		 */
+		private static function _csrfModuleEnabled( array &$appData ): bool {
+
+			foreach( $appData['/nino/modules'] ?? [] as $className )
+				if( strcasecmp( ltrim( $className, '\\' ), ltrim( \Nino\Modules\Csrf::class, '\\' ) ) === 0 )
+					return true;
+
+			return false;
+		}
+
+		/**
+		 *	Current tries counter for an username - same negative-timestamp
+		 *	encoding _registerFailedAttemp() writes: zero/positive is a plain
+		 *	attempt count, negative means "still cooling down until -tries"
+		 *
+		 *	@param		array 				&$appData			(reference) Array with current app data
+		 *	@param		string				$username 		Username
+		 *
+		 *	@return 	int
+		 */
+		private static function _getTries( array &$appData, string $username ): int {
+
+			$state = \Nino\Filesystem::getFileContent( $appData, self::TRIES_PATH, [] );
+
+			return $state[$username] ?? 0;
+		}
+
+		/**
+		 *	Remove a username's tries entry entirely - called on deleteUser()
+		 *	so TRIES_PATH doesn't accumulate an orphaned entry for an
+		 *	account that no longer exists
+		 *
+		 *	@param		array 				&$appData			(reference) Array with current app data
+		 *	@param		string				$username 		Username
+		 *
+		 *	@return 	void
+		 */
+		private static function _dropTries( array &$appData, string $username ): void {
+
+			unset( $appData['./nino/filesystem/cache'][self::TRIES_PATH] );
+			$state = \Nino\Filesystem::getFileContent( $appData, self::TRIES_PATH, [] );
+
+			if( isset( $state[$username] ) === false )
+				return;
+
+			unset( $state[$username] );
+			\Nino\Filesystem::lockFile( $appData, self::TRIES_PATH );
+			\Nino\Filesystem::putFileContent( $appData, self::TRIES_PATH, $state, true );
+		}
+
+		/**
+		 *	Move a username's tries entry to a new key - called on
+		 *	updateUser()'s rename path so an in-progress cooldown survives a
+		 *	mail change instead of being silently dropped (reset) or left
+		 *	behind as an orphan under the old, now-unused mail
+		 *
+		 *	@param		array 				&$appData			(reference) Array with current app data
+		 *	@param		string				$oldUsername 	Previous mail
+		 *	@param		string				$newUsername 	New mail
+		 *
+		 *	@return 	void
+		 */
+		private static function _renameTries( array &$appData, string $oldUsername, string $newUsername ): void {
+
+			unset( $appData['./nino/filesystem/cache'][self::TRIES_PATH] );
+			$state = \Nino\Filesystem::getFileContent( $appData, self::TRIES_PATH, [] );
+
+			if( isset( $state[$oldUsername] ) === false )
+				return;
+
+			$state[$newUsername] = $state[$oldUsername];
+			unset( $state[$oldUsername] );
+			\Nino\Filesystem::lockFile( $appData, self::TRIES_PATH );
+			\Nino\Filesystem::putFileContent( $appData, self::TRIES_PATH, $state, true );
+		}
+
+		/**
 		 *	Register a failed login attempt
 		 *
 		 *	@param		array 				&$appData			(reference) Array with current app data
@@ -543,18 +767,32 @@ namespace Nino {
 		 */
 		private static function _registerFailedAttemp( array &$appData, array $user ): bool {
 
-			if( $user['tries'] >= 0 )
-				$user['tries']++;
+			// Drop the cache entry, re-read, then lock and write with nolock -
+			// the exact same shape AppData::writeContentData() uses for
+			// config.php (see its docblock). A plain unlocked read-modify-
+			// write here would let two concurrent failed attempts (eg. a
+			// brute-force script hammering the login endpoint from several
+			// connections at once) both read the same starting count and
+			// overwrite each other's increment - exactly the case this file
+			// exists to catch.
+			unset( $appData['./nino/filesystem/cache'][self::TRIES_PATH] );
+			$state = \Nino\Filesystem::getFileContent( $appData, self::TRIES_PATH, [] );
+			$tries = $state[$user['mail']] ?? 0;
+
+			if( $tries >= 0 )
+				$tries++;
 			else
-				$user['tries'] = 1;
+				$tries = 1;
 
 			// Check max tries
-			if( $user['tries'] >= $appData['/nino/auth/maxtries'] )
-				$user['tries'] = 0 - time() - $appData['/nino/auth/cooldown'];
+			if( $tries >= $appData['/nino/auth/maxtries'] )
+				$tries = 0 - time() - $appData['/nino/auth/cooldown'];
 
-			// Write data change
-			$appData['/nino/auth/user'][$user['mail']] = $user;
-			\Nino\AppData::writeContentData( $appData, [ '/nino/auth/user' ] );
+			// Write data change - a dedicated file, not config.php, so this
+			// unauthenticated path never triggers a config.php rewrite
+			$state[$user['mail']] = $tries;
+			\Nino\Filesystem::lockFile( $appData, self::TRIES_PATH );
+			\Nino\Filesystem::putFileContent( $appData, self::TRIES_PATH, $state, true );
 
 			return false;
 		}
@@ -707,6 +945,17 @@ namespace Nino {
 
 				flock( $appData['./nino/filesystem/cache'][$filename]['handle'], LOCK_SH );
 
+				// This handle may be the one putFileContent() just wrote
+				// through (its own cache slot, reused here) - fwrite() left
+				// it positioned at end-of-file, not the start, so fread()
+				// below would silently return '' instead of the real
+				// content. clearstatcache() matters for the same reason:
+				// filesize() is path-based, and PHP's stat cache can still
+				// report the pre-write size otherwise, even though fstat()
+				// above (handle-based) already sees the fresh mtime.
+				rewind( $appData['./nino/filesystem/cache'][$filename]['handle'] );
+				clearstatcache( true, $appData['./nino/filesystem/cache'][$filename]['path'] );
+
 				$appData['./nino/filesystem/cache'][$filename]['fstat']['mtime'] = $stats['mtime'];
 				$size = filesize( $appData['./nino/filesystem/cache'][$filename]['path'] );
 
@@ -765,7 +1014,6 @@ namespace Nino {
 
 			// Update cache
 			$appData['./nino/filesystem/cache'][$filename]['content']	= $content;
-			$appData['./nino/filesystem/cache'][$filename]['fstat']		= fstat( $handle );
 
 			// Prepare content
 			if( substr( $filename, -5 ) === '.json' )
@@ -781,6 +1029,13 @@ namespace Nino {
 			ftruncate( $handle, 0 );
 			fwrite( $handle, $content );
 			fflush( $handle );
+
+			// Captured after the write, not before - the pre-write mtime
+			// used to make getFileContent() think its cache was stale on
+			// every single next read of this same file (see its docblock
+			// for the actually broken half of that: a stale-cache read
+			// reusing this handle without rewinding first)
+			$appData['./nino/filesystem/cache'][$filename]['fstat'] = fstat( $handle );
 			flock( $handle, LOCK_UN );
 
 			// Reset opcache
@@ -960,11 +1215,17 @@ namespace Nino {
 		 */
 		private static function _prepareFileCache( array &$appData, string $filename ): bool {
 
-			// Check, if already exists
+			// Check, if already exists - config.php alone resolves against the
+			// (optionally outside-webroot) configpath instead of the regular
+			// project path, see \Nino\init()
+			$base = ( $filename === '/config.php' && ( $appData['./nino/filesystem/configpath'] ?? '' ) !== '' )
+				? $appData['./nino/filesystem/configpath']
+				: $appData['./nino/filesystem/path'];
+
 			if( isset( $appData['./nino/filesystem/cache'][$filename] ) === false )
 				$appData['./nino/filesystem/cache'][$filename] = [
 					'handle'			=> null,
-					'path'				=> $appData['./nino/filesystem/path']. '/'. ltrim( $filename, '/' ),
+					'path'				=> $base. '/'. ltrim( $filename, '/' ),
 					'content'			=> '',
 					'fstat'				=> [],
 				];
@@ -1509,9 +1770,6 @@ namespace Nino {
 
 	class Html {
 
-		private static
-			$_currentInstance = null;
-
 		private const array HTML_TAGS = [ 'strong', 'em', 'span', 'a' ];
 
 		/**
@@ -1668,10 +1926,19 @@ namespace Nino {
 			if( $appData['./nino/html/cache'] === false )
 				$appData['./nino/html/cache'] = implode( '|', array_keys( ( $appData['./nino/html/shortcodes'] ?? [] ) ) );
 
-			$oldAppData = self::$_currentInstance;
-			self::$_currentInstance = $appData;
-			$html = preg_replace_callback( '/\[('. $appData['./nino/html/cache'] . ')(?: ([^\]]*))?\](?:([^\[]*+(?:\[(?!\/\1\])[^\[]*+)*+)(?:\[\/(?:\1)\]))?/', [ self::class, '_doShortcode' ], $html );
-			self::$_currentInstance = $oldAppData;
+			// A closure capturing $appData by reference, not the previous
+			// static-property-as-callback-target approach: preg_replace_callback()
+			// only accepts a callable, but binding $appData to a class property
+			// so the static _doShortcode() could reach it meant any addAsset()/
+			// addFills()/addShortcode() call a shortcode's own callback made
+			// was silently lost - the property held a copy, not the caller's
+			// actual array. The closure sidesteps that entirely: it's a real
+			// reference to $appData, exactly like passing it as a parameter
+			// anywhere else in this file.
+			$callback = function( array $pregArgs ) use ( &$appData ): string {
+				return self::_doShortcode( $appData, $pregArgs );
+			};
+			$html = preg_replace_callback( '/\[('. $appData['./nino/html/cache'] . ')(?: ([^\]]*))?\](?:([^\[]*+(?:\[(?!\/\1\])[^\[]*+)*+)(?:\[\/(?:\1)\]))?/', $callback, $html );
 
 			return $html;
 		}
@@ -1713,18 +1980,19 @@ namespace Nino {
 		/**
 		 *	Method
 		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		$pregArgs			Arguments from preg_replace_callback()
 		 *
 		 *	@return 	string									Application event return value or empty string
 		 */
-		private static function _doShortcode( array $pregArgs ): string {
+		private static function _doShortcode( array &$appData, array $pregArgs ): string {
 
 			// Read preg arguments
 			$shortcode	= $pregArgs[1];
 			$content		= $pregArgs[3] ?? '';
 
 			// Check shortcode
-			if( isset( self::$_currentInstance['./nino/html/shortcodes'][$shortcode] ) === false )
+			if( isset( $appData['./nino/html/shortcodes'][$shortcode] ) === false )
 				return '';
 
 			// Split shortcode arguments
@@ -1749,8 +2017,8 @@ namespace Nino {
 			if( strlen( $content ) > 0 )
 				$args['content'] = $content;
 
-			$value = \Nino\Callbacks::doCallbacks( self::$_currentInstance, '/nino/html/shortcode/'. $shortcode, $args );
-			$value = self::renderHtml( self::$_currentInstance, $value );
+			$value = \Nino\Callbacks::doCallbacks( $appData, '/nino/html/shortcode/'. $shortcode, $args );
+			$value = self::renderHtml( $appData, $value );
 
 			// Return value or empty string
 			return ( is_string( $value ) === true ) ? $value : '';
@@ -1905,7 +2173,7 @@ namespace Nino {
 				'method'				=> self::_cleanRawMethod( $request['REQUEST_METHOD'] ),
 				'uri'						=> self::cleanUri( $request['REQUEST_URI'] ),
 				'query'					=> self::_getRequestQueryVarsPart( $request['REQUEST_URI'] ),
-				'header'				=> self::filterHeaderFields( $request ),
+				'header'				=> self::_filterRequestHeaderFields( $request ),
 				'body'					=> file_get_contents( 'php://input' ),
 				'user'					=> ( $request['PHP_AUTH_USER'] ?? '' ),
 				'pw'						=> ( $request['PHP_AUTH_PW'] ?? '' ),
@@ -2081,7 +2349,45 @@ namespace Nino {
 		}
 
 		/**
-		 *	Filter all non-http keys from an array
+		 *	Build the request-side header array from $_SERVER (passed in as
+		 *	$rawServer). PHP exposes request headers as HTTP_FOO_BAR keys
+		 *	(Content-Type/-Length are the CGI-spec exception, without the
+		 *	HTTP_ prefix) - filterHeaderFields() expects real header names
+		 *	like 'Foo-Bar' as keys, which is what the response side already
+		 *	has, so this normalizes the request side to match before reusing
+		 *	it. The exact case reached here doesn't matter - filterHeaderFields()
+		 *	now matches case-insensitively and returns its own whitelist's
+		 *	casing, since header names are case-insensitive per HTTP anyway.
+		 *
+		 *	@param		array 	$rawServer					Raw $_SERVER-shaped array
+		 *
+		 *	@return 	array												Filtered array, real header names as keys
+		 */
+		static private function _filterRequestHeaderFields( array $rawServer ): array {
+
+			$normalized = [];
+
+			foreach( $rawServer as $key => $value ) {
+
+				if( str_starts_with( $key, 'HTTP_' ) === true )
+					$headerName = substr( $key, 5 );
+				elseif( in_array( $key, [ 'CONTENT_TYPE', 'CONTENT_LENGTH' ], true ) === true )
+					$headerName = $key;
+				else
+					continue;
+
+				$normalized[str_replace( '_', '-', $headerName )] = $value;
+			}
+
+			return self::filterHeaderFields( $normalized );
+		}
+
+		/**
+		 *	Filter all non-http keys from an array. Matches case-insensitively
+		 *	and normalizes to the whitelist's own casing - a naive exact
+		 *	match previously turned eg. the request side's 'TE' into 'Te' via
+		 *	ucwords() and then silently dropped it, since that no longer
+		 *	matched the whitelist's literal 'TE' entry.
 		 *
 		 *	@param		array 	$headerArray				Raw array with request header fields
 		 *
@@ -2089,11 +2395,16 @@ namespace Nino {
 		 */
 		static public function filterHeaderFields( array $headerArray ): array {
 
+			$allowed = [ 'Accept', 'Accept-Charset', 'Accept-Encoding', 'Accept-Language', 'Authorization', 'Cache-Control', 'Connection', 'Content-Length', 'Content-Type', 'Cookie', 'Date', 'Expect', 'From', 'Host', 'If-Modified-Since', 'If-None-Match', 'Location', 'Max-Forwards', 'Origin', 'Pragma', 'Proxy-Authorization', 'Range', 'Referer', 'TE', 'User-Agent', 'Upgrade', 'Via', 'Warning', 'X-CSRF-Token', 'X-Frame-Options', 'X-Content-Type-Options', 'Strict-Transport-Security', 'Content-Security-Policy', 'Referrer-Policy', 'Feature-Policy', 'Permissions-Policy' ];
+
 			$filteredArray = [];
 
 			foreach( $headerArray as $key => $value )
-				if( in_array( $key, [ 'Accept', 'Accept-Charset', 'Accept-Encoding', 'Accept-Language', 'Authorization', 'Cache-Control', 'Connection', 'Content-Length', 'Content-Type', 'Cookie', 'Date', 'Expect', 'From', 'Host', 'If-Modified-Since', 'If-None-Match', 'Location', 'Max-Forwards', 'Origin', 'Pragma', 'Proxy-Authorization', 'Range', 'Referer', 'TE', 'User-Agent', 'Upgrade', 'Via', 'Warning', 'X-Frame-Options', 'X-Content-Type-Options', 'Strict-Transport-Security', 'Content-Security-Policy', 'Referrer-Policy', 'Feature-Policy', 'Permissions-Policy' ] ) === true )
-					$filteredArray[$key] = $value;
+				foreach( $allowed as $canonical )
+					if( strcasecmp( $key, $canonical ) === 0 ) {
+						$filteredArray[$canonical] = $value;
+						break;
+					}
 
 			return $filteredArray;
 		}
@@ -3061,14 +3372,43 @@ namespace Nino\Modules {
 			if( $request['/nino/http/request']['method'] !== 'POST' )
 				return;
 
-			$given = $_POST['_csrf'] ?? '';
+			$given = self::_extractToken( $request );
 
-			if( is_string( $given ) === true && $given !== '' && hash_equals( self::getToken( $appData ), $given ) === true )
+			if( $given !== '' && hash_equals( self::getToken( $appData ), $given ) === true )
 				return;
 
 			$request['./nino/csrf/blocked']									= true;
 			$request['/nino/http/response']['statusCode']	= 403;
 			$request['/nino/http/response']['body']					= false;
+		}
+
+		/**
+		 *	Read the csrf token from wherever the caller put it: the classic
+		 *	hidden form field, the X-CSRF-Token header, or the parsed JSON
+		 *	body - $_POST is always empty for a json request, so relying on
+		 *	it alone 403s every json POST regardless of the token sent.
+		 *
+		 *	@param		array 		$request			Current server request
+		 *
+		 *	@return 	string									Token, or '' if none was found
+		 */
+		private static function _extractToken( array $request ): string {
+
+			if( is_string( $_POST['_csrf'] ?? null ) === true && $_POST['_csrf'] !== '' )
+				return $_POST['_csrf'];
+
+			$header = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
+			if( is_string( $header ) === true && $header !== '' )
+				return $header;
+
+			$body = $request['/nino/http/request']['body'] ?? '';
+			if( is_string( $body ) === true && $body !== '' ) {
+				$decoded = json_decode( $body, true );
+				if( is_array( $decoded ) === true && is_string( $decoded['_csrf'] ?? null ) === true )
+					return $decoded['_csrf'];
+			}
+
+			return '';
 		}
 
 		/**
