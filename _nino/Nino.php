@@ -226,6 +226,16 @@ namespace Nino {
 		 */
 		public static function init( array &$appData ): void {
 
+			// Login/logout are only safe against CSRF if the Csrf module is
+			// actually enabled - config.php's module list is already loaded
+			// at this point (see \Nino\init()). This used to trigger_error()
+			// right here, but that runs on *every* request incl. plain GETs,
+			// and Runtime's error handler always terminates the request (see
+			// its docblock) - one missing module entry would 500 the entire
+			// site, not just the login form. The flag is checked once an
+			// actual POST hits login/logout below instead, so this only ever
+			// blocks the one feature that's actually unsafe.
+			$appData['./nino/auth/csrf-enabled'] = self::_csrfModuleEnabled( $appData );
 
 			// Read session user - the session token (not the client ip) is what
 			// ties a php session to one entry in the user's 'sessions' array,
@@ -262,6 +272,9 @@ namespace Nino {
 		 */
 		public static function callbackLoginResponse( array &$appData, array &$request ): void {
 
+			if( ( $appData['./nino/auth/csrf-enabled'] ?? false ) === false )
+				trigger_error( 'Auth::callbackLoginResponse(): refused a login POST because the Csrf module is not enabled in config.php\'s /nino/modules - add "\Nino\Modules\Csrf" to run login/logout at all.', E_USER_ERROR );
+
 			if( ( $request['./nino/csrf/blocked'] ?? false ) === true )
 				return;
 
@@ -286,6 +299,9 @@ namespace Nino {
 		 *	@return 	void
 		 */
 		public static function callbackLogoutResponse( array &$appData, array &$request ): void {
+
+			if( ( $appData['./nino/auth/csrf-enabled'] ?? false ) === false )
+				trigger_error( 'Auth::callbackLogoutResponse(): refused a logout POST because the Csrf module is not enabled in config.php\'s /nino/modules - add "\Nino\Modules\Csrf" to run login/logout at all.', E_USER_ERROR );
 
 			if( ( $request['./nino/csrf/blocked'] ?? false ) === true )
 				return;
@@ -620,6 +636,27 @@ namespace Nino {
 			return false;
 		}
 
+
+		/**
+		 *	Whether the Csrf module is listed in config.php's /nino/modules -
+		 *	case-insensitively, since PHP class names are too (Modules::
+		 *	callModules() resolves them via class_exists(), which doesn't
+		 *	care about case either - a strict, case-sensitive match here
+		 *	could report the module "missing" even though it actually loads
+		 *	and runs fine).
+		 *
+		 *	@param		array 				&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	bool
+		 */
+		private static function _csrfModuleEnabled( array &$appData ): bool {
+
+			foreach( $appData['/nino/modules'] ?? [] as $className )
+				if( strcasecmp( ltrim( $className, '\\' ), ltrim( \Nino\Modules\Csrf::class, '\\' ) ) === 0 )
+					return true;
+
+			return false;
+		}
 
 		/**
 		 *	Current tries counter for an username - same negative-timestamp
