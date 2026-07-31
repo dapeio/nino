@@ -1753,9 +1753,6 @@ namespace Nino {
 
 	class Html {
 
-		private static
-			$_currentInstance = null;
-
 		private const array HTML_TAGS = [ 'strong', 'em', 'span', 'a' ];
 
 		/**
@@ -1912,10 +1909,19 @@ namespace Nino {
 			if( $appData['./nino/html/cache'] === false )
 				$appData['./nino/html/cache'] = implode( '|', array_keys( ( $appData['./nino/html/shortcodes'] ?? [] ) ) );
 
-			$oldAppData = self::$_currentInstance;
-			self::$_currentInstance = $appData;
-			$html = preg_replace_callback( '/\[('. $appData['./nino/html/cache'] . ')(?: ([^\]]*))?\](?:([^\[]*+(?:\[(?!\/\1\])[^\[]*+)*+)(?:\[\/(?:\1)\]))?/', [ self::class, '_doShortcode' ], $html );
-			self::$_currentInstance = $oldAppData;
+			// A closure capturing $appData by reference, not the previous
+			// static-property-as-callback-target approach: preg_replace_callback()
+			// only accepts a callable, but binding $appData to a class property
+			// so the static _doShortcode() could reach it meant any addAsset()/
+			// addFills()/addShortcode() call a shortcode's own callback made
+			// was silently lost - the property held a copy, not the caller's
+			// actual array. The closure sidesteps that entirely: it's a real
+			// reference to $appData, exactly like passing it as a parameter
+			// anywhere else in this file.
+			$callback = function( array $pregArgs ) use ( &$appData ): string {
+				return self::_doShortcode( $appData, $pregArgs );
+			};
+			$html = preg_replace_callback( '/\[('. $appData['./nino/html/cache'] . ')(?: ([^\]]*))?\](?:([^\[]*+(?:\[(?!\/\1\])[^\[]*+)*+)(?:\[\/(?:\1)\]))?/', $callback, $html );
 
 			return $html;
 		}
@@ -1957,18 +1963,19 @@ namespace Nino {
 		/**
 		 *	Method
 		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		$pregArgs			Arguments from preg_replace_callback()
 		 *
 		 *	@return 	string									Application event return value or empty string
 		 */
-		private static function _doShortcode( array $pregArgs ): string {
+		private static function _doShortcode( array &$appData, array $pregArgs ): string {
 
 			// Read preg arguments
 			$shortcode	= $pregArgs[1];
 			$content		= $pregArgs[3] ?? '';
 
 			// Check shortcode
-			if( isset( self::$_currentInstance['./nino/html/shortcodes'][$shortcode] ) === false )
+			if( isset( $appData['./nino/html/shortcodes'][$shortcode] ) === false )
 				return '';
 
 			// Split shortcode arguments
@@ -1993,8 +2000,8 @@ namespace Nino {
 			if( strlen( $content ) > 0 )
 				$args['content'] = $content;
 
-			$value = \Nino\Callbacks::doCallbacks( self::$_currentInstance, '/nino/html/shortcode/'. $shortcode, $args );
-			$value = self::renderHtml( self::$_currentInstance, $value );
+			$value = \Nino\Callbacks::doCallbacks( $appData, '/nino/html/shortcode/'. $shortcode, $args );
+			$value = self::renderHtml( $appData, $value );
 
 			// Return value or empty string
 			return ( is_string( $value ) === true ) ? $value : '';
