@@ -20,11 +20,28 @@ namespace Nino {
 
 		$appData = [
 			'./nino/uid'	=> dirname(__DIR__),
+			// config.php holds the password hashes and route/module wiring -
+			// letting it live outside the webroot means a webserver
+			// misconfiguration that serves raw .php source (the exact case
+			// the go-live checklist warns about) can't leak it. Defaults to
+			// the project root (old, in-webroot behaviour) unless the site's
+			// index.php defines NINO_CONFIG_DIR before requiring this file.
+			'./nino/filesystem/configpath'	=> defined( 'NINO_CONFIG_DIR' ) ? NINO_CONFIG_DIR : dirname(__DIR__),
 		];
 
 		\Nino\AppData::prepare( $appData );
 
 		\Nino\Runtime::init( $appData );
+
+		// Only for an explicitly-set NINO_CONFIG_DIR - the default (project
+		// root) is already covered by Filesystem::init()'s own checks below.
+		// Checked right after Runtime::init() so this goes through the same
+		// custom error handler as everything else, rather than falling
+		// through to AppData::init()'s later "config.php not found" with no
+		// indication of why the path was wrong in the first place.
+		if( defined( 'NINO_CONFIG_DIR' ) === true && ( is_dir( NINO_CONFIG_DIR ) === false || is_writable( NINO_CONFIG_DIR ) === false ) )
+			trigger_error( 'NINO_CONFIG_DIR (\''. NINO_CONFIG_DIR. '\') does not exist or is not writable.', E_USER_ERROR );
+
 		\Nino\Filesystem::init( $appData );
 		\Nino\AppData::init( $appData );
 		\Nino\Locales::init( $appData );
@@ -123,10 +140,19 @@ namespace Nino {
 		 *	@return 	void
 		 */
 		public static function init( array &$appData ): void {
+
+			// getFileContent()'s $default is itself an array ([]), so the old
+			// is_array() check below never actually caught a missing file -
+			// this checks existence directly, so a typo'd NINO_CONFIG_DIR (or
+			// a fresh install before the first config.php write) fails loud
+			// and specific instead of silently booting with an empty config
+			if( \Nino\Filesystem::fileExists( $appData, '/config.php' ) === false )
+				trigger_error( 'AppData::init(): config.php was not found under \''. ( $appData['./nino/filesystem/configpath'] ?? $appData['./nino/filesystem/path'] ). '\' - check NINO_CONFIG_DIR if it is set.', E_USER_ERROR );
+
 			$staticAppData = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
 
 			if( is_array( $staticAppData ) === false )
-				trigger_error( 'AppData file \'/config.php\' does not exists or has an error.'  );
+				trigger_error( 'AppData::init(): config.php exists but did not return an array.', E_USER_ERROR );
 
 			$appData = array_merge_recursive( $appData, $staticAppData );
 		}
@@ -1011,11 +1037,17 @@ namespace Nino {
 		 */
 		private static function _prepareFileCache( array &$appData, string $filename ): bool {
 
-			// Check, if already exists
+			// Check, if already exists - config.php alone resolves against the
+			// (optionally outside-webroot) configpath instead of the regular
+			// project path, see \Nino\init()
+			$base = ( $filename === '/config.php' && ( $appData['./nino/filesystem/configpath'] ?? '' ) !== '' )
+				? $appData['./nino/filesystem/configpath']
+				: $appData['./nino/filesystem/path'];
+
 			if( isset( $appData['./nino/filesystem/cache'][$filename] ) === false )
 				$appData['./nino/filesystem/cache'][$filename] = [
 					'handle'			=> null,
-					'path'				=> $appData['./nino/filesystem/path']. '/'. ltrim( $filename, '/' ),
+					'path'				=> $base. '/'. ltrim( $filename, '/' ),
 					'content'			=> '',
 					'fstat'				=> [],
 				];
