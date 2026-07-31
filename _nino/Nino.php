@@ -1286,7 +1286,12 @@ namespace Nino {
 		 *	@return 	string									Element type
 		 */
 		static public function getElementTypeFromUri( string $uri ): string {
-			return substr( $uri, 0, strpos( substr( $uri, 1 ), '/' ) + 1 );
+			$pos = strpos( substr( $uri, 1 ), '/' );
+			if( $pos === false ) {
+				trigger_error( 'Element uri \''. $uri. '\' has no type separator (expected \'/type/slug\').' );
+				return '';
+			}
+			return substr( $uri, 0, $pos + 1 );
 		}
 
 		/**
@@ -1297,7 +1302,12 @@ namespace Nino {
 		 *	@return 	string									Element uri
 		 */
 		static public function getElementUriFromUri( string $uri ): string {
-			return substr( $uri, strpos( substr( $uri, 1 ), '/' ) + 2 );
+			$pos = strpos( substr( $uri, 1 ), '/' );
+			if( $pos === false ) {
+				trigger_error( 'Element uri \''. $uri. '\' has no type separator (expected \'/type/slug\').' );
+				return '';
+			}
+			return substr( $uri, $pos + 2 );
 		}
 
 		/**
