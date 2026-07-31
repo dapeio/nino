@@ -3272,14 +3272,43 @@ namespace Nino\Modules {
 			if( $request['/nino/http/request']['method'] !== 'POST' )
 				return;
 
-			$given = $_POST['_csrf'] ?? '';
+			$given = self::_extractToken( $request );
 
-			if( is_string( $given ) === true && $given !== '' && hash_equals( self::getToken( $appData ), $given ) === true )
+			if( $given !== '' && hash_equals( self::getToken( $appData ), $given ) === true )
 				return;
 
 			$request['./nino/csrf/blocked']									= true;
 			$request['/nino/http/response']['statusCode']	= 403;
 			$request['/nino/http/response']['body']					= false;
+		}
+
+		/**
+		 *	Read the csrf token from wherever the caller put it: the classic
+		 *	hidden form field, the X-CSRF-Token header, or the parsed JSON
+		 *	body - $_POST is always empty for a json request, so relying on
+		 *	it alone 403s every json POST regardless of the token sent.
+		 *
+		 *	@param		array 		$request			Current server request
+		 *
+		 *	@return 	string									Token, or '' if none was found
+		 */
+		private static function _extractToken( array $request ): string {
+
+			if( is_string( $_POST['_csrf'] ?? null ) === true && $_POST['_csrf'] !== '' )
+				return $_POST['_csrf'];
+
+			$header = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
+			if( is_string( $header ) === true && $header !== '' )
+				return $header;
+
+			$body = $request['/nino/http/request']['body'] ?? '';
+			if( is_string( $body ) === true && $body !== '' ) {
+				$decoded = json_decode( $body, true );
+				if( is_array( $decoded ) === true && is_string( $decoded['_csrf'] ?? null ) === true )
+					return $decoded['_csrf'];
+			}
+
+			return '';
 		}
 
 		/**
