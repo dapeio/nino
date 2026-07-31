@@ -177,6 +177,12 @@ namespace Nino {
 
 	class Auth {
 
+		// How long an unused session token survives in a user's 'sessions'
+		// array before loginUser() prunes it - without this, closing the
+		// browser without logging out leaves a token entry that (unlike the
+		// old ip-keyed scheme, which reused the same key on the next login
+		// from that ip) is never removed on its own
+		private const int SESSION_TTL = 60 * 60 * 24 * 30;
 
 		/**
 		 *	Init auth
@@ -188,9 +194,14 @@ namespace Nino {
 		public static function init( array &$appData ): void {
 
 
-			// Read session user
-			$sessionUser = \Nino\Runtime::getSessionValue( $appData, './nino/auth/current', false );
-			if( $sessionUser !== false && isset( $sessionUser['mail'] ) === true && isset( $appData['/nino/auth/user'][$sessionUser['mail']] ) === true && isset( $appData['/nino/auth/user'][$sessionUser['mail']]['sessions'][\Nino\Http::getClientIp()] ) === true )
+			// Read session user - the session token (not the client ip) is what
+			// ties a php session to one entry in the user's 'sessions' array,
+			// so a login survives an ip change (mobile network handover, CGNAT
+			// rotation) and "log out everywhere" can't accidentally hit someone
+			// else sharing the same NAT ip
+			$sessionUser 	= \Nino\Runtime::getSessionValue( $appData, './nino/auth/current', false );
+			$sessionToken	= \Nino\Runtime::getSessionValue( $appData, './nino/auth/token', '' );
+			if( $sessionUser !== false && isset( $sessionUser['mail'] ) === true && isset( $appData['/nino/auth/user'][$sessionUser['mail']] ) === true && $sessionToken !== '' && isset( $appData['/nino/auth/user'][$sessionUser['mail']]['sessions'][$sessionToken] ) === true )
 				$appData['./nino/auth/current'] = $appData['/nino/auth/user'][$sessionUser['mail']];
 
 			$appData['/nino/http/routes']['POST://.nino/auth/login'] = [ 'uri' => '/.nino/auth/login' ];
@@ -273,14 +284,31 @@ namespace Nino {
 				session_regenerate_id( true );
 			\Nino\Modules\Csrf::rotateToken( $appData );
 
-			// Rotate the hash if it was created with an outdated algorithm/cost
-			$rehash = password_needs_rehash( $user['pw'], PASSWORD_DEFAULT );
-			if( $rehash === true )
-				$user['pw'] = password_hash( $pw, PASSWORD_DEFAULT );
+			// Rotate the hash if it was created with an outdated algorithm/cost -
+			// computed now (while $user still holds the verified pw context),
+			// applied further down to the freshly re-read $user
+			$rehash 	= password_needs_rehash( $user['pw'], PASSWORD_DEFAULT );
+			$newHash	= ( $rehash === true ) ? password_hash( $pw, PASSWORD_DEFAULT ) : null;
 
-			// Login
+			// Login - logoutUser() removes the previous session's token from
+			// this same user's persisted 'sessions' entry, so $user has to be
+			// re-read afterwards: reusing the pre-logout copy below would
+			// write that just-deleted token straight back in
 			if( isset( $appData['./nino/auth/current'] ) === true && is_array( $appData['./nino/auth/current'] ) === true )
 				self::logoutUser( $appData );
+
+			$user = self::getUser( $appData, $username );
+			if( $user === false )
+				return false;
+			if( $rehash === true )
+				$user['pw'] = $newHash;
+
+			// Issue a fresh, unguessable session token - this (not the client ip)
+			// is the key under which the session lives in $user['sessions'], so
+			// the login stays valid across ip changes. The ip is still recorded,
+			// but purely as a display value for the admin's session list.
+			$token = bin2hex( random_bytes( 32 ) );
+			\Nino\Runtime::setSessionValue( $appData, './nino/auth/token', $token );
 
 			// Update runtime website data
 			$appData['./nino/auth/current'] = $user;
@@ -291,11 +319,20 @@ namespace Nino {
 			// some unrelated per-route callback instead
 			\Nino\Callbacks::doCallbacks( $appData, '/nino/auth/login', $user );
 
-			// Update user in content (new session ip, or a rotated hash)
-			if( $rehash === false && isset( $user['sessions'][\Nino\Http::getClientIp()] ) === true )
-				return $user;
+			// Prune stale/legacy session entries opportunistically, on the
+			// one write this method was already going to make - same "clean
+			// up on write" idea as Mail::_hit(). is_array() also catches any
+			// pre-migration ip-keyed entry (a plain int timestamp, not the
+			// current ['time','ip'] shape) left over from before this fix.
+			$now = time();
+			foreach( $user['sessions'] as $sessionToken => $sessionData )
+				if( is_array( $sessionData ) === false || ( $sessionData['time'] ?? 0 ) < $now - self::SESSION_TTL )
+					unset( $user['sessions'][$sessionToken] );
 
-			$user['sessions'][\Nino\Http::getClientIp()] = time();
+			// Every login mints a new token, so - unlike the old ip-keyed
+			// bucket - there is no "already have a session for this key" case
+			// to skip the write for
+			$user['sessions'][$token] = [ 'time' => $now, 'ip' => \Nino\Http::getClientIp() ];
 			$appData['/nino/auth/user'][$user['mail']] = $user;
 			\Nino\AppData::writeContentData( $appData, [ '/nino/auth/user' ] );
 
@@ -320,7 +357,8 @@ namespace Nino {
 			\Nino\Modules\Csrf::rotateToken( $appData );
 
 			$user 	= self::getCurrentUser( $appData );
-			$client	= \Nino\Http::getClientIp();
+			$token	= \Nino\Runtime::getSessionValue( $appData, './nino/auth/token', '' );
+			\Nino\Runtime::unsetSessionValue( $appData, './nino/auth/token' );
 
 			if( $user === false )
 				return;
@@ -328,9 +366,10 @@ namespace Nino {
 			// Run callback - same reasoning as loginUser()'s '/nino/auth/login'
 			\Nino\Callbacks::doCallbacks( $appData, '/nino/auth/logout', $user );
 
-			// Logout ip in auth element
-			if( isset( $user['sessions'][$client] ) === true ) {
-				unset( $user['sessions'][$client] );
+			// Drop this one session token, not "whatever key matches the
+			// current ip" - the whole point is that the two no longer coincide
+			if( $token !== '' && isset( $user['sessions'][$token] ) === true ) {
+				unset( $user['sessions'][$token] );
 				$appData['/nino/auth/user'][$user['mail']] = $user;
 				\Nino\AppData::writeContentData( $appData, [ '/nino/auth/user' ] );
 			}
@@ -490,6 +529,7 @@ namespace Nino {
 
 			if( isset( $appData['./nino/auth/current']['mail'] ) === true && $appData['./nino/auth/current']['mail'] === $username ) {
 				\Nino\Runtime::unsetSessionValue( $appData, './nino/auth/current' );
+				\Nino\Runtime::unsetSessionValue( $appData, './nino/auth/token' );
 				\Nino\Modules\Csrf::rotateToken( $appData );
 				unset( $appData['./nino/auth/current'] );
 			}
