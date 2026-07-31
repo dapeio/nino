@@ -128,7 +128,7 @@ namespace Nino {
 		 */
 		public static function prepare( array &$appData ): void {
 
-			$appData = array_merge_recursive( self::$_initialInstance, $appData );
+			$appData = self::_merge( self::$_initialInstance, $appData );
 		}
 
 
@@ -154,7 +154,40 @@ namespace Nino {
 			if( is_array( $staticAppData ) === false )
 				trigger_error( 'AppData::init(): config.php exists but did not return an array.', E_USER_ERROR );
 
-			$appData = array_merge_recursive( $appData, $staticAppData );
+			$appData = self::_merge( $appData, $staticAppData );
+		}
+
+		/**
+		 *	Merge $overlay into $base: associative arrays are merged
+		 *	key-by-key recursively; a plain list (array_is_list(), eg.
+		 *	'/nino/modules') on either side is replaced wholesale, not
+		 *	merged index-by-index; anything else (including two conflicting
+		 *	scalars) is overwritten by $overlay's value. Unlike
+		 *	array_merge_recursive(), which turns two scalars sharing a key
+		 *	into an array instead of replacing, and appends rather than
+		 *	replaces list sub-arrays. The convention keeping runtime ('./')
+		 *	and persistent ('/') keys from colliding today means this rarely
+		 *	matters yet, but a module writing a persistent key that already
+		 *	exists in the defaults would otherwise silently become an array
+		 *	a callsite discovers far away from here.
+		 *
+		 *	@param		array 		$base					Lower-priority array
+		 *	@param		array 		$overlay			Higher-priority array, wins on conflicts
+		 *
+		 *	@return 	array
+		 */
+		private static function _merge( array $base, array $overlay ): array {
+
+			foreach( $overlay as $key => $value ) {
+
+				$baseValue = $base[$key] ?? null;
+				$bothMergeableArrays = is_array( $value ) === true && array_is_list( $value ) === false
+					&& is_array( $baseValue ) === true && array_is_list( $baseValue ) === false;
+
+				$base[$key] = ( $bothMergeableArrays === true ) ? self::_merge( $baseValue, $value ) : $value;
+			}
+
+			return $base;
 		}
 
 		/**
