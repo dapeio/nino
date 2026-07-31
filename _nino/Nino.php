@@ -210,6 +210,13 @@ namespace Nino {
 		// from that ip) is never removed on its own
 		private const int SESSION_TTL = 60 * 60 * 24 * 30;
 
+		// Failed-attempt counters live here, not in config.php - a login
+		// storm from an unauthenticated attacker would otherwise force a
+		// config.php rewrite (routes, module wiring, every user's hash) on
+		// every single failure. Same layout Mail::_hit() already uses for
+		// its own rate limit.
+		private const string TRIES_PATH = '/data/auth-tries.php';
+
 		/**
 		 *	Init auth
 		 *
@@ -305,7 +312,7 @@ namespace Nino {
 			$user	= self::getUser( $appData, $username );
 
 			// Check status / cooldown
-			if( $user === false || $user['status'] !== 2 || $user['tries'] < 0 - time() )
+			if( $user === false || $user['status'] !== 2 || self::_getTries( $appData, $username ) < 0 - time() )
 				return false;
 
 			// Verify and login
@@ -465,7 +472,6 @@ namespace Nino {
 				'status'		=> 2,
 				'sessions'	=> [],
 				'perms'			=> $perms,
-				'tries'			=> 0,
 			];
 
 			\Nino\AppData::writeContentData( $appData, [ '/nino/auth/user' ] );
@@ -495,6 +501,7 @@ namespace Nino {
 			unset( $appData['./nino/auth/current'] );
 
 			\Nino\AppData::writeContentData( $appData, [ '/nino/auth/user' ] );
+			self::_dropTries( $appData, $username );
 
 			// Run callback - eg. cleaning up the now-deleted account elsewhere
 			\Nino\Callbacks::doCallbacks( $appData, '/nino/auth/user/delete', $user );
@@ -504,8 +511,10 @@ namespace Nino {
 
 
 		/**
-		 *	Update a user's mail and/or password. Perms/sessions/tries/status
-		 *	are left untouched - those stay a developer-only, direct-json task.
+		 *	Update a user's mail and/or password. Perms/sessions/status are
+		 *	left untouched - those stay a developer-only, direct-json task.
+		 *	A tries counter (see TRIES_PATH) follows a mail change so an
+		 *	in-progress cooldown survives a rename.
 		 *
 		 *	@param		array 				&$appData			(reference) Array with current app data
 		 *	@param		string				$username 		Current mail
@@ -532,6 +541,8 @@ namespace Nino {
 			$appData['/nino/auth/user'][$newUsername] = $user;
 
 			\Nino\AppData::writeContentData( $appData, [ '/nino/auth/user' ] );
+			if( $newUsername !== $username )
+				self::_renameTries( $appData, $username, $newUsername );
 
 			// Keep the current session pointed at the right identity if this was a self-rename
 			if( isset( $appData['./nino/auth/current']['mail'] ) === true && $appData['./nino/auth/current']['mail'] === $username ) {
@@ -611,6 +622,72 @@ namespace Nino {
 
 
 		/**
+		 *	Current tries counter for an username - same negative-timestamp
+		 *	encoding _registerFailedAttemp() writes: zero/positive is a plain
+		 *	attempt count, negative means "still cooling down until -tries"
+		 *
+		 *	@param		array 				&$appData			(reference) Array with current app data
+		 *	@param		string				$username 		Username
+		 *
+		 *	@return 	int
+		 */
+		private static function _getTries( array &$appData, string $username ): int {
+
+			$state = \Nino\Filesystem::getFileContent( $appData, self::TRIES_PATH, [] );
+
+			return $state[$username] ?? 0;
+		}
+
+		/**
+		 *	Remove a username's tries entry entirely - called on deleteUser()
+		 *	so TRIES_PATH doesn't accumulate an orphaned entry for an
+		 *	account that no longer exists
+		 *
+		 *	@param		array 				&$appData			(reference) Array with current app data
+		 *	@param		string				$username 		Username
+		 *
+		 *	@return 	void
+		 */
+		private static function _dropTries( array &$appData, string $username ): void {
+
+			unset( $appData['./nino/filesystem/cache'][self::TRIES_PATH] );
+			$state = \Nino\Filesystem::getFileContent( $appData, self::TRIES_PATH, [] );
+
+			if( isset( $state[$username] ) === false )
+				return;
+
+			unset( $state[$username] );
+			\Nino\Filesystem::lockFile( $appData, self::TRIES_PATH );
+			\Nino\Filesystem::putFileContent( $appData, self::TRIES_PATH, $state, true );
+		}
+
+		/**
+		 *	Move a username's tries entry to a new key - called on
+		 *	updateUser()'s rename path so an in-progress cooldown survives a
+		 *	mail change instead of being silently dropped (reset) or left
+		 *	behind as an orphan under the old, now-unused mail
+		 *
+		 *	@param		array 				&$appData			(reference) Array with current app data
+		 *	@param		string				$oldUsername 	Previous mail
+		 *	@param		string				$newUsername 	New mail
+		 *
+		 *	@return 	void
+		 */
+		private static function _renameTries( array &$appData, string $oldUsername, string $newUsername ): void {
+
+			unset( $appData['./nino/filesystem/cache'][self::TRIES_PATH] );
+			$state = \Nino\Filesystem::getFileContent( $appData, self::TRIES_PATH, [] );
+
+			if( isset( $state[$oldUsername] ) === false )
+				return;
+
+			$state[$newUsername] = $state[$oldUsername];
+			unset( $state[$oldUsername] );
+			\Nino\Filesystem::lockFile( $appData, self::TRIES_PATH );
+			\Nino\Filesystem::putFileContent( $appData, self::TRIES_PATH, $state, true );
+		}
+
+		/**
 		 *	Register a failed login attempt
 		 *
 		 *	@param		array 				&$appData			(reference) Array with current app data
@@ -620,18 +697,32 @@ namespace Nino {
 		 */
 		private static function _registerFailedAttemp( array &$appData, array $user ): bool {
 
-			if( $user['tries'] >= 0 )
-				$user['tries']++;
+			// Drop the cache entry, re-read, then lock and write with nolock -
+			// the exact same shape AppData::writeContentData() uses for
+			// config.php (see its docblock). A plain unlocked read-modify-
+			// write here would let two concurrent failed attempts (eg. a
+			// brute-force script hammering the login endpoint from several
+			// connections at once) both read the same starting count and
+			// overwrite each other's increment - exactly the case this file
+			// exists to catch.
+			unset( $appData['./nino/filesystem/cache'][self::TRIES_PATH] );
+			$state = \Nino\Filesystem::getFileContent( $appData, self::TRIES_PATH, [] );
+			$tries = $state[$user['mail']] ?? 0;
+
+			if( $tries >= 0 )
+				$tries++;
 			else
-				$user['tries'] = 1;
+				$tries = 1;
 
 			// Check max tries
-			if( $user['tries'] >= $appData['/nino/auth/maxtries'] )
-				$user['tries'] = 0 - time() - $appData['/nino/auth/cooldown'];
+			if( $tries >= $appData['/nino/auth/maxtries'] )
+				$tries = 0 - time() - $appData['/nino/auth/cooldown'];
 
-			// Write data change
-			$appData['/nino/auth/user'][$user['mail']] = $user;
-			\Nino\AppData::writeContentData( $appData, [ '/nino/auth/user' ] );
+			// Write data change - a dedicated file, not config.php, so this
+			// unauthenticated path never triggers a config.php rewrite
+			$state[$user['mail']] = $tries;
+			\Nino\Filesystem::lockFile( $appData, self::TRIES_PATH );
+			\Nino\Filesystem::putFileContent( $appData, self::TRIES_PATH, $state, true );
 
 			return false;
 		}
