@@ -9,6 +9,8 @@
     5 => '\\Nino\\Modules\\Template',
     6 => '\\Nino\\Modules\\Csrf',
     7 => '\\Nino\\Modules\\Images',
+    8 => '\\Nino\\Modules\\Form',
+    9 => '\\Nino\\Modules\\Newsletter',
   ),
   '/nino/admin/backups' => false,
   '/nino/admin/logs' => false,
@@ -17,7 +19,7 @@
   '/nino/error/log' => true,
   '/nino/error/display' => false,
   '/nino/session/force-secure-cookie' => false,
-  '/nino/locales/native' => 'de_DE',
+  '/nino/locales/native' => 'en_US',
   '/nino/locales/available' =>
   array (
     0 => 'en_US',
@@ -55,6 +57,31 @@
       'uri' => '/404',
       'body' => '[template /templates/page-404]',
       'statusCode' => 404,
+    ),
+    'GET://about' =>
+    array (
+      'uri' => '/about',
+      'body' => '[template /templates/page-about]',
+    ),
+    'GET://services' =>
+    array (
+      'uri' => '/services',
+      'body' => '[template /templates/page-services]',
+    ),
+    'GET://work' =>
+    array (
+      'uri' => '/work',
+      'body' => '[template /templates/page-work]',
+    ),
+    'GET://faq' =>
+    array (
+      'uri' => '/faq',
+      'body' => '[template /templates/page-faq]',
+    ),
+    'GET://contact' =>
+    array (
+      'uri' => '/contact',
+      'body' => '[template /templates/page-contact]',
     ),
     'GET://.demo-elements' =>
     array (

@@ -5,8 +5,8 @@
 	<div class="ui-grid-row">
 		<div class="ui-grid-100">
 			<h2 class="ui-atf-title">Design-System: Viewport-Animationen</h2>
-			<p class="ui-atf-subtitle">Grundsätzliche Mechanik, dann eine Galerie zum Vergleichen. Sonstige Bausteine siehe <a href="[[/webpage/demo-elements/uri]]">demo-elements</a>.</p>
-			<a href="[[/webpage/demo-elements/uri]]" class="ui-btn ui-btn--outline">Zu den Bausteinen &rarr;</a>
+			<p class="ui-atf-subtitle">Grundsätzliche Mechanik, dann eine Galerie zum Vergleichen. Sonstige Bausteine siehe <a href="[[/webpage/.demo-elements/uri]]">demo-elements</a>.</p>
+			<a href="[[/webpage/.demo-elements/uri]]" class="ui-btn ui-btn--outline">Zu den Bausteinen &rarr;</a>
 		</div>
 	</div>
 	</div>

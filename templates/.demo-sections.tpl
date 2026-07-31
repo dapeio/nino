@@ -6,7 +6,7 @@
 			<div class="ui-grid-100">
 				<h2 class="ui-atf-title">Design-System: Sections</h2>
 				<p class="ui-atf-subtitle">Fertige, realistische Section-Typen zum Copy/Paste für neue Seiten - Markup direkt aus den Bausteinen in docs/design-system.md zusammengesetzt.</p>
-				<a href="[[/webpage/demo-elements/uri]]" class="ui-btn ui-btn--outline">Zu den einzelnen Bausteinen &rarr;</a>
+				<a href="[[/webpage/.demo-elements/uri]]" class="ui-btn ui-btn--outline">Zu den einzelnen Bausteinen &rarr;</a>
 			</div>
 		</div>
 	</div>

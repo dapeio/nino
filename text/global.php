@@ -1,18 +1,18 @@
 <?php return [
 
-	'[[/company/adress]]' 		=> 'Musterstraße 1, 12345 Musterstadt',
-	'[[/company/phone]]'		=> '+49 (0) 170 1234567',
-	'[[/company/email]]' => 'kontakt@maxmustermann.de',
-	'[[/company/signal]]' => 'maxmustermann.01',
-	'[[/company/instagram]]' => 'maxmustermann.coaching',
+	'[[/company/adress]]' 		=> 'Karl-Heine-Straße 87, 04229 Leipzig',
+	'[[/company/phone]]'		=> '+49 (0) 341 4956 220',
+	'[[/company/email]]' => 'hallo@formfunk-studio.example',
+	'[[/company/signal]]' => 'formfunk.07',
+	'[[/company/instagram]]' => 'formfunkstudio',
 
-	'[[/form/email/owner]]' => 'kontakt@maxmustermann.de',
+	'[[/form/email/owner]]' => 'hallo@formfunk-studio.example',
 
 
-	'[[/website/url]]' => 'www.maxmustermann.de',
+	'[[/website/url]]' => 'www.formfunk-studio.example',
 	'[[/website/charset]]'			=> 'UTF-8',
-	'[[/website/author]]'       => 'Max Mustermann',
-	'[[/website/host]]' => 'Max Mustermann Server, Musterstraße 99, 12345 Musterstadt',
+	'[[/website/author]]'       => 'Formfunk Studio GmbH',
+	'[[/website/host]]' => 'Beispiel Hosting GmbH, Musterstraße 99, 12345 Musterstadt',
 
 	// Only used by templates/mail-header.tpl - a self-contained email document
 	// with no shared stylesheet/cascade, so it can't use the CSS custom

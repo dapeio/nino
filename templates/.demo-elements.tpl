@@ -5,7 +5,7 @@
 		<div class="ui-grid-100">
 			<h2 class="ui-atf-title">Design-System: Bausteine</h2>
 			<p class="ui-atf-subtitle">Alle Bausteine aus docs/design-system.md, zum Durchklicken und Referenzieren.</p>
-			<a href="[[/webpage/demo-sections/uri]]" class="ui-btn ui-btn--outline">Zu den fertigen Sections &rarr;</a>
+			<a href="[[/webpage/.demo-sections/uri]]" class="ui-btn ui-btn--outline">Zu den fertigen Sections &rarr;</a>
 		</div>
 	</div>
 </section>
@@ -352,7 +352,7 @@
 	<div class="ui-grid-row">
 		<div class="ui-grid-100">
 			<h3 class="ui-section-title">Viewport Animation</h3>
-			<p class="ui-section-subtitle">js-vpa, --repeat, --speed-slow - beim Scrollen ins Viewport einblenden. Alle Effekt-Varianten (--zoom-*, --blur-*, --flip-*, ...) siehe <a href="[[/webpage/demo-vpa/uri]]">demo-vpa</a>.</p>
+			<p class="ui-section-subtitle">js-vpa, --repeat, --speed-slow - beim Scrollen ins Viewport einblenden. Alle Effekt-Varianten (--zoom-*, --blur-*, --flip-*, ...) siehe <a href="[[/webpage/.demo-vpa/uri]]">demo-vpa</a>.</p>
 		</div>
 		<div class="ui-grid-100 ui-grid-m-33 js-vpa ui-p-2"><div class="ui-alert ui-alert--info">js-vpa</div></div>
 		<div class="ui-grid-100 ui-grid-m-33 js-vpa js-vpa--speed-slow ui-p-2" data-vpa-delay="150ms"><div class="ui-alert ui-alert--info">js-vpa --speed-slow, delay 150ms</div></div>

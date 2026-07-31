@@ -23,7 +23,7 @@
 :root {
 	--color-primary: #4faae8;
 	--color-primary-text: #ffffff;
-	--color-secondary: var(--color-primary); /* TODO project: no dedicated secondary color existed yet - set a real value here or in the theme stylesheet */
+	--color-secondary: var(--color-primary);
 	--color-text: #333333;
 	--color-title: var(--color-primary);
 	--color-subtitle: var(--color-text);
@@ -86,12 +86,9 @@
 	text-transform:uppercase;
 }
 
-header {
-	border-bottom: 1px solid var(--color-border);
-}
 
 header .ui-logo {
-	background-image:url([[/nino/dir]]/images/demo/logo-invert.png);
+	background-image:url([[/nino/dir]]/images/.demo/logo-invert.png);
 }
 
 header .sc-nav-content li a {
@@ -103,6 +100,11 @@ header .sc-nav-content li a {
 header .sc-nav-content li a.active {
 	color: var(--color-primary);
 }
-body.js-scroll-atf .js-scroll-header {
-	padding-top:var(--space-2);
+@media (min-width: 768px){
+	header {
+		border-bottom: 1px solid var(--color-border);
+	}
+	body.js-scroll-atf .js-scroll-header {
+		padding-top:var(--space-2);
+	}
 }

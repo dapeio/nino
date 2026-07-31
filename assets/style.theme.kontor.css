@@ -1,0 +1,123 @@
+@font-face {
+  font-family: "Spectral";
+  src: url("/fonts/text/spectral-regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Spectral";
+  src: url("/fonts/text/spectral-bold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "League Spartan";
+  src: url("/fonts/titel/league-spartan.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  --color-primary: #14595e;
+  --color-primary-text: #f7f5f0;
+  --color-secondary: #94703f;
+  --color-text: #2a2f30;
+  --color-title: #0d3b3f;
+  --color-subtitle: #56605f;
+  --color-background: #ffffff;
+	--color-header-bg: var(--color-background-dim);
+  --color-footer-bg: #0d2b2e;
+  --color-footer-text-main: #a9bebd;
+  --color-footer-text-legal: #6d8483;
+  --color-border: #d8dedd;
+  --color-background-dim: rgb(9 40 43 / 72%);
+  --color-section-default-bg: #ffffff;
+  --color-section-default-text: #2a2f30;
+  --color-section-alt-bg: #eef1ef;
+  --color-section-alt-text: #16302f;
+  --color-section-dark-bg: #113b3f;
+  --color-section-dark-text: #f2f6f4;
+  --color-section-black-bg: #06201f;
+  --color-section-black-text: #f2f6f4;
+  --color-error: #b3261e;
+  --color-success: #2f6d4f;
+  --fontfamily-text: "Spectral", Georgia, "Times New Roman", serif;
+  --fontfamily-title: "League Spartan", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --fontfamily-subtitle: "Spectral", Georgia, "Times New Roman", serif;
+  --base-size: 16px;
+  --line-height: 1.65;
+  --fontsize-small: .8em;
+  --fontsize-big: 1.2em;
+  --fontsize-btn: .9rem;
+  --text-1: 1rem;
+  --text-2: 1.125rem;
+  --text-3: 1.3rem;
+  --text-4: 1.6rem;
+  --text-5: 2rem;
+  --text-6: 2.75rem;
+  --space-1: .5rem;
+  --space-2: 1rem;
+  --space-3: 2rem;
+  --space-4: 3rem;
+  --space-5: 5rem;
+  --space-6: 8rem;
+  --article-img-max-width: 12vw;
+  --article-img-max-height: 20vh;
+  --grid-max-width: 76rem;
+  --radius: 0;
+  --radius-small: 0;
+}
+
+@media (min-width: 768px) {
+  :root {
+    --base-size: 18px;
+    --text-4: 1.8rem;
+    --text-5: 2.4rem;
+    --text-6: 3.4rem;
+  }
+}
+
+header .ui-logo {
+	background-image:url([[/nino/dir]]/images/.demo/logo-invert.png);
+}
+
+.ui-atf-title,
+.ui-section-title,
+.ui-article-title {
+  font-weight: 700;
+  letter-spacing: -.01em;
+}
+
+.ui-atf-title {
+  line-height: 1.1;
+}
+
+.ui-section-subtitle,
+.ui-atf-subtitle {
+  font-style: italic;
+}
+
+.ui-btn {
+  font-family: var(--fontfamily-title);
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  font-weight: 700;
+}
+
+.ui-section--border-1 { border-bottom-color: rgb(20 89 94 / 18%); }
+.ui-section--border-2,
+.ui-section--border-3 { border-bottom-color: rgb(20 89 94 / 12%); }
+
+.ui-article--alt {
+  background-color: #f5f7f6;
+}
+
+.ui-article-price {
+  font-family: var(--fontfamily-title);
+  color: var(--color-secondary);
+}

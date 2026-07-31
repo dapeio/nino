@@ -1,0 +1,186 @@
+@font-face {
+  font-family: "PT Serif";
+  src: url("/fonts/text/pt-serif-regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "PT Serif";
+  src: url("/fonts/text/pt-serif-bold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Alegreya Sans";
+  src: url("/fonts/titel/alegreya-sans.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  --color-primary: #4a7f6d;
+  --color-primary-text: #fbfdfa;
+  --color-secondary: #d9a441;
+  --color-text: #33403a;
+  --color-title: #2c4a40;
+  --color-subtitle: #6a7a71;
+  --color-background: #f4f7f3;
+	--color-header-bg: var(--color-background-dim);
+  --color-footer-bg: #2c3a34;
+  --color-footer-text-main: #a9bcb2;
+  --color-footer-text-legal: #74877d;
+  --color-border: #dbe4dc;
+  --color-background-dim: rgb(44 58 52 / 70%);
+  --color-section-default-bg: #f4f7f3;
+  --color-section-default-text: #33403a;
+  --color-section-alt-bg: #e7efe7;
+  --color-section-alt-text: #24352d;
+  --color-section-dark-bg: #2c4a40;
+  --color-section-dark-text: #f1f6f1;
+  --color-section-black-bg: #17251f;
+  --color-section-black-text: #f1f6f1;
+  --color-error: #b34a3f;
+  --color-success: #4a7f4a;
+  --fontfamily-text: "PT Serif", Georgia, "Times New Roman", serif;
+  --fontfamily-title: "Alegreya Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --fontfamily-subtitle: "Alegreya Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --base-size: 17px;
+  --line-height: 1.75;
+  --fontsize-small: .82em;
+  --fontsize-big: 1.2em;
+  --fontsize-btn: 1rem;
+  --text-1: 1rem;
+  --text-2: 1.15rem;
+  --text-3: 1.3rem;
+  --text-4: 1.55rem;
+  --text-5: 1.95rem;
+  --text-6: 2.6rem;
+  --space-1: .6rem;
+  --space-2: 1.2rem;
+  --space-3: 2.25rem;
+  --space-4: 3.5rem;
+  --space-5: 6rem;
+  --space-6: 9rem;
+  --article-img-max-width: 12vw;
+  --article-img-max-height: 20vh;
+  --grid-max-width: 68rem;
+  --radius: 1.25rem;
+  --radius-small: .9rem;
+}
+
+@media (min-width: 768px) {
+  :root {
+    --base-size: 19px;
+    --text-4: 1.7rem;
+    --text-5: 2.2rem;
+    --text-6: 3.1rem;
+  }
+}
+
+header .ui-logo {
+	background-image:url([[/nino/dir]]/images/.demo/logo-invert.png);
+}
+
+
+.ui-atf-title,
+.ui-section-title,
+.ui-article-title {
+  font-weight: 500;
+  letter-spacing: .005em;
+}
+
+.ui-section-title::after {
+  content: "";
+  display: block;
+  width: 4.5rem;
+  height: .5rem;
+  margin: var(--space-2) auto 0;
+  background-image: radial-gradient(circle at center, var(--color-secondary) 2.5px, transparent 3px);
+  background-size: .9rem .5rem;
+  background-repeat: repeat-x;
+}
+
+.ui-atf-title::after {
+  content: "";
+  display: block;
+  width: 6rem;
+  height: .35rem;
+  margin-top: var(--space-2);
+  border-radius: 999px;
+  background-color: var(--color-secondary);
+}
+
+.ui-article-title::after {
+  content: "";
+  display: block;
+  width: 2rem;
+  height: .2rem;
+  margin-top: var(--space-1);
+  border-radius: 999px;
+  background-color: var(--color-border);
+}
+
+.ui-atf-subtitle,
+.ui-section-subtitle {
+  font-family: var(--fontfamily-subtitle);
+  letter-spacing: .04em;
+}
+
+.ui-btn {
+  position: relative;
+  border-radius: 999px;
+  padding: calc(var(--space-1) * 1.1) calc(var(--space-2) * 1.4);
+  font-weight: 700;
+  letter-spacing: .02em;
+}
+
+.ui-btn--primary::before,
+.ui-btn--outline::before {
+  content: "";
+  position: absolute;
+  inset: -.35rem;
+  border-radius: inherit;
+  border: 1px solid var(--color-primary);
+  opacity: 0;
+  transition: opacity .25s ease, inset .25s ease;
+  pointer-events: none;
+}
+
+.ui-btn--primary:hover::before,
+.ui-btn--primary:focus::before,
+.ui-btn--outline:hover::before,
+.ui-btn--outline:focus::before {
+  opacity: .5;
+  inset: -.55rem;
+}
+
+.ui-btn--small,
+.ui-btn--big { border-radius: 999px; }
+
+.ui-badge { border-radius: 999px; }
+
+.ui-section--border-1 { border-bottom-color: rgb(74 127 109 / 22%); }
+.ui-section--border-2,
+.ui-section--border-3 { border-bottom-color: rgb(74 127 109 / 14%); }
+
+.ui-article--alt {
+  background-color: #ffffff;
+}
+
+.ui-article-price {
+  font-family: var(--fontfamily-title);
+  font-weight: 700;
+  color: var(--color-primary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ui-btn--primary::before,
+  .ui-btn--outline::before { transition: none; }
+  .ui-btn--primary:hover::before,
+  .ui-btn--outline:hover::before { inset: -.35rem; }
+}

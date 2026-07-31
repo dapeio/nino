@@ -28,9 +28,11 @@
 					<h6 class="ui-footer-title">[[/website/footer/title/navigation]]</h6>
 					[navigation id="footer__nav"]
 							[[/webpage/home/uri]]:[[/webpage/home/name]]
-							[[/webpage/.demo-sections/uri]]:[[/webpage/.demo-sections/name]]
-							[[/webpage/.demo-elements/uri]]:[[/webpage/.demo-elements/name]]
-							[[/webpage/.demo-vpa/uri]]:[[/webpage/.demo-vpa/name]]
+							[[/webpage/about/uri]]:[[/webpage/about/name]]
+							[[/webpage/services/uri]]:[[/webpage/services/name]]
+							[[/webpage/work/uri]]:[[/webpage/work/name]]
+							[[/webpage/faq/uri]]:[[/webpage/faq/name]]
+							[[/webpage/contact/uri]]:[[/webpage/contact/name]]
 					[/navigation]
         </div>
       </section>

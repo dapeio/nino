@@ -41,7 +41,7 @@ namespace Nino\Dev {
 
 		// Generate with: php _dev/Dev.php <your password>
 		// CHANGE THIS before deploying - the shipped value matches no password
-		private const string PASSWORD_HASH = '$2y$10$JeWFJ0CAi.tAEc6i5IcyTOLSgeCbrspmb4p0Re7aWvJBOajXtwgt.';
+		private const string PASSWORD_HASH = '$2y$10$OSEm42n/ddR.iVb/qOwJd.NOReukf2SihVRWVhrRHf4blrWCSlCGS';
 
 		private const int MAX_TRIES = 5;
 		private const int COOLDOWN = 3600;
