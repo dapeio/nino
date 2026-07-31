@@ -945,6 +945,17 @@ namespace Nino {
 
 				flock( $appData['./nino/filesystem/cache'][$filename]['handle'], LOCK_SH );
 
+				// This handle may be the one putFileContent() just wrote
+				// through (its own cache slot, reused here) - fwrite() left
+				// it positioned at end-of-file, not the start, so fread()
+				// below would silently return '' instead of the real
+				// content. clearstatcache() matters for the same reason:
+				// filesize() is path-based, and PHP's stat cache can still
+				// report the pre-write size otherwise, even though fstat()
+				// above (handle-based) already sees the fresh mtime.
+				rewind( $appData['./nino/filesystem/cache'][$filename]['handle'] );
+				clearstatcache( true, $appData['./nino/filesystem/cache'][$filename]['path'] );
+
 				$appData['./nino/filesystem/cache'][$filename]['fstat']['mtime'] = $stats['mtime'];
 				$size = filesize( $appData['./nino/filesystem/cache'][$filename]['path'] );
 
@@ -1003,7 +1014,6 @@ namespace Nino {
 
 			// Update cache
 			$appData['./nino/filesystem/cache'][$filename]['content']	= $content;
-			$appData['./nino/filesystem/cache'][$filename]['fstat']		= fstat( $handle );
 
 			// Prepare content
 			if( substr( $filename, -5 ) === '.json' )
@@ -1019,6 +1029,13 @@ namespace Nino {
 			ftruncate( $handle, 0 );
 			fwrite( $handle, $content );
 			fflush( $handle );
+
+			// Captured after the write, not before - the pre-write mtime
+			// used to make getFileContent() think its cache was stale on
+			// every single next read of this same file (see its docblock
+			// for the actually broken half of that: a stale-cache read
+			// reusing this handle without rewinding first)
+			$appData['./nino/filesystem/cache'][$filename]['fstat'] = fstat( $handle );
 			flock( $handle, LOCK_UN );
 
 			// Reset opcache
