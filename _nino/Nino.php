@@ -2149,7 +2149,7 @@ namespace Nino {
 				'method'				=> self::_cleanRawMethod( $request['REQUEST_METHOD'] ),
 				'uri'						=> self::cleanUri( $request['REQUEST_URI'] ),
 				'query'					=> self::_getRequestQueryVarsPart( $request['REQUEST_URI'] ),
-				'header'				=> self::filterHeaderFields( $request ),
+				'header'				=> self::_filterRequestHeaderFields( $request ),
 				'body'					=> file_get_contents( 'php://input' ),
 				'user'					=> ( $request['PHP_AUTH_USER'] ?? '' ),
 				'pw'						=> ( $request['PHP_AUTH_PW'] ?? '' ),
@@ -2325,7 +2325,45 @@ namespace Nino {
 		}
 
 		/**
-		 *	Filter all non-http keys from an array
+		 *	Build the request-side header array from $_SERVER (passed in as
+		 *	$rawServer). PHP exposes request headers as HTTP_FOO_BAR keys
+		 *	(Content-Type/-Length are the CGI-spec exception, without the
+		 *	HTTP_ prefix) - filterHeaderFields() expects real header names
+		 *	like 'Foo-Bar' as keys, which is what the response side already
+		 *	has, so this normalizes the request side to match before reusing
+		 *	it. The exact case reached here doesn't matter - filterHeaderFields()
+		 *	now matches case-insensitively and returns its own whitelist's
+		 *	casing, since header names are case-insensitive per HTTP anyway.
+		 *
+		 *	@param		array 	$rawServer					Raw $_SERVER-shaped array
+		 *
+		 *	@return 	array												Filtered array, real header names as keys
+		 */
+		static private function _filterRequestHeaderFields( array $rawServer ): array {
+
+			$normalized = [];
+
+			foreach( $rawServer as $key => $value ) {
+
+				if( str_starts_with( $key, 'HTTP_' ) === true )
+					$headerName = substr( $key, 5 );
+				elseif( in_array( $key, [ 'CONTENT_TYPE', 'CONTENT_LENGTH' ], true ) === true )
+					$headerName = $key;
+				else
+					continue;
+
+				$normalized[str_replace( '_', '-', $headerName )] = $value;
+			}
+
+			return self::filterHeaderFields( $normalized );
+		}
+
+		/**
+		 *	Filter all non-http keys from an array. Matches case-insensitively
+		 *	and normalizes to the whitelist's own casing - a naive exact
+		 *	match previously turned eg. the request side's 'TE' into 'Te' via
+		 *	ucwords() and then silently dropped it, since that no longer
+		 *	matched the whitelist's literal 'TE' entry.
 		 *
 		 *	@param		array 	$headerArray				Raw array with request header fields
 		 *
@@ -2333,11 +2371,16 @@ namespace Nino {
 		 */
 		static public function filterHeaderFields( array $headerArray ): array {
 
+			$allowed = [ 'Accept', 'Accept-Charset', 'Accept-Encoding', 'Accept-Language', 'Authorization', 'Cache-Control', 'Connection', 'Content-Length', 'Content-Type', 'Cookie', 'Date', 'Expect', 'From', 'Host', 'If-Modified-Since', 'If-None-Match', 'Location', 'Max-Forwards', 'Origin', 'Pragma', 'Proxy-Authorization', 'Range', 'Referer', 'TE', 'User-Agent', 'Upgrade', 'Via', 'Warning', 'X-CSRF-Token', 'X-Frame-Options', 'X-Content-Type-Options', 'Strict-Transport-Security', 'Content-Security-Policy', 'Referrer-Policy', 'Feature-Policy', 'Permissions-Policy' ];
+
 			$filteredArray = [];
 
 			foreach( $headerArray as $key => $value )
-				if( in_array( $key, [ 'Accept', 'Accept-Charset', 'Accept-Encoding', 'Accept-Language', 'Authorization', 'Cache-Control', 'Connection', 'Content-Length', 'Content-Type', 'Cookie', 'Date', 'Expect', 'From', 'Host', 'If-Modified-Since', 'If-None-Match', 'Location', 'Max-Forwards', 'Origin', 'Pragma', 'Proxy-Authorization', 'Range', 'Referer', 'TE', 'User-Agent', 'Upgrade', 'Via', 'Warning', 'X-Frame-Options', 'X-Content-Type-Options', 'Strict-Transport-Security', 'Content-Security-Policy', 'Referrer-Policy', 'Feature-Policy', 'Permissions-Policy' ] ) === true )
-					$filteredArray[$key] = $value;
+				foreach( $allowed as $canonical )
+					if( strcasecmp( $key, $canonical ) === 0 ) {
+						$filteredArray[$canonical] = $value;
+						break;
+					}
 
 			return $filteredArray;
 		}
