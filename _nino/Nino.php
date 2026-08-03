@@ -2147,6 +2147,10 @@ namespace Nino {
 
 		private const array HTML_TAGS = [ 'strong', 'em', 'span', 'a' ];
 
+		// How deep shortcode output may be re-rendered into more shortcodes
+		// before _doShortcode() stops unrolling - see there
+		private const int MAX_RENDER_DEPTH = 20;
+
 		/**
 		 *	Prepare a response
 		 *
@@ -2393,10 +2397,28 @@ namespace Nino {
 				$args['content'] = $content;
 
 			$value = \Nino\Callbacks::doCallbacks( $appData, '/nino/html/shortcode/'. $shortcode, $args );
-			$value = self::renderHtml( $appData, $value );
 
-			// Return value or empty string
-			return ( is_string( $value ) === true ) ? $value : '';
+			if( is_string( $value ) === false )
+				return '';
+
+			// A shortcode's output is rendered again (its own fills/shortcodes),
+			// which is what makes [template] able to contain other shortcodes -
+			// and also what makes a template including itself, directly or
+			// through a second one, recurse until the memory limit kills the
+			// request. Templates and textfills are editable from _dev/_admin, so
+			// that is one typo away. The depth cap stops the recursion without
+			// putting a rule on any single shortcode; MAX_RENDER_DEPTH is far
+			// above what real nesting (page -> section -> element) reaches.
+			$depth = $appData['./nino/html/depth'] ?? 0;
+
+			if( $depth >= self::MAX_RENDER_DEPTH )
+				return $value;
+
+			$appData['./nino/html/depth'] = $depth + 1;
+			$value = self::renderHtml( $appData, $value );
+			$appData['./nino/html/depth'] = $depth;
+
+			return $value;
 		}
 
 		/**
@@ -5003,8 +5025,14 @@ namespace Nino\Modules {
 		 *	@return 	array | false 				AppData array or false
 		 */
 		public static function doShortcode( array &$appData, array $args ): string {
+
 			$html = \Nino\Filesystem::getFileContent( $appData, ( $args[0] ?? '' ). '.tpl', '' );
-			return \Nino\Callbacks::doCallbacks( $appData, '/nino/html/render', $html );
+
+			// No '/nino/html/render' callback here: Html::_doShortcode() passes
+			// every shortcode's return value through renderHtml() right after
+			// this returns, and that runs the same callback - so a template body
+			// went through the render pipeline twice, once for nothing
+			return is_string( $html ) === true ? $html : '';
 		}
 	}
 
