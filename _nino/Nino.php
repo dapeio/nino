@@ -121,6 +121,7 @@ namespace Nino {
 			$_initialInstance = [
 				'./nino/callbacks'							=> [],
 				'./nino/filesystem/cache'			=> [],
+				'./nino/filesystem/locks'			=> [],
 				'./nino/filesystem/path'				=> '',
 				'./nino/elements/cache'				=> [],
 				'./nino/html/shortcodes'				=> [],
@@ -263,12 +264,16 @@ namespace Nino {
 			// here to close
 			\Nino\Filesystem::lockFile( $appData, '/config.php' );
 
-			unset( $appData['./nino/filesystem/cache']['/config.php'] );
+			// Invalidate the fingerprint rather than dropping the whole slot:
+			// the re-read below has to happen either way (a concurrent write
+			// landing in the same wall-clock second would otherwise go
+			// unnoticed), but the slot itself has to survive
+			$appData['./nino/filesystem/cache']['/config.php']['fstat'] = [];
 			$content = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
 
 			foreach( $keys as $key )
 				$content[$key] = ( $key === '/nino/auth/user' )
-					? self::_mergeAuthUsers( $appData['./nino/auth/baseline'] ?? [], $content[$key] ?? [], $appData[$key] ?? [] )
+					? self::_mergeAuthUsers( $appData['./nino/auth/baseline'] ?? [], $content[$key] ?? [], $appData[$key] ?? [], $appData['./nino/auth/revoked'] ?? [] )
 					: ( $appData[$key] ?? null );
 
 			\Nino\Filesystem::putFileContent( $appData, '/config.php', $content, true );
@@ -289,18 +294,29 @@ namespace Nino {
 		 *	logout and "log out everywhere" keep working.
 		 *	Only the sessions map is merged: adding/removing users is an admin
 		 *	action, not something two requests do to each other by accident.
+		 *	$revoked overrides all of it. "Carry over what this request never
+		 *	saw" is the wrong rule for a request that deliberately ended every
+		 *	session of a user - a password change or "log out everywhere" would
+		 *	otherwise hand back a token that a parallel login created in the
+		 *	meantime, ie. exactly the session the user is trying to get rid of.
+		 *	Auth::updateUser()/logoutAllSessions() record the revocation there.
 		 *
 		 *	@param		array 		$baseline			'/nino/auth/user' as read at boot
 		 *	@param		array 		$onDisk				'/nino/auth/user' as it is on disk now
 		 *	@param		array 		$inMemory			'/nino/auth/user' as this request wants it
+		 *	@param		array 		$revoked			Mail => true for users whose sessions this request revoked
 		 *
 		 *	@return 	array
 		 */
-		private static function _mergeAuthUsers( array $baseline, array $onDisk, array $inMemory ): array {
+		private static function _mergeAuthUsers( array $baseline, array $onDisk, array $inMemory, array $revoked = [] ): array {
 
 			foreach( $inMemory as $mail => $user ) {
 
 				if( is_array( $user['sessions'] ?? null ) === false || is_array( $onDisk[$mail]['sessions'] ?? null ) === false )
+					continue;
+
+				// Nothing to carry over for a user this request revoked
+				if( ( $revoked[$mail] ?? false ) === true )
 					continue;
 
 				$baseSessions = $baseline[$mail]['sessions'] ?? [];
@@ -739,6 +755,13 @@ namespace Nino {
 				$user['sessions'] = ( $isSelf === true && is_string( $currentToken ) === true && isset( $user['sessions'][$currentToken] ) === true )
 					? [ $currentToken => $user['sessions'][$currentToken] ]
 					: [];
+
+				// Tell the merge in AppData::writeContentData() that this is a
+				// revocation, not just "these are the sessions I know about" -
+				// otherwise a login that happened in a parallel request after
+				// this one booted would be carried straight back in
+				$appData['./nino/auth/revoked'][$newUsername]	= true;
+				$appData['./nino/auth/revoked'][$username]			= true;
 			}
 
 			unset( $appData['/nino/auth/user'][$username] );
@@ -777,6 +800,11 @@ namespace Nino {
 				return false;
 
 			$appData['/nino/auth/user'][$username]['sessions'] = [];
+
+			// See updateUser(): a revocation must not have tokens merged back
+			// into it, not even ones this request never saw
+			$appData['./nino/auth/revoked'][$username] = true;
+
 			\Nino\AppData::writeContentData( $appData, [ '/nino/auth/user' ] );
 
 			if( isset( $appData['./nino/auth/current']['mail'] ) === true && $appData['./nino/auth/current']['mail'] === $username ) {
@@ -926,14 +954,20 @@ namespace Nino {
 		 */
 		private static function _dropTries( array &$appData, string $username ): void {
 
-			unset( $appData['./nino/filesystem/cache'][self::TRIES_PATH] );
+			// lock -> invalidate -> read -> write, in that order: reading before
+			// locking leaves a window for exactly the concurrent write the lock
+			// is meant to exclude
+			\Nino\Filesystem::lockFile( $appData, self::TRIES_PATH );
+			$appData['./nino/filesystem/cache'][self::TRIES_PATH]['fstat'] = [];
+
 			$state = \Nino\Filesystem::getFileContent( $appData, self::TRIES_PATH, [] );
 
-			if( isset( $state[$username] ) === false )
+			if( isset( $state[$username] ) === false ) {
+				\Nino\Filesystem::unlockFile( $appData, self::TRIES_PATH );
 				return;
+			}
 
 			unset( $state[$username] );
-			\Nino\Filesystem::lockFile( $appData, self::TRIES_PATH );
 			\Nino\Filesystem::putFileContent( $appData, self::TRIES_PATH, $state, true );
 		}
 
@@ -951,15 +985,19 @@ namespace Nino {
 		 */
 		private static function _renameTries( array &$appData, string $oldUsername, string $newUsername ): void {
 
-			unset( $appData['./nino/filesystem/cache'][self::TRIES_PATH] );
+			// Same lock -> invalidate -> read -> write order as _dropTries()
+			\Nino\Filesystem::lockFile( $appData, self::TRIES_PATH );
+			$appData['./nino/filesystem/cache'][self::TRIES_PATH]['fstat'] = [];
+
 			$state = \Nino\Filesystem::getFileContent( $appData, self::TRIES_PATH, [] );
 
-			if( isset( $state[$oldUsername] ) === false )
+			if( isset( $state[$oldUsername] ) === false ) {
+				\Nino\Filesystem::unlockFile( $appData, self::TRIES_PATH );
 				return;
+			}
 
 			$state[$newUsername] = $state[$oldUsername];
 			unset( $state[$oldUsername] );
-			\Nino\Filesystem::lockFile( $appData, self::TRIES_PATH );
 			\Nino\Filesystem::putFileContent( $appData, self::TRIES_PATH, $state, true );
 		}
 
@@ -975,15 +1013,16 @@ namespace Nino {
 		 */
 		private static function _registerFailedAttemp( array &$appData, array $keys ): bool {
 
-			// Drop the cache entry, re-read, then lock and write with nolock -
-			// the exact same shape AppData::writeContentData() uses for
-			// config.php (see its docblock). A plain unlocked read-modify-
-			// write here would let two concurrent failed attempts (eg. a
-			// brute-force script hammering the login endpoint from several
-			// connections at once) both read the same starting count and
-			// overwrite each other's increment - exactly the case this file
-			// exists to catch.
-			unset( $appData['./nino/filesystem/cache'][self::TRIES_PATH] );
+			// Lock, invalidate the cached fingerprint, re-read, then write
+			// through the held lock - the same order AppData::writeContentData()
+			// uses for config.php (see its docblock). Reading before locking, or
+			// without a lock at all, lets two concurrent failed attempts (a
+			// brute-force script hammering the endpoint over several
+			// connections) read the same starting count and overwrite each
+			// other's increment - exactly what this file exists to catch.
+			\Nino\Filesystem::lockFile( $appData, self::TRIES_PATH );
+			$appData['./nino/filesystem/cache'][self::TRIES_PATH]['fstat'] = [];
+
 			$state	= \Nino\Filesystem::getFileContent( $appData, self::TRIES_PATH, [] );
 			$now		= time();
 
@@ -1018,7 +1057,6 @@ namespace Nino {
 
 			// Write data change - a dedicated file, not config.php, so this
 			// unauthenticated path never triggers a config.php rewrite
-			\Nino\Filesystem::lockFile( $appData, self::TRIES_PATH );
 			\Nino\Filesystem::putFileContent( $appData, self::TRIES_PATH, $state, true );
 
 			return false;
@@ -1361,7 +1399,7 @@ namespace Nino {
 			// that takes its own lock) - flock() is per handle, so re-locking
 			// the same handle is a no-op rather than a deadlock, but there is
 			// no point in opening a second one
-			if( is_resource( $appData['./nino/filesystem/cache'][$filename]['lock'] ?? null ) === true )
+			if( is_resource( $appData['./nino/filesystem/locks'][$filename] ?? null ) === true )
 				return true;
 
 			self::forceDir( $appData, '/data/.locks' );
@@ -1377,7 +1415,13 @@ namespace Nino {
 				return false;
 			}
 
-			$appData['./nino/filesystem/cache'][$filename]['lock'] = $handle;
+			// Deliberately NOT in the file's cache slot: several call sites drop
+			// a slot to force a re-read (Auth's tries file, writeContentData),
+			// and _dev drops the whole cache array at once - any of which would
+			// take the only reference to this resource with it, closing the
+			// handle and releasing the lock while the caller still believes it
+			// holds one. Locks live in their own map for that reason.
+			$appData['./nino/filesystem/locks'][$filename] = $handle;
 
 			return true;
 		}
@@ -1392,7 +1436,7 @@ namespace Nino {
 		 */
 		public static function unlockFile( array &$appData, string $filename ): bool {
 
-			$handle = $appData['./nino/filesystem/cache'][$filename]['lock'] ?? null;
+			$handle = $appData['./nino/filesystem/locks'][$filename] ?? null;
 
 			if( is_resource( $handle ) === false )
 				return false;
@@ -1400,7 +1444,7 @@ namespace Nino {
 			flock( $handle, LOCK_UN );
 			fclose( $handle );
 
-			$appData['./nino/filesystem/cache'][$filename]['lock'] = null;
+			unset( $appData['./nino/filesystem/locks'][$filename] );
 
 			return true;
 		}
@@ -1545,12 +1589,14 @@ namespace Nino {
 				? $appData['./nino/filesystem/configpath']
 				: $appData['./nino/filesystem/path'];
 
-			// 'lock' holds the side-car lock handle while a caller is inside a
-			// read-modify-write (see lockFile()); 'fstat' is the mtime/size
-			// fingerprint getFileContent() decides staleness by
-			if( isset( $appData['./nino/filesystem/cache'][$filename] ) === false )
+			// 'fstat' is the mtime/size fingerprint getFileContent() decides
+			// staleness by; lock handles deliberately live outside this slot,
+			// see lockFile()
+			// Keyed on 'path', not on the slot as a whole: a caller that
+			// invalidated the fingerprint (['fstat'] = []) leaves a slot behind
+			// that exists but isn't set up yet
+			if( isset( $appData['./nino/filesystem/cache'][$filename]['path'] ) === false )
 				$appData['./nino/filesystem/cache'][$filename] = [
-					'lock'				=> null,
 					'path'				=> $base. '/'. ltrim( $filename, '/' ),
 					'content'			=> '',
 					'fstat'				=> [],
@@ -3363,7 +3409,7 @@ namespace Nino {
 			// firing requests concurrently, which is what a sending burst looks
 			// like anyway. Same shape as Auth::_registerFailedAttemp().
 			\Nino\Filesystem::lockFile( $appData, $path );
-			unset( $appData['./nino/filesystem/cache'][$path] );
+			$appData['./nino/filesystem/cache'][$path]['fstat'] = [];
 
 			$state 	= \Nino\Filesystem::getFileContent( $appData, $path, [] );
 

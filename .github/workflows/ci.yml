@@ -37,3 +37,6 @@ jobs:
 
       - name: Run dev tooling smoke tests
         run: php tests/dev-smoke.php
+
+      - name: Run concurrency smoke tests
+        run: php tests/concurrency-smoke.php

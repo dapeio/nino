@@ -420,6 +420,55 @@ $onDisk = include $sandbox. '/config.php';
 check( 'a later write to a different key doesn\'t erase an earlier request\'s change', ( $onDisk['/nino/auth/user']['race@example.com']['marker'] ?? null ) === 'FROM_A' );
 check( 'the later request\'s own change is still persisted', ( $onDisk['/nino/html/images']['marker'] ?? null ) === 'FROM_B' );
 
+// Two overlapping logins of the *same* user: the second must not drop the
+// first one's session token just because its own copy predates it
+$sessionUser = 'parallel@example.com';
+\Nino\Auth::insertUser( $appData, $sessionUser, 'correct horse battery staple' );
+
+$sessions = function() use ( $sandbox, $sessionUser ): array {
+	$onDisk = include $sandbox. '/config.php';
+	return $onDisk['/nino/auth/user'][$sessionUser]['sessions'] ?? [];
+};
+
+$loginA = $buildAppData();
+$loginB = $buildAppData();
+foreach( [ $loginA, $loginB ] as $req )
+	$req['./nino/auth/baseline'] = $req['/nino/auth/user'] ?? [];
+
+$loginA['/nino/auth/user'][$sessionUser]['sessions']['tokenA'] = [ 'time' => time(), 'ip' => '10.0.0.1' ];
+\Nino\AppData::writeContentData( $loginA, [ '/nino/auth/user' ] );
+
+$loginB['/nino/auth/user'][$sessionUser]['sessions']['tokenB'] = [ 'time' => time(), 'ip' => '10.0.0.2' ];
+\Nino\AppData::writeContentData( $loginB, [ '/nino/auth/user' ] );
+
+check( 'a parallel login keeps its own session', isset( $sessions()['tokenB'] ) === true );
+check( 'and does not log the other one out', isset( $sessions()['tokenA'] ) === true );
+
+// ...but a revocation must not have those same "unseen" tokens merged back
+// in: after a password change or a "log out everywhere" everything goes,
+// including a session that appeared while the request was running
+$revoke = $buildAppData();
+$revoke['./nino/auth/baseline'] = $revoke['/nino/auth/user'] ?? [];
+
+$sneaky = $buildAppData();
+$sneaky['./nino/auth/baseline'] = $sneaky['/nino/auth/user'] ?? [];
+$sneaky['/nino/auth/user'][$sessionUser]['sessions']['tokenC'] = [ 'time' => time(), 'ip' => '10.0.0.3' ];
+\Nino\AppData::writeContentData( $sneaky, [ '/nino/auth/user' ] );
+
+\Nino\Auth::logoutAllSessions( $revoke, $sessionUser );
+check( 'log out everywhere really clears every session, including a parallel one', $sessions() === [] );
+
+$pwChange = $buildAppData();
+$pwChange['./nino/auth/baseline'] = $pwChange['/nino/auth/user'] ?? [];
+
+$sneaky = $buildAppData();
+$sneaky['./nino/auth/baseline'] = $sneaky['/nino/auth/user'] ?? [];
+$sneaky['/nino/auth/user'][$sessionUser]['sessions']['tokenD'] = [ 'time' => time(), 'ip' => '10.0.0.4' ];
+\Nino\AppData::writeContentData( $sneaky, [ '/nino/auth/user' ] );
+
+\Nino\Auth::updateUser( $pwChange, $sessionUser, $sessionUser, 'a brand new password' );
+check( 'a password change ends a session opened while it was running', $sessions() === [] );
+
 echo "\n";
 
 
