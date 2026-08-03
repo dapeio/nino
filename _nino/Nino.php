@@ -31,6 +31,13 @@ namespace Nino {
 
 		\Nino\AppData::prepare( $appData );
 
+		// Session cookie params are fixed the moment session_start() runs and
+		// can't be retrofitted afterwards, so the keys Runtime::init() needs
+		// have to be known before it. The full config load still happens in
+		// AppData::init() below (it needs Filesystem::init() first) - this only
+		// pulls the '/nino/session/' keys forward.
+		\Nino\AppData::prepareSession( $appData );
+
 		\Nino\Runtime::init( $appData );
 
 		// Only for an explicitly-set NINO_CONFIG_DIR - the default (project
@@ -131,6 +138,37 @@ namespace Nino {
 			$appData = self::_merge( self::$_initialInstance, $appData );
 		}
 
+
+		/**
+		 *	Read the '/nino/session/' keys out of config.php ahead of the
+		 *	regular init(), for the one consumer that runs before it:
+		 *	Runtime::init() starts the php session, and a session cookie's
+		 *	flags are set once at session_start() time. Reading them from an
+		 *	appData that hasn't seen config.php yet meant
+		 *	'/nino/session/force-secure-cookie' was always missing and always
+		 *	fell back to false - so the option existed but could never take
+		 *	effect, on exactly the tls-terminating-proxy setup it was built
+		 *	for (no $_SERVER['HTTPS'], secure flag never set).
+		 *	Deliberately narrow: only these keys, no merge of anything else -
+		 *	init() below stays the single place the config is actually loaded.
+		 *	A missing/unreadable config.php is not diagnosed here either; that
+		 *	is init()'s job and its error message is the better one.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	void
+		 */
+		public static function prepareSession( array &$appData ): void {
+
+			$staticAppData = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
+
+			if( is_array( $staticAppData ) === false )
+				return;
+
+			foreach( $staticAppData as $key => $value )
+				if( is_string( $key ) === true && str_starts_with( $key, '/nino/session/' ) === true )
+					$appData[$key] = $value;
+		}
 
 		/**
 		 *	Init appData
@@ -284,10 +322,15 @@ namespace Nino {
 			// harmless miss, and would 500 every request from anyone who was
 			// logged in at deploy time instead of just treating them as
 			// logged out
+			// The same is_string() guard applies to the token: a session holding
+			// an array under this key (a pre-migration session, or a hand-edited
+			// one) used to reach isset( ...['sessions'][$sessionToken] ), and an
+			// array offset in isset() is a TypeError, not a miss - it would 500
+			// every request from that client instead of treating it as logged out
 			$sessionMail 	= \Nino\Runtime::getSessionValue( $appData, './nino/auth/current', '' );
 			$sessionToken	= \Nino\Runtime::getSessionValue( $appData, './nino/auth/token', '' );
-			if( is_string( $sessionMail ) === true && $sessionMail !== '' && isset( $appData['/nino/auth/user'][$sessionMail] ) === true && $sessionToken !== '' && isset( $appData['/nino/auth/user'][$sessionMail]['sessions'][$sessionToken] ) === true )
-				$appData['./nino/auth/current'] = $appData['/nino/auth/user'][$sessionMail];
+			if( is_string( $sessionMail ) === true && $sessionMail !== '' && is_string( $sessionToken ) === true && $sessionToken !== '' )
+				self::_resumeSession( $appData, $sessionMail, $sessionToken );
 
 			$appData['/nino/http/routes']['POST://.nino/auth/login'] = [ 'uri' => '/.nino/auth/login' ];
 			$appData['/nino/http/routes']['POST://.nino/auth/logout'] = [ 'uri' => '/.nino/auth/logout' ];
@@ -583,8 +626,23 @@ namespace Nino {
 
 			$user['mail'] = $newUsername;
 
-			if( $pw !== '' )
+			if( $pw !== '' ) {
+
 				$user['pw'] = password_hash( $pw, PASSWORD_DEFAULT );
+
+				// A password change has to end the sessions opened with the old
+				// one - otherwise the single action taken after a compromise
+				// ("change the password") leaves the attacker's session running.
+				// The session performing the change keeps its own token, so
+				// changing your own password doesn't log you out of the tab you
+				// are doing it in.
+				$currentToken	= \Nino\Runtime::getSessionValue( $appData, './nino/auth/token', '' );
+				$isSelf				= ( $appData['./nino/auth/current']['mail'] ?? '' ) === $username;
+
+				$user['sessions'] = ( $isSelf === true && is_string( $currentToken ) === true && isset( $user['sessions'][$currentToken] ) === true )
+					? [ $currentToken => $user['sessions'][$currentToken] ]
+					: [];
+			}
 
 			unset( $appData['/nino/auth/user'][$username] );
 			$appData['/nino/auth/user'][$newUsername] = $user;
@@ -669,6 +727,42 @@ namespace Nino {
 			return false;
 		}
 
+
+		/**
+		 *	Restore the logged-in user behind a session token - if that token
+		 *	is still listed on the user AND hasn't outlived SESSION_TTL. The
+		 *	ttl used to be enforced in loginUser() only, ie. on write: tokens
+		 *	were pruned when their owner logged in again, so an account that
+		 *	never logs in again kept every token it ever handed out, forever.
+		 *	An expired token is dropped right here rather than just ignored,
+		 *	so it can't sit in config.php until that next login either.
+		 *
+		 *	@param		array 				&$appData			(reference) Array with current app data
+		 *	@param		string				$mail					Mail from the php session
+		 *	@param		string				$token				Session token from the php session
+		 *
+		 *	@return 	void
+		 */
+		private static function _resumeSession( array &$appData, string $mail, string $token ): void {
+
+			$user = self::getUser( $appData, $mail );
+
+			if( $user === false || is_array( $user['sessions'][$token] ?? null ) === false )
+				return;
+
+			if( ( $user['sessions'][$token]['time'] ?? 0 ) < time() - self::SESSION_TTL ) {
+
+				unset( $appData['/nino/auth/user'][$mail]['sessions'][$token] );
+				\Nino\AppData::writeContentData( $appData, [ '/nino/auth/user' ] );
+
+				\Nino\Runtime::unsetSessionValue( $appData, './nino/auth/current' );
+				\Nino\Runtime::unsetSessionValue( $appData, './nino/auth/token' );
+
+				return;
+			}
+
+			$appData['./nino/auth/current'] = $user;
+		}
 
 		/**
 		 *	Whether the Csrf module is listed in config.php's /nino/modules -
@@ -2937,6 +3031,14 @@ namespace Nino {
 
 			// Start session
 			if( session_status() !== PHP_SESSION_ACTIVE ) {
+
+				// Without strict mode php happily adopts any session id a client
+				// sends, so an attacker can plant one before login and keep using
+				// it afterwards. loginUser()'s session_regenerate_id() covers the
+				// post-login half of that, but not the pre-login state living in
+				// the same session - the csrf token above all.
+				ini_set( 'session.use_strict_mode', '1' );
+
 				session_set_cookie_params( [
 					'lifetime'	=> 0,
 					'path'			=> '/',
