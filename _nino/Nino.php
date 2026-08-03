@@ -72,6 +72,11 @@ namespace Nino {
 		\Nino\Locales::request( $appData, $request );
 
 		\Nino\Http::response( $appData, $request );
+
+		// After Http::response(), not before: only there has the route been
+		// resolved and merged, so only there is a route's own 'locale' known
+		\Nino\Locales::response( $appData, $request );
+
 		$currentUser = \Nino\Auth::getCurrentUser( $appData );
 		\Nino\Html::addFills( $appData, [
 			'[[/nino/http/request/uri]]'			=> $request['/nino/http/request']['uri'],
@@ -3072,10 +3077,6 @@ namespace Nino {
 		 */
 		public static function request( array &$appData, array &$request ): void {
 
-			// Change locale
-			if( $request['/nino/http/response']['locale'] !== \Nino\Locales::getCurrentLocale( $appData ) )
-				\Nino\Locales::setCurrentLocale( $appData, $request['/nino/http/response']['locale'] );
-
 			// Catch locale change
 			if( isset( $request['/nino/http/request']['query']['/_nino/locales/current'] ) === false )
 				return;
@@ -3094,6 +3095,37 @@ namespace Nino {
 			// the method prefix (eg. "GET://legal"), strip it for the url
 			$request['/nino/http/response']['statusCode'] 					= 302;
 			$request['/nino/http/response']['header']['Location']	= ( $newUri !== null ) ? str_replace( $request['/nino/http/request']['method']. ':/', '', $newUri ) : '/';
+		}
+
+		/**
+		 *	Apply the locale of the resolved route, if it declares one (eg.
+		 *	config.php's 'GET://rechtliches' => [ ..., 'locale' => 'de_DE' ]).
+		 *
+		 *	Has to run after Http::response(): the route - and with it its
+		 *	'locale' - is only merged into the response array there. The same
+		 *	comparison used to sit in request(), where the response locale was
+		 *	still the seeded current one and the condition could therefore
+		 *	never be true. A locale-specific route set the response field but
+		 *	never switched the actual locale, so its textfills rendered in
+		 *	whatever locale the session happened to carry - the german page
+		 *	came out english for anyone whose session was on en_US.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		&$request			(reference) Current request
+		 *
+		 *	@return 	void
+		 */
+		public static function response( array &$appData, array &$request ): void {
+
+			$locale = $request['/nino/http/response']['locale'] ?? '';
+
+			if( is_string( $locale ) === false || $locale === '' || $locale === \Nino\Locales::getCurrentLocale( $appData ) )
+				return;
+
+			// setCurrentLocale() also persists into the session, same as the
+			// ?/_nino/locales/current switch above - visiting a locale-specific
+			// page is a locale choice like any other
+			$request['/nino/http/response']['locale'] = \Nino\Locales::setCurrentLocale( $appData, $locale );
 		}
 
 		/**
@@ -4399,6 +4431,11 @@ namespace Nino\Modules {
 
 			$callback	= $args['callback'] ?? '';
 
+			// $actLi stays empty when the current locale isn't one of the
+			// available ones (eg. a config.php whose /nino/locales/available
+			// doesn't contain the default) - reading it undefined below is a
+			// warning, and the error handler turns that into a 500
+			$actLi					= '';
 			$htmlLi 				= '';
 			$currentLocale	= \Nino\Locales::getCurrentLocale( $appData );
 
