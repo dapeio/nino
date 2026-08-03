@@ -3617,7 +3617,20 @@ namespace Nino\Modules {
 				$line = fgets( $handle );
 				fclose( $handle );
 
-				return ( $line !== false ) ? $line : '';
+				if( $line === false )
+					return '';
+
+				// Return the hash, not the line it sits in. _createCachefile()
+				// writes it as '/**<hash>**/' plus a line break, while the value
+				// this is compared against is a bare sha1() - so the comparison
+				// could never match and the bundle was rebuilt (read every asset,
+				// concatenate, minify, write the file) on every single request.
+				$line = trim( $line );
+
+				if( str_starts_with( $line, '/**' ) === false || str_ends_with( $line, '**/' ) === false )
+					return '';
+
+				return substr( $line, 3, -3 );
 		}
 
 		/**
