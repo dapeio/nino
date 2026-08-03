@@ -854,6 +854,46 @@ check( 'a bare [assets] shortcode without argument renders nothing instead of er
 echo "\n";
 
 
+// --- Modules::callModules() - path resolution for a config-listed module --
+
+echo "Modules::callModules() resolves a module class regardless of a leading backslash\n";
+
+// __DIR__ inside callModules() is _nino/ (where it's defined), not this
+// test file's own directory - the dummy module has to live where that
+// method will actually look for it
+$dummyModuleRoot = __DIR__. '/../_nino/KernelSmokeDummyModules';
+$dummyModuleDir = $dummyModuleRoot. '/DummyCallModulesFix';
+mkdir( $dummyModuleDir, 0777, true );
+file_put_contents( $dummyModuleDir. '/DummyCallModulesFix.php', <<<'PHP'
+<?php
+declare(strict_types=1);
+namespace KernelSmokeDummyModules {
+	class DummyCallModulesFix {
+		public static bool $called = false;
+		public static function init( array &$appData ): void {
+			self::$called = true;
+		}
+	}
+}
+PHP
+);
+
+// No leading backslash - config.php can write either form, both name the
+// same class, and the pre-fix str_replace()-only path build only worked
+// for the leading-backslash form
+$appData['/nino/modules'] = [ 'KernelSmokeDummyModules\DummyCallModulesFix' ];
+\Nino\Modules::callModules( $appData, 'init' );
+check( 'a module class name without a leading backslash still resolves and loads', \KernelSmokeDummyModules\DummyCallModulesFix::$called === true );
+
+unset( $appData['/nino/modules'] );
+\Nino\Modules::callModules( $appData, 'init' );
+check( 'callModules() does not warn/crash when /nino/modules is entirely unset', true );
+
+\Nino\Filesystem::removeDir( $dummyModuleRoot );
+
+echo "\n";
+
+
 // --- Cleanup ------------------------------------------------------------
 
 \Nino\Filesystem::removeDir( $sandbox );

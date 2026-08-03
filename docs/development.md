@@ -393,7 +393,7 @@ Removes a value from the session.
 The global error/exception handler: logs (if configured) to `/data/logs.<year-month>.php` and either displays the error or aborts with a 500.
 
 ### `\Nino\Modules`
-These kernel modules are optional and extend Nino projects' functionality - mostly on the frontend. They're built the same way an external module would be, but live in the same file as `\Nino` due to the kernel's compact size.
+These kernel modules are optional and extend Nino projects' functionality - mostly on the frontend. They're built exactly the way an external module would be (see "Building your own modules" below) and live under `_nino/Nino/Modules/`, one directory per module, `require`d unconditionally by `_nino/Nino.php` itself rather than lazily like a project's own custom modules.
 They're enabled via the `/nino/modules` array in `config.php`.
 
 #### `Assets`
@@ -485,15 +485,19 @@ If a listed class isn't loaded yet,
 `require`s it:
 
 ```php
-$filename = __DIR__ /* _nino/ */ . str_replace( '\\', '/', $className ) . '/' . basename( $filename ) . '.php';
+$relativePath = str_replace( '\\', '/', ltrim( $className, '\\' ) );
+$filename = __DIR__ /* _nino/ */ . '/' . $relativePath . '/' . basename( $relativePath ) . '.php';
 ```
 
-For `\MyProject\Modules\Foo`, that resolves to
+For `\MyProject\Modules\Foo` (or the leading-backslash-free
+`MyProject\Modules\Foo` - both name the same class), that resolves to
 `_nino/MyProject/Modules/Foo/Foo.php` — the directory is named after
 the full namespace path, and the file inside it repeats the short
-class name. Every built-in `\Nino\Modules\*` module is already loaded
-as part of `_nino/Nino.php` itself and therefore never needs to be
-`require`d.
+class name. Every built-in `\Nino\Modules\*` module already lives at
+exactly this path under `_nino/Nino/Modules/` and is `require`d
+unconditionally by `_nino/Nino.php` itself, so `callModules()` never
+actually needs to load one - this path derivation only ever fires for
+a project's own custom modules.
 
 Your own module, built in Nino's coding philosophy, could look like this:
 ### Example

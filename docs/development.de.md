@@ -390,7 +390,7 @@ Entfernt einen Wert aus der Session.
 Globaler Error-/Exception-Handler: loggt (falls konfiguriert) nach `/data/logs.<Jahr-Monat>.php` und zeigt den Fehler an oder bricht mit 500 ab.
 
 ### `\Nino\Modules`
-Diese Kernel-Module sind optional und erweitern den -meistens Frontend- Funktionsumfang von Nino-Projekten. Sie wurden wie externe Module aufgebaut, liegen aber aufgrund der kompakten Größe des Kernels in der gleichen Datei wie `\Nino`.
+Diese Kernel-Module sind optional und erweitern den -meistens Frontend- Funktionsumfang von Nino-Projekten. Sie sind genau wie ein externes Modul aufgebaut (siehe „Eigene Module entwickeln" weiter unten) und liegen unter `_nino/Nino/Modules/`, ein Verzeichnis pro Modul, das `_nino/Nino.php` selbst bedingungslos `required` - anders als bei einem projekteigenen Modul, das erst bei Bedarf nachgeladen wird.
 Die Aktivierung erfolgt über das `/nino/modules`Array in der `config.php`.
 #### `Assets`
 CSS/JS-Asset-Verwaltung: bündelt, cached und (bei `.min`-Dateinamen) minifiziert mehrere Quelldateien zu einer Ausgabedatei.
@@ -481,14 +481,18 @@ Falls eine gelistete Klasse noch nicht geladen ist, leitet
 `require`t ihn:
 
 ```php
-$filename = __DIR__ /* _nino/ */ . str_replace( '\\', '/', $className ) . '/' . basename( $filename ) . '.php';
+$relativePath = str_replace( '\\', '/', ltrim( $className, '\\' ) );
+$filename = __DIR__ /* _nino/ */ . '/' . $relativePath . '/' . basename( $relativePath ) . '.php';
 ```
 
-Für `\MyProject\Modules\Foo` löst das zu
+Für `\MyProject\Modules\Foo` (oder ohne führenden Backslash
+`MyProject\Modules\Foo` — beides meint dieselbe Klasse) löst das zu
 `_nino/MyProject/Modules/Foo/Foo.php` auf — das Verzeichnis heißt wie
 der vollständige Namespace-Pfad, und die Datei darin wiederholt den
-kurzen Klassennamen. Jedes eingebaute `\Nino\Modules\*`-Modul ist
-bereits Teil von `_nino/Nino.php` selbst geladen und muss somit nicht `required` werden.
+kurzen Klassennamen. Jedes eingebaute `\Nino\Modules\*`-Modul liegt
+bereits genau unter diesem Pfad in `_nino/Nino/Modules/` und wird von
+`_nino/Nino.php` selbst bedingungslos `required` - diese Pfadableitung
+greift also nur für die eigenen Module eines Projekts.
 
 Das eigene Modul nach der Coding-Philosophie von Nino kann so aussehen:
 ### Beispiel
