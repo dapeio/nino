@@ -194,8 +194,7 @@ namespace Nino\Admin {
 			$action = $_POST['action'] ?? '';
 
 			if( isset( $actions[$action] ) === false ) {
-				$request['/nino/http/response']['statusCode'] = 404;
-				$request['/nino/http/response']['body'] = [ 'error' => 'unknown action' ];
+				\Nino\Http::fail( $request, 404, 'unknown action' );
 				return;
 			}
 
@@ -281,8 +280,7 @@ namespace Nino\Admin {
 			self::_logLoginOnce( $appData );
 
 			if( \Nino\Auth::getCurrentUser( $appData ) === false ) {
-				$request['/nino/http/response']['statusCode'] = 401;
-				$request['/nino/http/response']['body'] = [ 'error' => 'not logged in' ];
+				\Nino\Http::fail( $request, 401, 'not logged in' );
 				return false;
 			}
 
@@ -313,8 +311,7 @@ namespace Nino\Admin {
 				return false;
 
 			if( \Nino\Auth::checkPermission( $appData, $perm ) === false ) {
-				$request['/nino/http/response']['statusCode'] = 403;
-				$request['/nino/http/response']['body'] = [ 'error' => 'not allowed' ];
+				\Nino\Http::fail( $request, 403, 'not allowed' );
 				return false;
 			}
 
@@ -388,8 +385,7 @@ namespace Nino\Admin {
 			$locale = (string) ( self::postData()['locale'] ?? '' );
 
 			if( \Nino\Locales::verifyLocale( $appData, $locale ) === false ) {
-				$request['/nino/http/response']['statusCode'] = 400;
-				$request['/nino/http/response']['body'] = [ 'error' => 'unknown locale' ];
+				\Nino\Http::fail( $request, 400, 'unknown locale' );
 				return;
 			}
 
@@ -444,7 +440,7 @@ namespace Nino\Admin {
 				$types[] = [ 'type' => $type, 'title' => $typeData['title'] ?? $type, 'descr' => self::typeDescr( $appData, $type ), 'model' => $typeData['model'] ?? [] ];
 			}
 
-			$request['/nino/http/response']['body'] = [ 'types' => $types, 'locales' => \Nino\Locales::getAvailableLocales( $appData ), 'selectedLocale' => Admin::sessionLocale( $appData ) ];
+			\Nino\Http::ok( $request, [ 'types' => $types, 'locales' => \Nino\Locales::getAvailableLocales( $appData ), 'selectedLocale' => Admin::sessionLocale( $appData ) ] );
 		}
 
 		/**
@@ -486,8 +482,7 @@ namespace Nino\Admin {
 			$type = (string) ( Admin::postData()['type'] ?? '' );
 
 			if( in_array( $type, self::types( $appData ), true ) === false ) {
-				$request['/nino/http/response']['statusCode'] = 404;
-				$request['/nino/http/response']['body'] = [ 'error' => 'unknown type' ];
+				\Nino\Http::fail( $request, 404, 'unknown type' );
 				return;
 			}
 
@@ -501,7 +496,7 @@ namespace Nino\Admin {
 				$elements[] = [ 'uri' => $uri, 'label' => self::label( $model, $element, $uri ) ];
 			}
 
-			$request['/nino/http/response']['body'] = [ 'model' => $model, 'elements' => $elements ];
+			\Nino\Http::ok( $request, [ 'model' => $model, 'elements' => $elements ] );
 		}
 
 		/**
@@ -522,8 +517,7 @@ namespace Nino\Admin {
 			$uri	= (string) ( $data['uri'] ?? '' );
 
 			if( in_array( $type, self::types( $appData ), true ) === false || $uri === '' || str_contains( $uri, '/' ) === true ) {
-				$request['/nino/http/response']['statusCode'] = 404;
-				$request['/nino/http/response']['body'] = [ 'error' => 'unknown type or element' ];
+				\Nino\Http::fail( $request, 404, 'unknown type or element' );
 				return;
 			}
 
@@ -553,12 +547,11 @@ namespace Nino\Admin {
 			}
 
 			if( $found === false ) {
-				$request['/nino/http/response']['statusCode'] = 404;
-				$request['/nino/http/response']['body'] = [ 'error' => 'element not found' ];
+				\Nino\Http::fail( $request, 404, 'element not found' );
 				return;
 			}
 
-			$request['/nino/http/response']['body'] = [ 'model' => $model, 'global' => $global, 'locales' => $locales ];
+			\Nino\Http::ok( $request, [ 'model' => $model, 'global' => $global, 'locales' => $locales ] );
 		}
 
 		/**
@@ -588,15 +581,13 @@ namespace Nino\Admin {
 			$key 			= (string) ( $data['key'] ?? '' );
 
 			if( in_array( $type, self::types( $appData ), true ) === false || $uri === '' || str_contains( $uri, '/' ) === true || \Nino\Locales::verifyLocale( $appData, $locale ) === false ) {
-				$request['/nino/http/response']['statusCode'] = 400;
-				$request['/nino/http/response']['body'] = [ 'error' => 'invalid type, uri or locale' ];
+				\Nino\Http::fail( $request, 400, 'invalid type, uri or locale' );
 				return;
 			}
 
 			$model = self::typeData( $appData, $type )['model'] ?? [];
 			if( ( $model[$key]['type'] ?? '' ) !== 'image' ) {
-				$request['/nino/http/response']['statusCode'] = 400;
-				$request['/nino/http/response']['body'] = [ 'error' => 'not an image field' ];
+				\Nino\Http::fail( $request, 400, 'not an image field' );
 				return;
 			}
 
@@ -604,21 +595,18 @@ namespace Nino\Admin {
 			$isLocaleField = ( $model[$key]['locale'] ?? false ) === true;
 
 			if( \Nino\Elements::getElement( $appData, $elementUri, '*' ) === false ) {
-				$request['/nino/http/response']['statusCode'] = 404;
-				$request['/nino/http/response']['body'] = [ 'error' => 'element not found - save it once before uploading an image' ];
+				\Nino\Http::fail( $request, 404, 'element not found - save it once before uploading an image' );
 				return;
 			}
 
 			if( isset( $_FILES['file'] ) === false || $_FILES['file']['error'] !== UPLOAD_ERR_OK ) {
-				$request['/nino/http/response']['statusCode'] = 400;
-				$request['/nino/http/response']['body'] = [ 'error' => 'no file uploaded' ];
+				\Nino\Http::fail( $request, 400, 'no file uploaded' );
 				return;
 			}
 
 			$bytes = file_get_contents( $_FILES['file']['tmp_name'] );
 			if( $bytes === false ) {
-				$request['/nino/http/response']['statusCode'] = 400;
-				$request['/nino/http/response']['body'] = [ 'error' => 'could not read upload' ];
+				\Nino\Http::fail( $request, 400, 'could not read upload' );
 				return;
 			}
 
@@ -650,8 +638,7 @@ namespace Nino\Admin {
 			$filename = \Nino\Images::process( $appData, $bytes, $width, $height, $basePath );
 
 			if( $filename === false ) {
-				$request['/nino/http/response']['statusCode'] = 400;
-				$request['/nino/http/response']['body'] = [ 'error' => 'invalid or oversized image' ];
+				\Nino\Http::fail( $request, 400, 'invalid or oversized image' );
 				return;
 			}
 
@@ -659,15 +646,14 @@ namespace Nino\Admin {
 
 			if( is_array( $result ) === false ) {
 				\Nino\Images::delete( $appData, $filename );
-				$request['/nino/http/response']['statusCode'] = 400;
-				$request['/nino/http/response']['body'] = [ 'error' => 'save failed' ];
+				\Nino\Http::fail( $request, 400, 'save failed' );
 				return;
 			}
 
 			if( is_string( $oldFilename ) === true && $oldFilename !== '' && $oldFilename !== $filename )
 				\Nino\Images::delete( $appData, $oldFilename );
 
-			$request['/nino/http/response']['body'] = [ 'filename' => $filename, 'url' => \Nino\Images::getUrl( $appData, $filename ) ];
+			\Nino\Http::ok( $request, [ 'filename' => $filename, 'url' => \Nino\Images::getUrl( $appData, $filename ) ] );
 		}
 
 		/**
@@ -691,8 +677,7 @@ namespace Nino\Admin {
 			$fields 	= is_array( $data['fields'] ?? null ) ? $data['fields'] : [];
 
 			if( in_array( $type, self::types( $appData ), true ) === false || $uri === '' || str_contains( $uri, '/' ) === true || \Nino\Locales::verifyLocale( $appData, $locale ) === false ) {
-				$request['/nino/http/response']['statusCode'] = 400;
-				$request['/nino/http/response']['body'] = [ 'error' => 'invalid type, uri or locale' ];
+				\Nino\Http::fail( $request, 400, 'invalid type, uri or locale' );
 				return;
 			}
 
@@ -716,12 +701,11 @@ namespace Nino\Admin {
 			restore_error_handler();
 
 			if( is_array( $result ) === false ) {
-				$request['/nino/http/response']['statusCode'] = 400;
-				$request['/nino/http/response']['body'] = [ 'error' => $errorMsg ?? 'save failed' ];
+				\Nino\Http::fail( $request, 400, $errorMsg ?? 'save failed' );
 				return;
 			}
 
-			$request['/nino/http/response']['body'] = [ 'element' => $result ];
+			\Nino\Http::ok( $request, [ 'element' => $result ] );
 		}
 
 		/**
@@ -742,8 +726,7 @@ namespace Nino\Admin {
 			$uri	= (string) ( $data['uri'] ?? '' );
 
 			if( in_array( $type, self::types( $appData ), true ) === false || $uri === '' || str_contains( $uri, '/' ) === true ) {
-				$request['/nino/http/response']['statusCode'] = 400;
-				$request['/nino/http/response']['body'] = [ 'error' => 'invalid type or uri' ];
+				\Nino\Http::fail( $request, 400, 'invalid type or uri' );
 				return;
 			}
 
@@ -758,8 +741,7 @@ namespace Nino\Admin {
 			restore_error_handler();
 
 			if( $errorMsg !== null ) {
-				$request['/nino/http/response']['statusCode'] = 400;
-				$request['/nino/http/response']['body'] = [ 'error' => $errorMsg ];
+				\Nino\Http::fail( $request, 400, $errorMsg );
 				return;
 			}
 
@@ -769,7 +751,7 @@ namespace Nino\Admin {
 			foreach( $imageFilenames as $filename )
 				\Nino\Images::delete( $appData, $filename );
 
-			$request['/nino/http/response']['body'] = [ 'ok' => true ];
+			\Nino\Http::ok( $request );
 		}
 
 		/**
@@ -939,11 +921,11 @@ namespace Nino\Admin {
 			if( Admin::guardPerm( $appData, $request, self::MANAGE_PERM ) === false )
 				return;
 
-			$request['/nino/http/response']['body'] = [
+			\Nino\Http::ok( $request, [
 				'keys' 					=> \Nino\Text::entries( $appData, false ),
 				'locales' 			=> \Nino\Locales::getAvailableLocales( $appData ),
 				'selectedLocale' => Admin::sessionLocale( $appData ),
-			];
+			] );
 		}
 
 		/**
@@ -963,7 +945,7 @@ namespace Nino\Admin {
 			$data 	= Admin::postData();
 			$items 	= is_array( $data['items'] ?? null ) ? $data['items'] : [];
 
-			$request['/nino/http/response']['body'] = [ 'results' => \Nino\Text::saveBatch( $appData, $items, false ) ];
+			\Nino\Http::ok( $request, [ 'results' => \Nino\Text::saveBatch( $appData, $items, false ) ] );
 		}
 
 		/**
@@ -987,15 +969,14 @@ namespace Nino\Admin {
 			$locale = (string) ( Admin::postData()['locale'] ?? '' );
 
 			if( \Nino\Locales::verifyLocale( $appData, $locale ) === false ) {
-				$request['/nino/http/response']['statusCode'] = 400;
-				$request['/nino/http/response']['body'] = [ 'error' => 'invalid locale' ];
+				\Nino\Http::fail( $request, 400, 'invalid locale' );
 				return;
 			}
 
-			$request['/nino/http/response']['body'] = [
+			\Nino\Http::ok( $request, [
 				'locale' 	=> $locale,
 				'content' => \Nino\Filesystem::getFileContent( $appData, '/text/'. $locale. '.php', [] ),
-			];
+			] );
 		}
 
 		/**
@@ -1023,14 +1004,12 @@ namespace Nino\Admin {
 			$content 	= $data['content'] ?? null;
 
 			if( \Nino\Locales::verifyLocale( $appData, $locale ) === false ) {
-				$request['/nino/http/response']['statusCode'] = 400;
-				$request['/nino/http/response']['body'] = [ 'error' => 'invalid locale' ];
+				\Nino\Http::fail( $request, 400, 'invalid locale' );
 				return;
 			}
 
 			if( is_array( $content ) === false || count( $content ) === 0 ) {
-				$request['/nino/http/response']['statusCode'] = 400;
-				$request['/nino/http/response']['body'] = [ 'error' => 'empty or invalid content' ];
+				\Nino\Http::fail( $request, 400, 'empty or invalid content' );
 				return;
 			}
 
@@ -1059,7 +1038,7 @@ namespace Nino\Admin {
 				return $existing;
 			} );
 
-			$request['/nino/http/response']['body'] = [ 'imported' => $imported, 'skipped' => $skipped ];
+			\Nino\Http::ok( $request, [ 'imported' => $imported, 'skipped' => $skipped ] );
 		}
 	}
 
@@ -1129,7 +1108,7 @@ namespace Nino\Admin {
 				$users[] = [ 'mail' => $mail, 'isSelf' => $mail === $current['mail'], 'perms' => $user['perms'] ?? [] ];
 			}
 
-			$request['/nino/http/response']['body'] = [ 'users' => $users, 'canManage' => $canManage, 'self' => $current['mail'], 'permOptions' => self::KNOWN_PERMS ];
+			\Nino\Http::ok( $request, [ 'users' => $users, 'canManage' => $canManage, 'self' => $current['mail'], 'permOptions' => self::KNOWN_PERMS ] );
 		}
 
 		/**
@@ -1154,14 +1133,12 @@ namespace Nino\Admin {
 			[ $allowed, $isSelf ] = self::_authorize( $appData, $username );
 
 			if( $allowed === false ) {
-				$request['/nino/http/response']['statusCode'] = 403;
-				$request['/nino/http/response']['body'] = [ 'error' => 'not allowed' ];
+				\Nino\Http::fail( $request, 403, 'not allowed' );
 				return;
 			}
 
 			if( $newUsername === '' || filter_var( $newUsername, FILTER_VALIDATE_EMAIL ) === false ) {
-				$request['/nino/http/response']['statusCode'] = 400;
-				$request['/nino/http/response']['body'] = [ 'error' => 'invalid mail' ];
+				\Nino\Http::fail( $request, 400, 'invalid mail' );
 				return;
 			}
 
@@ -1170,8 +1147,7 @@ namespace Nino\Admin {
 			if( $isSelf === true ) {
 				$storedUser = \Nino\Auth::getUser( $appData, $username );
 				if( $storedUser === false || password_verify( $currentPw, $storedUser['pw'] ) === false ) {
-					$request['/nino/http/response']['statusCode'] = 401;
-					$request['/nino/http/response']['body'] = [ 'error' => 'wrong current password' ];
+					\Nino\Http::fail( $request, 401, 'wrong current password' );
 					return;
 				}
 			}
@@ -1179,12 +1155,11 @@ namespace Nino\Admin {
 			$result = \Nino\Auth::updateUser( $appData, $username, $newUsername, $pw );
 
 			if( $result === false ) {
-				$request['/nino/http/response']['statusCode'] = 400;
-				$request['/nino/http/response']['body'] = [ 'error' => 'mail already in use' ];
+				\Nino\Http::fail( $request, 400, 'mail already in use' );
 				return;
 			}
 
-			$request['/nino/http/response']['body'] = [ 'mail' => $result['mail'] ];
+			\Nino\Http::ok( $request, [ 'mail' => $result['mail'] ] );
 		}
 
 		/**
@@ -1206,14 +1181,13 @@ namespace Nino\Admin {
 			[ $allowed, $isSelf ] = self::_authorize( $appData, $username );
 
 			if( $allowed === false ) {
-				$request['/nino/http/response']['statusCode'] = 403;
-				$request['/nino/http/response']['body'] = [ 'error' => 'not allowed' ];
+				\Nino\Http::fail( $request, 403, 'not allowed' );
 				return;
 			}
 
 			$ok = \Nino\Auth::logoutAllSessions( $appData, $username );
 
-			$request['/nino/http/response']['body'] = [ 'ok' => $ok, 'loggedOutSelf' => $isSelf ];
+			\Nino\Http::ok( $request, [ 'ok' => $ok, 'loggedOutSelf' => $isSelf ] );
 		}
 
 		/**
@@ -1241,8 +1215,7 @@ namespace Nino\Admin {
 			$perms 		= is_array( $data['perms'] ?? null ) ? $data['perms'] : [];
 
 			if( \Nino\Auth::getUser( $appData, $username ) === false ) {
-				$request['/nino/http/response']['statusCode'] = 404;
-				$request['/nino/http/response']['body'] = [ 'error' => 'unknown user' ];
+				\Nino\Http::fail( $request, 404, 'unknown user' );
 				return;
 			}
 
@@ -1252,7 +1225,7 @@ namespace Nino\Admin {
 			$appData['/nino/auth/user'][$username]['perms'] = $perms;
 			\Nino\AppData::writeContentData( $appData, [ '/nino/auth/user' ] );
 
-			$request['/nino/http/response']['body'] = [ 'perms' => $perms ];
+			\Nino\Http::ok( $request, [ 'perms' => $perms ] );
 		}
 
 		/**
@@ -1313,7 +1286,7 @@ namespace Nino\Admin {
 					'url' 			=> ( empty( $slot['filename'] ) === false ) ? \Nino\Images::getUrl( $appData, $slot['filename'] ) : null,
 				];
 
-			$request['/nino/http/response']['body'] = [ 'slots' => $slots ];
+			\Nino\Http::ok( $request, [ 'slots' => $slots ] );
 		}
 
 		/**
@@ -1337,21 +1310,18 @@ namespace Nino\Admin {
 			$slot	= \Nino\Images::getSlot( $appData, $uri );
 
 			if( $slot === false ) {
-				$request['/nino/http/response']['statusCode'] = 404;
-				$request['/nino/http/response']['body'] = [ 'error' => 'unknown slot' ];
+				\Nino\Http::fail( $request, 404, 'unknown slot' );
 				return;
 			}
 
 			if( isset( $_FILES['file'] ) === false || $_FILES['file']['error'] !== UPLOAD_ERR_OK ) {
-				$request['/nino/http/response']['statusCode'] = 400;
-				$request['/nino/http/response']['body'] = [ 'error' => 'no file uploaded' ];
+				\Nino\Http::fail( $request, 400, 'no file uploaded' );
 				return;
 			}
 
 			$bytes = file_get_contents( $_FILES['file']['tmp_name'] );
 			if( $bytes === false ) {
-				$request['/nino/http/response']['statusCode'] = 400;
-				$request['/nino/http/response']['body'] = [ 'error' => 'could not read upload' ];
+				\Nino\Http::fail( $request, 400, 'could not read upload' );
 				return;
 			}
 
@@ -1360,8 +1330,7 @@ namespace Nino\Admin {
 			$filename = \Nino\Images::process( $appData, $bytes, (int) ( $slot['width'] ?? 0 ), (int) ( $slot['height'] ?? 0 ), ltrim( $uri, '/' ) );
 
 			if( $filename === false ) {
-				$request['/nino/http/response']['statusCode'] = 400;
-				$request['/nino/http/response']['body'] = [ 'error' => 'invalid or oversized image' ];
+				\Nino\Http::fail( $request, 400, 'invalid or oversized image' );
 				return;
 			}
 
@@ -1370,7 +1339,7 @@ namespace Nino\Admin {
 			if( is_string( $oldFilename ) === true && $oldFilename !== '' && $oldFilename !== $filename )
 				\Nino\Images::delete( $appData, $oldFilename );
 
-			$request['/nino/http/response']['body'] = [ 'filename' => $filename, 'url' => \Nino\Images::getUrl( $appData, $filename ) ];
+			\Nino\Http::ok( $request, [ 'filename' => $filename, 'url' => \Nino\Images::getUrl( $appData, $filename ) ] );
 		}
 	}
 
@@ -1698,7 +1667,7 @@ namespace Nino\Admin {
 			if( Admin::guardPerm( $appData, $request, self::VIEW_PERM ) === false )
 				return;
 
-			$request['/nino/http/response']['body'] = [ 'lines' => array_reverse( self::_allLines( $appData ) ) ];
+			\Nino\Http::ok( $request, [ 'lines' => array_reverse( self::_allLines( $appData ) ) ] );
 		}
 
 		/**
@@ -1826,7 +1795,7 @@ namespace Nino\Admin {
 			if( Admin::guardPerm( $appData, $request, self::VIEW_PERM ) === false )
 				return;
 
-			$request['/nino/http/response']['body'] = [ 'entries' => array_reverse( self::_entries( $appData ) ) ];
+			\Nino\Http::ok( $request, [ 'entries' => array_reverse( self::_entries( $appData ) ) ] );
 		}
 
 		/**
@@ -1916,7 +1885,7 @@ namespace Nino\Admin {
 
 			$entries = \Nino\Filesystem::getFileContent( $appData, self::PATH, [] );
 
-			$request['/nino/http/response']['body'] = [ 'entries' => array_reverse( $entries ) ];
+			\Nino\Http::ok( $request, [ 'entries' => array_reverse( $entries ) ] );
 		}
 
 		/**
@@ -1937,7 +1906,7 @@ namespace Nino\Admin {
 			$email = (string) ( Admin::postData()['email'] ?? '' );
 
 			if( $email === '' ) {
-				$request['/nino/http/response']['statusCode'] = 404;
+				\Nino\Http::fail( $request, 404, 'unknown email' );
 				return;
 			}
 
@@ -1954,8 +1923,12 @@ namespace Nino\Admin {
 				return $filtered;
 			} );
 
-			if( $found === false )
-				$request['/nino/http/response']['statusCode'] = 404;
+			if( $found === false ) {
+				\Nino\Http::fail( $request, 404, 'unknown email' );
+				return;
+			}
+
+			\Nino\Http::ok( $request );
 		}
 	}
 

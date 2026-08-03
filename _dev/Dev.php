@@ -117,8 +117,7 @@ namespace Nino\Dev {
 			}
 
 			if( self::isAuthed( $appData ) === false ) {
-				$request['/nino/http/response']['statusCode'] = 401;
-				$request['/nino/http/response']['body'] = [ 'error' => 'not logged in' ];
+				\Nino\Http::fail( $request, 401, 'not logged in' );
 				return;
 			}
 
@@ -132,8 +131,7 @@ namespace Nino\Dev {
 				$actions += $module::actions();
 
 			if( isset( $actions[$action] ) === false ) {
-				$request['/nino/http/response']['statusCode'] = 404;
-				$request['/nino/http/response']['body'] = [ 'error' => 'unknown action' ];
+				\Nino\Http::fail( $request, 404, 'unknown action' );
 				return;
 			}
 
@@ -169,8 +167,7 @@ namespace Nino\Dev {
 				return false;
 
 			if( self::isAuthed( $appData ) === false ) {
-				$request['/nino/http/response']['statusCode'] = 401;
-				$request['/nino/http/response']['body'] = [ 'error' => 'not logged in' ];
+				\Nino\Http::fail( $request, 401, 'not logged in' );
 				return false;
 			}
 
@@ -227,14 +224,12 @@ namespace Nino\Dev {
 			}, [ 'tries' => 0, 'until' => 0 ] );
 
 			if( $lockedOut === true ) {
-				$request['/nino/http/response']['statusCode'] = 429;
-				$request['/nino/http/response']['body'] = [ 'error' => 'too many attempts' ];
+				\Nino\Http::fail( $request, 429, 'too many attempts' );
 				return;
 			}
 
 			if( $verified === false ) {
-				$request['/nino/http/response']['statusCode'] = 401;
-				$request['/nino/http/response']['body'] = [ 'error' => 'wrong password' ];
+				\Nino\Http::fail( $request, 401, 'wrong password' );
 				return;
 			}
 
@@ -362,7 +357,7 @@ namespace Nino\Dev {
 			if( \Nino\Dev\Dev::guard( $appData, $request ) === false )
 				return;
 
-			$request['/nino/http/response']['body'] = [ 'types' => self::summaries( $appData ), 'fieldTypes' => self::FIELD_TYPES ];
+			\Nino\Http::ok( $request, [ 'types' => self::summaries( $appData ), 'fieldTypes' => self::FIELD_TYPES ] );
 		}
 
 		/**
@@ -381,24 +376,22 @@ namespace Nino\Dev {
 			$typeUri = (string) ( \Nino\Dev\Dev::postData()['uri'] ?? '' );
 
 			if( self::isValidTypeUri( $typeUri ) === false ) {
-				$request['/nino/http/response']['statusCode'] = 400;
-				$request['/nino/http/response']['body'] = [ 'error' => 'invalid type uri' ];
+				\Nino\Http::fail( $request, 400, 'invalid type uri' );
 				return;
 			}
 
 			$typeData = \Nino\Filesystem::getFileContent( $appData, '/elements/'. $typeUri. '.php', false );
 
 			if( $typeData === false ) {
-				$request['/nino/http/response']['statusCode'] = 404;
-				$request['/nino/http/response']['body'] = [ 'error' => 'unknown type' ];
+				\Nino\Http::fail( $request, 404, 'unknown type' );
 				return;
 			}
 
-			$request['/nino/http/response']['body'] = [
+			\Nino\Http::ok( $request, [
 				'uri' 		=> $typeUri,
 				'title' 	=> $typeData['title'] ?? $typeUri,
 				'model' 	=> $typeData['model'] ?? [],
-			];
+			] );
 		}
 
 		/**
@@ -493,8 +486,7 @@ namespace Nino\Dev {
 			$typeUri = (string) ( $data['uri'] ?? '' );
 
 			if( self::isValidTypeUri( $typeUri ) === false ) {
-				$request['/nino/http/response']['statusCode'] = 400;
-				$request['/nino/http/response']['body'] = [ 'error' => 'invalid type uri' ];
+				\Nino\Http::fail( $request, 400, 'invalid type uri' );
 				return;
 			}
 
@@ -536,18 +528,16 @@ namespace Nino\Dev {
 			}, false );
 
 			if( $notFound === true ) {
-				$request['/nino/http/response']['statusCode'] = 404;
-				$request['/nino/http/response']['body'] = [ 'error' => 'unknown type' ];
+				\Nino\Http::fail( $request, 404, 'unknown type' );
 				return;
 			}
 
 			if( $written === false ) {
-				$request['/nino/http/response']['statusCode'] = 500;
-				$request['/nino/http/response']['body'] = [ 'error' => 'could not save the type file' ];
+				\Nino\Http::fail( $request, 500, 'could not save the type file' );
 				return;
 			}
 
-			$request['/nino/http/response']['body'] = [ 'uri' => $typeUri, 'title' => $resultTypeData['title'], 'model' => $resultTypeData['model'] ];
+			\Nino\Http::ok( $request, [ 'uri' => $typeUri, 'title' => $resultTypeData['title'], 'model' => $resultTypeData['model'] ] );
 		}
 
 		/**
@@ -635,14 +625,12 @@ namespace Nino\Dev {
 			$typeUri 	= (string) ( $data['uri'] ?? '' );
 
 			if( self::isValidTypeUri( $typeUri ) === false ) {
-				$request['/nino/http/response']['statusCode'] = 400;
-				$request['/nino/http/response']['body'] = [ 'error' => 'invalid type uri' ];
+				\Nino\Http::fail( $request, 400, 'invalid type uri' );
 				return;
 			}
 
 			if( \Nino\Filesystem::getFileContent( $appData, '/elements/'. $typeUri. '.php', '' ) !== '' ) {
-				$request['/nino/http/response']['statusCode'] = 409;
-				$request['/nino/http/response']['body'] = [ 'error' => 'type already exists' ];
+				\Nino\Http::fail( $request, 409, 'type already exists' );
 				return;
 			}
 
@@ -656,7 +644,7 @@ namespace Nino\Dev {
 
 			\Nino\Filesystem::putFileContent( $appData, '/elements/'. $typeUri. '.php', $typeData );
 
-			$request['/nino/http/response']['body'] = [ 'uri' => $typeUri, 'title' => $typeData['title'], 'model' => $typeData['model'] ];
+			\Nino\Http::ok( $request, [ 'uri' => $typeUri, 'title' => $typeData['title'], 'model' => $typeData['model'] ] );
 		}
 	}
 
@@ -807,7 +795,7 @@ namespace Nino\Dev {
 			if( \Nino\Dev\Dev::guard( $appData, $request ) === false )
 				return;
 
-			$request['/nino/http/response']['body'] = [ 'dates' => self::dates( $appData ) ];
+			\Nino\Http::ok( $request, [ 'dates' => self::dates( $appData ) ] );
 		}
 
 		/**
@@ -828,8 +816,7 @@ namespace Nino\Dev {
 			$date = (string) ( \Nino\Dev\Dev::postData()['date'] ?? '' );
 
 			if( preg_match( '/^\d{4}-\d{2}-\d{2}$/', $date ) !== 1 ) {
-				$request['/nino/http/response']['statusCode'] = 400;
-				$request['/nino/http/response']['body'] = [ 'error' => 'invalid date' ];
+				\Nino\Http::fail( $request, 400, 'invalid date' );
 				return;
 			}
 
@@ -837,24 +824,21 @@ namespace Nino\Dev {
 			$key = self::_key( $appData );
 
 			if( $dir === false || $key === false ) {
-				$request['/nino/http/response']['statusCode'] = 404;
-				$request['/nino/http/response']['body'] = [ 'error' => 'no backup available' ];
+				\Nino\Http::fail( $request, 404, 'no backup available' );
 				return;
 			}
 
 			$path = $dir. '/'. $date. '.php';
 
 			if( is_file( $path ) === false ) {
-				$request['/nino/http/response']['statusCode'] = 404;
-				$request['/nino/http/response']['body'] = [ 'error' => 'unknown backup date' ];
+				\Nino\Http::fail( $request, 404, 'unknown backup date' );
 				return;
 			}
 
 			$gz = self::_decrypt( $path, $key );
 
 			if( $gz === false ) {
-				$request['/nino/http/response']['statusCode'] = 500;
-				$request['/nino/http/response']['body'] = [ 'error' => 'decryption failed' ];
+				\Nino\Http::fail( $request, 500, 'decryption failed' );
 				return;
 			}
 
@@ -897,7 +881,7 @@ namespace Nino\Dev {
 			if( function_exists( 'opcache_reset' ) === true )
 				opcache_reset();
 
-			$request['/nino/http/response']['body'] = [ 'ok' => true, 'restoredDate' => $date ];
+			\Nino\Http::ok( $request, [ 'ok' => true, 'restoredDate' => $date ] );
 		}
 
 		/**
@@ -1020,7 +1004,7 @@ namespace Nino\Dev {
 			foreach( array_keys( self::KEY_TYPES ) as $key )
 				$values[$key] = json_encode( $stored[$key] ?? null, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE );
 
-			$request['/nino/http/response']['body'] = [ 'values' => $values ];
+			\Nino\Http::ok( $request, [ 'values' => $values ] );
 		}
 
 		/**
@@ -1043,29 +1027,26 @@ namespace Nino\Dev {
 			$raw 	= (string) ( $data['value'] ?? '' );
 
 			if( isset( self::KEY_TYPES[$key] ) === false ) {
-				$request['/nino/http/response']['statusCode'] = 400;
-				$request['/nino/http/response']['body'] = [ 'error' => 'unknown key' ];
+				\Nino\Http::fail( $request, 400, 'unknown key' );
 				return;
 			}
 
 			$decoded = json_decode( $raw, true );
 
 			if( json_last_error() !== JSON_ERROR_NONE ) {
-				$request['/nino/http/response']['statusCode'] = 400;
-				$request['/nino/http/response']['body'] = [ 'error' => 'invalid json: '. json_last_error_msg() ];
+				\Nino\Http::fail( $request, 400, 'invalid json: '. json_last_error_msg() );
 				return;
 			}
 
 			if( self::_matchesType( $decoded, self::KEY_TYPES[$key] ) === false ) {
-				$request['/nino/http/response']['statusCode'] = 400;
-				$request['/nino/http/response']['body'] = [ 'error' => 'expected a '. self::KEY_TYPES[$key]. ' value' ];
+				\Nino\Http::fail( $request, 400, 'expected a '. self::KEY_TYPES[$key]. ' value' );
 				return;
 			}
 
 			$appData[$key] = $decoded;
 			\Nino\AppData::writeContentData( $appData, [ $key ] );
 
-			$request['/nino/http/response']['body'] = [ 'ok' => true ];
+			\Nino\Http::ok( $request );
 		}
 
 		/**
@@ -1184,7 +1165,7 @@ namespace Nino\Dev {
 					'isManager' => \Nino\Auth::checkPermission( $appData, self::MANAGE_PERM, $mail ),
 				];
 
-			$request['/nino/http/response']['body'] = [ 'users' => $users ];
+			\Nino\Http::ok( $request, [ 'users' => $users ] );
 		}
 
 		/**
@@ -1206,20 +1187,18 @@ namespace Nino\Dev {
 			$isManager 	= ( $data['isManager'] ?? false ) === true;
 
 			if( filter_var( $mail, FILTER_VALIDATE_EMAIL ) === false || strlen( $password ) < 8 ) {
-				$request['/nino/http/response']['statusCode'] = 400;
-				$request['/nino/http/response']['body'] = [ 'error' => 'invalid mail or password too short' ];
+				\Nino\Http::fail( $request, 400, 'invalid mail or password too short' );
 				return;
 			}
 
 			$ok = \Nino\Auth::insertUser( $appData, $mail, $password, $isManager === true ? [ '/*' ] : self::CONTENT_PERMS );
 
 			if( $ok === false ) {
-				$request['/nino/http/response']['statusCode'] = 409;
-				$request['/nino/http/response']['body'] = [ 'error' => 'a user with this mail already exists' ];
+				\Nino\Http::fail( $request, 409, 'a user with this mail already exists' );
 				return;
 			}
 
-			$request['/nino/http/response']['body'] = [ 'ok' => true ];
+			\Nino\Http::ok( $request );
 		}
 
 		/**
@@ -1239,12 +1218,11 @@ namespace Nino\Dev {
 			$ok 	= \Nino\Auth::deleteUser( $appData, $mail );
 
 			if( $ok === false ) {
-				$request['/nino/http/response']['statusCode'] = 404;
-				$request['/nino/http/response']['body'] = [ 'error' => 'unknown user' ];
+				\Nino\Http::fail( $request, 404, 'unknown user' );
 				return;
 			}
 
-			$request['/nino/http/response']['body'] = [ 'ok' => true ];
+			\Nino\Http::ok( $request );
 		}
 
 		/**
@@ -1272,21 +1250,19 @@ namespace Nino\Dev {
 			$perms 	= $data['perms'] ?? null;
 
 			if( \Nino\Auth::getUser( $appData, $mail ) === false ) {
-				$request['/nino/http/response']['statusCode'] = 404;
-				$request['/nino/http/response']['body'] = [ 'error' => 'unknown user' ];
+				\Nino\Http::fail( $request, 404, 'unknown user' );
 				return;
 			}
 
 			if( is_array( $perms ) === false || count( array_filter( $perms, 'is_string' ) ) !== count( $perms ) ) {
-				$request['/nino/http/response']['statusCode'] = 400;
-				$request['/nino/http/response']['body'] = [ 'error' => 'perms must be an array of strings' ];
+				\Nino\Http::fail( $request, 400, 'perms must be an array of strings' );
 				return;
 			}
 
 			$appData['/nino/auth/user'][$mail]['perms'] = array_values( $perms );
 			\Nino\AppData::writeContentData( $appData, [ '/nino/auth/user' ] );
 
-			$request['/nino/http/response']['body'] = [ 'perms' => $appData['/nino/auth/user'][$mail]['perms'] ];
+			\Nino\Http::ok( $request, [ 'perms' => $appData['/nino/auth/user'][$mail]['perms'] ] );
 		}
 	}
 
@@ -1369,7 +1345,7 @@ namespace Nino\Dev {
 
 			usort( $slots, fn( array $a, array $b ) => strcmp( $a['uri'], $b['uri'] ) );
 
-			$request['/nino/http/response']['body'] = [ 'slots' => $slots ];
+			\Nino\Http::ok( $request, [ 'slots' => $slots ] );
 		}
 
 		/**
@@ -1389,8 +1365,7 @@ namespace Nino\Dev {
 			$uri 	= (string) ( $data['uri'] ?? '' );
 
 			if( isset( $appData['/nino/html/images'][$uri] ) === false ) {
-				$request['/nino/http/response']['statusCode'] = 404;
-				$request['/nino/http/response']['body'] = [ 'error' => 'unknown slot' ];
+				\Nino\Http::fail( $request, 404, 'unknown slot' );
 				return;
 			}
 
@@ -1399,8 +1374,7 @@ namespace Nino\Dev {
 			$height = max( 1, (int) ( $data['height'] ?? 0 ) );
 
 			if( $label === '' ) {
-				$request['/nino/http/response']['statusCode'] = 400;
-				$request['/nino/http/response']['body'] = [ 'error' => 'label is required' ];
+				\Nino\Http::fail( $request, 400, 'label is required' );
 				return;
 			}
 
@@ -1410,7 +1384,7 @@ namespace Nino\Dev {
 
 			\Nino\AppData::writeContentData( $appData, [ '/nino/html/images' ] );
 
-			$request['/nino/http/response']['body'] = [ 'ok' => true ];
+			\Nino\Http::ok( $request );
 		}
 
 		/**
@@ -1433,14 +1407,12 @@ namespace Nino\Dev {
 			$height = max( 1, (int) ( $data['height'] ?? 0 ) );
 
 			if( self::isValidUri( $uri ) === false || $label === '' ) {
-				$request['/nino/http/response']['statusCode'] = 400;
-				$request['/nino/http/response']['body'] = [ 'error' => 'invalid uri or missing label' ];
+				\Nino\Http::fail( $request, 400, 'invalid uri or missing label' );
 				return;
 			}
 
 			if( isset( $appData['/nino/html/images'][$uri] ) === true ) {
-				$request['/nino/http/response']['statusCode'] = 409;
-				$request['/nino/http/response']['body'] = [ 'error' => 'slot already exists' ];
+				\Nino\Http::fail( $request, 409, 'slot already exists' );
 				return;
 			}
 
@@ -1453,7 +1425,7 @@ namespace Nino\Dev {
 
 			\Nino\AppData::writeContentData( $appData, [ '/nino/html/images' ] );
 
-			$request['/nino/http/response']['body'] = [ 'ok' => true, 'uri' => $uri ];
+			\Nino\Http::ok( $request, [ 'ok' => true, 'uri' => $uri ] );
 		}
 
 		/**
@@ -1475,8 +1447,7 @@ namespace Nino\Dev {
 			$slot = $appData['/nino/html/images'][$uri] ?? null;
 
 			if( $slot === null ) {
-				$request['/nino/http/response']['statusCode'] = 404;
-				$request['/nino/http/response']['body'] = [ 'error' => 'unknown slot' ];
+				\Nino\Http::fail( $request, 404, 'unknown slot' );
 				return;
 			}
 
@@ -1487,7 +1458,7 @@ namespace Nino\Dev {
 
 			\Nino\AppData::writeContentData( $appData, [ '/nino/html/images' ] );
 
-			$request['/nino/http/response']['body'] = [ 'ok' => true ];
+			\Nino\Http::ok( $request );
 		}
 
 		/**
@@ -1515,7 +1486,7 @@ namespace Nino\Dev {
 			if( \Nino\Dev\Dev::guard( $appData, $request ) === false )
 				return;
 
-			$request['/nino/http/response']['body'] = [ 'missing' => self::_scanMissing( $appData ) ];
+			\Nino\Http::ok( $request, [ 'missing' => self::_scanMissing( $appData ) ] );
 		}
 
 		/**
@@ -1679,10 +1650,10 @@ namespace Nino\Dev {
 			if( \Nino\Dev\Dev::guard( $appData, $request ) === false )
 				return;
 
-			$request['/nino/http/response']['body'] = [
+			\Nino\Http::ok( $request, [
 				'keys' 		=> \Nino\Text::entries( $appData ),
 				'locales' => \Nino\Locales::getAvailableLocales( $appData ),
-			];
+			] );
 		}
 
 		/**
@@ -1706,14 +1677,12 @@ namespace Nino\Dev {
 			$value 		= (string) ( $data['value'] ?? '' );
 
 			if( self::isValidKey( $key ) === false ) {
-				$request['/nino/http/response']['statusCode'] = 400;
-				$request['/nino/http/response']['body'] = [ 'error' => 'invalid key' ];
+				\Nino\Http::fail( $request, 400, 'invalid key' );
 				return;
 			}
 
 			if( \Nino\Text::entry( $appData, $key ) !== null ) {
-				$request['/nino/http/response']['statusCode'] = 409;
-				$request['/nino/http/response']['body'] = [ 'error' => 'key already exists' ];
+				\Nino\Http::fail( $request, 409, 'key already exists' );
 				return;
 			}
 
@@ -1732,7 +1701,7 @@ namespace Nino\Dev {
 					} );
 			}
 
-			$request['/nino/http/response']['body'] = [ 'ok' => true, 'key' => $key ];
+			\Nino\Http::ok( $request, [ 'ok' => true, 'key' => $key ] );
 		}
 
 		/**
@@ -1760,8 +1729,7 @@ namespace Nino\Dev {
 			$entry = \Nino\Text::entry( $appData, $key );
 
 			if( $entry === null ) {
-				$request['/nino/http/response']['statusCode'] = 404;
-				$request['/nino/http/response']['body'] = [ 'error' => 'unknown key' ];
+				\Nino\Http::fail( $request, 404, 'unknown key' );
 				return;
 			}
 
@@ -1770,7 +1738,7 @@ namespace Nino\Dev {
 
 			\Nino\Text::setBlacklisted( $appData, $key, $blacklisted );
 
-			$request['/nino/http/response']['body'] = [ 'ok' => true ];
+			\Nino\Http::ok( $request );
 		}
 
 		/**
@@ -1791,7 +1759,7 @@ namespace Nino\Dev {
 			$data 	= \Nino\Dev\Dev::postData();
 			$items 	= is_array( $data['items'] ?? null ) ? $data['items'] : [];
 
-			$request['/nino/http/response']['body'] = [ 'results' => \Nino\Text::saveBatch( $appData, $items, true ) ];
+			\Nino\Http::ok( $request, [ 'results' => \Nino\Text::saveBatch( $appData, $items, true ) ] );
 		}
 
 		/**
@@ -1814,22 +1782,19 @@ namespace Nino\Dev {
 			$newKey = (string) ( $data['newKey'] ?? '' );
 
 			if( self::isValidKey( $newKey ) === false ) {
-				$request['/nino/http/response']['statusCode'] = 400;
-				$request['/nino/http/response']['body'] = [ 'error' => 'invalid new key' ];
+				\Nino\Http::fail( $request, 400, 'invalid new key' );
 				return;
 			}
 
 			$entry = \Nino\Text::entry( $appData, $key );
 
 			if( $entry === null ) {
-				$request['/nino/http/response']['statusCode'] = 404;
-				$request['/nino/http/response']['body'] = [ 'error' => 'unknown key' ];
+				\Nino\Http::fail( $request, 404, 'unknown key' );
 				return;
 			}
 
 			if( $newKey !== $key && \Nino\Text::entry( $appData, $newKey ) !== null ) {
-				$request['/nino/http/response']['statusCode'] = 409;
-				$request['/nino/http/response']['body'] = [ 'error' => 'key already exists' ];
+				\Nino\Http::fail( $request, 409, 'key already exists' );
 				return;
 			}
 
@@ -1856,7 +1821,7 @@ namespace Nino\Dev {
 				\Nino\Text::setBlacklisted( $appData, $newKey, true );
 			}
 
-			$request['/nino/http/response']['body'] = [ 'ok' => true, 'key' => $newKey ];
+			\Nino\Http::ok( $request, [ 'ok' => true, 'key' => $newKey ] );
 		}
 
 		/**
@@ -1879,8 +1844,7 @@ namespace Nino\Dev {
 			$entry = \Nino\Text::entry( $appData, $key );
 
 			if( $entry === null ) {
-				$request['/nino/http/response']['statusCode'] = 404;
-				$request['/nino/http/response']['body'] = [ 'error' => 'unknown key' ];
+				\Nino\Http::fail( $request, 404, 'unknown key' );
 				return;
 			}
 
@@ -1902,7 +1866,7 @@ namespace Nino\Dev {
 			if( $entry['blacklisted'] === true )
 				\Nino\Text::setBlacklisted( $appData, $key, false );
 
-			$request['/nino/http/response']['body'] = [ 'ok' => true ];
+			\Nino\Http::ok( $request );
 		}
 
 		/**
@@ -1993,7 +1957,7 @@ namespace Nino\Dev {
 			if( \Nino\Dev\Dev::guard( $appData, $request ) === false )
 				return;
 
-			$request['/nino/http/response']['body'] = [ 'missing' => self::_scanMissing( $appData ) ];
+			\Nino\Http::ok( $request, [ 'missing' => self::_scanMissing( $appData ) ] );
 		}
 
 		/**
@@ -2097,13 +2061,13 @@ namespace Nino\Dev {
 			if( \Nino\Dev\Dev::guard( $appData, $request ) === false )
 				return;
 
-			$request['/nino/http/response']['body'] = [
+			\Nino\Http::ok( $request, [
 				'types' 					=> ElementTypes::summaries( $appData ),
 				'users' 					=> Users::count( $appData ),
 				'lastBackup' 			=> Restore::lastDate( $appData ),
 				'missingText' 		=> Text::missingCount( $appData ),
 				'missingImages' 	=> Images::missingCount( $appData ),
-			];
+			] );
 		}
 	}
 }

@@ -2911,6 +2911,35 @@ namespace Nino {
 		}
 
 		/**
+		 *	Set a response's status code and error body in one call - the
+		 *	statusCode/body pair a handler otherwise sets by hand on every
+		 *	failure branch, with 'error' as the body key enforced rather
+		 *	than just remembered by convention
+		 *
+		 *	@param		array 		&$request			(reference) Current request
+		 *	@param		int				$statusCode
+		 *	@param		string		$error
+		 *
+		 *	@return 	void
+		 */
+		public static function fail( array &$request, int $statusCode, string $error ): void {
+			$request['/nino/http/response']['statusCode'] = $statusCode;
+			$request['/nino/http/response']['body'] = [ 'error' => $error ];
+		}
+
+		/**
+		 *	Set a response's success body - see fail()
+		 *
+		 *	@param		array 		&$request			(reference) Current request
+		 *	@param		mixed			$body					Response body, defaults to a bare acknowledgement
+		 *
+		 *	@return 	void
+		 */
+		public static function ok( array &$request, mixed $body = [ 'ok' => true ] ): void {
+			$request['/nino/http/response']['body'] = $body;
+		}
+
+		/**
 		 *	Search a route
 		 *
 		 *	@param		array 				&$appData			(reference) Array with current app data
