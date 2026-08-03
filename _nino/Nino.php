@@ -3239,10 +3239,84 @@ namespace Nino {
 		 */
 		public static function send( array &$appData, string $to, string $subject, string $body, string $replyTo ): bool {
 
-			if( self::_hit( $appData, \Nino\Http::getClientIp() ) === false )
+			if( self::_hit( $appData, \Nino\Http::getClientIp() ) === false ) {
+
+				// Flagged rather than just reported through the return value, so
+				// a caller can tell "we refused to send this" apart from "mail()
+				// failed" - Form uses it to not record a submission whose mail
+				// was never attempted (see its callbackResponse())
+				$appData['./nino/mail/ratelimited'] = true;
+
+				return false;
+			}
+
+			// Everything that ends up on a header line gets its CR/LF stripped.
+			// $subject comes from an admin-editable textfill and send() is public
+			// api, so without this a newline in any of them injects headers of
+			// its own (a Bcc: to somewhere else being the obvious one).
+			$to				= self::_headerValue( $to );
+			$subject	= self::_headerValue( $subject );
+			$replyTo	= self::_headerValue( $replyTo );
+
+			if( $to === '' )
 				return false;
 
-			return mail( $to, $subject, $body, "Content-Type:text/html\r\nReply-To: ". $replyTo. "\r\n" );
+			// Without a From: the mail goes out as the webserver user
+			// (www-data@some-host), which is the single most reliable way to end
+			// up in a spam folder. The envelope sender (-f) matters just as
+			// much: it is what SPF is checked against, and PHP defaults it to
+			// the same webserver user.
+			$sender = self::_getSender( $appData );
+
+			$headers = 'Content-Type:text/html';
+
+			if( $sender !== '' )
+				$headers .= "\r\n". 'From: '. $sender;
+
+			if( $replyTo !== '' )
+				$headers .= "\r\n". 'Reply-To: '. $replyTo;
+
+			// -f only for an address that validated - the parameter goes to the
+			// sendmail command line, so it must never carry anything unchecked
+			return ( $sender !== '' )
+				? mail( $to, $subject, $body, $headers, '-f'. $sender )
+				: mail( $to, $subject, $body, $headers );
+		}
+
+		/**
+		 *	A single header value with anything that could start a new header
+		 *	line removed
+		 *
+		 *	@param		string		$value				Raw value
+		 *
+		 *	@return 	string
+		 */
+		private static function _headerValue( string $value ): string {
+
+			return trim( str_replace( [ "\r", "\n" ], '', $value ) );
+		}
+
+		/**
+		 *	The address to send as: '/nino/mail/sender' from config.php if set,
+		 *	otherwise the site owner's address from the Text values. Configurable
+		 *	because the envelope sender has to be an address the sending host is
+		 *	allowed to send for (spf/dmarc), which is not necessarily the mailbox
+		 *	replies should go to. Returns '' if neither is a valid address, in
+		 *	which case send() simply omits From:/-f rather than passing something
+		 *	unchecked to sendmail.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	string
+		 */
+		private static function _getSender( array &$appData ): string {
+
+			$sender = self::_headerValue( (string) ( $appData['/nino/mail/sender'] ?? '' ) );
+
+			if( $sender === '' )
+				$sender = self::_headerValue( \Nino\Html::renderHtml( $appData, '[[/form/email/owner]]' ) );
+
+			return ( filter_var( $sender, FILTER_VALIDATE_EMAIL ) !== false ) ? $sender : '';
 		}
 
 		/**
@@ -3260,6 +3334,15 @@ namespace Nino {
 
 			$path 	= '/data/ratelimit.php';
 			$now 		= time();
+
+			// Lock, then drop the cache slot and re-read - an unlocked
+			// read-modify-write lets two parallel sends read the same counter
+			// and write back the same +1, so the cap is bypassed by simply
+			// firing requests concurrently, which is what a sending burst looks
+			// like anyway. Same shape as Auth::_registerFailedAttemp().
+			\Nino\Filesystem::lockFile( $appData, $path );
+			unset( $appData['./nino/filesystem/cache'][$path] );
+
 			$state 	= \Nino\Filesystem::getFileContent( $appData, $path, [] );
 
 			foreach( $state as $stateKey => $entry )
@@ -3270,7 +3353,7 @@ namespace Nino {
 			$entry['tries']	= (int) $entry['tries'] + 1;
 			$state[$key] 		= $entry;
 
-			\Nino\Filesystem::putFileContent( $appData, $path, $state );
+			\Nino\Filesystem::putFileContent( $appData, $path, $state, true );
 
 			return $entry['tries'] <= self::MAX_TRIES;
 		}
@@ -4168,6 +4251,14 @@ namespace Nino\Modules {
 			\Nino\Mail::send( $appData, $email, $subjectUser, $tpl_user, $emailOwner );
 
 			$request['/nino/http/response']['statusCode'] = 200;
+
+			// A submission whose mail was refused by the rate limit is not
+			// recorded: writing one entry per request regardless turns a
+			// throttled flood into unthrottled disk growth from an
+			// unauthenticated endpoint. A genuine mail() failure still records -
+			// there the inquiry did happen and losing it would be worse.
+			if( ( $appData['./nino/mail/ratelimited'] ?? false ) === true )
+				return;
 
 			// Stored escaped, same as before: _admin's submissions panel decodes
 			// these entities again on render (see _admin/assets/submissions.js,
