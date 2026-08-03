@@ -288,6 +288,27 @@ namespace Nino {
 		// its own rate limit.
 		private const string TRIES_PATH = '/data/auth-tries.php';
 
+		// Failed attempts are counted per account *and* per client ip. The
+		// account bucket on its own is a lockout weapon (five wrong guesses
+		// against a known mail address and its owner is out for the cooldown)
+		// and leaves guessing spread across many accounts unthrottled. The
+		// prefix keeps ip keys from colliding with a mail address.
+		private const string IP_KEY_PREFIX = 'ip:';
+
+		// The ip bucket trips at maxtries * this, not at maxtries: a shared
+		// exit ip (office nat, cgnat, a school) is one person mistyping their
+		// password away from locking out everyone behind it otherwise. The
+		// point of this bucket is to catch guessing spread across accounts,
+		// which needs far more attempts than one user's typos.
+		private const int IP_TRIES_FACTOR = 10;
+
+		// bcrypt hash of a random value nobody holds, verified against when
+		// the account doesn't exist or is disabled. Without it that path
+		// returns before password_verify() ever runs, so an unknown user
+		// answers measurably faster than a known one - and since only known
+		// accounts got a tries entry, the cooldown was an oracle too
+		private const string DUMMY_HASH = '$2y$12$.XrU56roB3Yw28vmlpzZN.I5lpI6kAPVytki6Mo1zm3w.WHYgeczq';
+
 		/**
 		 *	Init auth
 		 *
@@ -400,16 +421,35 @@ namespace Nino {
 		 */
 		public static function loginUser( array &$appData, string $username, string $pw ): array|false {
 
-			// Check user data
-			$user	= self::getUser( $appData, $username );
+			// Check user data - no client ip (cli, eg. the smoke tests) means no
+			// ip bucket rather than one shared '' bucket everything falls into
+			$user		= self::getUser( $appData, $username );
+			$ip			= \Nino\Http::getClientIp();
+			$ipKeys	= ( $ip !== '' ) ? [ self::IP_KEY_PREFIX. $ip ] : [];
 
-			// Check status / cooldown
-			if( $user === false || $user['status'] !== 2 || self::_getTries( $appData, $username ) < 0 - time() )
+			// Check cooldown - the ip bucket is checked regardless of whether
+			// the account exists, so guessing spread across many accounts hits
+			// a limit too
+			foreach( $ipKeys as $ipKey )
+				if( self::_inCooldown( $appData, $ipKey ) === true )
+					return false;
+
+			// Unknown or disabled account: verify against a hash that cannot
+			// match anyway, so this path costs the same as a wrong password
+			// instead of returning immediately, and count the attempt - both
+			// halves of what otherwise makes this an enumeration oracle
+			if( $user === false || $user['status'] !== 2 ) {
+				password_verify( $pw, self::DUMMY_HASH );
+				return self::_registerFailedAttemp( $appData, $ipKeys );
+			}
+
+			// Check account cooldown
+			if( self::_inCooldown( $appData, $username ) === true )
 				return false;
 
 			// Verify and login
 			if( password_verify( $pw, $user['pw'] ) === false )
-				return self::_registerFailedAttemp( $appData, $user );
+				return self::_registerFailedAttemp( $appData, array_merge( $ipKeys, [ $username ] ) );
 
 			// Rotate the session id + csrf token now that the session's identity
 			// is changing (session-fixation defense) - the status guard keeps
@@ -799,7 +839,22 @@ namespace Nino {
 
 			$state = \Nino\Filesystem::getFileContent( $appData, self::TRIES_PATH, [] );
 
-			return $state[$username] ?? 0;
+			return (int) ( $state[$username] ?? 0 );
+		}
+
+		/**
+		 *	Whether a bucket (account mail or IP_KEY_PREFIX.ip) is still
+		 *	cooling down, ie. holds a negative timestamp that lies in the
+		 *	future - see _registerFailedAttemp()'s encoding
+		 *
+		 *	@param		array 				&$appData			(reference) Array with current app data
+		 *	@param		string				$key					Bucket key
+		 *
+		 *	@return 	bool
+		 */
+		private static function _inCooldown( array &$appData, string $key ): bool {
+
+			return self::_getTries( $appData, $key ) < 0 - time();
 		}
 
 		/**
@@ -852,14 +907,16 @@ namespace Nino {
 		}
 
 		/**
-		 *	Register a failed login attempt
+		 *	Register one failed login attempt against every given bucket
+		 *	(account mail, client ip, or both) in a single read-modify-write,
+		 *	rather than one file rewrite per bucket
 		 *
 		 *	@param		array 				&$appData			(reference) Array with current app data
-		 *	@param		array 				$user					User data
+		 *	@param		array 				$keys					Bucket keys to count this attempt against
 		 *
 		 *	@return 	false
 		 */
-		private static function _registerFailedAttemp( array &$appData, array $user ): bool {
+		private static function _registerFailedAttemp( array &$appData, array $keys ): bool {
 
 			// Drop the cache entry, re-read, then lock and write with nolock -
 			// the exact same shape AppData::writeContentData() uses for
@@ -870,21 +927,40 @@ namespace Nino {
 			// overwrite each other's increment - exactly the case this file
 			// exists to catch.
 			unset( $appData['./nino/filesystem/cache'][self::TRIES_PATH] );
-			$state = \Nino\Filesystem::getFileContent( $appData, self::TRIES_PATH, [] );
-			$tries = $state[$user['mail']] ?? 0;
+			$state	= \Nino\Filesystem::getFileContent( $appData, self::TRIES_PATH, [] );
+			$now		= time();
 
-			if( $tries >= 0 )
-				$tries++;
-			else
-				$tries = 1;
+			// Drop buckets whose cooldown has already elapsed - with an ip
+			// bucket per attacking client this file would otherwise only ever
+			// grow. Same "clean up on the write we're doing anyway" idea as
+			// Mail::_hit() and loginUser()'s session pruning.
+			foreach( $state as $stateKey => $stateTries )
+				if( (int) $stateTries < 0 && 0 - (int) $stateTries <= $now )
+					unset( $state[$stateKey] );
 
-			// Check max tries
-			if( $tries >= $appData['/nino/auth/maxtries'] )
-				$tries = 0 - time() - $appData['/nino/auth/cooldown'];
+			foreach( $keys as $key ) {
+
+				$tries = (int) ( $state[$key] ?? 0 );
+
+				if( $tries >= 0 )
+					$tries++;
+				else
+					$tries = 1;
+
+				// Check max tries - see IP_TRIES_FACTOR for why the ip bucket
+				// gets a much longer leash than a single account does
+				$maxTries = ( str_starts_with( $key, self::IP_KEY_PREFIX ) === true )
+					? $appData['/nino/auth/maxtries'] * self::IP_TRIES_FACTOR
+					: $appData['/nino/auth/maxtries'];
+
+				if( $tries >= $maxTries )
+					$tries = 0 - $now - $appData['/nino/auth/cooldown'];
+
+				$state[$key] = $tries;
+			}
 
 			// Write data change - a dedicated file, not config.php, so this
 			// unauthenticated path never triggers a config.php rewrite
-			$state[$user['mail']] = $tries;
 			\Nino\Filesystem::lockFile( $appData, self::TRIES_PATH );
 			\Nino\Filesystem::putFileContent( $appData, self::TRIES_PATH, $state, true );
 
