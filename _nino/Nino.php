@@ -262,7 +262,15 @@ namespace Nino {
 			// window in which someone else's write lands between this call's
 			// read and its own write, which is the exact race the re-read is
 			// here to close
-			\Nino\Filesystem::lockFile( $appData, '/config.php' );
+			// A failed lock is a deployment problem (no /data/.locks, no free
+			// file handles), not contention - flock() blocks rather than failing
+			// when someone else holds it. Writing anyway would silently put back
+			// exactly the lost-update race the lock exists to prevent, so this
+			// path stops instead.
+			if( \Nino\Filesystem::lockFile( $appData, '/config.php' ) === false ) {
+				trigger_error( 'AppData::writeContentData(): could not lock config.php for writing - refusing to write unserialized.', E_USER_ERROR );
+				return;
+			}
 
 			// Invalidate the fingerprint rather than dropping the whole slot:
 			// the re-read below has to happen either way (a concurrent write
@@ -979,8 +987,11 @@ namespace Nino {
 
 			// lock -> invalidate -> read -> write, in that order: reading before
 			// locking leaves a window for exactly the concurrent write the lock
-			// is meant to exclude
-			\Nino\Filesystem::lockFile( $appData, self::TRIES_PATH );
+			// is meant to exclude. A lock that cannot be taken at all means the
+			// counter can't be maintained safely, so nothing is written.
+			if( \Nino\Filesystem::lockFile( $appData, self::TRIES_PATH ) === false )
+				return;
+
 			$appData['./nino/filesystem/cache'][self::TRIES_PATH]['fstat'] = [];
 
 			$state = \Nino\Filesystem::getFileContent( $appData, self::TRIES_PATH, [] );
@@ -1008,8 +1019,11 @@ namespace Nino {
 		 */
 		private static function _renameTries( array &$appData, string $oldUsername, string $newUsername ): void {
 
-			// Same lock -> invalidate -> read -> write order as _dropTries()
-			\Nino\Filesystem::lockFile( $appData, self::TRIES_PATH );
+			// Same lock -> invalidate -> read -> write order as _dropTries(),
+			// including giving up when the lock can't be taken
+			if( \Nino\Filesystem::lockFile( $appData, self::TRIES_PATH ) === false )
+				return;
+
 			$appData['./nino/filesystem/cache'][self::TRIES_PATH]['fstat'] = [];
 
 			$state = \Nino\Filesystem::getFileContent( $appData, self::TRIES_PATH, [] );
@@ -1043,7 +1057,13 @@ namespace Nino {
 			// brute-force script hammering the endpoint over several
 			// connections) read the same starting count and overwrite each
 			// other's increment - exactly what this file exists to catch.
-			\Nino\Filesystem::lockFile( $appData, self::TRIES_PATH );
+			// Without the lock two concurrent failures overwrite each other's
+			// increment, ie. the counter undercounts exactly when it matters -
+			// so a failed lock means this attempt is not recorded at all rather
+			// than recorded unreliably. The caller still gets false either way.
+			if( \Nino\Filesystem::lockFile( $appData, self::TRIES_PATH ) === false )
+				return false;
+
 			$appData['./nino/filesystem/cache'][self::TRIES_PATH]['fstat'] = [];
 
 			$state	= \Nino\Filesystem::getFileContent( $appData, self::TRIES_PATH, [] );
@@ -1850,13 +1870,12 @@ namespace Nino {
 			// Flush, reload and lock element file
 			$elementUri 	= self::getElementUriFromUri( $uri );
 			$typeUri			= self::getElementTypeFromUri( $uri );
-			$typeData			= \Nino\Elements::getElementFile( $appData, $typeUri );
+
+			// Lock first, then read under the lock - see _lockElementFile()
+			$typeData			= self::_lockElementFile( $appData, $typeUri );
 
 			if( $typeData === false )
-				return ! trigger_error( 'Element type \''. $typeUri. '\' does not exist.' );
-
-			// Lock file for writing
-			\Nino\Filesystem::lockFile( $appData, '/elements/'. $typeUri. '.php' );
+				return ! trigger_error( 'Element type \''. $typeUri. '\' does not exist or could not be locked for writing.' );
 
 			// Unset locale data
 			unset( $typeData[$locale][$elementUri] );
@@ -1902,6 +1921,36 @@ namespace Nino {
 		 *
 		 *	@return 	array | false
 		 */
+		/**
+		 *	Take the write lock on a type file and read it back fresh under
+		 *	that lock, for a read-modify-write sequence.
+		 *
+		 *	Reading before locking - which is what both write paths used to do -
+		 *	means the sequence can work from a copy that predates a parallel
+		 *	write, or from a cache slot filled earlier in the same request.
+		 *	Element files are the ones two people actually edit at the same
+		 *	time, so this matters more here than for config.php.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$typeUri			Uri of the element type to lock
+		 *
+		 *	@return 	array | false					Type data, or false if it doesn't exist or couldn't be locked
+		 */
+		static private function _lockElementFile( array &$appData, string $typeUri ): array|false {
+
+			$path = '/elements/'. $typeUri. '.php';
+
+			if( \Nino\Filesystem::lockFile( $appData, $path ) === false )
+				return false;
+
+			// Force the read below onto the disk, and drop the per-element cache
+			// so everything read from here on is post-lock state as well
+			$appData['./nino/filesystem/cache'][$path]['fstat'] = [];
+			unset( $appData['./nino/elements/cache'] );
+
+			return self::getElementFile( $appData, $typeUri );
+		}
+
 		private static function getElementFile( array &$appData, string $typeUri ): array|false {
 
 			// Check filecache
@@ -2039,13 +2088,12 @@ namespace Nino {
 
 			// Flush, reload and lock element file
 			$typeUri			= self::getElementTypeFromUri( $uri );
-			$typeData			= \Nino\Elements::getElementFile( $appData, $typeUri );
+
+			// Lock first, then read under the lock - see _lockElementFile()
+			$typeData			= self::_lockElementFile( $appData, $typeUri );
 
 			if( $typeData === false )
-				return ! trigger_error( 'Element type \''. $typeUri. '\' does not exist.' );
-
-			// Lock file for writing
-			\Nino\Filesystem::lockFile( $appData, '/elements/'. $typeUri. '.php' );
+				return ! trigger_error( 'Element type \''. $typeUri. '\' does not exist or could not be locked for writing.' );
 
 			// Run callbacks
 			$callbacks	= [];
@@ -3444,7 +3492,12 @@ namespace Nino {
 			// and write back the same +1, so the cap is bypassed by simply
 			// firing requests concurrently, which is what a sending burst looks
 			// like anyway. Same shape as Auth::_registerFailedAttemp().
-			\Nino\Filesystem::lockFile( $appData, $path );
+			// No lock, no reliable counter - and an unreliable send cap is worse
+			// than a closed one here, so the send is refused rather than let
+			// through unaccounted
+			if( \Nino\Filesystem::lockFile( $appData, $path ) === false )
+				return false;
+
 			$appData['./nino/filesystem/cache'][$path]['fstat'] = [];
 
 			$state 	= \Nino\Filesystem::getFileContent( $appData, $path, [] );

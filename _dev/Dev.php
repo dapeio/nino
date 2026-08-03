@@ -481,7 +481,17 @@ namespace Nino\Dev {
 				return;
 			}
 
-			\Nino\Filesystem::lockFile( $appData, '/elements/'. $typeUri. '.php' );
+			// Lock, then invalidate the cached fingerprint so the read below sees
+			// the state this write is actually based on - a slot filled earlier
+			// in the request would otherwise hide a parallel editor's change.
+			// A lock that can't be taken is a 500, not something to write past.
+			if( \Nino\Filesystem::lockFile( $appData, '/elements/'. $typeUri. '.php' ) === false ) {
+				$request['/nino/http/response']['statusCode'] = 500;
+				$request['/nino/http/response']['body'] = [ 'error' => 'could not lock the type file for writing' ];
+				return;
+			}
+
+			$appData['./nino/filesystem/cache']['/elements/'. $typeUri. '.php']['fstat'] = [];
 			$typeData = \Nino\Filesystem::getFileContent( $appData, '/elements/'. $typeUri. '.php', false );
 
 			if( $typeData === false ) {
