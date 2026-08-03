@@ -1976,7 +1976,13 @@ namespace Nino\Admin {
 	class Dashboard {
 
 		/**
-		 *	Gather the overview numbers
+		 *	Gather the overview numbers. Being reachable by any authenticated
+		 *	admin (Admin::guard(), not guardPerm()) only covers the panel
+		 *	itself - elements/lastBackup are basic operational info nobody's
+		 *	gated behind a specific permission, but submissions/newsletter/
+		 *	recentActivity each surface another module's own data and are
+		 *	included only for an admin who actually holds that module's
+		 *	permission, same as opening its panel directly would require
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
@@ -1988,13 +1994,21 @@ namespace Nino\Admin {
 			if( Admin::guard( $appData, $request ) === false )
 				return;
 
-			$request['/nino/http/response']['body'] = [
-				'submissions' 		=> Submissions::count( $appData ),
-				'newsletter' 			=> Newsletter::count( $appData ),
-				'elements' 				=> Elements::typeCounts( $appData ),
-				'lastBackup' 			=> Backup::lastDate( $appData ),
-				'recentActivity' 	=> Logs::recentLines( $appData, 8 ),
+			$body = [
+				'elements' 		=> Elements::typeCounts( $appData ),
+				'lastBackup' 	=> Backup::lastDate( $appData ),
 			];
+
+			if( \Nino\Auth::checkPermission( $appData, Submissions::VIEW_PERM ) === true )
+				$body['submissions'] = Submissions::count( $appData );
+
+			if( \Nino\Auth::checkPermission( $appData, Newsletter::MANAGE_PERM ) === true )
+				$body['newsletter'] = Newsletter::count( $appData );
+
+			if( \Nino\Auth::checkPermission( $appData, Logs::VIEW_PERM ) === true )
+				$body['recentActivity'] = Logs::recentLines( $appData, 8 );
+
+			$request['/nino/http/response']['body'] = $body;
 		}
 	}
 }

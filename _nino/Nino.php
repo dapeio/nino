@@ -1093,23 +1093,12 @@ namespace Nino {
 			if( is_callable( $callback ) === false )
 				return;
 
-			$type = 'else';
-			if( is_string( $callback ) === true && function_exists( $callback ) === true )
-				$type = 'function';
-			else if( is_array( $callback ) && is_object( $callback[0] ) === true && method_exists( $callback[0], $callback[1] ) )
-				$type = 'objectMethod';
-			else if( is_array( $callback ) && is_string( $callback[0] ) && class_exists( $callback[0] ) && method_exists( $callback[0], $callback[1] ) )
-				$type = 'classMethod';
-
 			$appData['./nino/callbacks'][$name] = $appData['./nino/callbacks'][$name] ?? [[],[],[],[],[],[],[],[],[],[]];
 
 			if( isset( $appData['./nino/callbacks'][$name][$prio] ) === false )
 				$prio = 5;
 
-			$appData['./nino/callbacks'][$name][$prio][] = [
-				'type'			=> $type,
-				'callback'	=> $callback,
-			];
+			$appData['./nino/callbacks'][$name][$prio][] = $callback;
 		}
 
 		/**
@@ -1127,19 +1116,13 @@ namespace Nino {
 			if( isset( $appData['./nino/callbacks'][$name] ) === false )
 				return $args;
 
-			// Do callbacks
-			foreach( $appData['./nino/callbacks'][$name] AS $prioArray ) {
-				foreach( $prioArray as $callback ) {
-					if( $callback['type'] === 'objectMethod' )
-						$args = $callback['callback'][0]->$callback['callback'][1]( $appData, $args ) ?? $args;
-					else if( $callback['type'] === 'classMethod' )
-						$args = $callback['callback'][0]::{$callback['callback'][1]}( $appData, $args ) ?? $args;
-					else if( $callback['type'] === 'function' )
-						$args = $callback['callback']( $appData, $args ) ?? $args;
-					else
-						$args = call_user_func_array( $callback['callback'], [ &$appData, &$args ] ) ?? $args;
-				}
-			}
+			// call_user_func_array() handles every callable shape
+			// registerCallback() accepts (function name, [object, method],
+			// [class, method], closure) uniformly - no per-shape branching
+			// needed
+			foreach( $appData['./nino/callbacks'][$name] AS $prioArray )
+				foreach( $prioArray as $callback )
+					$args = call_user_func_array( $callback, [ &$appData, &$args ] ) ?? $args;
 
 			return $args;
 		}
@@ -2877,20 +2860,12 @@ namespace Nino {
 		 */
 		public static function output( array &$appData, array &$request ): never {
 
-			// Catch json output
-			if( is_string( $request['/nino/http/response']['body'] ) === false ) {
-				$request['/nino/http/response']['body'] = json_encode( $request['/nino/http/response']['body'], JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT );
-				$request['/nino/http/response']['header']['Content-Type'] = 'application/json; charset=utf-8';
-			}
-
-			// Add default response keys
-			$request['/nino/http/response'] = array_merge( self::$_defaultResponse, $request['/nino/http/response'] );
-			$request['/nino/http/response']['header'] = array_merge( self::$_defaultResponse['header'], self::filterHeaderFields( $request['/nino/http/response']['header'] ) );
+			self::_finalizeResponse( $request );
 
 			// Output header
 			if( headers_sent() === false )
 				foreach( $request['/nino/http/response']['header'] AS $headerKey => $headerValue )
-					header( $headerKey. ':'. $headerValue );
+					header( $headerKey. ': '. $headerValue );
 
 			// Send status code
 			http_response_code( $request['/nino/http/response']['statusCode'] );
@@ -2904,6 +2879,35 @@ namespace Nino {
 				echo $request['/nino/http/response']['body'];
 
 			exit;
+		}
+
+		/**
+		 *	json-encode a non-string body, then merge in the default status/
+		 *	header/etc. keys - the part of output() that decides what would
+		 *	actually be sent, split out since output() itself exit()s and so
+		 *	can't be called from a test.
+		 *
+		 *	Not run through filterHeaderFields(): that whitelist is built for
+		 *	the request side (Accept, Cookie, ...) and silently drops
+		 *	response-only headers a module has every right to set (Set-Cookie,
+		 *	Content-Disposition, ETag, ...). Response header values are
+		 *	framework/module-computed, not a direct echo of user input, and
+		 *	header() itself already refuses to send a value containing a CR/LF.
+		 *
+		 *	@param		array					&$request			(reference) Current request
+		 *
+		 *	@return		void
+		 */
+		private static function _finalizeResponse( array &$request ): void {
+
+			// Catch json output
+			if( is_string( $request['/nino/http/response']['body'] ) === false ) {
+				$request['/nino/http/response']['body'] = json_encode( $request['/nino/http/response']['body'], JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT );
+				$request['/nino/http/response']['header']['Content-Type'] = 'application/json; charset=utf-8';
+			}
+
+			$request['/nino/http/response'] = array_merge( self::$_defaultResponse, $request['/nino/http/response'] );
+			$request['/nino/http/response']['header'] = array_merge( self::$_defaultResponse['header'], $request['/nino/http/response']['header'] );
 		}
 
 		/**

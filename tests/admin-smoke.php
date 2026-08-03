@@ -633,11 +633,17 @@ check( 'a user with only Elements::MANAGE_PERM can reach elements/types', $statu
 [ $status ] = callAdminPost( $appData, 'text/keys' );
 check( 'that same user still can\'t reach text/keys - perms don\'t leak across modules', $status === 403 );
 
-// The dashboard summary stays reachable to any logged-in admin regardless of
-// perms (see Admin\Dashboard::apiSummary - it's a read-only overview, not
-// gated per-module)
-[ $status ] = callAdminPost( $appData, 'dashboard/summary' );
+// The dashboard summary panel itself stays reachable to any logged-in admin
+// regardless of perms, but each module-specific field within it is only
+// included for an admin who actually holds that module's own permission
+// (see Admin\Dashboard::apiSummary) - contenteditor@example.com holds only
+// Elements::MANAGE_PERM here
+[ $status, $body ] = callAdminPost( $appData, 'dashboard/summary' );
 check( 'dashboard/summary needs no specific perm, just to be logged in', $status === 200 );
+check( 'elements/lastBackup are not module-specific and stay in the body regardless', array_key_exists( 'elements', $body ) === true && array_key_exists( 'lastBackup', $body ) === true );
+check( 'submissions is withheld without Submissions::VIEW_PERM', array_key_exists( 'submissions', $body ) === false );
+check( 'newsletter is withheld without Newsletter::MANAGE_PERM', array_key_exists( 'newsletter', $body ) === false );
+check( 'recentActivity is withheld without Logs::VIEW_PERM - the exact leak the field-level gate closes', array_key_exists( 'recentActivity', $body ) === false );
 
 \Nino\Auth::loginUser( $appData, 'manager@example.com', 'manager password' );
 

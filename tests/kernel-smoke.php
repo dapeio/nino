@@ -408,6 +408,35 @@ check( '/nino/elements<type>/update fires on updateElement, not again on insert'
 echo "\n";
 
 
+// --- Callbacks::doCallbacks - every callable shape registerCallback() accepts ---------------------------
+
+echo "Callbacks::doCallbacks runs every registered callable shape\n";
+
+class KernelSmokeCallbackTarget {
+	public array $seen = [];
+	public function instanceMethod( array &$appData, mixed $args ): mixed { $this->seen[] = $args; return $args; }
+	public static function staticMethod( array &$appData, mixed $args ): mixed { return ( is_array( $args ) ? $args : [] ) + [ 'static' => true ]; }
+}
+function kernelSmokeCallbackFunction( array &$appData, mixed $args ): mixed { return ( is_array( $args ) ? $args : [] ) + [ 'function' => true ]; }
+
+$callbackTarget = new KernelSmokeCallbackTarget();
+
+\Nino\Callbacks::registerCallback( $appData, 'test/callbackshapes', [ $callbackTarget, 'instanceMethod' ] );
+\Nino\Callbacks::registerCallback( $appData, 'test/callbackshapes', [ KernelSmokeCallbackTarget::class, 'staticMethod' ] );
+\Nino\Callbacks::registerCallback( $appData, 'test/callbackshapes', 'kernelSmokeCallbackFunction' );
+\Nino\Callbacks::registerCallback( $appData, 'test/callbackshapes', function( array &$appData, mixed $args ): mixed { return ( is_array( $args ) ? $args : [] ) + [ 'closure' => true ]; } );
+
+$callbackArgs = [ 'start' => true ];
+$callbackResult = \Nino\Callbacks::doCallbacks( $appData, 'test/callbackshapes', $callbackArgs );
+
+check( 'an [object, method] callback actually ran, not just registered', count( $callbackTarget->seen ) === 1 );
+check( 'a [class, method] static callback ran', ( $callbackResult['static'] ?? false ) === true );
+check( 'a plain function-name callback ran', ( $callbackResult['function'] ?? false ) === true );
+check( 'a closure callback ran', ( $callbackResult['closure'] ?? false ) === true );
+
+echo "\n";
+
+
 // --- AppData::writeContentData concurrency ------------------------------------------------------------
 
 echo "AppData::writeContentData doesn't clobber a concurrent write to a different key\n";
@@ -802,7 +831,23 @@ $pickerRedirect = fakeRequest( $appData, '/legal?/_nino/localepicker/current=de_
 check( 'the localepicker redirects with a 302 status code too', $pickerRedirect['/nino/http/response']['statusCode'] === 302 );
 check( 'and its Location points at the locale variant of the page', ( $pickerRedirect['/nino/http/response']['header']['Location'] ?? '' ) === '/rechtliches' );
 
-check( 'Location survives the response header filter', array_key_exists( 'Location', \Nino\Http::filterHeaderFields( [ 'Location' => '/rechtliches' ] ) ) === true );
+// Http::output() itself exit()s, so the header-finalizing part it delegates
+// to is exercised directly via Reflection instead (same approach as
+// Mail::_hit above). invokeArgs() with an array of references - plain
+// invoke() can't pass $request by reference, which would silently run
+// against a copy and never show this test its own mutations
+$finalizeResponse = new ReflectionMethod( '\Nino\Http', '_finalizeResponse' );
+$finalizeResponse->setAccessible( true );
+
+$cookieRequest = [ '/nino/http/response' => [ 'statusCode' => 200, 'header' => [ 'Set-Cookie' => 'sid=abc123; HttpOnly' ], 'body' => '' ] ];
+$finalizeResponse->invokeArgs( null, [ &$cookieRequest ] );
+check( 'a response header outside the request-side whitelist (Set-Cookie) is not dropped', ( $cookieRequest['/nino/http/response']['header']['Set-Cookie'] ?? null ) === 'sid=abc123; HttpOnly' );
+
+$downloadRequest = [ '/nino/http/response' => [ 'statusCode' => 200, 'header' => [ 'Content-Disposition' => 'attachment; filename="export.json"' ], 'body' => '' ] ];
+$finalizeResponse->invokeArgs( null, [ &$downloadRequest ] );
+check( 'another whitelist-only-on-the-request-side header (Content-Disposition) survives too', ( $downloadRequest['/nino/http/response']['header']['Content-Disposition'] ?? null ) === 'attachment; filename="export.json"' );
+
+check( 'Location (on the request-side whitelist too) still survives', array_key_exists( 'Location', \Nino\Http::filterHeaderFields( [ 'Location' => '/rechtliches' ] ) ) === true );
 
 check( 'a bare [assets] shortcode without argument renders nothing instead of erroring', \Nino\Modules\Assets::doShortcode( $appData, [] ) === '' );
 

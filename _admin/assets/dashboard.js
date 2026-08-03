@@ -87,7 +87,7 @@
 		 *	Render the whole panel: a row of stat tiles, an element-per-type
 		 *	breakdown, then recent activity
 		 *
-		 *	@param		{Object}	data					{ submissions, newsletter, elements, lastBackup, recentActivity }
+		 *	@param		{Object}	data					{ elements, lastBackup, submissions?, newsletter?, recentActivity? }
 		 *
 		 *	@return		void
 		 */
@@ -98,13 +98,20 @@
 
 			const tiles = dc.createElement('div');
 			tiles.id = 'admin-dashboard-tiles';
-			tiles.appendChild( Nino.admin.dashboard._tile( 'submissions', String( data.submissions ), 'Anfragen' ) );
-			tiles.appendChild( Nino.admin.dashboard._tile( 'newsletter', String( data.newsletter ), 'Newsletter-Abonnenten' ) );
+			// submissions/newsletter/recentActivity are only in the response
+			// at all if this admin holds the matching permission (see
+			// Dashboard::apiSummary()) - omitted, not just empty, so each is
+			// skipped here rather than rendered as "undefined"
+			if( data.submissions !== undefined )
+				tiles.appendChild( Nino.admin.dashboard._tile( 'submissions', String( data.submissions ), 'Anfragen' ) );
+			if( data.newsletter !== undefined )
+				tiles.appendChild( Nino.admin.dashboard._tile( 'newsletter', String( data.newsletter ), 'Newsletter-Abonnenten' ) );
 			tiles.appendChild( Nino.admin.dashboard._tile( 'logs', data.lastBackup || '–', 'Letztes Backup' ) );
 			wrap.appendChild( tiles );
 
 			wrap.appendChild( Nino.admin.dashboard._elementsSection( data.elements ) );
-			wrap.appendChild( Nino.admin.dashboard._activitySection( data.recentActivity ) );
+			if( data.recentActivity !== undefined )
+				wrap.appendChild( Nino.admin.dashboard._activitySection( data.recentActivity ) );
 		},
 
 		/**
