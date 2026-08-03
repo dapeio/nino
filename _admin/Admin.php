@@ -920,16 +920,14 @@ namespace Nino\Admin {
 
 		public const string MANAGE_PERM = '/_admin/text/manage';
 
-		private const int MIN_MAXLENGTH 		= 150;
-		private const int MAX_MAXLENGTH 		= 2000;
-		private const int MAXLENGTH_BUFFER = 150;
-		private const int HARD_MAXLENGTH 	= 20000;
-
 		/**
 		 *	List every editable key with its current value(s), whether it's a
 		 *	global (locale-independent) or per-locale key, whether it currently
 		 *	holds markup (so the editor offers the html editor for it) and a
-		 *	maxlength derived from the longest current value
+		 *	maxlength derived from the longest current value. Blacklisted keys
+		 *	(technical values, not content) are hidden entirely - unlike _dev's
+		 *	own text editor, this one only ever edits existing key values,
+		 *	never sees the blacklist itself.
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
@@ -942,24 +940,15 @@ namespace Nino\Admin {
 				return;
 
 			$request['/nino/http/response']['body'] = [
-				'keys' 					=> self::_entries( $appData ),
+				'keys' 					=> \Nino\Text::entries( $appData, false ),
 				'locales' 			=> \Nino\Locales::getAvailableLocales( $appData ),
 				'selectedLocale' => Admin::sessionLocale( $appData ),
 			];
 		}
 
 		/**
-		 *	Save several keys' values in one request (a whole category's worth
-		 *	of fields, all posted together). Batched per target file - a locale
-		 *	file gets one read-modify-write cycle no matter how many of its keys
-		 *	changed, instead of one per key. That's not just an optimization: two
-		 *	separate saves hitting the same file concurrently would race (each
-		 *	reads the file before the other's write lands, so one update gets
-		 *	silently lost) - batching removes the race entirely by construction.
-		 *
-		 *	A per-item failure (unknown/blacklisted key, invalid locale) doesn't
-		 *	fail the whole request - it's reported per key in the response so
-		 *	the other, valid items still get saved.
+		 *	Save several keys' values in one request (a whole category's
+		 *	worth of fields, all posted together) - see \Nino\Text::saveBatch()
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
@@ -974,138 +963,7 @@ namespace Nino\Admin {
 			$data 	= Admin::postData();
 			$items 	= is_array( $data['items'] ?? null ) ? $data['items'] : [];
 
-			$results 		= [];
-			$fileChanges = [];
-
-			foreach( $items as $item ) {
-
-				$key 		= (string) ( $item['key'] ?? '' );
-				$locale = (string) ( $item['locale'] ?? '' );
-				$value 	= (string) ( $item['value'] ?? '' );
-
-				$entry = self::_entry( $appData, $key );
-
-				if( $entry === null ) {
-					$results[$key] = [ 'ok' => false, 'error' => 'unknown key' ];
-					continue;
-				}
-
-				if( $entry['global'] === false && \Nino\Locales::verifyLocale( $appData, $locale ) === false ) {
-					$results[$key] = [ 'ok' => false, 'error' => 'invalid locale' ];
-					continue;
-				}
-
-				$value = substr( $value, 0, self::HARD_MAXLENGTH );
-				$value = ( $entry['html'] === true ) ? \Nino\Html::sanitizeHtml( $value ) : strip_tags( $value );
-
-				$file = ( $entry['global'] === true ) ? '/text/global.php' : '/text/'. $locale. '.php';
-
-				$fileChanges[$file]['[['. $key. ']]'] = $value;
-
-				$results[$key] = [ 'ok' => true, 'value' => $value ];
-			}
-
-			// One lock -> re-read -> write per target file, not per key - a
-			// locale file gets every one of this batch's changes merged into
-			// a fresh read under its own lock, so a concurrent save touching
-			// the same file can't land between two of this save's writes and
-			// get silently overwritten
-			foreach( $fileChanges as $file => $changes )
-				\Nino\Filesystem::mutate( $appData, $file, function( array $content ) use ( $changes ): array {
-					return array_merge( $content, $changes );
-				} );
-
-			$request['/nino/http/response']['body'] = [ 'results' => $results ];
-		}
-
-		/**
-		 *	Build the full list of editable key entries
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *
-		 *	@return 	array										List of [ key, global, html, maxlength, values ]
-		 */
-		private static function _entries( array &$appData ): array {
-
-			$global 	= \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] );
-			$locales 	= \Nino\Locales::getAvailableLocales( $appData );
-
-			$localeData = [];
-			foreach( $locales as $locale )
-				$localeData[$locale] = \Nino\Filesystem::getFileContent( $appData, '/text/'. $locale. '.php', [] );
-
-			$blacklist = self::_blacklist( $appData );
-
-			$bracketKeys = array_keys( $global );
-			foreach( $localeData as $data )
-				$bracketKeys = array_merge( $bracketKeys, array_keys( $data ) );
-			$bracketKeys = array_unique( $bracketKeys );
-
-			$entries = [];
-
-			foreach( $bracketKeys as $bracketKey ) {
-
-				$key = trim( $bracketKey, '[]' );
-
-				if( isset( $blacklist[$key] ) === true )
-					continue;
-
-				$isGlobal = array_key_exists( $bracketKey, $global );
-				$values 	= $isGlobal
-					? [ '*' => $global[$bracketKey] ]
-					: array_map( fn( array $data ) => $data[$bracketKey] ?? null, $localeData );
-
-				$longest 	= 0;
-				$html 		= false;
-
-				foreach( $values as $value ) {
-					if( $value === null )
-						continue;
-					$longest 	= max( $longest, strlen( $value ) );
-					$html 		= $html || \Nino\Html::containsHtml( $value );
-				}
-
-				$entries[] = [
-					'key' 				=> $key,
-					'global' 			=> $isGlobal,
-					'html' 				=> $html,
-					'maxlength' 	=> min( self::MAX_MAXLENGTH, max( self::MIN_MAXLENGTH, $longest + self::MAXLENGTH_BUFFER ) ),
-					'values' 			=> $values,
-				];
-			}
-
-			usort( $entries, fn( array $a, array $b ) => strcmp( $a['key'], $b['key'] ) );
-
-			return $entries;
-		}
-
-		/**
-		 *	Find one key's entry (see _entries())
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		string		$key					Bare key path (eg. "/home/welcome/h2")
-		 *
-		 *	@return 	array | null						The entry, or null if unknown/blacklisted
-		 */
-		private static function _entry( array &$appData, string $key ): array|null {
-
-			foreach( self::_entries( $appData ) as $entry )
-				if( $entry['key'] === $key )
-					return $entry;
-
-			return null;
-		}
-
-		/**
-		 *	Read the developer-maintained list of keys hidden from this editor
-		 *	(technical values, not content - uris, colors, typography, ...)
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *
-		 *	@return 	array										Set of blacklisted keys (key => true)
-		 */
-		private static function _blacklist( array &$appData ): array {
-			return array_flip( \Nino\Filesystem::getFileContent( $appData, '/text/blacklist.php', [] ) );
+			$request['/nino/http/response']['body'] = [ 'results' => \Nino\Text::saveBatch( $appData, $items, false ) ];
 		}
 
 		/**
@@ -1176,7 +1034,7 @@ namespace Nino\Admin {
 				return;
 			}
 
-			$blacklist 	= self::_blacklist( $appData );
+			$blacklist 	= \Nino\Text::blacklist( $appData );
 			$imported 	= 0;
 			$skipped 		= 0;
 
@@ -1709,7 +1567,7 @@ namespace Nino\Admin {
 			$tmpTar = tempnam( sys_get_temp_dir(), 'ninobackup' ). '.tar';
 
 			$phar = new \PharData( $tmpTar );
-			foreach( self::_criticalFiles( $appData ) as $absolute => $archiveName )
+			foreach( \Nino\Filesystem::backupManifest( $appData ) as $absolute => $archiveName )
 				$phar->addFromString( $archiveName, file_get_contents( $absolute ) );
 			$phar->compress( \Phar::GZ );
 			unset( $phar );
@@ -1724,49 +1582,6 @@ namespace Nino\Admin {
 			$cipher = openssl_encrypt( $gz, 'aes-256-gcm', $key, OPENSSL_RAW_DATA, $iv, $tag );
 
 			file_put_contents( $path, self::STUB_PREFIX. base64_encode( $iv. $tag. $cipher ). self::STUB_SUFFIX );
-		}
-
-		/**
-		 *	Every file the admin panel can write to at runtime - deliberately
-		 *	not developer code (_nino/, templates, _admin/ itself, ...),
-		 *	that's already versioned in git and would just bloat every backup
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *
-		 *	@return 	array										Absolute source path => name inside the archive
-		 */
-		private static function _criticalFiles( array &$appData ): array {
-
-			// Defensive: this runs right after _bootstrap() wrote config.php,
-			// so make sure the is_file() checks below see that write rather
-			// than a cached pre-write stat
-			clearstatcache();
-
-			$root 			= \Nino\Filesystem::getPath( $appData );
-			$configPath	= \Nino\Filesystem::getConfigPath( $appData );
-			$files 			= [];
-
-			// config.php resolves against configPath, not root - see
-			// \Nino\Filesystem::getConfigPath()'s docblock. Every other file
-			// here is always inside the regular project root.
-			if( is_file( $configPath. '/config.php' ) === true )
-				$files[$configPath. '/config.php'] = 'config.php';
-
-			if( is_file( $root. '/text/global.php' ) === true )
-				$files[$root. '/text/global.php'] = 'text/global.php';
-
-			foreach( \Nino\Locales::getAvailableLocales( $appData ) as $locale )
-				if( is_file( $root. '/text/'. $locale. '.php' ) === true )
-					$files[$root. '/text/'. $locale. '.php'] = 'text/'. $locale. '.php';
-
-			foreach( glob( $root. '/elements/*.php' ) ?: [] as $file )
-				$files[$file] = 'elements/'. basename( $file );
-
-			foreach( glob( $root. '/images/*' ) ?: [] as $file )
-				if( is_file( $file ) === true )
-					$files[$file] = 'images/'. basename( $file );
-
-			return $files;
 		}
 
 		/**

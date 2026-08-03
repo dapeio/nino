@@ -903,9 +903,11 @@ namespace Nino\Dev {
 		/**
 		 *	Archive the *current* on-disk state before overwriting it, same
 		 *	tar+gzip+encrypt shape as Backup::_create() (duplicated, not
-		 *	called into - see this class' own docblock). Named distinctly
-		 *	from a dated backup so it's never mistaken for one and never
-		 *	collides with/gets pruned by Backup's own retention sweep
+		 *	called into - see this class' own docblock; the file manifest
+		 *	itself is shared via Filesystem::backupManifest(), which carries
+		 *	no such coupling). Named distinctly from a dated backup so it's
+		 *	never mistaken for one and never collides with/gets pruned by
+		 *	Backup's own retention sweep
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		string		$dir					Absolute path to the backup directory
@@ -915,34 +917,10 @@ namespace Nino\Dev {
 		 */
 		private static function _safetySnapshot( array &$appData, string $dir, string $key ): void {
 
-			$root 			= \Nino\Filesystem::getPath( $appData );
-			$configPath	= \Nino\Filesystem::getConfigPath( $appData );
-			$files 			= [];
-
-			// config.php resolves against configPath, not root - see
-			// \Nino\Filesystem::getConfigPath()'s docblock. Every other file
-			// here is always inside the regular project root.
-			if( is_file( $configPath. '/config.php' ) === true )
-				$files[$configPath. '/config.php'] = 'config.php';
-
-			if( is_file( $root. '/text/global.php' ) === true )
-				$files[$root. '/text/global.php'] = 'text/global.php';
-
-			foreach( \Nino\Locales::getAvailableLocales( $appData ) as $locale )
-				if( is_file( $root. '/text/'. $locale. '.php' ) === true )
-					$files[$root. '/text/'. $locale. '.php'] = 'text/'. $locale. '.php';
-
-			foreach( glob( $root. '/elements/*.php' ) ?: [] as $file )
-				$files[$file] = 'elements/'. basename( $file );
-
-			foreach( glob( $root. '/images/*' ) ?: [] as $file )
-				if( is_file( $file ) === true )
-					$files[$file] = 'images/'. basename( $file );
-
 			$tmpTar = tempnam( sys_get_temp_dir(), 'ninosnapshot' ). '.tar';
 			$phar 	= new \PharData( $tmpTar );
 
-			foreach( $files as $absolute => $archiveName )
+			foreach( \Nino\Filesystem::backupManifest( $appData ) as $absolute => $archiveName )
 				$phar->addFromString( $archiveName, file_get_contents( $absolute ) );
 
 			$phar->compress( \Phar::GZ );
@@ -1648,11 +1626,6 @@ namespace Nino\Dev {
 	 */
 	class Text {
 
-		private const int MIN_MAXLENGTH 		= 150;
-		private const int MAX_MAXLENGTH 		= 2000;
-		private const int MAXLENGTH_BUFFER = 150;
-		private const int HARD_MAXLENGTH 	= 20000;
-
 		/**
 		 *	This module's action map, merged into Dev::handlePost()'s dispatch
 		 *
@@ -1692,67 +1665,9 @@ namespace Nino\Dev {
 		}
 
 		/**
-		 *	Every known key across global.php + every locale file, plus
-		 *	whether it's currently blacklisted (unlike _admin's own
-		 *	_entries(), blacklisted keys are NOT filtered out here - this is
-		 *	exactly where you'd come to un-blacklist one)
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *
-		 *	@return 	array
-		 */
-		private static function _entries( array &$appData ): array {
-
-			$global 	= \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] );
-			$locales 	= \Nino\Locales::getAvailableLocales( $appData );
-
-			$localeData = [];
-			foreach( $locales as $locale )
-				$localeData[$locale] = \Nino\Filesystem::getFileContent( $appData, '/text/'. $locale. '.php', [] );
-
-			$blacklist = array_flip( \Nino\Filesystem::getFileContent( $appData, '/text/blacklist.php', [] ) );
-
-			$bracketKeys = array_keys( $global );
-			foreach( $localeData as $data )
-				$bracketKeys = array_merge( $bracketKeys, array_keys( $data ) );
-			$bracketKeys = array_unique( $bracketKeys );
-
-			$entries = [];
-
-			foreach( $bracketKeys as $bracketKey ) {
-
-				$key 			= trim( $bracketKey, '[]' );
-				$isGlobal = array_key_exists( $bracketKey, $global );
-
-				$values = $isGlobal
-					? [ '*' => $global[$bracketKey] ]
-					: array_map( fn( array $data ) => $data[$bracketKey] ?? '', $localeData );
-
-				$longest 	= 0;
-				$html 		= false;
-
-				foreach( $values as $value ) {
-					$longest 	= max( $longest, strlen( $value ) );
-					$html 		= $html || \Nino\Html::containsHtml( $value );
-				}
-
-				$entries[] = [
-					'key' 					=> $key,
-					'global' 				=> $isGlobal,
-					'blacklisted' 	=> isset( $blacklist[$key] ) === true,
-					'html' 					=> $html,
-					'maxlength' 		=> min( self::MAX_MAXLENGTH, max( self::MIN_MAXLENGTH, $longest + self::MAXLENGTH_BUFFER ) ),
-					'values' 				=> $values,
-				];
-			}
-
-			usort( $entries, fn( array $a, array $b ) => strcmp( $a['key'], $b['key'] ) );
-
-			return $entries;
-		}
-
-		/**
-		 *	List every known text key (see _entries())
+		 *	List every known text key, blacklisted or not (unlike _admin's
+		 *	own panel, this is exactly where you'd come to un-blacklist one)
+		 *	- see \Nino\Text::entries()
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
@@ -1765,7 +1680,7 @@ namespace Nino\Dev {
 				return;
 
 			$request['/nino/http/response']['body'] = [
-				'keys' 		=> self::_entries( $appData ),
+				'keys' 		=> \Nino\Text::entries( $appData ),
 				'locales' => \Nino\Locales::getAvailableLocales( $appData ),
 			];
 		}
@@ -1796,12 +1711,11 @@ namespace Nino\Dev {
 				return;
 			}
 
-			foreach( self::_entries( $appData ) as $entry )
-				if( $entry['key'] === $key ) {
-					$request['/nino/http/response']['statusCode'] = 409;
-					$request['/nino/http/response']['body'] = [ 'error' => 'key already exists' ];
-					return;
-				}
+			if( \Nino\Text::entry( $appData, $key ) !== null ) {
+				$request['/nino/http/response']['statusCode'] = 409;
+				$request['/nino/http/response']['body'] = [ 'error' => 'key already exists' ];
+				return;
+			}
 
 			$bracketKey = '[['. $key. ']]';
 
@@ -1843,10 +1757,7 @@ namespace Nino\Dev {
 			$isGlobal = ( $data['global'] ?? false ) === true;
 			$blacklisted = ( $data['blacklisted'] ?? false ) === true;
 
-			$entry = null;
-			foreach( self::_entries( $appData ) as $candidate )
-				if( $candidate['key'] === $key )
-					$entry = $candidate;
+			$entry = \Nino\Text::entry( $appData, $key );
 
 			if( $entry === null ) {
 				$request['/nino/http/response']['statusCode'] = 404;
@@ -1857,17 +1768,15 @@ namespace Nino\Dev {
 			if( $entry['global'] !== $isGlobal )
 				self::_convertShape( $appData, $key, $entry, $isGlobal );
 
-			self::_setBlacklisted( $appData, $key, $blacklisted );
+			\Nino\Text::setBlacklisted( $appData, $key, $blacklisted );
 
 			$request['/nino/http/response']['body'] = [ 'ok' => true ];
 		}
 
 		/**
-		 *	Save several keys' values in one request - same batched-per-file
-		 *	shape as _admin's Text::apiSaveBatch(), reusing the same
-		 *	sanitizeHtml()/strip_tags() rule via \Nino\Html. Unlike _admin,
-		 *	a blacklisted key is still a valid save target here - blacklist
-		 *	only hides a key from _admin's Text panel, not from _dev's.
+		 *	Save several keys' values in one request - see \Nino\Text::saveBatch().
+		 *	Unlike _admin, a blacklisted key is still a valid save target here -
+		 *	blacklist only hides a key from _admin's Text panel, not from _dev's.
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
@@ -1882,50 +1791,7 @@ namespace Nino\Dev {
 			$data 	= \Nino\Dev\Dev::postData();
 			$items 	= is_array( $data['items'] ?? null ) ? $data['items'] : [];
 
-			$entries = self::_entries( $appData );
-
-			$results 		= [];
-			$fileChanges = [];
-
-			foreach( $items as $item ) {
-
-				$key 		= (string) ( $item['key'] ?? '' );
-				$locale = (string) ( $item['locale'] ?? '' );
-				$value 	= (string) ( $item['value'] ?? '' );
-
-				$entry = null;
-				foreach( $entries as $candidate )
-					if( $candidate['key'] === $key )
-						$entry = $candidate;
-
-				if( $entry === null ) {
-					$results[$key] = [ 'ok' => false, 'error' => 'unknown key' ];
-					continue;
-				}
-
-				if( $entry['global'] === false && \Nino\Locales::verifyLocale( $appData, $locale ) === false ) {
-					$results[$key] = [ 'ok' => false, 'error' => 'invalid locale' ];
-					continue;
-				}
-
-				$value = substr( $value, 0, self::HARD_MAXLENGTH );
-				$value = ( $entry['html'] === true ) ? \Nino\Html::sanitizeHtml( $value ) : strip_tags( $value );
-
-				$file = ( $entry['global'] === true ) ? '/text/global.php' : '/text/'. $locale. '.php';
-
-				$fileChanges[$file]['[['. $key. ']]'] = $value;
-
-				$results[$key] = [ 'ok' => true, 'value' => $value ];
-			}
-
-			// One lock -> re-read -> write per target file, not per key - see
-			// _admin's Text::apiSaveBatch() for why
-			foreach( $fileChanges as $file => $changes )
-				\Nino\Filesystem::mutate( $appData, $file, function( array $content ) use ( $changes ): array {
-					return array_merge( $content, $changes );
-				} );
-
-			$request['/nino/http/response']['body'] = [ 'results' => $results ];
+			$request['/nino/http/response']['body'] = [ 'results' => \Nino\Text::saveBatch( $appData, $items, true ) ];
 		}
 
 		/**
@@ -1953,12 +1819,7 @@ namespace Nino\Dev {
 				return;
 			}
 
-			$entries = self::_entries( $appData );
-
-			$entry = null;
-			foreach( $entries as $candidate )
-				if( $candidate['key'] === $key )
-					$entry = $candidate;
+			$entry = \Nino\Text::entry( $appData, $key );
 
 			if( $entry === null ) {
 				$request['/nino/http/response']['statusCode'] = 404;
@@ -1966,13 +1827,11 @@ namespace Nino\Dev {
 				return;
 			}
 
-			if( $newKey !== $key )
-				foreach( $entries as $candidate )
-					if( $candidate['key'] === $newKey ) {
-						$request['/nino/http/response']['statusCode'] = 409;
-						$request['/nino/http/response']['body'] = [ 'error' => 'key already exists' ];
-						return;
-					}
+			if( $newKey !== $key && \Nino\Text::entry( $appData, $newKey ) !== null ) {
+				$request['/nino/http/response']['statusCode'] = 409;
+				$request['/nino/http/response']['body'] = [ 'error' => 'key already exists' ];
+				return;
+			}
 
 			$oldBracket = '[['. $key. ']]';
 			$newBracket = '[['. $newKey. ']]';
@@ -1993,8 +1852,8 @@ namespace Nino\Dev {
 			}
 
 			if( $entry['blacklisted'] === true ) {
-				self::_setBlacklisted( $appData, $key, false );
-				self::_setBlacklisted( $appData, $newKey, true );
+				\Nino\Text::setBlacklisted( $appData, $key, false );
+				\Nino\Text::setBlacklisted( $appData, $newKey, true );
 			}
 
 			$request['/nino/http/response']['body'] = [ 'ok' => true, 'key' => $newKey ];
@@ -2017,10 +1876,7 @@ namespace Nino\Dev {
 			$data = \Nino\Dev\Dev::postData();
 			$key 	= (string) ( $data['key'] ?? '' );
 
-			$entry = null;
-			foreach( self::_entries( $appData ) as $candidate )
-				if( $candidate['key'] === $key )
-					$entry = $candidate;
+			$entry = \Nino\Text::entry( $appData, $key );
 
 			if( $entry === null ) {
 				$request['/nino/http/response']['statusCode'] = 404;
@@ -2044,7 +1900,7 @@ namespace Nino\Dev {
 			}
 
 			if( $entry['blacklisted'] === true )
-				self::_setBlacklisted( $appData, $key, false );
+				\Nino\Text::setBlacklisted( $appData, $key, false );
 
 			$request['/nino/http/response']['body'] = [ 'ok' => true ];
 		}
@@ -2055,7 +1911,7 @@ namespace Nino\Dev {
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		string		$key
-		 *	@param		array 		$entry					This key's current entry (see _entries())
+		 *	@param		array 		$entry					This key's current entry (see \Nino\Text::entries())
 		 *	@param		bool			$toGlobal				Target shape
 		 *
 		 *	@return 	void
@@ -2067,8 +1923,12 @@ namespace Nino\Dev {
 
 			if( $toGlobal === true ) {
 
+				// A locale missing this key entirely is null (see
+				// \Nino\Text::entries()), not '' - both are excluded here, so
+				// "the first non-empty value" doesn't pick a locale that never
+				// had one
 				$native = \Nino\Locales::getNativeLocale( $appData );
-				$value 	= $entry['values'][$native] ?? ( array_values( array_filter( $entry['values'], fn( $v ) => $v !== '' ) )[0] ?? '' );
+				$value 	= $entry['values'][$native] ?? ( array_values( array_filter( $entry['values'], fn( $v ) => $v !== null && $v !== '' ) )[0] ?? '' );
 
 				foreach( $locales as $locale )
 					\Nino\Filesystem::mutate( $appData, '/text/'. $locale. '.php', function( array $localeData ) use ( $bracketKey ): array {
@@ -2096,32 +1956,6 @@ namespace Nino\Dev {
 						return $localeData;
 					} );
 			}
-		}
-
-		/**
-		 *	Add or remove one key from /text/blacklist.php
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		string		$key
-		 *	@param		bool			$blacklisted
-		 *
-		 *	@return 	void
-		 */
-		private static function _setBlacklisted( array &$appData, string $key, bool $blacklisted ): void {
-
-			\Nino\Filesystem::mutate( $appData, '/text/blacklist.php', function( array $list ) use ( $key, $blacklisted ): ?array {
-
-				$has = in_array( $key, $list, true );
-
-				if( $blacklisted === true && $has === false )
-					$list[] = $key;
-				else if( $blacklisted === false && $has === true )
-					$list = array_values( array_diff( $list, [ $key ] ) );
-				else
-					return null;
-
-				return $list;
-			} );
 		}
 
 		/**
@@ -2186,7 +2020,7 @@ namespace Nino\Dev {
 		private static function _scanMissing( array &$appData ): array {
 
 			$known = [];
-			foreach( self::_entries( $appData ) as $entry )
+			foreach( \Nino\Text::entries( $appData ) as $entry )
 				$known[$entry['key']] = true;
 			foreach( self::KERNEL_FILLS as $key )
 				$known[$key] = true;

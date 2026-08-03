@@ -1560,6 +1560,56 @@ namespace Nino {
 		}
 
 		/**
+		 *	Absolute path -> archive name, for every file the admin panel
+		 *	writes to at runtime: config.php, the text files and every
+		 *	element type/image. Deliberately not developer code (_nino/,
+		 *	templates, _admin/ itself, ...) - that's already versioned in
+		 *	git and would just bloat every backup.
+		 *
+		 *	Shared by Admin\Backup::_create() and Dev\Restore::_safetySnapshot(),
+		 *	which both need the exact same manifest for the exact same reason -
+		 *	kept here rather than in either since Restore deliberately doesn't
+		 *	depend on _admin/Admin.php (see that class' own docblock).
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	array										Absolute source path => name inside the archive
+		 */
+		public static function backupManifest( array &$appData ): array {
+
+			// Defensive: a caller right after writing config.php
+			// (Admin\Backup::_bootstrap()) needs the is_file() checks below to
+			// see that write rather than a cached pre-write stat
+			clearstatcache();
+
+			$root 			= self::getPath( $appData );
+			$configPath	= self::getConfigPath( $appData );
+			$files 			= [];
+
+			// config.php resolves against configPath, not root - see
+			// getConfigPath()'s docblock. Every other file here is always
+			// inside the regular project root.
+			if( is_file( $configPath. '/config.php' ) === true )
+				$files[$configPath. '/config.php'] = 'config.php';
+
+			if( is_file( $root. '/text/global.php' ) === true )
+				$files[$root. '/text/global.php'] = 'text/global.php';
+
+			foreach( \Nino\Locales::getAvailableLocales( $appData ) as $locale )
+				if( is_file( $root. '/text/'. $locale. '.php' ) === true )
+					$files[$root. '/text/'. $locale. '.php'] = 'text/'. $locale. '.php';
+
+			foreach( glob( $root. '/elements/*.php' ) ?: [] as $file )
+				$files[$file] = 'elements/'. basename( $file );
+
+			foreach( glob( $root. '/images/*' ) ?: [] as $file )
+				if( is_file( $file ) === true )
+					$files[$file] = 'images/'. basename( $file );
+
+			return $files;
+		}
+
+		/**
 		 *	Return current filesystem dir
 		 *
 		 *	@param		array 				&$appData			(reference) Array with current app data
@@ -3411,6 +3461,221 @@ namespace Nino {
 			\Nino\Runtime::setSessionValue( $appData, './nino/locales/current', $locale );
 
 			return $locale;
+		}
+	}
+
+	/**
+	 *	Nino								A compact filesystembased php framework
+	 *	Text								The [[key]] textfill layer both _admin's Text panel
+	 *												and _dev's own text editor sit on top of - reading
+	 *												every known key out of /text/global.php + every
+	 *												/text/{locale}.php, and batching a value save into
+	 *												one lock/read/write per target file. Everything
+	 *												that differs between the two UIs (blacklist
+	 *												filtering vs. an editable blacklist flag, a
+	 *												PERM-gated save vs. a session-gated one, shape
+	 *												conversion) stays in _admin/Admin.php and _dev/Dev.php
+	 *												- this only holds what was byte-for-byte identical
+	 *												between them.
+	 *
+	 *	@package						Dape/Nino
+	 *	@author							David Perchermeier <mail@dape.io>
+	 *	@link								https://github.com/dapeio/nino
+	 */
+	class Text {
+
+		private const int MIN_MAXLENGTH 		= 150;
+		private const int MAX_MAXLENGTH 		= 2000;
+		private const int MAXLENGTH_BUFFER = 150;
+		private const int HARD_MAXLENGTH 	= 20000;
+
+		/**
+		 *	Every known key across global.php + every locale file, with its
+		 *	current value(s), whether it's global or per-locale, whether it
+		 *	currently holds markup, a maxlength derived from its longest
+		 *	current value, and whether it's blacklisted (see blacklist())
+		 *
+		 *	@param		array 		&$appData						(reference) Array with current app data
+		 *	@param		bool			$includeBlacklisted	Whether a blacklisted key is included at all, not
+		 *																			just flagged - _admin's Text panel hides them
+		 *																			entirely, _dev's own editor needs to see them
+		 *																			to be able to un-blacklist one
+		 *
+		 *	@return 	array											List of [ key, global, blacklisted, html, maxlength, values ]
+		 */
+		public static function entries( array &$appData, bool $includeBlacklisted = true ): array {
+
+			$global 	= \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] );
+			$locales 	= \Nino\Locales::getAvailableLocales( $appData );
+
+			$localeData = [];
+			foreach( $locales as $locale )
+				$localeData[$locale] = \Nino\Filesystem::getFileContent( $appData, '/text/'. $locale. '.php', [] );
+
+			$blacklist = self::blacklist( $appData );
+
+			$bracketKeys = array_keys( $global );
+			foreach( $localeData as $data )
+				$bracketKeys = array_merge( $bracketKeys, array_keys( $data ) );
+			$bracketKeys = array_unique( $bracketKeys );
+
+			$entries = [];
+
+			foreach( $bracketKeys as $bracketKey ) {
+
+				$key 					= trim( $bracketKey, '[]' );
+				$isBlacklisted = isset( $blacklist[$key] ) === true;
+
+				if( $isBlacklisted === true && $includeBlacklisted === false )
+					continue;
+
+				$isGlobal = array_key_exists( $bracketKey, $global );
+				$values 	= $isGlobal
+					? [ '*' => $global[$bracketKey] ]
+					: array_map( fn( array $data ) => $data[$bracketKey] ?? null, $localeData );
+
+				$longest 	= 0;
+				$html 		= false;
+
+				foreach( $values as $value ) {
+					if( $value === null )
+						continue;
+					$longest 	= max( $longest, strlen( $value ) );
+					$html 		= $html || \Nino\Html::containsHtml( $value );
+				}
+
+				$entries[] = [
+					'key' 				=> $key,
+					'global' 			=> $isGlobal,
+					'blacklisted' => $isBlacklisted,
+					'html' 				=> $html,
+					'maxlength' 	=> min( self::MAX_MAXLENGTH, max( self::MIN_MAXLENGTH, $longest + self::MAXLENGTH_BUFFER ) ),
+					'values' 			=> $values,
+				];
+			}
+
+			usort( $entries, fn( array $a, array $b ) => strcmp( $a['key'], $b['key'] ) );
+
+			return $entries;
+		}
+
+		/**
+		 *	Find one key's entry (see entries())
+		 *
+		 *	@param		array 		&$appData						(reference) Array with current app data
+		 *	@param		string		$key								Bare key path (eg. "/home/welcome/h2")
+		 *	@param		bool			$includeBlacklisted	Same meaning as entries()'s own parameter
+		 *
+		 *	@return 	array | null							The entry, or null if unknown (or hidden by $includeBlacklisted)
+		 */
+		public static function entry( array &$appData, string $key, bool $includeBlacklisted = true ): array|null {
+
+			foreach( self::entries( $appData, $includeBlacklisted ) as $entry )
+				if( $entry['key'] === $key )
+					return $entry;
+
+			return null;
+		}
+
+		/**
+		 *	Read the developer-maintained list of keys hidden from _admin's
+		 *	Text panel (technical values, not content - uris, colors,
+		 *	typography, ...)
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	array										Set of blacklisted keys (key => true)
+		 */
+		public static function blacklist( array &$appData ): array {
+			return array_flip( \Nino\Filesystem::getFileContent( $appData, '/text/blacklist.php', [] ) );
+		}
+
+		/**
+		 *	Add or remove one key from /text/blacklist.php - _dev-only,
+		 *	_admin's Text panel only ever reads the list
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$key
+		 *	@param		bool			$blacklisted
+		 *
+		 *	@return 	void
+		 */
+		public static function setBlacklisted( array &$appData, string $key, bool $blacklisted ): void {
+
+			\Nino\Filesystem::mutate( $appData, '/text/blacklist.php', function( array $list ) use ( $key, $blacklisted ): ?array {
+
+				$has = in_array( $key, $list, true );
+
+				if( $blacklisted === true && $has === false )
+					$list[] = $key;
+				else if( $blacklisted === false && $has === true )
+					$list = array_values( array_diff( $list, [ $key ] ) );
+				else
+					return null;
+
+				return $list;
+			} );
+		}
+
+		/**
+		 *	Save several keys' values in one request, batched per target file
+		 *	- a locale file gets one lock -> re-read -> write cycle no matter
+		 *	how many of its keys changed, instead of one per key. That's not
+		 *	just an optimization: two separate saves hitting the same file
+		 *	concurrently would race (each reads the file before the other's
+		 *	write lands, so one update gets silently lost) - batching removes
+		 *	the race entirely by construction.
+		 *
+		 *	A per-item failure (unknown/blacklisted key, invalid locale)
+		 *	doesn't fail the whole call - it's reported per key in the
+		 *	returned results so the other, valid items still get saved.
+		 *
+		 *	@param		array 		&$appData						(reference) Array with current app data
+		 *	@param		array 		$items							[ [ key, locale, value ], ... ]
+		 *	@param		bool			$includeBlacklisted	Same meaning as entries()'s own parameter -
+		 *																			whether a blacklisted key is a valid save target
+		 *
+		 *	@return 	array											key => [ ok, value ] or [ ok, error ]
+		 */
+		public static function saveBatch( array &$appData, array $items, bool $includeBlacklisted ): array {
+
+			$results 		= [];
+			$fileChanges = [];
+
+			foreach( $items as $item ) {
+
+				$key 		= (string) ( $item['key'] ?? '' );
+				$locale = (string) ( $item['locale'] ?? '' );
+				$value 	= (string) ( $item['value'] ?? '' );
+
+				$entry = self::entry( $appData, $key, $includeBlacklisted );
+
+				if( $entry === null ) {
+					$results[$key] = [ 'ok' => false, 'error' => 'unknown key' ];
+					continue;
+				}
+
+				if( $entry['global'] === false && \Nino\Locales::verifyLocale( $appData, $locale ) === false ) {
+					$results[$key] = [ 'ok' => false, 'error' => 'invalid locale' ];
+					continue;
+				}
+
+				$value = substr( $value, 0, self::HARD_MAXLENGTH );
+				$value = ( $entry['html'] === true ) ? \Nino\Html::sanitizeHtml( $value ) : strip_tags( $value );
+
+				$file = ( $entry['global'] === true ) ? '/text/global.php' : '/text/'. $locale. '.php';
+
+				$fileChanges[$file]['[['. $key. ']]'] = $value;
+
+				$results[$key] = [ 'ok' => true, 'value' => $value ];
+			}
+
+			foreach( $fileChanges as $file => $changes )
+				\Nino\Filesystem::mutate( $appData, $file, function( array $content ) use ( $changes ): array {
+					return array_merge( $content, $changes );
+				} );
+
+			return $results;
 		}
 	}
 
