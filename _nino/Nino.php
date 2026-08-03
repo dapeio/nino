@@ -2148,8 +2148,16 @@ namespace Nino {
 				'statusCode'	=> 404,
 				'header'			=> [
 					'Strict-Transport-Security' 	=> 'max-age=31536000; includeSubDomains',
-					'Content-Security-Policy' 		=> 'default-src \'self\'; img-src *; style-src \'self\' \'unsafe-inline\'',
-					'X-Frame-Options' 						=> 'same-origin',
+					// frame-ancestors is what actually stops framing in a current
+					// browser - X-Frame-Options below is the legacy fallback, and
+					// only DENY/SAMEORIGIN are valid values there ('same-origin'
+					// was silently ignored, ie. no clickjacking protection at all).
+					// base-uri/form-action are not covered by default-src: without
+					// them an injected <base>/<form action> escapes the policy -
+					// and textfills (Html::_renderFills()) put admin-editable text
+					// into the page unescaped, so the csp is load-bearing here.
+					'Content-Security-Policy' 		=> 'default-src \'self\'; img-src *; style-src \'self\' \'unsafe-inline\'; frame-ancestors \'self\'; base-uri \'self\'; form-action \'self\'',
+					'X-Frame-Options' 						=> 'SAMEORIGIN',
 					'X-Content-Type-Options'			=> 'nosniff',
 				],
 				'body'				=> '',
@@ -3871,7 +3879,13 @@ namespace Nino\Modules {
 					'[[content]]',
 					'[[nonce]]',
 				], [
-					json_encode( $fills ),
+					// The fill values are admin-editable text going straight into an
+					// inline <script> block. json_encode()'s default slash escaping
+					// happens to neutralize a '</script>' today, but that is a side
+					// effect, not a guarantee - one JSON_UNESCAPED_SLASHES away from
+					// being a stored xss. JSON_HEX_TAG & co. encode the characters
+					// that matter (<>&'") explicitly instead.
+					json_encode( $fills, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT ),
 					$appData['./nino/jstext/nonce'],
 				],
 				self::$_tpl['script'] );
