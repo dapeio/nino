@@ -1634,8 +1634,9 @@ namespace Nino {
 			// instead of once per element/locale below
 			$queryClean = [];
 			foreach( $query as $qKey => $kVal ) {
-				$kValClean = trim( $kVal, '%' );
-				$queryClean[$qKey] = [ $kValClean, strlen( $kValClean ) ];
+				$kVal							= (string) $kVal;
+				$kValClean				= trim( $kVal, '%' );
+				$queryClean[$qKey]	= [ $kVal, $kValClean, strlen( $kValClean ) ];
 			}
 
 			// Loop through elements
@@ -1651,23 +1652,15 @@ namespace Nino {
 
 					$hit = true;
 
-					foreach( $query as $qKey => $kVal ) {
-
-						[ $kValClean, $kValLen ] = $queryClean[$qKey];
-
-						$hit = false;
-
-						if( isset( $elementData[$qKey] ) === true ) {
-							if( $elementData[$qKey] === $kValClean )
-								$hit = true;
-							else if( $kVal[0] === '%' && $kVal[-1] === '%' && strpos( $elementData[$qKey], $kValClean ) !== false )
-								$hit = true;
-							else if( $kVal[0] === '%' && substr( $elementData[$qKey], 0-$kValLen ) === $kValClean )
-								$hit = true;
-							else if( $kVal[-1] === '%' && substr( $elementData[$qKey], 0, $kValLen ) === $kValClean )
-								$hit = true;
+					// Every query key has to match, not just the last one: $hit was
+					// reset per key and only ever set on a match, so whatever the
+					// final key decided was the result - query="cat=x&status=live"
+					// filtered by status alone
+					foreach( $queryClean as $qKey => [ $kVal, $kValClean, $kValLen ] )
+						if( self::_matchesQueryValue( $elementData[$qKey] ?? null, $kVal, $kValClean, $kValLen ) === false ) {
+							$hit = false;
+							break;
 						}
-					}
 
 					if( $hit === true )
 						break;
@@ -1679,6 +1672,52 @@ namespace Nino {
 			}
 
 			return $hits ?? $return;
+		}
+
+		/**
+		 *	Whether one element value satisfies one query value, including the
+		 *	'%foo%' / '%foo' / 'foo%' wildcard forms
+		 *
+		 *	@param		mixed			$value				Element value, or null if the element has no such key
+		 *	@param		string		$kVal					Query value as given, wildcards included
+		 *	@param		string		$kValClean		Query value with the wildcards trimmed off
+		 *	@param		int				$kValLen			Length of $kValClean
+		 *
+		 *	@return 	bool
+		 */
+		static private function _matchesQueryValue( mixed $value, string $kVal, string $kValClean, int $kValLen ): bool {
+
+			if( is_scalar( $value ) === false )
+				return false;
+
+			$value = (string) $value;
+
+			if( $value === $kValClean )
+				return true;
+
+			// An empty query value has no wildcard to read - $kVal[0] on '' is an
+			// "uninitialized string offset" warning, and the error handler turns
+			// that into a 500 for the whole page
+			if( $kVal === '' )
+				return false;
+
+			$leading	= $kVal[0] === '%';
+			$trailing	= $kVal[-1] === '%';
+
+			// A bare '%' (or '%%') is "anything"
+			if( $kValClean === '' )
+				return $leading === true || $trailing === true;
+
+			if( $leading === true && $trailing === true )
+				return strpos( $value, $kValClean ) !== false;
+
+			if( $leading === true )
+				return substr( $value, 0 - $kValLen ) === $kValClean;
+
+			if( $trailing === true )
+				return substr( $value, 0, $kValLen ) === $kValClean;
+
+			return false;
 		}
 
 		/**
@@ -2007,10 +2046,20 @@ namespace Nino {
 
 			// Check uri change
 			if( $uri !== $data['.uri'] ) {
+
 				\Nino\Callbacks::doCallbacks( $appData, '/nino/elements'. $typeUri. '/update/uri', $data );
-				$elementUri = self::getElementUriFromUri( $uri );
-				foreach( $typeData AS $locale => $localeData )
-					unset( $typeData[$locale][$elementUri] );
+
+				// Same reasoning as deleteElement(): iterate the known locale
+				// buckets, not $typeData's own keys. A type file also carries
+				// non-locale top-level keys (its display 'title', a plain string),
+				// and unset() on a string offset is a fatal Error - renaming an
+				// element uri took the whole request down with it. The loop
+				// variable was $locale too, overwriting the parameter for
+				// everything that follows.
+				$oldElementUri = self::getElementUriFromUri( $uri );
+
+				foreach( array_merge( \Nino\Locales::getAvailableLocales( $appData ), [ '*' ] ) AS $typeLocale )
+					unset( $typeData[$typeLocale][$oldElementUri] );
 			}
 
 			unset( $appData['./nino/elements/cache'] );
@@ -3909,12 +3958,19 @@ namespace Nino\Modules {
 			$query		= $args['query'] ?? '';
 			$queryArr	= [];
 
-			// Parse query array
+			// Parse query array - a pair without '=' (query="foo") used to read
+			// an undefined index, and the error handler turns that warning into
+			// a 500 for the entire page. Limit 2 so a value may contain '='.
 			if( $query !== '' )
-			foreach( explode( '&', $query ) as $qParts ) {
-				$qSubparts = explode( '=', $qParts );
-				$queryArr[$qSubparts[0]] = $qSubparts[1];
-			}
+				foreach( explode( '&', $query ) as $qParts ) {
+
+					$qSubparts = explode( '=', $qParts, 2 );
+
+					if( count( $qSubparts ) !== 2 || $qSubparts[0] === '' )
+						continue;
+
+					$queryArr[$qSubparts[0]] = $qSubparts[1];
+				}
 
 			$result = \Nino\Elements::queryElements( $appData, $uri, $queryArr, $locale, [] );
 			if( $result === [] )
