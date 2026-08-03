@@ -522,7 +522,15 @@ namespace Nino {
 			// response time answers the question the login form is refusing to
 			// answer: a locked account would come back in microseconds while a
 			// wrong password takes the full bcrypt cost.
-			$usable = ( $user !== false && $user['status'] === 2 && self::_inCooldown( $appData, $username ) === false );
+			// "In cooldown" is kept apart from "unknown or disabled" on purpose.
+			// An account that is already locked must not keep feeding the ip
+			// bucket: a user stubbornly retrying their own locked login would
+			// otherwise take out their whole ip - and everyone behind the same
+			// nat with it - after maxtries * IP_TRIES_FACTOR clicks. Those
+			// attempts also can't teach an attacker anything; the account is
+			// locked either way.
+			$cooling	= ( $user !== false && $user['status'] === 2 && self::_inCooldown( $appData, $username ) === true );
+			$usable		= ( $user !== false && $user['status'] === 2 && $cooling === false );
 
 			// Exactly one password_verify() on every path. DUMMY_HASH is a
 			// bcrypt hash of a value nobody holds, at the cost PASSWORD_DEFAULT
@@ -530,6 +538,11 @@ namespace Nino {
 			// older, cheaper cost stays distinguishable in principle; login
 			// rehashes those on the next successful login (see below).
 			$verified = password_verify( $pw, ( $usable === true ) ? $user['pw'] : self::DUMMY_HASH );
+
+			// After the verification, not before it - the point of the dummy
+			// hash is that every rejected attempt costs the same
+			if( $cooling === true )
+				return false;
 
 			if( $usable === false || $verified === false ) {
 
