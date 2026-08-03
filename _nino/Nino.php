@@ -2622,11 +2622,17 @@ namespace Nino {
 			$cleanMethod	= preg_replace( '/[^a-zA-Z]/', '', $rawMethod );
 			$cleanMethod	= strtoupper( $cleanMethod );
 
-			foreach( $legalMethods AS $method )
-				if( strpos( $cleanMethod, $method ) !== false )
-					return $method;
+			// Exact match rather than a substring test - 'XXGETXX' used to be
+			// accepted as GET, since any legal method contained anywhere in the
+			// value won
+			if( in_array( $cleanMethod, $legalMethods, true ) === false )
+				return '';
 
-			return '';
+			// HEAD is a GET without a response body, but routes are only ever
+			// registered for GET - so every HEAD request (uptime monitors, link
+			// checkers, some crawlers) found no route and answered 404. Mapping
+			// it here keeps that in one place; the sapi drops the body itself.
+			return ( $cleanMethod === 'HEAD' ) ? 'GET' : $cleanMethod;
 		}
 	}
 
@@ -3570,7 +3576,12 @@ namespace Nino\Modules {
 		 */
 		public static function callbackResponse( array &$appData, array &$request ): void {
 
-			if( $request['/nino/http/request']['method'] !== 'POST' )
+			// Every method that isn't safe by definition needs a token, not just
+			// POST: _cleanRawMethod() also accepts PUT/DELETE/PATCH and routes
+			// can be registered for them, which left those completely
+			// unprotected. An unrecognized method ('') stays on the checked
+			// side on purpose - it has no business writing anything either.
+			if( in_array( $request['/nino/http/request']['method'], [ 'GET', 'HEAD', 'OPTIONS' ], true ) === true )
 				return;
 
 			$given = self::_extractToken( $request );
