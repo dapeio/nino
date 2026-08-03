@@ -502,27 +502,36 @@ namespace Nino {
 
 			// Check cooldown - the ip bucket is checked regardless of whether
 			// the account exists, so guessing spread across many accounts hits
-			// a limit too
+			// a limit too. This one does return early: it is keyed by the
+			// caller's own ip, so it tells them nothing they didn't know.
 			foreach( $ipKeys as $ipKey )
 				if( self::_inCooldown( $appData, $ipKey ) === true )
 					return false;
 
-			// Unknown or disabled account: verify against a hash that cannot
-			// match anyway, so this path costs the same as a wrong password
-			// instead of returning immediately, and count the attempt - both
-			// halves of what otherwise makes this an enumeration oracle
-			if( $user === false || $user['status'] !== 2 ) {
-				password_verify( $pw, self::DUMMY_HASH );
-				return self::_registerFailedAttemp( $appData, $ipKeys );
+			// Whether this attempt could succeed at all. An account that is
+			// unknown, disabled or still cooling down cannot - but the check
+			// must not short-circuit past the hash verification below, or the
+			// response time answers the question the login form is refusing to
+			// answer: a locked account would come back in microseconds while a
+			// wrong password takes the full bcrypt cost.
+			$usable = ( $user !== false && $user['status'] === 2 && self::_inCooldown( $appData, $username ) === false );
+
+			// Exactly one password_verify() on every path. DUMMY_HASH is a
+			// bcrypt hash of a value nobody holds, at the cost PASSWORD_DEFAULT
+			// currently produces - a site whose stored hashes still carry an
+			// older, cheaper cost stays distinguishable in principle; login
+			// rehashes those on the next successful login (see below).
+			$verified = password_verify( $pw, ( $usable === true ) ? $user['pw'] : self::DUMMY_HASH );
+
+			if( $usable === false || $verified === false ) {
+
+				// Counted against the account only when the account is a real,
+				// currently usable one - counting a cooling account again on
+				// every probe would let an attacker extend its lockout forever
+				$keys = ( $usable === true ) ? array_merge( $ipKeys, [ $username ] ) : $ipKeys;
+
+				return self::_registerFailedAttemp( $appData, $keys );
 			}
-
-			// Check account cooldown
-			if( self::_inCooldown( $appData, $username ) === true )
-				return false;
-
-			// Verify and login
-			if( password_verify( $pw, $user['pw'] ) === false )
-				return self::_registerFailedAttemp( $appData, array_merge( $ipKeys, [ $username ] ) );
 
 			// Rotate the session id + csrf token now that the session's identity
 			// is changing (session-fixation defense) - the status guard keeps
@@ -835,15 +844,29 @@ namespace Nino {
 			if( $user === false )
 				return false;
 
+			// Strict comparison: without it a single truthy non-string in perms
+			// (a config typo like 'perms' => [ true ]) loosely matches every
+			// permission there is, ie. silently grants everything
+			$perms = ( is_array( $user['perms'] ?? null ) === true ) ? $user['perms'] : [];
+
 			// Check exact perm
-			if( in_array( $perm, $user['perms'] ) === true )
+			if( in_array( $perm, $perms, true ) === true )
 				return true;
 
 			// Check perms recursive
 			while( $perm !== '' ) {
-				$parentPerms	= substr( $perm, 0, strrpos( $perm, '/' ) );
 
-				if( in_array( $parentPerms. '/*', $user['perms'] ) === true )
+				$separator = strrpos( $perm, '/' );
+
+				// A perm without any '/' has no parent to walk up to. This used
+				// to hand strrpos()'s false straight to substr(), which is a
+				// TypeError under strict_types - a 500 instead of a denial.
+				if( $separator === false )
+					return false;
+
+				$parentPerms = substr( $perm, 0, $separator );
+
+				if( in_array( $parentPerms. '/*', $perms, true ) === true )
 					return true;
 
 				$perm = $parentPerms;

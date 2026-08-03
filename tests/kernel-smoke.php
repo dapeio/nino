@@ -351,6 +351,19 @@ check( 'logoutAllSessions clears every session entry', \Nino\Auth::logoutAllSess
 \Nino\Auth::loginUser( $appData, 'multisession@example.com', 'correct horse battery staple' );
 check( 'logoutAllSessions on the current user also ends the current session', \Nino\Auth::logoutAllSessions( $appData, 'multisession@example.com' ) === true && \Nino\Auth::getCurrentUser( $appData ) === false );
 
+// checkPermission
+\Nino\Auth::insertUser( $appData, 'perms@example.com', 'correct horse battery staple', [ '/section/*' ] );
+check( 'checkPermission grants a wildcard-covered permission', \Nino\Auth::checkPermission( $appData, '/section/thing/manage', 'perms@example.com' ) === true );
+check( 'checkPermission denies one outside the wildcard', \Nino\Auth::checkPermission( $appData, '/other/thing/manage', 'perms@example.com' ) === false );
+check( 'a permission without a slash is denied, not a fatal', \Nino\Auth::checkPermission( $appData, 'manage', 'perms@example.com' ) === false );
+
+// A non-string truthy value in perms (a config typo) must not loosely match
+// every permission there is
+$appData['/nino/auth/user']['perms@example.com']['perms'] = [ true ];
+check( 'a truthy non-string in perms grants nothing', \Nino\Auth::checkPermission( $appData, '/section/thing/manage', 'perms@example.com' ) === false );
+
+\Nino\Auth::deleteUser( $appData, 'perms@example.com' );
+
 echo "\n";
 
 
