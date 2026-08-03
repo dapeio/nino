@@ -46,7 +46,7 @@ mkdir( $sandbox, 0777, true );
 mkdir( $sandbox. '/text', 0777, true );
 
 // A key already longer than MAX_MAXLENGTH - MAXLENGTH_BUFFER, to prove the computed
-// maxlength grows to fit existing content instead of clamping below its own length
+// maxlength is capped at MAX_MAXLENGTH rather than growing past it
 $longValue = str_repeat( 'x', 1900 );
 
 file_put_contents( $sandbox. '/text/global.php', '<?php return [ \'[[/company/name]]\' => \'Acme\', \'[[/website/lang]]\' => \'de\' ];' );
@@ -59,6 +59,9 @@ $_SERVER['REMOTE_ADDR'] = '127.0.0.1';
 $appData = [ './nino/uid' => $sandbox ];
 \Nino\AppData::prepare( $appData );
 $appData['./nino/filesystem/path']			= $sandbox;
+// Mirrors \Nino\init()'s default (no NINO_CONFIG_DIR set): configpath falls
+// back to the project root, same as this sandbox's regular path
+$appData['./nino/filesystem/configpath']	= $sandbox;
 $appData['/nino/dir']				= '';
 $appData['/nino/locales/native']				= 'de_DE';
 $appData['/nino/locales/available']			= [ 'de_DE', 'en_US' ];
@@ -92,7 +95,7 @@ check( 'locale key is included and flagged non-global', ( $byKey['/home/h2']['gl
 check( 'a key with existing markup is auto-flagged html', ( $byKey['/home/h2']['html'] ?? null ) === true );
 check( 'a key without markup is not flagged html', ( $byKey['/home/plain']['html'] ?? null ) === false );
 check( 'maxlength is at least the min floor', ( $byKey['/home/plain']['maxlength'] ?? 0 ) >= 150 );
-check( 'maxlength grows past the 2000 default for a key already longer than that, instead of clamping below its own length', ( $byKey['/home/long']['maxlength'] ?? 0 ) >= strlen( $longValue ) + 150 );
+check( 'maxlength is capped at 2000 for a key already longer than that, not grown past it', ( $byKey['/home/long']['maxlength'] ?? 0 ) === 2000 );
 check( 'Text::apiKeys exposes the session-remembered locale, defaulting to native', ( $request['/nino/http/response']['body']['selectedLocale'] ?? null ) === 'de_DE' );
 
 echo "\n";

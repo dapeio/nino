@@ -69,7 +69,6 @@ namespace Nino {
 	function request( array &$appData, array $request ): array {
 
 		\Nino\Http::request( $appData, $request );
-		\Nino\Locales::request( $appData, $request );
 
 		\Nino\Http::response( $appData, $request );
 
@@ -1554,6 +1553,24 @@ namespace Nino {
 		public static function getPath( array &$appData ): string {
 
 			return $appData['./nino/filesystem/path'];
+
+		}
+
+		/**
+		 *	Return the path config.php actually lives under - normally the
+		 *	same as getPath(), but distinct when NINO_CONFIG_DIR moves it
+		 *	outside the webroot (see \Nino\init()). Callers that build a list
+		 *	of on-disk files by hand (Backup, Restore) must resolve config.php
+		 *	through this, not getPath(), or they miss/misplace it entirely
+		 *	under a hardened, out-of-webroot setup.
+		 *
+		 *	@param		array 				&$appData			(reference) Array with current app data
+		 *
+		 *	@return		string											Current filesystem config path
+		 */
+		public static function getConfigPath( array &$appData ): string {
+
+			return $appData['./nino/filesystem/configpath'];
 
 		}
 
@@ -3230,36 +3247,43 @@ namespace Nino {
 
 			if( $currentLocale !== null )
 				\Nino\Locales::setCurrentLocale( $appData, $currentLocale );
+
+			// Registered rather than called directly out of \Nino\request(): a
+			// route can declare its own 'statusCode' (eg. GET://_admin), and
+			// Http::response() array_merge()s the route into the response array
+			// *after* seeding it - calling this any earlier had the merge wipe
+			// the 302 this sets right back to the route's own status, so the
+			// Location header ended up in the response with a 200 and the
+			// browser never followed it. Hooking '/nino/http/response' runs
+			// this after that merge, same as Modules\Localepicker's own
+			// locale-switch callback.
+			\Nino\Callbacks::registerCallback( $appData, '/nino/http/response', [ self::class, 'callbackResponse' ] );
 		}
 
 		/**
-		 *	Init module
+		 *	Switch locale via the '/_nino/locales/current' query param and
+		 *	redirect back to the current uri in the new locale
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current request
 		 *
 		 *	@return 	void
 		 */
-		public static function request( array &$appData, array &$request ): void {
+		public static function callbackResponse( array &$appData, array &$request ): void {
 
 			// Catch locale change
 			if( isset( $request['/nino/http/request']['query']['/_nino/locales/current'] ) === false )
 				return;
 
 			$locale = \Nino\Locales::setCurrentLocale( $appData, $request['/nino/http/request']['query']['/_nino/locales/current'] );
+			$newUri = \Nino\Http::findRouteUri( $appData, $request['/nino/http/response']['uri'], $locale );
 
-			// This runs before Http::response(), so the response uri still is
-			// the raw request uri - resolve the route first to get the
-			// response uri findRouteUri() actually matches against
-			$route	= \Nino\Http::requestRoute( $appData, $request['/nino/http/request']['uri'], $request['/nino/http/request']['method'] );
-			$newUri = \Nino\Http::findRouteUri( $appData, $route['uri'] ?? $request['/nino/http/response']['uri'], $locale );
-
-			// Redirect via the response array (statusCode + Location header) -
-			// a direct header() call would be overwritten by Http::output()'s
-			// own http_response_code()/header() pass. The route key carries
-			// the method prefix (eg. "GET://legal"), strip it for the url
-			$request['/nino/http/response']['statusCode'] 					= 302;
-			$request['/nino/http/response']['header']['Location']	= ( $newUri !== null ) ? str_replace( $request['/nino/http/request']['method']. ':/', '', $newUri ) : '/';
+			// Redirect via the response array - a direct header() call would be
+			// overwritten by Http::output()'s own http_response_code() pass
+			if( $newUri !== null ) {
+				$request['/nino/http/response']['statusCode'] 					= 302;
+				$request['/nino/http/response']['header']['Location']	= str_replace( $request['/nino/http/request']['method']. ':/', '', $newUri );
+			}
 		}
 
 		/**
@@ -3433,13 +3457,20 @@ namespace Nino {
 			// the same webserver user.
 			$sender = self::_getSender( $appData );
 
-			$headers = 'Content-Type:text/html';
+			$headers = 'MIME-Version: 1.0';
+			$headers .= "\r\n". 'Content-Type: text/html; charset=UTF-8';
 
 			if( $sender !== '' )
 				$headers .= "\r\n". 'From: '. $sender;
 
 			if( $replyTo !== '' )
 				$headers .= "\r\n". 'Reply-To: '. $replyTo;
+
+			// Encoded after _headerValue() above, not before: the CR/LF strip
+			// has to run against the raw, untrusted subject - encoding first
+			// would mean sanitizing mb_encode_mimeheader()'s output instead of
+			// the actual input
+			$subject = mb_encode_mimeheader( $subject, 'UTF-8', 'B' );
 
 			// -f only for an address that validated - the parameter goes to the
 			// sendmail command line, so it must never carry anything unchecked

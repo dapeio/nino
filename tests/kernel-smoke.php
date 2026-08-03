@@ -49,6 +49,9 @@ $_SERVER['REMOTE_ADDR'] = '127.0.0.1';
 $appData = [ './nino/uid' => $sandbox ];
 \Nino\AppData::prepare( $appData );
 $appData['./nino/filesystem/path']			= $sandbox;
+// Mirrors \Nino\init()'s default (no NINO_CONFIG_DIR set): configpath falls
+// back to the project root, same as this sandbox's regular path
+$appData['./nino/filesystem/configpath']	= $sandbox;
 $appData['/nino/dir']				= '';
 $appData['/nino/locales/native']				= 'de_DE';
 $appData['/nino/locales/available']			= [ 'de_DE', 'en_US' ];
@@ -722,9 +725,15 @@ echo "Http::request/response - header composition, csp, locale redirects\n";
 $appData['/nino/http/routes'] = [
 	'GET://' 						=> [ 'uri' => '/home', 'body' => '' ],
 	'GET://rechtliches'	=> [ 'uri' => '/legal', 'body' => '', 'locale' => 'de_DE' ],
-	'GET://legal'				=> [ 'uri' => '/legal', 'body' => '', 'locale' => 'en_US' ],
+	// statusCode mirrors a route like GET://_admin declaring its own status -
+	// exactly the shape that used to swallow the locale-switch redirect below
+	'GET://legal'				=> [ 'uri' => '/legal', 'body' => '', 'locale' => 'en_US', 'statusCode' => 201 ],
 	'GET://robots.txt'	=> [ 'uri' => '/robots.txt', 'body' => '', 'header' => [ 'Content-Type' => 'text/plain; charset=utf-8' ] ],
 ];
+
+// Mirrors what \Nino\Locales::init() registers in the real request flow -
+// this test builds appData by hand and never calls \Nino\init() itself
+\Nino\Callbacks::registerCallback( $appData, '/nino/http/response', [ \Nino\Locales::class, 'callbackResponse' ] );
 
 function fakeRequest( array &$appData, string $uri, string $method = 'GET' ): array {
 	$request = [ 'REQUEST_METHOD' => $method, 'REQUEST_URI' => $uri, 'REMOTE_ADDR' => '127.0.0.1' ];
@@ -749,8 +758,8 @@ check( 'a route-level header extends the response header', ( $robotsRequest['/ni
 check( 'a route-level header does not wipe the seeded security headers', isset( $robotsRequest['/nino/http/response']['header']['X-Content-Type-Options'] ) === true );
 
 $localesRedirect = fakeRequest( $appData, '/legal?/_nino/locales/current=de_DE' );
-\Nino\Locales::request( $appData, $localesRedirect );
-check( 'a locale switch redirects with a 302 status code', $localesRedirect['/nino/http/response']['statusCode'] === 302 );
+\Nino\Http::response( $appData, $localesRedirect );
+check( 'a locale switch redirects with a 302 status code even on a route with its own statusCode', $localesRedirect['/nino/http/response']['statusCode'] === 302 );
 check( 'the Location points at the locale variant of the page, without the route-key method prefix', ( $localesRedirect['/nino/http/response']['header']['Location'] ?? '' ) === '/rechtliches' );
 
 \Nino\Locales::setCurrentLocale( $appData, 'en_US' );

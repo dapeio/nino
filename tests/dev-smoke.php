@@ -60,6 +60,9 @@ $_SERVER['REMOTE_ADDR'] = '127.0.0.1';
 $appData = [ './nino/uid' => $sandbox ];
 \Nino\AppData::prepare( $appData );
 $appData['./nino/filesystem/path']	= $sandbox;
+// Mirrors \Nino\init()'s default (no NINO_CONFIG_DIR set): configpath falls
+// back to the project root, same as this sandbox's regular path
+$appData['./nino/filesystem/configpath']	= $sandbox;
 $appData['/nino/dir']		= '';
 $appData['/nino/locales/native']		= 'de_DE';
 $appData['/nino/locales/available']	= [ 'de_DE', 'en_US' ];
@@ -309,6 +312,87 @@ $_POST['data'] = json_encode( [ 'date' => 'not-a-date' ] );
 $badDateRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Dev\Restore::apiRestore( $appData, $badDateRequest );
 check( 'restoring a malformed date is rejected before touching the filesystem', $badDateRequest['/nino/http/response']['statusCode'] === 400 );
+
+echo "\n";
+
+
+// --- Backup/Restore with config.php outside the project root --------------
+
+echo "Backup/Restore - config.php resolves via configPath, not root (NINO_CONFIG_DIR)\n";
+
+$outSandbox 	= sys_get_temp_dir(). '/nino-dev-smoke-outofweb-'. uniqid();
+$outConfigDir = $outSandbox. '/secret-config';
+
+mkdir( $outSandbox. '/_admin', 0777, true );
+mkdir( $outSandbox. '/_dev', 0777, true );
+mkdir( $outConfigDir, 0777, true );
+
+$outAppData = [ './nino/uid' => $outSandbox ];
+\Nino\AppData::prepare( $outAppData );
+$outAppData['./nino/filesystem/path']			= $outSandbox;
+$outAppData['./nino/filesystem/configpath']	= $outConfigDir; // simulates NINO_CONFIG_DIR
+$outAppData['/nino/dir']										= '';
+$outAppData['/nino/locales/native']				= 'de_DE';
+$outAppData['/nino/locales/available']			= [ 'de_DE' ];
+$outAppData['/nino/auth/maxtries']					= 5;
+$outAppData['/nino/auth/cooldown']					= 3600;
+
+\Nino\Filesystem::putFileContent( $outAppData, '/config.php', [
+	'/nino/error/log'					=> false,
+	'/nino/error/display'			=> true,
+	'/nino/locales/native'		=> 'de_DE',
+	'/nino/locales/available'	=> [ 'de_DE' ],
+	'/nino/html/assets'				=> [],
+	'/nino/http/routes'				=> [],
+] );
+
+check( 'config.php was written under configPath, not under the project root', is_file( $outConfigDir. '/config.php' ) === true && is_file( $outSandbox. '/config.php' ) === false );
+
+\Nino\Auth::insertUser( $outAppData, 'admin@example.com', 'correct horse battery staple' );
+\Nino\Auth::loginUser( $outAppData, 'admin@example.com', 'correct horse battery staple' );
+
+$outGuard = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Admin\Admin::guard( $outAppData, $outGuard ); // bootstraps + creates today's backup as a side effect
+
+$outBackupDir = $outSandbox. '/_admin/'. $outAppData['/nino/backup/dir'];
+$outToday 		= $outBackupDir. '/'. date( 'Y-m-d' ). '.php';
+
+check( 'a backup was created for the out-of-webroot setup', is_file( $outToday ) === true );
+
+$outKey 		= base64_decode( $outAppData['/nino/backup/key'] );
+$outPrefix 	= "<?php http_response_code(403); exit; return '";
+$outSuffix 	= "';\n";
+$outRaw 		= file_get_contents( $outToday );
+$outPayload = base64_decode( substr( $outRaw, strlen( $outPrefix ), -strlen( $outSuffix ) ) );
+$outGz 			= openssl_decrypt( substr( $outPayload, 28 ), 'aes-256-gcm', $outKey, OPENSSL_RAW_DATA, substr( $outPayload, 0, 12 ), substr( $outPayload, 12, 16 ) );
+
+$outTmpGz 		= $outSandbox. '/verify.tar.gz';
+$outExtractDir = $outSandbox. '/verify-extracted';
+file_put_contents( $outTmpGz, $outGz );
+mkdir( $outExtractDir );
+( new \PharData( $outTmpGz ) )->extractTo( $outExtractDir );
+
+check( 'the out-of-webroot config.php made it into the backup archive', is_file( $outExtractDir. '/config.php' ) === true );
+
+// Corrupt config.php (still under configPath) and restore it
+$outCorrupted = \Nino\Filesystem::getFileContent( $outAppData, '/config.php', [] );
+$outCorrupted['/nino/auth/user'] = [];
+\Nino\Filesystem::putFileContent( $outAppData, '/config.php', $outCorrupted );
+
+// Dev's own session gate, not Auth's - same shortcut the rest of this file
+// uses instead of driving the (placeholder-hashed) real login flow
+\Nino\Runtime::setSessionValue( $outAppData, './nino/dev/authed', true );
+
+$_POST['data'] = json_encode( [ 'date' => date( 'Y-m-d' ) ] );
+$outRestoreRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Dev\Restore::apiRestore( $outAppData, $outRestoreRequest );
+check( 'apiRestore succeeds for the out-of-webroot setup', ( $outRestoreRequest['/nino/http/response']['body']['ok'] ?? false ) === true );
+
+$outAfterRestore = \Nino\Filesystem::getFileContent( $outAppData, '/config.php', [] );
+check( 'the restored config.php landed back under configPath, with the user record restored', isset( $outAfterRestore['/nino/auth/user']['admin@example.com'] ) === true );
+check( 'restore did not leak a stray config.php copy into the webroot root', is_file( $outSandbox. '/config.php' ) === false );
+
+\Nino\Filesystem::removeDir( $outSandbox );
 
 echo "\n";
 

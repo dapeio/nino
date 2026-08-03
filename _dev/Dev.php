@@ -831,13 +831,33 @@ namespace Nino\Dev {
 
 			self::_safetySnapshot( $appData, $dir, $key );
 
-			$root 	= \Nino\Filesystem::getPath( $appData );
-			$tmpGz 	= tempnam( sys_get_temp_dir(), 'ninorestore' ). '.tar.gz';
+			$root 			= \Nino\Filesystem::getPath( $appData );
+			$configPath	= \Nino\Filesystem::getConfigPath( $appData );
+			$tmpGz 			= tempnam( sys_get_temp_dir(), 'ninorestore' ). '.tar.gz';
+			$staging		= sys_get_temp_dir(). '/ninorestore-'. bin2hex( random_bytes( 8 ) );
+
 			file_put_contents( $tmpGz, $gz );
-			( new \PharData( $tmpGz ) )->extractTo( $root, null, true );
+			mkdir( $staging, 0755, true );
+			( new \PharData( $tmpGz ) )->extractTo( $staging, null, true );
 			unlink( $tmpGz );
 
-			// extractTo() writes straight to disk, bypassing Filesystem's own
+			// config.php belongs under configPath, not root - see
+			// \Nino\Filesystem::getConfigPath()'s docblock. Extracting it straight
+			// to root like every other file would restore it to the wrong place,
+			// and under a hardened NINO_CONFIG_DIR setup would additionally leak
+			// a stray copy back into the webroot - so it's staged first and moved
+			// separately from the rest of the archive.
+			$stagedConfig = $staging. '/config.php';
+
+			if( is_file( $stagedConfig ) === true ) {
+				file_put_contents( $configPath. '/config.php', file_get_contents( $stagedConfig ) );
+				unlink( $stagedConfig );
+			}
+
+			\Nino\Filesystem::copyDir( $staging, $root );
+			\Nino\Filesystem::removeDir( $staging );
+
+			// extractTo()/copyDir() write straight to disk, bypassing Filesystem's own
 			// cache tracking entirely - drop it so any getFileContent() call
 			// later in this same request (or a request landing in the same
 			// wall-clock second - see AppData::writeContentData()'s docblock
@@ -866,11 +886,15 @@ namespace Nino\Dev {
 		 */
 		private static function _safetySnapshot( array &$appData, string $dir, string $key ): void {
 
-			$root 	= \Nino\Filesystem::getPath( $appData );
-			$files 	= [];
+			$root 			= \Nino\Filesystem::getPath( $appData );
+			$configPath	= \Nino\Filesystem::getConfigPath( $appData );
+			$files 			= [];
 
-			if( is_file( $root. '/config.php' ) === true )
-				$files[$root. '/config.php'] = 'config.php';
+			// config.php resolves against configPath, not root - see
+			// \Nino\Filesystem::getConfigPath()'s docblock. Every other file
+			// here is always inside the regular project root.
+			if( is_file( $configPath. '/config.php' ) === true )
+				$files[$configPath. '/config.php'] = 'config.php';
 
 			if( is_file( $root. '/text/global.php' ) === true )
 				$files[$root. '/text/global.php'] = 'text/global.php';
@@ -1688,7 +1712,7 @@ namespace Nino\Dev {
 					'global' 				=> $isGlobal,
 					'blacklisted' 	=> isset( $blacklist[$key] ) === true,
 					'html' 					=> $html,
-					'maxlength' 		=> max( self::MAX_MAXLENGTH, max( self::MIN_MAXLENGTH, $longest + self::MAXLENGTH_BUFFER ) ),
+					'maxlength' 		=> min( self::MAX_MAXLENGTH, max( self::MIN_MAXLENGTH, $longest + self::MAXLENGTH_BUFFER ) ),
 					'values' 				=> $values,
 				];
 			}

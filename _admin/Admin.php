@@ -1065,7 +1065,7 @@ namespace Nino\Admin {
 					'key' 				=> $key,
 					'global' 			=> $isGlobal,
 					'html' 				=> $html,
-					'maxlength' 	=> max( self::MAX_MAXLENGTH, max( self::MIN_MAXLENGTH, $longest + self::MAXLENGTH_BUFFER ) ),
+					'maxlength' 	=> min( self::MAX_MAXLENGTH, max( self::MIN_MAXLENGTH, $longest + self::MAXLENGTH_BUFFER ) ),
 					'values' 			=> $values,
 				];
 			}
@@ -1737,11 +1737,15 @@ namespace Nino\Admin {
 			// than a cached pre-write stat
 			clearstatcache();
 
-			$root 	= \Nino\Filesystem::getPath( $appData );
-			$files 	= [];
+			$root 			= \Nino\Filesystem::getPath( $appData );
+			$configPath	= \Nino\Filesystem::getConfigPath( $appData );
+			$files 			= [];
 
-			if( is_file( $root. '/config.php' ) === true )
-				$files[$root. '/config.php'] = 'config.php';
+			// config.php resolves against configPath, not root - see
+			// \Nino\Filesystem::getConfigPath()'s docblock. Every other file
+			// here is always inside the regular project root.
+			if( is_file( $configPath. '/config.php' ) === true )
+				$files[$configPath. '/config.php'] = 'config.php';
 
 			if( is_file( $root. '/text/global.php' ) === true )
 				$files[$root. '/text/global.php'] = 'text/global.php';
