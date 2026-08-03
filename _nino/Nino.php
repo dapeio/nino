@@ -2645,6 +2645,11 @@ namespace Nino {
 			// Add request/response values
 			$request['/nino/http/request'] = [
 				'method'				=> self::_cleanRawMethod( $request['REQUEST_METHOD'] ),
+				// The method as it came in, before HEAD is folded into GET for
+				// routing - output() needs it to send a HEAD response without a
+				// body, and it keeps that fold from being invisible to anything
+				// else that cares
+				'rawMethod'			=> self::_cleanRawMethod( $request['REQUEST_METHOD'], [], false ),
 				'uri'						=> self::cleanUri( $request['REQUEST_URI'] ),
 				'query'					=> self::_getRequestQueryVarsPart( $request['REQUEST_URI'] ),
 				'header'				=> self::_filterRequestHeaderFields( $request ),
@@ -2727,8 +2732,14 @@ namespace Nino {
 			// Send status code
 			http_response_code( $request['/nino/http/response']['statusCode'] );
 
-			// Send body
-			echo $request['/nino/http/response']['body'];
+			// Send body - a HEAD response carries the headers of the GET it
+			// stands for and nothing else. The request's method has already been
+			// folded to GET for routing, so the unmapped value is what decides
+			// here (see _cleanRawMethod()). Most sapis would drop the body
+			// anyway; not generating it is both cheaper and unambiguous.
+			if( ( $request['/nino/http/request']['rawMethod'] ?? '' ) !== 'HEAD' )
+				echo $request['/nino/http/response']['body'];
+
 			exit;
 		}
 
@@ -2907,10 +2918,11 @@ namespace Nino {
 		 *
 		 *	@param		string 	$rawMethod			Raw requested method
 		 *	@param		array 	$legalMethods		(optional) Array with all legal methods
+		 *	@param		bool 		$mapHead				(optional) Whether HEAD resolves to GET (routing) or stays HEAD
 		 *
 		 *	@return 	string 									Cleaned method
 		 */
-		static private function _cleanRawMethod( string $rawMethod, array $legalMethods = [] ): string {
+		static private function _cleanRawMethod( string $rawMethod, array $legalMethods = [], bool $mapHead = true ): string {
 
 			if( $legalMethods === [] )
 				$legalMethods = ['GET', 'HEAD', 'POST', 'PUT', 'DELETE', 'CONNECT', 'OPTIONS', 'TRACE', 'PATCH' ];
@@ -2926,9 +2938,10 @@ namespace Nino {
 
 			// HEAD is a GET without a response body, but routes are only ever
 			// registered for GET - so every HEAD request (uptime monitors, link
-			// checkers, some crawlers) found no route and answered 404. Mapping
-			// it here keeps that in one place; the sapi drops the body itself.
-			return ( $cleanMethod === 'HEAD' ) ? 'GET' : $cleanMethod;
+			// checkers, some crawlers) found no route and answered 404. The
+			// unmapped value stays available as the request's 'rawMethod', which
+			// is what output() suppresses the body by.
+			return ( $mapHead === true && $cleanMethod === 'HEAD' ) ? 'GET' : $cleanMethod;
 		}
 	}
 
