@@ -394,13 +394,13 @@ namespace Nino {
 
 			// Login/logout are only safe against CSRF if the Csrf module is
 			// actually enabled - config.php's module list is already loaded
-			// at this point (see \Nino\init()). This used to trigger_error()
-			// right here, but that runs on *every* request incl. plain GETs,
-			// and Runtime's error handler always terminates the request (see
-			// its docblock) - one missing module entry would 500 the entire
-			// site, not just the login form. The flag is checked once an
-			// actual POST hits login/logout below instead, so this only ever
-			// blocks the one feature that's actually unsafe.
+			// at this point (see \Nino\init()). Flagged here rather than
+			// trigger_error()'d immediately: that runs on *every* request
+			// incl. plain GETs, and Runtime's error handler always terminates
+			// the request (see its docblock) - one missing module entry would
+			// 500 the entire site, not just the login form. The flag is
+			// checked once an actual POST hits login/logout below instead, so
+			// this only ever blocks the one feature that's actually unsafe.
 			$appData['./nino/auth/csrf-enabled'] = self::_csrfModuleEnabled( $appData );
 
 			// Snapshot of the user records as this request found them, before
@@ -417,17 +417,11 @@ namespace Nino {
 			// Only mail + token live in $_SESSION (see loginUser()) - the user
 			// array itself, pw hash included, is reloaded fresh from appData's
 			// in-memory content on every request instead
-			// is_string() guards a pre-migration session that still holds the
-			// old full user array under this key (see P1-1/P1-2 above) - an
-			// array used as an array key below would be a TypeError, not a
-			// harmless miss, and would 500 every request from anyone who was
-			// logged in at deploy time instead of just treating them as
-			// logged out
-			// The same is_string() guard applies to the token: a session holding
-			// an array under this key (a pre-migration session, or a hand-edited
-			// one) used to reach isset( ...['sessions'][$sessionToken] ), and an
-			// array offset in isset() is a TypeError, not a miss - it would 500
-			// every request from that client instead of treating it as logged out
+			// is_string() guards both against a pre-migration or hand-edited
+			// session that still holds an array under either key - used as an
+			// array key/isset() offset below, that would be a TypeError rather
+			// than a miss, 500ing every request from that client instead of
+			// just treating it as logged out
 			$sessionMail 	= \Nino\Runtime::getSessionValue( $appData, './nino/auth/current', '' );
 			$sessionToken	= \Nino\Runtime::getSessionValue( $appData, './nino/auth/token', '' );
 			if( is_string( $sessionMail ) === true && $sessionMail !== '' && is_string( $sessionToken ) === true && $sessionToken !== '' )
@@ -1257,14 +1251,12 @@ namespace Nino {
 
 			$path = $appData['./nino/filesystem/cache'][$filename]['path'];
 
-			// No flock() on the read side at all any more. It used to take a
-			// LOCK_SH and then LOCK_UN on the cache slot's handle - which is the
-			// very handle lockFile() may have taken a LOCK_EX on: reading in the
-			// middle of a caller's read-modify-write (Elements does exactly that
-			// between lockFile() and putFileContent()) first downgraded that
-			// exclusive lock and then dropped it entirely. Writes are atomic now
-			// (see _writeFile()), so a reader sees either the whole old file or
-			// the whole new one and needs no lock of its own.
+			// No flock() on the read side: a LOCK_SH here would first downgrade,
+			// then drop, an exclusive lock a caller may already hold on this
+			// same handle mid read-modify-write (Elements does exactly that
+			// between lockFile() and putFileContent()). Writes are atomic (see
+			// _writeFile()), so a reader always sees either the whole old file
+			// or the whole new one and needs no lock of its own.
 			clearstatcache( true, $path );
 			$stat = @stat( $path );
 
@@ -1944,22 +1936,13 @@ namespace Nino {
 
 
 		/**
-		 *	Get element file
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		string		$typeUri			Uri of required element type
-		 *
-		 *	@return 	array | false
-		 */
-		/**
 		 *	Take the write lock on a type file and read it back fresh under
 		 *	that lock, for a read-modify-write sequence.
 		 *
-		 *	Reading before locking - which is what both write paths used to do -
-		 *	means the sequence can work from a copy that predates a parallel
-		 *	write, or from a cache slot filled earlier in the same request.
-		 *	Element files are the ones two people actually edit at the same
-		 *	time, so this matters more here than for config.php.
+		 *	Locking before reading, not after, matters because element files
+		 *	are the ones two people actually edit at the same time: reading
+		 *	first can hand the sequence a copy that predates a parallel write,
+		 *	or a cache slot filled earlier in the same request.
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		string		$typeUri			Uri of the element type to lock
@@ -2947,10 +2930,10 @@ namespace Nino {
 
 		/**
 		 *	Filter all non-http keys from an array. Matches case-insensitively
-		 *	and normalizes to the whitelist's own casing - a naive exact
-		 *	match previously turned eg. the request side's 'TE' into 'Te' via
-		 *	ucwords() and then silently dropped it, since that no longer
-		 *	matched the whitelist's literal 'TE' entry.
+		 *	and normalizes to the whitelist's own casing - a naive exact match
+		 *	would silently drop a header whose casing doesn't match the
+		 *	whitelist's literal entry (eg. the request side's 'TE' normalized
+		 *	to 'Te' via ucwords()).
 		 *
 		 *	@param		array 	$headerArray				Raw array with request header fields
 		 *
@@ -3291,13 +3274,9 @@ namespace Nino {
 		 *	config.php's 'GET://rechtliches' => [ ..., 'locale' => 'de_DE' ]).
 		 *
 		 *	Has to run after Http::response(): the route - and with it its
-		 *	'locale' - is only merged into the response array there. The same
-		 *	comparison used to sit in request(), where the response locale was
-		 *	still the seeded current one and the condition could therefore
-		 *	never be true. A locale-specific route set the response field but
-		 *	never switched the actual locale, so its textfills rendered in
-		 *	whatever locale the session happened to carry - the german page
-		 *	came out english for anyone whose session was on en_US.
+		 *	'locale' - is only merged into the response array there, so
+		 *	comparing response locale against current locale any earlier
+		 *	only ever sees the seeded default, not the route's own choice.
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current request
@@ -3728,12 +3707,11 @@ namespace Nino {
 			if( $configured === true && self::$_currentInstance['/nino/error/log'] === true )
 				self::_recordError( self::$_currentInstance, $errorArray );
 
-			// Display error - only when the site explicitly asked for it. An error
-			// raised before AppData::init() has read config.php (ie. inside the
-			// boot sequence itself, see \Nino\init()) used to display too, which
-			// made the one case where displaying is *not* a deliberate choice the
-			// one case that always dumped everything - on a production install
-			// with /nino/error/display set to false.
+			// Display error - only when the site explicitly asked for it, and
+			// only once that choice is actually known. An error raised inside
+			// the boot sequence itself, before AppData::init() has read
+			// config.php (see \Nino\init()), must default to not displaying -
+			// that's exactly the case a production install never opted into.
 			if( $configured === true && self::$_currentInstance['/nino/error/display'] === true ) {
 
 				// DEBUG_BACKTRACE_IGNORE_ARGS: the frames on this stack carry
@@ -3985,11 +3963,9 @@ namespace Nino\Modules {
 				if( $line === false )
 					return '';
 
-				// Return the hash, not the line it sits in. _createCachefile()
-				// writes it as '/**<hash>**/' plus a line break, while the value
-				// this is compared against is a bare sha1() - so the comparison
-				// could never match and the bundle was rebuilt (read every asset,
-				// concatenate, minify, write the file) on every single request.
+				// Strip the '/**' / '**/' wrapper _createCachefile() writes
+				// around the hash, returning the bare sha1() the caller compares
+				// against.
 				$line = trim( $line );
 
 				if( str_starts_with( $line, '/**' ) === false || str_ends_with( $line, '**/' ) === false )
@@ -4912,10 +4888,10 @@ namespace Nino\Modules {
 			if( ( $request['./nino/csrf/blocked'] ?? false ) === true )
 				return;
 
-			// Not escaped before validating (see Form::callbackResponse): an
-			// address with an apostrophe used to be turned into "&#039;" and
-			// then rejected - or, worse, stored in its mangled form, where
-			// getUnsubscribeLink() could never find it again
+			// Not escaped before validating (see Form::callbackResponse):
+			// escaping an address with an apostrophe first would turn it into
+			// "&#039;", either failing validation or getting stored in a form
+			// getUnsubscribeLink() can never match again
 			$email 		= mb_strtolower( substr( trim( (string) ( $_POST['email'] ?? '' ) ), 0, self::MAX_FIELD_LENGTH ) );
 			$location = substr( trim( (string) ( $_POST['location'] ?? '' ) ), 0, self::MAX_FIELD_LENGTH );
 
