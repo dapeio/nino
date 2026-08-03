@@ -974,8 +974,8 @@ namespace Nino\Admin {
 			$data 	= Admin::postData();
 			$items 	= is_array( $data['items'] ?? null ) ? $data['items'] : [];
 
-			$results 	= [];
-			$fileData = [];
+			$results 		= [];
+			$fileChanges = [];
 
 			foreach( $items as $item ) {
 
@@ -1000,16 +1000,20 @@ namespace Nino\Admin {
 
 				$file = ( $entry['global'] === true ) ? '/text/global.php' : '/text/'. $locale. '.php';
 
-				if( isset( $fileData[$file] ) === false )
-					$fileData[$file] = \Nino\Filesystem::getFileContent( $appData, $file, [] );
-
-				$fileData[$file]['[['. $key. ']]'] = $value;
+				$fileChanges[$file]['[['. $key. ']]'] = $value;
 
 				$results[$key] = [ 'ok' => true, 'value' => $value ];
 			}
 
-			foreach( $fileData as $file => $content )
-				\Nino\Filesystem::putFileContent( $appData, $file, $content );
+			// One lock -> re-read -> write per target file, not per key - a
+			// locale file gets every one of this batch's changes merged into
+			// a fresh read under its own lock, so a concurrent save touching
+			// the same file can't land between two of this save's writes and
+			// get silently overwritten
+			foreach( $fileChanges as $file => $changes )
+				\Nino\Filesystem::mutate( $appData, $file, function( array $content ) use ( $changes ): array {
+					return array_merge( $content, $changes );
+				} );
 
 			$request['/nino/http/response']['body'] = [ 'results' => $results ];
 		}
@@ -1173,28 +1177,29 @@ namespace Nino\Admin {
 			}
 
 			$blacklist 	= self::_blacklist( $appData );
-			$existing 	= \Nino\Filesystem::getFileContent( $appData, '/text/'. $locale. '.php', [] );
-
 			$imported 	= 0;
 			$skipped 		= 0;
 
-			foreach( $content as $bracketKey => $value ) {
+			\Nino\Filesystem::mutate( $appData, '/text/'. $locale. '.php', function( array $existing ) use ( $content, $blacklist, &$imported, &$skipped ): array {
 
-				if( is_string( $bracketKey ) === false || str_starts_with( $bracketKey, '[[' ) === false || str_ends_with( $bracketKey, ']]' ) === false ) {
-					$skipped++;
-					continue;
+				foreach( $content as $bracketKey => $value ) {
+
+					if( is_string( $bracketKey ) === false || str_starts_with( $bracketKey, '[[' ) === false || str_ends_with( $bracketKey, ']]' ) === false ) {
+						$skipped++;
+						continue;
+					}
+
+					if( isset( $blacklist[ trim( $bracketKey, '[]' ) ] ) === true ) {
+						$skipped++;
+						continue;
+					}
+
+					$existing[$bracketKey] = (string) $value;
+					$imported++;
 				}
 
-				if( isset( $blacklist[ trim( $bracketKey, '[]' ) ] ) === true ) {
-					$skipped++;
-					continue;
-				}
-
-				$existing[$bracketKey] = (string) $value;
-				$imported++;
-			}
-
-			\Nino\Filesystem::putFileContent( $appData, '/text/'. $locale. '.php', $existing );
+				return $existing;
+			} );
 
 			$request['/nino/http/response']['body'] = [ 'imported' => $imported, 'skipped' => $skipped ];
 		}
@@ -1850,12 +1855,23 @@ namespace Nino\Admin {
 				if( is_dir( $dir ) === false )
 					mkdir( $dir, 0755, true );
 
-				$path 	= $dir. '/'. date( 'Y-m-d' ). '.php';
-				$lines 	= is_file( $path ) === true ? self::_readLines( $path ) : [];
+				$relPath = '/_admin/'. $appData['/nino/logs/dir']. '/'. date( 'Y-m-d' ). '.php';
+				$path 	 = $dir. '/'. date( 'Y-m-d' ). '.php';
 
+				// Locked directly, not via Filesystem::mutate(): this file is
+				// base64+stub encoded, not the plain array format getFileContent()/
+				// putFileContent() know how to read - but two concurrent admin
+				// actions still need to not both read the same line list and each
+				// overwrite the other's append
+				if( \Nino\Filesystem::lockFile( $appData, $relPath ) === false )
+					return;
+
+				$lines 	 = is_file( $path ) === true ? self::_readLines( $path ) : [];
 				$lines[] = date( 'Y-m-d H:i' ). '  '. $actor. '  '. $message;
 
 				file_put_contents( $path, self::STUB_PREFIX. base64_encode( implode( "\n", $lines ) ). self::STUB_SUFFIX );
+
+				\Nino\Filesystem::unlockFile( $appData, $relPath );
 
 				self::_prune( $dir );
 
@@ -2132,15 +2148,21 @@ namespace Nino\Admin {
 				return;
 			}
 
-			$entries 	= \Nino\Filesystem::getFileContent( $appData, self::PATH, [] );
-			$filtered = array_values( array_filter( $entries, function( $entry ) use ( $email ) { return ( $entry['email'] ?? null ) !== $email; } ) );
+			$found = false;
 
-			if( count( $filtered ) === count( $entries ) ) {
+			\Nino\Filesystem::mutate( $appData, self::PATH, function( array $entries ) use ( $email, &$found ): ?array {
+
+				$filtered = array_values( array_filter( $entries, function( $entry ) use ( $email ) { return ( $entry['email'] ?? null ) !== $email; } ) );
+
+				if( count( $filtered ) === count( $entries ) )
+					return null;
+
+				$found = true;
+				return $filtered;
+			} );
+
+			if( $found === false )
 				$request['/nino/http/response']['statusCode'] = 404;
-				return;
-			}
-
-			\Nino\Filesystem::putFileContent( $appData, self::PATH, $filtered );
 		}
 	}
 

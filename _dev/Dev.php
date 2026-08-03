@@ -195,31 +195,48 @@ namespace Nino\Dev {
 		 */
 		private static function apiLogin( array &$appData, array &$request ): void {
 
-			$state = \Nino\Filesystem::getFileContent( $appData, '/_dev/.lockout.json', [ 'tries' => 0, 'until' => 0 ] );
+			$password 	= (string) ( json_decode( $_POST['data'] ?? '{}', true )['password'] ?? '' );
+			$lockedOut 	= false;
+			$verified 	= false;
 
-			if( (int) $state['until'] > time() ) {
-				$request['/nino/http/response']['statusCode'] = 429;
-				$request['/nino/http/response']['body'] = [ 'error' => 'too many attempts' ];
-				return;
-			}
+			// The cooldown check, password verify and tries update all happen
+			// inside one lock: reading the counter, verifying, then writing as
+			// three separate steps would let two concurrent wrong attempts both
+			// read the same "tries" and both write back the same +1, losing an
+			// increment - the exact way to dodge the lockout with two requests
+			// instead of one
+			\Nino\Filesystem::mutate( $appData, '/_dev/.lockout.json', function( array $state ) use ( $password, &$lockedOut, &$verified ): ?array {
 
-			$password = (string) ( json_decode( $_POST['data'] ?? '{}', true )['password'] ?? '' );
+				if( (int) $state['until'] > time() ) {
+					$lockedOut = true;
+					return null;
+				}
 
-			if( password_verify( $password, self::PASSWORD_HASH ) === false ) {
+				$verified = password_verify( $password, self::PASSWORD_HASH );
+
+				if( $verified === true )
+					return [ 'tries' => 0, 'until' => 0 ];
 
 				$state['tries'] = (int) $state['tries'] + 1;
 				if( $state['tries'] >= self::MAX_TRIES ) {
 					$state['tries'] = 0;
 					$state['until'] = time() + self::COOLDOWN;
 				}
-				\Nino\Filesystem::putFileContent( $appData, '/_dev/.lockout.json', $state );
 
+				return $state;
+			}, [ 'tries' => 0, 'until' => 0 ] );
+
+			if( $lockedOut === true ) {
+				$request['/nino/http/response']['statusCode'] = 429;
+				$request['/nino/http/response']['body'] = [ 'error' => 'too many attempts' ];
+				return;
+			}
+
+			if( $verified === false ) {
 				$request['/nino/http/response']['statusCode'] = 401;
 				$request['/nino/http/response']['body'] = [ 'error' => 'wrong password' ];
 				return;
 			}
-
-			\Nino\Filesystem::putFileContent( $appData, '/_dev/.lockout.json', [ 'tries' => 0, 'until' => 0 ] );
 
 			// Defend against session fixation, same as Auth::loginUser()
 			session_regenerate_id( true );
@@ -481,44 +498,56 @@ namespace Nino\Dev {
 				return;
 			}
 
-			// Lock, then invalidate the cached fingerprint so the read below sees
-			// the state this write is actually based on - a slot filled earlier
-			// in the request would otherwise hide a parallel editor's change.
-			// A lock that can't be taken is a 500, not something to write past.
-			if( \Nino\Filesystem::lockFile( $appData, '/elements/'. $typeUri. '.php' ) === false ) {
-				$request['/nino/http/response']['statusCode'] = 500;
-				$request['/nino/http/response']['body'] = [ 'error' => 'could not lock the type file for writing' ];
-				return;
-			}
+			// Locking and re-reading through mutate() means the "unknown type"
+			// 404 below can return null from inside the callback and let
+			// mutate() release the lock itself - unlike the manual lock/read/
+			// write this used to be, there is no early-return branch left that
+			// could walk away holding the lock (see Filesystem::mutate()'s
+			// docblock)
+			$notFound 			= false;
+			$resultTypeData	= null;
 
-			$appData['./nino/filesystem/cache']['/elements/'. $typeUri. '.php']['fstat'] = [];
-			$typeData = \Nino\Filesystem::getFileContent( $appData, '/elements/'. $typeUri. '.php', false );
+			$written = \Nino\Filesystem::mutate( $appData, '/elements/'. $typeUri. '.php', function( mixed $typeData ) use ( $appData, $data, $typeUri, &$notFound, &$resultTypeData ): ?array {
 
-			if( $typeData === false ) {
+				if( $typeData === false ) {
+					$notFound = true;
+					return null;
+				}
+
+				$title 		= trim( (string) ( $data['title'] ?? '' ) );
+				$oldModel = $typeData['model'] ?? [];
+				$newModel = self::cleanModel( $data['model'] ?? [] );
+
+				foreach( $newModel as $key => $field ) {
+					if( array_key_exists( $key, $oldModel ) === false )
+						continue;
+					$wasLocale = ( $oldModel[$key]['locale'] ?? false ) === true;
+					$isLocale 	= ( $field['locale'] ?? false ) === true;
+					if( $wasLocale !== $isLocale )
+						self::_migrateFieldShape( $appData, $typeData, $key, $isLocale );
+				}
+
+				$typeData['title'] = ( $title !== '' ) ? $title : ( $typeData['title'] ?? $typeUri );
+				$typeData['model'] = $newModel;
+
+				$resultTypeData = $typeData;
+
+				return $typeData;
+			}, false );
+
+			if( $notFound === true ) {
 				$request['/nino/http/response']['statusCode'] = 404;
 				$request['/nino/http/response']['body'] = [ 'error' => 'unknown type' ];
 				return;
 			}
 
-			$title 		= trim( (string) ( $data['title'] ?? '' ) );
-			$oldModel = $typeData['model'] ?? [];
-			$newModel = self::cleanModel( $data['model'] ?? [] );
-
-			foreach( $newModel as $key => $field ) {
-				if( array_key_exists( $key, $oldModel ) === false )
-					continue;
-				$wasLocale = ( $oldModel[$key]['locale'] ?? false ) === true;
-				$isLocale 	= ( $field['locale'] ?? false ) === true;
-				if( $wasLocale !== $isLocale )
-					self::_migrateFieldShape( $appData, $typeData, $key, $isLocale );
+			if( $written === false ) {
+				$request['/nino/http/response']['statusCode'] = 500;
+				$request['/nino/http/response']['body'] = [ 'error' => 'could not save the type file' ];
+				return;
 			}
 
-			$typeData['title'] = ( $title !== '' ) ? $title : ( $typeData['title'] ?? $typeUri );
-			$typeData['model'] = $newModel;
-
-			\Nino\Filesystem::putFileContent( $appData, '/elements/'. $typeUri. '.php', $typeData, true );
-
-			$request['/nino/http/response']['body'] = [ 'uri' => $typeUri, 'title' => $typeData['title'], 'model' => $typeData['model'] ];
+			$request['/nino/http/response']['body'] = [ 'uri' => $typeUri, 'title' => $resultTypeData['title'], 'model' => $resultTypeData['model'] ];
 		}
 
 		/**
@@ -1777,15 +1806,16 @@ namespace Nino\Dev {
 			$bracketKey = '[['. $key. ']]';
 
 			if( $isGlobal === true ) {
-				$global = \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] );
-				$global[$bracketKey] = $value;
-				\Nino\Filesystem::putFileContent( $appData, '/text/global.php', $global );
+				\Nino\Filesystem::mutate( $appData, '/text/global.php', function( array $global ) use ( $bracketKey, $value ): array {
+					$global[$bracketKey] = $value;
+					return $global;
+				} );
 			} else {
-				foreach( \Nino\Locales::getAvailableLocales( $appData ) as $locale ) {
-					$localeData = \Nino\Filesystem::getFileContent( $appData, '/text/'. $locale. '.php', [] );
-					$localeData[$bracketKey] = $value;
-					\Nino\Filesystem::putFileContent( $appData, '/text/'. $locale. '.php', $localeData );
-				}
+				foreach( \Nino\Locales::getAvailableLocales( $appData ) as $locale )
+					\Nino\Filesystem::mutate( $appData, '/text/'. $locale. '.php', function( array $localeData ) use ( $bracketKey, $value ): array {
+						$localeData[$bracketKey] = $value;
+						return $localeData;
+					} );
 			}
 
 			$request['/nino/http/response']['body'] = [ 'ok' => true, 'key' => $key ];
@@ -1854,8 +1884,8 @@ namespace Nino\Dev {
 
 			$entries = self::_entries( $appData );
 
-			$results 	= [];
-			$fileData = [];
+			$results 		= [];
+			$fileChanges = [];
 
 			foreach( $items as $item ) {
 
@@ -1883,16 +1913,17 @@ namespace Nino\Dev {
 
 				$file = ( $entry['global'] === true ) ? '/text/global.php' : '/text/'. $locale. '.php';
 
-				if( isset( $fileData[$file] ) === false )
-					$fileData[$file] = \Nino\Filesystem::getFileContent( $appData, $file, [] );
-
-				$fileData[$file]['[['. $key. ']]'] = $value;
+				$fileChanges[$file]['[['. $key. ']]'] = $value;
 
 				$results[$key] = [ 'ok' => true, 'value' => $value ];
 			}
 
-			foreach( $fileData as $file => $content )
-				\Nino\Filesystem::putFileContent( $appData, $file, $content );
+			// One lock -> re-read -> write per target file, not per key - see
+			// _admin's Text::apiSaveBatch() for why
+			foreach( $fileChanges as $file => $changes )
+				\Nino\Filesystem::mutate( $appData, $file, function( array $content ) use ( $changes ): array {
+					return array_merge( $content, $changes );
+				} );
 
 			$request['/nino/http/response']['body'] = [ 'results' => $results ];
 		}
@@ -1947,17 +1978,18 @@ namespace Nino\Dev {
 			$newBracket = '[['. $newKey. ']]';
 
 			if( $entry['global'] === true ) {
-				$global = \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] );
-				$global[$newBracket] = $global[$oldBracket] ?? '';
-				unset( $global[$oldBracket] );
-				\Nino\Filesystem::putFileContent( $appData, '/text/global.php', $global );
+				\Nino\Filesystem::mutate( $appData, '/text/global.php', function( array $global ) use ( $oldBracket, $newBracket ): array {
+					$global[$newBracket] = $global[$oldBracket] ?? '';
+					unset( $global[$oldBracket] );
+					return $global;
+				} );
 			} else {
-				foreach( \Nino\Locales::getAvailableLocales( $appData ) as $locale ) {
-					$localeData = \Nino\Filesystem::getFileContent( $appData, '/text/'. $locale. '.php', [] );
-					$localeData[$newBracket] = $localeData[$oldBracket] ?? '';
-					unset( $localeData[$oldBracket] );
-					\Nino\Filesystem::putFileContent( $appData, '/text/'. $locale. '.php', $localeData );
-				}
+				foreach( \Nino\Locales::getAvailableLocales( $appData ) as $locale )
+					\Nino\Filesystem::mutate( $appData, '/text/'. $locale. '.php', function( array $localeData ) use ( $oldBracket, $newBracket ): array {
+						$localeData[$newBracket] = $localeData[$oldBracket] ?? '';
+						unset( $localeData[$oldBracket] );
+						return $localeData;
+					} );
 			}
 
 			if( $entry['blacklisted'] === true ) {
@@ -1999,15 +2031,16 @@ namespace Nino\Dev {
 			$bracketKey = '[['. $key. ']]';
 
 			if( $entry['global'] === true ) {
-				$global = \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] );
-				unset( $global[$bracketKey] );
-				\Nino\Filesystem::putFileContent( $appData, '/text/global.php', $global );
+				\Nino\Filesystem::mutate( $appData, '/text/global.php', function( array $global ) use ( $bracketKey ): array {
+					unset( $global[$bracketKey] );
+					return $global;
+				} );
 			} else {
-				foreach( \Nino\Locales::getAvailableLocales( $appData ) as $locale ) {
-					$localeData = \Nino\Filesystem::getFileContent( $appData, '/text/'. $locale. '.php', [] );
-					unset( $localeData[$bracketKey] );
-					\Nino\Filesystem::putFileContent( $appData, '/text/'. $locale. '.php', $localeData );
-				}
+				foreach( \Nino\Locales::getAvailableLocales( $appData ) as $locale )
+					\Nino\Filesystem::mutate( $appData, '/text/'. $locale. '.php', function( array $localeData ) use ( $bracketKey ): array {
+						unset( $localeData[$bracketKey] );
+						return $localeData;
+					} );
 			}
 
 			if( $entry['blacklisted'] === true )
@@ -2037,29 +2070,31 @@ namespace Nino\Dev {
 				$native = \Nino\Locales::getNativeLocale( $appData );
 				$value 	= $entry['values'][$native] ?? ( array_values( array_filter( $entry['values'], fn( $v ) => $v !== '' ) )[0] ?? '' );
 
-				foreach( $locales as $locale ) {
-					$localeData = \Nino\Filesystem::getFileContent( $appData, '/text/'. $locale. '.php', [] );
-					unset( $localeData[$bracketKey] );
-					\Nino\Filesystem::putFileContent( $appData, '/text/'. $locale. '.php', $localeData );
-				}
+				foreach( $locales as $locale )
+					\Nino\Filesystem::mutate( $appData, '/text/'. $locale. '.php', function( array $localeData ) use ( $bracketKey ): array {
+						unset( $localeData[$bracketKey] );
+						return $localeData;
+					} );
 
-				$global = \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] );
-				$global[$bracketKey] = $value;
-				\Nino\Filesystem::putFileContent( $appData, '/text/global.php', $global );
+				\Nino\Filesystem::mutate( $appData, '/text/global.php', function( array $global ) use ( $bracketKey, $value ): array {
+					$global[$bracketKey] = $value;
+					return $global;
+				} );
 
 			} else {
 
 				$value = $entry['values']['*'] ?? '';
 
-				$global = \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] );
-				unset( $global[$bracketKey] );
-				\Nino\Filesystem::putFileContent( $appData, '/text/global.php', $global );
+				\Nino\Filesystem::mutate( $appData, '/text/global.php', function( array $global ) use ( $bracketKey ): array {
+					unset( $global[$bracketKey] );
+					return $global;
+				} );
 
-				foreach( $locales as $locale ) {
-					$localeData = \Nino\Filesystem::getFileContent( $appData, '/text/'. $locale. '.php', [] );
-					$localeData[$bracketKey] = $value;
-					\Nino\Filesystem::putFileContent( $appData, '/text/'. $locale. '.php', $localeData );
-				}
+				foreach( $locales as $locale )
+					\Nino\Filesystem::mutate( $appData, '/text/'. $locale. '.php', function( array $localeData ) use ( $bracketKey, $value ): array {
+						$localeData[$bracketKey] = $value;
+						return $localeData;
+					} );
 			}
 		}
 
@@ -2074,17 +2109,19 @@ namespace Nino\Dev {
 		 */
 		private static function _setBlacklisted( array &$appData, string $key, bool $blacklisted ): void {
 
-			$list 	= \Nino\Filesystem::getFileContent( $appData, '/text/blacklist.php', [] );
-			$has 		= in_array( $key, $list, true );
+			\Nino\Filesystem::mutate( $appData, '/text/blacklist.php', function( array $list ) use ( $key, $blacklisted ): ?array {
 
-			if( $blacklisted === true && $has === false )
-				$list[] = $key;
-			else if( $blacklisted === false && $has === true )
-				$list = array_values( array_diff( $list, [ $key ] ) );
-			else
-				return;
+				$has = in_array( $key, $list, true );
 
-			\Nino\Filesystem::putFileContent( $appData, '/text/blacklist.php', $list );
+				if( $blacklisted === true && $has === false )
+					$list[] = $key;
+				else if( $blacklisted === false && $has === true )
+					$list = array_values( array_diff( $list, [ $key ] ) );
+				else
+					return null;
+
+				return $list;
+			} );
 		}
 
 		/**

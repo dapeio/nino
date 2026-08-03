@@ -240,15 +240,14 @@ namespace Nino {
 		 *	blindly re-serializing all of it would silently discard whatever
 		 *	a concurrent request (eg. a second admin session, or Auth's own
 		 *	failed-attempt tracking) wrote to config.php in the meantime.
-		 *	Re-reading fresh right before writing - same "read, then lock,
-		 *	then put with nolock" shape Elements already uses for its own
-		 *	per-type files - keeps this call's changes from clobbering
-		 *	anyone else's. The cache entry is dropped first rather than just
-		 *	calling getFileContent() as-is: its staleness check compares
-		 *	mtimes at 1-second resolution, so a concurrent write landing in
-		 *	the same wall-clock second (the exact case this exists to guard
-		 *	against) would otherwise go undetected and this call would still
-		 *	work from a stale copy.
+		 *	Filesystem::mutate() re-reads fresh under the lock for the same
+		 *	reason - this only has to merge the given keys into that copy.
+		 *
+		 *	A failed lock is treated as a deployment problem (no /data/.locks,
+		 *	no free file handles), not contention - unlike every other
+		 *	mutate() caller, this surfaces it via trigger_error() rather than
+		 *	giving up silently: a dropped config.php write can mean a
+		 *	permission change, a route, or a user's login never actually saved.
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		$keys					Top-level appData keys this call changed
@@ -257,33 +256,20 @@ namespace Nino {
 		 */
 		public static function writeContentData( array &$appData, array $keys ): void {
 
-			// Lock first, then re-read: doing it the other way round leaves a
-			// window in which someone else's write lands between this call's
-			// read and its own write, which is the exact race the re-read is
-			// here to close
-			// A failed lock is a deployment problem (no /data/.locks, no free
-			// file handles), not contention - flock() blocks rather than failing
-			// when someone else holds it. Writing anyway would silently put back
-			// exactly the lost-update race the lock exists to prevent, so this
-			// path stops instead.
 			if( \Nino\Filesystem::lockFile( $appData, '/config.php' ) === false ) {
 				trigger_error( 'AppData::writeContentData(): could not lock config.php for writing - refusing to write unserialized.', E_USER_ERROR );
 				return;
 			}
 
-			// Invalidate the fingerprint rather than dropping the whole slot:
-			// the re-read below has to happen either way (a concurrent write
-			// landing in the same wall-clock second would otherwise go
-			// unnoticed), but the slot itself has to survive
-			$appData['./nino/filesystem/cache']['/config.php']['fstat'] = [];
-			$content = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
+			\Nino\Filesystem::mutate( $appData, '/config.php', function( array $content, array &$appData ) use ( $keys ): array {
 
-			foreach( $keys as $key )
-				$content[$key] = ( $key === '/nino/auth/user' )
-					? self::_mergeAuthUsers( $appData['./nino/auth/baseline'] ?? [], $content[$key] ?? [], $appData[$key] ?? [], $appData['./nino/auth/revoked'] ?? [] )
-					: ( $appData[$key] ?? null );
+				foreach( $keys as $key )
+					$content[$key] = ( $key === '/nino/auth/user' )
+						? self::_mergeAuthUsers( $appData['./nino/auth/baseline'] ?? [], $content[$key] ?? [], $appData[$key] ?? [], $appData['./nino/auth/revoked'] ?? [] )
+						: ( $appData[$key] ?? null );
 
-			\Nino\Filesystem::putFileContent( $appData, '/config.php', $content, true );
+				return $content;
+			} );
 		}
 
 		/**
@@ -991,24 +977,14 @@ namespace Nino {
 		 */
 		private static function _dropTries( array &$appData, string $username ): void {
 
-			// lock -> invalidate -> read -> write, in that order: reading before
-			// locking leaves a window for exactly the concurrent write the lock
-			// is meant to exclude. A lock that cannot be taken at all means the
-			// counter can't be maintained safely, so nothing is written.
-			if( \Nino\Filesystem::lockFile( $appData, self::TRIES_PATH ) === false )
-				return;
+			\Nino\Filesystem::mutate( $appData, self::TRIES_PATH, function( array $state ) use ( $username ): ?array {
 
-			$appData['./nino/filesystem/cache'][self::TRIES_PATH]['fstat'] = [];
+				if( isset( $state[$username] ) === false )
+					return null;
 
-			$state = \Nino\Filesystem::getFileContent( $appData, self::TRIES_PATH, [] );
-
-			if( isset( $state[$username] ) === false ) {
-				\Nino\Filesystem::unlockFile( $appData, self::TRIES_PATH );
-				return;
-			}
-
-			unset( $state[$username] );
-			\Nino\Filesystem::putFileContent( $appData, self::TRIES_PATH, $state, true );
+				unset( $state[$username] );
+				return $state;
+			} );
 		}
 
 		/**
@@ -1025,23 +1001,15 @@ namespace Nino {
 		 */
 		private static function _renameTries( array &$appData, string $oldUsername, string $newUsername ): void {
 
-			// Same lock -> invalidate -> read -> write order as _dropTries(),
-			// including giving up when the lock can't be taken
-			if( \Nino\Filesystem::lockFile( $appData, self::TRIES_PATH ) === false )
-				return;
+			\Nino\Filesystem::mutate( $appData, self::TRIES_PATH, function( array $state ) use ( $oldUsername, $newUsername ): ?array {
 
-			$appData['./nino/filesystem/cache'][self::TRIES_PATH]['fstat'] = [];
+				if( isset( $state[$oldUsername] ) === false )
+					return null;
 
-			$state = \Nino\Filesystem::getFileContent( $appData, self::TRIES_PATH, [] );
-
-			if( isset( $state[$oldUsername] ) === false ) {
-				\Nino\Filesystem::unlockFile( $appData, self::TRIES_PATH );
-				return;
-			}
-
-			$state[$newUsername] = $state[$oldUsername];
-			unset( $state[$oldUsername] );
-			\Nino\Filesystem::putFileContent( $appData, self::TRIES_PATH, $state, true );
+				$state[$newUsername] = $state[$oldUsername];
+				unset( $state[$oldUsername] );
+				return $state;
+			} );
 		}
 
 		/**
@@ -1056,57 +1024,45 @@ namespace Nino {
 		 */
 		private static function _registerFailedAttemp( array &$appData, array $keys ): bool {
 
-			// Lock, invalidate the cached fingerprint, re-read, then write
-			// through the held lock - the same order AppData::writeContentData()
-			// uses for config.php (see its docblock). Reading before locking, or
-			// without a lock at all, lets two concurrent failed attempts (a
-			// brute-force script hammering the endpoint over several
-			// connections) read the same starting count and overwrite each
-			// other's increment - exactly what this file exists to catch.
-			// Without the lock two concurrent failures overwrite each other's
-			// increment, ie. the counter undercounts exactly when it matters -
-			// so a failed lock means this attempt is not recorded at all rather
-			// than recorded unreliably. The caller still gets false either way.
-			if( \Nino\Filesystem::lockFile( $appData, self::TRIES_PATH ) === false )
-				return false;
+			// A dedicated file, not config.php, so this unauthenticated path
+			// never triggers a config.php rewrite. A failed lock (see
+			// Filesystem::mutate()) means this attempt goes unrecorded rather
+			// than recorded unreliably - the caller gets false either way.
+			\Nino\Filesystem::mutate( $appData, self::TRIES_PATH, function( array $state, array &$appData ) use ( $keys ): array {
 
-			$appData['./nino/filesystem/cache'][self::TRIES_PATH]['fstat'] = [];
+				$now = time();
 
-			$state	= \Nino\Filesystem::getFileContent( $appData, self::TRIES_PATH, [] );
-			$now		= time();
+				// Drop buckets whose cooldown has already elapsed - with an ip
+				// bucket per attacking client this file would otherwise only ever
+				// grow. Same "clean up on the write we're doing anyway" idea as
+				// Mail::_hit() and loginUser()'s session pruning.
+				foreach( $state as $stateKey => $stateTries )
+					if( (int) $stateTries < 0 && 0 - (int) $stateTries <= $now )
+						unset( $state[$stateKey] );
 
-			// Drop buckets whose cooldown has already elapsed - with an ip
-			// bucket per attacking client this file would otherwise only ever
-			// grow. Same "clean up on the write we're doing anyway" idea as
-			// Mail::_hit() and loginUser()'s session pruning.
-			foreach( $state as $stateKey => $stateTries )
-				if( (int) $stateTries < 0 && 0 - (int) $stateTries <= $now )
-					unset( $state[$stateKey] );
+				foreach( $keys as $key ) {
 
-			foreach( $keys as $key ) {
+					$tries = (int) ( $state[$key] ?? 0 );
 
-				$tries = (int) ( $state[$key] ?? 0 );
+					if( $tries >= 0 )
+						$tries++;
+					else
+						$tries = 1;
 
-				if( $tries >= 0 )
-					$tries++;
-				else
-					$tries = 1;
+					// Check max tries - see IP_TRIES_FACTOR for why the ip bucket
+					// gets a much longer leash than a single account does
+					$maxTries = ( str_starts_with( $key, self::IP_KEY_PREFIX ) === true )
+						? $appData['/nino/auth/maxtries'] * self::IP_TRIES_FACTOR
+						: $appData['/nino/auth/maxtries'];
 
-				// Check max tries - see IP_TRIES_FACTOR for why the ip bucket
-				// gets a much longer leash than a single account does
-				$maxTries = ( str_starts_with( $key, self::IP_KEY_PREFIX ) === true )
-					? $appData['/nino/auth/maxtries'] * self::IP_TRIES_FACTOR
-					: $appData['/nino/auth/maxtries'];
+					if( $tries >= $maxTries )
+						$tries = 0 - $now - $appData['/nino/auth/cooldown'];
 
-				if( $tries >= $maxTries )
-					$tries = 0 - $now - $appData['/nino/auth/cooldown'];
+					$state[$key] = $tries;
+				}
 
-				$state[$key] = $tries;
-			}
-
-			// Write data change - a dedicated file, not config.php, so this
-			// unauthenticated path never triggers a config.php rewrite
-			\Nino\Filesystem::putFileContent( $appData, self::TRIES_PATH, $state, true );
+				return $state;
+			} );
 
 			return false;
 		}
@@ -1494,6 +1450,43 @@ namespace Nino {
 			unset( $appData['./nino/filesystem/locks'][$filename] );
 
 			return true;
+		}
+
+		/**
+		 *	Lock -> invalidate -> read -> write, in that order, around a
+		 *	callback that computes the new state - the shape every
+		 *	read-modify-write cycle on a file needs, written once. Reading
+		 *	before locking leaves a window for exactly the concurrent write
+		 *	the lock exists to exclude.
+		 *
+		 *	$fn returning null aborts without writing (eg. "nothing to
+		 *	change") and still releases the lock, so a caller with an early
+		 *	exit doesn't need its own unlockFile() call.
+		 *
+		 *	@param		array 			&$appData			(reference) Array with current app data
+		 *	@param		string			$path					Filename to lock, read and write
+		 *	@param		callable		$fn						fn( mixed $state, array &$appData ): mixed - the new
+		 *																	state to write, or null to abort
+		 *	@param		mixed				$default			Passed to getFileContent() as the not-found default
+		 *
+		 *	@return		bool										If a write happened and succeeded
+		 */
+		public static function mutate( array &$appData, string $path, callable $fn, mixed $default = [] ): bool {
+
+			if( self::lockFile( $appData, $path ) === false )
+				return false;
+
+			$appData['./nino/filesystem/cache'][$path]['fstat'] = [];
+
+			$state 	= self::getFileContent( $appData, $path, $default );
+			$new 		= $fn( $state, $appData );
+
+			if( $new === null ) {
+				self::unlockFile( $appData, $path );
+				return false;
+			}
+
+			return self::putFileContent( $appData, $path, $new, true );
 		}
 
 		/**
@@ -3509,33 +3502,28 @@ namespace Nino {
 
 			$path 	= '/data/ratelimit.php';
 			$now 		= time();
+			$tries	= null;
 
-			// Lock, then drop the cache slot and re-read - an unlocked
-			// read-modify-write lets two parallel sends read the same counter
-			// and write back the same +1, so the cap is bypassed by simply
-			// firing requests concurrently, which is what a sending burst looks
-			// like anyway. Same shape as Auth::_registerFailedAttemp().
-			// No lock, no reliable counter - and an unreliable send cap is worse
-			// than a closed one here, so the send is refused rather than let
-			// through unaccounted
-			if( \Nino\Filesystem::lockFile( $appData, $path ) === false )
-				return false;
+			// An unlocked read-modify-write lets two parallel sends read the
+			// same counter and write back the same +1, bypassing the cap by
+			// simply firing requests concurrently - which is what a sending
+			// burst looks like anyway. No reliable counter, no send: an
+			// unreliable cap is worse than a closed one here.
+			$written = \Nino\Filesystem::mutate( $appData, $path, function( array $state ) use ( $key, $now, &$tries ): array {
 
-			$appData['./nino/filesystem/cache'][$path]['fstat'] = [];
+				foreach( $state as $stateKey => $entry )
+					if( ( $entry['reset'] ?? 0 ) <= $now )
+						unset( $state[$stateKey] );
 
-			$state 	= \Nino\Filesystem::getFileContent( $appData, $path, [] );
+				$entry 					= $state[$key] ?? [ 'tries' => 0, 'reset' => $now + self::WINDOW ];
+				$entry['tries']	= (int) $entry['tries'] + 1;
+				$state[$key] 		= $entry;
+				$tries 					= $entry['tries'];
 
-			foreach( $state as $stateKey => $entry )
-				if( ( $entry['reset'] ?? 0 ) <= $now )
-					unset( $state[$stateKey] );
+				return $state;
+			} );
 
-			$entry 					= $state[$key] ?? [ 'tries' => 0, 'reset' => $now + self::WINDOW ];
-			$entry['tries']	= (int) $entry['tries'] + 1;
-			$state[$key] 		= $entry;
-
-			\Nino\Filesystem::putFileContent( $appData, $path, $state, true );
-
-			return $entry['tries'] <= self::MAX_TRIES;
+			return $written === true && $tries <= self::MAX_TRIES;
 		}
 	}
 
@@ -3754,12 +3742,12 @@ namespace Nino {
 
 			try {
 
-				$path 		= '/data/logs.'. date( 'Y-m' ). '.php';
-				$entries 	= \Nino\Filesystem::getFileContent( $appData, $path, [] );
+				$path = '/data/logs.'. date( 'Y-m' ). '.php';
 
-				$entries[] = $entry + [ 'date' => date( 'Y-m-d H:i:s' ) ];
-
-				\Nino\Filesystem::putFileContent( $appData, $path, $entries );
+				\Nino\Filesystem::mutate( $appData, $path, function( array $entries ) use ( $entry ): array {
+					$entries[] = $entry + [ 'date' => date( 'Y-m-d H:i:s' ) ];
+					return $entries;
+				} );
 
 				self::_pruneLogs( \Nino\Filesystem::getPath( $appData ). '/data' );
 
@@ -4476,10 +4464,10 @@ namespace Nino\Modules {
 
 				$path = '/data/forms.'. date( 'Y-m' ). '.php';
 
-				$entries 	= \Nino\Filesystem::getFileContent( $appData, $path, [] );
-				$entries[] = $entry;
-
-				\Nino\Filesystem::putFileContent( $appData, $path, $entries );
+				\Nino\Filesystem::mutate( $appData, $path, function( array $entries ) use ( $entry ): array {
+					$entries[] = $entry;
+					return $entries;
+				} );
 
 				self::_prune( \Nino\Filesystem::getPath( $appData ). '/data' );
 
@@ -4990,33 +4978,47 @@ namespace Nino\Modules {
 
 			try {
 
-				$entries = \Nino\Filesystem::getFileContent( $appData, self::PATH, [] );
-				$token 	 = null;
+				$existing 	= false;
+				$token 			= null;
 
-				foreach( $entries as $entryKey => $entry ) {
+				\Nino\Filesystem::mutate( $appData, self::PATH, function( array $entries ) use ( $email, &$existing, &$token ): ?array {
 
-					if( ( $entry['email'] ?? null ) !== $email )
-						continue;
+					foreach( $entries as $entryKey => $entry ) {
 
-					if( ( $entry['status'] ?? 'subscribed' ) === 'subscribed' )
-						return 'existing';
+						if( ( $entry['email'] ?? null ) !== $email )
+							continue;
 
-					$token = $entry['token'];
-					$entries[$entryKey]['date'] = date( 'Y-m-d H:i:s' );
-				}
+						if( ( $entry['status'] ?? 'subscribed' ) === 'subscribed' ) {
+							$existing = true;
+							return null;
+						}
 
-				if( $token === null ) {
-					$token 		 = bin2hex( random_bytes( 16 ) );
-					$entries[] = [
-						'email'		=> $email,
-						'token'		=> $token,
-						'status'	=> 'pending',
-						'date'		=> date( 'Y-m-d H:i:s' ),
-						'ip'			=> \Nino\Http::getClientIp(),
-					];
-				}
+						$token = $entry['token'];
+						$entries[$entryKey]['date'] = date( 'Y-m-d H:i:s' );
+					}
 
-				\Nino\Filesystem::putFileContent( $appData, self::PATH, $entries );
+					if( $token === null ) {
+						$token 		 = bin2hex( random_bytes( 16 ) );
+						$entries[] = [
+							'email'		=> $email,
+							'token'		=> $token,
+							'status'	=> 'pending',
+							'date'		=> date( 'Y-m-d H:i:s' ),
+							'ip'			=> \Nino\Http::getClientIp(),
+						];
+					}
+
+					return $entries;
+				} );
+
+				if( $existing === true )
+					return 'existing';
+
+				// $token is only still null if the lock itself couldn't be taken
+				// (mutate()'s callback never ran) - nothing was recorded, so
+				// there is nothing to mail a confirm link for either
+				if( $token === null )
+					return 'existing';
 
 				self::_sendConfirmMail( $appData, $email, $token );
 
@@ -5075,21 +5077,30 @@ namespace Nino\Modules {
 
 			try {
 
-				$entries = \Nino\Filesystem::getFileContent( $appData, self::PATH, [] );
+				$found = false;
 
-				foreach( $entries as $entryKey => $entry ) {
+				\Nino\Filesystem::mutate( $appData, self::PATH, function( array $entries ) use ( $token, &$found ): ?array {
 
-					if( hash_equals( (string) ( $entry['token'] ?? '' ), $token ) === false )
-						continue;
+					foreach( $entries as $entryKey => $entry ) {
 
-					if( ( $entry['status'] ?? '' ) !== 'subscribed' ) {
+						if( hash_equals( (string) ( $entry['token'] ?? '' ), $token ) === false )
+							continue;
+
+						$found = true;
+
+						if( ( $entry['status'] ?? '' ) === 'subscribed' )
+							return null;
+
 						$entries[$entryKey]['status']	= 'subscribed';
 						$entries[$entryKey]['date']		= date( 'Y-m-d H:i:s' );
-						\Nino\Filesystem::putFileContent( $appData, self::PATH, $entries );
+
+						return $entries;
 					}
 
-					return true;
-				}
+					return null;
+				} );
+
+				return $found;
 
 			} catch( \Throwable $e ) {
 				trigger_error( 'Newsletter confirm failed: '. $e->getMessage() );
@@ -5114,14 +5125,21 @@ namespace Nino\Modules {
 
 			try {
 
-				$entries = \Nino\Filesystem::getFileContent( $appData, self::PATH, [] );
+				$found = false;
 
-				foreach( $entries as $entryKey => $entry )
-					if( hash_equals( (string) ( $entry['token'] ?? '' ), $token ) === true ) {
-						unset( $entries[$entryKey] );
-						\Nino\Filesystem::putFileContent( $appData, self::PATH, array_values( $entries ) );
-						return true;
-					}
+				\Nino\Filesystem::mutate( $appData, self::PATH, function( array $entries ) use ( $token, &$found ): ?array {
+
+					foreach( $entries as $entryKey => $entry )
+						if( hash_equals( (string) ( $entry['token'] ?? '' ), $token ) === true ) {
+							unset( $entries[$entryKey] );
+							$found = true;
+							return array_values( $entries );
+						}
+
+					return null;
+				} );
+
+				return $found;
 
 			} catch( \Throwable $e ) {
 				trigger_error( 'Newsletter unsubscribe failed: '. $e->getMessage() );
