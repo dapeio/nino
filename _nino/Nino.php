@@ -252,14 +252,60 @@ namespace Nino {
 		 */
 		public static function writeContentData( array &$appData, array $keys ): void {
 
+			// Lock first, then re-read: doing it the other way round leaves a
+			// window in which someone else's write lands between this call's
+			// read and its own write, which is the exact race the re-read is
+			// here to close
+			\Nino\Filesystem::lockFile( $appData, '/config.php' );
+
 			unset( $appData['./nino/filesystem/cache']['/config.php'] );
 			$content = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
 
 			foreach( $keys as $key )
-				$content[$key] = $appData[$key] ?? null;
+				$content[$key] = ( $key === '/nino/auth/user' )
+					? self::_mergeAuthUsers( $appData['./nino/auth/baseline'] ?? [], $content[$key] ?? [], $appData[$key] ?? [] )
+					: ( $appData[$key] ?? null );
 
-			\Nino\Filesystem::lockFile( $appData, '/config.php' );
 			\Nino\Filesystem::putFileContent( $appData, '/config.php', $content, true );
+		}
+
+		/**
+		 *	Three-way merge for '/nino/auth/user'. Re-reading the file only
+		 *	protects *other* top-level keys - two parallel logins both write
+		 *	the whole '/nino/auth/user' key from their own, by then outdated,
+		 *	in-memory copy, so whoever writes second drops the other's session
+		 *	and logs that user straight back out.
+		 *	The three sides are: what this request saw at boot (baseline, see
+		 *	Auth::init()), what is on disk right now, and what this request
+		 *	decided. A session token that appeared on disk after boot can only
+		 *	be someone else's parallel login - this request never saw it, so it
+		 *	cannot have removed it - and is carried over. A token this request
+		 *	removed (in the baseline, gone from memory) stays removed, so
+		 *	logout and "log out everywhere" keep working.
+		 *	Only the sessions map is merged: adding/removing users is an admin
+		 *	action, not something two requests do to each other by accident.
+		 *
+		 *	@param		array 		$baseline			'/nino/auth/user' as read at boot
+		 *	@param		array 		$onDisk				'/nino/auth/user' as it is on disk now
+		 *	@param		array 		$inMemory			'/nino/auth/user' as this request wants it
+		 *
+		 *	@return 	array
+		 */
+		private static function _mergeAuthUsers( array $baseline, array $onDisk, array $inMemory ): array {
+
+			foreach( $inMemory as $mail => $user ) {
+
+				if( is_array( $user['sessions'] ?? null ) === false || is_array( $onDisk[$mail]['sessions'] ?? null ) === false )
+					continue;
+
+				$baseSessions = $baseline[$mail]['sessions'] ?? [];
+
+				foreach( $onDisk[$mail]['sessions'] as $token => $session )
+					if( isset( $baseSessions[$token] ) === false && isset( $user['sessions'][$token] ) === false )
+						$inMemory[$mail]['sessions'][$token] = $session;
+			}
+
+			return $inMemory;
 		}
 	}
 
@@ -328,6 +374,12 @@ namespace Nino {
 			// actual POST hits login/logout below instead, so this only ever
 			// blocks the one feature that's actually unsafe.
 			$appData['./nino/auth/csrf-enabled'] = self::_csrfModuleEnabled( $appData );
+
+			// Snapshot of the user records as this request found them, before
+			// anything in it can have changed them - the third side of
+			// AppData::writeContentData()'s merge, which is what keeps two
+			// parallel logins from cancelling each other out
+			$appData['./nino/auth/baseline'] = $appData['/nino/auth/user'] ?? [];
 
 			// Read session user - the session token (not the client ip) is what
 			// ties a php session to one entry in the user's 'sessions' array,
