@@ -1105,38 +1105,37 @@ namespace Nino {
 			if( self::_prepareFileCache( $appData, $filename ) === false )
 				return $default;
 
-			// Check handle and content
-			if( $appData['./nino/filesystem/cache'][$filename]['handle'] === null )
-				$appData['./nino/filesystem/cache'][$filename]['handle'] = fopen( $appData['./nino/filesystem/cache'][$filename]['path'], 'r' );
+			$path = $appData['./nino/filesystem/cache'][$filename]['path'];
 
-			// Check if we have to read the filecontent
-			$stats = fstat( $appData['./nino/filesystem/cache'][$filename]['handle'] );
-			if( isset( $appData['./nino/filesystem/cache'][$filename]['fstat']['mtime'] ) === false || $stats['mtime'] !== $appData['./nino/filesystem/cache'][$filename]['fstat']['mtime'] ) {
+			// No flock() on the read side at all any more. It used to take a
+			// LOCK_SH and then LOCK_UN on the cache slot's handle - which is the
+			// very handle lockFile() may have taken a LOCK_EX on: reading in the
+			// middle of a caller's read-modify-write (Elements does exactly that
+			// between lockFile() and putFileContent()) first downgraded that
+			// exclusive lock and then dropped it entirely. Writes are atomic now
+			// (see _writeFile()), so a reader sees either the whole old file or
+			// the whole new one and needs no lock of its own.
+			clearstatcache( true, $path );
+			$stat = @stat( $path );
 
-				flock( $appData['./nino/filesystem/cache'][$filename]['handle'], LOCK_SH );
+			if( $stat === false )
+				return $default;
 
-				// This handle may be the one putFileContent() just wrote
-				// through (its own cache slot, reused here) - fwrite() left
-				// it positioned at end-of-file, not the start, so fread()
-				// below would silently return '' instead of the real
-				// content. clearstatcache() matters for the same reason:
-				// filesize() is path-based, and PHP's stat cache can still
-				// report the pre-write size otherwise, even though fstat()
-				// above (handle-based) already sees the fresh mtime.
-				rewind( $appData['./nino/filesystem/cache'][$filename]['handle'] );
-				clearstatcache( true, $appData['./nino/filesystem/cache'][$filename]['path'] );
+			// mtime alone has 1-second resolution; comparing size as well
+			// catches most same-second rewrites. Callers that must not miss one
+			// (AppData::writeContentData(), Auth's tries file) still drop their
+			// cache slot explicitly before reading.
+			$fingerprint = [ 'mtime' => $stat['mtime'], 'size' => $stat['size'] ];
 
-				$appData['./nino/filesystem/cache'][$filename]['fstat']['mtime'] = $stats['mtime'];
-				$size = filesize( $appData['./nino/filesystem/cache'][$filename]['path'] );
+			if( $appData['./nino/filesystem/cache'][$filename]['fstat'] !== $fingerprint ) {
 
-				if( substr( $filename, -4 ) === '.php' )
-					$appData['./nino/filesystem/cache'][$filename]['content'] = include $appData['./nino/filesystem/cache'][$filename]['path'];
-				else
-					$appData['./nino/filesystem/cache'][$filename]['content']	= ( $size > 0 ) ? fread( $appData['./nino/filesystem/cache'][$filename]['handle'], $size ) : '';
+				$appData['./nino/filesystem/cache'][$filename]['fstat'] 	= $fingerprint;
+				$appData['./nino/filesystem/cache'][$filename]['content']	= ( substr( $filename, -4 ) === '.php' )
+					? include $path
+					: (string) @file_get_contents( $path );
+
 				if( substr( $filename, -5 ) === '.json' )
 					$appData['./nino/filesystem/cache'][$filename]['content'] = json_decode( $appData['./nino/filesystem/cache'][$filename]['content'], true );
-
-				flock( $appData['./nino/filesystem/cache'][$filename]['handle'], LOCK_UN );
 			}
 
 			return $appData['./nino/filesystem/cache'][$filename]['content'];
@@ -1148,7 +1147,7 @@ namespace Nino {
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		string		$filename			Filename of requested file
 		 *	@param		misc			$content			Content to put
-		 *	@param		boolean		$nolock 			(optional) If flock LOCK_EX should be ignored
+		 *	@param		boolean		$nolock 			(optional) If the caller already holds the lock (see lockFile())
 		 *	@param		boolean		$append 			(optional) Append to file
 		 *
 		 *	@return		bool										If successful
@@ -1163,27 +1162,18 @@ namespace Nino {
 
 			self::forceDir( $appData, dirname( ltrim( $filename, '/' ) ) );
 
-			// Create handle - reuse one already locked via lockFile() instead of
-			// opening a fresh one: lockFile() stores its locked handle in this same
-			// cache slot, and overwriting it here would drop the only reference to
-			// that resource, closing it and silently releasing the flock before this
-			// write happens. For a fresh handle, open with 'c+' (create, don't
-			// truncate) rather than 'w+' - 'w+' truncates the file the instant it's
-			// opened, before flock() below runs, so a concurrent reader/writer could
-			// observe 0 bytes even though nothing is locked yet.
-			$existingHandle = $appData['./nino/filesystem/cache'][$filename]['handle'] ?? null;
-			$handle = ( $nolock === true && is_resource( $existingHandle ) === true )
-				? $existingHandle
-				: fopen( $appData['./nino/filesystem/cache'][$filename]['path'], ( $append === true ) ? 'a' : 'c+' );
+			$path = $appData['./nino/filesystem/cache'][$filename]['path'];
 
-			$appData['./nino/filesystem/cache'][$filename]['handle'] = $handle;
+			// Take the lock unless the caller already holds it via lockFile()
+			if( $nolock === false && self::lockFile( $appData, $filename ) === false )
+				return false;
 
-			// Lock file
-			if( $nolock === false )
-				flock( $handle, LOCK_EX );
-
-			// Update cache
-			$appData['./nino/filesystem/cache'][$filename]['content']	= $content;
+			// Update cache - for an append the cached value would be just the
+			// chunk, not the file, so the slot is dropped and re-read instead
+			if( $append === true )
+				$appData['./nino/filesystem/cache'][$filename]['fstat'] = [];
+			else
+				$appData['./nino/filesystem/cache'][$filename]['content'] = $content;
 
 			// Prepare content
 			if( substr( $filename, -5 ) === '.json' )
@@ -1191,32 +1181,115 @@ namespace Nino {
 			if( substr( $filename, -4 ) === '.php' )
 				$content = '<?php return '. var_export( $content, true ). ';';
 
-			// Write file - fflush() before unlocking matters: fwrite() alone can leave
-			// data sitting in PHP's own stream buffer rather than actually on disk yet,
-			// so a *different* read of the same path (a different handle/process, or
-			// even this same request via a function that doesn't share this handle)
-			// can still see the pre-write content/size until it's flushed
-			ftruncate( $handle, 0 );
-			fwrite( $handle, $content );
-			fflush( $handle );
+			$success = ( $append === true )
+				? self::_appendFile( $path, (string) $content )
+				: self::_writeFile( $path, (string) $content );
 
-			// Captured after the write, not before - the pre-write mtime
-			// used to make getFileContent() think its cache was stale on
-			// every single next read of this same file (see its docblock
-			// for the actually broken half of that: a stale-cache read
-			// reusing this handle without rewinding first)
-			$appData['./nino/filesystem/cache'][$filename]['fstat'] = fstat( $handle );
-			flock( $handle, LOCK_UN );
+			// Released either way, including for $nolock === true: the write is
+			// the end of the caller's read-modify-write sequence (lockFile() ->
+			// read -> putFileContent()), which is exactly where the previous
+			// implementation dropped its flock too. Holding on past it would
+			// block the next sequence in the same process - two appData copies
+			// in one request, or simply the next write of the same file.
+			self::unlockFile( $appData, $filename );
 
 			// Reset opcache
-			if( function_exists( 'opcache_invalidate' ) === true && is_file( $appData['./nino/filesystem/cache'][$filename]['path'] ) === true )
-				opcache_invalidate( $appData['./nino/filesystem/cache'][$filename]['path'] );
+			if( function_exists( 'opcache_invalidate' ) === true && is_file( $path ) === true )
+				opcache_invalidate( $path );
+
+			// Refresh the fingerprint getFileContent() compares against, so the
+			// write this call just made doesn't look like someone else's change
+			clearstatcache( true, $path );
+			$stat = @stat( $path );
+
+			if( $append === false && $stat !== false )
+				$appData['./nino/filesystem/cache'][$filename]['fstat'] = [ 'mtime' => $stat['mtime'], 'size' => $stat['size'] ];
+
+			return $success;
+		}
+
+		/**
+		 *	Replace a file's content atomically: write a temp file next to it,
+		 *	then rename() over the target. A plain ftruncate()+fwrite() leaves
+		 *	the file empty for the duration of the write and, if the process
+		 *	dies in between (php timeout, oom kill, deploy restart), leaves it
+		 *	empty for good - for config.php that is every route, every module
+		 *	binding and every password hash gone. rename() within the same
+		 *	directory is atomic, so a concurrent reader sees either the whole
+		 *	old file or the whole new one, never a half-written one.
+		 *
+		 *	@param		string		$path					Absolute target path
+		 *	@param		string		$content			Content to write
+		 *
+		 *	@return		bool										If successful
+		 */
+		private static function _writeFile( string $path, string $content ): bool {
+
+			$temp		= $path. '.'. bin2hex( random_bytes( 6 ) ). '.tmp';
+			$handle	= fopen( $temp, 'wb' );
+
+			if( $handle === false )
+				return false;
+
+			$written = fwrite( $handle, $content );
+
+			// fflush() before closing: a short write (full disk, quota) has to
+			// fail here, while the temp file is still the only thing affected
+			if( $written === false || $written !== strlen( $content ) || fflush( $handle ) === false ) {
+				fclose( $handle );
+				@unlink( $temp );
+				return false;
+			}
+
+			fclose( $handle );
+
+			// Keep the existing file's mode - the temp file was created fresh
+			// under the current umask, so without this a rewrite could quietly
+			// widen (or narrow) permissions on eg. config.php
+			$mode = @fileperms( $path );
+			if( $mode !== false )
+				@chmod( $temp, $mode & 0777 );
+
+			if( rename( $temp, $path ) === false ) {
+				@unlink( $temp );
+				return false;
+			}
 
 			return true;
 		}
 
 		/**
-		 *	Lock a file for writing via flock
+		 *	Append to a file. Kept separate from _writeFile(): appending is by
+		 *	definition an in-place operation, there is nothing to swap in.
+		 *
+		 *	@param		string		$path					Absolute target path
+		 *	@param		string		$content			Content to append
+		 *
+		 *	@return		bool										If successful
+		 */
+		private static function _appendFile( string $path, string $content ): bool {
+
+			$handle = fopen( $path, 'a' );
+
+			if( $handle === false )
+				return false;
+
+			// No ftruncate() here - it used to run unconditionally, so an
+			// "append" emptied the file and wrote the chunk on its own
+			$written = fwrite( $handle, $content );
+			$flushed = fflush( $handle );
+
+			fclose( $handle );
+
+			return $written !== false && $written === strlen( $content ) && $flushed === true;
+		}
+
+		/**
+		 *	Lock a file for a read-modify-write sequence. The lock lives on a
+		 *	side-car file in /data/.locks rather than on the file itself: the
+		 *	data file is replaced by rename() (see _writeFile()), and a lock
+		 *	held on the replaced inode stops serializing anything the moment
+		 *	that happens. The lock file is only ever created, never replaced.
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		string		$filename			Filename of requested file
@@ -1225,21 +1298,35 @@ namespace Nino {
 		 */
 		public static function lockFile( array &$appData, string $filename ): bool {
 
-			// Prepare file cache and force parent dir
-			if( self::_prepareFileCache( $appData, $filename ) === false )
+			self::_prepareFileCache( $appData, $filename );
+
+			// Already holding it (eg. lockFile() followed by a putFileContent()
+			// that takes its own lock) - flock() is per handle, so re-locking
+			// the same handle is a no-op rather than a deadlock, but there is
+			// no point in opening a second one
+			if( is_resource( $appData['./nino/filesystem/cache'][$filename]['lock'] ?? null ) === true )
+				return true;
+
+			self::forceDir( $appData, '/data/.locks' );
+
+			$lockPath	= self::getPath( $appData ). '/data/.locks/'. sha1( $filename ). '.lock';
+			$handle		= fopen( $lockPath, 'c' );
+
+			if( $handle === false )
 				return false;
 
-			self::forceDir( $appData, dirname( '/'. ltrim( $filename, '/' ) ) );
+			if( flock( $handle, LOCK_EX ) === false ) {
+				fclose( $handle );
+				return false;
+			}
 
-			// Create handle
-			$appData['./nino/filesystem/cache'][$filename]['handle'] = fopen( $appData['./nino/filesystem/cache'][$filename]['path'], 'r+' );
-			$lock = flock( $appData['./nino/filesystem/cache'][$filename]['handle'], LOCK_EX );
+			$appData['./nino/filesystem/cache'][$filename]['lock'] = $handle;
 
-			return $lock;
+			return true;
 		}
 
 		/**
-		 *	Unlock a file
+		 *	Release a lock taken by lockFile()
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		string		$filename			Filename of requested file
@@ -1248,12 +1335,15 @@ namespace Nino {
 		 */
 		public static function unlockFile( array &$appData, string $filename ): bool {
 
-			// Prepare file array cache
-			if( self::_prepareFileCache( $appData, $filename ) === false || isset( $appData['./nino/filesystem/cache'][$filename]['handle'] ) === false )
+			$handle = $appData['./nino/filesystem/cache'][$filename]['lock'] ?? null;
+
+			if( is_resource( $handle ) === false )
 				return false;
 
-			// Unlock
-			flock( $appData['./nino/filesystem/cache'][$filename]['handle'], LOCK_UN );
+			flock( $handle, LOCK_UN );
+			fclose( $handle );
+
+			$appData['./nino/filesystem/cache'][$filename]['lock'] = null;
 
 			return true;
 		}
@@ -1289,8 +1379,12 @@ namespace Nino {
 
 			$dirpath = $appData['./nino/filesystem/path']. '/'. $dirpath;
 
+			// 0755, not 0777: with the umask cleared (not unusual on shared
+			// hosting, and the default in some cli/cron contexts) 0777 really
+			// does mean world-writable - for /images, /data and the asset cache,
+			// ie. directories the webserver serves from
 			if( is_dir( $dirpath ) === false )
-				mkdir( $dirpath, 0777, true );
+				mkdir( $dirpath, 0755, true );
 		}
 
 		/**
@@ -1329,14 +1423,16 @@ namespace Nino {
 		 */
 		public static function copyDir( string $source, string $dest ): bool {
 
+			// 0755, see forceDir() - this one copies backup/restore trees, so a
+			// world-writable mode here would land on the backup directory too
 			if( ! file_exists( dirname( $dest ) ) )
-				mkdir( dirname( $dest ), 0777, true );
+				mkdir( dirname( $dest ), 0755, true );
 
 			if( is_file( $source ) )
 				return copy( $source, $dest );
 
 			if( ! is_dir( $dest ) )
-				mkdir( $dest, 0777, true );
+				mkdir( $dest, 0755, true );
 
 			foreach( scandir( $source ) as $object ) {
 				if( $object === '.' || $object === '..' )
@@ -1392,9 +1488,12 @@ namespace Nino {
 				? $appData['./nino/filesystem/configpath']
 				: $appData['./nino/filesystem/path'];
 
+			// 'lock' holds the side-car lock handle while a caller is inside a
+			// read-modify-write (see lockFile()); 'fstat' is the mtime/size
+			// fingerprint getFileContent() decides staleness by
 			if( isset( $appData['./nino/filesystem/cache'][$filename] ) === false )
 				$appData['./nino/filesystem/cache'][$filename] = [
-					'handle'			=> null,
+					'lock'				=> null,
 					'path'				=> $base. '/'. ltrim( $filename, '/' ),
 					'content'			=> '',
 					'fstat'				=> [],

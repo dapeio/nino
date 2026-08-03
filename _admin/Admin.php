@@ -1841,8 +1841,10 @@ namespace Nino\Admin {
 
 				$dir = \Nino\Filesystem::getPath( $appData ). '/_admin/'. $appData['/nino/logs/dir'];
 
+				// 0755, see Filesystem::forceDir() - this directory's only real
+				// protection is its random name, world-writable undoes that
 				if( is_dir( $dir ) === false )
-					mkdir( $dir, 0777, true );
+					mkdir( $dir, 0755, true );
 
 				$path 	= $dir. '/'. date( 'Y-m-d' ). '.php';
 				$lines 	= is_file( $path ) === true ? self::_readLines( $path ) : [];
