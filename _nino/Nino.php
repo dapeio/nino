@@ -1667,6 +1667,65 @@ namespace Nino {
 
 	/**
 	 *	Nino								A compact filesystembased php framework
+	 *	RotatingLog					One prune() for every "delete dated files older
+	 *											than a cutoff" sweep - Runtime's error log,
+	 *											Modules\Form's submissions, Admin\Logs' activity
+	 *											log and Admin\Backup's own retention each used
+	 *											to carry their own copy
+	 *
+	 *	@package						Dape/Nino
+	 *	@author							David Perchermeier <mail@dape.io>
+	 *	@link								https://github.com/dapeio/nino
+	 */
+
+	class RotatingLog {
+
+		/**
+		 *	Delete files in $dir named "<prefix><date><suffix>" whose date is
+		 *	older than $cutoff. A name whose date portion doesn't parse cleanly
+		 *	is left alone, not deleted - not being one of this sweep's files is
+		 *	not evidence of being stale, and "can't tell" must never mean
+		 *	"delete it" (true of a backup directory most of all).
+		 *
+		 *	@param		string			$dir					Absolute path to the directory holding the dated files
+		 *	@param		string			$prefix				Filename prefix before the date (eg. 'logs.', '')
+		 *	@param		string			$dateFormat		'Y-m' (monthly) or 'Y-m-d' (daily) - the date portion's own format
+		 *	@param		string			$suffix				Filename suffix after the date (eg. '.php')
+		 *	@param		\DateTime		$cutoff				Files dated before this are deleted
+		 *
+		 *	@return 	void
+		 */
+		public static function prune( string $dir, string $prefix, string $dateFormat, string $suffix, \DateTime $cutoff ): void {
+
+			foreach( glob( $dir. '/'. $prefix. '*'. $suffix ) ?: [] as $file ) {
+
+				$datePart = substr( basename( $file ), strlen( $prefix ), -strlen( $suffix ) );
+
+				// Always parsed as a full 'Y-m-d', padding a monthly 'Y-m' out
+				// to the first of the month first - createFromFormat() would
+				// otherwise default a bare 'Y-m''s missing day to *today's*,
+				// drifting the cutoff boundary day to day and risking a
+				// rollover into the next month entirely (eg. parsing "...-02"
+				// on the 31st)
+				$full = ( $dateFormat === 'Y-m' ) ? $datePart. '-01' : $datePart;
+				$date = \DateTime::createFromFormat( 'Y-m-d', $full );
+
+				// Round-tripped back through the same format rather than
+				// matched against a regex first - stricter (createFromFormat()
+				// alone tolerates eg. "2026-13-45" by rolling it into a real
+				// date) and there is no separate regex to keep in sync with
+				// $dateFormat
+				if( $date === false || $date->format( 'Y-m-d' ) !== $full )
+					continue;
+
+				if( $date->setTime( 0, 0 ) < $cutoff )
+					unlink( $file );
+			}
+		}
+	}
+
+	/**
+	 *	Nino								A compact filesystembased php framework
 	 *	Elements 						A simple filebased node/element/post integration
 	 *
 	 *	@package						Dape/Nino
@@ -3767,18 +3826,7 @@ namespace Nino {
 
 			$cutoff = ( new \DateTime( 'first day of -'. self::RETENTION_MONTHS. ' months' ) )->setTime( 0, 0 );
 
-			foreach( glob( $dir. '/logs.*.php' ) ?: [] as $file ) {
-
-				$month = substr( basename( $file, '.php' ), 5 );
-
-				if( preg_match( '/^\d{4}-\d{2}$/', $month ) !== 1 )
-					continue;
-
-				$date = \DateTime::createFromFormat( 'Y-m-d', $month. '-01' );
-
-				if( $date === false || $date < $cutoff )
-					unlink( $file );
-			}
+			\Nino\RotatingLog::prune( $dir, 'logs.', 'Y-m', '.php', $cutoff );
 		}
 	}
 }
@@ -4489,18 +4537,7 @@ namespace Nino\Modules {
 
 			$cutoff = ( new \DateTime( 'first day of -'. self::RETENTION_MONTHS. ' months' ) )->setTime( 0, 0 );
 
-			foreach( glob( $dir. '/forms.*.php' ) ?: [] as $file ) {
-
-				$month = substr( basename( $file, '.php' ), 6 );
-
-				if( preg_match( '/^\d{4}-\d{2}$/', $month ) !== 1 )
-					continue;
-
-				$date = \DateTime::createFromFormat( 'Y-m-d', $month. '-01' );
-
-				if( $date === false || $date < $cutoff )
-					unlink( $file );
-			}
+			\Nino\RotatingLog::prune( $dir, 'forms.', 'Y-m', '.php', $cutoff );
 		}
 	}
 

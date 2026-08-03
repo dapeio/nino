@@ -1782,20 +1782,9 @@ namespace Nino\Admin {
 		 */
 		private static function _prune( string $dir ): void {
 
-			$cutoff = time() - ( self::RETENTION_DAYS * 86400 );
+			$cutoff = ( new \DateTime( '-'. self::RETENTION_DAYS. ' days' ) )->setTime( 0, 0 );
 
-			foreach( glob( $dir. '/*.php' ) ?: [] as $file ) {
-
-				$basename = basename( $file, '.php' );
-
-				if( preg_match( '/^\d{4}-\d{2}-\d{2}$/', $basename ) !== 1 )
-					continue;
-
-				$date = \DateTime::createFromFormat( 'Y-m-d', $basename );
-
-				if( $date === false || $date->getTimestamp() < $cutoff )
-					unlink( $file );
-			}
+			\Nino\RotatingLog::prune( $dir, '', 'Y-m-d', '.php', $cutoff );
 		}
 	}
 
@@ -1983,20 +1972,9 @@ namespace Nino\Admin {
 		 */
 		private static function _prune( string $dir ): void {
 
-			$cutoff = time() - ( self::RETENTION_DAYS * 86400 );
+			$cutoff = ( new \DateTime( '-'. self::RETENTION_DAYS. ' days' ) )->setTime( 0, 0 );
 
-			foreach( glob( $dir. '/*.php' ) ?: [] as $file ) {
-
-				$basename = basename( $file, '.php' );
-
-				if( preg_match( '/^\d{4}-\d{2}-\d{2}$/', $basename ) !== 1 )
-					continue;
-
-				$date = \DateTime::createFromFormat( 'Y-m-d', $basename );
-
-				if( $date === false || $date->getTimestamp() < $cutoff )
-					unlink( $file );
-			}
+			\Nino\RotatingLog::prune( $dir, '', 'Y-m-d', '.php', $cutoff );
 		}
 	}
 

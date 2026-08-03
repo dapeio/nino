@@ -718,6 +718,39 @@ check( 'and the stale entry was dropped rather than accumulating forever', $rate
 echo "\n";
 
 
+// --- RotatingLog::prune ----------------------------------------------------
+
+echo "RotatingLog::prune - shared dated-file sweep (Runtime, Form, Admin\\Logs, Admin\\Backup)\n";
+
+$rotDir = $sandbox. '/rotatinglog';
+mkdir( $rotDir, 0777, true );
+
+$oldMonthly 		= $rotDir. '/logs.2020-01.php';
+$freshMonthly 	= $rotDir. '/logs.'. date( 'Y-m' ). '.php';
+$oldDaily 			= $rotDir. '/2020-01-01.php';
+$freshDaily 		= $rotDir. '/'. date( 'Y-m-d' ). '.php';
+$unparseable 		= $rotDir. '/pre-restore-1234567890.php';
+
+foreach( [ $oldMonthly, $freshMonthly, $oldDaily, $freshDaily, $unparseable ] as $f )
+	file_put_contents( $f, '<?php return [];' );
+
+$monthlyCutoff = ( new \DateTime( 'first day of -3 months' ) )->setTime( 0, 0 );
+\Nino\RotatingLog::prune( $rotDir, 'logs.', 'Y-m', '.php', $monthlyCutoff );
+
+check( 'an old monthly bucket past the cutoff is deleted', is_file( $oldMonthly ) === false );
+check( 'a fresh monthly bucket is kept', is_file( $freshMonthly ) === true );
+check( 'a filename this sweep does not own (no "logs." prefix) is untouched', is_file( $unparseable ) === true );
+
+$dailyCutoff = ( new \DateTime( '-14 days' ) )->setTime( 0, 0 );
+\Nino\RotatingLog::prune( $rotDir, '', 'Y-m-d', '.php', $dailyCutoff );
+
+check( 'an old daily file past the cutoff is deleted', is_file( $oldDaily ) === false );
+check( 'a fresh daily file is kept', is_file( $freshDaily ) === true );
+check( 'a same-directory file whose name does not parse as a date is left alone, not deleted', is_file( $unparseable ) === true );
+
+echo "\n";
+
+
 // --- Http header composition / locale redirects ---------------------------
 
 echo "Http::request/response - header composition, csp, locale redirects\n";
