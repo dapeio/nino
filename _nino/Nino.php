@@ -3028,15 +3028,30 @@ namespace Nino {
 			if( $configured === true && self::$_currentInstance['/nino/error/log'] === true )
 				self::_recordError( self::$_currentInstance, $errorArray );
 
-			// Display error (always, if not configured yet)
-			if( $configured === false || self::$_currentInstance['/nino/error/display'] === true ) {
+			// Display error - only when the site explicitly asked for it. An error
+			// raised before AppData::init() has read config.php (ie. inside the
+			// boot sequence itself, see \Nino\init()) used to display too, which
+			// made the one case where displaying is *not* a deliberate choice the
+			// one case that always dumped everything - on a production install
+			// with /nino/error/display set to false.
+			if( $configured === true && self::$_currentInstance['/nino/error/display'] === true ) {
+
+				// DEBUG_BACKTRACE_IGNORE_ARGS: the frames on this stack carry
+				// $appData (every password hash, the session token), the request
+				// headers incl. Cookie/Authorization, and - in the login path -
+				// the plaintext password passed to loginUser(). None of that
+				// belongs on a rendered page, not even a deliberately enabled
+				// debug one, which is just as likely to be screenshotted into a
+				// ticket as it is to be read by the developer who enabled it.
 				echo '<pre>';
-				var_dump( $errorArray, debug_backtrace() );
+				var_dump( $errorArray, debug_backtrace( DEBUG_BACKTRACE_IGNORE_ARGS ) );
 				die('</pre>');
 			}
 
-			// Break current cycle
-			header( $_SERVER['SERVER_PROTOCOL']. ' 500 Internal Server Error', true, 500 );
+			// Break current cycle - SERVER_PROTOCOL is absent on cli (and can be
+			// absent behind an odd sapi), and an undefined-key warning raised
+			// inside the error handler would re-enter this very method
+			header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.1' ). ' 500 Internal Server Error', true, 500 );
 			exit;
 		}
 
