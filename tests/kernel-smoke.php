@@ -553,7 +553,7 @@ check( 'a csrf-blocked signup does not create the newsletter file', is_file( \Ni
 
 $okNewsletterRequest = submitNewsletter( $appData, [ 'email' => 'jo@example.com' ] );
 check( 'a valid signup succeeds (200)', $okNewsletterRequest['/nino/http/response']['statusCode'] === 200 );
-check( 'a valid new signup reports status "new"', $okNewsletterRequest['/nino/http/response']['body']['status'] === 'new' );
+check( 'a valid new signup reports the generic status', $okNewsletterRequest['/nino/http/response']['body']['status'] === 'ok' );
 check( 'a valid signup bootstraps the newsletter file at the project root, not under _admin', is_file( \Nino\Filesystem::getPath( $appData ). '/data/newsletter.php' ) === true && is_dir( \Nino\Filesystem::getPath( $appData ). '/_admin/data' ) === false );
 
 $subscribersPath 	= '/data/newsletter.php';
@@ -570,7 +570,7 @@ $pendingToken = $subscribers[0]['token'];
 
 $dupeRequest = submitNewsletter( $appData, [ 'email' => 'jo@example.com' ] );
 check( 'a repeated signup while still pending succeeds (200)', $dupeRequest['/nino/http/response']['statusCode'] === 200 );
-check( 'and reports "new" again - the confirm mail is simply re-sent', $dupeRequest['/nino/http/response']['body']['status'] === 'new' );
+check( 'and reports the same generic status - the confirm mail is simply re-sent', $dupeRequest['/nino/http/response']['body']['status'] === 'ok' );
 $subscribers = \Nino\Filesystem::getFileContent( $appData, $subscribersPath, [] );
 check( 'without creating a duplicate entry', count( $subscribers ) === 1 );
 check( 'and without rotating the pending token', $subscribers[0]['token'] === $pendingToken );
@@ -589,7 +589,9 @@ $reconfirmRequest = visitNewsletterLink( $appData, [ 'confirm' => $pendingToken 
 check( 'confirming twice stays a friendly 200, not an error', $reconfirmRequest['/nino/http/response']['statusCode'] === 200 );
 
 $subscribedRequest = submitNewsletter( $appData, [ 'email' => 'jo@example.com' ] );
-check( 'signing up a confirmed subscriber again reports "existing"', $subscribedRequest['/nino/http/response']['body']['status'] === 'existing' );
+// The response must not distinguish a known address from a new one - that
+// would let anyone test whether a given address is subscribed
+check( 'signing up a confirmed subscriber again reports the same generic status', $subscribedRequest['/nino/http/response']['body']['status'] === 'ok' );
 check( 'and does not create a duplicate entry', count( \Nino\Filesystem::getFileContent( $appData, $subscribersPath, [] ) ) === 1 );
 
 $unsubscribeLink = \Nino\Modules\Newsletter::getUnsubscribeLink( $appData, 'jo@example.com' );

@@ -637,17 +637,19 @@
 
 			/*
 			 *	js-newsletter-form - same validate-then-xhr shape as ui-form
-			 *	above, kept separate because a signup can succeed two ways
-			 *	that need their own message: a brand new subscriber ('new'
-			 *	-> /newsletter/info/success) vs an email already on the list
-			 *	('existing' -> /newsletter/info/existing, not an error)
+			 *	above, kept separate because the signup is disabled after a
+			 *	successful submit and shows /newsletter/info/success.
+			 *	The endpoint deliberately answers the same way whether or not
+			 *	the address was already on the list - anything else lets anyone
+			 *	test whether a given address is subscribed - so there is no
+			 *	'existing' case to distinguish here either.
 			 */
 			if( e.newsletterForm.length > 0 ) {
 
 				let
 					/**
 					 *	Handle a .js-newsletter-form's xhr response: disable the
-					 *	form and show the matching success/existing/error message.
+					 *	form and show the matching success/error message.
 					 *	Bound as `this.form` before use.
 					 *
 					 *	@param		{XMLHttpRequest}	xhr				Completed (normalized) xhr
@@ -658,9 +660,7 @@
 
 						this.form.classList.remove('pending');
 
-						let result = 'error';
-						if( xhr.status === 200 )
-							result = ( xhr.responseJSON && xhr.responseJSON.status === 'existing' ) ? 'existing' : 'success';
+						let result = ( xhr.status === 200 ) ? 'success' : 'error';
 
 						this.form.classList.add(result);
 						this.form.msg.innerHTML = Nino.content.getText('/newsletter/info/'+ result);

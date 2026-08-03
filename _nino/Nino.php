@@ -4101,18 +4101,25 @@ namespace Nino\Modules {
 			if( ( $request['./nino/csrf/blocked'] ?? false ) === true )
 				return;
 
-			$_POST['name'] 			= htmlspecialchars( substr( trim( $_POST['name'] ?? '' ), 0, self::MAX_FIELD_LENGTH ), ENT_QUOTES, 'UTF-8' );
-			$_POST['email'] 		= htmlspecialchars( substr( trim( $_POST['email'] ?? '' ), 0, self::MAX_FIELD_LENGTH ), ENT_QUOTES, 'UTF-8' );
-			$_POST['message'] 	= htmlspecialchars( substr( trim( $_POST['message'] ?? '' ), 0, self::MAX_FIELD_LENGTH ), ENT_QUOTES, 'UTF-8' );
-			$_POST['location'] 	= htmlspecialchars( substr( trim( $_POST['location'] ?? '' ), 0, self::MAX_FIELD_LENGTH ), ENT_QUOTES, 'UTF-8' );
-			$_POST['cat'] 			= htmlspecialchars( substr( trim( $_POST['cat'] ?? '' ), 0, self::MAX_FIELD_LENGTH ), ENT_QUOTES, 'UTF-8' );
+			// Trimmed and length-capped, but not yet escaped - escaping is an
+			// output concern, and doing it here broke validation: a perfectly
+			// legitimate "o'brien@example.com" becomes "o&#039;brien@..." and
+			// FILTER_VALIDATE_EMAIL then rejects it, ie. a 400 for a valid
+			// address the visitor has no way of getting past
+			$clean = fn( string $key ): string => substr( trim( (string) ( $_POST[$key] ?? '' ) ), 0, self::MAX_FIELD_LENGTH );
+
+			$name			= $clean( 'name' );
+			$email		= $clean( 'email' );
+			$message	= $clean( 'message' );
+			$location	= $clean( 'location' );
+			$cat			= $clean( 'cat' );
 
 			// Fields empty
-			if( empty( $_POST['name'] ) === true || empty( $_POST['email'] ) === true || empty( $_POST['message'] ) === true || filter_var( $_POST['email'], FILTER_VALIDATE_EMAIL ) === false )
+			if( $name === '' || $email === '' || $message === '' || filter_var( $email, FILTER_VALIDATE_EMAIL ) === false )
 				$request['/nino/http/response']['statusCode'] = 400;
 
 			// Honeypot is filled
-			if( empty( $_POST['location'] ) === false )
+			if( $location !== '' )
 				$request['/nino/http/response']['statusCode'] = 418;
 
 			if( $request['/nino/http/response']['statusCode'] !== 200 )
@@ -4122,11 +4129,15 @@ namespace Nino\Modules {
 			// [[/nino/dir]] is resolved manually here (not via the normal
 			// Text-fill mechanism), since this callback runs inside
 			// Http::response() - before \Nino\request() adds it as a fill
+			// Escaped here, on the way into the html mail templates - the one
+			// place these values actually become markup
+			$safe = fn( string $value ): string => htmlspecialchars( $value, ENT_QUOTES, 'UTF-8' );
+
 			$fields = [
-				'[[name]]'					=> $_POST['name'],
-				'[[email]]'					=> $_POST['email'],
-				'[[message]]'				=> nl2br( $_POST['message'] ),
-				'[[subject]]'				=> $_POST['cat'],
+				'[[name]]'					=> $safe( $name ),
+				'[[email]]'					=> $safe( $email ),
+				'[[message]]'				=> nl2br( $safe( $message ) ),
+				'[[subject]]'				=> $safe( $cat ),
 				'[[date]]'					=> date("Y-m-d H:i:s"),
 				'[[/nino/dir]]'		=> \Nino\Filesystem::getDir( $appData ),
 			];
@@ -4152,18 +4163,21 @@ namespace Nino\Modules {
 
 			\Nino\Locales::setCurrentLocale( $appData, $visitorLocale );
 
-			\Nino\Mail::send( $appData, $emailOwner, $subjectOwner, $tpl_owner, $_POST['email'] );
+			\Nino\Mail::send( $appData, $emailOwner, $subjectOwner, $tpl_owner, $email );
 
-			\Nino\Mail::send( $appData, $_POST['email'], $subjectUser, $tpl_user, $emailOwner );
+			\Nino\Mail::send( $appData, $email, $subjectUser, $tpl_user, $emailOwner );
 
 			$request['/nino/http/response']['statusCode'] = 200;
 
+			// Stored escaped, same as before: _admin's submissions panel decodes
+			// these entities again on render (see _admin/assets/submissions.js,
+			// decodeEntities() into textContent)
 			self::_record( $appData, [
 				'date'		=> date( 'Y-m-d H:i:s' ),
-				'name'		=> $_POST['name'],
-				'email'		=> $_POST['email'],
-				'message'	=> $_POST['message'],
-				'cat'			=> $_POST['cat'],
+				'name'		=> $safe( $name ),
+				'email'		=> $safe( $email ),
+				'message'	=> $safe( $message ),
+				'cat'			=> $safe( $cat ),
 				'ip'			=> \Nino\Http::getClientIp(),
 			] );
 		}
@@ -4606,24 +4620,33 @@ namespace Nino\Modules {
 			if( ( $request['./nino/csrf/blocked'] ?? false ) === true )
 				return;
 
-			$email 		= mb_strtolower( htmlspecialchars( substr( trim( $_POST['email'] ?? '' ), 0, self::MAX_FIELD_LENGTH ), ENT_QUOTES, 'UTF-8' ) );
-			$location = htmlspecialchars( substr( trim( $_POST['location'] ?? '' ), 0, self::MAX_FIELD_LENGTH ), ENT_QUOTES, 'UTF-8' );
+			// Not escaped before validating (see Form::callbackResponse): an
+			// address with an apostrophe used to be turned into "&#039;" and
+			// then rejected - or, worse, stored in its mangled form, where
+			// getUnsubscribeLink() could never find it again
+			$email 		= mb_strtolower( substr( trim( (string) ( $_POST['email'] ?? '' ) ), 0, self::MAX_FIELD_LENGTH ) );
+			$location = substr( trim( (string) ( $_POST['location'] ?? '' ) ), 0, self::MAX_FIELD_LENGTH );
 
 			// Email missing/invalid
-			if( empty( $email ) === true || filter_var( $email, FILTER_VALIDATE_EMAIL ) === false )
+			if( $email === '' || filter_var( $email, FILTER_VALIDATE_EMAIL ) === false )
 				$request['/nino/http/response']['statusCode'] = 400;
 
 			// Honeypot is filled
-			if( empty( $location ) === false )
+			if( $location !== '' )
 				$request['/nino/http/response']['statusCode'] = 418;
 
 			if( $request['/nino/http/response']['statusCode'] !== 200 )
 				return;
 
-			$status = self::_requestSignup( $appData, $email );
+			self::_requestSignup( $appData, $email );
 
+			// Always the same answer. Reporting 'new' vs 'existing' told anyone
+			// who asked whether a given address is on the list - the signup form
+			// is public, so that is a free subscriber-enumeration oracle. With
+			// double opt-in there is nothing to tell the visitor either way
+			// except "check your inbox".
 			$request['/nino/http/response']['statusCode'] = 200;
-			$request['/nino/http/response']['body'] 			= [ 'status' => $status ];
+			$request['/nino/http/response']['body'] 			= [ 'status' => 'ok' ];
 		}
 
 		/**
