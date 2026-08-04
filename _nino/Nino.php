@@ -1103,16 +1103,23 @@ namespace Nino {
 		private static function _writeFile( string $path, string $content ): bool {
 
 			$temp		= $path. '.'. bin2hex( random_bytes( 6 ) ). '.tmp';
-			$handle	= fopen( $temp, 'wb' );
+			// @ on every primary I/O call below, not just the cleanup ones -
+			// a disk-full/quota/permission failure here otherwise raises a
+			// plain E_WARNING, which Runtime::handleError() (deliberately)
+			// still treats as fatal. Without @, that warning - not the
+			// === false check three lines down - is what ends the request,
+			// and every caller's carefully worded "could not be written"/
+			// "could not be locked" message not currently reachable
+			$handle	= @fopen( $temp, 'wb' );
 
 			if( $handle === false )
 				return false;
 
-			$written = fwrite( $handle, $content );
+			$written = @fwrite( $handle, $content );
 
 			// fflush() before closing: a short write (full disk, quota) has to
 			// fail here, while the temp file is still the only thing affected
-			if( $written === false || $written !== strlen( $content ) || fflush( $handle ) === false ) {
+			if( $written === false || $written !== strlen( $content ) || @fflush( $handle ) === false ) {
 				fclose( $handle );
 				@unlink( $temp );
 				return false;
@@ -1127,7 +1134,7 @@ namespace Nino {
 			if( $mode !== false )
 				@chmod( $temp, $mode & 0777 );
 
-			if( rename( $temp, $path ) === false ) {
+			if( @rename( $temp, $path ) === false ) {
 				@unlink( $temp );
 				return false;
 			}
@@ -1139,15 +1146,16 @@ namespace Nino {
 		// definition an in-place operation, there is nothing to swap in.
 		private static function _appendFile( string $path, string $content ): bool {
 
-			$handle = fopen( $path, 'a' );
+			// See _writeFile()'s identical @ - same reasoning, same handler
+			$handle = @fopen( $path, 'a' );
 
 			if( $handle === false )
 				return false;
 
 			// No ftruncate() here - it used to run unconditionally, so an
 			// "append" emptied the file and wrote the chunk on its own
-			$written = fwrite( $handle, $content );
-			$flushed = fflush( $handle );
+			$written = @fwrite( $handle, $content );
+			$flushed = @fflush( $handle );
 
 			fclose( $handle );
 
@@ -1173,7 +1181,11 @@ namespace Nino {
 			self::forceDir( $appData, '/data/.locks' );
 
 			$lockPath	= self::getPath( $appData ). '/data/.locks/'. sha1( $filename ). '.lock';
-			$handle		= fopen( $lockPath, 'c' );
+			// See _writeFile()'s @fopen() - same reasoning: without it, a
+			// permission/quota failure here 500s before "could not be
+			// locked for writing" (mutate(), writeContentData(), Elements)
+			// ever gets a chance to run
+			$handle		= @fopen( $lockPath, 'c' );
 
 			if( $handle === false )
 				return false;
@@ -1254,8 +1266,16 @@ namespace Nino {
 			// hosting, and the default in some cli/cron contexts) 0777 really
 			// does mean world-writable - for /images, /data and the asset cache,
 			// ie. directories the webserver serves from
+			//
+			// @ on mkdir(), whose return value this never checked anyway
+			// (best-effort - a real failure surfaces properly at the actual
+			// file write that follows): without it, two concurrent requests
+			// racing to create the same missing directory raise "File
+			// exists" as a plain E_WARNING on whichever one loses the race,
+			// which - unguarded - 500s a request that has nothing wrong
+			// with it; the directory exists either way once either finishes
 			if( is_dir( $dirpath ) === false )
-				mkdir( $dirpath, 0755, true );
+				@mkdir( $dirpath, 0755, true );
 		}
 
 		public static function getPath( array &$appData ): string {
@@ -1284,18 +1304,25 @@ namespace Nino {
 
 		public static function copyDir( string $source, string $dest ): bool {
 
+			// @ throughout - see forceDir()'s identical reasoning: none of
+			// these return values were ever checked (this is used for a
+			// single request's own restore/backup copy, not concurrent
+			// writers, but a permission/quota failure mid-copy is exactly
+			// as real), and an unguarded warning here 500s a restore before
+			// it can report anything more useful than that
+
 			// 0755, see forceDir() - this one copies backup/restore trees, so a
 			// world-writable mode here would land on the backup directory too
 			if( ! file_exists( dirname( $dest ) ) )
-				mkdir( dirname( $dest ), 0755, true );
+				@mkdir( dirname( $dest ), 0755, true );
 
 			if( is_file( $source ) )
-				return copy( $source, $dest );
+				return @copy( $source, $dest );
 
 			if( ! is_dir( $dest ) )
-				mkdir( $dest, 0755, true );
+				@mkdir( $dest, 0755, true );
 
-			foreach( scandir( $source ) as $object ) {
+			foreach( @scandir( $source ) ?: [] as $object ) {
 				if( $object === '.' || $object === '..' )
 					continue;
 
@@ -1309,21 +1336,26 @@ namespace Nino {
 		public static function removeDir( string $target ): void {
 
 			if( is_file( $target ) ) {
-				unlink( $target );
+				@unlink( $target );
 				return;
 			}
 
 			if( ! is_dir( $target ) || is_link( $target ) )
 				return;
 
-			foreach( scandir( $target ) as $object ) {
+			// @ throughout: two concurrent cleanups (or a request racing this
+			// same recursion) can both reach a since-removed entry - is_dir()
+			// above and each unlink()/rmdir() below all have their own TOCTOU
+			// gap, and scandir() on the way in warns just as unguarded on an
+			// unreadable directory, taking the foreach below with it
+			foreach( @scandir( $target ) ?: [] as $object ) {
 				if( $object === '.' || $object === '..' )
 					continue;
 
 				self::removeDir( $target. '/'. $object );
 			}
 
-			rmdir( $target );
+			@rmdir( $target );
 		}
 
 
@@ -1470,8 +1502,11 @@ namespace Nino {
 				if( $date === false || $date->format( 'Y-m-d' ) !== $full )
 					continue;
 
+				// @: two requests racing the same glob() over the same expired
+				// file both reach here, and the loser's unlink() on an
+				// already-gone file otherwise 500s an ordinary page view
 				if( $date->setTime( 0, 0 ) < $cutoff )
-					unlink( $file );
+					@unlink( $file );
 			}
 		}
 	}
@@ -2718,8 +2753,10 @@ namespace Nino {
 				return;
 
 			$path = \Nino\Filesystem::getPath( $appData ). self::UPLOAD_DIR. '/'. $filename;
+			// @: same TOCTOU as Filesystem::removeDir() - is_file() above and
+			// unlink() here are two syscalls, not one
 			if( is_file( $path ) === true )
-				unlink( $path );
+				@unlink( $path );
 		}
 
 		public static function getUrl( array &$appData, string $filename ): string {

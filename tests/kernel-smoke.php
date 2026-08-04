@@ -1153,6 +1153,61 @@ check( 'an engine-raised warning (not one of our own E_USER_* calls) still termi
 echo "\n";
 
 
+// --- Filesystem's own I/O calls stay non-fatal under the real handler -----
+
+echo "Filesystem - a real fopen()/mkdir()/unlink() failure returns false, doesn't 500\n";
+
+// Regression: fopen()/fwrite()/fflush()/rename()/mkdir()/unlink() raise a
+// plain E_WARNING on failure, which - same as the engine-raised warning
+// above - is fatal under the real handler unless the call itself is @-
+// silenced. Without @, the warning kills the request before the
+// "=== false" checks right below each call ever run: _writeFile()'s "short
+// write has to fail here" comment, lockFile()'s "could not lock" return,
+// and writeContentData()'s own error message were all unreachable the same
+// way the Newsletter catch blocks were - just one layer down, at the
+// engine level instead of trigger_error()
+$writeFailure = runIsolated( $bootstrap. '
+	echo "before\n";
+	$brokenBase = $sandbox. "/not-a-dir";
+	file_put_contents( $brokenBase, "x" );
+	$appData["./nino/filesystem/configpath"] = $brokenBase;
+	$result = \Nino\Filesystem::putFileContent( $appData, "/config.php", [ "a" => 1 ] );
+	echo "after:". var_export( $result, true );
+' );
+check( 'a real fopen() failure (configpath base is a file, not a dir) returns false instead of terminating the request', trim( $writeFailure['stdout'] ) === 'before' . "\n" . 'after:false' );
+
+// forceDir()'s own is_dir() check can't be driven into the race from a
+// single synchronous script (by definition: TOCTOU is the gap between two
+// processes, not two lines in one) - this proves the underlying mechanism
+// forceDir()'s @mkdir() relies on instead: mkdir() on a directory that
+// exists because something else (another request) created it first
+$mkdirRace = runIsolated( $bootstrap. '
+	mkdir( $sandbox. "/already-there", 0755, true );
+	echo "before\n";
+	@mkdir( $sandbox. "/already-there", 0755, true );
+	echo "after\n";
+' );
+check( '@mkdir() on a directory another request already created (forceDir()\'s TOCTOU gap) does not terminate the request', trim( $mkdirRace['stdout'] ) === "before\nafter" );
+
+// The exact race RotatingLog::prune() (and removeDir(), Images::delete())
+// guard against - two concurrent deletes reaching the same since-removed
+// file - cannot be forced deterministically without actually forking a
+// second process at the right instant; this proves the underlying
+// mechanism their shared @unlink() relies on instead: unlink() on a file
+// that is already gone by the time it runs
+$unlinkRace = runIsolated( $bootstrap. '
+	$f = $sandbox. "/already-gone.txt";
+	file_put_contents( $f, "x" );
+	unlink( $f );
+	echo "before\n";
+	@unlink( $f );
+	echo "after\n";
+' );
+check( '@unlink() on a file another request already removed (the race prune()/removeDir()/Images::delete() all guard against) does not terminate the request', trim( $unlinkRace['stdout'] ) === "before\nafter" );
+
+echo "\n";
+
+
 // --- Cleanup ------------------------------------------------------------
 
 \Nino\Filesystem::removeDir( $sandbox );
