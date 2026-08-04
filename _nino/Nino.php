@@ -1319,17 +1319,20 @@ namespace Nino {
 			if( is_file( $source ) )
 				return @copy( $source, $dest );
 
-			if( ! is_dir( $dest ) )
-				@mkdir( $dest, 0755, true );
+			if( is_dir( $dest ) === false && @mkdir( $dest, 0755, true ) === false && is_dir( $dest ) === false )
+				return false;
 
+			$ok = true;
 			foreach( @scandir( $source ) ?: [] as $object ) {
+
 				if( $object === '.' || $object === '..' )
 					continue;
 
-				self::copyDir( $source. '/'. $object, $dest. '/'. $object );
+				if( self::copyDir( $source. '/'. $object, $dest. '/'. $object ) === false )
+					$ok = false;
 			}
 
-			return true;
+			return $ok;
 		}
 
 
