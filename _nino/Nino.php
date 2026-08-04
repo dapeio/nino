@@ -888,6 +888,36 @@ namespace Nino {
 			if( in_array( $request['/nino/http/request']['method'], [ 'GET', 'HEAD', 'OPTIONS' ], true ) === true )
 				return;
 
+			// Opt-out per route, set explicitly in config.php - default stays
+			// "on". A public POST endpoint that can't carry a session token
+			// (webhook, payment callback, a form posted from another site)
+			// needs a deliberate way out, or the only fix left after this
+			// runs unconditionally is a silent 403 nobody notices for weeks.
+			//
+			// A fresh requestRoute() lookup on purpose, not the cheaper
+			// $request['/nino/http/response']['csrf'] Http::response() has
+			// already merged in: for a POST to a route that doesn't exist,
+			// that merged data is the /404 route's, looked up with method
+			// 'GET' - a 'csrf' => false set there (say, because the 404 page
+			// itself is GET-only and reasonably doesn't need it) would
+			// silently wave through every POST to an unregistered uri
+			// site-wide. The raw lookup below, on the request's own uri and
+			// method, correctly comes back null for anything unmatched.
+			//
+			// 'method' needs no isset() guard the way 'uri' does: the
+			// safe-method check above already dereferenced it unconditionally,
+			// so surviving that proves it's set. 'uri' has no such prior use -
+			// a hand-built $request missing it (the smoke tests build exactly
+			// that) would otherwise crash requestRoute(), which requires a
+			// real string and would never terminate its dirname() walk on an
+			// empty one.
+			$routeData = isset( $request['/nino/http/request']['uri'] ) === true
+				? \Nino\Http::requestRoute( $appData, $request['/nino/http/request']['uri'], $request['/nino/http/request']['method'] )
+				: null;
+
+			if( ( $routeData['csrf'] ?? true ) === false )
+				return;
+
 			$given = self::_extractToken( $request );
 
 			if( $given !== '' && hash_equals( self::getToken( $appData ), $given ) === true )
