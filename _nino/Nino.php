@@ -3039,7 +3039,22 @@ namespace Nino {
 			$subject	= self::_headerValue( $subject );
 			$replyTo	= self::_headerValue( $replyTo );
 
-			if( $to === '' )
+			// _headerValue() only strips CR/LF - mail()'s $to also accepts a
+			// plain comma-separated list with no newline involved at all, so
+			// an admin-editable field this comes from (Form's owner notify
+			// uses '[[/form/email/owner]]' verbatim) could silently gain a
+			// second, invisible recipient. One address only: nothing here
+			// currently needs send() to notify more than one.
+
+			// FILTER_VALIDATE_EMAIL rejects the display-name form, and
+			// "Max Mustermann <max@site.de>" is a plausible thing for a site owner
+			// to have typed into '[[/form/email/owner]]' back when mail() accepted
+			// it. Take the address out of the angle brackets rather than turn an
+			// existing, working install into one that silently sends nothing.
+			if( preg_match( '/<([^<>]+)>$/', $to, $addressMatch ) === 1 )
+				$to = trim( $addressMatch[1] );
+
+			if( filter_var( $to, FILTER_VALIDATE_EMAIL ) === false )
 				return false;
 
 			// Without a From: the mail goes out as the webserver user
