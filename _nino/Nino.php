@@ -1595,10 +1595,19 @@ namespace Nino {
 			$elementUri 	= self::getElementUriFromUri( $uri );
 			$typeUri			= self::getElementTypeFromUri( $uri );
 
-			// $outcome stays 'notfound' unless the callback below actually runs
-			// and says otherwise - that covers both "type file missing" (the
-			// callback sees a non-array $state and aborts) and "could not be
-			// locked at all" (the callback never runs), same message either way
+			// Locked explicitly up front, distinct from mutate()'s own
+			// internal lockFile() call, purely to tell "could not lock" (a
+			// filesystem/permissions problem, worth an operator's attention)
+			// apart from "type file missing" (a plain caller error) below -
+			// re-locking the same path is a no-op per lockFile()'s own
+			// docblock, so this doesn't change what mutate() does after it
+			if( \Nino\Filesystem::lockFile( $appData, '/elements/'. $typeUri. '.php' ) === false )
+				return ! trigger_error( 'Element type \''. $typeUri. '\' could not be locked for writing.' );
+
+			// $outcome stays 'notfound' unless the callback below actually
+			// runs and says otherwise - the lock is already confirmed above,
+			// so reaching here with 'notfound' means the type file itself is
+			// missing (the callback sees a non-array $state and aborts)
 			$outcome = 'notfound';
 
 			$success = \Nino\Filesystem::mutate( $appData, '/elements/'. $typeUri. '.php', function( mixed $typeData, array &$appData ) use ( $elementUri, $locale, $typeUri, &$outcome ): mixed {
@@ -1641,10 +1650,16 @@ namespace Nino {
 			}, false );
 
 			if( $outcome === 'notfound' )
-				return ! trigger_error( 'Element type \''. $typeUri. '\' does not exist or could not be locked for writing.' );
+				return ! trigger_error( 'Element type \''. $typeUri. '\' does not exist.' );
 
 			if( $outcome === 'veto' )
 				return null;
+
+			// $outcome only reflects the callback's own decision - mutate()
+			// can still fail to actually persist it (disk full, permissions),
+			// which used to be reported as a plain, silent success
+			if( $success === false )
+				return ! trigger_error( 'Element \''. $uri. '\' could not be written.' );
 
 			return true;
 		}
@@ -1746,10 +1761,16 @@ namespace Nino {
 			// Flush, reload and lock element file
 			$typeUri			= self::getElementTypeFromUri( $uri );
 
-			// $outcome stays 'notfound' unless the callback below actually runs
-			// and says otherwise - that covers both "type file missing" (the
-			// callback sees a non-array $state and aborts) and "could not be
-			// locked at all" (the callback never runs), same message either way
+			// See deleteElement()'s identical pre-lock: distinguishes "could
+			// not lock" from "type file missing" below, rather than folding
+			// both into the same 'notfound' outcome and message
+			if( \Nino\Filesystem::lockFile( $appData, '/elements/'. $typeUri. '.php' ) === false )
+				return ! trigger_error( 'Element type \''. $typeUri. '\' could not be locked for writing.' );
+
+			// $outcome stays 'notfound' unless the callback below actually
+			// runs and says otherwise - the lock is already confirmed above,
+			// so reaching here with 'notfound' means the type file itself is
+			// missing (the callback sees a non-array $state and aborts)
 			$outcome 		= 'notfound';
 			$resultData	= null;
 
@@ -1759,7 +1780,6 @@ namespace Nino {
 					return null;
 
 				// Run callbacks
-				$callbacks	= [];
 				$data['.uri'] 		= $uri;
 				$data['.locale']	= $locale;
 
@@ -1772,8 +1792,10 @@ namespace Nino {
 								return null;
 							}
 
-				// Check new element data
-				if( is_array( $data ) === false || isset( $data['.uri'] ) === false || isset( $data['.locale'] ) === false ) {
+				// Check new element data - $data is always an array (typed
+				// parameter), but a field callback got it by reference and
+				// can still have unset() one of these two keys
+				if( isset( $data['.uri'] ) === false || isset( $data['.locale'] ) === false ) {
 					$outcome = 'veto';
 					return null;
 				}
@@ -1882,13 +1904,19 @@ namespace Nino {
 			}, false );
 
 			if( $outcome === 'notfound' )
-				return ! trigger_error( 'Element type \''. $typeUri. '\' does not exist or could not be locked for writing.' );
+				return ! trigger_error( 'Element type \''. $typeUri. '\' does not exist.' );
 
 			if( $outcome === 'error' )
 				return false;
 
 			if( $outcome === 'veto' )
 				return null;
+
+			// Same reasoning as deleteElement(): $outcome === 'success' only
+			// means the callback agreed to the write, not that mutate() was
+			// able to persist it
+			if( $success === false )
+				return ! trigger_error( 'Element \''. $uri. '\' could not be written.' );
 
 			return \Nino\Elements::getElement( $appData, $resultData['.uri'], $resultData['.locale'] );
 		}
