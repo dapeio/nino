@@ -524,8 +524,15 @@ namespace Nino {
 
 			\Nino\AppData::writeContentData( $appData, [ '/nino/auth/user' ] );
 
-			// Run callback - eg. a welcome mail, or syncing the new account elsewhere
-			\Nino\Callbacks::doCallbacks( $appData, '/nino/auth/user/insert', self::getUser( $appData, $username ) );
+			// Run callback - eg. a welcome mail, or syncing the new account elsewhere.
+			// getUser()'s result has to sit in a variable first: doCallbacks()'s
+			// third parameter is by-reference, and passing a function call
+			// straight through raises an "Only variables should be passed by
+			// reference" notice - fatal here, since Runtime::handleError() is
+			// live on every real request (unlike the CLI smoke tests, which
+			// call these methods directly without ever booting it)
+			$inserted = self::getUser( $appData, $username );
+			\Nino\Callbacks::doCallbacks( $appData, '/nino/auth/user/insert', $inserted );
 
 			return true;
 		}
@@ -604,8 +611,10 @@ namespace Nino {
 				\Nino\Runtime::setSessionValue( $appData, './nino/auth/current', $updated['mail'] );
 			}
 
-			// Run callback - eg. syncing the changed mail/password elsewhere
-			\Nino\Callbacks::doCallbacks( $appData, '/nino/auth/user/update', self::getUser( $appData, $newUsername ) );
+			// Run callback - eg. syncing the changed mail/password elsewhere.
+			// See insertUser() for why this can't pass self::getUser(...) straight through.
+			$updatedUser = self::getUser( $appData, $newUsername );
+			\Nino\Callbacks::doCallbacks( $appData, '/nino/auth/user/update', $updatedUser );
 
 			return self::getUser( $appData, $newUsername );
 		}
