@@ -2262,7 +2262,14 @@ namespace Nino {
 			if( $href === '' )
 				return null;
 
-			if( $href[0] === '/' || $href[0] === '#' )
+
+			if( $href[0] === '#' )
+				return $href;
+
+			// '//evil.com' (and '/\evil.com', which browsers normalise to the
+			// same thing) are protocol-relative, ie. off-site - a leading slash
+			// alone is not enough to call an href relative
+			if( $href[0] === '/' && ( $href[1] ?? '' ) !== '/' && ( $href[1] ?? '' ) !== '\\' )
 				return $href;
 
 			return preg_match( '#^(https?|mailto|tel):#i', $href ) === 1 ? $href : null;
