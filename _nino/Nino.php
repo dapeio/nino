@@ -52,6 +52,7 @@ namespace Nino {
 		\Nino\Filesystem::init( $appData );
 		\Nino\AppData::init( $appData );
 		\Nino\Locales::init( $appData );
+		\Nino\Csrf::init( $appData );
 		\Nino\Auth::init( $appData );
 		\Nino\Modules::callModules( $appData, 'init' );
 
@@ -381,17 +382,6 @@ namespace Nino {
 		 */
 		public static function init( array &$appData ): void {
 
-			// Login/logout are only safe against CSRF if the Csrf module is
-			// actually enabled - config.php's module list is already loaded
-			// at this point (see \Nino\init()). Flagged here rather than
-			// trigger_error()'d immediately: that runs on *every* request
-			// incl. plain GETs, and Runtime's error handler always terminates
-			// the request (see its docblock) - one missing module entry would
-			// 500 the entire site, not just the login form. The flag is
-			// checked once an actual POST hits login/logout below instead, so
-			// this only ever blocks the one feature that's actually unsafe.
-			$appData['./nino/auth/csrf-enabled'] = self::_csrfModuleEnabled( $appData );
-
 			// Snapshot of the user records as this request found them, before
 			// anything in it can have changed them - the third side of
 			// AppData::writeContentData()'s merge, which is what keeps two
@@ -432,9 +422,6 @@ namespace Nino {
 		 */
 		public static function callbackLoginResponse( array &$appData, array &$request ): void {
 
-			if( ( $appData['./nino/auth/csrf-enabled'] ?? false ) === false )
-				trigger_error( 'Auth::callbackLoginResponse(): refused a login POST because the Csrf module is not enabled in config.php\'s /nino/modules - add "\Nino\Modules\Csrf" to run login/logout at all.', E_USER_ERROR );
-
 			if( ( $request['./nino/csrf/blocked'] ?? false ) === true )
 				return;
 
@@ -459,9 +446,6 @@ namespace Nino {
 		 *	@return 	void
 		 */
 		public static function callbackLogoutResponse( array &$appData, array &$request ): void {
-
-			if( ( $appData['./nino/auth/csrf-enabled'] ?? false ) === false )
-				trigger_error( 'Auth::callbackLogoutResponse(): refused a logout POST because the Csrf module is not enabled in config.php\'s /nino/modules - add "\Nino\Modules\Csrf" to run login/logout at all.', E_USER_ERROR );
 
 			if( ( $request['./nino/csrf/blocked'] ?? false ) === true )
 				return;
@@ -541,7 +525,7 @@ namespace Nino {
 			// cli callers (tests) without an active session working
 			if( session_status() === PHP_SESSION_ACTIVE )
 				session_regenerate_id( true );
-			\Nino\Modules\Csrf::rotateToken( $appData );
+			\Nino\Csrf::rotateToken( $appData );
 
 			// Rotate the hash if it was created with an outdated algorithm/cost -
 			// computed now (while $user still holds the verified pw context),
@@ -615,7 +599,7 @@ namespace Nino {
 			\Nino\Runtime::unsetSessionValue( $appData, './nino/auth/current' );
 
 			// Rotate the csrf token now that the session's identity is changing (session-fixation defense)
-			\Nino\Modules\Csrf::rotateToken( $appData );
+			\Nino\Csrf::rotateToken( $appData );
 
 			$user 	= self::getCurrentUser( $appData );
 			$token	= \Nino\Runtime::getSessionValue( $appData, './nino/auth/token', '' );
@@ -822,7 +806,7 @@ namespace Nino {
 			if( isset( $appData['./nino/auth/current']['mail'] ) === true && $appData['./nino/auth/current']['mail'] === $username ) {
 				\Nino\Runtime::unsetSessionValue( $appData, './nino/auth/current' );
 				\Nino\Runtime::unsetSessionValue( $appData, './nino/auth/token' );
-				\Nino\Modules\Csrf::rotateToken( $appData );
+				\Nino\Csrf::rotateToken( $appData );
 				unset( $appData['./nino/auth/current'] );
 			}
 
@@ -913,27 +897,6 @@ namespace Nino {
 			}
 
 			$appData['./nino/auth/current'] = $user;
-		}
-
-		/**
-		 *	Whether the Csrf module is listed in config.php's /nino/modules -
-		 *	case-insensitively, since PHP class names are too (Modules::
-		 *	callModules() resolves them via class_exists(), which doesn't
-		 *	care about case either - a strict, case-sensitive match here
-		 *	could report the module "missing" even though it actually loads
-		 *	and runs fine).
-		 *
-		 *	@param		array 				&$appData			(reference) Array with current app data
-		 *
-		 *	@return 	bool
-		 */
-		private static function _csrfModuleEnabled( array &$appData ): bool {
-
-			foreach( $appData['/nino/modules'] ?? [] as $className )
-				if( strcasecmp( ltrim( $className, '\\' ), ltrim( \Nino\Modules\Csrf::class, '\\' ) ) === 0 )
-					return true;
-
-			return false;
 		}
 
 		/**
@@ -1128,6 +1091,130 @@ namespace Nino {
 					$args = call_user_func_array( $callback, [ &$appData, &$args ] ) ?? $args;
 
 			return $args;
+		}
+	}
+
+	/**
+	 *	Nino								A compact filesystembased php framework
+	 *	Csrf								Cross-site-request-forgery protection for every
+	 *											non-safe request, via a session token - required,
+	 *											not optional: the hidden field/shortcode stays a
+	 *											module (see Modules\Csrf), but the check itself
+	 *											doesn't make sense as an opt-in - a login form the
+	 *											developer forgot to protect isn't a login form
+	 *											with a gap, it's just an unprotected login form
+	 *
+	 *	@package						Dape/Nino
+	 *	@author							David Perchermeier <mail@dape.io>
+	 *	@link								https://github.com/dapeio/nino
+	 */
+
+	class Csrf {
+
+		/**
+		 *	Registers the response-side check that runs for every non-safe
+		 *	request, whether or not the optional Modules\Csrf (the shortcode)
+		 *	is enabled - called unconditionally from \Nino\init(), same as
+		 *	Auth::init()
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	void
+		 */
+		public static function init( array &$appData ): void {
+			\Nino\Callbacks::registerCallback( $appData, '/nino/http/response', [ self::class, 'callbackResponse' ], 1 );
+		}
+
+		/**
+		 *	Return the current session's csrf token, creating one if missing
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	string									Current csrf token
+		 */
+		public static function getToken( array &$appData ): string {
+
+			$token = \Nino\Runtime::getSessionValue( $appData, './nino/csrf/token' );
+
+			if( is_string( $token ) === false || $token === '' ) {
+				$token = bin2hex( random_bytes( 32 ) );
+				\Nino\Runtime::setSessionValue( $appData, './nino/csrf/token', $token );
+			}
+
+			return $token;
+		}
+
+		/**
+		 *	Replace the current session's csrf token with a fresh one, eg.
+		 *	after login/logout to defend against session fixation
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	void
+		 */
+		public static function rotateToken( array &$appData ): void {
+			\Nino\Runtime::setSessionValue( $appData, './nino/csrf/token', bin2hex( random_bytes( 32 ) ) );
+		}
+
+		/**
+		 *	Reject a POST request with a missing or wrong csrf token. Sets a
+		 *	dedicated './nino/csrf/blocked' flag in addition to the status
+		 *	code, since doCallbacks() always runs every registered callback
+		 *	regardless of outcome - callbacks that run after this one (eg.
+		 *	Auth) must check that flag themselves before acting.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		&$request			(reference) Current server request
+		 *
+		 *	@return 	void
+		 */
+		public static function callbackResponse( array &$appData, array &$request ): void {
+
+			// Every method that isn't safe by definition needs a token, not just
+			// POST: _cleanRawMethod() also accepts PUT/DELETE/PATCH and routes
+			// can be registered for them, which left those completely
+			// unprotected. An unrecognized method ('') stays on the checked
+			// side on purpose - it has no business writing anything either.
+			if( in_array( $request['/nino/http/request']['method'], [ 'GET', 'HEAD', 'OPTIONS' ], true ) === true )
+				return;
+
+			$given = self::_extractToken( $request );
+
+			if( $given !== '' && hash_equals( self::getToken( $appData ), $given ) === true )
+				return;
+
+			$request['./nino/csrf/blocked']									= true;
+			$request['/nino/http/response']['statusCode']	= 403;
+			$request['/nino/http/response']['body']					= false;
+		}
+
+		/**
+		 *	Read the csrf token from wherever the caller put it: the classic
+		 *	hidden form field, the X-CSRF-Token header, or the parsed JSON
+		 *	body - $_POST is always empty for a json request, so relying on
+		 *	it alone 403s every json POST regardless of the token sent.
+		 *
+		 *	@param		array 		$request			Current server request
+		 *
+		 *	@return 	string									Token, or '' if none was found
+		 */
+		private static function _extractToken( array $request ): string {
+
+			if( is_string( $_POST['_csrf'] ?? null ) === true && $_POST['_csrf'] !== '' )
+				return $_POST['_csrf'];
+
+			$header = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
+			if( is_string( $header ) === true && $header !== '' )
+				return $header;
+
+			$body = $request['/nino/http/request']['body'] ?? '';
+			if( is_string( $body ) === true && $body !== '' ) {
+				$decoded = json_decode( $body, true );
+				if( is_array( $decoded ) === true && is_string( $decoded['_csrf'] ?? null ) === true )
+					return $decoded['_csrf'];
+			}
+
+			return '';
 		}
 	}
 

@@ -266,6 +266,13 @@ Registriert eine Callable unter einem Namen (mit Priorität) in appData.
 `doCallbacks( array &$appData, string $name, mixed &$args = null )`
 Führt alle unter einem Namen registrierten Callbacks der Reihe nach aus und reicht ihren Rückgabewert als neue `$args` weiter.
 
+#### `Csrf`
+CSRF-Schutz für jeden nicht-sicheren (`POST`/`PUT`/`DELETE`/`PATCH`) Request, per Session-Token - erforderlich und immer aktiv, anders als die optionalen `\Nino\Modules\*`-Klassen weiter unten. `\Nino\Modules\Csrf` ergänzt lediglich den `[csrf]`-Shortcode obendrauf.
+`getToken( array &$appData )`
+Gibt das aktuelle CSRF-Token der Session zurück, legt bei Bedarf eines an.
+`rotateToken( array &$appData )`
+Ersetzt das Token durch ein neues (z. B. nach Login/Logout).
+
 #### `Filesystem`
 Zentrale Datei-Ein-/Ausgabe mit In-Request-Cache, Locking und automatischer `.php`-/`.json`-(De-)Serialisierung.
 `getFileContent( array &$appData, string $filename, mixed $default = false )`
@@ -399,11 +406,7 @@ CSS/JS-Asset-Verwaltung: bündelt, cached und (bei `.min`-Dateinamen) minifizier
 Bindet die für diese Bibliothek per `addAsset()` gesammelten Dateien gebündelt (und bei `.min`-Dateinamen minifiziert) als `<link>`- oder `<script>`-Tag ein.
 
 #### `Csrf`
-CSRF-Schutz für alle POST-Requests per Session-Token.
-`getToken( array &$appData )`
-Liefert das aktuelle Session-CSRF-Token, legt bei Bedarf eines an.
-`rotateToken( array &$appData )`
-Ersetzt das Token durch ein neues (z. B. nach Login/Logout).
+Ergänzt den `[csrf]`-Shortcode obendrauf auf die erforderliche Kernel-Klasse `\Nino\Csrf` (siehe oben) - der Schutz selbst ist aktiv, unabhängig davon, ob dieses Modul aktiviert ist.
 **Shortcode:**
 `[csrf]`
 Rendert ein verstecktes `_csrf`-Inputfeld mit dem aktuellen Session-Token - gehört in jedes Formular, das serverseitig per Csrf-Callback geprüft wird.
@@ -572,7 +575,7 @@ tests/admin-smoke.php     _admin/Admin.php: Elements, Text, Users, Images, Backu
 tests/dev-smoke.php       _dev/Dev.php: ElementTypes, Restore, Rate-Limiting
 ```
 
-Ausführen mit `php tests/kernel-smoke.php` etc. — aktuell 469
+Ausführen mit `php tests/kernel-smoke.php` etc. — aktuell 513
 Assertions insgesamt über die drei Suites. CI führt alle drei plus
 `php -l` und `node --check` über jede Datei aus, siehe
 `.github/workflows/ci.yml`.

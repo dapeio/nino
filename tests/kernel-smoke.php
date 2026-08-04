@@ -601,28 +601,79 @@ echo "\n";
 
 // --- Csrf ------------------------------------------------------------
 
-echo "Csrf::getToken / rotateToken / callbackResponse / doShortcode\n";
+echo "Csrf::getToken / rotateToken / callbackResponse (kernel, required) / Modules\\Csrf::doShortcode (optional)\n";
 
-$token1 = \Nino\Modules\Csrf::getToken( $appData );
+$token1 = \Nino\Csrf::getToken( $appData );
 check( 'getToken creates a token', is_string( $token1 ) === true && strlen( $token1 ) > 0 );
-check( 'getToken returns the same token on a second call', \Nino\Modules\Csrf::getToken( $appData ) === $token1 );
+check( 'getToken returns the same token on a second call', \Nino\Csrf::getToken( $appData ) === $token1 );
 
-\Nino\Modules\Csrf::rotateToken( $appData );
-$token2 = \Nino\Modules\Csrf::getToken( $appData );
+\Nino\Csrf::rotateToken( $appData );
+$token2 = \Nino\Csrf::getToken( $appData );
 check( 'rotateToken replaces the token', $token2 !== $token1 );
 
 $_POST['_csrf'] = 'wrong-token';
 $fakeRequest = [ '/nino/http/request' => [ 'method' => 'POST' ], '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Modules\Csrf::callbackResponse( $appData, $fakeRequest );
+\Nino\Csrf::callbackResponse( $appData, $fakeRequest );
 check( 'callbackResponse rejects a wrong token', $fakeRequest['/nino/http/response']['statusCode'] === 403 );
 check( 'callbackResponse sets the blocked flag on rejection', ( $fakeRequest['./nino/csrf/blocked'] ?? false ) === true );
 
 $_POST['_csrf'] = $token2;
 $fakeRequest = [ '/nino/http/request' => [ 'method' => 'POST' ], '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Modules\Csrf::callbackResponse( $appData, $fakeRequest );
+\Nino\Csrf::callbackResponse( $appData, $fakeRequest );
 check( 'callbackResponse accepts the current token', $fakeRequest['/nino/http/response']['statusCode'] === 200 );
 
-check( 'doShortcode renders a hidden input with the current token', str_contains( \Nino\Modules\Csrf::doShortcode( $appData, [] ), 'value="'. $token2. '"' ) === true );
+check( 'Modules\Csrf::doShortcode renders a hidden input with the current token, reading the kernel token', str_contains( \Nino\Modules\Csrf::doShortcode( $appData, [] ), 'value="'. $token2. '"' ) === true );
+
+// Regression: Auth::callbackLoginResponse()/callbackLogoutResponse() used
+// to hard-refuse (trigger_error(E_USER_ERROR)) unless the Csrf module was
+// listed in '/nino/modules' - protection is now the required \Nino\Csrf
+// kernel class instead, always active, so that refusal is gone. This
+// sandbox's $appData never lists Csrf under '/nino/modules' anywhere in
+// this file (see below), which used to make every login/logout POST here
+// a 500 - the two callbacks cooperating correctly via the shared
+// './nino/csrf/blocked' flag, with no module in the loop at all, is
+// exactly the property this split is for.
+$csrfUser = 'csrfpipeline@example.com';
+\Nino\Auth::insertUser( $appData, $csrfUser, 'correct horse battery staple' );
+
+$capturedErrors = [];
+set_error_handler( function( int $errno, string $errstr ) use ( &$capturedErrors ): bool {
+	$capturedErrors[] = [ 'errno' => $errno, 'errstr' => $errstr ];
+	return true;
+} );
+
+// Wrong token - same order the real pipeline runs in: Csrf at priority 1
+// sets the blocked flag before Auth's own route callback ever sees it
+$_POST['_csrf'] = 'not-the-real-token';
+$badLoginRequest = [
+	'/nino/http/request' 	=> [ 'method' => 'POST', 'user' => $csrfUser, 'pw' => 'correct horse battery staple' ],
+	'/nino/http/response'	=> [ 'statusCode' => 200 ],
+];
+\Nino\Csrf::callbackResponse( $appData, $badLoginRequest );
+\Nino\Auth::callbackLoginResponse( $appData, $badLoginRequest );
+
+restore_error_handler();
+
+check( 'callbackLoginResponse no longer hard-refuses regardless of /nino/modules', count( $capturedErrors ) === 0 );
+check( 'callbackLoginResponse still respects a Csrf rejection (403, not the 401/200 it sets itself)', $badLoginRequest['/nino/http/response']['statusCode'] === 403 );
+check( 'a Csrf-blocked login request never reaches loginUser()', \Nino\Auth::getCurrentUser( $appData ) === false );
+
+// Valid token - the full pipeline succeeds end-to-end, still with no
+// module involved anywhere
+$_POST['_csrf'] = \Nino\Csrf::getToken( $appData );
+$goodLoginRequest = [
+	'/nino/http/request' 	=> [ 'method' => 'POST', 'user' => $csrfUser, 'pw' => 'correct horse battery staple' ],
+	'/nino/http/response'	=> [ 'statusCode' => 200 ],
+];
+\Nino\Csrf::callbackResponse( $appData, $goodLoginRequest );
+\Nino\Auth::callbackLoginResponse( $appData, $goodLoginRequest );
+
+check( 'callbackLoginResponse succeeds end-to-end with a valid token', $goodLoginRequest['/nino/http/response']['statusCode'] === 200 );
+check( 'and actually logs the user in', ( \Nino\Auth::getCurrentUser( $appData )['mail'] ?? null ) === $csrfUser );
+
+\Nino\Auth::logoutUser( $appData );
+\Nino\Auth::deleteUser( $appData, $csrfUser );
+unset( $_POST['_csrf'] );
 
 echo "\n";
 
@@ -677,7 +728,7 @@ check( 'the file is a plain, human-readable php array file - not an encoded stub
 $submissionsBefore = count( \Nino\Filesystem::getFileContent( $appData, '/data/forms.'. date( 'Y-m' ). '.php', [] ) );
 $_POST['_csrf'] = 'wrong-token';
 $blockedRequest = [ '/nino/http/request' => [ 'method' => 'POST' ], '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Modules\Csrf::callbackResponse( $appData, $blockedRequest ); // sets 403 + the blocked flag, same as the real POST pipeline
+\Nino\Csrf::callbackResponse( $appData, $blockedRequest ); // sets 403 + the blocked flag, same as the real POST pipeline
 $_POST = array_merge( $_POST, [ 'name' => 'Attacker', 'email' => 'attacker@example.com', 'message' => 'Hi', 'location' => '', 'cat' => '' ] );
 \Nino\Modules\Form::callbackResponse( $appData, $blockedRequest );
 check( 'a csrf-blocked request is rejected even with otherwise-valid fields', $blockedRequest['/nino/http/response']['statusCode'] === 403 );
@@ -721,7 +772,7 @@ check( 'none of the rejected signups created the newsletter file', is_file( \Nin
 
 $_POST['_csrf'] = 'wrong-token';
 $blockedNewsletterRequest = [ '/nino/http/request' => [ 'method' => 'POST' ], '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Modules\Csrf::callbackResponse( $appData, $blockedNewsletterRequest );
+\Nino\Csrf::callbackResponse( $appData, $blockedNewsletterRequest );
 $_POST = array_merge( $_POST, [ 'email' => 'jo@example.com', 'location' => '' ] );
 \Nino\Modules\Newsletter::callbackResponse( $appData, $blockedNewsletterRequest );
 check( 'a csrf-blocked signup is rejected too', $blockedNewsletterRequest['/nino/http/response']['statusCode'] === 403 );

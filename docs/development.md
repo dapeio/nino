@@ -269,6 +269,13 @@ Registers a callable under a name (with a priority) in appData.
 `doCallbacks( array &$appData, string $name, mixed &$args = null )`
 Runs every callback registered under a name, in order, passing its return value on as the new `$args`.
 
+#### `Csrf`
+CSRF protection for every non-safe (`POST`/`PUT`/`DELETE`/`PATCH`) request, via a session token - required and always active, unlike the optional `\Nino\Modules\*` classes below. `\Nino\Modules\Csrf` only adds the `[csrf]` shortcode on top of it.
+`getToken( array &$appData )`
+Returns the current session's CSRF token, creating one if needed.
+`rotateToken( array &$appData )`
+Replaces the token with a new one (e.g. after login/logout).
+
 #### `Filesystem`
 Central file I/O with an in-request cache, locking, and automatic `.php`/`.json` (de)serialization.
 `getFileContent( array &$appData, string $filename, mixed $default = false )`
@@ -403,11 +410,7 @@ CSS/JS asset management: bundles, caches and (for `.min` filenames) minifies sev
 Includes the files collected for this library via `addAsset()`, bundled (and minified for a `.min` filename), as a `<link>` or `<script>` tag.
 
 #### `Csrf`
-CSRF protection for every POST request, via a session token.
-`getToken( array &$appData )`
-Returns the current session's CSRF token, creating one if needed.
-`rotateToken( array &$appData )`
-Replaces the token with a new one (e.g. after login/logout).
+Adds the `[csrf]` shortcode on top of the required `\Nino\Csrf` kernel class (see above) - the protection itself is active whether or not this module is.
 **Shortcode:**
 `[csrf]`
 Renders a hidden `_csrf` input field carrying the current session token - belongs in every form that's checked server-side via the Csrf callback.
@@ -573,7 +576,7 @@ tests/admin-smoke.php     _admin/Admin.php: Elements, Text, Users, Images, Backu
 tests/dev-smoke.php       _dev/Dev.php: ElementTypes, Restore, rate limiting
 ```
 
-Run with `php tests/kernel-smoke.php` etc. — currently 469
+Run with `php tests/kernel-smoke.php` etc. — currently 513
 assertions total across the three suites. CI runs all three plus
 `php -l` and `node --check` over every file, see
 `.github/workflows/ci.yml`.
