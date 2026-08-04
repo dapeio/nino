@@ -2567,15 +2567,26 @@ namespace Nino {
 	class Images {
 
 		private const int MAX_UPLOAD_BYTES 		= 8 * 1024 * 1024;
-		private const int MAX_SOURCE_PIXELS 		= 8000;
+		// 20 megapixels, not 40: gd decodes into a 4-bytes-per-pixel truecolor
+		// buffer, so this caps imagecreatefromstring() at roughly 80MB - the raw
+		// bytes and the target canvas come on top of that, and the total still
+		// fits php's 128M memory_limit default. At 40MP the buffer alone is
+		// ~160MB, ie. the guard would let through exactly the upload that OOMs
+		// on the cheap shared hosting this is built for. 20MP still covers a
+		// 24MP dslr (6000x4000) and every current phone camera.
+		private const int MAX_SOURCE_PIXELS 		= 20 * 1000 * 1000;
 		private const string UPLOAD_DIR 				= '/images';
 
 		// Validate, center-crop and resize raw uploaded image bytes to exactly
 		// $targetWidth x $targetHeight, then store the result at $basePath
 		// with an extension appended for the chosen output format - the
 		// caller picks $basePath deterministically (eg. "elements/<type>/<uri>"),
-		// so re-uploading the same slot overwrites in place rather than
-		// accumulating orphaned files
+		// so re-uploading the *same slot at the same configured dimensions*
+		// overwrites in place rather than accumulating orphaned files. The
+		// target size is baked into the filename (see below) - changing a
+		// slot's configured width/height in config.php orphans whatever file
+		// the old dimensions produced; the stored filename keeps pointing at
+		// it until the next re-upload writes a new one under the new name
 		public static function process( array &$appData, string $bytes, int $targetWidth, int $targetHeight, string $basePath ): string|false {
 
 			if( $bytes === '' || strlen( $bytes ) > self::MAX_UPLOAD_BYTES || $targetWidth < 1 || $targetHeight < 1 || $basePath === '' )
@@ -2590,9 +2601,20 @@ namespace Nino {
 			if( $info === false || in_array( $info[2], [ IMAGETYPE_JPEG, IMAGETYPE_PNG, IMAGETYPE_GIF, IMAGETYPE_WEBP ], true ) === false )
 				return false;
 
-			if( $info[0] > self::MAX_SOURCE_PIXELS || $info[1] > self::MAX_SOURCE_PIXELS )
+			// Total pixel count, not either edge alone: an edge-only check let an
+			// 8000x8000 source through (both edges exactly at the old limit) -
+			// 64 megapixels, which imagecreatefromstring() below decodes into a
+			// ~256MB truecolor buffer on top of the raw bytes and the target
+			// canvas. A small, deceptively compressed source (eg. a flat-color
+			// PNG scan) sails straight past MAX_UPLOAD_BYTES, so the byte-size
+			// check alone never catches this
+			if( $info[0] * $info[1] > self::MAX_SOURCE_PIXELS )
 				return false;
 
+			// A GIF's animation does not survive this: imagecreatefromstring()
+			// only ever decodes the first frame, and the re-encode below is a
+			// still image regardless of source format - fine for a static
+			// logo slot, a surprise for anyone uploading an animated one
 			$source = @imagecreatefromstring( $bytes );
 			if( $source === false )
 				return false;
@@ -2620,7 +2642,16 @@ namespace Nino {
 			// might carry it, jpeg otherwise - keeps photos small, logos crisp
 			$keepAlpha = in_array( $info[2], [ IMAGETYPE_PNG, IMAGETYPE_GIF, IMAGETYPE_WEBP ], true );
 
-			$canvas = imagecreatetruecolor( $targetWidth, $targetHeight );
+			$canvas = @imagecreatetruecolor( $targetWidth, $targetHeight );
+
+			// Same allocation-failure class MAX_SOURCE_PIXELS above guards
+			// against, just on the target side - a clean false here beats
+			// imagealphablending()'s first param TypeError-ing under
+			// strict_types when handed one
+			if( $canvas === false ) {
+				imagedestroy( $source );
+				return false;
+			}
 
 			if( $keepAlpha === true ) {
 				imagealphablending( $canvas, false );
