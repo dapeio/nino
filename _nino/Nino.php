@@ -3926,24 +3926,16 @@ namespace Nino {
 		 *	@return 	void
 		 */
 		public static function callModules( array &$appData, string $method ): void {
-			foreach( $appData['/nino/modules'] ?? [] as $key => $className ) {
 
-				// ltrim() before the path build, not after: str_replace() alone
-				// only produces a rooted path (leading '/') when $className
-				// itself already starts with '\' - config.php writing the
-				// class name either way (with or without the leading
-				// backslash - both are the same class to PHP) must resolve
-				// to the same file
-				$relativePath = str_replace( '\\', '/', ltrim( $className, '\\' ) );
-				$filename = __DIR__. '/'. $relativePath. '/'. basename( $relativePath ). '.php';
-
-				if( class_exists( $className ) === false && is_file( $filename ) )
-					require_once $filename;
-
+			// method_exists() autoloads $className itself if it isn't defined
+			// yet (see the spl_autoload_register() call at the bottom of this
+			// file) - config.php's own '/nino/modules' list only ever
+			// controlled which modules get a method called on them here, not
+			// which classes exist to be called at all, so there is nothing
+			// left for this loop to load by hand
+			foreach( $appData['/nino/modules'] ?? [] as $className )
 				if( method_exists( $className, $method ) === true )
 					$className::$method( $appData );
-
-			}
 		}
 	}
 
@@ -4162,24 +4154,25 @@ namespace {
 
 	/**
 	 *	Nino								A compact filesystembased php framework
-	 *	Modules							All optional Modules - one file per module under Nino/Modules/,
-	 *											loaded unconditionally here rather than through
-	 *											Modules::callModules()'s own config-driven require_once:
-	 *											several call sites (tests among them) reference a module
-	 *											class directly without going through a route/callback that
-	 *											would trigger that lazy load first, and config.php's own
-	 *											'/nino/modules' list only controls which modules actually
-	 *											get init()/request()/response() called on them, not which
-	 *											classes exist to be called at all
+	 *	Modules							Autoloads \Nino\Modules\* (one file per module, under
+	 *											Nino/Modules/) and any project's own custom module
+	 *											classes on first use, from the same
+	 *											<namespace-as-path>/<basename>.php layout
+	 *											Modules::callModules() itself derives a class' file
+	 *											from - config.php's '/nino/modules' list only ever
+	 *											controlled which modules get init()/request()/
+	 *											response() called on them, never which classes exist
+	 *											to be called at all, so a call site that references a
+	 *											module class directly (tests among them), without
+	 *											going through callModules() first, needs to resolve
+	 *											the same way
 	 */
-	require_once __DIR__. '/Nino/Modules/Assets/Assets.php';
-	require_once __DIR__. '/Nino/Modules/Csrf/Csrf.php';
-	require_once __DIR__. '/Nino/Modules/Elements/Elements.php';
-	require_once __DIR__. '/Nino/Modules/Form/Form.php';
-	require_once __DIR__. '/Nino/Modules/Images/Images.php';
-	require_once __DIR__. '/Nino/Modules/Jstext/Jstext.php';
-	require_once __DIR__. '/Nino/Modules/Localepicker/Localepicker.php';
-	require_once __DIR__. '/Nino/Modules/Navigation/Navigation.php';
-	require_once __DIR__. '/Nino/Modules/Newsletter/Newsletter.php';
-	require_once __DIR__. '/Nino/Modules/Template/Template.php';
+	spl_autoload_register( function( string $className ): void {
+
+		$relativePath	= str_replace( '\\', '/', $className );
+		$filename			= __DIR__. '/'. $relativePath. '/'. basename( $relativePath ). '.php';
+
+		if( is_file( $filename ) === true )
+			require $filename;
+	} );
 }

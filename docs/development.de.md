@@ -390,7 +390,7 @@ Entfernt einen Wert aus der Session.
 Globaler Error-/Exception-Handler: loggt (falls konfiguriert) nach `/data/logs.<Jahr-Monat>.php` und zeigt den Fehler an oder bricht mit 500 ab.
 
 ### `\Nino\Modules`
-Diese Kernel-Module sind optional und erweitern den -meistens Frontend- Funktionsumfang von Nino-Projekten. Sie sind genau wie ein externes Modul aufgebaut (siehe „Eigene Module entwickeln" weiter unten) und liegen unter `_nino/Nino/Modules/`, ein Verzeichnis pro Modul, das `_nino/Nino.php` selbst bedingungslos `required` - anders als bei einem projekteigenen Modul, das erst bei Bedarf nachgeladen wird.
+Diese Kernel-Module sind optional und erweitern den -meistens Frontend- Funktionsumfang von Nino-Projekten. Sie sind genau wie ein externes Modul aufgebaut (siehe „Eigene Module entwickeln" weiter unten) und liegen unter `_nino/Nino/Modules/`, ein Verzeichnis pro Modul, das bei Bedarf nachgeladen wird - genau wie ein projekteigenes Modul.
 Die Aktivierung erfolgt über das `/nino/modules`Array in der `config.php`.
 #### `Assets`
 CSS/JS-Asset-Verwaltung: bündelt, cached und (bei `.min`-Dateinamen) minifiziert mehrere Quelldateien zu einer Ausgabedatei.
@@ -476,23 +476,29 @@ Das Registrieren in `config.php` erfolgt nach dem Muster:
 ],
 ```
 
-Falls eine gelistete Klasse noch nicht geladen ist, leitet
-`Modules::callModules()` einen Dateipfad aus ihrem Namespace ab und
-`require`t ihn:
+Jede Klasse, die dieser Konvention folgt, wird beim ersten Zugriff
+automatisch geladen - egal ob durch `callModules()`, durch
+`\Nino\init(..)` oder durch einen direkten Aufruf von irgendwo sonst:
+`_nino/Nino.php` registriert dafür einen `spl_autoload_register()`-
+Callback, der aus dem Namespace der angefragten Klasse einen Dateipfad
+ableitet:
 
 ```php
-$relativePath = str_replace( '\\', '/', ltrim( $className, '\\' ) );
+$relativePath = str_replace( '\\', '/', $className );
 $filename = __DIR__ /* _nino/ */ . '/' . $relativePath . '/' . basename( $relativePath ) . '.php';
 ```
 
 Für `\MyProject\Modules\Foo` (oder ohne führenden Backslash
-`MyProject\Modules\Foo` — beides meint dieselbe Klasse) löst das zu
-`_nino/MyProject/Modules/Foo/Foo.php` auf — das Verzeichnis heißt wie
-der vollständige Namespace-Pfad, und die Datei darin wiederholt den
-kurzen Klassennamen. Jedes eingebaute `\Nino\Modules\*`-Modul liegt
-bereits genau unter diesem Pfad in `_nino/Nino/Modules/` und wird von
-`_nino/Nino.php` selbst bedingungslos `required` - diese Pfadableitung
-greift also nur für die eigenen Module eines Projekts.
+`MyProject\Modules\Foo` — beides meint dieselbe Klasse, PHP entfernt
+den führenden Backslash, bevor ein Autoloader den Namen überhaupt zu
+sehen bekommt) löst das zu `_nino/MyProject/Modules/Foo/Foo.php` auf —
+das Verzeichnis heißt wie der vollständige Namespace-Pfad, und die
+Datei darin wiederholt den kurzen Klassennamen. Jedes eingebaute
+`\Nino\Modules\*`-Modul liegt bereits genau unter diesem Pfad in
+`_nino/Nino/Modules/` und wird also genauso automatisch geladen -
+`config.php`s `/nino/modules`-Liste steuert nur, welche Module über
+`callModules()` eine Methode aufgerufen bekommen, nie welche Klassen
+überhaupt referenziert werden können.
 
 Das eigene Modul nach der Coding-Philosophie von Nino kann so aussehen:
 ### Beispiel

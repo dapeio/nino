@@ -926,8 +926,8 @@ PHP
 );
 
 // No leading backslash - config.php can write either form, both name the
-// same class, and the pre-fix str_replace()-only path build only worked
-// for the leading-backslash form
+// same class, and PHP normalizes it away before the autoloader ever sees
+// the name (see the spl_autoload_register() call at the bottom of Nino.php)
 $appData['/nino/modules'] = [ 'KernelSmokeDummyModules\DummyCallModulesFix' ];
 \Nino\Modules::callModules( $appData, 'init' );
 check( 'a module class name without a leading backslash still resolves and loads', \KernelSmokeDummyModules\DummyCallModulesFix::$called === true );
@@ -935,6 +935,32 @@ check( 'a module class name without a leading backslash still resolves and loads
 unset( $appData['/nino/modules'] );
 \Nino\Modules::callModules( $appData, 'init' );
 check( 'callModules() does not warn/crash when /nino/modules is entirely unset', true );
+
+// A second dummy, never listed in '/nino/modules' at all - proves a
+// project's own custom module class now autoloads on a direct reference
+// too, not just when routed through callModules() first. Before the
+// spl_autoload_register() switch, only the ten built-in \Nino\Modules\*
+// classes had that property (require_once'd unconditionally by
+// Nino.php); a custom module's class only ever got loaded via
+// callModules()'s own lazy-load branch - a direct call anywhere else,
+// same as every \Nino\Modules\* call in this test file, would have been
+// a fatal "class not found".
+$directDummyDir = $dummyModuleRoot. '/DummyDirectAutoload';
+mkdir( $directDummyDir, 0777, true );
+file_put_contents( $directDummyDir. '/DummyDirectAutoload.php', <<<'PHP'
+<?php
+declare(strict_types=1);
+namespace KernelSmokeDummyModules {
+	class DummyDirectAutoload {
+		public static function ping(): string {
+			return 'pong';
+		}
+	}
+}
+PHP
+);
+
+check( 'a custom module class autoloads on a direct reference, without ever going through callModules()', \KernelSmokeDummyModules\DummyDirectAutoload::ping() === 'pong' );
 
 \Nino\Filesystem::removeDir( $dummyModuleRoot );
 

@@ -393,7 +393,7 @@ Removes a value from the session.
 The global error/exception handler: logs (if configured) to `/data/logs.<year-month>.php` and either displays the error or aborts with a 500.
 
 ### `\Nino\Modules`
-These kernel modules are optional and extend Nino projects' functionality - mostly on the frontend. They're built exactly the way an external module would be (see "Building your own modules" below) and live under `_nino/Nino/Modules/`, one directory per module, `require`d unconditionally by `_nino/Nino.php` itself rather than lazily like a project's own custom modules.
+These kernel modules are optional and extend Nino projects' functionality - mostly on the frontend. They're built exactly the way an external module would be (see "Building your own modules" below) and live under `_nino/Nino/Modules/`, one directory per module, autoloaded on first use exactly like a project's own custom modules.
 They're enabled via the `/nino/modules` array in `config.php`.
 
 #### `Assets`
@@ -480,24 +480,27 @@ Registering it in `config.php` follows this pattern:
 ],
 ```
 
-If a listed class isn't loaded yet,
-`Modules::callModules()` derives a file path from its namespace and
-`require`s it:
+Any class following this convention is autoloaded on first reference,
+whether that's `callModules()` calling it, `\Nino\init(..)`, or a direct
+call from anywhere else: `_nino/Nino.php` registers a
+`spl_autoload_register()` callback that derives a file path from the
+requested class' own namespace:
 
 ```php
-$relativePath = str_replace( '\\', '/', ltrim( $className, '\\' ) );
+$relativePath = str_replace( '\\', '/', $className );
 $filename = __DIR__ /* _nino/ */ . '/' . $relativePath . '/' . basename( $relativePath ) . '.php';
 ```
 
 For `\MyProject\Modules\Foo` (or the leading-backslash-free
-`MyProject\Modules\Foo` - both name the same class), that resolves to
-`_nino/MyProject/Modules/Foo/Foo.php` — the directory is named after
-the full namespace path, and the file inside it repeats the short
-class name. Every built-in `\Nino\Modules\*` module already lives at
-exactly this path under `_nino/Nino/Modules/` and is `require`d
-unconditionally by `_nino/Nino.php` itself, so `callModules()` never
-actually needs to load one - this path derivation only ever fires for
-a project's own custom modules.
+`MyProject\Modules\Foo` - both name the same class, and PHP strips the
+leading backslash before an autoloader ever sees the name), that
+resolves to `_nino/MyProject/Modules/Foo/Foo.php` — the directory is
+named after the full namespace path, and the file inside it repeats the
+short class name. Every built-in `\Nino\Modules\*` module already lives
+at exactly this path under `_nino/Nino/Modules/`, so it autoloads the
+same way - `config.php`'s `/nino/modules` list only ever controls which
+modules get a method called on them via `callModules()`, never which
+classes exist to be referenced at all.
 
 Your own module, built in Nino's coding philosophy, could look like this:
 ### Example
