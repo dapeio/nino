@@ -9,7 +9,7 @@ declare(strict_types=1);
  */
 namespace Nino {
 
-	const VERSION = '0.9.0-beta';
+	const VERSION = '0.10.0-beta';
 
 	function init(): array {
 
