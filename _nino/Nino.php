@@ -2880,6 +2880,7 @@ namespace Nino {
 
 			$results 		= [];
 			$fileChanges = [];
+			$fileKeys 	= [];
 
 			// entry() rebuilds the full entries() list (global.php + every
 			// locale file) on every call - fine for a single lookup, not for
@@ -2911,14 +2912,24 @@ namespace Nino {
 				$file = ( $entry['global'] === true ) ? '/text/global.php' : '/text/'. $locale. '.php';
 
 				$fileChanges[$file]['[['. $key. ']]'] = $value;
+				$fileKeys[$file][] = $key;
 
 				$results[$key] = [ 'ok' => true, 'value' => $value ];
 			}
 
-			foreach( $fileChanges as $file => $changes )
-				\Nino\Filesystem::mutate( $appData, $file, function( array $content ) use ( $changes ): array {
+			foreach( $fileChanges as $file => $changes ) {
+
+				$written = \Nino\Filesystem::mutate( $appData, $file, function( array $content ) use ( $changes ): array {
 					return array_merge( $content, $changes );
 				} );
+
+				// mutate()'s result was previously discarded - every key
+				// destined for this file was reported 'ok' even if the write
+				// itself (lock failure, disk full) never happened
+				if( $written === false )
+					foreach( $fileKeys[$file] as $key )
+						$results[$key] = [ 'ok' => false, 'error' => 'could not be written' ];
+			}
 
 			return $results;
 		}
