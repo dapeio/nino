@@ -2469,6 +2469,19 @@ namespace Nino {
 		// has no trusted-proxy configuration to verify them against. Trusting
 		// them here would let a session's ip-pinning check (see Auth) and the
 		// activity log's ip field both be spoofed by the request itself.
+		//
+		// Behind a reverse proxy (Cloudflare, a load balancer, ...) this is
+		// necessarily the proxy's own address for every single visitor, not
+		// theirs - REMOTE_ADDR simply has no other value to be. Mail::_hit()'s
+		// per-ip send cap is the one place that currently matters: it becomes
+		// a per-site cap instead, and five contact-form submissions from
+		// anyone lock out every visitor's mail (newsletter confirmations
+		// included) for the rest of the window, silently, since a rate-limit
+		// refusal is not surfaced as an error. A trusted-proxy allowlist
+		// (only trust X-Forwarded-For's rightmost hop when REMOTE_ADDR itself
+		// is a known proxy) would fix this properly but isn't implemented -
+		// this comment exists so that gap gets found in the source, not at
+		// the mail server, if it ever bites.
 		public static function getClientIp(): string {
 
 			return $_SERVER['REMOTE_ADDR'] ?? '';
