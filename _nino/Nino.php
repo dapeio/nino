@@ -937,7 +937,11 @@ namespace Nino {
 			if( is_string( $_POST['_csrf'] ?? null ) === true && $_POST['_csrf'] !== '' )
 				return $_POST['_csrf'];
 
-			$header = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
+			// Via the already-normalized/whitelisted request header, not
+			// $_SERVER directly - that's the only path a test can drive
+			// (there is no way to fake $_SERVER for a smoke test), and the
+			// one every other header read in the kernel already goes through.
+			$header = $request['/nino/http/request']['header']['X-CSRF-Token'] ?? '';
 			if( is_string( $header ) === true && $header !== '' )
 				return $header;
 
