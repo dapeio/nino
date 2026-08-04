@@ -888,7 +888,7 @@ namespace Nino\Dev {
 		 *	Archive the *current* on-disk state before overwriting it, same
 		 *	tar+gzip+encrypt shape as Backup::_create() (duplicated, not
 		 *	called into - see this class' own docblock; the file manifest
-		 *	itself is shared via Filesystem::backupManifest(), which carries
+		 *	itself is shared via \Nino\Backup::manifest(), which carries
 		 *	no such coupling). Named distinctly from a dated backup so it's
 		 *	never mistaken for one and never collides with/gets pruned by
 		 *	Backup's own retention sweep
@@ -904,7 +904,7 @@ namespace Nino\Dev {
 			$tmpTar = tempnam( sys_get_temp_dir(), 'ninosnapshot' ). '.tar';
 			$phar 	= new \PharData( $tmpTar );
 
-			foreach( \Nino\Filesystem::backupManifest( $appData ) as $absolute => $archiveName )
+			foreach( \Nino\Backup::manifest( $appData ) as $absolute => $archiveName )
 				$phar->addFromString( $archiveName, file_get_contents( $absolute ) );
 
 			$phar->compress( \Phar::GZ );

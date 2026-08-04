@@ -561,6 +561,41 @@ $sneaky['/nino/auth/user'][$sessionUser]['sessions']['tokenD'] = [ 'time' => tim
 \Nino\Auth::updateUser( $pwChange, $sessionUser, $sessionUser, 'a brand new password' );
 check( 'a password change ends a session opened while it was running', $sessions() === [] );
 
+// Regression: mutate()'s return value used to be silently discarded here -
+// a failed config.php write (disk full, permission denied, ...) had no
+// observable effect anywhere. Forced via a configpath whose base is a
+// plain file, not a directory: nothing can be created "inside" it
+// (ENOTDIR), which fails the write even for root, unlike a chmod-based
+// denial. lockFile() itself still succeeds - it locks a sidecar file
+// under the (perfectly normal) main filesystem path, not configpath - so
+// this exercises mutate()'s own failure, not writeContentData()'s
+// pre-existing "could not lock" check.
+$writeFailDir = sys_get_temp_dir(). '/nino-kernel-smoke-writefail-'. uniqid();
+mkdir( $writeFailDir, 0777, true );
+$brokenConfigBase = $writeFailDir. '/not-a-directory';
+file_put_contents( $brokenConfigBase, 'x' );
+
+$writeFailAppData = [ './nino/uid' => $writeFailDir ];
+\Nino\AppData::prepare( $writeFailAppData );
+$writeFailAppData['./nino/filesystem/path']				= $writeFailDir;
+$writeFailAppData['./nino/filesystem/configpath']	= $brokenConfigBase;
+$writeFailAppData['/nino/auth/user'] = [ 'someone@example.com' => [] ];
+
+$capturedErrors = [];
+set_error_handler( function( int $errno, string $errstr ) use ( &$capturedErrors ): bool {
+	$capturedErrors[] = [ 'errno' => $errno, 'errstr' => $errstr ];
+	return true;
+} );
+
+\Nino\AppData::writeContentData( $writeFailAppData, [ '/nino/auth/user' ] );
+
+restore_error_handler();
+
+$sawWriteFailure = count( array_filter( $capturedErrors, fn( $e ) => $e['errno'] === E_USER_ERROR && str_contains( $e['errstr'], 'failed to write config.php' ) ) ) === 1;
+check( 'writeContentData() surfaces a failed config.php write via trigger_error(E_USER_ERROR)', $sawWriteFailure );
+
+\Nino\Filesystem::removeDir( $writeFailDir );
+
 echo "\n";
 
 
@@ -816,6 +851,21 @@ $monthlyCutoff = ( new \DateTime( 'first day of -3 months' ) )->setTime( 0, 0 );
 check( 'an old monthly bucket past the cutoff is deleted', is_file( $oldMonthly ) === false );
 check( 'a fresh monthly bucket is kept', is_file( $freshMonthly ) === true );
 check( 'a filename this sweep does not own (no "logs." prefix) is untouched', is_file( $unparseable ) === true );
+
+// Regression: an empty $suffix used to hide every file from this sweep -
+// substr()'s own -strlen('') is -0, and PHP has no negative zero, so that
+// collapsed to a length of 0 ("take zero characters") instead of "to the
+// end of the string". The date portion was always extracted as '', which
+// never parses, so every file silently survived regardless of its age.
+$noSuffixOld 		= $rotDir. '/nosuffix.2020-01';
+$noSuffixFresh	= $rotDir. '/nosuffix.'. date( 'Y-m' );
+file_put_contents( $noSuffixOld, 'x' );
+file_put_contents( $noSuffixFresh, 'x' );
+
+\Nino\RotatingLog::prune( $rotDir, 'nosuffix.', 'Y-m', '', $monthlyCutoff );
+
+check( 'an empty suffix still deletes an old file past the cutoff', is_file( $noSuffixOld ) === false );
+check( 'an empty suffix still keeps a fresh file', is_file( $noSuffixFresh ) === true );
 
 $dailyCutoff = ( new \DateTime( '-14 days' ) )->setTime( 0, 0 );
 \Nino\RotatingLog::prune( $rotDir, '', 'Y-m-d', '.php', $dailyCutoff );

@@ -261,7 +261,7 @@ namespace Nino {
 				return;
 			}
 
-			\Nino\Filesystem::mutate( $appData, '/config.php', function( array $content, array &$appData ) use ( $keys ): array {
+			$written = \Nino\Filesystem::mutate( $appData, '/config.php', function( array $content, array &$appData ) use ( $keys ): array {
 
 				foreach( $keys as $key )
 					$content[$key] = ( $key === '/nino/auth/user' )
@@ -270,6 +270,9 @@ namespace Nino {
 
 				return $content;
 			} );
+
+			if( $written === false )
+				trigger_error( 'AppData::writeContentData(): failed to write config.php.', E_USER_ERROR );
 		}
 
 		/**
@@ -1543,56 +1546,6 @@ namespace Nino {
 		}
 
 		/**
-		 *	Absolute path -> archive name, for every file the admin panel
-		 *	writes to at runtime: config.php, the text files and every
-		 *	element type/image. Deliberately not developer code (_nino/,
-		 *	templates, _admin/ itself, ...) - that's already versioned in
-		 *	git and would just bloat every backup.
-		 *
-		 *	Shared by Admin\Backup::_create() and Dev\Restore::_safetySnapshot(),
-		 *	which both need the exact same manifest for the exact same reason -
-		 *	kept here rather than in either since Restore deliberately doesn't
-		 *	depend on _admin/Admin.php (see that class' own docblock).
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *
-		 *	@return 	array										Absolute source path => name inside the archive
-		 */
-		public static function backupManifest( array &$appData ): array {
-
-			// Defensive: a caller right after writing config.php
-			// (Admin\Backup::_bootstrap()) needs the is_file() checks below to
-			// see that write rather than a cached pre-write stat
-			clearstatcache();
-
-			$root 			= self::getPath( $appData );
-			$configPath	= self::getConfigPath( $appData );
-			$files 			= [];
-
-			// config.php resolves against configPath, not root - see
-			// getConfigPath()'s docblock. Every other file here is always
-			// inside the regular project root.
-			if( is_file( $configPath. '/config.php' ) === true )
-				$files[$configPath. '/config.php'] = 'config.php';
-
-			if( is_file( $root. '/text/global.php' ) === true )
-				$files[$root. '/text/global.php'] = 'text/global.php';
-
-			foreach( \Nino\Locales::getAvailableLocales( $appData ) as $locale )
-				if( is_file( $root. '/text/'. $locale. '.php' ) === true )
-					$files[$root. '/text/'. $locale. '.php'] = 'text/'. $locale. '.php';
-
-			foreach( glob( $root. '/elements/*.php' ) ?: [] as $file )
-				$files[$file] = 'elements/'. basename( $file );
-
-			foreach( glob( $root. '/images/*' ) ?: [] as $file )
-				if( is_file( $file ) === true )
-					$files[$file] = 'images/'. basename( $file );
-
-			return $files;
-		}
-
-		/**
 		 *	Return current filesystem dir
 		 *
 		 *	@param		array 				&$appData			(reference) Array with current app data
@@ -1700,6 +1653,72 @@ namespace Nino {
 
 	/**
 	 *	Nino								A compact filesystembased php framework
+	 *	Backup							Shared backup/restore manifest: which files belong
+	 *											in an admin-panel backup archive at all - not
+	 *											itself a filesystem primitive, so it doesn't live
+	 *											in Filesystem
+	 *
+	 *	@package						Dape/Nino
+	 *	@author							David Perchermeier <mail@dape.io>
+	 *	@link								https://github.com/dapeio/nino
+	 */
+
+	class Backup {
+
+		/**
+		 *	Absolute path -> archive name, for every file the admin panel
+		 *	writes to at runtime: config.php, the text files and every
+		 *	element type/image. Deliberately not developer code (_nino/,
+		 *	templates, _admin/ itself, ...) - that's already versioned in
+		 *	git and would just bloat every backup.
+		 *
+		 *	Shared by Admin\Backup::_create() and Dev\Restore::_safetySnapshot(),
+		 *	which both need the exact same manifest for the exact same reason -
+		 *	kept here rather than in either since Restore deliberately doesn't
+		 *	depend on _admin/Admin.php (see that class' own docblock).
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	array										Absolute source path => name inside the archive
+		 */
+		public static function manifest( array &$appData ): array {
+
+			// Defensive: a caller right after writing config.php
+			// (Admin\Backup::_bootstrap()) needs the is_file() checks below to
+			// see that write rather than a cached pre-write stat
+			clearstatcache();
+
+			$root 			= \Nino\Filesystem::getPath( $appData );
+			$configPath	= \Nino\Filesystem::getConfigPath( $appData );
+			$files 			= [];
+
+			// config.php resolves against configPath, not root - see
+			// getConfigPath()'s docblock. Every other file here is always
+			// inside the regular project root.
+			if( is_file( $configPath. '/config.php' ) === true )
+				$files[$configPath. '/config.php'] = 'config.php';
+
+			if( is_file( $root. '/text/global.php' ) === true )
+				$files[$root. '/text/global.php'] = 'text/global.php';
+
+			foreach( \Nino\Locales::getAvailableLocales( $appData ) as $locale )
+				if( is_file( $root. '/text/'. $locale. '.php' ) === true )
+					$files[$root. '/text/'. $locale. '.php'] = 'text/'. $locale. '.php';
+
+			foreach( glob( $root. '/elements/*.php' ) ?: [] as $file )
+				$files[$file] = 'elements/'. basename( $file );
+
+			foreach( glob( $root. '/images/*' ) ?: [] as $file )
+				if( is_file( $file ) === true )
+					$files[$file] = 'images/'. basename( $file );
+
+			return $files;
+		}
+
+	}
+
+	/**
+	 *	Nino								A compact filesystembased php framework
 	 *	RotatingLog					One prune() for every "delete dated files older
 	 *											than a cutoff" sweep - Runtime's error log,
 	 *											Modules\Form's submissions, Admin\Logs' activity
@@ -1732,7 +1751,9 @@ namespace Nino {
 
 			foreach( glob( $dir. '/'. $prefix. '*'. $suffix ) ?: [] as $file ) {
 
-				$datePart = substr( basename( $file ), strlen( $prefix ), -strlen( $suffix ) );
+				// An empty $suffix must mean "to the end of the string", not
+				// substr()'s own -strlen('') = -0 = 0, ie. "take zero chars"
+				$datePart = substr( basename( $file ), strlen( $prefix ), $suffix === '' ? null : -strlen( $suffix ) );
 
 				// Always parsed as a full 'Y-m-d', padding a monthly 'Y-m' out
 				// to the first of the month first - createFromFormat() would
@@ -3697,13 +3718,19 @@ namespace Nino {
 			$results 		= [];
 			$fileChanges = [];
 
+			// entry() rebuilds the full entries() list (global.php + every
+			// locale file) on every call - fine for a single lookup, not for
+			// one per item in a batch. Built once here and indexed by key
+			// instead.
+			$entriesByKey = array_column( self::entries( $appData, $includeBlacklisted ), null, 'key' );
+
 			foreach( $items as $item ) {
 
 				$key 		= (string) ( $item['key'] ?? '' );
 				$locale = (string) ( $item['locale'] ?? '' );
 				$value 	= (string) ( $item['value'] ?? '' );
 
-				$entry = self::entry( $appData, $key, $includeBlacklisted );
+				$entry = $entriesByKey[$key] ?? null;
 
 				if( $entry === null ) {
 					$results[$key] = [ 'ok' => false, 'error' => 'unknown key' ];

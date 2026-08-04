@@ -1536,7 +1536,7 @@ namespace Nino\Admin {
 			$tmpTar = tempnam( sys_get_temp_dir(), 'ninobackup' ). '.tar';
 
 			$phar = new \PharData( $tmpTar );
-			foreach( \Nino\Filesystem::backupManifest( $appData ) as $absolute => $archiveName )
+			foreach( \Nino\Backup::manifest( $appData ) as $absolute => $archiveName )
 				$phar->addFromString( $archiveName, file_get_contents( $absolute ) );
 			$phar->compress( \Phar::GZ );
 			unset( $phar );
