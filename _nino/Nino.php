@@ -1978,76 +1978,61 @@ namespace Nino {
 			$elementUri 	= self::getElementUriFromUri( $uri );
 			$typeUri			= self::getElementTypeFromUri( $uri );
 
-			// Lock first, then read under the lock - see _lockElementFile()
-			$typeData			= self::_lockElementFile( $appData, $typeUri );
+			// $outcome stays 'notfound' unless the callback below actually runs
+			// and says otherwise - that covers both "type file missing" (the
+			// callback sees a non-array $state and aborts) and "could not be
+			// locked at all" (the callback never runs), same message either way
+			$outcome = 'notfound';
 
-			if( $typeData === false )
+			$success = \Nino\Filesystem::mutate( $appData, '/elements/'. $typeUri. '.php', function( mixed $typeData, array &$appData ) use ( $elementUri, $locale, $typeUri, &$outcome ): mixed {
+
+				if( is_array( $typeData ) === false )
+					return null;
+
+				// Unset locale data
+				unset( $typeData[$locale][$elementUri] );
+				if( empty( $typeData[$locale] ) === true )
+					unset( $typeData[$locale] );
+
+				// Delete all (*) - deliberately not iterating $typeData's own keys,
+				// as a type file also has non-locale top-level keys (eg. its own
+				// display "title", a plain string rather than a data bucket) that
+				// would crash unset() on a string offset
+				if( $locale === '*' )
+					foreach( \Nino\Locales::getAvailableLocales( $appData ) as $l )
+						unset( $typeData[$l][$elementUri] );
+
+				// Delete last * (only if no other locale still references this element)
+				$lastEntry = true;
+				foreach( \Nino\Locales::getAvailableLocales( $appData ) as $l )
+					if( isset( $typeData[$l][$elementUri] ) === true )
+						$lastEntry = false;
+
+				if( $lastEntry === true )
+					unset( $typeData['*'][$elementUri] );
+
+				unset( $appData['./nino/elements/cache'] );
+
+				// Run callback
+				if( \Nino\Callbacks::doCallbacks( $appData, '/nino/elements/delete'. $typeUri, $typeData ) === false ) {
+					$outcome = 'veto';
+					return null;
+				}
+
+				$outcome = 'success';
+				return $typeData;
+			}, false );
+
+			if( $outcome === 'notfound' )
 				return ! trigger_error( 'Element type \''. $typeUri. '\' does not exist or could not be locked for writing.' );
 
-			// Unset locale data
-			unset( $typeData[$locale][$elementUri] );
-			if( empty( $typeData[$locale] ) === true )
-				unset( $typeData[$locale] );
-
-			// Delete all (*) - deliberately not iterating $typeData's own keys,
-			// as a type file also has non-locale top-level keys (eg. its own
-			// display "title", a plain string rather than a data bucket) that
-			// would crash unset() on a string offset
-			if( $locale === '*' )
-				foreach( \Nino\Locales::getAvailableLocales( $appData ) as $l )
-					unset( $typeData[$l][$elementUri] );
-
-			// Delete last * (only if no other locale still references this element)
-			$lastEntry = true;
-			foreach( \Nino\Locales::getAvailableLocales( $appData ) as $l )
-				if( isset( $typeData[$l][$elementUri] ) === true )
-					$lastEntry = false;
-
-			if( $lastEntry === true )
-				unset( $typeData['*'][$elementUri] );
-
-			unset( $appData['./nino/elements/cache'] );
-
-			// Run callback
-			if( \Nino\Callbacks::doCallbacks( $appData, '/nino/elements/delete'. $typeUri, $typeData ) === false )
+			if( $outcome === 'veto' )
 				return null;
-
-			// Put element file
-			\Nino\Filesystem::putFileContent( $appData, '/elements/'. $typeUri. '.php', $typeData, true );
 
 			return true;
 		}
 
 
-
-		/**
-		 *	Take the write lock on a type file and read it back fresh under
-		 *	that lock, for a read-modify-write sequence.
-		 *
-		 *	Locking before reading, not after, matters because element files
-		 *	are the ones two people actually edit at the same time: reading
-		 *	first can hand the sequence a copy that predates a parallel write,
-		 *	or a cache slot filled earlier in the same request.
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		string		$typeUri			Uri of the element type to lock
-		 *
-		 *	@return 	array | false					Type data, or false if it doesn't exist or couldn't be locked
-		 */
-		static private function _lockElementFile( array &$appData, string $typeUri ): array|false {
-
-			$path = '/elements/'. $typeUri. '.php';
-
-			if( \Nino\Filesystem::lockFile( $appData, $path ) === false )
-				return false;
-
-			// Force the read below onto the disk, and drop the per-element cache
-			// so everything read from here on is post-lock state as well
-			$appData['./nino/filesystem/cache'][$path]['fstat'] = [];
-			unset( $appData['./nino/elements/cache'] );
-
-			return self::getElementFile( $appData, $typeUri );
-		}
 
 		private static function getElementFile( array &$appData, string $typeUri ): array|false {
 
@@ -2187,114 +2172,151 @@ namespace Nino {
 			// Flush, reload and lock element file
 			$typeUri			= self::getElementTypeFromUri( $uri );
 
-			// Lock first, then read under the lock - see _lockElementFile()
-			$typeData			= self::_lockElementFile( $appData, $typeUri );
+			// $outcome stays 'notfound' unless the callback below actually runs
+			// and says otherwise - that covers both "type file missing" (the
+			// callback sees a non-array $state and aborts) and "could not be
+			// locked at all" (the callback never runs), same message either way
+			$outcome 		= 'notfound';
+			$resultData	= null;
 
-			if( $typeData === false )
-				return ! trigger_error( 'Element type \''. $typeUri. '\' does not exist or could not be locked for writing.' );
+			$success = \Nino\Filesystem::mutate( $appData, '/elements/'. $typeUri. '.php', function( mixed $typeData, array &$appData ) use ( $uri, $data, $locale, $typeUri, $update, &$outcome, &$resultData ): mixed {
 
-			// Run callbacks
-			$callbacks	= [];
-			$data['.uri'] 		= $uri;
-			$data['.locale']	= $locale;
+				if( is_array( $typeData ) === false )
+					return null;
 
-			foreach( $typeData['model'] AS $key => $field )
-				if( isset( $field['callbacks'] ) === true && isset( $data[$key] ) )
-					foreach( $field['callbacks'] AS $callbackUri )
-						if( \Nino\Callbacks::doCallbacks( $appData, $callbackUri, $data ) === false )
-							return ! trigger_error( 'Callback \''. $callbackUri. '\' returns an error.' );
+				// Run callbacks
+				$callbacks	= [];
+				$data['.uri'] 		= $uri;
+				$data['.locale']	= $locale;
 
-			// Check new element data
-			if( is_array( $data ) === false || isset( $data['.uri'] ) === false || isset( $data['.locale'] ) === false )
-				return null;
+				foreach( $typeData['model'] AS $key => $field )
+					if( isset( $field['callbacks'] ) === true && isset( $data[$key] ) )
+						foreach( $field['callbacks'] AS $callbackUri )
+							if( \Nino\Callbacks::doCallbacks( $appData, $callbackUri, $data ) === false ) {
+								trigger_error( 'Callback \''. $callbackUri. '\' returns an error.' );
+								$outcome = 'error';
+								return null;
+							}
 
-			// Combine old and new data
-			if( $update === true )
-			$data = $data + \Nino\Elements::getElement( $appData, $uri, '*' );
-
-			// Render/write new element
-			$elementUri = self::getElementUriFromUri( $data['.uri'] );
-
-			foreach( $typeData['model'] AS $key => $field ) {
-
-				// Required - a plain empty() would also reject a legitimate 0/false
-				// value on a boolean/integer/double field, so presence alone is
-				// enough for those; string/array still need an actual non-empty value
-				if( isset( $field['required'] ) === true && $field['required'] === true ) {
-					$isEmpty = match( true ) {
-						isset( $data[$key] ) === false 																								=> true,
-						in_array( $field['type'], [ 'boolean', 'integer', 'double' ], true ) === true => false,
-						is_array( $data[$key] ) === true 																							=> count( $data[$key] ) === 0,
-						default 																																				=> $data[$key] === '',
-					};
-					if( $isEmpty === true )
-						return ! trigger_error( 'Missing required element key \''. $key. '\' in \''. $uri. '\'.' );
+				// Check new element data
+				if( is_array( $data ) === false || isset( $data['.uri'] ) === false || isset( $data['.locale'] ) === false ) {
+					$outcome = 'veto';
+					return null;
 				}
 
-				// Default
-				if( isset( $field['default'] ) === true && ( isset( $data[$key] ) === false || $field['default'] === $data[$key] ) )
-					continue;
+				// Combine old and new data
+				if( $update === true )
+					$data = $data + \Nino\Elements::getElement( $appData, $uri, '*' );
 
-				// Check key
-				if( isset( $data[$key] ) === false )
-					continue;
+				// Render/write new element
+				$elementUri = self::getElementUriFromUri( $data['.uri'] );
 
-				// Var type (a whole-number 'double' round-trips through json as an 'integer', accept and coerce it)
-				if( $field['type'] === 'double' && gettype( $data[$key] ) === 'integer' )
-					$data[$key] = (float) $data[$key];
+				foreach( $typeData['model'] AS $key => $field ) {
 
-				if( gettype( $data[$key] ) !== self::_expectedGettype( $field['type'] ) )
-					return ! trigger_error( 'Wrong var type \''. $key. '\' in \''. $uri. '\'. \''. $field['type']. '\' required, \''. gettype( $data[$key] ). '\' given.' );
+					// Required - a plain empty() would also reject a legitimate 0/false
+					// value on a boolean/integer/double field, so presence alone is
+					// enough for those; string/array still need an actual non-empty value
+					if( isset( $field['required'] ) === true && $field['required'] === true ) {
+						$isEmpty = match( true ) {
+							isset( $data[$key] ) === false 																								=> true,
+							in_array( $field['type'], [ 'boolean', 'integer', 'double' ], true ) === true => false,
+							is_array( $data[$key] ) === true 																							=> count( $data[$key] ) === 0,
+							default 																																				=> $data[$key] === '',
+						};
+						if( $isEmpty === true ) {
+							trigger_error( 'Missing required element key \''. $key. '\' in \''. $uri. '\'.' );
+							$outcome = 'error';
+							return null;
+						}
+					}
 
-				// Whitelist
-				if( isset( $field['whitelist'] ) === true && in_array( $data[$key], $field['whitelist'] ) === false )
-					return ! trigger_error( 'Element value \''. $key. '\' is not whitelisted.' );
+					// Default
+					if( isset( $field['default'] ) === true && ( isset( $data[$key] ) === false || $field['default'] === $data[$key] ) )
+						continue;
 
-				// Blacklist
-				if( isset( $field['blacklist'] ) === true && in_array( $data[$key], $field['blacklist'] ) === true )
-					return ! trigger_error( 'Element value \''. $key. '\' is blacklisted.' );
+					// Check key
+					if( isset( $data[$key] ) === false )
+						continue;
 
-				$targetArray = ( isset( $typeData['model'][$key]['locale'] ) === true && $typeData['model'][$key]['locale'] === true ) ? $data['.locale'] : '*';
+					// Var type (a whole-number 'double' round-trips through json as an 'integer', accept and coerce it)
+					if( $field['type'] === 'double' && gettype( $data[$key] ) === 'integer' )
+						$data[$key] = (float) $data[$key];
+
+					if( gettype( $data[$key] ) !== self::_expectedGettype( $field['type'] ) ) {
+						trigger_error( 'Wrong var type \''. $key. '\' in \''. $uri. '\'. \''. $field['type']. '\' required, \''. gettype( $data[$key] ). '\' given.' );
+						$outcome = 'error';
+						return null;
+					}
+
+					// Whitelist
+					if( isset( $field['whitelist'] ) === true && in_array( $data[$key], $field['whitelist'] ) === false ) {
+						trigger_error( 'Element value \''. $key. '\' is not whitelisted.' );
+						$outcome = 'error';
+						return null;
+					}
+
+					// Blacklist
+					if( isset( $field['blacklist'] ) === true && in_array( $data[$key], $field['blacklist'] ) === true ) {
+						trigger_error( 'Element value \''. $key. '\' is blacklisted.' );
+						$outcome = 'error';
+						return null;
+					}
+
+					$targetArray = ( isset( $typeData['model'][$key]['locale'] ) === true && $typeData['model'][$key]['locale'] === true ) ? $data['.locale'] : '*';
 
 
-				// Set value
-				$typeData[$targetArray][$elementUri] = $typeData[$targetArray][$elementUri] ?? [];
-				$typeData[$targetArray][$elementUri][$key] = $data[$key];
-			}
+					// Set value
+					$typeData[$targetArray][$elementUri] = $typeData[$targetArray][$elementUri] ?? [];
+					$typeData[$targetArray][$elementUri][$key] = $data[$key];
+				}
 
-			$typeData['*'][$elementUri] = $typeData['*'][$elementUri] ?? [];
+				$typeData['*'][$elementUri] = $typeData['*'][$elementUri] ?? [];
 
-			// Check uri change
-			if( $uri !== $data['.uri'] ) {
+				// Check uri change
+				if( $uri !== $data['.uri'] ) {
 
-				\Nino\Callbacks::doCallbacks( $appData, '/nino/elements'. $typeUri. '/update/uri', $data );
+					\Nino\Callbacks::doCallbacks( $appData, '/nino/elements'. $typeUri. '/update/uri', $data );
 
-				// Same reasoning as deleteElement(): iterate the known locale
-				// buckets, not $typeData's own keys. A type file also carries
-				// non-locale top-level keys (its display 'title', a plain string),
-				// and unset() on a string offset is a fatal Error - renaming an
-				// element uri took the whole request down with it. The loop
-				// variable was $locale too, overwriting the parameter for
-				// everything that follows.
-				$oldElementUri = self::getElementUriFromUri( $uri );
+					// Same reasoning as deleteElement(): iterate the known locale
+					// buckets, not $typeData's own keys. A type file also carries
+					// non-locale top-level keys (its display 'title', a plain string),
+					// and unset() on a string offset is a fatal Error - renaming an
+					// element uri took the whole request down with it. The loop
+					// variable was $locale too, overwriting the parameter for
+					// everything that follows.
+					$oldElementUri = self::getElementUriFromUri( $uri );
 
-				foreach( array_merge( \Nino\Locales::getAvailableLocales( $appData ), [ '*' ] ) AS $typeLocale )
-					unset( $typeData[$typeLocale][$oldElementUri] );
-			}
+					foreach( array_merge( \Nino\Locales::getAvailableLocales( $appData ), [ '*' ] ) AS $typeLocale )
+						unset( $typeData[$typeLocale][$oldElementUri] );
+				}
 
-			unset( $appData['./nino/elements/cache'] );
+				unset( $appData['./nino/elements/cache'] );
 
-			// Run callback - lets a module react to (or veto, by returning
-			// false) a save, same veto-capable shape as deleteElement()'s
-			// own '/nino/elements/delete<typeUri>' callback below
-			$callbackName = '/nino/elements'. $typeUri. ( $update === true ? '/update' : '/insert' );
-			if( \Nino\Callbacks::doCallbacks( $appData, $callbackName, $typeData ) === false )
+				// Run callback - lets a module react to (or veto, by returning
+				// false) a save, same veto-capable shape as deleteElement()'s
+				// own '/nino/elements/delete<typeUri>' callback below
+				$callbackName = '/nino/elements'. $typeUri. ( $update === true ? '/update' : '/insert' );
+				if( \Nino\Callbacks::doCallbacks( $appData, $callbackName, $typeData ) === false ) {
+					$outcome = 'veto';
+					return null;
+				}
+
+				$outcome 		= 'success';
+				$resultData	= [ '.uri' => $data['.uri'], '.locale' => $data['.locale'] ];
+
+				return $typeData;
+			}, false );
+
+			if( $outcome === 'notfound' )
+				return ! trigger_error( 'Element type \''. $typeUri. '\' does not exist or could not be locked for writing.' );
+
+			if( $outcome === 'error' )
+				return false;
+
+			if( $outcome === 'veto' )
 				return null;
 
-			// Put element file
-			\Nino\Filesystem::putFileContent( $appData, '/elements/'. $typeUri. '.php', $typeData, true );
-
-			return \Nino\Elements::getElement( $appData, $data['.uri'], $data['.locale'] );
+			return \Nino\Elements::getElement( $appData, $resultData['.uri'], $resultData['.locale'] );
 		}
 
 		/**

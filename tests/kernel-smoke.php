@@ -36,6 +36,31 @@ function check( string $label, bool $condition ): void {
 	echo "FAIL  - $label\n";
 }
 
+/**
+ *	Probe whether a Filesystem::lockFile()'d path's sidecar .lock file is
+ *	currently free, via a second, independent file handle - flock() is per
+ *	open-file-description, so this genuinely conflicts with a handle Nino
+ *	itself is still holding open, the same way a second request would.
+ *	Releases its own probe lock again before returning, so it never leaves
+ *	the sidecar locked for whatever runs next.
+ *
+ *	@param		string		$sandbox			Sandbox root (./nino/filesystem/path)
+ *	@param		string		$filename			Locked path as passed to lockFile(), eg. '/elements/foo.php'
+ *
+ *	@return		bool										True if the lock was free (and has now been released again)
+ */
+function probeLockFree( string $sandbox, string $filename ): bool {
+	$lockPath	= $sandbox. '/data/.locks/'. sha1( $filename ). '.lock';
+	$probe		= @fopen( $lockPath, 'c' );
+	if( $probe === false )
+		return false;
+	$free = flock( $probe, LOCK_EX | LOCK_NB );
+	if( $free === true )
+		flock( $probe, LOCK_UN );
+	fclose( $probe );
+	return $free;
+}
+
 // Silence trigger_error() output (we're using the plain php handler, no Nino\Runtime error handler
 // is registered here on purpose - keeps expected-failure paths from being noisy)
 set_error_handler( function() { return true; } );
@@ -103,6 +128,18 @@ check( 'insertElement accepts a legitimate 0 for a required integer field', \Nin
 \Nino\Elements::deleteElement( $appData, '/reqtype/item1', '*' );
 check( 'insertElement accepts a legitimate false for a required boolean field', \Nino\Elements::insertElement( $appData, '/reqtype/item2', [ 'title' => 'x', 'tags' => [ 'a' ], 'count' => 1, 'active' => false ], 'de_DE' ) !== false );
 \Nino\Elements::deleteElement( $appData, '/reqtype/item2', '*' );
+
+// Regression: every early return between taking the type file's write lock
+// and putFileContent() (which is the only place that used to release it)
+// leaked that lock for the rest of the request - a required-field
+// validation failure is one of them. Probed via a second, independent file
+// handle on the sidecar .lock file, since Nino's own re-lock check inside
+// the same $appData would otherwise mask a leak as "already holding it".
+\Nino\Elements::insertElement( $appData, '/reqtype/leaktest', [ 'title' => '', 'tags' => [ 'a' ], 'count' => 1, 'active' => true ], 'de_DE' );
+// Note the double slash: Elements builds its lock/cache key as '/elements/'.
+// $typeUri. '.php' and $typeUri already carries its own leading slash - the
+// probe has to match that exact key, not the visually "clean" single-slash path
+check( 'insertElement releases the type file lock after a required-field validation failure', probeLockFree( $sandbox, '/elements//reqtype.php' ) === true );
 
 $fetched = \Nino\Elements::getElement( $appData, '/testtype/item1', 'de_DE' );
 check( 'getElement finds the inserted element', is_array( $fetched ) === true && $fetched['title'] === 'Hello' );
@@ -404,6 +441,16 @@ check( '/nino/elements<type>/insert fires on insertElement, not on update', coun
 
 \Nino\Elements::updateElement( $appData, '/hooktest/item1', [ 'name' => 'Item 1 renamed' ], 'de_DE' );
 check( '/nino/elements<type>/update fires on updateElement, not again on insert', count( $elementSeen['update'] ?? [] ) === 1 && count( $elementSeen['insert'] ?? [] ) === 1 );
+
+// Regression: same lock-leak as the insertElement one above, but on
+// deleteElement()'s own early return - a callback veto used to skip
+// putFileContent(), the only place that released the lock
+\Nino\Callbacks::registerCallback( $appData, '/nino/elements/delete/hooktest', function( &$appData, &$args ) { return false; } );
+
+$vetoed = \Nino\Elements::deleteElement( $appData, '/hooktest/item1', 'de_DE' );
+check( 'deleteElement returns null when the delete callback vetoes', $vetoed === null );
+// Same double-slash key as above, see the insertElement leak check
+check( 'deleteElement releases the type file lock after a callback veto', probeLockFree( $sandbox, '/elements//hooktest.php' ) === true );
 
 echo "\n";
 
