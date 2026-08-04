@@ -965,15 +965,15 @@ namespace Nino {
 
 			$path = $appData['./nino/uid'];
 			if( is_dir( $path ) === false ) {
-				trigger_error( 'Filesystem path \''. $path. '\' does not exists.' );
+				trigger_error( 'Filesystem path \''. $path. '\' does not exists.', E_USER_ERROR );
 				return;
 			}
 			if( is_writable( $path ) === false ) {
-				trigger_error( 'Filesystem path \''. $path. '\' is not writable.' );
+				trigger_error( 'Filesystem path \''. $path. '\' is not writable.', E_USER_ERROR );
 				return;
 			}
 			if( strpos( __DIR__, $path ) !== 0 ) {
-				trigger_error( 'Filesystem path \''. $path. '\' is not inside root dir.' );
+				trigger_error( 'Filesystem path \''. $path. '\' is not inside root dir.', E_USER_ERROR );
 				return;
 			}
 
@@ -3181,6 +3181,20 @@ namespace Nino {
 
 		private const int RETENTION_MONTHS = 3;
 
+		// The levels our own trigger_error() calls use as an out-of-band "record
+		// this and carry on" channel: Elements' "return ! trigger_error( ... )"
+		// idiom and Modules\Newsletter's catch blocks ("a storage failure must
+		// not turn a visitor-facing signup into a 500") are both written for a
+		// handler that returns - without this they were 500s all the same, and
+		// the statement after the trigger_error() was unreachable.
+		//
+		// Engine-raised levels are deliberately absent: an undefined array key
+		// or a division by zero is a bug in here, and a handler that swallows
+		// those hides exactly what it exists to surface. Anything that really
+		// must stop the request says so explicitly with E_USER_ERROR (see
+		// AppData::init(), Filesystem::init()).
+		private const array NON_FATAL_LEVELS = [ E_USER_NOTICE, E_USER_WARNING, E_USER_DEPRECATED ];
+
 		private static
 			$_currentInstance = [];
 
@@ -3230,9 +3244,10 @@ namespace Nino {
 		}
 
 
-		// Global error/exception handler. Returns false (script continues
-		// normally) only when the error level is filtered by
-		// error_reporting(); every other path terminates the script.
+		// Global error/exception handler. Terminates the request with a 500 for
+		// exceptions, for E_USER_ERROR and for every engine-raised level;
+		// returns (script continues on the next statement) for a level in
+		// NON_FATAL_LEVELS and for one filtered out by error_reporting().
 		public static function handleError(): bool {
 
 			// Get errorhandler
@@ -3258,6 +3273,10 @@ namespace Nino {
 				'line'						=> $args[3],
 			];
 
+			// An exception is always fatal, and so is anything php raised itself -
+			// only the user levels above are survivable
+			$fatal = is_object( $args[0] ) === true || in_array( $args[0], self::NON_FATAL_LEVELS, true ) === false;
+
 			// Check, if error/log and error/display are configured yet
 			$configured = self::$_currentInstance !== null && isset( self::$_currentInstance['/nino/error/log'] ) === true && isset( self::$_currentInstance['/nino/error/display'] ) === true;
 
@@ -3279,10 +3298,23 @@ namespace Nino {
 				// belongs on a rendered page, not even a deliberately enabled
 				// debug one, which is just as likely to be screenshotted into a
 				// ticket as it is to be read by the developer who enabled it.
+
+				// Dumped either way, but only fatal levels die here: a display-on
+				// dev install that stopped on a notice the production install
+				// survives would be the two behaving differently, which is the one
+				// thing a debug switch must never do
 				echo '<pre>';
 				var_dump( $errorArray, debug_backtrace( DEBUG_BACKTRACE_IGNORE_ARGS ) );
-				die('</pre>');
+				echo '</pre>';
+
+				if( $fatal === true )
+					exit;
 			}
+
+			// Recorded and, where asked for, displayed - returning true is what
+			// stops php from printing the message a second time on its own
+			if( $fatal === false )
+				return true;
 
 			// Break current cycle - SERVER_PROTOCOL is absent on cli (and can be
 			// absent behind an odd sapi), and an undefined-key warning raised

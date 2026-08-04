@@ -1080,6 +1080,79 @@ check( 'a custom module class autoloads on a direct reference, without ever goin
 echo "\n";
 
 
+// --- Runtime::handleError() - severity-aware, not unconditionally fatal ---
+
+echo "Runtime::handleError() - a NON_FATAL_LEVELS trigger_error() returns instead of exiting\n";
+
+// Regression: handleError() used to exit() for every error level alike,
+// including the default E_USER_NOTICE trigger_error() calls. Every
+// "return ! trigger_error( ... )" in Elements and every "catch
+// (\Throwable $e) { trigger_error(...); return ...; }" in Newsletter/Form
+// is written assuming the handler returns and execution continues past the
+// trigger_error() call - before this fix, none of them ever did outside
+// Admin\Elements::apiSave()'s own temporary set_error_handler() override,
+// which shadows the real one. A genuine exit() can't be observed from
+// inside this same process without taking the whole suite down with it, so
+// this spawns a child php process per case and checks what actually
+// survived to run.
+function runIsolated( string $body ): array {
+	// php -r's code is implicitly already inside a php open/close pair,
+	// unlike a regular script file - a literal '<?php' prefix here is a
+	// syntax error
+	$script = 'require '. var_export( __DIR__. '/../_nino/Nino.php', true ). '; '. $body;
+	$descriptors = [ 1 => [ 'pipe', 'w' ], 2 => [ 'pipe', 'w' ] ];
+	$process = proc_open( [ PHP_BINARY, '-r', $script ], $descriptors, $pipes );
+	$stdout = stream_get_contents( $pipes[1] );
+	fclose( $pipes[1] );
+	fclose( $pipes[2] );
+	$exitCode = proc_close( $process );
+	return [ 'stdout' => $stdout, 'exitCode' => $exitCode ];
+}
+
+$bootstrap = '
+	$sandbox = sys_get_temp_dir(). "/nino-handleerror-". bin2hex( random_bytes( 4 ) );
+	mkdir( $sandbox, 0755, true );
+	$appData = [ "./nino/uid" => $sandbox ];
+	\Nino\AppData::prepare( $appData );
+	$appData["./nino/filesystem/path"] = $sandbox;
+	$appData["./nino/filesystem/configpath"] = $sandbox;
+	$appData["/nino/error/log"] = false;
+	$appData["/nino/error/display"] = false;
+	\Nino\Runtime::init( $appData );
+';
+
+$notice = runIsolated( $bootstrap. '
+	echo "before\n";
+	trigger_error( "a plain notice", E_USER_NOTICE );
+	echo "after\n";
+' );
+check( 'a default-level (E_USER_NOTICE) trigger_error() lets execution continue past it', trim( $notice['stdout'] ) === "before\nafter" );
+check( 'and the request does not exit early', $notice['exitCode'] === 0 );
+
+$warning = runIsolated( $bootstrap. '
+	echo "before\n";
+	trigger_error( "a plain warning", E_USER_WARNING );
+	echo "after\n";
+' );
+check( 'an E_USER_WARNING trigger_error() also lets execution continue past it', trim( $warning['stdout'] ) === "before\nafter" );
+
+$fatal = runIsolated( $bootstrap. '
+	echo "before\n";
+	trigger_error( "a real failure", E_USER_ERROR );
+	echo "after\n";
+' );
+check( 'an E_USER_ERROR trigger_error() still terminates the request', trim( $fatal['stdout'] ) === 'before' );
+
+$engineWarning = runIsolated( $bootstrap. '
+	echo "before\n";
+	$undefined[0];
+	echo "after\n";
+' );
+check( 'an engine-raised warning (not one of our own E_USER_* calls) still terminates the request', trim( $engineWarning['stdout'] ) === 'before' );
+
+echo "\n";
+
+
 // --- Cleanup ------------------------------------------------------------
 
 \Nino\Filesystem::removeDir( $sandbox );
