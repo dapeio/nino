@@ -1350,10 +1350,14 @@ namespace Nino {
 	class Backup {
 
 		// Absolute path -> archive name, for every file the admin panel
-		// writes to at runtime: config.php, the text files and every
-		// element type/image. Deliberately not developer code (_nino/,
-		// templates, _admin/ itself, ...) - that's already versioned in
-		// git and would just bloat every backup.
+		// writes to at runtime: config.php, the text files, every element
+		// type/image, and the /data/ content a project actually accumulates
+		// (newsletter subscribers, form submissions, the error/activity
+		// log). Deliberately not developer code (_nino/, templates,
+		// _admin/ itself, ...) - that's already versioned in git and would
+		// just bloat every backup. Also deliberately not auth-tries.php or
+		// ratelimit.php - both are transient throttling counters, not data
+		// a restore should bring back.
 		//
 		// Shared by Admin\Backup::_create() and Dev\Restore::_safetySnapshot(),
 		// which both need the exact same manifest for the exact same reason -
@@ -1389,6 +1393,15 @@ namespace Nino {
 			foreach( glob( $root. '/images/*' ) ?: [] as $file )
 				if( is_file( $file ) === true )
 					$files[$file] = 'images/'. basename( $file );
+
+			if( is_file( $root. '/data/newsletter.php' ) === true )
+				$files[$root. '/data/newsletter.php'] = 'data/newsletter.php';
+
+			foreach( glob( $root. '/data/forms.*.php' ) ?: [] as $file )
+				$files[$file] = 'data/'. basename( $file );
+
+			foreach( glob( $root. '/data/logs.*.php' ) ?: [] as $file )
+				$files[$file] = 'data/'. basename( $file );
 
 			return $files;
 		}
