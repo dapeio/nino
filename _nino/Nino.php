@@ -1380,12 +1380,14 @@ namespace Nino {
 			if( is_file( $configPath. '/config.php' ) === true )
 				$files[$configPath. '/config.php'] = 'config.php';
 
-			if( is_file( $root. '/text/global.php' ) === true )
-				$files[$root. '/text/global.php'] = 'text/global.php';
-
-			foreach( \Nino\Locales::getAvailableLocales( $appData ) as $locale )
-				if( is_file( $root. '/text/'. $locale. '.php' ) === true )
-					$files[$root. '/text/'. $locale. '.php'] = 'text/'. $locale. '.php';
+			// Every /text/*.php on disk, not just global.php plus the
+			// currently available locales: that would silently drop
+			// blacklist.php (written at runtime by Text::setBlacklisted(),
+			// not reliably in git) and a removed locale's file (still on
+			// disk, no longer in '/nino/locales/available') from every
+			// backup from that point on
+			foreach( glob( $root. '/text/*.php' ) ?: [] as $file )
+				$files[$file] = 'text/'. basename( $file );
 
 			foreach( glob( $root. '/elements/*.php' ) ?: [] as $file )
 				$files[$file] = 'elements/'. basename( $file );
