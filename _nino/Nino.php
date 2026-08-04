@@ -3170,6 +3170,20 @@ namespace {
 	spl_autoload_register( function( string $className ): void {
 
 		$relativePath	= str_replace( '\\', '/', $className );
+
+		// A valid namespace path only ever has letters/digits/underscore/
+		// slash - in particular never a '.', which is the only way a '..'
+		// segment could smuggle the resolved path outside __DIR__. Every
+		// caller that reaches the autoloader with an attacker-influenced
+		// class name (config.php's '/nino/modules' list, fed straight into
+		// method_exists() by callModules()) is otherwise turned from
+		// "picks a class" into "requires an arbitrary file". preg_match()
+		// returns 0 (not false) on a clean non-match - false is reserved
+		// for a regex engine error, which this fixed, valid pattern never
+		// raises, so the check must be !== 1, not === false.
+		if( preg_match( '#^[A-Za-z0-9_/]+$#', $relativePath ) !== 1 )
+			return;
+
 		$filename			= __DIR__. '/'. $relativePath. '/'. basename( $relativePath ). '.php';
 
 		if( is_file( $filename ) === true )
