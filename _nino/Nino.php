@@ -1399,6 +1399,22 @@ namespace Nino {
 			if( is_file( $root. '/data/newsletter.php' ) === true )
 				$files[$root. '/data/newsletter.php'] = 'data/newsletter.php';
 
+			// The removal record \Nino\Modules\Newsletter writes on every
+			// unsubscribe (a sha256 per removed address, not the address
+			// itself) - Dev\Restore::_mergeNewsletterRestore() needs this
+			// backed up too, as the fallback source of truth for a restore
+			// where $root's own copy is itself what's being recovered from.
+			// '/data/newsletter-removed.php' as a plain literal, deliberately
+			// not \Nino\Modules\Newsletter::REMOVED_PATH: this runs
+			// unconditionally on every backup (see Backup::maybeRun()), and
+			// a class constant read autoloads the class just as
+			// unconditionally - a project that deleted this optional
+			// module's file (never used its public signup routes) would get
+			// a fatal "Class not found" on every single backup, admin
+			// requests included, for a project that touched nothing
+			if( is_file( $root. '/data/newsletter-removed.php' ) === true )
+				$files[$root. '/data/newsletter-removed.php'] = 'data/newsletter-removed.php';
+
 			foreach( glob( $root. '/data/forms.*.php' ) ?: [] as $file )
 				$files[$file] = 'data/'. basename( $file );
 

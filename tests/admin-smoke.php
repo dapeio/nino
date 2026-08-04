@@ -906,6 +906,8 @@ check( 'newsletter/delete succeeds for an existing subscriber', $status === 200 
 [ , $body ] = callAdminPost( $appData, 'newsletter/list' );
 check( 'the deleted subscriber is gone, the other one remains', count( $body['entries'] ) === 1 && $body['entries'][0]['email'] === 'anna@example.com' );
 
+check( 'the admin delete also records the removal, same as a self-service unsubscribe', in_array( hash( 'sha256', 'jo@example.com' ), \Nino\Filesystem::getFileContent( $appData, '/data/newsletter-removed.php', [] ), true ) === true );
+
 echo "\n";
 
 

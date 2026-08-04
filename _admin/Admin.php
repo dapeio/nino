@@ -1858,6 +1858,13 @@ namespace Nino\Admin {
 
 		private const string PATH = '/data/newsletter.php';
 
+		// Same literal \Nino\Modules\Newsletter uses for its own removal
+		// record (see that class' REMOVED_PATH docblock, including why it's
+		// a sha256 hash and not the address) - duplicated rather than
+		// referenced, same reasoning as PATH just above already being its
+		// own copy rather than \Nino\Modules\Newsletter::PATH
+		private const string REMOVED_PATH = '/data/newsletter-removed.php';
+
 		/**
 		 *	How many subscribers are currently on file - shared by
 		 *	Dashboard::apiSummary
@@ -1927,6 +1934,25 @@ namespace Nino\Admin {
 				\Nino\Http::fail( $request, 404, 'unknown email' );
 				return;
 			}
+
+			// Same removal record self-service unsubscribe writes, same hash
+			// (see \Nino\Modules\Newsletter's own REMOVED_PATH docblock) -
+			// an admin delete is exactly as durable a removal as a visitor's
+			// own unsubscribe link, and a later disaster-recovery restore
+			// must not resurrect either. Written here directly, not via a
+			// call into \Nino\Modules\Newsletter: that would autoload the
+			// class unconditionally, turning a routine admin action into a
+			// fatal error for a project that removed this optional module's
+			// file
+			$removedHash = hash( 'sha256', mb_strtolower( trim( $email ) ) );
+
+			\Nino\Filesystem::mutate( $appData, self::REMOVED_PATH, function( array $removed ) use ( $removedHash ): array {
+
+				if( in_array( $removedHash, $removed, true ) === false )
+					$removed[] = $removedHash;
+
+				return $removed;
+			} );
 
 			\Nino\Http::ok( $request );
 		}

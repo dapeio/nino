@@ -867,6 +867,9 @@ namespace Nino\Dev {
 				unlink( $stagedConfig );
 			}
 
+			// Newsletter: merged, not overwritten - see _mergeNewsletterRestore()
+			self::_mergeNewsletterRestore( $root, $staging );
+
 			\Nino\Filesystem::copyDir( $staging, $root );
 			\Nino\Filesystem::removeDir( $staging );
 
@@ -882,6 +885,86 @@ namespace Nino\Dev {
 				opcache_reset();
 
 			\Nino\Http::ok( $request, [ 'ok' => true, 'restoredDate' => $date ] );
+		}
+
+		/**
+		 *	Rewrite the staged newsletter files in place, before copyDir()
+		 *	copies the staging tree over $root, so a restore merges instead of
+		 *	overwriting: an address someone removed (self-service unsubscribe
+		 *	or an admin delete, see \Nino\Modules\Newsletter's own removal
+		 *	record docblock) stays removed no matter how old the backup being
+		 *	restored is - Art. 17 (right to erasure), once exercised, must
+		 *	survive a later disaster-recovery restore the same way it
+		 *	survives everything else.
+		 *
+		 *	The removal list itself is unioned rather than replaced (a removal
+		 *	recorded on either side stays a removal) since $root's own copy
+		 *	could itself be the very thing being recovered from and is not to
+		 *	be trusted as complete. A resubscribe clears its own address from
+		 *	that list already (see \Nino\Modules\Newsletter's own
+		 *	_clearRemoval() call site) - this merge only ever excludes, never
+		 *	decides who should be excluded. The list holds a sha256 per
+		 *	address, not the address itself (see REMOVED_PATH's own
+		 *	docblock), so an entry is matched by hashing it the same way,
+		 *	not by comparing emails directly.
+		 *
+		 *	'/data/newsletter.php' / '/data/newsletter-removed.php' as plain
+		 *	literals throughout, deliberately not
+		 *	\Nino\Modules\Newsletter::PATH/REMOVED_PATH: a class constant
+		 *	read autoloads the class unconditionally, same as a method call
+		 *	would, turning a restore - the exact tool a broken install needs
+		 *	most - into a fatal error for a project that deleted this
+		 *	optional module's file. See Backup::manifest()'s own docblock in
+		 *	_nino/Nino.php for the identical reasoning on the backup side.
+		 *
+		 *	A no-op if the backup being restored predates this feature and
+		 *	carries neither file - nothing to merge, copyDir() below restores
+		 *	them exactly as it always did.
+		 *
+		 *	@param		string 		$root					Project root - reads $root's *current* files, unchanged otherwise
+		 *	@param		string 		$staging			Extracted backup, rewritten in place
+		 *
+		 *	@return 	void
+		 */
+		private static function _mergeNewsletterRestore( string $root, string $staging ): void {
+
+			$stagedEntries = $staging. '/data/newsletter.php';
+			$stagedRemoved = $staging. '/data/newsletter-removed.php';
+
+			if( is_file( $stagedEntries ) === false && is_file( $stagedRemoved ) === false )
+				return;
+
+			$removed = array_values( array_unique( array_merge(
+				self::_readDataFile( $root. '/data/newsletter-removed.php' ),
+				self::_readDataFile( $stagedRemoved )
+			) ) );
+
+			$entries = array_values( array_filter(
+				self::_readDataFile( $stagedEntries ),
+				function( array $entry ) use ( $removed ): bool {
+					$hash = hash( 'sha256', mb_strtolower( trim( (string) ( $entry['email'] ?? '' ) ) ) );
+					return in_array( $hash, $removed, true ) === false;
+				}
+			) );
+
+			file_put_contents( $stagedEntries, '<?php return '. var_export( $entries, true ). ';' );
+			file_put_contents( $stagedRemoved, '<?php return '. var_export( $removed, true ). ';' );
+		}
+
+		// Reads one of Filesystem's own "<?php return [...];" data files
+		// straight off disk, bypassing $appData/Filesystem entirely - used
+		// here for files under $staging (a tempdir, not the project root
+		// Filesystem resolves against) and, for the same reason, for $root's
+		// own copy alongside it, so both sides of the merge above go through
+		// the identical read path
+		private static function _readDataFile( string $path ): array {
+
+			if( is_file( $path ) === false )
+				return [];
+
+			$data = include $path;
+
+			return is_array( $data ) ? $data : [];
 		}
 
 		/**

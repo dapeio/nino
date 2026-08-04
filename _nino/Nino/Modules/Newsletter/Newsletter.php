@@ -37,6 +37,19 @@ namespace Nino\Modules {
 
 		private const string PATH = '/data/newsletter.php';
 
+		// Flat, append-only list of a sha256 of every email ever removed
+		// (self-service unsubscribe or an admin delete) - hashed, not the
+		// address itself: this list is never pruned by design (see
+		// _recordRemoval()'s own docblock for why), and a plaintext address
+		// would sit in it forever even past its own deletion, working
+		// against the exact erasure this exists to protect. A hash is
+		// enough - all this ever needs to answer is "was this address
+		// removed", never "which addresses were removed". Consulted by
+		// \Nino\Backup and Dev\Restore, both via the plain
+		// '/data/newsletter-removed.php' literal rather than this constant -
+		// see Backup::manifest()'s own docblock for why
+		private const string REMOVED_PATH = '/data/newsletter-removed.php';
+
 		/**
 		 *	Register both /.newsletter routes and their handlers - the routes
 		 *	are registered here rather than hand-declared in config.php
@@ -219,6 +232,12 @@ namespace Nino\Modules {
 				if( $token === null )
 					return 'existing';
 
+				// A signup this loop actually recorded (pending or resent) is
+				// a current, freely given consent - clear any earlier removal
+				// so a later restore doesn't mistake this resubscription for
+				// the resurrection it's specifically meant to prevent
+				self::_clearRemoval( $appData, $email );
+
 				self::_sendConfirmMail( $appData, $email, $token );
 
 				return 'new';
@@ -325,11 +344,13 @@ namespace Nino\Modules {
 			try {
 
 				$found = false;
+				$email = null;
 
-				\Nino\Filesystem::mutate( $appData, self::PATH, function( array $entries ) use ( $token, &$found ): ?array {
+				\Nino\Filesystem::mutate( $appData, self::PATH, function( array $entries ) use ( $token, &$found, &$email ): ?array {
 
 					foreach( $entries as $entryKey => $entry )
 						if( hash_equals( (string) ( $entry['token'] ?? '' ), $token ) === true ) {
+							$email = $entry['email'] ?? null;
 							unset( $entries[$entryKey] );
 							$found = true;
 							return array_values( $entries );
@@ -337,6 +358,9 @@ namespace Nino\Modules {
 
 					return null;
 				} );
+
+				if( $found === true && is_string( $email ) === true )
+					self::_recordRemoval( $appData, $email );
 
 				return $found;
 
@@ -359,6 +383,41 @@ namespace Nino\Modules {
 		private static function _getActionUrl( array &$appData, string $action, string $token ): string {
 
 			return 'https://'. \Nino\Html::renderHtml( $appData, '[[/website/url]]' ). '/.newsletter?'. $action. '='. rawurlencode( $token );
+		}
+
+		// Record an email as removed - called on self-service unsubscribe
+		// above. Admin\Newsletter::apiDelete() (_admin/Admin.php) does its
+		// own equivalent write (same hash) rather than calling this: a
+		// static method call autoloads this class just as unconditionally
+		// as a constant read does (see Backup::manifest()'s own docblock
+		// for the underlying reason), which would turn deleting a
+		// subscriber - a routine admin action - into a fatal error for a
+		// project that removed this module's file because it never used
+		// the public signup routes. This list is never pruned (that's the
+		// point - see REMOVED_PATH's own docblock), so only the hash goes
+		// in, never the address itself
+		private static function _recordRemoval( array &$appData, string $email ): void {
+
+			$hash = hash( 'sha256', mb_strtolower( trim( $email ) ) );
+
+			\Nino\Filesystem::mutate( $appData, self::REMOVED_PATH, function( array $removed ) use ( $hash ): array {
+
+				if( in_array( $hash, $removed, true ) === false )
+					$removed[] = $hash;
+
+				return $removed;
+			} );
+		}
+
+		// Undoes _recordRemoval() for a fresh signup - see its call site in
+		// _requestSignup()
+		private static function _clearRemoval( array &$appData, string $email ): void {
+
+			$hash = hash( 'sha256', mb_strtolower( trim( $email ) ) );
+
+			\Nino\Filesystem::mutate( $appData, self::REMOVED_PATH, function( array $removed ) use ( $hash ): array {
+				return array_values( array_filter( $removed, function( $entry ) use ( $hash ): bool { return $entry !== $hash; } ) );
+			} );
 		}
 	}
 

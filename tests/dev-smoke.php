@@ -316,6 +316,62 @@ check( 'restoring a malformed date is rejected before touching the filesystem', 
 echo "\n";
 
 
+// --- Dev\Restore - newsletter restore merges instead of overwriting -------
+
+echo "Dev\\Restore - newsletter restore merges, doesn't resurrect a removal (Art. 17)\n";
+
+// _mergeNewsletterRestore() is exercised directly (Reflection) rather than
+// through a real two-backup apiRestore() round trip: Backup::maybeRun()
+// only ever creates one backup per calendar day, so a sandboxed test run
+// can't produce an "older backup" and a "current, since-changed state" the
+// way a real installation would days apart
+$mergeMethod = new ReflectionMethod( '\Nino\Dev\Restore', '_mergeNewsletterRestore' );
+$mergeMethod->setAccessible( true );
+
+$mergeRoot 		= sys_get_temp_dir(). '/nino-mergetest-root-'. bin2hex( random_bytes( 8 ) );
+$mergeStaging = sys_get_temp_dir(). '/nino-mergetest-staging-'. bin2hex( random_bytes( 8 ) );
+mkdir( $mergeRoot. '/data', 0755, true );
+mkdir( $mergeStaging. '/data', 0755, true );
+
+// root (current): alice unsubscribed since the backup was taken - gone from
+// newsletter.php, recorded (as a sha256, see \Nino\Modules\Newsletter's own
+// REMOVED_PATH docblock) in newsletter-removed.php; bob untouched
+$aliceHash = hash( 'sha256', 'alice@example.com' );
+file_put_contents( $mergeRoot. '/data/newsletter.php', '<?php return [ [ "email" => "bob@example.com", "status" => "subscribed" ] ];' );
+file_put_contents( $mergeRoot. '/data/newsletter-removed.php', '<?php return [ '. var_export( $aliceHash, true ). ' ];' );
+
+// staging (the backup being restored): older, still has alice subscribed,
+// predates this feature entirely - no removed-file of its own
+file_put_contents( $mergeStaging. '/data/newsletter.php', '<?php return [ [ "email" => "alice@example.com", "status" => "subscribed" ], [ "email" => "bob@example.com", "status" => "subscribed" ] ];' );
+
+$mergeMethod->invoke( null, $mergeRoot, $mergeStaging );
+
+$mergedEntries = include $mergeStaging. '/data/newsletter.php';
+$mergedRemoved = include $mergeStaging. '/data/newsletter-removed.php';
+
+check( 'a restore does not resurrect an address unsubscribed since the backup was taken', in_array( 'alice@example.com', array_column( $mergedEntries, 'email' ), true ) === false );
+check( 'an untouched subscriber survives the restore', in_array( 'bob@example.com', array_column( $mergedEntries, 'email' ), true ) === true );
+check( 'the removal record itself is carried into the restored state, not just the filtered entries', in_array( $aliceHash, $mergedRemoved, true ) === true );
+
+\Nino\Filesystem::removeDir( $mergeRoot );
+\Nino\Filesystem::removeDir( $mergeStaging );
+
+// A backup that predates this feature (or a project that never enabled the
+// module) carries neither newsletter file - must be a no-op, not an error
+$mergeRoot2 	= sys_get_temp_dir(). '/nino-mergetest-root2-'. bin2hex( random_bytes( 8 ) );
+$mergeStaging2 = sys_get_temp_dir(). '/nino-mergetest-staging2-'. bin2hex( random_bytes( 8 ) );
+mkdir( $mergeRoot2, 0755, true );
+mkdir( $mergeStaging2, 0755, true );
+
+$mergeMethod->invoke( null, $mergeRoot2, $mergeStaging2 );
+check( 'a backup with no newsletter files at all is a no-op, not an error', is_file( $mergeStaging2. '/data/newsletter.php' ) === false );
+
+\Nino\Filesystem::removeDir( $mergeRoot2 );
+\Nino\Filesystem::removeDir( $mergeStaging2 );
+
+echo "\n";
+
+
 // --- Backup/Restore with config.php outside the project root --------------
 
 echo "Backup/Restore - config.php resolves via configPath, not root (NINO_CONFIG_DIR)\n";

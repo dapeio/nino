@@ -834,6 +834,18 @@ check( 'an unsubscribe link with the subscriber\'s token answers 200', $unsubscr
 check( 'and removes the entry from the list', count( \Nino\Filesystem::getFileContent( $appData, $subscribersPath, [] ) ) === 0 );
 check( 'and prepares the "unsubscribed" page fills', ( $appData['./nino/html/fills']['*']['[[/newsletter/page/title]]'] ?? '' ) === '[[/newsletter/page/unsubscribed/title]]' );
 
+// Dev\Restore::_mergeNewsletterRestore() relies on this record surviving
+// every unsubscribe - see its own test in dev-smoke.php for the restore side.
+// A sha256 of the address, not the address itself - see
+// \Nino\Modules\Newsletter's own REMOVED_PATH docblock for why
+$joRemovalHash = hash( 'sha256', 'jo@example.com' );
+check( 'the unsubscribe is recorded, for a later restore not to undo it', in_array( $joRemovalHash, \Nino\Filesystem::getFileContent( $appData, '/data/newsletter-removed.php', [] ), true ) === true );
+
+$resubscribeRequest = submitNewsletter( $appData, [ 'email' => 'jo@example.com' ] );
+check( 'resubscribing after an unsubscribe succeeds', $resubscribeRequest['/nino/http/response']['statusCode'] === 200 );
+check( 'and creates a fresh pending entry', count( \Nino\Filesystem::getFileContent( $appData, $subscribersPath, [] ) ) === 1 );
+check( 'and clears the earlier removal record - a fresh signup is a fresh consent', in_array( $joRemovalHash, \Nino\Filesystem::getFileContent( $appData, '/data/newsletter-removed.php', [] ), true ) === false );
+
 $bareVisitRequest = visitNewsletterLink( $appData, [] );
 check( 'a bare GET /.newsletter without confirm/unsubscribe answers 404', $bareVisitRequest['/nino/http/response']['statusCode'] === 404 );
 
