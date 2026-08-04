@@ -11,11 +11,6 @@ namespace Nino {
 
 	const VERSION = '0.9.0-beta';
 
-	/**
-	 *	Init nino
-	 *
-	 *	@return 	array
-	 */
 	function init(): array {
 
 		$appData = [
@@ -59,14 +54,6 @@ namespace Nino {
 		return $appData;
 	}
 
-	/**
-	 *	Handle a request
-	 *
-	 *	@param		array 		&$appData			(reference) Array with current app data
-	 *	@param		array 		$request			Output to handle
-	 *
-	 *	@return 	array
-	 */
 	function request( array &$appData, array $request ): array {
 
 		\Nino\Http::request( $appData, $request );
@@ -94,27 +81,13 @@ namespace Nino {
 
 
 
-	/**
-	 *	Output a request
-	 *
-	 *	@param		array 		&$appData			(reference) Array with current app data
-	 *	@param		array 		$request			Output to handle
-	 *
-	 *	@return 	void
-	 */
 	function output( array &$appData, array $request ): void {
 
 		\Nino\Http::output( $appData, $request );
 	}
 
-	/**
-	 *	Nino								A compact filesystembased php framework
-	 *	AppData 						Handle appData array
-	 *
-	 *	@package						Dape/Nino
-	 *	@author							David Perchermeier <mail@dape.io>
-	 *	@link								https://github.com/dapeio/nino
-	 */
+	// AppData - loading config.php at boot, and selectively writing individual
+	// top-level keys back
 	class AppData {
 
 		private static
@@ -132,38 +105,25 @@ namespace Nino {
 				'./nino/auth/currentUser'			=> [],
 			];
 
-		/**
-		 *	Prepare appData
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *
-		 *	@return 	void
-		 */
 		public static function prepare( array &$appData ): void {
 
 			$appData = self::_merge( self::$_initialInstance, $appData );
 		}
 
 
-		/**
-		 *	Read the '/nino/session/' keys out of config.php ahead of the
-		 *	regular init(), for the one consumer that runs before it:
-		 *	Runtime::init() starts the php session, and a session cookie's
-		 *	flags are set once at session_start() time. Reading them from an
-		 *	appData that hasn't seen config.php yet meant
-		 *	'/nino/session/force-secure-cookie' was always missing and always
-		 *	fell back to false - so the option existed but could never take
-		 *	effect, on exactly the tls-terminating-proxy setup it was built
-		 *	for (no $_SERVER['HTTPS'], secure flag never set).
-		 *	Deliberately narrow: only these keys, no merge of anything else -
-		 *	init() below stays the single place the config is actually loaded.
-		 *	A missing/unreadable config.php is not diagnosed here either; that
-		 *	is init()'s job and its error message is the better one.
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *
-		 *	@return 	void
-		 */
+		// Reads the '/nino/session/' keys out of config.php ahead of the
+		// regular init(), for the one consumer that runs before it:
+		// Runtime::init() starts the php session, and a session cookie's
+		// flags are set once at session_start() time. Reading them from an
+		// appData that hasn't seen config.php yet meant
+		// '/nino/session/force-secure-cookie' was always missing and always
+		// fell back to false - so the option existed but could never take
+		// effect, on exactly the tls-terminating-proxy setup it was built
+		// for (no $_SERVER['HTTPS'], secure flag never set).
+		// Deliberately narrow: only these keys, no merge of anything else -
+		// init() below stays the single place the config is actually loaded.
+		// A missing/unreadable config.php is not diagnosed here either; that
+		// is init()'s job and its error message is the better one.
 		public static function prepareSession( array &$appData ): void {
 
 			$staticAppData = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
@@ -176,20 +136,12 @@ namespace Nino {
 					$appData[$key] = $value;
 		}
 
-		/**
-		 *	Init appData
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *
-		 *	@return 	void
-		 */
 		public static function init( array &$appData ): void {
 
-			// getFileContent()'s $default is itself an array ([]), so the old
-			// is_array() check below never actually caught a missing file -
-			// this checks existence directly, so a typo'd NINO_CONFIG_DIR (or
-			// a fresh install before the first config.php write) fails loud
-			// and specific instead of silently booting with an empty config
+			// getFileContent()'s $default is itself [], so an is_array() check
+			// alone never caught a missing file - checked directly here so a
+			// typo'd NINO_CONFIG_DIR (or a fresh install) fails loud instead
+			// of silently booting empty
 			if( \Nino\Filesystem::fileExists( $appData, '/config.php' ) === false )
 				trigger_error( 'AppData::init(): config.php was not found under \''. ( $appData['./nino/filesystem/configpath'] ?? $appData['./nino/filesystem/path'] ). '\' - check NINO_CONFIG_DIR if it is set.', E_USER_ERROR );
 
@@ -201,25 +153,14 @@ namespace Nino {
 			$appData = self::_merge( $appData, $staticAppData );
 		}
 
-		/**
-		 *	Merge $overlay into $base: associative arrays are merged
-		 *	key-by-key recursively; a plain list (array_is_list(), eg.
-		 *	'/nino/modules') on either side is replaced wholesale, not
-		 *	merged index-by-index; anything else (including two conflicting
-		 *	scalars) is overwritten by $overlay's value. Unlike
-		 *	array_merge_recursive(), which turns two scalars sharing a key
-		 *	into an array instead of replacing, and appends rather than
-		 *	replaces list sub-arrays. The convention keeping runtime ('./')
-		 *	and persistent ('/') keys from colliding today means this rarely
-		 *	matters yet, but a module writing a persistent key that already
-		 *	exists in the defaults would otherwise silently become an array
-		 *	a callsite discovers far away from here.
-		 *
-		 *	@param		array 		$base					Lower-priority array
-		 *	@param		array 		$overlay			Higher-priority array, wins on conflicts
-		 *
-		 *	@return 	array
-		 */
+		// Merges $overlay into $base: associative arrays merge key-by-key
+		// recursively; a plain list (array_is_list(), eg. '/nino/modules')
+		// is replaced wholesale; anything else is overwritten by $overlay.
+		// Unlike array_merge_recursive(), which turns conflicting scalars
+		// into an array and appends list sub-arrays instead of replacing -
+		// a module writing a persistent key that already exists in the
+		// defaults would otherwise silently become an array, discovered
+		// far from here.
 		private static function _merge( array $base, array $overlay ): array {
 
 			foreach( $overlay as $key => $value ) {
@@ -234,27 +175,18 @@ namespace Nino {
 			return $base;
 		}
 
-		/**
-		 *	Persist a set of top-level appData keys into config.php - only
-		 *	those keys, not a dump of the whole in-memory appData. That
-		 *	distinction matters: appData is loaded once at request boot, so
-		 *	blindly re-serializing all of it would silently discard whatever
-		 *	a concurrent request (eg. a second admin session, or Auth's own
-		 *	failed-attempt tracking) wrote to config.php in the meantime.
-		 *	Filesystem::mutate() re-reads fresh under the lock for the same
-		 *	reason - this only has to merge the given keys into that copy.
-		 *
-		 *	A failed lock is treated as a deployment problem (no /data/.locks,
-		 *	no free file handles), not contention - unlike every other
-		 *	mutate() caller, this surfaces it via trigger_error() rather than
-		 *	giving up silently: a dropped config.php write can mean a
-		 *	permission change, a route, or a user's login never actually saved.
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		array 		$keys					Top-level appData keys this call changed
-		 *
-		 *	@return 	void
-		 */
+		// Persists only the given top-level keys into config.php, not the
+		// whole in-memory appData - which is loaded once at boot, so a full
+		// re-serialize would silently discard whatever a concurrent request
+		// (a second admin session, Auth's failed-attempt tracking) wrote in
+		// the meantime. mutate() re-reads fresh under the lock for the same
+		// reason; this just merges the given keys into that copy.
+		//
+		// A failed lock here means a deployment problem (no /data/.locks, no
+		// free handles), not contention - unlike every other mutate() caller,
+		// this trigger_error()s instead of failing silently, since a dropped
+		// config.php write can mean a route, permission, or login never
+		// actually saved.
 		public static function writeContentData( array &$appData, array $keys ): void {
 
 			if( \Nino\Filesystem::lockFile( $appData, '/config.php' ) === false ) {
@@ -276,35 +208,21 @@ namespace Nino {
 				trigger_error( 'AppData::writeContentData(): failed to write config.php.', E_USER_ERROR );
 		}
 
-		/**
-		 *	Three-way merge for '/nino/auth/user'. Re-reading the file only
-		 *	protects *other* top-level keys - two parallel logins both write
-		 *	the whole '/nino/auth/user' key from their own, by then outdated,
-		 *	in-memory copy, so whoever writes second drops the other's session
-		 *	and logs that user straight back out.
-		 *	The three sides are: what this request saw at boot (baseline, see
-		 *	Auth::init()), what is on disk right now, and what this request
-		 *	decided. A session token that appeared on disk after boot can only
-		 *	be someone else's parallel login - this request never saw it, so it
-		 *	cannot have removed it - and is carried over. A token this request
-		 *	removed (in the baseline, gone from memory) stays removed, so
-		 *	logout and "log out everywhere" keep working.
-		 *	Only the sessions map is merged: adding/removing users is an admin
-		 *	action, not something two requests do to each other by accident.
-		 *	$revoked overrides all of it. "Carry over what this request never
-		 *	saw" is the wrong rule for a request that deliberately ended every
-		 *	session of a user - a password change or "log out everywhere" would
-		 *	otherwise hand back a token that a parallel login created in the
-		 *	meantime, ie. exactly the session the user is trying to get rid of.
-		 *	Auth::updateUser()/logoutAllSessions() record the revocation there.
-		 *
-		 *	@param		array 		$baseline			'/nino/auth/user' as read at boot
-		 *	@param		array 		$onDisk				'/nino/auth/user' as it is on disk now
-		 *	@param		array 		$inMemory			'/nino/auth/user' as this request wants it
-		 *	@param		array 		$revoked			Mail => true for users whose sessions this request revoked
-		 *
-		 *	@return 	array
-		 */
+		// Three-way merge for '/nino/auth/user' sessions - two parallel
+		// logins both write the whole key from their own stale copy, so
+		// re-reading alone isn't enough; whoever writes second would
+		// otherwise drop the other's session.
+		// $baseline = sessions at boot, $onDisk = current file, $inMemory =
+		// this request's own decision. A token on disk but missing from both
+		// baseline and memory is someone else's parallel login and is kept;
+		// one that was in baseline but is gone from memory was deliberately
+		// removed and stays removed.
+		// Only sessions are merged, never the rest of a user's record.
+		// $revoked (mail => true) overrides the "keep what we never saw"
+		// rule for a request that means to end every session - a password
+		// change or "log out everywhere" (Auth::updateUser()/
+		// logoutAllSessions()) must not resurrect a token a parallel login
+		// created in the meantime.
 		private static function _mergeAuthUsers( array $baseline, array $onDisk, array $inMemory, array $revoked = [] ): array {
 
 			foreach( $inMemory as $mail => $user ) {
@@ -327,15 +245,8 @@ namespace Nino {
 		}
 	}
 
-	/**
-	 *	Nino								A compact filesystembased php framework
-	 *	Auth								User authentification
-	 *
-	 *	@package						Dape/Nino
-	 *	@author							David Perchermeier <mail@dape.io>
-	 *	@link								https://github.com/dapeio/nino
-	 */
-
+	// Auth - session login/logout, user management, and the granular
+	// permission system for admin accounts
 	class Auth {
 
 		// How long an unused session token survives in a user's 'sessions'
@@ -373,13 +284,6 @@ namespace Nino {
 		// accounts got a tries entry, the cooldown was an oracle too
 		private const string DUMMY_HASH = '$2y$12$.XrU56roB3Yw28vmlpzZN.I5lpI6kAPVytki6Mo1zm3w.WHYgeczq';
 
-		/**
-		 *	Init auth
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *
-		 *	@return 	void
-		 */
 		public static function init( array &$appData ): void {
 
 			// Snapshot of the user records as this request found them, before
@@ -412,14 +316,6 @@ namespace Nino {
 			\Nino\Callbacks::registerCallback( $appData, '/nino/http/response/POST://.nino/auth/logout', [ self::class, 'callbackLogoutResponse' ] );
 		}
 
-		/**
-		 *	Catch login response
-		 *
-		 *	@param		array 				&$appData			(reference) Array with current app data
-		 *	@param		array 				$request			Current server request
-		 *
-		 *	@return 	void
-		 */
 		public static function callbackLoginResponse( array &$appData, array &$request ): void {
 
 			if( ( $request['./nino/csrf/blocked'] ?? false ) === true )
@@ -437,14 +333,6 @@ namespace Nino {
 			$request['/nino/http/response']['body']				= true;
 		}
 
-		/**
-		 *	Catch logout response
-		 *
-		 *	@param		array 				&$appData			(reference) Array with current app data
-		 *	@param		array 				$request			Current server request
-		 *
-		 *	@return 	void
-		 */
 		public static function callbackLogoutResponse( array &$appData, array &$request ): void {
 
 			if( ( $request['./nino/csrf/blocked'] ?? false ) === true )
@@ -457,15 +345,6 @@ namespace Nino {
 		}
 
 
-		/**
-		 *	Auth and login an user
-		 *
-		 *	@param		array 				&$appData			(reference) Array with current app data
-		 *	@param		string				$username 		Username
-		 *	@param		string				$pw 					Password
-		 *
-		 *	@return 	array | false 							New user array or false (on error)
-		 */
 		public static function loginUser( array &$appData, string $username, string $pw ): array|false {
 
 			// Check user data - no client ip (cli, eg. the smoke tests) means no
@@ -585,13 +464,6 @@ namespace Nino {
 		}
 
 
-		/**
-		 *	Logout current user
-		 *
-		 *	@param		array 				&$appData			(reference) Array with current app data
-		 *
-		 *	@return 	void
-		 */
 		public static function logoutUser( array &$appData ): void {
 
 
@@ -624,26 +496,11 @@ namespace Nino {
 		}
 
 
-		/**
-		 *	Get current user data
-		 *
-		 *	@param		array 				&$appData			(reference) Array with current app data
-		 *
-		 *	@return 	array | false
-		 */
 		public static function getCurrentUser( array &$appData ): array|false {
 
 			return $appData['./nino/auth/current'] ?? false;
 		}
 
-		/**
-		 *	Get user data per mail
-		 *
-		 *	@param		array 				&$appData			(reference) Array with current app data
-		 *	@param		string				$username			Mail of requested user
-		 *
-		 *	@return 	array | false
-		 */
 		public static function getUser( array &$appData, string $username ): array|false {
 			if( isset( $appData['/nino/auth/user'][$username] ) === false )
 				return false;
@@ -653,16 +510,6 @@ namespace Nino {
 
 
 
-		/**
-		 *	Insert an user
-		 *
-		 *	@param		array 				&$appData			(reference) Array with current app data
-		 *	@param		string				$username 		Username
-		 *	@param		string				$pw 					Password
-		 *	@param		array 				$perms				(optional) Permissions array
-		 *
-		 *	@return 	boolean											If successful
-		 */
 		public static function insertUser( array &$appData, string $username, string $pw, array $perms = [] ): bool {
 
 			if( self::getUser( $appData, $username ) !== false )
@@ -684,14 +531,6 @@ namespace Nino {
 		}
 
 
-		/**
-		 *	Delete an user
-		 *
-		 *	@param		array 				&$appData			(reference) Array with current app data
-		 *	@param		string				$username 		Username
-		 *
-		 *	@return 	boolean											If succesful
-		 */
 		public static function deleteUser( array &$appData, string $username ): bool {
 
 			$user = self::getUser( $appData, $username );
@@ -711,19 +550,10 @@ namespace Nino {
 		}
 
 
-		/**
-		 *	Update a user's mail and/or password. Perms/sessions/status are
-		 *	left untouched - those stay a developer-only, direct-json task.
-		 *	A tries counter (see TRIES_PATH) follows a mail change so an
-		 *	in-progress cooldown survives a rename.
-		 *
-		 *	@param		array 				&$appData			(reference) Array with current app data
-		 *	@param		string				$username 		Current mail
-		 *	@param		string				$newUsername	New mail (pass the same value to leave it unchanged)
-		 *	@param		string				$pw 					(optional) New password - empty string keeps the current hash
-		 *
-		 *	@return 	array | false					Updated user array, or false (unknown user / new mail already taken)
-		 */
+		// Update a user's mail and/or password. Perms/sessions/status are
+		// left untouched - those stay a developer-only, direct-json task.
+		// A tries counter (see TRIES_PATH) follows a mail change so an
+		// in-progress cooldown survives a rename.
 		public static function updateUser( array &$appData, string $username, string $newUsername, string $pw = '' ): array|false {
 
 			$user = self::getUser( $appData, $username );
@@ -781,15 +611,8 @@ namespace Nino {
 		}
 
 
-		/**
-		 *	Clear all of a user's active sessions ("log out everywhere"). If
-		 *	that's the current user, also ends the current request's session.
-		 *
-		 *	@param		array 				&$appData			(reference) Array with current app data
-		 *	@param		string				$username 		Username
-		 *
-		 *	@return 	boolean											If successful
-		 */
+		// Clear all of a user's active sessions ("log out everywhere"). If
+		// that's the current user, also ends the current request's session.
 		public static function logoutAllSessions( array &$appData, string $username ): bool {
 
 			if( self::getUser( $appData, $username ) === false )
@@ -814,15 +637,6 @@ namespace Nino {
 		}
 
 
-		/**
-		 *	Check, if current user has a permission
-		 *
-		 *	@param		array 				&$appData			(reference) Array with current app data
-		 *	@param		string				$perm 				Permission to check
-		 *	@param		string				$username 		(optional) Username, otherwise current
-		 *
-		 *	@return 	boolean 										If user has permission
-		 */
 		public static function checkPermission( array &$appData, string $perm, string $username = '' ): bool {
 
 			// Get current user data
@@ -863,21 +677,13 @@ namespace Nino {
 		}
 
 
-		/**
-		 *	Restore the logged-in user behind a session token - if that token
-		 *	is still listed on the user AND hasn't outlived SESSION_TTL. The
-		 *	ttl used to be enforced in loginUser() only, ie. on write: tokens
-		 *	were pruned when their owner logged in again, so an account that
-		 *	never logs in again kept every token it ever handed out, forever.
-		 *	An expired token is dropped right here rather than just ignored,
-		 *	so it can't sit in config.php until that next login either.
-		 *
-		 *	@param		array 				&$appData			(reference) Array with current app data
-		 *	@param		string				$mail					Mail from the php session
-		 *	@param		string				$token				Session token from the php session
-		 *
-		 *	@return 	void
-		 */
+		// Restore the logged-in user behind a session token - if that token
+		// is still listed on the user AND hasn't outlived SESSION_TTL. The
+		// ttl used to be enforced in loginUser() only, ie. on write: tokens
+		// were pruned when their owner logged in again, so an account that
+		// never logs in again kept every token it ever handed out, forever.
+		// An expired token is dropped right here rather than just ignored,
+		// so it can't sit in config.php until that next login either.
 		private static function _resumeSession( array &$appData, string $mail, string $token ): void {
 
 			$user = self::getUser( $appData, $mail );
@@ -899,16 +705,9 @@ namespace Nino {
 			$appData['./nino/auth/current'] = $user;
 		}
 
-		/**
-		 *	Current tries counter for an username - same negative-timestamp
-		 *	encoding _registerFailedAttemp() writes: zero/positive is a plain
-		 *	attempt count, negative means "still cooling down until -tries"
-		 *
-		 *	@param		array 				&$appData			(reference) Array with current app data
-		 *	@param		string				$username 		Username
-		 *
-		 *	@return 	int
-		 */
+		// Current tries counter for an username - same negative-timestamp
+		// encoding _registerFailedAttemp() writes: zero/positive is a plain
+		// attempt count, negative means "still cooling down until -tries"
 		private static function _getTries( array &$appData, string $username ): int {
 
 			$state = \Nino\Filesystem::getFileContent( $appData, self::TRIES_PATH, [] );
@@ -916,31 +715,17 @@ namespace Nino {
 			return (int) ( $state[$username] ?? 0 );
 		}
 
-		/**
-		 *	Whether a bucket (account mail or IP_KEY_PREFIX.ip) is still
-		 *	cooling down, ie. holds a negative timestamp that lies in the
-		 *	future - see _registerFailedAttemp()'s encoding
-		 *
-		 *	@param		array 				&$appData			(reference) Array with current app data
-		 *	@param		string				$key					Bucket key
-		 *
-		 *	@return 	bool
-		 */
+		// Whether a bucket (account mail or IP_KEY_PREFIX.ip) is still
+		// cooling down, ie. holds a negative timestamp that lies in the
+		// future - see _registerFailedAttemp()'s encoding
 		private static function _inCooldown( array &$appData, string $key ): bool {
 
 			return self::_getTries( $appData, $key ) < 0 - time();
 		}
 
-		/**
-		 *	Remove a username's tries entry entirely - called on deleteUser()
-		 *	so TRIES_PATH doesn't accumulate an orphaned entry for an
-		 *	account that no longer exists
-		 *
-		 *	@param		array 				&$appData			(reference) Array with current app data
-		 *	@param		string				$username 		Username
-		 *
-		 *	@return 	void
-		 */
+		// Remove a username's tries entry entirely - called on deleteUser()
+		// so TRIES_PATH doesn't accumulate an orphaned entry for an
+		// account that no longer exists
 		private static function _dropTries( array &$appData, string $username ): void {
 
 			\Nino\Filesystem::mutate( $appData, self::TRIES_PATH, function( array $state ) use ( $username ): ?array {
@@ -953,18 +738,10 @@ namespace Nino {
 			} );
 		}
 
-		/**
-		 *	Move a username's tries entry to a new key - called on
-		 *	updateUser()'s rename path so an in-progress cooldown survives a
-		 *	mail change instead of being silently dropped (reset) or left
-		 *	behind as an orphan under the old, now-unused mail
-		 *
-		 *	@param		array 				&$appData			(reference) Array with current app data
-		 *	@param		string				$oldUsername 	Previous mail
-		 *	@param		string				$newUsername 	New mail
-		 *
-		 *	@return 	void
-		 */
+		// Move a username's tries entry to a new key - called on
+		// updateUser()'s rename path so an in-progress cooldown survives a
+		// mail change instead of being silently dropped (reset) or left
+		// behind as an orphan under the old, now-unused mail
 		private static function _renameTries( array &$appData, string $oldUsername, string $newUsername ): void {
 
 			\Nino\Filesystem::mutate( $appData, self::TRIES_PATH, function( array $state ) use ( $oldUsername, $newUsername ): ?array {
@@ -978,16 +755,9 @@ namespace Nino {
 			} );
 		}
 
-		/**
-		 *	Register one failed login attempt against every given bucket
-		 *	(account mail, client ip, or both) in a single read-modify-write,
-		 *	rather than one file rewrite per bucket
-		 *
-		 *	@param		array 				&$appData			(reference) Array with current app data
-		 *	@param		array 				$keys					Bucket keys to count this attempt against
-		 *
-		 *	@return 	false
-		 */
+		// Register one failed login attempt against every given bucket
+		// (account mail, client ip, or both) in a single read-modify-write,
+		// rather than one file rewrite per bucket
 		private static function _registerFailedAttemp( array &$appData, array $keys ): bool {
 
 			// A dedicated file, not config.php, so this unauthenticated path
@@ -1034,26 +804,10 @@ namespace Nino {
 		}
 	}
 
-	/**
-	 *	Nino								A compact filesystembased php framework
-	 *	Callbacks						Simple callback helper
-	 *
-	 *	@package						Dape/Nino
-	 *	@author							David Perchermeier <mail@dape.io>
-	 *	@link								https://github.com/dapeio/nino
-	 */
-
+	// Callbacks - any code registers itself under a string key, any other
+	// code fires that key deliberately
 	class Callbacks {
 
-		/**
-		 *	Register a callback in appData
-		 *
-		 *	@param		array 		&$appData					(reference) Array with current app data
-		 *	@param		string		$name							Name of callback
-		 *	@param		callable	$callback					Callback function
-		 *
-		 *	@return 	void
-		 */
 		public static function registerCallback( array &$appData, string $name, mixed $callback, int $prio = 5 ): void {
 
 			if( is_callable( $callback ) === false )
@@ -1067,15 +821,6 @@ namespace Nino {
 			$appData['./nino/callbacks'][$name][$prio][] = $callback;
 		}
 
-		/**
-		 *	Run a callback
-		 *
-		 *	@param		array 		&$appData					(reference) Array with current app data
-		 *	@param		string		$name							Name of callback
-		 *	@param		misc			$args							(optional) arguments for callback
-		 *
-		 *	@return 	misc												Return value
-		 */
 		public static function doCallbacks( array &$appData, string $name, mixed &$args = null ): mixed {
 
 			// Check registered callback
@@ -1094,44 +839,22 @@ namespace Nino {
 		}
 	}
 
-	/**
-	 *	Nino								A compact filesystembased php framework
-	 *	Csrf								Cross-site-request-forgery protection for every
-	 *											non-safe request, via a session token - required,
-	 *											not optional: the hidden field/shortcode stays a
-	 *											module (see Modules\Csrf), but the check itself
-	 *											doesn't make sense as an opt-in - a login form the
-	 *											developer forgot to protect isn't a login form
-	 *											with a gap, it's just an unprotected login form
-	 *
-	 *	@package						Dape/Nino
-	 *	@author							David Perchermeier <mail@dape.io>
-	 *	@link								https://github.com/dapeio/nino
-	 */
+	// Csrf - protection for every non-safe request via a session token,
+	// required and always active (unlike the hidden field/shortcode, which
+	// stays a module - see Modules\Csrf): a login form the developer forgot
+	// to protect isn't a login form with a gap, it's unprotected
 
 	class Csrf {
 
-		/**
-		 *	Registers the response-side check that runs for every non-safe
-		 *	request, whether or not the optional Modules\Csrf (the shortcode)
-		 *	is enabled - called unconditionally from \Nino\init(), same as
-		 *	Auth::init()
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *
-		 *	@return 	void
-		 */
+		// Registers the response-side check that runs for every non-safe
+		// request, whether or not the optional Modules\Csrf (the shortcode)
+		// is enabled - called unconditionally from \Nino\init(), same as
+		// Auth::init()
 		public static function init( array &$appData ): void {
 			\Nino\Callbacks::registerCallback( $appData, '/nino/http/response', [ self::class, 'callbackResponse' ], 1 );
 		}
 
-		/**
-		 *	Return the current session's csrf token, creating one if missing
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *
-		 *	@return 	string									Current csrf token
-		 */
+		// Return the current session's csrf token, creating one if missing
 		public static function getToken( array &$appData ): string {
 
 			$token = \Nino\Runtime::getSessionValue( $appData, './nino/csrf/token' );
@@ -1144,30 +867,17 @@ namespace Nino {
 			return $token;
 		}
 
-		/**
-		 *	Replace the current session's csrf token with a fresh one, eg.
-		 *	after login/logout to defend against session fixation
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *
-		 *	@return 	void
-		 */
+		// Replace the current session's csrf token with a fresh one, eg.
+		// after login/logout to defend against session fixation
 		public static function rotateToken( array &$appData ): void {
 			\Nino\Runtime::setSessionValue( $appData, './nino/csrf/token', bin2hex( random_bytes( 32 ) ) );
 		}
 
-		/**
-		 *	Reject a POST request with a missing or wrong csrf token. Sets a
-		 *	dedicated './nino/csrf/blocked' flag in addition to the status
-		 *	code, since doCallbacks() always runs every registered callback
-		 *	regardless of outcome - callbacks that run after this one (eg.
-		 *	Auth) must check that flag themselves before acting.
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		array 		&$request			(reference) Current server request
-		 *
-		 *	@return 	void
-		 */
+		// Reject a POST request with a missing or wrong csrf token. Sets a
+		// dedicated './nino/csrf/blocked' flag in addition to the status
+		// code, since doCallbacks() always runs every registered callback
+		// regardless of outcome - callbacks that run after this one (eg.
+		// Auth) must check that flag themselves before acting.
 		public static function callbackResponse( array &$appData, array &$request ): void {
 
 			// Every method that isn't safe by definition needs a token, not just
@@ -1188,16 +898,10 @@ namespace Nino {
 			$request['/nino/http/response']['body']					= false;
 		}
 
-		/**
-		 *	Read the csrf token from wherever the caller put it: the classic
-		 *	hidden form field, the X-CSRF-Token header, or the parsed JSON
-		 *	body - $_POST is always empty for a json request, so relying on
-		 *	it alone 403s every json POST regardless of the token sent.
-		 *
-		 *	@param		array 		$request			Current server request
-		 *
-		 *	@return 	string									Token, or '' if none was found
-		 */
+		// Read the csrf token from wherever the caller put it: the classic
+		// hidden form field, the X-CSRF-Token header, or the parsed JSON
+		// body - $_POST is always empty for a json request, so relying on
+		// it alone 403s every json POST regardless of the token sent.
 		private static function _extractToken( array $request ): string {
 
 			if( is_string( $_POST['_csrf'] ?? null ) === true && $_POST['_csrf'] !== '' )
@@ -1218,25 +922,11 @@ namespace Nino {
 		}
 	}
 
-	/**
-	 *	Nino								A compact filesystembased php framework
-	 *	Filesystem 					Handle all filesystem operations
-	 *
-	 *	@package						Dape/Nino
-	 *	@author							David Perchermeier <mail@dape.io>
-	 *	@link								https://github.com/dapeio/nino
-	 */
-
+	// Filesystem - central file I/O with an in-request cache, locking, and
+	// automatic .php/.json (de)serialization
 	class Filesystem {
 
 
-		/**
-		 *	Init filesystem
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *
-		 *	@return 	void
-		 */
 		public static function init( array &$appData ): void {
 
 			$path = $appData['./nino/uid'];
@@ -1257,15 +947,6 @@ namespace Nino {
 
 		}
 
-		/**
-		 *	Read content from file
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		string		$filename			Filename of requested file
-		 *	@param		misc			$default			(optional) Return value, if file not found
-		 *
-		 *	@return		string | false					Filecontent or false
-		 */
 		public static function getFileContent( array &$appData, string $filename, mixed $default = false ): mixed {
 
 			// Every call site is expected to already validate $filename against its
@@ -1312,17 +993,6 @@ namespace Nino {
 			return $appData['./nino/filesystem/cache'][$filename]['content'];
 		}
 
-		/**
-		 *	Put content into file
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		string		$filename			Filename of requested file
-		 *	@param		misc			$content			Content to put
-		 *	@param		boolean		$nolock 			(optional) If the caller already holds the lock (see lockFile())
-		 *	@param		boolean		$append 			(optional) Append to file
-		 *
-		 *	@return		bool										If successful
-		 */
 		public static function putFileContent( array &$appData, string $filename, mixed $content, bool $nolock = false, bool $append = false ): bool {
 
 			// See getFileContent() - same defense-in-depth ".." rejection, on the write side
@@ -1379,21 +1049,14 @@ namespace Nino {
 			return $success;
 		}
 
-		/**
-		 *	Replace a file's content atomically: write a temp file next to it,
-		 *	then rename() over the target. A plain ftruncate()+fwrite() leaves
-		 *	the file empty for the duration of the write and, if the process
-		 *	dies in between (php timeout, oom kill, deploy restart), leaves it
-		 *	empty for good - for config.php that is every route, every module
-		 *	binding and every password hash gone. rename() within the same
-		 *	directory is atomic, so a concurrent reader sees either the whole
-		 *	old file or the whole new one, never a half-written one.
-		 *
-		 *	@param		string		$path					Absolute target path
-		 *	@param		string		$content			Content to write
-		 *
-		 *	@return		bool										If successful
-		 */
+		// Replace a file's content atomically: write a temp file next to it,
+		// then rename() over the target. A plain ftruncate()+fwrite() leaves
+		// the file empty for the duration of the write and, if the process
+		// dies in between (php timeout, oom kill, deploy restart), leaves it
+		// empty for good - for config.php that is every route, every module
+		// binding and every password hash gone. rename() within the same
+		// directory is atomic, so a concurrent reader sees either the whole
+		// old file or the whole new one, never a half-written one.
 		private static function _writeFile( string $path, string $content ): bool {
 
 			$temp		= $path. '.'. bin2hex( random_bytes( 6 ) ). '.tmp';
@@ -1429,15 +1092,8 @@ namespace Nino {
 			return true;
 		}
 
-		/**
-		 *	Append to a file. Kept separate from _writeFile(): appending is by
-		 *	definition an in-place operation, there is nothing to swap in.
-		 *
-		 *	@param		string		$path					Absolute target path
-		 *	@param		string		$content			Content to append
-		 *
-		 *	@return		bool										If successful
-		 */
+		// Append to a file. Kept separate from _writeFile(): appending is by
+		// definition an in-place operation, there is nothing to swap in.
 		private static function _appendFile( string $path, string $content ): bool {
 
 			$handle = fopen( $path, 'a' );
@@ -1455,18 +1111,11 @@ namespace Nino {
 			return $written !== false && $written === strlen( $content ) && $flushed === true;
 		}
 
-		/**
-		 *	Lock a file for a read-modify-write sequence. The lock lives on a
-		 *	side-car file in /data/.locks rather than on the file itself: the
-		 *	data file is replaced by rename() (see _writeFile()), and a lock
-		 *	held on the replaced inode stops serializing anything the moment
-		 *	that happens. The lock file is only ever created, never replaced.
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		string		$filename			Filename of requested file
-		 *
-		 *	@return		bool										If successful
-		 */
+		// Lock a file for a read-modify-write sequence. The lock lives on a
+		// side-car file in /data/.locks rather than on the file itself: the
+		// data file is replaced by rename() (see _writeFile()), and a lock
+		// held on the replaced inode stops serializing anything the moment
+		// that happens. The lock file is only ever created, never replaced.
 		public static function lockFile( array &$appData, string $filename ): bool {
 
 			self::_prepareFileCache( $appData, $filename );
@@ -1502,14 +1151,6 @@ namespace Nino {
 			return true;
 		}
 
-		/**
-		 *	Release a lock taken by lockFile()
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		string		$filename			Filename of requested file
-		 *
-		 *	@return		bool										If successful
-		 */
 		public static function unlockFile( array &$appData, string $filename ): bool {
 
 			$handle = $appData['./nino/filesystem/locks'][$filename] ?? null;
@@ -1525,25 +1166,14 @@ namespace Nino {
 			return true;
 		}
 
-		/**
-		 *	Lock -> invalidate -> read -> write, in that order, around a
-		 *	callback that computes the new state - the shape every
-		 *	read-modify-write cycle on a file needs, written once. Reading
-		 *	before locking leaves a window for exactly the concurrent write
-		 *	the lock exists to exclude.
-		 *
-		 *	$fn returning null aborts without writing (eg. "nothing to
-		 *	change") and still releases the lock, so a caller with an early
-		 *	exit doesn't need its own unlockFile() call.
-		 *
-		 *	@param		array 			&$appData			(reference) Array with current app data
-		 *	@param		string			$path					Filename to lock, read and write
-		 *	@param		callable		$fn						fn( mixed $state, array &$appData ): mixed - the new
-		 *																	state to write, or null to abort
-		 *	@param		mixed				$default			Passed to getFileContent() as the not-found default
-		 *
-		 *	@return		bool										If a write happened and succeeded
-		 */
+		// Lock -> invalidate -> read -> write, in that order, around a
+		// callback that computes the new state - the shape every
+		// read-modify-write cycle on a file needs, written once. Reading
+		// before locking leaves a window for exactly the concurrent write
+		// the lock exists to exclude. $fn is fn(mixed $state, array
+		// &$appData): mixed, returning either the new state to write or
+		// null to abort - which still releases the lock, so a caller with
+		// an early exit doesn't need its own unlockFile() call.
 		public static function mutate( array &$appData, string $path, callable $fn, mixed $default = [] ): bool {
 
 			if( self::lockFile( $appData, $path ) === false )
@@ -1562,14 +1192,6 @@ namespace Nino {
 			return self::putFileContent( $appData, $path, $new, true );
 		}
 
-		/**
-		 *	Check, if a file exists
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		string		$filename			Filename of requested file
-		 *
-		 *	@return		bool										If file exists
-		 */
 		public static function fileExists( array &$appData, string $filename ): bool {
 
 			// Force file array cache
@@ -1581,14 +1203,6 @@ namespace Nino {
 		}
 
 
-		/**
-		 *	Create a directory, if needed
-		 *
-		 *	@param		array 				&$appData			(reference) Array with current app data
-		 *	@param		string				$dirpath			Path to required dir
-		 *
-		 *	@return		void
-		 */
 		public static function forceDir( array &$appData, string $dirpath ): void {
 
 			$dirpath = $appData['./nino/filesystem/path']. '/'. $dirpath;
@@ -1601,58 +1215,30 @@ namespace Nino {
 				mkdir( $dirpath, 0755, true );
 		}
 
-		/**
-		 *	Return current filesystem path
-		 *
-		 *	@param		array 				&$appData			(reference) Array with current app data
-		 *
-		 *	@return		string											Current filesystem path
-		 */
 		public static function getPath( array &$appData ): string {
 
 			return $appData['./nino/filesystem/path'];
 
 		}
 
-		/**
-		 *	Return the path config.php actually lives under - normally the
-		 *	same as getPath(), but distinct when NINO_CONFIG_DIR moves it
-		 *	outside the webroot (see \Nino\init()). Callers that build a list
-		 *	of on-disk files by hand (Backup, Restore) must resolve config.php
-		 *	through this, not getPath(), or they miss/misplace it entirely
-		 *	under a hardened, out-of-webroot setup.
-		 *
-		 *	@param		array 				&$appData			(reference) Array with current app data
-		 *
-		 *	@return		string											Current filesystem config path
-		 */
+		// Return the path config.php actually lives under - normally the
+		// same as getPath(), but distinct when NINO_CONFIG_DIR moves it
+		// outside the webroot (see \Nino\init()). Callers that build a list
+		// of on-disk files by hand (Backup, Restore) must resolve config.php
+		// through this, not getPath(), or they miss/misplace it entirely
+		// under a hardened, out-of-webroot setup.
 		public static function getConfigPath( array &$appData ): string {
 
 			return $appData['./nino/filesystem/configpath'];
 
 		}
 
-		/**
-		 *	Return current filesystem dir
-		 *
-		 *	@param		array 				&$appData			(reference) Array with current app data
-		 *
-		 *	@return		string											Current filesystem dir
-		 */
 		public static function getDir( array &$appData ): string {
 
 			return $appData['/nino/dir'];
 
 		}
 
-		/**
-		 *	Copy recursive files and folder
-		 *
-		 *	@param		string 			$source				Source file or folder
-		 *	@param		string			$dest					Target destination path
-		 *
-		 *	@return 	bool									If successful
-		 */
 		public static function copyDir( string $source, string $dest ): bool {
 
 			// 0755, see forceDir() - this one copies backup/restore trees, so a
@@ -1677,11 +1263,6 @@ namespace Nino {
 		}
 
 
-		/**
-		 *	Delete recursive files and folder
-		 *
-		 *	@param		string 	$target				Target file or folder to delete
-		 */
 		public static function removeDir( string $target ): void {
 
 			if( is_file( $target ) ) {
@@ -1703,14 +1284,6 @@ namespace Nino {
 		}
 
 
-		/**
-		 *	Create a file cache array with handle and infos
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		string		$filename			Relative filename
-		 *
-		 *	@return		bool 										If succesful
-		 */
 		private static function _prepareFileCache( array &$appData, string $filename ): bool {
 
 			// Check, if already exists - config.php alone resolves against the
@@ -1738,36 +1311,20 @@ namespace Nino {
 
 	}
 
-	/**
-	 *	Nino								A compact filesystembased php framework
-	 *	Backup							Shared backup/restore manifest: which files belong
-	 *											in an admin-panel backup archive at all - not
-	 *											itself a filesystem primitive, so it doesn't live
-	 *											in Filesystem
-	 *
-	 *	@package						Dape/Nino
-	 *	@author							David Perchermeier <mail@dape.io>
-	 *	@link								https://github.com/dapeio/nino
-	 */
-
+	// Backup - shared backup/restore manifest (which files belong in an
+	// admin-panel archive) - not a filesystem primitive, so not in Filesystem
 	class Backup {
 
-		/**
-		 *	Absolute path -> archive name, for every file the admin panel
-		 *	writes to at runtime: config.php, the text files and every
-		 *	element type/image. Deliberately not developer code (_nino/,
-		 *	templates, _admin/ itself, ...) - that's already versioned in
-		 *	git and would just bloat every backup.
-		 *
-		 *	Shared by Admin\Backup::_create() and Dev\Restore::_safetySnapshot(),
-		 *	which both need the exact same manifest for the exact same reason -
-		 *	kept here rather than in either since Restore deliberately doesn't
-		 *	depend on _admin/Admin.php (see that class' own docblock).
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *
-		 *	@return 	array										Absolute source path => name inside the archive
-		 */
+		// Absolute path -> archive name, for every file the admin panel
+		// writes to at runtime: config.php, the text files and every
+		// element type/image. Deliberately not developer code (_nino/,
+		// templates, _admin/ itself, ...) - that's already versioned in
+		// git and would just bloat every backup.
+		//
+		// Shared by Admin\Backup::_create() and Dev\Restore::_safetySnapshot(),
+		// which both need the exact same manifest for the exact same reason -
+		// kept here rather than in either since Restore deliberately doesn't
+		// depend on _admin/Admin.php (see that class' own docblock).
 		public static function manifest( array &$appData ): array {
 
 			// Defensive: a caller right after writing config.php
@@ -1804,36 +1361,16 @@ namespace Nino {
 
 	}
 
-	/**
-	 *	Nino								A compact filesystembased php framework
-	 *	RotatingLog					One prune() for every "delete dated files older
-	 *											than a cutoff" sweep - Runtime's error log,
-	 *											Modules\Form's submissions, Admin\Logs' activity
-	 *											log and Admin\Backup's own retention each used
-	 *											to carry their own copy
-	 *
-	 *	@package						Dape/Nino
-	 *	@author							David Perchermeier <mail@dape.io>
-	 *	@link								https://github.com/dapeio/nino
-	 */
-
+	// RotatingLog - one prune() for every "delete dated files older than a
+	// cutoff" sweep (Runtime's error log, Form's submissions, Admin\Logs,
+	// Admin\Backup's retention), which each used to carry their own copy
 	class RotatingLog {
 
-		/**
-		 *	Delete files in $dir named "<prefix><date><suffix>" whose date is
-		 *	older than $cutoff. A name whose date portion doesn't parse cleanly
-		 *	is left alone, not deleted - not being one of this sweep's files is
-		 *	not evidence of being stale, and "can't tell" must never mean
-		 *	"delete it" (true of a backup directory most of all).
-		 *
-		 *	@param		string			$dir					Absolute path to the directory holding the dated files
-		 *	@param		string			$prefix				Filename prefix before the date (eg. 'logs.', '')
-		 *	@param		string			$dateFormat		'Y-m' (monthly) or 'Y-m-d' (daily) - the date portion's own format
-		 *	@param		string			$suffix				Filename suffix after the date (eg. '.php')
-		 *	@param		\DateTime		$cutoff				Files dated before this are deleted
-		 *
-		 *	@return 	void
-		 */
+		// Delete files in $dir named "<prefix><date><suffix>" whose date is
+		// older than $cutoff. A name whose date portion doesn't parse cleanly
+		// is left alone, not deleted - not being one of this sweep's files is
+		// not evidence of being stale, and "can't tell" must never mean
+		// "delete it" (true of a backup directory most of all).
 		public static function prune( string $dir, string $prefix, string $dateFormat, string $suffix, \DateTime $cutoff ): void {
 
 			foreach( glob( $dir. '/'. $prefix. '*'. $suffix ) ?: [] as $file ) {
@@ -1865,27 +1402,10 @@ namespace Nino {
 		}
 	}
 
-	/**
-	 *	Nino								A compact filesystembased php framework
-	 *	Elements 						A simple filebased node/element/post integration
-	 *
-	 *	@package						Dape/Nino
-	 *	@author							David Perchermeier <mail@dape.io>
-	 *	@link								https://github.com/dapeio/nino
-	 */
-
+	// Elements - file-based, multilingual content (comparable to posts/nodes)
 	class Elements {
 
-		/**
-		 *	Get an element from file
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		string		$uri					Uri of child element
-		 *	@param		string		$locale 			Required locale
-		 *	@param		misc			$return 			(optional) Return value, if element does not exists.
-		 *
-		 *	@return 	array | false						Element array or false
-		 */
+		// Get an element from file
 		static public function getElement( array &$appData, string $uri, string $locale = '', mixed $return = false ): mixed {
 
 			// Verify locale
@@ -1898,17 +1418,7 @@ namespace Nino {
 			return $appData['./nino/elements/cache'][ $uri ][ $locale ] ?? $return;
 		}
 
-		/**
-		 *	Get an element from file
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		string		$typeUri			Type of element
-		 *	@param		array			$query 				Search query ( 'key' => 'value' )
-		 *	@param		string		$locale 			(optional) Element locale
-		 *	@param		misc			$return 			(optional) Return value, if element does not exists.
-		 *
-		 *	@return 	array | false						Element array or false
-		 */
+		// Get an element from file
 		static public function queryElements( array &$appData, string $typeUri, array $query, string $locale = '', mixed $return = false ): mixed {
 
 			// Verify locale
@@ -1983,17 +1493,8 @@ namespace Nino {
 			return $hits ?? $return;
 		}
 
-		/**
-		 *	Whether one element value satisfies one query value, including the
-		 *	'%foo%' / '%foo' / 'foo%' wildcard forms
-		 *
-		 *	@param		mixed			$value				Element value, or null if the element has no such key
-		 *	@param		string		$kVal					Query value as given, wildcards included
-		 *	@param		string		$kValClean		Query value with the wildcards trimmed off
-		 *	@param		int				$kValLen			Length of $kValClean
-		 *
-		 *	@return 	bool
-		 */
+		// Whether one element value satisfies one query value, including the
+		// '%foo%' / '%foo' / 'foo%' wildcard forms
 		static private function _matchesQueryValue( mixed $value, string $kVal, string $kValClean, int $kValLen ): bool {
 
 			if( is_scalar( $value ) === false )
@@ -2029,16 +1530,7 @@ namespace Nino {
 			return false;
 		}
 
-		/**
-		 *	Update an element
-		 *
-		 *	@param		array 		&$appData					(reference) Array with current app data
-		 *	@param		string		$uri		 					Uri of child element
-		 *	@param		array			$data							Data to update
-		 *	@param		string		$locale 					Required locale
-		 *
-		 *	@return 	boolean											If successful
-		 */
+		// Update an element
 		static public function updateElement( array &$appData, string $uri, array $data, string $locale = '' ): mixed {
 
 			$element = \Nino\Elements::getElement( $appData, $uri, $locale );
@@ -2049,16 +1541,7 @@ namespace Nino {
 			return self::_writeElementData( $appData, $uri, $data, $locale, true );
 		}
 
-		/**
-		 *	Update an element
-		 *
-		 *	@param		array 		&$appData					(reference) Array with current app data
-		 *	@param		string		$uri		 					Uri of child element
-		 *	@param		array			$data							Data to update
-		 *	@param		string		$locale 					Required locale
-		 *
-		 *	@return 	boolean											If successful
-		 */
+		// Update an element
 		static public function insertElement( array &$appData, string $uri, array $data, string $locale = '' ): mixed {
 
 			if( \Nino\Elements::getElement( $appData, $uri, $locale ) !== false )
@@ -2067,15 +1550,7 @@ namespace Nino {
 			return self::_writeElementData( $appData, $uri, $data, $locale );
 		}
 
-		/**
-		 *	Delete an element
-		 *
-		 *	@param		array 		&$appData					(reference) Array with current app data
-		 *	@param		string		$uri		 					Uri of child element
-		 *	@param		string		$locale 					Required locale
-		 *
-		 *	@return 	boolean											If successful
-		 */
+		// Delete an element
 		static public function deleteElement( array &$appData, string $uri, string $locale = '' ): mixed {
 
 			// Verify locale
@@ -2153,15 +1628,7 @@ namespace Nino {
 			return $appData['./nino/elements/cache'][$typeUri];
 		}
 
-		/**
-		 *	Insert an element type
-		 *
-		 *	@param		array 		&$appData					(reference) Array with current app data
-		 *	@param		string		$typeUri					Uri of element type
-		 *	@param		array			$model						Type model
-		 *
-		 *	@return 	boolean											If successful
-		 */
+		// Insert an element type
 		static public function insertElementType( array &$appData, string $typeUri, array $model ): mixed {
 
 			$typeUri = '/'. ltrim( $typeUri, '/' );
@@ -2198,14 +1665,7 @@ namespace Nino {
 		}
 
 
-		/**
-		 *	Returns an element type model
-		 *
-		 *	@param		array 		&$appData					(reference) Array with current app data
-		 *	@param		string		$typeUri					Uri of element type
-		 *
-		 *	@return 	array												Type model
-		 */
+		// Returns an element type model
 		static public function getElementModel( array &$appData, string $typeUri ): array {
 			$typeData = self::getElementFile( $appData, $typeUri );
 			return ( $typeData === false || is_array( $typeData['model'] ?? null ) === false )
@@ -2213,13 +1673,7 @@ namespace Nino {
 				: $typeData['model'];
 		}
 
-		/**
-		 *	Get element type from element uri
-		 *
-		 *	@param		string		$uri					Uri of element
-		 *
-		 *	@return 	string									Element type
-		 */
+		// Get element type from element uri
 		static public function getElementTypeFromUri( string $uri ): string {
 			$pos = strpos( substr( $uri, 1 ), '/' );
 			if( $pos === false ) {
@@ -2229,13 +1683,7 @@ namespace Nino {
 			return substr( $uri, 0, $pos + 1 );
 		}
 
-		/**
-		 *	Get element part from element uri
-		 *
-		 *	@param		string		$uri					Uri of element
-		 *
-		 *	@return 	string									Element uri
-		 */
+		// Get element part from element uri
 		static public function getElementUriFromUri( string $uri ): string {
 			$pos = strpos( substr( $uri, 1 ), '/' );
 			if( $pos === false ) {
@@ -2245,32 +1693,16 @@ namespace Nino {
 			return substr( $uri, $pos + 2 );
 		}
 
-		/**
-		 *	The PHP gettype() a model field's declared type is expected to hold
-		 *	as - 'date'/'datetime' values are plain ISO strings (php has no
-		 *	native date type) and an 'image' field stores its uploaded file's
-		 *	generated filename, also a string; everything else matches its
-		 *	type name directly
-		 *
-		 *	@param		string		$type					Model field type (eg. "date")
-		 *
-		 *	@return 	string									A gettype() return value (eg. "string")
-		 */
+		// The PHP gettype() a model field's declared type is expected to hold
+		// as - 'date'/'datetime' values are plain ISO strings (php has no
+		// native date type) and an 'image' field stores its uploaded file's
+		// generated filename, also a string; everything else matches its
+		// type name directly
 		static private function _expectedGettype( string $type ): string {
 			return in_array( $type, [ 'date', 'datetime', 'image' ], true ) ? 'string' : $type;
 		}
 
-		/**
-		 *	Write element data into file content
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		string		$uri					Uri of child element
-		 *	@param		array 		$data					New element data
-		 *	@param		string		$locale 			Required locale
-		 *	@param		bool			$update				Update?
-		 *
-		 *	@return 	void
-		 */
+		// Write element data into file content
 		static private function _writeElementData( array &$appData, string $uri, array $data, string $locale, bool $update = false ): mixed {
 
 			// Verify locale
@@ -2427,17 +1859,9 @@ namespace Nino {
 			return \Nino\Elements::getElement( $appData, $resultData['.uri'], $resultData['.locale'] );
 		}
 
-		/**
-		 *	Load an element into app cache. Resolves '*' to the actual locale
-		 *	it found data in (reference), so the caller can look up that same
-		 *	cache slot afterwards.
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		string		$uri					Uri of child element
-		 *	@param		string		&$locale 			(reference) Requested locale, resolved in place if '*'
-		 *
-		 *	@return 	void
-		 */
+		// Load an element into app cache. Resolves '*' to the actual locale
+		// it found data in (reference), so the caller can look up that same
+		// cache slot afterwards.
 		static private function _cacheElement( array &$appData, string $uri, string &$locale ): void {
 
 			// Get uris
@@ -2479,15 +1903,8 @@ namespace Nino {
 
 	}
 
-	/**
-	 *	Nino								A compact filesystembased php framework
-	 *	Html 								All html related methods
-	 *
-	 *	@package						Dape/Nino
-	 *	@author							David Perchermeier <mail@dape.io>
-	 *	@link								https://github.com/dapeio/nino
-	 */
-
+	// Html - the html rendering pipeline: textfills, shortcodes, asset
+	// lists, and html sanitizing
 	class Html {
 
 		private const array HTML_TAGS = [ 'strong', 'em', 'span', 'a' ];
@@ -2496,27 +1913,11 @@ namespace Nino {
 		// before _doShortcode() stops unrolling - see there
 		private const int MAX_RENDER_DEPTH = 20;
 
-		/**
-		 *	Prepare a response
-		 *
-		 *	@param		array 				&$appData			(reference) Array with current app data
-		 *	@param		array					&$request			(reference) Current request
-		 *
-		 *	@return		array | null 							Webpage array or null
-		 */
 		public static function response( array &$appData, array &$request ): void {
 			if( is_string( $request['/nino/http/response']['body'] ) === true )
 				$request['/nino/http/response']['body'] = self::renderHtml( $appData, $request['/nino/http/response']['body'] );
 		}
 
-		/**
-		 *	Render text and shortcode replacements on a html text
-		 *
-		 *	@param		array 				&$appData			(reference) Array with current app data
-		 *	@param		string				$html					Html to render
-		 *
-		 *	@return 	null
-		 */
 		public static function renderHtml( array &$appData, string $html ): string {
 
 			$html = self::_renderFills( $appData, $html );
@@ -2527,14 +1928,6 @@ namespace Nino {
 			return $html;
 		}
 
-		/**
-		 *	Render a textfills in current language
-		 *
-		 *	@param		array 				&$appData			(reference) Array with current app data
-		 *	@param		string				$fill					Textfill to render
-		 *
-		 *	@return 	string											Rendered fill
-		 */
 		public static function renderTextfill( array &$appData, string $fill ): string {
 
 			$fills = self::getFills( $appData );
@@ -2542,15 +1935,6 @@ namespace Nino {
 			return $fills[ '[['. $fill. ']]'] ?? '';
 		}
 
-		/**
-		 *	Add an asset to global list
-		 *
-		 *	@param		array 				&$appData			(reference) Array with current app data
-		 *	@param		string				$library			Target assets library
-		 *	@param		string				$assetfile		Path to asset file
-		 *
-		 *	@return 	void
-		 */
 		public static function addAsset( array &$appData, string $library, string $assetfile ): void {
 
 			$appData['/nino/html/assets'][$library] = $appData['/nino/html/assets'][$library] ?? [];
@@ -2559,15 +1943,6 @@ namespace Nino {
 				$appData['/nino/html/assets'][$library][] = $assetfile;
 		}
 
-		/**
-		 *	Bind a shortcode to an event
-		 *
-		 *	@param		array 				&$appData			(reference) Array with current app data
-		 *	@param		string				$shortcode		Name of text tag
-		 *	@param									$callback			Target callback
-		 *
-		 *	@return 	void
-		 */
 		public static function addShortcode( array &$appData, string $shortcode, mixed $callback ): void {
 
 			// Add shortcode in appData
@@ -2578,15 +1953,6 @@ namespace Nino {
 			$appData['./nino/html/cache'] = false;
 		}
 
-		/**
-		 *	Add textfills
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		array 		$fills				Textfills to add
-		 *	@param		string		$locale 			(optional) Target locale or current
-		 *
-		 *	@return 	void
-		 */
 		public static function addFills( array &$appData, array $fills, string $locale = ''  ): void {
 
 			// Check locale
@@ -2601,25 +1967,10 @@ namespace Nino {
 				$appData['./nino/html/fills'][$locale]['[['. trim( $fillKey, '[[]]' ). ']]'] = $fillValue;
 		}
 
-		/**
-		 *	Return all current assets with an extension
-		 *
-		 *	@param		array 				&$appData			(reference) Array with current app data
-		 *	@param		string				$library			Target assets library
-		 *
-		 *	@return 	array 											Asset files
-		 */
 		public static function getAssets( array &$appData, string $library ): array {
 			return $appData['/nino/html/assets'][$library] ?? [];
 		}
 
-		/**
-		 *	Return all current textfills
-		 *
-		 *	@param		array 				&$appData			(reference) Array with current app data
-		 *
-		 *	@return 	array 											Fill data
-		 */
 		public static function getFills( array &$appData ): array {
 
 			$locale = \Nino\Locales::getCurrentLocale( $appData );
@@ -2632,14 +1983,6 @@ namespace Nino {
 			);
 		}
 
-		/**
-		 *	Render shortcodes
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		string		$html 				Html to render
-		 *
-		 *	@return 	string									Application event return value or empty string
-		 */
 		private static function _renderShortcodes( array &$appData, string $html ): string {
 
 			// Check html text for [ or [[
@@ -2667,14 +2010,6 @@ namespace Nino {
 			return $html;
 		}
 
-		/**
-		 *	Render textfills
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		string		$html 				Html to render
-		 *
-		 *	@return 	string									Application event return value or empty string
-		 */
 		private static function _renderFills( array &$appData, string $html ): string {
 
 			if( substr_count( $html, '[[' ) === 0 )
@@ -2701,14 +2036,6 @@ namespace Nino {
 			return $html;
 		}
 
-		/**
-		 *	Method
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		array 		$pregArgs			Arguments from preg_replace_callback()
-		 *
-		 *	@return 	string									Application event return value or empty string
-		 */
 		private static function _doShortcode( array &$appData, array $pregArgs ): string {
 
 			// Read preg arguments
@@ -2766,30 +2093,18 @@ namespace Nino {
 			return $value;
 		}
 
-		/**
-		 *	Whether a value currently contains one of the allowed inline tags -
-		 *	used to auto-decide whether a field/key gets the html editor.
-		 *	Shared by every domain class with a model/entry 'html' flag
-		 *	(_admin's Text/Elements, _dev's Text).
-		 *
-		 *	@param		string		$value				Value to check
-		 *
-		 *	@return 	bool
-		 */
+		// Whether a value currently contains one of the allowed inline tags -
+		// used to auto-decide whether a field/key gets the html editor.
+		// Shared by every domain class with a model/entry 'html' flag
+		// (_admin's Text/Elements, _dev's Text).
 		public static function containsHtml( string $value ): bool {
 			return preg_match( '/<(?:'. implode( '|', self::HTML_TAGS ). ')[ >]/i', $value ) === 1;
 		}
 
-		/**
-		 *	Rebuild a html value, keeping only whitelisted inline tags (strong/
-		 *	em/span/a) one level deep and a safe href scheme on links. Never
-		 *	trust the client's html: the editor's "no nesting" toolbar rule is
-		 *	enforced here too, against a client that bypasses it entirely.
-		 *
-		 *	@param		string		$html					Raw html from the client
-		 *
-		 *	@return 	string									Sanitized html
-		 */
+		// Rebuild a html value, keeping only whitelisted inline tags (strong/
+		// em/span/a) one level deep and a safe href scheme on links. Never
+		// trust the client's html: the editor's "no nesting" toolbar rule is
+		// enforced here too, against a client that bypasses it entirely.
 		public static function sanitizeHtml( string $html ): string {
 
 			if( trim( $html ) === '' )
@@ -2806,16 +2121,9 @@ namespace Nino {
 			return $wrap === null ? '' : self::_sanitizeChildren( $wrap, false );
 		}
 
-		/**
-		 *	Recursively rebuild a node's children, keeping only whitelisted
-		 *	inline tags one level deep - a whitelisted tag found while already
-		 *	inside another one is unwrapped (kept as plain content)
-		 *
-		 *	@param		\DOMNode	$node					Node whose children to rebuild
-		 *	@param		bool			$insideInline	Whether an ancestor is already a whitelisted inline tag
-		 *
-		 *	@return 	string									Rebuilt html
-		 */
+		// Recursively rebuild a node's children, keeping only whitelisted
+		// inline tags one level deep - a whitelisted tag found while already
+		// inside another one is unwrapped (kept as plain content)
 		private static function _sanitizeChildren( \DOMNode $node, bool $insideInline ): string {
 
 			$out = '';
@@ -2852,14 +2160,8 @@ namespace Nino {
 			return $out;
 		}
 
-		/**
-		 *	Validate a link href: only relative/fragment uris or a handful of
-		 *	safe schemes - blocks javascript: and similar injection vectors
-		 *
-		 *	@param		string		$href					Raw href attribute value
-		 *
-		 *	@return 	string | null						The href if safe, else null
-		 */
+		// Validate a link href: only relative/fragment uris or a handful of
+		// safe schemes - blocks javascript: and similar injection vectors
 		private static function _safeHref( string $href ): string|null {
 
 			$href = trim( $href );
@@ -2874,15 +2176,8 @@ namespace Nino {
 		}
 	}
 
-	/**
-	 *	Nino								A compact filesystembased php framework
-	 *	Http 								All http related methods
-	 *
-	 *	@package						Dape/Nino
-	 *	@author							David Perchermeier <mail@dape.io>
-	 *	@link								https://github.com/dapeio/nino
-	 */
-
+	// Http - request/response composition, headers, routing, and locale
+	// redirects
 	class Http {
 
 		private static
@@ -2906,14 +2201,6 @@ namespace Nino {
 				'uri'					=> '',
 			];
 
-		/**
-		 *	Prepare a request
-		 *
-		 *	@param		array 				&$appData			(reference) Array with current app data
-		 *	@param		array					&$request			(reference) Current request
-		 *
-		 *	@return		array | null 							Webpage array or null
-		 */
 		public static function request( array &$appData, array &$request ): void {
 
 			$currentLocale = \Nino\Locales::getCurrentLocale( $appData );
@@ -2951,14 +2238,6 @@ namespace Nino {
 			\Nino\Callbacks::doCallbacks( $appData, '/nino/http/request', $request );
 		}
 
-		/**
-		 *	Prepare a get response
-		 *
-		 *	@param		array 				&$appData			(reference) Array with current app data
-		 *	@param		array					&$request			(reference) Current request
-		 *
-		 *	@return		array | null 							Webpage array or null
-		 */
 		public static function response( array &$appData, array &$request ): void {
 
 			// Find current route
@@ -2980,14 +2259,6 @@ namespace Nino {
 
 
 
-		/**
-		 *	Output a http response
-		 *
-		 *	@param		array 				&$appData			(reference) Array with current app data
-		 *	@param		array					&$request			(reference) Current request
-		 *
-		 *	@return		array | null 							Webpage array or null
-		 */
 		public static function output( array &$appData, array &$request ): never {
 
 			self::_finalizeResponse( $request );
@@ -3011,23 +2282,17 @@ namespace Nino {
 			exit;
 		}
 
-		/**
-		 *	json-encode a non-string body, then merge in the default status/
-		 *	header/etc. keys - the part of output() that decides what would
-		 *	actually be sent, split out since output() itself exit()s and so
-		 *	can't be called from a test.
-		 *
-		 *	Not run through filterHeaderFields(): that whitelist is built for
-		 *	the request side (Accept, Cookie, ...) and silently drops
-		 *	response-only headers a module has every right to set (Set-Cookie,
-		 *	Content-Disposition, ETag, ...). Response header values are
-		 *	framework/module-computed, not a direct echo of user input, and
-		 *	header() itself already refuses to send a value containing a CR/LF.
-		 *
-		 *	@param		array					&$request			(reference) Current request
-		 *
-		 *	@return		void
-		 */
+		// json-encode a non-string body, then merge in the default status/
+		// header/etc. keys - the part of output() that decides what would
+		// actually be sent, split out since output() itself exit()s and so
+		// can't be called from a test.
+		//
+		// Not run through filterHeaderFields(): that whitelist is built for
+		// the request side (Accept, Cookie, ...) and silently drops
+		// response-only headers a module has every right to set (Set-Cookie,
+		// Content-Disposition, ETag, ...). Response header values are
+		// framework/module-computed, not a direct echo of user input, and
+		// header() itself already refuses to send a value containing a CR/LF.
 		private static function _finalizeResponse( array &$request ): void {
 
 			// Catch json output
@@ -3040,44 +2305,20 @@ namespace Nino {
 			$request['/nino/http/response']['header'] = array_merge( self::$_defaultResponse['header'], $request['/nino/http/response']['header'] );
 		}
 
-		/**
-		 *	Set a response's status code and error body in one call - the
-		 *	statusCode/body pair a handler otherwise sets by hand on every
-		 *	failure branch, with 'error' as the body key enforced rather
-		 *	than just remembered by convention
-		 *
-		 *	@param		array 		&$request			(reference) Current request
-		 *	@param		int				$statusCode
-		 *	@param		string		$error
-		 *
-		 *	@return 	void
-		 */
+		// Set a response's status code and error body in one call - the
+		// statusCode/body pair a handler otherwise sets by hand on every
+		// failure branch, with 'error' as the body key enforced rather
+		// than just remembered by convention
 		public static function fail( array &$request, int $statusCode, string $error ): void {
 			$request['/nino/http/response']['statusCode'] = $statusCode;
 			$request['/nino/http/response']['body'] = [ 'error' => $error ];
 		}
 
-		/**
-		 *	Set a response's success body - see fail()
-		 *
-		 *	@param		array 		&$request			(reference) Current request
-		 *	@param		mixed			$body					Response body, defaults to a bare acknowledgement
-		 *
-		 *	@return 	void
-		 */
+		// Set a response's success body - see fail()
 		public static function ok( array &$request, mixed $body = [ 'ok' => true ] ): void {
 			$request['/nino/http/response']['body'] = $body;
 		}
 
-		/**
-		 *	Search a route
-		 *
-		 *	@param		array 				&$appData			(reference) Array with current app data
-		 *	@param		string				$uri					Requested uri
-		 *	@param		string				$method				Request method
-		 *
-		 *	@return		array | null 							Webpage array or null
-		 */
 		public static function requestRoute( array &$appData, string $uri, string $method ): ?array {
 
 			$result 		= $appData['/nino/http/routes'][$method. ':/'. $uri] ?? null;
@@ -3091,17 +2332,9 @@ namespace Nino {
 			return $result;
 		}
 
-		/**
-		 *	Find the route key (eg. "GET://about") that renders a given
-		 *	response uri in a specific locale, eg. to redirect to the
-		 *	locale-specific variant of the current page
-		 *
-		 *	@param		array 				&$appData			(reference) Array with current app data
-		 *	@param		string				$responseUri	Uri as currently set in the response (eg. "/about")
-		 *	@param		string				$locale				Required locale
-		 *
-		 *	@return		string | null							Route key, or null if none found
-		 */
+		// Find the route key (eg. "GET://about") that renders a given
+		// response uri in a specific locale, eg. to redirect to the
+		// locale-specific variant of the current page
 		public static function findRouteUri( array &$appData, string $responseUri, string $locale ): ?string {
 
 			foreach( $appData['/nino/http/routes'] as $routeUri => $routeData )
@@ -3111,25 +2344,11 @@ namespace Nino {
 			return null;
 		}
 
-		/**
-		 *	Search a route
-		 *
-		 *	@param		array 				&$appData			(reference) Array with current app data
-		 *	@param		int						$offset				Offset of requested request in request array
-		 *
-		 *	@return		array | false 							Request array or null
-		 */
 		public static function getRequest( array &$appData, int $offset = 0 ): array|false {
 			return $appData['./nino/http/requests'][$offset] ?? false;
 		}
 
-		/**
-		 *	Return clean uri
-		 *
-		 *	@param		string 	$rawUri				Raw uri string
-		 *
-		 *	@return 	string								Clean uri
-		 */
+		// Return clean uri
 		static private function cleanUri( string $rawUri ): string {
 
 			// Clean uri
@@ -3144,36 +2363,26 @@ namespace Nino {
 			return $cleanUri;
 		}
 
-		/**
-		 *	Return current client ip address. Only the actual TCP peer address
-		 *	(REMOTE_ADDR) is trusted - Client-Ip/X-Forwarded-For are ordinary
-		 *	request headers any client can set to an arbitrary value, and Nino
-		 *	has no trusted-proxy configuration to verify them against. Trusting
-		 *	them here would let a session's ip-pinning check (see Auth) and the
-		 *	activity log's ip field both be spoofed by the request itself.
-		 *
-		 *	@return 	string											Current ip address
-		 */
+		// Return current client ip address. Only the actual TCP peer address
+		// (REMOTE_ADDR) is trusted - Client-Ip/X-Forwarded-For are ordinary
+		// request headers any client can set to an arbitrary value, and Nino
+		// has no trusted-proxy configuration to verify them against. Trusting
+		// them here would let a session's ip-pinning check (see Auth) and the
+		// activity log's ip field both be spoofed by the request itself.
 		public static function getClientIp(): string {
 
 			return $_SERVER['REMOTE_ADDR'] ?? '';
 		}
 
-		/**
-		 *	Build the request-side header array from $_SERVER (passed in as
-		 *	$rawServer). PHP exposes request headers as HTTP_FOO_BAR keys
-		 *	(Content-Type/-Length are the CGI-spec exception, without the
-		 *	HTTP_ prefix) - filterHeaderFields() expects real header names
-		 *	like 'Foo-Bar' as keys, which is what the response side already
-		 *	has, so this normalizes the request side to match before reusing
-		 *	it. The exact case reached here doesn't matter - filterHeaderFields()
-		 *	now matches case-insensitively and returns its own whitelist's
-		 *	casing, since header names are case-insensitive per HTTP anyway.
-		 *
-		 *	@param		array 	$rawServer					Raw $_SERVER-shaped array
-		 *
-		 *	@return 	array												Filtered array, real header names as keys
-		 */
+		// Build the request-side header array from $_SERVER (passed in as
+		// $rawServer). PHP exposes request headers as HTTP_FOO_BAR keys
+		// (Content-Type/-Length are the CGI-spec exception, without the
+		// HTTP_ prefix) - filterHeaderFields() expects real header names
+		// like 'Foo-Bar' as keys, which is what the response side already
+		// has, so this normalizes the request side to match before reusing
+		// it. The exact case reached here doesn't matter - filterHeaderFields()
+		// now matches case-insensitively and returns its own whitelist's
+		// casing, since header names are case-insensitive per HTTP anyway.
 		static private function _filterRequestHeaderFields( array $rawServer ): array {
 
 			$normalized = [];
@@ -3193,17 +2402,11 @@ namespace Nino {
 			return self::filterHeaderFields( $normalized );
 		}
 
-		/**
-		 *	Filter all non-http keys from an array. Matches case-insensitively
-		 *	and normalizes to the whitelist's own casing - a naive exact match
-		 *	would silently drop a header whose casing doesn't match the
-		 *	whitelist's literal entry (eg. the request side's 'TE' normalized
-		 *	to 'Te' via ucwords()).
-		 *
-		 *	@param		array 	$headerArray				Raw array with request header fields
-		 *
-		 *	@return 	array												Filtered array
-		 */
+		// Filter all non-http keys from an array. Matches case-insensitively
+		// and normalizes to the whitelist's own casing - a naive exact match
+		// would silently drop a header whose casing doesn't match the
+		// whitelist's literal entry (eg. the request side's 'TE' normalized
+		// to 'Te' via ucwords()).
 		static public function filterHeaderFields( array $headerArray ): array {
 
 			$allowed = [ 'Accept', 'Accept-Charset', 'Accept-Encoding', 'Accept-Language', 'Authorization', 'Cache-Control', 'Connection', 'Content-Length', 'Content-Type', 'Cookie', 'Date', 'Expect', 'From', 'Host', 'If-Modified-Since', 'If-None-Match', 'Location', 'Max-Forwards', 'Origin', 'Pragma', 'Proxy-Authorization', 'Range', 'Referer', 'TE', 'User-Agent', 'Upgrade', 'Via', 'Warning', 'X-CSRF-Token', 'X-Frame-Options', 'X-Content-Type-Options', 'Strict-Transport-Security', 'Content-Security-Policy', 'Referrer-Policy', 'Feature-Policy', 'Permissions-Policy' ];
@@ -3221,13 +2424,6 @@ namespace Nino {
 		}
 
 
-		/**
-		 *	Return query get vars from get request uri string
-		 *
-		 *	@param		string 	$rawRequest		Raw request
-		 *
-		 *	@return 	array									All query get vars
-		 */
 		private static function _getRequestQueryVarsPart( string $rawRequest ): array {
 
 			// Parse query vars
@@ -3239,15 +2435,7 @@ namespace Nino {
 		}
 
 
-		/**
-		 *	Clean request methods
-		 *
-		 *	@param		string 	$rawMethod			Raw requested method
-		 *	@param		array 	$legalMethods		(optional) Array with all legal methods
-		 *	@param		bool 		$mapHead				(optional) Whether HEAD resolves to GET (routing) or stays HEAD
-		 *
-		 *	@return 	string 									Cleaned method
-		 */
+		// Clean request methods
 		static private function _cleanRawMethod( string $rawMethod, array $legalMethods = [], bool $mapHead = true ): string {
 
 			if( $legalMethods === [] )
@@ -3271,44 +2459,23 @@ namespace Nino {
 		}
 	}
 
-	/**
-	 *	Nino								A compact filesystembased php framework
-	 *	Images							Upload -> validate -> centered crop/resize -> store,
-	 *											shared by Elements' "image" field type and any
-	 *											developer-fixed image slot (eg. a future Admin
-	 *											media area). Every image is re-encoded via gd from
-	 *											scratch, never the uploaded bytes as-is - besides
-	 *											giving a predictable output format, that also
-	 *											discards anything a crafted file might carry beyond
-	 *											actual pixel data.
-	 *
-	 *	@package						Dape/Nino
-	 *	@author							David Perchermeier <mail@dape.io>
-	 *	@link								https://github.com/dapeio/nino
-	 */
-
+	// Images - upload -> validate -> centered crop/resize -> store, shared
+	// by Elements' "image" field type and any developer-fixed image slot.
+	// Every image is re-encoded via gd from scratch, never the uploaded
+	// bytes as-is, which also discards anything a crafted file might carry
+	// beyond actual pixel data
 	class Images {
 
 		private const int MAX_UPLOAD_BYTES 		= 8 * 1024 * 1024;
 		private const int MAX_SOURCE_PIXELS 		= 8000;
 		private const string UPLOAD_DIR 				= '/images';
 
-		/**
-		 *	Validate, center-crop and resize raw uploaded image bytes to exactly
-		 *	$targetWidth x $targetHeight, then store the result at $basePath
-		 *	with an extension appended for the chosen output format - the
-		 *	caller picks $basePath deterministically (eg. "elements/<type>/<uri>"),
-		 *	so re-uploading the same slot overwrites in place rather than
-		 *	accumulating orphaned files
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		string		$bytes				Raw uploaded file content
-		 *	@param		int				$targetWidth	Target width in pixels
-		 *	@param		int				$targetHeight	Target height in pixels
-		 *	@param		string		$basePath			Deterministic path (relative to /images), without extension
-		 *
-		 *	@return 	string|false						The stored filename (relative to /images, incl. extension), or false
-		 */
+		// Validate, center-crop and resize raw uploaded image bytes to exactly
+		// $targetWidth x $targetHeight, then store the result at $basePath
+		// with an extension appended for the chosen output format - the
+		// caller picks $basePath deterministically (eg. "elements/<type>/<uri>"),
+		// so re-uploading the same slot overwrites in place rather than
+		// accumulating orphaned files
 		public static function process( array &$appData, string $bytes, int $targetWidth, int $targetHeight, string $basePath ): string|false {
 
 			if( $bytes === '' || strlen( $bytes ) > self::MAX_UPLOAD_BYTES || $targetWidth < 1 || $targetHeight < 1 || $basePath === '' )
@@ -3389,14 +2556,6 @@ namespace Nino {
 			return $filename;
 		}
 
-		/**
-		 *	Delete a previously stored image
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		string		$filename			Filename as returned by process()
-		 *
-		 *	@return 	void
-		 */
 		public static function delete( array &$appData, string $filename ): void {
 
 			// process() only ever hands out names it generated itself (nested under
@@ -3410,54 +2569,24 @@ namespace Nino {
 				unlink( $path );
 		}
 
-		/**
-		 *	Public url for a stored image
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		string		$filename			Filename as returned by process()
-		 *
-		 *	@return 	string
-		 */
 		public static function getUrl( array &$appData, string $filename ): string {
 			return \Nino\Filesystem::getDir( $appData ). self::UPLOAD_DIR. '/'. $filename;
 		}
 
-		/**
-		 *	Every developer-fixed image slot ("/nino/html/images" in config.php) -
-		 *	unlike an Element's "image" field, slots themselves can't be added or
-		 *	removed from the admin, only the file each currently points to changes
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *
-		 *	@return 	array										Slot uri => [ label, width, height, filename ]
-		 */
+		// Every developer-fixed image slot ("/nino/html/images" in config.php) -
+		// unlike an Element's "image" field, slots themselves can't be added or
+		// removed from the admin, only the file each currently points to changes
 		public static function getSlots( array &$appData ): array {
 			return $appData['/nino/html/images'] ?? [];
 		}
 
-		/**
-		 *	One image slot's definition
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		string		$uri					Slot uri
-		 *
-		 *	@return 	array|false
-		 */
 		public static function getSlot( array &$appData, string $uri ): array|false {
 			return self::getSlots( $appData )[$uri] ?? false;
 		}
 
-		/**
-		 *	Record a new filename for an existing slot and persist it - only
-		 *	the /nino/html/images key of config.php, same as Auth::updateUser()
-		 *	only persists /nino/auth/user (see AppData::writeContentData())
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		string		$uri					Slot uri
-		 *	@param		string		$filename			Filename as returned by process()
-		 *
-		 *	@return 	bool										If successful (false if the slot doesn't exist)
-		 */
+		// Record a new filename for an existing slot and persist it - only
+		// the /nino/html/images key of config.php, same as Auth::updateUser()
+		// only persists /nino/auth/user (see AppData::writeContentData())
 		public static function setSlotFilename( array &$appData, string $uri, string $filename ): bool {
 
 			if( self::getSlot( $appData, $uri ) === false )
@@ -3470,24 +2599,9 @@ namespace Nino {
 		}
 	}
 
-	/**
-	 *	Nino								A compact filesystembased php framework
-	 *	Locales 						Handles the framework locale
-	 *
-	 *	@package						Dape/Nino
-	 *	@author							David Perchermeier <mail@dape.io>
-	 *	@link								https://github.com/dapeio/nino
-	 */
-
+	// Locales - current-locale resolution, switching, and redirects
 	class Locales {
 
-		/**
-		 *	Init module
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *
-		 *	@return 	void
-		 */
 		public static function init( array &$appData ): void {
 
 			// Get current locale
@@ -3508,15 +2622,8 @@ namespace Nino {
 			\Nino\Callbacks::registerCallback( $appData, '/nino/http/response', [ self::class, 'callbackResponse' ] );
 		}
 
-		/**
-		 *	Switch locale via the '/_nino/locales/current' query param and
-		 *	redirect back to the current uri in the new locale
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		array 		&$request			(reference) Current request
-		 *
-		 *	@return 	void
-		 */
+		// Switch locale via the '/_nino/locales/current' query param and
+		// redirect back to the current uri in the new locale
 		public static function callbackResponse( array &$appData, array &$request ): void {
 
 			// Catch locale change
@@ -3534,20 +2641,13 @@ namespace Nino {
 			}
 		}
 
-		/**
-		 *	Apply the locale of the resolved route, if it declares one (eg.
-		 *	config.php's 'GET://rechtliches' => [ ..., 'locale' => 'de_DE' ]).
-		 *
-		 *	Has to run after Http::response(): the route - and with it its
-		 *	'locale' - is only merged into the response array there, so
-		 *	comparing response locale against current locale any earlier
-		 *	only ever sees the seeded default, not the route's own choice.
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		array 		&$request			(reference) Current request
-		 *
-		 *	@return 	void
-		 */
+		// Apply the locale of the resolved route, if it declares one (eg.
+		// config.php's 'GET://rechtliches' => [ ..., 'locale' => 'de_DE' ]).
+		//
+		// Has to run after Http::response(): the route - and with it its
+		// 'locale' - is only merged into the response array there, so
+		// comparing response locale against current locale any earlier
+		// only ever sees the seeded default, not the route's own choice.
 		public static function response( array &$appData, array &$request ): void {
 
 			$locale = $request['/nino/http/response']['locale'] ?? '';
@@ -3561,60 +2661,23 @@ namespace Nino {
 			$request['/nino/http/response']['locale'] = \Nino\Locales::setCurrentLocale( $appData, $locale );
 		}
 
-		/**
-		 *	Get current locale
-		 *
-		 *	@param		array 				&$appData			(reference) Array with current app data
-		 *
-		 *	@return 	string											Current locale
-		 */
 		public static function getCurrentLocale( array &$appData ): string {
 			return $appData['./nino/locales/current'];
 		}
 
-		/**
-		 *	Get native locale
-		 *
-		 *	@param		array 				&$appData			(reference) Array with current app data
-		 *
-		 *	@return 	string											Current locale
-		 */
 		public static function getNativeLocale( array &$appData ): string {
 			return $appData['/nino/locales/native'];
 		}
 
-		/**
-		 *	Get available locales
-		 *
-		 *	@param		array 				&$appData			(reference) Array with current app data
-		 *
-		 *	@return 	array												Available locale
-		 */
 		public static function getAvailableLocales( array &$appData ): array {
 			return $appData['/nino/locales/available'];
 		}
 
-		/**
-		 *	Verify, if a locale is available
-		 *
-		 *	@param		array 				&$appData			(reference) Array with current app data
-		 *	@param		string				$locale 			Locale to verify
-		 *
-		 *	@return 	bool												If locale is available
-		 */
 		public static function verifyLocale( array &$appData, string $locale ): bool {
 
 			return in_array( $locale, \Nino\Locales::getAvailableLocales( $appData ) );
 		}
 
-		/**
-		 *	Set a new locale
-		 *
-		 *	@param		array 				&$appData			(reference) Array with current app data
-		 *	@param		string				$locale				New locale
-		 *
-		 *	@return 	string											Current locale
-		 */
 		public static function setCurrentLocale( array &$appData, string $locale ): string {
 
 			// Verify, if requested locale is available
@@ -3627,24 +2690,12 @@ namespace Nino {
 		}
 	}
 
-	/**
-	 *	Nino								A compact filesystembased php framework
-	 *	Text								The [[key]] textfill layer both _admin's Text panel
-	 *												and _dev's own text editor sit on top of - reading
-	 *												every known key out of /text/global.php + every
-	 *												/text/{locale}.php, and batching a value save into
-	 *												one lock/read/write per target file. Everything
-	 *												that differs between the two UIs (blacklist
-	 *												filtering vs. an editable blacklist flag, a
-	 *												PERM-gated save vs. a session-gated one, shape
-	 *												conversion) stays in _admin/Admin.php and _dev/Dev.php
-	 *												- this only holds what was byte-for-byte identical
-	 *												between them.
-	 *
-	 *	@package						Dape/Nino
-	 *	@author							David Perchermeier <mail@dape.io>
-	 *	@link								https://github.com/dapeio/nino
-	 */
+	// Text - the [[key]] textfill layer _admin's Text panel and _dev's text
+	// editor both sit on top of: reads every key out of /text/global.php +
+	// every /text/{locale}.php, batches a save into one lock/read/write per
+	// file. Only holds what was byte-for-byte identical between the two
+	// UIs - blacklist filtering, PERM- vs session-gated saves, shape
+	// conversion stay in Admin.php/Dev.php.
 	class Text {
 
 		private const int MIN_MAXLENGTH 		= 150;
@@ -3652,20 +2703,13 @@ namespace Nino {
 		private const int MAXLENGTH_BUFFER = 150;
 		private const int HARD_MAXLENGTH 	= 20000;
 
-		/**
-		 *	Every known key across global.php + every locale file, with its
-		 *	current value(s), whether it's global or per-locale, whether it
-		 *	currently holds markup, a maxlength derived from its longest
-		 *	current value, and whether it's blacklisted (see blacklist())
-		 *
-		 *	@param		array 		&$appData						(reference) Array with current app data
-		 *	@param		bool			$includeBlacklisted	Whether a blacklisted key is included at all, not
-		 *																			just flagged - _admin's Text panel hides them
-		 *																			entirely, _dev's own editor needs to see them
-		 *																			to be able to un-blacklist one
-		 *
-		 *	@return 	array											List of [ key, global, blacklisted, html, maxlength, values ]
-		 */
+		// Every known key across global.php + every locale file, with its
+		// current value(s), whether it's global or per-locale, whether it
+		// currently holds markup, a maxlength derived from its longest
+		// current value, and whether it's blacklisted (see blacklist()).
+		// $includeBlacklisted controls whether a blacklisted key is skipped
+		// entirely or just flagged - _admin's Text panel hides them, _dev's
+		// editor needs to see them to be able to un-blacklist one.
 		public static function entries( array &$appData, bool $includeBlacklisted = true ): array {
 
 			$global 	= \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] );
@@ -3722,15 +2766,6 @@ namespace Nino {
 			return $entries;
 		}
 
-		/**
-		 *	Find one key's entry (see entries())
-		 *
-		 *	@param		array 		&$appData						(reference) Array with current app data
-		 *	@param		string		$key								Bare key path (eg. "/home/welcome/h2")
-		 *	@param		bool			$includeBlacklisted	Same meaning as entries()'s own parameter
-		 *
-		 *	@return 	array | null							The entry, or null if unknown (or hidden by $includeBlacklisted)
-		 */
 		public static function entry( array &$appData, string $key, bool $includeBlacklisted = true ): array|null {
 
 			foreach( self::entries( $appData, $includeBlacklisted ) as $entry )
@@ -3740,29 +2775,15 @@ namespace Nino {
 			return null;
 		}
 
-		/**
-		 *	Read the developer-maintained list of keys hidden from _admin's
-		 *	Text panel (technical values, not content - uris, colors,
-		 *	typography, ...)
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *
-		 *	@return 	array										Set of blacklisted keys (key => true)
-		 */
+		// Read the developer-maintained list of keys hidden from _admin's
+		// Text panel (technical values, not content - uris, colors,
+		// typography, ...)
 		public static function blacklist( array &$appData ): array {
 			return array_flip( \Nino\Filesystem::getFileContent( $appData, '/text/blacklist.php', [] ) );
 		}
 
-		/**
-		 *	Add or remove one key from /text/blacklist.php - _dev-only,
-		 *	_admin's Text panel only ever reads the list
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		string		$key
-		 *	@param		bool			$blacklisted
-		 *
-		 *	@return 	void
-		 */
+		// Add or remove one key from /text/blacklist.php - _dev-only,
+		// _admin's Text panel only ever reads the list
 		public static function setBlacklisted( array &$appData, string $key, bool $blacklisted ): void {
 
 			\Nino\Filesystem::mutate( $appData, '/text/blacklist.php', function( array $list ) use ( $key, $blacklisted ): ?array {
@@ -3780,26 +2801,19 @@ namespace Nino {
 			} );
 		}
 
-		/**
-		 *	Save several keys' values in one request, batched per target file
-		 *	- a locale file gets one lock -> re-read -> write cycle no matter
-		 *	how many of its keys changed, instead of one per key. That's not
-		 *	just an optimization: two separate saves hitting the same file
-		 *	concurrently would race (each reads the file before the other's
-		 *	write lands, so one update gets silently lost) - batching removes
-		 *	the race entirely by construction.
-		 *
-		 *	A per-item failure (unknown/blacklisted key, invalid locale)
-		 *	doesn't fail the whole call - it's reported per key in the
-		 *	returned results so the other, valid items still get saved.
-		 *
-		 *	@param		array 		&$appData						(reference) Array with current app data
-		 *	@param		array 		$items							[ [ key, locale, value ], ... ]
-		 *	@param		bool			$includeBlacklisted	Same meaning as entries()'s own parameter -
-		 *																			whether a blacklisted key is a valid save target
-		 *
-		 *	@return 	array											key => [ ok, value ] or [ ok, error ]
-		 */
+		// Save several keys' values in one request, batched per target file
+		// - a locale file gets one lock -> re-read -> write cycle no matter
+		// how many of its keys changed, instead of one per key. That's not
+		// just an optimization: two separate saves hitting the same file
+		// concurrently would race (each reads the file before the other's
+		// write lands, so one update gets silently lost) - batching removes
+		// the race entirely by construction.
+		//
+		// A per-item failure (unknown/blacklisted key, invalid locale)
+		// doesn't fail the whole call - it's reported per key in the
+		// returned results so the other, valid items still get saved.
+		// $includeBlacklisted has the same meaning as entries()'s own
+		// parameter: whether a blacklisted key is a valid save target.
 		public static function saveBatch( array &$appData, array $items, bool $includeBlacklisted ): array {
 
 			$results 		= [];
@@ -3849,48 +2863,19 @@ namespace Nino {
 	}
 
 
-	/**
-	 *	Nino								A compact filesystembased php framework
-	 *	Mail								Thin wrapper around mail() - centralizes the
-	 *												Content-Type/Reply-To header building, so a
-	 *												project-wide change (envelope sender, BCC, logging
-	 *												a failure) has one place to happen instead of one
-	 *												per caller (Form, Newsletter). Also the one choke
-	 *												point both of those callers actually share, so a
-	 *												simple per-ip send cap lives here too rather than
-	 *												duplicated in each caller: a fixed-window counter
-	 *												(5 mails/hour/ip, state in /data/ratelimit.php - same
-	 *												plain, human-readable php-array convention as
-	 *												/data/forms.<Y-m>.php and /data/newsletter.php),
-	 *												checked before every send. Once a client is over
-	 *												budget, send() just returns false - the same outcome
-	 *												as any other mail() failure, which both callers
-	 *												already treat as "don't surface this to the visitor,
-	 *												the form/signup itself still succeeded" (see their
-	 *												own comments) - so a rate-limited burst degrades to
-	 *												silently-missing mail rather than a visible error
-	 *
-	 *	@package						Dape/Nino
-	 *	@author							David Perchermeier <mail@dape.io>
-	 *	@link								https://github.com/dapeio/nino
-	 */
+	// Mail - thin wrapper around mail(): centralizes Content-Type/Reply-To
+	// headers (one place for a project-wide change) and a shared per-ip
+	// send cap (5/hour, /data/ratelimit.php) - over budget, send() just
+	// returns false, the same outcome as any other mail() failure, which
+	// Form/Newsletter already treat as non-fatal, so a rate-limited burst
+	// just becomes silently-missing mail
 	class Mail {
 
 		private const int MAX_TRIES 	= 5;
 		private const int WINDOW 		= 3600;
 
-		/**
-		 *	Send an html mail with a Reply-To header, unless the current
-		 *	client ip has hit the send cap for this window
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		string		$to							Recipient
-		 *	@param		string		$subject				Subject
-		 *	@param		string		$body						Rendered html body
-		 *	@param		string		$replyTo				Reply-To address
-		 *
-		 *	@return		bool										True on success (same as mail()), false on failure or when rate-limited
-		 */
+		// Send an html mail with a Reply-To header, unless the current
+		// client ip has hit the send cap for this window
 		public static function send( array &$appData, string $to, string $subject, string $body, string $replyTo ): bool {
 
 			if( self::_hit( $appData, \Nino\Http::getClientIp() ) === false ) {
@@ -3944,32 +2929,20 @@ namespace Nino {
 				: mail( $to, $subject, $body, $headers );
 		}
 
-		/**
-		 *	A single header value with anything that could start a new header
-		 *	line removed
-		 *
-		 *	@param		string		$value				Raw value
-		 *
-		 *	@return 	string
-		 */
+		// A single header value with anything that could start a new header
+		// line removed
 		private static function _headerValue( string $value ): string {
 
 			return trim( str_replace( [ "\r", "\n" ], '', $value ) );
 		}
 
-		/**
-		 *	The address to send as: '/nino/mail/sender' from config.php if set,
-		 *	otherwise the site owner's address from the Text values. Configurable
-		 *	because the envelope sender has to be an address the sending host is
-		 *	allowed to send for (spf/dmarc), which is not necessarily the mailbox
-		 *	replies should go to. Returns '' if neither is a valid address, in
-		 *	which case send() simply omits From:/-f rather than passing something
-		 *	unchecked to sendmail.
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *
-		 *	@return 	string
-		 */
+		// The address to send as: '/nino/mail/sender' from config.php if set,
+		// otherwise the site owner's address from the Text values. Configurable
+		// because the envelope sender has to be an address the sending host is
+		// allowed to send for (spf/dmarc), which is not necessarily the mailbox
+		// replies should go to. Returns '' if neither is a valid address, in
+		// which case send() simply omits From:/-f rather than passing something
+		// unchecked to sendmail.
 		private static function _getSender( array &$appData ): string {
 
 			$sender = self::_headerValue( (string) ( $appData['/nino/mail/sender'] ?? '' ) );
@@ -3980,17 +2953,10 @@ namespace Nino {
 			return ( filter_var( $sender, FILTER_VALIDATE_EMAIL ) !== false ) ? $sender : '';
 		}
 
-		/**
-		 *	Register one send attempt for $key and report whether it's
-		 *	still within budget for the current window. Any key (not just
-		 *	the one being checked) whose window has already elapsed is
-		 *	dropped on write, so the state file can't grow without bound.
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		string		$key					Bucket, the sending client's ip
-		 *
-		 *	@return 	bool										False once $key has used up MAX_TRIES within the current window
-		 */
+		// Register one send attempt for $key and report whether it's
+		// still within budget for the current window. Any key (not just
+		// the one being checked) whose window has already elapsed is
+		// dropped on write, so the state file can't grow without bound.
 		private static function _hit( array &$appData, string $key ): bool {
 
 			$path 	= '/data/ratelimit.php';
@@ -4021,24 +2987,10 @@ namespace Nino {
 	}
 
 
-	/**
-	 *	Nino								A compact filesystembased php framework
-	 *	Modules 						Handle optional modules
-	 *
-	 *	@package						Dape/Nino
-	 *	@author							David Perchermeier <mail@dape.io>
-	 *	@link								https://github.com/dapeio/nino
-	 */
+	// Modules - calls a method (init/request/response) on every module
+	// enabled in config.php's '/nino/modules'
 	class Modules {
 
-		/**
-		 *	Call a method at all module
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		string		$method 			Name of required modules
-		 *
-		 *	@return 	void
-		 */
 		public static function callModules( array &$appData, string $method ): void {
 
 			// method_exists() autoloads $className itself if it isn't defined
@@ -4053,15 +3005,8 @@ namespace Nino {
 		}
 	}
 
-	/**
-	 *	Nino								A compact filesystembased php framework
-	 *	Runtime 						Handle the php runtime
-	 *
-	 *	@package						Dape/Nino
-	 *	@author							David Perchermeier <mail@dape.io>
-	 *	@link								https://github.com/dapeio/nino
-	 */
-
+	// Runtime - session handling and global error/exception handling,
+	// including logging
 	class Runtime {
 
 		private const int RETENTION_MONTHS = 3;
@@ -4069,13 +3014,6 @@ namespace Nino {
 		private static
 			$_currentInstance = [];
 
-		/**
-		 *	Init php runtime
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *
-		 *	@return 	void
-		 */
 		public static function init( array &$appData ): void {
 
 			// Set current instance
@@ -4108,52 +3046,23 @@ namespace Nino {
 				$_SESSION[$appData['./nino/uid']] = [];
 		}
 
-		/**
-		 *	Write a value in current session
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		string		$key					Key in session array
-		 *	@param		misc			$return				(optional) Return value
-		 *
-		 *	@return 	void
-		 */
 		public static function getSessionValue( array &$appData, string $key, mixed $return = null ): mixed {
 			return $_SESSION[$appData['./nino/uid']][$key] ?? $return;
 		}
 
-		/**
-		 *	Write a value in current session
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		string		$key					Key in session array
-		 *	@param		misc			$value				New value
-		 *
-		 *	@return 	void
-		 */
 		public static function setSessionValue( array &$appData, string $key, mixed $value ): void {
 			$_SESSION[$appData['./nino/uid']] = $_SESSION[$appData['./nino/uid']] ?? [];
 			$_SESSION[$appData['./nino/uid']][$key] = $value;
 		}
 
-		/**
-		 *	Remove a value in current session
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		string		$key					Key in session array
-		 *
-		 *	@return 	void
-		 */
 		public static function unsetSessionValue( array &$appData, string $key ): void {
 			unset( $_SESSION[$appData['./nino/uid']][$key] );
 		}
 
 
-		/**
-		 *	Do event on global error and break execution
-		 *
-		 *	@return 	bool										False to let a suppressed (@) error continue
-		 *																			normally; every other path terminates the script.
-		 */
+		// Global error/exception handler. Returns false (script continues
+		// normally) only when the error level is filtered by
+		// error_reporting(); every other path terminates the script.
 		public static function handleError(): bool {
 
 			// Get errorhandler
@@ -4212,23 +3121,16 @@ namespace Nino {
 			exit;
 		}
 
-		/**
-		 *	Append one error entry to this month's /data/logs.<Y-m>.php -
-		 *	a plain, readable array file (Filesystem::getFileContent()/
-		 *	putFileContent()'s native .php handling), same idea as
-		 *	Modules\Form's forms.<Y-m>.php. Fixed, predictable path -
-		 *	no random directory name, unlike _admin's own backups/activity
-		 *	log (see docs/developer.md's "Encryption / stub conventions"):
-		 *	this is public-site kernel data, not a credential-adjacent
-		 *	secret, so it doesn't need that protection.
-		 *	Never thrown - a logging failure inside the error handler
-		 *	itself must not recurse into another error
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		array 		$entry				One error ( type, message, file, line )
-		 *
-		 *	@return 	void
-		 */
+		// Append one error entry to this month's /data/logs.<Y-m>.php -
+		// a plain, readable array file (Filesystem::getFileContent()/
+		// putFileContent()'s native .php handling), same idea as
+		// Modules\Form's forms.<Y-m>.php. Fixed, predictable path -
+		// no random directory name, unlike _admin's own backups/activity
+		// log (see docs/developer.md's "Encryption / stub conventions"):
+		// this is public-site kernel data, not a credential-adjacent
+		// secret, so it doesn't need that protection.
+		// Never thrown - a logging failure inside the error handler
+		// itself must not recurse into another error
 		private static function _recordError( array &$appData, array $entry ): void {
 
 			try {
@@ -4247,13 +3149,6 @@ namespace Nino {
 			}
 		}
 
-		/**
-		 *	Delete monthly log files older than RETENTION_MONTHS
-		 *
-		 *	@param		string		$dir					Absolute path to the /data directory
-		 *
-		 *	@return 	void
-		 */
 		private static function _pruneLogs( string $dir ): void {
 
 			$cutoff = ( new \DateTime( 'first day of -'. self::RETENTION_MONTHS. ' months' ) )->setTime( 0, 0 );
@@ -4266,21 +3161,12 @@ namespace Nino {
 
 namespace {
 
-	/**
-	 *	Nino								A compact filesystembased php framework
-	 *	Modules							Autoloads \Nino\Modules\* (one file per module, under
-	 *											Nino/Modules/) and any project's own custom module
-	 *											classes on first use, from the same
-	 *											<namespace-as-path>/<basename>.php layout
-	 *											Modules::callModules() itself derives a class' file
-	 *											from - config.php's '/nino/modules' list only ever
-	 *											controlled which modules get init()/request()/
-	 *											response() called on them, never which classes exist
-	 *											to be called at all, so a call site that references a
-	 *											module class directly (tests among them), without
-	 *											going through callModules() first, needs to resolve
-	 *											the same way
-	 */
+	// Autoloads \Nino\Modules\* and any project's custom module classes on
+	// first use, from the same <namespace-as-path>/<basename>.php layout
+	// callModules() derives a class' file from - '/nino/modules' only ever
+	// controlled which modules get a method called, never which classes
+	// exist, so a direct reference (tests among them) needs to resolve the
+	// same way without going through callModules() first
 	spl_autoload_register( function( string $className ): void {
 
 		$relativePath	= str_replace( '\\', '/', $className );
