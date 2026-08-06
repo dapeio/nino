@@ -1197,7 +1197,7 @@ namespace Nino {
 
 			// Deliberately NOT in the file's cache slot: several call sites drop
 			// a slot to force a re-read (Auth's tries file, writeContentData),
-			// and _dev drops the whole cache array at once - any of which would
+			// and _admin drops the whole cache array at once - any of which would
 			// take the only reference to this resource with it, closing the
 			// handle and releasing the lock while the caller still believes it
 			// holds one. Locks live in their own map for that reason.
@@ -1398,7 +1398,7 @@ namespace Nino {
 		// type/image, and the /data/ content a project actually accumulates
 		// (newsletter subscribers, form submissions, the error/activity
 		// log). Deliberately not developer code (_nino/, templates,
-		// _admin/ itself, ...) - that's already versioned in git and would
+		// _editor/ itself, ...) - that's already versioned in git and would
 		// just bloat every backup. Also deliberately not auth-tries.php or
 		// ratelimit.php - both are transient throttling counters, not data
 		// a restore should bring back.
@@ -1406,7 +1406,7 @@ namespace Nino {
 		// Shared by Admin\Backup::_create() and Dev\Restore::_safetySnapshot(),
 		// which both need the exact same manifest for the exact same reason -
 		// kept here rather than in either since Restore deliberately doesn't
-		// depend on _admin/Admin.php (see that class' own docblock).
+		// depend on _editor/Editor.php (see that class' own docblock).
 		public static function manifest( array &$appData ): array {
 
 			// Defensive: a caller right after writing config.php
@@ -2164,7 +2164,7 @@ namespace Nino {
 			// (eg. /form/subject/owner containing [[/website/url]]) - a
 			// same-count swap would otherwise look "stable" after one pass.
 			// The pass cap guards against a fill value that references
-			// itself (possible via _admin's Text editor, not just the
+			// itself (possible via _editor's Text editor, not just the
 			// developer-authored defaults).
 			for( $pass = 0; $pass < 10; $pass++ ) {
 				$rendered = str_replace( $fillKeys, $fillValues, $html );
@@ -2217,7 +2217,7 @@ namespace Nino {
 			// which is what makes [template] able to contain other shortcodes -
 			// and also what makes a template including itself, directly or
 			// through a second one, recurse until the memory limit kills the
-			// request. Templates and textfills are editable from _dev/_admin, so
+			// request. Templates and textfills are editable from _admin/_editor, so
 			// that is one typo away. The depth cap stops the recursion without
 			// putting a rule on any single shortcode; MAX_RENDER_DEPTH is far
 			// above what real nesting (page -> section -> element) reaches.
@@ -2236,7 +2236,7 @@ namespace Nino {
 		// Whether a value currently contains one of the allowed inline tags -
 		// used to auto-decide whether a field/key gets the html editor.
 		// Shared by every domain class with a model/entry 'html' flag
-		// (_admin's Text/Elements, _dev's Text).
+		// (_editor's Text/Elements, _admin's Text).
 		public static function containsHtml( string $value ): bool {
 			return preg_match( '/<(?:'. implode( '|', self::HTML_TAGS ). ')[ >]/i', $value ) === 1;
 		}
@@ -2804,7 +2804,7 @@ namespace Nino {
 				\Nino\Locales::setCurrentLocale( $appData, $currentLocale );
 
 			// Registered rather than called directly out of \Nino\request(): a
-			// route can declare its own 'statusCode' (eg. GET://_admin), and
+			// route can declare its own 'statusCode' (eg. GET://_editor), and
 			// Http::response() array_merge()s the route into the response array
 			// *after* seeding it - calling this any earlier had the merge wipe
 			// the 302 this sets right back to the route's own status, so the
@@ -2824,6 +2824,16 @@ namespace Nino {
 				return;
 
 			$locale = \Nino\Locales::setCurrentLocale( $appData, $request['/nino/http/request']['query']['/_nino/locales/current'] );
+
+			// Keep the response's own 'locale' in sync with the switch just
+			// made - \Nino\request() calls Locales::response() right after
+			// Http::response()'s callbacks run, and that method reverts the
+			// current locale straight back if it doesn't match this field.
+			// Left at whatever Http::request() seeded it with (the locale
+			// *before* this switch), that's exactly what would happen: the
+			// switch above would never survive past this same request
+			$request['/nino/http/response']['locale'] = $locale;
+
 			$newUri = \Nino\Http::findRouteUri( $appData, $request['/nino/http/response']['uri'], $locale );
 
 			// Redirect via the response array - a direct header() call would be
@@ -2883,12 +2893,12 @@ namespace Nino {
 		}
 	}
 
-	// Text - the [[key]] textfill layer _admin's Text panel and _dev's text
+	// Text - the [[key]] textfill layer _editor's Text panel and _admin's text
 	// editor both sit on top of: reads every key out of /text/global.php +
 	// every /text/{locale}.php, batches a save into one lock/read/write per
 	// file. Only holds what was byte-for-byte identical between the two
 	// UIs - blacklist filtering, PERM- vs session-gated saves, shape
-	// conversion stay in Admin.php/Dev.php.
+	// conversion stay in Admin.php/Admin.php.
 	class Text {
 
 		private const int MIN_MAXLENGTH 		= 150;
@@ -2901,7 +2911,7 @@ namespace Nino {
 		// currently holds markup, a maxlength derived from its longest
 		// current value, and whether it's blacklisted (see blacklist()).
 		// $includeBlacklisted controls whether a blacklisted key is skipped
-		// entirely or just flagged - _admin's Text panel hides them, _dev's
+		// entirely or just flagged - _editor's Text panel hides them, _admin's
 		// editor needs to see them to be able to un-blacklist one.
 		public static function entries( array &$appData, bool $includeBlacklisted = true ): array {
 
@@ -2968,15 +2978,15 @@ namespace Nino {
 			return null;
 		}
 
-		// Read the developer-maintained list of keys hidden from _admin's
+		// Read the developer-maintained list of keys hidden from _editor's
 		// Text panel (technical values, not content - uris, colors,
 		// typography, ...)
 		public static function blacklist( array &$appData ): array {
 			return array_flip( \Nino\Filesystem::getFileContent( $appData, '/text/blacklist.php', [] ) );
 		}
 
-		// Add or remove one key from /text/blacklist.php - _dev-only,
-		// _admin's Text panel only ever reads the list
+		// Add or remove one key from /text/blacklist.php - _admin-only,
+		// _editor's Text panel only ever reads the list
 		public static function setBlacklisted( array &$appData, string $key, bool $blacklisted ): void {
 
 			\Nino\Filesystem::mutate( $appData, '/text/blacklist.php', function( array $list ) use ( $key, $blacklisted ): ?array {
@@ -3376,7 +3386,7 @@ namespace Nino {
 		// a plain, readable array file (Filesystem::getFileContent()/
 		// putFileContent()'s native .php handling), same idea as
 		// Modules\Form's forms.<Y-m>.php. Fixed, predictable path -
-		// no random directory name, unlike _admin's own backups/activity
+		// no random directory name, unlike _editor's own backups/activity
 		// log (see docs/developer.md's "Encryption / stub conventions"):
 		// this is public-site kernel data, not a credential-adjacent
 		// secret, so it doesn't need that protection.

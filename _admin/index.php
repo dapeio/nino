@@ -11,10 +11,10 @@ declare(strict_types=1);
 require '../_nino/Nino.php';
 require 'Admin.php';
 
-// Init Nino Admin
+// Init Nino Dev
 $appData = \Nino\init();
 \Nino\Admin\Admin::init( $appData );
 
-// Output Nino Admin
+// Output Nino Dev
 $request = \Nino\request( $appData, $_SERVER );
 \Nino\output( $appData, $request );

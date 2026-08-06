@@ -2,12 +2,12 @@
 *[Deutsch](development.de.md)*
 
 **Links:**
-[README](../README.md) · [Design Handbook](design.md) · [_admin Handbook](_admin.md) · [_dev Handbook](_dev.md) · [Security Policy](../SECURITY.md) · [Changelog](../CHANGELOG.md)
+[README](../README.md) · [Design Handbook](design.md) · [_editor Handbook](_editor.md) · [_admin Handbook](_admin.md) · [_install Handbook](_install.md) · [Security Policy](../SECURITY.md) · [Changelog](../CHANGELOG.md)
 
 ## Overview
 Nino deliberately does without an installer tool or a purely UI-driven workflow during development. Developers therefore need basic PHP knowledge and advanced HTML/CSS/JavaScript skills to fully build a website. Administering and running a finished project, however, requires no technical know-how at all.
 
-Building a simple website with static and dynamic content needs very little PHP work. Templates are written in HTML+ *(HTML + [[/text/fills]] + [shortcodes])*. The kernel configuration, global and local texts *(textfills)*, and typed data *(elements)* are stored in PHP arrays. These can be created through the graphical `_dev` interface and then maintained via `_admin`. Further assets (CSS/JS/images) are added the classic way.
+Building a simple website with static and dynamic content needs very little PHP work. Templates are written in HTML+ *(HTML + [[/text/fills]] + [shortcodes])*. The kernel configuration, global and local texts *(textfills)*, and typed data *(elements)* are stored in PHP arrays. These can be created through the graphical `_admin` interface and then maintained via `_editor`. Further assets (CSS/JS/images) are added the classic way.
 Advanced module development for extended functionality — integrating an API or a database, for example — requires advanced PHP knowledge.
 
 ## Fundamentals
@@ -44,7 +44,7 @@ Communication and dynamics between Nino and its modules happen only through call
 ```
 
 `$name` is just a plain string key — following the convention (`/nino/http/response`,
-`/nino/http/response/GET://_admin`, `/nino/html/shortcode/template`). The kernel's own fixed callbacks are registered and run following the same pattern. Any module can use kernel callbacks or register its own.
+`/nino/http/response/GET://_editor`, `/nino/html/shortcode/template`). The kernel's own fixed callbacks are registered and run following the same pattern. Any module can use kernel callbacks or register its own.
 `$prio` is `0`–`9`, lower runs first.
 
 `doCallbacks()` calls every callback registered under `$name` in priority order, passing `$args` through each one.
@@ -84,10 +84,10 @@ The last line, `Modules::callModules()`, takes `config.php`'s `/nino/modules` ar
 loads every class name it contains, and calls `$className::init( &$appData )`.
 
 One exception:
-`_admin/Admin.php` and `_dev/Dev.php` are **not** modules in this
+`_editor/Editor.php` and `_admin/Admin.php` are **not** modules in this
 list — they are self-contained entry points that call their own
-`::init()` explicitly (see "The `_admin`/`_dev` add-ons" below), since a
-request to `/_admin` never goes through the main site's
+`::init()` explicitly (see "The `_editor`/`_admin` add-ons" below), since a
+request to `/_editor` never goes through the main site's
 `config.php`/`index.php` at all.
 
 ### 2. `\Nino\request()` — resolve the route, run the request/response callbacks
@@ -160,24 +160,24 @@ After that the script is done - there is no "teardown" phase.
 
 ## Persistent data
 ### Overview
-For handling persistent data, Nino provides three different concepts. All of them are stored in the filesystem and can be read and written through the kernel, `_dev` and `_admin`. They differ in structure and, correspondingly, in how they're used.
+For handling persistent data, Nino provides three different concepts. All of them are stored in the filesystem and can be read and written through the kernel, `_admin` and `_editor`. They differ in structure and, correspondingly, in how they're used.
 
 #### 1. `config.php` — the place for global key/value values
 This is where the `$appData` starting values live: routes, modules, locales, users, asset bundles, error/session flags. Every persistent change to the kernel and module configuration is stored here - including for additional modules. `$appData` is, however, never written automatically. That only happens deliberately, via:
 `AppData::writeContentData( $appData, array $keys )`
-The file is re-read here and merged together with the *passed* keys. Integrating external values into `_dev` is not implemented yet.
+The file is re-read here and merged together with the *passed* keys. Integrating external values into `_admin` is not implemented yet.
 
 #### 2. `elements/*.php` — the place for typed values
 This is where data following fixed models can be stored and read *(e.g. posts, staff, reviews, news, etc.)*.
-For every element, a type model with fields is defined *(e.g. title/string/200 chars/multilocale, price/float/€ suffix, product/image/800x600, etc.)*, which can then be filled with elements via `_admin`. Fields/variables can have different types *(strings, integer, DateTime, boolean - also images and float)*, can be single- or multi-language, or carry extra rules *(max length, suffix, etc.)*. The type model is stored together with the elements in one file *(e.g. `elements/services.php`)*.
+For every element, a type model with fields is defined *(e.g. title/string/200 chars/multilocale, price/float/€ suffix, product/image/800x600, etc.)*, which can then be filled with elements via `_editor`. Fields/variables can have different types *(strings, integer, DateTime, boolean - also images and float)*, can be single- or multi-language, or carry extra rules *(max length, suffix, etc.)*. The type model is stored together with the elements in one file *(e.g. `elements/services.php`)*.
 Every type has a unique type uri *(e.g. `/services`)*, a global title, and its model with the variable definitions.
 Every element has a unique uri *(e.g. `/webdesign` - so `/services/webdesign`)* and, depending on the model, global and local values.
-A graphical interface for conveniently creating/editing types is available in `_dev`. Precise documentation for manually editing the file will follow.
+A graphical interface for conveniently creating/editing types is available in `_admin`. Precise documentation for manually editing the file will follow.
 **Access** happens through the built-in template shortcode, e.g. `[elements /services]<h5>[title]</h5>[/elements]`, or the kernel class `\Nino\Elements::getElement( $appData, ..)`, etc.
-Creating/editing/deleting elements (not types) - including image upload - also happens graphically, via `_admin`.
+Creating/editing/deleting elements (not types) - including image upload - also happens graphically, via `_editor`.
 
 #### 3. `text/*.php` — the place for global/local text content
-This is where all language-independent *(text/global.php)* and language-dependent texts live *(`text/de_DE.php`, `text/en_US.php`, ...)*. The structure is likewise key/value, but is aimed specifically at text building blocks in templates. The global texts, and the local texts matching the current language, are loaded automatically at startup and substituted in `\Nino\Html::renderHtml()`. Textfills are normally set up following the convention `[[/category/type/name]]` and are substituted in exactly that form inside the template. Nesting *(e.g. `[[/webpage[[/nino/http/response/uri]]/title]]`)* is possible too and is fully resolved. Which text keys can exist is defined in `_dev`. Filling in the text values happens in `_admin`.
+This is where all language-independent *(text/global.php)* and language-dependent texts live *(`text/de_DE.php`, `text/en_US.php`, ...)*. The structure is likewise key/value, but is aimed specifically at text building blocks in templates. The global texts, and the local texts matching the current language, are loaded automatically at startup and substituted in `\Nino\Html::renderHtml()`. Textfills are normally set up following the convention `[[/category/type/name]]` and are substituted in exactly that form inside the template. Nesting *(e.g. `[[/webpage[[/nino/http/response/uri]]/title]]`)* is possible too and is fully resolved. Which text keys can exist is defined in `_admin`. Filling in the text values happens in `_editor`.
 
 ## Basic Templating (Shortcodes, Textfills)
 
@@ -424,7 +424,7 @@ Renders the content once, for a single element; `[[key]]` placeholders inside th
 Repeats the content for every element of a type (optionally filtered via `query`, capped via `limit`) - `[[key]]` placeholders are re-substituted for each hit.
 
 #### `Form`
-The contact form: validation, sending the owner/confirmation mail, and storing every submission for `_admin`.
+The contact form: validation, sending the owner/confirmation mail, and storing every submission for `_editor`.
 **Javascript:**
 `Nino.http.sendRequest( '/.form', 'POST', function( xhr ) { ... }, { name: '...', email: '...', message: '...', cat: '...', location: '' } )`
 Sends the contact form to `/.form`. `location` must stay empty (honeypot). Success/failure is only visible via `xhr.status` - the response body stays empty: 200 sent, 400 missing/invalid field, 418 honeypot filled, 403 CSRF invalid/missing.
@@ -539,29 +539,29 @@ namespace MyProject\Modules {
 ***The long-term dream is to build a small Nino community. Thanks to the modular concept, we can take work off each other's hands and share encapsulated modules with general-purpose tasks.
 I'd love any feedback, on GitHub or at mail@dape.io.***
 
-## The `_admin`/`_dev` add-ons
+## The `_editor`/`_admin` add-ons
 
-For developing and maintaining a website, `_dev/` and `_admin/` ship graphical frontend tools. Both have their own bootstrap scripts that work independently of the `/index.php` route. The applications are therefore decoupled and can be removed at any time without affecting the actual website's display.
-The webserver must be configured to forward requests to `/_admin` and `/_dev` to the matching index. When testing locally with PHP's built-in server, the router script must route this case explicitly.
+For developing and maintaining a website, `_admin/` and `_editor/` ship graphical frontend tools. Both have their own bootstrap scripts that work independently of the `/index.php` route. The applications are therefore decoupled and can be removed at any time without affecting the actual website's display.
+The webserver must be configured to forward requests to `/_editor` and `/_admin` to the matching index. When testing locally with PHP's built-in server, the router script must route this case explicitly.
 
 The two applications are built similarly, with clear differences:
 
-**`_dev`** serves a single (!) developer. Login happens via a hardcoded `PASSWORD_HASH` constant, defined directly in the file. Its functions simplify site development and reduce the need to hand-edit `.php` array files. Its potential for structural damage, however, is significant.
+**`_admin`** serves a single (!) developer. Login happens via a hardcoded `PASSWORD_HASH` constant, defined directly in the file. Its functions simplify site development and reduce the need to hand-edit `.php` array files. Its potential for structural damage, however, is significant.
 
-_admin serves the site administrators/operators. Multiple admin accounts can be created (via _dev) with different permissions. The backup system provides basic safeguarding.
+_editor serves the site administrators/operators. Multiple admin accounts can be created (via _admin) with different permissions. The backup system provides basic safeguarding.
 
-**`_dev` is deliberately decoupled from `config.php`**
-Logging in and using `_dev` works independently of `config.php`. That way a backup can be restored even if `config.php` itself is broken.
+**`_admin` is deliberately decoupled from `config.php`**
+Logging in and using `_admin` works independently of `config.php`. That way a backup can be restored even if `config.php` itself is broken.
 
 ### The Backup
-Once development is done, the backup can be enabled via `config.php`'s `/nino/admin/backups`. That creates a backup once a day on `_admin` login. `Admin\Backup::maybeRun()` tars+gzips every file the admin panel can write to at runtime,
+Once development is done, the backup can be enabled via `config.php`'s `/nino/editor/backups`. That creates a backup once a day on `_editor` login. `Admin\Backup::maybeRun()` tars+gzips every file the admin panel can write to at runtime,
   encrypts it (AES-256-GCM), and writes it under a one-time random
-  directory name inside `_admin/`. Backups rotate every 14 days. The file itself has a `.php` extension with a self-terminating stub `<?php http_response_code(403); exit; return '<base64-payload>';` — so a direct HTTP request can't read it.
+  directory name inside `_editor/`. Backups rotate every 14 days. The file itself has a `.php` extension with a self-terminating stub `<?php http_response_code(403); exit; return '<base64-payload>';` — so a direct HTTP request can't read it.
 `Dev\Restore` reads `Backup`'s own output independently — it discovers the
-  backup directory via a filesystem glob pattern and keeps its own copy of the decryption key in `_dev/.restore-key.php`. Every restore first takes an independent safety snapshot of the *current* state.
+  backup directory via a filesystem glob pattern and keeps its own copy of the decryption key in `_admin/.restore-key.php`. Every restore first takes an independent safety snapshot of the *current* state.
 
 A user guide for both applications lives here:
-[_admin Handbook](_admin.md) · [_dev Handbook](_dev.md)
+[_editor Handbook](_editor.md) · [_admin Handbook](_admin.md)
 
 ## Testing
 
@@ -572,8 +572,8 @@ runs against an isolated sandbox directory under
 
 ```
 tests/kernel-smoke.php    Kernel: AppData, Filesystem, Auth, Http, Locales, Images, Csrf, Mail, Newsletter, ...
-tests/admin-smoke.php     _admin/Admin.php: Elements, Text, Users, Images, Backup, Logs, Submissions
-tests/dev-smoke.php       _dev/Dev.php: ElementTypes, Restore, rate limiting
+tests/admin-smoke.php     _editor/Editor.php: Elements, Text, Users, Images, Backup, Logs, Submissions
+tests/dev-smoke.php       _admin/Admin.php: ElementTypes, Restore, rate limiting
 ```
 
 Run with `php tests/kernel-smoke.php` etc. — currently 513
@@ -620,25 +620,25 @@ The shortest real path from an empty checkout to a deployed, working
 site:
 
 1. **Routing works locally.** `php -S 127.0.0.1:8000 router.php` —
-   the bundled `router.php` dispatches `/_admin/*`/`/_dev/*` to
+   the bundled `router.php` dispatches `/_editor/*`/`/_admin/*` to
    their own entry points and lets `.cache/`/`.demo/` through as static
-   files; without it, `/_admin` and `/_dev` 404 on the built-in
+   files; without it, `/_editor` and `/_admin` 404 on the built-in
    server.
-2. **Set a real `_dev` password:** `php _dev/Dev.php <your
-   password>` → paste the printed hash into `_dev/Dev.php`'s
+2. **Set a real `_admin` password:** `php _admin/Admin.php <your
+   password>` → paste the printed hash into `_admin/Admin.php`'s
    `PASSWORD_HASH` constant. The shipped placeholder matches no real
    password, so nothing past it is reachable before this is set.
-3. **Create the first admin account** under `/_dev` → "Users",
+3. **Create the first admin account** under `/_admin` → "Users",
    with the manager checkbox ticked — the first real write to `config.php`'s
    `/nino/auth/user`.
 4. **Define the route** in `config.php`'s `/nino/http/routes` (by
-   hand, or via `/_dev` → "Config"):
+   hand, or via `/_admin` → "Config"):
    ```php
    'GET://about' => [ 'uri' => '/about', 'body' => '[template /templates/page-about]' ],
    ```
-5. **Create an element type** under `/_dev` → "Element Types" for
+5. **Create an element type** under `/_admin` → "Element Types" for
    every kind of recurring content the site needs.
-6. **Prepare an image slot** under `/_dev` → "Images" for anything
+6. **Prepare an image slot** under `/_admin` → "Images" for anything
    the template should later let admins swap out without a code
    change.
 7. **Write the template**, using the textfills, element type and
@@ -654,9 +654,9 @@ site:
      behind a TLS-terminating reverse proxy (where
      `$_SERVER['HTTPS']` typically isn't set, even over an HTTPS
      connection)
-   - decide on `/nino/admin/backups`/`/nino/admin/logs`
+   - decide on `/nino/editor/backups`/`/nino/editor/logs`
 9. **Go live** — point the webserver at the project root,
-   verify that `/_admin` actually renders a login page
+   verify that `/_editor` actually renders a login page
    (no 404, no raw PHP source), then work through
    `docs/admin.md`'s go-live checklist, including running all three
    test suites against the deployed `config.php`.

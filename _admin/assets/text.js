@@ -2,14 +2,17 @@
 
 /**
  *	Nino										A compact filesystembased php framework
- *	Modules									Optional modules
- *	Nino										Framework
- *	text.js									Admin "Text" panel: browse text-key categories (grouped by
- *													the key's first path segment), then edit every key of a
- *													category at once - a locale switch at the top plus every
- *													global/locale field below, same shape as the Elements form.
- *													The set of keys is developer-owned (see /text/blacklist.php) -
- *													this only ever edits existing key values, no create/delete.
+ *	Dev											"Text" module: browse text-key categories (grouped by the
+ *													key's first path segment, same as _editor's Text panel) and
+ *													bulk-edit every key of a category's value(s) - global fields
+ *													always, per-locale fields behind a locale switcher. Unlike
+ *													_editor, also shows blacklisted keys and lets each key's
+ *													key/global/per-locale shape/blacklist status be changed or
+ *													the key deleted entirely, all inline (the "set" half - see
+ *													Dev\Text's class docblock) - and a "New text key"
+ *													action to create one. Full CRUD, deliberately not just a
+ *													copy of _editor's values-only editor - during active
+ *													development that's one less reason to switch tabs.
  *
  *	@package								Dape/Nino
  *	@author									David Perchermeier <mail@dape.io>
@@ -29,10 +32,11 @@
 		_localeValues		: {},
 		_htmlEditors		: {},
 		_fieldEls				: {},
+		_isNew					: false,
 		_ready					: false,
 
 		/**
-		 *	Load every editable key, group them and render the category list
+		 *	Load every known text key, group them and render the category list
 		 *
 		 *	@return		void
 		 */
@@ -41,32 +45,20 @@
 			if( dc.getElementById('text-list') === null )
 				return;
 
-			Nino.admin.text._apiCall( 'keys', {}, function( status, response ) {
+			Nino.admin.text._apiCall( 'list', {}, function( status, response ) {
 				if( status !== 200 || response === null )
 					return Nino.admin.text._showError( dc.getElementById('text-list'), status, response );
 
-				// Capture the hash before any _show*() call below can overwrite it -
-				// _showList() would otherwise wipe the deep-link part it's trying to restore
-				const hash = Nino.admin.router.current();
-
 				Nino.admin.text._locales = response.locales;
-				Nino.admin.sessionLocale.init( response.selectedLocale );
-				Nino.admin.text._groups = Nino.admin.text._groupEntries( response.keys );
+				Nino.admin.text._groups 	= Nino.admin.text._groupEntries( response.keys );
 				Nino.admin.text._renderCategoryList();
+				Nino.admin.text._showList();
 				Nino.admin.text._ready 	= true;
-
-				if( hash.panel === 'text' && hash.parts.length > 0 && Nino.admin.text._groups[hash.parts[0]] !== undefined )
-					Nino.admin.text._openGroup( hash.parts[0] );
-				else
-					Nino.admin.text._showList();
 			} );
 		},
 
 		/**
-		 *	Re-apply whatever drill-down level this panel is currently on -
-		 *	called when the user switches TO this tab, so the hash (only ever
-		 *	written by router.set() while this panel is the visible one) gets
-		 *	synced to reality instead of staying stale from before the switch
+		 *	Re-show whichever level (list or form) is currently on
 		 *
 		 *	@return		void
 		 */
@@ -82,9 +74,9 @@
 		},
 
 		/**
-		 *	Call a text/* admin action - see elements.js for why /_admin/ (trailing slash)
+		 *	Call a devtext/* dev action
 		 *
-		 *	@param		{string}		endpoint			Action name (eg. "savebatch", becomes "text/savebatch")
+		 *	@param		{string}		endpoint			Action name (eg. "list", becomes "devtext/list")
 		 *	@param		{Object}		payload				Request payload, sent json-encoded as "data"
 		 *	@param		{Function}	callback			Called with ( xhr.status, xhr.responseJSON )
 		 *
@@ -93,15 +85,15 @@
 		_apiCall : function( endpoint, payload, callback ) {
 			Nino.http.sendRequest( '/_admin/', 'POST', function( xhr ) {
 				callback( xhr.status, xhr.responseJSON );
-			}, { action : 'text/'+ endpoint, data : JSON.stringify( payload ) } );
+			}, { action : 'devtext/'+ endpoint, data : JSON.stringify( payload ) } );
 		},
 
 		/**
 		 *	Show a failed request's status/error in a container
 		 *
-		 *	@param		{Element}		container			Element to render the error into
-		 *	@param		{number}		status				Xhr status code
-		 *	@param		{*}					response			Parsed response body, if any
+		 *	@param		{Element}		container
+		 *	@param		{number}		status
+		 *	@param		{*}					response
 		 *
 		 *	@return		void
 		 */
@@ -109,32 +101,24 @@
 			container.innerHTML = '';
 			const p = dc.createElement('p');
 			p.className = 'admin-error';
-			p.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : Nino.content.getText('/_admin/text/error/load') );
+			p.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : 'Failed to load.' );
 			container.appendChild( p );
 		},
 
-		/**
-		 *	Drill-down navigation: category list -> category form. The main
-		 *	System/Texte/Elemente bar stays visible throughout.
-		 *
-		 *	@return		void
-		 */
 		_showList : function() {
 			dc.getElementById('text-list').classList.remove('admin-hidden');
 			dc.getElementById('text-form').classList.add('admin-hidden');
-			Nino.admin.router.set( 'text', [] );
 		},
 
 		_showForm : function() {
 			dc.getElementById('text-list').classList.add('admin-hidden');
 			dc.getElementById('text-form').classList.remove('admin-hidden');
-			Nino.admin.router.set( 'text', [ Nino.admin.text._currentGroup ] );
 		},
 
 		/**
 		 *	Group key entries by the first path segment (eg. "/home/welcome/h2" -> "home")
 		 *
-		 *	@param		{Array}		entries				List of key entries (see Text::apiKeys())
+		 *	@param		{Array}		entries				List of key entries (see Text::_entries())
 		 *
 		 *	@return		{Object}									group name -> entries[]
 		 */
@@ -162,7 +146,7 @@
 
 		/**
 		 *	Build a group's "(N) preview, preview, .." description, matching
-		 *	the Elements type list's description style
+		 *	_editor's Text panel and _admin's own Element-type list style
 		 *
 		 *	@param		{Array}		entries
 		 *
@@ -175,125 +159,7 @@
 		},
 
 		/**
-		 *	Build the "Übersetzung" toolbar: export a locale's raw file
-		 *	content as JSON (round-trip it through an external LLM by hand),
-		 *	then paste the translated JSON back in for a target locale. See
-		 *	Admin\Text::apiExport()/apiImport() for the actual read/write -
-		 *	this only builds the request and downloads/shows the result
-		 *
-		 *	@return		{Element}
-		 */
-		_renderTranslateTools : function() {
-
-			const wrap = dc.createElement('div');
-			wrap.id = 'text-translate-tools';
-
-			const buildLocaleSelect = function() {
-				const select = dc.createElement('select');
-				Nino.admin.text._locales.forEach( function( locale ) {
-					const opt = dc.createElement('option');
-					opt.value = locale;
-					opt.textContent = locale;
-					select.appendChild( opt );
-				} );
-				select.value = Nino.admin.sessionLocale.current ?? Nino.admin.text._locales[0] ?? '';
-				return select;
-			};
-
-			// Export
-			const exportRow = dc.createElement('div');
-			exportRow.className = 'text-translate-row';
-
-			const exportSelect = buildLocaleSelect();
-			exportRow.appendChild( exportSelect );
-
-			const exportBtn = dc.createElement('button');
-			exportBtn.type = 'button';
-			exportBtn.textContent = 'Als JSON exportieren';
-			exportBtn.addEventListener( 'click', function() {
-				Nino.admin.text._apiCall( 'export', { locale : exportSelect.value }, function( status, response ) {
-					if( status !== 200 || response === null )
-						return;
-					const json = JSON.stringify( response.content, null, 2 );
-					const blob = new Blob( [ json ], { type : 'application/json;charset=utf-8;' } );
-					const url = URL.createObjectURL( blob );
-					const a = dc.createElement('a');
-					a.href = url;
-					a.download = 'text-'+ exportSelect.value+ '.json';
-					dc.body.appendChild( a );
-					a.click();
-					a.remove();
-					URL.revokeObjectURL( url );
-				} );
-			} );
-			exportRow.appendChild( exportBtn );
-
-			wrap.appendChild( exportRow );
-
-			// Import
-			const importRow = dc.createElement('div');
-			importRow.className = 'text-translate-row';
-
-			const importSelect = buildLocaleSelect();
-			importRow.appendChild( importSelect );
-
-			const importArea = dc.createElement('textarea');
-			importArea.id = 'text-import-area';
-			importArea.placeholder = 'Übersetztes JSON hier einfügen ...';
-			importRow.appendChild( importArea );
-
-			const importResult = dc.createElement('span');
-			importResult.id = 'text-import-result';
-
-			const importBtn = dc.createElement('button');
-			importBtn.type = 'button';
-			importBtn.textContent = 'Importieren';
-			importBtn.addEventListener( 'click', function() {
-
-				let content;
-				try {
-					content = JSON.parse( importArea.value );
-				} catch(e) {
-					importResult.textContent = 'Ungültiges JSON.';
-					importResult.className = 'text-import-error';
-					return;
-				}
-
-				Nino.admin.text._apiCall( 'import', { locale : importSelect.value, content : content }, function( status, response ) {
-					if( status !== 200 || response === null ) {
-						importResult.textContent = ( response && response.error ) ? response.error : 'Fehler beim Import.';
-						importResult.className = 'text-import-error';
-						return;
-					}
-					importResult.textContent = response.imported+ ' importiert, '+ response.skipped+ ' übersprungen.';
-					importResult.className = 'text-import-success';
-					importArea.value = '';
-
-					// Re-fetch so the editor (previews, per-key values) reflects what
-					// was just imported - delayed so _renderCategoryList()'s rebuild
-					// (which replaces this whole toolbar, importResult included)
-					// doesn't wipe the success message before it's even been read
-					setTimeout( function() {
-						Nino.admin.text._apiCall( 'keys', {}, function( status, response ) {
-							if( status !== 200 || response === null )
-								return;
-							Nino.admin.text._locales = response.locales;
-							Nino.admin.text._groups 	= Nino.admin.text._groupEntries( response.keys );
-							Nino.admin.text._renderCategoryList();
-						} );
-					}, 2000 );
-				} );
-			} );
-			importRow.appendChild( importBtn );
-			importRow.appendChild( importResult );
-
-			wrap.appendChild( importRow );
-
-			return wrap;
-		},
-
-		/**
-		 *	Render the category list, styled the same as the Elements type list
+		 *	Render the category list, plus an "add new key" action below it
 		 *
 		 *	@return		void
 		 */
@@ -302,26 +168,24 @@
 			const wrap = dc.getElementById('text-list');
 			wrap.innerHTML = '';
 
-			wrap.appendChild( Nino.admin.text._renderTranslateTools() );
-
 			Object.keys( Nino.admin.text._groups ).sort().forEach( function( group ) {
 
 				const entries = Nino.admin.text._groups[group];
 
 				const btn = dc.createElement('div');
-				btn.className = 'admin-type-btn';
+				btn.className = 'editor-type-btn';
 				btn.dataset.group = group;
 
 				const titleWrap = dc.createElement('div');
 				titleWrap.textContent = group;
 
 				const descr = dc.createElement('div');
-				descr.className = 'admin-type-btn-descr';
+				descr.className = 'editor-type-btn-descr';
 				descr.textContent = Nino.admin.text._groupDescr( entries );
 				titleWrap.appendChild( descr );
 
 				const chev = dc.createElement('span');
-				chev.className = 'admin-view-button-chev';
+				chev.className = 'editor-view-button-chev';
 				chev.setAttribute( 'aria-hidden', 'true' );
 				chev.textContent = '›';
 
@@ -331,6 +195,20 @@
 
 				wrap.appendChild( btn );
 			} );
+
+			const addBtn = dc.createElement('button');
+			addBtn.type = 'button';
+			addBtn.className = 'editor-list-action';
+			addBtn.textContent = 'New text key';
+			addBtn.addEventListener( 'click', function() { Nino.admin.text._openNewKeyForm() } );
+			wrap.appendChild( addBtn );
+
+			const scanBtn = dc.createElement('button');
+			scanBtn.type = 'button';
+			scanBtn.className = 'editor-list-action';
+			scanBtn.textContent = 'Scan templates for missing keys';
+			scanBtn.addEventListener( 'click', function() { Nino.admin.text._openScanForm() } );
+			wrap.appendChild( scanBtn );
 		},
 
 		/**
@@ -344,8 +222,9 @@
 
 			Nino.admin.text._destroyHtmlEditors();
 
+			Nino.admin.text._isNew 					= false;
 			Nino.admin.text._currentGroup 	= group;
-			Nino.admin.text._selectedLocale = Nino.admin.sessionLocale.current ?? Nino.admin.text._locales[0] ?? '';
+			Nino.admin.text._selectedLocale = Nino.admin.text._locales[0] ?? '';
 			Nino.admin.text._localeValues 	= {};
 			Nino.admin.text._fieldEls 			= {};
 
@@ -354,59 +233,165 @@
 		},
 
 		/**
-		 *	Render one key as a labeled field, html-editor or textarea+counter
-		 *	depending on the entry, matching elements.js's field styling
+		 *	Render one key as a labeled value field (html-editor or
+		 *	textarea+counter), plus its global/ausgeblendet schema toggles
 		 *
 		 *	@param		{Object}	entry					Key entry
 		 *	@param		{*}				value					Current value
 		 *
-		 *	@return		{Element}								<label> wrapping the field
+		 *	@return		{Element}								<div> wrapping the field + its schema toggles
 		 */
 		_renderKeyField : function( entry, value ) {
 
-			const label = dc.createElement('label');
-			label.className = 'admin-field';
-
-			if( entry.html === true ) {
-				const span = dc.createElement('span');
-				span.textContent = '[[' + entry.key + ']]';
-				label.appendChild( span );
-				const mount = dc.createElement('div');
-				label.appendChild( mount );
-				Nino.admin.text._htmlEditors[entry.key] = Nino.admin.htmlEditor.create( mount, value ?? '', entry.maxlength );
-				return label;
-			}
-
-			const textarea = dc.createElement('textarea');
-			textarea.maxLength = entry.maxlength;
-			textarea.value = value ?? '';
-			Nino.admin.text._fieldEls[entry.key] = textarea;
+			const wrap = dc.createElement('div');
+			wrap.className = 'editor-field';
 
 			const header = dc.createElement('div');
-			header.className = 'admin-field-header';
+			header.className = 'editor-field-header';
 
-			const nameSpan = dc.createElement('span');
-			nameSpan.className = 'admin-field-name';
-			nameSpan.textContent = '[[' + entry.key + ']]';
-			header.appendChild( nameSpan );
+			const keyInput = dc.createElement('input');
+			keyInput.type = 'text';
+			keyInput.className = 'admin-text-key-input';
+			keyInput.value = entry.key;
+			header.appendChild( keyInput );
 
-			const counter = dc.createElement('span');
-			counter.className = 'char-counter';
+			const renameBtn = dc.createElement('button');
+			renameBtn.type = 'button';
+			renameBtn.className = 'admin-text-key-btn';
+			renameBtn.textContent = 'Rename';
+			renameBtn.addEventListener( 'click', function() { Nino.admin.text._renameKey( entry.key, keyInput.value ) } );
+			header.appendChild( renameBtn );
 
-			function updateCounter() {
-				const len = textarea.value.length;
-				counter.textContent = len + ' / ' + entry.maxlength;
-				counter.classList.toggle( 'char-counter-limit', len >= entry.maxlength );
+			const deleteBtn = dc.createElement('button');
+			deleteBtn.type = 'button';
+			deleteBtn.className = 'admin-text-key-btn admin-danger-btn';
+			deleteBtn.textContent = 'Delete';
+			deleteBtn.addEventListener( 'click', function() { Nino.admin.text._deleteKey( entry.key ) } );
+			header.appendChild( deleteBtn );
+
+			wrap.appendChild( header );
+
+			if( entry.html === true ) {
+				const mount = dc.createElement('div');
+				wrap.appendChild( mount );
+				Nino.admin.text._htmlEditors[entry.key] = Nino.editor.htmlEditor.create( mount, value ?? '', entry.maxlength );
+			} else {
+				const textarea = dc.createElement('textarea');
+				textarea.maxLength = entry.maxlength;
+				textarea.value = value ?? '';
+				Nino.admin.text._fieldEls[entry.key] = textarea;
+
+				const counter = dc.createElement('span');
+				counter.className = 'char-counter';
+
+				function updateCounter() {
+					const len = textarea.value.length;
+					counter.textContent = len + ' / ' + entry.maxlength;
+					counter.classList.toggle( 'char-counter-limit', len >= entry.maxlength );
+				}
+
+				textarea.addEventListener( 'input', updateCounter );
+				updateCounter();
+
+				header.appendChild( counter );
+				wrap.appendChild( textarea );
 			}
 
-			textarea.addEventListener( 'input', updateCounter );
-			updateCounter();
+			const schemaWrap = dc.createElement('div');
+			schemaWrap.className = 'admin-text-schema';
 
-			header.appendChild( counter );
-			label.appendChild( header );
-			label.appendChild( textarea );
+			const globalLabel = dc.createElement('label');
+			const globalCheck = dc.createElement('input');
+			globalCheck.type = 'checkbox';
+			globalCheck.checked = entry.global;
+			globalCheck.addEventListener( 'change', function() {
+				Nino.admin.text._saveSchema( entry.key, globalCheck.checked, blacklistCheck.checked );
+			} );
+			globalLabel.appendChild( globalCheck );
+			globalLabel.appendChild( dc.createTextNode(' Global') );
+			schemaWrap.appendChild( globalLabel );
 
-			return label;
+			const blacklistLabel = dc.createElement('label');
+			const blacklistCheck = dc.createElement('input');
+			blacklistCheck.type = 'checkbox';
+			blacklistCheck.checked = entry.blacklisted;
+			blacklistCheck.addEventListener( 'change', function() {
+				Nino.admin.text._saveSchema( entry.key, globalCheck.checked, blacklistCheck.checked );
+			} );
+			blacklistLabel.appendChild( blacklistCheck );
+			blacklistLabel.appendChild( dc.createTextNode(' Hidden (in _editor)') );
+			schemaWrap.appendChild( blacklistLabel );
+
+			wrap.appendChild( schemaWrap );
+
+			return wrap;
+		},
+
+		/**
+		 *	Persist a key's global/blacklisted shape immediately (fires on
+		 *	toggling either checkbox) - reloads the whole module afterwards
+		 *	since a shape change moves the key between groups' locale/global
+		 *	fieldsets, which the currently-open form can no longer represent
+		 *
+		 *	@param		{string}	key
+		 *	@param		{boolean}	isGlobal
+		 *	@param		{boolean}	blacklisted
+		 *
+		 *	@return		void
+		 */
+		_saveSchema : function( key, isGlobal, blacklisted ) {
+			Nino.admin.text._apiCall( 'save', { key : key, global : isGlobal, blacklisted : blacklisted }, function( status, response ) {
+				if( status !== 200 || response === null ) {
+					wn.alert( '('+ status+ ') '+ ( ( response && response.error ) ? response.error : 'Failed to save.' ) );
+					return;
+				}
+				Nino.admin.text.init();
+			} );
+		},
+
+		/**
+		 *	Rename a key - reloads the whole module afterwards since a
+		 *	rename can move the key into a different category (its first
+		 *	path segment may have changed)
+		 *
+		 *	@param		{string}	key
+		 *	@param		{string}	newKey
+		 *
+		 *	@return		void
+		 */
+		_renameKey : function( key, newKey ) {
+
+			if( newKey === key )
+				return;
+
+			Nino.admin.text._apiCall( 'rename', { key : key, newKey : newKey }, function( status, response ) {
+				if( status !== 200 || response === null ) {
+					wn.alert( '('+ status+ ') '+ ( ( response && response.error ) ? response.error : 'Failed to rename.' ) );
+					return;
+				}
+				Nino.admin.text.init();
+			} );
+		},
+
+		/**
+		 *	Delete a key entirely, after confirmation
+		 *
+		 *	@param		{string}	key
+		 *
+		 *	@return		void
+		 */
+		_deleteKey : function( key ) {
+
+			if( wn.confirm( 'Really delete text key "'+ key+ '"? The value is lost in every language.' ) === false )
+				return;
+
+			Nino.admin.text._apiCall( 'delete', { key : key }, function( status, response ) {
+				if( status !== 200 || response === null ) {
+					wn.alert( '('+ status+ ') '+ ( ( response && response.error ) ? response.error : 'Failed to delete.' ) );
+					return;
+				}
+				Nino.admin.text.init();
+			} );
 		},
 
 		/**
@@ -426,8 +411,8 @@
 		},
 
 		/**
-		 *	Destroy every currently mounted html-editor instance (both global
-		 *	and locale-scoped) - call before tearing down the group form
+		 *	Destroy every currently mounted html-editor instance - call
+		 *	before tearing down the group form
 		 *
 		 *	@return		void
 		 */
@@ -485,8 +470,8 @@
 		},
 
 		/**
-		 *	Render the category's bulk-edit form: global fields, then a locale
-		 *	select + locale-scoped fields, same shape as the Elements form
+		 *	Render the category's bulk-edit form: global fields, then a
+		 *	locale select + locale-scoped fields
 		 *
 		 *	@return		void
 		 */
@@ -504,7 +489,7 @@
 			const backLink = dc.createElement('a');
 			backLink.href = '#';
 			backLink.className = 'back-link';
-			backLink.textContent = Nino.content.getText('/_admin/text/label/back');
+			backLink.textContent = 'Back to list';
 			backLink.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.text._destroyHtmlEditors(); Nino.admin.text._showList() } );
 			wrap.appendChild( backLink );
 
@@ -521,7 +506,7 @@
 				const globalWrap = dc.createElement('fieldset');
 				globalWrap.id = 'text-form-global';
 				const legend = dc.createElement('legend');
-				legend.textContent = Nino.content.getText('/_admin/elements/label/global');
+				legend.textContent = 'Global';
 				globalWrap.appendChild( legend );
 
 				globalEntries.forEach( function( entry ) {
@@ -536,7 +521,7 @@
 				const localeWrap = dc.createElement('fieldset');
 				localeWrap.id = 'text-form-locale';
 				const legend = dc.createElement('legend');
-				legend.textContent = Nino.content.getText('/_admin/elements/label/locale');
+				legend.textContent = 'Per language';
 				localeWrap.appendChild( legend );
 
 				const select = dc.createElement('select');
@@ -551,7 +536,6 @@
 				select.addEventListener( 'change', function() {
 					Nino.admin.text._storeVisibleLocaleFields();
 					Nino.admin.text._selectedLocale = select.value;
-					Nino.admin.sessionLocale.set( select.value );
 					Nino.admin.text._renderLocaleFields();
 				} );
 				localeWrap.appendChild( select );
@@ -564,11 +548,11 @@
 			}
 
 			const actions = dc.createElement('div');
-			actions.className = 'admin-form-actions';
+			actions.className = 'editor-form-actions';
 
 			const saveBtn = dc.createElement('button');
 			saveBtn.type = 'submit';
-			saveBtn.textContent = Nino.content.getText('/_admin/text/label/save');
+			saveBtn.textContent = 'Save';
 			actions.appendChild( saveBtn );
 
 			const msg = dc.createElement('p');
@@ -585,10 +569,10 @@
 		},
 
 		/**
-		 *	Save every key of the current category (global fields always, plus
-		 *	the currently selected locale's fields) in one batched request.
-		 *	Deliberately does not navigate back to the list afterwards - only
-		 *	refreshes its preview.
+		 *	Save every key's value of the current category (global fields
+		 *	always, plus the currently selected locale's fields) in one
+		 *	batched request. Deliberately does not navigate back to the
+		 *	list afterwards - only refreshes its preview.
 		 *
 		 *	@return		void
 		 */
@@ -611,12 +595,12 @@
 				items.push( { key : entry.key, locale : Nino.admin.text._selectedLocale, value : localeValues[entry.key] ?? '' } );
 			} );
 
-			msg.textContent = Nino.content.getText('/_admin/text/msg/pending');
+			msg.textContent = 'Saving …';
 
 			Nino.admin.text._apiCall( 'savebatch', { items : items }, function( status, response ) {
 
 				if( status !== 200 || response === null ) {
-					msg.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : Nino.content.getText('/_admin/text/error/save') );
+					msg.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : 'Failed to save.' );
 					return;
 				}
 
@@ -637,11 +621,276 @@
 				} );
 
 				msg.textContent = ( failed.length === 0 )
-					? Nino.content.getText('/_admin/text/msg/saved')
-					: Nino.content.getText('/_admin/text/error/save')+ ' ('+ failed.join(', ')+ ')';
+					? 'Gespeichert.'
+					: 'Fehler beim Speichern ('+ failed.join(', ')+ ')';
 
 				Nino.admin.text._renderCategoryList();
 			} );
+		},
+
+		/**
+		 *	Open the "create a new key" form
+		 *
+		 *	@return		void
+		 */
+		_openNewKeyForm : function() {
+			Nino.admin.text._isNew = true;
+			Nino.admin.text._renderNewKeyForm();
+			Nino.admin.text._showForm();
+		},
+
+		/**
+		 *	Render the "create a new key" form: key, global toggle, initial value
+		 *
+		 *	@return		void
+		 */
+		_renderNewKeyForm : function() {
+
+			const wrap = dc.getElementById('text-form');
+			wrap.innerHTML = '';
+
+			const backLink = dc.createElement('a');
+			backLink.href = '#';
+			backLink.className = 'back-link';
+			backLink.textContent = 'Back to list';
+			backLink.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.text._showList() } );
+			wrap.appendChild( backLink );
+
+			const form = dc.createElement('form');
+
+			const keyLabel = dc.createElement('label');
+			keyLabel.className = 'editor-field';
+			const keySpan = dc.createElement('span');
+			keySpan.textContent = 'Key (eg. /home/welcome/subtitle)';
+			keyLabel.appendChild( keySpan );
+			const keyInput = dc.createElement('input');
+			keyInput.type = 'text';
+			keyInput.id = 'text-form-key';
+			keyInput.required = true;
+			keyLabel.appendChild( keyInput );
+			form.appendChild( keyLabel );
+
+			const globalLabel = dc.createElement('label');
+			const globalCheck = dc.createElement('input');
+			globalCheck.type = 'checkbox';
+			globalCheck.id = 'text-form-new-global';
+			globalLabel.appendChild( globalCheck );
+			globalLabel.appendChild( dc.createTextNode(' Global (one translation for all languages, instead of one per language)') );
+			form.appendChild( globalLabel );
+
+			const valueLabel = dc.createElement('label');
+			valueLabel.className = 'editor-field';
+			const valueSpan = dc.createElement('span');
+			valueSpan.textContent = 'Initial value (for global, or as a starting point for every language)';
+			valueLabel.appendChild( valueSpan );
+			const valueInput = dc.createElement('input');
+			valueInput.type = 'text';
+			valueInput.id = 'text-form-new-value';
+			valueLabel.appendChild( valueInput );
+			form.appendChild( valueLabel );
+
+			const msg = dc.createElement('p');
+			msg.id = 'text-form-msg';
+			form.appendChild( msg );
+
+			const saveBtn = dc.createElement('button');
+			saveBtn.type = 'submit';
+			saveBtn.textContent = 'Create';
+			form.appendChild( saveBtn );
+
+			form.addEventListener( 'submit', function( ev ) { ev.preventDefault(); Nino.admin.text._saveNewKey() } );
+
+			wrap.appendChild( form );
+		},
+
+		/**
+		 *	Create the new key currently in the form
+		 *
+		 *	@return		void
+		 */
+		_saveNewKey : function() {
+
+			const msg 		= dc.getElementById('text-form-msg');
+			const key 		= dc.getElementById('text-form-key').value;
+			const isGlobal = dc.getElementById('text-form-new-global').checked;
+			const value 	= dc.getElementById('text-form-new-value').value;
+
+			msg.textContent = 'Saving …';
+
+			Nino.admin.text._apiCall( 'create', { key : key, global : isGlobal, value : value }, function( status, response ) {
+				if( status !== 200 || response === null ) {
+					msg.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : 'Failed to save.' );
+					return;
+				}
+				Nino.admin.text.init();
+			} );
+		},
+
+		/**
+		 *	Open the "missing keys found in templates" scan results form -
+		 *	see Dev\Text::apiScan()
+		 *
+		 *	@return		void
+		 */
+		_openScanForm : function() {
+
+			const wrap = dc.getElementById('text-form');
+			wrap.innerHTML = '';
+
+			const backLink = dc.createElement('a');
+			backLink.href = '#';
+			backLink.className = 'back-link';
+			backLink.textContent = 'Back to list';
+			backLink.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.text._showList() } );
+			wrap.appendChild( backLink );
+
+			const title = dc.createElement('div');
+			title.className = 'main-title';
+			title.textContent = 'Scan templates for missing keys';
+			wrap.appendChild( title );
+
+			const msg = dc.createElement('p');
+			msg.id = 'text-scan-msg';
+			msg.textContent = 'Scanning …';
+			wrap.appendChild( msg );
+
+			Nino.admin.text._showForm();
+
+			Nino.admin.text._apiCall( 'scan', {}, function( status, response ) {
+				if( status !== 200 || response === null ) {
+					msg.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : 'Scan failed.' );
+					return;
+				}
+				Nino.admin.text._renderScanForm( response.missing );
+			} );
+		},
+
+		/**
+		 *	Render the scan results: one row per missing key (starting-value
+		 *	input + "Ignore" toggle), a submit button that creates every
+		 *	non-ignored one via the existing devtext/create action - the
+		 *	same "one starting value, copied into every language" semantics
+		 *	_openNewKeyForm() already uses, since the value is just a
+		 *	starting point to be translated later (see _editor's JSON export/
+		 *	import round-trip)
+		 *
+		 *	@param		{Array}		missing				[ { key, files[] }, ... ]
+		 *
+		 *	@return		void
+		 */
+		_renderScanForm : function( missing ) {
+
+			const wrap = dc.getElementById('text-form');
+			wrap.innerHTML = '';
+
+			const backLink = dc.createElement('a');
+			backLink.href = '#';
+			backLink.className = 'back-link';
+			backLink.textContent = 'Back to list';
+			backLink.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.text._showList() } );
+			wrap.appendChild( backLink );
+
+			const title = dc.createElement('div');
+			title.className = 'main-title';
+			title.textContent = 'Scan templates for missing keys';
+			wrap.appendChild( title );
+
+			if( missing.length === 0 ) {
+				const p = dc.createElement('p');
+				p.textContent = 'No missing keys found - every [[/key]] referenced in templates/*.tpl is already defined.';
+				wrap.appendChild( p );
+				return;
+			}
+
+			const form = dc.createElement('form');
+			const rows = [];
+
+			missing.forEach( function( item ) {
+
+				const field = dc.createElement('div');
+				field.className = 'editor-field';
+
+				const span = dc.createElement('span');
+				span.textContent = item.key+ '  ('+ item.files.join(', ')+ ')';
+				field.appendChild( span );
+
+				const valueInput = dc.createElement('input');
+				valueInput.type = 'text';
+				valueInput.placeholder = 'Starting value for every language';
+				field.appendChild( valueInput );
+
+				const ignoreLabel = dc.createElement('label');
+				ignoreLabel.className = 'admin-scan-ignore';
+				const ignoreCheck = dc.createElement('input');
+				ignoreCheck.type = 'checkbox';
+				ignoreLabel.appendChild( ignoreCheck );
+				ignoreLabel.appendChild( dc.createTextNode(' Ignore') );
+				field.appendChild( ignoreLabel );
+
+				form.appendChild( field );
+
+				rows.push( { key : item.key, valueInput : valueInput, ignoreCheck : ignoreCheck } );
+			} );
+
+			const msg = dc.createElement('p');
+			msg.id = 'text-scan-msg';
+			form.appendChild( msg );
+
+			const saveBtn = dc.createElement('button');
+			saveBtn.type = 'submit';
+			saveBtn.textContent = 'Create the non-ignored keys';
+			form.appendChild( saveBtn );
+
+			form.addEventListener( 'submit', function( ev ) { ev.preventDefault(); Nino.admin.text._saveScanResults( rows ) } );
+
+			wrap.appendChild( form );
+		},
+
+		/**
+		 *	Create every non-ignored row's key (see _renderScanForm()), one
+		 *	devtext/create call at a time - simplest way to surface a
+		 *	per-key failure (eg. a duplicate created elsewhere in the
+		 *	meantime) without one bad key silently swallowing the rest
+		 *
+		 *	@param		{Array}		rows					[ { key, valueInput, ignoreCheck }, ... ]
+		 *
+		 *	@return		void
+		 */
+		_saveScanResults : function( rows ) {
+
+			const msg 		= dc.getElementById('text-scan-msg');
+			const pending = rows.filter( function( row ) { return row.ignoreCheck.checked === false } );
+
+			if( pending.length === 0 ) {
+				Nino.admin.text._showList();
+				return;
+			}
+
+			let created = 0;
+			const failed = [];
+
+			function next( i ) {
+
+				if( i >= pending.length ) {
+					if( failed.length > 0 )
+						wn.alert( created+ ' created. Failed: '+ failed.join(', ') );
+					Nino.admin.text.init();
+					return;
+				}
+
+				const row = pending[i];
+				msg.textContent = 'Creating '+ row.key+ ' ('+ (i + 1)+ ' / '+ pending.length+ ') …';
+
+				Nino.admin.text._apiCall( 'create', { key : row.key, global : false, value : row.valueInput.value }, function( status ) {
+					if( status === 200 )
+						created++;
+					else
+						failed.push( row.key );
+					next( i + 1 );
+				} );
+			}
+
+			next( 0 );
 		},
 	};
 

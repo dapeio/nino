@@ -711,7 +711,7 @@ check( 'neither rejected submission created the form data file', is_file( \Nino\
 
 $okRequest = submitForm( $appData, [ 'name' => 'Jo Client', 'email' => 'jo@example.com', 'message' => "Line one\nLine two", 'cat' => 'General' ] );
 check( 'a valid submission succeeds (200)', $okRequest['/nino/http/response']['statusCode'] === 200 );
-check( 'a valid submission bootstraps the data dir at the project root, not under _admin', is_dir( \Nino\Filesystem::getPath( $appData ). '/data' ) === true && is_dir( \Nino\Filesystem::getPath( $appData ). '/_admin/data' ) === false );
+check( 'a valid submission bootstraps the data dir at the project root, not under _editor', is_dir( \Nino\Filesystem::getPath( $appData ). '/data' ) === true && is_dir( \Nino\Filesystem::getPath( $appData ). '/_editor/data' ) === false );
 
 $formsDir 	= \Nino\Filesystem::getPath( $appData ). '/data';
 $monthFile 	= $formsDir. '/forms.'. date( 'Y-m' ). '.php';
@@ -781,7 +781,7 @@ check( 'a csrf-blocked signup does not create the newsletter file', is_file( \Ni
 $okNewsletterRequest = submitNewsletter( $appData, [ 'email' => 'jo@example.com' ] );
 check( 'a valid signup succeeds (200)', $okNewsletterRequest['/nino/http/response']['statusCode'] === 200 );
 check( 'a valid new signup reports the generic status', $okNewsletterRequest['/nino/http/response']['body']['status'] === 'ok' );
-check( 'a valid signup bootstraps the newsletter file at the project root, not under _admin', is_file( \Nino\Filesystem::getPath( $appData ). '/data/newsletter.php' ) === true && is_dir( \Nino\Filesystem::getPath( $appData ). '/_admin/data' ) === false );
+check( 'a valid signup bootstraps the newsletter file at the project root, not under _editor', is_file( \Nino\Filesystem::getPath( $appData ). '/data/newsletter.php' ) === true && is_dir( \Nino\Filesystem::getPath( $appData ). '/_editor/data' ) === false );
 
 $subscribersPath 	= '/data/newsletter.php';
 $subscribersFile 	= \Nino\Filesystem::getPath( $appData ). $subscribersPath;
@@ -947,7 +947,7 @@ echo "Http::request/response - header composition, csp, locale redirects\n";
 $appData['/nino/http/routes'] = [
 	'GET://' 						=> [ 'uri' => '/home', 'body' => '' ],
 	'GET://rechtliches'	=> [ 'uri' => '/legal', 'body' => '', 'locale' => 'de_DE' ],
-	// statusCode mirrors a route like GET://_admin declaring its own status -
+	// statusCode mirrors a route like GET://_editor declaring its own status -
 	// exactly the shape that used to swallow the locale-switch redirect below
 	'GET://legal'				=> [ 'uri' => '/legal', 'body' => '', 'locale' => 'en_US', 'statusCode' => 201 ],
 	'GET://robots.txt'	=> [ 'uri' => '/robots.txt', 'body' => '', 'header' => [ 'Content-Type' => 'text/plain; charset=utf-8' ] ],

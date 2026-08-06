@@ -3,19 +3,20 @@ declare(strict_types=1);
 
 /**
  *	Nino								A compact filesystembased php framework
- *	admin-smoke.php		Dependency-free smoke test for the admin backend
- *											(_admin/Admin.php) - the Text editor's blacklist
- *											filtering and html sanitizer in particular, since a
- *											mistake there could leak unsafe markup into the live
- *											site (values are inserted raw, unescaped, via [[key]]
- *											fills). Runs against an isolated sandbox directory,
- *											never touches the real project data.
+ *	admin-smoke.php		Dependency-free smoke test for the developer tooling
+ *											(_admin/Admin.php) - the session gate and the element-type
+ *											editor in particular, since a mistake there could either
+ *											let a save reach a type file it shouldn't, or - worse -
+ *											clobber a type's real content ('*'/locale buckets) while
+ *											only meaning to touch its model. Runs against an isolated
+ *											sandbox directory, never touches the real project data.
  *
- *	Usage: php tests/admin-smoke.php
+ *	Usage: php tests/dev-smoke.php
  */
 
 require __DIR__. '/../_nino/Nino.php';
 require __DIR__. '/../_admin/Admin.php';
+require __DIR__. '/../_editor/Editor.php'; // only for Backup - Restore reads its output, doesn't call into it
 
 $failures = 0;
 $checks		= 0;
@@ -41,903 +42,983 @@ function check( string $label, bool $condition ): void {
 
 set_error_handler( function() { return true; } );
 
-$sandbox = sys_get_temp_dir(). '/nino-admin-smoke-'. uniqid();
+$sandbox = sys_get_temp_dir(). '/nino-dev-smoke-'. uniqid();
 mkdir( $sandbox, 0777, true );
-mkdir( $sandbox. '/text', 0777, true );
+mkdir( $sandbox. '/elements', 0777, true );
 
-// A key already longer than MAX_MAXLENGTH - MAXLENGTH_BUFFER, to prove the computed
-// maxlength is capped at MAX_MAXLENGTH rather than growing past it
-$longValue = str_repeat( 'x', 1900 );
-
-file_put_contents( $sandbox. '/text/global.php', '<?php return [ \'[[/company/name]]\' => \'Acme\', \'[[/website/lang]]\' => \'de\' ];' );
-file_put_contents( $sandbox. '/text/de_DE.php', '<?php return [ \'[[/home/h2]]\' => \'<span>Hallo</span> Welt.\', \'[[/home/plain]]\' => \'Ein Satz.\', \'[[/home/long]]\' => \''. $longValue. '\' ];' );
-file_put_contents( $sandbox. '/text/en_US.php', '<?php return [ \'[[/home/h2]]\' => \'<span>Hi</span> World.\', \'[[/home/plain]]\' => \'A sentence.\' ];' );
-file_put_contents( $sandbox. '/text/blacklist.php', '<?php return [ \'/website/lang\' ];' );
+// A hand-authored-shaped type file (top-level 'title' key, real locale content) -
+// apiSave must only ever touch 'title'/'model', never this real content
+file_put_contents( $sandbox. '/elements/testtype.php', '<?php return [
+	\'title\'	=> \'Test Type\',
+	\'model\'	=> [ \'name\' => [ \'type\' => \'string\', \'locale\' => true ] ],
+	\'*\'			=> [ \'*\' => [] ],
+	\'de_DE\'	=> [ \'item1\' => [ \'name\' => \'Hallo\' ] ],
+];' );
 
 $_SERVER['REMOTE_ADDR'] = '127.0.0.1';
 
 $appData = [ './nino/uid' => $sandbox ];
 \Nino\AppData::prepare( $appData );
-$appData['./nino/filesystem/path']			= $sandbox;
+$appData['./nino/filesystem/path']	= $sandbox;
 // Mirrors \Nino\init()'s default (no NINO_CONFIG_DIR set): configpath falls
 // back to the project root, same as this sandbox's regular path
 $appData['./nino/filesystem/configpath']	= $sandbox;
-$appData['/nino/dir']				= '';
-$appData['/nino/locales/native']				= 'de_DE';
-$appData['/nino/locales/available']			= [ 'de_DE', 'en_US' ];
-$appData['/nino/auth/maxtries']					= 3;
-$appData['/nino/auth/cooldown']					= 3600;
-$appData['/nino/auth/user']							= [];
+$appData['/nino/dir']		= '';
+$appData['/nino/locales/native']		= 'de_DE';
+$appData['/nino/locales/available']	= [ 'de_DE', 'en_US' ];
 
-// '/*' - the main test account throughout this file exercises every module,
-// same shape as config.php's real seeded admin (full access)
-\Nino\Auth::insertUser( $appData, 'admin@example.com', 'correct horse battery staple', [ '/*' ] );
-\Nino\Auth::loginUser( $appData, 'admin@example.com', 'correct horse battery staple' );
+// Config::apiList() reads config.php fresh rather than $appData (see its
+// docblock) - a real deployment always has $appData booted from this file
+// in the first place, so mirror that here instead of only setting $appData
+\Nino\Filesystem::putFileContent( $appData, '/config.php', [
+	'/nino/error/log'					=> false,
+	'/nino/error/display'			=> true,
+	'/nino/locales/native'		=> $appData['/nino/locales/native'],
+	'/nino/locales/available'	=> $appData['/nino/locales/available'],
+	'/nino/html/assets'				=> [],
+	'/nino/http/routes'				=> [],
+] );
 
 echo "Sandbox: $sandbox\n\n";
 
 
-// --- Text::apiKeys ------------------------------------------------------
+// --- Admin::isAuthed / guard / handlePost (login/logout) ------------------
 
-echo "Text::apiKeys\n";
+echo "Admin::isAuthed / guard / handlePost (login/logout)\n";
 
-$request = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Admin\Text::apiKeys( $appData, $request );
-$keys = $request['/nino/http/response']['body']['keys'] ?? [];
+check( 'isAuthed defaults to false', \Nino\Admin\Admin::isAuthed( $appData ) === false );
 
-$byKey = [];
-foreach( $keys as $entry )
-	$byKey[$entry['key']] = $entry;
+$guardRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+check( 'guard rejects an unauthed request', \Nino\Admin\Admin::guard( $appData, $guardRequest ) === false );
+check( 'guard sets a 401', $guardRequest['/nino/http/response']['statusCode'] === 401 );
 
-check( 'blacklisted key is excluded', isset( $byKey['/website/lang'] ) === false );
-check( 'global key is included and flagged global', ( $byKey['/company/name']['global'] ?? null ) === true );
-check( 'locale key is included and flagged non-global', ( $byKey['/home/h2']['global'] ?? null ) === false );
-check( 'a key with existing markup is auto-flagged html', ( $byKey['/home/h2']['html'] ?? null ) === true );
-check( 'a key without markup is not flagged html', ( $byKey['/home/plain']['html'] ?? null ) === false );
-check( 'maxlength is at least the min floor', ( $byKey['/home/plain']['maxlength'] ?? 0 ) >= 150 );
-check( 'maxlength is capped at 2000 for a key already longer than that, not grown past it', ( $byKey['/home/long']['maxlength'] ?? 0 ) === 2000 );
-check( 'Text::apiKeys exposes the session-remembered locale, defaulting to native', ( $request['/nino/http/response']['body']['selectedLocale'] ?? null ) === 'de_DE' );
+$_POST['action']	= 'dev/login';
+$_POST['data']		= json_encode( [ 'password' => 'definitely-the-wrong-password' ] );
+$loginRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Admin\Admin::handlePost( $appData, $loginRequest );
+check( 'a wrong password is rejected', $loginRequest['/nino/http/response']['statusCode'] === 401 );
+check( 'a rejected login never opens the session gate', \Nino\Admin\Admin::isAuthed( $appData ) === false );
 
-echo "\n";
-
-
-// --- Admin::sessionLocale / apiSetLocale --------------------------------------
-
-echo "Admin::sessionLocale / apiSetLocale\n";
-
-check( 'sessionLocale defaults to the native locale before anything is chosen', \Nino\Admin\Admin::sessionLocale( $appData ) === 'de_DE' );
-
-$request = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-$_POST['data'] = json_encode( [ 'locale' => 'not-a-locale' ] );
-\Nino\Admin\Admin::apiSetLocale( $appData, $request );
-check( 'apiSetLocale rejects a locale that is not available', $request['/nino/http/response']['statusCode'] === 400 );
-check( 'sessionLocale is unaffected by the rejected attempt', \Nino\Admin\Admin::sessionLocale( $appData ) === 'de_DE' );
-
-$request = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-$_POST['data'] = json_encode( [ 'locale' => 'en_US' ] );
-\Nino\Admin\Admin::apiSetLocale( $appData, $request );
-check( 'apiSetLocale accepts an available locale', $request['/nino/http/response']['statusCode'] === 200 );
-check( 'sessionLocale now returns the newly chosen locale', \Nino\Admin\Admin::sessionLocale( $appData ) === 'en_US' );
-
-$request = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Admin\Elements::apiTypes( $appData, $request );
-check( 'Elements::apiTypes also exposes the (now updated) session locale', ( $request['/nino/http/response']['body']['selectedLocale'] ?? null ) === 'en_US' );
-
-echo "\n";
-
-
-// --- Text::apiSaveBatch: access control -----------------------------------
-
-echo "Text::apiSaveBatch - access control\n";
-
-/**
- *	Call Text::apiSaveBatch() with a single item, like the real POST /_admin dispatch does
- *
- *	@param		array 		&$appData
- *	@param		array 		$data					[ key, locale, value ]
- *
- *	@return		array										The item's result ( [ ok, value ] or [ ok, error ] )
- */
-function saveText( array &$appData, array $data ): array {
-	$request = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-	$_POST['data'] = json_encode( [ 'items' => [ $data ] ] );
-	\Nino\Admin\Text::apiSaveBatch( $appData, $request );
-	$results = $request['/nino/http/response']['body']['results'] ?? [];
-	return $results[$data['key'] ?? ''] ?? [ 'ok' => false ];
+// 4 more wrong attempts (5 total) should trip the lockout
+for( $i = 0; $i < 4; $i++ ) {
+	$attemptRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+	\Nino\Admin\Admin::handlePost( $appData, $attemptRequest );
 }
+$lockedOutRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Admin\Admin::handlePost( $appData, $lockedOutRequest );
+check( 'the 6th attempt is locked out (429), not just rejected as wrong', $lockedOutRequest['/nino/http/response']['statusCode'] === 429 );
 
-$result = saveText( $appData, [ 'key' => '/website/lang', 'locale' => 'de_DE', 'value' => 'fr' ] );
-check( 'saving a blacklisted key is rejected', $result['ok'] === false && $result['error'] === 'unknown key' );
+$_POST['data'] = json_encode( [ 'password' => 'definitely-the-wrong-password' ] );
+$duringCooldownRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Admin\Admin::handlePost( $appData, $duringCooldownRequest );
+check( 'the lockout applies regardless of the password tried next', $duringCooldownRequest['/nino/http/response']['statusCode'] === 429 );
 
-$result = saveText( $appData, [ 'key' => '/does/not/exist', 'locale' => 'de_DE', 'value' => 'x' ] );
-check( 'saving an unknown key is rejected', $result['ok'] === false );
+// Reset the lockout state for the rest of the file - a fresh cooldown window shouldn't leak into later checks
+\Nino\Filesystem::putFileContent( $appData, '/_admin/.lockout.json', [ 'tries' => 0, 'until' => 0 ] );
 
-$result = saveText( $appData, [ 'key' => '/home/plain', 'locale' => 'not-a-locale', 'value' => 'x' ] );
-check( 'saving with an invalid locale is rejected', $result['ok'] === false && $result['error'] === 'invalid locale' );
+$_POST['action'] = 'devtypes/list';
+$_POST['data']	 = '{}';
+$unauthedRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Admin\Admin::handlePost( $appData, $unauthedRequest );
+check( 'a module action is rejected while unauthed', $unauthedRequest['/nino/http/response']['statusCode'] === 401 );
 
-echo "\n";
+// The shipped PASSWORD_HASH is a placeholder matching no real password (see Admin.php) -
+// simulate a successful login directly, the same way Auth-based tests call insertUser()
+// directly rather than driving a registration form
+\Nino\Runtime::setSessionValue( $appData, './nino/admin/authed', true );
+check( 'isAuthed reflects the session flag', \Nino\Admin\Admin::isAuthed( $appData ) === true );
 
+$_POST['action'] = 'dev/logout';
+$_POST['data']	 = '{}';
+$logoutRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Admin\Admin::handlePost( $appData, $logoutRequest );
+check( 'logout clears the session flag', \Nino\Admin\Admin::isAuthed( $appData ) === false );
 
-// --- Text::apiSaveBatch: batching -------------------------------------------
-
-echo "Text::apiSaveBatch - batching multiple keys in one request\n";
-
-$request = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-$_POST['data'] = json_encode( [ 'items' => [
-	[ 'key' => '/home/h2', 	'locale' => 'de_DE', 'value' => 'Neu 1' ],
-	[ 'key' => '/home/plain', 'locale' => 'de_DE', 'value' => 'Neu 2' ],
-	[ 'key' => '/does/not/exist', 'locale' => 'de_DE', 'value' => 'x' ],
-] ] );
-\Nino\Admin\Text::apiSaveBatch( $appData, $request );
-$results = $request['/nino/http/response']['body']['results'] ?? [];
-
-check( 'the request itself succeeds even with one invalid item', $request['/nino/http/response']['statusCode'] === 200 );
-check( 'the first valid item in the batch is saved', ( $results['/home/h2']['ok'] ?? false ) === true );
-check( 'the second valid item in the same file is also saved', ( $results['/home/plain']['ok'] ?? false ) === true );
-check( 'the invalid item in the batch is reported, not silently dropped', ( $results['/does/not/exist']['ok'] ?? true ) === false );
-
-$stored = \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] );
-check( 'both batched keys landed in the same file write', ( $stored['[[/home/h2]]'] ?? '' ) === 'Neu 1' && ( $stored['[[/home/plain]]'] ?? '' ) === 'Neu 2' );
-
-echo "\n";
-
-
-// --- Text::apiSaveBatch: sanitizing ------------------------------------------
-
-echo "Text::apiSaveBatch - sanitizing\n";
-
-$result = saveText( $appData, [
-	'key' 		=> '/home/h2',
-	'locale' 	=> 'de_DE',
-	'value' 	=> '<strong><em>Bold Italic</em></strong> <script>alert(1)</script> <a href="javascript:alert(2)">bad</a> <a href="/ok">good</a> <img src=x onerror=alert(3)>',
-] );
-
-check( 'save succeeds', $result['ok'] === true );
-check( 'nested tags collapse to a single level', ( $result['value'] ?? '' ) === '<strong>Bold Italic</strong>  bad <a href="/ok">good</a> ' );
-check( 'script tag never reaches the stored value', str_contains( $result['value'] ?? '', '<script' ) === false );
-check( 'javascript: href never reaches the stored value', str_contains( $result['value'] ?? '', 'javascript:' ) === false );
-check( 'img tag never reaches the stored value', str_contains( $result['value'] ?? '', '<img' ) === false );
-
-$stored = \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] );
-check( 'the sanitized value is actually persisted to disk', ( $stored['[[/home/h2]]'] ?? '' ) === $result['value'] );
-
-$result = saveText( $appData, [
-	'key' 		=> '/home/plain',
-	'locale' 	=> 'de_DE',
-	'value' 	=> 'Acme <b>Corp</b> <script>x</script>',
-] );
-
-check( 'a non-html key has all tags stripped, not sanitized-and-kept', ( $result['value'] ?? '' ) === 'Acme Corp x' );
-
-$result = saveText( $appData, [ 'key' => '/company/name', 'locale' => '*', 'value' => 'New Co' ] );
-check( 'saving a global key succeeds', $result['ok'] === true );
-$storedGlobal = \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] );
-check( 'a global key is written to global.php, not a locale file', ( $storedGlobal['[[/company/name]]'] ?? '' ) === 'New Co' );
+// Re-authenticate for every check below
+\Nino\Runtime::setSessionValue( $appData, './nino/admin/authed', true );
 
 echo "\n";
 
 
-// --- Text::apiExport/apiImport: translation round-trip -----------------------
+// --- Dev\ElementTypes::apiList / apiGet / apiSave / apiCreate -----------
 
-echo "Text::apiExport/apiImport - translation round-trip\n";
-
-$request = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-$_POST['data'] = json_encode( [ 'locale' => 'de_DE' ] );
-\Nino\Admin\Text::apiExport( $appData, $request );
-check( 'export succeeds', $request['/nino/http/response']['statusCode'] === 200 );
-check( 'export returns the locale file\'s own raw content', ( $request['/nino/http/response']['body']['content']['[[/home/plain]]'] ?? null ) === 'Acme Corp x' );
-
-$request = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-$_POST['data'] = json_encode( [ 'locale' => 'xx_XX' ] );
-\Nino\Admin\Text::apiExport( $appData, $request );
-check( 'export rejects an invalid locale', $request['/nino/http/response']['statusCode'] === 400 );
-
-$request = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-$_POST['data'] = json_encode( [
-	'locale' 	=> 'en_US',
-	'content' => [ '[[/home/h2]]' => 'Translated Headline', '[[/home/brand-new]]' => 'A key that never existed before' ],
-] );
-\Nino\Admin\Text::apiImport( $appData, $request );
-check( 'import succeeds', $request['/nino/http/response']['statusCode'] === 200 );
-check( 'import reports 2 imported, 0 skipped', $request['/nino/http/response']['body'] === [ 'imported' => 2, 'skipped' => 0 ] );
-
-$enUs = \Nino\Filesystem::getFileContent( $appData, '/text/en_US.php', [] );
-check( 'an imported key overwrote the existing value', $enUs['[[/home/h2]]'] === 'Translated Headline' );
-check( 'a brand-new key from the import was created', $enUs['[[/home/brand-new]]'] === 'A key that never existed before' );
-
-$request = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-$_POST['data'] = json_encode( [
-	'locale' 	=> 'de_DE',
-	'content' => [ '[[/home/plain]]' => 'Geänderter Satz', '[[/website/lang]]' => 'HACKED' ],
-] );
-\Nino\Admin\Text::apiImport( $appData, $request );
-check( 'import with a mix of keys still succeeds overall', $request['/nino/http/response']['statusCode'] === 200 );
-check( 'a blacklisted key in the import is silently skipped, the rest still imports', $request['/nino/http/response']['body'] === [ 'imported' => 1, 'skipped' => 1 ] );
-
-$deDe = \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] );
-check( 'the blacklisted key was NOT written despite being in the import', isset( $deDe['[[/website/lang]]'] ) === false );
-check( 'the non-blacklisted key from the same import was written', $deDe['[[/home/plain]]'] === 'Geänderter Satz' );
-
-$request = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-$_POST['data'] = json_encode( [ 'locale' => 'de_DE', 'content' => [] ] );
-\Nino\Admin\Text::apiImport( $appData, $request );
-check( 'import rejects empty content', $request['/nino/http/response']['statusCode'] === 400 );
-
-echo "\n";
-
-
-// --- Elements::apiSave: html field sanitizing -------------------------------
-
-echo "Elements::apiSave - html field sanitizing\n";
-
-\Nino\Elements::insertElementType( $appData, '/demo', [
-	'body' 	=> [ 'type' => 'string', 'locale' => true, 'html' => true ],
-	'plain' => [ 'type' => 'string', 'locale' => true ],
-] );
-
-$request = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-$_POST['data'] = json_encode( [
-	'type' 		=> 'demo',
-	'uri' 		=> 'item1',
-	'locale' 	=> 'de_DE',
-	'isNew' 	=> true,
-	'fields' 	=> [
-		'body' 	=> '<strong><em>Bold Italic</em></strong> <script>alert(1)</script>',
-		'plain' => 'Acme <b>Corp</b>',
-	],
-] );
-\Nino\Admin\Elements::apiSave( $appData, $request );
-$element = $request['/nino/http/response']['body']['element'] ?? [];
-
-check( 'element save succeeds', $request['/nino/http/response']['statusCode'] === 200 );
-check( 'an html-flagged field is sanitized like a Text html key', ( $element['body'] ?? '' ) === '<strong>Bold Italic</strong> ' );
-check( 'a plain field is left as-is (Elements never sanitized these before either)', ( $element['plain'] ?? '' ) === 'Acme <b>Corp</b>' );
-
-echo "\n";
-
-
-// --- Elements::apiSave: required fields ---------------------------------------
-
-echo "Elements::apiSave - required fields\n";
-
-// Required-field enforcement itself lives in the kernel (Elements::insertElement(),
-// via _writeElementData()) - this just confirms apiSave() surfaces its rejection
-\Nino\Elements::insertElementType( $appData, '/demoreq', [
-	'title' 	=> [ 'type' => 'string', 'required' => true ],
-	'tags' 		=> [ 'type' => 'array', 'required' => true ],
-	'count' 	=> [ 'type' => 'integer', 'required' => true ],
-	'active' 	=> [ 'type' => 'boolean', 'required' => true ],
-] );
-
-$request = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-$_POST['data'] = json_encode( [
-	'type' 		=> 'demoreq',
-	'uri' 		=> 'item1',
-	'locale' 	=> 'de_DE',
-	'isNew' 	=> true,
-	'fields' 	=> [ 'title' => '', 'tags' => [ 'a' ], 'count' => 0, 'active' => false ],
-] );
-\Nino\Admin\Elements::apiSave( $appData, $request );
-check( 'apiSave rejects a missing required string field', $request['/nino/http/response']['statusCode'] === 400 );
-check( 'the error names the missing field', str_contains( $request['/nino/http/response']['body']['error'] ?? '', 'title' ) === true );
-
-$request = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-$_POST['data'] = json_encode( [
-	'type' 		=> 'demoreq',
-	'uri' 		=> 'item1',
-	'locale' 	=> 'de_DE',
-	'isNew' 	=> true,
-	'fields' 	=> [ 'title' => 'Hallo', 'tags' => [ 'a' ], 'count' => 0, 'active' => false ],
-] );
-\Nino\Admin\Elements::apiSave( $appData, $request );
-check( 'apiSave succeeds once every required field actually has a value', $request['/nino/http/response']['statusCode'] === 200 );
-
-echo "\n";
-
-
-// --- Elements::apiUploadImage ------------------------------------------------
-
-echo "Elements::apiUploadImage\n";
-
-/**
- *	Write a small solid-color image to a real temp file and populate $_FILES['file']
- *	as if it had actually been uploaded - apiUploadImage() reads it via
- *	file_get_contents(), not move_uploaded_file(), specifically so it stays testable
- *	outside a real http upload context
- *
- *	@param		bool	$alpha		Encode as png (with transparency) instead of jpeg
- *
- *	@return		string	The temp file path
- */
-function fakeUploadedFile( bool $alpha = false ): string {
-	$img = imagecreatetruecolor( 300, 150 );
-	if( $alpha === true ) {
-		imagealphablending( $img, false );
-		imagesavealpha( $img, true );
-		imagefill( $img, 0, 0, imagecolorallocatealpha( $img, 0, 200, 0, 64 ) );
-	} else {
-		imagefill( $img, 0, 0, imagecolorallocate( $img, 0, 0, 200 ) );
-	}
-	$path = tempnam( sys_get_temp_dir(), 'nino-upload-' );
-	$alpha === true ? imagepng( $img, $path ) : imagejpeg( $img, $path, 90 );
-	imagedestroy( $img );
-	return $path;
-}
-
-/**
- *	Call Elements::apiUploadImage with a fake uploaded file
- *
- *	@param		array 		&$appData
- *	@param		array 		$data
- *	@param		bool			$alpha		Upload a png-with-alpha source instead of a jpeg
- *
- *	@return		array			[ statusCode, body ]
- */
-function callUploadImage( array &$appData, array $data, bool $alpha = false ): array {
-	$request = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-	$_POST['data'] = json_encode( $data );
-	$path = fakeUploadedFile( $alpha );
-	$_FILES['file'] = [ 'tmp_name' => $path, 'error' => UPLOAD_ERR_OK, 'name' => 'test.jpg', 'size' => filesize( $path ) ];
-	\Nino\Admin\Elements::apiUploadImage( $appData, $request );
-	@unlink( $path );
-	return [ $request['/nino/http/response']['statusCode'], $request['/nino/http/response']['body'] ];
-}
-
-\Nino\Elements::insertElementType( $appData, '/imagedemo', [
-	'photo' => [ 'type' => 'image', 'width' => 40, 'height' => 40 ],
-	'plain' => [ 'type' => 'string', 'locale' => true ],
-] );
-\Nino\Elements::insertElement( $appData, '/imagedemo/item1', [ 'plain' => 'x' ], 'de_DE' );
-
-[ $status, $body ] = callUploadImage( $appData, [ 'type' => 'imagedemo', 'uri' => 'item1', 'locale' => 'de_DE', 'key' => 'photo' ] );
-check( 'a valid upload for an image field succeeds', $status === 200 && is_string( $body['filename'] ?? null ) === true );
-
-$firstFilename = $body['filename'];
-check( 'the sole image field on this type needs no key/locale disambiguation in the path', $firstFilename === 'elements/imagedemo/item1.40x40.jpg' );
-
-$uploadPath = $appData['./nino/filesystem/path']. '/images/'. $firstFilename;
-check( 'the processed file actually exists on disk', is_file( $uploadPath ) === true );
-
-$stored = \Nino\Elements::getElement( $appData, '/imagedemo/item1', '*' );
-check( 'the uploaded filename is committed to the element immediately (no Speichern needed)', ( $stored['photo'] ?? null ) === $firstFilename );
-
-[ $status2, $body2 ] = callUploadImage( $appData, [ 'type' => 'imagedemo', 'uri' => 'item1', 'locale' => 'de_DE', 'key' => 'photo' ] );
-check( 'uploading a replacement succeeds', $status2 === 200 );
-check( 'a same-format replacement overwrites the same deterministic path, not a new file', ( $body2['filename'] ?? null ) === $firstFilename && is_file( $uploadPath ) === true );
-
-// When the output format itself changes (a png-with-alpha source this time), the path
-// changes with it (different extension) - the old, now-orphaned .jpg must be cleaned up
-[ $status3, $body3 ] = callUploadImage( $appData, [ 'type' => 'imagedemo', 'uri' => 'item1', 'locale' => 'de_DE', 'key' => 'photo' ], true );
-check( 'switching output format succeeds and yields a differently-named file', $status3 === 200 && ( $body3['filename'] ?? null ) === 'elements/imagedemo/item1.40x40.png' );
-check( 'the old .jpg is deleted once the new .png is committed (no orphan across a format change)', is_file( $uploadPath ) === false );
-
-[ $statusMissing ] = callUploadImage( $appData, [ 'type' => 'imagedemo', 'uri' => 'does-not-exist', 'locale' => 'de_DE', 'key' => 'photo' ] );
-check( 'uploading for an element that was never saved is rejected', $statusMissing === 404 );
-
-[ $statusWrongKey ] = callUploadImage( $appData, [ 'type' => 'imagedemo', 'uri' => 'item1', 'locale' => 'de_DE', 'key' => 'plain' ] );
-check( 'uploading to a key that is not an image field is rejected', $statusWrongKey === 400 );
-
-// Deleting an element with an image field must also clean up the file it points
-// to - an "image" field's value is just a filename reference, so deleteElement()
-// itself has no way of knowing to touch it
-\Nino\Elements::insertElement( $appData, '/imagedemo/item2', [ 'plain' => 'y' ], 'de_DE' );
-[ , $bodyForDelete ] = callUploadImage( $appData, [ 'type' => 'imagedemo', 'uri' => 'item2', 'locale' => 'de_DE', 'key' => 'photo' ] );
-$deletePath = $appData['./nino/filesystem/path']. '/images/'. $bodyForDelete['filename'];
-check( 'the image exists before the element is deleted', is_file( $deletePath ) === true );
-
-$deleteRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-$_POST['data'] = json_encode( [ 'type' => 'imagedemo', 'uri' => 'item2' ] );
-\Nino\Admin\Elements::apiDelete( $appData, $deleteRequest );
-check( 'deleting the element succeeds', $deleteRequest['/nino/http/response']['statusCode'] === 200 );
-check( 'deleting the element also deletes its uploaded image (no orphan)', is_file( $deletePath ) === false );
-
-// Regression: apiDelete always calls deleteElement( ..., '*' ), which used to
-// crash with "Cannot unset string offsets" on any type file with a top-level
-// 'title' key - ie. every hand-authored type, but NOT one created via
-// insertElementType() like 'imagedemo' above, which is why that never caught it
-\Nino\Filesystem::putFileContent( $appData, '/elements/titleddemo.php', [
-	'title' 	=> 'Titled Demo',
-	'model' 	=> [ 'plain' => [ 'type' => 'string', 'locale' => true ] ],
-	'*' 			=> [ '*' => [] ],
-	'de_DE' 	=> [ 'item1' => [ 'plain' => 'x' ] ],
-] );
-
-$titledDeleteRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-$_POST['data'] = json_encode( [ 'type' => 'titleddemo', 'uri' => 'item1' ] );
-\Nino\Admin\Elements::apiDelete( $appData, $titledDeleteRequest );
-check( 'deleting an element on a type with a "title" key succeeds (no crash)', $titledDeleteRequest['/nino/http/response']['statusCode'] === 200 );
-check( 'the element is actually gone', \Nino\Elements::getElement( $appData, '/titleddemo/item1', '*' ) === false );
-
-echo "\n";
-
-
-// --- Admin\Images::apiList / apiUpload --------------------------------------
-
-echo "Admin\\Images::apiList / apiUpload\n";
-
-$appData['/nino/html/images'] = [
-	'/hero' => [ 'label' => 'Hero-Banner', 'width' => 60, 'height' => 40, 'filename' => null ],
-];
-
-/**
- *	Call Admin\Images::apiUpload with a fake uploaded file
- *
- *	@param		array 		&$appData
- *	@param		string		$uri
- *
- *	@return		array			[ statusCode, body ]
- */
-function callUploadSlotImage( array &$appData, string $uri ): array {
-	$request = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-	$_POST['data'] = json_encode( [ 'uri' => $uri ] );
-	$path = fakeUploadedFile();
-	$_FILES['file'] = [ 'tmp_name' => $path, 'error' => UPLOAD_ERR_OK, 'name' => 'test.jpg', 'size' => filesize( $path ) ];
-	\Nino\Admin\Images::apiUpload( $appData, $request );
-	@unlink( $path );
-	return [ $request['/nino/http/response']['statusCode'], $request['/nino/http/response']['body'] ];
-}
+echo "Dev\\ElementTypes::apiList / apiGet / apiSave / apiCreate\n";
 
 $listRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Admin\Images::apiList( $appData, $listRequest );
-$slots = $listRequest['/nino/http/response']['body']['slots'] ?? [];
-check( 'apiList returns every developer-fixed slot', count( $slots ) === 1 && $slots[0]['uri'] === '/hero' );
-check( 'apiList reports no url for a slot with no image yet', $slots[0]['url'] === null );
+\Nino\Admin\ElementTypes::apiList( $appData, $listRequest );
+$types = $listRequest['/nino/http/response']['body']['types'] ?? [];
+check( 'apiList finds the sandbox type', count( $types ) === 1 && $types[0]['uri'] === 'testtype' );
+check( 'apiList reports the real title', $types[0]['title'] === 'Test Type' );
+check( 'apiList reports the real field count', $types[0]['fieldCount'] === 1 );
+check( 'apiList exposes the allowed field types', in_array( 'image', $listRequest['/nino/http/response']['body']['fieldTypes'] ?? [], true ) === true );
 
-[ $slotStatus, $slotBody ] = callUploadSlotImage( $appData, '/hero' );
-check( 'a valid upload for a known slot succeeds', $slotStatus === 200 && is_string( $slotBody['filename'] ?? null ) === true );
-check( 'the slot uri\'s leading slash is stripped for the deterministic path', $slotBody['filename'] === 'hero.60x40.jpg' );
+$_POST['data'] = json_encode( [ 'uri' => 'testtype' ] );
+$getRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Admin\ElementTypes::apiGet( $appData, $getRequest );
+$got = $getRequest['/nino/http/response']['body'] ?? [];
+check( 'apiGet returns the real title', $got['title'] === 'Test Type' );
+check( 'apiGet returns the real model', ( $got['model']['name']['type'] ?? null ) === 'string' );
 
-$slotUploadPath = $appData['./nino/filesystem/path']. '/images/'. $slotBody['filename'];
-check( 'the processed file exists on disk', is_file( $slotUploadPath ) === true );
-check( 'the filename is committed to the slot immediately', ( \Nino\Images::getSlot( $appData, '/hero' )['filename'] ?? null ) === $slotBody['filename'] );
+$_POST['data'] = json_encode( [ 'uri' => 'not-a-real-type' ] );
+$getMissingRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Admin\ElementTypes::apiGet( $appData, $getMissingRequest );
+check( 'apiGet 404s for an unknown type', $getMissingRequest['/nino/http/response']['statusCode'] === 404 );
 
-[ $slotStatus2, $slotBody2 ] = callUploadSlotImage( $appData, '/hero' );
-check( 'uploading a replacement succeeds and overwrites the same path', $slotStatus2 === 200 && $slotBody2['filename'] === $slotBody['filename'] && is_file( $slotUploadPath ) === true );
+$_POST['data'] = json_encode( [ 'uri' => '../escape' ] );
+$getInvalidRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Admin\ElementTypes::apiGet( $appData, $getInvalidRequest );
+check( 'apiGet rejects a non-slug type uri before ever touching the filesystem', $getInvalidRequest['/nino/http/response']['statusCode'] === 400 );
 
-[ $slotStatusUnknown ] = callUploadSlotImage( $appData, 'does-not-exist' );
-check( 'uploading to an unknown slot is rejected', $slotStatusUnknown === 404 );
+// Save: rename the field, add an image field and a suffixed/maxlength'd one,
+// and slip in a field with an invalid type - the invalid one must be
+// silently dropped, not crash or persist
+$_POST['data'] = json_encode( [
+	'uri' 		=> 'testtype',
+	'title' 	=> 'Test Type Renamed',
+	'model' 	=> [
+		'name' 		=> [ 'type' => 'string', 'locale' => true, 'required' => true, 'maxlength' => 80 ],
+		'photo' 	=> [ 'type' => 'image', 'width' => 40, 'height' => 40, 'suffix' => 'ignored on image' ],
+		'price' 	=> [ 'type' => 'double', 'suffix' => '€' ],
+		'active' 	=> [ 'type' => 'boolean', 'suffix' => 'ignored on boolean' ],
+		'bogus' 	=> [ 'type' => 'not-a-real-type' ],
+	],
+] );
+$saveRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Admin\ElementTypes::apiSave( $appData, $saveRequest );
+check( 'apiSave succeeds', $saveRequest['/nino/http/response']['statusCode'] === 200 );
 
-// The admin now groups slots by the uri's first path segment (eg. "/home/hero" ->
-// category "home") - a slot uri is just a free-form array key, so this needs no
-// kernel/admin support of its own, but is worth locking in as a real upload
-$appData['/nino/html/images']['/home/hero'] = [ 'label' => 'Hero', 'width' => 60, 'height' => 40, 'filename' => null ];
-[ $categoryStatus, $categoryBody ] = callUploadSlotImage( $appData, '/home/hero' );
-check( 'uploading to a category-style ("/<category>/<identifier>") slot uri succeeds', $categoryStatus === 200 && $categoryBody['filename'] === 'home/hero.60x40.jpg' );
-check( 'the file lands at the nested deterministic path', is_file( $appData['./nino/filesystem/path']. '/images/'. $categoryBody['filename'] ) === true );
+$afterSave = \Nino\Filesystem::getFileContent( $appData, '/elements/testtype.php', false );
+check( 'apiSave updates the title', $afterSave['title'] === 'Test Type Renamed' );
+check( 'apiSave keeps the valid field', ( $afterSave['model']['name']['required'] ?? null ) === true );
+check( 'apiSave sets a string field\'s maxlength', ( $afterSave['model']['name']['maxlength'] ?? null ) === 80 );
+check( 'apiSave adds the new field', ( $afterSave['model']['photo']['width'] ?? null ) === 40 );
+check( 'apiSave drops suffix on an image field', isset( $afterSave['model']['photo']['suffix'] ) === false );
+check( 'apiSave sets a suffix on a non-boolean/image field', $afterSave['model']['price']['suffix'] === '€' );
+check( 'apiSave drops suffix on a boolean field', isset( $afterSave['model']['active']['suffix'] ) === false );
+check( 'apiSave silently drops a field with an unknown type', isset( $afterSave['model']['bogus'] ) === false );
+check( 'apiSave never touches the "*" bucket', $afterSave['*'] === [ '*' => [] ] );
+check( 'apiSave never touches real locale content', ( $afterSave['de_DE']['item1']['name'] ?? null ) === 'Hallo' );
+
+// Switching a field's locale flag must migrate its stored value(s), not just
+// the model - otherwise a stale per-locale value keeps shadowing the new
+// '*' value forever (_cacheElement() merges locale data over '*' data)
+$_POST['data'] = json_encode( [
+	'uri' 		=> 'testtype',
+	'title' 	=> 'Test Type Renamed',
+	'model' 	=> [ 'name' => [ 'type' => 'string' ] ],
+] );
+$globalizeRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Admin\ElementTypes::apiSave( $appData, $globalizeRequest );
+check( 'apiSave succeeds when switching a field to global', $globalizeRequest['/nino/http/response']['statusCode'] === 200 );
+
+$afterGlobalize = \Nino\Filesystem::getFileContent( $appData, '/elements/testtype.php', false );
+check( 'switching to global migrates the native locale\'s value into "*"', ( $afterGlobalize['*']['item1']['name'] ?? null ) === 'Hallo' );
+check( 'switching to global removes the stale value from the locale bucket', isset( $afterGlobalize['de_DE']['item1']['name'] ) === false );
+
+$_POST['data'] = json_encode( [
+	'uri' 		=> 'testtype',
+	'title' 	=> 'Test Type Renamed',
+	'model' 	=> [ 'name' => [ 'type' => 'string', 'locale' => true ] ],
+] );
+$localizeRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Admin\ElementTypes::apiSave( $appData, $localizeRequest );
+check( 'apiSave succeeds when switching a field back to per-locale', $localizeRequest['/nino/http/response']['statusCode'] === 200 );
+
+$afterLocalize = \Nino\Filesystem::getFileContent( $appData, '/elements/testtype.php', false );
+check( 'switching back to per-locale copies the value into every locale', $afterLocalize['de_DE']['item1']['name'] === 'Hallo' && $afterLocalize['en_US']['item1']['name'] === 'Hallo' );
+check( 'switching back to per-locale removes the stale value from "*"', isset( $afterLocalize['*']['item1']['name'] ) === false );
+
+$_POST['data'] = json_encode( [ 'uri' => 'testtype', 'title' => 'x', 'model' => [] ] );
+foreach( [ '../escape', 'Has Uppercase', '1startswithdigit', '' ] as $badUri ) {
+	$_POST['data'] = json_encode( [ 'uri' => $badUri, 'title' => 'x', 'model' => [] ] );
+	$badSaveRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+	\Nino\Admin\ElementTypes::apiSave( $appData, $badSaveRequest );
+	check( "apiSave rejects an invalid type uri ('$badUri')", $badSaveRequest['/nino/http/response']['statusCode'] === 400 );
+}
+
+$_POST['data'] = json_encode( [ 'uri' => 'brandnewtype', 'title' => 'Brand New', 'model' => [ 'headline' => [ 'type' => 'string' ] ] ] );
+$createRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Admin\ElementTypes::apiCreate( $appData, $createRequest );
+check( 'apiCreate succeeds', $createRequest['/nino/http/response']['statusCode'] === 200 );
+
+$created = \Nino\Filesystem::getFileContent( $appData, '/elements/brandnewtype.php', false );
+check( 'apiCreate writes the title', $created['title'] === 'Brand New' );
+check( 'apiCreate writes the model', ( $created['model']['headline']['type'] ?? null ) === 'string' );
+check( 'apiCreate starts with an empty shell, no fabricated content', $created['*'] === [ '*' => [] ] );
+
+$duplicateCreateRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Admin\ElementTypes::apiCreate( $appData, $duplicateCreateRequest );
+check( 'apiCreate rejects an already-existing type', $duplicateCreateRequest['/nino/http/response']['statusCode'] === 409 );
 
 echo "\n";
 
 
-// --- Users::apiList / apiSave / apiLogoutAll --------------------------------
+// --- Dev\Restore ----------------------------------------------------------
 
-echo "Users::apiList / apiSave / apiLogoutAll\n";
+echo "Dev\\Restore - reads Backup's output independently, doesn't call into _editor/Editor.php\n";
+
+mkdir( $sandbox. '/_editor', 0777, true );
+mkdir( $sandbox. '/_admin', 0777, true );
+
+$appData['/nino/auth/maxtries'] 	= 5;
+$appData['/nino/auth/cooldown'] 	= 3600;
+$appData['/nino/auth/user'] 			= $appData['/nino/auth/user'] ?? [];
+\Nino\Auth::insertUser( $appData, 'admin@example.com', 'correct horse battery staple' );
+\Nino\Auth::loginUser( $appData, 'admin@example.com', 'correct horse battery staple' );
+
+$guardOk = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Editor\Editor::guard( $appData, $guardOk ); // bootstraps + creates today's backup as a side effect
+
+check( 'Backup::maybeRun (via Editor::guard) writes the restore key into _admin/', is_file( $sandbox. '/_admin/.restore-key.php' ) === true );
+
+// Regression: an install that already had Backup running (dir/key already in
+// config.php) before Restore/_admin/.restore-key.php existed must still get the
+// _admin/ key copy written on the next admin request - not just on the very
+// first-ever bootstrap
+unlink( $sandbox. '/_admin/.restore-key.php' );
+\Nino\Editor\Editor::guard( $appData, $guardOk );
+check( 'Backup::maybeRun re-creates a missing _admin/.restore-key.php on an already-bootstrapped install', is_file( $sandbox. '/_admin/.restore-key.php' ) === true );
+
+$listRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Admin\Restore::apiList( $appData, $listRequest );
+$dates = $listRequest['/nino/http/response']['body']['dates'] ?? [];
+check( 'apiList finds today\'s backup without reading config.php\'s own copy of the dir/key', count( $dates ) === 1 && $dates[0] === date( 'Y-m-d' ) );
+
+// Simulate config.php DATA corruption (not a syntax error) - eg. a wrecked user record -
+// the scenario Restore exists for. A genuine syntax error is out of scope (see Admin.php docblock).
+$beforeCorruption = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
+$corrupted = $beforeCorruption;
+$corrupted['/nino/auth/user'] = [];
+\Nino\Filesystem::putFileContent( $appData, '/config.php', $corrupted );
+check( 'the simulated corruption actually wiped the user record', \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/auth/user'] === [] );
+
+$_POST['data'] = json_encode( [ 'date' => $dates[0] ] );
+$restoreRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Admin\Restore::apiRestore( $appData, $restoreRequest );
+check( 'apiRestore reports success', ( $restoreRequest['/nino/http/response']['body']['ok'] ?? false ) === true );
+
+$afterRestore = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
+check( 'the wrecked user record is back after restore', isset( $afterRestore['/nino/auth/user']['admin@example.com'] ) === true );
+
+$backupDir = $sandbox. '/_editor/'. $appData['/nino/backup/dir'];
+check( 'a pre-restore safety snapshot of the (corrupted) state was made first', count( glob( $backupDir. '/pre-restore-*.php' ) ?: [] ) === 1 );
+
+$_POST['data'] = json_encode( [ 'date' => '2020-01-01' ] );
+$unknownDateRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Admin\Restore::apiRestore( $appData, $unknownDateRequest );
+check( 'restoring a date with no matching backup 404s', $unknownDateRequest['/nino/http/response']['statusCode'] === 404 );
+
+$_POST['data'] = json_encode( [ 'date' => 'not-a-date' ] );
+$badDateRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Admin\Restore::apiRestore( $appData, $badDateRequest );
+check( 'restoring a malformed date is rejected before touching the filesystem', $badDateRequest['/nino/http/response']['statusCode'] === 400 );
+
+echo "\n";
+
+
+// --- Dev\Restore - newsletter restore merges instead of overwriting -------
+
+echo "Dev\\Restore - newsletter restore merges, doesn't resurrect a removal (Art. 17)\n";
+
+// _mergeNewsletterRestore() is exercised directly (Reflection) rather than
+// through a real two-backup apiRestore() round trip: Backup::maybeRun()
+// only ever creates one backup per calendar day, so a sandboxed test run
+// can't produce an "older backup" and a "current, since-changed state" the
+// way a real installation would days apart
+$mergeMethod = new ReflectionMethod( '\Nino\Admin\Restore', '_mergeNewsletterRestore' );
+$mergeMethod->setAccessible( true );
+
+$mergeRoot 		= sys_get_temp_dir(). '/nino-mergetest-root-'. bin2hex( random_bytes( 8 ) );
+$mergeStaging = sys_get_temp_dir(). '/nino-mergetest-staging-'. bin2hex( random_bytes( 8 ) );
+mkdir( $mergeRoot. '/data', 0755, true );
+mkdir( $mergeStaging. '/data', 0755, true );
+
+// root (current): alice unsubscribed since the backup was taken - gone from
+// newsletter.php, recorded (as a sha256, see \Nino\Modules\Newsletter's own
+// REMOVED_PATH docblock) in newsletter-removed.php; bob untouched
+$aliceHash = hash( 'sha256', 'alice@example.com' );
+file_put_contents( $mergeRoot. '/data/newsletter.php', '<?php return [ [ "email" => "bob@example.com", "status" => "subscribed" ] ];' );
+file_put_contents( $mergeRoot. '/data/newsletter-removed.php', '<?php return [ '. var_export( $aliceHash, true ). ' ];' );
+
+// staging (the backup being restored): older, still has alice subscribed,
+// predates this feature entirely - no removed-file of its own
+file_put_contents( $mergeStaging. '/data/newsletter.php', '<?php return [ [ "email" => "alice@example.com", "status" => "subscribed" ], [ "email" => "bob@example.com", "status" => "subscribed" ] ];' );
+
+$mergeMethod->invoke( null, $mergeRoot, $mergeStaging );
+
+$mergedEntries = include $mergeStaging. '/data/newsletter.php';
+$mergedRemoved = include $mergeStaging. '/data/newsletter-removed.php';
+
+check( 'a restore does not resurrect an address unsubscribed since the backup was taken', in_array( 'alice@example.com', array_column( $mergedEntries, 'email' ), true ) === false );
+check( 'an untouched subscriber survives the restore', in_array( 'bob@example.com', array_column( $mergedEntries, 'email' ), true ) === true );
+check( 'the removal record itself is carried into the restored state, not just the filtered entries', in_array( $aliceHash, $mergedRemoved, true ) === true );
+
+\Nino\Filesystem::removeDir( $mergeRoot );
+\Nino\Filesystem::removeDir( $mergeStaging );
+
+// A backup that predates this feature (or a project that never enabled the
+// module) carries neither newsletter file - must be a no-op, not an error
+$mergeRoot2 	= sys_get_temp_dir(). '/nino-mergetest-root2-'. bin2hex( random_bytes( 8 ) );
+$mergeStaging2 = sys_get_temp_dir(). '/nino-mergetest-staging2-'. bin2hex( random_bytes( 8 ) );
+mkdir( $mergeRoot2, 0755, true );
+mkdir( $mergeStaging2, 0755, true );
+
+$mergeMethod->invoke( null, $mergeRoot2, $mergeStaging2 );
+check( 'a backup with no newsletter files at all is a no-op, not an error', is_file( $mergeStaging2. '/data/newsletter.php' ) === false );
+
+\Nino\Filesystem::removeDir( $mergeRoot2 );
+\Nino\Filesystem::removeDir( $mergeStaging2 );
+
+echo "\n";
+
+
+// --- Backup/Restore with config.php outside the project root --------------
+
+echo "Backup/Restore - config.php resolves via configPath, not root (NINO_CONFIG_DIR)\n";
+
+$outSandbox 	= sys_get_temp_dir(). '/nino-dev-smoke-outofweb-'. uniqid();
+$outConfigDir = $outSandbox. '/secret-config';
+
+mkdir( $outSandbox. '/_editor', 0777, true );
+mkdir( $outSandbox. '/_admin', 0777, true );
+mkdir( $outConfigDir, 0777, true );
+
+$outAppData = [ './nino/uid' => $outSandbox ];
+\Nino\AppData::prepare( $outAppData );
+$outAppData['./nino/filesystem/path']			= $outSandbox;
+$outAppData['./nino/filesystem/configpath']	= $outConfigDir; // simulates NINO_CONFIG_DIR
+$outAppData['/nino/dir']										= '';
+$outAppData['/nino/locales/native']				= 'de_DE';
+$outAppData['/nino/locales/available']			= [ 'de_DE' ];
+$outAppData['/nino/auth/maxtries']					= 5;
+$outAppData['/nino/auth/cooldown']					= 3600;
+
+\Nino\Filesystem::putFileContent( $outAppData, '/config.php', [
+	'/nino/error/log'					=> false,
+	'/nino/error/display'			=> true,
+	'/nino/locales/native'		=> 'de_DE',
+	'/nino/locales/available'	=> [ 'de_DE' ],
+	'/nino/html/assets'				=> [],
+	'/nino/http/routes'				=> [],
+] );
+
+check( 'config.php was written under configPath, not under the project root', is_file( $outConfigDir. '/config.php' ) === true && is_file( $outSandbox. '/config.php' ) === false );
+
+\Nino\Auth::insertUser( $outAppData, 'admin@example.com', 'correct horse battery staple' );
+\Nino\Auth::loginUser( $outAppData, 'admin@example.com', 'correct horse battery staple' );
+
+$outGuard = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Editor\Editor::guard( $outAppData, $outGuard ); // bootstraps + creates today's backup as a side effect
+
+$outBackupDir = $outSandbox. '/_editor/'. $outAppData['/nino/backup/dir'];
+$outToday 		= $outBackupDir. '/'. date( 'Y-m-d' ). '.php';
+
+check( 'a backup was created for the out-of-webroot setup', is_file( $outToday ) === true );
+
+$outKey 		= base64_decode( $outAppData['/nino/backup/key'] );
+$outPrefix 	= "<?php http_response_code(403); exit; return '";
+$outSuffix 	= "';\n";
+$outRaw 		= file_get_contents( $outToday );
+$outPayload = base64_decode( substr( $outRaw, strlen( $outPrefix ), -strlen( $outSuffix ) ) );
+$outGz 			= openssl_decrypt( substr( $outPayload, 28 ), 'aes-256-gcm', $outKey, OPENSSL_RAW_DATA, substr( $outPayload, 0, 12 ), substr( $outPayload, 12, 16 ) );
+
+$outTmpGz 		= $outSandbox. '/verify.tar.gz';
+$outExtractDir = $outSandbox. '/verify-extracted';
+file_put_contents( $outTmpGz, $outGz );
+mkdir( $outExtractDir );
+( new \PharData( $outTmpGz ) )->extractTo( $outExtractDir );
+
+check( 'the out-of-webroot config.php made it into the backup archive', is_file( $outExtractDir. '/config.php' ) === true );
+
+// Corrupt config.php (still under configPath) and restore it
+$outCorrupted = \Nino\Filesystem::getFileContent( $outAppData, '/config.php', [] );
+$outCorrupted['/nino/auth/user'] = [];
+\Nino\Filesystem::putFileContent( $outAppData, '/config.php', $outCorrupted );
+
+// Dev's own session gate, not Auth's - same shortcut the rest of this file
+// uses instead of driving the (placeholder-hashed) real login flow
+\Nino\Runtime::setSessionValue( $outAppData, './nino/admin/authed', true );
+
+$_POST['data'] = json_encode( [ 'date' => date( 'Y-m-d' ) ] );
+$outRestoreRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Admin\Restore::apiRestore( $outAppData, $outRestoreRequest );
+check( 'apiRestore succeeds for the out-of-webroot setup', ( $outRestoreRequest['/nino/http/response']['body']['ok'] ?? false ) === true );
+
+$outAfterRestore = \Nino\Filesystem::getFileContent( $outAppData, '/config.php', [] );
+check( 'the restored config.php landed back under configPath, with the user record restored', isset( $outAfterRestore['/nino/auth/user']['admin@example.com'] ) === true );
+check( 'restore did not leak a stray config.php copy into the webroot root', is_file( $outSandbox. '/config.php' ) === false );
+
+\Nino\Filesystem::removeDir( $outSandbox );
+
+echo "\n";
+
+
+// --- Dev\Config ---------------------------------------------------------
+
+echo "Dev\\Config - soft-value json editor\n";
 
 /**
- *	Call a Users::api* method as whichever user is currently logged in
+ *	Dispatch one action directly against a Dev\* module class
  *
  *	@param		array 		&$appData
- *	@param		string		$method				apiList | apiSave | apiLogoutAll
+ *	@param		string		$class				eg. "\Nino\Admin\Config"
+ *	@param		string		$method				eg. "apiList"
  *	@param		array 		$data					Post data
  *
  *	@return		array										[ statusCode, body ]
  */
-function callUsers( array &$appData, string $method, array $data = [] ): array {
+function callDev( array &$appData, string $class, string $method, array $data = [] ): array {
 	$request = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 	$_POST['data'] = json_encode( $data );
-	\Nino\Admin\Users::{$method}( $appData, $request );
+	$class::{$method}( $appData, $request );
 	return [ $request['/nino/http/response']['statusCode'], $request['/nino/http/response']['body'] ];
 }
 
-// '/*' rather than just users/manage - later sections reuse this session for
-// unrelated module actions (Elements/Text/Logs via handlePost), same as any
-// real "full admin" account would have
-\Nino\Auth::insertUser( $appData, 'manager@example.com', 'manager password', [ '/*' ] );
-\Nino\Auth::insertUser( $appData, 'plain@example.com', 'plain password' );
+[ $status, $body ] = callDev( $appData, \Nino\Admin\Config::class, 'apiList' );
+check( 'apiList succeeds', $status === 200 );
+check( 'apiList returns exactly the whitelisted keys', array_keys( $body['values'] ) === [
+	'/nino/error/log', '/nino/error/display', '/nino/locales/native', '/nino/locales/available',
+	'/nino/html/assets', '/nino/http/routes',
+] );
+check( 'apiList pretty-prints the current value', $body['values']['/nino/locales/native'] === '"de_DE"' );
 
-\Nino\Auth::loginUser( $appData, 'plain@example.com', 'plain password' );
-[ , $body ] = callUsers( $appData, 'apiList' );
-check( 'a plain user only sees themselves in the list', count( $body['users'] ) === 1 && $body['users'][0]['mail'] === 'plain@example.com' );
+// Regression: Admin::init() adds GET/POST /_admin into $appData['/nino/http/routes'] at
+// runtime (self-registered, same as Editor::init() does for /_editor - never persisted,
+// see Admin::init()'s docblock). apiList() must read config.php's own stored routes, not
+// that live-merged value, or saving this key back would bake _admin's own route into it.
+$appData['/nino/http/routes']['GET://_admin'] = [ 'uri' => '/_admin', 'body' => 'x' ];
+[ $status, $body ] = callDev( $appData, \Nino\Admin\Config::class, 'apiList' );
+check( 'apiList does not leak _admin\'s own runtime-injected route into the editable value', strpos( $body['values']['/nino/http/routes'], 'GET://_admin' ) === false );
+unset( $appData['/nino/http/routes']['GET://_admin'] );
 
-[ $status ] = callUsers( $appData, 'apiSave', [ 'username' => 'plain@example.com', 'mail' => 'plain2@example.com', 'currentPassword' => 'wrong password' ] );
-check( 'a plain user editing themselves needs the right current password', $status === 401 );
+[ $status ] = callDev( $appData, \Nino\Admin\Config::class, 'apiSave', [ 'key' => '/nino/error/display', 'value' => 'false' ] );
+check( 'apiSave accepts a valid bool', $status === 200 );
+check( 'the saved value actually lands in appData', $appData['/nino/error/display'] === false );
 
-[ $status, $body ] = callUsers( $appData, 'apiSave', [ 'username' => 'plain@example.com', 'mail' => 'plain2@example.com', 'currentPassword' => 'plain password' ] );
-check( 'a plain user can rename themselves with the right current password', $status === 200 && $body['mail'] === 'plain2@example.com' );
+[ $status ] = callDev( $appData, \Nino\Admin\Config::class, 'apiSave', [ 'key' => '/nino/locales/available', 'value' => '["de_DE","en_US","fr_FR"]' ] );
+check( 'apiSave accepts a valid array', $status === 200 );
+check( 'the saved array round-trips correctly', $appData['/nino/locales/available'] === [ 'de_DE', 'en_US', 'fr_FR' ] );
 
-[ $status ] = callUsers( $appData, 'apiSave', [ 'username' => 'manager@example.com', 'mail' => 'manager2@example.com', 'currentPassword' => '' ] );
-check( 'a plain user cannot edit another user at all', $status === 403 );
+[ $status ] = callDev( $appData, \Nino\Admin\Config::class, 'apiSave', [ 'key' => '/nino/locales/native', 'value' => '{not valid json' ] );
+check( 'apiSave rejects malformed json', $status === 400 );
 
-[ $status ] = callUsers( $appData, 'apiLogoutAll', [ 'username' => 'manager@example.com' ] );
-check( 'a plain user cannot log out another user', $status === 403 );
+[ $status ] = callDev( $appData, \Nino\Admin\Config::class, 'apiSave', [ 'key' => '/nino/locales/native', 'value' => '["should be a string, not an array"]' ] );
+check( 'apiSave rejects valid json of the wrong shape for this key', $status === 400 );
 
-\Nino\Auth::loginUser( $appData, 'manager@example.com', 'manager password' );
-[ , $body ] = callUsers( $appData, 'apiList' );
-// admin@example.com (from the earlier sections) + manager@example.com + plain2@example.com
-check( 'a manager sees every user in the list', count( $body['users'] ) === 3 );
+[ $status ] = callDev( $appData, \Nino\Admin\Config::class, 'apiSave', [ 'key' => '/nino/modules', 'value' => '[]' ] );
+check( 'apiSave refuses a key outside the whitelist (a "hard" value)', $status === 400 );
 
-[ $status, $body ] = callUsers( $appData, 'apiSave', [ 'username' => 'plain2@example.com', 'mail' => 'plain3@example.com' ] );
-check( 'a manager can rename another user without knowing their password', $status === 200 && $body['mail'] === 'plain3@example.com' );
+[ $status ] = callDev( $appData, \Nino\Admin\Config::class, 'apiSave', [ 'key' => '/nino/html/images', 'value' => '[]' ] );
+check( 'apiSave refuses /nino/html/images too (it has its own dedicated editor now)', $status === 400 );
 
-[ $status ] = callUsers( $appData, 'apiSave', [ 'username' => 'plain3@example.com', 'mail' => 'manager@example.com' ] );
-check( 'renaming to a mail already in use is rejected', $status === 400 );
+\Nino\Runtime::unsetSessionValue( $appData, './nino/admin/authed' );
+[ $status ] = callDev( $appData, \Nino\Admin\Config::class, 'apiList' );
+check( 'Config actions require an authed _admin session too', $status === 401 );
+\Nino\Runtime::setSessionValue( $appData, './nino/admin/authed', true );
 
-$appData['/nino/auth/user']['plain3@example.com']['sessions'] = [ '127.0.0.1' => time(), '10.0.0.1' => time() ];
-[ $status, $body ] = callUsers( $appData, 'apiLogoutAll', [ 'username' => 'plain3@example.com' ] );
-check( 'a manager can log out another user everywhere', $status === 200 && $body['ok'] === true && $body['loggedOutSelf'] === false );
-check( 'that user\'s sessions are actually cleared', \Nino\Auth::getUser( $appData, 'plain3@example.com' )['sessions'] === [] );
+echo "\n";
 
-// --- Users::apiSetPermissions ---
 
-// Its own dedicated account - plain3@example.com's empty perms are relied on
-// by the "Admin::guardPerm" section below, so this must not touch it
-\Nino\Auth::insertUser( $appData, 'permtest@example.com', 'perm test password' );
+// --- Dev\Users ------------------------------------------------------------
 
-\Nino\Auth::loginUser( $appData, 'permtest@example.com', 'perm test password' );
-[ $status ] = callUsers( $appData, 'apiSetPermissions', [ 'username' => 'permtest@example.com', 'perms' => [ \Nino\Admin\Elements::MANAGE_PERM ] ] );
-check( 'a non-manager cannot set anyone\'s permissions, not even their own', $status === 403 );
+echo "Dev\\Users - admin account bootstrap (create/delete) + raw permissions editor\n";
 
-\Nino\Auth::loginUser( $appData, 'manager@example.com', 'manager password' );
+[ $status ] = callDev( $appData, \Nino\Admin\Users::class, 'apiCreate', [ 'mail' => 'newdev@example.com', 'password' => 'a-long-enough-password', 'isManager' => true ] );
+check( 'apiCreate creates a user', $status === 200 );
+check( 'the new user has the manage permission', \Nino\Auth::checkPermission( $appData, '/_editor/users/manage', 'newdev@example.com' ) === true );
 
-[ $status ] = callUsers( $appData, 'apiSetPermissions', [ 'username' => 'does-not-exist@example.com', 'perms' => [ '/*' ] ] );
+// A non-manager account still gets full content access (elements/text/...),
+// same as any admin account had before per-module permissions existed - only
+// /_editor/users/manage is gated by the isManager checkbox
+[ $status ] = callDev( $appData, \Nino\Admin\Users::class, 'apiCreate', [ 'mail' => 'newcontenteditor@example.com', 'password' => 'a-long-enough-password' ] );
+check( 'apiCreate creates a non-manager user', $status === 200 );
+check( 'a non-manager still has content-module access', \Nino\Auth::checkPermission( $appData, '/_editor/elements/manage', 'newcontenteditor@example.com' ) === true );
+check( 'a non-manager does not have the manage permission', \Nino\Auth::checkPermission( $appData, '/_editor/users/manage', 'newcontenteditor@example.com' ) === false );
+\Nino\Auth::deleteUser( $appData, 'newcontenteditor@example.com' );
+
+[ $status ] = callDev( $appData, \Nino\Admin\Users::class, 'apiCreate', [ 'mail' => 'not-an-email', 'password' => 'a-long-enough-password' ] );
+check( 'apiCreate rejects an invalid mail', $status === 400 );
+
+[ $status ] = callDev( $appData, \Nino\Admin\Users::class, 'apiCreate', [ 'mail' => 'short@example.com', 'password' => 'short' ] );
+check( 'apiCreate rejects a too-short password', $status === 400 );
+
+[ $status ] = callDev( $appData, \Nino\Admin\Users::class, 'apiCreate', [ 'mail' => 'newdev@example.com', 'password' => 'a-long-enough-password' ] );
+check( 'apiCreate rejects a mail that already exists', $status === 409 );
+
+[ , $body ] = callDev( $appData, \Nino\Admin\Users::class, 'apiList' );
+check( 'the new user shows up in apiList, never a password hash', in_array( 'newdev@example.com', array_column( $body['users'], 'mail' ), true ) === true && isset( $body['users'][0]['pw'] ) === false );
+
+[ $status ] = callDev( $appData, \Nino\Admin\Users::class, 'apiDelete', [ 'mail' => 'newdev@example.com' ] );
+check( 'apiDelete removes the user', $status === 200 );
+check( 'the user is actually gone', isset( $appData['/nino/auth/user']['newdev@example.com'] ) === false );
+
+[ $status ] = callDev( $appData, \Nino\Admin\Users::class, 'apiDelete', [ 'mail' => 'newdev@example.com' ] );
+check( 'apiDelete 404s for an already-gone user', $status === 404 );
+
+[ $status ] = callDev( $appData, \Nino\Admin\Users::class, 'apiCreate', [ 'mail' => 'permsdev@example.com', 'password' => 'a-long-enough-password' ] );
+check( 'apiCreate creates the account used for the permissions editor checks', $status === 200 );
+
+[ $status ] = callDev( $appData, \Nino\Admin\Users::class, 'apiSetPermissions', [ 'mail' => 'unknown@example.com', 'perms' => [ '/*' ] ] );
 check( 'apiSetPermissions 404s for an unknown user', $status === 404 );
 
-[ $status, $body ] = callUsers( $appData, 'apiSetPermissions', [ 'username' => 'permtest@example.com', 'perms' => [ \Nino\Admin\Elements::MANAGE_PERM, 'not/a/real/perm' ] ] );
-check( 'apiSetPermissions succeeds and whitelists away an unknown perm string', $status === 200 && $body['perms'] === [ \Nino\Admin\Elements::MANAGE_PERM ] );
-check( 'the perm actually persisted to the user record', \Nino\Auth::getUser( $appData, 'permtest@example.com' )['perms'] === [ \Nino\Admin\Elements::MANAGE_PERM ] );
+[ $status ] = callDev( $appData, \Nino\Admin\Users::class, 'apiSetPermissions', [ 'mail' => 'permsdev@example.com', 'perms' => 'not-an-array' ] );
+check( 'apiSetPermissions rejects a non-array perms value', $status === 400 );
 
-[ $status, $body ] = callUsers( $appData, 'apiSetPermissions', [ 'username' => 'permtest@example.com', 'perms' => [ '/*' ] ] );
-check( 'apiSetPermissions accepts the \'/*\' full-access wildcard', $status === 200 && $body['perms'] === [ '/*' ] );
+[ $status ] = callDev( $appData, \Nino\Admin\Users::class, 'apiSetPermissions', [ 'mail' => 'permsdev@example.com', 'perms' => [ '/_editor/elements/manage', 42 ] ] );
+check( 'apiSetPermissions rejects a perms array with a non-string entry', $status === 400 );
 
-echo "\n";
+// No whitelist here on purpose - unlike _editor's own apiSetPermissions() this is the
+// developer bypass, so even a permission string _editor doesn't know about persists
+[ $status, $body ] = callDev( $appData, \Nino\Admin\Users::class, 'apiSetPermissions', [ 'mail' => 'permsdev@example.com', 'perms' => [ '/_editor/elements/manage', '/some/future/module' ] ] );
+check( 'apiSetPermissions saves an arbitrary, unwhitelisted perms array', $status === 200 && $body['perms'] === [ '/_editor/elements/manage', '/some/future/module' ] );
+check( 'the permission actually took effect', \Nino\Auth::checkPermission( $appData, '/_editor/elements/manage', 'permsdev@example.com' ) === true );
+check( 'a permission not granted stays denied', \Nino\Auth::checkPermission( $appData, '/_editor/text/manage', 'permsdev@example.com' ) === false );
 
+[ , $body ] = callDev( $appData, \Nino\Admin\Users::class, 'apiList' );
+$listed = $body['users'][ array_search( 'permsdev@example.com', array_column( $body['users'], 'mail' ), true ) ];
+check( 'apiList exposes the raw perms array too, not just the derived isManager flag', $listed['perms'] === [ '/_editor/elements/manage', '/some/future/module' ] );
 
-[ $status, $body ] = callUsers( $appData, 'apiLogoutAll', [ 'username' => 'manager@example.com' ] );
-check( 'logging out yourself everywhere reports loggedOutSelf', $status === 200 && $body['loggedOutSelf'] === true );
-check( 'logging out yourself everywhere actually ends the current session', \Nino\Auth::getCurrentUser( $appData ) === false );
-
-echo "\n";
-
-
-// --- Admin::guardPerm - per-module permissions ------------------------------
-
-echo "Admin::guardPerm - per-module permissions (Elements/Text/Images/Submissions/Newsletter/Logs)\n";
-
-// plain3@example.com (renamed from plain2/plain earlier) has no perms at all
-\Nino\Auth::loginUser( $appData, 'plain3@example.com', 'plain password' );
-
-[ $status ] = callAdminPost( $appData, 'elements/types' );
-check( 'a user with no perms is rejected from elements/types', $status === 403 );
-
-[ $status ] = callAdminPost( $appData, 'text/keys' );
-check( 'a user with no perms is rejected from text/keys', $status === 403 );
-
-[ $status ] = callAdminPost( $appData, 'images/list' );
-check( 'a user with no perms is rejected from images/list', $status === 403 );
-
-[ $status ] = callAdminPost( $appData, 'submissions/list' );
-check( 'a user with no perms is rejected from submissions/list', $status === 403 );
-
-[ $status ] = callAdminPost( $appData, 'newsletter/list' );
-check( 'a user with no perms is rejected from newsletter/list', $status === 403 );
-
-[ $status ] = callAdminPost( $appData, 'logs/list' );
-check( 'a user with no perms is rejected from logs/list', $status === 403 );
-
-// A narrowly-scoped account: only Elements::MANAGE_PERM, nothing else
-\Nino\Auth::insertUser( $appData, 'contenteditor@example.com', 'editor password', [ \Nino\Admin\Elements::MANAGE_PERM ] );
-\Nino\Auth::loginUser( $appData, 'contenteditor@example.com', 'editor password' );
-
-[ $status ] = callAdminPost( $appData, 'elements/types' );
-check( 'a user with only Elements::MANAGE_PERM can reach elements/types', $status === 200 );
-
-[ $status ] = callAdminPost( $appData, 'text/keys' );
-check( 'that same user still can\'t reach text/keys - perms don\'t leak across modules', $status === 403 );
-
-// The dashboard summary panel itself stays reachable to any logged-in admin
-// regardless of perms, but each module-specific field within it is only
-// included for an admin who actually holds that module's own permission
-// (see Admin\Dashboard::apiSummary) - contenteditor@example.com holds only
-// Elements::MANAGE_PERM here
-[ $status, $body ] = callAdminPost( $appData, 'dashboard/summary' );
-check( 'dashboard/summary needs no specific perm, just to be logged in', $status === 200 );
-check( 'elements/lastBackup are not module-specific and stay in the body regardless', array_key_exists( 'elements', $body ) === true && array_key_exists( 'lastBackup', $body ) === true );
-check( 'submissions is withheld without Submissions::VIEW_PERM', array_key_exists( 'submissions', $body ) === false );
-check( 'newsletter is withheld without Newsletter::MANAGE_PERM', array_key_exists( 'newsletter', $body ) === false );
-check( 'recentActivity is withheld without Logs::VIEW_PERM - the exact leak the field-level gate closes', array_key_exists( 'recentActivity', $body ) === false );
-
-\Nino\Auth::loginUser( $appData, 'manager@example.com', 'manager password' );
+\Nino\Auth::deleteUser( $appData, 'permsdev@example.com' );
 
 echo "\n";
 
 
-// --- Backup ------------------------------------------------------------
+// --- Dev\Images -----------------------------------------------------------
 
-echo "Backup::maybeRun (triggered from Admin::guard on every authenticated request)\n";
+echo "Dev\\Images - image slot definitions (label/width/height only)\n";
 
-// Every earlier guarded call in this whole file (Text::apiSaveBatch etc., way
-// above) already ran Backup::maybeRun() at least once, since Admin::guard()
-// is the hook point - so the dir/key already exist and today's backup already
-// exists too, from whatever state existed back then. Remove it so the checks
-// below observe a fresh backup of *this* section's actual current state,
-// rather than a stale one made from a much earlier, mostly-empty config.php.
-\Nino\Auth::loginUser( $appData, 'manager@example.com', 'manager password' );
-callUsers( $appData, 'apiList' ); // ensures /nino/backup/dir exists even on a from-scratch run
+[ $status ] = callDev( $appData, \Nino\Admin\Images::class, 'apiCreate', [ 'uri' => '/home/hero', 'label' => 'Hero', 'width' => '1200', 'height' => '600' ] );
+check( 'apiCreate creates a slot', $status === 200 );
+check( 'the slot starts with no filename', array_key_exists( 'filename', $appData['/nino/html/images']['/home/hero'] ) === true && $appData['/nino/html/images']['/home/hero']['filename'] === null );
 
-check( 'the backup dir/key exist in config.php', isset( $appData['/nino/backup/dir'] ) === true && isset( $appData['/nino/backup/key'] ) === true );
+[ $status ] = callDev( $appData, \Nino\Admin\Images::class, 'apiCreate', [ 'uri' => 'not valid', 'label' => 'x', 'width' => '10', 'height' => '10' ] );
+check( 'apiCreate rejects an invalid uri', $status === 400 );
 
-$backupDir 	= $sandbox. '/_admin/'. $appData['/nino/backup/dir'];
-$today 			= $backupDir. '/'. date( 'Y-m-d' ). '.php';
+[ $status ] = callDev( $appData, \Nino\Admin\Images::class, 'apiCreate', [ 'uri' => '/home/hero', 'label' => 'x', 'width' => '10', 'height' => '10' ] );
+check( 'apiCreate rejects a uri that already exists', $status === 409 );
 
-if( is_file( $today ) === true )
-	unlink( $today );
+[ $status, $body ] = callDev( $appData, \Nino\Admin\Images::class, 'apiList' );
+check( 'apiList succeeds', $status === 200 );
+check( 'apiList finds the new slot', in_array( '/home/hero', array_column( $body['slots'], 'uri' ), true ) === true );
 
-$logLinesBeforeBackup = isset( $appData['/nino/logs/dir'] ) === true ? readTodayLogLines( $appData, $sandbox ) : [];
+[ $status ] = callDev( $appData, \Nino\Admin\Images::class, 'apiSave', [ 'uri' => '/home/hero', 'label' => 'Hero neu', 'width' => '800', 'height' => '400' ] );
+check( 'apiSave edits an existing slot', $status === 200 );
+check( 'the slot metadata actually changed', $appData['/nino/html/images']['/home/hero']['label'] === 'Hero neu' && $appData['/nino/html/images']['/home/hero']['width'] === 800 );
 
-callUsers( $appData, 'apiList' ); // this call's Backup::maybeRun() creates today's backup fresh
+$appData['/nino/html/images']['/home/hero']['filename'] = 'elements/home/hero.800x400.jpg';
+[ $status ] = callDev( $appData, \Nino\Admin\Images::class, 'apiSave', [ 'uri' => '/home/hero', 'label' => 'Hero neu 2', 'width' => '800', 'height' => '400' ] );
+check( 'apiSave never touches an existing filename', $appData['/nino/html/images']['/home/hero']['filename'] === 'elements/home/hero.800x400.jpg' );
 
-check( 'the backup directory is created', is_dir( $backupDir ) === true );
-check( 'today\'s backup file is created', is_file( $today ) === true );
+[ $status ] = callDev( $appData, \Nino\Admin\Images::class, 'apiSave', [ 'uri' => '/does/not/exist', 'label' => 'x', 'width' => '10', 'height' => '10' ] );
+check( 'apiSave 404s for an unknown slot', $status === 404 );
 
-$logLinesAfterBackup = readTodayLogLines( $appData, $sandbox );
-check( 'creating a backup is recorded to the activity log', count( $logLinesAfterBackup ) === count( $logLinesBeforeBackup ) + 1 && str_ends_with( end( $logLinesAfterBackup ), '  Backup created' ) === true );
+[ $status ] = callDev( $appData, \Nino\Admin\Images::class, 'apiDelete', [ 'uri' => '/does/not/exist' ] );
+check( 'apiDelete 404s for an unknown slot', $status === 404 );
 
-$raw 		= file_get_contents( $today );
-$prefix = "<?php http_response_code(403); exit; return '";
-check( 'the backup file starts with the self-terminating stub, not raw bytes', str_starts_with( $raw, $prefix ) === true );
-
-$suffix 	= "';\n";
-$payload 	= base64_decode( substr( $raw, strlen( $prefix ), -strlen( $suffix ) ) );
-$key 			= base64_decode( $appData['/nino/backup/key'] );
-$iv 			= substr( $payload, 0, 12 );
-$tag 			= substr( $payload, 12, 16 );
-$cipher 	= substr( $payload, 28 );
-$gz 			= openssl_decrypt( $cipher, 'aes-256-gcm', $key, OPENSSL_RAW_DATA, $iv, $tag );
-
-check( 'the payload decrypts with the stored key', $gz !== false );
-
-$tmpGz = $sandbox. '/verify.tar.gz';
-file_put_contents( $tmpGz, $gz );
-$extractDir = $sandbox. '/verify-extracted';
-mkdir( $extractDir );
-( new \PharData( $tmpGz ) )->extractTo( $extractDir );
-
-check( 'the decrypted archive contains a byte-identical config.php', file_get_contents( $sandbox. '/config.php' ) === file_get_contents( $extractDir. '/config.php' ) );
-
-$mtimeBefore = filemtime( $today );
-clearstatcache();
-callUsers( $appData, 'apiList' );
-clearstatcache();
-check( 'a second authenticated request the same day doesn\'t touch an already-existing backup', filemtime( $today ) === $mtimeBefore );
-
-$staleFile = $backupDir. '/2020-01-01.php';
-file_put_contents( $staleFile, $prefix. 'x'. $suffix );
-unlink( $today ); // force a fresh create+prune cycle, same as a new calendar day would
-callUsers( $appData, 'apiList' );
-
-check( 'a stale backup past the retention window gets pruned on the next create', is_file( $staleFile ) === false );
-check( 'a fresh backup for today exists after the prune cycle', is_file( $today ) === true );
+[ $status ] = callDev( $appData, \Nino\Admin\Images::class, 'apiDelete', [ 'uri' => '/home/hero' ] );
+check( 'apiDelete succeeds', $status === 200 );
+check( 'the slot is gone from appData', isset( $appData['/nino/html/images']['/home/hero'] ) === false );
+$imagesAfterDelete = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/html/images'] ?? [];
+check( 'the slot is gone from config.php too', isset( $imagesAfterDelete['/home/hero'] ) === false );
 
 echo "\n";
 
 
-// --- Logs::record via Admin::handlePost()'s per-action hook + login hook ---
+// --- Dev\Text ---------------------------------------------------------------
 
-echo "Admin activity log (Logs::record via handlePost()'s per-action hook + login hook)\n";
+echo "Dev\\Text - text key schema (existence, global/per-locale, blacklist)\n";
 
-/**
- *	Dispatch one POST /_admin action through the real Admin::handlePost()
- *	entry point (not the domain class directly) - the activity log only
- *	hooks in at that level, so exercising it needs the real dispatch path
- *
- *	@param		array 		&$appData
- *	@param		string		$action				eg. "elements/save"
- *	@param		array 		$data					Post data
- *
- *	@return		array										[ statusCode, body ]
- */
-function callAdminPost( array &$appData, string $action, array $data = [] ): array {
-	$request = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-	$_POST['action'] = $action;
-	$_POST['data'] = json_encode( $data );
-	\Nino\Admin\Admin::handlePost( $appData, $request );
-	return [ $request['/nino/http/response']['statusCode'], $request['/nino/http/response']['body'] ];
-}
+[ $status ] = callDev( $appData, \Nino\Admin\Text::class, 'apiCreate', [ 'key' => '/home/welcome/subtitle', 'global' => false, 'value' => 'Start' ] );
+check( 'apiCreate creates a per-locale key', $status === 200 );
 
-/**
- *	Read today's log file back into its lines, decoding the same stub +
- *	base64 wrapping Logs::record() writes
- *
- *	@param		array 		&$appData
- *	@param		string		$sandbox
- *
- *	@return		string[]
- */
-function readTodayLogLines( array &$appData, string $sandbox ): array {
-	$path = $sandbox. '/_admin/'. $appData['/nino/logs/dir']. '/'. date( 'Y-m-d' ). '.php';
-	if( is_file( $path ) === false )
-		return [];
-	$prefix 	= "<?php http_response_code(403); exit; return '";
-	$suffix 	= "';\n";
-	$decoded 	= base64_decode( substr( file_get_contents( $path ), strlen( $prefix ), -strlen( $suffix ) ) );
-	return $decoded === '' ? [] : explode( "\n", $decoded );
-}
+$deDE = \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] );
+$enUS = \Nino\Filesystem::getFileContent( $appData, '/text/en_US.php', [] );
+check( 'the initial value is written into every available locale', $deDE['[[/home/welcome/subtitle]]'] === 'Start' && $enUS['[[/home/welcome/subtitle]]'] === 'Start' );
 
-// Admin::guard() has already been called many times by earlier sections
-// (every domain action calls it), so the activity log already has entries
-// (including "Login" lines from _logLoginOnce()) by this point - every check
-// below compares against a fresh baseline instead of assuming an empty log
+[ $status ] = callDev( $appData, \Nino\Admin\Text::class, 'apiCreate', [ 'key' => '/company/tagline', 'global' => true, 'value' => 'Immer' ] );
+check( 'apiCreate creates a global key', $status === 200 );
 
-\Nino\Auth::loginUser( $appData, 'manager@example.com', 'manager password' );
+$global = \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] );
+check( 'the initial value is written into global.php, not any locale file', $global['[[/company/tagline]]'] === 'Immer' );
 
-\Nino\Elements::insertElementType( $appData, '/logtestdemo', [ 'model' => [ 'title' => [ 'type' => 'string' ] ] ] );
+[ $status ] = callDev( $appData, \Nino\Admin\Text::class, 'apiCreate', [ 'key' => 'not-a-valid-key', 'global' => true, 'value' => 'x' ] );
+check( 'apiCreate rejects an invalid key', $status === 400 );
 
-$before = readTodayLogLines( $appData, $sandbox );
+[ $status ] = callDev( $appData, \Nino\Admin\Text::class, 'apiCreate', [ 'key' => '/company/tagline', 'global' => true, 'value' => 'x' ] );
+check( 'apiCreate rejects a key that already exists', $status === 409 );
 
-[ $status ] = callAdminPost( $appData, 'elements/save', [ 'type' => 'logtestdemo', 'uri' => 'entry1', 'locale' => 'de_DE', 'isNew' => true, 'fields' => [ 'title' => 'Hi' ] ] );
-check( 'elements/save via handlePost succeeds', $status === 200 );
+[ $status, $body ] = callDev( $appData, \Nino\Admin\Text::class, 'apiList' );
+check( 'apiList succeeds', $status === 200 );
+$subtitleEntry = null;
+foreach( $body['keys'] as $entry ) if( $entry['key'] === '/home/welcome/subtitle' ) $subtitleEntry = $entry;
+check( 'apiList finds the new per-locale key, not blacklisted by default', $subtitleEntry !== null && $subtitleEntry['global'] === false && $subtitleEntry['blacklisted'] === false );
 
-$lines = readTodayLogLines( $appData, $sandbox );
-check( 'elements/save is recorded to the activity log', count( $lines ) === count( $before ) + 1 && str_ends_with( end( $lines ), 'Add Element /logtestdemo/entry1' ) === true );
-check( 'the log line records the acting admin', str_contains( end( $lines ), 'manager@example.com' ) === true );
+[ $status ] = callDev( $appData, \Nino\Admin\Text::class, 'apiSave', [ 'key' => '/home/welcome/subtitle', 'global' => true, 'blacklisted' => false ] );
+check( 'apiSave converts a per-locale key to global', $status === 200 );
 
-check( 'Logs uses its own random directory, independent of Backup\'s', $appData['/nino/logs/dir'] !== $appData['/nino/backup/dir'] );
+$deDEAfter = \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] );
+$globalAfter = \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] );
+check( 'converting to global removes it from every locale file', isset( $deDEAfter['[[/home/welcome/subtitle]]'] ) === false );
+check( 'converting to global migrates the value instead of discarding it', $globalAfter['[[/home/welcome/subtitle]]'] === 'Start' );
 
-callAdminPost( $appData, 'elements/list', [ 'type' => 'logtestdemo' ] );
-check( 'a read-only action (elements/list) does not add a log entry', count( readTodayLogLines( $appData, $sandbox ) ) === count( $lines ) );
+[ $status ] = callDev( $appData, \Nino\Admin\Text::class, 'apiSave', [ 'key' => '/home/welcome/subtitle', 'global' => false, 'blacklisted' => true ] );
+check( 'apiSave converts back to per-locale and blacklists it in the same call', $status === 200 );
 
-[ $status ] = callAdminPost( $appData, 'elements/save', [ 'type' => 'logtestdemo', 'uri' => '', 'locale' => 'de_DE', 'fields' => [] ] );
-check( 'an invalid elements/save is rejected', $status === 400 );
-check( 'a failed action does not add a log entry', count( readTodayLogLines( $appData, $sandbox ) ) === count( $lines ) );
+$deDEAfter2 = \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] );
+$globalAfter2 = \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] );
+$blacklist = \Nino\Filesystem::getFileContent( $appData, '/text/blacklist.php', [] );
+check( 'converting back to per-locale migrates the value into every locale', $deDEAfter2['[[/home/welcome/subtitle]]'] === 'Start' );
+check( 'converting back to per-locale removes it from global.php', isset( $globalAfter2['[[/home/welcome/subtitle]]'] ) === false );
+check( 'the key is now blacklisted', in_array( '/home/welcome/subtitle', $blacklist, true ) === true );
 
-[ $status ] = callAdminPost( $appData, 'elements/delete', [ 'type' => 'logtestdemo', 'uri' => 'entry1' ] );
-check( 'elements/delete via handlePost succeeds', $status === 200 );
+[ $status ] = callDev( $appData, \Nino\Admin\Text::class, 'apiSave', [ 'key' => '/does/not/exist', 'global' => true, 'blacklisted' => false ] );
+check( 'apiSave 404s for an unknown key', $status === 404 );
 
-$linesAfterDelete = readTodayLogLines( $appData, $sandbox );
-check( 'elements/delete is recorded to the activity log', count( $linesAfterDelete ) === count( $lines ) + 1 && str_ends_with( end( $linesAfterDelete ), 'Delete Element /logtestdemo/entry1' ) === true );
+[ $status, $body ] = callDev( $appData, \Nino\Admin\Text::class, 'apiSaveBatch', [ 'items' => [
+	[ 'key' => '/company/tagline', 'locale' => '*', 'value' => 'Immer und ewig' ],
+	[ 'key' => '/home/welcome/subtitle', 'locale' => 'de_DE', 'value' => 'Neuer Start' ],
+] ] );
+check( 'apiSaveBatch succeeds', $status === 200 );
+check( 'apiSaveBatch saves a global value', $body['results']['/company/tagline']['ok'] === true );
+check( 'apiSaveBatch saves a blacklisted key\'s value too - blacklist only hides it from _editor', $body['results']['/home/welcome/subtitle']['ok'] === true );
 
-[ $status ] = callAdminPost( $appData, 'text/savebatch', [ 'items' => [ [ 'key' => '/home/plain', 'locale' => 'de_DE', 'value' => 'Neuer Text' ] ] ] );
-check( 'text/savebatch via handlePost succeeds', $status === 200 );
+$globalAfterBatch = \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] );
+$deDEAfterBatch 	= \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] );
+check( 'the global value actually landed in global.php', $globalAfterBatch['[[/company/tagline]]'] === 'Immer und ewig' );
+check( 'the per-locale value actually landed in the right locale file', $deDEAfterBatch['[[/home/welcome/subtitle]]'] === 'Neuer Start' );
 
-$linesAfterText = readTodayLogLines( $appData, $sandbox );
-check( 'text/savebatch is recorded with the key\'s category, not the locale', count( $linesAfterText ) === count( $linesAfterDelete ) + 1 && str_ends_with( end( $linesAfterText ), 'Edit Text /home' ) === true );
+// html is auto-detected from a key's *current* value (see _entries()) - create one
+// that already holds a whitelisted tag, so this save actually exercises sanitizeHtml()
+// rather than the plain strip_tags() path a fresh/plain-text key would get
+[ $status ] = callDev( $appData, \Nino\Admin\Text::class, 'apiCreate', [ 'key' => '/company/note', 'global' => true, 'value' => '<strong>Wichtig</strong>' ] );
+check( 'apiCreate creates the html-flagged fixture key', $status === 200 );
 
-// --- Login hook: Admin::guard()/handleGet() log "Login" the first time a
-// newly-authenticated session touches _admin - not a direct Auth hook, since
-// the real login POST (/.nino/auth/login) isn't guaranteed to be routed
-// through _admin/index.php at all (see Admin::_logLoginOnce()'s docblock)
+[ $status, $body ] = callDev( $appData, \Nino\Admin\Text::class, 'apiSaveBatch', [ 'items' => [
+	[ 'key' => '/company/note', 'locale' => '*', 'value' => '<script>alert(1)</script><strong>Wichtig</strong><em>auch</em>' ],
+] ] );
+check( 'apiSaveBatch sanitizes html the same way _editor\'s Text does', $body['results']['/company/note']['value'] === '<strong>Wichtig</strong><em>auch</em>' );
 
-unset( $appData['./nino/auth/current'] );
-\Nino\Runtime::unsetSessionValue( $appData, './admin/loginLoggedFor' );
+[ $status, $body ] = callDev( $appData, \Nino\Admin\Text::class, 'apiSaveBatch', [ 'items' => [
+	[ 'key' => '/does/not/exist', 'locale' => '*', 'value' => 'x' ],
+] ] );
+check( 'apiSaveBatch reports an unknown key without failing the whole request', $status === 200 && $body['results']['/does/not/exist']['ok'] === false );
 
-[ $status ] = callAdminPost( $appData, 'elements/list', [ 'type' => 'logtestdemo' ] );
-check( 'a logged-out request is rejected', $status === 401 );
-check( 'a logged-out request adds no log entry', count( readTodayLogLines( $appData, $sandbox ) ) === count( $linesAfterText ) );
+[ $status, $body ] = callDev( $appData, \Nino\Admin\Text::class, 'apiSaveBatch', [ 'items' => [
+	[ 'key' => '/home/welcome/subtitle', 'locale' => 'xx_XX', 'value' => 'x' ],
+] ] );
+check( 'apiSaveBatch rejects an invalid locale for a per-locale key', $body['results']['/home/welcome/subtitle']['ok'] === false );
 
-\Nino\Auth::loginUser( $appData, 'manager@example.com', 'manager password' );
+[ $status ] = callDev( $appData, \Nino\Admin\Text::class, 'apiRename', [ 'key' => '/company/tagline', 'newKey' => '/company/motto' ] );
+check( 'apiRename succeeds for a global key', $status === 200 );
 
-[ $status ] = callAdminPost( $appData, 'elements/list', [ 'type' => 'logtestdemo' ] );
-check( 'the first request after a fresh login still succeeds', $status === 200 );
+$globalAfterRename = \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] );
+check( 'the old key is gone from global.php', isset( $globalAfterRename['[[/company/tagline]]'] ) === false );
+check( 'the value moved to the new key', $globalAfterRename['[[/company/motto]]'] === 'Immer und ewig' );
 
-$linesAfterLogin = readTodayLogLines( $appData, $sandbox );
-check( 'a fresh login is recorded exactly once', count( $linesAfterLogin ) === count( $linesAfterText ) + 1 );
-check( 'the login line names the newly-authenticated user', str_ends_with( end( $linesAfterLogin ), '  Login' ) === true && str_contains( end( $linesAfterLogin ), 'manager@example.com' ) === true );
+[ $status ] = callDev( $appData, \Nino\Admin\Text::class, 'apiRename', [ 'key' => '/company/motto', 'newKey' => 'not-a-valid-key' ] );
+check( 'apiRename rejects an invalid new key', $status === 400 );
 
-callAdminPost( $appData, 'elements/list', [ 'type' => 'logtestdemo' ] );
-check( 'a second request in the same login does not log another Login line', count( readTodayLogLines( $appData, $sandbox ) ) === count( $linesAfterLogin ) );
+[ $status ] = callDev( $appData, \Nino\Admin\Text::class, 'apiRename', [ 'key' => '/company/motto', 'newKey' => '/company/note' ] );
+check( 'apiRename rejects a new key that already exists', $status === 409 );
 
-[ $status, $body ] = callAdminPost( $appData, 'logs/list' );
-$linesSoFar = readTodayLogLines( $appData, $sandbox );
-check( 'logs/list succeeds', $status === 200 );
-check( 'logs/list returns lines most-recent-first', $body['lines'][0] === end( $linesSoFar ) );
-check( 'logs/list returns every recorded line so far', count( $body['lines'] ) === count( $linesSoFar ) );
+[ $status ] = callDev( $appData, \Nino\Admin\Text::class, 'apiRename', [ 'key' => '/does/not/exist', 'newKey' => '/also/new' ] );
+check( 'apiRename 404s for an unknown key', $status === 404 );
 
-$logsDir = $sandbox. '/_admin/'. $appData['/nino/logs/dir'];
-$staleLogFile = $logsDir. '/2020-01-01.php';
-file_put_contents( $staleLogFile, "<?php http_response_code(403); exit; return '". base64_encode( '2020-01-01 00:00  x  y' ). "';\n" );
+[ $status ] = callDev( $appData, \Nino\Admin\Text::class, 'apiDelete', [ 'key' => '/company/note' ] );
+check( 'apiDelete succeeds for a global key', $status === 200 );
 
-callAdminPost( $appData, 'elements/save', [ 'type' => 'logtestdemo', 'uri' => 'entry2', 'locale' => 'de_DE', 'isNew' => true, 'fields' => [ 'title' => 'Hi2' ] ] );
-check( 'a stale log file past the retention window gets pruned on the next write', is_file( $staleLogFile ) === false );
+$globalAfterDelete = \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] );
+check( 'the deleted global key is gone', isset( $globalAfterDelete['[[/company/note]]'] ) === false );
 
-echo "\n";
+[ $status ] = callDev( $appData, \Nino\Admin\Text::class, 'apiDelete', [ 'key' => '/home/welcome/subtitle' ] );
+check( 'apiDelete succeeds for a blacklisted per-locale key', $status === 200 );
 
+$deDEAfterDelete 	= \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] );
+$enUSAfterDelete 	= \Nino\Filesystem::getFileContent( $appData, '/text/en_US.php', [] );
+$blacklistAfterDelete = \Nino\Filesystem::getFileContent( $appData, '/text/blacklist.php', [] );
+check( 'the deleted per-locale key is gone from every locale file', isset( $deDEAfterDelete['[[/home/welcome/subtitle]]'] ) === false && isset( $enUSAfterDelete['[[/home/welcome/subtitle]]'] ) === false );
+check( 'the deleted key is also gone from the blacklist', in_array( '/home/welcome/subtitle', $blacklistAfterDelete, true ) === false );
 
-// --- Submissions: Modules\Form writes, Admin\Submissions reads independently ---
-
-echo "Submissions (Modules\\Form writes, Admin\\Submissions::apiList reads)\n";
-
-\Nino\Html::addFills( $appData, [
-	'[[/form/email/owner]]' 	=> 'owner@example.com',
-	'[[/form/subject/owner]]' => 'New inquiry',
-	'[[/form/subject/user]]' 	=> 'Thanks for reaching out',
-], '*' );
-
-$_POST = [ 'name' => 'Jo Client', 'email' => 'jo@example.com', 'message' => 'Hallo!', 'location' => '', 'cat' => 'General' ];
-$formRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Modules\Form::callbackResponse( $appData, $formRequest );
-check( 'a valid contact submission succeeds', $formRequest['/nino/http/response']['statusCode'] === 200 );
-
-[ $status, $body ] = callAdminPost( $appData, 'submissions/list' );
-check( 'submissions/list succeeds', $status === 200 );
-check( 'submissions/list finds the submission just sent', count( $body['entries'] ) === 1 && $body['entries'][0]['email'] === 'jo@example.com' );
-
-check( 'forms data lives at the project-root /data dir, not under _admin', is_file( \Nino\Filesystem::getPath( $appData ). '/data/forms.'. date( 'Y-m' ). '.php' ) === true && is_dir( \Nino\Filesystem::getPath( $appData ). '/_admin/data' ) === false );
-
-unset( $appData['./nino/auth/current'] );
-[ $status ] = callAdminPost( $appData, 'submissions/list' );
-check( 'submissions/list requires an authed admin session too', $status === 401 );
-\Nino\Auth::loginUser( $appData, 'manager@example.com', 'manager password' );
+[ $status ] = callDev( $appData, \Nino\Admin\Text::class, 'apiDelete', [ 'key' => '/does/not/exist' ] );
+check( 'apiDelete 404s for an unknown key', $status === 404 );
 
 echo "\n";
 
 
-// --- Newsletter: Modules\Newsletter writes, Admin\Newsletter reads/deletes independently ---
+// --- Text::apiScan / Images::apiScan: template scanners ---------------------
 
-echo "Newsletter (Modules\\Newsletter writes, Admin\\Newsletter::apiList/apiDelete)\n";
+echo "Text::apiScan - missing [[/key]] placeholders in templates/*.tpl\n";
 
-$_POST = [ 'email' => 'jo@example.com', 'location' => '' ];
-$newsletterRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Modules\Newsletter::callbackResponse( $appData, $newsletterRequest );
-check( 'a valid newsletter signup succeeds', $newsletterRequest['/nino/http/response']['statusCode'] === 200 );
+mkdir( $sandbox. '/templates', 0777, true );
+file_put_contents( $sandbox. '/templates/scan-fixture.tpl', '<p>[[/page-scan-test/heading]]</p><p>[[/page-scan-test/heading]]</p><p>[[/company/name]]</p>' );
+// A nested, dynamically-constructed fill (same shape as html-header.tpl's real
+// [[/webpage[[/nino/http/response/uri]]/title]]) - only the inner, always-
+// registered kernel fill should ever be visible to a static regex scan
+file_put_contents( $sandbox. '/templates/scan-fixture-2.tpl', '<title>[[/webpage[[/nino/http/response/uri]]/title]]</title>' );
 
-$_POST = [ 'email' => 'anna@example.com', 'location' => '' ];
-$newsletterRequest2 = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Modules\Newsletter::callbackResponse( $appData, $newsletterRequest2 );
-check( 'a second valid newsletter signup succeeds', $newsletterRequest2['/nino/http/response']['statusCode'] === 200 );
+// /company/name is genuinely defined (unlike /page-scan-test/heading) - proves
+// a real key is correctly excluded, not just absent from the fixture by accident
+$globalFixture = \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] );
+$globalFixture['[[/company/name]]'] = 'Acme';
+\Nino\Filesystem::putFileContent( $appData, '/text/global.php', $globalFixture );
 
-[ $status, $body ] = callAdminPost( $appData, 'newsletter/list' );
-check( 'newsletter/list succeeds', $status === 200 );
-check( 'newsletter/list finds both signups just sent', count( $body['entries'] ) === 2 );
+[ $status, $body ] = callDev( $appData, \Nino\Admin\Text::class, 'apiScan' );
+check( 'apiScan succeeds', $status === 200 );
 
-check( 'newsletter data lives at the project-root /data dir, not under _admin', is_file( \Nino\Filesystem::getPath( $appData ). '/data/newsletter.php' ) === true && is_dir( \Nino\Filesystem::getPath( $appData ). '/_admin/data' ) === false );
+$missingKeys = array_column( $body['missing'], 'key' );
+check( 'a genuinely undefined key is reported', in_array( '/page-scan-test/heading', $missingKeys, true ) === true );
+check( 'an undefined key found twice in the same file is only reported once', count( array_filter( $missingKeys, fn( $k ) => $k === '/page-scan-test/heading' ) ) === 1 );
+check( 'an already-defined key is not reported', in_array( '/company/name', $missingKeys, true ) === false );
+check( 'the kernel-injected /nino/http/response/uri fill is never reported, despite appearing inside a nested [[...]] construct', in_array( '/nino/http/response/uri', $missingKeys, true ) === false );
 
-unset( $appData['./nino/auth/current'] );
-[ $status ] = callAdminPost( $appData, 'newsletter/list' );
-check( 'newsletter/list requires an authed admin session too', $status === 401 );
-[ $status ] = callAdminPost( $appData, 'newsletter/delete', [ 'email' => 'jo@example.com' ] );
-check( 'newsletter/delete requires an authed admin session too', $status === 401 );
-\Nino\Auth::loginUser( $appData, 'manager@example.com', 'manager password' );
-
-[ $status ] = callAdminPost( $appData, 'newsletter/delete', [ 'email' => 'does-not-exist@example.com' ] );
-check( 'newsletter/delete 404s for an email that was never subscribed', $status === 404 );
-
-[ $status ] = callAdminPost( $appData, 'newsletter/delete', [ 'email' => 'jo@example.com' ] );
-check( 'newsletter/delete succeeds for an existing subscriber', $status === 200 );
-
-[ , $body ] = callAdminPost( $appData, 'newsletter/list' );
-check( 'the deleted subscriber is gone, the other one remains', count( $body['entries'] ) === 1 && $body['entries'][0]['email'] === 'anna@example.com' );
-
-check( 'the admin delete also records the removal, same as a self-service unsubscribe', in_array( hash( 'sha256', 'jo@example.com' ), \Nino\Filesystem::getFileContent( $appData, '/data/newsletter-removed.php', [] ), true ) === true );
+unlink( $sandbox. '/templates/scan-fixture.tpl' );
+unlink( $sandbox. '/templates/scan-fixture-2.tpl' );
 
 echo "\n";
 
 
-// --- Dashboard::apiSummary - aggregates numbers the other panels already compute ---
+echo "Images::apiScan - hardcoded <img> tags in templates/*.tpl, not backed by a slot\n";
+
+mkdir( $sandbox. '/images', 0777, true );
+
+// A real, tiny (3x2px) PNG so getimagesize() has something genuine to probe
+$probeImg = imagecreatetruecolor( 3, 2 );
+ob_start();
+imagepng( $probeImg );
+file_put_contents( $sandbox. '/images/probe.png', ob_get_clean() );
+imagedestroy( $probeImg );
+
+file_put_contents( $sandbox. '/templates/scan-fixture-img.tpl', '<img src="[[/nino/dir]]/images/probe.png"><img src="[[/nino/dir]]/images/probe.png"><img src="https://example.com/x.jpg"><img src="data:image/svg+xml,%3Csvg/%3E">' );
+
+[ $status, $body ] = callDev( $appData, \Nino\Admin\Images::class, 'apiScan' );
+check( 'apiScan succeeds', $status === 200 );
+check( 'exactly one missing image is reported (deduped, external/data-uri skipped)', count( $body['missing'] ) === 1 );
+check( 'the reported filename is the local one, relative to /images/', ( $body['missing'][0]['filename'] ?? null ) === 'probe.png' );
+check( 'width/height were probed from the real file since the <img> tag had none', ( $body['missing'][0]['width'] ?? null ) === 3 && ( $body['missing'][0]['height'] ?? null ) === 2 );
+check( 'a suggested uri was derived from the filename', ( $body['missing'][0]['suggestedUri'] ?? null ) === '/probe' );
+
+[ $status ] = callDev( $appData, \Nino\Admin\Images::class, 'apiCreate', [ 'uri' => '/probe', 'label' => 'Probe', 'width' => '3', 'height' => '2' ] );
+check( 'the suggested slot can actually be created', $status === 200 );
+
+// Once a slot's filename actually tracks it (the manual step _editor's upload
+// flow would do next), the same <img> must disappear from the scan
+$appData['/nino/html/images']['/probe']['filename'] = 'probe.png';
+[ $status, $body ] = callDev( $appData, \Nino\Admin\Images::class, 'apiScan' );
+check( 'once a slot tracks the file, it no longer shows up as missing', count( $body['missing'] ) === 0 );
+
+unlink( $sandbox. '/templates/scan-fixture-img.tpl' );
+
+echo "\n";
+
+
+// --- Dashboard::apiSummary - aggregates Text/Images::missingCount() ---------
 
 echo "Dashboard::apiSummary\n";
 
-[ $status, $body ] = callAdminPost( $appData, 'dashboard/summary' );
-check( 'dashboard/summary succeeds', $status === 200 );
-check( 'submissions total matches Submissions::count (1 sent above, none deleted)', $body['submissions'] === 1 );
-check( 'newsletter total matches what remains after the delete above (jo removed, anna remains)', $body['newsletter'] === 1 );
+[ $status, $body ] = callDev( $appData, \Nino\Admin\Dashboard::class, 'apiSummary' );
+check( 'apiSummary succeeds', $status === 200 );
+check( 'missingText is 0 - both scan fixtures above were already cleaned up', $body['missingText'] === 0 );
+check( 'missingImages is 0 - the scan fixture above was already cleaned up', $body['missingImages'] === 0 );
 
-$imagedemo = array_values( array_filter( $body['elements'], fn( $e ) => $e['type'] === 'imagedemo' ) )[0] ?? null;
-check( 'elements includes imagedemo with its final count (item1 remains, item2 was deleted above)', $imagedemo !== null && $imagedemo['count'] === 1 );
+// A fresh, self-contained fixture (one undefined key, one untracked image) to
+// prove the two counts actually reflect Text/Images::_scanMissing(), not just
+// always 0 - a new filename, since probe.png is already tracked by the slot
+// created in the Images::apiScan section above
+file_put_contents( $sandbox. '/templates/dashboard-fixture.tpl', '<p>[[/dashboard-scan-test/heading]]</p><img src="[[/nino/dir]]/images/probe2.png">' );
 
-check( 'lastBackup is today\'s date (Backup::maybeRun already ran via Admin::guard() many times above)', $body['lastBackup'] === date( 'Y-m-d' ) );
-check( 'recentActivity is non-empty (at least the Login line from earlier)', is_array( $body['recentActivity'] ) && count( $body['recentActivity'] ) > 0 );
+[ , $body ] = callDev( $appData, \Nino\Admin\Dashboard::class, 'apiSummary' );
+check( 'missingText picks up the fresh undefined key', $body['missingText'] === 1 );
+check( 'missingImages picks up the fresh untracked image (a new filename, not tracked by any slot)', $body['missingImages'] === 1 );
 
-unset( $appData['./nino/auth/current'] );
-[ $status ] = callAdminPost( $appData, 'dashboard/summary' );
-check( 'dashboard/summary requires an authed admin session too', $status === 401 );
-\Nino\Auth::loginUser( $appData, 'manager@example.com', 'manager password' );
+unlink( $sandbox. '/templates/dashboard-fixture.tpl' );
+
+\Nino\Runtime::unsetSessionValue( $appData, './nino/admin/authed' );
+[ $status ] = callDev( $appData, \Nino\Admin\Dashboard::class, 'apiSummary' );
+check( 'apiSummary requires an authed dev session too', $status === 401 );
+\Nino\Runtime::setSessionValue( $appData, './nino/admin/authed', true );
 
 echo "\n";
 
 
-// --- Cleanup ---------------------------------------------------------------
+// --- Dev\PageEditor - create/edit/delete page routes -------------------------
 
-\Nino\Filesystem::removeDir( $sandbox );
+echo "Dev\\PageEditor - create/edit/delete page routes\n";
+
+file_put_contents( $sandbox. '/templates/page-about.tpl', '<h1>About</h1>' );
+file_put_contents( $sandbox. '/templates/page-contact.tpl', '<h1>Contact</h1>' );
+file_put_contents( $sandbox. '/templates/not-a-page.tpl', '<p>ignored - not a page-*.tpl file</p>' );
+
+[ $status, $body ] = callDev( $appData, \Nino\Admin\PageEditor::class, 'apiList' );
+check( 'apiList succeeds', $status === 200 );
+check( 'starts with an empty page list', $body['pages'] === [] );
+check( 'lists only templates/page-*.tpl files, sorted, extension stripped', $body['templates'] === [ 'page-about', 'page-contact' ] );
+check( 'navModule is false - Navigation was never picked', $body['navModule'] === false );
+
+[ $status ] = callDev( $appData, \Nino\Admin\PageEditor::class, 'apiSave', [
+	'originalHttpUri' => '', 'uri' => '../etc/passwd', 'httpUri' => '/about', 'template' => 'page-about', 'text' => [],
+] );
+check( 'rejects an unsafe Element-URI with 400', $status === 400 );
+
+[ $status ] = callDev( $appData, \Nino\Admin\PageEditor::class, 'apiSave', [
+	'originalHttpUri' => '', 'uri' => '/about', 'httpUri' => '../etc/passwd', 'template' => 'page-about', 'text' => [],
+] );
+check( 'rejects an unsafe Http-URI with 400', $status === 400 );
+
+[ $status ] = callDev( $appData, \Nino\Admin\PageEditor::class, 'apiSave', [
+	'originalHttpUri' => '', 'uri' => '/about', 'httpUri' => '/about', 'template' => 'not-a-page', 'text' => [],
+] );
+check( 'rejects a template outside the page-*.tpl whitelist with 400', $status === 400 );
+
+// The actual, first real save: Element-URI deliberately differs from
+// Http-URI, to prove the class uses the entry's own uri, not the request
+// path, for the route's own data field/meta namespace
+[ $status, $body ] = callDev( $appData, \Nino\Admin\PageEditor::class, 'apiSave', [
+	'originalHttpUri' => '', 'uri' => '/site-about', 'httpUri' => '/about', 'template' => 'page-about', 'statusCode' => 200, 'text' => [
+		'de_DE' => [ 'name' => 'Über uns', 'title' => 'Über uns', 'description' => 'Über unser Unternehmen.' ],
+	],
+] );
+check( 'apiSave succeeds', $status === 200 );
+check( 'response echoes the persisted list', count( $body['pages'] ) === 1 );
+
+$configAfterSave = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
+check( 'registers a route at "/about" (its Http-URI)', isset( $configAfterSave['/nino/http/routes']['GET://about'] ) === true );
+check( 'the route\'s own "uri" data field is the Element-URI, not the Http-URI', $configAfterSave['/nino/http/routes']['GET://about']['uri'] === '/site-about' );
+check( 'the route body references the picked template, extension stripped', $configAfterSave['/nino/http/routes']['GET://about']['body'] === '[template /templates/page-about]' );
+check( 'a 200 status code is not written out (the implicit default)', isset( $configAfterSave['/nino/http/routes']['GET://about']['statusCode'] ) === false );
+check( 'the list itself is persisted at /nino/install/webpages', count( $configAfterSave['/nino/install/webpages'] ) === 1 );
+
+$deAfterSave = \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] );
+check( 'writes the page\'s own de_DE meta, keyed by its Element-URI', $deAfterSave['[[/webpage/site-about/name]]'] === 'Über uns' && $deAfterSave['[[/webpage/site-about/title]]'] === 'Über uns' );
+
+$enAfterSave = \Nino\Filesystem::getFileContent( $appData, '/text/en_US.php', [] );
+check( 'a locale left entirely unposted still gets the generic placeholder, not left unset', $enAfterSave['[[/webpage/site-about/name]]'] === 'Page' );
+
+// Duplicate checks: a second entry may not reuse either uri
+[ $status ] = callDev( $appData, \Nino\Admin\PageEditor::class, 'apiSave', [
+	'originalHttpUri' => '', 'uri' => '/site-about', 'httpUri' => '/contact', 'template' => 'page-contact', 'text' => [],
+] );
+check( 'rejects a duplicate Element-URI with 400', $status === 400 );
+
+[ $status ] = callDev( $appData, \Nino\Admin\PageEditor::class, 'apiSave', [
+	'originalHttpUri' => '', 'uri' => '/site-contact', 'httpUri' => '/about', 'template' => 'page-contact', 'text' => [],
+] );
+check( 'rejects a duplicate Http-URI with 400', $status === 400 );
+
+// A real second entry, with a non-200 status code and nav checked
+[ $status ] = callDev( $appData, \Nino\Admin\PageEditor::class, 'apiSave', [
+	'originalHttpUri' => '', 'uri' => '/site-contact', 'httpUri' => '/contact', 'template' => 'page-contact', 'statusCode' => 404, 'nav' => true, 'text' => [
+		'de_DE' => [ 'name' => 'Kontakt' ],
+	],
+] );
+check( 'apiSave succeeds for the second entry too', $status === 200 );
+
+$configAfterSecond = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
+check( 'a non-200, in-range status code is written out as posted', $configAfterSecond['/nino/http/routes']['GET://contact']['statusCode'] === 404 );
+check( 'both entries are now persisted, in order', array_column( $configAfterSecond['/nino/install/webpages'], 'httpUri' ) === [ '/about', '/contact' ] );
+
+// Navigation: only regenerated while the module is active
+$appData['/nino/modules'][] = '\\Nino\\Modules\\Navigation';
+
+[ $status ] = callDev( $appData, \Nino\Admin\PageEditor::class, 'apiSave', [
+	'originalHttpUri' => '/contact', 'uri' => '/site-contact', 'httpUri' => '/contact', 'template' => 'page-contact', 'nav' => true, 'text' => [
+		'de_DE' => [ 'name' => 'Kontakt' ],
+	],
+] );
+check( 'resaving an existing entry unchanged (identified by originalHttpUri) succeeds', $status === 200 );
+
+$deAfterNav = \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] );
+check( 'generates the main-menu fill once Navigation is active, keyed by Http-URI (not Element-URI)', $deAfterNav['[[/website/navigation/main]]'] === '/contact:Kontakt' );
+check( 'the non-nav entry (about) is left out of the generated menu', str_contains( $deAfterNav['[[/website/navigation/main]]'], 'about' ) === false );
+
+// Reordering: check both entries "nav" so the generated menu actually
+// shows a reorder, not just the list itself
+[ $status ] = callDev( $appData, \Nino\Admin\PageEditor::class, 'apiSave', [
+	'originalHttpUri' => '/about', 'uri' => '/site-about', 'httpUri' => '/about', 'template' => 'page-about', 'nav' => true, 'text' => [
+		'de_DE' => [ 'name' => 'About' ],
+	],
+] );
+check( 'checking "nav" on the first entry too succeeds', $status === 200 );
+
+[ $status ] = callDev( $appData, \Nino\Admin\PageEditor::class, 'apiMove', [ 'httpUri' => '/about', 'direction' => 'up' ] );
+check( 'moving the first entry up (already at the top) 400s', $status === 400 );
+
+[ $status ] = callDev( $appData, \Nino\Admin\PageEditor::class, 'apiMove', [ 'httpUri' => '/contact', 'direction' => 'down' ] );
+check( 'moving the last entry down (already at the bottom) 400s', $status === 400 );
+
+[ $status ] = callDev( $appData, \Nino\Admin\PageEditor::class, 'apiMove', [ 'httpUri' => '/about', 'direction' => 'sideways' ] );
+check( 'rejects an invalid direction with 400', $status === 400 );
+
+[ $status ] = callDev( $appData, \Nino\Admin\PageEditor::class, 'apiMove', [ 'httpUri' => '/does-not-exist', 'direction' => 'up' ] );
+check( 'apiMove 404s for an unknown httpUri', $status === 404 );
+
+[ $status, $body ] = callDev( $appData, \Nino\Admin\PageEditor::class, 'apiMove', [ 'httpUri' => '/about', 'direction' => 'down' ] );
+check( 'moving the first entry down succeeds', $status === 200 );
+check( 'the two entries actually swapped places', array_column( $body['pages'], 'httpUri' ) === [ '/contact', '/about' ] );
+
+$configAfterMove = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
+check( 'the swapped order is persisted too', array_column( $configAfterMove['/nino/install/webpages'], 'httpUri' ) === [ '/contact', '/about' ] );
+
+$deAfterMove = \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] );
+check( 'the generated main-menu fill reflects the new order too', $deAfterMove['[[/website/navigation/main]]'] === "/contact:Kontakt\n/about:About" );
+
+// Move it back for the rename/delete checks below, which assume the
+// original order ("about" first)
+[ $status ] = callDev( $appData, \Nino\Admin\PageEditor::class, 'apiMove', [ 'httpUri' => '/about', 'direction' => 'up' ] );
+check( 'moving it back up succeeds', $status === 200 );
+
+// Renaming an entry's Http-URI: the old route key must disappear, the new
+// one appear, and the list must stay at 2 entries (replaced in place)
+[ $status ] = callDev( $appData, \Nino\Admin\PageEditor::class, 'apiSave', [
+	'originalHttpUri' => '/about', 'uri' => '/site-about', 'httpUri' => '/ueber-uns', 'template' => 'page-about', 'text' => [
+		'de_DE' => [ 'name' => 'Über uns' ],
+	],
+] );
+check( 'renaming an entry\'s Http-URI succeeds', $status === 200 );
+
+$configAfterRename = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
+check( 'the old route key is gone after a rename', isset( $configAfterRename['/nino/http/routes']['GET://about'] ) === false );
+check( 'the new route key exists', isset( $configAfterRename['/nino/http/routes']['GET://ueber-uns'] ) === true );
+check( 'still exactly two persisted pages - rename replaced in place, did not append a third', count( $configAfterRename['/nino/install/webpages'] ) === 2 );
+
+// Delete
+[ $status, $body ] = callDev( $appData, \Nino\Admin\PageEditor::class, 'apiDelete', [ 'httpUri' => '/ueber-uns' ] );
+check( 'apiDelete succeeds', $status === 200 );
+check( 'exactly one page remains', count( $body['pages'] ) === 1 );
+
+$configAfterDelete = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
+check( 'the deleted entry\'s route is gone', isset( $configAfterDelete['/nino/http/routes']['GET://ueber-uns'] ) === false );
+check( 'the surviving entry\'s route is untouched', isset( $configAfterDelete['/nino/http/routes']['GET://contact'] ) === true );
+
+$deAfterDelete = \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] );
+check( 'the deleted entry\'s own text meta is left in place - additive-only, never auto-deleted', isset( $deAfterDelete['[[/webpage/site-about/name]]'] ) === true );
+
+[ $status ] = callDev( $appData, \Nino\Admin\PageEditor::class, 'apiDelete', [ 'httpUri' => '/does-not-exist' ] );
+check( 'apiDelete 404s for an unknown httpUri', $status === 404 );
+
+array_pop( $appData['/nino/modules'] ); // drop the simulated Navigation module again
+
+unlink( $sandbox. '/templates/page-about.tpl' );
+unlink( $sandbox. '/templates/page-contact.tpl' );
+unlink( $sandbox. '/templates/not-a-page.tpl' );
+
+\Nino\Runtime::unsetSessionValue( $appData, './nino/admin/authed' );
+[ $status ] = callDev( $appData, \Nino\Admin\PageEditor::class, 'apiList' );
+check( 'PageEditor actions require an authed _admin session too', $status === 401 );
+\Nino\Runtime::setSessionValue( $appData, './nino/admin/authed', true );
+
+echo "\n";
+
+
+// --- Final: unauthed guard sanity check across every module -------------
+
+echo "Every module rejects an unauthed request\n";
+
+\Nino\Runtime::unsetSessionValue( $appData, './nino/admin/authed' );
+$unauthedListRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Admin\Restore::apiList( $appData, $unauthedListRequest );
+check( 'apiList requires an authed _admin session, same as every other module', $unauthedListRequest['/nino/http/response']['statusCode'] === 401 );
+
+echo "\n";
 
 echo "$checks checks, $failures failed\n";
-
 exit( $failures > 0 ? 1 : 0 );

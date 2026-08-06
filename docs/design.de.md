@@ -2,7 +2,7 @@
 *[English](design.md)*
 
 **Links:**
-[README](../README.de.md) · [Entwickler-Handbuch](development.de.md) · [Admin-Handbuch](_admin.de.md) · [_dev-Handbuch](_dev.de.md) · [Security Policy](../SECURITY.md) · [Changelog](../CHANGELOG.md)
+[README](../README.de.md) · [Entwickler-Handbuch](development.de.md) · [Admin-Handbuch](_editor.de.md) · [_admin-Handbuch](_admin.de.md) · [_install-Handbuch](_install.de.md) · [Security Policy](../SECURITY.md) · [Changelog](../CHANGELOG.md)
 
 ## Einführung
 
@@ -15,8 +15,8 @@ Nino arbeitet mit reinem HTML, das mit drei Mechanismen ergänzt wird. Logik ist
 #### Textfills
 Jede Nino Webseite hat eine Textsammlung nach dem Muster
 `[[key]] => value`.
-Diese wird in **globale Werte** (in allen Sprachen gleich) und **lokale Werte** (für jede Sprache unterschiedlich) aufgeteilt. Diese Textsammlung können Entwickler und Administratoren jederzeit über `_dev`und `/_admin` bearbeiten.
-Der Entwickler legt dafür Textbausteine in `_dev` an - über `_admin`können sie dann -abhängig der Einstellung- global oder für alle erlaubten Sprachen befüllt werden.
+Diese wird in **globale Werte** (in allen Sprachen gleich) und **lokale Werte** (für jede Sprache unterschiedlich) aufgeteilt. Diese Textsammlung können Entwickler und Administratoren jederzeit über `_admin`und `/_editor` bearbeiten.
+Der Entwickler legt dafür Textbausteine in `_admin` an - über `_editor`können sie dann -abhängig der Einstellung- global oder für alle erlaubten Sprachen befüllt werden.
 Textfills können **beliebig lang** sein. Sie sollten jedoch **keinen HTML-Code** beinhalten.
 Beim Templating kann man so **sprachrelevante und wiederkehrende Texte** mit einem Fill eintragen, der bei jedem Rendering mit der entsprechenden Client-Locale ersetzt wird.
 
@@ -74,7 +74,7 @@ Weitere Shortcodes können einfach über PHP-Module ergänzt werden.
 
 #### Elemente
 Elemente sind Ninos Lösung für **wiederkehrende Daten** nach einem festen Datenmodell.
-Das eignet sich z.B. für Serviceleistungen, Partner, Neuigkeiten, Blogbeiträge, etc. Der Entwickler erstellt über `_dev`einen **Elementtyp** mit einer URI *(z.B. /services)* und den Feldern *(z.B. title, descr, eventdate, price)* . Damit können dann über `_admin` **beliebig viele Elemente** erstellt werden. Jedes Element erhält ebenfalls eine URI *(z.B. /webdesign)* die sich mit der Typ-URI kombiniert *(/services/webdesign)*.
+Das eignet sich z.B. für Serviceleistungen, Partner, Neuigkeiten, Blogbeiträge, etc. Der Entwickler erstellt über `_admin`einen **Elementtyp** mit einer URI *(z.B. /services)* und den Feldern *(z.B. title, descr, eventdate, price)* . Damit können dann über `_editor` **beliebig viele Elemente** erstellt werden. Jedes Element erhält ebenfalls eine URI *(z.B. /webdesign)* die sich mit der Typ-URI kombiniert *(/services/webdesign)*.
 
 In der Template-Engine stehen zur Abbildung von Elementen zwei Shortcodes bereit:
 
@@ -254,7 +254,7 @@ Der Rest der Datei referenziert **ausschließlich** `var(--token)`, nirgendwo ei
 }
 ```
 
-Sobald ein Token auch über `/_admin` editierbar bleiben soll (z. B. eine Akzentfarbe, die die Betreiberin selbst anpassen darf), wird er statt eines Literals als Textfill deklariert - `--color-primary: [[/ui/color-primary]];` - und landet damit im gleichen Fill-Mechanismus wie normaler Seiteninhalt. Alle übrigen `/ui/*`-Werte sind bewusst **nicht** im `/_admin`-Textpanel sichtbar (`text/blacklist.php`) - es sind Entwickler-Design-Tokens, kein Redaktionsinhalt.
+Sobald ein Token auch über `/_editor` editierbar bleiben soll (z. B. eine Akzentfarbe, die die Betreiberin selbst anpassen darf), wird er statt eines Literals als Textfill deklariert - `--color-primary: [[/ui/color-primary]];` - und landet damit im gleichen Fill-Mechanismus wie normaler Seiteninhalt. Alle übrigen `/ui/*`-Werte sind bewusst **nicht** im `/_editor`-Textpanel sichtbar (`text/blacklist.php`) - es sind Entwickler-Design-Tokens, kein Redaktionsinhalt.
 
 > **Wichtig: `_nino/Nino.css` wird nicht geschrieben - sondern überschrieben.**
 > `_nino/Nino.css` ist Kernel-Code, genau wie `_nino/Nino.php`. Es wird in einem Projekt **nie direkt bearbeitet** - jede Anpassung (Farben, Abstände, eigene Web-Fonts, zusätzliche Komponenten) gehört in eine eigene, projekteigene Stylesheet-Datei unter `assets/` (laut README-Konvention `assets/style.css`), die in `config.php`s `/nino/html/assets` **nach** `_nino/Nino.css` in dasselbe Bundle eingetragen wird:
@@ -539,7 +539,7 @@ Wiederholt den Inhalt für jedes Element eines Typs - optional gefiltert per `qu
 Einbinden eines entwicklerdefinierten Image-Slots.
 **Shortcode:**
 `[image slotUri alt="..."]`
-Rendert ein `<img>`-Tag für einen Bild-Slot, sofern über `/_admin` bereits ein Bild hochgeladen wurde - sonst bleibt die Ausgabe leer. Die verfügbaren Slots (Position, Zielformat) werden in `/_dev` definiert.
+Rendert ein `<img>`-Tag für einen Bild-Slot, sofern über `/_editor` bereits ein Bild hochgeladen wurde - sonst bleibt die Ausgabe leer. Die verfügbaren Slots (Position, Zielformat) werden in `/_admin` definiert.
 
 #### `Assets`
 CSS/JS-Bundle einbinden.

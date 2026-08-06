@@ -2,7 +2,7 @@
 *[Deutsch](design.de.md)*
 
 **Links:**
-[README](../README.md) · [Developer Handbook](development.md) · [_admin Handbook](_admin.md) · [_dev Handbook](_dev.md) · [Security Policy](../SECURITY.md) · [Changelog](../CHANGELOG.md)
+[README](../README.md) · [Developer Handbook](development.md) · [_editor Handbook](_editor.md) · [_admin Handbook](_admin.md) · [_install Handbook](_install.md) · [Security Policy](../SECURITY.md) · [Changelog](../CHANGELOG.md)
 
 ## Introduction
 
@@ -15,8 +15,8 @@ Nino works with plain HTML, extended by three mechanisms. Logic is deliberately 
 #### Text fills
 Every Nino website has a collection of texts following the pattern
 `[[key]] => value`.
-This is split into **global values** (the same across all languages) and **local values** (different per language). Developers and administrators can edit this text collection at any time via `_dev` and `/_admin`.
-The developer creates text building blocks for this in `_dev` - via `_admin` they can then be filled in, depending on the setting, either globally or for all allowed languages.
+This is split into **global values** (the same across all languages) and **local values** (different per language). Developers and administrators can edit this text collection at any time via `_admin` and `/_editor`.
+The developer creates text building blocks for this in `_admin` - via `_editor` they can then be filled in, depending on the setting, either globally or for all allowed languages.
 Text fills can be **any length**. They should, however, **not contain HTML markup**.
 In templating, this lets you enter **language-relevant, recurring text** as a fill that gets replaced with the matching client locale on every render.
 
@@ -73,7 +73,7 @@ Further shortcodes can easily be added via PHP modules.
 
 #### Elements
 Elements are Nino's solution for **recurring data** following a fixed data model.
-This is suited, for example, to services, partners, news, blog posts, etc. The developer creates an **element type** via `_dev` with a URI *(e.g. /services)* and fields *(e.g. title, descr, eventdate, price)*. Any number of **elements** can then be created via `_admin`. Every element likewise gets a URI *(e.g. /webdesign)* that combines with the type URI *(/services/webdesign)*.
+This is suited, for example, to services, partners, news, blog posts, etc. The developer creates an **element type** via `_admin` with a URI *(e.g. /services)* and fields *(e.g. title, descr, eventdate, price)*. Any number of **elements** can then be created via `_editor`. Every element likewise gets a URI *(e.g. /webdesign)* that combines with the type URI *(/services/webdesign)*.
 
 The template engine provides two shortcodes for rendering elements:
 
@@ -253,7 +253,7 @@ The rest of the file references **exclusively** `var(--token)`, never a hardcode
 }
 ```
 
-As soon as a token also needs to stay editable via `/_admin` (e.g. an accent colour the operator should be able to adjust themselves), it is declared as a text fill instead of a literal - `--color-primary: [[/ui/color-primary]];` - and thereby lands in the same fill mechanism as ordinary page content. All remaining `/ui/*` values are deliberately **not** visible in the `/_admin` text panel (`text/blacklist.php`) - they are developer design tokens, not editorial content.
+As soon as a token also needs to stay editable via `/_editor` (e.g. an accent colour the operator should be able to adjust themselves), it is declared as a text fill instead of a literal - `--color-primary: [[/ui/color-primary]];` - and thereby lands in the same fill mechanism as ordinary page content. All remaining `/ui/*` values are deliberately **not** visible in the `/_editor` text panel (`text/blacklist.php`) - they are developer design tokens, not editorial content.
 
 > **Important: `_nino/Nino.css` is not written to - it gets overridden.**
 > `_nino/Nino.css` is kernel code, exactly like `_nino/Nino.php`. It is **never edited directly** in a project - every adjustment (colours, spacing, custom web fonts, additional components) belongs in a separate, project-owned stylesheet file under `assets/` (per the README convention, `assets/style.css`), which is entered in `config.php`'s `/nino/html/assets` **after** `_nino/Nino.css` into the same bundle:
@@ -538,7 +538,7 @@ Repeats the content for every element of a type - optionally filtered by `query`
 Includes a developer-defined image slot.
 **Shortcode:**
 `[image slotUri alt="..."]`
-Renders an `<img>` tag for an image slot, provided an image has already been uploaded via `/_admin` - otherwise the output stays empty. The available slots (position, target format) are defined in `/_dev`.
+Renders an `<img>` tag for an image slot, provided an image has already been uploaded via `/_editor` - otherwise the output stays empty. The available slots (position, target format) are defined in `/_admin`.
 
 #### `Assets`
 Includes a CSS/JS bundle.

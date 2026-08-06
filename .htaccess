@@ -3,9 +3,9 @@
 # docs/setup.md's "Webserver (production)" for the equivalent nginx rules.
 
 # Never serve a dotfile directly - matches the filename only (not the
-# containing directory, so _admin/.cache/script.js is unaffected), which
-# is exactly what's needed: _dev/.lockout.json and _dev/.restore-key.php
-# are real dotfiles, _admin/.backups-*/ is a dotdir but its files inside
+# containing directory, so _editor/.cache/script.js is unaffected), which
+# is exactly what's needed: _admin/.lockout.json and _admin/.restore-key.php
+# are real dotfiles, _editor/.backups-*/ is a dotdir but its files inside
 # (eg. 2026-01-01.php) aren't themselves dotfiles - those stay protected
 # by their own self-exiting .php stub instead (see docs/developer.md's
 # "Encryption / stub conventions").
@@ -14,6 +14,6 @@
 </FilesMatch>
 
 # Don't let a directory with no index.php list its contents - matters most
-# for _admin/.backups-*/ and _admin/.logs-*/, whose only real protection
+# for _editor/.backups-*/ and _editor/.logs-*/, whose only real protection
 # is that their random directory name is never linked from anywhere
 Options -Indexes

@@ -15,13 +15,19 @@ $uri = urldecode( parse_url( $_SERVER['REQUEST_URI'], PHP_URL_PATH ) );
 // Dotfiles/dotdirs never get served as static files, .cache/ (the
 // bundled/minified css+js the [assets ...] shortcode generates) and
 // .demo/ (the bundled demo images) are the two exceptions - without
-// this, a direct request could otherwise read _dev/.lockout.json or
-// _admin/.backups-*/ contents straight off disk, bypassing the .php
+// this, a direct request could otherwise read _admin/.lockout.json or
+// _editor/.backups-*/ contents straight off disk, bypassing the .php
 // stub protection those paths normally rely on. Dot-uris that are no
 // files at all (/.newsletter, /.demo-sections, ...) fall through to
 // index.php and resolve as ordinary routes
 if( $uri !== '/' && preg_match( '#/\.(?!cache/|demo/)#', $uri ) !== 1 && is_file( __DIR__. $uri ) === true )
     return false;
+
+if( str_starts_with( $uri, '/_editor' ) === true ) {
+    chdir( __DIR__. '/_editor' );
+    require __DIR__. '/_editor/index.php';
+    return true;
+}
 
 if( str_starts_with( $uri, '/_admin' ) === true ) {
     chdir( __DIR__. '/_admin' );
@@ -29,9 +35,9 @@ if( str_starts_with( $uri, '/_admin' ) === true ) {
     return true;
 }
 
-if( str_starts_with( $uri, '/_dev' ) === true ) {
-    chdir( __DIR__. '/_dev' );
-    require __DIR__. '/_dev/index.php';
+if( str_starts_with( $uri, '/_install' ) === true ) {
+    chdir( __DIR__. '/_install' );
+    require __DIR__. '/_install/index.php';
     return true;
 }
 

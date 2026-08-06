@@ -2,278 +2,34 @@
 *[English](_admin.md)*
 
 **Links:**
-[README](../README.de.md) · [Design-Handbuch](design.de.md) · [Entwickler-Handbuch](development.de.md) · [_dev-Handbuch](_dev.de.md) · [Security Policy](../SECURITY.md) · [Changelog](../CHANGELOG.md)
+[README](../README.de.md) · [Design-Handbuch](design.de.md) · [Entwickler-Handbuch](development.de.md) · [_editor-Handbuch](_editor.de.md) · [_install-Handbuch](_install.de.md) · [Security Policy](../SECURITY.md) · [Changelog](../CHANGELOG.md)
 
-Exakte Anleitung für die tägliche Pflege der Website über `/_admin` — ohne Programmierkenntnisse
-Technische Hintergründe: `docs/development.de.md`.
+## Folgt.
 
-### Anmeldung
+Ein Modul ist vorab dokumentiert, da es direkt mit dem Webpages-Schritt von `/_install` zusammenspielt.
 
-Unter `/_admin` mit E-Mail-Adresse und Passwort einloggen. Nach zu
-vielen Fehlversuchen wird das Konto vorübergehend gesperrt
-(Standard: 5 Versuche, danach 1 Stunde Cooldown — konfiguriert über
-`/nino/auth/maxtries`/`/nino/auth/cooldown`, siehe
-`docs/development.de.md`).
-( Die Fehlermeldung unterscheidet bewusst
-nicht zwischen "E-Mail unbekannt" und "Passwort falsch" — beide zeigen
-dieselbe generische Meldung, damit sich über die Fehlermeldung selbst
-keine gültigen E-Mail-Adressen erraten lassen. )
+### Pages
 
-## 1. Der Admin-Bereich
+Seiten-Routen des Projekts anlegen, bearbeiten und löschen, ohne `/nino/http/routes` von Hand als rohes json zu bearbeiten (das Config-Modul von `_admin` deckt weiterhin alles ab, was dieses Modul nicht abdeckt - Routen außerhalb seiner Zuständigkeit, oder jeden anderen whitelisted "weichen" Config-Wert). Eine komfortablere Fortsetzung des Webpages-Schritts von `/_install` für die Zeit, nachdem `_install` gelöscht wurde: Die Template-Auswahl bietet ausschließlich bereits auf der Platte vorhandene `templates/page-*.tpl`-Dateien an - kein Kopieren, keine Library-Einheiten, nur das Verdrahten eines bestehenden Templates mit einer URI.
 
-Ein erfolgreicher Login rotiert die PHP-Session-ID — eventuell müssen nach einem Login die Inhalte in einer anderen Registerkarte neu geladen werden müssen.
+Jeder Eintrag hat:
 
-### a) Dashboard
+- **Element URI** - ein stabiler, frei wählbarer Bezeichner, der nicht wie ein echter Pfad aussehen muss. Er ist der Namensraum für die `/webpage<uri>/*`-Textschlüssel dieses Eintrags und wird zum eigenen `uri`-Datenfeld der Route.
+- **Http URI** - der echte, erreichbare Browser-Pfad. Nur dieser bestimmt den Array-Key in `/nino/http/routes` - die vollständige Begründung steht im Webpages-Abschnitt von `docs/_install.de.md` (`\Nino\Http::requestRoute()` matcht über den exakten Schlüssel, nicht über einen Scan nach einer Route mit passendem `uri`-Feld).
+- **Template** - eingeschränkt auf die tatsächlich vorhandenen `templates/page-*.tpl`-Dateien.
+- **Status Code** - standardmäßig 200; z. B. 404 für eine Nicht-gefunden-Seite.
+- **Nav** - erscheint nur, sobald das Navigation-Modul aktiv ist; regeneriert `[[/website/navigation/main]]` genauso wie der Webpages-Schritt von `/_install`.
+- **Name/Titel/Beschreibung**, pro aktiver Sprache - geschrieben in die `/webpage<uri>/*`-Textschlüssel, gleicher Fallback auf einen generischen Platzhalter wie bei Webpages.
 
-Die wichtigsten Informationen auf einen Blick. Die letzten Formular-Anfragen, alle Newsletteranmeldungen, das letzte Backup und die letzten Änderungen im Admin-Bereich.
+Beide URIs werden unabhängig voneinander validiert und auf Eindeutigkeit geprüft. Das Löschen einer Seite entfernt ihre Route, lässt aber die `/webpage<uri>/*`-Textschlüssel bestehen - dieselbe Nur-hinzufügen-Regel, der jedes Anwenden/Speichern in diesem Codebase folgt.
 
-### b) Elemente
+Die ↑/↓-Buttons der Liste tauschen einen Eintrag mit seinem Nachbarn und speichern die neue Reihenfolge - genau in dieser Reihenfolge wird `[[/website/navigation/main]]` generiert. Über die Liste zu sortieren ist also der Weg, das generierte Hauptmenü neu zu ordnen, sobald `/_install` (dessen eigener Webpages-Schritt dieselbe Liste-plus-Editor-Form und aus demselben Grund dieselben ↑/↓-Buttons hat) nicht mehr da ist.
 
-Wiederkehrende Inhaltsbausteine (z. B. Angebote, Referenzen,
-Preislisten, Team-Mitglieder) mit vom Entwickler vordefinierten
-Formularen (Feldmodell, angelegt über `/_dev` → "Element Types", siehe
-Abschnitt 11).
+Die gespeicherte Liste liegt unter dem `/nino/install/webpages`-Schlüssel in `config.php` - genau dasselbe Array, das der Webpages-Schritt von `/_install` verwaltet, synchron gehalten, da beide Werkzeuge dieselbe Form (`{ uri, httpUri, template, libraryKey, nav, statusCode, body, text }`) zurückschreiben. Das heißt, beide Werkzeuge können koexistieren: Eine hier bearbeitete Seite zeigt sich später beim erneuten Aufruf des Webpages-Schritts von `/_install` (vor dem Löschen) als aktuelle, echte Liste, nicht als veraltete.
 
-**Ablauf:**
-1. Elementtyp aus der Liste wählen (die Übersicht zeigt zu jedem Typ die
-   Anzahl vorhandener Einträge).
-2. Bestehendes Element öffnen oder neu anlegen.
-3. Jedes Feld ist pro Sprache separat befüllbar (Sprach-Reiter oben im
-   Formular) — ein Feld in einer Sprache leer zu lassen ist gültig,
-   rendert im Template dann als leerer Fill.
-4. Bildfelder laden über ein eigenes Upload-Fenster hoch; das System
-   schneidet automatisch zentriert zu und skaliert auf das vom
-   Entwickler vorgegebene Zielformat (dieselbe Verarbeitung wie bei
-   Bild-Slots, siehe Abschnitt 4 — der Unterschied ist nur, ob das Bild
-   an einem festen Slot oder an einem konkreten Element hängt).
-5. Speichern schreibt sofort in die zugehörige `elements/<typ>.php`.
+Zwei dieser Felder gehören dem jeweils anderen Werkzeug und werden hier nur durchgereicht, nie bearbeitet:
 
-**Löschen** entfernt ein Element inklusive aller zugehörigen Bilder
-**unwiderruflich** — kein Papierkorb, keine Bestätigungsstufe jenseits
-des Löschen-Dialogs selbst. Absicherung ist ausschließlich das
-automatische Backup (Abschnitt 8) — eine versehentliche Löschung lässt
-sich nur über `/_dev` → "Wiederherstellung" rückgängig machen, nicht
-aus `/_admin` selbst heraus.
+- **`libraryKey`** - von welcher `_install/library/pages`-Einheit der Eintrag ausgegangen ist. Sobald `_install` weg ist, bedeutet das Feld nichts mehr, aber ein Speichern hier erhält es, sodass ein vorheriger Aufruf des Webpages-Schritts diese Einheit weiterhin neu anwenden kann.
+- **`body`** - der Route-Body wörtlich. Normalerweise ist das schlicht `[template /templates/<template>]`, und das Template-`<select>` bestimmt ihn. Eine Library-Einheit kann aber mehr mitbringen - die "legal"-Einheit von `/_install` löst ihre Template-Datei pro Sprache über `[[/nino/http/response/locale]]` auf - und ein `<select>` konkreter Dateinamen kann das nicht abbilden. Bei solchen Einträgen ist das Select deaktiviert und zeigt stattdessen den Body; beim Speichern bleibt der Body wie er ist, statt die Seite auf die Datei einer einzelnen Sprache zu reduzieren.
 
-**Berechtigung:** `Elements::MANAGE_PERM` (Checkbox "Elemente" in der
-Nutzerverwaltung, siehe Abschnitt 5).
-
-### c) Texte
-
-Feste Textstellen der Website, nach Bereich/Kategorie gruppiert (z. B.
-alle Texte einer Seite zusammen). Eine Kategorie zeigt alle
-Textstellen der aktuell gewählten Sprache gemeinsam; Änderungen an
-mehreren Feldern werden gesammelt in einem Schritt gespeichert
-(Batch-Speichern), nicht Feld für Feld einzeln übertragen.
-
-Bei Werten, die Formatierung erlauben (fett, kursiv, Links — erkannt
-über `Html::containsHtml()`), erscheint automatisch eine kleine
-Formatierleiste; die eingegebene Formatierung wird beim Speichern über
-`Html::sanitizeHtml()` auf eine kleine, sichere Tag-Whitelist reduziert
-— eingefügtes `<script>` oder ein `javascript:`-Link überlebt das
-Speichern nicht.
-
-Rein technische Werte (Design-Tokens wie Farben, Abstände unter
-`/ui/*`) tauchen hier absichtlich **nicht** auf — sie stehen in
-`text/blacklist.php` und sind bewusst nur Entwicklern über die
-Rohdateien zugänglich (siehe `docs/design.de.md`s Architektur-Abschnitt).
-
-**Export/Import** existiert für Backup/Migration einzelner
-Textbestände außerhalb des regulären automatischen Backups (z. B. um
-Text zwischen zwei Umgebungen abzugleichen).
-
-**Berechtigung:** eigene Text-Berechtigung (Checkbox "Texte").
-
-### d) Bilder
-
-Jede Bild-Position ist ein fester **Slot** mit vom Entwickler
-vorgegebenem Zielformat (angelegt über `/_dev` → "Bilder", siehe
-Abschnitt 11). Ein Upload ersetzt das vorherige Bild an genau dieser
-Stelle — Zuschnitt (zentriert) und Zielgröße übernimmt das System
-automatisch über `gd`; der Upload selbst wird dabei komplett
-neu-encodiert (nie die hochgeladenen Bytes 1:1 übernommen), inklusive
-Prüfung der echten Bilddaten (nicht nur der angegebenen Dateiendung),
-einer 8-MB-Obergrenze und einer 8000-Pixel-Quellauflösungs-Obergrenze.
-Ein als Bild getarnter, aber tatsächlich ausführbarer Upload kann so
-nicht durchrutschen.
-
-**Unterscheidung, die häufig verwechselt wird:** ein Bild-**Slot**
-(dieser Abschnitt) ist eine feste, einmalige Position im Template
-(z. B. das Hero-Bild einer Seite); ein Bild-**Feld** an einem Element
-(Abschnitt 2) gehört zu einem einzelnen Element-Datensatz und kann
-beliebig oft vorkommen (ein Foto pro Team-Mitglied). Beide landen
-technisch im selben `images/`-Verzeichnis und laufen durch dieselbe
-Verarbeitung, sind aber administrativ getrennt.
-
-**Berechtigung:** eigene Bilder-Berechtigung (Checkbox "Bilder").
-
-### e) Nutzer
-
-**Eigenes Konto (jeder eingeloggte Nutzer):**
-- Eigenes Passwort/E-Mail ändern, jeweils mit Bestätigung durch das
-  aktuelle Passwort.
-- "Überall abmelden" beendet alle aktiven Sitzungen des eigenen Kontos
-  auf allen Geräten — sofort nutzen bei Verdacht auf Kompromittierung
-  (siehe Sicherheitshinweise, Abschnitt 12).
-
-**Mit Verwaltungsrechten (Checkbox "Vollzugriff"/Manager) zusätzlich:**
-- Berechtigungen anderer Nutzer per Checkbox setzen: Elemente, Texte,
-  Bilder, Anfragen, Newsletter, Log — oder "Vollzugriff" für alles
-  gleichzeitig. Die verfügbaren Checkboxen sind serverseitig
-  festgeschrieben (eine feste Liste bekannter Berechtigungsstrings) —
-  es lässt sich über dieses Formular nie eine Berechtigung setzen, die
-  die Oberfläche selbst nicht kennt.
-- **Am eigenen Konto lässt sich nichts über diesen Weg ändern** —
-  bewusste Absicherung dagegen, sich selbst versehentlich die eigenen
-  Verwaltungsrechte zu entziehen.
-- "Überall abmelden" auch für andere Nutzer auslösbar.
-
-**Neue Nutzer anlegen oder Nutzer löschen** ist bewusst Entwicklern
-über `/_dev` vorbehalten, nicht über `/_admin` möglich (siehe Abschnitt
-11) — die Trennung stellt sicher, dass das Anlegen eines ersten
-Kontos nie von einem bereits bestehenden `/_admin`-Konto abhängt.
-
-**Ist einmal niemand mehr mit Verwaltungsrechten übrig** (letztes
-Manager-Konto gelöscht, oder sich versehentlich selbst über die rohen
-`/_dev`-Berechtigungen ausgesperrt), hilft nur `/_dev` — dafür den
-Entwickler kontaktieren, der Zugriff auf das `_dev`-Passwort hat.
-
-**Berechtigung:** `Users::MANAGE_PERM` für den Verwaltungsteil; das
-eigene Passwort/E-Mail ändern und "Überall abmelden" für sich selbst
-braucht keine gesonderte Berechtigung, nur einen aktiven Login.
-
-### f) Anfragen
-
-Alle über das öffentliche Kontaktformular eingegangenen Nachrichten,
-neueste zuerst — als Sicherheitsnetz zusätzlich zur automatisch
-versendeten E-Mail (falls diese im Spam landet, verloren geht, oder der
-Mailversand gerade dem Rate-Limit unterliegt — siehe
-`docs/development.de.md`s `Mail`-Abschnitt). Rein lesend, kein
-Löschen/Bearbeiten über `/_admin`. 90 Tage Historie, danach automatisch
-bereinigt (3 Monate, `Form::RETENTION_MONTHS`).
-
-**Berechtigung:** eigene Anfragen-Berechtigung (Checkbox "Anfragen").
-
-### g) Newsletter
-
-Liste aller Newsletter-Anmeldungen. Die Anmeldung selbst läuft als
-**Double-Opt-in**: ein Eintrag ist zunächst nur "ausstehend" und wird
-erst "aktiv", sobald der Bestätigungslink aus der automatisch
-versendeten E-Mail angeklickt wurde — ein bloßes Ausfüllen des
-Anmeldeformulars trägt niemanden tatsächlich ein.
-
-Abonnenten können sich jederzeit selbst über einen Abmeldelink
-austragen (in jeder ausgehenden Newsletter-Mail enthalten, sobald das
-Template ihn einbindet — siehe `docs/development.de.md`s
-`Newsletter`-Abschnitt für `getUnsubscribeLink()`); zusätzlich lässt
-sich jeder Eintrag hier manuell löschen (z. B. auf Zuruf, oder um einen
-offensichtlich falsch eingetragenen Test-Eintrag zu entfernen).
-
-**Berechtigung:** eigene Newsletter-Berechtigung (Checkbox
-"Newsletter").
-
-### h) Log
-
-Protokoll der letzten Anmeldungen und admin-seitigen Änderungen (wer
-hat wann was bearbeitet) — jede mutierende Aktion über `/_admin`
-(Speichern, Löschen, Berechtigungsänderung, ...) erzeugt einen
-Eintrag; reine Anzeige-/Lese-Aufrufe (eine Liste öffnen, ohne etwas zu
-ändern) tauchen bewusst nicht auf, um das Log lesbar zu halten. Rein
-lesend, 14 Tage Historie.
-
-**Berechtigung:** eigene Log-Berechtigung (Checkbox "Log").
-
-## 2. Der Entwickler-Bereich (_dev)
-
-### a) Automatische Backups
-
-Einmal täglich, ausgelöst beim ersten Login des Tages (nicht als
-gesonderter Cronjob — läuft im Hintergrund des ersten `/_admin`-Aufrufs,
-den ein eingeloggter Nutzer an diesem Tag macht), wird eine
-verschlüsselte Sicherung aller über `/_admin` veränderbaren Inhalte
-erstellt (Elemente, Texte, Bilder, Nutzerkonten). 14 Tage Historie,
-ältere Backups werden automatisch gelöscht.
-
-Die Backup-Dateien selbst sind AES-256-GCM-verschlüsselt und liegen
-unter einem einmaligen, nirgendwo verlinkten Zufallsnamen — sie dienen
-ausschließlich der Wiederherstellung über `/_dev` (Abschnitt 9) und
-sind nicht direkt per Browser-Aufruf einsehbar (ein direkter Request
-liefert nur einen 403-Statuscode, keine Daten).
-
-Ein Entwickler kann Backups (und unabhängig davon das Activity-Log,
-Abschnitt 8b) über `config.php`s `/nino/admin/backups`/
-`/nino/admin/logs` projektweit abschalten.
-
-
-### b) Backup-Wiederherstellung (nur über `/_dev`)
-
-Der Stand eines beliebigen Tages der letzten 14 Tage lässt sich über
-`/_dev` → "Wiederherstellung" zurückholen. Der aktuelle (möglicherweise
-fehlerhafte) Stand wird davor automatisch als eigener Sicherheits-
-Snapshot gesichert — eine Wiederherstellung ist also selbst wieder
-umkehrbar, indem der Snapshot direkt danach erneut eingespielt wird.
-
-`/_dev` hat ein eigenes, von den `/_admin`-Konten komplett unabhängiges
-Passwort (nur dem Entwickler bekannt) — deshalb funktioniert die
-Wiederherstellung auch dann noch, wenn ausgerechnet die
-`/_admin`-Nutzerkonten selbst der beschädigte Teil sind.
-
-### c) Erster Zugang & Passwörter (`/_dev`)
-
-Ohne ein einziges bestehendes `/_admin`-Konto gibt es keinen Weg, sich
-dort einzuloggen — der allererste Zugang entsteht daher immer über
-`/_dev` → "Nutzer", mit der Checkbox für Verwaltungsrechte angehakt,
-damit dieses erste Konto anschließend auch alle anderen Konten und
-Berechtigungen von `/_admin` aus verwalten kann. Neue `/_admin`-Konten
-anlegen oder bestehende löschen bleibt danach dauerhaft eine
-`/_dev`-Aufgabe (siehe Abschnitt 5).
-
-`/_dev` selbst hat kein Formular-Login mit E-Mail — nur ein einziges,
-projektweites Passwort, das per Kommandozeile gesetzt wird (`php
-_dev/Dev.php <Passwort>`, Ergebnis-Hash in `_dev/Dev.php`s
-`PASSWORD_HASH`-Konstante eingetragen). Der mitgelieferte
-Platzhalter-Hash matcht absichtlich kein reales Passwort — vor dem
-ersten echten Einsatz muss ein eigenes gesetzt werden, sonst ist `/_dev`
-für niemanden nutzbar, auch nicht für den Entwickler selbst.
-
-## d) Weitere `/_dev`-Bereiche (Kurzüberblick für Betreiber)
-
-Diese Bereiche sind reines Entwickler-Tooling, werden hier nur der
-Vollständigkeit halber kurz erwähnt — Details siehe
-`docs/development.de.md`:
-
-- **Element Types** — legt das Feldmodell für Elementtypen fest (welche
-  Felder ein "Angebot" oder "Team-Mitglied" hat), bevor `/_admin` →
-  "Elemente" (Abschnitt 2) damit Daten pflegen kann.
-- **Bilder** — legt Bild-Slots (feste Positionen mit Zielformat) an,
-  bevor `/_admin` → "Bilder" (Abschnitt 4) sie befüllen kann; enthält
-  außerdem eine Scan-Funktion, die Templates nach referenzierten, aber
-  noch nicht angelegten Slots durchsucht.
-- **Texte** — legt neue Text-Keys an, benennt sie um, und enthält
-  dieselbe Scan-Funktion für in Templates verwendete, aber noch nicht
-  definierte `[[key]]`-Platzhalter — bevor `/_admin` → "Texte"
-  (Abschnitt 3) sie befüllen kann.
-- **Konfiguration** — rohe Ansicht/Bearbeitung ausgewählter,
-  freigegebener `config.php`-Schlüssel (Locales, Fehleranzeige/-log,
-  Asset-Bundles, Routen) — nicht alles in `config.php` ist hier
-  editierbar, nur ein bewusst begrenzter, typgeprüfter Ausschnitt.
-- **Nutzer** — siehe Abschnitt 5/10.
-- **Wiederherstellung** — siehe Abschnitt 9.
-
-## 3. Sicherheitshinweise
-
-- Passwörter nicht teilen, auch nicht innerhalb des Teams — jedes
-  `/_admin`-Konto ist einzeln zurückverfolgbar über das Log (Abschnitt
-  8b), ein geteiltes Passwort zerstört diese Nachvollziehbarkeit.
-- Bei Verdacht auf Kompromittierung (Passwort versehentlich
-  weitergegeben, verdächtige Log-Einträge) sofort "Überall abmelden"
-  (Abschnitt 5) nutzen und danach das Passwort ändern — in dieser
-  Reihenfolge, damit eine bereits laufende fremde Sitzung nicht durch
-  den reinen Passwortwechsel weiterläuft.
-- Das Log zeigt jederzeit nachvollziehbar, wer zuletzt was geändert
-  hat — bei einem unerklärten Inhaltswechsel als Erstes dort
-  nachsehen, bevor eine Wiederherstellung (Abschnitt 9) erwogen wird.
-- Ein automatisches Backup ersetzt keine bewusste Kontrolle: Löschungen
-  (Abschnitt 2) sind sofort wirksam, das Backup fängt sie erst beim
-  nächsten täglichen Lauf ab, danach ist der vorherige Stand nur noch
-  über die 14-Tage-Historie erreichbar.
+`statusCode` ist aus demselben Grund wichtig: Er liegt sonst nur in der Route, wo dieses Modul ihn nicht sieht - eine z. B. als 404 angelegte Seite käme beim ersten Speichern hier stillschweigend als 200 zurück.

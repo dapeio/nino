@@ -3,7 +3,7 @@
  *	Modules									Optional modules
  *	NinoJS									Basic js functionality & helper - client detection, cookies,
  *													dom-ready/resize/scroll events, xhr requests, auth,
- *													jstext lookups. Used by _admin/_dev and the public site
+ *													jstext lookups. Used by _editor/_admin and the public site
  *													alike. Frontend design-system behaviors (cover, parallax,
  *													vpa, autoheight, slider, generic forms) live separately
  *													in Nino.ui.js, since only the public site needs those.

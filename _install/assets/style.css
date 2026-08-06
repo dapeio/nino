@@ -1,0 +1,447 @@
+/**
+ *	Nino										A compact filesystembased php framework
+ *	style.css								Setup wizard UI - reuses _editor/assets/style.css's design
+ *													tokens/components and _admin/assets/style.css's utility classes
+ *													(both linked before this file in every template), only adds
+ *													what's specific to this wizard
+ *
+ *	@package								Dape/Nino
+ *	@author									David Perchermeier <mail@dape.io>
+ *	@link										https://github.com/dapeio/nino
+ */
+
+body {
+	margin: 0;
+	font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+	background: var(--editor-bg);
+	color: var(--editor-text);
+}
+
+code {
+	font-family: ui-monospace, monospace;
+	font-size: .9em;
+}
+
+/* ------------------------------------------------------------------ Locked */
+
+#install-locked-wrap {
+	max-width: 28rem;
+	margin: 4rem auto;
+	padding: 0 1rem;
+}
+
+#install-locked-msg {
+	font-weight: 700;
+	font-size: 1.1rem;
+}
+
+/* ----------------------------------------------------------------- Wizard */
+
+#install-bar-wrap {
+	position: sticky;
+	top: 0;
+	z-index: 10;
+	padding: 1rem 1.25rem;
+	background: var(--editor-bar-bg);
+	backdrop-filter: blur(20px) saturate(180%);
+	border-bottom: 1px solid var(--editor-separator);
+}
+
+#install-bar-title {
+	font-weight: 700;
+}
+
+#install-nav-wrap {
+	display: flex;
+	overflow-x: auto;
+	border-bottom: 1px solid var(--editor-separator);
+	padding: 0 1.25rem;
+}
+
+#install-nav-wrap span {
+	display: block;
+	padding: .65rem .1rem;
+	margin-right: 1.5rem;
+	white-space: nowrap;
+	border-bottom: 2px solid transparent;
+	color: var(--editor-text-secondary);
+	font-size: .9rem;
+	font-weight: 500;
+}
+
+#install-nav-wrap span.active {
+	color: var(--editor-blue);
+	font-weight: 600;
+	border-bottom-color: var(--editor-blue);
+}
+
+#install-content-wrap {
+	padding: 1.25rem 1rem 4rem;
+	max-width: 40rem;
+	margin: 0 auto;
+}
+
+/* Only one step's content pane is visible at a time - #install-page-wrap's
+   class (set by Nino.install.selectStep(), see script.js) picks which */
+#install-content-wrap > div {
+	display: none;
+}
+#install-page-wrap.show-checks #install-content-checks,
+#install-page-wrap.show-setup #install-content-setup,
+#install-page-wrap.show-webpages #install-content-webpages,
+#install-page-wrap.show-personalinfos #install-content-personalinfos,
+#install-page-wrap.show-admin #install-content-admin,
+#install-page-wrap.show-finish #install-content-finish {
+	display: block;
+}
+
+/* -------------------------------------------------------------- Setup tab */
+
+.install-setup-group {
+	background: var(--editor-bg-grouped);
+	border-radius: var(--editor-radius);
+	box-shadow: var(--editor-shadow);
+	padding: 1rem;
+	margin: 0 0 1rem;
+}
+
+.install-setup-group h3 {
+	margin: 0 0 .75rem;
+	font-size: .9rem;
+}
+
+#setup-theme-select,
+#setup-native-locale-select {
+	width: 100%;
+	box-sizing: border-box;
+	padding: .5rem;
+	border-radius: var(--editor-radius-sm);
+	border: 1px solid var(--editor-border);
+	background: var(--editor-bg-elevated);
+	color: var(--editor-text);
+	font: inherit;
+	font-size: .9rem;
+}
+
+.install-setup-option {
+	display: flex;
+	align-items: baseline;
+	gap: .5rem;
+	padding: .4rem 0;
+	border-bottom: 1px solid var(--editor-separator);
+}
+
+.install-setup-option:last-child {
+	border-bottom: none;
+}
+
+.install-setup-option label {
+	display: flex;
+	align-items: center;
+	gap: .5rem;
+	font-size: .9rem;
+}
+
+.install-setup-option-requires {
+	color: var(--editor-text-secondary);
+	font-size: .8rem;
+}
+
+/* -------------------------------------------------------------- Checklist */
+
+.install-check-group {
+	background: var(--editor-bg-grouped);
+	border-radius: var(--editor-radius);
+	box-shadow: var(--editor-shadow);
+	overflow: hidden;
+	margin: 0 0 1rem;
+}
+
+.install-check-group h3 {
+	margin: 0;
+	padding: .75rem 1rem;
+	font-size: .85rem;
+	color: var(--editor-text-secondary);
+	border-bottom: 1px solid var(--editor-separator);
+}
+
+.install-check-row {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: .75rem;
+	padding: .65rem 1rem;
+	border-bottom: 1px solid var(--editor-separator);
+	font-size: .9rem;
+}
+
+.install-check-row:last-child {
+	border-bottom: none;
+}
+
+.install-check-row-name {
+	font-family: ui-monospace, monospace;
+}
+
+.install-check-row-detail {
+	color: var(--editor-text-secondary);
+	font-size: .8rem;
+}
+
+.install-check-status {
+	flex: 0 0 auto;
+	font-weight: 700;
+	font-size: .8rem;
+}
+
+.install-check-status--ok {
+	color: var(--editor-green);
+}
+
+.install-check-status--fail {
+	color: var(--editor-red);
+}
+
+/* ---------------------------------------------------------- Webpages tab */
+
+/* List + drill-down-form shape, same as _admin's Pages module - #webpages-list
+   and #webpages-form mirror #pages-list/#pages-form's rules (own copies,
+   not shared, same standalone-per-area convention .install-webpage-locale-row
+   below already follows relative to .admin-page-locale-row); the form itself
+   is bare <fieldset>s styled entirely by _editor/assets/style.css's generic
+   fieldset/legend/.editor-field rules, same as personalinfos.js */
+
+#webpages-list > ul {
+	list-style: none;
+	margin: 0 0 .75rem;
+	padding: 0;
+	background: var(--editor-bg-grouped);
+	border-radius: var(--editor-radius);
+	box-shadow: var(--editor-shadow);
+	overflow: hidden;
+}
+
+#webpages-list > ul li {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	border-bottom: 1px solid var(--editor-separator);
+}
+
+#webpages-list > ul li:last-child {
+	border-bottom: none;
+}
+
+#webpages-list > ul li a {
+	display: block;
+	flex: 1 1 auto;
+	min-width: 0;
+	padding: .85rem 1rem;
+	font-family: ui-monospace, monospace;
+	font-size: .85rem;
+	color: var(--editor-text);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.install-webpage-move {
+	flex: 0 0 auto;
+	display: flex;
+	gap: .25rem;
+	padding: 0 .75rem;
+}
+
+.install-webpage-move button {
+	width: 1.75rem;
+	height: 1.75rem;
+	padding: 0;
+	border-radius: var(--editor-radius-sm);
+	border: 1px solid var(--editor-border);
+	background: var(--editor-bg-elevated);
+	color: var(--editor-text);
+	font: inherit;
+	line-height: 1;
+	cursor: pointer;
+}
+
+.install-webpage-move button:disabled {
+	opacity: .35;
+	cursor: default;
+}
+
+.install-webpage-requires {
+	margin: .5rem 0 0;
+}
+
+.install-webpage-locale-row {
+	display: grid;
+	grid-template-columns: 3rem 1fr 1fr;
+	gap: .5rem;
+	align-items: start;
+	padding: .5rem 0;
+	border-top: 1px solid var(--editor-separator);
+}
+
+.install-webpage-locale-row:first-child {
+	border-top: none;
+}
+
+.install-webpage-locale-label {
+	padding-top: .5rem;
+	font-size: .75rem;
+	color: var(--editor-text-secondary);
+	font-family: ui-monospace, monospace;
+}
+
+.install-webpage-locale-row input,
+.install-webpage-locale-row textarea {
+	width: 100%;
+	box-sizing: border-box;
+	padding: .5rem;
+	border-radius: var(--editor-radius-sm);
+	border: 1px solid var(--editor-border);
+	background: var(--editor-bg-elevated);
+	color: var(--editor-text);
+	font: inherit;
+	font-size: .85rem;
+}
+
+.install-webpage-locale-row textarea {
+	grid-column: 2 / -1;
+}
+
+/* ---------------------------------------------------------- Personal Infos */
+
+/* #personalinfos-form-global/-locale are plain <fieldset>s, styled entirely
+   by _editor/assets/style.css's generic fieldset/legend/.editor-field rules -
+   same shape as _editor's Text panel category form, see personalinfos.js */
+
+#personalinfos-locale-select {
+	position: absolute;
+	top: .6rem;
+	right: 1rem;
+	width: auto;
+	max-width: 7rem;
+	min-height: 30px;
+	padding: .25rem 1.5rem .25rem .6rem;
+	background-color: rgba(0,122,255,.1);
+	background-position: calc(100% - 12px) calc(50% - 0px), calc(100% - 6px) calc(50% - 0px);
+	border-color: transparent;
+	color: var(--editor-blue);
+	font-size: .78rem;
+	font-weight: 600;
+}
+
+/* -------------------------------------------------------------- Admins */
+
+#editor-list > ul {
+	list-style: none;
+	margin: 0 0 .75rem;
+	padding: 0;
+	background: var(--editor-bg-grouped);
+	border-radius: var(--editor-radius);
+	box-shadow: var(--editor-shadow);
+	overflow: hidden;
+}
+
+#editor-list > ul li {
+	padding: .75rem 1rem;
+	border-bottom: 1px solid var(--editor-separator);
+	font-family: ui-monospace, monospace;
+	font-size: .85rem;
+}
+
+#editor-list > ul li:last-child {
+	border-bottom: none;
+}
+
+#editor-add-form {
+	background: var(--editor-bg-grouped);
+	border-radius: var(--editor-radius);
+	box-shadow: var(--editor-shadow);
+	padding: 1rem;
+	display: flex;
+	flex-direction: column;
+	gap: .75rem;
+}
+
+#editor-add-form label {
+	display: flex;
+	align-items: center;
+	gap: .5rem;
+	font-size: .85rem;
+	color: var(--editor-text-secondary);
+}
+
+#editor-add-form input[type="email"],
+#editor-add-form input[type="password"] {
+	flex: 1 1 auto;
+	padding: .5rem;
+	border-radius: var(--editor-radius-sm);
+	border: 1px solid var(--editor-border);
+	background: var(--editor-bg-elevated);
+	color: var(--editor-text);
+	font: inherit;
+}
+
+/* -------------------------------------------------------------- Finish */
+
+#finish-form {
+	background: var(--editor-bg-grouped);
+	border-radius: var(--editor-radius);
+	box-shadow: var(--editor-shadow);
+	padding: 1.5rem;
+}
+
+/* ---------------------------------------------------------- Back/Next */
+
+#install-actions-wrap {
+	position: sticky;
+	bottom: 0;
+	display: flex;
+	align-items: center;
+	gap: .75rem;
+	padding: 1rem 1.25rem;
+	background: var(--editor-bar-bg);
+	backdrop-filter: blur(20px) saturate(180%);
+	border-top: 1px solid var(--editor-separator);
+}
+
+#install-actions-msg {
+	flex: 1 1 auto;
+	margin: 0;
+	font-size: .85rem;
+	color: var(--editor-red);
+	text-align: right;
+}
+
+#install-back,
+#install-next {
+	flex: 0 0 auto;
+	padding: .85rem 2rem;
+	border-radius: var(--editor-radius-sm);
+	border: none;
+	font: inherit;
+	font-size: 1rem;
+	font-weight: 600;
+	cursor: pointer;
+}
+
+#install-back {
+	background: var(--editor-bg-elevated);
+	color: var(--editor-text);
+	border: 1px solid var(--editor-border);
+}
+
+#install-next {
+	background: var(--editor-blue);
+	color: #fff;
+	margin-left: auto;
+}
+
+#install-back:disabled,
+#install-next:disabled {
+	opacity: .6;
+	cursor: default;
+}

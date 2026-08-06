@@ -32,11 +32,14 @@ jobs:
       - name: Run kernel smoke tests
         run: php tests/kernel-smoke.php
 
-      - name: Run admin backend smoke tests
+      - name: Run editor backend smoke tests
+        run: php tests/editor-smoke.php
+
+      - name: Run admin tooling smoke tests
         run: php tests/admin-smoke.php
 
-      - name: Run dev tooling smoke tests
-        run: php tests/dev-smoke.php
+      - name: Run install wizard smoke tests
+        run: php tests/install-smoke.php
 
       - name: Run concurrency smoke tests
         run: php tests/concurrency-smoke.php

@@ -1,0 +1,113 @@
+<?php
+return [
+	'[[/_editor/login/label/user]]'	=> 'Email',
+	'[[/_editor/login/label/pw]]'		=> 'Password',
+	'[[/_editor/login/label/submit]]'=> 'Log in',
+
+	'[[/_editor/login/error/user]]'	=> 'Email is required.',
+	'[[/_editor/login/error/pw]]'		=> 'Password is required.',
+	'[[/_editor/login/error/wrong]]'	=> 'Check your input or contact the administrator.',
+
+	'[[/_editor/login/msg/welcome]]'	=> 'Enter your email and password:',
+	'[[/_editor/login/msg/pending]]'	=> 'Checking your input.',
+
+	'[[/_editor/user/logout]]'				=> 'Log out',
+	'[[/_editor/user/theme]]'					=> 'Toggle light/dark',
+	'[[/_editor/user/settings]]'			=> 'Settings',
+
+	'[[/_editor/nav/dashboard]]'			=> 'Dashboard',
+	'[[/_editor/nav/user]]'					=> 'User',
+	'[[/_editor/nav/text]]'					=> 'Text',
+	'[[/_editor/nav/images]]'				=> 'Images',
+	'[[/_editor/nav/elements]]'			=> 'Elements',
+	'[[/_editor/nav/submissions]]'		=> 'Submissions',
+	'[[/_editor/nav/newsletter]]'		=> 'Newsletter',
+	'[[/_editor/nav/logs]]'					=> 'Log',
+
+	'[[/_editor/elements/label/type]]'			=> 'Type:',
+	'[[/_editor/elements/label/add]]'				=> 'New element',
+	'[[/_editor/elements/label/uri]]'				=> 'Uri',
+	'[[/_editor/elements/label/uri-hint]]'	=> 'Unique string (a-z, -, _) used to identify this element, e.g. “open-workshops”.',
+	'[[/_editor/elements/label/global]]'		=> 'Global',
+	'[[/_editor/elements/label/yes]]'				=> 'Yes',
+	'[[/_editor/elements/label/no]]'				=> 'No',
+	'[[/_editor/elements/label/image-savefirst]]'	=> 'Only available after the first save.',
+	'[[/_editor/elements/label/image-target]]'		=> 'Target size:',
+	'[[/_editor/elements/label/locale]]'		=> 'Translation',
+	'[[/_editor/elements/label/save]]'			=> 'Save',
+	'[[/_editor/elements/label/delete]]'		=> 'Delete',
+	'[[/_editor/elements/label/back]]'			=> 'Back to',
+	'[[/_editor/elements/label/backtypes]]'	=> 'Back to overview',
+
+	'[[/_editor/elements/msg/pending]]'			=> 'Saving …',
+	'[[/_editor/elements/msg/saved]]'				=> 'Saved.',
+	'[[/_editor/elements/error/uri]]'				=> 'Uri is required.',
+	'[[/_editor/elements/error/save]]'			=> 'Save failed.',
+	'[[/_editor/elements/error/load]]'			=> 'Failed to load.',
+	'[[/_editor/elements/error/required]]'	=> 'Please fill in all required fields:',
+	'[[/_editor/elements/confirm/delete]]'	=> 'Really delete this element?',
+
+	// Multilocale field labels for the Elements form - per type + model key,
+	// missing translations automatically fall back to the raw key
+	'[[/_editor/elements/field/deals/title]]'					=> 'Title',
+	'[[/_editor/elements/field/deals/subtitle]]'			=> 'Subtitle',
+	'[[/_editor/elements/field/deals/description]]'		=> 'Description',
+	'[[/_editor/elements/field/deals/price_default]]'	=> 'Default price',
+
+	'[[/_editor/elements/field/partner/title]]'				=> 'Title',
+	'[[/_editor/elements/field/partner/description]]'	=> 'Description',
+	'[[/_editor/elements/field/partner/url]]'					=> 'Website',
+
+	'[[/_editor/elements/field/portfolio/title]]'			=> 'Title',
+	'[[/_editor/elements/field/portfolio/description]]'	=> 'Description',
+	'[[/_editor/elements/field/portfolio/tasks]]'			=> 'Tasks',
+
+	'[[/_editor/elements/field/pricelist/title]]'			=> 'Title',
+	'[[/_editor/elements/field/pricelist/price]]'			=> 'Price',
+	'[[/_editor/elements/field/pricelist/cat]]'				=> 'Category',
+
+	'[[/_editor/elements/field/services/title]]'			=> 'Title',
+	'[[/_editor/elements/field/services/subtitle]]'		=> 'Subtitle',
+	'[[/_editor/elements/field/services/description]]'	=> 'Description',
+
+	'[[/_editor/text/label/save]]'					=> 'Save',
+	'[[/_editor/text/label/back]]'					=> 'Back to list',
+
+	'[[/_editor/text/msg/pending]]'					=> 'Saving …',
+	'[[/_editor/text/msg/saved]]'						=> 'Saved.',
+	'[[/_editor/text/error/save]]'					=> 'Save failed.',
+	'[[/_editor/text/error/load]]'					=> 'Failed to load.',
+
+	'[[/_editor/users/label/mail]]'					=> 'Email address',
+	'[[/_editor/users/label/newpw]]'				=> 'New password (leave blank to keep it unchanged)',
+	'[[/_editor/users/label/currentpw]]'		=> 'Current password to confirm',
+	'[[/_editor/users/label/you]]'					=> 'you',
+	'[[/_editor/users/label/save]]'					=> 'Save',
+	'[[/_editor/users/label/back]]'					=> 'Back to list',
+	'[[/_editor/users/label/logoutall]]'		=> 'Log out everywhere',
+	'[[/_editor/users/label/permissions]]'	=> 'Permissions',
+	'[[/_editor/users/label/permissions-full]]' => 'Full access (every module)',
+	'[[/_editor/users/label/permissions-manage]]' => 'Manage users',
+
+	'[[/_editor/users/msg/pending]]'				=> 'Saving …',
+	'[[/_editor/users/msg/saved]]'					=> 'Saved.',
+	'[[/_editor/users/msg/loggedout]]'			=> 'Logged out on all devices.',
+	'[[/_editor/users/error/save]]'					=> 'Save failed.',
+	'[[/_editor/users/error/load]]'					=> 'Failed to load.',
+	'[[/_editor/users/confirm/logoutall]]'	=> 'Really log this user out on all devices?',
+
+	'[[/_editor/images/label/image]]'				=> 'Image',
+	'[[/_editor/images/label/back]]'				=> 'Back to list',
+	'[[/_editor/images/msg/pending]]'				=> 'Uploading …',
+	'[[/_editor/images/msg/saved]]'					=> 'Saved.',
+	'[[/_editor/images/error/save]]'				=> 'Save failed.',
+	'[[/_editor/images/error/load]]'				=> 'Failed to load.',
+
+	'[[/_editor/htmleditor/label/strong]]'	=> 'Bold',
+	'[[/_editor/htmleditor/label/em]]'			=> 'Italic',
+	'[[/_editor/htmleditor/label/span]]'		=> 'Highlight',
+	'[[/_editor/htmleditor/label/a]]'				=> 'Link',
+	'[[/_editor/htmleditor/label/linkplaceholder]]'	=> 'https://…',
+	'[[/_editor/htmleditor/label/linkok]]'					=> 'Apply',
+	'[[/_editor/htmleditor/label/linkcancel]]'			=> 'Cancel',
+];

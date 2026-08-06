@@ -1,20 +1,28 @@
-[template /_admin/templates/html-header]
-
-		<form id="form-login">
-			[csrf]
-			<p id="form-message">[[/_admin/login/msg/welcome]]</p>
-			<label class="admin-field" for="input-user">
-				<span>[[/_admin/login/label/user]]</span>
-				<input id="input-user" type="email" autocomplete="username">
-			</label>
-			<label class="admin-field" for="input-pw">
-				<span>[[/_admin/login/label/pw]]</span>
-				<input id="input-pw" type="password" autocomplete="current-password">
-			</label>
-			<button id="submit" type="submit">[[/_admin/login/label/submit]]</button>
-			[[/_admin/localepicker]]
-		</form>
-		[jstext]
-		[assets /_admin/.cache/login.js]
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<meta name="robots" content="noindex, nofollow">
+		<link rel="icon" type="image/png" sizes="32x32" href="[[/nino/dir]]/_admin/assets/favicon-32x32.png">
+		<link rel="icon" href="[[/nino/dir]]/_admin/assets/favicon.ico">
+		<title>Admin</title>
+		<link rel="stylesheet" href="[[/nino/dir]]/_editor/assets/style.css">
+		<link rel="stylesheet" href="[[/nino/dir]]/_admin/assets/style.css">
+	</head>
+	<body>
+		<div id="admin-login-wrap">
+			<form id="admin-login-form">
+				[csrf]
+				<p id="admin-login-msg">Admin</p>
+				<label class="editor-field" for="admin-input-pw">
+					<span>Password</span>
+					<input id="admin-input-pw" type="password" autocomplete="current-password">
+				</label>
+				<button type="submit">Login</button>
+			</form>
+		</div>
+		<script src="[[/nino/dir]]/_nino/Nino.js"></script>
+		<script src="[[/nino/dir]]/_admin/assets/script.js"></script>
 	</body>
 </html>

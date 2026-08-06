@@ -2,12 +2,12 @@
 *[English](development.md)*
 
 **Links:**
-[README](../README.de.md) · [Design-Handbuch](design.de.md) · [_admin-Handbuch](_admin.de.md) · [_dev-Handbuch](_dev.de.md) · [Security Policy](../SECURITY.md) · [Changelog](../CHANGELOG.md)
+[README](../README.de.md) · [Design-Handbuch](design.de.md) · [_editor-Handbuch](_editor.de.md) · [_admin-Handbuch](_admin.de.md) · [_install-Handbuch](_install.de.md) · [Security Policy](../SECURITY.md) · [Changelog](../CHANGELOG.md)
 
 ## Übersicht
 Nino verzichtet in der Entwicklung bewusst auf ein Installations-Tools oder eine rein UI-basierte Arbeitsweise. Entwickler benötigen daher Grundkenntnisse in PHP und fortgeschrittene Kenntnisse in HTML/CSS/Javascript um eine Webseite vollständig umsetzen zu können. Die Administration und der Betrieb eines fertigen Projekts ist dann jedoch ohne technisches Knowhow möglich.
 
-Für die Entwicklung einer einfachen Webseite mit statischen und dynamischen Inhalten sind wenig Eingriffe in PHP notwendig. Templates werden in HTML+ *(HTML + [[/text/fills]] + [shortcodes])* angelegt. Die Kernel-Konfiguration, globale und lokale Texte *(Textfills)* und Daten mit typisierten Vorgaben *(Elemente)* werden in PHP-Arrays gespeichert. Diese können über das grafische _dev Interface erstellt und anschließend über _admin gepflegt werden. Weitere Assets (CSS/JS/Images) werden klassisch angelegt.
+Für die Entwicklung einer einfachen Webseite mit statischen und dynamischen Inhalten sind wenig Eingriffe in PHP notwendig. Templates werden in HTML+ *(HTML + [[/text/fills]] + [shortcodes])* angelegt. Die Kernel-Konfiguration, globale und lokale Texte *(Textfills)* und Daten mit typisierten Vorgaben *(Elemente)* werden in PHP-Arrays gespeichert. Diese können über das grafische _admin Interface erstellt und anschließend über _editor gepflegt werden. Weitere Assets (CSS/JS/Images) werden klassisch angelegt.
 Bei fortgeschrittener Modulentwicklung für erweiterte Funktionen, wie zum Beispiel die Integration einer API oder die Einbindung von Datenbanken, sind fortgeschrittene PHP-Kenntnisse notwendig.
 
 ## Grundlagen
@@ -44,7 +44,7 @@ Die Kommunikation und Dynamik zwischen Nino und seinen Modulen erfolgt nur über
 ```
 
 `$name` ist dabei ein einfacher String-Key — nach der Konvention (`/nino/http/response`,
-`/nino/http/response/GET://_admin`, `/nino/html/shortcode/template`). Die festgelegten Callbacks im Kernel werden ebenfalls nach diesem Muster registriert und ausgeführt. Jedes Modul kann Kernel-Callbacks nutzen oder Eigene registrieren.
+`/nino/http/response/GET://_editor`, `/nino/html/shortcode/template`). Die festgelegten Callbacks im Kernel werden ebenfalls nach diesem Muster registriert und ausgeführt. Jedes Modul kann Kernel-Callbacks nutzen oder Eigene registrieren.
 `$prio` ist `0`–`9`, niedriger läuft zuerst
 
 `doCallbacks()` ruft jeden auf `$name`registrierten Callback in Prioritätsreihenfolge auf und reicht `$args` durch jeden hindurch.
@@ -84,10 +84,10 @@ Die letzte Zeile `Modules::callModules()` nimmt `config.php`s `/nino/modules`-Ar
 lädt alle enthaltenen Klassen-Namen und ruft `$className::init( &$appData )` auf.
 
 Einzige Ausnahme:
-`_admin/Admin.php` und `_dev/Dev.php` sind **keine** Module in dieser
+`_editor/Editor.php` und `_admin/Admin.php` sind **keine** Module in dieser
 Liste — sie sind eigenständige Einstiegspunkte, die ihr eigenes
-`::init()` explizit aufrufen (siehe "Die `_admin`/`_dev`-Add-ons" unten),
-da ein Request an `/_admin` nie über `config.php`/`index.php` der
+`::init()` explizit aufrufen (siehe "Die `_editor`/`_admin`-Add-ons" unten),
+da ein Request an `/_editor` nie über `config.php`/`index.php` der
 Haupt-Site läuft.
 
 ### 2. `\Nino\request()` — Route auflösen, Request/Response-Callbacks ausführen
@@ -161,23 +161,23 @@ Danach ist das Script zu Ende — es gibt keine "Teardown"-Phase.
 
 ## Dauerhafte Daten
 ### Überblick
-Für den Umgang mit persistenten Daten stellt Nino drei unterschiedliche Konzepte bereit. Alle werden im Dateisystem gespeichert und können über den Kernel, _dev und _admin gelesen und geschrieben werden. Sie unterscheiden sich in der Struktur und damit verbunden in der Anwendung.
+Für den Umgang mit persistenten Daten stellt Nino drei unterschiedliche Konzepte bereit. Alle werden im Dateisystem gespeichert und können über den Kernel, _admin und _editor gelesen und geschrieben werden. Sie unterscheiden sich in der Struktur und damit verbunden in der Anwendung.
 
 #### 1. `config.php` - der Platz für globale key/value-Werte
 Hier sitzt die Quelle für Startwerte der `$appData`: Routen, Module, Locales, Nutzer, Asset-Bundles, Error-/Session-Flags. Hier werden alle persistente
 Änderungen der Kernel- und Modul-Konfiguration gespeichert - auch für zusätzliche Module. `$appData` wird jedoch niemals automatisch geschrieben. Dies erfolgt gezielt über:
 `AppData::writeContentData( $appData, array $keys )`
-Die Datei wird hier neu eingelesen und gemeinsam mit den *übergebenen* Keys gemerged. Die Integration von fremden Werten in _dev ist noch nicht umgesetzt.
+Die Datei wird hier neu eingelesen und gemeinsam mit den *übergebenen* Keys gemerged. Die Integration von fremden Werten in _admin ist noch nicht umgesetzt.
 #### 2.  `elements/*.php`- der Platz für typisierte Werte
 Hier können Daten nach festgelegten Modellen abgelegt und gelesen werden *(z.B. Beiträge, Mitarbeiter, Rezensionen, Neuigkeiten, etc.)*.
-Für jedes Element wird ein Typ-Modell mit Felder definiert *(z.B. title/string/200 chars/multilocale, price/float/€-Suffix, product/image/800x600, ..etc.)* die anschließend über _admin mit Elementen befüllt werden können. Die Felder/Variablen können unterschiedliche Typen haben *(Strings, Integer, DateTime, Boolean - auch Images und Float)*, ein- oder mehrsprachig sein oder mit zusätzlichen Regeln definiert werden *(max-length, suffix, etc.)*. Das Typ-Modell wird zusammen mit den Elementen in einer Datei gespeichert *(z.B. `elements/services.php`)*.
+Für jedes Element wird ein Typ-Modell mit Felder definiert *(z.B. title/string/200 chars/multilocale, price/float/€-Suffix, product/image/800x600, ..etc.)* die anschließend über _editor mit Elementen befüllt werden können. Die Felder/Variablen können unterschiedliche Typen haben *(Strings, Integer, DateTime, Boolean - auch Images und Float)*, ein- oder mehrsprachig sein oder mit zusätzlichen Regeln definiert werden *(max-length, suffix, etc.)*. Das Typ-Modell wird zusammen mit den Elementen in einer Datei gespeichert *(z.B. `elements/services.php`)*.
 Jeder Typ hat eine eindeutige Type-URI *(z.B. `/services`)*, einen globalen Titel und sein Model mit der Variablen-Definition.
 Jedes Element hat eine eindeutige URI *(z.B. `/webdesign` - somit `/services/webdesign`)* und -abhängig des Models- globale und lokale Werte. 
-Für das komfortable Erstellen/Bearbeiten von Typen steht in _dev eine grafische Oberfläche bereit. Eine präzise Dokumentation für die manuelle Bearbeitung der Datei folgt.
+Für das komfortable Erstellen/Bearbeiten von Typen steht in _admin eine grafische Oberfläche bereit. Eine präzise Dokumentation für die manuelle Bearbeitung der Datei folgt.
 **Der Zugriff** erfolgt über den integrierten Template-Shortcode `z.B. [elements /services]<h5>[title]</h5>[/elements]` oder die Kernel Klasse `\Nino\Elements::getElement( $appData, ..), etc.`
-Das Erstellen/Bearbeiten/Löschen von Elementen (nicht Typen) -inklusive Image-Upload- erfolgt (ebenfalls grafisch) über `_admin`.
+Das Erstellen/Bearbeiten/Löschen von Elementen (nicht Typen) -inklusive Image-Upload- erfolgt (ebenfalls grafisch) über `_editor`.
 #### 3. `text/*.php` - der Platz für globale/lokale Textinhalte
-Hier liegen alle sprachunabhängigen *(text/global.php)* und sprachabhängigen Texte *(`text/de_DE.php`, `text/en_US.php`, ...). Der Aufbau ist ebenfalls key/value - richtet sich in der Integration jedoch gezielt an Sprachbausteine in Templates. Die globalen und -zur aktuellen Sprache passenden- lokalen Texte werden automatisch bei Start geladen und bei `\Nino\Html:renderHtml()` ersetzt. Textfills sind im Regelfall nach der Konvention `[[/category/type/name]]` angelegt und werden genau in dieser Form  im Template ersetzt. Verschachtelungen *(z.B. [[/webpage[[/nino/http/response/uri]]/title]])*sind ebenso möglich und werden vollständig aufgelöst. Das Festlegen der möglichen Text-Keys erfolgt in _dev. Das Befüllen der Text-Werte in _admin.
+Hier liegen alle sprachunabhängigen *(text/global.php)* und sprachabhängigen Texte *(`text/de_DE.php`, `text/en_US.php`, ...). Der Aufbau ist ebenfalls key/value - richtet sich in der Integration jedoch gezielt an Sprachbausteine in Templates. Die globalen und -zur aktuellen Sprache passenden- lokalen Texte werden automatisch bei Start geladen und bei `\Nino\Html:renderHtml()` ersetzt. Textfills sind im Regelfall nach der Konvention `[[/category/type/name]]` angelegt und werden genau in dieser Form  im Template ersetzt. Verschachtelungen *(z.B. [[/webpage[[/nino/http/response/uri]]/title]])*sind ebenso möglich und werden vollständig aufgelöst. Das Festlegen der möglichen Text-Keys erfolgt in _admin. Das Befüllen der Text-Werte in _editor.
 
 ## Basic Templating (Shortcodes, Textfills)
 
@@ -420,7 +420,7 @@ Rendert den Inhalt einmal für ein einzelnes Element; `[[key]]`-Platzhalter im I
 Wiederholt den Inhalt für jedes Element eines Typs (optional gefiltert per `query`, begrenzt per `limit`) - `[[key]]`-Platzhalter werden je Treffer neu ersetzt.
 
 #### `Form`
-Kontaktformular: Validierung, Versand der Betreiber-/Bestätigungsmail und Ablage jeder Einsendung für `_admin`.
+Kontaktformular: Validierung, Versand der Betreiber-/Bestätigungsmail und Ablage jeder Einsendung für `_editor`.
 **Javascript:**
 `Nino.http.sendRequest( '/.form', 'POST', function( xhr ) { ... }, { name: '...', email: '...', message: '...', cat: '...', location: '' } )`
 Sendet das Kontaktformular an `/.form`. `location` muss leer bleiben (Honeypot). Erfolg/Fehler ist nur am `xhr.status` erkennbar - der Response-Body bleibt leer: 200 gesendet, 400 Pflichtfeld fehlt/ungültige E-Mail, 418 Honeypot gefüllt, 403 CSRF ungültig/fehlt.
@@ -537,30 +537,30 @@ namespace MyProject\Modules {
 ***Der langfristige Traum ist der Aufbau einer kleinen Nino-Community. Durch das modulare Konzept können wir uns gegenseitig Arbeit abnehmen und gekapselte Module mit globalen Aufgaben teilen.
 Ich freue mich über jedes Feedback auf GitHub oder mail@dape.io.***
 
-## Die `_admin`/`_dev`-Add-ons
+## Die `_editor`/`_admin`-Add-ons
 
-Für die Entwicklung und Pflege einer Webseite liegen in `_dev/`und `_admin/`grafische Frontend-Tools. Beide Seiten haben eigenständige Bootstrap-Skripte, die unabhängig der `/index.php` Route funktionieren. Die Anwendungen sind somit entkoppelt und können jederzeit entfernt werden ohne die Anzeige der eigentlichen Webseite zu beeinträchtigen .
-Der Webserver muss so konfiguriert sein, dass er Anfragen an `/_admin`,`/_dev`an die entsprechende Index weiterleitet. Beim lokalen Testen mit PHPs eingebautem Server muss das Router-Skript diesen Fall explizit routen.
+Für die Entwicklung und Pflege einer Webseite liegen in `_admin/`und `_editor/`grafische Frontend-Tools. Beide Seiten haben eigenständige Bootstrap-Skripte, die unabhängig der `/index.php` Route funktionieren. Die Anwendungen sind somit entkoppelt und können jederzeit entfernt werden ohne die Anzeige der eigentlichen Webseite zu beeinträchtigen .
+Der Webserver muss so konfiguriert sein, dass er Anfragen an `/_editor`,`/_admin`an die entsprechende Index weiterleitet. Beim lokalen Testen mit PHPs eingebautem Server muss das Router-Skript diesen Fall explizit routen.
 
 Die zwei Anwendungen sind ähnlich aufgebaut, mit eindeutigen Unterschieden:
 
-**_dev** dient einem (!) Entwickler. Der Login erfolgt über eine hartcodierte `PASSWORD_HASH`-Konstante, der fest in der Datei definiert wird. Die Funktionen vereinfachen die Entwicklung der Seite und reduzieren das Bearbeiten von .PHP-Array Dateien. Das strukturelle Schadenspotential ist jedoch groß.
+**_admin** dient einem (!) Entwickler. Der Login erfolgt über eine hartcodierte `PASSWORD_HASH`-Konstante, der fest in der Datei definiert wird. Die Funktionen vereinfachen die Entwicklung der Seite und reduzieren das Bearbeiten von .PHP-Array Dateien. Das strukturelle Schadenspotential ist jedoch groß.
 
-**_admin** dient den Administratoren/Betreibern der Seite. Es können *(über _dev)* mehrere Admin-Accounts erstellt werden, die über unterschiedliche Rechte verfügen. Durch das Backupsystem besteht eine grundlegende Absicherung.
+**_editor** dient den Administratoren/Betreibern der Seite. Es können *(über _admin)* mehrere Admin-Accounts erstellt werden, die über unterschiedliche Rechte verfügen. Durch das Backupsystem besteht eine grundlegende Absicherung.
 
 
-**`_dev` ist bewusst von `config.php` entkoppelt**
-Der Login und die Nutzung von `_dev` ist unabhängig der `config.php`möglich. So kann ein Backup wiederhergestellt werden, selbst wenn `config.php`beschädigt ist.
+**`_admin` ist bewusst von `config.php` entkoppelt**
+Der Login und die Nutzung von `_admin` ist unabhängig der `config.php`möglich. So kann ein Backup wiederhergestellt werden, selbst wenn `config.php`beschädigt ist.
 
 ### Das Backup
-Nach der Entwicklung kann über `config.php` das Backup über `/nino/admin/backups` aktiviert werden. Damit wird jeden Tag bei einem `_admin`-Login ein Backup erstellt. Die Funktion`Admin\Backup::maybeRun()` tar+gzipt jede Datei, die das Admin-Panel zur Laufzeit beschreiben kann,
+Nach der Entwicklung kann über `config.php` das Backup über `/nino/editor/backups` aktiviert werden. Damit wird jeden Tag bei einem `_editor`-Login ein Backup erstellt. Die Funktion`Admin\Backup::maybeRun()` tar+gzipt jede Datei, die das Admin-Panel zur Laufzeit beschreiben kann,
   verschlüsselt sie (AES-256-GCM) und schreibt sie unter einem
-  einmaligen Zufalls-Verzeichnisnamen in `_admin/`. Die Backups rotieren alle 14-Tage. Die Datei selbst hat eine `.php`-Extension mit einem selbst-terminierenden Stub `<?php http_response_code(403); exit; return '<base64-payload>';` — ein direkter HTTP-Request ist somit nicht möglich.
+  einmaligen Zufalls-Verzeichnisnamen in `_editor/`. Die Backups rotieren alle 14-Tage. Die Datei selbst hat eine `.php`-Extension mit einem selbst-terminierenden Stub `<?php http_response_code(403); exit; return '<base64-payload>';` — ein direkter HTTP-Request ist somit nicht möglich.
 `Dev\Restore` liest `Backup`s eigene Ausgabe unabhängig — entdeckt das
-  Backup-Verzeichnis per Dateisystem-Glob-Muster und hält seine eigene Kopie des Entschlüsselungs-Keys in `_dev/.restore-key.php`. Jede Wiederherstellung macht zuerst einen unabhängigen Sicherheits-Snapshot des *aktuellen* Zustands.
+  Backup-Verzeichnis per Dateisystem-Glob-Muster und hält seine eigene Kopie des Entschlüsselungs-Keys in `_admin/.restore-key.php`. Jede Wiederherstellung macht zuerst einen unabhängigen Sicherheits-Snapshot des *aktuellen* Zustands.
 
 Eine Bedienungsanleitung beider Anwendungen liegt hier:
-[_admin-Handbuch](_admin.de.md) · [_dev-Handbuch](_dev.de.md)
+[_editor-Handbuch](_editor.de.md) · [_admin-Handbuch](_admin.de.md)
 
 ## Testing
 
@@ -571,8 +571,8 @@ läuft gegen ein isoliertes Sandbox-Verzeichnis unter
 
 ```
 tests/kernel-smoke.php    Kernel: AppData, Filesystem, Auth, Http, Locales, Images, Csrf, Mail, Newsletter, ...
-tests/admin-smoke.php     _admin/Admin.php: Elements, Text, Users, Images, Backup, Logs, Submissions
-tests/dev-smoke.php       _dev/Dev.php: ElementTypes, Restore, Rate-Limiting
+tests/admin-smoke.php     _editor/Editor.php: Elements, Text, Users, Images, Backup, Logs, Submissions
+tests/dev-smoke.php       _admin/Admin.php: ElementTypes, Restore, Rate-Limiting
 ```
 
 Ausführen mit `php tests/kernel-smoke.php` etc. — aktuell 513
@@ -619,26 +619,26 @@ Der kürzeste reale Weg von einem leeren Checkout zu einer deployten,
 funktionierenden Seite:
 
 1. **Routing funktioniert lokal.** `php -S 127.0.0.1:8000 router.php` —
-   das mitgelieferte `router.php` dispatcht `/_admin/*`/`/_dev/*` zu
+   das mitgelieferte `router.php` dispatcht `/_editor/*`/`/_admin/*` zu
    deren eigenen Einstiegspunkten und lässt `.cache/`/`.demo/` als
-   statische Dateien durch; ohne es 404en `/_admin` und `/_dev` auf dem
+   statische Dateien durch; ohne es 404en `/_editor` und `/_admin` auf dem
    eingebauten Server.
-2. **Echtes `_dev`-Passwort setzen:** `php _dev/Dev.php <dein
-   Passwort>` → den ausgegebenen Hash in `_dev/Dev.php`s
+2. **Echtes `_admin`-Passwort setzen:** `php _admin/Admin.php <dein
+   Passwort>` → den ausgegebenen Hash in `_admin/Admin.php`s
    `PASSWORD_HASH`-Konstante einfügen. Der mitgelieferte Platzhalter
    matcht kein reales Passwort, nichts danach ist also erreichbar,
    bevor das gesetzt ist.
-3. **Ersten Admin-Account anlegen** unter `/_dev` → "Nutzer",
+3. **Ersten Admin-Account anlegen** unter `/_admin` → "Nutzer",
    Manager-Checkbox angehakt — das erste echte Schreiben in `config.php`s
    `/nino/auth/user`. 
 4. **Die Route** in `config.php`s `/nino/http/routes` definieren (von
-   Hand, oder `/_dev` → "Konfiguration"):
+   Hand, oder `/_admin` → "Konfiguration"):
    ```php
    'GET://about' => [ 'uri' => '/about', 'body' => '[template /templates/page-about]' ],
    ```
-5. **Einen Elementtyp anlegen** unter `/_dev` → "Element Types" für
+5. **Einen Elementtyp anlegen** unter `/_admin` → "Element Types" für
    jeden wiederkehrenden Inhalt, den die Seite braucht.
-6. **Einen Bild-Slot vorbereiten** unter `/_dev` → "Bilder" für alles,
+6. **Einen Bild-Slot vorbereiten** unter `/_admin` → "Bilder" für alles,
    was das Template später ohne Code-Änderung admin-austauschbar machen
    soll.
 7. **Das Template schreiben**, unter Verwendung von Textfills, des
@@ -654,9 +654,9 @@ funktionierenden Seite:
      hinter einem TLS-terminierenden Reverse-Proxy sitzt (wo
      `$_SERVER['HTTPS']` typischerweise nicht gesetzt ist, selbst bei
      einer HTTPS-Verbindung)
-   - über `/nino/admin/backups`/`/nino/admin/logs` entscheiden
+   - über `/nino/editor/backups`/`/nino/editor/logs` entscheiden
 9. **Live gehen** — den Webserver auf die Projektwurzel zeigen lassen,
-   verifizieren, dass `/_admin` tatsächlich eine Login-Seite rendert
+   verifizieren, dass `/_editor` tatsächlich eine Login-Seite rendert
    (kein 404, kein roher PHP-Quellcode), dann `docs/admin.de.md`s
    Go-Live-Checkliste durcharbeiten, inklusive dem Ausführen aller drei
    Test-Suiten gegen die deployte `config.php`.

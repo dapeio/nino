@@ -22,8 +22,8 @@ namespace Nino\Modules {
 	 *												the user mail renders in the visitor's current locale, the
 	 *												owner mail always in the site's native locale),
 	 *												and records every successful submission so it's visible in
-	 *												_admin (in addition to the mail itself) - see
-	 *												Admin\Submissions in _admin/Admin.php, which reads this
+	 *												_editor (in addition to the mail itself) - see
+	 *												Admin\Submissions in _editor/Editor.php, which reads this
 	 *												module's storage independently (same shape as Dev\Restore
 	 *												reading Admin\Backup's output).
 	 *
@@ -49,7 +49,7 @@ namespace Nino\Modules {
 		}
 
 		/**
-		 *	Validate and send the contact form, then record it for _admin -
+		 *	Validate and send the contact form, then record it for _editor -
 		 *	same field set/rules the form has always used
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
@@ -106,7 +106,7 @@ namespace Nino\Modules {
 				'[[/nino/dir]]'		=> \Nino\Filesystem::getDir( $appData ),
 			];
 
-			// Recipient/subject are Text values ([[/form/...]], editable via _admin) -
+			// Recipient/subject are Text values ([[/form/...]], editable via _editor) -
 			// only the message structure itself (the .tpl files) is developer territory
 			$emailOwner = \Nino\Html::renderHtml( $appData, '[[/form/email/owner]]' );
 
@@ -141,8 +141,8 @@ namespace Nino\Modules {
 			if( ( $appData['./nino/mail/ratelimited'] ?? false ) === true )
 				return;
 
-			// Stored escaped, same as before: _admin's submissions panel decodes
-			// these entities again on render (see _admin/assets/submissions.js,
+			// Stored escaped, same as before: _editor's submissions panel decodes
+			// these entities again on render (see _editor/assets/submissions.js,
 			// decodeEntities() into textContent)
 			self::_record( $appData, [
 				'date'		=> date( 'Y-m-d H:i:s' ),
@@ -159,14 +159,14 @@ namespace Nino\Modules {
 		 *	then prune months past RETENTION_MONTHS. Never thrown - a
 		 *	missing record must not turn a successfully-sent contact mail
 		 *	into a 500 for the visitor. Read independently by
-		 *	Admin\Submissions in _admin/Admin.php (same shape as
+		 *	Admin\Submissions in _editor/Editor.php (same shape as
 		 *	Dev\Restore reading Admin\Backup's output). Plain
 		 *	"<?php return [...];" array files (Filesystem::getFileContent()/
 		 *	putFileContent()'s native .php handling), same as config.php/
 		 *	text/elements - readable directly (eg. in an emergency without
-		 *	_admin installed at all) rather than needing a decoder. Lives
-		 *	in /data, not under _admin/, since this is public-site kernel
-		 *	data _admin merely happens to read - same fixed-path reasoning
+		 *	_editor installed at all) rather than needing a decoder. Lives
+		 *	in /data, not under _editor/, since this is public-site kernel
+		 *	data _editor merely happens to read - same fixed-path reasoning
 		 *	as Runtime::_recordError()'s own docblock.
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data

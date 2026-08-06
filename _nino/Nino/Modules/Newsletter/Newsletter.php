@@ -25,7 +25,7 @@ namespace Nino\Modules {
 	 *										Form::_record()'s forms.<Y-m>.php) since a subscriber
 	 *										list isn't naturally date-bucketed the way individual
 	 *										contact inquiries are. Read independently by
-	 *										Admin\Newsletter in _admin/Admin.php.
+	 *										Admin\Newsletter in _editor/Editor.php.
 	 *
 	 *	@package					Dape/Nino
 	 *	@author						David Perchermeier <mail@dape.io>
@@ -386,7 +386,7 @@ namespace Nino\Modules {
 		}
 
 		// Record an email as removed - called on self-service unsubscribe
-		// above. Admin\Newsletter::apiDelete() (_admin/Admin.php) does its
+		// above. Admin\Newsletter::apiDelete() (_editor/Editor.php) does its
 		// own equivalent write (same hash) rather than calling this: a
 		// static method call autoloads this class just as unconditionally
 		// as a constant read does (see Backup::manifest()'s own docblock

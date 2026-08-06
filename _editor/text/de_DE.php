@@ -1,0 +1,113 @@
+<?php
+return [
+	'[[/_editor/login/label/user]]'	=> 'E-Mail',
+	'[[/_editor/login/label/pw]]'		=> 'Passwort',
+	'[[/_editor/login/label/submit]]'=> 'Anmelden',
+
+	'[[/_editor/login/error/user]]'	=> 'E-Mail muss angegeben werden.',
+	'[[/_editor/login/error/pw]]'		=> 'Passwort muss angegeben werden.',
+	'[[/_editor/login/error/wrong]]'	=> 'Prüfen Sie Ihre Eingabe oder verständigen Sie den Administrator.',
+
+	'[[/_editor/login/msg/welcome]]'	=> 'Geben Sie Ihre E-Mail und Ihre Passwort an:',
+	'[[/_editor/login/msg/pending]]'	=> 'Eingabe wird geprüft.',
+
+	'[[/_editor/user/logout]]'				=> 'Abmelden',
+	'[[/_editor/user/theme]]'					=> 'Hell/Dunkel umschalten',
+	'[[/_editor/user/settings]]'			=> 'Einstellungen',
+	
+	'[[/_editor/nav/dashboard]]'			=> 'Dashboard',
+	'[[/_editor/nav/user]]'					=> 'Nutzer',
+	'[[/_editor/nav/text]]'					=> 'Texte',
+	'[[/_editor/nav/images]]'				=> 'Bilder',
+	'[[/_editor/nav/elements]]'			=> 'Elemente',
+	'[[/_editor/nav/submissions]]'		=> 'Anfragen',
+	'[[/_editor/nav/newsletter]]'		=> 'Newsletter',
+	'[[/_editor/nav/logs]]'					=> 'Log',
+
+	'[[/_editor/elements/label/type]]'			=> 'Typ:',
+	'[[/_editor/elements/label/add]]'				=> 'Neues Element',
+	'[[/_editor/elements/label/uri]]'				=> 'Uri',
+	'[[/_editor/elements/label/uri-hint]]'	=> 'Eindeutige Zeichenfolge (a-z, -, _) zur Identifikation, z. B. „offene-workshops“.',
+	'[[/_editor/elements/label/global]]'		=> 'Global',
+	'[[/_editor/elements/label/yes]]'				=> 'Ja',
+	'[[/_editor/elements/label/no]]'				=> 'Nein',
+	'[[/_editor/elements/label/image-savefirst]]'	=> 'Erst nach dem ersten Speichern verfügbar.',
+	'[[/_editor/elements/label/image-target]]'		=> 'Soll-Maße:',
+	'[[/_editor/elements/label/locale]]'		=> 'Übersetzung',
+	'[[/_editor/elements/label/save]]'			=> 'Speichern',
+	'[[/_editor/elements/label/delete]]'		=> 'Löschen',
+	'[[/_editor/elements/label/back]]'			=> 'Zurück zu',
+	'[[/_editor/elements/label/backtypes]]'	=> 'Zurück zur Übersicht',
+
+	'[[/_editor/elements/msg/pending]]'			=> 'Wird gespeichert …',
+	'[[/_editor/elements/msg/saved]]'				=> 'Gespeichert.',
+	'[[/_editor/elements/error/uri]]'				=> 'Uri muss angegeben werden.',
+	'[[/_editor/elements/error/save]]'			=> 'Speichern fehlgeschlagen.',
+	'[[/_editor/elements/error/load]]'			=> 'Laden fehlgeschlagen.',
+	'[[/_editor/elements/error/required]]'	=> 'Bitte füllen Sie alle Pflichtfelder aus:',
+	'[[/_editor/elements/confirm/delete]]'	=> 'Dieses Element wirklich löschen?',
+
+	// Multilocale Feld-Labels fürs Elements-Formular - je Typ + Modell-Key,
+	// fehlende Übersetzungen fallen automatisch auf den rohen Key zurück
+	'[[/_editor/elements/field/deals/title]]'					=> 'Titel',
+	'[[/_editor/elements/field/deals/subtitle]]'			=> 'Untertitel',
+	'[[/_editor/elements/field/deals/description]]'		=> 'Beschreibung',
+	'[[/_editor/elements/field/deals/price_default]]'	=> 'Standardpreis',
+
+	'[[/_editor/elements/field/partner/title]]'				=> 'Titel',
+	'[[/_editor/elements/field/partner/description]]'	=> 'Beschreibung',
+	'[[/_editor/elements/field/partner/url]]'					=> 'Webseite',
+
+	'[[/_editor/elements/field/portfolio/title]]'			=> 'Titel',
+	'[[/_editor/elements/field/portfolio/description]]'	=> 'Beschreibung',
+	'[[/_editor/elements/field/portfolio/tasks]]'			=> 'Aufgaben',
+
+	'[[/_editor/elements/field/pricelist/title]]'			=> 'Titel',
+	'[[/_editor/elements/field/pricelist/price]]'			=> 'Preis',
+	'[[/_editor/elements/field/pricelist/cat]]'				=> 'Kategorie',
+
+	'[[/_editor/elements/field/services/title]]'			=> 'Titel',
+	'[[/_editor/elements/field/services/subtitle]]'		=> 'Untertitel',
+	'[[/_editor/elements/field/services/description]]'	=> 'Beschreibung',
+
+	'[[/_editor/text/label/save]]'					=> 'Speichern',
+	'[[/_editor/text/label/back]]'					=> 'Zurück zur Liste',
+
+	'[[/_editor/text/msg/pending]]'					=> 'Wird gespeichert …',
+	'[[/_editor/text/msg/saved]]'						=> 'Gespeichert.',
+	'[[/_editor/text/error/save]]'					=> 'Speichern fehlgeschlagen.',
+	'[[/_editor/text/error/load]]'					=> 'Laden fehlgeschlagen.',
+
+	'[[/_editor/users/label/mail]]'					=> 'E-Mail-Adresse',
+	'[[/_editor/users/label/newpw]]'				=> 'Neues Passwort (leer lassen, um es nicht zu ändern)',
+	'[[/_editor/users/label/currentpw]]'		=> 'Aktuelles Passwort zur Bestätigung',
+	'[[/_editor/users/label/you]]'					=> 'Sie',
+	'[[/_editor/users/label/save]]'					=> 'Speichern',
+	'[[/_editor/users/label/back]]'					=> 'Zurück zur Liste',
+	'[[/_editor/users/label/logoutall]]'		=> 'Überall abmelden',
+	'[[/_editor/users/label/permissions]]'	=> 'Berechtigungen',
+	'[[/_editor/users/label/permissions-full]]' => 'Vollzugriff (alle Bereiche)',
+	'[[/_editor/users/label/permissions-manage]]' => 'Nutzer verwalten',
+
+	'[[/_editor/users/msg/pending]]'				=> 'Wird gespeichert …',
+	'[[/_editor/users/msg/saved]]'					=> 'Gespeichert.',
+	'[[/_editor/users/msg/loggedout]]'			=> 'Auf allen Geräten abgemeldet.',
+	'[[/_editor/users/error/save]]'					=> 'Speichern fehlgeschlagen.',
+	'[[/_editor/users/error/load]]'					=> 'Laden fehlgeschlagen.',
+	'[[/_editor/users/confirm/logoutall]]'	=> 'Diesen Nutzer wirklich auf allen Geräten abmelden?',
+
+	'[[/_editor/images/label/image]]'				=> 'Bild',
+	'[[/_editor/images/label/back]]'				=> 'Zurück zur Liste',
+	'[[/_editor/images/msg/pending]]'				=> 'Wird hochgeladen …',
+	'[[/_editor/images/msg/saved]]'					=> 'Gespeichert.',
+	'[[/_editor/images/error/save]]'				=> 'Speichern fehlgeschlagen.',
+	'[[/_editor/images/error/load]]'				=> 'Laden fehlgeschlagen.',
+
+	'[[/_editor/htmleditor/label/strong]]'	=> 'Fett',
+	'[[/_editor/htmleditor/label/em]]'			=> 'Kursiv',
+	'[[/_editor/htmleditor/label/span]]'		=> 'Hervorheben',
+	'[[/_editor/htmleditor/label/a]]'				=> 'Link',
+	'[[/_editor/htmleditor/label/linkplaceholder]]'	=> 'https://…',
+	'[[/_editor/htmleditor/label/linkok]]'					=> 'Übernehmen',
+	'[[/_editor/htmleditor/label/linkcancel]]'			=> 'Abbrechen',
+];

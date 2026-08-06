@@ -1,14 +1,11 @@
 /**
  *	Nino										A compact filesystembased php framework
- *	Modules									Optional modules
- *	Nino										Framework
- *	dashboard.js						Admin "Dashboard" panel - the landing tab: a handful
- *													of read-only numbers already available from the other
- *													panels (see _admin/Admin.php's Dashboard class), pulled
- *													into one overview. Doesn't write anything, and the tiles
- *													are just #hash links into the panel they summarize -
- *													Nino.admin.onReady()'s own hashchange listener does the
- *													actual tab switch, nothing dashboard-specific needed there.
+ *	Dev											"Dashboard" module: landing tab with the numbers the other
+ *													modules already compute (element types, pages, admin
+ *													accounts, last backup, missing text keys/image slots) -
+ *													see _admin/Admin.php's Dashboard class. Doesn't write anything,
+ *													the tiles/rows just jump to the tab they summarize via
+ *													Nino.admin.selectTab().
  *
  *	@package								Dape/Nino
  *	@author									David Perchermeier <mail@dape.io>
@@ -22,9 +19,9 @@
 	Nino.admin.dashboard = {
 
 		/**
-		 *	Load the summary and render it. Same "always re-fetch" shape as
-		 *	logs.js/newsletter.js - there's no drill-down state to preserve,
-		 *	and re-fetching on every tab switch keeps the numbers current
+		 *	Load the summary and render it. No drill-down state to
+		 *	preserve, so this always re-fetches, same shape as the other
+		 *	modules' init()/showCurrent()
 		 *
 		 *	@return		void
 		 */
@@ -47,12 +44,11 @@
 		 *	@return		void
 		 */
 		showCurrent : function() {
-			Nino.admin.router.set( 'dashboard', [] );
 			Nino.admin.dashboard.init();
 		},
 
 		/**
-		 *	Call a dashboard/* admin action
+		 *	Call a dashboard/* dev action
 		 *
 		 *	@param		{string}		endpoint			Action name (eg. "summary", becomes "dashboard/summary")
 		 *	@param		{Object}		payload				Request payload, sent json-encoded as "data"
@@ -79,15 +75,15 @@
 			wrap.innerHTML = '';
 			const p = dc.createElement('p');
 			p.className = 'admin-error';
-			p.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : 'Fehler beim Laden.' );
+			p.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : 'Failed to load.' );
 			wrap.appendChild( p );
 		},
 
 		/**
-		 *	Render the whole panel: a row of stat tiles, an element-per-type
-		 *	breakdown, then recent activity
+		 *	Render the whole panel: a row of stat tiles, an element-type
+		 *	breakdown (by field count), then the missing-content scans
 		 *
-		 *	@param		{Object}	data					{ elements, lastBackup, submissions?, newsletter?, recentActivity? }
+		 *	@param		{Object}	data					{ types, pages, users, lastBackup, missingText, missingImages }
 		 *
 		 *	@return		void
 		 */
@@ -98,45 +94,45 @@
 
 			const tiles = dc.createElement('div');
 			tiles.id = 'admin-dashboard-tiles';
-			// submissions/newsletter/recentActivity are only in the response
-			// at all if this admin holds the matching permission (see
-			// Dashboard::apiSummary()) - omitted, not just empty, so each is
-			// skipped here rather than rendered as "undefined"
-			if( data.submissions !== undefined )
-				tiles.appendChild( Nino.admin.dashboard._tile( 'submissions', String( data.submissions ), 'Anfragen' ) );
-			if( data.newsletter !== undefined )
-				tiles.appendChild( Nino.admin.dashboard._tile( 'newsletter', String( data.newsletter ), 'Newsletter-Abonnenten' ) );
-			tiles.appendChild( Nino.admin.dashboard._tile( 'logs', data.lastBackup || '–', 'Letztes Backup' ) );
+			tiles.appendChild( Nino.admin.dashboard._tile( 'types', String( data.types.length ), data.types.length === 1 ? 'element type' : 'element types' ) );
+			tiles.appendChild( Nino.admin.dashboard._tile( 'pages', String( data.pages ), data.pages === 1 ? 'page' : 'pages' ) );
+			tiles.appendChild( Nino.admin.dashboard._tile( 'users', String( data.users ), data.users === 1 ? 'admin account' : 'admin accounts' ) );
+			tiles.appendChild( Nino.admin.dashboard._tile( 'restore', data.lastBackup || '–', 'last backup' ) );
 			wrap.appendChild( tiles );
 
-			wrap.appendChild( Nino.admin.dashboard._elementsSection( data.elements ) );
-			if( data.recentActivity !== undefined )
-				wrap.appendChild( Nino.admin.dashboard._activitySection( data.recentActivity ) );
+			wrap.appendChild( Nino.admin.dashboard._typesSection( data.types ) );
+
+			const ul = dc.createElement('ul');
+			ul.id = 'admin-dashboard-summary';
+			ul.appendChild( Nino.admin.dashboard._row( 'text', data.missingText, 'missing text key', 'missing text keys', 'No missing text keys.' ) );
+			ul.appendChild( Nino.admin.dashboard._row( 'images', data.missingImages, 'missing image slot', 'missing image slots', 'No missing image slots.' ) );
+			wrap.appendChild( ul );
 		},
 
 		/**
-		 *	One clickable stat tile - #hash link into the panel it
-		 *	summarizes, same tab switch the nav bar itself uses
+		 *	One clickable stat tile - jumps to the tab it summarizes via
+		 *	Nino.admin.selectTab(), same reuse of _editor's tile markup/CSS
 		 *
-		 *	@param		{string}	panel					Target panel name (eg. "submissions")
+		 *	@param		{string}	tab						Target tab uri (matches Nino.admin.TABS)
 		 *	@param		{string}	value					Big figure
 		 *	@param		{string}	label					Caption below it
 		 *
 		 *	@return		{Element}
 		 */
-		_tile : function( panel, value, label ) {
+		_tile : function( tab, value, label ) {
 
 			const a = dc.createElement('a');
-			a.href = '#'+ panel;
-			a.className = 'admin-dashboard-tile admin-dashboard-tile--'+ panel;
+			a.href = '#';
+			a.className = 'editor-dashboard-tile editor-dashboard-tile--'+ tab;
+			a.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.selectTab( tab ) } );
 
 			const val = dc.createElement('span');
-			val.className = 'admin-dashboard-tile-value';
+			val.className = 'editor-dashboard-tile-value';
 			val.textContent = value;
 			a.appendChild( val );
 
 			const lbl = dc.createElement('span');
-			lbl.className = 'admin-dashboard-tile-label';
+			lbl.className = 'editor-dashboard-tile-label';
 			lbl.textContent = label;
 			a.appendChild( lbl );
 
@@ -144,62 +140,63 @@
 		},
 
 		/**
-		 *	"Elemente nach Typ": one meter bar per type, width relative to
-		 *	whichever type has the most entries, clicking a row jumps to
-		 *	that type in the Elements panel
+		 *	"Element types": one meter bar per type, width relative to
+		 *	whichever type has the most fields, clicking a row jumps to
+		 *	the Element Types tab
 		 *
-		 *	@param		{Array}		elements			[ { type, title, count }, ... ]
+		 *	@param		{Array}		types					[ { uri, title, fieldCount }, ... ]
 		 *
 		 *	@return		{Element}
 		 */
-		_elementsSection : function( elements ) {
+		_typesSection : function( types ) {
 
 			const section = dc.createElement('div');
-			section.className = 'admin-dashboard-section';
+			section.className = 'editor-dashboard-section';
 
 			const title = dc.createElement('h3');
-			title.textContent = 'Elemente nach Typ';
+			title.textContent = 'Element types';
 			section.appendChild( title );
 
-			if( elements.length === 0 ) {
+			if( types.length === 0 ) {
 				const p = dc.createElement('p');
-				p.textContent = 'Noch keine Element-Typen angelegt.';
+				p.textContent = 'No element types defined yet.';
 				section.appendChild( p );
 				return section;
 			}
 
-			const max = Math.max.apply( null, elements.map( function( e ) { return e.count } ).concat( [1] ) );
+			const max = Math.max.apply( null, types.map( function( t ) { return t.fieldCount } ).concat( [1] ) );
 
 			const ul = dc.createElement('ul');
-			ul.id = 'admin-dashboard-elements';
+			ul.id = 'admin-dashboard-types';
 
-			elements.forEach( function( e ) {
+			types.forEach( function( t ) {
 
 				const li = dc.createElement('li');
 
 				const a = dc.createElement('a');
-				a.href = '#elements/'+ e.type;
+				a.href = '#';
+				a.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.selectTab( 'types' ) } );
 
 				const row = dc.createElement('span');
-				row.className = 'admin-dashboard-meter-row';
+				row.className = 'editor-dashboard-meter-row';
 
 				const label = dc.createElement('span');
-				label.className = 'admin-dashboard-meter-label';
-				label.textContent = e.title;
+				label.className = 'editor-dashboard-meter-label';
+				label.textContent = t.title;
 				row.appendChild( label );
 
 				const count = dc.createElement('span');
-				count.className = 'admin-dashboard-meter-count';
-				count.textContent = e.count;
+				count.className = 'editor-dashboard-meter-count';
+				count.textContent = t.fieldCount;
 				row.appendChild( count );
 
 				a.appendChild( row );
 
 				const track = dc.createElement('span');
-				track.className = 'admin-dashboard-meter-track';
+				track.className = 'editor-dashboard-meter-track';
 				const fill = dc.createElement('span');
-				fill.className = 'admin-dashboard-meter-fill';
-				fill.style.width = ( e.count / max * 100 )+ '%';
+				fill.className = 'editor-dashboard-meter-fill';
+				fill.style.width = ( t.fieldCount / max * 100 )+ '%';
 				track.appendChild( fill );
 				a.appendChild( track );
 
@@ -213,48 +210,34 @@
 		},
 
 		/**
-		 *	"Letzte Aktivität": the handful of most recent log lines
-		 *	(server already limits + orders them), same list markup as
-		 *	logs.js's own full list
+		 *	One summary row - a link when the count is > 0 (jumps to the
+		 *	tab via Nino.admin.selectTab), plain text otherwise
 		 *
-		 *	@param		{string[]}	lines
+		 *	@param		{string}	tab						Tab uri to jump to (matches Nino.admin.TABS)
+		 *	@param		{number}	count
+		 *	@param		{string}	singular
+		 *	@param		{string}	plural
+		 *	@param		{string}	zeroText			Shown instead of a count when it's 0
 		 *
 		 *	@return		{Element}
 		 */
-		_activitySection : function( lines ) {
+		_row : function( tab, count, singular, plural, zeroText ) {
 
-			const section = dc.createElement('div');
-			section.className = 'admin-dashboard-section';
+			const li = dc.createElement('li');
+			li.className = 'admin-dashboard-row';
 
-			const title = dc.createElement('h3');
-			title.textContent = 'Letzte Aktivität';
-			section.appendChild( title );
-
-			if( lines.length === 0 ) {
-				const p = dc.createElement('p');
-				p.textContent = 'Noch keine Einträge.';
-				section.appendChild( p );
-				return section;
+			if( count === 0 ) {
+				li.textContent = zeroText;
+				return li;
 			}
 
-			const ul = dc.createElement('ul');
-			ul.id = 'admin-dashboard-activity';
+			const a = dc.createElement('a');
+			a.href = '#';
+			a.textContent = count+ ' '+ ( count === 1 ? singular : plural );
+			a.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.selectTab( tab ) } );
+			li.appendChild( a );
 
-			lines.forEach( function( line ) {
-				const li = dc.createElement('li');
-				li.textContent = line;
-				ul.appendChild( li );
-			} );
-
-			section.appendChild( ul );
-
-			const more = dc.createElement('a');
-			more.href = '#logs';
-			more.className = 'admin-dashboard-more';
-			more.textContent = 'Alle anzeigen →';
-			section.appendChild( more );
-
-			return section;
+			return li;
 		},
 	};
 

@@ -5,13 +5,13 @@
  *
  *
  *			Design tokens as native CSS custom properties. --color-primary defaults
- *			to _admin's blue - everything else is a project-neutral placeholder.
+ *			to _editor's blue - everything else is a project-neutral placeholder.
  *			A project overrides whatever it needs in its own stylesheet (eg.
  *			assets/style.theme01.css), loaded after this file, via a plain
  *			:root { --token: value; } block - no build step, no load-order
  *			juggling, the cascade resolves var() at compute time.
  *
- *			If a token still needs to stay _admin-editable per project, define it
+ *			If a token still needs to stay _editor-editable per project, define it
  *			as --token: [[/nino/path]]; instead of a literal value.
  *
  *			--text-1 .. --text-6 is a small type scale for titles/subtitles,

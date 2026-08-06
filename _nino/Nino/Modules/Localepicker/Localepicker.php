@@ -55,6 +55,16 @@ namespace Nino\Modules {
 				return;
 
 			$locale = \Nino\Locales::setCurrentLocale( $appData, $request['/nino/http/request']['query']['/_nino/localepicker/current'] );
+
+			// Keep the response's own 'locale' in sync with the switch just
+			// made - \Nino\request() calls Locales::response() right after
+			// Http::response()'s callbacks run, and that method reverts the
+			// current locale straight back if it doesn't match this field.
+			// Left at whatever Http::request() seeded it with (the locale
+			// *before* this switch), that's exactly what would happen: the
+			// switch above would never survive past this same request
+			$request['/nino/http/response']['locale'] = $locale;
+
 			$newUri = \Nino\Http::findRouteUri( $appData, $request['/nino/http/response']['uri'], $locale );
 
 			// Redirect via the response array - a direct header() call would be
