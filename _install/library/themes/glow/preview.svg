@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 400" width="600" height="400" role="img" aria-label="Glow theme preview">
+	<title>Glow</title>
+	<rect width="600" height="400" fill="#fcfcf9"/>
+
+	<!-- header -->
+	<rect x="24" y="20" width="86" height="12" rx="3" fill="#f50963"/>
+	<g fill="#f50963" opacity=".75">
+		<rect x="404" y="22" width="42" height="8" rx="3"/>
+		<rect x="458" y="22" width="42" height="8" rx="3"/>
+		<rect x="512" y="22" width="42" height="8" rx="3"/>
+	</g>
+	<rect x="24" y="48" width="552" height="1" fill="rgba(200,200,200,.5)"/>
+
+	<!-- hero -->
+	<text x="24" y="112" font-family="system-ui, sans-serif" font-size="40" font-weight="700" fill="#02041d">Glow</text>
+	<text x="24" y="140" font-family="system-ui, sans-serif" font-size="15" fill="#f50963">A starting look for the whole site.</text>
+	<rect x="24" y="160" width="132" height="34" rx="0" fill="#f50963"/>
+	<text x="90" y="182" font-family="system-ui, sans-serif" font-size="13" font-weight="600" fill="#FFFFFF" text-anchor="middle">Get in touch</text>
+	<rect x="168" y="160" width="112" height="34" rx="0" fill="none" stroke="#5e58f5" stroke-width="1.5"/>
+	<text x="224" y="182" font-family="system-ui, sans-serif" font-size="13" font-weight="600" fill="#5e58f5" text-anchor="middle">Learn more</text>
+
+	<!-- cards -->
+	<rect x="24" y="222" width="168" height="104" rx="1" fill="#f0f0f5"/>
+	<rect x="216" y="222" width="168" height="104" rx="1" fill="#f0f0f5"/>
+	<rect x="408" y="222" width="168" height="104" rx="1" fill="#f0f0f5"/>
+	<g fill="#111111">
+		<rect x="44" y="246" width="76" height="10" rx="3"/>
+		<rect x="236" y="246" width="76" height="10" rx="3"/>
+		<rect x="428" y="246" width="76" height="10" rx="3"/>
+	</g>
+	<g fill="#111111" opacity=".45">
+		<rect x="44" y="270" width="128" height="7" rx="3"/>
+		<rect x="44" y="285" width="104" height="7" rx="3"/>
+		<rect x="236" y="270" width="128" height="7" rx="3"/>
+		<rect x="236" y="285" width="104" height="7" rx="3"/>
+		<rect x="428" y="270" width="128" height="7" rx="3"/>
+		<rect x="428" y="285" width="104" height="7" rx="3"/>
+	</g>
+
+	<!-- footer -->
+	<rect x="0" y="352" width="600" height="48" fill="#1c1917"/>
+	<g fill="#9ca3af" opacity=".8">
+		<rect x="24" y="372" width="64" height="7" rx="3"/>
+		<rect x="100" y="372" width="46" height="7" rx="3"/>
+		<rect x="158" y="372" width="52" height="7" rx="3"/>
+	</g>
+</svg>

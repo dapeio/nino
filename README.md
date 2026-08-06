@@ -43,6 +43,7 @@ A well-thought-out **permission system** ensures administrator accounts only get
 ### _install UI features
 - Environment checks: PHP version, required extensions, file/folder permissions
 - Pick locales/modules/pages and assemble starting content from a library (routes, templates, text) - `_install/library/`, see `docs/_install.md`
+- Pick a theme from a preview grid - stylesheet, webfonts and everything else it ships, copied in and bundled
 - Bulk-fill the site's always-present "base" text content
 - Create the first _editor account(s)
 - Set the real _admin password (also the wizard's own lock-out condition)

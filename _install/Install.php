@@ -7,7 +7,8 @@ declare(strict_types=1);
  *												_editor/Editor.php and _admin/Admin.php. Walks a fresh checkout through
  *												environment/permission checks, assembling starting content from
  *												_install/library/ (locales/modules -> routes/templates/text,
- *												an ordered list of actual pages -> routes/templates/text/
+ *												a theme -> stylesheet/fonts + the css bundle, an ordered
+ *												list of actual pages -> routes/templates/text/
  *												navigation), bulk-filling the site's always-present "Personal
  *												Infos" text, creating the first _editor account(s) and finally
  *												setting the real _admin password.
@@ -44,6 +45,7 @@ namespace Nino\Install {
 		private const array MODULES = [
 			\Nino\Install\Checks::class,
 			\Nino\Install\Setup::class,
+			\Nino\Install\Themes::class,
 			\Nino\Install\Webpages::class,
 			\Nino\Install\PersonalInfos::class,
 			\Nino\Install\Admin::class,
@@ -375,7 +377,9 @@ namespace Nino\Install {
 	 *												manifest.php (routes/templates/blacklist/requiresModules)
 	 *												plus text/global.php and/or text/&lt;locale&gt;.php fragments
 	 *												merged into the real /text files - see docs/_install.md's
-	 *												Library format section.
+	 *												Library format section. Themes are their own unit kind
+	 *												with their own step (Themes, below) - this class never
+	 *												touches one.
 	 *
 	 *	@package					Dape/Nino
 	 *	@author						David Perchermeier <mail@dape.io>
@@ -405,13 +409,6 @@ namespace Nino\Install {
 		];
 
 		private const string LIBRARY = __DIR__. '/library';
-
-		// Theme stylesheets live in the project's own /assets, not the
-		// library - they're a bundled asset per project.json/build, not
-		// starter content this wizard assembles. Only the middle segment
-		// of 'style.theme.<key>.css' is ever shown/posted
-		private const string THEME_DIR = __DIR__. '/library/base/assets';
-		private const string THEME_PATTERN = '/^style\.theme\.([a-z0-9-]+)\.css$/';
 
 		/**
 		 *	This module's action map, merged into Install::handlePost()'s dispatch
@@ -456,47 +453,7 @@ namespace Nino\Install {
 				'activeLocales' 	=> $appData['/nino/locales/available'] ?? [],
 				'nativeLocale' 		=> $appData['/nino/locales/native'] ?? null,
 				'modules' 				=> $modules,
-				'themes' 					=> self::_themes(),
-				'activeTheme' 		=> self::_currentTheme( $appData ),
 			] );
-		}
-
-		/**
-		 *	Every /assets/style.theme.&lt;key&gt;.css found on disk, key only
-		 *	(no label - the key itself, capitalized client-side, is label
-		 *	enough for a handful of theme names)
-		 *
-		 *	@return 	array			Sorted list of theme keys
-		 */
-		private static function _themes(): array {
-
-			$themes = [];
-
-			foreach( scandir( self::THEME_DIR ) ?: [] as $entry )
-				if( preg_match( self::THEME_PATTERN, $entry, $match ) === 1 )
-					$themes[] = $match[1];
-
-			sort( $themes );
-
-			return $themes;
-		}
-
-		/**
-		 *	The theme key currently bundled into '/.cache/style.css' (see
-		 *	apiApply()) - null if config.php's '/nino/html/assets' isn't in
-		 *	the shape apiApply() itself would have left it in (eg. hand-edited)
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *
-		 *	@return 	string|null
-		 */
-		private static function _currentTheme( array &$appData ): ?string {
-
-			foreach( ( $appData['/nino/html/assets']['/.cache/style.css'] ?? [] ) as $file )
-				if( preg_match( self::THEME_PATTERN, basename( (string) $file ), $match ) === 1 )
-					return $match[1];
-
-			return null;
 		}
 
 		/**
@@ -656,30 +613,14 @@ namespace Nino\Install {
 
 			$appData['/nino/http/routes'] = $routes;
 
-			$writeKeys = [ '/nino/locales/available', '/nino/locales/native', '/nino/modules', '/nino/http/routes' ];
-
-			// Only ever swaps the one bundled theme stylesheet in place -
-			// left alone entirely if no (or an unknown) theme was posted,
-			// same reasoning as every other field here defaulting to "no
-			// change" rather than a forced pick
-			$theme = (string) ( $data['theme'] ?? '' );
-			if( in_array( $theme, self::_themes(), true ) === true ) {
-				$assets = $appData['/nino/html/assets'] ?? [];
-				foreach( ( $assets['/.cache/style.css'] ?? [] ) as $i => $file )
-					if( preg_match( self::THEME_PATTERN, basename( (string) $file ), $match ) === 1 )
-						$assets['/.cache/style.css'][$i] = '/assets/style.theme.'. $theme. '.css';
-				$appData['/nino/html/assets'] = $assets;
-				$writeKeys[] = '/nino/html/assets';
-			}
-
-			\Nino\AppData::writeContentData( $appData, $writeKeys );
+			\Nino\AppData::writeContentData( $appData, [ '/nino/locales/available', '/nino/locales/native', '/nino/modules', '/nino/http/routes' ] );
 
 			if( count( $blacklist ) > 0 )
 				\Nino\Filesystem::mutate( $appData, '/text/blacklist.php', function( array $list ) use ( $blacklist ): array {
 					return array_values( array_unique( array_merge( $list, $blacklist ) ) );
 				} );
 
-			\Nino\Http::ok( $request, [ 'locales' => $appData['/nino/locales/available'], 'nativeLocale' => $appData['/nino/locales/native'], 'modules' => $modules, 'theme' => self::_currentTheme( $appData ) ] );
+			\Nino\Http::ok( $request, [ 'locales' => $appData['/nino/locales/available'], 'nativeLocale' => $appData['/nino/locales/native'], 'modules' => $modules ] );
 		}
 
 		/**
@@ -825,7 +766,310 @@ namespace Nino\Install {
 
 	/**
 	 *	Nino							A compact filesystembased php framework
-	 *	Install						Step 3: build the project's actual pages - a free-form,
+	 *	Install						Step 3: pick one of _install/library/themes/&lt;key&gt; - a
+	 *												complete, self-contained look: its own stylesheet, the
+	 *												webfonts that stylesheet actually references, and
+	 *												whatever else its manifest lists (theme images, ...).
+	 *												Applying copies those files into the project exactly
+	 *												the way Setup copies a unit's 'files', and points
+	 *												config.php's css bundle at the picked theme's stylesheet.
+	 *
+	 *												A theme's manifest.php adds three keys to the shape
+	 *												every other library unit already uses: 'description'
+	 *												and 'preview' (both picker-only - the preview image is
+	 *												served straight out of the library and never copied
+	 *												anywhere) and 'stylesheet', the project-relative path
+	 *												the copied stylesheet ends up at, which is what gets
+	 *												bundled. See docs/_install.md's Library format section.
+	 *
+	 *												The picked key is persisted at '/nino/install/theme',
+	 *												the same way Webpages persists its own list: the css
+	 *												bundle alone can't say which theme produced it once a
+	 *												project renames or hand-edits its stylesheets, and this
+	 *												step has to be able to show the current pick every time
+	 *												it's revisited
+	 *
+	 *	@package					Dape/Nino
+	 *	@author						David Perchermeier <mail@dape.io>
+	 *	@link							https://github.com/dapeio/nino
+	 */
+	class Themes {
+
+		private const string LIBRARY = __DIR__. '/library/themes';
+
+		// Where a theme's stylesheet gets bundled - the one entry in
+		// config.php's '/nino/html/assets' this step owns (see _bundle())
+		private const string BUNDLE_KEY = '/.cache/style.css';
+
+		/**
+		 *	This module's action map, merged into Install::handlePost()'s dispatch
+		 *
+		 *	@return 	array
+		 */
+		public static function actions(): array {
+			return [
+				'themes/list' 	=> [ self::class, 'apiList' ],
+				'themes/apply' 	=> [ self::class, 'apiApply' ],
+			];
+		}
+
+		/**
+		 *	Every theme unit with the label/description/preview its picker
+		 *	tile shows, plus whichever one is currently applied so the
+		 *	picker can pre-select it - same state-restoration reasoning as
+		 *	Setup::apiLibrary()'s docblock
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		&$request			(reference) Current server request
+		 *
+		 *	@return 	void
+		 */
+		public static function apiList( array &$appData, array &$request ): void {
+
+			\Nino\Http::ok( $request, [
+				'themes' 			=> self::_themes( $appData ),
+				'activeTheme' => self::_currentTheme( $appData ),
+			] );
+		}
+
+		/**
+		 *	Copy the picked theme's files into the project and bundle its
+		 *	stylesheet. Unlike Setup/Webpages there is nothing to "replace"
+		 *	here - exactly one theme is active at a time, so applying a
+		 *	different one simply overwrites the previous one's files
+		 *	(same names, same places) and swaps the bundled stylesheet.
+		 *	A file the previous theme owned that the new one doesn't ship
+		 *	(eg. a font no longer used) is left behind rather than deleted,
+		 *	the same additive rule Setup's templates/text follow
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		&$request			(reference) Current server request
+		 *
+		 *	@return 	void
+		 */
+		public static function apiApply( array &$appData, array &$request ): void {
+
+			$data = \Nino\Install\Install::postData();
+			$key 	= (string) ( $data['theme'] ?? '' );
+
+			$manifest = self::_readManifest( $key );
+
+			if( $manifest === null ) {
+				\Nino\Http::fail( $request, 400, 'unknown theme: "'. $key. '"' );
+				return;
+			}
+
+			$unitDir 	= self::LIBRARY. '/'. $key;
+			$root 		= \Nino\Filesystem::getPath( $appData );
+
+			foreach( ( $manifest['files'] ?? [] ) as $file )
+				if( is_dir( $unitDir. '/'. $file ) === true )
+					\Nino\Filesystem::copyDir( $unitDir. '/'. $file, $root. '/'. $file );
+				else if( is_file( $unitDir. '/'. $file ) === true )
+					self::_copyFile( $unitDir. '/'. $file, $root. '/'. $file );
+
+			$appData['/nino/install/theme'] = $key;
+			$appData['/nino/html/assets'] 	= self::_bundle( $appData, (string) $manifest['stylesheet'] );
+
+			\Nino\AppData::writeContentData( $appData, [ '/nino/install/theme', '/nino/html/assets' ] );
+
+			\Nino\Http::ok( $request, [ 'theme' => $key ] );
+		}
+
+		/**
+		 *	'/nino/html/assets' with the picked theme's stylesheet in place
+		 *	of whichever theme stylesheet the css bundle carried before -
+		 *	matched against every path the library's own themes declare, so
+		 *	a project's hand-added stylesheet in that same bundle is never
+		 *	one of them and stays put, at its own position. Carried at the
+		 *	old theme entry's index rather than appended, since a
+		 *	stylesheet's position in the bundle is what decides which
+		 *	:root block wins the cascade (see docs/design.md); with no
+		 *	theme entry to replace (a hand-emptied bundle, or none at all)
+		 *	it goes last, after whatever the project already loads
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$stylesheet		The picked theme's project-relative stylesheet
+		 *
+		 *	@return 	array
+		 */
+		private static function _bundle( array &$appData, string $stylesheet ): array {
+
+			$assets = $appData['/nino/html/assets'] ?? [];
+			$known 	= self::_stylesheets();
+
+			$files 	= [];
+			$placed = false;
+
+			foreach( ( $assets[self::BUNDLE_KEY] ?? [] ) as $file ) {
+
+				if( in_array( (string) $file, $known, true ) === false ) {
+					$files[] = $file;
+					continue;
+				}
+
+				// Every further theme stylesheet in the same bundle (a
+				// hand-edited config listing two) collapses into this one
+				if( $placed === false ) {
+					$files[] = $stylesheet;
+					$placed 	= true;
+				}
+			}
+
+			if( $placed === false )
+				$files[] = $stylesheet;
+
+			$assets[self::BUNDLE_KEY] = $files;
+
+			return $assets;
+		}
+
+		/**
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	array			key -> { label, description, preview }
+		 */
+		private static function _themes( array &$appData ): array {
+
+			$themes = [];
+
+			foreach( scandir( self::LIBRARY ) ?: [] as $entry ) {
+
+				$manifest = self::_readManifest( $entry );
+				if( $manifest === null )
+					continue;
+
+				// The preview image is served straight off disk, out of the
+				// library folder itself - it's picker chrome, not project
+				// content, so it is deliberately not among the files apiApply()
+				// copies. Prefixed with the deploy path since /_install's own
+				// js has no other way to know it (the project may live in a
+				// subdirectory rather than at the site root)
+				$preview = (string) ( $manifest['preview'] ?? '' );
+
+				$themes[$entry] = [
+					'label' 			=> (string) ( $manifest['label'] ?? $entry ),
+					'description' => (string) ( $manifest['description'] ?? '' ),
+					'preview' 		=> ( $preview !== '' && is_file( self::LIBRARY. '/'. $entry. '/'. $preview ) === true )
+						? ( (string) ( $appData['/nino/dir'] ?? '' ) ). '/_install/library/themes/'. $entry. '/'. $preview
+						: null,
+				];
+			}
+
+			ksort( $themes );
+
+			return $themes;
+		}
+
+		/**
+		 *	The currently applied theme: whatever '/nino/install/theme'
+		 *	names, as long as it still resolves to a real unit. A config
+		 *	written before that key existed (or one hand-edited since) falls
+		 *	back to matching the css bundle against every theme's declared
+		 *	stylesheet - which is how the shipped config.php's "agency"
+		 *	pick is recognized without it having to be listed twice
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	string|null							Null if no library theme is currently applied
+		 */
+		private static function _currentTheme( array &$appData ): ?string {
+
+			$key = (string) ( $appData['/nino/install/theme'] ?? '' );
+
+			if( self::_readManifest( $key ) !== null )
+				return $key;
+
+			$bundled = array_map( 'strval', $appData['/nino/html/assets'][self::BUNDLE_KEY] ?? [] );
+
+			foreach( self::_stylesheets() as $candidate => $stylesheet )
+				if( in_array( $stylesheet, $bundled, true ) === true )
+					return $candidate;
+
+			return null;
+		}
+
+		/**
+		 *	Every theme's declared project-relative stylesheet path - what
+		 *	_bundle() strips out of the css bundle before adding the picked
+		 *	one back in, and what _currentTheme() falls back to matching
+		 *
+		 *	@return 	array			key -> stylesheet path
+		 */
+		private static function _stylesheets(): array {
+
+			$paths = [];
+
+			foreach( scandir( self::LIBRARY ) ?: [] as $entry ) {
+
+				$manifest = self::_readManifest( $entry );
+				if( $manifest === null )
+					continue;
+
+				$paths[$entry] = (string) $manifest['stylesheet'];
+			}
+
+			return $paths;
+		}
+
+		/**
+		 *	One theme unit's manifest.php. A theme without a 'stylesheet' is
+		 *	not a theme this step can apply - there would be nothing to
+		 *	bundle - so it never shows up in the picker either.
+		 *
+		 *	$key comes straight off the wire in apiApply(), so it is matched
+		 *	against a plain slug before ever reaching the filesystem - that
+		 *	rules out '.'/'..'/separators (a posted key trying to reach a
+		 *	directory outside library/themes) and null bytes (which php's own
+		 *	path functions raise a ValueError on) in one go, rather than
+		 *	relying on the lookup below quietly not resolving
+		 *
+		 *	@param		string		$key					Directory name under library/themes
+		 *
+		 *	@return 	array|null							Null if $key names no usable theme unit
+		 */
+		private static function _readManifest( string $key ): ?array {
+
+			if( preg_match( '/^[a-z0-9][a-z0-9-]*$/', $key ) !== 1 )
+				return null;
+
+			$path = self::LIBRARY. '/'. $key. '/manifest.php';
+
+			if( is_file( $path ) === false )
+				return null;
+
+			$manifest = include $path;
+
+			return ( is_array( $manifest ) === true && ( $manifest['stylesheet'] ?? '' ) !== '' ) ? $manifest : null;
+		}
+
+		/**
+		 *	Copy one library file into the project - see Setup::_copyFile()'s
+		 *	docblock, duplicated here for the same reason every class in this
+		 *	file duplicates a small helper instead of reaching into a
+		 *	sibling's internals
+		 *
+		 *	@param		string		$from
+		 *	@param		string		$to
+		 *
+		 *	@return 	void
+		 */
+		private static function _copyFile( string $from, string $to ): void {
+
+			$content = @file_get_contents( $from );
+			if( $content === false )
+				return;
+
+			if( is_file( $to ) === true )
+				@unlink( $to );
+
+			file_put_contents( $to, $content );
+		}
+	}
+
+	/**
+	 *	Nino							A compact filesystembased php framework
+	 *	Install						Step 4: build the project's actual pages - a free-form,
 	 *												ordered list of { uri, httpUri, template, nav, text }
 	 *												entries a developer adds/reorders/removes here, rather
 	 *												than a fixed checkbox per _install/library/pages/&lt;key&gt;
@@ -1580,7 +1824,7 @@ namespace Nino\Install {
 
 	/**
 	 *	Nino							A compact filesystembased php framework
-	 *	Install						Step 4: bulk-fill the handful of "Personal Infos" keys every
+	 *	Install						Step 5: bulk-fill the handful of "Personal Infos" keys every
 	 *												project has regardless of what Setup/Webpages picked -
 	 *												/company/* and /website/* (company/contact details,
 	 *												the site's author/hosting info), each with a friendly
@@ -1717,7 +1961,7 @@ namespace Nino\Install {
 
 	/**
 	 *	Nino							A compact filesystembased php framework
-	 *	Install						Step 5: create the first _editor account(s), the same way
+	 *	Install						Step 6: create the first _editor account(s), the same way
 	 *												\Nino\Admin\Users bootstraps them from inside _admin - duplicated
 	 *												rather than depended on, since /_install is meant to work even
 	 *												before a developer has decided whether to keep _admin around
@@ -1803,7 +2047,7 @@ namespace Nino\Install {
 
 	/**
 	 *	Nino							A compact filesystembased php framework
-	 *	Install						Step 6 - the wizard's last step: set the real _admin password.
+	 *	Install						Step 7 - the wizard's last step: set the real _admin password.
 	 *												The only step that writes to _admin/Admin.php's PHP source rather
 	 *												than a data file (see Install::setDevPassword()), and the one
 	 *												action whose success is itself what locks /_install back out -

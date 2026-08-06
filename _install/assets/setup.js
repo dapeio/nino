@@ -2,13 +2,12 @@
 
 /**
  *	Nino										A compact filesystembased php framework
- *	Install									Step 2: pick available locales/modules from _install/library,
- *													a native locale among the ones picked, and a bundled theme
- *													stylesheet (/assets/style.theme.&lt;key&gt;.css), and assemble
- *													them into the real project (routes, templates, text,
- *													/nino/html/assets). See _install/Install.php's Setup
- *													class. Pages have their own step (Webpages, see
- *													webpages.js) - this one only ever touches base +
+ *	Install									Step 2: pick available locales/modules from _install/library
+ *													and a native locale among the ones picked, and assemble
+ *													them into the real project (routes, templates, text).
+ *													See _install/Install.php's Setup class. Themes (see
+ *													themes.js) and pages (see webpages.js) have their own
+ *													steps - this one only ever touches base +
  *													modules/&lt;key&gt;. Driven by the shared Back/Next bar
  *													(script.js) rather than its own save button - apply() is
  *													exposed for Next to call, not wired to a button here.
@@ -68,7 +67,6 @@
 			} ), 'module' );
 
 			Nino.install.setup._renderNativeLocale( lib.nativeLocale );
-			Nino.install.setup._renderThemes( lib.themes, lib.activeTheme );
 		},
 
 		/**
@@ -130,33 +128,6 @@
 			// either way, see Setup::apiApply()'s docblock
 			if( picked.indexOf( current ) === -1 && picked.length > 0 )
 				select.value = picked[0];
-		},
-
-		/**
-		 *	@param		{Array}				themes				Theme keys (see Setup::_themes())
-		 *	@param		{string|null}	activeTheme
-		 *
-		 *	@return		void
-		 */
-		_renderThemes : function( themes, activeTheme ) {
-
-			const wrap = dc.getElementById('setup-theme');
-			if( wrap === null || themes.length === 0 )
-				return;
-
-			const select = dc.createElement('select');
-			select.id = 'setup-theme-select';
-
-			themes.forEach( function( key ) {
-				const option = dc.createElement('option');
-				option.value = key;
-				option.textContent = key.charAt(0).toUpperCase()+ key.slice(1);
-				option.selected = key === activeTheme;
-				select.appendChild( option );
-			} );
-
-			wrap.innerHTML = '';
-			wrap.appendChild( select );
 		},
 
 		/**
@@ -229,13 +200,11 @@
 			msg.textContent = 'Applying …';
 
 			const nativeSelect = dc.getElementById('setup-native-locale-select');
-			const themeSelect 	= dc.getElementById('setup-theme-select');
 
 			Nino.install.apiCall( 'setup/apply', {
 				locales : Nino.install.setup._picked( 'locale' ),
 				native 	: ( nativeSelect !== null ) ? nativeSelect.value : '',
 				modules : Nino.install.setup._picked( 'module' ),
-				theme 	: ( themeSelect !== null ) ? themeSelect.value : '',
 			}, function( status, response ) {
 
 				if( status !== 200 || response === null ) {

@@ -2,6 +2,30 @@
 
 ## Unreleased
 
+- **Added `/_install`'s "Themes" step** and the `_install/library/themes/`
+  branch behind it: a theme is now a complete, self-contained library unit
+  (`manifest.php` + its stylesheet + the webfonts that stylesheet actually
+  references + whatever else it lists) rather than one loose
+  `style.theme.<key>.css` among eight in `base/assets`. The wizard grew a
+  third step for it, between Setup and Webpages: a grid of tiles, one per
+  unit, each with the preview image, title and description its own manifest
+  declares, and a click on a tile's preview enlarges it in a lightbox. The
+  eight shipped themes move into their own directories unchanged, each now
+  carrying the three webfonts it uses - which also drops the shared font
+  collection out of the `democontent` module, along with the four faces no
+  theme ever referenced, and fixes four stylesheets pointing at a
+  `/fonts/titel/` directory that never existed (those title fonts silently
+  never loaded). Applying copies the unit's `files` exactly the way Setup
+  already copies a module's, and swaps the theme entry in `config.php`'s
+  `/nino/html/assets['/.cache/style.css']` bundle in place - a stylesheet's
+  position there is what decides which `:root` block wins the cascade, so
+  it is carried at the old entry's index rather than appended, and every
+  other entry in that array is left alone. The picked key is persisted at
+  `/nino/install/theme` (a config predating it still resolves by matching
+  the bundle against each theme's declared stylesheet). Setup loses its
+  theme `<select>` entirely; adding a ninth theme is one new directory, no
+  code change. See `docs/_install.md`
+
 - **Renamed both backend areas**: `/_dev` is now `/_admin`, and what used to
   be `/_admin` is now `/_editor`. The developer tooling already carried the
   project's technical surface (element types, text, pages, config, restore)

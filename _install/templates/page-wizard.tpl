@@ -23,10 +23,11 @@
 			<div id="install-nav-wrap">
 				<span id="install-nav-checks" class="active">1. Environment</span>
 				<span id="install-nav-setup">2. Setup</span>
-				<span id="install-nav-webpages">3. Webpages</span>
-				<span id="install-nav-personalinfos">4. Personal Infos</span>
-				<span id="install-nav-admin">5. Admins</span>
-				<span id="install-nav-finish">6. Finish</span>
+				<span id="install-nav-themes">3. Themes</span>
+				<span id="install-nav-webpages">4. Webpages</span>
+				<span id="install-nav-personalinfos">5. Personal Infos</span>
+				<span id="install-nav-admin">6. Admins</span>
+				<span id="install-nav-finish">7. Finish</span>
 			</div>
 
 			<div id="install-content-wrap">
@@ -51,11 +52,13 @@
 						<h3>Modules</h3>
 						<div id="setup-modules"></div>
 					</div>
-					<div class="install-setup-group">
-						<h3>Theme</h3>
-						<div id="setup-theme"></div>
-					</div>
 					<p id="setup-msg"></p>
+				</div>
+
+				<div id="install-content-themes">
+					<p class="admin-hint">Pick the site's look - one complete theme from <code>_install/library/themes</code>. Applying copies whatever its manifest lists (its stylesheet, the webfonts that stylesheet uses, any images it ships) into the project and points <code>config.php</code>'s css bundle at it. Click a tile's preview to enlarge it. Exactly one theme is active at a time: picking a different one later overwrites its files rather than adding to them.</p>
+					<div id="themes-grid"></div>
+					<p id="themes-msg"></p>
 				</div>
 
 				<div id="install-content-webpages">
@@ -107,10 +110,18 @@
 				<button type="button" id="install-next">Next</button>
 			</div>
 		</div>
+
+		<!-- Theme preview lightbox - a single, reused overlay filled by
+		     themes.js rather than one per tile, see its _openLightbox() -->
+		<div id="themes-lightbox" class="admin-hidden">
+			<img id="themes-lightbox-image" src="" alt="">
+			<p id="themes-lightbox-caption"></p>
+		</div>
 		<script src="[[/nino/dir]]/_nino/Nino.js"></script>
 		<script src="[[/nino/dir]]/_install/assets/script.js"></script>
 		<script src="[[/nino/dir]]/_install/assets/checks.js"></script>
 		<script src="[[/nino/dir]]/_install/assets/setup.js"></script>
+		<script src="[[/nino/dir]]/_install/assets/themes.js"></script>
 		<script src="[[/nino/dir]]/_install/assets/webpages.js"></script>
 		<script src="[[/nino/dir]]/_install/assets/personalinfos.js"></script>
 		<script src="[[/nino/dir]]/_install/assets/admin.js"></script>

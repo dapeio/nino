@@ -88,6 +88,7 @@ code {
 }
 #install-page-wrap.show-checks #install-content-checks,
 #install-page-wrap.show-setup #install-content-setup,
+#install-page-wrap.show-themes #install-content-themes,
 #install-page-wrap.show-webpages #install-content-webpages,
 #install-page-wrap.show-personalinfos #install-content-personalinfos,
 #install-page-wrap.show-admin #install-content-admin,
@@ -110,7 +111,6 @@ code {
 	font-size: .9rem;
 }
 
-#setup-theme-select,
 #setup-native-locale-select {
 	width: 100%;
 	box-sizing: border-box;
@@ -145,6 +145,105 @@ code {
 .install-setup-option-requires {
 	color: var(--editor-text-secondary);
 	font-size: .8rem;
+}
+
+/* -------------------------------------------------------------- Themes tab */
+
+/* One tile per _install/library/themes/<key> unit, each a <label> wrapping a
+   hidden radio - the whole card is the click target for picking, except the
+   preview image itself, which opens the lightbox instead (see themes.js) */
+
+#themes-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
+	gap: .75rem;
+	margin: 0 0 1rem;
+}
+
+.install-theme-tile {
+	display: flex;
+	flex-direction: column;
+	background: var(--editor-bg-grouped);
+	border: 2px solid transparent;
+	border-radius: var(--editor-radius);
+	box-shadow: var(--editor-shadow);
+	overflow: hidden;
+	cursor: pointer;
+}
+
+.install-theme-tile--active {
+	border-color: var(--editor-blue);
+}
+
+/* Kept focusable/reachable by keyboard, just never drawn - the tile's own
+   border is what shows the selection */
+.install-theme-tile input[type="radio"] {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	opacity: 0;
+	pointer-events: none;
+}
+
+.install-theme-preview {
+	display: block;
+	width: 100%;
+	aspect-ratio: 3 / 2;
+	object-fit: cover;
+	object-position: top center;
+	background: var(--editor-bg-elevated);
+	border-bottom: 1px solid var(--editor-separator);
+	cursor: zoom-in;
+}
+
+.install-theme-body {
+	display: flex;
+	flex-direction: column;
+	gap: .25rem;
+	padding: .75rem .85rem .9rem;
+}
+
+.install-theme-title {
+	font-size: .9rem;
+	font-weight: 600;
+}
+
+.install-theme-description {
+	font-size: .8rem;
+	line-height: 1.4;
+	color: var(--editor-text-secondary);
+}
+
+/* Lightbox - one reused overlay for every tile, closed by a click anywhere
+   or Escape (see themes.js) */
+
+#themes-lightbox {
+	position: fixed;
+	inset: 0;
+	z-index: 100;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: .75rem;
+	padding: 2rem 1rem;
+	background: rgba(0,0,0,.7);
+	backdrop-filter: blur(6px);
+	cursor: zoom-out;
+}
+
+#themes-lightbox-image {
+	max-width: min(60rem, 100%);
+	max-height: 80vh;
+	border-radius: var(--editor-radius);
+	box-shadow: 0 1.5rem 3rem rgba(0,0,0,.45);
+}
+
+#themes-lightbox-caption {
+	margin: 0;
+	color: #fff;
+	font-size: .9rem;
+	font-weight: 600;
 }
 
 /* -------------------------------------------------------------- Checklist */

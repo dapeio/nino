@@ -14,7 +14,8 @@
  *													step's own assets/<key>.js.
  *
  *													"Next" both commits the current step's data (if it has any -
- *													Setup applies its picker, Webpages applies its page list,
+ *													Setup applies its picker, Themes applies the picked theme,
+ *													Webpages applies its page list,
  *													PersonalInfos saves its fields, Admin just checks an
  *													account exists) and advances, replacing what used to be
  *													each step's own save button. A step with nothing to commit
@@ -33,6 +34,7 @@
 		STEPS : [
 			{ key : 'checks', 				paneClass : 'show-checks' 				},
 			{ key : 'setup', 					paneClass : 'show-setup' 				},
+			{ key : 'themes', 				paneClass : 'show-themes' 				},
 			{ key : 'webpages', 			paneClass : 'show-webpages' 			},
 			{ key : 'personalinfos', paneClass : 'show-personalinfos' },
 			{ key : 'admin', 					paneClass : 'show-admin' 				},
@@ -116,6 +118,9 @@
 
 			if( key === 'setup' && Nino.install.setup !== undefined )
 				return Nino.install.setup.apply( function( ok ) { callback( ok ) } );
+
+			if( key === 'themes' && Nino.install.themes !== undefined )
+				return Nino.install.themes.apply( function( ok ) { callback( ok ) } );
 
 			if( key === 'webpages' && Nino.install.webpages !== undefined )
 				return Nino.install.webpages.apply( function( ok ) { callback( ok ) } );

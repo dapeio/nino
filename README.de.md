@@ -43,6 +43,7 @@ Durch ein durchdachtes **Rechtesystem** erhalten Administrator-Accounts nur den 
 ### Features der _install UI
 - Umgebungsprüfung: PHP-Version, benötigte Extensions, Datei-/Ordnerrechte
 - Sprachen/Module/Seiten wählen und Startinhalt (Routen, Templates, Texte) aus einer Library zusammensetzen - `_install/library/`, siehe `docs/_install.de.md`
+- Theme aus einem Vorschau-Raster wählen - Stylesheet, Webfonts und alles Weitere werden kopiert und eingebunden
 - Gesammeltes Befüllen der immer vorhandenen "Basis"-Textinhalte
 - Anlegen des/der ersten _editor-Accounts
 - Setzen des echten _admin-Passworts (zugleich die Selbstsperre des Assistenten)

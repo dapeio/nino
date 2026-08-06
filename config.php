@@ -43,6 +43,7 @@
   '/nino/html/images' => 
   array (
   ),
+  '/nino/install/theme' => 'agency',
   '/nino/http/routes' => 
   array (
     'GET://robots.txt' => 

@@ -274,6 +274,83 @@ unset( $appData['/nino/http/routes']['GET://_install'], $appData['/nino/http/rou
 echo "\n";
 
 
+// --- Themes::apiList / apiApply --------------------------------------------
+
+echo "Themes::apiList / apiApply\n";
+
+// The css bundle starts out exactly as a hand-set-up project's would:
+// the kernel stylesheet plus one of the project's own, neither of them a
+// library theme. Both have to survive every apply below, in place
+$appData['/nino/html/assets'] = [
+	'/.cache/style.css' => [ '/_nino/Nino.css', '/assets/style.custom.css' ],
+	'/.cache/script.js' => [ '/_nino/Nino.js' ],
+];
+\Nino\AppData::writeContentData( $appData, [ '/nino/html/assets' ] );
+
+$themeListRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Install\Themes::apiList( $appData, $themeListRequest );
+$themeListBody = $themeListRequest['/nino/http/response']['body'];
+
+check( 'lists every theme unit, one per _install/library/themes/<key>', array_keys( $themeListBody['themes'] ) === [ 'agency', 'correct', 'glow', 'kontor', 'marketplace', 'nighty', 'solid', 'wellness' ] );
+check( 'each theme carries the label and description its manifest declares', $themeListBody['themes']['nighty']['label'] === 'Nighty' && $themeListBody['themes']['nighty']['description'] !== '' );
+check( 'each theme carries a preview image path, served out of the library itself', $themeListBody['themes']['nighty']['preview'] === '/_install/library/themes/nighty/preview.svg' );
+check( 'no theme is applied yet - the bundle carries none of the library\'s own stylesheets', $themeListBody['activeTheme'] === null );
+
+$_POST['data'] = json_encode( [ 'theme' => 'does-not-exist' ] );
+$unknownThemeRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Install\Themes::apiApply( $appData, $unknownThemeRequest );
+check( 'rejects an unknown theme with 400', $unknownThemeRequest['/nino/http/response']['statusCode'] === 400 );
+
+// A traversal attempt has to be rejected the same way any other unknown
+// key is - never resolved into a directory outside library/themes
+$_POST['data'] = json_encode( [ 'theme' => '../modules/democontent' ] );
+$traversalThemeRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Install\Themes::apiApply( $appData, $traversalThemeRequest );
+check( 'rejects a theme key trying to escape library/themes', $traversalThemeRequest['/nino/http/response']['statusCode'] === 400 );
+
+$_POST['data'] = json_encode( [ 'theme' => 'nighty' ] );
+$themeApplyRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Install\Themes::apiApply( $appData, $themeApplyRequest );
+check( 'apply succeeds', $themeApplyRequest['/nino/http/response']['statusCode'] === 200 );
+check( 'response echoes the applied theme', $themeApplyRequest['/nino/http/response']['body']['theme'] === 'nighty' );
+
+$configAfterTheme = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
+
+check( 'copies the theme\'s own stylesheet into /assets', is_file( $sandbox. '/assets/style.theme.nighty.css' ) === true );
+check( 'copies the webfonts that stylesheet references, keeping their subdirectories', is_file( $sandbox. '/fonts/text/lato-regular.woff2' ) === true && is_file( $sandbox. '/fonts/title/bebas-neue.woff2' ) === true );
+check( 'never copies the picker-only preview image into the project', is_file( $sandbox. '/preview.svg' ) === false );
+check( 'persists the picked key at /nino/install/theme', ( $configAfterTheme['/nino/install/theme'] ?? null ) === 'nighty' );
+check( 'appends the theme\'s stylesheet to the css bundle', in_array( '/assets/style.theme.nighty.css', $configAfterTheme['/nino/html/assets']['/.cache/style.css'], true ) === true );
+check( 'leaves the project\'s own stylesheets in the bundle alone, in order', array_slice( $configAfterTheme['/nino/html/assets']['/.cache/style.css'], 0, 2 ) === [ '/_nino/Nino.css', '/assets/style.custom.css' ] );
+check( 'never touches another bundle in the same array', $configAfterTheme['/nino/html/assets']['/.cache/script.js'] === [ '/_nino/Nino.js' ] );
+
+$themeListAfterApply = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Install\Themes::apiList( $appData, $themeListAfterApply );
+check( 'apiList now reports the applied theme, for the picker to pre-select', $themeListAfterApply['/nino/http/response']['body']['activeTheme'] === 'nighty' );
+
+// Switching themes replaces the bundled stylesheet at the position the
+// previous one held, rather than adding a second one next to it
+$_POST['data'] = json_encode( [ 'theme' => 'wellness' ] );
+$themeSwitchRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Install\Themes::apiApply( $appData, $themeSwitchRequest );
+
+$configAfterSwitch = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
+
+check( 'switching themes swaps the bundled stylesheet rather than adding a second one', $configAfterSwitch['/nino/html/assets']['/.cache/style.css'] === [ '/_nino/Nino.css', '/assets/style.custom.css', '/assets/style.theme.wellness.css' ] );
+check( '...and updates the persisted key with it', $configAfterSwitch['/nino/install/theme'] === 'wellness' );
+check( 'copies the new theme\'s own fonts too', is_file( $sandbox. '/fonts/text/pt-serif-regular.woff2' ) === true );
+check( 'a file the previous theme wrote is left behind, not deleted - same additive rule as Setup\'s templates/text', is_file( $sandbox. '/assets/style.theme.nighty.css' ) === true );
+
+// A config that predates '/nino/install/theme' (or was hand-edited since)
+// still has to resolve its current theme - from the css bundle alone
+unset( $appData['/nino/install/theme'] );
+$themeListLegacy = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Install\Themes::apiList( $appData, $themeListLegacy );
+check( 'falls back to matching the css bundle when /nino/install/theme is absent', $themeListLegacy['/nino/http/response']['body']['activeTheme'] === 'wellness' );
+
+echo "\n";
+
+
 // --- Webpages::apiList / apiApply ------------------------------------------
 
 echo "Webpages::apiList / apiApply\n";
@@ -678,6 +755,7 @@ check( 'registers "legal" and "contact" as well', isset( $realConfig['/nino/http
 check( 'auto-pulled "forms" (contact\'s requiresModules) into /nino/modules', in_array( '\\Nino\\Modules\\Form', $realConfig['/nino/modules'] ?? [], true ) === true );
 check( 'ships both library locales available', $realConfig['/nino/locales/available'] === [ 'en_US', 'de_DE' ] );
 check( 'a theme is bundled into /nino/html/assets', preg_match( '#^/assets/style\.theme\.[a-z0-9-]+\.css$#', (string) ( $realConfig['/nino/html/assets']['/.cache/style.css'][1] ?? '' ) ) === 1 );
+check( '...and named by the theme step\'s own persisted key', ( $realConfig['/nino/install/theme'] ?? null ) === 'agency' );
 
 // Every entry names the on-disk template file its route actually renders,
 // alongside the library unit it came from - what lets /_admin's Pages module
@@ -700,8 +778,31 @@ foreach( [ 'home/templates/page-home.tpl', '404/templates/page-404.tpl',
            'legal/templates/page-legal.de_DE.tpl', 'contact/templates/page-contact.tpl' ] as $file )
 	check( "the page library ships $file", is_file( $realRoot. '/_install/library/pages/'. $file ) === true );
 
-$themeKey = (string) ( $realConfig['/nino/html/assets']['/.cache/style.css'][1] ?? '' );
-check( 'the theme the config bundles exists in the library too', is_file( $realRoot. '/_install/library/base/assets/'. basename( $themeKey ) ) === true );
+// Every theme unit has to be self-contained: its own manifest, the
+// stylesheet that manifest names, and every webfont that stylesheet
+// @font-faces - nothing else in the library ships fonts anymore, so a
+// missing one is a font that silently never loads
+foreach( scandir( $realRoot. '/_install/library/themes' ) ?: [] as $themeEntry ) {
+
+	if( $themeEntry === '.' || $themeEntry === '..' )
+		continue;
+
+	$themeDir 			= $realRoot. '/_install/library/themes/'. $themeEntry;
+	$themeManifest 	= include $themeDir. '/manifest.php';
+	$themeCss 			= (string) ( $themeManifest['stylesheet'] ?? '' );
+
+	check( "the \"$themeEntry\" theme ships the stylesheet its manifest names", $themeCss !== '' && is_file( $themeDir. '/'. $themeCss ) === true );
+	check( "the \"$themeEntry\" theme ships a preview image and a description for the picker", is_file( $themeDir. '/'. ( $themeManifest['preview'] ?? '' ) ) === true && ( $themeManifest['description'] ?? '' ) !== '' );
+
+	preg_match_all( '#url\(["\']?(/fonts/[^)"\']+)#', (string) file_get_contents( $themeDir. '/'. $themeCss ), $themeFonts );
+
+	$missingFonts = array_values( array_filter( array_unique( $themeFonts[1] ), fn( string $font ): bool => is_file( $themeDir. $font ) === false ) );
+	check( "the \"$themeEntry\" theme ships every webfont its stylesheet references", $missingFonts === [] );
+}
+
+$themeKey = (string) ( $realConfig['/nino/install/theme'] ?? '' );
+check( 'the theme the config names exists in the library', is_file( $realRoot. '/_install/library/themes/'. $themeKey. '/manifest.php' ) === true );
+check( '...and the stylesheet it declares is the one the config bundles', ( include $realRoot. '/_install/library/themes/'. $themeKey. '/manifest.php' )['stylesheet'] === ( $realConfig['/nino/html/assets']['/.cache/style.css'][1] ?? '' ) );
 
 echo "\n";
 
