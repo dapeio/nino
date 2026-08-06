@@ -2,7 +2,7 @@
 *[Deutsch](_install.de.md)*
 
 **Links:**
-[README](../README.md) · [Design-Handbook](design.md) · [Developer-Handbook](development.md) · [_editor-Handbook](_editor.md) · [_admin-Handbook](_admin.md) · [Security Policy](../SECURITY.md) · [Changelog](../CHANGELOG.md)
+[README](../README.md) · [Design-Handbook](design.md) · [Developer-Handbook](development.md) · [_editor-Handbook](_editor.md) · [_admin-Handbook](_admin.md) · [_templates-Handbook](_templates.md) · [Security Policy](../SECURITY.md) · [Changelog](../CHANGELOG.md)
 
 A graphical, developer-only wizard for a fresh checkout's initial setup at `/_install`. Optional - a project can just as well be set up by hand (see `docs/development.md`) - but it walks through the same steps in a browser instead of the shell.
 

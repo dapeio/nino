@@ -2,7 +2,7 @@
 *[Deutsch](_editor.de.md)*
 
 **Links:**
-[README](../README.md) · [Design-Handbook](design.md) · [Developer-Handbook](development.md) · [_admin-Handbook](_admin.md) · [_install-Handbook](_install.md) · [Security Policy](../SECURITY.md) · [Changelog](../CHANGELOG.md)
+[README](../README.md) · [Design-Handbook](design.md) · [Developer-Handbook](development.md) · [_admin-Handbook](_admin.md) · [_install-Handbook](_install.md) · [_templates-Handbook](_templates.md) · [Security Policy](../SECURITY.md) · [Changelog](../CHANGELOG.md)
 
 Precise instructions for the day-to-day maintenance of the website via `/_editor` — no programming knowledge required.
 For technical background: `docs/development.md`.

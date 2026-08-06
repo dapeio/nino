@@ -41,5 +41,8 @@ jobs:
       - name: Run install wizard smoke tests
         run: php tests/install-smoke.php
 
+      - name: Run template builder smoke tests
+        run: php tests/templates-smoke.php
+
       - name: Run concurrency smoke tests
         run: php tests/concurrency-smoke.php

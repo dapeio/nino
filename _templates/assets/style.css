@@ -1,0 +1,249 @@
+/**
+ *	Nino										A compact filesystembased php framework
+ *	style.css								Template builder UI - reuses _editor/assets/style.css's design
+ *													tokens/components and _admin/assets/style.css's utility classes
+ *													(both linked before this file in every template), only adds
+ *													what's specific to the builder. Everything here is prefixed
+ *													tb-* so it can never collide with the ui-*/js-* classes the
+ *													canvas is drawing boxes *about*.
+ *
+ *	@package								Dape/Nino
+ *	@author									David Perchermeier <mail@dape.io>
+ *	@link										https://github.com/dapeio/nino
+ */
+
+body {
+	margin: 0;
+	font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+	background: var(--editor-bg);
+	color: var(--editor-text);
+}
+
+/* ------------------------------------------------------------------- Shell */
+
+#tb-bar-wrap {
+	position: sticky;
+	top: 0;
+	z-index: 10;
+	display: flex;
+	align-items: center;
+	gap: 1rem;
+	padding: 1rem 1.25rem;
+	background: var(--editor-bar-bg);
+	backdrop-filter: blur(20px) saturate(180%);
+	border-bottom: 1px solid var(--editor-separator);
+}
+
+#tb-bar-title {
+	font-weight: 700;
+}
+
+#tb-bar-document {
+	font-family: ui-monospace, monospace;
+	font-size: .85rem;
+	color: var(--editor-text-secondary);
+}
+
+#tb-bar-admin {
+	margin-left: auto;
+	font-size: .85rem;
+	color: var(--editor-blue);
+}
+
+/* Three rails: documents, canvas, palette. The canvas is the only one that
+   grows - the two side rails stay at a readable, fixed reading width */
+#tb-body {
+	display: grid;
+	grid-template-columns: 14rem minmax(0, 1fr) 16rem;
+	align-items: start;
+	gap: 1rem;
+	padding: 1rem 1.25rem 4rem;
+}
+
+@media (max-width: 60rem) {
+	#tb-body {
+		grid-template-columns: minmax(0, 1fr);
+	}
+}
+
+#tb-documents,
+#tb-palette {
+	position: sticky;
+	top: 5rem;
+	background: var(--editor-bg-grouped);
+	border-radius: var(--editor-radius);
+	box-shadow: var(--editor-shadow);
+	padding: .85rem 1rem 1rem;
+}
+
+#tb-documents h3,
+#tb-palette h3 {
+	margin: 0 0 .5rem;
+	font-size: .8rem;
+	text-transform: uppercase;
+	letter-spacing: .04em;
+	color: var(--editor-text-secondary);
+}
+
+#tb-documents ul,
+#tb-palette ul {
+	list-style: none;
+	margin: 0 0 .75rem;
+	padding: 0;
+}
+
+#tb-documents li a {
+	display: block;
+	padding: .35rem .4rem;
+	border-radius: var(--editor-radius-sm);
+	font-family: ui-monospace, monospace;
+	font-size: .8rem;
+	color: var(--editor-text);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+#tb-documents li a.active {
+	background: var(--editor-blue);
+	color: #fff;
+}
+
+/* A template the builder won't open - html-header/html-footer and anything
+   else outside page-*/section-*, see Documents' class docblock */
+#tb-documents li a.tb-document--locked {
+	color: var(--editor-text-secondary);
+	opacity: .6;
+}
+
+#tb-palette h4 {
+	margin: .75rem 0 .35rem;
+	font-size: .75rem;
+	color: var(--editor-text-secondary);
+}
+
+#tb-palette li {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: .5rem;
+	padding: .3rem .4rem;
+	border-radius: var(--editor-radius-sm);
+	font-size: .82rem;
+}
+
+.tb-palette-tag {
+	font-family: ui-monospace, monospace;
+	font-size: .7rem;
+	color: var(--editor-text-secondary);
+}
+
+/* ------------------------------------------------------------------ Canvas */
+
+#tb-canvas {
+	min-height: 20rem;
+	background: var(--editor-bg-grouped);
+	border-radius: var(--editor-radius);
+	box-shadow: var(--editor-shadow);
+	padding: 1rem;
+}
+
+.tb-notice {
+	margin: 0 0 1rem;
+	font-size: .85rem;
+}
+
+/* One box per node. Nesting is the template's own nesting - the indent is
+   the structure, so it stays visible even where a block draws no layout of
+   its own */
+.tb-node {
+	box-sizing: border-box;
+	border: 1px solid var(--editor-border);
+	border-radius: var(--editor-radius-sm);
+	background: var(--editor-bg-elevated);
+	padding: .4rem .5rem;
+	margin: 0 0 .35rem;
+}
+
+.tb-node .tb-list {
+	margin-top: .4rem;
+}
+
+/* Grid rows really do lay their columns out side by side, and a column
+   really is as wide as its width setting says - the two things a class list
+   alone can't be read for, see canvas.js */
+.tb-node--row > .tb-list {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: flex-start;
+	gap: 0;
+}
+
+.tb-node--column {
+	border-style: dashed;
+}
+
+.tb-node--unknown {
+	border-style: dotted;
+	background: transparent;
+	opacity: .8;
+}
+
+.tb-node--text,
+.tb-node--comment {
+	border: none;
+	background: transparent;
+	padding: .15rem .5rem;
+}
+
+.tb-node--comment {
+	opacity: .55;
+}
+
+.tb-node-header {
+	display: flex;
+	align-items: baseline;
+	flex-wrap: wrap;
+	gap: .45rem;
+}
+
+.tb-node-name {
+	font-size: .82rem;
+	font-weight: 600;
+}
+
+.tb-node--unknown .tb-node-name {
+	font-family: ui-monospace, monospace;
+	font-weight: 400;
+	font-size: .78rem;
+	color: var(--editor-text-secondary);
+}
+
+.tb-node-tag {
+	font-family: ui-monospace, monospace;
+	font-size: .72rem;
+	color: var(--editor-text-secondary);
+}
+
+.tb-node-preview {
+	flex: 1 1 12rem;
+	min-width: 0;
+	font-size: .78rem;
+	color: var(--editor-text-secondary);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+/* This node's id is targeted by a css rule, which can override whatever its
+   classes - the properties this builder shows - say. See Stylesheets */
+.tb-node-warning {
+	flex: 0 0 auto;
+	padding: .05rem .35rem;
+	border-radius: var(--editor-radius-sm);
+	background: rgba(255,149,0,.15);
+	color: var(--editor-orange, #c2410c);
+	font-family: ui-monospace, monospace;
+	font-size: .7rem;
+	cursor: help;
+}

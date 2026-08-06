@@ -2,7 +2,7 @@
 *[English](design.md)*
 
 **Links:**
-[README](../README.de.md) · [Entwickler-Handbuch](development.de.md) · [Admin-Handbuch](_editor.de.md) · [_admin-Handbuch](_admin.de.md) · [_install-Handbuch](_install.de.md) · [Security Policy](../SECURITY.md) · [Changelog](../CHANGELOG.md)
+[README](../README.de.md) · [Entwickler-Handbuch](development.de.md) · [Admin-Handbuch](_editor.de.md) · [_admin-Handbuch](_admin.de.md) · [_install-Handbuch](_install.de.md) · [_templates-Handbuch](_templates.de.md) · [Security Policy](../SECURITY.md) · [Changelog](../CHANGELOG.md)
 
 ## Einführung
 

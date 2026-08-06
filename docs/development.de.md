@@ -2,7 +2,7 @@
 *[English](development.md)*
 
 **Links:**
-[README](../README.de.md) · [Design-Handbuch](design.de.md) · [_editor-Handbuch](_editor.de.md) · [_admin-Handbuch](_admin.de.md) · [_install-Handbuch](_install.de.md) · [Security Policy](../SECURITY.md) · [Changelog](../CHANGELOG.md)
+[README](../README.de.md) · [Design-Handbuch](design.de.md) · [_editor-Handbuch](_editor.de.md) · [_admin-Handbuch](_admin.de.md) · [_install-Handbuch](_install.de.md) · [_templates-Handbuch](_templates.de.md) · [Security Policy](../SECURITY.md) · [Changelog](../CHANGELOG.md)
 
 ## Übersicht
 Nino verzichtet in der Entwicklung bewusst auf ein Installations-Tools oder eine rein UI-basierte Arbeitsweise. Entwickler benötigen daher Grundkenntnisse in PHP und fortgeschrittene Kenntnisse in HTML/CSS/Javascript um eine Webseite vollständig umsetzen zu können. Die Administration und der Betrieb eines fertigen Projekts ist dann jedoch ohne technisches Knowhow möglich.
@@ -570,13 +570,16 @@ läuft gegen ein isoliertes Sandbox-Verzeichnis unter
 `sys_get_temp_dir()`, nie gegen echte Projektdaten:
 
 ```
-tests/kernel-smoke.php    Kernel: AppData, Filesystem, Auth, Http, Locales, Images, Csrf, Mail, Newsletter, ...
-tests/admin-smoke.php     _editor/Editor.php: Elements, Text, Users, Images, Backup, Logs, Submissions
-tests/dev-smoke.php       _admin/Admin.php: ElementTypes, Restore, Rate-Limiting
+tests/kernel-smoke.php      Kernel: AppData, Filesystem, Auth, Http, Locales, Images, Csrf, Mail, Newsletter, ...
+tests/editor-smoke.php      _editor/Editor.php: Elements, Text, Users, Images, Backup, Logs, Submissions
+tests/admin-smoke.php       _admin/Admin.php: ElementTypes, Text, Pages, Images, Users, Restore, Config, Rate-Limiting
+tests/install-smoke.php     _install/Install.php: Checks, Setup, Themes, Webpages, PersonalInfos, Admins, Finish
+tests/templates-smoke.php   _templates/Templates.php: Library, Parser/Serializer-Round-Trip, Stylesheets, Documents
+tests/concurrency-smoke.php Filesystem-Locking bei parallelen Schreibern
 ```
 
-Ausführen mit `php tests/kernel-smoke.php` etc. — aktuell 513
-Assertions insgesamt über die drei Suites. CI führt alle drei plus
+Ausführen mit `php tests/kernel-smoke.php` etc. — aktuell 840
+Assertions insgesamt über die sechs Suites. CI führt alle sechs plus
 `php -l` und `node --check` über jede Datei aus, siehe
 `.github/workflows/ci.yml`.
 

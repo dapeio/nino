@@ -48,6 +48,12 @@ A well-thought-out **permission system** ensures administrator accounts only get
 - Create the first _editor account(s)
 - Set the real _admin password (also the wizard's own lock-out condition)
 
+### _templates UI features
+- Load any `templates/page-*.tpl` into a visual block tree - recognized from its own CSS classes, no migration and no marker attributes
+- Block library as one directory per block (`_templates/library/`), same manifest convention as `_install`
+- Grid widths and spacing drawn to scale; everything else a labelled box, see `docs/_templates.md`
+- Byte-exact round-trip: saving an untouched template changes nothing
+
 ### _admin UI features
 - Create/edit/delete element types
 - Create/edit/delete textfills
@@ -102,14 +108,16 @@ _editor/           Admin dashboard - content editors (values), users, backups, a
 _admin/             Developer tools - element/text/image "schema" editors, config editor, restore
 _install/         First-run setup wizard - checks, content setup (library/), bulk base
                   text, admins, _admin password
+_templates/       Template builder - visual editor for templates/*.tpl, block library
+                  (library/), gated by _admin's password
 
 elements/         Content of the element types (one .php file per type) - empty by default
 text/             Texts per locale + global.php (incl. design tokens) + blacklist.php - empty by default
 templates/        .tpl page/section templates - empty by default
 assets/           Project's own style.css/script.js
 images/           Uploaded images (admin-managed, generated on demand)
-docs/             _editor.md, _admin.md, _install.md, design.md, development.md,
-                  _editor.de.md, _admin.de.md, _install.de.md, design.de.md, development.de.md,
+docs/             _editor.md, _admin.md, _install.md, _templates.md, design.md, development.md,
+                  and a .de.md counterpart for each
 tests/            Dependency-free smoke tests (php tests/*.php)
 data/             Runtime data (newsletter subscribers, form submissions,
                   logs) - created on demand, never tracked in git
@@ -136,14 +144,19 @@ A **user guide** for the _admin developer interface.
 - **[docs/_install.md](docs/_install.md)**
 - **[docs/_install.de.md](docs/_install.de.md)** (German)
 A **user guide** for the _install setup wizard.
+---
+- **[docs/_templates.md](docs/_templates.md)**
+- **[docs/_templates.de.md](docs/_templates.de.md)** (German)
+A **user guide** for the _templates template builder.
 
 ## Tests
 
 ```
 php tests/kernel-smoke.php
 php tests/admin-smoke.php
-php tests/dev-smoke.php
+php tests/editor-smoke.php
 php tests/install-smoke.php
+php tests/templates-smoke.php
 php tests/concurrency-smoke.php
 ```
 

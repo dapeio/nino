@@ -2,6 +2,44 @@
 
 ## Unreleased
 
+- **Added `/_templates`, the template builder** (foundation - reads,
+  recognizes and draws; selecting/inserting/editing follow). Its own
+  top-level folder rather than an `_admin` module, same reasoning `_install`
+  has one: a development-time tool a project may delete once the design is
+  settled. The password is `_admin`'s, though - it requires
+  `_admin/Admin.php` and reuses its session flag instead of introducing a
+  second one, the dependency `_install` already has, and `/_admin`'s header
+  gained a link. The whole thing rests on one idea: **a block's identity is
+  its html tag plus its css classes, and its properties are those same
+  classes**. `<div class="ui-grid-100 ui-grid-l-50 ui-mb-3">` *is* a grid
+  column with those three settings - there is no data model beside the
+  markup, no json sidecar and no `data-*` marker to write, so every `.tpl`
+  the project already has opens with its structure recognized without being
+  migrated, and what the builder saves stays exactly as hand-editable as
+  what it opened. Blocks are one directory per block under
+  `_templates/library/<key>` (manifest + `block.tpl`), the same convention
+  `_install/library` uses - 21 core blocks ship, adding a 22nd is one new
+  directory and no code change. A manifest declares how to recognize the
+  block (`match`, scored by specificity so a generic "Heading" never
+  swallows a "Section Title") and which classes, attributes, tag or text are
+  editable (`settings`, six types); the mapping between control and class
+  runs client-side only, in `assets/blocks.js`, so nothing can read a class
+  one way and write it back another. The canvas is deliberately not a
+  preview: grid widths and spacing are drawn to scale, everything else is a
+  labelled box, and markup the library doesn't describe still gets a box -
+  read-only, never hidden and never dropped. A node whose `id` is targeted
+  by a project css rule is flagged, since such a rule overrides the classes
+  the builder presents as that node's properties. Only `page-*`/`section-*`
+  are editable: `html-header.tpl`/`html-footer.tpl` are one structure split
+  across two files (the header opens `<main>`, the footer closes it), so
+  neither is a well-formed fragment and an html parser handed one alone
+  would "correct" it into a broken page frame. Underpinning all of it,
+  `Parser`/`Serializer` guarantee a **byte-exact round-trip** - attribute
+  order, whitespace, comments and the original spelling of every entity are
+  preserved, so opening a template and saving it unchanged is a no-op rather
+  than a reformat; `tests/templates-smoke.php` asserts that against every
+  shipped page template. See `docs/_templates.md`
+
 - **Added `/_install`'s "Themes" step** and the `_install/library/themes/`
   branch behind it: a theme is now a complete, self-contained library unit
   (`manifest.php` + its stylesheet + the webfonts that stylesheet actually
