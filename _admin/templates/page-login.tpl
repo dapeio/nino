@@ -14,7 +14,9 @@
 		<div id="admin-login-wrap">
 			<form id="admin-login-form">
 				[csrf]
-				<p id="admin-login-msg">Admin</p>
+				<div class="admin-auth-brand" aria-hidden="true"><span>N</span>Nino</div>
+				<h1 class="admin-auth-title">Admin</h1>
+				<p id="admin-login-msg">Sign in to continue.</p>
 				<label class="editor-field" for="admin-input-pw">
 					<span>Password</span>
 					<input id="admin-input-pw" type="password" autocomplete="current-password">

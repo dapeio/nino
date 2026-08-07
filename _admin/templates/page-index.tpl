@@ -13,24 +13,31 @@
 	<body>
 		[csrf]
 		<div id="admin-page-wrap" class="show-dashboard">
-			<div id="admin-bar-wrap">
-				<div id="admin-bar-title">Admin</div>
-				<a href="#" id="admin-logout">Logout</a>
-			</div>
+			<aside id="admin-shell-rail" aria-label="Admin navigation">
+				<div id="admin-bar-wrap">
+					<div id="admin-bar-title">
+						<span class="admin-brand-mark" aria-hidden="true">N</span>
+						<span class="admin-brand-copy"><strong>Nino</strong><small>Admin</small></span>
+					</div>
+					<div id="admin-bar-actions">
+						<a href="#" id="admin-logout">Logout</a>
+					</div>
+				</div>
 
-			<!-- One tab + content pane per registered module (see Admin::MODULES) -->
-			<div id="admin-nav-wrap">
-				<a href="#" id="admin-nav-dashboard" class="active">Dashboard</a>
-				<a href="#" id="admin-nav-types">Element Types</a>
-				<a href="#" id="admin-nav-text">Text</a>
-				<a href="#" id="admin-nav-pages">Pages</a>
-				<a href="#" id="admin-nav-images">Images</a>
-				<a href="#" id="admin-nav-users">Users</a>
-				<a href="#" id="admin-nav-restore">Restore</a>
-				<a href="#" id="admin-nav-config">Config</a>
-			</div>
+				<!-- One tab + content pane per registered module (see Admin::MODULES) -->
+				<nav id="admin-nav-wrap" aria-label="Admin sections">
+					<a href="#" id="admin-nav-dashboard" class="active">Dashboard</a>
+					<a href="#" id="admin-nav-types">Element Types</a>
+					<a href="#" id="admin-nav-text">Text</a>
+					<a href="#" id="admin-nav-pages">Pages</a>
+					<a href="#" id="admin-nav-images">Images</a>
+					<a href="#" id="admin-nav-users">Users</a>
+					<a href="#" id="admin-nav-restore">Restore</a>
+					<a href="#" id="admin-nav-config">Config</a>
+				</nav>
+			</aside>
 
-			<div id="admin-content-wrap">
+			<main id="admin-content-wrap">
 				<div id="admin-content-dashboard"></div>
 				<div id="admin-content-types">
 					<div id="types-list"></div>
@@ -58,7 +65,7 @@
 					<div id="config-list"></div>
 					<div id="config-form"></div>
 				</div>
-			</div>
+			</main>
 		</div>
 		<script src="[[/nino/dir]]/_nino/Nino.js"></script>
 		<script src="[[/nino/dir]]/_editor/assets/html-editor.js"></script>

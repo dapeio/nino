@@ -14,23 +14,28 @@
 	<body>
 		[csrf]
 		<div id="install-page-wrap" class="show-checks">
-			<div id="install-bar-wrap">
-				<div id="install-bar-title">Nino Setup</div>
-			</div>
+			<aside id="install-shell-rail" aria-label="Installation progress">
+				<div id="install-bar-wrap">
+					<div id="install-bar-title">
+						<span class="install-brand-mark" aria-hidden="true">N</span>
+						<span class="install-brand-copy"><strong>Nino</strong><small>Setup</small></span>
+					</div>
+				</div>
 
-			<!-- Progress display only, not a jump-menu - each step's own
-			     Back/Next controls the wizard's flow, see script.js -->
-			<div id="install-nav-wrap">
-				<span id="install-nav-checks" class="active">1. Environment</span>
-				<span id="install-nav-setup">2. Setup</span>
-				<span id="install-nav-themes">3. Themes</span>
-				<span id="install-nav-webpages">4. Webpages</span>
-				<span id="install-nav-personalinfos">5. Personal Infos</span>
-				<span id="install-nav-admin">6. Admins</span>
-				<span id="install-nav-finish">7. Finish</span>
-			</div>
+				<!-- Progress display only, not a jump-menu - each step's own
+				     Back/Next controls the wizard's flow, see script.js -->
+				<div id="install-nav-wrap">
+					<span id="install-nav-checks" class="active">1. Environment</span>
+					<span id="install-nav-setup">2. Setup</span>
+					<span id="install-nav-themes">3. Themes</span>
+					<span id="install-nav-webpages">4. Webpages</span>
+					<span id="install-nav-personalinfos">5. Personal Infos</span>
+					<span id="install-nav-admin">6. Admins</span>
+					<span id="install-nav-finish">7. Finish</span>
+				</div>
+			</aside>
 
-			<div id="install-content-wrap">
+			<main id="install-content-wrap">
 
 				<div id="install-content-checks">
 					<p class="admin-hint">PHP version, extensions and file/folder permissions Nino needs to run.</p>
@@ -100,7 +105,7 @@
 					</div>
 				</div>
 
-			</div>
+			</main>
 
 			<!-- Shared Back/Next bar - hidden on the finish step (its own
 			     form replaces "Next" entirely), Back hidden on the first -->

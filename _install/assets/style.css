@@ -25,14 +25,44 @@ code {
 /* ------------------------------------------------------------------ Locked */
 
 #install-locked-wrap {
-	max-width: 28rem;
-	margin: 4rem auto;
-	padding: 0 1rem;
+	max-width: 31rem;
+	margin: clamp(2rem, 9vh, 6rem) auto;
+	padding: 2rem;
+	background: var(--editor-bg-grouped);
+	border: 1px solid var(--editor-border);
+	border-radius: var(--editor-radius);
+	box-shadow: var(--editor-shadow);
 }
 
 #install-locked-msg {
-	font-weight: 700;
-	font-size: 1.1rem;
+	margin: 1.5rem 0 .5rem;
+	font-weight: 750;
+	font-size: 1.4rem;
+	letter-spacing: -.03em;
+}
+
+.install-auth-brand {
+	display: flex;
+	align-items: center;
+	gap: .65rem;
+	font-weight: 750;
+	letter-spacing: -.02em;
+}
+
+.install-auth-brand span,
+.install-brand-mark {
+	display: inline-grid;
+	place-items: center;
+	width: 2.25rem;
+	height: 2.25rem;
+	flex: 0 0 auto;
+	border-radius: .75rem;
+	background: var(--editor-blue);
+	color: #fff;
+	font-size: 1rem;
+	font-weight: 800;
+	letter-spacing: -.04em;
+	box-shadow: 0 .45rem 1rem rgba(37,99,235,.2);
 }
 
 /* ----------------------------------------------------------------- Wizard */
@@ -41,21 +71,50 @@ code {
 	position: sticky;
 	top: 0;
 	z-index: 10;
-	padding: 1rem 1.25rem;
+	padding: .8rem 1rem;
 	background: var(--editor-bar-bg);
 	backdrop-filter: blur(20px) saturate(180%);
 	border-bottom: 1px solid var(--editor-separator);
 }
 
 #install-bar-title {
+	display: flex;
+	align-items: center;
+	gap: .65rem;
 	font-weight: 700;
+}
+
+.install-brand-copy {
+	display: flex;
+	flex-direction: column;
+	line-height: 1.1;
+}
+
+.install-brand-copy strong {
+	font-size: .95rem;
+	letter-spacing: -.01em;
+}
+
+.install-brand-copy small {
+	margin-top: .18rem;
+	color: var(--editor-text-secondary);
+	font-size: .72rem;
+	font-weight: 600;
+	letter-spacing: .08em;
+	text-transform: uppercase;
 }
 
 #install-nav-wrap {
 	display: flex;
 	overflow-x: auto;
+	-webkit-overflow-scrolling: touch;
+	scrollbar-width: none;
 	border-bottom: 1px solid var(--editor-separator);
 	padding: 0 1.25rem;
+}
+
+#install-nav-wrap::-webkit-scrollbar {
+	display: none;
 }
 
 #install-nav-wrap span {
@@ -76,8 +135,9 @@ code {
 }
 
 #install-content-wrap {
-	padding: 1.25rem 1rem 4rem;
-	max-width: 40rem;
+	width: 100%;
+	padding: 1.5rem 1rem 5rem;
+	max-width: 64rem;
 	margin: 0 auto;
 }
 
@@ -100,6 +160,7 @@ code {
 
 .install-setup-group {
 	background: var(--editor-bg-grouped);
+	border: 1px solid var(--editor-border);
 	border-radius: var(--editor-radius);
 	box-shadow: var(--editor-shadow);
 	padding: 1rem;
@@ -164,15 +225,28 @@ code {
 	display: flex;
 	flex-direction: column;
 	background: var(--editor-bg-grouped);
-	border: 2px solid transparent;
+	border: 1px solid var(--editor-border);
 	border-radius: var(--editor-radius);
 	box-shadow: var(--editor-shadow);
 	overflow: hidden;
 	cursor: pointer;
+	transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease;
 }
 
 .install-theme-tile--active {
 	border-color: var(--editor-blue);
+	box-shadow: var(--editor-focus), var(--editor-shadow);
+}
+
+.install-theme-tile:hover {
+	border-color: color-mix(in srgb, var(--editor-blue) 35%, var(--editor-border));
+	box-shadow: var(--editor-shadow);
+	transform: translateY(-2px);
+}
+
+.install-theme-tile:has(input:focus-visible) {
+	outline: 2px solid var(--editor-blue);
+	outline-offset: 3px;
 }
 
 /* Kept focusable/reachable by keyboard, just never drawn - the tile's own
@@ -200,7 +274,7 @@ code {
 	display: flex;
 	flex-direction: column;
 	gap: .25rem;
-	padding: .75rem .85rem .9rem;
+	padding: .9rem 1rem 1rem;
 }
 
 .install-theme-title {
@@ -250,6 +324,7 @@ code {
 
 .install-check-group {
 	background: var(--editor-bg-grouped);
+	border: 1px solid var(--editor-border);
 	border-radius: var(--editor-radius);
 	box-shadow: var(--editor-shadow);
 	overflow: hidden;
@@ -289,16 +364,20 @@ code {
 
 .install-check-status {
 	flex: 0 0 auto;
+	padding: .15rem .45rem;
+	border-radius: 999px;
 	font-weight: 700;
 	font-size: .8rem;
 }
 
 .install-check-status--ok {
 	color: var(--editor-green);
+	background: var(--editor-green-soft);
 }
 
 .install-check-status--fail {
 	color: var(--editor-red);
+	background: var(--editor-red-soft);
 }
 
 /* ---------------------------------------------------------- Webpages tab */
@@ -315,6 +394,7 @@ code {
 	margin: 0 0 .75rem;
 	padding: 0;
 	background: var(--editor-bg-grouped);
+	border: 1px solid var(--editor-border);
 	border-radius: var(--editor-radius);
 	box-shadow: var(--editor-shadow);
 	overflow: hidden;
@@ -335,13 +415,17 @@ code {
 	display: block;
 	flex: 1 1 auto;
 	min-width: 0;
-	padding: .85rem 1rem;
+	padding: .9rem 1rem;
 	font-family: ui-monospace, monospace;
 	font-size: .85rem;
 	color: var(--editor-text);
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
+}
+
+#webpages-list > ul li:hover {
+	background: var(--editor-blue-soft);
 }
 
 .install-webpage-move {
@@ -424,7 +508,7 @@ code {
 	max-width: 7rem;
 	min-height: 30px;
 	padding: .25rem 1.5rem .25rem .6rem;
-	background-color: rgba(0,122,255,.1);
+	background-color: var(--editor-blue-soft);
 	background-position: calc(100% - 12px) calc(50% - 0px), calc(100% - 6px) calc(50% - 0px);
 	border-color: transparent;
 	color: var(--editor-blue);
@@ -439,6 +523,7 @@ code {
 	margin: 0 0 .75rem;
 	padding: 0;
 	background: var(--editor-bg-grouped);
+	border: 1px solid var(--editor-border);
 	border-radius: var(--editor-radius);
 	box-shadow: var(--editor-shadow);
 	overflow: hidden;
@@ -457,6 +542,7 @@ code {
 
 #editor-add-form {
 	background: var(--editor-bg-grouped);
+	border: 1px solid var(--editor-border);
 	border-radius: var(--editor-radius);
 	box-shadow: var(--editor-shadow);
 	padding: 1rem;
@@ -488,6 +574,7 @@ code {
 
 #finish-form {
 	background: var(--editor-bg-grouped);
+	border: 1px solid var(--editor-border);
 	border-radius: var(--editor-radius);
 	box-shadow: var(--editor-shadow);
 	padding: 1.5rem;
@@ -501,7 +588,8 @@ code {
 	display: flex;
 	align-items: center;
 	gap: .75rem;
-	padding: 1rem 1.25rem;
+	z-index: 20;
+	padding: .8rem 1rem max(.8rem, env(safe-area-inset-bottom));
 	background: var(--editor-bar-bg);
 	backdrop-filter: blur(20px) saturate(180%);
 	border-top: 1px solid var(--editor-separator);
@@ -518,11 +606,11 @@ code {
 #install-back,
 #install-next {
 	flex: 0 0 auto;
-	padding: .85rem 2rem;
+	padding: .7rem 1.5rem;
 	border-radius: var(--editor-radius-sm);
 	border: none;
 	font: inherit;
-	font-size: 1rem;
+	font-size: .92rem;
 	font-weight: 600;
 	cursor: pointer;
 }
@@ -541,6 +629,118 @@ code {
 
 #install-back:disabled,
 #install-next:disabled {
-	opacity: .6;
+	opacity: .45;
 	cursor: default;
+}
+
+#install-content-wrap > div > .admin-hint:first-child {
+	padding: 1rem 1.1rem;
+	background: var(--editor-blue-soft);
+	border: 1px solid color-mix(in srgb, var(--editor-blue) 20%, var(--editor-border));
+	border-radius: var(--editor-radius-sm);
+	line-height: 1.55;
+}
+
+#setup-msg,
+#themes-msg,
+#webpages-msg,
+#personalinfos-msg,
+#editor-add-msg,
+#finish-msg {
+	min-height: 1.25rem;
+	font-size: .85rem;
+	color: var(--editor-text-secondary);
+}
+
+/* ------------------------------------------------------- Desktop app shell */
+
+@media (min-width: 64rem) {
+	#install-page-wrap {
+		display: grid;
+		grid-template-columns: 18rem minmax(0, 1fr);
+		grid-template-rows: minmax(0, 1fr) auto;
+		min-height: 100vh;
+	}
+
+	#install-shell-rail {
+		grid-column: 1;
+		grid-row: 1 / -1;
+		position: sticky;
+		top: 0;
+		align-self: start;
+		display: flex;
+		flex-direction: column;
+		height: 100vh;
+		padding: 1.35rem 1rem;
+		background: var(--editor-sidebar-bg);
+		border-right: 1px solid var(--editor-separator);
+	}
+
+	#install-bar-wrap {
+		position: static;
+		z-index: auto;
+		padding: 0 .35rem 1.25rem;
+		background: transparent;
+		backdrop-filter: none;
+		border: none;
+	}
+
+	#install-nav-wrap {
+		flex: 1 1 auto;
+		flex-direction: column;
+		gap: .3rem;
+		min-height: 0;
+		padding: 0;
+		overflow: auto;
+		border: none;
+	}
+
+	#install-nav-wrap span {
+		width: 100%;
+		margin: 0;
+		padding: .72rem .8rem;
+		border: none;
+		border-radius: var(--editor-radius-sm);
+		font-size: .86rem;
+	}
+
+	#install-nav-wrap span.active {
+		background: var(--editor-blue-soft);
+		color: var(--editor-blue);
+		border: none;
+	}
+
+	#install-content-wrap {
+		grid-column: 2;
+		grid-row: 1;
+		max-width: 76rem;
+		padding: 3rem clamp(2rem, 4vw, 4rem) 6rem;
+	}
+
+	#install-actions-wrap {
+		grid-column: 2;
+		grid-row: 2;
+		padding: .85rem clamp(2rem, 4vw, 4rem);
+	}
+}
+
+@media (max-width: 36rem) {
+	.install-webpage-locale-row {
+		grid-template-columns: 1fr;
+	}
+
+	.install-webpage-locale-label,
+	.install-webpage-locale-row textarea {
+		grid-column: 1;
+	}
+
+	#install-actions-wrap {
+		flex-wrap: wrap;
+	}
+
+	#install-actions-msg {
+		flex-basis: 100%;
+		order: -1;
+		text-align: left;
+	}
 }

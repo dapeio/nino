@@ -2,6 +2,8 @@
 
 		<form id="form-login">
 			[csrf]
+			<div class="editor-auth-brand" aria-hidden="true"><span>N</span>Nino</div>
+			<h1 class="editor-auth-title">Editor</h1>
 			<p id="form-message">[[/_editor/login/msg/welcome]]</p>
 			<label class="editor-field" for="input-user">
 				<span>[[/_editor/login/label/user]]</span>

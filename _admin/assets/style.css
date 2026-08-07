@@ -23,21 +23,60 @@ body {
 /* ------------------------------------------------------------------- Login */
 
 #admin-login-wrap {
-	max-width: 24rem;
-	margin: 4rem auto;
+	max-width: 26rem;
+	margin: clamp(2rem, 9vh, 6rem) auto;
 	padding: 0 1rem;
 }
 
 #admin-login-form {
 	background: var(--editor-bg-grouped);
+	border: 1px solid var(--editor-border);
 	border-radius: var(--editor-radius);
 	box-shadow: var(--editor-shadow);
-	padding: 1.5rem;
+	padding: 2rem;
 }
 
 #admin-login-msg {
-	margin: 0 0 1rem;
-	font-weight: 600;
+	margin: 0 0 1.4rem;
+	color: var(--editor-text-secondary);
+	font-size: .88rem;
+}
+
+.admin-auth-brand {
+	display: flex;
+	align-items: center;
+	gap: .65rem;
+	margin-bottom: 1.75rem;
+	font-weight: 750;
+	letter-spacing: -.02em;
+}
+
+.admin-auth-brand span,
+.admin-brand-mark {
+	display: inline-grid;
+	place-items: center;
+	width: 2.25rem;
+	height: 2.25rem;
+	flex: 0 0 auto;
+	border-radius: .75rem;
+	background: var(--editor-blue);
+	color: #fff;
+	font-size: 1rem;
+	font-weight: 800;
+	letter-spacing: -.04em;
+	box-shadow: 0 .45rem 1rem rgba(37,99,235,.2);
+}
+
+.admin-auth-title {
+	margin: 0 0 .35rem;
+	font-size: 1.55rem;
+	line-height: 1.2;
+	letter-spacing: -.035em;
+}
+
+#admin-login-form button[type="submit"] {
+	width: 100%;
+	margin-top: .4rem;
 }
 
 /* --------------------------------------------------------------- Dashboard */
@@ -49,14 +88,47 @@ body {
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
-	padding: 1rem 1.25rem;
+	gap: 1rem;
+	padding: .8rem 1rem;
 	background: var(--editor-bar-bg);
 	backdrop-filter: blur(20px) saturate(180%);
 	border-bottom: 1px solid var(--editor-separator);
 }
 
 #admin-bar-title {
+	display: flex;
+	align-items: center;
+	gap: .65rem;
 	font-weight: 700;
+}
+
+.admin-brand-copy {
+	display: flex;
+	flex-direction: column;
+	line-height: 1.1;
+}
+
+.admin-brand-copy strong {
+	font-size: .95rem;
+	letter-spacing: -.01em;
+}
+
+.admin-brand-copy small {
+	margin-top: .18rem;
+	color: var(--editor-text-secondary);
+	font-size: .72rem;
+	font-weight: 600;
+	letter-spacing: .08em;
+	text-transform: uppercase;
+}
+
+#admin-bar-actions {
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
+	gap: .8rem;
+	min-width: 0;
+	font-size: .84rem;
 }
 
 #admin-logout {
@@ -66,13 +138,22 @@ body {
 
 #admin-nav-wrap {
 	display: flex;
+	overflow-x: auto;
+	-webkit-overflow-scrolling: touch;
+	scrollbar-width: none;
 	border-bottom: 1px solid var(--editor-separator);
 	padding: 0 1.25rem;
 }
 
+#admin-nav-wrap::-webkit-scrollbar {
+	display: none;
+}
+
 #admin-nav-wrap a {
+	flex: 0 0 auto;
 	padding: .65rem .1rem;
 	margin-right: 1.5rem;
+	white-space: nowrap;
 	border-bottom: 2px solid transparent;
 	color: var(--editor-text-secondary);
 	font-size: .9rem;
@@ -86,8 +167,9 @@ body {
 }
 
 #admin-content-wrap {
-	padding: 1.25rem 1rem 4rem;
-	max-width: 40rem;
+	width: 100%;
+	padding: 1.5rem 1rem 5rem;
+	max-width: 64rem;
 	margin: 0 auto;
 }
 
@@ -131,6 +213,7 @@ body {
 	align-items: center;
 	justify-content: space-between;
 	background: var(--editor-bg-grouped);
+	border: 1px solid var(--editor-border);
 	border-radius: var(--editor-radius);
 	box-shadow: var(--editor-shadow);
 	padding: .75rem 1rem;
@@ -153,9 +236,9 @@ body {
 	background: var(--editor-bg-grouped);
 	border-radius: var(--editor-radius);
 	box-shadow: var(--editor-shadow);
-	border: none;
+	border: 1px solid var(--editor-border);
 	margin: 0 0 1rem;
-	padding: 1rem;
+	padding: 1.15rem;
 	display: flex;
 	flex-direction: column;
 	gap: .5rem;
@@ -206,6 +289,7 @@ body {
 	margin: 0 0 .75rem;
 	padding: 0;
 	background: var(--editor-bg-grouped);
+	border: 1px solid var(--editor-border);
 	border-radius: var(--editor-radius);
 	box-shadow: var(--editor-shadow);
 	overflow: hidden;
@@ -226,13 +310,17 @@ body {
 	display: block;
 	flex: 1 1 auto;
 	min-width: 0;
-	padding: .85rem 1rem;
+	padding: .9rem 1rem;
 	font-family: ui-monospace, monospace;
 	font-size: .85rem;
 	color: var(--editor-text);
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
+}
+
+#pages-list > ul li:hover {
+	background: var(--editor-blue-soft);
 }
 
 .admin-page-move {
@@ -305,6 +393,7 @@ body {
 	margin: 0;
 	padding: 0;
 	background: var(--editor-bg-grouped);
+	border: 1px solid var(--editor-border);
 	border-radius: var(--editor-radius);
 	box-shadow: var(--editor-shadow);
 	overflow: hidden;
@@ -329,6 +418,11 @@ body {
 	color: var(--editor-text);
 }
 
+#config-list > ul li a:hover,
+#text-list > ul li a:hover {
+	background: var(--editor-blue-soft);
+}
+
 /* ---------------------------------------------------------------- Users tab */
 
 #users-list > ul {
@@ -336,6 +430,7 @@ body {
 	margin: 0 0 .75rem;
 	padding: 0;
 	background: var(--editor-bg-grouped);
+	border: 1px solid var(--editor-border);
 	border-radius: var(--editor-radius);
 	box-shadow: var(--editor-shadow);
 	overflow: hidden;
@@ -355,6 +450,7 @@ body {
 
 #users-add-form {
 	background: var(--editor-bg-grouped);
+	border: 1px solid var(--editor-border);
 	border-radius: var(--editor-radius);
 	box-shadow: var(--editor-shadow);
 	padding: 1rem;
@@ -422,7 +518,20 @@ body {
 
 .admin-danger-btn {
 	color: var(--editor-red);
-	border-color: var(--editor-red);
+	box-shadow: inset 0 0 0 1px var(--editor-red);
+}
+
+.admin-danger-btn:hover:not(:disabled),
+button.red:hover:not(:disabled) {
+	background: var(--editor-red-soft);
+	color: var(--editor-red);
+}
+
+button.red {
+	min-height: 34px;
+	padding: .35rem .7rem;
+	color: var(--editor-red);
+	box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--editor-red) 45%, transparent);
 }
 
 .admin-scan-ignore {
@@ -484,9 +593,104 @@ body {
 }
 
 .admin-dashboard-row {
-	padding: .75rem 1rem;
+	padding: .85rem 1rem;
 	border-radius: var(--editor-radius-sm);
 	background: var(--editor-bg-elevated);
 	border: 1px solid var(--editor-border);
 	font-size: .9rem;
+}
+
+/* ------------------------------------------------------- Desktop app shell */
+
+@media (min-width: 64rem) {
+	#admin-page-wrap {
+		display: grid;
+		grid-template-columns: 17rem minmax(0, 1fr);
+		min-height: 100vh;
+	}
+
+	#admin-shell-rail {
+		grid-column: 1;
+		position: sticky;
+		top: 0;
+		align-self: start;
+		display: flex;
+		flex-direction: column;
+		height: 100vh;
+		padding: 1.35rem 1rem;
+		background: var(--editor-sidebar-bg);
+		border-right: 1px solid var(--editor-separator);
+	}
+
+	#admin-bar-wrap {
+		position: static;
+		z-index: auto;
+		align-items: stretch;
+		flex-direction: column;
+		padding: 0 .35rem 1.1rem;
+		background: transparent;
+		backdrop-filter: none;
+		border: none;
+	}
+
+	#admin-bar-actions {
+		justify-content: flex-start;
+		flex-wrap: wrap;
+		gap: .35rem .75rem;
+		padding-top: .8rem;
+		border-top: 1px solid var(--editor-separator);
+	}
+
+	#admin-nav-wrap {
+		flex: 1 1 auto;
+		flex-direction: column;
+		gap: .25rem;
+		min-height: 0;
+		padding: 0;
+		overflow: auto;
+		border: none;
+	}
+
+	#admin-nav-wrap a {
+		width: 100%;
+		margin: 0;
+		padding: .72rem .8rem;
+		border: none;
+		border-radius: var(--editor-radius-sm);
+		text-align: left;
+		font-size: .88rem;
+	}
+
+	#admin-nav-wrap a:hover {
+		background: var(--editor-bg);
+		color: var(--editor-text);
+	}
+
+	#admin-nav-wrap a.active {
+		background: var(--editor-blue-soft);
+		color: var(--editor-blue);
+		border: none;
+	}
+
+	#admin-content-wrap {
+		grid-column: 2;
+		max-width: 76rem;
+		padding: 3rem clamp(2rem, 4vw, 4rem) 6rem;
+	}
+}
+
+@media (max-width: 36rem) {
+	#admin-bar-actions {
+		gap: .5rem;
+		font-size: .78rem;
+	}
+
+	.admin-page-locale-row {
+		grid-template-columns: 1fr;
+	}
+
+	.admin-page-locale-label,
+	.admin-page-locale-row textarea {
+		grid-column: 1;
+	}
 }

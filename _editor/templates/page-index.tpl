@@ -1,7 +1,11 @@
 [template /_editor/templates/html-header]
 		[csrf]
 		<div id="editor-page-wrap" class="show-dashboard" data-dir="[[/nino/dir]]" data-panels="[[/_editor/panels]]">
-			<div id="editor-bar-wrap">
+			<aside id="editor-bar-wrap" aria-label="Editor navigation">
+				<div class="editor-brand">
+					<span class="editor-brand-mark" aria-hidden="true">N</span>
+					<span class="editor-brand-copy"><strong>Nino</strong><small>Editor</small></span>
+				</div>
 				<div id="editor-user">
 					<span id="editor-user-email">[[/nino/auth/user]]</span>
 					<a href="#" id="editor-user-logout">[[/_editor/user/logout]]</a>
@@ -14,7 +18,7 @@
 					</div>
 				</div>
 
-				<div id="editor-nav-wrap">
+				<nav id="editor-nav-wrap" aria-label="Editor sections">
 					<a href="#" id="editor-nav-dashboard">[[/_editor/nav/dashboard]]</a>
 					<a href="#" id="editor-nav-elements">[[/_editor/nav/elements]]</a>
 					<a href="#" id="editor-nav-text">[[/_editor/nav/text]]</a>
@@ -23,9 +27,9 @@
 					<a href="#" id="editor-nav-submissions">[[/_editor/nav/submissions]]</a>
 					<a href="#" id="editor-nav-newsletter">[[/_editor/nav/newsletter]]</a>
 					<a href="#" id="editor-nav-logs">[[/_editor/nav/logs]]</a>
-				</div>
-			</div>
-			<div id="editor-content-wrap">
+				</nav>
+			</aside>
+			<main id="editor-content-wrap">
 				<div id="editor-content-dashboard"></div>
 				<div id="editor-content-elements">
 					<div id="elements-types"></div>
@@ -53,7 +57,7 @@
 				<div id="editor-content-logs">
 					<div id="logs-list"></div>
 				</div>
-			</div>
+			</main>
 			[jstext]
 			[assets /_editor/.cache/script.js]
 		</div>
