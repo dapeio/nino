@@ -187,6 +187,12 @@
 
 			const msg = dc.getElementById('themes-msg');
 
+			if( Nino.install.themes._ready !== true ) {
+				msg.textContent = 'Themes are still loading.';
+				callback( false );
+				return;
+			}
+
 			if( Nino.install.themes._selected === null ) {
 				msg.textContent = 'Select a theme first.';
 				callback( false );

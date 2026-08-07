@@ -239,8 +239,38 @@
 		},
 
 		/**
+		 *	Build the complete batch payload: global fields once, and every
+		 *	locale-scoped field once per available locale. A locale already
+		 *	visited in the selector comes from _localeValues; an untouched one
+		 *	keeps the value apiList() originally returned.
+		 *
+		 *	@return		{Array}									Items for personalinfos/savebatch
+		 */
+		_saveItems : function() {
+
+			const items = [];
+
+			Nino.install.personalinfos._sortedEntries( function( e ) { return e.global === true } ).forEach( function( entry ) {
+				const el = Nino.install.personalinfos._fieldEls[entry.key];
+				items.push( { key : entry.key, locale : '*', value : ( el !== undefined ) ? el.value : ( entry.values['*'] ?? '' ) } );
+			} );
+
+			const localeEntries = Nino.install.personalinfos._sortedEntries( function( e ) { return e.global === false } );
+			Nino.install.personalinfos._locales.forEach( function( locale ) {
+				const stored = Nino.install.personalinfos._localeValues[locale] ?? {};
+				localeEntries.forEach( function( entry ) {
+					const value = ( stored[entry.key] !== undefined ) ? stored[entry.key] : ( entry.values[locale] ?? '' );
+					items.push( { key : entry.key, locale : locale, value : value } );
+				} );
+			} );
+
+			return items;
+		},
+
+		/**
 		 *	Save every field on the page in one batch request (global fields
-		 *	always, plus the currently selected locale's fields) - called by
+		 *	plus all available locales, including languages edited before the
+		 *	currently visible one) - called by
 		 *	the shared Next button, not by a button of its own
 		 *
 		 *	@param		{Function}	callback			Called with ( success )
@@ -249,22 +279,19 @@
 		 */
 		save : function( callback ) {
 
+			const msg = dc.getElementById('personalinfos-msg');
+
+			if( Nino.install.personalinfos._ready !== true ) {
+				msg.textContent = 'Personal Infos are still loading.';
+				callback( false );
+				return;
+			}
+
 			Nino.install.personalinfos._storeVisibleLocaleFields();
 
-			const msg = dc.getElementById('personalinfos-msg');
 			msg.textContent = 'Saving …';
 
-			const items = [];
-
-			Nino.install.personalinfos._sortedEntries( function( e ) { return e.global === true } ).forEach( function( entry ) {
-				const el = Nino.install.personalinfos._fieldEls[entry.key];
-				items.push( { key : entry.key, locale : '*', value : ( el !== undefined ) ? el.value : '' } );
-			} );
-
-			const localeValues = Nino.install.personalinfos._localeValues[Nino.install.personalinfos._selectedLocale] ?? {};
-			Nino.install.personalinfos._sortedEntries( function( e ) { return e.global === false } ).forEach( function( entry ) {
-				items.push( { key : entry.key, locale : Nino.install.personalinfos._selectedLocale, value : localeValues[entry.key] ?? '' } );
-			} );
+			const items = Nino.install.personalinfos._saveItems();
 
 			Nino.install.apiCall( 'personalinfos/savebatch', { items : items }, function( status, response ) {
 				if( status !== 200 || response === null ) {

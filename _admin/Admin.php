@@ -2150,6 +2150,11 @@ namespace Nino\Admin {
 	 */
 	class PageEditor {
 
+		// Kept in sync with _install's Webpages class. These routes are owned
+		// at runtime by the optional tools themselves and therefore do not show
+		// up in the persisted route array used for the general collision check.
+		private const array RESERVED_HTTP_URIS = [ '/_admin', '/_editor', '/_install', '/_templates' ];
+
 		// A fresh entry's text fields when none was posted (or a blank one) -
 		// same generic-by-design reasoning _install/Install.php's
 		// Webpages::DEFAULT_TEXT docblock explains
@@ -2355,6 +2360,11 @@ namespace Nino\Admin {
 				return;
 			}
 
+			if( in_array( $httpUri, self::RESERVED_HTTP_URIS, true ) === true ) {
+				\Nino\Http::fail( $request, 409, 'reserved http uri: "'. $httpUri. '"' );
+				return;
+			}
+
 
 			$statusCode = (int) ( $data['statusCode'] ?? 200 );
 			if( $statusCode < 100 || $statusCode > 599 )
@@ -2394,6 +2404,14 @@ namespace Nino\Admin {
 					\Nino\Http::fail( $request, 400, 'duplicate http uri: "'. $httpUri. '"' );
 					return;
 				}
+			}
+
+			$routeKey 			= self::_routeKey( $httpUri );
+			$previousRouteKey = $selfIndex !== null ? self::_routeKey( (string) $pages[$selfIndex]['httpUri'] ) : null;
+
+			if( isset( $routes[$routeKey] ) === true && $routeKey !== $previousRouteKey ) {
+				\Nino\Http::fail( $request, 409, 'http uri already belongs to another route: "'. $httpUri. '"' );
+				return;
 			}
 
 			$previous = $selfIndex !== null ? $pages[$selfIndex] : [];
@@ -2452,7 +2470,7 @@ namespace Nino\Admin {
 			if( $statusCode !== 200 )
 				$routeData['statusCode'] = $statusCode;
 
-			$routes[self::_routeKey( $httpUri )] = $routeData;
+			$routes[$routeKey] = $routeData;
 
 			$appData['/nino/install/webpages'] 	= array_values( $pages );
 			$appData['/nino/http/routes'] 				= $routes;

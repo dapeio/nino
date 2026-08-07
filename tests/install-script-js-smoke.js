@@ -1,0 +1,132 @@
+/**
+ *	Nino							A compact filesystembased php framework
+ *	install-script-js-smoke.js	DOM-light checks for wizard navigation and
+ *								open Webpage form commits.
+ *
+ *	Usage: node tests/install-script-js-smoke.js
+ */
+
+'use strict';
+
+const fs 	= require('fs');
+const path 	= require('path');
+const vm 		= require('vm');
+
+let checks = 0;
+let failures = 0;
+
+function check( label, condition ) {
+	checks++;
+	if( condition === true ) {
+		console.log( '  ok  - '+ label );
+		return;
+	}
+	failures++;
+	console.log( 'FAIL  - '+ label );
+}
+
+function classList() {
+	const values = new Set();
+	return {
+		add : function( value ) { values.add( value ) },
+		remove : function( value ) { values.delete( value ) },
+		contains : function( value ) { return values.has( value ) },
+		toggle : function( value, force ) {
+			if( force === true ) values.add( value );
+			else if( force === false ) values.delete( value );
+			else if( values.has( value ) ) values.delete( value );
+			else values.add( value );
+		},
+	};
+}
+
+const elements = {
+	'install-back' : { disabled : false, classList : classList() },
+	'install-next' : { disabled : false, classList : classList() },
+	'install-actions-msg' : { textContent : '' },
+	'webpages-msg' : { textContent : '' },
+};
+
+const sandbox = {
+	console : console,
+	document : {
+		documentElement : null,
+		body : null,
+		getElementById : function( id ) { return elements[id] ?? null },
+	},
+};
+sandbox.window = sandbox;
+sandbox.Nino = { events : { bindCallback : function() {} } };
+
+const context = vm.createContext( sandbox );
+vm.runInContext(
+	fs.readFileSync( path.join( __dirname, '../_install/assets/script.js' ), 'utf8' ),
+	context,
+	{ filename : 'script.js' }
+);
+
+const install = sandbox.Nino.install;
+
+install._setBusy( true );
+check( 'a pending commit disables both shared navigation buttons', elements['install-back'].disabled === true && elements['install-next'].disabled === true );
+
+let shown = null;
+install.showStep = function( index ) { shown = index; install._index = index };
+install._index = 2;
+install.back();
+check( 'Back cannot move the wizard while a commit is pending', shown === null );
+
+install._setBusy( false );
+let beforeLeaveCalls = 0;
+install.webpages = { beforeLeave : function() { beforeLeaveCalls++; return false } };
+install._index = 3;
+install.back();
+check( 'a step can stop Back when its open editor is invalid', beforeLeaveCalls === 1 && shown === null );
+
+install.webpages.beforeLeave = function() { beforeLeaveCalls++; return true };
+install.back();
+check( 'Back advances only after the current step has preserved its local state', beforeLeaveCalls === 2 && shown === 2 );
+
+let commitCallback = null;
+install._index = 1;
+install._commitStep = function( key, callback ) { commitCallback = callback };
+install.next();
+check( 'Next enters the busy state before waiting for its asynchronous commit', install._busy === true && typeof commitCallback === 'function' );
+
+// Simulate an unrelated index mutation: the callback must still advance from
+// the step that started the request, not from this later value.
+install._index = 0;
+commitCallback( true );
+check( 'a successful callback advances from its captured starting index', shown === 2 );
+check( 'navigation unlocks after the commit callback', install._busy === false && elements['install-back'].disabled === false && elements['install-next'].disabled === false );
+
+vm.runInContext(
+	fs.readFileSync( path.join( __dirname, '../_install/assets/webpages.js' ), 'utf8' ),
+	context,
+	{ filename : 'webpages.js' }
+);
+
+const webpages = sandbox.Nino.install.webpages;
+let apiCalls = 0;
+let callbackResult = null;
+webpages.beforeLeave = function() { return true };
+sandbox.Nino.install.apiCall = function() { apiCalls++ };
+webpages.apply( function( ok ) { callbackResult = ok } );
+check( 'Next cannot post an empty list before Webpages has finished loading', apiCalls === 0 && callbackResult === false );
+
+webpages._ready = true;
+webpages.beforeLeave = function() { return false };
+sandbox.Nino.install.apiCall = function() { apiCalls++ };
+webpages.apply( function( ok ) { callbackResult = ok } );
+check( 'Next does not post an older page list while the open form is invalid', apiCalls === 0 && callbackResult === false );
+
+webpages.beforeLeave = function() { return true };
+sandbox.Nino.install.apiCall = function( action, payload, callback ) {
+	apiCalls++;
+	callback( 200, { webpages : payload.webpages } );
+};
+webpages.apply( function( ok ) { callbackResult = ok } );
+check( 'a preserved open form is included before the page list is posted', apiCalls === 1 && callbackResult === true );
+
+console.log( '\n'+ checks+ ' checks, '+ failures+ ' failed' );
+process.exitCode = failures === 0 ? 0 : 1;

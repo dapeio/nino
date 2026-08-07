@@ -61,14 +61,17 @@ namespace Nino\Install {
 		 */
 		public static function init( array &$appData ): void {
 
-			$appData['/nino/http/routes'] += [
-				'GET://_install' 	=> [
-					'uri' 				=> '/_install',
-					'body'				=> '[template /_install/templates/page-wizard]',
-					'statusCode'	=> 200
-				],
-				'POST://_install'	=> [ 'uri' => '/_install' ],
+			// These runtime-only routes are owned by the installer and must win
+			// over a stale or hand-written config entry at the same uri. Using +=
+			// here let a Webpages entry mounted at /_install replace the wizard's
+			// GET body on the very next request, leaving the still-unfinished
+			// installer reachable only through manually crafted POST requests.
+			$appData['/nino/http/routes']['GET://_install'] = [
+				'uri' 				=> '/_install',
+				'body'				=> '[template /_install/templates/page-wizard]',
+				'statusCode'	=> 200
 			];
+			$appData['/nino/http/routes']['POST://_install'] = [ 'uri' => '/_install' ];
 
 			\Nino\Callbacks::registerCallback( $appData, '/nino/http/response/GET://_install', 	[ self::class, 'handleGet' ] );
 			\Nino\Callbacks::registerCallback( $appData, '/nino/http/response/POST://_install', [ self::class, 'handlePost' ] );
@@ -1108,6 +1111,12 @@ namespace Nino\Install {
 
 		private const string LIBRARY = __DIR__. '/library';
 
+		// Runtime-owned tool routes are not persisted in config.php, so a
+		// collision check against the on-disk route array alone cannot see
+		// them. A public page at one of these exact paths would hide the tool's
+		// own GET response once its authenticated/default-password gate passes.
+		private const array RESERVED_HTTP_URIS = [ '/_admin', '/_editor', '/_install', '/_templates' ];
+
 		// A fresh entry's text fields when the frontend doesn't post its
 		// own (or posts a blank one) - see apiApply()'s $text loop.
 		// Deliberately generic: unlike a template's own deeper content
@@ -1228,6 +1237,20 @@ namespace Nino\Install {
 			$templates 	= self::_templates();
 			$locales 		= $appData['/nino/locales/available'] ?? [];
 
+			// Work from the persisted route array, never the live one polluted by
+			// /_install and module bootstrap routes. The previous Webpages list's
+			// own keys are the only existing routes this replacement may reuse;
+			// everything left in $foreignRoutes belongs to Setup, a module or a
+			// developer and must not be overwritten silently.
+			$config 		= \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
+			$oldWebpages = $config['/nino/install/webpages'] ?? [];
+			$routes 		= $config['/nino/http/routes'] ?? [];
+			$foreignRoutes = $routes;
+
+			foreach( $oldWebpages as $oldEntry )
+				foreach( self::_routeKeys( $oldEntry ) as $routeKey )
+					unset( $foreignRoutes[$routeKey] );
+
 			$webpages 		= [];
 			$seenUris 		= [];
 			$seenHttpUris = [];
@@ -1259,6 +1282,17 @@ namespace Nino\Install {
 
 				if( $httpUri === null ) {
 					\Nino\Http::fail( $request, 400, 'invalid http uri: "'. ( (string) ( $item['httpUri'] ?? '' ) ). '"' );
+					return;
+				}
+
+				if( in_array( $httpUri, self::RESERVED_HTTP_URIS, true ) === true ) {
+					\Nino\Http::fail( $request, 409, 'reserved http uri: "'. $httpUri. '"' );
+					return;
+				}
+
+				$routeKey = 'GET://'. trim( $httpUri, '/' );
+				if( isset( $foreignRoutes[$routeKey] ) === true ) {
+					\Nino\Http::fail( $request, 409, 'http uri already belongs to another route: "'. $httpUri. '"' );
 					return;
 				}
 
@@ -1307,6 +1341,8 @@ namespace Nino\Install {
 				$statusCode = $route !== null
 					? (int) ( $route['statusCode'] ?? 200 )
 					: (int) ( $item['statusCode'] ?? 200 );
+				if( $statusCode < 100 || $statusCode > 599 )
+					$statusCode = 200;
 
 				$webpages[] = [
 					'uri' 				=> $uri,
@@ -1324,10 +1360,6 @@ namespace Nino\Install {
 			// $appData['/nino/install/webpages'] is overwritten below -
 			// are exactly what has to come out of $routes before this
 			// call's own entries go back in (see this method's docblock)
-			$config 		= \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
-			$oldWebpages = $config['/nino/install/webpages'] ?? [];
-			$routes 		= $config['/nino/http/routes'] ?? [];
-
 			foreach( $oldWebpages as $oldEntry )
 				foreach( self::_routeKeys( $oldEntry ) as $routeKey )
 					unset( $routes[$routeKey] );
@@ -2000,7 +2032,27 @@ namespace Nino\Install {
 		 *	@return 	void
 		 */
 		public static function apiList( array &$appData, array &$request ): void {
-			\Nino\Http::ok( $request, [ 'users' => array_keys( $appData['/nino/auth/user'] ?? [] ) ] );
+			\Nino\Http::ok( $request, [ 'users' => self::usableUsers( $appData ) ] );
+		}
+
+		/**
+		 *	Every account that can actually pass Auth's login-status gate. Disabled
+		 *	legacy placeholders must not satisfy the wizard's "at least one admin"
+		 *	precondition merely because an array key for them still exists.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	array		Mail addresses
+		 */
+		public static function usableUsers( array &$appData ): array {
+
+			$users = [];
+
+			foreach( $appData['/nino/auth/user'] ?? [] as $mail => $user )
+				if( is_array( $user ) === true && ( $user['status'] ?? null ) === 2 && is_string( $user['pw'] ?? null ) === true && $user['pw'] !== '' )
+					$users[] = (string) $mail;
+
+			return $users;
 		}
 
 		/**
@@ -2041,7 +2093,7 @@ namespace Nino\Install {
 
 			\Nino\Auth::insertUser( $appData, $mail, $pw, [ '/*' ] );
 
-			\Nino\Http::ok( $request, [ 'users' => array_keys( $appData['/nino/auth/user'] ?? [] ) ] );
+			\Nino\Http::ok( $request, [ 'users' => self::usableUsers( $appData ) ] );
 		}
 	}
 
@@ -2082,6 +2134,11 @@ namespace Nino\Install {
 
 			$data = \Nino\Install\Install::postData();
 			$pw 	= (string) ( $data['password'] ?? '' );
+
+			if( count( \Nino\Install\Admin::usableUsers( $appData ) ) === 0 ) {
+				\Nino\Http::fail( $request, 409, 'create at least one active _editor account first' );
+				return;
+			}
 
 			if( strlen( $pw ) < self::MIN_PW_LENGTH ) {
 				\Nino\Http::fail( $request, 400, 'password must be at least '. self::MIN_PW_LENGTH. ' characters' );

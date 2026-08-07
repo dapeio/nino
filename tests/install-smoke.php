@@ -105,6 +105,11 @@ check( 'postData() decodes the json payload', \Nino\Install\Install::postData() 
 $_POST['data'] = 'not json';
 check( 'postData() falls back to an empty array on invalid json', \Nino\Install\Install::postData() === [] );
 
+$appData['/nino/http/routes']['GET://_install'] = [ 'uri' => '/_install', 'body' => 'stale persisted page' ];
+\Nino\Install\Install::init( $appData );
+check( 'init always restores the installer-owned GET route over a stale collision', $appData['/nino/http/routes']['GET://_install']['body'] === '[template /_install/templates/page-wizard]' );
+check( 'init always restores the installer-owned POST route too', $appData['/nino/http/routes']['POST://_install']['uri'] === '/_install' );
+
 echo "\n";
 
 
@@ -383,6 +388,17 @@ $_POST['data'] = json_encode( [ 'webpages' => [ [ 'uri' => '/x', 'httpUri' => '/
 $badTemplateRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Install\Webpages::apiApply( $appData, $badTemplateRequest );
 check( 'rejects an unknown template with 400', $badTemplateRequest['/nino/http/response']['statusCode'] === 400 );
+
+$_POST['data'] = json_encode( [ 'webpages' => [ [ 'uri' => '/installer-shadow', 'httpUri' => '/_install', 'template' => 'home', 'text' => [] ] ] ] );
+$reservedHttpUriRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Install\Webpages::apiApply( $appData, $reservedHttpUriRequest );
+check( 'rejects a Webpage mounted on the installer\'s own runtime uri', $reservedHttpUriRequest['/nino/http/response']['statusCode'] === 409 );
+
+$_POST['data'] = json_encode( [ 'webpages' => [ [ 'uri' => '/custom-page', 'httpUri' => '/custom', 'template' => 'home', 'text' => [] ] ] ] );
+$foreignRouteRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Install\Webpages::apiApply( $appData, $foreignRouteRequest );
+check( 'rejects an Http-URI already owned by a non-Webpages route', $foreignRouteRequest['/nino/http/response']['statusCode'] === 409 );
+check( 'the colliding hand-written route remains untouched', ( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes']['GET://custom']['body'] ?? null ) === 'hand-written route' );
 
 $_POST['data'] = json_encode( [ 'webpages' => [
 	[ 'uri' => '/x', 'httpUri' => '/x', 'template' => 'home', 'text' => [] ],
@@ -663,7 +679,12 @@ echo "Editor::apiList / apiCreate\n";
 
 $adminListRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Install\Admin::apiList( $appData, $adminListRequest );
-check( 'starts out with only the shipped placeholder account', $adminListRequest['/nino/http/response']['body']['users'] === [ 'changeme@domain.com' ] );
+check( 'does not count the shipped, disabled placeholder as a usable admin account', $adminListRequest['/nino/http/response']['body']['users'] === [] );
+
+$_POST['data'] = json_encode( [ 'password' => 'a-long-enough-admin-password' ] );
+$finishWithoutAdminRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Install\Finish::apiComplete( $appData, $finishWithoutAdminRequest );
+check( 'refuses to lock the installer before an active _editor account exists', $finishWithoutAdminRequest['/nino/http/response']['statusCode'] === 409 );
 
 $_POST['data'] = json_encode( [ 'mail' => 'not-an-email', 'pw' => 'a-long-enough-password' ] );
 $invalidMailRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
@@ -680,6 +701,7 @@ $createRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Install\Admin::apiCreate( $appData, $createRequest );
 check( 'creates the account', \Nino\Auth::getUser( $appData, 'admin@example.com' ) !== false );
 check( 'drops the shipped placeholder account once a real admin exists', \Nino\Auth::getUser( $appData, 'changeme@domain.com' ) === false );
+check( 'returns only the newly usable account to the frontend', $createRequest['/nino/http/response']['body']['users'] === [ 'admin@example.com' ] );
 check( 'the new account can actually authenticate', \Nino\Auth::loginUser( $appData, 'admin@example.com', 'a-long-enough-password' ) !== false );
 \Nino\Auth::logoutUser( $appData );
 

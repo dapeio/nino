@@ -81,6 +81,23 @@
 			Nino.install.webpages._showList();
 		},
 
+		/**
+		 *	Fold an open page form into _entries before the shared wizard shell
+		 *	leaves this step. The form's own "Back to list" remains an explicit
+		 *	discard action; the global Back/Next controls, however, must not lose a
+		 *	page the user just finished typing.
+		 *
+		 *	@return		{boolean}		Whether navigation may continue
+		 */
+		beforeLeave : function() {
+
+			const wrap = dc.getElementById('webpages-form');
+			if( wrap === null || wrap.classList.contains('admin-hidden') === true )
+				return true;
+
+			return Nino.install.webpages._save();
+		},
+
 		_showList : function() {
 			dc.getElementById('webpages-list').classList.remove('admin-hidden');
 			dc.getElementById('webpages-form').classList.add('admin-hidden');
@@ -460,9 +477,18 @@
 		 *	Create or update the entry currently open, purely in _entries -
 		 *	nothing reaches the server until apply()
 		 *
-		 *	@return		void
+		 *	@return		{boolean}		Whether the current form was valid and saved
 		 */
 		_save : function() {
+
+			const form = dc.querySelector('#webpages-form form');
+			if( form === null )
+				return false;
+
+			if( form.checkValidity() === false ) {
+				form.reportValidity();
+				return false;
+			}
 
 			const text = {};
 			dc.querySelectorAll('#webpages-form-locales [data-locale]').forEach( function( row ) {
@@ -496,6 +522,8 @@
 
 			Nino.install.webpages._renderList();
 			Nino.install.webpages._showList();
+
+			return true;
 		},
 
 		/**
@@ -525,6 +553,22 @@
 		apply : function( callback ) {
 
 			const msg = dc.getElementById('webpages-msg');
+
+			if( Nino.install.webpages._ready !== true ) {
+				msg.textContent = 'Webpages are still loading.';
+				callback( false );
+				return;
+			}
+
+			// "Next" is the step-level commit action. If the drill-down form is
+			// still open, save it into the in-memory list first instead of posting
+			// the older list and silently discarding the visible edits.
+			if( Nino.install.webpages.beforeLeave() === false ) {
+				msg.textContent = 'Complete the open webpage first.';
+				callback( false );
+				return;
+			}
+
 			msg.textContent = 'Applying …';
 
 			Nino.install.apiCall( 'webpages/apply', { webpages : Nino.install.webpages._entries }, function( status, response ) {

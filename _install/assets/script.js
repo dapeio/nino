@@ -42,6 +42,25 @@
 		],
 
 		_index : 0,
+		_busy 	: false,
+
+		/**
+		 *	Lock both shared navigation controls around one asynchronous commit.
+		 *	Keeping Back active while Next was pending let the mutable _index move
+		 *	under the response callback, so a successful save advanced from the
+		 *	wrong step.
+		 *
+		 *	@param		{boolean}	busy
+		 *
+		 *	@return		void
+		 */
+		_setBusy : function( busy ) {
+			Nino.install._busy = busy;
+			const backBtn = dc.getElementById('install-back');
+			const nextBtn = dc.getElementById('install-next');
+			if( backBtn !== null ) backBtn.disabled = busy;
+			if( nextBtn !== null ) nextBtn.disabled = busy;
+		},
 
 		/**
 		 *	Show one step by index: swap the visible pane, update the nav's
@@ -80,27 +99,42 @@
 		},
 
 		back : function() {
+
+			if( Nino.install._busy === true )
+				return;
+
+			const step = Nino.install.STEPS[Nino.install._index];
+			const mod 	= step !== undefined ? Nino.install[step.key] : undefined;
+
+			// A step may have an open, purely client-side editor whose values
+			// must be folded into its in-memory model before leaving it.
+			if( mod !== undefined && typeof mod.beforeLeave === 'function' && mod.beforeLeave() === false )
+				return;
+
 			if( Nino.install._index > 0 )
 				Nino.install.showStep( Nino.install._index - 1 );
 		},
 
 		next : function() {
 
-			const nextBtn = dc.getElementById('install-next');
-			const step 		= Nino.install.STEPS[Nino.install._index];
+			if( Nino.install._busy === true )
+				return;
 
-			nextBtn.disabled = true;
+			const currentIndex = Nino.install._index;
+			const step 		= Nino.install.STEPS[currentIndex];
+
+			Nino.install._setBusy( true );
 
 			Nino.install._commitStep( step.key, function( ok, message ) {
 
-				nextBtn.disabled = false;
+				Nino.install._setBusy( false );
 
 				if( ok === false ) {
 					dc.getElementById('install-actions-msg').textContent = message || 'Please fix the error above before continuing.';
 					return;
 				}
 
-				Nino.install.showStep( Nino.install._index + 1 );
+				Nino.install.showStep( currentIndex + 1 );
 			} );
 		},
 
@@ -115,6 +149,9 @@
 		 *	@return		void
 		 */
 		_commitStep : function( key, callback ) {
+
+			if( key === 'checks' && Nino.install.checks !== undefined && Nino.install.checks._ready !== true )
+				return callback( false, 'Environment checks are still running.' );
 
 			if( key === 'setup' && Nino.install.setup !== undefined )
 				return Nino.install.setup.apply( function( ok ) { callback( ok ) } );

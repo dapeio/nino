@@ -865,6 +865,22 @@ check( 'rejects an unsafe Element-URI with 400', $status === 400 );
 check( 'rejects an unsafe Http-URI with 400', $status === 400 );
 
 [ $status ] = callDev( $appData, \Nino\Admin\PageEditor::class, 'apiSave', [
+	'originalHttpUri' => '', 'uri' => '/admin-shadow', 'httpUri' => '/_admin', 'template' => 'page-about', 'text' => [],
+] );
+check( 'rejects a page mounted on a runtime-owned tool uri', $status === 409 );
+
+\Nino\Filesystem::mutate( $appData, '/config.php', function( array $config ): array {
+	$config['/nino/http/routes']['GET://owned'] = [ 'uri' => '/owned', 'body' => 'hand-written route' ];
+	return $config;
+} );
+
+[ $status ] = callDev( $appData, \Nino\Admin\PageEditor::class, 'apiSave', [
+	'originalHttpUri' => '', 'uri' => '/owned-page', 'httpUri' => '/owned', 'template' => 'page-about', 'text' => [],
+] );
+check( 'rejects an Http-URI already owned by a non-page route', $status === 409 );
+check( 'keeps the colliding hand-written route unchanged', ( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes']['GET://owned']['body'] ?? null ) === 'hand-written route' );
+
+[ $status ] = callDev( $appData, \Nino\Admin\PageEditor::class, 'apiSave', [
 	'originalHttpUri' => '', 'uri' => '/about', 'httpUri' => '/about', 'template' => 'not-a-page', 'text' => [],
 ] );
 check( 'rejects a template outside the page-*.tpl whitelist with 400', $status === 400 );

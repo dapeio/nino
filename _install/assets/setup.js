@@ -197,6 +197,13 @@
 		apply : function( callback ) {
 
 			const msg = dc.getElementById('setup-msg');
+
+			if( Nino.install.setup._ready !== true ) {
+				msg.textContent = 'Setup options are still loading.';
+				callback( false );
+				return;
+			}
+
 			msg.textContent = 'Applying …';
 
 			const nativeSelect = dc.getElementById('setup-native-locale-select');
