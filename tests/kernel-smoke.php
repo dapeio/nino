@@ -205,8 +205,20 @@ check( 'deleteElement( locale: * ) succeeds on a type with a "title" key', $dele
 check( 'deleteElement( locale: * ) actually removes the element from every locale', \Nino\Elements::getElement( $appData, '/wildcardtest/a', '*' ) === false );
 check( 'deleteElement( locale: * ) leaves other elements untouched', \Nino\Elements::getElement( $appData, '/wildcardtest/b', '*' ) !== false );
 
+// item1 picked up an en_US entry in the partial-update checks above, so it now
+// lives in two locales. A single-locale delete drops that locale's own data and
+// nothing else: the element still exists for English, and with it the shared
+// '*' bucket entry holding its global fields
 \Nino\Elements::deleteElement( $appData, '/testtype/item1', 'de_DE' );
-check( 'deleteElement removes the element (no leftover "*" shell entry)', \Nino\Elements::getElement( $appData, '/testtype/item1', 'de_DE' ) === false );
+$afterDeDelete = \Nino\Elements::getElement( $appData, '/testtype/item1', 'de_DE' );
+check( 'deleteElement drops the requested locale\'s own data', is_array( $afterDeDelete ) === true && isset( $afterDeDelete['title'] ) === false );
+check( 'deleteElement keeps the shared global fields while another locale still references the element', ( $afterDeDelete['views'] ?? null ) === 7 );
+check( 'deleteElement leaves the other locale fully intact', ( \Nino\Elements::getElement( $appData, '/testtype/item1', 'en_US' )['title'] ?? null ) === 'Hello English' );
+
+// ...and once the last locale holding it goes, the '*' shell entry goes too
+\Nino\Elements::deleteElement( $appData, '/testtype/item1', 'en_US' );
+check( 'deleteElement removes the element (no leftover "*" shell entry)', \Nino\Elements::getElement( $appData, '/testtype/item1', 'en_US' ) === false );
+check( 'the element is gone from every other locale as well', \Nino\Elements::getElement( $appData, '/testtype/item1', '*' ) === false );
 
 // Regression: 'date'/'datetime' model fields hold a plain string value (php has no
 // native date type) - insertElement used to reject them outright, comparing

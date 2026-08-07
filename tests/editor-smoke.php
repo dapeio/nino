@@ -263,6 +263,24 @@ $deDe = \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] );
 check( 'the blacklisted key was NOT written despite being in the import', isset( $deDe['[[/website/lang]]'] ) === false );
 check( 'the non-blacklisted key from the same import was written', $deDe['[[/home/plain]]'] === 'Geänderter Satz' );
 
+// A global key is shared by every locale and lives in global.php alone (see
+// the saveBatch check above). Importing one into a locale file would shadow it
+// for that locale only - live on the site, but invisible in the Text panel,
+// which reads a global entry from global.php - so it is skipped, not written
+$request = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+$_POST['data'] = json_encode( [
+	'locale' 	=> 'de_DE',
+	'content' => [ '[[/company/name]]' => 'Andere GmbH', '[[/home/plain]]' => 'Noch ein Satz' ],
+] );
+\Nino\Editor\Text::apiImport( $appData, $request );
+check( 'import counts a global key as skipped, not imported', $request['/nino/http/response']['body'] === [ 'imported' => 1, 'skipped' => 1 ] );
+
+$deDe 				= \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] );
+$storedGlobal = \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] );
+check( 'a global key from an import does not become a locale-shadowing entry', isset( $deDe['[[/company/name]]'] ) === false );
+check( 'the global value itself is left untouched by the import', ( $storedGlobal['[[/company/name]]'] ?? '' ) === 'New Co' );
+check( 'the locale key from the same import was still written', $deDe['[[/home/plain]]'] === 'Noch ein Satz' );
+
 $request = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 $_POST['data'] = json_encode( [ 'locale' => 'de_DE', 'content' => [ '[[/home/plain]]' => str_repeat( 'x', 21000 ) ] ] );
 \Nino\Editor\Text::apiImport( $appData, $request );

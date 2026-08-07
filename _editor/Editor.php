@@ -1074,10 +1074,25 @@ namespace Nino\Editor {
 					continue;
 				}
 
+				$entry = $entriesByKey[$key] ?? null;
+
+				// A global key lives in /text/global.php and is shared by every
+				// locale - saveBatch() routes it there for exactly that reason.
+				// Writing it into the target locale file instead would shadow the
+				// global value for this one locale: live on the site (getFills()
+				// merges the locale file over global.php), yet invisible in the
+				// Text panel, which reads a global entry's value from global.php
+				// alone - so it could never be corrected or removed from the ui
+				// again. apiExport() only ever hands out the locale file, so a
+				// genuine round-trip never carries one to begin with
+				if( ( $entry['global'] ?? false ) === true ) {
+					$skipped++;
+					continue;
+				}
+
 				// A key known from any locale keeps its established html/plain
 				// contract. A genuinely new migration key is imported as plain text
 				// until a developer deliberately defines formatted content for it.
-				$entry = $entriesByKey[$key] ?? null;
 				$changes[$bracketKey] = \Nino\Text::sanitizeValue( (string) $value, ( $entry['html'] ?? false ) === true );
 				$imported++;
 			}
