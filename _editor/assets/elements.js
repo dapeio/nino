@@ -30,6 +30,7 @@
 		_globalValues		: {},
 		_localeValues		: {},
 		_selectedLocale	: null,
+		_dirtyLocales		: [],
 		_htmlEditors		: {},
 		_pendingUri			: undefined,
 		_ready					: false,
@@ -323,6 +324,7 @@
 				Nino.editor.elements._currentUri 	= null;
 				Nino.editor.elements._globalValues	= {};
 				Nino.editor.elements._localeValues	= {};
+				Nino.editor.elements._dirtyLocales	= [];
 				Nino.editor.elements._selectedLocale = Nino.editor.sessionLocale.current ?? Nino.editor.elements._locales[0] ?? '';
 				Nino.editor.elements._renderForm();
 				Nino.editor.elements._showFormView();
@@ -345,6 +347,7 @@
 				Nino.editor.elements._currentUri 	= uri;
 				Nino.editor.elements._globalValues	= response.global;
 				Nino.editor.elements._localeValues	= response.locales;
+				Nino.editor.elements._dirtyLocales	= [];
 				Nino.editor.elements._selectedLocale = ( preferred !== null && response.locales[preferred] !== undefined ) ? preferred : ( Object.keys( response.locales )[0] ?? Nino.editor.elements._locales[0] ?? '' );
 				Nino.editor.elements._renderForm();
 				Nino.editor.elements._showFormView();
@@ -720,10 +723,67 @@
 			if( wrap === null || Nino.editor.elements._selectedLocale === null )
 				return;
 
+			const previous = Nino.editor.elements._localeValues[Nino.editor.elements._selectedLocale] ?? {};
 			const values = {};
 			Nino.editor.elements._localeKeys.forEach( function( key ) { values[key] = Nino.editor.elements._readFieldByKey( key, Nino.editor.elements._currentModel[key] ) } );
 
+			const changed = Nino.editor.elements._localeKeys.some( function( key ) {
+				return Nino.editor.elements._fieldValuesEqual( Nino.editor.elements._currentModel[key], previous[key], values[key] ) === false;
+			} );
+
+			if( changed === true && Nino.editor.elements._dirtyLocales.indexOf( Nino.editor.elements._selectedLocale ) === -1 )
+				Nino.editor.elements._dirtyLocales.push( Nino.editor.elements._selectedLocale );
+
 			Nino.editor.elements._localeValues[Nino.editor.elements._selectedLocale] = values;
+		},
+
+		/**
+		 *	Compare a stored field with the value its control currently returns.
+		 *	An absent value and that control type's empty value are equivalent -
+		 *	merely visiting a translation must not mark it as edited.
+		 *
+		 *	@param		{Object}	field
+		 *	@param		{*}			before
+		 *	@param		{*}			after
+		 *
+		 *	@return		{boolean}
+		 */
+		_fieldValuesEqual : function( field, before, after ) {
+
+			function normalized( value ) {
+				if( value !== null && value !== undefined )
+					return value;
+				if( field.type === 'array' )
+					return [];
+				if( field.type === 'boolean' )
+					return false;
+				if( field.type === 'integer' || field.type === 'double' )
+					return 0;
+				return '';
+			}
+
+			return JSON.stringify( normalized( before ) ) === JSON.stringify( normalized( after ) );
+		},
+
+		/**
+		 *	Translations one click on Save must persist. Previously the browser
+		 *	remembered edits made before a locale switch, then submitted only the
+		 *	last visible locale. Keep edit order (important when the first request
+		 *	creates a new element), and fall back to the visible locale when no
+		 *	translation changed (eg. a save that only changes global fields).
+		 *
+		 *	@return		{Array<string>}
+		 */
+		_saveLocales : function() {
+
+			if( Nino.editor.elements._localeKeys.length === 0 )
+				return [ Nino.editor.elements._selectedLocale ];
+
+			const locales = Nino.editor.elements._dirtyLocales.slice();
+			if( locales.length === 0 )
+				locales.push( Nino.editor.elements._selectedLocale );
+
+			return locales;
 		},
 
 		/**
@@ -947,53 +1007,83 @@
 				return;
 			}
 
-			const fields = {};
-			Nino.editor.elements._globalKeys.forEach( function( key ) { fields[key] = Nino.editor.elements._readFieldByKey( key, Nino.editor.elements._currentModel[key] ) } );
-			Object.assign( fields, Nino.editor.elements._localeValues[Nino.editor.elements._selectedLocale] ?? {} );
+			const globalFields = {};
+			Nino.editor.elements._globalKeys.forEach( function( key ) { globalFields[key] = Nino.editor.elements._readFieldByKey( key, Nino.editor.elements._currentModel[key] ) } );
+
+			const locales = Nino.editor.elements._saveLocales();
+			const wasNew = Nino.editor.elements._isNew;
+			let position = 0;
+			let created = false;
 
 			msg.textContent = Nino.content.getText('/_editor/elements/msg/pending');
 
-			Nino.editor.elements._apiCall( 'save', {
-				type 		: Nino.editor.elements._currentType,
-				uri 		: uri,
-				locale 	: Nino.editor.elements._selectedLocale,
-				isNew 	: Nino.editor.elements._isNew,
-				fields 	: fields,
-			}, function( status, response ) {
+			function saveNextLocale() {
 
-				if( status !== 200 ) {
-					msg.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : Nino.content.getText('/_editor/elements/error/save') );
-					return;
-				}
+				const locale = locales[position];
+				const fields = Object.assign( {}, globalFields, Nino.editor.elements._localeValues[locale] ?? {} );
 
-				const wasNew = Nino.editor.elements._isNew;
+				Nino.editor.elements._apiCall( 'save', {
+					type 		: Nino.editor.elements._currentType,
+					uri 		: uri,
+					locale 	: locale,
+					isNew 	: wasNew === true && position === 0,
+					fields 	: fields,
+				}, function( status, response ) {
 
-				Nino.editor.elements._isNew 				= false;
-				Nino.editor.elements._currentUri 	= uri;
-				Nino.editor.elements._globalKeys.forEach( function( key ) { Nino.editor.elements._globalValues[key] = response.element[key] ?? null } );
-				Nino.editor.elements._localeValues[Nino.editor.elements._selectedLocale] = Nino.editor.elements._localeValues[Nino.editor.elements._selectedLocale] ?? {};
-				Nino.editor.elements._localeKeys.forEach( function( key ) { Nino.editor.elements._localeValues[Nino.editor.elements._selectedLocale][key] = response.element[key] ?? null } );
+					if( status !== 200 || response === null ) {
 
-				// Stay on the form after saving (do not navigate back to the list) - only
-				// re-render once if this created a new element (unlocks the uri field,
-				// shows the delete button), then refresh the list in the background.
-				// Also re-sync the hash - it was still pointing at ".../new" (from
-				// before _isNew flipped to false above), so a refresh right after
-				// creating an element would otherwise reopen a blank new-element
-				// form instead of the one that was actually just saved
-				if( wasNew === true ) {
-					Nino.editor.elements._renderForm();
-					Nino.editor.router.set( 'elements', [ Nino.editor.elements._currentType, Nino.editor.elements._currentUri ] );
-				}
+						// The first locale may already have created the element before a
+						// later locale failed. Reflect that durable state immediately so a
+						// retry updates the element rather than attempting a second insert.
+						if( wasNew === true && created === true ) {
+							Nino.editor.elements._renderForm();
+							Nino.editor.router.set( 'elements', [ Nino.editor.elements._currentType, Nino.editor.elements._currentUri ] );
+							msg = dc.getElementById('elements-form-msg');
+						}
 
-				msg = dc.getElementById('elements-form-msg');
-				msg.textContent = Nino.content.getText('/_editor/elements/msg/saved');
+						msg.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : Nino.content.getText('/_editor/elements/error/save') );
+						return;
+					}
 
-				Nino.editor.elements._apiCall( 'list', { type : Nino.editor.elements._currentType }, function( listStatus, listResponse ) {
-					if( listStatus === 200 && listResponse !== null )
-						Nino.editor.elements._renderList( listResponse.elements );
+					if( wasNew === true && position === 0 ) {
+						Nino.editor.elements._isNew = false;
+						Nino.editor.elements._currentUri = uri;
+						created = true;
+					}
+
+					Nino.editor.elements._globalKeys.forEach( function( key ) { Nino.editor.elements._globalValues[key] = response.element[key] ?? null } );
+					Nino.editor.elements._localeValues[locale] = Nino.editor.elements._localeValues[locale] ?? {};
+					Nino.editor.elements._localeKeys.forEach( function( key ) { Nino.editor.elements._localeValues[locale][key] = response.element[key] ?? null } );
+
+					const dirtyAt = Nino.editor.elements._dirtyLocales.indexOf( locale );
+					if( dirtyAt !== -1 )
+						Nino.editor.elements._dirtyLocales.splice( dirtyAt, 1 );
+
+					position++;
+					if( position < locales.length ) {
+						saveNextLocale();
+						return;
+					}
+
+					// Stay on the form after saving. A newly-created element is rendered
+					// once more to lock its uri and expose the delete action; existing
+					// elements keep focus and selection exactly where they were.
+					if( wasNew === true ) {
+						Nino.editor.elements._renderForm();
+						Nino.editor.router.set( 'elements', [ Nino.editor.elements._currentType, Nino.editor.elements._currentUri ] );
+					}
+
+					msg = dc.getElementById('elements-form-msg');
+					msg.textContent = Nino.content.getText('/_editor/elements/msg/saved');
+
+					Nino.editor.elements._apiCall( 'list', { type : Nino.editor.elements._currentType }, function( listStatus, listResponse ) {
+						if( listStatus === 200 && listResponse !== null )
+							Nino.editor.elements._renderList( listResponse.elements );
+					} );
 				} );
-			} );
+			}
+
+			saveNextLocale();
 		},
 
 		/**
