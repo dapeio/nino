@@ -79,7 +79,7 @@
 			wrap.innerHTML = '';
 			const p = dc.createElement('p');
 			p.className = 'editor-error';
-			p.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : 'Fehler beim Laden.' );
+			p.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : Nino.content.getText('/_editor/dashboard/error/load') );
 			wrap.appendChild( p );
 		},
 
@@ -103,10 +103,10 @@
 			// Dashboard::apiSummary()) - omitted, not just empty, so each is
 			// skipped here rather than rendered as "undefined"
 			if( data.submissions !== undefined )
-				tiles.appendChild( Nino.editor.dashboard._tile( 'submissions', String( data.submissions ), 'Anfragen' ) );
+				tiles.appendChild( Nino.editor.dashboard._tile( 'submissions', String( data.submissions ), Nino.content.getText('/_editor/dashboard/label/submissions') ) );
 			if( data.newsletter !== undefined )
-				tiles.appendChild( Nino.editor.dashboard._tile( 'newsletter', String( data.newsletter ), 'Newsletter-Abonnenten' ) );
-			tiles.appendChild( Nino.editor.dashboard._tile( 'logs', data.lastBackup || '–', 'Letztes Backup' ) );
+				tiles.appendChild( Nino.editor.dashboard._tile( 'newsletter', String( data.newsletter ), Nino.content.getText('/_editor/dashboard/label/newsletter') ) );
+			tiles.appendChild( Nino.editor.dashboard._tile( 'dashboard', data.lastBackup || '–', Nino.content.getText('/_editor/dashboard/label/lastbackup') ) );
 			wrap.appendChild( tiles );
 
 			wrap.appendChild( Nino.editor.dashboard._elementsSection( data.elements ) );
@@ -158,12 +158,12 @@
 			section.className = 'editor-dashboard-section';
 
 			const title = dc.createElement('h3');
-			title.textContent = 'Elemente nach Typ';
+			title.textContent = Nino.content.getText('/_editor/dashboard/label/elements');
 			section.appendChild( title );
 
 			if( elements.length === 0 ) {
 				const p = dc.createElement('p');
-				p.textContent = 'Noch keine Element-Typen angelegt.';
+				p.textContent = Nino.content.getText('/_editor/dashboard/empty/elements');
 				section.appendChild( p );
 				return section;
 			}
@@ -227,12 +227,12 @@
 			section.className = 'editor-dashboard-section';
 
 			const title = dc.createElement('h3');
-			title.textContent = 'Letzte Aktivität';
+			title.textContent = Nino.content.getText('/_editor/dashboard/label/activity');
 			section.appendChild( title );
 
 			if( lines.length === 0 ) {
 				const p = dc.createElement('p');
-				p.textContent = 'Noch keine Einträge.';
+				p.textContent = Nino.content.getText('/_editor/dashboard/empty/activity');
 				section.appendChild( p );
 				return section;
 			}
@@ -251,13 +251,11 @@
 			const more = dc.createElement('a');
 			more.href = '#logs';
 			more.className = 'editor-dashboard-more';
-			more.textContent = 'Alle anzeigen →';
+			more.textContent = Nino.content.getText('/_editor/dashboard/label/all')+ ' →';
 			section.appendChild( more );
 
 			return section;
 		},
 	};
-
-	Nino.events.bindCallback( 'ready', Nino.editor.dashboard.init );
 
 })(window, document, document.documentElement, document.body);

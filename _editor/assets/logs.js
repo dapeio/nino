@@ -81,7 +81,7 @@
 			wrap.innerHTML = '';
 			const p = dc.createElement('p');
 			p.className = 'editor-error';
-			p.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : 'Fehler beim Laden.' );
+			p.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : Nino.content.getText('/_editor/logs/error/load') );
 			wrap.appendChild( p );
 		},
 
@@ -100,7 +100,7 @@
 
 			if( lines.length === 0 ) {
 				const p = dc.createElement('p');
-				p.textContent = 'Noch keine Einträge.';
+				p.textContent = Nino.content.getText('/_editor/logs/empty');
 				wrap.appendChild( p );
 				return;
 			}
@@ -117,7 +117,5 @@
 			wrap.appendChild( ul );
 		},
 	};
-
-	Nino.events.bindCallback( 'ready', Nino.editor.logs.init );
 
 })(window, document, document.documentElement, document.body);

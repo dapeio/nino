@@ -235,15 +235,20 @@ check( 'export rejects an invalid locale', $request['/nino/http/response']['stat
 $request = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 $_POST['data'] = json_encode( [
 	'locale' 	=> 'en_US',
-	'content' => [ '[[/home/h2]]' => 'Translated Headline', '[[/home/brand-new]]' => 'A key that never existed before' ],
+	'content' => [
+		'[[/home/h2]]' 			=> '<strong><em>Translated</em></strong><script>x</script>',
+		'[[/home/brand-new]]' 	=> 'A <b>brand-new</b> key',
+		'[[/home/nested]]' 		=> [ 'not' => 'a scalar' ],
+	],
 ] );
 \Nino\Editor\Text::apiImport( $appData, $request );
 check( 'import succeeds', $request['/nino/http/response']['statusCode'] === 200 );
-check( 'import reports 2 imported, 0 skipped', $request['/nino/http/response']['body'] === [ 'imported' => 2, 'skipped' => 0 ] );
+check( 'import reports valid and structurally-invalid values separately', $request['/nino/http/response']['body'] === [ 'imported' => 2, 'skipped' => 1 ] );
 
 $enUs = \Nino\Filesystem::getFileContent( $appData, '/text/en_US.php', [] );
-check( 'an imported key overwrote the existing value', $enUs['[[/home/h2]]'] === 'Translated Headline' );
-check( 'a brand-new key from the import was created', $enUs['[[/home/brand-new]]'] === 'A key that never existed before' );
+check( 'an imported known html key uses the same whitelist sanitizer as a regular save', $enUs['[[/home/h2]]'] === '<strong>Translated</strong>' );
+check( 'a brand-new import key is treated as plain text, not trusted html', $enUs['[[/home/brand-new]]'] === 'A brand-new key' );
+check( 'a nested import value is skipped instead of being coerced to the string "Array"', isset( $enUs['[[/home/nested]]'] ) === false );
 
 $request = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 $_POST['data'] = json_encode( [
@@ -257,6 +262,12 @@ check( 'a blacklisted key in the import is silently skipped, the rest still impo
 $deDe = \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] );
 check( 'the blacklisted key was NOT written despite being in the import', isset( $deDe['[[/website/lang]]'] ) === false );
 check( 'the non-blacklisted key from the same import was written', $deDe['[[/home/plain]]'] === 'Geänderter Satz' );
+
+$request = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+$_POST['data'] = json_encode( [ 'locale' => 'de_DE', 'content' => [ '[[/home/plain]]' => str_repeat( 'x', 21000 ) ] ] );
+\Nino\Editor\Text::apiImport( $appData, $request );
+$deDe = \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] );
+check( 'import enforces the same hard 20,000-byte limit as a regular save', strlen( $deDe['[[/home/plain]]'] ?? '' ) === 20000 );
 
 $request = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 $_POST['data'] = json_encode( [ 'locale' => 'de_DE', 'content' => [] ] );
@@ -292,6 +303,14 @@ $element = $request['/nino/http/response']['body']['element'] ?? [];
 check( 'element save succeeds', $request['/nino/http/response']['statusCode'] === 200 );
 check( 'an html-flagged field is sanitized like a Text html key', ( $element['body'] ?? '' ) === '<strong>Bold Italic</strong> ' );
 check( 'a plain field is left as-is (Elements never sanitized these before either)', ( $element['plain'] ?? '' ) === 'Acme <b>Corp</b>' );
+
+$request = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+$_POST['data'] = json_encode( [
+	'type' => 'demo', 'uri' => 'not a slug', 'locale' => 'de_DE', 'isNew' => true,
+	'fields' => [ 'body' => 'x', 'plain' => 'x' ],
+] );
+\Nino\Editor\Elements::apiSave( $appData, $request );
+check( 'a new element uri outside the documented slug syntax is rejected', $request['/nino/http/response']['statusCode'] === 400 );
 
 echo "\n";
 
@@ -349,14 +368,14 @@ echo "Elements::apiUploadImage\n";
  *
  *	@return		string	The temp file path
  */
-function fakeUploadedFile( bool $alpha = false ): string {
+function fakeUploadedFile( bool $alpha = false, int $variant = 0 ): string {
 	$img = imagecreatetruecolor( 300, 150 );
 	if( $alpha === true ) {
 		imagealphablending( $img, false );
 		imagesavealpha( $img, true );
-		imagefill( $img, 0, 0, imagecolorallocatealpha( $img, 0, 200, 0, 64 ) );
+		imagefill( $img, 0, 0, imagecolorallocatealpha( $img, $variant > 0 ? 200 : 0, $variant > 0 ? 0 : 200, 0, 64 ) );
 	} else {
-		imagefill( $img, 0, 0, imagecolorallocate( $img, 0, 0, 200 ) );
+		imagefill( $img, 0, 0, imagecolorallocate( $img, $variant > 0 ? 200 : 0, 0, $variant > 0 ? 0 : 200 ) );
 	}
 	$path = tempnam( sys_get_temp_dir(), 'nino-upload-' );
 	$alpha === true ? imagepng( $img, $path ) : imagejpeg( $img, $path, 90 );
@@ -373,10 +392,10 @@ function fakeUploadedFile( bool $alpha = false ): string {
  *
  *	@return		array			[ statusCode, body ]
  */
-function callUploadImage( array &$appData, array $data, bool $alpha = false ): array {
+function callUploadImage( array &$appData, array $data, bool $alpha = false, int $variant = 0 ): array {
 	$request = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 	$_POST['data'] = json_encode( $data );
-	$path = fakeUploadedFile( $alpha );
+	$path = fakeUploadedFile( $alpha, $variant );
 	$_FILES['file'] = [ 'tmp_name' => $path, 'error' => UPLOAD_ERR_OK, 'name' => 'test.jpg', 'size' => filesize( $path ) ];
 	\Nino\Editor\Elements::apiUploadImage( $appData, $request );
 	@unlink( $path );
@@ -388,8 +407,9 @@ function callUploadImage( array &$appData, array $data, bool $alpha = false ): a
 	'plain' => [ 'type' => 'string', 'locale' => true ],
 ] );
 \Nino\Elements::insertElement( $appData, '/imagedemo/item1', [ 'plain' => 'x' ], 'de_DE' );
+\Nino\Elements::updateElement( $appData, '/imagedemo/item1', [ 'plain' => 'English' ], 'en_US' );
 
-[ $status, $body ] = callUploadImage( $appData, [ 'type' => 'imagedemo', 'uri' => 'item1', 'locale' => 'de_DE', 'key' => 'photo' ] );
+[ $status, $body ] = callUploadImage( $appData, [ 'type' => 'imagedemo', 'uri' => 'item1', 'locale' => 'en_US', 'key' => 'photo' ] );
 check( 'a valid upload for an image field succeeds', $status === 200 && is_string( $body['filename'] ?? null ) === true );
 
 $firstFilename = $body['filename'];
@@ -400,6 +420,8 @@ check( 'the processed file actually exists on disk', is_file( $uploadPath ) === 
 
 $stored = \Nino\Elements::getElement( $appData, '/imagedemo/item1', '*' );
 check( 'the uploaded filename is committed to the element immediately (no Speichern needed)', ( $stored['photo'] ?? null ) === $firstFilename );
+check( 'an immediate image update does not copy another locale\'s text into its target locale', \Nino\Elements::getElement( $appData, '/imagedemo/item1', 'en_US' )['plain'] === 'English' );
+check( 'an immediate image update leaves the source locale text untouched too', \Nino\Elements::getElement( $appData, '/imagedemo/item1', 'de_DE' )['plain'] === 'x' );
 
 [ $status2, $body2 ] = callUploadImage( $appData, [ 'type' => 'imagedemo', 'uri' => 'item1', 'locale' => 'de_DE', 'key' => 'photo' ] );
 check( 'uploading a replacement succeeds', $status2 === 200 );
@@ -410,6 +432,24 @@ check( 'a same-format replacement overwrites the same deterministic path, not a 
 [ $status3, $body3 ] = callUploadImage( $appData, [ 'type' => 'imagedemo', 'uri' => 'item1', 'locale' => 'de_DE', 'key' => 'photo' ], true );
 check( 'switching output format succeeds and yields a differently-named file', $status3 === 200 && ( $body3['filename'] ?? null ) === 'elements/imagedemo/item1.40x40.png' );
 check( 'the old .jpg is deleted once the new .png is committed (no orphan across a format change)', is_file( $uploadPath ) === false );
+
+// process() overwrites the deterministic path before updateElement() gets a
+// chance to run its veto callback. A rejected same-format update must restore
+// the old bytes the unchanged element record still references. Keep this on a
+// dedicated type so its deliberate update veto cannot affect later cases.
+\Nino\Elements::insertElementType( $appData, '/imageveto', [
+	'photo' => [ 'type' => 'image', 'width' => 40, 'height' => 40 ],
+] );
+\Nino\Elements::insertElement( $appData, '/imageveto/item1', [], 'de_DE' );
+[ , $imageVetoInitial ] = callUploadImage( $appData, [ 'type' => 'imageveto', 'uri' => 'item1', 'locale' => 'de_DE', 'key' => 'photo' ], true );
+$pngFilename = $imageVetoInitial['filename'];
+$pngPath = $appData['./nino/filesystem/path']. '/images/'. $pngFilename;
+$pngBeforeVeto = file_get_contents( $pngPath );
+\Nino\Callbacks::registerCallback( $appData, '/nino/elements/imageveto/update', function(): bool { return false; } );
+[ $vetoStatus ] = callUploadImage( $appData, [ 'type' => 'imageveto', 'uri' => 'item1', 'locale' => 'de_DE', 'key' => 'photo' ], true, 1 );
+check( 'a vetoed image metadata update reports failure', $vetoStatus === 400 );
+check( 'a vetoed same-format replacement restores the original processed image bytes', file_get_contents( $pngPath ) === $pngBeforeVeto );
+check( 'a vetoed image update leaves the element filename unchanged', \Nino\Elements::getElement( $appData, '/imageveto/item1', '*' )['photo'] === $pngFilename );
 
 [ $statusMissing ] = callUploadImage( $appData, [ 'type' => 'imagedemo', 'uri' => 'does-not-exist', 'locale' => 'de_DE', 'key' => 'photo' ] );
 check( 'uploading for an element that was never saved is rejected', $statusMissing === 404 );
@@ -430,6 +470,22 @@ $_POST['data'] = json_encode( [ 'type' => 'imagedemo', 'uri' => 'item2' ] );
 \Nino\Editor\Elements::apiDelete( $appData, $deleteRequest );
 check( 'deleting the element succeeds', $deleteRequest['/nino/http/response']['statusCode'] === 200 );
 check( 'deleting the element also deletes its uploaded image (no orphan)', is_file( $deletePath ) === false );
+
+// A module may veto deleteElement(). The editor must keep image files until
+// the element deletion itself has really committed.
+\Nino\Elements::insertElementType( $appData, '/deleteveto', [
+	'photo' => [ 'type' => 'image', 'width' => 40, 'height' => 40 ],
+] );
+\Nino\Elements::insertElement( $appData, '/deleteveto/item1', [], 'de_DE' );
+[ , $deleteVetoUpload ] = callUploadImage( $appData, [ 'type' => 'deleteveto', 'uri' => 'item1', 'locale' => 'de_DE', 'key' => 'photo' ] );
+$deleteVetoPath = $appData['./nino/filesystem/path']. '/images/'. $deleteVetoUpload['filename'];
+\Nino\Callbacks::registerCallback( $appData, '/nino/elements/delete/deleteveto', function(): bool { return false; } );
+$deleteVetoRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+$_POST['data'] = json_encode( [ 'type' => 'deleteveto', 'uri' => 'item1' ] );
+\Nino\Editor\Elements::apiDelete( $appData, $deleteVetoRequest );
+check( 'a vetoed element deletion is surfaced as a conflict', $deleteVetoRequest['/nino/http/response']['statusCode'] === 409 );
+check( 'a vetoed deletion leaves the element record in place', \Nino\Elements::getElement( $appData, '/deleteveto/item1', '*' ) !== false );
+check( 'a vetoed deletion also leaves its referenced image in place', is_file( $deleteVetoPath ) === true );
 
 // Regression: apiDelete always calls deleteElement( ..., '*' ), which used to
 // crash with "Cannot unset string offsets" on any type file with a top-level
@@ -541,6 +597,9 @@ check( 'a plain user only sees themselves in the list', count( $body['users'] ) 
 [ $status ] = callUsers( $appData, 'apiSave', [ 'username' => 'plain@example.com', 'mail' => 'plain2@example.com', 'currentPassword' => 'wrong password' ] );
 check( 'a plain user editing themselves needs the right current password', $status === 401 );
 
+[ $status ] = callUsers( $appData, 'apiSave', [ 'username' => 'plain@example.com', 'mail' => 'plain@example.com', 'pw' => 'short', 'currentPassword' => 'plain password' ] );
+check( 'a new password shorter than eight characters is rejected', $status === 400 );
+
 [ $status, $body ] = callUsers( $appData, 'apiSave', [ 'username' => 'plain@example.com', 'mail' => 'plain2@example.com', 'currentPassword' => 'plain password' ] );
 check( 'a plain user can rename themselves with the right current password', $status === 200 && $body['mail'] === 'plain2@example.com' );
 
@@ -645,7 +704,18 @@ check( 'submissions is withheld without Submissions::VIEW_PERM', array_key_exist
 check( 'newsletter is withheld without Newsletter::MANAGE_PERM', array_key_exists( 'newsletter', $body ) === false );
 check( 'recentActivity is withheld without Logs::VIEW_PERM - the exact leak the field-level gate closes', array_key_exists( 'recentActivity', $body ) === false );
 
+$getRequest = [ '/nino/http/response' => [ 'statusCode' => 200, 'body' => '[template /_editor/templates/page-index]' ] ];
+\Nino\Editor\Editor::handleGet( $appData, $getRequest );
+$visiblePanels = explode( ' ', \Nino\Html::renderTextfill( $appData, '/_editor/panels' ) );
+check( 'GET navigation exposes dashboard, the permitted Elements panel and the user\'s own profile', $visiblePanels === [ 'dashboard', 'elements', 'users' ] );
+check( 'GET navigation does not advertise endpoints this account cannot use', in_array( 'text', $visiblePanels, true ) === false && in_array( 'logs', $visiblePanels, true ) === false );
+
 \Nino\Auth::loginUser( $appData, 'manager@example.com', 'manager password' );
+
+$getRequest = [ '/nino/http/response' => [ 'statusCode' => 200, 'body' => '[template /_editor/templates/page-index]' ] ];
+\Nino\Editor\Editor::handleGet( $appData, $getRequest );
+$visiblePanels = explode( ' ', \Nino\Html::renderTextfill( $appData, '/_editor/panels' ) );
+check( 'a full-access account gets every editor panel in its navigation', $visiblePanels === [ 'dashboard', 'elements', 'text', 'images', 'users', 'submissions', 'newsletter', 'logs' ] );
 
 echo "\n";
 
@@ -708,6 +778,15 @@ clearstatcache();
 callUsers( $appData, 'apiList' );
 clearstatcache();
 check( 'a second authenticated request the same day doesn\'t touch an already-existing backup', filemtime( $today ) === $mtimeBefore );
+
+// The restore key is a second, independent copy. It is reconciled on every
+// authenticated request, not only on the first bootstrap, so a stale/corrupt
+// copy cannot make otherwise-valid backups undecryptable from _admin.
+mkdir( $sandbox. '/_admin', 0777, true );
+$restoreKeyPath = $sandbox. '/_admin/.restore-key.php';
+file_put_contents( $restoreKeyPath, 'stale' );
+callUsers( $appData, 'apiList' );
+check( 'a stale restore-key copy is repaired from the locked config value', file_get_contents( $restoreKeyPath ) === $prefix. $appData['/nino/backup/key']. $suffix );
 
 $staleFile = $backupDir. '/2020-01-01.php';
 file_put_contents( $staleFile, $prefix. 'x'. $suffix );

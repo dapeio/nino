@@ -27,8 +27,11 @@
 		_currentGroup		: null,
 		_selectedLocale	: null,
 		_localeValues		: {},
+		_dirtyLocales		: [],
 		_htmlEditors		: {},
 		_fieldEls				: {},
+		_loading				: false,
+		_saving					: false,
 		_ready					: false,
 
 		/**
@@ -38,10 +41,13 @@
 		 */
 		init : function() {
 
-			if( dc.getElementById('text-list') === null )
+			if( dc.getElementById('text-list') === null || Nino.editor.text._loading === true || Nino.editor.text._ready === true )
 				return;
 
+			Nino.editor.text._loading = true;
+
 			Nino.editor.text._apiCall( 'keys', {}, function( status, response ) {
+				Nino.editor.text._loading = false;
 				if( status !== 200 || response === null )
 					return Nino.editor.text._showError( dc.getElementById('text-list'), status, response );
 
@@ -72,8 +78,10 @@
 		 */
 		showCurrent : function() {
 
-			if( Nino.editor.text._ready === false )
+			if( Nino.editor.text._ready === false ) {
+				Nino.editor.text.init();
 				return;
+			}
 
 			if( dc.getElementById('text-form').classList.contains('editor-hidden') === false )
 				return Nino.editor.text._showForm();
@@ -209,7 +217,7 @@
 
 			const exportBtn = dc.createElement('button');
 			exportBtn.type = 'button';
-			exportBtn.textContent = 'Als JSON exportieren';
+			exportBtn.textContent = Nino.content.getText('/_editor/text/translate/export');
 			exportBtn.addEventListener( 'click', function() {
 				Nino.editor.text._apiCall( 'export', { locale : exportSelect.value }, function( status, response ) {
 					if( status !== 200 || response === null )
@@ -239,33 +247,34 @@
 
 			const importArea = dc.createElement('textarea');
 			importArea.id = 'text-import-area';
-			importArea.placeholder = 'Übersetztes JSON hier einfügen ...';
+			importArea.placeholder = Nino.content.getText('/_editor/text/translate/placeholder');
 			importRow.appendChild( importArea );
 
 			const importResult = dc.createElement('span');
 			importResult.id = 'text-import-result';
+			importResult.setAttribute( 'aria-live', 'polite' );
 
 			const importBtn = dc.createElement('button');
 			importBtn.type = 'button';
-			importBtn.textContent = 'Importieren';
+			importBtn.textContent = Nino.content.getText('/_editor/text/translate/import');
 			importBtn.addEventListener( 'click', function() {
 
 				let content;
 				try {
 					content = JSON.parse( importArea.value );
 				} catch(e) {
-					importResult.textContent = 'Ungültiges JSON.';
+					importResult.textContent = Nino.content.getText('/_editor/text/translate/invalid');
 					importResult.className = 'text-import-error';
 					return;
 				}
 
 				Nino.editor.text._apiCall( 'import', { locale : importSelect.value, content : content }, function( status, response ) {
 					if( status !== 200 || response === null ) {
-						importResult.textContent = ( response && response.error ) ? response.error : 'Fehler beim Import.';
+						importResult.textContent = ( response && response.error ) ? response.error : Nino.content.getText('/_editor/text/translate/error');
 						importResult.className = 'text-import-error';
 						return;
 					}
-					importResult.textContent = response.imported+ ' importiert, '+ response.skipped+ ' übersprungen.';
+					importResult.textContent = response.imported+ ' '+ Nino.content.getText('/_editor/text/translate/imported')+ ', '+ response.skipped+ ' '+ Nino.content.getText('/_editor/text/translate/skipped')+ '.';
 					importResult.className = 'text-import-success';
 					importArea.value = '';
 
@@ -308,7 +317,8 @@
 
 				const entries = Nino.editor.text._groups[group];
 
-				const btn = dc.createElement('div');
+				const btn = dc.createElement('button');
+				btn.type = 'button';
 				btn.className = 'editor-type-btn';
 				btn.dataset.group = group;
 
@@ -347,6 +357,7 @@
 			Nino.editor.text._currentGroup 	= group;
 			Nino.editor.text._selectedLocale = Nino.editor.sessionLocale.current ?? Nino.editor.text._locales[0] ?? '';
 			Nino.editor.text._localeValues 	= {};
+			Nino.editor.text._dirtyLocales 	= [];
 			Nino.editor.text._fieldEls 			= {};
 
 			Nino.editor.text._renderGroupForm();
@@ -450,10 +461,55 @@
 			if( entries.length === 0 || Nino.editor.text._selectedLocale === null )
 				return;
 
+			const locale = Nino.editor.text._selectedLocale;
+			const previous = Nino.editor.text._localeValues[locale] ?? Object.fromEntries( entries.map( function( entry ) {
+				return [ entry.key, entry.values[locale] ?? '' ];
+			} ) );
 			const values = {};
 			entries.forEach( function( entry ) { values[entry.key] = Nino.editor.text._readKeyValue( entry ) } );
 
-			Nino.editor.text._localeValues[Nino.editor.text._selectedLocale] = values;
+			const changed = entries.some( function( entry ) {
+				return String( previous[entry.key] ?? '' ) !== String( values[entry.key] ?? '' );
+			} );
+
+			if( changed === true && Nino.editor.text._dirtyLocales.indexOf( locale ) === -1 )
+				Nino.editor.text._dirtyLocales.push( locale );
+
+			Nino.editor.text._localeValues[locale] = values;
+		},
+
+		/**
+		 *	Locales one Save click must persist, in the order they were edited.
+		 *	When only global fields changed, the selected locale is a harmless
+		 *	fallback that gives the save loop one request to carry them in.
+		 *
+		 *	@return		{Array<string>}
+		 */
+		_saveLocales : function() {
+			const locales = Nino.editor.text._dirtyLocales.slice();
+			if( locales.length === 0 )
+				locales.push( Nino.editor.text._selectedLocale );
+			return locales;
+		},
+
+		/**
+		 *	Keep controls stable while sequential locale requests are running.
+		 *	This prevents a mid-save locale switch from changing which values a
+		 *	later callback believes it just persisted.
+		 *
+		 *	@param		{boolean}	pending
+		 *
+		 *	@return		void
+		 */
+		_setFormPending : function( pending ) {
+			const form = dc.getElementById('text-edit-form');
+			if( form === null )
+				return;
+			form.querySelectorAll('input, textarea, select, button').forEach( function( el ) { el.disabled = pending } );
+			form.querySelectorAll('[contenteditable]').forEach( function( el ) {
+				el.contentEditable = pending ? 'false' : 'true';
+				el.setAttribute( 'aria-disabled', pending ? 'true' : 'false' );
+			} );
 		},
 
 		/**
@@ -573,6 +629,7 @@
 
 			const msg = dc.createElement('p');
 			msg.id = 'text-form-msg';
+			msg.setAttribute( 'aria-live', 'polite' );
 			actions.appendChild( msg );
 
 			form.appendChild( actions );
@@ -585,8 +642,8 @@
 		},
 
 		/**
-		 *	Save every key of the current category (global fields always, plus
-		 *	the currently selected locale's fields) in one batched request.
+		 *	Save every key of the current category (global fields once, plus
+		 *	every locale edited before the click) in sequential batched requests.
 		 *	Deliberately does not navigate back to the list afterwards - only
 		 *	refreshes its preview.
 		 *
@@ -594,57 +651,89 @@
 		 */
 		_save : function() {
 
+			if( Nino.editor.text._saving === true )
+				return;
+
 			Nino.editor.text._storeVisibleLocaleFields();
 
 			const group 	= Nino.editor.text._currentGroup;
 			const entries = Nino.editor.text._groups[group] ?? [];
 			const msg 		= dc.getElementById('text-form-msg');
 
-			const items = [];
-
-			entries.filter( function( e ) { return e.global === true } ).forEach( function( entry ) {
-				items.push( { key : entry.key, locale : '*', value : Nino.editor.text._readKeyValue( entry ) } );
+			const globalEntries = entries.filter( function( e ) { return e.global === true } );
+			const localeEntries = entries.filter( function( e ) { return e.global === false } );
+			const globalItems = globalEntries.map( function( entry ) {
+				return { key : entry.key, locale : '*', value : Nino.editor.text._readKeyValue( entry ) };
 			} );
+			const locales = Nino.editor.text._saveLocales();
+			let position = 0;
 
-			const localeValues = Nino.editor.text._localeValues[Nino.editor.text._selectedLocale] ?? {};
-			entries.filter( function( e ) { return e.global === false } ).forEach( function( entry ) {
-				items.push( { key : entry.key, locale : Nino.editor.text._selectedLocale, value : localeValues[entry.key] ?? '' } );
-			} );
-
+			Nino.editor.text._saving = true;
+			Nino.editor.text._setFormPending( true );
 			msg.textContent = Nino.content.getText('/_editor/text/msg/pending');
 
-			Nino.editor.text._apiCall( 'savebatch', { items : items }, function( status, response ) {
-
-				if( status !== 200 || response === null ) {
-					msg.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : Nino.content.getText('/_editor/text/error/save') );
-					return;
-				}
-
-				const results = response.results ?? {};
-				const failed 	= [];
-
-				items.forEach( function( item ) {
-					const result = results[item.key];
-					if( result === undefined )
-						return;
-					if( result.ok === true ) {
-						const entry = entries.find( function( e ) { return e.key === item.key } );
-						if( entry !== undefined )
-							entry.values[item.locale] = result.value;
-					} else {
-						failed.push( item.key );
-					}
+			function saveNextLocale() {
+				const locale = locales[position];
+				const localeValues = Nino.editor.text._localeValues[locale] ?? {};
+				const localeItems = localeEntries.map( function( entry ) {
+					return { key : entry.key, locale : locale, value : localeValues[entry.key] ?? entry.values[locale] ?? '' };
 				} );
+				const items = ( position === 0 ? globalItems : [] ).concat( localeItems );
 
-				msg.textContent = ( failed.length === 0 )
-					? Nino.content.getText('/_editor/text/msg/saved')
-					: Nino.content.getText('/_editor/text/error/save')+ ' ('+ failed.join(', ')+ ')';
+				Nino.editor.text._apiCall( 'savebatch', { items : items }, function( status, response ) {
 
-				Nino.editor.text._renderCategoryList();
-			} );
+					if( status !== 200 || response === null ) {
+						Nino.editor.text._saving = false;
+						Nino.editor.text._setFormPending( false );
+						msg.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : Nino.content.getText('/_editor/text/error/save') );
+						return;
+					}
+
+					const results = response.results ?? {};
+					const failed 	= [];
+
+					items.forEach( function( item ) {
+						const result = results[item.key];
+						if( result === undefined || result.ok !== true ) {
+							failed.push( item.key );
+							return;
+						}
+						const entry = entries.find( function( e ) { return e.key === item.key } );
+						if( entry !== undefined ) {
+							entry.values[item.locale] = result.value;
+							if( item.locale !== '*' ) {
+								Nino.editor.text._localeValues[item.locale] = Nino.editor.text._localeValues[item.locale] ?? {};
+								Nino.editor.text._localeValues[item.locale][item.key] = result.value;
+							}
+						}
+					} );
+
+					if( failed.length > 0 ) {
+						Nino.editor.text._saving = false;
+						Nino.editor.text._setFormPending( false );
+						msg.textContent = Nino.content.getText('/_editor/text/error/save')+ ' ('+ failed.join(', ')+ ')';
+						return;
+					}
+
+					const dirtyAt = Nino.editor.text._dirtyLocales.indexOf( locale );
+					if( dirtyAt !== -1 )
+						Nino.editor.text._dirtyLocales.splice( dirtyAt, 1 );
+
+					position++;
+					if( position < locales.length ) {
+						saveNextLocale();
+						return;
+					}
+
+					Nino.editor.text._saving = false;
+					Nino.editor.text._setFormPending( false );
+					msg.textContent = Nino.content.getText('/_editor/text/msg/saved');
+					Nino.editor.text._renderCategoryList();
+				} );
+			}
+
+			saveNextLocale();
 		},
 	};
-
-	Nino.events.bindCallback( 'ready', Nino.editor.text.init );
 
 })(window, document, document.documentElement, document.body);

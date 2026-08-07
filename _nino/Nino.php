@@ -1878,14 +1878,31 @@ namespace Nino {
 					return null;
 				}
 
-				// Combine old and new data
-				if( $update === true )
-					$data = $data + \Nino\Elements::getElement( $appData, $uri, '*' );
+				// Keep the set of fields this update is actually meant to write.
+				// updateElement() also serves deliberately-partial updates (most
+				// notably _editor's immediate image upload). The previous wildcard
+				// merge filled every omitted key from whichever locale happened to
+				// occur first in the type file, then wrote all of those values into
+				// the requested locale below - uploading an English image could
+				// therefore copy German title/description values into English.
+				//
+				// Merge the requested locale only for the returned complete element,
+				// but write/validate just the keys the caller (or a field callback)
+				// supplied. An insert still validates every required model field.
+				$writeKeys = array_fill_keys( array_keys( $data ), true );
+				if( $update === true ) {
+					$existing = \Nino\Elements::getElement( $appData, $uri, $locale, [] );
+					if( is_array( $existing ) === true )
+						$data = $data + $existing;
+				}
 
 				// Render/write new element
 				$elementUri = self::getElementUriFromUri( $data['.uri'] );
 
 				foreach( $typeData['model'] AS $key => $field ) {
+
+					if( $update === true && isset( $writeKeys[$key] ) === false )
+						continue;
 
 					// Required - a plain empty() would also reject a legitimate 0/false
 					// value on a boolean/integer/double field, so presence alone is
@@ -2747,6 +2764,30 @@ namespace Nino {
 			return $filename;
 		}
 
+		// Read a previously processed image for a short-lived rollback snapshot.
+		// Element image replacement normally overwrites a deterministic filename
+		// in place; if the following metadata update is vetoed, _editor must be
+		// able to restore those old bytes rather than deleting the only copy.
+		public static function read( array &$appData, string $filename ): string|false {
+
+			if( $filename === '' || str_contains( $filename, '..' ) === true || str_starts_with( $filename, '/' ) === true )
+				return false;
+
+			$content = \Nino\Filesystem::getFileContent( $appData, self::UPLOAD_DIR. '/'. $filename, false );
+
+			return is_string( $content ) ? $content : false;
+		}
+
+		// Counterpart to read(): restore a validated processed filename through
+		// Filesystem's atomic writer after a failed deterministic replacement.
+		public static function restore( array &$appData, string $filename, string $bytes ): bool {
+
+			if( $filename === '' || str_contains( $filename, '..' ) === true || str_starts_with( $filename, '/' ) === true )
+				return false;
+
+			return \Nino\Filesystem::putFileContent( $appData, self::UPLOAD_DIR. '/'. $filename, $bytes );
+		}
+
 		public static function delete( array &$appData, string $filename ): void {
 
 			// process() only ever hands out names it generated itself (nested under
@@ -3047,8 +3088,7 @@ namespace Nino {
 					continue;
 				}
 
-				$value = substr( $value, 0, self::HARD_MAXLENGTH );
-				$value = ( $entry['html'] === true ) ? \Nino\Html::sanitizeHtml( $value ) : strip_tags( $value );
+				$value = self::sanitizeValue( $value, $entry['html'] === true );
 
 				$file = ( $entry['global'] === true ) ? '/text/global.php' : '/text/'. $locale. '.php';
 
@@ -3073,6 +3113,17 @@ namespace Nino {
 			}
 
 			return $results;
+		}
+
+		// The one value-normalization path shared by regular batch saves and
+		// _editor's JSON translation import. Keeping it here prevents import
+		// from bypassing the hard length limit and HTML whitelist that the form
+		// itself enforces.
+		public static function sanitizeValue( string $value, bool $html ): string {
+
+			$value = substr( $value, 0, self::HARD_MAXLENGTH );
+
+			return $html === true ? \Nino\Html::sanitizeHtml( $value ) : strip_tags( $value );
 		}
 	}
 

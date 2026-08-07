@@ -102,8 +102,34 @@ namespace Nino\Editor {
 
 			self::_logLoginOnce( $appData );
 
-			if( \Nino\Auth::getCurrentUser( $appData ) === false )
+			if( \Nino\Auth::getCurrentUser( $appData ) === false ) {
 				$request['/nino/http/response']['body'] = '[template /_editor/templates/page-login]';
+				return;
+			}
+
+			// Do not advertise panels whose endpoint this account cannot use.
+			// The API permission checks remain authoritative; this fill only keeps
+			// the navigation honest and avoids predictable 403 requests.
+			$panels = [ 'dashboard' ];
+			foreach( [
+				'elements' 		=> Elements::MANAGE_PERM,
+				'text' 				=> Text::MANAGE_PERM,
+				'images' 			=> Images::MANAGE_PERM,
+			] as $panel => $perm )
+				if( \Nino\Auth::checkPermission( $appData, $perm ) === true )
+					$panels[] = $panel;
+
+			$panels[] = 'users'; // every account may edit its own profile
+
+			foreach( [
+				'submissions' 	=> Submissions::VIEW_PERM,
+				'newsletter' 	=> Newsletter::MANAGE_PERM,
+				'logs' 				=> Logs::VIEW_PERM,
+			] as $panel => $perm )
+				if( \Nino\Auth::checkPermission( $appData, $perm ) === true )
+					$panels[] = $panel;
+
+			\Nino\Html::addFills( $appData, [ '[[/_editor/panels]]' => implode( ' ', $panels ) ], '*' );
 		}
 
 		/**
@@ -223,6 +249,7 @@ namespace Nino\Editor {
 
 			$message = match( $action ) {
 				'elements/save' 	=> ( ( $data['isNew'] ?? false ) === true ? 'Add Element /' : 'Edit Element /' ). ( $data['type'] ?? '' ). '/'. ( $data['uri'] ?? '' ),
+				'elements/uploadimage' => 'Upload Element Image /'. ( $data['type'] ?? '' ). '/'. ( $data['uri'] ?? '' ). ' '. ( $data['key'] ?? '' ),
 				'elements/delete' => 'Delete Element /'. ( $data['type'] ?? '' ). '/'. ( $data['uri'] ?? '' ),
 				'text/savebatch' 	=> 'Edit Text /'. self::_textCategory( is_array( $data['items'] ?? null ) ? $data['items'] : [] ),
 				'text/import' 			=> 'Import Text '. ( $data['locale'] ?? '' ),
@@ -459,7 +486,7 @@ namespace Nino\Editor {
 				$counts[] = [
 					'type' 	=> $type,
 					'title' => $typeData['title'] ?? $type,
-					'count' => count( \Nino\Elements::queryElements( $appData, '/'. $type, [] ) ),
+					'count' => count( \Nino\Elements::queryElements( $appData, '/'. $type, [], '*', [] ) ),
 				];
 			}
 
@@ -614,6 +641,7 @@ namespace Nino\Editor {
 			// Elements::_writeElementData() itself routes a save for this key)
 			$oldElement 	= \Nino\Elements::getElement( $appData, $elementUri, $isLocaleField ? $locale : '*' );
 			$oldFilename 	= is_array( $oldElement ) ? ( $oldElement[$key] ?? null ) : null;
+			$oldBytes 		= is_string( $oldFilename ) && $oldFilename !== '' ? \Nino\Images::read( $appData, $oldFilename ) : false;
 
 			$width 		= (int) ( $model[$key]['width'] ?? 0 );
 			$height 	= (int) ( $model[$key]['height'] ?? 0 );
@@ -645,7 +673,14 @@ namespace Nino\Editor {
 			$result = \Nino\Elements::updateElement( $appData, $elementUri, [ $key => $filename ], $locale );
 
 			if( is_array( $result ) === false ) {
-				\Nino\Images::delete( $appData, $filename );
+				// process() writes deterministic paths. A same-format replacement
+				// therefore already overwrote the old file before the metadata update
+				// above could be vetoed; restore that snapshot instead of deleting the
+				// filename the unchanged element record still references.
+				if( $filename === $oldFilename && is_string( $oldBytes ) === true )
+					\Nino\Images::restore( $appData, $filename, $oldBytes );
+				else
+					\Nino\Images::delete( $appData, $filename );
 				\Nino\Http::fail( $request, 400, 'save failed' );
 				return;
 			}
@@ -676,7 +711,7 @@ namespace Nino\Editor {
 			$isNew 		= ( $data['isNew'] ?? false ) === true;
 			$fields 	= is_array( $data['fields'] ?? null ) ? $data['fields'] : [];
 
-			if( in_array( $type, self::types( $appData ), true ) === false || $uri === '' || str_contains( $uri, '/' ) === true || \Nino\Locales::verifyLocale( $appData, $locale ) === false ) {
+			if( in_array( $type, self::types( $appData ), true ) === false || $uri === '' || str_contains( $uri, '/' ) === true || ( $isNew === true && self::_validNewUri( $uri ) === false ) || \Nino\Locales::verifyLocale( $appData, $locale ) === false ) {
 				\Nino\Http::fail( $request, 400, 'invalid type, uri or locale' );
 				return;
 			}
@@ -736,12 +771,12 @@ namespace Nino\Editor {
 			$errorMsg = null;
 			set_error_handler( function( int $errno, string $errstr ) use ( &$errorMsg ): bool { $errorMsg = $errstr; return true; } );
 
-			\Nino\Elements::deleteElement( $appData, $elementUri, '*' );
+			$deleted = \Nino\Elements::deleteElement( $appData, $elementUri, '*' );
 
 			restore_error_handler();
 
-			if( $errorMsg !== null ) {
-				\Nino\Http::fail( $request, 400, $errorMsg );
+			if( $errorMsg !== null || $deleted !== true ) {
+				\Nino\Http::fail( $request, 409, $errorMsg ?? 'delete vetoed' );
 				return;
 			}
 
@@ -828,7 +863,7 @@ namespace Nino\Editor {
 		 */
 		private static function typeDescr( array &$appData, string $type ): string {
 
-		$elements = \Nino\Elements::queryElements( $appData, '/'. $type, [] );
+			$elements = \Nino\Elements::queryElements( $appData, '/'. $type, [], '*', [] );
 			$info = '('. count( $elements ). ') ';
 
 			foreach( $elements as $elData )
@@ -880,6 +915,13 @@ namespace Nino\Editor {
 					$globalKeys[] = $key;
 
 			return [ $globalKeys, $localeKeys ];
+		}
+
+		// A new element uri becomes both an array key and (for image fields) a
+		// filename component. Keep it to the slug syntax the form's own hint
+		// promises; existing legacy uris remain readable/deletable.
+		private static function _validNewUri( string $uri ): bool {
+			return preg_match( '/^[A-Za-z0-9][A-Za-z0-9_-]*$/', $uri ) === 1;
 		}
 	}
 
@@ -1013,30 +1055,46 @@ namespace Nino\Editor {
 				return;
 			}
 
-			$blacklist 	= \Nino\Text::blacklist( $appData );
-			$imported 	= 0;
-			$skipped 		= 0;
+			$blacklist 		= \Nino\Text::blacklist( $appData );
+			$entriesByKey 	= array_column( \Nino\Text::entries( $appData, false ), null, 'key' );
+			$changes 			= [];
+			$imported 			= 0;
+			$skipped 			= 0;
 
-			\Nino\Filesystem::mutate( $appData, '/text/'. $locale. '.php', function( array $existing ) use ( $content, $blacklist, &$imported, &$skipped ): array {
+			foreach( $content as $bracketKey => $value ) {
 
-				foreach( $content as $bracketKey => $value ) {
-
-					if( is_string( $bracketKey ) === false || str_starts_with( $bracketKey, '[[' ) === false || str_ends_with( $bracketKey, ']]' ) === false ) {
-						$skipped++;
-						continue;
-					}
-
-					if( isset( $blacklist[ trim( $bracketKey, '[]' ) ] ) === true ) {
-						$skipped++;
-						continue;
-					}
-
-					$existing[$bracketKey] = (string) $value;
-					$imported++;
+				if( is_string( $bracketKey ) === false || preg_match( '/^\[\[[^\[\]]+\]\]$/', $bracketKey ) !== 1 || ( is_scalar( $value ) === false && $value !== null ) ) {
+					$skipped++;
+					continue;
 				}
 
-				return $existing;
+				$key = trim( $bracketKey, '[]' );
+				if( isset( $blacklist[$key] ) === true ) {
+					$skipped++;
+					continue;
+				}
+
+				// A key known from any locale keeps its established html/plain
+				// contract. A genuinely new migration key is imported as plain text
+				// until a developer deliberately defines formatted content for it.
+				$entry = $entriesByKey[$key] ?? null;
+				$changes[$bracketKey] = \Nino\Text::sanitizeValue( (string) $value, ( $entry['html'] ?? false ) === true );
+				$imported++;
+			}
+
+			if( $changes === [] ) {
+				\Nino\Http::fail( $request, 400, 'no valid content' );
+				return;
+			}
+
+			$written = \Nino\Filesystem::mutate( $appData, '/text/'. $locale. '.php', function( array $existing ) use ( $changes ): array {
+				return array_merge( $existing, $changes );
 			} );
+
+			if( $written === false ) {
+				\Nino\Http::fail( $request, 500, 'import could not be written' );
+				return;
+			}
 
 			\Nino\Http::ok( $request, [ 'imported' => $imported, 'skipped' => $skipped ] );
 		}
@@ -1060,6 +1118,7 @@ namespace Nino\Editor {
 	class Users {
 
 		public const string MANAGE_PERM = '/_editor/users/manage';
+		private const int MIN_PW_LENGTH = 8;
 
 		// Every per-module permission a manager can assign, label included -
 		// the single source of truth for both apiSetPermissions()'s whitelist
@@ -1139,6 +1198,11 @@ namespace Nino\Editor {
 
 			if( $newUsername === '' || filter_var( $newUsername, FILTER_VALIDATE_EMAIL ) === false ) {
 				\Nino\Http::fail( $request, 400, 'invalid mail' );
+				return;
+			}
+
+			if( $pw !== '' && strlen( $pw ) < self::MIN_PW_LENGTH ) {
+				\Nino\Http::fail( $request, 400, 'password must be at least '. self::MIN_PW_LENGTH. ' characters' );
 				return;
 			}
 
@@ -1393,6 +1457,7 @@ namespace Nino\Editor {
 	class Backup {
 
 		private const int RETENTION_DAYS = 14;
+		private const string LOCK_PATH = '/_editor/backup-daily';
 
 		private const string STUB_PREFIX = "<?php http_response_code(403); exit; return '";
 		private const string STUB_SUFFIX = "';\n";
@@ -1440,10 +1505,19 @@ namespace Nino\Editor {
 		 */
 		public static function maybeRun( array &$appData ): void {
 
+			$locked = false;
+
 			try {
 
 				if( ( $appData['/nino/editor/backups'] ?? true ) === false )
 					return;
+
+				// The directory name does not exist until _bootstrap(), so it
+				// cannot itself be the lock key. A stable, virtual path serializes
+				// first-use key generation and the once-a-day existence check alike.
+				$locked = \Nino\Filesystem::lockFile( $appData, self::LOCK_PATH );
+				if( $locked === false )
+					throw new \RuntimeException( 'daily backup could not be locked' );
 
 				self::_bootstrap( $appData );
 
@@ -1462,6 +1536,9 @@ namespace Nino\Editor {
 
 			} catch( \Throwable $e ) {
 				trigger_error( 'Backup failed: '. $e->getMessage() );
+			} finally {
+				if( $locked === true )
+					\Nino\Filesystem::unlockFile( $appData, self::LOCK_PATH );
 			}
 		}
 
@@ -1488,13 +1565,42 @@ namespace Nino\Editor {
 		 */
 		private static function _bootstrap( array &$appData ): void {
 
-			if( isset( $appData['/nino/backup/dir'] ) === false || isset( $appData['/nino/backup/key'] ) === false ) {
+			$readConfig = false;
+			$changed 	= false;
+			// Generated before mutate() takes config.php's lock: random_bytes()
+			// can throw, and Filesystem::mutate() deliberately expects a callback
+			// that returns normally in order to release its lock.
+			$candidateDir = '.backups-'. bin2hex( random_bytes( 16 ) );
+			$candidateKey = base64_encode( random_bytes( 32 ) );
 
-				$appData['/nino/backup/dir'] = '.backups-'. bin2hex( random_bytes( 16 ) );
-				$appData['/nino/backup/key'] = base64_encode( random_bytes( 32 ) );
+			$written = \Nino\Filesystem::mutate( $appData, '/config.php', function( mixed $content ) use ( &$appData, &$readConfig, &$changed, $candidateDir, $candidateKey ): mixed {
 
-				\Nino\AppData::writeContentData( $appData, [ '/nino/backup/dir', '/nino/backup/key' ] );
-			}
+				$readConfig = true;
+				if( is_array( $content ) === false )
+					return null;
+
+				// Re-read under config.php's own lock. A second request may have
+				// booted before the first generated these values; trusting its stale
+				// in-memory appData here would generate a different key and overwrite
+				// the first backup's only decryption key.
+				if( is_string( $content['/nino/backup/dir'] ?? null ) === false || is_string( $content['/nino/backup/key'] ?? null ) === false ) {
+					$content['/nino/backup/dir'] = $candidateDir;
+					$content['/nino/backup/key'] = $candidateKey;
+					$changed = true;
+				}
+
+				$appData['/nino/backup/dir'] = $content['/nino/backup/dir'];
+				$appData['/nino/backup/key'] = $content['/nino/backup/key'];
+
+				return $changed === true ? $content : null;
+			}, false );
+
+			if( $readConfig === false )
+				throw new \RuntimeException( 'config.php could not be locked' );
+			if( isset( $appData['/nino/backup/dir'], $appData['/nino/backup/key'] ) === false )
+				throw new \RuntimeException( 'config.php could not be read' );
+			if( $changed === true && $written === false )
+				throw new \RuntimeException( 'backup configuration could not be written' );
 
 			// Independent of the above: an install that already had a dir/key
 			// before _admin's Restore module existed (or whose _admin/.restore-key.php
@@ -1503,8 +1609,10 @@ namespace Nino\Editor {
 			$adminDir 		= \Nino\Filesystem::getPath( $appData ). '/_admin';
 			$adminKeyPath = $adminDir. '/.restore-key.php';
 
-			if( is_dir( $adminDir ) === true && is_file( $adminKeyPath ) === false )
-				file_put_contents( $adminKeyPath, self::STUB_PREFIX. $appData['/nino/backup/key']. self::STUB_SUFFIX );
+			$adminKeyContent = self::STUB_PREFIX. $appData['/nino/backup/key']. self::STUB_SUFFIX;
+
+			if( is_dir( $adminDir ) === true && @file_get_contents( $adminKeyPath ) !== $adminKeyContent )
+				self::_writeRawAtomic( $adminKeyPath, $adminKeyContent );
 		}
 
 		/**
@@ -1530,27 +1638,77 @@ namespace Nino\Editor {
 		 */
 		private static function _create( array &$appData, string $dir, string $path ): void {
 
-			if( is_dir( $dir ) === false )
-				mkdir( $dir, 0755, true );
+			if( is_dir( $dir ) === false && @mkdir( $dir, 0755, true ) === false && is_dir( $dir ) === false )
+				throw new \RuntimeException( 'backup directory could not be created' );
 
-			$tmpTar = tempnam( sys_get_temp_dir(), 'ninobackup' ). '.tar';
+			$tmpBase = tempnam( sys_get_temp_dir(), 'ninobackup' );
+			if( $tmpBase === false )
+				throw new \RuntimeException( 'temporary backup file could not be created' );
 
-			$phar = new \PharData( $tmpTar );
-			foreach( \Nino\Backup::manifest( $appData ) as $absolute => $archiveName )
-				$phar->addFromString( $archiveName, file_get_contents( $absolute ) );
-			$phar->compress( \Phar::GZ );
-			unset( $phar );
-			unlink( $tmpTar );
+			$tmpTar = $tmpBase. '.tar';
+			@unlink( $tmpBase );
 
-			$gz = file_get_contents( $tmpTar. '.gz' );
-			unlink( $tmpTar. '.gz' );
+			try {
+				$phar = new \PharData( $tmpTar );
+				foreach( \Nino\Backup::manifest( $appData ) as $absolute => $archiveName ) {
+					$bytes = @file_get_contents( $absolute );
+					if( $bytes === false )
+						throw new \RuntimeException( 'backup source could not be read: '. $archiveName );
+					$phar->addFromString( $archiveName, $bytes );
+				}
+				$phar->compress( \Phar::GZ );
+				unset( $phar );
 
-			$key 		= base64_decode( $appData['/nino/backup/key'] );
-			$iv 		= random_bytes( 12 );
-			$tag 		= '';
-			$cipher = openssl_encrypt( $gz, 'aes-256-gcm', $key, OPENSSL_RAW_DATA, $iv, $tag );
+				$gz = @file_get_contents( $tmpTar. '.gz' );
+				if( $gz === false )
+					throw new \RuntimeException( 'compressed backup could not be read' );
 
-			file_put_contents( $path, self::STUB_PREFIX. base64_encode( $iv. $tag. $cipher ). self::STUB_SUFFIX );
+				$key = base64_decode( (string) $appData['/nino/backup/key'], true );
+				if( is_string( $key ) === false || strlen( $key ) !== 32 )
+					throw new \RuntimeException( 'backup encryption key is invalid' );
+
+				$iv 		= random_bytes( 12 );
+				$tag 		= '';
+				$cipher = openssl_encrypt( $gz, 'aes-256-gcm', $key, OPENSSL_RAW_DATA, $iv, $tag );
+				if( $cipher === false )
+					throw new \RuntimeException( 'backup encryption failed' );
+
+				self::_writeRawAtomic( $path, self::STUB_PREFIX. base64_encode( $iv. $tag. $cipher ). self::STUB_SUFFIX );
+			} finally {
+				@unlink( $tmpBase );
+				@unlink( $tmpTar );
+				@unlink( $tmpTar. '.gz' );
+			}
+		}
+
+		// Raw (non-serialized) counterpart to Filesystem's atomic writer. Backup
+		// blobs and the restore-key stub are valid PHP source strings already;
+		// passing either through putFileContent() would var_export them instead.
+		private static function _writeRawAtomic( string $path, string $content ): void {
+
+			$temp = $path. '.'. bin2hex( random_bytes( 6 ) ). '.tmp';
+			$handle = @fopen( $temp, 'wb' );
+
+			if( $handle === false )
+				throw new \RuntimeException( 'temporary file could not be opened: '. basename( $path ) );
+
+			$written = @fwrite( $handle, $content );
+			$flushed = @fflush( $handle );
+			@fclose( $handle );
+
+			if( $written === false || $written !== strlen( $content ) || $flushed === false ) {
+				@unlink( $temp );
+				throw new \RuntimeException( 'file could not be written: '. basename( $path ) );
+			}
+
+			$mode = @fileperms( $path );
+			if( $mode !== false )
+				@chmod( $temp, $mode & 0777 );
+
+			if( @rename( $temp, $path ) === false ) {
+				@unlink( $temp );
+				throw new \RuntimeException( 'file could not be replaced: '. basename( $path ) );
+			}
 		}
 
 		/**
@@ -1917,42 +2075,51 @@ namespace Nino\Editor {
 				return;
 			}
 
-			$found = false;
+			$outcome = 'notfound';
+			$readEntries = false;
+			$removedHash = hash( 'sha256', mb_strtolower( trim( $email ) ) );
 
-			\Nino\Filesystem::mutate( $appData, self::PATH, function( array $entries ) use ( $email, &$found ): ?array {
+			$written = \Nino\Filesystem::mutate( $appData, self::PATH, function( array $entries ) use ( $email, $removedHash, &$appData, &$outcome, &$readEntries ): ?array {
+
+				$readEntries = true;
 
 				$filtered = array_values( array_filter( $entries, function( $entry ) use ( $email ) { return ( $entry['email'] ?? null ) !== $email; } ) );
 
 				if( count( $filtered ) === count( $entries ) )
 					return null;
 
-				$found = true;
+				// Persist the durable removal before dropping the address. If that
+				// write fails, leave the subscriber list untouched; if the following
+				// list write fails, a retry is safe because the hash is idempotent.
+				$removalWritten = \Nino\Filesystem::mutate( $appData, self::REMOVED_PATH, function( array $removed ) use ( $removedHash ): array {
+					if( in_array( $removedHash, $removed, true ) === false )
+						$removed[] = $removedHash;
+					return $removed;
+				} );
+
+				if( $removalWritten === false ) {
+					$outcome = 'removal-failed';
+					return null;
+				}
+
+				$outcome = 'ready';
 				return $filtered;
 			} );
 
-			if( $found === false ) {
+			if( $readEntries === false ) {
+				\Nino\Http::fail( $request, 500, 'subscriber list could not be locked' );
+				return;
+			}
+
+			if( $outcome === 'notfound' ) {
 				\Nino\Http::fail( $request, 404, 'unknown email' );
 				return;
 			}
 
-			// Same removal record self-service unsubscribe writes, same hash
-			// (see \Nino\Modules\Newsletter's own REMOVED_PATH docblock) -
-			// an admin delete is exactly as durable a removal as a visitor's
-			// own unsubscribe link, and a later disaster-recovery restore
-			// must not resurrect either. Written here directly, not via a
-			// call into \Nino\Modules\Newsletter: that would autoload the
-			// class unconditionally, turning a routine admin action into a
-			// fatal error for a project that removed this optional module's
-			// file
-			$removedHash = hash( 'sha256', mb_strtolower( trim( $email ) ) );
-
-			\Nino\Filesystem::mutate( $appData, self::REMOVED_PATH, function( array $removed ) use ( $removedHash ): array {
-
-				if( in_array( $removedHash, $removed, true ) === false )
-					$removed[] = $removedHash;
-
-				return $removed;
-			} );
+			if( $outcome !== 'ready' || $written === false ) {
+				\Nino\Http::fail( $request, 500, 'subscriber could not be deleted' );
+				return;
+			}
 
 			\Nino\Http::ok( $request );
 		}

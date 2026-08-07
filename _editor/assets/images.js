@@ -29,6 +29,7 @@
 
 		_groups				: {},
 		_currentGroup	: null,
+		_loading			: false,
 		_ready				: false,
 
 		/**
@@ -38,10 +39,13 @@
 		 */
 		init : function() {
 
-			if( dc.getElementById('images-list') === null )
+			if( dc.getElementById('images-list') === null || Nino.editor.images._loading === true || Nino.editor.images._ready === true )
 				return;
 
+			Nino.editor.images._loading = true;
+
 			Nino.editor.images._apiCall( 'list', {}, function( status, response ) {
+				Nino.editor.images._loading = false;
 				if( status !== 200 || response === null )
 					return Nino.editor.images._showError( dc.getElementById('images-list'), status, response );
 
@@ -70,8 +74,10 @@
 		 */
 		showCurrent : function() {
 
-			if( Nino.editor.images._ready === false )
+			if( Nino.editor.images._ready === false ) {
+				Nino.editor.images.init();
 				return;
+			}
 
 			if( dc.getElementById('images-form').classList.contains('editor-hidden') === false )
 				return Nino.editor.images._showForm();
@@ -163,7 +169,8 @@
 
 				const slots = Nino.editor.images._groups[group];
 
-				const btn = dc.createElement('div');
+				const btn = dc.createElement('button');
+				btn.type = 'button';
 				btn.className = 'editor-type-btn';
 				btn.dataset.group = group;
 
@@ -284,6 +291,7 @@
 
 			const msg = dc.createElement('p');
 			msg.className = 'editor-field-image-msg';
+			msg.setAttribute( 'aria-live', 'polite' );
 
 			fileInput.addEventListener( 'change', function() {
 				if( fileInput.files.length === 0 )
@@ -333,7 +341,5 @@
 			}, { file : file } );
 		},
 	};
-
-	Nino.events.bindCallback( 'ready', Nino.editor.images.init );
 
 })(window, document, document.documentElement, document.body);

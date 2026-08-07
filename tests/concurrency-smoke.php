@@ -20,6 +20,7 @@ declare(strict_types=1);
  */
 
 require __DIR__. '/../_nino/Nino.php';
+require __DIR__. '/../_editor/Editor.php';
 
 const ROUNDS = 50;
 
@@ -84,6 +85,24 @@ function runElementWorker( string $sandbox, string $prefix ): void {
 }
 
 /**
+ *	Run the editor's lazy daily backup from a separately-booted request.
+ *	Two of these starting against a config without backup keys used to each
+ *	generate a different directory/key pair.
+ *
+ *	@param		string		$sandbox
+ *
+ *	@return		void
+ */
+function runBackupWorker( string $sandbox ): void {
+
+	$appData = bootAppData( $sandbox );
+	$appData['./nino/filesystem/configpath'] = $sandbox;
+	$appData['/nino/editor/backups'] = true;
+
+	\Nino\Editor\Backup::maybeRun( $appData );
+}
+
+/**
  *	One worker: ROUNDS times, boot a fresh appData from the shared
  *	config.php, append one entry to this worker's own key and persist it
  *
@@ -117,6 +136,11 @@ if( ( $argv[1] ?? '' ) === 'worker' ) {
 
 if( ( $argv[1] ?? '' ) === 'element-worker' ) {
 	runElementWorker( $argv[2], $argv[3] );
+	exit( 0 );
+}
+
+if( ( $argv[1] ?? '' ) === 'backup-worker' ) {
+	runBackupWorker( $argv[2] );
 	exit( 0 );
 }
 
@@ -194,6 +218,40 @@ check( 'the type file is still a readable array after '. ( 2 * ROUNDS ). ' concu
 check( 'every element of the first editor survived', count( preg_grep( '/^a\d+$/', $stored ) ) === ROUNDS );
 check( 'every element of the second editor survived', count( preg_grep( '/^b\d+$/', $stored ) ) === ROUNDS );
 check( 'the type model itself is intact', ( $typeData['model']['title']['type'] ?? null ) === 'string' );
+
+echo "\n";
+
+
+// --- Daily backup bootstrap under real concurrency -----------------------------
+
+echo "Editor\\Backup::maybeRun under real concurrency\n";
+
+// Both workers boot before either is guaranteed to have persisted the lazy
+// backup configuration. The stable backup lock must serialize the locked
+// config re-read, key generation and today's existence check as one unit.
+runParallel( 'backup-worker', $sandbox, [ '-', '-' ] );
+
+$onDisk = include $sandbox. '/config.php';
+$backupDirs = glob( $sandbox. '/_editor/.backups-*', GLOB_ONLYDIR ) ?: [];
+$backupDir = $sandbox. '/_editor/'. ( $onDisk['/nino/backup/dir'] ?? '' );
+$today = $backupDir. '/'. date( 'Y-m-d' ). '.php';
+
+check( 'parallel first-use requests persist one backup directory/key pair', count( $backupDirs ) === 1 && is_string( $onDisk['/nino/backup/key'] ?? null ) === true );
+check( 'parallel first-use requests create exactly one usable daily backup', is_file( $today ) === true && count( glob( $backupDir. '/*.php' ) ?: [] ) === 1 );
+
+if( is_file( $today ) === true ) {
+	$prefix = "<?php http_response_code(403); exit; return '";
+	$suffix = "';\n";
+	$raw = file_get_contents( $today );
+	$payload = base64_decode( substr( $raw, strlen( $prefix ), -strlen( $suffix ) ), true );
+	$key = base64_decode( (string) ( $onDisk['/nino/backup/key'] ?? '' ), true );
+	$plain = ( is_string( $payload ) && is_string( $key ) )
+		? openssl_decrypt( substr( $payload, 28 ), 'aes-256-gcm', $key, OPENSSL_RAW_DATA, substr( $payload, 0, 12 ), substr( $payload, 12, 16 ) )
+		: false;
+	check( 'the surviving config key decrypts the concurrently-created backup', is_string( $plain ) === true && str_starts_with( $plain, "\x1f\x8b" ) === true );
+} else {
+	check( 'the surviving config key decrypts the concurrently-created backup', false );
+}
 
 \Nino\Filesystem::removeDir( $sandbox );
 

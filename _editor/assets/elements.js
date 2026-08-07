@@ -33,6 +33,10 @@
 		_dirtyLocales		: [],
 		_htmlEditors		: {},
 		_pendingUri			: undefined,
+		_loading				: false,
+		_saving					: false,
+		_listRequest		: 0,
+		_formRequest		: 0,
 		_ready					: false,
 		DEFAULT_MAXLENGTH : 2000,
 
@@ -43,10 +47,13 @@
 		 */
 		init : function() {
 
-			if( dc.getElementById('elements-types') === null )
+			if( dc.getElementById('elements-types') === null || Nino.editor.elements._loading === true || Nino.editor.elements._ready === true )
 				return;
 
+			Nino.editor.elements._loading = true;
+
 			Nino.editor.elements._apiCall( 'types', {}, function( status, response ) {
+				Nino.editor.elements._loading = false;
 				if( status !== 200 || response === null )
 					return Nino.editor.elements._showError( dc.getElementById('elements-types'), status, response );
 				Nino.editor.elements._locales = response.locales;
@@ -72,8 +79,10 @@
 		 */
 		showCurrent : function() {
 
-			if( Nino.editor.elements._ready === false )
+			if( Nino.editor.elements._ready === false ) {
+				Nino.editor.elements.init();
 				return;
+			}
 
 			if( Nino.editor.elements._currentType === null )
 				return Nino.editor.elements._showTypes();
@@ -199,7 +208,8 @@
 
 			types.forEach( function( entry ) {
 
-				const btn = dc.createElement('div');
+				const btn = dc.createElement('button');
+				btn.type = 'button';
 				btn.className = 'editor-type-btn';
 				btn.dataset.type = entry.type;
 				btn.classList.toggle( 'active', entry.type === Nino.editor.elements._currentType );
@@ -236,6 +246,11 @@
 		 */
 		_selectType : function( type, model, title ) {
 
+			if( Nino.editor.elements._saving === true )
+				return;
+
+			const requestId = ++Nino.editor.elements._listRequest;
+			++Nino.editor.elements._formRequest; // invalidate an element still loading
 			Nino.editor.elements._currentType 			= type;
 			Nino.editor.elements._currentTypeTitle	= title;
 			Nino.editor.elements._currentModel			= model;
@@ -248,6 +263,8 @@
 			dc.querySelectorAll('.editor-type-btn').forEach( function( btn ) { btn.classList.toggle( 'active', btn.dataset.type === type ) } );
 
 			Nino.editor.elements._apiCall( 'list', { type : type }, function( status, response ) {
+				if( requestId !== Nino.editor.elements._listRequest || type !== Nino.editor.elements._currentType )
+					return;
 				if( status !== 200 || response === null )
 					return Nino.editor.elements._showError( dc.getElementById('elements-list'), status, response );
 				Nino.editor.elements._renderList( response.elements );
@@ -319,6 +336,12 @@
 		 */
 		_openForm : function( uri ) {
 
+			if( Nino.editor.elements._saving === true )
+				return;
+
+			const requestId = ++Nino.editor.elements._formRequest;
+			const type = Nino.editor.elements._currentType;
+
 			if( uri === null ) {
 				Nino.editor.elements._isNew 				= true;
 				Nino.editor.elements._currentUri 	= null;
@@ -331,7 +354,10 @@
 				return;
 			}
 
-			Nino.editor.elements._apiCall( 'get', { type : Nino.editor.elements._currentType, uri : uri }, function( status, response ) {
+			Nino.editor.elements._apiCall( 'get', { type : type, uri : uri }, function( status, response ) {
+
+				if( requestId !== Nino.editor.elements._formRequest || type !== Nino.editor.elements._currentType )
+					return;
 
 				if( status !== 200 || response === null ) {
 					Nino.editor.elements._showError( dc.getElementById('elements-form'), status, response );
@@ -474,6 +500,7 @@
 
 				const msg = dc.createElement('p');
 				msg.className = 'editor-field-image-msg';
+				msg.setAttribute( 'aria-live', 'polite' );
 
 				if( Nino.editor.elements._isNew === true ) {
 					msg.textContent = Nino.content.getText('/_editor/elements/label/image-savefirst');
@@ -787,6 +814,27 @@
 		},
 
 		/**
+		 *	Disable the form while its locale sequence is in flight. Besides
+		 *	preventing a duplicate submit, this freezes the locale selector so a
+		 *	callback can never be applied to a different visible translation.
+		 *
+		 *	@param		{boolean}	pending
+		 *
+		 *	@return		void
+		 */
+		_setFormPending : function( pending ) {
+			const wrap = dc.getElementById('elements-form');
+			if( wrap === null )
+				return;
+			wrap.classList.toggle( 'editor-pending', pending );
+			wrap.querySelectorAll('input, textarea, select, button').forEach( function( el ) { el.disabled = pending } );
+			wrap.querySelectorAll('[contenteditable]').forEach( function( el ) {
+				el.contentEditable = pending ? 'false' : 'true';
+				el.setAttribute( 'aria-disabled', pending ? 'true' : 'false' );
+			} );
+		},
+
+		/**
 		 *	Re-render the locale-fields wrap for the currently selected locale
 		 *
 		 *	@return		void
@@ -847,7 +895,13 @@
 			backLink.href = '#';
 			backLink.className = 'back-link';
 			backLink.textContent = Nino.content.getText('/_editor/elements/label/back')+ ' '+ Nino.editor.elements._currentTypeTitle;
-			backLink.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.editor.elements._destroyHtmlEditors(); Nino.editor.elements._showList() } );
+			backLink.addEventListener( 'click', function( ev ) {
+				ev.preventDefault();
+				if( Nino.editor.elements._saving === true )
+					return;
+				Nino.editor.elements._destroyHtmlEditors();
+				Nino.editor.elements._showList();
+			} );
 			wrap.appendChild( backLink );
 
 			const form = dc.createElement('form');
@@ -972,6 +1026,7 @@
 
 			const msg = dc.createElement('p');
 			msg.id = 'elements-form-msg';
+			msg.setAttribute( 'aria-live', 'polite' );
 			actions.appendChild( msg );
 
 			form.appendChild( actions );
@@ -990,6 +1045,9 @@
 		 *	@return		void
 		 */
 		_save : function() {
+
+			if( Nino.editor.elements._saving === true )
+				return;
 
 			Nino.editor.elements._storeVisibleLocaleFields();
 
@@ -1015,12 +1073,17 @@
 			let position = 0;
 			let created = false;
 
+			Nino.editor.elements._saving = true;
+			Nino.editor.elements._setFormPending( true );
 			msg.textContent = Nino.content.getText('/_editor/elements/msg/pending');
 
 			function saveNextLocale() {
 
 				const locale = locales[position];
-				const fields = Object.assign( {}, globalFields, Nino.editor.elements._localeValues[locale] ?? {} );
+				// Global fields only need one write. Re-sending them for every
+				// translation repeated field callbacks and made a later locale request
+				// capable of reverting a transformation performed by the first.
+				const fields = Object.assign( {}, position === 0 ? globalFields : {}, Nino.editor.elements._localeValues[locale] ?? {} );
 
 				Nino.editor.elements._apiCall( 'save', {
 					type 		: Nino.editor.elements._currentType,
@@ -1042,6 +1105,8 @@
 						}
 
 						msg.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : Nino.content.getText('/_editor/elements/error/save') );
+						Nino.editor.elements._saving = false;
+						Nino.editor.elements._setFormPending( false );
 						return;
 					}
 
@@ -1075,9 +1140,12 @@
 
 					msg = dc.getElementById('elements-form-msg');
 					msg.textContent = Nino.content.getText('/_editor/elements/msg/saved');
+					Nino.editor.elements._saving = false;
+					Nino.editor.elements._setFormPending( false );
 
-					Nino.editor.elements._apiCall( 'list', { type : Nino.editor.elements._currentType }, function( listStatus, listResponse ) {
-						if( listStatus === 200 && listResponse !== null )
+					const savedType = Nino.editor.elements._currentType;
+					Nino.editor.elements._apiCall( 'list', { type : savedType }, function( listStatus, listResponse ) {
+						if( listStatus === 200 && listResponse !== null && savedType === Nino.editor.elements._currentType )
 							Nino.editor.elements._renderList( listResponse.elements );
 					} );
 				} );
@@ -1136,21 +1204,31 @@
 		 */
 		_delete : function() {
 
+			if( Nino.editor.elements._saving === true )
+				return;
+
 			if( wn.confirm( Nino.content.getText('/_editor/elements/confirm/delete') ) === false )
 				return;
 
-			Nino.editor.elements._apiCall( 'delete', { type : Nino.editor.elements._currentType, uri : Nino.editor.elements._currentUri }, function( status, response ) {
+			const type = Nino.editor.elements._currentType;
+			const model = Nino.editor.elements._currentModel;
+			const title = Nino.editor.elements._currentTypeTitle;
+			Nino.editor.elements._saving = true;
+			Nino.editor.elements._setFormPending( true );
+
+			Nino.editor.elements._apiCall( 'delete', { type : type, uri : Nino.editor.elements._currentUri }, function( status, response ) {
 				if( status !== 200 ) {
+					Nino.editor.elements._saving = false;
+					Nino.editor.elements._setFormPending( false );
 					const msg = dc.getElementById('elements-form-msg');
 					if( msg !== null )
 						msg.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : Nino.content.getText('/_editor/elements/error/save') );
 					return;
 				}
-				Nino.editor.elements._selectType( Nino.editor.elements._currentType, Nino.editor.elements._currentModel );
+				Nino.editor.elements._saving = false;
+				Nino.editor.elements._selectType( type, model, title );
 			} );
 		},
 	};
-
-	Nino.events.bindCallback( 'ready', Nino.editor.elements.init );
 
 })(window, document, document.documentElement, document.body);

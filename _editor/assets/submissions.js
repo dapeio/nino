@@ -78,7 +78,7 @@
 			wrap.innerHTML = '';
 			const p = dc.createElement('p');
 			p.className = 'editor-error';
-			p.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : 'Fehler beim Laden.' );
+			p.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : Nino.content.getText('/_editor/submissions/error/load') );
 			wrap.appendChild( p );
 		},
 
@@ -97,7 +97,7 @@
 
 			if( entries.length === 0 ) {
 				const p = dc.createElement('p');
-				p.textContent = 'Noch keine Anfragen.';
+				p.textContent = Nino.content.getText('/_editor/submissions/empty');
 				wrap.appendChild( p );
 				return;
 			}
@@ -105,7 +105,7 @@
 			const exportBtn = dc.createElement('button');
 			exportBtn.type = 'button';
 			exportBtn.id = 'submissions-export';
-			exportBtn.textContent = 'Als CSV exportieren';
+			exportBtn.textContent = Nino.content.getText('/_editor/submissions/label/export');
 			exportBtn.addEventListener( 'click', function() {
 				Nino.editor.exportCsv( 'anfragen.csv', entries );
 			} );
@@ -186,7 +186,7 @@
 
 			const toggle = dc.createElement('span');
 			toggle.className = 'submissions-entry-toggle';
-			toggle.textContent = 'Mehr anzeigen';
+			toggle.textContent = Nino.content.getText('/_editor/submissions/label/more');
 			li.appendChild( toggle );
 
 			li.addEventListener( 'click', Nino.editor.submissions._toggleEntry );
@@ -212,10 +212,8 @@
 
 			const toggle = this.querySelector('.submissions-entry-toggle');
 			if( toggle !== null )
-				toggle.textContent = this.classList.contains('expanded') ? 'Weniger anzeigen' : 'Mehr anzeigen';
+				toggle.textContent = this.classList.contains('expanded') ? Nino.content.getText('/_editor/submissions/label/less') : Nino.content.getText('/_editor/submissions/label/more');
 		},
 	};
-
-	Nino.events.bindCallback( 'ready', Nino.editor.submissions.init );
 
 })(window, document, document.documentElement, document.body);

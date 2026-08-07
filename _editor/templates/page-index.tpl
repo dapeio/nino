@@ -1,6 +1,6 @@
 [template /_editor/templates/html-header]
 		[csrf]
-		<div id="editor-page-wrap" class="show-dashboard" data-dir="[[/nino/dir]]">
+		<div id="editor-page-wrap" class="show-dashboard" data-dir="[[/nino/dir]]" data-panels="[[/_editor/panels]]">
 			<div id="editor-bar-wrap">
 				<div id="editor-user">
 					<span id="editor-user-email">[[/nino/auth/user]]</span>

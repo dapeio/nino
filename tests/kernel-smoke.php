@@ -158,6 +158,18 @@ check( 'getElement( *, ) resolves to a locale with actual data', is_array( $wild
 $partialUpdate = \Nino\Elements::updateElement( $appData, '/testtype/item1', [], 'de_DE' );
 check( 'updateElement preserves fields that are not re-sent', is_array( $partialUpdate ) === true && $partialUpdate['title'] === 'Hello updated' );
 
+// A partial update must merge the locale it is actually targeting, and only
+// persist the supplied keys. The old wildcard merge picked the first locale
+// that happened to exist and then wrote every merged field into en_US - a
+// global counter update could silently replace its English title with German.
+\Nino\Elements::updateElement( $appData, '/testtype/item1', [ 'title' => 'Hello English' ], 'en_US' );
+$partialGlobalUpdate = \Nino\Elements::updateElement( $appData, '/testtype/item1', [ 'views' => 7 ], 'en_US' );
+$afterPartialDe = \Nino\Elements::getElement( $appData, '/testtype/item1', 'de_DE' );
+$afterPartialEn = \Nino\Elements::getElement( $appData, '/testtype/item1', 'en_US' );
+check( 'a partial global update returns the requested locale\'s complete element', is_array( $partialGlobalUpdate ) === true && $partialGlobalUpdate['title'] === 'Hello English' && $partialGlobalUpdate['views'] === 7 );
+check( 'a partial global update does not overwrite the target locale from another locale', $afterPartialEn['title'] === 'Hello English' );
+check( 'a partial global update leaves the other locale untouched', $afterPartialDe['title'] === 'Hello updated' && $afterPartialDe['views'] === 7 );
+
 $queried = \Nino\Elements::queryElements( $appData, '/testtype', [ 'title' => '%updated%' ], 'de_DE', [] );
 check( 'queryElements finds the element via wildcard match', count( $queried ) === 1 );
 check( 'queryElements returns no hits for a non-matching query', \Nino\Elements::queryElements( $appData, '/testtype', [ 'title' => 'nope' ], 'de_DE', [] ) === [] );

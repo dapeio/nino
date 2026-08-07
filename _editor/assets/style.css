@@ -525,7 +525,10 @@ button[type="submit"] {
 }
 
 .editor-type-btn{
-  display:flex;
+	appearance:none;
+	font:inherit;
+	display:flex;
+	min-height:44px;
   align-items:flex-start;
   justify-content:space-between;
   gap:.75rem;
@@ -545,6 +548,11 @@ button[type="submit"] {
 .editor-type-btn:hover{background:rgba(0,122,255,.06)}
 .editor-type-btn:active{transform:scale(.99)}
 .editor-type-btn:focus-visible{outline:none;box-shadow:0 0 0 .25rem rgba(0,122,255,.35)}
+
+a:focus-visible, button:focus-visible {
+	outline: 2px solid var(--editor-blue);
+	outline-offset: 2px;
+}
 
 .editor-type-btn-descr {
 	font-size: .75rem;

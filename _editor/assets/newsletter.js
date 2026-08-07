@@ -81,7 +81,7 @@
 			wrap.innerHTML = '';
 			const p = dc.createElement('p');
 			p.className = 'editor-error';
-			p.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : 'Fehler beim Laden.' );
+			p.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : Nino.content.getText('/_editor/newsletter/error/load') );
 			wrap.appendChild( p );
 		},
 
@@ -101,14 +101,14 @@
 
 			if( entries.length === 0 ) {
 				const p = dc.createElement('p');
-				p.textContent = 'Noch keine Anmeldungen.';
+				p.textContent = Nino.content.getText('/_editor/newsletter/empty');
 				wrap.appendChild( p );
 				return;
 			}
 
 			const summary = dc.createElement('p');
 			summary.id = 'newsletter-summary';
-			summary.textContent = entries.length+ ' Abonnent'+ ( entries.length === 1 ? '' : 'en' );
+			summary.textContent = entries.length+ ' '+ Nino.content.getText( entries.length === 1 ? '/_editor/newsletter/label/subscriber' : '/_editor/newsletter/label/subscribers' );
 			wrap.appendChild( summary );
 
 			wrap.appendChild( Nino.editor.newsletter._renderBcc( entries ) );
@@ -153,7 +153,7 @@
 			const deleteBtn = dc.createElement('button');
 			deleteBtn.type = 'button';
 			deleteBtn.className = 'newsletter-entry-delete';
-			deleteBtn.textContent = 'Löschen';
+			deleteBtn.textContent = Nino.content.getText('/_editor/newsletter/label/delete');
 			deleteBtn.addEventListener( 'click', function() { Nino.editor.newsletter._delete( entry.email ) } );
 			meta.appendChild( deleteBtn );
 
@@ -173,7 +173,7 @@
 		 */
 		_delete : function( email ) {
 
-			if( wn.confirm( email+ ' wirklich aus dem Newsletter löschen?' ) === false )
+			if( wn.confirm( email+ Nino.content.getText('/_editor/newsletter/confirm/delete') ) === false )
 				return;
 
 			Nino.editor.newsletter._apiCall( 'delete', { email : email }, function( status, response ) {
@@ -202,7 +202,7 @@
 
 			const label = dc.createElement('label');
 			label.htmlFor = 'newsletter-bcc-field';
-			label.textContent = 'Adressen als BCC-Zeile';
+			label.textContent = Nino.content.getText('/_editor/newsletter/label/bcc');
 			wrap.appendChild( label );
 
 			const field = dc.createElement('textarea');
@@ -217,12 +217,25 @@
 
 			const copyBtn = dc.createElement('button');
 			copyBtn.type = 'button';
-			copyBtn.textContent = 'Kopieren';
+			copyBtn.textContent = Nino.content.getText('/_editor/newsletter/label/copy');
 			copyBtn.addEventListener( 'click', function() {
 				field.select();
-				navigator.clipboard.writeText( field.value ).then( function() {
+				const write = wn.navigator.clipboard && typeof wn.navigator.clipboard.writeText === 'function'
+					? wn.navigator.clipboard.writeText( field.value )
+					: new Promise( function( resolve, reject ) {
+						try {
+							dc.execCommand('copy') === true ? resolve() : reject();
+						} catch(e) { reject(e) }
+					} );
+				write.then( function() {
+					copied.textContent = Nino.content.getText('/_editor/newsletter/label/copied');
+					copied.classList.remove('text-import-error');
 					copied.classList.remove('editor-hidden');
 					setTimeout( function() { copied.classList.add('editor-hidden') }, 2000 );
+				} ).catch( function() {
+					copied.textContent = Nino.content.getText('/_editor/newsletter/error/copy');
+					copied.classList.add('text-import-error');
+					copied.classList.remove('editor-hidden');
 				} );
 			} );
 			actions.appendChild( copyBtn );
@@ -230,13 +243,14 @@
 			const copied = dc.createElement('span');
 			copied.id = 'newsletter-bcc-copied';
 			copied.className = 'editor-hidden';
-			copied.textContent = 'Kopiert!';
+			copied.setAttribute( 'aria-live', 'polite' );
+			copied.textContent = Nino.content.getText('/_editor/newsletter/label/copied');
 			actions.appendChild( copied );
 
 			const exportBtn = dc.createElement('button');
 			exportBtn.type = 'button';
 			exportBtn.id = 'newsletter-export';
-			exportBtn.textContent = 'Als CSV exportieren';
+			exportBtn.textContent = Nino.content.getText('/_editor/newsletter/label/export');
 			exportBtn.addEventListener( 'click', function() {
 				Nino.editor.exportCsv( 'newsletter.csv', entries );
 			} );
@@ -247,7 +261,5 @@
 			return wrap;
 		},
 	};
-
-	Nino.events.bindCallback( 'ready', Nino.editor.newsletter.init );
 
 })(window, document, document.documentElement, document.body);

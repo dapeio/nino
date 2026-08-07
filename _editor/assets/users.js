@@ -26,6 +26,7 @@
 		_currentUser	: null,
 		_canManage		: false,
 		_permOptions	: [],
+		_loading			: false,
 		_ready				: false,
 
 		/**
@@ -35,10 +36,13 @@
 		 */
 		init : function() {
 
-			if( dc.getElementById('users-list') === null )
+			if( dc.getElementById('users-list') === null || Nino.editor.users._loading === true || Nino.editor.users._ready === true )
 				return;
 
+			Nino.editor.users._loading = true;
+
 			Nino.editor.users._apiCall( 'list', {}, function( status, response ) {
+				Nino.editor.users._loading = false;
 				if( status !== 200 || response === null )
 					return Nino.editor.users._showError( dc.getElementById('users-list'), status, response );
 
@@ -73,8 +77,10 @@
 		 */
 		showCurrent : function() {
 
-			if( Nino.editor.users._ready === false )
+			if( Nino.editor.users._ready === false ) {
+				Nino.editor.users.init();
 				return;
+			}
 
 			if( dc.getElementById('users-form').classList.contains('editor-hidden') === false )
 				return Nino.editor.users._showForm();
@@ -228,6 +234,7 @@
 			const pwInput = dc.createElement('input');
 			pwInput.type = 'password';
 			pwInput.id = 'users-form-pw';
+			pwInput.minLength = 8;
 			pwInput.autocomplete = 'new-password';
 			pwLabel.appendChild( pwInput );
 			form.appendChild( pwLabel );
@@ -263,6 +270,7 @@
 
 			const msg = dc.createElement('p');
 			msg.id = 'users-form-msg';
+			msg.setAttribute( 'aria-live', 'polite' );
 			actions.appendChild( msg );
 
 			form.appendChild( actions );
@@ -337,6 +345,7 @@
 
 			const msg = dc.createElement('p');
 			msg.id = 'users-permissions-msg';
+			msg.setAttribute( 'aria-live', 'polite' );
 			actions.appendChild( msg );
 
 			form.appendChild( actions );
@@ -453,7 +462,5 @@
 			} );
 		},
 	};
-
-	Nino.events.bindCallback( 'ready', Nino.editor.users.init );
 
 })(window, document, document.documentElement, document.body);

@@ -42,8 +42,14 @@
 			 */
 			current : function() {
 				const raw = wn.location.hash.replace(/^#/, '');
-				const parts = raw === '' ? [] : raw.split('/').map( function(p) { return decodeURIComponent(p) } );
-				return { panel : parts[0] ?? '', parts : parts.slice(1) };
+				try {
+					const parts = raw === '' ? [] : raw.split('/').map( function(p) { return decodeURIComponent(p) } );
+					return { panel : parts[0] ?? '', parts : parts.slice(1) };
+				} catch(e) {
+					// A hand-edited hash with a stray '%' must not abort all editor
+					// initialization with decodeURIComponent()'s URIError.
+					return { panel : '', parts : [] };
+				}
 			},
 
 			/**
@@ -309,14 +315,9 @@
 			if( rows.length === 0 )
 				return;
 
-			const escape = function( value ) {
-				const str = Nino.editor.decodeEntities( String( value ?? '' ) );
-				return /["\r\n,]/.test( str ) ? '"'+ str.replace( /"/g, '""' )+ '"' : str;
-			};
-
 			const headers = Object.keys( rows[0] );
-			const lines = [ headers.map( escape ).join(',') ].concat(
-				rows.map( function( row ) { return headers.map( function( key ) { return escape( row[key] ) } ).join(',') } )
+			const lines = [ headers.map( Nino.editor.csvCell ).join(',') ].concat(
+				rows.map( function( row ) { return headers.map( function( key ) { return Nino.editor.csvCell( row[key] ) } ).join(',') } )
 			);
 
 			// Leading BOM so Excel (still the most common CSV consumer) detects
@@ -330,6 +331,22 @@
 			a.click();
 			a.remove();
 			URL.revokeObjectURL( url );
+		},
+
+		/**
+		 *	Escape one CSV cell and neutralize spreadsheet formulas. Prefixing an
+		 *	apostrophe is the convention spreadsheet apps use for explicit text;
+		 *	it also covers formula markers hidden behind whitespace.
+		 *
+		 *	@param		{*}	value
+		 *
+		 *	@return		{string}
+		 */
+		csvCell : function( value ) {
+			let str = Nino.editor.decodeEntities( String( value ?? '' ) );
+			if( /^[\t\r\n ]*[=+\-@]/.test( str ) === true )
+				str = "'"+ str;
+			return /["\r\n,]/.test( str ) ? '"'+ str.replace( /"/g, '""' )+ '"' : str;
 		},
 
 		/**
@@ -363,8 +380,6 @@
 				'navLogs'			: dc.getElementById('editor-nav-logs'),
 			};
 
-			const tabs = [ el.navDashboard, el.navElements, el.navText, el.navImages, el.navUser, el.navSubmissions, el.navNewsletter, el.navLogs ];
-
 			// panel name (matches the hash + router.PANEL_CLASS) -> [ page-wrap class, tab link, panel's own "re-show whatever it's currently on" fn ]
 			const panels = {
 				dashboard : [ 'show-dashboard', 	el.navDashboard, function() { Nino.editor.dashboard.showCurrent() } ],
@@ -376,6 +391,14 @@
 				newsletter : [ 'show-newsletter', 	el.navNewsletter, function() { Nino.editor.newsletter.showCurrent() } ],
 				logs 			: [ 'show-logs', 			el.navLogs, 		function() { Nino.editor.logs.showCurrent() } ],
 			};
+
+			const allowed = new Set( ( el.pageWrap.dataset.panels || 'dashboard users' ).split(/\s+/).filter( Boolean ) );
+			const tabs = Object.keys( panels ).map( function( panel ) { return panels[panel][1] } );
+
+			Object.keys( panels ).forEach( function( panel ) {
+				if( allowed.has( panel ) === false )
+					panels[panel][1].hidden = true;
+			} );
 
 			/**
 			 *	Switch panel and mark the clicked tab active - each panel keeps its
@@ -392,7 +415,7 @@
 			 */
 			function selectTab( panel ) {
 				const target = panels[panel];
-				if( target === undefined )
+				if( target === undefined || allowed.has( panel ) === false )
 					return;
 				el.pageWrap.className = target[0];
 				tabs.forEach( function( t ) { t.classList.toggle( 'active', t === target[1] ) } );
@@ -409,7 +432,7 @@
 			 */
 			function selectTabFromHash() {
 				const panel = Nino.editor.router.current().panel;
-				selectTab( panels[panel] !== undefined ? panel : 'dashboard' );
+				selectTab( panels[panel] !== undefined && allowed.has( panel ) === true ? panel : 'dashboard' );
 			}
 
 			// Bind events - the User/Texte/Elemente bar itself always stays visible

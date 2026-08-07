@@ -40,10 +40,15 @@
 
 			const toolbar = dc.createElement('div');
 			toolbar.className = 'html-editor-toolbar';
+			toolbar.setAttribute( 'role', 'toolbar' );
+			toolbar.setAttribute( 'aria-label', Nino.content.getText('/_editor/htmleditor/label/formatting') );
 
 			const content = dc.createElement('div');
 			content.className = 'html-editor-content';
 			content.contentEditable = 'true';
+			content.setAttribute( 'role', 'textbox' );
+			content.setAttribute( 'aria-multiline', 'false' );
+			content.setAttribute( 'aria-label', Nino.content.getText('/_editor/htmleditor/label/content') );
 			content.innerHTML = value || '';
 
 			const linkbar = dc.createElement('div');
@@ -56,6 +61,7 @@
 			// silently block the surrounding form's submit once this field is hidden
 			linkInput.type = 'text';
 			linkInput.placeholder = Nino.content.getText('/_editor/htmleditor/label/linkplaceholder');
+			linkInput.setAttribute( 'aria-label', Nino.content.getText('/_editor/htmleditor/label/linkplaceholder') );
 
 			const linkOk = dc.createElement('button');
 			linkOk.type = 'button';
@@ -71,6 +77,7 @@
 
 			const counter = dc.createElement('div');
 			counter.className = 'char-counter';
+			counter.setAttribute( 'aria-live', 'polite' );
 
 			let savedRange = null;
 
@@ -251,6 +258,7 @@
 				btn.className = 'html-editor-btn';
 				btn.dataset.tag = tag;
 				btn.textContent = Nino.content.getText('/_editor/htmleditor/label/'+ tag);
+				btn.setAttribute( 'aria-pressed', 'false' );
 				btn.addEventListener( 'mousedown', function( ev ) { ev.preventDefault() } );
 				btn.addEventListener( 'click', function() { applyFormat( tag ) } );
 				toolbar.appendChild( btn );
@@ -310,7 +318,9 @@
 			function onSelectionChange() {
 				const range = currentRange();
 				toolbar.querySelectorAll('button[data-tag]').forEach( function( btn ) {
-					btn.classList.toggle( 'active', range !== null && range.collapsed === false && findWrappingTag( range, btn.dataset.tag ) !== null );
+					const active = range !== null && range.collapsed === false && findWrappingTag( range, btn.dataset.tag ) !== null;
+					btn.classList.toggle( 'active', active );
+					btn.setAttribute( 'aria-pressed', active ? 'true' : 'false' );
 				} );
 			}
 
