@@ -491,6 +491,18 @@ $appData['/nino/http/routes']['GET://_admin'] = [ 'uri' => '/_admin', 'body' => 
 check( 'apiList does not leak _admin\'s own runtime-injected route into the editable value', strpos( $body['values']['/nino/http/routes'], 'GET://_admin' ) === false );
 unset( $appData['/nino/http/routes']['GET://_admin'] );
 
+// Regression: init() used to merge its own routes with '+=', which does NOT
+// overwrite a key that already exists - so a persisted 'GET://_admin' (hand-
+// written through the very Config module above, whose whitelist includes
+// '/nino/http/routes' as raw json) shadowed the dashboard and left no ui path
+// back to the route that did it. Same fix Install::init() already carries.
+$shadowed = $appData;
+$shadowed['/nino/http/routes']['GET://_admin'] 	= [ 'uri' => '/_admin', 'body' => 'hijacked' ];
+$shadowed['/nino/http/routes']['POST://_admin'] = [ 'uri' => '/_admin', 'body' => 'hijacked' ];
+\Nino\Admin\Admin::init( $shadowed );
+check( 'init always restores the tool-owned GET route over a stale/hand-written collision', $shadowed['/nino/http/routes']['GET://_admin']['body'] === '[template /_admin/templates/page-index]' );
+check( 'init always restores the tool-owned POST route too', ( $shadowed['/nino/http/routes']['POST://_admin']['body'] ?? null ) === null );
+
 [ $status ] = callDev( $appData, \Nino\Admin\Config::class, 'apiSave', [ 'key' => '/nino/error/display', 'value' => 'false' ] );
 check( 'apiSave accepts a valid bool', $status === 200 );
 check( 'the saved value actually lands in appData', $appData['/nino/error/display'] === false );

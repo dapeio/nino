@@ -77,6 +77,29 @@ $appData['/nino/auth/user']							= [];
 echo "Sandbox: $sandbox\n\n";
 
 
+// --- Editor::init route ownership ----------------------------------------
+
+echo "Editor::init - runtime route ownership\n";
+
+// Regression: init() used to merge its own routes with '+=', which does NOT
+// overwrite a key that already exists - so a persisted 'GET://_editor' (hand-
+// written through _admin's Config module, which exposes '/nino/http/routes' as
+// raw json, or a webpage entry created before the reserved-uri check existed)
+// shadowed the editor entirely. Same fix Install::init() already carries.
+$shadowed = $appData;
+$shadowed['/nino/http/routes'] = [
+	'GET://_editor' 	=> [ 'uri' => '/_editor', 'body' => 'hijacked' ],
+	'POST://_editor' 	=> [ 'uri' => '/_editor', 'body' => 'hijacked' ],
+	'GET://custom' 		=> [ 'uri' => '/custom', 'body' => 'hand-written route' ],
+];
+\Nino\Editor\Editor::init( $shadowed );
+check( 'init always restores the tool-owned GET route over a stale/hand-written collision', $shadowed['/nino/http/routes']['GET://_editor']['body'] === '[template /_editor/templates/page-index]' );
+check( 'init always restores the tool-owned POST route too', ( $shadowed['/nino/http/routes']['POST://_editor']['body'] ?? null ) === null );
+check( 'a route the tool does not own is left untouched', $shadowed['/nino/http/routes']['GET://custom']['body'] === 'hand-written route' );
+
+echo "\n";
+
+
 // --- Text::apiKeys ------------------------------------------------------
 
 echo "Text::apiKeys\n";

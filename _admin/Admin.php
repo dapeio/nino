@@ -75,14 +75,19 @@ namespace Nino\Admin {
 		 */
 		public static function init( array &$appData ): void {
 
-			$appData['/nino/http/routes'] += [
-				'GET://_admin' 	=> [
-					'uri' 				=> '/_admin',
-					'body'				=> '[template /_admin/templates/page-index]',
-					'statusCode'	=> 200
-				],
-				'POST://_admin'	=> [ 'uri' => '/_admin' ],
+			// These runtime-only routes are owned by the tool itself and must win
+			// over a stale or hand-written config entry at the same uri - the same
+			// reasoning (and the same former '+=' bug) as Install::init()'s own
+			// routes. '/nino/http/routes' is editable as raw json through this very
+			// tool's Config module, so a persisted 'GET://_admin' would otherwise
+			// shadow the dashboard and leave no ui path back to the route that did
+			// it - locking an operator out of the one tool that could remove it
+			$appData['/nino/http/routes']['GET://_admin'] = [
+				'uri' 				=> '/_admin',
+				'body'				=> '[template /_admin/templates/page-index]',
+				'statusCode'	=> 200
 			];
+			$appData['/nino/http/routes']['POST://_admin'] = [ 'uri' => '/_admin' ];
 
 			\Nino\Callbacks::registerCallback( $appData, '/nino/http/response/GET://_admin', 	[ self::class, 'handleGet' ] );
 			\Nino\Callbacks::registerCallback( $appData, '/nino/http/response/POST://_admin', [ self::class, 'handlePost' ] );

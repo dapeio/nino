@@ -35,14 +35,18 @@ namespace Nino\Editor {
 		 */
 		public static function init( array &$appData ): void {
 
-			$appData['/nino/http/routes'] += [
-				'GET://_editor' 	=> [
-					'uri' 				=> '/_editor',
-					'body'				=> '[template /_editor/templates/page-index]',
-					'statusCode'	=> 200
-				],
-				'POST://_editor'	=> [ 'uri' => '/_editor' ],
+			// These runtime-only routes are owned by the tool itself and must win
+			// over a stale or hand-written config entry at the same uri - the same
+			// reasoning (and the same former '+=' bug) as Install::init()'s own
+			// routes. A persisted 'GET://_editor' (hand-written through _admin's
+			// Config module, or a webpage entry created before the reserved-uri
+			// check existed) would otherwise shadow the editor entirely
+			$appData['/nino/http/routes']['GET://_editor'] = [
+				'uri' 				=> '/_editor',
+				'body'				=> '[template /_editor/templates/page-index]',
+				'statusCode'	=> 200
 			];
+			$appData['/nino/http/routes']['POST://_editor'] = [ 'uri' => '/_editor' ];
 
 			$appData['/nino/html/assets']['/_editor/.cache/style.css'] = [
 				'/_editor/assets/style.css',
