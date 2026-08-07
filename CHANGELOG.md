@@ -2,6 +2,36 @@
 
 ## Unreleased
 
+- **`/_templates` can now edit, not just read**: click a box in the canvas to
+  select it, and the inspector renders one control per setting the block's
+  manifest declares - a select for `classenum`/`classgroup`/`tag`, a
+  checkbox for `classtoggle`, a text field for `attr`/`text`, with a
+  responsive setting's breakpoint variants indented under their base rather
+  than standing next to it as five near-identical fields. There is no
+  per-block form code anywhere; adding a setting to a manifest is what makes
+  it editable. Clicking a palette entry inserts that block - inside the
+  selection if it takes children, next to it if it doesn't, at the end of
+  the document if nothing is selected - and its `block.tpl` is parsed
+  server-side by the same parser documents go through (`library/parse`), so
+  a block's markup is written exactly like template markup with no second
+  code path. Move/duplicate/remove come from the manifest's own `actions`.
+  Nesting depth is now drawn as a per-level tint (`color-mix()` against the
+  editor theme's tokens, capped at six levels) so the layers of a deep grid
+  read apart. Nothing reaches disk until Save; switching template or leaving
+  the page with unsaved work asks first. Structural edits carry their own
+  indentation, copied from the neighbour the new markup lands next to rather
+  than derived from a depth counter, so an insert lines up with whatever the
+  file already uses and a remove doesn't leave a blank line behind. Two
+  fixes fell out of testing that: `blocks.js` documented in-place class
+  replacement but actually removed-and-appended, which reshuffled the
+  `class` attribute of every edited element, and a first child inserted into
+  an empty element copied the closing tag's indent and landed one level too
+  shallow. The dom-free half of the frontend (`blocks.js`, the new
+  `tree.js`) is covered by `tests/templates-js-smoke.js`, a plain-node suite
+  in the same dependency-free shape as the php ones - its stub `document`
+  throws on use, so a module that started touching the dom fails the suite
+  rather than quietly becoming untestable. See `docs/_templates.md`
+
 - **Added `/_templates`, the template builder** (foundation - reads,
   recognizes and draws; selecting/inserting/editing follow). Its own
   top-level folder rather than an `_admin` module, same reasoning `_install`

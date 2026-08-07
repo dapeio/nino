@@ -159,6 +159,7 @@ php tests/admin-smoke.php
 php tests/editor-smoke.php
 php tests/install-smoke.php
 php tests/templates-smoke.php
+node tests/templates-js-smoke.js
 php tests/concurrency-smoke.php
 ```
 

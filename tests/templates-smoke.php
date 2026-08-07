@@ -98,6 +98,26 @@ foreach( $blocks as $key => $block )
 
 check( 'every block\'s own starting markup round-trips unchanged', $blockMismatch === [] );
 
+// Inserting a block goes through this rather than the client building
+// markup of its own - one parser, one meaning of "what a template is"
+$_POST['data'] = json_encode( [ 'block' => 'button' ] );
+$parseRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Templates\Library::apiParse( $appData, $parseRequest );
+$parseBody = $parseRequest['/nino/http/response']['body'];
+
+check( 'library/parse returns a block\'s markup as a node tree', ( $parseBody['nodes'][0]['tag'] ?? '' ) === 'a' );
+check( '...with its classes already separated out, ready to be edited', ( $parseBody['nodes'][0]['classes'] ?? [] ) === [ 'ui-btn', 'ui-btn--primary' ] );
+
+$_POST['data'] = json_encode( [ 'block' => 'does-not-exist' ] );
+$unknownParse = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Templates\Library::apiParse( $appData, $unknownParse );
+check( 'library/parse rejects an unknown block with 404', $unknownParse['/nino/http/response']['statusCode'] === 404 );
+
+$_POST['data'] = json_encode( [ 'block' => '../../../etc/passwd' ] );
+$traversalParse = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Templates\Library::apiParse( $appData, $traversalParse );
+check( 'library/parse rejects a block key trying to escape the library', $traversalParse['/nino/http/response']['statusCode'] === 404 );
+
 echo "\n";
 
 

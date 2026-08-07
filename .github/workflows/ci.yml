@@ -44,5 +44,8 @@ jobs:
       - name: Run template builder smoke tests
         run: php tests/templates-smoke.php
 
+      - name: Run template builder frontend smoke tests
+        run: node tests/templates-js-smoke.js
+
       - name: Run concurrency smoke tests
         run: php tests/concurrency-smoke.php

@@ -17,6 +17,8 @@
 			<div id="tb-bar-wrap">
 				<div id="tb-bar-title">Template Builder</div>
 				<span id="tb-bar-document"></span>
+				<span id="tb-bar-state"></span>
+				<button type="button" id="tb-save" disabled>Save</button>
 				<a href="[[/nino/dir]]/_admin/" id="tb-bar-admin">← Admin</a>
 			</div>
 
@@ -37,17 +39,27 @@
 					<div id="tb-canvas-tree"></div>
 				</div>
 
-				<!-- Right rail: the block palette, grouped by manifest category -->
-				<div id="tb-palette">
-					<h3>Blocks</h3>
-					<div id="tb-palette-list"></div>
+				<!-- Right rail: the selected block's settings on top, the block
+				     palette below. Both scroll inside the rail rather than with
+				     the page, so the canvas stays the thing that moves -->
+				<div id="tb-rail">
+					<div id="tb-inspector-wrap">
+						<h3>Settings</h3>
+						<div id="tb-inspector"></div>
+					</div>
+					<div id="tb-palette">
+						<h3>Blocks</h3>
+						<div id="tb-palette-list"></div>
+					</div>
 				</div>
 
 			</div>
 		</div>
 		<script src="[[/nino/dir]]/_nino/Nino.js"></script>
 		<script src="[[/nino/dir]]/_templates/assets/script.js"></script>
+		<script src="[[/nino/dir]]/_templates/assets/tree.js"></script>
 		<script src="[[/nino/dir]]/_templates/assets/blocks.js"></script>
 		<script src="[[/nino/dir]]/_templates/assets/canvas.js"></script>
+		<script src="[[/nino/dir]]/_templates/assets/inspector.js"></script>
 	</body>
 </html>

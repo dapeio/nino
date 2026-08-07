@@ -6,8 +6,6 @@
 
 A graphical, developer-only editor for the project's own `templates/*.tpl` files, at `/_templates`. Optional - a `.tpl` is plain HTML and can just as well be written by hand (see `docs/design.md`) - but it turns "which grid classes does this column carry" into a form instead of a lookup in the design handbook.
 
-> **Status.** This is the foundation: the builder **reads** templates, recognizes blocks, draws the structure and lists the library. Selecting, inserting and editing blocks land in the next patch - see "Roadmap" at the end.
-
 ## Where it lives
 
 Its own top-level folder, `_templates/`, not a module inside `/_admin` - the same reasoning `/_install` has one: it's a development-time tool, so a project is free to delete it (`rm -rf _templates`) once the design is settled, and `_admin/Admin.php` is large enough already.
@@ -34,8 +32,10 @@ The alternative - writing a `data-nino-builder="grid-col"` marker onto every ele
 Three rails:
 
 - **Templates** (left) - every `templates/*.tpl` on disk. Names shown dimmed are not editable (see below).
-- **Canvas** (middle) - the opened template as a tree of nested boxes.
-- **Blocks** (right) - the library, grouped by each manifest's own `category`.
+- **Canvas** (middle) - the opened template as a tree of nested boxes. Click one to select it.
+- **Settings + Blocks** (right) - the selected block's own properties on top, the library below, grouped by each manifest's own `category`.
+
+Nothing reaches the filesystem until **Save**. Every edit changes the in-memory tree and redraws; the header shows "unsaved changes" and the Save button enables. Switching template or leaving the page with unsaved work asks first.
 
 ### What the canvas shows
 
@@ -45,6 +45,8 @@ Deliberately **not** a preview. Only the two things that genuinely can't be judg
 - **vertical spacing** - `ui-mt-*`/`ui-mb-*`/`ui-pt-*`/`ui-pb-*` are drawn as real margin and padding
 
 Everything else is a labelled box: the block's name, its HTML tag, and a short preview of its text, link target or shortcode arguments. Colours, fonts and real typography are the theme's job (`docs/design.md`); reproducing them here would mean maintaining a second renderer that is wrong in a different way on every project.
+
+**Nesting depth is drawn too** - each level sits on a slightly stronger tint than the one above it, so the layers of a deep grid read apart instead of as one wall of boxes. The tint is mixed against the editor theme's own tokens (`color-mix()` on a `--tb-depth` custom property set per box), so it comes out right in light and dark alike, and it caps after six levels rather than fading to unreadable.
 
 Note that a column showing 100% is showing the truth: `ui-grid-100 ui-grid-l-50` *is* full width until the `l` breakpoint. The canvas draws the base width, and the breakpoint values sit in the settings.
 
@@ -59,6 +61,20 @@ A node whose `id` is targeted by a rule in the project's own stylesheets gets an
 This matters because of the core idea above: the builder presents an element's CSS classes as its properties, and a rule bound to an id overrides those classes in the real page while being completely invisible here. `#hero { padding: 0 }` beats `ui-pt-4` in the cascade, so the canvas would draw padding the browser will not render. The badge says "the class list is not the whole truth for this node" rather than quietly showing something wrong.
 
 The scan reads every `.css` file listed in any of `config.php`'s `/nino/html/assets` bundles and collects the ids their selectors mention. It is a selector scan, not a full CSS parser - a false positive costs one unnecessary badge, which is the right way for it to be wrong.
+
+## Editing
+
+**Selecting.** Click a box. The click selects the innermost box it landed in, not every ancestor it bubbled through; clicking the canvas background deselects. Selection is by node id, so it survives the redraw every edit triggers.
+
+**Settings.** The inspector renders one control per setting the block's manifest declares - there is no per-block form code anywhere, and adding a setting to a manifest is enough to make it editable. Which control appears follows from the setting's type: a select for `classenum`/`classgroup`/`tag`, a checkbox for `classtoggle`, a text field for `attr` and `text`. A responsive setting's breakpoint variants appear indented under their base control, so five fields called "Width" read as one setting with four variants rather than five settings.
+
+Changes apply immediately to the tree and redraw the canvas. A text field additionally updates its box's preview while you type - a full redraw per keystroke would move focus out of the field.
+
+**Inserting.** Click a block in the palette. Where it lands follows from the selection: *inside* it if that block takes children, *next to* it if it doesn't, and at the end of the document if nothing is selected. The block's own `block.tpl` is parsed **on the server, by the same parser documents go through** (`library/parse`), so a block's starting markup is written exactly like template markup and there is no second code path that could disagree about what a template means.
+
+**Actions.** The inspector's footer carries the selected block's own actions - move up/down, duplicate, remove - filtered by what its manifest's `actions` allows. An unrecognized element gets the structural ones only, since those need no model of what it is.
+
+**Indentation.** Every structural edit carries its own whitespace, because the tree keeps the exact text between tags (that is what makes the round-trip byte-exact). Rather than deriving indentation from a depth counter, an insert *copies the whitespace its new neighbour already has* - whatever the file uses, tabs or spaces, at whatever depth. A remove takes its own indentation with it, so edits don't slowly accumulate blank lines. The one case with no neighbour to copy from, a first child going into an empty element, derives one level from the parent. `tests/templates-js-smoke.js` covers each of those cases.
 
 ## Which templates can be edited
 
@@ -160,20 +176,27 @@ This area sits behind `_admin`'s password, the same trust level as its Config mo
 
 There is no backup step of its own - `/templates` is git-tracked project source, and `_editor`'s automatic backups already cover it.
 
+## Testing
+
+Two suites, because the builder is split across two languages:
+
+- `php tests/templates-smoke.php` - the library loader, the `Parser`/`Serializer` round-trip (against every shipped page template), the `#id` scan, and `documents/list`/`load`/`save` including every refusal.
+- `node tests/templates-js-smoke.js` - the block mapping (`blocks.js`) and the tree edits (`tree.js`). Both modules are deliberately dom-free, which is what lets them run in plain node against a two-line `window` stub - no test framework, no browser. The harness hands them a `document` that throws on any property access beyond the two their IIFE dereferences, so a module that started using the dom would fail the suite rather than quietly become untestable.
+
+Those two files hold the parts that can silently corrupt a template: a setting written back differently than it was read reshuffles class attributes, and an insert that mishandles whitespace leaves the file a little more crooked on every edit. What neither suite covers is the rendering itself (`canvas.js`, `inspector.js`), which is dom-bound.
+
 ## Roadmap
 
-Delivered here (patch 1 of the builder):
+Delivered (patches 1-2):
 
 - the `/_templates` app, its `_admin`-gated route, and the link from `/_admin`
-- `Parser`/`Serializer` with the byte-exact round-trip guarantee and its test suite
+- `Parser`/`Serializer` with the byte-exact round-trip guarantee
 - the `library/<key>` block format, its loader and 21 core blocks
 - the `#id` scan and warning
-- `documents/list`/`load`/`save`, including every refusal above
-- the canvas (read), the palette (list) and the class↔setting mapping in `blocks.js`
+- `documents/list`/`load`/`save` and `library/blocks`/`parse`, including every refusal above
+- the canvas with depth tinting and selection, the palette, the generated settings inspector, insert/move/duplicate/remove, and save with unsaved-changes guards
 
 Still to come:
 
-- selecting a node, and the settings inspector the mapping already supports
-- inserting from the palette (click + ↑/↓ to move, matching `/_admin`'s Pages and `/_install`'s Webpages), remove and duplicate
 - the remaining ~25 blocks of the `Nino.css` catalogue (table, pricing, accordion, gallery, tabs, modal, slider, timeline, badge, alert, breadcrumbs, list, logo strip, video, …)
 - a "new template" action, and `section-*` extraction from an existing selection

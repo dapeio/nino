@@ -216,18 +216,16 @@
 				return Nino.templates.blocks._setClass( node, setting.class, value === true );
 
 			if( setting.type === 'classgroup' ) {
-				Object.keys( setting.options ).forEach( function( cls ) {
-					if( cls !== '' )
-						Nino.templates.blocks._setClass( node, cls, cls === value );
-				} );
+				const options = Object.keys( setting.options ).filter( function( cls ) { return cls !== '' } );
+				Nino.templates.blocks._swapClass( node, options, ( value === undefined || value === null ) ? '' : String( value ) );
 				return;
 			}
 
 			if( setting.type === 'classenum' ) {
-				const pattern = ( parts[1] !== undefined ) ? Nino.templates.blocks._bp( setting.bpPattern, parts[1] ) : setting.pattern;
-				setting.values.forEach( function( v ) {
-					Nino.templates.blocks._setClass( node, pattern.replace( '%s', v ), String( v ) === String( value ) );
-				} );
+				const pattern 		= ( parts[1] !== undefined ) ? Nino.templates.blocks._bp( setting.bpPattern, parts[1] ) : setting.pattern;
+				const candidates 	= setting.values.map( function( v ) { return pattern.replace( '%s', v ) } );
+				const active 			= ( value === '' || value === undefined || value === null ) ? '' : pattern.replace( '%s', String( value ) );
+				Nino.templates.blocks._swapClass( node, candidates, active );
 				return;
 			}
 
@@ -330,6 +328,55 @@
 		 */
 		_bp : function( bpPattern, bp ) {
 			return ( bpPattern || '' ).replace( '%b', bp );
+		},
+
+		/**
+		 *	Replace whichever of a set of mutually-exclusive classes a node
+		 *	currently carries with one specific class - **at the index the
+		 *	old one already sat at**, not by removing it and appending the
+		 *	new one at the end.
+		 *
+		 *	That distinction is the whole point of this method. Changing a
+		 *	grid column's width must turn 'ui-grid-100 ui-grid-m-50 ui-mb-3'
+		 *	into 'ui-grid-50 ui-grid-m-50 ui-mb-3', not into
+		 *	'ui-grid-m-50 ui-mb-3 ui-grid-50' - the latter is the same css
+		 *	but a different line in the file, so every edited element would
+		 *	come back with its class attribute reshuffled and the round-trip
+		 *	guarantee would only hold for documents nobody touched.
+		 *
+		 *	A node carrying two of the candidates at once (hand-written, or
+		 *	a stale class left behind) collapses onto the first position.
+		 *
+		 *	@param		{Object}	node
+		 *	@param		{Array}		candidates		The mutually exclusive set
+		 *	@param		{string}	active				The one to end up with, '' for none
+		 *
+		 *	@return		void
+		 */
+		_swapClass : function( node, candidates, active ) {
+
+			node.classes = node.classes || [];
+
+			const kept = [];
+			let placed = false;
+
+			node.classes.forEach( function( cls ) {
+
+				if( candidates.indexOf( cls ) === -1 ) {
+					kept.push( cls );
+					return;
+				}
+
+				if( placed === false && active !== '' ) {
+					kept.push( active );
+					placed = true;
+				}
+			} );
+
+			if( placed === false && active !== '' )
+				kept.push( active );
+
+			node.classes = kept;
 		},
 
 		/**

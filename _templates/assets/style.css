@@ -44,8 +44,30 @@ body {
 	color: var(--editor-text-secondary);
 }
 
-#tb-bar-admin {
+#tb-bar-state {
 	margin-left: auto;
+	font-size: .8rem;
+	color: var(--editor-text-secondary);
+}
+
+#tb-save {
+	padding: .4rem 1.25rem;
+	border-radius: var(--editor-radius-sm);
+	border: none;
+	background: var(--editor-blue);
+	color: #fff;
+	font: inherit;
+	font-size: .85rem;
+	font-weight: 600;
+	cursor: pointer;
+}
+
+#tb-save:disabled {
+	opacity: .4;
+	cursor: default;
+}
+
+#tb-bar-admin {
 	font-size: .85rem;
 	color: var(--editor-blue);
 }
@@ -67,16 +89,37 @@ body {
 }
 
 #tb-documents,
-#tb-palette {
+#tb-rail {
 	position: sticky;
 	top: 5rem;
+	max-height: calc(100vh - 6.5rem);
+	overflow-y: auto;
+}
+
+#tb-rail {
+	display: flex;
+	flex-direction: column;
+	gap: 1rem;
+}
+
+#tb-documents,
+#tb-inspector-wrap,
+#tb-palette {
 	background: var(--editor-bg-grouped);
 	border-radius: var(--editor-radius);
 	box-shadow: var(--editor-shadow);
 	padding: .85rem 1rem 1rem;
 }
 
+/* A read-only template can still be browsed, but nothing can be inserted
+   into it - see Documents' EDITABLE_PREFIXES */
+.tb-disabled {
+	opacity: .45;
+	pointer-events: none;
+}
+
 #tb-documents h3,
+#tb-inspector-wrap h3,
 #tb-palette h3 {
 	margin: 0 0 .5rem;
 	font-size: .8rem;
@@ -122,14 +165,25 @@ body {
 	color: var(--editor-text-secondary);
 }
 
-#tb-palette li {
+.tb-palette-item {
 	display: flex;
+	width: 100%;
 	align-items: baseline;
 	justify-content: space-between;
 	gap: .5rem;
 	padding: .3rem .4rem;
+	border: none;
 	border-radius: var(--editor-radius-sm);
+	background: transparent;
+	color: var(--editor-text);
+	font: inherit;
 	font-size: .82rem;
+	text-align: left;
+	cursor: pointer;
+}
+
+.tb-palette-item:hover {
+	background: var(--editor-bg-elevated);
 }
 
 .tb-palette-tag {
@@ -155,14 +209,30 @@ body {
 
 /* One box per node. Nesting is the template's own nesting - the indent is
    the structure, so it stays visible even where a block draws no layout of
-   its own */
+   its own.
+
+   Each level is mixed a little further towards the text colour than its
+   parent, which is what makes the layers of a deep grid read apart instead
+   of as one wall of boxes. --tb-depth is set inline per box by canvas.js
+   (capped, see its MAX_TINT_DEPTH), so this works at any nesting depth
+   without a stack of descendant selectors - and because the tint is mixed
+   against the theme's own tokens rather than hardcoded, it comes out right
+   in the light and dark editor themes alike */
 .tb-node {
 	box-sizing: border-box;
 	border: 1px solid var(--editor-border);
 	border-radius: var(--editor-radius-sm);
-	background: var(--editor-bg-elevated);
+	background: color-mix( in srgb, var(--editor-text) calc( var(--tb-depth, 0) * 3.5% ), var(--editor-bg-elevated) );
 	padding: .4rem .5rem;
 	margin: 0 0 .35rem;
+}
+
+/* Older browsers without color-mix() fall back to the flat elevated
+   background - the tint is a reading aid, never information of its own */
+@supports not (background: color-mix( in srgb, red 10%, blue )) {
+	.tb-node {
+		background: var(--editor-bg-elevated);
+	}
 }
 
 .tb-node .tb-list {
@@ -187,6 +257,21 @@ body {
 	border-style: dotted;
 	background: transparent;
 	opacity: .8;
+}
+
+/* The selected box, and the one the inspector is pointed at */
+.tb-node--selected {
+	border-color: var(--editor-blue);
+	border-style: solid;
+	box-shadow: 0 0 0 1px var(--editor-blue);
+}
+
+.tb-node:hover {
+	border-color: var(--editor-text-secondary);
+}
+
+.tb-node--selected:hover {
+	border-color: var(--editor-blue);
 }
 
 .tb-node--text,
@@ -246,4 +331,105 @@ body {
 	font-family: ui-monospace, monospace;
 	font-size: .7rem;
 	cursor: help;
+}
+
+/* --------------------------------------------------------------- Inspector */
+
+/* One control per setting the block's manifest declares - see inspector.js.
+   There is no per-block form anywhere; everything below styles whatever that
+   generates */
+
+.tb-inspector-title {
+	display: flex;
+	align-items: baseline;
+	gap: .45rem;
+	padding: 0 0 .6rem;
+	margin: 0 0 .6rem;
+	border-bottom: 1px solid var(--editor-separator);
+}
+
+.tb-inspector-name {
+	font-size: .9rem;
+	font-weight: 600;
+}
+
+.tb-inspector-hint {
+	margin: 0 0 .5rem;
+	font-size: .78rem;
+	line-height: 1.45;
+}
+
+.tb-field {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: .5rem;
+	padding: .28rem 0;
+	font-size: .78rem;
+	color: var(--editor-text-secondary);
+}
+
+/* Indented under the base control it varies, and dimmer - see
+   inspector.js's _field() */
+.tb-field--bp {
+	padding-left: .75rem;
+	font-size: .74rem;
+	opacity: .8;
+}
+
+.tb-field > span {
+	flex: 0 1 auto;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.tb-field input[type="text"],
+.tb-field select {
+	flex: 1 1 7rem;
+	min-width: 0;
+	max-width: 60%;
+	box-sizing: border-box;
+	padding: .28rem .4rem;
+	border-radius: var(--editor-radius-sm);
+	border: 1px solid var(--editor-border);
+	background: var(--editor-bg-elevated);
+	color: var(--editor-text);
+	font: inherit;
+	font-size: .78rem;
+}
+
+.tb-field input[type="checkbox"] {
+	flex: 0 0 auto;
+	margin: 0;
+}
+
+.tb-inspector-actions {
+	display: flex;
+	gap: .35rem;
+	padding-top: .75rem;
+	margin-top: .5rem;
+	border-top: 1px solid var(--editor-separator);
+}
+
+.tb-action {
+	flex: 1 1 auto;
+	padding: .35rem 0;
+	border-radius: var(--editor-radius-sm);
+	border: 1px solid var(--editor-border);
+	background: var(--editor-bg-elevated);
+	color: var(--editor-text);
+	font: inherit;
+	font-size: .85rem;
+	line-height: 1;
+	cursor: pointer;
+}
+
+.tb-action:hover {
+	border-color: var(--editor-text-secondary);
+}
+
+.tb-action--remove {
+	color: var(--editor-red);
 }

@@ -575,13 +575,18 @@ tests/editor-smoke.php      _editor/Editor.php: Elements, Text, Users, Images, B
 tests/admin-smoke.php       _admin/Admin.php: ElementTypes, Text, Pages, Images, Users, Restore, Config, Rate-Limiting
 tests/install-smoke.php     _install/Install.php: Checks, Setup, Themes, Webpages, PersonalInfos, Admins, Finish
 tests/templates-smoke.php   _templates/Templates.php: Library, Parser/Serializer-Round-Trip, Stylesheets, Documents
+tests/templates-js-smoke.js _templates/assets/: die Baustein-Abbildung (blocks.js) und Baum-Edits (tree.js)
 tests/concurrency-smoke.php Filesystem-Locking bei parallelen Schreibern
 ```
 
-Ausführen mit `php tests/kernel-smoke.php` etc. — aktuell 840
-Assertions insgesamt über die sechs Suites. CI führt alle sechs plus
-`php -l` und `node --check` über jede Datei aus, siehe
-`.github/workflows/ci.yml`.
+Ausführen mit `php tests/kernel-smoke.php` etc. — aktuell 914
+Assertions insgesamt über die sieben Suites. Sechs davon sind PHP; die
+siebte läuft in reinem Node (`node tests/templates-js-smoke.js`), weil
+die beiden abgedeckten Frontend-Module bewusst DOM-frei sind und das,
+was sie falsch machen können — eine Klasse anders zurückschreiben als
+gelesen, ein Insert mit falscher Einrückung — ein Template still
+beschädigt. CI führt alle sieben plus `php -l` und `node --check` über
+jede Datei aus, siehe `.github/workflows/ci.yml`.
 
 Zwei Dinge, die beim Ergänzen eigener Tests weitergelten sollten:
 

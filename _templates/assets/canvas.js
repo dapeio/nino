@@ -21,8 +21,15 @@
  *													model for what their properties mean, so it offers none,
  *													but it never hides or drops them either.
  *
- *													Patch 1 renders; selecting, inserting and editing follow
- *													in the next patch.
+ *													Nesting depth is also drawn - each level sits on a
+ *													slightly stronger tint than the one above it, so the
+ *													layers of a deep grid read apart at a glance instead of
+ *													as one wall of boxes.
+ *
+ *													Clicking a box selects it; the inspector then edits
+ *													whatever the library says that block has. Selection is
+ *													by node id, so it survives the re-render every edit
+ *													triggers.
  *
  *	@package								Dape/Nino
  *	@author									David Perchermeier <mail@dape.io>
@@ -43,43 +50,97 @@
 	// about what gets written back
 	const SPACE = [ 0, 0.75, 1.5, 2.25, 3, 4, 5 ];
 
+	// How far the depth tint deepens before it stops. Without a cap a
+	// deeply nested grid would fade to unreadable; six levels is past
+	// anything the structure convention produces (see docs/design.md)
+	const MAX_TINT_DEPTH = 6;
+
 	Nino.templates.canvas = {
 
-		_styledIds : [],
+		_styledIds 	: [],
+		_document 	: null,
 
 		/**
-		 *	@param		{Object}	document		{ name, nodes, styledIds, readonly }
+		 *	@param		{Object}	doc		{ name, nodes, styledIds, readonly }
 		 *
 		 *	@return		void
 		 */
-		render : function( document ) {
+		render : function( doc ) {
 
-			const tree 		= dc.getElementById('tb-canvas-tree');
+			Nino.templates.canvas._document 	= doc;
+			Nino.templates.canvas._styledIds 	= doc.styledIds || [];
+
 			const notice 	= dc.getElementById('tb-canvas-notice');
 			const hint 		= dc.getElementById('tb-canvas-hint');
-
-			Nino.templates.canvas._styledIds = document.styledIds || [];
 
 			hint.textContent = '';
 			notice.innerHTML = '';
 
-			if( document.readonly !== null && document.readonly !== undefined ) {
+			if( doc.readonly !== null && doc.readonly !== undefined ) {
 				const p = dc.createElement('p');
 				p.className = 'admin-error tb-notice';
-				p.textContent = 'Read-only: '+ document.readonly;
+				p.textContent = 'Read-only: '+ doc.readonly;
 				notice.appendChild( p );
 			}
 
+			Nino.templates.canvas.rerender();
+		},
+
+		/**
+		 *	Redraw the tree from the current document - called after every
+		 *	edit. Cheap enough to do wholesale: a page template is a few
+		 *	dozen nodes, and rebuilding beats keeping a diff of boxes in
+		 *	step with a tree that is itself the state
+		 *
+		 *	@return		void
+		 */
+		rerender : function() {
+
+			const tree = dc.getElementById('tb-canvas-tree');
+
+			if( tree === null || Nino.templates.canvas._document === null )
+				return;
+
 			tree.innerHTML = '';
-			tree.appendChild( Nino.templates.canvas._list( document.nodes || [] ) );
+			tree.appendChild( Nino.templates.canvas._list( Nino.templates.canvas._document.nodes || [], 0 ) );
+		},
+
+		/**
+		 *	Update one box's preview text in place, without rebuilding the
+		 *	tree - what the inspector calls while a text field is being
+		 *	typed into. A full rerender on every keystroke would work too,
+		 *	but it moves focus out of the field being typed in
+		 *
+		 *	@param		{string}	nodeId
+		 *
+		 *	@return		void
+		 */
+		refreshPreview : function( nodeId ) {
+
+			const box = dc.querySelector('.tb-node[data-node-id="'+ nodeId+ '"]');
+
+			if( box === null || Nino.templates.canvas._document === null )
+				return;
+
+			const node = Nino.templates.tree.find( Nino.templates.canvas._document.nodes, nodeId );
+
+			if( node === null )
+				return;
+
+			const blockKey 	= Nino.templates.blocks.match( node );
+			const preview 	= box.querySelector('.tb-node-preview');
+
+			if( preview !== null )
+				preview.textContent = Nino.templates.canvas._preview( node, blockKey, Nino.templates.blocks.get( blockKey ) );
 		},
 
 		/**
 		 *	@param		{Array}		nodes
+		 *	@param		{number}	depth
 		 *
 		 *	@return		{Element}
 		 */
-		_list : function( nodes ) {
+		_list : function( nodes, depth ) {
 
 			const wrap = dc.createElement('div');
 			wrap.className = 'tb-list';
@@ -92,7 +153,7 @@
 				if( node.type === 'text' && node.value.trim() === '' )
 					return;
 
-				wrap.appendChild( Nino.templates.canvas._node( node ) );
+				wrap.appendChild( Nino.templates.canvas._node( node, depth ) );
 			} );
 
 			return wrap;
@@ -103,7 +164,7 @@
 		 *
 		 *	@return		{Element}
 		 */
-		_node : function( node ) {
+		_node : function( node, depth ) {
 
 			if( node.type === 'text' )
 				return Nino.templates.canvas._leaf( 'tb-node--text', 'text', Nino.templates.blocks.showEntities( node.value.trim() ) );
@@ -117,6 +178,22 @@
 
 			box.className = 'tb-node'+ ( block === null ? ' tb-node--unknown' : '' );
 			box.dataset.nodeId = node.id;
+
+			// Each nesting level is tinted a little more strongly than its
+			// parent, which is what separates the layers of a deep grid
+			// visually. Driven by a custom property rather than a stack of
+			// descendant selectors, so it works at any depth
+			box.style.setProperty( '--tb-depth', Math.min( depth, MAX_TINT_DEPTH ) );
+
+			if( node.id === Nino.templates.selectedId() )
+				box.classList.add('tb-node--selected');
+
+			// Selecting the innermost box the click landed in, not every
+			// ancestor it bubbled through
+			box.addEventListener( 'click', function( event ) {
+				event.stopPropagation();
+				Nino.templates.select( node.id );
+			} );
 
 			if( block !== null )
 				Nino.templates.canvas._applyLayout( box, node, blockKey, block );
@@ -136,7 +213,7 @@
 			} );
 
 			if( children.length > 0 )
-				box.appendChild( Nino.templates.canvas._list( children ) );
+				box.appendChild( Nino.templates.canvas._list( children, depth + 1 ) );
 
 			return box;
 		},

@@ -248,7 +248,10 @@ namespace Nino\Templates {
 		 *	@return 	array
 		 */
 		public static function actions(): array {
-			return [ 'library/blocks' => [ self::class, 'apiBlocks' ] ];
+			return [
+				'library/blocks' 	=> [ self::class, 'apiBlocks' ],
+				'library/parse' 	=> [ self::class, 'apiParse' ],
+			];
 		}
 
 		/**
@@ -261,6 +264,40 @@ namespace Nino\Templates {
 		 */
 		public static function apiBlocks( array &$appData, array &$request ): void {
 			\Nino\Http::ok( $request, [ 'blocks' => self::blocks() ] );
+		}
+
+		/**
+		 *	One block's starting markup, parsed into the same node shape a
+		 *	document loads as. Inserting a block is therefore "parse this
+		 *	block.tpl, splice the result into the tree" - a block's markup is
+		 *	written exactly like template markup and goes through exactly the
+		 *	same parser, so there is no second code path that could disagree
+		 *	with the first about what a template means
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		&$request			(reference) Current server request
+		 *
+		 *	@return 	void
+		 */
+		public static function apiParse( array &$appData, array &$request ): void {
+
+			$key 		= (string) ( \Nino\Templates\Templates::postData()['block'] ?? '' );
+			$blocks = self::blocks();
+
+			if( isset( $blocks[$key] ) === false ) {
+				\Nino\Http::fail( $request, 404, 'unknown block: "'. $key. '"' );
+				return;
+			}
+
+			if( $blocks[$key]['html'] === '' ) {
+				\Nino\Http::fail( $request, 400, 'block "'. $key. '" has no markup to insert' );
+				return;
+			}
+
+			\Nino\Http::ok( $request, [
+				'block' => $key,
+				'nodes' => \Nino\Templates\Parser::parse( $appData, $blocks[$key]['html'] ),
+			] );
 		}
 
 		/**

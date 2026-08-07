@@ -6,8 +6,6 @@
 
 Ein grafischer, rein entwicklerseitiger Editor für die `templates/*.tpl`-Dateien des Projekts, erreichbar unter `/_templates`. Optional - eine `.tpl` ist einfaches HTML und lässt sich genauso gut von Hand schreiben (siehe `docs/design.de.md`) - aber er macht aus "welche Grid-Klassen trägt diese Spalte?" ein Formular statt eines Nachschlagens im Design-Handbuch.
 
-> **Stand.** Dies ist das Fundament: Der Builder **liest** Templates, erkennt Bausteine, zeichnet die Struktur und listet die Library. Auswählen, Einfügen und Bearbeiten folgen im nächsten Patch - siehe "Fahrplan" am Ende.
-
 ## Wo er liegt
 
 In einem eigenen Verzeichnis auf oberster Ebene, `_templates/`, nicht als Modul in `/_admin` - aus demselben Grund, aus dem auch `/_install` eines hat: Er ist ein Entwicklungswerkzeug, ein Projekt darf ihn also nach Abschluss des Designs löschen (`rm -rf _templates`), und `_admin/Admin.php` ist bereits groß genug.
@@ -34,8 +32,10 @@ Die Alternative - ein `data-nino-builder="grid-col"`-Marker an jedem Element - w
 Drei Spalten:
 
 - **Templates** (links) - jede `templates/*.tpl` auf der Platte. Ausgegraute Namen sind nicht editierbar (siehe unten).
-- **Canvas** (Mitte) - das geöffnete Template als Baum verschachtelter Kästchen.
-- **Blocks** (rechts) - die Library, gruppiert nach der `category` des jeweiligen Manifests.
+- **Canvas** (Mitte) - das geöffnete Template als Baum verschachtelter Kästchen. Ein Klick wählt ein Kästchen aus.
+- **Settings + Blocks** (rechts) - oben die Eigenschaften des gewählten Bausteins, darunter die Library, gruppiert nach der `category` des jeweiligen Manifests.
+
+Nichts erreicht das Dateisystem vor **Save**. Jede Änderung geht in den Baum im Speicher und zeichnet neu; die Kopfzeile zeigt "unsaved changes" und der Save-Button wird aktiv. Wer das Template wechselt oder die Seite mit ungespeicherter Arbeit verlässt, wird vorher gefragt.
 
 ### Was der Canvas zeigt
 
@@ -45,6 +45,8 @@ Bewusst **keine** Vorschau. Nur die beiden Dinge, die sich aus einer Liste von K
 - **vertikale Abstände** - `ui-mt-*`/`ui-mb-*`/`ui-pt-*`/`ui-pb-*` werden als echtes Margin und Padding gezeichnet
 
 Alles andere ist ein beschriftetes Kästchen: Name des Bausteins, HTML-Tag und eine kurze Vorschau auf Text, Linkziel oder Shortcode-Argumente. Farben, Schriften und echte Typografie sind Sache des Themes (`docs/design.de.md`); sie hier nachzubauen hieße, einen zweiten Renderer zu pflegen, der in jedem Projekt auf andere Weise falsch ist.
+
+**Auch die Verschachtelungstiefe wird gezeichnet** - jede Ebene liegt auf einem etwas kräftigeren Farbton als die darüber, sodass sich die Schichten eines tiefen Grids voneinander abheben statt als eine Wand aus Kästchen zu erscheinen. Der Farbton wird gegen die Tokens des Editor-Themes gemischt (`color-mix()` auf einer pro Kästchen gesetzten Custom Property `--tb-depth`), stimmt also im hellen wie im dunklen Theme, und wird nach sechs Ebenen gedeckelt, statt ins Unlesbare zu laufen.
 
 Eine Spalte, die 100 % anzeigt, zeigt dabei die Wahrheit: `ui-grid-100 ui-grid-l-50` *ist* bis zum `l`-Breakpoint volle Breite. Der Canvas zeichnet die Basisbreite, die Breakpoint-Werte stehen in den Einstellungen.
 
@@ -59,6 +61,20 @@ Ein Knoten, dessen `id` von einer Regel in den Stylesheets des Projekts adressie
 Das ist wegen der Grundidee oben wichtig: Der Builder zeigt die CSS-Klassen eines Elements als seine Eigenschaften an, und eine an eine ID gebundene Regel überschreibt diese Klassen auf der echten Seite, ist hier aber völlig unsichtbar. `#hero { padding: 0 }` gewinnt in der Kaskade gegen `ui-pt-4`, der Canvas würde also ein Padding zeichnen, das der Browser nicht rendert. Das Abzeichen sagt "für diesen Knoten ist die Klassenliste nicht die ganze Wahrheit", statt stillschweigend etwas Falsches anzuzeigen.
 
 Der Scan liest jede `.css`-Datei aus allen `/nino/html/assets`-Bundles der `config.php` und sammelt die IDs, die deren Selektoren erwähnen. Es ist ein Selektor-Scan, kein vollwertiger CSS-Parser - ein False Positive kostet ein überflüssiges Abzeichen, und das ist die richtige Richtung, in der er falsch liegen darf.
+
+## Bearbeiten
+
+**Auswählen.** Ein Kästchen anklicken. Der Klick wählt das innerste getroffene Kästchen aus, nicht jeden Vorfahren, durch den er geblubbert ist; ein Klick auf den Canvas-Hintergrund hebt die Auswahl auf. Die Auswahl hängt an der Knoten-ID und übersteht damit das Neuzeichnen nach jeder Änderung.
+
+**Einstellungen.** Der Inspector erzeugt ein Bedienelement pro Einstellung, die das Manifest des Bausteins deklariert - es gibt nirgends bausteinspezifischen Formularcode, und eine Einstellung im Manifest zu ergänzen genügt, um sie editierbar zu machen. Welches Bedienelement erscheint, folgt aus dem Typ: ein Select für `classenum`/`classgroup`/`tag`, eine Checkbox für `classtoggle`, ein Textfeld für `attr` und `text`. Die Breakpoint-Varianten einer responsiven Einstellung erscheinen eingerückt unter ihrem Basis-Bedienelement, sodass fünf Felder namens "Width" als eine Einstellung mit vier Varianten lesbar sind statt als fünf Einstellungen.
+
+Änderungen greifen sofort im Baum und zeichnen den Canvas neu. Ein Textfeld aktualisiert zusätzlich die Vorschau seines Kästchens beim Tippen - ein vollständiges Neuzeichnen pro Tastendruck würde den Fokus aus dem Feld nehmen.
+
+**Einfügen.** Einen Baustein in der Palette anklicken. Wo er landet, folgt aus der Auswahl: *in* ihr, wenn der gewählte Baustein Kinder aufnimmt, *neben* ihr, wenn nicht, und am Ende des Dokuments, wenn nichts ausgewählt ist. Die `block.tpl` des Bausteins wird **serverseitig mit demselben Parser** geparst, den auch Dokumente durchlaufen (`library/parse`) - das Startmarkup eines Bausteins ist damit exakt wie Template-Markup geschrieben, und es gibt keinen zweiten Codepfad, der anderer Meinung darüber sein könnte, was ein Template bedeutet.
+
+**Aktionen.** Die Fußzeile des Inspectors trägt die Aktionen des gewählten Bausteins - nach oben/unten verschieben, duplizieren, entfernen - gefiltert nach dem, was `actions` im Manifest erlaubt. Ein nicht erkanntes Element bekommt nur die strukturellen, denn die brauchen kein Modell davon, was es ist.
+
+**Einrückung.** Jede strukturelle Änderung bringt ihren eigenen Whitespace mit, denn der Baum behält den exakten Text zwischen den Tags (genau das macht den Round-Trip byte-genau). Statt die Einrückung aus einem Tiefenzähler abzuleiten, *kopiert* ein Insert den Whitespace, den sein neuer Nachbar bereits hat - was auch immer die Datei verwendet, Tabs oder Leerzeichen, in welcher Tiefe auch immer. Ein Remove nimmt seine eigene Einrückung mit, damit sich über die Zeit keine Leerzeilen ansammeln. Der einzige Fall ohne Nachbarn zum Kopieren, ein erstes Kind in einem leeren Element, leitet eine Ebene vom Elternteil ab. `tests/templates-js-smoke.js` deckt jeden dieser Fälle ab.
 
 ## Welche Templates bearbeitet werden können
 
@@ -160,20 +176,27 @@ Dieser Bereich liegt hinter dem Passwort von `_admin`, auf derselben Vertrauenss
 
 Einen eigenen Backup-Schritt gibt es nicht - `/templates` ist git-verwalteter Projektquellcode, und die automatischen Backups von `_editor` decken es bereits ab.
 
+## Tests
+
+Zwei Suites, weil der Builder auf zwei Sprachen verteilt ist:
+
+- `php tests/templates-smoke.php` - der Library-Loader, der `Parser`/`Serializer`-Round-Trip (gegen jedes ausgelieferte Seitentemplate), der `#id`-Scan und `documents/list`/`load`/`save` inklusive aller Verweigerungen.
+- `node tests/templates-js-smoke.js` - die Baustein-Abbildung (`blocks.js`) und die Baum-Änderungen (`tree.js`). Beide Module sind bewusst DOM-frei, und genau das lässt sie in reinem Node gegen einen zweizeiligen `window`-Stub laufen - kein Testframework, kein Browser. Die Testumgebung reicht ihnen ein `document`, das bei jedem Zugriff über die zwei von ihrem IIFE dereferenzierten Eigenschaften hinaus wirft; ein Modul, das anfinge das DOM zu benutzen, ließe die Suite scheitern, statt still untestbar zu werden.
+
+Diese beiden Dateien enthalten die Teile, die ein Template still beschädigen können: Eine Einstellung, die anders zurückgeschrieben als gelesen wird, sortiert Klassenattribute um, und ein Insert mit falsch behandeltem Whitespace macht die Datei bei jeder Änderung ein Stück krummer. Was keine der Suites abdeckt, ist das Rendering selbst (`canvas.js`, `inspector.js`), das DOM-gebunden ist.
+
 ## Fahrplan
 
-Hier ausgeliefert (Patch 1 des Builders):
+Ausgeliefert (Patch 1-2):
 
 - die App `/_templates`, ihre über `_admin` abgesicherte Route und der Link aus `/_admin`
-- `Parser`/`Serializer` mit der byte-genauen Round-Trip-Garantie und deren Testsuite
+- `Parser`/`Serializer` mit der byte-genauen Round-Trip-Garantie
 - das Bausteinformat `library/<key>`, sein Loader und 21 Kernbausteine
 - der `#id`-Scan samt Hinweis
-- `documents/list`/`load`/`save` inklusive aller oben genannten Verweigerungen
-- der Canvas (lesend), die Palette (listend) und die Klassen-Einstellungs-Abbildung in `blocks.js`
+- `documents/list`/`load`/`save` sowie `library/blocks`/`parse` inklusive aller oben genannten Verweigerungen
+- der Canvas mit Tiefen-Einfärbung und Auswahl, die Palette, der generierte Einstellungs-Inspector, Einfügen/Verschieben/Duplizieren/Entfernen und Speichern mit Warnung bei ungespeicherten Änderungen
 
 Noch ausstehend:
 
-- einen Knoten auswählen und der Einstellungs-Inspektor, den die Abbildung bereits unterstützt
-- Einfügen aus der Palette (Klick + ↑/↓ zum Verschieben, passend zu Pages in `/_admin` und Webpages in `/_install`), Entfernen und Duplizieren
 - die restlichen ~25 Bausteine des `Nino.css`-Katalogs (Tabelle, Pricing, Accordion, Galerie, Tabs, Modal, Slider, Timeline, Badge, Alert, Breadcrumbs, Liste, Logoleiste, Video, …)
 - eine "Neues Template"-Aktion und das Herauslösen von `section-*` aus einer bestehenden Auswahl
