@@ -1,6 +1,6 @@
 [template /templates/html-header]
 <section class="ui-atf ui-section--fullwidth js-cover js-cover--dim" data-cover-height="100">
-	<img src="[[/nino/dir]]/images/.demo/demo-00.jpg">
+	<img src="[[/nino/dir]]/images/demo-home.jpg">
 	<div class="js-cover-content">
 		<div class="ui-grid-row">
 			<div class="ui-grid-100 js-vpa js-vpa--speed-slow">
