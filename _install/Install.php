@@ -447,7 +447,7 @@ namespace Nino\Install {
 			$modules = self::_listUnits( self::LIBRARY. '/modules' );
 			foreach( $modules as $key => &$unit ) {
 				$manifest 			= self::_readManifest( self::LIBRARY. '/modules/'. $key );
-				$unit['active'] = isset( $manifest['moduleClass'] ) === true && in_array( $manifest['moduleClass'], $activeModules, true ) === true;
+				$unit['active'] = ( isset( $manifest['moduleClass'] ) === true && in_array( $manifest['moduleClass'], $activeModules, true ) === true ) || ( ( $manifest['active'] ?? false ) === true );
 			}
 			unset( $unit );
 
