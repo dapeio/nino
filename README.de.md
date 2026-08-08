@@ -48,6 +48,13 @@ Durch ein durchdachtes **Rechtesystem** erhalten Administrator-Accounts nur den 
 - Anlegen des/der ersten _editor-Accounts
 - Setzen des echten _admin-Passworts (zugleich die Selbstsperre des Assistenten)
 
+### Features der _templates UI
+- Beliebige `templates/page-*.tpl` als visuellen Baustein-Baum laden - erkannt an den eigenen CSS-Klassen, ohne Migration und ohne Marker-Attribute
+- Baustein-Library mit 76 Definitionen als ein Verzeichnis pro Baustein (`_templates/library/`), einschließlich des `Nino.css`-Komponentenkatalogs und aus der Einfüge-Palette ausgeblendeter Erkennungshelfer
+- Grid-Breiten und Abstände maßstäblich gezeichnet, alles andere als beschriftetes Kästchen, siehe `docs/_templates.de.md`
+- Generierte Einstellungen für Klassen, Text, Tags und Attribute, einschließlich nativer boolescher Attribute als Checkbox (`required`, `open`, `controls`, …)
+- Byte-genauer Round-Trip: Ein unverändertes Template zu speichern ändert nichts
+
 ### Features der _admin UI
 - Erstellen/Bearbeiten/Löschen von Elements-Typen
 - Erstellen/Bearbeiten/Löschen von Textfills
@@ -104,14 +111,16 @@ _editor/           Admin-Dashboard - Inhaltseditoren (Werte), Nutzer, Backups, A
 _admin/             Entwickler-Werkzeuge - Element-/Text-/Bild-"Schema"-Editoren, Konfigurationseditor, Wiederherstellung
 _install/         Einrichtungsassistent - Prüfungen, Content-Setup (library/), Basis-Texte im
                   Bulk, Admins, _admin-Passwort
+_templates/       Template-Builder - visueller Editor für templates/*.tpl, Baustein-Library
+                  (library/), abgesichert über das Passwort von _admin
 
 elements/         Inhalte der Element-Typen (eine .php-Datei pro Typ) - standardmäßig leer
 text/             Texte je Sprache + global.php (inkl. Design-Tokens) + blacklist.php - standardmäßig leer
 templates/        .tpl-Seiten-/Sektions-Templates - standardmäßig leer
 assets/           Projekt-eigenes style.css/script.js
 images/           Hochgeladene Bilder (admin-verwaltet, bei Bedarf generiert)
-docs/             _editor.md, _admin.md, _install.md, design.md, development.md,
-                  _editor.de.md, _admin.de.md, _install.de.md, design.de.md, development.de.md,
+docs/             _editor.md, _admin.md, _install.md, _templates.md, design.md, development.md,
+                  und je ein .de.md-Gegenstück dazu
 tests/            Abhängigkeitsfreie Smoke-Tests (php tests/*.php)
 data/             Laufzeitdaten (Newsletter-Abonnenten, Formular-Einsendungen,
                   Logs) - entstehen bei Bedarf, nie in git getrackt
@@ -139,14 +148,20 @@ Das **Benutzerhandbuch** für die _admin Entwickleroberfläche.
 - **[docs/_install.de.md](docs/_install.de.md)**
 - **[docs/_install.md](docs/_install.md)** (English)
 Das **Benutzerhandbuch** für den _install Einrichtungsassistenten.
+---
+- **[docs/_templates.de.md](docs/_templates.de.md)**
+- **[docs/_templates.md](docs/_templates.md)** (English)
+Das **Benutzerhandbuch** für den _templates Template-Builder.
 
 ## Tests
 ```
 php tests/kernel-smoke.php
 php tests/admin-smoke.php
-php tests/dev-smoke.php
+php tests/editor-smoke.php
 php tests/install-smoke.php
+php tests/templates-smoke.php
 php tests/concurrency-smoke.php
+for test in tests/*-js-smoke.js; do node "$test"; done
 ```
 
 Jede Datei ist ein **eigenständiges Skript** (kein PHPUnit), das gegen ein

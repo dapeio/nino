@@ -41,5 +41,11 @@ if( str_starts_with( $uri, '/_install' ) === true ) {
     return true;
 }
 
+if( str_starts_with( $uri, '/_templates' ) === true ) {
+    chdir( __DIR__. '/_templates' );
+    require __DIR__. '/_templates/index.php';
+    return true;
+}
+
 require __DIR__. '/index.php';
 return true;

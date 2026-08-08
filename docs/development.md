@@ -2,7 +2,7 @@
 *[Deutsch](development.de.md)*
 
 **Links:**
-[README](../README.md) · [Design Handbook](design.md) · [_editor Handbook](_editor.md) · [_admin Handbook](_admin.md) · [_install Handbook](_install.md) · [Security Policy](../SECURITY.md) · [Changelog](../CHANGELOG.md)
+[README](../README.md) · [Design Handbook](design.md) · [_editor Handbook](_editor.md) · [_admin Handbook](_admin.md) · [_install Handbook](_install.md) · [_templates-Handbook](_templates.md) · [Security Policy](../SECURITY.md) · [Changelog](../CHANGELOG.md)
 
 ## Overview
 Nino deliberately does without an installer tool or a purely UI-driven workflow during development. Developers therefore need basic PHP knowledge and advanced HTML/CSS/JavaScript skills to fully build a website. Administering and running a finished project, however, requires no technical know-how at all.
@@ -571,15 +571,24 @@ runs against an isolated sandbox directory under
 `sys_get_temp_dir()`, never against real project data:
 
 ```
-tests/kernel-smoke.php    Kernel: AppData, Filesystem, Auth, Http, Locales, Images, Csrf, Mail, Newsletter, ...
-tests/admin-smoke.php     _editor/Editor.php: Elements, Text, Users, Images, Backup, Logs, Submissions
-tests/dev-smoke.php       _admin/Admin.php: ElementTypes, Restore, rate limiting
+tests/kernel-smoke.php      Kernel: AppData, Filesystem, Auth, Http, Locales, Images, Csrf, Mail, Newsletter, ...
+tests/editor-smoke.php      _editor/Editor.php: Elements, Text, Users, Images, Backup, Logs, Submissions
+tests/admin-smoke.php       _admin/Admin.php: ElementTypes, Text, Pages, Images, Users, Restore, Config, rate limiting
+tests/install-smoke.php     _install/Install.php: Checks, Setup, Themes, Webpages, PersonalInfos, Admins, Finish
+tests/templates-smoke.php   _templates/Templates.php: Library, Parser/Serializer round-trip, Stylesheets, Documents
+tests/concurrency-smoke.php Filesystem locking under parallel writers
+tests/editor-*-js-smoke.js  _editor frontend state, locale saves and exports
+tests/install-*-js-smoke.js _install frontend state and wizard navigation
+tests/templates-js-smoke.js _templates/assets/: the block mapping (blocks.js) and tree edits (tree.js)
 ```
 
-Run with `php tests/kernel-smoke.php` etc. — currently 513
-assertions total across the three suites. CI runs all three plus
-`php -l` and `node --check` over every file, see
-`.github/workflows/ci.yml`.
+Run the PHP files directly (`php tests/kernel-smoke.php`, etc.) and the
+frontend suites with `for test in tests/*-js-smoke.js; do node "$test"; done`.
+The template frontend's two covered modules are deliberately
+DOM-free, because the parts they get wrong — a class written back
+differently than it was read, an insert that mishandles indentation —
+silently corrupt a template. CI runs every smoke suite plus `php -l`
+and `node --check` over every source file; see `.github/workflows/ci.yml`.
 
 Two things worth keeping in mind when adding your own tests:
 

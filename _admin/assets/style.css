@@ -131,6 +131,15 @@ body {
 	font-size: .84rem;
 }
 
+/* Sits between the title and Logout - margin-left:auto rather than relying
+   on the wrap's space-between, which would centre it once there are three
+   children instead of two */
+#admin-templatebuilder {
+	margin: 0;
+	color: var(--editor-blue);
+	font-weight: 500;
+}
+
 #admin-logout {
 	color: var(--editor-red);
 	font-weight: 500;
@@ -641,6 +650,10 @@ button.red {
 		border-top: 1px solid var(--editor-separator);
 	}
 
+	#admin-templatebuilder {
+		flex: 1 0 100%;
+	}
+
 	#admin-nav-wrap {
 		flex: 1 1 auto;
 		flex-direction: column;
@@ -683,6 +696,13 @@ button.red {
 	#admin-bar-actions {
 		gap: .5rem;
 		font-size: .78rem;
+	}
+
+	#admin-templatebuilder {
+		max-width: 9rem;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
 	}
 
 	.admin-page-locale-row {

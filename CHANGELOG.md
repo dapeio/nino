@@ -2,6 +2,97 @@
 
 ## Unreleased
 
+- **`/_templates` now covers the `Nino.css` component catalogue**: the
+  library grows from 21 foundations to 76 definitions, including tables,
+  pricing cards, accordions, galleries, tabs, modals, sliders, timelines,
+  badges, alerts, breadcrumbs, content lists, pagination, logo strips,
+  feature lists, video embeds/posters, image backgrounds, form controls,
+  counters and toast triggers. Composite inserts ship useful starting
+  markup; their nested pieces (table cells, tab panels, modal controls,
+  pricing titles/prices, etc.) have manifests of their own so their settings
+  remain editable after insertion. Twenty-five such structural helpers set
+  the new `palette => false` manifest flag: recognition/actions/settings
+  still work in the canvas, but the top-level palette stays focused on
+  useful inserts. A seventh generated setting type, `attrtoggle`, maps a
+  checkbox to a native boolean attribute and preserves its correct bare form
+  (`required`, `open`, `multiple`, `controls`, `allowfullscreen`) instead of
+  treating an empty value as "delete" like an ordinary `attr` setting.
+  Article modifiers that Nino.css permits together are now independent
+  toggles rather than a mutually-exclusive group, and behavioural buttons
+  are excluded from the generic Button match so a styled modal/toast trigger
+  opens in its specific inspector rather than winning or losing an
+  alphabetical score tie. The PHP smoke suite asserts the catalogue and all
+  block round-trips; the DOM-free JS suite covers `attrtoggle` and that
+  match-specificity edge. See `docs/_templates.md`.
+
+- **`/_templates` can now edit, not just read**: click a box in the canvas to
+  select it, and the inspector renders one control per setting the block's
+  manifest declares - a select for `classenum`/`classgroup`/`tag`, a
+  checkbox for `classtoggle`/`attrtoggle`, a text field for `attr`/`text`,
+  with a responsive setting's breakpoint variants indented under their base rather
+  than standing next to it as five near-identical fields. There is no
+  per-block form code anywhere; adding a setting to a manifest is what makes
+  it editable. Clicking a palette entry inserts that block - inside the
+  selection if it takes children, next to it if it doesn't, at the end of
+  the document if nothing is selected - and its `block.tpl` is parsed
+  server-side by the same parser documents go through (`library/parse`), so
+  a block's markup is written exactly like template markup with no second
+  code path. Move/duplicate/remove come from the manifest's own `actions`.
+  Nesting depth is now drawn as a per-level tint (`color-mix()` against the
+  editor theme's tokens, capped at six levels) so the layers of a deep grid
+  read apart. Nothing reaches disk until Save; switching template or leaving
+  the page with unsaved work asks first. Structural edits carry their own
+  indentation, copied from the neighbour the new markup lands next to rather
+  than derived from a depth counter, so an insert lines up with whatever the
+  file already uses and a remove doesn't leave a blank line behind. Two
+  fixes fell out of testing that: `blocks.js` documented in-place class
+  replacement but actually removed-and-appended, which reshuffled the
+  `class` attribute of every edited element, and a first child inserted into
+  an empty element copied the closing tag's indent and landed one level too
+  shallow. The dom-free half of the frontend (`blocks.js`, the new
+  `tree.js`) is covered by `tests/templates-js-smoke.js`, a plain-node suite
+  in the same dependency-free shape as the php ones - its stub `document`
+  throws on use, so a module that started touching the dom fails the suite
+  rather than quietly becoming untestable. See `docs/_templates.md`
+
+- **Added `/_templates`, the template builder** (foundation - reads,
+  recognizes and draws; selecting/inserting/editing follow). Its own
+  top-level folder rather than an `_admin` module, same reasoning `_install`
+  has one: a development-time tool a project may delete once the design is
+  settled. The password is `_admin`'s, though - it requires
+  `_admin/Admin.php` and reuses its session flag instead of introducing a
+  second one, the dependency `_install` already has, and `/_admin`'s header
+  gained a link. The whole thing rests on one idea: **a block's identity is
+  its html tag plus its css classes, and its properties are those same
+  classes**. `<div class="ui-grid-100 ui-grid-l-50 ui-mb-3">` *is* a grid
+  column with those three settings - there is no data model beside the
+  markup, no json sidecar and no `data-*` marker to write, so every `.tpl`
+  the project already has opens with its structure recognized without being
+  migrated, and what the builder saves stays exactly as hand-editable as
+  what it opened. Blocks are one directory per block under
+  `_templates/library/<key>` (manifest + `block.tpl`), the same convention
+  `_install/library` uses - 21 core blocks shipped in this foundation, and
+  adding a 22nd was one new directory and no code change. A manifest declares how to recognize the
+  block (`match`, scored by specificity so a generic "Heading" never
+  swallows a "Section Title") and which classes, attributes, tag or text are
+  editable (`settings`, initially six types); the mapping between control
+  and class runs client-side only, in `assets/blocks.js`, so nothing can read a class
+  one way and write it back another. The canvas is deliberately not a
+  preview: grid widths and spacing are drawn to scale, everything else is a
+  labelled box, and markup the library doesn't describe still gets a box -
+  read-only, never hidden and never dropped. A node whose `id` is targeted
+  by a project css rule is flagged, since such a rule overrides the classes
+  the builder presents as that node's properties. Only `page-*`/`section-*`
+  are editable: `html-header.tpl`/`html-footer.tpl` are one structure split
+  across two files (the header opens `<main>`, the footer closes it), so
+  neither is a well-formed fragment and an html parser handed one alone
+  would "correct" it into a broken page frame. Underpinning all of it,
+  `Parser`/`Serializer` guarantee a **byte-exact round-trip** - attribute
+  order, whitespace, comments and the original spelling of every entity are
+  preserved, so opening a template and saving it unchanged is a no-op rather
+  than a reformat; `tests/templates-smoke.php` asserts that against every
+  shipped page template. See `docs/_templates.md`
+
 - **Added `/_install`'s "Themes" step** and the `_install/library/themes/`
   branch behind it: a theme is now a complete, self-contained library unit
   (`manifest.php` + its stylesheet + the webfonts that stylesheet actually

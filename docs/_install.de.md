@@ -2,7 +2,7 @@
 *[English](_install.md)*
 
 **Links:**
-[README](../README.de.md) · [Design-Handbuch](design.de.md) · [Entwickler-Handbuch](development.de.md) · [_editor-Handbuch](_editor.de.md) · [_admin-Handbuch](_admin.de.md) · [Security Policy](../SECURITY.md) · [Changelog](../CHANGELOG.md)
+[README](../README.de.md) · [Design-Handbuch](design.de.md) · [Entwickler-Handbuch](development.de.md) · [_editor-Handbuch](_editor.de.md) · [_admin-Handbuch](_admin.de.md) · [_templates-Handbuch](_templates.de.md) · [Security Policy](../SECURITY.md) · [Changelog](../CHANGELOG.md)
 
 Ein grafischer, nur für Entwickler gedachter Assistent für das initiale Setup eines frischen Checkouts unter `/_install`. Optional - ein Projekt lässt sich genauso gut von Hand einrichten (siehe `docs/development.de.md`) - der Assistent führt lediglich durch dieselben Schritte im Browser statt in der Shell.
 
