@@ -4,4 +4,9 @@
 	// (see Install\Webpages) writes those directly, keyed by whatever uri
 	// a project actually mounts this template at, not this folder's name
 
+	'[[/webpage/contact/uri]]' => '/contact',
+	'[[/webpage/contact/name]]' => 'Contact',
+	'[[/webpage/contact/title]]' => 'Contact us',
+	'[[/webpage/contact/description]]' => 'Get in touch - we usually reply within one business day.',
+
 ];

@@ -6,4 +6,9 @@
 
 	'[[/page-about-me/title]]' => 'Über uns',
 	'[[/page-about-me/text]]' => 'Erzählen Sie hier etwas über sich oder Ihr Unternehmen.',
+	'[[/webpage/about-me/uri]]' => '/about',
+	'[[/webpage/about-me/name]]' => 'Über mich',
+	'[[/webpage/about-me/title]]' => 'Über mich',
+	'[[/webpage/about-me/description]]' => 'Erzählen Sie hier etwas über sich oder Ihr Unternehmen.',
+
 ];

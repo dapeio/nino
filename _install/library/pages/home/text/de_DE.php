@@ -6,4 +6,8 @@
 
 	'[[/page-home/welcome/title]]' => 'Willkommen.',
 	'[[/page-home/welcome/subtitle]]' => 'Hier steht Ihr erster Eindruck.',
+	'[[/webpage/home/uri]]' => '/',
+	'[[/webpage/home/name]]' => 'Startseite',
+	'[[/webpage/home/title]]' => 'Willkommen.',
+	'[[/webpage/home/description]]' => 'Hier steht Ihr erster Eindruck.',
 ];
