@@ -1037,6 +1037,133 @@ check( 'PageEditor actions require an authed _admin session too', $status === 40
 echo "\n";
 
 
+// --- Elements: element *content* CRUD ------------------------------------
+
+echo "Elements - element content CRUD\n";
+
+// A second type alongside testtype, with both a global and a locale field, so
+// the global/locale split and the raw-bucket view have something real to show
+file_put_contents( $sandbox. '/elements/contenttype.php', '<?php return [
+	\'title\'	=> \'Content Type\',
+	\'model\'	=> [
+		\'title\'	=> [ \'type\' => \'string\', \'locale\' => true ],
+		\'views\'	=> [ \'type\' => \'integer\', \'default\' => 0 ],
+	],
+];' );
+
+[ $status, $body ] = callDev( $appData, \Nino\Admin\Elements::class, 'apiTypes' );
+check( 'apiTypes succeeds', $status === 200 );
+check( 'apiTypes lists every type on disk', in_array( 'contenttype', array_column( $body['types'], 'type' ), true ) === true );
+check( 'apiTypes carries each type\'s model along', ( $body['types'][array_search( 'contenttype', array_column( $body['types'], 'type' ), true )]['model']['views']['type'] ?? null ) === 'integer' );
+// Not a literal list: an earlier Config::apiSave check in this same file adds
+// fr_FR to the available locales, and this module must simply report whatever
+// is configured at the time it runs
+check( 'apiTypes reports the currently available locales', $body['locales'] === \Nino\Locales::getAvailableLocales( $appData ) );
+check( 'apiTypes seeds the locale select with the native locale', $body['selectedLocale'] === 'de_DE' );
+
+[ $status ] = callDev( $appData, \Nino\Admin\Elements::class, 'apiList', [ 'type' => 'nope' ] );
+check( 'apiList 404s for an unknown type', $status === 404 );
+
+[ $status, $body ] = callDev( $appData, \Nino\Admin\Elements::class, 'apiSave', [
+	'type' => 'contenttype', 'uri' => 'first', 'locale' => 'de_DE', 'isNew' => true,
+	'fields' => [ 'title' => 'Erster', 'views' => 3 ],
+] );
+check( 'apiSave inserts a new element', $status === 200 );
+check( 'apiSave returns the stored element', ( $body['element']['title'] ?? null ) === 'Erster' && ( $body['element']['views'] ?? null ) === 3 );
+
+[ $status ] = callDev( $appData, \Nino\Admin\Elements::class, 'apiSave', [
+	'type' => 'contenttype', 'uri' => 'not a slug', 'locale' => 'de_DE', 'isNew' => true,
+	'fields' => [ 'title' => 'x' ],
+] );
+check( 'apiSave rejects a new uri that is not a plain slug', $status === 400 );
+
+// The second locale of the same element - what the frontend's _saveLocales()
+// sends as a follow-up request, global fields omitted (position > 0)
+[ $status ] = callDev( $appData, \Nino\Admin\Elements::class, 'apiSave', [
+	'type' => 'contenttype', 'uri' => 'first', 'locale' => 'en_US', 'isNew' => false,
+	'fields' => [ 'title' => 'First' ],
+] );
+check( 'apiSave updates a second locale of the same element', $status === 200 );
+
+[ $status, $body ] = callDev( $appData, \Nino\Admin\Elements::class, 'apiList', [ 'type' => 'contenttype' ] );
+check( 'apiList succeeds', $status === 200 );
+check( 'apiList finds the element across locales', count( $body['elements'] ) === 1 && $body['elements'][0]['uri'] === 'first' );
+check( 'apiList labels an element by its title', $body['elements'][0]['label'] === 'Erster' );
+
+[ $status, $body ] = callDev( $appData, \Nino\Admin\Elements::class, 'apiGet', [ 'type' => 'contenttype', 'uri' => 'first' ] );
+check( 'apiGet succeeds', $status === 200 );
+check( 'apiGet splits global fields out of the locale buckets', $body['global'] === [ 'views' => 3 ] );
+check( 'apiGet keeps each locale\'s own translation', $body['locales']['de_DE']['title'] === 'Erster' && $body['locales']['en_US']['title'] === 'First' );
+
+// An untranslated locale still shows up in the form, with empty fields: the
+// element exists there (getElement resolves the shared '*' bucket, which is
+// not empty), it just has no translation of its own yet. Same behaviour as
+// _editor's equivalent - the form is the resolved view, not the storage
+check( 'a locale with no translation of its own is still offered, with empty fields', array_key_exists( 'fr_FR', $body['locales'] ) === true && $body['locales']['fr_FR']['title'] === null );
+
+// ...and this is exactly what the raw view is for: it shows the storage, so
+// the difference between "translated" and "only resolving through '*'" -
+// invisible in the form above - becomes readable
+check( 'apiGet exposes the raw per-bucket storage', isset( $body['raw'] ) === true );
+check( 'the global field sits in the "*" bucket, not in a locale one', $body['raw']['*'] === [ 'views' => 3 ] );
+check( 'each locale bucket holds only that locale\'s own fields', $body['raw']['de_DE'] === [ 'title' => 'Erster' ] && $body['raw']['en_US'] === [ 'title' => 'First' ] );
+check( 'a locale that only resolves through "*" has no bucket of its own at all', array_key_exists( 'fr_FR', $body['raw'] ) === false );
+check( 'the raw view never leaks the type\'s own non-bucket keys', isset( $body['raw']['model'] ) === false && isset( $body['raw']['title'] ) === false );
+
+[ $status ] = callDev( $appData, \Nino\Admin\Elements::class, 'apiGet', [ 'type' => 'contenttype', 'uri' => 'nope' ] );
+check( 'apiGet 404s for an unknown element', $status === 404 );
+
+// Regression guard for the exact shape that used to crash the kernel's own
+// deleteElement()/queryElements(): a hand-authored type file's top-level
+// 'title' is a plain string, not a bucket of entries. Fed in literally rather
+// than read off disk - this is a pure function, and the fixture files earlier
+// checks in this file mutate would make it a moving target
+$handAuthored = [
+	'title' => 'Hand Authored',
+	'model' => [ 'name' => [ 'type' => 'string', 'locale' => true ] ],
+	'*' 		=> [ '*' => [], 'item1' => [ 'sort' => 1 ] ],
+	'de_DE' => [ 'item1' => [ 'name' => 'Hallo' ], 'item2' => [ 'name' => 'Zwei' ] ],
+];
+check( 'rawBuckets survives a type file whose top-level "title" is a plain string', \Nino\Admin\Elements::rawBuckets( $handAuthored, 'item1' ) === [ '*' => [ 'sort' => 1 ], 'de_DE' => [ 'name' => 'Hallo' ] ] );
+check( 'rawBuckets never returns another element\'s buckets', \Nino\Admin\Elements::rawBuckets( $handAuthored, 'item2' ) === [ 'de_DE' => [ 'name' => 'Zwei' ] ] );
+check( 'rawBuckets returns nothing for an element that does not exist', \Nino\Admin\Elements::rawBuckets( $handAuthored, 'nope' ) === [] );
+
+[ $status ] = callDev( $appData, \Nino\Admin\Elements::class, 'apiDelete', [ 'type' => 'contenttype', 'uri' => 'first' ] );
+check( 'apiDelete succeeds', $status === 200 );
+[ $status ] = callDev( $appData, \Nino\Admin\Elements::class, 'apiGet', [ 'type' => 'contenttype', 'uri' => 'first' ] );
+check( 'the deleted element is gone from every locale', $status === 404 );
+
+// Deleting again is a no-op that still reports success: the kernel's
+// deleteElement() unsets whatever is there and reports the write, it does not
+// treat "already gone" as an error. Identical to _editor's own apiDelete -
+// asserted here so a future change to either side has to be deliberate
+[ $status ] = callDev( $appData, \Nino\Admin\Elements::class, 'apiDelete', [ 'type' => 'contenttype', 'uri' => 'first' ] );
+check( 'deleting an already-deleted element is an idempotent no-op, not an error', $status === 200 );
+
+[ $status ] = callDev( $appData, \Nino\Admin\Elements::class, 'apiDelete', [ 'type' => 'nope', 'uri' => 'first' ] );
+check( 'apiDelete 400s for an unknown type', $status === 400 );
+
+\Nino\Runtime::unsetSessionValue( $appData, './nino/admin/authed' );
+[ $status ] = callDev( $appData, \Nino\Admin\Elements::class, 'apiTypes' );
+check( 'Elements actions require an authed _admin session too', $status === 401 );
+\Nino\Runtime::setSessionValue( $appData, './nino/admin/authed', true );
+
+// Every action this module registers must actually resolve through the
+// dispatcher - a typo in the action map would otherwise only surface in the ui
+$dispatchable = true;
+foreach( array_keys( \Nino\Admin\Elements::actions() ) as $actionName ) {
+	$_POST['action'] = $actionName;
+	$_POST['data']	 = json_encode( [ 'type' => 'contenttype', 'uri' => 'first' ] );
+	$dispatchRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+	\Nino\Admin\Admin::handlePost( $appData, $dispatchRequest );
+	if( $dispatchRequest['/nino/http/response']['statusCode'] === 404 && ( $dispatchRequest['/nino/http/response']['body']['error'] ?? '' ) === 'unknown action' )
+		$dispatchable = false;
+}
+check( 'every develements/* action is reachable through Admin::handlePost', $dispatchable === true );
+
+echo "\n";
+
+
 // --- Final: unauthed guard sanity check across every module -------------
 
 echo "Every module rejects an unauthed request\n";

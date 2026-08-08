@@ -12,7 +12,7 @@
 	</head>
 	<body>
 		[csrf]
-		<div id="admin-page-wrap" class="show-dashboard">
+		<div id="admin-page-wrap" class="show-dashboard" data-dir="[[/nino/dir]]">
 			<aside id="admin-shell-rail" aria-label="Admin navigation">
 				<div id="admin-bar-wrap">
 					<div id="admin-bar-title">
@@ -31,6 +31,7 @@
 				<nav id="admin-nav-wrap" aria-label="Admin sections">
 					<a href="#" id="admin-nav-dashboard" class="active">Dashboard</a>
 					<a href="#" id="admin-nav-types">Element Types</a>
+					<a href="#" id="admin-nav-elements">Elements</a>
 					<a href="#" id="admin-nav-text">Text</a>
 					<a href="#" id="admin-nav-pages">Pages</a>
 					<a href="#" id="admin-nav-images">Images</a>
@@ -45,6 +46,13 @@
 				<div id="admin-content-types">
 					<div id="types-list"></div>
 					<div id="types-form"></div>
+				</div>
+				<!-- Drill-down: types -> element list -> edit form, each level
+				     hiding its parent (see assets/elements.js) -->
+				<div id="admin-content-elements">
+					<div id="elements-types"></div>
+					<div id="elements-list"></div>
+					<div id="elements-form"></div>
 				</div>
 				<div id="admin-content-text">
 					<div id="text-list"></div>
@@ -75,6 +83,7 @@
 		<script src="[[/nino/dir]]/_admin/assets/script.js"></script>
 		<script src="[[/nino/dir]]/_admin/assets/dashboard.js"></script>
 		<script src="[[/nino/dir]]/_admin/assets/elementtypes.js"></script>
+		<script src="[[/nino/dir]]/_admin/assets/elements.js"></script>
 		<script src="[[/nino/dir]]/_admin/assets/text.js"></script>
 		<script src="[[/nino/dir]]/_admin/assets/pages.js"></script>
 		<script src="[[/nino/dir]]/_admin/assets/images.js"></script>

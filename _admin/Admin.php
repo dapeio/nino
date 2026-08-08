@@ -58,6 +58,7 @@ namespace Nino\Admin {
 		private const array MODULES = [
 			\Nino\Admin\Dashboard::class,
 			\Nino\Admin\ElementTypes::class,
+			\Nino\Admin\Elements::class,
 			\Nino\Admin\Text::class,
 			\Nino\Admin\PageEditor::class,
 			\Nino\Admin\Images::class,
@@ -683,6 +684,552 @@ namespace Nino\Admin {
 	 *											small bit of archiving logic it needs, same reasoning as
 	 *											postData() above - this whole folder stays standalone) and
 	 *											of config.php's own data:
+	 *											- the backup directory is *found* by globbing _editor/ for
+	 *											  its one-time random name, not read from a config value
+	 *											- the decryption key has its own independent copy here
+	 *											  (_admin/.restore-key.php), written once by
+	 *											  Backup::_bootstrap() the first time it runs
+	 *											So this still works even if config.php's *data* (not
+	 *											syntax) is what's broken - eg. a wrecked admin user
+	 *											record. A genuine config.php syntax error is out of scope:
+	 *											_admin boots through the same kernel bootstrap as _editor
+	 *											and can't survive that either - that's a manual recovery.
+	 *
+	 *	@package					Dape/Nino
+	 *	@author						David Perchermeier <mail@dape.io>
+	 *	@link							https://github.com/dapeio/nino
+	 */
+	class Elements {
+
+		// Same DEFAULT_MAXLENGTH the frontend falls back to - kept here only
+		// so the two can't drift apart silently; nothing server-side enforces
+		// it (the kernel's own model validation does), it's a form hint
+		private const int DEFAULT_MAXLENGTH = 2000;
+
+		/**
+		 *	This module's action map, merged into Admin::handlePost()'s dispatch
+		 *
+		 *	@return 	array
+		 */
+		public static function actions(): array {
+			return [
+				'develements/types' 			=> [ self::class, 'apiTypes' ],
+				'develements/list' 				=> [ self::class, 'apiList' ],
+				'develements/get' 				=> [ self::class, 'apiGet' ],
+				'develements/save' 				=> [ self::class, 'apiSave' ],
+				'develements/delete' 			=> [ self::class, 'apiDelete' ],
+				'develements/uploadimage' => [ self::class, 'apiUploadImage' ],
+			];
+		}
+
+		/**
+		 *	Nav entry for this module, rendered into the dashboard's tab bar
+		 *
+		 *	@return 	array										[ uri, label ]
+		 */
+		public static function nav(): array {
+			return [ 'elements', 'Elements' ];
+		}
+
+		/**
+		 *	List all element types with their model. 'selectedLocale' is the
+		 *	native locale rather than a remembered per-session one: _editor
+		 *	persists that choice (Editor::sessionLocale) because an editor works
+		 *	in one language for a whole session, whereas here it is only the
+		 *	locale select's initial value - the pick itself stays client-side
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		&$request			(reference) Current server request
+		 *
+		 *	@return 	void
+		 */
+		public static function apiTypes( array &$appData, array &$request ): void {
+
+			if( \Nino\Admin\Admin::guard( $appData, $request ) === false )
+				return;
+
+			$types = [];
+			foreach( self::types( $appData ) as $type ) {
+				$typeData = self::typeData( $appData, $type );
+				$types[] = [
+					'type' 	=> $type,
+					'title' => $typeData['title'] ?? $type,
+					'descr' => self::typeDescr( $appData, $type ),
+					'model' => $typeData['model'] ?? [],
+				];
+			}
+
+			\Nino\Http::ok( $request, [
+				'types' 					=> $types,
+				'locales' 				=> \Nino\Locales::getAvailableLocales( $appData ),
+				'selectedLocale' 	=> \Nino\Locales::getNativeLocale( $appData ),
+				'maxlength' 			=> self::DEFAULT_MAXLENGTH,
+			] );
+		}
+
+		/**
+		 *	List all elements of a type
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		&$request			(reference) Current server request
+		 *
+		 *	@return 	void
+		 */
+		public static function apiList( array &$appData, array &$request ): void {
+
+			if( \Nino\Admin\Admin::guard( $appData, $request ) === false )
+				return;
+
+			$type = (string) ( \Nino\Admin\Admin::postData()['type'] ?? '' );
+
+			if( in_array( $type, self::types( $appData ), true ) === false ) {
+				\Nino\Http::fail( $request, 404, 'unknown type' );
+				return;
+			}
+
+			$model 		= self::typeData( $appData, $type )['model'] ?? [];
+			$results 	= \Nino\Elements::queryElements( $appData, '/'. $type, [], '*', [] );
+
+			$elements = [];
+			foreach( $results as $element ) {
+				$uri = basename( $element['.uri'] ?? '' );
+				$elements[] = [ 'uri' => $uri, 'label' => self::label( $model, $element, $uri ) ];
+			}
+
+			\Nino\Http::ok( $request, [ 'model' => $model, 'elements' => $elements ] );
+		}
+
+		/**
+		 *	Get one element's global fields + per-locale field values, for
+		 *	editing - plus, unlike _editor's equivalent, the element's raw
+		 *	per-bucket storage exactly as it sits in elements/&lt;type&gt;.php.
+		 *	Same reasoning as this tool's Text module seeing blacklisted keys:
+		 *	_admin is the developer-facing view, and the resolved form alone
+		 *	can't show *which* bucket a value actually came from - a locale
+		 *	falling back to '*', or a translation that only looks present
+		 *	because another locale supplies it, is invisible otherwise
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		&$request			(reference) Current server request
+		 *
+		 *	@return 	void
+		 */
+		public static function apiGet( array &$appData, array &$request ): void {
+
+			if( \Nino\Admin\Admin::guard( $appData, $request ) === false )
+				return;
+
+			$data = \Nino\Admin\Admin::postData();
+			$type = (string) ( $data['type'] ?? '' );
+			$uri	= (string) ( $data['uri'] ?? '' );
+
+			if( in_array( $type, self::types( $appData ), true ) === false || $uri === '' || str_contains( $uri, '/' ) === true ) {
+				\Nino\Http::fail( $request, 404, 'unknown type or element' );
+				return;
+			}
+
+			$typeData = self::typeData( $appData, $type );
+			$model 		= $typeData['model'] ?? [];
+			[ $globalKeys, $localeKeys ] = self::splitModel( $model );
+
+			$global 	= [];
+			$locales	= [];
+			$found		= false;
+
+			foreach( \Nino\Locales::getAvailableLocales( $appData ) as $locale ) {
+
+				$element = \Nino\Elements::getElement( $appData, '/'. $type. '/'. $uri, $locale, [] );
+
+				if( $element === [] )
+					continue;
+
+				$found = true;
+
+				foreach( $globalKeys as $key )
+					$global[$key] = $element[$key] ?? null;
+
+				$locales[$locale] = [];
+				foreach( $localeKeys as $key )
+					$locales[$locale][$key] = $element[$key] ?? null;
+			}
+
+			if( $found === false ) {
+				\Nino\Http::fail( $request, 404, 'element not found' );
+				return;
+			}
+
+			\Nino\Http::ok( $request, [
+				'model' 	=> $model,
+				'global' 	=> $global,
+				'locales' => $locales,
+				'raw' 		=> self::rawBuckets( $typeData, $uri ),
+			] );
+		}
+
+		/**
+		 *	One element's untouched per-bucket storage: the '*' (global) bucket
+		 *	and every locale bucket that actually carries an entry for it.
+		 *
+		 *	Deliberately not iterating $typeData's keys blindly - a type file
+		 *	also has non-bucket top-level keys (its own display 'title', a plain
+		 *	string, and 'model'), which is the exact shape that used to crash
+		 *	the kernel's own deleteElement()/queryElements() (see their
+		 *	docblocks). Anything that isn't an array of entries is skipped.
+		 *
+		 *	@param		array 		$typeData			Raw elements/<type>.php content
+		 *	@param		string		$uri					Bare element uri (eg. "item1")
+		 *
+		 *	@return 	array										bucket => that bucket's entry for $uri
+		 */
+		public static function rawBuckets( array $typeData, string $uri ): array {
+
+			$raw = [];
+
+			foreach( $typeData as $bucket => $entries ) {
+
+				if( $bucket === 'model' || is_array( $entries ) === false )
+					continue;
+
+				if( array_key_exists( $uri, $entries ) === true )
+					$raw[(string) $bucket] = $entries[$uri];
+			}
+
+			return $raw;
+		}
+
+		/**
+		 *	Upload, process and store a new image for one "image"-typed model
+		 *	field of an already-saved element - identical contract to _editor's
+		 *	own (deterministic path, committed immediately, previous file only
+		 *	removed once the new one is safely written and the element record
+		 *	actually updated). See _editor/Editor.php's Elements::apiUploadImage()
+		 *	for the full reasoning behind the rollback handling below
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		&$request			(reference) Current server request
+		 *
+		 *	@return 	void
+		 */
+		public static function apiUploadImage( array &$appData, array &$request ): void {
+
+			if( \Nino\Admin\Admin::guard( $appData, $request ) === false )
+				return;
+
+			$data 		= \Nino\Admin\Admin::postData();
+			$type 		= (string) ( $data['type'] ?? '' );
+			$uri 			= (string) ( $data['uri'] ?? '' );
+			$locale 	= (string) ( $data['locale'] ?? '' );
+			$key 			= (string) ( $data['key'] ?? '' );
+
+			if( in_array( $type, self::types( $appData ), true ) === false || $uri === '' || str_contains( $uri, '/' ) === true || \Nino\Locales::verifyLocale( $appData, $locale ) === false ) {
+				\Nino\Http::fail( $request, 400, 'invalid type, uri or locale' );
+				return;
+			}
+
+			$model = self::typeData( $appData, $type )['model'] ?? [];
+			if( ( $model[$key]['type'] ?? '' ) !== 'image' ) {
+				\Nino\Http::fail( $request, 400, 'not an image field' );
+				return;
+			}
+
+			$elementUri 		= '/'. $type. '/'. $uri;
+			$isLocaleField 	= ( $model[$key]['locale'] ?? false ) === true;
+
+			if( \Nino\Elements::getElement( $appData, $elementUri, '*' ) === false ) {
+				\Nino\Http::fail( $request, 404, 'element not found - save it once before uploading an image' );
+				return;
+			}
+
+			if( isset( $_FILES['file'] ) === false || $_FILES['file']['error'] !== UPLOAD_ERR_OK ) {
+				\Nino\Http::fail( $request, 400, 'no file uploaded' );
+				return;
+			}
+
+			$bytes = file_get_contents( $_FILES['file']['tmp_name'] );
+			if( $bytes === false ) {
+				\Nino\Http::fail( $request, 400, 'could not read upload' );
+				return;
+			}
+
+			$oldElement 	= \Nino\Elements::getElement( $appData, $elementUri, $isLocaleField ? $locale : '*' );
+			$oldFilename 	= is_array( $oldElement ) ? ( $oldElement[$key] ?? null ) : null;
+			$oldBytes 		= is_string( $oldFilename ) && $oldFilename !== '' ? \Nino\Images::read( $appData, $oldFilename ) : false;
+
+			$width 		= (int) ( $model[$key]['width'] ?? 0 );
+			$height 	= (int) ( $model[$key]['height'] ?? 0 );
+
+			$imageFieldCount = 0;
+			foreach( $model as $modelField )
+				if( ( $modelField['type'] ?? '' ) === 'image' )
+					$imageFieldCount++;
+
+			$basePath = 'elements/'. $type. '/'. $uri;
+			if( $imageFieldCount > 1 )
+				$basePath .= '-'. $key;
+			if( $isLocaleField === true )
+				$basePath .= '-'. $locale;
+
+			$filename = \Nino\Images::process( $appData, $bytes, $width, $height, $basePath );
+
+			if( $filename === false ) {
+				\Nino\Http::fail( $request, 400, 'invalid or oversized image' );
+				return;
+			}
+
+			$result = \Nino\Elements::updateElement( $appData, $elementUri, [ $key => $filename ], $locale );
+
+			if( is_array( $result ) === false ) {
+				if( $filename === $oldFilename && is_string( $oldBytes ) === true )
+					\Nino\Images::restore( $appData, $filename, $oldBytes );
+				else
+					\Nino\Images::delete( $appData, $filename );
+				\Nino\Http::fail( $request, 400, 'save failed' );
+				return;
+			}
+
+			if( is_string( $oldFilename ) === true && $oldFilename !== '' && $oldFilename !== $filename )
+				\Nino\Images::delete( $appData, $oldFilename );
+
+			\Nino\Http::ok( $request, [ 'filename' => $filename, 'url' => \Nino\Images::getUrl( $appData, $filename ) ] );
+		}
+
+		/**
+		 *	Insert or update an element
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		&$request			(reference) Current server request
+		 *
+		 *	@return 	void
+		 */
+		public static function apiSave( array &$appData, array &$request ): void {
+
+			if( \Nino\Admin\Admin::guard( $appData, $request ) === false )
+				return;
+
+			$data 		= \Nino\Admin\Admin::postData();
+			$type 		= (string) ( $data['type'] ?? '' );
+			$uri 			= (string) ( $data['uri'] ?? '' );
+			$locale 	= (string) ( $data['locale'] ?? '' );
+			$isNew 		= ( $data['isNew'] ?? false ) === true;
+			$fields 	= is_array( $data['fields'] ?? null ) ? $data['fields'] : [];
+
+			if( in_array( $type, self::types( $appData ), true ) === false || $uri === '' || str_contains( $uri, '/' ) === true || ( $isNew === true && self::validNewUri( $uri ) === false ) || \Nino\Locales::verifyLocale( $appData, $locale ) === false ) {
+				\Nino\Http::fail( $request, 400, 'invalid type, uri or locale' );
+				return;
+			}
+
+			// A model field with 'html' => true gets the same whitelist-tag
+			// sanitizing Text uses - never trust the client's html
+			$model = self::typeData( $appData, $type )['model'] ?? [];
+			foreach( $fields as $key => $value )
+				if( is_string( $value ) === true && ( $model[$key]['html'] ?? false ) === true )
+					$fields[$key] = \Nino\Html::sanitizeHtml( $value );
+
+			// Required-field enforcement lives in the kernel itself
+			// (Elements::insertElement()/updateElement()) - $errorMsg below
+			// already captures its "Missing required element key '...'" message
+			$errorMsg = null;
+			set_error_handler( function( int $errno, string $errstr ) use ( &$errorMsg ): bool { $errorMsg = $errstr; return true; } );
+
+			$result = ( $isNew === true )
+				? \Nino\Elements::insertElement( $appData, '/'. $type. '/'. $uri, $fields, $locale )
+				: \Nino\Elements::updateElement( $appData, '/'. $type. '/'. $uri, $fields, $locale );
+
+			restore_error_handler();
+
+			if( is_array( $result ) === false ) {
+				\Nino\Http::fail( $request, 400, $errorMsg ?? 'save failed' );
+				return;
+			}
+
+			\Nino\Http::ok( $request, [ 'element' => $result ] );
+		}
+
+		/**
+		 *	Delete an element (all locales)
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		&$request			(reference) Current server request
+		 *
+		 *	@return 	void
+		 */
+		public static function apiDelete( array &$appData, array &$request ): void {
+
+			if( \Nino\Admin\Admin::guard( $appData, $request ) === false )
+				return;
+
+			$data = \Nino\Admin\Admin::postData();
+			$type = (string) ( $data['type'] ?? '' );
+			$uri	= (string) ( $data['uri'] ?? '' );
+
+			if( in_array( $type, self::types( $appData ), true ) === false || $uri === '' || str_contains( $uri, '/' ) === true ) {
+				\Nino\Http::fail( $request, 400, 'invalid type or uri' );
+				return;
+			}
+
+			$elementUri 		= '/'. $type. '/'. $uri;
+			$imageFilenames = self::collectImageFilenames( $appData, $type, $elementUri );
+
+			$errorMsg = null;
+			set_error_handler( function( int $errno, string $errstr ) use ( &$errorMsg ): bool { $errorMsg = $errstr; return true; } );
+
+			$deleted = \Nino\Elements::deleteElement( $appData, $elementUri, '*' );
+
+			restore_error_handler();
+
+			if( $errorMsg !== null || $deleted !== true ) {
+				\Nino\Http::fail( $request, 409, $errorMsg ?? 'delete vetoed' );
+				return;
+			}
+
+			// Only once the element itself is actually gone - an "image" field's
+			// value is just a filename reference, deleting the element wouldn't
+			// otherwise touch the file it points to at all
+			foreach( $imageFilenames as $filename )
+				\Nino\Images::delete( $appData, $filename );
+
+			\Nino\Http::ok( $request );
+		}
+
+		/**
+		 *	Every uploaded image filename currently stored on an element - a
+		 *	locale-scoped image field can differ per locale, so all of them
+		 *	need checking, not just the global bucket
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$type					Element type
+		 *	@param		string		$elementUri		Full element uri (eg. "/portfolio/item1")
+		 *
+		 *	@return 	array										Distinct, non-empty filenames
+		 */
+		private static function collectImageFilenames( array &$appData, string $type, string $elementUri ): array {
+
+			$model 		= self::typeData( $appData, $type )['model'] ?? [];
+			$imageKeys = [];
+			foreach( $model as $key => $field )
+				if( ( $field['type'] ?? '' ) === 'image' )
+					$imageKeys[] = $key;
+
+			if( $imageKeys === [] )
+				return [];
+
+			$filenames = [];
+
+			foreach( \Nino\Locales::getAvailableLocales( $appData ) as $locale ) {
+				$element = \Nino\Elements::getElement( $appData, $elementUri, $locale, [] );
+				foreach( $imageKeys as $key )
+					if( is_string( $element[$key] ?? null ) === true && $element[$key] !== '' )
+						$filenames[$element[$key]] = true;
+			}
+
+			return array_keys( $filenames );
+		}
+
+		/**
+		 *	Return all element type uris (bare names, eg. "services") found on disk
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	array										List of type names
+		 */
+		private static function types( array &$appData ): array {
+
+			$types = [];
+			foreach( glob( \Nino\Filesystem::getPath( $appData ). '/elements/*.php' ) ?: [] as $file )
+				$types[] = basename( $file, '.php' );
+
+			sort( $types );
+
+			return $types;
+		}
+
+		/**
+		 *	Read a type's data
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$type					Type name (eg. "services")
+		 *
+		 *	@return 	array										Raw elements/<type>.php content
+		 */
+		private static function typeData( array &$appData, string $type ): array {
+			return \Nino\Filesystem::getFileContent( $appData, '/elements/'. $type. '.php', [] );
+		}
+
+		/**
+		 *	Pick a human readable description for a type
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$type					Type name (eg. "services")
+		 *
+		 *	@return 	string									Readable description
+		 */
+		private static function typeDescr( array &$appData, string $type ): string {
+
+			$elements = \Nino\Elements::queryElements( $appData, '/'. $type, [], '*', [] );
+			$info = '('. count( $elements ). ') ';
+
+			foreach( $elements as $elData )
+				$info .= str_replace( '/'. $type, '', $elData['.uri'] ). ', ';
+
+			return ( strlen( $info ) > 150 ) ? substr( $info, 0, 150 ). ' ..' : $info;
+		}
+
+		/**
+		 *	Pick a human readable label for an element (for the list view)
+		 *
+		 *	@param		array 		$model				Type model definition
+		 *	@param		array 		$element			Resolved element data
+		 *	@param		string		$uri					Element uri, used as fallback label
+		 *
+		 *	@return 	string									Label
+		 */
+		private static function label( array $model, array $element, string $uri ): string {
+
+			foreach( [ 'title', 'label', 'name' ] as $key )
+				if( isset( $element[$key] ) === true && $element[$key] !== '' )
+					return (string) $element[$key];
+
+			foreach( $model as $key => $field )
+				if( ( $field['type'] ?? '' ) === 'string' && isset( $element[$key] ) === true && $element[$key] !== '' )
+					return (string) $element[$key];
+
+			return $uri;
+		}
+
+		/**
+		 *	Split a model into its global-only and locale-specific field keys
+		 *
+		 *	@param		array 		$model				Type model definition
+		 *
+		 *	@return 	array										[ globalKeys[], localeKeys[] ]
+		 */
+		private static function splitModel( array $model ): array {
+
+			$globalKeys = [];
+			$localeKeys = [];
+
+			foreach( $model as $key => $field )
+				if( ( $field['locale'] ?? false ) === true )
+					$localeKeys[] = $key;
+				else
+					$globalKeys[] = $key;
+
+			return [ $globalKeys, $localeKeys ];
+		}
+
+		// A new element uri becomes both an array key and (for image fields) a
+		// filename component. Keep it to the slug syntax the form's own hint
+		// promises; existing legacy uris remain readable/deletable.
+		private static function validNewUri( string $uri ): bool {
+			return preg_match( '/^[A-Za-z0-9][A-Za-z0-9_-]*$/', $uri ) === 1;
+		}
+	}
+
+	/**
+	 *	Nino							A compact filesystembased php framework
+	 *	Dev								Disaster recovery: restore a _editor daily backup.
+	 *
+	 *											Deliberately independent of config.php's own backup keys:
 	 *											- the backup directory is *found* by globbing _editor/ for
 	 *											  its one-time random name, not read from a config value
 	 *											- the decryption key has its own independent copy here

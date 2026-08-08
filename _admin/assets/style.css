@@ -193,6 +193,7 @@ body {
 }
 #admin-page-wrap.show-dashboard #admin-content-dashboard,
 #admin-page-wrap.show-types #admin-content-types,
+#admin-page-wrap.show-elements #admin-content-elements,
 #admin-page-wrap.show-text #admin-content-text,
 #admin-page-wrap.show-pages #admin-content-pages,
 #admin-page-wrap.show-images #admin-content-images,
@@ -202,11 +203,47 @@ body {
 	display: block;
 }
 
+#admin-content-elements > div:not(.admin-hidden),
 #admin-content-text > div:not(.admin-hidden),
 #admin-content-pages > div:not(.admin-hidden),
 #admin-content-images > div:not(.admin-hidden),
 #admin-content-config > div:not(.admin-hidden) {
 	display: block;
+}
+
+/* ------------------------------------------------------------- Elemente (Rohdaten) */
+
+/* The read-only bucket dump under the element form (see assets/elements.js's
+   _renderRaw) - a diagnostic view, so it stays visually quieter than the form
+   itself and never competes with it for attention */
+#elements-form-raw {
+	margin-top: 2rem;
+	border-top: 1px solid var(--editor-separator);
+	padding-top: 1rem;
+}
+
+#elements-form-raw summary {
+	cursor: pointer;
+	font-weight: 600;
+}
+
+.elements-raw-bucket {
+	margin-top: .75rem;
+	font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+	font-weight: 600;
+}
+
+.elements-raw-json {
+	margin: .25rem 0 0;
+	padding: .5rem .75rem;
+	background: var(--editor-bg-grouped);
+	border-radius: var(--editor-radius-sm);
+	font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+	font-size: .8125rem;
+	line-height: 1.5;
+	/* Arbitrary stored content - never let a long value push the panel wide */
+	overflow-x: auto;
+	white-space: pre;
 }
 
 /* ------------------------------------------------------------- Wiederherstellung */
