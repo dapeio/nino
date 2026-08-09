@@ -4,7 +4,7 @@
 
 **[Live Demo](https://demo.getnino.dev)** ·
 
-## Build websites simply with Nino
+## Build websites, not programs.
 
 Nino is a lean foundation for modern PHP websites. It works entirely without a database or external packages and avoids unnecessary bloat. Developers retain control over the frontend, templates, and functionality; editors and site owners maintain content through a streamlined GUI.
 Nino does not get lost in possibilities—it puts content on the web.
