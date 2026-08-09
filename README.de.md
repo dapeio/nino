@@ -2,6 +2,8 @@
 
 **Sprache:** [English](README.md) · Deutsch
 
+**[Live Demo](https://demo.getnino.dev)** ·
+
 ## Mit Nino einfach Webseiten entwickeln
 
 Nino ist eine schlanke Basis für moderne PHP-Webseiten. Es funktioniert komplett ohne Datenbank oder externe Pakete und verzichtet auf unnötigen Ballast. Entwickler behalten die Kontrolle über Frontend, Templates und Funktionen; Redakteure und Betreiber pflegen Inhalte über ein schlankes GUI.
