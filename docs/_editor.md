@@ -1,275 +1,207 @@
-# Nino — Editor Handbook
-*[Deutsch](_editor.de.md)*
+# `/_editor` — User Manual
 
-**Links:**
-[README](../README.md) · [Design-Handbook](design.md) · [Developer-Handbook](development.md) · [_admin-Handbook](_admin.md) · [_install-Handbook](_install.md) · [_templates-Handbook](_templates.md) · [Security Policy](../SECURITY.md) · [Changelog](../CHANGELOG.md)
+**Language:** English · [Deutsch](_editor.de.md)
 
-Precise instructions for the day-to-day maintenance of the website via `/_editor` — no programming knowledge required.
-For technical background: `docs/development.md`.
+**Last updated:** August 8, 2026 · **Nino version:** 0.11.0-beta.1
 
-### Signing in
+This manual explains the daily work with released texts, elements, images, users, and operational data under `/_editor`. If you need full technical and content access, read the [`/_admin` Operation Manual](_admin.md); the structural editing of templates is described in the [`/_templates` Operation](_templates.md).
 
-Sign in at `/_editor` with an email address and password. After too
-many failed attempts the account is temporarily locked
-(default: 5 attempts, followed by a 1-hour cooldown — configured via
-`/nino/auth/maxtries`/`/nino/auth/cooldown`, see
-`docs/development.md`).
-( The error message deliberately does not distinguish between
-"email unknown" and "wrong password" — both show the same generic
-message, so that no valid email addresses can be guessed from the
-error message itself. )
+**Additional Links:**
+[README](../README.md) · [Concepts](concepts.md) · [Developer Manual](development.md) · [Getting Started](getting-started.md) · [`/_install` Reference](_install.md) · [`/_admin` Operation](_admin.md) · [`/_templates` Operation](_templates.md) · [`/_editor` Operation](_editor.md) · [Deployment](deployment.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
 
-## 1. The admin area
+**Security:** Which areas you see and are allowed to use depends on the permissions of your account. A missing menu item is therefore often intentional and not a display error.
 
-A successful login rotates the PHP session ID — after a login you may
-need to reload the contents of any other open tab.
+## Login and Interface
 
-### a) Dashboard
+Open `https://your-domain.example/_editor` and log in with your email address and password. Accounts are created during setup or later under `/_admin`.
 
-The most important information at a glance. The most recent form
-submissions, all newsletter sign-ups, the last backup, and the most
-recent changes made in the admin area.
+On the login page, you can choose the language of the interface. After logging in, you will find at the top or side:
 
-### b) Elements
+- your email address;
+- **Logout**;
+- a gear icon for interface language and light or dark color scheme;
+- the areas released for your account.
 
-Recurring content building blocks (e.g. offerings, references, price
-lists, team members) with forms predefined by the developer (field
-model, created via `/_admin` → "Element Types", see section 11).
+The last selected language remains for the session and is also used by the language switches in **Texts** and **Elements**.
 
-**Procedure:**
-1. Pick an element type from the list (the overview shows the number of
-   existing entries for each type).
-2. Open an existing element or create a new one.
-3. Every field can be filled in separately per language (language tabs
-   at the top of the form) — leaving a field empty in one language is
-   valid and simply renders as an empty fill in the template.
-4. Image fields upload through their own upload window; the system
-   crops automatically (centred) and scales to the target format
-   specified by the developer (the same processing as for image slots,
-   see section 4 — the only difference is whether the image is attached
-   to a fixed slot or to a specific element).
-5. Saving writes immediately to the corresponding `elements/<type>.php`.
+After repeated incorrect credentials, Nino may temporarily lock the account. Contact an administrator if you can no longer log in despite the correct password.
 
-**Deleting** removes an element including all its images
-**irreversibly** — no recycle bin, no confirmation step beyond the
-delete dialog itself. The only safeguard is the automatic backup
-(section 8) — an accidental deletion can only be undone via `/_admin` →
-"Restore", not from within `/_editor` itself.
+## Permissions and Visible Areas
 
-**Permission:** `Elements::MANAGE_PERM` (the "Elements" checkbox in
-user management, see section 5).
+`/_editor` hides areas without appropriate permissions. The API checks the same permissions again when saving or loading.
 
-### c) Texts
+| Area | Permission |
+|---|---|
+| Elements | `/_editor/elements/manage` |
+| Texts | `/_editor/text/manage` |
+| Images | `/_editor/images/manage` |
+| Requests | `/_editor/submissions/view` |
+| Newsletter | `/_editor/newsletter/manage` |
+| Log | `/_editor/logs/view` |
+| Other Users and Permissions | `/_editor/users/manage` |
+| All Areas | `/*` |
 
-Fixed pieces of text on the website, grouped by area/category (e.g. all
-the texts of one page together). A category shows all text entries for
-the currently selected language together; changes across several fields
-are saved collectively in one step (batch save) rather than being
-submitted field by field.
+Each account can independently edit its own profile under **Users**.
 
-For values that allow formatting (bold, italic, links — detected via
-`Html::containsHtml()`), a small formatting bar appears automatically;
-the formatting entered is reduced on save to a small, safe tag
-whitelist via `Html::sanitizeHtml()` — pasted `<script>` or a
-`javascript:` link will not survive the save.
+## Dashboard
 
-Purely technical values (design tokens such as colours and spacing
-under `/ui/*`) deliberately do **not** appear here — they live in
-`text/blacklist.php` and are intentionally accessible only to
-developers via the raw files (see the architecture section of
-`docs/design.md`).
+The **Dashboard** shows the operational status relevant to you. Depending on your permissions, this includes:
 
-**Export/import** exists for backing up or migrating individual text
-sets outside the regular automatic backup (e.g. to reconcile text
-between two environments).
+- number of elements by type;
+- new or saved requests;
+- newsletter subscribers;
+- date of the last backup;
+- last logged activities.
 
-**Permission:** its own text permission (the "Texts" checkbox).
+The tiles lead to the respective areas. Values from non-released areas are not displayed.
 
-### d) Images
+## Global and Translated Content
 
-Every image position is a fixed **slot** with a target format specified
-by the developer (created via `/_admin` → "Images", see section 11). An
-upload replaces the previous image at exactly that position — cropping
-(centred) and target size are handled automatically by the system via
-`gd`; the upload itself is fully re-encoded (the uploaded bytes are
-never taken over as-is), including verification of the actual image
-data (not just the stated file extension), an 8 MB size limit, and an
-8000-pixel source resolution limit. An upload disguised as an image but
-actually executable therefore cannot slip through.
+Nino distinguishes between two types of fields:
 
-**A distinction that is often confused:** an image **slot** (this
-section) is a fixed, one-off position in the template (e.g. the hero
-image of a page); an image **field** on an element (section 2) belongs
-to a single element record and can occur any number of times (one photo
-per team member). Technically both end up in the same `images/`
-directory and run through the same processing, but they are separate
-administratively.
+- **Global** applies identically in all languages, such as price, date, or an internal identifier.
+- **Translation** has a separate value for each language, such as title or description.
 
-**Permission:** its own image permission (the "Images" checkbox).
+The developer defines this assignment in `/_admin`. In `/_editor`, you only edit the resulting fields.
 
-### e) Users
+You can switch between languages within a form. Unsaved inputs from the previously selected language remain in the browser during this time. After all changes, click **Save** and wait for confirmation before leaving the area or reloading the page.
 
-**Your own account (every signed-in user):**
-- Change your own password/email, each confirmed with the current
-  password.
-- "Sign out everywhere" ends all active sessions of your own account on
-  all devices — use immediately if you suspect a compromise (see the
-  security notes, section 12).
+## Maintain Texts
 
-**With management rights (the "Full access"/Manager checkbox),
-additionally:**
-- Set other users' permissions by checkbox: Elements, Texts, Images,
-  Requests, Newsletter, Log — or "Full access" for everything at once.
-  The available checkboxes are fixed server-side (a fixed list of known
-  permission strings) — this form can never set a permission that the
-  interface itself does not know about.
-- **Nothing about your own account can be changed this way** — a
-  deliberate safeguard against accidentally revoking your own
-  management rights.
-- "Sign out everywhere" can also be triggered for other users.
+The **Texts** area contains individual textfills such as headings, descriptions, contact details, or labels. The keys are grouped by their first path segment; you edit one complete group at a time.
 
-**Creating new users or deleting users** is deliberately reserved for
-developers via `/_admin` and is not possible through `/_editor` (see
-section 11) — the separation ensures that creating a first account
-never depends on an already existing `/_editor` account.
+![Global and translated text values in `/_editor`](assets/screenshots/editor-text.webp)
 
-**If no one with management rights is left** (the last manager account
-was deleted, or you accidentally locked yourself out via the raw
-`/_admin` permissions), only `/_admin` helps — contact the developer, who
-has access to the `_admin` password.
+1. Open **Texts**.
+2. Select the appropriate group.
+3. Edit global values and select the desired language for translated values.
+4. For formatted fields, use only the offered functions for bold, italic, highlighting, and links.
+5. Click **Save** and wait for the **Saved** message.
 
-**Permission:** `Users::MANAGE_PERM` for the management part; changing
-your own password/email and "Sign out everywhere" for yourself require
-no separate permission, only an active login.
+Character counters show the maximum length intended by the developer. A text key that does not appear here may be intentionally hidden in `/_admin` or technically reserved.
 
-### f) Requests
+### Export and Import Translations
 
-All messages received through the public contact form, newest first —
-as a safety net in addition to the automatically sent email (in case it
-ends up in spam, gets lost, or mail sending is currently subject to the
-rate limit — see the `Mail` section of `docs/development.md`).
-Read-only; no deleting or editing via `/_editor`. 90 days of history,
-after which entries are cleaned up automatically (3 months,
-`Form::RETENTION_MONTHS`).
+Via the translation tools, you can export the texts of one language as JSON. Global values are not included because they apply to all languages.
 
-**Permission:** its own requests permission (the "Requests" checkbox).
+For import:
 
-### g) Newsletter
+1. select the target language;
+2. paste the translated JSON into the text field;
+3. check that keys and JSON structure remain unchanged;
+4. select **Import**;
+5. control the number of imported and skipped entries.
 
-A list of all newsletter sign-ups. The sign-up itself runs as a
-**double opt-in**: an entry is initially only "pending" and becomes
-"active" only once the confirmation link from the automatically sent
-email has been clicked — merely filling in the sign-up form does not
-actually subscribe anyone.
+The import supplements or updates the mentioned keys. Existing texts not included are not deleted. Global keys are skipped so that a translation does not overwrite a cross-language value.
 
-Subscribers can unsubscribe themselves at any time via an unsubscribe
-link (included in every outgoing newsletter email as soon as the
-template embeds it — see the `Newsletter` section of
-`docs/development.md` for `getUnsubscribeLink()`); in addition, every
-entry can be deleted manually here (e.g. on request, or to remove an
-obviously mistaken test entry).
+## Maintain Elements
 
-**Permission:** its own newsletter permission (the "Newsletter"
-checkbox).
+Elements are recurring structured content such as team members, services, events, or references. The developer defines the available types and fields in `/_admin`.
 
-### h) Log
+![Editing an approved element in `/_editor`](assets/screenshots/editor-elements.webp)
 
-A record of recent logins and admin-side changes (who edited what and
-when) — every mutating action via `/_editor` (saving, deleting,
-permission changes, ...) creates an entry; purely display/read
-operations (opening a list without changing anything) deliberately do
-not appear, to keep the log readable. Read-only, 14 days of history.
+### Create a new element
 
-**Permission:** its own log permission (the "Log" checkbox).
+1. Open **Elements** and choose the required type.
+2. Select **New element**.
+3. Enter a unique URI using lowercase letters, digits, hyphens, and underscores, for example `open-workshops`.
+4. Complete all required fields.
+5. Maintain global values and the required translations.
+6. Save the element.
 
-## 2. The developer area (_admin)
+The URI is the permanent technical identifier. Keep it short and meaningful; it cannot be changed through the form later.
 
-### a) Automatic backups
+### Edit an existing element
 
-Once a day, triggered by the first login of the day (not as a separate
-cron job — it runs in the background of the first `/_editor` request a
-signed-in user makes that day), an encrypted backup is created of all
-content editable via `/_editor` (elements, texts, images, user
-accounts). 14 days of history; older backups are deleted automatically.
+Open the type and then the required entry. Global fields are stored once, while translated fields are stored per language. Depending on the model, inputs may appear as text, number, date, selection, yes/no value, list, or image.
 
-The backup files themselves are AES-256-GCM encrypted and are stored
-under a one-off, nowhere-linked random name — they serve exclusively
-for restoration via `/_admin` (section 9) and cannot be viewed directly
-through a browser request (a direct request returns only a 403 status
-code, no data).
+An image field becomes available only after a new element has been saved once. Nino then processes the uploaded file to the dimensions specified by the developer.
 
-A developer can disable backups (and, independently of that, the
-activity log, section 8b) project-wide via `config.php`'s
-`/nino/editor/backups`/`/nino/editor/logs`.
+**Delete** removes the element in every language. Images used exclusively by its image fields are deleted as well. Only a backup can restore the operation.
 
+## Replace Images
 
-### b) Backup restoration (via `/_admin` only)
+The **Images** area contains fixed image slots defined by the developer in `/_admin`. They are grouped by URI area and show their label, shortcode, and target dimensions.
 
-The state of any day within the last 14 days can be restored via
-`/_admin` → "Restore". The current (possibly faulty) state is
-automatically saved beforehand as its own safety snapshot — a
-restoration is therefore itself reversible, by immediately restoring
-that snapshot afterwards.
+1. Open the appropriate group.
+2. Choose an image file for the required slot.
+3. Check the specified target dimensions.
+4. Start the upload and wait for **Saved**.
 
-`/_admin` has its own password, completely independent of the `/_editor`
-accounts (known only to the developer) — which is why restoration still
-works even when the `/_editor` user accounts are precisely the damaged
-part.
+Nino validates and processes the file. Invalid or oversized images are rejected. A successful upload replaces the current image immediately; there is no separate publishing step.
 
-### c) First access & passwords (`/_admin`)
+Image slots cannot be created or deleted in `/_editor`. This is done in `/_admin` so that templates and content use the same technical structure.
 
-Without a single existing `/_editor` account there is no way to sign in
-there — the very first access therefore always comes through `/_admin` →
-"Users", with the management rights checkbox ticked, so that this first
-account can subsequently manage all other accounts and permissions from
-`/_editor`. Creating new `/_editor` accounts or deleting existing ones
-remains a `/_admin` task permanently thereafter (see section 5).
+## User Profile and Accounts
 
-`/_admin` itself has no form login with an email — only a single,
-project-wide password, set via the command line (`php _admin/Admin.php
-<password>`, with the resulting hash entered into the `PASSWORD_HASH`
-constant in `_admin/Admin.php`). The placeholder hash shipped with the
-project deliberately matches no real password — your own must be set
-before first real use, otherwise `/_admin` is unusable for anyone, not
-even for the developer.
+Under **Users**, every account can change its own email address and password. Changes to your own account require the current password. A new password must contain at least eight characters; leaving the field empty keeps the existing password.
 
-## d) Further `/_admin` areas (brief overview for operators)
+**Log out everywhere** terminates all active sessions for the selected account. Use it after a password has been exposed, a device has been lost, or unauthorized access is suspected.
 
-These areas are pure developer tooling and are mentioned here only for
-completeness — for details see `docs/development.md`:
+### Manage other users
 
-- **Element Types** — defines the field model for element types (which
-  fields an "offering" or "team member" has), before `/_editor` →
-  "Elements" (section 2) can maintain data with them.
-- **Images** — creates image slots (fixed positions with a target
-  format) before `/_editor` → "Images" (section 4) can fill them; also
-  contains a scan function that searches templates for slots that are
-  referenced but not yet created.
-- **Texts** — creates new text keys, renames them, and contains the
-  same scan function for `[[key]]` placeholders used in templates but
-  not yet defined — before `/_editor` → "Texts" (section 3) can fill
-  them.
-- **Configuration** — raw view/editing of selected, released
-  `config.php` keys (locales, error display/logging, asset bundles,
-  routes) — not everything in `config.php` is editable here, only a
-  deliberately limited, type-checked subset.
-- **Users** — see sections 5/10.
-- **Restore** — see section 9.
+Accounts with `/_editor/users/manage` can also see other existing users. They can change an email address or password, terminate sessions, grant known permissions, and assign full access `/*`.
 
-## 3. Security notes
+Users cannot extend their own permissions. Creating and deleting accounts remains a task for `/_admin`.
 
-- Do not share passwords, not even within the team — every `/_editor`
-  account is individually traceable via the log (section 8b), and a
-  shared password destroys that traceability.
-- If you suspect a compromise (password accidentally passed on,
-  suspicious log entries), use "Sign out everywhere" (section 5)
-  immediately and change the password afterwards — in that order, so
-  that an already running foreign session is not left running by a mere
-  password change.
-- The log shows at any time who last changed what — in the case of an
-  unexplained content change, look there first before considering a
-  restoration (section 9).
-- An automatic backup is no substitute for deliberate care: deletions
-  (section 2) take effect immediately, the backup only catches them at
-  the next daily run, and after that the previous state is only
-  reachable through the 14-day history.
+Grant only the permissions needed for the actual role. Full access should remain limited to a small number of responsible people.
+
+## Manage Submissions
+
+**Submissions** lists stored form entries when the form module is used and the account has read permission.
+
+The list shows date, category, sender, and message. Long content can be expanded and collapsed. Selecting an email address opens the local mail client; Nino does not send a reply automatically.
+
+**Export as CSV** downloads the current entries. The view is deliberately read-only: submissions cannot be changed or deleted here.
+
+## Manage Newsletter Subscribers
+
+The **Newsletter** area shows stored subscriptions. You can open individual email addresses, copy all addresses as a BCC line, export the list as CSV, or delete a subscription after confirmation.
+
+Before sending, verify that the mail client actually uses BCC so recipients cannot see one another’s addresses.
+
+A deleted address is additionally recorded as removed. This prevents restoring an older backup from silently undoing the unsubscribe operation.
+
+## View the Log
+
+**Log** shows the `/_editor` activity log, including logins and successful changes. Entries are retained for 14 days and are read-only.
+
+This is not the PHP error log. Error logging is configured separately through `config.php` or `/_admin`.
+
+## Saving, Backups, and Publishing
+
+Changes in `/_editor` are written directly to the file-based project data. There is no draft state or separate publish button. Check changes immediately in the frontend and in every affected language.
+
+By default, Nino creates an encrypted backup on the first authenticated editor access of each day and retains daily backups for 14 days. Restoration is performed in `/_admin`.
+
+These backups protect against many editing mistakes but do not replace an external backup of the complete project. Images, configuration, texts, elements, and operational data belong in the same backup plan.
+
+## Recommended Roles
+
+| Role | Suggested permissions |
+| --- | --- |
+| Editor | Texts, elements, and optionally images |
+| Communications | Submissions and newsletter; optionally texts |
+| Site management | Content, log, and user management |
+| Technical owner | Full access `/*`; only for a few accounts |
+
+Start with narrow permissions and expand them only for a concrete need.
+
+## Troubleshooting
+
+| Problem | Check |
+| --- | --- |
+| An area is missing | Check the account permissions under **Users** or in `/_admin`. |
+| Saving fails | Check required fields, character limits, and server write permissions. |
+| Image upload is unavailable | Save a new element once before uploading its image. |
+| An image is rejected | Check format, file size, and target dimensions; contact the developer if necessary. |
+| Changes do not appear in the frontend | Check the selected language, entry, and browser cache. |
+| Login fails | Check credentials and a possible temporary lock; reset the account through `/_admin` if necessary. |
+| No backup date appears | Ask a developer to check backups and write permissions. |
+
+## Next Steps
+
+- [`/_admin` Operation](_admin.md) explains full project administration.
+- [`/_templates` Operation](_templates.md) describes the optional template builder in Alpha status.
+- [Getting Started](getting-started.md) guides through the initial setup.
+- [Deployment](deployment.md) describes web server configuration, security, and go-live.

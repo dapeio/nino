@@ -1,279 +1,218 @@
-# Nino — Editor-Handbuch
-*[English](_editor.md)*
+# `/_editor` — Bedienungsanleitung
 
-**Links:**
-[README](../README.de.md) · [Design-Handbuch](design.de.md) · [Entwickler-Handbuch](development.de.md) · [_admin-Handbuch](_admin.de.md) · [_install-Handbuch](_install.de.md) · [_templates-Handbuch](_templates.de.md) · [Security Policy](../SECURITY.md) · [Changelog](../CHANGELOG.md)
+**Sprache:** [English](_editor.md) · Deutsch
 
-Exakte Anleitung für die tägliche Pflege der Website über `/_editor` — ohne Programmierkenntnisse
-Technische Hintergründe: `docs/development.de.md`.
+**Stand:** 8. August 2026 · **Nino-Version:** 0.11.0-beta.1
 
-### Anmeldung
+Dieses Handbuch erklärt die tägliche Arbeit mit freigegebenen Texten, Elementen, Bildern, Nutzern und Betriebsdaten unter `/_editor`. Falls du vollständigen technischen und inhaltlichen Zugriff benötigst, lies die [`/_admin`-Bedienungsanleitung](_admin.de.md); die strukturelle Bearbeitung von Templates beschreibt die [`/_templates`-Bedienung](_templates.de.md).
 
-Unter `/_editor` mit E-Mail-Adresse und Passwort einloggen. Nach zu
-vielen Fehlversuchen wird das Konto vorübergehend gesperrt
-(Standard: 5 Versuche, danach 1 Stunde Cooldown — konfiguriert über
-`/nino/auth/maxtries`/`/nino/auth/cooldown`, siehe
-`docs/development.de.md`).
-( Die Fehlermeldung unterscheidet bewusst
-nicht zwischen "E-Mail unbekannt" und "Passwort falsch" — beide zeigen
-dieselbe generische Meldung, damit sich über die Fehlermeldung selbst
-keine gültigen E-Mail-Adressen erraten lassen. )
+**Weitere Links:**
+[README](../README.de.md) · [Grundkonzepte](concepts.de.md) · [Entwickler-Handbuch](development.de.md) · [Erste Schritte](getting-started.de.md) · [`/_install`-Referenz](_install.de.md) · [`/_admin`-Bedienung](_admin.de.md) · [`/_templates`-Bedienung](_templates.de.md) · [`/_editor`-Bedienung](_editor.de.md) · [Deployment](deployment.de.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
 
-## 1. Der Admin-Bereich
+**Sicherheit:** Welche Bereiche du siehst und verwenden darfst, hängt von den Rechten deines Kontos ab. Ein fehlender Menüpunkt ist deshalb häufig beabsichtigt und kein Darstellungsfehler.
 
-Ein erfolgreicher Login rotiert die PHP-Session-ID — eventuell müssen nach einem Login die Inhalte in einer anderen Registerkarte neu geladen werden müssen.
+## Anmeldung und Oberfläche
 
-### a) Dashboard
+Öffne `https://deine-domain.example/_editor` und melde dich mit E-Mail-Adresse und Passwort an. Konten werden bei der Einrichtung oder später unter `/_admin` angelegt.
 
-Die wichtigsten Informationen auf einen Blick. Die letzten Formular-Anfragen, alle Newsletteranmeldungen, das letzte Backup und die letzten Änderungen im Admin-Bereich.
+Auf der Anmeldeseite kannst du die Sprache der Oberfläche wählen. Nach der Anmeldung findest du oben beziehungsweise seitlich:
 
-### b) Elemente
+- deine E-Mail-Adresse;
+- **Abmelden**;
+- ein Zahnrad für Oberflächensprache und helles oder dunkles Farbschema;
+- die für dein Konto freigegebenen Bereiche.
 
-Wiederkehrende Inhaltsbausteine (z. B. Angebote, Referenzen,
-Preislisten, Team-Mitglieder) mit vom Entwickler vordefinierten
-Formularen (Feldmodell, angelegt über `/_admin` → "Element Types", siehe
-Abschnitt 11).
+Die zuletzt gewählte Sprache bleibt für die Sitzung erhalten und wird auch von den Sprachumschaltern in **Texte** und **Elemente** verwendet.
 
-**Ablauf:**
-1. Elementtyp aus der Liste wählen (die Übersicht zeigt zu jedem Typ die
-   Anzahl vorhandener Einträge).
-2. Bestehendes Element öffnen oder neu anlegen.
-3. Jedes Feld ist pro Sprache separat befüllbar (Sprach-Reiter oben im
-   Formular) — ein Feld in einer Sprache leer zu lassen ist gültig,
-   rendert im Template dann als leerer Fill.
-4. Bildfelder laden über ein eigenes Upload-Fenster hoch; das System
-   schneidet automatisch zentriert zu und skaliert auf das vom
-   Entwickler vorgegebene Zielformat (dieselbe Verarbeitung wie bei
-   Bild-Slots, siehe Abschnitt 4 — der Unterschied ist nur, ob das Bild
-   an einem festen Slot oder an einem konkreten Element hängt).
-5. Speichern schreibt sofort in die zugehörige `elements/<typ>.php`.
+Nach wiederholt falschen Zugangsdaten kann Nino das Konto vorübergehend sperren. Wende dich an einen Administrator, wenn du dich trotz korrektem Passwort nicht mehr anmelden kannst.
 
-**Löschen** entfernt ein Element inklusive aller zugehörigen Bilder
-**unwiderruflich** — kein Papierkorb, keine Bestätigungsstufe jenseits
-des Löschen-Dialogs selbst. Absicherung ist ausschließlich das
-automatische Backup (Abschnitt 8) — eine versehentliche Löschung lässt
-sich nur über `/_admin` → "Wiederherstellung" rückgängig machen, nicht
-aus `/_editor` selbst heraus.
+## Rechte und sichtbare Bereiche
 
-**Berechtigung:** `Elements::MANAGE_PERM` (Checkbox "Elemente" in der
-Nutzerverwaltung, siehe Abschnitt 5).
+`/_editor` blendet Bereiche ohne passende Berechtigung aus. Die API prüft dieselben Rechte nochmals beim Speichern oder Laden.
 
-### c) Texte
+| Bereich | Berechtigung |
+|---|---|
+| Elemente | `/_editor/elements/manage` |
+| Texte | `/_editor/text/manage` |
+| Bilder | `/_editor/images/manage` |
+| Anfragen | `/_editor/submissions/view` |
+| Newsletter | `/_editor/newsletter/manage` |
+| Log | `/_editor/logs/view` |
+| andere Nutzer und Rechte | `/_editor/users/manage` |
+| alle Bereiche | `/*` |
 
-Feste Textstellen der Website, nach Bereich/Kategorie gruppiert (z. B.
-alle Texte einer Seite zusammen). Eine Kategorie zeigt alle
-Textstellen der aktuell gewählten Sprache gemeinsam; Änderungen an
-mehreren Feldern werden gesammelt in einem Schritt gespeichert
-(Batch-Speichern), nicht Feld für Feld einzeln übertragen.
+Jedes Konto kann unabhängig davon das eigene Profil unter **Nutzer** bearbeiten.
 
-Bei Werten, die Formatierung erlauben (fett, kursiv, Links — erkannt
-über `Html::containsHtml()`), erscheint automatisch eine kleine
-Formatierleiste; die eingegebene Formatierung wird beim Speichern über
-`Html::sanitizeHtml()` auf eine kleine, sichere Tag-Whitelist reduziert
-— eingefügtes `<script>` oder ein `javascript:`-Link überlebt das
-Speichern nicht.
+## Dashboard
 
-Rein technische Werte (Design-Tokens wie Farben, Abstände unter
-`/ui/*`) tauchen hier absichtlich **nicht** auf — sie stehen in
-`text/blacklist.php` und sind bewusst nur Entwicklern über die
-Rohdateien zugänglich (siehe `docs/design.de.md`s Architektur-Abschnitt).
+Das **Dashboard** zeigt den für dich relevanten Betriebsstand. Dazu gehören – abhängig von deinen Rechten –:
 
-**Export/Import** existiert für Backup/Migration einzelner
-Textbestände außerhalb des regulären automatischen Backups (z. B. um
-Text zwischen zwei Umgebungen abzugleichen).
+- Anzahl der Elemente nach Typ;
+- neue oder gespeicherte Anfragen;
+- Newsletter-Abonnenten;
+- Datum des letzten Backups;
+- letzte protokollierte Aktivitäten.
 
-**Berechtigung:** eigene Text-Berechtigung (Checkbox "Texte").
+Die Kacheln führen in die jeweiligen Bereiche. Werte aus nicht freigegebenen Bereichen werden nicht angezeigt.
 
-### d) Bilder
+## Globale und übersetzte Inhalte
 
-Jede Bild-Position ist ein fester **Slot** mit vom Entwickler
-vorgegebenem Zielformat (angelegt über `/_admin` → "Bilder", siehe
-Abschnitt 11). Ein Upload ersetzt das vorherige Bild an genau dieser
-Stelle — Zuschnitt (zentriert) und Zielgröße übernimmt das System
-automatisch über `gd`; der Upload selbst wird dabei komplett
-neu-encodiert (nie die hochgeladenen Bytes 1:1 übernommen), inklusive
-Prüfung der echten Bilddaten (nicht nur der angegebenen Dateiendung),
-einer 8-MB-Obergrenze und einer 8000-Pixel-Quellauflösungs-Obergrenze.
-Ein als Bild getarnter, aber tatsächlich ausführbarer Upload kann so
-nicht durchrutschen.
+Nino unterscheidet zwei Arten von Feldern:
 
-**Unterscheidung, die häufig verwechselt wird:** ein Bild-**Slot**
-(dieser Abschnitt) ist eine feste, einmalige Position im Template
-(z. B. das Hero-Bild einer Seite); ein Bild-**Feld** an einem Element
-(Abschnitt 2) gehört zu einem einzelnen Element-Datensatz und kann
-beliebig oft vorkommen (ein Foto pro Team-Mitglied). Beide landen
-technisch im selben `images/`-Verzeichnis und laufen durch dieselbe
-Verarbeitung, sind aber administrativ getrennt.
+- **Global** gilt in allen Sprachen identisch, beispielsweise Preis, Datum oder eine interne Kennung.
+- **Übersetzung** besitzt pro Sprache einen eigenen Wert, beispielsweise Titel oder Beschreibung.
 
-**Berechtigung:** eigene Bilder-Berechtigung (Checkbox "Bilder").
+Der Entwickler legt diese Zuordnung in `/_admin` fest. In `/_editor` bearbeitest du nur die daraus entstehenden Felder.
 
-### e) Nutzer
+Du kannst innerhalb eines Formulars zwischen den Sprachen wechseln. Noch nicht gespeicherte Eingaben der zuvor gewählten Sprache bleiben währenddessen im Browser erhalten. Klicke nach allen Änderungen auf **Speichern** und warte auf die Bestätigung, bevor du den Bereich verlässt oder die Seite neu lädst.
 
-**Eigenes Konto (jeder eingeloggte Nutzer):**
-- Eigenes Passwort/E-Mail ändern, jeweils mit Bestätigung durch das
-  aktuelle Passwort.
-- "Überall abmelden" beendet alle aktiven Sitzungen des eigenen Kontos
-  auf allen Geräten — sofort nutzen bei Verdacht auf Kompromittierung
-  (siehe Sicherheitshinweise, Abschnitt 12).
+## Texte pflegen
 
-**Mit Verwaltungsrechten (Checkbox "Vollzugriff"/Manager) zusätzlich:**
-- Berechtigungen anderer Nutzer per Checkbox setzen: Elemente, Texte,
-  Bilder, Anfragen, Newsletter, Log — oder "Vollzugriff" für alles
-  gleichzeitig. Die verfügbaren Checkboxen sind serverseitig
-  festgeschrieben (eine feste Liste bekannter Berechtigungsstrings) —
-  es lässt sich über dieses Formular nie eine Berechtigung setzen, die
-  die Oberfläche selbst nicht kennt.
-- **Am eigenen Konto lässt sich nichts über diesen Weg ändern** —
-  bewusste Absicherung dagegen, sich selbst versehentlich die eigenen
-  Verwaltungsrechte zu entziehen.
-- "Überall abmelden" auch für andere Nutzer auslösbar.
+Der Bereich **Texte** enthält einzelne Textfills wie Überschriften, Beschreibungen, Kontaktdaten oder Beschriftungen. Die Schlüssel werden nach ihrem ersten Pfadsegment gruppiert; du bearbeitest jeweils eine vollständige Gruppe.
 
-**Neue Nutzer anlegen oder Nutzer löschen** ist bewusst Entwicklern
-über `/_admin` vorbehalten, nicht über `/_editor` möglich (siehe Abschnitt
-11) — die Trennung stellt sicher, dass das Anlegen eines ersten
-Kontos nie von einem bereits bestehenden `/_editor`-Konto abhängt.
+![Globale und übersetzte Textwerte in `/_editor`](assets/screenshots/editor-text.webp)
 
-**Ist einmal niemand mehr mit Verwaltungsrechten übrig** (letztes
-Manager-Konto gelöscht, oder sich versehentlich selbst über die rohen
-`/_admin`-Berechtigungen ausgesperrt), hilft nur `/_admin` — dafür den
-Entwickler kontaktieren, der Zugriff auf das `_admin`-Passwort hat.
+1. Öffne **Texte**.
+2. Wähle die passende Gruppe.
+3. Bearbeite globale Werte und wähle für übersetzte Werte die gewünschte Sprache.
+4. Nutze bei formatierten Feldern nur die angebotenen Funktionen für Fett, Kursiv, Hervorhebung und Links.
+5. Klicke auf **Speichern** und warte auf die Meldung **Gespeichert**.
 
-**Berechtigung:** `Users::MANAGE_PERM` für den Verwaltungsteil; das
-eigene Passwort/E-Mail ändern und "Überall abmelden" für sich selbst
-braucht keine gesonderte Berechtigung, nur einen aktiven Login.
+Zeichenzähler zeigen die vom Entwickler vorgesehene Maximallänge. Ein Textschlüssel, der hier nicht erscheint, kann in `/_admin` bewusst ausgeblendet oder technisch reserviert sein.
 
-### f) Anfragen
+### Übersetzungen exportieren und importieren
 
-Alle über das öffentliche Kontaktformular eingegangenen Nachrichten,
-neueste zuerst — als Sicherheitsnetz zusätzlich zur automatisch
-versendeten E-Mail (falls diese im Spam landet, verloren geht, oder der
-Mailversand gerade dem Rate-Limit unterliegt — siehe
-`docs/development.de.md`s `Mail`-Abschnitt). Rein lesend, kein
-Löschen/Bearbeiten über `/_editor`. 90 Tage Historie, danach automatisch
-bereinigt (3 Monate, `Form::RETENTION_MONTHS`).
+Über die Übersetzungswerkzeuge kannst du die Texte einer Sprache als JSON exportieren. Globale Werte sind darin nicht enthalten, weil sie für alle Sprachen gelten.
 
-**Berechtigung:** eigene Anfragen-Berechtigung (Checkbox "Anfragen").
+Für den Import:
 
-### g) Newsletter
+1. wähle die Zielsprache;
+2. füge das übersetzte JSON in das Textfeld ein;
+3. prüfe, dass Schlüssel und JSON-Struktur unverändert geblieben sind;
+4. wähle **Importieren**;
+5. kontrolliere die Anzahl importierter und übersprungener Einträge.
 
-Liste aller Newsletter-Anmeldungen. Die Anmeldung selbst läuft als
-**Double-Opt-in**: ein Eintrag ist zunächst nur "ausstehend" und wird
-erst "aktiv", sobald der Bestätigungslink aus der automatisch
-versendeten E-Mail angeklickt wurde — ein bloßes Ausfüllen des
-Anmeldeformulars trägt niemanden tatsächlich ein.
+Der Import ergänzt oder aktualisiert die genannten Schlüssel. Nicht enthaltene bestehende Texte werden nicht gelöscht. Globale Schlüssel werden übersprungen, damit eine Übersetzung keinen sprachübergreifenden Wert überschreibt.
 
-Abonnenten können sich jederzeit selbst über einen Abmeldelink
-austragen (in jeder ausgehenden Newsletter-Mail enthalten, sobald das
-Template ihn einbindet — siehe `docs/development.de.md`s
-`Newsletter`-Abschnitt für `getUnsubscribeLink()`); zusätzlich lässt
-sich jeder Eintrag hier manuell löschen (z. B. auf Zuruf, oder um einen
-offensichtlich falsch eingetragenen Test-Eintrag zu entfernen).
+## Elemente pflegen
 
-**Berechtigung:** eigene Newsletter-Berechtigung (Checkbox
-"Newsletter").
+Elemente sind wiederkehrende strukturierte Inhalte wie Teammitglieder, Leistungen, Termine oder Referenzen. Welche Typen und Felder vorhanden sind, bestimmt der Entwickler in `/_admin`.
 
-### h) Log
+![Freigegebenes Element in `/_editor` bearbeiten](assets/screenshots/editor-elements.webp)
 
-Protokoll der letzten Anmeldungen und admin-seitigen Änderungen (wer
-hat wann was bearbeitet) — jede mutierende Aktion über `/_editor`
-(Speichern, Löschen, Berechtigungsänderung, ...) erzeugt einen
-Eintrag; reine Anzeige-/Lese-Aufrufe (eine Liste öffnen, ohne etwas zu
-ändern) tauchen bewusst nicht auf, um das Log lesbar zu halten. Rein
-lesend, 14 Tage Historie.
+### Neues Element anlegen
 
-**Berechtigung:** eigene Log-Berechtigung (Checkbox "Log").
+1. Öffne **Elemente** und wähle den gewünschten Typ.
+2. Wähle **Neues Element**.
+3. Vergib eine eindeutige URI aus Kleinbuchstaben, Ziffern, Bindestrichen und Unterstrichen, zum Beispiel `offene-workshops`.
+4. Fülle alle Pflichtfelder aus.
+5. Pflege globale Werte und die benötigten Übersetzungen.
+6. Speichere das Element.
 
-## 2. Der Entwickler-Bereich (_admin)
+Die URI ist die dauerhafte technische Kennung. Wähle sie kurz und sprechend; sie lässt sich später nicht über das Formular ändern.
 
-### a) Automatische Backups
+### Vorhandenes Element bearbeiten
 
-Einmal täglich, ausgelöst beim ersten Login des Tages (nicht als
-gesonderter Cronjob — läuft im Hintergrund des ersten `/_editor`-Aufrufs,
-den ein eingeloggter Nutzer an diesem Tag macht), wird eine
-verschlüsselte Sicherung aller über `/_editor` veränderbaren Inhalte
-erstellt (Elemente, Texte, Bilder, Nutzerkonten). 14 Tage Historie,
-ältere Backups werden automatisch gelöscht.
+Öffne den Typ und anschließend den gewünschten Eintrag. Globale Felder werden einmal gespeichert, übersetzte Felder je Sprache. Eingaben können je nach Modell als Text, Zahl, Datum, Auswahl, Ja/Nein-Wert, Liste oder Bild erscheinen.
 
-Die Backup-Dateien selbst sind AES-256-GCM-verschlüsselt und liegen
-unter einem einmaligen, nirgendwo verlinkten Zufallsnamen — sie dienen
-ausschließlich der Wiederherstellung über `/_admin` (Abschnitt 9) und
-sind nicht direkt per Browser-Aufruf einsehbar (ein direkter Request
-liefert nur einen 403-Statuscode, keine Daten).
+Ein Bildfeld ist erst verfügbar, nachdem das neue Element einmal gespeichert wurde. Beim anschließenden Upload verarbeitet Nino die Datei auf die vom Entwickler festgelegten Zielmaße.
 
-Ein Entwickler kann Backups (und unabhängig davon das Activity-Log,
-Abschnitt 8b) über `config.php`s `/nino/editor/backups`/
-`/nino/editor/logs` projektweit abschalten.
+**Löschen** entfernt das Element in allen Sprachen. Auch Bilder, die ausschließlich zu seinen Bildfeldern gehören, werden gelöscht. Die Aktion lässt sich nur über eine Sicherung rückgängig machen.
 
+## Bilder ersetzen
 
-### b) Backup-Wiederherstellung (nur über `/_admin`)
+Der Bereich **Bilder** enthält feste Bildplätze, die der Entwickler in `/_admin` definiert hat. Sie werden nach ihrem URI-Bereich gruppiert und zeigen Bezeichnung, Shortcode und Zielmaße.
 
-Der Stand eines beliebigen Tages der letzten 14 Tage lässt sich über
-`/_admin` → "Wiederherstellung" zurückholen. Der aktuelle (möglicherweise
-fehlerhafte) Stand wird davor automatisch als eigener Sicherheits-
-Snapshot gesichert — eine Wiederherstellung ist also selbst wieder
-umkehrbar, indem der Snapshot direkt danach erneut eingespielt wird.
+1. Öffne die passende Gruppe.
+2. Wähle eine Bilddatei für den gewünschten Platz.
+3. Prüfe die angegebenen Zielmaße.
+4. Starte den Upload und warte auf **Gespeichert**.
 
-`/_admin` hat ein eigenes, von den `/_editor`-Konten komplett unabhängiges
-Passwort (nur dem Entwickler bekannt) — deshalb funktioniert die
-Wiederherstellung auch dann noch, wenn ausgerechnet die
-`/_editor`-Nutzerkonten selbst der beschädigte Teil sind.
+Nino prüft und verarbeitet die Datei. Ungültige oder zu große Bilder werden abgelehnt. Ein erfolgreicher Upload ersetzt das bisherige Bild sofort; es gibt keinen zusätzlichen Veröffentlichungs-Schritt.
 
-### c) Erster Zugang & Passwörter (`/_admin`)
+Bildplätze lassen sich in `/_editor` weder anlegen noch löschen. Das geschieht unter `/_admin`, damit Templates und Inhalt dieselbe technische Struktur verwenden.
 
-Ohne ein einziges bestehendes `/_editor`-Konto gibt es keinen Weg, sich
-dort einzuloggen — der allererste Zugang entsteht daher immer über
-`/_admin` → "Nutzer", mit der Checkbox für Verwaltungsrechte angehakt,
-damit dieses erste Konto anschließend auch alle anderen Konten und
-Berechtigungen von `/_editor` aus verwalten kann. Neue `/_editor`-Konten
-anlegen oder bestehende löschen bleibt danach dauerhaft eine
-`/_admin`-Aufgabe (siehe Abschnitt 5).
+## Nutzerprofil und Konten
 
-`/_admin` selbst hat kein Formular-Login mit E-Mail — nur ein einziges,
-projektweites Passwort, das per Kommandozeile gesetzt wird (`php
-_admin/Admin.php <Passwort>`, Ergebnis-Hash in `_admin/Admin.php`s
-`PASSWORD_HASH`-Konstante eingetragen). Der mitgelieferte
-Platzhalter-Hash matcht absichtlich kein reales Passwort — vor dem
-ersten echten Einsatz muss ein eigenes gesetzt werden, sonst ist `/_admin`
-für niemanden nutzbar, auch nicht für den Entwickler selbst.
+Unter **Nutzer** kann jedes Konto die eigene E-Mail-Adresse und das eigene Passwort ändern. Für Änderungen am eigenen Konto muss das aktuelle Passwort bestätigt werden. Ein neues Passwort benötigt mindestens acht Zeichen; ein leeres Passwortfeld lässt das bisherige Passwort unverändert.
 
-## d) Weitere `/_admin`-Bereiche (Kurzüberblick für Betreiber)
+Mit **Überall abmelden** werden alle aktiven Sitzungen des gewählten Kontos beendet. Verwende diese Funktion nach einem Passwortverlust, auf einem verlorenen Gerät oder bei einem vermuteten Fremdzugriff.
 
-Diese Bereiche sind reines Entwickler-Tooling, werden hier nur der
-Vollständigkeit halber kurz erwähnt — Details siehe
-`docs/development.de.md`:
+### Andere Nutzer verwalten
 
-- **Element Types** — legt das Feldmodell für Elementtypen fest (welche
-  Felder ein "Angebot" oder "Team-Mitglied" hat), bevor `/_editor` →
-  "Elemente" (Abschnitt 2) damit Daten pflegen kann.
-- **Bilder** — legt Bild-Slots (feste Positionen mit Zielformat) an,
-  bevor `/_editor` → "Bilder" (Abschnitt 4) sie befüllen kann; enthält
-  außerdem eine Scan-Funktion, die Templates nach referenzierten, aber
-  noch nicht angelegten Slots durchsucht.
-- **Texte** — legt neue Text-Keys an, benennt sie um, und enthält
-  dieselbe Scan-Funktion für in Templates verwendete, aber noch nicht
-  definierte `[[key]]`-Platzhalter — bevor `/_editor` → "Texte"
-  (Abschnitt 3) sie befüllen kann.
-- **Konfiguration** — rohe Ansicht/Bearbeitung ausgewählter,
-  freigegebener `config.php`-Schlüssel (Locales, Fehleranzeige/-log,
-  Asset-Bundles, Routen) — nicht alles in `config.php` ist hier
-  editierbar, nur ein bewusst begrenzter, typgeprüfter Ausschnitt.
-- **Nutzer** — siehe Abschnitt 5/10.
-- **Wiederherstellung** — siehe Abschnitt 9.
+Konten mit `/_editor/users/manage` sehen auch andere bestehende Nutzer. Sie können:
 
-## 3. Sicherheitshinweise
+- E-Mail-Adresse oder Passwort ändern;
+- Sitzungen des Kontos beenden;
+- bekannte Rechte über Checkboxen vergeben;
+- Vollzugriff `/*` setzen.
 
-- Passwörter nicht teilen, auch nicht innerhalb des Teams — jedes
-  `/_editor`-Konto ist einzeln zurückverfolgbar über das Log (Abschnitt
-  8b), ein geteiltes Passwort zerstört diese Nachvollziehbarkeit.
-- Bei Verdacht auf Kompromittierung (Passwort versehentlich
-  weitergegeben, verdächtige Log-Einträge) sofort "Überall abmelden"
-  (Abschnitt 5) nutzen und danach das Passwort ändern — in dieser
-  Reihenfolge, damit eine bereits laufende fremde Sitzung nicht durch
-  den reinen Passwortwechsel weiterläuft.
-- Das Log zeigt jederzeit nachvollziehbar, wer zuletzt was geändert
-  hat — bei einem unerklärten Inhaltswechsel als Erstes dort
-  nachsehen, bevor eine Wiederherstellung (Abschnitt 9) erwogen wird.
-- Ein automatisches Backup ersetzt keine bewusste Kontrolle: Löschungen
-  (Abschnitt 2) sind sofort wirksam, das Backup fängt sie erst beim
-  nächsten täglichen Lauf ab, danach ist der vorherige Stand nur noch
-  über die 14-Tage-Historie erreichbar.
+Ein Nutzer darf die eigenen Rechte nicht selbst erweitern. Neue Konten anlegen und bestehende Konten löschen bleibt Aufgabe von `/_admin`.
+
+Vergib nur die Rechte, die für die tatsächliche Aufgabe benötigt werden. Vollzugriff sollte auf wenige verantwortliche Personen begrenzt bleiben.
+
+## Anfragen bearbeiten
+
+Unter **Anfragen** erscheinen gespeicherte Formulareingänge, sofern das Formular-Modul verwendet wird und dein Konto die passende Leseberechtigung besitzt.
+
+Die Liste zeigt Datum, Kategorie, Absender und Nachricht. Lange Inhalte lassen sich ein- und ausklappen. Über die E-Mail-Adresse öffnest du das lokale Mailprogramm; Nino versendet dabei nicht automatisch eine Antwort.
+
+**Als CSV exportieren** lädt die aktuell vorhandenen Einträge herunter. Die Ansicht ist bewusst schreibgeschützt: Anfragen werden hier nicht verändert oder gelöscht.
+
+## Newsletter verwalten
+
+Der Bereich **Newsletter** zeigt die gespeicherten Anmeldungen. Du kannst:
+
+- einzelne E-Mail-Adressen öffnen;
+- alle Adressen als BCC-Zeile kopieren;
+- die Liste als CSV exportieren;
+- eine Anmeldung nach Bestätigung löschen.
+
+Prüfe vor dem Versand, ob dein Mailprogramm BCC tatsächlich verwendet, damit Empfängeradressen nicht gegenseitig sichtbar werden.
+
+Eine gelöschte Adresse wird zusätzlich als entfernt vermerkt. Dadurch soll eine spätere Wiederherstellung eines älteren Backups die Abmeldung nicht unbemerkt rückgängig machen.
+
+## Log einsehen
+
+**Log** zeigt das Aktivitätsprotokoll von `/_editor`, beispielsweise Anmeldungen und erfolgreiche Änderungen. Die Einträge werden für 14 Tage aufbewahrt und sind schreibgeschützt.
+
+Dieses Protokoll ist nicht mit dem technischen PHP-Fehlerprotokoll identisch. Fehlerprotokollierung wird separat über `config.php` beziehungsweise `/_admin` gesteuert.
+
+## Speichern, Backups und Veröffentlichung
+
+Änderungen in `/_editor` werden direkt in die dateibasierten Projektdaten geschrieben. Es gibt weder Entwurfsstatus noch einen getrennten Veröffentlichungs-Button. Prüfe Änderungen deshalb unmittelbar im Frontend und in allen betroffenen Sprachen.
+
+Standardmäßig erzeugt Nino beim ersten authentifizierten Editor-Zugriff eines Tages ein verschlüsseltes Backup und bewahrt tägliche Sicherungen 14 Tage auf. Die Wiederherstellung erfolgt unter `/_admin`.
+
+Diese Backups schützen vor vielen Bedienfehlern, ersetzen jedoch keine externe Sicherung des vollständigen Projekts. Bilder, Konfiguration, Texte, Elemente und Betriebsdaten gehören gemeinsam in den Backup-Plan.
+
+## Empfohlene Rollen
+
+| Rolle | Sinnvolle Rechte |
+|---|---|
+| Redaktion | Texte, Elemente und gegebenenfalls Bilder |
+| Kommunikation | Anfragen und Newsletter; bei Bedarf zusätzlich Texte |
+| Betreuung | Inhalte, Log und Nutzerverwaltung |
+| Technische Gesamtverantwortung | Vollzugriff `/*`; nur für wenige Konten |
+
+Die genaue Aufteilung hängt vom Projekt ab. Beginne mit kleinen Rechten und erweitere sie nur bei einem konkreten Bedarf.
+
+## Wenn etwas nicht funktioniert
+
+| Problem | Prüfung |
+|---|---|
+| Ein Bereich fehlt | Rechte des Kontos unter **Nutzer** oder in `/_admin` prüfen. |
+| Speichern schlägt fehl | Pflichtfelder, Zeichengrenzen und Schreibrechte des Servers prüfen. |
+| Bild-Upload ist noch nicht verfügbar | Neues Element zuerst einmal speichern. |
+| Bild wird abgelehnt | Dateiformat, Dateigröße und Zielmaße prüfen; gegebenenfalls Entwickler kontaktieren. |
+| Änderungen erscheinen nicht im Frontend | richtige Sprache, richtigen Eintrag und Browser-Cache prüfen. |
+| Anmeldung funktioniert nicht | Zugangsdaten und mögliche temporäre Sperre prüfen; notfalls Konto über `/_admin` zurücksetzen. |
+| Backup-Datum bleibt leer | Backups und Schreibrechte durch einen Entwickler prüfen lassen. |
+
+## Wie es weitergeht
+
+- [`/_admin`-Bedienung](_admin.de.md) erklärt den vollständigen technischen und inhaltlichen Zugriff.
+- [`/_templates`-Bedienung](_templates.de.md) erklärt den strukturellen Template-Builder im Alpha-Status.
+- [Grundkonzepte](concepts.de.md) beschreibt, wie Texte, Elemente, Bilder und Templates zusammenwirken.
+- [Deployment](deployment.de.md) behandelt Backups, Zugriffsschutz und sicheren Betrieb.
+

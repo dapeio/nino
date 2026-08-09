@@ -1,206 +1,163 @@
-# Nino — Template-Builder-Handbuch
-*[English](_templates.md)*
+# `/_templates` — Template-Builder (Alpha)
 
-**Links:**
-[README](../README.de.md) · [Design-Handbuch](design.de.md) · [Entwickler-Handbuch](development.de.md) · [_editor-Handbuch](_editor.de.md) · [_admin-Handbuch](_admin.de.md) · [_install-Handbuch](_install.de.md) · [Security Policy](../SECURITY.md) · [Changelog](../CHANGELOG.md)
+**Sprache:** [English](_templates.md) · Deutsch
 
-Ein grafischer, rein entwicklerseitiger Editor für die `templates/*.tpl`-Dateien des Projekts, erreichbar unter `/_templates`. Optional - eine `.tpl` ist einfaches HTML und lässt sich genauso gut von Hand schreiben (siehe `docs/design.de.md`) - aber er macht aus "welche Grid-Klassen trägt diese Spalte?" ein Formular statt eines Nachschlagens im Design-Handbuch.
+**Stand:** 8. August 2026 · **Nino-Version:** 0.11.0-beta.1
 
-## Wo er liegt
+Dieses Handbuch erklärt die strukturelle Bearbeitung von Seiten- und Abschnittstemplates unter `/_templates`. Falls du stattdessen Texte, Elemente, Seiten oder Konfiguration vollständig verwalten möchtest, lies die [`/_admin`-Bedienungsanleitung](_admin.de.md); die direkte Arbeit mit HTML+, Rendering und Shortcodes behandelt das [Entwickler-Handbuch](development.de.md).
 
-In einem eigenen Verzeichnis auf oberster Ebene, `_templates/`, nicht als Modul in `/_admin` - aus demselben Grund, aus dem auch `/_install` eines hat: Er ist ein Entwicklungswerkzeug, ein Projekt darf ihn also nach Abschluss des Designs löschen (`rm -rf _templates`), und `_admin/Admin.php` ist bereits groß genug.
+**Weitere Links:**
+[README](../README.de.md) · [Grundkonzepte](concepts.de.md) · [Entwickler-Handbuch](development.de.md) · [Erste Schritte](getting-started.de.md) · [`/_install`-Referenz](_install.de.md) · [`/_admin`-Bedienung](_admin.de.md) · [`/_templates`-Bedienung](_templates.de.md) · [`/_editor`-Bedienung](_editor.de.md) · [Deployment](deployment.de.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
 
-Das Passwort ist allerdings das von `/_admin`. `_templates/index.php` bindet `_admin/Admin.php` ein und nutzt dessen Session-Flag (`./nino/admin/authed`) weiter, statt ein zweites Passwort einzuführen, das synchron gehalten werden müsste - dieselbe Abhängigkeit, die `/_install` schon hat. In der Praxis: Wer in `/_admin` eingeloggt ist, hat auch den Builder offen, und die Kopfzeile von `/_admin` trägt einen Link "Template Builder". Ein Aufruf von `/_templates` ohne Login zeigt das Login-Formular von `_admin`, das nach `/_admin` postet und anschließend hierher zurücklädt.
+> **Status: Alpha.** Der Template-Builder ist nutzbar und durch Smoke-Tests abgesichert, wird sich aber voraussichtlich noch deutlich verändern. Oberfläche, Blockbibliothek und Bedienabläufe sind noch keine stabilen Verträge. Die gespeicherten Dateien bleiben dagegen normales, lesbares `.tpl`-Markup und können jederzeit direkt bearbeitet werden.
 
-`_admin` zu löschen deaktiviert damit auch `_templates`. Das ist Absicht - ein unauthentifizierter Template-Editor schreibt Markup in jede Seite der Website.
+## Aufgabe und Abgrenzung
 
-## Die Grundidee
+`/_templates` ist ein grafischer Struktur-Editor für ausgewählte Templates unter `templates/`. Er hilft dabei, Bereiche einzufügen, zu verschachteln, zu sortieren und über Klassen oder Attribute zu konfigurieren.
 
-**Die Identität eines Bausteins ist sein HTML-Tag plus seine CSS-Klassen, und seine Eigenschaften sind genau dieselben CSS-Klassen.**
+Der Builder zeigt bewusst nicht die fertige Webseite. Statt Farben, Schriften und realer Inhalte stellt die Arbeitsfläche vor allem dar:
 
-Es gibt kein separates Datenmodell neben dem Markup, keine JSON-Datei daneben, keine `data-*`-Attribute, die der Builder bräuchte, um eine Datei zu verstehen. `<div class="ui-grid-100 ui-grid-l-50 ui-mb-3">` *ist* eine Grid-Spalte mit Breite 100, Breite-ab-Large 50 und Margin-Bottom 3 - der Builder liest diese drei Einstellungen aus der Klassenliste und schreibt sie dorthin zurück.
+- Rasterbreiten;
+- vertikale Abstände;
+- verschachtelte Container;
+- bekannte Blocktypen;
+- bestehendes, noch unbekanntes Markup.
 
-Zwei Konsequenzen, die es wert sind, ausgesprochen zu werden:
+Die visuelle Endkontrolle erfolgt deshalb immer im Frontend. Theme-Gestaltung und CSS bleiben im aktuellen Stand direkte Projektarbeit. Das geplante `/_themes` soll später ein eigenes grafisches Design-System für Theme-Vorlagen bereitstellen und zunächst ebenfalls als Alpha erscheinen.
 
-- **Es funktioniert mit Templates, die älter sind als der Builder.** Jede `.tpl`, die das Projekt bereits hat, öffnet sich mit erkannter Struktur, ohne vorher angefasst oder migriert zu werden.
-- **Was er speichert, bleibt von Hand editierbar.** Die Ausgabe enthält nichts, was ein handgeschriebenes Template nicht auch enthielte. Sie können dieselbe Datei danach weiter im Editor bearbeiten, und der Builder versteht sie immer noch.
+## Zugang und Sicherheit
 
-Die Alternative - ein `data-nino-builder="grid-col"`-Marker an jedem Element - würde die Erkennung trivial eindeutig machen, um den Preis eines zusätzlichen Attributs an praktisch jedem Tag im ausgelieferten Frontend-HTML. Die Abwägung ist andersherum ausgefallen. Ein Baustein mit tatsächlich mehrdeutiger Klassensignatur kann weiterhin einen eigenen `attrs`-Match deklarieren (siehe "Library-Format"); keiner der mitgelieferten Bausteine braucht das.
+Öffne `https://deine-domain.example/_templates`. Der Bereich verwendet dasselbe technische Passwort, denselben Sperrstatus und dieselbe Sitzung wie `/_admin`.
 
-## Die Oberfläche
+Du kannst den Builder auch über **Template Builder** im Kopfbereich von `/_admin` öffnen. Ohne aktive Admin-Anmeldung erscheint zunächst dessen Login; nach erfolgreicher Anmeldung führt Nino zurück zum Builder.
 
-Drei Spalten:
+Beachte für den Betrieb:
 
-- **Templates** (links) - jede `templates/*.tpl` auf der Platte. Ausgegraute Namen sind nicht editierbar (siehe unten).
-- **Canvas** (Mitte) - das geöffnete Template als Baum verschachtelter Kästchen. Ein Klick wählt ein Kästchen aus.
-- **Settings + Blocks** (rechts) - oben die Eigenschaften des gewählten Bausteins, darunter die Library, gruppiert nach der `category` des jeweiligen Manifests.
+- verwende `/_templates` ausschließlich über HTTPS;
+- gib den Zugang nur an Entwickler und vertrauenswürdige Designer mit technischem Verständnis weiter;
+- arbeite mit einem aktuellen Git-Stand;
+- prüfe jede Änderung im Frontend und in allen relevanten Viewports;
+- entferne `_templates/` nach der Entwicklung aus der produktiven Auslieferung, wenn der Builder dort nicht benötigt wird.
 
-Nichts erreicht das Dateisystem vor **Save**. Jede Änderung geht in den Baum im Speicher und zeichnet neu; die Kopfzeile zeigt "unsaved changes" und der Save-Button wird aktiv. Wer das Template wechselt oder die Seite mit ungespeicherter Arbeit verlässt, wird vorher gefragt.
+`/_templates` hängt von `/_admin` ab. Wird `_admin/` entfernt, ist auch der Template-Builder nicht mehr funktionsfähig.
 
-### Was der Canvas zeigt
+## Oberfläche
 
-Bewusst **keine** Vorschau. Nur die beiden Dinge, die sich aus einer Liste von Klassennamen wirklich nicht beurteilen lassen, werden maßstäblich gezeichnet:
+Der Arbeitsbereich besteht aus drei Spalten:
 
-- die **Breite einer Grid-Spalte** - ihr Kästchen ist so breit, wie ihre `width`-Einstellung sagt, und eine Grid-Zeile setzt ihre Spalten nebeneinander, genau wie das Markup es tun wird
-- **vertikale Abstände** - `ui-mt-*`/`ui-mb-*`/`ui-pt-*`/`ui-pb-*` werden als echtes Margin und Padding gezeichnet
+| Bereich | Aufgabe |
+|---|---|
+| **Templates** | vorhandene Templates auswählen und ihren Schreibstatus erkennen |
+| **Canvas** | Struktur auswählen, verschachteln und umordnen |
+| **Settings / Blocks** | Eigenschaften des gewählten Blocks bearbeiten oder neue Blöcke einfügen |
 
-Alles andere ist ein beschriftetes Kästchen: Name des Bausteins, HTML-Tag und eine kurze Vorschau auf Text, Linkziel oder Shortcode-Argumente. Farben, Schriften und echte Typografie sind Sache des Themes (`docs/design.de.md`); sie hier nachzubauen hieße, einen zweiten Renderer zu pflegen, der in jedem Projekt auf andere Weise falsch ist.
+Beim Öffnen eines Templates liest der Builder dessen HTML-Struktur ein. Änderungen bleiben zunächst im Browser und werden erst mit **Save** in die Datei geschrieben.
 
-**Auch die Verschachtelungstiefe wird gezeichnet** - jede Ebene liegt auf einem etwas kräftigeren Farbton als die darüber, sodass sich die Schichten eines tiefen Grids voneinander abheben statt als eine Wand aus Kästchen zu erscheinen. Der Farbton wird gegen die Tokens des Editor-Themes gemischt (`color-mix()` auf einer pro Kästchen gesetzten Custom Property `--tb-depth`), stimmt also im hellen wie im dunklen Theme, und wird nach sechs Ebenen gedeckelt, statt ins Unlesbare zu laufen.
-
-Eine Spalte, die 100 % anzeigt, zeigt dabei die Wahrheit: `ui-grid-100 ui-grid-l-50` *ist* bis zum `l`-Breakpoint volle Breite. Der Canvas zeichnet die Basisbreite, die Breakpoint-Werte stehen in den Einstellungen.
-
-### Markup, das die Library nicht kennt
-
-Alles ohne passenden Baustein bekommt trotzdem ein Kästchen, beschriftet mit Tag, ID und Klassen (`<div id="hero" class="my-thing">`) und mit gepunktetem Rahmen gezeichnet. Diese sind rein strukturell: Der Builder hat kein Modell dafür, was ihre Eigenschaften bedeuten, bietet also keine Felder dafür an - er versteckt sie aber nie, verwirft sie nie, und ihre Kinder werden ganz normal weiter geparst und angezeigt. Ein erkannter Baustein innerhalb eines nicht erkannten Wrappers funktioniert genau wie überall sonst.
-
-### Der `#id`-Hinweis
-
-Ein Knoten, dessen `id` von einer Regel in den Stylesheets des Projekts adressiert wird, bekommt ein oranges Abzeichen.
-
-Das ist wegen der Grundidee oben wichtig: Der Builder zeigt die CSS-Klassen eines Elements als seine Eigenschaften an, und eine an eine ID gebundene Regel überschreibt diese Klassen auf der echten Seite, ist hier aber völlig unsichtbar. `#hero { padding: 0 }` gewinnt in der Kaskade gegen `ui-pt-4`, der Canvas würde also ein Padding zeichnen, das der Browser nicht rendert. Das Abzeichen sagt "für diesen Knoten ist die Klassenliste nicht die ganze Wahrheit", statt stillschweigend etwas Falsches anzuzeigen.
-
-Der Scan liest jede `.css`-Datei aus allen `/nino/html/assets`-Bundles der `config.php` und sammelt die IDs, die deren Selektoren erwähnen. Es ist ein Selektor-Scan, kein vollwertiger CSS-Parser - ein False Positive kostet ein überflüssiges Abzeichen, und das ist die richtige Richtung, in der er falsch liegen darf.
-
-## Bearbeiten
-
-**Auswählen.** Ein Kästchen anklicken. Der Klick wählt das innerste getroffene Kästchen aus, nicht jeden Vorfahren, durch den er geblubbert ist; ein Klick auf den Canvas-Hintergrund hebt die Auswahl auf. Die Auswahl hängt an der Knoten-ID und übersteht damit das Neuzeichnen nach jeder Änderung.
-
-**Einstellungen.** Der Inspector erzeugt ein Bedienelement pro Einstellung, die das Manifest des Bausteins deklariert - es gibt nirgends bausteinspezifischen Formularcode, und eine Einstellung im Manifest zu ergänzen genügt, um sie editierbar zu machen. Welches Bedienelement erscheint, folgt aus dem Typ: ein Select für `classenum`/`classgroup`/`tag`, eine Checkbox für `classtoggle`/`attrtoggle`, ein Textfeld für `attr` und `text`. Die Breakpoint-Varianten einer responsiven Einstellung erscheinen eingerückt unter ihrem Basis-Bedienelement, sodass fünf Felder namens "Width" als eine Einstellung mit vier Varianten lesbar sind statt als fünf Einstellungen.
-
-Änderungen greifen sofort im Baum und zeichnen den Canvas neu. Ein Textfeld aktualisiert zusätzlich die Vorschau seines Kästchens beim Tippen - ein vollständiges Neuzeichnen pro Tastendruck würde den Fokus aus dem Feld nehmen.
-
-**Einfügen.** Einen Baustein in der Palette anklicken. Wo er landet, folgt aus der Auswahl: *in* ihr, wenn der gewählte Baustein Kinder aufnimmt, *neben* ihr, wenn nicht, und am Ende des Dokuments, wenn nichts ausgewählt ist. Die `block.tpl` des Bausteins wird **serverseitig mit demselben Parser** geparst, den auch Dokumente durchlaufen (`library/parse`) - das Startmarkup eines Bausteins ist damit exakt wie Template-Markup geschrieben, und es gibt keinen zweiten Codepfad, der anderer Meinung darüber sein könnte, was ein Template bedeutet.
-
-Die Library umfasst aktuell **76 Bausteindefinitionen**: 51 einfügbare Einträge decken den `Nino.css`-Katalog ab (Tabellen, Pricing, Accordions, Galerien, Tabs, Modals, Slider, Timelines, Badges, Alerts, Breadcrumbs, Listen, Logoleisten, Video und ihre Bestandteile), während 25 verschachtelte Hilfsbausteine nur Markup wie Tabellenzellen, Tab-Panels und Modal-Schließen-Buttons erkennen und bearbeitbar machen. Diese Helfer setzen `palette => false`: Im Canvas bleiben sie vollständig editierbar, ohne die oberste Palette zu überladen.
-
-**Aktionen.** Die Fußzeile des Inspectors trägt die Aktionen des gewählten Bausteins - nach oben/unten verschieben, duplizieren, entfernen - gefiltert nach dem, was `actions` im Manifest erlaubt. Ein nicht erkanntes Element bekommt nur die strukturellen, denn die brauchen kein Modell davon, was es ist.
-
-**Einrückung.** Jede strukturelle Änderung bringt ihren eigenen Whitespace mit, denn der Baum behält den exakten Text zwischen den Tags (genau das macht den Round-Trip byte-genau). Statt die Einrückung aus einem Tiefenzähler abzuleiten, *kopiert* ein Insert den Whitespace, den sein neuer Nachbar bereits hat - was auch immer die Datei verwendet, Tabs oder Leerzeichen, in welcher Tiefe auch immer. Ein Remove nimmt seine eigene Einrückung mit, damit sich über die Zeit keine Leerzeilen ansammeln. Der einzige Fall ohne Nachbarn zum Kopieren, ein erstes Kind in einem leeren Element, leitet eine Ebene vom Elternteil ab. `tests/templates-js-smoke.js` deckt jeden dieser Fälle ab.
+> **Wichtig:** Ein Wechsel des Templates oder das Verlassen der Seite kann ungespeicherte Änderungen verwerfen. Der Builder warnt davor, trotzdem ersetzt diese Warnung keinen bewussten Speichervorgang.
 
 ## Welche Templates bearbeitet werden können
 
-Nur `page-*` und `section-*`. Alles andere wird gelistet, öffnet sich aber schreibgeschützt.
+Beschreibbar sind ausschließlich:
 
-Der Grund sind `html-header.tpl` und `html-footer.tpl`: Sie sind **eine Struktur, aufgeteilt auf zwei Dateien**. Der Header öffnet `<head>`, `<header>` und `<main>`; der Footer schließt `</main>` und ergänzt `<footer>`. Keine der beiden ist für sich ein wohlgeformtes Fragment. Ein HTML-Parser, dem man den Header allein gibt, "korrigiert" ihn, indem er das offen gebliebene Tag schließt - und dieses Ergebnis zu speichern würde den Seitenrahmen jeder Seite der Website stillschweigend zerstören. Dasselbe gilt für das Paar `mail-header`/`mail-footer`, und `sitemap-xml.tpl` ist überhaupt kein HTML.
+- `templates/page-*.tpl`;
+- `templates/section-*.tpl`.
 
-Ein Template kann sich aus einem zweiten Grund schreibgeschützt öffnen: Es hat den Round-Trip nicht bestanden (siehe unten). Das bedeutet, es enthält Markup, für das der Baum keine getreue Repräsentation hat - und der Builder sagt das, statt es umzuformatieren.
+Andere Templates werden zwar in der Liste angezeigt, bleiben aber schreibgeschützt. Das betrifft insbesondere Dateien, die Header oder Footer trennen, keinen HTML-Baum enthalten oder sich nicht zuverlässig und bytegenau einlesen und wieder ausgeben lassen.
 
-Beide Fälle erscheinen als Hinweis oben im Canvas, mit Begründung.
+Diese Grenze verhindert, dass der Builder technische Includes oder unbekannte Sonderfälle versehentlich umschreibt. Solche Dateien werden weiterhin direkt im Editor beziehungsweise in der Entwicklungsumgebung bearbeitet.
 
-## Die Round-Trip-Garantie
+## Ein Template bearbeiten
 
-**Ein Template zu öffnen und unverändert zu speichern reproduziert die Datei Byte für Byte.**
+1. Wähle links ein beschreibbares Template.
+2. Klicke im Canvas auf den Block, den du bearbeiten möchtest.
+3. Ändere rechts die angebotenen Einstellungen.
+4. Füge bei Bedarf einen Block aus **Blocks** hinzu.
+5. Ordne, dupliziere oder entferne ausgewählte Blöcke.
+6. Speichere mit **Save**.
+7. Öffne die betroffene Seite im Frontend und prüfe das Ergebnis.
 
-Auf dieser Eigenschaft ruht alles andere. Ein Builder, dessen erstes Speichern die Einrückung umformatiert, Attribute umsortiert und `required` zu `required=""` umschreibt, ist einer, den Entwickler nicht mehr öffnen. Der Knotenbaum behält deshalb alles: die Attributreihenfolge (einschließlich der Position von `class` zwischen den übrigen), den exakten Whitespace zwischen den Tags, Kommentare und die ursprüngliche Schreibweise jeder HTML-Entity.
+Die verfügbaren Einstellungen werden aus der Blockdefinition abgeleitet. Je nach Block können sie unter anderem CSS-Klassen, responsive Rasterbreiten, Abstände, Attribute, Tags oder direkt bearbeitbaren Text steuern.
 
-`tests/templates-smoke.php` prüft das gegen jedes `page-*`-Template der Library sowie gegen eine Reihe von Einzelfällen (Boolean-Attribute, Void-Elemente, `&shy;`, nacktes vs. kodiertes Ampersand, Attributreihenfolge, Whitespace). Eine Parser-Änderung, die eines davon bricht, zeigt sich als fehlschlagender Test statt als zerschossene Website.
+Beim Einfügen entscheidet die aktuelle Auswahl über die Position:
 
-Etwas Mechanik dahinter, falls Sie den Parser anfassen:
+- bei einem geeigneten Container wird der neue Block darin eingefügt;
+- bei einem Blatt-Element wird er daneben eingefügt;
+- ohne passende Auswahl landet er am Ende des Dokuments.
 
-- **Shortcodes sind Struktur, kein Text.** `[elements /services limit="3"]…[/elements]` umschließt HTML, muss also ein Knoten mit Kindern sein. Vor dem Parsen wird jeder Shortcode-Aufruf in ein `<nino-sc name args>`-Platzhalterelement umgeschrieben; der Serializer macht das rückgängig. Damit erledigt PHP 8.4s echter HTML5-Parser (`\Dom\HTMLDocument`) die gesamte eigentliche Arbeit. Ein Shortcode innerhalb eines Tags (in einem Attributwert) bleibt bewusst unangetastet - ein Element mitten in ein Attribut zu injizieren würde das Dokument zerstören.
-- **Textfills brauchen überhaupt keine Behandlung.** `[[/key]]` ist gewöhnlicher Text, in Textknoten wie in Attributwerten, verschachtelte wie `[[/webpage[[/nino/http/response/uri]]/title]]` eingeschlossen.
-- **Entities werden vor dem Parsen gegen einen Platzhalter getauscht.** Der Parser dekodiert `&shy;` zu einem Weichtrennzeichen, und danach lässt sich nicht mehr erraten, ob in der Quelle `&shy;`, `&#173;` oder ein literales Zeichen stand. Jede Entity wird zwischen zwei Zeichen der Private Use Area (U+E000/U+E001) durch den Baum getragen und führt ihren eigenen Namen mit, sodass das Wiederherstellen ohne Nachschlagetabelle auskommt.
+Die Aktionen zum Verschieben nach oben oder unten, Duplizieren und Entfernen beziehen sich immer auf den ausgewählten Block.
 
-## Library-Format
+## Struktur statt Metadaten
 
-`_templates/library/` enthält ein Verzeichnis pro Baustein, jeweils mit `manifest.php` und optional `block.tpl` - dieselbe Verzeichnis-plus-Manifest-Konvention, die auch `_install/library` verwendet. Einen Baustein hinzuzufügen ist genau ein neues Verzeichnis; nirgends eine Codeänderung.
+Der Builder speichert keine zusätzliche Projektdatei und versieht das Template nicht mit proprietären Builder-Attributen. Die Identität und Einstellungen eines Blocks ergeben sich aus seinem HTML-Tag und seinen CSS-Klassen.
 
-```
-_templates/library/
-  grid-col/
-    manifest.php      category, tag, name, match, children, use, settings, actions, palette
-    block.tpl         das Markup, das beim Einfügen dieses Bausteins entsteht
-  section/
-  button/
-  …
-```
+Dadurch gelten zwei wichtige Eigenschaften:
 
-Eine `manifest.php` liefert ein einfaches Array zurück:
+1. Vorhandene, von Hand geschriebene Templates bleiben grundsätzlich bearbeitbar.
+2. Ein gespeichertes Template bleibt normales HTML+ und kann anschließend wieder von Hand geändert werden.
 
-| Schlüssel | Bedeutung |
+Wird ein Template geöffnet und unverändert gespeichert, muss der Inhalt bytegenau erhalten bleiben. Kann der Builder diesen Round-Trip nicht sicher gewährleisten, bietet er die Datei nur schreibgeschützt an.
+
+## Unbekanntes Markup
+
+Nicht jedes Element muss in der Blockbibliothek bekannt sein. Unbekanntes Markup erscheint als gestrichelter Strukturblock und bleibt beim Speichern erhalten. Bekannte Kindblöcke darin können weiterhin ausgewählt und bearbeitet werden.
+
+Prüfe solche Bereiche besonders sorgfältig im Quelltext und Frontend. Der Builder erhält die Struktur, kann für unbekannte Elemente aber keine passenden Einstellungen oder semantischen Hinweise anbieten.
+
+Verwendet das Projekt CSS-Selektoren, die gezielt auf eine Element-ID wie `#hero` zugreifen, zeigt der Builder einen Hinweis. Da die Oberfläche ihre Darstellung vor allem aus Klassen ableitet, kann sie die vollständige CSS-Kaskade solcher Selektoren nicht zuverlässig nachbilden.
+
+## Blockbibliothek
+
+Die Palette bündelt wiederverwendbare Strukturbausteine und Hilfselemente. Eine Blockdefinition besteht im Kern aus einem Manifest unter `_templates/library/` und kann zusätzlich eigenes Ausgangs-Markup mitbringen.
+
+Die Bibliothek enthält derzeit unter anderem Bausteine für:
+
+- Seiten- und Abschnittsstruktur;
+- Raster und Spalten;
+- Abstände und Ausrichtung;
+- Typografie und Medien;
+- Navigation und interaktive Komponenten;
+- Hilfselemente für vorhandene Klassenmodelle.
+
+Da der Builder Alpha ist, sind Umfang, Benennung und Gruppierung dieser Palette noch veränderlich. Maßgeblich bleibt das gespeicherte Template, nicht die Anzahl aktuell mitgelieferter Blöcke.
+
+## Speichern und Schutzregeln
+
+Vor dem Schreiben prüft Nino den resultierenden Template-Baum. Ein Speichervorgang wird unter anderem abgelehnt, wenn:
+
+- die Datei nicht dem Muster `page-*.tpl` oder `section-*.tpl` entspricht;
+- der resultierende Baum leer ist;
+- ein HTML-Tag außerhalb der erlaubten Liste vorkommt;
+- ein Event-Handler-Attribut wie `onclick` oder ein anderes `on*`-Attribut enthalten ist.
+
+Insbesondere `<script>` gehört nicht in einen über den Builder gespeicherten Strukturblock. JavaScript wird als Projekt-Asset entwickelt und eingebunden.
+
+Das Schreiben erfolgt atomar: Erst wenn die neue Datei vollständig bereitsteht, ersetzt sie den vorherigen Stand. Der Builder legt dabei keine eigene Sicherungskopie an. Templates gehören deshalb in Git; zusätzlich enthalten die von Nino erzeugten Projektbackups die Template-Dateien.
+
+## Grenzen des aktuellen Alpha-Stands
+
+Der Template-Builder konzentriert sich auf das sichere Bearbeiten vorhandener Seiten- und Abschnittsstrukturen. Noch nicht Teil des stabilen Ablaufs sind insbesondere:
+
+- das Anlegen eines vollständig neuen Templates über die Oberfläche;
+- das Extrahieren einer Auswahl in ein neues `section-*.tpl`;
+- eine pixelgenaue Vorschau des finalen Themes;
+- ein stabil zugesagter Umfang der Blockbibliothek.
+
+Für neue oder technisch besondere Templates bleibt die direkte Arbeit an `.tpl`-Dateien daher ein normaler Bestandteil der Entwicklung.
+
+## Wenn etwas nicht funktioniert
+
+| Problem | Prüfung |
 |---|---|
-| `category` | Gruppe in der Palette (`Grid`, `Sections`, `Content`, `Media`, `Forms`, `Shortcodes`, …). Frei wählbar - die Palette gruppiert nach dem, was sie vorfindet |
-| `tag` | Um welche Art Ding es sich handelt (`wrap`, `title`, `text`, `image`, `link`, `loop`, `include`, `meta`). Wird neben dem Namen angezeigt und ist das, wogegen ein künftiger `children`-Filter prüft |
-| `name` | Anzeige in der Palette und als Beschriftung des Kästchens |
-| `match` | Wie dieser Baustein in einem bestehenden Template erkannt wird - siehe unten |
-| `children` | `[ '*' ]`, wenn der Baustein Kinder aufnimmt, sonst weggelassen |
-| `use` | Einzubindende gemeinsame Einstellungsgruppen: `spacing`, `align`, `vpa`. Erspart es, dieselben zwanzig Zeilen in vierzig Manifesten zu wiederholen; die eigenen `settings` eines Bausteins gewinnen bei Namensgleichheit |
-| `settings` | Die editierbaren Eigenschaften - siehe unten |
-| `actions` | Welche Aktionen der Baustein anbietet. Standard: `remove`, `duplicate`, `moveup`, `movedown` |
-| `palette` | `false` für einen verschachtelten Helfer, der nur der Erkennung dient. Er beschriftet Markup und liefert im Canvas weiterhin Einstellungen/Aktionen, wird aber nicht als eigener Top-Level-Insert angeboten. Standard: `true` |
-| `html` | Inline-Startmarkup, für einen Einzeiler, der keine eigene `block.tpl` wert ist |
+| Login wird erneut angezeigt | Mit dem Passwort von `/_admin` anmelden; Sperrstatus und Session-Cookies prüfen. |
+| Template ist schreibgeschützt | Dateiname, HTML-Round-Trip und unterstützten Dateityp prüfen. |
+| Einstellung fehlt | Block ist möglicherweise unbekannt oder die Bibliotheksdefinition bietet diese Option noch nicht an. |
+| Darstellung im Canvas weicht vom Frontend ab | Der Canvas zeigt Struktur, keine vollständige Theme-Vorschau; CSS, Inhalte und `#id`-Selektoren im Browser prüfen. |
+| Speichern wird abgelehnt | Leeren Baum, unerlaubte Tags, `on*`-Attribute und Schreibrechte von `templates/` prüfen. |
+| Änderung ist nach dem Wechsel verschwunden | Ungespeicherte Änderungen wurden nur im Browser gehalten; erneut durchführen und vor dem Wechsel speichern. |
 
-### `match`
+## Wie es weitergeht
 
-```php
-'match' => [
-    'tag'        => 'div',                    // oder 'tags' => [ 'h2', 'h3', 'h4' ]
-    'classes'    => [ 'ui-grid-row' ],        // alle davon müssen vorhanden sein
-    'classesAny' => [ 'ui-grid-25', … ],      // mindestens eine davon
-    'attrs'      => [ 'name' => 'elements' ], // exakte Werte (Shortcode-Bausteine)
-    'not'        => [ 'ui-atf-title' ],       // schließt den Knoten aus
-],
-```
-
-Jeder Baustein, dessen `match` ein Knoten erfüllt, wird danach bewertet, wie spezifisch dieser Match war - eine Pflichtklasse oder ein Attribut zählt 10, `classesAny` zählt 5, ein reiner Tag-Match zählt 1 - und der höchste Wert gewinnt. Genau das erlaubt es, "Section Title" (`h3.ui-section-title`) und das generische "Heading" (jedes `h1`-`h6`) nebeneinander zu haben, ohne dass das generische je das spezifische verschluckt.
-
-### `settings`
-
-Sieben Typen, alle eine Zwei-Wege-Abbildung zwischen einem Formularfeld und der Klassenliste, den Attributen, dem Tag oder dem Text des Knotens:
-
-| Typ | Bildet ab auf | Deklaration |
-|---|---|---|
-| `classenum` | einen Wert aus einer Liste, über ein printf-Muster | `'pattern' => 'ui-grid-%s'`, `'values' => [ '25', '50', … ]`, optional `'bpPattern' => 'ui-grid-%b-%s'` + `'breakpoints' => [ 's','m','l','xl' ]` |
-| `classgroup` | eine Klasse aus einer expliziten Liste (Varianten ohne gemeinsames Muster) | `'options' => [ '' => 'Default', 'ui-btn--primary' => 'Primary', … ]` |
-| `classtoggle` | eine einzelne Klasse, an oder aus | `'class' => 'ui-section--fullwidth'` |
-| `attr` | ein einfaches HTML-Attribut | `'attr' => 'href'`, optional `'values' => [ … ]` für eine feste Auswahl |
-| `attrtoggle` | ein boolesches HTML-Attribut, vorhanden oder nicht vorhanden | `'attr' => 'required'`; erscheint als Checkbox und wird ohne Wert serialisiert (`required`, nicht `required=""`) |
-| `tag` | den Elementnamen selbst (`h2` vs. `h3`) - die einzige Eigenschaft, die weder Klasse noch Attribut ist | `'values' => [ 'h2', 'h3', 'h4' ]` |
-| `text` | den eigenen direkten Textinhalt des Knotens, Textfills eingeschlossen | — |
-
-Ein responsives `classenum` liefert zusätzlich zur Basis einen Wert pro Breakpoint, unter den Schlüsseln `width@m`, `width@l` und so weiter.
-
-**Die Abbildung selbst läuft clientseitig**, in `_templates/assets/blocks.js`, und nur dort. Der Server liefert die Deklarationen (`Library`) und schiebt Tags, Attribute und eine geordnete Klassenliste hin und her (`Parser`/`Serializer`), interpretiert aber nie eine Klasse. Genau eine Implementierung der Abbildung bedeutet, dass nichts eine Klasse auf die eine Art lesen und auf eine andere zurückschreiben kann - und das hält die Round-Trip-Garantie auch über eine Bearbeitung hinweg aufrecht.
-
-Eine Einstellung zu ändern ersetzt ihre Klasse **an dem Index, an dem sie bereits stand**, statt sie zu entfernen und hinten anzuhängen. Eine Eigenschaft zu bearbeiten sortiert also nie den Rest des `class`-Attributs um.
-
-## Speichern
-
-`documents/save` serialisiert den übermittelten Baum und schreibt ihn atomar (temporäre Datei + `rename()`, wie beim Passwort-Rewrite von `/_install`) - ein halb geschriebenes Seitentemplate ist eine kaputte Website.
-
-Vor dem Schreiben verweigert es:
-
-- ein Template außerhalb von `page-*`/`section-*` (403)
-- einen leeren Baum (400) - ein Versehen, nie eine Absicht
-- jedes Tag außerhalb der Allowlist (400), allen voran `<script>`, dessen Inhalt kein Markup ist und niemals umformatiert oder neu escaped werden darf, als wäre er welches
-- jedes `on*`-Eventhandler-Attribut (400)
-
-Dieser Bereich liegt hinter dem Passwort von `_admin`, auf derselben Vertrauensstufe wie dessen Config-Modul, das `config.php` als rohes JSON bearbeitet. "Vertrauenswürdig" und "wohlgeformt" sind allerdings zwei verschiedene Fragen, und ein Baum mit einem Tag, das der Builder nie erzeugt hätte, ist ein Bug, den man ablehnen sollte, statt ihn auf die Platte zu schreiben.
-
-Einen eigenen Backup-Schritt gibt es nicht - `/templates` ist git-verwalteter Projektquellcode, und die automatischen Backups von `_editor` decken es bereits ab.
-
-## Tests
-
-Zwei Suites, weil der Builder auf zwei Sprachen verteilt ist:
-
-- `php tests/templates-smoke.php` - der Loader der 76 Definitionen, der `Parser`/`Serializer`-Round-Trip jedes einfügbaren Bausteins (zusätzlich zu jedem ausgelieferten Seitentemplate), der `#id`-Scan und `documents/list`/`load`/`save` inklusive aller Verweigerungen.
-- `node tests/templates-js-smoke.js` - die Baustein-Abbildung (`blocks.js`) und die Baum-Änderungen (`tree.js`). Beide Module sind bewusst DOM-frei, und genau das lässt sie in reinem Node gegen einen zweizeiligen `window`-Stub laufen - kein Testframework, kein Browser. Die Testumgebung reicht ihnen ein `document`, das bei jedem Zugriff über die zwei von ihrem IIFE dereferenzierten Eigenschaften hinaus wirft; ein Modul, das anfinge das DOM zu benutzen, ließe die Suite scheitern, statt still untestbar zu werden.
-
-Diese beiden Dateien enthalten die Teile, die ein Template still beschädigen können: Eine Einstellung, die anders zurückgeschrieben als gelesen wird, sortiert Klassenattribute um, und ein Insert mit falsch behandeltem Whitespace macht die Datei bei jeder Änderung ein Stück krummer. Was keine der Suites abdeckt, ist das Rendering selbst (`canvas.js`, `inspector.js`), das DOM-gebunden ist.
-
-## Fahrplan
-
-Ausgeliefert (Patch 1-3):
-
-- die App `/_templates`, ihre über `_admin` abgesicherte Route und der Link aus `/_admin`
-- `Parser`/`Serializer` mit der byte-genauen Round-Trip-Garantie
-- das Bausteinformat `library/<key>`, sein Loader und 76 Definitionen für den `Nino.css`-Komponentenkatalog; reine Erkennungshelfer können aus der Palette ausgeblendet bleiben
-- sieben generierte Einstellungstypen einschließlich `attrtoggle` für native boolesche Attribute wie `required`, `open`, `controls` und `allowfullscreen`
-- der `#id`-Scan samt Hinweis
-- `documents/list`/`load`/`save` sowie `library/blocks`/`parse` inklusive aller oben genannten Verweigerungen
-- der Canvas mit Tiefen-Einfärbung und Auswahl, die Palette, der generierte Einstellungs-Inspector, Einfügen/Verschieben/Duplizieren/Entfernen und Speichern mit Warnung bei ungespeicherten Änderungen
-
-Noch ausstehend:
-
-- eine "Neues Template"-Aktion und das Herauslösen von `section-*` aus einer bestehenden Auswahl
+- [`/_admin`-Bedienung](_admin.de.md) erklärt Elemente, Texte, Seiten und technische Konfiguration.
+- [Entwickler-Handbuch](development.de.md) beschreibt HTML+, Rendering, Assets und Tests.
+- [Grundkonzepte](concepts.de.md) ordnet Templates in Datenfluss und Architektur ein.
+- [Deployment](deployment.de.md) behandelt Zugriffsschutz, Schreibrechte und die Entfernung optionaler Werkzeuge.

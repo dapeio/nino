@@ -1,300 +1,323 @@
 # Changelog
 
+All notable changes to Nino are documented in this file.
+
 ## Unreleased
 
-- **`/_templates` now covers the `Nino.css` component catalogue**: the
-  library grows from 21 foundations to 76 definitions, including tables,
-  pricing cards, accordions, galleries, tabs, modals, sliders, timelines,
-  badges, alerts, breadcrumbs, content lists, pagination, logo strips,
-  feature lists, video embeds/posters, image backgrounds, form controls,
-  counters and toast triggers. Composite inserts ship useful starting
-  markup; their nested pieces (table cells, tab panels, modal controls,
-  pricing titles/prices, etc.) have manifests of their own so their settings
-  remain editable after insertion. Twenty-five such structural helpers set
-  the new `palette => false` manifest flag: recognition/actions/settings
-  still work in the canvas, but the top-level palette stays focused on
-  useful inserts. A seventh generated setting type, `attrtoggle`, maps a
-  checkbox to a native boolean attribute and preserves its correct bare form
-  (`required`, `open`, `multiple`, `controls`, `allowfullscreen`) instead of
-  treating an empty value as "delete" like an ordinary `attr` setting.
-  Article modifiers that Nino.css permits together are now independent
-  toggles rather than a mutually-exclusive group, and behavioural buttons
-  are excluded from the generic Button match so a styled modal/toast trigger
-  opens in its specific inspector rather than winning or losing an
-  alphabetical score tie. The PHP smoke suite asserts the catalogue and all
-  block round-trips; the DOM-free JS suite covers `attrtoggle` and that
-  match-specificity edge. See `docs/_templates.md`.
+No unreleased changes yet.
 
-- **`/_templates` can now edit, not just read**: click a box in the canvas to
-  select it, and the inspector renders one control per setting the block's
-  manifest declares - a select for `classenum`/`classgroup`/`tag`, a
-  checkbox for `classtoggle`/`attrtoggle`, a text field for `attr`/`text`,
-  with a responsive setting's breakpoint variants indented under their base rather
-  than standing next to it as five near-identical fields. There is no
-  per-block form code anywhere; adding a setting to a manifest is what makes
-  it editable. Clicking a palette entry inserts that block - inside the
-  selection if it takes children, next to it if it doesn't, at the end of
-  the document if nothing is selected - and its `block.tpl` is parsed
-  server-side by the same parser documents go through (`library/parse`), so
-  a block's markup is written exactly like template markup with no second
-  code path. Move/duplicate/remove come from the manifest's own `actions`.
-  Nesting depth is now drawn as a per-level tint (`color-mix()` against the
-  editor theme's tokens, capped at six levels) so the layers of a deep grid
-  read apart. Nothing reaches disk until Save; switching template or leaving
-  the page with unsaved work asks first. Structural edits carry their own
-  indentation, copied from the neighbour the new markup lands next to rather
-  than derived from a depth counter, so an insert lines up with whatever the
-  file already uses and a remove doesn't leave a blank line behind. Two
-  fixes fell out of testing that: `blocks.js` documented in-place class
-  replacement but actually removed-and-appended, which reshuffled the
-  `class` attribute of every edited element, and a first child inserted into
-  an empty element copied the closing tag's indent and landed one level too
-  shallow. The dom-free half of the frontend (`blocks.js`, the new
-  `tree.js`) is covered by `tests/templates-js-smoke.js`, a plain-node suite
-  in the same dependency-free shape as the php ones - its stub `document`
-  throws on use, so a module that started touching the dom fails the suite
-  rather than quietly becoming untestable. See `docs/_templates.md`
+## 0.11.0-beta.1 — 2026-08-09
 
-- **Added `/_templates`, the template builder** (foundation - reads,
-  recognizes and draws; selecting/inserting/editing follow). Its own
-  top-level folder rather than an `_admin` module, same reasoning `_install`
-  has one: a development-time tool a project may delete once the design is
-  settled. The password is `_admin`'s, though - it requires
-  `_admin/Admin.php` and reuses its session flag instead of introducing a
-  second one, the dependency `_install` already has, and `/_admin`'s header
-  gained a link. The whole thing rests on one idea: **a block's identity is
-  its html tag plus its css classes, and its properties are those same
-  classes**. `<div class="ui-grid-100 ui-grid-l-50 ui-mb-3">` *is* a grid
-  column with those three settings - there is no data model beside the
-  markup, no json sidecar and no `data-*` marker to write, so every `.tpl`
-  the project already has opens with its structure recognized without being
-  migrated, and what the builder saves stays exactly as hand-editable as
-  what it opened. Blocks are one directory per block under
-  `_templates/library/<key>` (manifest + `block.tpl`), the same convention
-  `_install/library` uses - 21 core blocks shipped in this foundation, and
-  adding a 22nd was one new directory and no code change. A manifest declares how to recognize the
-  block (`match`, scored by specificity so a generic "Heading" never
-  swallows a "Section Title") and which classes, attributes, tag or text are
-  editable (`settings`, initially six types); the mapping between control
-  and class runs client-side only, in `assets/blocks.js`, so nothing can read a class
-  one way and write it back another. The canvas is deliberately not a
-  preview: grid widths and spacing are drawn to scale, everything else is a
-  labelled box, and markup the library doesn't describe still gets a box -
-  read-only, never hidden and never dropped. A node whose `id` is targeted
-  by a project css rule is flagged, since such a rule overrides the classes
-  the builder presents as that node's properties. Only `page-*`/`section-*`
-  are editable: `html-header.tpl`/`html-footer.tpl` are one structure split
-  across two files (the header opens `<main>`, the footer closes it), so
-  neither is a well-formed fragment and an html parser handed one alone
-  would "correct" it into a broken page frame. Underpinning all of it,
-  `Parser`/`Serializer` guarantee a **byte-exact round-trip** - attribute
-  order, whitespace, comments and the original spelling of every entity are
-  preserved, so opening a template and saving it unchanged is a no-op rather
-  than a reformat; `tests/templates-smoke.php` asserts that against every
-  shipped page template. See `docs/_templates.md`
+Development tooling, installation workflow, content management, and documentation update.
 
-- **Added `/_install`'s "Themes" step** and the `_install/library/themes/`
-  branch behind it: a theme is now a complete, self-contained library unit
-  (`manifest.php` + its stylesheet + the webfonts that stylesheet actually
-  references + whatever else it lists) rather than one loose
-  `style.theme.<key>.css` among eight in `base/assets`. The wizard grew a
-  third step for it, between Setup and Webpages: a grid of tiles, one per
-  unit, each with the preview image, title and description its own manifest
-  declares, and a click on a tile's preview enlarges it in a lightbox. The
-  eight shipped themes move into their own directories unchanged, each now
-  carrying the three webfonts it uses - which also drops the shared font
-  collection out of the `democontent` module, along with the four faces no
-  theme ever referenced, and fixes four stylesheets pointing at a
-  `/fonts/titel/` directory that never existed (those title fonts silently
-  never loaded). Applying copies the unit's `files` exactly the way Setup
-  already copies a module's, and swaps the theme entry in `config.php`'s
-  `/nino/html/assets['/.cache/style.css']` bundle in place - a stylesheet's
-  position there is what decides which `:root` block wins the cascade, so
-  it is carried at the old entry's index rather than appended, and every
-  other entry in that array is left alone. The picked key is persisted at
-  `/nino/install/theme` (a config predating it still resolves by matching
-  the bundle against each theme's declared stylesheet). Setup loses its
-  theme `<select>` entirely; adding a ninth theme is one new directory, no
-  code change. See `docs/_install.md`
+> Nino remains in beta. The optional Template Builder under `/_templates`
+> is released as an alpha feature. Its interface, block library, and
+> workflows may still change significantly.
 
-- **Renamed both backend areas**: `/_dev` is now `/_admin`, and what used to
-  be `/_admin` is now `/_editor`. The developer tooling already carried the
-  project's technical surface (element types, text, pages, config, restore)
-  while `/_admin` was the content backend an editor logs into every day -
-  the names were the wrong way round. Directories, entry stubs, routes, PHP
-  namespaces and bootstrap classes (`\Nino\Dev\Dev` -> `\Nino\Admin\Admin`,
-  `\Nino\Admin\Admin` -> `\Nino\Editor\Editor`), JS namespaces
-  (`Nino.dev` -> `Nino.admin`, `Nino.admin` -> `Nino.editor`), handbooks and
-  smoke tests all move with them, as does every identifier the two areas
-  own: css custom properties and classes (`--admin-*` -> `--editor-*`,
-  `.admin-field` -> `.editor-field`, `.dev-hint` -> `.admin-hint`), element
-  ids (`#dev-login-form` -> `#admin-login-form`), the session flag
-  (`./nino/dev/authed` -> `./nino/admin/authed`) and `config.php`'s own keys
-  (`/nino/admin/backups` -> `/nino/editor/backups`, same for `/logs`).
-  `/_install`'s own `\Nino\Install\Admin` - the wizard's Admins step, a
-  different class that only shares the name - is untouched, and so is every
-  entry in the released sections below, which describe the layout as it was
-  at the time. `.gitignore` still names the old paths and needs updating by
-  hand - it is left out here so this change applies with a plain `git am`
-  (it is the one file in the repository with CRLF line endings, which git's
-  mailbox parsing mangles)
+### Added
 
-- **Fixed `/nino/install/webpages` not actually being a shared list**: the
-  two tools that write it disagreed on what `template` meant - `/_install`'s
-  Webpages step stored its own `_install/library/pages` unit key (`404`),
-  while `/_admin`'s Pages module reads it as the on-disk template file
-  (`page-404`). Since the project ships four pages pre-applied, that made
-  every page in a fresh checkout unopenable in the Pages module ("unknown
-  template"). Entries now carry both, `template` naming the file and
-  `libraryKey` the unit, and each entry's `statusCode` and route `body` are
-  persisted alongside them rather than left implicit in the route - without
-  those, saving the shipped 404 page from `/_admin` reset it to a 200, and
-  saving the "legal" page flattened its per-locale template resolution
-  (`[template /templates/page-legal.[[/nino/http/response/locale]]]`) onto
-  a single locale's file. A body the template `<select>` can't spell now
-  disables that select and is kept verbatim on save, and the Webpages step
-  carries an entry created in `/_admin` (which has no `libraryKey`) through
-  its replace instead of rejecting it
+- Added `/_templates`, an optional graphical structure editor for
+  `page-*.tpl` and `section-*.tpl` files.
+- Added a manifest-driven block library covering the Nino.css component
+  catalogue.
+- Added structural block selection, insertion, reordering, duplication,
+  removal, and responsive settings to the Template Builder.
+- Added support for editing CSS classes, attributes, boolean attributes,
+  HTML tags, and text through block manifests.
+- Added structural visualization of nested blocks, grids, spacing, and
+  responsive properties.
+- Added the **Themes** step to `/_install`, including self-contained theme
+  library units with previews, stylesheets, assets, and fonts.
+- Added page management to `/_admin`.
+- Added complete management of element types, elements, multilingual texts,
+  image slots, pages, routes, users, configuration, and restoration to
+  `/_admin`.
+- Added English and German documentation for:
+  - concepts and architecture;
+  - development;
+  - installation;
+  - administration;
+  - editorial content management;
+  - template editing;
+  - deployment.
+- Added screenshots for the frontend, `/_install`, `/_admin`, `/_editor`,
+  and `/_templates`.
+- Added language links between all German and English manuals.
 
-- **Added `/_admin`'s "Pages" module**: create/edit/delete the site's actual
-  page routes without hand-editing `/nino/http/routes` as raw json (Config
-  still covers everything this doesn't) - a friendlier continuation of
-  `/_install`'s Webpages step for once `_install` has been deleted. The
-  template `<select>` only ever offers a `templates/page-*.tpl` file that
-  already exists on disk - no copying, no library units, just wiring an
-  existing template up to a uri. Same Element-URI/Http-URI split as
-  Webpages (see below) and the same `/nino/install/webpages` array as its
-  persisted list - shared, not duplicated, so either tool sees the other's
-  edits. The edit form's fields sit inside `<fieldset>`s so they pick up
-  `_editor`'s usual card styling, and the list's own ↑/↓ buttons swap an
-  entry with its neighbor and re-persist the new order - the same order
-  `[[/website/navigation/main]]` gets generated in, and the same ↑/↓
-  pattern Webpages (see below) now uses too. See `docs/_admin.md`
-- **Added `/_install`**: a graphical, developer-only setup wizard for a
-  fresh checkout, walked through as a strictly linear "Back"/"Next" flow
-  across six steps (the step list at the top is a progress display, not a
-  menu): Environment checks; Setup (Available Locales, a Native Locale
-  among them - its `<select>` only ever offers whichever locales are
-  currently checked, live-updated as you check/uncheck them - modules and
-  a theme - one of the bundled `assets/style.theme.<key>.css` stylesheets,
-  swapped into `config.php`'s asset bundle on apply); Webpages (a
-  free-form, ordered list of the project's actual pages, click a row to
-  edit it or "New Webpage" for a blank one - same list-plus-drill-down-form
-  shape and ↑/↓ list reordering `_admin`'s Pages module uses (see above), so
-  the two feel like one tool rather than two differently-built ones -
-  everything here stays client-side until "Next" posts the whole list at
-  once, unlike Pages' immediate per-entry save; an Element-URI, a stable
-  identifier used only for this entry's own `/webpage<uri>/*` text meta
-  and the route's own `uri` data field; an Http-URI, the real browser
-  path that alone drives the `/nino/http/routes` array key
-  (`\Nino\Http::requestRoute()` matches by exact key, not by scanning for
-  a route whose `uri` field matches - see `Webpages::_routeKeys()`'s
-  docblock); a starting template from `_install/library/pages`; per-locale
-  name/title/description defaulting to a generic placeholder rather than
-  the template's own wording; and, once the Navigation module is active, a
-  "Show in main navigation" checkbox that feeds a generated main menu);
-  Personal Infos (same
-  shape as `_editor`'s Text panel - every `/company/*`/`/website/*` key
-  that's global in one fieldset on top, every locale-scoped key
-  (`/company/country`, `/company/description`) below behind a locale
-  dropdown, each with a friendly label); Admins (create/delete accounts,
-  the list is allowed to end up empty - "Next" is what actually requires
-  one); and Finish, which sets the real `_admin` password. Guarded by
-  `Admin::hasDefaultPassword()`: only runs while `_admin/Admin.php` still ships
-  its placeholder hash, and setting a real one (the wizard's own last step)
-  locks it back out for good. See `docs/_install.md`. Entirely optional,
-  same as `_admin`/`_editor` - safe to delete (`rm -rf _install`). Picking a
-  module/template that declares `requiresModules` (eg. Contact needs
-  Forms) pulls those in automatically. Setup's and Webpages' pickers always
-  show the current selection pre-checked and applying either replaces the
-  whole picture - unchecking a locale/module or removing a page and
-  re-applying actually removes it. Routes/modules/locales are always
-  rebuilt from what's actually persisted in `config.php`, never from the
-  current request's in-memory state - a module's self-registered runtime
-  routes (eg. `POST://.form`) and `/_install`'s own route never end up
-  written to `config.php`, and a hand-added route outside the library
-  survives every apply untouched. Templates/text are the exception and are
-  only ever added, never removed by a later apply. Routing isn't
-  reviewable in the wizard either - `_admin`'s existing Config module already
-  covers that
-- **`text/`, `templates/` and `elements/` ship pre-filled with a working
-  starter site instead of empty.** `config.php` ships as if `/_install`'s
-  Setup (native locale only, structural modules, the "agency" theme) and
-  Webpages steps (`/home` at `/`, `/404`, `/legal` and `/contact`, Contact
-  auto-pulling Forms) had already been run once - a fresh checkout renders
-  a real four-page site out of the box, `/_install` remains available
-  (and safe to re-run - see its "replaces, not merges" behaviour above) to
-  add locales/modules/pages or reshape the defaults before deleting it.
-  Previously shipped demo/starter content (Max Mustermann business-coaching
-  copy, the Nino kernel showcase pages) moved into `_install/library/` as
-  generic, brand-neutral placeholder content, selectable per locale/module/
-  page via `/_install`'s Setup/Webpages steps
-- **8 bundled themes** (`assets/style.theme.<agency|correct|glow|kontor|
-  marketplace|nighty|solid|wellness>.css`) replace the previous 3
-  (`style01`/`02`/`03`) - each a self-contained stylesheet with its own
-  `@font-face` declarations, picked in `/_install`'s Setup step (see above)
-  or swapped by hand in `config.php`'s `/nino/html/assets` bundle
-- **`_install/library/modules/mail` merged into `forms`/`newsletter`.**
-  Both content modules now carry their own `mail-header.tpl`/
-  `mail-footer.tpl` and mail design-token blacklist entries directly
-  instead of depending on a separate `mail` module pulled in via
-  `requiresModules` - one fewer opt-in unit for the same content, no
-  behaviour change
-- **Fix**: `Auth::insertUser()`/`Auth::updateUser()` passed a function call
-  straight into `doCallbacks()`'s by-reference parameter, raising an "Only
-  variables should be passed by reference" notice that Runtime's own error
-  handler treats as fatal on every real request (not just the CLI smoke
-  tests, which never boot that handler) - creating or renaming/repasswording
-  an account over http 500'd
+### Changed
+
+- Renamed the former `/_dev` developer area to `/_admin`.
+- Renamed the former `/_admin` content backend to `/_editor`.
+- Updated directories, routes, namespaces, sessions, JavaScript namespaces,
+  CSS identifiers, configuration keys, documentation, and tests to use the
+  new names.
+- Changed fresh checkouts to require `/_install` before the website can run.
+- Changed `/_install` from six to seven steps:
+  1. Environment
+  2. Setup
+  3. Themes
+  4. Webpages
+  5. Personal information
+  6. Admins
+  7. Finish
+- Changed project directories such as `templates/`, `text/`, `elements/`,
+  `images/`, and `assets/` to be created and populated by `/_install`
+  instead of being included as an already configured project.
+- Changed themes from loose stylesheets to self-contained installation
+  library units.
+- Changed theme selection from a setup field to a dedicated visual step.
+- Changed `/_admin` from a collection of technical configuration tools to
+  complete technical and content project management.
+- Kept `/_editor` focused on permission-controlled day-to-day content
+  maintenance.
+- Changed the shared webpage model used by `/_install` and `/_admin` to
+  distinguish:
+  - the installation library key;
+  - the template file;
+  - the internal page URI;
+  - the public HTTP URI;
+  - the response status;
+  - the rendered route body.
+- Changed the Template Builder to derive block identity and settings from
+  ordinary HTML tags and CSS classes.
+- Changed Template Builder inserts to use the same server-side parser as
+  existing template documents.
+- Changed responsive block settings to appear below their base setting
+  instead of as unrelated fields.
+- Changed article modifiers from mutually exclusive settings to independent
+  toggles where Nino.css allows combinations.
+- Changed boolean HTML attributes such as `required`, `open`, `multiple`,
+  `controls`, and `allowfullscreen` to use the dedicated `attrtoggle`
+  setting type.
+- Standardized documentation structure, metadata, navigation, terminology,
+  language links, and maturity labels.
+- Documented `/_templates` consistently as Alpha while the overall project
+  remains Beta.
+
+### Fixed
+
+- Fixed `/nino/install/webpages` being interpreted differently by
+  `/_install` and `/_admin`.
+- Fixed pages created during installation appearing as unknown templates in
+  `/_admin`.
+- Fixed saving the shipped 404 page resetting its response status to `200`.
+- Fixed saving localized pages replacing their locale-dependent template
+  expression with a single locale.
+- Fixed custom route bodies being overwritten when they cannot be expressed
+  by the template selector.
+- Fixed manually added routes being removed when installation selections
+  were applied again.
+- Fixed account creation and account updates failing because a temporary
+  value was passed to a by-reference callback parameter.
+- Fixed theme stylesheets referencing a font directory that did not exist.
+- Removed unused font faces from the shared installation content.
+- Fixed edited CSS classes being removed and appended again, which changed
+  their original order.
+- Fixed the first child inserted into an empty template element receiving
+  incorrect indentation.
+- Fixed removed template blocks leaving unnecessary blank lines behind.
+- Fixed generic button definitions conflicting with specialized modal and
+  toast controls.
+- Fixed Template Builder block matching where a generic definition could
+  override a more specific component.
+- Fixed template inserts deriving indentation solely from nesting depth
+  instead of the surrounding source formatting.
+
+### Security
+
+- The Template Builder writes only supported `page-*.tpl` and
+  `section-*.tpl` files.
+- Header, footer, email, and other technical templates remain read-only in
+  the Template Builder.
+- Template writes reject unsupported HTML tags.
+- Template writes reject event-handler attributes such as `onclick` and
+  other `on*` attributes.
+- Empty template trees cannot be written.
+- Template changes are written atomically.
+- `/_templates` reuses the protected `/_admin` session and password instead
+  of introducing a separate authentication mechanism.
+- Unknown markup remains visible and is preserved instead of being silently
+  removed.
+- Existing templates are accepted for editing only when a byte-exact
+  parse-and-serialize round trip can be guaranteed.
+- The Template Builder stores no proprietary sidecar files or builder
+  attributes in project templates.
+- Reducing third-party runtime dependencies and avoiding an open plugin
+  system continues to limit supply-chain and update risks.
+
+### Tests
+
+- Added `tests/templates-smoke.php`.
+- Added the dependency-free `tests/templates-js-smoke.js` suite.
+- Added tests for the complete Template Builder block catalogue.
+- Added tests for block manifest parsing and validation.
+- Added tests for byte-exact template round trips.
+- Added tests for structural insert, move, duplicate, and remove actions.
+- Added tests for responsive settings.
+- Added tests for `attrtoggle` and bare boolean attributes.
+- Added tests for block matching specificity.
+- Added tests for theme installation units and their assets.
+- Expanded installation smoke tests for the new Themes step.
+- Expanded administration smoke tests for pages, elements, texts, and
+  shared installation data.
+
+### Technical details
+
+- `/_templates` uses one directory per block under
+  `_templates/library/<key>`.
+- Each block consists of a manifest and, where needed, a `block.tpl`
+  containing its initial markup.
+- Block manifests define:
+  - matching rules;
+  - available actions;
+  - editable settings;
+  - palette visibility.
+- The block library contains 76 definitions, including:
+  - grids and columns;
+  - tables;
+  - pricing cards;
+  - accordions;
+  - galleries;
+  - tabs;
+  - modals;
+  - sliders;
+  - timelines;
+  - badges;
+  - alerts;
+  - breadcrumbs;
+  - content lists;
+  - pagination;
+  - logo strips;
+  - feature lists;
+  - video embeds and posters;
+  - image backgrounds;
+  - form controls;
+  - counters;
+  - toast triggers.
+- Structural helper blocks remain recognizable and editable in the canvas
+  while staying hidden from the top-level palette.
+- The Template Builder supports:
+  - `classenum`;
+  - `classgroup`;
+  - `classtoggle`;
+  - `attr`;
+  - `attrtoggle`;
+  - `tag`;
+  - `text`.
+- Unknown HTML remains represented as a structural block and survives
+  saving unchanged.
+- Elements targeted by project CSS through an ID selector are marked because
+  the canvas cannot fully reproduce that part of the CSS cascade.
+- Templates retain their original:
+  - attribute order;
+  - whitespace;
+  - comments;
+  - indentation;
+  - entity spelling.
+- Opening and saving an unchanged template therefore remains a no-op.
+- Template changes remain normal readable HTML+ and can still be edited
+  directly.
+- Theme units live below `_install/library/themes/` and contain their own:
+  - manifest;
+  - stylesheet;
+  - preview;
+  - referenced fonts;
+  - additional declared assets.
+- Applying a theme replaces its entry in the configured CSS bundle without
+  changing the position of the stylesheet in the cascade.
+- Existing bundle entries outside the selected theme remain untouched.
+- The selected theme is persisted under `/nino/install/theme`.
+- Additional themes can be added as new library directories without changing
+  the installer code.
+- `/_install` replaces selected locales, modules, pages, and the theme with
+  the submitted configuration while preserving manually defined routes
+  outside the installation library.
+- Templates and text content are added but are not automatically deleted by
+  a later installation pass.
+- `/_admin` and `/_install` now share the persisted webpage list instead of
+  maintaining separate models.
+- Page ordering in `/_admin` also determines the generated main navigation
+  order.
 
 ## 0.10.0-beta
 
 Security and reliability hardening pass, plus a module-system refactor.
 
-- **CSRF**: `\Nino\Csrf` protection is now always active; `\Nino\Modules\Csrf`
-  only powers the `[csrf]` shortcode. Tokens are accepted from header or JSON
-  body, enforcement matches methods exactly instead of "beyond POST" loosely,
-  and it no longer depends on an enable flag
-- **Auth/session**: throttled logins per IP, stopped user enumeration,
-  session tokens instead of client-IP binding, password hash dropped from
-  the PHP session, strict session cookie flags and token lifetime, fixed
-  parallel logins cancelling each other out
-- **Headers**: valid `X-Frame-Options`, completed CSP, fixed mail header
-  injection and sender headers, stopped leaking credentials through the
-  error handler
-- **Filesystem/locking**: switched `Elements` to `Filesystem::mutate()`
-  (closed 8 early-return lock leaks), atomic file writes with correct
-  locking, `Filesystem` now mutates its lock primitive on every read,
-  config path and rotating-log edge cases fixed
-- **Module system**: modules moved to
-  `_nino/Nino/Modules/<Name>/<Name>.php` and are now loaded via
-  `spl_autoload_register()`; `\Nino\Shortcodes` renamed to `\Nino\Modules`
-- **Refactors**: added `Http::fail()`/`Http::ok()` response helpers, moved
-  `\Nino\Text` into the kernel (Admin/Dev keep only their delta), reworked
-  the rotating log, moved `backupManifest()` to `\Nino\Backup`, trimmed
-  comment density across the codebase
-- **Fixes**: shortcode recursion guard, element query keys combined with
-  AND, uri rename no longer breaks, route locale handling, asset bundle
-  rebuilt only when changed, `array_merge_recursive` replaced with a
-  scalar-overwrite merge, a dashboard permission leak, response header
-  filtering, `Callbacks::doCallbacks()`, `writeContentData()` now checks
-  its return value, `Text::saveBatch()` no longer rebuilds entries per call
-- **Tests**: added `concurrency-smoke.php` and `dev-smoke.php`, expanded
-  `kernel-smoke.php` and `admin-smoke.php`
+### Security
+
+- Made `\Nino\Csrf` protection permanently active.
+- Limited `\Nino\Modules\Csrf` to rendering the `[csrf]` shortcode.
+- Accepted CSRF tokens from request headers and JSON bodies.
+- Changed CSRF method matching to use exact HTTP methods.
+- Added throttled logins per IP address.
+- Prevented user enumeration during login.
+- Replaced client-IP session binding with session tokens.
+- Removed password hashes from PHP session data.
+- Added strict session cookie settings and token lifetimes.
+- Fixed parallel logins invalidating each other.
+- Fixed `X-Frame-Options`.
+- Completed the Content-Security-Policy configuration.
+- Fixed mail header injection and sender headers.
+- Prevented credentials from leaking through the error handler.
+
+### Changed
+
+- Moved modules to `_nino/Nino/Modules/<Name>/<Name>.php`.
+- Added module loading through `spl_autoload_register()`.
+- Renamed `\Nino\Shortcodes` to `\Nino\Modules`.
+- Added `Http::fail()` and `Http::ok()` response helpers.
+- Moved `\Nino\Text` into the kernel.
+- Reworked the rotating log.
+- Moved `backupManifest()` to `\Nino\Backup`.
+- Reduced comment density across the codebase.
+
+### Fixed
+
+- Changed element mutations to use `Filesystem::mutate()`.
+- Fixed early-return lock leaks in element operations.
+- Added atomic file writes with correct locking.
+- Changed `Filesystem` reads to use the locking primitive consistently.
+- Fixed configuration path and rotating-log edge cases.
+- Added a shortcode recursion guard.
+- Fixed element query keys being combined incorrectly.
+- Fixed URI renaming.
+- Fixed route locale handling.
+- Prevented asset bundles from being rebuilt when unchanged.
+- Replaced recursive array merging with scalar-overwrite behavior.
+- Fixed a dashboard permission leak.
+- Fixed response header filtering.
+- Fixed `Callbacks::doCallbacks()`.
+- Changed `writeContentData()` to check its write result.
+- Prevented `Text::saveBatch()` from rebuilding entries for every call.
+
+### Tests
+
+- Added `tests/concurrency-smoke.php`.
+- Added the developer-area smoke suite.
+- Expanded `tests/kernel-smoke.php`.
+- Expanded the administration smoke suite.
 
 ## 0.9.0-beta
 
-First tagged release. Highlights since the initial drop:
+First tagged release.
 
-- Fixed the default Content-Security-Policy being wiped by the Jstext
-  module's own script-src fragment
-- Fixed error display/logging defaults for production (display off, log on)
-- Fixed locale-switch redirects, which never actually redirected
-- Added `session_regenerate_id()` on login (session fixation defense)
-- `/data/` and uploaded images are no longer git-tracked
-- Newsletter signup is now double opt-in (confirm link by mail) with a
-  self-service unsubscribe link; everything moved under `/.newsletter`
-  (routes registered by the `Newsletter` class itself, not `config.php`)
-- `router.php` serves the bundled demo images on the local dev server
-- Simplified all `docs/*.md` down to plain reference material; removed
-  `docs/security.md`
+### Added
+
+- Added newsletter double opt-in with confirmation by email.
+- Added self-service newsletter unsubscribe links.
+- Added automatic newsletter routes under `/.newsletter`.
+- Added local development support for bundled demo images through
+  `router.php`.
+
+### Changed
+
+- Stopped tracking `/data/` and uploaded images in Git.
+- Simplified `docs/*.md` to reference documentation.
+- Removed `docs/security.md`.
+
+### Fixed
+
+- Fixed the Jstext module clearing the default Content-Security-Policy.
+- Fixed production error display and logging defaults.
+- Fixed locale-switch redirects.
+- Added `session_regenerate_id()` after login to prevent session fixation.

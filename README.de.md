@@ -1,172 +1,189 @@
-# Nino
+# Hi, ich bin Nino.
 
-*[English](README.md)*
+**Sprache:** [English](README.md) · Deutsch
 
-## **Hallo, ich bin Nino.**
-Nino ist ein kompaktes PHP-Framework für Webseiten. Es funktioniert **unabhängig von Paketen**, benötigt **keine Datenbank** und bietet trotzdem alle essenziellen Funktionen für die Entwicklung und den Betrieb moderner Webanwendungen.
-Das Framework beinhaltet die vorgegebene Dateistruktur, einen **Kernel** zur dynamischen Generierung und Anzeige der Seite (_nino) und eine **optionale** grafische Oberfläche für den Entwickler (_admin), den Betreiber (_editor) sowie einen Einrichtungsassistenten für die Erstinstallation (_install).
+## Mit Nino einfach Webseiten entwickeln
 
-## _nino
-Der Kernel (_nino) umfasst PHP/JS/CSS-Dateien für das Front- und Backend. Er bündelt den gesamten PHP-Code in nur **einer Datei mit 5.000 Zeilen** und beinhaltet alle notwendigen Methoden, zur Darstellung mehrsprachiger Webseiten - inklusive einem vollständigen Backend, dateibasierter Inhaltsverwaltung, Templating und einem umfangreichen Werkzeugkasten mit weiteren Frontend- und Backendtools.
-Texte und wiederkehrende Inhalte der Webseite (wie Beiträge, Leistungen, Neuigkeiten, ..) liegen in **PHP-Dateien**, Templates werden **HTML-ähnlich** angelegt. Der Nino-Kernel kümmert sich vollständig um den Request (Locale/Auth/Route), rendert die Templates und liefert das Ergebnis sauber aus.
-Alle Daten des laufenden PHP-Lifecycle werden in einem **einzigen Array** durch ein **Callback-System** gereicht. Dadurch sind Anpassungen und Weiterentwicklungen einfach und **ohne Eingriff im Kernel** möglich.
-Neben dem Kernel \Nino stehen bereits die wichtigsten Funktionen einer modernen Webseite (Elemente, Newsletter, Bilduploads, Formulare, Localepicker, Navigationen, u.v.m) als **optionale Module** in \Nino\Modules zur Verfügung - inklusive aller notwendigen CSS- und JS-Codes. Eigene Module können durch das Callback-System ganz einfach entwickelt und integriert werden.
+Nino ist eine schlanke Basis für moderne PHP-Webseiten. Es funktioniert komplett ohne Datenbank oder externe Pakete und verzichtet auf unnötigen Ballast. Entwickler behalten die Kontrolle über Frontend, Templates und Funktionen; Redakteure und Betreiber pflegen Inhalte über ein schlankes GUI.
+Nino verliert sich nicht in Möglichkeiten – es bringt Inhalte ins Internet.
 
-### Die Kernel-Features von Nino.php
-- HTTP Request-/Response Handling
-- Systemweite Callbacks für flexible Eingriffe
-- Dateiverwaltung (Lesen, Schreiben, Caching)
-- Verwaltung mehrsprachiger Elemente (wiederkehrende Inhalte und Beiträge)
-- Template- und HTML-Rendering mit mehrsprachigen Textfills und Shortcodes
-- Benutzerauthentifizierung (inkl. Timeout-Schutz)
-- Bild-Upload
-- Systemweites Locale-Handling
-- Einfaches Mailing
-- Fehler-Logging
-- Config-Handling
-- Modulverwaltung für zusätzliche Funktionen
+Das gesamte Projekt ist jederzeit ein lesbarer, mit Git versionierbarer Dateibestand und läuft auf klassischem PHP-Hosting. Die erste Installation ist in wenigen Minuten abgeschlossen und hinterlässt ein funktionierendes Gerüst für die Weiterentwicklung. Entwickler können es mit den notwendigen Tools füllen und über ein flexibles Callback-System eigene Funktionen hinzufügen.
+Mehrsprachigkeit, Beiträge und Elemente, Formulare, Newsletter, Benutzerrechte und Backups sind bereits enthalten.
 
-### Die optionalen Nino-Module
-- CSS/JS-Asset-Verwaltung (Rendering und Minifizierung)
-- Locale-Picker
-- Mehrsprachige JavaScript-Texte
-- Navigationsmenüs (inkl. Burger-Menü)
-- CSRF-Schutz
-- HTML-Formulare
-- Newsletter (Double-Opt-in-Anmeldung + Abmeldelink)
+## Warum noch ein CMS?
 
-## _admin / _editor / _install
-Der Nino-Core _nino kümmert sich **ausschließlich um die Darstellung der Seite**. Parallel ergänzen _admin (für Entwickler) und _editor (für Administratoren) das Frontend als grafische Verwaltungstools, und _install bietet einen grafischen, schrittweisen Einrichtungsassistenten für einen frischen Checkout.
-Alle drei sind **vollständig optional** und lassen sich bei Bedarf komplett entfernen. Sie ermöglichen eine effektive und schnelle Entwicklung und bieten im Anschluss den Betreibern und Administratoren eine einfache und angenehme Pflege der laufenden Daten - **ganz ohne technisches Knowhow**.
-Durch ein durchdachtes **Rechtesystem** erhalten Administrator-Accounts nur den Zugriff, den sie brauchen. Kompaktes Logging, ein integriertes Backup und ein sauberes Sicherheitskonzept runden das Toolset für den Alltag ab.
+Es gibt großartige PHP-Lösungen für Webseiten:
+Ausgereifte Systeme wie WordPress decken mit Themes, Plugins und ihrer großen Community nahezu alle Anwendungen ab. Diese Vielseitigkeit ist ihre Stärke – und gleichzeitig ihre größte Schwäche.
+Technische Frameworks wie Laravel ermöglichen hochkomplexe Anwendungen, benötigen für klassische Webseiten jedoch ein umfangreicheres, Composer-basiertes Umfeld und zusätzliche Frontend-Werkzeuge.
+Webseiten aus reinem HTML/CSS/JavaScript sind dagegen sehr schlank, müssen redaktionelle Funktionen aber immer wieder neu lösen.
 
-### Features der _install UI
-- Umgebungsprüfung: PHP-Version, benötigte Extensions, Datei-/Ordnerrechte
-- Sprachen/Module/Seiten wählen und Startinhalt (Routen, Templates, Texte) aus einer Library zusammensetzen - `_install/library/`, siehe `docs/_install.de.md`
-- Theme aus einem Vorschau-Raster wählen - Stylesheet, Webfonts und alles Weitere werden kopiert und eingebunden
-- Gesammeltes Befüllen der immer vorhandenen "Basis"-Textinhalte
-- Anlegen des/der ersten _editor-Accounts
-- Setzen des echten _admin-Passworts (zugleich die Selbstsperre des Assistenten)
+**Nino setzt dazwischen an:** als praxisnahe Basis für dynamische Webseiten. Entwickler können Projekte schnell anpassen; Betreiber erhalten eine einfache Oberfläche für die grundlegende Inhaltspflege.
 
-### Features der _templates UI
-- Beliebige `templates/page-*.tpl` als visuellen Baustein-Baum laden - erkannt an den eigenen CSS-Klassen, ohne Migration und ohne Marker-Attribute
-- Baustein-Library mit 76 Definitionen als ein Verzeichnis pro Baustein (`_templates/library/`), einschließlich des `Nino.css`-Komponentenkatalogs und aus der Einfüge-Palette ausgeblendeter Erkennungshelfer
-- Grid-Breiten und Abstände maßstäblich gezeichnet, alles andere als beschriftetes Kästchen, siehe `docs/_templates.de.md`
-- Generierte Einstellungen für Klassen, Text, Tags und Attribute, einschließlich nativer boolescher Attribute als Checkbox (`required`, `open`, `controls`, …)
-- Byte-genauer Round-Trip: Ein unverändertes Template zu speichern ändert nichts
+## Für wen ist Nino gedacht?
 
-### Features der _admin UI
-- Erstellen/Bearbeiten/Löschen von Elements-Typen
-- Erstellen/Bearbeiten/Löschen von Textfills
-- Scan von undefinierten Textfills
-- Anlegen von bearbeitbaren Image-Slots für Adminstratoren
-- Erstellen/Bearbeiten/Löschen von Administratoren
-- Granulares Rechtesystem für Admin-Konten
-- Backup-Wiederherstellung
-- Bearbeitung der wichtigsten Config-Werten
+Nino richtet sich in erster Linie an Webentwickler und kleine Agenturen, die individuelle, klassische Webseiten entwickeln und eventuell an Dritte zur Inhaltspflege übergeben.
 
-### Features der _editor UI
-- Erstellen/Bearbeiten/Löschen von Elementen (mehrsprachig)
-- Bearbeiten von Textfills (mehrsprachig)
-- Upload/Austausch der festgelegten Image-Slots
-- Passwort-/E-Mail-Änderung von Administrator-Accounts
-- Einsicht in Formular-Anfragen
-- Einsicht/Löschung und Export von Newsletter-Anmeldungen
-- Einsicht in eigene Logs
+Für die Umsetzung sind gute HTML/CSS/JavaScript-Kenntnisse und PHP-Grundkenntnisse sinnvoll. Eigene Module, APIs oder Datenbanken lassen sich integrieren, erfordern aber entsprechend mehr PHP-Erfahrung.
 
-*Alle Features sind über das Rechtesystem pro Account regelbar*
+## Die Säulen von Nino
+
+### Frontend – simpel, aber individuell
+
+![Beispiel eines mit Nino erstellten Frontends](docs/assets/screenshots/frontend.webp)
+
+Das Frontend entsteht aus einfachen HTML-basierten Templates, Textfills, Shortcodes und wiederkehrenden Elementen. Nino gibt keine fertige Seitenstruktur vor: Das sichtbare Ergebnis bleibt ein individuelles Projekt.
+
+Das mitgelieferte Design-System mit Basiskomponenten und Modulen bietet einen schnellen Ausgangspunkt für klassische Webseiten. Mehrsprachige Inhalte, Responsive Design, Performance und Sicherheit bleiben dabei Teil des Projekts.
+
+### `/_install` – der schnelle Einstieg zum Projekt
+
+![Umgebungsprüfung im Installationsassistenten](docs/assets/screenshots/install.webp)
+
+Jeder frische Checkout wird über `/_install` eingerichtet. Der Assistent prüft die Umgebung, führt durch Sprachen, Module und Theme, übernimmt die benötigten Assets, legt erste Seiten und Basisinformationen an und erstellt die Zugänge für `/_editor` und `/_admin`.
+
+Danach kann der Entwickler direkt mit dem Projekt beginnen.
+
+### `/_admin` – optional: die GUI für Entwickler
+
+![Dashboard der technischen Projektverwaltung](docs/assets/screenshots/admin.webp)
+
+In `/_admin` verwaltet der Entwickler die technische und inhaltliche Struktur der Webseite: Elementtypen, Elemente und Texte, Bilder, Seiten und Routen, Benutzer sowie die Konfiguration.
+
+Die Oberfläche bietet vollständigen Zugriff für Entwicklung, Diagnose und Korrekturen und bleibt deshalb einem separaten technischen Zugang vorbehalten. Alle Änderungen lassen sich alternativ direkt im Dateisystem vornehmen.
+
+### `/_editor` – optional: Inhalte einfach weiterpflegen
+
+![Dashboard der Redaktionsoberfläche](docs/assets/screenshots/editor.webp)
+
+`/_editor` ist die tägliche Oberfläche für Redakteure und Betreiber. Hier werden Texte, wiederkehrende Inhalte und Bilder gepflegt sowie Formulareingänge, Newsletter-Abonnements, Benutzerrechte und Logs verwaltet.
+
+Der Entwickler legt fest, welche Inhalte sichtbar sind und welche Bereiche ein Account tatsächlich benötigt.
+
+### `/_templates` – optional, Alpha
+
+![Strukturelle Bearbeitung eines Seitentemplates im Template-Builder](docs/assets/screenshots/templates.webp)
+
+`/_templates` ist ein grafischer Struktur-Editor für `page-*.tpl` und `section-*.tpl`. Der Template-Builder zeigt Raster, Abstände und verschachtelte Blöcke, erzeugt seine Einstellungen aus HTML-Tags und CSS-Klassen und speichert weiterhin lesbares HTML+ in den normalen Template-Dateien.
+
+Er ist bewusst **keine visuelle Vorschau der fertigen Webseite**.
+
+> **Status: Alpha.** Das Datenformat bleibt einfaches `.tpl`-Markup, Oberfläche, Blockbibliothek und Bedienabläufe können sich jedoch noch deutlich verändern.
+
+## Was Nino mitbringt
+
+* mehrsprachiges Routing sowie mehrsprachige Texte und Inhalte
+* eigenes Template-System mit Shortcodes und klarer Trennung von HTML und PHP
+* optionaler Template-Builder für `.tpl`-Dateien (Alpha)
+* dateibasiertes Content-Modell für Textfills und wiederkehrende Elemente
+* Themes, Asset-Bundling und Frontend-Basiskomponenten
+* Formulare, Newsletter, Navigation, Sprachauswahl und Bildverarbeitung
+* Benutzer, granulare Rechte, Login-Schutz und Aktivitätenprotokolle
+* automatische, verschlüsselte Backups und Wiederherstellung
+* integriertes Callback-System für eigene Module und Integrationen
+
+## Nino vs. WordPress, Laravel, Kirby und Grav
+
+Keines dieser Systeme ist grundsätzlich besser als die anderen. Sie beginnen lediglich an unterschiedlichen Stellen und setzen andere Schwerpunkte.
+
+*Stand: August 2026*
+
+| System        | Ansatz                                                                       | Technische Grundlage                                           | Besonders passend für                                                                   |
+| ------------- | ---------------------------------------------------------------------------- | -------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| **Nino**      | Kompaktes Webseiten-Framework mit eigener Redaktionsoberfläche               | PHP und Dateisystem; keine Datenbank und keine externen Pakete | Individuelle, mehrsprachige Webseiten mit klarer Übergabe vom Entwickler an Redakteure  |
+| **WordPress** | Universelles, inhaltsorientiertes CMS mit großem Theme- und Plugin-Ökosystem | PHP mit MySQL oder MariaDB                                     | Projekte, die von fertigen Erweiterungen, Themes und einer großen Community profitieren |
+| **Laravel**   | Full-Stack-Framework für Webanwendungen                                      | Composer-basiertes PHP-Ökosystem                               | Individuelle Anwendungen, komplexe Geschäftslogik und skalierbare Infrastruktur         |
+| **Kirby**     | Flexibles Flat-File-CMS mit ausgereiftem Panel und Plugin-Plattform          | Dateibasierte Inhalte und modernes PHP                         | Maßgeschneiderte Webseiten mit etabliertem Flat-File-Ökosystem                          |
+| **Grav**      | Open-Source-Flat-File-CMS mit Themes und Plugins                             | Markdown, Twig, Symfony-Komponenten und Package-Manager        | Datei- und Markdown-orientierte Webseiten mit offenem Erweiterungs-Ökosystem            |
+
+Nino entscheidet sich bewusst für einen kleineren Rahmen: **keine universelle Plugin-Welt, kein abstrakter Anwendungsbaukasten und keine Datenbank.**
+
+Dafür bilden der stabile Kernel, die schnelle Installation, die Entwicklerwerkzeuge und die Redaktionsoberfläche einen zusammenhängenden Ablauf, der speziell auf individuelle Webseiten zugeschnitten ist.
+
+Durch den Verzicht auf ein offenes Plugin-System und fremde Laufzeitpakete reduziert Nino seine Angriffsfläche sowie Update- und Lieferkettenrisiken. Weniger fremder Code und weniger voneinander abhängige Versionsstände machen den installierten Codebestand überschaubarer und leichter prüfbar.
+
+**Das ersetzt keine sichere Entwicklung, verringert jedoch den Update- und Pflegeaufwand deutlich.**
 
 ## Schnellstart
 
-```
+Nino benötigt **PHP 8.4 oder neuer** mit der `gd`-Erweiterung und `phar.ini`-Unterstützung für `PharData`. Es wird ohne Paketmanager oder Build-Schritt gestartet:
+
+```bash
+git clone https://github.com/dapeio/nino.git
+cd nino
 php -S 127.0.0.1:8000 router.php
 ```
 
-Benötigt **PHP 8.4+** mit der `gd`-Erweiterung (Bildzuschnitt/-skalierung) und
-`phar.ini`-Unterstützung für `PharData` (wird für die automatischen Backups
-in `_editor` benötigt, nicht durch `phar.readonly` eingeschränkt). **Kein
-weiteres Setup nötig** - `config.php` im Projektwurzelverzeichnis enthält die
-Konfiguration der Website und wird bei jedem Request neu eingelesen. Das
-nötige Router-Skript für `_editor`/`_admin`, die Webserver-Konfiguration und
-den vollständigen Weg bis zum Go-Live beschreibt **[docs/setup.md](docs/setup.md)**
-(Englisch).
+Öffne anschließend http://127.0.0.1:8000/_install.
 
-`text/`, `templates/` und `elements/` werden **leer** ausgeliefert - es gibt
-keinen Startinhalt, bis der Setup-Schritt von `/_install` welchen aus seiner
-Library zusammensetzt, oder Sie ihn von Hand anlegen. Frischer Checkout?
-Unter `/_install` steht ein grafischer Assistent für die Ersteinrichtung
-bereit (Umgebungsprüfung, Content-Setup, Basis-Texte im Bulk, Admins,
-_admin-Passwort) - siehe **[docs/_install.de.md](docs/_install.de.md)**. Er
-funktioniert nur, bis ein echtes `/_admin`-Passwort gesetzt ist, und lässt sich
-genauso gut von Hand durchführen.
+Der Assistent ist für einen frischen Checkout notwendig und erzeugt den ersten lauffähigen Projektstand.
 
-## Struktur
+Der vollständige Ablauf steht unter **[Erste Schritte](docs/getting-started.de.md)**. Alle Optionen und Schreibvorgänge erklärt das **[`/_install`-Referenzhandbuch](docs/_install.de.md)**.
 
+## Projektstruktur
+
+```text
+index.php        Haupt-Einstiegspunkt der Webseite
+config.php       Site-Konfiguration
+
+_nino/           Kernel und Frontend-Core
+_editor/         Inhaltseditor, Nutzer, Backups, Aktivitätslog
+_admin/          Entwickler-Werkzeuge und Wiederherstellung
+_install/        Einrichtungsassistent
+_templates/      Template-Builder
+
+elements/        Element-Typen
+templates/       Seiten- und Sektions-Templates
+text/            Texte je Sprache und globale Einstellungen
+assets/          Projekt-eigenes CSS und JavaScript
+images/          Hochgeladene Bilder
+docs/            Dokumentation
+data/            Laufzeitdaten, nicht in Git getrackt
 ```
-index.php        Haupt-Einstiegspunkt der Website
-config.php        Site-Konfiguration: Routen, Module, Sprachen, Formular-Einstellungen
-
-_nino/           Kernel - Nino.php (Backend), Nino.js/Nino.css/Nino.ui.js (Frontend-Core)
-_editor/           Admin-Dashboard - Inhaltseditoren (Werte), Nutzer, Backups, Aktivitätslog
-_admin/             Entwickler-Werkzeuge - Element-/Text-/Bild-"Schema"-Editoren, Konfigurationseditor, Wiederherstellung
-_install/         Einrichtungsassistent - Prüfungen, Content-Setup (library/), Basis-Texte im
-                  Bulk, Admins, _admin-Passwort
-_templates/       Template-Builder - visueller Editor für templates/*.tpl, Baustein-Library
-                  (library/), abgesichert über das Passwort von _admin
-
-elements/         Inhalte der Element-Typen (eine .php-Datei pro Typ) - standardmäßig leer
-text/             Texte je Sprache + global.php (inkl. Design-Tokens) + blacklist.php - standardmäßig leer
-templates/        .tpl-Seiten-/Sektions-Templates - standardmäßig leer
-assets/           Projekt-eigenes style.css/script.js
-images/           Hochgeladene Bilder (admin-verwaltet, bei Bedarf generiert)
-docs/             _editor.md, _admin.md, _install.md, _templates.md, design.md, development.md,
-                  und je ein .de.md-Gegenstück dazu
-tests/            Abhängigkeitsfreie Smoke-Tests (php tests/*.php)
-data/             Laufzeitdaten (Newsletter-Abonnenten, Formular-Einsendungen,
-                  Logs) - entstehen bei Bedarf, nie in git getrackt
-```
-
-## Dokumentation
-
-- **[docs/development.de.md](docs/development.de.md)**
-- **[docs/development.md](docs/development.md)** (English)
-Alle Informationen für den **Backend-Entwickler**.
-Aufbau des Kernels, das AppData-Konzept, das Callback-System, die Init → Request → Output-Pipeline, Templates/Shortcodes/Textfills, das Rechtesystem, die Entwicklung eigener Module. Die Architektur von `_editor`/`_admin`, Testkonventionen.
----
-- **[docs/design.de.md](docs/design.de.md)**
-- **[docs/design.md](docs/design.md)** (English)
-Alle Informationen für den **Frontend-Designer und -Entwickler**. Der Ablauf von HTML-Rendering, die Architektur/Naming-Conventions des integrierten CSS-Frameworks, die Entwicklung eigener Frontend-Elemente und Shortcodes.
----
-- **[docs/_editor.de.md](docs/_editor.de.md)**
-- **[docs/_editor.md](docs/_editor.md)** (English)
-Das **Benutzerhandbuch** für die _editor Administrator- und Benutzeroberfläche.
----
-- **[docs/_admin.de.md](docs/_admin.de.md)**
-- **[docs/_admin.md](docs/_admin.md)** (English)
-Das **Benutzerhandbuch** für die _admin Entwickleroberfläche.
----
-- **[docs/_install.de.md](docs/_install.de.md)**
-- **[docs/_install.md](docs/_install.md)** (English)
-Das **Benutzerhandbuch** für den _install Einrichtungsassistenten.
----
-- **[docs/_templates.de.md](docs/_templates.de.md)**
-- **[docs/_templates.md](docs/_templates.md)** (English)
-Das **Benutzerhandbuch** für den _templates Template-Builder.
 
 ## Tests
-```
+
+Jede Datei ist ein eigenständiges Skript und läuft gegen ein isoliertes Sandbox-Verzeichnis:
+
+```bash
 php tests/kernel-smoke.php
 php tests/admin-smoke.php
 php tests/editor-smoke.php
 php tests/install-smoke.php
 php tests/templates-smoke.php
 php tests/concurrency-smoke.php
-for test in tests/*-js-smoke.js; do node "$test"; done
 ```
 
-Jede Datei ist ein **eigenständiges Skript** (kein PHPUnit), das gegen ein
-isoliertes Sandbox-Verzeichnis läuft und eine Pass/Fail-Zusammenfassung
-ausgibt. CI führt alle fünf bei jedem Push aus.
+## Philosophie und Technik
+
+Nino hält seine Architektur bewusst klein: Ein zentrales `$appData`-Array trägt den Anwendungszustand, `$request` bleibt für HTTP-Anfrage und -Antwort zuständig, und Callbacks verbinden Kernel, Module und Templates.
+
+## Weitere Dokumente:
+
+* **[Grundkonzepte](docs/concepts.de.md):** Architektur, Datenfluss und Aufgabentrennung
+* **[Entwickler-Handbuch](docs/development.de.md):** Laufzeitverträge, APIs, Module und Tests
+* **[Erste Schritte](docs/getting-started.de.md):** vom Checkout zur eingerichteten Webseite
+* **[`/_install`-Referenz](docs/_install.de.md):** Schritte, Schreibregeln und Library-Format
+* **[`/_admin`-Bedienung](docs/_admin.de.md):** Projektstruktur, Inhalte, Konten, Konfiguration und Wiederherstellung
+* **[`/_templates`-Bedienung](docs/_templates.de.md):** strukturelle Template-Bearbeitung mit dem Alpha-Builder
+* **[`/_editor`-Bedienung](docs/_editor.de.md):** Texte, Elemente, Bilder, Anfragen und Newsletter
+* **[Deployment](docs/deployment.de.md):** Webserver, Sicherheit, Backups und Go-live
+* **[Design-Handbuch](docs/design.de.md):** Frontend, Design-System, CSS und Template-Arbeit **(WIP)**
+* **[Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md):** Sicherheitsmeldungen und unterstützte Versionen
+* **[Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md):** Änderungen zwischen den Versionen
+
+## Status und Sicherheit
+
+Nino befindet sich als Gesamtprojekt derzeit in der **Beta-Phase**. Einzelne optionale Werkzeuge besitzen einen eigenen, niedrigeren Reifegrad:
+
+| Bereich                                          | Status                                    |
+| ------------------------------------------------ | ----------------------------------------- |
+| Kernel, Frontend und bestehende Projektgrundlage | Beta                                      |
+| `/_templates`                                    | Alpha                                     |
+
+Sicherheitskorrekturen landen direkt auf `main`; eine separate LTS-Version gibt es noch nicht.
+
+Sicherheitsprobleme sollten nicht als öffentliches Issue gemeldet werden. Kontaktdaten und unterstützter Versionsstand stehen in der [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md).
 
 ## Lizenz
-[MIT](LICENSE)
+
+[MIT](https://github.com/dapeio/nino/blob/main/LICENSE)

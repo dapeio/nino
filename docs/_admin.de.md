@@ -1,35 +1,262 @@
-# Nino — Admin-Handbuch
-*[English](_admin.md)*
+# `/_admin` — Bedienungsanleitung
 
-**Links:**
-[README](../README.de.md) · [Design-Handbuch](design.de.md) · [Entwickler-Handbuch](development.de.md) · [_editor-Handbuch](_editor.de.md) · [_install-Handbuch](_install.de.md) · [_templates-Handbuch](_templates.de.md) · [Security Policy](../SECURITY.md) · [Changelog](../CHANGELOG.md)
+**Sprache:** [English](_admin.md) · Deutsch
 
-## Folgt.
+**Stand:** 8. August 2026 · **Nino-Version:** 0.11.0-beta.1
 
-Ein Modul ist vorab dokumentiert, da es direkt mit dem Webpages-Schritt von `/_install` zusammenspielt.
+Dieses Handbuch erklärt die vollständige technische und inhaltliche Projektverwaltung unter `/_admin`. Falls du stattdessen nur freigegebene Inhalte im Alltag pflegen möchtest, lies die [`/_editor`-Bedienungsanleitung](_editor.de.md); die strukturelle Bearbeitung von `.tpl`-Dateien beschreibt die [`/_templates`-Bedienung](_templates.de.md).
 
-### Pages
+**Weitere Links:**
+[README](../README.de.md) · [Grundkonzepte](concepts.de.md) · [Entwickler-Handbuch](development.de.md) · [Erste Schritte](getting-started.de.md) · [`/_install`-Referenz](_install.de.md) · [`/_admin`-Bedienung](_admin.de.md) · [`/_templates`-Bedienung](_templates.de.md) · [`/_editor`-Bedienung](_editor.de.md) · [Deployment](deployment.de.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
 
-Seiten-Routen des Projekts anlegen, bearbeiten und löschen, ohne `/nino/http/routes` von Hand als rohes json zu bearbeiten (das Config-Modul von `_admin` deckt weiterhin alles ab, was dieses Modul nicht abdeckt - Routen außerhalb seiner Zuständigkeit, oder jeden anderen whitelisted "weichen" Config-Wert). Eine komfortablere Fortsetzung des Webpages-Schritts von `/_install` für die Zeit, nachdem `_install` gelöscht wurde: Die Template-Auswahl bietet ausschließlich bereits auf der Platte vorhandene `templates/page-*.tpl`-Dateien an - kein Kopieren, keine Library-Einheiten, nur das Verdrahten eines bestehenden Templates mit einer URI.
+**Sicherheitshinweis:** `/_admin` richtet sich an Entwickler. Änderungen werden unmittelbar in Konfiguration und Projektdateien geschrieben und können Routing, Datenmodelle, Inhalte und die sichtbare Webseite verändern. Arbeite deshalb mit einem aktuellen Git-Stand oder einer anderen verlässlichen Sicherung.
 
-Jeder Eintrag hat:
+## Aufgabe und Abgrenzung
 
-- **Element URI** - ein stabiler, frei wählbarer Bezeichner, der nicht wie ein echter Pfad aussehen muss. Er ist der Namensraum für die `/webpage<uri>/*`-Textschlüssel dieses Eintrags und wird zum eigenen `uri`-Datenfeld der Route.
-- **Http URI** - der echte, erreichbare Browser-Pfad. Nur dieser bestimmt den Array-Key in `/nino/http/routes` - die vollständige Begründung steht im Webpages-Abschnitt von `docs/_install.de.md` (`\Nino\Http::requestRoute()` matcht über den exakten Schlüssel, nicht über einen Scan nach einer Route mit passendem `uri`-Feld).
-- **Template** - eingeschränkt auf die tatsächlich vorhandenen `templates/page-*.tpl`-Dateien.
-- **Status Code** - standardmäßig 200; z. B. 404 für eine Nicht-gefunden-Seite.
-- **Nav** - erscheint nur, sobald das Navigation-Modul aktiv ist; regeneriert `[[/website/navigation/main]]` genauso wie der Webpages-Schritt von `/_install`.
-- **Name/Titel/Beschreibung**, pro aktiver Sprache - geschrieben in die `/webpage<uri>/*`-Textschlüssel, gleicher Fallback auf einen generischen Platzhalter wie bei Webpages.
+`/_admin` bietet vollständigen Zugriff für Entwicklung, Diagnose und Korrekturen. `/_editor` bildet dagegen den freigegebenen Arbeitsbereich für Redakteure und Betreiber. Die Trennung verläuft damit nicht mehr grundsätzlich zwischen Struktur und Inhalt, sondern zwischen technischem Vollzugriff und rollenbasierter Alltagspflege.
 
-Beide URIs werden unabhängig voneinander validiert und auf Eindeutigkeit geprüft. Das Löschen einer Seite entfernt ihre Route, lässt aber die `/webpage<uri>/*`-Textschlüssel bestehen - dieselbe Nur-hinzufügen-Regel, der jedes Anwenden/Speichern in diesem Codebase folgt.
+| Bereich | `/_admin` | `/_editor` |
+|---|---|---|
+| Elementtypen | Felder und Datentypen definieren | keine Strukturänderung |
+| Elemente | alle Einträge, Sprachen und Speicher-Buckets bearbeiten | freigegebene Einträge innerhalb der Rechte pflegen |
+| Texte | Schlüssel, Werte, Sprachen und Editor-Sichtbarkeit vollständig verwalten | freigegebene Werte pflegen |
+| Bilder | Bildplätze und Zielmaße definieren | Bilder hochladen und ersetzen |
+| Seiten | Routen, Templates und Navigation verwalten | Seitentexte pflegen |
+| Templates | Link zum eigenständigen Alpha-Builder `/_templates` | kein Zugriff |
+| Nutzer | Konten anlegen, löschen und Rechte technisch verwalten | Profildaten und freigegebene Rechte pflegen |
+| Konfiguration | ausgewählte technische Werte bearbeiten | kein Zugriff |
+| Backups | vorhandene Sicherungen wiederherstellen | tägliche Sicherung automatisch auslösen |
 
-Die ↑/↓-Buttons der Liste tauschen einen Eintrag mit seinem Nachbarn und speichern die neue Reihenfolge - genau in dieser Reihenfolge wird `[[/website/navigation/main]]` generiert. Über die Liste zu sortieren ist also der Weg, das generierte Hauptmenü neu zu ordnen, sobald `/_install` (dessen eigener Webpages-Schritt dieselbe Liste-plus-Editor-Form und aus demselben Grund dieselben ↑/↓-Buttons hat) nicht mehr da ist.
+Die Menübezeichnungen in `/_admin` sind im aktuellen Beta-Stand überwiegend englisch. Dieses Handbuch verwendet die deutschen Begriffe und nennt die sichtbaren Menünamen dazu.
 
-Die gespeicherte Liste liegt unter dem `/nino/install/webpages`-Schlüssel in `config.php` - genau dasselbe Array, das der Webpages-Schritt von `/_install` verwaltet, synchron gehalten, da beide Werkzeuge dieselbe Form (`{ uri, httpUri, template, libraryKey, nav, statusCode, body, text }`) zurückschreiben. Das heißt, beide Werkzeuge können koexistieren: Eine hier bearbeitete Seite zeigt sich später beim erneuten Aufruf des Webpages-Schritts von `/_install` (vor dem Löschen) als aktuelle, echte Liste, nicht als veraltete.
+## Anmeldung und sicherer Betrieb
 
-Zwei dieser Felder gehören dem jeweils anderen Werkzeug und werden hier nur durchgereicht, nie bearbeitet:
+Öffne `https://deine-domain.example/_admin` und melde dich mit dem technischen Passwort an, das im letzten Schritt von `/_install` gesetzt wurde. Dieser Zugang ist unabhängig von den E-Mail-Konten unter `/_editor`.
 
-- **`libraryKey`** - von welcher `_install/library/pages`-Einheit der Eintrag ausgegangen ist. Sobald `_install` weg ist, bedeutet das Feld nichts mehr, aber ein Speichern hier erhält es, sodass ein vorheriger Aufruf des Webpages-Schritts diese Einheit weiterhin neu anwenden kann.
-- **`body`** - der Route-Body wörtlich. Normalerweise ist das schlicht `[template /templates/<template>]`, und das Template-`<select>` bestimmt ihn. Eine Library-Einheit kann aber mehr mitbringen - die "legal"-Einheit von `/_install` löst ihre Template-Datei pro Sprache über `[[/nino/http/response/locale]]` auf - und ein `<select>` konkreter Dateinamen kann das nicht abbilden. Bei solchen Einträgen ist das Select deaktiviert und zeigt stattdessen den Body; beim Speichern bleibt der Body wie er ist, statt die Seite auf die Datei einer einzelnen Sprache zu reduzieren.
+Nach fünf falschen Anmeldeversuchen sperrt `/_admin` den gemeinsamen Zugang für eine Stunde. Die Sperre gilt projektweit, nicht nur für den verwendeten Browser.
 
-`statusCode` ist aus demselben Grund wichtig: Er liegt sonst nur in der Route, wo dieses Modul ihn nicht sieht - eine z. B. als 404 angelegte Seite käme beim ersten Speichern hier stillschweigend als 200 zurück.
+Beachte für den Betrieb:
+
+- verwende `/_admin` ausschließlich über HTTPS;
+- teile das technische Passwort nicht mit Redakteuren;
+- melde dich nach der Arbeit über **Logout** ab;
+- schütze den Bereich bei Bedarf zusätzlich über Webserver, VPN oder IP-Freigaben;
+- entferne `_admin/` und `_templates/` aus der Auslieferung, wenn die Oberflächen im laufenden Betrieb nicht benötigt werden.
+
+`/_templates` verwendet dasselbe Passwort, denselben Sperrstatus und dieselbe Sitzung wie `/_admin`. Der Link **Template Builder** im Kopfbereich öffnet das eigenständige Alpha-Werkzeug. Ohne `_admin/` kann auch `/_templates` nicht verwendet werden.
+
+Das Passwort lässt sich außerhalb des Installers mit `php _admin/Admin.php <passwort>` neu hashen. Der ausgegebene Hash ersetzt `PASSWORD_HASH` in `_admin/Admin.php`. Führe diesen Vorgang nur in einer geschützten lokalen Umgebung aus; ein als Kommandozeilenargument eingegebenes Passwort kann in Shell-Verlauf oder Prozessliste sichtbar werden.
+
+## Dashboard
+
+Das **Dashboard** fasst den technischen Projektstand zusammen:
+
+- Anzahl der Elementtypen, Seiten und Editor-Konten;
+- Datum des letzten automatischen Backups;
+- Felder pro Elementtyp;
+- Textschlüssel und Bildplätze, die in Templates verwendet, aber noch nicht definiert sind.
+
+Die Kacheln und Hinweise führen direkt in den zugehörigen Bereich. Das Dashboard selbst verändert keine Daten.
+
+## Element Types: Elementtypen definieren
+
+Elementtypen beschreiben wiederkehrende Inhalte wie Leistungen, Teammitglieder oder Referenzen. Jeder Typ entspricht einer Datei unter `elements/`; seine Einträge werden anschließend vollständig unter **Elements** oder innerhalb der vergebenen Rechte in `/_editor` gepflegt.
+
+### Einen Elementtyp anlegen
+
+1. Öffne **Element Types** und wähle **New type**.
+2. Vergib eine technische URI. Sie beginnt mit einem Kleinbuchstaben und darf danach Kleinbuchstaben, Ziffern, Bindestriche und Unterstriche enthalten, zum Beispiel `team` oder `service_items`.
+3. Vergib einen verständlichen Titel für die Anzeige in `/_editor`.
+4. Füge mit **Add field** die benötigten Felder hinzu.
+5. Speichere den Typ.
+
+Die URI wird zum Dateinamen `elements/<uri>.php` und lässt sich nach dem Anlegen nicht mehr über die Oberfläche ändern.
+
+### Feldtypen und Optionen
+
+| Typ | Geeignet für |
+|---|---|
+| `string` | ein- oder mehrzeilige Texte; optional als Rich Text oder feste Auswahlliste |
+| `integer` | ganze Zahlen |
+| `double` | Dezimalzahlen |
+| `boolean` | Ja-/Nein-Werte |
+| `array` | einfache Listen oder strukturierte Werte |
+| `date` | ein Datum |
+| `datetime` | Datum und Uhrzeit |
+| `image` | ein Bild mit festgelegten Zielmaßen |
+
+Je nach Typ stehen zusätzliche Eigenschaften bereit:
+
+- **per translation** speichert pro Sprache einen eigenen Wert;
+- **Required field** macht das Feld verpflichtend;
+- **Rich text** aktiviert beim Typ `string` die eingeschränkte Textformatierung;
+- feste Werte begrenzen ein Textfeld auf eine vorgegebene Auswahl;
+- Breite und Höhe bestimmen bei Bildern die Zielmaße;
+- eine Einheit oder ein Suffix ergänzt beispielsweise `€`, `km` oder `%` in der Eingabe.
+
+Beim Wechsel zwischen globalen und sprachabhängigen Feldern migriert Nino bestehende Werte. Prüfe das Ergebnis trotzdem in jeder Sprache. Das Speichern eines Typmodells löscht keine vorhandenen Einträge; entfernte Felder erscheinen jedoch nicht mehr in `/_editor`.
+
+Elementtypen können bewusst nicht über `/_admin` gelöscht werden. Damit verhindert Nino, dass ein unbedachter Klick sämtliche zugehörigen Inhalte vernichtet.
+
+## Elements: Inhalte vollständig bearbeiten
+
+Der Bereich **Elements** ergänzt die Typdefinition um die tatsächlichen Einträge. Er bietet denselben grundlegenden Bearbeitungsumfang wie `/_editor`, ist aber nicht durch Editor-Rechte oder ausgeblendete Bereiche eingeschränkt.
+
+![Vollständige Elementbearbeitung in `/_admin`](assets/screenshots/admin-elements.webp)
+
+1. Wähle einen Elementtyp.
+2. Öffne einen vorhandenen Eintrag oder lege einen neuen an.
+3. Bearbeite globale Felder einmal und sprachabhängige Felder in der gewünschten Sprache.
+4. Speichere einen neuen Eintrag zunächst, bevor du Bilder in seine Bildfelder hochlädst.
+
+Zusätzlich zeigt `/_admin` die zugrunde liegenden Speicher-Buckets: `*` für globale Werte und jeweils einen Bucket pro Sprache. Diese technische Sicht hilft bei Migrationen und Diagnose, sollte aber nicht zur normalen Inhaltspflege verleiten. Rich-Text-Werte werden beim Speichern bereinigt; Pflichtfelder und Feldtypen werden vom Kernel geprüft.
+
+Beim Löschen entfernt Nino den Eintrag in allen Sprachen sowie die zugehörigen Elementbilder. Sichere den Projektstand, wenn die Daten nicht anderweitig wiederherstellbar sind.
+
+## Text: Textschlüssel und Werte verwalten
+
+Der Bereich **Text** bietet vollständigen Zugriff auf Schlüssel und Werte und zeigt alle Textfills gruppiert nach dem ersten Segment ihres Schlüssels. Ein Schlüssel wie `/home/intro/title` erscheint damit in der Gruppe `home`.
+
+![Globale und sprachabhängige Textwerte in `/_admin`](assets/screenshots/admin-text.webp)
+
+Hier kannst du:
+
+- Werte global oder pro Sprache pflegen;
+- neue Textschlüssel anlegen;
+- Schlüssel umbenennen;
+- zwischen globaler und sprachabhängiger Speicherung wechseln;
+- Schlüssel für `/_editor` ausblenden;
+- Schlüssel vollständig löschen.
+
+Beim Umbenennen und beim Wechsel der Speicherform migriert Nino vorhandene Werte. Beim Löschen verschwindet der Wert dagegen aus allen Sprachen. Prüfe deshalb vor einer Löschung, ob der Schlüssel noch in Templates, E-Mails oder projektspezifischen Modulen verwendet wird.
+
+### Fehlende Schlüssel suchen
+
+**Scan templates for missing keys** durchsucht die öffentlichen `.tpl`-Dateien nach statischen Textfills wie `[[/home/intro/title]]`. Gefundene Schlüssel lassen sich einzeln ignorieren oder gemeinsam anlegen.
+
+Der Scan kann dynamisch zusammengesetzte Schlüssel nicht vollständig erkennen. Ein fehlerfreier Scan ersetzt daher nicht den Test aller Seiten und Sprachen.
+
+## Pages: Seiten und Routen verwalten
+
+Der Bereich **Pages** verwaltet die über `/_install` angelegte Seitenliste, die zugehörigen `GET`-Routen und die Navigation.
+
+Eine Seite besitzt zwei verschiedene URIs:
+
+- **Element URI** ist die stabile interne Identität, an der Seitentexte wie `/webpage<uri>/title` hängen;
+- **Http URI** ist der tatsächlich im Browser erreichbare Pfad.
+
+So kann eine Seite intern `/about` heißen und öffentlich beispielsweise unter `/ueber-uns` erreichbar sein.
+
+Beim Anlegen oder Bearbeiten bestimmst du außerdem:
+
+- ein vorhandenes Template aus `templates/page-*.tpl`;
+- einen HTTP-Statuscode;
+- Navigationsname, Seitentitel und Beschreibung für jede aktive Sprache.
+
+Die Pfeile in der Seitenliste verändern die Reihenfolge und – bei aktivem Navigation-Modul – zugleich `[[/website/navigation/main]]`. Reservierte Pfade wie `/_admin`, `/_editor`, `/_install` und `/_templates` können nicht als öffentliche Seiten verwendet werden.
+
+Einige Routen wählen ihr Template zur Laufzeit. In diesem Fall zeigt `/_admin` den bestehenden Route-Body an und lässt ihn beim Speichern unverändert.
+
+Das Löschen einer Seite entfernt ihren Listeneintrag, ihre Route und die zugehörigen Seitentexte. Die Template-Datei selbst bleibt bestehen.
+
+## Images: Bildplätze definieren
+
+Ein Bildplatz verbindet eine technische URI mit einer verständlichen Bezeichnung und festen Zielmaßen. Redakteure sehen diese Plätze anschließend unter **Bilder** in `/_editor` und können dort die eigentliche Datei hochladen.
+
+Für einen neuen Platz werden benötigt:
+
+- URI, zum Beispiel `/home/hero`;
+- Bezeichnung, zum Beispiel `Startseite – Titelbild`;
+- Breite und Höhe in Pixeln.
+
+**Scan templates for missing image slots** sucht in öffentlichen Templates nach lokalen `<img src="…">`-Verweisen unter `images/`, für die noch kein Bildplatz existiert. Dynamische Bilder und externe URLs werden nicht erfasst.
+
+Beim Löschen eines Bildplatzes wird auch das dort hinterlegte Bild entfernt. Nutze diese Aktion nur, wenn weder Template noch Inhalt den Platz weiter benötigen.
+
+## Users: Editor-Konten und Rechte
+
+Unter **Users** verwaltest du die Konten für `/_editor`. Das technische `/_admin`-Passwort wird hier nicht geführt.
+
+### Konto anlegen
+
+Gib eine gültige E-Mail-Adresse und ein Passwort mit mindestens acht Zeichen an. Ein reguläres neues Konto erhält die üblichen Inhaltsrechte. Die Option **Verwaltung** vergibt Vollzugriff über `/*` und sollte nur für vertrauenswürdige Verantwortliche verwendet werden.
+
+E-Mail-Adresse und Passwort eines bestehenden Kontos werden anschließend in `/_editor` geändert. `/_admin` ist für Anlegen, Löschen und den technischen Zugriff auf Berechtigungen zuständig.
+
+### Berechtigungen bearbeiten
+
+Der Link **Permissions** öffnet die Rechte als JSON-Array. Dieser Editor ist absichtlich nicht auf bekannte Rechte beschränkt und damit ein technisches Notfall- und Entwicklungswerkzeug. Für normale Rollenänderungen ist die Checkbox-Ansicht unter `/_editor` sicherer.
+
+Beispiele:
+
+```json
+["/_editor/text/manage", "/_editor/images/manage"]
+```
+
+```json
+["/*"]
+```
+
+Ungültige oder zu weit gefasste Rechte können Nutzer aussperren oder ungewollt freischalten. Sichere `config.php`, bevor du Rechte hier manuell veränderst.
+
+Das Löschen eines Kontos beendet dessen Zugriff. Prüfe vorher, ob mindestens ein verwaltendes Konto erhalten bleibt.
+
+## Restore: Backup wiederherstellen
+
+`/_editor` erzeugt standardmäßig beim ersten authentifizierten Zugriff eines Tages ein verschlüsseltes Backup. Die täglichen Sicherungen werden 14 Tage aufbewahrt. Unter **Restore** zeigt `/_admin` die verfügbaren Daten an.
+
+Wähle das gewünschte Datum und bestätige **Restore**. Vor der Wiederherstellung sichert Nino automatisch noch einmal den aktuellen Zustand. Teste danach mindestens:
+
+- Frontend und alle Sprachen;
+- Anmeldung und Rechte in `/_editor`;
+- Seiten, Texte, Elemente und Bilder;
+- Formulare und Newsletter-Daten.
+
+Die automatische Sicherung ist ein Sicherheitsnetz für redaktionelle Änderungen, ersetzt aber kein externes Backup des vollständigen Projekts.
+
+## Config: technische Konfiguration
+
+Der Bereich **Config** bearbeitet eine bewusst begrenzte Auswahl aus `config.php` als JSON:
+
+| Schlüssel | Erwarteter Wert |
+|---|---|
+| `/nino/error/log` | `true` oder `false` |
+| `/nino/error/display` | `true` oder `false` |
+| `/nino/locales/native` | Sprachcode als String |
+| `/nino/locales/available` | Liste von Sprachcodes |
+| `/nino/html/assets` | Asset-Bundles als Objekt |
+| `/nino/http/routes` | vollständige Routing-Tabelle |
+
+Nino prüft JSON-Syntax und Grundtyp, aber nicht jede fachliche Abhängigkeit. Fehler in Routen, Sprachen oder Asset-Bundles können die Webseite oder die Verwaltungsbereiche unzugänglich machen. Nutze für normale Seitenänderungen deshalb **Pages** und für Bildplätze **Images**.
+
+In Produktion muss `/nino/error/display` auf `false` stehen.
+
+## Empfohlener Arbeitsablauf
+
+1. Lege unter **Element Types**, **Text**, **Pages** und **Images** die benötigte Struktur an.
+2. Pflege oder korrigiere vollständige Texte und Elemente direkt in `/_admin`.
+3. Bearbeite Seiten- und Abschnittstemplates bei Bedarf über [`/_templates`](_templates.de.md) und prüfe das Ergebnis im Browser.
+4. Prüfe Dashboard und Template-Scans auf fehlende Definitionen.
+5. Erstelle unter **Users** passende Konten mit möglichst kleinen Rechten.
+6. Teste die freigegebenen Inhalte und Rechte in `/_editor`.
+7. Prüfe Frontend, Sprachen, Formulare und responsive Darstellung.
+8. Committe die entstandenen Projektdateien in Git.
+
+## Wenn etwas nicht funktioniert
+
+| Problem | Prüfung |
+|---|---|
+| Anmeldung nach mehreren Versuchen gesperrt | Eine Stunde warten; die Sperre ist projektweit. |
+| Speichern schlägt fehl | Schreibrechte für die betroffene Datei beziehungsweise das Verzeichnis prüfen. |
+| Template fehlt in **Pages** | Nur vorhandene Dateien `templates/page-*.tpl` werden angeboten. |
+| Template lässt sich im Builder nicht speichern | Nur `page-*.tpl` und `section-*.tpl` sind beschreibbar; Hinweise zu unbekanntem Markup und Validierung in der [`/_templates`-Bedienung](_templates.de.md) prüfen. |
+| Texte oder Bilder fehlen im Scan | Dynamische Schlüssel und Bilder werden nicht zuverlässig statisch erkannt. |
+| Backup-Liste ist leer | Zuerst mit einem Editor-Konto anmelden und prüfen, ob Backups aktiviert sowie Schreibrechte vorhanden sind. |
+| Webseite funktioniert nach **Config** nicht | Letzten Git-Stand oder Backup wiederherstellen und JSON sowie Schlüsselstruktur prüfen. |
+
+## Wie es weitergeht
+
+- [`/_templates`-Bedienung](_templates.de.md) erklärt den strukturellen Template-Builder im Alpha-Status.
+- [`/_editor`-Bedienung](_editor.de.md) erklärt die tägliche, berechtigungsgesteuerte Inhaltspflege.
+- [Entwickler-Handbuch](development.de.md) beschreibt APIs, Module und direkte Arbeit an Projektdateien.
+- [Deployment](deployment.de.md) behandelt Zugriffsschutz, Backups und sicheren Produktivbetrieb.

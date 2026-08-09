@@ -1,140 +1,204 @@
-# Nino — Install Handbook
-*[Deutsch](_install.de.md)*
+# `/_install` — Reference Manual
 
-**Links:**
-[README](../README.md) · [Design-Handbook](design.md) · [Developer-Handbook](development.md) · [_editor-Handbook](_editor.md) · [_admin-Handbook](_admin.md) · [_templates-Handbook](_templates.md) · [Security Policy](../SECURITY.md) · [Changelog](../CHANGELOG.md)
+**Language:** English · [Deutsch](_install.de.md)
 
-A graphical, developer-only wizard for a fresh checkout's initial setup at `/_install`. Optional - a project can just as well be set up by hand (see `docs/development.md`) - but it walks through the same steps in a browser instead of the shell.
+**Last updated:** August 8, 2026 · **Nino version:** 0.11.0-beta.1
 
-The project ships with `text/`, `templates/` and `elements/` **pre-filled with a working starter site** - `config.php` ships as if `/_install`'s Setup (native locale only, structural modules), Themes ("agency") and Webpages steps (`/home` at `/`, `/404`, `/legal` and `/contact`) had already been run once, so a fresh checkout renders a real four-page site with no setup at all. `/_install` stays available afterward (and safe to re-run - see "Whatever's checked/listed when you hit Next is the whole picture" below) to add locales/modules/pages or reshape the defaults before deleting it.
+This manual explains the decisions and writing processes of the seven steps of `/_install`. If you instead want to take the shortest path from checkout to a configured website, start with [Getting Started](getting-started.md); the later production operation is covered in [Deployment](deployment.md).
 
-## When it runs
+**Additional Links:**
+[README](../README.md) · [Concepts](concepts.md) · [Developer Manual](development.md) · [Getting Started](getting-started.md) · [`/_install` Reference](_install.md) · [`/_admin` Operation](_admin.md) · [`/_templates` Operation](_templates.md) · [`/_editor` Operation](_editor.md) · [Deployment](deployment.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
 
-`/_install` only works while `_admin/Admin.php` still ships its placeholder `PASSWORD_HASH` (the value that matches no real password). The wizard's own last step - setting a real `/_admin` password - is what locks it back out, permanently: once a real hash is in place, `/_install` refuses to run at all, on every request, with no login screen and no way back in short of hand-editing `_admin/Admin.php`'s `PASSWORD_HASH` constant again.
+**Important:** `/_install` creates the first functional project state from a fresh Nino checkout. The assistant is necessary: Before its execution, the actual project directories such as `templates/`, `text/`, `elements/`, and `images/` do not yet exist.
 
-That also means `/_install` needs no password of its own. Before a real `/_admin` password exists, the project isn't meaningfully secured yet either way - the wizard's job is to get it there.
+## When to Use `/_install`
 
-Like `_admin` and `_editor`, `_install` is entirely optional and safe to remove: once finished, delete the whole folder (`rm -rf _install`). A project that never wants the wizard or its content library at all can delete `_install/` from the start (kept optional exactly like `_admin`/`_editor`) and set up `text/`/`templates/`/`elements/`/`config.php` by hand instead.
+The assistant is intended for one-time initial setup. It:
 
-## The wizard
+- checks PHP and write permissions;
+- sets languages and modules;
+- creates the project directories from its library;
+- applies a theme;
+- sets up the first web pages;
+- records central website information;
+- creates accesses for `/_editor` and `/_admin`; the admin access also applies to `/_templates`.
 
-A strictly linear flow: "Back"/"Next" at the bottom move between the seven steps below, committing whatever the current step needs to save before advancing (Setup applies its picker, Themes applies the picked theme, Webpages applies its page list, Personal Infos saves its fields, Admins just checks an account exists first - Environment and Finish have nothing to commit). The step list at the top is a progress display only, not a menu - it isn't clickable, there's no jumping ahead or skipping a step.
+`/_install` is not an update tool for a running project. After successful completion, the assistant locks itself and can be removed from production delivery.
 
-### 1. Environment
+**Security:** Until completion, `/_install` has no individual access protection. Perform the setup locally or in another protected environment, not on an openly accessible domain.
 
-Read-only diagnostics: the running PHP version against the `>= 8.4` the kernel requires, the extensions the README documents (`gd` for image cropping/resizing, `mbstring`, `session`, `json`, and `Phar`/`PharData` for `_editor`'s automatic backups and `_admin`'s Restore), and whether the directories Nino writes to at runtime (project root, `text/`, `images/`, `data/`, `.cache/`) are writable. "Recheck" re-runs the same probes - nothing here is ever written to.
+## Navigation and Saving
 
-### 2. Setup
+Each step loads the already saved state and displays it again. As long as the assistant is not completed, you can return to an earlier step, change settings, and reapply them.
 
-Picks Available Locales, a Native Locale among them and "modules" (Navigation, Localepicker, Forms, Newsletter - each their own text and/or mail templates), and assembles them into the real project: `config.php`'s locales/modules/routes, `/templates` and `/text`. Themes and pages have their own steps (below) - Setup never touches either.
+Three different rules apply:
 
-**Native Locale** is a `<select>` that only ever offers whichever Available Locales are currently checked above - checking/unchecking one updates it live. It maps to `/nino/locales/native` (the fallback used wherever no locale is otherwise known, eg. a fresh visitor with no locale cookie yet). Posting one that's actually among this call's own picked locales always wins; anything else (nothing posted, or a stale value no longer checked) falls back to keeping the current native if it's still picked, else the first picked locale - the same rule `/_install` always applied here, just now also directly choosable instead of only ever inherited.
+| Data Type | Behavior When Reapplying |
+|---|---|
+| Languages, modules, generated routes, and page list | the visible selection replaces the previously managed state by the assistant |
+| Templates, texts, and element types | are supplemented or updated but not automatically deleted |
+| Theme files | files with the same name are overwritten; additional files from a previous theme remain |
 
-Picking a module that declares `requiresModules` pulls that in automatically - the response after applying lists the full, resolved selection, not just what you checked.
+This distinction protects your own changes. Deselecting a module may remove its configuration; automatically deleting a template file that has been edited in the meantime would not be safe.
 
-The picker shows the current selection, pre-checked, every time you land on this step - because applying replaces it. Whatever's checked when you hit "Next" is the whole picture: unchecking a locale/module and re-applying actually removes it, the same way any settings form works. Routes are always rebuilt from what's actually persisted in `config.php`, never from the current request's own in-memory state - a module's self-registered runtime routes (eg. `POST://.form`) and `/_install`'s own route never end up written to `config.php`, and a route you added by hand outside the library (eg. via `_admin`'s Config module) is left alone regardless of what you pick here.
+## 1. Environment
 
-Templates and text fragments are the exception: those are only ever added, never removed by a later apply, even for a module you un-pick - deleting a file you may have since hand-edited is a much riskier kind of "undo" than toggling a config array. Remove those by hand if you no longer want them.
+The first step checks only the environment and writes no files. The following are controlled:
 
-### 3. Themes
+- the running PHP version;
+- the required PHP extensions;
+- the writability of the project root and already existing runtime paths.
 
-Picks the site's look: a grid of tiles, one per `_install/library/themes/<key>` unit, each showing the preview image, title and description that unit's own `manifest.php` declares (eight themes ship out of the box). Clicking a tile's preview enlarges it in a lightbox; clicking anywhere else on the tile selects the theme. The currently applied one is pre-selected every time you land here.
+Project directories that do not yet exist are expected. The decisive factor is that PHP is allowed to create them later. "Recheck" only repeats the same diagnoses.
 
-A theme is a complete, self-contained look, not just a stylesheet: its unit ships the `.css` file, the webfonts that stylesheet actually references, and whatever else it lists (theme images, ...). Applying copies all of those into the project exactly the way Setup copies a module's `files`, and points `config.php`'s `/nino/html/assets['/.cache/style.css']` bundle at the copied stylesheet - swapped in at the position the previous theme's entry held (a stylesheet's position in that bundle is what decides which `:root` block wins the cascade, see `docs/design.md`), leaving every other entry in the array untouched. With no theme entry to replace, it goes last.
+Fix failed checks before continuing. Without sufficient write permissions, the assistant cannot reliably create either configuration or content.
 
-Exactly one theme is active at a time, so unlike Setup and Webpages there is no "replace" to reason about here: picking a different theme simply overwrites the previous one's files (same names, same places). A file the previous theme owned that the new one doesn't ship - a webfont it no longer uses, say - is left behind rather than deleted, the same additive rule Setup's templates and text follow.
+## 2. Setup
 
-The picked key is persisted at `config.php`'s `/nino/install/theme`. The css bundle alone couldn't reliably say which theme produced it once a project renames or hand-edits its stylesheets; a config predating that key (or hand-edited since) still resolves by matching the bundle against every theme's declared stylesheet.
+Setup sets languages and functional modules and creates the basis of the project.
 
-The preview image is picker chrome, not project content - it is served straight out of the library folder and never copied anywhere.
+### Languages
 
-### 4. Webpages
+**Available Locales** determines the available languages. **Native Locale** is the default language and must be part of this selection. Technically, it serves as a fallback as long as no language is yet determined for a visitor, and in terms of content, it forms the "mother tongue" of the website.
 
-Builds the project's actual pages: a free-form, ordered list you manage directly, rather than a fixed checkbox per `_install/library/pages/<key>` bundle. Ships with four default entries (`/home` at `/`, `/404`, `/legal`, `/contact` - see "When it runs" above); click a row to open its editor, or "New Webpage" for a blank one - same list-plus-drill-down-form shape `_admin`'s Pages module uses once `_install` is gone, so the two feel like one tool rather than two differently-built ones. Each entry has:
+When reapplying, the visible language selection replaces the previous state. The default language is retained as long as it is still selected; otherwise, Nino uses the first selected language.
 
-- **Element-URI** - a stable identifier, yours to pick, that never has to look like a real path (eg. `/home`). It namespaces this entry's own `/webpage<uri>/*` text meta and becomes the route's own `uri` data field (what `[[/nino/http/response/uri]]` resolves to) - it does **not** decide where the page is actually reachable.
-- **Http-URI** - the real browser path (eg. `/`). This alone drives the `/nino/http/routes` array key: `\Nino\Http::requestRoute()` matches a route by looking up `'<METHOD>:/'.$uri` as a literal array key, not by scanning for a route whose own `uri` field matches, so only the Http-URI is ever actually clickable. Keeping it separate from the Element-URI is what lets the home page keep a stable `/home` identifier while really living at `/`.
-- **template** - which `_install/library/pages/<key>` bundle supplies the route body, template file and any deeper page content. The same template can be used more than once, at different uris (eg. two differently-purposed pages both starting from the "home" bundle).
-- **name/title/description**, per active locale - this entry's own nav label, `<title>` and meta description. Left blank, each falls back to a generic placeholder ("Page"/"Page Title"/"Page description.") rather than whatever wording the template's manifest ships - that wording is a per-instance choice now, not baked into the template.
-- **Show in main navigation** - only shown once the Navigation module (step 2) is active. Checked entries feed the generated main menu, see "Navigation" below.
+### Modules
 
-Both uris go through the same safety normalization (leading slash, no `..`, plain path characters) and must be unique within the list - independently, so two entries can't share either an Element-URI or an Http-URI, but one entry's Element-URI can equal another's Http-URI without conflict.
+The library can provide, among other things, demo content, navigation, language selection, forms, and newsletters. If a selected module requires another module, the assistant automatically includes this dependency in the selection. A used page template can also pull in required modules; a contact page, for example, activates its form and mail functions.
 
-The list's own ↑/↓ buttons reorder it in place; "Delete page" lives inside an entry's own editor. Everything here - add, edit, delete, reorder - only ever touches the in-memory list; nothing reaches the server until "Next" batch-generates routes/templates/text/blacklist from the whole list in one go - same replace semantics as Setup: the posted list is the complete, authoritative picture, and revisiting this step always shows the current, persisted list rather than starting blank.
+Setup writes:
 
-Templates and deeper page content stay additive, same as Setup - dropping a uri from the list doesn't delete the template file or content it already wrote.
+- available and native language to `config.php`;
+- the activated module classes to `/nino/modules`;
+- the routes provided by the base and modules to `/nino/http/routes`;
+- templates to `templates/`;
+- global and language-dependent texts to `text/`;
+- provided element types to `elements/`;
+- other declared files to their project paths.
 
-The list is persisted at `config.php`'s `/nino/install/webpages` as `{ uri, httpUri, template, libraryKey, nav, statusCode, body, text }` - the same array `_admin`'s Pages module reads and writes. `libraryKey` is this step's own field (which `_install/library/pages` unit the entry came from); `template`, `statusCode` and `body` describe the route that unit produced, so the Pages module can still work with the entry once `_install` is gone. An entry the Pages module created carries no `libraryKey` at all - this step passes it through its replace untouched rather than rejecting it, and its template select shows it as "already set up".
+Languages, modules, and the routes managed by Setup are replaced. Manually or by other areas created routes remain preserved. Templates, texts, and element types that have already been copied are not deleted by later deselection.
 
-**Navigation.** Once the Navigation module is active, every entry with "Nav" checked feeds `[[/website/navigation/main]]` - a generated `httpUri:name` list per active locale (the real, clickable path - not the Element-URI), in the exact shape `\Nino\Modules\Navigation`'s `[navigation]...[/navigation]` shortcode expects (see `_install/library/modules/navigation/templates/html-header-nav.tpl`/`html-footer-nav.tpl`). Unlike the rest of Webpages' output, this key is regenerated - not merged - on every apply: it's fully derived from the current list, not something you're expected to hand-edit before finishing the wizard.
+## 3. Themes
 
-### 5. Personal Infos
+A theme is a complete visual starting point. It can include stylesheets, fonts, images, and other assets. The preview in the selection grid belongs only to the assistant and is not copied into the project.
 
-Bulk-fills the handful of `/company/*` and `/website/*` text keys every project has regardless of what steps 2-4 picked - each with a friendly label instead of its raw key, same shape as `_editor`'s Text panel: every **global** key (Company Name, Company Email, Company Phone, Company Adress, Website Author, Website Host) in one fieldset on top, every **per-locale** key (Company Country, Company Description) below behind a locale dropdown, with an in-memory snapshot preserving unsaved edits across a locale switch. Every field is a single-line input except Company Adress and Company Description, which stay multi-line. Saving writes the global fields plus whichever locale is currently selected - switch locales and save again to fill in the rest.
+Exactly one theme is active. When applying:
 
-Everything else - technical/design-token keys (`text/blacklist.php`), a webpage's own name/title/description (Webpages already covers that), and any deeper module/page content - is left out here on purpose: it's fine as the library's own generic default, and if it isn't, edit it via `_editor`'s Text panel (or `_admin`, for technical keys) afterward instead.
+1. `/_install` copies the files specified in the manifest into the project;
+2. replaces the previous theme stylesheet in the asset bundle `/.cache/style.css`;
+3. saves the selected theme key under `/nino/install/theme`.
 
-### 6. Admins
+The position of the stylesheet in the bundle is preserved as much as possible so that the CSS cascade does not change unintentionally. Own additional bundle entries are not removed.
 
-Creates the first `/_editor` account(s) with full permissions (`/*`). The shipped placeholder account (`changeme@domain.com`, whose password hash matches nothing) is dropped automatically the moment a real admin is created. Submit the form again to set up more than one admin, or delete a row to remove one again - the list is allowed to end up empty, "Next" is what actually requires at least one account before the wizard continues.
+**Important:** Theme files with the same name are overwritten. Files that only the previous theme brought remain. Therefore, secure your own changes via Git before switching or reapplying the theme. After completion, `/_install` locks itself; a later theme change via the interface is therefore not planned and is carried out as a normal project change via files and Git.
 
-### 7. Finish
+The planned area `/_themes` is independent of this. It is intended to make theme templates graphically editable later but is not yet implemented in the current state and is planned for its first release as Alpha.
 
-Sets the real `/_admin` password. Make sure at least one admin account exists first (step 6) - without one, `/_editor` login won't be possible once the wizard locks itself out. This step rewrites `_admin/Admin.php`'s `PASSWORD_HASH` constant on disk (the only step that touches PHP source rather than a data file) and is what ends `/_install`'s own access for good.
+## 4. Webpages
 
-Routes aren't reviewable in the wizard itself - use `_admin`'s Config module (`/_admin` → Config → `/nino/http/routes`) for that, before or after finishing here.
+This step creates the public page structure. The list can be supplemented, edited, deleted, and sorted. With "Continue", the entire visible list is applied as the new state.
 
-## Library format
+Each page requires:
 
-`_install/library/` has four kinds of units, each a directory with a `manifest.php`:
+- an **Element URI** as a stable internal identity;
+- an **HTTP URI** as the publicly accessible path;
+- a **Template** from `templates/page-*.tpl`;
+- **Navigation Name**, **Page Title**, and **Description** for each active language.
+
+The Element URI is the anchor for page texts like `/webpage<uri>/title`. The HTTP URI is the path visible in the browser. This separation allows the internal identity to remain stable even if the public path changes.
+
+Reserved paths such as `/_admin`, `/_editor`, `/_install`, and `/_templates` cannot be used as public pages.
+
+## 5. Personal Information
+
+This step records central company and website values as textfills. The values are stored globally and can be edited later via `/_admin` or `/_editor`.
+
+The following keys are typically created:
+
+- `/company/name`
+- `/company/address`
+- `/company/email`
+- `/company/phone`
+- `/website/name`
+- `/website/description`
+- `/website/keywords`
+
+These textfills are used in templates, meta tags, and possibly in the footer or contact forms.
+
+## 6. Access for `/_editor`
+
+This step creates the first user account for `/_editor`. The account receives full permissions over `/*` and can manage all content, users, and settings.
+
+Provide:
+
+- a valid **email address**;
+- a **password** with at least 8 characters.
+
+The email address and password can be changed later via `/_editor` or `/_admin`.
+
+## 7. Completion
+
+The last step sets the technical password for `/_admin` and `/_templates` and locks the installer. This password is separate from the editor accounts and should be treated as a technical access with full control.
+
+Provide:
+
+- a **password** for `/_admin` and `/_templates`.
+
+After setting the password, `/_install` is locked and can no longer be used. The assistant is then removed from production delivery.
+
+## Verify the Result and Remove the Installer
+
+After completion, open the frontend and both management interfaces. Check at least the start page, every configured language, login to `/_editor`, login to `/_admin`, and the selected theme assets.
+
+The installer is intended only for initial setup. Remove or block `/_install` before the website becomes publicly accessible. Keeping it available unnecessarily increases the exposed surface of the project.
+
+## Library Format
+
+The library in `/_install/library/` contains the files for the initial setup. It is structured as follows:
 
 ```
 _install/library/
-  base/               always applied, regardless of selection
-    manifest.php        routes (robots.txt/sitemap.xml/llms.txt), templates, blacklist, files
-    templates/           html-header.tpl, html-footer.tpl, mail-header.tpl, ...
-    assets/              script.js
-    text/global.php, text/de_DE.php, text/en_US.php
-  modules/<key>/      selectable in step 2's "Modules" list
-    manifest.php        moduleClass, templates (eg. mail templates), requiresModules
-    templates/, text/global.php, text/<locale>.php
-  themes/<key>/       selectable as a tile in step 3
-    manifest.php        label, description, preview, stylesheet, files
-    preview.svg          the picker tile's image - never copied into the project
-    assets/              style.theme.<key>.css
-    fonts/text/, fonts/title/    the webfonts that stylesheet references
-  pages/<key>/        selectable as a Webpages entry's "template"
-    manifest.php        one route, templates, elementTypes, blacklist, requiresModules
-    templates/, text/<locale>.php
+├── locales/
+│   ├── de_DE/
+│   │   ├── text/
+│   │   │   └── global.php
+│   │   └── elements/
+│   │       └── services.php
+│   └── en_US/
+│       ├── text/
+│       │   └── global.php
+│       └── elements/
+│           └── services.php
+├── modules/
+│   ├── navigation/
+│   │   ├── module.php
+│   │   └── templates/
+│   │       └── navigation.tpl
+│   └── form/
+│       ├── module.php
+│       └── templates/
+│           └── form.tpl
+└── themes/
+    └── default/
+        ├── manifest.json
+        ├── style.css
+        └── assets/
+            └── logo.svg
 ```
 
-A theme unit is deliberately self-contained: nothing else in the library ships webfonts, so whatever a theme's stylesheet `@font-face`s has to sit in that theme's own `fonts/`. Adding a ninth theme is one new directory - no code change anywhere, the picker lists whatever it finds.
+Each locale directory contains the text and element files for that language. Modules provide their own files and templates. Themes include a `manifest.json` that lists the files to be copied.
 
-A `manifest.php` returns a plain array, only the keys it needs:
+## What `/_install` Deliberately Does Not Do
 
-| Key | Meaning |
-|---|---|
-| `label` | Shown in the picker |
-| `moduleClass` | Modules only - added to `/nino/modules` when picked (a module can be template-only - nothing but its own text/mail templates - and skip this) |
-| `routes` | Pages only, exactly one entry: `[ 'body' => ..., 'statusCode' => ... ]` (no `uri` - the Webpages entry using this template supplies both uris, see step 4 above). `\Nino\Http::requestRoute()` matches a route by looking up `'<METHOD>:/'.$httpUri` as a literal array key, not by scanning for a route whose own `uri` field matches - so a template can only ever occupy the single Http-URI a Webpages entry assigns it, never more than one. A page needing per-locale content picks it inside its own body instead, via the same `[[/nino/http/response/locale]]` fill html-header.tpl already uses for the page title (see `pages/legal` for an example) |
-| `templates` | `'file.tpl' => locale-or-null` - copied from this unit's own `templates/` into the project's `/templates`; `null` (or a plain, unkeyed list entry) means "always", a locale code gates it the same way a route's `'locale'` does |
-| `elementTypes` | Pages only. Filenames copied from the unit's own root into `/elements` |
-| `blacklist` | Keys appended to `/text/blacklist.php` (see `_editor`'s Text panel / `docs/_editor.md`) |
-| `requiresModules` | Other module keys auto-selected alongside this one (Setup) or this template (Webpages) |
-| `files` | Files/directories copied verbatim from the unit's own root into the project's, keeping their name (`assets` -> `/assets`, `fonts` -> `/fonts`). Used by `base`, `modules/democontent` and every theme |
-| `stylesheet` | Themes only, required - the project-relative path the copied stylesheet lands at (eg. `/assets/style.theme.agency.css`). This is what gets bundled into `/nino/html/assets`; a theme without one is not offered in the picker |
-| `description` | Themes only - the tile's body text |
-| `preview` | Themes only - an image file inside the unit, shown on the tile and in the lightbox. Served straight out of the library, never copied into the project |
+The wizard creates the first working project state, but it does not replace project-specific development. Templates, content models, callbacks, integrations, detailed design, and production configuration remain part of the implementation.
 
-Text fragments (`text/global.php`, `text/<locale>.php`) are plain `'[[/key]]' => 'value'` arrays, merged into the real `/text/global.php`/`/text/<locale>.php` the same shape `_admin`'s Text editor already uses. A page's own fragment should **not** declare `/webpage/<name>/*` keys - Webpages writes those itself, keyed by whichever Element-URI the entry actually picked (`/webpage<uri>/name`, `.../title`, `.../description`), not by the template's folder name or its Http-URI; anything under that prefix a fragment still ships is filtered out defensively.
+It also does not create `images/`, `templates/`, `text/`, or `elements/` before setup begins. These directories and their initial content are generated from the selected installation library during the process.
 
-### Known limitations (v1)
+## Next Steps
 
-- **`sitemap.xml`/`llms.txt` aren't assembled from the Webpages list** - they ship with just the site root; add an entry per page by hand.
-- The footer's legal link/cookie banner (`[[/website/legal/uri]]`/`[[/website/legal/name]]`) and the localepicker call assume a "legal"-templated entry and 2+ locales respectively. `[[/website/legal/uri]]` mirrors that entry's Http-URI (the real, clickable path), not its Element-URI. Those two keys are only ever *set*, never cleared - if you drop the "legal" entry from the Webpages list later, the footer link keeps pointing at its old uri until you either add a new "legal" entry or remove the block from `templates/html-footer.tpl` by hand.
-- No images are provided - `<img>` tags in the shipped templates (logo, hero) reference paths you fill in yourself (or manage via `_editor`'s image slots, see `docs/_editor.md`).
-
-## Notes
-
-- Every step's underlying data (texts, routes, modules, admin accounts) can also be edited by hand or through `_admin` afterward - the wizard is a convenience, not the only way in.
-- Nothing here requires `_admin` or `_editor` to be deleted or kept - `/_install` works alongside both, and only ever touches `_admin/Admin.php` in its very last step.
+- [Getting Started](getting-started.md) guides through the necessary initial setup.
+- [`/_admin` Operation](_admin.md) explains full project administration.
+- [`/_templates` Operation](_templates.md) describes the optional template builder in Alpha status.
+- [`/_editor` Operation](_editor.md) explains the subsequent, permission-controlled content maintenance.
+- [Deployment](deployment.md) describes web server configuration, security, and go-live.
