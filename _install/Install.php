@@ -1156,18 +1156,24 @@ namespace Nino\Install {
 		 */
 		public static function apiList( array &$appData, array &$request ): void {
 
+			$locales = $appData['/nino/locales/available'] ?? [];
+
 			\Nino\Http::ok( $request, [
-				'templates' 	=> self::_templates(),
-				'locales' 		=> $appData['/nino/locales/available'] ?? [],
+				'templates' 	=> self::_templates( $locales ),
+				'locales' 		=> $locales,
 				'webpages' 		=> $appData['/nino/install/webpages'] ?? [],
 				'navModule' 	=> in_array( '\\Nino\\Modules\\Navigation', $appData['/nino/modules'] ?? [], true ),
 			] );
 		}
 
 		/**
-		 *	@return 	array			folder name -> { label, requiresModules }
+		 *	@param		array 		$locales			Picked locales - drives which locales each unit's own
+		 *																	suggested wording is read for (empty: none, which is
+		 *																	all apiApply()'s validation-only call needs)
+		 *
+		 *	@return 	array			folder name -> { label, requiresModules, uri, text }
 		 */
-		private static function _templates(): array {
+		private static function _templates( array $locales = [] ): array {
 
 			$units = [];
 
@@ -1183,12 +1189,61 @@ namespace Nino\Install {
 				$units[$entry] = [
 					'label' 					=> (string) ( $manifest['label'] ?? $entry ),
 					'requiresModules' => $manifest['requiresModules'] ?? [],
-				];
+				] + self::_suggestions( $entry, $locales );
 			}
 
 			ksort( $units );
 
 			return $units;
+		}
+
+		/**
+		 *	The starter wording a library unit ships for an instance of
+		 *	itself: the [[/webpage/&lt;folder name&gt;/{uri,name,title,
+		 *	description}]] keys its own text/&lt;locale&gt;.php fragments still
+		 *	carry.
+		 *
+		 *	_applyWebpage() deliberately never merges those as text (see
+		 *	_withoutWebpageMeta()) - keyed by the template's folder name
+		 *	rather than the uri an instance actually gets mounted at, they'd
+		 *	be stale the moment the two differ. As the Webpages form's own
+		 *	prefill they're exactly right though, and the only place a
+		 *	template's per-locale wording exists at all: without it, every
+		 *	locale nobody hand-typed silently lands on DEFAULT_TEXT's generic
+		 *	"Page"/"Page Title" (which stays the fallback for a blank field -
+		 *	see apiApply()'s $text loop - it just isn't what a freshly picked
+		 *	template should start from).
+		 *
+		 *	@param		string		$libraryKey
+		 *	@param		array 		$locales			Picked locales
+		 *
+		 *	@return 	array			{ uri, text: { <locale>: { name, title, description } } }
+		 */
+		private static function _suggestions( string $libraryKey, array $locales ): array {
+
+			$prefix = '[[/webpage/'. $libraryKey. '/';
+			$uri 		= '';
+			$text 	= [];
+
+			foreach( $locales as $locale ) {
+
+				$path 		= self::LIBRARY. '/pages/'. $libraryKey. '/text/'. $locale. '.php';
+				$fragment = is_file( $path ) === true ? include $path : [];
+
+				$text[$locale] = [
+					'name' 				=> (string) ( $fragment[$prefix. 'name]]'] 				?? '' ),
+					'title' 			=> (string) ( $fragment[$prefix. 'title]]'] 			?? '' ),
+					'description' => (string) ( $fragment[$prefix. 'description]]'] ?? '' ),
+				];
+
+				// One Http-URI for every locale - an entry only has the single
+				// one (see _routeKeys()'s docblock), so the first locale that
+				// names one wins rather than the last
+				if( $uri === '' )
+					$uri = (string) ( $fragment[$prefix. 'uri]]'] ?? '' );
+			}
+
+			return [ 'uri' => $uri, 'text' => $text ];
 		}
 
 		/**

@@ -12,10 +12,11 @@
  *													both exist. List + drill-down-form shape, same as _admin's
  *													Pages module (see pages.js) - the two are meant to feel
  *													like the same tool, since they do the same job. "New
- *													Webpage" opens a blank-looking entry (its name/title/
- *													description fields carry no value, just a generic
- *													placeholder - what actually lands on "Next" if left
- *													untouched, see Install.php's Webpages class); the list's
+ *													Webpage" opens an entry prefilled from the picked
+ *													template's own suggested uris and per-locale wording
+ *													(see _suggest(), fed by Install.php's Webpages::
+ *													_suggestions()) - a field left blank still falls back to
+ *													that class's generic placeholder on "Next"; the list's
  *													own ↑/↓ buttons reorder in place. Everything here is
  *													purely client-side - unlike _admin's Pages module, nothing
  *													persists until "Next" posts the whole list at once (see
@@ -219,7 +220,11 @@
 		 *	one for a new page - mirrors _admin's Pages module (see pages.js's
 		 *	_openForm()), except nothing here is pushed into _entries until
 		 *	_save() actually runs, so "Back to list" on an unsaved new entry
-		 *	simply discards it
+		 *	simply discards it. A new entry starts from the picked template's
+		 *	own suggested uris/wording (see _suggest()) rather than blank, so
+		 *	every active locale - not just whichever one someone bothers to
+		 *	type - ends up with real text instead of Install.php's generic
+		 *	"Page"/"Page Title" fallback
 		 *
 		 *	@param		{number|null}	index		Index into _entries, or null to create new
 		 *
@@ -233,23 +238,51 @@
 			let entry = index !== null ? Nino.install.webpages._entries[index] : null;
 			if( entry === null ) {
 
-				const text = {};
-				Nino.install.webpages._locales.forEach( function( locale ) { text[locale] = {} } );
-
-				const freeUri = Nino.install.webpages._freeUri( function( e ) { return e.uri } );
+				const libraryKey 	= Object.keys( Nino.install.webpages._templates )[0] || '';
+				const suggested 	= Nino.install.webpages._suggest( libraryKey );
 
 				entry = {
-					uri 				: freeUri,
-					httpUri 		: Nino.install.webpages._freeUri( function( e ) { return e.httpUri }, freeUri ),
-					libraryKey 	: Object.keys( Nino.install.webpages._templates )[0] || '',
+					uri 				: Nino.install.webpages._freeUri( function( e ) { return e.uri }, suggested.uri ),
+					httpUri 		: Nino.install.webpages._freeUri( function( e ) { return e.httpUri }, suggested.httpUri ),
+					libraryKey 	: libraryKey,
 					nav 				: false,
-					text 				: text,
+					text 				: suggested.text,
 				};
 			}
 
 			Nino.install.webpages._current = entry;
 			Nino.install.webpages._renderForm( entry );
 			Nino.install.webpages._showForm();
+		},
+
+		/**
+		 *	What one library template suggests for an instance of itself:
+		 *	its folder name as the Element-URI, plus the Http-URI and the
+		 *	per-locale name/title/description its own text fragments ship
+		 *	(see Install.php's Webpages::_suggestions()). A template /_admin
+		 *	created - or one whose fragments carry no such wording - simply
+		 *	suggests nothing, and the fields stay on their placeholders
+		 *
+		 *	@param		{string}	libraryKey
+		 *
+		 *	@return		{Object}	{ uri, httpUri, text: { <locale>: { name, title, description } } }
+		 */
+		_suggest : function( libraryKey ) {
+
+			const template 	= Nino.install.webpages._templates[libraryKey] || {};
+			const uri 			= libraryKey !== '' ? '/'+ libraryKey : '';
+			const text 			= {};
+
+			Nino.install.webpages._locales.forEach( function( locale ) {
+				const row = ( template.text || {} )[locale] || {};
+				text[locale] = {
+					name 				: row.name 				|| '',
+					title 			: row.title 			|| '',
+					description : row.description || '',
+				};
+			} );
+
+			return { uri : uri, httpUri : template.uri || uri, text : text };
 		},
 
 		/**
@@ -263,7 +296,7 @@
 
 			const taken = Nino.install.webpages._entries.map( pick );
 
-			if( preferred !== undefined && taken.indexOf( preferred ) === -1 )
+			if( preferred !== undefined && preferred !== '' && taken.indexOf( preferred ) === -1 )
 				return preferred;
 
 			let uri = '/new-page';
@@ -379,6 +412,38 @@
 			templateSelect.addEventListener( 'change', updateRequiresHint );
 			updateRequiresHint();
 			pageFieldset.appendChild( requiresHint );
+
+			// Picking a different template re-suggests its own uris/wording,
+			// but only into fields that are still untouched - blank, or still
+			// carrying exactly what the previously picked template suggested.
+			// Anything actually typed here outranks a suggestion and survives
+			// the switch; an existing entry's uris are never re-suggested at
+			// all, since that's the identity its already-written text meta is
+			// keyed by (see Install.php's Webpages::_applyWebpage())
+			let suggested = Nino.install.webpages._suggest( templateSelect.value );
+			templateSelect.addEventListener( 'change', function() {
+
+				const next = Nino.install.webpages._suggest( templateSelect.value );
+
+				if( Nino.install.webpages._isNew === true ) {
+					if( uriInput.value === '' || uriInput.value === suggested.uri )
+						uriInput.value = Nino.install.webpages._freeUri( function( e ) { return e.uri }, next.uri );
+					if( httpUriInput.value === '' || httpUriInput.value === suggested.httpUri )
+						httpUriInput.value = Nino.install.webpages._freeUri( function( e ) { return e.httpUri }, next.httpUri );
+				}
+
+				dc.querySelectorAll('#webpages-form-locales [data-locale]').forEach( function( row ) {
+					const was 	= suggested.text[row.dataset.locale] || {};
+					const now 	= next.text[row.dataset.locale] || {};
+					[ 'name', 'title', 'description' ].forEach( function( field ) {
+						const input = row.querySelector('[data-field="'+ field+ '"]');
+						if( input.value === '' || input.value === ( was[field] || '' ) )
+							input.value = now[field] || '';
+					} );
+				} );
+
+				suggested = next;
+			} );
 
 			if( Nino.install.webpages._navModule === true ) {
 				const navLabel = dc.createElement('label');

@@ -487,8 +487,14 @@
 				const preview = dc.createElement('img');
 				preview.className = 'editor-field-image-preview';
 				preview.hidden = ! value;
+				// Every uploaded image lives under /images (Nino\Images::UPLOAD_DIR),
+				// and the stored value is the filename relative to it - the same
+				// url \Nino\Images::getUrl() builds server-side, which is what
+				// _uploadImage() below renders straight from the response. Only
+				// this re-render from a stored value had to build it itself, and
+				// pointed at a /uploads directory that does not exist
 				if( value )
-					preview.src = Nino.editor.assetUrl( '/uploads/'+ value );
+					preview.src = Nino.editor.assetUrl( '/images/'+ value );
 				wrap.appendChild( preview );
 
 				const hiddenInput = dc.createElement('input');
@@ -689,7 +695,15 @@
 		/**
 		 *	Labels of every currently-visible required field that's empty -
 		 *	global fields always, locale fields only for the selected locale
-		 *	(the only one actually being submitted)
+		 *	(the only one actually being submitted).
+		 *
+		 *	An image field is never among them, even if its model says
+		 *	required: its file is uploaded separately, only once the element
+		 *	exists and has a uri to attach the upload to (see _renderField()'s
+		 *	image branch), so on a new element it is empty by construction -
+		 *	holding the save back for it would make the element impossible to
+		 *	create. Same rule /_admin's own copy of this module applies, and
+		 *	the one its Element Types editor now enforces when writing a model
 		 *
 		 *	@return		{Array<string>}
 		 */
@@ -698,6 +712,7 @@
 			const keys = Nino.editor.elements._globalKeys.concat( Nino.editor.elements._localeKeys );
 
 			return keys
+				.filter( function( key ) { return Nino.editor.elements._currentModel[key].type !== 'image' } )
 				.filter( function( key ) { return ( Nino.editor.elements._currentModel[key].required ?? false ) === true } )
 				.filter( function( key ) { return Nino.editor.elements._isFieldEmpty( key, Nino.editor.elements._currentModel[key] ) } )
 				.map( function( key ) { return Nino.editor.elements._fieldLabel( key ) } );

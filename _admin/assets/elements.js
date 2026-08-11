@@ -51,6 +51,7 @@
 		_htmlEditors		: {},
 		_loading				: false,
 		_saving					: false,
+		_typesRequest		: 0,
 		_listRequest		: 0,
 		_formRequest		: 0,
 		_ready					: false,
@@ -66,10 +67,15 @@
 			if( dc.getElementById('elements-types') === null || Nino.admin.elements._loading === true || Nino.admin.elements._ready === true )
 				return;
 
+			const requestId = ++Nino.admin.elements._typesRequest;
 			Nino.admin.elements._loading = true;
 
 			Nino.admin.elements._apiCall( 'types', {}, function( status, response ) {
 				Nino.admin.elements._loading = false;
+				// invalidate() ran while this was in flight: the types/models
+				// about to be cached here are the ones it just declared stale
+				if( requestId !== Nino.admin.elements._typesRequest )
+					return;
 				if( status !== 200 || response === null )
 					return Nino.admin.elements._showError( dc.getElementById('elements-types'), status, response );
 				Nino.admin.elements._locales = response.locales;
@@ -79,6 +85,63 @@
 				Nino.admin.elements._showTypes();
 				Nino.admin.elements._ready = true;
 			} );
+		},
+
+		/**
+		 *	Drop everything this module cached and fall back to its type
+		 *	picker, so the next showCurrent() fetches again.
+		 *
+		 *	The schema this module renders every form from - the type list,
+		 *	each type's model, its global/locale key split - belongs to the
+		 *	Element Types module next door (see elementtypes.js), and is read
+		 *	exactly once per page load: init() returns early forever after
+		 *	_ready, and showCurrent() only re-shows a drill-down level from
+		 *	what is already in memory. Without this, a field added, renamed
+		 *	or removed over there simply never appeared here until the whole
+		 *	page was reloaded - and a form still open on the old model would
+		 *	have gone on editing keys the type no longer has.
+		 *
+		 *	Public on purpose: it is this module's own contract with its
+		 *	sibling ("your save invalidates my cache"), not a private flag
+		 *	for the other side to reach in and flip.
+		 *
+		 *	@return		void
+		 */
+		invalidate : function() {
+
+			// Any list/get response still in flight targets the type that is
+			// being dropped here - both guards those callbacks check are reset
+			// below, but bump the sequence counters too, exactly as
+			// _selectType() does, in case the same type is picked again before
+			// they arrive
+			++Nino.admin.elements._typesRequest;
+			++Nino.admin.elements._listRequest;
+			++Nino.admin.elements._formRequest;
+
+			Nino.admin.elements._destroyHtmlEditors();
+
+			Nino.admin.elements._ready 						= false;
+			Nino.admin.elements._currentType 			= null;
+			Nino.admin.elements._currentTypeTitle	= null;
+			Nino.admin.elements._currentModel			= null;
+			Nino.admin.elements._globalKeys				= [];
+			Nino.admin.elements._localeKeys				= [];
+			Nino.admin.elements._currentUri				= null;
+			Nino.admin.elements._isNew						= false;
+			Nino.admin.elements._globalValues			= {};
+			Nino.admin.elements._localeValues			= {};
+			Nino.admin.elements._raw							= {};
+			Nino.admin.elements._dirtyLocales			= [];
+
+			if( dc.getElementById('elements-types') === null )
+				return;
+
+			// The rendered list/form belong to the model that just changed -
+			// left standing, showCurrent() would flash them before init()'s
+			// response replaces the picker behind them
+			dc.getElementById('elements-list').innerHTML = '';
+			dc.getElementById('elements-form').innerHTML = '';
+			Nino.admin.elements._showTypes();
 		},
 
 		/**
@@ -470,8 +533,14 @@
 				const preview = dc.createElement('img');
 				preview.className = 'editor-field-image-preview';
 				preview.hidden = ! value;
+				// Every uploaded image lives under /images (Nino\Images::UPLOAD_DIR),
+				// and the stored value is the filename relative to it - the same
+				// url \Nino\Images::getUrl() builds server-side, which is what
+				// _uploadImage() below renders straight from the response. Only
+				// this re-render from a stored value had to build it itself, and
+				// pointed at a /uploads directory that does not exist
 				if( value )
-					preview.src = Nino.admin.assetUrl( '/uploads/'+ value );
+					preview.src = Nino.admin.assetUrl( '/images/'+ value );
 				wrap.appendChild( preview );
 
 				const hiddenInput = dc.createElement('input');
@@ -672,7 +741,16 @@
 		/**
 		 *	Labels of every currently-visible required field that's empty -
 		 *	global fields always, locale fields only for the selected locale
-		 *	(the only one actually being submitted)
+		 *	(the only one actually being submitted).
+		 *
+		 *	An image field is never among them, even if its model says
+		 *	required: its file is uploaded separately, only once the element
+		 *	exists and has a uri to attach the upload to (see _renderField()'s
+		 *	image branch), so on a new element it is empty by construction -
+		 *	holding the save back for it would make the element impossible to
+		 *	create. Neither tool writes that flag onto an image field anymore
+		 *	(see Admin.php's cleanModel()); this keeps a model that still
+		 *	carries one from an older version out of that dead end
 		 *
 		 *	@return		{Array<string>}
 		 */
@@ -681,6 +759,7 @@
 			const keys = Nino.admin.elements._globalKeys.concat( Nino.admin.elements._localeKeys );
 
 			return keys
+				.filter( function( key ) { return Nino.admin.elements._currentModel[key].type !== 'image' } )
 				.filter( function( key ) { return ( Nino.admin.elements._currentModel[key].required ?? false ) === true } )
 				.filter( function( key ) { return Nino.admin.elements._isFieldEmpty( key, Nino.admin.elements._currentModel[key] ) } )
 				.map( function( key ) { return Nino.admin.elements._fieldLabel( key ) } );
@@ -932,7 +1011,12 @@
 				Nino.admin.elements._destroyHtmlEditors();
 				Nino.admin.elements._showList();
 			} );
-			wrap.appendChild( backLink );
+
+			// An element type can declare a long list of locale keys - the
+			// back link and the locale switch ride along in one pinned row
+			// instead of scrolling out of reach (see script.js's formToolbar())
+			const toolbar = Nino.admin.formToolbar( backLink );
+			wrap.appendChild( toolbar );
 
 			const form = dc.createElement('form');
 			form.id = 'elements-edit-form';
@@ -1022,7 +1106,11 @@
 					Nino.admin.elements._selectedLocale = select.value;
 					Nino.admin.elements._renderLocaleFields();
 				} );
-				localeWrap.appendChild( select );
+
+				// In the pinned toolbar, not in this fieldset's own corner:
+				// which translation you are looking at has to stay switchable
+				// from anywhere in a long form, not only from its top
+				toolbar.appendChild( select );
 
 				const fieldsWrap = dc.createElement('div');
 				fieldsWrap.id = 'elements-form-locale-fields';

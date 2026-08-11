@@ -374,6 +374,16 @@ check( '"contact" declares it requires "forms"', $wpLibraryBody['templates']['co
 check( 'starts with an empty list - nothing persisted yet', $wpLibraryBody['webpages'] === [] );
 check( 'navModule is false - Navigation was never picked', $wpLibraryBody['navModule'] === false );
 
+// Each template also reports the starter wording its own text fragments
+// ship, so the form can prefill a new entry per locale instead of leaving
+// every locale nobody hand-typed on DEFAULT_TEXT (see _suggestions())
+check( 'reports "home"\'s own suggested wording for every picked locale, not just one', array_keys( $wpLibraryBody['templates']['home']['text'] ) === [ 'de_DE', 'en_US' ] );
+check( '...with de_DE\'s wording read from the unit\'s own de_DE fragment', $wpLibraryBody['templates']['home']['text']['de_DE']['name'] === 'Startseite' );
+check( '...and en_US\'s from its own en_US fragment - the locale that used to end up generic', $wpLibraryBody['templates']['home']['text']['en_US']['name'] === 'Home' && $wpLibraryBody['templates']['home']['text']['en_US']['title'] === 'Welcome.' );
+check( 'reports the Http-URI "home" suggests for itself, which is not its folder name', $wpLibraryBody['templates']['home']['uri'] === '/' );
+check( '...and "contact"\'s, which is', $wpLibraryBody['templates']['contact']['uri'] === '/contact' );
+check( 'a template whose fragments ship no wording at all reports empty strings, never a missing key', array_keys( $wpLibraryBody['templates']['.demo-elements']['text']['en_US'] ) === [ 'name', 'title', 'description' ] );
+
 $_POST['data'] = json_encode( [ 'webpages' => [ [ 'uri' => '../etc/passwd', 'httpUri' => '/x', 'template' => 'home', 'text' => [] ] ] ] );
 $badUriRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Install\Webpages::apiApply( $appData, $badUriRequest );

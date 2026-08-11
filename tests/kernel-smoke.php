@@ -129,6 +129,24 @@ check( 'insertElement accepts a legitimate 0 for a required integer field', \Nin
 check( 'insertElement accepts a legitimate false for a required boolean field', \Nino\Elements::insertElement( $appData, '/reqtype/item2', [ 'title' => 'x', 'tags' => [ 'a' ], 'count' => 1, 'active' => false ], 'de_DE' ) !== false );
 \Nino\Elements::deleteElement( $appData, '/reqtype/item2', '*' );
 
+// An image is exempt from "required" on purpose: both editing tools upload
+// its file only once the element exists and has a uri to attach it to, so
+// enforcing the flag here would reject the very insert that has to come
+// first - the type could never get an element at all. A model carrying the
+// flag from an older version or from hand-editing must not be that dead end
+\Nino\Elements::insertElementType( $appData, '/reqimagetype', [
+	'title' 	=> [ 'type' => 'string', 'required' => true ],
+	'photo' 	=> [ 'type' => 'image', 'required' => true, 'width' => 40, 'height' => 40 ],
+] );
+
+check( 'insertElement accepts an element whose required image field has no file yet', \Nino\Elements::insertElement( $appData, '/reqimagetype/item1', [ 'title' => 'x', 'photo' => '' ], 'de_DE' ) !== false );
+check( '...and one that omits the image field entirely', \Nino\Elements::insertElement( $appData, '/reqimagetype/item2', [ 'title' => 'x' ], 'de_DE' ) !== false );
+check( 'the exemption is image-only - a required string alongside it is still enforced', \Nino\Elements::insertElement( $appData, '/reqimagetype/item3', [ 'title' => '', 'photo' => '' ], 'de_DE' ) === false );
+check( 'a filename passed for an image field is still stored', ( \Nino\Elements::updateElement( $appData, '/reqimagetype/item1', [ 'photo' => 'reqimagetype/item1/photo.webp' ], 'de_DE' )['photo'] ?? null ) === 'reqimagetype/item1/photo.webp' );
+
+\Nino\Elements::deleteElement( $appData, '/reqimagetype/item1', '*' );
+\Nino\Elements::deleteElement( $appData, '/reqimagetype/item2', '*' );
+
 // Regression: every early return between taking the type file's write lock
 // and putFileContent() (which is the only place that used to release it)
 // leaked that lock for the rest of the request - a required-field

@@ -244,7 +244,11 @@
 		_renderKeyField : function( entry, value ) {
 
 			const wrap = dc.createElement('div');
-			wrap.className = 'editor-field';
+			// .admin-text-field marks the three-part (header / value / schema)
+			// shape assets/style.css folds into two rows from 768px up - the
+			// plain .editor-field label/input pairs elsewhere in this module
+			// must not be caught by that grid
+			wrap.className = 'editor-field admin-text-field';
 
 			const header = dc.createElement('div');
 			header.className = 'editor-field-header';
@@ -491,7 +495,12 @@
 			backLink.className = 'back-link';
 			backLink.textContent = 'Back to list';
 			backLink.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.text._destroyHtmlEditors(); Nino.admin.text._showList() } );
-			wrap.appendChild( backLink );
+
+			// A category can carry hundreds of keys - the back link and the
+			// locale switch ride along in one pinned row instead of scrolling
+			// out of reach at the top of it (see script.js's formToolbar())
+			const toolbar = Nino.admin.formToolbar( backLink );
+			wrap.appendChild( toolbar );
 
 			const form = dc.createElement('form');
 			form.id = 'text-edit-form';
@@ -538,7 +547,11 @@
 					Nino.admin.text._selectedLocale = select.value;
 					Nino.admin.text._renderLocaleFields();
 				} );
-				localeWrap.appendChild( select );
+
+				// In the pinned toolbar, not in this fieldset's own corner:
+				// which translation you are looking at has to stay switchable
+				// from anywhere in a long category, not only from its top
+				toolbar.appendChild( select );
 
 				const fieldsWrap = dc.createElement('div');
 				fieldsWrap.id = 'text-form-locale-fields';
@@ -689,14 +702,19 @@
 			valueLabel.appendChild( valueInput );
 			form.appendChild( valueLabel );
 
-			const msg = dc.createElement('p');
-			msg.id = 'text-form-msg';
-			form.appendChild( msg );
+			const actions = dc.createElement('div');
+			actions.className = 'editor-form-actions';
 
 			const saveBtn = dc.createElement('button');
 			saveBtn.type = 'submit';
 			saveBtn.textContent = 'Create';
-			form.appendChild( saveBtn );
+			actions.appendChild( saveBtn );
+
+			const msg = dc.createElement('p');
+			msg.id = 'text-form-msg';
+			actions.appendChild( msg );
+
+			form.appendChild( actions );
 
 			form.addEventListener( 'submit', function( ev ) { ev.preventDefault(); Nino.admin.text._saveNewKey() } );
 
@@ -832,14 +850,19 @@
 				rows.push( { key : item.key, valueInput : valueInput, ignoreCheck : ignoreCheck } );
 			} );
 
-			const msg = dc.createElement('p');
-			msg.id = 'text-scan-msg';
-			form.appendChild( msg );
+			const actions = dc.createElement('div');
+			actions.className = 'editor-form-actions';
 
 			const saveBtn = dc.createElement('button');
 			saveBtn.type = 'submit';
 			saveBtn.textContent = 'Create the non-ignored keys';
-			form.appendChild( saveBtn );
+			actions.appendChild( saveBtn );
+
+			const msg = dc.createElement('p');
+			msg.id = 'text-scan-msg';
+			actions.appendChild( msg );
+
+			form.appendChild( actions );
 
 			form.addEventListener( 'submit', function( ev ) { ev.preventDefault(); Nino.admin.text._saveScanResults( rows ) } );
 

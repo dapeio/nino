@@ -174,14 +174,22 @@
 			textarea.value = Nino.admin.config._values[key] ?? '';
 			form.appendChild( textarea );
 
-			const msg = dc.createElement('p');
-			msg.id = 'config-form-msg';
-			form.appendChild( msg );
+			// Save + its message in the shared actions row every module's form
+			// ends on - assets/style.css pins that row to the bottom of the
+			// viewport, so a long value never puts Save out of reach
+			const actions = dc.createElement('div');
+			actions.className = 'editor-form-actions';
 
 			const saveBtn = dc.createElement('button');
 			saveBtn.type = 'submit';
 			saveBtn.textContent = 'Save';
-			form.appendChild( saveBtn );
+			actions.appendChild( saveBtn );
+
+			const msg = dc.createElement('p');
+			msg.id = 'config-form-msg';
+			actions.appendChild( msg );
+
+			form.appendChild( actions );
 
 			form.addEventListener( 'submit', function( ev ) { ev.preventDefault(); Nino.admin.config._save() } );
 

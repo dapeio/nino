@@ -269,7 +269,7 @@
 		 *	that's not otherwise known to js and can be a subdirectory rather
 		 *	than site root
 		 *
-		 *	@param		{string}	path					Path starting with "/" (eg. "/uploads/x.jpg")
+		 *	@param		{string}	path					Path starting with "/" (eg. "/images/x.jpg")
 		 *
 		 *	@return		{string}
 		 */

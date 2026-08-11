@@ -232,27 +232,38 @@
 			heightLabel.appendChild( heightInput );
 			form.appendChild( heightLabel );
 
-			const msg = dc.createElement('p');
-			msg.id = 'images-form-msg';
-			form.appendChild( msg );
+			// Save + its message in the shared actions row every module's form
+			// ends on - assets/style.css pins that row to the bottom of the
+			// viewport, so a long field list never puts Save out of reach
+			const actions = dc.createElement('div');
+			actions.className = 'editor-form-actions';
 
 			const saveBtn = dc.createElement('button');
 			saveBtn.type = 'submit';
 			saveBtn.textContent = 'Save';
-			form.appendChild( saveBtn );
+			actions.appendChild( saveBtn );
 
-			form.addEventListener( 'submit', function( ev ) { ev.preventDefault(); Nino.admin.images._save() } );
-
-			wrap.appendChild( form );
-
+			// In the actions row, not loose below the form: that row is pinned
+			// to the bottom of the viewport now (see assets/style.css), and a
+			// button left outside it would be the one control that scrolls away
 			if( Nino.admin.images._isNew === false ) {
 				const deleteBtn = dc.createElement('button');
 				deleteBtn.type = 'button';
 				deleteBtn.className = 'admin-danger-btn';
 				deleteBtn.textContent = 'Delete slot';
 				deleteBtn.addEventListener( 'click', function() { Nino.admin.images._delete() } );
-				wrap.appendChild( deleteBtn );
+				actions.appendChild( deleteBtn );
 			}
+
+			const msg = dc.createElement('p');
+			msg.id = 'images-form-msg';
+			actions.appendChild( msg );
+
+			form.appendChild( actions );
+
+			form.addEventListener( 'submit', function( ev ) { ev.preventDefault(); Nino.admin.images._save() } );
+
+			wrap.appendChild( form );
 		},
 
 		/**
@@ -455,14 +466,19 @@
 				rows.push( { uriInput : uriInput, labelInput : labelInput, widthInput : widthInput, heightInput : heightInput, ignoreCheck : ignoreCheck } );
 			} );
 
-			const msg = dc.createElement('p');
-			msg.id = 'images-scan-msg';
-			form.appendChild( msg );
+			const actions = dc.createElement('div');
+			actions.className = 'editor-form-actions';
 
 			const saveBtn = dc.createElement('button');
 			saveBtn.type = 'submit';
 			saveBtn.textContent = 'Create the non-ignored slots';
-			form.appendChild( saveBtn );
+			actions.appendChild( saveBtn );
+
+			const msg = dc.createElement('p');
+			msg.id = 'images-scan-msg';
+			actions.appendChild( msg );
+
+			form.appendChild( actions );
 
 			form.addEventListener( 'submit', function( ev ) { ev.preventDefault(); Nino.admin.images._saveScanResults( rows ) } );
 

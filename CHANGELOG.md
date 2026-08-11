@@ -4,7 +4,38 @@ All notable changes to Nino are documented in this file.
 
 ## Unreleased
 
-No unreleased changes yet.
+### Added
+
+- Added starter wording to the **Webpages** step of `/_install`: a new page
+  now prefills its HTTP URI and its name, title, and description in every
+  active language from the selected library template, instead of leaving
+  every language nobody typed by hand on the generic placeholder.
+- Added a pinned form toolbar to `/_admin` carrying the "Back to list" link
+  and the language switch, so both stay reachable inside long forms.
+
+### Changed
+
+- Changed `/_admin`'s save row to stay anchored at the bottom of the
+  viewport while a form is open, matching `/_install`'s Back/Next bar.
+- Changed `/_admin`'s form density from 768px up: fields, buttons, and
+  fieldsets are more compact, and a text key's name, value, and flags share
+  two rows instead of three. Below 768px the layout is unchanged.
+
+### Fixed
+
+- Fixed `/_admin`'s **Elements** module showing an outdated schema after a
+  type was saved in **Element Types**. It read every type's model once per
+  page load, so an added, renamed, or removed field only appeared after a
+  full page reload; saving a type now invalidates that cache.
+- Fixed an image field marked as required making its element type impossible
+  to add an element to. The file is uploaded only once the element exists, so
+  the field is empty on the very save that would have to satisfy it.
+  **Element Types** no longer offers the flag for image fields and drops it
+  when saving a model, and both editors ignore it on one.
+- Fixed the image preview in `/_admin` and `/_editor` pointing at a
+  `/uploads` directory. Uploaded images are stored under `/images`, so a form
+  re-rendered from a stored filename showed a broken preview — only the one
+  shown right after an upload, which uses the server's own url, was correct.
 
 ## 0.11.0-beta.1 — 2026-08-09
 

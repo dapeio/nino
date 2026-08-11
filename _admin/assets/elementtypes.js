@@ -221,14 +221,24 @@
 				localeLabel.appendChild( dc.createTextNode(' per translation') );
 				optionsWrap.appendChild( localeLabel );
 
-				const requiredLabel = dc.createElement('label');
-				const requiredCheck = dc.createElement('input');
-				requiredCheck.type = 'checkbox';
-				requiredCheck.className = 'admin-field-required';
-				requiredCheck.checked = field.required === true;
-				requiredLabel.appendChild( requiredCheck );
-				requiredLabel.appendChild( dc.createTextNode(' Required field') );
-				optionsWrap.appendChild( requiredLabel );
+				// Never offered for an image: its file is uploaded separately,
+				// after the element already exists (see elements.js's image
+				// branch - a new element has no uri to attach an upload to yet),
+				// so a required image could never be filled in on the very save
+				// that would have to satisfy it. The element would simply be
+				// impossible to create. Admin.php's _cleanModel() drops the flag
+				// on save too, so a type file that carries one from before loses
+				// it the next time it is saved here
+				if( type !== 'image' ) {
+					const requiredLabel = dc.createElement('label');
+					const requiredCheck = dc.createElement('input');
+					requiredCheck.type = 'checkbox';
+					requiredCheck.className = 'admin-field-required';
+					requiredCheck.checked = field.required === true;
+					requiredLabel.appendChild( requiredCheck );
+					requiredLabel.appendChild( dc.createTextNode(' Required field') );
+					optionsWrap.appendChild( requiredLabel );
+				}
 
 				// Shown next to the value everywhere except boolean (a "Ja"/"Nein"
 				// choice has nothing to append) and image (its own preview/upload
@@ -332,7 +342,9 @@
 					key 			: row.querySelector('.admin-field-key').value,
 					type 			: row.querySelector('select').value,
 					locale 		: row.querySelector('.admin-field-locale').checked,
-					required 	: row.querySelector('.admin-field-required').checked,
+					// Absent on an image row, which is never offered the checkbox
+					// (see _renderFieldRow()) - false, not "keep whatever was there"
+					required 	: ( row.querySelector('.admin-field-required')?.checked ) ?? false,
 					html 			: ( row.querySelector('.admin-field-html')?.checked ) ?? false,
 					maxlength : row.querySelector('.admin-field-maxlength')?.value,
 					width 		: row.querySelector('.admin-field-width')?.value,
@@ -406,14 +418,22 @@
 			} );
 			form.appendChild( addFieldBtn );
 
-			const msg = dc.createElement('p');
-			msg.id = 'admin-form-msg';
-			form.appendChild( msg );
+			// Save + its message in the shared actions row every module's form
+			// ends on - assets/style.css pins that row to the bottom of the
+			// viewport, so a long field list never puts Save out of reach
+			const actions = dc.createElement('div');
+			actions.className = 'editor-form-actions';
 
 			const saveBtn = dc.createElement('button');
 			saveBtn.type = 'submit';
 			saveBtn.textContent = 'Save';
-			form.appendChild( saveBtn );
+			actions.appendChild( saveBtn );
+
+			const msg = dc.createElement('p');
+			msg.id = 'admin-form-msg';
+			actions.appendChild( msg );
+
+			form.appendChild( actions );
 
 			form.addEventListener( 'submit', function( ev ) { ev.preventDefault(); Nino.admin.elementTypes._save() } );
 
@@ -449,6 +469,27 @@
 		},
 
 		/**
+		 *	Tell the Elements module next door that the schema it renders its
+		 *	forms from has just changed (see elements.js's invalidate()).
+		 *
+		 *	That module reads every type's model exactly once per page load,
+		 *	so without this a field added, renamed or removed here only
+		 *	showed up over there after a full page reload. Called through its
+		 *	own public entry point rather than by touching its state, and
+		 *	guarded so this module still works on its own if elements.js is
+		 *	not deployed alongside it
+		 *
+		 *	@return		void
+		 */
+		_invalidateElements : function() {
+
+			if( wn.Nino.admin.elements === undefined )
+				return;
+
+			Nino.admin.elements.invalidate();
+		},
+
+		/**
 		 *	Create or save the type currently open
 		 *
 		 *	@return		void
@@ -472,6 +513,7 @@
 					Nino.admin.elementTypes._currentUri = response.uri;
 					msg.textContent = 'Saved.';
 					Nino.admin.elementTypes.init();
+					Nino.admin.elementTypes._invalidateElements();
 				} );
 				return;
 			}
@@ -483,6 +525,7 @@
 				}
 				msg.textContent = 'Saved.';
 				Nino.admin.elementTypes.init();
+				Nino.admin.elementTypes._invalidateElements();
 			} );
 		},
 	};

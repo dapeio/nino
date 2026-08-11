@@ -1906,8 +1906,17 @@ namespace Nino {
 
 					// Required - a plain empty() would also reject a legitimate 0/false
 					// value on a boolean/integer/double field, so presence alone is
-					// enough for those; string/array still need an actual non-empty value
-					if( isset( $field['required'] ) === true && $field['required'] === true ) {
+					// enough for those; string/array still need an actual non-empty
+					// value. An image is exempt: both editing tools upload its file
+					// separately, only once the element exists and has a uri to
+					// attach the upload to, so a required image would reject the
+					// very insert that has to happen first - making the element
+					// impossible to create at all. Neither tool writes the flag onto
+					// an image field anymore (see _admin/Admin.php's cleanModel());
+					// this keeps a model that still carries one from an older
+					// version, or from hand-editing, out of that dead end. A caller
+					// that does pass an image filename is unaffected either way
+					if( isset( $field['required'] ) === true && $field['required'] === true && $field['type'] !== 'image' ) {
 						$isEmpty = match( true ) {
 							isset( $data[$key] ) === false 																								=> true,
 							in_array( $field['type'], [ 'boolean', 'integer', 'double' ], true ) === true => false,

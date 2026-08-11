@@ -35,13 +35,25 @@ sandbox.Nino = {
 	events : { bindCallback : function() {} },
 };
 
+const source = fs.readFileSync( path.join( __dirname, '../_editor/assets/elements.js' ), 'utf8' );
+
 vm.runInContext(
-	fs.readFileSync( path.join( __dirname, '../_editor/assets/elements.js' ), 'utf8' ),
+	source,
 	vm.createContext( sandbox ),
 	{ filename : 'elements.js' }
 );
 
 const elements = sandbox.Nino.editor.elements;
+
+// Regression: an image field's preview used to be built as "/uploads/<stored
+// filename>", a directory no deployment has - every upload is stored under
+// /images (Nino\Images::UPLOAD_DIR). The preview shown right after an upload
+// renders the server's own url and always looked right, so the 404 only
+// appeared once the form was re-rendered from the stored value. Same bug and
+// same guard as _admin's own copy of this module (see
+// tests/admin-elements-js-smoke.js)
+check( 'no image url is built under a /uploads directory', /assetUrl\(\s*'\/uploads\//.test( source ) === false );
+check( 'the image preview is built under /images', /assetUrl\(\s*'\/images\/'\+ value\s*\)/.test( source ) === true );
 
 elements._localeKeys = [ 'title', 'description' ];
 elements._dirtyLocales = [ 'de_DE', 'en_US' ];
@@ -61,6 +73,26 @@ check( 'an absent string equals its untouched empty control', elements._fieldVal
 check( 'an absent array equals its untouched empty control', elements._fieldValuesEqual( { type : 'array' }, undefined, [] ) === true );
 check( 'an absent boolean equals its untouched false control', elements._fieldValuesEqual( { type : 'boolean' }, null, false ) === true );
 check( 'actual text edits are detected', elements._fieldValuesEqual( { type : 'string' }, 'Before', 'After' ) === false );
+
+// An image field never blocks a save, even when its model says required: its
+// file is uploaded separately, only once the element exists and has a uri to
+// attach it to, so on a new element it is empty by construction. Enforcing it
+// would make the element impossible to create at all - the same rule _admin's
+// own copy of this module and its Element Types editor apply (see
+// tests/admin-elements-js-smoke.js and tests/admin-smoke.php)
+sandbox.document.getElementById = function() { return null };
+sandbox.Nino.content = { getText : function() { return '' } };
+
+elements._currentType 	= 'service';
+elements._globalKeys 		= [ 'photo' ];
+elements._localeKeys 		= [ 'title' ];
+elements._currentModel	= {
+	photo : { type : 'image', required : true },
+	title : { type : 'string', required : true },
+};
+
+check( 'a required image field is never reported as missing', elements._missingRequiredFields().indexOf( 'photo' ) === -1 );
+check( '...while an empty required field of any other type still is', JSON.stringify( elements._missingRequiredFields() ) === JSON.stringify( [ 'title' ] ) );
 
 console.log( '\n'+ checks+ ' checks, '+ failures+ ' failed' );
 process.exitCode = failures === 0 ? 0 : 1;

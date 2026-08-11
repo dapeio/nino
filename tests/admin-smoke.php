@@ -177,7 +177,7 @@ $_POST['data'] = json_encode( [
 	'title' 	=> 'Test Type Renamed',
 	'model' 	=> [
 		'name' 		=> [ 'type' => 'string', 'locale' => true, 'required' => true, 'maxlength' => 80 ],
-		'photo' 	=> [ 'type' => 'image', 'width' => 40, 'height' => 40, 'suffix' => 'ignored on image' ],
+		'photo' 	=> [ 'type' => 'image', 'width' => 40, 'height' => 40, 'suffix' => 'ignored on image', 'required' => true ],
 		'price' 	=> [ 'type' => 'double', 'suffix' => '€' ],
 		'active' 	=> [ 'type' => 'boolean', 'suffix' => 'ignored on boolean' ],
 		'bogus' 	=> [ 'type' => 'not-a-real-type' ],
@@ -193,6 +193,10 @@ check( 'apiSave keeps the valid field', ( $afterSave['model']['name']['required'
 check( 'apiSave sets a string field\'s maxlength', ( $afterSave['model']['name']['maxlength'] ?? null ) === 80 );
 check( 'apiSave adds the new field', ( $afterSave['model']['photo']['width'] ?? null ) === 40 );
 check( 'apiSave drops suffix on an image field', isset( $afterSave['model']['photo']['suffix'] ) === false );
+// An image's file is uploaded only after the element exists, so a required
+// image would make the type impossible to add an element to - the flag is
+// dropped whatever was posted, and only for image fields
+check( 'apiSave drops "required" on an image field', isset( $afterSave['model']['photo']['required'] ) === false );
 check( 'apiSave sets a suffix on a non-boolean/image field', $afterSave['model']['price']['suffix'] === '€' );
 check( 'apiSave drops suffix on a boolean field', isset( $afterSave['model']['active']['suffix'] ) === false );
 check( 'apiSave silently drops a field with an unknown type', isset( $afterSave['model']['bogus'] ) === false );

@@ -108,6 +108,8 @@ Each page requires:
 
 The Element URI is the anchor for page texts like `/webpage<uri>/title`. The HTTP URI is the path visible in the browser. This separation allows the internal identity to remain stable even if the public path changes.
 
+A new page starts from the selected library template's own suggestions: its HTTP URI, plus Navigation Name, Page Title, and Description in **every** active language, read from the template's `text/<locale>.php` files. Switching the template only updates fields that are still untouched — anything typed by hand survives the switch. A field left empty still falls back to the generic placeholder ("Page", "Page Title").
+
 Reserved paths such as `/_admin`, `/_editor`, `/_install`, and `/_templates` cannot be used as public pages.
 
 ## 5. Personal Information

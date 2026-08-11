@@ -420,6 +420,18 @@
 			saveBtn.textContent = 'Save';
 			actions.appendChild( saveBtn );
 
+			// In the actions row, not loose below the form: that row is pinned
+			// to the bottom of the viewport now (see assets/style.css), and a
+			// button left outside it would be the one control that scrolls away
+			if( Nino.admin.pages._isNew === false ) {
+				const deleteBtn = dc.createElement('button');
+				deleteBtn.type = 'button';
+				deleteBtn.className = 'admin-danger-btn';
+				deleteBtn.textContent = 'Delete page';
+				deleteBtn.addEventListener( 'click', function() { Nino.admin.pages._delete() } );
+				actions.appendChild( deleteBtn );
+			}
+
 			const msg = dc.createElement('p');
 			msg.id = 'pages-form-msg';
 			actions.appendChild( msg );
@@ -429,15 +441,6 @@
 			form.addEventListener( 'submit', function( ev ) { ev.preventDefault(); Nino.admin.pages._save() } );
 
 			wrap.appendChild( form );
-
-			if( Nino.admin.pages._isNew === false ) {
-				const deleteBtn = dc.createElement('button');
-				deleteBtn.type = 'button';
-				deleteBtn.className = 'admin-danger-btn';
-				deleteBtn.textContent = 'Delete page';
-				deleteBtn.addEventListener( 'click', function() { Nino.admin.pages._delete() } );
-				wrap.appendChild( deleteBtn );
-			}
 		},
 
 		/**

@@ -176,8 +176,13 @@ body {
 }
 
 #admin-content-wrap {
+	/* The pane's own horizontal padding, as a token: the sticky save row
+	   below bleeds edge to edge by cancelling exactly this much, and the
+	   value changes with the desktop shell (see the 64rem query) */
+	--admin-pane-pad: 1rem;
+
 	width: 100%;
-	padding: 1.5rem 1rem 5rem;
+	padding: 1.5rem var(--admin-pane-pad) 5rem;
 	max-width: 64rem;
 	margin: 0 auto;
 }
@@ -646,6 +651,241 @@ button.red {
 	font-size: .9rem;
 }
 
+/* ------------------------------------------------------ Sticky form chrome */
+
+/*	A drill-down form in this tool routinely runs to hundreds of fields - a
+	text category holding every key of a namespace, an element type with a
+	long locale-key list - which leaves both ends of it a full scroll away
+	from wherever the editing actually happens. Both stay in reach instead,
+	the same shape /_install's wizard uses for its Back/Next bar: the
+	toolbar (back link + locale switch, see script.js's formToolbar()) rides
+	the top, the save row the bottom.
+
+	Sticky rather than fixed on purpose - each one is bound to its own form,
+	so it settles back into the flow at that form's end instead of floating
+	over whatever follows. */
+
+#admin-content-wrap .admin-form-toolbar {
+	position: sticky;
+	top: .5rem;
+	z-index: 15;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: .75rem;
+	margin-bottom: .5rem;
+	/* Only the two controls take clicks - the gap between them stays
+	   transparent to whichever field it happens to be floating over */
+	pointer-events: none;
+}
+
+#admin-content-wrap .admin-form-toolbar > * {
+	pointer-events: auto;
+}
+
+/*	Pinned as a pill, not as a full-width bar: its click target stays the
+	size of its own label, which a stretched-out bar's would not */
+#admin-content-wrap .back-link {
+	position: sticky;
+	top: .5rem;
+	z-index: 15;
+	display: flex;
+	width: fit-content;
+	padding: .3rem .8rem .3rem .5rem;
+	background: var(--editor-bar-bg);
+	backdrop-filter: blur(20px) saturate(180%);
+	border: 1px solid var(--editor-border);
+	border-radius: 999px;
+	box-shadow: var(--editor-shadow-sm);
+}
+
+#admin-content-wrap .admin-form-toolbar .back-link {
+	position: static;
+	margin-bottom: 0;
+}
+
+/*	Out of the fieldset corner _editor/assets/style.css parks it in and into
+	the pinned toolbar, where it stays reachable from anywhere in a long
+	form - same compact look, just no longer absolutely positioned */
+#admin-content-wrap .admin-form-toolbar select {
+	position: static;
+	flex: 0 0 auto;
+	margin: 0;
+	min-height: 30px;
+	padding: .25rem 1.5rem .25rem .6rem;
+	font-size: .78rem;
+}
+
+#admin-content-wrap .editor-form-actions,
+#admin-content-wrap #elements-form-actions {
+	position: sticky;
+	bottom: 0;
+	z-index: 15;
+	flex-wrap: nowrap;
+	margin: 1rem calc(var(--admin-pane-pad) * -1) 0;
+	padding: .7rem var(--admin-pane-pad) max(.7rem, env(safe-area-inset-bottom));
+	background: var(--editor-bar-bg);
+	backdrop-filter: blur(20px) saturate(180%);
+	border-top: 1px solid var(--editor-separator);
+}
+
+/*	Natural width at every size - the full-width stack the shared rule gives
+	these below 36rem would make the pinned row several buttons tall */
+#admin-content-wrap .editor-form-actions button,
+#admin-content-wrap #elements-form-actions button {
+	width: auto;
+	flex: 0 0 auto;
+}
+
+/*	The status line ("Saving …", a failed key list) shares the row rather
+	than claiming one of its own, right-aligned against the buttons -
+	same arrangement as /_install's #install-actions-msg */
+#admin-content-wrap .editor-form-actions p,
+#admin-content-wrap #elements-form-actions p {
+	order: -1;
+	flex: 1 1 auto;
+	min-width: 0;
+	margin: 0;
+	text-align: right;
+	font-size: .85rem;
+	color: var(--editor-text-secondary);
+}
+
+/* ---------------------------------------------------- Compact from 768px up */
+
+/*	From 768px up this is a working surface, not a phone form: the 44px
+	touch-target sizing everything inherits from _editor/assets/style.css
+	turns a category with three dozen keys into several screens of
+	scrolling. Only spacing is tightened here - nothing changes shape, and
+	below 768px the mobile sizing is deliberately left exactly as it is
+	(that width is for fixing a value or two, not for writing pages). */
+
+@media (min-width: 768px) {
+
+	#admin-content-wrap fieldset {
+		margin-bottom: .75rem;
+		padding: 2.4rem 1rem .4rem;
+	}
+
+	#admin-content-wrap fieldset legend {
+		top: .85rem;
+		left: 1rem;
+	}
+
+	#admin-content-wrap .editor-field {
+		margin-bottom: .6rem;
+	}
+
+	#admin-content-wrap .editor-field > span {
+		margin-bottom: .15rem;
+	}
+
+	#admin-content-wrap input[type="text"],
+	#admin-content-wrap input[type="email"],
+	#admin-content-wrap input[type="password"],
+	#admin-content-wrap input[type="number"],
+	#admin-content-wrap input[type="date"],
+	#admin-content-wrap input[type="url"],
+	#admin-content-wrap textarea,
+	#admin-content-wrap select {
+		min-height: 34px;
+		padding: .4rem .6rem;
+		font-size: .875rem;
+	}
+
+	#admin-content-wrap .editor-field textarea,
+	#admin-content-wrap #config-form-value,
+	#admin-content-wrap #text-form-value {
+		min-height: 3.25rem;
+	}
+
+	#admin-content-wrap button {
+		min-height: 34px;
+		padding: .4rem .85rem;
+		font-size: .875rem;
+	}
+
+	#admin-content-wrap .admin-text-key-btn {
+		min-height: 30px;
+		padding: .25rem .6rem;
+		font-size: .8rem;
+	}
+
+	#admin-content-wrap .admin-field-row {
+		gap: .35rem;
+		margin-bottom: .6rem;
+		padding: .7rem .85rem;
+	}
+
+	#admin-content-wrap .html-editor {
+		margin-bottom: 0;
+	}
+
+	#admin-content-wrap .html-editor-toolbar {
+		margin-bottom: .3rem;
+		padding: .2rem;
+	}
+
+	#admin-content-wrap .html-editor-btn {
+		min-height: 28px;
+		padding: .2rem .55rem;
+		font-size: .8rem;
+	}
+
+	#admin-content-wrap .html-editor-content {
+		min-height: 2.75rem;
+		padding: .45rem .6rem;
+	}
+
+	/*	Text: a key's name, its value and its shape toggles read as one
+		two-row block instead of three stacked ones. The toggles move up
+		beside the key input - they describe the key, not the value - which
+		leaves the whole width to the value itself */
+	#admin-content-text .admin-text-field {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) auto;
+		grid-template-areas:
+			"header schema"
+			"value  value";
+		align-items: center;
+		column-gap: 1rem;
+		margin-bottom: .4rem;
+		padding-bottom: .4rem;
+		border-bottom: 1px solid var(--editor-separator);
+	}
+
+	#admin-content-text .admin-text-field:last-child {
+		padding-bottom: 0;
+		border-bottom: none;
+	}
+
+	#admin-content-text .admin-text-field > .editor-field-header {
+		grid-area: header;
+		margin-bottom: .25rem;
+	}
+
+	/*	"112 / 281" is one token - wrapped over two lines it would set the
+		height of the whole header row */
+	#admin-content-text .admin-text-field .char-counter {
+		flex: 0 0 auto;
+		white-space: nowrap;
+	}
+
+	#admin-content-text .admin-text-field > .admin-text-schema {
+		grid-area: schema;
+		gap: 0 .9rem;
+		margin: 0 0 .25rem;
+		font-size: .8rem;
+	}
+
+	/*	Whatever the value is rendered as - a plain textarea, or the html
+		editor's own mount (see text.js's _renderKeyField()) - takes the
+		full-width row below both */
+	#admin-content-text .admin-text-field > *:not(.editor-field-header):not(.admin-text-schema) {
+		grid-area: value;
+	}
+}
+
 /* ------------------------------------------------------- Desktop app shell */
 
 @media (min-width: 64rem) {
@@ -723,9 +963,11 @@ button.red {
 	}
 
 	#admin-content-wrap {
+		--admin-pane-pad: clamp(2rem, 4vw, 4rem);
+
 		grid-column: 2;
 		max-width: 76rem;
-		padding: 3rem clamp(2rem, 4vw, 4rem) 6rem;
+		padding: 3rem var(--admin-pane-pad) 6rem;
 	}
 }
 

@@ -454,7 +454,15 @@ namespace Nino\Admin {
 				if( $data['type'] === 'string' && ( $data['html'] ?? false ) === true )
 					$field['html'] = true;
 
-				if( ( $data['required'] ?? false ) === true )
+				// Never on an image, whatever was posted: its file is uploaded
+				// separately, once the element already exists and has a uri to
+				// attach it to (see assets/elements.js's image branch), so a
+				// required image could not be satisfied by the very save that
+				// creates the element - the type would be impossible to add an
+				// element to at all. The frontend stops offering the checkbox
+				// for image fields (see assets/elementtypes.js), and this drops
+				// it from a hand-written or older model on the next save
+				if( $data['type'] !== 'image' && ( $data['required'] ?? false ) === true )
 					$field['required'] = true;
 
 				if( $data['type'] === 'image' ) {

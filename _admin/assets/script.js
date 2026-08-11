@@ -98,13 +98,39 @@
 		 *	script.js carries, reading the same [[/nino/dir]] fill (see
 		 *	page-index.tpl's data-dir)
 		 *
-		 *	@param		{string}	path					Eg. "/uploads/elements/services/item1.webp"
+		 *	@param		{string}	path					Eg. "/images/elements/services/item1.webp"
 		 *
 		 *	@return		{string}
 		 */
 		assetUrl : function( path ) {
 			const wrap = dc.getElementById('admin-page-wrap');
 			return ( ( wrap === null ? '' : wrap.dataset.dir ) ?? '' )+ path;
+		},
+
+		/**
+		 *	The sticky chrome a drill-down form is framed by at the top: its
+		 *	own "back to list" link, plus - where a module has one - its
+		 *	locale switch, in a single row that stays pinned while the form
+		 *	scrolls (see assets/style.css's .admin-form-toolbar, and the
+		 *	.editor-form-actions rule that pins the save row to the bottom
+		 *	the same way /_install's Back/Next bar is pinned).
+		 *
+		 *	Shared rather than copied per module for once: it's three lines
+		 *	of DOM carrying no module state at all, and the whole point is
+		 *	that every module's form is framed identically. A module with no
+		 *	locale switch simply appends nothing else.
+		 *
+		 *	@param		{Element}	backLink			The module's own .back-link anchor
+		 *
+		 *	@return		{Element}	The toolbar, to append where the back link went before
+		 */
+		formToolbar : function( backLink ) {
+
+			const toolbar = dc.createElement('div');
+			toolbar.className = 'admin-form-toolbar';
+			toolbar.appendChild( backLink );
+
+			return toolbar;
 		},
 
 		/**
