@@ -72,7 +72,7 @@ A general example configuration cannot reliably guess the paths and PHP-FPM sett
 
 Before initial setup, PHP must be able to create directories and files in the project root. The still missing project paths are created by `/_install` or, if needed, by the kernel and are not a manually required prerequisite.
 
-During operation, Nino only needs write permissions for actually changeable content. Depending on usage, this includes `config.php`, `text/`, `elements/`, `images/`, `data/`, and `.cache/` as well as the log and backup directories created by `/_editor`. The template builder `/_templates` requires write permissions for the edited files under `templates/`; `/_admin` writes, depending on the function, configuration, texts, elements, and images, among others.
+During operation, Nino only needs write permissions for actually changeable content. Depending on usage, this includes `config.php`, `text/`, `elements/`, `images/`, `data/`, and `.cache/` as well as the log and backup directories created by `/_editor`. The Template Builder under `/_templates` requires write permissions for edited files under `templates/`; it can additionally create native text keys, Element Types, and image-slot definitions in the configuration. `/_admin` writes, depending on the function, configuration, texts, elements, and images, among others.
 
 Grant these permissions to the user under which PHP is executed. World-writable permissions such as `0777` are not a suitable permanent solution. After deployment, the kernel and other PHP source code should not be generally writable.
 
@@ -107,14 +107,14 @@ Error messages should not expose file paths, configuration values, or stack trac
 Before go-live, both accesses must work and have separate, strong passwords:
 
 - `/_admin` is the full technical and content management for developers.
-- `/_templates` is an optional Alpha tool and uses the password, lock status, and session of `/_admin`.
+- `/_templates` is the section-first Alpha tool and uses the password, lock status, and session of `/_admin`.
 - `/_editor` has individual user accounts and permissions for operators and editors.
 
 Grant editor permissions as narrowly as practically possible. The first account created during `/_install` has full permissions over `/*`; additional editors usually do not need this scope.
 
 HTTPS protects not only login data but also session cookies and all editorially transmitted content. Permanently redirect HTTP requests to HTTPS and only test login via the final public address.
 
-Additional web server protection for `/_admin` and `/_templates`—such as IP allowances or HTTP authentication—can form a useful second barrier under suitable operating conditions. It does not replace the Nino password. If the tools are not needed after development and acceptance, `_templates/` and, together with it, `_admin/` can be removed from production delivery.
+Additional web server protection for `/_admin` and `/_templates`—such as IP allowances or HTTP authentication—can form a useful second barrier under suitable operating conditions. It does not replace the Nino password. If the tools are not needed after development and acceptance, `_templates/` and `_admin/` can be removed from production delivery.
 
 ## `/_install` After Setup
 

@@ -603,14 +603,14 @@ $request = \Nino\request( $appData, $_SERVER );
 \Nino\output( $appData, $request );
 ```
 
-The example shows the entry point of `/_templates`; `/_editor` and `/_install` initialize their own classes accordingly. The areas are not regular modules from `/nino/modules`:
+The example shows the entry point of `/_templates`; the other areas initialize their own classes accordingly. The areas are not regular modules from `/nino/modules`:
 
 - `/_install` creates the first project state and then locks itself;
 - `/_admin` provides full access to technical structure as well as texts and elements;
-- `/_templates` edits the structure of selected `.tpl` files as an Alpha tool;
+- `/_templates` creates and composes `page-*.tpl` files from complete HTML and template sections and quick-fills native content;
 - `/_editor` maintains content and operational data within account permissions.
 
-`/_templates` integrates admin authentication and shares password, lock status, and session with `/_admin`. If `_admin/` is removed from a delivery, the template builder is therefore also no longer available. The planned `/_themes` is not yet an entry point in the current source state.
+`/_templates` integrates admin authentication and shares password, lock status, and session with `/_admin`. If `_admin/` is removed from a delivery, the builder is therefore also unavailable. The planned `/_themes` is not yet an entry point in the current source state.
 
 ---
 
@@ -692,7 +692,7 @@ Nino uses standalone smoke tests without PHPUnit. Each test creates an isolated 
 | `tests/editor-smoke.php` | Editor routes, permissions, backups, logs, and content operations |
 | `tests/admin-smoke.php` | Admin authentication and technical management functions |
 | `tests/install-smoke.php` | Installation steps, generated structure, and self-lock |
-| `tests/templates-smoke.php` | Template builder, round trips, write limits, and validation |
+| `tests/templates-smoke.php` | section composition, template includes, lossless page frames, content quick fill, and save conflicts |
 | `tests/*-js-smoke.js` | browser-like logic of management interfaces and template builder |
 | `tests/concurrency-smoke.php` | parallel and atomic write operations |
 

@@ -1,0 +1,28 @@
+<?php return [
+	'name' => 'Blank Section',
+	'description' => 'Start with the section shell, header and content module you need.',
+	'category' => 'Build',
+	'tags' => [ 'custom', 'flexible', 'section' ],
+	'version' => 1,
+	'shell' => 'section',
+	'defaults' => [
+		'surface' => 'default', 'background' => 'none', 'header' => 'title-subtitle',
+		'align' => 'left', 'content' => 'none', 'contentStyle' => 'auto',
+		'action' => 'none', 'motion' => 'page', 'padding' => 'default',
+		'margin' => 'none', 'border' => 'none', 'layout' => 'auto', 'limit' => 3,
+	],
+	'allow' => [
+		'surface' => [ 'default', 'alt', 'primary', 'dark', 'black' ],
+		'background' => [ 'none', 'image-cover', 'image-static', 'parallax' ],
+		'header' => [ 'none', 'title', 'title-subtitle', 'title-subtitle-description' ],
+		'align' => [ 'left', 'center', 'right' ],
+		'content' => [ 'none', 'text', 'media-split', 'articles', 'articles-image', 'cards', 'lists', 'slider', 'media-slider', 'testimonials', 'profiles', 'stats', 'features', 'feature-list', 'accordion', 'tabs', 'pricing', 'comparison', 'data-table', 'logos', 'badges', 'gallery', 'timeline', 'video', 'video-embed', 'notice', 'contact', 'newsletter' ],
+		'contentStyle' => [ 'auto', 'default', 'alt' ],
+		'action' => [ 'none', 'link', 'button', 'dual-buttons' ],
+		'motion' => [ 'page', 'on', 'off' ],
+		'padding' => [ 'default', 'none', 'compact', 'generous' ],
+		'margin' => [ 'none', 'small', 'medium', 'large' ],
+		'border' => [ 'none', '1', '2', '3' ],
+		'layout' => [ 'auto', '2', '3', '4', 'media-left', 'media-right', 'media-left-full', 'media-right-full', 'narrow', 'wide', 'spotlight', 'slider', 'grid', 'mosaic', 'bento', 'split', 'featured', 'check', 'check-2', 'numbered', 'numbered-2', 'plain', 'striped', 'bordered', 'striped-bordered', 'pill', 'info', 'success', 'error', '4-3' ],
+	],
+];

@@ -404,6 +404,11 @@ $reservedHttpUriRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Install\Webpages::apiApply( $appData, $reservedHttpUriRequest );
 check( 'rejects a Webpage mounted on the installer\'s own runtime uri', $reservedHttpUriRequest['/nino/http/response']['statusCode'] === 409 );
 
+$_POST['data'] = json_encode( [ 'webpages' => [ [ 'uri' => '/designer-shadow', 'httpUri' => '/_templates', 'template' => 'home', 'text' => [] ] ] ] );
+$reservedDesignerRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Install\Webpages::apiApply( $appData, $reservedDesignerRequest );
+check( 'rejects a Webpage mounted on the Template Builder runtime uri', $reservedDesignerRequest['/nino/http/response']['statusCode'] === 409 );
+
 $_POST['data'] = json_encode( [ 'webpages' => [ [ 'uri' => '/custom-page', 'httpUri' => '/custom', 'template' => 'home', 'text' => [] ] ] ] );
 $foreignRouteRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Install\Webpages::apiApply( $appData, $foreignRouteRequest );

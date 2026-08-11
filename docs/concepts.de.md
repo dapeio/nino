@@ -133,7 +133,7 @@ Die geladene `.tpl`-Datei kann neben HTML auch wieder Shortcodes und Textfills e
 
 So können mehrere Template-Dateien zu einer komplexen HTML-Struktur zusammengesetzt werden.
 
-Ausgewählte Seiten- und Abschnittstemplates lassen sich entweder direkt im Dateisystem oder über den optionalen [Template-Builder `/_templates`](_templates.de.md) bearbeiten. Das Alpha-Werkzeug stellt die Struktur als Raster und verschachtelte Blöcke dar, speichert aber weiterhin normales, lesbares `.tpl`-Markup. Es ist kein visueller Ersatz für die Prüfung der fertigen Webseite im Browser.
+Seitentemplates lassen sich über den optionalen [Template Builder `/_templates`](_templates.de.md) aus vollständigen HTML- und `[template]`-Sections zusammensetzen. Er speichert normales, lesbares `.tpl`-Markup und ersetzt nicht die Prüfung der fertigen Webseite im Browser; tiefergehende Strukturarbeit bleibt über HTML+ oder Code möglich.
 
 Nino verarbeitet einen HTML-String bei jedem Rendering-Durchlauf in einer festen Reihenfolge:
 
@@ -162,7 +162,7 @@ Die optionalen Oberflächen besitzen eigene Einstiegspunkte und sind keine Front
 | Oberfläche | Verantwortung |
 |---|---|
 | [`/_admin`](_admin.de.md) | vollständiger technischer Zugriff auf Struktur, Konfiguration, Texte und Elemente |
-| [`/_templates`](_templates.de.md) | strukturelle Bearbeitung von `page-*.tpl` und `section-*.tpl` über den Alpha-Builder |
+| [`/_templates`](_templates.de.md) | sectionbasierte Komposition, wiederverwendbare Template-Includes und native Schnellbefüllung von `page-*.tpl` |
 | [`/_editor`](_editor.de.md) | tägliche Pflege freigegebener Inhalte, Bilder, Nutzer- und Betriebsdaten |
 
 `/_templates` teilt Passwort und Sitzung mit `/_admin`; `/_editor` besitzt dagegen einzelne Konten und granulare Rechte. Damit liegt die Abgrenzung nicht mehr allein zwischen Struktur und Inhalt, sondern vor allem zwischen vollständigem Entwicklungszugriff und eingeschränkter redaktioneller Arbeit.
@@ -175,7 +175,8 @@ Das geplante `/_themes` soll diese Werkzeuge später um eine grafische Bearbeitu
 |---|---|
 | Seitentitel ändern | Textfill in `text/` oder über `/_editor` |
 | neues Teammitglied ergänzen | Element über `/_editor` |
-| HTML-Struktur einer Seite ändern | `.tpl`-Datei in `templates/` oder `/_templates` (Alpha) |
+| Seite aus vollständigen Sections zusammensetzen | `/_templates` (Alpha) |
+| tiefergehende HTML-Struktur ändern | HTML+-Escape-Hatch oder `.tpl`-Datei in `templates/` |
 | neue öffentliche URL anlegen | Route in `config.php` beziehungsweise über `/_admin` |
 | dynamische Liste ausgeben | Element-Abfrage oder Shortcode mit Callback |
 | technische Funktion ergänzen | projektspezifisches Modul |
@@ -188,4 +189,3 @@ Das geplante `/_themes` soll diese Werkzeuge später um eine grafische Bearbeitu
 - [`/_templates`-Bedienung](_templates.de.md) erklärt den strukturellen Template-Builder im Alpha-Status.
 - [`/_editor`-Bedienung](_editor.de.md) begleitet die berechtigungsgesteuerte Inhaltspflege.
 - [Deployment](deployment.de.md) beschreibt den Weg von der lokalen Webseite in den sicheren Betrieb.
-

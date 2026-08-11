@@ -1,163 +1,160 @@
-# `/_templates` — Template-Builder (Alpha)
+# `/_templates` — Template Builder (Alpha)
 
 **Sprache:** [English](_templates.md) · Deutsch
 
-**Stand:** 8. August 2026 · **Nino-Version:** 0.11.0-beta.1
+**Stand:** 11. August 2026 · **Nino-Version:** Unreleased
 
-Dieses Handbuch erklärt die strukturelle Bearbeitung von Seiten- und Abschnittstemplates unter `/_templates`. Falls du stattdessen Texte, Elemente, Seiten oder Konfiguration vollständig verwalten möchtest, lies die [`/_admin`-Bedienungsanleitung](_admin.de.md); die direkte Arbeit mit HTML+, Rendering und Shortcodes behandelt das [Entwickler-Handbuch](development.de.md).
+Der Template Builder ist der schnelle Weg vom `page-*.tpl` zur befüllten Seite. Er behandelt ein Template als geordnete Abfolge vollständiger HTML-Sections und wiederverwendbarer `[template]`-Sections, statt jeden verschachtelten DOM-Knoten zur Bearbeitung anzubieten.
 
-**Weitere Links:**
-[README](../README.de.md) · [Grundkonzepte](concepts.de.md) · [Entwickler-Handbuch](development.de.md) · [Erste Schritte](getting-started.de.md) · [`/_install`-Referenz](_install.de.md) · [`/_admin`-Bedienung](_admin.de.md) · [`/_templates`-Bedienung](_templates.de.md) · [`/_editor`-Bedienung](_editor.de.md) · [Deployment](deployment.de.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
+[README](../README.de.md) · [`/_admin`-Bedienung](_admin.de.md) · [`/_templates`-Bedienung](_templates.de.md) · [`/_editor`-Bedienung](_editor.de.md) · [Entwickler-Handbuch](development.de.md)
 
-> **Status: Alpha.** Der Template-Builder ist nutzbar und durch Smoke-Tests abgesichert, wird sich aber voraussichtlich noch deutlich verändern. Oberfläche, Blockbibliothek und Bedienabläufe sind noch keine stabilen Verträge. Die gespeicherten Dateien bleiben dagegen normales, lesbares `.tpl`-Markup und können jederzeit direkt bearbeitet werden.
+> **Alpha:** Seitendateien bleiben gewöhnliches HTML+ und sind zur Laufzeit nicht vom Werkzeug abhängig. Preset-Library und Composer-Ablauf können sich noch verändern.
 
 ## Aufgabe und Abgrenzung
 
-`/_templates` ist ein grafischer Struktur-Editor für ausgewählte Templates unter `templates/`. Er hilft dabei, Bereiche einzufügen, zu verschachteln, zu sortieren und über Klassen oder Attribute zu konfigurieren.
+Nutze `/_templates`, um:
 
-Der Builder zeigt bewusst nicht die fertige Webseite. Statt Farben, Schriften und realer Inhalte stellt die Arbeitsfläche vor allem dar:
+- vorhandene Dateien `templates/page-*.tpl` zu öffnen;
+- ein neues `page-*.tpl` mit echtem Dateinamen, Anzeigenamen, Header, Footer und VPA-Standard anzulegen;
+- vollständige Sections anhand ihres Aussehens aus einer durchsuchbaren, getaggten visuellen Library einzufügen;
+- eine alleinstehende `[template /templates/<name>]`-Section direkt über **Add section** einzufügen, zu verschieben, zu ersetzen oder zu duplizieren;
+- Header und Footer aus passenden Nicht-Seiten-`.tpl`-Dateien zu wählen oder einen Slot auf **None** zu setzen;
+- eine stabile Section-ID zu vergeben;
+- Oberfläche, Hintergrund, Überschrift, Content-Modul, Aktion, Layout und Viewport-Animation zu konfigurieren;
+- alle sichtbaren Content-Bausteine umzusortieren, zu duplizieren oder zu entfernen, während Header und Footer außerhalb des Canvas fix bleiben;
+- erzeugte Textfills direkt in der nativen Sprache zu befüllen;
+- eine vorhandene Elements-Collection zu wählen oder den empfohlenen Elementtyp des Moduls anzulegen;
+- eine einzelne Section bewusst als HTML+ zu bearbeiten, wenn der Composer nicht ausreicht.
 
-- Rasterbreiten;
-- vertikale Abstände;
-- verschachtelte Container;
-- bekannte Blocktypen;
-- bestehendes, noch unbekanntes Markup.
-
-Die visuelle Endkontrolle erfolgt deshalb immer im Frontend. Theme-Gestaltung und CSS bleiben im aktuellen Stand direkte Projektarbeit. Das geplante `/_themes` soll später ein eigenes grafisches Design-System für Theme-Vorlagen bereitstellen und zunächst ebenfalls als Alpha erscheinen.
+Der Template Builder erzeugt keine Routen, bearbeitet nicht den Inhalt eingebundener Header-/Footer-Dateien, übersetzt nicht alle Sprachen und pflegt keine einzelnen Elements-Einträge. Seine isolierten Vorschauen verwenden das aktuelle Projekt-Stylesheet und definierte Beispieldaten, führen aber das JavaScript der fertigen Seite nicht aus. Dafür bleiben `/_admin`, das Frontend und Code zuständig. Der frühere DOM-orientierte Builder wurde durch diesen sectionbasierten Ablauf ersetzt.
 
 ## Zugang und Sicherheit
 
-Öffne `https://deine-domain.example/_templates`. Der Bereich verwendet dasselbe technische Passwort, denselben Sperrstatus und dieselbe Sitzung wie `/_admin`.
+Öffne `https://deine-domain.example/_templates`. Das Werkzeug teilt Passwort, Sperrstatus und Sitzung mit `/_admin`. Es benötigt `_admin/Admin.php`; ohne `/_admin` fehlt auch sein Authentifizierungs-Backend.
 
-Du kannst den Builder auch über **Template Builder** im Kopfbereich von `/_admin` öffnen. Ohne aktive Admin-Anmeldung erscheint zunächst dessen Login; nach erfolgreicher Anmeldung führt Nino zurück zum Builder.
+Geschrieben werden:
 
-Beachte für den Betrieb:
+- `templates/page-*.tpl` über **Save template**, **New page template** oder **Delete**; gelöschte Templates lassen sich im Builder nicht wiederherstellen;
+- `text/<native-sprache>.php` beim Speichern der nativen Inhalte;
+- `elements/<typ>.php`, wenn die automatische Elementtyp-Erstellung bestätigt ist;
+- die Projektkonfiguration, wenn eine fehlende Bildplatz-Definition automatisch angelegt wird. Der eigentliche Bild-Upload bleibt in `/_admin`.
 
-- verwende `/_templates` ausschließlich über HTTPS;
-- gib den Zugang nur an Entwickler und vertrauenswürdige Designer mit technischem Verständnis weiter;
-- arbeite mit einem aktuellen Git-Stand;
-- prüfe jede Änderung im Frontend und in allen relevanten Viewports;
-- entferne `_templates/` nach der Entwicklung aus der produktiven Auslieferung, wenn der Builder dort nicht benötigt wird.
+Verwende HTTPS, behandle das technische Passwort vertraulich und arbeite mit einem wiederherstellbaren Projektstand. Entferne Entwicklerwerkzeuge aus der Produktivauslieferung, wenn sie dort nicht benötigt werden.
 
-`/_templates` hängt von `/_admin` ab. Wird `_admin/` entfernt, ist auch der Template-Builder nicht mehr funktionsfähig.
+## Hauptablauf
 
-## Oberfläche
+1. Wähle links ein Seitentemplate oder lege es über **New page template** an. Der Dialog fragt den vollständigen Dateinamen, Anzeigenamen, Header, Footer und den VPA-Standard ab.
+2. Öffne **Add section**.
+3. Durchsuche oder filtere unter **Choose** die große Galerie und wähle ein Preset anhand seiner echten Markup-Vorschau. Wiederverwendbare Nicht-Seiten-`.tpl`-Dateien stehen dort als Kategorie **Templates** bereit und werden ohne unnötigen Konfigurationsschritt eingefügt.
+4. Wechsle zu **Configure & fill**, vergib eine sprechende ID wie `main-hero` oder `services-overview` und passe nur relevante Einstellungen an. Seltenere Abstands- und Rahmenoptionen liegen unter **Advanced**.
+5. Befülle im selben Schritt **Native content**. Wähle für ein wiederholbares Modul eine Elements-Collection; existiert sie noch nicht, lasse die automatische Schema-Erstellung aktiv.
+6. Vergleiche die Live-Vorschau und füge die Section ein. Empfohlene Textschlüssel, Elementtypen und Bildplatz-Definitionen können dabei mit angelegt werden.
+7. Öffne bei Bedarf Bildplätze oder einzelne Elements-Einträge direkt in `/_admin`.
+8. Ordne HTML- und Template-Section-Karten und speichere das Seitentemplate.
+9. Prüfe die echte Seite im Browser. Vervollständige Übersetzungen danach über den vorhandenen JSON-Batch-Ablauf oder `/_admin`.
 
-Der Arbeitsbereich besteht aus drei Spalten:
+Die schnelle native Befüllung legt neue Schlüssel in der nativen Projektsprache an und ändert bei sprachabhängigen Schlüsseln nur diese Sprache. Ein bereits globaler Schlüssel bleibt bewusst global. Bestehende Übersetzungs-Buckets werden nie geleert oder überschrieben.
 
-| Bereich | Aufgabe |
+## Seiten- und Section-Einstellungen
+
+**Name**, **Header**, **Footer**, **VPA** und **Delete** liegen in den Template Settings. Die Header-/Footer-Selects zeigen die echten `.tpl`-Dateinamen, listen dem Projekt bekannte Nicht-Seiten-Templates und bieten außerdem **None**. Der ausgewählte Wert wird weiterhin als gewöhnlicher `[template /templates/<name>]`-Shortcode geschrieben; die Controls verhindern nur, dass die Seitenschale mit verschiebbarem Content verwechselt wird. **Delete** entfernt genau die aktuell geladene Revision der Datei nach einer ausdrücklichen Bestätigung; eine Wiederherstellung erfordert Versionsverwaltung oder ein anderes externes Backup.
+
+**VPA** auf Template-Ebene liefert den Standard für Sections mit der Einstellung **Page**. Eine Änderung setzt verwaltete Sections neu zusammen, aktualisiert deren `js-vpa`-Klasse und bleibt auch in einem noch leeren Template erhalten. **On** oder **Off** an einer einzelnen Section überschreibt den Template-Standard.
+
+Der Composer gruppiert Einstellungen nach Zweck:
+
+| Gruppe | Beispiele |
 |---|---|
-| **Templates** | vorhandene Templates auswählen und ihren Schreibstatus erkennen |
-| **Canvas** | Struktur auswählen, verschachteln und umordnen |
-| **Settings / Blocks** | Eigenschaften des gewählten Blocks bearbeiten oder neue Blöcke einfügen |
+| Identität | Section-ID und entstehender Präfix `/page-<seite>/<section>/…` |
+| Hintergrund & Überschrift | Oberfläche, Bild/Parallax, Überschriftenumfang, Ausrichtung |
+| Content-Modul | Text, Media-Split, Artikel, Listen, Slider, Tabs, Testimonials, Team, Statistiken, Features, Pricing, Tabellen, Badges, Formulare, Galerie, Video, Hinweise |
+| Content-Quelle | natives Textfill oder Elements-Collection |
+| Aktion | keiner, Link, Primary-Button oder Primary- plus Outline-Button |
+| Erweitert | Padding, Margin und Border |
 
-Beim Öffnen eines Templates liest der Builder dessen HTML-Struktur ein. Änderungen bleiben zunächst im Browser und werden erst mit **Save** in die Datei geschrieben.
+Kuratierte Presets zeigen nur kompatible Auswahlmöglichkeiten. **Blank Section** stellt den vollständigen Composer bereit, wenn eine Kombination nicht durch ein fokussiertes Preset abgedeckt ist.
 
-> **Wichtig:** Ein Wechsel des Templates oder das Verlassen der Seite kann ungespeicherte Änderungen verwerfen. Der Builder warnt davor, trotzdem ersetzt diese Warnung keinen bewussten Speichervorgang.
+## Quelltext-Sicherheit und HTML+-Escape-Hatch
 
-## Welche Templates bearbeitet werden können
+Beim Laden scannt das Backend oberste `<section>`-Elemente, ohne den umgebenden Quelltext zu serialisieren. Eine alleinstehende `[template /templates/<name>]`-Zeile außerhalb einer Section wird zur eigenen Template-Section-Karte; innerhalb einer Section bleibt der Shortcode Bestandteil dieser Section. Markierte Header-/Footer-Shortcodes werden stattdessen zu festen Settings-Slots. Sonstiger Quelltext wird als gesperrtes Raw-Segment ausgeliefert. Beim Speichern gilt:
 
-Beschreibbar sind ausschließlich:
+- jedes Raw-Segment muss bytegenau unverändert sein;
+- jedes bearbeitbare HTML-Segment muss genau eine vollständige oberste Section enthalten;
+- jedes Template-Segment muss genau einen gültigen alleinstehenden `[template]`-Shortcode enthalten;
+- genau je ein Header- und Footer-Marker muss alle Canvas-Bausteine umschließen; für **None** darf der jeweilige Marker bewusst ohne Shortcode stehen;
+- doppelte nichtleere Section-IDs werden abgelehnt;
+- eine optimistische SHA-256-Revision verhindert das Überschreiben externer Änderungen;
+- die fertige Datei wird atomar ersetzt.
 
-- `templates/page-*.tpl`;
-- `templates/section-*.tpl`.
+Kommentare, verschachtelte Sections sowie sectionähnlicher Text in `script`, `style` oder `textarea` werden nicht zu eigenen Karten.
 
-Andere Templates werden zwar in der Liste angezeigt, bleiben aber schreibgeschützt. Das betrifft insbesondere Dateien, die Header oder Footer trennen, keinen HTML-Baum enthalten oder sich nicht zuverlässig und bytegenau einlesen und wieder ausgeben lassen.
+Die Shell-Slots verwenden inerte Kommentare:
 
-Diese Grenze verhindert, dass der Builder technische Includes oder unbekannte Sonderfälle versehentlich umschreibt. Solche Dateien werden weiterhin direkt im Editor beziehungsweise in der Entwicklungsumgebung bearbeitet.
+```html
+<!-- nino:template-slot header -->
+[template /templates/html-header]
+```
 
-## Ein Template bearbeiten
+Neue Seitentemplates enthalten beide Marker. Aus Kompatibilitätsgründen wird ein exakter führender `html-header` und abschließender `html-footer` zunächst im Speicher erkannt; der erste bewusste Speichervorgang ergänzt die Marker. Andere `[template]`-Shortcodes bleiben gewöhnliche Canvas-Bausteine.
 
-1. Wähle links ein beschreibbares Template.
-2. Klicke im Canvas auf den Block, den du bearbeiten möchtest.
-3. Ändere rechts die angebotenen Einstellungen.
-4. Füge bei Bedarf einen Block aus **Blocks** hinzu.
-5. Ordne, dupliziere oder entferne ausgewählte Blöcke.
-6. Speichere mit **Save**.
-7. Öffne die betroffene Seite im Frontend und prüfe das Ergebnis.
+Am Dateianfang liegen ebenfalls inerte Template-Metadaten, die nicht im Canvas erscheinen:
 
-Die verfügbaren Einstellungen werden aus der Blockdefinition abgeleitet. Je nach Block können sie unter anderem CSS-Klassen, responsive Rasterbreiten, Abstände, Attribute, Tags oder direkt bearbeitbaren Text steuern.
+```html
+<!-- nino:template-name Error 404 -->
+<!-- nino:template-vpa off -->
+```
 
-Beim Einfügen entscheidet die aktuelle Auswahl über die Position:
+Der Name speist Anzeige und Suche in der linken Liste; der zweite Marker persistiert den VPA-Standard. Bestehende Dateien ohne diese Metadaten erhalten einen aus dem Dateinamen abgeleiteten Anzeigenamen und übernehmen, sofern vorhanden, den bisherigen Wert einer verwalteten Section. Beim ersten bewussten Speichern werden beide Marker geschrieben.
 
-- bei einem geeigneten Container wird der neue Block darin eingefügt;
-- bei einem Blatt-Element wird er daneben eingefügt;
-- ohne passende Auswahl landet er am Ende des Dokuments.
+Verwaltete Sections tragen einen Kommentar wie:
 
-Die Aktionen zum Verschieben nach oben oder unten, Duplizieren und Entfernen beziehen sich immer auf den ausgewählten Block.
+```html
+<!-- nino:section {"preset":"hero-centered","version":1,...} -->
+```
 
-## Struktur statt Metadaten
+Diese Metadaten erlauben das erneute Öffnen der Composer-Einstellungen. Sie sind inertes HTML und erzeugen keine Laufzeitabhängigkeit. Die Wahl von **HTML+** entfernt die Metadaten bewusst beim Übernehmen des eigenen Quelltexts. Die Section gilt danach als codebasiert und kann nicht durch eine spätere Composer- oder Seitenstandard-Änderung überschrieben werden.
 
-Der Builder speichert keine zusätzliche Projektdatei und versieht das Template nicht mit proprietären Builder-Attributen. Die Identität und Einstellungen eines Blocks ergeben sich aus seinem HTML-Tag und seinen CSS-Klassen.
+## Section-Library
 
-Dadurch gelten zwei wichtige Eigenschaften:
+System-Presets liegen unter:
 
-1. Vorhandene, von Hand geschriebene Templates bleiben grundsätzlich bearbeitbar.
-2. Ein gespeichertes Template bleibt normales HTML+ und kann anschließend wieder von Hand geändert werden.
+```text
+_templates/library/<preset>/manifest.php
+```
 
-Wird ein Template geöffnet und unverändert gespeichert, muss der Inhalt bytegenau erhalten bleiben. Kann der Builder diesen Round-Trip nicht sicher gewährleisten, bietet er die Datei nur schreibgeschützt an.
+Ein Manifest enthält Name, Beschreibung, Kategorie, Tags, Version, Defaults und erlaubte Einstellungswerte. Nicht angegebene Achsen werden auf ihren Default festgelegt; dadurch bleibt ein kuratiertes Preset fokussiert. Das Preset `blank` erlaubt ausdrücklich den gesamten Composer.
 
-## Unbekanntes Markup
+Eine optionale `section.tpl` neben dem Manifest erzeugt ein codebasiertes Preset. Verfügbare Tokens sind:
 
-Nicht jedes Element muss in der Blockbibliothek bekannt sein. Unbekanntes Markup erscheint als gestrichelter Strukturblock und bleibt beim Speichern erhalten. Bekannte Kindblöcke darin können weiterhin ausgewählt und bearbeitet werden.
+```text
+{{section:id}}
+{{section:classes}}
+{{section:meta}}
+{{content:prefix}}
+{{elements:type}}
+{{text:<suffix>}}
+{{image:<suffix>}}
+```
 
-Prüfe solche Bereiche besonders sorgfältig im Quelltext und Frontend. Der Builder erhält die Struktur, kann für unbekannte Elemente aber keine passenden Einstellungen oder semantischen Hinweise anbieten.
+Der erzeugte Quelltext wird in die Seite kopiert. Wird das Preset später entfernt, bleibt die öffentliche Webseite funktionsfähig; nur die visuelle Composer-Bearbeitung dieser Section steht nicht mehr zur Verfügung.
 
-Verwendet das Projekt CSS-Selektoren, die gezielt auf eine Element-ID wie `#hero` zugreifen, zeigt der Builder einen Hinweis. Da die Oberfläche ihre Darstellung vor allem aus Klassen ableitet, kann sie die vollständige CSS-Kaskade solcher Selektoren nicht zuverlässig nachbilden.
+## Aktuelle Grenzen
 
-## Blockbibliothek
+- Library und Konfiguration rendern erzeugtes Markup mit `/.cache/style.css` und Beispieldaten. Die Vorschauen sind isoliert und führen bewusst kein Projekt-JavaScript aus, senden keine Formulare ab und folgen keinen Links.
+- Visuelle Content-Einheiten sind oberste `<section>`-Elemente und alleinstehende `[template /templates/<name>]`-Zeilen; markierte Header-/Footer-Slots liegen stattdessen in den Template Settings.
+- Der Builder kann `page-*.tpl` anlegen; die Zuordnung von Route zu Template bleibt in `/_admin` oder im Code.
+- Native Quick-Fills sind einfache Texteingaben. Rich Text, Übersetzungen und Batch-Pflege bleiben in den etablierten Content-Werkzeugen.
+- Fehlende Bildplatz-Definitionen lassen sich mit empfohlenen Maßen anlegen; Auswahl und Upload des eigentlichen Bildes bleiben in `/_admin`.
+- Eigene Sections werden nie durch erratene Composer-Einstellungen rückwärts interpretiert.
 
-Die Palette bündelt wiederverwendbare Strukturbausteine und Hilfselemente. Eine Blockdefinition besteht im Kern aus einem Manifest unter `_templates/library/` und kann zusätzlich eigenes Ausgangs-Markup mitbringen.
-
-Die Bibliothek enthält derzeit unter anderem Bausteine für:
-
-- Seiten- und Abschnittsstruktur;
-- Raster und Spalten;
-- Abstände und Ausrichtung;
-- Typografie und Medien;
-- Navigation und interaktive Komponenten;
-- Hilfselemente für vorhandene Klassenmodelle.
-
-Da der Builder Alpha ist, sind Umfang, Benennung und Gruppierung dieser Palette noch veränderlich. Maßgeblich bleibt das gespeicherte Template, nicht die Anzahl aktuell mitgelieferter Blöcke.
-
-## Speichern und Schutzregeln
-
-Vor dem Schreiben prüft Nino den resultierenden Template-Baum. Ein Speichervorgang wird unter anderem abgelehnt, wenn:
-
-- die Datei nicht dem Muster `page-*.tpl` oder `section-*.tpl` entspricht;
-- der resultierende Baum leer ist;
-- ein HTML-Tag außerhalb der erlaubten Liste vorkommt;
-- ein Event-Handler-Attribut wie `onclick` oder ein anderes `on*`-Attribut enthalten ist.
-
-Insbesondere `<script>` gehört nicht in einen über den Builder gespeicherten Strukturblock. JavaScript wird als Projekt-Asset entwickelt und eingebunden.
-
-Das Schreiben erfolgt atomar: Erst wenn die neue Datei vollständig bereitsteht, ersetzt sie den vorherigen Stand. Der Builder legt dabei keine eigene Sicherungskopie an. Templates gehören deshalb in Git; zusätzlich enthalten die von Nino erzeugten Projektbackups die Template-Dateien.
-
-## Grenzen des aktuellen Alpha-Stands
-
-Der Template-Builder konzentriert sich auf das sichere Bearbeiten vorhandener Seiten- und Abschnittsstrukturen. Noch nicht Teil des stabilen Ablaufs sind insbesondere:
-
-- das Anlegen eines vollständig neuen Templates über die Oberfläche;
-- das Extrahieren einer Auswahl in ein neues `section-*.tpl`;
-- eine pixelgenaue Vorschau des finalen Themes;
-- ein stabil zugesagter Umfang der Blockbibliothek.
-
-Für neue oder technisch besondere Templates bleibt die direkte Arbeit an `.tpl`-Dateien daher ein normaler Bestandteil der Entwicklung.
-
-## Wenn etwas nicht funktioniert
+## Fehlersuche
 
 | Problem | Prüfung |
 |---|---|
-| Login wird erneut angezeigt | Mit dem Passwort von `/_admin` anmelden; Sperrstatus und Session-Cookies prüfen. |
-| Template ist schreibgeschützt | Dateiname, HTML-Round-Trip und unterstützten Dateityp prüfen. |
-| Einstellung fehlt | Block ist möglicherweise unbekannt oder die Bibliotheksdefinition bietet diese Option noch nicht an. |
-| Darstellung im Canvas weicht vom Frontend ab | Der Canvas zeigt Struktur, keine vollständige Theme-Vorschau; CSS, Inhalte und `#id`-Selektoren im Browser prüfen. |
-| Speichern wird abgelehnt | Leeren Baum, unerlaubte Tags, `on*`-Attribute und Schreibrechte von `templates/` prüfen. |
-| Änderung ist nach dem Wechsel verschwunden | Ungespeicherte Änderungen wurden nur im Browser gehalten; erneut durchführen und vor dem Wechsel speichern. |
-
-## Wie es weitergeht
-
-- [`/_admin`-Bedienung](_admin.de.md) erklärt Elemente, Texte, Seiten und technische Konfiguration.
-- [Entwickler-Handbuch](development.de.md) beschreibt HTML+, Rendering, Assets und Tests.
-- [Grundkonzepte](concepts.de.md) ordnet Templates in Datenfluss und Architektur ein.
-- [Deployment](deployment.de.md) behandelt Zugriffsschutz, Schreibrechte und die Entfernung optionaler Werkzeuge.
+| Seite ist schreibgeschützt | Nach einem nicht geschlossenen oder überzähligen `<section>`-Tag suchen. |
+| Speichern meldet externe Änderung | Seite neu laden und Änderung bewusst zusammenführen; das Werkzeug überschreibt sie nicht. |
+| Doppelte Section-ID | Jeder Section eine eindeutige sprechende ID geben. |
+| Header oder Footer fehlt | Das gewünschte Include unter **Template Settings → Header/Footer** wählen. `html-header`, `html-footer` und **None** sind immer verfügbar. |
+| Elements-Collection fehlt | Bei verwalteten Sections rechts anlegen, bei eigenem Code in `/_admin`. |
+| Section öffnet nur als HTML+ | Metadaten fehlen, sind ungültig oder verweisen auf ein nicht mehr installiertes Preset. |
+| Echte Seite weicht von Live-Vorschau ab | Die Vorschau verwendet aktuelles CSS, aber inerte Beispieldaten und kein Projekt-JavaScript; das echte Frontend bleibt maßgeblich. |

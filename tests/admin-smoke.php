@@ -885,6 +885,11 @@ check( 'rejects an unsafe Http-URI with 400', $status === 400 );
 ] );
 check( 'rejects a page mounted on a runtime-owned tool uri', $status === 409 );
 
+[ $status ] = callDev( $appData, \Nino\Admin\PageEditor::class, 'apiSave', [
+	'originalHttpUri' => '', 'uri' => '/designer-shadow', 'httpUri' => '/_templates', 'template' => 'page-about', 'text' => [],
+] );
+check( 'rejects a page mounted on the Template Builder runtime uri', $status === 409 );
+
 \Nino\Filesystem::mutate( $appData, '/config.php', function( array $config ): array {
 	$config['/nino/http/routes']['GET://owned'] = [ 'uri' => '/owned', 'body' => 'hand-written route' ];
 	return $config;

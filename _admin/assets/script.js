@@ -186,6 +186,13 @@
 				if( a !== null )
 					a.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.selectTab( uri ) } );
 			} );
+
+			// Standalone tools can deep-link back to the exact Admin module they
+			// depend on (eg. /_admin/?tab=elements&type=services). Unknown tabs
+			// keep the dashboard default instead of producing an empty shell.
+			const tab = new URLSearchParams( wn.location.search || '' ).get('tab');
+			if( tab !== null && Nino.admin.TABS[tab] !== undefined )
+				Nino.admin.selectTab( tab );
 		},
 	};
 

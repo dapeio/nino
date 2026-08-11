@@ -56,9 +56,9 @@ Das erste Editor-Konto besitzt vollständige Rechte. Weitere Konten werden spät
 | `/` | Die eingerichtete Webseite wird mit dem gewählten Theme ausgeliefert. |
 | `/_editor` | Das erste Nutzerkonto kann Inhalte pflegen. |
 | `/_admin` | Das getrennte technische Passwort öffnet die vollständige Projektverwaltung. |
-| `/_templates` | Dasselbe technische Passwort öffnet den optionalen Template-Builder (Alpha). |
+| `/_templates` | Dasselbe technische Passwort öffnet den sectionbasierten Template Builder (Alpha). |
 
-Prüfe außerdem jede Sprache und Route, die Navigation sowie verwendete Formulare. Speichere testweise einen Text und ein Bild in `/_editor`. Falls du `/_templates` einsetzen möchtest, öffne zusätzlich ein `page-*.tpl`, ändere zunächst nichts und prüfe, ob der Builder die Struktur ohne Warnung einlesen kann.
+Prüfe außerdem jede Sprache und Route, die Navigation sowie verwendete Formulare. Speichere testweise einen Text und ein Bild in `/_editor`. Falls du `/_templates` einsetzen möchtest, öffne zusätzlich ein `page-*.tpl`, ändere zunächst nichts und prüfe, ob seine obersten Sections ohne Warnung erkannt werden.
 
 Der letzte Installationsschritt ersetzt den mitgelieferten `_admin`-Passworthash und sperrt `/_install`. Entferne anschließend `_install/` aus der produktiven Auslieferung; die korrekte Reihenfolge und weitere Sicherheitsprüfungen stehen im [Deployment-Handbuch](deployment.de.md#_install-nach-der-einrichtung).
 
@@ -68,6 +68,6 @@ Der letzte Installationsschritt ersetzt den mitgelieferten `_admin`-Passworthash
 - [Entwickler-Handbuch](development.de.md) vertieft Kernel, APIs, Callbacks und eigene Module.
 - [`/_install`-Referenz](_install.de.md) dokumentiert alle Optionen und Schreibvorgänge.
 - [`/_admin`-Bedienung](_admin.de.md) führt durch die vollständige Projektverwaltung.
-- [`/_templates`-Bedienung](_templates.de.md) erklärt den optionalen Template-Builder im Alpha-Status.
+- [`/_templates`-Bedienung](_templates.de.md) erklärt den sectionbasierten Template Builder im Alpha-Status.
 - [`/_editor`-Bedienung](_editor.de.md) erklärt die anschließende, berechtigungsgesteuerte Inhaltspflege.
 - [Deployment](deployment.de.md) führt durch Webserver-Konfiguration, Sicherheit, Backups und Go-live.

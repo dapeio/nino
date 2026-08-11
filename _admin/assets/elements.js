@@ -55,6 +55,7 @@
 		_listRequest		: 0,
 		_formRequest		: 0,
 		_ready					: false,
+		_deepLinkHandled	: false,
 		DEFAULT_MAXLENGTH : 2000,
 
 		/**
@@ -84,7 +85,30 @@
 				Nino.admin.elements._renderTypes( response.types );
 				Nino.admin.elements._showTypes();
 				Nino.admin.elements._ready = true;
+				Nino.admin.elements._followDeepLink( response.types );
 			} );
+		},
+
+		/**
+		 *	Open a requested collection after the normal type list has loaded.
+		 *	Used by Template Builder resource links; malformed/unknown values simply
+		 *	leave the regular type picker visible.
+		 *
+		 *	@param		{Array}		types
+		 *
+		 *	@return		void
+		 */
+		_followDeepLink : function( types ) {
+
+			if( Nino.admin.elements._deepLinkHandled === true )
+				return;
+
+			Nino.admin.elements._deepLinkHandled = true;
+			const requested = new URLSearchParams( wn.location.search || '' ).get('type');
+			const entry = types.find( function( type ) { return type.type === requested } );
+
+			if( entry !== undefined )
+				Nino.admin.elements._selectType( entry.type, entry.model, entry.title );
 		},
 
 		/**

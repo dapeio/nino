@@ -583,14 +583,14 @@ $request = \Nino\request( $appData, $_SERVER );
 \Nino\output( $appData, $request );
 ```
 
-Das Beispiel zeigt den Einstiegspunkt von `/_templates`; `/_editor` und `/_install` initialisieren entsprechend ihre eigenen Klassen. Die Bereiche sind keine regulären Module aus `/nino/modules`:
+Das Beispiel zeigt den Einstiegspunkt von `/_templates`; die übrigen Bereiche initialisieren entsprechend ihre eigenen Klassen. Die Bereiche sind keine regulären Module aus `/nino/modules`:
 
 - `/_install` erzeugt den ersten Projektstand und sperrt sich anschließend;
 - `/_admin` bietet vollständigen Zugriff auf technische Struktur sowie Texte und Elemente;
-- `/_templates` bearbeitet als Alpha-Werkzeug die Struktur ausgewählter `.tpl`-Dateien;
+- `/_templates` legt `page-*.tpl` an, setzt sie aus vollständigen HTML- und Template-Sections zusammen und befüllt native Inhalte schnell;
 - `/_editor` pflegt Inhalte und Betriebsdaten innerhalb der Kontoberechtigungen.
 
-`/_templates` bindet die Admin-Authentifizierung ein und teilt Passwort, Sperrstatus und Sitzung mit `/_admin`. Wird `_admin/` aus einer Auslieferung entfernt, steht deshalb auch der Template-Builder nicht mehr zur Verfügung. Das geplante `/_themes` ist noch kein Einstiegspunkt im aktuellen Quellstand.
+`/_templates` bindet die Admin-Authentifizierung ein und teilt Passwort, Sperrstatus und Sitzung mit `/_admin`. Wird `_admin/` aus einer Auslieferung entfernt, steht deshalb auch der Builder nicht mehr zur Verfügung. Das geplante `/_themes` ist noch kein Einstiegspunkt im aktuellen Quellstand.
 
 ## Fehlerbehandlung und Protokolle
 
@@ -666,7 +666,7 @@ Nino verwendet eigenständige Smoke-Tests ohne PHPUnit. Jeder Test erstellt ein 
 | `tests/editor-smoke.php` | Editor-Routen, Rechte, Backups, Protokolle und Inhaltsoperationen |
 | `tests/admin-smoke.php` | Admin-Authentifizierung und technische Verwaltungsfunktionen |
 | `tests/install-smoke.php` | Installationsschritte, erzeugte Struktur und Selbstsperre |
-| `tests/templates-smoke.php` | Template-Builder, Round-Trips, Schreibgrenzen und Validierung |
+| `tests/templates-smoke.php` | Section-Komposition, Template-Includes, verlustfreie Seitenrahmen, native Schnellbefüllung und Speicherkonflikte |
 | `tests/*-js-smoke.js` | browsernahe Logik der Verwaltungsoberflächen und des Template-Builders |
 | `tests/concurrency-smoke.php` | parallele und atomare Schreibvorgänge |
 

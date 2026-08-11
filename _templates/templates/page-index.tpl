@@ -13,53 +13,198 @@
 	</head>
 	<body>
 		[csrf]
-		<div id="tb-page-wrap">
-			<div id="tb-bar-wrap">
-				<div id="tb-bar-title">Template Builder</div>
-				<span id="tb-bar-document"></span>
-				<span id="tb-bar-state"></span>
-				<button type="button" id="tb-save" disabled>Save</button>
-				<a href="[[/nino/dir]]/_admin/" id="tb-bar-admin">← Admin</a>
-			</div>
-
-			<div id="tb-body">
-
-				<!-- Left rail: the project's own /templates/*.tpl files -->
-				<div id="tb-documents">
-					<h3>Templates</h3>
-					<div id="tb-documents-list"></div>
+		<div id="pd-app" data-dir="[[/nino/dir]]">
+			<header id="pd-topbar">
+				<div class="pd-head-rail">
+					<a class="pd-brand" href="[[/nino/dir]]/_templates/" aria-label="Templates home">
+						<span class="pd-brand-mark" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg></span>
+						<span class="pd-brand-copy"><strong>Nino</strong><small>Templates</small></span>
+					</a>
+					<a href="[[/nino/dir]]/_admin/" class="pd-back-admin"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/><path d="M21 12H9"/></svg><span>Back to Admin</span></a>
 				</div>
-
-				<!-- Middle: the parsed block tree. Grid widths and spacing are
-				     drawn to scale, everything else is a labelled box - see
-				     docs/_templates.md -->
-				<div id="tb-canvas">
-					<p class="admin-hint" id="tb-canvas-hint">Pick a template on the left.</p>
-					<div id="tb-canvas-notice"></div>
-					<div id="tb-canvas-tree"></div>
+				<div id="pd-document-meta" aria-live="polite">
+					<strong id="pd-document-title">No template selected</strong>
+					<span id="pd-document-detail">Choose or create a page template to begin.</span>
 				</div>
+				<div id="pd-top-actions">
+					<span id="pd-save-state" role="status"></span>
+					<button type="button" id="pd-save" class="pd-primary" disabled>Save template</button>
+				</div>
+			</header>
 
-				<!-- Right rail: the selected block's settings on top, the block
-				     palette below. Both scroll inside the rail rather than with
-				     the page, so the canvas stays the thing that moves -->
-				<div id="tb-rail">
-					<div id="tb-inspector-wrap">
-						<h3>Settings</h3>
-						<div id="tb-inspector"></div>
+			<div id="pd-shell">
+				<aside id="pd-pages" aria-label="Page templates">
+					<div class="pd-panel-heading">
+						<div><span class="pd-eyebrow">Project</span><h2>Templates</h2></div>
+						<div class="pd-heading-actions">
+							<button type="button" class="pd-icon-button" id="pd-new-template" title="Create a page template" aria-label="Create a page template">＋</button>
+							<button type="button" class="pd-icon-button" id="pd-reload-pages" title="Reload templates" aria-label="Reload templates">↻</button>
+						</div>
 					</div>
-					<div id="tb-palette">
-						<h3>Blocks</h3>
-						<div id="tb-palette-list"></div>
+					<label class="pd-search" for="pd-page-search">
+						<span aria-hidden="true">⌕</span>
+						<input id="pd-page-search" type="search" placeholder="Find a page…" autocomplete="off">
+					</label>
+					<nav id="pd-page-list" aria-label="Available page templates"></nav>
+					<div class="pd-sidebar-note">
+						<strong>Focused by design</strong>
+						<span>Only <code>page-*.tpl</code> files are shown. Content sections stay movable; the page header and footer live safely in Template Settings.</span>
 					</div>
-				</div>
+				</aside>
 
+				<main id="pd-workspace">
+					<div id="pd-page-toolbar" class="pd-hidden">
+						<div class="pd-template-settings">
+							<span class="pd-eyebrow">Template settings</span>
+							<div class="pd-template-settings-row">
+								<label class="pd-slot-setting pd-name-setting" for="pd-template-name"><span>Name</span><input id="pd-template-name" type="text" maxlength="160" aria-label="Template name"></label>
+								<label class="pd-slot-setting" for="pd-header-template"><span>Header</span><select id="pd-header-template" aria-label="Header template"></select></label>
+								<label class="pd-slot-setting" for="pd-footer-template"><span>Footer</span><select id="pd-footer-template" aria-label="Footer template"></select></label>
+								<div class="pd-inline-setting">
+									<strong>VPA</strong>
+									<div class="pd-segmented" id="pd-page-motion" aria-label="Default viewport motion">
+										<button type="button" data-value="off">Off</button>
+										<button type="button" data-value="on">On</button>
+									</div>
+								</div>
+								<button type="button" id="pd-delete-template" class="pd-danger-button">Delete</button>
+							</div>
+						</div>
+						<div class="pd-toolbar-actions">
+							<button type="button" id="pd-add-section" class="pd-primary"><span aria-hidden="true">＋</span> Add section</button>
+						</div>
+					</div>
+					<div id="pd-notice" aria-live="polite"></div>
+					<div id="pd-empty" class="pd-empty-state">
+						<div class="pd-empty-illustration" aria-hidden="true"><span></span><span></span><span></span></div>
+						<h1>Build page templates from complete sections</h1>
+						<p>Select or create a template on the left. Then combine curated HTML sections with reusable template sections and fill native content without leaving the flow.</p>
+					</div>
+					<div id="pd-canvas" class="pd-hidden" aria-label="Page sections"></div>
+				</main>
+
+				<aside id="pd-inspector" aria-label="Selected section">
+					<div id="pd-inspector-empty" class="pd-inspector-empty">
+						<span class="pd-inspector-icon" aria-hidden="true">§</span>
+						<h2>Section details</h2>
+						<p>Select a section to edit its structure and native content.</p>
+					</div>
+					<div id="pd-inspector-content" class="pd-hidden"></div>
+				</aside>
 			</div>
 		</div>
+
+		<dialog id="pd-composer" class="pd-dialog pd-composer-dialog">
+			<form method="dialog" class="pd-dialog-shell" id="pd-composer-form">
+				<header class="pd-dialog-header">
+					<div class="pd-composer-heading"><div><span class="pd-eyebrow">Section composer</span><h2 id="pd-composer-title">Add section</h2></div><ol class="pd-stepper" aria-label="Composer progress"><li id="pd-step-library" class="is-active"><span>1</span>Choose</li><li id="pd-step-config"><span>2</span>Configure &amp; fill</li></ol></div>
+					<button type="button" class="pd-icon-button pd-dialog-close" aria-label="Close">×</button>
+				</header>
+				<div class="pd-composer-body">
+					<section id="pd-composer-library-step" class="pd-composer-step pd-library-step" aria-label="Choose a section">
+						<div class="pd-library-toolbar">
+							<div><span class="pd-eyebrow">Section library</span><h3>What should this part of the page look like?</h3><p>Choose a visual section or insert a reusable <code>[template]</code> include.</p></div>
+							<label class="pd-search" for="pd-library-search"><span aria-hidden="true">⌕</span><input id="pd-library-search" type="search" placeholder="Search hero, FAQ, image left, template…" autocomplete="off"></label>
+						</div>
+						<div id="pd-library-categories" class="pd-chip-row"></div>
+						<div id="pd-library-list" aria-live="polite"></div>
+					</section>
+					<section id="pd-composer-config-step" class="pd-composer-step pd-config-step pd-hidden" aria-label="Configure and fill the section">
+						<div class="pd-config-pane"><div id="pd-selected-preset"></div><div id="pd-composer-settings"></div></div>
+						<aside class="pd-preview-pane" aria-label="Live section preview">
+							<div class="pd-preview-sticky">
+								<div class="pd-preview-heading"><span><span class="pd-eyebrow">Current project design</span><strong>Live preview</strong></span><small id="pd-preview-status" role="status">Ready</small></div>
+								<div id="pd-composer-preview" class="pd-real-preview is-detail"><iframe title="Section preview" sandbox="allow-same-origin" tabindex="-1"></iframe></div>
+								<div id="pd-composer-summary"></div>
+							</div>
+						</aside>
+					</section>
+				</div>
+				<footer class="pd-dialog-footer">
+					<span id="pd-composer-error" class="pd-dialog-message" role="alert"></span>
+					<button type="button" class="pd-dialog-close">Cancel</button>
+					<button type="button" id="pd-compose-back" class="pd-hidden">Back to library</button>
+					<button type="button" id="pd-compose-next" class="pd-primary">Configure section</button>
+					<button type="submit" id="pd-compose-submit" class="pd-primary pd-hidden">Insert section</button>
+				</footer>
+			</form>
+		</dialog>
+
+		<dialog id="pd-create-dialog" class="pd-dialog pd-small-dialog">
+			<form method="dialog" class="pd-dialog-shell" id="pd-create-form">
+				<header class="pd-dialog-header">
+					<div><span class="pd-eyebrow">Template Builder</span><h2>New page template</h2></div>
+					<button type="button" class="pd-icon-button pd-create-close" aria-label="Close">×</button>
+				</header>
+				<div class="pd-simple-dialog-body pd-create-body">
+					<div class="pd-create-grid">
+						<label class="pd-form-field is-wide" for="pd-create-filename">
+							<span>Filename</span>
+							<input id="pd-create-filename" name="filename" type="text" required pattern="page-[A-Za-z0-9][A-Za-z0-9._-]*\.tpl" autocomplete="off" placeholder="page-services.tpl">
+							<small>The real file in <code>templates/</code>, including <code>page-</code> and <code>.tpl</code>.</small>
+						</label>
+						<label class="pd-form-field is-wide" for="pd-create-name">
+							<span>Name</span>
+							<input id="pd-create-name" name="displayName" type="text" required maxlength="160" autocomplete="off" placeholder="Services">
+							<small>Shown in the Template Builder and stored as <code>&lt;!-- nino:template-name … --&gt;</code>.</small>
+						</label>
+						<label class="pd-form-field" for="pd-create-header"><span>Header</span><select id="pd-create-header" name="header"></select></label>
+						<label class="pd-form-field" for="pd-create-footer"><span>Footer</span><select id="pd-create-footer" name="footer"></select></label>
+						<label class="pd-form-field is-wide" for="pd-create-vpa">
+							<span>Default VPA</span>
+							<select id="pd-create-vpa" name="pageMotion"><option value="off">Off</option><option value="on">On</option></select>
+							<small>Automatically adds <code>js-vpa</code> to compatible sections created for this template.</small>
+						</label>
+					</div>
+				</div>
+				<footer class="pd-dialog-footer">
+					<span id="pd-create-error" class="pd-dialog-message" role="alert"></span>
+					<button type="button" class="pd-create-close">Cancel</button>
+					<button type="submit" class="pd-primary">Create template</button>
+				</footer>
+			</form>
+		</dialog>
+
+		<dialog id="pd-include-dialog" class="pd-dialog pd-include-dialog">
+			<div class="pd-dialog-shell">
+				<header class="pd-dialog-header">
+					<div><span class="pd-eyebrow">[template] shortcode</span><h2 id="pd-include-title">Insert template section</h2></div>
+					<button type="button" class="pd-icon-button pd-include-close" aria-label="Close">×</button>
+				</header>
+				<div class="pd-include-body">
+					<p>Insert a reusable non-page template as a first-class canvas item. The page header and footer are managed separately in Template Settings.</p>
+					<label class="pd-search" for="pd-include-search"><span aria-hidden="true">⌕</span><input id="pd-include-search" type="search" placeholder="Find a template section…" autocomplete="off"></label>
+					<div id="pd-include-list"></div>
+				</div>
+				<footer class="pd-dialog-footer">
+					<button type="button" class="pd-include-close">Cancel</button>
+				</footer>
+			</div>
+		</dialog>
+
+		<dialog id="pd-code-dialog" class="pd-dialog pd-code-dialog">
+			<form method="dialog" class="pd-dialog-shell" id="pd-code-form">
+				<header class="pd-dialog-header">
+					<div><span class="pd-eyebrow">HTML+ escape hatch</span><h2 id="pd-code-title">Edit section source</h2></div>
+					<button type="button" class="pd-icon-button pd-code-close" aria-label="Close">×</button>
+				</header>
+				<div class="pd-code-body">
+					<p id="pd-code-note">Exactly one complete <code>&lt;section&gt;</code> is accepted. Other page source remains locked.</p>
+					<label for="pd-code-source">Section source</label>
+					<textarea id="pd-code-source" spellcheck="false"></textarea>
+				</div>
+				<footer class="pd-dialog-footer">
+					<span id="pd-code-error" class="pd-dialog-message" role="alert"></span>
+					<button type="button" class="pd-code-close">Cancel</button>
+					<button type="submit" class="pd-primary">Use section</button>
+				</footer>
+			</form>
+		</dialog>
+
+		<div id="pd-toast" role="status" aria-live="polite"></div>
 		<script src="[[/nino/dir]]/_nino/Nino.js"></script>
 		<script src="[[/nino/dir]]/_templates/assets/script.js"></script>
-		<script src="[[/nino/dir]]/_templates/assets/tree.js"></script>
-		<script src="[[/nino/dir]]/_templates/assets/blocks.js"></script>
-		<script src="[[/nino/dir]]/_templates/assets/canvas.js"></script>
-		<script src="[[/nino/dir]]/_templates/assets/inspector.js"></script>
+		<script src="[[/nino/dir]]/_templates/assets/sections.js"></script>
+		<script src="[[/nino/dir]]/_templates/assets/composer.js"></script>
 	</body>
 </html>

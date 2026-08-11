@@ -63,19 +63,17 @@ Der Entwickler legt fest, welche Inhalte sichtbar sind und welche Bereiche ein A
 
 ### `/_templates` – optional, Alpha
 
-![Strukturelle Bearbeitung eines Seitentemplates im Template-Builder](docs/assets/screenshots/templates.webp)
+`/_templates` macht aus `page-*.tpl`-Dateien eine übersichtliche Abfolge vollständiger HTML- und `[template]`-Sections. Entwickler können ein Template anlegen, aus 43 kuratierten Section-Presets wählen, sinnvolle IDs vergeben, Content und Layout konfigurieren und Textfills unmittelbar in der nativen Sprache befüllen oder mit einer Elements-Collection verbinden.
 
-`/_templates` ist ein grafischer Struktur-Editor für `page-*.tpl` und `section-*.tpl`. Der Template-Builder zeigt Raster, Abstände und verschachtelte Blöcke, erzeugt seine Einstellungen aus HTML-Tags und CSS-Klassen und speichert weiterhin lesbares HTML+ in den normalen Template-Dateien.
+Der Template Builder bewahrt normales HTML+. Alleinstehende Template-Shortcodes lassen sich direkt über **Add section** wählen und bleiben verschiebbare Canvas-Bausteine; Header und Footer sind gewöhnliche `[template]`-Shortcodes, werden aber sicher über feste Template Settings verwaltet. Anzeigename und VPA-Standard stehen als inerte Metadaten am Dateianfang. Sonstiger Quelltext bleibt gesperrt und bytegenau erhalten. Für codebasierte Sections gibt es einen bewussten HTML+-Escape-Hatch. Der frühere DOM-orientierte Builder wurde entfernt.
 
-Er ist bewusst **keine visuelle Vorschau der fertigen Webseite**.
-
-> **Status: Alpha.** Das Datenformat bleibt einfaches `.tpl`-Markup, Oberfläche, Blockbibliothek und Bedienabläufe können sich jedoch noch deutlich verändern.
+> **Status: Alpha.** Preset-Manifeste und erzeugtes `.tpl`-Markup bleiben lesbar und erweiterbar; Library und Arbeitsablauf können sich noch weiterentwickeln.
 
 ## Was Nino mitbringt
 
 * mehrsprachiges Routing sowie mehrsprachige Texte und Inhalte
 * eigenes Template-System mit Shortcodes und klarer Trennung von HTML und PHP
-* optionaler Template-Builder für `.tpl`-Dateien (Alpha)
+* optionaler sectionbasierter Template Builder für `.tpl`-Dateien (Alpha)
 * dateibasiertes Content-Modell für Textfills und wiederkehrende Elemente
 * Themes, Asset-Bundling und Frontend-Basiskomponenten
 * Formulare, Newsletter, Navigation, Sprachauswahl und Bildverarbeitung
@@ -131,7 +129,7 @@ _nino/           Kernel und Frontend-Core
 _editor/         Inhaltseditor, Nutzer, Backups, Aktivitätslog
 _admin/          Entwickler-Werkzeuge und Wiederherstellung
 _install/        Einrichtungsassistent
-_templates/      Template-Builder
+_templates/      Sectionbasierter Template Builder
 
 elements/        Element-Typen
 templates/       Seiten- und Sektions-Templates
@@ -166,7 +164,7 @@ Nino hält seine Architektur bewusst klein: Ein zentrales `$appData`-Array träg
 * **[Erste Schritte](docs/getting-started.de.md):** vom Checkout zur eingerichteten Webseite
 * **[`/_install`-Referenz](docs/_install.de.md):** Schritte, Schreibregeln und Library-Format
 * **[`/_admin`-Bedienung](docs/_admin.de.md):** Projektstruktur, Inhalte, Konten, Konfiguration und Wiederherstellung
-* **[`/_templates`-Bedienung](docs/_templates.de.md):** strukturelle Template-Bearbeitung mit dem Alpha-Builder
+* **[`/_templates`-Bedienung](docs/_templates.de.md):** Seitentemplates aus vollständigen HTML- und Template-Sections zusammensetzen
 * **[`/_editor`-Bedienung](docs/_editor.de.md):** Texte, Elemente, Bilder, Anfragen und Newsletter
 * **[Deployment](docs/deployment.de.md):** Webserver, Sicherheit, Backups und Go-live
 * **[Design-Handbuch](docs/design.de.md):** Frontend, Design-System, CSS und Template-Arbeit **(WIP)**

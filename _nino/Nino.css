@@ -50,11 +50,15 @@
 	--color-section-dark-text: #ffffff;
 	--color-section-black-bg: #0a0e1a;
 	--color-section-black-text: #ffffff;
+	--color-code-bg: var(--color-section-black-bg);
+	--color-code-text: var(--color-section-black-text);
+	--color-code-border: rgb(255 255 255 / 12%);
 	--color-error: #f44336;
 	--color-success: #4caf50;
 
 	--fontfamily-text: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
 	--fontfamily-title: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+	--fontfamily-code: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 	--base-size: 16px;
 	--line-height: 1.5;
 	--fontsize-small: .75em;
@@ -713,6 +717,7 @@ body.js-scroll-down .js-scroll-header {
  *			.ui-badge(--pill, --primary, --success, --error)
  *			.ui-breadcrumbs
  *			.ui-video(--4-3)
+ *			.ui-code
  *			.ui-alert(--success, --error, --info)
  *			.js-stat-counter, .js-back-to-top
  *			.ui-pricing-row, .ui-pricing-item(--featured), .ui-pricing-title, .ui-pricing-price
@@ -1035,6 +1040,14 @@ body.js-scroll-down .js-scroll-header {
 .ui-badge--primary { background-color: var(--color-primary); color: var(--color-primary-text); }
 .ui-badge--success { background-color: var(--color-success); color: var(--color-primary-text); }
 .ui-badge--error { background-color: var(--color-error); color: var(--color-primary-text); }
+.ui-badge-cloud {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: center;
+	gap: var(--space-1);
+}
+.ui-badge-cloud--left { justify-content: flex-start; }
+.ui-badge-cloud--right { justify-content: flex-end; }
 
 /* Breadcrumbs */
 .ui-breadcrumbs {
@@ -1107,6 +1120,18 @@ body.js-scroll-down .js-scroll-header {
 	font-size: var(--fontsize-small);
 	font-weight: bold;
 }
+.ui-list--content {
+	width: min(100%, 64rem);
+	margin-inline: auto;
+}
+@media (min-width: 768px) {
+	.ui-list--columns {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		column-gap: var(--space-4);
+		row-gap: var(--space-2);
+	}
+}
 
 /* Video embed wrapper - responsive iframe/video, default 16:9 */
 .ui-video {
@@ -1126,6 +1151,40 @@ body.js-scroll-down .js-scroll-header {
 	border: 0;
 }
 
+/* Code block - preserves authored whitespace and scrolls horizontally rather
+   than forcing long lines to widen the page. Add tabindex="0" to a <pre>
+   when keyboard users should be able to focus and scroll the block. */
+.ui-code {
+	display: block;
+	width: 100%;
+	max-width: 100%;
+	padding: var(--space-2);
+	overflow: auto;
+	border: 1px solid var(--color-code-border);
+	border-radius: var(--radius);
+	background-color: var(--color-code-bg);
+	color: var(--color-code-text);
+	font-family: var(--fontfamily-code);
+	font-size: .875rem;
+	line-height: 1.65;
+	tab-size: 2;
+	text-align: left;
+	white-space: pre;
+	-webkit-overflow-scrolling: touch;
+}
+.ui-code code {
+	display: block;
+	min-width: max-content;
+	color: inherit;
+	background: none;
+	font: inherit;
+	white-space: inherit;
+}
+.ui-code:focus-visible {
+	outline: 2px solid var(--color-primary);
+	outline-offset: 2px;
+}
+
 /* Alert / inline feedback (static - form-specific feedback is .ui-form-message) */
 .ui-alert {
 	padding: var(--space-2);
@@ -1137,6 +1196,10 @@ body.js-scroll-down .js-scroll-header {
 .ui-alert--success { border-color: var(--color-success); color: var(--color-success); }
 .ui-alert--error { border-color: var(--color-error); color: var(--color-error); }
 .ui-alert--info { border-color: var(--color-primary); color: var(--color-primary); }
+.ui-alert--content {
+	padding: var(--space-3);
+	font-size: var(--fontsize-big);
+}
 
 /* Stat counter - see Nino.ui.js for the count-up behavior */
 .js-stat-counter {
@@ -1243,6 +1306,11 @@ body.js-scroll-btf .js-back-to-top {
 	border-color: var(--color-primary);
 	border-width: 2px;
 }
+.ui-pricing-row--feature-middle > .ui-pricing-item:nth-child(2) {
+	border-color: var(--color-primary);
+	border-width: 2px;
+	box-shadow: 0 .75rem 2rem rgba(0,0,0,.1);
+}
 .ui-pricing-title {
 	font-size: 1.125rem;
 	margin-bottom: var(--space-1);
@@ -1259,6 +1327,15 @@ body.js-scroll-btf .js-back-to-top {
 .ui-pricing-item--featured .ui-pricing-price {
 	font-size: 2.8rem;
 	color: var(--color-primary);
+}
+.ui-pricing-row--feature-middle > .ui-pricing-item:nth-child(2) .ui-pricing-title {
+	font-size: 1.8rem;
+}
+.ui-pricing-row--feature-middle > .ui-pricing-item:nth-child(2) .ui-pricing-price {
+	font-size: 2.8rem;
+}
+.ui-pricing-features {
+	margin: var(--space-2) 0;
 }
 
 /* Accordion - plain <details>/<summary>, no JS needed. Multiple <details>
@@ -1349,6 +1426,12 @@ body.js-scroll-btf .js-back-to-top {
 	opacity: 1;
 	filter: grayscale(0);
 }
+.ui-logos-item img {
+	display: block;
+	max-width: 9rem;
+	max-height: 3.5rem;
+	object-fit: contain;
+}
 
 /* Gallery/Mosaic grid - fixed row height, items span extra columns/rows
    via --wide/--tall to break up the grid */
@@ -1392,6 +1475,9 @@ body.js-scroll-btf .js-back-to-top {
 .ui-gallery-item--wide {
 	grid-column: span 2;
 }
+.ui-gallery--mosaic > .ui-gallery-item:nth-child(6n + 1) {
+	grid-column: span 2;
+}
 @media (min-width: 768px) {
 	.ui-gallery {
 		grid-template-columns: repeat(4, 1fr);
@@ -1400,6 +1486,84 @@ body.js-scroll-btf .js-back-to-top {
 	.ui-gallery-item--tall {
 		grid-row: span 2;
 	}
+	.ui-gallery--mosaic > .ui-gallery-item:nth-child(6n + 1) {
+		grid-row: span 2;
+	}
+	.ui-gallery--mosaic > .ui-gallery-item:nth-child(6n + 4) {
+		grid-column: span 2;
+	}
+}
+
+/* Modern asymmetric feature grid. The repeating content remains a normal
+   Elements collection; visual rhythm comes from the reusable container. */
+.ui-bento {
+	display: grid;
+	grid-template-columns: 1fr;
+	gap: var(--space-2);
+}
+.ui-bento-item {
+	min-height: 100%;
+}
+@media (min-width: 768px) {
+	.ui-bento {
+		grid-template-columns: repeat(6, minmax(0, 1fr));
+	}
+	.ui-bento-item {
+		grid-column: span 3;
+	}
+	.ui-bento-item:nth-child(6n + 1),
+	.ui-bento-item:nth-child(6n + 4) {
+		grid-column: span 4;
+	}
+	.ui-bento-item:nth-child(6n + 2),
+	.ui-bento-item:nth-child(6n + 3) {
+		grid-column: span 2;
+	}
+}
+
+.ui-testimonial-author {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-1);
+	margin-top: var(--space-2);
+	text-align: left;
+}
+.ui-testimonial-author img {
+	width: 3rem;
+	height: 3rem;
+	border-radius: 50%;
+	object-fit: cover;
+}
+.ui-testimonial-author span,
+.ui-testimonial-author small {
+	display: block;
+}
+.ui-profile-image {
+	width: min(16rem, 42vw);
+	aspect-ratio: 4 / 5;
+	object-fit: cover;
+}
+.ui-profile-links {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--space-1) var(--space-2);
+}
+.ui-contact-details {
+	display: grid;
+	gap: var(--space-1);
+	margin-top: var(--space-2);
+	font-style: normal;
+}
+.ui-newsletter-inline {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: flex-start;
+	justify-content: center;
+	gap: var(--space-1);
+}
+.ui-newsletter-inline .ui-form-input {
+	flex: 1 1 16rem;
+	margin: 0;
 }
 
 /* Feature-Split - icon + heading + text rows, paired with an image

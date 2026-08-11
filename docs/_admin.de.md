@@ -4,7 +4,7 @@
 
 **Stand:** 8. August 2026 · **Nino-Version:** 0.11.0-beta.1
 
-Dieses Handbuch erklärt die vollständige technische und inhaltliche Projektverwaltung unter `/_admin`. Falls du stattdessen nur freigegebene Inhalte im Alltag pflegen möchtest, lies die [`/_editor`-Bedienungsanleitung](_editor.de.md); die strukturelle Bearbeitung von `.tpl`-Dateien beschreibt die [`/_templates`-Bedienung](_templates.de.md).
+Dieses Handbuch erklärt die vollständige technische und inhaltliche Projektverwaltung unter `/_admin`. Falls du stattdessen nur freigegebene Inhalte im Alltag pflegen möchtest, lies die [`/_editor`-Bedienungsanleitung](_editor.de.md); die schnelle sectionbasierte Seitenkomposition beschreibt die [`/_templates`-Bedienung](_templates.de.md).
 
 **Weitere Links:**
 [README](../README.de.md) · [Grundkonzepte](concepts.de.md) · [Entwickler-Handbuch](development.de.md) · [Erste Schritte](getting-started.de.md) · [`/_install`-Referenz](_install.de.md) · [`/_admin`-Bedienung](_admin.de.md) · [`/_templates`-Bedienung](_templates.de.md) · [`/_editor`-Bedienung](_editor.de.md) · [Deployment](deployment.de.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
@@ -22,7 +22,7 @@ Dieses Handbuch erklärt die vollständige technische und inhaltliche Projektver
 | Texte | Schlüssel, Werte, Sprachen und Editor-Sichtbarkeit vollständig verwalten | freigegebene Werte pflegen |
 | Bilder | Bildplätze und Zielmaße definieren | Bilder hochladen und ersetzen |
 | Seiten | Routen, Templates und Navigation verwalten | Seitentexte pflegen |
-| Templates | Link zum eigenständigen Alpha-Builder `/_templates` | kein Zugriff |
+| Seitentemplates | Link zum sectionbasierten Template Builder unter `/_templates` | kein Zugriff |
 | Nutzer | Konten anlegen, löschen und Rechte technisch verwalten | Profildaten und freigegebene Rechte pflegen |
 | Konfiguration | ausgewählte technische Werte bearbeiten | kein Zugriff |
 | Backups | vorhandene Sicherungen wiederherstellen | tägliche Sicherung automatisch auslösen |
@@ -43,7 +43,7 @@ Beachte für den Betrieb:
 - schütze den Bereich bei Bedarf zusätzlich über Webserver, VPN oder IP-Freigaben;
 - entferne `_admin/` und `_templates/` aus der Auslieferung, wenn die Oberflächen im laufenden Betrieb nicht benötigt werden.
 
-`/_templates` verwendet dasselbe Passwort, denselben Sperrstatus und dieselbe Sitzung wie `/_admin`. Der Link **Template Builder** im Kopfbereich öffnet das eigenständige Alpha-Werkzeug. Ohne `_admin/` kann auch `/_templates` nicht verwendet werden.
+`/_templates` verwendet dasselbe Passwort, denselben Sperrstatus und dieselbe Sitzung wie `/_admin`. Der Link **Template Builder** im Kopfbereich öffnet das sectionbasierte Alpha-Werkzeug. Ohne `_admin/` kann der eigenständige Builder nicht verwendet werden.
 
 Das Passwort lässt sich außerhalb des Installers mit `php _admin/Admin.php <passwort>` neu hashen. Der ausgegebene Hash ersetzt `PASSWORD_HASH` in `_admin/Admin.php`. Führe diesen Vorgang nur in einer geschützten lokalen Umgebung aus; ein als Kommandozeilenargument eingegebenes Passwort kann in Shell-Verlauf oder Prozessliste sichtbar werden.
 
@@ -153,7 +153,7 @@ Beim Anlegen oder Bearbeiten bestimmst du außerdem:
 - einen HTTP-Statuscode;
 - Navigationsname, Seitentitel und Beschreibung für jede aktive Sprache.
 
-Die Pfeile in der Seitenliste verändern die Reihenfolge und – bei aktivem Navigation-Modul – zugleich `[[/website/navigation/main]]`. Reservierte Pfade wie `/_admin`, `/_editor`, `/_install` und `/_templates` können nicht als öffentliche Seiten verwendet werden.
+Die Pfeile in der Seitenliste verändern die Reihenfolge und – bei aktivem Navigation-Modul – zugleich `[[/website/navigation/main]]`. Reservierte Pfade wie `/_admin`, `/_editor`, `/_install`, `/_templates` können nicht als öffentliche Seiten verwendet werden.
 
 Einige Routen wählen ihr Template zur Laufzeit. In diesem Fall zeigt `/_admin` den bestehenden Route-Body an und lässt ihn beim Speichern unverändert.
 
@@ -235,7 +235,7 @@ In Produktion muss `/nino/error/display` auf `false` stehen.
 
 1. Lege unter **Element Types**, **Text**, **Pages** und **Images** die benötigte Struktur an.
 2. Pflege oder korrigiere vollständige Texte und Elemente direkt in `/_admin`.
-3. Bearbeite Seiten- und Abschnittstemplates bei Bedarf über [`/_templates`](_templates.de.md) und prüfe das Ergebnis im Browser.
+3. Setze Seitentemplates über [`/_templates`](_templates.de.md) aus vollständigen HTML- und Template-Sections zusammen; nutze für tiefergehende Strukturarbeit den HTML+-Escape-Hatch oder Code und prüfe das Ergebnis im Browser.
 4. Prüfe Dashboard und Template-Scans auf fehlende Definitionen.
 5. Erstelle unter **Users** passende Konten mit möglichst kleinen Rechten.
 6. Teste die freigegebenen Inhalte und Rechte in `/_editor`.
@@ -249,14 +249,14 @@ In Produktion muss `/nino/error/display` auf `false` stehen.
 | Anmeldung nach mehreren Versuchen gesperrt | Eine Stunde warten; die Sperre ist projektweit. |
 | Speichern schlägt fehl | Schreibrechte für die betroffene Datei beziehungsweise das Verzeichnis prüfen. |
 | Template fehlt in **Pages** | Nur vorhandene Dateien `templates/page-*.tpl` werden angeboten. |
-| Template lässt sich im Builder nicht speichern | Nur `page-*.tpl` und `section-*.tpl` sind beschreibbar; Hinweise zu unbekanntem Markup und Validierung in der [`/_templates`-Bedienung](_templates.de.md) prüfen. |
+| Seite lässt sich im Template Builder nicht speichern | Nach externer Änderung neu laden, eindeutige Section-IDs und nicht geschlossene `<section>`-Tags prüfen; siehe [`/_templates`-Bedienung](_templates.de.md). |
 | Texte oder Bilder fehlen im Scan | Dynamische Schlüssel und Bilder werden nicht zuverlässig statisch erkannt. |
 | Backup-Liste ist leer | Zuerst mit einem Editor-Konto anmelden und prüfen, ob Backups aktiviert sowie Schreibrechte vorhanden sind. |
 | Webseite funktioniert nach **Config** nicht | Letzten Git-Stand oder Backup wiederherstellen und JSON sowie Schlüsselstruktur prüfen. |
 
 ## Wie es weitergeht
 
-- [`/_templates`-Bedienung](_templates.de.md) erklärt den strukturellen Template-Builder im Alpha-Status.
+- [`/_templates`-Bedienung](_templates.de.md) erklärt die sectionbasierte Seitenkomposition im Alpha-Status.
 - [`/_editor`-Bedienung](_editor.de.md) erklärt die tägliche, berechtigungsgesteuerte Inhaltspflege.
 - [Entwickler-Handbuch](development.de.md) beschreibt APIs, Module und direkte Arbeit an Projektdateien.
 - [Deployment](deployment.de.md) behandelt Zugriffsschutz, Backups und sicheren Produktivbetrieb.

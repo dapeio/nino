@@ -56,9 +56,9 @@ After completion, open:
 | `/` | The configured website is delivered with the selected theme. |
 | `/_editor` | The first user account can maintain content. |
 | `/_admin` | The separate technical password opens the full project administration. |
-| `/_templates` | The same technical password opens the optional template builder (Alpha). |
+| `/_templates` | The same technical password opens the section-first Template Builder (Alpha). |
 
-Also check every language and route, the navigation, and used forms. Save a text and an image in `/_editor` as a test. If you want to use `/_templates`, additionally open a `page-*.tpl`, change nothing at first, and check if the builder can read the structure without warnings.
+Also check every language and route, the navigation, and used forms. Save a text and an image in `/_editor` as a test. If you want to use `/_templates`, additionally open a `page-*.tpl`, change nothing at first, and check whether its top-level sections are recognized without warnings.
 
 The last installation step replaces the provided `_admin` password hash and locks `/_install`. Subsequently, remove `_install/` from production delivery; the correct order and further security checks are described in the [Deployment Manual](deployment.md#_install-after-setup).
 
@@ -68,6 +68,6 @@ The last installation step replaces the provided `_admin` password hash and lock
 - [Developer Manual](development.md) deepens kernel, APIs, callbacks, and custom modules.
 - [`/_install` Reference](_install.md) documents all options and writing processes.
 - [`/_admin` Operation](_admin.md) guides through full project administration.
-- [`/_templates` Operation](_templates.md) explains the optional template builder in Alpha status.
+- [`/_templates` Operation](_templates.md) explains the section-first Template Builder in Alpha status.
 - [`/_editor` Operation](_editor.md) explains the subsequent, permission-controlled content maintenance.
 - [Deployment](deployment.md) guides through web server configuration, security, backups, and go-live.

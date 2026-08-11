@@ -4,7 +4,7 @@
 
 **Last updated:** August 8, 2026 · **Nino version:** 0.11.0-beta.1
 
-This manual explains the complete technical and content project management under `/_admin`. If you instead only want to maintain released content on a daily basis, read the [`/_editor` Operation Manual](_editor.md); the structural editing of `.tpl` files is described in the [`/_templates` Operation](_templates.md).
+This manual explains the complete technical and content project management under `/_admin`. If you instead only want to maintain released content on a daily basis, read the [`/_editor` Operation Manual](_editor.md); fast section-based page composition is described in the [`/_templates` Operation](_templates.md).
 
 **Additional Links:**
 [README](../README.md) · [Concepts](concepts.md) · [Developer Manual](development.md) · [Getting Started](getting-started.md) · [`/_install` Reference](_install.md) · [`/_admin` Operation](_admin.md) · [`/_templates` Operation](_templates.md) · [`/_editor` Operation](_editor.md) · [Deployment](deployment.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
@@ -22,7 +22,7 @@ This manual explains the complete technical and content project management under
 | Texts | Fully manage keys, values, languages, and editor visibility | Maintain released values |
 | Images | Define image slots and target dimensions | Upload and replace images |
 | Pages | Manage routes, templates, and navigation | Maintain page texts |
-| Templates | Link to the standalone Alpha builder `/_templates` | No access |
+| Page templates | Link to the section-first `/_templates` Template Builder | No access |
 | Users | Create, delete, and technically manage accounts | Manage profile data and released permissions |
 | Configuration | Edit selected technical values | No access |
 | Backups | Restore existing backups | Trigger daily backup automatically |
@@ -43,7 +43,7 @@ For operation, note:
 - additionally protect the area if needed via web server, VPN, or IP allowances;
 - remove `_admin/` and `_templates/` from delivery if the interfaces are not needed in live operation.
 
-`/_templates` uses the same password, lock status, and session as `/_admin`. The **Template Builder** link in the header opens the standalone Alpha tool. Without `_admin/`, `/_templates` cannot be used either.
+`/_templates` uses the same password, lock status, and session as `/_admin`. The **Template Builder** link in the header opens the section-first Alpha tool. Without `_admin/`, the standalone builder cannot be used.
 
 The password can be rehashed outside the installer with `php _admin/Admin.php <password>`. The output hash replaces `PASSWORD_HASH` in `_admin/Admin.php`. Perform this process only in a protected local environment; a password entered as a command-line argument may be visible in shell history or process list.
 
@@ -244,7 +244,7 @@ In production, `/nino/error/display` must be `false`.
 
 1. Create the required structure under **Element Types**, **Text**, **Pages**, and **Images**.
 2. Maintain or correct full texts and elements directly in `/_admin`.
-3. Edit page and section templates if needed via [`/_templates`](_templates.md) and check the result in the browser.
+3. Compose page templates from complete HTML and template sections via [`/_templates`](_templates.md); use the HTML+ escape hatch or code for lower-level structure work, then check the result in the browser.
 4. Check dashboard and template scans for missing definitions.
 5. Create suitable accounts with the smallest possible permissions under **Users**.
 6. Test the released content and permissions in `/_editor`.
@@ -258,15 +258,15 @@ In production, `/nino/error/display` must be `false`.
 | Login locked after several attempts | Wait one hour; the lock is project-wide. |
 | Saving fails | Check write permissions for the affected file or directory. |
 | Template missing in **Pages** | Only existing files `templates/page-*.tpl` are offered. |
-| Template cannot be saved in builder | Only `page-*.tpl` and `section-*.tpl` are writable; check for unknown markup and validation in [`/_templates` Operation](_templates.md). |
+| Page cannot be saved in Template Builder | Reload after an external edit, check unique section IDs and unmatched `<section>` tags; see [`/_templates` Operation](_templates.md). |
 | Texts or images missing in scan | Dynamic keys and images are not reliably statically recognized. |
 | Backup list is empty | First log in with an editor account and check if backups are enabled and write permissions exist. |
 | Website does not work after **Config** | Restore last Git state or backup and check JSON and key structure. |
 
 ## Next Steps
 
-- **[Design Manual](../design.md):** Frontend, design system, and CSS **(WIP)**
-- [`/_templates` Operation](_templates.md) explains the structural template builder in Alpha status.
+- **[Design Manual](design.md):** Frontend, design system, and CSS **(WIP)**
+- [`/_templates` Operation](_templates.md) explains section-first page composition in Alpha status.
 - [`/_editor` Operation](_editor.md) explains daily, permission-controlled content maintenance.
 - [Developer Manual](development.md) describes APIs, modules, and direct work on project files.
 - [Deployment](deployment.md) covers access protection, backups, and secure production operation.

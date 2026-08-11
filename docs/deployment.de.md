@@ -71,7 +71,7 @@ Eine allgemeine Beispielkonfiguration kann die Pfade und PHP-FPM-Einstellungen e
 
 Vor der Ersteinrichtung muss PHP in der Projektwurzel Verzeichnisse und Dateien anlegen dürfen. Die noch fehlenden Projektpfade werden von `/_install` beziehungsweise bei Bedarf vom Kernel erzeugt und sind keine manuell anzulegende Voraussetzung.
 
-Im laufenden Betrieb benötigt Nino Schreibrechte nur für tatsächlich veränderliche Inhalte. Dazu gehören je nach Nutzung `config.php`, `text/`, `elements/`, `images/`, `data/` und `.cache/` sowie die von `/_editor` angelegten Log- und Backup-Verzeichnisse. Der Template-Builder `/_templates` benötigt Schreibrechte für die bearbeiteten Dateien unter `templates/`; `/_admin` schreibt je nach Funktion unter anderem Konfiguration, Texte, Elemente und Bilder.
+Im laufenden Betrieb benötigt Nino Schreibrechte nur für tatsächlich veränderliche Inhalte. Dazu gehören je nach Nutzung `config.php`, `text/`, `elements/`, `images/`, `data/` und `.cache/` sowie die von `/_editor` angelegten Log- und Backup-Verzeichnisse. Der Template Builder unter `/_templates` benötigt Schreibrechte für bearbeitete Dateien unter `templates/`; er kann zusätzlich native Textschlüssel, Elementtypen und Bildplatz-Definitionen in der Konfiguration anlegen. `/_admin` schreibt je nach Funktion unter anderem Konfiguration, Texte, Elemente und Bilder.
 
 Vergib diese Rechte an den Benutzer, unter dem PHP ausgeführt wird. Weltweit beschreibbare Rechte wie `0777` sind keine geeignete Dauerlösung. Nach dem Deployment sollten Kernel und übriger PHP-Quellcode nicht allgemein beschreibbar sein.
 
@@ -106,14 +106,14 @@ Fehlermeldungen sollten im Browser keine Dateipfade, Konfigurationswerte oder St
 Vor dem Go-live müssen beide Zugänge funktionieren und voneinander getrennte, starke Passwörter besitzen:
 
 - `/_admin` ist die vollständige technische und inhaltliche Verwaltung für Entwickler.
-- `/_templates` ist ein optionales Alpha-Werkzeug und verwendet Passwort, Sperrstatus und Sitzung von `/_admin`.
+- `/_templates` ist das sectionbasierte Alpha-Werkzeug und verwendet Passwort, Sperrstatus und Sitzung von `/_admin`.
 - `/_editor` besitzt einzelne Nutzerkonten und Berechtigungen für Betreiber und Redakteure.
 
 Vergib Editor-Rechte so eng wie praktisch möglich. Das während `/_install` angelegte erste Konto besitzt vollständige Rechte über `/*`; weitere Redakteure benötigen diese Reichweite meist nicht.
 
 HTTPS schützt nicht nur Anmeldedaten, sondern auch die Session-Cookies und alle redaktionell übertragenen Inhalte. Leite HTTP-Anfragen dauerhaft auf HTTPS um und teste die Anmeldung erst über die endgültige öffentliche Adresse.
 
-Zusätzlicher Webserver-Schutz für `/_admin` und `/_templates` – etwa IP-Freigaben oder HTTP-Authentifizierung – kann bei passenden Betriebsbedingungen eine sinnvolle zweite Barriere bilden. Er ersetzt das Nino-Passwort nicht. Werden die Werkzeuge nach Entwicklung und Abnahme nicht benötigt, können `_templates/` und gemeinsam damit auch `_admin/` aus der produktiven Auslieferung entfernt werden.
+Zusätzlicher Webserver-Schutz für `/_admin`, `/_templates` – etwa IP-Freigaben oder HTTP-Authentifizierung – kann bei passenden Betriebsbedingungen eine sinnvolle zweite Barriere bilden. Er ersetzt das Nino-Passwort nicht. Werden die Werkzeuge nach Entwicklung und Abnahme nicht benötigt, können `_templates/` und gemeinsam damit auch `_admin/` aus der produktiven Auslieferung entfernt werden.
 
 ## `/_install` nach der Einrichtung
 

@@ -134,7 +134,7 @@ The loaded `.tpl` file can contain shortcodes and textfills in addition to HTML:
 
 This way, multiple template files can be combined into a complex HTML structure.
 
-Selected page and section templates can be edited either directly in the file system or via the optional [Template Builder `/_templates`](_templates.md). The Alpha tool represents the structure as a grid and nested blocks but still saves normal, readable `.tpl` markup. It is not a visual replacement for testing the finished website in the browser.
+Page templates can be composed from complete HTML and `[template]` sections via the optional [Template Builder `/_templates`](_templates.md). It saves normal, readable `.tpl` markup and does not replace testing the finished website in the browser; lower-level structure work remains possible through HTML+ or code.
 
 Nino processes an HTML string in a fixed order during each rendering pass:
 
@@ -163,7 +163,7 @@ The optional interfaces have their own entry points and are not frontend modules
 | Interface | Responsibility |
 |---|---|
 | [`/_admin`](_admin.md) | full technical access to structure, configuration, texts, and elements |
-| [`/_templates`](_templates.md) | structural editing of `page-*.tpl` and `section-*.tpl` via the Alpha builder |
+| [`/_templates`](_templates.md) | section-first composition, reusable template includes, and native quick fill of `page-*.tpl` |
 | [`/_editor`](_editor.md) | daily maintenance of released content, images, user, and operational data |
 
 `/_templates` shares password and session with `/_admin`; `/_editor`, on the other hand, has individual accounts and granular rights. Thus, the separation is no longer solely between structure and content but primarily between full development access and restricted editorial work.
@@ -176,7 +176,8 @@ The planned `/_themes` will later complement these tools with graphical editing 
 |---|---|
 | Change page title | textfill in `text/` or via `/_editor` |
 | Add new team member | element via `/_editor` |
-| Change HTML structure of a page | `.tpl` file in `templates/` or `/_templates` (Alpha) |
+| Compose a page from complete sections | `/_templates` (Alpha) |
+| Change lower-level HTML structure | HTML+ escape hatch or `.tpl` file in `templates/` |
 | Create new public URL | route in `config.php` or via `/_admin` |
 | Output dynamic list | element query or shortcode with callback |
 | Add technical function | project-specific module |

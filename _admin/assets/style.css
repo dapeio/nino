@@ -134,7 +134,7 @@ body {
 /* Sits between the title and Logout - margin-left:auto rather than relying
    on the wrap's space-between, which would centre it once there are three
    children instead of two */
-#admin-templatebuilder {
+#admin-templates {
 	margin: 0;
 	color: var(--editor-blue);
 	font-weight: 500;
@@ -927,7 +927,7 @@ button.red {
 		border-top: 1px solid var(--editor-separator);
 	}
 
-	#admin-templatebuilder {
+	#admin-templates {
 		flex: 1 0 100%;
 	}
 
@@ -977,7 +977,7 @@ button.red {
 		font-size: .78rem;
 	}
 
-	#admin-templatebuilder {
+	#admin-templates {
 		max-width: 9rem;
 		overflow: hidden;
 		text-overflow: ellipsis;

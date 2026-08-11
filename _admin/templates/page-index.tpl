@@ -22,7 +22,7 @@
 					<div id="admin-bar-actions">
 						<!-- /_templates is its own app, not a module here - same session
 						     gate, so this is a plain link rather than a tab -->
-						<a href="[[/nino/dir]]/_templates/" id="admin-templatebuilder">Template Builder</a>
+						<a href="[[/nino/dir]]/_templates/" id="admin-templates">Template Builder</a>
 						<a href="#" id="admin-logout">Logout</a>
 					</div>
 				</div>

@@ -63,19 +63,17 @@ The developer determines which content is visible and which areas an account act
 
 ### `/_templates` — optional, Alpha
 
-![Structural editing of a page template in the Template Builder](docs/assets/screenshots/templates.webp)
+`/_templates` turns `page-*.tpl` files into a focused sequence of complete HTML and `[template]` sections. Developers can create a template, choose from 43 curated section presets, assign meaningful IDs, configure content and layout, and immediately fill native textfills or connect an Elements collection.
 
-`/_templates` is a graphical structure editor for `page-*.tpl` and `section-*.tpl`. The Template Builder displays grids, spacing, and nested blocks, derives its settings from HTML tags and CSS classes, and continues to save readable HTML+ in the regular template files.
+The Template Builder preserves ordinary HTML+ source. Standalone template shortcodes can be chosen directly through **Add section** and remain movable canvas items, while the page header and footer are ordinary `[template]` shortcodes managed safely through fixed Template Settings. A display name and VPA default live as inert metadata at the start of the file. Unrelated source remains locked and byte-identical. A deliberate HTML+ escape hatch is available for code-authored sections. The former DOM-oriented builder has been removed.
 
-It is deliberately **not a visual preview of the finished website**.
-
-> **Status: Alpha.** The data format remains plain `.tpl` markup, but the interface, block library, and workflows may still change significantly.
+> **Status: Alpha.** Preset manifests and generated `.tpl` markup are readable and extensible, but the library and composition workflow may still evolve.
 
 ## What Nino includes
 
 * multilingual routing, texts, and content
 * a dedicated template system with shortcodes and a clear separation of HTML and PHP
-* an optional Template Builder for `.tpl` files (Alpha)
+* an optional section-first Template Builder for `.tpl` files (Alpha)
 * a file-based content model for textfills and recurring elements
 * themes, asset bundling, and frontend base components
 * forms, newsletters, navigation, language selection, and image processing
@@ -131,7 +129,7 @@ _nino/           Kernel and frontend core
 _editor/         Content editor, users, backups, activity log
 _admin/          Developer tools and restoration
 _install/        Setup wizard
-_templates/      Template Builder
+_templates/      Section-first Template Builder
 
 elements/        Element types
 templates/       Page and section templates
@@ -166,7 +164,7 @@ Nino deliberately keeps its architecture small: a central `$appData` array carri
 * **[Getting Started](docs/getting-started.md):** from checkout to a configured website
 * **[`/_install` Reference](docs/_install.md):** steps, writing rules, and library format
 * **[`/_admin` Manual](docs/_admin.md):** project structure, content, accounts, configuration, and restoration
-* **[`/_templates` Manual](docs/_templates.md):** structural template editing with the Alpha builder
+* **[`/_templates` Manual](docs/_templates.md):** composing page templates from complete HTML and template sections
 * **[`/_editor` Manual](docs/_editor.md):** texts, elements, images, submissions, and newsletters
 * **[Deployment](docs/deployment.md):** web server, security, backups, and go-live
 * **[Design Manual](docs/design.md):** frontend, design system, CSS, and template work **(WIP)**

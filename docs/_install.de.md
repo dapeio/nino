@@ -167,7 +167,7 @@ Prüfe nach dem Abschluss:
 - den Zugriff auf `/_templates` mit demselben Passwort, sofern der Alpha-Builder verwendet werden soll;
 - das Speichern eines Testtexts und eines Testbildes.
 
-Entferne anschließend `_install/` aus der produktiven Auslieferung. Der abgeschlossene Projektstand benötigt die Library und den Assistenten nicht mehr. Seitenstruktur, vollständige Inhalte und technische Konfiguration werden danach über `/_admin`, ausgewählte Template-Strukturen optional über `/_templates` und freigegebene redaktionelle Inhalte über `/_editor` gepflegt.
+Entferne anschließend `_install/` aus der produktiven Auslieferung. Der abgeschlossene Projektstand benötigt die Library und den Assistenten nicht mehr. Seitenstruktur, vollständige Inhalte und technische Konfiguration werden danach über `/_admin`, Seitentemplates über `/_templates` und freigegebene redaktionelle Inhalte über `/_editor` gepflegt. Für tiefergehende Strukturarbeit bleiben der HTML+-Escape-Hatch und Code verfügbar.
 
 ## Library-Format
 

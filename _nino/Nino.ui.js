@@ -26,6 +26,29 @@
 		_onScrollTicking	: false,
 		_onViewable			: [],
 		_onViewableDelay	: 500,
+		_sliderTouchThreshold : 8,
+
+		/**
+		 *	Decide whether a slider touch gesture is horizontal or vertical.
+		 *	Small movements remain undecided; equal diagonal movement deliberately
+		 *	counts as vertical so the page keeps its native scrolling behaviour.
+		 *
+		 *	@param		{number}	deltaX				Horizontal distance from touchstart
+		 *	@param		{number}	deltaY				Vertical distance from touchstart
+		 *
+		 *	@return		{string|null}				'x', 'y', or null below the threshold
+		 */
+		_sliderTouchAxis : function( deltaX, deltaY ) {
+
+			const
+				distanceX = Math.abs( deltaX ),
+				distanceY = Math.abs( deltaY );
+
+			if( Math.max( distanceX, distanceY ) < Nino.ui._sliderTouchThreshold )
+				return null;
+
+			return distanceX > distanceY ? 'x' : 'y';
+		},
 
 		/**
 		 *	Initialize all ui behaviors (cover, parallax, vpa, autoheight,
@@ -466,12 +489,17 @@
 					};
 
 
-				for( let i=0, l=e.slider.length, touchStartX=0, touchEndX=0, slider; i<l; i++ ) {
+				for( let i=0, l=e.slider.length, slider; i<l; i++ ) {
 
 					slider				= e.slider[i];
 					slider.stage	= slider.getElementsByTagName('ul')[0];
 					slider.lis 		= slider.stage.getElementsByTagName('li');
 					slider.pos 		= parseInt(slider.getAttribute( 'data-slider-pos' )) ?? Math.floor( slider.lis.length / 2 );
+
+					let
+						touchStartX = 0,
+						touchStartY = 0,
+						touchAxis = null;
 
 					// Controls: prev button, dot pagination, next button - grouped
 					// in one wrapper so they lay out as a single centered row
@@ -504,25 +532,88 @@
 
 					// Touch swipe support
 					if( ( slider.getAttribute( 'data-slider-touch' ) ?? 'true' ) !== 'false' ) {
-						// Drag the track along with the finger while swiping
-						slider.addEventListener( 'touchmove', function(e) { e.preventDefault(); this.stage.style.left = ( this.posLeft - (touchStartX - e.changedTouches[0].screenX))+'px' } );
-						// Remember the swipe start position
-						slider.addEventListener( 'touchstart', function(e) { this.classList.add('touch'); touchStartX = e.changedTouches[0].screenX }, false );
-						// On swipe end, advance the slider if the swipe distance was large enough
+						// Let the browser own vertical scrolling and pinch zoom. Horizontal
+						// gestures remain available to the custom slider implementation.
+						slider.style.touchAction = 'pan-y pinch-zoom';
+
+						// Remember both axes, but do not enter dragging mode until the
+						// visitor's intended direction is clear.
+						slider.addEventListener( 'touchstart', function(e) {
+
+							const touch = e.changedTouches[0];
+							if( typeof touch === 'undefined' )
+								return;
+							if( typeof e.touches !== 'undefined' && e.touches.length > 1 ) {
+								this.classList.remove('touch');
+								touchAxis = 'y';
+								sliderResize();
+								return;
+							}
+
+							touchStartX = touch.clientX;
+							touchStartY = touch.clientY;
+							touchAxis = null;
+						}, false );
+
+						// Prevent the browser default only after a horizontal swipe has
+						// been identified. A vertical move therefore keeps scrolling the page.
+						slider.addEventListener( 'touchmove', function(e) {
+
+							const touch = e.changedTouches[0];
+							if( typeof touch === 'undefined' )
+								return;
+							if( typeof e.touches !== 'undefined' && e.touches.length > 1 )
+								return;
+
+							const
+								deltaX = touch.clientX - touchStartX,
+								deltaY = touch.clientY - touchStartY;
+
+							if( touchAxis === null )
+								touchAxis = ui._sliderTouchAxis( deltaX, deltaY );
+
+							if( touchAxis !== 'x' )
+								return;
+
+							e.preventDefault();
+							this.classList.add('touch');
+							this.stage.style.left = ( this.posLeft + deltaX ) +'px';
+						}, { passive : false } );
+
+						// On swipe end, advance the slider if the horizontal distance was
+						// large enough. Vertical gestures never change the active slide.
 						slider.addEventListener( 'touchend', function(e) {
 
 							this.classList.remove('touch');
 
-							touchEndX = e.changedTouches[0].screenX;
+							const touch = e.changedTouches[0];
+							if( typeof touch !== 'undefined' ) {
+								const
+									deltaX = touch.clientX - touchStartX,
+									deltaY = touch.clientY - touchStartY;
 
-							if ( touchEndX + 50 < touchStartX )
-								sliderClick( slider, 1);
-							else if ( touchEndX - 50 > touchStartX )
-								sliderClick( slider, -1);
+								if( touchAxis === null )
+									touchAxis = ui._sliderTouchAxis( deltaX, deltaY );
+
+								if( touchAxis === 'x' && deltaX < -50 )
+									sliderClick( this, 1 );
+								else if( touchAxis === 'x' && deltaX > 50 )
+									sliderClick( this, -1 );
+							}
 
 							sliderResize();
+							touchAxis = null;
 
-						}, false);
+						}, false );
+
+						// Native scrolling or pinch zoom can cancel the touch sequence.
+						// Restore the centered track in that case as well.
+						slider.addEventListener( 'touchcancel', function() {
+
+							this.classList.remove('touch');
+							touchAxis = null;
+							sliderResize();
+						}, false );
 					}
 
 					e.slider[i].lis[e.slider[i].pos].classList.add('active');
@@ -725,16 +816,57 @@
 						tabs		= e.tabs[i].querySelectorAll('.js-tabs-tab'),
 						panels	= e.tabs[i].querySelectorAll('.js-tabs-panel');
 
-					for( let t=0, tl=tabs.length; t<tl; t++ )
-						tabs[t].addEventListener( 'click', function() {
+					if( tabs.length === 0 || panels.length === 0 )
+						continue;
 
-							const target = this.getAttribute('data-tabs-target');
+					const activateTab = function( activeTab, focus ) {
+						const target = activeTab.getAttribute('data-tabs-target');
 
-							for( let x=0, xl=tabs.length; x<xl; x++ )
-								tabs[x].classList.toggle( 'active', tabs[x] === this );
-							for( let p=0, pl=panels.length; p<pl; p++ )
-								panels[p].classList.toggle( 'active', panels[p].id === target );
+						for( let x=0, xl=tabs.length; x<xl; x++ ) {
+							const active = tabs[x] === activeTab;
+							tabs[x].classList.toggle( 'active', active );
+							tabs[x].setAttribute( 'aria-selected', active ? 'true' : 'false' );
+							tabs[x].tabIndex = active ? 0 : -1;
+						}
+						for( let p=0, pl=panels.length; p<pl; p++ ) {
+							const active = panels[p].id === target;
+							panels[p].classList.toggle( 'active', active );
+							panels[p].hidden = active === false;
+							panels[p].setAttribute( 'aria-hidden', active ? 'false' : 'true' );
+						}
+						if( focus === true )
+							activeTab.focus();
+					};
+
+					e.tabs[i].querySelector('.js-tabs-nav')?.setAttribute( 'role', 'tablist' );
+
+					for( let t=0, tl=tabs.length; t<tl; t++ ) {
+						const target = tabs[t].getAttribute('data-tabs-target');
+						const panel = dc.getElementById( target );
+						tabs[t].setAttribute( 'role', 'tab' );
+						if( tabs[t].id === '' )
+							tabs[t].id = target+ '-trigger';
+						tabs[t].setAttribute( 'aria-controls', target );
+						if( panel !== null ) {
+							panel.setAttribute( 'role', 'tabpanel' );
+							panel.setAttribute( 'aria-labelledby', tabs[t].id );
+						}
+						tabs[t].addEventListener( 'click', function() { activateTab( this, false ) } );
+						tabs[t].addEventListener( 'keydown', function( ev ) {
+							const keys = [ 'ArrowLeft', 'ArrowRight', 'Home', 'End' ];
+							if( keys.includes( ev.key ) === false )
+								return;
+							ev.preventDefault();
+							let next = t;
+							if( ev.key === 'ArrowLeft' ) next = ( t - 1 + tabs.length ) % tabs.length;
+							if( ev.key === 'ArrowRight' ) next = ( t + 1 ) % tabs.length;
+							if( ev.key === 'Home' ) next = 0;
+							if( ev.key === 'End' ) next = tabs.length - 1;
+							activateTab( tabs[next], true );
 						} );
+					}
+
+					activateTab( Array.from( tabs ).find( function( tab ) { return tab.classList.contains('active') } ) || tabs[0], false );
 				}
 			}
 
