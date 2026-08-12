@@ -30,6 +30,8 @@
 		'/website/url',
 	],
 	'files' => [
-		'assets'
+		'assets',
+		'images',
+		'favicon'
 	],
 ];
