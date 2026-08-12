@@ -7,4 +7,7 @@
 		'images',
 	],
 	'templates' => [ 'page-home.tpl' ],
+	'files' => [
+		'images/demo.jpg',
+	],
 ];

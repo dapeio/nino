@@ -1,8 +1,8 @@
 <?php return [
-	'name' => 'Hero — Centered',
+	'name' => 'Hero — Full',
 	'description' => 'Fullscreen introduction with optional cover image and call to action.',
 	'category' => 'Hero',
-	'tags' => [ 'hero', 'atf', 'cover', 'centered', 'cta' ],
+	'tags' => [ 'hero', 'atf', 'cover', 'cta' ],
 	'version' => 1,
 	'shell' => 'hero',
 	'defaults' => [
@@ -13,6 +13,7 @@
 	],
 	'allow' => [
 		'surface' => [ 'default', 'alt', 'primary', 'dark', 'black' ],
+		'align' => [ 'left', 'center', 'right' ],
 		'background' => [ 'none', 'image-cover', 'image-static', 'parallax' ],
 		'header' => [ 'title', 'title-subtitle', 'title-subtitle-description' ],
 		'action' => [ 'none', 'link', 'button', 'dual-buttons' ],
