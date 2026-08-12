@@ -705,7 +705,7 @@ $today 			= $backupDir. '/'. date( 'Y-m-d' ). '.php';
 if( is_file( $today ) === true )
 	unlink( $today );
 
-$logLinesBeforeBackup = isset( $appData['/nino/logs/dir'] ) === true ? readTodayLogLines( $appData, $sandbox ) : [];
+$logLinesBeforeBackup = readTodayLogLines( $appData, $sandbox );
 
 callUsers( $appData, 'apiList' ); // this call's Backup::maybeRun() creates today's backup fresh
 
@@ -796,7 +796,7 @@ function callAdminPost( array &$appData, string $action, array $data = [] ): arr
  *	@return		string[]
  */
 function readTodayLogLines( array &$appData, string $sandbox ): array {
-	$path = $sandbox. '/_editor/'. $appData['/nino/logs/dir']. '/'. date( 'Y-m-d' ). '.php';
+	$path = $sandbox. '/content/.logs/'. date( 'Y-m-d' ). '.php';
 	if( is_file( $path ) === false )
 		return [];
 	$prefix 	= "<?php http_response_code(403); exit; return '";
@@ -823,7 +823,12 @@ $lines = readTodayLogLines( $appData, $sandbox );
 check( 'elements/save is recorded to the activity log', count( $lines ) === count( $before ) + 1 && str_ends_with( end( $lines ), 'Add Element /logtestdemo/entry1' ) === true );
 check( 'the log line records the acting admin', str_contains( end( $lines ), 'manager@example.com' ) === true );
 
-check( 'Logs uses its own random directory, independent of Backup\'s', $appData['/nino/logs/dir'] !== $appData['/nino/backup/dir'] );
+// The logs no longer need an unguessable directory name: they sit under the
+// content directory, which is denied by its own .htaccess, and every file in
+// there carries the same 403 stub it always did
+check( 'the logs live under the content directory, not in a tool folder', is_file( $sandbox. '/content/.logs/'. date( 'Y-m-d' ). '.php' ) === true );
+check( 'no random log directory is generated any more', isset( $appData['/nino/logs/dir'] ) === false );
+check( 'each log file still carries its own 403 stub', str_starts_with( (string) file_get_contents( $sandbox. '/content/.logs/'. date( 'Y-m-d' ). '.php' ), '<?php http_response_code(403); exit;' ) === true );
 
 callAdminPost( $appData, 'elements/list', [ 'type' => 'logtestdemo' ] );
 check( 'a read-only action (elements/list) does not add a log entry', count( readTodayLogLines( $appData, $sandbox ) ) === count( $lines ) );
@@ -874,7 +879,7 @@ check( 'logs/list succeeds', $status === 200 );
 check( 'logs/list returns lines most-recent-first', $body['lines'][0] === end( $linesSoFar ) );
 check( 'logs/list returns every recorded line so far', count( $body['lines'] ) === count( $linesSoFar ) );
 
-$logsDir = $sandbox. '/_editor/'. $appData['/nino/logs/dir'];
+$logsDir = $sandbox. '/content/.logs';
 $staleLogFile = $logsDir. '/2020-01-01.php';
 file_put_contents( $staleLogFile, "<?php http_response_code(403); exit; return '". base64_encode( '2020-01-01 00:00  x  y' ). "';\n" );
 

@@ -115,7 +115,7 @@ $duringCooldownRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 check( 'the lockout applies regardless of the password tried next', $duringCooldownRequest['/nino/http/response']['statusCode'] === 429 );
 
 // Reset the lockout state for the rest of the file - a fresh cooldown window shouldn't leak into later checks
-\Nino\Filesystem::putFileContent( $appData, '/_admin/.lockout.json', [ 'tries' => 0, 'until' => 0 ] );
+\Nino\Filesystem::putFileContent( $appData, \Nino\Filesystem::CONTENT_DIR. '/.auth/lockout.json', [ 'tries' => 0, 'until' => 0 ] );
 
 $_POST['action'] = 'devtypes/list';
 $_POST['data']	 = '{}';
@@ -149,9 +149,21 @@ check( 'the right one opens the gate', $login( $appData, 'the real password' ) =
 // The lockout counter runs whether or not a password exists - answering an
 // unknown-password project instantly would tell an unauthenticated caller
 // which state this installation is in
-\Nino\Filesystem::putFileContent( $appData, '/_admin/.lockout.json', [ 'tries' => 0, 'until' => time() + 60 ] );
+\Nino\Filesystem::putFileContent( $appData, \Nino\Filesystem::CONTENT_DIR. '/.auth/lockout.json', [ 'tries' => 0, 'until' => time() + 60 ] );
 check( 'a locked-out login reports 429, not 401', $login( $appData, 'the real password' ) === 429 );
+\Nino\Filesystem::putFileContent( $appData, \Nino\Filesystem::CONTENT_DIR. '/.auth/lockout.json', [ 'tries' => 0, 'until' => 0 ] );
+
+// An active lockout that predates the counter's move has to survive the
+// update: otherwise replacing _admin/ would be a way to clear it, handing an
+// attacker mid-cooldown a fresh set of attempts
+unlink( $sandbox. '/content/.auth/lockout.json' );
+$appData['./nino/filesystem/cache'] = [];
+\Nino\Filesystem::putFileContent( $appData, '/_admin/.lockout.json', [ 'tries' => 0, 'until' => time() + 60 ] );
+check( 'a lockout left in the old location still applies after the move', $login( $appData, 'the real password' ) === 429 );
+
 \Nino\Filesystem::putFileContent( $appData, '/_admin/.lockout.json', [ 'tries' => 0, 'until' => 0 ] );
+\Nino\Filesystem::putFileContent( $appData, \Nino\Filesystem::CONTENT_DIR. '/.auth/lockout.json', [ 'tries' => 0, 'until' => 0 ] );
+check( 'once both are clear, logging in works again', $login( $appData, 'the real password' ) === 200 );
 
 // --- upgrading a project whose hash is still in the constant -------------
 //

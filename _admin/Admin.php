@@ -49,6 +49,17 @@ namespace Nino\Admin {
 		// last wizard step writes it; passwordHash() reads it
 		public const string PASSWORD_PATH = '/.auth/pw.php';
 
+		// The login throttle counter, next to the credential it guards. A
+		// virtual path (see \Nino\Filesystem::CONTENT_DIR), so it goes
+		// through mutate() and keeps its lock - two concurrent wrong attempts
+		// must not both read the same "tries" and each write back the same +1
+		private const string LOCKOUT_PATH = \Nino\Filesystem::CONTENT_DIR. '/.auth/lockout.json';
+
+		// Where that counter used to live, inside this tool's own folder.
+		// Read once on the next login so an upgrade does not hand an
+		// attacker mid-lockout a fresh set of attempts; never written again
+		private const string LEGACY_LOCKOUT_PATH = '/_admin/.lockout.json';
+
 		// The stub that file is wrapped in - a php file that 403s and exits
 		// before it ever returns the hash, so it stays useless even where a
 		// webserver happily serves it. Same convention (and same constants)
@@ -332,7 +343,7 @@ namespace Nino\Admin {
 			// read the same "tries" and both write back the same +1, losing an
 			// increment - the exact way to dodge the lockout with two requests
 			// instead of one
-			\Nino\Filesystem::mutate( $appData, '/_admin/.lockout.json', function( array $state ) use ( $password, $hash, &$lockedOut, &$verified ): ?array {
+			\Nino\Filesystem::mutate( $appData, self::LOCKOUT_PATH, function( array $state ) use ( $password, $hash, &$lockedOut, &$verified ): ?array {
 
 				if( (int) $state['until'] > time() ) {
 					$lockedOut = true;
@@ -355,7 +366,7 @@ namespace Nino\Admin {
 				}
 
 				return $state;
-			}, [ 'tries' => 0, 'until' => 0 ] );
+			}, self::_lockoutState( $appData ) );
 
 			if( $lockedOut === true ) {
 				\Nino\Http::fail( $request, 429, 'too many attempts' );
@@ -379,6 +390,26 @@ namespace Nino\Admin {
 			// Defend against session fixation, same as Auth::loginUser()
 			session_regenerate_id( true );
 			\Nino\Runtime::setSessionValue( $appData, './nino/admin/authed', true );
+		}
+
+		/**
+		 *	The counter mutate() starts from when the current file is missing:
+		 *	whatever this tool's own folder still holds from before the
+		 *	counter moved, so an update cannot be used to clear an active
+		 *	lockout by simply replacing that folder
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	array										{ tries, until }
+		 */
+		private static function _lockoutState( array &$appData ): array {
+
+			$legacy = \Nino\Filesystem::getFileContent( $appData, self::LEGACY_LOCKOUT_PATH, [] );
+
+			return [
+				'tries' => (int) ( $legacy['tries'] ?? 0 ),
+				'until' => (int) ( $legacy['until'] ?? 0 ),
+			];
 		}
 
 		/**

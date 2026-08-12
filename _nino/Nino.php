@@ -1269,9 +1269,36 @@ namespace Nino {
 		}
 
 
+		// The virtual path prefix everything under the content directory is
+		// addressed by. Callers keep using '/content/...' whatever
+		// NINO_CONTENT_DIR points at, so a moved content directory changes
+		// no call site - the same indirection '/config.php' already has
+		public const string CONTENT_DIR = '/content';
+
+		// Map a virtual, project-relative path onto its real location on
+		// disk. Almost always the project root - except config.php, which may
+		// live outside the webroot (NINO_CONFIG_DIR), and everything under
+		// CONTENT_DIR, which is this project's own state and moves with
+		// NINO_CONTENT_DIR. With neither constant set both resolve exactly
+		// where a naive concatenation would have put them, so the default
+		// layout is byte-for-byte what it was.
+		private static function _resolvePath( array &$appData, string $filename ): string {
+
+			$filename = '/'. ltrim( $filename, '/' );
+
+			if( $filename === '/config.php' && ( $appData['./nino/filesystem/configpath'] ?? '' ) !== '' )
+				return $appData['./nino/filesystem/configpath']. '/config.php';
+
+			if( ( $appData['./nino/filesystem/contentpath'] ?? '' ) !== ''
+				&& ( $filename === self::CONTENT_DIR || str_starts_with( $filename, self::CONTENT_DIR. '/' ) === true ) )
+				return rtrim( $appData['./nino/filesystem/contentpath']. substr( $filename, strlen( self::CONTENT_DIR ) ), '/' );
+
+			return $appData['./nino/filesystem/path']. $filename;
+		}
+
 		public static function forceDir( array &$appData, string $dirpath ): void {
 
-			$dirpath = $appData['./nino/filesystem/path']. '/'. $dirpath;
+			$dirpath = self::_resolvePath( $appData, $dirpath );
 
 			// 0755, not 0777: with the umask cleared (not unusual on shared
 			// hosting, and the default in some cli/cron contexts) 0777 really
@@ -1393,22 +1420,19 @@ namespace Nino {
 
 		private static function _prepareFileCache( array &$appData, string $filename ): bool {
 
-			// Check, if already exists - config.php alone resolves against the
-			// (optionally outside-webroot) configpath instead of the regular
-			// project path, see \Nino\init()
-			$base = ( $filename === '/config.php' && ( $appData['./nino/filesystem/configpath'] ?? '' ) !== '' )
-				? $appData['./nino/filesystem/configpath']
-				: $appData['./nino/filesystem/path'];
-
 			// 'fstat' is the mtime/size fingerprint getFileContent() decides
 			// staleness by; lock handles deliberately live outside this slot,
 			// see lockFile()
 			// Keyed on 'path', not on the slot as a whole: a caller that
 			// invalidated the fingerprint (['fstat'] = []) leaves a slot behind
-			// that exists but isn't set up yet
+			// that exists but isn't set up yet.
+			// The cache key stays the virtual path callers pass in, while
+			// 'path' is where it actually lives - see _resolvePath(), which is
+			// what lets config.php and everything under /content sit outside
+			// the project root without any call site knowing
 			if( isset( $appData['./nino/filesystem/cache'][$filename]['path'] ) === false )
 				$appData['./nino/filesystem/cache'][$filename] = [
-					'path'				=> $base. '/'. ltrim( $filename, '/' ),
+					'path'				=> self::_resolvePath( $appData, $filename ),
 					'content'			=> '',
 					'fstat'				=> [],
 				];

@@ -1646,6 +1646,12 @@ namespace Nino\Editor {
 
 		public const string VIEW_PERM = '/_editor/logs/view';
 
+		// Under the content directory, not in this tool's own folder: a tool
+		// folder holding runtime state cannot be replaced on an update. A
+		// fixed name rather than the '.logs-<random>' this used to generate -
+		// see _logDirs() for why the randomness is no longer load-bearing
+		private const string LOGS_DIR = \Nino\Filesystem::CONTENT_DIR. '/.logs';
+
 		private const int RETENTION_DAYS = 14;
 
 		private const string STUB_PREFIX = "<?php http_response_code(403); exit; return '";
@@ -1670,17 +1676,12 @@ namespace Nino\Editor {
 
 			try {
 
-				self::_bootstrap( $appData );
+				$relPath = self::LOGS_DIR. '/'. date( 'Y-m-d' ). '.php';
 
-				$dir = \Nino\Filesystem::getPath( $appData ). '/_editor/'. $appData['/nino/logs/dir'];
+				\Nino\Filesystem::forceDir( $appData, self::LOGS_DIR );
 
-				// 0755, see Filesystem::forceDir() - this directory's only real
-				// protection is its random name, world-writable undoes that
-				if( is_dir( $dir ) === false )
-					mkdir( $dir, 0755, true );
-
-				$relPath = '/_editor/'. $appData['/nino/logs/dir']. '/'. date( 'Y-m-d' ). '.php';
-				$path 	 = $dir. '/'. date( 'Y-m-d' ). '.php';
+				$dir 	= \Nino\Filesystem::getContentPath( $appData ). substr( self::LOGS_DIR, strlen( \Nino\Filesystem::CONTENT_DIR ) );
+				$path = $dir. '/'. date( 'Y-m-d' ). '.php';
 
 				// Locked directly, not via Filesystem::mutate(): this file is
 				// base64+stub encoded, not the plain array format getFileContent()/
@@ -1697,7 +1698,10 @@ namespace Nino\Editor {
 
 				\Nino\Filesystem::unlockFile( $appData, $relPath );
 
-				self::_prune( $dir );
+				// Both locations - a legacy directory nobody writes to any
+				// more still has to age out rather than sit there forever
+				foreach( self::_logDirs( $appData ) as $logDir )
+					self::_prune( $logDir );
 
 			} catch( \Throwable $e ) {
 				trigger_error( 'Activity log write failed: '. $e->getMessage() );
@@ -1746,10 +1750,13 @@ namespace Nino\Editor {
 
 			$lines = [];
 
-			if( isset( $appData['/nino/logs/dir'] ) === true ) {
+			// Both locations: the current one, and the random directory under
+			// _editor/ a project written before the logs moved still has. The
+			// legacy one is read and pruned but never written to again, so it
+			// empties itself within the retention window
+			foreach( self::_logDirs( $appData ) as $dir ) {
 
-				$dir 		= \Nino\Filesystem::getPath( $appData ). '/_editor/'. $appData['/nino/logs/dir'];
-				$files 	= glob( $dir. '/*.php' ) ?: [];
+				$files = glob( $dir. '/*.php' ) ?: [];
 
 				sort( $files );
 
@@ -1762,23 +1769,28 @@ namespace Nino\Editor {
 		}
 
 		/**
-		 *	Generate the random log directory name on first use - same
-		 *	one-time-generation shape as Backup::_bootstrap(), independent
-		 *	random directory (not shared with Backup's), so leaking one
-		 *	doesn't expose the other
+		 *	Every directory that holds activity logs, newest scheme first.
+		 *
+		 *	There used to be exactly one, named '.logs-&lt;random&gt;' under
+		 *	_editor/ and generated on first use - the random name was that
+		 *	directory's only real protection, since it sat in the webroot
+		 *	inside a tool folder. Under the content directory it does not need
+		 *	one: that directory is denied by its own .htaccess and every file
+		 *	in it carries a 403 stub anyway. '/nino/logs/dir' is therefore no
+		 *	longer generated, only still honoured where a project has one
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *
-		 *	@return 	void
+		 *	@return 	array										Absolute paths, existing or not
 		 */
-		private static function _bootstrap( array &$appData ): void {
+		private static function _logDirs( array &$appData ): array {
+
+			$dirs = [ \Nino\Filesystem::getContentPath( $appData ). substr( self::LOGS_DIR, strlen( \Nino\Filesystem::CONTENT_DIR ) ) ];
 
 			if( isset( $appData['/nino/logs/dir'] ) === true )
-				return;
+				$dirs[] = \Nino\Filesystem::getPath( $appData ). '/_editor/'. $appData['/nino/logs/dir'];
 
-			$appData['/nino/logs/dir'] = '.logs-'. bin2hex( random_bytes( 16 ) );
-
-			\Nino\AppData::writeContentData( $appData, [ '/nino/logs/dir' ] );
+			return $dirs;
 		}
 
 		/**

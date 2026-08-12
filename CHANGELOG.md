@@ -10,7 +10,9 @@ All notable changes to Nino are documented in this file.
   `\Nino\Filesystem::getContentPath()` and movable with `NINO_CONTENT_DIR`
   (the generalisation of `NINO_CONFIG_DIR`). It ships an Apache deny rule,
   and every file inside carries a 403 stub, so it stays unreadable even where
-  that rule does not apply.
+  that rule does not apply. Paths under it are addressed by the virtual
+  prefix `\Nino\Filesystem::CONTENT_DIR`, so `mutate()` and its locking work
+  there unchanged and no call site knows where the directory really is.
 - Added a **Navigations** area to `/_admin`: create, rename, and delete the
   menus registered in `/nino/html/navs`, and set each menu's whole running
   order with ↑/↓, a remove button, and a picker that adds any `GET` route at
@@ -66,6 +68,16 @@ All notable changes to Nino are documented in this file.
   `/_install` on a live site, because that placeholder was exactly what the
   installer's lock was reading. A project whose hash still lives in the
   constant keeps working and migrates itself on the next successful login.
+- Moved the `/_admin` login throttle to `content/.auth/lockout.json` and the
+  `/_editor` activity log to `content/.logs/`. Both used to live inside the
+  tool folders, which is what made those folders un-replaceable. An active
+  lockout left in the old location still applies, so an update cannot be used
+  to clear one, and a legacy `.logs-<random>` directory is still read and
+  pruned until it ages out of the retention window.
+- Removed the generated `/nino/logs/dir` key. The activity log no longer
+  needs an unguessable directory name: under the content directory it is
+  denied by that directory's own rule, and its files carry the same 403 stub
+  they always did.
 - Changed the `/_install` lock to a persisted `/nino/install/completed`
   marker alongside the stored password, so deleting the password file locks
   `/_admin` instead of handing the installer back. The hash is deliberately
