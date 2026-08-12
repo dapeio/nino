@@ -185,7 +185,7 @@ namespace Nino\Modules {
 					return $entries;
 				} );
 
-				self::_prune( \Nino\Filesystem::getPath( $appData ). '/data' );
+				self::_prune( \Nino\Filesystem::path( $appData, '/data' ) );
 
 			} catch( \Throwable $e ) {
 				trigger_error( 'Submission log write failed: '. $e->getMessage() );

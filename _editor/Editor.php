@@ -834,7 +834,7 @@ namespace Nino\Editor {
 		private static function types( array &$appData ): array {
 
 			$types = [];
-			foreach( glob( \Nino\Filesystem::getPath( $appData ). '/elements/*.php' ) ?: [] as $file )
+			foreach( glob( \Nino\Filesystem::path( $appData, '/elements' ). '/*.php' ) ?: [] as $file )
 				$types[] = basename( $file, '.php' );
 
 			sort( $types );
@@ -1951,7 +1951,7 @@ namespace Nino\Editor {
 		private static function _entries( array &$appData ): array {
 
 			$entries 	= [];
-			$dir 			= \Nino\Filesystem::getPath( $appData ). '/data';
+			$dir 			= \Nino\Filesystem::path( $appData, '/data' );
 			$files 		= glob( $dir. '/forms.*.php' ) ?: [];
 
 			sort( $files );

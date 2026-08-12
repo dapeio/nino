@@ -1543,7 +1543,7 @@ namespace Nino\Templates {
 		public static function apiList( array &$appData, array &$request ): void {
 
 			$documents = [];
-			foreach( glob( \Nino\Filesystem::getPath( $appData ). '/templates/page-*.tpl' ) ?: [] as $file ) {
+			foreach( glob( \Nino\Filesystem::path( $appData, '/templates' ). '/page-*.tpl' ) ?: [] as $file ) {
 				$name = basename( $file, '.tpl' );
 				$source = (string) file_get_contents( $file );
 				$parsed = self::_pageSegments( $source, $name );
@@ -1654,7 +1654,7 @@ namespace Nino\Templates {
 		public static function apiIncludes( array &$appData, array &$request ): void {
 
 			$names = [ 'html-header' => true, 'html-footer' => true ];
-			foreach( glob( \Nino\Filesystem::getPath( $appData ). '/templates/*.tpl' ) ?: [] as $file ) {
+			foreach( glob( \Nino\Filesystem::path( $appData, '/templates' ). '/*.tpl' ) ?: [] as $file ) {
 				$name = basename( $file, '.tpl' );
 				if( preg_match( '/^[A-Za-z0-9][A-Za-z0-9._-]*$/', $name ) === 1 && str_starts_with( $name, 'page-' ) === false )
 					$names[$name] = true;
@@ -1670,7 +1670,7 @@ namespace Nino\Templates {
 					'path' => '/templates/'. $name,
 					'label' => ucwords( str_replace( [ '-', '_' ], ' ', $name ) ),
 					'kind' => $kind,
-					'exists' => is_file( \Nino\Filesystem::getPath( $appData ). '/templates/'. $name. '.tpl' ),
+					'exists' => is_file( \Nino\Filesystem::path( $appData, '/templates/'. $name. '.tpl' ) ),
 				];
 			}
 
@@ -2039,7 +2039,7 @@ namespace Nino\Templates {
 		private static function _path( array &$appData, string $name ): ?string {
 			if( preg_match( '/^page-[A-Za-z0-9][A-Za-z0-9._-]*$/', $name ) !== 1 || str_contains( $name, '..' ) )
 				return null;
-			return \Nino\Filesystem::getPath( $appData ). '/templates/'. $name. '.tpl';
+			return \Nino\Filesystem::path( $appData, '/templates/'. $name. '.tpl' );
 		}
 
 		private static function _write( string $path, string $content ): bool {

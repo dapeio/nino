@@ -535,7 +535,7 @@ file_put_contents( $mergeRoot. '/data/newsletter-removed.php', '<?php return [ '
 // predates this feature entirely - no removed-file of its own
 file_put_contents( $mergeStaging. '/data/newsletter.php', '<?php return [ [ "email" => "alice@example.com", "status" => "subscribed" ], [ "email" => "bob@example.com", "status" => "subscribed" ] ];' );
 
-$mergeMethod->invoke( null, $mergeRoot, $mergeStaging );
+$mergeMethod->invoke( null, $mergeRoot. '/data', $mergeStaging );
 
 $mergedEntries = include $mergeStaging. '/data/newsletter.php';
 $mergedRemoved = include $mergeStaging. '/data/newsletter-removed.php';

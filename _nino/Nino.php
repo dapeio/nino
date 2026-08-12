@@ -30,6 +30,13 @@ namespace Nino {
 			// Defaults to <project>/content unless index.php defines
 			// NINO_CONTENT_DIR before requiring this file
 			'./nino/filesystem/contentpath'	=> defined( 'NINO_CONTENT_DIR' ) ? NINO_CONTENT_DIR : dirname(__DIR__). '/content',
+			// Where the private half of a project lives - config.php, the
+			// templates, the text/elements they render from, and the data
+			// visitors produce (see Filesystem::PRIVATE_DIRS). Still the
+			// project root: the directories have not moved, this only gives
+			// the distinction a name so a webserver-facing path and a
+			// never-served one stop being the same thing
+			'./nino/filesystem/privatepath'	=> dirname(__DIR__),
 		];
 
 		\Nino\AppData::prepare( $appData );
@@ -1191,7 +1198,7 @@ namespace Nino {
 
 			self::forceDir( $appData, '/data/.locks' );
 
-			$lockPath	= self::getPath( $appData ). '/data/.locks/'. sha1( $filename ). '.lock';
+			$lockPath	= self::path( $appData, '/data' ). '/.locks/'. sha1( $filename ). '.lock';
 			// See _writeFile()'s @fopen() - same reasoning: without it, a
 			// permission/quota failure here 500s before "could not be
 			// locked for writing" (mutate(), writeContentData(), Elements)
@@ -1275,13 +1282,26 @@ namespace Nino {
 		// no call site - the same indirection '/config.php' already has
 		public const string CONTENT_DIR = '/content';
 
+		// Everything a project keeps that a webserver must never serve: its
+		// configuration, the templates it renders, the text and elements it
+		// renders them from, and the data its visitors produce. Addressed by
+		// these virtual paths throughout, resolved against the private root -
+		// see path(), and getPath()'s own docblock for the other half.
+		public const array PRIVATE_DIRS = [ '/config.php', '/templates', '/text', '/elements', '/data' ];
+
 		// Map a virtual, project-relative path onto its real location on
-		// disk. Almost always the project root - except config.php, which may
-		// live outside the webroot (NINO_CONFIG_DIR), and everything under
-		// CONTENT_DIR, which is this project's own state and moves with
-		// NINO_CONTENT_DIR. With neither constant set both resolve exactly
-		// where a naive concatenation would have put them, so the default
-		// layout is byte-for-byte what it was.
+		// disk:
+		//
+		//	- config.php may live outside the webroot on its own (NINO_CONFIG_DIR)
+		//	- everything under CONTENT_DIR is this project's own state and
+		//	  moves with NINO_CONTENT_DIR
+		//	- everything under PRIVATE_DIRS resolves against the private root
+		//	- everything else - /images, /assets, the asset cache - is public
+		//	  and stays where the webserver can reach it
+		//
+		// With the private root left at the project root (its default) every
+		// one of these resolves exactly where a naive concatenation would
+		// have put it, so the layout is byte-for-byte what it was.
 		private static function _resolvePath( array &$appData, string $filename ): string {
 
 			$filename = '/'. ltrim( $filename, '/' );
@@ -1293,7 +1313,38 @@ namespace Nino {
 				&& ( $filename === self::CONTENT_DIR || str_starts_with( $filename, self::CONTENT_DIR. '/' ) === true ) )
 				return rtrim( $appData['./nino/filesystem/contentpath']. substr( $filename, strlen( self::CONTENT_DIR ) ), '/' );
 
-			return $appData['./nino/filesystem/path']. $filename;
+			if( self::_isPrivate( $filename ) === true && ( $appData['./nino/filesystem/privatepath'] ?? '' ) !== '' )
+				return rtrim( $appData['./nino/filesystem/privatepath']. $filename, '/' );
+
+			return rtrim( $appData['./nino/filesystem/path']. $filename, '/' );
+		}
+
+		// Whether a virtual path belongs to the private side - the whole
+		// PRIVATE_DIRS entry, never a prefix match on a partial segment:
+		// '/textures' must not read as '/text'
+		private static function _isPrivate( string $filename ): bool {
+
+			foreach( self::PRIVATE_DIRS as $dir )
+				if( $filename === $dir || str_starts_with( $filename, $dir. '/' ) === true )
+					return true;
+
+			return false;
+		}
+
+		/**
+		 *	Resolve a virtual, project-relative path to the absolute one it
+		 *	lives at - for the handful of callers that need a real path rather
+		 *	than a getFileContent()/mutate() call, typically to glob() a
+		 *	directory. Everything else should keep passing virtual paths and
+		 *	let the filesystem functions resolve them
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$filename			Eg. '/elements', '/templates/page-home.tpl'
+		 *
+		 *	@return 	string									Absolute path, existing or not
+		 */
+		public static function path( array &$appData, string $filename ): string {
+			return self::_resolvePath( $appData, $filename );
 		}
 
 		public static function forceDir( array &$appData, string $dirpath ): void {
@@ -1316,9 +1367,24 @@ namespace Nino {
 				@mkdir( $dirpath, 0755, true );
 		}
 
+		// The project's *public* root - the directory a webserver serves
+		// from, holding /images, /assets, the generated asset cache and the
+		// tool folders. Everything a webserver must never serve resolves
+		// against the private root instead; use path() for those rather than
+		// concatenating onto this one (see PRIVATE_DIRS)
 		public static function getPath( array &$appData ): string {
 
 			return $appData['./nino/filesystem/path'];
+
+		}
+
+		// The project's *private* root - config.php, templates, text,
+		// elements and data (see PRIVATE_DIRS). Still the project root by
+		// default, so nothing has moved; naming the distinction is what lets
+		// it move later without touching a single call site
+		public static function getPrivatePath( array &$appData ): string {
+
+			return $appData['./nino/filesystem/privatepath'];
 
 		}
 
@@ -1467,13 +1533,17 @@ namespace Nino {
 			// see that write rather than a cached pre-write stat
 			clearstatcache();
 
-			$root 			= \Nino\Filesystem::getPath( $appData );
+			// Every path here is resolved rather than concatenated onto one
+			// root: config.php may sit outside the webroot on its own
+			// (NINO_CONFIG_DIR), text/elements/data are private and images
+			// are public, so the two halves need not live under the same
+			// directory - see Filesystem::path() and PRIVATE_DIRS
+			$text 			= \Nino\Filesystem::path( $appData, '/text' );
+			$elements 	= \Nino\Filesystem::path( $appData, '/elements' );
+			$images 		= \Nino\Filesystem::path( $appData, '/images' );
+			$data 			= \Nino\Filesystem::path( $appData, '/data' );
 			$configPath	= \Nino\Filesystem::getConfigPath( $appData );
 			$files 			= [];
-
-			// config.php resolves against configPath, not root - see
-			// getConfigPath()'s docblock. Every other file here is always
-			// inside the regular project root.
 			if( is_file( $configPath. '/config.php' ) === true )
 				$files[$configPath. '/config.php'] = 'config.php';
 
@@ -1483,24 +1553,24 @@ namespace Nino {
 			// not reliably in git) and a removed locale's file (still on
 			// disk, no longer in '/nino/locales/available') from every
 			// backup from that point on
-			foreach( glob( $root. '/text/*.php' ) ?: [] as $file )
+			foreach( glob( $text. '/*.php' ) ?: [] as $file )
 				$files[$file] = 'text/'. basename( $file );
 
-			foreach( glob( $root. '/elements/*.php' ) ?: [] as $file )
+			foreach( glob( $elements. '/*.php' ) ?: [] as $file )
 				$files[$file] = 'elements/'. basename( $file );
 
-			foreach( glob( $root. '/images/*' ) ?: [] as $file )
+			foreach( glob( $images. '/*' ) ?: [] as $file )
 				if( is_file( $file ) === true )
 					$files[$file] = 'images/'. basename( $file );
 
-			if( is_file( $root. '/data/newsletter.php' ) === true )
-				$files[$root. '/data/newsletter.php'] = 'data/newsletter.php';
+			if( is_file( $data. '/newsletter.php' ) === true )
+				$files[$data. '/newsletter.php'] = 'data/newsletter.php';
 
 			// The removal record \Nino\Modules\Newsletter writes on every
 			// unsubscribe (a sha256 per removed address, not the address
 			// itself) - Dev\Restore::_mergeNewsletterRestore() needs this
 			// backed up too, as the fallback source of truth for a restore
-			// where $root's own copy is itself what's being recovered from.
+			// where the live copy is itself what's being recovered from.
 			// '/data/newsletter-removed.php' as a plain literal, deliberately
 			// not \Nino\Modules\Newsletter::REMOVED_PATH: this runs
 			// unconditionally on every backup (see Backup::maybeRun()), and
@@ -1509,13 +1579,13 @@ namespace Nino {
 			// module's file (never used its public signup routes) would get
 			// a fatal "Class not found" on every single backup, admin
 			// requests included, for a project that touched nothing
-			if( is_file( $root. '/data/newsletter-removed.php' ) === true )
-				$files[$root. '/data/newsletter-removed.php'] = 'data/newsletter-removed.php';
+			if( is_file( $data. '/newsletter-removed.php' ) === true )
+				$files[$data. '/newsletter-removed.php'] = 'data/newsletter-removed.php';
 
-			foreach( glob( $root. '/data/forms.*.php' ) ?: [] as $file )
+			foreach( glob( $data. '/forms.*.php' ) ?: [] as $file )
 				$files[$file] = 'data/'. basename( $file );
 
-			foreach( glob( $root. '/data/logs.*.php' ) ?: [] as $file )
+			foreach( glob( $data. '/logs.*.php' ) ?: [] as $file )
 				$files[$file] = 'data/'. basename( $file );
 
 			return $files;
@@ -3546,7 +3616,7 @@ namespace Nino {
 					return $entries;
 				} );
 
-				self::_pruneLogs( \Nino\Filesystem::getPath( $appData ). '/data' );
+				self::_pruneLogs( \Nino\Filesystem::path( $appData, '/data' ) );
 
 			} catch( \Throwable $e ) {
 				// Swallow - nothing left to log this failure to from inside the error handler itself

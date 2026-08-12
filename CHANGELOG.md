@@ -60,6 +60,15 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- Separated the project's public root from its private one in the kernel.
+  `\Nino\Filesystem::getPath()` is now documented as the webserver-facing
+  root (images, assets, the generated cache); everything a webserver must
+  never serve — `config.php`, `templates/`, `text/`, `elements/`, `data/`,
+  listed in `Filesystem::PRIVATE_DIRS` — resolves through the new
+  `Filesystem::path()` against a private root of its own. Nothing has moved:
+  that root defaults to the project root, so the on-disk layout is unchanged.
+  What changes is that no call site concatenates a private path onto the
+  public root any more, which is what a later move needs.
 - Moved the `/_admin` password hash out of `_admin/Admin.php` into
   `content/.auth/pw.php`. `/_install` no longer rewrites PHP source, so the
   tool folders are pure code again and an update may replace them wholesale.

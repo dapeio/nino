@@ -1356,6 +1356,49 @@ check( '@unlink() on a file another request already removed (the race prune()/re
 echo "\n";
 
 
+// --- Filesystem::path - public vs private roots --------------------------
+
+echo "Filesystem::path - which root a virtual path resolves against\n";
+
+// Naming the split is the whole point of this: a webserver-facing directory
+// and a never-served one stop being the same path. Nothing has moved yet -
+// the private root still defaults to the project root - so every one of
+// these resolves exactly where a plain concatenation used to put it
+$pathAppData = $appData;
+$pathAppData['./nino/filesystem/path'] 				= '/srv/site';
+$pathAppData['./nino/filesystem/configpath'] 	= '/srv/site';
+$pathAppData['./nino/filesystem/contentpath'] = '/srv/site/content';
+$pathAppData['./nino/filesystem/privatepath'] = '/srv/site';
+
+foreach( [ '/images/hero.jpg', '/assets/style.css', '/.cache/script.js', '/_editor/x' ] as $public )
+	check( "$public stays on the public root", \Nino\Filesystem::path( $pathAppData, $public ) === '/srv/site'. $public );
+
+foreach( \Nino\Filesystem::PRIVATE_DIRS as $private )
+	check( "$private resolves against the private root", \Nino\Filesystem::path( $pathAppData, $private ) === '/srv/site'. $private );
+
+check( 'a path under a private directory follows it', \Nino\Filesystem::path( $pathAppData, '/text/de_DE.php' ) === '/srv/site/text/de_DE.php' );
+check( 'a directory merely starting with a private name does not', \Nino\Filesystem::path( $pathAppData, '/textures/x.png' ) === '/srv/site/textures/x.png' );
+check( 'everything under /content follows the content root', \Nino\Filesystem::path( $pathAppData, '/content/.auth/pw.php' ) === '/srv/site/content/.auth/pw.php' );
+
+// Moving the private root moves every private path with it, and nothing else
+$pathAppData['./nino/filesystem/privatepath'] = '/var/nino-private';
+
+check( 'config.php keeps following its own configpath, not the private root', \Nino\Filesystem::path( $pathAppData, '/config.php' ) === '/srv/site/config.php' );
+check( 'a moved private root takes the templates with it', \Nino\Filesystem::path( $pathAppData, '/templates/page-home.tpl' ) === '/var/nino-private/templates/page-home.tpl' );
+check( '...and text, elements and data', [
+	\Nino\Filesystem::path( $pathAppData, '/text' ),
+	\Nino\Filesystem::path( $pathAppData, '/elements' ),
+	\Nino\Filesystem::path( $pathAppData, '/data' ),
+] === [ '/var/nino-private/text', '/var/nino-private/elements', '/var/nino-private/data' ] );
+check( 'but leaves the public ones where the webserver reaches them', \Nino\Filesystem::path( $pathAppData, '/images/hero.jpg' ) === '/srv/site/images/hero.jpg' );
+
+// config.php keeps its own, older override - it wins over the private root
+$pathAppData['./nino/filesystem/configpath'] = '/etc/nino';
+check( 'NINO_CONFIG_DIR still wins for config.php alone', \Nino\Filesystem::path( $pathAppData, '/config.php' ) === '/etc/nino/config.php' );
+
+echo "\n";
+
+
 // --- Cleanup ------------------------------------------------------------
 
 \Nino\Filesystem::removeDir( $sandbox );

@@ -2487,7 +2487,7 @@ valid or safe for HTML, a path, a header, or a class name.
 - Define a full-match allowlist regex for IDs and slugs.
 - Reject `..`, slashes where a flat segment is expected, null/control
   characters, and empty normalized values.
-- Resolve project paths through `Filesystem` or a fixed owned base directory.
+- Resolve project paths through `Filesystem` or a fixed owned base directory. Never concatenate onto `Filesystem::getPath()` for a private path — that is the public, webserver-facing root. Use `Filesystem::path( $appData, '/text' )`, which resolves `Filesystem::PRIVATE_DIRS` against the private root instead.
 - Never pass a request-derived class string to autoloading or
   `method_exists()`.
 - Never let a request choose an arbitrary callback method.

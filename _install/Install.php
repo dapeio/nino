@@ -276,18 +276,21 @@ namespace Nino\Install {
 		 */
 		private static function _directories( array &$appData ): array {
 
-			$root 	= \Nino\Filesystem::getPath( $appData );
 			$result = [];
 
 			foreach( self::DIRECTORIES as $rel => $tracked ) {
 
-				$path 	= rtrim( $root. '/'. $rel, '/' );
+				// Resolved, not concatenated: a private directory (templates,
+				// text, elements, data) need not sit under the same root as a
+				// public one - see \Nino\Filesystem::path()
+				$path 	= \Nino\Filesystem::path( $appData, '/'. $rel );
+				$parent = dirname( $path );
 				$exists = is_dir( $path );
 
 				// A not-yet-created directory (data/, .cache/) is fine as long as
-				// its parent (always the project root here) can create it on
-				// first write - only an already-existing one has to be writable itself
-				$writable = $exists ? is_writable( $path ) : is_writable( $root );
+				// its parent can create it on first write - only an
+				// already-existing one has to be writable itself
+				$writable = $exists ? is_writable( $path ) : is_writable( $parent );
 
 				$result[( $rel === '' ) ? '.' : $rel] = [
 					'exists' 		=> $exists,
@@ -620,7 +623,6 @@ namespace Nino\Install {
 		private static function _applyUnit( array &$appData, string $unitDir, array $locales, array &$routes, array &$blacklist ): void {
 
 			$manifest = self::_readManifest( $unitDir ) ?? [];
-			$root 		= \Nino\Filesystem::getPath( $appData );
 
 			foreach( ( $manifest['routes'] ?? [] ) as $routeKey => $route ) {
 				if( isset( $route['locale'] ) === true && in_array( $route['locale'], $locales, true ) === false )
@@ -633,22 +635,22 @@ namespace Nino\Install {
 				foreach( $manifest['templates'] as $locale => $file ) {
 					if( is_string( $locale ) === true && in_array( $locale, $locales, true ) === false )
 						continue;
-					self::_copyFile( $unitDir. '/templates/'. $file, $root. '/templates/'. $file );
+					self::_copyFile( $unitDir. '/templates/'. $file, \Nino\Filesystem::path( $appData, '/templates/'. $file ) );
 				}
 			}
 
 			if( count( $manifest['files'] ?? [] ) > 0 ) {
 				foreach( $manifest['files'] as $file )
 					if( is_dir( $unitDir. '/'. $file ) === true )
-						\Nino\Filesystem::copyDir( $unitDir. '/'. $file, $root. '/'. $file );
+						\Nino\Filesystem::copyDir( $unitDir. '/'. $file, \Nino\Filesystem::path( $appData, '/'. $file ) );
 					else if( is_file( $unitDir. '/'. $file ) === true )
-						self::_copyFile( $unitDir. '/'. $file, $root. '/'. $file );
+						self::_copyFile( $unitDir. '/'. $file, \Nino\Filesystem::path( $appData, '/'. $file ) );
 			}
 
 			if( count( $manifest['elementTypes'] ?? [] ) > 0 ) {
 				\Nino\Filesystem::forceDir( $appData, '/elements' );
 				foreach( $manifest['elementTypes'] as $file )
-					self::_copyFile( $unitDir. '/'. $file, $root. '/elements/'. $file );
+					self::_copyFile( $unitDir. '/'. $file, \Nino\Filesystem::path( $appData, '/elements/'. $file ) );
 			}
 
 			foreach( ( $manifest['blacklist'] ?? [] ) as $key )
@@ -814,14 +816,19 @@ namespace Nino\Install {
 				return;
 			}
 
-			$unitDir 	= self::LIBRARY. '/'. $key;
-			$root 		= \Nino\Filesystem::getPath( $appData );
+			$unitDir = self::LIBRARY. '/'. $key;
 
-			foreach( ( $manifest['files'] ?? [] ) as $file )
+			// Each declared file lands wherever this project keeps that kind
+			// of file - a unit's templates/ is private, its assets/ public
+			foreach( ( $manifest['files'] ?? [] ) as $file ) {
+
+				$target = \Nino\Filesystem::path( $appData, '/'. $file );
+
 				if( is_dir( $unitDir. '/'. $file ) === true )
-					\Nino\Filesystem::copyDir( $unitDir. '/'. $file, $root. '/'. $file );
+					\Nino\Filesystem::copyDir( $unitDir. '/'. $file, $target );
 				else if( is_file( $unitDir. '/'. $file ) === true )
-					self::_copyFile( $unitDir. '/'. $file, $root. '/'. $file );
+					self::_copyFile( $unitDir. '/'. $file, $target );
+			}
 
 			$appData['/nino/install/theme'] = $key;
 			$appData['/nino/html/assets'] 	= self::_bundle( $appData, (string) $manifest['stylesheet'] );
@@ -1810,7 +1817,6 @@ namespace Nino\Install {
 
 				$unitDir 	= self::LIBRARY. '/pages/'. $libraryKey;
 				$manifest = self::_readManifest( $unitDir ) ?? [];
-				$root 		= \Nino\Filesystem::getPath( $appData );
 				$route 		= self::_unitRoute( $libraryKey, $locales );
 
 				if( $routeKey !== null && $route !== null ) {
@@ -1834,22 +1840,22 @@ namespace Nino\Install {
 					foreach( $manifest['templates'] as $locale => $file ) {
 						if( is_string( $locale ) === true && in_array( $locale, $locales, true ) === false )
 							continue;
-						self::_copyFile( $unitDir. '/templates/'. $file, $root. '/templates/'. $file );
+						self::_copyFile( $unitDir. '/templates/'. $file, \Nino\Filesystem::path( $appData, '/templates/'. $file ) );
 					}
 				}
 					
 				if( count( $manifest['files'] ?? [] ) > 0 ) {
 					foreach( $manifest['files'] as $file )
 						if( is_dir( $unitDir. '/'. $file ) === true )
-							\Nino\Filesystem::copyDir( $unitDir. '/'. $file, $root. '/'. $file );
+							\Nino\Filesystem::copyDir( $unitDir. '/'. $file, \Nino\Filesystem::path( $appData, '/'. $file ) );
 						else if( is_file( $unitDir. '/'. $file ) === true )
-							self::_copyFile( $unitDir. '/'. $file, $root. '/'. $file );
+							self::_copyFile( $unitDir. '/'. $file, \Nino\Filesystem::path( $appData, '/'. $file ) );
 				}
 
 				if( count( $manifest['elementTypes'] ?? [] ) > 0 ) {
 					\Nino\Filesystem::forceDir( $appData, '/elements' );
 					foreach( $manifest['elementTypes'] as $file )
-						self::_copyFile( $unitDir. '/'. $file, $root. '/elements/'. $file );
+						self::_copyFile( $unitDir. '/'. $file, \Nino\Filesystem::path( $appData, '/elements/'. $file ) );
 				}
 
 				foreach( ( $manifest['blacklist'] ?? [] ) as $key )
@@ -1944,14 +1950,13 @@ namespace Nino\Install {
 		private static function _applyModule( array &$appData, string $unitDir, array $locales, array &$blacklist ): void {
 
 			$manifest = self::_readManifest( $unitDir ) ?? [];
-			$root 		= \Nino\Filesystem::getPath( $appData );
 
 			if( count( $manifest['templates'] ?? [] ) > 0 ) {
 				\Nino\Filesystem::forceDir( $appData, '/templates' );
 				foreach( $manifest['templates'] as $locale => $file ) {
 					if( is_string( $locale ) === true && in_array( $locale, $locales, true ) === false )
 						continue;
-					self::_copyFile( $unitDir. '/templates/'. $file, $root. '/templates/'. $file );
+					self::_copyFile( $unitDir. '/templates/'. $file, \Nino\Filesystem::path( $appData, '/templates/'. $file ) );
 				}
 			}
 

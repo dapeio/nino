@@ -607,7 +607,7 @@ namespace Nino\Admin {
 		public static function summaries( array &$appData ): array {
 
 			$types = [];
-			foreach( glob( \Nino\Filesystem::getPath( $appData ). '/elements/*.php' ) ?: [] as $file ) {
+			foreach( glob( \Nino\Filesystem::path( $appData, '/elements' ). '/*.php' ) ?: [] as $file ) {
 
 				$typeUri 	= basename( $file, '.php' );
 				$typeData = \Nino\Filesystem::getFileContent( $appData, '/elements/'. $typeUri. '.php', [] );
@@ -1396,7 +1396,7 @@ namespace Nino\Admin {
 		private static function types( array &$appData ): array {
 
 			$types = [];
-			foreach( glob( \Nino\Filesystem::getPath( $appData ). '/elements/*.php' ) ?: [] as $file )
+			foreach( glob( \Nino\Filesystem::path( $appData, '/elements' ). '/*.php' ) ?: [] as $file )
 				$types[] = basename( $file, '.php' );
 
 			sort( $types );
@@ -1732,7 +1732,6 @@ namespace Nino\Admin {
 
 			self::_safetySnapshot( $appData, $dir, $key );
 
-			$root 			= \Nino\Filesystem::getPath( $appData );
 			$configPath	= \Nino\Filesystem::getConfigPath( $appData );
 			$tmpGz 			= tempnam( sys_get_temp_dir(), 'ninorestore' ). '.tar.gz';
 			$staging		= sys_get_temp_dir(). '/ninorestore-'. bin2hex( random_bytes( 8 ) );
@@ -1756,9 +1755,24 @@ namespace Nino\Admin {
 			}
 
 			// Newsletter: merged, not overwritten - see _mergeNewsletterRestore()
-			self::_mergeNewsletterRestore( $root, $staging );
+			self::_mergeNewsletterRestore( \Nino\Filesystem::path( $appData, '/data' ), $staging );
 
-			\Nino\Filesystem::copyDir( $staging, $root );
+			// The archive's own layout is flat - text/, elements/, images/,
+			// data/ - but those no longer share one destination on disk:
+			// everything but images is private and resolves against the
+			// private root (see \Nino\Filesystem::PRIVATE_DIRS). Copied one
+			// top-level entry at a time rather than as a single tree, so each
+			// lands wherever this project actually keeps it
+			foreach( glob( $staging. '/*' ) ?: [] as $entry ) {
+
+				$target = \Nino\Filesystem::path( $appData, '/'. basename( $entry ) );
+
+				if( is_dir( $entry ) === true )
+					\Nino\Filesystem::copyDir( $entry, $target );
+				else
+					@copy( $entry, $target );
+			}
+
 			\Nino\Filesystem::removeDir( $staging );
 
 			// extractTo()/copyDir() write straight to disk, bypassing Filesystem's own
@@ -1777,7 +1791,7 @@ namespace Nino\Admin {
 
 		/**
 		 *	Rewrite the staged newsletter files in place, before copyDir()
-		 *	copies the staging tree over $root, so a restore merges instead of
+		 *	copies the staged directories over the live ones, so a restore merges instead of
 		 *	overwriting: an address someone removed (self-service unsubscribe
 		 *	or an admin delete, see \Nino\Modules\Newsletter's own removal
 		 *	record docblock) stays removed no matter how old the backup being
@@ -1786,7 +1800,7 @@ namespace Nino\Admin {
 		 *	survives everything else.
 		 *
 		 *	The removal list itself is unioned rather than replaced (a removal
-		 *	recorded on either side stays a removal) since $root's own copy
+		 *	recorded on either side stays a removal) since the live copy
 		 *	could itself be the very thing being recovered from and is not to
 		 *	be trusted as complete. A resubscribe clears its own address from
 		 *	that list already (see \Nino\Modules\Newsletter's own
@@ -1809,12 +1823,12 @@ namespace Nino\Admin {
 		 *	carries neither file - nothing to merge, copyDir() below restores
 		 *	them exactly as it always did.
 		 *
-		 *	@param		string 		$root					Project root - reads $root's *current* files, unchanged otherwise
+		 *	@param		string 		$dataDir			The live /data directory - read, never written
 		 *	@param		string 		$staging			Extracted backup, rewritten in place
 		 *
 		 *	@return 	void
 		 */
-		private static function _mergeNewsletterRestore( string $root, string $staging ): void {
+		private static function _mergeNewsletterRestore( string $dataDir, string $staging ): void {
 
 			$stagedEntries = $staging. '/data/newsletter.php';
 			$stagedRemoved = $staging. '/data/newsletter-removed.php';
@@ -1823,7 +1837,7 @@ namespace Nino\Admin {
 				return;
 
 			$removed = array_values( array_unique( array_merge(
-				self::_readDataFile( $root. '/data/newsletter-removed.php' ),
+				self::_readDataFile( $dataDir. '/newsletter-removed.php' ),
 				self::_readDataFile( $stagedRemoved )
 			) ) );
 
@@ -2963,7 +2977,7 @@ namespace Nino\Admin {
 
 			$found = [];
 
-			foreach( glob( \Nino\Filesystem::getPath( $appData ). '/templates/*.tpl' ) ?: [] as $file ) {
+			foreach( glob( \Nino\Filesystem::path( $appData, '/templates' ). '/*.tpl' ) ?: [] as $file ) {
 
 				$content = file_get_contents( $file );
 				if( $content === false || preg_match_all( '/\[\[([^\[\]]+)\]\]/', $content, $matches ) === false )
@@ -3211,7 +3225,7 @@ namespace Nino\Admin {
 
 			$elements = [];
 
-			foreach( glob( \Nino\Filesystem::getPath( $appData ). '/elements/*.php' ) ?: [] as $file ) {
+			foreach( glob( \Nino\Filesystem::path( $appData, '/elements' ). '/*.php' ) ?: [] as $file ) {
 
 				$type 		= basename( $file, '.php' );
 				$typeData = \Nino\Filesystem::getFileContent( $appData, '/elements/'. $type. '.php', [] );
@@ -3592,7 +3606,7 @@ namespace Nino\Admin {
 		 */
 		private static function _templates( array &$appData ): array {
 
-			$files = glob( \Nino\Filesystem::getPath( $appData ). '/templates/page-*.tpl' ) ?: [];
+			$files = glob( \Nino\Filesystem::path( $appData, '/templates' ). '/page-*.tpl' ) ?: [];
 			$names = array_map( fn( string $file ): string => basename( $file, '.tpl' ), $files );
 
 			sort( $names );
