@@ -62,6 +62,7 @@ $appData['./nino/filesystem/path']			= $sandbox;
 // Mirrors \Nino\init()'s default (no NINO_CONFIG_DIR set): configpath falls
 // back to the project root, same as this sandbox's regular path
 $appData['./nino/filesystem/configpath']	= $sandbox;
+$appData['./nino/filesystem/contentpath']	= $sandbox. '/content';
 $appData['/nino/dir']				= '';
 $appData['/nino/locales/native']				= 'de_DE';
 $appData['/nino/locales/available']			= [ 'de_DE', 'en_US' ];

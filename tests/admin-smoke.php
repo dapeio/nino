@@ -63,6 +63,7 @@ $appData['./nino/filesystem/path']	= $sandbox;
 // Mirrors \Nino\init()'s default (no NINO_CONFIG_DIR set): configpath falls
 // back to the project root, same as this sandbox's regular path
 $appData['./nino/filesystem/configpath']	= $sandbox;
+$appData['./nino/filesystem/contentpath']	= $sandbox. '/content';
 $appData['/nino/dir']		= '';
 $appData['/nino/locales/native']		= 'de_DE';
 $appData['/nino/locales/available']	= [ 'de_DE', 'en_US' ];
@@ -122,9 +123,100 @@ $unauthedRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Admin\Admin::handlePost( $appData, $unauthedRequest );
 check( 'a module action is rejected while unauthed', $unauthedRequest['/nino/http/response']['statusCode'] === 401 );
 
-// The shipped PASSWORD_HASH is a placeholder matching no real password (see Admin.php) -
-// simulate a successful login directly, the same way Auth-based tests call insertUser()
-// directly rather than driving a registration form
+// --- the password gate itself -------------------------------------------
+//
+// The hash lives under the content directory, not in _admin/Admin.php and
+// not in config.php: a tool folder carrying state cannot be replaced on an
+// update, and a Restore rewrites config.php - the credential that authorises
+// restoring must survive both (see Admin::passwordHash())
+
+$login = static function( array &$appData, string $password ): int {
+	$_POST['action'] = 'dev/login';
+	$_POST['data'] 	 = json_encode( [ 'password' => $password ] );
+	$request = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+	\Nino\Admin\Admin::handlePost( $appData, $request );
+	return $request['/nino/http/response']['statusCode'];
+};
+
+check( 'a fresh checkout has no password at all', \Nino\Admin\Admin::passwordHash( $appData ) === null );
+check( 'so every login fails rather than matching the shipped placeholder', $login( $appData, '' ) === 401 );
+check( '...including one against the placeholder hash itself', \Nino\Admin\Admin::isAuthed( $appData ) === false );
+
+check( 'storing a hash succeeds', \Nino\Admin\Admin::writePasswordHash( $appData, password_hash( 'the real password', PASSWORD_DEFAULT ) ) === true );
+check( 'a wrong password is still rejected', $login( $appData, 'not the password' ) === 401 );
+check( 'the right one opens the gate', $login( $appData, 'the real password' ) === 200 && \Nino\Admin\Admin::isAuthed( $appData ) === true );
+
+// The lockout counter runs whether or not a password exists - answering an
+// unknown-password project instantly would tell an unauthenticated caller
+// which state this installation is in
+\Nino\Filesystem::putFileContent( $appData, '/_admin/.lockout.json', [ 'tries' => 0, 'until' => time() + 60 ] );
+check( 'a locked-out login reports 429, not 401', $login( $appData, 'the real password' ) === 429 );
+\Nino\Filesystem::putFileContent( $appData, '/_admin/.lockout.json', [ 'tries' => 0, 'until' => 0 ] );
+
+// --- upgrading a project whose hash is still in the constant -------------
+//
+// The one path an update has to keep working: before this file's hash moved
+// out, /_install rewrote the PASSWORD_HASH constant inside _admin/Admin.php.
+// Such a project must keep logging in, and must migrate itself across on the
+// first successful login - otherwise replacing that file on a later update
+// silently restores the shipped placeholder, which logs the operator out and
+// hands /_install back to whoever asks for it.
+//
+// Driven in a subprocess against a patched copy of Admin.php, since the
+// constant is private and the real file must stay untouched
+$legacyRoot 	= $sandbox. '/legacy';
+$legacyHash 	= password_hash( 'the legacy password', PASSWORD_DEFAULT );
+$legacySource = str_replace(
+	"private const string PASSWORD_HASH = '". \Nino\Admin\Admin::DEFAULT_PASSWORD_HASH. "';",
+	"private const string PASSWORD_HASH = '". $legacyHash. "';",
+	file_get_contents( __DIR__. '/../_admin/Admin.php' ),
+	$legacyReplacements
+);
+
+mkdir( $legacyRoot, 0777, true );
+file_put_contents( $legacyRoot. '/Admin.php', $legacySource );
+
+check( 'the legacy fixture really patched the effective constant', $legacyReplacements === 1 );
+
+$legacyDriver = $legacyRoot. '/drive.php';
+file_put_contents( $legacyDriver, '<?php
+declare(strict_types=1);
+require '. var_export( __DIR__. '/../_nino/Nino.php', true ). ';
+require '. var_export( $legacyRoot. '/Admin.php', true ). ';
+set_error_handler( function() { return true; } );
+$_SERVER["REMOTE_ADDR"] = "127.0.0.1";
+$appData = [ "./nino/uid" => '. var_export( $legacyRoot, true ). ' ];
+\Nino\AppData::prepare( $appData );
+$appData["./nino/filesystem/path"]				= '. var_export( $legacyRoot, true ). ';
+$appData["./nino/filesystem/configpath"]	= '. var_export( $legacyRoot, true ). ';
+$appData["./nino/filesystem/contentpath"] = '. var_export( $legacyRoot. '/content', true ). ';
+$appData["/nino/dir"] = "";
+\Nino\Filesystem::putFileContent( $appData, "/config.php", [] );
+
+$before = \Nino\Admin\Admin::passwordHash( $appData );
+
+$_POST["action"] = "dev/login";
+$_POST["data"]	 = json_encode( [ "password" => "the legacy password" ] );
+$request = [ "/nino/http/response" => [ "statusCode" => 200 ] ];
+\Nino\Admin\Admin::handlePost( $appData, $request );
+
+echo json_encode( [
+	"hashBefore"	=> $before,
+	"status"			=> $request["/nino/http/response"]["statusCode"],
+	"installed"		=> \Nino\Admin\Admin::isInstalled( $appData ),
+	"migrated"		=> is_file( \Nino\Admin\Admin::passwordPath( $appData ) ),
+	"stored"			=> \Nino\Admin\Admin::passwordHash( $appData ),
+] );
+' );
+
+$legacyResult = json_decode( (string) shell_exec( 'php '. escapeshellarg( $legacyDriver ). ' 2>/dev/null' ), true ) ?? [];
+
+check( 'a legacy project still reports its constant as the hash in effect', ( $legacyResult['hashBefore'] ?? null ) === $legacyHash );
+check( '...and counts as installed, so /_install stays locked for it', ( $legacyResult['installed'] ?? null ) === true );
+check( 'its password still logs in', ( $legacyResult['status'] ?? null ) === 200 );
+check( 'the login migrates the hash out into the content directory', ( $legacyResult['migrated'] ?? null ) === true );
+check( '...unchanged, so the same password keeps working afterwards', ( $legacyResult['stored'] ?? null ) === $legacyHash );
+
 \Nino\Runtime::setSessionValue( $appData, './nino/admin/authed', true );
 check( 'isAuthed reflects the session flag', \Nino\Admin\Admin::isAuthed( $appData ) === true );
 
@@ -413,6 +505,7 @@ $outAppData = [ './nino/uid' => $outSandbox ];
 \Nino\AppData::prepare( $outAppData );
 $outAppData['./nino/filesystem/path']			= $outSandbox;
 $outAppData['./nino/filesystem/configpath']	= $outConfigDir; // simulates NINO_CONFIG_DIR
+$outAppData['./nino/filesystem/contentpath']	= $outSandbox. '/content';
 $outAppData['/nino/dir']										= '';
 $outAppData['/nino/locales/native']				= 'de_DE';
 $outAppData['/nino/locales/available']			= [ 'de_DE' ];

@@ -92,7 +92,7 @@
 				</div>
 
 				<div id="install-content-finish">
-					<p class="admin-hint">Set the real <code>/_admin</code> password. This is the last step - once set, <code>/_install</code> locks itself out for good (no way back short of hand-editing <code>_admin/Admin.php</code>).</p>
+					<p class="admin-hint">Set the real <code>/_admin</code> password. This is the last step - once set, <code>/_install</code> locks itself out for good (no way back short of clearing <code>/nino/install/completed</code> in <code>config.php</code> and removing the stored password).</p>
 					<p class="admin-error" id="finish-warning">Make sure an admin account was created in the previous step first - without one, <code>/_editor</code> login won't be possible afterwards.</p>
 					<form id="finish-form">
 						<label class="editor-field" for="finish-pw"><span>New _admin password</span><input id="finish-pw" type="password" autocomplete="new-password" required></label>

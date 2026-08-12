@@ -22,6 +22,14 @@ namespace Nino {
 			// the project root (old, in-webroot behaviour) unless the site's
 			// index.php defines NINO_CONFIG_DIR before requiring this file.
 			'./nino/filesystem/configpath'	=> defined( 'NINO_CONFIG_DIR' ) ? NINO_CONFIG_DIR : dirname(__DIR__),
+			// Everything this project *is*, as opposed to the code that runs
+			// it: for now the _admin password hash, later the rest of what
+			// makes one installation differ from another. Kept apart from the
+			// tool folders so those stay pure code and can be replaced
+			// wholesale on an update - see Filesystem::getContentPath().
+			// Defaults to <project>/content unless index.php defines
+			// NINO_CONTENT_DIR before requiring this file
+			'./nino/filesystem/contentpath'	=> defined( 'NINO_CONTENT_DIR' ) ? NINO_CONTENT_DIR : dirname(__DIR__). '/content',
 		];
 
 		\Nino\AppData::prepare( $appData );
@@ -1296,6 +1304,24 @@ namespace Nino {
 		public static function getConfigPath( array &$appData ): string {
 
 			return $appData['./nino/filesystem/configpath'];
+
+		}
+
+		// Return the path this project's own, non-code state lives under -
+		// normally <project>/content, moved by NINO_CONTENT_DIR (see
+		// \Nino\init()). The generalisation of getConfigPath(): where that
+		// one moves a single file, this moves everything that makes one
+		// installation differ from another, so the tool folders stay pure
+		// code an update may replace outright.
+		//
+		// Today this holds .auth/pw.php alone - the _admin password hash,
+		// which used to be a constant inside _admin/Admin.php and therefore
+		// made that file un-replaceable (see Admin::passwordHash()). It is
+		// deliberately *not* the config path: a Restore rewrites config.php,
+		// and the credential that authorises the restore must survive it.
+		public static function getContentPath( array &$appData ): string {
+
+			return $appData['./nino/filesystem/contentpath'];
 
 		}
 

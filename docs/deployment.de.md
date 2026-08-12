@@ -180,7 +180,7 @@ Behandle ein Nino-Update wie eine Änderung am konkreten Webseitenprojekt, nicht
 
 1. Sichere den aktuellen produktiven Stand außerhalb des Webroots.
 2. Übernimm die Änderung zunächst in eine Entwicklungs- oder Staging-Umgebung.
-3. Vergleiche eigene Anpassungen in Kernel, Templates und Verwaltungsoberflächen mit dem neuen Stand.
+3. Vergleiche eigene Anpassungen in Kernel, Templates und Verwaltungsoberflächen mit dem neuen Stand. Die Verwaltungsoberflächen selbst tragen keinen Projektzustand mehr: Das `/_admin`-Passwort liegt in `content/.auth/pw.php`, `_admin/` lässt sich also komplett ersetzen, ohne den Login zu verlieren oder `/_install` wieder zu öffnen.
 4. Führe Smoke-Tests und projektspezifische Abnahme aus.
 5. Übertrage den geprüften Stand und behalte die vorherige Version für ein Rollback.
 
@@ -191,6 +191,7 @@ Nino befindet sich in der Beta-Phase. Sicherheitskorrekturen erscheinen auf `mai
 - [ ] PHP-Version und Erweiterungen entsprechen den Anforderungen.
 - [ ] Öffentliche Routen werden korrekt an Nino übergeben.
 - [ ] Dotfiles, Dot-Verzeichnisse und PHP-Datendateien sind nicht direkt erreichbar.
+- [ ] `content/` wird nicht ausgeliefert — die eigene `.htaccess` sperrt das Verzeichnis, und jede Datei darin trägt einen 403-Stub; prüfe, ob beides auf deinem Webserver greift, oder verlege das Verzeichnis mit `NINO_CONTENT_DIR` aus dem Webroot.
 - [ ] Verzeichnisauflistung ist deaktiviert.
 - [ ] `/_install` konnte die Projektverzeichnisse aus der beschreibbaren Projektwurzel selbst erzeugen.
 - [ ] Schreibrechte sind nach der Einrichtung auf die benötigten Pfade begrenzt.

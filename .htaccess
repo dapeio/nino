@@ -13,6 +13,12 @@
 	Require all denied
 </FilesMatch>
 
+# The project's own state (see \Nino\Filesystem::getContentPath()) is only
+# ever read by php, never served - denied by content/.htaccess rather than
+# from here, since a rule written here would have to name an absolute url
+# path and would therefore miss a subdirectory install (/nino/dir). Both are
+# belt and braces next to the 403 stub each of those files carries itself.
+
 # Don't let a directory with no index.php list its contents - matters most
 # for _editor/.backups-*/ and _editor/.logs-*/, whose only real protection
 # is that their random directory name is never linked from anywhere

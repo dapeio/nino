@@ -181,7 +181,7 @@ Treat a Nino update like a change to the specific website project, not like blin
 
 1. Secure the current production state outside the webroot.
 2. First transfer the change to a development or staging environment.
-3. Compare your own adjustments in kernel, templates, and management interfaces with the new state.
+3. Compare your own adjustments in kernel, templates, and management interfaces with the new state. The management interfaces themselves no longer hold project state: the `/_admin` password lives in `content/.auth/pw.php`, so `_admin/` can be replaced wholesale without losing the login or re-opening `/_install`.
 4. Run smoke tests and project-specific acceptance.
 5. Transfer the tested state and keep the previous version for rollback.
 
@@ -192,6 +192,7 @@ Nino is in the beta phase. Security fixes appear on `main`; there is currently n
 - [ ] PHP version and extensions meet the requirements.
 - [ ] Public routes are correctly forwarded to Nino.
 - [ ] Dotfiles, dot directories, and PHP data files are not directly accessible.
+- [ ] `content/` is not served — its own `.htaccess` denies it, and each file inside carries a 403 stub; verify both apply on your webserver, or move the directory out of the webroot with `NINO_CONTENT_DIR`.
 - [ ] Directory listing is disabled.
 - [ ] `/_install` was able to create the project directories from the writable project root itself.
 - [ ] Write permissions are limited to the required paths after setup.

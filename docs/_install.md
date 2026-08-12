@@ -150,7 +150,9 @@ Provide:
 
 - a **password** for `/_admin` and `/_templates`.
 
-After setting the password, `/_install` is locked and can no longer be used. The assistant is then removed from production delivery.
+The hash is written to `content/.auth/pw.php` and the project is marked installed via `/nino/install/completed` in `config.php`. Either of those alone keeps `/_install` locked, so losing the password file locks `/_admin` rather than handing the installer back. Neither lives in a tool folder, which is what lets an update replace `_nino/`, `_admin/`, `_editor/`, and `_templates/` wholesale.
+
+If completion fails, check the write permissions of the `content/` directory. After setting the password, `/_install` is locked and can no longer be used. The assistant is then removed from production delivery.
 
 ## Verify the Result and Remove the Installer
 

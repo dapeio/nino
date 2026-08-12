@@ -47,7 +47,7 @@ Beachte für den Betrieb:
 
 `/_templates` verwendet dasselbe Passwort, denselben Sperrstatus und dieselbe Sitzung wie `/_admin`. Der Link **Template Builder** im Kopfbereich öffnet das sectionbasierte Alpha-Werkzeug. Ohne `_admin/` kann der eigenständige Builder nicht verwendet werden.
 
-Das Passwort lässt sich außerhalb des Installers mit `php _admin/Admin.php <passwort>` neu hashen. Der ausgegebene Hash ersetzt `PASSWORD_HASH` in `_admin/Admin.php`. Führe diesen Vorgang nur in einer geschützten lokalen Umgebung aus; ein als Kommandozeilenargument eingegebenes Passwort kann in Shell-Verlauf oder Prozessliste sichtbar werden.
+Das Passwort lässt sich außerhalb des Installers mit `php _admin/Admin.php <passwort>` neu hashen. Die Ausgabe ist eine vollständige Datei — schreibe sie nach `content/.auth/pw.php` und ersetze damit den vorhandenen Inhalt. Sie liegt bewusst nicht in `_admin/Admin.php` (ein Werkzeugordner muss bei einem Update ersetzbar bleiben) und nicht in der `config.php` (eine Wiederherstellung überschreibt diese Datei, und die Zugangsdaten, die eine Wiederherstellung autorisieren, müssen sie überleben). Führe diesen Vorgang nur in einer geschützten lokalen Umgebung aus; ein als Kommandozeilenargument eingegebenes Passwort kann in Shell-Verlauf oder Prozessliste sichtbar werden.
 
 ## Dashboard
 

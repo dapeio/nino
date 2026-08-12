@@ -6,6 +6,11 @@ All notable changes to Nino are documented in this file.
 
 ### Added
 
+- Added a `content/` directory for this project's own state, reached through
+  `\Nino\Filesystem::getContentPath()` and movable with `NINO_CONTENT_DIR`
+  (the generalisation of `NINO_CONFIG_DIR`). It ships an Apache deny rule,
+  and every file inside carries a 403 stub, so it stays unreadable even where
+  that rule does not apply.
 - Added a **Navigations** area to `/_admin`: create, rename, and delete the
   menus registered in `/nino/html/navs`, and set each menu's whole running
   order with ↑/↓, a remove button, and a picker that adds any `GET` route at
@@ -53,6 +58,20 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- Moved the `/_admin` password hash out of `_admin/Admin.php` into
+  `content/.auth/pw.php`. `/_install` no longer rewrites PHP source, so the
+  tool folders are pure code again and an update may replace them wholesale.
+  Previously, copying a new `_admin/Admin.php` over the old one restored the
+  shipped placeholder hash — which logged the operator out **and** re-opened
+  `/_install` on a live site, because that placeholder was exactly what the
+  installer's lock was reading. A project whose hash still lives in the
+  constant keeps working and migrates itself on the next successful login.
+- Changed the `/_install` lock to a persisted `/nino/install/completed`
+  marker alongside the stored password, so deleting the password file locks
+  `/_admin` instead of handing the installer back. The hash is deliberately
+  not in `config.php`: a Restore rewrites that file, and the credential that
+  authorises restoring has to survive it. It is not part of the backup
+  manifest either — a backup recovers content, not access.
 - Replaced the DOM-oriented `/_templates` builder with the section-first
   Template Builder under the same route and removed the obsolete block
   library and nested-DOM editing client.

@@ -13,11 +13,12 @@ declare(strict_types=1);
  *												Infos" text, creating the first _editor account(s) and finally
  *												setting the real _admin password.
  *
- *												Guarded by \Nino\Admin\Admin::hasDefaultPassword(): this only ever
- *												runs against a checkout that still ships the placeholder _admin
- *												hash. Setting a real one - the wizard's own last step - is what
- *												locks /_install back out, permanently, with no way back in short
- *												of hand-editing _admin/Admin.php's PASSWORD_HASH again. Not part of
+ *												Guarded by \Nino\Admin\Admin::isInstalled(): this only ever runs
+ *												against a project that has never finished the wizard. Its own
+ *												last step is what locks /_install back out, permanently - it
+ *												stores the real _admin password and marks the project
+ *												installed, and either of those alone keeps the gate shut, so
+ *												losing one file does not hand the installer back. Not part of
  *												the shipped admin dashboard, not linked from it. Safe (and
  *												recommended) to delete the whole folder once done: `rm -rf _install`.
  *
@@ -31,7 +32,7 @@ namespace Nino\Install {
 	/**
 	 *	Nino							A compact filesystembased php framework
 	 *	Install						Bootstraps /_install: registers the route, gates every request
-	 *												behind Admin::hasDefaultPassword(), dispatches POST actions to a
+	 *												behind Admin::isInstalled(), dispatches POST actions to a
 	 *												small registry of step modules. Add a new step by writing a
 	 *												class with an actions() method and listing it in MODULES -
 	 *												nothing else here needs to change.
@@ -88,8 +89,10 @@ namespace Nino\Install {
 		 */
 		public static function handleGet( array &$appData, array &$request ): void {
 
-			if( \Nino\Admin\Admin::hasDefaultPassword() === false )
-				$request['/nino/http/response']['body'] = '[template /_install/templates/page-locked]';
+			if( \Nino\Admin\Admin::isInstalled( $appData ) === false )
+				return;
+
+			$request['/nino/http/response']['body'] = '[template /_install/templates/page-locked]';
 		}
 
 		/**
@@ -107,7 +110,7 @@ namespace Nino\Install {
 		 */
 		public static function handlePost( array &$appData, array &$request ): void {
 
-			if( self::guard( $request ) === false )
+			if( self::guard( $appData, $request ) === false )
 				return;
 
 			$action = $_POST['action'] ?? '';
@@ -136,12 +139,12 @@ namespace Nino\Install {
 		 *
 		 *	@return 	bool										If the request may proceed
 		 */
-		public static function guard( array &$request ): bool {
+		public static function guard( array &$appData, array &$request ): bool {
 
 			if( $request['/nino/http/response']['statusCode'] !== 200 )
 				return false;
 
-			if( \Nino\Admin\Admin::hasDefaultPassword() === false ) {
+			if( \Nino\Admin\Admin::isInstalled( $appData ) === true ) {
 				\Nino\Http::fail( $request, 423, 'already installed' );
 				return false;
 			}
@@ -161,88 +164,25 @@ namespace Nino\Install {
 		}
 
 		/**
-		 *	Rewrite _admin/Admin.php's PASSWORD_HASH constant in place - the one
-		 *	piece of the wizard that touches PHP source rather than a data
-		 *	file, so it doesn't go through \Nino\Filesystem (which only knows
-		 *	how to read/write .php files shaped as `<?php return [...];`).
-		 *	Used by Finish::apiComplete(); $path is only ever overridden by
-		 *	tests/install-smoke.php, against a sandboxed copy of Admin.php -
-		 *	there is exactly one real _admin/Admin.php per project, so production
-		 *	code never passes it
+		 *	Hash the posted password and store it under the content directory
+		 *	(see \Nino\Admin\Admin::PASSWORD_PATH).
 		 *
-		 *	@param		string				$pw					New plaintext _admin password
-		 *	@param		string|null		$path				Admin.php to rewrite - defaults to the real one
+		 *	Used to rewrite _admin/Admin.php's PASSWORD_HASH constant in the
+		 *	source file itself. It no longer does: a tool folder carrying
+		 *	project state cannot be replaced on an update, and replacing it
+		 *	anyway restored the shipped placeholder - which logged the
+		 *	operator out and, because that placeholder is exactly what
+		 *	Admin::isInstalled() reads, handed /_install back to whoever asked
+		 *	for it. The hash is deliberately not in config.php either, so a
+		 *	Restore cannot roll back the credential that authorises restoring
 		 *
-		 *	@return 	bool											Whether the file was rewritten
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$pw						New plaintext _admin password
+		 *
+		 *	@return 	bool										Whether the hash was stored
 		 */
-		public static function setDevPassword( string $pw, ?string $path = null ): bool {
-
-			$path 	??= dirname( __DIR__ ). '/_admin/Admin.php';
-			$source = @file_get_contents( $path );
-
-			if( $source === false )
-				return false;
-
-			$hash 	= password_hash( $pw, PASSWORD_DEFAULT );
-			$count 	= 0;
-
-			// preg_replace_callback rather than preg_replace(): a bcrypt hash's
-			// '$2y$10$...' shape is full of '$<digits>' sequences a plain
-			// replacement string would read as backreferences ($2, $10, ...)
-			// instead of literal characters
-			$updated = preg_replace_callback(
-				'/private const string PASSWORD_HASH = \'[^\']*\';/',
-				function() use ( $hash ): string { return 'private const string PASSWORD_HASH = \''. $hash. '\';'; },
-				$source,
-				1,
-				$count
-			);
-
-			if( $updated === null || $count !== 1 )
-				return false;
-
-			return self::_writeFileAtomic( $path, $updated );
-		}
-
-		// Replace a file's content atomically: write a temp file next to it,
-		// then rename() over the target - same reasoning as
-		// \Nino\Filesystem::_writeFile(), duplicated here rather than reused
-		// since that one is private and shaped around the filesystem-cache
-		// abstraction (json/php-array files under the project root), while
-		// this rewrites a specific line of PHP source outside it
-		private static function _writeFileAtomic( string $path, string $content ): bool {
-
-			$temp 	= $path. '.'. bin2hex( random_bytes( 6 ) ). '.tmp';
-			$handle = @fopen( $temp, 'wb' );
-
-			if( $handle === false )
-				return false;
-
-			$written = fwrite( $handle, $content );
-			$flushed = fflush( $handle );
-			fclose( $handle );
-
-			if( $written === false || $written !== strlen( $content ) || $flushed === false ) {
-				@unlink( $temp );
-				return false;
-			}
-
-			$mode = @fileperms( $path );
-			if( $mode !== false )
-				@chmod( $temp, $mode & 0777 );
-
-			if( @rename( $temp, $path ) === false ) {
-				@unlink( $temp );
-				return false;
-			}
-
-			// Without this, an opcache-enabled webserver keeps serving the old
-			// PASSWORD_HASH (and /_install would look un-installed forever)
-			// until the cache entry expires or the process restarts
-			if( function_exists( 'opcache_invalidate' ) === true )
-				opcache_invalidate( $path, true );
-
-			return true;
+		public static function setDevPassword( array &$appData, string $pw ): bool {
+			return \Nino\Admin\Admin::writePasswordHash( $appData, password_hash( $pw, PASSWORD_DEFAULT ) );
 		}
 	}
 
@@ -2368,10 +2308,10 @@ namespace Nino\Install {
 	/**
 	 *	Nino							A compact filesystembased php framework
 	 *	Install						Step 7 - the wizard's last step: set the real _admin password.
-	 *												The only step that writes to _admin/Admin.php's PHP source rather
-	 *												than a data file (see Install::setDevPassword()), and the one
+	 *												Writes it under the content directory rather than into any
+	 *												tool folder (see Install::setDevPassword()), and is the one
 	 *												action whose success is itself what locks /_install back out -
-	 *												Admin::hasDefaultPassword() goes false the moment this returns
+	 *												Admin::isInstalled() goes true the moment this returns
 	 *
 	 *	@package					Dape/Nino
 	 *	@author						David Perchermeier <mail@dape.io>
@@ -2391,7 +2331,13 @@ namespace Nino\Install {
 		}
 
 		/**
-		 *	Rewrite _admin/Admin.php's PASSWORD_HASH to the posted password's hash
+		 *	Store the posted password's hash and mark this project installed.
+		 *
+		 *	The marker is what makes "already installed" survive the loss of
+		 *	the password file: without it, deleting one file would re-open
+		 *	the wizard on a live site (see Admin::isInstalled()). Written
+		 *	after the hash, never before - a marker on a project that has no
+		 *	password yet would lock its operator out of both areas at once
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
@@ -2413,10 +2359,14 @@ namespace Nino\Install {
 				return;
 			}
 
-			if( \Nino\Install\Install::setDevPassword( $pw ) === false ) {
-				\Nino\Http::fail( $request, 500, 'could not write _admin/Admin.php - check its file permissions' );
+			if( \Nino\Install\Install::setDevPassword( $appData, $pw ) === false ) {
+				\Nino\Http::fail( $request, 500, 'could not write '. \Nino\Admin\Admin::PASSWORD_PATH. ' under the content directory - check its file permissions' );
 				return;
 			}
+
+			$appData['/nino/install/completed'] = true;
+
+			\Nino\AppData::writeContentData( $appData, [ '/nino/install/completed' ] );
 
 			\Nino\Http::ok( $request );
 		}

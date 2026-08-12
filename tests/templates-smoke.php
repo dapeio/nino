@@ -54,6 +54,7 @@ $appData = [ './nino/uid' => $sandbox ];
 \Nino\AppData::prepare( $appData );
 $appData['./nino/filesystem/path'] = $sandbox;
 $appData['./nino/filesystem/configpath'] = $sandbox;
+$appData['./nino/filesystem/contentpath'] = $sandbox. '/content';
 $appData['/nino/dir'] = '';
 $appData['/nino/locales/native'] = 'en_US';
 $appData['/nino/locales/available'] = [ 'en_US', 'de_DE' ];

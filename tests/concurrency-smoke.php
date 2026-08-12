@@ -97,6 +97,7 @@ function runBackupWorker( string $sandbox ): void {
 
 	$appData = bootAppData( $sandbox );
 	$appData['./nino/filesystem/configpath'] = $sandbox;
+	$appData['./nino/filesystem/contentpath'] = $sandbox. '/content';
 	$appData['/nino/editor/backups'] = true;
 
 	\Nino\Editor\Backup::maybeRun( $appData );

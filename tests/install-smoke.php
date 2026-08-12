@@ -52,6 +52,7 @@ $appData = [ './nino/uid' => $sandbox ];
 \Nino\AppData::prepare( $appData );
 $appData['./nino/filesystem/path']				= $sandbox;
 $appData['./nino/filesystem/configpath']	= $sandbox;
+$appData['./nino/filesystem/contentpath']	= $sandbox. '/content';
 $appData['/nino/dir']										= '';
 $appData['/nino/locales/native']					= 'de_DE';
 // Matches the real shipped config.php default - only the native locale,
@@ -89,16 +90,25 @@ echo "Sandbox: $sandbox\n\n";
 
 echo "Install::guard / postData\n";
 
-// hasDefaultPassword() reflects the real, unmodified _admin/Admin.php shipped in
-// this checkout - always true here, since nothing in this file ever writes
-// to it (see the Finish section below for why)
-check( 'Admin::hasDefaultPassword() is true on a fresh checkout', \Nino\Admin\Admin::hasDefaultPassword() === true );
+// The sandbox has no password file and no marker, which is exactly what a
+// project that never finished the wizard looks like
+check( 'Admin::isInstalled() is false on a project that never ran the wizard', \Nino\Admin\Admin::isInstalled( $appData ) === false );
+check( '...because there is no stored hash at all', \Nino\Admin\Admin::passwordHash( $appData ) === null );
 
 $nonOkRequest = [ '/nino/http/response' => [ 'statusCode' => 404 ] ];
-check( 'guard rejects a request an earlier callback already failed', \Nino\Install\Install::guard( $nonOkRequest ) === false );
+check( 'guard rejects a request an earlier callback already failed', \Nino\Install\Install::guard( $appData, $nonOkRequest ) === false );
 
 $okRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-check( 'guard passes while the project is still on the default _admin hash', \Nino\Install\Install::guard( $okRequest ) === true );
+check( 'guard passes while the project is not installed yet', \Nino\Install\Install::guard( $appData, $okRequest ) === true );
+
+// The marker alone closes the gate - that is the whole point of it: losing
+// the password file must lock the admin area, never re-open the installer
+$appData['/nino/install/completed'] = true;
+$markedRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+check( 'a project marked installed is locked out even with no password file', \Nino\Install\Install::guard( $appData, $markedRequest ) === false );
+check( '...with 423, not a silent pass', $markedRequest['/nino/http/response']['statusCode'] === 423 );
+check( 'isInstalled() agrees', \Nino\Admin\Admin::isInstalled( $appData ) === true );
+unset( $appData['/nino/install/completed'] );
 
 $_POST['data'] = json_encode( [ 'foo' => 'bar' ] );
 check( 'postData() decodes the json payload', \Nino\Install\Install::postData() === [ 'foo' => 'bar' ] );
@@ -754,32 +764,60 @@ $shortFinishRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Install\Finish::apiComplete( $appData, $shortFinishRequest );
 check( 'rejects a too-short _admin password with 400', $shortFinishRequest['/nino/http/response']['statusCode'] === 400 );
 
-// setDevPassword() itself is exercised directly against a sandboxed copy of
-// Admin.php, never Finish::apiComplete() end-to-end - that method always
-// targets the real project's _admin/Admin.php (there is only ever one), which
-// this file must not touch. See Install::setDevPassword()'s docblock.
-$adminCopy = $sandbox. '/Admin.php';
-copy( __DIR__. '/../_admin/Admin.php', $adminCopy );
+// setDevPassword() no longer rewrites php source: it stores the hash under
+// the content directory, outside every tool folder and outside config.php.
+// _admin/Admin.php therefore stays byte-identical, which is what makes it
+// replaceable on an update (see Install::setDevPassword()'s docblock)
+$adminBefore = file_get_contents( __DIR__. '/../_admin/Admin.php' );
 
-check( 'the sandboxed copy still carries the shipped placeholder hash', str_contains( file_get_contents( $adminCopy ), \Nino\Admin\Admin::DEFAULT_PASSWORD_HASH ) === true );
+$_POST['data'] = json_encode( [ 'password' => 'a brand new dev password' ] );
+$finishRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Install\Finish::apiComplete( $appData, $finishRequest );
+check( 'apiComplete succeeds once an editor account exists', $finishRequest['/nino/http/response']['statusCode'] === 200 );
 
-$setResult = \Nino\Install\Install::setDevPassword( 'a brand new dev password', $adminCopy );
-check( 'setDevPassword() reports success', $setResult === true );
+check( 'the real _admin/Admin.php was not touched', file_get_contents( __DIR__. '/../_admin/Admin.php' ) === $adminBefore );
 
-// DEFAULT_PASSWORD_HASH itself must never be touched - it's the fixed
-// reference value hasDefaultPassword() compares against, so the file still
-// legitimately contains that string in its own declaration. What has to
-// change is the *other* one: the private PASSWORD_HASH constant actually in effect.
-$rewritten = file_get_contents( $adminCopy );
-preg_match( '/private const string PASSWORD_HASH = \'([^\']*)\';/', $rewritten, $hashMatch );
+$pwPath = \Nino\Admin\Admin::passwordPath( $appData );
+check( 'the hash lands under the content directory', $pwPath === $sandbox. '/content/.auth/pw.php' && is_file( $pwPath ) === true );
 
-check( 'the effective PASSWORD_HASH no longer matches the placeholder', ( $hashMatch[1] ?? '' ) !== \Nino\Admin\Admin::DEFAULT_PASSWORD_HASH );
-check( 'the new hash actually verifies against the posted password', password_verify( 'a brand new dev password', $hashMatch[1] ?? '' ) === true );
+$pwRaw = file_get_contents( $pwPath );
+check( 'it is wrapped in the self-exiting 403 stub', str_starts_with( $pwRaw, \Nino\Admin\Admin::STUB_PREFIX ) === true && str_ends_with( $pwRaw, \Nino\Admin\Admin::STUB_SUFFIX ) === true );
+// Run in a subprocess, not inline: the stub's whole job is to exit(), which
+// would take this test run with it. What matters is that executing the file -
+// which is what a webserver that happily serves it would do - prints nothing
+$stubOutput = (string) shell_exec( 'php -r '. escapeshellarg( 'include '. var_export( $pwPath, true ). ';' ). ' 2>&1' );
+check( 'executing that file prints nothing - the hash never reaches a response body', trim( $stubOutput ) === '' );
 
-$lintOutput = (string) shell_exec( 'php -l '. escapeshellarg( $adminCopy ). ' 2>&1' );
-check( 'the rewritten file is still otherwise valid php', str_contains( $lintOutput, 'No syntax errors detected' ) === true );
+check( 'passwordHash() reads it back', password_verify( 'a brand new dev password', (string) \Nino\Admin\Admin::passwordHash( $appData ) ) === true );
+check( 'the project is now installed', \Nino\Admin\Admin::isInstalled( $appData ) === true );
+check( '...and the marker is persisted, so losing the file cannot re-open the wizard', ( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/install/completed'] ?? false ) === true );
 
-check( 'setDevPassword() fails cleanly against a file that does not exist', \Nino\Install\Install::setDevPassword( 'whatever password', $sandbox. '/does-not-exist.php' ) === false );
+// The credential is not part of what a backup restores - a backup recovers
+// content, and a stolen archive must not carry an admin hash
+check( 'the password file is not in the backup manifest', count( array_filter(
+	array_keys( \Nino\Backup::manifest( $appData ) ),
+	fn( string $file ): bool => str_contains( $file, '/.auth/' )
+) ) === 0 );
+
+// Deleting it locks the admin area rather than handing back the installer
+unlink( $pwPath );
+check( 'a missing password file leaves no usable hash', \Nino\Admin\Admin::passwordHash( $appData ) === null );
+check( '...but the project still counts as installed', \Nino\Admin\Admin::isInstalled( $appData ) === true );
+
+$reopenRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+check( 'so /_install stays locked', \Nino\Install\Install::guard( $appData, $reopenRequest ) === false );
+
+// A half-written file must read as "no password", never as a hash that just
+// happens not to match
+file_put_contents( $pwPath, \Nino\Admin\Admin::STUB_PREFIX );
+check( 'a truncated password file reads as no password at all', \Nino\Admin\Admin::passwordHash( $appData ) === null );
+unlink( $pwPath );
+
+check( 'writePasswordHash() refuses an empty hash rather than storing one nothing can match', \Nino\Admin\Admin::writePasswordHash( $appData, '' ) === false );
+check( 'setDevPassword() can write the file again afterwards', \Nino\Install\Install::setDevPassword( $appData, 'another dev password' ) === true );
+check( '...and the new password is the one that verifies', password_verify( 'another dev password', (string) \Nino\Admin\Admin::passwordHash( $appData ) ) === true );
+
+check( 'the content directory carries its own deny rule', is_file( $sandbox. '/content/.htaccess' ) === true );
 
 echo "\n";
 

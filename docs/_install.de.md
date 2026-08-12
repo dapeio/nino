@@ -152,9 +152,9 @@ So bleibt die Menge der Konten eine technische Strukturentscheidung, während di
 
 Der letzte Schritt setzt das echte Passwort für `/_admin` und damit zugleich für `/_templates`. Es muss mindestens acht Zeichen lang sein und ist unabhängig von den Nutzerkonten in `/_editor`.
 
-Vor dem Abschluss muss mindestens ein funktionierender Editor-Nutzer existieren. Der Assistent schreibt den neuen Passwort-Hash direkt in `_admin/Admin.php`. Sobald dies erfolgreich war, erkennt `/_install` das geänderte Passwort und sperrt den eigenen Zugriff.
+Vor dem Abschluss muss mindestens ein funktionierender Editor-Nutzer existieren. Der Assistent schreibt den neuen Passwort-Hash nach `content/.auth/pw.php` und setzt `/nino/install/completed` in der `config.php`. Jedes von beiden allein hält `/_install` gesperrt — geht die Passwortdatei verloren, sperrt sich `/_admin` zu, statt den Installer wieder freizugeben.
 
-Schlägt der Abschluss fehl, prüfe die Schreibrechte von `_admin/Admin.php`. Entferne den Installer nicht, bevor dieser Schritt erfolgreich beendet wurde.
+Schlägt der Abschluss fehl, prüfe die Schreibrechte des Verzeichnisses `content/`. Entferne den Installer nicht, bevor dieser Schritt erfolgreich beendet wurde.
 
 ## Ergebnis prüfen und Installer entfernen
 

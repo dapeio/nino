@@ -20,8 +20,13 @@ namespace {
 	// never over HTTP (a webserver never runs PHP as "cli"), so this can stay
 	// in the file without being a usable-over-the-web endpoint:
 	// `php _admin/Admin.php <pw>`
+	//
+	// The hash it prints goes into the project's content/.auth/pw.php, wrapped
+	// in the stub below - not into this file. Nothing here is project state
+	// any more, which is what lets an update replace it (see
+	// Admin::passwordHash())
 	if( php_sapi_name() === 'cli' && isset( $argv[1] ) === true )
-		die( password_hash( $argv[1], PASSWORD_DEFAULT ). PHP_EOL );
+		die( \Nino\Admin\Admin::STUB_PREFIX. password_hash( $argv[1], PASSWORD_DEFAULT ). \Nino\Admin\Admin::STUB_SUFFIX );
 }
 
 namespace Nino\Admin {
@@ -39,17 +44,29 @@ namespace Nino\Admin {
 	 */
 	class Admin {
 
-		// Generate with: php _admin/Admin.php <your password> - or let /_install's
-		// last wizard step do it for you (see DEFAULT_PASSWORD_HASH below).
-		// CHANGE THIS before deploying - the shipped value matches no password
+		// Where the real password hash lives, relative to the content
+		// directory (see \Nino\Filesystem::getContentPath()). /_install's
+		// last wizard step writes it; passwordHash() reads it
+		public const string PASSWORD_PATH = '/.auth/pw.php';
+
+		// The stub that file is wrapped in - a php file that 403s and exits
+		// before it ever returns the hash, so it stays useless even where a
+		// webserver happily serves it. Same convention (and same constants)
+		// Backup uses for its key and its archives
+		public const string STUB_PREFIX = "<?php http_response_code(403); exit; return '";
+		public const string STUB_SUFFIX = "';\n";
+
+		// Legacy fallback only, for a project installed while the hash still
+		// lived in this file. Kept read-only: setDevPassword() no longer
+		// rewrites it, and apiLogin() migrates such a project to
+		// PASSWORD_PATH on the next successful login. A hash in here made
+		// this file carry state, which is why replacing it on an update used
+		// to log the operator out *and* hand /_install back to whoever asked
 		private const string PASSWORD_HASH = '$2y$10$JeWFJ0CAi.tAEc6i5IcyTOLSgeCbrspmb4p0Re7aWvJBOajXtwgt.';
 
 		// The exact value PASSWORD_HASH ships with, kept separately so it can
-		// be compared against rather than duplicated. /_install (see
-		// _install/Install.php) reads this through hasDefaultPassword() to
-		// decide whether the project has already been through the wizard -
-		// once PASSWORD_HASH no longer matches, /_install refuses to run at
-		// all, which is also the only thing that ever locks it back out.
+		// be compared against rather than duplicated - a checkout still
+		// carrying it has no legacy password to fall back to
 		public const string DEFAULT_PASSWORD_HASH = '$2y$10$JeWFJ0CAi.tAEc6i5IcyTOLSgeCbrspmb4p0Re7aWvJBOajXtwgt.';
 
 		private const int MAX_TRIES = 5;
@@ -171,15 +188,97 @@ namespace Nino\Admin {
 		}
 
 		/**
-		 *	Whether PASSWORD_HASH is still the shipped placeholder - true for
-		 *	every fresh checkout, false the moment a real password has been
-		 *	set (by hand, or by /_install's finish step). This is the one
+		 *	The password hash currently in effect, or null when this project
+		 *	has none yet.
+		 *
+		 *	Canonically PASSWORD_PATH, under the content directory - never
+		 *	config.php: a Restore rewrites config.php, and a credential that
+		 *	authorises restoring must not be part of what gets restored (the
+		 *	same reasoning Backup already applies to the encryption key, see
+		 *	Restore::_key()). It is also outside every tool folder, so
+		 *	replacing _admin/Admin.php on an update no longer takes the
+		 *	password with it.
+		 *
+		 *	PASSWORD_HASH is the fallback for a project installed before that
+		 *	file existed - apiLogin() migrates such a project across on the
+		 *	next successful login, after which the constant is dead weight
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	string|null							Null when no password has been set at all
+		 */
+		public static function passwordHash( array &$appData ): ?string {
+
+			$stored = self::_readPasswordFile( $appData );
+
+			if( $stored !== null )
+				return $stored;
+
+			return self::PASSWORD_HASH !== self::DEFAULT_PASSWORD_HASH ? self::PASSWORD_HASH : null;
+		}
+
+		/**
+		 *	Whether this project has been through /_install already - the one
 		 *	thing /_install checks before it lets itself run at all.
+		 *
+		 *	Deliberately not "a password exists": that alone would mean
+		 *	deleting one file re-opens the installer on a live site, which is
+		 *	exactly the hazard moving the hash out of the source file is meant
+		 *	to remove. The persisted marker is what makes the answer stick, so
+		 *	a project missing its password file locks its admin area rather
+		 *	than handing out a fresh installer (put the file back by hand -
+		 *	the same escape hatch editing the constant used to be)
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *
 		 *	@return 	bool
 		 */
-		public static function hasDefaultPassword(): bool {
-			return self::PASSWORD_HASH === self::DEFAULT_PASSWORD_HASH;
+		public static function isInstalled( array &$appData ): bool {
+
+			if( ( $appData['/nino/install/completed'] ?? false ) === true )
+				return true;
+
+			return self::passwordHash( $appData ) !== null;
+		}
+
+		/**
+		 *	The absolute path of the file passwordHash() reads
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	string
+		 */
+		public static function passwordPath( array &$appData ): string {
+			return \Nino\Filesystem::getContentPath( $appData ). self::PASSWORD_PATH;
+		}
+
+		/**
+		 *	Read the stored hash back out of its self-exiting php stub - the
+		 *	same shape (and the same reason) Backup writes its key and its
+		 *	archives with: the file sits under a path a webserver may well
+		 *	serve, and a stub that 403s before returning anything is the one
+		 *	protection that does not depend on .htaccess applying
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	string|null							Null if there is no readable, well-formed file
+		 */
+		private static function _readPasswordFile( array &$appData ): ?string {
+
+			$raw = @file_get_contents( self::passwordPath( $appData ) );
+
+			if( is_string( $raw ) === false )
+				return null;
+
+			if( str_starts_with( $raw, self::STUB_PREFIX ) === false || str_ends_with( $raw, self::STUB_SUFFIX ) === false )
+				return null;
+
+			$hash = substr( $raw, strlen( self::STUB_PREFIX ), -strlen( self::STUB_SUFFIX ) );
+
+			// A truncated or half-written file must read as "no password" and
+			// therefore fail every login, never as a hash password_verify()
+			// would happily reject in a way that looks like a wrong password
+			return $hash !== '' ? $hash : null;
 		}
 
 		/**
@@ -223,6 +322,7 @@ namespace Nino\Admin {
 		private static function apiLogin( array &$appData, array &$request ): void {
 
 			$password 	= (string) ( json_decode( $_POST['data'] ?? '{}', true )['password'] ?? '' );
+			$hash 			= self::passwordHash( $appData );
 			$lockedOut 	= false;
 			$verified 	= false;
 
@@ -232,14 +332,18 @@ namespace Nino\Admin {
 			// read the same "tries" and both write back the same +1, losing an
 			// increment - the exact way to dodge the lockout with two requests
 			// instead of one
-			\Nino\Filesystem::mutate( $appData, '/_admin/.lockout.json', function( array $state ) use ( $password, &$lockedOut, &$verified ): ?array {
+			\Nino\Filesystem::mutate( $appData, '/_admin/.lockout.json', function( array $state ) use ( $password, $hash, &$lockedOut, &$verified ): ?array {
 
 				if( (int) $state['until'] > time() ) {
 					$lockedOut = true;
 					return null;
 				}
 
-				$verified = password_verify( $password, self::PASSWORD_HASH );
+				// No password at all - a project whose file went missing, or
+				// one that never finished /_install. Still run the counter:
+				// answering instantly would tell an unauthenticated caller
+				// which of the two states this installation is in
+				$verified = $hash !== null && password_verify( $password, $hash );
 
 				if( $verified === true )
 					return [ 'tries' => 0, 'until' => 0 ];
@@ -263,9 +367,124 @@ namespace Nino\Admin {
 				return;
 			}
 
+			// A project whose hash still lives in this file's constant moves
+			// across on its first successful login, so an update may replace
+			// _admin/Admin.php from then on. Done after the verify, not
+			// inside the lock above: this writes a different file, and a
+			// failure here must not cost the operator the login they just
+			// passed - they simply migrate on the next one
+			if( self::_readPasswordFile( $appData ) === null )
+				self::writePasswordHash( $appData, (string) $hash );
+
 			// Defend against session fixation, same as Auth::loginUser()
 			session_regenerate_id( true );
 			\Nino\Runtime::setSessionValue( $appData, './nino/admin/authed', true );
+		}
+
+		/**
+		 *	Write a hash to PASSWORD_PATH, creating the content directory if
+		 *	it isn't there yet. The one writer - /_install's finish step goes
+		 *	through Install::setDevPassword(), which calls this
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$hash					An already-hashed password, never a plaintext one
+		 *
+		 *	@return 	bool										False when the file could not be written
+		 */
+		public static function writePasswordHash( array &$appData, string $hash ): bool {
+
+			if( $hash === '' )
+				return false;
+
+			$path = self::passwordPath( $appData );
+			$dir 	= dirname( $path );
+
+			// @ throughout, same reasoning Filesystem::forceDir() documents:
+			// a concurrent request may have created the directory between the
+			// is_dir() and the mkdir()
+			if( is_dir( $dir ) === false && @mkdir( $dir, 0777, true ) === false && is_dir( $dir ) === false )
+				return false;
+
+			self::_denyDirectory( dirname( $dir ) );
+
+			return self::_writeFileAtomic( $path, self::STUB_PREFIX. $hash. self::STUB_SUFFIX );
+		}
+
+		/**
+		 *	Write a file's content atomically: a temp file next to it, then
+		 *	rename() over the target - so a concurrent reader sees either the
+		 *	old credential or the new one, never a half-written file.
+		 *
+		 *	Own copy rather than \Nino\Filesystem's, which is private and
+		 *	shaped around the filesystem cache (php-array files under the
+		 *	project root); this one writes a php *stub* under the content
+		 *	directory, which that abstraction cannot express
+		 *
+		 *	@param		string		$path
+		 *	@param		string		$content
+		 *
+		 *	@return 	bool
+		 */
+		private static function _writeFileAtomic( string $path, string $content ): bool {
+
+			$temp 	= $path. '.'. bin2hex( random_bytes( 6 ) ). '.tmp';
+			$handle = @fopen( $temp, 'wb' );
+
+			if( $handle === false )
+				return false;
+
+			$written = fwrite( $handle, $content );
+			$flushed = fflush( $handle );
+			fclose( $handle );
+
+			// fwrite() reports a short write rather than failing, and without
+			// the fflush() a rename() can win the race against the bytes ever
+			// reaching disk - either way the result is a truncated hash that
+			// would lock the operator out
+			if( $written === false || $written !== strlen( $content ) || $flushed === false ) {
+				@unlink( $temp );
+				return false;
+			}
+
+			$mode = @fileperms( $path );
+			if( $mode !== false )
+				@chmod( $temp, $mode & 0777 );
+
+			if( @rename( $temp, $path ) === false ) {
+				@unlink( $temp );
+				return false;
+			}
+
+			// passwordHash() reads these bytes directly rather than including
+			// them, so opcache never sits in that path - but the file is
+			// still php a webserver may compile if it is requested, and
+			// leaving a stale compiled copy of a credential file around is
+			// not something to rely on being harmless
+			if( function_exists( 'opcache_invalidate' ) === true )
+				opcache_invalidate( $path, true );
+
+			return true;
+		}
+
+		/**
+		 *	Drop an Apache deny rule into the content directory if it has
+		 *	none. Belt and braces next to the stub inside the file itself:
+		 *	the stub is what protects the hash on any webserver, this is what
+		 *	keeps the directory from being browsable on the common one. Never
+		 *	overwrites an existing file - a deployment may have its own rules
+		 *
+		 *	@param		string		$dir					Absolute path of the content directory
+		 *
+		 *	@return 	void
+		 */
+		private static function _denyDirectory( string $dir ): void {
+
+			$path = $dir. '/.htaccess';
+
+			if( is_dir( $dir ) === false || file_exists( $path ) === true )
+				return;
+
+			@file_put_contents( $path, "# Nino content directory - never served, only read by php.\n". "Require all denied\n" );
 		}
 
 		/**
