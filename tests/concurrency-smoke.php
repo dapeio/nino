@@ -233,8 +233,8 @@ echo "Editor\\Backup::maybeRun under real concurrency\n";
 runParallel( 'backup-worker', $sandbox, [ '-', '-' ] );
 
 $onDisk = include $sandbox. '/config.php';
-$backupDirs = glob( $sandbox. '/_editor/.backups-*', GLOB_ONLYDIR ) ?: [];
-$backupDir = $sandbox. '/_editor/'. ( $onDisk['/nino/backup/dir'] ?? '' );
+$backupDirs = glob( $sandbox. '/content/.backups', GLOB_ONLYDIR ) ?: [];
+$backupDir = $sandbox. '/content/.backups';
 $today = $backupDir. '/'. date( 'Y-m-d' ). '.php';
 
 check( 'parallel first-use requests persist one backup directory/key pair', count( $backupDirs ) === 1 && is_string( $onDisk['/nino/backup/key'] ?? null ) === true );

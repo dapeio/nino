@@ -1352,8 +1352,67 @@ namespace Nino\Editor {
 		private const int RETENTION_DAYS = 14;
 		private const string LOCK_PATH = '/_editor/backup-daily';
 
+		// Under the content directory, not in this tool's own folder - the
+		// archives are project data, and a tool folder holding them cannot be
+		// replaced on an update. A fixed name rather than the
+		// '.backups-<random>' this used to generate: that randomness was the
+		// directory's only real protection while it sat in the webroot, and
+		// here it is denied by the content directory's own rule on top of the
+		// 403 stub every archive already carries (see dirs())
+		private const string BACKUPS_DIR = \Nino\Filesystem::CONTENT_DIR. '/.backups';
+
+		// The archive key's own copy, kept outside config.php on purpose: a
+		// restore rewrites config.php, so the key that decrypts the archive
+		// being restored cannot only live in it. Next to the /_admin
+		// credential rather than next to the archives - it is a credential,
+		// they are data
+		public const string KEY_PATH = \Nino\Filesystem::CONTENT_DIR. '/.auth/backup-key.php';
+
 		private const string STUB_PREFIX = "<?php http_response_code(403); exit; return '";
 		private const string STUB_SUFFIX = "';\n";
+
+		/**
+		 *	Every directory that holds backup archives, current one first.
+		 *
+		 *	There used to be exactly one, named '.backups-&lt;random&gt;' under
+		 *	_editor/ and generated on first use. A project that already has
+		 *	one keeps it listed here so its existing archives stay
+		 *	restorable - it is read and pruned, never written to again, so it
+		 *	empties itself within the retention window. '/nino/backup/dir' is
+		 *	therefore no longer generated, only still honoured
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	array										Absolute paths, existing or not
+		 */
+		public static function dirs( array &$appData ): array {
+
+			$dirs = [ \Nino\Filesystem::getContentPath( $appData ). substr( self::BACKUPS_DIR, strlen( \Nino\Filesystem::CONTENT_DIR ) ) ];
+
+			if( is_string( $appData['/nino/backup/dir'] ?? null ) === true )
+				$dirs[] = \Nino\Filesystem::getPath( $appData ). '/_editor/'. $appData['/nino/backup/dir'];
+
+			return $dirs;
+		}
+
+		/**
+		 *	Where the archive key's own copy lives, with the pre-move location
+		 *	as a fallback: a project that has not written a backup since the
+		 *	move still has its only out-of-config copy under _admin/, and
+		 *	losing that would mean losing every existing archive
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		bool			$existing			True: return whichever copy actually exists
+		 *
+		 *	@return 	string									Absolute path
+		 */
+		public static function keyPath( array &$appData, bool $existing = false ): string {
+
+			$path 	= \Nino\Filesystem::getContentPath( $appData ). substr( self::KEY_PATH, strlen( \Nino\Filesystem::CONTENT_DIR ) );
+			$legacy = \Nino\Filesystem::getPath( $appData ). '/_admin/.restore-key.php';
+
+			return ( $existing === true && is_file( $path ) === false && is_file( $legacy ) === true ) ? $legacy : $path;
+		}
 
 		/**
 		 *	Most recent backup date on file, if any - shared by
@@ -1365,15 +1424,12 @@ namespace Nino\Editor {
 		 */
 		public static function lastDate( array &$appData ): ?string {
 
-			if( isset( $appData['/nino/backup/dir'] ) === false )
-				return null;
-
-			$dir 	= \Nino\Filesystem::getPath( $appData ). '/_editor/'. $appData['/nino/backup/dir'];
 			$dates = [];
 
-			foreach( glob( $dir. '/*.php' ) ?: [] as $file )
-				if( preg_match( '/^\d{4}-\d{2}-\d{2}$/', basename( $file, '.php' ) ) === 1 )
-					$dates[] = basename( $file, '.php' );
+			foreach( self::dirs( $appData ) as $dir )
+				foreach( glob( $dir. '/*.php' ) ?: [] as $file )
+					if( preg_match( '/^\d{4}-\d{2}-\d{2}$/', basename( $file, '.php' ) ) === 1 )
+						$dates[] = basename( $file, '.php' );
 
 			if( count( $dates ) === 0 )
 				return null;
@@ -1414,14 +1470,19 @@ namespace Nino\Editor {
 
 				self::_bootstrap( $appData );
 
-				$dir 		= \Nino\Filesystem::getPath( $appData ). '/_editor/'. $appData['/nino/backup/dir'];
+				\Nino\Filesystem::forceDir( $appData, self::BACKUPS_DIR );
+
+				$dir 		= self::dirs( $appData )[0];
 				$path 	= $dir. '/'. date( 'Y-m-d' ). '.php';
 
 				if( is_file( $path ) === true )
 					return;
 
 				self::_create( $appData, $dir, $path );
-				self::_prune( $dir );
+				// Both locations - a legacy directory nobody writes to any
+				// more still has to age out rather than sit there forever
+				foreach( self::dirs( $appData ) as $backupDir )
+					self::_prune( $backupDir );
 
 				$user = \Nino\Auth::getCurrentUser( $appData );
 				if( $user !== false )
@@ -1463,49 +1524,55 @@ namespace Nino\Editor {
 			// Generated before mutate() takes config.php's lock: random_bytes()
 			// can throw, and Filesystem::mutate() deliberately expects a callback
 			// that returns normally in order to release its lock.
-			$candidateDir = '.backups-'. bin2hex( random_bytes( 16 ) );
+			//
+			// Only the key. The directory used to be generated alongside it,
+			// as an unguessable name; the archives live under the content
+			// directory now and need none (see dirs())
 			$candidateKey = base64_encode( random_bytes( 32 ) );
 
-			$written = \Nino\Filesystem::mutate( $appData, '/config.php', function( mixed $content ) use ( &$appData, &$readConfig, &$changed, $candidateDir, $candidateKey ): mixed {
+			$written = \Nino\Filesystem::mutate( $appData, '/config.php', function( mixed $content ) use ( &$appData, &$readConfig, &$changed, $candidateKey ): mixed {
 
 				$readConfig = true;
 				if( is_array( $content ) === false )
 					return null;
 
 				// Re-read under config.php's own lock. A second request may have
-				// booted before the first generated these values; trusting its stale
+				// booted before the first generated this value; trusting its stale
 				// in-memory appData here would generate a different key and overwrite
 				// the first backup's only decryption key.
-				if( is_string( $content['/nino/backup/dir'] ?? null ) === false || is_string( $content['/nino/backup/key'] ?? null ) === false ) {
-					$content['/nino/backup/dir'] = $candidateDir;
+				if( is_string( $content['/nino/backup/key'] ?? null ) === false ) {
 					$content['/nino/backup/key'] = $candidateKey;
 					$changed = true;
 				}
 
-				$appData['/nino/backup/dir'] = $content['/nino/backup/dir'];
 				$appData['/nino/backup/key'] = $content['/nino/backup/key'];
+
+				// Carried through untouched where a project still has one -
+				// its existing archives are still addressed by it
+				if( is_string( $content['/nino/backup/dir'] ?? null ) === true )
+					$appData['/nino/backup/dir'] = $content['/nino/backup/dir'];
 
 				return $changed === true ? $content : null;
 			}, false );
 
 			if( $readConfig === false )
 				throw new \RuntimeException( 'config.php could not be locked' );
-			if( isset( $appData['/nino/backup/dir'], $appData['/nino/backup/key'] ) === false )
+			if( isset( $appData['/nino/backup/key'] ) === false )
 				throw new \RuntimeException( 'config.php could not be read' );
 			if( $changed === true && $written === false )
 				throw new \RuntimeException( 'backup configuration could not be written' );
 
 			// Independent of the above: an install that already had a dir/key
-			// before _admin's Restore module existed (or whose _admin/.restore-key.php
-			// was lost/deleted since) never gets one otherwise, since this only
-			// ran once, on first-ever bootstrap
-			$adminDir 		= \Nino\Filesystem::getPath( $appData ). '/_admin';
-			$adminKeyPath = $adminDir. '/.restore-key.php';
+			// before this copy existed (or whose copy was lost/deleted since)
+			// never gets one otherwise, since the block above only ran once,
+			// on first-ever bootstrap
+			\Nino\Filesystem::forceDir( $appData, dirname( self::KEY_PATH ) );
 
-			$adminKeyContent = self::STUB_PREFIX. $appData['/nino/backup/key']. self::STUB_SUFFIX;
+			$keyPath 		= self::keyPath( $appData );
+			$keyContent = self::STUB_PREFIX. $appData['/nino/backup/key']. self::STUB_SUFFIX;
 
-			if( is_dir( $adminDir ) === true && @file_get_contents( $adminKeyPath ) !== $adminKeyContent )
-				self::_writeRawAtomic( $adminKeyPath, $adminKeyContent );
+			if( @file_get_contents( $keyPath ) !== $keyContent )
+				self::_writeRawAtomic( $keyPath, $keyContent );
 		}
 
 		/**

@@ -16,7 +16,7 @@ $uri = urldecode( parse_url( $_SERVER['REQUEST_URI'], PHP_URL_PATH ) );
 // bundled/minified css+js the [assets ...] shortcode generates) and
 // .demo/ (the bundled demo images) are the two exceptions - without
 // this, a direct request could otherwise read content/.auth/pw.php or
-// _editor/.backups-*/ contents straight off disk, bypassing the .php
+// content/.backups/ contents straight off disk, bypassing the .php
 // stub protection those paths normally rely on. Dot-uris that are no
 // files at all (/.newsletter, /.demo-sections, ...) fall through to
 // index.php and resolve as ordinary routes

@@ -109,7 +109,7 @@ Important source directories:
 | `_nino/Nino.js` | Shared browser helpers |
 | `_nino/Nino.admin.css` | Shared management-interface design |
 | `_admin/Admin.php` | All `\Nino\Admin\*` backend classes |
-| `content/` | Project state, never code: `.auth/pw.php` (the `/_admin` hash), `.auth/lockout.json` (login throttle), `.logs/` (activity log). Addressed by the virtual prefix `Filesystem::CONTENT_DIR`, resolved by `Filesystem::getContentPath()`, moved by `NINO_CONTENT_DIR`. Never write project state into a tool folder or into `config.php` — the first breaks updates, the second is rolled back by a Restore |
+| `content/` | Project state, never code: `.auth/` (the `/_admin` hash, login throttle, backup key), `.logs/` (activity log), `.backups/` (encrypted archives). Addressed by the virtual prefix `Filesystem::CONTENT_DIR`, resolved by `Filesystem::getContentPath()`, moved by `NINO_CONTENT_DIR`. Never write project state into a tool folder or into `config.php` — the first breaks updates, the second is rolled back by a Restore |
 | `_admin/assets/*.js` | Admin frontend modules; no bundler |
 | `_admin/templates/page-index.tpl` | Admin shell, tabs, panes, assets |
 | `_templates/Templates.php` | Template Builder API, parser, composer |

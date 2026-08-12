@@ -19,7 +19,7 @@
 # path and would therefore miss a subdirectory install (/nino/dir). Both are
 # belt and braces next to the 403 stub each of those files carries itself.
 
-# Don't let a directory with no index.php list its contents - matters most
-# for _editor/.backups-*/, whose only real protection is that its random
-# directory name is never linked from anywhere
+# Don't let a directory with no index.php list its contents - a plain
+# defence-in-depth default now that nothing relies on an unguessable
+# directory name any more
 Options -Indexes

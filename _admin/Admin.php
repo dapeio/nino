@@ -944,11 +944,12 @@ namespace Nino\Admin {
 	 *											small bit of archiving logic it needs, same reasoning as
 	 *											postData() above - this whole folder stays standalone) and
 	 *											of config.php's own data:
-	 *											- the backup directory is *found* by globbing _editor/ for
-	 *											  its one-time random name, not read from a config value
-	 *											- the decryption key has its own independent copy here
-	 *											  (_admin/.restore-key.php), written once by
-	 *											  Backup::_bootstrap() the first time it runs
+	 *											- the archives are *found* on disk (content/.backups, plus
+	 *											  whatever pre-move directory a project still has), never
+	 *											  addressed through a config value
+	 *											- the decryption key has its own independent copy outside
+	 *											  config.php (content/.auth/backup-key.php), rewritten by
+	 *											  Backup::_bootstrap() whenever it goes missing
 	 *											So this still works even if config.php's *data* (not
 	 *											syntax) is what's broken - eg. a wrecked admin user
 	 *											record. A genuine config.php syntax error is out of scope:
@@ -1490,11 +1491,12 @@ namespace Nino\Admin {
 	 *	Dev								Disaster recovery: restore a _editor daily backup.
 	 *
 	 *											Deliberately independent of config.php's own backup keys:
-	 *											- the backup directory is *found* by globbing _editor/ for
-	 *											  its one-time random name, not read from a config value
-	 *											- the decryption key has its own independent copy here
-	 *											  (_admin/.restore-key.php), written once by
-	 *											  Backup::_bootstrap() the first time it runs
+	 *											- the archives are *found* on disk (content/.backups, plus
+	 *											  whatever pre-move directory a project still has), never
+	 *											  addressed through a config value
+	 *											- the decryption key has its own independent copy outside
+	 *											  config.php (content/.auth/backup-key.php), rewritten by
+	 *											  Backup::_bootstrap() whenever it goes missing
 	 *											So this still works even if config.php's *data* (not
 	 *											syntax) is what's broken - eg. a wrecked admin user
 	 *											record. A genuine config.php syntax error is out of scope:
@@ -1538,9 +1540,47 @@ namespace Nino\Admin {
 		 *
 		 *	@return 	string|false
 		 */
-		private static function _backupDir( array &$appData ): string|false {
-			$matches = glob( \Nino\Filesystem::getPath( $appData ). '/_editor/.backups-*', GLOB_ONLYDIR );
-			return $matches[0] ?? false;
+		private static function _backupDirs( array &$appData ): array {
+
+			// Own copies of the two paths rather than \Nino\Editor\Backup's
+			// own constants: this class exists to work when nothing else
+			// does, and /_editor is separately deletable - reaching into it
+			// would make Restore fail in exactly the situation it is for
+			// (see this class's docblock, and the standalone-per-area
+			// reasoning every other cross-area helper in this file follows)
+			$dirs = [ \Nino\Filesystem::getContentPath( $appData ). '/.backups' ];
+
+			// A project that has not written a backup since the archives
+			// moved still has them under their pre-move random name
+			if( is_string( $appData['/nino/backup/dir'] ?? null ) === true )
+				$dirs[] = \Nino\Filesystem::getPath( $appData ). '/_editor/'. $appData['/nino/backup/dir'];
+
+			// ...and one whose config.php lost that value still has the
+			// directory itself - the glob is what finds it back
+			foreach( glob( \Nino\Filesystem::getPath( $appData ). '/_editor/.backups-*', GLOB_ONLYDIR ) ?: [] as $dir )
+				$dirs[] = $dir;
+
+			return array_values( array_unique( array_filter( $dirs, 'is_dir' ) ) );
+		}
+
+		/**
+		 *	The directory one dated archive actually sits in
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$date					"Y-m-d", already validated
+		 *
+		 *	@return 	string|false
+		 */
+		private static function _backupDir( array &$appData, string $date = '' ): string|false {
+
+			$dirs = self::_backupDirs( $appData );
+
+			if( $date !== '' )
+				foreach( $dirs as $dir )
+					if( is_file( $dir. '/'. $date. '.php' ) === true )
+						return $dir;
+
+			return $dirs[0] ?? false;
 		}
 
 		/**
@@ -1552,14 +1592,25 @@ namespace Nino\Admin {
 		 */
 		private static function _key( array &$appData ): string|false {
 
-			$path = \Nino\Filesystem::getPath( $appData ). '/_admin/.restore-key.php';
+			// Current location first, then the pre-move one - again as this
+			// class's own copies, never through \Nino\Editor\Backup (see
+			// _backupDirs())
+			$paths = [
+				\Nino\Filesystem::getContentPath( $appData ). '/.auth/backup-key.php',
+				\Nino\Filesystem::getPath( $appData ). '/_admin/.restore-key.php',
+			];
 
-			if( is_file( $path ) === false )
-				return false;
+			foreach( $paths as $path ) {
 
-			$raw = file_get_contents( $path );
+				if( is_file( $path ) === false )
+					continue;
 
-			return base64_decode( substr( $raw, strlen( self::STUB_PREFIX ), -strlen( self::STUB_SUFFIX ) ) );
+				$raw = file_get_contents( $path );
+
+				return base64_decode( substr( $raw, strlen( self::STUB_PREFIX ), -strlen( self::STUB_SUFFIX ) ) );
+			}
+
+			return false;
 		}
 
 		/**
@@ -1591,13 +1642,16 @@ namespace Nino\Admin {
 		 */
 		public static function dates( array &$appData ): array {
 
-			$dir 	= self::_backupDir( $appData );
-			$dates 	= [];
+			$dates = [];
 
-			if( $dir !== false )
+			// Every location, not just the current one: an archive written
+			// before the directory moved is still a restorable archive
+			foreach( self::_backupDirs( $appData ) as $dir )
 				foreach( glob( $dir. '/*.php' ) ?: [] as $file )
 					if( preg_match( '/^\d{4}-\d{2}-\d{2}$/', basename( $file, '.php' ) ) === 1 )
 						$dates[] = basename( $file, '.php' );
+
+			$dates = array_values( array_unique( $dates ) );
 
 			rsort( $dates );
 
@@ -1654,7 +1708,7 @@ namespace Nino\Admin {
 				return;
 			}
 
-			$dir = self::_backupDir( $appData );
+			$dir = self::_backupDir( $appData, $date );
 			$key = self::_key( $appData );
 
 			if( $dir === false || $key === false ) {

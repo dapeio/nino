@@ -399,15 +399,76 @@ $appData['/nino/auth/user'] 			= $appData['/nino/auth/user'] ?? [];
 $guardOk = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Editor\Editor::guard( $appData, $guardOk ); // bootstraps + creates today's backup as a side effect
 
-check( 'Backup::maybeRun (via Editor::guard) writes the restore key into _admin/', is_file( $sandbox. '/_admin/.restore-key.php' ) === true );
+check( 'Backup::maybeRun (via Editor::guard) writes the archive key into the content directory', is_file( $sandbox. '/content/.auth/backup-key.php' ) === true );
 
-// Regression: an install that already had Backup running (dir/key already in
-// config.php) before Restore/_admin/.restore-key.php existed must still get the
-// _admin/ key copy written on the next admin request - not just on the very
-// first-ever bootstrap
-unlink( $sandbox. '/_admin/.restore-key.php' );
+check( 'the archives land under the content directory, not in a tool folder', is_dir( $sandbox. '/content/.backups' ) === true );
+check( 'no random backup directory is generated any more', isset( $appData['/nino/backup/dir'] ) === false );
+
+// Regression: an install that already had Backup running (key already in
+// config.php) before this out-of-config copy existed must still get one
+// written on the next admin request - not just on the very first bootstrap
+unlink( $sandbox. '/content/.auth/backup-key.php' );
 \Nino\Editor\Editor::guard( $appData, $guardOk );
-check( 'Backup::maybeRun re-creates a missing _admin/.restore-key.php on an already-bootstrapped install', is_file( $sandbox. '/_admin/.restore-key.php' ) === true );
+check( 'Backup::maybeRun re-creates a missing key copy on an already-bootstrapped install', is_file( $sandbox. '/content/.auth/backup-key.php' ) === true );
+
+// A project that has not written a backup since the move still has its only
+// out-of-config key copy under _admin/. Losing that would make every archive
+// it already holds undecryptable, so the pre-move location stays readable
+$legacyKey = $sandbox. '/_admin/.restore-key.php';
+copy( $sandbox. '/content/.auth/backup-key.php', $legacyKey );
+unlink( $sandbox. '/content/.auth/backup-key.php' );
+check( 'the key is still found in its pre-move location', \Nino\Editor\Backup::keyPath( $appData, true ) === $legacyKey );
+
+$legacyListRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Admin\Restore::apiList( $appData, $legacyListRequest );
+check( '...and the archives stay listable with it', count( $legacyListRequest['/nino/http/response']['body']['dates'] ?? [] ) === 1 );
+
+unlink( $legacyKey );
+\Nino\Editor\Editor::guard( $appData, $guardOk );
+
+// An archive written before the move lives in the old random directory -
+// it has to stay listed, or a restore would silently lose everything older
+// than the update
+$legacyDir = $sandbox. '/_editor/.backups-'. str_repeat( 'ab', 16 );
+mkdir( $legacyDir, 0755, true );
+copy( $sandbox. '/content/.backups/'. date( 'Y-m-d' ). '.php', $legacyDir. '/2020-02-02.php' );
+$appData['/nino/backup/dir'] = basename( $legacyDir );
+
+$legacyDirRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Admin\Restore::apiList( $appData, $legacyDirRequest );
+check( 'an archive in the pre-move directory is still listed', in_array( '2020-02-02', $legacyDirRequest['/nino/http/response']['body']['dates'] ?? [], true ) === true );
+
+unset( $appData['/nino/backup/dir'] );
+\Nino\Filesystem::removeDir( $legacyDir );
+
+// Restore has to work with /_editor deleted - that is the whole point of it
+// reading Backup's output rather than calling into it, and this file loads
+// Editor.php for its own fixtures, so only a subprocess can prove it. A
+// plain \Nino\Editor\Backup:: reference in Restore would pass every check
+// above and still 500 on the one install that actually needs restoring
+$standaloneDriver = $sandbox. '/restore-standalone.php';
+file_put_contents( $standaloneDriver, '<?php
+declare(strict_types=1);
+require '. var_export( __DIR__. '/../_nino/Nino.php', true ). ';
+require '. var_export( __DIR__. '/../_admin/Admin.php', true ). ';
+set_error_handler( function() { return true; } );
+$appData = [ "./nino/uid" => '. var_export( $sandbox, true ). ' ];
+\Nino\AppData::prepare( $appData );
+$appData["./nino/filesystem/path"]				= '. var_export( $sandbox, true ). ';
+$appData["./nino/filesystem/configpath"]	= '. var_export( $sandbox, true ). ';
+$appData["./nino/filesystem/contentpath"] = '. var_export( $sandbox. '/content', true ). ';
+$appData["/nino/dir"] = "";
+\Nino\AppData::init( $appData );
+echo json_encode( [
+	"editorLoaded"	=> class_exists( "\\Nino\\Editor\\Backup", false ),
+	"dates"					=> \Nino\Admin\Restore::dates( $appData ),
+] );
+' );
+
+$standalone = json_decode( (string) shell_exec( 'php '. escapeshellarg( $standaloneDriver ). ' 2>/dev/null' ), true ) ?? [];
+
+check( 'Restore runs without _editor/Editor.php loaded at all', ( $standalone['editorLoaded'] ?? true ) === false );
+check( '...and still finds the archives from there', in_array( date( 'Y-m-d' ), $standalone['dates'] ?? [], true ) === true );
 
 $listRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Admin\Restore::apiList( $appData, $listRequest );
@@ -430,7 +491,7 @@ check( 'apiRestore reports success', ( $restoreRequest['/nino/http/response']['b
 $afterRestore = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
 check( 'the wrecked user record is back after restore', isset( $afterRestore['/nino/auth/user']['admin@example.com'] ) === true );
 
-$backupDir = $sandbox. '/_editor/'. $appData['/nino/backup/dir'];
+$backupDir = $sandbox. '/content/.backups';
 check( 'a pre-restore safety snapshot of the (corrupted) state was made first', count( glob( $backupDir. '/pre-restore-*.php' ) ?: [] ) === 1 );
 
 $_POST['data'] = json_encode( [ 'date' => '2020-01-01' ] );
@@ -541,7 +602,7 @@ check( 'config.php was written under configPath, not under the project root', is
 $outGuard = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Editor\Editor::guard( $outAppData, $outGuard ); // bootstraps + creates today's backup as a side effect
 
-$outBackupDir = $outSandbox. '/_editor/'. $outAppData['/nino/backup/dir'];
+$outBackupDir = $outSandbox. '/content/.backups';
 $outToday 		= $outBackupDir. '/'. date( 'Y-m-d' ). '.php';
 
 check( 'a backup was created for the out-of-webroot setup', is_file( $outToday ) === true );

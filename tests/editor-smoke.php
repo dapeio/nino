@@ -695,11 +695,12 @@ echo "Backup::maybeRun (triggered from Editor::guard on every authenticated requ
 // below observe a fresh backup of *this* section's actual current state,
 // rather than a stale one made from a much earlier, mostly-empty config.php.
 \Nino\Auth::loginUser( $appData, 'manager@example.com', 'manager password' );
-callUsers( $appData, 'apiList' ); // ensures /nino/backup/dir exists even on a from-scratch run
+callUsers( $appData, 'apiList' ); // ensures the backup key exists even on a from-scratch run
 
-check( 'the backup dir/key exist in config.php', isset( $appData['/nino/backup/dir'] ) === true && isset( $appData['/nino/backup/key'] ) === true );
+check( 'the backup key exists in config.php', isset( $appData['/nino/backup/key'] ) === true );
+check( 'no random backup directory is generated any more', isset( $appData['/nino/backup/dir'] ) === false );
 
-$backupDir 	= $sandbox. '/_editor/'. $appData['/nino/backup/dir'];
+$backupDir 	= $sandbox. '/content/.backups';
 $today 			= $backupDir. '/'. date( 'Y-m-d' ). '.php';
 
 if( is_file( $today ) === true )
@@ -747,7 +748,7 @@ check( 'a second authenticated request the same day doesn\'t touch an already-ex
 // authenticated request, not only on the first bootstrap, so a stale/corrupt
 // copy cannot make otherwise-valid backups undecryptable from _admin.
 mkdir( $sandbox. '/_admin', 0777, true );
-$restoreKeyPath = $sandbox. '/_admin/.restore-key.php';
+$restoreKeyPath = $sandbox. '/content/.auth/backup-key.php';
 file_put_contents( $restoreKeyPath, 'stale' );
 callUsers( $appData, 'apiList' );
 check( 'a stale restore-key copy is repaired from the locked config value', file_get_contents( $restoreKeyPath ) === $prefix. $appData['/nino/backup/key']. $suffix );

@@ -74,10 +74,15 @@ All notable changes to Nino are documented in this file.
   lockout left in the old location still applies, so an update cannot be used
   to clear one, and a legacy `.logs-<random>` directory is still read and
   pruned until it ages out of the retention window.
-- Removed the generated `/nino/logs/dir` key. The activity log no longer
-  needs an unguessable directory name: under the content directory it is
-  denied by that directory's own rule, and its files carry the same 403 stub
-  they always did.
+- Moved the encrypted backup archives to `content/.backups/` and the archive
+  key's out-of-config copy to `content/.auth/backup-key.php`. With that,
+  `_admin/` and `_editor/` hold no project state at all. Archives and keys
+  left in their pre-move locations are still listed, restored and pruned, so
+  nothing already on disk becomes unreadable.
+- Removed the generated `/nino/backup/dir` and `/nino/logs/dir` keys. Neither
+  the archives nor the activity log need an unguessable directory name any
+  more: under the content directory both are denied by that directory's own
+  rule, on top of the 403 stub their files always carried.
 - Changed the `/_install` lock to a persisted `/nino/install/completed`
   marker alongside the stored password, so deleting the password file locks
   `/_admin` instead of handing the installer back. The hash is deliberately
