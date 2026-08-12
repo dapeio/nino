@@ -944,7 +944,7 @@ check( 'registers a route at "/about" (its Http-URI)', isset( $configAfterSave['
 check( 'the route\'s own "uri" data field is the Element-URI, not the Http-URI', $configAfterSave['/nino/http/routes']['GET://about']['uri'] === '/site-about' );
 check( 'the route body references the picked template, extension stripped', $configAfterSave['/nino/http/routes']['GET://about']['body'] === '[template /templates/page-about]' );
 check( 'a 200 status code is not written out (the implicit default)', isset( $configAfterSave['/nino/http/routes']['GET://about']['statusCode'] ) === false );
-check( 'the list itself is persisted at /nino/install/webpages', count( $configAfterSave['/nino/install/webpages'] ) === 1 );
+check( 'the route is the whole persistence - no second list is written alongside it', isset( $configAfterSave['/nino/install/webpages'] ) === false && count( array_filter( $configAfterSave['/nino/http/routes'], fn( array $r, string $k ): bool => \Nino\Admin\PageEditor::isPageRoute( $k, $r ), ARRAY_FILTER_USE_BOTH ) ) === 1 );
 
 $deAfterSave = \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] );
 check( 'writes the page\'s own de_DE meta, keyed by its Element-URI', $deAfterSave['[[/webpage/site-about/name]]'] === 'Über uns' && $deAfterSave['[[/webpage/site-about/title]]'] === 'Über uns' );
@@ -973,7 +973,7 @@ check( 'apiSave succeeds for the second entry too', $status === 200 );
 
 $configAfterSecond = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
 check( 'a non-200, in-range status code is written out as posted', $configAfterSecond['/nino/http/routes']['GET://contact']['statusCode'] === 404 );
-check( 'both entries are now persisted, in order', array_column( $configAfterSecond['/nino/install/webpages'], 'httpUri' ) === [ '/about', '/contact' ] );
+check( 'both page routes are now persisted, in order', array_keys( array_filter( $configAfterSecond['/nino/http/routes'], fn( array $r, string $k ): bool => \Nino\Admin\PageEditor::isPageRoute( $k, $r ), ARRAY_FILTER_USE_BOTH ) ) === [ 'GET://about', 'GET://contact' ] );
 
 // Navigation: only regenerated while the module is active
 $appData['/nino/modules'][] = '\\Nino\\Modules\\Navigation';
@@ -988,7 +988,7 @@ check( 'resaving an existing entry unchanged (identified by originalHttpUri) suc
 // Menu membership lives on the route this entry owns, not in a generated
 // textfill - see \Nino\Modules\Navigation::routeLines()
 $routesAfterNav = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes'];
-check( 'a nav-checked page joins the first registered menu on its own route', ( $routesAfterNav['GET://contact']['navs'] ?? null ) === [ 'main' => 5 ] );
+check( 'a nav-checked page joins the first registered menu on its own route', ( $routesAfterNav['GET://contact']['navs'] ?? null ) === [ 'main' => 1 ] );
 check( 'a page in no menu carries no membership at all', isset( $routesAfterNav['GET://about']['navs'] ) === false );
 check( 'nothing is generated into the text files anymore', isset( \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] )['[[/website/navigation/main]]'] ) === false );
 
@@ -1000,6 +1000,9 @@ check( 'nothing is generated into the text files anymore', isset( \Nino\Filesyst
 	],
 ] );
 check( 'checking "nav" on the first entry too succeeds', $status === 200 );
+
+// A membership a save newly adds goes behind everything already in that menu
+check( 'the second page to join the menu lands behind the first, not on top of it', ( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes']['GET://about']['navs'] ?? null ) === [ 'main' => 2 ] );
 
 [ $status ] = callDev( $appData, \Nino\Admin\PageEditor::class, 'apiMove', [ 'httpUri' => '/about', 'direction' => 'up' ] );
 check( 'moving the first entry up (already at the top) 400s', $status === 400 );
@@ -1018,11 +1021,8 @@ check( 'moving the first entry down succeeds', $status === 200 );
 check( 'the two entries actually swapped places', array_column( $body['pages'], 'httpUri' ) === [ '/contact', '/about' ] );
 
 $configAfterMove = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
-check( 'the swapped order is persisted too', array_column( $configAfterMove['/nino/install/webpages'], 'httpUri' ) === [ '/contact', '/about' ] );
-
-// Equal menu priorities fall back to the order the routes stand in, so the
-// move has to reorder those too - the list on its own renders nothing
-check( 'the routes are reordered with the list, which is what reorders the menus', array_slice( array_keys( $configAfterMove['/nino/http/routes'] ), -2 ) === [ 'GET://contact', 'GET://about' ] );
+check( 'the swapped order is persisted too', array_slice( array_keys( $configAfterMove['/nino/http/routes'] ), -2 ) === [ 'GET://contact', 'GET://about' ] );
+check( 'the hand-written route the swap stepped over kept its own slot', array_keys( $configAfterMove['/nino/http/routes'] )[0] === 'GET://owned' );
 
 // Move it back for the rename/delete checks below, which assume the
 // original order ("about" first)
@@ -1041,7 +1041,8 @@ check( 'renaming an entry\'s Http-URI succeeds', $status === 200 );
 $configAfterRename = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
 check( 'the old route key is gone after a rename', isset( $configAfterRename['/nino/http/routes']['GET://about'] ) === false );
 check( 'the new route key exists', isset( $configAfterRename['/nino/http/routes']['GET://ueber-uns'] ) === true );
-check( 'still exactly two persisted pages - rename replaced in place, did not append a third', count( $configAfterRename['/nino/install/webpages'] ) === 2 );
+check( 'still exactly two page routes - rename replaced in place, did not append a third', count( array_filter( $configAfterRename['/nino/http/routes'], fn( array $r, string $k ): bool => \Nino\Admin\PageEditor::isPageRoute( $k, $r ), ARRAY_FILTER_USE_BOTH ) ) === 2 );
+check( 'the renamed route keeps the slot the old key stood in, rather than dropping to the bottom', array_slice( array_keys( $configAfterRename['/nino/http/routes'] ), -2 ) === [ 'GET://ueber-uns', 'GET://contact' ] );
 
 // Delete
 [ $status, $body ] = callDev( $appData, \Nino\Admin\PageEditor::class, 'apiDelete', [ 'httpUri' => '/ueber-uns' ] );

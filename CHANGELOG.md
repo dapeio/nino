@@ -65,6 +65,16 @@ All notable changes to Nino are documented in this file.
 - Renamed the visible `/_admin` **Pages** area to **Routes** while preserving
   its internal API and storage identifiers, and moved the site-wide JSON
   translation workflow out of `/_editor` into `/_admin`.
+- Removed the `/nino/install/webpages` config key. `/_install`'s **Webpages**
+  step and `/_admin`'s **Routes** area no longer keep a page list beside the
+  routes: both derive the list they show from `/nino/http/routes` plus the
+  `/webpage<uri>/*` text keys on every request, and both write only those.
+  A page route hand-written in `config.php` is therefore a first-class entry
+  in both tools, and neither tool can drift against the routes it renders.
+- Changed menu membership to be numbered densely. A page joins a navigation
+  at its own position in the routes list (`'navs' => [ 'main' => 1, ... ]`)
+  instead of at a fixed default priority, and a membership added in
+  `/_admin` starts behind everything already in that menu.
 
 ### Fixed
 

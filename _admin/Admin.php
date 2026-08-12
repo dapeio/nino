@@ -3040,16 +3040,17 @@ namespace Nino\Admin {
 	 *												existing template up to a uri.
 	 *
 	 *												Same Element-URI/Http-URI split Webpages introduced (see
-	 *												_routeKey()'s docblock for why) and the same
-	 *												/nino/install/webpages array as its persisted list -
-	 *												shared, not duplicated, so either tool sees the other's
-	 *												edits. That array is no longer purely /_install's own
-	 *												internal bookkeeping once this class exists alongside it
-	 *												(see docs/_install.md's note on this). The list's own
-	 *												order is what every navigation gets
-	 *												rendered in (see Modules\Navigation) - apiMove() swaps
-	 *												one entry with a neighbor, the same ↑/↓ reordering
-	 *												Webpages' own list does while _install is still around.
+	 *												_routeKey()'s docblock for why), and the same single
+	 *												source of truth: /nino/http/routes plus the
+	 *												/webpage&lt;uri&gt;/* keys in /text/*.php. There is no
+	 *												second list to keep in sync - pages() derives the whole
+	 *												thing from the routes on every request, so a route
+	 *												written here, in /_install or by hand in config.php is
+	 *												the same page to all three. apiMove() swaps one page
+	 *												route with its neighbor, the same ↑/↓ reordering
+	 *												Webpages' own list does while _install is still around;
+	 *												the route order is also what breaks a tie between two
+	 *												equal menu priorities (see Modules\Navigation).
 	 *
 	 *	@package					Dape/Nino
 	 *	@author						David Perchermeier <mail@dape.io>
@@ -3061,12 +3062,6 @@ namespace Nino\Admin {
 		// at runtime by the optional tools themselves and therefore do not show
 		// up in the persisted route array used for the general collision check.
 		private const array RESERVED_HTTP_URIS = [ '/_admin', '/_editor', '/_install', '/_templates' ];
-
-		// The priority a menu membership gets when nothing has set one yet -
-		// the middle of the range, same as Callbacks::registerCallback()'s own
-		// default, so a hand-written route can deliberately sort before or
-		// after everything this module writes
-		private const int DEFAULT_NAV_PRIO = 5;
 
 		// A fresh entry's text fields when none was posted (or a blank one) -
 		// same generic-by-design reasoning _install/Install.php's
@@ -3108,14 +3103,17 @@ namespace Nino\Admin {
 		 *	@return 	int
 		 */
 		public static function count( array &$appData ): int {
-			return count( $appData['/nino/install/webpages'] ?? [] );
+
+			$routes = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes'] ?? [];
+
+			return count( array_filter( $routes, fn( array $r, string $k ): bool => self::isPageRoute( $k, $r ), ARRAY_FILTER_USE_BOTH ) );
 		}
 
 		/**
-		 *	List the persisted page list, every templates/page-*.tpl file
-		 *	available to pick from, the active locales and whether the
-		 *	Navigation module is active (a page's own "nav" flag only means
-		 *	anything while it is)
+		 *	List the page routes, every templates/page-*.tpl file available to
+		 *	pick from, the active locales and the navigations a page can be
+		 *	put into (empty while the Navigation module is inactive, which is
+		 *	what tells the frontend to offer no menu fields at all)
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
@@ -3127,26 +3125,96 @@ namespace Nino\Admin {
 			if( \Nino\Admin\Admin::guard( $appData, $request ) === false )
 				return;
 
-			$config = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
-			$navs 	= self::navKeys( $appData );
-			$routes = $config['/nino/http/routes'] ?? [];
-
-			// Menu membership is reported from the route each entry owns, not
-			// from the entry - the route is where it actually lives (see
-			// Modules\Navigation::routeLines()), so a membership added to
-			// config.php by hand shows up here instead of being overwritten
-			// by this list's older copy on the next save
-			$pages = array_map( function( array $entry ) use ( $routes, $navs ): array {
-				$entry['navs'] = self::entryNavs( $entry, $routes, $navs );
-				return $entry;
-			}, $config['/nino/install/webpages'] ?? [] );
+			$config 	= \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
+			$navs 		= self::navKeys( $appData );
+			$locales 	= \Nino\Locales::getAvailableLocales( $appData );
 
 			\Nino\Http::ok( $request, [
-				'pages' 			=> $pages,
+				'pages' 			=> self::pages( $appData, $config['/nino/http/routes'] ?? [], $locales, $navs ),
 				'templates' 	=> self::_templates( $appData ),
-				'locales' 		=> \Nino\Locales::getAvailableLocales( $appData ),
+				'locales' 		=> $locales,
 				'navs' 				=> $navs,
 			] );
+		}
+
+		/**
+		 *	Whether one route is a page this module manages.
+		 *
+		 *	A page is a GET route rendering a templates/page-*.tpl file -
+		 *	the same criterion the template picker below already uses, and
+		 *	the one thing that keeps robots.txt/sitemap.xml/llms.txt (GET
+		 *	routes with their own headers and no page template) out of the
+		 *	list. Matched on the body's prefix rather than through
+		 *	_templateFromBody(), which deliberately reports null for a body
+		 *	that resolves its file at runtime - /_install's "legal" unit's
+		 *	[[/nino/http/response/locale]] body is a page like any other
+		 *
+		 *	@param		string		$routeKey			Eg. 'GET://kontakt'
+		 *	@param		array 		$route
+		 *
+		 *	@return 	bool
+		 */
+		public static function isPageRoute( string $routeKey, array $route ): bool {
+
+			return str_starts_with( $routeKey, 'GET://' ) === true
+				&& preg_match( '~^\[template /templates/page-~', trim( (string) ( $route['body'] ?? '' ) ) ) === 1;
+		}
+
+		/**
+		 *	The page list, derived from the routes and the text files rather
+		 *	than from a second, parallel array that could drift against
+		 *	them - /_install's Webpages step builds the very same shape from
+		 *	the very same places (see its own pages()).
+		 *
+		 *	The route key is the Http-URI, the route's own 'uri' data field
+		 *	the Element-URI, 'navs' the menu membership, and the per-locale
+		 *	name/title/description are the /webpage&lt;uri&gt;/* keys both
+		 *	tools write into /text/&lt;locale&gt;.php
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		$routes				The persisted route array
+		 *	@param		array 		$locales			Available locales
+		 *	@param		array 		$navKeys			Registered nav keys (see navKeys())
+		 *
+		 *	@return 	array										One entry per page route, in route order
+		 */
+		public static function pages( array &$appData, array $routes, array $locales, array $navKeys ): array {
+
+			$text = [];
+			foreach( $locales as $locale )
+				$text[$locale] = \Nino\Filesystem::getFileContent( $appData, '/text/'. $locale. '.php', [] );
+
+			$pages = [];
+
+			foreach( $routes as $routeKey => $route ) {
+
+				if( self::isPageRoute( $routeKey, $route ) === false )
+					continue;
+
+				$httpUri 	= substr( $routeKey, strlen( 'GET:/' ) );
+				$uri 			= (string) ( $route['uri'] ?? $httpUri );
+				$body 		= (string) ( $route['body'] ?? '' );
+
+				$entryText = [];
+				foreach( $locales as $locale )
+					$entryText[$locale] = [
+						'name' 				=> (string) ( $text[$locale]['[[/webpage'. $uri. '/name]]'] 				?? '' ),
+						'title' 			=> (string) ( $text[$locale]['[[/webpage'. $uri. '/title]]'] 			?? '' ),
+						'description' => (string) ( $text[$locale]['[[/webpage'. $uri. '/description]]'] ?? '' ),
+					];
+
+				$pages[] = [
+					'uri' 				=> $uri,
+					'httpUri' 		=> $httpUri,
+					'template' 		=> self::_templateFromBody( $body ) ?? '',
+					'navs' 				=> array_values( array_intersect( $navKeys, array_keys( (array) ( $route['navs'] ?? [] ) ) ) ),
+					'statusCode' 	=> (int) ( $route['statusCode'] ?? 200 ),
+					'body' 				=> $body,
+					'text' 				=> $entryText,
+				];
+			}
+
+			return $pages;
 		}
 
 		/**
@@ -3184,25 +3252,19 @@ namespace Nino\Admin {
 		}
 
 		/**
-		 *	Which navigations one list entry currently belongs to.
+		 *	Which navigations one posted entry asks to be in, narrowed to the
+		 *	navigations this project actually registers.
 		 *
-		 *	Read from its route first, since that is what actually renders.
-		 *	'nav' =&gt; true is what a config written before per-menu membership
-		 *	existed carries, and means the first registered navigation - the
-		 *	single menu that entry could have been in back then
+		 *	'nav' =&gt; true is what a frontend written before per-menu
+		 *	membership existed posts, and means the first registered
+		 *	navigation - the single menu an entry could have been in back then
 		 *
-		 *	@param		array 		$entry				One page-list entry
-		 *	@param		array 		$routes				The persisted route array
+		 *	@param		array 		$entry				One posted page entry
 		 *	@param		array 		$navs					Registered nav keys (see navKeys())
 		 *
 		 *	@return 	array										Nav keys this entry belongs to
 		 */
-		public static function entryNavs( array $entry, array $routes, array $navs ): array {
-
-			$onRoute = $routes[ self::_routeKey( (string) ( $entry['httpUri'] ?? '' ) ) ]['navs'] ?? null;
-
-			if( is_array( $onRoute ) === true )
-				return array_values( array_intersect( $navs, array_keys( $onRoute ) ) );
+		public static function entryNavs( array $entry, array $navs ): array {
 
 			if( isset( $entry['navs'] ) === true && is_array( $entry['navs'] ) === true )
 				return array_values( array_intersect( $navs, $entry['navs'] ) );
@@ -3371,8 +3433,9 @@ namespace Nino\Admin {
 			}
 
 			$config = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
-			$pages 	= $config['/nino/install/webpages'] ?? [];
 			$routes = $config['/nino/http/routes'] ?? [];
+			$navKeys = self::navKeys( $appData );
+			$pages 	= self::pages( $appData, $routes, $locales, $navKeys );
 
 			$selfIndex = null;
 
@@ -3397,6 +3460,9 @@ namespace Nino\Admin {
 			$routeKey 			= self::_routeKey( $httpUri );
 			$previousRouteKey = $selfIndex !== null ? self::_routeKey( (string) $pages[$selfIndex]['httpUri'] ) : null;
 
+			// Every route counts here, not just the page ones: a page may
+			// never take a uri robots.txt, a module or a developer already
+			// answers on
 			if( isset( $routes[$routeKey] ) === true && $routeKey !== $previousRouteKey ) {
 				\Nino\Http::fail( $request, 409, 'http uri already belongs to another route: "'. $httpUri. '"' );
 				return;
@@ -3431,35 +3497,10 @@ namespace Nino\Admin {
 				return;
 			}
 
-			// Menu membership: kept on the entry as this list's own copy,
-			// written onto the route below - that is where it renders from.
-			// 'nav' stays alongside it as a derived mirror so a downgrade to a
-			// version that only knows the boolean doesn't empty every menu
-			$navs = self::entryNavs( $data, [], self::navKeys( $appData ) );
-
-			$entry = [
-				'uri' 				=> $uri,
-				'httpUri' 		=> $httpUri,
-				'template' 		=> $template,
-				'navs' 				=> $navs,
-				'nav' 				=> count( $navs ) > 0,
-				'statusCode' 	=> $statusCode,
-				'body' 				=> $body,
-				'text' 				=> $text,
-			];
-
-			// _install's own field, naming the library unit this entry
-			// started from - carried over untouched so its Webpages step can
-			// still re-apply that unit after an edit made over here
-			if( isset( $previous['libraryKey'] ) === true )
-				$entry['libraryKey'] = $previous['libraryKey'];
-
-			if( $selfIndex !== null ) {
-				unset( $routes[self::_routeKey( $pages[$selfIndex]['httpUri'] )] );
-				$pages[$selfIndex] = $entry;
-			} else {
-				$pages[] = $entry;
-			}
+			// Menu membership lives on the route and nowhere else - that is
+			// what Modules\Navigation::routeLines() reads, and the only copy
+			// that renders
+			$navs = self::entryNavs( $data, $navKeys );
 
 			$routeData = [ 'uri' => $uri, 'body' => $body ];
 			if( $statusCode !== 200 )
@@ -3467,17 +3508,17 @@ namespace Nino\Admin {
 
 			// A priority someone tuned on this route is not this save's to
 			// reset - only the set of keys is rewritten (see the shortcode's
-			// own routeLines() for what the value means)
-			$prios = $routes[$routeKey]['navs'] ?? [];
+			// own routeLines() for what the value means). A membership this
+			// save adds starts behind everything already in that menu
+			$prios = $routes[$previousRouteKey ?? $routeKey]['navs'] ?? [];
 			foreach( $navs as $navKey )
-				$routeData['navs'][$navKey] = $prios[$navKey] ?? self::DEFAULT_NAV_PRIO;
+				$routeData['navs'][$navKey] = (int) ( $prios[$navKey] ?? self::_nextPrio( $routes, $navKey ) );
 
-			$routes[$routeKey] = $routeData;
+			$routes = self::_putRoute( $routes, $previousRouteKey, $routeKey, $routeData );
 
-			$appData['/nino/install/webpages'] 	= array_values( $pages );
-			$appData['/nino/http/routes'] 				= self::_orderRoutes( $routes, $pages );
+			$appData['/nino/http/routes'] = $routes;
 
-			\Nino\AppData::writeContentData( $appData, [ '/nino/install/webpages', '/nino/http/routes' ] );
+			\Nino\AppData::writeContentData( $appData, [ '/nino/http/routes' ] );
 
 			foreach( $locales as $locale )
 				self::_mergeText( $appData, '/text/'. $locale. '.php', [
@@ -3486,15 +3527,67 @@ namespace Nino\Admin {
 					'[[/webpage'. $uri. '/description]]' => $text[$locale]['description'],
 				] );
 
-			\Nino\Http::ok( $request, [ 'pages' => $appData['/nino/install/webpages'] ] );
+			\Nino\Http::ok( $request, [ 'pages' => self::pages( $appData, $routes, $locales, $navKeys ) ] );
 		}
 
 		/**
-		 *	Remove one page entry and its route. Its /webpage&lt;uri&gt;/* text
-		 *	meta is deliberately left in place - same additive-only
-		 *	philosophy every other apply/save in this codebase follows,
-		 *	deleting a file/key a developer may have since hand-edited is a
-		 *	much riskier "undo" than toggling a config array
+		 *	Where a membership this save newly adds goes: behind everything
+		 *	already in that menu. Read across every route rather than just the
+		 *	page ones, so a hand-written route in the same menu is counted too
+		 *
+		 *	@param		array 		$routes				The persisted route array
+		 *	@param		string		$navKey				Eg. 'main'
+		 *
+		 *	@return 	int
+		 */
+		private static function _nextPrio( array $routes, string $navKey ): int {
+
+			$last = 0;
+			foreach( $routes as $route )
+				$last = max( $last, (int) ( $route['navs'][$navKey] ?? 0 ) );
+
+			return $last + 1;
+		}
+
+		/**
+		 *	Write one route, keeping the slot it already occupies even when
+		 *	its key changes: the route array's own order is what breaks a tie
+		 *	between two equal menu priorities (see
+		 *	Modules\Navigation::routeLines()) and what the list in the browser
+		 *	is sorted by, so renaming a page's http uri must not quietly move
+		 *	it to the bottom of both
+		 *
+		 *	@param		array 		$routes				The persisted route array
+		 *	@param		string|null	$previousKey	The key this route currently occupies, null for a new one
+		 *	@param		string		$routeKey			The key it should occupy afterwards
+		 *	@param		array 		$routeData
+		 *
+		 *	@return 	array
+		 */
+		private static function _putRoute( array $routes, ?string $previousKey, string $routeKey, array $routeData ): array {
+
+			if( $previousKey === null || isset( $routes[$previousKey] ) === false ) {
+				$routes[$routeKey] = $routeData;
+				return $routes;
+			}
+
+			$out = [];
+
+			foreach( $routes as $key => $route )
+				if( $key === $previousKey )
+					$out[$routeKey] = $routeData;
+				else
+					$out[$key] = $route;
+
+			return $out;
+		}
+
+		/**
+		 *	Remove one page route. Its /webpage&lt;uri&gt;/* text meta is
+		 *	deliberately left in place - same additive-only philosophy every
+		 *	other apply/save in this codebase follows, deleting a file/key a
+		 *	developer may have since hand-edited is a much riskier "undo" than
+		 *	dropping one route
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
@@ -3506,45 +3599,39 @@ namespace Nino\Admin {
 			if( \Nino\Admin\Admin::guard( $appData, $request ) === false )
 				return;
 
-			$httpUri = (string) ( \Nino\Admin\Admin::postData()['httpUri'] ?? '' );
+			$httpUri 	= (string) ( \Nino\Admin\Admin::postData()['httpUri'] ?? '' );
+			$routes 	= \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes'] ?? [];
+			$routeKey = self::_routeKey( $httpUri );
 
-			$config = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
-			$pages 	= $config['/nino/install/webpages'] ?? [];
-			$routes = $config['/nino/http/routes'] ?? [];
-
-			$index = null;
-			foreach( $pages as $i => $entry )
-				if( ( $entry['httpUri'] ?? null ) === $httpUri ) {
-					$index = $i;
-					break;
-				}
-
-			if( $index === null ) {
+			// Only ever a page route: this module lists nothing else, so
+			// anything else under that key is a module's or a developer's and
+			// not this button's to delete
+			if( isset( $routes[$routeKey] ) === false || self::isPageRoute( $routeKey, $routes[$routeKey] ) === false ) {
 				\Nino\Http::fail( $request, 404, 'unknown page' );
 				return;
 			}
 
-			unset( $routes[self::_routeKey( $httpUri )] );
-			unset( $pages[$index] );
+			unset( $routes[$routeKey] );
 
-			$appData['/nino/install/webpages'] 	= array_values( $pages );
-			$appData['/nino/http/routes'] 				= $routes;
+			$appData['/nino/http/routes'] = $routes;
 
-			\Nino\AppData::writeContentData( $appData, [ '/nino/install/webpages', '/nino/http/routes' ] );
+			\Nino\AppData::writeContentData( $appData, [ '/nino/http/routes' ] );
 
-			\Nino\Http::ok( $request, [ 'pages' => $appData['/nino/install/webpages'] ] );
+			\Nino\Http::ok( $request, [ 'pages' => self::pages( $appData, $routes, \Nino\Locales::getAvailableLocales( $appData ), self::navKeys( $appData ) ) ] );
 		}
 
 		/**
-		 *	Swap one page entry with its immediate neighbor - the list's own
-		 *	order is what every navigation renders in (see
-		 *	Modules\Navigation::routeLines()), so reordering here is the only way to
-		 *	control the generated main menu's order once _install (whose
-		 *	Webpages step has the same ↑/↓ buttons on its own list for the
-		 *	same reason) has been deleted. A swap rather than an arbitrary posted index:
-		 *	the list itself never leaves the browser, only which of two
-		 *	neighbors should trade places - nothing to validate beyond "is
-		 *	this still a valid direction from here"
+		 *	Swap one page route with its immediate neighbor - the order this
+		 *	list stands in, and the tie-breaker between two equal menu
+		 *	priorities (see Modules\Navigation::routeLines()). A swap rather
+		 *	than an arbitrary posted index: the list itself never leaves the
+		 *	browser, only which of two neighbors should trade places - nothing
+		 *	to validate beyond "is this still a valid direction from here"
+		 *
+		 *	Only page routes take part. Everything else in the array - a
+		 *	module's route, a hand-written one - keeps the exact slot it
+		 *	stands in, so reordering pages can never reshuffle a route this
+		 *	module does not own
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
@@ -3565,75 +3652,43 @@ namespace Nino\Admin {
 				return;
 			}
 
-			$pages = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/install/webpages'] ?? [];
+			$routes 	= \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes'] ?? [];
+			$pageKeys = array_keys( array_filter( $routes, fn( array $r, string $k ): bool => self::isPageRoute( $k, $r ), ARRAY_FILTER_USE_BOTH ) );
 
-			$index = null;
-			foreach( $pages as $i => $entry )
-				if( ( $entry['httpUri'] ?? null ) === $httpUri ) {
-					$index = $i;
-					break;
-				}
+			$index = array_search( self::_routeKey( $httpUri ), $pageKeys, true );
 
-			if( $index === null ) {
+			if( $index === false ) {
 				\Nino\Http::fail( $request, 404, 'unknown page' );
 				return;
 			}
 
 			$swapWith = $direction === 'up' ? $index - 1 : $index + 1;
 
-			if( $swapWith < 0 || $swapWith >= count( $pages ) ) {
+			if( $swapWith < 0 || $swapWith >= count( $pageKeys ) ) {
 				\Nino\Http::fail( $request, 400, 'already at the '. ( $direction === 'up' ? 'top' : 'bottom' ) );
 				return;
 			}
 
-			[ $pages[$index], $pages[$swapWith] ] = [ $pages[$swapWith], $pages[$index] ];
+			[ $pageKeys[$index], $pageKeys[$swapWith] ] = [ $pageKeys[$swapWith], $pageKeys[$index] ];
 
-			$pages = array_values( $pages );
+			// Refill the slots the page routes occupy, in the swapped order -
+			// every other route stays exactly where it was
+			$ordered 	= [];
+			$next 		= 0;
 
-			// The routes follow the list: equal menu priorities keep the order
-			// the routes stand in (see Modules\Navigation::routeLines()), so
-			// this swap is what actually reorders every menu these pages
-			// appear in - the list on its own renders nothing
-			$appData['/nino/install/webpages'] 	= $pages;
-			$appData['/nino/http/routes'] 				= self::_orderRoutes( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes'] ?? [], $pages );
+			foreach( $routes as $routeKey => $route )
+				if( self::isPageRoute( $routeKey, $route ) === true ) {
+					$ordered[ $pageKeys[$next] ] = $routes[ $pageKeys[$next] ];
+					$next++;
+				} else {
+					$ordered[$routeKey] = $route;
+				}
 
-			\Nino\AppData::writeContentData( $appData, [ '/nino/install/webpages', '/nino/http/routes' ] );
+			$appData['/nino/http/routes'] = $ordered;
 
-			\Nino\Http::ok( $request, [ 'pages' => $appData['/nino/install/webpages'] ] );
-		}
+			\Nino\AppData::writeContentData( $appData, [ '/nino/http/routes' ] );
 
-		/**
-		 *	The route array, reordered so this list's own routes stand in list
-		 *	order. Every other route - hand-written, or one a module owns -
-		 *	keeps its place ahead of them.
-		 *
-		 *	Only ever an ordering, never a filter: a route the list does not
-		 *	know is carried over untouched. It matters because equal menu
-		 *	priorities fall back to the order the routes stand in (see
-		 *	Modules\Navigation::routeLines()), which is what makes the ↑/↓
-		 *	buttons in this module reorder the menus at all
-		 *
-		 *	@param		array 		$routes				The route array to reorder
-		 *	@param		array 		$pages				The current page list, in its own order
-		 *
-		 *	@return 	array
-		 */
-		private static function _orderRoutes( array $routes, array $pages ): array {
-
-			$ordered = [];
-
-			foreach( $pages as $entry ) {
-				$routeKey = self::_routeKey( (string) ( $entry['httpUri'] ?? '' ) );
-				if( isset( $routes[$routeKey] ) === true )
-					$ordered[$routeKey] = true;
-			}
-
-			$foreign = array_diff_key( $routes, $ordered );
-			$own 		= array_intersect_key( $routes, $ordered );
-
-			// array_replace(), not array_merge(): these keys ("GET://404") are
-			// strings php would renumber if any of them looked numeric
-			return array_replace( $foreign, array_replace( $ordered, $own ) );
+			\Nino\Http::ok( $request, [ 'pages' => self::pages( $appData, $ordered, \Nino\Locales::getAvailableLocales( $appData ), self::navKeys( $appData ) ) ] );
 		}
 
 		/**

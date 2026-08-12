@@ -158,7 +158,7 @@ Import is merge-only: matching target-language values are overwritten, while val
 
 ## Routes: Manage Page Routes
 
-The **Routes** area manages the page list created via `/_install`, the associated `GET` routes, and the navigation.
+The **Routes** area manages the page routes created via `/_install` and the navigation. There is no separate page list: the list you see is derived from `/nino/http/routes` and the `/webpage<uri>/*` text keys on every request, so a route written here, in `/_install`, or by hand in `config.php` is the same page everywhere.
 
 A page has two different URIs:
 
@@ -174,13 +174,13 @@ When creating or editing, you also determine:
 - navigation name, page title, and description for each active language;
 - one checkbox per navigation registered in `/nino/html/navs`.
 
-Membership is stored on the page's own route as `'navs' => [ 'main' => 5, ... ]`, where the value is a priority (lower first, 5 is the default). A route added to `config.php` by hand joins a menu the same way, without any tool, and is rendered by `[navigation nav="main"]`.
+Membership is stored on the page's own route as `'navs' => [ 'main' => 1, ... ]`, where the value is a priority (lower first). A membership added here starts behind everything already in that menu; a priority you tuned by hand is never reset by a later save. A route added to `config.php` by hand joins a menu the same way, without any tool, and is rendered by `[navigation nav="main"]`.
 
-The arrows in the page list change the order of the pages and of the routes with them. Menu entries of equal priority follow route order, so this is what reorders every navigation those pages appear in. Reserved paths such as `/_admin`, `/_editor`, `/_install`, and `/_templates` cannot be used as public pages.
+The arrows in the page list swap two page routes in `config.php`; every other route keeps its own slot. Menu entries of equal priority follow route order. Reserved paths such as `/_admin`, `/_editor`, `/_install`, and `/_templates` cannot be used as public pages.
 
 Some routes select their template at runtime. In this case, `/_admin` shows the existing route body and leaves it unchanged when saving.
 
-Deleting a page removes its list entry, its route, and the associated page texts. The template file itself remains.
+Deleting a page removes its route. Its page texts and its template file remain — nothing on disk is deleted for you.
 
 ## Images: Define Image Slots
 

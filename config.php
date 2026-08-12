@@ -43,6 +43,10 @@
   '/nino/html/images' => 
   array (
   ),
+  '/nino/html/navs' => 
+  array (
+    0 => 'main',
+  ),
   '/nino/install/theme' => 'agency',
   '/nino/http/routes' => 
   array (
@@ -77,6 +81,10 @@
     array (
       'uri' => '/home',
       'body' => '[template /templates/page-home]',
+      'navs' => 
+      array (
+        'main' => 1,
+      ),
     ),
     'GET://404' => 
     array (
@@ -93,84 +101,9 @@
     array (
       'uri' => '/contact',
       'body' => '[template /templates/page-contact]',
-    ),
-  ),
-  '/nino/install/webpages' => 
-  array (
-    0 => 
-    array (
-      'uri' => '/home',
-      'httpUri' => '/',
-      'template' => 'page-home',
-      'libraryKey' => 'home',
-      'nav' => true,
-      'statusCode' => 200,
-      'body' => '[template /templates/page-home]',
-      'text' => 
+      'navs' => 
       array (
-        'de_DE' => 
-        array (
-          'name' => 'Start',
-          'title' => 'Willkommen',
-          'description' => 'Willkommen auf unserer Website.',
-        ),
-      ),
-    ),
-    1 => 
-    array (
-      'uri' => '/404',
-      'httpUri' => '/404',
-      'template' => 'page-404',
-      'libraryKey' => '404',
-      'nav' => false,
-      'statusCode' => 404,
-      'body' => '[template /templates/page-404]',
-      'text' => 
-      array (
-        'de_DE' => 
-        array (
-          'name' => 'Seite nicht gefunden',
-          'title' => 'Seite nicht gefunden',
-          'description' => 'Die angeforderte Seite wurde nicht gefunden.',
-        ),
-      ),
-    ),
-    2 => 
-    array (
-      'uri' => '/legal',
-      'httpUri' => '/legal',
-      'template' => '',
-      'libraryKey' => 'legal',
-      'nav' => false,
-      'statusCode' => 200,
-      'body' => '[template /templates/page-legal.[[/nino/http/response/locale]]]',
-      'text' => 
-      array (
-        'de_DE' => 
-        array (
-          'name' => 'Impressum',
-          'title' => 'Impressum',
-          'description' => 'Impressum und rechtliche Hinweise.',
-        ),
-      ),
-    ),
-    3 => 
-    array (
-      'uri' => '/contact',
-      'httpUri' => '/contact',
-      'template' => 'page-contact',
-      'libraryKey' => 'contact',
-      'nav' => true,
-      'statusCode' => 200,
-      'body' => '[template /templates/page-contact]',
-      'text' => 
-      array (
-        'de_DE' => 
-        array (
-          'name' => 'Kontakt',
-          'title' => 'Kontakt',
-          'description' => 'Kontaktieren Sie uns.',
-        ),
+        'main' => 4,
       ),
     ),
   ),

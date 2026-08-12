@@ -156,7 +156,7 @@ Der Import führt nur zusammen: Passende Werte der Zielsprache werden überschri
 
 ## Routes: Seitenrouten verwalten
 
-Der Bereich **Routes** verwaltet die über `/_install` angelegte Seitenliste, die zugehörigen `GET`-Routen und die Navigation.
+Der Bereich **Routes** verwaltet die über `/_install` angelegten Seitenrouten und die Navigation. Es gibt keine getrennte Seitenliste: Die angezeigte Liste wird bei jedem Aufruf aus `/nino/http/routes` und den `/webpage<uri>/*`-Textschlüsseln abgeleitet. Eine Route, die hier, in `/_install` oder von Hand in der `config.php` entsteht, ist damit überall dieselbe Seite.
 
 Eine Seite besitzt zwei verschiedene URIs:
 
@@ -169,13 +169,16 @@ Beim Anlegen oder Bearbeiten bestimmst du außerdem:
 
 - ein vorhandenes Template aus `templates/page-*.tpl`;
 - einen HTTP-Statuscode;
-- Navigationsname, Seitentitel und Beschreibung für jede aktive Sprache.
+- Navigationsname, Seitentitel und Beschreibung für jede aktive Sprache;
+- je eine Checkbox pro Navigation aus `/nino/html/navs`.
 
-Die Pfeile in der Seitenliste verändern die Reihenfolge der Seiten und mit ihnen die der Routen. Menüeinträge gleicher Priorität folgen der Routenreihenfolge, das sortiert also jede Navigation, in der diese Seiten stehen. Reservierte Pfade wie `/_admin`, `/_editor`, `/_install`, `/_templates` können nicht als öffentliche Seiten verwendet werden.
+Die Zugehörigkeit steht als `'navs' => [ 'main' => 1, … ]` auf der Route der Seite; der Wert ist eine Priorität (kleiner zuerst). Eine hier neu gesetzte Zugehörigkeit landet hinter allem, was bereits in diesem Menü steht; eine von Hand vergebene Priorität setzt ein späteres Speichern nicht zurück. Eine von Hand in die `config.php` geschriebene Route tritt einem Menü genauso bei – ganz ohne Werkzeug – und wird von `[navigation nav="main"]` gerendert.
+
+Die Pfeile in der Seitenliste vertauschen zwei Seitenrouten in der `config.php`; jede andere Route behält ihren Platz. Menüeinträge gleicher Priorität folgen der Routenreihenfolge. Reservierte Pfade wie `/_admin`, `/_editor`, `/_install`, `/_templates` können nicht als öffentliche Seiten verwendet werden.
 
 Einige Routen wählen ihr Template zur Laufzeit. In diesem Fall zeigt `/_admin` den bestehenden Route-Body an und lässt ihn beim Speichern unverändert.
 
-Das Löschen einer Seite entfernt ihren Listeneintrag, ihre Route und die zugehörigen Seitentexte. Die Template-Datei selbst bleibt bestehen.
+Das Löschen einer Seite entfernt ihre Route. Ihre Seitentexte und ihre Template-Datei bleiben bestehen – auf der Festplatte wird nichts für dich gelöscht.
 
 ## Images: Bildplätze definieren
 

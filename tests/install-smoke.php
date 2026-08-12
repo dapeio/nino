@@ -459,8 +459,9 @@ check( 'registers a route at "/" for the home entry, keyed by its Http-URI', iss
 check( 'the route\'s own "uri" data field is the Element-URI, not the Http-URI', $configAfterWpApply['/nino/http/routes']['GET://']['uri'] === '/site-home' );
 check( 'registers a route at "/kontakt" for the contact entry, keyed by its Http-URI', isset( $configAfterWpApply['/nino/http/routes']['GET://kontakt'] ) === true );
 check( 'auto-pulls "forms" (contact\'s requiresModules)', in_array( '\\Nino\\Modules\\Form', $configAfterWpApply['/nino/modules'], true ) === true );
-check( 'the list itself is persisted at /nino/install/webpages, in order, Element-URI', array_column( $configAfterWpApply['/nino/install/webpages'], 'uri' ) === [ '/site-home', '/site-contact' ] );
-check( '...and Http-URI', array_column( $configAfterWpApply['/nino/install/webpages'], 'httpUri' ) === [ '/', '/kontakt' ] );
+check( 'the routes are the whole persisted list - no second copy of it anywhere in config.php', isset( $configAfterWpApply['/nino/install/webpages'] ) === false );
+check( 'the page routes stand in the posted order, Element-URI', array_values( array_map( fn( array $r ): string => $r['uri'], array_filter( $configAfterWpApply['/nino/http/routes'], fn( array $r, string $k ): bool => \Nino\Install\Webpages::isPageRoute( $k, $r ), ARRAY_FILTER_USE_BOTH ) ) ) === [ '/site-home', '/site-contact' ] );
+check( '...and Http-URI (the route keys themselves)', array_keys( array_filter( $configAfterWpApply['/nino/http/routes'], fn( array $r, string $k ): bool => \Nino\Install\Webpages::isPageRoute( $k, $r ), ARRAY_FILTER_USE_BOTH ) ) === [ 'GET://', 'GET://kontakt' ] );
 check( 'a hand-written route outside the library still survives Webpages apply too', isset( $configAfterWpApply['/nino/http/routes']['GET://custom'] ) === true );
 
 check( 'copies "forms"\'s own mail-header/footer templates too, auto-pulled in by "contact"', \Nino\Filesystem::fileExists( $appData, '/templates/mail-header.tpl' ) === true );
@@ -505,8 +506,8 @@ $enAfterNav = \Nino\Filesystem::getFileContent( $appData, '/text/en_US.php', [] 
 $routesAfterNav = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes'];
 
 check( 'the Navigation module registers the menus the editors offer', \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/html/navs'] === [ 'main', 'footer' ] );
-check( 'a nav-checked entry joins the first registered menu on its own route', ( $routesAfterNav['GET://']['navs'] ?? null ) === [ 'main' => 5 ] );
-check( '...and so does the second one', ( $routesAfterNav['GET://kontakt']['navs'] ?? null ) === [ 'main' => 5 ] );
+check( 'a nav-checked entry joins the first registered menu on its own route, at its own position in the list', ( $routesAfterNav['GET://']['navs'] ?? null ) === [ 'main' => 1 ] );
+check( '...and so does the second one, one position further down', ( $routesAfterNav['GET://kontakt']['navs'] ?? null ) === [ 'main' => 2 ] );
 check( 'an entry that is in no menu carries no membership at all', isset( $routesAfterNav['GET://impressum']['navs'] ) === false );
 check( 'nothing is generated into the text files anymore', isset( $deAfterNav['[[/website/navigation/main]]'] ) === false && isset( $enAfterNav['[[/website/navigation/main]]'] ) === false );
 
@@ -540,18 +541,17 @@ check( '/website/legal/uri is only ever set, never cleared - known v1 limitation
 echo "\n";
 
 
-// --- Webpages <-> _admin's Pages module share one list ------------------------
+// --- Webpages <-> _admin's Routes module share one source of truth ------------
 
-echo "Webpages <-> _admin's Pages module share one list\n";
+echo "Webpages <-> _admin's Routes module share one source of truth\n";
 
-// docs/_admin.md documents /nino/install/webpages as one list both tools
-// write in the same shape, { uri, httpUri, template, nav, statusCode, text }.
-// That only holds if Webpages persists what the other side actually reads:
-// "template" as the on-disk template file (not its own library-unit key,
-// which means nothing over there) and "statusCode" explicitly (it lives in
-// the route otherwise, and is unrecoverable from the list alone). Without
-// that, every shipped page - all four of them - is unopenable in /_admin, and
-// saving the 404 page there quietly turns it into a 200.
+// Neither tool keeps a list of its own: both derive one from
+// /nino/http/routes plus the /webpage<uri>/* keys in the text files (see
+// Webpages::pages() and Admin.php's PageEditor::pages()). That only works if
+// the route really carries everything either side needs to reopen an entry -
+// its Element-URI, its body and its status code. Without that, every shipped
+// page is unopenable in /_admin, and saving the 404 page there quietly turns
+// it into a 200.
 $_POST['data'] = json_encode( [ 'webpages' => [
 	[ 'uri' => '/site-home', 'httpUri' => '/', 'libraryKey' => 'home', 'nav' => true, 'text' => [ 'de_DE' => [ 'name' => 'Start' ] ] ],
 	[ 'uri' => '/site-404', 'httpUri' => '/404', 'libraryKey' => '404', 'nav' => false, 'text' => [ 'de_DE' => [ 'name' => 'Weg' ] ] ],
@@ -562,15 +562,15 @@ $sharedApplyRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 check( 'apply succeeds', $sharedApplyRequest['/nino/http/response']['statusCode'] === 200 );
 
 $sharedConfig = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
-$sharedList 	= $sharedConfig['/nino/install/webpages'];
+$sharedList 	= $sharedApplyRequest['/nino/http/response']['body']['webpages'];
 
-check( 'persists "template" as the on-disk template file /_admin selects from', array_column( $sharedList, 'template' ) === [ 'page-home', 'page-404', '' ] );
-check( 'keeps its own library-unit key in "libraryKey" instead', array_column( $sharedList, 'libraryKey' ) === [ 'home', '404', 'legal' ] );
-check( 'persists each entry\'s status code explicitly', array_column( $sharedList, 'statusCode' ) === [ 200, 404, 200 ] );
+check( 'reports "template" as the on-disk template file /_admin selects from', array_column( $sharedList, 'template' ) === [ 'page-home', 'page-404', '' ] );
+check( 'resolves each entry back to the library unit it came from, from its route body alone', array_column( $sharedList, 'libraryKey' ) === [ 'home', '404', 'legal' ] );
+check( 'reports each entry\'s status code, read back off its route', array_column( $sharedList, 'statusCode' ) === [ 200, 404, 200 ] );
 check( 'the 404 entry really is a 404 in the route too', ( $sharedConfig['/nino/http/routes']['GET://404']['statusCode'] ?? 200 ) === 404 );
 check( '"legal" reports no single template - its body resolves one per locale', $sharedList[2]['body'] === '[template /templates/page-legal.[[/nino/http/response/locale]]]' );
 
-// Now the other direction: open one of those entries in /_admin's Pages module
+// Now the other direction: open one of those entries in /_admin's Routes module
 // and save it back unchanged, exactly as pages.js posts it
 \Nino\Runtime::setSessionValue( $appData, './nino/admin/authed', true );
 
@@ -596,7 +596,7 @@ check( 'saving a Webpages-made entry from /_admin succeeds', $adminSaveRequest['
 
 $afterDevSave = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
 check( 'saving it there does not quietly reset its 404 to a 200', ( $afterDevSave['/nino/http/routes']['GET://404']['statusCode'] ?? 200 ) === 404 );
-check( '/_install\'s own libraryKey survives a save made in /_admin', ( $afterDevSave['/nino/install/webpages'][1]['libraryKey'] ?? null ) === '404' );
+check( 'the entry still resolves to /_install\'s own "404" unit after a save made in /_admin', ( \Nino\Install\Webpages::pages( $appData, $afterDevSave['/nino/http/routes'], [ 'de_DE' ], [] )[1]['libraryKey'] ?? null ) === '404' );
 
 // The locale-resolving body the template <select> can't spell: saving that
 // entry from /_admin keeps the body it already has rather than flattening it
@@ -611,7 +611,7 @@ check( 'saving the locale-resolving entry from /_admin succeeds', $adminLegalReq
 
 $afterLegalSave = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
 check( 'its runtime-resolved body is kept, not flattened to one locale\'s file', $afterLegalSave['/nino/http/routes']['GET://legal']['body'] === '[template /templates/page-legal.[[/nino/http/response/locale]]]' );
-check( '...and the list stops claiming a template it does not use', ( $afterLegalSave['/nino/install/webpages'][2]['template'] ?? null ) === '' );
+check( '...and the derived list claims no template for it', ( \Nino\Install\Webpages::pages( $appData, $afterLegalSave['/nino/http/routes'], [ 'de_DE' ], [] )[2]['template'] ?? null ) === '' );
 
 // An entry /_admin created has no library unit at all - Webpages has to carry
 // it through its own replace rather than reject it as an unknown template
@@ -624,7 +624,7 @@ $adminNewRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 check( 'creating a page in /_admin succeeds', $adminNewRequest['/nino/http/response']['statusCode'] === 200 );
 
 $beforeReapply = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
-$_POST['data'] = json_encode( [ 'webpages' => $beforeReapply['/nino/install/webpages'] ] );
+$_POST['data'] = json_encode( [ 'webpages' => \Nino\Install\Webpages::pages( $appData, $beforeReapply['/nino/http/routes'], [ 'de_DE' ], [] ) ] );
 $reapplyRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Install\Webpages::apiApply( $appData, $reapplyRequest );
 check( 'Webpages re-applies a list containing a /_admin-made entry', $reapplyRequest['/nino/http/response']['statusCode'] === 200 );
@@ -795,9 +795,14 @@ echo "Shipped defaults (real config.php + _install/library)\n";
 $realRoot 	= __DIR__. '/..';
 $realConfig = include $realRoot. '/config.php';
 
+$realAppData 		= [ '/nino/locales/available' => $realConfig['/nino/locales/available'] ?? [], '/nino/configpath' => $realRoot ];
+$realPageRoutes = array_filter( $realConfig['/nino/http/routes'] ?? [], fn( array $r, string $k ): bool => \Nino\Install\Webpages::isPageRoute( $k, $r ), ARRAY_FILTER_USE_BOTH );
+$realPages 			= \Nino\Install\Webpages::pages( $realAppData, $realConfig['/nino/http/routes'] ?? [], [], [ 'main' ] );
+
 check( 'the real config.php returns an array', is_array( $realConfig ) === true );
-check( 'ships exactly the four default webpages, in order, Element-URI', array_column( $realConfig['/nino/install/webpages'] ?? [], 'uri' ) === [ '/home', '/404', '/legal', '/contact' ] );
-check( '...and Http-URI', array_column( $realConfig['/nino/install/webpages'] ?? [], 'httpUri' ) === [ '/', '/404', '/legal', '/contact' ] );
+check( 'ships exactly the four default page routes, in order, Element-URI', array_column( $realPages, 'uri' ) === [ '/home', '/404', '/legal', '/contact' ] );
+check( '...and Http-URI', array_column( $realPages, 'httpUri' ) === [ '/', '/404', '/legal', '/contact' ] );
+check( 'no second copy of that list is shipped alongside the routes', isset( $realConfig['/nino/install/webpages'] ) === false );
 check( 'registers the home entry\'s route at "/" (its Http-URI), "uri" data field is its Element-URI', ( ( $realConfig['/nino/http/routes']['GET://'] ?? [] )['uri'] ?? null ) === '/home' );
 check( 'registers the 404 entry at "/404" too - the exact key Http::response()\'s own fallback lookup needs', isset( $realConfig['/nino/http/routes']['GET://404'] ) === true );
 check( 'registers "legal" and "contact" as well', isset( $realConfig['/nino/http/routes']['GET://legal'] ) === true && isset( $realConfig['/nino/http/routes']['GET://contact'] ) === true );
@@ -806,12 +811,19 @@ check( 'ships both library locales available', $realConfig['/nino/locales/availa
 check( 'a theme is bundled into /nino/html/assets', preg_match( '#^/assets/style\.theme\.[a-z0-9-]+\.css$#', (string) ( $realConfig['/nino/html/assets']['/.cache/style.css'][1] ?? '' ) ) === 1 );
 check( '...and named by the theme step\'s own persisted key', ( $realConfig['/nino/install/theme'] ?? null ) === 'agency' );
 
-// Every entry names the on-disk template file its route actually renders,
-// alongside the library unit it came from - what lets /_admin's Pages module
-// work with the shipped pages at all (see the shared-list section above)
-check( 'each shipped entry names its own on-disk template', array_column( $realConfig['/nino/install/webpages'] ?? [], 'template' ) === [ 'page-home', 'page-404', '', 'page-contact' ] );
-check( '...and the library unit behind it', array_column( $realConfig['/nino/install/webpages'] ?? [], 'libraryKey' ) === [ 'home', '404', 'legal', 'contact' ] );
-check( 'the shipped 404 entry really carries a 404', array_column( $realConfig['/nino/install/webpages'] ?? [], 'statusCode' ) === [ 200, 404, 200, 200 ] );
+// Every shipped route resolves back to the on-disk template file it renders,
+// and to the library unit it came from - what lets /_admin's Routes module
+// work with the shipped pages at all (see the shared-source-of-truth section
+// above)
+check( 'each shipped route resolves to its own on-disk template', array_column( $realPages, 'template' ) === [ 'page-home', 'page-404', '', 'page-contact' ] );
+check( '...and to the library unit behind it', array_column( $realPages, 'libraryKey' ) === [ 'home', '404', 'legal', 'contact' ] );
+check( 'the shipped 404 route really carries a 404', array_column( $realPages, 'statusCode' ) === [ 200, 404, 200, 200 ] );
+
+// The menus are on the routes themselves, densely numbered by the position
+// the wizard's list had them in (see Webpages::apiApply())
+check( 'the registry the page editors offer checkboxes for is shipped', ( $realConfig['/nino/html/navs'] ?? null ) === [ 'main' ] );
+check( 'the two menu pages carry their membership on their own route', array_column( $realPages, 'navs' ) === [ [ 'main' ], [], [], [ 'main' ] ] );
+check( '...at their own position in that list', [ $realPageRoutes['GET://']['navs'], $realPageRoutes['GET://contact']['navs'] ] === [ [ 'main' => 1 ], [ 'main' => 4 ] ] );
 
 // The generated site itself is deliberately not tracked - it is the
 // wizard's output, not repository content

@@ -1103,12 +1103,12 @@ namespace Nino\Install {
 	 *												manifest may ship, since that's a per-instance choice now,
 	 *												not a per-template one.
 	 *
-	 *												The list itself - not the routes/text/templates it produces
-	 *												- is the persisted source of truth (see apiApply()'s
-	 *												docblock), stored at '/nino/install/webpages'. That array
-	 *												is shared, not exclusive to this class: _admin/Admin.php's
-	 *												PageEditor manages the same list independently (its own
-	 *												standalone copy of this shape/logic, restricted to
+	 *												Nothing of this is persisted as a list of its own: the
+	 *												routes are the pages (see isPageRoute()/pages()), the
+	 *												/webpage&lt;uri&gt;/* text keys are their wording, and the
+	 *												route's 'navs' its menu membership. /_admin/Admin.php's
+	 *												PageEditor reads and writes exactly the same routes (its
+	 *												own standalone copy of this shape/logic, restricted to
 	 *												templates already on disk rather than library units) for
 	 *												once this folder has been deleted - see its own docblock
 	 *
@@ -1126,6 +1126,13 @@ namespace Nino\Install {
 		// own GET response once its authenticated/default-password gate passes.
 		private const array RESERVED_HTTP_URIS = [ '/_admin', '/_editor', '/_install', '/_templates' ];
 
+		// The priority a menu membership falls back to when the entry
+		// carries no position of its own - apiApply() numbers every entry by
+		// its place in the list, so this only ever applies to a hand-built
+		// post. The middle of the range, same as
+		// Callbacks::registerCallback()'s own default
+		private const int DEFAULT_NAV_PRIO = 5;
+
 		// A fresh entry's text fields when the frontend doesn't post its
 		// own (or posts a blank one) - see apiApply()'s $text loop.
 		// Deliberately generic: unlike a template's own deeper content
@@ -1133,12 +1140,6 @@ namespace Nino\Install {
 		// instance's own meta is this developer's to write, and defaulting
 		// it to eg. "Home" would just be wrong the moment the same
 		// template gets mounted a second time under a different uri
-		// The priority a menu membership gets when nothing has set one yet -
-		// the middle of the range, same as Callbacks::registerCallback()'s own
-		// default, so a hand-written route can deliberately sort before or
-		// after everything this step writes
-		private const int DEFAULT_NAV_PRIO = 5;
-
 		private const array DEFAULT_TEXT = [
 			'name' 				=> 'Page',
 			'title' 			=> 'Page Title',
@@ -1159,10 +1160,12 @@ namespace Nino\Install {
 
 		/**
 		 *	List every selectable template (one per _install/library/pages/&lt;key&gt;
-		 *	directory) and the current, persisted webpages list - state
+		 *	directory) and the page list as it currently stands - state
 		 *	restoration, same reasoning as Setup::apiLibrary()'s docblock:
 		 *	apply() replaces the whole list, so the frontend has to be able
-		 *	to show what's already there
+		 *	to show what's already there. The list is derived from the routes
+		 *	on every call, never read back out of a copy this step persisted
+		 *	(see pages())
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
@@ -1173,22 +1176,15 @@ namespace Nino\Install {
 
 			$locales 	= $appData['/nino/locales/available'] ?? [];
 			$navs 		= self::navKeys( $appData );
-			$routes 	= \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes'] ?? [];
 
-			// Each entry's menu membership is reported from the route it owns,
-			// not from the entry - the route is where it actually lives (see
-			// Modules\Navigation::routeLines()), so a membership added to
-			// config.php by hand shows up here instead of being overwritten by
-			// this list's older copy on the next apply
-			$webpages = array_map( function( array $entry ) use ( $routes, $navs ): array {
-				$entry['navs'] = self::entryNavs( $entry, $routes, $navs );
-				return $entry;
-			}, $appData['/nino/install/webpages'] ?? [] );
+			// The persisted route array, never the live one polluted by
+			// /_install's and the modules' own bootstrap routes
+			$routes 	= \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes'] ?? [];
 
 			\Nino\Http::ok( $request, [
 				'templates' 	=> self::_templates( $locales ),
 				'locales' 		=> $locales,
-				'webpages' 		=> $webpages,
+				'webpages' 		=> self::pages( $appData, $routes, $locales, $navs ),
 				'navs' 				=> $navs,
 			] );
 		}
@@ -1225,26 +1221,19 @@ namespace Nino\Install {
 		}
 
 		/**
-		 *	Which navigations one list entry currently belongs to.
+		 *	Which navigations one posted entry asks to be in, narrowed to the
+		 *	navigations this project actually registers.
 		 *
-		 *	Read from its route first, since that is what actually renders.
-		 *	'nav' =&gt; true is what a config written before per-menu membership
-		 *	existed carries, and means the first registered navigation - the
-		 *	single menu that entry could have been in back then
+		 *	'nav' =&gt; true is what a frontend written before per-menu
+		 *	membership existed posts, and means the first registered
+		 *	navigation - the single menu an entry could have been in back then
 		 *
-		 *	@param		array 		$entry				One webpages-list entry
-		 *	@param		array 		$routes				The persisted route array
+		 *	@param		array 		$entry				One posted webpages entry
 		 *	@param		array 		$navs					Registered nav keys (see navKeys())
 		 *
 		 *	@return 	array										Nav keys this entry belongs to
 		 */
-		public static function entryNavs( array $entry, array $routes, array $navs ): array {
-
-			$routeKey = 'GET://'. trim( (string) ( $entry['httpUri'] ?? '' ), '/' );
-			$onRoute 	= $routes[$routeKey]['navs'] ?? null;
-
-			if( is_array( $onRoute ) === true )
-				return array_values( array_intersect( $navs, array_keys( $onRoute ) ) );
+		public static function entryNavs( array $entry, array $navs ): array {
 
 			if( isset( $entry['navs'] ) === true && is_array( $entry['navs'] ) === true )
 				return array_values( array_intersect( $navs, $entry['navs'] ) );
@@ -1338,8 +1327,131 @@ namespace Nino\Install {
 			return [
 				'uri' 	=> $uri,
 				'navs' 	=> array_keys( ( $manifestRoute['navs'] ?? [] ) ),
+				'body' 	=> (string) ( $manifestRoute['body'] ?? '' ),
 				'text' 	=> $text,
 			];
+		}
+
+		/**
+		 *	Whether one route is a page this step manages.
+		 *
+		 *	A page is a GET route rendering a templates/page-*.tpl file -
+		 *	the same criterion /_admin's template picker already uses, and
+		 *	the one thing that keeps robots.txt/sitemap.xml/llms.txt (GET
+		 *	routes with their own headers and no page template) out of a
+		 *	page list. Matched on the body's prefix rather than through
+		 *	_templateFromBody(), which deliberately reports null for a body
+		 *	that resolves its file at runtime - the "legal" unit's
+		 *	[[/nino/http/response/locale]] body is a page like any other
+		 *
+		 *	@param		string		$routeKey			Eg. 'GET://kontakt'
+		 *	@param		array 		$route
+		 *
+		 *	@return 	bool
+		 */
+		public static function isPageRoute( string $routeKey, array $route ): bool {
+
+			return str_starts_with( $routeKey, 'GET://' ) === true
+				&& preg_match( '~^\[template /templates/page-~', trim( (string) ( $route['body'] ?? '' ) ) ) === 1;
+		}
+
+		/**
+		 *	The page list both editing tools show, derived from the routes
+		 *	and the text files rather than from a second, parallel array
+		 *	that could drift against them.
+		 *
+		 *	Every field is recovered from where it actually lives: the
+		 *	route key is the Http-URI, the route's own 'uri' data field the
+		 *	Element-URI, 'navs' the menu membership, and the per-locale
+		 *	name/title/description are the /webpage&lt;uri&gt;/* keys this
+		 *	step writes into /text/&lt;locale&gt;.php. 'libraryKey' is
+		 *	resolved back from the body (see _unitFromBody()) so the form's
+		 *	template picker can still show which library unit a page came
+		 *	from - it is never stored
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		$routes				The persisted route array
+		 *	@param		array 		$locales			Picked locales
+		 *	@param		array 		$navKeys			Registered nav keys (see navKeys())
+		 *
+		 *	@return 	array										One entry per page route, in route order
+		 */
+		public static function pages( array &$appData, array $routes, array $locales, array $navKeys ): array {
+
+			$text = [];
+			foreach( $locales as $locale )
+				$text[$locale] = \Nino\Filesystem::getFileContent( $appData, '/text/'. $locale. '.php', [] );
+
+			$pages = [];
+
+			foreach( $routes as $routeKey => $route ) {
+
+				if( self::isPageRoute( $routeKey, $route ) === false )
+					continue;
+
+				$httpUri 		= substr( $routeKey, strlen( 'GET:/' ) );
+				$uri 				= (string) ( $route['uri'] ?? $httpUri );
+				$body 			= (string) ( $route['body'] ?? '' );
+				$libraryKey = self::_unitFromBody( $body );
+
+				// A page whose meta has never been written yet starts from the
+				// wording its library unit suggests, in every active locale -
+				// the same starter text a page newly picked in this step gets
+				// (see _suggestions()). This is what the shipped config's four
+				// pages look like on a fresh checkout: their routes are
+				// tracked, the /text files they read from are not (see
+				// docs/_install.md), so without this the wizard would apply
+				// "Page"/"Page Title" over a starter site that ships real
+				// wording for both languages
+				$suggested = $libraryKey !== '' ? self::_suggestions( $libraryKey, $locales )['text'] : [];
+
+				$entryText = [];
+				foreach( $locales as $locale )
+					foreach( [ 'name', 'title', 'description' ] as $field )
+						$entryText[$locale][$field] = (string) ( $text[$locale]['[[/webpage'. $uri. '/'. $field. ']]']
+							?? $suggested[$locale][$field]
+							?? '' );
+
+				$pages[] = [
+					'uri' 				=> $uri,
+					'httpUri' 		=> $httpUri,
+					'template' 		=> self::_templateFromBody( $body ) ?? '',
+					'libraryKey' 	=> $libraryKey,
+					'navs' 				=> array_values( array_intersect( $navKeys, array_keys( (array) ( $route['navs'] ?? [] ) ) ) ),
+					'statusCode' 	=> (int) ( $route['statusCode'] ?? 200 ),
+					'body' 				=> $body,
+					'text' 				=> $entryText,
+				];
+			}
+
+			return $pages;
+		}
+
+		/**
+		 *	Which library unit a route body came from, or '' for a body no
+		 *	unit declares (hand-written, or a page pointed at a template
+		 *	that was never part of the library).
+		 *
+		 *	Every unit's manifest route declares a distinct body, so the
+		 *	body identifies the unit on its own - which is why the binding
+		 *	does not have to be persisted anywhere. It only decides which
+		 *	unit's files a *new* page installs (see apiApply()); an existing
+		 *	page is just a route with a template
+		 *
+		 *	@param		string		$body
+		 *
+		 *	@return 	string									Unit key, or '' if no unit declares this body
+		 */
+		private static function _unitFromBody( string $body ): string {
+
+			if( $body === '' )
+				return '';
+
+			foreach( self::_templates() as $key => $unit )
+				if( ( $unit['body'] ?? '' ) === $body )
+					return (string) $key;
+
+			return '';
 		}
 
 		/**
@@ -1360,17 +1472,15 @@ namespace Nino\Install {
 		 *	entry by entry, so the response ("Applied N pages") reflects
 		 *	exactly what actually landed.
 		 *
-		 *	The list itself is a full replace, the same reasoning as
+		 *	A full replace of the *page* routes, the same reasoning as
 		 *	Setup::apiApply()'s docblock: whatever's posted is the complete,
-		 *	authoritative picture. Routes take the same care Setup's own
-		 *	replace does, but scoped more narrowly - rather than stripping
-		 *	every route key any template in the library could ever produce
-		 *	(which, since an entry's httpUri - not a fixed template name -
-		 *	now drives the route key, isn't even a fixed set), this only
-		 *	strips the route keys the *previous* persisted list would have
-		 *	produced. A hand-added route (via _admin's Config module) or one
-		 *	Setup's own base/modules own is never among those, so it
-		 *	survives untouched.
+		 *	authoritative picture. What makes that safe without a second,
+		 *	persisted list to remember ownership by is isPageRoute(): the
+		 *	step shows every route it could delete, so a page route that
+		 *	exists and wasn't posted is one the developer removed. Anything
+		 *	that isn't a page route - robots.txt, a module's own, a
+		 *	hand-written one - is never a deletion candidate and survives
+		 *	untouched.
 		 *
 		 *	Templates/text stay additive, same as Setup - a uri dropped
 		 *	from the list doesn't delete the template file or text it
@@ -1389,27 +1499,13 @@ namespace Nino\Install {
 			$locales 		= $appData['/nino/locales/available'] ?? [];
 			$navKeys 		= self::navKeys( $appData );
 
-			// Work from the persisted route array, never the live one polluted by
-			// /_install and module bootstrap routes. The previous Webpages list's
-			// own keys are the only existing routes this replacement may reuse;
-			// everything left in $foreignRoutes belongs to Setup, a module or a
-			// developer and must not be overwritten silently.
+			// Work from the persisted route array, never the live one polluted
+			// by /_install's and the modules' own bootstrap routes. Everything
+			// that isn't a page route belongs to Setup, a module or a
+			// developer and must not be touched here at all.
 			$config 		= \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
-			$oldWebpages = $config['/nino/install/webpages'] ?? [];
 			$routes 		= $config['/nino/http/routes'] ?? [];
-			$foreignRoutes = $routes;
-
-			// Captured before the replace below strips this list's own route
-			// keys: a menu priority someone tuned on a route is not this
-			// step's to reset, only the membership set is (see _applyWebpage())
-			$navPrios = [];
-			foreach( $routes as $existingKey => $existingRoute )
-				if( is_array( $existingRoute['navs'] ?? null ) === true )
-					$navPrios[$existingKey] = $existingRoute['navs'];
-
-			foreach( $oldWebpages as $oldEntry )
-				foreach( self::_routeKeys( $oldEntry ) as $routeKey )
-					unset( $foreignRoutes[$routeKey] );
+			$foreignRoutes = array_filter( $routes, fn( array $r, string $k ): bool => self::isPageRoute( $k, $r ) === false, ARRAY_FILTER_USE_BOTH );
 
 			$webpages 		= [];
 			$seenUris 		= [];
@@ -1421,14 +1517,15 @@ namespace Nino\Install {
 				$httpUri 	= self::_normalizeUri( (string) ( $item['httpUri'] ?? '' ) );
 
 				// 'libraryKey' names the _install/library/pages unit this
-				// entry starts from - this class's own field. An entry
-				// /_admin's Pages module created carries none (there is no
-				// library over there, see Admin.php's PageEditor), just the
-				// route it already owns; those pass through untouched below
-				// rather than being rejected, so the shared list really is
-				// shared in both directions. A config.php written before the
-				// persisted shape grew this field still names its unit in
-				// 'template', so fall back to that when it resolves
+				// entry starts from - reported by pages(), which resolves it
+				// from the route's own body (see _unitFromBody()), or picked
+				// in the template select. A page pointed at a template no unit
+				// declares carries none; it passes through untouched below on
+				// its own body rather than being rejected, which is what lets
+				// this step re-apply a list containing a page /_admin created.
+				// A frontend that only knows the on-disk template name still
+				// names its unit in 'template', so fall back to that when it
+				// resolves
 				$libraryKey = (string) ( $item['libraryKey'] ?? '' );
 				if( $libraryKey === '' && isset( $templates[ (string) ( $item['template'] ?? '' ) ] ) === true )
 					$libraryKey = (string) $item['template'];
@@ -1489,50 +1586,49 @@ namespace Nino\Install {
 				}
 
 				// Resolve the route the picked unit declares here rather than
-				// only inside _applyWebpage(), so 'body'/'statusCode' - and
-				// the on-disk template name derived from the body - land in
-				// the persisted entry too. /_admin's Pages module reads exactly
-				// those three (see docs/_admin.md's shared-shape note): left
-				// implicit in the route, they'd be unrecoverable from the
-				// list alone, and reopening the entry over there would
-				// silently reset eg. the 404 page's status code to 200
+				// only inside _applyWebpage(), so the body this apply is
+				// about is known before it is written
 				$route 			= $libraryKey !== '' ? self::_unitRoute( $libraryKey, $locales ) : null;
 				$routeBody 	= $route !== null ? (string) ( $route['body'] ?? '' ) : $body;
-				$statusCode = $route !== null
+
+				// The unit's own status code only applies to an entry that is
+				// new or has just been moved onto a different template - one
+				// staying on the body it already has keeps the code it
+				// carries, which is where a page /_admin created (and gave eg.
+				// a 201) has it. Necessary because a library unit is
+				// identified by its route body (see _unitFromBody()): a page
+				// /_admin wired up to templates/page-home.tpl by hand is
+				// indistinguishable from the "home" unit, and must not have
+				// that unit's status code pushed onto it
+				$statusCode = $route !== null && $routeBody !== $body
 					? (int) ( $route['statusCode'] ?? 200 )
 					: (int) ( $item['statusCode'] ?? 200 );
 				if( $statusCode < 100 || $statusCode > 599 )
 					$statusCode = 200;
 
-				// Menu membership: kept on the entry as the editor's own copy,
-				// written onto the route by _applyWebpage() - that is where it
-				// renders from. 'nav' stays alongside it as a derived mirror so
-				// a downgrade to a version that only knows the boolean doesn't
-				// silently empty every menu
-				$navs = self::entryNavs( $item, [], $navKeys );
-
+				// Menu membership, with this entry's own position in the list
+				// as the priority - the same value for every menu it is in.
+				// Sorting the pages here is therefore what orders the menus,
+				// and the order is explicit in config.php afterwards rather
+				// than implied by the route array's sequence
 				$webpages[] = [
 					'uri' 				=> $uri,
 					'httpUri' 		=> $httpUri,
-					'template' 		=> self::_templateFromBody( $routeBody ) ?? '',
 					'libraryKey' 	=> $libraryKey,
-					'navs' 				=> $navs,
-					'nav' 				=> count( $navs ) > 0,
+					'navs' 				=> self::entryNavs( $item, $navKeys ),
+					'prio' 				=> count( $webpages ) + 1,
 					'statusCode' 	=> $statusCode,
 					'body' 				=> $routeBody,
 					'text' 				=> $text,
 				];
 			}
 
-			// The previous list's own route keys - computed before
-			// $appData['/nino/install/webpages'] is overwritten below -
-			// are exactly what has to come out of $routes before this
-			// call's own entries go back in (see this method's docblock)
-			foreach( $oldWebpages as $oldEntry )
-				foreach( self::_routeKeys( $oldEntry ) as $routeKey )
-					unset( $routes[$routeKey] );
-
-			$appData['/nino/install/webpages'] = $webpages;
+			// Every page route the posted list no longer mentions was deleted
+			// by the developer - the step shows all of them, so "not posted"
+			// can only mean "removed" (see this method's docblock). Rebuilt
+			// from $foreignRoutes so the surviving pages also end up in the
+			// posted order, foreign routes keeping their place ahead of them
+			$routes = $foreignRoutes;
 
 			// Auto-pull whatever module a used template requires (eg.
 			// "contact" -> forms+mail), same reasoning as Setup's own
@@ -1565,11 +1661,11 @@ namespace Nino\Install {
 				self::_applyModule( $appData, self::LIBRARY. '/modules/'. $moduleKey, $locales, $blacklist );
 
 			foreach( $webpages as $entry )
-				self::_applyWebpage( $appData, $entry, $locales, $routes, $blacklist, $navPrios[ self::_routeKeys( $entry )[0] ?? '' ] ?? [] );
+				self::_applyWebpage( $appData, $entry, $locales, $routes, $blacklist );
 
 			$appData['/nino/http/routes'] = $routes;
 
-			\Nino\AppData::writeContentData( $appData, [ '/nino/install/webpages', '/nino/modules', '/nino/http/routes' ] );
+			\Nino\AppData::writeContentData( $appData, [ '/nino/modules', '/nino/http/routes' ] );
 
 			if( count( $blacklist ) > 0 )
 				\Nino\Filesystem::mutate( $appData, '/text/blacklist.php', function( array $list ) use ( $blacklist ): array {
@@ -1578,7 +1674,10 @@ namespace Nino\Install {
 
 			self::_applyLegalLink( $appData, $webpages, $locales );
 
-			\Nino\Http::ok( $request, [ 'webpages' => $webpages ] );
+			// Derived back off the routes just written, not the working copy
+			// above: what the frontend holds after an apply is then exactly
+			// what a reload would hand it (see apiList())
+			\Nino\Http::ok( $request, [ 'webpages' => self::pages( $appData, $routes, $locales, $navKeys ) ] );
 		}
 
 		/**
@@ -1757,7 +1856,7 @@ namespace Nino\Install {
 		 *
 		 *	@return 	void
 		 */
-		private static function _applyWebpage( array &$appData, array $entry, array $locales, array &$routes, array &$blacklist, array $navPrios = [] ): void {
+		private static function _applyWebpage( array &$appData, array $entry, array $locales, array &$routes, array &$blacklist ): void {
 
 			$routeKey 	= self::_routeKeys( $entry )[0] ?? null;
 			$libraryKey = self::_libraryKey( $entry );
@@ -1770,7 +1869,18 @@ namespace Nino\Install {
 				$route 		= self::_unitRoute( $libraryKey, $locales );
 
 				if( $routeKey !== null && $route !== null ) {
-					$route['uri'] 			= $entry['uri'];
+
+					$route['uri'] = $entry['uri'];
+
+					// The entry's status code, not the unit's: a library unit is
+					// identified by its route body (see _unitFromBody()), so a
+					// page /_admin wired up to the same template file resolves
+					// to the same unit and must keep the code it carries.
+					// apiApply() has already decided which of the two that is
+					unset( $route['statusCode'] );
+					if( (int) ( $entry['statusCode'] ?? 200 ) !== 200 )
+						$route['statusCode'] = (int) $entry['statusCode'];
+
 					$routes[$routeKey] = $route;
 				}
 
@@ -1817,14 +1927,13 @@ namespace Nino\Install {
 
 			// Menu membership belongs on the route: that is what
 			// Modules\Navigation::routeLines() reads, and it is the only copy
-			// that renders. Priorities already there - set by hand, or by a
-			// later navigation editor - survive: only the set of keys is
-			// rewritten from the entry, each keeping the priority it had
+			// that renders. The entry's own position in the wizard's list is
+			// the priority, the same value for every menu it joins
 			if( $routeKey !== null && isset( $routes[$routeKey] ) === true ) {
 
 				$navs = [];
 				foreach( ( $entry['navs'] ?? [] ) as $navKey )
-					$navs[$navKey] = $navPrios[$navKey] ?? ( $routes[$routeKey]['navs'][$navKey] ?? self::DEFAULT_NAV_PRIO );
+					$navs[$navKey] = (int) ( $entry['prio'] ?? self::DEFAULT_NAV_PRIO );
 
 				if( count( $navs ) > 0 )
 					$routes[$routeKey]['navs'] = $navs;

@@ -104,7 +104,10 @@ Each page requires:
 - an **Element URI** as a stable internal identity;
 - an **HTTP URI** as the publicly accessible path;
 - a **Template** from `templates/page-*.tpl`;
-- **Navigation Name**, **Page Title**, and **Description** for each active language.
+- **Navigation Name**, **Page Title**, and **Description** for each active language;
+- one checkbox per navigation registered in `/nino/html/navs`.
+
+The step keeps no list of its own: it writes `/nino/http/routes` and the `/webpage<uri>/*` text keys, and reads the list back out of them the next time it runs. Menu membership goes onto the page's own route as `'navs' => [ 'main' => 1, ... ]`, using the page's position in the list as its priority — sorting the list here is what orders the menus.
 
 The Element URI is the anchor for page texts like `/webpage<uri>/title`. The HTTP URI is the path visible in the browser. This separation allows the internal identity to remain stable even if the public path changes.
 
