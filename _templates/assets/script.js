@@ -137,6 +137,22 @@
 			return ( app ? app.dataset.dir || '' : '' )+ path;
 		},
 
+		/**
+		 *	The url of something a browser loads directly - the bundled
+		 *	stylesheet a preview renders with, an uploaded image. Those live
+		 *	under the public content directory, one level below the project
+		 *	root (see \Nino\Filesystem::getPublicDir()), unlike a link into
+		 *	/_admin
+		 *
+		 *	@param		{string}	path			Eg. '/.cache/style.css'
+		 *
+		 *	@return		{string}
+		 */
+		publicUrl : function( path ) {
+			const app = dc.getElementById('pd-app');
+			return ( app ? app.dataset.public || '' : '' )+ path;
+		},
+
 		section : function( clientId ) {
 			if( Nino.templates._current === null )
 				return null;

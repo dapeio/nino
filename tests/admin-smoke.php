@@ -44,11 +44,11 @@ set_error_handler( function() { return true; } );
 
 $sandbox = sys_get_temp_dir(). '/nino-dev-smoke-'. uniqid();
 mkdir( $sandbox, 0777, true );
-mkdir( $sandbox. '/elements', 0777, true );
+mkdir( $sandbox. '/content/elements', 0777, true );
 
 // A hand-authored-shaped type file (top-level 'title' key, real locale content) -
 // apiSave must only ever touch 'title'/'model', never this real content
-file_put_contents( $sandbox. '/elements/testtype.php', '<?php return [
+file_put_contents( $sandbox. '/content/elements/testtype.php', '<?php return [
 	\'title\'	=> \'Test Type\',
 	\'model\'	=> [ \'name\' => [ \'type\' => \'string\', \'locale\' => true ] ],
 	\'*\'			=> [ \'*\' => [] ],
@@ -62,8 +62,9 @@ $appData = [ './nino/uid' => $sandbox ];
 $appData['./nino/filesystem/path']	= $sandbox;
 // Mirrors \Nino\init()'s default (no NINO_CONFIG_DIR set): configpath falls
 // back to the project root, same as this sandbox's regular path
-$appData['./nino/filesystem/configpath']	= $sandbox;
+$appData['./nino/filesystem/configpath']	= $sandbox. '/content';
 $appData['./nino/filesystem/contentpath']	= $sandbox. '/content';
+$appData['./nino/filesystem/privatepath'] = $sandbox. '/content';
 $appData['/nino/dir']		= '';
 $appData['/nino/locales/native']		= 'de_DE';
 $appData['/nino/locales/available']	= [ 'de_DE', 'en_US' ];
@@ -953,12 +954,12 @@ echo "\n";
 
 echo "Text::apiScan - missing [[/key]] placeholders in templates/*.tpl\n";
 
-mkdir( $sandbox. '/templates', 0777, true );
-file_put_contents( $sandbox. '/templates/scan-fixture.tpl', '<p>[[/page-scan-test/heading]]</p><p>[[/page-scan-test/heading]]</p><p>[[/company/name]]</p>' );
+mkdir( $sandbox. '/content/templates', 0777, true );
+file_put_contents( $sandbox. '/content/templates/scan-fixture.tpl', '<p>[[/page-scan-test/heading]]</p><p>[[/page-scan-test/heading]]</p><p>[[/company/name]]</p>' );
 // A nested, dynamically-constructed fill (same shape as html-header.tpl's real
 // [[/webpage[[/nino/http/response/uri]]/title]]) - only the inner, always-
 // registered kernel fill should ever be visible to a static regex scan
-file_put_contents( $sandbox. '/templates/scan-fixture-2.tpl', '<title>[[/webpage[[/nino/http/response/uri]]/title]]</title>' );
+file_put_contents( $sandbox. '/content/templates/scan-fixture-2.tpl', '<title>[[/webpage[[/nino/http/response/uri]]/title]]</title>' );
 
 // /company/name is genuinely defined (unlike /page-scan-test/heading) - proves
 // a real key is correctly excluded, not just absent from the fixture by accident
@@ -975,8 +976,8 @@ check( 'an undefined key found twice in the same file is only reported once', co
 check( 'an already-defined key is not reported', in_array( '/company/name', $missingKeys, true ) === false );
 check( 'the kernel-injected /nino/http/response/uri fill is never reported, despite appearing inside a nested [[...]] construct', in_array( '/nino/http/response/uri', $missingKeys, true ) === false );
 
-unlink( $sandbox. '/templates/scan-fixture.tpl' );
-unlink( $sandbox. '/templates/scan-fixture-2.tpl' );
+unlink( $sandbox. '/content/templates/scan-fixture.tpl' );
+unlink( $sandbox. '/content/templates/scan-fixture-2.tpl' );
 
 echo "\n";
 
@@ -992,7 +993,7 @@ imagepng( $probeImg );
 file_put_contents( $sandbox. '/images/probe.png', ob_get_clean() );
 imagedestroy( $probeImg );
 
-file_put_contents( $sandbox. '/templates/scan-fixture-img.tpl', '<img src="[[/nino/dir]]/images/probe.png"><img src="[[/nino/dir]]/images/probe.png"><img src="https://example.com/x.jpg"><img src="data:image/svg+xml,%3Csvg/%3E">' );
+file_put_contents( $sandbox. '/content/templates/scan-fixture-img.tpl', '<img src="[[/nino/dir]]/images/probe.png"><img src="[[/nino/dir]]/images/probe.png"><img src="https://example.com/x.jpg"><img src="data:image/svg+xml,%3Csvg/%3E">' );
 
 [ $status, $body ] = callDev( $appData, \Nino\Admin\Images::class, 'apiScan' );
 check( 'apiScan succeeds', $status === 200 );
@@ -1010,7 +1011,7 @@ $appData['/nino/html/images']['/probe']['filename'] = 'probe.png';
 [ $status, $body ] = callDev( $appData, \Nino\Admin\Images::class, 'apiScan' );
 check( 'once a slot tracks the file, it no longer shows up as missing', count( $body['missing'] ) === 0 );
 
-unlink( $sandbox. '/templates/scan-fixture-img.tpl' );
+unlink( $sandbox. '/content/templates/scan-fixture-img.tpl' );
 
 echo "\n";
 
@@ -1028,13 +1029,13 @@ check( 'missingImages is 0 - the scan fixture above was already cleaned up', $bo
 // prove the two counts actually reflect Text/Images::_scanMissing(), not just
 // always 0 - a new filename, since probe.png is already tracked by the slot
 // created in the Images::apiScan section above
-file_put_contents( $sandbox. '/templates/dashboard-fixture.tpl', '<p>[[/dashboard-scan-test/heading]]</p><img src="[[/nino/dir]]/images/probe2.png">' );
+file_put_contents( $sandbox. '/content/templates/dashboard-fixture.tpl', '<p>[[/dashboard-scan-test/heading]]</p><img src="[[/nino/dir]]/images/probe2.png">' );
 
 [ , $body ] = callDev( $appData, \Nino\Admin\Dashboard::class, 'apiSummary' );
 check( 'missingText picks up the fresh undefined key', $body['missingText'] === 1 );
 check( 'missingImages picks up the fresh untracked image (a new filename, not tracked by any slot)', $body['missingImages'] === 1 );
 
-unlink( $sandbox. '/templates/dashboard-fixture.tpl' );
+unlink( $sandbox. '/content/templates/dashboard-fixture.tpl' );
 
 \Nino\Runtime::unsetSessionValue( $appData, './nino/admin/authed' );
 [ $status ] = callDev( $appData, \Nino\Admin\Dashboard::class, 'apiSummary' );
@@ -1048,9 +1049,9 @@ echo "\n";
 
 echo "Dev\\PageEditor - create/edit/delete page routes\n";
 
-file_put_contents( $sandbox. '/templates/page-about.tpl', '<h1>About</h1>' );
-file_put_contents( $sandbox. '/templates/page-contact.tpl', '<h1>Contact</h1>' );
-file_put_contents( $sandbox. '/templates/not-a-page.tpl', '<p>ignored - not a page-*.tpl file</p>' );
+file_put_contents( $sandbox. '/content/templates/page-about.tpl', '<h1>About</h1>' );
+file_put_contents( $sandbox. '/content/templates/page-contact.tpl', '<h1>Contact</h1>' );
+file_put_contents( $sandbox. '/content/templates/not-a-page.tpl', '<p>ignored - not a page-*.tpl file</p>' );
 
 [ $status, $body ] = callDev( $appData, \Nino\Admin\PageEditor::class, 'apiList' );
 check( 'apiList succeeds', $status === 200 );
@@ -1227,9 +1228,9 @@ check( 'apiDelete 404s for an unknown httpUri', $status === 404 );
 
 array_pop( $appData['/nino/modules'] ); // drop the simulated Navigation module again
 
-unlink( $sandbox. '/templates/page-about.tpl' );
-unlink( $sandbox. '/templates/page-contact.tpl' );
-unlink( $sandbox. '/templates/not-a-page.tpl' );
+unlink( $sandbox. '/content/templates/page-about.tpl' );
+unlink( $sandbox. '/content/templates/page-contact.tpl' );
+unlink( $sandbox. '/content/templates/not-a-page.tpl' );
 
 \Nino\Runtime::unsetSessionValue( $appData, './nino/admin/authed' );
 [ $status ] = callDev( $appData, \Nino\Admin\PageEditor::class, 'apiList' );
@@ -1409,7 +1410,7 @@ echo "Elements - element content CRUD\n";
 
 // A second type alongside testtype, with both a global and a locale field, so
 // the global/locale split and the raw-bucket view have something real to show
-file_put_contents( $sandbox. '/elements/contenttype.php', '<?php return [
+file_put_contents( $sandbox. '/content/elements/contenttype.php', '<?php return [
 	\'title\'	=> \'Content Type\',
 	\'model\'	=> [
 		\'title\'	=> [ \'type\' => \'string\', \'locale\' => true ],

@@ -2503,10 +2503,13 @@ namespace Nino\Admin {
 				if( ( $slot['filename'] ?? null ) !== null )
 					$known[ $slot['filename'] ] = true;
 
-			$path 	= \Nino\Filesystem::getPath( $appData );
-			$found 	= [];
+			// Two roots: the templates being scanned are private, the images
+			// they reference are public (see \Nino\Filesystem::PRIVATE_DIRS)
+			$templates 	= \Nino\Filesystem::path( $appData, '/templates' );
+			$images 		= \Nino\Filesystem::path( $appData, '/images' );
+			$found 			= [];
 
-			foreach( glob( $path. '/templates/*.tpl' ) ?: [] as $file ) {
+			foreach( glob( $templates. '/*.tpl' ) ?: [] as $file ) {
 
 				$content = file_get_contents( $file );
 				if( $content === false || preg_match_all( '/<img\b[^>]*\bsrc="([^"]+)"[^>]*>/i', $content, $matches, PREG_SET_ORDER ) === false )
@@ -2514,7 +2517,7 @@ namespace Nino\Admin {
 
 				foreach( $matches as $match ) {
 
-					// A local image is always referenced as [[/nino/dir]]/images/...
+					// A local image is always referenced as [[/nino/public]]/images/...
 					// in raw template source (the /nino/dir fill hasn't resolved
 					// yet at this point - this scans the .tpl source directly)
 					$src = preg_replace( '#^\[\[/nino/dir\]\]#', '', $match[1] );
@@ -2537,8 +2540,8 @@ namespace Nino\Admin {
 						if( preg_match( '/\bheight="(\d+)"/i', $match[0], $h ) === 1 )
 							$height = (int) $h[1];
 
-						if( ( $width === 0 || $height === 0 ) && is_file( $path. '/images/'. $relative ) === true ) {
-							$size = @getimagesize( $path. '/images/'. $relative );
+						if( ( $width === 0 || $height === 0 ) && is_file( $images. '/'. $relative ) === true ) {
+							$size = @getimagesize( $images. '/'. $relative );
 							if( $size !== false ) {
 								$width 	= $width ?: $size[0];
 								$height = $height ?: $size[1];

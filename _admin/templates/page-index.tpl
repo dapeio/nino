@@ -13,7 +13,7 @@
 	</head>
 	<body>
 		[csrf]
-		<div id="admin-page-wrap" class="show-dashboard" data-dir="[[/nino/dir]]">
+		<div id="admin-page-wrap" class="show-dashboard" data-dir="[[/nino/dir]]" data-public="[[/nino/public]]">
 			<aside id="admin-shell-rail" aria-label="Admin navigation">
 				<div id="admin-bar-wrap">
 					<div id="admin-bar-title">

@@ -22,7 +22,7 @@
 </section>
 
 <section class="ui-atf ui-section--fullwidth js-cover js-cover--dim" data-cover-height="100">
-	<img src="[[/nino/dir]]/images/demo-00.jpg">
+	<img src="[[/nino/public]]/images/demo-00.jpg">
 	<div class="js-cover-content">
 		<div class="ui-grid-row">
 			<div class="ui-grid-100 js-vpa js-vpa--speed-slow">
@@ -37,7 +37,7 @@
 </section>
 
 <section class="ui-atf ui-section--fullwidth js-cover js-cover-center js-cover--dim" data-cover-height="100">
-	<img src="[[/nino/dir]]/images/demo-00.jpg">
+	<img src="[[/nino/public]]/images/demo-00.jpg">
 	<div class="js-cover-content">
 		<div class="ui-grid-row">
 			<div class="ui-grid-100 js-vpa js-vpa--speed-slow">
@@ -83,7 +83,7 @@
 <section class="ui-section">
 	<div class="ui-grid-row ui-grid-middle">
 		<div class="ui-grid-100 ui-grid-m-50 ui-img-cover">
-			<img class="ui-article-img" src="[[/nino/dir]]/images/demo-00.jpg" style="height:320px;">
+			<img class="ui-article-img" src="[[/nino/public]]/images/demo-00.jpg" style="height:320px;">
 		</div>
 		<div class="ui-grid-100 ui-grid-m-50">
 			<article class="ui-article">
@@ -113,7 +113,7 @@
 			</article>
 		</div>
 		<div class="ui-grid-100 ui-grid-m-50 ui-img-cover">
-			<img class="ui-article-img" src="[[/nino/dir]]/images/demo-00.jpg" style="height:320px;">
+			<img class="ui-article-img" src="[[/nino/public]]/images/demo-00.jpg" style="height:320px;">
 		</div>
 	</div>
 </section>
@@ -128,7 +128,7 @@
 <section class="ui-section ui-section--fullwidth ui-section--fullheight">
 	<div class="ui-grid-row ui-grid--fullwidth ui-grid-middle">
 		<div class="ui-grid-100 ui-grid-m-50 ui-img-cover">
-			<img src="[[/nino/dir]]/images/demo-00.jpg" style="height:480px;">
+			<img src="[[/nino/public]]/images/demo-00.jpg" style="height:480px;">
 		</div>
 		<div class="ui-grid-100 ui-grid-m-50">
 			<article class="ui-article">
@@ -157,7 +157,7 @@
 			</article>
 		</div>
 		<div class="ui-grid-100 ui-grid-m-50 ui-img-cover">
-			<img src="[[/nino/dir]]/images/demo-00.jpg" style="height:480px;">
+			<img src="[[/nino/public]]/images/demo-00.jpg" style="height:480px;">
 		</div>
 	</div>
 </section>
@@ -174,7 +174,7 @@
 				<div class="ui-article-content">
 					<p class="ui-article-title" style="font-weight:normal;">&bdquo;Die Zusammenarbeit war unkompliziert und das Ergebnis hat unsere Erwartungen übertroffen.&ldquo;</p>
 					<div class="ui-mt-2" style="display:flex; align-items:center; justify-content:center; gap:var(--space-1);">
-						<img src="[[/nino/dir]]/images/demo-00.jpg" style="width:3rem; height:3rem; border-radius:50%; object-fit:cover;">
+						<img src="[[/nino/public]]/images/demo-00.jpg" style="width:3rem; height:3rem; border-radius:50%; object-fit:cover;">
 						<div class="ui-text-left">
 							<strong>Julia Berger</strong><br>
 							<span class="ui-font-small">Geschäftsführerin, Nordwind GmbH</span>
@@ -197,7 +197,7 @@
 	<div class="ui-grid-row">
 		<div class="ui-grid-100 ui-grid-m-66" style="margin:0 auto;">
 			<article class="ui-article ui-article-cols-m">
-				<img class="ui-article-img" src="[[/nino/dir]]/images/demo-00.jpg">
+				<img class="ui-article-img" src="[[/nino/public]]/images/demo-00.jpg">
 				<div class="ui-article-content">
 					<h3 class="ui-article-title">Max Mustermann</h3>
 					<p class="ui-article-subtitle">Gründer &amp; Berater</p>
@@ -221,7 +221,7 @@
 		<div class="ui-grid-100 ui-grid-m-66" style="margin:0 auto;">
 			<article class="ui-article">
 				<div class="ui-img-cover" style="height:320px;">
-					<img class="ui-article-img" src="[[/nino/dir]]/images/demo-00.jpg">
+					<img class="ui-article-img" src="[[/nino/public]]/images/demo-00.jpg">
 					<span class="ui-badge ui-badge--primary">Neu</span>
 				</div>
 				<div class="ui-article-content ui-text-center">
@@ -313,7 +313,7 @@
 		[elements /demo-services limit="3"]
 		<div class="ui-grid-100 ui-grid-m-33 ui-mb-3">
 			<article class="ui-article ui-article--alt ui-article--wide">
-				<img class="ui-article-img ui-article-img--dim" src="[[/nino/dir]]/images/.demo/demo-0[[.id]].jpg">
+				<img class="ui-article-img ui-article-img--dim" src="[[/nino/public]]/images/.demo/demo-0[[.id]].jpg">
 				<div class="ui-article-content">
 					<h4 class="ui-article-title">[[title]]</h4>
 					<p class="ui-article-descr">[[description]]</p>
@@ -334,7 +334,7 @@
 		[elements /demo-services limit="3"]
 		<div class="ui-grid-100 ui-grid-m-33 ui-mb-3">
 			<article class="ui-article ui-article--alt ui-article--fullwidth">
-				<img class="ui-article-img" src="[[/nino/dir]]/images/.demo/demo-0[[.id]].jpg">
+				<img class="ui-article-img" src="[[/nino/public]]/images/.demo/demo-0[[.id]].jpg">
 				<div class="ui-article-content">
 					<h4 class="ui-article-title">[[title]]</h4>
 					<p class="ui-article-descr">[[description]]</p>
@@ -359,7 +359,7 @@
      Parallax-Zitat: Bild mit Parallax-Effekt, zentriertes Statement
      ============================================================ -->
 <section class="js-parallex js-parallex--dim" id="demo-sections-parallax" style="color:var(--color-primary-text);">
-	<img src="[[/nino/dir]]/images/demo-00.jpg">
+	<img src="[[/nino/public]]/images/demo-00.jpg">
 	<div class="js-cover-content ui-text-center">
 		<div class="ui-grid-row">
 			<div class="ui-grid-100">
@@ -502,7 +502,7 @@
 <section class="ui-section ui-section--alt">
 	<div class="ui-grid-row ui-grid-middle">
 		<div class="ui-grid-100 ui-grid-m-50 ui-mb-2">
-			<img src="[[/nino/dir]]/images/demo-00.jpg" class="ui-article-img" style="border-radius:var(--radius-small);">
+			<img src="[[/nino/public]]/images/demo-00.jpg" class="ui-article-img" style="border-radius:var(--radius-small);">
 		</div>
 		<div class="ui-grid-100 ui-grid-m-50">
 			<article class="ui-article">
@@ -578,7 +578,7 @@
 	<div class="ui-grid-row">
 		<div class="ui-grid-100 ui-grid-m-50">
 			<article class="ui-article ui-article--alt ui-text-center ui-article--fullwidth">
-				<img src="[[/nino/dir]]/images/demo-00.jpg" class="ui-article-img ui-article-img--maxheight">
+				<img src="[[/nino/public]]/images/demo-00.jpg" class="ui-article-img ui-article-img--maxheight">
 				<div class="ui-article-content">
 					<h3 class="ui-article-title">Für Unternehmen</h3>
 					<p class="ui-article-descr">Individuelle Beratung für Ihr Projekt, von der Konzeption bis zum Launch.</p>
@@ -588,7 +588,7 @@
 		</div>
 		<div class="ui-grid-100 ui-grid-m-50">
 			<article class="ui-article ui-article--alt ui-text-center ui-article--fullwidth">
-				<img src="[[/nino/dir]]/images/demo-00.jpg" class="ui-article-img ui-article-img--maxheight">
+				<img src="[[/nino/public]]/images/demo-00.jpg" class="ui-article-img ui-article-img--maxheight">
 				<div class="ui-article-content">
 					<h3 class="ui-article-title">Für Privatpersonen</h3>
 					<p class="ui-article-descr">Persönliches Coaching, das zu Ihrem Alltag passt.</p>
@@ -685,58 +685,58 @@
 	<div class="ui-gallery">
 		<div class="ui-gallery-item ui-gallery-item--wide ui-gallery-item--tall">
 			<button type="button" class="js-modal-trigger" data-modal-target="ds-gallery-modal-1" aria-label="Bild vergrößern">
-				<img src="[[/nino/dir]]/images/demo-00.jpg" loading="lazy">
+				<img src="[[/nino/public]]/images/demo-00.jpg" loading="lazy">
 			</button>
 		</div>
 		<div class="ui-gallery-item">
 			<button type="button" class="js-modal-trigger" data-modal-target="ds-gallery-modal-2" aria-label="Bild vergrößern">
-				<img src="[[/nino/dir]]/images/demo-00.jpg" loading="lazy">
+				<img src="[[/nino/public]]/images/demo-00.jpg" loading="lazy">
 			</button>
 		</div>
 		<div class="ui-gallery-item">
 			<button type="button" class="js-modal-trigger" data-modal-target="ds-gallery-modal-3" aria-label="Bild vergrößern">
-				<img src="[[/nino/dir]]/images/demo-00.jpg" loading="lazy">
+				<img src="[[/nino/public]]/images/demo-00.jpg" loading="lazy">
 			</button>
 		</div>
 		<div class="ui-gallery-item ui-gallery-item--wide">
 			<button type="button" class="js-modal-trigger" data-modal-target="ds-gallery-modal-4" aria-label="Bild vergrößern">
-				<img src="[[/nino/dir]]/images/demo-00.jpg" loading="lazy">
+				<img src="[[/nino/public]]/images/demo-00.jpg" loading="lazy">
 			</button>
 		</div>
 		<div class="ui-gallery-item">
 			<button type="button" class="js-modal-trigger" data-modal-target="ds-gallery-modal-5" aria-label="Bild vergrößern">
-				<img src="[[/nino/dir]]/images/demo-00.jpg" loading="lazy">
+				<img src="[[/nino/public]]/images/demo-00.jpg" loading="lazy">
 			</button>
 		</div>
 		<div class="ui-gallery-item">
 			<button type="button" class="js-modal-trigger" data-modal-target="ds-gallery-modal-6" aria-label="Bild vergrößern">
-				<img src="[[/nino/dir]]/images/demo-00.jpg" loading="lazy">
+				<img src="[[/nino/public]]/images/demo-00.jpg" loading="lazy">
 			</button>
 		</div>
 	</div>
 	<dialog class="js-modal js-modal--lightbox" id="ds-gallery-modal-1">
 		<button type="button" class="js-modal-close" aria-label="Schließen">&times;</button>
-		<img src="[[/nino/dir]]/images/demo-00.jpg">
+		<img src="[[/nino/public]]/images/demo-00.jpg">
 	</dialog>
 	<dialog class="js-modal js-modal--lightbox" id="ds-gallery-modal-2">
 		<button type="button" class="js-modal-close" aria-label="Schließen">&times;</button>
-		<img src="[[/nino/dir]]/images/demo-00.jpg">
+		<img src="[[/nino/public]]/images/demo-00.jpg">
 	</dialog>
 	<dialog class="js-modal js-modal--lightbox" id="ds-gallery-modal-3">
 		<button type="button" class="js-modal-close" aria-label="Schließen">&times;</button>
-		<img src="[[/nino/dir]]/images/demo-00.jpg">
+		<img src="[[/nino/public]]/images/demo-00.jpg">
 	</dialog>
 	<dialog class="js-modal js-modal--lightbox" id="ds-gallery-modal-4">
 		<button type="button" class="js-modal-close" aria-label="Schließen">&times;</button>
-		<img src="[[/nino/dir]]/images/demo-00.jpg">
+		<img src="[[/nino/public]]/images/demo-00.jpg">
 	</dialog>
 	<dialog class="js-modal js-modal--lightbox" id="ds-gallery-modal-5">
 		<button type="button" class="js-modal-close" aria-label="Schließen">&times;</button>
-		<img src="[[/nino/dir]]/images/demo-00.jpg">
+		<img src="[[/nino/public]]/images/demo-00.jpg">
 	</dialog>
 	<dialog class="js-modal js-modal--lightbox" id="ds-gallery-modal-6">
 		<button type="button" class="js-modal-close" aria-label="Schließen">&times;</button>
-		<img src="[[/nino/dir]]/images/demo-00.jpg">
+		<img src="[[/nino/public]]/images/demo-00.jpg">
 	</dialog>
 </section>
 
@@ -773,7 +773,7 @@
 			</ul>
 		</div>
 		<div class="ui-grid-100 ui-grid-m-50 ui-img-cover">
-			<img src="[[/nino/dir]]/images/demo-00.jpg" style="height:420px;">
+			<img src="[[/nino/public]]/images/demo-00.jpg" style="height:420px;">
 		</div>
 	</div>
 </section>
@@ -826,7 +826,7 @@
 		</div>
 		<div class="ui-grid-100 ui-grid-m-75" style="margin:0 auto;">
 			<button type="button" class="ui-video-poster js-modal-trigger" data-modal-target="ds-video-modal" aria-label="Video abspielen">
-				<img src="[[/nino/dir]]/images/demo-01.jpg">
+				<img src="[[/nino/public]]/images/demo-01.jpg">
 				<svg class="ui-video-play" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"></path></svg>
 			</button>
 		</div>
@@ -844,7 +844,7 @@
      Overlay, ohne Parallax-Scroll-Effekt (Unterschied zum Zitat oben)
      ============================================================ -->
 <section class="ui-section ui-section--fullwidth ui-img-background ui-img-background--dim ui-text-center" style="padding:var(--space-6) var(--space-1); color:var(--color-primary-text);">
-	<img src="[[/nino/dir]]/images/demo-00.jpg">
+	<img src="[[/nino/public]]/images/demo-00.jpg">
 	<div class="ui-grid-row ui-img-background-content">
 		<div class="ui-grid-100">
 			<h3 class="ui-atf-title">Vollbild-Textbanner</h3>

@@ -53,7 +53,9 @@ The included `.htaccess` sets two basic protection rules, provided the server al
 - Files with a leading dot are not delivered directly.
 - Directories without an index file do not show a file list.
 
-Additionally, check in the hosting configuration how non-existent paths are passed to `index.php`. An `.htaccess` ignored by the server has no protective effect.
+A third rule lives in `content/.htaccess` and denies that directory outright. It is the one that matters most: `content/` holds `config.php`, the templates, the text and elements they render from, and the data your visitors produce. Without it, a request for `content/templates/page-home.tpl` returns the template source as plain text.
+
+Additionally, check in the hosting configuration how non-existent paths are passed to `index.php`. An `.htaccess` ignored by the server has no protective effect — and for `content/` that is not a hardening detail but a disclosure. If you cannot rely on `.htaccess`, point `NINO_CONTENT_DIR` in `index.php` at a directory outside the webroot instead; then no server rule is needed at all.
 
 ### Nginx and Other Web Servers
 
@@ -63,8 +65,17 @@ Transfer the same behavior explicitly to the server configuration:
 - forward normal website routes to `index.php`;
 - route `/_editor`, `/_admin`, `/_templates`, and possibly `/_install` to their own entry points;
 - deny access to dotfiles and dot directories;
+- **deny `content/` entirely** — it is never requested by a browser, only read by PHP;
 - disable directory listing;
 - do not deliver PHP source and data files as text.
+
+For nginx that last-but-two point is one block:
+
+```nginx
+location ^~ /content/ { deny all; return 404; }
+```
+
+Or avoid the question by moving the directory out of the webroot with `NINO_CONTENT_DIR`.
 
 A general example configuration cannot reliably guess the paths and PHP-FPM settings of a specific hosting. Therefore, after setup, check both desired routes and deliberately forbidden direct accesses.
 
@@ -184,6 +195,8 @@ Treat a Nino update like a change to the specific website project, not like blin
 3. Compare your own adjustments in kernel, templates, and management interfaces with the new state. The management interfaces themselves no longer hold project state: the `/_admin` password lives in `content/.auth/pw.php`, so `_admin/` can be replaced wholesale without losing the login or re-opening `/_install`.
 4. Run smoke tests and project-specific acceptance.
 5. Transfer the tested state and keep the previous version for rollback.
+
+A project laid out before `content/` and `public/` existed keeps its files at the project root and is detected as such on every request — an update never moves anything for you. To switch it over, move `config.php`, `templates/`, `text/`, `elements/` and `data/` into `content/`, and `images/`, `assets/`, `favicon/`, `fonts/` and `.cache/` into `public/`. Templates generated before the move still address images as `[[/nino/dir]]/images/...`; those need to become `[[/nino/public]]/images/...` in the same step, or they will 404 afterwards.
 
 Nino is in the beta phase. Security fixes appear on `main`; there is currently no separate LTS line. Therefore, plan updates as active project maintenance and check `SECURITY.md` and the changelog before an update.
 

@@ -115,7 +115,7 @@ namespace Nino\Modules {
 			return str_replace( [
 				'[[filename]]',
 			], [
-				rtrim( \Nino\Filesystem::getDir( $appData ), '/'). $targetFile,
+				\Nino\Filesystem::url( $appData, $targetFile ),
 			], $content );
 		}
 
@@ -130,13 +130,14 @@ namespace Nino\Modules {
 		private static function _getFileHashes( array &$appData, array $assetFiles ): string {
 
 				$hash 	= '';
-				$path 	= \Nino\Filesystem::getPath( $appData );
 
-				// Loop through files and collect file details
+				// Loop through files and collect file details - resolved one
+				// by one, since a bundle mixes public content (/assets/...)
+				// with a tool folder's own source (/_nino/Nino.css)
 				foreach( $assetFiles AS $file ) {
-					$filepath = $path. $file;
+					$filepath = \Nino\Filesystem::path( $appData, $file );
 
-					if( is_file( $path. $file ) === true )
+					if( is_file( $filepath ) === true )
 						$hash .= $filepath. '|'. filesize( $filepath ). '|'. filemtime(  $filepath );
 				}
 
@@ -154,7 +155,7 @@ namespace Nino\Modules {
 		 */
 		private static function _readHashLine( array &$appData, string $targetFile ): string {
 
-				$path 	= \Nino\Filesystem::getPath( $appData ). $targetFile;
+				$path 	= \Nino\Filesystem::path( $appData, $targetFile );
 
 				if( is_file( $path ) === false )
 					return '';

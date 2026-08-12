@@ -111,6 +111,22 @@
 		},
 
 		/**
+		 *	The url of something a browser loads directly - an uploaded image,
+		 *	a bundled stylesheet. Not the same prefix as assetUrl(): those
+		 *	live under the public content directory, which is one level below
+		 *	the project root (see \Nino\Filesystem::getPublicDir()), while a
+		 *	link into /_admin is relative to the root itself
+		 *
+		 *	@param		{string}	path			Eg. '/images/hero.jpg'
+		 *
+		 *	@return		{string}
+		 */
+		publicUrl : function( path ) {
+			const wrap = dc.getElementById('admin-page-wrap');
+			return ( ( wrap === null ? '' : wrap.dataset.public ) ?? '' )+ path;
+		},
+
+		/**
 		 *	The sticky chrome a drill-down form is framed by at the top: its
 		 *	own "back to list" link, plus - where a module has one - its
 		 *	locale switch, in a single row that stays pinned while the form

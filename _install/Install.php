@@ -213,8 +213,13 @@ namespace Nino\Install {
 		// path relative to the project root -> whether it's expected to
 		// already exist in a fresh checkout (git-tracked) or gets created on
 		// first use - see README.md's Structure section
+		// Virtual paths, resolved per entry - the private ones land under the
+		// content directory, the public ones stay where the webserver reaches
+		// them (see \Nino\Filesystem::path())
 		private const array DIRECTORIES = [
-			''				=> true,	// project root - config.php, _admin/Admin.php
+			''				=> true,	// project root - index.php, the tool folders
+			'content'	=> true,	// config.php, templates, text, elements, data
+			'public'	=> true,	// images, assets, fonts, favicon, the cache
 			'text'		=> true,
 			'images'	=> true,
 			'data'		=> false,	// runtime data - newsletter/submissions/logs

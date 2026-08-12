@@ -13,30 +13,54 @@ namespace Nino {
 
 	function init(): array {
 
+		$root 		= dirname(__DIR__);
+
+		// Everything this project *is*, as opposed to the code that runs it:
+		// its configuration, templates, text, elements, data and the state
+		// the management tools keep. Held apart from the tool folders so
+		// those stay pure code an update may replace wholesale - see
+		// Filesystem::getContentPath()
+		$content 	= defined( 'NINO_CONTENT_DIR' ) ? NINO_CONTENT_DIR : $root. '/content';
+
+		// Which of the two a project actually uses. A checkout ships
+		// content/config.php, so a new project is on the content layout from
+		// its first request; one installed before the move still has its
+		// files at the project root and keeps them there rather than being
+		// stranded by an update. Probed on config.php, plus text/ for a
+		// project whose config.php sits outside both (NINO_CONFIG_DIR).
+		// Move the five private entries into content/ to switch a project
+		// over - nothing here ever moves a file by itself
+		$legacy = is_file( $content. '/config.php' ) === false
+			&& ( is_file( $root. '/config.php' ) === true || is_dir( $root. '/text' ) === true );
+
+		$private = $legacy === true ? $root : $content;
+
+		// ...and the public half, the mirror of it: images, assets, fonts,
+		// the favicon set and the generated asset cache. Gathered in public/
+		// so the project root holds the code that runs the site and nothing
+		// else. Still inside the webroot - the urls simply gain a /public
+		// segment (see Filesystem::getPublicDir()) - so no deployment has to
+		// change its document root
+		$public = $legacy === true ? $root : $root. '/public';
+
 		$appData = [
-			'./nino/uid'	=> dirname(__DIR__),
+			'./nino/uid'	=> $root,
 			// config.php holds the password hashes and route/module wiring -
 			// letting it live outside the webroot means a webserver
 			// misconfiguration that serves raw .php source (the exact case
-			// the go-live checklist warns about) can't leak it. Defaults to
-			// the project root (old, in-webroot behaviour) unless the site's
-			// index.php defines NINO_CONFIG_DIR before requiring this file.
-			'./nino/filesystem/configpath'	=> defined( 'NINO_CONFIG_DIR' ) ? NINO_CONFIG_DIR : dirname(__DIR__),
-			// Everything this project *is*, as opposed to the code that runs
-			// it: for now the _admin password hash, later the rest of what
-			// makes one installation differ from another. Kept apart from the
-			// tool folders so those stay pure code and can be replaced
-			// wholesale on an update - see Filesystem::getContentPath().
-			// Defaults to <project>/content unless index.php defines
-			// NINO_CONTENT_DIR before requiring this file
-			'./nino/filesystem/contentpath'	=> defined( 'NINO_CONTENT_DIR' ) ? NINO_CONTENT_DIR : dirname(__DIR__). '/content',
+			// the go-live checklist warns about) can't leak it. Follows the
+			// private root unless the site's index.php defines
+			// NINO_CONFIG_DIR before requiring this file.
+			'./nino/filesystem/configpath'	=> defined( 'NINO_CONFIG_DIR' ) ? NINO_CONFIG_DIR : $private,
+			'./nino/filesystem/contentpath'	=> $content,
 			// Where the private half of a project lives - config.php, the
 			// templates, the text/elements they render from, and the data
-			// visitors produce (see Filesystem::PRIVATE_DIRS). Still the
-			// project root: the directories have not moved, this only gives
-			// the distinction a name so a webserver-facing path and a
-			// never-served one stop being the same thing
-			'./nino/filesystem/privatepath'	=> dirname(__DIR__),
+			// visitors produce (see Filesystem::PRIVATE_DIRS). Never served
+			// by a webserver
+			'./nino/filesystem/privatepath'	=> $private,
+			// ...and where the half that *is* served lives (see
+			// Filesystem::PUBLIC_DIRS)
+			'./nino/filesystem/publicpath'	=> $public,
 		];
 
 		\Nino\AppData::prepare( $appData );
@@ -86,6 +110,7 @@ namespace Nino {
 			'[[/nino/http/response/locale]]'	=> $request['/nino/http/response']['locale'],
 			'[[/nino/auth/user]]'						=> ( ( $currentUser !== false ) ? $currentUser['mail'] : '' ),
 			'[[/nino/dir]]'				=> \Nino\Filesystem::getDir( $appData ),
+			'[[/nino/public]]'								=> \Nino\Filesystem::getPublicDir( $appData ),
 			'[[/date/year]]'									=> date('Y'),
 		], '*' );
 
@@ -1289,6 +1314,12 @@ namespace Nino {
 		// see path(), and getPath()'s own docblock for the other half.
 		public const array PRIVATE_DIRS = [ '/config.php', '/templates', '/text', '/elements', '/data' ];
 
+		// The mirror of it: everything a browser loads directly. Kept
+		// together under the public root so the project root is code and
+		// nothing else - the tool folders stay put, since they serve their
+		// own js/css from where they are
+		public const array PUBLIC_DIRS = [ '/images', '/assets', '/favicon', '/fonts', '/.cache' ];
+
 		// Map a virtual, project-relative path onto its real location on
 		// disk:
 		//
@@ -1313,18 +1344,21 @@ namespace Nino {
 				&& ( $filename === self::CONTENT_DIR || str_starts_with( $filename, self::CONTENT_DIR. '/' ) === true ) )
 				return rtrim( $appData['./nino/filesystem/contentpath']. substr( $filename, strlen( self::CONTENT_DIR ) ), '/' );
 
-			if( self::_isPrivate( $filename ) === true && ( $appData['./nino/filesystem/privatepath'] ?? '' ) !== '' )
+			if( self::_isIn( self::PRIVATE_DIRS, $filename ) === true && ( $appData['./nino/filesystem/privatepath'] ?? '' ) !== '' )
 				return rtrim( $appData['./nino/filesystem/privatepath']. $filename, '/' );
+
+			if( self::_isIn( self::PUBLIC_DIRS, $filename ) === true && ( $appData['./nino/filesystem/publicpath'] ?? '' ) !== '' )
+				return rtrim( $appData['./nino/filesystem/publicpath']. $filename, '/' );
 
 			return rtrim( $appData['./nino/filesystem/path']. $filename, '/' );
 		}
 
-		// Whether a virtual path belongs to the private side - the whole
-		// PRIVATE_DIRS entry, never a prefix match on a partial segment:
-		// '/textures' must not read as '/text'
-		private static function _isPrivate( string $filename ): bool {
+		// Whether a virtual path belongs to one of these directories - the
+		// whole entry, never a prefix match on a partial segment: '/textures'
+		// must not read as '/text', '/imagesets' not as '/images'
+		private static function _isIn( array $dirs, string $filename ): bool {
 
-			foreach( self::PRIVATE_DIRS as $dir )
+			foreach( $dirs as $dir )
 				if( $filename === $dir || str_starts_with( $filename, $dir. '/' ) === true )
 					return true;
 
@@ -1379,12 +1413,69 @@ namespace Nino {
 		}
 
 		// The project's *private* root - config.php, templates, text,
-		// elements and data (see PRIVATE_DIRS). Still the project root by
-		// default, so nothing has moved; naming the distinction is what lets
-		// it move later without touching a single call site
+		// elements and data (see PRIVATE_DIRS)
 		public static function getPrivatePath( array &$appData ): string {
 
 			return $appData['./nino/filesystem/privatepath'];
+
+		}
+
+		// The project's *public content* root - images, assets, fonts, the
+		// favicon set and the generated cache (see PUBLIC_DIRS). Inside the
+		// webroot, one level down from it, so the project root keeps only
+		// the code that runs the site
+		public static function getPublicPath( array &$appData ): string {
+
+			return $appData['./nino/filesystem/publicpath'];
+
+		}
+
+		/**
+		 *	The url prefix those same files are reached under - getDir() plus
+		 *	the public directory's own segment. Rendered as the
+		 *	[[/nino/public]] fill, which is what every template, stylesheet
+		 *	and admin preview builds an image or asset url from: writing
+		 *	a hardcoded [[/nino/dir]]/images/... would break the moment this
+		 *	moves, which is exactly what it did
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	string									Eg. '' , '/public', '/subdir/public'
+		 */
+		/**
+		 *	The url one virtual path is reached under - the mirror of path().
+		 *	A public-content path (PUBLIC_DIRS) gets the public prefix, a tool
+		 *	folder's own file gets the plain project dir: /_editor bundles its
+		 *	login css into /_editor/.cache/, which is code shipped with the
+		 *	tool, not this project's public content, and must keep resolving
+		 *	next to the tool itself
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$filename			Eg. '/.cache/style.css', '/_editor/.cache/login.js'
+		 *
+		 *	@return 	string
+		 */
+		public static function url( array &$appData, string $filename ): string {
+
+			$filename = '/'. ltrim( $filename, '/' );
+
+			$prefix = self::_isIn( self::PUBLIC_DIRS, $filename ) === true
+				? self::getPublicDir( $appData )
+				: self::getDir( $appData );
+
+			return rtrim( $prefix, '/' ). $filename;
+		}
+
+		public static function getPublicDir( array &$appData ): string {
+
+			$dir 		= rtrim( self::getDir( $appData ), '/' );
+			$public = self::getPublicPath( $appData );
+			$root 	= self::getPath( $appData );
+
+			// The public root is either the project root itself (a project
+			// laid out before the move) or exactly one directory below it -
+			// its name is the segment the urls gain
+			return $public === $root ? $dir : $dir. substr( $public, strlen( $root ) );
 
 		}
 
@@ -2928,7 +3019,7 @@ namespace Nino {
 			if( $filename === '' || str_contains( $filename, '..' ) === true || str_starts_with( $filename, '/' ) === true )
 				return;
 
-			$path = \Nino\Filesystem::getPath( $appData ). self::UPLOAD_DIR. '/'. $filename;
+			$path = \Nino\Filesystem::path( $appData, self::UPLOAD_DIR. '/'. $filename );
 			// @: same TOCTOU as Filesystem::removeDir() - is_file() above and
 			// unlink() here are two syscalls, not one
 			if( is_file( $path ) === true )

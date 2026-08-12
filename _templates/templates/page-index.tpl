@@ -14,7 +14,7 @@
 	</head>
 	<body>
 		[csrf]
-		<div id="pd-app" data-dir="[[/nino/dir]]">
+		<div id="pd-app" data-dir="[[/nino/dir]]" data-public="[[/nino/public]]">
 			<header id="pd-topbar">
 				<div class="pd-head-rail">
 					<a class="pd-brand" href="[[/nino/dir]]/_templates/" aria-label="Templates home">

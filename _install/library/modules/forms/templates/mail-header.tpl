@@ -67,6 +67,6 @@
 <body>
 	<div class="mail-container">
 		<div class="mail-header">
-			<img src="https://[[/website/url]][[/nino/dir]]/images/logo.png" alt="[[/company/name]]">
+			<img src="https://[[/website/url]][[/nino/public]]/images/logo.png" alt="[[/company/name]]">
 		</div>
 		<div class="mail-body">

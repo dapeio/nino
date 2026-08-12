@@ -12,12 +12,22 @@ declare(strict_types=1);
 
 $uri = urldecode( parse_url( $_SERVER['REQUEST_URI'], PHP_URL_PATH ) );
 
+// The private half of the project is never served as a static file. In
+// production content/.htaccess denies it (and a hardened setup points
+// NINO_CONTENT_DIR outside the webroot entirely), but this server applies
+// no .htaccess at all - without this, a request for
+// /content/templates/page-home.tpl would hand back the template source,
+// which is exactly what moving those files out of the public root prevents
+if( preg_match( '#^/content(/|$)#', $uri ) === 1 ) {
+    http_response_code( 404 );
+    return true;
+}
+
 // Dotfiles/dotdirs never get served as static files, .cache/ (the
 // bundled/minified css+js the [assets ...] shortcode generates) and
 // .demo/ (the bundled demo images) are the two exceptions - without
-// this, a direct request could otherwise read content/.auth/pw.php or
-// content/.backups/ contents straight off disk, bypassing the .php
-// stub protection those paths normally rely on. Dot-uris that are no
+// this, a direct request could otherwise read a stub-protected file
+// straight off disk, bypassing that protection. Dot-uris that are no
 // files at all (/.newsletter, /.demo-sections, ...) fall through to
 // index.php and resolve as ordinary routes
 if( $uri !== '/' && preg_match( '#/\.(?!cache/|demo/)#', $uri ) !== 1 && is_file( __DIR__. $uri ) === true )

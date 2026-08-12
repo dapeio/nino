@@ -50,7 +50,7 @@ function check( string $label, bool $condition ): void {
  *	@return		bool										True if the lock was free (and has now been released again)
  */
 function probeLockFree( string $sandbox, string $filename ): bool {
-	$lockPath	= $sandbox. '/data/.locks/'. sha1( $filename ). '.lock';
+	$lockPath	= $sandbox. '/content/data/.locks/'. sha1( $filename ). '.lock';
 	$probe		= @fopen( $lockPath, 'c' );
 	if( $probe === false )
 		return false;
@@ -76,8 +76,9 @@ $appData = [ './nino/uid' => $sandbox ];
 $appData['./nino/filesystem/path']			= $sandbox;
 // Mirrors \Nino\init()'s default (no NINO_CONFIG_DIR set): configpath falls
 // back to the project root, same as this sandbox's regular path
-$appData['./nino/filesystem/configpath']	= $sandbox;
+$appData['./nino/filesystem/configpath']	= $sandbox. '/content';
 $appData['./nino/filesystem/contentpath']	= $sandbox. '/content';
+$appData['./nino/filesystem/privatepath'] = $sandbox. '/content';
 $appData['/nino/dir']				= '';
 $appData['/nino/locales/native']				= 'de_DE';
 $appData['/nino/locales/available']			= [ 'de_DE', 'en_US' ];
@@ -341,7 +342,7 @@ check( 'setSlotFilename rejects an unknown slot', \Nino\Images::setSlotFilename(
 check( 'setSlotFilename accepts a known slot', \Nino\Images::setSlotFilename( $appData, 'hero', 'hero.1600x600.jpg' ) === true );
 check( 'setSlotFilename updates the in-memory slot immediately', \Nino\Images::getSlot( $appData, 'hero' )['filename'] === 'hero.1600x600.jpg' );
 
-$persisted = include $appData['./nino/filesystem/path']. '/config.php';
+$persisted = include \Nino\Filesystem::path( $appData, '/config.php' );
 check( 'setSlotFilename persists to config.php (same as Auth::updateUser)', ( $persisted['/nino/html/images']['hero']['filename'] ?? null ) === 'hero.1600x600.jpg' );
 
 $appData['/nino/html/images']['logo'] = [ 'label' => 'Logo', 'width' => 400, 'height' => 400, 'filename' => null ];
@@ -537,7 +538,10 @@ echo "AppData::writeContentData doesn't clobber a concurrent write to a differen
 $buildAppData = function() use ( $sandbox ) {
 	$fresh = [ './nino/uid' => $sandbox ];
 	\Nino\AppData::prepare( $fresh );
-	$fresh['./nino/filesystem/path'] = $sandbox;
+	$fresh['./nino/filesystem/path'] 				= $sandbox;
+	$fresh['./nino/filesystem/configpath'] 	= $sandbox. '/content';
+	$fresh['./nino/filesystem/contentpath'] = $sandbox. '/content';
+	$fresh['./nino/filesystem/privatepath'] = $sandbox. '/content';
 	\Nino\AppData::init( $fresh );
 	return $fresh;
 };
@@ -551,7 +555,7 @@ $reqA['/nino/auth/user']['race@example.com'] = [ 'marker' => 'FROM_A' ];
 $reqB['/nino/html/images'] = [ 'marker' => 'FROM_B' ];
 \Nino\AppData::writeContentData( $reqB, [ '/nino/html/images' ] );
 
-$onDisk = include $sandbox. '/config.php';
+$onDisk = include $sandbox. '/content/config.php';
 check( 'a later write to a different key doesn\'t erase an earlier request\'s change', ( $onDisk['/nino/auth/user']['race@example.com']['marker'] ?? null ) === 'FROM_A' );
 check( 'the later request\'s own change is still persisted', ( $onDisk['/nino/html/images']['marker'] ?? null ) === 'FROM_B' );
 
@@ -561,7 +565,7 @@ $sessionUser = 'parallel@example.com';
 \Nino\Auth::insertUser( $appData, $sessionUser, 'correct horse battery staple' );
 
 $sessions = function() use ( $sandbox, $sessionUser ): array {
-	$onDisk = include $sandbox. '/config.php';
+	$onDisk = include $sandbox. '/content/config.php';
 	return $onDisk['/nino/auth/user'][$sessionUser]['sessions'] ?? [];
 };
 
@@ -754,9 +758,9 @@ check( 'neither rejected submission created the form data file', is_file( \Nino\
 
 $okRequest = submitForm( $appData, [ 'name' => 'Jo Client', 'email' => 'jo@example.com', 'message' => "Line one\nLine two", 'cat' => 'General' ] );
 check( 'a valid submission succeeds (200)', $okRequest['/nino/http/response']['statusCode'] === 200 );
-check( 'a valid submission bootstraps the data dir at the project root, not under _editor', is_dir( \Nino\Filesystem::getPath( $appData ). '/data' ) === true && is_dir( \Nino\Filesystem::getPath( $appData ). '/_editor/data' ) === false );
+check( 'a valid submission bootstraps the data dir on the private root, not under _editor', is_dir( \Nino\Filesystem::path( $appData, '/data' ) ) === true && is_dir( \Nino\Filesystem::getPath( $appData ). '/_editor/data' ) === false );
 
-$formsDir 	= \Nino\Filesystem::getPath( $appData ). '/data';
+$formsDir 	= \Nino\Filesystem::path( $appData, '/data' );
 $monthFile 	= $formsDir. '/forms.'. date( 'Y-m' ). '.php';
 check( 'this month\'s submissions file was actually written', is_file( $monthFile ) === true );
 
@@ -824,10 +828,10 @@ check( 'a csrf-blocked signup does not create the newsletter file', is_file( \Ni
 $okNewsletterRequest = submitNewsletter( $appData, [ 'email' => 'jo@example.com' ] );
 check( 'a valid signup succeeds (200)', $okNewsletterRequest['/nino/http/response']['statusCode'] === 200 );
 check( 'a valid new signup reports the generic status', $okNewsletterRequest['/nino/http/response']['body']['status'] === 'ok' );
-check( 'a valid signup bootstraps the newsletter file at the project root, not under _editor', is_file( \Nino\Filesystem::getPath( $appData ). '/data/newsletter.php' ) === true && is_dir( \Nino\Filesystem::getPath( $appData ). '/_editor/data' ) === false );
+check( 'a valid signup bootstraps the newsletter file on the private root, not under _editor', is_file( \Nino\Filesystem::path( $appData, '/data/newsletter.php' ) ) === true && is_dir( \Nino\Filesystem::getPath( $appData ). '/_editor/data' ) === false );
 
 $subscribersPath 	= '/data/newsletter.php';
-$subscribersFile 	= \Nino\Filesystem::getPath( $appData ). $subscribersPath;
+$subscribersFile 	= \Nino\Filesystem::path( $appData, $subscribersPath );
 
 $subscribers = \Nino\Filesystem::getFileContent( $appData, $subscribersPath, [] );
 check( 'exactly one entry was recorded', count( $subscribers ) === 1 );
@@ -1395,6 +1399,61 @@ check( 'but leaves the public ones where the webserver reaches them', \Nino\File
 // config.php keeps its own, older override - it wins over the private root
 $pathAppData['./nino/filesystem/configpath'] = '/etc/nino';
 check( 'NINO_CONFIG_DIR still wins for config.php alone', \Nino\Filesystem::path( $pathAppData, '/config.php' ) === '/etc/nino/config.php' );
+
+// --- and the url side, which has to split exactly the same way ----------
+//
+// A tool bundles its own login css into /_editor/.cache/ - that is code
+// shipped with the tool, not this project's public content. Giving every
+// /.cache path the public prefix pointed /_editor's stylesheet and login
+// script at /public/_editor/.cache/... and left the login page unstyled
+// with its script 404ing, which no unit assertion here noticed
+$pathAppData['./nino/filesystem/publicpath'] = '/srv/site/public';
+$pathAppData['/nino/dir'] = '';
+
+check( 'public content is reached under the public prefix', \Nino\Filesystem::url( $pathAppData, '/images/hero.jpg' ) === '/public/images/hero.jpg' );
+check( '...including the generated bundle', \Nino\Filesystem::url( $pathAppData, '/.cache/style.css' ) === '/public/.cache/style.css' );
+check( "a tool's own bundle keeps resolving next to the tool", \Nino\Filesystem::url( $pathAppData, '/_editor/.cache/login.js' ) === '/_editor/.cache/login.js' );
+check( '...and so does any other tool file', \Nino\Filesystem::url( $pathAppData, '/_admin/assets/script.js' ) === '/_admin/assets/script.js' );
+
+$pathAppData['/nino/dir'] = '/subdir';
+check( 'a subdirectory install carries into both', [
+	\Nino\Filesystem::url( $pathAppData, '/images/hero.jpg' ),
+	\Nino\Filesystem::url( $pathAppData, '/_admin/assets/script.js' ),
+] === [ '/subdir/public/images/hero.jpg', '/subdir/_admin/assets/script.js' ] );
+
+// A project laid out before the move has no public directory of its own -
+// then the two prefixes are the same and nothing gains a segment
+$pathAppData['./nino/filesystem/publicpath'] = '/srv/site';
+$pathAppData['/nino/dir'] = '';
+check( 'the pre-move layout adds no segment at all', \Nino\Filesystem::url( $pathAppData, '/images/hero.jpg' ) === '/images/hero.jpg' );
+
+echo "\n";
+
+
+// --- The private root is never reachable over http -----------------------
+
+echo "router.php - the private root is never served\n";
+
+// Moving the templates out of the public root only helps if nothing hands
+// them back at their new path. The dev server applies no .htaccess at all,
+// so router.php has to refuse /content itself - a plain request for
+// /content/templates/page-home.tpl returned the full template source until
+// it did. Production has content/.htaccess (and NINO_CONTENT_DIR for a
+// setup that cannot rely on it), see docs/deployment.md
+$routerSource = file_get_contents( __DIR__. '/../router.php' );
+
+check( 'router.php refuses everything under the private root', preg_match( '#\^/content\(/\|\$\)#', $routerSource ) === 1 );
+check( '...before it ever looks for a static file', strpos( $routerSource, '/content' ) < strpos( $routerSource, 'is_file( __DIR__. $uri )' ) );
+
+check( 'the shipped content directory denies itself for a webserver that does apply it', str_contains(
+	(string) @file_get_contents( __DIR__. '/../content/.htaccess' ), 'Require all denied'
+) === true );
+
+// Nothing private may sit in the public root of a fresh checkout
+foreach( \Nino\Filesystem::PRIVATE_DIRS as $private )
+	check( "a checkout ships no $private in the public root", file_exists( __DIR__. '/..'. $private ) === false );
+
+check( 'config.php ships under the content directory instead', is_file( __DIR__. '/../content/config.php' ) === true );
 
 echo "\n";
 

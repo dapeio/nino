@@ -67,7 +67,7 @@
 	}
 
 	function previewDocument( markup ) {
-		const stylesheet = escapeAttribute( pd.assetUrl( '/.cache/style.css' ) );
+		const stylesheet = escapeAttribute( pd.publicUrl( '/.cache/style.css' ) );
 		const origin = wn.location && /^https?:$/.test( wn.location.protocol ) ? wn.location.origin : '';
 		const projectSource = origin ? ' '+ origin : '';
 		const policy = "default-src 'none'; style-src 'unsafe-inline'"+ projectSource+ '; img-src data:'+ projectSource+ '; font-src data:'+ projectSource+ '; media-src'+ projectSource+ "; script-src 'none'; frame-src 'none'; connect-src 'none'; form-action 'none'; base-uri 'none'";

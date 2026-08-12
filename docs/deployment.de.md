@@ -52,7 +52,9 @@ Die mitgelieferte `.htaccess` setzt zwei grundlegende Schutzregeln, sofern der S
 - Dateien mit einem führenden Punkt werden nicht direkt ausgeliefert.
 - Verzeichnisse ohne Indexdatei zeigen keine Dateiliste.
 
-Prüfe in der Hosting-Konfiguration zusätzlich, wie nicht vorhandene Pfade an `index.php` übergeben werden. Eine `.htaccess`, die vom Server ignoriert wird, entfaltet keinerlei Schutzwirkung.
+Eine dritte Regel liegt in `content/.htaccess` und sperrt dieses Verzeichnis vollständig. Sie ist die wichtigste: In `content/` liegen `config.php`, die Templates sowie die Texte und Elemente, aus denen sie rendern, und die Daten deiner Besucher. Ohne sie liefert ein Aufruf von `content/templates/page-home.tpl` den Template-Quelltext im Klartext aus.
+
+Prüfe in der Hosting-Konfiguration zusätzlich, wie nicht vorhandene Pfade an `index.php` übergeben werden. Eine `.htaccess`, die vom Server ignoriert wird, entfaltet keinerlei Schutzwirkung – und bei `content/` ist das keine Härtungsfrage, sondern eine Offenlegung. Wenn du dich auf `.htaccess` nicht verlassen kannst, richte stattdessen `NINO_CONTENT_DIR` in der `index.php` auf ein Verzeichnis außerhalb des Webroots; dann braucht es gar keine Serverregel.
 
 ### Nginx und andere Webserver
 
@@ -62,8 +64,17 @@ Prüfe in der Hosting-Konfiguration zusätzlich, wie nicht vorhandene Pfade an `
 - normale Webseitenrouten an `index.php` weitergeben;
 - `/_editor`, `/_admin`, `/_templates` und gegebenenfalls `/_install` an ihre eigenen Einstiegspunkte routen;
 - Zugriffe auf Dotfiles und Dot-Verzeichnisse verweigern;
+- **`content/` vollständig sperren** – es wird nie von einem Browser angefragt, sondern nur von PHP gelesen;
 - Verzeichnisauflistung deaktivieren;
 - PHP-Quell- und Datendateien nicht als Text ausliefern.
+
+Für nginx ist der vorletzte Punkt ein einzelner Block:
+
+```nginx
+location ^~ /content/ { deny all; return 404; }
+```
+
+Oder du umgehst die Frage, indem du das Verzeichnis mit `NINO_CONTENT_DIR` aus dem Webroot verlegst.
 
 Eine allgemeine Beispielkonfiguration kann die Pfade und PHP-FPM-Einstellungen eines konkreten Hostings nicht zuverlässig erraten. Prüfe deshalb nach dem Einrichten sowohl gewünschte Routen als auch bewusst verbotene Direktzugriffe.
 
@@ -183,6 +194,8 @@ Behandle ein Nino-Update wie eine Änderung am konkreten Webseitenprojekt, nicht
 3. Vergleiche eigene Anpassungen in Kernel, Templates und Verwaltungsoberflächen mit dem neuen Stand. Die Verwaltungsoberflächen selbst tragen keinen Projektzustand mehr: Das `/_admin`-Passwort liegt in `content/.auth/pw.php`, `_admin/` lässt sich also komplett ersetzen, ohne den Login zu verlieren oder `/_install` wieder zu öffnen.
 4. Führe Smoke-Tests und projektspezifische Abnahme aus.
 5. Übertrage den geprüften Stand und behalte die vorherige Version für ein Rollback.
+
+Ein Projekt, das vor `content/` und `public/` eingerichtet wurde, behält seine Dateien im Projektstamm und wird bei jedem Request als solches erkannt – ein Update verschiebt nie etwas von selbst. Zum Umstellen verschiebst du `config.php`, `templates/`, `text/`, `elements/` und `data/` nach `content/` sowie `images/`, `assets/`, `favicon/`, `fonts/` und `.cache/` nach `public/`. Vor dem Umzug erzeugte Templates adressieren Bilder noch als `[[/nino/dir]]/images/...`; das muss im selben Schritt zu `[[/nino/public]]/images/...` werden, sonst laufen sie danach ins Leere.
 
 Nino befindet sich in der Beta-Phase. Sicherheitskorrekturen erscheinen auf `main`; eine getrennte LTS-Linie gibt es derzeit nicht. Plane Updates deshalb als aktive Projektpflege ein und prüfe `SECURITY.md` sowie den Changelog vor einer Aktualisierung.
 

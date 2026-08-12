@@ -501,7 +501,7 @@
 				// this re-render from a stored value had to build it itself, and
 				// pointed at a /uploads directory that does not exist
 				if( value )
-					preview.src = Nino.editor.assetUrl( '/images/'+ value );
+					preview.src = Nino.editor.publicUrl( '/images/'+ value );
 				wrap.appendChild( preview );
 
 				const hiddenInput = dc.createElement('input');

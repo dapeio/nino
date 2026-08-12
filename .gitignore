@@ -1,20 +1,41 @@
 /.cache/
 /_admin/.cache/
-/_admin/.backups-*/
-/_admin/.logs-*/
+/_admin/.lockout.json
+/_admin/.restore-key.php
+/_editor/.cache/
+/_editor/.backups-*/
+/_editor/.logs-*/
 /_dev/.restore-key.php
 /_dev/.lockout.json
 /_dev/Dev.php
 
-# Runtime data (form submissions, newsletter subscribers, rate limits,
-# error logs) contains PII - never track it
-/data/
+# The project's private half. config.php is tracked deliberately - it is the
+# starter configuration a checkout ships - but everything the wizard
+# generates below it is that project's own output, and the runtime data and
+# management state additionally hold PII and credentials
+/content/templates/
+/content/text/
+/content/elements/
+/content/data/
+/content/.auth/
+/content/.logs/
+/content/.backups/
 
-# Uploaded images are runtime content too - only the bundled demo assets
-# stay tracked
+# The same content in the pre-move layout, for a project installed before it
+/templates/
+/text/
+/elements/
+/data/
+/assets/
+/favicon/
+/fonts/
 /images/*
 !/images/.demo/
 
+# The project's public half - everything a browser loads directly. All of it
+# is the wizard's output (themes, fonts, the favicon set) or runtime content
+# (uploaded images), never repository content
+/public/
+
 .DS_Store
 Thumbs.db
-config.php

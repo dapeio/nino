@@ -43,16 +43,16 @@ set_error_handler( function() { return true; } );
 
 $sandbox = sys_get_temp_dir(). '/nino-admin-smoke-'. uniqid();
 mkdir( $sandbox, 0777, true );
-mkdir( $sandbox. '/text', 0777, true );
+mkdir( $sandbox. '/content/text', 0777, true );
 
 // A key already longer than MAX_MAXLENGTH - MAXLENGTH_BUFFER, to prove the computed
 // maxlength is capped at MAX_MAXLENGTH rather than growing past it
 $longValue = str_repeat( 'x', 1900 );
 
-file_put_contents( $sandbox. '/text/global.php', '<?php return [ \'[[/company/name]]\' => \'Acme\', \'[[/website/lang]]\' => \'de\' ];' );
-file_put_contents( $sandbox. '/text/de_DE.php', '<?php return [ \'[[/home/h2]]\' => \'<span>Hallo</span> Welt.\', \'[[/home/plain]]\' => \'Ein Satz.\', \'[[/home/long]]\' => \''. $longValue. '\' ];' );
-file_put_contents( $sandbox. '/text/en_US.php', '<?php return [ \'[[/home/h2]]\' => \'<span>Hi</span> World.\', \'[[/home/plain]]\' => \'A sentence.\' ];' );
-file_put_contents( $sandbox. '/text/blacklist.php', '<?php return [ \'/website/lang\' ];' );
+file_put_contents( $sandbox. '/content/text/global.php', '<?php return [ \'[[/company/name]]\' => \'Acme\', \'[[/website/lang]]\' => \'de\' ];' );
+file_put_contents( $sandbox. '/content/text/de_DE.php', '<?php return [ \'[[/home/h2]]\' => \'<span>Hallo</span> Welt.\', \'[[/home/plain]]\' => \'Ein Satz.\', \'[[/home/long]]\' => \''. $longValue. '\' ];' );
+file_put_contents( $sandbox. '/content/text/en_US.php', '<?php return [ \'[[/home/h2]]\' => \'<span>Hi</span> World.\', \'[[/home/plain]]\' => \'A sentence.\' ];' );
+file_put_contents( $sandbox. '/content/text/blacklist.php', '<?php return [ \'/website/lang\' ];' );
 
 $_SERVER['REMOTE_ADDR'] = '127.0.0.1';
 
@@ -61,8 +61,9 @@ $appData = [ './nino/uid' => $sandbox ];
 $appData['./nino/filesystem/path']			= $sandbox;
 // Mirrors \Nino\init()'s default (no NINO_CONFIG_DIR set): configpath falls
 // back to the project root, same as this sandbox's regular path
-$appData['./nino/filesystem/configpath']	= $sandbox;
+$appData['./nino/filesystem/configpath']	= $sandbox. '/content';
 $appData['./nino/filesystem/contentpath']	= $sandbox. '/content';
+$appData['./nino/filesystem/privatepath'] = $sandbox. '/content';
 $appData['/nino/dir']				= '';
 $appData['/nino/locales/native']				= 'de_DE';
 $appData['/nino/locales/available']			= [ 'de_DE', 'en_US' ];
@@ -736,7 +737,7 @@ $extractDir = $sandbox. '/verify-extracted';
 mkdir( $extractDir );
 ( new \PharData( $tmpGz ) )->extractTo( $extractDir );
 
-check( 'the decrypted archive contains a byte-identical config.php', file_get_contents( $sandbox. '/config.php' ) === file_get_contents( $extractDir. '/config.php' ) );
+check( 'the decrypted archive contains a byte-identical config.php', file_get_contents( $sandbox. '/content/config.php' ) === file_get_contents( $extractDir. '/config.php' ) );
 
 $mtimeBefore = filemtime( $today );
 clearstatcache();
@@ -909,7 +910,7 @@ check( 'a valid contact submission succeeds', $formRequest['/nino/http/response'
 check( 'submissions/list succeeds', $status === 200 );
 check( 'submissions/list finds the submission just sent', count( $body['entries'] ) === 1 && $body['entries'][0]['email'] === 'jo@example.com' );
 
-check( 'forms data lives at the project-root /data dir, not under _editor', is_file( \Nino\Filesystem::getPath( $appData ). '/data/forms.'. date( 'Y-m' ). '.php' ) === true && is_dir( \Nino\Filesystem::getPath( $appData ). '/_editor/data' ) === false );
+check( 'forms data lives on the private root, not under _editor', is_file( \Nino\Filesystem::path( $appData, '/data/forms.'. date( 'Y-m' ). '.php' ) ) === true && is_dir( \Nino\Filesystem::getPath( $appData ). '/_editor/data' ) === false );
 
 unset( $appData['./nino/auth/current'] );
 [ $status ] = callAdminPost( $appData, 'submissions/list' );
@@ -937,7 +938,7 @@ check( 'a second valid newsletter signup succeeds', $newsletterRequest2['/nino/h
 check( 'newsletter/list succeeds', $status === 200 );
 check( 'newsletter/list finds both signups just sent', count( $body['entries'] ) === 2 );
 
-check( 'newsletter data lives at the project-root /data dir, not under _editor', is_file( \Nino\Filesystem::getPath( $appData ). '/data/newsletter.php' ) === true && is_dir( \Nino\Filesystem::getPath( $appData ). '/_editor/data' ) === false );
+check( 'newsletter data lives on the private root, not under _editor', is_file( \Nino\Filesystem::path( $appData, '/data/newsletter.php' ) ) === true && is_dir( \Nino\Filesystem::getPath( $appData ). '/_editor/data' ) === false );
 
 unset( $appData['./nino/auth/current'] );
 [ $status ] = callAdminPost( $appData, 'newsletter/list' );

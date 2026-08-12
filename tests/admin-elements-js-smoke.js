@@ -60,8 +60,8 @@ const elements = sandbox.Nino.admin.elements;
 // appeared once the form was re-rendered from the stored value. Checked
 // against the source: the url is only ever built inside _renderField()'s dom
 // branch, which this dom-free sandbox cannot reach
-check( 'no image url is built under a /uploads directory', /assetUrl\(\s*'\/uploads\//.test( source ) === false );
-check( 'the image preview is built under /images', /assetUrl\(\s*'\/images\/'\+ value\s*\)/.test( source ) === true );
+check( 'no image url is built under a /uploads directory', /(?:asset|public)Url\(\s*'\/uploads\//.test( source ) === false );
+check( 'the image preview is built under /images, via the public content prefix', /publicUrl\(\s*'\/images\/'\+ value\s*\)/.test( source ) === true );
 
 elements._localeKeys = [ 'title', 'description' ];
 elements._dirtyLocales = [ 'de_DE', 'en_US' ];

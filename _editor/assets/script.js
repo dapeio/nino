@@ -278,6 +278,20 @@
 		},
 
 		/**
+		 *	The url of something a browser loads directly - an uploaded image,
+		 *	a bundled stylesheet. Those live under the public content
+		 *	directory, one level below the project root (see
+		 *	\Nino\Filesystem::getPublicDir()), unlike a link into /_editor
+		 *
+		 *	@param		{string}	path			Eg. '/images/hero.jpg'
+		 *
+		 *	@return		{string}
+		 */
+		publicUrl : function( path ) {
+			return ( dc.getElementById('editor-page-wrap').dataset.public ?? '' )+ path;
+		},
+
+		/**
 		 *	The common pinned context row used by every drill-down level.
 		 *	Locale selects can be appended after creation by the calling module.
 		 *

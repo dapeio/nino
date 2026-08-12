@@ -826,7 +826,7 @@ namespace Nino\Templates {
 
 			if( in_array( $content, [ 'articles', 'articles-image' ], true ) ) {
 				$grid = self::_gridClass( $spec['layout'] );
-				$image = $content === 'articles-image' ? "\t\t\t\t<img class=\"ui-article-img\" src=\"[[/nino/dir]]/images/[[image]]\" alt=\"[[title]]\">\n" : '';
+				$image = $content === 'articles-image' ? "\t\t\t\t<img class=\"ui-article-img\" src=\"[[/nino/public]]/images/[[image]]\" alt=\"[[title]]\">\n" : '';
 				return "\t\t[elements ". $type. " limit=\"". $limit. "\"]\n"
 					. "\t\t<div class=\"ui-grid-100 ". $grid. " ui-mb-3\">\n"
 					. "\t\t\t<article class=\"". $articleClass. "\">\n". $image
@@ -844,7 +844,7 @@ namespace Nino\Templates {
 					. "\t\t<div class=\"ui-grid-100 ". $grid. " ui-mb-3\"". $center. ">\n"
 					. "\t\t\t<article class=\"". $articleClass. " ui-article--fullwidth\">\n"
 					. "\t\t\t\t<div class=\"ui-img-cover\">\n"
-					. "\t\t\t\t\t<img class=\"ui-article-img ui-article-img--maxheight\" src=\"[[/nino/dir]]/images/[[image]]\" alt=\"[[title]]\">\n"
+					. "\t\t\t\t\t<img class=\"ui-article-img ui-article-img--maxheight\" src=\"[[/nino/public]]/images/[[image]]\" alt=\"[[title]]\">\n"
 					. "\t\t\t\t\t<span class=\"ui-badge ui-badge--primary\">[[badge]]</span>\n"
 					. "\t\t\t\t</div>\n"
 					. "\t\t\t\t<div class=\"ui-article-content\">\n"
@@ -856,7 +856,7 @@ namespace Nino\Templates {
 			}
 
 			if( $content === 'testimonials' ) {
-				$testimonial = "<article class=\"". $articleClass. " ui-text-center\"><div class=\"ui-article-content\"><blockquote class=\"ui-article-title\">[[quote]]</blockquote><div class=\"ui-testimonial-author\"><img src=\"[[/nino/dir]]/images/[[image]]\" alt=\"\"><span><strong>[[author]]</strong><small>[[role]]</small></span></div></div></article>";
+				$testimonial = "<article class=\"". $articleClass. " ui-text-center\"><div class=\"ui-article-content\"><blockquote class=\"ui-article-title\">[[quote]]</blockquote><div class=\"ui-testimonial-author\"><img src=\"[[/nino/public]]/images/[[image]]\" alt=\"\"><span><strong>[[author]]</strong><small>[[role]]</small></span></div></div></article>";
 				if( $spec['layout'] === 'slider' )
 					return "\t\t<div class=\"ui-grid-100\">\n\t\t\t<div class=\"js-slider\" data-slider-pos=\"0\" data-slider-width=\"60%\" data-slider-min=\"280px\">\n\t\t\t\t<ul>\n"
 						. "\t\t\t\t\t[elements ". $type. " limit=\"". $limit. "\"]\n\t\t\t\t\t<li>". $testimonial. "</li>\n\t\t\t\t\t[/elements]\n"
@@ -869,10 +869,10 @@ namespace Nino\Templates {
 
 			if( $content === 'profiles' ) {
 				if( $spec['layout'] === 'spotlight' )
-					return "\t\t[elements ". $type. " limit=\"". $limit. "\"]\n\t\t<div class=\"ui-grid-100 ui-grid-m-66\" style=\"margin:0 auto;\">\n\t\t\t<article class=\"". $articleClass. " ui-article-cols-m\">\n\t\t\t\t<img class=\"ui-article-img ui-profile-image\" src=\"[[/nino/dir]]/images/[[image]]\" alt=\"[[title]]\">\n\t\t\t\t<div class=\"ui-article-content\"><h3 class=\"ui-article-title\">[[title]]</h3><p class=\"ui-article-subtitle\">[[role]]</p><div class=\"ui-article-descr\">[[description]]</div><p class=\"ui-profile-links\"><a href=\"mailto:[[email]]\">[[email]]</a><a href=\"tel:[[phone]]\">[[phone]]</a></p></div>\n\t\t\t</article>\n\t\t</div>\n\t\t[/elements]\n";
+					return "\t\t[elements ". $type. " limit=\"". $limit. "\"]\n\t\t<div class=\"ui-grid-100 ui-grid-m-66\" style=\"margin:0 auto;\">\n\t\t\t<article class=\"". $articleClass. " ui-article-cols-m\">\n\t\t\t\t<img class=\"ui-article-img ui-profile-image\" src=\"[[/nino/public]]/images/[[image]]\" alt=\"[[title]]\">\n\t\t\t\t<div class=\"ui-article-content\"><h3 class=\"ui-article-title\">[[title]]</h3><p class=\"ui-article-subtitle\">[[role]]</p><div class=\"ui-article-descr\">[[description]]</div><p class=\"ui-profile-links\"><a href=\"mailto:[[email]]\">[[email]]</a><a href=\"tel:[[phone]]\">[[phone]]</a></p></div>\n\t\t\t</article>\n\t\t</div>\n\t\t[/elements]\n";
 
 				$grid = self::_gridClass( $spec['layout'] );
-				return "\t\t[elements ". $type. " limit=\"". $limit. "\"]\n\t\t<div class=\"ui-grid-100 ". $grid. " ui-mb-3\">\n\t\t\t<article class=\"". $articleClass. " ui-article--fullwidth\"><img class=\"ui-article-img ui-article-img--maxheight\" src=\"[[/nino/dir]]/images/[[image]]\" alt=\"[[title]]\"><div class=\"ui-article-content\"><h3 class=\"ui-article-title\">[[title]]</h3><p class=\"ui-article-subtitle\">[[role]]</p><div class=\"ui-article-descr\">[[description]]</div></div></article>\n\t\t</div>\n\t\t[/elements]\n";
+				return "\t\t[elements ". $type. " limit=\"". $limit. "\"]\n\t\t<div class=\"ui-grid-100 ". $grid. " ui-mb-3\">\n\t\t\t<article class=\"". $articleClass. " ui-article--fullwidth\"><img class=\"ui-article-img ui-article-img--maxheight\" src=\"[[/nino/public]]/images/[[image]]\" alt=\"[[title]]\"><div class=\"ui-article-content\"><h3 class=\"ui-article-title\">[[title]]</h3><p class=\"ui-article-subtitle\">[[role]]</p><div class=\"ui-article-descr\">[[description]]</div></div></article>\n\t\t</div>\n\t\t[/elements]\n";
 			}
 
 			if( $content === 'stats' ) {
@@ -906,7 +906,7 @@ namespace Nino\Templates {
 				$width = $spec['layout'] === 'narrow' ? '72%' : '88%';
 				return "\t\t<div class=\"ui-grid-100\">\n\t\t\t<div class=\"js-slider ui-media-slider\" data-slider-pos=\"0\" data-slider-width=\"". $width. "\" data-slider-min=\"280px\">\n\t\t\t\t<ul>\n"
 					. "\t\t\t\t\t[elements ". $type. " limit=\"". $limit. "\"]\n"
-					. "\t\t\t\t\t<li><article class=\"". $articleClass. " ui-article--fullwidth\"><img class=\"ui-article-img ui-article-img--maxheight\" src=\"[[/nino/dir]]/images/[[image]]\" alt=\"[[title]]\"><div class=\"ui-article-content\"><h3 class=\"ui-article-title\">[[title]]</h3><div class=\"ui-article-descr\">[[description]]</div><a href=\"[[link]]\" class=\"ui-btn ui-btn--primary\">[[linkLabel]]</a></div></article></li>\n"
+					. "\t\t\t\t\t<li><article class=\"". $articleClass. " ui-article--fullwidth\"><img class=\"ui-article-img ui-article-img--maxheight\" src=\"[[/nino/public]]/images/[[image]]\" alt=\"[[title]]\"><div class=\"ui-article-content\"><h3 class=\"ui-article-title\">[[title]]</h3><div class=\"ui-article-descr\">[[description]]</div><a href=\"[[link]]\" class=\"ui-btn ui-btn--primary\">[[linkLabel]]</a></div></article></li>\n"
 					. "\t\t\t\t\t[/elements]\n\t\t\t\t</ul>\n\t\t\t</div>\n\t\t</div>\n";
 			}
 
@@ -940,7 +940,7 @@ namespace Nino\Templates {
 			}
 
 			if( $content === 'logos' ) {
-				return "\t\t<div class=\"ui-grid-100\"><div class=\"ui-logos\">\n\t\t\t[elements ". $type. " limit=\"". $limit. "\"]\n\t\t\t<span class=\"ui-logos-item\"><img src=\"[[/nino/dir]]/images/[[image]]\" alt=\"[[title]]\"></span>\n\t\t\t[/elements]\n\t\t</div></div>\n";
+				return "\t\t<div class=\"ui-grid-100\"><div class=\"ui-logos\">\n\t\t\t[elements ". $type. " limit=\"". $limit. "\"]\n\t\t\t<span class=\"ui-logos-item\"><img src=\"[[/nino/public]]/images/[[image]]\" alt=\"[[title]]\"></span>\n\t\t\t[/elements]\n\t\t</div></div>\n";
 			}
 
 			if( $content === 'badges' ) {
@@ -952,8 +952,8 @@ namespace Nino\Templates {
 			if( $content === 'gallery' ) {
 				$galleryClass = 'ui-gallery'. ( $spec['layout'] === 'mosaic' ? ' ui-gallery--mosaic' : '' );
 				$modalId = self::_escape( $spec['id'] ). '-gallery-[[.id]]';
-				return "\t\t<div class=\"ui-grid-100\"><div class=\"". $galleryClass. "\">\n\t\t\t[elements ". $type. " limit=\"". $limit. "\"]\n\t\t\t<div class=\"ui-gallery-item\"><button type=\"button\" class=\"js-modal-trigger\" data-modal-target=\"". $modalId. "\" aria-label=\"[[title]]\"><img src=\"[[/nino/dir]]/images/[[image]]\" alt=\"[[title]]\" loading=\"lazy\"></button></div>\n\t\t\t[/elements]\n\t\t</div></div>\n"
-					. "\t\t[elements ". $type. " limit=\"". $limit. "\"]\n\t\t<dialog class=\"js-modal js-modal--lightbox\" id=\"". $modalId. "\"><button type=\"button\" class=\"js-modal-close\" aria-label=\"Close\">&times;</button><img src=\"[[/nino/dir]]/images/[[image]]\" alt=\"[[title]]\"></dialog>\n\t\t[/elements]\n";
+				return "\t\t<div class=\"ui-grid-100\"><div class=\"". $galleryClass. "\">\n\t\t\t[elements ". $type. " limit=\"". $limit. "\"]\n\t\t\t<div class=\"ui-gallery-item\"><button type=\"button\" class=\"js-modal-trigger\" data-modal-target=\"". $modalId. "\" aria-label=\"[[title]]\"><img src=\"[[/nino/public]]/images/[[image]]\" alt=\"[[title]]\" loading=\"lazy\"></button></div>\n\t\t\t[/elements]\n\t\t</div></div>\n"
+					. "\t\t[elements ". $type. " limit=\"". $limit. "\"]\n\t\t<dialog class=\"js-modal js-modal--lightbox\" id=\"". $modalId. "\"><button type=\"button\" class=\"js-modal-close\" aria-label=\"Close\">&times;</button><img src=\"[[/nino/public]]/images/[[image]]\" alt=\"[[title]]\"></dialog>\n\t\t[/elements]\n";
 			}
 
 			if( $content === 'timeline' ) {

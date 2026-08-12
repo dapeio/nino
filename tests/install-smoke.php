@@ -51,8 +51,9 @@ $_SERVER['REMOTE_ADDR'] = '127.0.0.1';
 $appData = [ './nino/uid' => $sandbox ];
 \Nino\AppData::prepare( $appData );
 $appData['./nino/filesystem/path']				= $sandbox;
-$appData['./nino/filesystem/configpath']	= $sandbox;
+$appData['./nino/filesystem/configpath']	= $sandbox. '/content';
 $appData['./nino/filesystem/contentpath']	= $sandbox. '/content';
+$appData['./nino/filesystem/privatepath'] = $sandbox. '/content';
 $appData['/nino/dir']										= '';
 $appData['/nino/locales/native']					= 'de_DE';
 // Matches the real shipped config.php default - only the native locale,
@@ -61,9 +62,9 @@ $appData['/nino/locales/native']					= 'de_DE';
 $appData['/nino/locales/available']			= [ 'de_DE' ];
 $appData['/nino/modules']								= [ '\\Nino\\Modules\\Assets', '\\Nino\\Modules\\Elements', '\\Nino\\Modules\\Template', '\\Nino\\Modules\\Jstext', '\\Nino\\Modules\\Csrf', '\\Nino\\Modules\\Images' ];
 
-mkdir( $sandbox. '/templates', 0777, true );
+mkdir( $sandbox. '/content/templates', 0777, true );
 mkdir( $sandbox. '/images', 0777, true );
-mkdir( $sandbox. '/text', 0777, true );
+mkdir( $sandbox. '/content/text', 0777, true );
 mkdir( $sandbox. '/assets', 0777, true );
 
 \Nino\Filesystem::putFileContent( $appData, '/config.php', [
@@ -834,7 +835,7 @@ echo "\n";
 echo "Shipped defaults (real config.php + _install/library)\n";
 
 $realRoot 	= __DIR__. '/..';
-$realConfig = include $realRoot. '/config.php';
+$realConfig = include $realRoot. '/content/config.php';
 
 $realAppData 		= [ '/nino/locales/available' => $realConfig['/nino/locales/available'] ?? [], '/nino/configpath' => $realRoot ];
 $realPageRoutes = array_filter( $realConfig['/nino/http/routes'] ?? [], fn( array $r, string $k ): bool => \Nino\Install\Webpages::isPageRoute( $k, $r ), ARRAY_FILTER_USE_BOTH );
@@ -868,7 +869,7 @@ check( '...at their own position in that list', [ $realPageRoutes['GET://']['nav
 
 // The generated site itself is deliberately not tracked - it is the
 // wizard's output, not repository content
-foreach( [ 'templates', 'text', 'assets' ] as $dir )
+foreach( [ 'content/templates', 'content/text', 'content/elements', 'assets' ] as $dir )
 	check( "does not ship a generated /$dir - the wizard writes it", is_dir( $realRoot. '/'. $dir ) === false );
 
 // ...but everything needed to generate it has to be in the library, or a

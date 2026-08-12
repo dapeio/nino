@@ -21,16 +21,16 @@
 			<meta property="og:description" content="[[/webpage[[/nino/http/response/uri]]/description]]">
 			<meta property="og:url" content="https://[[/website/url]][[/nino/http/request/uri]]">
 			<meta property="og:locale" content="[[/nino/http/response/locale]]">
-			<meta property="og:image" content="https://[[/website/url]][[/nino/dir]]/images/logo.png">
+			<meta property="og:image" content="https://[[/website/url]][[/nino/public]]/images/logo.png">
 			<meta name="twitter:card" content="summary_large_image">
 			<meta name="twitter:title" content="[[/webpage[[/nino/http/response/uri]]/title]] | [[/company/name]]">
 			<meta name="twitter:description" content="[[/webpage[[/nino/http/response/uri]]/description]]">
-			<meta name="twitter:image" content="https://[[/website/url]][[/nino/dir]]/images/logo.png">
+			<meta name="twitter:image" content="https://[[/website/url]][[/nino/public]]/images/logo.png">
 
-			<link rel="apple-touch-icon" sizes="180x180" href="[[/nino/dir]]/favicon/apple-touch-icon.png">
-			<link rel="icon" type="image/png" sizes="32x32" href="[[/nino/dir]]/favicon/favicon-32x32.png">
-			<link rel="icon" type="image/png" sizes="16x16" href="[[/nino/dir]]/favicon/favicon-16x16.png">
-			<link rel="manifest" href="[[/nino/dir]]/favicon/site.webmanifest">
+			<link rel="apple-touch-icon" sizes="180x180" href="[[/nino/public]]/favicon/apple-touch-icon.png">
+			<link rel="icon" type="image/png" sizes="32x32" href="[[/nino/public]]/favicon/favicon-32x32.png">
+			<link rel="icon" type="image/png" sizes="16x16" href="[[/nino/public]]/favicon/favicon-16x16.png">
+			<link rel="manifest" href="[[/nino/public]]/favicon/site.webmanifest">
 			[assets /.cache/style.css]
 
 			<!-- Structured data (schema.org) -->

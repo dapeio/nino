@@ -60,6 +60,24 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- Moved the project's public half into `public/`: `images/`, `assets/`,
+  `favicon/`, `fonts/` and the generated `.cache/` no longer sit beside the
+  code that runs the site. Urls gain a `/public` segment, built from the new
+  `[[/nino/public]]` fill (or `\Nino\Filesystem::url()`) rather than from
+  `[[/nino/dir]]` by hand — a tool's own bundle, like `/_editor/.cache/`,
+  still resolves next to the tool. The document root does not change, so no
+  deployment has to be reconfigured. A project installed before this keeps
+  its files where they are.
+- Moved the project's private half into `content/`: `config.php`, `templates/`,
+  `text/`, `elements/` and `data/` now sit beside the state the management
+  tools already kept there, leaving the public root holding only what a
+  webserver should serve. Until now a request for `templates/page-home.tpl`
+  returned the template source as plain text — the shipped `.htaccess` only
+  blocked dotfiles, and `.tpl` is not a PHP extension. `content/` denies
+  itself, `router.php` refuses it outright, and `NINO_CONTENT_DIR` moves it
+  out of the webroot entirely for a setup that cannot rely on either.
+  A project installed before this keeps its files where they are: the layout
+  is probed once per request, and nothing is ever moved for you.
 - Separated the project's public root from its private one in the kernel.
   `\Nino\Filesystem::getPath()` is now documented as the webserver-facing
   root (images, assets, the generated cache); everything a webserver must

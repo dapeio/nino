@@ -4,7 +4,7 @@
 		<footer>
 			<section class="ui-footer-main ui-grid-row ui-pt-2">
 	      <div class="ui-grid-100 ui-grid-l-33 ui-pb-2">
-					<img src="[[/nino/dir]]/images/logo-invert.png" class="ui-footer-logo ui-mb-2" alt="[[/company/name]]">
+					<img src="[[/nino/public]]/images/logo-invert.png" class="ui-footer-logo ui-mb-2" alt="[[/company/name]]">
 					<p>[[/company/description]]</p>
 	      </div>
         <div class="ui-grid-100 ui-grid-l-33 ui-pb-2">
