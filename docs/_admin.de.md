@@ -22,7 +22,8 @@ Dieses Handbuch erklärt die vollständige technische und inhaltliche Projektver
 | Texte | Schlüssel, Werte, Sprachen und Editor-Sichtbarkeit vollständig verwalten | freigegebene Werte pflegen |
 | Übersetzungen | native Text-/Elements-Inhalte exportieren und in eine Zielsprache importieren | kein Batch-Workflow |
 | Bilder | Bildplätze und Zielmaße definieren | Bilder hochladen und ersetzen |
-| Routen | Seitenrouten, Templates und Navigation verwalten | Seitentexte pflegen |
+| Routen | Seitenrouten, Templates und Menü-Zugehörigkeit verwalten | Seitentexte pflegen |
+| Navigationen | Menüs anlegen und ihre Reihenfolge festlegen | kein Zugriff |
 | Seitentemplates | Link zum sectionbasierten Template Builder unter `/_templates` | kein Zugriff |
 | Nutzer | Konten anlegen, löschen und Rechte technisch verwalten | Profildaten und freigegebene Rechte pflegen |
 | Konfiguration | ausgewählte technische Werte bearbeiten | kein Zugriff |
@@ -156,7 +157,7 @@ Der Import führt nur zusammen: Passende Werte der Zielsprache werden überschri
 
 ## Routes: Seitenrouten verwalten
 
-Der Bereich **Routes** verwaltet die über `/_install` angelegten Seitenrouten und die Navigation. Es gibt keine getrennte Seitenliste: Die angezeigte Liste wird bei jedem Aufruf aus `/nino/http/routes` und den `/webpage<uri>/*`-Textschlüsseln abgeleitet. Eine Route, die hier, in `/_install` oder von Hand in der `config.php` entsteht, ist damit überall dieselbe Seite.
+Der Bereich **Routes** verwaltet die über `/_install` angelegten Seitenrouten, einschließlich der Menüs, zu denen eine Seite gehört. Die Reihenfolge innerhalb dieser Menüs wird unter **Navigations** festgelegt. Es gibt keine getrennte Seitenliste: Die angezeigte Liste wird bei jedem Aufruf aus `/nino/http/routes` und den `/webpage<uri>/*`-Textschlüsseln abgeleitet. Eine Route, die hier, in `/_install` oder von Hand in der `config.php` entsteht, ist damit überall dieselbe Seite.
 
 Eine Seite besitzt zwei verschiedene URIs:
 
@@ -179,6 +180,26 @@ Die Pfeile in der Seitenliste vertauschen zwei Seitenrouten in der `config.php`;
 Einige Routen wählen ihr Template zur Laufzeit. In diesem Fall zeigt `/_admin` den bestehenden Route-Body an und lässt ihn beim Speichern unverändert.
 
 Das Löschen einer Seite entfernt ihre Route. Ihre Seitentexte und ihre Template-Datei bleiben bestehen – auf der Festplatte wird nichts für dich gelöscht.
+
+## Navigations: Menüs und ihre Reihenfolge
+
+Der Bereich **Navigations** ist die andere Hälfte dessen, was **Routes** bearbeitet. Dort hakt eine Seite die Menüs an, zu denen sie gehört – eine Seite nach der anderen; hier wird ein Menü geöffnet und seine gesamte Reihenfolge festgelegt.
+
+Die Liste zeigt jedes in `/nino/html/navs` registrierte Menü mit der Anzahl seiner Einträge. Beim Öffnen erscheinen die Einträge in ihrer Renderreihenfolge, mit:
+
+- ↑ / ↓ zum Verschieben innerhalb dieses Menüs;
+- × zum Entfernen – die Route selbst bleibt, nur ihre Zugehörigkeit geht;
+- einer Auswahl, die eine weitere Route hinzufügt; sie landet immer an letzter Stelle.
+
+Jede `GET`-Route kann Menüeintrag werden, nicht nur die von **Routes** verwalteten Seiten – ein Menüeintrag ist immer nur „ein Pfad mit einem Namen". Dieser Name ist der `/webpage<uri>/name`-Schlüssel der Seite; eine Route ohne ihn wird entsprechend markiert, weil `[navigation]` sie überspringt, statt einen leeren Link zu rendern.
+
+Die Prioritäten bleiben dicht, `1..n` je Menü, sodass die auf der Route gespeicherte Zahl als Position lesbar bleibt. Eine von Hand in die `config.php` geschriebene Route tritt einem Menü genauso bei und erscheint hier wie jede andere.
+
+Das **Anlegen** registriert eine Menü-Id; das **Umbenennen** prüft, ob die Id frei ist – in der Registry *und* auf jeder Route – und zieht sie dann in beiden nach. Das **Löschen** entfernt sie aus der Registry und von jeder Route darin.
+
+Weder Umbenennen noch Löschen fasst deine Templates an: Das `[navigation nav="…"]`-Argument in einem Template ist Inhalt, du passt es also selbst an. Bis dahin rendert das umbenannte Menü nirgends und das gelöschte leer.
+
+Einen Sprachumschalter gibt es hier nicht: An einem Menü ist nichts sprachabhängig, und dieselbe Reihenfolge gilt für jede Sprache.
 
 ## Images: Bildplätze definieren
 

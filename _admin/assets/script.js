@@ -28,6 +28,7 @@
 			text : [ 'show-text', function() { Nino.admin.text.showCurrent() } ],
 			translations : [ 'show-translations', function() { Nino.admin.translations.showCurrent() } ],
 			pages : [ 'show-pages', function() { Nino.admin.pages.showCurrent() } ],
+			navs : [ 'show-navs', function() { Nino.admin.navs.showCurrent() } ],
 			images : [ 'show-images', function() { Nino.admin.images.showCurrent() } ],
 			users : [ 'show-users', function() { Nino.admin.users.showCurrent() } ],
 			restore : [ 'show-restore', function() { Nino.admin.restore.showCurrent() } ],

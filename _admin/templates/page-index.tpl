@@ -36,6 +36,7 @@
 					<a href="#" id="admin-nav-text">Text</a>
 					<a href="#" id="admin-nav-translations">Translations</a>
 					<a href="#" id="admin-nav-pages">Routes</a>
+					<a href="#" id="admin-nav-navs">Navigations</a>
 					<a href="#" id="admin-nav-images">Images</a>
 					<a href="#" id="admin-nav-users">Users</a>
 					<a href="#" id="admin-nav-restore">Restore</a>
@@ -65,6 +66,12 @@
 					<div id="pages-list"></div>
 					<div id="pages-form"></div>
 				</div>
+				<!-- Drill-down: menu list -> one menu's own running order
+				     (see assets/navs.js) -->
+				<div id="admin-content-navs">
+					<div id="navs-list"></div>
+					<div id="navs-form"></div>
+				</div>
 				<div id="admin-content-images">
 					<div id="images-list"></div>
 					<div id="images-form"></div>
@@ -90,6 +97,7 @@
 		<script src="[[/nino/dir]]/_admin/assets/text.js"></script>
 		<script src="[[/nino/dir]]/_admin/assets/translations.js"></script>
 		<script src="[[/nino/dir]]/_admin/assets/pages.js"></script>
+		<script src="[[/nino/dir]]/_admin/assets/navs.js"></script>
 		<script src="[[/nino/dir]]/_admin/assets/images.js"></script>
 		<script src="[[/nino/dir]]/_admin/assets/users.js"></script>
 		<script src="[[/nino/dir]]/_admin/assets/restore.js"></script>

@@ -1209,12 +1209,14 @@ namespace Nino\Install {
 			if( in_array( '\\Nino\\Modules\\Navigation', $appData['/nino/modules'] ?? [], true ) === false )
 				return [];
 
-			$navs = $appData['/nino/html/navs'] ?? [];
+			$navs = $appData['/nino/html/navs'] ?? null;
 
-			// A project from before this registry existed - or one whose array
-			// got emptied - still has the single menu the old generated fill
-			// was hardcoded to, so it keeps an editable one rather than none
-			if( is_array( $navs ) === false || count( $navs ) === 0 )
+			// A project from before this registry existed still has the single
+			// menu the old generated fill was hardcoded to, so it keeps an
+			// editable one rather than none. An array that *is* there and empty
+			// is a deliberate "no menus at all" - the Navigations module can
+			// delete the last one - and stays empty
+			if( is_array( $navs ) === false )
 				return [ 'main' ];
 
 			return array_values( array_unique( array_map( 'strval', $navs ) ) );

@@ -1073,6 +1073,170 @@ check( 'PageEditor actions require an authed _admin session too', $status === 40
 echo "\n";
 
 
+// --- Dev\Navigations - which menus exist, and what stands in them ----------
+
+echo "Dev\\Navigations - menus and their running order\n";
+
+// Same two config keys the Routes module writes, from the other side: this
+// one opens one menu and sets its whole running order. Route bodies are
+// deliberately mixed - a page route, and one no page editor manages
+// (robots.txt) - to prove a menu is only ever "a path with a name"
+\Nino\Filesystem::mutate( $appData, '/config.php', function( array $config ): array {
+	$config['/nino/html/navs'] = [ 'main', 'footer' ];
+	$config['/nino/http/routes'] = [
+		'GET://' 						=> [ 'uri' => '/home', 	'body' => '[template /templates/page-home]', 'navs' => [ 'main' => 1 ] ],
+		'GET://robots.txt' 	=> [ 'uri' => '/robots.txt', 'body' => '[template /templates/robots]' ],
+		'GET://contact' 		=> [ 'uri' => '/contact', 'body' => '[template /templates/page-contact]', 'navs' => [ 'main' => 2 ] ],
+		'GET://legal' 			=> [ 'uri' => '/legal', 'body' => '[template /templates/page-legal]' ],
+	];
+	return $config;
+} );
+$appData['/nino/html/navs'] = [ 'main', 'footer' ];
+\Nino\Filesystem::putFileContent( $appData, '/text/de_DE.php', array_merge(
+	\Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] ),
+	[ '[[/webpage/home/name]]' => 'Start', '[[/webpage/contact/name]]' => 'Kontakt', '[[/webpage/legal/name]]' => 'Impressum' ]
+) );
+
+$navKeys = fn( array $body ): array => array_column( $body['navs'], 'key' );
+$entriesOf = fn( array $body, string $key ): array => array_column(
+	$body['navs'][ array_search( $key, array_column( $body['navs'], 'key' ), true ) ]['entries'], 'httpUri'
+);
+
+[ $status, $body ] = callDev( $appData, \Nino\Admin\Navigations::class, 'apiList' );
+check( 'apiList succeeds', $status === 200 );
+check( 'lists every registered menu, in registry order', $navKeys( $body ) === [ 'main', 'footer' ] );
+check( 'a menu reports its members in running order', $entriesOf( $body, 'main' ) === [ '/', '/contact' ] );
+check( 'a registered menu nobody is in is still listed, empty', $entriesOf( $body, 'footer' ) === [] );
+check( 'reports whether the module that renders any of this is active', $body['active'] === false );
+check( 'offers every GET route as a possible entry, not just the page ones', array_column( $body['routes'], 'httpUri' ) === [ '/', '/robots.txt', '/contact', '/legal' ] );
+check( 'labels a route by the /webpage<uri>/name key the menu would render', $body['routes'][0]['label'] === 'Start' );
+check( '...and falls back to the path for one nobody named', $body['routes'][1]['label'] === '/robots.txt' );
+check( 'a route with no name is reported as such - routeLines() would skip it', $body['routes'][1]['named'] === false && $body['routes'][0]['named'] === true );
+
+// Assign: joins at the end, never in the middle
+[ $status, $body ] = callDev( $appData, \Nino\Admin\Navigations::class, 'apiAssign', [ 'key' => 'main', 'httpUri' => '/legal' ] );
+check( 'apiAssign succeeds', $status === 200 );
+check( 'the new entry joins at the end', $entriesOf( $body, 'main' ) === [ '/', '/contact', '/legal' ] );
+
+$routesAfterAssign = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes'];
+check( 'membership is written onto the route itself, densely numbered', [
+	$routesAfterAssign['GET://']['navs'], $routesAfterAssign['GET://contact']['navs'], $routesAfterAssign['GET://legal']['navs'],
+] === [ [ 'main' => 1 ], [ 'main' => 2 ], [ 'main' => 3 ] ] );
+
+[ $status ] = callDev( $appData, \Nino\Admin\Navigations::class, 'apiAssign', [ 'key' => 'main', 'httpUri' => '/legal' ] );
+check( 'assigning the same route twice 409s', $status === 409 );
+
+[ $status ] = callDev( $appData, \Nino\Admin\Navigations::class, 'apiAssign', [ 'key' => 'nope', 'httpUri' => '/legal' ] );
+check( 'assigning into an unknown menu 404s', $status === 404 );
+
+[ $status ] = callDev( $appData, \Nino\Admin\Navigations::class, 'apiAssign', [ 'key' => 'main', 'httpUri' => '/does-not-exist' ] );
+check( 'assigning an unknown route 404s', $status === 404 );
+
+// Move
+[ $status, $body ] = callDev( $appData, \Nino\Admin\Navigations::class, 'apiMove', [ 'key' => 'main', 'httpUri' => '/legal', 'direction' => 'up' ] );
+check( 'apiMove succeeds', $status === 200 );
+check( 'the two entries swapped places', $entriesOf( $body, 'main' ) === [ '/', '/legal', '/contact' ] );
+
+$routesAfterMove = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes'];
+check( 'the swap is a swap of two priorities, still dense', [
+	$routesAfterMove['GET://']['navs'], $routesAfterMove['GET://legal']['navs'], $routesAfterMove['GET://contact']['navs'],
+] === [ [ 'main' => 1 ], [ 'main' => 2 ], [ 'main' => 3 ] ] );
+check( 'the route array itself is not reordered by a menu move', array_keys( $routesAfterMove ) === [ 'GET://', 'GET://robots.txt', 'GET://contact', 'GET://legal' ] );
+
+[ $status ] = callDev( $appData, \Nino\Admin\Navigations::class, 'apiMove', [ 'key' => 'main', 'httpUri' => '/', 'direction' => 'up' ] );
+check( 'moving the first entry up 400s', $status === 400 );
+
+[ $status ] = callDev( $appData, \Nino\Admin\Navigations::class, 'apiMove', [ 'key' => 'main', 'httpUri' => '/contact', 'direction' => 'sideways' ] );
+check( 'an invalid direction 400s', $status === 400 );
+
+[ $status ] = callDev( $appData, \Nino\Admin\Navigations::class, 'apiMove', [ 'key' => 'main', 'httpUri' => '/robots.txt', 'direction' => 'up' ] );
+check( 'moving a route that is not in this menu 404s', $status === 404 );
+
+// Unassign: closes the gap it leaves
+[ $status, $body ] = callDev( $appData, \Nino\Admin\Navigations::class, 'apiUnassign', [ 'key' => 'main', 'httpUri' => '/legal' ] );
+check( 'apiUnassign succeeds', $status === 200 );
+check( 'the entry is gone from the menu', $entriesOf( $body, 'main' ) === [ '/', '/contact' ] );
+
+$routesAfterUnassign = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes'];
+check( 'the gap it left is closed right away', [ $routesAfterUnassign['GET://']['navs'], $routesAfterUnassign['GET://contact']['navs'] ] === [ [ 'main' => 1 ], [ 'main' => 2 ] ] );
+check( 'a route in no menu at all carries no "navs" key rather than an empty one', isset( $routesAfterUnassign['GET://legal']['navs'] ) === false );
+check( 'the route itself survives losing its membership', isset( $routesAfterUnassign['GET://legal'] ) === true );
+
+[ $status ] = callDev( $appData, \Nino\Admin\Navigations::class, 'apiUnassign', [ 'key' => 'main', 'httpUri' => '/legal' ] );
+check( 'unassigning a route that is not in the menu 404s', $status === 404 );
+
+// Create
+[ $status, $body ] = callDev( $appData, \Nino\Admin\Navigations::class, 'apiSave', [ 'originalKey' => '', 'key' => 'meta' ] );
+check( 'creating a menu succeeds', $status === 200 );
+check( 'it is registered, at the end', $navKeys( $body ) === [ 'main', 'footer', 'meta' ] );
+check( '...and starts empty', $entriesOf( $body, 'meta' ) === [] );
+
+[ $status ] = callDev( $appData, \Nino\Admin\Navigations::class, 'apiSave', [ 'originalKey' => '', 'key' => 'meta' ] );
+check( 'creating one that already exists 409s', $status === 409 );
+
+foreach( [ 'Main Menu', 'main/sub', '', '2fast', 'MAIN' ] as $badKey ) {
+	[ $status ] = callDev( $appData, \Nino\Admin\Navigations::class, 'apiSave', [ 'originalKey' => '', 'key' => $badKey ] );
+	check( 'rejects "'. $badKey. '" as a menu id', $status === 400 );
+}
+
+// Rename: follows the key into the registry and onto every member route
+[ $status, $body ] = callDev( $appData, \Nino\Admin\Navigations::class, 'apiSave', [ 'originalKey' => 'main', 'key' => 'primary' ] );
+check( 'renaming succeeds', $status === 200 );
+check( 'the renamed menu keeps its place in the registry', $navKeys( $body ) === [ 'primary', 'footer', 'meta' ] );
+check( '...and keeps its members, in order', $entriesOf( $body, 'primary' ) === [ '/', '/contact' ] );
+
+$routesAfterRename = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes'];
+check( 'every member route carries the new key, at the priority it had', [ $routesAfterRename['GET://']['navs'], $routesAfterRename['GET://contact']['navs'] ] === [ [ 'primary' => 1 ], [ 'primary' => 2 ] ] );
+check( 'the old key is gone from the routes', isset( $routesAfterRename['GET://']['navs']['main'] ) === false );
+
+[ $status ] = callDev( $appData, \Nino\Admin\Navigations::class, 'apiSave', [ 'originalKey' => 'primary', 'key' => 'footer' ] );
+check( 'renaming onto a registered id 409s', $status === 409 );
+
+// ...and onto one only a route carries: without this the rename would merge
+// two memberships into one and silently drop a priority
+\Nino\Filesystem::mutate( $appData, '/config.php', function( array $config ): array {
+	$config['/nino/http/routes']['GET://']['navs']['handwritten'] = 4;
+	return $config;
+} );
+[ $status ] = callDev( $appData, \Nino\Admin\Navigations::class, 'apiSave', [ 'originalKey' => 'primary', 'key' => 'handwritten' ] );
+check( 'renaming onto an id only a hand-written route carries 409s too', $status === 409 );
+
+[ $status ] = callDev( $appData, \Nino\Admin\Navigations::class, 'apiSave', [ 'originalKey' => 'nope', 'key' => 'whatever' ] );
+check( 'renaming an unknown menu 404s', $status === 404 );
+
+// Delete: out of the registry, and off every route
+[ $status, $body ] = callDev( $appData, \Nino\Admin\Navigations::class, 'apiDelete', [ 'key' => 'primary' ] );
+check( 'deleting succeeds', $status === 200 );
+check( 'it is out of the registry', $navKeys( $body ) === [ 'footer', 'meta' ] );
+
+$routesAfterDelete = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes'];
+check( 'every member route lost the membership too', isset( $routesAfterDelete['GET://contact']['navs'] ) === false );
+check( 'a route that was in a second menu keeps that one', $routesAfterDelete['GET://']['navs'] === [ 'handwritten' => 4 ] );
+check( 'the routes themselves survive', array_keys( $routesAfterDelete ) === [ 'GET://', 'GET://robots.txt', 'GET://contact', 'GET://legal' ] );
+
+[ $status ] = callDev( $appData, \Nino\Admin\Navigations::class, 'apiDelete', [ 'key' => 'primary' ] );
+check( 'deleting an unknown menu 404s', $status === 404 );
+
+// Deleting the last one really does leave none - the "one menu by default"
+// fallback is for a config from before the registry existed, not for one
+// somebody deliberately emptied
+callDev( $appData, \Nino\Admin\Navigations::class, 'apiDelete', [ 'key' => 'footer' ] );
+[ $status, $body ] = callDev( $appData, \Nino\Admin\Navigations::class, 'apiDelete', [ 'key' => 'meta' ] );
+check( 'the last menu can be deleted, and stays deleted', $navKeys( $body ) === [] );
+
+unset( $appData['/nino/html/navs'] );
+check( 'a config from before the registry existed still offers the one menu the old generated fill was hardcoded to', \Nino\Admin\Navigations::registry( $appData ) === [ 'main' ] );
+$appData['/nino/html/navs'] = [];
+check( '...while an empty registry stays empty', \Nino\Admin\Navigations::registry( $appData ) === [] );
+
+\Nino\Runtime::unsetSessionValue( $appData, './nino/admin/authed' );
+[ $status ] = callDev( $appData, \Nino\Admin\Navigations::class, 'apiList' );
+check( 'Navigations actions require an authed _admin session too', $status === 401 );
+\Nino\Runtime::setSessionValue( $appData, './nino/admin/authed', true );
+
+echo "\n";
+
+
 // --- Elements: element *content* CRUD ------------------------------------
 
 echo "Elements - element content CRUD\n";

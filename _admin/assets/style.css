@@ -202,6 +202,7 @@ body {
 #admin-page-wrap.show-text #admin-content-text,
 #admin-page-wrap.show-translations #admin-content-translations,
 #admin-page-wrap.show-pages #admin-content-pages,
+#admin-page-wrap.show-navs #admin-content-navs,
 #admin-page-wrap.show-images #admin-content-images,
 #admin-page-wrap.show-users #admin-content-users,
 #admin-page-wrap.show-restore #admin-content-restore,
@@ -212,6 +213,7 @@ body {
 #admin-content-elements > div:not(.admin-hidden),
 #admin-content-text > div:not(.admin-hidden),
 #admin-content-pages > div:not(.admin-hidden),
+#admin-content-navs > div:not(.admin-hidden),
 #admin-content-images > div:not(.admin-hidden),
 #admin-content-config > div:not(.admin-hidden) {
 	display: block;
@@ -627,6 +629,30 @@ body {
 .admin-page-move button:disabled {
 	opacity: .35;
 	cursor: default;
+}
+
+/* One entry inside one navigation (see assets/navs.js). Unlike the page
+   list's rows these don't drill down anywhere, so the row itself carries
+   the padding/label treatment .admin-drill-list otherwise gives its <a>.
+   Flat inside its fieldset, too - the fieldset is already the card here,
+   and a second one nested in it just reads as noise */
+#navs-form .admin-drill-list {
+	background: none;
+	box-shadow: none;
+}
+
+#navs-form .admin-drill-list li {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	min-height: 44px;
+	padding-left: .75rem;
+	font-family: ui-monospace, monospace;
+	font-size: .85rem;
+}
+
+#navs-form .admin-drill-list li .admin-page-label {
+	flex: 1 1 auto;
 }
 
 .admin-page-locale-row {

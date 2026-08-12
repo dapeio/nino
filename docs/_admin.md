@@ -22,7 +22,8 @@ This manual explains the complete technical and content project management under
 | Texts | Fully manage keys, values, languages, and editor visibility | Maintain released values |
 | Translations | Export native Text/Elements content and import a target language | No batch workflow |
 | Images | Define image slots and target dimensions | Upload and replace images |
-| Routes | Manage page routes, templates, and navigation | Maintain page texts |
+| Routes | Manage page routes, templates, and menu membership | Maintain page texts |
+| Navigations | Create menus and set their running order | No access |
 | Page templates | Link to the section-first `/_templates` Template Builder | No access |
 | Users | Create, delete, and technically manage accounts | Manage profile data and released permissions |
 | Configuration | Edit selected technical values | No access |
@@ -158,7 +159,7 @@ Import is merge-only: matching target-language values are overwritten, while val
 
 ## Routes: Manage Page Routes
 
-The **Routes** area manages the page routes created via `/_install` and the navigation. There is no separate page list: the list you see is derived from `/nino/http/routes` and the `/webpage<uri>/*` text keys on every request, so a route written here, in `/_install`, or by hand in `config.php` is the same page everywhere.
+The **Routes** area manages the page routes created via `/_install`, including which menus each page belongs to. The order those menus run in is set under **Navigations**. There is no separate page list: the list you see is derived from `/nino/http/routes` and the `/webpage<uri>/*` text keys on every request, so a route written here, in `/_install`, or by hand in `config.php` is the same page everywhere.
 
 A page has two different URIs:
 
@@ -181,6 +182,26 @@ The arrows in the page list swap two page routes in `config.php`; every other ro
 Some routes select their template at runtime. In this case, `/_admin` shows the existing route body and leaves it unchanged when saving.
 
 Deleting a page removes its route. Its page texts and its template file remain — nothing on disk is deleted for you.
+
+## Navigations: Menus and Their Running Order
+
+The **Navigations** area is the other half of what **Routes** edits. There a page ticks the menus it belongs to, one page at a time; here one menu is opened and its whole running order is set.
+
+The list shows every menu registered in `/nino/html/navs`, with the number of entries it holds. Opening one shows its entries in the order they render, with:
+
+- ↑ / ↓ to move an entry within this menu;
+- × to take it back out — the route itself stays, only its membership goes;
+- a picker that adds another route, which joins at the end.
+
+Every `GET` route can be a menu entry, not just the pages **Routes** manages — a menu entry is only ever a path with a name. That name is the page's own `/webpage<uri>/name` key; a route without one is marked accordingly, because `[navigation]` skips it rather than rendering an empty link.
+
+Priorities are kept dense, `1..n` per menu, so the number stored on each route reads as its position. A route added to `config.php` by hand joins a menu the same way and appears here like any other.
+
+**Creating** a menu registers its id; **renaming** one checks that the id is free — in the registry *and* on every route — and then follows it into both. **Deleting** removes it from the registry and from every route in it.
+
+Neither renaming nor deleting touches your templates: the `[navigation nav="…"]` argument in a template is content, so update it yourself. Until you do, the renamed menu renders nowhere and the deleted one renders empty.
+
+There is no language switch here: a menu has nothing per-language about it, and the same running order serves every language.
 
 ## Images: Define Image Slots
 

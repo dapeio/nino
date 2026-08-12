@@ -6,6 +6,13 @@ All notable changes to Nino are documented in this file.
 
 ### Added
 
+- Added a **Navigations** area to `/_admin`: create, rename, and delete the
+  menus registered in `/nino/html/navs`, and set each menu's whole running
+  order with ↑/↓, a remove button, and a picker that adds any `GET` route at
+  the end. Priorities stay dense (`1..n` per menu), a rename follows the key
+  into the registry and onto every member route, and a delete takes the
+  membership off every route in it. Templates are deliberately left alone —
+  their `[navigation nav="…"]` argument is yours to update.
 - Added a section-first Template Builder for creating and composing
   `page-*.tpl` files with a searchable, visual preset library and a two-step
   Section Composer. The gallery and live configuration view render real
