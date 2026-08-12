@@ -712,6 +712,9 @@ namespace Nino\Install {
 			if( is_file( $to ) === true )
 				@unlink( $to );
 
+			if( is_dir( dirname( $to ) ) === false )
+				@mkdir( dirname( $to ), 0755, true );
+
 			file_put_contents( $to, $content );
 		}
 	}
@@ -1834,6 +1837,14 @@ namespace Nino\Install {
 						self::_copyFile( $unitDir. '/templates/'. $file, $root. '/templates/'. $file );
 					}
 				}
+					
+				if( count( $manifest['files'] ?? [] ) > 0 ) {
+					foreach( $manifest['files'] as $file )
+						if( is_dir( $unitDir. '/'. $file ) === true )
+							\Nino\Filesystem::copyDir( $unitDir. '/'. $file, $root. '/'. $file );
+						else if( is_file( $unitDir. '/'. $file ) === true )
+							self::_copyFile( $unitDir. '/'. $file, $root. '/'. $file );
+				}
 
 				if( count( $manifest['elementTypes'] ?? [] ) > 0 ) {
 					\Nino\Filesystem::forceDir( $appData, '/elements' );
@@ -2057,6 +2068,9 @@ namespace Nino\Install {
 
 			if( is_file( $to ) === true )
 				@unlink( $to );
+			
+			if( is_dir( dirname( $to ) ) === false )
+				@mkdir( dirname( $to ), 0755, true );
 
 			file_put_contents( $to, $content );
 		}
