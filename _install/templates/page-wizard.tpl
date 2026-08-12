@@ -110,17 +110,17 @@
 							</div>
 						</div>
 						<div class="install-next-steps" aria-label="Next steps">
-							<a class="install-next-step install-next-step--frontend" href="[[/nino/dir]]/">
+							<a class="install-next-step install-next-step--frontend" href="[[/nino/dir]]/" target="_blank">
 								<span class="install-next-step-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 0 20M12 2a15.3 15.3 0 0 0 0 20"/></svg></span>
 								<span class="install-next-step-copy"><strong>View the Frontend</strong><small>Open the new website and see the result.</small></span>
 								<svg class="install-next-step-arrow" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
 							</a>
-							<a class="install-next-step install-next-step--admin" href="[[/nino/dir]]/_admin/">
+							<a class="install-next-step install-next-step--admin" href="[[/nino/dir]]/_admin/" target="_blank">
 								<span class="install-next-step-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></span>
 								<span class="install-next-step-copy"><strong>Create content in _admin</strong><small>Manage routes, templates and native content.</small></span>
 								<svg class="install-next-step-arrow" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
 							</a>
-							<a class="install-next-step install-next-step--editor" href="[[/nino/dir]]/_editor/">
+							<a class="install-next-step install-next-step--editor" href="[[/nino/dir]]/_editor/" target="_blank">
 								<span class="install-next-step-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5Z"/><polyline points="14 2 14 8 20 8"/><path d="M9 15h6M9 11h1"/></svg></span>
 								<span class="install-next-step-copy"><strong>Edit content in _editor</strong><small>Update individual texts, elements and images.</small></span>
 								<svg class="install-next-step-arrow" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
