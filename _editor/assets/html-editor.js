@@ -5,10 +5,10 @@
  *	Modules									Optional modules
  *	Nino										Framework
  *	html-editor.js					Minimal contenteditable rich-text editor for admin "html"
- *													fields: strong/em/span/a only, always flat - applying a
+ *													fields: strong/em/span/code/a only, always flat - applying a
  *													format to a selection replaces any format already on it,
  *													never nests. No execCommand; paste is always plain text.
- *													Reused by text.js (and, later, the Elements editor) for
+ *													Shared by Text and Elements in /_editor and /_admin for
  *													any field whose model/entry has html === true.
  *
  *	@package								Dape/Nino
@@ -20,7 +20,7 @@
 
 	wn.Nino.editor = wn.Nino.editor || {};
 
-	const TAGS = [ 'strong', 'em', 'span', 'a' ];
+	const TAGS = [ 'strong', 'em', 'span', 'code', 'a' ];
 
 	Nino.editor.htmlEditor = {
 
@@ -49,6 +49,8 @@
 			content.setAttribute( 'role', 'textbox' );
 			content.setAttribute( 'aria-multiline', 'false' );
 			content.setAttribute( 'aria-label', Nino.content.getText('/_editor/htmleditor/label/content') );
+			content.setAttribute( 'tabindex', '0' );
+			content.spellcheck = true;
 			content.innerHTML = value || '';
 
 			const linkbar = dc.createElement('div');

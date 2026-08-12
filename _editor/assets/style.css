@@ -599,50 +599,6 @@ button:focus-visible {
 	margin-bottom: 1.25rem;
 }
 
-/* Text tab's "Übersetzung" export/import toolbar - a flex child of
-   #text-list (see above) alongside the category buttons, forced onto its
-   own row via width:100% since it's structurally unrelated to them */
-#text-translate-tools {
-	grid-column: 1 / -1;
-	width: 100%;
-	background: var(--editor-bg-grouped);
-	border: 1px solid var(--editor-border);
-	border-radius: var(--editor-radius);
-	box-shadow: var(--editor-shadow);
-	padding: 1rem;
-}
-.text-translate-row {
-	display: flex;
-	flex-wrap: wrap;
-	align-items: center;
-	gap: .75rem;
-}
-.text-translate-row + .text-translate-row {
-	margin-top: .75rem;
-}
-.text-translate-row select {
-	width: auto;
-	flex: 0 0 auto;
-	padding-right: 32px;
-}
-#text-import-area {
-	flex: 1 1 240px;
-	min-height: 44px;
-	resize: vertical;
-	font-family: ui-monospace, monospace;
-	font-size: .8rem;
-}
-.text-import-success {
-	color: var(--editor-green);
-	font-size: .85rem;
-	font-weight: 600;
-}
-.text-import-error {
-	color: var(--editor-red);
-	font-size: .85rem;
-	font-weight: 600;
-}
-
 .editor-type-btn{
 	appearance: none;
 	font: inherit;
@@ -1109,6 +1065,11 @@ input.error, .pending.error {
 	font-weight: 400;
 }
 
+.html-editor-btn[data-tag="code"] {
+	font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+	font-weight: 500;
+}
+
 .html-editor-btn.active {
 	background: var(--editor-bg-elevated);
 	color: var(--editor-blue);
@@ -1121,12 +1082,32 @@ input.error, .pending.error {
 	border: 1px solid var(--editor-border);
 	border-radius: var(--editor-radius-sm);
 	background: var(--editor-bg-elevated);
+	-webkit-user-select: text;
+	user-select: text;
+	-webkit-touch-callout: default;
+	cursor: text;
 	transition: border-color .15s ease, box-shadow .15s ease;
+}
+
+/* WebKit historically treats user-select as inherited. Set it on the inline
+   markup too, so a surrounding app/canvas rule cannot make formatted pieces
+   inside this shared editor impossible to drag-select. */
+.html-editor-content * {
+	-webkit-user-select: text;
+	user-select: text;
+	cursor: text;
 }
 
 .html-editor-content strong { font-weight: 700; }
 .html-editor-content em { font-style: italic; }
 .html-editor-content span { background: rgba(255,204,0,.35); border-radius: 3px; }
+.html-editor-content code {
+	padding: .08em .3em;
+	border-radius: 4px;
+	background: var(--editor-bg);
+	font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+	font-size: .92em;
+}
 .html-editor-content a { color: var(--editor-blue); text-decoration: underline; }
 
 .html-editor-linkbar {

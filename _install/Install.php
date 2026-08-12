@@ -714,6 +714,15 @@ namespace Nino\Install {
 			foreach( ( $manifest['blacklist'] ?? [] ) as $key )
 				$blacklist[] = $key;
 
+			// A unit's own config defaults - only filled in where the project
+			// has nothing yet, never overwritten: re-applying a unit must not
+			// reset a value the developer has edited since
+			foreach( ( $manifest['config'] ?? [] ) as $configKey => $configValue )
+				if( isset( $appData[$configKey] ) === false ) {
+					$appData[$configKey] = $configValue;
+					\Nino\AppData::writeContentData( $appData, [ $configKey ] );
+				}
+
 			$globalFragment = $unitDir. '/text/global.php';
 			if( is_file( $globalFragment ) === true )
 				self::_mergeText( $appData, '/text/global.php', include $globalFragment );
@@ -1124,6 +1133,12 @@ namespace Nino\Install {
 		// instance's own meta is this developer's to write, and defaulting
 		// it to eg. "Home" would just be wrong the moment the same
 		// template gets mounted a second time under a different uri
+		// The priority a menu membership gets when nothing has set one yet -
+		// the middle of the range, same as Callbacks::registerCallback()'s own
+		// default, so a hand-written route can deliberately sort before or
+		// after everything this step writes
+		private const int DEFAULT_NAV_PRIO = 5;
+
 		private const array DEFAULT_TEXT = [
 			'name' 				=> 'Page',
 			'title' 			=> 'Page Title',
@@ -1156,14 +1171,85 @@ namespace Nino\Install {
 		 */
 		public static function apiList( array &$appData, array &$request ): void {
 
-			$locales = $appData['/nino/locales/available'] ?? [];
+			$locales 	= $appData['/nino/locales/available'] ?? [];
+			$navs 		= self::navKeys( $appData );
+			$routes 	= \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes'] ?? [];
+
+			// Each entry's menu membership is reported from the route it owns,
+			// not from the entry - the route is where it actually lives (see
+			// Modules\Navigation::routeLines()), so a membership added to
+			// config.php by hand shows up here instead of being overwritten by
+			// this list's older copy on the next apply
+			$webpages = array_map( function( array $entry ) use ( $routes, $navs ): array {
+				$entry['navs'] = self::entryNavs( $entry, $routes, $navs );
+				return $entry;
+			}, $appData['/nino/install/webpages'] ?? [] );
 
 			\Nino\Http::ok( $request, [
 				'templates' 	=> self::_templates( $locales ),
 				'locales' 		=> $locales,
-				'webpages' 		=> $appData['/nino/install/webpages'] ?? [],
-				'navModule' 	=> in_array( '\\Nino\\Modules\\Navigation', $appData['/nino/modules'] ?? [], true ),
+				'webpages' 		=> $webpages,
+				'navs' 				=> $navs,
 			] );
+		}
+
+		/**
+		 *	The navigations this project offers, in the order a menu picker
+		 *	should list them: '/nino/html/navs', a plain list of keys.
+		 *
+		 *	Purely an editing affordance - Modules\Navigation renders whatever
+		 *	key a template asks for, registered here or not, so a project that
+		 *	never writes this array loses nothing but the checkboxes. Empty
+		 *	while the Navigation module is inactive, which is what tells the
+		 *	frontend to offer no menu fields at all (the old 'navModule' flag
+		 *	said exactly that, and nothing else)
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	array										Nav keys, eg. [ 'main', 'footer' ]
+		 */
+		public static function navKeys( array &$appData ): array {
+
+			if( in_array( '\\Nino\\Modules\\Navigation', $appData['/nino/modules'] ?? [], true ) === false )
+				return [];
+
+			$navs = $appData['/nino/html/navs'] ?? [];
+
+			// A project from before this registry existed - or one whose array
+			// got emptied - still has the single menu the old generated fill
+			// was hardcoded to, so it keeps an editable one rather than none
+			if( is_array( $navs ) === false || count( $navs ) === 0 )
+				return [ 'main' ];
+
+			return array_values( array_unique( array_map( 'strval', $navs ) ) );
+		}
+
+		/**
+		 *	Which navigations one list entry currently belongs to.
+		 *
+		 *	Read from its route first, since that is what actually renders.
+		 *	'nav' =&gt; true is what a config written before per-menu membership
+		 *	existed carries, and means the first registered navigation - the
+		 *	single menu that entry could have been in back then
+		 *
+		 *	@param		array 		$entry				One webpages-list entry
+		 *	@param		array 		$routes				The persisted route array
+		 *	@param		array 		$navs					Registered nav keys (see navKeys())
+		 *
+		 *	@return 	array										Nav keys this entry belongs to
+		 */
+		public static function entryNavs( array $entry, array $routes, array $navs ): array {
+
+			$routeKey = 'GET://'. trim( (string) ( $entry['httpUri'] ?? '' ), '/' );
+			$onRoute 	= $routes[$routeKey]['navs'] ?? null;
+
+			if( is_array( $onRoute ) === true )
+				return array_values( array_intersect( $navs, array_keys( $onRoute ) ) );
+
+			if( isset( $entry['navs'] ) === true && is_array( $entry['navs'] ) === true )
+				return array_values( array_intersect( $navs, $entry['navs'] ) );
+
+			return ( $entry['nav'] ?? false ) === true ? array_slice( $navs, 0, 1 ) : [];
 		}
 
 		/**
@@ -1214,10 +1300,14 @@ namespace Nino\Install {
 		 *	see apiApply()'s $text loop - it just isn't what a freshly picked
 		 *	template should start from).
 		 *
+		 *	The menus a unit suggests for itself come from its manifest route's
+		 *	own 'navs' instead - a starting point for the form's checkboxes,
+		 *	exactly like the wording is for its text fields
+		 *
 		 *	@param		string		$libraryKey
 		 *	@param		array 		$locales			Picked locales
 		 *
-		 *	@return 	array			{ uri, text: { <locale>: { name, title, description } } }
+		 *	@return 	array			{ uri, navs, text: { <locale>: { name, title, description } } }
 		 */
 		private static function _suggestions( string $libraryKey, array $locales ): array {
 
@@ -1243,7 +1333,13 @@ namespace Nino\Install {
 					$uri = (string) ( $fragment[$prefix. 'uri]]'] ?? '' );
 			}
 
-			return [ 'uri' => $uri, 'text' => $text ];
+			$manifestRoute = array_values( ( self::_readManifest( self::LIBRARY. '/pages/'. $libraryKey ) ?? [] )['routes'] ?? [] )[0] ?? [];
+
+			return [
+				'uri' 	=> $uri,
+				'navs' 	=> array_keys( ( $manifestRoute['navs'] ?? [] ) ),
+				'text' 	=> $text,
+			];
 		}
 
 		/**
@@ -1291,6 +1387,7 @@ namespace Nino\Install {
 			$posted 		= is_array( $data['webpages'] ?? null ) ? $data['webpages'] : [];
 			$templates 	= self::_templates();
 			$locales 		= $appData['/nino/locales/available'] ?? [];
+			$navKeys 		= self::navKeys( $appData );
 
 			// Work from the persisted route array, never the live one polluted by
 			// /_install and module bootstrap routes. The previous Webpages list's
@@ -1301,6 +1398,14 @@ namespace Nino\Install {
 			$oldWebpages = $config['/nino/install/webpages'] ?? [];
 			$routes 		= $config['/nino/http/routes'] ?? [];
 			$foreignRoutes = $routes;
+
+			// Captured before the replace below strips this list's own route
+			// keys: a menu priority someone tuned on a route is not this
+			// step's to reset, only the membership set is (see _applyWebpage())
+			$navPrios = [];
+			foreach( $routes as $existingKey => $existingRoute )
+				if( is_array( $existingRoute['navs'] ?? null ) === true )
+					$navPrios[$existingKey] = $existingRoute['navs'];
 
 			foreach( $oldWebpages as $oldEntry )
 				foreach( self::_routeKeys( $oldEntry ) as $routeKey )
@@ -1399,12 +1504,20 @@ namespace Nino\Install {
 				if( $statusCode < 100 || $statusCode > 599 )
 					$statusCode = 200;
 
+				// Menu membership: kept on the entry as the editor's own copy,
+				// written onto the route by _applyWebpage() - that is where it
+				// renders from. 'nav' stays alongside it as a derived mirror so
+				// a downgrade to a version that only knows the boolean doesn't
+				// silently empty every menu
+				$navs = self::entryNavs( $item, [], $navKeys );
+
 				$webpages[] = [
 					'uri' 				=> $uri,
 					'httpUri' 		=> $httpUri,
 					'template' 		=> self::_templateFromBody( $routeBody ) ?? '',
 					'libraryKey' 	=> $libraryKey,
-					'nav' 				=> (bool) ( $item['nav'] ?? false ),
+					'navs' 				=> $navs,
+					'nav' 				=> count( $navs ) > 0,
 					'statusCode' 	=> $statusCode,
 					'body' 				=> $routeBody,
 					'text' 				=> $text,
@@ -1452,7 +1565,7 @@ namespace Nino\Install {
 				self::_applyModule( $appData, self::LIBRARY. '/modules/'. $moduleKey, $locales, $blacklist );
 
 			foreach( $webpages as $entry )
-				self::_applyWebpage( $appData, $entry, $locales, $routes, $blacklist );
+				self::_applyWebpage( $appData, $entry, $locales, $routes, $blacklist, $navPrios[ self::_routeKeys( $entry )[0] ?? '' ] ?? [] );
 
 			$appData['/nino/http/routes'] = $routes;
 
@@ -1464,7 +1577,6 @@ namespace Nino\Install {
 				} );
 
 			self::_applyLegalLink( $appData, $webpages, $locales );
-			self::_applyNavigation( $appData, $webpages, $locales );
 
 			\Nino\Http::ok( $request, [ 'webpages' => $webpages ] );
 		}
@@ -1645,7 +1757,7 @@ namespace Nino\Install {
 		 *
 		 *	@return 	void
 		 */
-		private static function _applyWebpage( array &$appData, array $entry, array $locales, array &$routes, array &$blacklist ): void {
+		private static function _applyWebpage( array &$appData, array $entry, array $locales, array &$routes, array &$blacklist, array $navPrios = [] ): void {
 
 			$routeKey 	= self::_routeKeys( $entry )[0] ?? null;
 			$libraryKey = self::_libraryKey( $entry );
@@ -1701,6 +1813,23 @@ namespace Nino\Install {
 					$route['statusCode'] = (int) $entry['statusCode'];
 
 				$routes[$routeKey] = $route;
+			}
+
+			// Menu membership belongs on the route: that is what
+			// Modules\Navigation::routeLines() reads, and it is the only copy
+			// that renders. Priorities already there - set by hand, or by a
+			// later navigation editor - survive: only the set of keys is
+			// rewritten from the entry, each keeping the priority it had
+			if( $routeKey !== null && isset( $routes[$routeKey] ) === true ) {
+
+				$navs = [];
+				foreach( ( $entry['navs'] ?? [] ) as $navKey )
+					$navs[$navKey] = $navPrios[$navKey] ?? ( $routes[$routeKey]['navs'][$navKey] ?? self::DEFAULT_NAV_PRIO );
+
+				if( count( $navs ) > 0 )
+					$routes[$routeKey]['navs'] = $navs;
+				else
+					unset( $routes[$routeKey]['navs'] );
 			}
 
 			// The entry's own meta, whichever tool created it - this is what
@@ -1767,6 +1896,15 @@ namespace Nino\Install {
 			foreach( ( $manifest['blacklist'] ?? [] ) as $key )
 				$blacklist[] = $key;
 
+			// A unit's own config defaults - only filled in where the project
+			// has nothing yet, never overwritten: re-applying a unit must not
+			// reset a value the developer has edited since
+			foreach( ( $manifest['config'] ?? [] ) as $configKey => $configValue )
+				if( isset( $appData[$configKey] ) === false ) {
+					$appData[$configKey] = $configValue;
+					\Nino\AppData::writeContentData( $appData, [ $configKey ] );
+				}
+
 			$globalFragment = $unitDir. '/text/global.php';
 			if( is_file( $globalFragment ) === true )
 				self::_mergeText( $appData, '/text/global.php', include $globalFragment );
@@ -1814,42 +1952,6 @@ namespace Nino\Install {
 		}
 
 		/**
-		 *	Regenerates the site's main-menu text (see
-		 *	_install/library/modules/navigation/templates/html-header-nav.tpl
-		 *	and html-footer-nav.tpl's [[/website/navigation/main]] fill) from
-		 *	every entry with 'nav' checked, one "httpUri:name" line per entry
-		 *	- the exact shape \Nino\Modules\Navigation's [navigation]...
-		 *	[/navigation] shortcode already expects. httpUri, not Element-
-		 *	URI, since this becomes an actual href. Only runs while the
-		 *	Navigation module is active; overwrites rather than merges,
-		 *	unlike every other piece of text this class writes - it's fully
-		 *	derived from the current list, not something a developer is
-		 *	expected to have hand-edited before finishing the wizard
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		array 		$webpages			The just-applied, current webpages list
-		 *	@param		array 		$locales			Picked locales
-		 *
-		 *	@return 	void
-		 */
-		private static function _applyNavigation( array &$appData, array $webpages, array $locales ): void {
-
-			if( in_array( '\\Nino\\Modules\\Navigation', $appData['/nino/modules'] ?? [], true ) === false )
-				return;
-
-			$navEntries = array_values( array_filter( $webpages, fn( array $e ): bool => ( $e['nav'] ?? false ) === true ) );
-
-			foreach( $locales as $locale ) {
-
-				$lines = [];
-				foreach( $navEntries as $entry )
-					$lines[] = $entry['httpUri']. ':'. ( $entry['text'][$locale]['name'] ?? self::DEFAULT_TEXT['name'] );
-
-				self::_setText( $appData, '/text/'. $locale. '.php', '[[/website/navigation/main]]', implode( PHP_EOL, $lines ) );
-			}
-		}
-
-		/**
 		 *	Merge a text fragment's keys into a /text/*.php file - later
 		 *	units win a key collision
 		 *
@@ -1869,11 +1971,11 @@ namespace Nino\Install {
 		 *	Set (overwrite) a single text key - unlike _mergeText(), used
 		 *	only for fully-derived content that has to track its source on
 		 *	every apply() rather than merge on top of a possibly-stale
-		 *	previous value (see _applyNavigation()'s docblock)
+		 *	previous value (see _applyLegalLink())
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		string		$path					Filesystem-relative path, eg. '/text/de_DE.php'
-		 *	@param		string		$bracketKey		Eg. '[[/website/navigation/main]]'
+		 *	@param		string		$bracketKey		Eg. '[[/website/legal/name]]'
 		 *	@param		string		$value
 		 *
 		 *	@return 	void

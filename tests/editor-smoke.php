@@ -212,11 +212,11 @@ echo "Text::apiSaveBatch - sanitizing\n";
 $result = saveText( $appData, [
 	'key' 		=> '/home/h2',
 	'locale' 	=> 'de_DE',
-	'value' 	=> '<strong><em>Bold Italic</em></strong> <script>alert(1)</script> <a href="javascript:alert(2)">bad</a> <a href="/ok">good</a> <img src=x onerror=alert(3)>',
+	'value' 	=> '<strong><em>Bold Italic</em></strong> <code>const x = 1;</code> <script>alert(1)</script> <a href="javascript:alert(2)">bad</a> <a href="/ok">good</a> <img src=x onerror=alert(3)>',
 ] );
 
 check( 'save succeeds', $result['ok'] === true );
-check( 'nested tags collapse to a single level', ( $result['value'] ?? '' ) === '<strong>Bold Italic</strong>  bad <a href="/ok">good</a> ' );
+check( 'nested tags collapse to a single level and inline code survives', ( $result['value'] ?? '' ) === '<strong>Bold Italic</strong> <code>const x = 1;</code>  bad <a href="/ok">good</a> ' );
 check( 'script tag never reaches the stored value', str_contains( $result['value'] ?? '', '<script' ) === false );
 check( 'javascript: href never reaches the stored value', str_contains( $result['value'] ?? '', 'javascript:' ) === false );
 check( 'img tag never reaches the stored value', str_contains( $result['value'] ?? '', '<img' ) === false );
@@ -236,84 +236,6 @@ $result = saveText( $appData, [ 'key' => '/company/name', 'locale' => '*', 'valu
 check( 'saving a global key succeeds', $result['ok'] === true );
 $storedGlobal = \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] );
 check( 'a global key is written to global.php, not a locale file', ( $storedGlobal['[[/company/name]]'] ?? '' ) === 'New Co' );
-
-echo "\n";
-
-
-// --- Text::apiExport/apiImport: translation round-trip -----------------------
-
-echo "Text::apiExport/apiImport - translation round-trip\n";
-
-$request = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-$_POST['data'] = json_encode( [ 'locale' => 'de_DE' ] );
-\Nino\Editor\Text::apiExport( $appData, $request );
-check( 'export succeeds', $request['/nino/http/response']['statusCode'] === 200 );
-check( 'export returns the locale file\'s own raw content', ( $request['/nino/http/response']['body']['content']['[[/home/plain]]'] ?? null ) === 'Acme Corp x' );
-
-$request = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-$_POST['data'] = json_encode( [ 'locale' => 'xx_XX' ] );
-\Nino\Editor\Text::apiExport( $appData, $request );
-check( 'export rejects an invalid locale', $request['/nino/http/response']['statusCode'] === 400 );
-
-$request = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-$_POST['data'] = json_encode( [
-	'locale' 	=> 'en_US',
-	'content' => [
-		'[[/home/h2]]' 			=> '<strong><em>Translated</em></strong><script>x</script>',
-		'[[/home/brand-new]]' 	=> 'A <b>brand-new</b> key',
-		'[[/home/nested]]' 		=> [ 'not' => 'a scalar' ],
-	],
-] );
-\Nino\Editor\Text::apiImport( $appData, $request );
-check( 'import succeeds', $request['/nino/http/response']['statusCode'] === 200 );
-check( 'import reports valid and structurally-invalid values separately', $request['/nino/http/response']['body'] === [ 'imported' => 2, 'skipped' => 1 ] );
-
-$enUs = \Nino\Filesystem::getFileContent( $appData, '/text/en_US.php', [] );
-check( 'an imported known html key uses the same whitelist sanitizer as a regular save', $enUs['[[/home/h2]]'] === '<strong>Translated</strong>' );
-check( 'a brand-new import key is treated as plain text, not trusted html', $enUs['[[/home/brand-new]]'] === 'A brand-new key' );
-check( 'a nested import value is skipped instead of being coerced to the string "Array"', isset( $enUs['[[/home/nested]]'] ) === false );
-
-$request = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-$_POST['data'] = json_encode( [
-	'locale' 	=> 'de_DE',
-	'content' => [ '[[/home/plain]]' => 'Geänderter Satz', '[[/website/lang]]' => 'HACKED' ],
-] );
-\Nino\Editor\Text::apiImport( $appData, $request );
-check( 'import with a mix of keys still succeeds overall', $request['/nino/http/response']['statusCode'] === 200 );
-check( 'a blacklisted key in the import is silently skipped, the rest still imports', $request['/nino/http/response']['body'] === [ 'imported' => 1, 'skipped' => 1 ] );
-
-$deDe = \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] );
-check( 'the blacklisted key was NOT written despite being in the import', isset( $deDe['[[/website/lang]]'] ) === false );
-check( 'the non-blacklisted key from the same import was written', $deDe['[[/home/plain]]'] === 'Geänderter Satz' );
-
-// A global key is shared by every locale and lives in global.php alone (see
-// the saveBatch check above). Importing one into a locale file would shadow it
-// for that locale only - live on the site, but invisible in the Text panel,
-// which reads a global entry from global.php - so it is skipped, not written
-$request = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-$_POST['data'] = json_encode( [
-	'locale' 	=> 'de_DE',
-	'content' => [ '[[/company/name]]' => 'Andere GmbH', '[[/home/plain]]' => 'Noch ein Satz' ],
-] );
-\Nino\Editor\Text::apiImport( $appData, $request );
-check( 'import counts a global key as skipped, not imported', $request['/nino/http/response']['body'] === [ 'imported' => 1, 'skipped' => 1 ] );
-
-$deDe 				= \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] );
-$storedGlobal = \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] );
-check( 'a global key from an import does not become a locale-shadowing entry', isset( $deDe['[[/company/name]]'] ) === false );
-check( 'the global value itself is left untouched by the import', ( $storedGlobal['[[/company/name]]'] ?? '' ) === 'New Co' );
-check( 'the locale key from the same import was still written', $deDe['[[/home/plain]]'] === 'Noch ein Satz' );
-
-$request = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-$_POST['data'] = json_encode( [ 'locale' => 'de_DE', 'content' => [ '[[/home/plain]]' => str_repeat( 'x', 21000 ) ] ] );
-\Nino\Editor\Text::apiImport( $appData, $request );
-$deDe = \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] );
-check( 'import enforces the same hard 20,000-byte limit as a regular save', strlen( $deDe['[[/home/plain]]'] ?? '' ) === 20000 );
-
-$request = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-$_POST['data'] = json_encode( [ 'locale' => 'de_DE', 'content' => [] ] );
-\Nino\Editor\Text::apiImport( $appData, $request );
-check( 'import rejects empty content', $request['/nino/http/response']['statusCode'] === 400 );
 
 echo "\n";
 

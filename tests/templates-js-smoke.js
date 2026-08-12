@@ -94,7 +94,11 @@ const previewDocument = Nino.templates.composer.previewDocument( '<section id="s
 check( 'preview documents load the project bundle around generated section HTML', previewDocument.includes( '/.cache/style.css' ) && previewDocument.includes( '<section id="sample"></section>' ) );
 check( 'preview documents block scripts, forms and third-party network access', previewDocument.includes( 'Content-Security-Policy' ) && previewDocument.includes( "script-src 'none'" ) && previewDocument.includes( "form-action 'none'" ) );
 
+const composerSource = fs.readFileSync( path.join( __dirname, '../_templates/assets/composer.js' ), 'utf8' );
 const templateMarkup = fs.readFileSync( path.join( __dirname, '../_templates/templates/page-index.tpl' ), 'utf8' );
+const sandboxAssignments = composerSource.match( /iframe\.setAttribute\(\s*'sandbox',\s*PREVIEW_SANDBOX\s*\)/g ) || [];
+check( 'gallery and detail preview code retain the project origin without enabling scripts', composerSource.includes( "const PREVIEW_SANDBOX = 'allow-same-origin'" ) && sandboxAssignments.length === 2 );
+check( 'the initial detail preview uses the same project-origin sandbox', templateMarkup.includes( 'sandbox="allow-same-origin"' ) && templateMarkup.includes( 'sandbox=""' ) === false );
 check( 'new-template UI asks for filename, name, shell slots and VPA', [ 'pd-create-filename', 'pd-create-name', 'pd-create-header', 'pd-create-footer', 'pd-create-vpa' ].every( function( id ) { return templateMarkup.includes( 'id="'+ id+ '"' ) } ) );
 check( 'the primary toolbar exposes one Add Section entry point', templateMarkup.includes( 'id="pd-add-section"' ) && templateMarkup.includes( 'id="pd-add-template"' ) === false );
 

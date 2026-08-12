@@ -207,8 +207,6 @@ namespace Nino\Editor {
 				'elements/delete' 	=> [ Elements::class, 'apiDelete' ],
 				'text/keys' 				=> [ Text::class, 'apiKeys' ],
 				'text/savebatch' 	=> [ Text::class, 'apiSaveBatch' ],
-				'text/export' 			=> [ Text::class, 'apiExport' ],
-				'text/import' 			=> [ Text::class, 'apiImport' ],
 				'users/list' 			=> [ Users::class, 'apiList' ],
 				'users/save' 			=> [ Users::class, 'apiSave' ],
 				'users/logoutall' => [ Users::class, 'apiLogoutAll' ],
@@ -256,7 +254,6 @@ namespace Nino\Editor {
 				'elements/uploadimage' => 'Upload Element Image /'. ( $data['type'] ?? '' ). '/'. ( $data['uri'] ?? '' ). ' '. ( $data['key'] ?? '' ),
 				'elements/delete' => 'Delete Element /'. ( $data['type'] ?? '' ). '/'. ( $data['uri'] ?? '' ),
 				'text/savebatch' 	=> 'Edit Text /'. self::_textCategory( is_array( $data['items'] ?? null ) ? $data['items'] : [] ),
-				'text/import' 			=> 'Import Text '. ( $data['locale'] ?? '' ),
 				'users/save' 			=> 'Edit User '. ( trim( (string) ( $data['mail'] ?? '' ) ) !== '' ? $data['mail'] : ( $data['username'] ?? '' ) ),
 				'users/logoutall' => 'Logout-All '. ( $data['username'] ?? '' ),
 				'users/permissions' => 'Edit Permissions '. ( $data['username'] ?? '' ),
@@ -994,129 +991,6 @@ namespace Nino\Editor {
 			\Nino\Http::ok( $request, [ 'results' => \Nino\Text::saveBatch( $appData, $items, false ) ] );
 		}
 
-		/**
-		 *	Export one locale's raw file content (the same bracket-keyed array
-		 *	the file itself stores) for an external translation round-trip -
-		 *	see apiImport(). Deliberately per-locale-file, not the merged
-		 *	apiKeys() view: global.php holds locale-independent values
-		 *	(address, phone, ...) that should never be translated, so it's
-		 *	never part of this export
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		array 		&$request			(reference) Current server request
-		 *
-		 *	@return 	void
-		 */
-		public static function apiExport( array &$appData, array &$request ): void {
-
-			if( Editor::guardPerm( $appData, $request, self::MANAGE_PERM ) === false )
-				return;
-
-			$locale = (string) ( Editor::postData()['locale'] ?? '' );
-
-			if( \Nino\Locales::verifyLocale( $appData, $locale ) === false ) {
-				\Nino\Http::fail( $request, 400, 'invalid locale' );
-				return;
-			}
-
-			\Nino\Http::ok( $request, [
-				'locale' 	=> $locale,
-				'content' => \Nino\Filesystem::getFileContent( $appData, '/text/'. $locale. '.php', [] ),
-			] );
-		}
-
-		/**
-		 *	Import a translated locale file - written by pasting apiExport()'s
-		 *	JSON output, round-tripped through an external LLM translation,
-		 *	back in. Merges into the target locale's existing content rather
-		 *	than replacing it wholesale (a key the import doesn't mention
-		 *	stays as-is) and silently skips any blacklisted key even if
-		 *	present in the import, since those are routing/technical values
-		 *	(uris, colors, ...) an LLM asked to "translate everything" could
-		 *	otherwise corrupt
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		array 		&$request			(reference) Current server request
-		 *
-		 *	@return 	void
-		 */
-		public static function apiImport( array &$appData, array &$request ): void {
-
-			if( Editor::guardPerm( $appData, $request, self::MANAGE_PERM ) === false )
-				return;
-
-			$data 		= Editor::postData();
-			$locale 	= (string) ( $data['locale'] ?? '' );
-			$content 	= $data['content'] ?? null;
-
-			if( \Nino\Locales::verifyLocale( $appData, $locale ) === false ) {
-				\Nino\Http::fail( $request, 400, 'invalid locale' );
-				return;
-			}
-
-			if( is_array( $content ) === false || count( $content ) === 0 ) {
-				\Nino\Http::fail( $request, 400, 'empty or invalid content' );
-				return;
-			}
-
-			$blacklist 		= \Nino\Text::blacklist( $appData );
-			$entriesByKey 	= array_column( \Nino\Text::entries( $appData, false ), null, 'key' );
-			$changes 			= [];
-			$imported 			= 0;
-			$skipped 			= 0;
-
-			foreach( $content as $bracketKey => $value ) {
-
-				if( is_string( $bracketKey ) === false || preg_match( '/^\[\[[^\[\]]+\]\]$/', $bracketKey ) !== 1 || ( is_scalar( $value ) === false && $value !== null ) ) {
-					$skipped++;
-					continue;
-				}
-
-				$key = trim( $bracketKey, '[]' );
-				if( isset( $blacklist[$key] ) === true ) {
-					$skipped++;
-					continue;
-				}
-
-				$entry = $entriesByKey[$key] ?? null;
-
-				// A global key lives in /text/global.php and is shared by every
-				// locale - saveBatch() routes it there for exactly that reason.
-				// Writing it into the target locale file instead would shadow the
-				// global value for this one locale: live on the site (getFills()
-				// merges the locale file over global.php), yet invisible in the
-				// Text panel, which reads a global entry's value from global.php
-				// alone - so it could never be corrected or removed from the ui
-				// again. apiExport() only ever hands out the locale file, so a
-				// genuine round-trip never carries one to begin with
-				if( ( $entry['global'] ?? false ) === true ) {
-					$skipped++;
-					continue;
-				}
-
-				// A key known from any locale keeps its established html/plain
-				// contract. A genuinely new migration key is imported as plain text
-				// until a developer deliberately defines formatted content for it.
-				$changes[$bracketKey] = \Nino\Text::sanitizeValue( (string) $value, ( $entry['html'] ?? false ) === true );
-				$imported++;
-			}
-
-			if( $changes === [] ) {
-				\Nino\Http::fail( $request, 400, 'no valid content' );
-				return;
-			}
-
-			$written = \Nino\Filesystem::mutate( $appData, '/text/'. $locale. '.php', function( array $existing ) use ( $changes ): array {
-				return array_merge( $existing, $changes );
-			} );
-
-			if( $written === false ) {
-				\Nino\Http::fail( $request, 500, 'import could not be written' );
-				return;
-			}
-
-			\Nino\Http::ok( $request, [ 'imported' => $imported, 'skipped' => $skipped ] );
-		}
 	}
 
 	/**

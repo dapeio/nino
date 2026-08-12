@@ -200,6 +200,7 @@ body {
 #admin-page-wrap.show-types #admin-content-types,
 #admin-page-wrap.show-elements #admin-content-elements,
 #admin-page-wrap.show-text #admin-content-text,
+#admin-page-wrap.show-translations #admin-content-translations,
 #admin-page-wrap.show-pages #admin-content-pages,
 #admin-page-wrap.show-images #admin-content-images,
 #admin-page-wrap.show-users #admin-content-users,
@@ -328,16 +329,170 @@ body {
 	flex: 1 1 10rem;
 }
 
+/* One row's own controls: reorder on the left, remove pushed to the right */
+.admin-field-actions {
+	display: flex;
+	align-items: center;
+	gap: .5rem;
+}
+
+.admin-field-actions .red {
+	margin-left: auto;
+}
+
+/* Own copy of .admin-page-move's rules rather than a shared class - same
+   standalone-per-area convention .install-webpage-move already follows */
+.admin-field-move {
+	flex: 0 0 auto;
+	display: flex;
+	gap: .25rem;
+}
+
+.admin-field-move button {
+	width: 1.75rem;
+	height: 1.75rem;
+	min-height: 0;
+	padding: 0;
+	border-radius: var(--editor-radius-sm);
+	border: 1px solid var(--editor-border);
+	background: var(--editor-bg-elevated);
+	color: var(--editor-text);
+	font: inherit;
+	line-height: 1;
+	box-shadow: none;
+	cursor: pointer;
+}
+
+.admin-field-move button:disabled {
+	opacity: .35;
+	cursor: default;
+}
+
 .admin-error {
 	color: var(--editor-red);
 	font-weight: 600;
 }
 
-/* --------------------------------------------------------------- Pages tab */
+.admin-success {
+	color: var(--editor-green);
+	font-weight: 600;
+}
 
-#pages-list > ul {
+/* ------------------------------------------------------------ Translations */
+
+.admin-translations-intro {
+	max-width: 48rem;
+	margin-bottom: 1.5rem;
+}
+
+.admin-translations-intro > span {
+	display: inline-flex;
+	margin-bottom: .65rem;
+	padding: .3rem .6rem;
+	border-radius: 999px;
+	background: var(--editor-blue-soft);
+	color: var(--editor-blue);
+	font-size: .72rem;
+	font-weight: 750;
+	letter-spacing: .06em;
+	text-transform: uppercase;
+}
+
+.admin-translations-intro h1 {
+	margin: 0 0 .55rem;
+	font-size: clamp(1.65rem, 4vw, 2.35rem);
+	line-height: 1.08;
+	letter-spacing: -.045em;
+}
+
+.admin-translations-intro p,
+.admin-translation-card-copy p {
+	margin: 0;
+	color: var(--editor-text-secondary);
+	line-height: 1.55;
+}
+
+.admin-translations-flow {
+	display: grid;
+	gap: 1rem;
+}
+
+.admin-translation-card {
+	display: grid;
+	grid-template-columns: auto minmax(0, 1fr);
+	gap: .9rem 1rem;
+	align-items: start;
+	padding: clamp(1rem, 3vw, 1.5rem);
+	border: 1px solid var(--editor-border);
+	border-radius: var(--editor-radius);
+	background: var(--editor-bg-grouped);
+	box-shadow: var(--editor-shadow-sm);
+}
+
+.admin-step-number {
+	display: grid;
+	place-items: center;
+	width: 2rem;
+	height: 2rem;
+	border-radius: .7rem;
+	background: var(--editor-blue);
+	color: #fff;
+	font-size: .85rem;
+	font-weight: 800;
+}
+
+.admin-translation-card-copy h2 {
+	margin: .15rem 0 .35rem;
+	font-size: 1.05rem;
+}
+
+.admin-translation-card > button,
+.admin-translation-fields {
+	grid-column: 2;
+}
+
+.admin-translation-card > button {
+	margin-top: .1rem;
+}
+
+.admin-translation-fields {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 0 1rem;
+}
+
+.admin-translation-json {
+	grid-column: 1 / -1;
+}
+
+#translations-json {
+	font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+	font-size: .82rem;
+	line-height: 1.5;
+	resize: vertical;
+	tab-size: 2;
+}
+
+#translations-message {
+	min-height: 1.4em;
+	margin: .85rem 0 0;
+	font-size: .88rem;
+}
+
+/* ---------------------------------------------------- Drill-down list rows */
+
+/* The shared _editor sheet presents these containers as card grids. Admin's
+   list-heavy workflow stays denser: one scan-friendly grouped panel, matching
+   Config, with a single visual affordance for every row that opens a view. */
+#admin-content-elements #elements-types,
+#admin-content-text #text-list,
+#admin-content-images #images-list {
+	display: block;
+}
+
+.admin-drill-list {
 	list-style: none;
-	margin: 0 0 .75rem;
+	margin: 0;
 	padding: 0;
 	background: var(--editor-bg-grouped);
 	border: 1px solid var(--editor-border);
@@ -346,32 +501,104 @@ body {
 	overflow: hidden;
 }
 
-#pages-list > ul li {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
+.admin-drill-list li {
 	border-bottom: 1px solid var(--editor-separator);
 }
 
-#pages-list > ul li:last-child {
+.admin-drill-list li:last-child {
 	border-bottom: none;
 }
 
-#pages-list > ul li a {
-	display: block;
-	flex: 1 1 auto;
-	min-width: 0;
-	padding: .9rem 1rem;
-	font-family: ui-monospace, monospace;
-	font-size: .85rem;
+.admin-drill-list li a {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: .75rem;
+	min-height: 50px;
+	padding: .85rem 1rem;
+	box-sizing: border-box;
 	color: var(--editor-text);
+	transition: background-color .15s ease;
+}
+
+.admin-drill-list li a::after {
+	content: "›";
+	flex: 0 0 auto;
+	color: var(--editor-text-secondary);
+	font-size: 1.2rem;
+	line-height: 1;
+	transition: transform .15s ease, color .15s ease;
+}
+
+.admin-drill-list li a:hover,
+.admin-drill-list li a:active,
+.admin-drill-list li a.active {
+	background: var(--editor-blue-soft);
+}
+
+.admin-drill-list li a:hover::after,
+.admin-drill-list li a.active::after {
+	color: var(--editor-blue);
+	transform: translateX(.15rem);
+}
+
+.admin-drill-list li a:focus-visible {
+	outline: none;
+	box-shadow: inset 0 0 0 2px var(--editor-blue);
+}
+
+.admin-list-copy {
+	display: grid;
+	gap: .15rem;
+	min-width: 0;
+}
+
+.admin-list-copy strong,
+.admin-list-copy small {
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
 }
 
-#pages-list > ul li:hover {
-	background: var(--editor-blue-soft);
+.admin-list-copy strong {
+	font-size: .9rem;
+	font-weight: 650;
+}
+
+.admin-list-copy small {
+	color: var(--editor-text-secondary);
+	font-size: .78rem;
+	line-height: 1.35;
+}
+
+.admin-list-action--before {
+	margin: 0 0 .75rem;
+}
+
+/* --------------------------------------------------------------- Pages tab */
+
+#pages-list > ul {
+	margin: 0 0 .75rem;
+}
+
+#pages-list > ul li {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+}
+
+#pages-list > ul li a {
+	flex: 1 1 auto;
+	min-width: 0;
+	font-family: ui-monospace, monospace;
+	font-size: .85rem;
+}
+
+.admin-page-label {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
 .admin-page-move {
@@ -384,6 +611,9 @@ body {
 .admin-page-move button {
 	width: 1.75rem;
 	height: 1.75rem;
+	/* The shared button rule's 44px touch target would stretch this into a
+	   pill - an icon button this small is meant to stay square */
+	min-height: 0;
 	padding: 0;
 	border-radius: var(--editor-radius-sm);
 	border: 1px solid var(--editor-border);
@@ -438,40 +668,9 @@ body {
 
 /* -------------------------------------------------------------- Config tab */
 
-#config-list > ul,
-#text-list > ul {
-	list-style: none;
-	margin: 0;
-	padding: 0;
-	background: var(--editor-bg-grouped);
-	border: 1px solid var(--editor-border);
-	border-radius: var(--editor-radius);
-	box-shadow: var(--editor-shadow);
-	overflow: hidden;
-}
-
-#config-list > ul li,
-#text-list > ul li {
-	border-bottom: 1px solid var(--editor-separator);
-}
-
-#config-list > ul li:last-child,
-#text-list > ul li:last-child {
-	border-bottom: none;
-}
-
-#config-list > ul li a,
-#text-list > ul li a {
-	display: block;
-	padding: .85rem 1rem;
+#config-list > .admin-drill-list li a {
 	font-family: ui-monospace, monospace;
 	font-size: .85rem;
-	color: var(--editor-text);
-}
-
-#config-list > ul li a:hover,
-#text-list > ul li a:hover {
-	background: var(--editor-blue-soft);
 }
 
 /* ---------------------------------------------------------------- Users tab */
@@ -629,9 +828,23 @@ button.red {
 }
 #admin-dashboard-types a {
 	display: block;
+	position: relative;
+	padding-right: 1.25rem;
 	text-decoration: none;
 	color: inherit;
 	cursor: pointer;
+}
+
+#admin-dashboard-types a::after,
+#admin-dashboard-summary a::after {
+	content: "›";
+	position: absolute;
+	top: 50%;
+	right: 0;
+	color: var(--editor-text-secondary);
+	font-size: 1.1rem;
+	line-height: 1;
+	transform: translateY(-50%);
 }
 
 #admin-dashboard-summary {
@@ -641,6 +854,12 @@ button.red {
 	display: flex;
 	flex-direction: column;
 	gap: .5rem;
+}
+
+#admin-dashboard-summary a {
+	display: block;
+	position: relative;
+	padding-right: 1.25rem;
 }
 
 .admin-dashboard-row {
@@ -811,6 +1030,14 @@ button.red {
 		font-size: .8rem;
 	}
 
+	/*	Square icon buttons keep their own size - the compact padding above
+		would stretch them the same way the shared 44px target does */
+	#admin-content-wrap .admin-page-move button,
+	#admin-content-wrap .admin-field-move button {
+		min-height: 0;
+		padding: 0;
+	}
+
 	#admin-content-wrap .admin-field-row {
 		gap: .35rem;
 		margin-bottom: .6rem;
@@ -972,6 +1199,19 @@ button.red {
 }
 
 @media (max-width: 36rem) {
+	.admin-translation-card {
+		grid-template-columns: 1fr;
+	}
+
+	.admin-translation-card > button,
+	.admin-translation-fields {
+		grid-column: 1;
+	}
+
+	.admin-translation-fields {
+		grid-template-columns: 1fr;
+	}
+
 	#admin-bar-actions {
 		gap: .5rem;
 		font-size: .78rem;

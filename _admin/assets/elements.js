@@ -261,7 +261,7 @@
 		},
 
 		/**
-		 *	Render the list of element types as buttons
+		 *	Render the list of element types as drill-down rows
 		 *
 		 *	@param		{Array}		types					[ { type, title, descr, model }, ... ]
 		 *
@@ -280,33 +280,34 @@
 				return;
 			}
 
+			const ul = dc.createElement('ul');
+			ul.className = 'admin-drill-list';
+
 			types.forEach( function( entry ) {
 
-				const btn = dc.createElement('button');
-				btn.type = 'button';
-				btn.className = 'editor-type-btn';
-				btn.dataset.type = entry.type;
-				btn.classList.toggle( 'active', entry.type === Nino.admin.elements._currentType );
+				const li = dc.createElement('li');
+				const link = dc.createElement('a');
+				link.href = '#';
+				link.dataset.type = entry.type;
+				link.classList.toggle( 'active', entry.type === Nino.admin.elements._currentType );
 
-				const titleWrap = dc.createElement('div');
-				titleWrap.textContent = entry.title;
+				const copy = dc.createElement('span');
+				copy.className = 'admin-list-copy';
+				const title = dc.createElement('strong');
+				title.textContent = entry.title;
 
-				const descr = dc.createElement('div');
-				descr.className = 'editor-type-btn-descr';
+				const descr = dc.createElement('small');
 				descr.textContent = entry.descr;
-				titleWrap.appendChild( descr );
+				copy.appendChild( title );
+				copy.appendChild( descr );
+				link.appendChild( copy );
 
-				const chev = dc.createElement('span');
-				chev.className = 'editor-view-button-chev';
-				chev.setAttribute( 'aria-hidden', 'true' );
-				chev.textContent = '›';
-
-				btn.appendChild( titleWrap );
-				btn.appendChild( chev );
-				btn.addEventListener( 'click', function() { Nino.admin.elements._selectType( entry.type, entry.model, entry.title ) } );
-
-				wrap.appendChild( btn );
+				link.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.elements._selectType( entry.type, entry.model, entry.title ) } );
+				li.appendChild( link );
+				ul.appendChild( li );
 			} );
+
+			wrap.appendChild( ul );
 		},
 
 		/**
@@ -334,7 +335,7 @@
 			Nino.admin.elements._destroyHtmlEditors();
 			dc.getElementById('elements-form').innerHTML = '';
 
-			dc.querySelectorAll('#elements-types .editor-type-btn').forEach( function( btn ) { btn.classList.toggle( 'active', btn.dataset.type === type ) } );
+			dc.querySelectorAll('#elements-types .admin-drill-list a').forEach( function( link ) { link.classList.toggle( 'active', link.dataset.type === type ) } );
 
 			Nino.admin.elements._apiCall( 'list', { type : type }, function( status, response ) {
 				if( requestId !== Nino.admin.elements._listRequest || type !== Nino.admin.elements._currentType )
@@ -377,6 +378,7 @@
 			wrap.appendChild( uri );
 
 			const ul = dc.createElement('ul');
+			ul.className = 'admin-drill-list';
 			elements.forEach( function( element ) {
 				const li 		= dc.createElement('li');
 				const link	= dc.createElement('a');
@@ -458,18 +460,25 @@
 		 *	@param		{Object}	field					Model field definition ({ type, ... })
 		 *	@param		{*}				value					Current value
 		 *
-		 *	@return		{Element}								<label> wrapping the input
+		 *	@return		{Element}								Field wrapper
 		 */
 		_renderField : function( key, field, value ) {
 
-			const label = dc.createElement('label');
-			label.className = 'editor-field';
-
 			const displayName = Nino.admin.elements._fieldLabel( key );
+			const isHtml = field.type === 'string' && field.html === true;
+			// A contenteditable inside <label> is invalid interactive markup and
+			// can make drag-selection fail in Safari. Rich text gets a semantic
+			// group; ordinary controls retain their native label wrapper.
+			const label = dc.createElement( isHtml ? 'div' : 'label' );
+			label.className = 'editor-field';
+			if( isHtml ) {
+				label.setAttribute( 'role', 'group' );
+				label.setAttribute( 'aria-label', displayName );
+			}
 
 			// A string field with html: true gets the same minimal rich-text editor
 			// as Text's html-flagged keys, sanitized the same way server-side on save
-			if( field.type === 'string' && field.html === true ) {
+			if( isHtml ) {
 				const span = dc.createElement('span');
 				span.textContent = displayName;
 				label.appendChild( span );

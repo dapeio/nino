@@ -24,6 +24,7 @@
 		'/nino/locales/native' 			: 'Native language of the site, eg. "de_DE".',
 		'/nino/locales/available' 	: 'List of available languages, eg. ["de_DE", "en_US"].',
 		'/nino/html/assets' 				: 'Bundle name -> list of files bundled together.',
+		'/nino/html/navs' 					: 'Menus the page editors offer a checkbox for, eg. ["main", "footer"]. A route joins one via its own "navs" key.',
 		'/nino/http/routes' 				: 'Routing table: "METHOD://uri" -> { uri, body, statusCode, locale }.',
 	};
 
@@ -123,6 +124,7 @@
 			wrap.innerHTML = '';
 
 			const ul = dc.createElement('ul');
+			ul.className = 'admin-drill-list';
 			Object.keys( Nino.admin.config._values ).forEach( function( key ) {
 				const li 		= dc.createElement('li');
 				const link	= dc.createElement('a');

@@ -372,7 +372,7 @@ $wpLibraryBody = $wpLibraryRequest['/nino/http/response']['body'];
 check( 'lists every page template, one per _install/library/pages/<key>', in_array( 'home', array_keys( $wpLibraryBody['templates'] ), true ) === true && in_array( 'contact', array_keys( $wpLibraryBody['templates'] ), true ) === true );
 check( '"contact" declares it requires "forms"', $wpLibraryBody['templates']['contact']['requiresModules'] === [ 'forms' ] );
 check( 'starts with an empty list - nothing persisted yet', $wpLibraryBody['webpages'] === [] );
-check( 'navModule is false - Navigation was never picked', $wpLibraryBody['navModule'] === false );
+check( 'no navigations are offered - Navigation was never picked', $wpLibraryBody['navs'] === [] );
 
 // Each template also reports the starter wording its own text fragments
 // ship, so the form can prefill a new entry per locale instead of leaving
@@ -498,9 +498,21 @@ $navWpApplyRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 $deAfterNav = \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] );
 $enAfterNav = \Nino\Filesystem::getFileContent( $appData, '/text/en_US.php', [] );
 
-check( 'generates the main-menu fill once Navigation is active, one line per nav-checked entry, keyed by Http-URI', $deAfterNav['[[/website/navigation/main]]'] === "/:Start\n/kontakt:Kontakt" );
-check( 'the non-nav entry (legal) is left out of the generated menu', str_contains( $deAfterNav['[[/website/navigation/main]]'], 'impressum' ) === false );
-check( 'generates a separate line-up per locale, using that locale\'s own name', $enAfterNav['[[/website/navigation/main]]'] === "/:Home\n/kontakt:Contact" );
+// Menu membership lives on the route each entry owns, not in a generated
+// textfill - see \Nino\Modules\Navigation::routeLines(). Nothing is written
+// per locale here at all: the menu is built per request, from the same
+// /webpage<uri>/name keys the entries already carry
+$routesAfterNav = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes'];
+
+check( 'the Navigation module registers the menus the editors offer', \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/html/navs'] === [ 'main', 'footer' ] );
+check( 'a nav-checked entry joins the first registered menu on its own route', ( $routesAfterNav['GET://']['navs'] ?? null ) === [ 'main' => 5 ] );
+check( '...and so does the second one', ( $routesAfterNav['GET://kontakt']['navs'] ?? null ) === [ 'main' => 5 ] );
+check( 'an entry that is in no menu carries no membership at all', isset( $routesAfterNav['GET://impressum']['navs'] ) === false );
+check( 'nothing is generated into the text files anymore', isset( $deAfterNav['[[/website/navigation/main]]'] ) === false && isset( $enAfterNav['[[/website/navigation/main]]'] ) === false );
+
+// The routes stand in list order, which is what equal priorities fall back
+// to - reordering pages is what reorders the menus
+check( 'the applied routes stand in the list\'s own order', array_slice( array_keys( $routesAfterNav ), -3 ) === [ 'GET://', 'GET://kontakt', 'GET://impressum' ] );
 
 // The legal template's single route (see _routeKeys()' docblock) is
 // registered at whatever Http-URI the entry picked, its body driven by

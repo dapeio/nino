@@ -2,7 +2,7 @@
 
 **Language:** English · [Deutsch](_admin.de.md)
 
-**Last updated:** August 8, 2026 · **Nino version:** 0.11.0-beta.1
+**Last updated:** August 11, 2026 · **Nino version:** 0.11.0-beta.1
 
 This manual explains the complete technical and content project management under `/_admin`. If you instead only want to maintain released content on a daily basis, read the [`/_editor` Operation Manual](_editor.md); fast section-based page composition is described in the [`/_templates` Operation](_templates.md).
 
@@ -20,8 +20,9 @@ This manual explains the complete technical and content project management under
 | Element Types | Define fields and data types | No structural changes |
 | Elements | Edit all entries, languages, and storage buckets | Maintain released entries within permissions |
 | Texts | Fully manage keys, values, languages, and editor visibility | Maintain released values |
+| Translations | Export native Text/Elements content and import a target language | No batch workflow |
 | Images | Define image slots and target dimensions | Upload and replace images |
-| Pages | Manage routes, templates, and navigation | Maintain page texts |
+| Routes | Manage page routes, templates, and navigation | Maintain page texts |
 | Page templates | Link to the section-first `/_templates` Template Builder | No access |
 | Users | Create, delete, and technically manage accounts | Manage profile data and released permissions |
 | Configuration | Edit selected technical values | No access |
@@ -51,7 +52,7 @@ The password can be rehashed outside the installer with `php _admin/Admin.php <p
 
 The **Dashboard** summarizes the technical project state:
 
-- number of element types, pages, and editor accounts;
+- number of element types, routes, and editor accounts;
 - date of the last automatic backup;
 - fields per element type;
 - text keys and image slots used in templates but not yet defined.
@@ -89,7 +90,7 @@ Depending on the type, additional properties are available:
 
 - **per translation** stores a separate value for each language;
 - **Required field** makes the field mandatory;
-- **Rich text** activates limited text formatting for the `string` type;
+- **Rich text** activates bold, italic, highlight, inline-code, and link formatting for the `string` type;
 - fixed values limit a text field to a predefined selection;
 - width and height determine the target dimensions for images;
 - a unit or suffix adds, for example, `€`, `km`, or `%` in the input.
@@ -138,9 +139,26 @@ When renaming and when switching the storage form, Nino migrates existing values
 
 The scan cannot fully recognize dynamically composed keys. A flawless scan therefore does not replace testing all pages and languages.
 
-## Pages: Manage Pages and Routes
+## Translations: Translate the Native Content Layer
 
-The **Pages** area manages the page list created via `/_install`, the associated `GET` routes, and the navigation.
+**Translations** is the project-wide hand-off for translating a site after its native content has been completed. The export always uses the configured native locale and combines:
+
+- non-global, nontechnical Text values;
+- locale-scoped Element fields which have an actual value in the native bucket.
+
+Global values, blacklisted technical text, images, element URIs, ordering, and structural data are not exported. The JSON includes instructions for translation tools: translate values only and preserve keys, JSON value types, HTML, URLs, placeholders, shortcodes, and identifiers.
+
+1. Download the native JSON package.
+2. Translate its values without changing the object structure.
+3. Choose a configured target language.
+4. Upload the `.json` file or paste its content and select **Import into selected language**.
+5. Check the imported and skipped counters.
+
+Import is merge-only: matching target-language values are overwritten, while values absent from the document are not deleted. The server validates every path against a fresh native export, sanitizes text and rich-text values, and skips unknown, global, technical, and image fields. Selecting the native locale as the target is possible but overwrites source content and should therefore be deliberate.
+
+## Routes: Manage Page Routes
+
+The **Routes** area manages the page list created via `/_install`, the associated `GET` routes, and the navigation.
 
 A page has two different URIs:
 
@@ -153,9 +171,12 @@ When creating or editing, you also determine:
 
 - an existing template from `templates/page-*.tpl`;
 - an HTTP status code;
-- navigation name, page title, and description for each active language.
+- navigation name, page title, and description for each active language;
+- one checkbox per navigation registered in `/nino/html/navs`.
 
-The arrows in the page list change the order and — with the navigation module active — also `[[/website/navigation/main]]`. Reserved paths such as `/_admin`, `/_editor`, `/_install`, and `/_templates` cannot be used as public pages.
+Membership is stored on the page's own route as `'navs' => [ 'main' => 5, ... ]`, where the value is a priority (lower first, 5 is the default). A route added to `config.php` by hand joins a menu the same way, without any tool, and is rendered by `[navigation nav="main"]`.
+
+The arrows in the page list change the order of the pages and of the routes with them. Menu entries of equal priority follow route order, so this is what reorders every navigation those pages appear in. Reserved paths such as `/_admin`, `/_editor`, `/_install`, and `/_templates` cannot be used as public pages.
 
 Some routes select their template at runtime. In this case, `/_admin` shows the existing route body and leaves it unchanged when saving.
 
@@ -234,7 +255,7 @@ The **Config** area edits a deliberately limited selection from `config.php` as 
 | `/nino/html/assets` | asset bundles as object |
 | `/nino/http/routes` | complete routing table |
 
-Nino checks JSON syntax and basic type but not every technical dependency. Errors in routes, languages, or asset bundles can make the website or management areas inaccessible. For normal page changes, therefore use **Pages** and for image slots **Images**.
+Nino checks JSON syntax and basic type but not every technical dependency. Errors in routes, languages, or asset bundles can make the website or management areas inaccessible. For normal page changes, therefore use **Routes** and for image slots **Images**.
 
 In production, `/nino/error/display` must be `false`.
 
@@ -242,7 +263,7 @@ In production, `/nino/error/display` must be `false`.
 
 > **WIP:** This section will be supplemented with details on modules, asset bundles, and advanced route configuration.
 
-1. Create the required structure under **Element Types**, **Text**, **Pages**, and **Images**.
+1. Create the required structure under **Element Types**, **Text**, **Routes**, and **Images**.
 2. Maintain or correct full texts and elements directly in `/_admin`.
 3. Compose page templates from complete HTML and template sections via [`/_templates`](_templates.md); use the HTML+ escape hatch or code for lower-level structure work, then check the result in the browser.
 4. Check dashboard and template scans for missing definitions.
@@ -257,7 +278,7 @@ In production, `/nino/error/display` must be `false`.
 |---|---|
 | Login locked after several attempts | Wait one hour; the lock is project-wide. |
 | Saving fails | Check write permissions for the affected file or directory. |
-| Template missing in **Pages** | Only existing files `templates/page-*.tpl` are offered. |
+| Template missing in **Routes** | Only existing files `templates/page-*.tpl` are offered. |
 | Page cannot be saved in Template Builder | Reload after an external edit, check unique section IDs and unmatched `<section>` tags; see [`/_templates` Operation](_templates.md). |
 | Texts or images missing in scan | Dynamic keys and images are not reliably statically recognized. |
 | Backup list is empty | First log in with an editor account and check if backups are enabled and write permissions exist. |

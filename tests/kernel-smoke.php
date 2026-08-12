@@ -999,6 +999,39 @@ $appData['/nino/http/routes'] = [
 // this test builds appData by hand and never calls \Nino\init() itself
 \Nino\Callbacks::registerCallback( $appData, '/nino/http/response', [ \Nino\Locales::class, 'callbackResponse' ] );
 
+// Locales::init() resolves the default locale for a visitor who has not
+// picked one. AppData::prepare() can only seed a hardcoded placeholder
+// there (config.php isn't read yet at that point), and leaving it at that
+// meant a project rendered in that hardcoded locale rather than its own
+// configured native one - and, for a project that doesn't install the
+// hardcoded one at all, out of a text file that does not exist: every
+// per-locale [[key]] on the page unresolved
+// Its own uid, so its session bucket (keyed by exactly that, see
+// Runtime::getSessionValue()) cannot be one an earlier check already wrote
+$nativeAppData = [ './nino/uid' => $sandbox. '-native' ];
+\Nino\AppData::prepare( $nativeAppData );
+$nativeAppData['./nino/filesystem/path'] = $sandbox;
+$nativeAppData['/nino/locales/native'] 		= 'en_US';
+$nativeAppData['/nino/locales/available'] = [ 'en_US' ];
+\Nino\Locales::init( $nativeAppData );
+check( 'Locales::init defaults to the configured native locale, not the seeded placeholder', \Nino\Locales::getCurrentLocale( $nativeAppData ) === 'en_US' );
+check( '...which is therefore always one this project actually has text for', \Nino\Locales::verifyLocale( $nativeAppData, \Nino\Locales::getCurrentLocale( $nativeAppData ) ) === true );
+
+// A native locale outside the available list is a broken config (_admin's
+// raw Config editor can produce one) - still better answered with a locale
+// the project has than with one it has no text file for
+$brokenNativeAppData = [ './nino/uid' => $sandbox. '-broken-native' ];
+\Nino\AppData::prepare( $brokenNativeAppData );
+$brokenNativeAppData['./nino/filesystem/path'] = $sandbox;
+$brokenNativeAppData['/nino/locales/native'] 		= 'fr_FR';
+$brokenNativeAppData['/nino/locales/available'] = [ 'en_US', 'de_DE' ];
+\Nino\Locales::init( $brokenNativeAppData );
+check( 'a native locale that is not available falls back to the first available one', \Nino\Locales::getCurrentLocale( $brokenNativeAppData ) === 'en_US' );
+
+// The default must not be written into the session - it is nobody's choice,
+// and stored there it would outlive a later change of the native locale
+check( 'resolving the default does not persist it as a visitor locale', \Nino\Runtime::getSessionValue( $nativeAppData, './nino/locales/current' ) === null );
+
 function fakeRequest( array &$appData, string $uri, string $method = 'GET' ): array {
 	$request = [ 'REQUEST_METHOD' => $method, 'REQUEST_URI' => $uri, 'REMOTE_ADDR' => '127.0.0.1' ];
 	\Nino\Http::request( $appData, $request );
@@ -1032,6 +1065,78 @@ $pickerRedirect = fakeRequest( $appData, '/legal?/_nino/localepicker/current=de_
 \Nino\Modules\Localepicker::callbackResponse( $appData, $pickerRedirect );
 check( 'the localepicker redirects with a 302 status code too', $pickerRedirect['/nino/http/response']['statusCode'] === 302 );
 check( 'and its Location points at the locale variant of the page', ( $pickerRedirect['/nino/http/response']['header']['Location'] ?? '' ) === '/rechtliches' );
+
+echo "\n";
+
+
+// --- Modules\Navigation ----------------------------------------------------
+
+echo "Modules\\Navigation: menus built from the routes\n";
+
+// A menu is not stored anywhere - it is computed per request from the routes
+// that list themselves under its key. That is what lets a route added to
+// config.php by hand be a menu entry with no tool involved, and what keeps a
+// menu from ever going stale against the routes it describes.
+$routesBeforeNav = $appData['/nino/http/routes'];
+
+$appData['/nino/http/routes'] = [
+	'GET://top' 				=> [ 'uri' => '/top', 			'body' => '', 'navs' => [ 'main' => 1 ] ],
+	'GET://' 						=> [ 'uri' => '/home', 			'body' => '', 'navs' => [ 'main' => 5, 'footer' => 5 ] ],
+	'GET://kontakt' 		=> [ 'uri' => '/contact', 	'body' => '', 'navs' => [ 'main' => 5 ] ],
+	'GET://impressum' 	=> [ 'uri' => '/legal', 		'body' => '', 'navs' => [ 'footer' => 5 ] ],
+	'GET://intern' 			=> [ 'uri' => '/intern', 		'body' => '' ],
+	'GET://namenlos' 		=> [ 'uri' => '/namenlos', 	'body' => '', 'navs' => [ 'main' => 5 ] ],
+	'GET://rechtliches' => [ 'uri' => '/legal-de', 	'body' => '', 'navs' => [ 'footer' => 5 ], 'locale' => 'de_DE' ],
+	'POST://.form' 			=> [ 'uri' => '/.form', 		'body' => '', 'navs' => [ 'main' => 1 ] ],
+];
+
+\Nino\Locales::setCurrentLocale( $appData, 'en_US' );
+\Nino\Html::addFills( $appData, [
+	'/webpage/home/name' 			=> 'Home',
+	'/webpage/contact/name' 	=> 'Contact',
+	'/webpage/legal/name' 		=> 'Legal',
+	'/webpage/top/name' 			=> 'Top',
+], 'en_US' );
+\Nino\Html::addFills( $appData, [
+	'/webpage/legal-de/name' 	=> 'Rechtliches',
+	'/webpage/home/name' 			=> 'Start',
+], 'de_DE' );
+
+$mainLines = \Nino\Modules\Navigation::routeLines( $appData, 'main' );
+
+check( 'a menu collects every route that lists itself under its key', $mainLines === [ '/top:Top', '/:Home', '/kontakt:Contact' ] );
+check( 'a lower priority sorts first, equal priorities keep the routes\' own order', $mainLines[0] === '/top:Top' );
+check( 'a route with no membership stays out', in_array( '/intern:', $mainLines, true ) === false && str_contains( implode( '', $mainLines ), 'intern' ) === false );
+check( 'a route nobody named stays out rather than rendering an empty link', str_contains( implode( '', $mainLines ), 'namenlos' ) === false );
+check( 'a POST route is never a menu entry', str_contains( implode( '', $mainLines ), '.form' ) === false );
+
+$footerLines = \Nino\Modules\Navigation::routeLines( $appData, 'footer' );
+check( 'a second menu is an independent selection of the same routes', $footerLines === [ '/:Home', '/impressum:Legal' ] );
+
+// A locale-gated route only exists for its own locale (same rule
+// Http::findRouteUri() applies), so it only belongs in that locale's menu
+check( 'a locale-gated route stays out of another locale\'s menu', str_contains( implode( '', $footerLines ), 'rechtliches' ) === false );
+
+\Nino\Locales::setCurrentLocale( $appData, 'de_DE' );
+$footerDe = \Nino\Modules\Navigation::routeLines( $appData, 'footer' );
+check( '...and appears in its own', in_array( '/rechtliches:Rechtliches', $footerDe, true ) === true );
+check( 'every title comes from the current locale', in_array( '/:Start', $footerDe, true ) === true );
+
+\Nino\Locales::setCurrentLocale( $appData, 'en_US' );
+
+$navHtml = \Nino\Modules\Navigation::doShortcode( $appData, [ 'nav' => 'main' ] );
+check( 'the shortcode renders one <li> per entry', substr_count( $navHtml, '<li>' ) === 3 );
+check( '...in menu order', strpos( $navHtml, 'Top' ) < strpos( $navHtml, 'Home' ) );
+
+$navMixed = \Nino\Modules\Navigation::doShortcode( $appData, [ 'nav' => 'main', 'content' => '/extra:Extra' ] );
+check( 'a hand-written line is appended after the generated ones', substr_count( $navMixed, '<li>' ) === 4 && strpos( $navMixed, 'Extra' ) > strpos( $navMixed, 'Contact' ) );
+
+$navManual = \Nino\Modules\Navigation::doShortcode( $appData, [ 'content' => "/a:A\n/b:B" ] );
+check( 'a menu written entirely by hand still works, with no nav argument at all', substr_count( $navManual, '<li>' ) === 2 );
+check( 'an empty shortcode renders nothing', \Nino\Modules\Navigation::doShortcode( $appData, [] ) === '' );
+check( 'an unknown menu key renders nothing', \Nino\Modules\Navigation::doShortcode( $appData, [ 'nav' => 'nope' ] ) === '' );
+
+$appData['/nino/http/routes'] = $routesBeforeNav;
 
 // Http::output() itself exit()s, so the header-finalizing part it delegates
 // to is exercised directly via Reflection instead (same approach as

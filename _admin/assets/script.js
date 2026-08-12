@@ -26,6 +26,7 @@
 			types : [ 'show-types', function() { Nino.admin.elementTypes.showCurrent() } ],
 			elements : [ 'show-elements', function() { Nino.admin.elements.showCurrent() } ],
 			text : [ 'show-text', function() { Nino.admin.text.showCurrent() } ],
+			translations : [ 'show-translations', function() { Nino.admin.translations.showCurrent() } ],
 			pages : [ 'show-pages', function() { Nino.admin.pages.showCurrent() } ],
 			images : [ 'show-images', function() { Nino.admin.images.showCurrent() } ],
 			users : [ 'show-users', function() { Nino.admin.users.showCurrent() } ],
@@ -57,7 +58,7 @@
 		 *	Nino.content.getText(). That store is populated by the Jstext module,
 		 *	which only the public site and /_editor load - over here it stays
 		 *	empty, so getText()'s "|| ''" fallback rendered the whole toolbar
-		 *	as four blank buttons, the link popover's Apply/Cancel included.
+		 *	as blank buttons, the link popover's Apply/Cancel included.
 		 *	Seeded rather than translated: _admin is English-only by design
 		 *	(see any module's own hardcoded strings).
 		 *
@@ -77,6 +78,7 @@
 				'/_editor/htmleditor/label/strong'					: 'Bold',
 				'/_editor/htmleditor/label/em'							: 'Italic',
 				'/_editor/htmleditor/label/span'						: 'Highlight',
+				'/_editor/htmleditor/label/code'						: 'Code',
 				'/_editor/htmleditor/label/a'								: 'Link',
 				'/_editor/htmleditor/label/linkplaceholder'	: 'https://…',
 				'/_editor/htmleditor/label/linkok'					: 'Apply',

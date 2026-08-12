@@ -101,6 +101,9 @@ namespace Nino {
 				'./nino/html/fills'						=> [],
 				'./nino/html/cache'						=> [],
 				'./nino/http/requests'					=> [],
+					// Placeholder only, for the window before config.php has been
+				// read - Locales::init() replaces it with the project's own
+				// native locale (see its docblock) as soon as that is known
 				'./nino/locales/current'				=> 'de_DE',
 				'./nino/auth/currentUser'			=> [],
 			];
@@ -2073,7 +2076,7 @@ namespace Nino {
 	// lists, and html sanitizing
 	class Html {
 
-		private const array HTML_TAGS = [ 'strong', 'em', 'span', 'a' ];
+		private const array HTML_TAGS = [ 'strong', 'em', 'span', 'code', 'a' ];
 
 		// How deep shortcode output may be re-rendered into more shortcodes
 		// before _doShortcode() stops unrolling - see there
@@ -2268,7 +2271,7 @@ namespace Nino {
 		}
 
 		// Rebuild a html value, keeping only whitelisted inline tags (strong/
-		// em/span/a) one level deep and a safe href scheme on links. Never
+		// em/span/code/a) one level deep and a safe href scheme on links. Never
 		// trust the client's html: the editor's "no nesting" toolbar rule is
 		// enforced here too, against a client that bypasses it entirely.
 		public static function sanitizeHtml( string $html ): string {
@@ -2847,7 +2850,37 @@ namespace Nino {
 
 		public static function init( array &$appData ): void {
 
-			// Get current locale
+			// The project's configured native locale is the default for anyone
+			// who hasn't picked one. AppData::$_initialInstance can only seed a
+			// hardcoded placeholder there, since config.php isn't read until
+			// AppData::init() - which runs immediately before this. Left at that
+			// placeholder, every first visit rendered in whatever locale was
+			// hardcoded rather than the project's own, and a project that does
+			// not install that locale at all fell through to a text file that
+			// does not exist: an unresolved [[key]] in place of every per-locale
+			// fill on the page, the <html lang> and <title> included.
+			//
+			// A native locale that isn't among the available ones is a broken
+			// config (Install\Setup won't produce one, _admin's raw Config
+			// editor can) - the first available locale is still a far better
+			// answer than a locale this project has no text for at all.
+			//
+			// Assigned directly rather than through setCurrentLocale(): a
+			// default nobody chose has no business being written into the
+			// visitor's session, where it would then outlive a later change of
+			// the project's native locale.
+			$available 	= $appData['/nino/locales/available'] ?? [];
+			$default 		= (string) ( $appData['/nino/locales/native'] ?? '' );
+
+			if( in_array( $default, $available, true ) === false )
+				$default = (string) ( $available[0] ?? '' );
+
+			if( $default !== '' )
+				$appData['./nino/locales/current'] = $default;
+
+			// A locale the visitor picked themselves still wins over that
+			// default - setCurrentLocale() verifies it and falls back to the
+			// value just set if it isn't available anymore
 			$currentLocale = \Nino\Runtime::getSessionValue( $appData, './nino/locales/current' );
 
 			if( $currentLocale !== null )
@@ -3125,7 +3158,7 @@ namespace Nino {
 		}
 
 		// The one value-normalization path shared by regular batch saves and
-		// _editor's JSON translation import. Keeping it here prevents import
+		// _admin's JSON translation import. Keeping it here prevents import
 		// from bypassing the hard length limit and HTML whitelist that the form
 		// itself enforces.
 		public static function sanitizeValue( string $value, bool $html ): string {

@@ -110,7 +110,7 @@ Jede Seite besitzt:
 | **Name** | sprachabhängige Bezeichnung, beispielsweise in der Navigation |
 | **Title** | sprachabhängiger Seitentitel |
 | **Description** | sprachabhängige Meta-Beschreibung |
-| **Show in main navigation** | nimmt die Seite bei aktivierter Navigation in das Hauptmenü auf |
+| **Show in "…" navigation** | je eine Checkbox pro Navigation aus `/nino/html/navs`; die Zugehörigkeit landet als `'navs' => [ 'main' => 5, … ]` auf der Route der Seite |
 
 Element-URI und HTTP-URI müssen innerhalb ihrer jeweiligen Spalte eindeutig sein. Sie dürfen voneinander abweichen: Die Startseite kann intern `/home` heißen und trotzdem unter `/` erreichbar sein.
 

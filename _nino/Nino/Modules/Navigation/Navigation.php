@@ -46,6 +46,12 @@ namespace Nino\Modules {
 		/**
 		 *	Replace shortcode
 		 *
+		 *	Two sources, either or both: nav="&lt;key&gt;" collects every route
+		 *	that lists itself under that key (see routeLines()), and whatever
+		 *	stands between the tags is appended after it, unchanged - a
+		 *	hand-written menu keeps working exactly as before, and a generated
+		 *	one can still be extended by hand (an external link, a separator).
+		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		misc			$args					Shortcode arguments
 		 *
@@ -57,19 +63,27 @@ namespace Nino\Modules {
 			$callback	= $args['callback'] ?? '';
 			$id				= $args['id'] ?? '';
 			$class		= $args['class'] ?? '';
+			$nav			= $args['nav'] ?? '';
 			$html 		= '';
 
 			// Render list elements
 			$lis	= '';
 
-			if( $content === '' )
-				return '';
+			$lines = ( $nav !== '' ) ? self::routeLines( $appData, (string) $nav ) : [];
 
-			$lines = explode( PHP_EOL, $content );
+			if( $content !== '' )
+				$lines = array_merge( $lines, explode( PHP_EOL, $content ) );
+
+			if( count( $lines ) === 0 )
+				return '';
 
 			foreach( $lines as $line ) {
 
-				if( $line === '' )
+				// Blank, not just empty: with the list coming from the routes,
+				// what stands between the tags is usually nothing but the
+				// template's own indentation - which used to end up as a stray
+				// empty <div> in the rendered menu
+				if( trim( $line ) === '' )
 					continue;
 
 				if( strpos( $line, ':' ) === false ) {
@@ -95,6 +109,71 @@ namespace Nino\Modules {
 				\Nino\Callbacks::doCallbacks( $appData, $callback, $result );
 
 			return $result;
+		}
+
+		/**
+		 *	Every route that puts itself into one navigation, as the same
+		 *	"&lt;uri&gt;:&lt;title&gt;" lines a hand-written menu uses.
+		 *
+		 *	Membership lives on the route itself - 'navs' =&gt; [ 'main' =&gt; 5,
+		 *	'footer' =&gt; 3 ] - rather than in a generated textfill some tool
+		 *	owns and overwrites. A route added by hand in config.php is
+		 *	therefore a menu entry like any other, with no tool involved, and
+		 *	nothing here ever writes: the menu is computed per request, so it
+		 *	cannot go stale against the routes it describes.
+		 *
+		 *	The value is a priority, same rule Callbacks::registerCallback()
+		 *	uses - lower runs first, 5 is the middle - except it is a plain
+		 *	int rather than a fixed bucket. Equal priorities keep the order the
+		 *	routes stand in, which is the page order /_install and /_admin
+		 *	write (see their apiApply()/apiMove()), so reordering pages there
+		 *	reorders every menu they appear in without touching a priority.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$nav					Navigation key, eg. "main"
+		 *
+		 *	@return 	array										"&lt;uri&gt;:&lt;title&gt;" lines, in menu order
+		 */
+		public static function routeLines( array &$appData, string $nav ): array {
+
+			$locale 	= \Nino\Locales::getCurrentLocale( $appData );
+			$buckets 	= [];
+
+			foreach( ( $appData['/nino/http/routes'] ?? [] ) as $routeKey => $route ) {
+
+				// Only a page a visitor can actually open: a POST endpoint or a
+				// module's own runtime route is not a menu entry
+				if( str_starts_with( $routeKey, 'GET://' ) === false )
+					continue;
+
+				if( isset( $route['navs'][$nav] ) === false )
+					continue;
+
+				// Same rule Http::findRouteUri() applies: a locale-gated route
+				// (eg. legal content whose slug differs by language) only exists
+				// for its own locale, and only belongs in that locale's menu
+				if( isset( $route['locale'] ) === true && $route['locale'] !== $locale )
+					continue;
+
+				// The page's own name in the current locale - the very key
+				// /_install and /_admin already write per webpage. A route
+				// nobody named has nothing to show in a menu, so it stays out
+				// rather than appearing as a raw uri or an empty link
+				$title = \Nino\Html::renderTextfill( $appData, '/webpage'. ( $route['uri'] ?? '' ). '/name' );
+
+				if( $title === '' )
+					continue;
+
+				// 'GET://' -> '/', 'GET://kontakt' -> '/kontakt' - the same
+				// derivation Locales::callbackResponse() makes for its redirect,
+				// and the same uri space the request carries, so the "active"
+				// match in doShortcode() keeps comparing like for like
+				$buckets[ (int) $route['navs'][$nav] ][] = substr( $routeKey, strlen( 'GET:/' ) ). ':'. $title;
+			}
+
+			ksort( $buckets );
+
+			return count( $buckets ) === 0 ? [] : array_merge( ...array_values( $buckets ) );
 		}
 	}
 

@@ -387,18 +387,25 @@
 		 *	@param		{Object}	field					Model field definition ({ type, ... })
 		 *	@param		{*}				value					Current value
 		 *
-		 *	@return		{Element}								<label> wrapping the input
+		 *	@return		{Element}								Field wrapper
 		 */
 		_renderField : function( key, field, value ) {
 
-			const label = dc.createElement('label');
-			label.className = 'editor-field';
-
 			const displayName = Nino.editor.elements._fieldLabel( key );
+			const isHtml = field.type === 'string' && field.html === true;
+			// A contenteditable inside <label> is invalid interactive markup and
+			// can make drag-selection fail in Safari. Rich text gets a semantic
+			// group; ordinary controls retain their native label wrapper.
+			const label = dc.createElement( isHtml ? 'div' : 'label' );
+			label.className = 'editor-field';
+			if( isHtml ) {
+				label.setAttribute( 'role', 'group' );
+				label.setAttribute( 'aria-label', displayName );
+			}
 
 			// A string field with html: true gets the same minimal rich-text editor as
 			// Text's html-flagged keys, sanitized the same way server-side on save
-			if( field.type === 'string' && field.html === true ) {
+			if( isHtml ) {
 				const span = dc.createElement('span');
 				span.textContent = displayName;
 				label.appendChild( span );

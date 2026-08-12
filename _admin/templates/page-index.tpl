@@ -33,7 +33,8 @@
 					<a href="#" id="admin-nav-types">Element Types</a>
 					<a href="#" id="admin-nav-elements">Elements</a>
 					<a href="#" id="admin-nav-text">Text</a>
-					<a href="#" id="admin-nav-pages">Pages</a>
+					<a href="#" id="admin-nav-translations">Translations</a>
+					<a href="#" id="admin-nav-pages">Routes</a>
 					<a href="#" id="admin-nav-images">Images</a>
 					<a href="#" id="admin-nav-users">Users</a>
 					<a href="#" id="admin-nav-restore">Restore</a>
@@ -58,6 +59,7 @@
 					<div id="text-list"></div>
 					<div id="text-form"></div>
 				</div>
+				<div id="admin-content-translations"></div>
 				<div id="admin-content-pages">
 					<div id="pages-list"></div>
 					<div id="pages-form"></div>
@@ -85,6 +87,7 @@
 		<script src="[[/nino/dir]]/_admin/assets/elementtypes.js"></script>
 		<script src="[[/nino/dir]]/_admin/assets/elements.js"></script>
 		<script src="[[/nino/dir]]/_admin/assets/text.js"></script>
+		<script src="[[/nino/dir]]/_admin/assets/translations.js"></script>
 		<script src="[[/nino/dir]]/_admin/assets/pages.js"></script>
 		<script src="[[/nino/dir]]/_admin/assets/images.js"></script>
 		<script src="[[/nino/dir]]/_admin/assets/users.js"></script>

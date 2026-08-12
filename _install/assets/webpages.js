@@ -3,7 +3,7 @@
 /**
  *	Nino										A compact filesystembased php framework
  *	Install									Step 3: the project's actual pages - a free-form, ordered
- *													list of { uri, httpUri, template, nav, text } entries
+ *													list of { uri, httpUri, template, navs, text } entries
  *													built here, rather than a fixed checkbox per
  *													_install/library/pages/&lt;key&gt; unit (that picker is
  *													Setup's - see setup.js). "uri" (Element-URI) is a stable
@@ -39,7 +39,7 @@
 		_ready 					: false,
 		_templates 			: {},
 		_locales 				: [],
-		_navModule 			: false,
+		_navs 					: [],
 		_entries 				: [],
 		_currentIndex 	: null,
 		_current 			: null,
@@ -62,7 +62,7 @@
 
 				Nino.install.webpages._templates 	= response.templates;
 				Nino.install.webpages._locales 		= response.locales;
-				Nino.install.webpages._navModule 	= response.navModule;
+				Nino.install.webpages._navs 			= response.navs;
 				Nino.install.webpages._entries 		= response.webpages;
 				Nino.install.webpages._renderList();
 				Nino.install.webpages._showList();
@@ -245,7 +245,7 @@
 					uri 				: Nino.install.webpages._freeUri( function( e ) { return e.uri }, suggested.uri ),
 					httpUri 		: Nino.install.webpages._freeUri( function( e ) { return e.httpUri }, suggested.httpUri ),
 					libraryKey 	: libraryKey,
-					nav 				: false,
+					navs 				: suggested.navs,
 					text 				: suggested.text,
 				};
 			}
@@ -265,7 +265,7 @@
 		 *
 		 *	@param		{string}	libraryKey
 		 *
-		 *	@return		{Object}	{ uri, httpUri, text: { <locale>: { name, title, description } } }
+		 *	@return		{Object}	{ uri, httpUri, navs, text: { <locale>: { name, title, description } } }
 		 */
 		_suggest : function( libraryKey ) {
 
@@ -282,7 +282,12 @@
 				};
 			} );
 
-			return { uri : uri, httpUri : template.uri || uri, text : text };
+			return {
+				uri 		: uri,
+				httpUri : template.uri || uri,
+				navs 		: ( template.navs || [] ).filter( function( navKey ) { return Nino.install.webpages._navs.indexOf( navKey ) !== -1 } ),
+				text 		: text,
+			};
 		},
 
 		/**
@@ -432,6 +437,14 @@
 						httpUriInput.value = Nino.install.webpages._freeUri( function( e ) { return e.httpUri }, next.httpUri );
 				}
 
+				// Menus follow the same rule as the fields: only boxes that still
+				// match the previous template's suggestion are re-ticked
+				dc.querySelectorAll('#webpages-form [data-nav]').forEach( function( input ) {
+					const navKey = input.dataset.nav;
+					if( input.checked === ( suggested.navs.indexOf( navKey ) !== -1 ) )
+						input.checked = next.navs.indexOf( navKey ) !== -1;
+				} );
+
 				dc.querySelectorAll('#webpages-form-locales [data-locale]').forEach( function( row ) {
 					const was 	= suggested.text[row.dataset.locale] || {};
 					const now 	= next.text[row.dataset.locale] || {};
@@ -445,17 +458,22 @@
 				suggested = next;
 			} );
 
-			if( Nino.install.webpages._navModule === true ) {
+			// One checkbox per navigation the project registered
+			// (/nino/html/navs) - an empty list means the Navigation module is
+			// inactive and no menu field is offered at all. What a page is a
+			// member of lives on its route, which is what actually renders it
+			// (see \Nino\Modules\Navigation::routeLines())
+			Nino.install.webpages._navs.forEach( function( navKey ) {
 				const navLabel = dc.createElement('label');
-				navLabel.className = 'editor-field';
+				navLabel.className = 'editor-checkbox-field';
 				const navInput = dc.createElement('input');
 				navInput.type = 'checkbox';
-				navInput.id = 'webpages-form-nav';
-				navInput.checked = entry.nav === true;
+				navInput.dataset.nav = navKey;
+				navInput.checked = ( entry.navs || [] ).indexOf( navKey ) !== -1;
 				navLabel.appendChild( navInput );
-				navLabel.appendChild( dc.createTextNode(' Show in main navigation') );
+				navLabel.appendChild( dc.createTextNode( ' Show in "'+ navKey+ '" navigation' ) );
 				pageFieldset.appendChild( navLabel );
-			}
+			} );
 
 			form.appendChild( pageFieldset );
 
@@ -564,7 +582,11 @@
 				};
 			} );
 
-			const navInput = dc.getElementById('webpages-form-nav');
+			const navs = [];
+			dc.querySelectorAll('#webpages-form [data-nav]').forEach( function( input ) {
+				if( input.checked === true )
+					navs.push( input.dataset.nav );
+			} );
 
 			// Built on top of the entry as it stands rather than from the
 			// form's fields alone: 'body'/'statusCode'/'template' are
@@ -576,7 +598,7 @@
 				uri 				: dc.getElementById('webpages-form-uri').value,
 				httpUri 		: dc.getElementById('webpages-form-http-uri').value,
 				libraryKey 	: dc.getElementById('webpages-form-template').value,
-				nav 				: navInput !== null && navInput.checked,
+				navs				: navs,
 				text 				: text,
 			} );
 

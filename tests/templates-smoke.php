@@ -101,6 +101,12 @@ check( 'reports the generated background image slot', $hero['imageSlots'] === [ 
 check( 'inherits page motion into generated js-vpa markup', str_contains( $hero['source'], 'class="ui-grid-row js-vpa"' ) );
 check( 'applies heading alignment without forcing it through nested content', str_contains( $hero['source'], 'ui-grid-100 ui-mb-3 ui-text-center' ) && str_contains( strtok( $hero['source'], "\n" ), 'ui-text-center' ) === false );
 
+$heroPreview = \Nino\Templates\Composer::preview( [
+	'preset' => 'hero-centered', 'pageId' => 'preview', 'id' => 'motion-hero', 'pageMotion' => 'on',
+] );
+check( 'preview strips VPA classes that would stay hidden without client scripts', $heroPreview !== null && str_contains( $heroPreview, 'js-vpa' ) === false );
+check( 'preview-only VPA cleanup never changes composed template source', str_contains( $hero['source'], 'js-vpa' ) && str_contains( $hero['source'], 'js-vpa--visible' ) === false );
+
 $articles = \Nino\Templates\Composer::compose( [
 	'preset' => 'articles-grid', 'pageId' => 'home', 'id' => 'services', 'elementType' => 'services',
 	'content' => 'articles-image', 'layout' => '4',

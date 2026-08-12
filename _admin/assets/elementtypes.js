@@ -119,11 +119,22 @@
 			wrap.innerHTML = '';
 
 			const ul = dc.createElement('ul');
+			ul.className = 'admin-drill-list';
 			Nino.admin.elementTypes._types.forEach( function( type ) {
 				const li 		= dc.createElement('li');
 				const link	= dc.createElement('a');
 				link.href = '#';
-				link.textContent = type.title+ ' ('+ type.fieldCount+ ' fields)';
+
+				const copy = dc.createElement('span');
+				copy.className = 'admin-list-copy';
+				const title = dc.createElement('strong');
+				title.textContent = type.title;
+				const descr = dc.createElement('small');
+				descr.textContent = '/'+ type.uri+ ' · '+ type.fieldCount+ ' '+ ( type.fieldCount === 1 ? 'field' : 'fields' );
+				copy.appendChild( title );
+				copy.appendChild( descr );
+				link.appendChild( copy );
+
 				link.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.elementTypes._openForm( type.uri ) } );
 				li.appendChild( link );
 				ul.appendChild( li );
@@ -300,18 +311,86 @@
 			typeSelect.addEventListener( 'change', renderTypeOptions );
 			renderTypeOptions();
 
+			const actions = dc.createElement('div');
+			actions.className = 'admin-field-actions';
+
+			// Same ↑/↓ pair the Pages list uses (see pages.js's _move()) - a
+			// field's position in the model is the order both element forms
+			// render it in, so this is a real editing control, not just a way
+			// to tidy up this list
+			const move = dc.createElement('span');
+			move.className = 'admin-field-move';
+
+			const up = dc.createElement('button');
+			up.type = 'button';
+			up.title = 'Move up';
+			up.textContent = '↑';
+			up.disabled = index === 0;
+			up.addEventListener( 'click', function() { Nino.admin.elementTypes._move( index, 'up' ) } );
+			move.appendChild( up );
+
+			const down = dc.createElement('button');
+			down.type = 'button';
+			down.title = 'Move down';
+			down.textContent = '↓';
+			down.disabled = index === Nino.admin.elementTypes._fields.length - 1;
+			down.addEventListener( 'click', function() { Nino.admin.elementTypes._move( index, 'down' ) } );
+			move.appendChild( down );
+
+			actions.appendChild( move );
+
 			const removeBtn = dc.createElement('button');
 			removeBtn.type = 'button';
 			removeBtn.className = 'red';
 			removeBtn.textContent = 'Remove';
 			removeBtn.addEventListener( 'click', function() {
+				// Read the rows back first, same as _move()/"Add field" do -
+				// every row is re-rendered from _fields below, so without this
+				// dropping one row would silently revert every edit typed into
+				// the others since the last render
+				Nino.admin.elementTypes._storeFields();
 				Nino.admin.elementTypes._fields.splice( index, 1 );
 				Nino.admin.elementTypes._renderFields();
 			} );
-			row.appendChild( removeBtn );
+			actions.appendChild( removeBtn );
+
+			row.appendChild( actions );
 
 			row.dataset.index = index;
 			return row;
+		},
+
+		/**
+		 *	Swap a field row with its neighbour and re-render.
+		 *
+		 *	Order matters beyond this list: _buildModel() walks _fields in
+		 *	order, json_decode and Admin.php's cleanModel() both keep that
+		 *	order on the way into the type file, and each element form renders
+		 *	its fields in the model's own key order (see elements.js's
+		 *	_globalKeys/_localeKeys) - so this is how the editing form for
+		 *	every element of this type gets arranged
+		 *
+		 *	@param		{number}	index
+		 *	@param		{string}	direction		'up' | 'down'
+		 *
+		 *	@return		void
+		 */
+		_move : function( index, direction ) {
+
+			// Rows are re-rendered from _fields, so whatever is currently typed
+			// into them has to be read back first - otherwise moving a row
+			// would revert every edit made since the last render
+			Nino.admin.elementTypes._storeFields();
+
+			const fields 		= Nino.admin.elementTypes._fields;
+			const swapWith 	= direction === 'up' ? index - 1 : index + 1;
+
+			if( swapWith < 0 || swapWith >= fields.length )
+				return;
+
+			[ fields[index], fields[swapWith] ] = [ fields[swapWith], fields[index] ];
+
+			Nino.admin.elementTypes._renderFields();
 		},
 
 		/**

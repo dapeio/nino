@@ -75,24 +75,12 @@ Der Bereich **Texte** enthält einzelne Textfills wie Überschriften, Beschreibu
 1. Öffne **Texte**.
 2. Wähle die passende Gruppe.
 3. Bearbeite globale Werte und wähle für übersetzte Werte die gewünschte Sprache.
-4. Nutze bei formatierten Feldern nur die angebotenen Funktionen für Fett, Kursiv, Hervorhebung und Links.
+4. Nutze bei formatierten Feldern nur die angebotenen Funktionen für Fett, Kursiv, Hervorhebung, Inline-Code und Links.
 5. Klicke auf **Speichern** und warte auf die Meldung **Gespeichert**.
 
 Zeichenzähler zeigen die vom Entwickler vorgesehene Maximallänge. Ein Textschlüssel, der hier nicht erscheint, kann in `/_admin` bewusst ausgeblendet oder technisch reserviert sein.
 
-### Übersetzungen exportieren und importieren
-
-Über die Übersetzungswerkzeuge kannst du die Texte einer Sprache als JSON exportieren. Globale Werte sind darin nicht enthalten, weil sie für alle Sprachen gelten.
-
-Für den Import:
-
-1. wähle die Zielsprache;
-2. füge das übersetzte JSON in das Textfeld ein;
-3. prüfe, dass Schlüssel und JSON-Struktur unverändert geblieben sind;
-4. wähle **Importieren**;
-5. kontrolliere die Anzahl importierter und übersprungener Einträge.
-
-Der Import ergänzt oder aktualisiert die genannten Schlüssel. Nicht enthaltene bestehende Texte werden nicht gelöscht. Globale Schlüssel werden übersprungen, damit eine Übersetzung keinen sprachübergreifenden Wert überschreibt.
+Der projektweite JSON-Übersetzungsworkflow liegt bewusst unter **Translations** in `/_admin`. Er bündelt native Text- und Elements-Inhalte; `/_editor` bleibt auf die Änderung einzelner freigegebener Werte konzentriert.
 
 ## Elemente pflegen
 
@@ -215,4 +203,3 @@ Die genaue Aufteilung hängt vom Projekt ab. Beginne mit kleinen Rechten und erw
 - [`/_templates`-Bedienung](_templates.de.md) erklärt den strukturellen Template-Builder im Alpha-Status.
 - [Grundkonzepte](concepts.de.md) beschreibt, wie Texte, Elemente, Bilder und Templates zusammenwirken.
 - [Deployment](deployment.de.md) behandelt Backups, Zugriffsschutz und sicheren Betrieb.
-

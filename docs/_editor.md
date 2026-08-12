@@ -75,24 +75,12 @@ The **Texts** area contains individual textfills such as headings, descriptions,
 1. Open **Texts**.
 2. Select the appropriate group.
 3. Edit global values and select the desired language for translated values.
-4. For formatted fields, use only the offered functions for bold, italic, highlighting, and links.
+4. For formatted fields, use only the offered functions for bold, italic, highlighting, inline code, and links.
 5. Click **Save** and wait for the **Saved** message.
 
 Character counters show the maximum length intended by the developer. A text key that does not appear here may be intentionally hidden in `/_admin` or technically reserved.
 
-### Export and Import Translations
-
-Via the translation tools, you can export the texts of one language as JSON. Global values are not included because they apply to all languages.
-
-For import:
-
-1. select the target language;
-2. paste the translated JSON into the text field;
-3. check that keys and JSON structure remain unchanged;
-4. select **Import**;
-5. control the number of imported and skipped entries.
-
-The import supplements or updates the mentioned keys. Existing texts not included are not deleted. Global keys are skipped so that a translation does not overwrite a cross-language value.
+The project-wide JSON translation workflow is intentionally located under **Translations** in `/_admin`. It combines native Text and Elements content; `/_editor` remains focused on changing individual released values.
 
 ## Maintain Elements
 

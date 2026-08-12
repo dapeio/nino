@@ -114,6 +114,7 @@
 			wrap.innerHTML = '';
 
 			const ul = dc.createElement('ul');
+			ul.className = 'admin-drill-list';
 			Nino.admin.images._slots.forEach( function( slot ) {
 				const li 		= dc.createElement('li');
 				const link	= dc.createElement('a');

@@ -203,6 +203,28 @@ check( 'apiSave silently drops a field with an unknown type', isset( $afterSave[
 check( 'apiSave never touches the "*" bucket', $afterSave['*'] === [ '*' => [] ] );
 check( 'apiSave never touches real locale content', ( $afterSave['de_DE']['item1']['name'] ?? null ) === 'Hallo' );
 
+// The order fields are posted in is the order they are written in, and the
+// order every element form then renders them in - that is exactly what the
+// editor's new ↑/↓ buttons change (see assets/elementtypes.js's _move())
+check( 'apiSave keeps the posted field order', array_keys( $afterSave['model'] ) === [ 'name', 'photo', 'price', 'active' ] );
+
+$_POST['data'] = json_encode( [
+	'uri' 		=> 'testtype',
+	'title' 	=> 'Test Type Renamed',
+	'model' 	=> [
+		'price' 	=> [ 'type' => 'double' ],
+		'name' 		=> [ 'type' => 'string', 'locale' => true, 'required' => true, 'maxlength' => 80 ],
+		'active' 	=> [ 'type' => 'boolean' ],
+		'photo' 	=> [ 'type' => 'image', 'width' => 40, 'height' => 40 ],
+	],
+] );
+$reorderRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Admin\ElementTypes::apiSave( $appData, $reorderRequest );
+$afterReorder = \Nino\Filesystem::getFileContent( $appData, '/elements/testtype.php', false );
+check( 'apiSave rewrites the model in a reordered post\'s own order', array_keys( $afterReorder['model'] ) === [ 'price', 'name', 'active', 'photo' ] );
+check( 'a reordered field keeps its own settings', ( $afterReorder['model']['name']['maxlength'] ?? null ) === 80 && ( $afterReorder['model']['photo']['width'] ?? null ) === 40 );
+check( 'reordering never touches real locale content', ( $afterReorder['de_DE']['item1']['name'] ?? null ) === 'Hallo' );
+
 // Switching a field's locale flag must migrate its stored value(s), not just
 // the model - otherwise a stale per-locale value keeps shadowing the new
 // '*' value forever (_cacheElement() merges locale data over '*' data)
@@ -482,7 +504,7 @@ function callDev( array &$appData, string $class, string $method, array $data = 
 check( 'apiList succeeds', $status === 200 );
 check( 'apiList returns exactly the whitelisted keys', array_keys( $body['values'] ) === [
 	'/nino/error/log', '/nino/error/display', '/nino/locales/native', '/nino/locales/available',
-	'/nino/html/assets', '/nino/http/routes',
+	'/nino/html/assets', '/nino/html/navs', '/nino/http/routes',
 ] );
 check( 'apiList pretty-prints the current value', $body['values']['/nino/locales/native'] === '"de_DE"' );
 
@@ -710,9 +732,9 @@ check( 'the per-locale value actually landed in the right locale file', $deDEAft
 check( 'apiCreate creates the html-flagged fixture key', $status === 200 );
 
 [ $status, $body ] = callDev( $appData, \Nino\Admin\Text::class, 'apiSaveBatch', [ 'items' => [
-	[ 'key' => '/company/note', 'locale' => '*', 'value' => '<script>alert(1)</script><strong>Wichtig</strong><em>auch</em>' ],
+	[ 'key' => '/company/note', 'locale' => '*', 'value' => '<script>alert(1)</script><strong>Wichtig</strong><em>auch</em><code>x()</code>' ],
 ] ] );
-check( 'apiSaveBatch sanitizes html the same way _editor\'s Text does', $body['results']['/company/note']['value'] === '<strong>Wichtig</strong><em>auch</em>' );
+check( 'apiSaveBatch sanitizes html and preserves inline code', $body['results']['/company/note']['value'] === '<strong>Wichtig</strong><em>auch</em><code>x()</code>' );
 
 [ $status, $body ] = callDev( $appData, \Nino\Admin\Text::class, 'apiSaveBatch', [ 'items' => [
 	[ 'key' => '/does/not/exist', 'locale' => '*', 'value' => 'x' ],
@@ -868,7 +890,7 @@ file_put_contents( $sandbox. '/templates/not-a-page.tpl', '<p>ignored - not a pa
 check( 'apiList succeeds', $status === 200 );
 check( 'starts with an empty page list', $body['pages'] === [] );
 check( 'lists only templates/page-*.tpl files, sorted, extension stripped', $body['templates'] === [ 'page-about', 'page-contact' ] );
-check( 'navModule is false - Navigation was never picked', $body['navModule'] === false );
+check( 'no navigations are offered - Navigation was never picked', $body['navs'] === [] );
 
 [ $status ] = callDev( $appData, \Nino\Admin\PageEditor::class, 'apiSave', [
 	'originalHttpUri' => '', 'uri' => '../etc/passwd', 'httpUri' => '/about', 'template' => 'page-about', 'text' => [],
@@ -963,9 +985,12 @@ $appData['/nino/modules'][] = '\\Nino\\Modules\\Navigation';
 ] );
 check( 'resaving an existing entry unchanged (identified by originalHttpUri) succeeds', $status === 200 );
 
-$deAfterNav = \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] );
-check( 'generates the main-menu fill once Navigation is active, keyed by Http-URI (not Element-URI)', $deAfterNav['[[/website/navigation/main]]'] === '/contact:Kontakt' );
-check( 'the non-nav entry (about) is left out of the generated menu', str_contains( $deAfterNav['[[/website/navigation/main]]'], 'about' ) === false );
+// Menu membership lives on the route this entry owns, not in a generated
+// textfill - see \Nino\Modules\Navigation::routeLines()
+$routesAfterNav = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes'];
+check( 'a nav-checked page joins the first registered menu on its own route', ( $routesAfterNav['GET://contact']['navs'] ?? null ) === [ 'main' => 5 ] );
+check( 'a page in no menu carries no membership at all', isset( $routesAfterNav['GET://about']['navs'] ) === false );
+check( 'nothing is generated into the text files anymore', isset( \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] )['[[/website/navigation/main]]'] ) === false );
 
 // Reordering: check both entries "nav" so the generated menu actually
 // shows a reorder, not just the list itself
@@ -995,8 +1020,9 @@ check( 'the two entries actually swapped places', array_column( $body['pages'], 
 $configAfterMove = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
 check( 'the swapped order is persisted too', array_column( $configAfterMove['/nino/install/webpages'], 'httpUri' ) === [ '/contact', '/about' ] );
 
-$deAfterMove = \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] );
-check( 'the generated main-menu fill reflects the new order too', $deAfterMove['[[/website/navigation/main]]'] === "/contact:Kontakt\n/about:About" );
+// Equal menu priorities fall back to the order the routes stand in, so the
+// move has to reorder those too - the list on its own renders nothing
+check( 'the routes are reordered with the list, which is what reorders the menus', array_slice( array_keys( $configAfterMove['/nino/http/routes'] ), -2 ) === [ 'GET://contact', 'GET://about' ] );
 
 // Move it back for the rename/delete checks below, which assume the
 // original order ("about" first)
@@ -1118,6 +1144,136 @@ check( 'the global field sits in the "*" bucket, not in a locale one', $body['ra
 check( 'each locale bucket holds only that locale\'s own fields', $body['raw']['de_DE'] === [ 'title' => 'Erster' ] && $body['raw']['en_US'] === [ 'title' => 'First' ] );
 check( 'a locale that only resolves through "*" has no bucket of its own at all', array_key_exists( 'fr_FR', $body['raw'] ) === false );
 check( 'the raw view never leaks the type\'s own non-bucket keys', isset( $body['raw']['model'] ) === false && isset( $body['raw']['title'] ) === false );
+
+echo "\nTranslations - native Text + Elements JSON round-trip\n";
+
+// Translation fixtures deliberately mix public/per-locale content with
+// global, blacklisted and image values which must never enter the package.
+\Nino\Filesystem::mutate( $appData, '/text/de_DE.php', function( array $content ): array {
+	$content['[[/translation/title]]'] 		= '<code>Nino</code> Start';
+	$content['[[/translation/plain]]'] 		= 'Willkommen';
+	$content['[[/translation/technical]]'] = 'do-not-translate';
+	return $content;
+} );
+\Nino\Filesystem::mutate( $appData, '/text/en_US.php', function( array $content ): array {
+	$content['[[/translation/title]]'] 		= '<code>Nino</code> Old';
+	$content['[[/translation/plain]]'] 		= 'Old';
+	$content['[[/translation/technical]]'] = 'technical';
+	return $content;
+} );
+\Nino\Filesystem::mutate( $appData, '/text/global.php', function( array $content ): array {
+	$content['[[/translation/global]]'] = 'Shared';
+	return $content;
+} );
+\Nino\Filesystem::mutate( $appData, '/text/blacklist.php', function( array $content ): array {
+	$content[] = '/translation/technical';
+	return array_values( array_unique( $content ) );
+} );
+
+\Nino\Filesystem::putFileContent( $appData, '/elements/translationtype.php', [
+	'title' => 'Translation Type',
+	'model' => [
+		'title' 			=> [ 'type' => 'string', 'locale' => true ],
+		'description' => [ 'type' => 'string', 'locale' => true, 'html' => true ],
+		'features' 		=> [ 'type' => 'array', 'locale' => true ],
+		'views' 			=> [ 'type' => 'integer' ],
+		'image' 			=> [ 'type' => 'image', 'locale' => true ],
+	],
+	'*' => [
+		'*' => [],
+		'item' => [ 'views' => 7 ],
+	],
+	'de_DE' => [
+		'item' => [
+			'title' => 'Projekt',
+			'description' => '<code>Native</code>',
+			'features' => [ 'Schnell', 'Klein' ],
+			'image' => 'native.webp',
+		],
+	],
+	'en_US' => [
+		'item' => [
+			'title' => 'Old project',
+			'description' => '<code>Old</code>',
+			'features' => [ 'Old' ],
+			'image' => 'english.webp',
+		],
+	],
+] );
+unset( $appData['./nino/elements/cache'] );
+
+[ $status, $info ] = callDev( $appData, \Nino\Admin\Translations::class, 'apiInfo' );
+check( 'apiInfo succeeds and fixes the source to the native locale', $status === 200 && $info['nativeLocale'] === 'de_DE' );
+check( 'apiInfo offers every configured import target', $info['locales'] === [ 'de_DE', 'en_US', 'fr_FR' ] );
+
+$_POST['action'] = 'translations/info';
+$_POST['data'] = '{}';
+$translationDispatch = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Admin\Admin::handlePost( $appData, $translationDispatch );
+check( 'Translations is registered in Admin\'s central action dispatcher', $translationDispatch['/nino/http/response']['statusCode'] === 200 );
+
+[ $status, $translation ] = callDev( $appData, \Nino\Admin\Translations::class, 'apiExport' );
+check( 'apiExport returns a versioned translation document', $status === 200 && $translation['format'] === 'nino.translation' && $translation['version'] === 1 );
+check( 'apiExport includes public native text without [[ ]] around its key', ( $translation['text']['/translation/title'] ?? null ) === '<code>Nino</code> Start' );
+check( 'apiExport excludes global and blacklisted text', isset( $translation['text']['/translation/global'] ) === false && isset( $translation['text']['/translation/technical'] ) === false );
+check( 'apiExport includes locale-scoped element content', ( $translation['elements']['translationtype']['item']['features'] ?? null ) === [ 'Schnell', 'Klein' ] );
+check( 'apiExport excludes global and image element fields', isset( $translation['elements']['translationtype']['item']['views'] ) === false && isset( $translation['elements']['translationtype']['item']['image'] ) === false );
+
+// Post only a small translated subset: import is allowed to be partial and
+// must count every invalid path while still applying valid siblings.
+$translation['text'] = [
+	'/translation/title' 		=> 'Home <code>Nino</code>',
+	'/translation/plain' 		=> '<b>Welcome</b>',
+	'/translation/global' 		=> 'HACKED',
+	'/translation/technical' => 'HACKED',
+	'/translation/unknown' 		=> 'HACKED',
+];
+$translation['elements'] = [
+	'translationtype' => [
+		'item' => [
+			'title' => '<b>Project</b>',
+			'description' => '<code>Translated</code><img src=x onerror=alert(1)>',
+			'features' => [ 'One <b>x</b>', [ 'Deep <em>y</em>' ] ],
+			'views' => 99,
+			'image' => 'hacked.webp',
+			'unknown' => 'HACKED',
+		],
+		'ghost' => [ 'title' => 'HACKED' ],
+	],
+	'unknown-type' => [ 'ghost' => [ 'title' => 'HACKED' ] ],
+];
+
+[ $status, $result ] = callDev( $appData, \Nino\Admin\Translations::class, 'apiImport', [
+	'targetLocale' => 'en_US',
+	'translation' => $translation,
+] );
+check( 'apiImport succeeds for a configured target locale', $status === 200 && $result['targetLocale'] === 'en_US' );
+check( 'apiImport reports Text values and rejected keys separately', $result['text'] === [ 'imported' => 2, 'skipped' => 3 ] );
+check( 'apiImport reports Element fields and rejected paths separately', $result['elements'] === [ 'imported' => 3, 'skipped' => 5 ] );
+
+$translatedText = \Nino\Filesystem::getFileContent( $appData, '/text/en_US.php', [] );
+$nativeText = \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] );
+check( 'Text import preserves allowed code markup and sanitizes plain text', $translatedText['[[/translation/title]]'] === 'Home <code>Nino</code>' && $translatedText['[[/translation/plain]]'] === 'Welcome' );
+check( 'Text import leaves native source, global and technical values untouched', $nativeText['[[/translation/title]]'] === '<code>Nino</code> Start' && $translatedText['[[/translation/technical]]'] === 'technical' );
+
+$translatedElements = \Nino\Filesystem::getFileContent( $appData, '/elements/translationtype.php', [] );
+check( 'Element import sanitizes plain, HTML and nested array strings', $translatedElements['en_US']['item']['title'] === 'Project' && $translatedElements['en_US']['item']['description'] === '<code>Translated</code>' && $translatedElements['en_US']['item']['features'] === [ 'One x', [ 'Deep y' ] ] );
+check( 'Element import cannot overwrite global or image fields', $translatedElements['*']['item']['views'] === 7 && $translatedElements['en_US']['item']['image'] === 'english.webp' );
+check( 'Element import leaves the native bucket untouched', $translatedElements['de_DE']['item']['title'] === 'Projekt' );
+
+$badTranslation = $translation;
+$badTranslation['version'] = 99;
+[ $status ] = callDev( $appData, \Nino\Admin\Translations::class, 'apiImport', [ 'targetLocale' => 'en_US', 'translation' => $badTranslation ] );
+check( 'apiImport rejects an incompatible format version', $status === 400 );
+[ $status ] = callDev( $appData, \Nino\Admin\Translations::class, 'apiImport', [ 'targetLocale' => 'xx_XX', 'translation' => $translation ] );
+check( 'apiImport rejects an unknown target locale', $status === 400 );
+
+\Nino\Runtime::unsetSessionValue( $appData, './nino/admin/authed' );
+[ $status ] = callDev( $appData, \Nino\Admin\Translations::class, 'apiExport' );
+check( 'Translations actions require an authed _admin session', $status === 401 );
+\Nino\Runtime::setSessionValue( $appData, './nino/admin/authed', true );
+
+check( 'PageEditor keeps the stable pages tab id but labels it Routes', \Nino\Admin\PageEditor::nav() === [ 'pages', 'Routes' ] );
 
 [ $status ] = callDev( $appData, \Nino\Admin\Elements::class, 'apiGet', [ 'type' => 'contenttype', 'uri' => 'nope' ] );
 check( 'apiGet 404s for an unknown element', $status === 404 );

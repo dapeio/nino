@@ -159,7 +159,7 @@
 		},
 
 		/**
-		 *	Render the category list, plus an "add new key" action below it
+		 *	Render the scan action, category list and "add new key" action
 		 *
 		 *	@return		void
 		 */
@@ -168,33 +168,41 @@
 			const wrap = dc.getElementById('text-list');
 			wrap.innerHTML = '';
 
+			const scanBtn = dc.createElement('button');
+			scanBtn.type = 'button';
+			scanBtn.className = 'editor-list-action admin-list-action--before';
+			scanBtn.textContent = 'Scan templates for missing keys';
+			scanBtn.addEventListener( 'click', function() { Nino.admin.text._openScanForm() } );
+			wrap.appendChild( scanBtn );
+
+			const ul = dc.createElement('ul');
+			ul.className = 'admin-drill-list';
+
 			Object.keys( Nino.admin.text._groups ).sort().forEach( function( group ) {
 
 				const entries = Nino.admin.text._groups[group];
 
-				const btn = dc.createElement('div');
-				btn.className = 'editor-type-btn';
-				btn.dataset.group = group;
+				const li = dc.createElement('li');
+				const link = dc.createElement('a');
+				link.href = '#';
+				link.dataset.group = group;
 
-				const titleWrap = dc.createElement('div');
-				titleWrap.textContent = group;
+				const copy = dc.createElement('span');
+				copy.className = 'admin-list-copy';
+				const title = dc.createElement('strong');
+				title.textContent = group;
 
-				const descr = dc.createElement('div');
-				descr.className = 'editor-type-btn-descr';
+				const descr = dc.createElement('small');
 				descr.textContent = Nino.admin.text._groupDescr( entries );
-				titleWrap.appendChild( descr );
+				copy.appendChild( title );
+				copy.appendChild( descr );
+				link.appendChild( copy );
 
-				const chev = dc.createElement('span');
-				chev.className = 'editor-view-button-chev';
-				chev.setAttribute( 'aria-hidden', 'true' );
-				chev.textContent = '›';
-
-				btn.appendChild( titleWrap );
-				btn.appendChild( chev );
-				btn.addEventListener( 'click', function() { Nino.admin.text._openGroup( group ) } );
-
-				wrap.appendChild( btn );
+				link.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.text._openGroup( group ) } );
+				li.appendChild( link );
+				ul.appendChild( li );
 			} );
+			wrap.appendChild( ul );
 
 			const addBtn = dc.createElement('button');
 			addBtn.type = 'button';
@@ -202,13 +210,6 @@
 			addBtn.textContent = 'New text key';
 			addBtn.addEventListener( 'click', function() { Nino.admin.text._openNewKeyForm() } );
 			wrap.appendChild( addBtn );
-
-			const scanBtn = dc.createElement('button');
-			scanBtn.type = 'button';
-			scanBtn.className = 'editor-list-action';
-			scanBtn.textContent = 'Scan templates for missing keys';
-			scanBtn.addEventListener( 'click', function() { Nino.admin.text._openScanForm() } );
-			wrap.appendChild( scanBtn );
 		},
 
 		/**

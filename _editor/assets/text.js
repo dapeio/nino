@@ -183,125 +183,6 @@
 		},
 
 		/**
-		 *	Build the "Übersetzung" toolbar: export a locale's raw file
-		 *	content as JSON (round-trip it through an external LLM by hand),
-		 *	then paste the translated JSON back in for a target locale. See
-		 *	Admin\Text::apiExport()/apiImport() for the actual read/write -
-		 *	this only builds the request and downloads/shows the result
-		 *
-		 *	@return		{Element}
-		 */
-		_renderTranslateTools : function() {
-
-			const wrap = dc.createElement('div');
-			wrap.id = 'text-translate-tools';
-
-			const buildLocaleSelect = function() {
-				const select = dc.createElement('select');
-				Nino.editor.text._locales.forEach( function( locale ) {
-					const opt = dc.createElement('option');
-					opt.value = locale;
-					opt.textContent = locale;
-					select.appendChild( opt );
-				} );
-				select.value = Nino.editor.sessionLocale.current ?? Nino.editor.text._locales[0] ?? '';
-				return select;
-			};
-
-			// Export
-			const exportRow = dc.createElement('div');
-			exportRow.className = 'text-translate-row';
-
-			const exportSelect = buildLocaleSelect();
-			exportRow.appendChild( exportSelect );
-
-			const exportBtn = dc.createElement('button');
-			exportBtn.type = 'button';
-			exportBtn.textContent = Nino.content.getText('/_editor/text/translate/export');
-			exportBtn.addEventListener( 'click', function() {
-				Nino.editor.text._apiCall( 'export', { locale : exportSelect.value }, function( status, response ) {
-					if( status !== 200 || response === null )
-						return;
-					const json = JSON.stringify( response.content, null, 2 );
-					const blob = new Blob( [ json ], { type : 'application/json;charset=utf-8;' } );
-					const url = URL.createObjectURL( blob );
-					const a = dc.createElement('a');
-					a.href = url;
-					a.download = 'text-'+ exportSelect.value+ '.json';
-					dc.body.appendChild( a );
-					a.click();
-					a.remove();
-					URL.revokeObjectURL( url );
-				} );
-			} );
-			exportRow.appendChild( exportBtn );
-
-			wrap.appendChild( exportRow );
-
-			// Import
-			const importRow = dc.createElement('div');
-			importRow.className = 'text-translate-row';
-
-			const importSelect = buildLocaleSelect();
-			importRow.appendChild( importSelect );
-
-			const importArea = dc.createElement('textarea');
-			importArea.id = 'text-import-area';
-			importArea.placeholder = Nino.content.getText('/_editor/text/translate/placeholder');
-			importRow.appendChild( importArea );
-
-			const importResult = dc.createElement('span');
-			importResult.id = 'text-import-result';
-			importResult.setAttribute( 'aria-live', 'polite' );
-
-			const importBtn = dc.createElement('button');
-			importBtn.type = 'button';
-			importBtn.textContent = Nino.content.getText('/_editor/text/translate/import');
-			importBtn.addEventListener( 'click', function() {
-
-				let content;
-				try {
-					content = JSON.parse( importArea.value );
-				} catch(e) {
-					importResult.textContent = Nino.content.getText('/_editor/text/translate/invalid');
-					importResult.className = 'text-import-error';
-					return;
-				}
-
-				Nino.editor.text._apiCall( 'import', { locale : importSelect.value, content : content }, function( status, response ) {
-					if( status !== 200 || response === null ) {
-						importResult.textContent = ( response && response.error ) ? response.error : Nino.content.getText('/_editor/text/translate/error');
-						importResult.className = 'text-import-error';
-						return;
-					}
-					importResult.textContent = response.imported+ ' '+ Nino.content.getText('/_editor/text/translate/imported')+ ', '+ response.skipped+ ' '+ Nino.content.getText('/_editor/text/translate/skipped')+ '.';
-					importResult.className = 'text-import-success';
-					importArea.value = '';
-
-					// Re-fetch so the editor (previews, per-key values) reflects what
-					// was just imported - delayed so _renderCategoryList()'s rebuild
-					// (which replaces this whole toolbar, importResult included)
-					// doesn't wipe the success message before it's even been read
-					setTimeout( function() {
-						Nino.editor.text._apiCall( 'keys', {}, function( status, response ) {
-							if( status !== 200 || response === null )
-								return;
-							Nino.editor.text._locales = response.locales;
-							Nino.editor.text._groups 	= Nino.editor.text._groupEntries( response.keys );
-							Nino.editor.text._renderCategoryList();
-						} );
-					}, 2000 );
-				} );
-			} );
-			importRow.appendChild( importBtn );
-			importRow.appendChild( importResult );
-
-			wrap.appendChild( importRow );
-
-			return wrap;
-		},
-
-		/**
 		 *	Render the category list, styled the same as the Elements type list
 		 *
 		 *	@return		void
@@ -310,8 +191,6 @@
 
 			const wrap = dc.getElementById('text-list');
 			wrap.innerHTML = '';
-
-			wrap.appendChild( Nino.editor.text._renderTranslateTools() );
 
 			Object.keys( Nino.editor.text._groups ).sort().forEach( function( group ) {
 
@@ -371,14 +250,19 @@
 		 *	@param		{Object}	entry					Key entry
 		 *	@param		{*}				value					Current value
 		 *
-		 *	@return		{Element}								<label> wrapping the field
+		 *	@return		{Element}								Field wrapper
 		 */
 		_renderKeyField : function( entry, value ) {
 
-			const label = dc.createElement('label');
+			// contenteditable is an interactive surface of its own. Nesting it in
+			// a <label> is invalid interactive markup and Safari may forward the
+			// drag back to the label instead of starting a text selection.
+			const label = dc.createElement( entry.html === true ? 'div' : 'label' );
 			label.className = 'editor-field';
 
 			if( entry.html === true ) {
+				label.setAttribute( 'role', 'group' );
+				label.setAttribute( 'aria-label', '[['+ entry.key+ ']]' );
 				const span = dc.createElement('span');
 				span.textContent = '[[' + entry.key + ']]';
 				label.appendChild( span );

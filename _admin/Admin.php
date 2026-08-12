@@ -60,6 +60,7 @@ namespace Nino\Admin {
 			\Nino\Admin\ElementTypes::class,
 			\Nino\Admin\Elements::class,
 			\Nino\Admin\Text::class,
+			\Nino\Admin\Translations::class,
 			\Nino\Admin\PageEditor::class,
 			\Nino\Admin\Images::class,
 			\Nino\Admin\Users::class,
@@ -1619,6 +1620,7 @@ namespace Nino\Admin {
 			'/nino/locales/native'		=> 'string',
 			'/nino/locales/available'	=> 'array',
 			'/nino/html/assets'				=> 'array',
+			'/nino/html/navs'					=> 'array',
 			'/nino/http/routes'				=> 'array',
 		];
 
@@ -2680,6 +2682,351 @@ namespace Nino\Admin {
 
 	/**
 	 *	Nino							A compact filesystembased php framework
+	 *	Admin						Batch translation hand-off for the complete native
+	 *										content layer: public textfills and locale-scoped
+	 *										element fields. The JSON deliberately contains no
+	 *										global/technical values, images or element structure.
+	 *										Import is merge-only and validates every posted path
+	 *										against a fresh native export before it writes.
+	 *
+	 *	@package					Dape/Nino
+	 *	@author					David Perchermeier <mail@dape.io>
+	 *	@link						https://github.com/dapeio/nino
+	 */
+	class Translations {
+
+		private const string FORMAT = 'nino.translation';
+		private const int VERSION = 1;
+
+		/**
+		 *	This module's action map, merged into Admin::handlePost()
+		 *
+		 *	@return 	array
+		 */
+		public static function actions(): array {
+			return [
+				'translations/info' 		=> [ self::class, 'apiInfo' ],
+				'translations/export' 	=> [ self::class, 'apiExport' ],
+				'translations/import' 	=> [ self::class, 'apiImport' ],
+			];
+		}
+
+		public static function nav(): array {
+			return [ 'translations', 'Translations' ];
+		}
+
+		/**
+		 *	Report the fixed source language, possible targets and package size
+		 */
+		public static function apiInfo( array &$appData, array &$request ): void {
+
+			if( \Nino\Admin\Admin::guard( $appData, $request ) === false )
+				return;
+
+			$translation = self::_translationData( $appData );
+
+			$elementFields = 0;
+			foreach( $translation['elements'] as $elements )
+				foreach( $elements as $fields )
+					$elementFields += count( $fields );
+
+			\Nino\Http::ok( $request, [
+				'nativeLocale' 	=> $translation['sourceLocale'],
+				'locales' 			=> \Nino\Locales::getAvailableLocales( $appData ),
+				'textCount' 		=> count( $translation['text'] ),
+				'elementCount' 	=> $elementFields,
+			] );
+		}
+
+		/**
+		 *	Return the versioned native-language hand-off document
+		 */
+		public static function apiExport( array &$appData, array &$request ): void {
+
+			if( \Nino\Admin\Admin::guard( $appData, $request ) === false )
+				return;
+
+			\Nino\Http::ok( $request, self::_translationData( $appData ) );
+		}
+
+		/**
+		 *	Merge a translated hand-off document into one configured locale.
+		 *	The document's keys are untrusted: only paths which still occur in
+		 *	a freshly generated native package may reach the write APIs.
+		 */
+		public static function apiImport( array &$appData, array &$request ): void {
+
+			if( \Nino\Admin\Admin::guard( $appData, $request ) === false )
+				return;
+
+			$data 			= \Nino\Admin\Admin::postData();
+			$targetLocale = (string) ( $data['targetLocale'] ?? '' );
+			$translation 	= $data['translation'] ?? null;
+
+			if( \Nino\Locales::verifyLocale( $appData, $targetLocale ) === false ) {
+				\Nino\Http::fail( $request, 400, 'invalid target locale' );
+				return;
+			}
+
+			if(
+				is_array( $translation ) === false ||
+				( $translation['format'] ?? null ) !== self::FORMAT ||
+				( $translation['version'] ?? null ) !== self::VERSION ||
+				( $translation['sourceLocale'] ?? null ) !== \Nino\Locales::getNativeLocale( $appData ) ||
+				is_array( $translation['text'] ?? null ) === false ||
+				is_array( $translation['elements'] ?? null ) === false
+			) {
+				\Nino\Http::fail( $request, 400, 'invalid or incompatible translation document' );
+				return;
+			}
+
+			$reference = self::_translationData( $appData );
+
+			$textItems 		= [];
+			$textSkipped 	= 0;
+
+			foreach( $translation['text'] as $key => $value ) {
+				if( is_string( $key ) === false || array_key_exists( $key, $reference['text'] ) === false || is_string( $value ) === false ) {
+					$textSkipped++;
+					continue;
+				}
+				$textItems[] = [ 'key' => $key, 'locale' => $targetLocale, 'value' => $value ];
+			}
+
+			$textImported = 0;
+			foreach( \Nino\Text::saveBatch( $appData, $textItems, false ) as $result ) {
+				if( ( $result['ok'] ?? false ) === true )
+					$textImported++;
+				else
+					$textSkipped++;
+			}
+
+			$elementImported = 0;
+			$elementSkipped 	= 0;
+			$errors 				= [];
+
+			foreach( $translation['elements'] as $type => $submittedElements ) {
+
+				$referenceElements = is_string( $type ) ? ( $reference['elements'][$type] ?? null ) : null;
+				if( is_array( $submittedElements ) === false || is_array( $referenceElements ) === false ) {
+					$elementSkipped += self::_submittedFieldCount( $submittedElements );
+					continue;
+				}
+
+				$typeData = \Nino\Filesystem::getFileContent( $appData, '/elements/'. $type. '.php', [] );
+				$model 		= is_array( $typeData['model'] ?? null ) ? $typeData['model'] : [];
+				$changes 	= [];
+
+				foreach( $submittedElements as $elementUri => $submittedFields ) {
+
+					$elementUri = is_string( $elementUri ) || is_int( $elementUri ) ? (string) $elementUri : '';
+					$referenceFields = $elementUri !== '' ? ( $referenceElements[$elementUri] ?? null ) : null;
+					if( is_array( $submittedFields ) === false || is_array( $referenceFields ) === false ) {
+						$elementSkipped += is_array( $submittedFields ) ? count( $submittedFields ) : 1;
+						continue;
+					}
+
+					foreach( $submittedFields as $key => $value ) {
+						$key = is_string( $key ) || is_int( $key ) ? (string) $key : '';
+						$field = $key !== '' ? ( $model[$key] ?? null ) : null;
+						if(
+							is_array( $field ) === false ||
+							array_key_exists( $key, $referenceFields ) === false ||
+							( $field['locale'] ?? false ) !== true ||
+							( $field['type'] ?? '' ) === 'image'
+						) {
+							$elementSkipped++;
+							continue;
+						}
+
+						$value = self::_sanitizeElementValue( $value, $field );
+						if( self::_validElementValue( $value, $field ) === false ) {
+							$elementSkipped++;
+							continue;
+						}
+
+						$changes[$elementUri][$key] = $value;
+					}
+				}
+
+				if( $changes === [] )
+					continue;
+
+				// Old hand-authored type files sometimes only carry a native
+				// bucket. The kernel needs the empty global identity stub to see
+				// that same element from a target locale which has no bucket yet.
+				$missingStubs = array_values( array_filter( array_keys( $changes ), fn( string|int $uri ): bool => isset( $typeData['*'][$uri] ) === false ) );
+
+				if( $missingStubs !== [] ) {
+					$stubWritten = \Nino\Filesystem::mutate( $appData, '/elements/'. $type. '.php', function( array $fresh ) use ( $missingStubs ): array {
+						foreach( $missingStubs as $uri )
+							$fresh['*'][$uri] = $fresh['*'][$uri] ?? [];
+						return $fresh;
+					} );
+
+					if( $stubWritten === false ) {
+						foreach( $changes as $fields )
+							$elementSkipped += count( $fields );
+						$errors[] = $type. ': element identities could not be written';
+						continue;
+					}
+					unset( $appData['./nino/elements/cache'] );
+				}
+
+				foreach( $changes as $elementUri => $fields ) {
+					$result = \Nino\Elements::updateElement( $appData, '/'. $type. '/'. $elementUri, $fields, $targetLocale );
+					if( is_array( $result ) === true )
+						$elementImported += count( $fields );
+					else {
+						$elementSkipped += count( $fields );
+						$errors[] = $type. '/'. $elementUri. ': values were rejected';
+					}
+				}
+			}
+
+			\Nino\Http::ok( $request, [
+				'targetLocale' 	=> $targetLocale,
+				'text' 				=> [ 'imported' => $textImported, 'skipped' => $textSkipped ],
+				'elements' 		=> [ 'imported' => $elementImported, 'skipped' => $elementSkipped ],
+				'errors' 			=> $errors,
+			] );
+		}
+
+		/**
+		 *	Build the deterministic source document from raw native buckets
+		 */
+		private static function _translationData( array &$appData ): array {
+
+			$native = \Nino\Locales::getNativeLocale( $appData );
+			$text 	= [];
+
+			foreach( \Nino\Text::entries( $appData, false ) as $entry )
+				if( $entry['global'] === false && array_key_exists( $native, $entry['values'] ) === true && $entry['values'][$native] !== null )
+					$text[$entry['key']] = $entry['values'][$native];
+
+			$elements = [];
+
+			foreach( glob( \Nino\Filesystem::getPath( $appData ). '/elements/*.php' ) ?: [] as $file ) {
+
+				$type 		= basename( $file, '.php' );
+				$typeData = \Nino\Filesystem::getFileContent( $appData, '/elements/'. $type. '.php', [] );
+				$model 		= is_array( $typeData['model'] ?? null ) ? $typeData['model'] : [];
+				$nativeData = is_array( $typeData[$native] ?? null ) ? $typeData[$native] : [];
+
+				foreach( $nativeData as $elementUri => $rawFields ) {
+					$elementUri = (string) $elementUri;
+					if( $elementUri === '*' || is_array( $rawFields ) === false )
+						continue;
+
+					foreach( $model as $key => $field )
+						if(
+							is_array( $field ) === true &&
+							( $field['locale'] ?? false ) === true &&
+							( $field['type'] ?? '' ) !== 'image' &&
+							array_key_exists( $key, $rawFields ) === true
+						)
+							$elements[$type][$elementUri][$key] = $rawFields[$key];
+				}
+			}
+
+			ksort( $text );
+			ksort( $elements );
+			foreach( $elements as &$typeElements ) {
+				ksort( $typeElements );
+				foreach( $typeElements as &$fields )
+					ksort( $fields );
+				unset( $fields );
+			}
+			unset( $typeElements );
+
+			return [
+				'format' 			=> self::FORMAT,
+				'version' 			=> self::VERSION,
+				'sourceLocale' 	=> $native,
+				'instructions' 	=> [
+					'Translate values only. Never change, add, or remove object keys.',
+					'Keep JSON value types unchanged and preserve HTML tags, URLs, [[placeholders]], [shortcodes], and identifiers.',
+				],
+				'text' 				=> $text,
+				'elements' 		=> $elements,
+			];
+		}
+
+		/**
+		 *	Normalize external values before the kernel validates/stores them
+		 */
+		private static function _sanitizeElementValue( mixed $value, array $field ): mixed {
+
+			$type = (string) ( $field['type'] ?? '' );
+
+			if( is_string( $value ) === true )
+				return $type === 'string' && ( $field['html'] ?? false ) === true
+					? \Nino\Html::sanitizeHtml( $value )
+					: strip_tags( $value );
+
+			if( $type === 'array' && is_array( $value ) === true )
+				return array_map( function( mixed $item ): mixed {
+					if( is_string( $item ) === true )
+						return strip_tags( $item );
+					if( is_array( $item ) === true )
+						return self::_sanitizeElementValue( $item, [ 'type' => 'array' ] );
+					return $item;
+				}, $value );
+
+			return $value;
+		}
+
+		/**
+		 *	Reject one malformed field without making the kernel reject all
+		 *	valid sibling fields in that element's partial update.
+		 */
+		private static function _validElementValue( mixed $value, array $field ): bool {
+
+			$type = (string) ( $field['type'] ?? '' );
+			$expected = in_array( $type, [ 'date', 'datetime', 'image' ], true ) ? 'string' : $type;
+
+			if( $type === 'double' && is_int( $value ) === true ) {
+				// The kernel accepts and coerces whole-number JSON values too.
+			} else if( gettype( $value ) !== $expected )
+				return false;
+
+			if( ( $field['required'] ?? false ) === true ) {
+				if( is_string( $value ) === true && $value === '' )
+					return false;
+				if( is_array( $value ) === true && $value === [] )
+					return false;
+			}
+
+			if( isset( $field['whitelist'] ) === true && in_array( $value, $field['whitelist'] ) === false )
+				return false;
+
+			if( is_array( $field['options'] ?? null ) === true && $field['options'] !== [] && in_array( $value, $field['options'], true ) === false )
+				return false;
+
+			if( isset( $field['blacklist'] ) === true && in_array( $value, $field['blacklist'] ) === true )
+				return false;
+
+			return true;
+		}
+
+		/**
+		 *	Count field-shaped entries in an unknown submitted element branch
+		 */
+		private static function _submittedFieldCount( mixed $elements ): int {
+
+			if( is_array( $elements ) === false )
+				return 1;
+
+			$count = 0;
+			foreach( $elements as $fields )
+				$count += is_array( $fields ) ? count( $fields ) : 1;
+
+			return $count;
+		}
+	}
+
+	/**
+	 *	Nino							A compact filesystembased php framework
 	 *	Dev								"Pages" module: create/edit/delete the site's actual page
 	 *												routes without hand-editing /nino/http/routes as raw json
 	 *												(Config still covers everything this doesn't, see its own
@@ -2699,8 +3046,8 @@ namespace Nino\Admin {
 	 *												edits. That array is no longer purely /_install's own
 	 *												internal bookkeeping once this class exists alongside it
 	 *												(see docs/_install.md's note on this). The list's own
-	 *												order is what [[/website/navigation/main]] gets
-	 *												generated in (see _applyNavigation()) - apiMove() swaps
+	 *												order is what every navigation gets
+	 *												rendered in (see Modules\Navigation) - apiMove() swaps
 	 *												one entry with a neighbor, the same ↑/↓ reordering
 	 *												Webpages' own list does while _install is still around.
 	 *
@@ -2714,6 +3061,12 @@ namespace Nino\Admin {
 		// at runtime by the optional tools themselves and therefore do not show
 		// up in the persisted route array used for the general collision check.
 		private const array RESERVED_HTTP_URIS = [ '/_admin', '/_editor', '/_install', '/_templates' ];
+
+		// The priority a menu membership gets when nothing has set one yet -
+		// the middle of the range, same as Callbacks::registerCallback()'s own
+		// default, so a hand-written route can deliberately sort before or
+		// after everything this module writes
+		private const int DEFAULT_NAV_PRIO = 5;
 
 		// A fresh entry's text fields when none was posted (or a blank one) -
 		// same generic-by-design reasoning _install/Install.php's
@@ -2744,7 +3097,7 @@ namespace Nino\Admin {
 		 *	@return 	array										[ uri, label ]
 		 */
 		public static function nav(): array {
-			return [ 'pages', 'Pages' ];
+			return [ 'pages', 'Routes' ];
 		}
 
 		/**
@@ -2774,12 +3127,87 @@ namespace Nino\Admin {
 			if( \Nino\Admin\Admin::guard( $appData, $request ) === false )
 				return;
 
+			$config = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
+			$navs 	= self::navKeys( $appData );
+			$routes = $config['/nino/http/routes'] ?? [];
+
+			// Menu membership is reported from the route each entry owns, not
+			// from the entry - the route is where it actually lives (see
+			// Modules\Navigation::routeLines()), so a membership added to
+			// config.php by hand shows up here instead of being overwritten
+			// by this list's older copy on the next save
+			$pages = array_map( function( array $entry ) use ( $routes, $navs ): array {
+				$entry['navs'] = self::entryNavs( $entry, $routes, $navs );
+				return $entry;
+			}, $config['/nino/install/webpages'] ?? [] );
+
 			\Nino\Http::ok( $request, [
-				'pages' 			=> \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/install/webpages'] ?? [],
+				'pages' 			=> $pages,
 				'templates' 	=> self::_templates( $appData ),
 				'locales' 		=> \Nino\Locales::getAvailableLocales( $appData ),
-				'navModule' 	=> in_array( '\\Nino\\Modules\\Navigation', $appData['/nino/modules'] ?? [], true ),
+				'navs' 				=> $navs,
 			] );
+		}
+
+		/**
+		 *	The navigations this project offers, in the order a menu picker
+		 *	should list them: '/nino/html/navs', a plain list of keys.
+		 *
+		 *	Purely an editing affordance - Modules\Navigation renders whatever
+		 *	key a template asks for, registered here or not, so a project that
+		 *	never writes this array loses nothing but the checkboxes. Empty
+		 *	while the Navigation module is inactive, which is what tells the
+		 *	frontend to offer no menu fields at all (the old 'navModule' flag
+		 *	said exactly that, and nothing else).
+		 *
+		 *	Own copy of /_install's Webpages::navKeys(), same standalone-per-
+		 *	area reasoning every other helper in this class duplicates
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	array										Nav keys, eg. [ 'main', 'footer' ]
+		 */
+		public static function navKeys( array &$appData ): array {
+
+			if( in_array( '\\Nino\\Modules\\Navigation', $appData['/nino/modules'] ?? [], true ) === false )
+				return [];
+
+			$navs = $appData['/nino/html/navs'] ?? [];
+
+			// A project from before this registry existed - or one whose array
+			// got emptied - still has the single menu the old generated fill
+			// was hardcoded to, so it keeps an editable one rather than none
+			if( is_array( $navs ) === false || count( $navs ) === 0 )
+				return [ 'main' ];
+
+			return array_values( array_unique( array_map( 'strval', $navs ) ) );
+		}
+
+		/**
+		 *	Which navigations one list entry currently belongs to.
+		 *
+		 *	Read from its route first, since that is what actually renders.
+		 *	'nav' =&gt; true is what a config written before per-menu membership
+		 *	existed carries, and means the first registered navigation - the
+		 *	single menu that entry could have been in back then
+		 *
+		 *	@param		array 		$entry				One page-list entry
+		 *	@param		array 		$routes				The persisted route array
+		 *	@param		array 		$navs					Registered nav keys (see navKeys())
+		 *
+		 *	@return 	array										Nav keys this entry belongs to
+		 */
+		public static function entryNavs( array $entry, array $routes, array $navs ): array {
+
+			$onRoute = $routes[ self::_routeKey( (string) ( $entry['httpUri'] ?? '' ) ) ]['navs'] ?? null;
+
+			if( is_array( $onRoute ) === true )
+				return array_values( array_intersect( $navs, array_keys( $onRoute ) ) );
+
+			if( isset( $entry['navs'] ) === true && is_array( $entry['navs'] ) === true )
+				return array_values( array_intersect( $navs, $entry['navs'] ) );
+
+			return ( $entry['nav'] ?? false ) === true ? array_slice( $navs, 0, 1 ) : [];
 		}
 
 		/**
@@ -3003,11 +3431,18 @@ namespace Nino\Admin {
 				return;
 			}
 
+			// Menu membership: kept on the entry as this list's own copy,
+			// written onto the route below - that is where it renders from.
+			// 'nav' stays alongside it as a derived mirror so a downgrade to a
+			// version that only knows the boolean doesn't empty every menu
+			$navs = self::entryNavs( $data, [], self::navKeys( $appData ) );
+
 			$entry = [
 				'uri' 				=> $uri,
 				'httpUri' 		=> $httpUri,
 				'template' 		=> $template,
-				'nav' 				=> (bool) ( $data['nav'] ?? false ),
+				'navs' 				=> $navs,
+				'nav' 				=> count( $navs ) > 0,
 				'statusCode' 	=> $statusCode,
 				'body' 				=> $body,
 				'text' 				=> $text,
@@ -3030,10 +3465,17 @@ namespace Nino\Admin {
 			if( $statusCode !== 200 )
 				$routeData['statusCode'] = $statusCode;
 
+			// A priority someone tuned on this route is not this save's to
+			// reset - only the set of keys is rewritten (see the shortcode's
+			// own routeLines() for what the value means)
+			$prios = $routes[$routeKey]['navs'] ?? [];
+			foreach( $navs as $navKey )
+				$routeData['navs'][$navKey] = $prios[$navKey] ?? self::DEFAULT_NAV_PRIO;
+
 			$routes[$routeKey] = $routeData;
 
 			$appData['/nino/install/webpages'] 	= array_values( $pages );
-			$appData['/nino/http/routes'] 				= $routes;
+			$appData['/nino/http/routes'] 				= self::_orderRoutes( $routes, $pages );
 
 			\Nino\AppData::writeContentData( $appData, [ '/nino/install/webpages', '/nino/http/routes' ] );
 
@@ -3043,8 +3485,6 @@ namespace Nino\Admin {
 					'[[/webpage'. $uri. '/title]]' 			=> $text[$locale]['title'],
 					'[[/webpage'. $uri. '/description]]' => $text[$locale]['description'],
 				] );
-
-			self::_applyNavigation( $appData, $appData['/nino/install/webpages'], $locales );
 
 			\Nino\Http::ok( $request, [ 'pages' => $appData['/nino/install/webpages'] ] );
 		}
@@ -3092,15 +3532,13 @@ namespace Nino\Admin {
 
 			\Nino\AppData::writeContentData( $appData, [ '/nino/install/webpages', '/nino/http/routes' ] );
 
-			self::_applyNavigation( $appData, $appData['/nino/install/webpages'], \Nino\Locales::getAvailableLocales( $appData ) );
-
 			\Nino\Http::ok( $request, [ 'pages' => $appData['/nino/install/webpages'] ] );
 		}
 
 		/**
 		 *	Swap one page entry with its immediate neighbor - the list's own
-		 *	order is what [[/website/navigation/main]] is generated in (see
-		 *	_applyNavigation()), so reordering here is the only way to
+		 *	order is what every navigation renders in (see
+		 *	Modules\Navigation::routeLines()), so reordering here is the only way to
 		 *	control the generated main menu's order once _install (whose
 		 *	Webpages step has the same ↑/↓ buttons on its own list for the
 		 *	same reason) has been deleted. A swap rather than an arbitrary posted index:
@@ -3150,48 +3588,52 @@ namespace Nino\Admin {
 
 			[ $pages[$index], $pages[$swapWith] ] = [ $pages[$swapWith], $pages[$index] ];
 
-			$appData['/nino/install/webpages'] = array_values( $pages );
-			\Nino\AppData::writeContentData( $appData, [ '/nino/install/webpages' ] );
+			$pages = array_values( $pages );
 
-			self::_applyNavigation( $appData, $appData['/nino/install/webpages'], \Nino\Locales::getAvailableLocales( $appData ) );
+			// The routes follow the list: equal menu priorities keep the order
+			// the routes stand in (see Modules\Navigation::routeLines()), so
+			// this swap is what actually reorders every menu these pages
+			// appear in - the list on its own renders nothing
+			$appData['/nino/install/webpages'] 	= $pages;
+			$appData['/nino/http/routes'] 				= self::_orderRoutes( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes'] ?? [], $pages );
+
+			\Nino\AppData::writeContentData( $appData, [ '/nino/install/webpages', '/nino/http/routes' ] );
 
 			\Nino\Http::ok( $request, [ 'pages' => $appData['/nino/install/webpages'] ] );
 		}
 
 		/**
-		 *	Regenerates the site's main-menu text (see
-		 *	_install/library/modules/navigation/templates/html-header-nav.tpl
-		 *	and html-footer-nav.tpl's [[/website/navigation/main]] fill) from
-		 *	every entry with 'nav' checked, one "httpUri:name" line per
-		 *	entry - the exact shape \Nino\Modules\Navigation's
-		 *	[navigation]...[/navigation] shortcode expects. Only runs while
-		 *	the Navigation module is active; overwrites rather than merges,
-		 *	same reasoning as _install/Install.php's
-		 *	Webpages::_applyNavigation() docblock: it's fully derived from
-		 *	the current list, not something a developer is expected to
-		 *	hand-edit
+		 *	The route array, reordered so this list's own routes stand in list
+		 *	order. Every other route - hand-written, or one a module owns -
+		 *	keeps its place ahead of them.
 		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		array 		$pages				The just-saved, current page list
-		 *	@param		array 		$locales			Active locales
+		 *	Only ever an ordering, never a filter: a route the list does not
+		 *	know is carried over untouched. It matters because equal menu
+		 *	priorities fall back to the order the routes stand in (see
+		 *	Modules\Navigation::routeLines()), which is what makes the ↑/↓
+		 *	buttons in this module reorder the menus at all
 		 *
-		 *	@return 	void
+		 *	@param		array 		$routes				The route array to reorder
+		 *	@param		array 		$pages				The current page list, in its own order
+		 *
+		 *	@return 	array
 		 */
-		private static function _applyNavigation( array &$appData, array $pages, array $locales ): void {
+		private static function _orderRoutes( array $routes, array $pages ): array {
 
-			if( in_array( '\\Nino\\Modules\\Navigation', $appData['/nino/modules'] ?? [], true ) === false )
-				return;
+			$ordered = [];
 
-			$navEntries = array_values( array_filter( $pages, fn( array $p ): bool => ( $p['nav'] ?? false ) === true ) );
-
-			foreach( $locales as $locale ) {
-
-				$lines = [];
-				foreach( $navEntries as $entry )
-					$lines[] = $entry['httpUri']. ':'. ( $entry['text'][$locale]['name'] ?? self::DEFAULT_TEXT['name'] );
-
-				self::_setText( $appData, '/text/'. $locale. '.php', '[[/website/navigation/main]]', implode( PHP_EOL, $lines ) );
+			foreach( $pages as $entry ) {
+				$routeKey = self::_routeKey( (string) ( $entry['httpUri'] ?? '' ) );
+				if( isset( $routes[$routeKey] ) === true )
+					$ordered[$routeKey] = true;
 			}
+
+			$foreign = array_diff_key( $routes, $ordered );
+			$own 		= array_intersect_key( $routes, $ordered );
+
+			// array_replace(), not array_merge(): these keys ("GET://404") are
+			// strings php would renumber if any of them looked numeric
+			return array_replace( $foreign, array_replace( $ordered, $own ) );
 		}
 
 		/**
@@ -3214,11 +3656,11 @@ namespace Nino\Admin {
 		 *	Set (overwrite) a single text key - unlike _mergeText(), used
 		 *	only for fully-derived content that has to track its source on
 		 *	every save rather than merge on top of a possibly-stale
-		 *	previous value (see _applyNavigation()'s docblock)
+		 *	previous value
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		string		$path					Filesystem-relative path, eg. '/text/de_DE.php'
-		 *	@param		string		$bracketKey		Eg. '[[/website/navigation/main]]'
+		 *	@param		string		$bracketKey		Eg. '[[/website/legal/name]]'
 		 *	@param		string		$value
 		 *
 		 *	@return 	void

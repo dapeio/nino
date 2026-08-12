@@ -567,6 +567,19 @@ namespace Nino\Templates {
 			$source = preg_replace( '/[\t ]*<!--\s*nino:section\s+\{[^\r\n]*\}\s*-->[\t ]*(?:\r?\n)?/', '', $source ) ?? $source;
 			$source = preg_replace( '#<script\b[^>]*>.*?</script\s*>#is', '', $source ) ?? $source;
 			$source = preg_replace( '#<\?.*?\?>#s', '', $source ) ?? $source;
+			// Preview frames deliberately run without Nino.ui.js. Remove VPA's
+			// hidden initial state (and its variants) instead of leaving motion-
+			// enabled sections permanently transparent inside the iframe.
+			$source = preg_replace_callback( '#(\bclass\s*=\s*)(["\'])(.*?)\2#is', function( array $match ): string {
+				$classes = preg_split( '/\s+/', trim( $match[3] ), -1, PREG_SPLIT_NO_EMPTY ) ?: [];
+				$previewClasses = array_values( array_filter(
+					$classes,
+					fn( string $class ): bool => $class !== 'js-vpa' && str_starts_with( $class, 'js-vpa--' ) === false
+				) );
+				if( $previewClasses === $classes )
+					return $match[0];
+				return $match[1]. $match[2]. implode( ' ', $previewClasses ). $match[2];
+			}, $source ) ?? $source;
 			$source = preg_replace_callback( '#\[image\s+[^\]]+\]#i', fn(): string => '<img src="'. self::_previewImage( 'Section image' ). '" alt="">', $source ) ?? $source;
 
 			$source = preg_replace_callback( '#\[elements\s+([^\]]*)\](.*?)\[/elements\]#is', function( array $match ): string {

@@ -9,7 +9,7 @@
 	// would only ever be reachable at whichever request path equals their
 	// own key, never at the uri a Webpages entry actually assigns
 	'routes' 		=> [
-		'GET://' => [ 'body' => '[template /templates/page-legal.[[/nino/http/response/locale]]]' ],
+		'GET://' => [ 'body' => '[template /templates/page-legal.[[/nino/http/response/locale]]]', 'navs' => [ 'footer' => 5 ] ],
 	],
 	'templates' => [
 		 'de_DE' => 'page-legal.de_DE.tpl',

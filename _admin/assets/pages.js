@@ -10,7 +10,8 @@
  *													PageEditor class docblock for the Element URI/Http URI
  *													split every entry carries. List + drill-down-form shape
  *													follows images.js closely; the list's own ↑/↓ buttons
- *													reorder [[/website/navigation/main]] along with it.
+ *													reorder the routes with it, which is what orders every
+ *													menu those pages appear in (see \Nino\Modules\Navigation).
  *
  *	@package								Dape/Nino
  *	@author									David Perchermeier <mail@dape.io>
@@ -26,7 +27,7 @@
 		_pages 					: [],
 		_templates 			: [],
 		_locales 				: [],
-		_navModule 			: false,
+		_navs 					: [],
 		_currentHttpUri : null,
 		_isNew 					: false,
 		_ready 					: false,
@@ -48,7 +49,7 @@
 				Nino.admin.pages._pages 			= response.pages;
 				Nino.admin.pages._templates 	= response.templates;
 				Nino.admin.pages._locales 		= response.locales;
-				Nino.admin.pages._navModule 	= response.navModule;
+				Nino.admin.pages._navs 			= response.navs;
 				Nino.admin.pages._renderList();
 				Nino.admin.pages._showList();
 				Nino.admin.pages._ready = true;
@@ -115,9 +116,9 @@
 
 		/**
 		 *	Render the page list, plus a "New page" action below it. Each
-		 *	row's ↑/↓ buttons reorder the persisted list in place - the
-		 *	same order [[/website/navigation/main]] is generated in, see
-		 *	Admin.php's PageEditor::apiMove()
+		 *	row's ↑/↓ buttons reorder the persisted list and the routes with
+		 *	it - equal menu priorities follow route order, so this is what
+		 *	orders the menus (see Admin.php's PageEditor::apiMove())
 		 *
 		 *	@return		void
 		 */
@@ -129,11 +130,12 @@
 			if( Nino.admin.pages._pages.length === 0 ) {
 				const p = dc.createElement('p');
 				p.className = 'admin-hint';
-				p.textContent = 'No pages yet - add one below.';
+				p.textContent = 'No routes yet - add one below.';
 				wrap.appendChild( p );
 			}
 
 			const ul = dc.createElement('ul');
+			ul.className = 'admin-drill-list';
 			Nino.admin.pages._pages.forEach( function( entry, index ) {
 
 				const li = dc.createElement('li');
@@ -146,8 +148,11 @@
 
 				const link = dc.createElement('a');
 				link.href = '#';
-				link.textContent = entry.httpUri+ ' → '+ target+
+				const label = dc.createElement('span');
+				label.className = 'admin-page-label';
+				label.textContent = entry.httpUri+ ' → '+ target+
 					( entry.uri !== entry.httpUri ? '  ('+ entry.uri+ ')' : '' );
+				link.appendChild( label );
 				link.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.pages._openForm( entry ) } );
 				li.appendChild( link );
 
@@ -157,7 +162,7 @@
 				const upBtn = dc.createElement('button');
 				upBtn.type = 'button';
 				upBtn.textContent = '↑';
-				upBtn.title = 'Move up - reorders [[/website/navigation/main]] too';
+				upBtn.title = 'Move up - reorders the navigations too';
 				upBtn.disabled = index === 0;
 				upBtn.addEventListener( 'click', function() { Nino.admin.pages._move( entry.httpUri, 'up' ) } );
 				moveWrap.appendChild( upBtn );
@@ -165,7 +170,7 @@
 				const downBtn = dc.createElement('button');
 				downBtn.type = 'button';
 				downBtn.textContent = '↓';
-				downBtn.title = 'Move down - reorders [[/website/navigation/main]] too';
+				downBtn.title = 'Move down - reorders the navigations too';
 				downBtn.disabled = index === Nino.admin.pages._pages.length - 1;
 				downBtn.addEventListener( 'click', function() { Nino.admin.pages._move( entry.httpUri, 'down' ) } );
 				moveWrap.appendChild( downBtn );
@@ -178,7 +183,7 @@
 			const addBtn = dc.createElement('button');
 			addBtn.type = 'button';
 			addBtn.className = 'editor-list-action';
-			addBtn.textContent = 'New page';
+			addBtn.textContent = 'New route';
 			addBtn.addEventListener( 'click', function() { Nino.admin.pages._openForm( null ) } );
 			wrap.appendChild( addBtn );
 		},
@@ -297,7 +302,7 @@
 			// straight on the page's own background
 			const pageFieldset = dc.createElement('fieldset');
 			const pageLegend = dc.createElement('legend');
-			pageLegend.textContent = 'Page';
+			pageLegend.textContent = 'Route';
 			pageFieldset.appendChild( pageLegend );
 
 			const uriLabel = dc.createElement('label');
@@ -366,7 +371,7 @@
 
 				const fixedHint = dc.createElement('p');
 				fixedHint.className = 'admin-hint';
-				fixedHint.textContent = 'This page picks its template per request: '+ entry.body+ ' - left as it is.';
+				fixedHint.textContent = 'This route picks its template per request: '+ entry.body+ ' - left as it is.';
 				pageFieldset.appendChild( fixedHint );
 			}
 
@@ -384,17 +389,22 @@
 			statusLabel.appendChild( statusInput );
 			pageFieldset.appendChild( statusLabel );
 
-			if( Nino.admin.pages._navModule === true ) {
+			// One checkbox per navigation the project registered
+			// (/nino/html/navs) - an empty list means the Navigation module is
+			// inactive and no menu field is offered at all. What a page is a
+			// member of lives on its route, which is what actually renders it
+			// (see \Nino\Modules\Navigation::routeLines())
+			Nino.admin.pages._navs.forEach( function( navKey ) {
 				const navLabel = dc.createElement('label');
-				navLabel.className = 'editor-field';
+				navLabel.className = 'editor-checkbox-field';
 				const navInput = dc.createElement('input');
 				navInput.type = 'checkbox';
-				navInput.id = 'pages-form-nav';
-				navInput.checked = entry.nav === true;
+				navInput.dataset.nav = navKey;
+				navInput.checked = ( entry.navs || [] ).indexOf( navKey ) !== -1;
 				navLabel.appendChild( navInput );
-				navLabel.appendChild( dc.createTextNode(' Show in main navigation') );
+				navLabel.appendChild( dc.createTextNode( ' Show in "'+ navKey+ '" navigation' ) );
 				pageFieldset.appendChild( navLabel );
-			}
+			} );
 
 			form.appendChild( pageFieldset );
 
@@ -427,7 +437,7 @@
 				const deleteBtn = dc.createElement('button');
 				deleteBtn.type = 'button';
 				deleteBtn.className = 'admin-danger-btn';
-				deleteBtn.textContent = 'Delete page';
+				deleteBtn.textContent = 'Delete route';
 				deleteBtn.addEventListener( 'click', function() { Nino.admin.pages._delete() } );
 				actions.appendChild( deleteBtn );
 			}
@@ -503,7 +513,11 @@
 				};
 			} );
 
-			const navInput = dc.getElementById('pages-form-nav');
+			const navs = [];
+			dc.querySelectorAll('#pages-form [data-nav]').forEach( function( input ) {
+				if( input.checked === true )
+					navs.push( input.dataset.nav );
+			} );
 
 			Nino.admin.pages._apiCall( 'save', {
 				originalHttpUri : Nino.admin.pages._isNew ? '' : Nino.admin.pages._currentHttpUri,
@@ -511,7 +525,7 @@
 				httpUri 				: dc.getElementById('pages-form-http-uri').value,
 				template 				: dc.getElementById('pages-form-template').value,
 				statusCode 			: dc.getElementById('pages-form-status').value,
-				nav 						: navInput !== null && navInput.checked,
+				navs						: navs,
 				text 						: text,
 			}, function( status, response ) {
 				if( status !== 200 || response === null ) {
@@ -532,7 +546,7 @@
 		 */
 		_delete : function() {
 
-			if( wn.confirm( 'Really delete the page at "'+ Nino.admin.pages._currentHttpUri+ '"?' ) === false )
+			if( wn.confirm( 'Really delete the route at "'+ Nino.admin.pages._currentHttpUri+ '"?' ) === false )
 				return;
 
 			const msg = dc.getElementById('pages-form-msg');

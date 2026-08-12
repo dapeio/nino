@@ -2,7 +2,7 @@
 
 **Sprache:** [English](_admin.md) · Deutsch
 
-**Stand:** 8. August 2026 · **Nino-Version:** 0.11.0-beta.1
+**Stand:** 11. August 2026 · **Nino-Version:** 0.11.0-beta.1
 
 Dieses Handbuch erklärt die vollständige technische und inhaltliche Projektverwaltung unter `/_admin`. Falls du stattdessen nur freigegebene Inhalte im Alltag pflegen möchtest, lies die [`/_editor`-Bedienungsanleitung](_editor.de.md); die schnelle sectionbasierte Seitenkomposition beschreibt die [`/_templates`-Bedienung](_templates.de.md).
 
@@ -20,8 +20,9 @@ Dieses Handbuch erklärt die vollständige technische und inhaltliche Projektver
 | Elementtypen | Felder und Datentypen definieren | keine Strukturänderung |
 | Elemente | alle Einträge, Sprachen und Speicher-Buckets bearbeiten | freigegebene Einträge innerhalb der Rechte pflegen |
 | Texte | Schlüssel, Werte, Sprachen und Editor-Sichtbarkeit vollständig verwalten | freigegebene Werte pflegen |
+| Übersetzungen | native Text-/Elements-Inhalte exportieren und in eine Zielsprache importieren | kein Batch-Workflow |
 | Bilder | Bildplätze und Zielmaße definieren | Bilder hochladen und ersetzen |
-| Seiten | Routen, Templates und Navigation verwalten | Seitentexte pflegen |
+| Routen | Seitenrouten, Templates und Navigation verwalten | Seitentexte pflegen |
 | Seitentemplates | Link zum sectionbasierten Template Builder unter `/_templates` | kein Zugriff |
 | Nutzer | Konten anlegen, löschen und Rechte technisch verwalten | Profildaten und freigegebene Rechte pflegen |
 | Konfiguration | ausgewählte technische Werte bearbeiten | kein Zugriff |
@@ -51,7 +52,7 @@ Das Passwort lässt sich außerhalb des Installers mit `php _admin/Admin.php <pa
 
 Das **Dashboard** fasst den technischen Projektstand zusammen:
 
-- Anzahl der Elementtypen, Seiten und Editor-Konten;
+- Anzahl der Elementtypen, Routen und Editor-Konten;
 - Datum des letzten automatischen Backups;
 - Felder pro Elementtyp;
 - Textschlüssel und Bildplätze, die in Templates verwendet, aber noch nicht definiert sind.
@@ -89,7 +90,7 @@ Je nach Typ stehen zusätzliche Eigenschaften bereit:
 
 - **per translation** speichert pro Sprache einen eigenen Wert;
 - **Required field** macht das Feld verpflichtend;
-- **Rich text** aktiviert beim Typ `string` die eingeschränkte Textformatierung;
+- **Rich text** aktiviert beim Typ `string` Fett, Kursiv, Hervorhebung, Inline-Code und Links;
 - feste Werte begrenzen ein Textfeld auf eine vorgegebene Auswahl;
 - Breite und Höhe bestimmen bei Bildern die Zielmaße;
 - eine Einheit oder ein Suffix ergänzt beispielsweise `€`, `km` oder `%` in der Eingabe.
@@ -136,9 +137,26 @@ Beim Umbenennen und beim Wechsel der Speicherform migriert Nino vorhandene Werte
 
 Der Scan kann dynamisch zusammengesetzte Schlüssel nicht vollständig erkennen. Ein fehlerfreier Scan ersetzt daher nicht den Test aller Seiten und Sprachen.
 
-## Pages: Seiten und Routen verwalten
+## Translations: Native Inhalte übersetzen
 
-Der Bereich **Pages** verwaltet die über `/_install` angelegte Seitenliste, die zugehörigen `GET`-Routen und die Navigation.
+**Translations** ist die projektweite Übergabe, um eine Website nach Abschluss der nativen Befüllung zu übersetzen. Der Export verwendet immer die konfigurierte native Sprache und bündelt:
+
+- nicht globale, nicht technische Text-Werte;
+- sprachabhängige Elementfelder, die im nativen Bucket tatsächlich einen Wert besitzen.
+
+Globale Werte, ausgeblendete technische Texte, Bilder, Element-URIs, Sortierung und Strukturdaten werden nicht exportiert. Das JSON enthält Hinweise für Übersetzungswerkzeuge: Nur Werte übersetzen und Schlüssel, JSON-Datentypen, HTML, URLs, Platzhalter, Shortcodes und Bezeichner unverändert lassen.
+
+1. Lade das native JSON-Paket herunter.
+2. Übersetze seine Werte, ohne die Objektstruktur zu verändern.
+3. Wähle eine konfigurierte Zielsprache.
+4. Lade die `.json`-Datei hoch oder füge ihren Inhalt ein und wähle **Import into selected language**.
+5. Kontrolliere die Zahl importierter und übersprungener Werte.
+
+Der Import führt nur zusammen: Passende Werte der Zielsprache werden überschrieben, im Dokument fehlende Werte aber nicht gelöscht. Der Server prüft jeden Pfad gegen einen frisch erzeugten nativen Export, bereinigt Text- und Rich-Text-Werte und überspringt unbekannte, globale, technische und Bildfelder. Die native Sprache kann als Ziel gewählt werden, überschreibt dann jedoch Quellinhalte und sollte daher bewusst gewählt werden.
+
+## Routes: Seitenrouten verwalten
+
+Der Bereich **Routes** verwaltet die über `/_install` angelegte Seitenliste, die zugehörigen `GET`-Routen und die Navigation.
 
 Eine Seite besitzt zwei verschiedene URIs:
 
@@ -153,7 +171,7 @@ Beim Anlegen oder Bearbeiten bestimmst du außerdem:
 - einen HTTP-Statuscode;
 - Navigationsname, Seitentitel und Beschreibung für jede aktive Sprache.
 
-Die Pfeile in der Seitenliste verändern die Reihenfolge und – bei aktivem Navigation-Modul – zugleich `[[/website/navigation/main]]`. Reservierte Pfade wie `/_admin`, `/_editor`, `/_install`, `/_templates` können nicht als öffentliche Seiten verwendet werden.
+Die Pfeile in der Seitenliste verändern die Reihenfolge der Seiten und mit ihnen die der Routen. Menüeinträge gleicher Priorität folgen der Routenreihenfolge, das sortiert also jede Navigation, in der diese Seiten stehen. Reservierte Pfade wie `/_admin`, `/_editor`, `/_install`, `/_templates` können nicht als öffentliche Seiten verwendet werden.
 
 Einige Routen wählen ihr Template zur Laufzeit. In diesem Fall zeigt `/_admin` den bestehenden Route-Body an und lässt ihn beim Speichern unverändert.
 
@@ -227,13 +245,13 @@ Der Bereich **Config** bearbeitet eine bewusst begrenzte Auswahl aus `config.php
 | `/nino/html/assets` | Asset-Bundles als Objekt |
 | `/nino/http/routes` | vollständige Routing-Tabelle |
 
-Nino prüft JSON-Syntax und Grundtyp, aber nicht jede fachliche Abhängigkeit. Fehler in Routen, Sprachen oder Asset-Bundles können die Webseite oder die Verwaltungsbereiche unzugänglich machen. Nutze für normale Seitenänderungen deshalb **Pages** und für Bildplätze **Images**.
+Nino prüft JSON-Syntax und Grundtyp, aber nicht jede fachliche Abhängigkeit. Fehler in Routen, Sprachen oder Asset-Bundles können die Webseite oder die Verwaltungsbereiche unzugänglich machen. Nutze für normale Seitenänderungen deshalb **Routes** und für Bildplätze **Images**.
 
 In Produktion muss `/nino/error/display` auf `false` stehen.
 
 ## Empfohlener Arbeitsablauf
 
-1. Lege unter **Element Types**, **Text**, **Pages** und **Images** die benötigte Struktur an.
+1. Lege unter **Element Types**, **Text**, **Routes** und **Images** die benötigte Struktur an.
 2. Pflege oder korrigiere vollständige Texte und Elemente direkt in `/_admin`.
 3. Setze Seitentemplates über [`/_templates`](_templates.de.md) aus vollständigen HTML- und Template-Sections zusammen; nutze für tiefergehende Strukturarbeit den HTML+-Escape-Hatch oder Code und prüfe das Ergebnis im Browser.
 4. Prüfe Dashboard und Template-Scans auf fehlende Definitionen.
@@ -248,7 +266,7 @@ In Produktion muss `/nino/error/display` auf `false` stehen.
 |---|---|
 | Anmeldung nach mehreren Versuchen gesperrt | Eine Stunde warten; die Sperre ist projektweit. |
 | Speichern schlägt fehl | Schreibrechte für die betroffene Datei beziehungsweise das Verzeichnis prüfen. |
-| Template fehlt in **Pages** | Nur vorhandene Dateien `templates/page-*.tpl` werden angeboten. |
+| Template fehlt in **Routes** | Nur vorhandene Dateien `templates/page-*.tpl` werden angeboten. |
 | Seite lässt sich im Template Builder nicht speichern | Nach externer Änderung neu laden, eindeutige Section-IDs und nicht geschlossene `<section>`-Tags prüfen; siehe [`/_templates`-Bedienung](_templates.de.md). |
 | Texte oder Bilder fehlen im Scan | Dynamische Schlüssel und Bilder werden nicht zuverlässig statisch erkannt. |
 | Backup-Liste ist leer | Zuerst mit einem Editor-Konto anmelden und prüfen, ob Backups aktiviert sowie Schreibrechte vorhanden sind. |

@@ -7,6 +7,7 @@
 	'use strict';
 
 	const pd = Nino.templates;
+	const PREVIEW_SANDBOX = 'allow-same-origin';
 
 	function element( tag, className, text ) {
 		const node = dc.createElement( tag );
@@ -87,7 +88,7 @@
 		iframe.style.width = width+ 'px';
 		iframe.style.height = height+ 'px';
 		iframe.style.transform = 'scale('+ scale+ ')';
-		iframe.setAttribute('sandbox', 'allow-same-origin');
+		iframe.setAttribute( 'sandbox', PREVIEW_SANDBOX );
 		frame.style.height = Math.max( 1, Math.round( height * scale ) )+ 'px';
 	}
 
@@ -405,7 +406,7 @@
 				const iframe = element('iframe');
 				iframe.loading = 'lazy';
 				iframe.tabIndex = -1;
-				iframe.setAttribute( 'sandbox', '' );
+				iframe.setAttribute( 'sandbox', PREVIEW_SANDBOX );
 				frame.appendChild( iframe );
 				card.appendChild( frame );
 

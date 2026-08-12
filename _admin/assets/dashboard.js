@@ -95,7 +95,7 @@
 			const tiles = dc.createElement('div');
 			tiles.id = 'admin-dashboard-tiles';
 			tiles.appendChild( Nino.admin.dashboard._tile( 'types', String( data.types.length ), data.types.length === 1 ? 'element type' : 'element types' ) );
-			tiles.appendChild( Nino.admin.dashboard._tile( 'pages', String( data.pages ), data.pages === 1 ? 'page' : 'pages' ) );
+			tiles.appendChild( Nino.admin.dashboard._tile( 'pages', String( data.pages ), data.pages === 1 ? 'route' : 'routes' ) );
 			tiles.appendChild( Nino.admin.dashboard._tile( 'users', String( data.users ), data.users === 1 ? 'admin account' : 'admin accounts' ) );
 			tiles.appendChild( Nino.admin.dashboard._tile( 'restore', data.lastBackup || '–', 'last backup' ) );
 			wrap.appendChild( tiles );
