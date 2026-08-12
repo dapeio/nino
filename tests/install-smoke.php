@@ -174,7 +174,7 @@ $libraryBody = $libraryRequest['/nino/http/response']['body'];
 check( 'lists the two locales the library ships translations for', $libraryBody['locales'] === [ 'de_DE', 'en_US' ] );
 check( 'reports the config\'s current native locale as already active', $libraryBody['activeLocales'] === [ 'de_DE' ] );
 check( 'reports the config\'s current native locale itself, for the Native Locale dropdown to pre-select', $libraryBody['nativeLocale'] === 'de_DE' );
-check( 'lists every module unit - pages have their own step now (Webpages), not listed here', array_keys( $libraryBody['modules'] ) === [ 'democontent', 'forms', 'localepicker', 'navigation', 'newsletter' ] );
+check( 'lists every module unit - pages have their own step now (Webpages), not listed here', array_keys( $libraryBody['modules'] ) === [ 'forms', 'localepicker', 'navigation', 'newsletter' ] );
 check( 'no module is active yet', $libraryBody['modules']['forms']['active'] === false );
 
 $_POST['data'] = json_encode( [ 'locales' => [], 'modules' => [] ] );
