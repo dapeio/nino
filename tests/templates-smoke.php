@@ -78,7 +78,7 @@ $presets = \Nino\Templates\Library::presets();
 $modules = \Nino\Templates\Composer::modules();
 
 check( 'ships a broad initial Section Library', count( $presets ) >= 43 );
-check( 'includes a flexible blank section and curated hero', isset( $presets['blank'], $presets['hero-centered'] ) );
+check( 'includes a flexible blank section and curated hero', isset( $presets['blank'], $presets['hero-full'] ) );
 check( 'covers reusable demo-element content patterns', isset( $presets['list-check'], $presets['list-numbered'], $presets['content-tabs'], $presets['data-table'], $presets['media-slider'], $presets['video-embed'], $presets['notice-callout'], $presets['badge-cloud'] ) );
 check( 'every preset has searchable metadata and normalized choices', array_filter( $presets, fn( array $preset ): bool => $preset['name'] === '' || $preset['category'] === '' || $preset['tags'] === [] || $preset['allow'] === [] ) === [] );
 check( 'repeatable articles recommend a localized CTA label', ( $modules['articles']['model']['linkLabel']['locale'] ?? false ) === true );
@@ -92,7 +92,7 @@ check( 'every curated preset composes with its defaults', array_filter( array_ke
 } ) === [] );
 
 $hero = \Nino\Templates\Composer::compose( [
-	'preset' => 'hero-centered', 'pageId' => 'home', 'id' => 'main-hero', 'pageMotion' => 'on',
+	'preset' => 'hero-full', 'pageId' => 'home', 'id' => 'main-hero', 'pageMotion' => 'on',
 ] );
 
 check( 'composes one ordinary section', str_starts_with( $hero['source'], '<section' ) && str_contains( $hero['source'], '</section>' ) );
@@ -103,7 +103,7 @@ check( 'inherits page motion into generated js-vpa markup', str_contains( $hero[
 check( 'applies heading alignment without forcing it through nested content', str_contains( $hero['source'], 'ui-grid-100 ui-mb-3 ui-text-center' ) && str_contains( strtok( $hero['source'], "\n" ), 'ui-text-center' ) === false );
 
 $heroPreview = \Nino\Templates\Composer::preview( [
-	'preset' => 'hero-centered', 'pageId' => 'preview', 'id' => 'motion-hero', 'pageMotion' => 'on',
+	'preset' => 'hero-full', 'pageId' => 'preview', 'id' => 'motion-hero', 'pageMotion' => 'on',
 ] );
 check( 'preview strips VPA classes that would stay hidden without client scripts', $heroPreview !== null && str_contains( $heroPreview, 'js-vpa' ) === false );
 check( 'preview-only VPA cleanup never changes composed template source', str_contains( $hero['source'], 'js-vpa' ) && str_contains( $hero['source'], 'js-vpa--visible' ) === false );
