@@ -214,6 +214,7 @@
 
 			const actions = dc.createElement('div');
 			actions.id = 'newsletter-bcc-actions';
+			actions.className = 'nino-admin-actionbar';
 
 			const copyBtn = dc.createElement('button');
 			copyBtn.type = 'button';

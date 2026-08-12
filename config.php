@@ -46,6 +46,7 @@
   '/nino/html/navs' => 
   array (
     0 => 'main',
+    1 => 'footer',
   ),
   '/nino/install/theme' => 'agency',
   '/nino/http/routes' => 
@@ -86,6 +87,15 @@
         'main' => 1,
       ),
     ),
+    'GET://contact' =>
+    array (
+      'uri' => '/contact',
+      'body' => '[template /templates/page-contact]',
+      'navs' =>
+      array (
+        'main' => 2,
+      ),
+    ),
     'GET://404' => 
     array (
       'uri' => '/404',
@@ -96,15 +106,6 @@
     array (
       'body' => '[template /templates/page-legal.[[/nino/http/response/locale]]]',
       'uri' => '/legal',
-    ),
-    'GET://contact' => 
-    array (
-      'uri' => '/contact',
-      'body' => '[template /templates/page-contact]',
-      'navs' => 
-      array (
-        'main' => 4,
-      ),
     ),
   ),
   '/nino/auth/user' => 

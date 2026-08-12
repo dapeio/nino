@@ -294,7 +294,7 @@
 			backLink.className = 'back-link';
 			backLink.textContent = Nino.content.getText('/_editor/elements/label/backtypes');
 			backLink.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.editor.elements._showTypes() } );
-			wrap.appendChild( backLink );
+			wrap.appendChild( Nino.editor.formToolbar( backLink ) );
 
 			const title = dc.createElement('div');
 			title.className = 'main-title--withuri';
@@ -324,7 +324,7 @@
 			addBtn.className = 'editor-list-action';
 			addBtn.textContent = Nino.content.getText('/_editor/elements/label/add');
 			addBtn.addEventListener( 'click', function() { Nino.editor.elements._openForm( null ) } );
-			wrap.appendChild( addBtn );
+			wrap.appendChild( Nino.adminUi.listActions( [ addBtn ] ) );
 		},
 
 		/**
@@ -924,7 +924,8 @@
 				Nino.editor.elements._destroyHtmlEditors();
 				Nino.editor.elements._showList();
 			} );
-			wrap.appendChild( backLink );
+			const toolbar = Nino.editor.formToolbar( backLink );
+			wrap.appendChild( toolbar );
 
 			const form = dc.createElement('form');
 			form.id = 'elements-edit-form';
@@ -1019,7 +1020,7 @@
 					Nino.editor.sessionLocale.set( select.value );
 					Nino.editor.elements._renderLocaleFields();
 				} );
-				localeWrap.appendChild( select );
+				toolbar.appendChild( select );
 
 				const fieldsWrap = dc.createElement('div');
 				fieldsWrap.id = 'elements-form-locale-fields';
@@ -1031,6 +1032,7 @@
 			// Actions
 			const actions = dc.createElement('div');
 			actions.id = 'elements-form-actions';
+			actions.className = 'nino-admin-actionbar';
 
 			const saveBtn = dc.createElement('button');
 			saveBtn.type = 'submit';

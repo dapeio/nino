@@ -278,6 +278,18 @@
 		},
 
 		/**
+		 *	The common pinned context row used by every drill-down level.
+		 *	Locale selects can be appended after creation by the calling module.
+		 *
+		 *	@param		{Element}	backLink
+		 *
+		 *	@return		{Element}
+		 */
+		formToolbar : function( backLink ) {
+			return Nino.adminUi.contextBar( backLink );
+		},
+
+		/**
 		 *	Decode html entities back to plain text (eg. "&amp;" -> "&") -
 		 *	Submissions/Newsletter fields are stored htmlspecialchars()-encoded
 		 *	(see Shortcodes\Form/Newsletter::callbackResponse()), so anything

@@ -511,6 +511,7 @@
 				Nino.templates._current = null;
 				Nino.templates._selectedId = null;
 				Nino.templates._dirty = false;
+				dc.getElementById('pd-add-section').classList.add('pd-hidden');
 				dc.getElementById('pd-page-toolbar').classList.add('pd-hidden');
 				dc.getElementById('pd-canvas').classList.add('pd-hidden');
 				dc.getElementById('pd-empty').classList.remove('pd-hidden');
@@ -575,6 +576,7 @@
 			empty.classList.add('pd-hidden');
 			canvas.classList.remove('pd-hidden');
 			toolbar.classList.remove('pd-hidden');
+			dc.getElementById('pd-add-section').classList.remove('pd-hidden');
 			title.textContent = current.displayName || current.pageId.replace( /-/g, ' ' );
 			detail.textContent = 'templates/'+ ( current.filename || current.name+ '.tpl' );
 
@@ -695,6 +697,15 @@
 		init : function() {
 			if( !dc.getElementById('pd-app') )
 				return;
+
+			// List-level creation and Save share one predictable bottom action
+			// area across all tools. The button stays hidden until a document is
+			// open, just as it did inside the document-only settings toolbar.
+			const addSection = dc.getElementById('pd-add-section');
+			const topActions = dc.getElementById('pd-top-actions');
+			dc.getElementById('pd-app').appendChild( topActions );
+			addSection.classList.add('pd-hidden');
+			topActions.insertBefore( addSection, dc.getElementById('pd-save') );
 
 			dc.getElementById('pd-save').addEventListener( 'click', Nino.templates.save );
 			dc.getElementById('pd-reload-pages').addEventListener( 'click', function() {

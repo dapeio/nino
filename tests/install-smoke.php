@@ -369,7 +369,7 @@ $wpLibraryRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Install\Webpages::apiList( $appData, $wpLibraryRequest );
 $wpLibraryBody = $wpLibraryRequest['/nino/http/response']['body'];
 
-check( 'lists every page template, one per _install/library/pages/<key>', in_array( 'home', array_keys( $wpLibraryBody['templates'] ), true ) === true && in_array( 'contact', array_keys( $wpLibraryBody['templates'] ), true ) === true );
+check( 'lists every page template, one per _install/library/pages/<key>', in_array( 'home', array_keys( $wpLibraryBody['templates'] ), true ) === true && in_array( 'blank', array_keys( $wpLibraryBody['templates'] ), true ) === true && in_array( 'contact', array_keys( $wpLibraryBody['templates'] ), true ) === true );
 check( '"contact" declares it requires "forms"', $wpLibraryBody['templates']['contact']['requiresModules'] === [ 'forms' ] );
 check( 'starts with an empty list - nothing persisted yet', $wpLibraryBody['webpages'] === [] );
 check( 'no navigations are offered - Navigation was never picked', $wpLibraryBody['navs'] === [] );
@@ -382,6 +382,9 @@ check( '...with de_DE\'s wording read from the unit\'s own de_DE fragment', $wpL
 check( '...and en_US\'s from its own en_US fragment - the locale that used to end up generic', $wpLibraryBody['templates']['home']['text']['en_US']['name'] === 'Home' && $wpLibraryBody['templates']['home']['text']['en_US']['title'] === 'Welcome.' );
 check( 'reports the Http-URI "home" suggests for itself, which is not its folder name', $wpLibraryBody['templates']['home']['uri'] === '/' );
 check( '...and "contact"\'s, which is', $wpLibraryBody['templates']['contact']['uri'] === '/contact' );
+check( 'the blank template starts every locale with useful page metadata', $wpLibraryBody['templates']['blank']['text']['de_DE']['name'] === 'Neue Webseite' && $wpLibraryBody['templates']['blank']['text']['en_US']['name'] === 'New webpage' );
+check( 'the blank template suggests a stable Http-URI and its own page template', $wpLibraryBody['templates']['blank']['uri'] === '/new-webpage' && $wpLibraryBody['templates']['blank']['body'] === '[template /templates/page-blank]' );
+check( 'the blank page template deliberately has no section', strpos( (string) file_get_contents( __DIR__. '/../_install/library/pages/blank/templates/page-blank.tpl' ), '<section' ) === false );
 check( 'a template whose fragments ship no wording at all reports empty strings, never a missing key', array_keys( $wpLibraryBody['templates']['.demo-elements']['text']['en_US'] ) === [ 'name', 'title', 'description' ] );
 
 $_POST['data'] = json_encode( [ 'webpages' => [ [ 'uri' => '../etc/passwd', 'httpUri' => '/x', 'template' => 'home', 'text' => [] ] ] ] );
@@ -797,11 +800,11 @@ $realConfig = include $realRoot. '/config.php';
 
 $realAppData 		= [ '/nino/locales/available' => $realConfig['/nino/locales/available'] ?? [], '/nino/configpath' => $realRoot ];
 $realPageRoutes = array_filter( $realConfig['/nino/http/routes'] ?? [], fn( array $r, string $k ): bool => \Nino\Install\Webpages::isPageRoute( $k, $r ), ARRAY_FILTER_USE_BOTH );
-$realPages 			= \Nino\Install\Webpages::pages( $realAppData, $realConfig['/nino/http/routes'] ?? [], [], [ 'main' ] );
+$realPages 			= \Nino\Install\Webpages::pages( $realAppData, $realConfig['/nino/http/routes'] ?? [], [], $realConfig['/nino/html/navs'] ?? [] );
 
 check( 'the real config.php returns an array', is_array( $realConfig ) === true );
-check( 'ships exactly the four default page routes, in order, Element-URI', array_column( $realPages, 'uri' ) === [ '/home', '/404', '/legal', '/contact' ] );
-check( '...and Http-URI', array_column( $realPages, 'httpUri' ) === [ '/', '/404', '/legal', '/contact' ] );
+check( 'ships exactly the four default page routes, in order, Element-URI', array_column( $realPages, 'uri' ) === [ '/home', '/contact', '/404', '/legal' ] );
+check( '...and Http-URI', array_column( $realPages, 'httpUri' ) === [ '/', '/contact', '/404', '/legal' ] );
 check( 'no second copy of that list is shipped alongside the routes', isset( $realConfig['/nino/install/webpages'] ) === false );
 check( 'registers the home entry\'s route at "/" (its Http-URI), "uri" data field is its Element-URI', ( ( $realConfig['/nino/http/routes']['GET://'] ?? [] )['uri'] ?? null ) === '/home' );
 check( 'registers the 404 entry at "/404" too - the exact key Http::response()\'s own fallback lookup needs', isset( $realConfig['/nino/http/routes']['GET://404'] ) === true );
@@ -815,15 +818,15 @@ check( '...and named by the theme step\'s own persisted key', ( $realConfig['/ni
 // and to the library unit it came from - what lets /_admin's Routes module
 // work with the shipped pages at all (see the shared-source-of-truth section
 // above)
-check( 'each shipped route resolves to its own on-disk template', array_column( $realPages, 'template' ) === [ 'page-home', 'page-404', '', 'page-contact' ] );
-check( '...and to the library unit behind it', array_column( $realPages, 'libraryKey' ) === [ 'home', '404', 'legal', 'contact' ] );
-check( 'the shipped 404 route really carries a 404', array_column( $realPages, 'statusCode' ) === [ 200, 404, 200, 200 ] );
+check( 'each shipped route resolves to its own on-disk template', array_column( $realPages, 'template' ) === [ 'page-home', 'page-contact', 'page-404', '' ] );
+check( '...and to the library unit behind it', array_column( $realPages, 'libraryKey' ) === [ 'home', 'contact', '404', 'legal' ] );
+check( 'the shipped 404 route really carries a 404', array_column( $realPages, 'statusCode' ) === [ 200, 200, 404, 200 ] );
 
 // The menus are on the routes themselves, densely numbered by the position
 // the wizard's list had them in (see Webpages::apiApply())
-check( 'the registry the page editors offer checkboxes for is shipped', ( $realConfig['/nino/html/navs'] ?? null ) === [ 'main' ] );
-check( 'the two menu pages carry their membership on their own route', array_column( $realPages, 'navs' ) === [ [ 'main' ], [], [], [ 'main' ] ] );
-check( '...at their own position in that list', [ $realPageRoutes['GET://']['navs'], $realPageRoutes['GET://contact']['navs'] ] === [ [ 'main' => 1 ], [ 'main' => 4 ] ] );
+check( 'the registry the page editors offer checkboxes for is shipped', ( $realConfig['/nino/html/navs'] ?? null ) === [ 'main', 'footer' ] );
+check( 'the two menu pages carry their membership on their own route', array_column( $realPages, 'navs' ) === [ [ 'main' ], [ 'main' ], [], [] ] );
+check( '...at their own position in that list', [ $realPageRoutes['GET://']['navs'], $realPageRoutes['GET://contact']['navs'] ] === [ [ 'main' => 1 ], [ 'main' => 2 ] ] );
 
 // The generated site itself is deliberately not tracked - it is the
 // wizard's output, not repository content
@@ -836,7 +839,8 @@ foreach( [ 'html-header.tpl', 'html-footer.tpl' ] as $file )
 	check( "the base unit ships $file", is_file( $realRoot. '/_install/library/base/templates/'. $file ) === true );
 
 foreach( [ 'home/templates/page-home.tpl', '404/templates/page-404.tpl',
-           'legal/templates/page-legal.de_DE.tpl', 'contact/templates/page-contact.tpl' ] as $file )
+           'legal/templates/page-legal.de_DE.tpl', 'contact/templates/page-contact.tpl',
+           'blank/templates/page-blank.tpl' ] as $file )
 	check( "the page library ships $file", is_file( $realRoot. '/_install/library/pages/'. $file ) === true );
 
 // Every theme unit has to be self-contained: its own manifest, the

@@ -1,0 +1,1467 @@
+/**
+ * Nino admin UI
+ *
+ * Shared visual system for /_admin, /_editor, /_install and /_templates.
+ * App styles define their specialist layouts; this file is linked last and
+ * supplies the common density, typography, controls, lists and fixed chrome.
+ */
+
+:root {
+	--editor-radius: 10px;
+	--editor-radius-sm: 7px;
+	--editor-gap: .75rem;
+	--editor-shadow: 0 1px 2px rgba(15,23,42,.05), 0 8px 24px rgba(15,23,42,.055);
+	--editor-shadow-sm: 0 1px 2px rgba(15,23,42,.045), 0 3px 10px rgba(15,23,42,.035);
+
+	--nino-admin-sidebar-width: 15rem;
+	--nino-admin-actionbar-height: 4.25rem;
+	--nino-admin-content-inline: clamp(1.25rem, 3vw, 3rem);
+	--nino-admin-control-height: 38px;
+	--nino-admin-row-height: 46px;
+	--nino-admin-rail: var(--editor-sidebar-bg);
+	--nino-admin-rail-hover: var(--editor-blue-soft);
+	--nino-admin-rail-text: var(--editor-text);
+	--nino-admin-rail-muted: var(--editor-text-secondary);
+	--nino-admin-rail-border: var(--editor-separator);
+	--nino-admin-active-text: #fff;
+	--nino-admin-surface-muted: color-mix(in srgb, var(--editor-bg) 72%, var(--editor-bg-elevated));
+}
+
+@media (prefers-color-scheme: dark) {
+	:root:not([data-theme="light"]) {
+		--editor-shadow: 0 1px 2px rgba(0,0,0,.28), 0 8px 24px rgba(0,0,0,.2);
+		--editor-shadow-sm: 0 1px 2px rgba(0,0,0,.24), 0 3px 10px rgba(0,0,0,.16);
+		--nino-admin-active-text: #0b0f17;
+		--nino-admin-surface-muted: color-mix(in srgb, var(--editor-bg) 76%, var(--editor-bg-elevated));
+	}
+}
+
+:root[data-theme="dark"] {
+	--editor-shadow: 0 1px 2px rgba(0,0,0,.28), 0 8px 24px rgba(0,0,0,.2);
+	--editor-shadow-sm: 0 1px 2px rgba(0,0,0,.24), 0 3px 10px rgba(0,0,0,.16);
+	--nino-admin-active-text: #0b0f17;
+	--nino-admin-surface-muted: color-mix(in srgb, var(--editor-bg) 76%, var(--editor-bg-elevated));
+}
+
+body {
+	font-size: 15px;
+	line-height: 1.45;
+}
+
+:where(#admin-page-wrap, #editor-page-wrap, #install-page-wrap, #pd-app) {
+	min-height: 100vh;
+	background: var(--editor-bg);
+	color: var(--editor-text);
+}
+
+:where(#admin-page-wrap, #editor-page-wrap, #install-page-wrap, #pd-app) *,
+:where(#admin-login-wrap, #form-login, #install-locked-wrap) * {
+	scrollbar-color: color-mix(in srgb, var(--editor-text-secondary) 32%, transparent) transparent;
+}
+
+/* ---------------------------------------------------------- Type hierarchy */
+
+:where(#admin-page-wrap, #editor-page-wrap, #install-page-wrap, #pd-app) :is(h1, h2, h3, h4),
+:where(#admin-login-wrap, #form-login, #install-locked-wrap) :is(h1, h2, h3, h4) {
+	color: var(--editor-text);
+	font-weight: 700;
+	line-height: 1.2;
+	letter-spacing: -.025em;
+}
+
+:where(#admin-page-wrap, #editor-page-wrap, #install-page-wrap) :is(.main-title, .main-title--withuri) {
+	margin: 0 0 .2rem;
+	font-size: clamp(1.15rem, 2vw, 1.4rem);
+	font-weight: 700;
+	line-height: 1.2;
+	letter-spacing: -.025em;
+}
+
+:where(#admin-page-wrap, #editor-page-wrap, #install-page-wrap) .main-uri {
+	margin: 0 0 .85rem;
+	color: var(--editor-text-secondary);
+	font: .75rem/1.4 ui-monospace, "SFMono-Regular", Consolas, monospace;
+}
+
+:where(#admin-page-wrap, #editor-page-wrap, #install-page-wrap) fieldset legend,
+#pd-app .pd-eyebrow {
+	font-size: .7rem;
+	font-weight: 750;
+	letter-spacing: .065em;
+	text-transform: uppercase;
+}
+
+:where(#admin-page-wrap, #editor-page-wrap, #install-page-wrap) .admin-hint,
+#pd-app :is(.pd-sidebar-note, .pd-empty-state p, .pd-inspector-empty p) {
+	color: var(--editor-text-secondary);
+	font-size: .8rem;
+	line-height: 1.55;
+}
+
+/* ------------------------------------------------------------- Controls */
+
+:where(#admin-page-wrap, #editor-page-wrap, #install-page-wrap, #pd-app) button,
+:where(#admin-login-wrap, #form-login) button {
+	min-height: var(--nino-admin-control-height);
+	padding: .48rem .82rem;
+	border-radius: var(--editor-radius-sm);
+	font-size: .84rem;
+	font-weight: 650;
+	box-shadow: inset 0 0 0 1px var(--editor-border), var(--editor-shadow-sm);
+	transform: none;
+}
+
+:where(#admin-page-wrap, #editor-page-wrap, #install-page-wrap, #pd-app) button:active,
+:where(#admin-login-wrap, #form-login) button:active {
+	transform: none;
+}
+
+:where(#admin-page-wrap, #editor-page-wrap, #install-page-wrap, #pd-app) :is(
+	button[type="submit"],
+	.editor-list-action,
+	.pd-primary,
+	#install-next
+),
+:where(#admin-login-wrap, #form-login) button[type="submit"] {
+	border-color: transparent;
+	background: var(--editor-blue);
+	box-shadow: none;
+	color: #fff;
+}
+
+:where(#admin-page-wrap, #editor-page-wrap, #install-page-wrap, #pd-app) :is(
+	button[type="submit"],
+	.editor-list-action,
+	.pd-primary,
+	#install-next
+):hover:not(:disabled),
+:where(#admin-login-wrap, #form-login) button[type="submit"]:hover:not(:disabled) {
+	background: var(--editor-blue-hover);
+	color: #fff;
+}
+
+:where(#admin-page-wrap, #editor-page-wrap, #install-page-wrap, #pd-app) :is(
+	.editor-danger,
+	.admin-danger-btn,
+	.pd-danger-button,
+	button.red,
+	.newsletter-entry-delete
+) {
+	border-color: color-mix(in srgb, var(--editor-red) 38%, transparent);
+	background: var(--editor-red-soft);
+	box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--editor-red) 38%, transparent);
+	color: var(--editor-red);
+	opacity: 1;
+}
+
+:where(#admin-page-wrap, #editor-page-wrap, #install-page-wrap, #pd-app) :is(
+	.editor-danger,
+	.admin-danger-btn,
+	.pd-danger-button,
+	button.red,
+	.newsletter-entry-delete
+):hover:not(:disabled) {
+	background: var(--editor-red);
+	color: #fff;
+}
+
+:where(#admin-page-wrap, #editor-page-wrap, #install-page-wrap, #pd-app) :is(
+	input[type="text"],
+	input[type="search"],
+	input[type="email"],
+	input[type="password"],
+	input[type="number"],
+	input[type="date"],
+	input[type="url"],
+	input[type="datetime-local"],
+	textarea,
+	select
+),
+:where(#admin-login-wrap, #form-login) :is(input, textarea, select) {
+	min-height: var(--nino-admin-control-height);
+	padding: .48rem .62rem;
+	border-radius: var(--editor-radius-sm);
+	font-size: .84rem;
+	box-shadow: inset 0 1px 1px rgba(15,23,42,.025);
+}
+
+:where(#admin-page-wrap, #editor-page-wrap, #install-page-wrap, #pd-app) :is(input, textarea, select):hover:not(:disabled) {
+	border-color: color-mix(in srgb, var(--editor-text-secondary) 42%, var(--editor-border));
+}
+
+:where(#admin-page-wrap, #editor-page-wrap, #install-page-wrap, #pd-app) :is(input, textarea, select, button, a):focus-visible {
+	outline: 2px solid var(--editor-blue);
+	outline-offset: 2px;
+}
+
+/* --------------------------------------------------------- Cards and forms */
+
+:where(#admin-page-wrap, #editor-page-wrap, #install-page-wrap) fieldset,
+:where(#admin-page-wrap, #editor-page-wrap, #install-page-wrap) :is(
+	.editor-dashboard-section,
+	.admin-translation-card,
+	.install-setup-group,
+	#newsletter-bcc,
+	#editor-add-form,
+	#users-add-form,
+	#finish-form
+) {
+	border: 1px solid var(--editor-border);
+	border-radius: var(--editor-radius);
+	background: var(--editor-bg-grouped);
+	box-shadow: var(--editor-shadow-sm);
+}
+
+:where(#admin-page-wrap, #editor-page-wrap, #install-page-wrap) fieldset {
+	margin-bottom: .75rem;
+	padding: 2.65rem 1rem .2rem;
+}
+
+:where(#admin-page-wrap, #editor-page-wrap, #install-page-wrap) fieldset legend {
+	top: .82rem;
+	left: 1rem;
+}
+
+:where(#admin-page-wrap, #editor-page-wrap, #install-page-wrap) .editor-field {
+	margin-bottom: .72rem;
+}
+
+:where(#admin-page-wrap, #editor-page-wrap, #install-page-wrap) .editor-field > span,
+:where(#admin-page-wrap, #editor-page-wrap, #install-page-wrap) .editor-field-name {
+	margin-bottom: .22rem;
+	color: var(--editor-text-secondary);
+	font-size: .74rem;
+	font-weight: 600;
+}
+
+:where(#admin-page-wrap, #editor-page-wrap, #install-page-wrap) .editor-field-header {
+	margin-bottom: .22rem;
+}
+
+:where(#admin-page-wrap, #editor-page-wrap, #install-page-wrap) .editor-checkbox-field {
+	min-height: 34px;
+	margin-bottom: .28rem;
+}
+
+:where(#admin-page-wrap, #editor-page-wrap, #install-page-wrap) .editor-field-radios,
+:where(#admin-page-wrap, #editor-page-wrap, #install-page-wrap) .editor-field-radio {
+	min-height: var(--nino-admin-control-height);
+}
+
+:where(#admin-page-wrap, #editor-page-wrap, #install-page-wrap) .html-editor {
+	margin-bottom: .72rem;
+}
+
+:where(#admin-page-wrap, #editor-page-wrap, #install-page-wrap) .html-editor-toolbar {
+	gap: .2rem;
+	margin-bottom: .32rem;
+	padding: .22rem;
+	border-radius: var(--editor-radius-sm);
+}
+
+:where(#admin-page-wrap, #editor-page-wrap, #install-page-wrap) .html-editor-btn {
+	min-height: 30px;
+	padding: .3rem .55rem;
+	font-size: .76rem;
+	box-shadow: none;
+}
+
+:where(#admin-page-wrap, #editor-page-wrap, #install-page-wrap) .html-editor-content {
+	min-height: 3rem;
+	padding: .55rem .65rem;
+	border-radius: var(--editor-radius-sm);
+	font-size: .86rem;
+}
+
+/* ------------------------------------------------------- Grouped list base */
+
+:where(#admin-page-wrap, #editor-page-wrap, #install-page-wrap) :is(
+	.admin-drill-list,
+	#elements-list ul,
+	#images-list ul,
+	#users-list ul,
+	#logs-entries,
+	#newsletter-entries,
+	#webpages-list > ul,
+	#editor-list > ul,
+	#restore-dates
+) {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	overflow: hidden;
+	border: 1px solid var(--editor-border);
+	border-radius: var(--editor-radius);
+	background: var(--editor-bg-grouped);
+	box-shadow: var(--editor-shadow-sm);
+}
+
+:where(#admin-page-wrap, #editor-page-wrap, #install-page-wrap) :is(
+	.admin-drill-list,
+	#elements-list ul,
+	#images-list ul,
+	#users-list ul,
+	#logs-entries,
+	#newsletter-entries,
+	#webpages-list > ul,
+	#editor-list > ul
+) > li {
+	margin: 0;
+	border: 0;
+	border-bottom: 1px solid var(--editor-separator);
+	border-radius: 0;
+	background: transparent;
+	box-shadow: none;
+}
+
+:where(#admin-page-wrap, #editor-page-wrap, #install-page-wrap) :is(
+	.admin-drill-list,
+	#elements-list ul,
+	#images-list ul,
+	#users-list ul,
+	#logs-entries,
+	#newsletter-entries,
+	#webpages-list > ul,
+	#editor-list > ul
+) > li:last-child {
+	border-bottom: 0;
+}
+
+:where(#admin-page-wrap, #editor-page-wrap, #install-page-wrap) :is(
+	.admin-drill-list li a,
+	#elements-list li a,
+	#images-list li a,
+	#users-list li a,
+	#webpages-list > ul li a
+) {
+	display: flex;
+	align-items: center;
+	min-height: var(--nino-admin-row-height);
+	padding: .58rem .78rem;
+	color: var(--editor-text);
+	font-size: .84rem;
+}
+
+:where(#admin-page-wrap, #editor-page-wrap, #install-page-wrap) :is(
+	.admin-drill-list li a,
+	#elements-list li a,
+	#images-list li a,
+	#users-list li a
+):hover,
+#install-page-wrap #webpages-list > ul li:hover {
+	background: var(--editor-blue-soft);
+}
+
+:where(#admin-page-wrap, #editor-page-wrap, #install-page-wrap) :is(
+	.admin-drill-list li a,
+	#elements-list li a,
+	#images-list li a,
+	#users-list li a
+)::after {
+	content: "›";
+	margin-left: auto;
+	color: var(--editor-text-secondary);
+	font-size: 1.15rem;
+	line-height: 1;
+}
+
+:where(#admin-page-wrap, #editor-page-wrap) .admin-list-copy {
+	gap: .08rem;
+}
+
+:where(#admin-page-wrap, #editor-page-wrap) .admin-list-copy strong {
+	font-size: .84rem;
+	font-weight: 650;
+}
+
+:where(#admin-page-wrap, #editor-page-wrap) .admin-list-copy small {
+	font-size: .72rem;
+}
+
+/* Editor category cards become the same grouped lists used by Admin. */
+#editor-page-wrap :is(#elements-types, #text-list, #images-list):has(> .editor-type-btn) {
+	display: block;
+	margin: 0;
+	overflow: hidden;
+	border: 1px solid var(--editor-border);
+	border-radius: var(--editor-radius);
+	background: var(--editor-bg-grouped);
+	box-shadow: var(--editor-shadow-sm);
+}
+
+#editor-page-wrap :is(#elements-types, #text-list, #images-list) > .editor-type-btn {
+	align-items: center;
+	min-height: 54px;
+	margin: 0;
+	padding: .62rem .78rem;
+	border: 0;
+	border-bottom: 1px solid var(--editor-separator);
+	border-radius: 0;
+	background: transparent;
+	box-shadow: none;
+	font-size: .84rem;
+	transform: none;
+}
+
+#editor-page-wrap :is(#elements-types, #text-list, #images-list) > .editor-type-btn:last-child {
+	border-bottom: 0;
+}
+
+#editor-page-wrap :is(#elements-types, #text-list, #images-list) > .editor-type-btn:hover,
+#editor-page-wrap :is(#elements-types, #text-list, #images-list) > .editor-type-btn:active {
+	border-color: var(--editor-separator);
+	background: var(--editor-blue-soft);
+	box-shadow: none;
+	transform: none;
+}
+
+#editor-page-wrap .editor-type-btn > div {
+	min-width: 0;
+	font-weight: 650;
+}
+
+#editor-page-wrap .editor-type-btn-descr {
+	overflow: hidden;
+	margin-top: .06rem;
+	font-size: .72rem;
+	font-weight: 400;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+#editor-page-wrap .editor-view-button-chev {
+	color: var(--editor-text-secondary);
+	font-size: 1.15rem;
+}
+
+/* Dense data collections retain their content, but lose floating cards. */
+#editor-page-wrap #submissions-entries {
+	overflow: hidden;
+	border: 1px solid var(--editor-border);
+	border-radius: var(--editor-radius);
+	background: var(--editor-bg-grouped);
+	box-shadow: var(--editor-shadow-sm);
+}
+
+#editor-page-wrap #submissions-entries > li {
+	margin: 0;
+	padding: .7rem .8rem;
+	border: 0;
+	border-bottom: 1px solid var(--editor-separator);
+	border-radius: 0;
+	background: transparent;
+	box-shadow: none;
+	transform: none;
+}
+
+#editor-page-wrap #submissions-entries > li:last-child {
+	border-bottom: 0;
+}
+
+#editor-page-wrap #submissions-entries > li:hover {
+	background: var(--editor-blue-soft);
+	box-shadow: none;
+	transform: none;
+}
+
+#editor-page-wrap #logs-entries li,
+#editor-page-wrap #newsletter-entries li,
+#install-page-wrap #editor-list > ul li {
+	min-height: var(--nino-admin-row-height);
+	padding: .58rem .78rem;
+}
+
+/* ------------------------------------------------------- Fixed app chrome */
+
+.nino-admin-contextbar,
+#admin-content-wrap .admin-form-toolbar {
+	position: sticky;
+	top: 0;
+	z-index: 24;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: .65rem;
+	min-height: 52px;
+	margin: -1rem -1rem 1rem;
+	padding: .48rem 1rem;
+	border-bottom: 1px solid var(--editor-separator);
+	background: var(--editor-bar-bg);
+	box-shadow: 0 1px 0 rgba(15,23,42,.025);
+	backdrop-filter: blur(18px) saturate(170%);
+	-webkit-backdrop-filter: blur(18px) saturate(170%);
+}
+
+.nino-admin-contextbar .back-link,
+#admin-content-wrap .admin-form-toolbar .back-link {
+	position: static;
+	width: auto;
+	margin: 0;
+	padding: .35rem .48rem;
+	border: 0;
+	border-radius: var(--editor-radius-sm);
+	background: transparent;
+	box-shadow: none;
+	font-size: .82rem;
+}
+
+.nino-admin-contextbar :is(select, button),
+#admin-content-wrap .admin-form-toolbar :is(select, button) {
+	position: static;
+	width: auto;
+	max-width: min(13rem, 45vw);
+	margin: 0;
+}
+
+#admin-page-wrap .nino-admin-actionbar,
+#admin-page-wrap #elements-form-actions.nino-admin-actionbar,
+#editor-page-wrap .nino-admin-actionbar,
+#editor-page-wrap #elements-form-actions.nino-admin-actionbar,
+#install-page-wrap .nino-admin-actionbar,
+#install-actions-wrap,
+#pd-top-actions {
+	position: fixed;
+	right: 0;
+	bottom: 0;
+	left: 0;
+	z-index: 70;
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
+	gap: .5rem;
+	min-height: var(--nino-admin-actionbar-height);
+	margin: 0;
+	padding: .65rem 1rem max(.65rem, env(safe-area-inset-bottom));
+	border-top: 1px solid var(--editor-separator);
+	background: var(--editor-bar-bg);
+	box-shadow: 0 -.5rem 1.5rem rgba(15,23,42,.055);
+	backdrop-filter: blur(20px) saturate(175%);
+	-webkit-backdrop-filter: blur(20px) saturate(175%);
+}
+
+#admin-page-wrap .nino-admin-actionbar > :is(p, [role="status"]),
+#admin-page-wrap #elements-form-actions.nino-admin-actionbar > :is(p, [role="status"]),
+#editor-page-wrap .nino-admin-actionbar > :is(p, [role="status"]),
+#editor-page-wrap #elements-form-actions.nino-admin-actionbar > :is(p, [role="status"]),
+#install-page-wrap .nino-admin-actionbar > :is(p, [role="status"]),
+#install-actions-wrap > p,
+#pd-top-actions > #pd-save-state {
+	order: -1;
+	flex: 1 1 auto;
+	min-width: 0;
+	margin: 0;
+	color: var(--editor-text-secondary);
+	font-size: .78rem;
+	text-align: right;
+}
+
+#admin-page-wrap .nino-admin-actionbar button,
+#admin-page-wrap #elements-form-actions.nino-admin-actionbar button,
+#editor-page-wrap .nino-admin-actionbar button,
+#editor-page-wrap #elements-form-actions.nino-admin-actionbar button,
+#install-page-wrap .nino-admin-actionbar button,
+#install-actions-wrap button,
+#pd-top-actions button {
+	flex: 0 0 auto;
+	width: auto;
+	min-width: 0;
+}
+
+.nino-admin-list-actions .editor-list-action {
+	width: auto;
+	margin: 0;
+}
+
+#editor-page-wrap .nino-admin-list-actions #submissions-export {
+	display: inline-flex;
+	margin: 0;
+}
+
+:where(#admin-page-wrap, #editor-page-wrap, #install-page-wrap) .nino-admin-actionbar :is(
+	.editor-danger,
+	.admin-danger-btn,
+	button.red
+) {
+	order: -2;
+}
+
+#editor-page-wrap .nino-admin-contextbar :is(#elements-form-locale-select, #text-form-locale-select) {
+	position: static;
+	flex: 0 0 auto;
+	width: auto;
+	max-width: min(10rem, 45vw);
+	margin: 0;
+}
+
+/* ---------------------------------------------------------- Login screens */
+
+:where(#admin-login-wrap, #form-login, #install-locked-wrap) {
+	width: min(100% - 2rem, 26rem);
+	max-width: none;
+	margin: clamp(2rem, 9vh, 6rem) auto;
+	padding: 0;
+}
+
+:where(#admin-login-form, #form-login, #install-locked-wrap) {
+	padding: 1.6rem;
+	border: 1px solid var(--editor-border);
+	border-radius: 12px;
+	background: var(--editor-bg-grouped);
+	box-shadow: var(--editor-shadow);
+}
+
+:where(.admin-auth-brand, .editor-auth-brand, .install-auth-brand) {
+	margin-bottom: 1.2rem;
+}
+
+:where(.admin-auth-brand span, .editor-auth-brand span, .install-auth-brand span) {
+	width: 2.1rem;
+	height: 2.1rem;
+	border-radius: var(--editor-radius-sm);
+	box-shadow: none;
+}
+
+:where(.admin-auth-title, .editor-auth-title) {
+	font-size: 1.4rem;
+}
+
+/* --------------------------------------------------------- Shared sidebars */
+
+@media (min-width: 64rem) {
+	body:has(#admin-page-wrap),
+	body:has(#editor-page-wrap),
+	body:has(#install-page-wrap),
+	body:has(#pd-app) {
+		height: 100dvh;
+		overflow: hidden;
+	}
+
+	#admin-page-wrap,
+	#editor-page-wrap {
+		grid-template-columns: var(--nino-admin-sidebar-width) minmax(0, 1fr);
+		height: 100dvh;
+		min-height: 0;
+		overflow: hidden;
+	}
+
+	#install-page-wrap {
+		grid-template-columns: var(--nino-admin-sidebar-width) minmax(0, 1fr);
+		height: 100dvh;
+		min-height: 0;
+		overflow: hidden;
+	}
+
+	#admin-shell-rail,
+	#editor-bar-wrap,
+	#install-shell-rail {
+		height: 100dvh;
+		padding: 1rem .72rem;
+		border-right: 1px solid var(--nino-admin-rail-border);
+		background: var(--nino-admin-rail);
+		color: var(--nino-admin-rail-text);
+	}
+
+	#admin-bar-wrap,
+	#install-bar-wrap {
+		padding: 0 .35rem .85rem;
+	}
+
+	#editor-bar-wrap {
+		gap: .8rem;
+	}
+
+	:where(#admin-shell-rail, #editor-bar-wrap, #install-shell-rail) :is(
+		.admin-brand-copy strong,
+		.editor-brand-copy strong,
+		.install-brand-copy strong
+	) {
+		color: var(--nino-admin-rail-text);
+	}
+
+	:where(#admin-shell-rail, #editor-bar-wrap, #install-shell-rail) :is(
+		.admin-brand-copy small,
+		.editor-brand-copy small,
+		.install-brand-copy small
+	) {
+		color: var(--nino-admin-rail-muted);
+	}
+
+	:where(#admin-shell-rail, #editor-bar-wrap, #install-shell-rail) :is(
+		.admin-brand-mark,
+		.editor-brand-mark,
+		.install-brand-mark
+	) {
+		width: 2rem;
+		height: 2rem;
+		border-radius: var(--editor-radius-sm);
+		box-shadow: none;
+	}
+
+	#editor-user {
+		padding: .55rem .62rem;
+		border-color: var(--nino-admin-rail-border);
+		background: var(--editor-bg);
+		color: var(--nino-admin-rail-muted);
+	}
+
+	#editor-user-logout,
+	#admin-logout {
+		color: var(--editor-red);
+	}
+
+	#admin-templates {
+		color: var(--editor-blue);
+	}
+
+	#admin-bar-actions {
+		border-color: var(--nino-admin-rail-border);
+	}
+
+	#admin-nav-wrap,
+	#editor-nav-wrap,
+	#install-nav-wrap {
+		gap: .12rem;
+	}
+
+	#admin-nav-wrap a,
+	#editor-nav-wrap a,
+	#install-nav-wrap span {
+		padding: .55rem .68rem;
+		border: 0;
+		border-radius: var(--editor-radius-sm);
+		background: transparent;
+		color: var(--nino-admin-rail-text);
+		font-size: .82rem;
+	}
+
+	#admin-nav-wrap a:hover,
+	#editor-nav-wrap a:hover {
+		background: var(--nino-admin-rail-hover);
+		color: var(--editor-text);
+	}
+
+	#admin-nav-wrap a.active,
+	#editor-nav-wrap a.active,
+	#install-nav-wrap span.active {
+		background: var(--editor-blue);
+		color: var(--nino-admin-active-text);
+	}
+
+	#admin-content-wrap,
+	#editor-content-wrap,
+	#install-content-wrap {
+		--admin-pane-pad: var(--nino-admin-content-inline);
+		height: 100dvh;
+		max-width: none;
+		min-height: 0;
+		margin: 0;
+		overflow-y: auto;
+		overscroll-behavior: contain;
+		scrollbar-gutter: stable;
+		padding: 1rem var(--nino-admin-content-inline) calc(var(--nino-admin-actionbar-height) + 2rem);
+	}
+
+	.nino-admin-contextbar,
+	#admin-content-wrap .admin-form-toolbar {
+		/* A negative block margin makes a sticky row overlap the first title:
+		   the scrollport clamps the row to its padded top, while following
+		   content is still pulled upward. Only bleed it horizontally here. */
+		margin: 0 calc(var(--nino-admin-content-inline) * -1) 1rem;
+		padding-right: var(--nino-admin-content-inline);
+		padding-left: var(--nino-admin-content-inline);
+	}
+
+	#admin-page-wrap .nino-admin-actionbar,
+	#admin-page-wrap #elements-form-actions.nino-admin-actionbar,
+	#editor-page-wrap .nino-admin-actionbar,
+	#editor-page-wrap #elements-form-actions.nino-admin-actionbar,
+	#install-page-wrap .nino-admin-actionbar,
+	#install-actions-wrap {
+		left: var(--nino-admin-sidebar-width);
+		padding-right: var(--nino-admin-content-inline);
+		padding-left: var(--nino-admin-content-inline);
+	}
+}
+
+/* ------------------------------------------------------------ Admin/Editor */
+
+#admin-dashboard-tiles,
+#editor-dashboard-tiles {
+	gap: .65rem;
+	margin-bottom: .75rem;
+}
+
+:where(#admin-page-wrap, #editor-page-wrap) .editor-dashboard-tile {
+	gap: .08rem;
+	padding: .85rem 1rem;
+	border-top-width: 2px;
+	border-radius: var(--editor-radius);
+	box-shadow: var(--editor-shadow-sm);
+	transform: none;
+}
+
+:where(#admin-page-wrap, #editor-page-wrap) .editor-dashboard-tile:hover {
+	box-shadow: var(--editor-shadow);
+	transform: none;
+}
+
+:where(#admin-page-wrap, #editor-page-wrap) .editor-dashboard-tile-value {
+	font-size: 1.6rem;
+}
+
+:where(#admin-page-wrap, #editor-page-wrap) .editor-dashboard-section {
+	margin-bottom: .75rem;
+	padding: .85rem;
+}
+
+:where(#admin-page-wrap, #editor-page-wrap) .editor-dashboard-section h3 {
+	margin-bottom: .55rem;
+	font-size: .9rem;
+}
+
+#admin-page-wrap .admin-dashboard-row {
+	padding: .6rem .75rem;
+	border-radius: var(--editor-radius-sm);
+	font-size: .82rem;
+}
+
+#admin-page-wrap .admin-field-row {
+	gap: .38rem;
+	margin-bottom: .55rem;
+	padding: .72rem .8rem;
+	border-radius: var(--editor-radius);
+	box-shadow: var(--editor-shadow-sm);
+}
+
+#admin-page-wrap .admin-translation-card {
+	gap: .65rem .8rem;
+	padding: .9rem;
+}
+
+#admin-page-wrap .admin-translations-intro {
+	margin-bottom: .9rem;
+}
+
+#admin-page-wrap .admin-translations-intro h1 {
+	font-size: 1.55rem;
+	letter-spacing: -.03em;
+}
+
+#admin-page-wrap .admin-translations-flow {
+	gap: .75rem;
+}
+
+/* --------------------------------------------------------------- Install */
+
+#install-content-wrap > div > .admin-hint:first-child {
+	margin: 0 0 .8rem;
+	padding: .75rem .85rem;
+	border-radius: var(--editor-radius);
+	background: var(--editor-blue-soft);
+	box-shadow: none;
+}
+
+#install-page-wrap .install-setup-group {
+	margin-bottom: .7rem;
+	padding: .85rem;
+}
+
+#install-page-wrap .install-setup-group h3 {
+	margin: 0 0 .55rem;
+	font-size: .9rem;
+}
+
+#install-page-wrap :is(#setup-locales, #setup-modules) label {
+	min-height: 38px;
+	padding: .45rem .65rem;
+	border-radius: var(--editor-radius-sm);
+}
+
+#install-page-wrap .install-theme-card {
+	border-radius: var(--editor-radius);
+	box-shadow: var(--editor-shadow-sm);
+}
+
+#install-page-wrap .install-theme-card:hover {
+	box-shadow: var(--editor-shadow);
+	transform: none;
+}
+
+#install-page-wrap #editor-add-form,
+#install-page-wrap #finish-form {
+	padding: 1rem;
+}
+
+#install-page-wrap #finish-done {
+	max-width: 72rem;
+	margin: clamp(1.5rem, 5vh, 3.5rem) auto 0;
+}
+
+#install-page-wrap .install-finish-intro {
+	display: flex;
+	align-items: center;
+	gap: 1rem;
+	margin-bottom: 1.25rem;
+}
+
+#install-page-wrap .install-finish-mark {
+	display: grid;
+	place-items: center;
+	width: 3.25rem;
+	height: 3.25rem;
+	flex: 0 0 auto;
+	border-radius: 50%;
+	background: var(--editor-green-soft);
+	color: var(--editor-green);
+}
+
+#install-page-wrap .install-finish-mark svg {
+	width: 1.55rem;
+	height: 1.55rem;
+}
+
+#install-page-wrap .install-finish-intro h1 {
+	margin: .1rem 0 .22rem;
+	font-size: clamp(1.35rem, 3vw, 1.8rem);
+}
+
+#install-page-wrap .install-finish-intro p {
+	margin: 0;
+	color: var(--editor-text-secondary);
+}
+
+#install-page-wrap .install-finish-eyebrow {
+	color: var(--editor-green);
+	font-size: .7rem;
+	font-weight: 750;
+	letter-spacing: .07em;
+	text-transform: uppercase;
+}
+
+#install-page-wrap .install-next-steps {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: .8rem;
+}
+
+#install-page-wrap .install-next-step {
+	--install-next-accent: var(--editor-blue);
+	--install-next-soft: var(--editor-blue-soft);
+	display: grid;
+	grid-template-columns: auto minmax(0, 1fr) auto;
+	align-items: center;
+	gap: .8rem;
+	min-height: 9rem;
+	padding: 1.05rem;
+	border: 1px solid var(--editor-border);
+	border-radius: var(--editor-radius);
+	background:
+		linear-gradient(145deg, var(--install-next-soft), transparent 55%),
+		var(--editor-bg-grouped);
+	box-shadow: var(--editor-shadow-sm);
+	color: var(--editor-text);
+	text-decoration: none;
+}
+
+#install-page-wrap .install-next-step--admin {
+	--install-next-accent: var(--editor-orange);
+	--install-next-soft: color-mix(in srgb, var(--editor-orange) 11%, transparent);
+}
+
+#install-page-wrap .install-next-step--editor {
+	--install-next-accent: var(--editor-green);
+	--install-next-soft: var(--editor-green-soft);
+}
+
+#install-page-wrap .install-next-step:hover {
+	border-color: color-mix(in srgb, var(--install-next-accent) 48%, var(--editor-border));
+	box-shadow: var(--editor-shadow);
+}
+
+#install-page-wrap .install-next-step-icon {
+	display: grid;
+	place-items: center;
+	width: 2.7rem;
+	height: 2.7rem;
+	border-radius: var(--editor-radius-sm);
+	background: var(--install-next-soft);
+	color: var(--install-next-accent);
+}
+
+#install-page-wrap .install-next-step-icon svg {
+	width: 1.25rem;
+	height: 1.25rem;
+}
+
+#install-page-wrap .install-next-step-copy {
+	display: flex;
+	flex-direction: column;
+	gap: .28rem;
+	min-width: 0;
+}
+
+#install-page-wrap .install-next-step-copy strong {
+	font-size: .92rem;
+	line-height: 1.25;
+}
+
+#install-page-wrap .install-next-step-copy small {
+	color: var(--editor-text-secondary);
+	font-size: .74rem;
+	line-height: 1.45;
+}
+
+#install-page-wrap .install-next-step-arrow {
+	width: 1.1rem;
+	height: 1.1rem;
+	color: var(--install-next-accent);
+	transition: transform .15s ease;
+}
+
+#install-page-wrap .install-next-step:hover .install-next-step-arrow {
+	transform: translateX(2px);
+}
+
+#install-page-wrap .install-cleanup-note {
+	margin: 1rem 0 0;
+	padding: .75rem .85rem;
+	border-radius: var(--editor-radius-sm);
+	background: var(--nino-admin-surface-muted);
+	color: var(--editor-text-secondary);
+	font-size: .78rem;
+}
+
+#install-page-wrap.show-finish.is-complete #install-actions-wrap {
+	display: none;
+}
+
+#install-page-wrap.show-finish.is-complete #install-content-finish > :is(.admin-hint, .admin-error) {
+	display: none;
+}
+
+#install-actions-wrap {
+	grid-column: auto;
+	grid-row: auto;
+}
+
+#install-actions-wrap #install-actions-msg {
+	color: var(--editor-red);
+}
+
+#install-context-action {
+	display: none;
+}
+
+#install-page-wrap.show-webpages:not(.is-editing-webpage) #install-context-action {
+	display: inline-flex;
+}
+
+#install-page-wrap.show-webpages.is-editing-webpage #install-actions-wrap {
+	display: none;
+}
+
+#install-page-wrap.show-webpages.is-editing-webpage #install-content-webpages > .admin-hint {
+	display: none;
+}
+
+/* ------------------------------------------------------ Template Builder */
+
+#pd-app {
+	--pd-topbar-height: 5.35rem;
+	--pd-sidebar-width: var(--nino-admin-sidebar-width);
+	--pd-inspector-width: 20rem;
+}
+
+#pd-app #pd-topbar {
+	grid-template-columns: var(--pd-sidebar-width) minmax(0, 1fr);
+	gap: 1rem;
+	height: var(--pd-topbar-height);
+	padding: .6rem 1rem;
+	box-shadow: none;
+}
+
+#pd-app .pd-head-rail {
+	gap: .4rem;
+}
+
+#pd-app :is(.pd-brand-mark, .pd-page-icon, .pd-inspector-icon) {
+	border-radius: var(--editor-radius-sm);
+}
+
+#pd-app .pd-brand-mark {
+	width: 2rem;
+	height: 2rem;
+	box-shadow: none;
+}
+
+#pd-app .pd-back-admin {
+	padding-top: .38rem;
+	font-size: .73rem;
+}
+
+#pd-app #pd-document-meta strong {
+	font-size: .86rem;
+}
+
+#pd-app #pd-pages,
+#pd-app #pd-inspector {
+	padding: .9rem .75rem calc(var(--nino-admin-actionbar-height) + 1rem);
+}
+
+#pd-app .pd-panel-heading {
+	padding: 0 .2rem .6rem;
+}
+
+#pd-app :is(.pd-panel-heading h2, .pd-inspector-empty h2, .pd-inspector-title h2, .pd-dialog-header h2) {
+	font-size: .95rem;
+	letter-spacing: -.02em;
+}
+
+#pd-app .pd-icon-button {
+	width: 2rem;
+	height: 2rem;
+	min-height: 0;
+	padding: 0;
+	border-radius: var(--editor-radius-sm);
+}
+
+#pd-app .pd-search {
+	margin-bottom: .65rem;
+	padding: .02rem .62rem;
+	border-radius: var(--editor-radius-sm);
+	box-shadow: none;
+}
+
+#pd-app .pd-search input {
+	min-height: 2.15rem;
+	padding: 0;
+	border: 0;
+	box-shadow: none;
+	font-size: .78rem;
+}
+
+#pd-app #pd-page-list {
+	display: block;
+	overflow: hidden;
+	border: 1px solid var(--editor-border);
+	border-radius: var(--editor-radius);
+	background: var(--editor-bg-grouped);
+	box-shadow: var(--editor-shadow-sm);
+}
+
+#pd-app .pd-page-button {
+	grid-template-columns: 1.7rem minmax(0, 1fr) auto;
+	gap: .48rem;
+	min-height: 48px;
+	margin: 0;
+	padding: .38rem .55rem;
+	border: 0;
+	border-bottom: 1px solid var(--editor-separator);
+	border-radius: 0;
+	background: transparent;
+	box-shadow: none;
+}
+
+#pd-app .pd-page-button:last-child {
+	border-bottom: 0;
+}
+
+#pd-app .pd-page-button:hover:not(:disabled),
+#pd-app .pd-page-button.is-active {
+	background: var(--editor-blue-soft);
+	box-shadow: none;
+}
+
+#pd-app .pd-page-icon {
+	width: 1.7rem;
+	height: 1.7rem;
+}
+
+#pd-app .pd-page-copy strong {
+	font-size: .77rem;
+}
+
+#pd-app .pd-page-copy small,
+#pd-app .pd-page-count {
+	font-size: .63rem;
+}
+
+#pd-app #pd-workspace {
+	padding: 1rem clamp(1rem, 2.6vw, 2.5rem) calc(var(--nino-admin-actionbar-height) + 1.5rem);
+}
+
+#pd-app #pd-page-toolbar {
+	position: sticky;
+	top: -1rem;
+	z-index: 12;
+	width: calc(100% + clamp(2rem, 5.2vw, 5rem));
+	max-width: none;
+	margin: -1rem calc(clamp(1rem, 2.6vw, 2.5rem) * -1) 1rem;
+	padding: .7rem clamp(1rem, 2.6vw, 2.5rem);
+	border-width: 0 0 1px;
+	border-radius: 0;
+	background: var(--editor-bar-bg);
+	box-shadow: 0 1px 0 rgba(15,23,42,.025);
+	backdrop-filter: blur(18px) saturate(170%);
+	-webkit-backdrop-filter: blur(18px) saturate(170%);
+}
+
+#pd-app .pd-slot-setting span,
+#pd-app .pd-inline-setting > strong {
+	font-size: .64rem;
+	letter-spacing: .04em;
+}
+
+#pd-app :is(.pd-section-card, .pd-inspector-card, .pd-empty-state, .pd-sidebar-note) {
+	border-radius: var(--editor-radius);
+	box-shadow: var(--editor-shadow-sm);
+}
+
+#pd-app .pd-section-card:hover {
+	box-shadow: var(--editor-shadow);
+	transform: none;
+}
+
+#pd-app .pd-dialog {
+	border-radius: 12px;
+	box-shadow: 0 1.5rem 4rem rgba(0,0,0,.24);
+}
+
+#pd-app :is(.pd-dialog-header, .pd-dialog-footer) {
+	min-height: 56px;
+	padding: .7rem .85rem;
+}
+
+#pd-app #pd-top-actions {
+	left: var(--pd-sidebar-width);
+	padding-right: clamp(1rem, 2.6vw, 2.5rem);
+	padding-left: clamp(1rem, 2.6vw, 2.5rem);
+}
+
+/* init() moves this row out of the filtered header so fixed positioning is
+   viewport-relative. Keep the pre-init copy from briefly covering the brand. */
+#pd-app #pd-topbar > #pd-top-actions {
+	visibility: hidden;
+}
+
+#pd-app > #pd-top-actions {
+	visibility: visible;
+}
+
+#pd-app #pd-save-state {
+	max-width: none;
+}
+
+#pd-app .pd-toolbar-actions:empty {
+	display: none;
+}
+
+@media (min-width: 58.001rem) {
+	#pd-app .pd-head-rail,
+	#pd-app #pd-pages {
+		border-color: var(--nino-admin-rail-border);
+		background: var(--nino-admin-rail);
+	}
+
+	#pd-app .pd-head-rail {
+		align-self: stretch;
+		box-sizing: border-box;
+		justify-self: start;
+		width: var(--pd-sidebar-width);
+		margin: -.6rem 0 -.6rem -1rem;
+		padding: .65rem .75rem;
+	}
+
+	#pd-app :is(.pd-brand, .pd-panel-heading h2, .pd-sidebar-note strong) {
+		color: var(--nino-admin-rail-text);
+	}
+
+	#pd-app :is(.pd-brand-copy small, .pd-eyebrow, .pd-back-admin, .pd-sidebar-note) {
+		color: var(--nino-admin-rail-muted);
+	}
+
+	#pd-app .pd-back-admin {
+		border-color: var(--nino-admin-rail-border);
+		color: var(--editor-blue);
+	}
+
+	#pd-app #pd-pages .pd-search,
+	#pd-app #pd-page-list {
+		border-color: var(--nino-admin-rail-border);
+		background: var(--editor-bg-grouped);
+		box-shadow: none;
+	}
+
+	#pd-app #pd-pages .pd-search input,
+	#pd-app .pd-page-button {
+		color: var(--editor-text);
+	}
+
+	#pd-app .pd-page-button {
+		border-color: var(--nino-admin-rail-border);
+	}
+
+	#pd-app .pd-page-button:hover:not(:disabled),
+	#pd-app .pd-page-button.is-active {
+		background: var(--editor-blue-soft);
+		color: var(--editor-blue);
+	}
+
+	#pd-app .pd-page-icon,
+	#pd-app .pd-page-count {
+		border-color: var(--nino-admin-rail-border);
+		background: var(--editor-bg);
+		color: var(--nino-admin-rail-text);
+	}
+
+	#pd-app :is(.pd-page-copy small, .pd-page-count) {
+		color: var(--nino-admin-rail-muted);
+	}
+
+	#pd-app .pd-heading-actions button {
+		background: var(--editor-bg-elevated);
+		color: var(--editor-text);
+		box-shadow: inset 0 0 0 1px var(--nino-admin-rail-border);
+	}
+}
+
+/* --------------------------------------------------------- Dense desktops */
+
+@media (min-width: 48rem) {
+	:where(#admin-page-wrap, #editor-page-wrap, #install-page-wrap) fieldset > .editor-field:not(.admin-text-field),
+	:where(#admin-page-wrap, #editor-page-wrap, #install-page-wrap) fieldset > :is(
+		#elements-form-locale-fields,
+		#text-form-locale-fields,
+		#personalinfos-form-global-fields,
+		#personalinfos-form-locale-fields
+	) > .editor-field:not(.admin-text-field) {
+		display: grid;
+		grid-template-columns: minmax(9rem, 22%) minmax(0, 1fr);
+		gap: .3rem .8rem;
+		align-items: start;
+		margin: 0;
+		padding: .48rem 0;
+		border-top: 1px solid var(--editor-separator);
+	}
+
+	:where(#admin-page-wrap, #editor-page-wrap, #install-page-wrap) fieldset > .editor-field:not(.admin-text-field):first-of-type,
+	:where(#admin-page-wrap, #editor-page-wrap, #install-page-wrap) fieldset > :is(
+		#elements-form-locale-fields,
+		#text-form-locale-fields,
+		#personalinfos-form-global-fields,
+		#personalinfos-form-locale-fields
+	) > .editor-field:not(.admin-text-field):first-child {
+		border-top: 0;
+	}
+
+	:where(#admin-page-wrap, #editor-page-wrap, #install-page-wrap) fieldset > .editor-field:not(.admin-text-field) > :is(span, .editor-field-header),
+	:where(#admin-page-wrap, #editor-page-wrap, #install-page-wrap) fieldset > :is(
+		#elements-form-locale-fields,
+		#text-form-locale-fields,
+		#personalinfos-form-global-fields,
+		#personalinfos-form-locale-fields
+	) > .editor-field:not(.admin-text-field) > :is(span, .editor-field-header) {
+		grid-column: 1;
+		align-self: center;
+		margin: .18rem 0 0;
+	}
+
+	:where(#admin-page-wrap, #editor-page-wrap, #install-page-wrap) fieldset > .editor-field:not(.admin-text-field) > :not(span):not(.editor-field-header),
+	:where(#admin-page-wrap, #editor-page-wrap, #install-page-wrap) fieldset > :is(
+		#elements-form-locale-fields,
+		#text-form-locale-fields,
+		#personalinfos-form-global-fields,
+		#personalinfos-form-locale-fields
+	) > .editor-field:not(.admin-text-field) > :not(span):not(.editor-field-header) {
+		grid-column: 2;
+		min-width: 0;
+	}
+
+	:where(#admin-page-wrap, #editor-page-wrap, #install-page-wrap) .editor-field textarea {
+		min-height: 3.4rem;
+	}
+}
+
+/* --------------------------------------------------------------- Mobile */
+
+@media (max-width: 76rem) {
+	#install-page-wrap .install-next-steps {
+		grid-template-columns: 1fr;
+	}
+
+	#install-page-wrap .install-next-step {
+		min-height: 5.5rem;
+	}
+}
+
+@media (max-width: 63.999rem) {
+	#admin-content-wrap,
+	#editor-content-wrap,
+	#install-content-wrap,
+	#pd-workspace,
+	#pd-inspector,
+	#pd-pages {
+		padding-bottom: calc(var(--nino-admin-actionbar-height) + 1.25rem);
+	}
+
+	#pd-app #pd-top-actions {
+		left: 0;
+	}
+}
+
+@media (max-width: 58rem) {
+	#pd-app #pd-topbar {
+		grid-template-columns: minmax(0, 1fr);
+	}
+
+	#pd-app #pd-page-toolbar {
+		position: sticky;
+		top: 0;
+		width: calc(100% + clamp(2rem, 5.2vw, 5rem));
+	}
+}
+
+@media (max-width: 38rem) {
+	#admin-page-wrap .nino-admin-actionbar,
+	#admin-page-wrap #elements-form-actions.nino-admin-actionbar,
+	#editor-page-wrap .nino-admin-actionbar,
+	#editor-page-wrap #elements-form-actions.nino-admin-actionbar,
+	#install-page-wrap .nino-admin-actionbar,
+	#install-actions-wrap,
+	#pd-top-actions {
+		gap: .4rem;
+		padding-right: .7rem;
+		padding-left: .7rem;
+	}
+
+	#admin-page-wrap .nino-admin-actionbar > :is(p, [role="status"]),
+	#admin-page-wrap #elements-form-actions.nino-admin-actionbar > :is(p, [role="status"]),
+	#editor-page-wrap .nino-admin-actionbar > :is(p, [role="status"]),
+	#editor-page-wrap #elements-form-actions.nino-admin-actionbar > :is(p, [role="status"]),
+	#install-page-wrap .nino-admin-actionbar > :is(p, [role="status"]),
+	#install-actions-wrap > p,
+	#pd-top-actions > #pd-save-state {
+		display: none;
+	}
+
+	#pd-app #pd-page-toolbar {
+		align-items: stretch;
+	}
+}
+
+@media (pointer: coarse) {
+	:root {
+		--nino-admin-control-height: 44px;
+		--nino-admin-row-height: 50px;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	:where(#admin-page-wrap, #editor-page-wrap, #install-page-wrap, #pd-app) *,
+	:where(#admin-page-wrap, #editor-page-wrap, #install-page-wrap, #pd-app) *::before,
+	:where(#admin-page-wrap, #editor-page-wrap, #install-page-wrap, #pd-app) *::after {
+		scroll-behavior: auto !important;
+		transition-duration: .01ms !important;
+		animation-duration: .01ms !important;
+	}
+}

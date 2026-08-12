@@ -17,6 +17,37 @@
 
 	wn.Nino = {
 
+		/**
+		 *	Small DOM primitives shared by Nino's four administration apps.
+		 *	They only assign the common chrome classes from Nino.admin.css;
+		 *	application modules keep ownership of labels, state and events.
+		 */
+		adminUi : {
+
+			contextBar : function( backLink, controls ) {
+				const bar = dc.createElement('div');
+				bar.className = 'nino-admin-contextbar';
+				if( backLink )
+					bar.appendChild( backLink );
+				( Array.isArray( controls ) ? controls : ( controls ? [ controls ] : [] ) ).forEach( function( control ) {
+					bar.appendChild( control );
+				} );
+				return bar;
+			},
+
+			actionBar : function( bar ) {
+				bar.classList.add('nino-admin-actionbar');
+				return bar;
+			},
+
+			listActions : function( buttons ) {
+				const bar = dc.createElement('div');
+				bar.className = 'nino-admin-actionbar nino-admin-list-actions';
+				buttons.forEach( function( button ) { bar.appendChild( button ) } );
+				return bar;
+			},
+		},
+
 		auth : {
 
 			/**

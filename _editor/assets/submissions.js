@@ -109,7 +109,6 @@
 			exportBtn.addEventListener( 'click', function() {
 				Nino.editor.exportCsv( 'anfragen.csv', entries );
 			} );
-			wrap.appendChild( exportBtn );
 
 			const ul = dc.createElement('ul');
 			ul.id = 'submissions-entries';
@@ -119,6 +118,7 @@
 			} );
 
 			wrap.appendChild( ul );
+			wrap.appendChild( Nino.adminUi.listActions( [ exportBtn ] ) );
 
 			// Only show the "expand" hint on cards whose message actually
 			// overflows its collapsed (line-clamped) height - can only be

@@ -13,5 +13,6 @@
 			<link rel="icon" type="image/png" sizes="32x32" href="[[/nino/dir]]/_editor/assets/favicon-32x32.png">
 			<link rel="icon" href="[[/nino/dir]]/_editor/assets/favicon.ico">
 			[assets /_editor/.cache/style.css]
+			<link rel="stylesheet" href="[[/nino/dir]]/_nino/Nino.admin.css">
 		</head>
 		<body>

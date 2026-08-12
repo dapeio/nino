@@ -128,9 +128,8 @@
 		 */
 		formToolbar : function( backLink ) {
 
-			const toolbar = dc.createElement('div');
-			toolbar.className = 'admin-form-toolbar';
-			toolbar.appendChild( backLink );
+			const toolbar = Nino.adminUi.contextBar( backLink );
+			toolbar.classList.add('admin-form-toolbar');
 
 			return toolbar;
 		},

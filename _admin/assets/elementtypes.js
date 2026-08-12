@@ -146,7 +146,7 @@
 			addBtn.className = 'editor-list-action';
 			addBtn.textContent = 'New type';
 			addBtn.addEventListener( 'click', function() { Nino.admin.elementTypes._openForm( null ) } );
-			wrap.appendChild( addBtn );
+			wrap.appendChild( Nino.adminUi.listActions( [ addBtn ] ) );
 		},
 
 		/**
@@ -453,7 +453,7 @@
 			backLink.className = 'back-link';
 			backLink.textContent = 'Back to list';
 			backLink.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.elementTypes._showList() } );
-			wrap.appendChild( backLink );
+			wrap.appendChild( Nino.admin.formToolbar( backLink ) );
 
 			const form = dc.createElement('form');
 
@@ -501,7 +501,7 @@
 			// ends on - assets/style.css pins that row to the bottom of the
 			// viewport, so a long field list never puts Save out of reach
 			const actions = dc.createElement('div');
-			actions.className = 'editor-form-actions';
+			actions.className = 'editor-form-actions nino-admin-actionbar';
 
 			const saveBtn = dc.createElement('button');
 			saveBtn.type = 'submit';

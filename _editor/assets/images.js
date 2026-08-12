@@ -231,7 +231,7 @@
 			backLink.className = 'back-link';
 			backLink.textContent = Nino.content.getText('/_editor/images/label/back');
 			backLink.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.editor.images._showList() } );
-			wrap.appendChild( backLink );
+			wrap.appendChild( Nino.editor.formToolbar( backLink ) );
 
 			const title = dc.createElement('div');
 			title.className = 'main-title';

@@ -10,6 +10,7 @@
 		<link rel="stylesheet" href="[[/nino/dir]]/_editor/assets/style.css">
 		<link rel="stylesheet" href="[[/nino/dir]]/_admin/assets/style.css">
 		<link rel="stylesheet" href="[[/nino/dir]]/_templates/assets/style.css">
+		<link rel="stylesheet" href="[[/nino/dir]]/_nino/Nino.admin.css">
 	</head>
 	<body>
 		<div id="admin-login-wrap">

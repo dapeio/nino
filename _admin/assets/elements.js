@@ -365,7 +365,7 @@
 			// No chevron in the text - .back-link::before already supplies one
 			backLink.textContent = 'Back to overview';
 			backLink.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.elements._showTypes() } );
-			wrap.appendChild( backLink );
+			wrap.appendChild( Nino.admin.formToolbar( backLink ) );
 
 			const title = dc.createElement('div');
 			title.className = 'main-title--withuri';
@@ -395,7 +395,7 @@
 			addBtn.className = 'editor-list-action';
 			addBtn.textContent = 'New element';
 			addBtn.addEventListener( 'click', function() { Nino.admin.elements._openForm( null ) } );
-			wrap.appendChild( addBtn );
+			wrap.appendChild( Nino.adminUi.listActions( [ addBtn ] ) );
 		},
 
 		/**
@@ -1155,6 +1155,7 @@
 			// Actions
 			const actions = dc.createElement('div');
 			actions.id = 'elements-form-actions';
+			actions.className = 'nino-admin-actionbar';
 
 			const saveBtn = dc.createElement('button');
 			saveBtn.type = 'submit';

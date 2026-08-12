@@ -200,7 +200,7 @@
 			backLink.className = 'back-link';
 			backLink.textContent = Nino.content.getText('/_editor/users/label/back');
 			backLink.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.editor.users._showList() } );
-			wrap.appendChild( backLink );
+			wrap.appendChild( Nino.editor.formToolbar( backLink ) );
 
 			const form = dc.createElement('form');
 			form.id = 'users-edit-form';
@@ -255,7 +255,7 @@
 			}
 
 			const actions = dc.createElement('div');
-			actions.className = 'editor-form-actions';
+			actions.className = 'editor-form-actions nino-admin-actionbar';
 
 			const saveBtn = dc.createElement('button');
 			saveBtn.type = 'submit';

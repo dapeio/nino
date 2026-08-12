@@ -100,18 +100,20 @@
 		},
 
 		_showList : function() {
+			dc.getElementById('install-page-wrap').classList.remove('is-editing-webpage');
 			dc.getElementById('webpages-list').classList.remove('admin-hidden');
 			dc.getElementById('webpages-form').classList.add('admin-hidden');
 		},
 
 		_showForm : function() {
+			dc.getElementById('install-page-wrap').classList.add('is-editing-webpage');
 			dc.getElementById('webpages-list').classList.add('admin-hidden');
 			dc.getElementById('webpages-form').classList.remove('admin-hidden');
 		},
 
 		/**
-		 *	Render the page list, plus a "New Webpage" action below it. Each
-		 *	row's ↑/↓ buttons reorder _entries in place
+		 *	Render the page list, plus a "New Webpage" action in the shared
+		 *	bottom bar. Each row's ↑/↓ buttons reorder _entries in place
 		 *
 		 *	@return		void
 		 */
@@ -166,12 +168,19 @@
 			} );
 			wrap.appendChild( ul );
 
-			const addBtn = dc.createElement('button');
-			addBtn.type = 'button';
-			addBtn.className = 'editor-list-action';
-			addBtn.textContent = 'New Webpage';
-			addBtn.addEventListener( 'click', function() { Nino.install.webpages._openForm( null ) } );
-			wrap.appendChild( addBtn );
+			// Keep the list action in the wizard's shared bottom bar. Reuse the
+			// same button across list renders so Save/Delete cannot accumulate
+			// duplicate actions while this entirely client-side step is edited.
+			let addBtn = dc.getElementById('install-context-action');
+			if( addBtn === null ) {
+				addBtn = dc.createElement('button');
+				addBtn.type = 'button';
+				addBtn.id = 'install-context-action';
+				addBtn.className = 'editor-list-action';
+				addBtn.textContent = 'New Webpage';
+				addBtn.addEventListener( 'click', function() { Nino.install.webpages._openForm( null ) } );
+				dc.getElementById('install-actions-wrap').insertBefore( addBtn, dc.getElementById('install-back') );
+			}
 		},
 
 		/**
@@ -336,7 +345,7 @@
 			backLink.className = 'back-link';
 			backLink.textContent = 'Back to list';
 			backLink.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.install.webpages._showList() } );
-			wrap.appendChild( backLink );
+			wrap.appendChild( Nino.adminUi.contextBar( backLink ) );
 
 			const form = dc.createElement('form');
 
@@ -492,7 +501,16 @@
 			form.appendChild( contentFieldset );
 
 			const actions = dc.createElement('div');
-			actions.className = 'editor-form-actions';
+			actions.className = 'editor-form-actions nino-admin-actionbar';
+
+			if( Nino.install.webpages._isNew === false ) {
+				const deleteBtn = dc.createElement('button');
+				deleteBtn.type = 'button';
+				deleteBtn.className = 'admin-danger-btn';
+				deleteBtn.textContent = 'Delete page';
+				deleteBtn.addEventListener( 'click', function() { Nino.install.webpages._delete() } );
+				actions.appendChild( deleteBtn );
+			}
 
 			const saveBtn = dc.createElement('button');
 			saveBtn.type = 'submit';
@@ -504,15 +522,6 @@
 			form.addEventListener( 'submit', function( ev ) { ev.preventDefault(); Nino.install.webpages._save() } );
 
 			wrap.appendChild( form );
-
-			if( Nino.install.webpages._isNew === false ) {
-				const deleteBtn = dc.createElement('button');
-				deleteBtn.type = 'button';
-				deleteBtn.className = 'admin-danger-btn';
-				deleteBtn.textContent = 'Delete page';
-				deleteBtn.addEventListener( 'click', function() { Nino.install.webpages._delete() } );
-				wrap.appendChild( deleteBtn );
-			}
 		},
 
 		/**

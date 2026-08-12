@@ -185,7 +185,7 @@
 			addBtn.className = 'editor-list-action';
 			addBtn.textContent = 'New route';
 			addBtn.addEventListener( 'click', function() { Nino.admin.pages._openForm( null ) } );
-			wrap.appendChild( addBtn );
+			wrap.appendChild( Nino.adminUi.listActions( [ addBtn ] ) );
 		},
 
 		/**
@@ -291,7 +291,7 @@
 			backLink.className = 'back-link';
 			backLink.textContent = 'Back to list';
 			backLink.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.pages._showList() } );
-			wrap.appendChild( backLink );
+			wrap.appendChild( Nino.admin.formToolbar( backLink ) );
 
 			const form = dc.createElement('form');
 
@@ -423,7 +423,7 @@
 			form.appendChild( contentFieldset );
 
 			const actions = dc.createElement('div');
-			actions.className = 'editor-form-actions';
+			actions.className = 'editor-form-actions nino-admin-actionbar';
 
 			const saveBtn = dc.createElement('button');
 			saveBtn.type = 'submit';

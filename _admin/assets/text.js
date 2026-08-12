@@ -209,7 +209,7 @@
 			addBtn.className = 'editor-list-action';
 			addBtn.textContent = 'New text key';
 			addBtn.addEventListener( 'click', function() { Nino.admin.text._openNewKeyForm() } );
-			wrap.appendChild( addBtn );
+			wrap.appendChild( Nino.adminUi.listActions( [ addBtn ] ) );
 		},
 
 		/**
@@ -562,7 +562,7 @@
 			}
 
 			const actions = dc.createElement('div');
-			actions.className = 'editor-form-actions';
+			actions.className = 'editor-form-actions nino-admin-actionbar';
 
 			const saveBtn = dc.createElement('button');
 			saveBtn.type = 'submit';
@@ -668,7 +668,7 @@
 			backLink.className = 'back-link';
 			backLink.textContent = 'Back to list';
 			backLink.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.text._showList() } );
-			wrap.appendChild( backLink );
+			wrap.appendChild( Nino.admin.formToolbar( backLink ) );
 
 			const form = dc.createElement('form');
 
@@ -704,7 +704,7 @@
 			form.appendChild( valueLabel );
 
 			const actions = dc.createElement('div');
-			actions.className = 'editor-form-actions';
+			actions.className = 'editor-form-actions nino-admin-actionbar';
 
 			const saveBtn = dc.createElement('button');
 			saveBtn.type = 'submit';
@@ -761,7 +761,7 @@
 			backLink.className = 'back-link';
 			backLink.textContent = 'Back to list';
 			backLink.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.text._showList() } );
-			wrap.appendChild( backLink );
+			wrap.appendChild( Nino.admin.formToolbar( backLink ) );
 
 			const title = dc.createElement('div');
 			title.className = 'main-title';
@@ -807,7 +807,7 @@
 			backLink.className = 'back-link';
 			backLink.textContent = 'Back to list';
 			backLink.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.text._showList() } );
-			wrap.appendChild( backLink );
+			wrap.appendChild( Nino.admin.formToolbar( backLink ) );
 
 			const title = dc.createElement('div');
 			title.className = 'main-title';
@@ -852,7 +852,7 @@
 			} );
 
 			const actions = dc.createElement('div');
-			actions.className = 'editor-form-actions';
+			actions.className = 'editor-form-actions nino-admin-actionbar';
 
 			const saveBtn = dc.createElement('button');
 			saveBtn.type = 'submit';

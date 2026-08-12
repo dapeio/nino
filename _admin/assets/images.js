@@ -131,14 +131,13 @@
 			addBtn.className = 'editor-list-action';
 			addBtn.textContent = 'New image slot';
 			addBtn.addEventListener( 'click', function() { Nino.admin.images._openForm( null ) } );
-			wrap.appendChild( addBtn );
 
 			const scanBtn = dc.createElement('button');
 			scanBtn.type = 'button';
 			scanBtn.className = 'editor-list-action';
 			scanBtn.textContent = 'Scan templates for missing image slots';
 			scanBtn.addEventListener( 'click', function() { Nino.admin.images._openScanForm() } );
-			wrap.appendChild( scanBtn );
+			wrap.appendChild( Nino.adminUi.listActions( [ addBtn, scanBtn ] ) );
 		},
 
 		/**
@@ -174,7 +173,7 @@
 			backLink.className = 'back-link';
 			backLink.textContent = 'Back to list';
 			backLink.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.images._showList() } );
-			wrap.appendChild( backLink );
+			wrap.appendChild( Nino.admin.formToolbar( backLink ) );
 
 			const form = dc.createElement('form');
 
@@ -237,7 +236,7 @@
 			// ends on - assets/style.css pins that row to the bottom of the
 			// viewport, so a long field list never puts Save out of reach
 			const actions = dc.createElement('div');
-			actions.className = 'editor-form-actions';
+			actions.className = 'editor-form-actions nino-admin-actionbar';
 
 			const saveBtn = dc.createElement('button');
 			saveBtn.type = 'submit';
@@ -343,7 +342,7 @@
 			backLink.className = 'back-link';
 			backLink.textContent = 'Back to list';
 			backLink.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.images._showList() } );
-			wrap.appendChild( backLink );
+			wrap.appendChild( Nino.admin.formToolbar( backLink ) );
 
 			const title = dc.createElement('div');
 			title.className = 'main-title';
@@ -390,7 +389,7 @@
 			backLink.className = 'back-link';
 			backLink.textContent = 'Back to list';
 			backLink.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.images._showList() } );
-			wrap.appendChild( backLink );
+			wrap.appendChild( Nino.admin.formToolbar( backLink ) );
 
 			const title = dc.createElement('div');
 			title.className = 'main-title';
@@ -468,7 +467,7 @@
 			} );
 
 			const actions = dc.createElement('div');
-			actions.className = 'editor-form-actions';
+			actions.className = 'editor-form-actions nino-admin-actionbar';
 
 			const saveBtn = dc.createElement('button');
 			saveBtn.type = 'submit';
