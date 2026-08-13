@@ -220,10 +220,6 @@ namespace Nino\Install {
 			''				=> true,	// project root - index.php, the tool folders
 			'private'	=> true,	// config.php, templates, text, elements, data
 			'public'	=> true,	// images, assets, fonts, favicon, the cache
-			'text'		=> true,
-			'images'	=> true,
-			'data'		=> false,	// runtime data - newsletter/submissions/logs
-			'.cache'	=> false,	// bundled/minified css+js
 		];
 
 		/**
