@@ -29,7 +29,7 @@
 					<span id="install-nav-checks" class="active">1. Environment</span>
 					<span id="install-nav-setup">2. Setup</span>
 					<span id="install-nav-themes">3. Themes</span>
-					<span id="install-nav-webpages">4. Webpages</span>
+					<span id="install-nav-webpages">4. Routes</span>
 					<span id="install-nav-personalinfos">5. Personal Infos</span>
 					<span id="install-nav-admin">6. Admins</span>
 					<span id="install-nav-finish">7. Finish</span>
@@ -68,7 +68,7 @@
 				</div>
 
 				<div id="install-content-webpages">
-					<p class="admin-hint">Build the project's actual pages: click a row to open it, or "New Webpage" to add one - an Element URI (a stable identifier, eg. <code>/home</code>), the real Http URI it's reachable at (eg. <code>/</code>), a starting template from <code>_install/library/pages</code>, and each active locale's name/title/description - name is also what shows up in the main menu, if the Navigation module (step 2) is active and its "Show in main navigation" box is checked. Click ↑/↓ to reorder, "Next" batch-generates routes/templates/text/blacklist from the list below.</p>
+					<p class="admin-hint">Build the project's actual routes: click a row to open it, or "New Route" to add one - an Element URI (a stable identifier, eg. <code>/home</code>), the real Http URI it's reachable at (eg. <code>/</code>), a starting template from <code>_install/library/pages</code>, and each active locale's name/title/description - name is also what shows up in the main menu, if the Navigation module (step 2) is active and its "Show in main navigation" box is checked. Click ↑/↓ to reorder, "Next" batch-generates routes/templates/text/blacklist from the list below.</p>
 					<div id="webpages-list"></div>
 					<div id="webpages-form" class="admin-hidden"></div>
 					<p id="webpages-msg"></p>

@@ -1403,6 +1403,31 @@ check( 'apiList succeeds', $status === 200 );
 check( 'apiList finds the element across locales', count( $body['elements'] ) === 1 && $body['elements'][0]['uri'] === 'first' );
 check( 'apiList labels an element by its title', $body['elements'][0]['label'] === 'Erster' );
 
+// Only 'title', and the element's own uri otherwise. Guessing a label from
+// 'label'/'name' or from whichever string field came first in the model meant
+// the list showed a different field per type, and reordering a model silently
+// relabelled every row in it
+[ $status ] = callDev( $appData, \Nino\Admin\ElementTypes::class, 'apiCreate', [ 'uri' => 'labeltype', 'title' => 'Label Type', 'model' => [
+	'name' 	=> [ 'type' => 'string' ],
+	'label' => [ 'type' => 'string' ],
+	'title' => [ 'type' => 'string' ],
+] ] );
+check( 'a type for the label rules is created', $status === 200 );
+
+callDev( $appData, \Nino\Admin\Elements::class, 'apiSave', [ 'type' => 'labeltype', 'uri' => 'titled', 'locale' => 'de_DE', 'isNew' => true,
+	'fields' => [ 'name' => 'A name', 'label' => 'A label', 'title' => 'A title' ] ] );
+callDev( $appData, \Nino\Admin\Elements::class, 'apiSave', [ 'type' => 'labeltype', 'uri' => 'untitled', 'locale' => 'de_DE', 'isNew' => true,
+	'fields' => [ 'name' => 'A name', 'label' => 'A label' ] ] );
+callDev( $appData, \Nino\Admin\Elements::class, 'apiSave', [ 'type' => 'labeltype', 'uri' => 'blank-title', 'locale' => 'de_DE', 'isNew' => true,
+	'fields' => [ 'name' => 'A name', 'title' => '' ] ] );
+
+[ , $labelBody ] = callDev( $appData, \Nino\Admin\Elements::class, 'apiList', [ 'type' => 'labeltype' ] );
+$labels = array_column( $labelBody['elements'], 'label', 'uri' );
+
+check( 'a title wins', ( $labels['titled'] ?? null ) === 'A title' );
+check( 'no title falls back to the element\'s own uri, not to "label" or "name"', ( $labels['untitled'] ?? null ) === '/untitled' );
+check( 'an empty title counts as no title', ( $labels['blank-title'] ?? null ) === '/blank-title' );
+
 [ $status, $body ] = callDev( $appData, \Nino\Admin\Elements::class, 'apiGet', [ 'type' => 'contenttype', 'uri' => 'first' ] );
 check( 'apiGet succeeds', $status === 200 );
 check( 'apiGet splits global fields out of the locale buckets', $body['global'] === [ 'views' => 3 ] );

@@ -251,6 +251,38 @@
 			dc.getElementById('elements-types').classList.remove('admin-hidden');
 			dc.getElementById('elements-list').classList.add('admin-hidden');
 			dc.getElementById('elements-form').classList.add('admin-hidden');
+			Nino.admin.elements._refreshTypes();
+		},
+
+		/**
+		 *	Re-read the type list behind the overview. What it shows per type is
+		 *	content, not schema - the element count and the uris underneath it
+		 *	(see Admin.php's typeDescr()) - and the list is rendered once, by
+		 *	init(). Creating or deleting an element and going back to the
+		 *	overview therefore left the count it had on page load: "(0)" next to
+		 *	a type that visibly has an element in it.
+		 *
+		 *	Not a failure path: the list on screen stays whatever it was if this
+		 *	does not come back, and never replaces the model init() cached (that
+		 *	is elementTypes.js's job, through invalidate()).
+		 *
+		 *	@return		void
+		 */
+		_refreshTypes : function() {
+
+			// init() renders the list itself and calls _showTypes() on the way
+			// through - refetching there would just repeat the request it is
+			// already inside of
+			if( Nino.admin.elements._ready === false || Nino.admin.elements._loading === true )
+				return;
+
+			const requestId = ++Nino.admin.elements._typesRequest;
+
+			Nino.admin.elements._apiCall( 'types', {}, function( status, response ) {
+				if( requestId !== Nino.admin.elements._typesRequest || status !== 200 || response === null )
+					return;
+				Nino.admin.elements._renderTypes( response.types );
+			} );
 		},
 
 		_showList : function() {
@@ -1280,6 +1312,48 @@
 			saveBtn.textContent = 'Save';
 			actions.appendChild( saveBtn );
 
+			// The two ways out of a form that end in a save, as their own
+			// buttons rather than as a save followed by a manual click: filling
+			// a type with entries is one save-and-next-one after another, and
+			// leaving through the back link is what loses an edit nobody
+			// realised was unsaved. Both run the same _save() and only act on
+			// its completion callback, so a rejected save leaves the form
+			// exactly where it is - with its message - instead of navigating
+			// away from values that never landed.
+			//
+			// Desktop only: this is a fixed bottom bar that also carries Delete
+			// and the status message, and four controls do not fit a phone. The
+			// plain Save is always there, so nothing is unreachable.
+			const saveBackBtn = dc.createElement('button');
+			saveBackBtn.type = 'button';
+			saveBackBtn.className = 'admin-desktop-action';
+			saveBackBtn.textContent = 'Save and back';
+			saveBackBtn.addEventListener( 'click', function() {
+				Nino.admin.elements._save( function() {
+					Nino.admin.elements._saving = false;
+					Nino.admin.elements._setFormPending( false );
+					Nino.admin.elements._destroyHtmlEditors();
+					Nino.admin.elements._reloadList();
+					Nino.admin.elements._showList();
+				} );
+			} );
+			actions.appendChild( saveBackBtn );
+
+			const saveNewBtn = dc.createElement('button');
+			saveNewBtn.type = 'button';
+			saveNewBtn.className = 'admin-desktop-action';
+			saveNewBtn.textContent = 'Save and new';
+			saveNewBtn.addEventListener( 'click', function() {
+				Nino.admin.elements._save( function() {
+					Nino.admin.elements._saving = false;
+					Nino.admin.elements._setFormPending( false );
+					Nino.admin.elements._destroyHtmlEditors();
+					Nino.admin.elements._reloadList();
+					Nino.admin.elements._openForm( null );
+				} );
+			} );
+			actions.appendChild( saveNewBtn );
+
 			if( Nino.admin.elements._isNew === false ) {
 				const delBtn = dc.createElement('button');
 				delBtn.type = 'button';
@@ -1313,9 +1387,15 @@
 		/**
 		 *	Collect the form's current values and save (insert or update) the element
 		 *
+		 *	@param		{Function}	[onSaved]		Run once the element is durably saved, and
+		 *																	only then - every early return here is a save
+		 *																	that did not happen, so "save and back"/"save
+		 *																	and new" must not navigate away from a form
+		 *																	still holding unsaved values
+		 *
 		 *	@return		void
 		 */
-		_save : function() {
+		_save : function( onSaved ) {
 
 			if( Nino.admin.elements._saving === true )
 				return;
@@ -1403,6 +1483,11 @@
 					Nino.admin.elements._saving = false;
 					Nino.admin.elements._setFormPending( false );
 
+					if( typeof onSaved === 'function' ) {
+						onSaved();
+						return;
+					}
+
 					// Re-read the element so the raw view reflects what actually
 					// landed on disk, rather than the values this form just sent -
 					// which is the whole point of showing it. Also re-renders the
@@ -1425,6 +1510,24 @@
 		 *
 		 *	@return		void
 		 */
+		/**
+		 *	Re-read the element list of the type currently open. Shared by
+		 *	_refreshAfterSave() and by the two save-and-leave actions, which
+		 *	skip the form half of it - they are not staying on the form, so
+		 *	re-rendering it would only be work thrown away.
+		 *
+		 *	@return		void
+		 */
+		_reloadList : function() {
+
+			const type = Nino.admin.elements._currentType;
+
+			Nino.admin.elements._apiCall( 'list', { type : type }, function( status, response ) {
+				if( status === 200 && response !== null && type === Nino.admin.elements._currentType )
+					Nino.admin.elements._renderList( response.elements );
+			} );
+		},
+
 		_refreshAfterSave : function( uri ) {
 
 			const type = Nino.admin.elements._currentType;
@@ -1446,10 +1549,7 @@
 				if( msg !== null )
 					msg.textContent = status === 200 ? 'Saved.' : 'Saved, but reloading the element failed.';
 
-				Nino.admin.elements._apiCall( 'list', { type : type }, function( listStatus, listResponse ) {
-					if( listStatus === 200 && listResponse !== null && type === Nino.admin.elements._currentType )
-						Nino.admin.elements._renderList( listResponse.elements );
-				} );
+				Nino.admin.elements._reloadList();
 			} );
 		},
 

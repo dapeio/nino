@@ -567,6 +567,21 @@ body {
 	min-width: 0;
 }
 
+/* A secondary action in a fixed bottom bar that already carries a primary
+   button, sometimes a destructive one and always the status message. There
+   is room for it on a desktop and none on a phone, and every one of them is
+   a shortcut for something the primary button plus one click already does -
+   so it is dropped rather than wrapped onto a second row. */
+.nino-admin-actionbar .admin-desktop-action {
+	display: none;
+}
+
+@media (min-width: 48rem) {
+	.nino-admin-actionbar .admin-desktop-action {
+		display: inline-flex;
+	}
+}
+
 .nino-admin-list-actions .editor-list-action {
 	width: auto;
 	margin: 0;

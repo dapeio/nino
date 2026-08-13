@@ -1433,25 +1433,29 @@ namespace Nino\Admin {
 		}
 
 		/**
-		 *	Pick a human readable label for an element (for the list view)
+		 *	Pick a human readable label for an element (for the list view):
+		 *	its 'title' field, or its own uri.
 		 *
-		 *	@param		array 		$model				Type model definition
+		 *	Deliberately only 'title'. Guessing - 'label'/'name', then the
+		 *	first string field in model order - meant the list showed whichever
+		 *	field happened to come first, so two types with the same content
+		 *	labelled their rows differently and reordering a model silently
+		 *	relabelled every row in it. A uri is not as pretty, but it is the
+		 *	thing the row actually is, and it matches how the type overview
+		 *	already lists its elements (see typeDescr()).
+		 *
+		 *	@param		array 		$model				Type model definition (unused, kept for call-site symmetry)
 		 *	@param		array 		$element			Resolved element data
-		 *	@param		string		$uri					Element uri, used as fallback label
+		 *	@param		string		$uri					Element uri, used when there is no title
 		 *
 		 *	@return 	string									Label
 		 */
 		private static function label( array $model, array $element, string $uri ): string {
 
-			foreach( [ 'title', 'label', 'name' ] as $key )
-				if( isset( $element[$key] ) === true && $element[$key] !== '' )
-					return (string) $element[$key];
+			if( isset( $element['title'] ) === true && is_scalar( $element['title'] ) === true && (string) $element['title'] !== '' )
+				return (string) $element['title'];
 
-			foreach( $model as $key => $field )
-				if( ( $field['type'] ?? '' ) === 'string' && isset( $element[$key] ) === true && $element[$key] !== '' )
-					return (string) $element[$key];
-
-			return $uri;
+			return '/'. $uri;
 		}
 
 		/**

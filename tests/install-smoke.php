@@ -498,6 +498,47 @@ $libraryAfterWpApply = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Install\Webpages::apiList( $appData, $libraryAfterWpApply );
 check( 'apiList now reflects the persisted, current list', array_column( $libraryAfterWpApply['/nino/http/response']['body']['webpages'], 'httpUri' ) === [ '/', '/kontakt' ] );
 
+// --- a 'templatePerRoute' unit gets one template per route ----------------
+//
+// "blank" is the empty starting point, so every route picking it has to get
+// its own file: with one shared page-blank.tpl, building a second blank page
+// silently rewrote the first one. A finished unit (home, contact, ...) is a
+// one-off and keeps sharing - that is what its template is for
+$_POST['data'] = json_encode( [ 'webpages' => [
+	[ 'uri' => '/site-home', 'httpUri' => '/', 'template' => 'home', 'text' => [] ],
+	[ 'uri' => '/site-contact', 'httpUri' => '/kontakt', 'template' => 'contact', 'text' => [] ],
+	[ 'uri' => '/team', 'httpUri' => '/team', 'template' => 'blank', 'text' => [] ],
+	[ 'uri' => '/jobs/open', 'httpUri' => '/jobs', 'template' => 'blank', 'text' => [] ],
+] ] );
+$perRouteRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Install\Webpages::apiApply( $appData, $perRouteRequest );
+check( 'applying two blank routes succeeds', $perRouteRequest['/nino/http/response']['statusCode'] === 200 );
+
+$configPerRoute = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
+
+check( 'each blank route gets its own template file, named after its Element-URI', \Nino\Filesystem::fileExists( $appData, '/templates/page-team.tpl' ) === true && \Nino\Filesystem::fileExists( $appData, '/templates/page-jobs-open.tpl' ) === true );
+check( '...and renders it, rather than the unit\'s shared one', ( $configPerRoute['/nino/http/routes']['GET://team']['body'] ?? null ) === '[template /templates/page-team]'
+	&& ( $configPerRoute['/nino/http/routes']['GET://jobs']['body'] ?? null ) === '[template /templates/page-jobs-open]' );
+check( 'a nested Element-URI flattens into one page-*.tpl, which is the only shape the template pickers glob for', \Nino\Filesystem::fileExists( $appData, '/templates/page-jobs/open.tpl' ) === false );
+check( 'the unit\'s own page-blank.tpl is never copied in as a shared file', \Nino\Filesystem::fileExists( $appData, '/templates/page-blank.tpl' ) === false );
+check( 'a unit without the flag still shares one template', \Nino\Filesystem::fileExists( $appData, '/templates/page-contact.tpl' ) === true
+	&& ( $configPerRoute['/nino/http/routes']['GET://kontakt']['body'] ?? null ) === '[template /templates/page-contact]' );
+
+// Re-applying must not undo work done in a per-route template since - it is
+// that route's page now, not a copy of the library's starting point
+\Nino\Filesystem::putFileContent( $appData, '/templates/page-team.tpl', 'edited by hand' );
+$perRouteAgain = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Install\Webpages::apiApply( $appData, $perRouteAgain );
+check( 're-applying leaves an edited per-route template alone', trim( (string) \Nino\Filesystem::getFileContent( $appData, '/templates/page-team.tpl', '' ) ) === 'edited by hand' );
+
+// Reading the list back: the route no longer carries the unit's body, so it
+// reports as a page of its own - the same thing an /_admin-created page is,
+// and exactly what it has become
+$perRouteList = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Install\Webpages::apiList( $appData, $perRouteList );
+$teamEntry = array_values( array_filter( $perRouteList['/nino/http/response']['body']['webpages'], fn( array $e ): bool => $e['httpUri'] === '/team' ) )[0] ?? [];
+check( 'a per-route page reads back as owning its template rather than as the library unit', ( $teamEntry['libraryKey'] ?? null ) === '' && ( $teamEntry['body'] ?? null ) === '[template /templates/page-team]' );
+
 // Navigation: only shows up once the module is active, one "httpUri:name"
 // line per entry with nav checked (a real, clickable href - not the
 // Element-URI), regenerated (not merged) on every apply

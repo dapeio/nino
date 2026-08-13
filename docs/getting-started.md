@@ -38,7 +38,7 @@ As long as the assistant is not completed, you can return to earlier steps and r
 | [1. Environment](_install.md#1-environment) | Are PHP, extensions, and write permissions ready for use? |
 | [2. Setup](_install.md#2-setup) | Which languages and functional modules does the project require? |
 | [3. Themes](_install.md#3-themes) | Which visual starting point should be copied? |
-| [4. Webpages](_install.md#4-webpages) | Which first pages, public paths, and metadata are created? |
+| [4. Routes](_install.md#4-routes) | Which first pages, public paths, and metadata are created? |
 | [5. Personal Information](_install.md#5-personal-information) | Which central company and website values are available as textfills? |
 | [6. Editor Access](_install.md#6-access-for-_editor) | Which first account receives full access to `/_editor`? |
 | [7. Completion](_install.md#7-completion) | Which separate password protects `/_admin` and `/_templates` and locks the installer? |

@@ -83,10 +83,11 @@
 		},
 
 		/**
-		 *	Fold an open page form into _entries before the shared wizard shell
-		 *	leaves this step. The form's own "Back to list" remains an explicit
-		 *	discard action; the global Back/Next controls, however, must not lose a
-		 *	page the user just finished typing.
+		 *	Fold an open route form into _entries before the shared wizard shell
+		 *	leaves this step - the global Back/Next controls must not lose a
+		 *	route the user just finished typing. The form's own "Back to list"
+		 *	does the same thing (see _renderForm()), so leaving an open form
+		 *	means the same whichever control does it.
 		 *
 		 *	@return		{boolean}		Whether navigation may continue
 		 */
@@ -125,7 +126,7 @@
 			if( Nino.install.webpages._entries.length === 0 ) {
 				const p = dc.createElement('p');
 				p.className = 'admin-hint';
-				p.textContent = 'No pages yet - add one below.';
+				p.textContent = 'No routes yet - add one below.';
 				wrap.appendChild( p );
 			}
 
@@ -177,7 +178,7 @@
 				addBtn.type = 'button';
 				addBtn.id = 'install-context-action';
 				addBtn.className = 'editor-list-action';
-				addBtn.textContent = 'New Webpage';
+				addBtn.textContent = 'New Route';
 				addBtn.addEventListener( 'click', function() { Nino.install.webpages._openForm( null ) } );
 				dc.getElementById('install-actions-wrap').insertBefore( addBtn, dc.getElementById('install-back') );
 			}
@@ -226,10 +227,11 @@
 
 		/**
 		 *	Open the editor for an existing entry, or a blank (uri-suggested)
-		 *	one for a new page - mirrors _admin's Pages module (see pages.js's
-		 *	_openForm()), except nothing here is pushed into _entries until
-		 *	_save() actually runs, so "Back to list" on an unsaved new entry
-		 *	simply discards it. A new entry starts from the picked template's
+		 *	one for a new route - mirrors _admin's Pages module (see pages.js's
+		 *	_openForm()), except nothing here is written to disk until "Next"
+		 *	applies the whole list, so every way out of this form folds the
+		 *	entry into _entries rather than discarding it. A new entry starts
+		 *	from the picked template's
 		 *	own suggested uris/wording (see _suggest()) rather than blank, so
 		 *	every active locale - not just whichever one someone bothers to
 		 *	type - ends up with real text instead of Install.php's generic
@@ -344,7 +346,14 @@
 			backLink.href = '#';
 			backLink.className = 'back-link';
 			backLink.textContent = 'Back to list';
-			backLink.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.install.webpages._showList() } );
+			// Folds the open entry into the list, exactly like the wizard's own
+			// Back/Next already do (see beforeLeave()). Discarding here instead
+			// meant the same "back" gesture kept an edit or threw it away
+			// depending on which of the two controls you happened to use - and
+			// nothing on this step is written to disk before "Next" anyway, so
+			// there is no save to weigh against. An invalid form reports itself
+			// and stays open rather than losing what is in it
+			backLink.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.install.webpages._save() } );
 			wrap.appendChild( Nino.adminUi.contextBar( backLink ) );
 
 			const form = dc.createElement('form');
@@ -353,7 +362,7 @@
 			// from _editor/assets/style.css's generic `fieldset { ... }` rule
 			const pageFieldset = dc.createElement('fieldset');
 			const pageLegend = dc.createElement('legend');
-			pageLegend.textContent = 'Page';
+			pageLegend.textContent = 'Route';
 			pageFieldset.appendChild( pageLegend );
 
 			const uriLabel = dc.createElement('label');
@@ -507,7 +516,7 @@
 				const deleteBtn = dc.createElement('button');
 				deleteBtn.type = 'button';
 				deleteBtn.className = 'admin-danger-btn';
-				deleteBtn.textContent = 'Delete page';
+				deleteBtn.textContent = 'Delete route';
 				deleteBtn.addEventListener( 'click', function() { Nino.install.webpages._delete() } );
 				actions.appendChild( deleteBtn );
 			}
@@ -630,7 +639,7 @@
 		_delete : function() {
 
 			const entry = Nino.install.webpages._entries[Nino.install.webpages._currentIndex];
-			if( wn.confirm( 'Really delete the page at "'+ entry.httpUri+ '"?' ) === false )
+			if( wn.confirm( 'Really delete the route at "'+ entry.httpUri+ '"?' ) === false )
 				return;
 
 			Nino.install.webpages._entries.splice( Nino.install.webpages._currentIndex, 1 );
@@ -651,7 +660,7 @@
 			const msg = dc.getElementById('webpages-msg');
 
 			if( Nino.install.webpages._ready !== true ) {
-				msg.textContent = 'Webpages are still loading.';
+				msg.textContent = 'Routes are still loading.';
 				callback( false );
 				return;
 			}
@@ -660,7 +669,7 @@
 			// still open, save it into the in-memory list first instead of posting
 			// the older list and silently discarding the visible edits.
 			if( Nino.install.webpages.beforeLeave() === false ) {
-				msg.textContent = 'Complete the open webpage first.';
+				msg.textContent = 'Complete the open route first.';
 				callback( false );
 				return;
 			}
@@ -675,7 +684,7 @@
 					return;
 				}
 
-				msg.textContent = 'Applied '+ response.webpages.length+ ' page(s).';
+				msg.textContent = 'Applied '+ response.webpages.length+ ' route(s).';
 
 				// Setup may since have added/removed a module the
 				// requiresModules pull-in also touches - reload on next visit

@@ -183,6 +183,35 @@
 			dc.getElementById('elements-list').classList.add('editor-hidden');
 			dc.getElementById('elements-form').classList.add('editor-hidden');
 			Nino.editor.router.set( 'elements', [] );
+			Nino.editor.elements._refreshTypes();
+		},
+
+		/**
+		 *	Re-read the type list behind the overview. What it shows per type is
+		 *	content, not schema - the element count and the uris underneath it
+		 *	(see Editor.php's typeDescr()) - and the list is rendered once, by
+		 *	init(). Creating or deleting an element and going back to the
+		 *	overview therefore left the count it had on page load: "(0)" next to
+		 *	a type that visibly has an element in it.
+		 *
+		 *	Not a failure path: the list on screen stays whatever it was if this
+		 *	does not come back.
+		 *
+		 *	@return		void
+		 */
+		_refreshTypes : function() {
+
+			// init() renders the list itself and calls _showTypes() on the way
+			// through - refetching there would just repeat the request it is
+			// already inside of
+			if( Nino.editor.elements._ready === false || Nino.editor.elements._loading === true )
+				return;
+
+			Nino.editor.elements._apiCall( 'types', {}, function( status, response ) {
+				if( status !== 200 || response === null )
+					return;
+				Nino.editor.elements._renderTypes( response.types );
+			} );
 		},
 
 		_showList : function() {

@@ -71,6 +71,31 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- Renamed `/_install`'s fourth step from **Webpages** to **Routes**, throughout
+  its wizard label, its controls and its messages. What the step writes are
+  routes — an Element URI, a public HTTP URI and a template — and calling them
+  pages made the one field that is not a page (the HTTP URI) read like an
+  afterthought.
+- Changed the **Blank** page template into a per-route starting point: a route
+  picking it gets its own copy, named after its Element URI (a `/team` route
+  becomes `templates/page-team.tpl`, rendered by
+  `[template /templates/page-team]`). Every blank route used to share the single
+  `page-blank.tpl`, so building a second blank page silently rewrote the first.
+  An existing file is never overwritten, so re-running the step leaves work
+  already done in such a page alone. Opt-in per library unit through the
+  manifest's `templatePerRoute` — a finished unit (home, contact, legal, …) is a
+  one-off and keeps sharing its template.
+- Added **Save and back** and **Save and new** next to Save in `/_admin`'s
+  element editor. Both act only on a completed save, so a rejected one leaves
+  the form where it is instead of navigating away from values that never
+  landed. Desktop only: the fixed bottom bar also carries Delete and the status
+  message, and both buttons are shortcuts for something Save plus one click
+  already does.
+- Changed the element list's row label to the element's `title` field, falling
+  back to its own uri. It used to try `title`, then `label`, then `name`, then
+  the first string field in model order — so two types with the same content
+  labelled their rows differently, and reordering a model silently relabelled
+  every row in it.
 - Moved the project's public half into `public/`: `images/`, `assets/`,
   `favicon/`, `fonts/` and the generated `.cache/` no longer sit beside the
   code that runs the site. Urls gain a `/public` segment, built from the new
@@ -155,6 +180,15 @@ All notable changes to Nino are documented in this file.
 
 ### Fixed
 
+- Fixed `/_admin`'s and `/_editor`'s element type overview keeping the element
+  count it had on page load. Creating or deleting an element and going back to
+  the overview left a type that visibly has entries in it reading `(0)`: the
+  list is rendered once at load, and going back only unhid it.
+- Fixed "Back to list" in `/_install`'s Routes step discarding the open form.
+  The wizard's own Back/Next already folded that entry into the list, so the
+  same gesture kept an edit or threw it away depending on which control you
+  reached for — and nothing on this step is written to disk before "Next"
+  anyway, so there was no save to weigh it against.
 - Fixed `/_admin`'s Element Types editor dropping a field's **max. characters**
   and **unit/suffix** on save. Both controls were offered, filled in and read
   back off the row, and the server has always accepted them — they simply never

@@ -38,7 +38,7 @@ Solange der Assistent nicht abgeschlossen ist, kannst du zu früheren Schritten 
 | [1. Umgebung](_install.de.md#1-umgebung) | Sind PHP, Erweiterungen und Schreibrechte einsatzbereit? |
 | [2. Setup](_install.de.md#2-setup) | Welche Sprachen und funktionalen Module benötigt das Projekt? |
 | [3. Themes](_install.de.md#3-themes) | Welcher visuelle Ausgangspunkt soll kopiert werden? |
-| [4. Webpages](_install.de.md#4-webpages) | Welche ersten Seiten, öffentlichen Pfade und Metadaten werden angelegt? |
+| [4. Routes](_install.de.md#4-routes) | Welche ersten Seiten, öffentlichen Pfade und Metadaten werden angelegt? |
 | [5. Persönliche Angaben](_install.de.md#5-persönliche-angaben) | Welche zentralen Unternehmens- und Webseitenwerte stehen als Textfills bereit? |
 | [6. Editor-Zugang](_install.de.md#6-zugänge-für-_editor) | Welches erste Konto erhält vollständigen Zugriff auf `/_editor`? |
 | [7. Abschluss](_install.de.md#7-abschluss) | Welches getrennte Passwort schützt `/_admin` sowie `/_templates` und sperrt den Installer? |

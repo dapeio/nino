@@ -1544,6 +1544,15 @@ namespace Nino\Install {
 				$route 			= $libraryKey !== '' ? self::_unitRoute( $libraryKey, $locales ) : null;
 				$routeBody 	= $route !== null ? (string) ( $route['body'] ?? '' ) : $body;
 
+				// A 'templatePerRoute' unit renders its own copy, so the body
+				// stored here has to be the one _applyWebpage() will actually
+				// write - otherwise the persisted list and the route disagree,
+				// and the status-code comparison below reads a body no route
+				// ever had
+				$perRouteBody = $libraryKey !== '' ? self::_perRouteBody( [ 'uri' => $uri ], $libraryKey ) : null;
+				if( $perRouteBody !== null )
+					$routeBody = $perRouteBody;
+
 				// The unit's own status code only applies to an entry that is
 				// new or has just been moved onto a different template - one
 				// staying on the body it already has keeps the code it
@@ -1631,6 +1640,67 @@ namespace Nino\Install {
 			// above: what the frontend holds after an apply is then exactly
 			// what a reload would hand it (see apiList())
 			\Nino\Http::ok( $request, [ 'webpages' => self::pages( $appData, $routes, $locales, $navKeys ) ] );
+		}
+
+		/**
+		 *	Where a 'templatePerRoute' unit's template lands for one entry,
+		 *	and which of the unit's own files it is copied from.
+		 *
+		 *	Named after the entry's Element URI rather than its Http URI: the
+		 *	Element URI is the stable identifier (the Http one is free to
+		 *	change, and '/' has no name at all), and page-&lt;uri&gt;.tpl is the
+		 *	shape /_admin's template picker globs for. A nested uri flattens
+		 *	to one segment - that picker lists templates/page-*.tpl and never
+		 *	looks into subdirectories.
+		 *
+		 *	Falls back to the unit's own single template when the uri yields
+		 *	nothing usable, so a strange entry still gets a working page
+		 *	rather than a route pointing at a file that was never written.
+		 *
+		 *	@param		array 		$entry				One webpages-list entry
+		 *	@param		array 		$manifest			The unit's manifest
+		 *
+		 *	@return 	array|null							{ file, source }, or null without a template to copy
+		 */
+		/**
+		 *	The route body a 'templatePerRoute' unit produces for one entry,
+		 *	or null for a unit that shares one template. Both apiApply() (which
+		 *	persists the list) and _applyWebpage() (which writes the route)
+		 *	resolve it through here, so the two can never disagree about which
+		 *	template a route renders.
+		 *
+		 *	@param		array 		$entry				One webpages-list entry
+		 *	@param		string		$libraryKey
+		 *
+		 *	@return 	string|null
+		 */
+		private static function _perRouteBody( array $entry, string $libraryKey ): ?string {
+
+			$manifest = self::_readManifest( self::LIBRARY. '/pages/'. $libraryKey ) ?? [];
+
+			if( ( $manifest['templatePerRoute'] ?? false ) !== true )
+				return null;
+
+			$template = self::_perRouteTemplate( $entry, $manifest );
+
+			return $template === null ? null : '[template /templates/'. pathinfo( $template['file'], PATHINFO_FILENAME ). ']';
+		}
+
+		private static function _perRouteTemplate( array $entry, array $manifest ): ?array {
+
+			$source = (string) ( array_values( $manifest['templates'] ?? [] )[0] ?? '' );
+
+			if( $source === '' )
+				return null;
+
+			$slug = strtolower( trim( (string) ( $entry['uri'] ?? '' ), '/' ) );
+			$slug = preg_replace( '/[^a-z0-9]+/', '-', $slug );
+			$slug = trim( (string) $slug, '-' );
+
+			return [
+				'file' 		=> $slug === '' ? $source : 'page-'. $slug. '.tpl',
+				'source' 	=> $source,
+			];
 		}
 
 		/**
@@ -1820,9 +1890,20 @@ namespace Nino\Install {
 				$manifest = self::_readManifest( $unitDir ) ?? [];
 				$route 		= self::_unitRoute( $libraryKey, $locales );
 
+				// A unit declaring 'templatePerRoute' hands every route its own
+				// copy instead of one shared file - see the "blank" manifest for
+				// why. Resolved before the route is written, since the copy's
+				// name is also what the route body has to render
+				$perRoute = ( $manifest['templatePerRoute'] ?? false ) === true
+					? self::_perRouteTemplate( $entry, $manifest )
+					: null;
+
 				if( $routeKey !== null && $route !== null ) {
 
 					$route['uri'] = $entry['uri'];
+
+					if( $perRoute !== null )
+						$route['body'] = (string) self::_perRouteBody( $entry, $libraryKey );
 
 					// The entry's status code, not the unit's: a library unit is
 					// identified by its route body (see _unitFromBody()), so a
@@ -1836,7 +1917,18 @@ namespace Nino\Install {
 					$routes[$routeKey] = $route;
 				}
 
-				if( count( $manifest['templates'] ?? [] ) > 0 ) {
+				if( $perRoute !== null ) {
+
+					// Never over an existing file: the whole point of a per-route
+					// copy is that it becomes that route's own page, and re-running
+					// this step (or adding a second route) must not overwrite what
+					// has been built in it since
+					\Nino\Filesystem::forceDir( $appData, '/templates' );
+					$target = \Nino\Filesystem::path( $appData, '/templates/'. $perRoute['file'] );
+					if( is_file( $target ) === false )
+						self::_copyFile( $unitDir. '/templates/'. $perRoute['source'], $target );
+
+				} elseif( count( $manifest['templates'] ?? [] ) > 0 ) {
 					\Nino\Filesystem::forceDir( $appData, '/templates' );
 					foreach( $manifest['templates'] as $locale => $file ) {
 						if( is_string( $locale ) === true && in_array( $locale, $locales, true ) === false )
