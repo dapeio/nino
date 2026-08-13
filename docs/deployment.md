@@ -83,7 +83,7 @@ A general example configuration cannot reliably guess the paths and PHP-FPM sett
 
 Before initial setup, PHP must be able to create directories and files in the project root. The still missing project paths are created by `/_install` or, if needed, by the kernel and are not a manually required prerequisite.
 
-During operation, Nino only needs write permissions for actually changeable content. Depending on usage, this includes `private/config.php`, `private/text/`, `private/elements/`, `private/data/`, `private/.logs/`, `private/.backups/`, `public/images/`, and `public/.cache/`. The Template Builder under `/_templates` additionally needs `private/templates/`; it can create native text keys, Element Types, and image-slot definitions in the configuration. `/_admin` writes, depending on the function, configuration, texts, elements, and images, among others.
+During operation, Nino only needs write permissions for actually changeable content. Depending on usage, this includes `private/config.php`, `private/text/`, `private/elements/`, `private/data/`, `private/.logs/`, `private/.backups/`, `public/images/`, and `public/.cache/`. The Template Builder under `/_templates` additionally needs `private/templates/`; it can create native text keys, Element Types, and image-slot definitions in the configuration. `/_admin` writes, depending on the function, configuration, texts, elements, and images, among others. The project root and PHP source can remain read-only after installation.
 
 Grant these permissions to the user under which PHP is executed. World-writable permissions such as `0777` are not a suitable permanent solution. After deployment, the kernel and other PHP source code should not be generally writable.
 
@@ -97,7 +97,7 @@ define('NINO_CONTENT_DIR', '/path/outside/the/webroot/nino-private');
 // define('NINO_CONFIG_DIR', '/path/outside/the/webroot');
 ```
 
-Enter either definition in `index.php` before loading `_nino/Nino.php`. Moving the complete tree with `NINO_CONTENT_DIR` removes the need to protect `private/` through the webserver. Moving only `config.php` does not: the remaining private files must still not be delivered directly.
+Enter either definition in `index.php` before loading `_nino/Nino.php`. An invalid explicit path stops boot; Nino never silently falls back to an in-project directory. Moving the complete tree with `NINO_CONTENT_DIR` removes the need to protect `private/` through the webserver. Moving only `config.php` does not: the remaining private files must still not be delivered directly.
 
 ## Settings for Production
 

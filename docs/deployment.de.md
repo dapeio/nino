@@ -82,7 +82,7 @@ Eine allgemeine Beispielkonfiguration kann die Pfade und PHP-FPM-Einstellungen e
 
 Vor der Ersteinrichtung muss PHP in der Projektwurzel Verzeichnisse und Dateien anlegen dürfen. Die noch fehlenden Projektpfade werden von `/_install` beziehungsweise bei Bedarf vom Kernel erzeugt und sind keine manuell anzulegende Voraussetzung.
 
-Im laufenden Betrieb benötigt Nino Schreibrechte nur für tatsächlich veränderliche Inhalte. Dazu gehören je nach Nutzung `private/config.php`, `private/text/`, `private/elements/`, `private/data/`, `private/.logs/`, `private/.backups/`, `public/images/` und `public/.cache/`. Der Template Builder unter `/_templates` benötigt zusätzlich `private/templates/`; er kann native Textschlüssel, Elementtypen und Bildplatz-Definitionen in der Konfiguration anlegen. `/_admin` schreibt je nach Funktion unter anderem Konfiguration, Texte, Elemente und Bilder.
+Im laufenden Betrieb benötigt Nino Schreibrechte nur für tatsächlich veränderliche Inhalte. Dazu gehören je nach Nutzung `private/config.php`, `private/text/`, `private/elements/`, `private/data/`, `private/.logs/`, `private/.backups/`, `public/images/` und `public/.cache/`. Der Template Builder unter `/_templates` benötigt zusätzlich `private/templates/`; er kann native Textschlüssel, Elementtypen und Bildplatz-Definitionen in der Konfiguration anlegen. `/_admin` schreibt je nach Funktion unter anderem Konfiguration, Texte, Elemente und Bilder. Projektwurzel und PHP-Quellcode können nach der Installation schreibgeschützt bleiben.
 
 Vergib diese Rechte an den Benutzer, unter dem PHP ausgeführt wird. Weltweit beschreibbare Rechte wie `0777` sind keine geeignete Dauerlösung. Nach dem Deployment sollten Kernel und übriger PHP-Quellcode nicht allgemein beschreibbar sein.
 
@@ -96,7 +96,7 @@ define('NINO_CONTENT_DIR', '/pfad/ausserhalb/des/webroots/nino-private');
 // define('NINO_CONFIG_DIR', '/pfad/ausserhalb/des/webroots');
 ```
 
-Trage eine der Definitionen vor dem Laden von `_nino/Nino.php` in `index.php` ein. Wird der vollständige Baum mit `NINO_CONTENT_DIR` verschoben, muss `private/` nicht mehr durch den Webserver geschützt werden. Wird nur `config.php` verschoben, dürfen die übrigen privaten Dateien weiterhin nicht direkt ausgeliefert werden.
+Trage eine der Definitionen vor dem Laden von `_nino/Nino.php` in `index.php` ein. Ein ungültiger ausdrücklich gesetzter Pfad bricht den Start ab; Nino fällt nie still auf ein Verzeichnis im Projekt zurück. Wird der vollständige Baum mit `NINO_CONTENT_DIR` verschoben, muss `private/` nicht mehr durch den Webserver geschützt werden. Wird nur `config.php` verschoben, dürfen die übrigen privaten Dateien weiterhin nicht direkt ausgeliefert werden.
 
 ## Einstellungen für den Produktivbetrieb
 

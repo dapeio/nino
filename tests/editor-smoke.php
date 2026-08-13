@@ -703,6 +703,9 @@ check( 'no random backup directory is generated any more', isset( $appData['/nin
 
 $backupDir 	= $sandbox. '/private/.backups';
 $today 			= $backupDir. '/'. date( 'Y-m-d' ). '.php';
+$nestedBackupImage = '/images/elements/backup/nested.jpg';
+$nestedBackupBytes = 'nested-image-bytes';
+\Nino\Filesystem::putFileContent( $appData, $nestedBackupImage, $nestedBackupBytes );
 
 if( is_file( $today ) === true )
 	unlink( $today );
@@ -738,6 +741,7 @@ mkdir( $extractDir );
 ( new \PharData( $tmpGz ) )->extractTo( $extractDir );
 
 check( 'the decrypted archive contains a byte-identical config.php', file_get_contents( $sandbox. '/private/config.php' ) === file_get_contents( $extractDir. '/config.php' ) );
+check( 'the decrypted archive preserves nested element images', file_get_contents( $extractDir. '/images/elements/backup/nested.jpg' ) === $nestedBackupBytes );
 
 $mtimeBefore = filemtime( $today );
 clearstatcache();

@@ -15,6 +15,15 @@ namespace Nino {
 
 		$root 		= dirname(__DIR__);
 
+		// These paths are needed before Runtime installs Nino's error handler:
+		// AppData::prepareSession() already reads config.php from them. Validate
+		// them before any path concatenation can obscure the real problem.
+		if( defined( 'NINO_CONTENT_DIR' ) === true && ( is_string( NINO_CONTENT_DIR ) === false || NINO_CONTENT_DIR === '' || is_dir( NINO_CONTENT_DIR ) === false || is_writable( NINO_CONTENT_DIR ) === false ) )
+			trigger_error( 'NINO_CONTENT_DIR must point to an existing, writable directory.', E_USER_ERROR );
+
+		if( defined( 'NINO_CONFIG_DIR' ) === true && ( is_string( NINO_CONFIG_DIR ) === false || NINO_CONFIG_DIR === '' || is_dir( NINO_CONFIG_DIR ) === false || is_writable( NINO_CONFIG_DIR ) === false ) )
+			trigger_error( 'NINO_CONFIG_DIR must point to an existing, writable directory.', E_USER_ERROR );
+
 		// Everything this project *is*, as opposed to the code that runs it:
 		// configuration, templates, content and management state all live in
 		// private/. NINO_CONTENT_DIR may deliberately move that complete tree
@@ -65,15 +74,6 @@ namespace Nino {
 		\Nino\AppData::prepareSession( $appData );
 
 		\Nino\Runtime::init( $appData );
-
-		// Only for an explicitly-set NINO_CONFIG_DIR - the default private
-		// directory is covered by the filesystem operations that use it.
-		// Checked right after Runtime::init() so this goes through the same
-		// custom error handler as everything else, rather than falling
-		// through to AppData::init()'s later "config.php not found" with no
-		// indication of why the path was wrong in the first place.
-		if( defined( 'NINO_CONFIG_DIR' ) === true && ( is_dir( NINO_CONFIG_DIR ) === false || is_writable( NINO_CONFIG_DIR ) === false ) )
-			trigger_error( 'NINO_CONFIG_DIR (\''. NINO_CONFIG_DIR. '\') does not exist or is not writable.', E_USER_ERROR );
 
 		\Nino\Filesystem::init( $appData );
 		\Nino\AppData::init( $appData );
@@ -1009,15 +1009,11 @@ namespace Nino {
 
 			$path = $appData['./nino/uid'];
 			if( is_dir( $path ) === false ) {
-				trigger_error( 'Filesystem path \''. $path. '\' does not exists.', E_USER_ERROR );
+				trigger_error( 'Filesystem path \''. $path. '\' does not exist.', E_USER_ERROR );
 				return;
 			}
-			if( is_writable( $path ) === false ) {
-				trigger_error( 'Filesystem path \''. $path. '\' is not writable.', E_USER_ERROR );
-				return;
-			}
-			if( strpos( __DIR__, $path ) !== 0 ) {
-				trigger_error( 'Filesystem path \''. $path. '\' is not inside root dir.', E_USER_ERROR );
+			if( realpath( $path ) !== realpath( dirname(__DIR__) ) ) {
+				trigger_error( 'Filesystem path \''. $path. '\' is not the project root.', E_USER_ERROR );
 				return;
 			}
 
@@ -1087,16 +1083,18 @@ namespace Nino {
 			if( $nolock === false && self::lockFile( $appData, $filename ) === false )
 				return false;
 
-			// Update cache - for an append the cached value would be just the
-			// chunk, not the file, so the slot is dropped and re-read instead
-			if( $append === true )
-				$appData['./nino/filesystem/cache'][$filename]['fstat'] = [];
-			else
-				$appData['./nino/filesystem/cache'][$filename]['content'] = $content;
+			// Preserve the caller-facing value for the cache. Serialization and
+			// disk I/O must succeed before it becomes observable in this request.
+			$cacheContent = $content;
 
 			// Prepare content
-			if( substr( $filename, -5 ) === '.json' )
+			if( substr( $filename, -5 ) === '.json' ) {
 				$content = json_encode( $content, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES );
+				if( $content === false ) {
+					self::unlockFile( $appData, $filename );
+					return false;
+				}
+			}
 			if( substr( $filename, -4 ) === '.php' )
 				$content = '<?php return '. var_export( $content, true ). ';';
 
@@ -1112,9 +1110,24 @@ namespace Nino {
 			// in one request, or simply the next write of the same file.
 			self::unlockFile( $appData, $filename );
 
+			// A failed atomic replace leaves the old file in place; a failed
+			// append may have written a short prefix. In either case, discard the
+			// slot so the next read reflects disk rather than the attempted value.
+			if( $success === false ) {
+				unset( $appData['./nino/filesystem/cache'][$filename] );
+				return false;
+			}
+
+			// Update cache only after persistence. For an append the complete new
+			// value is unknown here, so force the next read back to disk.
+			if( $append === true )
+				$appData['./nino/filesystem/cache'][$filename]['fstat'] = [];
+			else
+				$appData['./nino/filesystem/cache'][$filename]['content'] = $cacheContent;
+
 			// Reset opcache
 			if( function_exists( 'opcache_invalidate' ) === true && is_file( $path ) === true )
-				opcache_invalidate( $path );
+				opcache_invalidate( $path, true );
 
 			// Refresh the fingerprint getFileContent() compares against, so the
 			// write this call just made doesn't look like someone else's change
@@ -1124,7 +1137,7 @@ namespace Nino {
 			if( $append === false && $stat !== false )
 				$appData['./nino/filesystem/cache'][$filename]['fstat'] = [ 'mtime' => $stat['mtime'], 'size' => $stat['size'] ];
 
-			return $success;
+			return true;
 		}
 
 		// Replace a file's content atomically: write a temp file next to it,
@@ -1624,9 +1637,25 @@ namespace Nino {
 			foreach( glob( $elements. '/*.php' ) ?: [] as $file )
 				$files[$file] = 'elements/'. basename( $file );
 
-			foreach( glob( $images. '/*' ) ?: [] as $file )
-				if( is_file( $file ) === true )
-					$files[$file] = 'images/'. basename( $file );
+			// Element images are deliberately nested (images/elements/type/...).
+			// Walk the complete tree and preserve each relative archive path;
+			// never follow symlinks out of the public image directory.
+			if( is_dir( $images ) === true ) {
+				$iterator = new \RecursiveIteratorIterator(
+					new \RecursiveDirectoryIterator( $images, \FilesystemIterator::SKIP_DOTS ),
+					\RecursiveIteratorIterator::LEAVES_ONLY,
+					\RecursiveIteratorIterator::CATCH_GET_CHILD
+				);
+
+				foreach( $iterator as $file ) {
+					$path = $file->getPathname();
+					if( $file->isFile() === false || is_link( $path ) === true )
+						continue;
+
+					$relative = substr( $path, strlen( rtrim( $images, DIRECTORY_SEPARATOR ) ) + 1 );
+					$files[$path] = 'images/'. str_replace( DIRECTORY_SEPARATOR, '/', $relative );
+				}
+			}
 
 			if( is_file( $data. '/newsletter.php' ) === true )
 				$files[$data. '/newsletter.php'] = 'data/newsletter.php';
@@ -1836,7 +1865,7 @@ namespace Nino {
 			$element = \Nino\Elements::getElement( $appData, $uri, $locale );
 
 			if( $element === false )
-				return ! trigger_error( 'Element \''. $uri. '\' does not exists.' );
+				return ! trigger_error( 'Element \''. $uri. '\' does not exist.' );
 
 			return self::_writeElementData( $appData, $uri, $data, $locale, true );
 		}
@@ -1845,7 +1874,7 @@ namespace Nino {
 		static public function insertElement( array &$appData, string $uri, array $data, string $locale = '' ): mixed {
 
 			if( \Nino\Elements::getElement( $appData, $uri, $locale ) !== false )
-				return ! trigger_error( 'Element \''. $uri. '\' does already exists.' );
+				return ! trigger_error( 'Element \''. $uri. '\' already exists.' );
 
 			return self::_writeElementData( $appData, $uri, $data, $locale );
 		}
@@ -1867,7 +1896,8 @@ namespace Nino {
 			// apart from "type file missing" (a plain caller error) below -
 			// re-locking the same path is a no-op per lockFile()'s own
 			// docblock, so this doesn't change what mutate() does after it
-			if( \Nino\Filesystem::lockFile( $appData, '/elements/'. $typeUri. '.php' ) === false )
+			$typeFile = self::_typeFile( $typeUri );
+			if( \Nino\Filesystem::lockFile( $appData, $typeFile ) === false )
 				return ! trigger_error( 'Element type \''. $typeUri. '\' could not be locked for writing.' );
 
 			// $outcome stays 'notfound' unless the callback below actually
@@ -1876,7 +1906,7 @@ namespace Nino {
 			// missing (the callback sees a non-array $state and aborts)
 			$outcome = 'notfound';
 
-			$success = \Nino\Filesystem::mutate( $appData, '/elements/'. $typeUri. '.php', function( mixed $typeData, array &$appData ) use ( $elementUri, $locale, $typeUri, &$outcome ): mixed {
+			$success = \Nino\Filesystem::mutate( $appData, $typeFile, function( mixed $typeData, array &$appData ) use ( $elementUri, $locale, $typeUri, &$outcome ): mixed {
 
 				if( is_array( $typeData ) === false )
 					return null;
@@ -1934,11 +1964,14 @@ namespace Nino {
 
 		private static function getElementFile( array &$appData, string $typeUri ): array|false {
 
+			$typeUri = '/'. trim( $typeUri, '/' );
+			$typeFile = self::_typeFile( $typeUri );
+
 			// Check filecache
-			$appData['./nino/elements/cache'][$typeUri] = \Nino\Filesystem::getFileContent( $appData, '/elements/'. $typeUri. '.php', false );
+			$appData['./nino/elements/cache'][$typeUri] = \Nino\Filesystem::getFileContent( $appData, $typeFile, false );
 
 			if( $appData['./nino/elements/cache'][$typeUri] === false )
-				trigger_error( 'Invalid element php file \''. '/elements/'. $typeUri. '.php\'' );
+				trigger_error( 'Invalid element php file \''. $typeFile. '\'' );
 
 			return $appData['./nino/elements/cache'][$typeUri];
 		}
@@ -1946,10 +1979,11 @@ namespace Nino {
 		// Insert an element type
 		static public function insertElementType( array &$appData, string $typeUri, array $model ): mixed {
 
-			$typeUri = '/'. ltrim( $typeUri, '/' );
+			$typeUri = '/'. trim( $typeUri, '/' );
+			$typeFile = self::_typeFile( $typeUri );
 
 			// Check if element exists
-			if( \Nino\Filesystem::getFileContent( $appData, '/elements/'. $typeUri. '.php', '' ) !== '' )
+			if( \Nino\Filesystem::getFileContent( $appData, $typeFile, '' ) !== '' )
 				return ! trigger_error( 'Element type \''. $typeUri. '\' already exists.' );
 
 			$typeData = [
@@ -1965,8 +1999,12 @@ namespace Nino {
 				if( isset( $data['type'] ) === false || in_array( $data['type'], [ 'string', 'integer', 'array', 'boolean', 'double', 'date', 'datetime', 'image' ] ) === false )
 					continue;
 
-				if( isset( $data['required'] ) === true && $data['required'] === true && isset( $data['default'] ) === true && gettype( $data['default'] ) !== self::_expectedGettype( $data['type'] ) )
-					continue;
+				if( isset( $data['default'] ) === true ) {
+					if( $data['type'] === 'double' && gettype( $data['default'] ) === 'integer' )
+						$data['default'] = (float) $data['default'];
+					if( gettype( $data['default'] ) !== self::_expectedGettype( $data['type'] ) )
+						continue;
+				}
 
 				$typeData['model'][$key] = $data;
 
@@ -1974,9 +2012,17 @@ namespace Nino {
 					$typeData['*']['*'][$key] = $data['default'];
 			}
 
-			\Nino\Filesystem::putFileContent( $appData, '/elements/'. $typeUri. '.php', $typeData );
+			if( \Nino\Filesystem::putFileContent( $appData, $typeFile, $typeData ) === false )
+				return ! trigger_error( 'Element type \''. $typeUri. '\' could not be written.' );
 
 			return true;
+		}
+
+		// Canonical virtual filename for a type URI. Type URIs intentionally
+		// include a leading slash; trimming it here prevents alias cache/lock
+		// keys such as /elements//articles.php for the same physical file.
+		private static function _typeFile( string $typeUri ): string {
+			return '/elements/'. trim( $typeUri, '/' ). '.php';
 		}
 
 
@@ -2030,7 +2076,8 @@ namespace Nino {
 			// See deleteElement()'s identical pre-lock: distinguishes "could
 			// not lock" from "type file missing" below, rather than folding
 			// both into the same 'notfound' outcome and message
-			if( \Nino\Filesystem::lockFile( $appData, '/elements/'. $typeUri. '.php' ) === false )
+			$typeFile = self::_typeFile( $typeUri );
+			if( \Nino\Filesystem::lockFile( $appData, $typeFile ) === false )
 				return ! trigger_error( 'Element type \''. $typeUri. '\' could not be locked for writing.' );
 
 			// $outcome stays 'notfound' unless the callback below actually
@@ -2040,7 +2087,7 @@ namespace Nino {
 			$outcome 		= 'notfound';
 			$resultData	= null;
 
-			$success = \Nino\Filesystem::mutate( $appData, '/elements/'. $typeUri. '.php', function( mixed $typeData, array &$appData ) use ( $uri, $data, $locale, $typeUri, $update, &$outcome, &$resultData ): mixed {
+			$success = \Nino\Filesystem::mutate( $appData, $typeFile, function( mixed $typeData, array &$appData ) use ( $uri, $data, $locale, $typeUri, $update, &$outcome, &$resultData ): mixed {
 
 				if( is_array( $typeData ) === false )
 					return null;
@@ -2058,11 +2105,22 @@ namespace Nino {
 								return null;
 							}
 
-				// Check new element data - $data is always an array (typed
-				// parameter), but a field callback got it by reference and
-				// can still have unset() one of these two keys
-				if( isset( $data['.uri'] ) === false || isset( $data['.locale'] ) === false ) {
+				// Check new element data - a field callback receives it by
+				// reference and may change or remove these values.
+				if( is_string( $data['.uri'] ?? null ) === false || is_string( $data['.locale'] ?? null ) === false ) {
 					$outcome = 'veto';
+					return null;
+				}
+
+				$newTypeUri = self::getElementTypeFromUri( $data['.uri'] );
+				$newElementUri = self::getElementUriFromUri( $data['.uri'] );
+				if(
+					$newTypeUri !== $typeUri
+					|| $newElementUri === ''
+					|| ( $data['.locale'] !== '*' && \Nino\Locales::verifyLocale( $appData, $data['.locale'] ) === false )
+				) {
+					trigger_error( 'Callback returned an invalid element URI or locale for \''. $uri. '\'.' );
+					$outcome = 'error';
 					return null;
 				}
 
@@ -2084,8 +2142,33 @@ namespace Nino {
 						$data = $data + $existing;
 				}
 
-				// Render/write new element
-				$elementUri = self::getElementUriFromUri( $data['.uri'] );
+				// Render/write new element. When a field callback changes the URI,
+				// first copy every stored locale/global field to the destination;
+				// the partial update below then overwrites only the supplied keys.
+				// Without that copy, omitted title/description/image fields vanished
+				// when the old URI was removed at the end of the mutation.
+				$elementUri 		= $newElementUri;
+				$oldElementUri = self::getElementUriFromUri( $uri );
+				$renameBuckets = [];
+
+				if( $uri !== $data['.uri'] ) {
+					foreach( $typeData as $bucketName => $bucketData ) {
+						if( $bucketName === 'model' || is_array( $bucketData ) === false )
+							continue;
+
+						if( array_key_exists( $elementUri, $bucketData ) === true ) {
+							trigger_error( 'Element \''. $data['.uri']. '\' already exists.' );
+							$outcome = 'error';
+							return null;
+						}
+
+						if( array_key_exists( $oldElementUri, $bucketData ) === true )
+							$renameBuckets[] = $bucketName;
+					}
+
+					foreach( $renameBuckets as $bucketName )
+						$typeData[$bucketName][$elementUri] = $typeData[$bucketName][$oldElementUri];
+				}
 
 				foreach( $typeData['model'] AS $key => $field ) {
 
@@ -2118,17 +2201,30 @@ namespace Nino {
 						}
 					}
 
-					// Default
-					if( isset( $field['default'] ) === true && ( isset( $data[$key] ) === false || $field['default'] === $data[$key] ) )
-						continue;
-
-					// Check key
+					// Check key. A whole-number 'double' round-trips through JSON as
+					// an integer; coerce it before the default comparison as well, so
+					// posting 5 can genuinely reset an inherited default of 5.0.
 					if( isset( $data[$key] ) === false )
 						continue;
 
-					// Var type (a whole-number 'double' round-trips through json as an 'integer', accept and coerce it)
 					if( $field['type'] === 'double' && gettype( $data[$key] ) === 'integer' )
 						$data[$key] = (float) $data[$key];
+
+					$targetArray = ( isset( $typeData['model'][$key]['locale'] ) === true && $typeData['model'][$key]['locale'] === true ) ? $data['.locale'] : '*';
+
+					// A model default is inherited from ['*']['*']; writing the same
+					// value is unnecessary. On update, however, an older explicit
+					// override must be removed or the reset appears to save but the
+					// stale value wins again on the next read.
+					if( isset( $field['default'] ) === true && isset( $data[$key] ) === true && $field['default'] === $data[$key] ) {
+						unset( $typeData[$targetArray][$elementUri][$key] );
+						if( $targetArray !== '*' && ( $typeData[$targetArray][$elementUri] ?? null ) === [] ) {
+							unset( $typeData[$targetArray][$elementUri] );
+							if( ( $typeData[$targetArray] ?? null ) === [] )
+								unset( $typeData[$targetArray] );
+						}
+						continue;
+					}
 
 					if( gettype( $data[$key] ) !== self::_expectedGettype( $field['type'] ) ) {
 						trigger_error( 'Wrong var type \''. $key. '\' in \''. $uri. '\'. \''. $field['type']. '\' required, \''. gettype( $data[$key] ). '\' given.' );
@@ -2150,9 +2246,6 @@ namespace Nino {
 						return null;
 					}
 
-					$targetArray = ( isset( $typeData['model'][$key]['locale'] ) === true && $typeData['model'][$key]['locale'] === true ) ? $data['.locale'] : '*';
-
-
 					// Set value
 					$typeData[$targetArray][$elementUri] = $typeData[$targetArray][$elementUri] ?? [];
 					$typeData[$targetArray][$elementUri][$key] = $data[$key];
@@ -2163,19 +2256,13 @@ namespace Nino {
 				// Check uri change
 				if( $uri !== $data['.uri'] ) {
 
-					\Nino\Callbacks::doCallbacks( $appData, '/nino/elements'. $typeUri. '/update/uri', $data );
+					// Notification callbacks may inspect/replace their argument, but
+					// cannot change the URI after its data has already been moved.
+					$uriChangeData = $data;
+					\Nino\Callbacks::doCallbacks( $appData, '/nino/elements'. $typeUri. '/update/uri', $uriChangeData );
 
-					// Same reasoning as deleteElement(): iterate the known locale
-					// buckets, not $typeData's own keys. A type file also carries
-					// non-locale top-level keys (its display 'title', a plain string),
-					// and unset() on a string offset is a fatal Error - renaming an
-					// element uri took the whole request down with it. The loop
-					// variable was $locale too, overwriting the parameter for
-					// everything that follows.
-					$oldElementUri = self::getElementUriFromUri( $uri );
-
-					foreach( array_merge( \Nino\Locales::getAvailableLocales( $appData ), [ '*' ] ) AS $typeLocale )
-						unset( $typeData[$typeLocale][$oldElementUri] );
+					foreach( $renameBuckets as $bucketName )
+						unset( $typeData[$bucketName][$oldElementUri] );
 				}
 
 				unset( $appData['./nino/elements/cache'] );
@@ -2682,11 +2769,20 @@ namespace Nino {
 
 		public static function requestRoute( array &$appData, string $uri, string $method ): ?array {
 
+			// Only normalized absolute request paths are routable. dirname('')
+			// and dirname('relative') both stabilize at '.', which made the
+			// parent walk below loop forever for a malformed direct call.
+			if( $uri === '' || str_starts_with( $uri, '/' ) === false )
+				return null;
+
 			$result 		= $appData['/nino/http/routes'][$method. ':/'. $uri] ?? null;
 			$parentUri	= $uri;
 
 			while( $parentUri !== '/' && $result === null ) {
-				$parentUri	= dirname( $parentUri );
+				$nextParent = dirname( $parentUri );
+				if( $nextParent === '.' || $nextParent === $parentUri )
+					break;
+				$parentUri	= $nextParent;
 				$result 		= $appData['/nino/http/routes'][$method. ':/'. $parentUri.'/*'] ?? null;
 			}
 
@@ -2802,7 +2898,9 @@ namespace Nino {
 
 			// Parse query vars
 			$queryVars = [];
-			$parsedUrl = parse_url( $rawRequest, PHP_URL_QUERY ) ?? '';
+			$parsedUrl = @parse_url( $rawRequest, PHP_URL_QUERY );
+			if( is_string( $parsedUrl ) === false || $parsedUrl === '' )
+				return $queryVars;
 			parse_str( $parsedUrl, $queryVars );
 
 			return $queryVars;
@@ -2846,8 +2944,8 @@ namespace Nino {
 		// bytes and the target canvas come on top of that, and the total still
 		// fits php's 128M memory_limit default. At 40MP the buffer alone is
 		// ~160MB, ie. the guard would let through exactly the upload that OOMs
-		// on the cheap shared hosting this is built for. 20MP still covers a
-		// 24MP dslr (6000x4000) and every current phone camera.
+		// on the cheap shared hosting this is built for. Larger camera sources
+		// (including a 24MP 6000x4000 image) are deliberately rejected.
 		private const int MAX_SOURCE_PIXELS 		= 20 * 1000 * 1000;
 		private const string UPLOAD_DIR 				= '/images';
 
@@ -3068,7 +3166,7 @@ namespace Nino {
 			// value just set if it isn't available anymore
 			$currentLocale = \Nino\Runtime::getSessionValue( $appData, './nino/locales/current' );
 
-			if( $currentLocale !== null )
+			if( is_string( $currentLocale ) === true )
 				\Nino\Locales::setCurrentLocale( $appData, $currentLocale );
 
 			// Registered rather than called directly out of \Nino\request(): a
@@ -3087,11 +3185,13 @@ namespace Nino {
 		// redirect back to the current uri in the new locale
 		public static function callbackResponse( array &$appData, array &$request ): void {
 
-			// Catch locale change
-			if( isset( $request['/nino/http/request']['query']['/_nino/locales/current'] ) === false )
+			// Catch locale change. parse_str() legitimately creates arrays for a
+			// query such as current[]=de_DE; only scalar locale ids are valid.
+			$requestedLocale = $request['/nino/http/request']['query']['/_nino/locales/current'] ?? null;
+			if( is_string( $requestedLocale ) === false )
 				return;
 
-			$locale = \Nino\Locales::setCurrentLocale( $appData, $request['/nino/http/request']['query']['/_nino/locales/current'] );
+			$locale = \Nino\Locales::setCurrentLocale( $appData, $requestedLocale );
 
 			// Keep the response's own 'locale' in sync with the switch just
 			// made - \Nino\request() calls Locales::response() right after

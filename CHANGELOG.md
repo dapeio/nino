@@ -144,6 +144,17 @@ All notable changes to Nino are documented in this file.
 
 ### Fixed
 
+- Fixed backups omitting nested Element image paths by including the complete
+  public image tree instead of top-level files only.
+- Fixed failed or unserializable file writes becoming visible through the
+  in-request cache even though those values were never persisted.
+- Fixed Element type files acquiring double-slash cache/lock aliases, type
+  creation hiding write failures, a reset-to-default leaving an old override,
+  and partial callback-driven URI renames discarding omitted fields.
+- Hardened route/query and locale handling against malformed or array-shaped
+  request values, including non-string locale values stored in a session.
+- Removed the requirement that the complete project/code root remain writable
+  during normal operation and now validate explicit private/config overrides.
 - Kept Template Builder gallery previews on the project origin so locally
   hosted fonts can load inside their script-disabled sandbox, matching the
   already sandboxed detail preview.

@@ -80,7 +80,7 @@ define( 'NINO_CONTENT_DIR', '/var/www/private/nino-example' );
 require_once __DIR__. '/_nino/Nino.php';
 ```
 
-Use `NINO_CONTENT_DIR` for the complete private tree and `NINO_CONFIG_DIR` only for a separate `config.php`. Each target must exist and be writable for necessary write operations.
+Use `NINO_CONTENT_DIR` for the complete private tree and `NINO_CONFIG_DIR` only for a separate `config.php`. Each explicitly configured target must exist and be writable; an invalid path is not silently replaced.
 
 ---
 

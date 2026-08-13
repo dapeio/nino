@@ -10,7 +10,8 @@ declare(strict_types=1);
 
 //  router.php - for local developement only
 
-$uri = urldecode( parse_url( $_SERVER['REQUEST_URI'], PHP_URL_PATH ) );
+$parsedPath = @parse_url( (string) ( $_SERVER['REQUEST_URI'] ?? '/' ), PHP_URL_PATH );
+$uri = is_string( $parsedPath ) === true ? urldecode( $parsedPath ) : '/';
 
 // The private half of the project is never served as a static file. In
 // production private/.htaccess denies it (and a hardened setup points

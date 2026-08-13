@@ -97,10 +97,24 @@ $model = [
 	'title' => [ 'type' => 'string', 'locale' => true ],
 	'views' => [ 'type' => 'integer', 'default' => 0 ],
 	'price' => [ 'type' => 'double' ],
+	'rating' => [ 'type' => 'double', 'default' => 5 ],
+	'invalidDefault' => [ 'type' => 'integer', 'default' => 'not-an-integer' ],
 ];
 
 check( 'insertElementType creates a new type', \Nino\Elements::insertElementType( $appData, '/testtype', $model ) !== false );
 check( 'insertElementType rejects a duplicate type', \Nino\Elements::insertElementType( $appData, '/testtype', $model ) === false );
+check( 'element type I/O uses one canonical cache path', isset( $appData['./nino/filesystem/cache']['/elements/testtype.php'] ) === true && isset( $appData['./nino/filesystem/cache']['/elements//testtype.php'] ) === false );
+$storedModel = \Nino\Elements::getElementModel( $appData, '/testtype' );
+check( 'a whole-number double default is normalized to a double', gettype( $storedModel['rating']['default'] ?? null ) === 'double' );
+check( 'an invalid optional-field default is not persisted into the model', isset( $storedModel['invalidDefault'] ) === false );
+
+$notADirectory = $sandbox. '/not-a-private-directory';
+file_put_contents( $notADirectory, 'x' );
+$typeWriteFailure = $appData;
+$typeWriteFailure['./nino/filesystem/cache'] = [];
+$typeWriteFailure['./nino/filesystem/privatepath'] = $notADirectory;
+check( 'insertElementType reports a failed type-file write', \Nino\Elements::insertElementType( $typeWriteFailure, '/cannot-write', $model ) === false );
+unlink( $notADirectory );
 
 $inserted = \Nino\Elements::insertElement( $appData, '/testtype/item1', [ 'title' => 'Hello' ], 'de_DE' );
 check( 'insertElement returns the new element', is_array( $inserted ) === true );
@@ -156,10 +170,7 @@ check( 'a filename passed for an image field is still stored', ( \Nino\Elements:
 // handle on the sidecar .lock file, since Nino's own re-lock check inside
 // the same $appData would otherwise mask a leak as "already holding it".
 \Nino\Elements::insertElement( $appData, '/reqtype/leaktest', [ 'title' => '', 'tags' => [ 'a' ], 'count' => 1, 'active' => true ], 'de_DE' );
-// Note the double slash: Elements builds its lock/cache key as '/elements/'.
-// $typeUri. '.php' and $typeUri already carries its own leading slash - the
-// probe has to match that exact key, not the visually "clean" single-slash path
-check( 'insertElement releases the type file lock after a required-field validation failure', probeLockFree( $sandbox, '/elements//reqtype.php' ) === true );
+check( 'insertElement releases the type file lock after a required-field validation failure', probeLockFree( $sandbox, '/elements/reqtype.php' ) === true );
 
 $fetched = \Nino\Elements::getElement( $appData, '/testtype/item1', 'de_DE' );
 check( 'getElement finds the inserted element', is_array( $fetched ) === true && $fetched['title'] === 'Hello' );
@@ -189,6 +200,35 @@ $afterPartialEn = \Nino\Elements::getElement( $appData, '/testtype/item1', 'en_U
 check( 'a partial global update returns the requested locale\'s complete element', is_array( $partialGlobalUpdate ) === true && $partialGlobalUpdate['title'] === 'Hello English' && $partialGlobalUpdate['views'] === 7 );
 check( 'a partial global update does not overwrite the target locale from another locale', $afterPartialEn['title'] === 'Hello English' );
 check( 'a partial global update leaves the other locale untouched', $afterPartialDe['title'] === 'Hello updated' && $afterPartialDe['views'] === 7 );
+
+$resetDefault = \Nino\Elements::updateElement( $appData, '/testtype/item1', [ 'views' => 0 ], 'en_US' );
+$typeOnDisk = include \Nino\Filesystem::path( $appData, '/elements/testtype.php' );
+check( 'updating a field back to its model default returns that default', ( $resetDefault['views'] ?? null ) === 0 );
+check( 'resetting to a default removes the stale explicit override on disk', isset( $typeOnDisk['*']['item1']['views'] ) === false );
+check( 'the inherited default is visible in every locale', \Nino\Elements::getElement( $appData, '/testtype/item1', 'de_DE' )['views'] === 0 );
+\Nino\Elements::updateElement( $appData, '/testtype/item1', [ 'views' => 7 ], 'en_US' );
+
+// A field callback may normalize an element URI from a supplied slug. The
+// triggering update is intentionally partial: all omitted localized/global
+// fields must move with the URI instead of disappearing with the old key.
+\Nino\Callbacks::registerCallback( $appData, '/tests/elements/slug-uri', function( array &$appData, array &$data ): array {
+	$data['.uri'] = '/renametest/'. $data['slug'];
+	return $data;
+} );
+\Nino\Elements::insertElementType( $appData, '/renametest', [
+	'slug' 			=> [ 'type' => 'string', 'callbacks' => [ '/tests/elements/slug-uri' ] ],
+	'title' 		=> [ 'type' => 'string', 'locale' => true ],
+	'description' => [ 'type' => 'string', 'locale' => true ],
+	'views' 			=> [ 'type' => 'integer' ],
+] );
+\Nino\Elements::insertElement( $appData, '/renametest/old', [ 'slug' => 'old', 'title' => 'Deutsch', 'description' => 'Beschreibung', 'views' => 4 ], 'de_DE' );
+\Nino\Elements::updateElement( $appData, '/renametest/old', [ 'title' => 'English', 'description' => 'Description' ], 'en_US' );
+$renamed = \Nino\Elements::updateElement( $appData, '/renametest/old', [ 'slug' => 'new' ], 'de_DE' );
+check( 'a callback-driven partial URI rename succeeds at the destination', is_array( $renamed ) === true && ( $renamed['.uri'] ?? null ) === '/renametest/new' );
+check( 'a URI rename preserves omitted localized fields in the updated locale', $renamed['title'] === 'Deutsch' && $renamed['description'] === 'Beschreibung' );
+check( 'a URI rename preserves omitted fields in every other locale too', ( \Nino\Elements::getElement( $appData, '/renametest/new', 'en_US' )['description'] ?? null ) === 'Description' );
+check( 'a URI rename preserves omitted global fields', ( $renamed['views'] ?? null ) === 4 );
+check( 'a URI rename removes the old element key', \Nino\Elements::getElement( $appData, '/renametest/old', '*' ) === false );
 
 $queried = \Nino\Elements::queryElements( $appData, '/testtype', [ 'title' => '%updated%' ], 'de_DE', [] );
 check( 'queryElements finds the element via wildcard match', count( $queried ) === 1 );
@@ -355,6 +395,23 @@ check( '[image] shortcode renders nothing for an unknown slot', \Nino\Html::rend
 echo "\n";
 
 
+// --- Filesystem cache after a rejected write ----------------------------
+
+echo "Filesystem::putFileContent - failed writes never become cached state\n";
+
+\Nino\Filesystem::putFileContent( $appData, '/data/cache-state.json', [ 'state' => 'old' ] );
+check( 'the cache-write fixture starts with the persisted old value', \Nino\Filesystem::getFileContent( $appData, '/data/cache-state.json', [] ) === [ 'state' => 'old' ] );
+
+$recursiveJson = [];
+$recursiveJson['self'] =& $recursiveJson;
+check( 'an unserializable JSON write is rejected', \Nino\Filesystem::putFileContent( $appData, '/data/cache-state.json', $recursiveJson ) === false );
+unset( $recursiveJson );
+check( 'a rejected write leaves the previous bytes on disk', json_decode( (string) file_get_contents( \Nino\Filesystem::path( $appData, '/data/cache-state.json' ) ), true ) === [ 'state' => 'old' ] );
+check( 'a rejected write leaves the in-request read cache on the persisted value', \Nino\Filesystem::getFileContent( $appData, '/data/cache-state.json', [] ) === [ 'state' => 'old' ] );
+
+echo "\n";
+
+
 // --- Auth ------------------------------------------------------------
 
 echo "Auth::insertUser / loginUser / deleteUser\n";
@@ -493,8 +550,7 @@ check( '/nino/elements<type>/update fires on updateElement, not again on insert'
 
 $vetoed = \Nino\Elements::deleteElement( $appData, '/hooktest/item1', 'de_DE' );
 check( 'deleteElement returns null when the delete callback vetoes', $vetoed === null );
-// Same double-slash key as above, see the insertElement leak check
-check( 'deleteElement releases the type file lock after a callback veto', probeLockFree( $sandbox, '/elements//hooktest.php' ) === true );
+check( 'deleteElement releases the type file lock after a callback veto', probeLockFree( $sandbox, '/elements/hooktest.php' ) === true );
 
 echo "\n";
 
@@ -1034,6 +1090,15 @@ $brokenNativeAppData['/nino/locales/available'] = [ 'en_US', 'de_DE' ];
 \Nino\Locales::init( $brokenNativeAppData );
 check( 'a native locale that is not available falls back to the first available one', \Nino\Locales::getCurrentLocale( $brokenNativeAppData ) === 'en_US' );
 
+$malformedSessionAppData = [ './nino/uid' => $sandbox. '-malformed-locale-session' ];
+\Nino\AppData::prepare( $malformedSessionAppData );
+$malformedSessionAppData['./nino/filesystem/path'] = $sandbox;
+$malformedSessionAppData['/nino/locales/native'] = 'en_US';
+$malformedSessionAppData['/nino/locales/available'] = [ 'en_US', 'de_DE' ];
+\Nino\Runtime::setSessionValue( $malformedSessionAppData, './nino/locales/current', [ 'de_DE' ] );
+\Nino\Locales::init( $malformedSessionAppData );
+check( 'Locales::init ignores a malformed non-string locale stored in the session', \Nino\Locales::getCurrentLocale( $malformedSessionAppData ) === 'en_US' );
+
 // The default must not be written into the session - it is nobody's choice,
 // and stored there it would outlive a later change of the native locale
 check( 'resolving the default does not persist it as a visitor locale', \Nino\Runtime::getSessionValue( $nativeAppData, './nino/locales/current' ) === null );
@@ -1071,6 +1136,22 @@ $pickerRedirect = fakeRequest( $appData, '/legal?/_nino/localepicker/current=de_
 \Nino\Modules\Localepicker::callbackResponse( $appData, $pickerRedirect );
 check( 'the localepicker redirects with a 302 status code too', $pickerRedirect['/nino/http/response']['statusCode'] === 302 );
 check( 'and its Location points at the locale variant of the page', ( $pickerRedirect['/nino/http/response']['header']['Location'] ?? '' ) === '/rechtliches' );
+
+\Nino\Locales::setCurrentLocale( $appData, 'en_US' );
+$arrayLocaleRequest = fakeRequest( $appData, '/legal?/_nino/locales/current[]=de_DE' );
+\Nino\Http::response( $appData, $arrayLocaleRequest );
+check( 'an array-shaped locale query is ignored instead of causing a TypeError', \Nino\Locales::getCurrentLocale( $appData ) === 'en_US' && $arrayLocaleRequest['/nino/http/response']['statusCode'] === 201 );
+
+$arrayPickerRequest = fakeRequest( $appData, '/legal?/_nino/localepicker/current[]=de_DE' );
+\Nino\Http::response( $appData, $arrayPickerRequest );
+\Nino\Modules\Localepicker::callbackResponse( $appData, $arrayPickerRequest );
+check( 'the localepicker also ignores an array-shaped locale query', \Nino\Locales::getCurrentLocale( $appData ) === 'en_US' && $arrayPickerRequest['/nino/http/response']['statusCode'] === 201 );
+
+$queryParser = new ReflectionMethod( '\Nino\Http', '_getRequestQueryVarsPart' );
+$queryParser->setAccessible( true );
+check( 'a URL parse failure produces an empty query array', $queryParser->invoke( null, 'http://[' ) === [] );
+check( 'requestRoute rejects an empty URI without entering its parent walk', \Nino\Http::requestRoute( $appData, '', 'GET' ) === null );
+check( 'requestRoute rejects a relative URI without entering its parent walk', \Nino\Http::requestRoute( $appData, 'relative/path', 'GET' ) === null );
 
 echo "\n";
 
@@ -1261,6 +1342,14 @@ function runIsolated( string $body ): array {
 	$exitCode = proc_close( $process );
 	return [ 'stdout' => $stdout, 'exitCode' => $exitCode ];
 }
+
+$invalidContentDir = runIsolated( '
+	define( "NINO_CONTENT_DIR", "/definitely/not/a/nino-private-directory" );
+	echo "before\n";
+	\Nino\init();
+	echo "after\n";
+' );
+check( 'an invalid NINO_CONTENT_DIR fails before boot instead of falling back elsewhere', trim( $invalidContentDir['stdout'] ) === 'before' && $invalidContentDir['exitCode'] !== 0 );
 
 $bootstrap = '
 	$sandbox = sys_get_temp_dir(). "/nino-handleerror-". bin2hex( random_bytes( 4 ) );

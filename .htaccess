@@ -1,13 +1,13 @@
 # Nino - minimal Apache hardening defaults. Harmless if AllowOverride
 # doesn't apply this file (eg. a PHP-FPM/nginx deployment) - see
-# docs/setup.md's "Webserver (production)" for the equivalent nginx rules.
+# docs/deployment.md's "Webserver (production)" for the equivalent nginx rules.
 
 # Never serve a dotfile directly - matches the filename only (not the
-# containing directory, so _editor/.cache/script.js is unaffected), which
-# is exactly what's needed: _admin/.restore-key.php is a real dotfile, while
+# containing directory, so _editor/.cache/script.js is unaffected).
 # private/.auth/ and private/.logs/ are dotdirs whose files inside
-# (eg. 2026-01-01.php) aren't themselves dotfiles - those stay protected
-# by their own self-exiting .php stub instead (see docs/developer.md's
+# (eg. 2026-01-01.php) aren't themselves dotfiles - the complete private tree
+# is denied by private/.htaccess, with self-exiting .php stubs as an additional
+# safeguard (see docs/development.md's
 # "Encryption / stub conventions").
 <FilesMatch "^\.">
 	Require all denied

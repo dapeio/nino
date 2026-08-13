@@ -78,7 +78,7 @@ define( 'NINO_CONTENT_DIR', '/var/www/private/nino-example' );
 require_once __DIR__. '/_nino/Nino.php';
 ```
 
-Verwende `NINO_CONTENT_DIR` für den vollständigen privaten Baum und `NINO_CONFIG_DIR` nur für eine getrennte `config.php`. Jedes Ziel muss für notwendige Schreibvorgänge existieren und beschreibbar sein.
+Verwende `NINO_CONTENT_DIR` für den vollständigen privaten Baum und `NINO_CONFIG_DIR` nur für eine getrennte `config.php`. Jedes ausdrücklich konfigurierte Ziel muss existieren und beschreibbar sein; ein ungültiger Pfad wird nicht stillschweigend ersetzt.
 
 ## Der Request-/Response-Lebenszyklus im Detail
 

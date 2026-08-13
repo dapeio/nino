@@ -1,13 +1,5 @@
-/.cache/
 /_admin/.cache/
-/_admin/.lockout.json
-/_admin/.restore-key.php
 /_editor/.cache/
-/_editor/.backups-*/
-/_editor/.logs-*/
-/_dev/.restore-key.php
-/_dev/.lockout.json
-/_dev/Dev.php
 
 # The project's private half. config.php is tracked deliberately - it is the
 # starter configuration a checkout ships - but everything the wizard
@@ -20,35 +12,6 @@
 /private/.auth/
 /private/.logs/
 /private/.backups/
-
-# Compatibility with the short-lived typo
-/privat/templates/
-/privat/text/
-/privat/elements/
-/privat/data/
-/privat/.auth/
-/privat/.logs/
-/privat/.backups/
-
-# Compatibility with the short-lived pre-private layout
-/content/templates/
-/content/text/
-/content/elements/
-/content/data/
-/content/.auth/
-/content/.logs/
-/content/.backups/
-
-# The same content in the pre-move layout, for a project installed before it
-/templates/
-/text/
-/elements/
-/data/
-/assets/
-/favicon/
-/fonts/
-/images/*
-!/images/.demo/
 
 # The project's public half - everything a browser loads directly. All of it
 # is the wizard's output (themes, fonts, the favicon set) or runtime content

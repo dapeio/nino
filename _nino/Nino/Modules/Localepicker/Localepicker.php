@@ -51,10 +51,11 @@ namespace Nino\Modules {
 		 */
 		public static function callbackResponse( array &$appData, array &$request ): void {
 
-			if( isset( $request['/nino/http/request']['query']['/_nino/localepicker/current'] ) === false )
+			$requestedLocale = $request['/nino/http/request']['query']['/_nino/localepicker/current'] ?? null;
+			if( is_string( $requestedLocale ) === false )
 				return;
 
-			$locale = \Nino\Locales::setCurrentLocale( $appData, $request['/nino/http/request']['query']['/_nino/localepicker/current'] );
+			$locale = \Nino\Locales::setCurrentLocale( $appData, $requestedLocale );
 
 			// Keep the response's own 'locale' in sync with the switch just
 			// made - \Nino\request() calls Locales::response() right after
