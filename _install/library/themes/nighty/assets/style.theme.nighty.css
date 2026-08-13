@@ -1,6 +1,6 @@
 @font-face {
   font-family: "Lato";
-  src: url("/fonts/text/lato-regular.woff2") format("woff2");
+  src: url("[[/nino/public]]/fonts/text/lato-regular.woff2") format("woff2");
   font-weight: 400;
   font-style: normal;
   font-display: swap;
@@ -8,7 +8,7 @@
 
 @font-face {
   font-family: "Lato";
-  src: url("/fonts/text/lato-bold.woff2") format("woff2");
+  src: url("[[/nino/public]]/fonts/text/lato-bold.woff2") format("woff2");
   font-weight: 700;
   font-style: normal;
   font-display: swap;
@@ -16,7 +16,7 @@
 
 @font-face {
   font-family: "Bebas Neue";
-  src: url("/fonts/title/bebas-neue.woff2") format("woff2");
+  src: url("[[/nino/public]]/fonts/title/bebas-neue.woff2") format("woff2");
   font-weight: 100 900;
   font-style: normal;
   font-display: swap;

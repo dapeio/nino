@@ -3,21 +3,21 @@
 	font-family: 'Text';
 	font-style: normal;
 	font-weight: normal;
-	src: local('Text Regular'), url('/fonts/text/open-sans-regular.woff2') format('woff2');
+	src: local('Text Regular'), url('[[/nino/public]]/fonts/text/open-sans-regular.woff2') format('woff2');
 }
 
 @font-face {
 	font-family: 'Text';
 	font-style: bold;
 	font-weight: bold;
-	src: local('Text Bold'), url('/fonts/text/open-sans-bold.woff2') format('woff2');
+	src: local('Text Bold'), url('[[/nino/public]]/fonts/text/open-sans-bold.woff2') format('woff2');
 }
 
 @font-face {
 	font-family: 'Title';
 	font-style: bold;
 	font-weight: bold;
-	src: local('Title Bold'), url('/fonts/title/league-spartan.woff2') format('woff2');
+	src: local('Title Bold'), url('[[/nino/public]]/fonts/title/league-spartan.woff2') format('woff2');
 }
 
 :root {

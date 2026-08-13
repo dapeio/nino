@@ -207,7 +207,7 @@ namespace Nino\Modules {
 			// into stored XSS on every page that includes the bundle. Only the one
 			// developer/kernel-controlled token the shipped assets actually use is
 			// substituted here.
-			$content = str_replace( '[[/nino/dir]]', \Nino\Filesystem::getDir( $appData ), $content );
+			$content = str_replace( '[[/nino/public]]', \Nino\Filesystem::getPublicDir( $appData ), $content );
 
 			// Minify
 			if( substr( $pathinfo['filename'], -4 ) === '.min' )
