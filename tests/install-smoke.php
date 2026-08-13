@@ -54,6 +54,7 @@ $appData['./nino/filesystem/path']				= $sandbox;
 $appData['./nino/filesystem/configpath']	= $sandbox. '/private';
 $appData['./nino/filesystem/contentpath']	= $sandbox. '/private';
 $appData['./nino/filesystem/privatepath'] = $sandbox. '/private';
+$appData['./nino/filesystem/publicpath'] 	= $sandbox. '/public';
 $appData['/nino/dir']										= '';
 $appData['/nino/locales/native']					= 'de_DE';
 // Matches the real shipped config.php default - only the native locale,
@@ -63,9 +64,9 @@ $appData['/nino/locales/available']			= [ 'de_DE' ];
 $appData['/nino/modules']								= [ '\\Nino\\Modules\\Assets', '\\Nino\\Modules\\Elements', '\\Nino\\Modules\\Template', '\\Nino\\Modules\\Jstext', '\\Nino\\Modules\\Csrf', '\\Nino\\Modules\\Images' ];
 
 mkdir( $sandbox. '/private/templates', 0777, true );
-mkdir( $sandbox. '/images', 0777, true );
+mkdir( $sandbox. '/public/images', 0777, true );
 mkdir( $sandbox. '/private/text', 0777, true );
-mkdir( $sandbox. '/assets', 0777, true );
+mkdir( $sandbox. '/public/assets', 0777, true );
 
 \Nino\Filesystem::putFileContent( $appData, '/config.php', [
 	'/nino/error/log'					=> false,
@@ -333,8 +334,8 @@ check( 'response echoes the applied theme', $themeApplyRequest['/nino/http/respo
 
 $configAfterTheme = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
 
-check( 'copies the theme\'s own stylesheet into /assets', is_file( $sandbox. '/assets/style.theme.nighty.css' ) === true );
-check( 'copies the webfonts that stylesheet references, keeping their subdirectories', is_file( $sandbox. '/fonts/text/lato-regular.woff2' ) === true && is_file( $sandbox. '/fonts/title/bebas-neue.woff2' ) === true );
+check( 'copies the theme\'s own stylesheet into /assets', is_file( $sandbox. '/public/assets/style.theme.nighty.css' ) === true );
+check( 'copies the webfonts that stylesheet references, keeping their subdirectories', is_file( $sandbox. '/public/fonts/text/lato-regular.woff2' ) === true && is_file( $sandbox. '/public/fonts/title/bebas-neue.woff2' ) === true );
 check( 'never copies the picker-only preview image into the project', is_file( $sandbox. '/preview.svg' ) === false );
 check( 'persists the picked key at /nino/install/theme', ( $configAfterTheme['/nino/install/theme'] ?? null ) === 'nighty' );
 check( 'appends the theme\'s stylesheet to the css bundle', in_array( '/assets/style.theme.nighty.css', $configAfterTheme['/nino/html/assets']['/.cache/style.css'], true ) === true );
@@ -355,8 +356,8 @@ $configAfterSwitch = \Nino\Filesystem::getFileContent( $appData, '/config.php', 
 
 check( 'switching themes swaps the bundled stylesheet rather than adding a second one', $configAfterSwitch['/nino/html/assets']['/.cache/style.css'] === [ '/_nino/Nino.css', '/assets/style.custom.css', '/assets/style.theme.wellness.css' ] );
 check( '...and updates the persisted key with it', $configAfterSwitch['/nino/install/theme'] === 'wellness' );
-check( 'copies the new theme\'s own fonts too', is_file( $sandbox. '/fonts/text/pt-serif-regular.woff2' ) === true );
-check( 'a file the previous theme wrote is left behind, not deleted - same additive rule as Setup\'s templates/text', is_file( $sandbox. '/assets/style.theme.nighty.css' ) === true );
+check( 'copies the new theme\'s own fonts too', is_file( $sandbox. '/public/fonts/text/pt-serif-regular.woff2' ) === true );
+check( 'a file the previous theme wrote is left behind, not deleted - same additive rule as Setup\'s templates/text', is_file( $sandbox. '/public/assets/style.theme.nighty.css' ) === true );
 
 // A config that predates '/nino/install/theme' (or was hand-edited since)
 // still has to resolve its current theme - from the css bundle alone

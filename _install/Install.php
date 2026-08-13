@@ -167,8 +167,8 @@ namespace Nino\Install {
 		 *	Hash the posted password and store it under the private directory
 		 *	(see \Nino\Admin\Admin::PASSWORD_PATH).
 		 *
-		 *	Used to rewrite _admin/Admin.php's PASSWORD_HASH constant in the
-		 *	source file itself. It no longer does: a tool folder carrying
+		 *	Earlier iterations wrote the hash into _admin/Admin.php itself.
+		 *	That is deliberately no longer supported: a tool folder carrying
 		 *	project state cannot be replaced on an update, and replacing it
 		 *	anyway restored the shipped placeholder - which logged the
 		 *	operator out and, because that placeholder is exactly what

@@ -71,14 +71,16 @@ The relevant part of `$request` looks simplified like this:
 
 ### Configuration Outside the Document Root
 
-Without further specification, Nino looks for `config.php` in the project directory. If the file is to be located outside the publicly accessible directory, the path is defined before loading the kernel:
+Without an override, Nino reads `config.php` from `private/`. To move the complete private tree or only this file outside the publicly accessible directory, define the path before loading the kernel:
 
 ```php
-define( 'NINO_CONFIG_DIR', '/var/www/private/nino-example' );
+define( 'NINO_CONTENT_DIR', '/var/www/private/nino-example' );
+// Or, to move config.php alone:
+// define( 'NINO_CONFIG_DIR', '/var/www/private/nino-example' );
 require_once __DIR__. '/_nino/Nino.php';
 ```
 
-The target directory must exist and be writable for necessary write operations. An explicitly set but invalid path is not silently replaced by the project directory.
+Use `NINO_CONTENT_DIR` for the complete private tree and `NINO_CONFIG_DIR` only for a separate `config.php`. Each target must exist and be writable for necessary write operations.
 
 ---
 

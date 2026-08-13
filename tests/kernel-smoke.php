@@ -74,11 +74,11 @@ $_SERVER['REMOTE_ADDR'] = '127.0.0.1';
 $appData = [ './nino/uid' => $sandbox ];
 \Nino\AppData::prepare( $appData );
 $appData['./nino/filesystem/path']			= $sandbox;
-// Mirrors \Nino\init()'s default (no NINO_CONFIG_DIR set): configpath falls
-// back to the project root, same as this sandbox's regular path
+// Mirrors \Nino\init()'s fixed private/public split.
 $appData['./nino/filesystem/configpath']	= $sandbox. '/private';
 $appData['./nino/filesystem/contentpath']	= $sandbox. '/private';
 $appData['./nino/filesystem/privatepath'] = $sandbox. '/private';
+$appData['./nino/filesystem/publicpath'] 	= $sandbox. '/public';
 $appData['/nino/dir']				= '';
 $appData['/nino/locales/native']				= 'de_DE';
 $appData['/nino/locales/available']			= [ 'de_DE', 'en_US' ];
@@ -287,7 +287,7 @@ $wideSource = makeTestImage( 400, 200 );
 $squareFilename = \Nino\Images::process( $appData, $wideSource, 100, 100, 'elements/demo/item1' );
 check( 'process() returns the deterministic filename (basePath + dimensions + extension)', $squareFilename === 'elements/demo/item1.100x100.jpg' );
 
-$squarePath = $appData['./nino/filesystem/path']. '/images/'. ( $squareFilename ?: '' );
+$squarePath = \Nino\Filesystem::path( $appData, '/images/'. ( $squareFilename ?: '' ) );
 check( 'process() writes the file to disk, creating parent dirs as needed', is_file( $squarePath ) === true );
 
 [ $outWidth, $outHeight ] = getimagesize( $squarePath );
@@ -348,7 +348,7 @@ check( 'setSlotFilename persists to config.php (same as Auth::updateUser)', ( $p
 $appData['/nino/html/images']['logo'] = [ 'label' => 'Logo', 'width' => 400, 'height' => 400, 'filename' => null ];
 
 \Nino\Modules\Images::init( $appData );
-check( '[image] shortcode renders an <img> tag for a slot with an uploaded file', str_contains( \Nino\Html::renderHtml( $appData, '[image hero]' ), '<img src="/images/hero.1600x600.jpg" width="1600" height="600"' ) === true );
+check( '[image] shortcode renders an <img> tag under the public prefix', str_contains( \Nino\Html::renderHtml( $appData, '[image hero]' ), '<img src="/public/images/hero.1600x600.jpg" width="1600" height="600"' ) === true );
 check( '[image] shortcode renders nothing for a slot with no file uploaded yet', \Nino\Html::renderHtml( $appData, '[image logo]' ) === '' );
 check( '[image] shortcode renders nothing for an unknown slot', \Nino\Html::renderHtml( $appData, '[image nope]' ) === '' );
 
@@ -542,6 +542,7 @@ $buildAppData = function() use ( $sandbox ) {
 	$fresh['./nino/filesystem/configpath'] 	= $sandbox. '/private';
 	$fresh['./nino/filesystem/contentpath'] = $sandbox. '/private';
 	$fresh['./nino/filesystem/privatepath'] = $sandbox. '/private';
+	$fresh['./nino/filesystem/publicpath'] 	= $sandbox. '/public';
 	\Nino\AppData::init( $fresh );
 	return $fresh;
 };
@@ -1365,38 +1366,39 @@ echo "\n";
 echo "Filesystem::path - which root a virtual path resolves against\n";
 
 // Naming the split is the whole point of this: a webserver-facing directory
-// and a never-served one stop being the same path. Nothing has moved yet -
-// the private root still defaults to the project root - so every one of
-// these resolves exactly where a plain concatenation used to put it
+// and a never-served one are always separate paths.
 $pathAppData = $appData;
 $pathAppData['./nino/filesystem/path'] 				= '/srv/site';
-$pathAppData['./nino/filesystem/configpath'] 	= '/srv/site';
+$pathAppData['./nino/filesystem/configpath'] 	= '/srv/site/private';
 $pathAppData['./nino/filesystem/contentpath'] = '/srv/site/private';
-$pathAppData['./nino/filesystem/privatepath'] = '/srv/site';
+$pathAppData['./nino/filesystem/privatepath'] = '/srv/site/private';
+$pathAppData['./nino/filesystem/publicpath'] 	= '/srv/site/public';
 
-foreach( [ '/images/hero.jpg', '/assets/style.css', '/.cache/script.js', '/_editor/x' ] as $public )
-	check( "$public stays on the public root", \Nino\Filesystem::path( $pathAppData, $public ) === '/srv/site'. $public );
+foreach( [ '/images/hero.jpg', '/assets/style.css', '/.cache/script.js' ] as $public )
+	check( "$public stays on the public root", \Nino\Filesystem::path( $pathAppData, $public ) === '/srv/site/public'. $public );
+
+check( 'tool code stays on the project root', \Nino\Filesystem::path( $pathAppData, '/_editor/x' ) === '/srv/site/_editor/x' );
 
 foreach( \Nino\Filesystem::PRIVATE_DIRS as $private )
-	check( "$private resolves against the private root", \Nino\Filesystem::path( $pathAppData, $private ) === '/srv/site'. $private );
+	check( "$private resolves against the private root", \Nino\Filesystem::path( $pathAppData, $private ) === '/srv/site/private'. $private );
 
-check( 'a path under a private directory follows it', \Nino\Filesystem::path( $pathAppData, '/text/de_DE.php' ) === '/srv/site/text/de_DE.php' );
+check( 'a path under a private directory follows it', \Nino\Filesystem::path( $pathAppData, '/text/de_DE.php' ) === '/srv/site/private/text/de_DE.php' );
 check( 'a directory merely starting with a private name does not', \Nino\Filesystem::path( $pathAppData, '/textures/x.png' ) === '/srv/site/textures/x.png' );
 check( 'everything under /private follows the private root', \Nino\Filesystem::path( $pathAppData, '/private/.auth/pw.php' ) === '/srv/site/private/.auth/pw.php' );
-check( 'the typo virtual prefix remains compatible', \Nino\Filesystem::path( $pathAppData, '/privat/.auth/pw.php' ) === '/srv/site/private/.auth/pw.php' );
-check( 'the preceding beta virtual prefix remains compatible', \Nino\Filesystem::path( $pathAppData, '/content/.auth/pw.php' ) === '/srv/site/private/.auth/pw.php' );
+check( 'the old /content prefix is not a private-path alias', \Nino\Filesystem::path( $pathAppData, '/content/.auth/pw.php' ) === '/srv/site/content/.auth/pw.php' );
+check( 'the typo /privat prefix is not a private-path alias', \Nino\Filesystem::path( $pathAppData, '/privat/.auth/pw.php' ) === '/srv/site/privat/.auth/pw.php' );
 
 // Moving the private root moves every private path with it, and nothing else
 $pathAppData['./nino/filesystem/privatepath'] = '/var/nino-private';
 
-check( 'config.php keeps following its own configpath, not the private root', \Nino\Filesystem::path( $pathAppData, '/config.php' ) === '/srv/site/config.php' );
+check( 'config.php keeps following its own configpath, not the private root', \Nino\Filesystem::path( $pathAppData, '/config.php' ) === '/srv/site/private/config.php' );
 check( 'a moved private root takes the templates with it', \Nino\Filesystem::path( $pathAppData, '/templates/page-home.tpl' ) === '/var/nino-private/templates/page-home.tpl' );
 check( '...and text, elements and data', [
 	\Nino\Filesystem::path( $pathAppData, '/text' ),
 	\Nino\Filesystem::path( $pathAppData, '/elements' ),
 	\Nino\Filesystem::path( $pathAppData, '/data' ),
 ] === [ '/var/nino-private/text', '/var/nino-private/elements', '/var/nino-private/data' ] );
-check( 'but leaves the public ones where the webserver reaches them', \Nino\Filesystem::path( $pathAppData, '/images/hero.jpg' ) === '/srv/site/images/hero.jpg' );
+check( 'but leaves the public ones where the webserver reaches them', \Nino\Filesystem::path( $pathAppData, '/images/hero.jpg' ) === '/srv/site/public/images/hero.jpg' );
 
 // config.php keeps its own, older override - it wins over the private root
 $pathAppData['./nino/filesystem/configpath'] = '/etc/nino';
@@ -1423,12 +1425,6 @@ check( 'a subdirectory install carries into both', [
 	\Nino\Filesystem::url( $pathAppData, '/_admin/assets/script.js' ),
 ] === [ '/subdir/public/images/hero.jpg', '/subdir/_admin/assets/script.js' ] );
 
-// A project laid out before the move has no public directory of its own -
-// then the two prefixes are the same and nothing gains a segment
-$pathAppData['./nino/filesystem/publicpath'] = '/srv/site';
-$pathAppData['/nino/dir'] = '';
-check( 'the pre-move layout adds no segment at all', \Nino\Filesystem::url( $pathAppData, '/images/hero.jpg' ) === '/images/hero.jpg' );
-
 echo "\n";
 
 
@@ -1444,7 +1440,7 @@ echo "router.php - the private root is never served\n";
 // setup that cannot rely on it), see docs/deployment.md
 $routerSource = file_get_contents( __DIR__. '/../router.php' );
 
-check( 'router.php refuses the canonical and preceding-beta private roots', str_contains( $routerSource, '#^/(?:private|privat|content)(/|$)#' ) === true );
+check( 'router.php refuses the private root', str_contains( $routerSource, '#^/private(?:/|$)#' ) === true );
 check( '...before it ever looks for a static file', strpos( $routerSource, '/private' ) < strpos( $routerSource, 'is_file( __DIR__. $uri )' ) );
 
 check( 'the shipped private directory denies itself for a webserver that does apply it', str_contains(

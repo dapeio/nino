@@ -10,15 +10,14 @@ declare(strict_types=1);
 
 // Optional: keep config.php (password hashes, routes, module list) outside
 // the webroot. Uncomment and point it at a directory the webserver does not
-// serve; it must exist and be writable. Leave commented to keep the old
-// in-webroot behaviour.
+// serve; it must exist and be writable. By default it lives in private/.
 // define( 'NINO_CONFIG_DIR', '/absolute/path/outside/webroot' );
 
-// Optional: move this project's own state (currently the _admin password
-// hash, see \Nino\Filesystem::getContentPath()) somewhere else. Defaults to
-// <project>/private, which ships with an Apache deny rule and whose files
-// carry their own 403 stub. Point it outside the webroot for a setup that
-// does not depend on either; it must exist and be writable.
+// Optional: move the complete private tree (config, templates, text,
+// elements, data and management state) somewhere else. It defaults to
+// <project>/private, which ships with an Apache deny rule. Point it outside
+// the webroot for a setup that does not depend on that rule; the target must
+// exist and be writable.
 // define( 'NINO_CONTENT_DIR', '/absolute/path/outside/webroot' );
 
 require '_nino/Nino.php';

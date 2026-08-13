@@ -59,11 +59,11 @@ $_SERVER['REMOTE_ADDR'] = '127.0.0.1';
 $appData = [ './nino/uid' => $sandbox ];
 \Nino\AppData::prepare( $appData );
 $appData['./nino/filesystem/path']			= $sandbox;
-// Mirrors \Nino\init()'s default (no NINO_CONFIG_DIR set): configpath falls
-// back to the project root, same as this sandbox's regular path
+// Mirrors \Nino\init()'s fixed private/public split.
 $appData['./nino/filesystem/configpath']	= $sandbox. '/private';
 $appData['./nino/filesystem/contentpath']	= $sandbox. '/private';
 $appData['./nino/filesystem/privatepath'] = $sandbox. '/private';
+$appData['./nino/filesystem/publicpath'] 	= $sandbox. '/public';
 $appData['/nino/dir']				= '';
 $appData['/nino/locales/native']				= 'de_DE';
 $appData['/nino/locales/available']			= [ 'de_DE', 'en_US' ];
@@ -380,7 +380,7 @@ check( 'a valid upload for an image field succeeds', $status === 200 && is_strin
 $firstFilename = $body['filename'];
 check( 'the sole image field on this type needs no key/locale disambiguation in the path', $firstFilename === 'elements/imagedemo/item1.40x40.jpg' );
 
-$uploadPath = $appData['./nino/filesystem/path']. '/images/'. $firstFilename;
+$uploadPath = \Nino\Filesystem::path( $appData, '/images/'. $firstFilename );
 check( 'the processed file actually exists on disk', is_file( $uploadPath ) === true );
 
 $stored = \Nino\Elements::getElement( $appData, '/imagedemo/item1', '*' );
@@ -408,7 +408,7 @@ check( 'the old .jpg is deleted once the new .png is committed (no orphan across
 \Nino\Elements::insertElement( $appData, '/imageveto/item1', [], 'de_DE' );
 [ , $imageVetoInitial ] = callUploadImage( $appData, [ 'type' => 'imageveto', 'uri' => 'item1', 'locale' => 'de_DE', 'key' => 'photo' ], true );
 $pngFilename = $imageVetoInitial['filename'];
-$pngPath = $appData['./nino/filesystem/path']. '/images/'. $pngFilename;
+$pngPath = \Nino\Filesystem::path( $appData, '/images/'. $pngFilename );
 $pngBeforeVeto = file_get_contents( $pngPath );
 \Nino\Callbacks::registerCallback( $appData, '/nino/elements/imageveto/update', function(): bool { return false; } );
 [ $vetoStatus ] = callUploadImage( $appData, [ 'type' => 'imageveto', 'uri' => 'item1', 'locale' => 'de_DE', 'key' => 'photo' ], true, 1 );
@@ -427,7 +427,7 @@ check( 'uploading to a key that is not an image field is rejected', $statusWrong
 // itself has no way of knowing to touch it
 \Nino\Elements::insertElement( $appData, '/imagedemo/item2', [ 'plain' => 'y' ], 'de_DE' );
 [ , $bodyForDelete ] = callUploadImage( $appData, [ 'type' => 'imagedemo', 'uri' => 'item2', 'locale' => 'de_DE', 'key' => 'photo' ] );
-$deletePath = $appData['./nino/filesystem/path']. '/images/'. $bodyForDelete['filename'];
+$deletePath = \Nino\Filesystem::path( $appData, '/images/'. $bodyForDelete['filename'] );
 check( 'the image exists before the element is deleted', is_file( $deletePath ) === true );
 
 $deleteRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
@@ -443,7 +443,7 @@ check( 'deleting the element also deletes its uploaded image (no orphan)', is_fi
 ] );
 \Nino\Elements::insertElement( $appData, '/deleteveto/item1', [], 'de_DE' );
 [ , $deleteVetoUpload ] = callUploadImage( $appData, [ 'type' => 'deleteveto', 'uri' => 'item1', 'locale' => 'de_DE', 'key' => 'photo' ] );
-$deleteVetoPath = $appData['./nino/filesystem/path']. '/images/'. $deleteVetoUpload['filename'];
+$deleteVetoPath = \Nino\Filesystem::path( $appData, '/images/'. $deleteVetoUpload['filename'] );
 \Nino\Callbacks::registerCallback( $appData, '/nino/elements/delete/deleteveto', function(): bool { return false; } );
 $deleteVetoRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 $_POST['data'] = json_encode( [ 'type' => 'deleteveto', 'uri' => 'item1' ] );
@@ -508,7 +508,7 @@ check( 'apiList reports no url for a slot with no image yet', $slots[0]['url'] =
 check( 'a valid upload for a known slot succeeds', $slotStatus === 200 && is_string( $slotBody['filename'] ?? null ) === true );
 check( 'the slot uri\'s leading slash is stripped for the deterministic path', $slotBody['filename'] === 'hero.60x40.jpg' );
 
-$slotUploadPath = $appData['./nino/filesystem/path']. '/images/'. $slotBody['filename'];
+$slotUploadPath = \Nino\Filesystem::path( $appData, '/images/'. $slotBody['filename'] );
 check( 'the processed file exists on disk', is_file( $slotUploadPath ) === true );
 check( 'the filename is committed to the slot immediately', ( \Nino\Images::getSlot( $appData, '/hero' )['filename'] ?? null ) === $slotBody['filename'] );
 
@@ -524,7 +524,7 @@ check( 'uploading to an unknown slot is rejected', $slotStatusUnknown === 404 );
 $appData['/nino/html/images']['/home/hero'] = [ 'label' => 'Hero', 'width' => 60, 'height' => 40, 'filename' => null ];
 [ $categoryStatus, $categoryBody ] = callUploadSlotImage( $appData, '/home/hero' );
 check( 'uploading to a category-style ("/<category>/<identifier>") slot uri succeeds', $categoryStatus === 200 && $categoryBody['filename'] === 'home/hero.60x40.jpg' );
-check( 'the file lands at the nested deterministic path', is_file( $appData['./nino/filesystem/path']. '/images/'. $categoryBody['filename'] ) === true );
+check( 'the file lands at the nested deterministic path', is_file( \Nino\Filesystem::path( $appData, '/images/'. $categoryBody['filename'] ) ) === true );
 
 echo "\n";
 

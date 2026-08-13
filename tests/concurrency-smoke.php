@@ -58,6 +58,7 @@ function bootAppData( string $sandbox ): array {
 	$appData['./nino/filesystem/configpath'] 	= $sandbox. '/private';
 	$appData['./nino/filesystem/contentpath'] = $sandbox. '/private';
 	$appData['./nino/filesystem/privatepath'] = $sandbox. '/private';
+	$appData['./nino/filesystem/publicpath'] 	= $sandbox. '/public';
 	\Nino\AppData::init( $appData );
 
 	return $appData;

@@ -33,7 +33,7 @@ namespace Nino\Admin {
 
 	/**
 	 *	Nino							A compact filesystembased php framework
-	 *	Dev								Bootstraps the dev area: one hardcoded-password session gate
+	 *	Dev								Bootstraps the dev area: one private-password session gate
 	 *												in front of a small registry of dev-only modules. Add a new
 	 *												tool by writing a class with actions()/nav() and listing it
 	 *												in MODULES - nothing else here needs to change.
@@ -55,30 +55,12 @@ namespace Nino\Admin {
 		// must not both read the same "tries" and each write back the same +1
 		private const string LOCKOUT_PATH = \Nino\Filesystem::CONTENT_DIR. '/.auth/lockout.json';
 
-		// Where that counter used to live, inside this tool's own folder.
-		// Read once on the next login so an upgrade does not hand an
-		// attacker mid-lockout a fresh set of attempts; never written again
-		private const string LEGACY_LOCKOUT_PATH = '/_admin/.lockout.json';
-
 		// The stub that file is wrapped in - a php file that 403s and exits
 		// before it ever returns the hash, so it stays useless even where a
 		// webserver happily serves it. Same convention (and same constants)
 		// Backup uses for its key and its archives
 		public const string STUB_PREFIX = "<?php http_response_code(403); exit; return '";
 		public const string STUB_SUFFIX = "';\n";
-
-		// Legacy fallback only, for a project installed while the hash still
-		// lived in this file. Kept read-only: setDevPassword() no longer
-		// rewrites it, and apiLogin() migrates such a project to
-		// PASSWORD_PATH on the next successful login. A hash in here made
-		// this file carry state, which is why replacing it on an update used
-		// to log the operator out *and* hand /_install back to whoever asked
-		private const string PASSWORD_HASH = '$2y$10$JeWFJ0CAi.tAEc6i5IcyTOLSgeCbrspmb4p0Re7aWvJBOajXtwgt.';
-
-		// The exact value PASSWORD_HASH ships with, kept separately so it can
-		// be compared against rather than duplicated - a checkout still
-		// carrying it has no legacy password to fall back to
-		public const string DEFAULT_PASSWORD_HASH = '$2y$10$JeWFJ0CAi.tAEc6i5IcyTOLSgeCbrspmb4p0Re7aWvJBOajXtwgt.';
 
 		private const int MAX_TRIES = 5;
 		private const int COOLDOWN = 3600;
@@ -210,22 +192,13 @@ namespace Nino\Admin {
 		 *	replacing _admin/Admin.php on an update no longer takes the
 		 *	password with it.
 		 *
-		 *	PASSWORD_HASH is the fallback for a project installed before that
-		 *	file existed - apiLogin() migrates such a project across on the
-		 *	next successful login, after which the constant is dead weight
-		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *
 		 *	@return 	string|null							Null when no password has been set at all
 		 */
 		public static function passwordHash( array &$appData ): ?string {
 
-			$stored = self::_readPasswordFile( $appData );
-
-			if( $stored !== null )
-				return $stored;
-
-			return self::PASSWORD_HASH !== self::DEFAULT_PASSWORD_HASH ? self::PASSWORD_HASH : null;
+			return self::_readPasswordFile( $appData );
 		}
 
 		/**
@@ -315,7 +288,7 @@ namespace Nino\Admin {
 		}
 
 		/**
-		 *	Check the posted password against the hardcoded hash and open
+		 *	Check the posted password against the private hash and open
 		 *	the session gate. Rate-limited the same shape as Auth's per-user
 		 *	tries/cooldown (see _nino/Nino.php Auth::_registerFailedAttemp()),
 		 *	just against one shared counter instead of a per-user record,
@@ -366,7 +339,7 @@ namespace Nino\Admin {
 				}
 
 				return $state;
-			}, self::_lockoutState( $appData ) );
+			}, [ 'tries' => 0, 'until' => 0 ] );
 
 			if( $lockedOut === true ) {
 				\Nino\Http::fail( $request, 429, 'too many attempts' );
@@ -378,38 +351,9 @@ namespace Nino\Admin {
 				return;
 			}
 
-			// A project whose hash still lives in this file's constant moves
-			// across on its first successful login, so an update may replace
-			// _admin/Admin.php from then on. Done after the verify, not
-			// inside the lock above: this writes a different file, and a
-			// failure here must not cost the operator the login they just
-			// passed - they simply migrate on the next one
-			if( self::_readPasswordFile( $appData ) === null )
-				self::writePasswordHash( $appData, (string) $hash );
-
 			// Defend against session fixation, same as Auth::loginUser()
 			session_regenerate_id( true );
 			\Nino\Runtime::setSessionValue( $appData, './nino/admin/authed', true );
-		}
-
-		/**
-		 *	The counter mutate() starts from when the current file is missing:
-		 *	whatever this tool's own folder still holds from before the
-		 *	counter moved, so an update cannot be used to clear an active
-		 *	lockout by simply replacing that folder
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *
-		 *	@return 	array										{ tries, until }
-		 */
-		private static function _lockoutState( array &$appData ): array {
-
-			$legacy = \Nino\Filesystem::getFileContent( $appData, self::LEGACY_LOCKOUT_PATH, [] );
-
-			return [
-				'tries' => (int) ( $legacy['tries'] ?? 0 ),
-				'until' => (int) ( $legacy['until'] ?? 0 ),
-			];
 		}
 
 		/**
@@ -938,23 +882,7 @@ namespace Nino\Admin {
 
 	/**
 	 *	Nino							A compact filesystembased php framework
-	 *	Dev								Restore: lists and restores the encrypted daily backups
-	 *											_editor/Editor.php's Backup class creates. Deliberately
-	 *											independent of _editor/Editor.php's own code (duplicates the
-	 *											small bit of archiving logic it needs, same reasoning as
-	 *											postData() above - this whole folder stays standalone) and
-	 *											of config.php's own data:
-	 *											- the archives are *found* on disk (private/.backups, plus
-	 *											  whatever pre-move directory a project still has), never
-	 *											  addressed through a config value
-	 *											- the decryption key has its own independent copy outside
-	 *											  config.php (private/.auth/backup-key.php), rewritten by
-	 *											  Backup::_bootstrap() whenever it goes missing
-	 *											So this still works even if config.php's *data* (not
-	 *											syntax) is what's broken - eg. a wrecked admin user
-	 *											record. A genuine config.php syntax error is out of scope:
-	 *											_admin boots through the same kernel bootstrap as _editor
-	 *											and can't survive that either - that's a manual recovery.
+	 *	Dev								Edit Element instances and their locale-specific values.
 	 *
 	 *	@package					Dape/Nino
 	 *	@author						David Perchermeier <mail@dape.io>
@@ -1491,8 +1419,7 @@ namespace Nino\Admin {
 	 *	Dev								Disaster recovery: restore a _editor daily backup.
 	 *
 	 *											Deliberately independent of config.php's own backup keys:
-	 *											- the archives are *found* on disk (private/.backups, plus
-	 *											  whatever pre-move directory a project still has), never
+	 *											- the archives are found under private/.backups, never
 	 *											  addressed through a config value
 	 *											- the decryption key has its own independent copy outside
 	 *											  config.php (private/.auth/backup-key.php), rewritten by
@@ -1534,11 +1461,11 @@ namespace Nino\Admin {
 		}
 
 		/**
-		 *	Find Backup's one random backup directory under _editor/
+		 *	Find the private backup directory.
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *
-		 *	@return 	string|false
+		 *	@return 	array
 		 */
 		private static function _backupDirs( array &$appData ): array {
 
@@ -1548,19 +1475,8 @@ namespace Nino\Admin {
 			// would make Restore fail in exactly the situation it is for
 			// (see this class's docblock, and the standalone-per-area
 			// reasoning every other cross-area helper in this file follows)
-			$dirs = [ \Nino\Filesystem::getContentPath( $appData ). '/.backups' ];
-
-			// A project that has not written a backup since the archives
-			// moved still has them under their pre-move random name
-			if( is_string( $appData['/nino/backup/dir'] ?? null ) === true )
-				$dirs[] = \Nino\Filesystem::getPath( $appData ). '/_editor/'. $appData['/nino/backup/dir'];
-
-			// ...and one whose config.php lost that value still has the
-			// directory itself - the glob is what finds it back
-			foreach( glob( \Nino\Filesystem::getPath( $appData ). '/_editor/.backups-*', GLOB_ONLYDIR ) ?: [] as $dir )
-				$dirs[] = $dir;
-
-			return array_values( array_unique( array_filter( $dirs, 'is_dir' ) ) );
+			$dir = \Nino\Filesystem::getContentPath( $appData ). '/.backups';
+			return is_dir( $dir ) === true ? [ $dir ] : [];
 		}
 
 		/**
@@ -1584,7 +1500,7 @@ namespace Nino\Admin {
 		}
 
 		/**
-		 *	Read the encryption key's own independent copy under _admin/
+		 *	Read the encryption key's independent copy under private/.auth/
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *
@@ -1592,25 +1508,12 @@ namespace Nino\Admin {
 		 */
 		private static function _key( array &$appData ): string|false {
 
-			// Current location first, then the pre-move one - again as this
-			// class's own copies, never through \Nino\Editor\Backup (see
-			// _backupDirs())
-			$paths = [
-				\Nino\Filesystem::getContentPath( $appData ). '/.auth/backup-key.php',
-				\Nino\Filesystem::getPath( $appData ). '/_admin/.restore-key.php',
-			];
+			$path = \Nino\Filesystem::getContentPath( $appData ). '/.auth/backup-key.php';
+			if( is_file( $path ) === false )
+				return false;
 
-			foreach( $paths as $path ) {
-
-				if( is_file( $path ) === false )
-					continue;
-
-				$raw = file_get_contents( $path );
-
-				return base64_decode( substr( $raw, strlen( self::STUB_PREFIX ), -strlen( self::STUB_SUFFIX ) ) );
-			}
-
-			return false;
+			$raw = file_get_contents( $path );
+			return base64_decode( substr( $raw, strlen( self::STUB_PREFIX ), -strlen( self::STUB_SUFFIX ) ) );
 		}
 
 		/**
@@ -2517,10 +2420,11 @@ namespace Nino\Admin {
 
 				foreach( $matches as $match ) {
 
-					// A local image is always referenced as [[/nino/public]]/images/...
-					// in raw template source (the /nino/dir fill hasn't resolved
-					// yet at this point - this scans the .tpl source directly)
-					$src = preg_replace( '#^\[\[/nino/dir\]\]#', '', $match[1] );
+					// A local image is referenced as [[/nino/public]]/images/...
+					// in current template source. Also accept [[/nino/dir]] here:
+					// scanning developer-authored templates should diagnose that
+					// form rather than silently ignoring the image altogether.
+					$src = preg_replace( '#^\[\[/nino/(?:public|dir)\]\]#', '', $match[1] );
 
 					if( str_starts_with( $src, '/images/' ) === false )
 						continue;
@@ -2924,7 +2828,7 @@ namespace Nino\Admin {
 		 */
 		private const array KERNEL_FILLS = [
 			'/nino/http/request/uri', '/nino/http/response/uri', '/nino/http/response/locale',
-			'/nino/auth/user', '/nino/dir', '/date/year',
+			'/nino/auth/user', '/nino/dir', '/nino/public', '/date/year',
 		];
 
 		/**

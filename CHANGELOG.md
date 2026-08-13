@@ -65,9 +65,9 @@ All notable changes to Nino are documented in this file.
   code that runs the site. Urls gain a `/public` segment, built from the new
   `[[/nino/public]]` fill (or `\Nino\Filesystem::url()`) rather than from
   `[[/nino/dir]]` by hand — a tool's own bundle, like `/_editor/.cache/`,
-  still resolves next to the tool. The document root does not change, so no
-  deployment has to be reconfigured. A project installed before this keeps
-  its files where they are.
+  still resolves next to the tool. Image shortcodes and Admin's template
+  scanners use the same public prefix. The document root does not change, so
+  no deployment has to be reconfigured.
 - Moved the project's private half into `private/`: `config.php`, `templates/`,
   `text/`, `elements/` and `data/` now sit beside the state the management
   tools already kept there, leaving the public root holding only what a
@@ -75,40 +75,33 @@ All notable changes to Nino are documented in this file.
   returned the template source as plain text — the shipped `.htaccess` only
   blocked dotfiles, and `.tpl` is not a PHP extension. `private/` denies
   itself, `router.php` refuses it outright, and `NINO_CONTENT_DIR` moves it
-  out of the webroot entirely for a setup that cannot rely on either.
-  The preceding beta's `content/` name and the short-lived `privat/` typo
-  remain detectable for a deliberate offline rename; new projects and
-  virtual paths use `private/`.
-  A project installed before this keeps its files where they are: the layout
-  is probed once per request, and nothing is ever moved for you.
+  out of the webroot entirely for a setup that cannot rely on either. Nino
+  uses this layout exclusively and does not detect alternative project
+  directory structures during a request.
 - Separated the project's public root from its private one in the kernel.
-  `\Nino\Filesystem::getPath()` is now documented as the webserver-facing
-  root (images, assets, the generated cache); everything a webserver must
-  never serve — `config.php`, `templates/`, `text/`, `elements/`, `data/`,
-  listed in `Filesystem::PRIVATE_DIRS` — resolves through the new
-  `Filesystem::path()` against a private root of its own. Nothing has moved:
-  that root defaults to the project root, so the on-disk layout is unchanged.
-  What changes is that no call site concatenates a private path onto the
-  public root any more, which is what a later move needs.
+  `\Nino\Filesystem::getPath()` remains the project/code root, while
+  `getPublicPath()` identifies the browser-facing root (images, assets and
+  the generated cache). Everything a webserver must never serve —
+  `config.php`, `templates/`, `text/`, `elements/`, `data/`, listed in
+  `Filesystem::PRIVATE_DIRS` — resolves through `Filesystem::path()` against
+  the private root. No call site concatenates a private path onto the public
+  root.
 - Moved the `/_admin` password hash out of `_admin/Admin.php` into
   `private/.auth/pw.php`. `/_install` no longer rewrites PHP source, so the
   tool folders are pure code again and an update may replace them wholesale.
   Previously, copying a new `_admin/Admin.php` over the old one restored the
   shipped placeholder hash — which logged the operator out **and** re-opened
   `/_install` on a live site, because that placeholder was exactly what the
-  installer's lock was reading. A project whose hash still lives in the
-  constant keeps working and migrates itself on the next successful login.
+  installer's lock was reading. The source-file hash and its migration path
+  are gone; only the private credential file is read.
 - Moved the `/_admin` login throttle to `private/.auth/lockout.json` and the
   `/_editor` activity log to `private/.logs/`. Both used to live inside the
-  tool folders, which is what made those folders un-replaceable. An active
-  lockout left in the old location still applies, so an update cannot be used
-  to clear one, and a legacy `.logs-<random>` directory is still read and
-  pruned until it ages out of the retention window.
+  tool folders, which is what made those folders un-replaceable. Nino now
+  reads and writes these exclusively under `private/`.
 - Moved the encrypted backup archives to `private/.backups/` and the archive
   key's out-of-config copy to `private/.auth/backup-key.php`. With that,
-  `_admin/` and `_editor/` hold no project state at all. Archives and keys
-  left in their pre-move locations are still listed, restored and pruned, so
-  nothing already on disk becomes unreadable.
+  `_admin/` and `_editor/` hold no project state at all. Archives and keys are
+  read exclusively from their private locations.
 - Removed the generated `/nino/backup/dir` and `/nino/logs/dir` keys. Neither
   the archives nor the activity log need an unguessable directory name any
   more: under the private directory both are denied by that directory's own

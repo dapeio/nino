@@ -83,19 +83,21 @@ A general example configuration cannot reliably guess the paths and PHP-FPM sett
 
 Before initial setup, PHP must be able to create directories and files in the project root. The still missing project paths are created by `/_install` or, if needed, by the kernel and are not a manually required prerequisite.
 
-During operation, Nino only needs write permissions for actually changeable content. Depending on usage, this includes `config.php`, `text/`, `elements/`, `images/`, `data/`, and `.cache/` as well as the log and backup directories created by `/_editor`. The Template Builder under `/_templates` requires write permissions for edited files under `templates/`; it can additionally create native text keys, Element Types, and image-slot definitions in the configuration. `/_admin` writes, depending on the function, configuration, texts, elements, and images, among others.
+During operation, Nino only needs write permissions for actually changeable content. Depending on usage, this includes `private/config.php`, `private/text/`, `private/elements/`, `private/data/`, `private/.logs/`, `private/.backups/`, `public/images/`, and `public/.cache/`. The Template Builder under `/_templates` additionally needs `private/templates/`; it can create native text keys, Element Types, and image-slot definitions in the configuration. `/_admin` writes, depending on the function, configuration, texts, elements, and images, among others.
 
 Grant these permissions to the user under which PHP is executed. World-writable permissions such as `0777` are not a suitable permanent solution. After deployment, the kernel and other PHP source code should not be generally writable.
 
 ## Configuration Outside the Webroot
 
-`index.php` supports the PHP constant `NINO_CONFIG_DIR`. It points to an existing, writable directory from which `config.php` is loaded. This allows the central configuration to be located outside the publicly accessible project directory.
+By default, the complete private tree including `config.php` lives in `private/`. `NINO_CONTENT_DIR` moves that complete tree to an existing, writable directory outside the webroot. `NINO_CONFIG_DIR` can additionally point only `config.php` at a different existing, writable directory.
 
 ```php
-define('NINO_CONFIG_DIR', '/path/outside/the/webroot');
+define('NINO_CONTENT_DIR', '/path/outside/the/webroot/nino-private');
+// Or, to move config.php alone:
+// define('NINO_CONFIG_DIR', '/path/outside/the/webroot');
 ```
 
-Enter the definition in `index.php` before loading `_nino/Nino.php`. Use this option if the server provides a suitable private path. Web server protection remains necessary because other project files must also not be delivered directly.
+Enter either definition in `index.php` before loading `_nino/Nino.php`. Moving the complete tree with `NINO_CONTENT_DIR` removes the need to protect `private/` through the webserver. Moving only `config.php` does not: the remaining private files must still not be delivered directly.
 
 ## Settings for Production
 
@@ -196,9 +198,7 @@ Treat a Nino update like a change to the specific website project, not like blin
 4. Run smoke tests and project-specific acceptance.
 5. Transfer the tested state and keep the previous version for rollback.
 
-A project laid out before `private/` and `public/` existed keeps its files at the project root and is detected as such on every request — an update never moves anything for you. To switch it over, move `config.php`, `templates/`, `text/`, `elements/` and `data/` into `private/`, and `images/`, `assets/`, `favicon/`, `fonts/` and `.cache/` into `public/`. Templates generated before the move still address images as `[[/nino/dir]]/images/...`; those need to become `[[/nino/public]]/images/...` in the same step, or they will 404 afterwards.
-
-Earlier beta revisions named this directory `content/`, and one short-lived revision misspelled the new name as `privat/`. Nino still detects both names so an update does not strand existing project data, but `private/` is canonical. Rename the complete directory while the site is offline; do not keep more than one of these directories.
+Nino uses exactly one project layout: private files belong in `private/`, and browser-facing files belong in `public/`. It does not detect or migrate alternative directory layouts during a request. `NINO_CONTENT_DIR` remains available when the complete private tree should deliberately live outside the webroot.
 
 Nino is in the beta phase. Security fixes appear on `main`; there is currently no separate LTS line. Therefore, plan updates as active project maintenance and check `SECURITY.md` and the changelog before an update.
 

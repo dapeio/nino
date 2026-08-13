@@ -69,14 +69,16 @@ Der relevante Teil von `$request` sieht vereinfacht so aus:
 
 ### Konfiguration außerhalb des Document-Roots
 
-Ohne weitere Angabe sucht Nino `config.php` im Projektverzeichnis. Soll die Datei außerhalb des öffentlich erreichbaren Verzeichnisses liegen, wird der Pfad vor dem Laden des Kernels definiert:
+Ohne Override liest Nino `config.php` aus `private/`. Um den vollständigen privaten Verzeichnisbaum oder nur diese Datei außerhalb des öffentlich erreichbaren Verzeichnisses abzulegen, wird der Pfad vor dem Laden des Kernels definiert:
 
 ```php
-define( 'NINO_CONFIG_DIR', '/var/www/private/nino-example' );
+define( 'NINO_CONTENT_DIR', '/var/www/private/nino-example' );
+// Oder, um nur config.php zu verschieben:
+// define( 'NINO_CONFIG_DIR', '/var/www/private/nino-example' );
 require_once __DIR__. '/_nino/Nino.php';
 ```
 
-Das Zielverzeichnis muss existieren und für notwendige Schreibvorgänge beschreibbar sein. Ein ausdrücklich gesetzter, aber ungültiger Pfad wird nicht stillschweigend durch das Projektverzeichnis ersetzt.
+Verwende `NINO_CONTENT_DIR` für den vollständigen privaten Baum und `NINO_CONFIG_DIR` nur für eine getrennte `config.php`. Jedes Ziel muss für notwendige Schreibvorgänge existieren und beschreibbar sein.
 
 ## Der Request-/Response-Lebenszyklus im Detail
 

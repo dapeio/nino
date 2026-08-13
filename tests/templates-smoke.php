@@ -56,6 +56,7 @@ $appData['./nino/filesystem/path'] = $sandbox;
 $appData['./nino/filesystem/configpath'] = $sandbox. '/private';
 $appData['./nino/filesystem/contentpath'] = $sandbox. '/private';
 $appData['./nino/filesystem/privatepath'] = $sandbox. '/private';
+$appData['./nino/filesystem/publicpath'] = $sandbox. '/public';
 $appData['/nino/dir'] = '';
 $appData['/nino/locales/native'] = 'en_US';
 $appData['/nino/locales/available'] = [ 'en_US', 'de_DE' ];

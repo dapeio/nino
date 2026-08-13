@@ -1352,13 +1352,9 @@ namespace Nino\Editor {
 		private const int RETENTION_DAYS = 14;
 		private const string LOCK_PATH = '/_editor/backup-daily';
 
-		// Under the private directory, not in this tool's own folder - the
-		// archives are project data, and a tool folder holding them cannot be
-		// replaced on an update. A fixed name rather than the
-		// '.backups-<random>' this used to generate: that randomness was the
-		// directory's only real protection while it sat in the webroot, and
-		// here it is denied by the private directory's own rule on top of the
-		// 403 stub every archive already carries (see dirs())
+		// Under the private directory, not in this tool's own folder: archives
+		// are project data, and a tool folder holding them cannot be replaced
+		// independently on an update.
 		private const string BACKUPS_DIR = \Nino\Filesystem::CONTENT_DIR. '/.backups';
 
 		// The archive key's own copy, kept outside config.php on purpose: a
@@ -1372,14 +1368,7 @@ namespace Nino\Editor {
 		private const string STUB_SUFFIX = "';\n";
 
 		/**
-		 *	Every directory that holds backup archives, current one first.
-		 *
-		 *	There used to be exactly one, named '.backups-&lt;random&gt;' under
-		 *	_editor/ and generated on first use. A project that already has
-		 *	one keeps it listed here so its existing archives stay
-		 *	restorable - it is read and pruned, never written to again, so it
-		 *	empties itself within the retention window. '/nino/backup/dir' is
-		 *	therefore no longer generated, only still honoured
+		 *	The directory that holds backup archives.
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *
@@ -1387,31 +1376,18 @@ namespace Nino\Editor {
 		 */
 		public static function dirs( array &$appData ): array {
 
-			$dirs = [ \Nino\Filesystem::getContentPath( $appData ). substr( self::BACKUPS_DIR, strlen( \Nino\Filesystem::CONTENT_DIR ) ) ];
-
-			if( is_string( $appData['/nino/backup/dir'] ?? null ) === true )
-				$dirs[] = \Nino\Filesystem::getPath( $appData ). '/_editor/'. $appData['/nino/backup/dir'];
-
-			return $dirs;
+			return [ \Nino\Filesystem::getContentPath( $appData ). substr( self::BACKUPS_DIR, strlen( \Nino\Filesystem::CONTENT_DIR ) ) ];
 		}
 
 		/**
-		 *	Where the archive key's own copy lives, with the pre-move location
-		 *	as a fallback: a project that has not written a backup since the
-		 *	move still has its only out-of-config copy under _admin/, and
-		 *	losing that would mean losing every existing archive
+		 *	Where the archive key's own copy lives.
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		bool			$existing			True: return whichever copy actually exists
-		 *
 		 *	@return 	string									Absolute path
 		 */
-		public static function keyPath( array &$appData, bool $existing = false ): string {
+		public static function keyPath( array &$appData ): string {
 
-			$path 	= \Nino\Filesystem::getContentPath( $appData ). substr( self::KEY_PATH, strlen( \Nino\Filesystem::CONTENT_DIR ) );
-			$legacy = \Nino\Filesystem::getPath( $appData ). '/_admin/.restore-key.php';
-
-			return ( $existing === true && is_file( $path ) === false && is_file( $legacy ) === true ) ? $legacy : $path;
+			return \Nino\Filesystem::getContentPath( $appData ). substr( self::KEY_PATH, strlen( \Nino\Filesystem::CONTENT_DIR ) );
 		}
 
 		/**
@@ -1479,8 +1455,6 @@ namespace Nino\Editor {
 					return;
 
 				self::_create( $appData, $dir, $path );
-				// Both locations - a legacy directory nobody writes to any
-				// more still has to age out rather than sit there forever
 				foreach( self::dirs( $appData ) as $backupDir )
 					self::_prune( $backupDir );
 
@@ -1546,11 +1520,6 @@ namespace Nino\Editor {
 				}
 
 				$appData['/nino/backup/key'] = $content['/nino/backup/key'];
-
-				// Carried through untouched where a project still has one -
-				// its existing archives are still addressed by it
-				if( is_string( $content['/nino/backup/dir'] ?? null ) === true )
-					$appData['/nino/backup/dir'] = $content['/nino/backup/dir'];
 
 				return $changed === true ? $content : null;
 			}, false );
@@ -1714,9 +1683,7 @@ namespace Nino\Editor {
 		public const string VIEW_PERM = '/_editor/logs/view';
 
 		// Under the private directory, not in this tool's own folder: a tool
-		// folder holding runtime state cannot be replaced on an update. A
-		// fixed name rather than the '.logs-<random>' this used to generate -
-		// see _logDirs() for why the randomness is no longer load-bearing
+		// folder holding runtime state cannot be replaced independently.
 		private const string LOGS_DIR = \Nino\Filesystem::CONTENT_DIR. '/.logs';
 
 		private const int RETENTION_DAYS = 14;
@@ -1765,8 +1732,6 @@ namespace Nino\Editor {
 
 				\Nino\Filesystem::unlockFile( $appData, $relPath );
 
-				// Both locations - a legacy directory nobody writes to any
-				// more still has to age out rather than sit there forever
 				foreach( self::_logDirs( $appData ) as $logDir )
 					self::_prune( $logDir );
 
@@ -1817,10 +1782,6 @@ namespace Nino\Editor {
 
 			$lines = [];
 
-			// Both locations: the current one, and the random directory under
-			// _editor/ a project written before the logs moved still has. The
-			// legacy one is read and pruned but never written to again, so it
-			// empties itself within the retention window
 			foreach( self::_logDirs( $appData ) as $dir ) {
 
 				$files = glob( $dir. '/*.php' ) ?: [];
@@ -1836,15 +1797,7 @@ namespace Nino\Editor {
 		}
 
 		/**
-		 *	Every directory that holds activity logs, newest scheme first.
-		 *
-		 *	There used to be exactly one, named '.logs-&lt;random&gt;' under
-		 *	_editor/ and generated on first use - the random name was that
-		 *	directory's only real protection, since it sat in the webroot
-		 *	inside a tool folder. Under the private directory it does not need
-		 *	one: that directory is denied by its own .htaccess and every file
-		 *	in it carries a 403 stub anyway. '/nino/logs/dir' is therefore no
-		 *	longer generated, only still honoured where a project has one
+		 *	The directory that holds activity logs.
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *
@@ -1852,12 +1805,7 @@ namespace Nino\Editor {
 		 */
 		private static function _logDirs( array &$appData ): array {
 
-			$dirs = [ \Nino\Filesystem::getContentPath( $appData ). substr( self::LOGS_DIR, strlen( \Nino\Filesystem::CONTENT_DIR ) ) ];
-
-			if( isset( $appData['/nino/logs/dir'] ) === true )
-				$dirs[] = \Nino\Filesystem::getPath( $appData ). '/_editor/'. $appData['/nino/logs/dir'];
-
-			return $dirs;
+			return [ \Nino\Filesystem::getContentPath( $appData ). substr( self::LOGS_DIR, strlen( \Nino\Filesystem::CONTENT_DIR ) ) ];
 		}
 
 		/**
