@@ -184,10 +184,10 @@
 		/**
 		 *	Render one field's row: key, type, and whichever options apply to
 		 *	that type (locale/html/required always; maxlength for string;
-		 *	width+height for image; suffix for everything but boolean/image;
-		 *	options for a fixed value list)
+		 *	width+height for image; the referenced type for element; suffix for
+		 *	everything but boolean/image/element; options for a fixed value list)
 		 *
-		 *	@param		{Object}	field					{ key, type, locale, html, required, maxlength, width, height, suffix, options }
+		 *	@param		{Object}	field					{ key, type, locale, html, required, maxlength, width, height, elementType, suffix, options }
 		 *	@param		{number}	index					Index into _fields, for the remove button
 		 *
 		 *	@return		{Element}
@@ -287,6 +287,59 @@
 					optionsInput.placeholder = 'Fixed values, comma-separated (optional)';
 					optionsInput.value = ( field.options ?? [] ).join(', ');
 					optionsWrap.appendChild( optionsInput );
+				}
+
+				// Which type this reference may point at. Part of the field, not
+				// of the value: it is what both element forms build their select
+				// of elements from, so a reference without one has nothing to
+				// offer (Admin.php's _unknownReferencedType() rejects the save).
+				// A brand-new type is not in this list yet - it has no file on
+				// disk to reference - so a self-reference is added by reopening
+				// the type once it exists
+				if( type === 'element' ) {
+					const refLabel = dc.createElement('label');
+					refLabel.className = 'editor-field';
+					const refSpan = dc.createElement('span');
+					refSpan.textContent = 'References element type';
+					refLabel.appendChild( refSpan );
+
+					const refSelect = dc.createElement('select');
+					refSelect.className = 'admin-field-element-type';
+
+					const others = Nino.admin.elementTypes._types.filter( function( t ) {
+						return t.uri !== Nino.admin.elementTypes._currentUri;
+					} );
+
+					if( others.length === 0 ) {
+						const empty = dc.createElement('option');
+						empty.value = '';
+						empty.textContent = 'No other element type exists yet';
+						refSelect.appendChild( empty );
+						refSelect.disabled = true;
+					}
+
+					others.forEach( function( t ) {
+						const opt = dc.createElement('option');
+						opt.value = t.uri;
+						opt.textContent = t.title+ ' ('+ t.uri+ ')';
+						opt.selected = ( t.uri === field.elementType );
+						refSelect.appendChild( opt );
+					} );
+
+					// A reference whose target was deleted since keeps showing what
+					// it points at, rather than silently re-pointing at whichever
+					// type happens to sort first
+					if( field.elementType && others.some( function( t ) { return t.uri === field.elementType } ) === false ) {
+						const dangling = dc.createElement('option');
+						dangling.value = field.elementType;
+						dangling.textContent = field.elementType+ ' (missing)';
+						dangling.selected = true;
+						refSelect.appendChild( dangling );
+						refSelect.disabled = false;
+					}
+
+					refLabel.appendChild( refSelect );
+					optionsWrap.appendChild( refLabel );
 				}
 
 				if( type === 'image' ) {
@@ -429,6 +482,8 @@
 					width 		: row.querySelector('.admin-field-width')?.value,
 					height 		: row.querySelector('.admin-field-height')?.value,
 					suffix 		: ( row.querySelector('.admin-field-suffix')?.value ) ?? '',
+					// Absent on every row but an element reference
+					elementType : ( row.querySelector('.admin-field-element-type')?.value ) ?? '',
 					options 	: options ? options.value.split(',').map( function(s) { return s.trim() } ).filter( function(s) { return s !== '' } ) : [],
 				} );
 			} );
@@ -534,14 +589,22 @@
 			Nino.admin.elementTypes._fields.forEach( function( field ) {
 				if( field.key === '' )
 					return;
+				// Every key _storeFields() reads back off a row belongs here.
+				// maxlength and suffix were offered by the field editor and
+				// collected by _storeFields(), but never made it into the
+				// payload - the server has always accepted both (see Admin.php's
+				// cleanModel()), so setting either simply did nothing
 				model[field.key] = {
-					type 			: field.type,
-					locale 		: field.locale,
-					required 	: field.required,
-					html 			: field.html,
-					width 		: field.width,
-					height 		: field.height,
-					options 	: field.options,
+					type 				: field.type,
+					locale 			: field.locale,
+					required 		: field.required,
+					html 				: field.html,
+					maxlength 	: field.maxlength,
+					width 			: field.width,
+					height 			: field.height,
+					suffix 			: field.suffix,
+					elementType : field.elementType,
+					options 		: field.options,
 				};
 			} );
 			return model;

@@ -6,6 +6,17 @@ All notable changes to Nino are documented in this file.
 
 ### Added
 
+- Added an `element` model field type: a reference from one element to another.
+  Defining the field asks which element type it may point at; editing an
+  element then offers that type's entries as a select. The stored value is the
+  referenced element's full uri (`/<type>/<slug>`) — what
+  `\Nino\Elements::getElement()` already takes, so nothing has to re-join it
+  with the model. The kernel rejects a value pointing outside the declared
+  type, and `/_admin` refuses to save a reference to a type that does not
+  exist rather than leaving an unusable, permanently empty select behind. A
+  referenced element deleted later keeps its reference, shown as *missing* in
+  both element forms. References stay out of Translations exports: a uri is a
+  choice, not translatable text.
 - Added a `private/` directory for this project's own state, reached through
   `\Nino\Filesystem::getContentPath()` and movable with `NINO_CONTENT_DIR`
   (the generalisation of `NINO_CONFIG_DIR`). It ships an Apache deny rule,
@@ -144,6 +155,10 @@ All notable changes to Nino are documented in this file.
 
 ### Fixed
 
+- Fixed `/_admin`'s Element Types editor dropping a field's **max. characters**
+  and **unit/suffix** on save. Both controls were offered, filled in and read
+  back off the row, and the server has always accepted them — they simply never
+  made it into the posted model, so setting either did nothing at all.
 - Fixed backups omitting nested Element image paths by including the complete
   public image tree instead of top-level files only.
 - Fixed failed or unserializable file writes becoming visible through the

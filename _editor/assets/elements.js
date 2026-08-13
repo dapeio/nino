@@ -32,6 +32,11 @@
 		_selectedLocale	: null,
 		_dirtyLocales		: [],
 		_htmlEditors		: {},
+		// Referenced type uri -> [ { uri, label } ], the choices an element
+		// field's select offers. Refilled on every form open rather than
+		// cached across them: adding an element to the referenced type has to
+		// show up in the very next form that points at it
+		_referenceOptions	: {},
 		_pendingUri			: undefined,
 		_loading				: false,
 		_saving					: false,
@@ -349,8 +354,12 @@
 				Nino.editor.elements._localeValues	= {};
 				Nino.editor.elements._dirtyLocales	= [];
 				Nino.editor.elements._selectedLocale = Nino.editor.sessionLocale.current ?? Nino.editor.elements._locales[0] ?? '';
-				Nino.editor.elements._renderForm();
-				Nino.editor.elements._showFormView();
+				Nino.editor.elements._loadReferenceOptions( function() {
+					if( requestId !== Nino.editor.elements._formRequest || type !== Nino.editor.elements._currentType )
+						return;
+					Nino.editor.elements._renderForm();
+					Nino.editor.elements._showFormView();
+				} );
 				return;
 			}
 
@@ -375,8 +384,59 @@
 				Nino.editor.elements._localeValues	= response.locales;
 				Nino.editor.elements._dirtyLocales	= [];
 				Nino.editor.elements._selectedLocale = ( preferred !== null && response.locales[preferred] !== undefined ) ? preferred : ( Object.keys( response.locales )[0] ?? Nino.editor.elements._locales[0] ?? '' );
-				Nino.editor.elements._renderForm();
-				Nino.editor.elements._showFormView();
+				Nino.editor.elements._loadReferenceOptions( function() {
+					if( requestId !== Nino.editor.elements._formRequest || type !== Nino.editor.elements._currentType )
+						return;
+					Nino.editor.elements._renderForm();
+					Nino.editor.elements._showFormView();
+				} );
+			} );
+		},
+
+		/**
+		 *	Fill _referenceOptions with the elements every 'element' field in
+		 *	the current model may point at, then continue. Reuses the ordinary
+		 *	list action - the referenced type's elements are exactly what it
+		 *	returns, labels included - rather than adding an endpoint that
+		 *	would answer the same question a second way. Element management is
+		 *	one permission, so a type reachable as a reference is one this
+		 *	account may list anyway.
+		 *
+		 *	Runs before the form renders so every select is complete on first
+		 *	paint: a locale switch re-renders the fields, and options arriving
+		 *	afterwards would have to be threaded through that too.
+		 *
+		 *	@param		{Function}	done				Called once every referenced type has answered
+		 *
+		 *	@return		void
+		 */
+		_loadReferenceOptions : function( done ) {
+
+			Nino.editor.elements._referenceOptions = {};
+
+			const model = Nino.editor.elements._currentModel ?? {};
+			const types = [];
+
+			Object.keys( model ).forEach( function( key ) {
+				const referenced = model[key].elementType;
+				if( model[key].type === 'element' && referenced && types.indexOf( referenced ) === -1 )
+					types.push( referenced );
+			} );
+
+			if( types.length === 0 )
+				return done();
+
+			// A type that errors (deleted since the model was written) resolves
+			// to an empty list rather than holding the form back - _renderField()
+			// then shows the dangling value and says so
+			let pending = types.length;
+
+			types.forEach( function( referenced ) {
+				Nino.editor.elements._apiCall( 'list', { type : referenced }, function( status, response ) {
+					Nino.editor.elements._referenceOptions[referenced] = ( status === 200 && response !== null ) ? ( response.elements ?? [] ) : [];
+					if( --pending === 0 )
+						done();
+				} );
 			} );
 		},
 
@@ -468,6 +528,66 @@
 				} );
 
 				label.appendChild( Nino.editor.elements._wrapWithSuffix( select, field ) );
+				return label;
+			}
+
+			// A reference to another element: the choices are that type's own
+			// elements, loaded before the form rendered (see
+			// _loadReferenceOptions()), and the stored value is the referenced
+			// element's full uri - exactly what \Nino\Elements::getElement()
+			// takes, so a template never has to re-join it with the model
+			if( field.type === 'element' ) {
+				const span = dc.createElement('span');
+				span.textContent = displayName;
+				label.appendChild( span );
+
+				const select = dc.createElement('select');
+				select.dataset.field = key;
+				select.dataset.type = field.type;
+
+				const options = Nino.editor.elements._referenceOptions[field.elementType] ?? [];
+				const current = ( value === null || value === undefined ) ? '' : String( value );
+
+				// Always offered, even on a required field: the browser's own
+				// "select an option" is not what holds the save back - the same
+				// _missingRequiredFields() check every other type goes through
+				// is, and it needs an empty state to be able to catch
+				const empty = dc.createElement('option');
+				empty.value = '';
+				empty.textContent = ( field.required === true )
+					? Nino.content.getText('/_editor/elements/label/reference-choose')
+					: Nino.content.getText('/_editor/elements/label/reference-none');
+				empty.selected = ( current === '' );
+				select.appendChild( empty );
+
+				options.forEach( function( element ) {
+					const option = dc.createElement('option');
+					option.value = '/'+ field.elementType+ '/'+ element.uri;
+					option.textContent = element.label;
+					option.selected = ( option.value === current );
+					select.appendChild( option );
+				} );
+
+				// A reference whose target was deleted since keeps its value
+				// instead of silently resetting to none - a save the editor did
+				// not intend would otherwise drop the reference for good
+				if( current !== '' && options.some( function( e ) { return '/'+ field.elementType+ '/'+ e.uri === current } ) === false ) {
+					const dangling = dc.createElement('option');
+					dangling.value = current;
+					dangling.textContent = current+ ' ('+ Nino.content.getText('/_editor/elements/label/reference-missing')+ ')';
+					dangling.selected = true;
+					select.appendChild( dangling );
+				}
+
+				label.appendChild( select );
+
+				if( options.length === 0 ) {
+					const hint = dc.createElement('p');
+					hint.className = 'editor-field-hint';
+					hint.textContent = Nino.content.getText('/_editor/elements/label/reference-empty');
+					label.appendChild( hint );
+				}
+
 				return label;
 			}
 

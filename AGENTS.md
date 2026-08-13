@@ -2262,7 +2262,7 @@ several fields. Use native textfills for one section-specific record.
 The current Admin model editor supports these types:
 
 ```text
-string, integer, double, boolean, array, date, datetime, image
+string, integer, double, boolean, array, date, datetime, image, element
 ```
 
 Common model properties:
@@ -2274,12 +2274,23 @@ Common model properties:
 | `required` | non-image | Reject missing value on insert |
 | `html` | string | Allow sanitized rich inline HTML |
 | `maxlength` | string | Editing limit/hint |
-| `suffix` | non-boolean, non-image | Fixed UI unit such as `€` or `%` |
-| `options` | supported controls | Fixed choices presented by the editing UI |
+| `suffix` | non-boolean, non-image, non-element | Fixed UI unit such as `€` or `%` |
+| `options` | supported controls, never element | Fixed choices presented by the editing UI |
 | `width`, `height` | image | Required generated image dimensions |
+| `elementType` | element | Required uri of the element type this field may reference |
 
 An image MUST NOT be required: the element must exist before its deterministic
 upload path can be created.
+
+An `element` field references another element. Its value is that element's full
+uri (`/<type>/<slug>`) — exactly what `\Nino\Elements::getElement()` takes, so a
+template never re-joins it with the model. Both element forms render it as a
+select of the referenced type's elements, and the kernel rejects a value that
+points outside `elementType`. `elementType` is mandatory: `insertElementType()`
+drops a field without one, and the Admin editor refuses to save a reference to a
+type that does not exist. A target deleted later is tolerated — the stored value
+survives and both forms mark it as missing. Element references never enter a
+Translations export: a uri is a choice, not translatable text.
 
 The lower-level Elements API also understands advanced metadata such as
 defaults, callbacks, whitelist, and blacklist. The current Admin schema editor

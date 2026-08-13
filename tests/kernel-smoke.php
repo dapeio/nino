@@ -289,6 +289,48 @@ $dateInserted = \Nino\Elements::insertElement( $appData, '/datetesttype/item1', 
 check( 'insertElement accepts a date field value', is_array( $dateInserted ) === true && $dateInserted['when'] === '2026-07-14' );
 check( 'insertElement accepts a datetime field value', is_array( $dateInserted ) === true && $dateInserted['at'] === '2026-07-14T15:30' );
 
+// An 'element' field references another element by its full uri - the value is
+// a plain string like every date/image value, and the type it may point at is
+// part of the field
+\Nino\Elements::insertElementType( $appData, '/author', [ 'name' => [ 'type' => 'string' ] ] );
+\Nino\Elements::insertElement( $appData, '/author/ada', [ 'name' => 'Ada' ], '*' );
+
+check( 'insertElementType accepts an element reference field', \Nino\Elements::insertElementType( $appData, '/article', [
+	'headline' 	=> [ 'type' => 'string' ],
+	'author' 		=> [ 'type' => 'element', 'elementType' => 'author' ],
+] ) !== false );
+
+check( 'the referenced type is kept on the field, not dropped as an unknown key',
+	( \Nino\Elements::getElementModel( $appData, '/article' )['author']['elementType'] ?? null ) === 'author' );
+
+// Without one there is nothing to choose from - the field would render as a
+// permanently empty select, so it is not a field at all
+\Nino\Elements::insertElementType( $appData, '/looseref', [ 'a' => [ 'type' => 'element' ], 'b' => [ 'type' => 'element', 'elementType' => '  ' ], 'keep' => [ 'type' => 'string' ] ] );
+check( 'an element field without a referenced type is dropped from the model',
+	array_keys( \Nino\Elements::getElementModel( $appData, '/looseref' ) ) === [ 'keep' ] );
+
+$referencing = \Nino\Elements::insertElement( $appData, '/article/first', [ 'headline' => 'Hello', 'author' => '/author/ada' ], '*' );
+check( 'insertElement stores the referenced element\'s full uri', is_array( $referencing ) === true && $referencing['author'] === '/author/ada' );
+check( '...which is exactly what getElement() takes, with no re-joining',
+	( \Nino\Elements::getElement( $appData, \Nino\Elements::getElement( $appData, '/article/first', '*' )['author'], '*' )['name'] ?? null ) === 'Ada' );
+
+// The reference is checked against the model, not against the referenced file:
+// pointing into another type would hand a reader an element of a shape the
+// model never promised
+check( 'a reference into a different type is rejected',
+	\Nino\Elements::insertElement( $appData, '/article/wrong', [ 'headline' => 'x', 'author' => '/testtype/item1' ], '*' ) === false );
+check( 'a bare slug without the type prefix is rejected too',
+	\Nino\Elements::insertElement( $appData, '/article/bare', [ 'headline' => 'x', 'author' => 'ada' ], '*' ) === false );
+check( 'an empty reference is accepted - "no reference" is a legitimate value',
+	is_array( \Nino\Elements::insertElement( $appData, '/article/none', [ 'headline' => 'x', 'author' => '' ], '*' ) ) === true );
+
+// A target deleted later stays readable rather than being scrubbed: the
+// element forms show it as missing, which is recoverable - silently dropping
+// it is not
+\Nino\Elements::deleteElement( $appData, '/author/ada', '*' );
+check( 'a reference whose target is gone keeps its value',
+	( \Nino\Elements::getElement( $appData, '/article/first', '*' )['author'] ?? null ) === '/author/ada' );
+
 echo "\n";
 
 

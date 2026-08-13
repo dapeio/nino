@@ -86,6 +86,7 @@ The URI becomes the filename `elements/<uri>.php` and cannot be changed via the 
 | `date` | a date |
 | `datetime` | date and time |
 | `image` | an image with fixed target dimensions |
+| `element` | a reference to an element of another type |
 
 Depending on the type, additional properties are available:
 
@@ -94,7 +95,10 @@ Depending on the type, additional properties are available:
 - **Rich text** activates bold, italic, highlight, inline-code, and link formatting for the `string` type;
 - fixed values limit a text field to a predefined selection;
 - width and height determine the target dimensions for images;
-- a unit or suffix adds, for example, `€`, `km`, or `%` in the input.
+- a unit or suffix adds, for example, `€`, `km`, or `%` in the input;
+- **References element type** determines, for the `element` type, which type this field may point at.
+
+An `element` field links one element to another. When defining the field you pick the element type it references; when editing an element you then pick one of that type's entries from a select. The stored value is the referenced element's full uri (`/<type>/<slug>`), which templates hand straight to `\Nino\Elements::getElement()`. A field may only be saved once the referenced type exists, and its value may only point into that type. If the referenced element is deleted later, the reference is kept and shown as *missing* — nothing is silently dropped. References are not part of a Translations export, since a uri is a choice rather than translatable text.
 
 When switching between global and language-dependent fields, Nino migrates existing values. Still, check the result in each language. Saving a type model does not delete existing entries; however, removed fields no longer appear in `/_editor`.
 

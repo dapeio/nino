@@ -305,6 +305,54 @@ $duplicateCreateRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Admin\ElementTypes::apiCreate( $appData, $duplicateCreateRequest );
 check( 'apiCreate rejects an already-existing type', $duplicateCreateRequest['/nino/http/response']['statusCode'] === 409 );
 
+// --- element reference fields ---
+//
+// The type a reference may point at is what both element forms build their
+// select from. A reference nobody can satisfy would render as an empty,
+// permanently unusable control - and look exactly like a type that simply has
+// no elements yet - so the save is refused instead of the field being dropped
+
+$_POST['data'] = json_encode( [ 'uri' => 'refholder', 'title' => 'Ref Holder', 'model' => [
+	'author' => [ 'type' => 'element', 'elementType' => 'nonexistenttype' ],
+] ] );
+$danglingCreateRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Admin\ElementTypes::apiCreate( $appData, $danglingCreateRequest );
+check( 'apiCreate refuses a reference to a type that does not exist', $danglingCreateRequest['/nino/http/response']['statusCode'] === 400 );
+check( '...and names the field and the missing type, so it can be fixed', str_contains( (string) ( $danglingCreateRequest['/nino/http/response']['body']['error'] ?? '' ), 'author' )
+	&& str_contains( (string) ( $danglingCreateRequest['/nino/http/response']['body']['error'] ?? '' ), 'nonexistenttype' ) );
+check( '...and writes no half-valid type file', \Nino\Filesystem::getFileContent( $appData, '/elements/refholder.php', '' ) === '' );
+
+$_POST['data'] = json_encode( [ 'uri' => 'refholder', 'title' => 'Ref Holder', 'model' => [
+	'author' => [ 'type' => 'element', 'elementType' => '' ],
+] ] );
+$emptyRefCreateRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Admin\ElementTypes::apiCreate( $appData, $emptyRefCreateRequest );
+check( 'apiCreate refuses a reference with no type at all', $emptyRefCreateRequest['/nino/http/response']['statusCode'] === 400 );
+
+$_POST['data'] = json_encode( [ 'uri' => 'refholder', 'title' => 'Ref Holder', 'model' => [
+	'author' 	=> [ 'type' => 'element', 'elementType' => 'brandnewtype', 'suffix' => 'ignored', 'options' => [ 'a', 'b' ], 'required' => true, 'locale' => true ],
+] ] );
+$refCreateRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Admin\ElementTypes::apiCreate( $appData, $refCreateRequest );
+check( 'apiCreate accepts a reference to a real type', $refCreateRequest['/nino/http/response']['statusCode'] === 200 );
+
+$refCreated = \Nino\Filesystem::getFileContent( $appData, '/elements/refholder.php', false );
+check( 'the referenced type is persisted on the field', ( $refCreated['model']['author']['elementType'] ?? null ) === 'brandnewtype' );
+check( 'a reference can be required and per-translation like any other field', ( $refCreated['model']['author']['required'] ?? null ) === true && ( $refCreated['model']['author']['locale'] ?? null ) === true );
+check( 'a reference gets no suffix - it renders as a select, not an input', isset( $refCreated['model']['author']['suffix'] ) === false );
+// Two selects fighting over one value: the reference list is the choice
+check( 'a reference gets no fixed options list either', isset( $refCreated['model']['author']['options'] ) === false );
+
+$_POST['data'] = json_encode( [ 'uri' => 'refholder', 'title' => 'Ref Holder', 'model' => [
+	'author' => [ 'type' => 'element', 'elementType' => 'gone-since' ],
+] ] );
+$danglingSaveRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Admin\ElementTypes::apiSave( $appData, $danglingSaveRequest );
+check( 'apiSave refuses the same dangling reference', $danglingSaveRequest['/nino/http/response']['statusCode'] === 400 );
+check( '...leaving the stored model untouched', ( \Nino\Filesystem::getFileContent( $appData, '/elements/refholder.php', false )['model']['author']['elementType'] ?? null ) === 'brandnewtype' );
+
+check( '"element" is offered as a field type by apiList', in_array( 'element', \Nino\Admin\ElementTypes::FIELD_TYPES, true ) === true );
+
 echo "\n";
 
 
@@ -1408,6 +1456,7 @@ echo "\nTranslations - native Text + Elements JSON round-trip\n";
 		'features' 		=> [ 'type' => 'array', 'locale' => true ],
 		'views' 			=> [ 'type' => 'integer' ],
 		'image' 			=> [ 'type' => 'image', 'locale' => true ],
+		'related' 		=> [ 'type' => 'element', 'elementType' => 'brandnewtype', 'locale' => true ],
 	],
 	'*' => [
 		'*' => [],
@@ -1419,6 +1468,7 @@ echo "\nTranslations - native Text + Elements JSON round-trip\n";
 			'description' => '<code>Native</code>',
 			'features' => [ 'Schnell', 'Klein' ],
 			'image' => 'native.webp',
+			'related' => '/brandnewtype/de',
 		],
 	],
 	'en_US' => [
@@ -1427,6 +1477,7 @@ echo "\nTranslations - native Text + Elements JSON round-trip\n";
 			'description' => '<code>Old</code>',
 			'features' => [ 'Old' ],
 			'image' => 'english.webp',
+			'related' => '/brandnewtype/en',
 		],
 	],
 ] );
@@ -1448,6 +1499,9 @@ check( 'apiExport includes public native text without [[ ]] around its key', ( $
 check( 'apiExport excludes global and blacklisted text', isset( $translation['text']['/translation/global'] ) === false && isset( $translation['text']['/translation/technical'] ) === false );
 check( 'apiExport includes locale-scoped element content', ( $translation['elements']['translationtype']['item']['features'] ?? null ) === [ 'Schnell', 'Klein' ] );
 check( 'apiExport excludes global and image element fields', isset( $translation['elements']['translationtype']['item']['views'] ) === false && isset( $translation['elements']['translationtype']['item']['image'] ) === false );
+// A reference is per-locale content, but a uri is not translatable text - it
+// is picked in the element form, where it shows as the element it points at
+check( 'apiExport excludes element reference fields too', isset( $translation['elements']['translationtype']['item']['related'] ) === false );
 
 // Post only a small translated subset: import is allowed to be partial and
 // must count every invalid path while still applying valid siblings.
@@ -1466,6 +1520,7 @@ $translation['elements'] = [
 			'features' => [ 'One <b>x</b>', [ 'Deep <em>y</em>' ] ],
 			'views' => 99,
 			'image' => 'hacked.webp',
+			'related' => '/brandnewtype/hacked',
 			'unknown' => 'HACKED',
 		],
 		'ghost' => [ 'title' => 'HACKED' ],
@@ -1479,7 +1534,7 @@ $translation['elements'] = [
 ] );
 check( 'apiImport succeeds for a configured target locale', $status === 200 && $result['targetLocale'] === 'en_US' );
 check( 'apiImport reports Text values and rejected keys separately', $result['text'] === [ 'imported' => 2, 'skipped' => 3 ] );
-check( 'apiImport reports Element fields and rejected paths separately', $result['elements'] === [ 'imported' => 3, 'skipped' => 5 ] );
+check( 'apiImport reports Element fields and rejected paths separately', $result['elements'] === [ 'imported' => 3, 'skipped' => 6 ] );
 
 $translatedText = \Nino\Filesystem::getFileContent( $appData, '/text/en_US.php', [] );
 $nativeText = \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] );
@@ -1489,6 +1544,7 @@ check( 'Text import leaves native source, global and technical values untouched'
 $translatedElements = \Nino\Filesystem::getFileContent( $appData, '/elements/translationtype.php', [] );
 check( 'Element import sanitizes plain, HTML and nested array strings', $translatedElements['en_US']['item']['title'] === 'Project' && $translatedElements['en_US']['item']['description'] === '<code>Translated</code>' && $translatedElements['en_US']['item']['features'] === [ 'One x', [ 'Deep y' ] ] );
 check( 'Element import cannot overwrite global or image fields', $translatedElements['*']['item']['views'] === 7 && $translatedElements['en_US']['item']['image'] === 'english.webp' );
+check( '...nor an element reference, which is a choice rather than a translation', $translatedElements['en_US']['item']['related'] === '/brandnewtype/en' );
 check( 'Element import leaves the native bucket untouched', $translatedElements['de_DE']['item']['title'] === 'Projekt' );
 
 $badTranslation = $translation;

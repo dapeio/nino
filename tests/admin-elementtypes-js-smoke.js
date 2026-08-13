@@ -67,10 +67,11 @@ function fakeRow( field ) {
 		'.admin-field-required' 			: field.type === 'image' ? null : { checked : field.required === true },
 		'.admin-field-html' 					: field.type === 'string' ? { checked : field.html === true } : null,
 		'.admin-field-maxlength' 			: field.type === 'string' ? { value : field.maxlength ?? '' } : null,
-		'.admin-field-select-options' : null,
+		'.admin-field-select-options' : field.type === 'string' ? { value : ( field.options ?? [] ).join(', ') } : null,
 		'.admin-field-width' 					: field.type === 'image' ? { value : field.width ?? '' } : null,
 		'.admin-field-height' 				: field.type === 'image' ? { value : field.height ?? '' } : null,
-		'.admin-field-suffix' 				: null,
+		'.admin-field-suffix' 				: [ 'boolean', 'image', 'element' ].indexOf( field.type ) === -1 ? { value : field.suffix ?? '' } : null,
+		'.admin-field-element-type' 	: field.type === 'element' ? { value : field.elementType ?? '' } : null,
 	};
 	return { querySelector : function( selector ) { return controls[selector] ?? null } };
 }
@@ -122,6 +123,40 @@ elementTypes._move( 1, 'up' );
 check( 'a reorder keeps an edit that was only in the dom yet', elementTypes._fields.map( function( f ) { return f.key } ).join() === 'photo,headline,sort' );
 check( '...including the per-type options of the moved row', ( elementTypes._fields[0].width === '800' && elementTypes._fields[0].height === '600' ) === true );
 check( 'an image row, which renders no "required" checkbox, reads back as not required', elementTypes._fields[0].required === false );
+
+
+// --- _buildModel(): every key a row reads back has to reach the payload ----
+//
+// _storeFields() collects one object per row, _buildModel() copies it into
+// the json that actually gets posted - by naming each key. A key present in
+// the first and missing from the second is invisible: the field editor offers
+// the control, the user fills it in, the server would accept it, and it is
+// dropped in between. maxlength and suffix were exactly that.
+
+elementTypes._fields = [
+	{ key : 'title', 	type : 'string', 	locale : true, required : true, html : true, maxlength : '80', suffix : '', elementType : '', options : [ 'a', 'b' ] },
+	{ key : 'photo', 	type : 'image', 	width : '800', height : '600' },
+	{ key : 'price', 	type : 'double', 	suffix : '\u20ac' },
+	{ key : 'author', type : 'element', 	elementType : 'people' },
+	{ key : '', 			type : 'string' },
+];
+mountRows( elementTypes._fields );
+
+const built = elementTypes._buildModel();
+
+check( 'a field without a key never reaches the payload', Object.keys( built ).join() === 'title,photo,price,author' );
+check( '_buildModel carries a string field\'s maxlength', built.title.maxlength === '80' );
+check( '_buildModel carries a suffix', built.price.suffix === '\u20ac' );
+check( '_buildModel carries an element field\'s referenced type', built.author.elementType === 'people' );
+check( '_buildModel carries the image dimensions', built.photo.width === '800' && built.photo.height === '600' );
+check( '_buildModel carries locale/required/html and the options list', built.title.locale === true && built.title.required === true && built.title.html === true && built.title.options.join() === 'a,b' );
+
+// The actual guard: whatever _storeFields() knows how to read, _buildModel()
+// has to forward. Comparing the two key sets catches a control added to the
+// editor and forgotten here, which is how maxlength/suffix went missing
+const readBack = Object.keys( elementTypes._fields[0] ).filter( function( k ) { return k !== 'key' } );
+const forwarded = Object.keys( built.title );
+check( 'every key _storeFields() reads is forwarded by _buildModel()', readBack.every( function( k ) { return forwarded.indexOf( k ) !== -1 } ) );
 
 console.log( '\n'+ checks+ ' checks, '+ failures+ ' failed' );
 process.exitCode = failures === 0 ? 0 : 1;

@@ -156,12 +156,13 @@ check( 'reports the running php version', $checksBody['php']['version'] === PHP_
 check( 'gd is reported as loaded (required by CI)', $checksBody['extensions']['gd']['ok'] === true );
 check( 'the project root is reported as writable', $checksBody['directories']['.']['ok'] === true );
 check( 'the canonical private directory is reported as private', isset( $checksBody['directories']['private'] ) === true && isset( $checksBody['directories']['content'] ) === false );
-// data/ isn't tracked in git, but by this point in the file it likely
-// already exists - writing config.php above already took a Filesystem
-// lock, which itself creates data/.locks as a side effect. Either way
-// (not yet created, parent writable / already created, itself writable)
-// it has to come back ok
-check( 'a possibly-not-yet-created directory (data) still comes back ok', $checksBody['directories']['data']['ok'] === true );
+// Only the three roots are probed, not their children: whatever can write
+// into private/ can create text/, elements/ and data/ inside it, and the
+// same holds for public/. A child listed here reported "not yet created"
+// on a perfectly healthy project and told the installer nothing the parent
+// had not already answered
+check( 'the public root is reported too', ( $checksBody['directories']['public']['ok'] ?? null ) === true );
+check( 'no child directory is probed separately any more', isset( $checksBody['directories']['data'], $checksBody['directories']['text'], $checksBody['directories']['images'] ) === false );
 
 echo "\n";
 

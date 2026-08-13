@@ -86,6 +86,7 @@ Die URI wird zum Dateinamen `elements/<uri>.php` und lässt sich nach dem Anlege
 | `date` | ein Datum |
 | `datetime` | Datum und Uhrzeit |
 | `image` | ein Bild mit festgelegten Zielmaßen |
+| `element` | eine Referenz auf ein Element eines anderen Typs |
 
 Je nach Typ stehen zusätzliche Eigenschaften bereit:
 
@@ -94,7 +95,10 @@ Je nach Typ stehen zusätzliche Eigenschaften bereit:
 - **Rich text** aktiviert beim Typ `string` Fett, Kursiv, Hervorhebung, Inline-Code und Links;
 - feste Werte begrenzen ein Textfeld auf eine vorgegebene Auswahl;
 - Breite und Höhe bestimmen bei Bildern die Zielmaße;
-- eine Einheit oder ein Suffix ergänzt beispielsweise `€`, `km` oder `%` in der Eingabe.
+- eine Einheit oder ein Suffix ergänzt beispielsweise `€`, `km` oder `%` in der Eingabe;
+- **References element type** legt beim Typ `element` fest, auf welchen Typ dieses Feld zeigen darf.
+
+Ein `element`-Feld verknüpft ein Element mit einem anderen. Beim Anlegen des Feldes wählst du den Elementtyp, auf den es verweist; beim Bearbeiten eines Elements wählst du dann per Auswahlliste einen Eintrag dieses Typs. Gespeichert wird die vollständige Uri des referenzierten Elements (`/<typ>/<slug>`) — genau das, was Templates an `\Nino\Elements::getElement()` übergeben. Ein Feld lässt sich erst speichern, wenn der referenzierte Typ existiert, und sein Wert darf nur in diesen Typ zeigen. Wird das referenzierte Element später gelöscht, bleibt der Verweis erhalten und wird als *missing* angezeigt — es geht nichts stillschweigend verloren. Referenzen sind nicht Teil eines Übersetzungsexports, denn eine Uri ist eine Auswahl und kein übersetzbarer Text.
 
 Beim Wechsel zwischen globalen und sprachabhängigen Feldern migriert Nino bestehende Werte. Prüfe das Ergebnis trotzdem in jeder Sprache. Das Speichern eines Typmodells löscht keine vorhandenen Einträge; entfernte Felder erscheinen jedoch nicht mehr in `/_editor`.
 

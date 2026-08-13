@@ -138,5 +138,59 @@ check( 'invalidate drops edits belonging to the old model rather than carrying t
 check( 'invalidate bumps every request counter, so responses in flight are dropped on arrival',
 	elements._typesRequest === beforeTypes + 1 && elements._listRequest === beforeList + 1 && elements._formRequest === beforeForm + 1 );
 
+// --- _loadReferenceOptions(): what an element field's select is built from --
+//
+// The choices come from the referenced type's own element list, fetched
+// before the form renders (a locale switch re-renders the fields, so options
+// arriving afterwards would have to be threaded through that too). One
+// request per distinct referenced type, never one per field.
+
+const calls = [];
+elements._apiCall = function( endpoint, payload, callback ) {
+	calls.push( endpoint+ ':'+ JSON.stringify( payload ) );
+	callback( 200, { elements : [ { uri : 'ada', label : 'Ada' }, { uri : 'grace', label : 'Grace' } ] } );
+};
+
+elements._currentModel = {
+	headline 	: { type : 'string' },
+	author 		: { type : 'element', elementType : 'people' },
+	reviewer 	: { type : 'element', elementType : 'people' },
+	source 		: { type : 'element', elementType : 'journals' },
+	broken 		: { type : 'element' },
+};
+
+let done = false;
+elements._loadReferenceOptions( function() { done = true } );
+
+check( 'the continuation runs once every referenced type has answered', done === true );
+check( 'one list request per distinct referenced type, not per field', calls.length === 2 );
+check( '...and each asks for the type the field declares', calls.join() === 'list:{"type":"people"},list:{"type":"journals"}' );
+check( 'a field with no referenced type is skipped rather than requested as ""', calls.some( function( c ) { return c.indexOf( '""' ) !== -1 } ) === false );
+check( 'the options land keyed by referenced type', Object.keys( elements._referenceOptions ).sort().join() === 'journals,people' );
+check( '...carrying uri and label for the select to render', elements._referenceOptions.people[0].uri === 'ada' && elements._referenceOptions.people[0].label === 'Ada' );
+
+// A model with nothing to resolve must not wait on a request that never fires
+calls.length = 0;
+elements._currentModel = { headline : { type : 'string' } };
+let plainDone = false;
+elements._loadReferenceOptions( function() { plainDone = true } );
+check( 'a model without references continues immediately, with no request at all', plainDone === true && calls.length === 0 );
+
+// A referenced type deleted since the model was written answers with an error.
+// Resolving it to an empty list is what lets _renderField() show the stored
+// value as missing - holding the form back would strand the whole element
+elements._apiCall = function( endpoint, payload, callback ) { callback( 404, null ) };
+elements._currentModel = { author : { type : 'element', elementType : 'gone' } };
+let errorDone = false;
+elements._loadReferenceOptions( function() { errorDone = true } );
+check( 'a referenced type that errors resolves to an empty list instead of hanging', errorDone === true && JSON.stringify( elements._referenceOptions.gone ) === '[]' );
+
+// Stale options are worse than none: an element added to the referenced type
+// has to be selectable in the very next form that points at it
+elements._apiCall = function( endpoint, payload, callback ) { callback( 200, { elements : [ { uri : 'new', label : 'New' } ] } ) };
+elements._loadReferenceOptions( function() {} );
+check( 'each form open refills the options rather than reusing the last ones', elements._referenceOptions.gone[0].uri === 'new' );
+
+
 console.log( '\n'+ checks+ ' checks, '+ failures+ ' failed' );
 process.exitCode = failures === 0 ? 0 : 1;

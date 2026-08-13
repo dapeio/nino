@@ -502,7 +502,7 @@ namespace Nino\Admin {
 	 */
 	class ElementTypes {
 
-		public const array FIELD_TYPES = [ 'string', 'integer', 'double', 'boolean', 'array', 'date', 'datetime', 'image' ];
+		public const array FIELD_TYPES = [ 'string', 'integer', 'double', 'boolean', 'array', 'date', 'datetime', 'image', 'element' ];
 
 		/**
 		 *	This module's action map, merged into Admin::handlePost()'s dispatch
@@ -621,8 +621,9 @@ namespace Nino\Admin {
 		/**
 		 *	Validate a posted model definition, dropping anything malformed -
 		 *	same rules as Elements::insertElementType(), plus width/height for
-		 *	image fields, maxlength for string fields, a fixed unit suffix for
-		 *	every type but boolean/image, and a plain string list for options
+		 *	image fields, maxlength for string fields, the referenced type for
+		 *	element fields, a fixed unit suffix for every type but boolean/
+		 *	image/element, and a plain string list for options
 		 *
 		 *	@param		mixed			$model				Posted model, expected array<string,array>
 		 *
@@ -666,6 +667,14 @@ namespace Nino\Admin {
 					$field['height'] 	= max( 1, (int) ( $data['height'] ?? 0 ) );
 				}
 
+				// Which type an element reference may point at. Kept as posted
+				// rather than checked against the types on disk here - this
+				// method has no $appData; apiSave()/apiCreate() reject an
+				// unknown one outright (see _unknownReferencedType()) so the
+				// author gets told, instead of the field silently vanishing
+				if( $data['type'] === 'element' )
+					$field['elementType'] = trim( (string) ( $data['elementType'] ?? '' ) );
+
 				// Only rendered for a string field (elements.js's maxlength+counter and
 				// html-editor branches) - 0/absent falls back to DEFAULT_MAXLENGTH client-side
 				if( $data['type'] === 'string' ) {
@@ -675,20 +684,65 @@ namespace Nino\Admin {
 				}
 
 				// A fixed unit/label shown next to the input (eg. a "price" field's
-				// "€") - elements.js applies it to every type except boolean/image
-				if( $data['type'] !== 'boolean' && $data['type'] !== 'image' ) {
+				// "€") - elements.js applies it to every type except boolean,
+				// image and element, none of which render an input a unit could
+				// sit next to
+				if( in_array( $data['type'], [ 'boolean', 'image', 'element' ], true ) === false ) {
 					$suffix = trim( (string) ( $data['suffix'] ?? '' ) );
 					if( $suffix !== '' )
 						$field['suffix'] = $suffix;
 				}
 
-				if( is_array( $data['options'] ?? null ) === true && count( $data['options'] ) > 0 )
+				// Never on an element reference: its choices are the referenced
+				// type's elements, and a second fixed list next to them would
+				// be two selects fighting over the same value (elements.js
+				// renders the options list ahead of the type's own branches)
+				if( $data['type'] !== 'element' && is_array( $data['options'] ?? null ) === true && count( $data['options'] ) > 0 )
 					$field['options'] = array_values( array_map( 'strval', $data['options'] ) );
 
 				$clean[$key] = $field;
 			}
 
 			return $clean;
+		}
+
+		/**
+		 *	The first element field in a cleaned model whose referenced type
+		 *	does not exist on disk, as a ready-made error message - or null
+		 *	when every reference resolves.
+		 *
+		 *	Checked before the type file is written rather than silently
+		 *	dropping the field: a reference nobody can satisfy would render as
+		 *	an empty, permanently unusable select in both element forms, and
+		 *	the author has no way of telling that from "this type simply has
+		 *	no elements yet". A type deleted *later* is a different case and
+		 *	stays tolerated - the forms show the dangling value rather than
+		 *	discard it (see assets/elements.js's element branch).
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		$model				Model as returned by cleanModel()
+		 *
+		 *	@return 	string|null								Error message, or null when every reference resolves
+		 */
+		private static function _unknownReferencedType( array &$appData, array $model ): ?string {
+
+			$known = array_column( self::summaries( $appData ), 'uri' );
+
+			foreach( $model as $key => $field ) {
+
+				if( ( $field['type'] ?? '' ) !== 'element' )
+					continue;
+
+				$referenced = (string) ( $field['elementType'] ?? '' );
+
+				if( $referenced === '' )
+					return 'field "'. $key. '" is an element reference without a type to point at';
+
+				if( in_array( $referenced, $known, true ) === false )
+					return 'field "'. $key. '" references the unknown element type "'. $referenced. '"';
+			}
+
+			return null;
 		}
 
 		/**
@@ -719,6 +773,13 @@ namespace Nino\Admin {
 
 			if( self::isValidTypeUri( $typeUri ) === false ) {
 				\Nino\Http::fail( $request, 400, 'invalid type uri' );
+				return;
+			}
+
+			$danglingReference = self::_unknownReferencedType( $appData, self::cleanModel( $data['model'] ?? [] ) );
+
+			if( $danglingReference !== null ) {
+				\Nino\Http::fail( $request, 400, $danglingReference );
 				return;
 			}
 
@@ -867,10 +928,18 @@ namespace Nino\Admin {
 			}
 
 			$title = trim( (string) ( $data['title'] ?? '' ) );
+			$model = self::cleanModel( $data['model'] ?? [] );
+
+			$danglingReference = self::_unknownReferencedType( $appData, $model );
+
+			if( $danglingReference !== null ) {
+				\Nino\Http::fail( $request, 400, $danglingReference );
+				return;
+			}
 
 			$typeData = [
 				'title' 	=> ( $title !== '' ) ? $title : $typeUri,
-				'model' 	=> self::cleanModel( $data['model'] ?? [] ),
+				'model' 	=> $model,
 				'*' 			=> [ '*' => [] ],
 			];
 
@@ -2924,6 +2993,15 @@ namespace Nino\Admin {
 		private const string FORMAT = 'nino.translation';
 		private const int VERSION = 1;
 
+		// Locale-flagged element fields whose value is not translatable text
+		// and therefore never leaves in an export, nor is accepted back from
+		// one. An image field holds a generated filename, an element field a
+		// referenced element's uri: both may legitimately differ per locale,
+		// but neither is something a translator can translate - and both are
+		// picked in the element form, where the choice is shown as what it is
+		// rather than as a string to overwrite
+		private const array UNTRANSLATABLE_TYPES = [ 'image', 'element' ];
+
 		/**
 		 *	This module's action map, merged into Admin::handlePost()
 		 *
@@ -3059,7 +3137,7 @@ namespace Nino\Admin {
 							is_array( $field ) === false ||
 							array_key_exists( $key, $referenceFields ) === false ||
 							( $field['locale'] ?? false ) !== true ||
-							( $field['type'] ?? '' ) === 'image'
+							in_array( $field['type'] ?? '', self::UNTRANSLATABLE_TYPES, true ) === true
 						) {
 							$elementSkipped++;
 							continue;
@@ -3148,7 +3226,7 @@ namespace Nino\Admin {
 						if(
 							is_array( $field ) === true &&
 							( $field['locale'] ?? false ) === true &&
-							( $field['type'] ?? '' ) !== 'image' &&
+							in_array( $field['type'] ?? '', self::UNTRANSLATABLE_TYPES, true ) === false &&
 							array_key_exists( $key, $rawFields ) === true
 						)
 							$elements[$type][$elementUri][$key] = $rawFields[$key];
@@ -3209,7 +3287,7 @@ namespace Nino\Admin {
 		private static function _validElementValue( mixed $value, array $field ): bool {
 
 			$type = (string) ( $field['type'] ?? '' );
-			$expected = in_array( $type, [ 'date', 'datetime', 'image' ], true ) ? 'string' : $type;
+			$expected = in_array( $type, [ 'date', 'datetime', 'image', 'element' ], true ) ? 'string' : $type;
 
 			if( $type === 'double' && is_int( $value ) === true ) {
 				// The kernel accepts and coerces whole-number JSON values too.

@@ -1996,7 +1996,14 @@ namespace Nino {
 			// Fill model
 			foreach( $model AS $key => $data ) {
 
-				if( isset( $data['type'] ) === false || in_array( $data['type'], [ 'string', 'integer', 'array', 'boolean', 'double', 'date', 'datetime', 'image' ] ) === false )
+				if( isset( $data['type'] ) === false || in_array( $data['type'], [ 'string', 'integer', 'array', 'boolean', 'double', 'date', 'datetime', 'image', 'element' ] ) === false )
+					continue;
+
+				// An 'element' field is a reference to another element, and the
+				// type it may point at is part of the field, not of the value -
+				// without it there is nothing to offer a choice from, so such a
+				// field is not a field at all
+				if( $data['type'] === 'element' && trim( (string) ( $data['elementType'] ?? '' ) ) === '' )
 					continue;
 
 				if( isset( $data['default'] ) === true ) {
@@ -2056,11 +2063,12 @@ namespace Nino {
 
 		// The PHP gettype() a model field's declared type is expected to hold
 		// as - 'date'/'datetime' values are plain ISO strings (php has no
-		// native date type) and an 'image' field stores its uploaded file's
-		// generated filename, also a string; everything else matches its
-		// type name directly
+		// native date type), an 'image' field stores its uploaded file's
+		// generated filename and an 'element' field the referenced element's
+		// full uri, both also strings; everything else matches its type name
+		// directly
 		static private function _expectedGettype( string $type ): string {
-			return in_array( $type, [ 'date', 'datetime', 'image' ], true ) ? 'string' : $type;
+			return in_array( $type, [ 'date', 'datetime', 'image', 'element' ], true ) ? 'string' : $type;
 		}
 
 		// Write element data into file content
@@ -2242,6 +2250,22 @@ namespace Nino {
 					// Blacklist
 					if( isset( $field['blacklist'] ) === true && in_array( $data[$key], $field['blacklist'] ) === true ) {
 						trigger_error( 'Element value \''. $key. '\' is blacklisted.' );
+						$outcome = 'error';
+						return null;
+					}
+
+					// An element reference stores the referenced element's full uri
+					// ('/type/slug' - what getElement() takes), and may only point
+					// into the type its field declares. Checked as a plain string
+					// against the model, deliberately not against the referenced
+					// file: this runs inside a lock on *this* type's file, and a
+					// reference whose target is deleted later stays readable either
+					// way (both element forms show it as missing rather than
+					// dropping it). An empty value is "no reference" - 'required'
+					// above is what makes one mandatory
+					if( $field['type'] === 'element' && $data[$key] !== ''
+						&& str_starts_with( $data[$key], '/'. trim( (string) ( $field['elementType'] ?? '' ), '/' ). '/' ) === false ) {
+						trigger_error( 'Element reference \''. $key. '\' in \''. $uri. '\' must point into \''. ( $field['elementType'] ?? '' ). '\', got \''. $data[$key]. '\'.' );
 						$outcome = 'error';
 						return null;
 					}
