@@ -47,7 +47,7 @@ For operation, note:
 
 `/_templates` uses the same password, lock status, and session as `/_admin`. The **Template Builder** link in the header opens the section-first Alpha tool. Without `_admin/`, the standalone builder cannot be used.
 
-The password can be rehashed outside the installer with `php _admin/Admin.php <password>`. The output is a complete file — write it to `content/.auth/pw.php`, replacing whatever is there. It is deliberately not in `_admin/Admin.php` (a tool folder must stay replaceable on an update) and not in `config.php` (a restore rewrites that file, and the credential that authorises restoring has to survive it). Perform this process only in a protected local environment; a password entered as a command-line argument may be visible in shell history or process list.
+The password can be rehashed outside the installer with `php _admin/Admin.php <password>`. The output is a complete file — write it to `private/.auth/pw.php`, replacing whatever is there. It is deliberately not in `_admin/Admin.php` (a tool folder must stay replaceable on an update) and not in `config.php` (a restore rewrites that file, and the credential that authorises restoring has to survive it). Perform this process only in a protected local environment; a password entered as a command-line argument may be visible in shell history or process list.
 
 ## Dashboard
 

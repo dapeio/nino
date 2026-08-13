@@ -21,7 +21,7 @@ namespace {
 	// in the file without being a usable-over-the-web endpoint:
 	// `php _admin/Admin.php <pw>`
 	//
-	// The hash it prints goes into the project's content/.auth/pw.php, wrapped
+	// The hash it prints goes into the project's private/.auth/pw.php, wrapped
 	// in the stub below - not into this file. Nothing here is project state
 	// any more, which is what lets an update replace it (see
 	// Admin::passwordHash())
@@ -202,7 +202,7 @@ namespace Nino\Admin {
 		 *	The password hash currently in effect, or null when this project
 		 *	has none yet.
 		 *
-		 *	Canonically PASSWORD_PATH, under the content directory - never
+		 *	Canonically PASSWORD_PATH, under the private directory - never
 		 *	config.php: a Restore rewrites config.php, and a credential that
 		 *	authorises restoring must not be part of what gets restored (the
 		 *	same reasoning Backup already applies to the encryption key, see
@@ -413,7 +413,7 @@ namespace Nino\Admin {
 		}
 
 		/**
-		 *	Write a hash to PASSWORD_PATH, creating the content directory if
+		 *	Write a hash to PASSWORD_PATH, creating the private directory if
 		 *	it isn't there yet. The one writer - /_install's finish step goes
 		 *	through Install::setDevPassword(), which calls this
 		 *
@@ -498,13 +498,13 @@ namespace Nino\Admin {
 		}
 
 		/**
-		 *	Drop an Apache deny rule into the content directory if it has
+		 *	Drop an Apache deny rule into the private directory if it has
 		 *	none. Belt and braces next to the stub inside the file itself:
 		 *	the stub is what protects the hash on any webserver, this is what
 		 *	keeps the directory from being browsable on the common one. Never
 		 *	overwrites an existing file - a deployment may have its own rules
 		 *
-		 *	@param		string		$dir					Absolute path of the content directory
+		 *	@param		string		$dir					Absolute path of the private directory
 		 *
 		 *	@return 	void
 		 */
@@ -515,7 +515,7 @@ namespace Nino\Admin {
 			if( is_dir( $dir ) === false || file_exists( $path ) === true )
 				return;
 
-			@file_put_contents( $path, "# Nino content directory - never served, only read by php.\n". "Require all denied\n" );
+			@file_put_contents( $path, "# Nino private directory - never served, only read by php.\n". "Require all denied\n" );
 		}
 
 		/**
@@ -944,11 +944,11 @@ namespace Nino\Admin {
 	 *											small bit of archiving logic it needs, same reasoning as
 	 *											postData() above - this whole folder stays standalone) and
 	 *											of config.php's own data:
-	 *											- the archives are *found* on disk (content/.backups, plus
+	 *											- the archives are *found* on disk (private/.backups, plus
 	 *											  whatever pre-move directory a project still has), never
 	 *											  addressed through a config value
 	 *											- the decryption key has its own independent copy outside
-	 *											  config.php (content/.auth/backup-key.php), rewritten by
+	 *											  config.php (private/.auth/backup-key.php), rewritten by
 	 *											  Backup::_bootstrap() whenever it goes missing
 	 *											So this still works even if config.php's *data* (not
 	 *											syntax) is what's broken - eg. a wrecked admin user
@@ -1491,11 +1491,11 @@ namespace Nino\Admin {
 	 *	Dev								Disaster recovery: restore a _editor daily backup.
 	 *
 	 *											Deliberately independent of config.php's own backup keys:
-	 *											- the archives are *found* on disk (content/.backups, plus
+	 *											- the archives are *found* on disk (private/.backups, plus
 	 *											  whatever pre-move directory a project still has), never
 	 *											  addressed through a config value
 	 *											- the decryption key has its own independent copy outside
-	 *											  config.php (content/.auth/backup-key.php), rewritten by
+	 *											  config.php (private/.auth/backup-key.php), rewritten by
 	 *											  Backup::_bootstrap() whenever it goes missing
 	 *											So this still works even if config.php's *data* (not
 	 *											syntax) is what's broken - eg. a wrecked admin user

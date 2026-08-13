@@ -6,7 +6,7 @@ All notable changes to Nino are documented in this file.
 
 ### Added
 
-- Added a `content/` directory for this project's own state, reached through
+- Added a `private/` directory for this project's own state, reached through
   `\Nino\Filesystem::getContentPath()` and movable with `NINO_CONTENT_DIR`
   (the generalisation of `NINO_CONFIG_DIR`). It ships an Apache deny rule,
   and every file inside carries a 403 stub, so it stays unreadable even where
@@ -68,14 +68,17 @@ All notable changes to Nino are documented in this file.
   still resolves next to the tool. The document root does not change, so no
   deployment has to be reconfigured. A project installed before this keeps
   its files where they are.
-- Moved the project's private half into `content/`: `config.php`, `templates/`,
+- Moved the project's private half into `private/`: `config.php`, `templates/`,
   `text/`, `elements/` and `data/` now sit beside the state the management
   tools already kept there, leaving the public root holding only what a
   webserver should serve. Until now a request for `templates/page-home.tpl`
   returned the template source as plain text — the shipped `.htaccess` only
-  blocked dotfiles, and `.tpl` is not a PHP extension. `content/` denies
+  blocked dotfiles, and `.tpl` is not a PHP extension. `private/` denies
   itself, `router.php` refuses it outright, and `NINO_CONTENT_DIR` moves it
   out of the webroot entirely for a setup that cannot rely on either.
+  The preceding beta's `content/` name and the short-lived `privat/` typo
+  remain detectable for a deliberate offline rename; new projects and
+  virtual paths use `private/`.
   A project installed before this keeps its files where they are: the layout
   is probed once per request, and nothing is ever moved for you.
 - Separated the project's public root from its private one in the kernel.
@@ -88,27 +91,27 @@ All notable changes to Nino are documented in this file.
   What changes is that no call site concatenates a private path onto the
   public root any more, which is what a later move needs.
 - Moved the `/_admin` password hash out of `_admin/Admin.php` into
-  `content/.auth/pw.php`. `/_install` no longer rewrites PHP source, so the
+  `private/.auth/pw.php`. `/_install` no longer rewrites PHP source, so the
   tool folders are pure code again and an update may replace them wholesale.
   Previously, copying a new `_admin/Admin.php` over the old one restored the
   shipped placeholder hash — which logged the operator out **and** re-opened
   `/_install` on a live site, because that placeholder was exactly what the
   installer's lock was reading. A project whose hash still lives in the
   constant keeps working and migrates itself on the next successful login.
-- Moved the `/_admin` login throttle to `content/.auth/lockout.json` and the
-  `/_editor` activity log to `content/.logs/`. Both used to live inside the
+- Moved the `/_admin` login throttle to `private/.auth/lockout.json` and the
+  `/_editor` activity log to `private/.logs/`. Both used to live inside the
   tool folders, which is what made those folders un-replaceable. An active
   lockout left in the old location still applies, so an update cannot be used
   to clear one, and a legacy `.logs-<random>` directory is still read and
   pruned until it ages out of the retention window.
-- Moved the encrypted backup archives to `content/.backups/` and the archive
-  key's out-of-config copy to `content/.auth/backup-key.php`. With that,
+- Moved the encrypted backup archives to `private/.backups/` and the archive
+  key's out-of-config copy to `private/.auth/backup-key.php`. With that,
   `_admin/` and `_editor/` hold no project state at all. Archives and keys
   left in their pre-move locations are still listed, restored and pruned, so
   nothing already on disk becomes unreadable.
 - Removed the generated `/nino/backup/dir` and `/nino/logs/dir` keys. Neither
   the archives nor the activity log need an unguessable directory name any
-  more: under the content directory both are denied by that directory's own
+  more: under the private directory both are denied by that directory's own
   rule, on top of the 403 stub their files always carried.
 - Changed the `/_install` lock to a persisted `/nino/install/completed`
   marker alongside the stored password, so deleting the password file locks

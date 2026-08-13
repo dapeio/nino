@@ -43,16 +43,16 @@ set_error_handler( function() { return true; } );
 
 $sandbox = sys_get_temp_dir(). '/nino-admin-smoke-'. uniqid();
 mkdir( $sandbox, 0777, true );
-mkdir( $sandbox. '/content/text', 0777, true );
+mkdir( $sandbox. '/private/text', 0777, true );
 
 // A key already longer than MAX_MAXLENGTH - MAXLENGTH_BUFFER, to prove the computed
 // maxlength is capped at MAX_MAXLENGTH rather than growing past it
 $longValue = str_repeat( 'x', 1900 );
 
-file_put_contents( $sandbox. '/content/text/global.php', '<?php return [ \'[[/company/name]]\' => \'Acme\', \'[[/website/lang]]\' => \'de\' ];' );
-file_put_contents( $sandbox. '/content/text/de_DE.php', '<?php return [ \'[[/home/h2]]\' => \'<span>Hallo</span> Welt.\', \'[[/home/plain]]\' => \'Ein Satz.\', \'[[/home/long]]\' => \''. $longValue. '\' ];' );
-file_put_contents( $sandbox. '/content/text/en_US.php', '<?php return [ \'[[/home/h2]]\' => \'<span>Hi</span> World.\', \'[[/home/plain]]\' => \'A sentence.\' ];' );
-file_put_contents( $sandbox. '/content/text/blacklist.php', '<?php return [ \'/website/lang\' ];' );
+file_put_contents( $sandbox. '/private/text/global.php', '<?php return [ \'[[/company/name]]\' => \'Acme\', \'[[/website/lang]]\' => \'de\' ];' );
+file_put_contents( $sandbox. '/private/text/de_DE.php', '<?php return [ \'[[/home/h2]]\' => \'<span>Hallo</span> Welt.\', \'[[/home/plain]]\' => \'Ein Satz.\', \'[[/home/long]]\' => \''. $longValue. '\' ];' );
+file_put_contents( $sandbox. '/private/text/en_US.php', '<?php return [ \'[[/home/h2]]\' => \'<span>Hi</span> World.\', \'[[/home/plain]]\' => \'A sentence.\' ];' );
+file_put_contents( $sandbox. '/private/text/blacklist.php', '<?php return [ \'/website/lang\' ];' );
 
 $_SERVER['REMOTE_ADDR'] = '127.0.0.1';
 
@@ -61,9 +61,9 @@ $appData = [ './nino/uid' => $sandbox ];
 $appData['./nino/filesystem/path']			= $sandbox;
 // Mirrors \Nino\init()'s default (no NINO_CONFIG_DIR set): configpath falls
 // back to the project root, same as this sandbox's regular path
-$appData['./nino/filesystem/configpath']	= $sandbox. '/content';
-$appData['./nino/filesystem/contentpath']	= $sandbox. '/content';
-$appData['./nino/filesystem/privatepath'] = $sandbox. '/content';
+$appData['./nino/filesystem/configpath']	= $sandbox. '/private';
+$appData['./nino/filesystem/contentpath']	= $sandbox. '/private';
+$appData['./nino/filesystem/privatepath'] = $sandbox. '/private';
 $appData['/nino/dir']				= '';
 $appData['/nino/locales/native']				= 'de_DE';
 $appData['/nino/locales/available']			= [ 'de_DE', 'en_US' ];
@@ -701,7 +701,7 @@ callUsers( $appData, 'apiList' ); // ensures the backup key exists even on a fro
 check( 'the backup key exists in config.php', isset( $appData['/nino/backup/key'] ) === true );
 check( 'no random backup directory is generated any more', isset( $appData['/nino/backup/dir'] ) === false );
 
-$backupDir 	= $sandbox. '/content/.backups';
+$backupDir 	= $sandbox. '/private/.backups';
 $today 			= $backupDir. '/'. date( 'Y-m-d' ). '.php';
 
 if( is_file( $today ) === true )
@@ -737,7 +737,7 @@ $extractDir = $sandbox. '/verify-extracted';
 mkdir( $extractDir );
 ( new \PharData( $tmpGz ) )->extractTo( $extractDir );
 
-check( 'the decrypted archive contains a byte-identical config.php', file_get_contents( $sandbox. '/content/config.php' ) === file_get_contents( $extractDir. '/config.php' ) );
+check( 'the decrypted archive contains a byte-identical config.php', file_get_contents( $sandbox. '/private/config.php' ) === file_get_contents( $extractDir. '/config.php' ) );
 
 $mtimeBefore = filemtime( $today );
 clearstatcache();
@@ -749,7 +749,7 @@ check( 'a second authenticated request the same day doesn\'t touch an already-ex
 // authenticated request, not only on the first bootstrap, so a stale/corrupt
 // copy cannot make otherwise-valid backups undecryptable from _admin.
 mkdir( $sandbox. '/_admin', 0777, true );
-$restoreKeyPath = $sandbox. '/content/.auth/backup-key.php';
+$restoreKeyPath = $sandbox. '/private/.auth/backup-key.php';
 file_put_contents( $restoreKeyPath, 'stale' );
 callUsers( $appData, 'apiList' );
 check( 'a stale restore-key copy is repaired from the locked config value', file_get_contents( $restoreKeyPath ) === $prefix. $appData['/nino/backup/key']. $suffix );
@@ -798,7 +798,7 @@ function callAdminPost( array &$appData, string $action, array $data = [] ): arr
  *	@return		string[]
  */
 function readTodayLogLines( array &$appData, string $sandbox ): array {
-	$path = $sandbox. '/content/.logs/'. date( 'Y-m-d' ). '.php';
+	$path = $sandbox. '/private/.logs/'. date( 'Y-m-d' ). '.php';
 	if( is_file( $path ) === false )
 		return [];
 	$prefix 	= "<?php http_response_code(403); exit; return '";
@@ -826,11 +826,11 @@ check( 'elements/save is recorded to the activity log', count( $lines ) === coun
 check( 'the log line records the acting admin', str_contains( end( $lines ), 'manager@example.com' ) === true );
 
 // The logs no longer need an unguessable directory name: they sit under the
-// content directory, which is denied by its own .htaccess, and every file in
+// private directory, which is denied by its own .htaccess, and every file in
 // there carries the same 403 stub it always did
-check( 'the logs live under the content directory, not in a tool folder', is_file( $sandbox. '/content/.logs/'. date( 'Y-m-d' ). '.php' ) === true );
+check( 'the logs live under the private directory, not in a tool folder', is_file( $sandbox. '/private/.logs/'. date( 'Y-m-d' ). '.php' ) === true );
 check( 'no random log directory is generated any more', isset( $appData['/nino/logs/dir'] ) === false );
-check( 'each log file still carries its own 403 stub', str_starts_with( (string) file_get_contents( $sandbox. '/content/.logs/'. date( 'Y-m-d' ). '.php' ), '<?php http_response_code(403); exit;' ) === true );
+check( 'each log file still carries its own 403 stub', str_starts_with( (string) file_get_contents( $sandbox. '/private/.logs/'. date( 'Y-m-d' ). '.php' ), '<?php http_response_code(403); exit;' ) === true );
 
 callAdminPost( $appData, 'elements/list', [ 'type' => 'logtestdemo' ] );
 check( 'a read-only action (elements/list) does not add a log entry', count( readTodayLogLines( $appData, $sandbox ) ) === count( $lines ) );
@@ -881,7 +881,7 @@ check( 'logs/list succeeds', $status === 200 );
 check( 'logs/list returns lines most-recent-first', $body['lines'][0] === end( $linesSoFar ) );
 check( 'logs/list returns every recorded line so far', count( $body['lines'] ) === count( $linesSoFar ) );
 
-$logsDir = $sandbox. '/content/.logs';
+$logsDir = $sandbox. '/private/.logs';
 $staleLogFile = $logsDir. '/2020-01-01.php';
 file_put_contents( $staleLogFile, "<?php http_response_code(403); exit; return '". base64_encode( '2020-01-01 00:00  x  y' ). "';\n" );
 

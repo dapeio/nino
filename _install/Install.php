@@ -164,7 +164,7 @@ namespace Nino\Install {
 		}
 
 		/**
-		 *	Hash the posted password and store it under the content directory
+		 *	Hash the posted password and store it under the private directory
 		 *	(see \Nino\Admin\Admin::PASSWORD_PATH).
 		 *
 		 *	Used to rewrite _admin/Admin.php's PASSWORD_HASH constant in the
@@ -214,11 +214,11 @@ namespace Nino\Install {
 		// already exist in a fresh checkout (git-tracked) or gets created on
 		// first use - see README.md's Structure section
 		// Virtual paths, resolved per entry - the private ones land under the
-		// content directory, the public ones stay where the webserver reaches
+		// private directory, the public ones stay where the webserver reaches
 		// them (see \Nino\Filesystem::path())
 		private const array DIRECTORIES = [
 			''				=> true,	// project root - index.php, the tool folders
-			'content'	=> true,	// config.php, templates, text, elements, data
+			'private'	=> true,	// config.php, templates, text, elements, data
 			'public'	=> true,	// images, assets, fonts, favicon, the cache
 			'text'		=> true,
 			'images'	=> true,
@@ -2332,7 +2332,7 @@ namespace Nino\Install {
 	/**
 	 *	Nino							A compact filesystembased php framework
 	 *	Install						Step 7 - the wizard's last step: set the real _admin password.
-	 *												Writes it under the content directory rather than into any
+	 *												Writes it under the private directory rather than into any
 	 *												tool folder (see Install::setDevPassword()), and is the one
 	 *												action whose success is itself what locks /_install back out -
 	 *												Admin::isInstalled() goes true the moment this returns
@@ -2384,7 +2384,7 @@ namespace Nino\Install {
 			}
 
 			if( \Nino\Install\Install::setDevPassword( $appData, $pw ) === false ) {
-				\Nino\Http::fail( $request, 500, 'could not write '. \Nino\Admin\Admin::PASSWORD_PATH. ' under the content directory - check its file permissions' );
+				\Nino\Http::fail( $request, 500, 'could not write '. \Nino\Admin\Admin::PASSWORD_PATH. ' under the private directory - check its file permissions' );
 				return;
 			}
 

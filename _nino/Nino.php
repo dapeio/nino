@@ -20,20 +20,65 @@ namespace Nino {
 		// the management tools keep. Held apart from the tool folders so
 		// those stay pure code an update may replace wholesale - see
 		// Filesystem::getContentPath()
-		$content 	= defined( 'NINO_CONTENT_DIR' ) ? NINO_CONTENT_DIR : $root. '/content';
+		$defaultContent  = $root. '/private';
+		$typoContent     = $root. '/privat';
+		$previousContent = $root. '/content';
+		$hasPrivateData  = static function( string $path ): bool {
+			foreach( [ 'templates', 'text', 'elements', 'data', '.auth', '.logs', '.backups' ] as $dir ) {
+				if( is_dir( $path. '/'. $dir ) === true )
+					return true;
+			}
+			return false;
+		};
+		$defaultHasData  = $hasPrivateData( $defaultContent );
+		$typoHasData     = is_file( $typoContent. '/config.php' ) === true
+			|| $hasPrivateData( $typoContent );
+		$previousHasData = is_file( $previousContent. '/config.php' ) === true
+			|| $hasPrivateData( $previousContent );
 
-		// Which of the two a project actually uses. A checkout ships
-		// content/config.php, so a new project is on the content layout from
+		// NINO_CONTENT_DIR keeps its established name: it describes the
+		// project's content, while "private" is the canonical directory name.
+		// A project created by the short-lived content/ layout remains usable
+		// until its owner deliberately renames that directory. Never move
+		// project data during a request.
+		if( defined( 'NINO_CONTENT_DIR' ) === true )
+			$content = NINO_CONTENT_DIR;
+		elseif( $defaultHasData === false && $typoHasData === true )
+			$content = $typoContent;
+		elseif( $defaultHasData === false && $previousHasData === true )
+			$content = $previousContent;
+		else
+			$content = $defaultContent;
+
+		// Which of the layouts a project actually uses. A checkout ships
+		// private/config.php, so a new project is on the private layout from
 		// its first request; one installed before the move still has its
 		// files at the project root and keeps them there rather than being
 		// stranded by an update. Probed on config.php, plus text/ for a
 		// project whose config.php sits outside both (NINO_CONFIG_DIR).
-		// Move the five private entries into content/ to switch a project
+		// Move the five private entries into private/ to switch a project
 		// over - nothing here ever moves a file by itself
-		$legacy = is_file( $content. '/config.php' ) === false
+		$legacy = defined( 'NINO_CONTENT_DIR' ) === false
+			&& $defaultHasData === false
+			&& $typoHasData === false
+			&& $previousHasData === false
 			&& ( is_file( $root. '/config.php' ) === true || is_dir( $root. '/text' ) === true );
 
 		$private = $legacy === true ? $root : $content;
+
+		if( defined( 'NINO_CONFIG_DIR' ) === true )
+			$config = NINO_CONFIG_DIR;
+		elseif( defined( 'NINO_CONTENT_DIR' ) === true )
+			$config = $private;
+		elseif( is_file( $private. '/config.php' ) === true )
+			$config = $private;
+		elseif( is_file( $defaultContent. '/config.php' ) === true )
+			// Applying the directory-rename patch can move tracked config.php
+			// before ignored project data is renamed. Keep that split layout
+			// readable until the documented offline directory rename is done.
+			$config = $defaultContent;
+		else
+			$config = $private;
 
 		// ...and the public half, the mirror of it: images, assets, fonts,
 		// the favicon set and the generated asset cache. Gathered in public/
@@ -51,7 +96,7 @@ namespace Nino {
 			// the go-live checklist warns about) can't leak it. Follows the
 			// private root unless the site's index.php defines
 			// NINO_CONFIG_DIR before requiring this file.
-			'./nino/filesystem/configpath'	=> defined( 'NINO_CONFIG_DIR' ) ? NINO_CONFIG_DIR : $private,
+			'./nino/filesystem/configpath'	=> $config,
 			'./nino/filesystem/contentpath'	=> $content,
 			// Where the private half of a project lives - config.php, the
 			// templates, the text/elements they render from, and the data
@@ -1301,11 +1346,15 @@ namespace Nino {
 		}
 
 
-		// The virtual path prefix everything under the content directory is
-		// addressed by. Callers keep using '/content/...' whatever
-		// NINO_CONTENT_DIR points at, so a moved content directory changes
+		// The virtual path prefix everything under the private directory is
+		// addressed by. Callers keep using '/private/...' whatever
+		// NINO_CONTENT_DIR points at, so a moved private directory changes
 		// no call site - the same indirection '/config.php' already has
-		public const string CONTENT_DIR = '/content';
+		public const string CONTENT_DIR = '/private';
+		// Accept the prefixes used by preceding beta revisions without making
+		// either one canonical for new call sites.
+		private const string LEGACY_CONTENT_DIR = '/content';
+		private const string TYPO_CONTENT_DIR = '/privat';
 
 		// Everything a project keeps that a webserver must never serve: its
 		// configuration, the templates it renders, the text and elements it
@@ -1340,9 +1389,17 @@ namespace Nino {
 			if( $filename === '/config.php' && ( $appData['./nino/filesystem/configpath'] ?? '' ) !== '' )
 				return $appData['./nino/filesystem/configpath']. '/config.php';
 
-			if( ( $appData['./nino/filesystem/contentpath'] ?? '' ) !== ''
-				&& ( $filename === self::CONTENT_DIR || str_starts_with( $filename, self::CONTENT_DIR. '/' ) === true ) )
-				return rtrim( $appData['./nino/filesystem/contentpath']. substr( $filename, strlen( self::CONTENT_DIR ) ), '/' );
+			$privatePrefix = null;
+
+			foreach( [ self::CONTENT_DIR, self::TYPO_CONTENT_DIR, self::LEGACY_CONTENT_DIR ] as $prefix ) {
+				if( $filename === $prefix || str_starts_with( $filename, $prefix. '/' ) === true ) {
+					$privatePrefix = $prefix;
+					break;
+				}
+			}
+
+			if( ( $appData['./nino/filesystem/contentpath'] ?? '' ) !== '' && $privatePrefix !== null )
+				return rtrim( $appData['./nino/filesystem/contentpath']. substr( $filename, strlen( $privatePrefix ) ), '/' );
 
 			if( self::_isIn( self::PRIVATE_DIRS, $filename ) === true && ( $appData['./nino/filesystem/privatepath'] ?? '' ) !== '' )
 				return rtrim( $appData['./nino/filesystem/privatepath']. $filename, '/' );
@@ -1492,7 +1549,7 @@ namespace Nino {
 		}
 
 		// Return the path this project's own, non-code state lives under -
-		// normally <project>/content, moved by NINO_CONTENT_DIR (see
+		// normally <project>/private, moved by NINO_CONTENT_DIR (see
 		// \Nino\init()). The generalisation of getConfigPath(): where that
 		// one moves a single file, this moves everything that makes one
 		// installation differ from another, so the tool folders stay pure
@@ -1585,7 +1642,7 @@ namespace Nino {
 			// that exists but isn't set up yet.
 			// The cache key stays the virtual path callers pass in, while
 			// 'path' is where it actually lives - see _resolvePath(), which is
-			// what lets config.php and everything under /content sit outside
+			// what lets config.php and everything under /private sit outside
 			// the project root without any call site knowing
 			if( isset( $appData['./nino/filesystem/cache'][$filename]['path'] ) === false )
 				$appData['./nino/filesystem/cache'][$filename] = [

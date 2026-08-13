@@ -50,7 +50,7 @@ function check( string $label, bool $condition ): void {
  *	@return		bool										True if the lock was free (and has now been released again)
  */
 function probeLockFree( string $sandbox, string $filename ): bool {
-	$lockPath	= $sandbox. '/content/data/.locks/'. sha1( $filename ). '.lock';
+	$lockPath	= $sandbox. '/private/data/.locks/'. sha1( $filename ). '.lock';
 	$probe		= @fopen( $lockPath, 'c' );
 	if( $probe === false )
 		return false;
@@ -76,9 +76,9 @@ $appData = [ './nino/uid' => $sandbox ];
 $appData['./nino/filesystem/path']			= $sandbox;
 // Mirrors \Nino\init()'s default (no NINO_CONFIG_DIR set): configpath falls
 // back to the project root, same as this sandbox's regular path
-$appData['./nino/filesystem/configpath']	= $sandbox. '/content';
-$appData['./nino/filesystem/contentpath']	= $sandbox. '/content';
-$appData['./nino/filesystem/privatepath'] = $sandbox. '/content';
+$appData['./nino/filesystem/configpath']	= $sandbox. '/private';
+$appData['./nino/filesystem/contentpath']	= $sandbox. '/private';
+$appData['./nino/filesystem/privatepath'] = $sandbox. '/private';
 $appData['/nino/dir']				= '';
 $appData['/nino/locales/native']				= 'de_DE';
 $appData['/nino/locales/available']			= [ 'de_DE', 'en_US' ];
@@ -539,9 +539,9 @@ $buildAppData = function() use ( $sandbox ) {
 	$fresh = [ './nino/uid' => $sandbox ];
 	\Nino\AppData::prepare( $fresh );
 	$fresh['./nino/filesystem/path'] 				= $sandbox;
-	$fresh['./nino/filesystem/configpath'] 	= $sandbox. '/content';
-	$fresh['./nino/filesystem/contentpath'] = $sandbox. '/content';
-	$fresh['./nino/filesystem/privatepath'] = $sandbox. '/content';
+	$fresh['./nino/filesystem/configpath'] 	= $sandbox. '/private';
+	$fresh['./nino/filesystem/contentpath'] = $sandbox. '/private';
+	$fresh['./nino/filesystem/privatepath'] = $sandbox. '/private';
 	\Nino\AppData::init( $fresh );
 	return $fresh;
 };
@@ -555,7 +555,7 @@ $reqA['/nino/auth/user']['race@example.com'] = [ 'marker' => 'FROM_A' ];
 $reqB['/nino/html/images'] = [ 'marker' => 'FROM_B' ];
 \Nino\AppData::writeContentData( $reqB, [ '/nino/html/images' ] );
 
-$onDisk = include $sandbox. '/content/config.php';
+$onDisk = include $sandbox. '/private/config.php';
 check( 'a later write to a different key doesn\'t erase an earlier request\'s change', ( $onDisk['/nino/auth/user']['race@example.com']['marker'] ?? null ) === 'FROM_A' );
 check( 'the later request\'s own change is still persisted', ( $onDisk['/nino/html/images']['marker'] ?? null ) === 'FROM_B' );
 
@@ -565,7 +565,7 @@ $sessionUser = 'parallel@example.com';
 \Nino\Auth::insertUser( $appData, $sessionUser, 'correct horse battery staple' );
 
 $sessions = function() use ( $sandbox, $sessionUser ): array {
-	$onDisk = include $sandbox. '/content/config.php';
+	$onDisk = include $sandbox. '/private/config.php';
 	return $onDisk['/nino/auth/user'][$sessionUser]['sessions'] ?? [];
 };
 
@@ -1371,7 +1371,7 @@ echo "Filesystem::path - which root a virtual path resolves against\n";
 $pathAppData = $appData;
 $pathAppData['./nino/filesystem/path'] 				= '/srv/site';
 $pathAppData['./nino/filesystem/configpath'] 	= '/srv/site';
-$pathAppData['./nino/filesystem/contentpath'] = '/srv/site/content';
+$pathAppData['./nino/filesystem/contentpath'] = '/srv/site/private';
 $pathAppData['./nino/filesystem/privatepath'] = '/srv/site';
 
 foreach( [ '/images/hero.jpg', '/assets/style.css', '/.cache/script.js', '/_editor/x' ] as $public )
@@ -1382,7 +1382,9 @@ foreach( \Nino\Filesystem::PRIVATE_DIRS as $private )
 
 check( 'a path under a private directory follows it', \Nino\Filesystem::path( $pathAppData, '/text/de_DE.php' ) === '/srv/site/text/de_DE.php' );
 check( 'a directory merely starting with a private name does not', \Nino\Filesystem::path( $pathAppData, '/textures/x.png' ) === '/srv/site/textures/x.png' );
-check( 'everything under /content follows the content root', \Nino\Filesystem::path( $pathAppData, '/content/.auth/pw.php' ) === '/srv/site/content/.auth/pw.php' );
+check( 'everything under /private follows the private root', \Nino\Filesystem::path( $pathAppData, '/private/.auth/pw.php' ) === '/srv/site/private/.auth/pw.php' );
+check( 'the typo virtual prefix remains compatible', \Nino\Filesystem::path( $pathAppData, '/privat/.auth/pw.php' ) === '/srv/site/private/.auth/pw.php' );
+check( 'the preceding beta virtual prefix remains compatible', \Nino\Filesystem::path( $pathAppData, '/content/.auth/pw.php' ) === '/srv/site/private/.auth/pw.php' );
 
 // Moving the private root moves every private path with it, and nothing else
 $pathAppData['./nino/filesystem/privatepath'] = '/var/nino-private';
@@ -1436,24 +1438,24 @@ echo "router.php - the private root is never served\n";
 
 // Moving the templates out of the public root only helps if nothing hands
 // them back at their new path. The dev server applies no .htaccess at all,
-// so router.php has to refuse /content itself - a plain request for
-// /content/templates/page-home.tpl returned the full template source until
-// it did. Production has content/.htaccess (and NINO_CONTENT_DIR for a
+// so router.php has to refuse /private itself - a plain request for
+// /private/templates/page-home.tpl returned the full template source until
+// it did. Production has private/.htaccess (and NINO_CONTENT_DIR for a
 // setup that cannot rely on it), see docs/deployment.md
 $routerSource = file_get_contents( __DIR__. '/../router.php' );
 
-check( 'router.php refuses everything under the private root', preg_match( '#\^/content\(/\|\$\)#', $routerSource ) === 1 );
-check( '...before it ever looks for a static file', strpos( $routerSource, '/content' ) < strpos( $routerSource, 'is_file( __DIR__. $uri )' ) );
+check( 'router.php refuses the canonical and preceding-beta private roots', str_contains( $routerSource, '#^/(?:private|privat|content)(/|$)#' ) === true );
+check( '...before it ever looks for a static file', strpos( $routerSource, '/private' ) < strpos( $routerSource, 'is_file( __DIR__. $uri )' ) );
 
-check( 'the shipped content directory denies itself for a webserver that does apply it', str_contains(
-	(string) @file_get_contents( __DIR__. '/../content/.htaccess' ), 'Require all denied'
+check( 'the shipped private directory denies itself for a webserver that does apply it', str_contains(
+	(string) @file_get_contents( __DIR__. '/../private/.htaccess' ), 'Require all denied'
 ) === true );
 
 // Nothing private may sit in the public root of a fresh checkout
 foreach( \Nino\Filesystem::PRIVATE_DIRS as $private )
 	check( "a checkout ships no $private in the public root", file_exists( __DIR__. '/..'. $private ) === false );
 
-check( 'config.php ships under the content directory instead', is_file( __DIR__. '/../content/config.php' ) === true );
+check( 'config.php ships under the private directory instead', is_file( __DIR__. '/../private/config.php' ) === true );
 
 echo "\n";
 

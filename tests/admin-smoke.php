@@ -44,11 +44,11 @@ set_error_handler( function() { return true; } );
 
 $sandbox = sys_get_temp_dir(). '/nino-dev-smoke-'. uniqid();
 mkdir( $sandbox, 0777, true );
-mkdir( $sandbox. '/content/elements', 0777, true );
+mkdir( $sandbox. '/private/elements', 0777, true );
 
 // A hand-authored-shaped type file (top-level 'title' key, real locale content) -
 // apiSave must only ever touch 'title'/'model', never this real content
-file_put_contents( $sandbox. '/content/elements/testtype.php', '<?php return [
+file_put_contents( $sandbox. '/private/elements/testtype.php', '<?php return [
 	\'title\'	=> \'Test Type\',
 	\'model\'	=> [ \'name\' => [ \'type\' => \'string\', \'locale\' => true ] ],
 	\'*\'			=> [ \'*\' => [] ],
@@ -62,9 +62,9 @@ $appData = [ './nino/uid' => $sandbox ];
 $appData['./nino/filesystem/path']	= $sandbox;
 // Mirrors \Nino\init()'s default (no NINO_CONFIG_DIR set): configpath falls
 // back to the project root, same as this sandbox's regular path
-$appData['./nino/filesystem/configpath']	= $sandbox. '/content';
-$appData['./nino/filesystem/contentpath']	= $sandbox. '/content';
-$appData['./nino/filesystem/privatepath'] = $sandbox. '/content';
+$appData['./nino/filesystem/configpath']	= $sandbox. '/private';
+$appData['./nino/filesystem/contentpath']	= $sandbox. '/private';
+$appData['./nino/filesystem/privatepath'] = $sandbox. '/private';
 $appData['/nino/dir']		= '';
 $appData['/nino/locales/native']		= 'de_DE';
 $appData['/nino/locales/available']	= [ 'de_DE', 'en_US' ];
@@ -126,7 +126,7 @@ check( 'a module action is rejected while unauthed', $unauthedRequest['/nino/htt
 
 // --- the password gate itself -------------------------------------------
 //
-// The hash lives under the content directory, not in _admin/Admin.php and
+// The hash lives under the private directory, not in _admin/Admin.php and
 // not in config.php: a tool folder carrying state cannot be replaced on an
 // update, and a Restore rewrites config.php - the credential that authorises
 // restoring must survive both (see Admin::passwordHash())
@@ -157,7 +157,7 @@ check( 'a locked-out login reports 429, not 401', $login( $appData, 'the real pa
 // An active lockout that predates the counter's move has to survive the
 // update: otherwise replacing _admin/ would be a way to clear it, handing an
 // attacker mid-cooldown a fresh set of attempts
-unlink( $sandbox. '/content/.auth/lockout.json' );
+unlink( $sandbox. '/private/.auth/lockout.json' );
 $appData['./nino/filesystem/cache'] = [];
 \Nino\Filesystem::putFileContent( $appData, '/_admin/.lockout.json', [ 'tries' => 0, 'until' => time() + 60 ] );
 check( 'a lockout left in the old location still applies after the move', $login( $appData, 'the real password' ) === 429 );
@@ -202,7 +202,7 @@ $appData = [ "./nino/uid" => '. var_export( $legacyRoot, true ). ' ];
 \Nino\AppData::prepare( $appData );
 $appData["./nino/filesystem/path"]				= '. var_export( $legacyRoot, true ). ';
 $appData["./nino/filesystem/configpath"]	= '. var_export( $legacyRoot, true ). ';
-$appData["./nino/filesystem/contentpath"] = '. var_export( $legacyRoot. '/content', true ). ';
+$appData["./nino/filesystem/contentpath"] = '. var_export( $legacyRoot. '/private', true ). ';
 $appData["/nino/dir"] = "";
 \Nino\Filesystem::putFileContent( $appData, "/config.php", [] );
 
@@ -227,7 +227,7 @@ $legacyResult = json_decode( (string) shell_exec( 'php '. escapeshellarg( $legac
 check( 'a legacy project still reports its constant as the hash in effect', ( $legacyResult['hashBefore'] ?? null ) === $legacyHash );
 check( '...and counts as installed, so /_install stays locked for it', ( $legacyResult['installed'] ?? null ) === true );
 check( 'its password still logs in', ( $legacyResult['status'] ?? null ) === 200 );
-check( 'the login migrates the hash out into the content directory', ( $legacyResult['migrated'] ?? null ) === true );
+check( 'the login migrates the hash out into the private directory', ( $legacyResult['migrated'] ?? null ) === true );
 check( '...unchanged, so the same password keeps working afterwards', ( $legacyResult['stored'] ?? null ) === $legacyHash );
 
 \Nino\Runtime::setSessionValue( $appData, './nino/admin/authed', true );
@@ -400,24 +400,24 @@ $appData['/nino/auth/user'] 			= $appData['/nino/auth/user'] ?? [];
 $guardOk = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Editor\Editor::guard( $appData, $guardOk ); // bootstraps + creates today's backup as a side effect
 
-check( 'Backup::maybeRun (via Editor::guard) writes the archive key into the content directory', is_file( $sandbox. '/content/.auth/backup-key.php' ) === true );
+check( 'Backup::maybeRun (via Editor::guard) writes the archive key into the private directory', is_file( $sandbox. '/private/.auth/backup-key.php' ) === true );
 
-check( 'the archives land under the content directory, not in a tool folder', is_dir( $sandbox. '/content/.backups' ) === true );
+check( 'the archives land under the private directory, not in a tool folder', is_dir( $sandbox. '/private/.backups' ) === true );
 check( 'no random backup directory is generated any more', isset( $appData['/nino/backup/dir'] ) === false );
 
 // Regression: an install that already had Backup running (key already in
 // config.php) before this out-of-config copy existed must still get one
 // written on the next admin request - not just on the very first bootstrap
-unlink( $sandbox. '/content/.auth/backup-key.php' );
+unlink( $sandbox. '/private/.auth/backup-key.php' );
 \Nino\Editor\Editor::guard( $appData, $guardOk );
-check( 'Backup::maybeRun re-creates a missing key copy on an already-bootstrapped install', is_file( $sandbox. '/content/.auth/backup-key.php' ) === true );
+check( 'Backup::maybeRun re-creates a missing key copy on an already-bootstrapped install', is_file( $sandbox. '/private/.auth/backup-key.php' ) === true );
 
 // A project that has not written a backup since the move still has its only
 // out-of-config key copy under _admin/. Losing that would make every archive
 // it already holds undecryptable, so the pre-move location stays readable
 $legacyKey = $sandbox. '/_admin/.restore-key.php';
-copy( $sandbox. '/content/.auth/backup-key.php', $legacyKey );
-unlink( $sandbox. '/content/.auth/backup-key.php' );
+copy( $sandbox. '/private/.auth/backup-key.php', $legacyKey );
+unlink( $sandbox. '/private/.auth/backup-key.php' );
 check( 'the key is still found in its pre-move location', \Nino\Editor\Backup::keyPath( $appData, true ) === $legacyKey );
 
 $legacyListRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
@@ -432,7 +432,7 @@ unlink( $legacyKey );
 // than the update
 $legacyDir = $sandbox. '/_editor/.backups-'. str_repeat( 'ab', 16 );
 mkdir( $legacyDir, 0755, true );
-copy( $sandbox. '/content/.backups/'. date( 'Y-m-d' ). '.php', $legacyDir. '/2020-02-02.php' );
+copy( $sandbox. '/private/.backups/'. date( 'Y-m-d' ). '.php', $legacyDir. '/2020-02-02.php' );
 $appData['/nino/backup/dir'] = basename( $legacyDir );
 
 $legacyDirRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
@@ -457,7 +457,7 @@ $appData = [ "./nino/uid" => '. var_export( $sandbox, true ). ' ];
 \Nino\AppData::prepare( $appData );
 $appData["./nino/filesystem/path"]				= '. var_export( $sandbox, true ). ';
 $appData["./nino/filesystem/configpath"]	= '. var_export( $sandbox, true ). ';
-$appData["./nino/filesystem/contentpath"] = '. var_export( $sandbox. '/content', true ). ';
+$appData["./nino/filesystem/contentpath"] = '. var_export( $sandbox. '/private', true ). ';
 $appData["/nino/dir"] = "";
 \Nino\AppData::init( $appData );
 echo json_encode( [
@@ -492,7 +492,7 @@ check( 'apiRestore reports success', ( $restoreRequest['/nino/http/response']['b
 $afterRestore = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
 check( 'the wrecked user record is back after restore', isset( $afterRestore['/nino/auth/user']['admin@example.com'] ) === true );
 
-$backupDir = $sandbox. '/content/.backups';
+$backupDir = $sandbox. '/private/.backups';
 check( 'a pre-restore safety snapshot of the (corrupted) state was made first', count( glob( $backupDir. '/pre-restore-*.php' ) ?: [] ) === 1 );
 
 $_POST['data'] = json_encode( [ 'date' => '2020-01-01' ] );
@@ -579,7 +579,7 @@ $outAppData = [ './nino/uid' => $outSandbox ];
 \Nino\AppData::prepare( $outAppData );
 $outAppData['./nino/filesystem/path']			= $outSandbox;
 $outAppData['./nino/filesystem/configpath']	= $outConfigDir; // simulates NINO_CONFIG_DIR
-$outAppData['./nino/filesystem/contentpath']	= $outSandbox. '/content';
+$outAppData['./nino/filesystem/contentpath']	= $outSandbox. '/private';
 $outAppData['/nino/dir']										= '';
 $outAppData['/nino/locales/native']				= 'de_DE';
 $outAppData['/nino/locales/available']			= [ 'de_DE' ];
@@ -603,7 +603,7 @@ check( 'config.php was written under configPath, not under the project root', is
 $outGuard = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Editor\Editor::guard( $outAppData, $outGuard ); // bootstraps + creates today's backup as a side effect
 
-$outBackupDir = $outSandbox. '/content/.backups';
+$outBackupDir = $outSandbox. '/private/.backups';
 $outToday 		= $outBackupDir. '/'. date( 'Y-m-d' ). '.php';
 
 check( 'a backup was created for the out-of-webroot setup', is_file( $outToday ) === true );
@@ -954,12 +954,12 @@ echo "\n";
 
 echo "Text::apiScan - missing [[/key]] placeholders in templates/*.tpl\n";
 
-mkdir( $sandbox. '/content/templates', 0777, true );
-file_put_contents( $sandbox. '/content/templates/scan-fixture.tpl', '<p>[[/page-scan-test/heading]]</p><p>[[/page-scan-test/heading]]</p><p>[[/company/name]]</p>' );
+mkdir( $sandbox. '/private/templates', 0777, true );
+file_put_contents( $sandbox. '/private/templates/scan-fixture.tpl', '<p>[[/page-scan-test/heading]]</p><p>[[/page-scan-test/heading]]</p><p>[[/company/name]]</p>' );
 // A nested, dynamically-constructed fill (same shape as html-header.tpl's real
 // [[/webpage[[/nino/http/response/uri]]/title]]) - only the inner, always-
 // registered kernel fill should ever be visible to a static regex scan
-file_put_contents( $sandbox. '/content/templates/scan-fixture-2.tpl', '<title>[[/webpage[[/nino/http/response/uri]]/title]]</title>' );
+file_put_contents( $sandbox. '/private/templates/scan-fixture-2.tpl', '<title>[[/webpage[[/nino/http/response/uri]]/title]]</title>' );
 
 // /company/name is genuinely defined (unlike /page-scan-test/heading) - proves
 // a real key is correctly excluded, not just absent from the fixture by accident
@@ -976,8 +976,8 @@ check( 'an undefined key found twice in the same file is only reported once', co
 check( 'an already-defined key is not reported', in_array( '/company/name', $missingKeys, true ) === false );
 check( 'the kernel-injected /nino/http/response/uri fill is never reported, despite appearing inside a nested [[...]] construct', in_array( '/nino/http/response/uri', $missingKeys, true ) === false );
 
-unlink( $sandbox. '/content/templates/scan-fixture.tpl' );
-unlink( $sandbox. '/content/templates/scan-fixture-2.tpl' );
+unlink( $sandbox. '/private/templates/scan-fixture.tpl' );
+unlink( $sandbox. '/private/templates/scan-fixture-2.tpl' );
 
 echo "\n";
 
@@ -993,7 +993,7 @@ imagepng( $probeImg );
 file_put_contents( $sandbox. '/images/probe.png', ob_get_clean() );
 imagedestroy( $probeImg );
 
-file_put_contents( $sandbox. '/content/templates/scan-fixture-img.tpl', '<img src="[[/nino/dir]]/images/probe.png"><img src="[[/nino/dir]]/images/probe.png"><img src="https://example.com/x.jpg"><img src="data:image/svg+xml,%3Csvg/%3E">' );
+file_put_contents( $sandbox. '/private/templates/scan-fixture-img.tpl', '<img src="[[/nino/dir]]/images/probe.png"><img src="[[/nino/dir]]/images/probe.png"><img src="https://example.com/x.jpg"><img src="data:image/svg+xml,%3Csvg/%3E">' );
 
 [ $status, $body ] = callDev( $appData, \Nino\Admin\Images::class, 'apiScan' );
 check( 'apiScan succeeds', $status === 200 );
@@ -1011,7 +1011,7 @@ $appData['/nino/html/images']['/probe']['filename'] = 'probe.png';
 [ $status, $body ] = callDev( $appData, \Nino\Admin\Images::class, 'apiScan' );
 check( 'once a slot tracks the file, it no longer shows up as missing', count( $body['missing'] ) === 0 );
 
-unlink( $sandbox. '/content/templates/scan-fixture-img.tpl' );
+unlink( $sandbox. '/private/templates/scan-fixture-img.tpl' );
 
 echo "\n";
 
@@ -1029,13 +1029,13 @@ check( 'missingImages is 0 - the scan fixture above was already cleaned up', $bo
 // prove the two counts actually reflect Text/Images::_scanMissing(), not just
 // always 0 - a new filename, since probe.png is already tracked by the slot
 // created in the Images::apiScan section above
-file_put_contents( $sandbox. '/content/templates/dashboard-fixture.tpl', '<p>[[/dashboard-scan-test/heading]]</p><img src="[[/nino/dir]]/images/probe2.png">' );
+file_put_contents( $sandbox. '/private/templates/dashboard-fixture.tpl', '<p>[[/dashboard-scan-test/heading]]</p><img src="[[/nino/dir]]/images/probe2.png">' );
 
 [ , $body ] = callDev( $appData, \Nino\Admin\Dashboard::class, 'apiSummary' );
 check( 'missingText picks up the fresh undefined key', $body['missingText'] === 1 );
 check( 'missingImages picks up the fresh untracked image (a new filename, not tracked by any slot)', $body['missingImages'] === 1 );
 
-unlink( $sandbox. '/content/templates/dashboard-fixture.tpl' );
+unlink( $sandbox. '/private/templates/dashboard-fixture.tpl' );
 
 \Nino\Runtime::unsetSessionValue( $appData, './nino/admin/authed' );
 [ $status ] = callDev( $appData, \Nino\Admin\Dashboard::class, 'apiSummary' );
@@ -1049,9 +1049,9 @@ echo "\n";
 
 echo "Dev\\PageEditor - create/edit/delete page routes\n";
 
-file_put_contents( $sandbox. '/content/templates/page-about.tpl', '<h1>About</h1>' );
-file_put_contents( $sandbox. '/content/templates/page-contact.tpl', '<h1>Contact</h1>' );
-file_put_contents( $sandbox. '/content/templates/not-a-page.tpl', '<p>ignored - not a page-*.tpl file</p>' );
+file_put_contents( $sandbox. '/private/templates/page-about.tpl', '<h1>About</h1>' );
+file_put_contents( $sandbox. '/private/templates/page-contact.tpl', '<h1>Contact</h1>' );
+file_put_contents( $sandbox. '/private/templates/not-a-page.tpl', '<p>ignored - not a page-*.tpl file</p>' );
 
 [ $status, $body ] = callDev( $appData, \Nino\Admin\PageEditor::class, 'apiList' );
 check( 'apiList succeeds', $status === 200 );
@@ -1228,9 +1228,9 @@ check( 'apiDelete 404s for an unknown httpUri', $status === 404 );
 
 array_pop( $appData['/nino/modules'] ); // drop the simulated Navigation module again
 
-unlink( $sandbox. '/content/templates/page-about.tpl' );
-unlink( $sandbox. '/content/templates/page-contact.tpl' );
-unlink( $sandbox. '/content/templates/not-a-page.tpl' );
+unlink( $sandbox. '/private/templates/page-about.tpl' );
+unlink( $sandbox. '/private/templates/page-contact.tpl' );
+unlink( $sandbox. '/private/templates/not-a-page.tpl' );
 
 \Nino\Runtime::unsetSessionValue( $appData, './nino/admin/authed' );
 [ $status ] = callDev( $appData, \Nino\Admin\PageEditor::class, 'apiList' );
@@ -1410,7 +1410,7 @@ echo "Elements - element content CRUD\n";
 
 // A second type alongside testtype, with both a global and a locale field, so
 // the global/locale split and the raw-bucket view have something real to show
-file_put_contents( $sandbox. '/content/elements/contenttype.php', '<?php return [
+file_put_contents( $sandbox. '/private/elements/contenttype.php', '<?php return [
 	\'title\'	=> \'Content Type\',
 	\'model\'	=> [
 		\'title\'	=> [ \'type\' => \'string\', \'locale\' => true ],

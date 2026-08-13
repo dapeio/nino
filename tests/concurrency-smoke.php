@@ -55,9 +55,9 @@ function bootAppData( string $sandbox ): array {
 	$appData = [ './nino/uid' => $sandbox ];
 	\Nino\AppData::prepare( $appData );
 	$appData['./nino/filesystem/path'] 				= $sandbox;
-	$appData['./nino/filesystem/configpath'] 	= $sandbox. '/content';
-	$appData['./nino/filesystem/contentpath'] = $sandbox. '/content';
-	$appData['./nino/filesystem/privatepath'] = $sandbox. '/content';
+	$appData['./nino/filesystem/configpath'] 	= $sandbox. '/private';
+	$appData['./nino/filesystem/contentpath'] = $sandbox. '/private';
+	$appData['./nino/filesystem/privatepath'] = $sandbox. '/private';
 	\Nino\AppData::init( $appData );
 
 	return $appData;
@@ -169,9 +169,9 @@ function runParallel( string $mode, string $sandbox, array $args ): void {
 }
 
 $sandbox = sys_get_temp_dir(). '/nino-concurrency-'. bin2hex( random_bytes( 6 ) );
-mkdir( $sandbox. '/content/data', 0755, true );
+mkdir( $sandbox. '/private/data', 0755, true );
 
-file_put_contents( $sandbox. '/content/config.php', '<?php return '. var_export( [
+file_put_contents( $sandbox. '/private/config.php', '<?php return '. var_export( [
 	'/test/a' => [],
 	'/test/b' => [],
 ], true ). ';' );
@@ -183,7 +183,7 @@ echo "AppData::writeContentData under real concurrency\n";
 // accident
 runParallel( 'worker', $sandbox, [ '/test/a', '/test/b' ] );
 
-$onDisk = include $sandbox. '/content/config.php';
+$onDisk = include $sandbox. '/private/config.php';
 
 check( 'config.php is still a readable array after '. ( 2 * ROUNDS ). ' concurrent writes', is_array( $onDisk ) === true );
 check( 'no worker lost an entry of its own key (a)', count( $onDisk['/test/a'] ?? [] ) === ROUNDS );
@@ -201,8 +201,8 @@ echo "Elements::insertElement under real concurrency\n";
 // element type at the same time. Every insert is a read-modify-write of one
 // type file, so an unserialized round drops whatever the other one just
 // added - a published article silently disappearing.
-mkdir( $sandbox. '/content/elements', 0755, true );
-file_put_contents( $sandbox. '/content/elements/news.php', '<?php return '. var_export( [
+mkdir( $sandbox. '/private/elements', 0755, true );
+file_put_contents( $sandbox. '/private/elements/news.php', '<?php return '. var_export( [
 	'title'	=> 'News',
 	'model'	=> [ 'title' => [ 'type' => 'string', 'locale' => true ] ],
 	'*'			=> [ '*' => [] ],
@@ -210,7 +210,7 @@ file_put_contents( $sandbox. '/content/elements/news.php', '<?php return '. var_
 
 runParallel( 'element-worker', $sandbox, [ 'a', 'b' ] );
 
-$typeData	= include $sandbox. '/content/elements/news.php';
+$typeData	= include $sandbox. '/private/elements/news.php';
 $stored		= array_diff( array_keys( $typeData['de_DE'] ?? [] ), [ '*' ] );
 
 check( 'the type file is still a readable array after '. ( 2 * ROUNDS ). ' concurrent inserts', is_array( $typeData ) === true );
@@ -230,9 +230,9 @@ echo "Editor\\Backup::maybeRun under real concurrency\n";
 // config re-read, key generation and today's existence check as one unit.
 runParallel( 'backup-worker', $sandbox, [ '-', '-' ] );
 
-$onDisk = include $sandbox. '/content/config.php';
-$backupDirs = glob( $sandbox. '/content/.backups', GLOB_ONLYDIR ) ?: [];
-$backupDir = $sandbox. '/content/.backups';
+$onDisk = include $sandbox. '/private/config.php';
+$backupDirs = glob( $sandbox. '/private/.backups', GLOB_ONLYDIR ) ?: [];
+$backupDir = $sandbox. '/private/.backups';
 $today = $backupDir. '/'. date( 'Y-m-d' ). '.php';
 
 check( 'parallel first-use requests persist one backup directory/key pair', count( $backupDirs ) === 1 && is_string( $onDisk['/nino/backup/key'] ?? null ) === true );

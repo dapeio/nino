@@ -52,9 +52,9 @@ Die mitgelieferte `.htaccess` setzt zwei grundlegende Schutzregeln, sofern der S
 - Dateien mit einem führenden Punkt werden nicht direkt ausgeliefert.
 - Verzeichnisse ohne Indexdatei zeigen keine Dateiliste.
 
-Eine dritte Regel liegt in `content/.htaccess` und sperrt dieses Verzeichnis vollständig. Sie ist die wichtigste: In `content/` liegen `config.php`, die Templates sowie die Texte und Elemente, aus denen sie rendern, und die Daten deiner Besucher. Ohne sie liefert ein Aufruf von `content/templates/page-home.tpl` den Template-Quelltext im Klartext aus.
+Eine dritte Regel liegt in `private/.htaccess` und sperrt dieses Verzeichnis vollständig. Sie ist die wichtigste: In `private/` liegen `config.php`, die Templates sowie die Texte und Elemente, aus denen sie rendern, und die Daten deiner Besucher. Ohne sie liefert ein Aufruf von `private/templates/page-home.tpl` den Template-Quelltext im Klartext aus.
 
-Prüfe in der Hosting-Konfiguration zusätzlich, wie nicht vorhandene Pfade an `index.php` übergeben werden. Eine `.htaccess`, die vom Server ignoriert wird, entfaltet keinerlei Schutzwirkung – und bei `content/` ist das keine Härtungsfrage, sondern eine Offenlegung. Wenn du dich auf `.htaccess` nicht verlassen kannst, richte stattdessen `NINO_CONTENT_DIR` in der `index.php` auf ein Verzeichnis außerhalb des Webroots; dann braucht es gar keine Serverregel.
+Prüfe in der Hosting-Konfiguration zusätzlich, wie nicht vorhandene Pfade an `index.php` übergeben werden. Eine `.htaccess`, die vom Server ignoriert wird, entfaltet keinerlei Schutzwirkung – und bei `private/` ist das keine Härtungsfrage, sondern eine Offenlegung. Wenn du dich auf `.htaccess` nicht verlassen kannst, richte stattdessen `NINO_CONTENT_DIR` in der `index.php` auf ein Verzeichnis außerhalb des Webroots; dann braucht es gar keine Serverregel.
 
 ### Nginx und andere Webserver
 
@@ -64,14 +64,14 @@ Prüfe in der Hosting-Konfiguration zusätzlich, wie nicht vorhandene Pfade an `
 - normale Webseitenrouten an `index.php` weitergeben;
 - `/_editor`, `/_admin`, `/_templates` und gegebenenfalls `/_install` an ihre eigenen Einstiegspunkte routen;
 - Zugriffe auf Dotfiles und Dot-Verzeichnisse verweigern;
-- **`content/` vollständig sperren** – es wird nie von einem Browser angefragt, sondern nur von PHP gelesen;
+- **`private/` vollständig sperren** – es wird nie von einem Browser angefragt, sondern nur von PHP gelesen;
 - Verzeichnisauflistung deaktivieren;
 - PHP-Quell- und Datendateien nicht als Text ausliefern.
 
 Für nginx ist der vorletzte Punkt ein einzelner Block:
 
 ```nginx
-location ^~ /content/ { deny all; return 404; }
+location ^~ /private/ { deny all; return 404; }
 ```
 
 Oder du umgehst die Frage, indem du das Verzeichnis mit `NINO_CONTENT_DIR` aus dem Webroot verlegst.
@@ -191,11 +191,13 @@ Behandle ein Nino-Update wie eine Änderung am konkreten Webseitenprojekt, nicht
 
 1. Sichere den aktuellen produktiven Stand außerhalb des Webroots.
 2. Übernimm die Änderung zunächst in eine Entwicklungs- oder Staging-Umgebung.
-3. Vergleiche eigene Anpassungen in Kernel, Templates und Verwaltungsoberflächen mit dem neuen Stand. Die Verwaltungsoberflächen selbst tragen keinen Projektzustand mehr: Das `/_admin`-Passwort liegt in `content/.auth/pw.php`, `_admin/` lässt sich also komplett ersetzen, ohne den Login zu verlieren oder `/_install` wieder zu öffnen.
+3. Vergleiche eigene Anpassungen in Kernel, Templates und Verwaltungsoberflächen mit dem neuen Stand. Die Verwaltungsoberflächen selbst tragen keinen Projektzustand mehr: Das `/_admin`-Passwort liegt in `private/.auth/pw.php`, `_admin/` lässt sich also komplett ersetzen, ohne den Login zu verlieren oder `/_install` wieder zu öffnen.
 4. Führe Smoke-Tests und projektspezifische Abnahme aus.
 5. Übertrage den geprüften Stand und behalte die vorherige Version für ein Rollback.
 
-Ein Projekt, das vor `content/` und `public/` eingerichtet wurde, behält seine Dateien im Projektstamm und wird bei jedem Request als solches erkannt – ein Update verschiebt nie etwas von selbst. Zum Umstellen verschiebst du `config.php`, `templates/`, `text/`, `elements/` und `data/` nach `content/` sowie `images/`, `assets/`, `favicon/`, `fonts/` und `.cache/` nach `public/`. Vor dem Umzug erzeugte Templates adressieren Bilder noch als `[[/nino/dir]]/images/...`; das muss im selben Schritt zu `[[/nino/public]]/images/...` werden, sonst laufen sie danach ins Leere.
+Ein Projekt, das vor `private/` und `public/` eingerichtet wurde, behält seine Dateien im Projektstamm und wird bei jedem Request als solches erkannt – ein Update verschiebt nie etwas von selbst. Zum Umstellen verschiebst du `config.php`, `templates/`, `text/`, `elements/` und `data/` nach `private/` sowie `images/`, `assets/`, `favicon/`, `fonts/` und `.cache/` nach `public/`. Vor dem Umzug erzeugte Templates adressieren Bilder noch als `[[/nino/dir]]/images/...`; das muss im selben Schritt zu `[[/nino/public]]/images/...` werden, sonst laufen sie danach ins Leere.
+
+Frühere Beta-Stände nannten dieses Verzeichnis `content/`; in einem kurzlebigen Stand war der neue Name zudem als `privat/` falsch geschrieben. Nino erkennt beide Namen weiterhin, damit ein Update vorhandene Projektdaten nicht abschneidet; kanonisch ist aber `private/`. Benenne das vollständige Verzeichnis um, während die Seite offline ist, und behalte nicht mehrere dieser Verzeichnisse.
 
 Nino befindet sich in der Beta-Phase. Sicherheitskorrekturen erscheinen auf `main`; eine getrennte LTS-Linie gibt es derzeit nicht. Plane Updates deshalb als aktive Projektpflege ein und prüfe `SECURITY.md` sowie den Changelog vor einer Aktualisierung.
 
@@ -204,7 +206,7 @@ Nino befindet sich in der Beta-Phase. Sicherheitskorrekturen erscheinen auf `mai
 - [ ] PHP-Version und Erweiterungen entsprechen den Anforderungen.
 - [ ] Öffentliche Routen werden korrekt an Nino übergeben.
 - [ ] Dotfiles, Dot-Verzeichnisse und PHP-Datendateien sind nicht direkt erreichbar.
-- [ ] `content/` wird nicht ausgeliefert — die eigene `.htaccess` sperrt das Verzeichnis, und jede Datei darin trägt einen 403-Stub; prüfe, ob beides auf deinem Webserver greift, oder verlege das Verzeichnis mit `NINO_CONTENT_DIR` aus dem Webroot.
+- [ ] `private/` wird nicht ausgeliefert — die eigene `.htaccess` sperrt das Verzeichnis, und jede Datei darin trägt einen 403-Stub; prüfe, ob beides auf deinem Webserver greift, oder verlege das Verzeichnis mit `NINO_CONTENT_DIR` aus dem Webroot.
 - [ ] Verzeichnisauflistung ist deaktiviert.
 - [ ] `/_install` konnte die Projektverzeichnisse aus der beschreibbaren Projektwurzel selbst erzeugen.
 - [ ] Schreibrechte sind nach der Einrichtung auf die benötigten Pfade begrenzt.

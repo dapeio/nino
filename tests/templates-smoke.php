@@ -44,18 +44,18 @@ function throwsInvalidArgument( callable $callback ): bool {
 set_error_handler( function() { return true; } );
 
 $sandbox = sys_get_temp_dir(). '/nino-templates-smoke-'. uniqid();
-mkdir( $sandbox. '/content/templates', 0777, true );
-mkdir( $sandbox. '/content/text', 0777, true );
-mkdir( $sandbox. '/content/elements', 0777, true );
+mkdir( $sandbox. '/private/templates', 0777, true );
+mkdir( $sandbox. '/private/text', 0777, true );
+mkdir( $sandbox. '/private/elements', 0777, true );
 
 $_SERVER['REMOTE_ADDR'] = '127.0.0.1';
 
 $appData = [ './nino/uid' => $sandbox ];
 \Nino\AppData::prepare( $appData );
 $appData['./nino/filesystem/path'] = $sandbox;
-$appData['./nino/filesystem/configpath'] = $sandbox. '/content';
-$appData['./nino/filesystem/contentpath'] = $sandbox. '/content';
-$appData['./nino/filesystem/privatepath'] = $sandbox. '/content';
+$appData['./nino/filesystem/configpath'] = $sandbox. '/private';
+$appData['./nino/filesystem/contentpath'] = $sandbox. '/private';
+$appData['./nino/filesystem/privatepath'] = $sandbox. '/private';
 $appData['/nino/dir'] = '';
 $appData['/nino/locales/native'] = 'en_US';
 $appData['/nino/locales/available'] = [ 'en_US', 'de_DE' ];
@@ -236,9 +236,9 @@ echo "\n";
 echo "Documents\n";
 
 $page = "[template /templates/html-header]\n<!-- locked project source -->\n". $hero['source']. $articles['source']. "[template /templates/html-footer]\n";
-file_put_contents( $sandbox. '/content/templates/page-home.tpl', $page );
-file_put_contents( $sandbox. '/content/templates/section-card.tpl', '<section></section>' );
-file_put_contents( $sandbox. '/content/templates/html-header.tpl', '<!doctype html>' );
+file_put_contents( $sandbox. '/private/templates/page-home.tpl', $page );
+file_put_contents( $sandbox. '/private/templates/section-card.tpl', '<section></section>' );
+file_put_contents( $sandbox. '/private/templates/html-header.tpl', '<!doctype html>' );
 
 $listRequest = response();
 \Nino\Templates\Documents::apiList( $appData, $listRequest );
@@ -254,15 +254,15 @@ $includes = $includesRequest['/nino/http/response']['body']['includes'];
 check( 'include library always starts with html-header and html-footer', array_column( array_slice( $includes, 0, 2 ), 'name' ) === [ 'html-header', 'html-footer' ] );
 check( 'include library offers section templates but excludes page templates', in_array( 'section-card', array_column( $includes, 'name' ), true ) && in_array( 'page-home', array_column( $includes, 'name' ), true ) === false );
 
-file_put_contents( $sandbox. '/content/templates/page-2026.home.tpl', $page );
+file_put_contents( $sandbox. '/private/templates/page-2026.home.tpl', $page );
 $variantListRequest = response();
 \Nino\Templates\Documents::apiList( $appData, $variantListRequest );
 $variant = array_values( array_filter( $variantListRequest['/nino/http/response']['body']['documents'], fn( array $document ): bool => $document['name'] === 'page-2026.home' ) )[0] ?? [];
 check( 'derives a valid distinct id from dotted or number-prefixed page names', ( $variant['pageId'] ?? '' ) === 'p-2026-home' );
-unlink( $sandbox. '/content/templates/page-2026.home.tpl' );
+unlink( $sandbox. '/private/templates/page-2026.home.tpl' );
 
 $bareSource = "<section id=\"bare\"></section>\n";
-file_put_contents( $sandbox. '/content/templates/page-bare.tpl', $bareSource );
+file_put_contents( $sandbox. '/private/templates/page-bare.tpl', $bareSource );
 post( [ 'name' => 'page-bare' ] );
 $bareLoadRequest = response();
 \Nino\Templates\Documents::apiLoad( $appData, $bareLoadRequest );
@@ -273,10 +273,10 @@ post( [ 'name' => 'page-bare', 'revision' => $bare['revision'], 'segments' => $b
 $bareSaveRequest = response();
 \Nino\Templates\Documents::apiSave( $appData, $bareSaveRequest );
 check( 'None placeholders persist as markers without inventing template includes', $bareSaveRequest['/nino/http/response']['statusCode'] === 200
-	&& substr_count( (string) file_get_contents( $sandbox. '/content/templates/page-bare.tpl' ), 'nino:template-slot' ) === 2
-	&& str_starts_with( (string) file_get_contents( $sandbox. '/content/templates/page-bare.tpl' ), '<!-- nino:template-name Bare -->' )
-	&& str_contains( (string) file_get_contents( $sandbox. '/content/templates/page-bare.tpl' ), '[template ' ) === false );
-unlink( $sandbox. '/content/templates/page-bare.tpl' );
+	&& substr_count( (string) file_get_contents( $sandbox. '/private/templates/page-bare.tpl' ), 'nino:template-slot' ) === 2
+	&& str_starts_with( (string) file_get_contents( $sandbox. '/private/templates/page-bare.tpl' ), '<!-- nino:template-name Bare -->' )
+	&& str_contains( (string) file_get_contents( $sandbox. '/private/templates/page-bare.tpl' ), '[template ' ) === false );
+unlink( $sandbox. '/private/templates/page-bare.tpl' );
 
 post( [ 'name' => 'page-home' ] );
 $loadRequest = response();
@@ -293,9 +293,9 @@ post( [ 'name' => 'page-home', 'revision' => $loaded['revision'], 'segments' => 
 $roundTripRequest = response();
 \Nino\Templates\Documents::apiSave( $appData, $roundTripRequest );
 check( 'saving untouched segments succeeds', $roundTripRequest['/nino/http/response']['statusCode'] === 200 );
-check( 'the first deliberate save adds inert markers around legacy shell includes', str_contains( (string) file_get_contents( $sandbox. '/content/templates/page-home.tpl' ), '<!-- nino:template-slot header -->' )
-	&& str_contains( (string) file_get_contents( $sandbox. '/content/templates/page-home.tpl' ), '<!-- nino:template-slot footer -->' )
-	&& str_starts_with( (string) file_get_contents( $sandbox. '/content/templates/page-home.tpl' ), "<!-- nino:template-name Home -->\n<!-- nino:template-vpa on -->\n" ) );
+check( 'the first deliberate save adds inert markers around legacy shell includes', str_contains( (string) file_get_contents( $sandbox. '/private/templates/page-home.tpl' ), '<!-- nino:template-slot header -->' )
+	&& str_contains( (string) file_get_contents( $sandbox. '/private/templates/page-home.tpl' ), '<!-- nino:template-slot footer -->' )
+	&& str_starts_with( (string) file_get_contents( $sandbox. '/private/templates/page-home.tpl' ), "<!-- nino:template-name Home -->\n<!-- nino:template-vpa on -->\n" ) );
 $loaded['revision'] = $roundTripRequest['/nino/http/response']['body']['revision'];
 
 $sectionSlots = array_keys( array_filter( $loaded['segments'], fn( array $segment ): bool => $segment['type'] === 'section' ) );
@@ -304,7 +304,7 @@ $reordered = $loaded['segments'];
 post( [ 'name' => 'page-home', 'revision' => $loaded['revision'], 'segments' => $reordered ] );
 $reorderRequest = response();
 \Nino\Templates\Documents::apiSave( $appData, $reorderRequest );
-$reorderedSource = file_get_contents( $sandbox. '/content/templates/page-home.tpl' );
+$reorderedSource = file_get_contents( $sandbox. '/private/templates/page-home.tpl' );
 check( 'reordering complete sections succeeds', $reorderRequest['/nino/http/response']['statusCode'] === 200 );
 check( 'reordering leaves metadata and marked header/footer frame source in place', str_starts_with( $reorderedSource, '<!-- nino:template-name Home -->' )
 	&& strpos( $reorderedSource, '<!-- nino:template-name Home -->' ) < strpos( $reorderedSource, '<!-- nino:template-slot header -->' )
@@ -355,7 +355,7 @@ $duplicateRequest = response();
 \Nino\Templates\Documents::apiSave( $appData, $duplicateRequest );
 check( 'rejects duplicate non-empty section ids', $duplicateRequest['/nino/http/response']['statusCode'] === 409 );
 
-file_put_contents( $sandbox. '/content/templates/page-home.tpl', $reorderedSource. "\n<!-- external edit -->\n" );
+file_put_contents( $sandbox. '/private/templates/page-home.tpl', $reorderedSource. "\n<!-- external edit -->\n" );
 post( [ 'name' => 'page-home', 'revision' => $fresh['revision'], 'segments' => $fresh['segments'] ] );
 $staleRequest = response();
 \Nino\Templates\Documents::apiSave( $appData, $staleRequest );
@@ -375,7 +375,7 @@ post( [
 ] );
 $createRequest = response();
 \Nino\Templates\Documents::apiCreate( $appData, $createRequest );
-$createdPage = file_get_contents( $sandbox. '/content/templates/page-services.tpl' );
+$createdPage = file_get_contents( $sandbox. '/private/templates/page-services.tpl' );
 check( 'creates a new page template on demand', $createRequest['/nino/http/response']['statusCode'] === 200 && $createdPage !== false );
 $createdSegments = array_values( array_filter( \Nino\Templates\SectionDocument::split( (string) $createdPage )['segments'], fn( array $segment ): bool => $segment['type'] === 'slot' ) );
 check( 'new templates start with name/VPA metadata and chosen header/footer slots', str_starts_with( (string) $createdPage, "<!-- nino:template-name Services Overview -->\n<!-- nino:template-vpa on -->\n" )
@@ -396,11 +396,11 @@ check( 'rejects an unsafe new-template filename', $invalidCreateRequest['/nino/h
 post( [ 'name' => 'page-services', 'confirmName' => 'page-other', 'revision' => $createdLoad['revision'] ] );
 $unconfirmedDeleteRequest = response();
 \Nino\Templates\Documents::apiDelete( $appData, $unconfirmedDeleteRequest );
-check( 'requires an exact template name before deleting a file', $unconfirmedDeleteRequest['/nino/http/response']['statusCode'] === 400 && is_file( $sandbox. '/content/templates/page-services.tpl' ) );
+check( 'requires an exact template name before deleting a file', $unconfirmedDeleteRequest['/nino/http/response']['statusCode'] === 400 && is_file( $sandbox. '/private/templates/page-services.tpl' ) );
 post( [ 'name' => 'page-services', 'confirmName' => 'page-services', 'revision' => $createdLoad['revision'] ] );
 $deleteRequest = response();
 \Nino\Templates\Documents::apiDelete( $appData, $deleteRequest );
-check( 'deletes exactly the revision the user confirmed', $deleteRequest['/nino/http/response']['statusCode'] === 200 && is_file( $sandbox. '/content/templates/page-services.tpl' ) === false );
+check( 'deletes exactly the revision the user confirmed', $deleteRequest['/nino/http/response']['statusCode'] === 200 && is_file( $sandbox. '/private/templates/page-services.tpl' ) === false );
 
 echo "\n";
 

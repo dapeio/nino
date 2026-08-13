@@ -5,7 +5,7 @@
 # Never serve a dotfile directly - matches the filename only (not the
 # containing directory, so _editor/.cache/script.js is unaffected), which
 # is exactly what's needed: _admin/.restore-key.php is a real dotfile, while
-# content/.auth/ and content/.logs/ are dotdirs whose files inside
+# private/.auth/ and private/.logs/ are dotdirs whose files inside
 # (eg. 2026-01-01.php) aren't themselves dotfiles - those stay protected
 # by their own self-exiting .php stub instead (see docs/developer.md's
 # "Encryption / stub conventions").
@@ -14,7 +14,7 @@
 </FilesMatch>
 
 # The project's private half (see \Nino\Filesystem::PRIVATE_DIRS) is only
-# ever read by php, never served - denied by content/.htaccess rather than
+# ever read by php, never served - denied by private/.htaccess rather than
 # from here, since a rule written here would have to name an absolute url
 # path and would therefore miss a subdirectory install (/nino/dir). Both are
 # belt and braces next to the 403 stub each of those files carries itself.

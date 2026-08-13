@@ -51,9 +51,9 @@ $_SERVER['REMOTE_ADDR'] = '127.0.0.1';
 $appData = [ './nino/uid' => $sandbox ];
 \Nino\AppData::prepare( $appData );
 $appData['./nino/filesystem/path']				= $sandbox;
-$appData['./nino/filesystem/configpath']	= $sandbox. '/content';
-$appData['./nino/filesystem/contentpath']	= $sandbox. '/content';
-$appData['./nino/filesystem/privatepath'] = $sandbox. '/content';
+$appData['./nino/filesystem/configpath']	= $sandbox. '/private';
+$appData['./nino/filesystem/contentpath']	= $sandbox. '/private';
+$appData['./nino/filesystem/privatepath'] = $sandbox. '/private';
 $appData['/nino/dir']										= '';
 $appData['/nino/locales/native']					= 'de_DE';
 // Matches the real shipped config.php default - only the native locale,
@@ -62,9 +62,9 @@ $appData['/nino/locales/native']					= 'de_DE';
 $appData['/nino/locales/available']			= [ 'de_DE' ];
 $appData['/nino/modules']								= [ '\\Nino\\Modules\\Assets', '\\Nino\\Modules\\Elements', '\\Nino\\Modules\\Template', '\\Nino\\Modules\\Jstext', '\\Nino\\Modules\\Csrf', '\\Nino\\Modules\\Images' ];
 
-mkdir( $sandbox. '/content/templates', 0777, true );
+mkdir( $sandbox. '/private/templates', 0777, true );
 mkdir( $sandbox. '/images', 0777, true );
-mkdir( $sandbox. '/content/text', 0777, true );
+mkdir( $sandbox. '/private/text', 0777, true );
 mkdir( $sandbox. '/assets', 0777, true );
 
 \Nino\Filesystem::putFileContent( $appData, '/config.php', [
@@ -154,6 +154,7 @@ $checksBody = $checksRequest['/nino/http/response']['body'];
 check( 'reports the running php version', $checksBody['php']['version'] === PHP_VERSION );
 check( 'gd is reported as loaded (required by CI)', $checksBody['extensions']['gd']['ok'] === true );
 check( 'the project root is reported as writable', $checksBody['directories']['.']['ok'] === true );
+check( 'the canonical private directory is reported as private', isset( $checksBody['directories']['private'] ) === true && isset( $checksBody['directories']['content'] ) === false );
 // data/ isn't tracked in git, but by this point in the file it likely
 // already exists - writing config.php above already took a Filesystem
 // lock, which itself creates data/.locks as a side effect. Either way
@@ -766,7 +767,7 @@ $shortFinishRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 check( 'rejects a too-short _admin password with 400', $shortFinishRequest['/nino/http/response']['statusCode'] === 400 );
 
 // setDevPassword() no longer rewrites php source: it stores the hash under
-// the content directory, outside every tool folder and outside config.php.
+// the private directory, outside every tool folder and outside config.php.
 // _admin/Admin.php therefore stays byte-identical, which is what makes it
 // replaceable on an update (see Install::setDevPassword()'s docblock)
 $adminBefore = file_get_contents( __DIR__. '/../_admin/Admin.php' );
@@ -779,7 +780,7 @@ check( 'apiComplete succeeds once an editor account exists', $finishRequest['/ni
 check( 'the real _admin/Admin.php was not touched', file_get_contents( __DIR__. '/../_admin/Admin.php' ) === $adminBefore );
 
 $pwPath = \Nino\Admin\Admin::passwordPath( $appData );
-check( 'the hash lands under the content directory', $pwPath === $sandbox. '/content/.auth/pw.php' && is_file( $pwPath ) === true );
+check( 'the hash lands under the private directory', $pwPath === $sandbox. '/private/.auth/pw.php' && is_file( $pwPath ) === true );
 
 $pwRaw = file_get_contents( $pwPath );
 check( 'it is wrapped in the self-exiting 403 stub', str_starts_with( $pwRaw, \Nino\Admin\Admin::STUB_PREFIX ) === true && str_ends_with( $pwRaw, \Nino\Admin\Admin::STUB_SUFFIX ) === true );
@@ -818,7 +819,7 @@ check( 'writePasswordHash() refuses an empty hash rather than storing one nothin
 check( 'setDevPassword() can write the file again afterwards', \Nino\Install\Install::setDevPassword( $appData, 'another dev password' ) === true );
 check( '...and the new password is the one that verifies', password_verify( 'another dev password', (string) \Nino\Admin\Admin::passwordHash( $appData ) ) === true );
 
-check( 'the content directory carries its own deny rule', is_file( $sandbox. '/content/.htaccess' ) === true );
+check( 'the private directory carries its own deny rule', is_file( $sandbox. '/private/.htaccess' ) === true );
 
 echo "\n";
 
@@ -835,7 +836,7 @@ echo "\n";
 echo "Shipped defaults (real config.php + _install/library)\n";
 
 $realRoot 	= __DIR__. '/..';
-$realConfig = include $realRoot. '/content/config.php';
+$realConfig = include $realRoot. '/private/config.php';
 
 $realAppData 		= [ '/nino/locales/available' => $realConfig['/nino/locales/available'] ?? [], '/nino/configpath' => $realRoot ];
 $realPageRoutes = array_filter( $realConfig['/nino/http/routes'] ?? [], fn( array $r, string $k ): bool => \Nino\Install\Webpages::isPageRoute( $k, $r ), ARRAY_FILTER_USE_BOTH );
@@ -869,7 +870,7 @@ check( '...at their own position in that list', [ $realPageRoutes['GET://']['nav
 
 // The generated site itself is deliberately not tracked - it is the
 // wizard's output, not repository content
-foreach( [ 'content/templates', 'content/text', 'content/elements', 'assets' ] as $dir )
+foreach( [ 'private/templates', 'private/text', 'private/elements', 'assets' ] as $dir )
 	check( "does not ship a generated /$dir - the wizard writes it", is_dir( $realRoot. '/'. $dir ) === false );
 
 // ...but everything needed to generate it has to be in the library, or a

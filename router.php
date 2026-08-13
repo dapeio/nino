@@ -13,12 +13,12 @@ declare(strict_types=1);
 $uri = urldecode( parse_url( $_SERVER['REQUEST_URI'], PHP_URL_PATH ) );
 
 // The private half of the project is never served as a static file. In
-// production content/.htaccess denies it (and a hardened setup points
+// production private/.htaccess denies it (and a hardened setup points
 // NINO_CONTENT_DIR outside the webroot entirely), but this server applies
 // no .htaccess at all - without this, a request for
-// /content/templates/page-home.tpl would hand back the template source,
+// /private/templates/page-home.tpl would hand back the template source,
 // which is exactly what moving those files out of the public root prevents
-if( preg_match( '#^/content(/|$)#', $uri ) === 1 ) {
+if( preg_match( '#^/(?:private|privat|content)(/|$)#', $uri ) === 1 ) {
     http_response_code( 404 );
     return true;
 }

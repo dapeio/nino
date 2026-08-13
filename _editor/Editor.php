@@ -1352,12 +1352,12 @@ namespace Nino\Editor {
 		private const int RETENTION_DAYS = 14;
 		private const string LOCK_PATH = '/_editor/backup-daily';
 
-		// Under the content directory, not in this tool's own folder - the
+		// Under the private directory, not in this tool's own folder - the
 		// archives are project data, and a tool folder holding them cannot be
 		// replaced on an update. A fixed name rather than the
 		// '.backups-<random>' this used to generate: that randomness was the
 		// directory's only real protection while it sat in the webroot, and
-		// here it is denied by the content directory's own rule on top of the
+		// here it is denied by the private directory's own rule on top of the
 		// 403 stub every archive already carries (see dirs())
 		private const string BACKUPS_DIR = \Nino\Filesystem::CONTENT_DIR. '/.backups';
 
@@ -1713,7 +1713,7 @@ namespace Nino\Editor {
 
 		public const string VIEW_PERM = '/_editor/logs/view';
 
-		// Under the content directory, not in this tool's own folder: a tool
+		// Under the private directory, not in this tool's own folder: a tool
 		// folder holding runtime state cannot be replaced on an update. A
 		// fixed name rather than the '.logs-<random>' this used to generate -
 		// see _logDirs() for why the randomness is no longer load-bearing
@@ -1841,7 +1841,7 @@ namespace Nino\Editor {
 		 *	There used to be exactly one, named '.logs-&lt;random&gt;' under
 		 *	_editor/ and generated on first use - the random name was that
 		 *	directory's only real protection, since it sat in the webroot
-		 *	inside a tool folder. Under the content directory it does not need
+		 *	inside a tool folder. Under the private directory it does not need
 		 *	one: that directory is denied by its own .htaccess and every file
 		 *	in it carries a 403 stub anyway. '/nino/logs/dir' is therefore no
 		 *	longer generated, only still honoured where a project has one
