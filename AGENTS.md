@@ -350,6 +350,7 @@ Reach for an existing class first; only invent one when no role fits.
 | Primary / destructive button | `.nino-admin-btn-primary`, `.nino-admin-btn-danger` |
 | Raised panel | `.nino-admin-card` (a `fieldset` is one already) |
 | Clickable drill-down list | `.nino-admin-list` (+ `.nino-admin-list-copy` per row) |
+| Many rows of the same record, with search/sort/paging | `Nino.adminUi.table()` — see below |
 | List of rows that are read, not opened | `.nino-admin-list-dense` |
 | List whose rows are `button`s | `.nino-admin-list-buttons` |
 | Dashboard tiles | `.nino-admin-tiles`, `.nino-admin-tile` |
@@ -359,6 +360,34 @@ Reach for an existing class first; only invent one when no role fits.
 | Rich-text editor mount | `.nino-admin-richtext` |
 | Explanatory text / screen intro | `.nino-admin-hint`, `.nino-admin-hint-lead` |
 | Error text | `.nino-admin-error` |
+
+#### The shared data table
+
+`Nino.adminUi.table()` renders a sortable, searchable, paged table of records.
+Use it where the values themselves are what the screen is for; the grouped list
+stays right for a handful of rows you only drill into.
+
+It owns **no strings**. Everything that can be a number or a glyph is one - the
+pager arrows, the row range, a boolean cell - so a caller supplies only
+`labels: { search, empty, noMatch }`. That is deliberate: `/_admin` is
+English-only and labels a field by its raw model key, `/_editor` translates
+through `Nino.content`, and a component that hardcoded one word would be
+half-translated in the other tool.
+
+Pass the **whole set** and let it page. An element type is one file read whole
+on every request (`\Nino\Elements::queryElements`), so asking for one page costs
+exactly what asking for everything costs, and searching locally is instant
+instead of a round trip per keystroke. 1000 rows of eight columns is 14 KB
+gzipped. Roughly 1000 elements per type is also where the storage model itself
+stops being the right tool — past that, use SQLite or MySQL.
+
+A column may carry `render(value, row)` returning an Element, for a cell that
+holds a link or a per-row action; sorting and searching still use the plain
+value, so behaviour never depends on how a cell is drawn.
+
+The pure half (`Nino.adminUi.tableModel`) is filtering, sorting, paging and cell
+formatting as plain functions — extend and test there, not in the renderer.
+`tests/nino-ui-table-js-smoke.js` covers it.
 
 #### Two traps
 

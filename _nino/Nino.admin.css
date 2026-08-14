@@ -52,6 +52,12 @@
  *   Surfaces   .nino-admin-card  .nino-admin-tiles  .nino-admin-tile
  *   Lists      .nino-admin-list  .nino-admin-list-copy
  *              .nino-admin-list-dense  .nino-admin-list-buttons
+ *   Table      .nino-admin-table  .nino-admin-table-scroll
+ *              .nino-admin-table-toolbar  .nino-admin-table-search
+ *              .nino-admin-table-sort  .nino-admin-table-num
+ *              .nino-admin-table-uri  .nino-admin-table-pager
+ *              .nino-admin-table-range  .nino-admin-table-size
+ *              .nino-admin-table-step  .nino-admin-table-empty
  *   Forms      .nino-admin-field  .nino-admin-field-wide
  *              .nino-admin-fieldgrid  .nino-admin-checkbox-fieldset
  *							.nino-admin-checkbox-field
@@ -489,6 +495,165 @@ body {
 	background: var(--editor-blue-soft);
 	box-shadow: none;
 	transform: none;
+}
+
+/* ------------------------------------------------------------ Data table */
+
+/* A table of records - the shape Elements, Submissions and any other
+   "many rows of the same thing" screen wants. The grouped list next to it
+   stays the right choice for a handful of rows you drill into; this one is
+   for the case where the values themselves are what you came to read.
+   Rendered by Nino.adminUi.table(), which owns none of the wording. */
+
+:where(.nino-admin) .nino-admin-table-toolbar {
+	display: flex;
+	align-items: center;
+	gap: .5rem;
+	margin-bottom: .6rem;
+}
+
+:where(.nino-admin) .nino-admin-table-search {
+	flex: 1 1 auto;
+	max-width: 22rem;
+}
+
+/* The table sets its own width from its content and scrolls inside this box,
+   so a wide model never widens the pane and pushes the whole layout sideways */
+:where(.nino-admin) .nino-admin-table-scroll {
+	overflow-x: auto;
+	overscroll-behavior-x: contain;
+	border: 1px solid var(--editor-border);
+	border-radius: var(--editor-radius);
+	background: var(--editor-bg-grouped);
+	box-shadow: var(--editor-shadow-sm);
+}
+
+:where(.nino-admin) .nino-admin-table {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: .82rem;
+}
+
+:where(.nino-admin) .nino-admin-table :is(th, td) {
+	padding: .5rem .78rem;
+	border-bottom: 1px solid var(--editor-separator);
+	text-align: left;
+	white-space: nowrap;
+}
+
+:where(.nino-admin) .nino-admin-table tbody tr:last-child :is(th, td) {
+	border-bottom: 0;
+}
+
+/* Sticky so the columns stay named while a long page scrolls */
+:where(.nino-admin) .nino-admin-table thead th {
+	position: sticky;
+	top: 0;
+	z-index: 1;
+	padding: 0;
+	background: var(--nino-admin-surface-muted);
+}
+
+:where(.nino-admin) .nino-admin-table-sort {
+	width: 100%;
+	min-height: 0;
+	padding: .5rem .78rem;
+	border: 0;
+	border-radius: 0;
+	background: transparent;
+	box-shadow: none;
+	color: var(--editor-text-secondary);
+	font-size: .72rem;
+	font-weight: 700;
+	letter-spacing: .04em;
+	text-align: left;
+	text-transform: uppercase;
+}
+
+:where(.nino-admin) .nino-admin-table-sort:hover:not(:disabled) {
+	background: var(--editor-blue-soft);
+	color: var(--editor-blue);
+}
+
+/* The sort marker is generated, so no caller has to ship an arrow glyph */
+:where(.nino-admin) .nino-admin-table th.is-sorted .nino-admin-table-sort {
+	color: var(--editor-blue);
+}
+
+:where(.nino-admin) .nino-admin-table th.is-sorted .nino-admin-table-sort::after {
+	content: " \2191";
+}
+
+:where(.nino-admin) .nino-admin-table th.is-sorted.is-desc .nino-admin-table-sort::after {
+	content: " \2193";
+}
+
+:where(.nino-admin) .nino-admin-table tbody tr.is-clickable {
+	cursor: pointer;
+}
+
+:where(.nino-admin) .nino-admin-table tbody tr:is(:hover, :focus-visible) {
+	background: var(--editor-blue-soft);
+	outline: none;
+}
+
+/* Numbers line up on their last digit, uris read as identifiers.
+   Qualified with :is(th, td) on purpose: the cell rule above weighs (0,1,1)
+   because :is() takes its most specific argument, so a bare class here would
+   lose to it and the column would stay left-aligned. */
+:where(.nino-admin) .nino-admin-table :is(th, td).nino-admin-table-num {
+	text-align: right;
+	font-variant-numeric: tabular-nums;
+}
+
+:where(.nino-admin) .nino-admin-table th.nino-admin-table-num .nino-admin-table-sort {
+	text-align: right;
+}
+
+:where(.nino-admin) .nino-admin-table :is(th, td).nino-admin-table-uri {
+	color: var(--editor-text-secondary);
+	font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+	font-size: .76rem;
+}
+
+:where(.nino-admin) .nino-admin-table td.is-empty::after {
+	content: "\2013";
+	color: var(--editor-text-secondary);
+	opacity: .5;
+}
+
+:where(.nino-admin) .nino-admin-table-pager {
+	display: flex;
+	align-items: center;
+	gap: .5rem;
+	margin: .6rem 0 .8rem;
+}
+
+:where(.nino-admin) .nino-admin-table-range {
+	flex: 1 1 auto;
+	color: var(--editor-text-secondary);
+	font-size: .76rem;
+	font-variant-numeric: tabular-nums;
+}
+
+:where(.nino-admin) .nino-admin-table-size {
+	width: auto;
+	min-height: 30px;
+	padding-top: .2rem;
+	padding-bottom: .2rem;
+	font-size: .76rem;
+}
+
+:where(.nino-admin) .nino-admin-table-step {
+	min-width: 2.2rem;
+	min-height: 30px;
+	padding: .2rem .5rem;
+	font-size: .9rem;
+	line-height: 1;
+}
+
+:where(.nino-admin) .nino-admin-table-empty {
+	margin: .8rem 0;
 }
 
 /* --------------------------------------------------------------- Surfaces */

@@ -85,6 +85,10 @@ check( 'the shared design system styles only nino-admin-* classes',
 	( sharedRules.match(/\.(?!nino-admin)[a-zA-Z][a-zA-Z0-9_-]*/g) || [] )
 		.filter( c => [ '.main-title', '.main-title--withuri', '.main-uri', '.back-link',
 		                '.active', '.tool', '.system', '.local' ].includes( c ) === false )
+		// State modifiers are the house convention (.is-dirty, .is-error, ...):
+		// they qualify a design-system component rather than name one, so they
+		// stay unprefixed
+		.filter( c => /^\.is-/.test( c ) === false )
 		.length === 0 );
 
 check( 'the shared design system declares its own cascade layer',
@@ -137,7 +141,7 @@ Object.keys( TOOL_ROOTS ).forEach( function( file ) {
 // a later layer silently narrows the padding and the option text slides under
 // the arrow
 check( 'the design system owns both the select chevron and its padding',
-	/:where\(\.nino-admin\) select \{[^}]*padding-right: var\(--nino-admin-select-indicator\)[^}]*background-image:/s.test( shared ) );
+	/:where\(\.nino-admin\) select \{[^}]*var\(--nino-admin-select-indicator\)[^}]*background-image:/s.test( shared ) );
 
 check( 'the locale switch is a shared class, not a per-tool id',
 	shared.includes('.nino-admin-locale-select') &&

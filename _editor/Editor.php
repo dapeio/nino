@@ -516,15 +516,45 @@ namespace Nino\Editor {
 
 			$typeData = self::typeData( $appData, $type );
 			$model = $typeData['model'] ?? [];
-			$results 	= \Nino\Elements::queryElements( $appData, '/'. $type, [], '*', [] );
+			$locale = (string) ( Editor::postData()['locale'] ?? '' );
+
+			// The table view reads one translation at a time: global fields plus
+			// the picked locale's. Without one, fall back to the old "any locale"
+			// behaviour, which is what the plain list wants
+			$results 	= \Nino\Elements::queryElements( $appData, '/'. $type, [],
+				$locale !== '' && \Nino\Locales::verifyLocale( $appData, $locale ) === true ? $locale : '*', [] );
+
+			$columns = self::displayableColumns( $model );
 
 			$elements = [];
 			foreach( $results as $element ) {
-				$uri = basename( $element['.uri'] ?? '' );
-				$elements[] = [ 'uri' => $uri, 'label' => self::label( $model, $element, $uri ) ];
+
+				$uri 		= basename( $element['.uri'] ?? '' );
+				$values = [];
+
+				// Only the fields a cell can actually show, so a type with a
+				// large rich-text or image field does not ship it to a list
+				// that would never render it.
+				//
+				// Nested rather than merged into the row: a model is free to
+				// name a field "label" or "uri", and flattening let such a field
+				// overwrite the row's own identity
+				foreach( $columns as $key )
+					$values[$key] = $element[$key] ?? null;
+
+				$elements[] = [
+					'uri' 		=> $uri,
+					'label' 	=> self::label( $model, $element, $uri ),
+					'values' 	=> $values,
+				];
 			}
 
-			\Nino\Http::ok( $request, [ 'model' => $model, 'elements' => $elements ] );
+			\Nino\Http::ok( $request, [
+				'model' 		=> $model,
+				'columns' 	=> $columns,
+				'elements' 	=> $elements,
+				'total' 		=> count( $elements ),
+			] );
 		}
 
 		/**
@@ -873,6 +903,39 @@ namespace Nino\Editor {
 			$info = ( strlen( $info ) > 150 ) ? substr( $info, 0, 150 ).' ..' : $info;
 
 			return (string) $info;
+		}
+
+		/**
+		 *	The model field keys a table cell can show: everything except an
+		 *	image (a file), an array (a structure) and a rich-text string (its
+		 *	value is markup, and a cell renders text).
+		 *
+		 *	Mirrored by Nino.adminUi.tableModel.isDisplayable() on the frontend -
+		 *	the server decides what to send, the client what to draw, and the two
+		 *	have to agree on the same rule.
+		 *
+		 *	@param		array 		$model				Type model definition
+		 *
+		 *	@return 	array										Field keys, in model order
+		 */
+		public static function displayableColumns( array $model ): array {
+
+			$keys = [];
+
+			foreach( $model as $key => $field ) {
+
+				$type = (string) ( $field['type'] ?? '' );
+
+				if( in_array( $type, [ 'image', 'array' ], true ) === true )
+					continue;
+
+				if( $type === 'string' && ( $field['html'] ?? false ) === true )
+					continue;
+
+				$keys[] = (string) $key;
+			}
+
+			return $keys;
 		}
 
 		/**

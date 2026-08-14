@@ -414,18 +414,28 @@
 			uri.textContent = '/'+ Nino.admin.elements._currentType;
 			wrap.appendChild( uri );
 
-			const ul = dc.createElement('ul');
-			ul.className = 'nino-admin-list';
-			elements.forEach( function( element ) {
-				const li 		= dc.createElement('li');
-				const link	= dc.createElement('a');
-				link.href = '#';
-				link.textContent = element.label;
-				link.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.elements._openForm( element.uri ) } );
-				li.appendChild( link );
-				ul.appendChild( li );
+			const table = dc.createElement('div');
+			wrap.appendChild( table );
+
+			// The whole set at once, paged in the browser: an element type is
+			// one file read whole on every request (see Nino\Elements::
+			// queryElements), so asking for page 3 costs exactly what asking for
+			// everything costs - and searching stays instant instead of a round
+			// trip per keystroke. The recommended ceiling is ~1000 elements per
+			// type; past that the storage model itself is the wrong tool
+			Nino.adminUi.table( {
+				mount 	: table,
+				columns : Nino.admin.elements._tableColumns(),
+				rows 		: elements.map( function( element ) {
+					// The uri under a key a model field cannot claim - values
+					// arrive nested for exactly that reason (see Admin.php's
+					// Elements::apiList)
+					return Object.assign( { '.uri' : element.uri }, element.values || {} );
+				} ),
+				labels 	: { search : 'Search all columns', empty : 'No elements yet.', noMatch : 'No element matches this search.' },
+				rowKey 	: '.uri',
+				onRowClick : function( row ) { Nino.admin.elements._openForm( row['.uri'] ) },
 			} );
-			wrap.appendChild( ul );
 
 			const addBtn = dc.createElement('button');
 			addBtn.type = 'button';
@@ -433,6 +443,27 @@
 			addBtn.textContent = 'New element';
 			addBtn.addEventListener( 'click', function() { Nino.admin.elements._openForm( null ) } );
 			wrap.appendChild( Nino.adminUi.listActions( [ addBtn ] ) );
+		},
+
+		/**
+		 *	The table's columns for the type currently open: its own uri first,
+		 *	then every model field a cell can show. Labelled by the raw model
+		 *	key on purpose - this is the developer-facing tool, and the schema
+		 *	name is what you are working with here (see this file's header).
+		 *
+		 *	@return		{Array}		[ { key, label, type }, ... ]
+		 */
+		_tableColumns : function() {
+
+			const model 	= Nino.admin.elements._currentModel || {};
+			const columns = [ { key : '.uri', label : 'uri', type : 'string' } ];
+
+			Object.keys( model ).forEach( function( key ) {
+				if( Nino.adminUi.tableModel.isDisplayable( model[key] ) === true )
+					columns.push( { key : key, label : key, type : model[key].type } );
+			} );
+
+			return columns;
 		},
 
 		/**

@@ -113,54 +113,43 @@
 
 			wrap.appendChild( Nino.editor.newsletter._renderBcc( entries ) );
 
-			const ul = dc.createElement('ul');
-			ul.id = 'newsletter-entries';
-			ul.className = 'nino-admin-list nino-admin-list-dense';
+			const table = dc.createElement('div');
+			table.id = 'newsletter-entries';
+			wrap.appendChild( table );
 
-			entries.forEach( function( entry ) {
-				ul.appendChild( Nino.editor.newsletter._renderEntry( entry ) );
+			// Subscribers are records, not cards - the shared table gives this
+			// list search, sorting and paging that it never had. The mail column
+			// and the per-row delete are drawn through the column render hook,
+			// so both stay sortable/searchable on their plain values
+			Nino.adminUi.table( {
+				mount 	: table,
+				rows 		: entries,
+				rowKey 	: 'email',
+				columns : [
+					{ key : 'email', label : Nino.content.getText('/_editor/newsletter/label/mail'), type : 'string',
+					  render : function( value ) {
+							const link = dc.createElement('a');
+							link.href = 'mailto:'+ ( value ?? '' );
+							link.textContent = value ?? '';
+							return link;
+						} },
+					{ key : 'date', label : Nino.content.getText('/_editor/newsletter/label/date'), type : 'datetime' },
+					{ key : 'email', label : '', type : 'string',
+					  render : function( value ) {
+							const btn = dc.createElement('button');
+							btn.type = 'button';
+							btn.className = 'nino-admin-btn-danger newsletter-entry-delete';
+							btn.textContent = Nino.content.getText('/_editor/newsletter/label/delete');
+							btn.addEventListener( 'click', function() { Nino.editor.newsletter._delete( value ) } );
+							return btn;
+						} },
+				],
+				labels 	: {
+					search 	: Nino.content.getText('/_editor/newsletter/label/search'),
+					empty 	: Nino.content.getText('/_editor/newsletter/empty'),
+					noMatch : Nino.content.getText('/_editor/newsletter/nomatch'),
+				},
 			} );
-
-			wrap.appendChild( ul );
-		},
-
-		/**
-		 *	Render one subscriber row: email (mailto link), date and a
-		 *	"Löschen" button
-		 *
-		 *	@param		{Object}	entry
-		 *
-		 *	@return		{Element}
-		 */
-		_renderEntry : function( entry ) {
-
-			const li = dc.createElement('li');
-
-			const mailLink = dc.createElement('a');
-			mailLink.href = 'mailto:'+ ( entry.email ?? '' );
-			mailLink.textContent = entry.email ?? '';
-			li.appendChild( mailLink );
-
-			// date + delete grouped together so the li's own space-between
-			// still just splits it two ways (email left, this group right)
-			const meta = dc.createElement('div');
-			meta.className = 'newsletter-entry-meta';
-
-			const date = dc.createElement('span');
-			date.className = 'newsletter-entry-date';
-			date.textContent = entry.date ?? '';
-			meta.appendChild( date );
-
-			const deleteBtn = dc.createElement('button');
-			deleteBtn.type = 'button';
-			deleteBtn.className = 'newsletter-entry-delete';
-			deleteBtn.textContent = Nino.content.getText('/_editor/newsletter/label/delete');
-			deleteBtn.addEventListener( 'click', function() { Nino.editor.newsletter._delete( entry.email ) } );
-			meta.appendChild( deleteBtn );
-
-			li.appendChild( meta );
-
-			return li;
 		},
 
 		/**

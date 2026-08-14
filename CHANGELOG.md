@@ -6,6 +6,25 @@ All notable changes to Nino are documented in this file.
 
 ### Added
 
+- Added a shared admin data table — `Nino.adminUi.table()` plus the
+  `nino-admin-table` primitives — with search across all visible columns,
+  type-aware sorting and 50/100/150 paging. `/_admin`'s Elements list uses it,
+  and `/_editor`'s Newsletter list is the second consumer, which is what
+  surfaced the per-column `render` hook a cell holding a link or a per-row
+  action needs. The component owns no strings: everything that can be a number
+  or a glyph is one, so a caller supplies only `{ search, empty, noMatch }` —
+  otherwise the same table would read half-English in the localized tool.
+  Its pure half (`Nino.adminUi.tableModel`) is covered by
+  `tests/nino-ui-table-js-smoke.js`.
+- Elements' list endpoint now returns each row's displayable field values
+  (`values`), the column keys it chose (`columns`) and a `total`, and accepts a
+  `locale` so the table can show one translation at a time. Image, array and
+  rich-text fields are left out — a cell renders text, and shipping a large
+  html body to a list that would never draw it is waste. Nested under `values`
+  rather than merged into the row on purpose: a model is free to name a field
+  "label" or "uri", and flattening let such a field overwrite the row's own
+  identity.
+
 - Added an `element` model field type: a reference from one element to another.
   Defining the field asks which element type it may point at; editing an
   element then offers that type's entries as a select. The stored value is the
