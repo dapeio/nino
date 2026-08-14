@@ -48,7 +48,11 @@
 			if( target === undefined )
 				return;
 
-			dc.getElementById('admin-page-wrap').className = target[0];
+			// Swap the state class without touching the rest: the shell also
+			// carries its design-system classes (see _nino/Nino.admin.css), and
+			// assigning className outright dropped them - taking the whole
+			// shared layout with them the first time a tab was clicked
+			Nino.adminUi.setStateClass( dc.getElementById('admin-page-wrap'), target[0] );
 			dc.querySelectorAll('#admin-nav-wrap a').forEach( function( a ) { a.classList.toggle( 'active', a.id === 'admin-nav-'+ uri ) } );
 			target[1]();
 		},

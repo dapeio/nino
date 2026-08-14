@@ -109,7 +109,7 @@
 		_renderKeyField : function( entry, value ) {
 
 			const label = dc.createElement('label');
-			label.className = 'editor-field';
+			label.className = 'nino-admin-field';
 
 			const span = dc.createElement('span');
 			span.textContent = entry.label;
@@ -230,6 +230,7 @@
 
 				const fieldsWrap = dc.createElement('div');
 				fieldsWrap.id = 'personalinfos-form-locale-fields';
+				fieldsWrap.className = 'nino-admin-fieldgrid';
 				localeWrap.appendChild( fieldsWrap );
 
 				wrap.appendChild( localeWrap );

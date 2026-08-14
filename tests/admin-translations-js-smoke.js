@@ -76,9 +76,9 @@ const kernel = source('_nino/Nino.php');
 const editorElements = source('_editor/assets/elements.js');
 const adminElements = source('_admin/assets/elements.js');
 check( 'toolbar and server sanitizer both whitelist code', htmlEditor.includes("'span', 'code', 'a'") && kernel.includes("'span', 'code', 'a'") );
-check( 'the editable surface explicitly restores drag selection', editorCss.includes('.html-editor-content *') && editorCss.includes('-webkit-user-select: text') && editorCss.includes('user-select: text') );
+check( 'the editable surface explicitly restores drag selection', editorCss.includes('.nino-admin-richtext-content *') && editorCss.includes('-webkit-user-select: text') && editorCss.includes('user-select: text') );
 check( 'rich text is not nested inside an interactive label', editorText.includes("dc.createElement( entry.html === true ? 'div' : 'label' )") && editorElements.includes("dc.createElement( isHtml ? 'div' : 'label' )") && adminElements.includes("dc.createElement( isHtml ? 'div' : 'label' )") );
-check( 'code receives a readable monospace treatment', editorCss.includes('.html-editor-content code') && editorCss.includes('ui-monospace') );
+check( 'code receives a readable monospace treatment', editorCss.includes('.nino-admin-richtext-content code') && editorCss.includes('ui-monospace') );
 
 console.log( '\n'+ checks+ ' checks, '+ failures+ ' failed' );
 process.exitCode = failures === 0 ? 0 : 1;

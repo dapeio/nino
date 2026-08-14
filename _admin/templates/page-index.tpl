@@ -13,23 +13,23 @@
 	</head>
 	<body>
 		[csrf]
-		<div id="admin-page-wrap" class="show-dashboard" data-dir="[[/nino/dir]]" data-public="[[/nino/public]]">
-			<aside id="admin-shell-rail" aria-label="Admin navigation">
-				<div id="admin-bar-wrap">
+		<div id="admin-page-wrap" class="nino-admin nino-admin-shell nino-admin-shell--rail show-dashboard" data-dir="[[/nino/dir]]" data-public="[[/nino/public]]">
+			<aside id="admin-shell-rail" class="nino-admin-rail" aria-label="Admin navigation">
+				<div id="admin-bar-wrap" class="nino-admin-rail-head">
 					<div id="admin-bar-title">
-						<span class="admin-brand-mark" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-box-icon lucide-box"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg></span>
-						<span class="admin-brand-copy"><strong>Nino</strong><small>Admin</small></span>
+						<span class="nino-admin-brand-mark" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-box-icon lucide-box"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg></span>
+						<span class="nino-admin-brand-copy"><strong>Nino</strong><small>Admin</small></span>
 					</div>
-					<div id="admin-bar-actions">
+					<div id="admin-bar-actions" class="nino-admin-rail-actions">
 						<!-- /_templates is its own app, not a module here - same session
 						     gate, so this is a plain link rather than a tab -->
-						<a href="[[/nino/dir]]/_templates/" id="admin-templates">Template Builder</a>
-						<a href="#" id="admin-logout">Logout</a>
+						<a href="[[/nino/dir]]/_templates/" id="admin-templates" class="nino-admin-rail-accent">Template Builder</a>
+						<a href="#" id="admin-logout" class="nino-admin-rail-danger">Logout</a>
 					</div>
 				</div>
 
 				<!-- One tab + content pane per registered module (see Admin::MODULES) -->
-				<nav id="admin-nav-wrap" aria-label="Admin sections">
+				<nav id="admin-nav-wrap" class="nino-admin-nav" aria-label="Admin sections">
 					<a href="#" id="admin-nav-dashboard" class="active">Dashboard</a>
 					<a href="#" id="admin-nav-types">Element Types</a>
 					<a href="#" id="admin-nav-elements">Elements</a>
@@ -44,7 +44,7 @@
 				</nav>
 			</aside>
 
-			<main id="admin-content-wrap">
+			<main id="admin-content-wrap" class="nino-admin-pane">
 				<div id="admin-content-dashboard"></div>
 				<div id="admin-content-types">
 					<div id="types-list"></div>

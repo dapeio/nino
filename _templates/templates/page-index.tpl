@@ -14,12 +14,12 @@
 	</head>
 	<body>
 		[csrf]
-		<div id="pd-app" data-dir="[[/nino/dir]]" data-public="[[/nino/public]]">
+		<div id="pd-app" class="nino-admin nino-admin-shell" data-dir="[[/nino/dir]]" data-public="[[/nino/public]]">
 			<header id="pd-topbar">
 				<div class="pd-head-rail">
 					<a class="pd-brand" href="[[/nino/dir]]/_templates/" aria-label="Templates home">
-						<span class="pd-brand-mark" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg></span>
-						<span class="pd-brand-copy"><strong>Nino</strong><small>Templates</small></span>
+						<span class="nino-admin-brand-mark" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg></span>
+						<span class="nino-admin-brand-copy"><strong>Nino</strong><small>Templates</small></span>
 					</a>
 					<a href="[[/nino/dir]]/_admin/" class="pd-back-admin"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/><path d="M21 12H9"/></svg><span>Back to Admin</span></a>
 				</div>
@@ -28,8 +28,8 @@
 					<span id="pd-document-detail">Choose or create a page template to begin.</span>
 				</div>
 				<div id="pd-top-actions">
-					<span id="pd-save-state" role="status"></span>
-					<button type="button" id="pd-save" class="pd-primary" disabled>Save template</button>
+					<span id="pd-save-state" class="nino-admin-actionbar-status" role="status"></span>
+					<button type="button" id="pd-save" class="nino-admin-btn-primary" disabled>Save template</button>
 				</div>
 			</header>
 
@@ -68,11 +68,11 @@
 										<button type="button" data-value="on">On</button>
 									</div>
 								</div>
-								<button type="button" id="pd-delete-template" class="pd-danger-button">Delete</button>
+								<button type="button" id="pd-delete-template" class="nino-admin-btn-danger">Delete</button>
 							</div>
 						</div>
 						<div class="pd-toolbar-actions">
-							<button type="button" id="pd-add-section" class="pd-primary"><span aria-hidden="true">＋</span> Add section</button>
+							<button type="button" id="pd-add-section" class="nino-admin-btn-primary"><span aria-hidden="true">＋</span> Add section</button>
 						</div>
 					</div>
 					<div id="pd-notice" aria-live="polite"></div>
@@ -125,8 +125,8 @@
 					<span id="pd-composer-error" class="pd-dialog-message" role="alert"></span>
 					<button type="button" class="pd-dialog-close">Cancel</button>
 					<button type="button" id="pd-compose-back" class="pd-hidden">Back to library</button>
-					<button type="button" id="pd-compose-next" class="pd-primary">Configure section</button>
-					<button type="submit" id="pd-compose-submit" class="pd-primary pd-hidden">Insert section</button>
+					<button type="button" id="pd-compose-next" class="nino-admin-btn-primary">Configure section</button>
+					<button type="submit" id="pd-compose-submit" class="nino-admin-btn-primary pd-hidden">Insert section</button>
 				</footer>
 			</form>
 		</dialog>
@@ -161,7 +161,7 @@
 				<footer class="pd-dialog-footer">
 					<span id="pd-create-error" class="pd-dialog-message" role="alert"></span>
 					<button type="button" class="pd-create-close">Cancel</button>
-					<button type="submit" class="pd-primary">Create template</button>
+					<button type="submit" class="nino-admin-btn-primary">Create template</button>
 				</footer>
 			</form>
 		</dialog>
@@ -197,7 +197,7 @@
 				<footer class="pd-dialog-footer">
 					<span id="pd-code-error" class="pd-dialog-message" role="alert"></span>
 					<button type="button" class="pd-code-close">Cancel</button>
-					<button type="submit" class="pd-primary">Use section</button>
+					<button type="submit" class="nino-admin-btn-primary">Use section</button>
 				</footer>
 			</form>
 		</dialog>

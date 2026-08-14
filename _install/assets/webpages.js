@@ -12,7 +12,7 @@
  *													both exist. List + drill-down-form shape, same as _admin's
  *													Pages module (see pages.js) - the two are meant to feel
  *													like the same tool, since they do the same job. "New
- *													Webpage" opens an entry prefilled from the picked
+ *													Route" opens an entry prefilled from the picked
  *													template's own suggested uris and per-locale wording
  *													(see _suggest(), fed by Install.php's Webpages::
  *													_suggestions()) - a field left blank still falls back to
@@ -38,6 +38,8 @@
 
 		_ready 					: false,
 		_templates 			: {},
+		// The library unit a new route starts on (see _openForm())
+		DEFAULT_TEMPLATE : 'blank',
 		_locales 				: [],
 		_navs 					: [],
 		_entries 				: [],
@@ -113,7 +115,7 @@
 		},
 
 		/**
-		 *	Render the page list, plus a "New Webpage" action in the shared
+		 *	Render the route list, plus a "New Route" action in the shared
 		 *	bottom bar. Each row's ↑/↓ buttons reorder _entries in place
 		 *
 		 *	@return		void
@@ -125,12 +127,13 @@
 
 			if( Nino.install.webpages._entries.length === 0 ) {
 				const p = dc.createElement('p');
-				p.className = 'admin-hint';
+				p.className = 'nino-admin-hint';
 				p.textContent = 'No routes yet - add one below.';
 				wrap.appendChild( p );
 			}
 
 			const ul = dc.createElement('ul');
+			ul.className = 'nino-admin-list';
 			Nino.install.webpages._entries.forEach( function( entry, index ) {
 
 				const li = dc.createElement('li');
@@ -177,7 +180,7 @@
 				addBtn = dc.createElement('button');
 				addBtn.type = 'button';
 				addBtn.id = 'install-context-action';
-				addBtn.className = 'editor-list-action';
+				addBtn.className = 'nino-admin-btn-primary';
 				addBtn.textContent = 'New Route';
 				addBtn.addEventListener( 'click', function() { Nino.install.webpages._openForm( null ) } );
 				dc.getElementById('install-actions-wrap').insertBefore( addBtn, dc.getElementById('install-back') );
@@ -249,7 +252,15 @@
 			let entry = index !== null ? Nino.install.webpages._entries[index] : null;
 			if( entry === null ) {
 
-				const libraryKey 	= Object.keys( Nino.install.webpages._templates )[0] || '';
+				// "Blank" rather than whatever sorts first: the library is keyed by
+				// folder name and ksorted server-side (see Install.php's
+				// _templates()), so the first entry is "404" - a new route started
+				// life as an error page, complete with its status code and wording.
+				// Blank is the one unit that means "a page of your own"
+				const keys 				= Object.keys( Nino.install.webpages._templates );
+				const libraryKey 	= keys.indexOf( Nino.install.webpages.DEFAULT_TEMPLATE ) !== -1
+					? Nino.install.webpages.DEFAULT_TEMPLATE
+					: ( keys[0] || '' );
 				const suggested 	= Nino.install.webpages._suggest( libraryKey );
 
 				entry = {
@@ -366,7 +377,7 @@
 			pageFieldset.appendChild( pageLegend );
 
 			const uriLabel = dc.createElement('label');
-			uriLabel.className = 'editor-field';
+			uriLabel.className = 'nino-admin-field';
 			const uriSpan = dc.createElement('span');
 			uriSpan.textContent = 'Element URI - a stable identifier, not necessarily the real path (see Http URI)';
 			uriLabel.appendChild( uriSpan );
@@ -380,7 +391,7 @@
 			pageFieldset.appendChild( uriLabel );
 
 			const httpUriLabel = dc.createElement('label');
-			httpUriLabel.className = 'editor-field';
+			httpUriLabel.className = 'nino-admin-field';
 			const httpUriSpan = dc.createElement('span');
 			httpUriSpan.textContent = 'Http URI - the real, reachable browser path';
 			httpUriLabel.appendChild( httpUriSpan );
@@ -394,7 +405,7 @@
 			pageFieldset.appendChild( httpUriLabel );
 
 			const templateLabel = dc.createElement('label');
-			templateLabel.className = 'editor-field';
+			templateLabel.className = 'nino-admin-field';
 			const templateSpan = dc.createElement('span');
 			templateSpan.textContent = 'Template';
 			templateLabel.appendChild( templateSpan );
@@ -424,7 +435,7 @@
 			pageFieldset.appendChild( templateLabel );
 
 			const requiresHint = dc.createElement('p');
-			requiresHint.className = 'admin-hint install-webpage-requires';
+			requiresHint.className = 'nino-admin-hint install-webpage-requires';
 			const updateRequiresHint = function() {
 				const requires = Nino.install.webpages._templates[templateSelect.value]?.requiresModules || [];
 				requiresHint.textContent = requires.length > 0
@@ -483,7 +494,7 @@
 			// (see \Nino\Modules\Navigation::routeLines())
 			Nino.install.webpages._navs.forEach( function( navKey ) {
 				const navLabel = dc.createElement('label');
-				navLabel.className = 'editor-checkbox-field';
+				navLabel.className = 'nino-admin-checkbox-field';
 				const navInput = dc.createElement('input');
 				navInput.type = 'checkbox';
 				navInput.dataset.nav = navKey;
@@ -515,7 +526,7 @@
 			if( Nino.install.webpages._isNew === false ) {
 				const deleteBtn = dc.createElement('button');
 				deleteBtn.type = 'button';
-				deleteBtn.className = 'admin-danger-btn';
+				deleteBtn.className = 'nino-admin-btn-danger';
 				deleteBtn.textContent = 'Delete route';
 				deleteBtn.addEventListener( 'click', function() { Nino.install.webpages._delete() } );
 				actions.appendChild( deleteBtn );

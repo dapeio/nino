@@ -105,6 +105,7 @@
 			const exportBtn = dc.createElement('button');
 			exportBtn.type = 'button';
 			exportBtn.id = 'submissions-export';
+			exportBtn.classList.add('nino-admin-btn-primary');
 			exportBtn.textContent = Nino.content.getText('/_editor/submissions/label/export');
 			exportBtn.addEventListener( 'click', function() {
 				Nino.editor.exportCsv( 'anfragen.csv', entries );
@@ -112,6 +113,7 @@
 
 			const ul = dc.createElement('ul');
 			ul.id = 'submissions-entries';
+			ul.className = 'nino-admin-list nino-admin-list-dense';
 
 			entries.forEach( function( entry ) {
 				ul.appendChild( Nino.editor.submissions._renderEntry( entry ) );

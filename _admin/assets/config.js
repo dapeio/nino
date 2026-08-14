@@ -98,7 +98,7 @@
 		_showError : function( container, status, response ) {
 			container.innerHTML = '';
 			const p = dc.createElement('p');
-			p.className = 'admin-error';
+			p.className = 'nino-admin-error';
 			p.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : 'Failed to load.' );
 			container.appendChild( p );
 		},
@@ -124,7 +124,7 @@
 			wrap.innerHTML = '';
 
 			const ul = dc.createElement('ul');
-			ul.className = 'admin-drill-list';
+			ul.className = 'nino-admin-list';
 			Object.keys( Nino.admin.config._values ).forEach( function( key ) {
 				const li 		= dc.createElement('li');
 				const link	= dc.createElement('a');
@@ -163,7 +163,7 @@
 			wrap.appendChild( title );
 
 			const hint = dc.createElement('p');
-			hint.className = 'admin-hint';
+			hint.className = 'nino-admin-hint';
 			hint.textContent = KEY_HINTS[key] ?? '';
 			wrap.appendChild( hint );
 

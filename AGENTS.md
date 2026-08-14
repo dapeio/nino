@@ -291,17 +291,84 @@ events; `/nino/*` is reserved for Nino.
 
 ### CSS and management UI
 
-- Reuse `_nino/Nino.admin.css` design tokens and primitives.
-- Keep application-specific layout in the application stylesheet.
-- Prefer list/drill-down views over isolated card inventions.
-- Use `admin-drill-list` for clickable Admin lists.
-- Use `Nino.adminUi.contextBar()` for the fixed upper context row.
-- Use `Nino.adminUi.listActions()` for fixed list actions.
-- Use `Nino.adminUi.actionBar()` or the established
-  `editor-form-actions nino-admin-actionbar` structure for bottom actions.
+See "Designing an admin frontend" below before writing any markup or CSS for
+`/_admin`, `/_editor`, `/_install` or `/_templates`.
+
 - Maintain keyboard focus, labels, error text, small viewports, coarse pointers,
   and `prefers-reduced-motion`.
 - Do not encode meaning only by color or hover.
+
+## 6a. Designing an admin frontend
+
+`_nino/Nino.admin.css` is the design system for all four tool frontends. It is
+not a stylesheet one tool happens to share - it defines the vocabulary, and a
+tool's own stylesheet supplies only what is genuinely local to it.
+
+**Every tool loads more than its own stylesheet.** `/_admin` loads `_editor`'s
+and its own; `/_templates` loads `_editor`'s, `_admin`'s and its own. A rule
+written without a scope in any of them therefore reaches the other tools too.
+
+#### The five rules
+
+1. **The shared file contains no id selectors.** An id names one element in one
+   tool. A tool's own stylesheet may use ids freely - that is where one-off
+   layout belongs.
+2. **Shared classes are namespaced `nino-admin-*`.** If a class does not carry
+   that prefix it belongs to one tool, and the shared file must not style it.
+3. **`.nino-admin` is the scope root**, on the outermost element of any admin
+   surface. Add `.nino-admin-shell` for a full-height application surface,
+   `.nino-admin-shell--rail` if it is the usual rail+pane layout, or
+   `.nino-admin-auth` for a centered login card.
+4. **A class name describes a role, never a place.** `.nino-admin-btn-primary`
+   is "the primary action", not "the button under a list". A class carrying the
+   margins of wherever it first appeared breaks the moment it is reused - which
+   is exactly how `/_install`'s "New Route" button inherited a stray
+   `margin-top` from an `/_editor` list class.
+5. **Cascade layers decide who wins, not specificity.** Every tool stylesheet
+   opens with `@layer nino.tool, nino.system, nino.local;` and wraps its own
+   rules in `@layer nino.tool { ... }`; `Nino.admin.css` is one
+   `@layer nino.system { ... }`. A layered rule loses to any rule in a later
+   layer however specific it is, so a tool's `#some-id` rule can no longer
+   silently outrank a design-system class. A tool that genuinely has to override
+   one says so out loud, in the `@layer nino.local { ... }` section at the
+   bottom of its own file.
+
+#### When adding a screen
+
+Reach for an existing class first; only invent one when no role fits.
+
+| Need | Class |
+|---|---|
+| Surface root | `.nino-admin` + `.nino-admin-shell` (+ `--rail`) |
+| Sidebar, its brand block, its nav | `.nino-admin-rail`, `.nino-admin-rail-head`, `.nino-admin-nav` |
+| Scrolling content column | `.nino-admin-pane` |
+| Sticky top row (back link, locale switch) | `.nino-admin-contextbar` via `Nino.adminUi.contextBar()` |
+| Fixed bottom actions | `.nino-admin-actionbar` via `Nino.adminUi.actionBar()` |
+| Fixed actions above a list | `.nino-admin-list-actions` via `Nino.adminUi.listActions()` |
+| Status text in a bottom bar | `.nino-admin-actionbar-status` |
+| Secondary action, desktop only | `.nino-admin-desktop-action` |
+| Primary / destructive button | `.nino-admin-btn-primary`, `.nino-admin-btn-danger` |
+| Raised panel | `.nino-admin-card` (a `fieldset` is one already) |
+| Clickable drill-down list | `.nino-admin-list` (+ `.nino-admin-list-copy` per row) |
+| List of rows that are read, not opened | `.nino-admin-list-dense` |
+| List whose rows are `button`s | `.nino-admin-list-buttons` |
+| Dashboard tiles | `.nino-admin-tiles`, `.nino-admin-tile` |
+| Labelled form field | `.nino-admin-field` (`.nino-admin-field-wide` opts out of the two-column desktop grid) |
+| Container whose fields share that grid | `.nino-admin-fieldgrid` |
+| Run of checkbox rows | `.nino-admin-checklist` |
+| Rich-text editor mount | `.nino-admin-richtext` |
+| Explanatory text / screen intro | `.nino-admin-hint`, `.nino-admin-hint-lead` |
+| Error text | `.nino-admin-error` |
+
+#### Two traps
+
+- **Never assign `className` on an element that carries a design-system class.**
+  The shells carry `.nino-admin` plus their `show-<panel>` state, so switching
+  panels with `el.className = 'show-x'` silently deletes the entire shared
+  layout. Use `Nino.adminUi.setStateClass()`, or `classList` for anything else.
+- **A tool stylesheet must scope every `nino-admin-*` rule to its own root**
+  (`#editor-page-wrap .nino-admin-rail`, not `.nino-admin-rail`) - see the
+  cross-loading note above.
 
 ### Templates
 
@@ -573,7 +640,7 @@ the API, DOM safety, and lifecycle shape:
 		_showError : function( container, status, response ) {
 			container.innerHTML = '';
 			const message = dc.createElement('p');
-			message.className = 'admin-error';
+			message.className = 'nino-admin-error';
 			message.textContent = '('+ status+ ') '
 				+ ( response && response.error
 					? response.error
@@ -601,7 +668,7 @@ the API, DOM safety, and lifecycle shape:
 			wrap.appendChild( heading );
 
 			const list = dc.createElement('ul');
-			list.className = 'admin-drill-list';
+			list.className = 'nino-admin-list';
 
 			if( Nino.admin.notes._items.length === 0 ) {
 				const empty = dc.createElement('p');

@@ -191,6 +191,7 @@
 
 			const wrap = dc.getElementById('text-list');
 			wrap.innerHTML = '';
+			wrap.classList.add( 'nino-admin-list', 'nino-admin-list-buttons' );
 
 			Object.keys( Nino.editor.text._groups ).sort().forEach( function( group ) {
 
@@ -244,7 +245,7 @@
 		},
 
 		/**
-		 *	Render one key as a labeled field, html-editor or textarea+counter
+		 *	Render one key as a labeled field, nino-admin-richtext or textarea+counter
 		 *	depending on the entry, matching elements.js's field styling
 		 *
 		 *	@param		{Object}	entry					Key entry
@@ -258,7 +259,7 @@
 			// a <label> is invalid interactive markup and Safari may forward the
 			// drag back to the label instead of starting a text selection.
 			const label = dc.createElement( entry.html === true ? 'div' : 'label' );
-			label.className = 'editor-field';
+			label.className = 'nino-admin-field';
 
 			if( entry.html === true ) {
 				label.setAttribute( 'role', 'group' );
@@ -278,10 +279,10 @@
 			Nino.editor.text._fieldEls[entry.key] = textarea;
 
 			const header = dc.createElement('div');
-			header.className = 'editor-field-header';
+			header.className = 'nino-admin-field-header';
 
 			const nameSpan = dc.createElement('span');
-			nameSpan.className = 'editor-field-name';
+			nameSpan.className = 'nino-admin-field-name';
 			nameSpan.textContent = '[[' + entry.key + ']]';
 			header.appendChild( nameSpan );
 
@@ -321,7 +322,7 @@
 		},
 
 		/**
-		 *	Destroy every currently mounted html-editor instance (both global
+		 *	Destroy every currently mounted nino-admin-richtext instance (both global
 		 *	and locale-scoped) - call before tearing down the group form
 		 *
 		 *	@return		void
@@ -482,6 +483,7 @@
 
 				const select = dc.createElement('select');
 				select.id = 'text-form-locale-select';
+				select.className = 'nino-admin-contextbar-select';
 				Nino.editor.text._locales.forEach( function( locale ) {
 					const option = dc.createElement('option');
 					option.value = locale;
@@ -499,6 +501,7 @@
 
 				const fieldsWrap = dc.createElement('div');
 				fieldsWrap.id = 'text-form-locale-fields';
+				fieldsWrap.className = 'nino-admin-fieldgrid';
 				localeWrap.appendChild( fieldsWrap );
 
 				form.appendChild( localeWrap );

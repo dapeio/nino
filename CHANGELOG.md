@@ -71,6 +71,30 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- Reworked `_nino/Nino.admin.css` into an actual design system for the four tool
+  frontends. It carried 68 id selectors and named the same concept up to five
+  ways (`.editor-danger`, `.admin-danger-btn`, `.pd-danger-button`, `button.red`,
+  `.newsletter-entry-delete` were one button), so nothing in it could be reused
+  by a new screen without copying a tool's ids along. It is now class-only,
+  namespaced `nino-admin-*`, scoped to a `.nino-admin` root, and half the size
+  (1482 -> 775 lines); the tool-specific blocks moved into the stylesheet of the
+  tool that owns them. `/_admin`, `/_editor`, `/_install` and `/_templates` use
+  the shared classes throughout.
+- Ordered the admin stylesheets into cascade layers: each tool declares
+  `@layer nino.tool, nino.system, nino.local;` and wraps its own rules in
+  `nino.tool`, so a tool's id rule can no longer silently outrank a
+  design-system class, and a deliberate override says so in its own
+  `nino.local` section. Documented in AGENTS.md, and enforced by
+  `tests/admin-lists-js-smoke.js`.
+- Renamed `/_install`'s "New Webpage" action to "New Route", matching the step
+  itself.
+- Changed the template a new route starts on from whichever library unit sorted
+  first - which was "404", so a new route began life as an error page, status
+  code and all - to "Blank".
+- The shipped `/contact` route now sits in the footer menu as well as the main
+  one. The footer nav is registered and rendered out of the box, and a contact
+  link is what a footer menu is for.
+
 - Renamed `/_install`'s fourth step from **Webpages** to **Routes**, throughout
   its wizard label, its controls and its messages. What the step writes are
   routes — an Element URI, a public HTTP URI and a template — and calling them
@@ -179,6 +203,15 @@ All notable changes to Nino are documented in this file.
   `/_admin` starts behind everything already in that menu.
 
 ### Fixed
+
+- Fixed `/_install`'s "New Route" button carrying a stray `margin-top`. It used
+  `/_editor`'s list-button class, which is a full-width block under a list
+  there, so in the wizard's fixed bottom bar it sat pushed down and stretched.
+  The class is now a role (`.nino-admin-btn-primary`) with no layout of its own.
+- Fixed the tool shells dropping their design-system classes whenever a panel
+  was switched: all three assigned `className` outright to set `show-<panel>`,
+  which deleted `.nino-admin` and `.nino-admin-shell` along with it. They go
+  through `Nino.adminUi.setStateClass()` now.
 
 - Fixed `/_admin`'s and `/_editor`'s element type overview keeping the element
   count it had on page load. Creating or deleting an element and going back to

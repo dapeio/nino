@@ -100,7 +100,7 @@
 		_showError : function( container, status, response ) {
 			container.innerHTML = '';
 			const p = dc.createElement('p');
-			p.className = 'admin-error';
+			p.className = 'nino-admin-error';
 			p.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : 'Failed to load.' );
 			container.appendChild( p );
 		},
@@ -170,13 +170,13 @@
 
 			const scanBtn = dc.createElement('button');
 			scanBtn.type = 'button';
-			scanBtn.className = 'editor-list-action admin-list-action--before';
+			scanBtn.className = 'nino-admin-btn-primary admin-list-action--before';
 			scanBtn.textContent = 'Scan templates for missing keys';
 			scanBtn.addEventListener( 'click', function() { Nino.admin.text._openScanForm() } );
 			wrap.appendChild( scanBtn );
 
 			const ul = dc.createElement('ul');
-			ul.className = 'admin-drill-list';
+			ul.className = 'nino-admin-list';
 
 			Object.keys( Nino.admin.text._groups ).sort().forEach( function( group ) {
 
@@ -188,7 +188,7 @@
 				link.dataset.group = group;
 
 				const copy = dc.createElement('span');
-				copy.className = 'admin-list-copy';
+				copy.className = 'nino-admin-list-copy';
 				const title = dc.createElement('strong');
 				title.textContent = group;
 
@@ -206,7 +206,7 @@
 
 			const addBtn = dc.createElement('button');
 			addBtn.type = 'button';
-			addBtn.className = 'editor-list-action';
+			addBtn.className = 'nino-admin-btn-primary';
 			addBtn.textContent = 'New text key';
 			addBtn.addEventListener( 'click', function() { Nino.admin.text._openNewKeyForm() } );
 			wrap.appendChild( Nino.adminUi.listActions( [ addBtn ] ) );
@@ -234,7 +234,7 @@
 		},
 
 		/**
-		 *	Render one key as a labeled value field (html-editor or
+		 *	Render one key as a labeled value field (nino-admin-richtext or
 		 *	textarea+counter), plus its global/ausgeblendet schema toggles
 		 *
 		 *	@param		{Object}	entry					Key entry
@@ -245,14 +245,14 @@
 		_renderKeyField : function( entry, value ) {
 
 			const wrap = dc.createElement('div');
-			// .admin-text-field marks the three-part (header / value / schema)
+			// .nino-admin-field-wide marks the three-part (header / value / schema)
 			// shape assets/style.css folds into two rows from 768px up - the
-			// plain .editor-field label/input pairs elsewhere in this module
+			// plain .nino-admin-field label/input pairs elsewhere in this module
 			// must not be caught by that grid
-			wrap.className = 'editor-field admin-text-field';
+			wrap.className = 'nino-admin-field nino-admin-field-wide';
 
 			const header = dc.createElement('div');
-			header.className = 'editor-field-header';
+			header.className = 'nino-admin-field-header';
 
 			const keyInput = dc.createElement('input');
 			keyInput.type = 'text';
@@ -269,7 +269,7 @@
 
 			const deleteBtn = dc.createElement('button');
 			deleteBtn.type = 'button';
-			deleteBtn.className = 'admin-text-key-btn admin-danger-btn';
+			deleteBtn.className = 'admin-text-key-btn nino-admin-btn-danger';
 			deleteBtn.textContent = 'Delete';
 			deleteBtn.addEventListener( 'click', function() { Nino.admin.text._deleteKey( entry.key ) } );
 			header.appendChild( deleteBtn );
@@ -416,7 +416,7 @@
 		},
 
 		/**
-		 *	Destroy every currently mounted html-editor instance - call
+		 *	Destroy every currently mounted nino-admin-richtext instance - call
 		 *	before tearing down the group form
 		 *
 		 *	@return		void
@@ -536,6 +536,7 @@
 
 				const select = dc.createElement('select');
 				select.id = 'text-form-locale-select';
+				select.className = 'nino-admin-contextbar-select';
 				Nino.admin.text._locales.forEach( function( locale ) {
 					const option = dc.createElement('option');
 					option.value = locale;
@@ -556,6 +557,7 @@
 
 				const fieldsWrap = dc.createElement('div');
 				fieldsWrap.id = 'text-form-locale-fields';
+				fieldsWrap.className = 'nino-admin-fieldgrid';
 				localeWrap.appendChild( fieldsWrap );
 
 				form.appendChild( localeWrap );
@@ -673,7 +675,7 @@
 			const form = dc.createElement('form');
 
 			const keyLabel = dc.createElement('label');
-			keyLabel.className = 'editor-field';
+			keyLabel.className = 'nino-admin-field';
 			const keySpan = dc.createElement('span');
 			keySpan.textContent = 'Key (eg. /home/welcome/subtitle)';
 			keyLabel.appendChild( keySpan );
@@ -693,7 +695,7 @@
 			form.appendChild( globalLabel );
 
 			const valueLabel = dc.createElement('label');
-			valueLabel.className = 'editor-field';
+			valueLabel.className = 'nino-admin-field';
 			const valueSpan = dc.createElement('span');
 			valueSpan.textContent = 'Initial value (for global, or as a starting point for every language)';
 			valueLabel.appendChild( valueSpan );
@@ -827,7 +829,7 @@
 			missing.forEach( function( item ) {
 
 				const field = dc.createElement('div');
-				field.className = 'editor-field';
+				field.className = 'nino-admin-field';
 
 				const span = dc.createElement('span');
 				span.textContent = item.key+ '  ('+ item.files.join(', ')+ ')';

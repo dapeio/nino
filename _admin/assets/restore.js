@@ -78,7 +78,7 @@
 			const wrap = dc.getElementById('restore-list');
 			wrap.innerHTML = '';
 			const p = dc.createElement('p');
-			p.className = 'admin-error';
+			p.className = 'nino-admin-error';
 			p.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : 'Failed to load.' );
 			wrap.appendChild( p );
 		},
@@ -105,6 +105,7 @@
 
 			const ul = dc.createElement('ul');
 			ul.id = 'restore-dates';
+			ul.className = 'nino-admin-list';
 
 			dates.forEach( function( date ) {
 

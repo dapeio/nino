@@ -36,15 +36,15 @@
 		create : function( container, value, maxlength ) {
 
 			container.innerHTML = '';
-			container.classList.add('html-editor');
+			container.classList.add('nino-admin-richtext');
 
 			const toolbar = dc.createElement('div');
-			toolbar.className = 'html-editor-toolbar';
+			toolbar.className = 'nino-admin-richtext-toolbar';
 			toolbar.setAttribute( 'role', 'toolbar' );
 			toolbar.setAttribute( 'aria-label', Nino.content.getText('/_editor/htmleditor/label/formatting') );
 
 			const content = dc.createElement('div');
-			content.className = 'html-editor-content';
+			content.className = 'nino-admin-richtext-content';
 			content.contentEditable = 'true';
 			content.setAttribute( 'role', 'textbox' );
 			content.setAttribute( 'aria-multiline', 'false' );
@@ -54,7 +54,7 @@
 			content.innerHTML = value || '';
 
 			const linkbar = dc.createElement('div');
-			linkbar.className = 'html-editor-linkbar';
+			linkbar.className = 'nino-admin-richtext-linkbar';
 			linkbar.hidden = true;
 
 			const linkInput = dc.createElement('input');
@@ -257,7 +257,7 @@
 			TAGS.forEach( function( tag ) {
 				const btn = dc.createElement('button');
 				btn.type = 'button';
-				btn.className = 'html-editor-btn';
+				btn.className = 'nino-admin-richtext-btn';
 				btn.dataset.tag = tag;
 				btn.textContent = Nino.content.getText('/_editor/htmleditor/label/'+ tag);
 				btn.setAttribute( 'aria-pressed', 'false' );

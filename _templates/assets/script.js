@@ -198,7 +198,11 @@
 			if( save )
 				save.disabled = !dirty || Nino.templates._saving || Nino.templates._current === null || Nino.templates._current.readonly !== null;
 			if( state && Nino.templates._saving === false ) {
-				state.className = dirty ? 'is-dirty' : '';
+				// toggle, not assign: this element also carries its design-system
+				// class (.nino-admin-actionbar-status), which an outright
+				// className write would drop
+				state.classList.remove('is-error');
+				state.classList.toggle( 'is-dirty', dirty );
 				state.textContent = dirty ? 'Unsaved template changes' : ( Nino.templates._current ? 'All template changes saved' : '' );
 			}
 		},
@@ -241,7 +245,7 @@
 
 			if( documents.length === 0 ) {
 				const empty = dc.createElement('p');
-				empty.className = 'admin-hint';
+				empty.className = 'nino-admin-hint';
 				empty.textContent = Nino.templates._documents.length === 0 ? 'No page-*.tpl templates found.' : 'No matching templates.';
 				list.appendChild( empty );
 				return;
@@ -432,7 +436,7 @@
 			} );
 			if( list.childNodes.length === 0 ) {
 				const empty = dc.createElement('p');
-				empty.className = 'admin-hint';
+				empty.className = 'nino-admin-hint';
 				empty.textContent = 'No matching template sections.';
 				list.appendChild( empty );
 			}
@@ -637,7 +641,8 @@
 			if( model.validDisplayName( payload.displayName ) === false ) {
 				Nino.templates._saving = false;
 				Nino.templates.setDirty( true );
-				state.className = 'is-error';
+				state.classList.remove('is-dirty');
+				state.classList.add('is-error');
 				state.textContent = 'Enter a safe template name before saving.';
 				return;
 			}
@@ -676,7 +681,8 @@
 					return;
 				}
 				Nino.templates.setDirty( true );
-				state.className = 'is-error';
+				state.classList.remove('is-dirty');
+				state.classList.add('is-error');
 				state.textContent = '('+ error.status+ ') '+ error.message;
 				Nino.templates.toast( error.message, true );
 			} );

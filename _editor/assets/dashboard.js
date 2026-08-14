@@ -98,6 +98,7 @@
 
 			const tiles = dc.createElement('div');
 			tiles.id = 'editor-dashboard-tiles';
+			tiles.className = 'nino-admin-tiles';
 			// submissions/newsletter/recentActivity are only in the response
 			// at all if this admin holds the matching permission (see
 			// Dashboard::apiSummary()) - omitted, not just empty, so each is
@@ -128,15 +129,15 @@
 
 			const a = dc.createElement('a');
 			a.href = '#'+ panel;
-			a.className = 'editor-dashboard-tile editor-dashboard-tile--'+ panel;
+			a.className = 'nino-admin-tile nino-admin-tile--'+ panel;
 
 			const val = dc.createElement('span');
-			val.className = 'editor-dashboard-tile-value';
+			val.className = 'nino-admin-tile-value';
 			val.textContent = value;
 			a.appendChild( val );
 
 			const lbl = dc.createElement('span');
-			lbl.className = 'editor-dashboard-tile-label';
+			lbl.className = 'nino-admin-tile-label';
 			lbl.textContent = label;
 			a.appendChild( lbl );
 
@@ -155,7 +156,7 @@
 		_elementsSection : function( elements ) {
 
 			const section = dc.createElement('div');
-			section.className = 'editor-dashboard-section';
+			section.className = 'nino-admin-card';
 
 			const title = dc.createElement('h3');
 			title.textContent = Nino.content.getText('/_editor/dashboard/label/elements');
@@ -224,7 +225,7 @@
 		_activitySection : function( lines ) {
 
 			const section = dc.createElement('div');
-			section.className = 'editor-dashboard-section';
+			section.className = 'nino-admin-card';
 
 			const title = dc.createElement('h3');
 			title.textContent = Nino.content.getText('/_editor/dashboard/label/activity');

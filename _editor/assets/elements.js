@@ -239,6 +239,7 @@
 
 			const wrap = dc.getElementById('elements-types');
 			wrap.innerHTML = '';
+			wrap.classList.add( 'nino-admin-list', 'nino-admin-list-buttons' );
 
 			types.forEach( function( entry ) {
 
@@ -341,6 +342,7 @@
 			wrap.appendChild( uri );
 
 			const ul = dc.createElement('ul');
+			ul.className = 'nino-admin-list';
 			elements.forEach( function( element ) {
 				const li 		= dc.createElement('li');
 				const link	= dc.createElement('a');
@@ -355,7 +357,7 @@
 			// "New element" as an action below the list, not above it
 			const addBtn = dc.createElement('button');
 			addBtn.type = 'button';
-			addBtn.className = 'editor-list-action';
+			addBtn.className = 'nino-admin-btn-primary';
 			addBtn.textContent = Nino.content.getText('/_editor/elements/label/add');
 			addBtn.addEventListener( 'click', function() { Nino.editor.elements._openForm( null ) } );
 			wrap.appendChild( Nino.adminUi.listActions( [ addBtn ] ) );
@@ -486,7 +488,7 @@
 			// can make drag-selection fail in Safari. Rich text gets a semantic
 			// group; ordinary controls retain their native label wrapper.
 			const label = dc.createElement( isHtml ? 'div' : 'label' );
-			label.className = 'editor-field';
+			label.className = 'nino-admin-field';
 			if( isHtml ) {
 				label.setAttribute( 'role', 'group' );
 				label.setAttribute( 'aria-label', displayName );
@@ -515,11 +517,11 @@
 				label.appendChild( span );
 
 				const group = dc.createElement('div');
-				group.className = 'editor-field-radios';
+				group.className = 'nino-admin-field-radios';
 
 				[ true, false ].forEach( function( boolValue ) {
 					const optLabel = dc.createElement('label');
-					optLabel.className = 'editor-field-radio';
+					optLabel.className = 'nino-admin-field-radio';
 					const radio = dc.createElement('input');
 					radio.type = 'radio';
 					radio.name = 'elements-radio-'+ key;
@@ -612,7 +614,7 @@
 
 				if( options.length === 0 ) {
 					const hint = dc.createElement('p');
-					hint.className = 'editor-field-hint';
+					hint.className = 'nino-admin-field-hint';
 					hint.textContent = Nino.content.getText('/_editor/elements/label/reference-empty');
 					label.appendChild( hint );
 				}
@@ -632,16 +634,16 @@
 
 				if( field.width && field.height ) {
 					const dimensions = dc.createElement('p');
-					dimensions.className = 'editor-field-image-dimensions';
+					dimensions.className = 'nino-admin-field-image-dimensions';
 					dimensions.textContent = Nino.content.getText('/_editor/elements/label/image-target')+ ' '+ field.width+ ' × '+ field.height+ ' px';
 					label.appendChild( dimensions );
 				}
 
 				const wrap = dc.createElement('div');
-				wrap.className = 'editor-field-image';
+				wrap.className = 'nino-admin-field-image';
 
 				const preview = dc.createElement('img');
-				preview.className = 'editor-field-image-preview';
+				preview.className = 'nino-admin-field-image-preview';
 				preview.hidden = ! value;
 				// Every uploaded image lives under /images (Nino\Images::UPLOAD_DIR),
 				// and the stored value is the filename relative to it - the same
@@ -661,7 +663,7 @@
 				wrap.appendChild( hiddenInput );
 
 				const msg = dc.createElement('p');
-				msg.className = 'editor-field-image-msg';
+				msg.className = 'nino-admin-field-image-msg';
 				msg.setAttribute( 'aria-live', 'polite' );
 
 				if( Nino.editor.elements._isNew === true ) {
@@ -726,10 +728,10 @@
 			input.maxLength = maxlength;
 
 			const header = dc.createElement('div');
-			header.className = 'editor-field-header';
+			header.className = 'nino-admin-field-header';
 
 			const nameSpan = dc.createElement('span');
-			nameSpan.className = 'editor-field-name';
+			nameSpan.className = 'nino-admin-field-name';
 			nameSpan.textContent = displayName;
 			header.appendChild( nameSpan );
 
@@ -768,11 +770,11 @@
 				return input;
 
 			const row = dc.createElement('div');
-			row.className = 'editor-field-suffixed';
+			row.className = 'nino-admin-field-suffixed';
 			row.appendChild( input );
 
 			const suffix = dc.createElement('span');
-			suffix.className = 'editor-field-suffix';
+			suffix.className = 'nino-admin-field-suffix';
 			suffix.textContent = field.suffix;
 			row.appendChild( suffix );
 
@@ -875,7 +877,7 @@
 		},
 
 		/**
-		 *	Destroy any currently mounted html-editor instances (removes their
+		 *	Destroy any currently mounted nino-admin-richtext instances (removes their
 		 *	document-level selectionchange listener) - call before clearing/
 		 *	replacing the DOM that contains them
 		 *
@@ -1085,7 +1087,7 @@
 			if( Nino.editor.elements._isNew === true ) {
 
 				const uriLabel = dc.createElement('label');
-				uriLabel.className = 'editor-field';
+				uriLabel.className = 'nino-admin-field';
 				const uriSpan = dc.createElement('span');
 				uriSpan.textContent = Nino.content.getText('/_editor/elements/label/uri');
 				uriLabel.appendChild( uriSpan );
@@ -1100,7 +1102,7 @@
 				// Only shown here - once an element exists its uri is fixed
 				// (shown as a plain heading below), so the hint no longer applies
 				const uriHint = dc.createElement('p');
-				uriHint.className = 'editor-field-hint';
+				uriHint.className = 'nino-admin-field-hint';
 				uriHint.textContent = Nino.content.getText('/_editor/elements/label/uri-hint');
 				form.appendChild( uriHint );
 
@@ -1156,6 +1158,7 @@
 
 				const select = dc.createElement('select');
 				select.id = 'elements-form-locale-select';
+				select.className = 'nino-admin-contextbar-select';
 				Nino.editor.elements._locales.forEach( function( locale ) {
 					const option = dc.createElement('option');
 					option.value = locale;
@@ -1173,6 +1176,7 @@
 
 				const fieldsWrap = dc.createElement('div');
 				fieldsWrap.id = 'elements-form-locale-fields';
+				fieldsWrap.className = 'nino-admin-fieldgrid';
 				localeWrap.appendChild( fieldsWrap );
 
 				form.appendChild( localeWrap );
@@ -1191,7 +1195,7 @@
 			if( Nino.editor.elements._isNew === false ) {
 				const delBtn = dc.createElement('button');
 				delBtn.type = 'button';
-				delBtn.classList.add('editor-danger');
+				delBtn.classList.add('nino-admin-btn-danger');
 				delBtn.textContent = Nino.content.getText('/_editor/elements/label/delete');
 				delBtn.addEventListener( 'click', function() { Nino.editor.elements._delete() } );
 				actions.appendChild( delBtn );
@@ -1344,7 +1348,7 @@
 		_uploadImage : function( key, file, hiddenInput, preview, msg, fileInput ) {
 
 			fileInput.disabled = true;
-			msg.className = 'editor-field-image-msg';
+			msg.className = 'nino-admin-field-image-msg';
 			msg.textContent = Nino.content.getText('/_editor/elements/msg/pending');
 
 			Nino.editor.elements._apiCall( 'uploadimage', {
@@ -1358,7 +1362,7 @@
 				fileInput.value = '';
 
 				if( status !== 200 || response === null ) {
-					msg.className = 'editor-field-image-msg error';
+					msg.className = 'nino-admin-field-image-msg error';
 					msg.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : Nino.content.getText('/_editor/elements/error/save') );
 					return;
 				}

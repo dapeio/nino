@@ -14,18 +14,18 @@
 	</head>
 	<body>
 		[csrf]
-		<div id="install-page-wrap" class="show-checks">
-			<aside id="install-shell-rail" aria-label="Installation progress">
-				<div id="install-bar-wrap">
+		<div id="install-page-wrap" class="nino-admin nino-admin-shell nino-admin-shell--rail show-checks">
+			<aside id="install-shell-rail" class="nino-admin-rail" aria-label="Installation progress">
+				<div id="install-bar-wrap" class="nino-admin-rail-head">
 					<div id="install-bar-title">
-						<span class="install-brand-mark" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-box-icon lucide-box"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg></span>
-						<span class="install-brand-copy"><strong>Nino</strong><small>Setup</small></span>
+						<span class="nino-admin-brand-mark" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-box-icon lucide-box"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg></span>
+						<span class="nino-admin-brand-copy"><strong>Nino</strong><small>Setup</small></span>
 					</div>
 				</div>
 
 				<!-- Progress display only, not a jump-menu - each step's own
 				     Back/Next controls the wizard's flow, see script.js -->
-				<div id="install-nav-wrap">
+				<div id="install-nav-wrap" class="nino-admin-nav">
 					<span id="install-nav-checks" class="active">1. Environment</span>
 					<span id="install-nav-setup">2. Setup</span>
 					<span id="install-nav-themes">3. Themes</span>
@@ -36,54 +36,54 @@
 				</div>
 			</aside>
 
-			<main id="install-content-wrap">
+			<main id="install-content-wrap" class="nino-admin-pane">
 
 				<div id="install-content-checks">
-					<p class="admin-hint">PHP version, extensions and file/folder permissions Nino needs to run.</p>
+					<p class="nino-admin-hint nino-admin-hint-lead">PHP version, extensions and file/folder permissions Nino needs to run.</p>
 					<div id="checks-results"></div>
 					<button type="button" id="checks-refresh">Recheck</button>
 				</div>
 
 				<div id="install-content-setup">
-					<p class="admin-hint">Pick locales and modules - assembles routes, templates and text from <code>_install/library</code>. Whatever's checked when you hit "Next" is the whole picture: unchecking something and coming back here replaces the previous selection, it doesn't add to it - though a route/template/text file already written for something you un-pick still has to be removed by hand, see <code>docs/_install.md</code>.</p>
-					<div class="install-setup-group">
+					<p class="nino-admin-hint nino-admin-hint-lead">Pick locales and modules - assembles routes, templates and text from <code>_install/library</code>. Whatever's checked when you hit "Next" is the whole picture: unchecking something and coming back here replaces the previous selection, it doesn't add to it - though a route/template/text file already written for something you un-pick still has to be removed by hand, see <code>docs/_install.md</code>.</p>
+					<div class="nino-admin-card install-setup-group">
 						<h3>Available Locales</h3>
-						<div id="setup-locales"></div>
+						<div id="setup-locales" class="nino-admin-checklist"></div>
 					</div>
-					<div class="install-setup-group">
+					<div class="nino-admin-card install-setup-group">
 						<h3>Native Locale</h3>
 						<div id="setup-native-locale"></div>
 					</div>
-					<div class="install-setup-group">
+					<div class="nino-admin-card install-setup-group">
 						<h3>Modules</h3>
-						<div id="setup-modules"></div>
+						<div id="setup-modules" class="nino-admin-checklist"></div>
 					</div>
 					<p id="setup-msg"></p>
 				</div>
 
 				<div id="install-content-themes">
-					<p class="admin-hint">Pick the site's look - one complete theme from <code>_install/library/themes</code>. Applying copies whatever its manifest lists (its stylesheet, the webfonts that stylesheet uses, any images it ships) into the project and points <code>config.php</code>'s css bundle at it. Click a tile's preview to enlarge it. Exactly one theme is active at a time: picking a different one later overwrites its files rather than adding to them.</p>
+					<p class="nino-admin-hint nino-admin-hint-lead">Pick the site's look - one complete theme from <code>_install/library/themes</code>. Applying copies whatever its manifest lists (its stylesheet, the webfonts that stylesheet uses, any images it ships) into the project and points <code>config.php</code>'s css bundle at it. Click a tile's preview to enlarge it. Exactly one theme is active at a time: picking a different one later overwrites its files rather than adding to them.</p>
 					<div id="themes-grid"></div>
 					<p id="themes-msg"></p>
 				</div>
 
 				<div id="install-content-webpages">
-					<p class="admin-hint">Build the project's actual routes: click a row to open it, or "New Route" to add one - an Element URI (a stable identifier, eg. <code>/home</code>), the real Http URI it's reachable at (eg. <code>/</code>), a starting template from <code>_install/library/pages</code>, and each active locale's name/title/description - name is also what shows up in the main menu, if the Navigation module (step 2) is active and its "Show in main navigation" box is checked. Click ↑/↓ to reorder, "Next" batch-generates routes/templates/text/blacklist from the list below.</p>
+					<p class="nino-admin-hint nino-admin-hint-lead">Build the project's actual routes: click a row to open it, or "New Route" to add one - an Element URI (a stable identifier, eg. <code>/home</code>), the real Http URI it's reachable at (eg. <code>/</code>), a starting template from <code>_install/library/pages</code>, and each active locale's name/title/description - name is also what shows up in the main menu, if the Navigation module (step 2) is active and its "Show in main navigation" box is checked. Click ↑/↓ to reorder, "Next" batch-generates routes/templates/text/blacklist from the list below.</p>
 					<div id="webpages-list"></div>
 					<div id="webpages-form" class="admin-hidden"></div>
 					<p id="webpages-msg"></p>
 				</div>
 
 				<div id="install-content-personalinfos">
-					<p class="admin-hint">Fill in the site's company/website info (contact details, author, hosting) - the handful of keys that are always there no matter what steps 2/3 picked. Everything else is fine as the library's generic default; edit it via <code>/_editor</code>'s Text panel (or <code>/_admin</code> for technical keys) afterward if it isn't.</p>
+					<p class="nino-admin-hint nino-admin-hint-lead">Fill in the site's company/website info (contact details, author, hosting) - the handful of keys that are always there no matter what steps 2/3 picked. Everything else is fine as the library's generic default; edit it via <code>/_editor</code>'s Text panel (or <code>/_admin</code> for technical keys) afterward if it isn't.</p>
 					<div id="personalinfos-list"></div>
 					<p id="personalinfos-msg"></p>
 				</div>
 
 				<div id="install-content-admin">
-					<p class="admin-hint">Create at least one <code>/_editor</code> account with full permissions. Submit again for additional admins, then continue.</p>
+					<p class="nino-admin-hint nino-admin-hint-lead">Create at least one <code>/_editor</code> account with full permissions. Submit again for additional admins, then continue.</p>
 					<div id="editor-list"></div>
-					<form id="editor-add-form">
+					<form id="editor-add-form" class="nino-admin-card">
 						<label for="editor-add-mail"><span>Email</span><input id="editor-add-mail" type="email" autocomplete="off" required></label>
 						<label for="editor-add-pw"><span>Password</span><input id="editor-add-pw" type="password" autocomplete="new-password" required></label>
 						<p id="editor-add-msg"></p>
@@ -92,11 +92,11 @@
 				</div>
 
 				<div id="install-content-finish">
-					<p class="admin-hint">Set the real <code>/_admin</code> password. This is the last step - once set, <code>/_install</code> locks itself out for good (no way back short of clearing <code>/nino/install/completed</code> in <code>config.php</code> and removing the stored password).</p>
-					<p class="admin-error" id="finish-warning">Make sure an admin account was created in the previous step first - without one, <code>/_editor</code> login won't be possible afterwards.</p>
-					<form id="finish-form">
-						<label class="editor-field" for="finish-pw"><span>New _admin password</span><input id="finish-pw" type="password" autocomplete="new-password" required></label>
-						<label class="editor-field" for="finish-pw2"><span>Repeat password</span><input id="finish-pw2" type="password" autocomplete="new-password" required></label>
+					<p class="nino-admin-hint nino-admin-hint-lead">Set the real <code>/_admin</code> password. This is the last step - once set, <code>/_install</code> locks itself out for good (no way back short of clearing <code>/nino/install/completed</code> in <code>config.php</code> and removing the stored password).</p>
+					<p class="nino-admin-error" id="finish-warning">Make sure an admin account was created in the previous step first - without one, <code>/_editor</code> login won't be possible afterwards.</p>
+					<form id="finish-form" class="nino-admin-card">
+						<label class="nino-admin-field" for="finish-pw"><span>New _admin password</span><input id="finish-pw" type="password" autocomplete="new-password" required></label>
+						<label class="nino-admin-field" for="finish-pw2"><span>Repeat password</span><input id="finish-pw2" type="password" autocomplete="new-password" required></label>
 						<p id="finish-msg"></p>
 						<button type="submit">Finish installation</button>
 					</form>
@@ -134,10 +134,10 @@
 
 			<!-- Shared Back/Next bar - hidden on the finish step (its own
 			     form replaces "Next" entirely), Back hidden on the first -->
-			<div id="install-actions-wrap">
-				<p id="install-actions-msg"></p>
+			<div id="install-actions-wrap" class="nino-admin-actionbar">
+				<p id="install-actions-msg" class="nino-admin-actionbar-status"></p>
 				<button type="button" id="install-back">Back</button>
-				<button type="button" id="install-next">Next</button>
+				<button type="button" id="install-next" class="nino-admin-btn-primary">Next</button>
 			</div>
 		</div>
 

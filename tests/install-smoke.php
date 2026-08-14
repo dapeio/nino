@@ -908,8 +908,10 @@ check( 'the shipped 404 route really carries a 404', array_column( $realPages, '
 // The menus are on the routes themselves, densely numbered by the position
 // the wizard's list had them in (see Webpages::apiApply())
 check( 'the registry the page editors offer checkboxes for is shipped', ( $realConfig['/nino/html/navs'] ?? null ) === [ 'main', 'footer' ] );
-check( 'the two menu pages carry their membership on their own route', array_column( $realPages, 'navs' ) === [ [ 'main' ], [ 'main' ], [], [] ] );
-check( '...at their own position in that list', [ $realPageRoutes['GET://']['navs'], $realPageRoutes['GET://contact']['navs'] ] === [ [ 'main' => 1 ], [ 'main' => 2 ] ] );
+// Contact ships in the footer as well: the footer nav is registered and
+// rendered out of the box, and a contact link is what a footer menu is for
+check( 'the two menu pages carry their membership on their own route', array_column( $realPages, 'navs' ) === [ [ 'main' ], [ 'main', 'footer' ], [], [] ] );
+check( '...at their own position in that list', [ $realPageRoutes['GET://']['navs'], $realPageRoutes['GET://contact']['navs'] ] === [ [ 'main' => 1 ], [ 'main' => 2, 'footer' => 1 ] ] );
 
 // The generated site itself is deliberately not tracked - it is the
 // wizard's output, not repository content

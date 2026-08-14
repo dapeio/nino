@@ -80,7 +80,11 @@
 			Nino.install._index = index;
 			dc.getElementById('install-actions-msg').textContent = '';
 
-			dc.getElementById('install-page-wrap').className = step.paneClass;
+			// Swap the state class without touching the rest: the shell also
+			// carries its design-system classes (see _nino/Nino.admin.css), and
+			// assigning className outright dropped them - taking the whole
+			// shared layout with them the first time a tab was clicked
+			Nino.adminUi.setStateClass( dc.getElementById('install-page-wrap'), step.paneClass );
 
 			Nino.install.STEPS.forEach( function( s, i ) {
 				const nav = dc.getElementById('install-nav-'+ s.key);
@@ -198,7 +202,7 @@
 		showError : function( container, status, response ) {
 			container.innerHTML = '';
 			const p = dc.createElement('p');
-			p.className = 'admin-error';
+			p.className = 'nino-admin-error';
 			p.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : 'Request failed.' );
 			container.appendChild( p );
 		},

@@ -94,6 +94,7 @@
       'navs' =>
       array (
         'main' => 2,
+        'footer' => 1,
       ),
     ),
     'GET://404' => 

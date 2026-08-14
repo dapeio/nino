@@ -46,6 +46,38 @@
 				buttons.forEach( function( button ) { bar.appendChild( button ) } );
 				return bar;
 			},
+
+			/**
+			 *	Put one "show-<panel>" state class on an app shell, replacing
+			 *	whichever one it currently carries and leaving everything else
+			 *	alone.
+			 *
+			 *	The shell element carries two unrelated things at once: the
+			 *	design system's own classes (.nino-admin, .nino-admin-shell -
+			 *	which every layout rule in _nino/Nino.admin.css hangs off) and
+			 *	the "which panel is open" state each tool switches on. Assigning
+			 *	className outright is the obvious way to do the second and
+			 *	silently destroys the first, so all three shells go through here
+			 *	instead.
+			 *
+			 *	@param		{Element}	shell					The tool's own page wrapper
+			 *	@param		{string}	stateClass		Eg. "show-elements"
+			 *
+			 *	@return		void
+			 */
+			setStateClass : function( shell, stateClass ) {
+
+				if( shell === null || shell === undefined )
+					return;
+
+				Array.from( shell.classList ).forEach( function( name ) {
+					if( name.indexOf('show-') === 0 )
+						shell.classList.remove( name );
+				} );
+
+				if( stateClass )
+					shell.classList.add( stateClass );
+			},
 		},
 
 		auth : {

@@ -115,6 +115,7 @@
 
 			const ul = dc.createElement('ul');
 			ul.id = 'newsletter-entries';
+			ul.className = 'nino-admin-list nino-admin-list-dense';
 
 			entries.forEach( function( entry ) {
 				ul.appendChild( Nino.editor.newsletter._renderEntry( entry ) );
@@ -199,6 +200,7 @@
 
 			const wrap = dc.createElement('div');
 			wrap.id = 'newsletter-bcc';
+			wrap.className = 'nino-admin-card';
 
 			const label = dc.createElement('label');
 			label.htmlFor = 'newsletter-bcc-field';

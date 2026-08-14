@@ -73,7 +73,7 @@
 
 			if( users.length === 0 ) {
 				const p = dc.createElement('p');
-				p.className = 'admin-hint';
+				p.className = 'nino-admin-hint';
 				p.textContent = 'No admin account yet.';
 				wrap.appendChild( p );
 				return;

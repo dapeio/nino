@@ -93,7 +93,7 @@
 		_showError : function( container, status, response ) {
 			container.innerHTML = '';
 			const p = dc.createElement('p');
-			p.className = 'admin-error';
+			p.className = 'nino-admin-error';
 			p.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : 'Failed to load.' );
 			container.appendChild( p );
 		},
@@ -119,14 +119,14 @@
 			wrap.innerHTML = '';
 
 			const ul = dc.createElement('ul');
-			ul.className = 'admin-drill-list';
+			ul.className = 'nino-admin-list';
 			Nino.admin.elementTypes._types.forEach( function( type ) {
 				const li 		= dc.createElement('li');
 				const link	= dc.createElement('a');
 				link.href = '#';
 
 				const copy = dc.createElement('span');
-				copy.className = 'admin-list-copy';
+				copy.className = 'nino-admin-list-copy';
 				const title = dc.createElement('strong');
 				title.textContent = type.title;
 				const descr = dc.createElement('small');
@@ -143,7 +143,7 @@
 
 			const addBtn = dc.createElement('button');
 			addBtn.type = 'button';
-			addBtn.className = 'editor-list-action';
+			addBtn.className = 'nino-admin-btn-primary';
 			addBtn.textContent = 'New type';
 			addBtn.addEventListener( 'click', function() { Nino.admin.elementTypes._openForm( null ) } );
 			wrap.appendChild( Nino.adminUi.listActions( [ addBtn ] ) );
@@ -298,7 +298,7 @@
 				// the type once it exists
 				if( type === 'element' ) {
 					const refLabel = dc.createElement('label');
-					refLabel.className = 'editor-field';
+					refLabel.className = 'nino-admin-field';
 					const refSpan = dc.createElement('span');
 					refSpan.textContent = 'References element type';
 					refLabel.appendChild( refSpan );
@@ -514,7 +514,7 @@
 
 			if( Nino.admin.elementTypes._isNew === true ) {
 				const uriLabel = dc.createElement('label');
-				uriLabel.className = 'editor-field';
+				uriLabel.className = 'nino-admin-field';
 				const uriSpan = dc.createElement('span');
 				uriSpan.textContent = 'Uri (elements/<uri>.php) - lowercase letters, digits, - and _ only';
 				uriLabel.appendChild( uriSpan );
@@ -527,7 +527,7 @@
 			}
 
 			const titleLabel = dc.createElement('label');
-			titleLabel.className = 'editor-field';
+			titleLabel.className = 'nino-admin-field';
 			const titleSpan = dc.createElement('span');
 			titleSpan.textContent = 'Title';
 			titleLabel.appendChild( titleSpan );

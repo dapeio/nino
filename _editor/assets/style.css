@@ -1,3 +1,15 @@
+@layer nino.tool, nino.system, nino.local;
+
+/*
+	This file is layered (see _nino/Nino.admin.css). Everything a tool declares
+	for itself sits in `nino.tool`, which the shared design system's `nino.system`
+	layer outranks whatever the selectors' specificity says - that is what makes
+	the system the baseline rather than something a tool's own id rule silently
+	wins against. The "Design-system locals" section at the bottom is the
+	deliberate exception and sits in `nino.local`, the highest layer.
+*/
+
+@layer nino.tool {
 /**
  *	Nino										A compact filesystembased php framework
  *	style.css								Admin dashboard design - iOS-inspired, mobile first.
@@ -38,10 +50,8 @@
 
 	color-scheme: light;
 }
-
 /*	Follows the OS preference by default, unless overridden by the manual
- *	switch in the admin bar (adds data-theme="light"/"dark" to <html>,
- *	persisted in localStorage - see script.js) */
+ *	switch in the admin bar (adds data-theme="light"/"dark" to <html>, *	persisted in localStorage - see script.js) */
 
 @media (prefers-color-scheme: dark) {
 	:root:not([data-theme="light"]) {
@@ -69,7 +79,6 @@
 		color-scheme: dark;
 	}
 }
-
 :root[data-theme="dark"] {
 	--editor-blue: 				#60a5fa;
 	--editor-blue-hover: 	#93c5fd;
@@ -94,16 +103,13 @@
 
 	color-scheme: dark;
 }
-
 * {
 	box-sizing: border-box;
 	-webkit-tap-highlight-color: transparent;
 }
-
 html {
 	-webkit-text-size-adjust: 100%;
 }
-
 body {
 	margin: 0;
 	min-width: 20rem;
@@ -116,14 +122,12 @@ body {
 	-webkit-font-smoothing: antialiased;
 	text-rendering: optimizeLegibility;
 }
-
 a {
 	color: var(--editor-blue);
 	text-decoration: none;
 	text-underline-offset: .18em;
 	transition: color .15s ease, background .15s ease, border-color .15s ease;
 }
-
 button {
 	font: inherit;
 	font-weight: 600;
@@ -139,91 +143,64 @@ button {
 	box-shadow: inset 0 0 0 1px var(--editor-border), var(--editor-shadow-sm);
 	transition: transform .12s ease, opacity .12s ease, background .15s ease, color .15s ease, box-shadow .15s ease;
 }
-button.editor-danger {
+button.nino-admin-btn-danger {
 	background:var(--editor-red);
 	color:#FFF;
 	opacity:.75;
 }
-button.editor-danger:hover, button.editor-danger:active {
+button.nino-admin-btn-danger:hover, button.nino-admin-btn-danger:active {
 	opacity:1;
 }
-
 button:active {
 	transform: scale(.96);
 	opacity: .8;
 }
-
 button:hover:not(:disabled) {
 	background: var(--editor-blue-soft);
 }
-
 button:disabled {
 	opacity: .45;
 	cursor: not-allowed;
 	box-shadow: none;
 }
-
 button[type="submit"] {
 	background: var(--editor-blue);
 	color: #fff;
 	box-shadow: none;
 	font-weight: 600;
 }
-
 button[type="submit"]:hover:not(:disabled) {
 	background: var(--editor-blue-hover);
 }
-
-button.editor-danger:hover:not(:disabled) {
+button.nino-admin-btn-danger:hover:not(:disabled) {
 	background: var(--editor-red);
 	color: #fff;
 }
-
-a:focus-visible,
-button:focus-visible {
+a:focus-visible, button:focus-visible {
 	outline: 2px solid var(--editor-blue);
 	outline-offset: 3px;
 }
-
 /* ------------------------------------------------------------------ Panels */
 
 /*	The User/Texte/Elemente bar (#editor-nav-wrap) always stays visible - only
- *	the content panels switch. Drilling into a panel (types -> list -> form,
- *	or category list -> category form) is handled locally within that panel via
+ *	the content panels switch. Drilling into a panel (types -> list -> form, *	or category list -> category form) is handled locally within that panel via
  *	.editor-hidden, not by hiding the whole panel/nav. */
 
-#editor-content-dashboard,
-#editor-content-user,
-#editor-content-text,
-#editor-content-images,
-#editor-content-elements,
-#editor-content-submissions,
-#editor-content-newsletter,
-#editor-content-logs {
+#editor-content-dashboard, #editor-content-user, #editor-content-text, #editor-content-images, #editor-content-elements, #editor-content-submissions, #editor-content-newsletter, #editor-content-logs {
 	display: none;
 }
-
-#editor-page-wrap.show-dashboard #editor-content-dashboard,
-#editor-page-wrap.show-user #editor-content-user,
-#editor-page-wrap.show-text #editor-content-text,
-#editor-page-wrap.show-images #editor-content-images,
-#editor-page-wrap.show-elements #editor-content-elements,
-#editor-page-wrap.show-submissions #editor-content-submissions,
-#editor-page-wrap.show-newsletter #editor-content-newsletter,
-#editor-page-wrap.show-logs #editor-content-logs {
+#editor-page-wrap.nino-admin-shell.show-dashboard #editor-content-dashboard, #editor-page-wrap.nino-admin-shell.show-user #editor-content-user, #editor-page-wrap.nino-admin-shell.show-text #editor-content-text, #editor-page-wrap.nino-admin-shell.show-images #editor-content-images, #editor-page-wrap.nino-admin-shell.show-elements #editor-content-elements, #editor-page-wrap.nino-admin-shell.show-submissions #editor-content-submissions, #editor-page-wrap.nino-admin-shell.show-newsletter #editor-content-newsletter, #editor-page-wrap.nino-admin-shell.show-logs #editor-content-logs {
 	display: block;
 }
-
 /*	Utility: force-hide an element regardless of its own display rules (eg. an
  *	id-selector default like #elements-types{display:flex}) - used to step
  *	through a panel's types/list/form (or list/form) drill-down levels */
 .editor-hidden {
 	display: none !important;
 }
-
 /* --------------------------------------------------------------------- Bar */
 
-#editor-bar-wrap {
+#editor-page-wrap .nino-admin-rail {
 	position: sticky;
 	top: 0;
 	z-index: 30;
@@ -237,16 +214,13 @@ button:focus-visible {
 	-webkit-backdrop-filter: blur(20px) saturate(180%);
 	border-bottom: 1px solid var(--editor-separator);
 }
-
 .editor-brand {
 	display: flex;
 	align-items: center;
 	gap: .65rem;
 	min-width: 0;
 }
-
-.editor-brand-mark,
-.editor-auth-brand span {
+#editor-page-wrap .nino-admin-brand-mark, #editor-page-wrap .nino-admin-auth-brand span {
 	display: inline-grid;
 	place-items: center;
 	width: 2.25rem;
@@ -260,19 +234,16 @@ button:focus-visible {
 	letter-spacing: -.04em;
 	box-shadow: 0 .45rem 1rem rgba(37,99,235,.2);
 }
-
-.editor-brand-copy {
+#editor-page-wrap .nino-admin-brand-copy {
 	display: flex;
 	flex-direction: column;
 	line-height: 1.1;
 }
-
-.editor-brand-copy strong {
+#editor-page-wrap .nino-admin-brand-copy strong {
 	font-size: .95rem;
 	letter-spacing: -.01em;
 }
-
-.editor-brand-copy small {
+#editor-page-wrap .nino-admin-brand-copy small {
 	margin-top: .18rem;
 	color: var(--editor-text-secondary);
 	font-size: .72rem;
@@ -280,8 +251,7 @@ button:focus-visible {
 	letter-spacing: .08em;
 	text-transform: uppercase;
 }
-
-#editor-user {
+#editor-page-wrap .nino-admin-rail-user {
 	display: flex;
 	align-items: center;
 	justify-content: flex-end;
@@ -290,20 +260,17 @@ button:focus-visible {
 	font-size: .9rem;
 	color: var(--editor-text-secondary);
 }
-
 #editor-user-email {
 	min-width: 0;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
 }
-
 #editor-user-logout {
 	color: var(--editor-red);
 	font-weight: 500;
 	flex-shrink: 0;
 }
-
 /*	Click/tap-toggled (see script.js), not :hover - touch devices have no
  *	real hover state (only inconsistent tap-simulated ones, with no
  *	equivalent "un-hover" gesture to close it again), and a :hover-only
@@ -314,7 +281,6 @@ button:focus-visible {
 	position: relative;
 	flex-shrink: 0;
 }
-
 #editor-nav-ui-toggle {
 	border: none;
 	background: none;
@@ -329,7 +295,6 @@ button:focus-visible {
 	box-shadow: none;
 	border-radius: .6rem;
 }
-
 #editor-nav-ui-menu {
 	position: absolute;
 	top: 100%;
@@ -345,7 +310,6 @@ button:focus-visible {
 	border-radius: var(--editor-radius-sm);
 	box-shadow: var(--editor-shadow);
 }
-
 #editor-theme-toggle {
 	flex-shrink: 0;
 	border: none;
@@ -360,7 +324,6 @@ button:focus-visible {
 	cursor: pointer;
 	box-shadow:none;
 }
-
 /* Same flat reset as #editor-theme-toggle, so it reads as one family of
    small bar controls instead of a form field - stays compact no matter
    how many locales are configured, unlike a row of links would */
@@ -387,7 +350,6 @@ button:focus-visible {
 	margin: 0 16px 0 0;
 	cursor: pointer;
 }
-
 /*	Deliberately styled as tabs, not buttons: a flat row sitting on a shared
  *	bottom border, only the active one picked out (colored + underlined).
  *	Buttons look like one-shot actions; tabs read as "you can jump between
@@ -397,7 +359,7 @@ button:focus-visible {
  *	label gets squeezed below its own text width, which overflows the
  *	bar instead of shrinking) - scroll horizontally instead, natural
  *	width per tab, no wrapping */
-#editor-nav-wrap {
+#editor-page-wrap .nino-admin-nav {
 	display: flex;
 	margin-right: 0;
 	width: 100%;
@@ -406,12 +368,10 @@ button:focus-visible {
 	scrollbar-width: none;
 	border-bottom: 1px solid var(--editor-separator);
 }
-
-#editor-nav-wrap::-webkit-scrollbar {
+#editor-page-wrap .nino-admin-nav::-webkit-scrollbar {
 	display: none;
 }
-
-#editor-nav-wrap a {
+#editor-page-wrap .nino-admin-nav a {
 	flex: 0 0 auto;
 	white-space: nowrap;
 	text-align: center;
@@ -423,28 +383,25 @@ button:focus-visible {
 	font-weight: 500;
 	transition: color .15s ease, border-color .15s ease;
 }
-
-#editor-nav-wrap a.active {
+#editor-page-wrap .nino-admin-nav a.active {
 	color: var(--editor-blue);
 	font-weight: 600;
 	border-bottom-color: var(--editor-blue);
 }
-
 @media (min-width: 40rem) and (max-width: 63.999rem) {
-	#editor-bar-wrap {
+	#editor-page-wrap .nino-admin-rail {
 		display: grid;
 		grid-template-columns: 1fr auto;
 		align-items: center;
 	}
-	#editor-user {
+	#editor-page-wrap .nino-admin-rail-user {
 		grid-column: 2;
 		grid-row: 1;
 	}
-	#editor-nav-wrap {
+	#editor-page-wrap .nino-admin-nav {
 		grid-column: 1 / -1;
 	}
 }
-
 /*	Local drill-down back link (Elements: list -> types, form -> list; Text:
  *	category form -> category list) */
 .back-link {
@@ -456,29 +413,25 @@ button:focus-visible {
 	color: var(--editor-blue);
 	font-weight: 500;
 }
-
 .back-link::before {
 	content: "‹";
 	font-size: 1.3rem;
 	line-height: 1;
 }
-
 /* ----------------------------------------------------------------- Content */
 
-#editor-content-wrap {
+#editor-page-wrap .nino-admin-pane {
 	width: 100%;
 	padding: 1.5rem 1rem 5rem;
 	max-width: 56rem;
 	margin: 0 auto;
 }
-
 @media (min-width: 768px) {
-	#editor-content-wrap {
+	#editor-page-wrap .nino-admin-pane {
 		max-width: 64rem;
 		padding: 2.25rem 2rem 5rem;
 	}
 }
-
 /* --------------------------------------------------------------- Dashboard */
 
 #editor-dashboard-tiles {
@@ -487,8 +440,7 @@ button:focus-visible {
 	gap: var(--editor-gap);
 	margin-bottom: calc(var(--editor-gap) * 1.5);
 }
-
-.editor-dashboard-tile {
+#editor-page-wrap .nino-admin-tile {
 	display: flex;
 	flex-direction: column;
 	gap: .25rem;
@@ -502,25 +454,23 @@ button:focus-visible {
 	color: var(--editor-text);
 	transition: transform .15s ease, box-shadow .15s ease;
 }
-.editor-dashboard-tile:hover, .editor-dashboard-tile:active {
+#editor-page-wrap .nino-admin-tile:hover, #editor-page-wrap .nino-admin-tile:active {
 	transform: translateY(-2px);
 	box-shadow: 0 14px 34px rgba(15,23,42,.1);
 }
-.editor-dashboard-tile--newsletter { border-top-color: var(--editor-green); }
-.editor-dashboard-tile--logs 			{ border-top-color: var(--editor-orange); }
-
-.editor-dashboard-tile-value {
+#editor-page-wrap .nino-admin-tile--newsletter { border-top-color: var(--editor-green); }
+#editor-page-wrap .nino-admin-tile--logs 			{ border-top-color: var(--editor-orange); }
+#editor-page-wrap .nino-admin-tile-value {
 	font-size: 2.25rem;
 	font-weight: 700;
 	line-height: 1.1;
 	font-variant-numeric: normal;
 }
-.editor-dashboard-tile-label {
+#editor-page-wrap .nino-admin-tile-label {
 	font-size: .85rem;
 	color: var(--editor-text-secondary);
 }
-
-.editor-dashboard-section {
+#editor-page-wrap .nino-admin-card {
 	margin-bottom: var(--editor-gap);
 	padding: 1.25rem;
 	background: var(--editor-bg-grouped);
@@ -528,11 +478,10 @@ button:focus-visible {
 	border-radius: var(--editor-radius);
 	box-shadow: var(--editor-shadow-sm);
 }
-.editor-dashboard-section h3 {
+#editor-page-wrap .nino-admin-card h3 {
 	font-size: 1rem;
 	margin: 0 0 .75rem;
 }
-
 #editor-dashboard-elements {
 	list-style: none;
 	margin: 0;
@@ -569,7 +518,6 @@ button:focus-visible {
 	background: var(--editor-blue);
 	border-radius: 3px;
 }
-
 #editor-dashboard-activity {
 	list-style: none;
 	margin: 0;
@@ -589,7 +537,6 @@ button:focus-visible {
 	margin-top: .5rem;
 	font-size: .85rem;
 }
-
 /* -------------------------------------------------------------- Type tabs */
 
 #elements-types, #text-list, #images-list {
@@ -598,7 +545,6 @@ button:focus-visible {
 	gap: .75rem;
 	margin-bottom: 1.25rem;
 }
-
 .editor-type-btn{
 	appearance: none;
 	font: inherit;
@@ -620,7 +566,6 @@ button:focus-visible {
 	text-decoration: none;
 	transition: transform .15s ease, background-color .2s ease, border-color .2s ease, box-shadow .2s ease;
 }
-
 .editor-type-btn:hover {
 	background: var(--editor-blue-soft);
 	border-color: color-mix(in srgb, var(--editor-blue) 35%, var(--editor-border));
@@ -633,7 +578,6 @@ button:focus-visible {
 	border-color: var(--editor-blue);
 	background: var(--editor-blue-soft);
 }
-
 .editor-type-btn-descr {
 	display: block;
 	margin-top: .2rem;
@@ -642,13 +586,11 @@ button:focus-visible {
 	color: var(--editor-text-secondary);
 	opacity: 1;
 }
-
 /* ----------------------------------------------------------- Grouped lists */
 
 #elements-list, #users-list {
 	margin-bottom: 1.5rem;
 }
-
 .main-title--withuri, .main-title {
 	font-size: 1.3rem;
 	font-weight: 700;
@@ -662,15 +604,6 @@ button:focus-visible {
 	color: var(--editor-text-secondary);
 	margin-bottom: .5rem;
 }
-.editor-list-action {
-	width: 100%;
-	margin-top: .75rem;
-	background: var(--editor-blue);
-	color: #fff;
-	box-shadow: none;
-	font-weight: 600;
-}
-
 #elements-list ul, #images-list ul, #users-list ul {
 	list-style: none;
 	margin: 0;
@@ -681,15 +614,12 @@ button:focus-visible {
 	box-shadow: var(--editor-shadow);
 	overflow: hidden;
 }
-
 #elements-list li, #images-list li, #users-list li {
 	border-bottom: 1px solid var(--editor-separator);
 }
-
 #elements-list li:last-child, #images-list li:last-child, #users-list li:last-child {
 	border-bottom: none;
 }
-
 #elements-list li a, #images-list li a, #users-list li a {
 	display: flex;
 	align-items: center;
@@ -699,19 +629,15 @@ button:focus-visible {
 	min-height: 50px;
 	color: var(--editor-text);
 }
-
 #elements-list li a::after, #images-list li a::after, #users-list li a::after {
 	content: "›";
 	color: var(--editor-text-secondary);
 	font-size: 1.2rem;
 	flex-shrink: 0;
 }
-
-#elements-list li a:hover, #images-list li a:hover, #users-list li a:hover,
-#elements-list li a:active, #images-list li a:active, #users-list li a:active {
+#elements-list li a:hover, #images-list li a:hover, #users-list li a:hover, #elements-list li a:active, #images-list li a:active, #users-list li a:active {
 	background: var(--editor-blue-soft);
 }
-
 #logs-entries {
 	list-style: none;
 	margin: 0;
@@ -724,22 +650,18 @@ button:focus-visible {
 	font-size: .85rem;
 	font-family: ui-monospace, monospace;
 }
-
 #logs-entries li {
 	padding: .6rem 1rem;
 	border-bottom: 1px solid var(--editor-separator);
 }
-
 #logs-entries li:last-child {
 	border-bottom: none;
 }
-
 /* -------------------------------------------------------------------- Form */
 
 form {
 	padding: 0;
 }
-
 fieldset {
 	background: var(--editor-bg-grouped);
 	border-radius: var(--editor-radius);
@@ -749,7 +671,6 @@ fieldset {
 	padding: 3.15rem 1.25rem .25rem;
 	position:relative;
 }
-
 fieldset legend {
 	top: 1rem;
 	left: 1.25rem;
@@ -761,68 +682,58 @@ fieldset legend {
 	letter-spacing: .04em;
 	color: var(--editor-text-secondary);
 }
-
-.editor-field, .text-form-key {
+#editor-page-wrap .nino-admin-field, .text-form-key {
 	display: block;
 	margin: 0 0 1rem;
 }
-
 /*	Direct child only - a descendant selector would also catch <span> tags
  *	the html editor's own "Hervorheben" formatting creates inside its
  *	content area, forcing them to display:block and breaking the markup */
-.editor-field > span {
+#editor-page-wrap .nino-admin-field > span {
 	display: block;
 	font-size: .8rem;
 	color: var(--editor-text-secondary);
 	margin-bottom: .3rem;
 }
-
-.editor-field-header {
+#editor-page-wrap .nino-admin-field-header {
 	display: flex;
 	justify-content: space-between;
 	align-items: baseline;
 	gap: .75rem;
 	margin-bottom: .3rem;
 }
-
-.editor-field-name {
+#editor-page-wrap .nino-admin-field-name {
 	font-size: .8rem;
 	color: var(--editor-text-secondary);
 	margin:-.5rem 0 1rem;
 	display:block;
 }
-
-.editor-field-header .char-counter {
+#editor-page-wrap .nino-admin-field-header .char-counter {
 	margin: 0;
 }
-
 /*	Only shown on the "insert" form - once an element exists its uri is
  *	fixed, shown as a plain heading instead (see elements.js) */
-.editor-field-hint {
+#editor-page-wrap .nino-admin-field-hint {
 	margin: -.65rem 0 1rem;
 	font-size: .75rem;
 	color: var(--editor-text-secondary);
 }
-
 /*	A field with a fixed unit/suffix (eg. a price's "€") next to its input */
-.editor-field-suffixed {
+#editor-page-wrap .nino-admin-field-suffixed {
 	display: flex;
 	align-items: center;
 	gap: .5rem;
 }
-
-.editor-field-suffixed input, .editor-field-suffixed textarea {
+#editor-page-wrap .nino-admin-field-suffixed input, #editor-page-wrap .nino-admin-field-suffixed textarea {
 	flex: 1;
 	width: auto;
 	min-width: 0;
 }
-
-.editor-field-suffix {
+#editor-page-wrap .nino-admin-field-suffix {
 	flex-shrink: 0;
 	color: var(--editor-text-secondary);
 	font-weight: 600;
 }
-
 .text-form-key {
 	font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 	font-size: 1rem;
@@ -831,9 +742,7 @@ fieldset legend {
 	padding-top: .75rem;
 	word-break: break-all;
 }
-
-input[type="text"], input[type="email"], input[type="password"], input[type="number"], input[type="date"], input[type="url"],
-textarea, input[type="datetime-local" i], select {
+input[type="text"], input[type="email"], input[type="password"], input[type="number"], input[type="date"], input[type="url"], textarea, input[type="datetime-local" i], select {
 	width: 100%;
 	max-width: 100%;
 	box-sizing: border-box;
@@ -847,9 +756,6 @@ textarea, input[type="datetime-local" i], select {
 	box-shadow: inset 0 1px 1px rgba(15,23,42,.025);
 	transition: border-color .15s ease, box-shadow .15s ease, background .15s ease;
 }
-
-
-
 input:focus, textarea:focus, select:focus, [contenteditable]:focus {
 	outline: none;
 	border-color: var(--editor-blue);
@@ -864,37 +770,32 @@ select {
   background-size:7px 7px;
   background-repeat:no-repeat;
 }
-
 input.error, .pending.error {
 	outline: 2px solid var(--editor-red);
 }
-
-.editor-field input[type="checkbox"] {
+#editor-page-wrap .nino-admin-field input[type="checkbox"] {
 	width: auto;
 	min-height: auto;
 }
-
 /*	A single checkbox + its own inline label text (eg. Users' permissions
-	list) - .editor-field's stacked span-above-input shape doesn't fit a
+	list) - .nino-admin-field's stacked span-above-input shape doesn't fit a
 	checkbox, same reasoning as _admin's .admin-scan-ignore */
-.editor-checkbox-field {
+#editor-page-wrap .nino-admin-checkbox-field {
 	display: flex;
 	align-items: center;
 	gap: .5rem;
 	margin: 0 0 .6rem;
 }
-.editor-checkbox-field input[type="checkbox"] {
+#editor-page-wrap .nino-admin-checkbox-field input[type="checkbox"] {
 	width: auto;
 	min-height: auto;
 }
-
-.editor-field-radios {
+#editor-page-wrap .nino-admin-field-radios {
 	display: flex;
 	min-height: 44px;
 	align-items: center;
 }
-
-.editor-field-radio {
+#editor-page-wrap .nino-admin-field-radio {
 	display: flex;
 	align-items: center;
 	padding-right:25px;
@@ -908,63 +809,54 @@ input.error, .pending.error {
 	cursor:pointer;
 	transition: all 0.2s ease;
 }
-.editor-field-radio:has(input[type="radio"]:checked) {
+#editor-page-wrap .nino-admin-field-radio:has(input[type="radio"]:checked) {
 	background-color: var(--editor-blue);
 	color: #fff;
 }
-.editor-field-radio input[type="radio"] {
+#editor-page-wrap .nino-admin-field-radio input[type="radio"] {
 	opacity:0;
 }
-.editor-field-radios > .editor-field-radio:first-child {
+#editor-page-wrap .nino-admin-field-radios > .nino-admin-field-radio:first-child {
 	border-radius: var(--editor-radius-sm) 0 0 var(--editor-radius-sm);
 }
-.editor-field-radios > .editor-field-radio:last-child {
+#editor-page-wrap .nino-admin-field-radios > .nino-admin-field-radio:last-child {
 	border-radius: 0 var(--editor-radius-sm) var(--editor-radius-sm) 0;
 	border-right: 1px solid var(--editor-border);
 }
-
-
-.editor-field-image-dimensions {
+#editor-page-wrap .nino-admin-field-image-dimensions {
 	margin: -.2rem 0 .5rem;
 	font-size: .75rem;
 	color: var(--editor-text-secondary);
 }
-
-.editor-field-image {
+#editor-page-wrap .nino-admin-field-image {
 	display: flex;
 	flex-direction: column;
 	gap: .5rem;
 }
-
-.editor-field-image-preview {
+#editor-page-wrap .nino-admin-field-image-preview {
 	max-width: 12rem;
 	max-height: 12rem;
 	border-radius: var(--editor-radius-sm);
 	box-shadow: inset 0 0 0 1px var(--editor-border);
 	object-fit: cover;
 }
-
-.editor-field-image input[type="file"] {
+#editor-page-wrap .nino-admin-field-image input[type="file"] {
 	padding: .5rem;
 	min-height: auto;
 }
-
-.editor-field-image-msg {
+#editor-page-wrap .nino-admin-field-image-msg {
 	margin: 0;
 	font-size: .8rem;
 	color: var(--editor-text-secondary);
 }
-
-.editor-field-image-msg.error {
+#editor-page-wrap .nino-admin-field-image-msg.error {
 	color: var(--editor-red);
 	font-weight: 600;
 }
-
-.editor-field textarea, #text-form-value {
+#editor-page-wrap .nino-admin-field textarea, #text-form-value {
 	min-height: 5rem;
 	resize: vertical;
 }
-
 /*	Set apart from "normal" selects on purpose - a locale switch isn't a form
  *	field, it's a view control (which translation you're looking at), so it
  *	sits up with the legend instead of looking like just another input row */
@@ -983,7 +875,6 @@ input.error, .pending.error {
 	font-size: .78rem;
 	font-weight: 600;
 }
-
 #elements-form-actions, .editor-form-actions {
 	display: flex;
 	flex-wrap: wrap;
@@ -994,31 +885,25 @@ input.error, .pending.error {
 .editor-form-actions button, #elements-form-actions button {
 	width: 100%;
 }
-
 @media (min-width: 36rem) {
-	.editor-form-actions button,
-	#elements-form-actions button {
+	.editor-form-actions button, #elements-form-actions button {
 		width: auto;
 		min-width: 8rem;
 	}
-	.editor-form-actions .editor-danger,
-	#elements-form-actions .editor-danger {
+	.editor-form-actions .nino-admin-btn-danger, #elements-form-actions .nino-admin-btn-danger {
 		margin-left: auto;
 	}
 }
-
 #elements-form-msg, #text-form-msg {
 	margin: 0;
 	flex-basis: 100%;
 	font-size: .85rem;
 	color: var(--editor-text-secondary);
 }
-
 .editor-error {
 	color: var(--editor-red);
 	font-weight: 600;
 }
-
 /* --------------------------------------------------------- Char counter */
 
 .char-counter {
@@ -1027,19 +912,16 @@ input.error, .pending.error {
 	color: var(--editor-text-secondary);
 	margin: .3rem 0 1rem;
 }
-
 .char-counter-limit {
 	color: var(--editor-red);
 	font-weight: 600;
 }
-
 /* ---------------------------------------------------------- Html editor */
 
-.html-editor {
+#editor-page-wrap .nino-admin-richtext {
 	margin-bottom: 1rem;
 }
-
-.html-editor-toolbar {
+#editor-page-wrap .nino-admin-richtext-toolbar {
 	display: flex;
 	gap: .3rem;
 	padding: .3rem;
@@ -1049,8 +931,7 @@ input.error, .pending.error {
 	border-radius: var(--editor-radius-sm);
 	width: fit-content;
 }
-
-.html-editor-btn {
+#editor-page-wrap .nino-admin-richtext-btn {
 	padding: .35rem .7rem;
 	min-height: 34px;
 	font-size: .85rem;
@@ -1059,24 +940,20 @@ input.error, .pending.error {
 	color: var(--editor-text);
 	box-shadow: none;
 }
-
-.html-editor-btn[data-tag="em"] {
+#editor-page-wrap .nino-admin-richtext-btn[data-tag="em"] {
 	font-style: italic;
 	font-weight: 400;
 }
-
-.html-editor-btn[data-tag="code"] {
+#editor-page-wrap .nino-admin-richtext-btn[data-tag="code"] {
 	font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 	font-weight: 500;
 }
-
-.html-editor-btn.active {
+#editor-page-wrap .nino-admin-richtext-btn.active {
 	background: var(--editor-bg-elevated);
 	color: var(--editor-blue);
 	box-shadow: var(--editor-shadow);
 }
-
-.html-editor-content {
+#editor-page-wrap .nino-admin-richtext-content {
 	min-height: 3rem;
 	padding: .65rem .75rem;
 	border: 1px solid var(--editor-border);
@@ -1088,42 +965,36 @@ input.error, .pending.error {
 	cursor: text;
 	transition: border-color .15s ease, box-shadow .15s ease;
 }
-
 /* WebKit historically treats user-select as inherited. Set it on the inline
    markup too, so a surrounding app/canvas rule cannot make formatted pieces
    inside this shared editor impossible to drag-select. */
-.html-editor-content * {
+#editor-page-wrap .nino-admin-richtext-content * {
 	-webkit-user-select: text;
 	user-select: text;
 	cursor: text;
 }
-
-.html-editor-content strong { font-weight: 700; }
-.html-editor-content em { font-style: italic; }
-.html-editor-content span { background: rgba(255,204,0,.35); border-radius: 3px; }
-.html-editor-content code {
+#editor-page-wrap .nino-admin-richtext-content strong { font-weight: 700; }
+#editor-page-wrap .nino-admin-richtext-content em { font-style: italic; }
+#editor-page-wrap .nino-admin-richtext-content span { background: rgba(255,204,0,.35); border-radius: 3px; }
+#editor-page-wrap .nino-admin-richtext-content code {
 	padding: .08em .3em;
 	border-radius: 4px;
 	background: var(--editor-bg);
 	font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 	font-size: .92em;
 }
-.html-editor-content a { color: var(--editor-blue); text-decoration: underline; }
-
-.html-editor-linkbar {
+#editor-page-wrap .nino-admin-richtext-content a { color: var(--editor-blue); text-decoration: underline; }
+#editor-page-wrap .nino-admin-richtext-linkbar {
 	display: flex;
 	gap: .4rem;
 	margin-top: .5rem;
 }
-
-.html-editor-linkbar[hidden] {
+#editor-page-wrap .nino-admin-richtext-linkbar[hidden] {
 	display: none;
 }
-
-.html-editor-linkbar input {
+#editor-page-wrap .nino-admin-richtext-linkbar input {
 	flex: 1;
 }
-
 /* ------------------------------------------------------------- Login page */
 
 #form-login {
@@ -1135,8 +1006,7 @@ input.error, .pending.error {
 	box-shadow: var(--editor-shadow);
 	border: 1px solid var(--editor-border);
 }
-
-.editor-auth-brand {
+#editor-page-wrap .nino-admin-auth-brand {
 	display: flex;
 	align-items: center;
 	gap: .65rem;
@@ -1144,55 +1014,45 @@ input.error, .pending.error {
 	font-weight: 750;
 	letter-spacing: -.02em;
 }
-
-.editor-auth-title {
+#editor-page-wrap .nino-admin-auth-title {
 	margin: 0 0 .35rem;
 	font-size: 1.55rem;
 	line-height: 1.2;
 	letter-spacing: -.035em;
 }
-
 #form-login #editor-localepicker {
 	display: block;
 	margin: 2rem auto 0;
 }
-
 #form-login #form-message {
 	margin: 0 0 1.4rem;
 }
-
 #form-login #submit {
 	width: 100%;
 	margin-top: .5rem;
 }
-
 #form-message {
 	font-size: .85rem;
 	color: var(--editor-text-secondary);
 	min-height: 1.2rem;
 }
-
 #form-message.pending {
 	color: var(--editor-blue);
 }
-
 #form-message.error {
 	color: var(--editor-red);
 }
-
 /* ------------------------------------------------------------ Submissions tab */
 
 #submissions-export {
 	display: block;
 	margin: 0 0 .75rem;
 }
-
 #submissions-entries {
 	list-style: none;
 	margin: 0;
 	padding: 0;
 }
-
 #submissions-entries li {
 	background: var(--editor-bg-grouped);
 	border-radius: var(--editor-radius);
@@ -1203,13 +1063,11 @@ input.error, .pending.error {
 	cursor: pointer;
 	transition: border-color .15s ease, transform .15s ease, box-shadow .15s ease;
 }
-
 #submissions-entries li:hover {
 	border-color: color-mix(in srgb, var(--editor-blue) 30%, var(--editor-border));
 	transform: translateY(-1px);
 	box-shadow: var(--editor-shadow);
 }
-
 .submissions-entry-header {
 	display: flex;
 	align-items: center;
@@ -1217,12 +1075,10 @@ input.error, .pending.error {
 	gap: .75rem;
 	margin-bottom: .3rem;
 }
-
 .submissions-entry-date {
 	font-size: .8rem;
 	color: var(--editor-text-secondary);
 }
-
 .submissions-entry-cat {
 	display: inline-block;
 	padding: .15rem .5rem;
@@ -1231,16 +1087,13 @@ input.error, .pending.error {
 	color: #fff;
 	font-size: .75rem;
 }
-
 .submissions-entry-name {
 	font-weight: 600;
 	margin-bottom: .3rem;
 }
-
 .submissions-entry-name a {
 	color: var(--editor-text);
 }
-
 .submissions-entry-message {
 	margin: 0;
 	white-space: pre-wrap;
@@ -1250,31 +1103,26 @@ input.error, .pending.error {
 	-webkit-line-clamp: 1;
 	overflow: hidden;
 }
-
 .submissions-entry.expanded .submissions-entry-message {
 	display: block;
 	-webkit-line-clamp: unset;
 	overflow: visible;
 }
-
 .submissions-entry-toggle {
 	display: none;
 	margin-top: .4rem;
 	font-size: .8rem;
 	color: var(--editor-blue);
 }
-
 .submissions-entry.has-overflow .submissions-entry-toggle {
 	display: inline-block;
 }
-
 /* -------------------------------------------------------------- Newsletter tab */
 
 #newsletter-summary {
 	margin: 0 0 1rem;
 	font-weight: 600;
 }
-
 #newsletter-bcc {
 	margin: 0 0 1.5rem;
 	padding: 1.2rem;
@@ -1283,34 +1131,29 @@ input.error, .pending.error {
 	border-radius: var(--editor-radius);
 	box-shadow: var(--editor-shadow-sm);
 }
-
 #newsletter-bcc label {
 	display: block;
 	font-size: .8rem;
 	color: var(--editor-text-secondary);
 	margin-bottom: .3rem;
 }
-
 #newsletter-bcc-field {
 	min-height: 80px;
 	resize: vertical;
 	font-family: ui-monospace, monospace;
 	font-size: .85rem;
 }
-
 #newsletter-bcc-actions {
 	display: flex;
 	align-items: center;
 	gap: .75rem;
 	margin-top: .5rem;
 }
-
 #newsletter-bcc-copied {
 	font-size: .85rem;
 	color: var(--editor-green);
 	font-weight: 600;
 }
-
 #newsletter-entries {
 	list-style: none;
 	margin: 0;
@@ -1321,7 +1164,6 @@ input.error, .pending.error {
 	box-shadow: var(--editor-shadow);
 	overflow: hidden;
 }
-
 #newsletter-entries li {
 	display: flex;
 	align-items: center;
@@ -1330,27 +1172,22 @@ input.error, .pending.error {
 	padding: .6rem 1rem;
 	border-bottom: 1px solid var(--editor-separator);
 }
-
 #newsletter-entries li:last-child {
 	border-bottom: none;
 }
-
 #newsletter-entries li a {
 	color: var(--editor-text);
 }
-
 .newsletter-entry-meta {
 	display: flex;
 	align-items: center;
 	gap: .75rem;
 	flex-shrink: 0;
 }
-
 .newsletter-entry-date {
 	font-size: .8rem;
 	color: var(--editor-text-secondary);
 }
-
 .newsletter-entry-delete {
 	min-height: auto;
 	padding: .3rem .75rem;
@@ -1359,22 +1196,19 @@ input.error, .pending.error {
 	color: #fff;
 	opacity: .75;
 }
-
 .newsletter-entry-delete:hover, .newsletter-entry-delete:active {
 	background: var(--editor-red);
 	opacity: 1;
 }
-
 /* ------------------------------------------------------- Desktop app shell */
 
 @media (min-width: 64rem) {
-	#editor-page-wrap {
+	#editor-page-wrap.nino-admin-shell {
 		display: grid;
 		grid-template-columns: 17rem minmax(0, 1fr);
 		min-height: 100vh;
 	}
-
-	#editor-bar-wrap {
+#editor-page-wrap .nino-admin-rail {
 		grid-column: 1;
 		position: sticky;
 		top: 0;
@@ -1388,12 +1222,10 @@ input.error, .pending.error {
 		border-right: 1px solid var(--editor-separator);
 		border-bottom: none;
 	}
-
-	.editor-brand {
+.editor-brand {
 		padding: 0 .35rem;
 	}
-
-	#editor-user {
+#editor-page-wrap .nino-admin-rail-user {
 		justify-content: flex-start;
 		flex-wrap: wrap;
 		gap: .45rem .7rem;
@@ -1402,26 +1234,21 @@ input.error, .pending.error {
 		border: 1px solid var(--editor-border);
 		border-radius: var(--editor-radius-sm);
 	}
-
-	#editor-user-email {
+#editor-user-email {
 		flex: 1 0 100%;
 		font-size: .78rem;
 	}
-
-	#editor-user-logout {
+#editor-user-logout {
 		font-size: .8rem;
 	}
-
-	#editor-nav-ui {
+#editor-nav-ui {
 		margin-left: auto;
 	}
-
-	#editor-nav-ui-menu {
+#editor-nav-ui-menu {
 		top: calc(100% + .25rem);
 		right: -.25rem;
 	}
-
-	#editor-nav-wrap {
+#editor-page-wrap .nino-admin-nav {
 		flex: 1 1 auto;
 		flex-direction: column;
 		gap: .25rem;
@@ -1431,8 +1258,7 @@ input.error, .pending.error {
 		overflow: auto;
 		border: none;
 	}
-
-	#editor-nav-wrap a {
+#editor-page-wrap .nino-admin-nav a {
 		width: 100%;
 		margin: 0;
 		padding: .72rem .8rem;
@@ -1441,25 +1267,21 @@ input.error, .pending.error {
 		text-align: left;
 		font-size: .88rem;
 	}
-
-	#editor-nav-wrap a:hover {
+#editor-page-wrap .nino-admin-nav a:hover {
 		background: var(--editor-bg);
 		color: var(--editor-text);
 	}
-
-	#editor-nav-wrap a.active {
+#editor-page-wrap .nino-admin-nav a.active {
 		background: var(--editor-blue-soft);
 		color: var(--editor-blue);
 		border: none;
 	}
-
-	#editor-content-wrap {
+#editor-page-wrap .nino-admin-pane {
 		grid-column: 2;
 		max-width: 76rem;
 		padding: 3rem clamp(2rem, 4vw, 4rem) 6rem;
 	}
 }
-
 @media (prefers-reduced-motion: reduce) {
 	*, *::before, *::after {
 		scroll-behavior: auto !important;
@@ -1467,4 +1289,38 @@ input.error, .pending.error {
 		animation-duration: .01ms !important;
 		animation-iteration-count: 1 !important;
 	}
+}
+}
+
+@layer nino.local {
+/* ------------------------------------------------- Design-system locals */
+/*
+   Tool-local overrides of shared components (see _nino/Nino.admin.css).
+   Ids are fine here - this file only ever loads inside /_editor - but they
+   stay out of the shared design system, which has to work for all four tools.
+*/
+
+/* The category buttons inside a .nino-admin-list-buttons row: the shared class
+   supplies the row surface, these two describe what the row says. */
+#editor-page-wrap .editor-type-btn > div {
+	min-width: 0;
+	font-weight: 650;
+}
+#editor-page-wrap .editor-type-btn-descr {
+	overflow: hidden;
+	margin-top: .06rem;
+	font-size: .72rem;
+	font-weight: 400;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+#editor-page-wrap .editor-view-button-chev {
+	color: var(--editor-text-secondary);
+	font-size: 1.15rem;
+}
+/* Submissions rows carry more than one line each, so they sit taller than the
+   shared .nino-admin-list-dense default. */
+#editor-page-wrap #submissions-entries > li {
+	padding: .7rem .8rem;
+}
 }

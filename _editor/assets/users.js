@@ -151,6 +151,7 @@
 			wrap.innerHTML = '';
 
 			const ul = dc.createElement('ul');
+			ul.className = 'nino-admin-list';
 			users.forEach( function( user ) {
 				const li 		= dc.createElement('li');
 				const link	= dc.createElement('a');
@@ -214,7 +215,7 @@
 			wrap.appendChild(usersWrap)
 
 			const mailLabel = dc.createElement('label');
-			mailLabel.className = 'editor-field';
+			mailLabel.className = 'nino-admin-field';
 			const mailSpan = dc.createElement('span');
 			mailSpan.textContent = Nino.content.getText('/_editor/users/label/mail');
 			mailLabel.appendChild( mailSpan );
@@ -227,7 +228,7 @@
 			form.appendChild( mailLabel );
 
 			const pwLabel = dc.createElement('label');
-			pwLabel.className = 'editor-field';
+			pwLabel.className = 'nino-admin-field';
 			const pwSpan = dc.createElement('span');
 			pwSpan.textContent = Nino.content.getText('/_editor/users/label/newpw');
 			pwLabel.appendChild( pwSpan );
@@ -241,7 +242,7 @@
 
 			if( user.isSelf === true ) {
 				const curLabel = dc.createElement('label');
-				curLabel.className = 'editor-field';
+				curLabel.className = 'nino-admin-field';
 				const curSpan = dc.createElement('span');
 				curSpan.textContent = Nino.content.getText('/_editor/users/label/currentpw');
 				curLabel.appendChild( curSpan );
@@ -306,7 +307,7 @@
 			form.id = 'users-permissions-form';
 
 			const fullLabel = dc.createElement('label');
-			fullLabel.className = 'editor-checkbox-field';
+			fullLabel.className = 'nino-admin-checkbox-field';
 			const fullCheck = dc.createElement('input');
 			fullCheck.type = 'checkbox';
 			fullCheck.id = 'users-permissions-full';
@@ -319,7 +320,7 @@
 			Nino.editor.users._permOptions.forEach( function( option ) {
 
 				const label = dc.createElement('label');
-				label.className = 'editor-checkbox-field';
+				label.className = 'nino-admin-checkbox-field';
 				const check = dc.createElement('input');
 				check.type = 'checkbox';
 				check.value = option.perm;

@@ -49,7 +49,7 @@
 			const wrap = dc.getElementById('admin-content-translations');
 			wrap.innerHTML = '';
 			const p = dc.createElement('p');
-			p.className = 'admin-error';
+			p.className = 'nino-admin-error';
 			p.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : 'Failed to load.' );
 			wrap.appendChild( p );
 		},
@@ -89,13 +89,13 @@
 			flow.className = 'admin-translations-flow';
 
 			const exportCard = dc.createElement('section');
-			exportCard.className = 'admin-translation-card';
+			exportCard.className = 'nino-admin-card admin-translation-card';
 			exportCard.innerHTML = '<span class="admin-step-number">1</span><div class="admin-translation-card-copy"><h2>Export native JSON</h2><p></p></div>';
 			exportCard.querySelector('p').textContent = info.textCount+ ' text values and '+ info.elementCount+ ' element fields. Global values, technical text, images, and structure stay outside the package.';
 
 			const exportBtn = dc.createElement('button');
 			exportBtn.type = 'button';
-			exportBtn.className = 'editor-list-action';
+			exportBtn.className = 'nino-admin-btn-primary';
 			exportBtn.textContent = 'Download '+ info.nativeLocale+ ' JSON';
 			exportBtn.addEventListener( 'click', function() {
 				exportBtn.disabled = true;
@@ -122,14 +122,14 @@
 			flow.appendChild( exportCard );
 
 			const importCard = dc.createElement('section');
-			importCard.className = 'admin-translation-card admin-translation-card-import';
+			importCard.className = 'nino-admin-card admin-translation-card admin-translation-card-import';
 			importCard.innerHTML = '<span class="admin-step-number">2</span><div class="admin-translation-card-copy"><h2>Import translated JSON</h2><p>Choose the destination deliberately. Import overwrites matching values in that language, but never deletes content omitted from the document.</p></div>';
 
 			const fields = dc.createElement('div');
 			fields.className = 'admin-translation-fields';
 
 			const localeLabel = dc.createElement('label');
-			localeLabel.className = 'editor-field';
+			localeLabel.className = 'nino-admin-field';
 			localeLabel.innerHTML = '<span>Target language</span>';
 			const localeSelect = dc.createElement('select');
 			localeSelect.id = 'translations-target-locale';
@@ -144,7 +144,7 @@
 			fields.appendChild( localeLabel );
 
 			const fileLabel = dc.createElement('label');
-			fileLabel.className = 'editor-field';
+			fileLabel.className = 'nino-admin-field';
 			fileLabel.innerHTML = '<span>JSON file</span>';
 			const fileInput = dc.createElement('input');
 			fileInput.type = 'file';
@@ -153,7 +153,7 @@
 			fields.appendChild( fileLabel );
 
 			const jsonLabel = dc.createElement('label');
-			jsonLabel.className = 'editor-field admin-translation-json';
+			jsonLabel.className = 'nino-admin-field admin-translation-json';
 			jsonLabel.innerHTML = '<span>Or paste JSON</span>';
 			const textarea = dc.createElement('textarea');
 			textarea.id = 'translations-json';
@@ -173,7 +173,7 @@
 
 			const importBtn = dc.createElement('button');
 			importBtn.type = 'button';
-			importBtn.className = 'editor-list-action';
+			importBtn.className = 'nino-admin-btn-primary';
 			importBtn.textContent = 'Import into selected language';
 			importBtn.addEventListener( 'click', function() {
 				let translation;
@@ -219,7 +219,7 @@
 			if( message === null )
 				return;
 			message.textContent = value;
-			message.className = error === true ? 'admin-error' : 'admin-success';
+			message.className = error === true ? 'nino-admin-error' : 'admin-success';
 		},
 	};
 

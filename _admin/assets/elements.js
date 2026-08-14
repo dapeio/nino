@@ -235,7 +235,7 @@
 		_showError : function( container, status, response ) {
 			container.innerHTML = '';
 			const p = dc.createElement('p');
-			p.className = 'admin-error';
+			p.className = 'nino-admin-error';
 			p.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : 'Failed to load.' );
 			container.appendChild( p );
 		},
@@ -311,14 +311,14 @@
 
 			if( types.length === 0 ) {
 				const p = dc.createElement('p');
-				p.className = 'admin-hint';
+				p.className = 'nino-admin-hint';
 				p.textContent = 'No element types yet - create one in the "Element Types" tab first.';
 				wrap.appendChild( p );
 				return;
 			}
 
 			const ul = dc.createElement('ul');
-			ul.className = 'admin-drill-list';
+			ul.className = 'nino-admin-list';
 
 			types.forEach( function( entry ) {
 
@@ -329,7 +329,7 @@
 				link.classList.toggle( 'active', entry.type === Nino.admin.elements._currentType );
 
 				const copy = dc.createElement('span');
-				copy.className = 'admin-list-copy';
+				copy.className = 'nino-admin-list-copy';
 				const title = dc.createElement('strong');
 				title.textContent = entry.title;
 
@@ -372,7 +372,7 @@
 			Nino.admin.elements._destroyHtmlEditors();
 			dc.getElementById('elements-form').innerHTML = '';
 
-			dc.querySelectorAll('#elements-types .admin-drill-list a').forEach( function( link ) { link.classList.toggle( 'active', link.dataset.type === type ) } );
+			dc.querySelectorAll('#elements-types .nino-admin-list a').forEach( function( link ) { link.classList.toggle( 'active', link.dataset.type === type ) } );
 
 			Nino.admin.elements._apiCall( 'list', { type : type }, function( status, response ) {
 				if( requestId !== Nino.admin.elements._listRequest || type !== Nino.admin.elements._currentType )
@@ -415,7 +415,7 @@
 			wrap.appendChild( uri );
 
 			const ul = dc.createElement('ul');
-			ul.className = 'admin-drill-list';
+			ul.className = 'nino-admin-list';
 			elements.forEach( function( element ) {
 				const li 		= dc.createElement('li');
 				const link	= dc.createElement('a');
@@ -429,7 +429,7 @@
 
 			const addBtn = dc.createElement('button');
 			addBtn.type = 'button';
-			addBtn.className = 'editor-list-action';
+			addBtn.className = 'nino-admin-btn-primary';
 			addBtn.textContent = 'New element';
 			addBtn.addEventListener( 'click', function() { Nino.admin.elements._openForm( null ) } );
 			wrap.appendChild( Nino.adminUi.listActions( [ addBtn ] ) );
@@ -560,7 +560,7 @@
 			// can make drag-selection fail in Safari. Rich text gets a semantic
 			// group; ordinary controls retain their native label wrapper.
 			const label = dc.createElement( isHtml ? 'div' : 'label' );
-			label.className = 'editor-field';
+			label.className = 'nino-admin-field';
 			if( isHtml ) {
 				label.setAttribute( 'role', 'group' );
 				label.setAttribute( 'aria-label', displayName );
@@ -588,11 +588,11 @@
 				label.appendChild( span );
 
 				const group = dc.createElement('div');
-				group.className = 'editor-field-radios';
+				group.className = 'nino-admin-field-radios';
 
 				[ true, false ].forEach( function( boolValue ) {
 					const optLabel = dc.createElement('label');
-					optLabel.className = 'editor-field-radio';
+					optLabel.className = 'nino-admin-field-radio';
 					const radio = dc.createElement('input');
 					radio.type = 'radio';
 					radio.name = 'elements-radio-'+ key;
@@ -683,7 +683,7 @@
 
 				if( options.length === 0 ) {
 					const hint = dc.createElement('p');
-					hint.className = 'editor-field-hint';
+					hint.className = 'nino-admin-field-hint';
 					hint.textContent = field.elementType
 						? 'No element of type "'+ field.elementType+ '" exists yet.'
 						: 'This field has no element type to reference.';
@@ -705,16 +705,16 @@
 
 				if( field.width && field.height ) {
 					const dimensions = dc.createElement('p');
-					dimensions.className = 'editor-field-image-dimensions';
+					dimensions.className = 'nino-admin-field-image-dimensions';
 					dimensions.textContent = 'Target size '+ field.width+ ' × '+ field.height+ ' px';
 					label.appendChild( dimensions );
 				}
 
 				const wrap = dc.createElement('div');
-				wrap.className = 'editor-field-image';
+				wrap.className = 'nino-admin-field-image';
 
 				const preview = dc.createElement('img');
-				preview.className = 'editor-field-image-preview';
+				preview.className = 'nino-admin-field-image-preview';
 				preview.hidden = ! value;
 				// Every uploaded image lives under /images (Nino\Images::UPLOAD_DIR),
 				// and the stored value is the filename relative to it - the same
@@ -734,7 +734,7 @@
 				wrap.appendChild( hiddenInput );
 
 				const msg = dc.createElement('p');
-				msg.className = 'editor-field-image-msg';
+				msg.className = 'nino-admin-field-image-msg';
 				msg.setAttribute( 'aria-live', 'polite' );
 
 				if( Nino.admin.elements._isNew === true ) {
@@ -799,10 +799,10 @@
 			input.maxLength = maxlength;
 
 			const header = dc.createElement('div');
-			header.className = 'editor-field-header';
+			header.className = 'nino-admin-field-header';
 
 			const nameSpan = dc.createElement('span');
-			nameSpan.className = 'editor-field-name';
+			nameSpan.className = 'nino-admin-field-name';
 			nameSpan.textContent = displayName;
 			header.appendChild( nameSpan );
 
@@ -841,11 +841,11 @@
 				return input;
 
 			const row = dc.createElement('div');
-			row.className = 'editor-field-suffixed';
+			row.className = 'nino-admin-field-suffixed';
 			row.appendChild( input );
 
 			const suffix = dc.createElement('span');
-			suffix.className = 'editor-field-suffix';
+			suffix.className = 'nino-admin-field-suffix';
 			suffix.textContent = field.suffix;
 			row.appendChild( suffix );
 
@@ -949,7 +949,7 @@
 		},
 
 		/**
-		 *	Destroy any currently mounted html-editor instances (removes their
+		 *	Destroy any currently mounted nino-admin-richtext instances (removes their
 		 *	document-level selectionchange listener) - call before clearing/
 		 *	replacing the DOM that contains them
 		 *
@@ -1149,7 +1149,7 @@
 			details.appendChild( summary );
 
 			const hint = dc.createElement('p');
-			hint.className = 'admin-hint';
+			hint.className = 'nino-admin-hint';
 			hint.textContent = 'Read-only. "*" holds this element\'s global fields, shared by every locale; each locale bucket holds only that locale\'s own values. A locale missing here falls back to "*".';
 			details.appendChild( hint );
 
@@ -1210,7 +1210,7 @@
 			if( Nino.admin.elements._isNew === true ) {
 
 				const uriLabel = dc.createElement('label');
-				uriLabel.className = 'editor-field';
+				uriLabel.className = 'nino-admin-field';
 				const uriSpan = dc.createElement('span');
 				uriSpan.textContent = 'Element URI';
 				uriLabel.appendChild( uriSpan );
@@ -1224,7 +1224,7 @@
 
 				// Only shown here - once an element exists its uri is fixed
 				const uriHint = dc.createElement('p');
-				uriHint.className = 'editor-field-hint';
+				uriHint.className = 'nino-admin-field-hint';
 				uriHint.textContent = 'Letters, digits, "-" and "_" only, starting with a letter or digit. Cannot be changed later.';
 				form.appendChild( uriHint );
 
@@ -1277,6 +1277,7 @@
 
 				const select = dc.createElement('select');
 				select.id = 'elements-form-locale-select';
+				select.className = 'nino-admin-contextbar-select';
 				Nino.admin.elements._locales.forEach( function( locale ) {
 					const option = dc.createElement('option');
 					option.value = locale;
@@ -1297,6 +1298,7 @@
 
 				const fieldsWrap = dc.createElement('div');
 				fieldsWrap.id = 'elements-form-locale-fields';
+				fieldsWrap.className = 'nino-admin-fieldgrid';
 				localeWrap.appendChild( fieldsWrap );
 
 				form.appendChild( localeWrap );
@@ -1326,7 +1328,7 @@
 			// plain Save is always there, so nothing is unreachable.
 			const saveBackBtn = dc.createElement('button');
 			saveBackBtn.type = 'button';
-			saveBackBtn.className = 'admin-desktop-action';
+			saveBackBtn.className = 'nino-admin-desktop-action';
 			saveBackBtn.textContent = 'Save and back';
 			saveBackBtn.addEventListener( 'click', function() {
 				Nino.admin.elements._save( function() {
@@ -1341,7 +1343,7 @@
 
 			const saveNewBtn = dc.createElement('button');
 			saveNewBtn.type = 'button';
-			saveNewBtn.className = 'admin-desktop-action';
+			saveNewBtn.className = 'nino-admin-desktop-action';
 			saveNewBtn.textContent = 'Save and new';
 			saveNewBtn.addEventListener( 'click', function() {
 				Nino.admin.elements._save( function() {
@@ -1357,7 +1359,7 @@
 			if( Nino.admin.elements._isNew === false ) {
 				const delBtn = dc.createElement('button');
 				delBtn.type = 'button';
-				delBtn.classList.add('editor-danger');
+				delBtn.classList.add('nino-admin-btn-danger');
 				delBtn.textContent = 'Delete';
 				delBtn.addEventListener( 'click', function() { Nino.admin.elements._delete() } );
 				actions.appendChild( delBtn );
@@ -1570,7 +1572,7 @@
 		_uploadImage : function( key, file, hiddenInput, preview, msg, fileInput ) {
 
 			fileInput.disabled = true;
-			msg.className = 'editor-field-image-msg';
+			msg.className = 'nino-admin-field-image-msg';
 			msg.textContent = 'Uploading …';
 
 			Nino.admin.elements._apiCall( 'uploadimage', {
@@ -1584,7 +1586,7 @@
 				fileInput.value = '';
 
 				if( status !== 200 || response === null ) {
-					msg.className = 'editor-field-image-msg error';
+					msg.className = 'nino-admin-field-image-msg error';
 					msg.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : 'Failed to save.' );
 					return;
 				}

@@ -107,6 +107,7 @@
 
 			const ul = dc.createElement('ul');
 			ul.id = 'logs-entries';
+			ul.className = 'nino-admin-list nino-admin-list-dense';
 
 			lines.forEach( function( line ) {
 				const li = dc.createElement('li');

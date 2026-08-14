@@ -138,7 +138,7 @@
 		_showError : function( container, status, response ) {
 			container.innerHTML = '';
 			const p = dc.createElement('p');
-			p.className = 'admin-error';
+			p.className = 'nino-admin-error';
 			p.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : 'Failed to load.' );
 			container.appendChild( p );
 		},
@@ -170,20 +170,20 @@
 			// the dialog looking broken
 			if( Nino.admin.navs._active === false ) {
 				const off = dc.createElement('p');
-				off.className = 'admin-hint';
+				off.className = 'nino-admin-hint';
 				off.textContent = 'The Navigation module is not active - these menus are stored, but nothing renders them. Activate \\Nino\\Modules\\Navigation under Config.';
 				wrap.appendChild( off );
 			}
 
 			if( Nino.admin.navs._navs.length === 0 ) {
 				const p = dc.createElement('p');
-				p.className = 'admin-hint';
+				p.className = 'nino-admin-hint';
 				p.textContent = 'No navigations yet - add one below.';
 				wrap.appendChild( p );
 			}
 
 			const ul = dc.createElement('ul');
-			ul.className = 'admin-drill-list';
+			ul.className = 'nino-admin-list';
 			Nino.admin.navs._navs.forEach( function( nav ) {
 
 				const li = dc.createElement('li');
@@ -200,7 +200,7 @@
 
 			const addBtn = dc.createElement('button');
 			addBtn.type = 'button';
-			addBtn.className = 'editor-list-action';
+			addBtn.className = 'nino-admin-btn-primary';
 			addBtn.textContent = 'New navigation';
 			addBtn.addEventListener( 'click', function() { Nino.admin.navs._openForm( null ) } );
 			wrap.appendChild( Nino.adminUi.listActions( [ addBtn ] ) );
@@ -269,7 +269,7 @@
 			navFieldset.appendChild( navLegend );
 
 			const keyLabel = dc.createElement('label');
-			keyLabel.className = 'editor-field';
+			keyLabel.className = 'nino-admin-field';
 			const keySpan = dc.createElement('span');
 			keySpan.textContent = 'Navigation id - the name a template asks for, eg. [navigation nav="main"]';
 			keyLabel.appendChild( keySpan );
@@ -287,7 +287,7 @@
 			// a rename has to happen by hand
 			if( Nino.admin.navs._isNew === false ) {
 				const renameHint = dc.createElement('p');
-				renameHint.className = 'admin-hint';
+				renameHint.className = 'nino-admin-hint';
 				renameHint.textContent = 'Renaming updates the routes in this navigation, not the templates rendering it - update their [navigation nav="…"] argument yourself.';
 				navFieldset.appendChild( renameHint );
 			}
@@ -310,7 +310,7 @@
 			if( Nino.admin.navs._isNew === false ) {
 				const deleteBtn = dc.createElement('button');
 				deleteBtn.type = 'button';
-				deleteBtn.className = 'admin-danger-btn';
+				deleteBtn.className = 'nino-admin-btn-danger';
 				deleteBtn.textContent = 'Delete navigation';
 				deleteBtn.addEventListener( 'click', function() { Nino.admin.navs._delete() } );
 				actions.appendChild( deleteBtn );
@@ -344,13 +344,13 @@
 
 			if( nav.entries.length === 0 ) {
 				const p = dc.createElement('p');
-				p.className = 'admin-hint';
+				p.className = 'nino-admin-hint';
 				p.textContent = 'No entries yet - add a route below.';
 				fieldset.appendChild( p );
 			}
 
 			const ul = dc.createElement('ul');
-			ul.className = 'admin-drill-list';
+			ul.className = 'nino-admin-list';
 			nav.entries.forEach( function( entry, index ) {
 
 				const li = dc.createElement('li');
@@ -400,7 +400,7 @@
 			const free 	= Nino.admin.navs._routes.filter( function( route ) { return taken.indexOf( route.httpUri ) === -1 } );
 
 			const addLabel = dc.createElement('label');
-			addLabel.className = 'editor-field';
+			addLabel.className = 'nino-admin-field';
 			const addSpan = dc.createElement('span');
 			addSpan.textContent = 'Add a route - it joins at the end';
 			addLabel.appendChild( addSpan );
@@ -417,7 +417,7 @@
 			addLabel.appendChild( addSelect );
 			fieldset.appendChild( addLabel );
 
-			// A plain button, not an .editor-list-action: that class is the
+			// A plain button, not an .nino-admin-btn-primary: that class is the
 			// full-width primary a *list* level carries (see _renderList()),
 			// and this one sits inside a form under a Save button it must not
 			// compete with - same shape elementtypes.js's "Add field" has

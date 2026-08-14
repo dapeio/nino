@@ -81,7 +81,7 @@
 			const wrap = dc.getElementById('users-list');
 			wrap.innerHTML = '';
 			const p = dc.createElement('p');
-			p.className = 'admin-error';
+			p.className = 'nino-admin-error';
 			p.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : 'Failed to load.' );
 			wrap.appendChild( p );
 		},
@@ -99,6 +99,7 @@
 			wrap.innerHTML = '';
 
 			const ul = dc.createElement('ul');
+			ul.className = 'nino-admin-list';
 			users.forEach( function( user ) {
 				const li = dc.createElement('li');
 
@@ -215,6 +216,7 @@
 
 			const form = dc.createElement('form');
 			form.id = 'users-add-form';
+			form.className = 'nino-admin-card';
 
 			const mailInput = dc.createElement('input');
 			mailInput.type = 'email';

@@ -242,7 +242,7 @@
 				empty.append( element( 'h1', '', 'This template has no sections yet' ), element( 'p', '', 'Add a complete HTML section or a reusable [template] section.' ) );
 				const actions = element( 'div', 'pd-toolbar-actions' );
 				actions.style.marginTop = '1rem';
-				actions.appendChild( button( '+ Add first section', 'Add the first section', function() { pd.composer.open( { afterId : null } ) }, 'pd-primary' ) );
+				actions.appendChild( button( '+ Add first section', 'Add the first section', function() { pd.composer.open( { afterId : null } ) }, 'nino-admin-btn-primary' ) );
 				empty.appendChild( actions );
 				canvas.appendChild( empty );
 			}
@@ -449,7 +449,7 @@
 				return;
 			const panel = element( 'section', 'pd-inspector-section' );
 			panel.appendChild( element( 'h3', '', 'Native content' ) );
-			const status = element( 'p', 'admin-hint', 'Loading textfills…' );
+			const status = element( 'p', 'nino-admin-hint', 'Loading textfills…' );
 			panel.appendChild( status );
 			container.appendChild( panel );
 
@@ -485,12 +485,12 @@
 						save.disabled = false;
 						message.textContent = error.message;
 					} );
-				}, 'pd-primary' );
+				}, 'nino-admin-btn-primary' );
 				footer.append( message, save );
 				panel.appendChild( footer );
 			} ).catch( function( error ) {
 				if( token === pd.sectionsUI._inspectorToken ) {
-					status.className = 'admin-error';
+					status.className = 'nino-admin-error';
 					status.textContent = error.message;
 				}
 			} );
@@ -519,7 +519,7 @@
 				const images = element( 'section', 'pd-inspector-section' );
 				images.appendChild( element( 'h3', '', 'Image slots' ) );
 				const imageList = element( 'div', 'pd-resource-list' );
-				imageList.appendChild( element( 'p', 'admin-hint', 'Checking image slots…' ) );
+				imageList.appendChild( element( 'p', 'nino-admin-hint', 'Checking image slots…' ) );
 				images.appendChild( imageList );
 				container.appendChild( images );
 
@@ -548,7 +548,7 @@
 					} );
 				} ).catch( function( error ) {
 					imageList.innerHTML = '';
-					imageList.appendChild( element( 'p', 'admin-error', error.message ) );
+					imageList.appendChild( element( 'p', 'nino-admin-error', error.message ) );
 				} );
 			}
 
@@ -557,7 +557,7 @@
 			const elements = element( 'section', 'pd-inspector-section' );
 			elements.appendChild( element( 'h3', '', 'Elements collections' ) );
 			const list = element( 'div', 'pd-resource-list' );
-			list.appendChild( element( 'p', 'admin-hint', 'Checking element types…' ) );
+			list.appendChild( element( 'p', 'nino-admin-hint', 'Checking element types…' ) );
 			elements.appendChild( list );
 			container.appendChild( elements );
 
@@ -590,7 +590,7 @@
 				} );
 			} ).catch( function( error ) {
 				list.innerHTML = '';
-				list.appendChild( element( 'p', 'admin-error', error.message ) );
+				list.appendChild( element( 'p', 'nino-admin-error', error.message ) );
 			} );
 		},
 

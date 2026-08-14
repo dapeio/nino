@@ -99,7 +99,7 @@
 		_showError : function( container, status, response ) {
 			container.innerHTML = '';
 			const p = dc.createElement('p');
-			p.className = 'admin-error';
+			p.className = 'nino-admin-error';
 			p.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : 'Failed to load.' );
 			container.appendChild( p );
 		},
@@ -129,13 +129,13 @@
 
 			if( Nino.admin.pages._pages.length === 0 ) {
 				const p = dc.createElement('p');
-				p.className = 'admin-hint';
+				p.className = 'nino-admin-hint';
 				p.textContent = 'No routes yet - add one below.';
 				wrap.appendChild( p );
 			}
 
 			const ul = dc.createElement('ul');
-			ul.className = 'admin-drill-list';
+			ul.className = 'nino-admin-list';
 			Nino.admin.pages._pages.forEach( function( entry, index ) {
 
 				const li = dc.createElement('li');
@@ -182,7 +182,7 @@
 
 			const addBtn = dc.createElement('button');
 			addBtn.type = 'button';
-			addBtn.className = 'editor-list-action';
+			addBtn.className = 'nino-admin-btn-primary';
 			addBtn.textContent = 'New route';
 			addBtn.addEventListener( 'click', function() { Nino.admin.pages._openForm( null ) } );
 			wrap.appendChild( Nino.adminUi.listActions( [ addBtn ] ) );
@@ -297,7 +297,7 @@
 
 			// Both fieldsets get their card/white-background look for free
 			// from _editor/assets/style.css's generic `fieldset { ... }`
-			// rule - a bare .editor-field label sitting directly in <form>
+			// rule - a bare .nino-admin-field label sitting directly in <form>
 			// (no fieldset) doesn't, which is why every field used to sit
 			// straight on the page's own background
 			const pageFieldset = dc.createElement('fieldset');
@@ -306,7 +306,7 @@
 			pageFieldset.appendChild( pageLegend );
 
 			const uriLabel = dc.createElement('label');
-			uriLabel.className = 'editor-field';
+			uriLabel.className = 'nino-admin-field';
 			const uriSpan = dc.createElement('span');
 			uriSpan.textContent = 'Element URI - a stable identifier, not necessarily the real path (see Http URI)';
 			uriLabel.appendChild( uriSpan );
@@ -320,7 +320,7 @@
 			pageFieldset.appendChild( uriLabel );
 
 			const httpUriLabel = dc.createElement('label');
-			httpUriLabel.className = 'editor-field';
+			httpUriLabel.className = 'nino-admin-field';
 			const httpUriSpan = dc.createElement('span');
 			httpUriSpan.textContent = 'Http URI - the real, reachable browser path';
 			httpUriLabel.appendChild( httpUriSpan );
@@ -334,7 +334,7 @@
 			pageFieldset.appendChild( httpUriLabel );
 
 			const templateLabel = dc.createElement('label');
-			templateLabel.className = 'editor-field';
+			templateLabel.className = 'nino-admin-field';
 			const templateSpan = dc.createElement('span');
 			templateSpan.textContent = 'Template';
 			templateLabel.appendChild( templateSpan );
@@ -370,13 +370,13 @@
 				templateSelect.disabled = true;
 
 				const fixedHint = dc.createElement('p');
-				fixedHint.className = 'admin-hint';
+				fixedHint.className = 'nino-admin-hint';
 				fixedHint.textContent = 'This route picks its template per request: '+ entry.body+ ' - left as it is.';
 				pageFieldset.appendChild( fixedHint );
 			}
 
 			const statusLabel = dc.createElement('label');
-			statusLabel.className = 'editor-field';
+			statusLabel.className = 'nino-admin-field';
 			const statusSpan = dc.createElement('span');
 			statusSpan.textContent = 'Status Code';
 			statusLabel.appendChild( statusSpan );
@@ -396,7 +396,7 @@
 			// (see \Nino\Modules\Navigation::routeLines())
 			Nino.admin.pages._navs.forEach( function( navKey ) {
 				const navLabel = dc.createElement('label');
-				navLabel.className = 'editor-checkbox-field';
+				navLabel.className = 'nino-admin-checkbox-field';
 				const navInput = dc.createElement('input');
 				navInput.type = 'checkbox';
 				navInput.dataset.nav = navKey;
@@ -436,7 +436,7 @@
 			if( Nino.admin.pages._isNew === false ) {
 				const deleteBtn = dc.createElement('button');
 				deleteBtn.type = 'button';
-				deleteBtn.className = 'admin-danger-btn';
+				deleteBtn.className = 'nino-admin-btn-danger';
 				deleteBtn.textContent = 'Delete route';
 				deleteBtn.addEventListener( 'click', function() { Nino.admin.pages._delete() } );
 				actions.appendChild( deleteBtn );

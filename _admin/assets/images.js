@@ -88,7 +88,7 @@
 		_showError : function( container, status, response ) {
 			container.innerHTML = '';
 			const p = dc.createElement('p');
-			p.className = 'admin-error';
+			p.className = 'nino-admin-error';
 			p.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : 'Failed to load.' );
 			container.appendChild( p );
 		},
@@ -114,7 +114,7 @@
 			wrap.innerHTML = '';
 
 			const ul = dc.createElement('ul');
-			ul.className = 'admin-drill-list';
+			ul.className = 'nino-admin-list';
 			Nino.admin.images._slots.forEach( function( slot ) {
 				const li 		= dc.createElement('li');
 				const link	= dc.createElement('a');
@@ -128,13 +128,13 @@
 
 			const addBtn = dc.createElement('button');
 			addBtn.type = 'button';
-			addBtn.className = 'editor-list-action';
+			addBtn.className = 'nino-admin-btn-primary';
 			addBtn.textContent = 'New image slot';
 			addBtn.addEventListener( 'click', function() { Nino.admin.images._openForm( null ) } );
 
 			const scanBtn = dc.createElement('button');
 			scanBtn.type = 'button';
-			scanBtn.className = 'editor-list-action';
+			scanBtn.className = 'nino-admin-btn-primary';
 			scanBtn.textContent = 'Scan templates for missing image slots';
 			scanBtn.addEventListener( 'click', function() { Nino.admin.images._openScanForm() } );
 			wrap.appendChild( Nino.adminUi.listActions( [ addBtn, scanBtn ] ) );
@@ -179,7 +179,7 @@
 
 			if( Nino.admin.images._isNew === true ) {
 				const uriLabel = dc.createElement('label');
-				uriLabel.className = 'editor-field';
+				uriLabel.className = 'nino-admin-field';
 				const uriSpan = dc.createElement('span');
 				uriSpan.textContent = 'Uri (eg. /home/hero)';
 				uriLabel.appendChild( uriSpan );
@@ -192,7 +192,7 @@
 			}
 
 			const labelLabel = dc.createElement('label');
-			labelLabel.className = 'editor-field';
+			labelLabel.className = 'nino-admin-field';
 			const labelSpan = dc.createElement('span');
 			labelSpan.textContent = 'Label';
 			labelLabel.appendChild( labelSpan );
@@ -205,7 +205,7 @@
 			form.appendChild( labelLabel );
 
 			const widthLabel = dc.createElement('label');
-			widthLabel.className = 'editor-field';
+			widthLabel.className = 'nino-admin-field';
 			const widthSpan = dc.createElement('span');
 			widthSpan.textContent = 'Width (px)';
 			widthLabel.appendChild( widthSpan );
@@ -219,7 +219,7 @@
 			form.appendChild( widthLabel );
 
 			const heightLabel = dc.createElement('label');
-			heightLabel.className = 'editor-field';
+			heightLabel.className = 'nino-admin-field';
 			const heightSpan = dc.createElement('span');
 			heightSpan.textContent = 'Height (px)';
 			heightLabel.appendChild( heightSpan );
@@ -249,7 +249,7 @@
 			if( Nino.admin.images._isNew === false ) {
 				const deleteBtn = dc.createElement('button');
 				deleteBtn.type = 'button';
-				deleteBtn.className = 'admin-danger-btn';
+				deleteBtn.className = 'nino-admin-btn-danger';
 				deleteBtn.textContent = 'Delete slot';
 				deleteBtn.addEventListener( 'click', function() { Nino.admin.images._delete() } );
 				actions.appendChild( deleteBtn );
@@ -409,7 +409,7 @@
 			missing.forEach( function( item ) {
 
 				const field = dc.createElement('div');
-				field.className = 'editor-field';
+				field.className = 'nino-admin-field';
 
 				const span = dc.createElement('span');
 				span.textContent = item.src+ '  ('+ item.files.join(', ')+ ')';

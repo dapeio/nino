@@ -597,7 +597,7 @@
 			panel.appendChild( heading );
 
 			if( suffixes.length === 0 )
-				panel.appendChild( element( 'p', 'admin-hint', moduleFor( draft.content ).source === 'elements' ? 'This section gets its repeated content from the Elements collection below.' : 'This configuration has no native textfills.' ) );
+				panel.appendChild( element( 'p', 'nino-admin-hint', moduleFor( draft.content ).source === 'elements' ? 'This section gets its repeated content from the Elements collection below.' : 'This configuration has no native textfills.' ) );
 			else {
 				const fields = element( 'div', 'pd-native-grid' );
 				suffixes.forEach( function( suffix ) {

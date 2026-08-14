@@ -164,6 +164,7 @@
 
 			const wrap = dc.getElementById('images-list');
 			wrap.innerHTML = '';
+			wrap.classList.add( 'nino-admin-list', 'nino-admin-list-buttons' );
 
 			Object.keys( Nino.editor.images._groups ).sort().forEach( function( group ) {
 
@@ -266,20 +267,20 @@
 			// literal "[image ...]"-shaped string is indistinguishable there from a
 			// real shortcode call, silently resolving to '' since no such slot exists
 			const imageUri = dc.createElement('span');
-			imageUri.className = 'editor-field-name';
+			imageUri.className = 'nino-admin-field-name';
 			imageUri.textContent = '[' + 'image ' + slot.uri + ']';
 			fieldset.appendChild( imageUri );
 
 			const dimensions = dc.createElement('p');
-			dimensions.className = 'editor-field-image-dimensions';
+			dimensions.className = 'nino-admin-field-image-dimensions';
 			dimensions.textContent = Nino.content.getText('/_editor/elements/label/image-target')+ ' '+ slot.width+ ' × '+ slot.height+ ' px';
 			fieldset.appendChild( dimensions );
 
 			const imageWrap = dc.createElement('div');
-			imageWrap.className = 'editor-field-image';
+			imageWrap.className = 'nino-admin-field-image';
 
 			const preview = dc.createElement('img');
-			preview.className = 'editor-field-image-preview';
+			preview.className = 'nino-admin-field-image-preview';
 			preview.hidden = ! slot.url;
 			if( slot.url )
 				preview.src = slot.url;
@@ -290,7 +291,7 @@
 			fileInput.accept = 'image/*';
 
 			const msg = dc.createElement('p');
-			msg.className = 'editor-field-image-msg';
+			msg.className = 'nino-admin-field-image-msg';
 			msg.setAttribute( 'aria-live', 'polite' );
 
 			fileInput.addEventListener( 'change', function() {
@@ -320,7 +321,7 @@
 		_uploadImage : function( slot, file, preview, msg, fileInput ) {
 
 			fileInput.disabled = true;
-			msg.className = 'editor-field-image-msg';
+			msg.className = 'nino-admin-field-image-msg';
 			msg.textContent = Nino.content.getText('/_editor/images/msg/pending');
 
 			Nino.editor.images._apiCall( 'upload', { uri : slot.uri }, function( status, response ) {
@@ -329,7 +330,7 @@
 				fileInput.value = '';
 
 				if( status !== 200 || response === null ) {
-					msg.className = 'editor-field-image-msg error';
+					msg.className = 'nino-admin-field-image-msg error';
 					msg.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : Nino.content.getText('/_editor/images/error/save') );
 					return;
 				}

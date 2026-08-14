@@ -74,7 +74,7 @@
 			const wrap = dc.getElementById('admin-content-dashboard');
 			wrap.innerHTML = '';
 			const p = dc.createElement('p');
-			p.className = 'admin-error';
+			p.className = 'nino-admin-error';
 			p.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : 'Failed to load.' );
 			wrap.appendChild( p );
 		},
@@ -94,6 +94,7 @@
 
 			const tiles = dc.createElement('div');
 			tiles.id = 'admin-dashboard-tiles';
+			tiles.className = 'nino-admin-tiles';
 			tiles.appendChild( Nino.admin.dashboard._tile( 'types', String( data.types.length ), data.types.length === 1 ? 'element type' : 'element types' ) );
 			tiles.appendChild( Nino.admin.dashboard._tile( 'pages', String( data.pages ), data.pages === 1 ? 'route' : 'routes' ) );
 			tiles.appendChild( Nino.admin.dashboard._tile( 'users', String( data.users ), data.users === 1 ? 'admin account' : 'admin accounts' ) );
@@ -123,16 +124,16 @@
 
 			const a = dc.createElement('a');
 			a.href = '#';
-			a.className = 'editor-dashboard-tile editor-dashboard-tile--'+ tab;
+			a.className = 'nino-admin-tile nino-admin-tile--'+ tab;
 			a.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.selectTab( tab ) } );
 
 			const val = dc.createElement('span');
-			val.className = 'editor-dashboard-tile-value';
+			val.className = 'nino-admin-tile-value';
 			val.textContent = value;
 			a.appendChild( val );
 
 			const lbl = dc.createElement('span');
-			lbl.className = 'editor-dashboard-tile-label';
+			lbl.className = 'nino-admin-tile-label';
 			lbl.textContent = label;
 			a.appendChild( lbl );
 
@@ -151,7 +152,7 @@
 		_typesSection : function( types ) {
 
 			const section = dc.createElement('div');
-			section.className = 'editor-dashboard-section';
+			section.className = 'nino-admin-card';
 
 			const title = dc.createElement('h3');
 			title.textContent = 'Element types';
