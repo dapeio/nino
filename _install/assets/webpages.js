@@ -487,6 +487,10 @@
 				suggested = next;
 			} );
 
+
+			const navsFieldset = dc.createElement('div');
+			navsFieldset.className = 'nino-admin-checkbox-fieldset';
+			pageFieldset.appendChild(navsFieldset);
 			// One checkbox per navigation the project registered
 			// (/nino/html/navs) - an empty list means the Navigation module is
 			// inactive and no menu field is offered at all. What a page is a
@@ -501,7 +505,7 @@
 				navInput.checked = ( entry.navs || [] ).indexOf( navKey ) !== -1;
 				navLabel.appendChild( navInput );
 				navLabel.appendChild( dc.createTextNode( ' Show in "'+ navKey+ '" navigation' ) );
-				pageFieldset.appendChild( navLabel );
+				navsFieldset.appendChild( navLabel );
 			} );
 
 			form.appendChild( pageFieldset );

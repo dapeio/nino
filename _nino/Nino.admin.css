@@ -53,7 +53,8 @@
  *   Lists      .nino-admin-list  .nino-admin-list-copy
  *              .nino-admin-list-dense  .nino-admin-list-buttons
  *   Forms      .nino-admin-field  .nino-admin-field-wide
- *              .nino-admin-fieldgrid  .nino-admin-checkbox-field
+ *              .nino-admin-fieldgrid  .nino-admin-checkbox-fieldset
+ *							.nino-admin-checkbox-field
  *              .nino-admin-checklist  .nino-admin-richtext
  *   Chrome     .nino-admin-contextbar  .nino-admin-contextbar-select
  *              .nino-admin-actionbar  .nino-admin-actionbar-status
@@ -276,10 +277,19 @@ body {
 	margin-bottom: .22rem;
 }
 
+:where(.nino-admin) .nino-admin-checkbox-fieldset {
+	padding: 1rem .5rem;
+  font-size: .9em;
+}
+:where(.nino-admin) .nino-admin-checkbox-fieldset label {
+	margin-right:1.5rem;
+}
+
 :where(.nino-admin) .nino-admin-checkbox-field {
 	min-height: 34px;
 	margin-bottom: .28rem;
 }
+
 
 :where(.nino-admin) .nino-admin-field-radios,
 :where(.nino-admin) .nino-admin-field-radio {
