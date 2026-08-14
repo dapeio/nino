@@ -56,6 +56,8 @@
  *              .nino-admin-fieldgrid  .nino-admin-checkbox-fieldset
  *							.nino-admin-checkbox-field
  *              .nino-admin-checklist  .nino-admin-richtext
+ *   Controls   .nino-admin-locale-select
+ *              .nino-admin-locale-select--corner
  *   Chrome     .nino-admin-contextbar  .nino-admin-contextbar-select
  *              .nino-admin-actionbar  .nino-admin-actionbar-status
  *              .nino-admin-list-actions  .nino-admin-desktop-action
@@ -75,6 +77,10 @@
 	--nino-admin-content-inline: clamp(1.25rem, 3vw, 3rem);
 	--nino-admin-control-height: 38px;
 	--nino-admin-row-height: 46px;
+	/* A select paints its own chevron; these keep the indicator and the room
+	   reserved for it in one place, so they cannot drift apart */
+	--nino-admin-select-indicator: 1.6rem;
+	--nino-admin-select-indicator-size: 7px;
 	--nino-admin-rail: var(--editor-sidebar-bg);
 	--nino-admin-rail-hover: var(--editor-blue-soft);
 	--nino-admin-rail-text: var(--editor-text);
@@ -217,14 +223,40 @@ body {
 	input[type="date"],
 	input[type="url"],
 	input[type="datetime-local"],
-	textarea,
-	select
+	textarea
 ) {
 	min-height: var(--nino-admin-control-height);
 	padding: .48rem .62rem;
 	border-radius: var(--editor-radius-sm);
 	font-size: .84rem;
 	box-shadow: inset 0 1px 1px rgba(15,23,42,.025);
+}
+
+/* A select is deliberately not in the group above: it paints its own chevron,
+   so its right side is not free to be symmetric. Both halves live here, from
+   one token, because they used to be split - the indicator came from a bare
+   `select` rule in _editor's stylesheet and the padding from this file, and
+   once this layer started winning, the symmetric .62rem replaced the tool's
+   roomier .8rem and long options slid under the arrow.
+
+   Keeping it out of the group also keeps the specificity honest: `:is()` takes
+   its most specific argument, so that group weighs (0,1,1) via
+   input[type="text"] and would outrank a plain `select` rule here. */
+:where(.nino-admin) select {
+	min-height: var(--nino-admin-control-height);
+	border-radius: var(--editor-radius-sm);
+	font-size: .84rem;
+	box-shadow: inset 0 1px 1px rgba(15,23,42,.025);
+	appearance: none;
+	padding: .48rem var(--nino-admin-select-indicator) .48rem .62rem;
+	background-image:
+		linear-gradient(45deg, transparent 50%, var(--editor-text-secondary) 50%),
+		linear-gradient(135deg, var(--editor-text-secondary) 50%, transparent 50%);
+	background-position:
+		calc(100% - var(--nino-admin-select-indicator) + 7px) calc(50% - 1px),
+		calc(100% - var(--nino-admin-select-indicator) + 14px) calc(50% - 1px);
+	background-size: var(--nino-admin-select-indicator-size) var(--nino-admin-select-indicator-size);
+	background-repeat: no-repeat;
 }
 
 :where(.nino-admin) :is(input, textarea, select):hover:not(:disabled) {
@@ -294,6 +326,32 @@ body {
 :where(.nino-admin) .nino-admin-field-radios,
 :where(.nino-admin) .nino-admin-field-radio {
 	min-height: var(--nino-admin-control-height);
+}
+
+/* The "which translation am I looking at" switch. A view control rather than a
+   form field - it says what the form below is showing instead of collecting a
+   value - so it reads as a compact tinted pill, not an input row.
+   Three tools render one; only the placement differs, which is why that is a
+   separate class: --corner pins it into a fieldset's own corner, and
+   .nino-admin-contextbar-select puts it in the pinned toolbar instead. */
+:where(.nino-admin) .nino-admin-locale-select {
+	width: auto;
+	max-width: 7rem;
+	min-height: 30px;
+	padding-top: .25rem;
+	padding-bottom: .25rem;
+	padding-left: .6rem;
+	border-color: transparent;
+	background-color: var(--editor-blue-soft);
+	color: var(--editor-blue);
+	font-size: .78rem;
+	font-weight: 600;
+}
+
+:where(.nino-admin) .nino-admin-locale-select--corner {
+	position: absolute;
+	top: .6rem;
+	right: 1rem;
 }
 
 /* A run of checkbox rows that reads as one control (locales, modules). */

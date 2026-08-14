@@ -443,21 +443,6 @@ code {
    by _editor/assets/style.css's generic fieldset/legend/.nino-admin-field rules -
    same shape as _editor's Text panel category form, see personalinfos.js */
 
-#personalinfos-locale-select {
-	position: absolute;
-	top: .6rem;
-	right: 1rem;
-	width: auto;
-	max-width: 7rem;
-	min-height: 30px;
-	padding: .25rem 1.5rem .25rem .6rem;
-	background-color: var(--editor-blue-soft);
-	background-position: calc(100% - 12px) calc(50% - 0px), calc(100% - 6px) calc(50% - 0px);
-	border-color: transparent;
-	color: var(--editor-blue);
-	font-size: .78rem;
-	font-weight: 600;
-}
 /* -------------------------------------------------------------- Admins */
 
 #editor-list > ul {

@@ -71,6 +71,16 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- Made the locale switch a design-system component. `/_admin`, `/_editor` and
+  `/_install` each carried their own id rule for it, two of them byte-identical,
+  so the one control that says "this is the translation you are looking at"
+  drifted per tool. It is `.nino-admin-locale-select` now, with placement kept
+  separate from the role: `--corner` pins it into a fieldset's corner (Personal
+  Infos), `.nino-admin-contextbar-select` puts it in the pinned toolbar.
+- Moved the select indicator into the design system. It was painted by a bare
+  `select` rule in `/_editor`'s stylesheet, which - since `/_admin` and
+  `/_templates` load that file - was quietly the baseline for three tools.
+
 - Reworked `_nino/Nino.admin.css` into an actual design system for the four tool
   frontends. It carried 68 id selectors and named the same concept up to five
   ways (`.editor-danger`, `.admin-danger-btn`, `.pd-danger-button`, `button.red`,
@@ -203,6 +213,15 @@ All notable changes to Nino are documented in this file.
   `/_admin` starts behind everything already in that menu.
 
 ### Fixed
+
+- Fixed long options running underneath a select's chevron. The indicator lived
+  in `/_editor`'s stylesheet while the padding that keeps text off it came from
+  `Nino.admin.css`, and once the shared file won by layer its symmetric
+  `.62rem` replaced the roomier `.8rem` the indicator needed. Both halves are
+  one rule now, sized from a single `--nino-admin-select-indicator` token, and
+  `select` is deliberately out of the shared input group - `:is()` takes its
+  most specific argument, so that group weighs (0,1,1) and would outrank a
+  plain `select` rule.
 
 - Fixed `/_install`'s "New Route" button carrying a stray `margin-top`. It used
   `/_editor`'s list-button class, which is a full-width block under a list

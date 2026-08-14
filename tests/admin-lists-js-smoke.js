@@ -111,7 +111,35 @@ Object.keys( TOOL_ROOTS ).forEach( function( file ) {
 	// naming a shared class without a scope reaches screens it was never
 	// written for - which is how _editor's shell grid once laid out the
 	// Template Builder
-	const unscoped = ( css.match(/^[\t ]*\.nino-admin[^{,]*[,{]/gm) || [] );
+	const unscoped = ( css.match(/^[\t ]*\.nino-admin[^{,\n]*[,{]\s*$/gm) || [] );
 	check( file+ ' scopes every nino-admin-* rule to its own root', unscoped.length === 0,
 		unscoped.slice(0, 3).join(' | ') );
 } );
+
+// A bare element selector in a tool stylesheet defines that element for every
+// tool that loads the file - _admin loads _editor's, _templates loads both. The
+// select chevron used to live in one of these while the padding that keeps text
+// off it came from the design system, and the two drifted apart. New ones are a
+// regression; the three below are the shared base resets, still to be moved.
+const BASE_RESETS = { '_editor/assets/style.css' : [ 'a', 'button', 'fieldset' ] };
+
+Object.keys( TOOL_ROOTS ).forEach( function( file ) {
+
+	const bare = ( read( file ).match( /^[\t ]*(select|input|textarea|button|fieldset|legend|table|ul|ol|li|a|p|h[1-6])\s*[,{]/gm ) || [] )
+		.map( s => s.replace( /[,{]\s*$/, '' ).trim() );
+
+	const unexpected = bare.filter( s => ( BASE_RESETS[file] || [] ).includes( s ) === false );
+
+	check( file+ ' adds no new bare element selector', unexpected.length === 0, unexpected.join(', ') );
+} );
+
+// The select indicator and the space reserved for it must stay in one file, or
+// a later layer silently narrows the padding and the option text slides under
+// the arrow
+check( 'the design system owns both the select chevron and its padding',
+	/:where\(\.nino-admin\) select \{[^}]*padding-right: var\(--nino-admin-select-indicator\)[^}]*background-image:/s.test( shared ) );
+
+check( 'the locale switch is a shared class, not a per-tool id',
+	shared.includes('.nino-admin-locale-select') &&
+	[ '_admin/assets/style.css', '_editor/assets/style.css', '_install/assets/style.css' ]
+		.every( f => /#(personalinfos|elements-form|text-form)-locale-select\s*[,{]/.test( read( f ) ) === false ) );

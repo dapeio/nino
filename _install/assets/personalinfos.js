@@ -214,6 +214,7 @@
 
 				const select = dc.createElement('select');
 				select.id = 'personalinfos-locale-select';
+				select.className = 'nino-admin-locale-select nino-admin-locale-select--corner';
 				Nino.install.personalinfos._locales.forEach( function( locale ) {
 					const option = dc.createElement('option');
 					option.value = locale;

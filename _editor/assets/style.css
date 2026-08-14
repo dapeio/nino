@@ -335,15 +335,9 @@ a:focus-visible, button:focus-visible {
 	box-sizing: content-box;
 	appearance: none;
 	border: none;
-	/* Same gradient-arrow trick as the generic select rule below, just
-	   repositioned/sized for a compact toolbar control instead of a form field */
+	/* The indicator itself is overridden in this file's nino.local section -
+	   the design system owns the form-field chevron, and this is a bar control */
 	background-color: transparent;
-	background-image:
-		linear-gradient(45deg, transparent 50%, #a0a8b2 50%),
-		linear-gradient(135deg, #a0a8b2 50%, transparent 50%);
-	background-position: calc(100% - 4px) 50%, 100% 50%;
-	background-size: 5px 5px;
-	background-repeat: no-repeat;
 	font: inherit;
 	font-size: .85rem;
 	color: var(--editor-text-secondary);
@@ -761,15 +755,6 @@ input:focus, textarea:focus, select:focus, [contenteditable]:focus {
 	border-color: var(--editor-blue);
 	box-shadow: var(--editor-focus);
 }
-select {
-	appearance:none;
-  background-image:
-    linear-gradient(45deg,transparent 50%,#a0a8b2 50%),
-    linear-gradient(135deg,#a0a8b2 50%,transparent 50%);
-  background-position:calc(100% - 17px) calc(50% - 0px), calc(100% - 10px) calc(50% - 0px);
-  background-size:7px 7px;
-  background-repeat:no-repeat;
-}
 input.error, .pending.error {
 	outline: 2px solid var(--editor-red);
 }
@@ -856,24 +841,6 @@ input.error, .pending.error {
 #editor-page-wrap .nino-admin-field textarea, #text-form-value {
 	min-height: 5rem;
 	resize: vertical;
-}
-/*	Set apart from "normal" selects on purpose - a locale switch isn't a form
- *	field, it's a view control (which translation you're looking at), so it
- *	sits up with the legend instead of looking like just another input row */
-#elements-form-locale-select, #text-form-locale-select {
-	position: absolute;
-	top: .6rem;
-	right: 1rem;
-	width: auto;
-	max-width: 7rem;
-	min-height: 30px;
-	padding: .25rem 1.5rem .25rem .6rem;
-	background-color: var(--editor-blue-soft);
-	background-position: calc(100% - 12px) calc(50% - 0px), calc(100% - 6px) calc(50% - 0px);
-	border-color: transparent;
-	color: var(--editor-blue);
-	font-size: .78rem;
-	font-weight: 600;
 }
 #elements-form-actions, .editor-form-actions {
 	display: flex;
@@ -1323,4 +1290,20 @@ input.error, .pending.error {
 #editor-page-wrap #submissions-entries > li {
 	padding: .7rem .8rem;
 }
+
+/* This picker navigates the whole UI's language; the design system's
+   .nino-admin-locale-select switches which translation a form is showing.
+   Different jobs, so this one keeps its own compact bar-control indicator -
+   and says so here, in the layer that is allowed to outrank nino.system. */
+#editor-page-wrap #editor-localepicker,
+#form-login #editor-localepicker {
+	padding-right: 14px;
+	background-image:
+		linear-gradient(45deg, transparent 50%, #a0a8b2 50%),
+		linear-gradient(135deg, #a0a8b2 50%, transparent 50%);
+	background-position: calc(100% - 4px) 50%, 100% 50%;
+	background-size: 5px 5px;
+	background-repeat: no-repeat;
+}
+
 }

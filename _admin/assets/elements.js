@@ -1277,7 +1277,7 @@
 
 				const select = dc.createElement('select');
 				select.id = 'elements-form-locale-select';
-				select.className = 'nino-admin-contextbar-select';
+				select.className = 'nino-admin-locale-select nino-admin-contextbar-select';
 				Nino.admin.elements._locales.forEach( function( locale ) {
 					const option = dc.createElement('option');
 					option.value = locale;
