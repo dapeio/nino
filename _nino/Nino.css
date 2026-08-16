@@ -2016,6 +2016,61 @@ header .ui-headernav-logo {
 	box-sizing: border-box;
 }
 
+/* Template Builder area primitives. Presets own their semantic slots and
+   component order; these classes only implement the shared section frame. */
+.nino-section-container--narrow { max-width: 52rem; }
+.nino-section-container--wide { max-width: 92rem; }
+.nino-section-overlay--soft::before,
+.nino-section-overlay--medium::before,
+.nino-section-overlay--strong::before {
+	content: '';
+	position: absolute;
+	inset: 0;
+	z-index: 50;
+	background: #000;
+	pointer-events: none;
+}
+.nino-section-overlay--soft::before { opacity: .2; }
+.nino-section-overlay--medium::before { opacity: .42; }
+.nino-section-overlay--strong::before { opacity: .68; }
+.nino-section > .ui-img-background-content { z-index: 101; }
+.nino-section-focus--1 > img { object-position: left top; }
+.nino-section-focus--2 > img { object-position: center top; }
+.nino-section-focus--3 > img { object-position: right top; }
+.nino-section-focus--4 > img { object-position: left center; }
+.nino-section-focus--5 > img { object-position: center center; }
+.nino-section-focus--6 > img { object-position: right center; }
+.nino-section-focus--7 > img { object-position: left bottom; }
+.nino-section-focus--8 > img { object-position: center bottom; }
+.nino-section-focus--9 > img { object-position: right bottom; }
+.nino-section-vertical--top > .js-cover-content { top: 0; transform: none; }
+.nino-section-vertical--bottom > .js-cover-content { top: auto; bottom: 0; transform: none; }
+.nino-area--heading { margin-bottom: var(--space-3); }
+.nino-area--action { margin-top: var(--space-3); }
+.nino-area--left { text-align: left; }
+.nino-area--center { text-align: center; }
+.nino-area--right { text-align: right; }
+.nino-area--center :is(.ui-section-title, .ui-section-subtitle, .ui-atf-title, .ui-atf-subtitle) { text-align: center; }
+.nino-area--right :is(.ui-section-title, .ui-section-subtitle, .ui-atf-title, .ui-atf-subtitle) { text-align: right; }
+.nino-area--center > .ui-btn { margin-right: calc(var(--space-1) / 2); margin-left: calc(var(--space-1) / 2); }
+.nino-area--right > .ui-btn { margin-left: var(--space-1); }
+.nino-component--quiet { opacity: .72; }
+.nino-component--loud:is(.ui-section-title, .ui-atf-title) { font-size: var(--text-5); line-height: 1.12; }
+.nino-component--lead { max-width: 52rem; font-size: var(--text-2); }
+.nino-area--center > .nino-component--lead { margin-right: auto; margin-left: auto; }
+.nino-area--right > .nino-component--lead { margin-left: auto; }
+.nino-area--narrow { max-width: 52rem; margin-right: auto; margin-left: auto; }
+.nino-area--rounded { overflow: hidden; border-radius: var(--radius-small); }
+.nino-split-image, .nino-split-image > img { width: 100%; height: 100%; }
+.nino-split-image > img { display: block; object-fit: cover; }
+.nino-component--rounded { overflow: hidden; border-radius: var(--radius-small); }
+.nino-component--cover { width: 100%; height: 100%; object-fit: cover; }
+.ui-article.nino-article--borderless { border: 0; background: transparent; }
+
+@media (prefers-reduced-motion: reduce), (pointer: coarse) {
+	.js-parallex > img { top: 0 !important; height: 100%; transform: none !important; will-change: auto; }
+}
+
 /* Contentslider */
 .js-slider {
 	position: relative;

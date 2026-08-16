@@ -1,15 +1,14 @@
-@layer nino.tool, nino.system, nino.local;
+@layer nino.system, nino.tool, nino.local;
 
 /*
-	This file is layered (see _nino/Nino.admin.css). Everything a tool declares
-	for itself sits in `nino.tool`, which the shared design system's `nino.system`
-	layer outranks whatever the selectors' specificity says - that is what makes
-	the system the baseline rather than something a tool's own id rule silently
-	wins against. The "Design-system locals" section at the bottom is the
-	deliberate exception and sits in `nino.local`, the highest layer.
+	This file is layered (see _nino/Nino.admin.css). Shared foundations sit in
+	`nino.system`; screen and component rules sit in the later `nino.tool` layer,
+	where they can deliberately refine that low-specificity baseline. The
+	"Design-system locals" section at the bottom remains the explicit last-resort
+	override and sits in `nino.local`, the highest layer.
 */
 
-@layer nino.tool {
+@layer nino.system {
 /**
  *	Nino										A compact filesystembased php framework
  *	style.css								Admin dashboard design - iOS-inspired, mobile first.
@@ -180,6 +179,9 @@ a:focus-visible, button:focus-visible {
 	outline: 2px solid var(--editor-blue);
 	outline-offset: 3px;
 }
+}
+
+@layer nino.tool {
 /* ------------------------------------------------------------------ Panels */
 
 /*	The User/Texte/Elemente bar (#editor-nav-wrap) always stays visible - only
@@ -652,7 +654,9 @@ a:focus-visible, button:focus-visible {
 	border-bottom: none;
 }
 /* -------------------------------------------------------------------- Form */
+}
 
+@layer nino.system {
 form {
 	padding: 0;
 }
@@ -676,6 +680,9 @@ fieldset legend {
 	letter-spacing: .04em;
 	color: var(--editor-text-secondary);
 }
+}
+
+@layer nino.tool {
 #editor-page-wrap .nino-admin-field, .text-form-key {
 	display: block;
 	margin: 0 0 1rem;
@@ -736,6 +743,9 @@ fieldset legend {
 	padding-top: .75rem;
 	word-break: break-all;
 }
+}
+
+@layer nino.system {
 input[type="text"], input[type="email"], input[type="password"], input[type="number"], input[type="date"], input[type="url"], textarea, input[type="datetime-local" i], select {
 	width: 100%;
 	max-width: 100%;
@@ -758,6 +768,9 @@ input:focus, textarea:focus, select:focus, [contenteditable]:focus {
 input.error, .pending.error {
 	outline: 2px solid var(--editor-red);
 }
+}
+
+@layer nino.tool {
 #editor-page-wrap .nino-admin-field input[type="checkbox"] {
 	width: auto;
 	min-height: auto;

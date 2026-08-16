@@ -1,12 +1,11 @@
-@layer nino.tool, nino.system, nino.local;
+@layer nino.system, nino.tool, nino.local;
 
 /*
-	This file is layered (see _nino/Nino.admin.css). Everything a tool declares
-	for itself sits in `nino.tool`, which the shared design system's `nino.system`
-	layer outranks whatever the selectors' specificity says - that is what makes
-	the system the baseline rather than something a tool's own id rule silently
-	wins against. The "Design-system locals" section at the bottom is the
-	deliberate exception and sits in `nino.local`, the highest layer.
+	This file is layered (see _nino/Nino.admin.css). Shared foundations sit in
+	`nino.system`; screen and component rules sit in the later `nino.tool` layer,
+	where they can deliberately refine that low-specificity baseline. The
+	"Design-system locals" section at the bottom remains the explicit last-resort
+	override and sits in `nino.local`, the highest layer.
 */
 
 @layer nino.tool {
@@ -154,12 +153,6 @@ code {
 	font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
 	font-size: .68rem;
 }
-#pd-app .nino-admin-actionbar {
-	display: flex;
-	align-items: center;
-	justify-content: flex-end;
-	gap: .65rem;
-}
 #pd-save-state {
 	max-width: 13rem;
 	color: var(--editor-text-secondary);
@@ -171,6 +164,12 @@ code {
 }
 #pd-save-state.is-error {
 	color: var(--editor-red);
+}
+#pd-top-actions {
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
+	gap: .45rem;
 }
 button.nino-admin-btn-primary, #pd-app .nino-admin-btn-primary {
 	min-height: 2.55rem;
@@ -231,6 +230,11 @@ button.nino-admin-btn-primary:hover:not(:disabled) {
 	padding: 0;
 	border-radius: .7rem;
 	font-size: 1.1rem;
+}
+.pd-icon-button svg {
+	width: 1rem;
+	height: 1rem;
+	pointer-events: none;
 }
 .pd-search {
 	display: flex;
@@ -364,10 +368,10 @@ button.nino-admin-btn-primary:hover:not(:disabled) {
 	flex: 1 1 auto;
 }
 .pd-template-settings-row {
-	display: flex;
+	display: grid;
+	grid-template-columns: minmax(10rem, 1.25fr) repeat(2, minmax(9rem, 1fr)) 6.25rem;
 	align-items: flex-end;
 	gap: .7rem;
-	flex-wrap: wrap;
 }
 .pd-slot-setting {
 	display: grid;
@@ -384,8 +388,8 @@ button.nino-admin-btn-primary:hover:not(:disabled) {
 	text-transform: uppercase;
 }
 .pd-slot-setting select, .pd-slot-setting input {
+	width: 100%;
 	min-height: 2.15rem;
-	max-width: 14rem;
 	padding: .38rem 2rem .38rem .55rem;
 	border: 1px solid var(--editor-border);
 	border-radius: .58rem;
@@ -396,16 +400,8 @@ button.nino-admin-btn-primary:hover:not(:disabled) {
 .pd-slot-setting input {
 	padding-right: .55rem;
 }
-.pd-inline-setting {
-	display: flex;
-	align-items: center;
-	gap: .75rem;
-}
-.pd-inline-setting strong {
-	font-size: .78rem;
-}
 #pd-app .nino-admin-btn-danger {
-	align-self: flex-end;
+	align-self: center;
 	min-height: 2.15rem;
 	padding: .4rem .65rem;
 	border-color: color-mix(in srgb, var(--editor-red) 32%, var(--editor-border));
@@ -420,19 +416,27 @@ button.nino-admin-btn-primary:hover:not(:disabled) {
 }
 .pd-segmented {
 	display: inline-flex;
-	padding: .18rem;
+	overflow: hidden;
+	padding: 0;
 	border: 1px solid var(--editor-border);
-	border-radius: .65rem;
+	border-radius: .58rem;
 	background: var(--editor-bg-elevated);
 }
 .pd-segmented button {
-	min-height: 1.8rem;
+	min-height: 2.05rem;
+	flex: 1 1 50%;
 	padding: .25rem .55rem;
-	border-radius: .48rem;
+	border: 0;
+	border-right: 1px solid var(--editor-border);
+	border-radius: .48rem 0 0 .48rem;
 	background: transparent;
 	box-shadow: none;
 	color: var(--editor-text-secondary);
 	font-size: .69rem;
+}
+.pd-segmented button:last-child {
+	border-right: 0;
+	border-radius: 0 .48rem .48rem 0;
 }
 .pd-segmented button.is-active {
 	background: var(--editor-blue);
@@ -500,6 +504,24 @@ button.nino-admin-btn-primary:hover:not(:disabled) {
 	gap: .72rem;
 	width: min(100%, var(--pd-canvas-width));
 	margin: 0 auto;
+}
+#pd-add-section {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: .35rem;
+	width: min(100%, var(--pd-canvas-width));
+	min-height: 3.15rem;
+	margin: .8rem auto 0;
+	border: 1px dashed color-mix(in srgb, var(--editor-blue) 48%, var(--editor-border));
+	background: var(--editor-blue-soft);
+	box-shadow: none;
+	color: var(--editor-blue);
+}
+#pd-add-section:hover:not(:disabled) {
+	border-style: solid;
+	background: var(--editor-blue);
+	color: #fff;
 }
 .pd-raw-boundary {
 	display: flex;
@@ -864,7 +886,7 @@ button.nino-admin-btn-primary:hover:not(:disabled) {
 	color: var(--editor-text-secondary);
 	font-weight: 450;
 }
-.pd-content-field input, .pd-content-field textarea, .pd-form-field input, .pd-form-field select {
+.pd-content-field input, .pd-content-field textarea, .pd-form-field input, .pd-form-field select, .pd-form-field textarea {
 	width: 100%;
 	min-height: 2.45rem;
 	padding: .55rem .65rem;
@@ -877,11 +899,11 @@ button.nino-admin-btn-primary:hover:not(:disabled) {
 	font: inherit;
 	font-size: .72rem;
 }
-.pd-content-field textarea {
+.pd-content-field textarea, .pd-form-field textarea {
 	min-height: 5.4rem;
 	resize: vertical;
 }
-.pd-content-field input:focus, .pd-content-field textarea:focus, .pd-form-field input:focus, .pd-form-field select:focus {
+.pd-content-field input:focus, .pd-content-field textarea:focus, .pd-form-field input:focus, .pd-form-field select:focus, .pd-form-field textarea:focus {
 	border-color: var(--editor-blue);
 	box-shadow: var(--editor-focus);
 }
@@ -1722,19 +1744,15 @@ button.nino-admin-btn-primary:hover:not(:disabled) {
 		align-items: stretch;
 		flex-direction: column;
 	}
-.pd-template-settings-row, .pd-inline-setting {
-		align-items: stretch;
-		flex-direction: column;
-	}
+.pd-template-settings-row {
+		grid-template-columns: minmax(0, 1fr);
+}
 .pd-slot-setting, .pd-slot-setting select, .pd-slot-setting input {
 		width: 100%;
 		max-width: none;
 	}
 #pd-app .nino-admin-btn-danger {
 		align-self: stretch;
-	}
-#pd-add-section {
-		width: 100%;
 	}
 .pd-toolbar-actions {
 		flex-direction: column;
@@ -1797,6 +1815,296 @@ button.nino-admin-btn-primary:hover:not(:disabled) {
 }
 }
 
+@layer nino.tool {
+#pd-composer-settings {
+	display: grid;
+	gap: .8rem;
+}
+#pd-composer-settings > .pd-form-section {
+	margin: 0;
+}
+.pd-v3-panel {
+	overflow: hidden;
+	padding: 0;
+	border: 1px solid var(--editor-border);
+	border-radius: .9rem;
+	background: var(--editor-bg-elevated);
+	box-shadow: 0 .3rem 1rem rgba(15,23,42,.045);
+}
+.pd-v3-panel-heading {
+	display: grid;
+	grid-template-columns: 2.55rem minmax(0, 1fr);
+	gap: .75rem;
+	align-items: center;
+	padding: .8rem .9rem .78rem;
+	border-bottom: 1px solid var(--editor-border);
+	background: linear-gradient(110deg, color-mix(in srgb, var(--editor-blue-soft) 42%, var(--editor-bg-elevated)), var(--editor-bg-elevated) 48%);
+}
+.pd-v3-panel-copy { min-width: 0; }
+.pd-v3-panel-heading h3 { margin: 0; font-size: .82rem; letter-spacing: -.01em; }
+.pd-v3-panel-heading p { max-width: 34rem; margin: .18rem 0 0; color: var(--editor-text-secondary); font-size: .65rem; line-height: 1.42; }
+.pd-v3-number {
+	display: grid;
+	align-content: center;
+	place-items: center;
+	width: 2.55rem;
+	height: 2.55rem;
+	border: 1px solid color-mix(in srgb, var(--editor-blue) 24%, var(--editor-border));
+	border-radius: .65rem;
+	background: var(--editor-blue-soft);
+	color: var(--editor-blue);
+	line-height: 1;
+}
+.pd-v3-number small {
+	font-size: .45rem;
+	font-weight: 750;
+	letter-spacing: .08em;
+	text-transform: uppercase;
+}
+.pd-v3-number strong {
+	margin-top: .16rem;
+	font-size: .9rem;
+	font-weight: 780;
+}
+
+/* Named area composer (manifest v3) ------------------------------------- */
+.pd-v3-panel > .pd-form-grid {
+	padding: .9rem;
+}
+.pd-v3-area-workspace {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr);
+	grid-template-rows: auto minmax(0, 1fr);
+	min-width: 0;
+	min-height: 25rem;
+}
+.pd-v3-areas-panel { min-width: 0; }
+.pd-v3-area-tabs {
+	display: flex;
+	align-items: stretch;
+	gap: .35rem;
+	min-width: 0;
+	padding: .55rem .7rem;
+	overflow-x: auto;
+	overflow-y: hidden;
+	border-bottom: 1px solid var(--editor-border);
+	background: color-mix(in srgb, var(--editor-bg-grouped) 78%, var(--editor-bg-elevated));
+	overscroll-behavior-inline: contain;
+	scrollbar-width: thin;
+}
+.pd-v3-area-tabs button {
+	display: grid;
+	grid-template-columns: 1.45rem minmax(0, 1fr);
+	align-items: center;
+	flex: 1 0 7.5rem;
+	gap: .45rem;
+	min-width: 7.5rem;
+	min-height: 2.85rem;
+	padding: .4rem .5rem;
+	border: 1px solid transparent;
+	border-radius: .65rem;
+	background: transparent;
+	box-shadow: none;
+	color: var(--editor-text);
+	text-align: left;
+}
+.pd-v3-area-tabs button:hover,
+.pd-v3-area-tabs button.is-active {
+	border-color: color-mix(in srgb, var(--editor-blue) 35%, var(--editor-border));
+	background: var(--editor-bg-elevated);
+}
+.pd-v3-area-tabs button.is-active {
+	border-color: color-mix(in srgb, var(--editor-blue) 42%, var(--editor-border));
+	box-shadow: inset 0 -3px 0 var(--editor-blue), 0 .18rem .5rem rgba(15,23,42,.05);
+}
+.pd-v3-area-index {
+	display: grid;
+	place-items: center;
+	width: 1.45rem;
+	height: 1.45rem;
+	border-radius: .48rem;
+	background: var(--editor-bg-grouped);
+	color: var(--editor-text-secondary);
+	font-size: .61rem;
+	font-weight: 760;
+}
+.pd-v3-area-tabs button.is-active .pd-v3-area-index { background: var(--editor-blue); color: #fff; }
+.pd-v3-area-tab-copy { display: grid; min-width: 0; }
+.pd-v3-area-tab-copy strong { overflow: hidden; font-size: .72rem; font-weight: 720; text-overflow: ellipsis; white-space: nowrap; }
+.pd-v3-area-tab-copy small { margin-top: .12rem; color: var(--editor-text-secondary); font-size: .58rem; }
+.pd-v3-area-editor {
+	min-width: 0;
+	background: var(--editor-bg);
+}
+.pd-v3-area-heading {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 1rem;
+	min-height: 4.25rem;
+	padding: .72rem .85rem;
+	border-bottom: 1px solid var(--editor-border);
+	background: var(--editor-bg-elevated);
+}
+.pd-v3-area-heading strong { display: block; font-size: .82rem; }
+.pd-v3-area-heading p { margin: .16rem 0 0; color: var(--editor-text-secondary); font-size: .7rem; line-height: 1.35; }
+.pd-v3-view-tabs {
+	display: inline-flex;
+	flex: 0 0 auto;
+	padding: 0;
+	overflow: hidden;
+	border: 1px solid var(--editor-border);
+	border-radius: .5rem;
+	background: var(--editor-bg-grouped);
+}
+.pd-v3-view-tabs button {
+	min-height: 2.05rem;
+	padding: .3rem .72rem;
+	border: 0;
+	border-right: 1px solid var(--editor-border);
+	border-radius: 0;
+	background: transparent;
+	box-shadow: none;
+	color: var(--editor-text-secondary);
+	font-size: .68rem;
+	font-weight: 700;
+}
+.pd-v3-view-tabs button:first-child { border-radius: .45rem 0 0 .45rem; }
+.pd-v3-view-tabs button:last-child { border-radius: 0 .45rem .45rem 0; }
+.pd-v3-view-tabs button:last-child { border-right: 0; }
+.pd-v3-view-tabs button.is-active { background: var(--editor-blue); color: #fff; box-shadow: none; }
+.pd-v3-area-body {
+	min-width: 0;
+	padding: .9rem;
+	background: color-mix(in srgb, var(--editor-bg) 72%, var(--editor-bg-elevated));
+}
+.pd-v3-data { min-width: 0; min-height: 20rem; }
+.pd-v3-section-label {
+	display: grid;
+	gap: .12rem;
+	margin: .9rem 0 .45rem;
+	padding-top: .75rem;
+	border-top: 1px solid var(--editor-separator);
+}
+.pd-v3-section-label strong { font-size: .69rem; letter-spacing: -.005em; }
+.pd-v3-section-label small { color: var(--editor-text-secondary); font-size: .59rem; line-height: 1.4; }
+.pd-v3-area-body > .pd-v3-section-label:first-child { margin-top: 0; padding-top: 0; border-top: 0; }
+.pd-v3-components,
+.pd-v3-bindings { display: grid; gap: .5rem; margin-top: 0; }
+.pd-v3-component {
+	display: grid;
+	grid-template-columns: minmax(8rem, 1fr) minmax(9rem, 1.2fr) auto;
+	align-items: center;
+	gap: .65rem;
+	padding: .58rem .62rem;
+	border: 1px solid var(--editor-border);
+	border-radius: .68rem;
+	background: var(--editor-bg-elevated);
+	box-shadow: 0 1px 2px rgba(15,23,42,.035);
+}
+.pd-v3-component-identity { display: grid; grid-template-columns: 1.65rem minmax(0, 1fr); align-items: center; gap: .52rem; min-width: 0; }
+.pd-v3-component-copy { display: grid; min-width: 0; }
+.pd-v3-component-copy strong { overflow: hidden; font-size: .72rem; text-overflow: ellipsis; white-space: nowrap; }
+.pd-v3-component-copy small { margin-top: .12rem; overflow: hidden; color: var(--editor-text-secondary); font-family: ui-monospace, "SFMono-Regular", Consolas, monospace; font-size: .58rem; text-overflow: ellipsis; white-space: nowrap; }
+.pd-v3-component-order { display: grid; place-items: center; width: 1.65rem; height: 1.65rem; border-radius: .5rem; background: var(--editor-blue-soft); color: var(--editor-blue); font-size: .62rem; font-weight: 760; }
+.pd-v3-component-controls { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .4rem; }
+.pd-v3-component-controls .pd-form-field { min-width: 0; }
+.pd-v3-component-controls .pd-form-field > span { font-size: .58rem; }
+.pd-v3-component-controls select { min-height: 2rem; padding-top: .25rem; padding-bottom: .25rem; font-size: .68rem; }
+.pd-v3-component-actions { display: flex; gap: .2rem; }
+.pd-v3-component-actions button {
+	display: inline-grid;
+	place-items: center;
+	width: 1.9rem;
+	height: 1.9rem;
+	min-height: 0;
+	padding: 0;
+	border: 1px solid var(--editor-border);
+	border-radius: .4rem;
+	background: var(--editor-bg-elevated);
+	box-shadow: none;
+	color: var(--editor-text-secondary);
+}
+.pd-v3-component-actions button:hover:not(:disabled) {
+	border-color: var(--editor-blue);
+	background: var(--editor-blue-soft);
+	color: var(--editor-blue);
+}
+.pd-v3-component-actions button svg { width: .92rem; height: .92rem; }
+.pd-v3-action-button:disabled { opacity: .35; }
+.pd-v3-component-actions .is-danger { color: var(--editor-red); }
+.pd-v3-component-actions .is-danger:hover:not(:disabled) {
+	border-color: color-mix(in srgb, var(--editor-red) 40%, var(--editor-border));
+	background: var(--editor-red-soft);
+	color: var(--editor-red);
+}
+.pd-v3-add-component {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) auto;
+	align-items: end;
+	gap: .5rem;
+	margin-top: .7rem;
+	padding: .7rem;
+	border: 1px dashed var(--editor-border);
+	border-radius: .68rem;
+	background: var(--editor-bg-elevated);
+}
+.pd-v3-add-component select { min-height: 2.35rem; }
+.pd-v3-add-component button { min-height: 2.35rem; box-shadow: none; }
+.pd-v3-add-field { min-width: 0; }
+.pd-v3-binding-group {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: .55rem;
+	padding: .72rem;
+	border: 1px solid var(--editor-border);
+	border-radius: .68rem;
+	background: var(--editor-bg-elevated);
+	box-shadow: 0 1px 1px rgba(15,23,42,.025);
+}
+.pd-v3-binding-heading {
+	display: grid;
+	grid-template-columns: 1.65rem minmax(0, 1fr);
+	align-items: center;
+	gap: .52rem;
+	grid-column: 1 / -1;
+	padding-bottom: .55rem;
+	border-bottom: 1px solid var(--editor-separator);
+}
+.pd-v3-binding-order { display: grid; place-items: center; width: 1.65rem; height: 1.65rem; border-radius: .5rem; background: var(--editor-bg-grouped); color: var(--editor-text-secondary); font-size: .62rem; font-weight: 760; }
+.pd-v3-binding-copy { display: flex; align-items: center; justify-content: space-between; gap: .7rem; min-width: 0; }
+.pd-v3-binding-copy strong { font-size: .72rem; }
+.pd-v3-binding-copy code {
+	min-width: 0;
+	overflow: hidden;
+	padding: .18rem .36rem;
+	border-radius: .35rem;
+	background: var(--editor-bg-grouped);
+	color: var(--editor-text-secondary);
+	font-size: .62rem;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.pd-v3-binding-group > .pd-form-field { grid-column: 1 / -1; }
+.pd-v3-generated-value textarea { min-height: 4.5rem; }
+.pd-v3-binding-note { grid-column: 1 / -1; margin: 0; padding: .5rem .58rem; border-radius: .5rem; background: var(--editor-bg-grouped); color: var(--editor-text-secondary); font-size: .59rem; line-height: 1.4; }
+.pd-v3-source-panel { min-width: 0; padding: .72rem; border: 1px solid var(--editor-border); border-radius: .68rem; background: var(--editor-bg-elevated); }
+.pd-v3-source-panel > .pd-v3-section-label { margin-top: 0; padding-top: 0; border-top: 0; }
+.pd-v3-source-panel + .pd-v3-section-label { margin-top: .8rem; }
+@media (max-width: 48rem) {
+	.pd-v3-component { grid-template-columns: minmax(0, 1fr) auto; }
+	.pd-v3-component-controls { grid-column: 1 / -1; grid-row: 2; }
+	.pd-v3-area-heading { align-items: flex-start; flex-direction: column; }
+}
+@media (max-width: 32rem) {
+	.pd-v3-panel-heading { grid-template-columns: 2.35rem minmax(0, 1fr); padding: .72rem; }
+	.pd-v3-number { width: 2.35rem; height: 2.35rem; }
+	.pd-v3-component { grid-template-columns: minmax(0, 1fr); }
+	.pd-v3-component-controls, .pd-v3-component-actions { grid-column: 1; grid-row: auto; }
+	.pd-v3-component-actions { justify-content: flex-end; }
+}
+}
+
 @layer nino.local {
 /* ------------------------------------------------- Design-system locals */
 /*
@@ -1811,7 +2119,7 @@ button.nino-admin-btn-primary:hover:not(:disabled) {
 	--pd-inspector-width: 20rem;
 }
 #pd-app #pd-topbar {
-	grid-template-columns: var(--pd-sidebar-width) minmax(0, 1fr);
+	grid-template-columns: var(--pd-sidebar-width) minmax(0, 1fr) auto;
 	gap: 1rem;
 	height: var(--pd-topbar-height);
 	padding: .6rem 1rem;
@@ -1835,8 +2143,14 @@ button.nino-admin-btn-primary:hover:not(:disabled) {
 #pd-app #pd-document-meta strong {
 	font-size: .86rem;
 }
+#pd-app #pd-top-actions :is(.nino-admin-btn-primary, .nino-admin-btn-danger) {
+	min-height: 2.2rem;
+	padding: .42rem .72rem;
+	border-radius: var(--editor-radius-sm);
+	font-size: .69rem;
+}
 #pd-app #pd-pages, #pd-app #pd-inspector {
-	padding: .9rem .75rem calc(var(--nino-admin-actionbar-height) + 1rem);
+	padding: .9rem .75rem 1.25rem;
 }
 #pd-app .pd-panel-heading {
 	padding: 0 .2rem .6rem;
@@ -1903,7 +2217,7 @@ button.nino-admin-btn-primary:hover:not(:disabled) {
 	font-size: .63rem;
 }
 #pd-app #pd-workspace {
-	padding: 1rem clamp(1rem, 2.6vw, 2.5rem) calc(var(--nino-admin-actionbar-height) + 1.5rem);
+	padding: 1rem clamp(1rem, 2.6vw, 2.5rem) 2rem;
 }
 #pd-app #pd-page-toolbar {
 	position: sticky;
@@ -1920,7 +2234,7 @@ button.nino-admin-btn-primary:hover:not(:disabled) {
 	backdrop-filter: blur(18px) saturate(170%);
 	-webkit-backdrop-filter: blur(18px) saturate(170%);
 }
-#pd-app .pd-slot-setting span, #pd-app .pd-inline-setting > strong {
+#pd-app .pd-slot-setting span {
 	font-size: .64rem;
 	letter-spacing: .04em;
 }
@@ -1939,19 +2253,6 @@ button.nino-admin-btn-primary:hover:not(:disabled) {
 #pd-app :is(.pd-dialog-header, .pd-dialog-footer) {
 	min-height: 56px;
 	padding: .7rem .85rem;
-}
-#pd-app .nino-admin-actionbar {
-	left: var(--pd-sidebar-width);
-	padding-right: clamp(1rem, 2.6vw, 2.5rem);
-	padding-left: clamp(1rem, 2.6vw, 2.5rem);
-}
-/* init() moves this row out of the filtered header so fixed positioning is
-   viewport-relative. Keep the pre-init copy from briefly covering the brand. */
-#pd-app #pd-topbar > .nino-admin-actionbar {
-	visibility: hidden;
-}
-#pd-app > .nino-admin-actionbar {
-	visibility: visible;
 }
 #pd-app #pd-save-state {
 	max-width: none;

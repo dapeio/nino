@@ -114,7 +114,9 @@ Important source directories:
 | `private/` | The project's private half — never served, only read by PHP: `config.php`, `templates/`, `text/`, `elements/`, `data/`, plus `.auth/` (the `/_admin` hash, login throttle, backup key), `.logs/` and `.backups/`. Reached through `Filesystem::path()` (which resolves `PRIVATE_DIRS` against it) or the virtual `Filesystem::CONTENT_DIR` prefix (`/private`); moved by `NINO_CONTENT_DIR`. Never write project state into a tool folder or into `config.php` — the first breaks updates, the second is rolled back by a Restore |
 | `_admin/assets/*.js` | Admin frontend modules; no bundler |
 | `_admin/templates/page-index.tpl` | Admin shell, tabs, panes, assets |
-| `_templates/Templates.php` | Template Builder API, parser, composer |
+| `_templates/Templates.php` | Template Builder API, document parser, preview sanitizer and preset dispatch |
+| `_templates/Areas.php` | Named-area manifest-v3 normalizer, validator and compiler |
+| `_templates/assets/area-composer.js` | Named-area Design/Data editor layered on the shared wizard shell |
 | `_templates/library/<slug>/` | Section preset library |
 | `_install/Install.php` | Installer behavior and library application |
 | `_install/library/modules/<slug>/` | Installer module packages |
@@ -324,14 +326,13 @@ written without a scope in any of them therefore reaches the other tools too.
    margins of wherever it first appeared breaks the moment it is reused - which
    is exactly how `/_install`'s "New Route" button inherited a stray
    `margin-top` from an `/_editor` list class.
-5. **Cascade layers decide who wins, not specificity.** Every tool stylesheet
-   opens with `@layer nino.tool, nino.system, nino.local;` and wraps its own
-   rules in `@layer nino.tool { ... }`; `Nino.admin.css` is one
-   `@layer nino.system { ... }`. A layered rule loses to any rule in a later
-   layer however specific it is, so a tool's `#some-id` rule can no longer
-   silently outrank a design-system class. A tool that genuinely has to override
-   one says so out loud, in the `@layer nino.local { ... }` section at the
-   bottom of its own file.
+5. **Cascade layers decide who wins before specificity.** Every tool stylesheet
+   opens with `@layer nino.system, nino.tool, nino.local;`. Shared foundations
+   and `Nino.admin.css` live in `nino.system`; normal screen and component rules
+   live in the later `nino.tool` layer, so they can refine the low-specificity
+   `:where(.nino-admin)` baseline without selector escalation. Reserve
+   `nino.local` for a deliberate final override, not every normal component
+   difference.
 
 #### When adding a screen
 
@@ -1465,419 +1466,240 @@ php tests/install-smoke.php
 node tests/install-script-js-smoke.js
 ```
 
+
 ## 10. Recipe: add a Section Library preset
 
-A Section Library preset is a discoverable recipe used by `/_templates`. The
-Composer validates its options and generates ordinary HTML+ source. That source
-is copied into a page template and remains independent of the library at
-runtime.
+A Section Library preset is a discoverable compile-time recipe used by
+`/_templates`. Generated HTML+ is copied into a page template and must remain
+independent of the library at public runtime.
 
-Use a preset when an existing Composer content type can express the section.
-Do not add PHP or a runtime module for visual markup alone.
+Every library preset MUST use the named-area manifest contract, version `3`.
+`Library::presets()` deliberately ignores manifests without that explicit
+version. Do not restore a parallel Classic gallery, compatibility loader,
+migration branch or Intro/Content/Outro compiler. An older managed section
+whose preset no longer exists remains editable through HTML+ as ordinary
+section source.
 
-### 10.1 Directory and slug
-
-```text
-_templates/library/services-image-grid/
-└── manifest.php
-```
-
-An optional code-authored variant adds:
+### 10.1 Directory, slug, and files
 
 ```text
-_templates/library/editorial-hero/
+_templates/library/services-grid/
 ├── manifest.php
 └── section.tpl
 ```
 
-The directory slug MUST match:
+A preset with genuinely different markup can provide several Layout files:
 
-```regex
-^[a-z0-9][a-z0-9-]*$
+```text
+_templates/library/fullscreen-image/
+├── manifest.php
+├── section-cover.tpl
+└── section-parallax.tpl
 ```
 
-Use a stable semantic slug. A preset is referenced by this key in stored
-section metadata.
+The directory slug MUST match `^[a-z0-9][a-z0-9-]*$`. Layout filenames must
+be local safe `.tpl` basenames; traversal and external paths are forbidden.
 
-### 10.2 Prefer a generic manifest first
+### 10.2 Mental model
 
-The generic Composer already handles surface, background, header, content,
-layout, actions, spacing, borders, and motion. A manifest-only preset gets all
-security, preview, schema, and future compatible behavior from that path.
+A v3 preset owns:
 
-Example
-`_templates/library/services-image-grid/manifest.php`:
+- one shared Section frame;
+- one or more real Layout templates;
+- semantic named Areas such as `heading`, `articles`, and `action`;
+- the safe component vocabulary allowed in every Area;
+- recommendations, not hidden mandatory UI state;
+- and any Elements model/shortcode contract used by a repeatable Area.
+
+A Layout contains every declared `[[area:<key>]]` token exactly once. Use a
+second Layout only when the source composition differs. Two-, three-, and
+four-column choices, alignment, density, and similar class-only changes belong
+in Area Styles. Do not create the Layout × Style cross-product.
+
+The visual editor offers Design and Data views per Area. Design changes Style
+and ordered components. Data connects single components to Text/Image/template
+bindings or maps repeatable components to an Elements model.
+
+The Add Section library contains version-3 named-area presets only. Add a
+focused semantic preset instead of duplicating it into several class-only
+cards; Layouts are for real source changes and Area Styles are for visual
+variants.
+
+HTML+, not another general-purpose Advanced panel, is the escape hatch for
+arbitrary HTML, heading hierarchy, additional ARIA attributes, custom classes,
+icons, nested structures, or project-specific behavior.
+
+### 10.3 Complete manifest shape
 
 ```php
-<?php
-declare(strict_types=1);
-
-return [
-	'name' => 'Services — Image Grid',
-	'description' => 'A responsive service grid with images, copy and links.',
+<?php return [
+	'name' => 'Services — Responsive grid',
+	'description' => 'A heading, repeatable service cards and optional action.',
 	'category' => 'Services',
-	'tags' => [
-		'services',
-		'articles',
-		'cards',
-		'images',
-		'grid',
-		'links',
+	'tags' => [ 'services', 'cards', 'grid', 'elements' ],
+	'version' => 3,
+	'previewHeight' => 680,
+	'recommend' => [
+		'layout' => 'default',
+		'frame' => [
+			'background' => 'alt',
+			'container' => 'wide',
+			'padding' => 'default',
+		],
 	],
-	'version' => 1,
-	'shell' => 'section',
-	'defaults' => [
-		'surface' => 'default',
-		'background' => 'none',
-		'header' => 'title-subtitle-description',
-		'align' => 'left',
-		'content' => 'articles-image',
-		'contentStyle' => 'auto',
-		'action' => 'none',
-		'motion' => 'page',
-		'padding' => 'default',
-		'margin' => 'none',
-		'border' => 'none',
-		'layout' => '3',
-		'limit' => 6,
+	'layouts' => [
+		'default' => [
+			'label' => 'Heading, services and action',
+			'template' => 'section.tpl',
+		],
 	],
-	'allow' => [
-		'surface' => [ 'default', 'alt', 'primary', 'dark', 'black' ],
-		'header' => [ 'title', 'title-subtitle', 'title-subtitle-description' ],
-		'align' => [ 'left', 'center' ],
-		'contentStyle' => [ 'auto', 'default', 'alt' ],
-		'motion' => [ 'page', 'on', 'off' ],
-		'padding' => [ 'default', 'compact', 'generous' ],
-		'margin' => [ 'none', 'small', 'medium', 'large' ],
-		'border' => [ 'none', '1', '2', '3' ],
-		'layout' => [ '2', '3', '4' ],
-	],
-];
-```
-
-Manifest metadata rules:
-
-- `name` is the human-facing library title.
-- `description` must explain visible structure, not implementation.
-- `category` must be useful as a filter and consistent with nearby presets.
-- `tags` MUST be non-empty and include likely visual/search terms.
-- `version` starts at `1`. Increment it when the preset's generated contract
-  changes materially.
-- `shell` is `section` or `hero`.
-- `defaults` describes a valid complete initial composition.
-- `allow` exposes only deliberate variants.
-
-Do not market every preset as “modern”. Tags should distinguish it by visible
-content, layout, purpose, and behavior.
-
-### 10.3 The critical `defaults` / `allow` rule
-
-For every Composer choice axis:
-
-1. If `allow[axis]` exists, invalid values are removed and only the remaining
-   values are selectable.
-2. If `allow[axis]` is absent but `defaults[axis]` exists, that axis is locked
-   to the single default.
-3. If both are absent, all globally valid values are allowed.
-
-Therefore a curated preset SHOULD define every default and list in `allow`
-only axes users are meant to vary. Omitting `allow['content']` in the example
-correctly locks the preset to `articles-image`.
-
-Every default must itself be present in that axis's allowed choices and its
-content/layout pair must be compatible. Otherwise the Composer falls back to
-the first allowed/compatible value, producing a surprising preview.
-
-`limit` is not a choice axis. It is a numeric default clamped to `1..12` and
-does not belong in `allow`.
-
-`pageMotion` is a page/template setting, not preset metadata. The section's
-`motion: page` inherits it when composed.
-
-### 10.4 Exact current choice values
-
-Do not spell values from memory. The current source of truth is
-`Composer::choices()` in `_templates/Templates.php`.
-
-| Axis | Valid values |
-| --- | --- |
-| `surface` | `default`, `alt`, `primary`, `dark`, `black` |
-| `background` | `none`, `image-cover`, `image-static`, `parallax` |
-| `header` | `none`, `title`, `title-subtitle`, `title-subtitle-description` |
-| `align` | `left`, `center`, `right` |
-| `content` | `none`, `text`, `media-split`, `articles`, `articles-image`, `cards`, `lists`, `slider`, `media-slider`, `testimonials`, `profiles`, `stats`, `features`, `feature-list`, `accordion`, `tabs`, `pricing`, `comparison`, `data-table`, `logos`, `badges`, `gallery`, `timeline`, `video`, `video-embed`, `notice`, `contact`, `newsletter` |
-| `contentStyle` | `auto`, `default`, `alt` |
-| `action` | `none`, `link`, `button`, `dual-buttons` |
-| `motion` | `page`, `on`, `off` |
-| `padding` | `default`, `none`, `compact`, `generous` |
-| `margin` | `none`, `small`, `medium`, `large` |
-| `border` | `none`, `1`, `2`, `3` |
-| `layout` | `auto`, `2`, `3`, `4`, `media-left`, `media-right`, `media-left-full`, `media-right-full`, `narrow`, `wide`, `spotlight`, `slider`, `grid`, `mosaic`, `bento`, `split`, `featured`, `check`, `check-2`, `numbered`, `numbered-2`, `plain`, `striped`, `bordered`, `striped-bordered`, `pill`, `info`, `success`, `error`, `4-3` |
-
-### 10.5 Content/layout compatibility
-
-A globally valid layout is not necessarily valid for a content type. Use
-`Composer::modules()` as the source of truth:
-
-| Content | Source | Compatible layouts |
-| --- | --- | --- |
-| `none` | none | `auto` |
-| `text` | native textfills | `wide`, `narrow` |
-| `media-split` | native textfills + image slot | `media-left`, `media-right`, `media-left-full`, `media-right-full` |
-| `lists` | Elements | `check`, `check-2`, `numbered`, `numbered-2` |
-| `articles` | Elements | `2`, `3`, `4` |
-| `articles-image` | Elements | `2`, `3`, `4` |
-| `cards` | Elements | `spotlight`, `2`, `3`, `4` |
-| `slider` | Elements | `narrow`, `wide` |
-| `media-slider` | Elements | `narrow`, `wide` |
-| `testimonials` | Elements | `spotlight`, `slider`, `2`, `3` |
-| `profiles` | Elements | `spotlight`, `3`, `4` |
-| `stats` | Elements | `2`, `3`, `4` |
-| `features` | Elements | `2`, `3`, `4`, `bento` |
-| `feature-list` | Elements + section image | `media-left`, `media-right` |
-| `accordion` | Elements | `narrow`, `wide` |
-| `tabs` | Elements | `narrow`, `wide` |
-| `pricing` | Elements | `2`, `3`, `4`, `featured` |
-| `comparison` | native headings + Elements | `wide` |
-| `data-table` | native headings + Elements | `plain`, `striped`, `bordered`, `striped-bordered` |
-| `logos` | Elements | `wide` |
-| `badges` | Elements | `plain`, `pill` |
-| `gallery` | Elements | `grid`, `mosaic` |
-| `timeline` | Elements | `3`, `4` |
-| `video` | native URI + image slot | `narrow`, `wide` |
-| `video-embed` | native URI | `narrow`, `wide`, `4-3` |
-| `notice` | native textfill | `info`, `success`, `error` |
-| `contact` | native textfills + form module convention | `split` |
-| `newsletter` | module text/form convention | `narrow`, `wide` |
-
-If a submitted layout is incompatible, the Composer silently chooses the
-content type's first compatible layout. A good manifest never depends on that
-fallback.
-
-“Native textfills” means one set of section values at paths based on:
-
-```text
-/page-<pageId>/<sectionId>/<suffix>
-```
-
-“Elements” means repeatable records and requires a valid Element type slug.
-When no slug is supplied, the builder derives:
-
-```text
-<pageId>-<sectionId>
-```
-
-### 10.6 Add a custom `section.tpl` only when necessary
-
-Use a custom file when the generic renderer cannot express an important DOM
-structure. The manifest still supplies validation, fields, images, schema,
-options, search metadata, and preview input.
-
-Example `_templates/library/editorial-hero/manifest.php`:
-
-```php
-<?php
-declare(strict_types=1);
-
-return [
-	'name' => 'Hero — Editorial Split',
-	'description' => 'Editorial copy, two actions and a full-height side image.',
-	'category' => 'Hero',
-	'tags' => [ 'hero', 'editorial', 'split', 'image', 'two buttons' ],
-	'version' => 1,
-	'shell' => 'hero',
-	'defaults' => [
-		'surface' => 'default',
-		'background' => 'none',
-		'header' => 'title-subtitle-description',
-		'align' => 'left',
-		'content' => 'media-split',
-		'contentStyle' => 'auto',
-		'action' => 'dual-buttons',
-		'motion' => 'page',
-		'padding' => 'default',
-		'margin' => 'none',
-		'border' => 'none',
-		'layout' => 'media-right',
-		'limit' => 1,
-	],
-	'allow' => [
-		'surface' => [ 'default', 'alt', 'primary', 'dark', 'black' ],
-		'motion' => [ 'page', 'on', 'off' ],
+	'areas' => [
+		'heading' => [
+			'label' => 'Title area',
+			'help' => 'The non-repeating introduction.',
+			'source' => 'single',
+			'allowed' => [ 'title', 'subtitle', 'description' ],
+			'container' => [
+				'tag' => 'div',
+				'class' => 'ui-grid-100 nino-area--heading',
+			],
+			'styles' => [
+				'left' => [ 'label' => 'Left', 'class' => 'nino-area--left' ],
+				'center' => [ 'label' => 'Centered', 'class' => 'nino-area--center' ],
+			],
+			'recommend' => [
+				'style' => 'center',
+				'components' => [
+					[ 'id' => 'title', 'type' => 'title' ],
+					[ 'id' => 'subtitle', 'type' => 'subtitle' ],
+				],
+			],
+			'render' => [
+				'title' => [ 'tag' => 'h2', 'class' => 'ui-section-title' ],
+			],
+		],
+		'services' => [
+			'label' => 'Services',
+			'source' => 'elements',
+			'allowed' => [ 'image', 'title', 'description', 'button' ],
+			'item' => [ 'tag' => 'article', 'class' => 'ui-article' ],
+			'styles' => [
+				'two-columns' => [ 'label' => '2 columns', 'class' => 'ui-grid-m-50' ],
+				'three-columns' => [ 'label' => '3 columns', 'class' => 'ui-grid-m-33' ],
+			],
+			'recommend' => [
+				'style' => 'three-columns',
+				'components' => [
+					[ 'id' => 'image', 'type' => 'image',
+					  'bindings' => [ 'src' => 'image', 'alt' => 'title' ] ],
+					[ 'id' => 'title', 'type' => 'title',
+					  'bindings' => [ 'text' => 'title' ] ],
+					[ 'id' => 'description', 'type' => 'description',
+					  'bindings' => [ 'text' => 'description' ] ],
+					[ 'id' => 'action', 'type' => 'button', 'style' => 'link',
+					  'bindings' => [ 'label' => 'linkLabel', 'href' => 'link' ] ],
+				],
+			],
+			'typeTitle' => 'Services',
+			'model' => [
+				'title' => [ 'type' => 'string', 'locale' => true, 'required' => true ],
+				'description' => [ 'type' => 'string', 'locale' => true, 'html' => true ],
+				'linkLabel' => [ 'type' => 'string', 'locale' => true ],
+				'link' => [ 'type' => 'string' ],
+				'image' => [ 'type' => 'image', 'width' => 1200, 'height' => 800 ],
+			],
+			'shortcode' => [
+				'locale' => '', 'callback' => '', 'limit' => 6, 'query' => '',
+			],
+		],
 	],
 ];
 ```
 
-Example `_templates/library/editorial-hero/section.tpl`:
+`section.tpl`:
 
 ```html
-<section id="{{section:id}}" class="{{section:classes}}">
-	{{section:meta}}
-	<div class="ui-grid-row ui-grid-middle">
-		<div class="ui-grid-100 ui-grid-m-50 ui-p-2">
-			<h2 class="ui-atf-title">{{text:title}}</h2>
-			<p class="ui-atf-subtitle">{{text:subtitle}}</p>
-			<p>{{text:description}}</p>
-			<div>{{text:content}}</div>
-			<div class="ui-mt-3">
-				<a href="{{text:cta-uri}}" class="ui-btn ui-btn--primary">
-					{{text:cta-label}}
-				</a>
-				<a
-					href="{{text:secondary-cta-uri}}"
-					class="ui-btn ui-btn--outline"
-				>
-					{{text:secondary-cta-label}}
-				</a>
-			</div>
-		</div>
-		<div class="ui-grid-100 ui-grid-m-50 ui-img-cover">
-			{{image:image}}
-		</div>
-	</div>
-</section>
+[[area:heading]]
+[[area:services]]
 ```
 
-The only supported custom tokens are:
+### 10.4 Component and binding contract
 
-| Token | Result |
-| --- | --- |
-| `{{section:id}}` | Escaped section ID |
-| `{{section:classes}}` | Escaped classes derived from the spec |
-| `{{section:meta}}` | Inert JSON comment used to reopen settings |
-| `{{content:prefix}}` | `/page-<pageId>/<sectionId>` |
-| `{{elements:type}}` | Element type slug without a leading slash |
-| `{{text:<suffix>}}` | Absolute textfill for a generated field suffix |
-| `{{image:<suffix>}}` | Generated `[image ...]` shortcode |
+The finite catalog is `title`, `subtitle`, `description`, `text`, `image`,
+`button`, `price`, `number`, and `template`. A manifest may restrict that
+list, override allowlisted tags/classes/styles and image dimensions, and set a
+maximum component count. It MUST NOT supply arbitrary component HTML.
 
-Every `{{text:*}}` suffix must be produced by the selected header, content, or
-action. Every `{{image:*}}` suffix must be produced by the selected background
-or content type. An unavailable token stays unresolved and composition fails.
+Single Areas create or reference absolute Text/Image bindings. Generated keys
+use `/page-<pageId>/<sectionId>/<component-suffix>`. A Template component
+accepts only `/templates/<safe-name>` and compiles to a normal `[template]`
+shortcode. Template components are forbidden in Elements Areas.
 
-For example:
+Elements Areas independently choose `new` or `existing`, a safe type slug,
+shortcode arguments, and mappings. Every mapped field must exist for a new
+model and must match image versus non-image type. Several Elements Areas in
+one preset MUST remain independent during creation, mapping, preview, and save.
 
-- `header: title-subtitle-description` supplies `title`, `subtitle`, and
-  `description`.
-- `content: media-split` supplies text `content` and section image `image`.
-- `action: dual-buttons` supplies four CTA text fields.
-- `background: image-cover` supplies section image `background`.
-- an image field inside an Elements schema is local `[[image]]` and is not a
-  `{{image:image}}` section slot.
+### 10.5 Frame recommendations
 
-An Elements-based custom section uses:
+Valid frame axes come from `AreaComposer::FRAME_CHOICES`: screen, vertical,
+background, container, padding, margin, focus, and overlay. A preset-level
+recommendation may be overridden by a Layout recommendation. User `auto`
+resolves Layout → preset → safe fallback. Never persist an invalid value
+silently as a custom class.
+
+Cover and parallax backgrounds create or reference one background image slot.
+Focus is positions 1–9 and overlay is none/soft/medium/strong. Mobile and
+reduced-motion behavior must remain meaningful without preview JavaScript.
+
+### 10.6 Validation and output
+
+A v3 Layout MUST contain no PHP, every declared Area exactly once, no unknown
+Area tokens, and only optional `[[section:id]]` outside Area tokens. The central
+renderer validates slugs, classes, tags, model fields, paths, dimensions,
+component count, styles, target behavior, and shortcode bounds.
+
+Composition MUST produce exactly one complete top-level `<section>`. It stores
+one inert round-trip comment:
 
 ```html
-<section id="{{section:id}}" class="{{section:classes}}">
-	{{section:meta}}
-	<ul class="ui-list">
-		[elements /{{elements:type}} limit="6"]
-		<li>
-			<strong>[[title]]</strong>
-			<span>[[description]]</span>
-		</li>
-		[/elements]
-	</ul>
-</section>
+<!-- nino:section {"version":3,"preset":"services-grid","areas":{...}} -->
 ```
 
-Its manifest `content` must be an Elements-sourced module whose schema contains
-those local fields. There is currently no custom token for a dynamic limit;
-either use a deliberate fixed value or prefer the generic renderer.
+The comment is ignored at runtime. HTML+ deliberately removes graphical
+ownership. Never add a public runtime dependency on the manifest.
 
-### 10.7 Custom section structural contract
+### 10.7 Preview and tests
 
-`section.tpl` MUST:
+Preview remains inert: no scripts, active forms, network iframes, or project
+callbacks. It strips VPA's hidden state, uses deterministic text and image
+fixtures, and renders the number of collection items implied by 1/2/3/4-column
+Styles where possible.
 
-- contain exactly one complete top-level `<section>...</section>`;
-- contain no non-whitespace source before or after it;
-- use a normal closing `</section>`, never a self-closing section;
-- keep `{{section:meta}}` inside the section;
-- use `{{section:id}}` and `{{section:classes}}` on the root;
-- contain no PHP;
-- leave all supported tokens resolvable by its manifest;
-- produce valid, accessible HTML;
-- and remain meaningful without preview JavaScript.
+Extend `tests/templates-smoke.php` and `tests/templates-js-smoke.js`. Test:
 
-Nested sections are legal when semantically appropriate, but multiple
-top-level sections are not.
-
-The preview is intentionally inert:
-
-- script blocks and PHP are stripped;
-- VPA classes are removed because `Nino.ui.js` does not run in the frame;
-- project fills and Elements receive deterministic fixtures;
-- image slots receive local SVG fixtures;
-- iframe sources become `about:blank`;
-- form actions become `#`;
-- and remaining project shortcodes are removed.
-
-Do not “fix” preview by enabling arbitrary scripts, remote iframes, or active
-forms. Make the preset's static structure communicate the design.
-
-### 10.8 Adding a new Composer content type is a larger change
-
-If no existing `content` module supplies the required field/schema/layout
-contract, a new preset alone is insufficient. A new content type requires:
-
-1. a new key in the valid content choices;
-2. a `Composer::modules()` entry with `source`, layouts, native fields, image
-   slots, and Element model;
-3. generic rendering in `Composer::_renderContent()`;
-4. deterministic preview fixtures for every new suffix;
-5. compatible Template Builder labels/filter behavior;
-6. CSS/JavaScript runtime behavior only when necessary;
-7. tests for composition, schema, preview, accessibility, and invalid layouts;
-8. updates to this table and the human Template Builder manual.
-
-Before adding one, check whether a custom `section.tpl` with an existing content
-contract is sufficient. Do not create two content keys with the same schema and
-only different cosmetic classes; that is normally a preset or layout variant.
-
-### 10.9 Section preset tests
-
-`tests/templates-smoke.php` already composes every preset with defaults. Add
-specific assertions for the new preset's meaningful contract:
-
-```php
-$services = \Nino\Templates\Composer::compose( [
-	'preset' => 'services-image-grid',
-	'pageId' => 'home',
-	'id' => 'services',
-	'elementType' => 'services',
-] );
-
-check(
-	'composes the services image grid',
-	str_contains( $services['source'], '[elements /services' )
-	&& isset( $services['elementSchema']['image'] )
-	&& $services['spec']['layout'] === '3'
-);
-```
-
-Also test:
-
-- searchable non-empty metadata;
-- every default and allowed choice;
-- invalid choices clamp to the preset, not an unrelated variant;
-- exact native field suffixes and image slots;
-- exact Element schema for repeatable content;
-- one valid top-level section;
-- no unresolved custom tokens;
-- preview has realistic content and no unresolved shortcodes;
-- VPA-enabled preview is visible;
-- and HTML/source includes the expected accessible structure.
+- every bundled manifest loads without a private Layout source leak;
+- v3 defaults compose and contain no unresolved Area token;
+- metadata preserves ordered components and independent collections;
+- component add/move/remove helpers do not mutate unrelated state;
+- new/existing Text, Image, Template, and Elements bindings;
+- invalid slugs, paths, tags, classes, styles, mappings, and Layouts;
+- exact collection schema and all shortcode arguments;
+- preview placeholders, column count, VPA visibility, and script isolation;
+- Content endpoints reject resources not declared by the selected preset/Area;
+- and unsupported manifest versions are not accepted.
 
 Run:
 
 ```bash
-php -l _templates/library/services-image-grid/manifest.php
+php -l _templates/Areas.php
+php -l _templates/library/services-grid/manifest.php
 php tests/templates-smoke.php
 node tests/templates-js-smoke.js
 ```
 
 Finally inspect the real library card and preview at small and large widths.
-Automated string assertions do not establish that a visual preset is useful.
-
+String assertions do not establish that a visual preset is useful.
 ## 11. Recipe: write templates and installable page units
 
 Nino templates are HTML+ files. They contain HTML, textfills, and shortcodes,

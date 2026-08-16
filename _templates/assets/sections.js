@@ -44,7 +44,76 @@
 		return section.htmlId || ( section.spec && section.spec.id ) || 'section-'+ ( index + 1 );
 	}
 
+	function isAreaSpec( spec ) {
+		return !!spec && Number( spec.version ) === 3 && spec.areas && typeof spec.areas === 'object';
+	}
+
+	function effectiveFrameValue( spec, preset, key ) {
+		const fallback = { screen : 'off', vertical : 'middle', background : 'default', container : 'default', padding : 'default', margin : 'none', focus : '5', overlay : 'medium' };
+		if( spec.frame && spec.frame[key] && spec.frame[key] !== 'auto' )
+			return spec.frame[key];
+		const layoutKey = spec.layout && spec.layout !== 'auto' && preset.layouts[spec.layout] ? spec.layout : preset.recommend.layout;
+		const layout = preset.layouts[layoutKey] || {};
+		if( layout.frame && layout.frame[key] && layout.frame[key] !== 'auto' )
+			return layout.frame[key];
+		if( preset.recommend.frame && preset.recommend.frame[key] && preset.recommend.frame[key] !== 'auto' )
+			return preset.recommend.frame[key];
+		return fallback[key] || 'auto';
+	}
+
+	function areaStyle( specArea, area ) {
+		const key = specArea && specArea.style && specArea.style !== 'auto' ? specArea.style : area.recommend.style;
+		return area.styles[key] || {};
+	}
+
+	function areaColumns( specArea, area ) {
+		const style = areaStyle( specArea, area );
+		const value = String( style.class || '' )+ ' '+ String( specArea && specArea.style || '' );
+		if( /(?:ui-grid-m-25|four)/.test( value ) ) return 4;
+		if( /(?:ui-grid-m-33|three)/.test( value ) ) return 3;
+		if( /(?:ui-grid-m-50|two)/.test( value ) ) return 2;
+		return 1;
+	}
+
+	function appendComponentPreview( wrap, type ) {
+		if( type === 'image' )
+			wrap.appendChild( element( 'span', 'pd-preview-media' ) );
+		else if( type === 'title' )
+			wrap.appendChild( element( 'span', 'pd-preview-title' ) );
+		else if( type === 'subtitle' || type === 'description' || type === 'text' || type === 'price' || type === 'number' )
+			wrap.appendChild( element( 'span', 'pd-preview-line' ) );
+		else if( type === 'button' )
+			wrap.appendChild( element( 'span', 'pd-preview-button' ) );
+		else if( type === 'template' )
+			wrap.appendChild( element( 'span', 'pd-preview-line pd-preview-template' ) );
+	}
+
+	function areaPreview( spec, preset ) {
+		const wrap = element('div');
+		Object.keys( preset.areas || {} ).forEach( function( areaKey ) {
+			const area = preset.areas[areaKey];
+			const specArea = spec.areas[areaKey] || {};
+			const components = specArea.components || [];
+			if( area.source === 'elements' ) {
+				const items = element( 'div', 'pd-preview-items' );
+				const columns = areaColumns( specArea, area );
+				items.style.setProperty( '--pd-items', String( columns ) );
+				for( let i = 0; i < columns; i++ )
+					items.appendChild( element( 'span', 'pd-preview-item'+ ( components.some( function( component ) { return component.type === 'image' } ) ? ' has-image' : '' ) ) );
+				wrap.appendChild( items );
+				return;
+			}
+			components.forEach( function( component ) { appendComponentPreview( wrap, component.type ) } );
+		} );
+		if( wrap.childNodes.length === 0 )
+			wrap.appendChild( element( 'span', 'pd-preview-line' ) );
+		return Array.from( wrap.childNodes );
+	}
+
 	function preview( spec, compact ) {
+		const areaPreset = isAreaSpec( spec ) ? presetFor( spec ) : null;
+		if( areaPreset )
+			return areaPreview( spec, areaPreset );
 		const wrap = element('div');
 		const header = spec && spec.header || 'title';
 		const content = spec && spec.content || 'custom';
@@ -129,9 +198,10 @@
 		const spec = section.spec;
 		const preset = presetFor( spec );
 		const managed = spec !== null && spec !== undefined && preset !== null;
+		const areas = managed && isAreaSpec( spec );
 		const card = element( 'article', 'pd-section-card'+ ( pd._selectedId === section._clientId ? ' is-selected' : '' ) );
 		card.dataset.kind = templateSection ? 'template' : ( managed ? 'managed' : 'custom' );
-		card.dataset.content = templateSection ? 'template' : ( managed ? spec.content : 'custom' );
+		card.dataset.content = templateSection ? 'template' : ( managed ? ( areas ? 'areas' : spec.content ) : 'custom' );
 		card.tabIndex = 0;
 		card.setAttribute( 'aria-label', 'Section '+ sectionLabel( section, sectionIndex ) );
 		card.addEventListener( 'click', function() { pd.select( section._clientId ) } );
@@ -147,7 +217,7 @@
 		const copy = element( 'div', 'pd-section-copy' );
 		const meta = element( 'div', 'pd-section-meta' );
 		meta.appendChild( element( 'span', 'pd-badge', templateSection ? 'Template section' : ( managed ? preset.category : 'Custom HTML+' ) ) );
-		meta.appendChild( element( 'span', 'pd-badge is-neutral', templateSection ? '[template]' : ( managed ? humanize( spec.surface ) : '<section>' ) ) );
+		meta.appendChild( element( 'span', 'pd-badge is-neutral', templateSection ? '[template]' : ( managed ? humanize( areas ? effectiveFrameValue( spec, preset, 'background' ) : spec.surface ) : '<section>' ) ) );
 		copy.appendChild( meta );
 		copy.appendChild( element( 'h3', '', sectionLabel( section, sectionIndex ) ) );
 		copy.appendChild( element( 'p', '', templateSection ? ( section.path || '/templates/'+ section.template )+ '.tpl' : ( managed ? preset.name : 'Code-authored section — preserved as ordinary HTML+' ) ) );
@@ -178,7 +248,7 @@
 		copy.appendChild( bindings );
 
 		const visual = element( 'div', 'pd-card-preview' );
-		visual.dataset.surface = managed ? spec.surface : 'default';
+		visual.dataset.surface = managed ? ( areas ? effectiveFrameValue( spec, preset, 'background' ) : spec.surface ) : 'default';
 		if( templateSection ) {
 			const templatePreview = element( 'div', 'pd-template-preview' );
 			const icon = element( 'span', 'pd-template-preview-icon', section.template === 'html-header' ? 'HEAD' : ( section.template === 'html-footer' ? 'FOOT' : 'TPL' ) );
@@ -414,7 +484,17 @@
 				const structure = element( 'section', 'pd-inspector-section' );
 				structure.appendChild( element( 'h3', '', 'Structure' ) );
 				const grid = element( 'div', 'pd-spec-grid' );
-				[ [ 'Surface', spec.surface ], [ 'Header', spec.header ], [ 'Content', spec.content ], [ 'Layout', spec.layout ], [ 'Motion', spec.motion ], [ 'Action', spec.action ] ].forEach( function( item ) {
+				const details = isAreaSpec( spec )
+					? [
+						[ 'Background', effectiveFrameValue( spec, preset, 'background' ) ],
+						[ 'Layout', spec.layout === 'auto' ? preset.recommend.layout : spec.layout ],
+						[ 'Areas', Object.keys( spec.areas ).length ],
+						[ 'Components', Object.keys( spec.areas ).reduce( function( count, key ) { return count + ( spec.areas[key].components || [] ).length }, 0 ) ],
+						[ 'Collections', Object.keys( preset.areas ).filter( function( key ) { return preset.areas[key].source === 'elements' } ).length ],
+						[ 'Motion', spec.pageMotion ],
+					]
+					: [ [ 'Surface', spec.surface ], [ 'Header', spec.header ], [ 'Content', spec.content ], [ 'Layout', spec.layout ], [ 'Motion', spec.motion ], [ 'Action', spec.action ] ];
+				details.forEach( function( item ) {
 					const cell = element( 'div', 'pd-spec-item' );
 					cell.append( element( 'small', '', item[0] ), element( 'strong', '', humanize( item[1] ) ) );
 					grid.appendChild( cell );
@@ -467,6 +547,7 @@
 					const input = element( long ? 'textarea' : 'input' );
 					input.value = entry.value;
 					input.dataset.key = entry.key;
+					input.dataset.create = entry.exists ? 'false' : 'true';
 					field.append( label, input );
 					fields.appendChild( field );
 				} );
@@ -476,7 +557,7 @@
 				const save = button( 'Save content', 'Save native content', function() {
 					save.disabled = true;
 					message.textContent = 'Saving…';
-					const items = Array.from( fields.querySelectorAll('[data-key]') ).map( function( input ) { return { key : input.dataset.key, value : input.value } } );
+					const items = Array.from( fields.querySelectorAll('[data-key]') ).map( function( input ) { return { key : input.dataset.key, value : input.value, create : input.dataset.create === 'true' } } );
 					pd.api( 'content/save', { items : items } ).then( function() {
 						save.disabled = false;
 						message.textContent = 'Native content saved; existing global keys stayed global.';
@@ -515,6 +596,8 @@
 		},
 
 		renderResources : function( container, section, token ) {
+			const preset = presetFor( section.spec );
+			const areaSpec = isAreaSpec( section.spec ) && preset;
 			if( section.imageSlots.length ) {
 				const images = element( 'section', 'pd-inspector-section' );
 				images.appendChild( element( 'h3', '', 'Image slots' ) );
@@ -536,13 +619,19 @@
 							link.href = pd.assetUrl( '/_admin/?tab=images' );
 							row.appendChild( link );
 						} else {
-							row.appendChild( button( 'Create slot', 'Create image slot '+ uri, function() {
-								pd.api( 'content/image-create', { uri : uri, label : humanize( uri.split('/').slice(-2).join(' ') ) } ).then( function() {
+							const request = areaSpec ? pd.sectionsUI.areaImageRequest( section.spec, preset, uri ) : { uri : uri, label : humanize( uri.split('/').slice(-2).join(' ') ) };
+							if( request ) row.appendChild( button( 'Create slot', 'Create image slot '+ uri, function() {
+								pd.api( 'content/image-create', request ).then( function() {
 									pd.sectionsUI._images.push( { uri : uri, hasImage : false } );
 									pd.toast( 'Image slot created.', false );
 									pd.sectionsUI.renderInspector();
 								} ).catch( function( error ) { pd.toast( error.message, true ) } );
 							} ) );
+							else {
+								const link = element( 'a', '', 'Create in Admin' );
+								link.href = pd.assetUrl( '/_admin/?tab=images' );
+								row.appendChild( link );
+							}
 						}
 						imageList.appendChild( row );
 					} );
@@ -573,6 +662,22 @@
 						const link = element( 'a', '', 'Edit elements' );
 						link.href = pd.assetUrl( '/_admin/?tab=elements&type='+ encodeURIComponent( uri ) );
 						row.appendChild( link );
+					} else if( areaSpec ) {
+						const area = Object.keys( preset.areas ).find( function( key ) {
+							return preset.areas[key].source === 'elements' && section.spec.areas[key] && section.spec.areas[key].source.elementType === uri;
+						} );
+						if( area ) row.appendChild( button( 'Create type', 'Create element type '+ uri, function() {
+							pd.api( 'content/type-create', { preset : section.spec.preset, area : area, uri : uri, title : humanize( uri ) } ).then( function( response ) {
+								pd.sectionsUI._types.push( { type : response.uri, title : response.title, model : response.model } );
+								pd.toast( 'Element type '+ uri+ ' created.', false );
+								pd.sectionsUI.renderInspector();
+							} ).catch( function( error ) { pd.toast( error.message, true ) } );
+						} ) );
+						else {
+							const link = element( 'a', '', 'Create in Admin' );
+							link.href = pd.assetUrl( '/_admin/?tab=types' );
+							row.appendChild( link );
+						}
 					} else if( section.spec && section.spec.content ) {
 						row.appendChild( button( 'Create type', 'Create element type '+ uri, function() {
 							pd.api( 'content/type-create', { module : section.spec.content, uri : uri, title : humanize( uri ) } ).then( function( response ) {
@@ -592,6 +697,21 @@
 				list.innerHTML = '';
 				list.appendChild( element( 'p', 'nino-admin-error', error.message ) );
 			} );
+		},
+
+		areaImageRequest : function( spec, preset, uri ) {
+			const generatedPrefix = '/page-'+ spec.pageId+ '/'+ spec.id+ '/';
+			if( uri === generatedPrefix+ 'background' )
+				return { preset : spec.preset, slot : 'background', uri : uri, label : 'Background image' };
+			for( const areaKey of Object.keys( preset.areas || {} ) ) {
+				const area = preset.areas[areaKey];
+				if( area.source !== 'single' || !spec.areas[areaKey] ) continue;
+				for( const component of spec.areas[areaKey].components || [] ) {
+					if( component.type === 'image' && component.bindings && component.bindings.src === uri && uri === generatedPrefix+ component.id )
+						return { preset : spec.preset, slot : areaKey+ '.'+ component.id+ '.src', area : areaKey, component : component.id, property : 'src', uri : uri, label : area.label+ ' · Image' };
+				}
+			}
+			return null;
 		},
 
 		init : function() {

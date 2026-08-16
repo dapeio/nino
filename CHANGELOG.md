@@ -50,15 +50,28 @@ All notable changes to Nino are documented in this file.
   into the registry and onto every member route, and a delete takes the
   membership off every route in it. Templates are deliberately left alone —
   their `[navigation nav="…"]` argument is yours to update.
+- Added the manifest-v3 named-area Template Builder. Presets can define
+  semantic Areas with Design/Data views, ordered safe components,
+  independent Text, Image, Template and Elements bindings, optional real Layout
+  templates, Area Styles and multiple collection sources. **Articles** is the
+  collection reference; **Fullscreen image** demonstrates Cover and Parallax
+  Layouts. One inert versioned metadata comment preserves graphical editing,
+  while HTML+ remains the explicit escape hatch.
+- Refined the Template Builder workspace: Delete and Save now stay in the
+  topbar, Template Settings keep Name/Header/Footer/VPA on one labeled row,
+  Add Section remains the final workspace control for empty and populated
+  templates, and dialog close controls use consistent SVG icons. The composer
+  now presents compact horizontal Area tabs above a full-width Design/Data
+  workspace, designed component rows, binding groups and SVG row actions. Flexible
+  content, media split and reusable-template presets expand the focused set
+  without duplicating every cosmetic combination.
 - Added a section-first Template Builder for creating and composing
   `page-*.tpl` files with a searchable, visual preset library and a two-step
   Section Composer. The gallery and live configuration view render real
   generated markup with the current project stylesheet instead of a schematic.
-- Added 43 curated presets covering heroes, introductions, article and offer
-  grids, media/text splits, testimonials, profiles, stats, feature layouts,
-  check and numbered lists, tabs, accordions, pricing, comparison and data
-  tables, forms, badges, logos, galleries, inline and lightbox video, media
-  sliders, notices, timelines, image banners, and calls to action.
+- Added five maintained named-area references covering responsive articles,
+  flexible content, fullscreen images, semantic media splits and reusable
+  template insertion.
 - Added first-class `[template]` canvas sections. Standalone includes can be
   inserted, replaced, duplicated, and reordered. Header and footer remain
   ordinary `[template]` shortcodes but are selected through fixed Template
@@ -90,6 +103,15 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- Reduced the Template Builder library to explicit manifest-v3 presets. The
+  Classic switch and all bundled version-1 recipes are gone; manifests with a
+  missing or different version are ignored instead of opening a second editing
+  model.
+- Reworked the complete `pd-config-pane` hierarchy into consistent step
+  panels, numbered Area tabs, Design/Data controls, component stacks,
+  collection-source panels and labeled binding groups. These rules now live in
+  the normal `nino.tool` layer, so the shared admin baseline remains easy to
+  refine without emergency specificity.
 - Made the locale switch a design-system component. `/_admin`, `/_editor` and
   `/_install` each carried their own id rule for it, two of them byte-identical,
   so the one control that says "this is the translation you are looking at"
@@ -110,10 +132,10 @@ All notable changes to Nino are documented in this file.
   tool that owns them. `/_admin`, `/_editor`, `/_install` and `/_templates` use
   the shared classes throughout.
 - Ordered the admin stylesheets into cascade layers: each tool declares
-  `@layer nino.tool, nino.system, nino.local;` and wraps its own rules in
-  `nino.tool`, so a tool's id rule can no longer silently outrank a
-  design-system class, and a deliberate override says so in its own
-  `nino.local` section. Documented in AGENTS.md, and enforced by
+  `@layer nino.system, nino.tool, nino.local;`. Shared foundations remain a
+  low-specificity baseline, normal tool components can refine them without
+  selector escalation, and `nino.local` is reserved for deliberate final
+  overrides. Documented in AGENTS.md, and enforced by
   `tests/admin-lists-js-smoke.js`.
 - Renamed `/_install`'s "New Webpage" action to "New Route", matching the step
   itself.
@@ -233,6 +255,18 @@ All notable changes to Nino are documented in this file.
 
 ### Fixed
 
+- Fixed named-area composer controls rendering with the shared default style:
+  all dialogs now remain inside `#pd-app`, which is the scope their component
+  rules and design tokens use.
+- Fixed Template Builder previews requesting `/.cache/style.css` from servers
+  that answer public dot-directory URLs with HTML. The authenticated library
+  response now refreshes the configured asset bundle, carries its generated CSS
+  and lets each inert `srcdoc` embed it; preview markup is stripped of scripts
+  and inline handlers, CSP still denies active content, and the opaque sandbox
+  avoids one browser-extension warning per preview frame.
+- Fixed vertical Area navigation narrowing and clipping the Design/Data body in
+  the Template Builder's already narrow configuration pane. Areas now use one
+  compact, horizontally scrolling tab row above the full-width editor body.
 - Fixed long options running underneath a select's chevron. The indicator lived
   in `/_editor`'s stylesheet while the padding that keeps text off it came from
   `Nino.admin.css`, and once the shared file won by layer its symmetric

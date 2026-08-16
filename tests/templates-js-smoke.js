@@ -41,7 +41,7 @@ const context = vm.createContext( {
 	URLSearchParams : URLSearchParams,
 } );
 
-[ 'script.js', 'sections.js', 'composer.js' ].forEach( function( file ) {
+[ 'script.js', 'sections.js', 'composer.js', 'area-composer.js' ].forEach( function( file ) {
 	vm.runInContext( fs.readFileSync( path.join( __dirname, '../_templates/assets/', file ), 'utf8' ), context, { filename : file } );
 } );
 
@@ -84,23 +84,89 @@ check( 'HTML+ editing detaches generated composer metadata', Nino.templates.sect
 console.log('\nSection Library filtering');
 
 const matches = Nino.templates.composer.matchesPreset;
-const matchesInclude = Nino.templates.composer.matchesInclude;
 const preset = { name : 'FAQ — Accordion', description : 'Questions and answers', category : 'Content', tags : [ 'faq', 'support' ] };
 check( 'matches preset names and tags case-insensitively', matches( preset, 'accordion', 'All' ) && matches( preset, 'SUPPORT', 'All' ) );
 check( 'applies category and text filters together', matches( preset, 'questions', 'Content' ) && !matches( preset, 'questions', 'Hero' ) );
 check( 'empty search keeps the selected category visible', matches( preset, '', 'Content' ) );
-check( 'reusable templates participate in the Add Section search and filter', matchesInclude( { name : 'section-navigation', label : 'Section Navigation', kind : 'Section template' }, 'navigation', 'All' ) && matchesInclude( { name : 'section-navigation', label : 'Section Navigation', kind : 'Section template' }, '', 'Templates' ) && !matchesInclude( { name : 'section-navigation', label : 'Section Navigation', kind : 'Section template' }, '', 'Hero' ) );
+check( 'the library accepts named-area presets only', Nino.templates.composer.isAreaPreset( { version : 3 } ) && !Nino.templates.composer.isAreaPreset( { version : 1 } ) );
+Nino.templates._library.previewCss = '/* project-preview-css */ .ui-section{display:block}';
 const previewDocument = Nino.templates.composer.previewDocument( '<section id="sample"></section>' );
-check( 'preview documents load the project bundle around generated section HTML', previewDocument.includes( '/.cache/style.css' ) && previewDocument.includes( '<section id="sample"></section>' ) );
+check( 'preview documents inline the project bundle without another stylesheet request', previewDocument.includes( 'project-preview-css' )
+	&& previewDocument.includes( '<section id="sample"></section>' )
+	&& !previewDocument.includes( '<link rel="stylesheet"' )
+	&& !previewDocument.includes( '/.cache/style.css' ) );
 check( 'preview documents block scripts, forms and third-party network access', previewDocument.includes( 'Content-Security-Policy' ) && previewDocument.includes( "script-src 'none'" ) && previewDocument.includes( "form-action 'none'" ) );
+const hostilePreview = Nino.templates.composer.previewDocument( '<script>alert(1)</script><a href="javascript:alert(2)" onclick="alert(3)">Safe</a><a href=javascript:alert(4)>Still safe</a><img src=x onerror=alert(5)>' );
+check( 'preview documents remove executable markup before assigning srcdoc', !hostilePreview.includes( '<script' )
+	&& !hostilePreview.includes( 'javascript:' )
+	&& !/\son[a-z]+=/i.test( hostilePreview ) );
 
 const composerSource = fs.readFileSync( path.join( __dirname, '../_templates/assets/composer.js' ), 'utf8' );
+const areaComposerSource = fs.readFileSync( path.join( __dirname, '../_templates/assets/area-composer.js' ), 'utf8' );
+const sectionsSource = fs.readFileSync( path.join( __dirname, '../_templates/assets/sections.js' ), 'utf8' );
+const scriptSource = fs.readFileSync( path.join( __dirname, '../_templates/assets/script.js' ), 'utf8' );
+const styleSource = fs.readFileSync( path.join( __dirname, '../_templates/assets/style.css' ), 'utf8' );
 const templateMarkup = fs.readFileSync( path.join( __dirname, '../_templates/templates/page-index.tpl' ), 'utf8' );
+const templatesPhpSource = fs.readFileSync( path.join( __dirname, '../_templates/Templates.php' ), 'utf8' );
 const sandboxAssignments = composerSource.match( /iframe\.setAttribute\(\s*'sandbox',\s*PREVIEW_SANDBOX\s*\)/g ) || [];
-check( 'gallery and detail preview code retain the project origin without enabling scripts', composerSource.includes( "const PREVIEW_SANDBOX = 'allow-same-origin'" ) && sandboxAssignments.length === 2 );
-check( 'the initial detail preview uses the same project-origin sandbox', templateMarkup.includes( 'sandbox="allow-same-origin"' ) && templateMarkup.includes( 'sandbox=""' ) === false );
+check( 'the backend refreshes the configured CSS bundle before embedding it', /Assets::doShortcode\(\s*\$appData,\s*\[\s*'\/\.cache\/style\.css'\s*\]/.test( templatesPhpSource ) );
+check( 'gallery and detail previews use an opaque sandbox while CSP still denies scripts', composerSource.includes( "const PREVIEW_SANDBOX = 'allow-scripts'" )
+	&& !composerSource.includes( "const PREVIEW_SANDBOX = 'allow-same-origin'" )
+	&& sandboxAssignments.length === 2 );
+check( 'the initial detail preview uses the same opaque sandbox', templateMarkup.includes( 'sandbox="allow-scripts"' )
+	&& !templateMarkup.includes( 'sandbox="allow-same-origin"' )
+	&& templateMarkup.includes( 'sandbox=""' ) === false );
 check( 'new-template UI asks for filename, name, shell slots and VPA', [ 'pd-create-filename', 'pd-create-name', 'pd-create-header', 'pd-create-footer', 'pd-create-vpa' ].every( function( id ) { return templateMarkup.includes( 'id="'+ id+ '"' ) } ) );
 check( 'the primary toolbar exposes one Add Section entry point', templateMarkup.includes( 'id="pd-add-section"' ) && templateMarkup.includes( 'id="pd-add-template"' ) === false );
+check( 'Add Section is the final workspace control instead of a template setting',
+	/<div id="pd-canvas"[^>]*><\/div>\s*<button[^>]*id="pd-add-section"[^>]*>[\s\S]*?<\/button>\s*<\/main>/.test( templateMarkup ) );
+check( 'Delete and Save stay together at the right of the real topbar', templateMarkup.indexOf( 'id="pd-top-actions"' ) < templateMarkup.indexOf( 'id="pd-delete-template"' )
+	&& templateMarkup.indexOf( 'id="pd-delete-template"' ) < templateMarkup.indexOf( 'id="pd-save"' )
+	&& scriptSource.includes( "appendChild( topActions )" ) === false );
+check( 'template VPA shares the labeled settings row and uses joined controls', templateMarkup.includes( 'class="pd-slot-setting pd-vpa-setting"' )
+	&& templateMarkup.includes( 'id="pd-page-motion"' ) );
+check( 'dialog close controls use the shared stroke SVG instead of text glyphs', ( templateMarkup.match( /class="pd-icon-button pd-[^"]+-close"[^>]*><svg/g ) || [] ).length === 4
+	&& templateMarkup.includes( '<path d="M18 6 6 18"/>' ) );
+check( 'Add Section lists presets only while reusable templates remain Area data inputs', composerSource.includes( 'const includes = []' )
+	&& areaComposerSource.includes( "propertyDefinition.kind === 'template'" )
+	&& areaComposerSource.includes( "include.kind !== 'Page frame'" ) );
+check( 'the removed Classic switch cannot reappear in the library UI', !templateMarkup.includes( 'pd-library-scope' )
+	&& !composerSource.includes( 'matchesScope' )
+	&& !composerSource.includes( 'selectScope' ) );
+check( 'dialogs share the #pd-app design scope instead of sitting beside it', /<div id="pd-app"[\s\S]*<dialog id="pd-composer"[\s\S]*<div id="pd-toast"[\s\S]*<\/div>\s*<\/div>\s*<script/.test( templateMarkup ) );
+
+console.log('\nNamed area composer');
+
+check( 'the Area editor loads after the established composer and exposes bounded pure helpers', templateMarkup.indexOf( 'composer.js' ) < templateMarkup.indexOf( 'area-composer.js' )
+	&& typeof Nino.templates.areaComposer.nextComponentId === 'function'
+	&& typeof Nino.templates.areaComposer.moveComponent === 'function' );
+const componentList = [ { id : 'title' }, { id : 'title-2' }, { id : 'image' } ];
+check( 'new component IDs remain stable and unique within an Area', Nino.templates.areaComposer.nextComponentId( componentList, 'title' ) === 'title-3'
+	&& Nino.templates.areaComposer.nextComponentId( componentList, 'button' ) === 'button' );
+const movedComponents = Nino.templates.areaComposer.moveComponent( componentList, 2, -1 );
+check( 'ordered components move without mutating the previous state', movedComponents[1].id === 'image'
+	&& componentList[1].id === 'title-2'
+	&& Nino.templates.areaComposer.moveComponent( componentList, 0, -1 ) === componentList );
+check( 'the editor keeps Area-level Design/Data views and independent collection creation', [ "[ 'design', 'data' ]", "'Content areas'", 'collection.area', 'image.component' ].every( function( marker ) { return areaComposerSource.includes( marker ) } ) );
+check( 'named Areas render as semantic tabs above one Design/Data workspace', [ "'pd-v3-area-workspace'", "setAttribute( 'role', 'tablist' )", "setAttribute( 'role', 'tabpanel' )" ].every( function( marker ) { return areaComposerSource.includes( marker ) } ) );
+check( 'the config pane gives steps, Area tabs, components, sources and bindings explicit UI structure', [
+	'pd-v3-panel-copy', 'pd-v3-area-index', 'pd-v3-area-tab-copy', 'pd-v3-component-copy',
+	'pd-v3-section-label', 'pd-v3-source-panel', 'pd-v3-binding-heading', 'pd-v3-generated-value',
+].every( function( marker ) { return areaComposerSource.includes( marker ) } ) );
+check( 'named-area rules use maintainable component specificity in the normal tool layer', /@layer nino\.tool \{\s*#pd-composer-settings/.test( styleSource )
+	&& styleSource.includes( '.pd-v3-area-tabs button' )
+	&& styleSource.includes( '.pd-v3-component-identity' )
+	&& !styleSource.includes( '#pd-app .pd-v3-' ) );
+check( 'Area navigation stays horizontal so the editor body keeps the full config-pane width', /\.pd-v3-area-workspace\s*\{[\s\S]*?grid-template-columns:\s*minmax\(0,\s*1fr\)/.test( styleSource )
+	&& /\.pd-v3-area-tabs\s*\{[\s\S]*?display:\s*flex;[\s\S]*?overflow-x:\s*auto;/.test( styleSource )
+	&& !styleSource.includes( 'grid-template-columns: 10.5rem minmax(0, 1fr)' ) );
+check( 'canvas cards and the inspector read named Areas instead of legacy section axes', [ 'isAreaSpec( spec )', 'areaPreview( spec, areaPreset )', "[ 'Areas'", "[ 'Collections'" ].every( function( marker ) { return sectionsSource.includes( marker ) } ) );
+const resourceSpec = { version : 3, preset : 'sample', pageId : 'home', id : 'services', areas : { copy : { components : [ { id : 'visual', type : 'image', bindings : { src : '/page-home/services/visual' } } ] } } };
+const resourcePreset = { areas : { copy : { label : 'Copy', source : 'single' } } };
+check( 'v3 image creation is limited to generated background and declared Area image slots',
+	Nino.templates.sectionsUI.areaImageRequest( resourceSpec, resourcePreset, '/page-home/services/background' ).slot === 'background'
+	&& Nino.templates.sectionsUI.areaImageRequest( resourceSpec, resourcePreset, '/page-home/services/visual' ).component === 'visual'
+	&& Nino.templates.sectionsUI.areaImageRequest( resourceSpec, resourcePreset, '/shared/existing-image' ) === null );
 
 console.log( '\n'+ checks+ ' checks, '+ failures+ ' failed' );
 process.exit( failures > 0 ? 1 : 0 );

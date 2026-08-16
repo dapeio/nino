@@ -14,6 +14,8 @@ declare(strict_types=1);
 
 namespace Nino\Templates {
 
+	require_once __DIR__. '/Areas.php';
+
 	/**
 	 *	Bootstrap and authenticated action dispatcher for /_templates.
 	 */
@@ -84,14 +86,14 @@ namespace Nino\Templates {
 	}
 
 	/**
-	 *	Manifest-backed entry points for the Section Composer. A preset is a
-	 *	curated configuration, not a second copy of every colour/layout
-	 *	combination. A project can add another directory with manifest.php;
-	 *	if section.tpl is present it is used as a code-authored custom preset.
+	 *	Manifest-backed entry points for the named-area Section Composer.
+	 *	Only version-3 manifests are exposed; their section templates remain
+	 *	code-authored while the UI edits normalized areas and bindings.
 	 */
 	class Library {
 
 		private const string DIRECTORY = __DIR__. '/library';
+		private const int MAX_PREVIEW_CSS_BYTES = 2_000_000;
 
 		public static function actions(): array {
 			return [
@@ -104,6 +106,8 @@ namespace Nino\Templates {
 		public static function apiList( array &$appData, array &$request ): void {
 			$presets = array_values( self::presets() );
 			foreach( $presets as &$preset ) {
+				$preset = self::publicPreset( $preset );
+				$preset['defaults'] = AreaComposer::defaults( $preset, 'preview', 'preview-'. $preset['key'] );
 				$preview = Composer::preview( [
 					'preset' => $preset['key'],
 					'pageId' => 'preview',
@@ -117,7 +121,8 @@ namespace Nino\Templates {
 			\Nino\Http::ok( $request, [
 				'presets'	=> $presets,
 				'modules'	=> array_values( Composer::modules() ),
-				'choices'	=> Composer::choices(),
+				'choices'	=> AreaComposer::choices(),
+				'previewCss' => self::_previewCss( $appData ),
 			] );
 		}
 
@@ -165,32 +170,14 @@ namespace Nino\Templates {
 				$manifest = include $path;
 				if( is_array( $manifest ) === false )
 					continue;
+				if( (int) ( $manifest['version'] ?? 0 ) !== 3 )
+					continue;
 
-				$defaults = is_array( $manifest['defaults'] ?? null ) ? $manifest['defaults'] : [];
-				$allow = [];
-				foreach( Composer::choices() as $name => $choices ) {
-					$declared = is_array( $manifest['allow'][$name] ?? null )
-						? $manifest['allow'][$name]
-						: ( isset( $defaults[$name] ) ? [ $defaults[$name] ] : $choices );
-					$allow[$name] = array_values( array_intersect( array_map( 'strval', $declared ), $choices ) );
-					if( $allow[$name] === [] ) {
-						$default = (string) ( $defaults[$name] ?? '' );
-						$allow[$name] = in_array( $default, $choices, true ) ? [ $default ] : $choices;
-					}
+				try {
+					$presets[$key] = AreaComposer::normalizePreset( $key, $manifest, self::DIRECTORY. '/'. $key );
+				} catch( \Throwable ) {
+					continue;
 				}
-
-				$presets[$key] = [
-					'key'			=> $key,
-					'name'			=> (string) ( $manifest['name'] ?? $key ),
-					'description'	=> (string) ( $manifest['description'] ?? '' ),
-					'category'		=> (string) ( $manifest['category'] ?? 'Other' ),
-					'tags'			=> array_values( array_map( 'strval', (array) ( $manifest['tags'] ?? [] ) ) ),
-					'version'		=> max( 1, (int) ( $manifest['version'] ?? 1 ) ),
-					'shell'			=> in_array( $manifest['shell'] ?? '', [ 'section', 'hero' ], true ) ? $manifest['shell'] : 'section',
-					'defaults'		=> $defaults,
-					'allow'			=> $allow,
-					'custom'		=> is_file( self::DIRECTORY. '/'. $key. '/section.tpl' ),
-				];
 			}
 
 			ksort( $presets );
@@ -210,6 +197,61 @@ namespace Nino\Templates {
 
 			$path = self::DIRECTORY. '/'. $key. '/section.tpl';
 			return is_file( $path ) ? (string) file_get_contents( $path ) : null;
+		}
+
+		public static function publicPreset( array $preset ): array {
+			unset( $preset['_layouts'] );
+			return $preset;
+		}
+
+		/**
+		 * Return the current project stylesheet for inert srcdoc previews.
+		 * Run the regular asset shortcode first so a missing or stale cache is
+		 * generated exactly as it is for the frontend. Embedding the result avoids
+		 * a browser request to a dot-directory, which some webserver configurations
+		 * answer with an HTML error page.
+		 */
+		private static function _previewCss( array &$appData ): string {
+
+			if( \Nino\Html::getAssets( $appData, '/.cache/style.css' ) !== [] )
+				\Nino\Modules\Assets::doShortcode( $appData, [ '/.cache/style.css' ] );
+
+			$path = \Nino\Filesystem::path( $appData, '/.cache/style.css' );
+
+			if( is_file( $path ) === false || is_readable( $path ) === false )
+				return '';
+
+			$bytes = filesize( $path );
+			if( $bytes === false || $bytes > self::MAX_PREVIEW_CSS_BYTES )
+				return '';
+
+			$css = file_get_contents( $path );
+
+			if( $css === false || strlen( $css ) > self::MAX_PREVIEW_CSS_BYTES )
+				return '';
+
+			return $css;
+		}
+
+		public static function normalizeModel( mixed $model ): array {
+
+			if( is_array( $model ) === false )
+				return [];
+
+			$result = [];
+			foreach( $model as $field => $definition ) {
+				if( preg_match( '/^[a-z][A-Za-z0-9]*$/', (string) $field ) !== 1 || is_array( $definition ) === false )
+					throw new \InvalidArgumentException( 'area model has an invalid field name' );
+				$type = (string) ( $definition['type'] ?? 'string' );
+				if( in_array( $type, [ 'string', 'integer', 'double', 'boolean', 'image', 'element' ], true ) === false )
+					throw new \InvalidArgumentException( 'area model field '. $field. ' has an unsupported type' );
+				$result[(string) $field] = $definition;
+				$result[(string) $field]['type'] = $type;
+				$result[(string) $field]['label'] = trim( (string) ( $definition['label'] ?? '' ) )
+					?: ucwords( preg_replace( '/(?<!^)[A-Z]/', ' $0', (string) $field ) );
+			}
+
+			return $result;
 		}
 	}
 
@@ -476,6 +518,8 @@ namespace Nino\Templates {
 
 			if( $preset === null )
 				throw new \InvalidArgumentException( 'unknown section preset' );
+			if( (int) ( $preset['version'] ?? 0 ) === 3 )
+				return AreaComposer::compose( $input, $preset );
 
 			$raw = array_merge( $preset['defaults'], $input );
 			$pageId = self::_slug( (string) ( $raw['pageId'] ?? '' ), 'page id' );
@@ -566,6 +610,15 @@ namespace Nino\Templates {
 
 			$source = preg_replace( '/[\t ]*<!--\s*nino:section\s+\{[^\r\n]*\}\s*-->[\t ]*(?:\r?\n)?/', '', $source ) ?? $source;
 			$source = preg_replace( '#<script\b[^>]*>.*?</script\s*>#is', '', $source ) ?? $source;
+			$source = preg_replace( '#<script\b[^>]*>.*$#is', '', $source ) ?? $source;
+			$source = preg_replace( '#</?script\b[^>]*>#is', '', $source ) ?? $source;
+			$source = preg_replace( '#\s+on[a-z0-9:_-]+\s*=\s*(?:"[^"]*"|\'[^\']*\'|[^\s>]+)#i', '', $source ) ?? $source;
+			$source = preg_replace_callback(
+				'#\s+(href|src|action|formaction|xlink:href)\s*=\s*(["\'])\s*javascript:[^"\']*\2#i',
+				fn( array $match ): string => ' '. $match[1]. '="#"',
+				$source
+			) ?? $source;
+			$source = preg_replace( '#\s+(href|src|action|formaction|xlink:href)\s*=\s*javascript:[^\s>]*#i', ' $1="#"', $source ) ?? $source;
 			$source = preg_replace( '#<\?.*?\?>#s', '', $source ) ?? $source;
 			// Preview frames deliberately run without Nino.ui.js. Remove VPA's
 			// hidden initial state (and its variants) instead of leaving motion-
@@ -585,7 +638,14 @@ namespace Nino\Templates {
 			$source = preg_replace_callback( '#\[elements\s+([^\]]*)\](.*?)\[/elements\]#is', function( array $match ): string {
 				$limit = [];
 				preg_match( '/\blimit="(\d+)"/i', $match[1], $limit );
-				$count = min( 4, max( 1, (int) ( $limit[1] ?? 3 ) ) );
+				$columns = match( true ) {
+					preg_match( '/(?:^|\s)ui-grid-[a-z]+-25(?:\s|["\'])/i', $match[2] ) === 1 => 4,
+					preg_match( '/(?:^|\s)ui-grid-[a-z]+-33(?:\s|["\'])/i', $match[2] ) === 1 => 3,
+					preg_match( '/(?:^|\s)ui-grid-[a-z]+-50(?:\s|["\'])/i', $match[2] ) === 1 => 2,
+					preg_match( '/(?:^|\s)ui-grid-[a-z]+-100(?:\s|["\'])/i', $match[2] ) === 1 => 1,
+					default => 3,
+				};
+				$count = min( $columns, max( 1, (int) ( $limit[1] ?? $columns ) ) );
 				$out = '';
 				for( $index = 0; $index < $count; $index++ ) {
 					$item = $match[2];
@@ -2078,10 +2138,12 @@ namespace Nino\Templates {
 	 */
 	class Content {
 
-		private const string KEY_PATTERN = '#^/page-[a-z][a-z0-9-]*/[a-z][a-z0-9-]*/[a-z][a-z0-9-]*$#';
+		private const string KEY_PATTERN = '#^/[A-Za-z0-9][A-Za-z0-9_./-]*$#';
+		private const string GENERATED_KEY_PATTERN = '#^/page-[a-z][a-z0-9-]*/[a-z][a-z0-9-]*/[a-z][a-z0-9-]*$#';
 
 		public static function actions(): array {
 			return [
+				'content/keys'		=> [ self::class, 'apiKeys' ],
 				'content/fields'		=> [ self::class, 'apiFields' ],
 				'content/save'			=> [ self::class, 'apiSave' ],
 				'content/types'			=> [ self::class, 'apiTypes' ],
@@ -2089,6 +2151,26 @@ namespace Nino\Templates {
 				'content/images'		=> [ self::class, 'apiImages' ],
 				'content/image-create'	=> [ self::class, 'apiCreateImage' ],
 			];
+		}
+
+		public static function apiKeys( array &$appData, array &$request ): void {
+
+			$native = \Nino\Locales::getNativeLocale( $appData );
+			$entries = [];
+			foreach( \Nino\Text::entries( $appData, false ) as $entry ) {
+				$key = (string) ( $entry['key'] ?? '' );
+				if( self::_validKey( $key ) === false )
+					continue;
+				$entries[] = [
+					'key' => $key,
+					'global' => ( $entry['global'] ?? false ) === true,
+					'value' => (string) ( ( $entry['global'] ?? false ) === true
+						? ( $entry['values']['*'] ?? '' )
+						: ( $entry['values'][$native] ?? '' ) ),
+				];
+			}
+
+			\Nino\Http::ok( $request, [ 'nativeLocale' => $native, 'entries' => $entries ] );
 		}
 
 		public static function apiFields( array &$appData, array &$request ): void {
@@ -2103,8 +2185,8 @@ namespace Nino\Templates {
 			$fields = [];
 
 			foreach( $keys as $key ) {
-				if( preg_match( self::KEY_PATTERN, $key ) !== 1 ) {
-					\Nino\Http::fail( $request, 400, 'invalid page text key' );
+				if( self::_validKey( $key ) === false ) {
+					\Nino\Http::fail( $request, 400, 'invalid textfill key' );
 					return;
 				}
 
@@ -2141,12 +2223,20 @@ namespace Nino\Templates {
 				$key = (string) ( $item['key'] ?? '' );
 				$value = (string) ( $item['value'] ?? '' );
 
-				if( preg_match( self::KEY_PATTERN, $key ) !== 1 ) {
-					\Nino\Http::fail( $request, 400, 'invalid page text key' );
+				if( self::_validKey( $key ) === false ) {
+					\Nino\Http::fail( $request, 400, 'invalid textfill key' );
 					return;
 				}
 
 				$entry = \Nino\Text::entry( $appData, $key );
+				if( $entry === null && ( $item['create'] ?? false ) !== true ) {
+					\Nino\Http::fail( $request, 400, 'an existing textfill binding no longer exists' );
+					return;
+				}
+				if( $entry === null && preg_match( self::GENERATED_KEY_PATTERN, $key ) !== 1 ) {
+					\Nino\Http::fail( $request, 400, 'new textfills must use the generated page/section prefix' );
+					return;
+				}
 				if( $entry === null )
 					$missing['[['. $key. ']]'] = '';
 
@@ -2186,18 +2276,22 @@ namespace Nino\Templates {
 		public static function apiCreateType( array &$appData, array &$request ): void {
 
 			$data = Templates::postData();
+			$preset = Library::preset( (string) ( $data['preset'] ?? '' ) );
+			$area = is_array( $preset )
+				? AreaComposer::collectionDefinition( $preset, (string) ( $data['area'] ?? '' ) )
+				: null;
 			$module = Composer::modules()[(string) ( $data['module'] ?? '' )] ?? null;
 			$uri = (string) ( $data['uri'] ?? '' );
 
-			if( $module === null || $module['source'] !== 'elements' || preg_match( '/^[a-z][a-z0-9_-]*$/', $uri ) !== 1 ) {
-				\Nino\Http::fail( $request, 400, 'invalid module or element type' );
+			if( ( $area === null && ( $module['source'] ?? '' ) !== 'elements' ) || preg_match( '/^[a-z][a-z0-9_-]*$/', $uri ) !== 1 ) {
+				\Nino\Http::fail( $request, 400, 'invalid preset area or element type' );
 				return;
 			}
 
 			$_POST['data'] = json_encode( [
 				'uri' => $uri,
-				'title' => trim( (string) ( $data['title'] ?? '' ) ) ?: ucwords( str_replace( '-', ' ', $uri ) ),
-				'model' => $module['model'],
+				'title' => trim( (string) ( $data['title'] ?? '' ) ) ?: ( $area['typeTitle'] ?? ucwords( str_replace( '-', ' ', $uri ) ) ),
+				'model' => $area['model'] ?? $module['model'],
 			] );
 
 			\Nino\Admin\ElementTypes::apiCreate( $appData, $request );
@@ -2206,22 +2300,44 @@ namespace Nino\Templates {
 		public static function apiCreateImage( array &$appData, array &$request ): void {
 
 			$data = Templates::postData();
+			$preset = Library::preset( (string) ( $data['preset'] ?? '' ) );
 			$uri = (string) ( $data['uri'] ?? '' );
-			$suffix = str_ends_with( $uri, '/background' ) ? 'background' : ( str_ends_with( $uri, '/image' ) ? 'image' : '' );
+			$slot = (string) ( $data['slot'] ?? '' );
+			$component = (string) ( $data['component'] ?? '' );
+			$isAreaPreset = is_array( $preset ) && (int) ( $preset['version'] ?? 0 ) === 3;
+			$legacySuffix = str_ends_with( $uri, '/background' ) ? 'background' : ( str_ends_with( $uri, '/image' ) ? 'image' : '' );
+			$definition = $isAreaPreset && $slot !== 'background'
+				? AreaComposer::imageDefinition(
+					$preset,
+					(string) ( $data['area'] ?? '' ),
+					$component,
+					(string) ( $data['property'] ?? '' )
+				)
+				: ( ( $isAreaPreset && $slot === 'background' ) || $legacySuffix === 'background'
+				? [ 'label' => 'Background image', 'width' => 1920, 'height' => 1080 ]
+				: ( $legacySuffix === 'image' ? [ 'label' => 'Section image', 'width' => 1200, 'height' => 900 ] : null ) );
+			$expectedSuffix = $isAreaPreset ? ( $slot === 'background' ? 'background' : $component ) : $legacySuffix;
 
-			if( preg_match( '#^/page-[a-z][a-z0-9-]*/[a-z][a-z0-9-]*/(background|image)$#', $uri ) !== 1 || $suffix === '' ) {
+			if( $definition === null || preg_match( '#^/page-[a-z][a-z0-9-]*/[a-z][a-z0-9-]*/[a-z][a-z0-9-]*$#', $uri ) !== 1 || str_ends_with( $uri, '/'. $expectedSuffix ) === false ) {
 				\Nino\Http::fail( $request, 400, 'invalid page image slot' );
 				return;
 			}
 
 			$_POST['data'] = json_encode( [
 				'uri' => $uri,
-				'label' => trim( (string) ( $data['label'] ?? '' ) ) ?: ucwords( str_replace( [ '/', '-' ], ' ', trim( $uri, '/' ) ) ),
-				'width' => $suffix === 'background' ? 1920 : 1200,
-				'height' => $suffix === 'background' ? 1080 : 900,
+				'label' => trim( (string) ( $data['label'] ?? '' ) ) ?: $definition['label'],
+				'width' => $definition['width'],
+				'height' => $definition['height'],
 			] );
 
 			\Nino\Admin\Images::apiCreate( $appData, $request );
+		}
+
+		private static function _validKey( string $key ): bool {
+			return strlen( $key ) <= 240
+				&& preg_match( self::KEY_PATTERN, $key ) === 1
+				&& str_contains( $key, '..' ) === false
+				&& str_contains( $key, '//' ) === false;
 		}
 	}
 }

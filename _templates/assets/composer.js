@@ -7,7 +7,10 @@
 	'use strict';
 
 	const pd = Nino.templates;
-	const PREVIEW_SANDBOX = 'allow-same-origin';
+	// Scripts are still removed and denied by CSP. allow-scripts only prevents
+	// browser extensions from producing one sandbox warning per srcdoc frame;
+	// omitting allow-same-origin keeps every preview in an opaque origin.
+	const PREVIEW_SANDBOX = 'allow-scripts';
 
 	function element( tag, className, text ) {
 		const node = dc.createElement( tag );
@@ -16,6 +19,10 @@
 		if( text !== undefined )
 			node.textContent = text;
 		return node;
+	}
+
+	function clone( value ) {
+		return JSON.parse( JSON.stringify( value ) );
 	}
 
 	function humanize( value ) {
@@ -39,6 +46,10 @@
 		return categoryMatch && ( needle === '' || haystack.includes( needle ) );
 	}
 
+	function isAreaPreset( preset ) {
+		return Number( preset && preset.version ) === 3;
+	}
+
 	function reusableIncludes() {
 		return pd._includes.filter( function( include ) { return include.kind !== 'Page frame' } );
 	}
@@ -58,6 +69,10 @@
 		return pd._library.presets.find( function( preset ) { return preset.key === pd.composer._presetKey } ) || null;
 	}
 
+	function presetKind( preset ) {
+		return Object.keys( preset && preset.areas || {} ).length+ ' areas';
+	}
+
 	function selectedInclude() {
 		return reusableIncludes().find( function( include ) { return include.path === pd.composer._includePath } ) || null;
 	}
@@ -66,14 +81,28 @@
 		return String( value || '' ).replace( /&/g, '&amp;' ).replace( /"/g, '&quot;' ).replace( /</g, '&lt;' );
 	}
 
+	function escapeStyleText( value ) {
+		return String( value || '' ).replace( /<\/style/gi, '<\\/style' );
+	}
+
+	function sanitizePreviewMarkup( markup ) {
+		return String( markup || '' )
+			.replace( /<script\b[^>]*>[\s\S]*?<\/script\s*>/gi, '' )
+			.replace( /<script\b[^>]*>[\s\S]*$/gi, '' )
+			.replace( /<\/?script\b[^>]*>/gi, '' )
+			.replace( /\s+on[a-z0-9:_-]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '' )
+			.replace( /\s+(href|src|action|formaction|xlink:href)\s*=\s*(["'])\s*javascript:[\s\S]*?\2/gi, ' $1="#"' )
+			.replace( /\s+(href|src|action|formaction|xlink:href)\s*=\s*javascript:[^\s>]*/gi, ' $1="#"' );
+	}
+
 	function previewDocument( markup ) {
-		const stylesheet = escapeAttribute( pd.publicUrl( '/.cache/style.css' ) );
 		const origin = wn.location && /^https?:$/.test( wn.location.protocol ) ? wn.location.origin : '';
 		const projectSource = origin ? ' '+ origin : '';
-		const policy = "default-src 'none'; style-src 'unsafe-inline'"+ projectSource+ '; img-src data:'+ projectSource+ '; font-src data:'+ projectSource+ '; media-src'+ projectSource+ "; script-src 'none'; frame-src 'none'; connect-src 'none'; form-action 'none'; base-uri 'none'";
+		const policy = "default-src 'none'; style-src 'unsafe-inline'; img-src data:"+ projectSource+ '; font-src data:'+ projectSource+ '; media-src'+ projectSource+ "; script-src 'none'; frame-src 'none'; connect-src 'none'; form-action 'none'; base-uri 'none'";
+		const projectCss = escapeStyleText( pd._library && pd._library.previewCss || '' );
 		return '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta http-equiv="Content-Security-Policy" content="'+ escapeAttribute( policy )+ '">'
-			+ '<link rel="stylesheet" href="'+ stylesheet+ '"><style>html,body{min-height:100%;margin:0}body{overflow:auto}a,button,input,textarea,select,form{pointer-events:none!important}</style>'
-			+ '</head><body>'+ String( markup || '' )+ '</body></html>';
+			+ '<style>'+ projectCss+ '\nhtml,body{min-height:100%;margin:0}body{overflow:auto}a,button,input,textarea,select,form{pointer-events:none!important}</style>'
+			+ '</head><body>'+ sanitizePreviewMarkup( markup )+ '</body></html>';
 	}
 
 	function fitPreviewFrame( frame ) {
@@ -176,6 +205,7 @@
 	Object.assign( pd, { composer : {
 
 		matchesPreset : matchesPreset,
+		isAreaPreset : isAreaPreset,
 		matchesInclude : matchesInclude,
 		previewDocument : previewDocument,
 		fieldSuffixes : fieldSuffixes,
@@ -198,10 +228,13 @@
 		_nativeLocale : '',
 		_createElementType : null,
 		_createImages : null,
+		_textEntries : [],
+		_textValues : {},
+		_touched : new Set(),
 
 		libraryReady : function() {
 			if( pd.composer._presetKey === null && pd._library.presets.length )
-				pd.composer._presetKey = pd._library.presets.some( function( preset ) { return preset.key === 'blank' } ) ? 'blank' : pd._library.presets[0].key;
+				pd.composer._presetKey = ( pd._library.presets.find( isAreaPreset ) || pd._library.presets[0] ).key;
 			const dialog = dc.getElementById('pd-composer');
 			if( dialog && dialog.open && pd.composer._step === 'library' ) {
 				pd.composer.renderCategories();
@@ -228,18 +261,22 @@
 			pd.composer._nativeLocale = '';
 			pd.composer._createElementType = null;
 			pd.composer._createImages = null;
+			pd.composer._textEntries = [];
+			pd.composer._textValues = {};
+			pd.composer._touched = new Set();
 
-			const fallback = pd._library.presets.some( function( preset ) { return preset.key === 'blank' } ) ? 'blank' : pd._library.presets[0].key;
+			const fallback = ( pd._library.presets.find( isAreaPreset ) || pd._library.presets[0] ).key;
 			const requested = context.spec && context.spec.preset ? context.spec.preset : fallback;
 			pd.composer._presetKey = pd._library.presets.some( function( preset ) { return preset.key === requested } ) ? requested : fallback;
 			const preset = selectedPreset();
 			const suggestedId = pd.model.nextId( pd._current.segments, preset.key );
-			pd.composer._draft = Object.assign( {}, preset.defaults, context.spec || {}, {
-				preset : preset.key,
-				pageId : pd._current.pageId,
-				pageMotion : pd._pageMotion,
-				id : context.spec && context.spec.id ? context.spec.id : suggestedId,
-			} );
+			pd.composer._draft = clone( context.spec || preset.defaults );
+			pd.composer._draft.preset = preset.key;
+			pd.composer._draft.pageId = pd._current.pageId;
+			pd.composer._draft.pageMotion = pd._pageMotion;
+			pd.composer._draft.id = context.spec && context.spec.id ? context.spec.id : suggestedId;
+			if( !context.spec )
+				pd.composer.resetGeneratedBindings();
 			pd.composer._autoElementType = pd._current.pageId+ '-'+ pd.composer._draft.id;
 			if( !pd.composer._draft.elementType && moduleFor( pd.composer._draft.content ).source === 'elements' )
 				pd.composer._draft.elementType = pd.composer._autoElementType;
@@ -253,7 +290,10 @@
 			wn.requestAnimationFrame( fitPreviewFrames );
 
 			const activeContext = context;
-			Promise.all( [ pd.sectionsUI.ensureTypes(), pd.sectionsUI.ensureImages() ] ).then( function() {
+			Promise.all( [ pd.sectionsUI.ensureTypes(), pd.sectionsUI.ensureImages(), pd.api( 'content/keys', {} ) ] ).then( function( responses ) {
+				pd.composer._textEntries = responses[2].entries || [];
+				if( pd.areaComposer )
+					pd.areaComposer.normalizeExistingSources();
 				if( pd.composer._context === activeContext && pd.composer._step === 'config' )
 					pd.composer.renderSettings();
 			} ).catch( function() {} );
@@ -273,12 +313,12 @@
 			const keep = pd.composer._draft || {};
 			pd.composer._presetKey = key;
 			const suggestedId = pd.model.nextId( pd._current.segments, key );
-			pd.composer._draft = Object.assign( {}, preset.defaults, {
-				preset : key,
-				pageId : pd._current.pageId,
-				pageMotion : pd._pageMotion,
-				id : pd.composer._idTouched ? keep.id : suggestedId,
-			} );
+			pd.composer._draft = clone( preset.defaults );
+			pd.composer._draft.preset = key;
+			pd.composer._draft.pageId = pd._current.pageId;
+			pd.composer._draft.pageMotion = pd._pageMotion;
+			pd.composer._draft.id = pd.composer._idTouched ? keep.id : suggestedId;
+			pd.composer.resetGeneratedBindings();
 			pd.composer._autoElementType = pd._current.pageId+ '-'+ pd.composer._draft.id;
 			if( moduleFor( pd.composer._draft.content ).source === 'elements' )
 				pd.composer._draft.elementType = pd.composer._autoElementType;
@@ -288,6 +328,8 @@
 			pd.composer._contentLoadedSignature = '';
 			pd.composer._createElementType = null;
 			pd.composer._createImages = null;
+			pd.composer._textValues = {};
+			pd.composer._touched = new Set();
 			pd.composer.renderLibrary();
 		},
 
@@ -301,11 +343,6 @@
 		},
 
 		continueFromLibrary : function() {
-			const include = selectedInclude();
-			if( include ) {
-				pd.insertInclude( include, { mode : 'insert', afterId : pd.composer._context.afterId || null }, 'pd-composer' );
-				return;
-			}
 			pd.composer.setStep('config');
 		},
 
@@ -362,14 +399,15 @@
 		renderCategories : function() {
 			const wrap = dc.getElementById('pd-library-categories');
 			wrap.innerHTML = '';
-			const includes = reusableIncludes();
-			const categories = [ 'All' ].concat( Array.from( new Set( pd._library.presets.map( function( preset ) { return preset.category } ) ) ).sort() );
+			const includes = [];
+			const scopedPresets = pd._library.presets.filter( isAreaPreset );
+			const categories = [ 'All' ].concat( Array.from( new Set( scopedPresets.map( function( preset ) { return preset.category } ) ) ).sort() );
 			if( includes.length && categories.includes('Templates') === false )
 				categories.push('Templates');
 			categories.forEach( function( category ) {
 				const count = category === 'All'
-					? pd._library.presets.length + includes.length
-					: ( category === 'Templates' ? includes.length : pd._library.presets.filter( function( preset ) { return preset.category === category } ).length );
+					? scopedPresets.length + includes.length
+					: ( category === 'Templates' ? includes.length : scopedPresets.filter( function( preset ) { return preset.category === category } ).length );
 				const button = element( 'button', 'pd-chip'+ ( pd.composer._category === category ? ' is-active' : '' ) );
 				button.type = 'button';
 				button.append( element( 'span', '', category ), element( 'small', '', String( count ) ) );
@@ -387,8 +425,8 @@
 			const search = dc.getElementById('pd-library-search');
 			if( !wrap || !search )
 				return;
-			const presets = pd._library.presets.filter( function( preset ) { return matchesPreset( preset, search.value, pd.composer._category ) } );
-			const includes = reusableIncludes().filter( function( include ) { return matchesInclude( include, search.value, pd.composer._category ) } );
+			const presets = pd._library.presets.filter( function( preset ) { return isAreaPreset( preset ) && matchesPreset( preset, search.value, pd.composer._category ) } );
+			const includes = [];
 			wrap.innerHTML = '';
 			if( presets.length === 0 && includes.length === 0 ) {
 				const empty = element( 'div', 'pd-library-empty' );
@@ -402,7 +440,7 @@
 				const card = element( 'article', 'pd-preset'+ ( active ? ' is-active' : '' ) );
 				const frame = element( 'div', 'pd-real-preview' );
 				frame.dataset.viewportWidth = '1200';
-				frame.dataset.viewportHeight = preset.shell === 'hero' ? '760' : '680';
+				frame.dataset.viewportHeight = String( preset.previewHeight || ( preset.shell === 'hero' ? 760 : 680 ) );
 				const iframe = element('iframe');
 				iframe.loading = 'lazy';
 				iframe.tabIndex = -1;
@@ -413,10 +451,11 @@
 				const copy = element( 'div', 'pd-preset-copy' );
 				const meta = element( 'div', 'pd-preset-meta' );
 				meta.appendChild( element( 'span', 'pd-preset-category', preset.category ) );
-				const facts = [ preset.defaults.content, preset.defaults.layout ].filter( function( fact ) { return fact && ![ 'none', 'auto' ].includes( fact ) } );
-				if( facts.length < 2 && ( preset.tags || [] ).length )
-					facts.push( preset.tags[0] );
-				facts.slice( 0, 2 ).forEach( function( fact ) { meta.appendChild( element( 'span', '', humanize( fact ) ) ) } );
+				const facts = [ presetKind( preset ), preset.layouts && preset.layouts[preset.recommend.layout] ? preset.layouts[preset.recommend.layout].label : '' ];
+				const visibleFacts = facts.filter( function( fact ) { return fact && ![ 'none', 'auto' ].includes( fact ) } );
+				if( visibleFacts.length < 2 && ( preset.tags || [] ).length )
+					visibleFacts.push( preset.tags[0] );
+				visibleFacts.slice( 0, 2 ).forEach( function( fact ) { meta.appendChild( element( 'span', '', humanize( fact ) ) ); } );
 				copy.append( meta, element( 'strong', '', preset.name ), element( 'p', '', preset.description ) );
 				card.appendChild( copy );
 
@@ -474,7 +513,7 @@
 				return;
 			wrap.innerHTML = '';
 			const copy = element('div');
-			copy.append( element( 'span', 'pd-eyebrow', preset.category+ ' section' ), element( 'strong', '', preset.name ), element( 'p', '', preset.description ) );
+			copy.append( element( 'span', 'pd-eyebrow', preset.category+ ' · '+ presetKind( preset ) ), element( 'strong', '', preset.name ), element( 'p', '', preset.description ) );
 			const change = element( 'button', '', 'Change layout' );
 			change.type = 'button';
 			change.addEventListener( 'click', function() { pd.composer.setStep('library') } );
@@ -631,6 +670,22 @@
 			wrap.appendChild( panel );
 		},
 
+		resetGeneratedBindings : function() {},
+
+		captureValues : function() {
+			pd.composer.captureNativeInputs();
+			const wrap = dc.getElementById('pd-composer-settings');
+			if( !wrap )
+				return;
+			wrap.querySelectorAll('[data-text-key]').forEach( function( input ) {
+				pd.composer._textValues[input.dataset.textKey] = input.value;
+			} );
+		},
+
+		loadTextValues : function() {
+			return pd.composer.loadNativeContent();
+		},
+
 		captureNativeInputs : function() {
 			const wrap = dc.getElementById('pd-composer-settings');
 			if( !wrap )
@@ -675,6 +730,8 @@
 
 		loadNativeContent : function() {
 			const draft = pd.composer._draft;
+			if( Number( selectedPreset() && selectedPreset().version ) === 3 && pd.areaComposer )
+				return pd.composer.loadTextValues();
 			if( !draft || /^[a-z][a-z0-9-]*$/.test( draft.id ) === false )
 				return Promise.resolve();
 			pd.composer.captureNativeInputs();
@@ -793,7 +850,8 @@
 					const entry = pd.composer._contentEntries[key];
 					return pd.composer._context.mode !== 'replace' || pd.composer._contentTouched.has( key ) || !entry || entry.exists === false;
 				} ).map( function( key ) {
-					return { key : key, value : pd.composer._contentValues[key] || '' };
+					const entry = pd.composer._contentEntries[key];
+					return { key : key, value : pd.composer._contentValues[key] || '', create : !entry || entry.exists === false };
 				} );
 				if( items.length === 0 )
 					return result;

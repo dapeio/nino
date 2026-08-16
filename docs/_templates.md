@@ -17,10 +17,10 @@ Use `/_templates` to:
 - open existing `templates/page-*.tpl` files;
 - create a new `page-*.tpl` with its real filename, display name, header, footer and VPA default;
 - choose a complete section by appearance from a searchable, tagged visual library;
-- insert a standalone `[template /templates/<name>]` section directly through **Add section**, then move, replace or duplicate it;
+- insert reusable `[template]` shortcodes as ordered components where a preset permits them;
 - select the page’s header and footer from compatible non-page `.tpl` files, or set either slot to **None**;
 - assign a stable section ID;
-- configure surface, background, heading, content module, action, layout and viewport motion;
+- configure the Section frame and each preset-defined Area's ordered components, Style and Data bindings;
 - reorder, duplicate or remove every content item while the header and footer remain fixed outside the canvas;
 - fill the generated textfills in the native locale;
 - select an existing Elements collection or create the module’s recommended Element Type;
@@ -45,9 +45,9 @@ Use HTTPS, keep the technical password private and work from a recoverable proje
 
 1. Select a page template in the left rail or create one with **New page template**. The dialog asks for the complete filename, display name, header, footer and VPA default.
 2. Choose **Add section**.
-3. In **Choose**, search or filter the fullscreen gallery and select a preset from its real-markup preview. Reusable non-page `.tpl` files appear in the **Templates** category and are inserted without an unnecessary configuration step.
-4. Continue to **Configure & fill**, give the section a meaningful ID such as `main-hero` or `services-overview`, and adjust only the settings that matter. Less common spacing and border controls stay under **Advanced**.
-5. Fill the generated **Native content** in the same step. For a repeatable module, choose an Elements collection; if it does not exist, keep automatic schema creation enabled.
+3. In **Choose**, search or filter the fullscreen gallery and select a named-area preset from its real-markup preview. The library intentionally contains only the current version-3 contract. Reusable `.tpl` files do not appear as pseudo-sections; a supporting preset can expose them as a **Template** component inside one of its Areas.
+4. Continue to **Configure & fill**, give the section a meaningful ID such as `main-hero` or `services-overview`, and set its Layout, dimensions, spacing and background in **Section**.
+5. Open each named Area. **Design** controls its Style and ordered components; **Data** creates or reuses Text/Image/Template bindings and, for repeatable Areas, an Elements collection with explicit field mappings.
 6. Compare the live preview, insert the section and create any recommended text keys, Element Type or image-slot definitions in the same operation.
 7. Open image slots or individual Elements entries in `/_admin` when needed.
 8. Reorder the HTML and template-section cards and save the page template.
@@ -57,26 +57,23 @@ Native quick fill creates new keys in the project’s native locale and changes 
 
 ## Page and section settings
 
-**Name**, **Header**, **Footer**, **VPA** and **Delete** live in Template Settings. The header/footer selects show real `.tpl` filenames, list non-page templates known to the project and also offer **None**. The selected value is still written as an ordinary `[template /templates/<name>]` shortcode; the controls only prevent shell includes from being mistaken for movable page content. **Delete** removes exactly the loaded file revision after explicit confirmation; recovery requires version control or another external backup.
+**Name**, **Header**, **Footer** and **VPA** share one labeled Template Settings row. **Delete** and **Save template** stay together at the right of the topbar; **Add section** remains in the document toolbar even after content has been inserted. The header/footer selects show real `.tpl` filenames, list non-page templates known to the project and also offer **None**. The selected value is still written as an ordinary `[template /templates/<name>]` shortcode; the controls only prevent shell includes from being mistaken for movable page content. **Delete** removes exactly the loaded file revision after explicit confirmation; recovery requires version control or another external backup.
 
 **VPA** at template level supplies the default for sections whose motion is set to **Page**. Changing it recomposes managed sections, updates their `js-vpa` class and remains persisted even while a template is still empty. **On** or **Off** on an individual section overrides that default.
 
-The composer groups settings by intent:
+The composer groups the current version-3 settings by intent:
 
 | Group | Examples |
 |---|---|
-| Identity | section ID and resulting `/page-<page>/<section>/…` prefix |
-| Background & heading | surface, image/parallax background, heading depth, alignment |
-| Content module | text, media split, articles, lists, sliders, tabs, testimonials, team, stats, features, pricing, tables, badges, forms, gallery, video, notices |
-| Content source | native textfill or Elements collection |
-| Action | none, link, primary button, or primary plus outline button |
-| Advanced | padding, margin and border |
+| Section | ID, Layout, height, width, spacing, background and optional background-image settings |
+| Area → Design | visual Area Style plus an ordered stack of allowed components |
+| Area → Data | native Text/Image/Template bindings or an Elements collection with explicit field mappings |
 
-Curated presets expose only compatible choices. **Blank Section** exposes the full composer when a project needs a combination not represented by a focused preset.
+Each manifest decides which Areas, components, Styles and Layouts are compatible. HTML+ remains the explicit route for arbitrary source changes.
 
 ## Source safety and the HTML+ escape hatch
 
-On load, the backend scans top-level `<section>` elements without serializing the surrounding source. A standalone `[template /templates/<name>]` line outside a section becomes a first-class template-section card; the shortcode remains part of its parent when it occurs inside a section. Marked header/footer shortcodes become fixed settings slots instead. Other source is returned as locked raw segments. On save:
+On load, the backend scans top-level `<section>` elements without serializing the surrounding source. An existing standalone `[template /templates/<name>]` line outside a section remains a first-class canvas card; new reusable includes are chosen through a preset's Template component. Marked header/footer shortcodes become fixed settings slots instead. Other source is returned as locked raw segments. On save:
 
 - every raw segment must still be byte-identical;
 - every editable HTML segment must contain exactly one complete top-level section;
@@ -119,29 +116,235 @@ This metadata lets the composer reopen its settings. It is inert HTML and does n
 System presets live under:
 
 ```text
-_templates/library/<preset>/manifest.php
+_templates/library/<preset-key>/
+├── manifest.php
+└── one or more .tpl layout files
 ```
 
-A manifest supplies name, description, category, tags, version, defaults and allowed setting values. Omitted axes are locked to their default, which keeps a curated preset focused. The `blank` preset explicitly allows the full composer.
+Preset keys and directory names match `^[a-z0-9][a-z0-9-]*$`. Invalid
+manifests are not exposed. Generated HTML+ is copied into the page template;
+the public request never reads the preset library.
 
-An optional `section.tpl` beside the manifest creates a code-authored preset. It may use these tokens:
+### Named-area contract (manifest version 3)
 
-```text
-{{section:id}}
-{{section:classes}}
-{{section:meta}}
-{{content:prefix}}
-{{elements:type}}
-{{text:<suffix>}}
-{{image:<suffix>}}
+Version 3 describes one Section frame and one or more semantic Areas. It does
+not use a universal Intro/Content/Outro structure. A Layout owns the actual
+composition and contains every declared `[[area:<key>]]` token exactly once.
+The Area editor then controls a finite, ordered component list and its data
+bindings.
+
+Use **Layout** only for genuinely different markup. Put two-, three- or
+four-column choices, alignment, density and other class-only differences into
+an Area **Style**. This keeps Structure and Style independent.
+
+The shared Section frame offers:
+
+| Setting | Values |
+|---|---|
+| Height | Auto, Off, 50, 75, 90 or 100 percent screen cover |
+| Content position | Auto, top, middle or bottom |
+| Width | Auto, default, narrow or wide |
+| Margin / padding | Auto, none, small, default or big |
+| Background | Auto, default, alt, primary, dark, black, cover or parallax |
+| Overlay | Auto, none, soft, medium or strong |
+| Image focus | Auto or positions 1–9 |
+
+Semantics such as an additional ARIA label, a different heading level or
+project-specific classes remain deliberate HTML+ work. A preset may recommend
+frame values globally and override them for a particular Layout. The user can
+still keep `auto`, so a future recommendation is adopted when the section is
+recomposed.
+
+Every Area defines:
+
+- a stable semantic key and human label;
+- `source: single` or `source: elements`;
+- allowed component types and a maximum component count;
+- one or more safe Styles;
+- a recommended Style and ordered component list;
+- a safe container or collection-item tag/class;
+- optional per-component tag, class, style and image-size overrides;
+- an Element model and shortcode defaults for a repeatable Area.
+
+The fixed component catalog is `title`, `subtitle`, `description`,
+`text`, `image`, `button`, `price`, `number` and `template`.
+Components can be added, reordered, styled or removed, but the Builder never
+accepts arbitrary markup through the visual editor.
+
+**Design** controls Area Style and component order. **Data** binds each
+component property:
+
+- a single Area creates a generated key such as
+  `/page-home/services/title` or connects an existing text/image key;
+- an Elements Area creates a new collection or selects an existing one and maps
+  each component property to a compatible model field;
+- a Template component selects an existing non-page `.tpl` and writes a
+  normal `[template /templates/<name>]` shortcode at that exact position.
+
+Several Elements Areas are independent. Each has its own collection ID,
+shortcode arguments and mappings. The insert operation creates only requested
+new textfills, image slots and Element Types; existing bindings are referenced,
+not overwritten.
+
+### Complete Articles example
+
+```php
+<?php return [
+    'name' => 'Articles — Responsive grid',
+    'description' => 'A heading, repeatable cards and optional action.',
+    'category' => 'Cards',
+    'tags' => [ 'articles', 'cards', 'grid' ],
+    'version' => 3,
+    'recommend' => [
+        'layout' => 'default',
+        'frame' => [ 'background' => 'alt', 'container' => 'wide' ],
+    ],
+    'layouts' => [
+        'default' => [
+            'label' => 'Heading, articles and action',
+            'template' => 'section.tpl',
+        ],
+    ],
+    'areas' => [
+        'heading' => [
+            'label' => 'Title area',
+            'source' => 'single',
+            'allowed' => [ 'title', 'subtitle', 'description' ],
+            'container' => [ 'class' => 'ui-grid-100 nino-area--heading' ],
+            'styles' => [
+                'left' => [ 'label' => 'Left', 'class' => 'nino-area--left' ],
+                'center' => [ 'label' => 'Centered', 'class' => 'nino-area--center' ],
+            ],
+            'recommend' => [
+                'style' => 'center',
+                'components' => [
+                    [ 'id' => 'title', 'type' => 'title' ],
+                    [ 'id' => 'subtitle', 'type' => 'subtitle' ],
+                ],
+            ],
+            'render' => [
+                'title' => [ 'tag' => 'h2', 'class' => 'ui-section-title' ],
+            ],
+        ],
+        'articles' => [
+            'label' => 'Articles',
+            'source' => 'elements',
+            'allowed' => [ 'image', 'title', 'description', 'button' ],
+            'item' => [ 'tag' => 'article', 'class' => 'ui-article' ],
+            'styles' => [
+                'two-columns' => [ 'label' => '2 columns', 'class' => 'ui-grid-m-50' ],
+                'three-columns' => [ 'label' => '3 columns', 'class' => 'ui-grid-m-33' ],
+                'four-columns' => [ 'label' => '4 columns', 'class' => 'ui-grid-m-25' ],
+            ],
+            'recommend' => [
+                'style' => 'three-columns',
+                'components' => [
+                    [ 'id' => 'image', 'type' => 'image',
+                      'bindings' => [ 'src' => 'image', 'alt' => 'title' ] ],
+                    [ 'id' => 'title', 'type' => 'title',
+                      'bindings' => [ 'text' => 'title' ] ],
+                    [ 'id' => 'action', 'type' => 'button', 'style' => 'link',
+                      'bindings' => [ 'label' => 'linkLabel', 'href' => 'link' ] ],
+                ],
+            ],
+            'typeTitle' => 'Articles',
+            'model' => [
+                'title' => [ 'type' => 'string', 'locale' => true ],
+                'linkLabel' => [ 'type' => 'string', 'locale' => true ],
+                'link' => [ 'type' => 'string' ],
+                'image' => [ 'type' => 'image', 'width' => 1200, 'height' => 800 ],
+            ],
+            'shortcode' => [
+                'locale' => '', 'callback' => '', 'limit' => 6, 'query' => '',
+            ],
+        ],
+    ],
+];
 ```
 
-The generated source is copied into the page. Removing the preset later does not break the public website; only reopening that section in the visual composer is no longer possible.
+`section.tpl` stays deliberately small:
+
+```html
+[[area:heading]]
+[[area:articles]]
+```
+
+### Multiple Layouts and Template components
+
+A fullscreen preset can offer truly different cover and parallax markup:
+
+```php
+'layouts' => [
+    'cover' => [
+        'label' => 'Static cover image',
+        'template' => 'section-cover.tpl',
+        'frame' => [ 'screen' => '100', 'background' => 'cover' ],
+    ],
+    'parallax' => [
+        'label' => 'Parallax image',
+        'template' => 'section-parallax.tpl',
+        'frame' => [ 'screen' => '100', 'background' => 'parallax' ],
+    ],
+],
+```
+
+To allow a reusable include, add `template` to a single Area's `allowed`
+list. It can be recommended empty:
+
+```php
+'recommend' => [
+    'components' => [
+        [
+            'id' => 'form',
+            'type' => 'template',
+            'bindings' => [ 'path' => '' ],
+        ],
+    ],
+],
+```
+
+Template components are forbidden in Elements Areas because a collection item
+must not dynamically select arbitrary project templates.
+
+### Safe manifest overrides
+
+Allowed container/item tags and component tags are selected from a finite
+allowlist. CSS classes accept letters, numbers, spaces, underscores and
+hyphens only. Component IDs and Area keys are lowercase slugs; model fields
+follow Nino's Element-field naming rules. Text, image and template paths are
+validated, traversal and double separators are rejected, shortcode arguments
+are bounded, image dimensions are clamped, and collection mappings must match
+image versus non-image field types.
+
+A Layout file:
+
+- contains no PHP;
+- contains every declared Area token once;
+- contains no undeclared or duplicate Area token;
+- uses `[[section:id]]` only for an escaped local identifier when required;
+- leaves all component HTML to the central renderer.
+
+The compiled section contains one inert comment:
+
+```html
+<!-- nino:section {"version":3,"preset":"articles-grid","areas":{...}} -->
+```
+
+This comment is the complete round-trip model. It is ignored at runtime and
+removed intentionally when the section is accepted through HTML+.
+
+### Version contract
+
+The Section Library loads explicit `version => 3` manifests only. A missing,
+older or unknown version is ignored instead of being guessed into another UI.
+Existing generated HTML remains valid runtime source and can still be edited
+through HTML+, but adding or graphically reopening a managed preset requires a
+maintained v3 manifest.
 
 ## Current limitations
 
-- Library and configuration previews render generated markup with `/.cache/style.css` and fixture content. They are sandboxed and intentionally do not execute project JavaScript, submit forms or follow links.
-- Visual content units are top-level `<section>` elements and standalone `[template /templates/<name>]` lines; marked header/footer slots live in Template Settings instead.
+- Library and configuration previews render generated markup with fixture content. The backend refreshes the configured `/.cache/style.css` bundle and returns its contents in the authenticated library payload; the client embeds it in each isolated `srcdoc`, avoiding a separate public dot-directory request. Script tags and inline handlers are removed, CSP denies scripts/network actions, forms cannot submit and links cannot be followed.
+- Visual content units are top-level `<section>` elements. Existing standalone `[template]` lines remain losslessly editable; new includes are inserted through an Area component. Marked header/footer slots live in Template Settings.
 - The builder can create `page-*.tpl` files; route-to-template assignment remains in `/_admin` or code.
 - Native quick fill is plain text input. Rich, translated and batch content remains in the established content tools.
 - Missing image-slot definitions can be created with recommended dimensions; choosing and uploading the actual image remains in `/_admin`.

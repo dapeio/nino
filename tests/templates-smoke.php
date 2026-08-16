@@ -47,6 +47,10 @@ $sandbox = sys_get_temp_dir(). '/nino-templates-smoke-'. uniqid();
 mkdir( $sandbox. '/private/templates', 0777, true );
 mkdir( $sandbox. '/private/text', 0777, true );
 mkdir( $sandbox. '/private/elements', 0777, true );
+mkdir( $sandbox. '/public/.cache', 0777, true );
+mkdir( $sandbox. '/public/assets', 0777, true );
+file_put_contents( $sandbox. '/public/.cache/style.css', '/* stale-template-preview-css */' );
+file_put_contents( $sandbox. '/public/assets/style.preview.css', '/* template-preview-project-css */ .ui-section{display:block}' );
 
 $_SERVER['REMOTE_ADDR'] = '127.0.0.1';
 
@@ -62,6 +66,7 @@ $appData['/nino/locales/native'] = 'en_US';
 $appData['/nino/locales/available'] = [ 'en_US', 'de_DE' ];
 $appData['./nino/html/shortcodes'] = [];
 $appData['/nino/html/images'] = [];
+$appData['/nino/html/assets'] = [ '/.cache/style.css' => [ '/assets/style.preview.css' ] ];
 
 \Nino\Filesystem::putFileContent( $appData, '/config.php', [ '/nino/html/images' => [] ] );
 \Nino\Filesystem::putFileContent( $appData, '/text/global.php', [] );
@@ -79,10 +84,55 @@ echo "Library / Composer\n";
 $presets = \Nino\Templates\Library::presets();
 $modules = \Nino\Templates\Composer::modules();
 
-check( 'ships a broad initial Section Library', count( $presets ) >= 43 );
-check( 'includes a flexible blank section and curated hero', isset( $presets['blank'], $presets['hero-full'] ) );
-check( 'covers reusable demo-element content patterns', isset( $presets['list-check'], $presets['list-numbered'], $presets['content-tabs'], $presets['data-table'], $presets['media-slider'], $presets['video-embed'], $presets['notice-callout'], $presets['badge-cloud'] ) );
-check( 'every preset has searchable metadata and normalized choices', array_filter( $presets, fn( array $preset ): bool => $preset['name'] === '' || $preset['category'] === '' || $preset['tags'] === [] || $preset['allow'] === [] ) === [] );
+check( 'ships only the five maintained named-area presets', array_keys( $presets ) === [ 'articles-grid', 'content-section', 'fullscreen-image', 'media-split-areas', 'template-include' ] );
+check( 'every preset has searchable metadata and a normalized v3 contract', array_filter( $presets, fn( array $preset ): bool => $preset['name'] === ''
+	|| $preset['category'] === ''
+	|| $preset['tags'] === []
+	|| $preset['version'] !== 3
+	|| $preset['areas'] === []
+	|| $preset['layouts'] === []
+	|| $preset['componentCatalog'] === [] ) === [] );
+$libraryRequest = response();
+\Nino\Templates\Library::apiList( $appData, $libraryRequest );
+$libraryBody = $libraryRequest['/nino/http/response']['body'];
+$publicPresets = $libraryBody['presets'];
+check( 'library API supplies editable v3 defaults without leaking Layout source', array_filter( $publicPresets, fn( array $preset ): bool => $preset['version'] === 3
+	&& ( !isset( $preset['defaults']['areas'] ) || isset( $preset['_layouts'] ) ) ) === [] );
+check( 'library API refreshes and embeds project CSS for request-free previews', str_contains( $libraryBody['previewCss'], 'template-preview-project-css' )
+	&& str_contains( $libraryBody['previewCss'], 'stale-template-preview-css' ) === false );
+
+$areaPresetDirectory = $sandbox. '/area-preset';
+mkdir( $areaPresetDirectory );
+file_put_contents( $areaPresetDirectory. '/section.tpl', "[[area:first]]\n[[area:second]]\n" );
+$multiAreaManifest = [
+	'name' => 'Two collections', 'description' => 'Two independent repeatable areas.',
+	'category' => 'Test', 'tags' => [ 'two', 'collections' ], 'version' => 3,
+	'layouts' => [ 'default' => [ 'label' => 'Default', 'template' => 'section.tpl' ] ],
+	'areas' => [
+		'first' => [
+			'label' => 'First', 'source' => 'elements', 'allowed' => [ 'title' ],
+			'model' => [ 'title' => [ 'type' => 'string', 'locale' => true ] ],
+			'recommend' => [ 'components' => [ [ 'id' => 'title', 'type' => 'title', 'bindings' => [ 'text' => 'title' ] ] ] ],
+		],
+		'second' => [
+			'label' => 'Second', 'source' => 'elements', 'allowed' => [ 'title' ],
+			'model' => [ 'title' => [ 'type' => 'string', 'locale' => true ] ],
+			'recommend' => [ 'components' => [ [ 'id' => 'title', 'type' => 'title', 'bindings' => [ 'text' => 'title' ] ] ] ],
+		],
+	],
+];
+$multiAreaPreset = \Nino\Templates\AreaComposer::normalizePreset( 'two-collections', $multiAreaManifest, $areaPresetDirectory );
+$multiAreaResult = \Nino\Templates\AreaComposer::compose(
+	\Nino\Templates\AreaComposer::defaults( $multiAreaPreset, 'home', 'related' ),
+	$multiAreaPreset
+);
+check( 'one preset can compose several independent Elements Areas', count( $multiAreaResult['content']['collections'] ) === 2
+	&& $multiAreaResult['content']['collections'][0]['elementType'] === 'home-related-first'
+	&& $multiAreaResult['content']['collections'][1]['elementType'] === 'home-related-second' );
+file_put_contents( $areaPresetDirectory. '/unsafe.tpl', "<?php echo 'unsafe'; ?>\n[[area:first]]\n[[area:second]]\n" );
+$unsafeManifest = $multiAreaManifest;
+$unsafeManifest['layouts']['default']['template'] = 'unsafe.tpl';
+check( 'Area manifests reject executable Layout source', throwsInvalidArgument( fn() => \Nino\Templates\AreaComposer::normalizePreset( 'unsafe-layout', $unsafeManifest, $areaPresetDirectory ) ) );
 check( 'repeatable articles recommend a localized CTA label', ( $modules['articles']['model']['linkLabel']['locale'] ?? false ) === true );
 check( 'every curated preset composes with its defaults', array_filter( array_keys( $presets ), function( string $key ): bool {
 	try {
@@ -93,86 +143,113 @@ check( 'every curated preset composes with its defaults', array_filter( array_ke
 	}
 } ) === [] );
 
-$hero = \Nino\Templates\Composer::compose( [
-	'preset' => 'hero-full', 'pageId' => 'home', 'id' => 'main-hero', 'pageMotion' => 'on',
-] );
+$heroInput = \Nino\Templates\AreaComposer::defaults( $presets['fullscreen-image'], 'home', 'main-hero' );
+$heroInput['pageMotion'] = 'on';
+$hero = \Nino\Templates\Composer::compose( $heroInput );
 
 check( 'composes one ordinary section', str_starts_with( $hero['source'], '<section' ) && str_contains( $hero['source'], '</section>' ) );
 check( 'writes stable section metadata inside generated source', str_contains( $hero['source'], '<!-- nino:section {' ) );
-check( 'derives textfill keys from page and section ids', in_array( 'title', $hero['fields'], true ) && str_contains( $hero['source'], '[[/page-home/main-hero/title]]' ) );
-check( 'reports the generated background image slot', $hero['imageSlots'] === [ 'background' ] );
+check( 'derives textfill keys from page and section ids', in_array( '/page-home/main-hero/title', array_column( $hero['fields'], 'key' ), true ) && str_contains( $hero['source'], '[[/page-home/main-hero/title]]' ) );
+check( 'reports the generated background image slot', ( $hero['images'][0]['slot'] ?? '' ) === 'background' );
 check( 'inherits page motion into generated js-vpa markup', str_contains( $hero['source'], 'class="ui-grid-row js-vpa"' ) );
-check( 'applies heading alignment without forcing it through nested content', str_contains( $hero['source'], 'ui-grid-100 ui-mb-3 ui-text-center' ) && str_contains( strtok( $hero['source'], "\n" ), 'ui-text-center' ) === false );
+check( 'applies Area alignment without forcing it onto the section shell', str_contains( $hero['source'], 'nino-area--center' ) && str_contains( strtok( $hero['source'], "\n" ), 'nino-area--center' ) === false );
 
 $heroPreview = \Nino\Templates\Composer::preview( [
-	'preset' => 'hero-full', 'pageId' => 'preview', 'id' => 'motion-hero', 'pageMotion' => 'on',
+	'preset' => 'fullscreen-image', 'pageId' => 'preview', 'id' => 'motion-hero', 'pageMotion' => 'on',
 ] );
 check( 'preview strips VPA classes that would stay hidden without client scripts', $heroPreview !== null && str_contains( $heroPreview, 'js-vpa' ) === false );
 check( 'preview-only VPA cleanup never changes composed template source', str_contains( $hero['source'], 'js-vpa' ) && str_contains( $hero['source'], 'js-vpa--visible' ) === false );
 
-$articles = \Nino\Templates\Composer::compose( [
-	'preset' => 'articles-grid', 'pageId' => 'home', 'id' => 'services', 'elementType' => 'services',
-	'content' => 'articles-image', 'layout' => '4',
-] );
+$articleInput = \Nino\Templates\AreaComposer::defaults( $presets['articles-grid'], 'home', 'services' );
+$articleInput['areas']['articles']['style'] = 'four-columns';
+$articleInput['areas']['articles']['source'] = [
+	'elementMode' => 'existing',
+	'elementType' => 'services',
+	'shortcode' => [ 'locale' => '', 'callback' => '', 'limit' => 4, 'query' => '' ],
+];
+$articleInput['areas']['articles']['components'][0]['bindings'] = [ 'src' => 'photo', 'alt' => 'name' ];
+$articleInput['areas']['articles']['components'][1]['bindings'] = [ 'text' => 'name' ];
+$articleInput['areas']['articles']['components'][2]['bindings'] = [ 'text' => 'copy' ];
+$articleInput['areas']['articles']['components'][3]['bindings'] = [ 'label' => 'buttonLabel', 'href' => 'href' ];
+$articles = \Nino\Templates\Composer::compose( $articleInput );
 
-check( 'binds repeatable modules to a chosen element type', str_contains( $articles['source'], '[elements /services limit="3"]' ) );
-check( 'uses the dedicated element CTA label instead of repeating its title', str_contains( $articles['source'], '[[linkLabel]]' ) );
-check( 'returns the exact schema needed to create that type', isset( $articles['elementSchema']['image'], $articles['elementSchema']['linkLabel'] ) );
-check( 'generated Elements images use Nino image storage, under the public content prefix', str_contains( $articles['source'], '[[/nino/public]]/images/[[image]]' ) && str_contains( $articles['source'], '/uploads/' ) === false );
+check( 'binds a repeatable Area to a chosen element type with all shortcode arguments', str_contains( $articles['source'], '[elements /services locale="" callback="" limit="4" query=""]' ) );
+check( 'maps ordered components to compatible existing model fields', str_contains( $articles['source'], '[[name]]' )
+	&& str_contains( $articles['source'], '[[photo]]' )
+	&& str_contains( $articles['source'], '[[buttonLabel]]' ) );
+check( 'returns each independently creatable collection and the complete recommended schema', isset( $articles['content']['collections'][0]['model']['image'], $articles['content']['collections'][0]['model']['linkLabel'] ) );
+check( 'generated Elements images use Nino image storage under the public content prefix', str_contains( $articles['source'], '[[/nino/public]]/images/[[photo]]' ) && str_contains( $articles['source'], '/uploads/' ) === false );
+
+$textOnlyInput = $articleInput;
+$textOnlyInput['id'] = 'plain-services';
+$textOnlyInput['areas']['articles']['components'] = array_values( array_filter(
+	$textOnlyInput['areas']['articles']['components'],
+	fn( array $component ): bool => in_array( $component['type'], [ 'title', 'description' ], true )
+) );
+$textOnly = \Nino\Templates\Composer::compose( $textOnlyInput );
+check( 'component order changes markup independently from the four-column Area Style', str_contains( $textOnly['source'], 'ui-grid-m-25' )
+	&& str_contains( $textOnly['source'], '[[name]]' )
+	&& str_contains( $textOnly['source'], '<img' ) === false
+	&& str_contains( $textOnly['source'], '<a ' ) === false );
+check( 'one v3 metadata comment preserves the complete graphical area model', substr_count( $textOnly['source'], '<!-- nino:section ' ) === 1
+	&& $textOnly['spec']['version'] === 3
+	&& count( $textOnly['spec']['areas']['articles']['components'] ) === 2 );
 
 $articlePreview = \Nino\Templates\Composer::preview( [
-	'preset' => 'articles-image-grid', 'pageId' => 'preview', 'id' => 'articles', 'elementType' => 'preview-items', 'limit' => 2,
+	'preset' => 'articles-grid', 'pageId' => 'preview', 'id' => 'articles',
+	'areas' => [ 'articles' => [ 'style' => 'two-columns', 'source' => [ 'shortcode' => [ 'limit' => 2 ] ] ] ],
 ] );
 check( 'renders real preview HTML with deterministic text and image fixtures', $articlePreview !== null && str_contains( $articlePreview, '<section' ) && str_contains( $articlePreview, 'data:image/svg+xml' ) && str_contains( $articlePreview, 'Thoughtful item 1' ) );
 check( 'preview HTML contains no unresolved project shortcodes', $articlePreview !== null && str_contains( $articlePreview, '[[' ) === false && str_contains( $articlePreview, '[elements' ) === false && str_contains( $articlePreview, '[image' ) === false );
-
-$list = \Nino\Templates\Composer::compose( [
-	'preset' => 'list-check', 'pageId' => 'home', 'id' => 'benefits', 'elementType' => 'benefits', 'layout' => 'check-2',
+$twoColumnPreview = \Nino\Templates\Composer::preview( [
+	'preset' => 'articles-grid', 'pageId' => 'preview', 'id' => 'two-columns',
+	'areas' => [ 'articles' => [ 'style' => 'two-columns' ] ],
 ] );
-check( 'composes a repeatable two-column checklist', str_contains( $list['source'], 'ui-list--check ui-list--content ui-list--columns' ) && isset( $list['elementSchema']['title'] ) );
-
-$tabs = \Nino\Templates\Composer::compose( [
-	'preset' => 'content-tabs', 'pageId' => 'home', 'id' => 'details', 'elementType' => 'details',
+$fourColumnPreview = \Nino\Templates\Composer::preview( [
+	'preset' => 'articles-grid', 'pageId' => 'preview', 'id' => 'four-columns',
+	'areas' => [ 'articles' => [ 'style' => 'four-columns' ] ],
 ] );
-check( 'composes tabs with stable element-derived panel ids', str_contains( $tabs['source'], 'data-tabs-target="details-tab-[[.id]]"' ) && str_contains( $tabs['source'], 'role="tabpanel"' ) );
+check( 'named-area preview mirrors the selected column count', substr_count( $twoColumnPreview ?? '', '<article' ) === 2
+	&& substr_count( $fourColumnPreview ?? '', '<article' ) === 4 );
 
-$table = \Nino\Templates\Composer::compose( [
-	'preset' => 'data-table', 'pageId' => 'home', 'id' => 'services-table', 'elementType' => 'service-data',
+$fullscreen = \Nino\Templates\Composer::compose( [
+	'preset' => 'fullscreen-image', 'pageId' => 'home', 'id' => 'stage', 'layout' => 'parallax',
 ] );
-check( 'composes a styled general data table', str_contains( $table['source'], 'ui-table--striped ui-table--bordered' ) && array_diff( [ 'column-a', 'column-b', 'column-c' ], $table['fields'] ) === [] );
+check( 'Layout changes real markup and can recommend a matching frame', str_contains( $fullscreen['source'], 'nino-fullscreen-stage--parallax' )
+	&& $fullscreen['effective']['layout'] === 'parallax'
+	&& $fullscreen['effective']['frame']['background'] === 'parallax'
+	&& ( $fullscreen['images'][0]['key'] ?? '' ) === '/page-home/stage/background' );
 
-$mediaSlider = \Nino\Templates\Composer::compose( [
-	'preset' => 'media-slider', 'pageId' => 'home', 'id' => 'highlights', 'elementType' => 'highlights',
-] );
-check( 'composes an image-led content slider', str_contains( $mediaSlider['source'], 'js-slider ui-media-slider' ) && isset( $mediaSlider['elementSchema']['image'], $mediaSlider['elementSchema']['linkLabel'] ) );
+$templateInput = \Nino\Templates\AreaComposer::defaults( $presets['articles-grid'], 'home', 'with-form' );
+$templateInput['areas']['action']['components'][] = [
+	'id' => 'form', 'type' => 'template', 'style' => 'auto', 'settings' => [ 'target' => 'same' ],
+	'bindings' => [ 'path' => '/templates/contact-form' ],
+];
+$templateSection = \Nino\Templates\Composer::compose( $templateInput );
+check( 'Template is an ordered Area input rather than a gallery pseudo-section', str_contains( $templateSection['source'], '[template /templates/contact-form]' ) );
 
-$videoEmbed = \Nino\Templates\Composer::compose( [
-	'preset' => 'video-embed', 'pageId' => 'home', 'id' => 'demo-video', 'layout' => '4-3',
-] );
-check( 'composes a direct responsive video embed', str_contains( $videoEmbed['source'], 'ui-video ui-video--4-3' ) && str_contains( $videoEmbed['source'], 'js-modal' ) === false );
+$includeInput = \Nino\Templates\AreaComposer::defaults( $presets['template-include'], 'home', 'contact-form' );
+$includeInput['areas']['include']['components'][0]['bindings']['path'] = '/templates/contact-form';
+$includeSection = \Nino\Templates\Composer::compose( $includeInput );
+check( 'the focused reusable-template preset emits one normal managed section', str_contains( $includeSection['source'], '[template /templates/contact-form]' )
+	&& substr_count( $includeSection['source'], '<section' ) === 1 );
 
-$notice = \Nino\Templates\Composer::compose( [
-	'preset' => 'notice-callout', 'pageId' => 'home', 'id' => 'important', 'layout' => 'success',
-] );
-check( 'composes a native-textfill notice variant', str_contains( $notice['source'], 'ui-alert--success' ) && in_array( 'content', $notice['fields'], true ) );
+$splitInput = \Nino\Templates\AreaComposer::defaults( $presets['media-split-areas'], 'home', 'story' );
+$splitInput['layout'] = 'media-right';
+$splitSection = \Nino\Templates\Composer::compose( $splitInput );
+check( 'media split Layouts change semantic Area order without duplicating presets', strpos( $splitSection['source'], 'nino-area--split-content' ) !== false
+	&& strpos( $splitSection['source'], 'nino-area--media' ) !== false
+	&& strpos( $splitSection['source'], 'nino-area--split-content' ) < strpos( $splitSection['source'], 'nino-area--media' )
+	&& count( $splitSection['images'] ) === 1 );
 
-$badges = \Nino\Templates\Composer::compose( [
-	'preset' => 'badge-cloud', 'pageId' => 'home', 'id' => 'technologies', 'elementType' => 'technologies',
-] );
-check( 'composes a repeatable pill cloud', str_contains( $badges['source'], 'ui-badge-cloud' ) && str_contains( $badges['source'], 'ui-badge--pill' ) );
-
-$dualCta = \Nino\Templates\Composer::compose( [
-	'preset' => 'closing-cta', 'pageId' => 'home', 'id' => 'closing', 'action' => 'dual-buttons',
-] );
-check( 'offers primary plus outline CTA as one supported action', str_contains( $dualCta['source'], 'ui-btn--primary' ) && str_contains( $dualCta['source'], 'ui-btn--outline' ) );
-check( 'dual CTA exposes all four native textfills', array_diff( [ 'cta-label', 'cta-uri', 'secondary-cta-label', 'secondary-cta-uri' ], $dualCta['fields'] ) === [] );
-
-$clamped = \Nino\Templates\Composer::compose( [
-	'preset' => 'faq-accordion', 'pageId' => 'home', 'id' => 'faq', 'content' => 'slider', 'layout' => '4',
-] );
-check( 'a curated preset rejects out-of-profile choices by falling back to its manifest', $clamped['spec']['content'] === 'accordion' && in_array( $clamped['spec']['layout'], [ 'narrow', 'wide' ], true ) );
-check( 'rejects invalid page ids', throwsInvalidArgument( fn() => \Nino\Templates\Composer::compose( [ 'preset' => 'blank', 'pageId' => '../home', 'id' => 'intro' ] ) ) );
-check( 'rejects invalid element type paths', throwsInvalidArgument( fn() => \Nino\Templates\Composer::compose( [ 'preset' => 'articles-grid', 'pageId' => 'home', 'id' => 'intro', 'elementType' => '../items' ] ) ) );
+check( 'rejects invalid page ids', throwsInvalidArgument( fn() => \Nino\Templates\Composer::compose( [ 'preset' => 'articles-grid', 'pageId' => '../home', 'id' => 'intro' ] ) ) );
+check( 'rejects invalid Area styles and element type paths', throwsInvalidArgument( fn() => \Nino\Templates\Composer::compose( [
+	'preset' => 'articles-grid', 'pageId' => 'home', 'id' => 'intro',
+	'areas' => [ 'articles' => [ 'style' => 'unknown' ] ],
+] ) ) && throwsInvalidArgument( fn() => \Nino\Templates\Composer::compose( [
+	'preset' => 'articles-grid', 'pageId' => 'home', 'id' => 'intro',
+	'areas' => [ 'articles' => [ 'source' => [ 'elementType' => '../items' ] ] ],
+] ) ) );
 
 echo "\n";
 
@@ -410,6 +487,11 @@ echo "\n";
 
 echo "Content\n";
 
+post( [] );
+$keysRequest = response();
+\Nino\Templates\Content::apiKeys( $appData, $keysRequest );
+check( 'lists existing native textfills for reusable Area bindings', in_array( '/page-home/hero/title', array_column( $keysRequest['/nino/http/response']['body']['entries'], 'key' ), true ) );
+
 post( [ 'keys' => [ '/page-home/hero/title', '/page-home/hero/subtitle' ] ] );
 $fieldsRequest = response();
 \Nino\Templates\Content::apiFields( $appData, $fieldsRequest );
@@ -418,7 +500,7 @@ check( 'reads existing and missing native textfill values together', $fields['na
 
 post( [ 'items' => [
 	[ 'key' => '/page-home/hero/title', 'value' => 'New title' ],
-	[ 'key' => '/page-home/hero/subtitle', 'value' => 'New subtitle' ],
+	[ 'key' => '/page-home/hero/subtitle', 'value' => 'New subtitle', 'create' => true ],
 ] ] );
 $contentSaveRequest = response();
 \Nino\Templates\Content::apiSave( $appData, $contentSaveRequest );
@@ -440,10 +522,26 @@ $createTypeRequest = response();
 $createdType = \Nino\Filesystem::getFileContent( $appData, '/elements/home-services.php', [] );
 check( 'creates a recommended Element Type through the shared Admin API', $createTypeRequest['/nino/http/response']['statusCode'] === 200 && isset( $createdType['model']['title'], $createdType['model']['linkLabel'] ) );
 
+post( [ 'preset' => 'articles-grid', 'area' => 'articles', 'uri' => 'home-area-services', 'title' => 'Area Services' ] );
+$createAreaTypeRequest = response();
+\Nino\Templates\Content::apiCreateType( $appData, $createAreaTypeRequest );
+$createdAreaType = \Nino\Filesystem::getFileContent( $appData, '/elements/home-area-services.php', [] );
+check( 'creates only the Elements model declared by the requested Area', $createAreaTypeRequest['/nino/http/response']['statusCode'] === 200
+	&& isset( $createdAreaType['model']['title'], $createdAreaType['model']['linkLabel'], $createdAreaType['model']['image'] ) );
+
 post( [ 'uri' => '/page-home/main-hero/background', 'label' => 'Main Hero Background' ] );
 $createImageRequest = response();
 \Nino\Templates\Content::apiCreateImage( $appData, $createImageRequest );
 check( 'creates a background image slot with safe recommended dimensions', $createImageRequest['/nino/http/response']['statusCode'] === 200 && $appData['/nino/html/images']['/page-home/main-hero/background']['width'] === 1920 && $appData['/nino/html/images']['/page-home/main-hero/background']['height'] === 1080 );
+
+post( [
+	'preset' => 'fullscreen-image', 'slot' => 'background',
+	'uri' => '/page-home/area-stage/background', 'label' => 'Area Stage Background',
+] );
+$createAreaImageRequest = response();
+\Nino\Templates\Content::apiCreateImage( $appData, $createAreaImageRequest );
+check( 'creates a v3 frame image only for the selected preset slot', $createAreaImageRequest['/nino/http/response']['statusCode'] === 200
+	&& $appData['/nino/html/images']['/page-home/area-stage/background']['width'] === 1920 );
 
 post( [ 'uri' => '/arbitrary/slot', 'label' => 'Unsafe' ] );
 $invalidImageRequest = response();

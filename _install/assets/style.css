@@ -1,12 +1,11 @@
-@layer nino.tool, nino.system, nino.local;
+@layer nino.system, nino.tool, nino.local;
 
 /*
-	This file is layered (see _nino/Nino.admin.css). Everything a tool declares
-	for itself sits in `nino.tool`, which the shared design system's `nino.system`
-	layer outranks whatever the selectors' specificity says - that is what makes
-	the system the baseline rather than something a tool's own id rule silently
-	wins against. The "Design-system locals" section at the bottom is the
-	deliberate exception and sits in `nino.local`, the highest layer.
+	This file is layered (see _nino/Nino.admin.css). Shared foundations sit in
+	`nino.system`; screen and component rules sit in the later `nino.tool` layer,
+	where they can deliberately refine that low-specificity baseline. The
+	"Design-system locals" section at the bottom remains the explicit last-resort
+	override and sits in `nino.local`, the highest layer.
 */
 
 @layer nino.tool {

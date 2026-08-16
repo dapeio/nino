@@ -29,6 +29,7 @@
 				</div>
 				<div id="pd-top-actions">
 					<span id="pd-save-state" class="nino-admin-actionbar-status" role="status"></span>
+					<button type="button" id="pd-delete-template" class="nino-admin-btn-danger" disabled>Delete</button>
 					<button type="button" id="pd-save" class="nino-admin-btn-primary" disabled>Save template</button>
 				</div>
 			</header>
@@ -61,18 +62,14 @@
 								<label class="pd-slot-setting pd-name-setting" for="pd-template-name"><span>Name</span><input id="pd-template-name" type="text" maxlength="160" aria-label="Template name"></label>
 								<label class="pd-slot-setting" for="pd-header-template"><span>Header</span><select id="pd-header-template" aria-label="Header template"></select></label>
 								<label class="pd-slot-setting" for="pd-footer-template"><span>Footer</span><select id="pd-footer-template" aria-label="Footer template"></select></label>
-								<div class="pd-inline-setting">
-									<strong>VPA</strong>
+								<div class="pd-slot-setting pd-vpa-setting">
+									<span>VPA</span>
 									<div class="pd-segmented" id="pd-page-motion" aria-label="Default viewport motion">
 										<button type="button" data-value="off">Off</button>
 										<button type="button" data-value="on">On</button>
 									</div>
 								</div>
-								<button type="button" id="pd-delete-template" class="nino-admin-btn-danger">Delete</button>
 							</div>
-						</div>
-						<div class="pd-toolbar-actions">
-							<button type="button" id="pd-add-section" class="nino-admin-btn-primary"><span aria-hidden="true">＋</span> Add section</button>
 						</div>
 					</div>
 					<div id="pd-notice" aria-live="polite"></div>
@@ -82,6 +79,7 @@
 						<p>Select or create a template on the left. Then combine curated HTML sections with reusable template sections and fill native content without leaving the flow.</p>
 					</div>
 					<div id="pd-canvas" class="pd-hidden" aria-label="Page sections"></div>
+					<button type="button" id="pd-add-section" class="nino-admin-btn-primary pd-workspace-add pd-hidden"><span aria-hidden="true">＋</span> Add section</button>
 				</main>
 
 				<aside id="pd-inspector" aria-label="Selected section">
@@ -93,18 +91,17 @@
 					<div id="pd-inspector-content" class="pd-hidden"></div>
 				</aside>
 			</div>
-		</div>
 
 		<dialog id="pd-composer" class="pd-dialog pd-composer-dialog">
 			<form method="dialog" class="pd-dialog-shell" id="pd-composer-form">
 				<header class="pd-dialog-header">
 					<div class="pd-composer-heading"><div><span class="pd-eyebrow">Section composer</span><h2 id="pd-composer-title">Add section</h2></div><ol class="pd-stepper" aria-label="Composer progress"><li id="pd-step-library" class="is-active"><span>1</span>Choose</li><li id="pd-step-config"><span>2</span>Configure &amp; fill</li></ol></div>
-					<button type="button" class="pd-icon-button pd-dialog-close" aria-label="Close">×</button>
+					<button type="button" class="pd-icon-button pd-dialog-close" aria-label="Close"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
 				</header>
 				<div class="pd-composer-body">
 					<section id="pd-composer-library-step" class="pd-composer-step pd-library-step" aria-label="Choose a section">
 						<div class="pd-library-toolbar">
-							<div><span class="pd-eyebrow">Section library</span><h3>What should this part of the page look like?</h3><p>Choose a visual section or insert a reusable <code>[template]</code> include.</p></div>
+							<div><span class="pd-eyebrow">Section library</span><h3>What should this part of the page do?</h3><p>Choose a real visual preset. Its named content areas stay flexible in the next step.</p></div>
 							<label class="pd-search" for="pd-library-search"><span aria-hidden="true">⌕</span><input id="pd-library-search" type="search" placeholder="Search hero, FAQ, image left, template…" autocomplete="off"></label>
 						</div>
 						<div id="pd-library-categories" class="pd-chip-row"></div>
@@ -115,7 +112,7 @@
 						<aside class="pd-preview-pane" aria-label="Live section preview">
 							<div class="pd-preview-sticky">
 								<div class="pd-preview-heading"><span><span class="pd-eyebrow">Current project design</span><strong>Live preview</strong></span><small id="pd-preview-status" role="status">Ready</small></div>
-								<div id="pd-composer-preview" class="pd-real-preview is-detail"><iframe title="Section preview" sandbox="allow-same-origin" tabindex="-1"></iframe></div>
+								<div id="pd-composer-preview" class="pd-real-preview is-detail"><iframe title="Section preview" sandbox="allow-scripts" tabindex="-1"></iframe></div>
 								<div id="pd-composer-summary"></div>
 							</div>
 						</aside>
@@ -135,7 +132,7 @@
 			<form method="dialog" class="pd-dialog-shell" id="pd-create-form">
 				<header class="pd-dialog-header">
 					<div><span class="pd-eyebrow">Template Builder</span><h2>New page template</h2></div>
-					<button type="button" class="pd-icon-button pd-create-close" aria-label="Close">×</button>
+					<button type="button" class="pd-icon-button pd-create-close" aria-label="Close"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
 				</header>
 				<div class="pd-simple-dialog-body pd-create-body">
 					<div class="pd-create-grid">
@@ -170,7 +167,7 @@
 			<div class="pd-dialog-shell">
 				<header class="pd-dialog-header">
 					<div><span class="pd-eyebrow">[template] shortcode</span><h2 id="pd-include-title">Insert template section</h2></div>
-					<button type="button" class="pd-icon-button pd-include-close" aria-label="Close">×</button>
+					<button type="button" class="pd-icon-button pd-include-close" aria-label="Close"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
 				</header>
 				<div class="pd-include-body">
 					<p>Insert a reusable non-page template as a first-class canvas item. The page header and footer are managed separately in Template Settings.</p>
@@ -187,7 +184,7 @@
 			<form method="dialog" class="pd-dialog-shell" id="pd-code-form">
 				<header class="pd-dialog-header">
 					<div><span class="pd-eyebrow">HTML+ escape hatch</span><h2 id="pd-code-title">Edit section source</h2></div>
-					<button type="button" class="pd-icon-button pd-code-close" aria-label="Close">×</button>
+					<button type="button" class="pd-icon-button pd-code-close" aria-label="Close"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
 				</header>
 				<div class="pd-code-body">
 					<p id="pd-code-note">Exactly one complete <code>&lt;section&gt;</code> is accepted. Other page source remains locked.</p>
@@ -203,9 +200,11 @@
 		</dialog>
 
 		<div id="pd-toast" role="status" aria-live="polite"></div>
+		</div>
 		<script src="[[/nino/dir]]/_nino/Nino.js"></script>
 		<script src="[[/nino/dir]]/_templates/assets/script.js"></script>
 		<script src="[[/nino/dir]]/_templates/assets/sections.js"></script>
 		<script src="[[/nino/dir]]/_templates/assets/composer.js"></script>
+		<script src="[[/nino/dir]]/_templates/assets/area-composer.js"></script>
 	</body>
 </html>

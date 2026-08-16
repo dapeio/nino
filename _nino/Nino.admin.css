@@ -2,8 +2,8 @@
  * Nino admin UI - the design system for Nino's own tool frontends
  *
  * Shared visual system for /_admin, /_editor, /_install and /_templates.
- * Linked last, after each tool's own stylesheet, so what is defined here is
- * the baseline every tool ends up with.
+ * Linked after each tool's own stylesheet, but placed in the lower
+ * `nino.system` cascade layer, so it remains an overridable baseline.
  *
  * ---------------------------------------------------------------------------
  * Convention (see AGENTS.md, "Designing an admin frontend")
@@ -28,13 +28,12 @@
  *    a list" - a class that carries its original position's margins is what
  *    breaks the moment someone reuses it somewhere else.
  *
- * 5. Cascade layers decide who wins, not specificity. Each tool's stylesheet
- *    declares `@layer nino.tool, nino.system, nino.local;` and wraps itself in
- *    `nino.tool`; everything below lives in `nino.system`. A layered rule loses
- *    to any rule in a later layer no matter how specific it is, so a tool's own
- *    `#some-id` rule can no longer silently outrank a design-system class - and
- *    a tool that genuinely has to override one says so out loud, in its
- *    `nino.local` section at the bottom of its own file.
+ * 5. Cascade layers decide who wins before specificity. Each tool declares
+ *    `@layer nino.system, nino.tool, nino.local;`; everything below lives in
+ *    `nino.system`, while ordinary tool components live in the later
+ *    `nino.tool` layer. The zero-specificity `:where()` scope therefore stays
+ *    easy to refine without `!important` or selector escalation. `nino.local`
+ *    remains available for a deliberate final override.
  *
  * The vocabulary, in the order it appears below:
  *
@@ -48,7 +47,8 @@
  *   Brand      .nino-admin-brand-mark  .nino-admin-brand-copy
  *   Type       .nino-admin-hint  .nino-admin-hint-lead  .nino-admin-eyebrow
  *              .nino-admin-error
- *   Controls   .nino-admin-btn-primary  .nino-admin-btn-danger
+ *   Controls   .nino-admin-btn-primary  .nino-admin-btn-secondary
+ *              .nino-admin-btn-danger
  *   Surfaces   .nino-admin-card  .nino-admin-tiles  .nino-admin-tile
  *   Lists      .nino-admin-list  .nino-admin-list-copy
  *              .nino-admin-list-dense  .nino-admin-list-buttons
@@ -205,6 +205,18 @@ body {
 :where(.nino-admin) :is(button[type="submit"], .nino-admin-btn-primary):hover:not(:disabled) {
 	background: var(--editor-blue-hover);
 	color: #fff;
+}
+
+:where(.nino-admin) .nino-admin-btn-secondary {
+	border-color: var(--editor-border);
+	background: var(--editor-bg-elevated);
+	color: var(--editor-blue);
+}
+
+:where(.nino-admin) .nino-admin-btn-secondary:hover:not(:disabled) {
+	border-color: color-mix(in srgb, var(--editor-blue) 35%, var(--editor-border));
+	background: var(--editor-blue-soft);
+	color: var(--editor-blue);
 }
 
 :where(.nino-admin) .nino-admin-btn-danger {

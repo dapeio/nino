@@ -106,7 +106,7 @@ Object.keys( TOOL_ROOTS ).forEach( function( file ) {
 	const css = read( file );
 
 	check( file+ ' opens with the shared layer order',
-		css.trimStart().startsWith('@layer nino.tool, nino.system, nino.local;') );
+		css.trimStart().startsWith('@layer nino.system, nino.tool, nino.local;') );
 
 	check( file+ ' wraps its own rules in the tool layer',
 		css.includes('@layer nino.tool {') && css.includes('@layer nino.local {') );
@@ -124,7 +124,8 @@ Object.keys( TOOL_ROOTS ).forEach( function( file ) {
 // tool that loads the file - _admin loads _editor's, _templates loads both. The
 // select chevron used to live in one of these while the padding that keeps text
 // off it came from the design system, and the two drifted apart. New ones are a
-// regression; the three below are the shared base resets, still to be moved.
+// regression; the three below are intentional shared foundations and live in
+// this file's nino.system blocks rather than in a tool-specific layer.
 const BASE_RESETS = { '_editor/assets/style.css' : [ 'a', 'button', 'fieldset' ] };
 
 Object.keys( TOOL_ROOTS ).forEach( function( file ) {

@@ -17,10 +17,10 @@ Nutze `/_templates`, um:
 - vorhandene Dateien `templates/page-*.tpl` zu öffnen;
 - ein neues `page-*.tpl` mit echtem Dateinamen, Anzeigenamen, Header, Footer und VPA-Standard anzulegen;
 - vollständige Sections anhand ihres Aussehens aus einer durchsuchbaren, getaggten visuellen Library einzufügen;
-- eine alleinstehende `[template /templates/<name>]`-Section direkt über **Add section** einzufügen, zu verschieben, zu ersetzen oder zu duplizieren;
+- wiederverwendbare `[template]`-Shortcodes als geordnete Komponenten einzufügen, wenn ein Preset sie erlaubt;
 - Header und Footer aus passenden Nicht-Seiten-`.tpl`-Dateien zu wählen oder einen Slot auf **None** zu setzen;
 - eine stabile Section-ID zu vergeben;
-- Oberfläche, Hintergrund, Überschrift, Content-Modul, Aktion, Layout und Viewport-Animation zu konfigurieren;
+- den Section-Frame sowie geordnete Komponenten, Style und Data-Bindings jeder vom Preset benannten Area zu konfigurieren;
 - alle sichtbaren Content-Bausteine umzusortieren, zu duplizieren oder zu entfernen, während Header und Footer außerhalb des Canvas fix bleiben;
 - erzeugte Textfills direkt in der nativen Sprache zu befüllen;
 - eine vorhandene Elements-Collection zu wählen oder den empfohlenen Elementtyp des Moduls anzulegen;
@@ -45,9 +45,9 @@ Verwende HTTPS, behandle das technische Passwort vertraulich und arbeite mit ein
 
 1. Wähle links ein Seitentemplate oder lege es über **New page template** an. Der Dialog fragt den vollständigen Dateinamen, Anzeigenamen, Header, Footer und den VPA-Standard ab.
 2. Öffne **Add section**.
-3. Durchsuche oder filtere unter **Choose** die große Galerie und wähle ein Preset anhand seiner echten Markup-Vorschau. Wiederverwendbare Nicht-Seiten-`.tpl`-Dateien stehen dort als Kategorie **Templates** bereit und werden ohne unnötigen Konfigurationsschritt eingefügt.
-4. Wechsle zu **Configure & fill**, vergib eine sprechende ID wie `main-hero` oder `services-overview` und passe nur relevante Einstellungen an. Seltenere Abstands- und Rahmenoptionen liegen unter **Advanced**.
-5. Befülle im selben Schritt **Native content**. Wähle für ein wiederholbares Modul eine Elements-Collection; existiert sie noch nicht, lasse die automatische Schema-Erstellung aktiv.
+3. Durchsuche oder filtere unter **Choose** die große Galerie und wähle ein Preset mit benannten Areas anhand seiner echten Markup-Vorschau. Die Library enthält bewusst nur noch den aktuellen Version-3-Vertrag. Wiederverwendbare `.tpl`-Dateien erscheinen nicht als Pseudo-Sections; ein passendes Preset kann sie als **Template**-Komponente in einer Area anbieten.
+4. Wechsle zu **Configure & fill**, vergib eine sprechende ID wie `main-hero` oder `services-overview` und stelle Layout, Maße, Abstände und Hintergrund unter **Section** ein.
+5. Öffne jede benannte Area. **Design** regelt Style und Komponentenreihenfolge; **Data** erzeugt oder verknüpft Text-, Bild- und Template-Daten sowie bei wiederholbaren Areas eine Elements-Collection mit explizitem Feld-Mapping.
 6. Vergleiche die Live-Vorschau und füge die Section ein. Empfohlene Textschlüssel, Elementtypen und Bildplatz-Definitionen können dabei mit angelegt werden.
 7. Öffne bei Bedarf Bildplätze oder einzelne Elements-Einträge direkt in `/_admin`.
 8. Ordne HTML- und Template-Section-Karten und speichere das Seitentemplate.
@@ -57,26 +57,23 @@ Die schnelle native Befüllung legt neue Schlüssel in der nativen Projektsprach
 
 ## Seiten- und Section-Einstellungen
 
-**Name**, **Header**, **Footer**, **VPA** und **Delete** liegen in den Template Settings. Die Header-/Footer-Selects zeigen die echten `.tpl`-Dateinamen, listen dem Projekt bekannte Nicht-Seiten-Templates und bieten außerdem **None**. Der ausgewählte Wert wird weiterhin als gewöhnlicher `[template /templates/<name>]`-Shortcode geschrieben; die Controls verhindern nur, dass die Seitenschale mit verschiebbarem Content verwechselt wird. **Delete** entfernt genau die aktuell geladene Revision der Datei nach einer ausdrücklichen Bestätigung; eine Wiederherstellung erfordert Versionsverwaltung oder ein anderes externes Backup.
+**Name**, **Header**, **Footer** und **VPA** stehen gemeinsam in einer beschrifteten Zeile der Template Settings. **Delete** und **Save template** bleiben rechts in der Topbar; **Add section** bleibt auch nach dem Einfügen von Content in der Dokument-Toolbar sichtbar. Die Header-/Footer-Selects zeigen die echten `.tpl`-Dateinamen, listen dem Projekt bekannte Nicht-Seiten-Templates und bieten außerdem **None**. Der ausgewählte Wert wird weiterhin als gewöhnlicher `[template /templates/<name>]`-Shortcode geschrieben; die Controls verhindern nur, dass die Seitenschale mit verschiebbarem Content verwechselt wird. **Delete** entfernt genau die aktuell geladene Revision der Datei nach einer ausdrücklichen Bestätigung; eine Wiederherstellung erfordert Versionsverwaltung oder ein anderes externes Backup.
 
 **VPA** auf Template-Ebene liefert den Standard für Sections mit der Einstellung **Page**. Eine Änderung setzt verwaltete Sections neu zusammen, aktualisiert deren `js-vpa`-Klasse und bleibt auch in einem noch leeren Template erhalten. **On** oder **Off** an einer einzelnen Section überschreibt den Template-Standard.
 
-Der Composer gruppiert Einstellungen nach Zweck:
+Der Composer gruppiert die aktuellen Version-3-Einstellungen nach Zweck:
 
 | Gruppe | Beispiele |
 |---|---|
-| Identität | Section-ID und entstehender Präfix `/page-<seite>/<section>/…` |
-| Hintergrund & Überschrift | Oberfläche, Bild/Parallax, Überschriftenumfang, Ausrichtung |
-| Content-Modul | Text, Media-Split, Artikel, Listen, Slider, Tabs, Testimonials, Team, Statistiken, Features, Pricing, Tabellen, Badges, Formulare, Galerie, Video, Hinweise |
-| Content-Quelle | natives Textfill oder Elements-Collection |
-| Aktion | keiner, Link, Primary-Button oder Primary- plus Outline-Button |
-| Erweitert | Padding, Margin und Border |
+| Section | ID, Layout, Höhe, Breite, Abstände, Hintergrund und optionale Hintergrundbild-Einstellungen |
+| Area → Design | visueller Area-Style und geordnete Liste erlaubter Komponenten |
+| Area → Data | native Text-/Bild-/Template-Bindings oder eine Elements-Collection mit explizitem Feld-Mapping |
 
-Kuratierte Presets zeigen nur kompatible Auswahlmöglichkeiten. **Blank Section** stellt den vollständigen Composer bereit, wenn eine Kombination nicht durch ein fokussiertes Preset abgedeckt ist.
+Das Manifest bestimmt, welche Areas, Komponenten, Styles und Layouts kompatibel sind. HTML+ bleibt der ausdrückliche Weg für freie Quelltextänderungen.
 
 ## Quelltext-Sicherheit und HTML+-Escape-Hatch
 
-Beim Laden scannt das Backend oberste `<section>`-Elemente, ohne den umgebenden Quelltext zu serialisieren. Eine alleinstehende `[template /templates/<name>]`-Zeile außerhalb einer Section wird zur eigenen Template-Section-Karte; innerhalb einer Section bleibt der Shortcode Bestandteil dieser Section. Markierte Header-/Footer-Shortcodes werden stattdessen zu festen Settings-Slots. Sonstiger Quelltext wird als gesperrtes Raw-Segment ausgeliefert. Beim Speichern gilt:
+Beim Laden scannt das Backend oberste `<section>`-Elemente, ohne den umgebenden Quelltext zu serialisieren. Eine bereits vorhandene alleinstehende `[template /templates/<name>]`-Zeile außerhalb einer Section bleibt eine eigene Canvas-Karte; neue wiederverwendbare Includes werden über die Template-Komponente eines Presets gewählt. Markierte Header-/Footer-Shortcodes werden stattdessen zu festen Settings-Slots. Sonstiger Quelltext wird als gesperrtes Raw-Segment ausgeliefert. Beim Speichern gilt:
 
 - jedes Raw-Segment muss bytegenau unverändert sein;
 - jedes bearbeitbare HTML-Segment muss genau eine vollständige oberste Section enthalten;
@@ -116,32 +113,170 @@ Diese Metadaten erlauben das erneute Öffnen der Composer-Einstellungen. Sie sin
 
 ## Section-Library
 
-System-Presets liegen unter:
+System-Presets liegen in `_templates/library/<preset-key>/`. Der erzeugte HTML+-Quelltext wird in die Seite kopiert; die öffentliche Website liest die Library nicht zur Laufzeit.
 
-```text
-_templates/library/<preset>/manifest.php
+## Manifest v3: benannte Areas
+
+Version 3 ersetzt das universelle Intro/Content/Outro-Modell durch semantische
+Slots des Presets. Ein Layout enthält jede deklarierte `[[area:<key>]]` genau
+einmal. Der Builder rendert das Token aus der geordneten Komponentenliste der
+Area und speichert das vollständige bearbeitbare Modell in einem einzigen
+`nino:section`-Kommentar.
+
+**Layout** wird nur verwendet, wenn eine weitere `.tpl` die Komposition
+wirklich ändert. 2/3/4 Spalten, Ausrichtung und andere reine Klassenvarianten
+gehören in den **Style** einer Area. So bleiben beide Auswahlen eindeutig.
+
+### Vollständiges Collection-Beispiel
+
+Dieses gekürzte Article-Manifest zeigt einen einzelnen Titelbereich, eine
+wiederholte Elements-Area und eine optionale Action-Area:
+
+```php
+<?php return [
+	'name' => 'Articles — Responsive grid',
+	'description' => 'Titel, wiederholbare Artikelkarten und optionale Action.',
+	'category' => 'Cards',
+	'tags' => [ 'articles', 'cards', 'grid' ],
+	'version' => 3,
+	'recommend' => [
+		'layout' => 'default',
+		'frame' => [ 'background' => 'alt', 'container' => 'wide' ],
+	],
+	'layouts' => [
+		'default' => [ 'label' => 'Heading, articles and action', 'template' => 'section.tpl' ],
+	],
+	'areas' => [
+		'heading' => [
+			'label' => 'Title area', 'source' => 'single',
+			'allowed' => [ 'title', 'subtitle', 'description' ],
+			'container' => [ 'tag' => 'div', 'class' => 'ui-grid-100 nino-area--heading' ],
+			'styles' => [
+				'left' => [ 'label' => 'Left', 'class' => 'nino-area--left' ],
+				'center' => [ 'label' => 'Centered', 'class' => 'nino-area--center' ],
+			],
+			'recommend' => [ 'style' => 'center', 'components' => [
+				[ 'id' => 'title', 'type' => 'title' ],
+				[ 'id' => 'subtitle', 'type' => 'subtitle' ],
+			] ],
+			'render' => [ 'title' => [ 'tag' => 'h2', 'class' => 'ui-section-title' ] ],
+		],
+		'articles' => [
+			'label' => 'Articles', 'source' => 'elements',
+			'allowed' => [ 'image', 'title', 'description', 'button' ],
+			'item' => [ 'tag' => 'article', 'class' => 'ui-article ui-article--alt' ],
+			'styles' => [
+				'two-columns' => [ 'label' => '2 columns', 'class' => 'ui-grid-m-50' ],
+				'three-columns' => [ 'label' => '3 columns', 'class' => 'ui-grid-m-33' ],
+			],
+			'recommend' => [ 'style' => 'three-columns', 'components' => [
+				[ 'id' => 'image', 'type' => 'image', 'bindings' => [ 'src' => 'image', 'alt' => 'title' ] ],
+				[ 'id' => 'title', 'type' => 'title', 'bindings' => [ 'text' => 'title' ] ],
+				[ 'id' => 'copy', 'type' => 'description', 'bindings' => [ 'text' => 'description' ] ],
+				[ 'id' => 'action', 'type' => 'button', 'style' => 'primary', 'bindings' => [ 'label' => 'linkLabel', 'href' => 'link' ] ],
+			] ],
+			'typeTitle' => 'Articles',
+			'model' => [
+				'title' => [ 'type' => 'string', 'locale' => true, 'required' => true ],
+				'description' => [ 'type' => 'string', 'locale' => true, 'html' => true ],
+				'linkLabel' => [ 'type' => 'string', 'locale' => true ],
+				'link' => [ 'type' => 'string' ],
+				'image' => [ 'type' => 'image', 'width' => 1200, 'height' => 800 ],
+			],
+			'shortcode' => [ 'locale' => '', 'callback' => '', 'limit' => 6, 'query' => '' ],
+		],
+		'action' => [
+			'label' => 'Action area', 'source' => 'single',
+			'allowed' => [ 'title', 'description', 'button', 'template' ],
+			'recommend' => [ 'components' => [] ],
+		],
+	],
+];
 ```
 
-Ein Manifest enthält Name, Beschreibung, Kategorie, Tags, Version, Defaults und erlaubte Einstellungswerte. Nicht angegebene Achsen werden auf ihren Default festgelegt; dadurch bleibt ein kuratiertes Preset fokussiert. Das Preset `blank` erlaubt ausdrücklich den gesamten Composer.
+`section.tpl` enthält keine komponentenspezifischen Tokens:
 
-Eine optionale `section.tpl` neben dem Manifest erzeugt ein codebasiertes Preset. Verfügbare Tokens sind:
-
-```text
-{{section:id}}
-{{section:classes}}
-{{section:meta}}
-{{content:prefix}}
-{{elements:type}}
-{{text:<suffix>}}
-{{image:<suffix>}}
+```html
+[[area:heading]]
+[[area:articles]]
+[[area:action]]
 ```
 
-Der erzeugte Quelltext wird in die Seite kopiert. Wird das Preset später entfernt, bleibt die öffentliche Webseite funktionsfähig; nur die visuelle Composer-Bearbeitung dieser Section steht nicht mehr zur Verfügung.
+### Layout- und Frame-Beispiel
+
+`fullscreen-image` bietet zwei echte Layout-Templates. Layout-Empfehlungen
+können die Frame-Empfehlung des Presets ergänzen; eine explizite Auswahl des
+Benutzers gewinnt weiterhin:
+
+```php
+'recommend' => [ 'layout' => 'cover', 'frame' => [ 'focus' => '5', 'overlay' => 'medium' ] ],
+'layouts' => [
+	'cover' => [
+		'label' => 'Static cover image', 'template' => 'section-cover.tpl',
+		'frame' => [ 'screen' => '100', 'background' => 'cover' ],
+	],
+	'parallax' => [
+		'label' => 'Parallax image', 'template' => 'section-parallax.tpl',
+		'frame' => [ 'screen' => '100', 'background' => 'parallax' ],
+	],
+],
+'areas' => [
+	'content' => [
+		'label' => 'Title content', 'source' => 'single',
+		'allowed' => [ 'title', 'subtitle', 'description', 'button', 'template' ],
+		'recommend' => [ 'components' => [
+			[ 'id' => 'title', 'type' => 'title', 'style' => 'loud' ],
+			[ 'id' => 'action', 'type' => 'button', 'style' => 'primary' ],
+		] ],
+	],
+],
+```
+
+### Regeln für Areas und Komponenten
+
+- `source` ist `single` oder `elements`. Eine Single-Area erzeugt/verwendet
+  native Text- und Image-Keys. Eine Elements-Area wählt/erstellt einen Typ und
+  mappt jede Komponenteneigenschaft auf ein kompatibles Modelfeld.
+- Kernkomponenten sind `title`, `subtitle`, `description`, `text`, `image`,
+  `button`, `price`, `number` und `template`. `allowed` ist eine strikte
+  Teilmenge pro Area. Komponenten können sortiert und gelöscht, aber nicht
+  verschachtelt werden.
+- Jede Komponente braucht eine eindeutige kleingeschriebene Slug-`id`. Sie ist
+  der stabile Default-Suffix. Bild `hero-image` erzeugt beispielsweise
+  `/page-<page>/<section>/hero-image` und `hero-image-alt`.
+- Eine `template`-Komponente bietet gezielt einen wiederverwendbaren `.tpl`-
+  Input an. Sie kompiliert zu validiertem `[template /templates/<name>]` und
+  kann an jeder Position der Komponentenliste stehen.
+- `styles` einer Area sind reine CSS-Auswahlen. `render.<type>` darf sicheren
+  Tag/Klasse, Bildmaße oder eine endliche Component-Style-Map überschreiben.
+  Tags und Klassen werden vom Compiler erlaubt; Browserdaten liefern weder
+  beliebiges Markup noch PHP.
+- `container` umschließt eine Single-Area, `item` jede Elements-Wiederholung.
+  Responsive Struktur und Full-Bleed bleiben in diesen preseteigenen Klassen
+  und Templates.
+- `maxComponents` ist standardmäßig 12 und wird auf 1…20 begrenzt.
+- Alle Shortcode-Argumente werden ausgegeben. Seltene Query-/Callback-
+  Änderungen bleiben nach dem Ablösen eine HTML+-Aufgabe.
+
+Die v3-Metadaten sind die einzige grafische Wahrheitsquelle:
+
+```html
+<!-- nino:section {"version":3,"preset":"articles-grid","areas":{…}} -->
+```
+
+Der öffentliche Request liest sie nicht. Nur der Builder öffnet damit die
+Area-/Komponenten-Konfiguration erneut. HTML+ entfernt den Kommentar und
+beendet damit bewusst die grafische Zuständigkeit.
+
+
+### Versionsvertrag
+
+Die Section Library lädt ausschließlich Manifeste mit explizitem `version => 3`. Eine fehlende, ältere oder unbekannte Version wird ignoriert, statt in eine andere UI geraten zu werden. Bereits erzeugtes HTML bleibt gültiger Runtime-Quelltext und kann über HTML+ weiterbearbeitet werden; zum neuen Einfügen oder grafischen Wiederöffnen eines verwalteten Presets wird jedoch ein gepflegtes V3-Manifest benötigt.
 
 ## Aktuelle Grenzen
 
-- Library und Konfiguration rendern erzeugtes Markup mit `/.cache/style.css` und Beispieldaten. Die Vorschauen sind isoliert und führen bewusst kein Projekt-JavaScript aus, senden keine Formulare ab und folgen keinen Links.
-- Visuelle Content-Einheiten sind oberste `<section>`-Elemente und alleinstehende `[template /templates/<name>]`-Zeilen; markierte Header-/Footer-Slots liegen stattdessen in den Template Settings.
+- Library und Konfiguration rendern erzeugtes Markup mit Beispieldaten. Das Backend aktualisiert zuerst das konfigurierte Bundle `/.cache/style.css` und liefert dessen Inhalt im authentifizierten Library-Payload; der Client bettet ihn in jedes isolierte `srcdoc` ein und benötigt deshalb keinen eigenen Request auf ein öffentliches Dot-Verzeichnis. Script-Tags und Inline-Handler werden entfernt, die CSP sperrt Skripte und Netzwerkaktionen, Formulare können nicht senden und Links werden nicht verfolgt.
+- Visuelle Content-Einheiten sind oberste `<section>`-Elemente. Bestehende alleinstehende `[template]`-Zeilen bleiben verlustfrei bearbeitbar; neue Includes werden über eine Area-Komponente eingefügt. Markierte Header-/Footer-Slots liegen in den Template Settings.
 - Der Builder kann `page-*.tpl` anlegen; die Zuordnung von Route zu Template bleibt in `/_admin` oder im Code.
 - Native Quick-Fills sind einfache Texteingaben. Rich Text, Übersetzungen und Batch-Pflege bleiben in den etablierten Content-Werkzeugen.
 - Fehlende Bildplatz-Definitionen lassen sich mit empfohlenen Maßen anlegen; Auswahl und Upload des eigentlichen Bildes bleiben in `/_admin`.
