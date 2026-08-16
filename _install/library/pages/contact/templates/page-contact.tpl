@@ -17,8 +17,13 @@
 				<label for="contact-message">[[/form/label/message]]</label>
 				<textarea id="contact-message" name="message" class="ui-form-textarea" required></textarea>
 
-				<!-- Honeypot - stays hidden/empty for real visitors, see Form.php -->
-				<input type="text" name="location" class="ui-sr-only" tabindex="-1" autocomplete="off">
+				<!-- Honeypot - stays hidden/empty for real visitors, see Form.php.
+				     Hidden from assistive technology as well, same as the newsletter
+				     signup in .demo-sections.tpl: .ui-sr-only is screen-reader-*only*,
+				     ie. the exact opposite, and an unlabeled field a screen reader
+				     announced and a visitor filled in came back as Form.php's silent
+				     418 with nothing to explain it -->
+				<input type="text" name="location" value="" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute; left:-9999px; width:1px; height:1px;">
 
 				<p class="ui-form-message"></p>
 				<p><small>[[/form/required]]</small></p>

@@ -40,6 +40,11 @@
 					return;
 				}
 
+				// Cleared, not left on "Saving …" - the done panel below replaces
+				// the form but not this line, so the finished wizard used to show
+				// "Installation complete" and "Saving …" at the same time
+				msg.textContent = '';
+
 				dc.getElementById('finish-form').classList.add('admin-hidden');
 				dc.getElementById('finish-done').classList.remove('admin-hidden');
 				dc.getElementById('install-page-wrap').classList.add('is-complete');

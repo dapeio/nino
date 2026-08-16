@@ -33,20 +33,35 @@
 			<link rel="manifest" href="[[/nino/public]]/favicon/site.webmanifest">
 			[assets /.cache/style.css]
 
-			<!-- Structured data (schema.org) -->
+			<!-- The preloader is a full-screen overlay that only Nino.ui.js
+			     takes back down, on window.load. Without this rule a visitor
+			     with javascript disabled - or one hitting a javascript error
+			     raised before that handler is bound, eg. from this project's
+			     own assets/script.js - is left looking at a blank page over
+			     perfectly good markup -->
+			<noscript><style>.js-preloader { display: none }</style></noscript>
+
+			<!-- Structured data (schema.org). Values go through [json ...]
+			     rather than "[[...]]" inside the quotes: a textfill is
+			     inserted verbatim, and /company/adress is multi-line by
+			     design (a postal address, offered as a <textarea> in
+			     /_install's own PersonalInfos step), so a raw newline used to
+			     land inside a json string and this whole block failed to
+			     parse on every page. [json ...] emits the complete string
+			     literal, quotes included - see Html::doJsonShortcode() -->
 			<script type="application/ld+json">
 			{
 				"@context": "https://schema.org",
 				"@type": "LocalBusiness",
-				"name": "[[/company/name]]",
-				"description": "[[/company/description]]",
+				"name": [json /company/name],
+				"description": [json /company/description],
 				"url": "https://[[/website/url]]",
-				"telephone": "[[/company/phone]]",
-				"email": "[[/company/email]]",
+				"telephone": [json /company/phone],
+				"email": [json /company/email],
 				"address": {
 					"@type": "PostalAddress",
-					"streetAddress": "[[/company/adress]]",
-					"addressCountry": "[[/company/country]]"
+					"streetAddress": [json /company/adress],
+					"addressCountry": [json /company/country]
 				}
 			}
 			</script>
