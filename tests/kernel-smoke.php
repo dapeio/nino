@@ -437,6 +437,37 @@ check( '[image] shortcode renders nothing for an unknown slot', \Nino\Html::rend
 echo "\n";
 
 
+// --- [json] textfills into a hand-written json document -----------------
+//
+// html-header.tpl's schema.org block writes json by hand and used to drop
+// raw fill values into it. '/company/adress' is multi-line by design, and a
+// raw newline in a json string is not valid json, so that block failed to
+// parse on every page of every install.
+
+\Nino\Html::init( $appData );
+\Nino\Html::addFills( $appData, [
+	'/test/json/multiline'	=> "Musterstraße 1\n10115 Berlin",
+	'/test/json/quotes'			=> 'We say "hello" & build 5 < 10 sites',
+	'/test/json/nested'			=> 'Contact [[/test/json/quotes]]',
+], '*' );
+
+check( '[json] wraps a value in its own quotes', \Nino\Html::renderHtml( $appData, '[json /test/json/multiline]' ) === '"Musterstraße 1\n10115 Berlin"' );
+check( '[json] renders an unknown key as an empty string literal', \Nino\Html::renderHtml( $appData, '[json /test/json/nope]' ) === '""' );
+check( '[json] resolves a nested fill before encoding', str_contains( \Nino\Html::renderHtml( $appData, '[json /test/json/nested]' ), 'hello' ) === true );
+
+$jsonDocument = \Nino\Html::renderHtml( $appData, '{ "streetAddress": [json /test/json/multiline], "description": [json /test/json/quotes] }' );
+$jsonDecoded  = json_decode( $jsonDocument, true );
+check( 'a document built this way parses as json', is_array( $jsonDecoded ) === true );
+check( '...with the multi-line value intact', ( $jsonDecoded['streetAddress'] ?? '' ) === "Musterstraße 1\n10115 Berlin" );
+check( '...and the quotes/ampersand round-tripped', ( $jsonDecoded['description'] ?? '' ) === 'We say "hello" & build 5 < 10 sites' );
+check( 'nothing that could close the surrounding <script> survives encoding', str_contains( $jsonDocument, '<' ) === false && str_contains( $jsonDocument, '&' ) === false );
+
+// The same document with the old raw-fill approach, as a regression guard
+check( 'the raw-fill form this replaces really is invalid json', json_decode( \Nino\Html::renderHtml( $appData, '{ "streetAddress": "[[/test/json/multiline]]" }' ), true ) === null );
+
+echo "\n";
+
+
 // --- Filesystem cache after a rejected write ----------------------------
 
 echo "Filesystem::putFileContent - failed writes never become cached state\n";
@@ -1155,12 +1186,57 @@ $homeRequest = fakeRequest( $appData, '/' );
 $seededCsp = $homeRequest['/nino/http/response']['header']['Content-Security-Policy'] ?? '';
 check( 'the response header is seeded with the default csp', str_contains( $seededCsp, "default-src 'self'" ) === true );
 
+// img-src '*' covers network schemes only, so a data: uri needs spelling out.
+// Nino.css uses one for .ui-atf-arrowdown, ie. the framework's own default
+// policy used to block the framework's own icon
+check( 'the default csp allows data: images', str_contains( $seededCsp, 'img-src * data:' ) === true );
+check( '...which is what Nino.css\'s own data: uri needs', str_contains(
+	(string) @file_get_contents( __DIR__. '/../_nino/Nino.css' ), 'url("data:image/svg+xml'
+) === false || str_contains( $seededCsp, 'data:' ) === true );
+
 $appData['./nino/jstext/nonce'] = base64_encode( random_bytes( 16 ) );
 \Nino\Modules\Jstext::callbackResponse( $appData, $homeRequest );
 $jstextCsp = $homeRequest['/nino/http/response']['header']['Content-Security-Policy'];
 check( 'Jstext appends its script-src to the csp', str_contains( $jstextCsp, "script-src 'self' 'nonce-" ) === true );
 check( 'Jstext keeps the default-src while doing so', str_contains( $jstextCsp, "default-src 'self'" ) === true );
 check( 'the composed csp does not start with a stray separator', str_starts_with( $jstextCsp, ';' ) === false );
+
+// The last-resort 404 fallback, ie. a project without its own /404 route.
+// Written as '.uri' it merged a stray key in and left the response uri on the
+// unmatched request path, so every [[/webpage[[/nino/http/response/uri]]/...]]
+// fill on that page resolved against a webpage that does not exist
+$noFallbackAppData = $appData;
+unset( $noFallbackAppData['/nino/http/routes']['GET://404'] );
+$unmatchedRequest = fakeRequest( $noFallbackAppData, '/no-such-page-xyz' );
+\Nino\Http::response( $noFallbackAppData, $unmatchedRequest );
+check( 'a project without a /404 route still answers 404', $unmatchedRequest['/nino/http/response']['statusCode'] === 404 );
+check( '...and points the response uri at /404 rather than the unmatched path', ( $unmatchedRequest['/nino/http/response']['uri'] ?? '' ) === '/404' );
+check( '...leaving no stray \'.uri\' key behind', isset( $unmatchedRequest['/nino/http/response']['.uri'] ) === false );
+
+// A route entry without a 'uri' is a hand-edited config.php away, and an
+// "Undefined array key" here is an engine-raised level, ie. fatal per
+// Runtime::handleError() - one config typo used to 500 every locale switch
+// Prepended, so the loop has to walk past it before reaching the match it
+// is looking for. The return value alone proves nothing here: these tests
+// call the kernel directly and never install Runtime's error handler, so the
+// "Undefined array key" this used to raise is a warning the run survives -
+// while in a real request that same level is fatal. The raised level is
+// therefore what gets asserted.
+$uriLessAppData = $appData;
+$uriLessAppData['/nino/http/routes'] = [ 'GET://broken-entry' => [ 'body' => 'no uri key here' ] ] + $appData['/nino/http/routes'];
+
+$routeWarnings = [];
+set_error_handler( function( int $level, string $message ) use ( &$routeWarnings ): bool {
+	$routeWarnings[] = $message;
+	return true;
+} );
+$foundGerman  = \Nino\Http::findRouteUri( $uriLessAppData, '/legal', 'de_DE' );
+$foundNothing = \Nino\Http::findRouteUri( $uriLessAppData, '/nowhere', 'de_DE' );
+restore_error_handler();
+
+check( 'findRouteUri() raises nothing on a route entry without a uri', $routeWarnings === [] );
+check( '...walks past it to the route that does match', $foundGerman === 'GET://rechtliches' );
+check( '...and still returns null for a response uri no route renders', $foundNothing === null );
 
 $robotsRequest = fakeRequest( $appData, '/robots.txt' );
 \Nino\Http::response( $appData, $robotsRequest );

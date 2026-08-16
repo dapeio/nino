@@ -79,6 +79,7 @@ namespace Nino {
 		\Nino\AppData::init( $appData );
 		\Nino\Locales::init( $appData );
 		\Nino\Csrf::init( $appData );
+		\Nino\Html::init( $appData );
 		\Nino\Auth::init( $appData );
 		\Nino\Modules::callModules( $appData, 'init' );
 
@@ -2378,9 +2379,56 @@ namespace Nino {
 		// before _doShortcode() stops unrolling - see there
 		private const int MAX_RENDER_DEPTH = 20;
 
+		// The shortcodes the kernel provides itself. Called unconditionally
+		// from \Nino\init(), same as Csrf::init() - the base templates use
+		// [json] in their schema.org block, so it has to be there whichever
+		// optional modules a project has enabled (or removed).
+		public static function init( array &$appData ): void {
+
+			self::addShortcode( $appData, 'json', [ self::class, 'doJsonShortcode' ] );
+		}
+
 		public static function response( array &$appData, array &$request ): void {
 			if( is_string( $request['/nino/http/response']['body'] ) === true )
 				$request['/nino/http/response']['body'] = self::renderHtml( $appData, $request['/nino/http/response']['body'] );
+		}
+
+		/**
+		 *	[json /company/adress] - one textfill as a complete json string
+		 *	literal, surrounding quotes included, for a json document a
+		 *	template writes by hand. The schema.org block in
+		 *	html-header.tpl is the reason it exists: a fill goes into the
+		 *	page verbatim (see _renderFills()), and '/company/adress' is
+		 *	multi-line by design - it renders as a postal address and
+		 *	_install's own PersonalInfos step offers it as a <textarea>. A
+		 *	raw newline inside a json string is not valid json, so that
+		 *	block failed to parse on every page of every install. A quote
+		 *	or a backslash in any of the other values does the same.
+		 *
+		 *	Same reasoning and the same flags as Modules\Jstext, which
+		 *	json-encodes fills for exactly this reason before writing them
+		 *	into an inline <script>: the JSON_HEX_* set encodes the
+		 *	characters that could end the surrounding element ('<', '&',
+		 *	quotes) explicitly rather than relying on slash escaping to
+		 *	neutralize a '</script>' as a side effect.
+		 *
+		 *	Nested fills are resolved before encoding, so a value that
+		 *	references another one ('[[/website/url]]' inside a subject
+		 *	line, say) still comes out as its final text - and the
+		 *	re-render Html::_doShortcode() runs on this return value then
+		 *	has nothing left to substitute back into the encoded string.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array			$args					Shortcode arguments, $args[0] is the fill key
+		 *
+		 *	@return 	string									A json string literal, '""' for an unknown key
+		 */
+		public static function doJsonShortcode( array &$appData, array $args ): string {
+
+			$value = self::renderTextfill( $appData, (string) ( $args[0] ?? '' ) );
+			$value = self::_renderFills( $appData, $value );
+
+			return (string) json_encode( $value, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT );
 		}
 
 		public static function renderHtml( array &$appData, string $html ): string {
@@ -2665,7 +2713,12 @@ namespace Nino {
 					// them an injected <base>/<form action> escapes the policy -
 					// and textfills (Html::_renderFills()) put admin-editable text
 					// into the page unescaped, so the csp is load-bearing here.
-					'Content-Security-Policy' 		=> 'default-src \'self\'; img-src *; style-src \'self\' \'unsafe-inline\'; frame-ancestors \'self\'; base-uri \'self\'; form-action \'self\'',
+					// img-src needs 'data:' spelled out: the '*' source covers
+					// network schemes only, so without it the browser refused
+					// every data: uri image - including the one Nino's own
+					// Nino.css uses for .ui-atf-arrowdown, which therefore
+					// rendered as an empty button on every page that has one.
+					'Content-Security-Policy' 		=> 'default-src \'self\'; img-src * data:; style-src \'self\' \'unsafe-inline\'; frame-ancestors \'self\'; base-uri \'self\'; form-action \'self\'',
 					'X-Frame-Options' 						=> 'SAMEORIGIN',
 					'X-Content-Type-Options'			=> 'nosniff',
 				],
@@ -2713,9 +2766,16 @@ namespace Nino {
 		public static function response( array &$appData, array &$request ): void {
 
 			// Find current route
+			// 'uri', not '.uri': the dot prefix is the convention for runtime
+			// keys elsewhere (see Elements), but the response array's own key
+			// is the plain one - written with the dot, this last-resort
+			// fallback merged in a stray key and left the response uri
+			// pointing at the unmatched request path, so every
+			// [[/webpage[[/nino/http/response/uri]]/...]] fill on the 404
+			// resolved against a page that does not exist
 			$routeData = self::requestRoute( $appData, $request['/nino/http/request']['uri'], $request['/nino/http/request']['method'] ) ??
 				self::requestRoute( $appData, '/404', 'GET' ) ??
-				[ '.uri' => '/404', 'statusCode' => 404 ];
+				[ 'uri' => '/404', 'statusCode' => 404 ];
 
 			// A route's own header fields extend the seeded response header
 			// (see request()) instead of replacing the whole array - eg.
@@ -2818,8 +2878,13 @@ namespace Nino {
 		// locale-specific variant of the current page
 		public static function findRouteUri( array &$appData, string $responseUri, string $locale ): ?string {
 
+			// '??' like every other route read in this file: a route entry
+			// without a 'uri' (hand-edited config.php, a module registering
+			// only a body) raised an "Undefined array key" here, and
+			// Runtime::handleError() treats an engine-raised level as fatal -
+			// so one typo in the config turned every locale switch into a 500
 			foreach( $appData['/nino/http/routes'] as $routeUri => $routeData )
-				if( $routeData['uri'] === $responseUri && ( isset( $routeData['locale'] ) === false || $routeData['locale'] === $locale ) )
+				if( ( $routeData['uri'] ?? null ) === $responseUri && ( isset( $routeData['locale'] ) === false || $routeData['locale'] === $locale ) )
 					return $routeUri;
 
 			return null;
