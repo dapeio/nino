@@ -121,8 +121,17 @@ html {
 	padding: 0;
 }
 
+/* Column flow so a short page still puts the footer on the bottom edge.
+   min-height alone only stretched the body - the footer stayed wherever the
+   content ended, which on a page-blank.tpl route (the starting point
+   /_install writes for every Blank page) left it floating mid-viewport above
+   a screen-high strip of empty background. `header` is position:fixed and so
+   out of flow either way; .js-preloader and .js-cookie-banner are fixed too,
+   which leaves `main` and `footer` as the only flex items here */
 body {
 	min-height: 100vh;
+	display: flex;
+	flex-direction: column;
 	line-height: inherit;
 	color: var(--color-text);
 	background-color: var(--color-background);
@@ -389,6 +398,10 @@ footer {
    being covered - except when the page opens with a cover/parallax hero,
    which is designed to sit flush behind the (semi-transparent) header */
 main {
+	/* Takes the leftover column height, which is what pushes `footer` down
+	   to the bottom edge on a page too short to fill the viewport. flex-basis
+	   auto + no shrink so a long page still lays out from its content */
+	flex: 1 0 auto;
 	padding-top: var(--space-6);
 }
 main:has(> .js-cover.ui-atf:first-child),

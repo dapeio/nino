@@ -641,10 +641,31 @@
 
 						this.form.classList.remove('pending');
 
-						let result = ( xhr.status === 200 ) ? 'success' : 'error';
+						const ok = ( xhr.status === 200 );
 
-						this.form.classList.add(result);
-						this.form.msg.innerHTML = Nino.content.getText('/form/info/'+ result);
+						this.form.classList.remove( ok === true ? 'error' : 'success' );
+						this.form.classList.add( ok === true ? 'success' : 'error' );
+
+						// A 400 is Form.php repeating the field validation this form
+						// already ran, ie. an address the regex below accepted and
+						// FILTER_VALIDATE_EMAIL did not - so it gets the field-level
+						// message instead of "please try again later", which sends the
+						// visitor away to wait out a problem only they can fix. Every
+						// other non-200 stays generic on purpose: naming the csrf 403
+						// or the honeypot's 418 tells a spam bot which check it tripped.
+						// textContent, not innerHTML - these are editor-editable
+						// textfills, and Modules\Jstext json-encodes them precisely so
+						// they cannot become markup on the way in
+						this.form.msg.textContent = ( xhr.status === 400 )
+							? Nino.content.getText('/form/info/email')
+							: Nino.content.getText('/form/info/'+ ( ok === true ? 'success' : 'error' ));
+
+						// Only a delivered message locks the form down. Disabling every
+						// field on any response left a visitor who mistyped their address
+						// looking at a correctable error in a form they could no longer
+						// correct
+						if( ok === false )
+							return;
 
 						this.form.btn.disabled = true;
 						for( let i = 0, l = this.form.fields.length; i<l; i++ )
@@ -669,30 +690,54 @@
 						let error = false, data = {};
 						for( let i = 0, l = this.fields.length; i<l; i++) {
 
-							// Store value
-							data[this.fields[i].name] = this.fields[i].value = this.fields[i].value.replace( /[<>'";(){}[\]\\|]/g, '' );
+							// Stored as typed. This used to strip [<>'";(){}[\]\|] from
+							// every field and write the stripped value back into the
+							// visible input, which silently rewrote legitimate content:
+							// "mary.o'brien@example.com" was submitted - and confirmed -
+							// as "mary.obrien@example.com", a different, quite possibly
+							// real mailbox, so the confirmation mail and the owner's
+							// reply both went to a stranger. Form.php's own comment
+							// spells out why it does not escape these values either.
+							// Escaping is an output concern and already handled where
+							// the values become markup (Form/Newsletter escape on the
+							// way into the mail templates); removing characters here
+							// protected nothing and corrupted ordinary input
+							data[this.fields[i].name] = this.fields[i].value;
 
 							// Check required
 							if( this.fields[i].required === true && this.fields[i].value.length === 0 )
 								this.fields[i].classList.add('error') || ( error = Nino.content.getText('/form/info/required') );
 
-							// Check email
-							if( error === false && this.fields[i].type === 'email' && ( /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(this.fields[i].value) === false ) )
+							// Check email. The local part uses the character set the html
+							// spec allows for input[type=email] (and php's
+							// FILTER_VALIDATE_EMAIL with it) rather than a hand-picked
+							// subset: the old one had no "'" in it, so a real
+							// "mary.o'brien@example.com" failed a check the browser's own
+							// native validation and Form.php both pass. The
+							// dot-plus-tld tail is kept - it is stricter than the spec,
+							// deliberately, because a contact form typo'd to "@localhost"
+							// helps nobody
+							if( error === false && this.fields[i].type === 'email' && ( /^[a-zA-Z0-9.!#$%&'*+\/=?^_`{|}~-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*\.[a-zA-Z]{2,}$/.test(this.fields[i].value) === false ) )
 								this.fields[i].classList.add('error') || ( error = Nino.content.getText('/form/info/email') );
 						}
 						// Catch error
 						if( error !== false )
-							return this.msg.innerHTML = error;
+							return this.msg.textContent = error;
 
-						// Send form
-						const uniqueResponse = formResponse;
-						uniqueResponse.form = this;
+						// One handler bound to this form, not a property written onto
+						// the shared function object: `const uniqueResponse =
+						// formResponse` was an alias, not a copy, so a second form
+						// submitting while the first was still in flight overwrote
+						// .form and the first response updated the wrong one.
+						// sendRequest() invokes the callback via callback.call(callback,
+						// ...), and a bound function's `this` survives that
+						const boundResponse = formResponse.bind( { form : this } );
 						this.classList.add('pending');
 
 						// action defaults to '/' (the contact form's own POST
 						// handler) - a form targeting a different endpoint (eg.
 						// the newsletter signup) sets its own action="..."
-						Nino.http.sendRequest( this.getAttribute('action') || '/.form', 'POST', formResponse, data );
+						Nino.http.sendRequest( this.getAttribute('action') || '/.form', 'POST', boundResponse, data );
 					},
 					/**
 					 *	Toggle the "empty" class on a form field's wrapper,
@@ -751,10 +796,22 @@
 
 						this.form.classList.remove('pending');
 
-						let result = ( xhr.status === 200 ) ? 'success' : 'error';
+						const ok = ( xhr.status === 200 );
 
-						this.form.classList.add(result);
-						this.form.msg.innerHTML = Nino.content.getText('/newsletter/info/'+ result);
+						this.form.classList.remove( ok === true ? 'error' : 'success' );
+						this.form.classList.add( ok === true ? 'success' : 'error' );
+
+						// Same split as the .ui-form handler above: a 400 is the
+						// address itself, anything else stays generic. The
+						// "already subscribed" case deliberately answers 200 like
+						// any other signup (see this block's docblock), so it
+						// still never reaches here as its own outcome
+						this.form.msg.textContent = ( xhr.status === 400 )
+							? Nino.content.getText('/newsletter/info/email')
+							: Nino.content.getText('/newsletter/info/'+ ( ok === true ? 'success' : 'error' ));
+
+						if( ok === false )
+							return;
 
 						this.form.btn.disabled = true;
 						for( let i = 0, l = this.form.fields.length; i<l; i++ )
@@ -777,22 +834,25 @@
 						let error = false, data = {};
 						for( let i = 0, l = this.fields.length; i<l; i++) {
 
-							data[this.fields[i].name] = this.fields[i].value = this.fields[i].value.replace( /[<>'";(){}[\]\\|]/g, '' );
+							// Stored as typed - see the .ui-form handler above for why
+							// the character strip that used to sit here was removed
+							data[this.fields[i].name] = this.fields[i].value;
 
 							if( this.fields[i].required === true && this.fields[i].value.length === 0 )
 								this.fields[i].classList.add('error') || ( error = Nino.content.getText('/newsletter/info/required') );
 
-							if( error === false && this.fields[i].type === 'email' && ( /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(this.fields[i].value) === false ) )
+							// Same character set as the .ui-form check above
+							if( error === false && this.fields[i].type === 'email' && ( /^[a-zA-Z0-9.!#$%&'*+\/=?^_`{|}~-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*\.[a-zA-Z]{2,}$/.test(this.fields[i].value) === false ) )
 								this.fields[i].classList.add('error') || ( error = Nino.content.getText('/newsletter/info/email') );
 						}
 						if( error !== false )
-							return this.msg.innerHTML = error;
+							return this.msg.textContent = error;
 
-						const uniqueResponse = newsletterResponse;
-						uniqueResponse.form = this;
+						// Bound per submit - see the .ui-form handler above
+						const boundResponse = newsletterResponse.bind( { form : this } );
 						this.classList.add('pending');
 
-						Nino.http.sendRequest( this.getAttribute('action') || '/.newsletter', 'POST', newsletterResponse, data );
+						Nino.http.sendRequest( this.getAttribute('action') || '/.newsletter', 'POST', boundResponse, data );
 					};
 
 				for( let i=0, l=e.newsletterForm.length; i<l; i++ ) {
