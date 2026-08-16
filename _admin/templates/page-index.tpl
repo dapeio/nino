@@ -83,7 +83,6 @@
 					<div id="restore-list"></div>
 				</div>
 				<div id="admin-content-config">
-					<div id="config-list"></div>
 					<div id="config-form"></div>
 				</div>
 			</main>

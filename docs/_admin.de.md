@@ -262,20 +262,39 @@ Die automatische Sicherung ist ein Sicherheitsnetz für redaktionelle Änderunge
 
 ## Config: technische Konfiguration
 
-Der Bereich **Config** bearbeitet eine bewusst begrenzte Auswahl aus `config.php` als JSON:
+Der Bereich **Config** bearbeitet eine bewusst begrenzte Auswahl aus `config.php` als Formular. Jeder Wert ist typisiert und wird vor dem Schreiben geprüft; die ganze Seite wird in einem Schreibvorgang gespeichert.
 
-| Schlüssel | Erwarteter Wert |
+| Gruppe | Einstellung | Schlüssel | Bedienelement |
+|---|---|---|---|
+| Errors and diagnostics | Fehler protokollieren | `/nino/error/log` | Schalter |
+| Errors and diagnostics | Fehler im Frontend anzeigen | `/nino/error/display` | Schalter |
+| Errors and diagnostics | Session-Cookie immer als secure setzen | `/nino/session/force-secure-cookie` | Schalter |
+| Login protection | Fehlversuche bis zur Sperre | `/nino/auth/maxtries` | Zahl, 1–100 |
+| Login protection | Sperrdauer | `/nino/auth/cooldown` | Zahl, 60–604800 Sekunden |
+| Editor features | Tägliches verschlüsseltes Backup | `/nino/editor/backups` | Schalter |
+| Editor features | Änderungsprotokoll führen | `/nino/editor/logs` | Schalter |
+| Languages | Sprachen | `/nino/locales/available` | Auswahlliste |
+| Languages | Muttersprache | `/nino/locales/native` | Select |
+
+Die Sprachliste zeigt jede Locale, die das Projekt kennt: die aus `config.php` plus jede auf der Platte gefundene `text/<locale>.php`. Jede Zeile meldet, ob diese Datei existiert und wie viele Schlüssel sie enthält — eine Sprache ohne eigene Textdatei rendert jeden sprachabhängigen Textfill als rohes `[[key]]`, und genau das sagt das Panel vor dem Speichern.
+
+**Eine Sprache hinzufügen** nimmt ihre Id (`fr_FR`) und schreibt sofort `text/fr_FR.php` — als Gerüst: jeder Schlüssel der Muttersprache, in deren Reihenfolge, mit leeren Werten. Genau diese Datei listen die Text-Bereiche von `/_editor` und `/_admin` anschließend als offene Arbeit auf. Die Werte bleiben absichtlich leer: ein Schlüssel, der den Satz der Muttersprache enthält, liest sich wie fertig — und geht so auch live.
+
+Aktiviert wird die Sprache dadurch **nicht**. Ihre Schlüssel sind leer, ein Anhaken hieße also, eine Sprache mit leeren Seiten einen Save vom Ausliefern zu entfernen. Erst unter **Text** übersetzen (oder über **Translations** importieren), dann hier anhaken und speichern. Eine vorhandene `text/<locale>.php` wird nie überschrieben — beim Hinzufügen einer Sprache, die schon eine hat, meldet das Panel nur deren Schlüsselzahl.
+
+Die Muttersprache kann nur eine der aktuell angehakten Sprachen sein. Beide Schlüssel werden deshalb gemeinsam gespeichert — getrennt gespeichert gäbe es einen Moment, in dem `config.php` eine Muttersprache nennt, die das Projekt nicht hat.
+
+Drei Schlüssel bearbeitet dieser Bereich bewusst nicht mehr:
+
+| Schlüssel | Stattdessen bearbeiten unter |
 |---|---|
-| `/nino/error/log` | `true` oder `false` |
-| `/nino/error/display` | `true` oder `false` |
-| `/nino/locales/native` | Sprachcode als String |
-| `/nino/locales/available` | Liste von Sprachcodes |
-| `/nino/html/assets` | Asset-Bundles als Objekt |
-| `/nino/http/routes` | vollständige Routing-Tabelle |
+| `/nino/http/routes` | **Routes** |
+| `/nino/html/navs` | **Navigations** |
+| `/nino/html/assets` | von Hand in `config.php` oder über einen erneuten Theme-Schritt in `/_install` |
 
-Nino prüft JSON-Syntax und Grundtyp, aber nicht jede fachliche Abhängigkeit. Fehler in Routen, Sprachen oder Asset-Bundles können die Webseite oder die Verwaltungsbereiche unzugänglich machen. Nutze für normale Seitenänderungen deshalb **Routes** und für Bildplätze **Images**.
+Asset-Bundles bleiben eine bewusste Dateiänderung, weil ihre **Reihenfolge** für die CSS-Kaskade tragend ist — und die zeigt ein Formular nicht. Die anderen beiden haben längst eigene Editoren, und ein zweiter, ungeprüfter Weg auf dieselben Daten ist ein Weg, sie zu beschädigen.
 
-In Produktion muss `/nino/error/display` auf `false` stehen.
+In Produktion muss `/nino/error/display` ausgeschaltet sein.
 
 ## Empfohlener Arbeitsablauf
 

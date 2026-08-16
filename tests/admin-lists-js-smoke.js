@@ -35,10 +35,36 @@ console.log('Admin drill-down lists');
 	[ 'Routes', 'pages.js' ],
 	[ 'Navigations', 'navs.js' ],
 	[ 'Images', 'images.js' ],
-	[ 'Config', 'config.js' ],
 ].forEach( function( entry ) {
 	check( entry[0]+ ' uses the shared grouped-list component', asset( entry[1] ).includes( "ul.className = 'nino-admin-list'" ) );
 } );
+
+// Config is deliberately not one of them. It used to be a list of keys drilling
+// down into a raw json textarea each; it is now a single grouped form, because
+// nine settings are quicker to read on one screen than behind nine clicks - and
+// because its two locale keys constrain each other and so have to be saved
+// together.
+const configSource = asset('config.js');
+check( 'Config is one form rather than a drill-down list', configSource.includes( "ul.className = 'nino-admin-list'" ) === false );
+check( 'Config renders booleans with the shared switch component', configSource.includes( "'nino-admin-switch'" ) && configSource.includes( "'nino-admin-switch-track'" ) );
+check( 'Config states a switch\'s condition in words, not by knob position alone', configSource.includes( "'nino-admin-switch-state'" ) );
+check( 'Config groups its fields into the shared card surface', configSource.includes( "fieldset.className = 'nino-admin-card'" ) );
+check( 'Config uses the shared pinned action bar for its single Save', configSource.includes( "'editor-form-actions nino-admin-actionbar'" ) );
+check( 'Config no longer edits routes, navigations or asset bundles', [ '/nino/http/routes', '/nino/html/navs', '/nino/html/assets' ].every( function( key ) { return configSource.includes( key ) === false } ) );
+check( 'Config builds the native-language select from the ticked languages', configSource.includes( '_refreshNative' ) );
+check( 'Config renders no raw json textarea any more', configSource.includes( 'config-form-value' ) === false );
+
+// Adding a language writes its text file as a skeleton of the native
+// language's keys. The row it produces must stay unticked: the keys are empty,
+// so ticking it would put a language that serves blank pages one Save away -
+// the exact failure the language group exists to warn about.
+const addLocaleStart = configSource.indexOf('_addLocale : function()');
+const addLocaleEnd = configSource.indexOf('_renderNative : function', addLocaleStart);
+const addLocaleSource = configSource.slice( addLocaleStart, addLocaleEnd );
+check( 'Config creates the text file through the backend rather than client-side only', addLocaleSource.includes( "_apiCall( 'addlocale'" ) );
+check( 'Config does not switch a freshly created skeleton on', /entry\.active\s*=\s*true/.test( addLocaleSource ) === false );
+check( 'Config still re-activates an already translated language directly', addLocaleSource.includes( 'existing.active = true' ) );
+check( 'Config says what the Add button writes before it is pressed', configSource.includes( 'Creates text/<locale>.php' ) );
 
 const textSource = asset('text.js');
 const categoryStart = textSource.indexOf('_renderCategoryList : function()');

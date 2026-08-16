@@ -75,8 +75,11 @@ $appData['/nino/locales/available']	= [ 'de_DE', 'en_US' ];
 \Nino\Filesystem::putFileContent( $appData, '/config.php', [
 	'/nino/error/log'					=> false,
 	'/nino/error/display'			=> true,
+	'/nino/auth/maxtries'			=> 5,
+	'/nino/auth/cooldown'			=> 3600,
 	'/nino/locales/native'		=> $appData['/nino/locales/native'],
 	'/nino/locales/available'	=> $appData['/nino/locales/available'],
+	'/nino/locales/textfiles'	=> '/text',
 	'/nino/html/assets'				=> [],
 	'/nino/http/routes'				=> [],
 ] );
@@ -615,26 +618,208 @@ function callDev( array &$appData, string $class, string $method, array $data = 
 
 [ $status, $body ] = callDev( $appData, \Nino\Admin\Config::class, 'apiList' );
 check( 'apiList succeeds', $status === 200 );
-check( 'apiList returns exactly the whitelisted keys', array_keys( $body['values'] ) === [
-	'/nino/error/log', '/nino/error/display', '/nino/locales/native', '/nino/locales/available',
-	'/nino/html/assets', '/nino/html/navs', '/nino/http/routes',
+check( 'apiList returns the field schema in render order', array_column( $body['fields'], 'key' ) === [
+	'/nino/error/log', '/nino/error/display', '/nino/session/force-secure-cookie',
+	'/nino/auth/maxtries', '/nino/auth/cooldown',
+	'/nino/editor/backups', '/nino/editor/logs',
+	'/nino/locales/available', '/nino/locales/native',
 ] );
-check( 'apiList pretty-prints the current value', $body['values']['/nino/locales/native'] === '"de_DE"' );
+check( 'every field carries the type its editor renders from', array_column( $body['fields'], 'type' ) === [
+	'bool', 'bool', 'bool', 'int', 'int', 'bool', 'bool', 'locales', 'native',
+] );
+check( 'apiList returns the group headings', array_keys( $body['groups'] ) === [ 'diagnostics', 'auth', 'editor', 'locales' ] );
+check( 'every field belongs to a declared group', array_diff( array_unique( array_column( $body['fields'], 'group' ) ), array_keys( $body['groups'] ) ) === [] );
 
-// Regression: Admin::init() adds GET/POST /_admin into $appData['/nino/http/routes'] at
-// runtime (self-registered, same as Editor::init() does for /_editor - never persisted,
-// see Admin::init()'s docblock). apiList() must read config.php's own stored routes, not
-// that live-merged value, or saving this key back would bake _admin's own route into it.
-$appData['/nino/http/routes']['GET://_admin'] = [ 'uri' => '/_admin', 'body' => 'x' ];
-[ $status, $body ] = callDev( $appData, \Nino\Admin\Config::class, 'apiList' );
-check( 'apiList does not leak _admin\'s own runtime-injected route into the editable value', strpos( $body['values']['/nino/http/routes'], 'GET://_admin' ) === false );
-unset( $appData['/nino/http/routes']['GET://_admin'] );
+$byKey = array_column( $body['fields'], null, 'key' );
+check( 'a stored value comes back typed, not as json text', $byKey['/nino/error/display']['value'] === true );
+check( 'an int comes back as an int', $byKey['/nino/auth/cooldown']['value'] === 3600 );
+check( 'an int field carries the bounds its editor and apiSave share', $byKey['/nino/auth/maxtries']['min'] === 1 && $byKey['/nino/auth/maxtries']['max'] === 100 );
+
+// The three keys this panel deliberately stopped editing: routes and navs have
+// real editors of their own (Pages/Navigations) and assets is a build concern
+// whose order a json textarea shows nobody. A second, unvalidated way to write
+// the same data is a way to corrupt it.
+foreach( [ '/nino/http/routes', '/nino/html/navs', '/nino/html/assets' ] as $goneKey )
+	check( "$goneKey is no longer part of Config", isset( $byKey[$goneKey] ) === false );
+
+// A missing key must report the same default the runtime itself applies, or the
+// form shows a value the site is not actually running with
+check( 'a key absent from config.php reports the runtime default', $byKey['/nino/editor/backups']['value'] === true );
+
+// Until 0.11.1 config.php shipped '/nino/admin/backups'/'/nino/admin/logs' while
+// _editor read - and still reads - '/nino/editor/*', so the shipped 'false' never
+// did anything and both features ran regardless. An existing project's old key is
+// shown so the panel reflects what its owner meant.
+$legacyConfig = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
+$legacyConfig['/nino/admin/logs'] = false;
+\Nino\Filesystem::putFileContent( $appData, '/config.php', $legacyConfig );
+[ , $legacyBody ] = callDev( $appData, \Nino\Admin\Config::class, 'apiList' );
+$legacyByKey = array_column( $legacyBody['fields'], null, 'key' );
+check( 'a pre-0.11.1 /nino/admin/logs is read as the value of /nino/editor/logs', $legacyByKey['/nino/editor/logs']['value'] === false );
+check( '...while /nino/editor/backups still reports its own default', $legacyByKey['/nino/editor/backups']['value'] === true );
+unset( $legacyConfig['/nino/admin/logs'] );
+\Nino\Filesystem::putFileContent( $appData, '/config.php', $legacyConfig );
+
+// The locale inventory is the union of what config.php lists and what has a
+// text file on disk - a translated language that is merely switched off should
+// be one checkbox away from being back on, and a configured language without a
+// text file renders every per-locale fill unresolved
+\Nino\Filesystem::putFileContent( $appData, '/text/de_DE.php', [ '[[/a]]' => 'a', '[[/b]]' => 'b' ] );
+\Nino\Filesystem::putFileContent( $appData, '/text/fr_FR.php', [ '[[/a]]' => 'a' ] );
+[ , $body ] = callDev( $appData, \Nino\Admin\Config::class, 'apiList' );
+$inventory = array_column( $body['locales'], null, 'code' );
+check( 'the inventory lists a configured locale', isset( $inventory['de_DE'] ) === true && $inventory['de_DE']['active'] === true );
+check( 'the inventory also lists a translated but unconfigured locale', isset( $inventory['fr_FR'] ) === true && $inventory['fr_FR']['active'] === false );
+check( 'a locale with a text file reports its key count', $inventory['de_DE']['hasText'] === true && $inventory['de_DE']['keys'] === 2 );
+check( 'a configured locale without a text file is flagged as such', $inventory['en_US']['hasText'] === false && $inventory['en_US']['active'] === true );
+check( 'a known locale gets a readable name', $inventory['de_DE']['name'] === 'German (Germany)' );
+
+// --- apiAddLocale -------------------------------------------------------
+//
+// Adding a language used to leave the project in exactly the state
+// Locales::init() warns about: a configured locale with no text file of its
+// own renders every per-locale fill as a raw [[key]]. Text::saveBatch() cannot
+// bootstrap one either - it validates against keys that already exist.
+
+[ $status, $body ] = callDev( $appData, \Nino\Admin\Config::class, 'apiAddLocale', [ 'locale' => 'it_IT' ] );
+check( 'apiAddLocale creates a text file for a new language', $status === 200 && ( $body['created'] ?? null ) === true );
+check( '...copying the key count of the native language', ( $body['keys'] ?? 0 ) === 2 && ( $body['from'] ?? '' ) === 'de_DE' );
+
+$skeleton = \Nino\Filesystem::getFileContent( $appData, '/text/it_IT.php', false );
+check( '...the file really is on disk', is_array( $skeleton ) === true );
+check( '...with exactly the native language\'s keys, in its order', array_keys( $skeleton ) === array_keys( \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] ) ) );
+check( '...and every value empty, so an untranslated key reads as untranslated', array_values( array_unique( $skeleton ) ) === [ '' ] );
+
+// The new language is a translation skeleton, not yet a language of the site -
+// activating it is the form's Save, together with the native language it has
+// to agree with
+$afterAdd = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
+check( 'apiAddLocale does not activate the language on its own', in_array( 'it_IT', $afterAdd['/nino/locales/available'] ?? [], true ) === false );
+
+[ , $body ] = callDev( $appData, \Nino\Admin\Config::class, 'apiList' );
+$inventoryAfterAdd = array_column( $body['locales'], null, 'code' );
+check( '...but the inventory now offers it as a translated, inactive language', ( $inventoryAfterAdd['it_IT']['hasText'] ?? null ) === true && ( $inventoryAfterAdd['it_IT']['active'] ?? null ) === false );
+
+// Reachable from a button, so it must never be one click away from emptying a
+// finished translation
+\Nino\Filesystem::putFileContent( $appData, '/text/it_IT.php', [ '[[/a]]' => 'tradotto', '[[/b]]' => 'anche' ] );
+[ $status, $body ] = callDev( $appData, \Nino\Admin\Config::class, 'apiAddLocale', [ 'locale' => 'it_IT' ] );
+check( 'apiAddLocale refuses to overwrite an existing translation', $status === 200 && ( $body['created'] ?? null ) === false );
+check( '...reporting what that file actually holds', ( $body['keys'] ?? 0 ) === 2 );
+check( '...and leaving its values untouched', \Nino\Filesystem::getFileContent( $appData, '/text/it_IT.php', [] )['[[/a]]'] === 'tradotto' );
+
+[ $status ] = callDev( $appData, \Nino\Admin\Config::class, 'apiAddLocale', [ 'locale' => 'notalocale' ] );
+check( 'apiAddLocale rejects a malformed language id', $status === 400 );
+
+[ $status ] = callDev( $appData, \Nino\Admin\Config::class, 'apiAddLocale', [ 'locale' => 'de_DE' ] );
+check( 'apiAddLocale answers the native language from its own existing file', $status === 200 );
+
+// A locale whose native has nothing to copy from cannot produce a skeleton -
+// better a clear refusal than an empty file that looks like one
+$noNative = $appData;
+$noNativeConfig = \Nino\Filesystem::getFileContent( $noNative, '/config.php', [] );
+$noNativeConfig['/nino/locales/native'] = 'pt_PT';
+\Nino\Filesystem::putFileContent( $noNative, '/config.php', $noNativeConfig );
+[ $status, $body ] = callDev( $noNative, \Nino\Admin\Config::class, 'apiAddLocale', [ 'locale' => 'sv_SE' ] );
+check( 'apiAddLocale refuses when the native language has no text file', $status === 400 && str_contains( (string) ( $body['error'] ?? '' ), 'pt_PT' ) === true );
+check( '...and writes nothing', \Nino\Filesystem::fileExists( $noNative, '/text/sv_SE.php' ) === false );
+$noNativeConfig['/nino/locales/native'] = 'de_DE';
+\Nino\Filesystem::putFileContent( $appData, '/config.php', $noNativeConfig );
+
+\Nino\Runtime::unsetSessionValue( $appData, './nino/admin/authed' );
+[ $status ] = callDev( $appData, \Nino\Admin\Config::class, 'apiAddLocale', [ 'locale' => 'nl_NL' ] );
+check( 'apiAddLocale requires an authed _admin session', $status === 401 );
+\Nino\Runtime::setSessionValue( $appData, './nino/admin/authed', true );
+
+// --- apiSave ------------------------------------------------------------
+
+[ $status ] = callDev( $appData, \Nino\Admin\Config::class, 'apiSave', [ 'fields' => [ '/nino/error/display' => false ] ] );
+check( 'apiSave accepts a bool', $status === 200 );
+check( 'the saved bool lands in appData', $appData['/nino/error/display'] === false );
+
+// A form posts strings; config.php has to receive the real types
+[ $status ] = callDev( $appData, \Nino\Admin\Config::class, 'apiSave', [ 'fields' => [ '/nino/auth/maxtries' => '8', '/nino/editor/logs' => 'true' ] ] );
+check( 'apiSave coerces a posted numeric string', $status === 200 && $appData['/nino/auth/maxtries'] === 8 );
+check( 'apiSave coerces a posted "true"', $appData['/nino/editor/logs'] === true );
+
+[ $status ] = callDev( $appData, \Nino\Admin\Config::class, 'apiSave', [ 'fields' => [ '/nino/auth/maxtries' => '5.5' ] ] );
+check( 'apiSave rejects a non-integer rather than casting it', $status === 400 && $appData['/nino/auth/maxtries'] === 8 );
+
+[ $status ] = callDev( $appData, \Nino\Admin\Config::class, 'apiSave', [ 'fields' => [ '/nino/auth/maxtries' => 0 ] ] );
+check( 'apiSave rejects an int below its minimum', $status === 400 );
+
+[ $status ] = callDev( $appData, \Nino\Admin\Config::class, 'apiSave', [ 'fields' => [ '/nino/auth/cooldown' => 999999999 ] ] );
+check( 'apiSave rejects an int above its maximum', $status === 400 );
+
+[ $status ] = callDev( $appData, \Nino\Admin\Config::class, 'apiSave', [ 'fields' => [ '/nino/error/log' => 'yes please' ] ] );
+check( 'apiSave rejects a bool that is neither', $status === 400 );
+
+// Nothing is written until every field validates, so one bad value cannot leave
+// half a form saved
+$beforePartial = $appData['/nino/error/display'];
+[ $status ] = callDev( $appData, \Nino\Admin\Config::class, 'apiSave', [ 'fields' => [ '/nino/error/display' => true, '/nino/auth/maxtries' => 'nope' ] ] );
+check( 'a rejected field leaves the valid ones in the same request unwritten', $status === 400 && $appData['/nino/error/display'] === $beforePartial );
+
+[ $status ] = callDev( $appData, \Nino\Admin\Config::class, 'apiSave', [ 'fields' => [ '/nino/modules' => [] ] ] );
+check( 'apiSave ignores a key outside the schema', $status === 400 );
+
+[ $status ] = callDev( $appData, \Nino\Admin\Config::class, 'apiSave', [ 'fields' => [ '/nino/html/assets' => [] ] ] );
+check( 'apiSave refuses /nino/html/assets, which this panel no longer owns', $status === 400 );
+
+[ $status ] = callDev( $appData, \Nino\Admin\Config::class, 'apiSave', [ 'fields' => [ '/nino/http/routes' => [] ] ] );
+check( 'apiSave refuses /nino/http/routes, which belongs to Pages', $status === 400 );
+
+// --- the two locale keys constrain each other ---------------------------
+
+[ $status ] = callDev( $appData, \Nino\Admin\Config::class, 'apiSave', [ 'fields' => [
+	'/nino/locales/available' => [ 'de_DE', 'en_US', 'fr_FR' ],
+	'/nino/locales/native' 		=> 'en_US',
+] ] );
+check( 'apiSave accepts a language list with a native language inside it', $status === 200 );
+check( 'the language list round-trips', $appData['/nino/locales/available'] === [ 'de_DE', 'en_US', 'fr_FR' ] );
+
+[ $status, $errorBody ] = callDev( $appData, \Nino\Admin\Config::class, 'apiSave', [ 'fields' => [
+	'/nino/locales/available' => [ 'de_DE' ],
+	'/nino/locales/native' 		=> 'en_US',
+] ] );
+check( 'apiSave refuses a native language outside the list being saved', $status === 400 );
+check( '...and says which rule was broken', str_contains( (string) ( $errorBody['error'] ?? '' ), 'native' ) === true );
+check( '...leaving the previous list untouched', $appData['/nino/locales/available'] === [ 'de_DE', 'en_US', 'fr_FR' ] );
+
+// Dropping the currently native language without naming a new one is the same
+// contradiction, just arrived at from the other side
+[ $status ] = callDev( $appData, \Nino\Admin\Config::class, 'apiSave', [ 'fields' => [ '/nino/locales/available' => [ 'de_DE', 'fr_FR' ] ] ] );
+check( 'apiSave refuses a list that drops the current native language', $status === 400 );
+
+[ $status ] = callDev( $appData, \Nino\Admin\Config::class, 'apiSave', [ 'fields' => [ '/nino/locales/available' => [] ] ] );
+check( 'apiSave refuses an empty language list', $status === 400 );
+
+[ $status ] = callDev( $appData, \Nino\Admin\Config::class, 'apiSave', [ 'fields' => [ '/nino/locales/available' => [ 'de_DE', 'notalocale' ] ] ] );
+check( 'apiSave refuses a malformed locale id', $status === 400 );
+
+[ $status ] = callDev( $appData, \Nino\Admin\Config::class, 'apiSave', [ 'fields' => [
+	'/nino/locales/available' => [ 'de_DE', 'de_DE', 'en_US' ],
+	'/nino/locales/native' 		=> 'de_DE',
+] ] );
+check( 'apiSave deduplicates a repeated locale', $status === 200 && $appData['/nino/locales/available'] === [ 'de_DE', 'en_US' ] );
+
+[ $status ] = callDev( $appData, \Nino\Admin\Config::class, 'apiSave', [ 'fields' => [] ] );
+check( 'apiSave rejects an empty form rather than writing nothing quietly', $status === 400 );
+
+// Put the language list back the way the blocks below expect to find it -
+// Translations asserts against all three. Saved through apiSave rather than
+// assigned, so this also lands in config.php, which is where its own apiInfo
+// reads the list from
+[ $status ] = callDev( $appData, \Nino\Admin\Config::class, 'apiSave', [ 'fields' => [
+	'/nino/locales/available' => [ 'de_DE', 'en_US', 'fr_FR' ],
+	'/nino/locales/native' 		=> 'de_DE',
+] ] );
+check( 'the language list is restored for the blocks below', $status === 200 && $appData['/nino/locales/available'] === [ 'de_DE', 'en_US', 'fr_FR' ] );
 
 // Regression: init() used to merge its own routes with '+=', which does NOT
-// overwrite a key that already exists - so a persisted 'GET://_admin' (hand-
-// written through the very Config module above, whose whitelist includes
-// '/nino/http/routes' as raw json) shadowed the dashboard and left no ui path
-// back to the route that did it. Same fix Install::init() already carries.
+// overwrite a key that already exists - so a persisted 'GET://_admin' (from a
+// hand-written config.php, or from Pages) shadowed the dashboard and left no ui
+// path back to the route that did it. Same fix Install::init() already carries.
 $shadowed = $appData;
 $shadowed['/nino/http/routes']['GET://_admin'] 	= [ 'uri' => '/_admin', 'body' => 'hijacked' ];
 $shadowed['/nino/http/routes']['POST://_admin'] = [ 'uri' => '/_admin', 'body' => 'hijacked' ];
@@ -642,29 +827,11 @@ $shadowed['/nino/http/routes']['POST://_admin'] = [ 'uri' => '/_admin', 'body' =
 check( 'init always restores the tool-owned GET route over a stale/hand-written collision', $shadowed['/nino/http/routes']['GET://_admin']['body'] === '[template /_admin/templates/page-index]' );
 check( 'init always restores the tool-owned POST route too', ( $shadowed['/nino/http/routes']['POST://_admin']['body'] ?? null ) === null );
 
-[ $status ] = callDev( $appData, \Nino\Admin\Config::class, 'apiSave', [ 'key' => '/nino/error/display', 'value' => 'false' ] );
-check( 'apiSave accepts a valid bool', $status === 200 );
-check( 'the saved value actually lands in appData', $appData['/nino/error/display'] === false );
-
-[ $status ] = callDev( $appData, \Nino\Admin\Config::class, 'apiSave', [ 'key' => '/nino/locales/available', 'value' => '["de_DE","en_US","fr_FR"]' ] );
-check( 'apiSave accepts a valid array', $status === 200 );
-check( 'the saved array round-trips correctly', $appData['/nino/locales/available'] === [ 'de_DE', 'en_US', 'fr_FR' ] );
-
-[ $status ] = callDev( $appData, \Nino\Admin\Config::class, 'apiSave', [ 'key' => '/nino/locales/native', 'value' => '{not valid json' ] );
-check( 'apiSave rejects malformed json', $status === 400 );
-
-[ $status ] = callDev( $appData, \Nino\Admin\Config::class, 'apiSave', [ 'key' => '/nino/locales/native', 'value' => '["should be a string, not an array"]' ] );
-check( 'apiSave rejects valid json of the wrong shape for this key', $status === 400 );
-
-[ $status ] = callDev( $appData, \Nino\Admin\Config::class, 'apiSave', [ 'key' => '/nino/modules', 'value' => '[]' ] );
-check( 'apiSave refuses a key outside the whitelist (a "hard" value)', $status === 400 );
-
-[ $status ] = callDev( $appData, \Nino\Admin\Config::class, 'apiSave', [ 'key' => '/nino/html/images', 'value' => '[]' ] );
-check( 'apiSave refuses /nino/html/images too (it has its own dedicated editor now)', $status === 400 );
-
 \Nino\Runtime::unsetSessionValue( $appData, './nino/admin/authed' );
 [ $status ] = callDev( $appData, \Nino\Admin\Config::class, 'apiList' );
 check( 'Config actions require an authed _admin session too', $status === 401 );
+[ $status ] = callDev( $appData, \Nino\Admin\Config::class, 'apiSave', [ 'fields' => [ '/nino/error/log' => true ] ] );
+check( '...apiSave too', $status === 401 );
 \Nino\Runtime::setSessionValue( $appData, './nino/admin/authed', true );
 
 echo "\n";

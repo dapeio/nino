@@ -264,25 +264,39 @@ The automatic backup is a safety net for editorial changes but does not replace 
 
 ## Config: Technical Configuration
 
-The **Config** area edits a deliberately limited selection from `config.php` as JSON:
+The **Config** area edits a deliberately limited selection from `config.php` as a form. Every value is typed and validated before it is written, and the whole page is saved in one write.
 
-> **Note:** The following sections are not yet fully documented:
-> - **Asset-Bundles** (`/nino/html/assets`) — Configuration of CSS/JS bundles.
-> - **Routing Table** (`/nino/http/routes`) — Complete route management.
-> - **Modules** — Integration and management of optional modules (see [Developer Manual](development.md)).
+| Group | Setting | Key | Control |
+|---|---|---|---|
+| Errors and diagnostics | Write errors to a log | `/nino/error/log` | switch |
+| Errors and diagnostics | Show errors in the frontend | `/nino/error/display` | switch |
+| Errors and diagnostics | Always set the session cookie as secure | `/nino/session/force-secure-cookie` | switch |
+| Login protection | Failed logins before lockout | `/nino/auth/maxtries` | number, 1–100 |
+| Login protection | Lockout duration | `/nino/auth/cooldown` | number, 60–604800 seconds |
+| Editor features | Daily encrypted backup | `/nino/editor/backups` | switch |
+| Editor features | Record an audit trail | `/nino/editor/logs` | switch |
+| Languages | Languages | `/nino/locales/available` | checklist |
+| Languages | Native language | `/nino/locales/native` | select |
 
-| Key | Expected Value |
+The language list shows every locale the project knows about: the ones `config.php` lists, plus every `text/<locale>.php` found on disk. Each row reports whether that file exists and how many keys it holds — a language switched on without one renders every per-locale fill as a raw `[[key]]`, so the panel says so before you save.
+
+**Adding a language** takes its id (`fr_FR`) and writes `text/fr_FR.php` immediately, as a skeleton: every key the native language has, in its order, with empty values. That is the file `/_editor`'s and `/_admin`'s Text panels then list as work to do — values are left empty on purpose, because a key filled with the native language's own sentence reads as finished and is what ends up shipping.
+
+The new language is **not switched on** by that. Its keys are empty, so activating it would put a language that serves blank pages one Save away. Translate it under **Text** (or import it under **Translations**), then tick it here and save. An existing `text/<locale>.php` is never overwritten — adding a language that already has one just reports its key count.
+
+The native language can only be one of the languages currently ticked. Both keys are therefore saved together — saving them separately would allow a moment in which `config.php` names a native language the project does not have.
+
+Three keys this area used to edit are deliberately gone:
+
+| Key | Edit it instead under |
 |---|---|
-| `/nino/error/log` | `true` or `false` |
-| `/nino/error/display` | `true` or `false` |
-| `/nino/locales/native` | language code as string |
-| `/nino/locales/available` | list of language codes |
-| `/nino/html/assets` | asset bundles as object |
-| `/nino/http/routes` | complete routing table |
+| `/nino/http/routes` | **Routes** |
+| `/nino/html/navs` | **Navigations** |
+| `/nino/html/assets` | by hand in `config.php`, or by re-running `/_install`'s theme step |
 
-Nino checks JSON syntax and basic type but not every technical dependency. Errors in routes, languages, or asset bundles can make the website or management areas inaccessible. For normal page changes, therefore use **Routes** and for image slots **Images**.
+Asset bundles stay a deliberate file edit because their **order** is load-bearing for the CSS cascade, which a form does not show. The other two have had real editors for a while, and a second, unvalidated way to write the same data is a way to corrupt it.
 
-In production, `/nino/error/display` must be `false`.
+In production, `/nino/error/display` must be off.
 
 ## Recommended Workflow
 

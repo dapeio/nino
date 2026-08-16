@@ -1948,20 +1948,27 @@ namespace Nino\Admin {
 
 	/**
 	 *	Nino							A compact filesystembased php framework
-	 *	Dev								Edit a curated whitelist of "soft" config.php values without
-	 *												touching the file by hand: error display/logging, available
-	 *												locales, asset bundles, and routes. Deliberately excludes
-	 *												"hard" values a wrong edit could brick the whole site over -
-	 *												modules, filesystem/dir, locales/textfiles - those stay a
-	 *												by-hand, deliberate-only task.
+	 *	Dev								The project's settings, as a form rather than as raw json:
+	 *												error handling, login throttling, the _editor features
+	 *												that can be switched off, and the site's languages.
+	 *												Deliberately excludes "hard" values a wrong edit could
+	 *												brick the whole site over - modules, filesystem/dir,
+	 *												locales/textfiles - those stay a by-hand, deliberate-only
+	 *												task.
 	 *
-	 *												/nino/html/images and /nino/auth/user aren't part of this
-	 *												generic json editor either, despite being just as "soft"
-	 *												conceptually - both get their own dedicated, richer editors
-	 *												instead (Images and Users below), the same reasoning as
-	 *												ElementTypes gets one instead of hand-editing elements/*.php:
-	 *												structured data with real validation beats a raw textarea
-	 *												once there's enough shape to it to be worth the editor.
+	 *												Three keys this used to edit are gone from here because
+	 *												they now have real editors of their own, and a second,
+	 *												unvalidated way to write the same data is a way to
+	 *												corrupt it: '/nino/http/routes' belongs to Pages,
+	 *												'/nino/html/navs' to Navigations, and '/nino/html/assets'
+	 *												is a build concern - its order is load-bearing for the css
+	 *												cascade, which a json textarea shows nobody, so it stays a
+	 *												deliberate config.php edit (or a rerun of /_install's theme
+	 *												step) rather than a field that looks safe to change.
+	 *
+	 *												'/nino/html/images' and '/nino/auth/user' were never part of
+	 *												this either, for the same reason: both get their own richer
+	 *												editors (Images and Users below).
 	 *
 	 *	@package					Dape/Nino
 	 *	@author						David Perchermeier <mail@dape.io>
@@ -1969,17 +1976,106 @@ namespace Nino\Admin {
 	 */
 	class Config {
 
-		// key -> expected decoded-json type, checked before ever writing back to
-		// config.php - a malformed save (wrong shape, not just invalid json)
-		// would otherwise silently corrupt that key for the rest of the site
-		private const array KEY_TYPES = [
-			'/nino/error/log'					=> 'bool',
-			'/nino/error/display'			=> 'bool',
-			'/nino/locales/native'		=> 'string',
-			'/nino/locales/available'	=> 'array',
-			'/nino/html/assets'				=> 'array',
-			'/nino/html/navs'					=> 'array',
-			'/nino/http/routes'				=> 'array',
+		// Every setting this panel offers, in render order: the type its value
+		// has to have, the group it renders under, and the copy that explains
+		// it. The type is what apiSave() validates against before anything is
+		// written - a value of the wrong shape would otherwise silently corrupt
+		// that key for the rest of the site.
+		//
+		// 'min'/'max' bound an int field. They are not cosmetic: a maxtries of 0
+		// locks every account out permanently on the first failed attempt, and a
+		// cooldown of 0 removes the throttle entirely - both are reachable by
+		// typing a plausible-looking number, so the bound belongs next to the
+		// field rather than in a comment somewhere.
+		private const array FIELDS = [
+			'/nino/error/log' => [
+				'type' 	=> 'bool',
+				'group'	=> 'diagnostics',
+				'label'	=> 'Write errors to a log',
+				'hint' 	=> 'Appends php errors to /data/logs.<month>.php, pruned after three months.',
+			],
+			'/nino/error/display' => [
+				'type' 	=> 'bool',
+				'group'	=> 'diagnostics',
+				'label'	=> 'Show errors in the frontend',
+				'hint' 	=> 'Development only. A live site must leave this off - the dump includes file paths and a stack trace.',
+			],
+			'/nino/session/force-secure-cookie' => [
+				'type' 	=> 'bool',
+				'group'	=> 'diagnostics',
+				'label'	=> 'Always set the session cookie as secure',
+				'hint' 	=> 'Turn on behind a tls-terminating proxy, where php sees no HTTPS of its own and would otherwise leave the flag off.',
+			],
+			'/nino/auth/maxtries' => [
+				'type' 	=> 'int',
+				'group'	=> 'auth',
+				'min' 	=> 1,
+				'max' 	=> 100,
+				'label'	=> 'Failed logins before lockout',
+				'hint' 	=> 'Counted per account. The per-ip bucket trips at ten times this, so one person mistyping cannot lock out everyone behind the same connection.',
+			],
+			'/nino/auth/cooldown' => [
+				'type' 	=> 'int',
+				'group'	=> 'auth',
+				'min' 	=> 60,
+				'max' 	=> 604800,
+				'unit' 	=> 'seconds',
+				'label'	=> 'Lockout duration',
+				'hint' 	=> 'How long a locked account or ip stays locked.',
+			],
+			// Both flags are read by _editor (Backup::maybeRun(), Logs::record()),
+			// which is also where the keys are named after - see apiList()'s note
+			// on the '/nino/admin/*' pair a pre-0.11.1 config.php shipped instead
+			'/nino/editor/backups' => [
+				'type' 	=> 'bool',
+				'group'	=> 'editor',
+				'label'	=> 'Daily encrypted backup',
+				'hint' 	=> 'Runs once a day on the first request after midnight and keeps fourteen days. Restore them under Wiederherstellung.',
+			],
+			'/nino/editor/logs' => [
+				'type' 	=> 'bool',
+				'group'	=> 'editor',
+				'label'	=> 'Record an audit trail',
+				'hint' 	=> 'One line per login and per change made in /_editor, kept for fourteen days. Who may read it stays a permission.',
+			],
+			'/nino/locales/available' => [
+				'type' 	=> 'locales',
+				'group'	=> 'locales',
+				'label'	=> 'Languages',
+				'hint' 	=> 'Every language the site serves. Each one reads its texts from its own text/<locale>.php - a language without that file renders every per-locale fill unresolved.',
+			],
+			'/nino/locales/native' => [
+				'type' 	=> 'native',
+				'group'	=> 'locales',
+				'label'	=> 'Native language',
+				'hint' 	=> 'The fallback for a visitor who has not picked one yet, and the language the owner notification of a contact form is sent in.',
+			],
+		];
+
+		// Group key -> heading + intro, in render order
+		private const array GROUPS = [
+			'diagnostics'	=> [ 'Errors and diagnostics', 'What happens when php raises an error, and how the session cookie is issued.' ],
+			'auth' 				=> [ 'Login protection', 'The throttle that sits in front of /_editor and /_admin.' ],
+			'editor' 			=> [ 'Editor features', 'Background work /_editor does on its own. Both were silently on in every project before 0.11.1 - see the changelog.' ],
+			'locales' 		=> [ 'Languages', 'Which languages exist, and which one a visitor gets before choosing.' ],
+		];
+
+		// A locale id is exactly language_TERRITORY. Narrow on purpose: the
+		// value becomes a filename (text/<locale>.php), so anything looser is a
+		// path question, and every locale Nino itself ships uses this shape
+		private const string LOCALE_PATTERN = '/^[a-z]{2}_[A-Z]{2}$/';
+
+		// Display names for the locales that actually turn up in practice. A
+		// code with no entry renders as itself - this is a convenience for
+		// reading the list, never a whitelist of what may be added
+		private const array LOCALE_NAMES = [
+			'de_DE' => 'German (Germany)',			'de_AT' => 'German (Austria)',
+			'de_CH' => 'German (Switzerland)',	'en_US' => 'English (US)',
+			'en_GB' => 'English (UK)', 					'fr_FR' => 'French (France)',
+			'it_IT' => 'Italian (Italy)', 			'es_ES' => 'Spanish (Spain)',
+			'nl_NL' => 'Dutch (Netherlands)', 	'pl_PL' => 'Polish (Poland)',
+			'pt_PT' => 'Portuguese (Portugal)',	'cs_CZ' => 'Czech (Czechia)',
+			'da_DK' => 'Danish (Denmark)', 			'sv_SE' => 'Swedish (Sweden)',
 		];
 
 		/**
@@ -1989,8 +2085,9 @@ namespace Nino\Admin {
 		 */
 		public static function actions(): array {
 			return [
-				'config/list' => [ self::class, 'apiList' ],
-				'config/save' => [ self::class, 'apiSave' ],
+				'config/list' 			=> [ self::class, 'apiList' ],
+				'config/save' 			=> [ self::class, 'apiSave' ],
+				'config/addlocale'	=> [ self::class, 'apiAddLocale' ],
 			];
 		}
 
@@ -2004,14 +2101,16 @@ namespace Nino\Admin {
 		}
 
 		/**
-		 *	List every editable key's current value (pretty-printed json).
+		 *	Every setting's current value, plus the schema the frontend renders
+		 *	it with and the locale inventory the language group needs.
+		 *
 		 *	Reads config.php fresh rather than $appData directly: by the time
 		 *	this runs, Admin::init() has already added _admin's own GET/POST
 		 *	/_admin route into $appData['/nino/http/routes'] at runtime (same
 		 *	as Editor::init() does for /_editor, self-registered, never
-		 *	persisted - see Admin::init()'s docblock). Showing that live value
-		 *	here would round-trip it straight into config.php on the next
-		 *	save of this key.
+		 *	persisted - see Admin::init()'s docblock). That no longer matters
+		 *	for routes, which this panel stopped editing, but the same applies
+		 *	to anything a module writes at runtime, so the fresh read stays.
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
@@ -2025,17 +2124,244 @@ namespace Nino\Admin {
 
 			$stored = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
 
-			$values = [];
-			foreach( array_keys( self::KEY_TYPES ) as $key )
-				$values[$key] = json_encode( $stored[$key] ?? null, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE );
+			$fields = [];
+			foreach( self::FIELDS as $key => $field ) {
 
-			\Nino\Http::ok( $request, [ 'values' => $values ] );
+				$fields[] = $field + [
+					'key' 		=> $key,
+					'value'		=> self::_currentValue( $stored, $key, $field['type'] ),
+				];
+			}
+
+			\Nino\Http::ok( $request, [
+				'groups' 	=> self::GROUPS,
+				'fields' 	=> $fields,
+				'locales'	=> self::_localeInventory( $appData, $stored ),
+			] );
 		}
 
 		/**
-		 *	Save one whitelisted key - validates both that the posted value is
-		 *	parseable json AND that it decodes to the type this key expects,
-		 *	before ever touching config.php
+		 *	One field's value as stored, falling back to the same default the
+		 *	runtime itself applies when the key is missing.
+		 *
+		 *	Both _editor flags carry one extra step. Until 0.11.1 config.php
+		 *	shipped them as '/nino/admin/backups' and '/nino/admin/logs', while
+		 *	_editor read - and still reads - '/nino/editor/*'. The shipped
+		 *	'false' therefore never did anything: the key the code looks for
+		 *	was absent, so its '?? true' default won and both features ran in
+		 *	every install regardless. An existing project's old key is read here
+		 *	so this panel shows what its owner actually intended rather than
+		 *	the default that has been overriding it, and saving writes the key
+		 *	_editor reads. The stale one is left alone rather than deleted -
+		 *	removing a key out of someone's config.php is not this panel's call.
+		 *
+		 *	@param		array 		$stored				config.php as read from disk
+		 *	@param		string		$key
+		 *	@param		string		$type					FIELDS type
+		 *
+		 *	@return 	mixed
+		 */
+		private static function _currentValue( array $stored, string $key, string $type ): mixed {
+
+			if( array_key_exists( $key, $stored ) === true )
+				return $stored[$key];
+
+			$legacy = match( $key ) {
+				'/nino/editor/backups'	=> '/nino/admin/backups',
+				'/nino/editor/logs' 		=> '/nino/admin/logs',
+				default 								=> null,
+			};
+
+			if( $legacy !== null && array_key_exists( $legacy, $stored ) === true && is_bool( $stored[$legacy] ) === true )
+				return $stored[$legacy];
+
+			// The runtime's own fallback for a missing key, so the form never
+			// shows a value the site is not actually running with
+			return match( $key ) {
+				'/nino/error/log' 									=> true,
+				'/nino/editor/backups', '/nino/editor/logs' => true,
+				'/nino/auth/maxtries' 							=> 5,
+				'/nino/auth/cooldown' 							=> 3600,
+				default 														=> match( $type ) {
+					'bool' 								=> false,
+					'int' 								=> 0,
+					'locales' 						=> [],
+					default 							=> '',
+				},
+			};
+		}
+
+		/**
+		 *	Every locale this project could sensibly list, and what actually
+		 *	exists on disk for each one.
+		 *
+		 *	The union of two sources, not just the configured list: a
+		 *	text/<locale>.php whose locale is not (or no longer) configured is
+		 *	worth showing, because it is a language that has been translated and
+		 *	is simply switched off. The other direction is the one that breaks a
+		 *	site - a configured locale with no text file of its own renders every
+		 *	per-locale fill as a raw [[key]], the exact case \Nino\Locales::init()
+		 *	guards the native locale against - so 'hasText' is reported per entry
+		 *	and the frontend says so before the language is ever saved.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		$stored				config.php as read from disk
+		 *
+		 *	@return 	array										[ [ code, name, hasText, keys, active ], ... ]
+		 */
+		private static function _localeInventory( array &$appData, array $stored ): array {
+
+			$configured = array_values( array_filter(
+				(array) ( $stored['/nino/locales/available'] ?? [] ),
+				fn( mixed $locale ): bool => is_string( $locale ) === true && preg_match( self::LOCALE_PATTERN, $locale ) === 1
+			) );
+
+			$textDir 	= (string) ( $stored['/nino/locales/textfiles'] ?? '/text' );
+			$files 		= glob( \Nino\Filesystem::path( $appData, $textDir ). '/*.php' ) ?: [];
+
+			$onDisk = [];
+			foreach( $files as $file ) {
+				$code = basename( $file, '.php' );
+				if( preg_match( self::LOCALE_PATTERN, $code ) === 1 )
+					$onDisk[$code] = $file;
+			}
+
+			$codes = array_values( array_unique( array_merge( $configured, array_keys( $onDisk ) ) ) );
+			sort( $codes );
+
+			$inventory = [];
+			foreach( $codes as $code ) {
+
+				$keys = 0;
+				if( isset( $onDisk[$code] ) === true ) {
+					$content 	= \Nino\Filesystem::getFileContent( $appData, $textDir. '/'. $code. '.php', [] );
+					$keys 		= is_array( $content ) === true ? count( $content ) : 0;
+				}
+
+				$inventory[] = [
+					'code' 		=> $code,
+					'name' 		=> self::LOCALE_NAMES[$code] ?? $code,
+					'hasText'	=> isset( $onDisk[$code] ),
+					'keys' 		=> $keys,
+					'active'	=> in_array( $code, $configured, true ),
+				];
+			}
+
+			return $inventory;
+		}
+
+		/**
+		 *	Create a new language's text file as a translation skeleton: every
+		 *	key the native locale has, in its order, with empty values.
+		 *
+		 *	Without this, adding a language left the project in the one state
+		 *	\Nino\Locales::init() warns about - a configured locale with no
+		 *	text/<locale>.php renders every per-locale fill as a raw [[key]] -
+		 *	and the only ways out were copying a file by hand or importing a
+		 *	translation. \Nino\Text::saveBatch() cannot bootstrap one either:
+		 *	it validates against the keys that already exist, so there is
+		 *	nothing to save into an empty locale.
+		 *
+		 *	Empty values, not the native language's own: an untranslated key
+		 *	has to be visibly untranslated. /_editor's and /_admin's Text
+		 *	panels both list a key with an empty value as work to do, while a
+		 *	copied German sentence sitting in the French file reads as
+		 *	finished and is what actually ships.
+		 *
+		 *	The language itself is not activated here. That is the form's
+		 *	Save, together with the native language it has to agree with - so
+		 *	a file created and then abandoned shows up next time as an
+		 *	inactive language that already has its keys, which is a state the
+		 *	inventory reports and one tick undoes.
+		 *
+		 *	An existing file is never overwritten. It is answered with its own
+		 *	current key count instead: this is reachable from a button, and a
+		 *	button must not be one click away from emptying a finished
+		 *	translation.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		&$request			(reference) Current server request
+		 *
+		 *	@return 	void
+		 */
+		public static function apiAddLocale( array &$appData, array &$request ): void {
+
+			if( \Nino\Admin\Admin::guard( $appData, $request ) === false )
+				return;
+
+			$data 	= \Nino\Admin\Admin::postData();
+			$locale = (string) ( $data['locale'] ?? '' );
+
+			if( preg_match( self::LOCALE_PATTERN, $locale ) !== 1 ) {
+				\Nino\Http::fail( $request, 400, 'a language id looks like de_DE' );
+				return;
+			}
+
+			$stored 	= \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
+			$textDir	= (string) ( $stored['/nino/locales/textfiles'] ?? '/text' );
+			$native 	= (string) ( $stored['/nino/locales/native'] ?? '' );
+
+			// Answered before the native locale is even looked at: this path
+			// creates nothing, so a project whose native language is itself
+			// unset must still be able to see what an existing file holds
+			if( \Nino\Filesystem::fileExists( $appData, $textDir. '/'. $locale. '.php' ) === true ) {
+				$existing = \Nino\Filesystem::getFileContent( $appData, $textDir. '/'. $locale. '.php', [] );
+				\Nino\Http::ok( $request, [
+					'locale' 	=> $locale,
+					'created'	=> false,
+					'keys' 		=> is_array( $existing ) === true ? count( $existing ) : 0,
+				] );
+				return;
+			}
+
+			if( preg_match( self::LOCALE_PATTERN, $native ) !== 1 ) {
+				\Nino\Http::fail( $request, 400, 'no native language is configured to copy the keys from' );
+				return;
+			}
+
+			if( $native === $locale ) {
+				\Nino\Http::fail( $request, 400, 'the native language has no text file of its own to copy' );
+				return;
+			}
+
+			$nativeContent = \Nino\Filesystem::getFileContent( $appData, $textDir. '/'. $native. '.php', [] );
+
+			if( is_array( $nativeContent ) === false || $nativeContent === [] ) {
+				\Nino\Http::fail( $request, 400, 'the native language '. $native. ' has no text file to copy the keys from' );
+				return;
+			}
+
+			// array_fill_keys over array_keys, so the new file carries the
+			// native one's key order - which is what makes the two readable
+			// side by side, in the Text panel and in a diff alike
+			$skeleton = array_fill_keys( array_keys( $nativeContent ), '' );
+
+			if( \Nino\Filesystem::putFileContent( $appData, $textDir. '/'. $locale. '.php', $skeleton ) === false ) {
+				\Nino\Http::fail( $request, 500, 'could not write '. $textDir. '/'. $locale. '.php' );
+				return;
+			}
+
+			\Nino\Http::ok( $request, [
+				'locale' 	=> $locale,
+				'created'	=> true,
+				'keys' 		=> count( $skeleton ),
+				'from' 		=> $native,
+			] );
+		}
+
+		/**
+		 *	Save the whole form in one write.
+		 *
+		 *	One request for every field rather than one per key, and one
+		 *	writeContentData() call for all of them: a settings form is saved as
+		 *	a unit, and the two locale keys have to be, since the native locale
+		 *	is only valid against the language list being saved alongside it.
+		 *	Writing them one at a time would mean a moment - or, if the second
+		 *	write fails, permanently - where config.php names a native locale
+		 *	the project does not have.
+		 *
+		 *	Nothing is written until every field validates, so a single bad
+		 *	value leaves config.php exactly as it was.
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
@@ -2047,51 +2373,163 @@ namespace Nino\Admin {
 			if( \Nino\Admin\Admin::guard( $appData, $request ) === false )
 				return;
 
-			$data = \Nino\Admin\Admin::postData();
-			$key 	= (string) ( $data['key'] ?? '' );
-			$raw 	= (string) ( $data['value'] ?? '' );
+			$data 	= \Nino\Admin\Admin::postData();
+			$posted = $data['fields'] ?? null;
 
-			if( isset( self::KEY_TYPES[$key] ) === false ) {
-				\Nino\Http::fail( $request, 400, 'unknown key' );
+			if( is_array( $posted ) === false ) {
+				\Nino\Http::fail( $request, 400, 'no fields posted' );
 				return;
 			}
 
-			$decoded = json_decode( $raw, true );
+			$clean = [];
+			foreach( self::FIELDS as $key => $field ) {
 
-			if( json_last_error() !== JSON_ERROR_NONE ) {
-				\Nino\Http::fail( $request, 400, 'invalid json: '. json_last_error_msg() );
+				// A field the frontend did not send keeps whatever config.php
+				// currently holds - this must never read as "set it to empty"
+				if( array_key_exists( $key, $posted ) === false )
+					continue;
+
+				$value = self::_cleanValue( $posted[$key], $field );
+
+				if( $value === null ) {
+					\Nino\Http::fail( $request, 400, self::_typeError( $key, $field ) );
+					return;
+				}
+
+				$clean[$key] = $value;
+			}
+
+			if( $clean === [] ) {
+				\Nino\Http::fail( $request, 400, 'no known fields posted' );
 				return;
 			}
 
-			if( self::_matchesType( $decoded, self::KEY_TYPES[$key] ) === false ) {
-				\Nino\Http::fail( $request, 400, 'expected a '. self::KEY_TYPES[$key]. ' value' );
+			// The two locale keys constrain each other, so they are checked
+			// against the values being saved - not against what is on disk,
+			// which is what they are about to stop being
+			$locales = $clean['/nino/locales/available'] ?? ( $appData['/nino/locales/available'] ?? [] );
+			$native 	= $clean['/nino/locales/native'] ?? ( $appData['/nino/locales/native'] ?? '' );
+
+			if( isset( $clean['/nino/locales/available'] ) === true && $locales === [] ) {
+				\Nino\Http::fail( $request, 400, 'at least one language is required' );
 				return;
 			}
 
-			$appData[$key] = $decoded;
-			\Nino\AppData::writeContentData( $appData, [ $key ] );
+			if( ( isset( $clean['/nino/locales/available'] ) === true || isset( $clean['/nino/locales/native'] ) === true )
+				&& in_array( $native, $locales, true ) === false ) {
+				\Nino\Http::fail( $request, 400, 'the native language must be one of the site\'s languages' );
+				return;
+			}
 
-			\Nino\Http::ok( $request );
+			foreach( $clean as $key => $value )
+				$appData[$key] = $value;
+
+			\Nino\AppData::writeContentData( $appData, array_keys( $clean ) );
+
+			\Nino\Http::ok( $request, [ 'saved' => array_keys( $clean ) ] );
 		}
 
 		/**
-		 *	Whether a json-decoded value matches the type KEY_TYPES expects
+		 *	Coerce and validate one posted value against its field definition.
 		 *
-		 *	@param		mixed			$value
-		 *	@param		string		$type					'bool' | 'string' | 'array'
+		 *	Coerce, because a form posts strings: a number field's "5" is the
+		 *	int 5 and a switch's "true" is the bool true, both of which
+		 *	config.php has to receive as the real type - a "5" written into
+		 *	'/nino/auth/maxtries' compares differently everywhere it is used.
+		 *	Anything that is not exactly one of the accepted forms is rejected
+		 *	rather than cast, so a typo cannot become a 0.
 		 *
-		 *	@return 	bool
+		 *	@param		mixed			$value				As posted
+		 *	@param		array			$field				Its FIELDS entry
+		 *
+		 *	@return 	mixed										The clean value, or null if it does not validate
 		 */
-		private static function _matchesType( mixed $value, string $type ): bool {
-			return match( $type ) {
-				'bool' 		=> is_bool( $value ),
-				'string' 	=> is_string( $value ),
-				'array' 	=> is_array( $value ),
-				default 	=> false,
+		private static function _cleanValue( mixed $value, array $field ): mixed {
+
+			return match( $field['type'] ) {
+
+				'bool' => match( true ) {
+					is_bool( $value ) 												=> $value,
+					$value === 'true', $value === 1, $value === '1' 	=> true,
+					$value === 'false', $value === 0, $value === '0' => false,
+					default 																	=> null,
+				},
+
+				'int' => self::_cleanInt( $value, $field ),
+
+				'native' => ( is_string( $value ) === true && preg_match( self::LOCALE_PATTERN, $value ) === 1 ) ? $value : null,
+
+				'locales' => self::_cleanLocales( $value ),
+
+				default => null,
+			};
+		}
+
+		/**
+		 *	@param		mixed			$value
+		 *	@param		array			$field				Its FIELDS entry, for 'min'/'max'
+		 *
+		 *	@return 	int|null								Null if not an int or out of range
+		 */
+		private static function _cleanInt( mixed $value, array $field ): ?int {
+
+			// A float, a bool or "5 " are all rejected rather than cast: this
+			// writes into config.php, where the value has to be an int and
+			// nothing else
+			if( is_int( $value ) === false && ( is_string( $value ) === false || preg_match( '/^-?\d+$/', $value ) !== 1 ) )
+				return null;
+
+			$int = (int) $value;
+
+			if( $int < ( $field['min'] ?? PHP_INT_MIN ) || $int > ( $field['max'] ?? PHP_INT_MAX ) )
+				return null;
+
+			return $int;
+		}
+
+		/**
+		 *	@param		mixed			$value				As posted
+		 *
+		 *	@return 	array|null							Deduplicated locale list, or null if any entry is malformed
+		 */
+		private static function _cleanLocales( mixed $value ): ?array {
+
+			if( is_array( $value ) === false )
+				return null;
+
+			$locales = [];
+			foreach( $value as $locale ) {
+
+				if( is_string( $locale ) === false || preg_match( self::LOCALE_PATTERN, $locale ) !== 1 )
+					return null;
+
+				if( in_array( $locale, $locales, true ) === false )
+					$locales[] = $locale;
+			}
+
+			return $locales;
+		}
+
+		/**
+		 *	The message a rejected field answers with - specific enough to fix
+		 *	the value from, which "invalid value" is not
+		 *
+		 *	@param		string		$key
+		 *	@param		array			$field
+		 *
+		 *	@return 	string
+		 */
+		private static function _typeError( string $key, array $field ): string {
+
+			return match( $field['type'] ) {
+				'int' 		=> $key. ': expected a whole number between '. ( $field['min'] ?? PHP_INT_MIN ). ' and '. ( $field['max'] ?? PHP_INT_MAX ),
+				'bool' 		=> $key. ': expected true or false',
+				'native' 	=> $key. ': expected a locale id like de_DE',
+				'locales'	=> $key. ': expected a list of locale ids like de_DE',
+				default 	=> $key. ': invalid value',
 			};
 		}
 	}
-
 	/**
 	 *	Nino							A compact filesystembased php framework
 	 *	Dev								Manage admin accounts: create/delete - the "set" half of what

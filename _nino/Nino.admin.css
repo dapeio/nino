@@ -61,7 +61,10 @@
  *   Forms      .nino-admin-field  .nino-admin-field-wide
  *              .nino-admin-fieldgrid  .nino-admin-checkbox-fieldset
  *							.nino-admin-checkbox-field
- *              .nino-admin-checklist  .nino-admin-richtext
+ *              .nino-admin-checklist  .nino-admin-checklist-state
+ *              .nino-admin-richtext
+ *   Boolean    .nino-admin-switch  .nino-admin-switch-track
+ *              .nino-admin-switch-copy  .nino-admin-switch-state
  *   Controls   .nino-admin-locale-select
  *              .nino-admin-locale-select--corner
  *   Chrome     .nino-admin-contextbar  .nino-admin-contextbar-select
@@ -372,11 +375,163 @@ body {
 	right: 1rem;
 }
 
-/* A run of checkbox rows that reads as one control (locales, modules). */
+/* The boolean control. A plain checkbox is the wrong affordance for a setting
+   that is on or off right now (rather than one of several things being picked),
+   so this renders one as a track and knob and states its condition in words
+   next to it - "on"/"off" is readable without relying on the knob's position,
+   which is the part a colour-blind or low-vision reader loses.
+
+   Still a real <input type=checkbox> underneath: it keeps the label
+   association, the keyboard behaviour (space toggles), the form value and the
+   :checked state that drives everything below. The input is clipped rather
+   than display:none - a hidden input is not focusable, which would take the
+   control off the keyboard entirely.
+
+     <label class="nino-admin-switch">
+       <input type="checkbox">
+       <span class="nino-admin-switch-track"></span>
+       <span class="nino-admin-switch-copy">Label<small>hint</small></span>
+       <span class="nino-admin-switch-state">on</span>
+     </label> */
+:where(.nino-admin) .nino-admin-switch {
+	display: flex;
+	align-items: flex-start;
+	gap: .7rem;
+	min-height: var(--nino-admin-row-height);
+	padding: .5rem .1rem;
+	cursor: pointer;
+}
+
+:where(.nino-admin) .nino-admin-switch input {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	margin: 0;
+	padding: 0;
+	border: 0;
+	clip-path: inset(50%);
+	overflow: hidden;
+	white-space: nowrap;
+}
+
+:where(.nino-admin) .nino-admin-switch-track {
+	position: relative;
+	flex: none;
+	width: 2.4rem;
+	height: 1.35rem;
+	margin-top: .1rem;
+	border: 1px solid var(--editor-separator);
+	border-radius: 999px;
+	background-color: var(--nino-admin-surface-muted);
+	transition: background-color .16s ease, border-color .16s ease;
+}
+
+:where(.nino-admin) .nino-admin-switch-track::after {
+	content: "";
+	position: absolute;
+	top: 50%;
+	left: .16rem;
+	width: .95rem;
+	height: .95rem;
+	transform: translateY(-50%);
+	border-radius: 50%;
+	background-color: var(--editor-bg-elevated);
+	box-shadow: var(--editor-shadow-sm);
+	transition: transform .16s ease;
+}
+
+:where(.nino-admin) .nino-admin-switch input:checked + .nino-admin-switch-track {
+	border-color: var(--editor-blue);
+	background-color: var(--editor-blue);
+}
+
+:where(.nino-admin) .nino-admin-switch input:checked + .nino-admin-switch-track::after {
+	transform: translateY(-50%) translateX(1.02rem);
+}
+
+/* The focus ring goes on the track, since the input it belongs to is clipped */
+:where(.nino-admin) .nino-admin-switch input:focus-visible + .nino-admin-switch-track {
+	outline: 2px solid var(--editor-blue);
+	outline-offset: 2px;
+}
+
+:where(.nino-admin) .nino-admin-switch input:disabled + .nino-admin-switch-track {
+	opacity: .5;
+}
+
+:where(.nino-admin) .nino-admin-switch-copy {
+	display: flex;
+	flex-direction: column;
+	gap: .1rem;
+	flex: 1 1 auto;
+	min-width: 0;
+	font-size: .88rem;
+	line-height: 1.35;
+}
+
+:where(.nino-admin) .nino-admin-switch-copy small {
+	color: var(--editor-text-secondary);
+	font-size: .76rem;
+	line-height: 1.4;
+}
+
+/* The written condition. Tabular figures are pointless here, but a fixed
+   min-width is not: without it the row's copy shifts sideways every time the
+   word changes length as the switch is toggled */
+:where(.nino-admin) .nino-admin-switch-state {
+	flex: none;
+	min-width: 2.4rem;
+	margin-top: .16rem;
+	color: var(--editor-text-secondary);
+	font-size: .74rem;
+	font-weight: 600;
+	letter-spacing: .04em;
+	text-transform: uppercase;
+	text-align: right;
+}
+
+:where(.nino-admin) .nino-admin-switch input:checked ~ .nino-admin-switch-state {
+	color: var(--editor-blue);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	:where(.nino-admin) .nino-admin-switch-track,
+	:where(.nino-admin) .nino-admin-switch-track::after {
+		transition: none;
+	}
+}
+
+/* A run of checkbox rows that reads as one control (locales, modules).
+   Rows, so the container stacks them: a <label> is inline by default, which
+   ran the whole run together on one line and made a list of languages read as
+   a sentence. Each row is a flex line of its own, so the box, the name and any
+   trailing status sit on one baseline however long the name is. */
+:where(.nino-admin) .nino-admin-checklist {
+	display: flex;
+	flex-direction: column;
+	gap: .12rem;
+}
+
 :where(.nino-admin) .nino-admin-checklist label {
+	display: flex;
+	align-items: center;
+	gap: .55rem;
 	min-height: 38px;
 	padding: .45rem .65rem;
 	border-radius: var(--editor-radius-sm);
+}
+
+/* A row's own status ("12 text keys", "no text file yet"), pushed to the far
+   end so it reads as a column against the names rather than as more of the
+   label. A named role rather than a :last-child rule - see convention 4 in
+   this file's header, and a structural selector here would also catch a row
+   that happens to end in something else. */
+:where(.nino-admin) .nino-admin-checklist-state {
+	margin-left: auto;
+	padding-left: .75rem;
+	color: var(--editor-text-secondary);
+	font-size: .76rem;
+	text-align: right;
 }
 
 :where(.nino-admin) .nino-admin-richtext {

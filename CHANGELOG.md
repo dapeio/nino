@@ -6,6 +6,36 @@ All notable changes to Nino are documented in this file.
 
 ### Added
 
+- `/_admin`'s **Config** is a typed form instead of a list of raw json
+  textareas. Booleans are switches, the two login-throttle values are bounded
+  number fields, and the language list and native language are one group that
+  is saved together. Every value is validated against a schema
+  (`Config::FIELDS`) before anything is written, and the whole page is one
+  write rather than one per key — which the two locale keys require, since a
+  native language has to be one of the available ones and saving them
+  separately allows a config.php that contradicts itself.
+- A boolean control in the admin design system: `.nino-admin-switch` with its
+  track, copy and written on/off state. The condition is stated in words next
+  to the knob, since knob position is otherwise the only signal and it is the
+  one a low-vision reader loses. The real `<input type=checkbox>` stays in the
+  markup, clipped rather than hidden, so the label association and keyboard
+  behaviour are the browser's rather than reimplemented.
+- Adding a language in Config writes its `text/<locale>.php` there and then, as
+  a skeleton of every key the native language has, in its order, with empty
+  values — the state `/_editor`'s Text panel lists as work to do. Values stay
+  empty on purpose: a key carrying the native language's own sentence reads as
+  finished and is what ends up shipping. The language is deliberately left
+  switched off, since a language of empty keys would otherwise be one Save away
+  from serving blank pages, and an existing text file is never overwritten.
+  Before this there was no way to bootstrap a locale from the interface at all —
+  `Text::saveBatch()` validates against keys that already exist, so there was
+  nothing to save into an empty language.
+- The Config language list reports what actually exists on disk per locale:
+  every `text/<locale>.php` found is offered even when `config.php` does not
+  list it (a translated language that is merely switched off), and a language
+  switched on without one is flagged before saving — that case renders every
+  per-locale fill as a raw `[[key]]`.
+
 - Added a shared admin data table — `Nino.adminUi.table()` plus the
   `nino-admin-table` primitives — with search across all visible columns,
   type-aware sorting and 50/100/150 paging. `/_admin`'s Elements list uses it,
@@ -102,6 +132,24 @@ All notable changes to Nino are documented in this file.
   server-side HTML sanitizer.
 
 ### Changed
+
+- `private/config.php` ships `/nino/editor/backups` and `/nino/editor/logs`
+  instead of `/nino/admin/backups` and `/nino/admin/logs`. The keys `_editor`
+  actually reads have always been the `/nino/editor/*` pair
+  (`Backup::maybeRun()`, `Logs::record()`), so the shipped `false` never took
+  effect: the key those two look for was absent and their `?? true` default
+  won, which means the daily backup and the audit trail have been running in
+  every installation regardless of what config.php said. Both now ship as
+  `true`, which is what every project has actually been doing — no behaviour
+  changes, the file simply stops contradicting the code. An existing project
+  still holding a `/nino/admin/*` key has its value read by Config's panel, so
+  what its owner intended is what the form shows; the stale key is left in
+  place rather than deleted.
+- Config no longer edits `/nino/http/routes`, `/nino/html/navs` or
+  `/nino/html/assets`. The first two have had dedicated editors for a while
+  (Routes, Navigations) and a second, unvalidated way to write the same data is
+  a way to corrupt it. Asset bundles stay a deliberate config.php edit because
+  their order is load-bearing for the css cascade, which a form does not show.
 
 - Reduced the Template Builder library to explicit manifest-v3 presets. The
   Classic switch and all bundled version-1 recipes are gone; manifests with a
