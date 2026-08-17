@@ -37,6 +37,11 @@
 
 		_locales				: [],
 		_currentType		: null,
+		// Type name -> the uri its next element would get, for the types that
+		// number their own elements (see Elements::AUTOINCREMENT_PAD). Filled
+		// from the same type list every form is built from, so the element form
+		// knows whether to ask for a uri at all.
+		_numbered				: {},
 		_currentTypeTitle	: null,
 		_currentModel		: null,
 		_globalKeys			: [],
@@ -306,6 +311,14 @@
 		 */
 		_renderTypes : function( types ) {
 
+			// Every path into a form goes through this list, so it is the one
+			// place that has to record which types number their own elements
+			Nino.admin.elements._numbered = {};
+			types.forEach( function( entry ) {
+				if( entry.autoincrement === true )
+					Nino.admin.elements._numbered[entry.type] = entry.nextUri || '';
+			} );
+
 			const wrap = dc.getElementById('elements-types');
 			wrap.innerHTML = '';
 
@@ -356,6 +369,27 @@
 		 *
 		 *	@return		void
 		 */
+		/**
+		 *	Whether the current type assigns its element uris itself
+		 *
+		 *	@return		{boolean}
+		 */
+		_isNumbered : function() {
+			return Object.prototype.hasOwnProperty.call( Nino.admin.elements._numbered, Nino.admin.elements._currentType );
+		},
+
+		/**
+		 *	The uri the next element of the current type would get. Read from the
+		 *	type list, so it is what the backend reported when that list was
+		 *	loaded - the allocation itself happens on save, under the type file's
+		 *	lock, and the saved element's real uri is what the form then shows.
+		 *
+		 *	@return		{string}
+		 */
+		_nextUri : function() {
+			return Nino.admin.elements._numbered[Nino.admin.elements._currentType] || '00001';
+		},
+
 		_selectType : function( type, model, title ) {
 
 			if( Nino.admin.elements._saving === true )
@@ -1238,7 +1272,30 @@
 			// Uri as the form's title - editable (it's how a new element gets its
 			// identifier) when new, otherwise a plain heading; consistent with
 			// Text, it can't be changed afterwards
-			if( Nino.admin.elements._isNew === true ) {
+			if( Nino.admin.elements._isNew === true && Nino.admin.elements._isNumbered() === true ) {
+
+				// A numbered type has nothing to ask for. The input stays in the
+				// markup, empty and hidden, because an empty uri is exactly what
+				// tells the backend to allocate the next number - and _save()
+				// keeps reading the field either way.
+				const uriInput = dc.createElement('input');
+				uriInput.type = 'hidden';
+				uriInput.id = 'elements-form-uri';
+				uriInput.value = '';
+				form.appendChild( uriInput );
+
+				// Shown rather than described: the number is what the element will
+				// be reachable at, and it is assigned on save, so nobody has to
+				// take on trust what they are about to create
+				// .nino-admin-hint, not -field-hint: this explains the screen, it
+				// does not belong to a field above it (there is none, and that
+				// class carries a negative top margin to sit under one)
+				const numbered = dc.createElement('p');
+				numbered.className = 'nino-admin-hint';
+				numbered.textContent = 'This type numbers its elements. Saving creates /'+ Nino.admin.elements._currentType+ '/'+ Nino.admin.elements._nextUri()+ '.';
+				form.appendChild( numbered );
+
+			} else if( Nino.admin.elements._isNew === true ) {
 
 				const uriLabel = dc.createElement('label');
 				uriLabel.className = 'nino-admin-field';
@@ -1435,10 +1492,15 @@
 
 			Nino.admin.elements._storeVisibleLocaleFields();
 
-			const uri = dc.getElementById('elements-form-uri').value.trim();
+			// A numbered type is saved with no uri on purpose - that is what asks
+			// the backend for the next number. Reassigned below, once the insert
+			// comes back and says which one it got, so the remaining locales of
+			// this same save address the element that now exists.
+			let uri = dc.getElementById('elements-form-uri').value.trim();
+			const numberedInsert = Nino.admin.elements._isNew === true && Nino.admin.elements._isNumbered() === true;
 			let msg = dc.getElementById('elements-form-msg');
 
-			if( uri === '' ) {
+			if( uri === '' && numberedInsert === false ) {
 				msg.textContent = 'An element uri is required.';
 				return;
 			}
@@ -1495,8 +1557,20 @@
 
 					if( wasNew === true && position === 0 ) {
 						Nino.admin.elements._isNew = false;
+						// A numbered type only knows its uri now. Every element the
+						// kernel returns carries the '.uri' it was actually written
+						// under, so take it from there rather than assuming.
+						const assigned = String( response.element['.uri'] ?? '' ).split('/').pop();
+						if( assigned !== '' )
+							uri = assigned;
 						Nino.admin.elements._currentUri = uri;
 						created = true;
+
+						// This insert consumed a number, so the next form's promise
+						// has to move with it (the backend reports the new one -
+						// the padding is the kernel's to decide, not this file's)
+						if( response.nextUri )
+							Nino.admin.elements._numbered[Nino.admin.elements._currentType] = response.nextUri;
 					}
 
 					Nino.admin.elements._globalKeys.forEach( function( key ) { Nino.admin.elements._globalValues[key] = response.element[key] ?? null } );

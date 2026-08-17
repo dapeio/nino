@@ -1611,6 +1611,80 @@ check( 'a title wins', ( $labels['titled'] ?? null ) === 'A title' );
 check( 'no title falls back to the element\'s own uri, not to "label" or "name"', ( $labels['untitled'] ?? null ) === '/untitled' );
 check( 'an empty title counts as no title', ( $labels['blank-title'] ?? null ) === '/blank-title' );
 
+// --- a type that numbers its own elements --------------------------------
+//
+// Some types have entries with no name worth putting in a url - a gallery
+// image, a price row. Asking for one anyway is how a project ends up with
+// "bild-2", "bild-2-neu", "bild-2-final". Such a type is switched to numbering
+// in this editor; the kernel then allocates the uri (see
+// Elements::AUTOINCREMENT_PAD), and the element form stops asking.
+
+[ $status, $body ] = callDev( $appData, \Nino\Admin\ElementTypes::class, 'apiCreate', [
+	'uri' => 'gallery', 'title' => 'Gallery', 'autoincrement' => true,
+	'model' => [ 'caption' => [ 'type' => 'string' ] ],
+] );
+check( 'a type can be created numbered', $status === 200 && ( $body['autoincrement'] ?? null ) === true );
+
+[ , $body ] = callDev( $appData, \Nino\Admin\ElementTypes::class, 'apiGet', [ 'uri' => 'gallery' ] );
+check( 'apiGet reports that this type numbers its elements', ( $body['autoincrement'] ?? null ) === true );
+check( '...and names the uri the next element would get', ( $body['next'] ?? null ) === '00001' );
+
+// The element form posts no uri at all for such a type - that is the request
+// to be numbered, and it is the kernel that decides which number
+[ $status, $body ] = callDev( $appData, \Nino\Admin\Elements::class, 'apiSave', [
+	'type' => 'gallery', 'uri' => '', 'locale' => 'de_DE', 'isNew' => true, 'fields' => [ 'caption' => 'One' ] ] );
+check( 'saving with no uri allocates the first number', $status === 200 && ( $body['element']['.uri'] ?? null ) === '/gallery/00001' );
+check( '...and reports the next one back, so the form\'s promise stays true', ( $body['nextUri'] ?? null ) === '00002' );
+
+[ , $body ] = callDev( $appData, \Nino\Admin\Elements::class, 'apiSave', [
+	'type' => 'gallery', 'uri' => '', 'locale' => 'de_DE', 'isNew' => true, 'fields' => [ 'caption' => 'Two' ] ] );
+check( 'the next save gets the next number', ( $body['element']['.uri'] ?? null ) === '/gallery/00002' );
+
+[ , $listBody ] = callDev( $appData, \Nino\Admin\Elements::class, 'apiList', [ 'type' => 'gallery' ] );
+check( 'both numbered elements are listed', array_column( $listBody['elements'], 'uri' ) === [ '00001', '00002' ] );
+
+[ , $typesBody ] = callDev( $appData, \Nino\Admin\Elements::class, 'apiTypes' );
+$galleryEntry = array_column( $typesBody['types'], null, 'type' )['gallery'] ?? [];
+check( 'the element form is told which types are numbered', ( $galleryEntry['autoincrement'] ?? null ) === true );
+check( '...and what the next uri would be, so it can show it', ( $galleryEntry['nextUri'] ?? null ) === '00003' );
+
+// An update names its element like any other - only the insert is uri-less
+[ $status ] = callDev( $appData, \Nino\Admin\Elements::class, 'apiSave', [
+	'type' => 'gallery', 'uri' => '00001', 'locale' => 'de_DE', 'isNew' => false, 'fields' => [ 'caption' => 'Edited' ] ] );
+check( 'a numbered element updates under the uri it was given', $status === 200 );
+check( '...and the edit actually landed', ( \Nino\Elements::getElement( $appData, '/gallery/00001', 'de_DE' )['caption'] ?? null ) === 'Edited' );
+
+// The same request against a type that names its own elements stays a 400 -
+// numbering is a property of the type, not a way to skip validation
+[ $status ] = callDev( $appData, \Nino\Admin\Elements::class, 'apiSave', [
+	'type' => 'labeltype', 'uri' => '', 'locale' => 'de_DE', 'isNew' => true, 'fields' => [ 'name' => 'x' ] ] );
+check( 'an empty uri is still rejected for a type that is not numbered', $status === 400 );
+
+// Turning numbering on later must not be able to collide with an element the
+// type already has - including one that happens to look like a number
+callDev( $appData, \Nino\Admin\Elements::class, 'apiSave', [
+	'type' => 'labeltype', 'uri' => '00007', 'locale' => 'de_DE', 'isNew' => true, 'fields' => [ 'name' => 'seven' ] ] );
+[ , $body ] = callDev( $appData, \Nino\Admin\ElementTypes::class, 'apiSave', [
+	'uri' => 'labeltype', 'title' => 'Label Type', 'autoincrement' => true,
+	'model' => [ 'name' => [ 'type' => 'string' ], 'label' => [ 'type' => 'string' ], 'title' => [ 'type' => 'string' ] ] ] );
+check( 'numbering can be switched on for an existing type', ( $body['autoincrement'] ?? null ) === true );
+
+[ , $body ] = callDev( $appData, \Nino\Admin\Elements::class, 'apiSave', [
+	'type' => 'labeltype', 'uri' => '', 'locale' => 'de_DE', 'isNew' => true, 'fields' => [ 'name' => 'eight' ] ] );
+$seeded = $body['element']['.uri'] ?? null;
+check( 'the counter starts past the highest number already in the type', $seeded === '/labeltype/00008' );
+check( 'the elements that were named by hand keep their uris',
+	( \Nino\Elements::getElement( $appData, '/labeltype/titled', 'de_DE' )['title'] ?? null ) === 'A title' );
+
+// Switching it back off returns the type to being named by hand
+[ , $body ] = callDev( $appData, \Nino\Admin\ElementTypes::class, 'apiSave', [
+	'uri' => 'labeltype', 'title' => 'Label Type', 'autoincrement' => false,
+	'model' => [ 'name' => [ 'type' => 'string' ], 'label' => [ 'type' => 'string' ], 'title' => [ 'type' => 'string' ] ] ] );
+check( 'numbering can be switched off again', ( $body['autoincrement'] ?? null ) === false );
+[ $status ] = callDev( $appData, \Nino\Admin\Elements::class, 'apiSave', [
+	'type' => 'labeltype', 'uri' => '', 'locale' => 'de_DE', 'isNew' => true, 'fields' => [ 'name' => 'x' ] ] );
+check( '...and an uri-less save is refused again', $status === 400 );
+
 [ $status, $body ] = callDev( $appData, \Nino\Admin\Elements::class, 'apiGet', [ 'type' => 'contenttype', 'uri' => 'first' ] );
 check( 'apiGet succeeds', $status === 200 );
 check( 'apiGet splits global fields out of the locale buckets', $body['global'] === [ 'views' => 3 ] );

@@ -263,48 +263,21 @@
 		},
 
 		/**
-		 *	A boolean as the design system's switch (see _nino/Nino.admin.css).
-		 *	The written on/off next to it is not decoration: the knob's position
-		 *	is the only other signal, and that is the one a low-vision reader
-		 *	loses.
+		 *	A boolean as the design system's switch. The Element Types editor
+		 *	needs the same control for its numbering option, so the component
+		 *	itself lives in Nino.adminUi - this only names the setting.
 		 *
 		 *	@param		{Object}	field
 		 *
 		 *	@return		{Element}
 		 */
 		_renderSwitch : function( field ) {
-
-			const label = dc.createElement('label');
-			label.className = 'nino-admin-switch';
-
-			const input = dc.createElement('input');
-			input.type = 'checkbox';
-			input.checked = field.value === true;
-			input.dataset.key = field.key;
-			label.appendChild( input );
-
-			const track = dc.createElement('span');
-			track.className = 'nino-admin-switch-track';
-			label.appendChild( track );
-
-			const copy = dc.createElement('span');
-			copy.className = 'nino-admin-switch-copy';
-			copy.appendChild( dc.createTextNode( field.label ) );
-
-			if( field.hint ) {
-				const hint = dc.createElement('small');
-				hint.textContent = field.hint;
-				copy.appendChild( hint );
-			}
-			label.appendChild( copy );
-
-			const state = dc.createElement('span');
-			state.className = 'nino-admin-switch-state';
-			state.textContent = input.checked ? 'on' : 'off';
-			input.addEventListener( 'change', function() { state.textContent = input.checked ? 'on' : 'off' } );
-			label.appendChild( state );
-
-			return label;
+			return Nino.adminUi.switchField( {
+				key 			: field.key,
+				checked 	: field.value === true,
+				label 		: field.label,
+				hint 			: field.hint,
+			} );
 		},
 
 		/**

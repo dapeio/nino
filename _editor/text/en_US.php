@@ -28,6 +28,7 @@ return [
 	'[[/_editor/elements/label/add]]'				=> 'New element',
 	'[[/_editor/elements/label/uri]]'				=> 'Uri',
 	'[[/_editor/elements/label/uri-hint]]'	=> 'Unique string (a-z, -, _) used to identify this element, e.g. “open-workshops”.',
+	'[[/_editor/elements/label/uri-numbered]]'	=> 'This type numbers its elements. Saving creates',
 	'[[/_editor/elements/label/global]]'		=> 'Global',
 	'[[/_editor/elements/label/yes]]'				=> 'Yes',
 	'[[/_editor/elements/label/no]]'				=> 'No',

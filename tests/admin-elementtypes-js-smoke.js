@@ -158,5 +158,22 @@ const readBack = Object.keys( elementTypes._fields[0] ).filter( function( k ) { 
 const forwarded = Object.keys( built.title );
 check( 'every key _storeFields() reads is forwarded by _buildModel()', readBack.every( function( k ) { return forwarded.indexOf( k ) !== -1 } ) );
 
+
+// --- the numbering option -------------------------------------------------
+//
+// Whether a type names its elements or numbers them is a property of the type,
+// so it is set here rather than per element. Source-level: _renderForm() is a
+// dom branch this sandbox cannot reach.
+const typesSource = fs.readFileSync( path.join( __dirname, '../_admin/assets/elementtypes.js' ), 'utf8' );
+
+check( 'the type editor offers the numbering option through the shared switch',
+	typesSource.includes('Nino.adminUi.switchField(') && typesSource.includes("key \t\t\t: 'autoincrement'") );
+check( 'both save paths send it, so it is not silently dropped on create',
+	typesSource.split('autoincrement : autoincrement').length === 3 );
+check( 'the form is told the current setting rather than defaulting to off',
+	/_renderForm\( response\.title, response\.autoincrement === true/.test( typesSource ) === true );
+check( 'and says that existing elements keep their uris',
+	typesSource.includes('Existing elements keep the uris they have') );
+
 console.log( '\n'+ checks+ ' checks, '+ failures+ ' failed' );
 process.exitCode = failures === 0 ? 0 : 1;

@@ -148,5 +148,40 @@ elements._loadReferenceOptions( function() {} );
 check( 'each form open refills the options rather than reusing the last ones', elements._referenceOptions.gone[0].uri === 'new' );
 
 
+
+// --- a type that numbers its own elements ---------------------------------
+//
+// The element form asks for a uri, unless the type assigns one itself (see
+// Elements::AUTOINCREMENT_PAD). Which types those are arrives with the same
+// type list every form is built from, and _renderTypes() is the one place that
+// records it - every path into a form goes through that list.
+
+elements._numbered = {};
+elements._currentType = 'articles';
+check( 'a type not in the numbered map asks for a uri', elements._isNumbered() === false );
+
+elements._numbered = { gallery : '00007' };
+elements._currentType = 'gallery';
+check( 'a numbered type is recognised', elements._isNumbered() === true );
+check( 'the next uri is the one the backend reported', elements._nextUri() === '00007' );
+
+// A type whose entry is an empty string is still numbered - the backend simply
+// had no number to report. hasOwnProperty, not a truthiness test, is what keeps
+// those two apart.
+elements._numbered = { gallery : '' };
+check( 'a numbered type with no reported number is still numbered', elements._isNumbered() === true );
+check( '...and falls back to the first number rather than showing nothing', elements._nextUri() === '00001' );
+
+// Source-level, because both live in _renderForm()/_save()'s dom branches
+// which this dom-free sandbox cannot reach
+check( 'a numbered insert renders the uri field hidden rather than dropping it',
+	/_isNumbered\(\) === true \) \{[\s\S]{0,600}uriInput\.type = 'hidden'/.test( source ) === true );
+check( '...and keeps its value empty, which is what asks for a number',
+	/_isNumbered\(\) === true \) \{[\s\S]{0,600}uriInput\.value = ''/.test( source ) === true );
+check( 'the "a uri is required" guard is skipped for a numbered insert',
+	/uri === '' && numberedInsert === false/.test( source ) === true );
+check( 'the saved element\'s own .uri is what the form adopts afterwards',
+	/response\.element\['\.uri'\]/.test( source ) === true );
+
 console.log( '\n'+ checks+ ' checks, '+ failures+ ' failed' );
 process.exitCode = failures === 0 ? 0 : 1;

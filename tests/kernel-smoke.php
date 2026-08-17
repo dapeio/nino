@@ -334,6 +334,78 @@ check( 'a reference whose target is gone keeps its value',
 echo "\n";
 
 
+// --- Sequential element uris (the type file's own AUTO_INCREMENT) --------
+
+echo "Elements sequential uris - a type that numbers its own entries\n";
+
+$numbered = [ 'title' => [ 'type' => 'string', 'locale' => true ] ];
+
+check( 'insertElementType can start a type off numbered',
+	\Nino\Elements::insertElementType( $appData, '/gallery', $numbered, true ) !== false );
+check( '...with its counter on the first number',
+	\Nino\Elements::getAutoincrement( $appData, '/gallery' ) === 1 );
+
+// '/gallery/' - the type with an empty slug - is the request to be numbered
+$first	= \Nino\Elements::insertElement( $appData, '/gallery/', [ 'title' => 'A' ], 'de_DE' );
+$second = \Nino\Elements::insertElement( $appData, '/gallery/', [ 'title' => 'B' ], 'de_DE' );
+
+check( 'an empty slug is allocated the first number, zero-padded',
+	( $first['.uri'] ?? null ) === '/gallery/00001' );
+check( '...and the next insert gets the one after it',
+	( $second['.uri'] ?? null ) === '/gallery/00002' );
+check( 'the returned element carries the uri it was given, so a caller can use it',
+	( $second['title'] ?? null ) === 'B' );
+check( 'the allocated element reads back under that uri',
+	( \Nino\Elements::getElement( $appData, '/gallery/00001', 'de_DE' )['title'] ?? null ) === 'A' );
+check( 'the counter has moved past both',
+	\Nino\Elements::getAutoincrement( $appData, '/gallery' ) === 3 );
+
+// A uri is a public address. Handing a deleted element's number to a different
+// one would silently repoint every link that still uses it, so the counter is
+// stored rather than derived from what is currently there.
+\Nino\Elements::deleteElement( $appData, '/gallery/00002', '*' );
+check( 'deleting the newest entry does not hand its number out again',
+	( \Nino\Elements::insertElement( $appData, '/gallery/', [ 'title' => 'C' ], 'de_DE' )['.uri'] ?? null ) === '/gallery/00003' );
+
+// Numbering is about what the tools offer, not a restriction on the kernel -
+// an import or a migration can still name an entry
+check( 'an explicit slug is still accepted on a numbered type',
+	( \Nino\Elements::insertElement( $appData, '/gallery/named', [ 'title' => 'D' ], 'de_DE' )['.uri'] ?? null ) === '/gallery/named' );
+
+// ...which is why the seed is re-checked on every allocation: a counter
+// trailing behind an imported number would otherwise overwrite it
+\Nino\Elements::insertElement( $appData, '/gallery/00042', [ 'title' => 'imported' ], 'de_DE' );
+check( 'the counter jumps past an entry numbered higher by hand',
+	( \Nino\Elements::insertElement( $appData, '/gallery/', [ 'title' => 'E' ], 'de_DE' )['.uri'] ?? null ) === '/gallery/00043' );
+check( '...leaving that entry untouched',
+	( \Nino\Elements::getElement( $appData, '/gallery/00042', 'de_DE' )['title'] ?? null ) === 'imported' );
+
+check( 'every numbered entry is found by queryElements',
+	count( \Nino\Elements::queryElements( $appData, '/gallery', [], 'de_DE' ) ?: [] ) === 5 );
+
+// The counter shares the type file's top level with 'title', not with the
+// locale buckets - nothing may read it as one
+$galleryFile = \Nino\Filesystem::getFileContent( $appData, '/elements/gallery.php', [] );
+check( 'the counter is stored as a plain int beside the data buckets',
+	( $galleryFile['autoincrement'] ?? null ) === 44 );
+check( 'no element was ever stored under an empty uri',
+	array_key_exists( '', $galleryFile['*'] ?? [] ) === false && array_key_exists( '', $galleryFile['de_DE'] ?? [] ) === false );
+
+check( 'a type that names its own elements has no counter',
+	\Nino\Elements::getAutoincrement( $appData, '/testtype' ) === null );
+check( '...so an empty slug there is still refused',
+	\Nino\Elements::insertElement( $appData, '/testtype/', [ 'title' => 'x' ], 'de_DE' ) === false );
+
+// Only an int is the switch. A hand-edited 'true' says nothing about which
+// number is next, so it is not a counter and must not be treated as one.
+\Nino\Elements::insertElementType( $appData, '/halfway', $numbered );
+\Nino\Filesystem::mutate( $appData, '/elements/halfway.php', function( mixed $d ): array { $d['autoincrement'] = true; return $d; }, false );
+check( 'a non-int autoincrement key is not read as a counter',
+	\Nino\Elements::getAutoincrement( $appData, '/halfway' ) === null );
+
+echo "\n";
+
+
 // --- Images ------------------------------------------------------------
 
 echo "Images::process / delete\n";

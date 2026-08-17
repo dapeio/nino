@@ -1985,7 +1985,7 @@ namespace Nino {
 		}
 
 		// Insert an element type
-		static public function insertElementType( array &$appData, string $typeUri, array $model ): mixed {
+		static public function insertElementType( array &$appData, string $typeUri, array $model, bool $autoincrement = false ): mixed {
 
 			$typeUri = '/'. trim( $typeUri, '/' );
 			$typeFile = self::_typeFile( $typeUri );
@@ -2000,6 +2000,11 @@ namespace Nino {
 					'*'				=> [],
 				],
 			];
+
+			// See AUTOINCREMENT_PAD: the key holds the next number due, and a
+			// brand new type starts at the first one
+			if( $autoincrement === true )
+				$typeData['autoincrement'] = 1;
 
 			// Fill model
 			foreach( $model AS $key => $data ) {
@@ -2069,6 +2074,74 @@ namespace Nino {
 			return substr( $uri, $pos + 2 );
 		}
 
+		// Sequential element uris - the type file's own AUTO_INCREMENT.
+		//
+		// A type whose entries have no natural name (an image in a gallery, a
+		// price row) is better off numbered than made to invent a slug per
+		// entry. Such a type carries one extra top-level key, next to its
+		// 'title' - 'autoincrement' => <the next number to hand out> - and
+		// inserting into it with an empty slug ('/gallery/', see
+		// _writeElementData()) allocates that number instead.
+		//
+		// The counter is stored rather than derived from the existing entries,
+		// which is what makes it behave like a database's: deleting the newest
+		// entry does not hand its number to the next one. A uri is a public
+		// address - it ends up in links, sitemaps and bookmarks - so silently
+		// pointing an old one at a different element is worse than a gap in the
+		// numbering. It is also read and written inside the same lock as the
+		// element itself, so two simultaneous inserts cannot be given the same
+		// number.
+		//
+		// Presence of an int is the switch. Anything else (absent, false, a
+		// string) means this type names its elements itself.
+		public const int AUTOINCREMENT_PAD = 5;
+
+		// Whether this type numbers its elements, and the next number due
+		static public function getAutoincrement( array &$appData, string $typeUri ): ?int {
+			$typeData = self::getElementFile( $appData, $typeUri );
+			return ( $typeData === false ) ? null : self::readAutoincrement( $typeData );
+		}
+
+		// The same, off an already-read type file - the form of it that can be
+		// called from inside a mutate() callback without a second read
+		static public function readAutoincrement( array $typeData ): ?int {
+			return is_int( $typeData['autoincrement'] ?? null ) ? $typeData['autoincrement'] : null;
+		}
+
+		// The first number that cannot collide with an element this type
+		// already has. Used when switching the counter on, and again on every
+		// allocation as a floor under the stored value - a hand-written or
+		// imported '/gallery/00042' would otherwise be overwritten by the
+		// counter catching up to it.
+		static public function autoincrementSeed( array $typeData ): int {
+
+			$highest = 0;
+
+			foreach( $typeData as $bucketName => $bucketData ) {
+
+				if( $bucketName === 'model' || is_array( $bucketData ) === false )
+					continue;
+
+				// Numeric-string keys stay strings in php only while they are
+				// not canonical decimals ('00042' does, '42' becomes int 42),
+				// so both spellings have to be read the same way here
+				foreach( array_keys( $bucketData ) as $elementUri )
+					if( ctype_digit( (string) $elementUri ) === true )
+						$highest = max( $highest, (int) $elementUri );
+			}
+
+			return $highest + 1;
+		}
+
+		// One allocated number as the slug it is stored under. Zero-padded so
+		// the entries of a numbered type sort in the order they were made,
+		// wherever they are compared as the strings they are - element uris are
+		// array keys in the type file and text in a list. Past the padding
+		// width a number simply gets longer.
+		static public function autoincrementUri( int $number ): string {
+			return str_pad( (string) $number, self::AUTOINCREMENT_PAD, '0', STR_PAD_LEFT );
+		}
+
 		// The PHP gettype() a model field's declared type is expected to hold
 		// as - 'date'/'datetime' values are plain ISO strings (php has no
 		// native date type), an 'image' field stores its uploaded file's
@@ -2103,10 +2176,31 @@ namespace Nino {
 			$outcome 		= 'notfound';
 			$resultData	= null;
 
-			$success = \Nino\Filesystem::mutate( $appData, $typeFile, function( mixed $typeData, array &$appData ) use ( $uri, $data, $locale, $typeUri, $update, &$outcome, &$resultData ): mixed {
+			// The uri actually written, which for a numbered type is only known
+			// once the mutation below has allocated it - so a failure message
+			// names the element rather than the '/type/' it was asked for
+			$writtenUri = $uri;
+
+			$success = \Nino\Filesystem::mutate( $appData, $typeFile, function( mixed $typeData, array &$appData ) use ( $uri, $data, $locale, $typeUri, $update, &$outcome, &$resultData, &$writtenUri ): mixed {
 
 				if( is_array( $typeData ) === false )
 					return null;
+
+				// A numbered type assigns the uri itself: insert into '/gallery/'
+				// - the type with an empty slug - and the next number is
+				// allocated here, inside the lock this mutation already holds,
+				// so two simultaneous inserts cannot be handed the same one.
+				// Everything below then runs on the allocated uri, including the
+				// field callbacks, which therefore see the same '.uri' they
+				// would for a named element.
+				$autoincrement = self::readAutoincrement( $typeData );
+
+				if( $update === false && $autoincrement !== null && self::getElementUriFromUri( $uri ) === '' ) {
+					$number 										= max( $autoincrement, self::autoincrementSeed( $typeData ) );
+					$uri 												= $typeUri. '/'. self::autoincrementUri( $number );
+					$writtenUri 								= $uri;
+					$typeData['autoincrement'] 	= $number + 1;
+				}
 
 				// Run callbacks
 				$data['.uri'] 		= $uri;
@@ -2327,7 +2421,7 @@ namespace Nino {
 			// means the callback agreed to the write, not that mutate() was
 			// able to persist it
 			if( $success === false )
-				return ! trigger_error( 'Element \''. $uri. '\' could not be written.' );
+				return ! trigger_error( 'Element \''. $writtenUri. '\' could not be written.' );
 
 			return \Nino\Elements::getElement( $appData, $resultData['.uri'], $resultData['.locale'] );
 		}
@@ -2350,10 +2444,13 @@ namespace Nino {
 				return;
 
 			// Catch native/fallback locale: find the first locale that actually
-			// has data for this element, else leave $locale at '*' (global-only)
+			// has data for this element, else leave $locale at '*' (global-only).
+			// is_array() because a type file's top level also holds plain values
+			// that are not data buckets - its 'title', and its 'autoincrement'
+			// counter if it numbers its elements
 			if( $locale === '*' )
 				foreach( $typeData AS $typeLocale => $typeElement )
-					if( $typeLocale !== 'model' && $typeLocale !== '*' && isset( $typeElement[$elementUri] ) === true ) {
+					if( $typeLocale !== 'model' && $typeLocale !== '*' && is_array( $typeElement ) === true && isset( $typeElement[$elementUri] ) === true ) {
 						$locale = $typeLocale;
 						break;
 					}

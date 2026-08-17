@@ -612,9 +612,15 @@ namespace Nino\Admin {
 			}
 
 			\Nino\Http::ok( $request, [
-				'uri' 		=> $typeUri,
-				'title' 	=> $typeData['title'] ?? $typeUri,
-				'model' 	=> $typeData['model'] ?? [],
+				'uri' 					=> $typeUri,
+				'title' 				=> $typeData['title'] ?? $typeUri,
+				'model' 				=> $typeData['model'] ?? [],
+				// The uri form of the type: named by whoever adds an element, or
+				// numbered by the type itself. 'next' is what the following
+				// element would be called, so the form can show it rather than
+				// describe it.
+				'autoincrement' => \Nino\Elements::readAutoincrement( $typeData ) !== null,
+				'next' 					=> \Nino\Elements::autoincrementUri( \Nino\Elements::readAutoincrement( $typeData ) ?? \Nino\Elements::autoincrementSeed( $typeData ) ),
 			] );
 		}
 
@@ -815,6 +821,20 @@ namespace Nino\Admin {
 				$typeData['title'] = ( $title !== '' ) ? $title : ( $typeData['title'] ?? $typeUri );
 				$typeData['model'] = $newModel;
 
+				// Switching numbering on seeds the counter past every element this
+				// type already has, so turning it on later - on a type that was
+				// named by hand until now - cannot collide with one of them.
+				// Switching it off drops the counter: the type stops numbering,
+				// and re-enabling it seeds again from what is there. Set inside
+				// this same mutation as the model, so the file never holds one
+				// half of a save.
+				if( ( $data['autoincrement'] ?? false ) === true ) {
+					if( \Nino\Elements::readAutoincrement( $typeData ) === null )
+						$typeData['autoincrement'] = \Nino\Elements::autoincrementSeed( $typeData );
+				} else {
+					unset( $typeData['autoincrement'] );
+				}
+
 				$resultTypeData = $typeData;
 
 				return $typeData;
@@ -830,7 +850,12 @@ namespace Nino\Admin {
 				return;
 			}
 
-			\Nino\Http::ok( $request, [ 'uri' => $typeUri, 'title' => $resultTypeData['title'], 'model' => $resultTypeData['model'] ] );
+			\Nino\Http::ok( $request, [
+				'uri' 					=> $typeUri,
+				'title' 				=> $resultTypeData['title'],
+				'model' 				=> $resultTypeData['model'],
+				'autoincrement' => \Nino\Elements::readAutoincrement( $resultTypeData ) !== null,
+			] );
 		}
 
 		/**
@@ -943,9 +968,19 @@ namespace Nino\Admin {
 				'*' 			=> [ '*' => [] ],
 			];
 
+			// A type created numbered starts at the first number - there is
+			// nothing yet to seed past (see Elements::AUTOINCREMENT_PAD)
+			if( ( $data['autoincrement'] ?? false ) === true )
+				$typeData['autoincrement'] = 1;
+
 			\Nino\Filesystem::putFileContent( $appData, '/elements/'. $typeUri. '.php', $typeData );
 
-			\Nino\Http::ok( $request, [ 'uri' => $typeUri, 'title' => $typeData['title'], 'model' => $typeData['model'] ] );
+			\Nino\Http::ok( $request, [
+				'uri' 					=> $typeUri,
+				'title' 				=> $typeData['title'],
+				'model' 				=> $typeData['model'],
+				'autoincrement' => isset( $typeData['autoincrement'] ),
+			] );
 		}
 	}
 
@@ -1009,11 +1044,16 @@ namespace Nino\Admin {
 			$types = [];
 			foreach( self::types( $appData ) as $type ) {
 				$typeData = self::typeData( $appData, $type );
+				$next 		= \Nino\Elements::readAutoincrement( $typeData );
 				$types[] = [
 					'type' 	=> $type,
 					'title' => $typeData['title'] ?? $type,
 					'descr' => self::typeDescr( $appData, $type ),
 					'model' => $typeData['model'] ?? [],
+					// A numbered type has no uri to ask for - the form shows the
+					// number the next element would get instead of a text field
+					'autoincrement' => $next !== null,
+					'nextUri' 			=> ( $next === null ) ? '' : \Nino\Elements::autoincrementUri( max( $next, \Nino\Elements::autoincrementSeed( $typeData ) ) ),
 				];
 			}
 
@@ -1301,7 +1341,15 @@ namespace Nino\Admin {
 			$isNew 		= ( $data['isNew'] ?? false ) === true;
 			$fields 	= is_array( $data['fields'] ?? null ) ? $data['fields'] : [];
 
-			if( in_array( $type, self::types( $appData ), true ) === false || $uri === '' || str_contains( $uri, '/' ) === true || ( $isNew === true && self::validNewUri( $uri ) === false ) || \Nino\Locales::verifyLocale( $appData, $locale ) === false ) {
+			// A numbered type assigns the uri, so an insert into one arrives
+			// without one and the kernel allocates it under the type file's lock
+			// (see Elements::AUTOINCREMENT_PAD). An update always names its
+			// element - by then it has a uri like any other.
+			$numbered = $isNew === true && $uri === ''
+				&& in_array( $type, self::types( $appData ), true ) === true
+				&& \Nino\Elements::readAutoincrement( self::typeData( $appData, $type ) ) !== null;
+
+			if( in_array( $type, self::types( $appData ), true ) === false || ( $uri === '' && $numbered === false ) || str_contains( $uri, '/' ) === true || ( $isNew === true && $numbered === false && self::validNewUri( $uri ) === false ) || \Nino\Locales::verifyLocale( $appData, $locale ) === false ) {
 				\Nino\Http::fail( $request, 400, 'invalid type, uri or locale' );
 				return;
 			}
@@ -1330,7 +1378,15 @@ namespace Nino\Admin {
 				return;
 			}
 
-			\Nino\Http::ok( $request, [ 'element' => $result ] );
+			// A numbered type's counter has just moved on, so the form's "saving
+			// creates /type/00007" promise would otherwise still name the number
+			// this very save consumed
+			$next = \Nino\Elements::getAutoincrement( $appData, '/'. $type );
+
+			\Nino\Http::ok( $request, [
+				'element' => $result,
+				'nextUri' => ( $next === null ) ? '' : \Nino\Elements::autoincrementUri( $next ),
+			] );
 		}
 
 		/**

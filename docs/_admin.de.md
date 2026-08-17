@@ -102,6 +102,35 @@ Ein `element`-Feld verknüpft ein Element mit einem anderen. Beim Anlegen des Fe
 
 Beim Wechsel zwischen globalen und sprachabhängigen Feldern migriert Nino bestehende Werte. Prüfe das Ergebnis trotzdem in jeder Sprache. Das Speichern eines Typmodells löscht keine vorhandenen Einträge; entfernte Felder erscheinen jedoch nicht mehr in `/_editor`.
 
+### Benannte oder nummerierte Element-Uris
+
+Jedes Element wird über eine Uri der Form `/<typ>/<slug>` angesprochen.
+Standardmäßig fragt das Elementformular nach diesem Slug — richtig, solange der
+Eintrag einen Namen hat, der in eine Url gehört: `/team/ada`,
+`/leistung/website-relaunch`.
+
+Manche Typen haben Einträge ohne solchen Namen: ein Bild in einer Galerie, eine
+Zeile in einer Preisliste. Trotzdem nach einem Namen zu fragen ist der Weg, auf
+dem ein Projekt zu `bild-2`, `bild-2-neu`, `bild-2-final` kommt. Aktiviere für
+diese Typen **Number the elements of this type** in der Gruppe *Element URIs*.
+Das Elementformular fragt dann nicht mehr nach einer Uri, sondern nennt die, die
+es anlegen wird — `/gallery/00001`, `/gallery/00002` und so weiter. Die Nummer
+wird beim Speichern vergeben.
+
+- **Nummern werden nie wiederverwendet.** Wer den neuesten Eintrag löscht, gibt
+  dessen Nummer nicht an den nächsten weiter. Eine Uri ist eine öffentliche
+  Adresse, die in Links, Sitemaps und Lesezeichen landet — eine Lücke in der
+  Nummerierung ist besser, als eine alte Adresse still auf ein anderes Element
+  zeigen zu lassen.
+- **Späteres Aktivieren ist unbedenklich.** Bestehende Einträge behalten ihre
+  Uris, und die Nummerierung beginnt hinter der höchsten Nummer, die der Typ
+  schon verwendet — auch hinter einer von Hand geschriebenen.
+- **Deaktivieren** lässt den Typ wieder nach einem Slug fragen. Die nummerierten
+  Einträge behalten ihre Nummern.
+- Der Zähler liegt in der Typdatei selbst (`elements/<uri>.php`), neben ihrem
+  Titel, und wird unter demselben Lock vergeben wie das Element — zwei
+  gleichzeitige Speichervorgänge können also nicht dieselbe Nummer erhalten.
+
 Elementtypen können bewusst nicht über `/_admin` gelöscht werden. Damit verhindert Nino, dass ein unbedachter Klick sämtliche zugehörigen Inhalte vernichtet.
 
 ## Elements: Inhalte vollständig bearbeiten

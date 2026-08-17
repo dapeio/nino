@@ -28,6 +28,7 @@ return [
 	'[[/_editor/elements/label/add]]'				=> 'Neues Element',
 	'[[/_editor/elements/label/uri]]'				=> 'Uri',
 	'[[/_editor/elements/label/uri-hint]]'	=> 'Eindeutige Zeichenfolge (a-z, -, _) zur Identifikation, z. B. „offene-workshops“.',
+	'[[/_editor/elements/label/uri-numbered]]'	=> 'Dieser Typ nummeriert seine Elemente. Beim Speichern entsteht',
 	'[[/_editor/elements/label/global]]'		=> 'Global',
 	'[[/_editor/elements/label/yes]]'				=> 'Ja',
 	'[[/_editor/elements/label/no]]'				=> 'Nein',

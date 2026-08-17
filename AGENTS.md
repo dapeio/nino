@@ -2228,6 +2228,41 @@ type that does not exist. A target deleted later is tolerated — the stored val
 survives and both forms mark it as missing. Element references never enter a
 Translations export: a uri is a choice, not translatable text.
 
+### 12.2 Named or numbered element uris
+
+An element is addressed as `/<type>/<slug>`. By default the slug is supplied by
+whoever adds the element, which is right when the entry has a name worth putting
+in a url (`/team/ada`). A type whose entries have no such name - a gallery image,
+a price row - carries one extra top-level key next to its `title`:
+
+```php
+'autoincrement' => 1,   // the next number to hand out
+```
+
+Presence of an **int** is the switch; anything else means the type names its own
+elements. `/_admin`'s type editor sets it, and the element form then stops asking
+for a uri: inserting with an empty slug (`insertElement( $appData, '/gallery/',
+… )`) allocates the next number, zero-padded to `Elements::AUTOINCREMENT_PAD`.
+
+- Allocation happens inside `_writeElementData()`'s existing `mutate()`, so the
+  counter is read and written under the same lock as the element - two
+  simultaneous inserts cannot be handed the same number.
+- The counter is **stored, not derived**. Deleting the newest entry does not free
+  its number: a uri is a public address, and repointing an old one at a different
+  element is worse than a gap.
+- `autoincrementSeed()` is re-checked on every allocation as a floor, so a
+  hand-written or imported `/gallery/00042` is never overwritten by the counter
+  catching up.
+- An explicit slug still works on a numbered type. Numbering is what the tools
+  offer, not a restriction on the kernel - an import or migration can still name
+  an entry.
+- `Elements::getAutoincrement()` / `readAutoincrement()` answer whether a type
+  numbers its elements and what is next; `autoincrementUri()` formats one number.
+
+A type file's top level therefore holds plain values as well as data buckets.
+Anything walking it must skip non-arrays (`is_array( $bucketData )`), the way
+`rawBuckets()`, `_writeElementData()` and `_cacheElement()` do.
+
 The lower-level Elements API also understands advanced metadata such as
 defaults, callbacks, whitelist, and blacklist. The current Admin schema editor
 does not preserve every advanced key when it rewrites a model. Use only the
@@ -2238,7 +2273,7 @@ Admin editor and tests together.
 treat client controls as a security boundary. When an enum or length is a
 runtime invariant, validate it in the owning server-side operation too.
 
-### 12.2 Complete type file
+### 12.3 Complete type file
 
 An installable `services.php` can contain:
 
@@ -2318,7 +2353,7 @@ New type slugs SHOULD match `^[a-z][a-z0-9_-]*$`. New record IDs accepted by
 Admin match `^[A-Za-z0-9][A-Za-z0-9_-]*$` and contain no slash. Prefer
 lowercase hyphenated IDs.
 
-### 12.3 Render Elements
+### 12.4 Render Elements
 
 ```html
 [elements /services limit="6" query="featured=1"]
@@ -2350,7 +2385,7 @@ lowercase hyphenated IDs.
 Do not use absolute `[[/page-*]]` fills for per-record data. Do not use local
 `[[title]]` outside an Element block.
 
-### 12.4 Element changes and translations
+### 12.5 Element changes and translations
 
 When saving a record with global and localized fields:
 
@@ -2367,7 +2402,7 @@ Admin preserves values using the native locale/fallback rules. A model patch
 must test the migration in both directions and must not leave stale locale
 values that override the new shape.
 
-### 12.5 Element tests
+### 12.6 Element tests
 
 Use `tests/kernel-smoke.php` for model/runtime behavior,
 `tests/admin-smoke.php` for type CRUD and migrations, and the relevant JS tests

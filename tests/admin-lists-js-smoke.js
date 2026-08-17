@@ -46,8 +46,15 @@ console.log('Admin drill-down lists');
 // together.
 const configSource = asset('config.js');
 check( 'Config is one form rather than a drill-down list', configSource.includes( "ul.className = 'nino-admin-list'" ) === false );
-check( 'Config renders booleans with the shared switch component', configSource.includes( "'nino-admin-switch'" ) && configSource.includes( "'nino-admin-switch-track'" ) );
-check( 'Config states a switch\'s condition in words, not by knob position alone', configSource.includes( "'nino-admin-switch-state'" ) );
+// The switch itself lives in Nino.adminUi, because the Element Types editor
+// needs the same control for its numbering option - two hand-rolled copies of
+// one component is how the written on/off state gets dropped from one of them.
+const adminUiSource = fs.readFileSync( path.join( __dirname, '../_nino/Nino.js' ), 'utf8' );
+check( 'the switch is a shared component, not a copy per tool',
+	adminUiSource.includes('switchField : function') && adminUiSource.includes( "'nino-admin-switch-track'" ) );
+check( 'a switch states its condition in words, not by knob position alone',
+	adminUiSource.includes( "'nino-admin-switch-state'" ) );
+check( 'Config renders booleans with that shared switch', configSource.includes('Nino.adminUi.switchField(') );
 check( 'Config relies on fieldset\'s own shared surface instead of applying card padding twice', configSource.includes( "fieldset.className = 'nino-admin-card'" ) === false );
 check( 'Config uses only the shared pinned action bar for its single Save', configSource.includes( "'nino-admin-actionbar'" ) && configSource.includes( 'editor-form-actions' ) === false );
 check( 'Config keeps its in-flow locale adder separate from fixed list actions', configSource.includes( "adderRow.className = 'admin-config-locale-adder'" ) && configSource.includes( "adderRow.className = 'nino-admin-list-actions'" ) === false );

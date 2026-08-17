@@ -48,6 +48,58 @@
 			},
 
 			/**
+			 *	One boolean setting as the design system's switch. The written
+			 *	on/off state next to the knob is the point of it: knob position
+			 *	alone is the one signal a low-vision reader loses, so the words
+			 *	are part of the component rather than a caller's decision.
+			 *
+			 *	Owns no strings, same rule as table(): /_admin is English and
+			 *	/_editor translates, so both the label and the two state words
+			 *	come from the caller.
+			 *
+			 *	@param	{Object}	options		{ key, checked, label, hint, on, off }
+			 *
+			 *	@return	{Element}						The label; its input carries data-key
+			 */
+			switchField : function( options ) {
+
+				const label = dc.createElement('label');
+				label.className = 'nino-admin-switch';
+
+				const input = dc.createElement('input');
+				input.type = 'checkbox';
+				input.checked = options.checked === true;
+				if( options.key )
+					input.dataset.key = options.key;
+				label.appendChild( input );
+
+				const track = dc.createElement('span');
+				track.className = 'nino-admin-switch-track';
+				label.appendChild( track );
+
+				const copy = dc.createElement('span');
+				copy.className = 'nino-admin-switch-copy';
+				copy.appendChild( dc.createTextNode( options.label ) );
+
+				if( options.hint ) {
+					const hint = dc.createElement('small');
+					hint.textContent = options.hint;
+					copy.appendChild( hint );
+				}
+				label.appendChild( copy );
+
+				const on 		= options.on ?? 'on';
+				const off 	= options.off ?? 'off';
+				const state = dc.createElement('span');
+				state.className = 'nino-admin-switch-state';
+				state.textContent = input.checked ? on : off;
+				input.addEventListener( 'change', function() { state.textContent = input.checked ? on : off } );
+				label.appendChild( state );
+
+				return label;
+			},
+
+			/**
 			 *	The data table's pure half: filtering, sorting, paging and cell
 			 *	formatting as plain functions over arrays, with no DOM and no
 			 *	state. table() below is the rendering half and owns neither.

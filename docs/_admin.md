@@ -102,6 +102,32 @@ An `element` field links one element to another. When defining the field you pic
 
 When switching between global and language-dependent fields, Nino migrates existing values. Still, check the result in each language. Saving a type model does not delete existing entries; however, removed fields no longer appear in `/_editor`.
 
+### Named or Numbered Element URIs
+
+Every element is addressed by a uri of the form `/<type>/<slug>`. By default the
+element form asks for that slug, which is right whenever the entry has a name
+worth putting in a url — `/team/ada`, `/service/website-relaunch`.
+
+Some types have entries with no such name: an image in a gallery, a row in a
+price list. Asking for one anyway is how a project ends up with `bild-2`,
+`bild-2-neu`, `bild-2-final`. For those, switch on **Number the elements of this
+type** in the type's *Element URIs* group. The element form then stops asking for
+a uri and states the one it is about to create instead — `/gallery/00001`,
+`/gallery/00002`, and so on. The number is assigned when the element is saved.
+
+- **Numbers are never reused.** Deleting the newest entry does not hand its
+  number to the next one. A uri is a public address that ends up in links,
+  sitemaps and bookmarks, so a gap in the numbering is better than silently
+  pointing an old address at a different element.
+- **Switching it on later is safe.** Existing entries keep the uris they have,
+  and numbering starts past the highest number the type already uses — including
+  one that was written by hand.
+- **Switching it off** returns the type to asking for a slug. The entries that
+  were numbered keep their numbers.
+- The counter lives in the type file itself (`elements/<uri>.php`), next to its
+  title, and is allocated under the same lock as the element, so two people
+  saving at the same moment cannot be handed the same number.
+
 Element types cannot be deleted via `/_admin` on purpose. This prevents a careless click from destroying all associated content.
 
 ## Elements: Fully Edit Content

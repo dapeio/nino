@@ -27,6 +27,36 @@ All notable changes to Nino are documented in this file.
   `/_admin`, `/_editor`, `/_templates` or `/_install` drops the whole cache -
   seen from the outside as an ordinary request, so no tool needed a hook of its
   own. Responses carry `X-Nino-Cache: hit|miss`.
+- Element types can number their own elements instead of asking for a uri.
+  `/_admin`'s Element Types editor gains an **Element URIs** switch; a type with
+  it on carries one extra key in its type file - `'autoincrement' => <next
+  number>` - and the element form in both `/_admin` and `/_editor` stops asking
+  for a slug, stating the uri it is about to create instead (`/gallery/00001`,
+  zero-padded to `Elements::AUTOINCREMENT_PAD`).
+
+  Some types have entries with no name worth putting in a url - an image in a
+  gallery, a row in a price list. Asking for one anyway is how a project ends up
+  with `bild-2`, `bild-2-neu`, `bild-2-final`.
+
+  The number is allocated inside `_writeElementData()`'s existing `mutate()`, so
+  the counter is read and written under the same lock as the element and two
+  simultaneous inserts cannot be handed the same one. It is stored rather than
+  derived from the entries that exist: deleting the newest one does not hand its
+  number to the next, because a uri is a public address that ends up in links,
+  sitemaps and bookmarks, and a gap in the numbering is better than silently
+  repointing an old address at a different element. Switching numbering on for a
+  type that was named by hand until now seeds the counter past the highest number
+  it already uses - including a hand-written or imported one, which is re-checked
+  on every allocation - so existing elements keep their uris and nothing can be
+  overwritten. An explicit slug still works at the API level: numbering is what
+  the editing tools offer, not a restriction on the kernel, so an import or a
+  migration can still name an entry.
+- The design system's boolean switch is a shared component,
+  `Nino.adminUi.switchField()`. Config had built it inline; the Element Types
+  editor needs the same control, and a second hand-rolled copy is how the written
+  on/off state - the one signal a low-vision reader has besides knob position -
+  gets dropped from one of them. It owns no strings, same rule as the shared
+  table: `/_admin` is English and `/_editor` translates.
 - A `/nino/http/output` callback, fired by `\Nino\output()` with the finished
   response. It is the only point where a module can see the bytes that are
   about to be sent - every other hook runs before `Html::response()` has

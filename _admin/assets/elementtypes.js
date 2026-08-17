@@ -170,7 +170,7 @@
 				Nino.admin.elementTypes._isNew 			= true;
 				Nino.admin.elementTypes._currentUri = null;
 				Nino.admin.elementTypes._fields 		= [];
-				Nino.admin.elementTypes._renderForm( '' );
+				Nino.admin.elementTypes._renderForm( '', false, '00001' );
 				Nino.admin.elementTypes._showForm();
 				return;
 			}
@@ -184,7 +184,7 @@
 				Nino.admin.elementTypes._fields 		= Object.keys( response.model ).map( function( key ) {
 					return Object.assign( { key : key }, response.model[key] );
 				} );
-				Nino.admin.elementTypes._renderForm( response.title );
+				Nino.admin.elementTypes._renderForm( response.title, response.autoincrement === true, response.next );
 				Nino.admin.elementTypes._showForm();
 			} );
 		},
@@ -500,13 +500,15 @@
 
 		/**
 		 *	Render the type editor: back-link, uri (editable only when new),
-		 *	title, every field row, "add field", save
+		 *	title, the uri form, every field row, "add field", save
 		 *
 		 *	@param		{string}	title
+		 *	@param		{boolean}	autoincrement	Whether this type numbers its own elements
+		 *	@param		{string}	next					The uri the next element would get, for the hint
 		 *
 		 *	@return		void
 		 */
-		_renderForm : function( title ) {
+		_renderForm : function( title, autoincrement, next ) {
 
 			const wrap = dc.getElementById('types-form');
 			wrap.innerHTML = '';
@@ -545,6 +547,38 @@
 			titleInput.value = title;
 			titleLabel.appendChild( titleInput );
 			form.appendChild( titleLabel );
+
+			// How an element of this type gets its uri. A type whose entries have
+			// a name worth putting in a url ("/team/ada") is asked for one; a type
+			// whose entries have no natural name - a gallery image, a price row -
+			// is better off numbered than made to invent one per entry, which is
+			// how it ends up with "bild-2", "bild-2-neu", "bild-2-final".
+			const autoWrap = dc.createElement('fieldset');
+			autoWrap.className = 'nino-admin-card';
+			const autoLegend = dc.createElement('legend');
+			autoLegend.textContent = 'Element URIs';
+			autoWrap.appendChild( autoLegend );
+
+			const autoSwitch = Nino.adminUi.switchField( {
+				key 			: 'autoincrement',
+				checked 	: autoincrement === true,
+				label 		: 'Number the elements of this type',
+				hint 			: 'The element form stops asking for a uri and assigns the next number instead - /'+ ( Nino.admin.elementTypes._currentUri ?? '<type>' )+ '/'+ ( next || '00001' )+ '. Numbers are never reused, so deleting an element does not free its uri for the next one.',
+			} );
+			autoSwitch.id = 'admin-form-autoincrement';
+			autoWrap.appendChild( autoSwitch );
+
+			// Only the elements added from here on are numbered. Saying so beats
+			// letting someone discover it, and it is the reason turning this on is
+			// not a destructive change.
+			if( autoincrement !== true && Nino.admin.elementTypes._isNew === false ) {
+				const autoNote = dc.createElement('p');
+				autoNote.className = 'nino-admin-hint';
+				autoNote.textContent = 'Existing elements keep the uris they have. Numbering starts past the highest number this type already uses.';
+				autoWrap.appendChild( autoNote );
+			}
+
+			form.appendChild( autoWrap );
 
 			const fieldsWrap = dc.createElement('div');
 			fieldsWrap.id = 'admin-fields-wrap';
@@ -649,12 +683,13 @@
 			const msg 	= dc.getElementById('admin-form-msg');
 			const title = dc.getElementById('admin-form-title').value;
 			const model = Nino.admin.elementTypes._buildModel();
+			const autoincrement = dc.querySelector('#admin-form-autoincrement input').checked;
 
 			msg.textContent = 'Saving …';
 
 			if( Nino.admin.elementTypes._isNew === true ) {
 				const uri = dc.getElementById('admin-form-uri').value;
-				Nino.admin.elementTypes._apiCall( 'create', { uri : uri, title : title, model : model }, function( status, response ) {
+				Nino.admin.elementTypes._apiCall( 'create', { uri : uri, title : title, model : model, autoincrement : autoincrement }, function( status, response ) {
 					if( status !== 200 || response === null ) {
 						msg.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : 'Failed to save.' );
 						return;
@@ -668,7 +703,7 @@
 				return;
 			}
 
-			Nino.admin.elementTypes._apiCall( 'save', { uri : Nino.admin.elementTypes._currentUri, title : title, model : model }, function( status, response ) {
+			Nino.admin.elementTypes._apiCall( 'save', { uri : Nino.admin.elementTypes._currentUri, title : title, model : model, autoincrement : autoincrement }, function( status, response ) {
 				if( status !== 200 || response === null ) {
 					msg.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : 'Failed to save.' );
 					return;

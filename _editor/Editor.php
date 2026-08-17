@@ -465,7 +465,18 @@ namespace Nino\Editor {
 			$types = [];
 			foreach( self::types( $appData ) as $type ) {
 				$typeData = self::typeData( $appData, $type );
-				$types[] = [ 'type' => $type, 'title' => $typeData['title'] ?? $type, 'descr' => self::typeDescr( $appData, $type ), 'model' => $typeData['model'] ?? [] ];
+				$next 		= \Nino\Elements::readAutoincrement( $typeData );
+				// A numbered type (set up in /_admin, see Elements::AUTOINCREMENT_PAD)
+				// has no uri to ask for - the form shows the number the next
+				// element would get instead of a text field
+				$types[] = [
+					'type' 					=> $type,
+					'title' 				=> $typeData['title'] ?? $type,
+					'descr' 				=> self::typeDescr( $appData, $type ),
+					'model' 				=> $typeData['model'] ?? [],
+					'autoincrement' => $next !== null,
+					'nextUri' 			=> ( $next === null ) ? '' : \Nino\Elements::autoincrementUri( max( $next, \Nino\Elements::autoincrementSeed( $typeData ) ) ),
+				];
 			}
 
 			\Nino\Http::ok( $request, [ 'types' => $types, 'locales' => \Nino\Locales::getAvailableLocales( $appData ), 'selectedLocale' => Editor::sessionLocale( $appData ) ] );
@@ -742,7 +753,15 @@ namespace Nino\Editor {
 			$isNew 		= ( $data['isNew'] ?? false ) === true;
 			$fields 	= is_array( $data['fields'] ?? null ) ? $data['fields'] : [];
 
-			if( in_array( $type, self::types( $appData ), true ) === false || $uri === '' || str_contains( $uri, '/' ) === true || ( $isNew === true && self::_validNewUri( $uri ) === false ) || \Nino\Locales::verifyLocale( $appData, $locale ) === false ) {
+			// A numbered type assigns the uri, so an insert into one arrives
+			// without one and the kernel allocates it under the type file's lock
+			// (see Elements::AUTOINCREMENT_PAD). An update always names its
+			// element - by then it has a uri like any other.
+			$numbered = $isNew === true && $uri === ''
+				&& in_array( $type, self::types( $appData ), true ) === true
+				&& \Nino\Elements::readAutoincrement( self::typeData( $appData, $type ) ) !== null;
+
+			if( in_array( $type, self::types( $appData ), true ) === false || ( $uri === '' && $numbered === false ) || str_contains( $uri, '/' ) === true || ( $isNew === true && $numbered === false && self::_validNewUri( $uri ) === false ) || \Nino\Locales::verifyLocale( $appData, $locale ) === false ) {
 				\Nino\Http::fail( $request, 400, 'invalid type, uri or locale' );
 				return;
 			}
@@ -771,7 +790,15 @@ namespace Nino\Editor {
 				return;
 			}
 
-			\Nino\Http::ok( $request, [ 'element' => $result ] );
+			// A numbered type's counter has just moved on, so the form's "saving
+			// creates /type/00007" promise would otherwise still name the number
+			// this very save consumed
+			$next = \Nino\Elements::getAutoincrement( $appData, '/'. $type );
+
+			\Nino\Http::ok( $request, [
+				'element' => $result,
+				'nextUri' => ( $next === null ) ? '' : \Nino\Elements::autoincrementUri( $next ),
+			] );
 		}
 
 		/**
