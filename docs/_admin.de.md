@@ -273,6 +273,9 @@ Der Bereich **Config** bearbeitet eine bewusst begrenzte Auswahl aus `config.php
 | Login protection | Sperrdauer | `/nino/auth/cooldown` | Zahl, 60–604800 Sekunden |
 | Editor features | Tägliches verschlüsseltes Backup | `/nino/editor/backups` | Schalter |
 | Editor features | Änderungsprotokoll führen | `/nino/editor/logs` | Schalter |
+| Page cache | Gerenderte Seiten cachen | `/nino/cache/status` | Schalter |
+| Page cache | Lebensdauer einer gecachten Seite | `/nino/cache/ttl` | Zahl, 10–2592000 Sekunden |
+| Page cache | Diese nie cachen | `/nino/cache/blacklist` | eine URI pro Zeile |
 | Languages | Sprachen | `/nino/locales/available` | Auswahlliste |
 | Languages | Muttersprache | `/nino/locales/native` | Select |
 
@@ -293,6 +296,18 @@ Drei Schlüssel bearbeitet dieser Bereich bewusst nicht mehr:
 | `/nino/html/assets` | von Hand in `config.php` oder über einen erneuten Theme-Schritt in `/_install` |
 
 Asset-Bundles bleiben eine bewusste Dateiänderung, weil ihre **Reihenfolge** für die CSS-Kaskade tragend ist — und die zeigt ein Formular nicht. Die anderen beiden haben längst eigene Editoren, und ein zweiter, ungeprüfter Weg auf dieselben Daten ist ein Weg, sie zu beschädigen.
+
+### Der Seiten-Cache
+
+Mit **Gerenderte Seiten cachen** legt `Modules\Cache` eine fertige Seite ab und liefert sie erneut aus, ohne sie zu rendern. In einem frischen Projekt ist er bewusst aus — einschalten, wenn die Seite fertig ist, nicht während der Arbeit daran.
+
+Nie gecacht wird, unabhängig von der Konfiguration: alles außer `GET`, alles mit Query-Variablen, jede URI unter `/_` oder `/.`, jede Antwort, die keine reine 200 ist, und jeder Aufruf eines eingeloggten Besuchers. **Diese nie cachen** ergänzt eigene Ausnahmen, eine URI pro Zeile; ein abschließendes `/*` deckt einen Teilbaum ab, `/blog/*` trifft also `/blog` und alles darunter.
+
+Zwei Werte in einer gespeicherten Seite gehören dem, der sie abruft, nicht dem, für den sie gerendert wurde — beide werden beim Ausliefern neu gestempelt: der `[csrf]`-Token, damit jeder Besucher mit seinem eigenen absendet, und der `[jstext]`-Nonce, damit er unerratbar bleibt und weiterhin zum `Content-Security-Policy`-Header genau dieser Antwort passt.
+
+Jedes Speichern über `/_admin`, `/_editor`, `/_templates` oder `/_install` verwirft den kompletten Cache sofort — ein einzelner Textfill kann jede Seite verändern, eine kleinere sinnvolle Einheit gibt es also nicht. Die Lebensdauer oben begrenzt nur, wie lange eine Seite ganz ohne Änderung überlebt.
+
+Antworten tragen `X-Nino-Cache: hit` oder `miss` — der schnellste Weg zu sehen, ob der Cache überhaupt greift.
 
 In Produktion muss `/nino/error/display` ausgeschaltet sein.
 

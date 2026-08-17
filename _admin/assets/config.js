@@ -220,7 +220,47 @@
 			if( field.type === 'native' )
 				return Nino.admin.config._renderNative( field );
 
+			if( field.type === 'lines' )
+				return Nino.admin.config._renderLines( field );
+
 			return null;
+		},
+
+		/**
+		 *	A list as a textarea, one entry per line. A repeater with an Add
+		 *	button would be more machinery for less: these are short uri
+		 *	patterns, and typing four of them is a paste, not four clicks.
+		 *	The backend splits and trims (see Config::_cleanLines()), so what
+		 *	is posted is simply the raw text.
+		 *
+		 *	@param		{Object}	field
+		 *
+		 *	@return		{Element}
+		 */
+		_renderLines : function( field ) {
+
+			const label = dc.createElement('label');
+			label.className = 'nino-admin-field nino-admin-field-wide';
+
+			const span = dc.createElement('span');
+			span.textContent = field.label;
+			label.appendChild( span );
+
+			const area = dc.createElement('textarea');
+			area.rows = 4;
+			area.spellcheck = false;
+			area.dataset.key = field.key;
+			area.value = ( field.value || [] ).join( '\n' );
+			label.appendChild( area );
+
+			if( field.hint ) {
+				const hint = dc.createElement('small');
+				hint.className = 'nino-admin-hint';
+				hint.textContent = field.hint;
+				label.appendChild( hint );
+			}
+
+			return label;
 		},
 
 		/**
@@ -678,6 +718,9 @@
 				else if( el.type === 'number' )
 					fields[el.dataset.key] = el.value.trim();
 				else
+					// A textarea goes as its raw text - Config::_cleanLines()
+					// splits and trims it, so the two never disagree about what
+					// an empty line means
 					fields[el.dataset.key] = el.value;
 			} );
 

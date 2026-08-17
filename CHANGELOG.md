@@ -6,6 +6,31 @@ All notable changes to Nino are documented in this file.
 
 ### Added
 
+- `Modules\Cache`, an optional full-page cache. A hit skips the render -
+  routing, template reads, the fill and shortcode passes - and answers from a
+  stored copy; a miss renders as before and stores the result. Off by default,
+  switched on in `/_admin`'s Config along with its lifetime and a blacklist of
+  uris (`/blog/*` covers a subtree).
+
+  It deliberately does not serve before `\Nino\init()`. A stored page carries
+  two values that belong to whoever asks for it rather than to whoever it was
+  rendered for, and neither is knowable before the session is up: the `[csrf]`
+  token, where serving one visitor's to everybody would leak it and 403 every
+  other form submission, and the `[jstext]` nonce, which the
+  `Content-Security-Policy` header whitelists for exactly one response and
+  which must therefore not survive in a cache. Both are stored as markers and
+  stamped with the current request's values on the way out.
+
+  Never cached regardless of configuration: anything but a GET, anything with
+  query vars, any uri under `/_` or `/.`, any response that is not a plain 200,
+  and every request from a signed-in visitor. A successful write through
+  `/_admin`, `/_editor`, `/_templates` or `/_install` drops the whole cache -
+  seen from the outside as an ordinary request, so no tool needed a hook of its
+  own. Responses carry `X-Nino-Cache: hit|miss`.
+- A `/nino/http/output` callback, fired by `\Nino\output()` with the finished
+  response. It is the only point where a module can see the bytes that are
+  about to be sent - every other hook runs before `Html::response()` has
+  rendered the body - and `Modules\Cache` is its first consumer.
 - `/_admin`'s **Config** is a typed form instead of a list of raw json
   textareas. Booleans are switches, the two login-throttle values are bounded
   number fields, and the language list and native language are one group that

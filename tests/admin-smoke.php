@@ -622,12 +622,13 @@ check( 'apiList returns the field schema in render order', array_column( $body['
 	'/nino/error/log', '/nino/error/display', '/nino/session/force-secure-cookie',
 	'/nino/auth/maxtries', '/nino/auth/cooldown',
 	'/nino/editor/backups', '/nino/editor/logs',
+	'/nino/cache/status', '/nino/cache/ttl', '/nino/cache/blacklist',
 	'/nino/locales/available', '/nino/locales/native',
 ] );
 check( 'every field carries the type its editor renders from', array_column( $body['fields'], 'type' ) === [
-	'bool', 'bool', 'bool', 'int', 'int', 'bool', 'bool', 'locales', 'native',
+	'bool', 'bool', 'bool', 'int', 'int', 'bool', 'bool', 'bool', 'int', 'lines', 'locales', 'native',
 ] );
-check( 'apiList returns the group headings', array_keys( $body['groups'] ) === [ 'diagnostics', 'auth', 'editor', 'locales' ] );
+check( 'apiList returns the group headings', array_keys( $body['groups'] ) === [ 'diagnostics', 'auth', 'editor', 'cache', 'locales' ] );
 check( 'every field belongs to a declared group', array_diff( array_unique( array_column( $body['fields'], 'group' ) ), array_keys( $body['groups'] ) ) === [] );
 
 $byKey = array_column( $body['fields'], null, 'key' );
@@ -802,6 +803,21 @@ check( 'apiSave refuses a malformed locale id', $status === 400 );
 	'/nino/locales/native' 		=> 'de_DE',
 ] ] );
 check( 'apiSave deduplicates a repeated locale', $status === 200 && $appData['/nino/locales/available'] === [ 'de_DE', 'en_US' ] );
+
+// A 'lines' field is typed as a textarea and stored as a list - the split and
+// the trim live in the backend, so the two cannot disagree about what a blank
+// line means
+[ $status ] = callDev( $appData, \Nino\Admin\Config::class, 'apiSave', [ 'fields' => [ '/nino/cache/blacklist' => "/contact\n\n  /blog/*  \n/contact\n" ] ] );
+check( 'apiSave splits a posted textarea into a list', $status === 200 && $appData['/nino/cache/blacklist'] === [ '/contact', '/blog/*' ] );
+
+[ $status ] = callDev( $appData, \Nino\Admin\Config::class, 'apiSave', [ 'fields' => [ '/nino/cache/blacklist' => [ '/a', '/b' ] ] ] );
+check( '...and accepts an already-split list too', $status === 200 && $appData['/nino/cache/blacklist'] === [ '/a', '/b' ] );
+
+[ $status ] = callDev( $appData, \Nino\Admin\Config::class, 'apiSave', [ 'fields' => [ '/nino/cache/blacklist' => [ [ 'not', 'a', 'string' ] ] ] ] );
+check( '...but refuses a list that is not of strings', $status === 400 );
+
+[ $status ] = callDev( $appData, \Nino\Admin\Config::class, 'apiSave', [ 'fields' => [ '/nino/cache/blacklist' => '' ] ] );
+check( '...and an emptied textarea clears the list', $status === 200 && $appData['/nino/cache/blacklist'] === [] );
 
 [ $status ] = callDev( $appData, \Nino\Admin\Config::class, 'apiSave', [ 'fields' => [] ] );
 check( 'apiSave rejects an empty form rather than writing nothing quietly', $status === 400 );

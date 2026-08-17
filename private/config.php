@@ -7,9 +7,15 @@
     3 => '\\Nino\\Modules\\Jstext',
     4 => '\\Nino\\Modules\\Csrf',
     5 => '\\Nino\\Modules\\Images',
-    6 => '\\Nino\\Modules\\Form',
-    7 => '\\Nino\\Modules\\Navigation',
-    8 => '\\Nino\\Modules\\Localepicker',
+    6 => '\\Nino\\Modules\\Cache',
+    7 => '\\Nino\\Modules\\Form',
+    8 => '\\Nino\\Modules\\Navigation',
+    9 => '\\Nino\\Modules\\Localepicker',
+  ),
+  '/nino/cache/status' => false,
+  '/nino/cache/ttl' => 3600,
+  '/nino/cache/blacklist' => 
+  array (
   ),
   '/nino/editor/backups' => true,
   '/nino/editor/logs' => true,

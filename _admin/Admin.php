@@ -2038,6 +2038,27 @@ namespace Nino\Admin {
 				'label'	=> 'Record an audit trail',
 				'hint' 	=> 'One line per login and per change made in /_editor, kept for fourteen days. Who may read it stays a permission.',
 			],
+			'/nino/cache/status' => [
+				'type' 	=> 'bool',
+				'group'	=> 'cache',
+				'label'	=> 'Cache rendered pages',
+				'hint' 	=> 'Anonymous GET requests only, and never a page with query vars, a tool uri or a signed-in visitor. Any save in /_admin, /_editor or /_templates drops the whole cache.',
+			],
+			'/nino/cache/ttl' => [
+				'type' 	=> 'int',
+				'group'	=> 'cache',
+				'min' 	=> 10,
+				'max' 	=> 2592000,
+				'unit' 	=> 'seconds',
+				'label'	=> 'Lifetime of a cached page',
+				'hint' 	=> 'How long a stored page is served before it is rendered again. Edits do not wait for this - they drop the cache immediately.',
+			],
+			'/nino/cache/blacklist' => [
+				'type' 	=> 'lines',
+				'group'	=> 'cache',
+				'label'	=> 'Never cache these',
+				'hint' 	=> 'One uri per line. A trailing /* covers a whole subtree: /blog/* matches /blog and everything below it. Use it for anything that has to be rendered per visit.',
+			],
 			'/nino/locales/available' => [
 				'type' 	=> 'locales',
 				'group'	=> 'locales',
@@ -2057,6 +2078,7 @@ namespace Nino\Admin {
 			'diagnostics'	=> [ 'Errors and diagnostics', 'What happens when php raises an error, and how the session cookie is issued.' ],
 			'auth' 				=> [ 'Login protection', 'The throttle that sits in front of /_editor and /_admin.' ],
 			'editor' 			=> [ 'Editor features', 'Background work /_editor does on its own. Both were silently on in every project before 0.11.1 - see the changelog.' ],
+			'cache' 			=> [ 'Page cache', 'Serving a stored copy skips the render. Off by default - switch it on once the site is finished, not while building it.' ],
 			'locales' 		=> [ 'Languages', 'Which languages exist, and which one a visitor gets before choosing.' ],
 		];
 
@@ -2182,10 +2204,11 @@ namespace Nino\Admin {
 				'/nino/editor/backups', '/nino/editor/logs' => true,
 				'/nino/auth/maxtries' 							=> 5,
 				'/nino/auth/cooldown' 							=> 3600,
+				'/nino/cache/ttl' 									=> 3600,
 				default 														=> match( $type ) {
 					'bool' 								=> false,
 					'int' 								=> 0,
-					'locales' 						=> [],
+					'locales', 'lines' 		=> [],
 					default 							=> '',
 				},
 			};
@@ -2459,6 +2482,8 @@ namespace Nino\Admin {
 
 				'native' => ( is_string( $value ) === true && preg_match( self::LOCALE_PATTERN, $value ) === 1 ) ? $value : null,
 
+				'lines' => self::_cleanLines( $value ),
+
 				'locales' => self::_cleanLocales( $value ),
 
 				default => null,
@@ -2485,6 +2510,38 @@ namespace Nino\Admin {
 				return null;
 
 			return $int;
+		}
+
+		/**
+		 *	A list typed one entry per line. Blank lines and surrounding
+		 *	whitespace go, because they are how a textarea ends up looking
+		 *	after editing and none of them mean anything to a consumer.
+		 *
+		 *	@param		mixed			$value				As posted - a list, or the raw textarea string
+		 *
+		 *	@return 	array|null							The cleaned list, or null if it is not a list of strings
+		 */
+		private static function _cleanLines( mixed $value ): ?array {
+
+			if( is_string( $value ) === true )
+				$value = preg_split( '/\r\n|\r|\n/', $value );
+
+			if( is_array( $value ) === false )
+				return null;
+
+			$lines = [];
+			foreach( $value as $line ) {
+
+				if( is_string( $line ) === false )
+					return null;
+
+				$line = trim( $line );
+
+				if( $line !== '' && in_array( $line, $lines, true ) === false )
+					$lines[] = $line;
+			}
+
+			return $lines;
 		}
 
 		/**
@@ -2526,6 +2583,7 @@ namespace Nino\Admin {
 				'bool' 		=> $key. ': expected true or false',
 				'native' 	=> $key. ': expected a locale id like de_DE',
 				'locales'	=> $key. ': expected a list of locale ids like de_DE',
+				'lines' 	=> $key. ': expected one entry per line',
 				default 	=> $key. ': invalid value',
 			};
 		}

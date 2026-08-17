@@ -116,6 +116,13 @@ namespace Nino {
 
 	function output( array &$appData, array $request ): void {
 
+		// The one point with a finished response in hand - every other hook
+		// runs before Html::response() has rendered the body. A module that
+		// needs the bytes that are actually about to be sent (Modules\Cache
+		// stores them) has nowhere else to stand. Http::output() exits, so
+		// this is also the last chance to run anything at all.
+		\Nino\Callbacks::doCallbacks( $appData, '/nino/http/output', $request );
+
 		\Nino\Http::output( $appData, $request );
 	}
 

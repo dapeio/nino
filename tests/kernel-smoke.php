@@ -1663,6 +1663,195 @@ check( 'config.php ships under the private directory instead', is_file( __DIR__.
 echo "\n";
 
 
+// --- Modules\Cache ---------------------------------------------------------
+
+echo "Modules\\Cache - full-page cache for anonymous GET\n";
+
+// A request as Http::request() leaves it, plus the response fields the two
+// callbacks read. Http::output() exits, so serving is never driven directly
+// here - _servable()/_cacheable() and the store side are what these cover.
+function cacheRequest( string $uri, string $method = 'GET', array $response = [] ): array {
+	return [
+		'/nino/http/request' => [
+			'method' 		=> $method === 'HEAD' ? 'GET' : $method,
+			'rawMethod'	=> $method,
+			'uri' 			=> $uri,
+			'query' 		=> [],
+		],
+		'/nino/http/response' => array_merge( [
+			'uri' 				=> $uri,
+			'locale' 			=> 'de_DE',
+			'statusCode'	=> 200,
+			'header' 			=> [],
+			'body' 				=> '<html>cached</html>',
+		], $response ),
+	];
+}
+
+function cacheEntryCount( array &$appData ): int {
+	return count( glob( \Nino\Filesystem::path( $appData, '/data/cache' ). '/*.php' ) ?: [] );
+}
+
+$appData['/nino/cache/status'] = true;
+$appData['/nino/cache/ttl'] = 60;
+$appData['/nino/cache/blacklist'] = [];
+\Nino\Modules\Cache::_invalidate( $appData );
+
+$store = cacheRequest( '/home' );
+\Nino\Modules\Cache::callbackOutput( $appData, $store );
+check( 'an anonymous GET 200 is stored', cacheEntryCount( $appData ) === 1 );
+
+// --- what must never be stored, whatever the configuration says -----------
+
+foreach( [
+	'a POST' 												=> [ cacheRequest( '/home', 'POST' ), [] ],
+	'a HEAD, which carries no body' => [ cacheRequest( '/home', 'HEAD' ), [] ],
+	'a 404' 												=> [ cacheRequest( '/nope', 'GET', [ 'statusCode' => 404 ] ), [] ],
+	'a redirect' 										=> [ cacheRequest( '/home', 'GET', [ 'header' => [ 'Location' => '/other' ] ] ), [] ],
+	'a json body' 									=> [ cacheRequest( '/home', 'GET', [ 'body' => [ 'ok' => true ] ] ), [] ],
+	'an empty body' 								=> [ cacheRequest( '/home', 'GET', [ 'body' => '' ] ), [] ],
+	'a tool uri' 										=> [ cacheRequest( '/_editor' ), [] ],
+	'a module endpoint' 						=> [ cacheRequest( '/.newsletter' ), [] ],
+] as $label => $case ) {
+	\Nino\Modules\Cache::_invalidate( $appData );
+	$req = $case[0];
+	\Nino\Modules\Cache::callbackOutput( $appData, $req );
+	check( "$label is never stored", cacheEntryCount( $appData ) === 0 );
+}
+
+// A query var is what makes a page not the same page for everyone - the
+// locale switch is exactly one
+\Nino\Modules\Cache::_invalidate( $appData );
+$withQuery = cacheRequest( '/home' );
+$withQuery['/nino/http/request']['query'] = [ '/_nino/localepicker/current' => 'de_DE' ];
+\Nino\Modules\Cache::callbackOutput( $appData, $withQuery );
+check( 'a request carrying query vars is never stored', cacheEntryCount( $appData ) === 0 );
+
+// A signed-in visitor's page may carry their name or an editing affordance
+\Nino\Modules\Cache::_invalidate( $appData );
+$appData['./nino/auth/current'] = [ 'mail' => 'someone@example.com', 'perms' => [] ];
+$signedIn = cacheRequest( '/home' );
+\Nino\Modules\Cache::callbackOutput( $appData, $signedIn );
+check( 'a signed-in visitor\'s page is never stored', cacheEntryCount( $appData ) === 0 );
+unset( $appData['./nino/auth/current'] );
+
+// Off means off
+\Nino\Modules\Cache::_invalidate( $appData );
+$appData['/nino/cache/status'] = false;
+$offRequest = cacheRequest( '/home' );
+\Nino\Modules\Cache::callbackOutput( $appData, $offRequest );
+check( 'nothing is stored while the cache is switched off', cacheEntryCount( $appData ) === 0 );
+$appData['/nino/cache/status'] = true;
+
+// --- the two per-request values ------------------------------------------
+//
+// A stored page must not carry the csrf token or the jstext nonce of whoever
+// it was rendered for: serving one visitor's token to everybody leaks it and
+// 403s every other form submission, and a nonce that survives in the cache is
+// readable by anyone who fetches the page - which is the one property a csp
+// nonce may not have.
+
+\Nino\Modules\Cache::_invalidate( $appData );
+$token = \Nino\Csrf::getToken( $appData );
+$appData['./nino/jstext/nonce'] = 'nonce-of-this-request';
+
+$tokenRequest = cacheRequest( '/home', 'GET', [
+	'body' => '<input name="_csrf" value="'. $token. '"><script nonce="nonce-of-this-request">x</script>',
+] );
+\Nino\Modules\Cache::callbackOutput( $appData, $tokenRequest );
+
+$storedFile	= glob( \Nino\Filesystem::path( $appData, '/data/cache' ). '/*.php' )[0] ?? '';
+$storedBody = ( include $storedFile )['body'] ?? '';
+
+check( 'the stored page carries no csrf token', str_contains( $storedBody, $token ) === false );
+check( 'the stored page carries no jstext nonce', str_contains( $storedBody, 'nonce-of-this-request' ) === false );
+check( '...both are held as markers instead', substr_count( $storedBody, '@@nino-cache-' ) === 2 );
+
+// --- blacklist ------------------------------------------------------------
+
+$appData['/nino/cache/blacklist'] = [ '/contact', '/blog/*' ];
+
+foreach( [ '/contact' => false, '/blog' => false, '/blog/post-1' => false, '/blog/2026/one' => false,
+           '/contacts' => true, '/blogging' => true, '/home' => true ] as $uri => $expectStored ) {
+	\Nino\Modules\Cache::_invalidate( $appData );
+	$req = cacheRequest( $uri );
+	\Nino\Modules\Cache::callbackOutput( $appData, $req );
+	check( "blacklist: $uri is ". ( $expectStored ? 'cached' : 'excluded' ), ( cacheEntryCount( $appData ) === 1 ) === $expectStored );
+}
+
+// A pattern is admin-editable text, so it must never reach a regex engine
+\Nino\Modules\Cache::_invalidate( $appData );
+$appData['/nino/cache/blacklist'] = [ '/.*' ];
+$regexish = cacheRequest( '/home' );
+\Nino\Modules\Cache::callbackOutput( $appData, $regexish );
+check( 'a regex-looking pattern is matched literally, not evaluated', cacheEntryCount( $appData ) === 1 );
+$appData['/nino/cache/blacklist'] = [];
+
+// --- expiry ---------------------------------------------------------------
+
+\Nino\Modules\Cache::_invalidate( $appData );
+$appData['/nino/cache/ttl'] = 60;
+$fresh = cacheRequest( '/home' );
+\Nino\Modules\Cache::callbackOutput( $appData, $fresh );
+$entryPath	= glob( \Nino\Filesystem::path( $appData, '/data/cache' ). '/*.php' )[0];
+$entry 			= include $entryPath;
+check( 'a stored entry carries an expiry from the configured ttl', ( $entry['expires'] - time() ) > 50 && ( $entry['expires'] - time() ) <= 60 );
+check( '...and the locale it rendered in, which serving has to re-apply', ( $entry['locale'] ?? '' ) === 'de_DE' );
+
+// --- a write through a tool drops everything ------------------------------
+
+foreach( [ '/_admin', '/_editor', '/_templates', '/_install' ] as $tool ) {
+	\Nino\Modules\Cache::_invalidate( $appData );
+	$seed = cacheRequest( '/home' );
+	\Nino\Modules\Cache::callbackOutput( $appData, $seed );
+	$toolWrite = cacheRequest( $tool, 'POST' );
+	\Nino\Modules\Cache::callbackOutput( $appData, $toolWrite );
+	check( "a successful POST to $tool drops the cache", cacheEntryCount( $appData ) === 0 );
+}
+
+// A rejected write changed nothing, so it must not cost the cache either
+\Nino\Modules\Cache::_invalidate( $appData );
+$seed = cacheRequest( '/home' );
+\Nino\Modules\Cache::callbackOutput( $appData, $seed );
+$rejected = cacheRequest( '/_admin', 'POST', [ 'statusCode' => 403 ] );
+\Nino\Modules\Cache::callbackOutput( $appData, $rejected );
+check( 'a rejected tool write leaves the cache alone', cacheEntryCount( $appData ) === 1 );
+
+// Reading in a tool is not a write either
+$toolRead = cacheRequest( '/_admin', 'GET' );
+\Nino\Modules\Cache::callbackOutput( $appData, $toolRead );
+check( 'merely opening a tool leaves the cache alone', cacheEntryCount( $appData ) === 1 );
+
+// The frontend's own endpoints are not tool writes - a contact form
+// submission changes no page
+$formPost = cacheRequest( '/.form', 'POST' );
+\Nino\Modules\Cache::callbackOutput( $appData, $formPost );
+check( 'a form submission does not drop the cache', cacheEntryCount( $appData ) === 1 );
+
+// --- keying ---------------------------------------------------------------
+
+\Nino\Modules\Cache::_invalidate( $appData );
+$de = cacheRequest( '/home' );
+$en = cacheRequest( '/home', 'GET', [ 'locale' => 'en_US' ] );
+\Nino\Modules\Cache::callbackOutput( $appData, $de );
+\Nino\Modules\Cache::callbackOutput( $appData, $en );
+check( 'the same uri in two locales is two entries', cacheEntryCount( $appData ) === 2 );
+
+// Two routes can resolve to the same page while the page still differs by the
+// uri it was asked for - html-header.tpl's canonical link is exactly that
+\Nino\Modules\Cache::_invalidate( $appData );
+$slash = cacheRequest( '/' );
+$slash['/nino/http/response']['uri'] = '/home';
+$named = cacheRequest( '/home' );
+\Nino\Modules\Cache::callbackOutput( $appData, $slash );
+\Nino\Modules\Cache::callbackOutput( $appData, $named );
+check( 'two request uris resolving to one page stay two entries', cacheEntryCount( $appData ) === 2 );
+
+\Nino\Modules\Cache::_invalidate( $appData );
+$appData['/nino/cache/status'] = false;
+
+echo "\n";
+
 // --- Cleanup ------------------------------------------------------------
 
 \Nino\Filesystem::removeDir( $sandbox );

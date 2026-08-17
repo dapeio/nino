@@ -275,6 +275,9 @@ The **Config** area edits a deliberately limited selection from `config.php` as 
 | Login protection | Lockout duration | `/nino/auth/cooldown` | number, 60–604800 seconds |
 | Editor features | Daily encrypted backup | `/nino/editor/backups` | switch |
 | Editor features | Record an audit trail | `/nino/editor/logs` | switch |
+| Page cache | Cache rendered pages | `/nino/cache/status` | switch |
+| Page cache | Lifetime of a cached page | `/nino/cache/ttl` | number, 10–2592000 seconds |
+| Page cache | Never cache these | `/nino/cache/blacklist` | one uri per line |
 | Languages | Languages | `/nino/locales/available` | checklist |
 | Languages | Native language | `/nino/locales/native` | select |
 
@@ -295,6 +298,18 @@ Three keys this area used to edit are deliberately gone:
 | `/nino/html/assets` | by hand in `config.php`, or by re-running `/_install`'s theme step |
 
 Asset bundles stay a deliberate file edit because their **order** is load-bearing for the CSS cascade, which a form does not show. The other two have had real editors for a while, and a second, unvalidated way to write the same data is a way to corrupt it.
+
+### The page cache
+
+With **Cache rendered pages** on, `Modules\Cache` stores a finished page and serves it again without rendering. It is off in a fresh project on purpose — switch it on once the site is finished, not while building it.
+
+Never cached, whatever the configuration says: anything but a `GET`, anything carrying query vars, any uri under `/_` or `/.`, any response that is not a plain 200, and every request from a signed-in visitor. **Never cache these** adds your own exclusions, one uri per line; a trailing `/*` covers a subtree, so `/blog/*` matches `/blog` and everything below it.
+
+Two values in a stored page belong to whoever asks for it rather than to whoever it was rendered for, and both are re-stamped on the way out: the `[csrf]` token, so every visitor submits with their own, and the `[jstext]` nonce, so it stays unguessable and keeps matching the `Content-Security-Policy` header of that one response.
+
+Any save through `/_admin`, `/_editor`, `/_templates` or `/_install` drops the whole cache immediately — a single textfill can change every page, so there is no smaller useful unit. The lifetime above only bounds how long a page survives without any edit at all.
+
+Responses carry `X-Nino-Cache: hit` or `miss`, which is the quickest way to see whether the cache is doing anything.
 
 In production, `/nino/error/display` must be off.
 
