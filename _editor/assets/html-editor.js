@@ -78,7 +78,7 @@
 			linkbar.appendChild( linkCancel );
 
 			const counter = dc.createElement('div');
-			counter.className = 'char-counter';
+			counter.className = 'nino-admin-char-counter';
 			counter.setAttribute( 'aria-live', 'polite' );
 
 			let savedRange = null;
@@ -169,7 +169,7 @@
 			function updateCounter() {
 				const len = content.textContent.length;
 				counter.textContent = len + ' / ' + maxlength;
-				counter.classList.toggle( 'char-counter-limit', len >= maxlength );
+				counter.classList.toggle( 'is-limit', len >= maxlength );
 			}
 
 			/**

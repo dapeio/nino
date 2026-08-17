@@ -81,10 +81,14 @@
 		if( Array.isArray( options ) ) {
 			input = node('select');
 			options.forEach( function( item ) {
-				const option = node( 'option', '', typeof item === 'string' ? humanize( item ) : item.label );
-				option.value = typeof item === 'string' ? item : item.value;
-				option.selected = option.value === String( value );
-				input.appendChild( option );
+				if( item && Array.isArray( item.options ) ) {
+					const group = node('optgroup');
+					group.label = item.label;
+					item.options.forEach( function( groupedItem ) { group.appendChild( selectOption( groupedItem, value ) ) } );
+					input.appendChild( group );
+					return;
+				}
+				input.appendChild( selectOption( item, value ) );
 			} );
 		} else {
 			input = node( options === 'textarea' ? 'textarea' : 'input' );
@@ -95,6 +99,29 @@
 		field.appendChild( input );
 		if( help ) field.appendChild( node( 'small', '', help ) );
 		return field;
+	}
+
+	function selectOption( item, value ) {
+		const option = node( 'option', '', typeof item === 'string' ? humanize( item ) : item.label );
+		option.value = typeof item === 'string' ? item : item.value;
+		option.selected = option.value === String( value );
+		return option;
+	}
+
+	function textfillOptions( current ) {
+		const groups = [
+			{ label : 'Content textfills', entries : [] },
+			{ label : 'Technical values', entries : [] },
+		];
+		( pd.composer._textEntries || [] ).forEach( function( entry ) {
+			groups[entry.blacklisted ? 1 : 0].entries.push( { value : entry.key, label : entry.key } );
+		} );
+		if( current && !( pd.composer._textEntries || [] ).some( function( entry ) { return entry.key === current } ) )
+			groups.push( { label : 'Current binding', entries : [ { value : current, label : current+ ' · unavailable' } ] } );
+		const result = groups.filter( function( group ) { return group.entries.length > 0 } ).map( function( group ) {
+			return { label : group.label, options : group.entries };
+		} );
+		return result.length ? result : [ { value : '', label : 'No textfills available' } ];
 	}
 
 	function panel( number, title, description ) {
@@ -133,6 +160,31 @@
 		return '/page-'+ draft.pageId+ '/'+ draft.id+ '/'+ suffix( component, property );
 	}
 
+	function quickMode() {
+		return !pd.composer._context || pd.composer._context.mode !== 'replace';
+	}
+
+	function bindingSource( area, component, property, definition ) {
+		const stored = component.bindingSources && component.bindingSources[property];
+		if( stored ) return stored;
+		if( definition.kind === 'template' ) return 'template';
+		const value = component.bindings && component.bindings[property] || '';
+		if( area.source === 'elements' ) return value.startsWith('/') ? 'textfill' : 'field';
+		if( value === generatedKey( pd.composer._draft, component, property ) ) return 'new';
+		return definition.kind === 'image' ? 'image' : 'textfill';
+	}
+
+	function setBindingSource( component, property, source ) {
+		component.bindingSources = component.bindingSources || {};
+		component.bindingSources[property] = source;
+	}
+
+	function firstTextfill() {
+		const entries = pd.composer._textEntries || [];
+		const content = entries.find( function( entry ) { return entry.blacklisted !== true } );
+		return content ? content.key : ( entries[0] ? entries[0].key : '' );
+	}
+
 	function effectiveLayout( draft, item ) {
 		return draft.layout !== 'auto' && item.layouts[draft.layout] ? draft.layout : item.recommend.layout;
 	}
@@ -158,6 +210,8 @@
 				Object.keys( definition.properties || {} ).forEach( function( property ) {
 					const propertyDefinition = definition.properties[property];
 					if( propertyDefinition.kind !== kind ) return;
+					const source = bindingSource( area, component, property, propertyDefinition );
+					if( source === 'fixed' ) return;
 					const generated = generatedKey( draft, component, property );
 					const key = component.bindings[property] || generated;
 					result.push( {
@@ -166,7 +220,7 @@
 						label : area.label+ ' · '+ definition.label+ ' · '+ propertyDefinition.label,
 						control : propertyDefinition.control, default : propertyDefinition.default || '',
 						width : propertyDefinition.width || 0, height : propertyDefinition.height || 0,
-						generatedKey : generated, key : key, mode : key === generated ? 'new' : 'existing',
+						generatedKey : generated, key : key, mode : source === 'new' || key === generated ? 'new' : 'existing',
 					} );
 				} );
 			} );
@@ -234,8 +288,10 @@
 		( draft.areas[areaKey].components || [] ).forEach( function( component ) {
 			const definition = componentDefinition( item, area, component );
 			Object.keys( definition.properties || {} ).forEach( function( property ) {
+				if( bindingSource( area, component, property, definition.properties[property] ) !== 'field' ) return;
 				const options = modelOptions( area, source.elementMode === 'existing' ? source.elementType : '', definition.properties[property].fieldType );
 				if( !options.some( function( option ) { return option.value === component.bindings[property] } ) ) component.bindings[property] = preferredMapping( options, component, property );
+				setBindingSource( component, property, 'field' );
 			} );
 		} );
 	}
@@ -249,7 +305,10 @@
 			( draft.areas[areaKey].components || [] ).forEach( function( component ) {
 				const definition = componentDefinition( item, area, component );
 				if( area.source === 'single' ) Object.keys( definition.properties || {} ).forEach( function( property ) {
-					if( definition.properties[property].kind !== 'template' ) component.bindings[property] = generatedKey( draft, component, property );
+					if( definition.properties[property].kind === 'template' ) return;
+					if( bindingSource( area, component, property, definition.properties[property] ) !== 'new' ) return;
+					component.bindings[property] = generatedKey( draft, component, property );
+					setBindingSource( component, property, 'new' );
 				} );
 			} );
 			if( area.source === 'elements' ) {
@@ -261,16 +320,21 @@
 	}
 
 	function renderSectionPanel( wrap, draft, item ) {
-		const section = panel( 1, 'Section', 'Stable identity, optional layout, dimensions, spacing and background.' );
+		const quick = quickMode();
+		const section = panel( 1, 'Section', quick
+			? 'Choose the identity, structure and background needed before the first frontend review.'
+			: 'Fine-tune identity, layout, dimensions, spacing and background.' );
 		const grid = node( 'div', 'pd-form-grid' );
 		grid.appendChild( formField( 'Section ID', 'id', 'text', draft.id, 'Creates /page-'+ draft.pageId+ '/'+ draft.id+ '/… bindings.', Object.keys( item.layouts ).length < 2 ) );
 		if( Object.keys( item.layouts ).length > 1 ) {
 			const layouts = [ { value : 'auto', label : 'Auto · '+ item.layouts[item.recommend.layout].label } ].concat( Object.keys( item.layouts ).map( function( key ) { return { value : key, label : item.layouts[key].label } } ) );
 			grid.appendChild( formField( 'Layout', 'layout', layouts, draft.layout, 'Changes the preset template, not merely its CSS.' ) );
 		}
-		grid.append( formField( 'Height', 'frame.screen', pd._library.choices.screen, draft.frame.screen ), formField( 'Width', 'frame.container', pd._library.choices.container, draft.frame.container ) );
-		if( effectiveFrame( draft, item ).screen !== 'off' ) grid.appendChild( formField( 'Content position', 'frame.vertical', pd._library.choices.vertical, draft.frame.vertical, 'Vertical alignment inside the screen cover.', true ) );
-		grid.append( formField( 'Margin top / bottom', 'frame.margin', pd._library.choices.margin, draft.frame.margin ), formField( 'Padding top / bottom', 'frame.padding', pd._library.choices.padding, draft.frame.padding ) );
+		if( !quick ) {
+			grid.append( formField( 'Height', 'frame.screen', pd._library.choices.screen, draft.frame.screen ), formField( 'Width', 'frame.container', pd._library.choices.container, draft.frame.container ) );
+			if( effectiveFrame( draft, item ).screen !== 'off' ) grid.appendChild( formField( 'Content position', 'frame.vertical', pd._library.choices.vertical, draft.frame.vertical, 'Vertical alignment inside the screen cover.', true ) );
+			grid.append( formField( 'Margin top / bottom', 'frame.margin', pd._library.choices.margin, draft.frame.margin ), formField( 'Padding top / bottom', 'frame.padding', pd._library.choices.padding, draft.frame.padding ) );
+		}
 		grid.appendChild( formField( 'Background', 'frame.background', pd._library.choices.background, draft.frame.background, '', true ) );
 		if( [ 'cover', 'parallax' ].includes( effectiveFrame( draft, item ).background ) ) {
 			grid.append( formField( 'Overlay', 'frame.overlay', pd._library.choices.overlay, draft.frame.overlay ), formField( 'Focus', 'frame.focus', pd._library.choices.focus, draft.frame.focus, '1–3 top · 4–6 middle · 7–9 bottom.' ) );
@@ -284,13 +348,125 @@
 		wrap.appendChild( section );
 	}
 
+	function renderComponentActions( areaDraft, index ) {
+		const actions = node( 'div', 'pd-v3-component-actions' );
+		[ [ [ 'm18 15-6-6-6 6' ], -1, 'Move up' ], [ [ 'm6 9 6 6 6-6' ], 1, 'Move down' ] ].forEach( function( action ) {
+			const button = iconButton( action[0], action[2] );
+			button.disabled = index + action[1] < 0 || index + action[1] >= areaDraft.components.length;
+			button.addEventListener( 'click', function() {
+				areaDraft.components = moveComponent( areaDraft.components, index, action[1] );
+				pd.composer.renderSettings(); pd.composer.renderSummary(); pd.composer.requestPreview();
+			} );
+			actions.appendChild( button );
+		} );
+		const remove = iconButton( [ 'M18 6 6 18', 'm6 6 12 12' ], 'Remove component', 'is-danger' );
+		remove.addEventListener( 'click', function() {
+			areaDraft.components.splice( index, 1 );
+			pd.composer.renderSettings(); pd.composer.loadTextValues(); pd.composer.renderSummary(); pd.composer.requestPreview();
+		} );
+		actions.appendChild( remove );
+		return actions;
+	}
+
+	function renderAddComponent( body, item, areaKey, area, areaDraft ) {
+		if( areaDraft.components.length >= area.maxComponents ) return;
+		const add = node( 'div', 'pd-v3-add-component' );
+		const field = node( 'label', 'pd-form-field pd-v3-add-field' );
+		field.appendChild( node( 'span', '', 'Component type' ) );
+		const select = node('select');
+		area.allowed.forEach( function( type ) {
+			const option = node( 'option', '', item.componentCatalog[type].label );
+			option.value = type; select.appendChild( option );
+		} );
+		const button = node( 'button', 'nino-admin-btn-secondary', '+ Add component' );
+		button.type = 'button';
+		button.addEventListener( 'click', function() { pd.areaComposer.addComponent( areaKey, select.value ) } );
+		field.appendChild( select ); add.append( field, button ); body.appendChild( add );
+	}
+
+	function renderCollectionSource( body, areaKey, areaDraft ) {
+		const sourcePanel = node( 'section', 'pd-v3-source-panel' );
+		const sourceGrid = node( 'div', 'pd-form-grid' );
+		sourceGrid.appendChild( formField( 'Source', 'areas.'+ areaKey+ '.source.elementMode', [ { value : 'new', label : 'Create a new collection' }, { value : 'existing', label : 'Use an existing collection' } ], areaDraft.source.elementMode ) );
+		if( areaDraft.source.elementMode === 'new' ) sourceGrid.appendChild( formField( 'New collection ID', 'areas.'+ areaKey+ '.source.elementType', 'text', areaDraft.source.elementType, 'The complete manifest model is created on insert.' ) );
+		else sourceGrid.appendChild( formField( 'Collection', 'areas.'+ areaKey+ '.source.elementType', ( pd.sectionsUI._types || [] ).map( function( type ) { return { value : type.type, label : type.title+ ' · '+ type.type } } ), areaDraft.source.elementType ) );
+		sourcePanel.append( sectionLabel( 'Collection source', 'Create the preset model or connect this area to an existing Elements type.' ), sourceGrid );
+		body.appendChild( sourcePanel );
+	}
+
+	function fixedValueField( propertyDefinition, path, value, wide ) {
+		const control = propertyDefinition.control === 'textarea' ? 'textarea' : ( propertyDefinition.control === 'url' ? 'url' : 'text' );
+		return formField( propertyDefinition.label+ ' value', path, control, value, 'Stored in the section source and shared by every rendered item.', wide === true );
+	}
+
+	function renderBindingFields( group, draft, item, areaKey, area, areaDraft, component, index ) {
+		const definition = componentDefinition( item, area, component );
+		Object.keys( definition.properties || {} ).forEach( function( property ) {
+			const propertyDefinition = definition.properties[property];
+			const path = 'areas.'+ areaKey+ '.components.'+ index+ '.bindings.'+ property;
+			const current = component.bindings[property] || '';
+			if( propertyDefinition.kind === 'template' ) {
+				const options = [ { value : '', label : 'None' } ].concat( pd._includes.filter( function( include ) { return include.kind !== 'Page frame' } ).map( function( include ) { return { value : include.path, label : include.name+ '.tpl' } } ) );
+				group.appendChild( formField( propertyDefinition.label, path, options, current, 'Writes a normal [template] shortcode.', true ) );
+				return;
+			}
+
+			const mode = bindingSource( area, component, property, propertyDefinition );
+			if( area.source === 'elements' ) {
+				if( propertyDefinition.fieldType !== 'image' ) {
+					const source = formField( propertyDefinition.label+ ' source', '', [ { value : 'field', label : 'Collection field' }, { value : 'textfill', label : 'Existing textfill' }, { value : 'fixed', label : 'Fixed value' } ], mode );
+					source.querySelector('select').removeAttribute('data-path');
+					source.querySelector('select').dataset.bindingMode = areaKey+ ':'+ index+ ':'+ property;
+					group.appendChild( source );
+				}
+				if( mode === 'textfill' ) group.appendChild( formField( propertyDefinition.label+ ' textfill', path, textfillOptions( current ), current ) );
+				else if( mode === 'fixed' ) group.appendChild( fixedValueField( propertyDefinition, path, current ) );
+				else {
+					const options = modelOptions( area, areaDraft.source.elementMode === 'existing' ? areaDraft.source.elementType : '', propertyDefinition.fieldType );
+					group.appendChild( formField( propertyDefinition.label+ ' maps to', path, options, current, '', propertyDefinition.fieldType === 'image' ) );
+				}
+				return;
+			}
+
+			const generated = generatedKey( draft, component, property );
+			const sourceOptions = propertyDefinition.kind === 'image'
+				? [ { value : 'new', label : 'New image slot' }, { value : 'image', label : 'Existing image slot' } ]
+				: [ { value : 'new', label : 'New section value' }, { value : 'textfill', label : 'Existing textfill' }, { value : 'fixed', label : 'Fixed value' } ];
+			const source = formField( propertyDefinition.label+ ' source', '', sourceOptions, mode );
+			source.querySelector('select').removeAttribute('data-path');
+			source.querySelector('select').dataset.bindingMode = areaKey+ ':'+ index+ ':'+ property;
+			group.appendChild( source );
+			if( mode === 'image' ) {
+				const options = ( pd.sectionsUI._images || [] ).map( function( image ) { return { value : image.uri, label : image.uri } } );
+				group.appendChild( formField( 'Image slot', path, options, current ) );
+			} else if( mode === 'textfill' ) {
+				group.appendChild( formField( 'Textfill key', path, textfillOptions( current ), current ) );
+			} else if( mode === 'fixed' ) {
+				group.appendChild( fixedValueField( propertyDefinition, path, current ) );
+			} else if( propertyDefinition.kind !== 'image' ) {
+				const valueField = node( 'label', 'pd-form-field pd-v3-generated-value' );
+				const input = node( propertyDefinition.control === 'textarea' ? 'textarea' : 'input' );
+				if( input.tagName === 'INPUT' ) input.type = propertyDefinition.control === 'url' ? 'url' : 'text';
+				input.value = Object.prototype.hasOwnProperty.call( pd.composer._textValues, generated ) ? pd.composer._textValues[generated] : propertyDefinition.default;
+				input.dataset.textKey = generated; input.placeholder = propertyDefinition.default;
+				valueField.append( node( 'span', '', propertyDefinition.label+ ' value' ), input ); group.appendChild( valueField );
+				input.addEventListener( 'input', function() { pd.composer._textValues[generated] = input.value; pd.composer._touched.add( generated ) } );
+			} else {
+				group.appendChild( node( 'p', 'pd-v3-binding-note', 'The image slot is created when the section is inserted and can then be filled in Admin.' ) );
+			}
+		} );
+	}
+
 	function renderAreaPanel( wrap, draft, item ) {
 		const keys = areaKeys( item );
+		const quick = quickMode();
 		if( !keys.includes( pd.areaComposer._areaKey ) ) pd.areaComposer._areaKey = keys[0];
 		const areaKey = pd.areaComposer._areaKey;
 		const area = item.areas[areaKey];
 		const areaDraft = draft.areas[areaKey];
-		const section = panel( 2, 'Content areas', 'Each named slot owns an ordered design and its matching data source.' );
+		const section = panel( 2, 'Content areas', quick
+			? 'Build each named slot from ordered components and connect its initial data.'
+			: 'Fine-tune each named slot through its separate Design and Data views.' );
 		section.classList.add('pd-v3-areas-panel');
 		const workspace = node( 'div', 'pd-v3-area-workspace' );
 		const tabs = node( 'div', 'pd-v3-area-tabs' );
@@ -318,7 +494,13 @@
 
 		const toolbar = node( 'div', 'pd-v3-area-heading' );
 		const copy = node('div');
-		copy.append( node( 'strong', '', area.label ), node( 'p', '', area.help || 'Configure the ordered components and connect their data.' ) );
+		copy.append( node( 'strong', '', area.label ), node( 'p', '', area.help || ( quick ? 'Choose the content structure and connect its data.' : 'Configure the ordered components and connect their data.' ) ) );
+		if( quick ) {
+			toolbar.appendChild( copy ); editor.appendChild( toolbar );
+			renderQuickArea( editor, draft, item, areaKey, area, areaDraft );
+			workspace.appendChild( editor ); section.appendChild( workspace ); wrap.appendChild( section );
+			return;
+		}
 		const views = node( 'div', 'pd-v3-view-tabs' );
 		[ 'design', 'data' ].forEach( function( view ) {
 			const button = node( 'button', pd.areaComposer._view === view ? 'is-active' : '', humanize( view ) );
@@ -336,6 +518,29 @@
 		workspace.appendChild( editor );
 		section.appendChild( workspace );
 		wrap.appendChild( section );
+	}
+
+	function renderQuickArea( section, draft, item, areaKey, area, areaDraft ) {
+		const body = node( 'div', 'pd-v3-area-body pd-v3-quick' );
+		if( area.source === 'elements' ) renderCollectionSource( body, areaKey, areaDraft );
+		body.appendChild( sectionLabel( 'Components and data', 'Add, order and fill only what this section needs initially. Visual fine-tuning remains available after insertion.' ) );
+		const list = node( 'div', 'pd-v3-quick-components' );
+		areaDraft.components.forEach( function( component, index ) {
+			const definition = componentDefinition( item, area, component );
+			const group = node( 'article', 'pd-v3-binding-group pd-v3-quick-component' );
+			const heading = node( 'div', 'pd-v3-binding-heading' );
+			const headingCopy = node( 'span', 'pd-v3-binding-copy' );
+			const identity = node( 'span', 'pd-v3-quick-identity' );
+			identity.append( node( 'strong', '', definition.label ), node( 'code', '', component.id ) );
+			headingCopy.append( identity, renderComponentActions( areaDraft, index ) );
+			heading.append( node( 'span', 'pd-v3-binding-order', String( index + 1 ) ), headingCopy );
+			group.appendChild( heading );
+			if( component.type === 'button' ) group.appendChild( formField( 'Opens', 'areas.'+ areaKey+ '.components.'+ index+ '.settings.target', [ { value : 'same', label : 'Same tab' }, { value : 'new', label : 'New tab' } ], component.settings.target ) );
+			renderBindingFields( group, draft, item, areaKey, area, areaDraft, component, index );
+			list.appendChild( group );
+		} );
+		if( areaDraft.components.length === 0 ) list.appendChild( node( 'p', 'nino-admin-hint', 'This area is empty. Add a component below if it should render content.' ) );
+		body.appendChild( list ); renderAddComponent( body, item, areaKey, area, areaDraft ); section.appendChild( body );
 	}
 
 	function renderDesign( section, draft, item, areaKey, area, areaDraft ) {
@@ -356,40 +561,16 @@
 			const styleOptions = definition.styles.map( function( key ) { return { value : key, label : key === 'auto' ? 'Auto' : humanize( key ) } } );
 			controls.appendChild( formField( 'Style', 'areas.'+ areaKey+ '.components.'+ index+ '.style', styleOptions, component.style ) );
 			if( component.type === 'button' ) controls.appendChild( formField( 'Target', 'areas.'+ areaKey+ '.components.'+ index+ '.settings.target', [ { value : 'same', label : 'Same tab' }, { value : 'new', label : 'New tab' } ], component.settings.target ) );
-			const actions = node( 'div', 'pd-v3-component-actions' );
-			[ [ [ 'm18 15-6-6-6 6' ], -1, 'Move up' ], [ [ 'm6 9 6 6 6-6' ], 1, 'Move down' ] ].forEach( function( action ) {
-				const button = iconButton( action[0], action[2] ); button.disabled = index + action[1] < 0 || index + action[1] >= areaDraft.components.length;
-				button.addEventListener( 'click', function() { areaDraft.components = moveComponent( areaDraft.components, index, action[1] ); pd.composer.renderSettings(); pd.composer.renderSummary(); pd.composer.requestPreview() } ); actions.appendChild( button );
-			} );
-			const remove = iconButton( [ 'M18 6 6 18', 'm6 6 12 12' ], 'Remove component', 'is-danger' );
-			remove.addEventListener( 'click', function() { areaDraft.components.splice( index, 1 ); pd.composer.renderSettings(); pd.composer.loadTextValues(); pd.composer.renderSummary(); pd.composer.requestPreview() } ); actions.appendChild( remove );
-			row.append( identity, controls, actions ); list.appendChild( row );
+			row.append( identity, controls, renderComponentActions( areaDraft, index ) ); list.appendChild( row );
 		} );
 		body.appendChild( list );
-		if( areaDraft.components.length < area.maxComponents ) {
-			const add = node( 'div', 'pd-v3-add-component' );
-			const field = node( 'label', 'pd-form-field pd-v3-add-field' );
-			field.appendChild( node( 'span', '', 'Component type' ) );
-			const select = node('select');
-			area.allowed.forEach( function( type ) { const option = node( 'option', '', item.componentCatalog[type].label ); option.value = type; select.appendChild( option ) } );
-			const button = node( 'button', 'nino-admin-btn-secondary', '+ Add component' ); button.type = 'button';
-			button.addEventListener( 'click', function() { pd.areaComposer.addComponent( areaKey, select.value ) } );
-			field.appendChild( select ); add.append( field, button ); body.appendChild( add );
-		}
+		renderAddComponent( body, item, areaKey, area, areaDraft );
 		section.appendChild( body );
 	}
 
 	function renderData( section, draft, item, areaKey, area, areaDraft ) {
 		const body = node( 'div', 'pd-v3-area-body pd-v3-data' );
-		if( area.source === 'elements' ) {
-			const sourcePanel = node( 'section', 'pd-v3-source-panel' );
-			const sourceGrid = node( 'div', 'pd-form-grid' );
-			sourceGrid.appendChild( formField( 'Source', 'areas.'+ areaKey+ '.source.elementMode', [ { value : 'new', label : 'Create a new collection' }, { value : 'existing', label : 'Use an existing collection' } ], areaDraft.source.elementMode ) );
-			if( areaDraft.source.elementMode === 'new' ) sourceGrid.appendChild( formField( 'New collection ID', 'areas.'+ areaKey+ '.source.elementType', 'text', areaDraft.source.elementType, 'The complete manifest model is created on insert.' ) );
-			else sourceGrid.appendChild( formField( 'Collection', 'areas.'+ areaKey+ '.source.elementType', ( pd.sectionsUI._types || [] ).map( function( type ) { return { value : type.type, label : type.title+ ' · '+ type.type } } ), areaDraft.source.elementType ) );
-			sourcePanel.append( sectionLabel( 'Collection source', 'Create the preset model or connect this area to an existing Elements type.' ), sourceGrid );
-			body.appendChild( sourcePanel );
-		}
+		if( area.source === 'elements' ) renderCollectionSource( body, areaKey, areaDraft );
 
 		body.appendChild( sectionLabel( 'Data bindings', 'Connect every visible component to its native content value.' ) );
 		const bindings = node( 'div', 'pd-v3-bindings' );
@@ -401,43 +582,7 @@
 			headingCopy.append( node( 'strong', '', definition.label ), node( 'code', '', component.id ) );
 			heading.append( node( 'span', 'pd-v3-binding-order', String( index + 1 ) ), headingCopy );
 			group.appendChild( heading );
-			Object.keys( definition.properties || {} ).forEach( function( property ) {
-				const propertyDefinition = definition.properties[property];
-				const path = 'areas.'+ areaKey+ '.components.'+ index+ '.bindings.'+ property;
-				if( propertyDefinition.kind === 'template' ) {
-					const options = [ { value : '', label : 'None' } ].concat( pd._includes.filter( function( include ) { return include.kind !== 'Page frame' } ).map( function( include ) { return { value : include.path, label : include.name+ '.tpl' } } ) );
-					group.appendChild( formField( propertyDefinition.label, path, options, component.bindings[property], 'Writes a normal [template] shortcode.', true ) );
-					return;
-				}
-				if( area.source === 'elements' ) {
-					const options = modelOptions( area, areaDraft.source.elementMode === 'existing' ? areaDraft.source.elementType : '', propertyDefinition.fieldType );
-					group.appendChild( formField( propertyDefinition.label+ ' maps to', path, options, component.bindings[property], '', true ) );
-					return;
-				}
-				const generated = generatedKey( draft, component, property );
-				const current = component.bindings[property] || generated;
-				const mode = current === generated ? 'new' : 'existing';
-				const source = formField( propertyDefinition.label+ ' source', '', [ { value : 'new', label : propertyDefinition.kind === 'image' ? 'New image slot' : 'New section value' }, { value : 'existing', label : propertyDefinition.kind === 'image' ? 'Existing image slot' : 'Existing textfill' } ], mode );
-				source.querySelector('select').removeAttribute('data-path');
-				source.querySelector('select').dataset.bindingMode = areaKey+ ':'+ index+ ':'+ property;
-				group.appendChild( source );
-				if( mode === 'existing' ) {
-					const options = propertyDefinition.kind === 'image'
-						? ( pd.sectionsUI._images || [] ).map( function( image ) { return { value : image.uri, label : image.uri } } )
-						: pd.composer._textEntries.map( function( entry ) { return { value : entry.key, label : entry.key } } );
-					group.appendChild( formField( propertyDefinition.kind === 'image' ? 'Image slot' : 'Textfill key', path, options, current, '', true ) );
-				} else if( propertyDefinition.kind !== 'image' ) {
-					const valueField = node( 'label', 'pd-form-field is-wide pd-v3-generated-value' );
-					const input = node( propertyDefinition.control === 'textarea' ? 'textarea' : 'input' );
-					if( input.tagName === 'INPUT' ) input.type = propertyDefinition.control === 'url' ? 'url' : 'text';
-					input.value = Object.prototype.hasOwnProperty.call( pd.composer._textValues, current ) ? pd.composer._textValues[current] : propertyDefinition.default;
-					input.dataset.textKey = current; input.placeholder = propertyDefinition.default;
-					valueField.append( node( 'span', '', propertyDefinition.label+ ' value' ), input ); group.appendChild( valueField );
-					input.addEventListener( 'input', function() { pd.composer._textValues[current] = input.value; pd.composer._touched.add( current ) } );
-				} else {
-					group.appendChild( node( 'p', 'pd-v3-binding-note', 'The image slot is created when the section is inserted and can then be filled in Admin.' ) );
-				}
-			} );
+			renderBindingFields( group, draft, item, areaKey, area, areaDraft, component, index );
 			bindings.appendChild( group );
 		} );
 		if( areaDraft.components.length === 0 ) bindings.appendChild( node( 'p', 'nino-admin-hint', 'This area currently has no data-bearing components.' ) );
@@ -453,11 +598,18 @@
 		wrap.querySelectorAll('[data-binding-mode]').forEach( function( input ) {
 			input.addEventListener( 'change', function() {
 				const parts = input.dataset.bindingMode.split(':');
+				const area = preset().areas[parts[0]];
 				const component = pd.composer._draft.areas[parts[0]].components[Number( parts[1] )];
-				const definition = componentDefinition( preset(), preset().areas[parts[0]], component ).properties[parts[2]];
+				const definition = componentDefinition( preset(), area, component ).properties[parts[2]];
+				setBindingSource( component, parts[2], input.value );
 				if( input.value === 'new' ) component.bindings[parts[2]] = generatedKey( pd.composer._draft, component, parts[2] );
-				else if( definition.kind === 'image' ) component.bindings[parts[2]] = pd.sectionsUI._images && pd.sectionsUI._images[0] ? pd.sectionsUI._images[0].uri : generatedKey( pd.composer._draft, component, parts[2] );
-				else component.bindings[parts[2]] = pd.composer._textEntries[0] ? pd.composer._textEntries[0].key : generatedKey( pd.composer._draft, component, parts[2] );
+				else if( input.value === 'image' ) component.bindings[parts[2]] = pd.sectionsUI._images && pd.sectionsUI._images[0] ? pd.sectionsUI._images[0].uri : '';
+				else if( input.value === 'textfill' ) component.bindings[parts[2]] = firstTextfill();
+				else if( input.value === 'fixed' ) component.bindings[parts[2]] = definition.default || '';
+				else if( input.value === 'field' ) {
+					const source = pd.composer._draft.areas[parts[0]].source;
+					component.bindings[parts[2]] = preferredMapping( modelOptions( area, source.elementMode === 'existing' ? source.elementType : '', definition.fieldType ), component, parts[2] );
+				}
 				pd.composer.renderSettings(); pd.composer.loadTextValues(); pd.composer.renderSummary(); pd.composer.requestPreview();
 			} );
 		} );
@@ -477,7 +629,7 @@
 		const draft = pd.composer._draft;
 		const item = preset();
 		if( !wrap || !draft ) return;
-		pd.composer.captureValues(); wrap.innerHTML = '';
+		pd.composer.captureValues(); wrap.innerHTML = ''; wrap.classList.toggle( 'is-quick', quickMode() );
 		renderSectionPanel( wrap, draft, item ); renderAreaPanel( wrap, draft, item ); bindSettings( wrap );
 	}
 
@@ -493,9 +645,13 @@
 			areaKeys( preset() ).forEach( function( areaKey ) {
 				const area = preset().areas[areaKey];
 				draft.areas[areaKey].components.forEach( function( component ) {
+					const definition = componentDefinition( preset(), area, component );
 					Object.keys( component.bindings || {} ).forEach( function( property ) {
 						const value = component.bindings[property];
-						if( area.source === 'single' && typeof value === 'string' && value.startsWith( '/page-'+ draft.pageId+ '/'+ oldId+ '/' ) ) component.bindings[property] = value.replace( '/'+ oldId+ '/', '/'+ draft.id+ '/' );
+						const source = component.bindingSources && component.bindingSources[property]
+							? component.bindingSources[property]
+							: ( typeof value === 'string' && value.startsWith( '/page-'+ draft.pageId+ '/'+ oldId+ '/' ) ? 'new' : ( definition.properties[property] ? bindingSource( area, component, property, definition.properties[property] ) : '' ) );
+						if( area.source === 'single' && source === 'new' && typeof value === 'string' && value.startsWith( '/page-'+ draft.pageId+ '/'+ oldId+ '/' ) ) component.bindings[property] = value.replace( '/'+ oldId+ '/', '/'+ draft.id+ '/' );
 					} );
 				} );
 				const source = draft.areas[areaKey].source;
@@ -560,6 +716,14 @@
 			areaDraft.components.forEach( function( component ) {
 				if( component.type === 'template' && !( component.bindings && component.bindings.path ) )
 					throw new Error( 'Choose a reusable template for '+ area.label+ '.' );
+				const definition = componentDefinition( item, area, component );
+				Object.keys( definition.properties || {} ).forEach( function( property ) {
+					const source = bindingSource( area, component, property, definition.properties[property] );
+					if( source === 'textfill' && !( pd.composer._textEntries || [] ).some( function( entry ) { return entry.key === component.bindings[property] } ) )
+						throw new Error( 'Choose an existing textfill for '+ area.label+ ' · '+ definition.properties[property].label+ '.' );
+					if( source === 'image' && !( pd.sectionsUI._images || [] ).some( function( image ) { return image.uri === component.bindings[property] } ) )
+						throw new Error( 'Choose an existing image slot for '+ area.label+ '.' );
+				} );
 			} );
 			if( area.source !== 'elements' ) return;
 			if( !/^[a-z][a-z0-9_-]*$/.test( areaDraft.source.elementType ) ) throw new Error( 'Choose a valid Elements type for '+ area.label+ '.' );
@@ -568,6 +732,7 @@
 			areaDraft.components.forEach( function( component ) {
 				const definition = componentDefinition( item, area, component );
 				Object.keys( definition.properties || {} ).forEach( function( property ) {
+					if( bindingSource( area, component, property, definition.properties[property] ) !== 'field' ) return;
 					const model = existing ? existing.model : area.model;
 					const mapped = model && model[component.bindings[property]];
 					if( !mapped || ( mapped.type === 'image' ) !== ( definition.properties[property].fieldType === 'image' ) ) throw new Error( 'Map every field in '+ area.label+ ' to a compatible Elements field.' );
@@ -620,8 +785,18 @@
 			const item = preset();
 			if( !item || Number( item.version ) !== 3 ) return;
 			areaKeys( item ).forEach( function( areaKey ) {
+				const area = item.areas[areaKey];
+				pd.composer._draft.areas[areaKey].components.forEach( function( component ) {
+					const definition = componentDefinition( item, area, component );
+					Object.keys( definition.properties || {} ).forEach( function( property ) {
+						const source = bindingSource( area, component, property, definition.properties[property] );
+						setBindingSource( component, property, source );
+						if( source === 'textfill' && !component.bindings[property] && firstTextfill() ) component.bindings[property] = firstTextfill();
+						if( source === 'image' && !component.bindings[property] && pd.sectionsUI._images && pd.sectionsUI._images[0] ) component.bindings[property] = pd.sectionsUI._images[0].uri;
+					} );
+				} );
 				const source = pd.composer._draft.areas[areaKey].source;
-				if( item.areas[areaKey].source !== 'elements' || source.elementMode !== 'new' ) return;
+				if( area.source !== 'elements' || source.elementMode !== 'new' ) return;
 				if( ( pd.sectionsUI._types || [] ).some( function( type ) { return type.type === source.elementType } ) ) {
 					source.elementMode = 'existing';
 					normalizeCollectionMappings( areaKey );
@@ -635,14 +810,18 @@
 			if( !area.allowed.includes( type ) || areaDraft.components.length >= area.maxComponents ) return;
 			const id = nextComponentId( areaDraft.components, type );
 			const definition = componentDefinition( item, area, { type : type } );
-			const component = { id : id, type : type, style : definition.styles[0] || 'auto', settings : { target : 'same' }, bindings : {} };
+			const component = { id : id, type : type, style : definition.styles[0] || 'auto', settings : { target : 'same' }, bindings : {}, bindingSources : {} };
 			Object.keys( definition.properties || {} ).forEach( function( property ) {
-				if( definition.properties[property].kind === 'template' ) component.bindings[property] = '';
-				else if( area.source === 'single' ) component.bindings[property] = generatedKey( pd.composer._draft, component, property );
+				if( definition.properties[property].kind === 'template' ) {
+					component.bindings[property] = ''; component.bindingSources[property] = 'template';
+				} else if( area.source === 'single' ) {
+					component.bindings[property] = generatedKey( pd.composer._draft, component, property ); component.bindingSources[property] = 'new';
+				}
 				else {
 					const source = areaDraft.source;
 					const options = modelOptions( area, source.elementMode === 'existing' ? source.elementType : '', definition.properties[property].fieldType );
 					component.bindings[property] = preferredMapping( options, component, property );
+					component.bindingSources[property] = 'field';
 				}
 			} );
 			areaDraft.components.push( component ); pd.composer.renderSettings(); pd.composer.loadTextValues(); pd.composer.renderSummary(); pd.composer.requestPreview();

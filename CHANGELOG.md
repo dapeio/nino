@@ -158,6 +158,14 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- Split the Template Builder's Section Composer by intent. **Add Section** now
+  keeps only the initial ID/Layout/Background choices and combines component
+  ordering with Data bindings; **Edit Section** retains frame spacing and the
+  separate Design/Data fine-tuning views. Component properties can now choose
+  generated/collection data, an existing shared textfill, or a safe fixed
+  value as appropriate. Authenticated binding selects include blacklisted
+  route and other technical textfills in their own group without rewriting
+  them on insert.
 - `private/config.php` ships `/nino/editor/backups` and `/nino/editor/logs`
   instead of `/nino/admin/backups` and `/nino/admin/logs`. The keys `_editor`
   actually reads have always been the `/nino/editor/*` pair
@@ -348,6 +356,11 @@ All notable changes to Nino are documented in this file.
   `select` is deliberately out of the shared input group - `:is()` takes its
   most specific argument, so that group weighs (0,1,1) and would outrank a
   plain `select` rule.
+- Fixed the last `/_admin` form regressions after the shared-style refactor:
+  Config fieldsets no longer apply card padding a second time over the space
+  reserved for their legends, the language input and its Add button stay in one
+  in-flow row instead of borrowing the fixed list-action role, and ordinary
+  field labels once again occupy their own line above their controls.
 
 - Fixed `/_install`'s "New Route" button carrying a stray `margin-top`. It used
   `/_editor`'s list-button class, which is a full-width block under a list

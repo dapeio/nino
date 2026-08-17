@@ -256,7 +256,7 @@
 
 			const backLink = dc.createElement('a');
 			backLink.href = '#';
-			backLink.className = 'back-link';
+			backLink.className = 'nino-admin-back-link';
 			backLink.textContent = 'Back to list';
 			backLink.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.navs._showList() } );
 			wrap.appendChild( Nino.admin.formToolbar( backLink ) );
@@ -300,7 +300,7 @@
 				form.appendChild( Nino.admin.navs._entriesFieldset( nav ) );
 
 			const actions = dc.createElement('div');
-			actions.className = 'editor-form-actions nino-admin-actionbar';
+			actions.className = 'nino-admin-actionbar';
 
 			const saveBtn = dc.createElement('button');
 			saveBtn.type = 'submit';

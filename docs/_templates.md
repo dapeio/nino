@@ -2,7 +2,7 @@
 
 **Language:** English · [Deutsch](_templates.de.md)
 
-**Status:** 11 August 2026 · **Nino version:** Unreleased
+**Status:** 17 August 2026 · **Nino version:** Unreleased
 
 The Template Builder is the fast path from a `page-*.tpl` file to a filled page. It treats a template as an ordered sequence of complete HTML sections and reusable `[template]` sections instead of exposing every nested DOM node.
 
@@ -46,12 +46,12 @@ Use HTTPS, keep the technical password private and work from a recoverable proje
 1. Select a page template in the left rail or create one with **New page template**. The dialog asks for the complete filename, display name, header, footer and VPA default.
 2. Choose **Add section**.
 3. In **Choose**, search or filter the fullscreen gallery and select a named-area preset from its real-markup preview. The library intentionally contains only the current version-3 contract. Reusable `.tpl` files do not appear as pseudo-sections; a supporting preset can expose them as a **Template** component inside one of its Areas.
-4. Continue to **Configure & fill**, give the section a meaningful ID such as `main-hero` or `services-overview`, and set its Layout, dimensions, spacing and background in **Section**.
-5. Open each named Area. **Design** controls its Style and ordered components; **Data** creates or reuses Text/Image/Template bindings and, for repeatable Areas, an Elements collection with explicit field mappings.
-6. Compare the live preview, insert the section and create any recommended text keys, Element Type or image-slot definitions in the same operation.
+4. Continue to **Configure & fill** and give the section a meaningful ID such as `main-hero` or `services-overview`. This deliberately reduced Add view contains Structure, Background, collection choice and one combined component/data list.
+5. Add, reorder or remove components directly beside their initial bindings, then compare the live preview and insert the section. Recommended text keys, an Element Type and image-slot definitions can be created in the same operation.
+6. After checking the real frontend, reopen the section with **Edit** when visual fine-tuning is needed. Edit exposes dimensions and spacing plus each Area's separate **Design** and **Data** views.
 7. Open image slots or individual Elements entries in `/_admin` when needed.
 8. Reorder the HTML and template-section cards and save the page template.
-9. Check the real page in the browser. Complete translations afterwards through the existing JSON batch workflow or `/_admin`.
+9. Complete translations afterwards through the existing JSON batch workflow or `/_admin`.
 
 Native quick fill creates new keys in the project’s native locale and changes only that locale for per-language keys. A pre-existing global key deliberately remains global. Existing translated buckets are never cleared or replaced.
 
@@ -61,15 +61,16 @@ Native quick fill creates new keys in the project’s native locale and changes 
 
 **VPA** at template level supplies the default for sections whose motion is set to **Page**. Changing it recomposes managed sections, updates their `js-vpa` class and remains persisted even while a template is still empty. **On** or **Off** on an individual section overrides that default.
 
-The composer groups the current version-3 settings by intent:
+Add and Edit intentionally expose different depths of the same version-3 metadata:
 
-| Group | Examples |
+| View | Controls |
 |---|---|
-| Section | ID, Layout, height, width, spacing, background and optional background-image settings |
-| Area → Design | visual Area Style plus an ordered stack of allowed components |
-| Area → Data | native Text/Image/Template bindings or an Elements collection with explicit field mappings |
+| Add Section | ID, Layout, Background, optional background-image settings, collection source, component order and initial data bindings |
+| Edit Section → Section | ID, Layout, height, width, spacing, Background and optional background-image settings |
+| Edit Section → Area / Design | visual Area Style plus the ordered component stack and Component Styles |
+| Edit Section → Area / Data | native Text/Image/Template bindings or an Elements collection with explicit field mappings |
 
-Each manifest decides which Areas, components, Styles and Layouts are compatible. HTML+ remains the explicit route for arbitrary source changes.
+Add omits Section height/width/margin/padding, Area Style and Component Style. It is meant to produce a useful first version before the page is judged in its real frontend. Edit keeps the complete graphical fine-tuning model; both views compile the same metadata. Each manifest decides which Areas, components, Styles and Layouts are compatible. HTML+ remains the explicit route for arbitrary source changes.
 
 ## Source safety and the HTML+ escape hatch
 
@@ -171,20 +172,55 @@ The fixed component catalog is `title`, `subtitle`, `description`,
 Components can be added, reordered, styled or removed, but the Builder never
 accepts arbitrary markup through the visual editor.
 
-**Design** controls Area Style and component order. **Data** binds each
-component property:
+While adding a section, component order and Data live in one compact list.
+After insertion, **Design** controls Area Style, Component Style and component
+order, while **Data** owns the same bindings. Every non-image property has an
+explicit source:
 
-- a single Area creates a generated key such as
-  `/page-home/services/title` or connects an existing text/image key;
-- an Elements Area creates a new collection or selects an existing one and maps
-  each component property to a compatible model field;
+- a single Area can create a generated key such as
+  `/page-home/services/title`, reference an existing textfill or store a fixed
+  value directly in the compiled section;
+- an Elements Area creates a new collection or selects an existing one. Each
+  non-image property can independently use a collection field, an existing
+  shared textfill or a fixed value. Images remain compatible model-field
+  mappings;
 - a Template component selects an existing non-page `.tpl` and writes a
   normal `[template /templates/<name>]` shortcode at that exact position.
+
+The Builder lists ordinary textfills under **Content textfills** and keys from
+`text/blacklist.php` under **Technical values**. Blacklisting controls normal
+editor visibility; it does not make route URIs or other technical values
+invalid template bindings. Existing and technical bindings are referenced only
+and are never rewritten by inserting a section.
 
 Several Elements Areas are independent. Each has its own collection ID,
 shortcode arguments and mappings. The insert operation creates only requested
 new textfills, image slots and Element Types; existing bindings are referenced,
 not overwritten.
+
+The persisted component node records the choice per property in
+`bindingSources`. Manifests may use the same contract for recommendations:
+
+```php
+[
+    'id' => 'action',
+    'type' => 'button',
+    'bindings' => [
+        'label' => 'Contact us',
+        'href' => '/webpage/contact/uri',
+    ],
+    'bindingSources' => [
+        'label' => 'fixed',
+        'href' => 'textfill',
+    ],
+]
+```
+
+For Single Areas the valid sources are `new`, `textfill` and `fixed` (or
+`new`/`image` for images). For Elements Areas they are `field`, `textfill` and
+`fixed`, while images accept `field` only. Template properties use `template`.
+Fixed output is escaped, bracket tokens are neutralized and fixed URLs accept
+only ordinary relative URLs or the `http`, `https`, `mailto` and `tel` schemes.
 
 ### Complete Articles example
 

@@ -42,8 +42,38 @@ namespace Nino\Templates {
 		}
 
 		public static function handleGet( array &$appData, array &$request ): void {
+			$policy = (string) ( $request['/nino/http/response']['header']['Content-Security-Policy'] ?? '' );
+			$request['/nino/http/response']['header']['Content-Security-Policy'] = self::_allowPreviewDataFonts( $policy );
+
 			if( \Nino\Admin\Admin::isAuthed( $appData ) === false )
 				$request['/nino/http/response']['body'] = '[template /_templates/templates/page-login]';
+		}
+
+		/**
+		 * The outer /_templates policy is inherited by sandboxed srcdoc frames.
+		 * Allow their inlined preview fonts without widening Nino's global CSP.
+		 */
+		private static function _allowPreviewDataFonts( string $policy ): string {
+
+			$directives = preg_split( '~\s*;\s*~', trim( $policy, '; ' ), -1, PREG_SPLIT_NO_EMPTY );
+			if( is_array( $directives ) === false )
+				$directives = [];
+
+			$fontDirective = false;
+			foreach( $directives as &$directive ) {
+				if( preg_match( '~^font-src(?:\s|$)~i', $directive ) !== 1 )
+					continue;
+
+				$fontDirective = true;
+				if( preg_match( '~(?:^|\s)data:(?:\s|$)~i', $directive ) !== 1 )
+					$directive .= ' data:';
+			}
+			unset( $directive );
+
+			if( $fontDirective === false )
+				$directives[] = "font-src 'self' data:";
+
+			return implode( '; ', $directives );
 		}
 
 		public static function handlePost( array &$appData, array &$request ): void {
@@ -94,6 +124,13 @@ namespace Nino\Templates {
 
 		private const string DIRECTORY = __DIR__. '/library';
 		private const int MAX_PREVIEW_CSS_BYTES = 2_000_000;
+		private const int MAX_PREVIEW_FONT_BYTES = 2_000_000;
+		private const array PREVIEW_FONT_MIME_TYPES = [
+			'woff2'	=> 'font/woff2',
+			'woff'	=> 'font/woff',
+			'ttf'	=> 'font/ttf',
+			'otf'	=> 'font/otf',
+		];
 
 		public static function actions(): array {
 			return [
@@ -230,7 +267,97 @@ namespace Nino\Templates {
 			if( $css === false || strlen( $css ) > self::MAX_PREVIEW_CSS_BYTES )
 				return '';
 
-			return $css;
+			return self::_inlinePreviewFonts( $appData, $css );
+		}
+
+		/**
+		 * Inline project fonts so sandboxed srcdoc previews do not request them
+		 * from their opaque `null` origin. A font rule that cannot be resolved
+		 * locally is omitted from the preview instead of producing one CORS error
+		 * per iframe; the frontend bundle itself remains untouched.
+		 */
+		private static function _inlinePreviewFonts( array &$appData, string $css ): string {
+
+			$publicUrl = parse_url( \Nino\Filesystem::getPublicDir( $appData ) );
+			$fontRoot = realpath( \Nino\Filesystem::path( $appData, '/fonts' ) );
+
+			if( is_array( $publicUrl ) === false || $fontRoot === false )
+				return preg_replace( '~@font-face\s*\{[^{}]*\}~i', '', $css ) ?? $css;
+
+			$embeddedBytes = 0;
+			$embeddedFonts = [];
+			$result = preg_replace_callback( '~@font-face\s*\{[^{}]*\}~i', function( array $fontRule ) use ( &$appData, $publicUrl, $fontRoot, &$embeddedBytes, &$embeddedFonts ): string {
+				$unresolved = false;
+				$rule = preg_replace_callback( '~url\(\s*(?:(["\'])(.*?)\1|([^\)"\']+))\s*\)~i', function( array $urlMatch ) use ( &$appData, $publicUrl, $fontRoot, &$embeddedBytes, &$embeddedFonts, &$unresolved ): string {
+					$source = trim( ( $urlMatch[2] ?? '' ) !== '' ? $urlMatch[2] : ( $urlMatch[3] ?? '' ) );
+
+					if( str_starts_with( strtolower( $source ), 'data:' ) === true )
+						return $urlMatch[0];
+
+					$dataUri = self::_previewFontDataUri( $appData, $source, $publicUrl, $fontRoot, $embeddedBytes, $embeddedFonts );
+					if( $dataUri === null ) {
+						$unresolved = true;
+						return $urlMatch[0];
+					}
+
+					return 'url("'. $dataUri. '")';
+				}, $fontRule[0] );
+
+				return $unresolved === true || is_string( $rule ) === false ? '' : $rule;
+			}, $css );
+
+			return is_string( $result ) ? $result : $css;
+		}
+
+		/**
+		 * Resolve one same-project public font URL to a bounded data URI.
+		 */
+		private static function _previewFontDataUri( array &$appData, string $source, array $publicUrl, string $fontRoot, int &$embeddedBytes, array &$embeddedFonts ): ?string {
+
+			$url = parse_url( $source );
+			if( is_array( $url ) === false )
+				return null;
+
+			foreach( [ 'scheme', 'host', 'port' ] as $originPart )
+				if( isset( $url[$originPart] ) === true && ( isset( $publicUrl[$originPart] ) === false || strcasecmp( (string) $url[$originPart], (string) $publicUrl[$originPart] ) !== 0 ) )
+					return null;
+
+			$publicPath = rtrim( (string) ( $publicUrl['path'] ?? '' ), '/' );
+			$fontPath = rawurldecode( (string) ( $url['path'] ?? '' ) );
+			if(
+				$publicPath === ''
+				|| str_starts_with( $fontPath, $publicPath. '/fonts/' ) === false
+				|| str_contains( $fontPath, "\0" ) === true
+				|| str_contains( $fontPath, '\\' ) === true
+				|| preg_match( '~(?:^|/)\.\.(?:/|$)~', $fontPath ) === 1
+			)
+				return null;
+
+			$virtualPath = substr( $fontPath, strlen( $publicPath ) );
+			$extension = strtolower( pathinfo( $virtualPath, PATHINFO_EXTENSION ) );
+			$mimeType = self::PREVIEW_FONT_MIME_TYPES[$extension] ?? null;
+			if( $mimeType === null )
+				return null;
+
+			$file = realpath( \Nino\Filesystem::path( $appData, $virtualPath ) );
+			if( $file === false || str_starts_with( $file, $fontRoot. DIRECTORY_SEPARATOR ) === false || is_file( $file ) === false || is_readable( $file ) === false )
+				return null;
+
+			if( isset( $embeddedFonts[$file] ) === true )
+				return $embeddedFonts[$file];
+
+			$bytes = filesize( $file );
+			if( $bytes === false || $bytes > self::MAX_PREVIEW_FONT_BYTES - $embeddedBytes )
+				return null;
+
+			$content = file_get_contents( $file );
+			if( $content === false )
+				return null;
+
+			$embeddedBytes += strlen( $content );
+			$embeddedFonts[$file] = 'data:'. $mimeType. ';base64,'. base64_encode( $content );
+
+			return $embeddedFonts[$file];
 		}
 
 		public static function normalizeModel( mixed $model ): array {
@@ -2157,13 +2284,14 @@ namespace Nino\Templates {
 
 			$native = \Nino\Locales::getNativeLocale( $appData );
 			$entries = [];
-			foreach( \Nino\Text::entries( $appData, false ) as $entry ) {
+			foreach( \Nino\Text::entries( $appData, true ) as $entry ) {
 				$key = (string) ( $entry['key'] ?? '' );
 				if( self::_validKey( $key ) === false )
 					continue;
 				$entries[] = [
 					'key' => $key,
 					'global' => ( $entry['global'] ?? false ) === true,
+					'blacklisted' => ( $entry['blacklisted'] ?? false ) === true,
 					'value' => (string) ( ( $entry['global'] ?? false ) === true
 						? ( $entry['values']['*'] ?? '' )
 						: ( $entry['values'][$native] ?? '' ) ),

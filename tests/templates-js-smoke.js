@@ -96,6 +96,8 @@ check( 'preview documents inline the project bundle without another stylesheet r
 	&& !previewDocument.includes( '<link rel="stylesheet"' )
 	&& !previewDocument.includes( '/.cache/style.css' ) );
 check( 'preview documents block scripts, forms and third-party network access', previewDocument.includes( 'Content-Security-Policy' ) && previewDocument.includes( "script-src 'none'" ) && previewDocument.includes( "form-action 'none'" ) );
+check( 'script-free previews reproduce configured cover heights and a stable parallax image', previewDocument.includes( '[data-cover-height="100"]{min-height:100vh!important}' )
+	&& previewDocument.includes( '.js-parallex>img{top:0!important;height:100%!important;transform:none!important}' ) );
 const hostilePreview = Nino.templates.composer.previewDocument( '<script>alert(1)</script><a href="javascript:alert(2)" onclick="alert(3)">Safe</a><a href=javascript:alert(4)>Still safe</a><img src=x onerror=alert(5)>' );
 check( 'preview documents remove executable markup before assigning srcdoc', !hostilePreview.includes( '<script' )
 	&& !hostilePreview.includes( 'javascript:' )
@@ -106,6 +108,8 @@ const areaComposerSource = fs.readFileSync( path.join( __dirname, '../_templates
 const sectionsSource = fs.readFileSync( path.join( __dirname, '../_templates/assets/sections.js' ), 'utf8' );
 const scriptSource = fs.readFileSync( path.join( __dirname, '../_templates/assets/script.js' ), 'utf8' );
 const styleSource = fs.readFileSync( path.join( __dirname, '../_templates/assets/style.css' ), 'utf8' );
+const ninoCssSource = fs.readFileSync( path.join( __dirname, '../_nino/Nino.css' ), 'utf8' );
+const articlesManifestSource = fs.readFileSync( path.join( __dirname, '../_templates/library/articles-grid/manifest.php' ), 'utf8' );
 const templateMarkup = fs.readFileSync( path.join( __dirname, '../_templates/templates/page-index.tpl' ), 'utf8' );
 const templatesPhpSource = fs.readFileSync( path.join( __dirname, '../_templates/Templates.php' ), 'utf8' );
 const sandboxAssignments = composerSource.match( /iframe\.setAttribute\(\s*'sandbox',\s*PREVIEW_SANDBOX\s*\)/g ) || [];
@@ -148,6 +152,20 @@ check( 'ordered components move without mutating the previous state', movedCompo
 	&& componentList[1].id === 'title-2'
 	&& Nino.templates.areaComposer.moveComponent( componentList, 0, -1 ) === componentList );
 check( 'the editor keeps Area-level Design/Data views and independent collection creation', [ "[ 'design', 'data' ]", "'Content areas'", 'collection.area', 'image.component' ].every( function( marker ) { return areaComposerSource.includes( marker ) } ) );
+check( 'Add Section uses a reduced combined component/data view while Edit keeps fine tuning', [
+	'function quickMode()', 'function renderQuickArea(', "'Components and data'", "if( !quick ) {",
+].every( function( marker ) { return areaComposerSource.includes( marker ) } )
+	&& composerSource.includes( "step === 'library' && pd.composer._context && pd.composer._context.mode === 'replace'" )
+	&& styleSource.includes( '.pd-composer-dialog.is-edit .pd-stepper' ) );
+check( 'Add Section omits visual frame and stack styles without dropping background or data controls', /if\( !quick \) \{[\s\S]*?'Height'[\s\S]*?'Width'[\s\S]*?'Margin top \/ bottom'[\s\S]*?'Padding top \/ bottom'[\s\S]*?\}\s*grid\.appendChild\( formField\( 'Background'/.test( areaComposerSource )
+	&& areaComposerSource.includes( "formField( 'Area style'" )
+	&& areaComposerSource.includes( 'renderBindingFields( group' ) );
+check( 'binding controls expose collection fields, existing textfills and fixed values', [
+	"{ value : 'field', label : 'Collection field' }", "{ value : 'textfill', label : 'Existing textfill' }", "{ value : 'fixed', label : 'Fixed value' }",
+].every( function( marker ) { return areaComposerSource.includes( marker ) } ) );
+check( 'new-section key regeneration preserves manifest-recommended shared and fixed bindings', areaComposerSource.includes( "bindingSource( area, component, property, definition.properties[property] ) !== 'new'" ) );
+check( 'blacklisted textfills remain selectable in a separate technical group', areaComposerSource.includes( "label : 'Technical values'" )
+	&& templatesPhpSource.includes( "'blacklisted' => ( $entry['blacklisted'] ?? false ) === true" ) );
 check( 'named Areas render as semantic tabs above one Design/Data workspace', [ "'pd-v3-area-workspace'", "setAttribute( 'role', 'tablist' )", "setAttribute( 'role', 'tabpanel' )" ].every( function( marker ) { return areaComposerSource.includes( marker ) } ) );
 check( 'the config pane gives steps, Area tabs, components, sources and bindings explicit UI structure', [
 	'pd-v3-panel-copy', 'pd-v3-area-index', 'pd-v3-area-tab-copy', 'pd-v3-component-copy',
@@ -161,6 +179,8 @@ check( 'Area navigation stays horizontal so the editor body keeps the full confi
 	&& /\.pd-v3-area-tabs\s*\{[\s\S]*?display:\s*flex;[\s\S]*?overflow-x:\s*auto;/.test( styleSource )
 	&& !styleSource.includes( 'grid-template-columns: 10.5rem minmax(0, 1fr)' ) );
 check( 'canvas cards and the inspector read named Areas instead of legacy section axes', [ 'isAreaSpec( spec )', 'areaPreview( spec, areaPreset )', "[ 'Areas'", "[ 'Collections'" ].every( function( marker ) { return sectionsSource.includes( marker ) } ) );
+check( 'the Articles preset keeps every margin-bearing card inside its selected grid row', articlesManifestSource.includes( 'nino-article-grid-item' )
+	&& [ '25', '33', '50' ].every( function( width ) { return new RegExp( '\\.nino-article-grid-item\\.ui-grid-m-'+ width+ '\\s*\\{[^}]*width:\\s*calc\\(' ).test( ninoCssSource ) } ) );
 const resourceSpec = { version : 3, preset : 'sample', pageId : 'home', id : 'services', areas : { copy : { components : [ { id : 'visual', type : 'image', bindings : { src : '/page-home/services/visual' } } ] } } };
 const resourcePreset = { areas : { copy : { label : 'Copy', source : 'single' } } };
 check( 'v3 image creation is limited to generated background and declared Area image slots',

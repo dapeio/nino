@@ -175,10 +175,18 @@
 			scanBtn.addEventListener( 'click', function() { Nino.admin.text._openScanForm() } );
 			wrap.appendChild( scanBtn );
 
+			const groups = Object.keys( Nino.admin.text._groups ).sort();
+			if( groups.length === 0 ) {
+				const empty = dc.createElement('p');
+				empty.className = 'nino-admin-hint';
+				empty.textContent = 'No text keys yet - create one below or scan the templates.';
+				wrap.appendChild( empty );
+			}
+
 			const ul = dc.createElement('ul');
 			ul.className = 'nino-admin-list';
 
-			Object.keys( Nino.admin.text._groups ).sort().forEach( function( group ) {
+			groups.forEach( function( group ) {
 
 				const entries = Nino.admin.text._groups[group];
 
@@ -202,7 +210,8 @@
 				li.appendChild( link );
 				ul.appendChild( li );
 			} );
-			wrap.appendChild( ul );
+			if( groups.length > 0 )
+				wrap.appendChild( ul );
 
 			const addBtn = dc.createElement('button');
 			addBtn.type = 'button';
@@ -287,12 +296,12 @@
 				Nino.admin.text._fieldEls[entry.key] = textarea;
 
 				const counter = dc.createElement('span');
-				counter.className = 'char-counter';
+				counter.className = 'nino-admin-char-counter';
 
 				function updateCounter() {
 					const len = textarea.value.length;
 					counter.textContent = len + ' / ' + entry.maxlength;
-					counter.classList.toggle( 'char-counter-limit', len >= entry.maxlength );
+					counter.classList.toggle( 'is-limit', len >= entry.maxlength );
 				}
 
 				textarea.addEventListener( 'input', updateCounter );
@@ -493,7 +502,7 @@
 
 			const backLink = dc.createElement('a');
 			backLink.href = '#';
-			backLink.className = 'back-link';
+			backLink.className = 'nino-admin-back-link';
 			backLink.textContent = 'Back to list';
 			backLink.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.text._destroyHtmlEditors(); Nino.admin.text._showList() } );
 
@@ -564,7 +573,7 @@
 			}
 
 			const actions = dc.createElement('div');
-			actions.className = 'editor-form-actions nino-admin-actionbar';
+			actions.className = 'nino-admin-actionbar';
 
 			const saveBtn = dc.createElement('button');
 			saveBtn.type = 'submit';
@@ -667,7 +676,7 @@
 
 			const backLink = dc.createElement('a');
 			backLink.href = '#';
-			backLink.className = 'back-link';
+			backLink.className = 'nino-admin-back-link';
 			backLink.textContent = 'Back to list';
 			backLink.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.text._showList() } );
 			wrap.appendChild( Nino.admin.formToolbar( backLink ) );
@@ -706,7 +715,7 @@
 			form.appendChild( valueLabel );
 
 			const actions = dc.createElement('div');
-			actions.className = 'editor-form-actions nino-admin-actionbar';
+			actions.className = 'nino-admin-actionbar';
 
 			const saveBtn = dc.createElement('button');
 			saveBtn.type = 'submit';
@@ -760,7 +769,7 @@
 
 			const backLink = dc.createElement('a');
 			backLink.href = '#';
-			backLink.className = 'back-link';
+			backLink.className = 'nino-admin-back-link';
 			backLink.textContent = 'Back to list';
 			backLink.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.text._showList() } );
 			wrap.appendChild( Nino.admin.formToolbar( backLink ) );
@@ -806,7 +815,7 @@
 
 			const backLink = dc.createElement('a');
 			backLink.href = '#';
-			backLink.className = 'back-link';
+			backLink.className = 'nino-admin-back-link';
 			backLink.textContent = 'Back to list';
 			backLink.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.text._showList() } );
 			wrap.appendChild( Nino.admin.formToolbar( backLink ) );
@@ -854,7 +863,7 @@
 			} );
 
 			const actions = dc.createElement('div');
-			actions.className = 'editor-form-actions nino-admin-actionbar';
+			actions.className = 'nino-admin-actionbar';
 
 			const saveBtn = dc.createElement('button');
 			saveBtn.type = 'submit';

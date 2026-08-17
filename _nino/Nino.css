@@ -2067,6 +2067,14 @@ header .ui-headernav-logo {
 .nino-component--cover { width: 100%; height: 100%; object-fit: cover; }
 .ui-article.nino-article--borderless { border: 0; background: transparent; }
 
+/* ui-article adds horizontal card margins from the medium breakpoint onward.
+   Account for those gutters when the article itself is also the grid column. */
+@media (min-width: 768px) {
+	.nino-article-grid-item.ui-grid-m-25 { width: calc(25% - var(--space-1) - var(--space-1)); }
+	.nino-article-grid-item.ui-grid-m-33 { width: calc((100% / 3) - var(--space-1) - var(--space-1)); }
+	.nino-article-grid-item.ui-grid-m-50 { width: calc(50% - var(--space-1) - var(--space-1)); }
+}
+
 @media (prefers-reduced-motion: reduce), (pointer: coarse) {
 	.js-parallex > img { top: 0 !important; height: 100%; transform: none !important; will-change: auto; }
 }

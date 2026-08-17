@@ -100,8 +100,12 @@
 		const projectSource = origin ? ' '+ origin : '';
 		const policy = "default-src 'none'; style-src 'unsafe-inline'; img-src data:"+ projectSource+ '; font-src data:'+ projectSource+ '; media-src'+ projectSource+ "; script-src 'none'; frame-src 'none'; connect-src 'none'; form-action 'none'; base-uri 'none'";
 		const projectCss = escapeStyleText( pd._library && pd._library.previewCss || '' );
+		const previewCss = 'html,body{min-height:100%;margin:0}body{overflow:auto}a,button,input,textarea,select,form{pointer-events:none!important}'
+			+ '[data-cover-height="50"]{min-height:50vh!important}[data-cover-height="75"]{min-height:75vh!important}'
+			+ '[data-cover-height="90"]{min-height:90vh!important}[data-cover-height="100"]{min-height:100vh!important}'
+			+ '.js-parallex>img{top:0!important;height:100%!important;transform:none!important}';
 		return '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta http-equiv="Content-Security-Policy" content="'+ escapeAttribute( policy )+ '">'
-			+ '<style>'+ projectCss+ '\nhtml,body{min-height:100%;margin:0}body{overflow:auto}a,button,input,textarea,select,form{pointer-events:none!important}</style>'
+			+ '<style>'+ projectCss+ '\n'+ previewCss+ '</style>'
 			+ '</head><body>'+ sanitizePreviewMarkup( markup )+ '</body></html>';
 	}
 
@@ -264,6 +268,10 @@
 			pd.composer._textEntries = [];
 			pd.composer._textValues = {};
 			pd.composer._touched = new Set();
+			if( pd.areaComposer ) {
+				pd.areaComposer._areaKey = '';
+				pd.areaComposer._view = 'design';
+			}
 
 			const fallback = ( pd._library.presets.find( isAreaPreset ) || pd._library.presets[0] ).key;
 			const requested = context.spec && context.spec.preset ? context.spec.preset : fallback;
@@ -281,12 +289,15 @@
 			if( !pd.composer._draft.elementType && moduleFor( pd.composer._draft.content ).source === 'elements' )
 				pd.composer._draft.elementType = pd.composer._autoElementType;
 
+			const dialog = dc.getElementById('pd-composer');
+			dialog.classList.toggle( 'is-edit', context.mode === 'replace' );
+			dialog.classList.toggle( 'is-add', context.mode !== 'replace' );
 			dc.getElementById('pd-composer-title').textContent = context.mode === 'replace' ? 'Edit section' : 'Add section';
 			dc.getElementById('pd-compose-submit').textContent = context.mode === 'replace' ? 'Update section' : 'Insert section';
 			dc.getElementById('pd-composer-error').textContent = '';
 			dc.getElementById('pd-library-search').value = '';
 			pd.composer.render();
-			dc.getElementById('pd-composer').showModal();
+			dialog.showModal();
 			wn.requestAnimationFrame( fitPreviewFrames );
 
 			const activeContext = context;
@@ -349,6 +360,8 @@
 		setStep : function( step ) {
 			if( ![ 'library', 'config' ].includes( step ) )
 				return;
+			if( step === 'library' && pd.composer._context && pd.composer._context.mode === 'replace' )
+				return;
 			pd.composer.captureNativeInputs();
 			pd.composer._step = step;
 			pd.composer.renderStep();
@@ -379,9 +392,10 @@
 			const next = dc.getElementById('pd-compose-next');
 			const submit = dc.getElementById('pd-compose-submit');
 			const onLibrary = pd.composer._step === 'library';
+			const editing = pd.composer._context && pd.composer._context.mode === 'replace';
 			library.classList.toggle( 'pd-hidden', !onLibrary );
 			config.classList.toggle( 'pd-hidden', onLibrary );
-			back.classList.toggle( 'pd-hidden', onLibrary );
+			back.classList.toggle( 'pd-hidden', onLibrary || editing );
 			next.classList.toggle( 'pd-hidden', !onLibrary );
 			next.textContent = selectedInclude() ? 'Insert template' : 'Configure section';
 			submit.classList.toggle( 'pd-hidden', onLibrary );
@@ -514,7 +528,11 @@
 			wrap.innerHTML = '';
 			const copy = element('div');
 			copy.append( element( 'span', 'pd-eyebrow', preset.category+ ' · '+ presetKind( preset ) ), element( 'strong', '', preset.name ), element( 'p', '', preset.description ) );
-			const change = element( 'button', '', 'Change layout' );
+			if( pd.composer._context && pd.composer._context.mode === 'replace' ) {
+				wrap.appendChild( copy );
+				return;
+			}
+			const change = element( 'button', '', 'Change preset' );
 			change.type = 'button';
 			change.addEventListener( 'click', function() { pd.composer.setStep('library') } );
 			wrap.append( copy, change );

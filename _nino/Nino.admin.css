@@ -60,7 +60,9 @@
  *              .nino-admin-table-step  .nino-admin-table-empty
  *   Forms      .nino-admin-field  .nino-admin-field-wide
  *              .nino-admin-fieldgrid  .nino-admin-checkbox-fieldset
- *							.nino-admin-checkbox-field
+ *              .nino-admin-checkbox-field  .nino-admin-field-header
+ *              .nino-admin-char-counter  .nino-admin-field-radios
+ *              .nino-admin-field-image  .nino-admin-field-suffixed
  *              .nino-admin-checklist  .nino-admin-checklist-state
  *              .nino-admin-richtext
  *   Boolean    .nino-admin-switch  .nino-admin-switch-track
@@ -68,6 +70,7 @@
  *   Controls   .nino-admin-locale-select
  *              .nino-admin-locale-select--corner
  *   Chrome     .nino-admin-contextbar  .nino-admin-contextbar-select
+ *              .nino-admin-back-link
  *              .nino-admin-actionbar  .nino-admin-actionbar-status
  *              .nino-admin-list-actions  .nino-admin-desktop-action
  */
@@ -75,6 +78,24 @@
 @layer nino.system {
 
 :root {
+	--editor-blue: #2563eb;
+	--editor-blue-hover: #1d4ed8;
+	--editor-blue-soft: rgba(37,99,235,.1);
+	--editor-red: #dc2626;
+	--editor-red-soft: rgba(220,38,38,.1);
+	--editor-green: #16a34a;
+	--editor-green-soft: rgba(22,163,74,.1);
+	--editor-orange: #d97706;
+	--editor-bg: #f5f7fb;
+	--editor-bg-elevated: #fff;
+	--editor-bg-grouped: #fff;
+	--editor-text: #172033;
+	--editor-text-secondary: #687386;
+	--editor-separator: rgba(15,23,42,.09);
+	--editor-border: rgba(15,23,42,.13);
+	--editor-bar-bg: rgba(255,255,255,.9);
+	--editor-sidebar-bg: #fff;
+	--editor-focus: 0 0 0 3px rgba(37,99,235,.2);
 	--editor-radius: 10px;
 	--editor-radius-sm: 7px;
 	--editor-gap: .75rem;
@@ -86,10 +107,10 @@
 	--nino-admin-content-inline: clamp(1.25rem, 3vw, 3rem);
 	--nino-admin-control-height: 38px;
 	--nino-admin-row-height: 46px;
-	/* A select paints its own chevron; these keep the indicator and the room
-	   reserved for it in one place, so they cannot drift apart */
+	/* The chevron and its reserved space stay together. A single SVG stroke
+	   avoids the sub-pixel seam two touching gradient triangles can expose. */
 	--nino-admin-select-indicator: 1.6rem;
-	--nino-admin-select-indicator-size: 7px;
+	--nino-admin-select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8' fill='none'%3E%3Cpath d='m1 1 5 5 5-5' stroke='%23687386' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
 	--nino-admin-rail: var(--editor-sidebar-bg);
 	--nino-admin-rail-hover: var(--editor-blue-soft);
 	--nino-admin-rail-text: var(--editor-text);
@@ -97,35 +118,230 @@
 	--nino-admin-rail-border: var(--editor-separator);
 	--nino-admin-active-text: #fff;
 	--nino-admin-surface-muted: color-mix(in srgb, var(--editor-bg) 72%, var(--editor-bg-elevated));
+	color-scheme: light;
 }
 
 @media (prefers-color-scheme: dark) {
 	:root:not([data-theme="light"]) {
+		--editor-blue: #60a5fa;
+		--editor-blue-hover: #93c5fd;
+		--editor-blue-soft: rgba(96,165,250,.14);
+		--editor-red: #f87171;
+		--editor-red-soft: rgba(248,113,113,.14);
+		--editor-green: #4ade80;
+		--editor-green-soft: rgba(74,222,128,.14);
+		--editor-orange: #fbbf24;
+		--editor-bg: #0b0f17;
+		--editor-bg-elevated: #151b26;
+		--editor-bg-grouped: #151b26;
+		--editor-text: #e7edf7;
+		--editor-text-secondary: #98a4b7;
+		--editor-separator: rgba(148,163,184,.14);
+		--editor-border: rgba(148,163,184,.2);
+		--editor-bar-bg: rgba(21,27,38,.9);
+		--editor-sidebar-bg: #111722;
+		--editor-focus: 0 0 0 3px rgba(96,165,250,.25);
 		--editor-shadow: 0 1px 2px rgba(0,0,0,.28), 0 8px 24px rgba(0,0,0,.2);
 		--editor-shadow-sm: 0 1px 2px rgba(0,0,0,.24), 0 3px 10px rgba(0,0,0,.16);
+		--nino-admin-select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8' fill='none'%3E%3Cpath d='m1 1 5 5 5-5' stroke='%2398a4b7' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
 		--nino-admin-active-text: #0b0f17;
 		--nino-admin-surface-muted: color-mix(in srgb, var(--editor-bg) 76%, var(--editor-bg-elevated));
+		color-scheme: dark;
 	}
 }
 
 :root[data-theme="dark"] {
+	--editor-blue: #60a5fa;
+	--editor-blue-hover: #93c5fd;
+	--editor-blue-soft: rgba(96,165,250,.14);
+	--editor-red: #f87171;
+	--editor-red-soft: rgba(248,113,113,.14);
+	--editor-green: #4ade80;
+	--editor-green-soft: rgba(74,222,128,.14);
+	--editor-orange: #fbbf24;
+	--editor-bg: #0b0f17;
+	--editor-bg-elevated: #151b26;
+	--editor-bg-grouped: #151b26;
+	--editor-text: #e7edf7;
+	--editor-text-secondary: #98a4b7;
+	--editor-separator: rgba(148,163,184,.14);
+	--editor-border: rgba(148,163,184,.2);
+	--editor-bar-bg: rgba(21,27,38,.9);
+	--editor-sidebar-bg: #111722;
+	--editor-focus: 0 0 0 3px rgba(96,165,250,.25);
 	--editor-shadow: 0 1px 2px rgba(0,0,0,.28), 0 8px 24px rgba(0,0,0,.2);
 	--editor-shadow-sm: 0 1px 2px rgba(0,0,0,.24), 0 3px 10px rgba(0,0,0,.16);
+	--nino-admin-select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8' fill='none'%3E%3Cpath d='m1 1 5 5 5-5' stroke='%2398a4b7' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
 	--nino-admin-active-text: #0b0f17;
 	--nino-admin-surface-muted: color-mix(in srgb, var(--editor-bg) 76%, var(--editor-bg-elevated));
+	color-scheme: dark;
+}
+
+* {
+	box-sizing: border-box;
+	-webkit-tap-highlight-color: transparent;
+}
+
+html {
+	-webkit-text-size-adjust: 100%;
 }
 
 body {
+	min-width: 20rem;
+	min-height: 100vh;
+	margin: 0;
+	background: var(--editor-bg);
+	color: var(--editor-text);
+	font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
 	font-size: 15px;
 	line-height: 1.45;
+	-webkit-font-smoothing: antialiased;
+	text-rendering: optimizeLegibility;
+}
+
+a {
+	color: var(--editor-blue);
+	text-decoration: none;
+	text-underline-offset: .18em;
+	transition: color .15s ease, background-color .15s ease, border-color .15s ease;
 }
 
 /* ------------------------------------------------------------- Scope root */
 
 :where(.nino-admin-shell) {
-	min-height: 100vh;
+	min-height: 100dvh;
 	background: var(--editor-bg);
 	color: var(--editor-text);
+}
+
+:where(.nino-admin-shell--rail) {
+	display: block;
+}
+
+:where(.nino-admin) .nino-admin-rail {
+	position: sticky;
+	top: 0;
+	z-index: 30;
+	display: flex;
+	flex-direction: column;
+	align-items: stretch;
+	gap: .65rem;
+	padding: max(.75rem, env(safe-area-inset-top)) 1rem .75rem;
+	border-bottom: 1px solid var(--nino-admin-rail-border);
+	background: var(--editor-bar-bg);
+	color: var(--nino-admin-rail-text);
+	backdrop-filter: blur(20px) saturate(175%);
+	-webkit-backdrop-filter: blur(20px) saturate(175%);
+}
+
+:where(.nino-admin) .nino-admin-rail-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 1rem;
+}
+
+:where(.nino-admin) :is(.nino-admin-auth-brand, .nino-admin-brand-copy, .nino-admin-rail-user, .nino-admin-rail-actions) {
+	display: flex;
+	align-items: center;
+}
+
+:where(.nino-admin) .nino-admin-brand-mark,
+:where(.nino-admin) .nino-admin-auth-brand span {
+	display: inline-grid;
+	place-items: center;
+	flex: 0 0 auto;
+	width: 2.1rem;
+	height: 2.1rem;
+	border-radius: var(--editor-radius-sm);
+	background: var(--editor-blue);
+	color: #fff;
+	box-shadow: 0 .35rem .9rem rgba(37,99,235,.16);
+}
+
+:where(.nino-admin) .nino-admin-brand-mark svg,
+:where(.nino-admin) .nino-admin-auth-brand svg {
+	width: 1.15rem;
+	height: 1.15rem;
+}
+
+:where(.nino-admin) .nino-admin-brand-copy {
+	flex-direction: column;
+	align-items: flex-start;
+	line-height: 1.08;
+}
+
+:where(.nino-admin) .nino-admin-brand-copy strong {
+	font-size: .94rem;
+	letter-spacing: -.01em;
+}
+
+:where(.nino-admin) .nino-admin-brand-copy small {
+	margin-top: .18rem;
+	color: var(--nino-admin-rail-muted);
+	font-size: .68rem;
+	font-weight: 650;
+	letter-spacing: .085em;
+	text-transform: uppercase;
+}
+
+:where(.nino-admin) .nino-admin-rail-user,
+:where(.nino-admin) .nino-admin-rail-actions {
+	justify-content: flex-end;
+	gap: .75rem;
+	min-width: 0;
+	color: var(--nino-admin-rail-muted);
+	font-size: .82rem;
+}
+
+:where(.nino-admin) .nino-admin-rail-accent {
+	color: var(--editor-blue);
+}
+
+:where(.nino-admin) .nino-admin-rail-danger {
+	color: var(--editor-red);
+}
+
+:where(.nino-admin) .nino-admin-nav {
+	display: flex;
+	width: 100%;
+	overflow-x: auto;
+	border-bottom: 1px solid var(--nino-admin-rail-border);
+	scrollbar-width: none;
+	-webkit-overflow-scrolling: touch;
+}
+
+:where(.nino-admin) .nino-admin-nav::-webkit-scrollbar {
+	display: none;
+}
+
+:where(.nino-admin) .nino-admin-nav > :is(a, span) {
+	flex: 0 0 auto;
+	margin-bottom: -1px;
+	padding: .62rem .65rem;
+	border-bottom: 2px solid transparent;
+	color: var(--nino-admin-rail-muted);
+	font-size: .82rem;
+	font-weight: 550;
+	white-space: nowrap;
+}
+
+:where(.nino-admin) .nino-admin-nav > a:hover,
+:where(.nino-admin) .nino-admin-nav > :is(a, span).active {
+	color: var(--editor-blue);
+}
+
+:where(.nino-admin) .nino-admin-nav > :is(a, span).active {
+	border-bottom-color: var(--editor-blue);
+	font-weight: 650;
+}
+
+:where(.nino-admin) .nino-admin-pane {
+	width: 100%;
+	max-width: 76rem;
+	min-width: 0;
+	margin: 0 auto;
+	padding: 1rem var(--nino-admin-content-inline) calc(var(--nino-admin-actionbar-height) + 1.5rem);
 }
 
 :where(.nino-admin) * {
@@ -184,15 +400,33 @@ body {
 :where(.nino-admin) button {
 	min-height: var(--nino-admin-control-height);
 	padding: .48rem .82rem;
+	border: 0;
 	border-radius: var(--editor-radius-sm);
+	appearance: none;
+	-webkit-appearance: none;
+	background: var(--editor-bg-elevated);
+	color: var(--editor-blue);
+	cursor: pointer;
+	font: inherit;
 	font-size: .84rem;
 	font-weight: 650;
 	box-shadow: inset 0 0 0 1px var(--editor-border), var(--editor-shadow-sm);
 	transform: none;
+	transition: background-color .15s ease, border-color .15s ease, color .15s ease, box-shadow .15s ease, opacity .12s ease;
+}
+
+:where(.nino-admin) button:hover:not(:disabled) {
+	background: var(--editor-blue-soft);
 }
 
 :where(.nino-admin) button:active {
 	transform: none;
+}
+
+:where(.nino-admin) button:disabled {
+	opacity: .45;
+	cursor: not-allowed;
+	box-shadow: none;
 }
 
 /* A submit button is the primary action of the form it closes, so it gets the
@@ -246,11 +480,18 @@ body {
 	input[type="datetime-local"],
 	textarea
 ) {
+	width: 100%;
+	max-width: 100%;
 	min-height: var(--nino-admin-control-height);
 	padding: .48rem .62rem;
+	border: 1px solid var(--editor-border);
 	border-radius: var(--editor-radius-sm);
+	background-color: var(--editor-bg-elevated);
+	color: var(--editor-text);
+	font: inherit;
 	font-size: .84rem;
 	box-shadow: inset 0 1px 1px rgba(15,23,42,.025);
+	transition: border-color .15s ease, box-shadow .15s ease, background-color .15s ease;
 }
 
 /* A select is deliberately not in the group above: it paints its own chevron,
@@ -264,24 +505,38 @@ body {
    its most specific argument, so that group weighs (0,1,1) via
    input[type="text"] and would outrank a plain `select` rule here. */
 :where(.nino-admin) select {
+	width: 100%;
+	max-width: 100%;
 	min-height: var(--nino-admin-control-height);
+	border: 1px solid var(--editor-border);
 	border-radius: var(--editor-radius-sm);
+	background-color: var(--editor-bg-elevated);
+	color: var(--editor-text);
+	font: inherit;
 	font-size: .84rem;
 	box-shadow: inset 0 1px 1px rgba(15,23,42,.025);
 	appearance: none;
+	-webkit-appearance: none;
 	padding: .48rem var(--nino-admin-select-indicator) .48rem .62rem;
-	background-image:
-		linear-gradient(45deg, transparent 50%, var(--editor-text-secondary) 50%),
-		linear-gradient(135deg, var(--editor-text-secondary) 50%, transparent 50%);
-	background-position:
-		calc(100% - var(--nino-admin-select-indicator) + 7px) calc(50% - 1px),
-		calc(100% - var(--nino-admin-select-indicator) + 14px) calc(50% - 1px);
-	background-size: var(--nino-admin-select-indicator-size) var(--nino-admin-select-indicator-size);
+	background-image: var(--nino-admin-select-chevron);
+	background-position: right .65rem center;
+	background-size: 12px 8px;
 	background-repeat: no-repeat;
+	transition: border-color .15s ease, box-shadow .15s ease, background-color .15s ease;
 }
 
 :where(.nino-admin) :is(input, textarea, select):hover:not(:disabled) {
 	border-color: color-mix(in srgb, var(--editor-text-secondary) 42%, var(--editor-border));
+}
+
+:where(.nino-admin) textarea {
+	resize: vertical;
+}
+
+:where(.nino-admin) :is(input, textarea, select, [contenteditable]):focus {
+	outline: none;
+	border-color: var(--editor-blue);
+	box-shadow: var(--editor-focus);
 }
 
 :where(.nino-admin) :is(input, textarea, select, button, a):focus-visible {
@@ -297,6 +552,10 @@ body {
 
 /* The one raised surface in the system. A fieldset is one by definition;
    anything else asks for it with .nino-admin-card. */
+:where(.nino-admin) form {
+	padding: 0;
+}
+
 :where(.nino-admin) :is(fieldset, .nino-admin-card) {
 	border: 1px solid var(--editor-border);
 	border-radius: var(--editor-radius);
@@ -305,21 +564,27 @@ body {
 }
 
 :where(.nino-admin) fieldset {
-	margin-bottom: .75rem;
+	position: relative;
+	margin: 0 0 .75rem;
 	padding: 2.65rem 1rem .2rem;
 }
 
 :where(.nino-admin) fieldset legend {
+	position: absolute;
 	top: .82rem;
 	left: 1rem;
+	padding: 0;
+	color: var(--editor-text-secondary);
 }
 
 :where(.nino-admin) .nino-admin-field {
-	margin-bottom: .72rem;
+	display: block;
+	margin: 0 0 .72rem;
 }
 
 :where(.nino-admin) .nino-admin-field > span,
 :where(.nino-admin) .nino-admin-field-name {
+	display: block;
 	margin-bottom: .22rem;
 	color: var(--editor-text-secondary);
 	font-size: .74rem;
@@ -327,26 +592,157 @@ body {
 }
 
 :where(.nino-admin) .nino-admin-field-header {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: .75rem;
+	min-width: 0;
 	margin-bottom: .22rem;
+}
+
+:where(.nino-admin) .nino-admin-field-header .nino-admin-field-name {
+	min-width: 0;
+	margin: 0;
+	overflow-wrap: anywhere;
+}
+
+:where(.nino-admin) .nino-admin-char-counter {
+	flex: 0 0 auto;
+	margin: 0;
+	color: var(--editor-text-secondary);
+	font-size: .72rem;
+	font-variant-numeric: tabular-nums;
+	text-align: right;
+	white-space: nowrap;
+}
+
+:where(.nino-admin) .nino-admin-char-counter.is-limit {
+	color: var(--editor-red);
+	font-weight: 650;
+}
+
+:where(.nino-admin) .nino-admin-field-hint {
+	margin: -.4rem 0 .72rem;
+	color: var(--editor-text-secondary);
+	font-size: .74rem;
+	line-height: 1.45;
+}
+
+:where(.nino-admin) .nino-admin-field-suffixed {
+	display: flex;
+	align-items: center;
+	gap: .5rem;
+}
+
+:where(.nino-admin) .nino-admin-field-suffixed :is(input, textarea) {
+	flex: 1 1 auto;
+	width: auto;
+	min-width: 0;
+}
+
+:where(.nino-admin) .nino-admin-field-suffix {
+	flex: 0 0 auto;
+	color: var(--editor-text-secondary);
+	font-size: .8rem;
+	font-weight: 650;
 }
 
 :where(.nino-admin) .nino-admin-checkbox-fieldset {
 	padding: 1rem .5rem;
-  font-size: .9em;
+	font-size: .9em;
 }
+
 :where(.nino-admin) .nino-admin-checkbox-fieldset label {
-	margin-right:1.5rem;
+	margin-right: 1.5rem;
 }
 
 :where(.nino-admin) .nino-admin-checkbox-field {
+	display: flex;
+	align-items: center;
+	gap: .5rem;
 	min-height: 34px;
-	margin-bottom: .28rem;
+	margin: 0 0 .28rem;
 }
 
+:where(.nino-admin) .nino-admin-field input[type="checkbox"],
+:where(.nino-admin) .nino-admin-checkbox-field input[type="checkbox"] {
+	width: auto;
+	min-height: auto;
+}
 
-:where(.nino-admin) .nino-admin-field-radios,
-:where(.nino-admin) .nino-admin-field-radio {
+:where(.nino-admin) .nino-admin-field-radios {
+	display: flex;
+	align-items: center;
 	min-height: var(--nino-admin-control-height);
+	overflow-x: auto;
+}
+
+:where(.nino-admin) .nino-admin-field-radio {
+	display: flex;
+	align-items: center;
+	min-height: var(--nino-admin-control-height);
+	padding-right: 1rem;
+	border: 1px solid var(--editor-border);
+	border-right: 0;
+	background: var(--editor-bg-elevated);
+	color: var(--editor-text);
+	cursor: pointer;
+	font-size: .82rem;
+	transition: background-color .15s ease, color .15s ease;
+}
+
+:where(.nino-admin) .nino-admin-field-radio:has(input[type="radio"]:checked) {
+	background: var(--editor-blue);
+	color: #fff;
+}
+
+:where(.nino-admin) .nino-admin-field-radio input[type="radio"] {
+	opacity: 0;
+}
+
+:where(.nino-admin) .nino-admin-field-radios > .nino-admin-field-radio:first-child {
+	border-radius: var(--editor-radius-sm) 0 0 var(--editor-radius-sm);
+}
+
+:where(.nino-admin) .nino-admin-field-radios > .nino-admin-field-radio:last-child {
+	border-right: 1px solid var(--editor-border);
+	border-radius: 0 var(--editor-radius-sm) var(--editor-radius-sm) 0;
+}
+
+:where(.nino-admin) .nino-admin-field-image-dimensions {
+	margin: -.2rem 0 .5rem;
+	color: var(--editor-text-secondary);
+	font-size: .74rem;
+}
+
+:where(.nino-admin) .nino-admin-field-image {
+	display: flex;
+	flex-direction: column;
+	gap: .5rem;
+}
+
+:where(.nino-admin) .nino-admin-field-image-preview {
+	max-width: 12rem;
+	max-height: 12rem;
+	border-radius: var(--editor-radius-sm);
+	box-shadow: inset 0 0 0 1px var(--editor-border);
+	object-fit: cover;
+}
+
+:where(.nino-admin) .nino-admin-field-image input[type="file"] {
+	min-height: auto;
+	padding: .5rem;
+}
+
+:where(.nino-admin) .nino-admin-field-image-msg {
+	margin: 0;
+	color: var(--editor-text-secondary);
+	font-size: .78rem;
+}
+
+:where(.nino-admin) .nino-admin-field-image-msg.is-error {
+	color: var(--editor-red);
+	font-weight: 650;
 }
 
 /* The "which translation am I looking at" switch. A view control rather than a
@@ -539,24 +935,99 @@ body {
 }
 
 :where(.nino-admin) .nino-admin-richtext-toolbar {
+	display: flex;
 	gap: .2rem;
 	margin-bottom: .32rem;
 	padding: .22rem;
+	width: fit-content;
+	border: 1px solid var(--editor-border);
 	border-radius: var(--editor-radius-sm);
+	background: var(--editor-bg);
 }
 
 :where(.nino-admin) .nino-admin-richtext-btn {
 	min-height: 30px;
 	padding: .3rem .55rem;
+	background: transparent;
+	color: var(--editor-text);
 	font-size: .76rem;
 	box-shadow: none;
+}
+
+:where(.nino-admin) .nino-admin-richtext-btn[data-tag="em"] {
+	font-style: italic;
+	font-weight: 400;
+}
+
+:where(.nino-admin) .nino-admin-richtext-btn[data-tag="code"] {
+	font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+	font-weight: 500;
+}
+
+:where(.nino-admin) .nino-admin-richtext-btn.active {
+	background: var(--editor-bg-elevated);
+	color: var(--editor-blue);
+	box-shadow: var(--editor-shadow-sm);
 }
 
 :where(.nino-admin) .nino-admin-richtext-content {
 	min-height: 3rem;
 	padding: .55rem .65rem;
+	border: 1px solid var(--editor-border);
 	border-radius: var(--editor-radius-sm);
+	background: var(--editor-bg-elevated);
 	font-size: .86rem;
+	-webkit-user-select: text;
+	user-select: text;
+	-webkit-touch-callout: default;
+	cursor: text;
+	transition: border-color .15s ease, box-shadow .15s ease;
+}
+
+:where(.nino-admin) .nino-admin-richtext-content * {
+	-webkit-user-select: text;
+	user-select: text;
+	cursor: text;
+}
+
+:where(.nino-admin) .nino-admin-richtext-content strong {
+	font-weight: 700;
+}
+
+:where(.nino-admin) .nino-admin-richtext-content em {
+	font-style: italic;
+}
+
+:where(.nino-admin) .nino-admin-richtext-content span {
+	border-radius: 3px;
+	background: rgba(255,204,0,.35);
+}
+
+:where(.nino-admin) .nino-admin-richtext-content code {
+	padding: .08em .3em;
+	border-radius: 4px;
+	background: var(--editor-bg);
+	font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+	font-size: .92em;
+}
+
+:where(.nino-admin) .nino-admin-richtext-content a {
+	color: var(--editor-blue);
+	text-decoration: underline;
+}
+
+:where(.nino-admin) .nino-admin-richtext-linkbar {
+	display: flex;
+	gap: .4rem;
+	margin-top: .5rem;
+}
+
+:where(.nino-admin) .nino-admin-richtext-linkbar[hidden] {
+	display: none;
+}
+
+:where(.nino-admin) .nino-admin-richtext-linkbar input {
+	flex: 1 1 auto;
 }
 
 /* ------------------------------------------------------- Grouped list base */
@@ -588,6 +1059,8 @@ body {
 :where(.nino-admin) .nino-admin-list li > a {
 	display: flex;
 	align-items: center;
+	justify-content: space-between;
+	gap: .75rem;
 	min-height: var(--nino-admin-row-height);
 	padding: .58rem .78rem;
 	color: var(--editor-text);
@@ -596,6 +1069,11 @@ body {
 
 :where(.nino-admin) .nino-admin-list li > a:hover {
 	background: var(--editor-blue-soft);
+}
+
+:where(.nino-admin) .nino-admin-list li > a:focus-visible {
+	outline: none;
+	box-shadow: inset 0 0 0 2px var(--editor-blue);
 }
 
 :where(.nino-admin) .nino-admin-list li > a::after {
@@ -607,16 +1085,26 @@ body {
 }
 
 :where(.nino-admin) .nino-admin-list-copy {
+	display: grid;
 	gap: .08rem;
+	min-width: 0;
 }
 
 :where(.nino-admin) .nino-admin-list-copy strong {
+	overflow: hidden;
 	font-size: .84rem;
 	font-weight: 650;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
 :where(.nino-admin) .nino-admin-list-copy small {
+	overflow: hidden;
+	color: var(--editor-text-secondary);
 	font-size: .72rem;
+	line-height: 1.35;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
 /* Rows that are read, not drilled into (log lines, submissions, subscribers):
@@ -826,17 +1314,26 @@ body {
 /* --------------------------------------------------------------- Surfaces */
 
 :where(.nino-admin) .nino-admin-tiles {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
 	gap: .65rem;
 	margin-bottom: .75rem;
 }
 
 :where(.nino-admin) .nino-admin-tile {
+	display: flex;
+	flex-direction: column;
 	gap: .08rem;
 	padding: .85rem 1rem;
-	border-top-width: 2px;
+	border: 1px solid var(--editor-border);
+	border-top: 2px solid var(--editor-blue);
 	border-radius: var(--editor-radius);
+	background: var(--editor-bg-elevated);
+	color: var(--editor-text);
 	box-shadow: var(--editor-shadow-sm);
+	text-decoration: none;
 	transform: none;
+	transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease;
 }
 
 :where(.nino-admin) .nino-admin-tile:hover {
@@ -846,11 +1343,28 @@ body {
 
 :where(.nino-admin) .nino-admin-tile-value {
 	font-size: 1.6rem;
+	font-weight: 720;
+	font-variant-numeric: tabular-nums;
+	line-height: 1.1;
+}
+
+:where(.nino-admin) .nino-admin-tile-label {
+	color: var(--editor-text-secondary);
+	font-size: .76rem;
+}
+
+:where(.nino-admin) .nino-admin-tile--newsletter {
+	border-top-color: var(--editor-green);
+}
+
+:where(.nino-admin) .nino-admin-tile--logs {
+	border-top-color: var(--editor-orange);
 }
 
 :where(.nino-admin) .nino-admin-card {
 	margin-bottom: .75rem;
 	padding: .85rem;
+	background: var(--editor-bg-grouped);
 }
 
 :where(.nino-admin) .nino-admin-card h3 {
@@ -859,6 +1373,29 @@ body {
 }
 
 /* ------------------------------------------------------- Fixed app chrome */
+
+:where(.nino-admin) .nino-admin-back-link {
+	display: inline-flex;
+	align-items: center;
+	gap: .42rem;
+	width: fit-content;
+	min-height: var(--nino-admin-control-height);
+	padding: .35rem .48rem;
+	color: var(--editor-blue);
+	font-size: .82rem;
+	font-weight: 600;
+	line-height: 1.2;
+}
+
+:where(.nino-admin) .nino-admin-back-link::before {
+	content: "";
+	flex: 0 0 auto;
+	width: .48rem;
+	height: .48rem;
+	border-bottom: 1.5px solid currentColor;
+	border-left: 1.5px solid currentColor;
+	transform: rotate(45deg);
+}
 
 .nino-admin .nino-admin-contextbar {
 	position: sticky;
@@ -869,8 +1406,8 @@ body {
 	justify-content: space-between;
 	gap: .65rem;
 	min-height: 52px;
-	margin: -1rem -1rem 1rem;
-	padding: .48rem 1rem;
+	margin: -1rem calc(var(--nino-admin-content-inline) * -1) 1rem;
+	padding: .48rem var(--nino-admin-content-inline);
 	border-bottom: 1px solid var(--editor-separator);
 	background: var(--editor-bar-bg);
 	box-shadow: 0 1px 0 rgba(15,23,42,.025);
@@ -878,7 +1415,7 @@ body {
 	-webkit-backdrop-filter: blur(18px) saturate(170%);
 }
 
-.nino-admin .nino-admin-contextbar .back-link {
+.nino-admin .nino-admin-contextbar .nino-admin-back-link {
 	position: static;
 	width: auto;
 	margin: 0;
@@ -986,7 +1523,12 @@ body {
 }
 
 .nino-admin-auth-brand {
+	display: flex;
+	align-items: center;
+	gap: .65rem;
 	margin-bottom: 1.2rem;
+	font-weight: 750;
+	letter-spacing: -.02em;
 }
 
 .nino-admin-auth-brand span {
@@ -997,7 +1539,10 @@ body {
 }
 
 .nino-admin-auth-title {
+	margin: 0 0 .35rem;
 	font-size: 1.4rem;
+	line-height: 1.2;
+	letter-spacing: -.035em;
 }
 
 /* --------------------------------------------------------- Shared sidebars */
@@ -1011,6 +1556,7 @@ body {
 	/* Only a rail+pane app: the Template Builder is a .nino-admin-shell too,
 	   and lays its four regions out itself. */
 	.nino-admin-shell--rail {
+		display: grid;
 		grid-template-columns: var(--nino-admin-sidebar-width) minmax(0, 1fr);
 		height: 100dvh;
 		min-height: 0;
@@ -1018,6 +1564,10 @@ body {
 	}
 
 	.nino-admin .nino-admin-rail {
+		grid-column: 1;
+		position: sticky;
+		top: 0;
+		align-self: start;
 		height: 100dvh;
 		padding: 1rem .72rem;
 		border-right: 1px solid var(--nino-admin-rail-border);
@@ -1026,6 +1576,8 @@ body {
 	}
 
 	.nino-admin .nino-admin-rail-head {
+		align-items: stretch;
+		flex-direction: column;
 		padding: 0 .35rem .85rem;
 	}
 
@@ -1060,11 +1612,20 @@ body {
 	}
 
 	.nino-admin .nino-admin-rail-actions {
-		border-color: var(--nino-admin-rail-border);
+		justify-content: flex-start;
+		flex-wrap: wrap;
+		gap: .35rem .75rem;
+		padding-top: .75rem;
+		border-top: 1px solid var(--nino-admin-rail-border);
 	}
 
 	.nino-admin .nino-admin-nav {
+		flex: 1 1 auto;
+		flex-direction: column;
 		gap: .12rem;
+		min-height: 0;
+		overflow-y: auto;
+		border: 0;
 	}
 
 	.nino-admin .nino-admin-nav > :is(a, span) {
@@ -1088,6 +1649,7 @@ body {
 
 	.nino-admin .nino-admin-pane {
 		--admin-pane-pad: var(--nino-admin-content-inline);
+		grid-column: 2;
 		height: 100dvh;
 		max-width: none;
 		min-height: 0;
@@ -1099,10 +1661,7 @@ body {
 	}
 
 	.nino-admin .nino-admin-contextbar {
-		/* A negative block margin makes a sticky row overlap the first title:
-		   the scrollport clamps the row to its padded top, while following
-		   content is still pulled upward. Only bleed it horizontally here. */
-		margin: 0 calc(var(--nino-admin-content-inline) * -1) 1rem;
+		margin: -1rem calc(var(--nino-admin-content-inline) * -1) 1rem;
 		padding-right: var(--nino-admin-content-inline);
 		padding-left: var(--nino-admin-content-inline);
 	}

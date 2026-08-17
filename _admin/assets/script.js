@@ -134,8 +134,8 @@
 		 *	The sticky chrome a drill-down form is framed by at the top: its
 		 *	own "back to list" link, plus - where a module has one - its
 		 *	locale switch, in a single row that stays pinned while the form
-		 *	scrolls (see assets/style.css's .admin-form-toolbar, and the
-		 *	.editor-form-actions rule that pins the save row to the bottom
+		 *	scrolls (see Nino.admin.css's .nino-admin-contextbar, and the
+		 *	shared action bar that pins the save row to the bottom
 		 *	the same way /_install's Back/Next bar is pinned).
 		 *
 		 *	Shared rather than copied per module for once: it's three lines
@@ -143,16 +143,13 @@
 		 *	that every module's form is framed identically. A module with no
 		 *	locale switch simply appends nothing else.
 		 *
-		 *	@param		{Element}	backLink			The module's own .back-link anchor
+		 *	@param		{Element}	backLink			The module's own .nino-admin-back-link anchor
 		 *
 		 *	@return		{Element}	The toolbar, to append where the back link went before
 		 */
 		formToolbar : function( backLink ) {
 
-			const toolbar = Nino.adminUi.contextBar( backLink );
-			toolbar.classList.add('admin-form-toolbar');
-
-			return toolbar;
+			return Nino.adminUi.contextBar( backLink );
 		},
 
 		/**

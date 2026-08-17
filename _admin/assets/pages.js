@@ -288,7 +288,7 @@
 
 			const backLink = dc.createElement('a');
 			backLink.href = '#';
-			backLink.className = 'back-link';
+			backLink.className = 'nino-admin-back-link';
 			backLink.textContent = 'Back to list';
 			backLink.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.pages._showList() } );
 			wrap.appendChild( Nino.admin.formToolbar( backLink ) );
@@ -296,7 +296,7 @@
 			const form = dc.createElement('form');
 
 			// Both fieldsets get their card/white-background look for free
-			// from _editor/assets/style.css's generic `fieldset { ... }`
+			// from the design system's generic `fieldset { ... }`
 			// rule - a bare .nino-admin-field label sitting directly in <form>
 			// (no fieldset) doesn't, which is why every field used to sit
 			// straight on the page's own background
@@ -423,7 +423,7 @@
 			form.appendChild( contentFieldset );
 
 			const actions = dc.createElement('div');
-			actions.className = 'editor-form-actions nino-admin-actionbar';
+			actions.className = 'nino-admin-actionbar';
 
 			const saveBtn = dc.createElement('button');
 			saveBtn.type = 'submit';

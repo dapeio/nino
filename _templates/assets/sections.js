@@ -289,6 +289,7 @@
 			if( !canvas || pd._current === null )
 				return;
 			canvas.innerHTML = '';
+			const sectionCount = pd.model.sectionIndices( pd._current.segments ).length;
 			let sectionIndex = 0;
 
 			pd._current.segments.forEach( function( segment, segmentIndex ) {
@@ -301,9 +302,11 @@
 				}
 
 				canvas.appendChild( createCard( segment, sectionIndex++ ) );
-				const between = element( 'div', 'pd-add-between' );
-				between.appendChild( button( '+', 'Add a section here', function() { pd.composer.open( { afterId : segment._clientId } ) } ) );
-				canvas.appendChild( between );
+				if( sectionIndex < sectionCount ) {
+					const between = element( 'div', 'pd-add-between' );
+					between.appendChild( button( '+', 'Add a section here', function() { pd.composer.open( { afterId : segment._clientId } ) } ) );
+					canvas.appendChild( between );
+				}
 			} );
 
 			if( sectionIndex === 0 ) {

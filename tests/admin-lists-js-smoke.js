@@ -48,8 +48,11 @@ const configSource = asset('config.js');
 check( 'Config is one form rather than a drill-down list', configSource.includes( "ul.className = 'nino-admin-list'" ) === false );
 check( 'Config renders booleans with the shared switch component', configSource.includes( "'nino-admin-switch'" ) && configSource.includes( "'nino-admin-switch-track'" ) );
 check( 'Config states a switch\'s condition in words, not by knob position alone', configSource.includes( "'nino-admin-switch-state'" ) );
-check( 'Config groups its fields into the shared card surface', configSource.includes( "fieldset.className = 'nino-admin-card'" ) );
-check( 'Config uses the shared pinned action bar for its single Save', configSource.includes( "'editor-form-actions nino-admin-actionbar'" ) );
+check( 'Config relies on fieldset\'s own shared surface instead of applying card padding twice', configSource.includes( "fieldset.className = 'nino-admin-card'" ) === false );
+check( 'Config uses only the shared pinned action bar for its single Save', configSource.includes( "'nino-admin-actionbar'" ) && configSource.includes( 'editor-form-actions' ) === false );
+check( 'Config keeps its in-flow locale adder separate from fixed list actions', configSource.includes( "adderRow.className = 'admin-config-locale-adder'" ) && configSource.includes( "adderRow.className = 'nino-admin-list-actions'" ) === false );
+check( 'Config lays out the locale input and its Add button as one in-flow row',
+	/#admin-page-wrap \.admin-config-locale-adder \{[^}]*display: grid;[^}]*grid-template-columns: minmax\(0, 1fr\) auto;/s.test( asset('style.css') ) );
 check( 'Config no longer edits routes, navigations or asset bundles', [ '/nino/http/routes', '/nino/html/navs', '/nino/html/assets' ].every( function( key ) { return configSource.includes( key ) === false } ) );
 check( 'Config builds the native-language select from the ticked languages', configSource.includes( '_refreshNative' ) );
 check( 'Config renders no raw json textarea any more', configSource.includes( 'config-form-value' ) === false );
@@ -79,37 +82,53 @@ check( 'Text places its template scan before the category list', categorySource.
 const navsSource = asset('navs.js');
 check( 'Navigations reuses the list component for one menu\'s entries too', navsSource.split("ul.className = 'nino-admin-list'").length === 3 );
 check( 'Navigations reuses the shared ↑/↓ cluster the Routes list has', navsSource.includes("moveWrap.className = 'admin-page-move'") );
-check( 'Navigations uses the shared pinned form toolbar and action bar', navsSource.includes('Nino.admin.formToolbar( backLink )') && navsSource.includes("'editor-form-actions nino-admin-actionbar'") );
+check( 'Navigations uses the shared pinned form toolbar and action bar', navsSource.includes('Nino.admin.formToolbar( backLink )') && navsSource.includes("'nino-admin-actionbar'") && navsSource.includes('editor-form-actions') === false );
 check( 'Navigations puts its list-level action in the shared bar', navsSource.includes('Nino.adminUi.listActions( [ addBtn ] )') );
 check( 'Navigations carries no locale state or switch - a menu has nothing per-locale', navsSource.includes('_locales') === false && navsSource.includes('selectedLocale') === false && navsSource.includes('data-locale') === false );
 
 const css = asset('style.css');
-check( 'shared rows expose a right-facing drill-down arrow', css.includes('.nino-admin-list li a::after') && css.includes('content: "›"') );
-check( 'shared rows retain a keyboard focus treatment', css.includes('.nino-admin-list li a:focus-visible') );
+const sharedCss = fs.readFileSync( path.join( __dirname, '../_nino/Nino.admin.css' ), 'utf8' );
+check( 'shared rows expose a right-facing drill-down arrow', sharedCss.includes('.nino-admin-list li > a::after') && sharedCss.includes('content: "›"') );
+check( 'shared rows retain a keyboard focus treatment', sharedCss.includes('.nino-admin-list li > a:focus-visible') );
 check( 'clickable Dashboard list rows expose the same arrow', css.includes('#admin-dashboard-types a::after') && css.includes('#admin-dashboard-summary a::after') );
 
-console.log( '\n'+ checks+ ' checks, '+ failures+ ' failed' );
-process.exitCode = failures === 0 ? 0 : 1;
+check( 'empty list screens show guidance instead of an empty bordered panel',
+	[ 'elementtypes.js', 'text.js', 'images.js', 'users.js' ]
+		.every( file => asset( file ).includes("empty.className = 'nino-admin-hint'") ) );
+
+const usersSource = asset('users.js');
+check( 'the user and permissions forms expose real labels and live status text',
+	usersSource.includes("mailLabel.className = 'nino-admin-field'") &&
+	usersSource.includes("pwLabel.className = 'nino-admin-field'") &&
+	usersSource.includes("textareaLabel.className = 'nino-admin-field'") &&
+	usersSource.split("setAttribute( 'aria-live', 'polite' )").length >= 3 );
+
+check( 'destructive Admin controls all use the shared danger treatment',
+	[ 'elementtypes.js', 'users.js', 'restore.js' ]
+		.every( file => asset( file ).includes("className = 'nino-admin-btn-danger'") ) );
+
+console.log('\nDesign system contracts');
 
 // --- design-system conventions (see AGENTS.md, "Designing an admin frontend")
 
 const cssRoot = require('path').join(__dirname, '..');
 const read = p => require('fs').readFileSync( require('path').join(cssRoot, p), 'utf8' );
 
-const shared = read('_nino/Nino.admin.css');
+const shared = sharedCss;
 
 // Selectors only: hex colours and the prose in the file header are not.
 const sharedRules = shared.replace(/\/\*[\s\S]*?\*\//g, '')
+	.replace(/url\((?:[^)(]|\([^)]*\))*\)/g, '')
 	.replace(/#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})\b/g, '');
 
 check( 'the shared design system uses no id selectors',
 	/#[a-zA-Z][a-zA-Z0-9_-]*/.test( sharedRules ) === false );
 
-// .main-title/.main-uri/.back-link predate the namespace and are still shared
+// .main-title/.main-uri predate the namespace and are still shared
 // markup; @layer names are not classes
 check( 'the shared design system styles only nino-admin-* classes',
 	( sharedRules.match(/\.(?!nino-admin)[a-zA-Z][a-zA-Z0-9_-]*/g) || [] )
-		.filter( c => [ '.main-title', '.main-title--withuri', '.main-uri', '.back-link',
+		.filter( c => [ '.main-title', '.main-title--withuri', '.main-uri',
 		                '.active', '.tool', '.system', '.local' ].includes( c ) === false )
 		// State modifiers are the house convention (.is-dirty, .is-error, ...):
 		// they qualify a design-system component rather than name one, so they
@@ -147,7 +166,7 @@ Object.keys( TOOL_ROOTS ).forEach( function( file ) {
 } );
 
 // A bare element selector in a tool stylesheet defines that element for every
-// tool that loads the file - _admin loads _editor's, _templates loads both. The
+// other tool that cross-loads the file - _templates still loads both. The
 // select chevron used to live in one of these while the padding that keeps text
 // off it came from the design system, and the two drifted apart. New ones are a
 // regression; the three below are intentional shared foundations and live in
@@ -170,7 +189,59 @@ Object.keys( TOOL_ROOTS ).forEach( function( file ) {
 check( 'the design system owns both the select chevron and its padding',
 	/:where\(\.nino-admin\) select \{[^}]*var\(--nino-admin-select-indicator\)[^}]*background-image:/s.test( shared ) );
 
+check( 'the select chevron is one seam-free image rather than two touching gradients',
+	shared.includes('--nino-admin-select-chevron: url("data:image/svg+xml') &&
+	/:where\(\.nino-admin\) select \{[^}]*background-image: var\(--nino-admin-select-chevron\)/s.test( shared ) );
+
 check( 'the locale switch is a shared class, not a per-tool id',
 	shared.includes('.nino-admin-locale-select') &&
 	[ '_admin/assets/style.css', '_editor/assets/style.css', '_install/assets/style.css' ]
 		.every( f => /#(personalinfos|elements-form|text-form)-locale-select\s*[,{]/.test( read( f ) ) === false ) );
+
+const adminTemplate = read('_admin/templates/page-index.tpl');
+const adminLoginTemplate = read('_admin/templates/page-login.tpl');
+check( 'Admin no longer depends on the complete Editor stylesheet',
+	[ adminTemplate, adminLoginTemplate ].every( source => source.includes('_editor/assets/style.css') === false ) &&
+	[ adminTemplate, adminLoginTemplate ].every( source => source.includes('_nino/Nino.admin.css') ) );
+
+check( 'the shared tile is a complete surface rather than a spacing-only refinement',
+	/:where\(\.nino-admin\) \.nino-admin-tile \{[^}]*display: flex;[^}]*border: 1px solid[^}]*background: var\(--editor-bg-elevated\);[^}]*color: var\(--editor-text\);/s.test( shared ) );
+
+check( 'the shared field header owns its complete horizontal layout',
+	/:where\(\.nino-admin\) \.nino-admin-field-header \{[^}]*display: flex;[^}]*align-items: baseline;[^}]*justify-content: space-between;/s.test( shared ) );
+
+check( 'ordinary shared field labels are block rows above their controls',
+	/:where\(\.nino-admin\) \.nino-admin-field > span,\s*:where\(\.nino-admin\) \.nino-admin-field-name \{[^}]*display: block;/s.test( shared ) );
+
+check( 'Admin form toolbars use the shared context bar without a dead local class',
+	asset('script.js').includes('Nino.adminUi.contextBar( backLink )') &&
+	asset('script.js').includes('admin-form-toolbar') === false );
+
+check( 'the shared context bar stays flush at the top of the scrolling pane',
+	/\.nino-admin \.nino-admin-contextbar \{[^}]*position: sticky;[^}]*top: 0;[^}]*margin: -1rem calc\(var\(--nino-admin-content-inline\) \* -1\) 1rem;/s.test( shared ) );
+
+check( 'the shared action bar is fixed to the viewport and clears the common rail',
+	/\.nino-admin \.nino-admin-actionbar \{[^}]*position: fixed;/s.test( shared ) &&
+	/@media \(min-width: 64rem\)[\s\S]*?\.nino-admin \.nino-admin-actionbar \{[^}]*left: var\(--nino-admin-sidebar-width\);/s.test( shared ) );
+
+check( 'Admin does not replace shared action bars, danger buttons, tiles or field headers',
+	css.includes('.nino-admin-actionbar') === false &&
+	/\.nino-admin-btn-danger[^\{]*\{[^}]*(?:background|color|box-shadow):/s.test( css ) === false &&
+	/\.nino-admin-tile[^\{]*\{[^}]*(?:display|background|box-shadow):/s.test( css ) === false &&
+	/\.nino-admin-field-header[^\{]*\{[^}]*(?:display|align-items|justify-content):/s.test( css ) === false );
+
+check( 'Admin carries no obsolete sticky action bar or second rail width',
+	css.includes('editor-form-actions') === false &&
+	css.includes('position: sticky') === false &&
+	css.includes('17rem') === false );
+
+const adminAssets = [ 'config.js', 'text.js', 'pages.js', 'elements.js', 'images.js', 'navs.js', 'elementtypes.js' ]
+	.map( asset ).join('\n');
+check( 'Admin forms use the shared action and back-link vocabulary',
+	adminAssets.includes('editor-form-actions') === false &&
+	adminAssets.includes("className = 'back-link'") === false &&
+	adminAssets.includes("'nino-admin-actionbar'") &&
+	adminAssets.includes("'nino-admin-back-link'") );
+
+console.log( '\n'+ checks+ ' checks, '+ failures+ ' failed' );
+process.exitCode = failures === 0 ? 0 : 1;

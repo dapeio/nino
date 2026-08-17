@@ -38,7 +38,7 @@
 			'help' => 'A repeatable collection. Add, reorder or remove the fields rendered for every article.',
 			'source' => 'elements',
 			'allowed' => [ 'image', 'title', 'description', 'button' ],
-			'item' => [ 'tag' => 'article', 'class' => 'ui-article ui-article--alt ui-mb-3' ],
+			'item' => [ 'tag' => 'article', 'class' => 'ui-article ui-article--alt ui-mb-3 nino-article-grid-item' ],
 			'styles' => [
 				'two-columns' => [ 'label' => '2 columns', 'class' => 'ui-grid-m-50' ],
 				'three-columns' => [ 'label' => '3 columns', 'class' => 'ui-grid-m-33' ],

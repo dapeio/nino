@@ -98,6 +98,13 @@
 			const wrap = dc.getElementById('users-list');
 			wrap.innerHTML = '';
 
+			if( users.length === 0 ) {
+				const empty = dc.createElement('p');
+				empty.className = 'nino-admin-hint';
+				empty.textContent = 'No users yet - create the first account below.';
+				wrap.appendChild( empty );
+			}
+
 			const ul = dc.createElement('ul');
 			ul.className = 'nino-admin-list';
 			users.forEach( function( user ) {
@@ -115,7 +122,7 @@
 
 				const delBtn = dc.createElement('button');
 				delBtn.type = 'button';
-				delBtn.className = 'red';
+				delBtn.className = 'nino-admin-btn-danger';
 				delBtn.textContent = 'Delete';
 				delBtn.addEventListener( 'click', function() { Nino.admin.users._delete( user.mail ) } );
 				li.appendChild( delBtn );
@@ -126,7 +133,8 @@
 
 				ul.appendChild( li );
 			} );
-			wrap.appendChild( ul );
+			if( users.length > 0 )
+				wrap.appendChild( ul );
 
 			wrap.appendChild( Nino.admin.users._renderAddForm() );
 		},
@@ -167,13 +175,21 @@
 
 			const form = dc.createElement('form');
 
+			const textareaLabel = dc.createElement('label');
+			textareaLabel.className = 'nino-admin-field';
+			const textareaTitle = dc.createElement('span');
+			textareaTitle.textContent = 'Permissions JSON';
+			textareaLabel.appendChild( textareaTitle );
+
 			const textarea = dc.createElement('textarea');
 			textarea.rows = 4;
 			textarea.spellcheck = false;
 			textarea.value = JSON.stringify( user.perms ?? [], null, 2 );
-			form.appendChild( textarea );
+			textareaLabel.appendChild( textarea );
+			form.appendChild( textareaLabel );
 
 			const msg = dc.createElement('p');
+			msg.setAttribute( 'aria-live', 'polite' );
 			form.appendChild( msg );
 
 			const saveBtn = dc.createElement('button');
@@ -218,28 +234,48 @@
 			form.id = 'users-add-form';
 			form.className = 'nino-admin-card';
 
+			const heading = dc.createElement('h2');
+			heading.textContent = 'Create user';
+			form.appendChild( heading );
+
+			const mailLabel = dc.createElement('label');
+			mailLabel.className = 'nino-admin-field';
+			const mailTitle = dc.createElement('span');
+			mailTitle.textContent = 'Email';
+			mailLabel.appendChild( mailTitle );
+
 			const mailInput = dc.createElement('input');
 			mailInput.type = 'email';
-			mailInput.placeholder = 'Email';
+			mailInput.autocomplete = 'email';
 			mailInput.required = true;
-			form.appendChild( mailInput );
+			mailLabel.appendChild( mailInput );
+			form.appendChild( mailLabel );
+
+			const pwLabel = dc.createElement('label');
+			pwLabel.className = 'nino-admin-field';
+			const pwTitle = dc.createElement('span');
+			pwTitle.textContent = 'Password (at least 8 characters)';
+			pwLabel.appendChild( pwTitle );
 
 			const pwInput = dc.createElement('input');
 			pwInput.type = 'password';
-			pwInput.placeholder = 'Password (min. 8 characters)';
+			pwInput.autocomplete = 'new-password';
 			pwInput.required = true;
 			pwInput.minLength = 8;
-			form.appendChild( pwInput );
+			pwLabel.appendChild( pwInput );
+			form.appendChild( pwLabel );
 
 			const managerLabel = dc.createElement('label');
+			managerLabel.className = 'nino-admin-checkbox-field admin-user-manager';
 			const managerCheck = dc.createElement('input');
 			managerCheck.type = 'checkbox';
 			managerLabel.appendChild( managerCheck );
-			managerLabel.appendChild( dc.createTextNode(' Verwaltungsrechte (darf andere Nutzer bearbeiten)') );
+			managerLabel.appendChild( dc.createTextNode('Manager permissions (may edit other users)') );
 			form.appendChild( managerLabel );
 
 			const msg = dc.createElement('p');
 			msg.id = 'users-add-msg';
+			msg.setAttribute( 'aria-live', 'polite' );
 			form.appendChild( msg );
 
 			const submitBtn = dc.createElement('button');

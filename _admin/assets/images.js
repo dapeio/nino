@@ -113,6 +113,13 @@
 			const wrap = dc.getElementById('images-list');
 			wrap.innerHTML = '';
 
+			if( Nino.admin.images._slots.length === 0 ) {
+				const empty = dc.createElement('p');
+				empty.className = 'nino-admin-hint';
+				empty.textContent = 'No image slots yet - create one or scan the templates.';
+				wrap.appendChild( empty );
+			}
+
 			const ul = dc.createElement('ul');
 			ul.className = 'nino-admin-list';
 			Nino.admin.images._slots.forEach( function( slot ) {
@@ -124,7 +131,8 @@
 				li.appendChild( link );
 				ul.appendChild( li );
 			} );
-			wrap.appendChild( ul );
+			if( Nino.admin.images._slots.length > 0 )
+				wrap.appendChild( ul );
 
 			const addBtn = dc.createElement('button');
 			addBtn.type = 'button';
@@ -170,7 +178,7 @@
 
 			const backLink = dc.createElement('a');
 			backLink.href = '#';
-			backLink.className = 'back-link';
+			backLink.className = 'nino-admin-back-link';
 			backLink.textContent = 'Back to list';
 			backLink.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.images._showList() } );
 			wrap.appendChild( Nino.admin.formToolbar( backLink ) );
@@ -233,10 +241,10 @@
 			form.appendChild( heightLabel );
 
 			// Save + its message in the shared actions row every module's form
-			// ends on - assets/style.css pins that row to the bottom of the
+			// ends on - Nino.admin.css pins that row to the bottom of the
 			// viewport, so a long field list never puts Save out of reach
 			const actions = dc.createElement('div');
-			actions.className = 'editor-form-actions nino-admin-actionbar';
+			actions.className = 'nino-admin-actionbar';
 
 			const saveBtn = dc.createElement('button');
 			saveBtn.type = 'submit';
@@ -339,7 +347,7 @@
 
 			const backLink = dc.createElement('a');
 			backLink.href = '#';
-			backLink.className = 'back-link';
+			backLink.className = 'nino-admin-back-link';
 			backLink.textContent = 'Back to list';
 			backLink.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.images._showList() } );
 			wrap.appendChild( Nino.admin.formToolbar( backLink ) );
@@ -386,7 +394,7 @@
 
 			const backLink = dc.createElement('a');
 			backLink.href = '#';
-			backLink.className = 'back-link';
+			backLink.className = 'nino-admin-back-link';
 			backLink.textContent = 'Back to list';
 			backLink.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.images._showList() } );
 			wrap.appendChild( Nino.admin.formToolbar( backLink ) );
@@ -467,7 +475,7 @@
 			} );
 
 			const actions = dc.createElement('div');
-			actions.className = 'editor-form-actions nino-admin-actionbar';
+			actions.className = 'nino-admin-actionbar';
 
 			const saveBtn = dc.createElement('button');
 			saveBtn.type = 'submit';

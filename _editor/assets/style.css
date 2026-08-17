@@ -709,7 +709,7 @@ fieldset legend {
 	margin:-.5rem 0 1rem;
 	display:block;
 }
-#editor-page-wrap .nino-admin-field-header .char-counter {
+#editor-page-wrap .nino-admin-field-header .nino-admin-char-counter {
 	margin: 0;
 }
 /*	Only shown on the "insert" form - once an element exists its uri is
@@ -847,7 +847,7 @@ input.error, .pending.error {
 	font-size: .8rem;
 	color: var(--editor-text-secondary);
 }
-#editor-page-wrap .nino-admin-field-image-msg.error {
+#editor-page-wrap .nino-admin-field-image-msg.is-error {
 	color: var(--editor-red);
 	font-weight: 600;
 }
@@ -881,18 +881,6 @@ input.error, .pending.error {
 	color: var(--editor-text-secondary);
 }
 .editor-error {
-	color: var(--editor-red);
-	font-weight: 600;
-}
-/* --------------------------------------------------------- Char counter */
-
-.char-counter {
-	text-align: right;
-	font-size: .75rem;
-	color: var(--editor-text-secondary);
-	margin: .3rem 0 1rem;
-}
-.char-counter-limit {
 	color: var(--editor-red);
 	font-weight: 600;
 }

@@ -19,6 +19,7 @@ final class AreaComposer {
 	private const string TEXT_KEY_PATTERN = '#^/[A-Za-z0-9][A-Za-z0-9_./-]*$#';
 	private const string IMAGE_KEY_PATTERN = '#^/[a-z0-9][a-z0-9_/-]*$#';
 	private const string TEMPLATE_PATTERN = '#^/templates/[A-Za-z0-9][A-Za-z0-9._-]*$#';
+	private const int MAX_LITERAL_LENGTH = 4000;
 	private const array FRAME_CHOICES = [
 		'screen' => [ 'auto', 'off', '50', '75', '90', '100' ],
 		'vertical' => [ 'auto', 'top', 'middle', 'bottom' ],
@@ -151,9 +152,7 @@ final class AreaComposer {
 		foreach( $preset['areas'] as $areaKey => $area ) {
 			$components = [];
 			foreach( $area['recommend']['components'] as $node ) {
-				$copy = $node;
-				$copy['bindings'] = self::defaultBindings( $spec, $area, $copy );
-				$components[] = $copy;
+				$components[] = self::defaultBindings( $spec, $area, $node );
 			}
 			$spec['areas'][$areaKey] = [
 				'style' => 'auto',
@@ -192,7 +191,7 @@ final class AreaComposer {
 			];
 			foreach( $spec['areas'][$areaKey]['components'] as $component )
 				foreach( $area['render'][$component['type']]['properties'] as $property => $definition )
-					if( $definition['fieldType'] === 'image' )
+					if( $definition['fieldType'] === 'image' && ( $component['bindingSources'][$property] ?? 'field' ) === 'field' )
 						$imageFields[] = $component['bindings'][$property];
 		}
 
@@ -277,20 +276,24 @@ final class AreaComposer {
 		if( in_array( $style, $component['styles'], true ) === false )
 			throw new \InvalidArgumentException( 'component '. $id. ' has an unsupported style' );
 		$bindings = [];
+		$bindingSources = [];
+		$inputBindings = is_array( $node['bindings'] ?? null ) ? $node['bindings'] : [];
+		$inputSources = is_array( $node['bindingSources'] ?? null ) ? $node['bindingSources'] : [];
 		foreach( $component['properties'] as $property => $definition ) {
-			$value = (string) ( $node['bindings'][$property] ?? self::suffix( $id, $property, $type ) );
-			if( $source === 'elements' && preg_match( self::FIELD_PATTERN, $value ) !== 1 )
-				throw new \InvalidArgumentException( 'component '. $id. ' maps to an unknown model field' );
-			if( $source === 'elements' && $strictModel && isset( $model[$value] ) === false )
-				throw new \InvalidArgumentException( 'component '. $id. ' maps to an unknown model field' );
-			if( $source === 'elements' && $strictModel && ( $definition['fieldType'] === 'image' ) !== ( $model[$value]['type'] === 'image' ) )
-				throw new \InvalidArgumentException( 'component '. $id. ' has an incompatible model mapping' );
+			if( isset( $inputBindings[$property] ) && is_scalar( $inputBindings[$property] ) === false )
+				throw new \InvalidArgumentException( 'component '. $id. ' has an invalid binding value' );
+			if( isset( $inputSources[$property] ) && is_string( $inputSources[$property] ) === false )
+				throw new \InvalidArgumentException( 'component '. $id. ' has an invalid binding source' );
+			$value = (string) ( $inputBindings[$property] ?? self::suffix( $id, $property, $type ) );
+			$bindingSource = self::bindingSource( (string) ( $inputSources[$property] ?? '' ), $source, $definition, $value );
+			self::validateBinding( $id, $value, $bindingSource, $source, $definition, $model, $strictModel );
 			$bindings[$property] = $value;
+			$bindingSources[$property] = $bindingSource;
 		}
 		$target = (string) ( $node['settings']['target'] ?? 'same' );
 		if( in_array( $target, [ 'same', 'new' ], true ) === false )
 			throw new \InvalidArgumentException( 'component '. $id. ' has an unsupported target' );
-		return [ 'id' => $id, 'type' => $type, 'style' => $style, 'settings' => [ 'target' => $target ], 'bindings' => $bindings ];
+		return [ 'id' => $id, 'type' => $type, 'style' => $style, 'settings' => [ 'target' => $target ], 'bindings' => $bindings, 'bindingSources' => $bindingSources ];
 	}
 
 	private static function spec( array $input, array $preset ): array {
@@ -329,7 +332,7 @@ final class AreaComposer {
 					throw new \InvalidArgumentException( 'duplicate component ID in area '. $areaKey );
 				$seen[$node['id']] = true;
 				if( $area['source'] === 'single' )
-					$node['bindings'] = self::singleBindings( $spec, $node, $area );
+					$node = self::singleBindings( $spec, $node, $area );
 				$components[] = $node;
 			}
 			$spec['areas'][$areaKey] = [
@@ -372,6 +375,8 @@ final class AreaComposer {
 				foreach( $area['render'][$node['type']]['properties'] as $property => $definition ) {
 					if( in_array( $definition['kind'], [ 'image', 'template' ], true ) )
 						continue;
+					if( ( $node['bindingSources'][$property] ?? 'new' ) === 'fixed' )
+						continue;
 					$suffix = self::suffix( $node['id'], $property, $node['type'] );
 					$generated = self::generatedKey( $spec, $suffix );
 					$key = (string) ( $node['bindings'][$property] ?? $generated );
@@ -381,7 +386,7 @@ final class AreaComposer {
 					$result[] = [
 						'slot' => $areaKey. '.'. $node['id']. '.'. $property, 'area' => $areaKey, 'component' => $node['id'], 'property' => $property,
 						'label' => $area['label']. ' · '. $definition['label'], 'control' => $definition['control'], 'default' => $definition['default'],
-						'key' => $key, 'generatedKey' => $generated, 'mode' => $key === $generated ? 'new' : 'existing',
+						'key' => $key, 'generatedKey' => $generated, 'mode' => ( $node['bindingSources'][$property] ?? '' ) === 'new' || $key === $generated ? 'new' : 'existing',
 					];
 				}
 			}
@@ -467,7 +472,10 @@ final class AreaComposer {
 			$slot = $areaKey. '.'. $node['id']. '.';
 			$values = [];
 			foreach( $area['render'][$node['type']]['properties'] as $property => $definition ) {
-				if( $area['source'] === 'elements' )
+				$bindingSource = (string) ( $node['bindingSources'][$property] ?? ( $area['source'] === 'elements' ? 'field' : 'new' ) );
+				if( $bindingSource === 'fixed' )
+					$values[$property] = self::escapeLiteral( (string) $node['bindings'][$property] );
+				elseif( $area['source'] === 'elements' )
 					$values[$property] = '[['. $node['bindings'][$property]. ']]';
 				elseif( $definition['kind'] === 'image' )
 					$values[$property] = $images[$slot. $property] ?? '';
@@ -598,34 +606,111 @@ final class AreaComposer {
 
 	private static function defaultBindings( array $spec, array $area, array $node ): array {
 		if( $area['source'] === 'elements' )
-			return $node['bindings'];
-		$result = [];
+			return $node;
+		$bindings = [];
+		$sources = [];
 		foreach( $area['render'][$node['type']]['properties'] as $property => $definition ) {
 			$value = (string) ( $node['bindings'][$property] ?? '' );
-			$result[$property] = $definition['kind'] === 'template'
-				? $value
-				: self::generatedKey( $spec, self::suffix( $node['id'], $property, $node['type'] ) );
+			$source = (string) ( $node['bindingSources'][$property] ?? 'new' );
+			if( $definition['kind'] === 'template' || $source === 'fixed' || ( in_array( $source, [ 'textfill', 'image' ], true ) && str_starts_with( $value, '/' ) ) ) {
+				$bindings[$property] = $value;
+				$sources[$property] = $definition['kind'] === 'template' ? 'template' : $source;
+				continue;
+			}
+			$bindings[$property] = self::generatedKey( $spec, self::suffix( $node['id'], $property, $node['type'] ) );
+			$sources[$property] = 'new';
 		}
-		return $result;
+		$node['bindings'] = $bindings;
+		$node['bindingSources'] = $sources;
+		return $node;
 	}
 
 	private static function singleBindings( array $spec, array $node, array $area ): array {
-		$result = [];
 		foreach( $area['render'][$node['type']]['properties'] as $property => $definition ) {
 			$value = (string) ( $node['bindings'][$property] ?? '' );
+			$source = (string) ( $node['bindingSources'][$property] ?? '' );
 			if( $definition['kind'] === 'template' ) {
 				if( $value !== '' && preg_match( self::TEMPLATE_PATTERN, $value ) !== 1 )
 					throw new \InvalidArgumentException( 'invalid reusable template path' );
-				$result[$property] = $value;
+				$node['bindings'][$property] = $value;
+				$node['bindingSources'][$property] = 'template';
 				continue;
 			}
-			if( str_starts_with( $value, '/' ) === false )
-				$value = self::generatedKey( $spec, $value === '' ? self::suffix( $node['id'], $property, $node['type'] ) : $value );
-			if( self::validKey( $value, $definition['kind'] === 'image' ) === false )
+			$generated = self::generatedKey( $spec, self::suffix( $node['id'], $property, $node['type'] ) );
+			if( $source === 'new' || $value === $generated || ( str_starts_with( $value, '/' ) === false && $source !== 'fixed' ) ) {
+				$value = $generated;
+				$source = 'new';
+			}
+			if( $source === 'fixed' && self::validLiteral( $value, $definition ) === false )
+				throw new \InvalidArgumentException( 'invalid fixed value for component '. $node['id'] );
+			if( $source !== 'fixed' && self::validKey( $value, $definition['kind'] === 'image' ) === false )
 				throw new \InvalidArgumentException( 'invalid binding for component '. $node['id'] );
-			$result[$property] = $value;
+			$node['bindings'][$property] = $value;
+			$node['bindingSources'][$property] = $source;
 		}
-		return $result;
+		return $node;
+	}
+
+	private static function bindingSource( string $requested, string $areaSource, array $definition, string $value ): string {
+		if( $definition['kind'] === 'template' ) {
+			if( $requested !== '' && $requested !== 'template' )
+				throw new \InvalidArgumentException( 'template bindings require the template source' );
+			return 'template';
+		}
+
+		if( $areaSource === 'elements' ) {
+			$source = $requested !== '' ? $requested : ( str_starts_with( $value, '/' ) ? 'textfill' : 'field' );
+			$allowed = $definition['fieldType'] === 'image' ? [ 'field' ] : [ 'field', 'textfill', 'fixed' ];
+		} else {
+			$source = $requested !== '' ? $requested : ( str_starts_with( $value, '/' ) ? ( $definition['kind'] === 'image' ? 'image' : 'textfill' ) : 'new' );
+			$allowed = $definition['kind'] === 'image' ? [ 'new', 'image' ] : [ 'new', 'textfill', 'fixed' ];
+		}
+
+		if( in_array( $source, $allowed, true ) === false )
+			throw new \InvalidArgumentException( 'unsupported binding source' );
+		return $source;
+	}
+
+	private static function validateBinding( string $id, string $value, string $bindingSource, string $areaSource, array $definition, array $model, bool $strictModel ): void {
+		if( $bindingSource === 'template' ) {
+			if( $value !== '' && preg_match( self::TEMPLATE_PATTERN, $value ) !== 1 )
+				throw new \InvalidArgumentException( 'invalid reusable template path' );
+			return;
+		}
+		if( $bindingSource === 'fixed' ) {
+			if( self::validLiteral( $value, $definition ) === false )
+				throw new \InvalidArgumentException( 'component '. $id. ' has an invalid fixed value' );
+			return;
+		}
+		if( $bindingSource === 'textfill' ) {
+			if( self::validKey( $value, false ) === false )
+				throw new \InvalidArgumentException( 'component '. $id. ' has an invalid textfill binding' );
+			return;
+		}
+		if( $areaSource !== 'elements' ) {
+			if( $bindingSource === 'image' && self::validKey( $value, true ) === false )
+				throw new \InvalidArgumentException( 'component '. $id. ' has an invalid image binding' );
+			return;
+		}
+		if( preg_match( self::FIELD_PATTERN, $value ) !== 1 || ( $strictModel && isset( $model[$value] ) === false ) )
+			throw new \InvalidArgumentException( 'component '. $id. ' maps to an unknown model field' );
+		if( $strictModel && ( $definition['fieldType'] === 'image' ) !== ( $model[$value]['type'] === 'image' ) )
+			throw new \InvalidArgumentException( 'component '. $id. ' has an incompatible model mapping' );
+	}
+
+	private static function validLiteral( string $value, array $definition ): bool {
+		if( strlen( $value ) > self::MAX_LITERAL_LENGTH || preg_match( '/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', $value ) === 1 )
+			return false;
+		if( $definition['control'] !== 'url' )
+			return true;
+		$value = trim( $value );
+		if( $value === '' )
+			return true;
+		if( preg_match( '/[\x00-\x20\x7F]/', $value ) === 1 )
+			return false;
+		if( preg_match( '#^[A-Za-z][A-Za-z0-9+.-]*:#', $value, $match ) !== 1 )
+			return str_starts_with( $value, '//' ) === false;
+		return in_array( strtolower( rtrim( $match[0], ':' ) ), [ 'http', 'https', 'mailto', 'tel' ], true );
 	}
 
 	private static function suffix( string $id, string $property, string $type ): string {
@@ -723,5 +808,9 @@ final class AreaComposer {
 
 	private static function escape( string $value ): string {
 		return htmlspecialchars( $value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8' );
+	}
+
+	private static function escapeLiteral( string $value ): string {
+		return str_replace( [ '[', ']' ], [ '&#91;', '&#93;' ], self::escape( $value ) );
 	}
 }

@@ -736,12 +736,12 @@
 			header.appendChild( nameSpan );
 
 			const counter = dc.createElement('span');
-			counter.className = 'char-counter';
+			counter.className = 'nino-admin-char-counter';
 
 			function updateCounter() {
 				const len = input.value.length;
 				counter.textContent = len + ' / ' + maxlength;
-				counter.classList.toggle( 'char-counter-limit', len >= maxlength );
+				counter.classList.toggle( 'is-limit', len >= maxlength );
 			}
 
 			input.addEventListener( 'input', updateCounter );
@@ -1362,7 +1362,7 @@
 				fileInput.value = '';
 
 				if( status !== 200 || response === null ) {
-					msg.className = 'nino-admin-field-image-msg error';
+					msg.className = 'nino-admin-field-image-msg is-error';
 					msg.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : Nino.content.getText('/_editor/elements/error/save') );
 					return;
 				}

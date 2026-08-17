@@ -2,7 +2,7 @@
 
 **Sprache:** [English](_templates.md) · Deutsch
 
-**Stand:** 11. August 2026 · **Nino-Version:** Unreleased
+**Stand:** 17. August 2026 · **Nino-Version:** Unreleased
 
 Der Template Builder ist der schnelle Weg vom `page-*.tpl` zur befüllten Seite. Er behandelt ein Template als geordnete Abfolge vollständiger HTML-Sections und wiederverwendbarer `[template]`-Sections, statt jeden verschachtelten DOM-Knoten zur Bearbeitung anzubieten.
 
@@ -46,12 +46,12 @@ Verwende HTTPS, behandle das technische Passwort vertraulich und arbeite mit ein
 1. Wähle links ein Seitentemplate oder lege es über **New page template** an. Der Dialog fragt den vollständigen Dateinamen, Anzeigenamen, Header, Footer und den VPA-Standard ab.
 2. Öffne **Add section**.
 3. Durchsuche oder filtere unter **Choose** die große Galerie und wähle ein Preset mit benannten Areas anhand seiner echten Markup-Vorschau. Die Library enthält bewusst nur noch den aktuellen Version-3-Vertrag. Wiederverwendbare `.tpl`-Dateien erscheinen nicht als Pseudo-Sections; ein passendes Preset kann sie als **Template**-Komponente in einer Area anbieten.
-4. Wechsle zu **Configure & fill**, vergib eine sprechende ID wie `main-hero` oder `services-overview` und stelle Layout, Maße, Abstände und Hintergrund unter **Section** ein.
-5. Öffne jede benannte Area. **Design** regelt Style und Komponentenreihenfolge; **Data** erzeugt oder verknüpft Text-, Bild- und Template-Daten sowie bei wiederholbaren Areas eine Elements-Collection mit explizitem Feld-Mapping.
-6. Vergleiche die Live-Vorschau und füge die Section ein. Empfohlene Textschlüssel, Elementtypen und Bildplatz-Definitionen können dabei mit angelegt werden.
+4. Wechsle zu **Configure & fill** und vergib eine sprechende ID wie `main-hero` oder `services-overview`. Diese bewusst reduzierte Add-Ansicht enthält Structure, Background, Collection-Auswahl und eine gemeinsame Komponenten-/Datenliste.
+5. Ergänze, sortiere oder entferne Komponenten direkt neben ihren ersten Bindings, vergleiche die Live-Vorschau und füge die Section ein. Empfohlene Textschlüssel, ein Elementtyp und Bildplatz-Definitionen können dabei mit angelegt werden.
+6. Öffne die Section nach der Prüfung im echten Frontend bei Bedarf über **Edit**. Dort stehen Maße und Abstände sowie die getrennten **Design**- und **Data**-Ansichten jeder Area für die grafische Feinjustierung bereit.
 7. Öffne bei Bedarf Bildplätze oder einzelne Elements-Einträge direkt in `/_admin`.
 8. Ordne HTML- und Template-Section-Karten und speichere das Seitentemplate.
-9. Prüfe die echte Seite im Browser. Vervollständige Übersetzungen danach über den vorhandenen JSON-Batch-Ablauf oder `/_admin`.
+9. Vervollständige Übersetzungen danach über den vorhandenen JSON-Batch-Ablauf oder `/_admin`.
 
 Die schnelle native Befüllung legt neue Schlüssel in der nativen Projektsprache an und ändert bei sprachabhängigen Schlüsseln nur diese Sprache. Ein bereits globaler Schlüssel bleibt bewusst global. Bestehende Übersetzungs-Buckets werden nie geleert oder überschrieben.
 
@@ -61,15 +61,16 @@ Die schnelle native Befüllung legt neue Schlüssel in der nativen Projektsprach
 
 **VPA** auf Template-Ebene liefert den Standard für Sections mit der Einstellung **Page**. Eine Änderung setzt verwaltete Sections neu zusammen, aktualisiert deren `js-vpa`-Klasse und bleibt auch in einem noch leeren Template erhalten. **On** oder **Off** an einer einzelnen Section überschreibt den Template-Standard.
 
-Der Composer gruppiert die aktuellen Version-3-Einstellungen nach Zweck:
+Add und Edit zeigen absichtlich unterschiedliche Tiefen derselben Version-3-Metadaten:
 
-| Gruppe | Beispiele |
+| Ansicht | Steuerelemente |
 |---|---|
-| Section | ID, Layout, Höhe, Breite, Abstände, Hintergrund und optionale Hintergrundbild-Einstellungen |
-| Area → Design | visueller Area-Style und geordnete Liste erlaubter Komponenten |
-| Area → Data | native Text-/Bild-/Template-Bindings oder eine Elements-Collection mit explizitem Feld-Mapping |
+| Add Section | ID, Layout, Background, optionale Hintergrundbild-Einstellungen, Collection-Quelle, Komponentenreihenfolge und erste Data-Bindings |
+| Edit Section → Section | ID, Layout, Höhe, Breite, Abstände, Background und optionale Hintergrundbild-Einstellungen |
+| Edit Section → Area / Design | visueller Area-Style, Komponentenreihenfolge und Component Styles |
+| Edit Section → Area / Data | native Text-/Bild-/Template-Bindings oder eine Elements-Collection mit explizitem Feld-Mapping |
 
-Das Manifest bestimmt, welche Areas, Komponenten, Styles und Layouts kompatibel sind. HTML+ bleibt der ausdrückliche Weg für freie Quelltextänderungen.
+Add blendet Section-Höhe/-Breite/-Margin/-Padding, Area Style und Component Style aus. Die Ansicht soll zuerst eine sinnvolle Section erzeugen, die man im echten Frontend beurteilen kann. Edit behält das vollständige grafische Feinjustierungsmodell; beide Ansichten kompilieren dieselben Metadaten. Das Manifest bestimmt, welche Areas, Komponenten, Styles und Layouts kompatibel sind. HTML+ bleibt der ausdrückliche Weg für freie Quelltextänderungen.
 
 ## Quelltext-Sicherheit und HTML+-Escape-Hatch
 
@@ -234,9 +235,12 @@ Benutzers gewinnt weiterhin:
 
 ### Regeln für Areas und Komponenten
 
-- `source` ist `single` oder `elements`. Eine Single-Area erzeugt/verwendet
-  native Text- und Image-Keys. Eine Elements-Area wählt/erstellt einen Typ und
-  mappt jede Komponenteneigenschaft auf ein kompatibles Modelfeld.
+- `source` ist `single` oder `elements`. Eine Single-Area kann einen neuen
+  nativen Text-/Image-Key erzeugen, einen vorhandenen Textfill verwenden oder
+  einen festen Wert direkt in die Section schreiben. Eine Elements-Area
+  wählt/erstellt einen Typ; jede Nicht-Bild-Eigenschaft kann unabhängig ein
+  Modelfeld, einen vorhandenen gemeinsamen Textfill oder einen festen Wert
+  verwenden. Bilder bleiben kompatible Modelfeld-Mappings.
 - Kernkomponenten sind `title`, `subtitle`, `description`, `text`, `image`,
   `button`, `price`, `number` und `template`. `allowed` ist eine strikte
   Teilmenge pro Area. Komponenten können sortiert und gelöscht, aber nicht
@@ -257,6 +261,38 @@ Benutzers gewinnt weiterhin:
 - `maxComponents` ist standardmäßig 12 und wird auf 1…20 begrenzt.
 - Alle Shortcode-Argumente werden ausgegeben. Seltene Query-/Callback-
   Änderungen bleiben nach dem Ablösen eine HTML+-Aufgabe.
+
+Beim Hinzufügen liegen Komponentenreihenfolge und Data in einer gemeinsamen
+kompakten Liste. Nach dem Einfügen trennt **Edit** wieder **Design** für Area
+Style, Component Style und Reihenfolge von **Data** für dieselben Bindings.
+Gewöhnliche Textfills stehen unter **Content textfills**, Einträge aus
+`text/blacklist.php` unter **Technical values**. Die Blacklist steuert nur die
+Sichtbarkeit im normalen Editor; technische Route-URIs bleiben gültige
+Template-Bindings und werden beim Einfügen nicht überschrieben.
+
+Die Auswahl jeder Eigenschaft wird als `bindingSources` im Komponenten-Knoten
+gespeichert und kann auch als Manifest-Empfehlung angegeben werden:
+
+```php
+[
+	'id' => 'action',
+	'type' => 'button',
+	'bindings' => [
+		'label' => 'Kontakt',
+		'href' => '/webpage/contact/uri',
+	],
+	'bindingSources' => [
+		'label' => 'fixed',
+		'href' => 'textfill',
+	],
+]
+```
+
+Für Single-Areas sind `new`, `textfill` und `fixed` gültig (bei Bildern
+`new`/`image`). Für Elements-Areas gelten `field`, `textfill` und `fixed`, bei
+Bildern nur `field`. Template-Eigenschaften verwenden `template`. Feste Werte
+werden escaped, Shortcode-Klammern neutralisiert; feste URLs erlauben nur
+gewöhnliche relative URLs oder die Schemes `http`, `https`, `mailto` und `tel`.
 
 Die v3-Metadaten sind die einzige grafische Wahrheitsquelle:
 

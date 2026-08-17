@@ -127,10 +127,10 @@
 			} );
 
 			// Save + its message in the shared actions row every module's form
-			// ends on - assets/style.css pins that row to the bottom of the
+			// ends on - Nino.admin.css pins that row to the bottom of the
 			// viewport, so a long form never puts Save out of reach
 			const actions = dc.createElement('div');
-			actions.className = 'editor-form-actions nino-admin-actionbar';
+			actions.className = 'nino-admin-actionbar';
 
 			const saveBtn = dc.createElement('button');
 			saveBtn.type = 'submit';
@@ -177,7 +177,6 @@
 			const group = Nino.admin.config._groups[groupKey];
 
 			const fieldset = dc.createElement('fieldset');
-			fieldset.className = 'nino-admin-card';
 
 			const legend = dc.createElement('legend');
 			legend.textContent = group[0];
@@ -438,7 +437,7 @@
 			adder.appendChild( adderHint );
 
 			const adderRow = dc.createElement('div');
-			adderRow.className = 'nino-admin-list-actions';
+			adderRow.className = 'admin-config-locale-adder';
 
 			const adderInput = dc.createElement('input');
 			adderInput.type = 'text';

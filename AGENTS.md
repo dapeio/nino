@@ -306,9 +306,10 @@ See "Designing an admin frontend" below before writing any markup or CSS for
 not a stylesheet one tool happens to share - it defines the vocabulary, and a
 tool's own stylesheet supplies only what is genuinely local to it.
 
-**Every tool loads more than its own stylesheet.** `/_admin` loads `_editor`'s
-and its own; `/_templates` loads `_editor`'s, `_admin`'s and its own. A rule
-written without a scope in any of them therefore reaches the other tools too.
+**Some tools load more than their own stylesheet.** `/_admin` is deliberately
+self-contained (`Nino.admin.css` plus its local stylesheet), while
+`/_templates` and `/_install` also load earlier tool stylesheets. A rule written
+without a scope in a tool stylesheet can therefore still reach another tool.
 
 #### The five rules
 
@@ -344,6 +345,7 @@ Reach for an existing class first; only invent one when no role fits.
 | Sidebar, its brand block, its nav | `.nino-admin-rail`, `.nino-admin-rail-head`, `.nino-admin-nav` |
 | Scrolling content column | `.nino-admin-pane` |
 | Sticky top row (back link, locale switch) | `.nino-admin-contextbar` via `Nino.adminUi.contextBar()` |
+| Back link inside that row | `.nino-admin-back-link` |
 | Fixed bottom actions | `.nino-admin-actionbar` via `Nino.adminUi.actionBar()` |
 | Fixed actions above a list | `.nino-admin-list-actions` via `Nino.adminUi.listActions()` |
 | Status text in a bottom bar | `.nino-admin-actionbar-status` |
@@ -746,7 +748,7 @@ the API, DOM safety, and lifecycle shape:
 
 			const back = dc.createElement('a');
 			back.href = '#';
-			back.className = 'back-link';
+			back.className = 'nino-admin-back-link';
 			back.textContent = 'Back to project notes';
 			back.addEventListener( 'click', function( event ) {
 				event.preventDefault();
@@ -801,7 +803,7 @@ the API, DOM safety, and lifecycle shape:
 			save.className = 'ui-btn ui-btn--primary';
 			save.textContent = 'Save';
 
-			actions.className = 'editor-form-actions nino-admin-actionbar';
+			actions.className = 'nino-admin-actionbar';
 			actions.appendChild( save );
 
 			form.appendChild( heading );
@@ -1516,9 +1518,12 @@ second Layout only when the source composition differs. Two-, three-, and
 four-column choices, alignment, density, and similar class-only changes belong
 in Area Styles. Do not create the Layout × Style cross-product.
 
-The visual editor offers Design and Data views per Area. Design changes Style
-and ordered components. Data connects single components to Text/Image/template
-bindings or maps repeatable components to an Elements model.
+Add Section deliberately uses a reduced composer: Section ID, Layout,
+Background, collection choice, component order, and initial bindings share one
+flow. It omits dimensions/spacing, Area Style, and Component Style. Edit Section
+opens the complete model: frame fine tuning plus Design and Data views per Area.
+Design changes Style and ordered components. Data connects single components to
+Text/Image/template bindings or maps repeatable components to an Elements model.
 
 The Add Section library contains version-3 named-area presets only. Add a
 focused semantic preset instead of duplicating it into several class-only
@@ -1630,10 +1635,22 @@ The finite catalog is `title`, `subtitle`, `description`, `text`, `image`,
 list, override allowlisted tags/classes/styles and image dimensions, and set a
 maximum component count. It MUST NOT supply arbitrary component HTML.
 
-Single Areas create or reference absolute Text/Image bindings. Generated keys
-use `/page-<pageId>/<sectionId>/<component-suffix>`. A Template component
-accepts only `/templates/<safe-name>` and compiles to a normal `[template]`
-shortcode. Template components are forbidden in Elements Areas.
+Each property persists an explicit `bindingSources` value. Single non-image
+properties allow `new`, `textfill`, or `fixed`; Single images allow `new` or
+`image`. Generated keys use
+`/page-<pageId>/<sectionId>/<component-suffix>`. Elements non-image properties
+allow `field`, `textfill`, or `fixed`, while Elements images remain `field`.
+Template properties use `template`, accept only `/templates/<safe-name>`, and
+compile to a normal `[template]` shortcode. Template components are forbidden
+in Elements Areas. Old v3 comments without `bindingSources` MUST continue to
+infer their original generated-key or model-field behavior.
+
+The authenticated Builder key list includes blacklisted keys, grouped as
+technical values in the UI. A Text blacklist is an editor-visibility rule, not
+an invalidation of route URIs or other reusable bindings. Existing textfills are
+reference-only during insertion. Fixed values MUST be bounded and escaped;
+neutralize shortcode brackets and allow only safe relative URL values or the
+`http`, `https`, `mailto`, and `tel` schemes.
 
 Elements Areas independently choose `new` or `existing`, a safe type slug,
 shortcode arguments, and mappings. Every mapped field must exist for a new
@@ -1682,7 +1699,8 @@ Extend `tests/templates-smoke.php` and `tests/templates-js-smoke.js`. Test:
 - v3 defaults compose and contain no unresolved Area token;
 - metadata preserves ordered components and independent collections;
 - component add/move/remove helpers do not mutate unrelated state;
-- new/existing Text, Image, Template, and Elements bindings;
+- new/existing/fixed Text, Image, Template, and Elements bindings, including
+  blacklisted technical textfills and legacy v3 source inference;
 - invalid slugs, paths, tags, classes, styles, mappings, and Layouts;
 - exact collection schema and all shortcode arguments;
 - preview placeholders, column count, VPA visibility, and script isolation;

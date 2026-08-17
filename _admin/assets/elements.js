@@ -398,8 +398,8 @@
 
 			const backLink = dc.createElement('a');
 			backLink.href = '#';
-			backLink.className = 'back-link';
-			// No chevron in the text - .back-link::before already supplies one
+			backLink.className = 'nino-admin-back-link';
+			// No chevron in the text - the shared back-link component supplies one
 			backLink.textContent = 'Back to overview';
 			backLink.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.elements._showTypes() } );
 			wrap.appendChild( Nino.admin.formToolbar( backLink ) );
@@ -838,12 +838,12 @@
 			header.appendChild( nameSpan );
 
 			const counter = dc.createElement('span');
-			counter.className = 'char-counter';
+			counter.className = 'nino-admin-char-counter';
 
 			function updateCounter() {
 				const len = input.value.length;
 				counter.textContent = len + ' / ' + maxlength;
-				counter.classList.toggle( 'char-counter-limit', len >= maxlength );
+				counter.classList.toggle( 'is-limit', len >= maxlength );
 			}
 
 			input.addEventListener( 'input', updateCounter );
@@ -1102,7 +1102,7 @@
 			const wrap = dc.getElementById('elements-form');
 			if( wrap === null )
 				return;
-			wrap.classList.toggle( 'editor-pending', pending );
+			wrap.classList.toggle( 'admin-pending', pending );
 			wrap.querySelectorAll('input, textarea, select, button').forEach( function( el ) { el.disabled = pending } );
 			wrap.querySelectorAll('[contenteditable]').forEach( function( el ) {
 				el.contentEditable = pending ? 'false' : 'true';
@@ -1215,8 +1215,8 @@
 
 			const backLink = dc.createElement('a');
 			backLink.href = '#';
-			backLink.className = 'back-link';
-			// No chevron in the text - .back-link::before already supplies one
+			backLink.className = 'nino-admin-back-link';
+			// No chevron in the text - the shared back-link component supplies one
 			backLink.textContent = 'Back to '+ Nino.admin.elements._currentTypeTitle;
 			backLink.addEventListener( 'click', function( ev ) {
 				ev.preventDefault();
@@ -1617,7 +1617,7 @@
 				fileInput.value = '';
 
 				if( status !== 200 || response === null ) {
-					msg.className = 'nino-admin-field-image-msg error';
+					msg.className = 'nino-admin-field-image-msg is-error';
 					msg.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : 'Failed to save.' );
 					return;
 				}

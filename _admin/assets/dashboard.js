@@ -112,7 +112,7 @@
 
 		/**
 		 *	One clickable stat tile - jumps to the tab it summarizes via
-		 *	Nino.admin.selectTab(), same reuse of _editor's tile markup/CSS
+		 *	Nino.admin.selectTab(), using the shared design-system tile
 		 *
 		 *	@param		{string}	tab						Target tab uri (matches Nino.admin.TABS)
 		 *	@param		{string}	value					Big figure
@@ -179,24 +179,24 @@
 				a.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.selectTab( 'types' ) } );
 
 				const row = dc.createElement('span');
-				row.className = 'editor-dashboard-meter-row';
+				row.className = 'admin-dashboard-meter-row';
 
 				const label = dc.createElement('span');
-				label.className = 'editor-dashboard-meter-label';
+				label.className = 'admin-dashboard-meter-label';
 				label.textContent = t.title;
 				row.appendChild( label );
 
 				const count = dc.createElement('span');
-				count.className = 'editor-dashboard-meter-count';
+				count.className = 'admin-dashboard-meter-count';
 				count.textContent = t.fieldCount;
 				row.appendChild( count );
 
 				a.appendChild( row );
 
 				const track = dc.createElement('span');
-				track.className = 'editor-dashboard-meter-track';
+				track.className = 'admin-dashboard-meter-track';
 				const fill = dc.createElement('span');
-				fill.className = 'editor-dashboard-meter-fill';
+				fill.className = 'admin-dashboard-meter-fill';
 				fill.style.width = ( t.fieldCount / max * 100 )+ '%';
 				track.appendChild( fill );
 				a.appendChild( track );

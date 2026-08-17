@@ -118,6 +118,13 @@
 			const wrap = dc.getElementById('types-list');
 			wrap.innerHTML = '';
 
+			if( Nino.admin.elementTypes._types.length === 0 ) {
+				const empty = dc.createElement('p');
+				empty.className = 'nino-admin-hint';
+				empty.textContent = 'No element types yet - create one below.';
+				wrap.appendChild( empty );
+			}
+
 			const ul = dc.createElement('ul');
 			ul.className = 'nino-admin-list';
 			Nino.admin.elementTypes._types.forEach( function( type ) {
@@ -139,7 +146,8 @@
 				li.appendChild( link );
 				ul.appendChild( li );
 			} );
-			wrap.appendChild( ul );
+			if( Nino.admin.elementTypes._types.length > 0 )
+				wrap.appendChild( ul );
 
 			const addBtn = dc.createElement('button');
 			addBtn.type = 'button';
@@ -394,7 +402,7 @@
 
 			const removeBtn = dc.createElement('button');
 			removeBtn.type = 'button';
-			removeBtn.className = 'red';
+			removeBtn.className = 'nino-admin-btn-danger';
 			removeBtn.textContent = 'Remove';
 			removeBtn.addEventListener( 'click', function() {
 				// Read the rows back first, same as _move()/"Add field" do -
@@ -505,7 +513,7 @@
 
 			const backLink = dc.createElement('a');
 			backLink.href = '#';
-			backLink.className = 'back-link';
+			backLink.className = 'nino-admin-back-link';
 			backLink.textContent = 'Back to list';
 			backLink.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.elementTypes._showList() } );
 			wrap.appendChild( Nino.admin.formToolbar( backLink ) );
@@ -553,10 +561,10 @@
 			form.appendChild( addFieldBtn );
 
 			// Save + its message in the shared actions row every module's form
-			// ends on - assets/style.css pins that row to the bottom of the
+			// ends on - Nino.admin.css pins that row to the bottom of the
 			// viewport, so a long field list never puts Save out of reach
 			const actions = dc.createElement('div');
-			actions.className = 'editor-form-actions nino-admin-actionbar';
+			actions.className = 'nino-admin-actionbar';
 
 			const saveBtn = dc.createElement('button');
 			saveBtn.type = 'submit';

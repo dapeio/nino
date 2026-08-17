@@ -49,8 +49,10 @@ mkdir( $sandbox. '/private/text', 0777, true );
 mkdir( $sandbox. '/private/elements', 0777, true );
 mkdir( $sandbox. '/public/.cache', 0777, true );
 mkdir( $sandbox. '/public/assets', 0777, true );
+mkdir( $sandbox. '/public/fonts/text', 0777, true );
 file_put_contents( $sandbox. '/public/.cache/style.css', '/* stale-template-preview-css */' );
-file_put_contents( $sandbox. '/public/assets/style.preview.css', '/* template-preview-project-css */ .ui-section{display:block}' );
+file_put_contents( $sandbox. '/public/fonts/text/preview.woff2', 'preview-font' );
+file_put_contents( $sandbox. '/public/assets/style.preview.css', '/* template-preview-project-css */ @font-face{font-family:Preview;src:url("[[/nino/public]]/fonts/text/preview.woff2") format("woff2")} @font-face{font-family:Remote;src:url("https://example.invalid/remote.woff2")} .ui-section{display:block}' );
 
 $_SERVER['REMOTE_ADDR'] = '127.0.0.1';
 
@@ -70,9 +72,9 @@ $appData['/nino/html/assets'] = [ '/.cache/style.css' => [ '/assets/style.previe
 
 \Nino\Filesystem::putFileContent( $appData, '/config.php', [ '/nino/html/images' => [] ] );
 \Nino\Filesystem::putFileContent( $appData, '/text/global.php', [] );
-\Nino\Filesystem::putFileContent( $appData, '/text/blacklist.php', [] );
-\Nino\Filesystem::putFileContent( $appData, '/text/en_US.php', [ '[[/page-home/hero/title]]' => 'Old title' ] );
-\Nino\Filesystem::putFileContent( $appData, '/text/de_DE.php', [ '[[/page-home/hero/title]]' => 'Alter Titel' ] );
+\Nino\Filesystem::putFileContent( $appData, '/text/blacklist.php', [ '/webpage/contact/uri' ] );
+\Nino\Filesystem::putFileContent( $appData, '/text/en_US.php', [ '[[/page-home/hero/title]]' => 'Old title', '[[/webpage/contact/uri]]' => '/contact' ] );
+\Nino\Filesystem::putFileContent( $appData, '/text/de_DE.php', [ '[[/page-home/hero/title]]' => 'Alter Titel', '[[/webpage/contact/uri]]' => '/kontakt' ] );
 
 echo "Sandbox: $sandbox\n\n";
 
@@ -100,6 +102,9 @@ check( 'library API supplies editable v3 defaults without leaking Layout source'
 	&& ( !isset( $preset['defaults']['areas'] ) || isset( $preset['_layouts'] ) ) ) === [] );
 check( 'library API refreshes and embeds project CSS for request-free previews', str_contains( $libraryBody['previewCss'], 'template-preview-project-css' )
 	&& str_contains( $libraryBody['previewCss'], 'stale-template-preview-css' ) === false );
+check( 'sandbox previews inline local fonts and discard unresolved remote font rules', str_contains( $libraryBody['previewCss'], 'data:font/woff2;base64,'. base64_encode('preview-font') )
+	&& str_contains( $libraryBody['previewCss'], '/fonts/text/preview.woff2' ) === false
+	&& str_contains( $libraryBody['previewCss'], 'example.invalid' ) === false );
 
 $areaPresetDirectory = $sandbox. '/area-preset';
 mkdir( $areaPresetDirectory );
@@ -145,14 +150,27 @@ check( 'every curated preset composes with its defaults', array_filter( array_ke
 
 $heroInput = \Nino\Templates\AreaComposer::defaults( $presets['fullscreen-image'], 'home', 'main-hero' );
 $heroInput['pageMotion'] = 'on';
+$heroInput['areas']['content']['components'][3]['bindings']['href'] = '/webpage/contact/uri';
+$heroInput['areas']['content']['components'][3]['bindingSources']['href'] = 'textfill';
 $hero = \Nino\Templates\Composer::compose( $heroInput );
 
 check( 'composes one ordinary section', str_starts_with( $hero['source'], '<section' ) && str_contains( $hero['source'], '</section>' ) );
 check( 'writes stable section metadata inside generated source', str_contains( $hero['source'], '<!-- nino:section {' ) );
 check( 'derives textfill keys from page and section ids', in_array( '/page-home/main-hero/title', array_column( $hero['fields'], 'key' ), true ) && str_contains( $hero['source'], '[[/page-home/main-hero/title]]' ) );
 check( 'reports the generated background image slot', ( $hero['images'][0]['slot'] ?? '' ) === 'background' );
-check( 'inherits page motion into generated js-vpa markup', str_contains( $hero['source'], 'class="ui-grid-row js-vpa"' ) );
+check( 'inherits page motion into generated js-vpa markup', preg_match( '/class="(?=[^"]*\bui-grid-row\b)(?=[^"]*\bjs-vpa\b)[^"]*"/', $hero['source'] ) === 1 );
 check( 'applies Area alignment without forcing it onto the section shell', str_contains( $hero['source'], 'nino-area--center' ) && str_contains( strtok( $hero['source'], "\n" ), 'nino-area--center' ) === false );
+$contactBinding = array_values( array_filter( $hero['fields'], fn( array $field ): bool => $field['key'] === '/webpage/contact/uri' ) )[0] ?? null;
+check( 'single-Area actions can reuse technical textfills without creating a new field', str_contains( $hero['source'], 'href="[[/webpage/contact/uri]]"' )
+	&& ( $contactBinding['mode'] ?? '' ) === 'existing'
+	&& ( $hero['spec']['areas']['content']['components'][3]['bindingSources']['href'] ?? '' ) === 'textfill' );
+$legacyHeroInput = \Nino\Templates\AreaComposer::defaults( $presets['fullscreen-image'], 'home', 'legacy-hero' );
+foreach( $legacyHeroInput['areas']['content']['components'] as &$legacyComponent )
+	unset( $legacyComponent['bindingSources'] );
+unset( $legacyComponent );
+$legacyHero = \Nino\Templates\Composer::compose( $legacyHeroInput );
+check( 'older v3 Single-Area metadata still infers generated text and image bindings', str_contains( $legacyHero['source'], '[[/page-home/legacy-hero/title]]' )
+	&& ( $legacyHero['spec']['areas']['content']['components'][0]['bindingSources']['text'] ?? '' ) === 'new' );
 
 $heroPreview = \Nino\Templates\Composer::preview( [
 	'preset' => 'fullscreen-image', 'pageId' => 'preview', 'id' => 'motion-hero', 'pageMotion' => 'on',
@@ -179,6 +197,35 @@ check( 'maps ordered components to compatible existing model fields', str_contai
 	&& str_contains( $articles['source'], '[[buttonLabel]]' ) );
 check( 'returns each independently creatable collection and the complete recommended schema', isset( $articles['content']['collections'][0]['model']['image'], $articles['content']['collections'][0]['model']['linkLabel'] ) );
 check( 'generated Elements images use Nino image storage under the public content prefix', str_contains( $articles['source'], '[[/nino/public]]/images/[[photo]]' ) && str_contains( $articles['source'], '/uploads/' ) === false );
+$legacyArticleInput = $articleInput;
+foreach( $legacyArticleInput['areas']['articles']['components'] as &$legacyComponent )
+	unset( $legacyComponent['bindingSources'] );
+unset( $legacyComponent );
+$legacyArticles = \Nino\Templates\Composer::compose( $legacyArticleInput );
+check( 'older v3 metadata without explicit binding sources still maps Element fields', str_contains( $legacyArticles['source'], '[[name]]' )
+	&& ( $legacyArticles['spec']['areas']['articles']['components'][1]['bindingSources']['text'] ?? '' ) === 'field' );
+
+$sharedActionInput = $articleInput;
+$sharedActionInput['id'] = 'shared-action';
+$sharedActionInput['areas']['articles']['components'][3]['bindings']['href'] = '/webpage/contact/uri';
+$sharedActionInput['areas']['articles']['components'][3]['bindingSources']['href'] = 'textfill';
+$sharedActionInput['areas']['articles']['components'][3]['bindings']['label'] = 'Contact [now]';
+$sharedActionInput['areas']['articles']['components'][3]['bindingSources']['label'] = 'fixed';
+$sharedAction = \Nino\Templates\Composer::compose( $sharedActionInput );
+check( 'repeatable components can combine Element fields, shared textfills and escaped fixed values', str_contains( $sharedAction['source'], 'href="[[/webpage/contact/uri]]"' )
+	&& str_contains( $sharedAction['source'], 'Contact &#91;now&#93;' )
+	&& str_contains( $sharedAction['source'], '[[name]]' ) );
+$unsafeActionInput = $sharedActionInput;
+$unsafeActionInput['areas']['articles']['components'][3]['bindings']['href'] = 'javascript:alert(1)';
+$unsafeActionInput['areas']['articles']['components'][3]['bindingSources']['href'] = 'fixed';
+check( 'fixed URL bindings reject executable schemes', throwsInvalidArgument( fn() => \Nino\Templates\Composer::compose( $unsafeActionInput ) ) );
+$obfuscatedUnsafeActionInput = $unsafeActionInput;
+$obfuscatedUnsafeActionInput['areas']['articles']['components'][3]['bindings']['href'] = "java\nscript:alert(1)";
+check( 'fixed URL bindings reject control-character scheme obfuscation', throwsInvalidArgument( fn() => \Nino\Templates\Composer::compose( $obfuscatedUnsafeActionInput ) ) );
+$invalidImageSourceInput = $articleInput;
+$invalidImageSourceInput['areas']['articles']['components'][0]['bindings']['src'] = '/page-home/services/shared-image';
+$invalidImageSourceInput['areas']['articles']['components'][0]['bindingSources']['src'] = 'textfill';
+check( 'Elements images cannot bypass compatible field mappings', throwsInvalidArgument( fn() => \Nino\Templates\Composer::compose( $invalidImageSourceInput ) ) );
 
 $textOnlyInput = $articleInput;
 $textOnlyInput['id'] = 'plain-services';
@@ -490,13 +537,19 @@ echo "Content\n";
 post( [] );
 $keysRequest = response();
 \Nino\Templates\Content::apiKeys( $appData, $keysRequest );
-check( 'lists existing native textfills for reusable Area bindings', in_array( '/page-home/hero/title', array_column( $keysRequest['/nino/http/response']['body']['entries'], 'key' ), true ) );
+$listedTextfills = $keysRequest['/nino/http/response']['body']['entries'];
+$technicalTextfill = array_values( array_filter( $listedTextfills, fn( array $entry ): bool => $entry['key'] === '/webpage/contact/uri' ) )[0] ?? null;
+check( 'lists content and blacklisted technical textfills for reusable Area bindings', in_array( '/page-home/hero/title', array_column( $listedTextfills, 'key' ), true )
+	&& ( $technicalTextfill['blacklisted'] ?? false ) === true );
 
-post( [ 'keys' => [ '/page-home/hero/title', '/page-home/hero/subtitle' ] ] );
+post( [ 'keys' => [ '/page-home/hero/title', '/page-home/hero/subtitle', '/webpage/contact/uri' ] ] );
 $fieldsRequest = response();
 \Nino\Templates\Content::apiFields( $appData, $fieldsRequest );
 $fields = $fieldsRequest['/nino/http/response']['body'];
-check( 'reads existing and missing native textfill values together', $fields['nativeLocale'] === 'en_US' && $fields['fields'][0]['value'] === 'Old title' && $fields['fields'][1]['exists'] === false );
+check( 'reads existing, missing and technical native textfill values together', $fields['nativeLocale'] === 'en_US'
+	&& $fields['fields'][0]['value'] === 'Old title'
+	&& $fields['fields'][1]['exists'] === false
+	&& $fields['fields'][2]['value'] === '/contact' );
 
 post( [ 'items' => [
 	[ 'key' => '/page-home/hero/title', 'value' => 'New title' ],
@@ -562,6 +615,11 @@ $appData['/nino/http/routes']['POST://_templates'] = [ 'uri' => '/stale' ];
 \Nino\Templates\Templates::init( $appData );
 check( 'runtime GET route replaces persisted collisions', $appData['/nino/http/routes']['GET://_templates']['body'] === '[template /_templates/templates/page-index]' );
 check( 'runtime POST route replaces persisted collisions', $appData['/nino/http/routes']['POST://_templates'] === [ 'uri' => '/_templates' ] );
+
+$templateGet = response();
+$templateGet['/nino/http/response']['header']['Content-Security-Policy'] = "default-src 'self'; style-src 'self' 'unsafe-inline'";
+\Nino\Templates\Templates::handleGet( $appData, $templateGet );
+check( 'Template Builder permits its sandboxed data-font previews without widening the global CSP', str_contains( $templateGet['/nino/http/response']['header']['Content-Security-Policy'], "font-src 'self' data:" ) );
 
 $notAuthed = response();
 check( 'guard shares the Admin session and rejects unauthenticated requests', \Nino\Templates\Templates::guard( $appData, $notAuthed ) === false && $notAuthed['/nino/http/response']['statusCode'] === 401 );

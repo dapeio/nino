@@ -287,12 +287,12 @@
 			header.appendChild( nameSpan );
 
 			const counter = dc.createElement('span');
-			counter.className = 'char-counter';
+			counter.className = 'nino-admin-char-counter';
 
 			function updateCounter() {
 				const len = textarea.value.length;
 				counter.textContent = len + ' / ' + entry.maxlength;
-				counter.classList.toggle( 'char-counter-limit', len >= entry.maxlength );
+				counter.classList.toggle( 'is-limit', len >= entry.maxlength );
 			}
 
 			textarea.addEventListener( 'input', updateCounter );

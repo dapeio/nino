@@ -117,6 +117,7 @@
 
 				const btn = dc.createElement('button');
 				btn.type = 'button';
+				btn.className = 'nino-admin-btn-danger';
 				btn.textContent = 'Restore';
 				btn.addEventListener( 'click', function() { Nino.admin.restore._confirmRestore( date ) } );
 				li.appendChild( btn );
