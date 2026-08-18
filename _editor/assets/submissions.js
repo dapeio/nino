@@ -77,7 +77,7 @@
 			const wrap = dc.getElementById('submissions-list');
 			wrap.innerHTML = '';
 			const p = dc.createElement('p');
-			p.className = 'editor-error';
+			p.className = 'nino-admin-error';
 			p.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : Nino.content.getText('/_editor/submissions/error/load') );
 			wrap.appendChild( p );
 		},

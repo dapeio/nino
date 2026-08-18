@@ -78,7 +78,7 @@
 			const wrap = dc.getElementById('editor-content-dashboard');
 			wrap.innerHTML = '';
 			const p = dc.createElement('p');
-			p.className = 'editor-error';
+			p.className = 'nino-admin-error';
 			p.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : Nino.content.getText('/_editor/dashboard/error/load') );
 			wrap.appendChild( p );
 		},
@@ -182,24 +182,24 @@
 				a.href = '#elements/'+ e.type;
 
 				const row = dc.createElement('span');
-				row.className = 'editor-dashboard-meter-row';
+				row.className = 'nino-admin-meter-row';
 
 				const label = dc.createElement('span');
-				label.className = 'editor-dashboard-meter-label';
+				label.className = 'nino-admin-meter-label';
 				label.textContent = e.title;
 				row.appendChild( label );
 
 				const count = dc.createElement('span');
-				count.className = 'editor-dashboard-meter-count';
+				count.className = 'nino-admin-meter-count';
 				count.textContent = e.count;
 				row.appendChild( count );
 
 				a.appendChild( row );
 
 				const track = dc.createElement('span');
-				track.className = 'editor-dashboard-meter-track';
+				track.className = 'nino-admin-meter-track';
 				const fill = dc.createElement('span');
-				fill.className = 'editor-dashboard-meter-fill';
+				fill.className = 'nino-admin-meter-fill';
 				fill.style.width = ( e.count / max * 100 )+ '%';
 				track.appendChild( fill );
 				a.appendChild( track );

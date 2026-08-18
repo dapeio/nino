@@ -96,7 +96,7 @@
 		beforeLeave : function() {
 
 			const wrap = dc.getElementById('webpages-form');
-			if( wrap === null || wrap.classList.contains('admin-hidden') === true )
+			if( wrap === null || wrap.classList.contains('install-hidden') === true )
 				return true;
 
 			return Nino.install.webpages._save();
@@ -104,14 +104,14 @@
 
 		_showList : function() {
 			dc.getElementById('install-page-wrap').classList.remove('is-editing-webpage');
-			dc.getElementById('webpages-list').classList.remove('admin-hidden');
-			dc.getElementById('webpages-form').classList.add('admin-hidden');
+			dc.getElementById('webpages-list').classList.remove('install-hidden');
+			dc.getElementById('webpages-form').classList.add('install-hidden');
 		},
 
 		_showForm : function() {
 			dc.getElementById('install-page-wrap').classList.add('is-editing-webpage');
-			dc.getElementById('webpages-list').classList.add('admin-hidden');
-			dc.getElementById('webpages-form').classList.remove('admin-hidden');
+			dc.getElementById('webpages-list').classList.add('install-hidden');
+			dc.getElementById('webpages-form').classList.remove('install-hidden');
 		},
 
 		/**
@@ -355,7 +355,7 @@
 
 			const backLink = dc.createElement('a');
 			backLink.href = '#';
-			backLink.className = 'back-link';
+			backLink.className = 'nino-admin-back-link';
 			backLink.textContent = 'Back to list';
 			// Folds the open entry into the list, exactly like the wizard's own
 			// Back/Next already do (see beforeLeave()). Discarding here instead
@@ -441,7 +441,7 @@
 				requiresHint.textContent = requires.length > 0
 					? 'requires modules: '+ requires.join( ', ' )+ ' - picked automatically on "Next" if not already active'
 					: '';
-				requiresHint.classList.toggle( 'admin-hidden', requires.length === 0 );
+				requiresHint.classList.toggle( 'install-hidden', requires.length === 0 );
 			};
 			templateSelect.addEventListener( 'change', updateRequiresHint );
 			updateRequiresHint();
@@ -525,7 +525,7 @@
 			form.appendChild( contentFieldset );
 
 			const actions = dc.createElement('div');
-			actions.className = 'editor-form-actions nino-admin-actionbar';
+			actions.className = 'nino-admin-actionbar';
 
 			if( Nino.install.webpages._isNew === false ) {
 				const deleteBtn = dc.createElement('button');

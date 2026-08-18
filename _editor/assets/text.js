@@ -116,7 +116,7 @@
 		_showError : function( container, status, response ) {
 			container.innerHTML = '';
 			const p = dc.createElement('p');
-			p.className = 'editor-error';
+			p.className = 'nino-admin-error';
 			p.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : Nino.content.getText('/_editor/text/error/load') );
 			container.appendChild( p );
 		},
@@ -444,7 +444,7 @@
 
 			const backLink = dc.createElement('a');
 			backLink.href = '#';
-			backLink.className = 'back-link';
+			backLink.className = 'nino-admin-back-link';
 			backLink.textContent = Nino.content.getText('/_editor/text/label/back');
 			backLink.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.editor.text._destroyHtmlEditors(); Nino.editor.text._showList() } );
 			const toolbar = Nino.editor.formToolbar( backLink );
@@ -508,7 +508,7 @@
 			}
 
 			const actions = dc.createElement('div');
-			actions.className = 'editor-form-actions nino-admin-actionbar';
+			actions.className = 'nino-admin-actionbar';
 
 			const saveBtn = dc.createElement('button');
 			saveBtn.type = 'submit';

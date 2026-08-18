@@ -114,7 +114,7 @@
 		_showError : function( container, status, response ) {
 			container.innerHTML = '';
 			const p = dc.createElement('p');
-			p.className = 'editor-error';
+			p.className = 'nino-admin-error';
 			p.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : Nino.content.getText('/_editor/images/error/load') );
 			container.appendChild( p );
 		},
@@ -229,7 +229,7 @@
 
 			const backLink = dc.createElement('a');
 			backLink.href = '#';
-			backLink.className = 'back-link';
+			backLink.className = 'nino-admin-back-link';
 			backLink.textContent = Nino.content.getText('/_editor/images/label/back');
 			backLink.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.editor.images._showList() } );
 			wrap.appendChild( Nino.editor.formToolbar( backLink ) );

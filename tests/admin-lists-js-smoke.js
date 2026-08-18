@@ -163,22 +163,20 @@ Object.keys( TOOL_ROOTS ).forEach( function( file ) {
 	check( file+ ' wraps its own rules in the tool layer',
 		css.includes('@layer nino.tool {') && css.includes('@layer nino.local {') );
 
-	// Every tool stylesheet is loaded by at least one *other* tool, so a rule
-	// naming a shared class without a scope reaches screens it was never
-	// written for - which is how _editor's shell grid once laid out the
-	// Template Builder
+	// A rule naming a shared class without a scope reaches every screen its file
+	// is loaded on - which is how _editor's shell grid once laid out the
+	// Template Builder, back when three of the four tools cross-loaded it
 	const unscoped = ( css.match(/^[\t ]*\.nino-admin[^{,\n]*[,{]\s*$/gm) || [] );
 	check( file+ ' scopes every nino-admin-* rule to its own root', unscoped.length === 0,
 		unscoped.slice(0, 3).join(' | ') );
 } );
 
-// A bare element selector in a tool stylesheet defines that element for every
-// other tool that cross-loads the file - _templates still loads both. The
-// select chevron used to live in one of these while the padding that keeps text
-// off it came from the design system, and the two drifted apart. New ones are a
-// regression; the three below are intentional shared foundations and live in
-// this file's nino.system blocks rather than in a tool-specific layer.
-const BASE_RESETS = { '_editor/assets/style.css' : [ 'a', 'button', 'fieldset' ] };
+// An element-wide reset belongs to the design system, the one file all four
+// tools load. A tool stylesheet defining one used to reach every other tool that
+// cross-loaded the file: the select chevron lived in _editor's copy while the
+// padding that keeps text off it came from the design system, and the two
+// drifted apart. There is no allowed exception left.
+const BASE_RESETS = {};
 
 Object.keys( TOOL_ROOTS ).forEach( function( file ) {
 
@@ -189,6 +187,38 @@ Object.keys( TOOL_ROOTS ).forEach( function( file ) {
 
 	check( file+ ' adds no new bare element selector', unexpected.length === 0, unexpected.join(', ') );
 } );
+
+// A tool links its own stylesheet and the design system, nothing else. Borrowing
+// another tool's complete stylesheet for a handful of its classes is what let
+// unrelated rules reach screens they were never written for, and it made every
+// /_install and /_templates request pay for two files it barely used. The
+// Template Builder's login screen is the one deliberate exception - it renders
+// /_admin's login markup with /_admin's own script.
+const TOOL_TEMPLATES = {
+	'_admin'     : [ '_admin/templates/page-index.tpl', '_admin/templates/page-login.tpl' ],
+	'_editor'    : [ '_editor/templates/html-header.tpl' ],
+	'_install'   : [ '_install/templates/page-wizard.tpl', '_install/templates/page-locked.tpl' ],
+	'_templates' : [ '_templates/templates/page-index.tpl' ],
+};
+
+Object.keys( TOOL_TEMPLATES ).forEach( function( tool ) {
+	TOOL_TEMPLATES[tool].forEach( function( file ) {
+
+		const markup = read( file );
+		const foreign = ( markup.match(/_(?:admin|editor|install|templates)\/assets\/style\.css/g) || [] )
+			.filter( function( reference ) { return reference.startsWith( tool+ '/' ) === false } );
+
+		check( file+ ' links no other tool\'s stylesheet', foreign.length === 0, foreign.join(', ') );
+		check( file+ ' links the shared design system', markup.includes('_nino/Nino.admin.css') );
+	} );
+} );
+
+// _editor used to ship a second copy of every design token and base control, in
+// the same cascade layer as the design system but linked before it - so the copy
+// silently lost every tie, while its higher-layer component overrides silently
+// won and pulled the Editor away from the other three tools' look
+check( 'no tool stylesheet redefines the shared design tokens',
+	Object.keys( TOOL_ROOTS ).every( function( file ) { return read( file ).includes('--editor-blue:') === false } ) );
 
 // The select indicator and the space reserved for it must stay in one file, or
 // a later layer silently narrows the padding and the option text slides under

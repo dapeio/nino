@@ -144,9 +144,10 @@
 
 			items.forEach( function( item ) {
 
-				const row = dc.createElement('div');
-				row.className = 'install-setup-option';
-
+				// One .nino-admin-checklist row: the label is the row, and the
+				// module requirement is its trailing state - the wrapper this
+				// used to carry stacked a second row height on top of the
+				// shared one and made a short list read as a sparse page
 				const label = dc.createElement('label');
 
 				const input = dc.createElement('input');
@@ -162,16 +163,14 @@
 				span.textContent = item.label || item.key;
 				label.appendChild( span );
 
-				row.appendChild( label );
-
 				if( ( item.requiresModules || [] ).length > 0 ) {
 					const hint = dc.createElement('span');
-					hint.className = 'install-setup-option-requires';
+					hint.className = 'nino-admin-checklist-state';
 					hint.textContent = 'requires modules: '+ item.requiresModules.join( ', ' );
-					row.appendChild( hint );
+					label.appendChild( hint );
 				}
 
-				wrap.appendChild( row );
+				wrap.appendChild( label );
 			} );
 		},
 

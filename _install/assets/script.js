@@ -92,10 +92,10 @@
 					nav.classList.toggle( 'active', i === index );
 			} );
 
-			dc.getElementById('install-back').classList.toggle( 'admin-hidden', index === 0 );
+			dc.getElementById('install-back').classList.toggle( 'install-hidden', index === 0 );
 			// Finish keeps its own form/button in place of "Next" - there is
 			// nothing left to advance to
-			dc.getElementById('install-next').classList.toggle( 'admin-hidden', index === Nino.install.STEPS.length - 1 );
+			dc.getElementById('install-next').classList.toggle( 'install-hidden', index === Nino.install.STEPS.length - 1 );
 
 			const mod = Nino.install[step.key];
 			if( mod !== undefined && typeof mod.showCurrent === 'function' )

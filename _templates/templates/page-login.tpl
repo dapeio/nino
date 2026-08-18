@@ -7,9 +7,7 @@
 		<link rel="icon" type="image/png" sizes="32x32" href="[[/nino/dir]]/_admin/assets/favicon-32x32.png">
 		<link rel="icon" href="[[/nino/dir]]/_admin/assets/favicon.ico">
 		<title>Template Builder</title>
-		<link rel="stylesheet" href="[[/nino/dir]]/_editor/assets/style.css">
 		<link rel="stylesheet" href="[[/nino/dir]]/_admin/assets/style.css">
-		<link rel="stylesheet" href="[[/nino/dir]]/_templates/assets/style.css">
 		<link rel="stylesheet" href="[[/nino/dir]]/_nino/Nino.admin.css">
 	</head>
 	<body>

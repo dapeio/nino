@@ -162,7 +162,7 @@
 			dc.getElementById('themes-lightbox-image').alt 					= theme.label+ ' preview';
 			dc.getElementById('themes-lightbox-caption').textContent = theme.label;
 
-			box.classList.remove('admin-hidden');
+			box.classList.remove('install-hidden');
 		},
 
 		closeLightbox : function() {
@@ -171,7 +171,7 @@
 			if( box === null )
 				return;
 
-			box.classList.add('admin-hidden');
+			box.classList.add('install-hidden');
 			dc.getElementById('themes-lightbox-image').src = '';
 		},
 

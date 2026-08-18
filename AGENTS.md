@@ -306,10 +306,14 @@ See "Designing an admin frontend" below before writing any markup or CSS for
 not a stylesheet one tool happens to share - it defines the vocabulary, and a
 tool's own stylesheet supplies only what is genuinely local to it.
 
-**Some tools load more than their own stylesheet.** `/_admin` is deliberately
-self-contained (`Nino.admin.css` plus its local stylesheet), while
-`/_templates` and `/_install` also load earlier tool stylesheets. A rule written
-without a scope in a tool stylesheet can therefore still reach another tool.
+**A tool links its own stylesheet and `Nino.admin.css`, nothing else.**
+`/_install` and `/_templates` used to load `/_editor`'s and `/_admin`'s complete
+stylesheets for a handful of their classes; they no longer do. Copy the class
+you need into the tool that needs it, or promote it to the design system - do
+not link another tool's stylesheet. The Template Builder's *login* screen is the
+one exception, because it renders `/_admin`'s login markup with `/_admin`'s own
+script. A rule written without a scope in a tool stylesheet still reaches every
+screen that file is loaded on, so keep scoping them.
 
 #### The five rules
 
@@ -357,6 +361,7 @@ Reach for an existing class first; only invent one when no role fits.
 | List of rows that are read, not opened | `.nino-admin-list-dense` |
 | List whose rows are `button`s | `.nino-admin-list-buttons` |
 | Dashboard tiles | `.nino-admin-tiles`, `.nino-admin-tile` |
+| Share-of-total bar under a label | `.nino-admin-meter-row` + `-label`/`-count`, `.nino-admin-meter-track` + `-fill` |
 | Labelled form field | `.nino-admin-field` (`.nino-admin-field-wide` opts out of the two-column desktop grid) |
 | Container whose fields share that grid | `.nino-admin-fieldgrid` |
 | Run of checkbox rows | `.nino-admin-checklist` |
@@ -401,6 +406,12 @@ formatting as plain functions — extend and test there, not in the renderer.
 - **A tool stylesheet must scope every `nino-admin-*` rule to its own root**
   (`#editor-page-wrap .nino-admin-rail`, not `.nino-admin-rail`) - see the
   cross-loading note above.
+- **Restating a shared component in a tool is not "refining" it.** A tool copy
+  sits in the later `nino.tool` layer, so it wins over the design system whole
+  and the two drift apart silently. `/_editor` carried a second copy of every
+  token, button, input, field, tile, card and rich-text rule this way. Delete
+  the copy; if the shared version is genuinely wrong for every tool, fix it in
+  `Nino.admin.css`.
 
 ### Templates
 

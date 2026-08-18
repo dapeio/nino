@@ -71,7 +71,10 @@ check( 'Admin exposes Translations and labels the route module correctly', admin
 console.log('\nShared HTML editor');
 
 const htmlEditor = source('_editor/assets/html-editor.js');
-const editorCss = source('_editor/assets/style.css');
+// The rich-text surface is shared markup: /_admin and /_editor mount the same
+// html-editor.js, so its rules belong to the design system rather than to one
+// tool's stylesheet - a tool copy only ever reached one of the two callers
+const editorCss = source('_nino/Nino.admin.css');
 const kernel = source('_nino/Nino.php');
 const editorElements = source('_editor/assets/elements.js');
 const adminElements = source('_admin/assets/elements.js');

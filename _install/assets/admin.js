@@ -79,9 +79,13 @@
 				return;
 			}
 
+			// Rows that are read rather than opened - the shared grouped list's
+			// dense variant, same as /_editor's log and submission lists
 			const ul = dc.createElement('ul');
+			ul.className = 'nino-admin-list nino-admin-list-dense';
 			users.forEach( function( mail ) {
 				const li = dc.createElement('li');
+				li.className = 'install-admin-row';
 				li.textContent = mail;
 				ul.appendChild( li );
 			} );

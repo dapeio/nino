@@ -7,8 +7,6 @@
 		<link rel="icon" type="image/png" sizes="32x32" href="[[/nino/dir]]/_admin/assets/favicon-32x32.png">
 		<link rel="icon" href="[[/nino/dir]]/_admin/assets/favicon.ico">
 		<title>Install</title>
-		<link rel="stylesheet" href="[[/nino/dir]]/_editor/assets/style.css">
-		<link rel="stylesheet" href="[[/nino/dir]]/_admin/assets/style.css">
 		<link rel="stylesheet" href="[[/nino/dir]]/_install/assets/style.css">
 		<link rel="stylesheet" href="[[/nino/dir]]/_nino/Nino.admin.css">
 	</head>
@@ -46,15 +44,15 @@
 
 				<div id="install-content-setup">
 					<p class="nino-admin-hint nino-admin-hint-lead">Pick locales and modules - assembles routes, templates and text from <code>_install/library</code>. Whatever's checked when you hit "Next" is the whole picture: unchecking something and coming back here replaces the previous selection, it doesn't add to it - though a route/template/text file already written for something you un-pick still has to be removed by hand, see <code>docs/_install.md</code>.</p>
-					<div class="nino-admin-card install-setup-group">
+					<div class="nino-admin-card">
 						<h3>Available Locales</h3>
 						<div id="setup-locales" class="nino-admin-checklist"></div>
 					</div>
-					<div class="nino-admin-card install-setup-group">
+					<div class="nino-admin-card">
 						<h3>Native Locale</h3>
 						<div id="setup-native-locale"></div>
 					</div>
-					<div class="nino-admin-card install-setup-group">
+					<div class="nino-admin-card">
 						<h3>Modules</h3>
 						<div id="setup-modules" class="nino-admin-checklist"></div>
 					</div>
@@ -70,7 +68,7 @@
 				<div id="install-content-webpages">
 					<p class="nino-admin-hint nino-admin-hint-lead">Build the project's actual routes: click a row to open it, or "New Route" to add one - an Element URI (a stable identifier, eg. <code>/home</code>), the real Http URI it's reachable at (eg. <code>/</code>), a starting template from <code>_install/library/pages</code>, and each active locale's name/title/description - name is also what shows up in the main menu, if the Navigation module (step 2) is active and its "Show in main navigation" box is checked. Click ↑/↓ to reorder, "Next" batch-generates routes/templates/text/blacklist from the list below.</p>
 					<div id="webpages-list"></div>
-					<div id="webpages-form" class="admin-hidden"></div>
+					<div id="webpages-form" class="install-hidden"></div>
 					<p id="webpages-msg"></p>
 				</div>
 
@@ -84,8 +82,8 @@
 					<p class="nino-admin-hint nino-admin-hint-lead">Create at least one <code>/_editor</code> account with full permissions. Submit again for additional admins, then continue.</p>
 					<div id="editor-list"></div>
 					<form id="editor-add-form" class="nino-admin-card">
-						<label for="editor-add-mail"><span>Email</span><input id="editor-add-mail" type="email" autocomplete="off" required></label>
-						<label for="editor-add-pw"><span>Password</span><input id="editor-add-pw" type="password" autocomplete="new-password" required></label>
+						<label class="nino-admin-field" for="editor-add-mail"><span>Email</span><input id="editor-add-mail" type="email" autocomplete="off" required></label>
+						<label class="nino-admin-field" for="editor-add-pw"><span>Password</span><input id="editor-add-pw" type="password" autocomplete="new-password" required></label>
 						<p id="editor-add-msg"></p>
 						<button type="submit">Create admin</button>
 					</form>
@@ -100,11 +98,11 @@
 						<p id="finish-msg"></p>
 						<button type="submit">Finish installation</button>
 					</form>
-					<div id="finish-done" class="admin-hidden">
+					<div id="finish-done" class="install-hidden">
 						<div class="install-finish-intro">
 							<span class="install-finish-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
 							<div>
-								<span class="install-finish-eyebrow">Ready to go</span>
+								<span class="nino-admin-eyebrow install-finish-eyebrow">Ready to go</span>
 								<h1>Installation complete</h1>
 								<p>Choose where you would like to continue.</p>
 							</div>
@@ -136,14 +134,14 @@
 			     form replaces "Next" entirely), Back hidden on the first -->
 			<div id="install-actions-wrap" class="nino-admin-actionbar">
 				<p id="install-actions-msg" class="nino-admin-actionbar-status"></p>
-				<button type="button" id="install-back">Back</button>
+				<button type="button" id="install-back" class="nino-admin-btn-secondary">Back</button>
 				<button type="button" id="install-next" class="nino-admin-btn-primary">Next</button>
 			</div>
 		</div>
 
 		<!-- Theme preview lightbox - a single, reused overlay filled by
 		     themes.js rather than one per tile, see its _openLightbox() -->
-		<div id="themes-lightbox" class="admin-hidden">
+		<div id="themes-lightbox" class="install-hidden">
 			<img id="themes-lightbox-image" src="" alt="">
 			<p id="themes-lightbox-caption"></p>
 		</div>

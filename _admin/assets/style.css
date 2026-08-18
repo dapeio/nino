@@ -82,7 +82,7 @@
 
 #admin-page-wrap .elements-raw-bucket {
 	margin-top: .75rem;
-	font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+	font-family: var(--nino-admin-mono);
 	font-size: .78rem;
 	font-weight: 650;
 }
@@ -94,7 +94,7 @@
 	border: 1px solid var(--editor-separator);
 	border-radius: var(--editor-radius-sm);
 	background: var(--nino-admin-surface-muted);
-	font: .76rem/1.5 ui-monospace, "SFMono-Regular", Menlo, monospace;
+	font: .76rem/1.5 var(--nino-admin-mono);
 	white-space: pre;
 }
 
@@ -107,14 +107,14 @@
 	gap: 1rem;
 	min-height: var(--nino-admin-row-height);
 	padding: .55rem .75rem;
-	font: .8rem/1.4 ui-monospace, "SFMono-Regular", Menlo, monospace;
+	font: .8rem/1.4 var(--nino-admin-mono);
 }
 
 #restore-dates > li > button {
 	flex: 0 0 auto;
 }
 
-#admin-page-wrap #users-list > .nino-admin-list > li {
+#users-list > .nino-admin-list > li {
 	display: grid;
 	grid-template-columns: minmax(0, 1fr) auto auto;
 	align-items: center;
@@ -123,7 +123,7 @@
 	padding: .55rem .75rem;
 }
 
-#admin-page-wrap #users-list > .nino-admin-list > li > span {
+#users-list > .nino-admin-list > li > span {
 	min-width: 0;
 	overflow: hidden;
 	font-size: .82rem;
@@ -131,46 +131,46 @@
 	white-space: nowrap;
 }
 
-#admin-page-wrap #users-list > .nino-admin-list > li > a {
+#users-list > .nino-admin-list > li > a {
 	min-height: 30px;
 	padding: .25rem .5rem;
 	border-radius: var(--editor-radius-sm);
 	font-size: .76rem;
 }
 
-#admin-page-wrap #users-list > .nino-admin-list > li > a::after {
+#users-list > .nino-admin-list > li > a::after {
 	display: none;
 }
 
-#admin-page-wrap #users-list > .nino-admin-list > li > div {
+#users-list > .nino-admin-list > li > div {
 	grid-column: 1 / -1;
 	min-width: 0;
 	padding-top: .65rem;
 	border-top: 1px solid var(--editor-separator);
 }
 
-#admin-page-wrap #users-list > .nino-admin-list > li > div form {
+#users-list > .nino-admin-list > li > div form {
 	display: grid;
 	grid-template-columns: minmax(0, 1fr) auto;
 	gap: .5rem;
 }
 
-#admin-page-wrap #users-list > .nino-admin-list > li > div form > .nino-admin-field,
-#admin-page-wrap #users-list > .nino-admin-list > li > div form > p {
+#users-list > .nino-admin-list > li > div form > .nino-admin-field,
+#users-list > .nino-admin-list > li > div form > p {
 	grid-column: 1 / -1;
 }
 
-#admin-page-wrap #users-list > .nino-admin-list > li > div form > .nino-admin-field {
+#users-list > .nino-admin-list > li > div form > .nino-admin-field {
 	margin-bottom: 0;
 }
 
-#admin-page-wrap #users-list > .nino-admin-list > li > div form > p {
+#users-list > .nino-admin-list > li > div form > p {
 	margin: 0;
 	color: var(--editor-text-secondary);
 	font-size: .76rem;
 }
 
-#admin-page-wrap #users-list > .nino-admin-list > li > div form > button {
+#users-list > .nino-admin-list > li > div form > button {
 	grid-column: 2;
 	justify-self: end;
 }
@@ -375,7 +375,7 @@
 }
 
 #translations-json {
-	font: .78rem/1.5 ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+	font: .78rem/1.5 var(--nino-admin-mono);
 	resize: vertical;
 	tab-size: 2;
 }
@@ -392,22 +392,22 @@
 	margin: 0 0 .65rem;
 }
 
-#admin-page-wrap #pages-list > .nino-admin-list,
-#admin-page-wrap #navs-list > .nino-admin-list {
+#pages-list > .nino-admin-list,
+#navs-list > .nino-admin-list {
 	margin-bottom: .75rem;
 }
 
-#admin-page-wrap #pages-list > .nino-admin-list > li,
-#admin-page-wrap #navs-form .nino-admin-list > li {
+#pages-list > .nino-admin-list > li,
+#navs-form .nino-admin-list > li {
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
 }
 
-#admin-page-wrap #pages-list > .nino-admin-list > li > a {
+#pages-list > .nino-admin-list > li > a {
 	flex: 1 1 auto;
 	min-width: 0;
-	font: .78rem/1.4 ui-monospace, "SFMono-Regular", Menlo, monospace;
+	font: .78rem/1.4 var(--nino-admin-mono);
 }
 
 #admin-page-wrap .admin-page-label {
@@ -421,18 +421,18 @@
 	padding: 0 .65rem;
 }
 
-#admin-page-wrap #navs-form .nino-admin-list {
+#navs-form .nino-admin-list {
 	background: transparent;
 	box-shadow: none;
 }
 
-#admin-page-wrap #navs-form .nino-admin-list > li {
+#navs-form .nino-admin-list > li {
 	min-height: var(--nino-admin-row-height);
 	padding-left: .75rem;
-	font: .78rem/1.4 ui-monospace, "SFMono-Regular", Menlo, monospace;
+	font: .78rem/1.4 var(--nino-admin-mono);
 }
 
-#admin-page-wrap #navs-form .nino-admin-list .admin-page-label {
+#navs-form .nino-admin-list .admin-page-label {
 	flex: 1 1 auto;
 }
 
@@ -452,7 +452,7 @@
 #admin-page-wrap .admin-page-locale-label {
 	padding-top: .5rem;
 	color: var(--editor-text-secondary);
-	font: .7rem/1.4 ui-monospace, "SFMono-Regular", Menlo, monospace;
+	font: .7rem/1.4 var(--nino-admin-mono);
 }
 
 #admin-page-wrap .admin-page-locale-row textarea {
@@ -483,7 +483,7 @@
 #admin-page-wrap .admin-text-key-input {
 	flex: 1 1 auto;
 	min-width: 8rem;
-	font: .76rem/1.4 ui-monospace, "SFMono-Regular", Menlo, monospace;
+	font: .76rem/1.4 var(--nino-admin-mono);
 }
 
 #admin-page-wrap .admin-text-key-btn {
@@ -533,34 +533,6 @@
 	transform: translateY(-50%);
 }
 
-#admin-page-wrap .admin-dashboard-meter-row {
-	display: flex;
-	justify-content: space-between;
-	gap: 1rem;
-	margin-bottom: .28rem;
-	font-size: .8rem;
-}
-
-#admin-page-wrap .admin-dashboard-meter-count {
-	color: var(--editor-text-secondary);
-	font-variant-numeric: tabular-nums;
-}
-
-#admin-page-wrap .admin-dashboard-meter-track {
-	display: block;
-	height: 4px;
-	overflow: hidden;
-	border-radius: 999px;
-	background: var(--editor-separator);
-}
-
-#admin-page-wrap .admin-dashboard-meter-fill {
-	display: block;
-	height: 100%;
-	border-radius: inherit;
-	background: var(--editor-blue);
-}
-
 #admin-page-wrap .admin-dashboard-row {
 	padding: .6rem .75rem;
 	border: 1px solid var(--editor-border);
@@ -569,11 +541,11 @@
 	font-size: .8rem;
 }
 
-#admin-page-wrap #admin-dashboard-tiles .nino-admin-tile--users {
+#admin-dashboard-tiles .nino-admin-tile--users {
 	border-top-color: var(--editor-green);
 }
 
-#admin-page-wrap #admin-dashboard-tiles .nino-admin-tile--restore {
+#admin-dashboard-tiles .nino-admin-tile--restore {
 	border-top-color: var(--editor-orange);
 }
 
@@ -663,17 +635,17 @@
 		grid-column: 1;
 	}
 
-	#admin-page-wrap #users-list > .nino-admin-list > li {
+	#users-list > .nino-admin-list > li {
 		grid-template-columns: minmax(0, 1fr) auto;
 	}
 
-	#admin-page-wrap #users-list > .nino-admin-list > li > a {
+	#users-list > .nino-admin-list > li > a {
 		grid-column: 1;
 		grid-row: 2;
 		justify-self: start;
 	}
 
-	#admin-page-wrap #users-list > .nino-admin-list > li > button {
+	#users-list > .nino-admin-list > li > button {
 		grid-column: 2;
 		grid-row: 2;
 	}

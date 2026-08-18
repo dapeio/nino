@@ -50,6 +50,9 @@
  *   Controls   .nino-admin-btn-primary  .nino-admin-btn-secondary
  *              .nino-admin-btn-danger
  *   Surfaces   .nino-admin-card  .nino-admin-tiles  .nino-admin-tile
+ *              .nino-admin-meter-row  .nino-admin-meter-label
+ *              .nino-admin-meter-count  .nino-admin-meter-track
+ *              .nino-admin-meter-fill
  *   Lists      .nino-admin-list  .nino-admin-list-copy
  *              .nino-admin-list-dense  .nino-admin-list-buttons
  *   Table      .nino-admin-table  .nino-admin-table-scroll
@@ -102,6 +105,7 @@
 	--editor-shadow: 0 1px 2px rgba(15,23,42,.05), 0 8px 24px rgba(15,23,42,.055);
 	--editor-shadow-sm: 0 1px 2px rgba(15,23,42,.045), 0 3px 10px rgba(15,23,42,.035);
 
+	--nino-admin-mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
 	--nino-admin-sidebar-width: 15rem;
 	--nino-admin-actionbar-height: 4.25rem;
 	--nino-admin-content-inline: clamp(1.25rem, 3vw, 3rem);
@@ -368,7 +372,7 @@ a {
 :where(.nino-admin) .main-uri {
 	margin: 0 0 .85rem;
 	color: var(--editor-text-secondary);
-	font: .75rem/1.4 ui-monospace, "SFMono-Regular", Consolas, monospace;
+	font: .75rem/1.4 var(--nino-admin-mono);
 }
 
 :where(.nino-admin) fieldset legend,
@@ -526,7 +530,7 @@ a {
 }
 
 :where(.nino-admin) :is(input, textarea, select):hover:not(:disabled) {
-	border-color: color-mix(in srgb, var(--editor-text-secondary) 42%, var(--editor-border));
+	border-color: var(--editor-border);
 }
 
 :where(.nino-admin) textarea {
@@ -960,7 +964,7 @@ a {
 }
 
 :where(.nino-admin) .nino-admin-richtext-btn[data-tag="code"] {
-	font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+	font-family: var(--nino-admin-mono);
 	font-weight: 500;
 }
 
@@ -1007,7 +1011,7 @@ a {
 	padding: .08em .3em;
 	border-radius: 4px;
 	background: var(--editor-bg);
-	font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+	font-family: var(--nino-admin-mono);
 	font-size: .92em;
 }
 
@@ -1121,15 +1125,20 @@ a {
 }
 
 /* A grouped list whose rows are <button>s rather than <li><a>: same surface,
-   same row height, none of the button chrome. */
+   same row height, none of the button chrome. A row is a flex line and says so
+   here - `align-items` alone did nothing, which left every caller re-declaring
+   the whole row and drifting apart from the <li><a> version next to it. */
 :where(.nino-admin) .nino-admin-list-buttons {
 	display: block;
 }
 
 :where(.nino-admin) .nino-admin-list-buttons > button {
+	display: flex;
 	align-items: center;
+	gap: .75rem;
 	width: 100%;
 	min-height: 54px;
+	text-align: left;
 	margin: 0;
 	padding: .62rem .78rem;
 	border: 0;
@@ -1267,7 +1276,7 @@ a {
 
 :where(.nino-admin) .nino-admin-table :is(th, td).nino-admin-table-uri {
 	color: var(--editor-text-secondary);
-	font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+	font-family: var(--nino-admin-mono);
 	font-size: .76rem;
 }
 
@@ -1372,6 +1381,38 @@ a {
 	font-size: .9rem;
 }
 
+/* A share-of-total bar: a labelled row over a thin track. Both dashboards draw
+   one, which is why it is here rather than twice under two tool prefixes - the
+   number next to the label is what a reader actually goes by, the bar only
+   ranks the rows at a glance. */
+:where(.nino-admin) .nino-admin-meter-row {
+	display: flex;
+	justify-content: space-between;
+	gap: 1rem;
+	margin-bottom: .28rem;
+	font-size: .8rem;
+}
+
+:where(.nino-admin) .nino-admin-meter-count {
+	color: var(--editor-text-secondary);
+	font-variant-numeric: tabular-nums;
+}
+
+:where(.nino-admin) .nino-admin-meter-track {
+	display: block;
+	height: 4px;
+	overflow: hidden;
+	border-radius: 999px;
+	background: var(--editor-separator);
+}
+
+:where(.nino-admin) .nino-admin-meter-fill {
+	display: block;
+	height: 100%;
+	border-radius: inherit;
+	background: var(--editor-blue);
+}
+
 /* ------------------------------------------------------- Fixed app chrome */
 
 :where(.nino-admin) .nino-admin-back-link {
@@ -1399,7 +1440,7 @@ a {
 
 .nino-admin .nino-admin-contextbar {
 	position: sticky;
-	top: 0;
+	top: -1rem;
 	z-index: 24;
 	display: flex;
 	align-items: center;
@@ -1656,7 +1697,6 @@ a {
 		margin: 0;
 		overflow-y: auto;
 		overscroll-behavior: contain;
-		scrollbar-gutter: stable;
 		padding: 1rem var(--nino-admin-content-inline) calc(var(--nino-admin-actionbar-height) + 2rem);
 	}
 

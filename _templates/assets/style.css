@@ -15,9 +15,9 @@
  */
 
 :root {
-	--pd-topbar-height: 6.4rem;
-	--pd-sidebar-width: 15.5rem;
-	--pd-inspector-width: 21rem;
+	--pd-topbar-height: 5.35rem;
+	--pd-sidebar-width: var(--nino-admin-sidebar-width);
+	--pd-inspector-width: 20rem;
 	--pd-canvas-width: 58rem;
 	--pd-purple: #7c3aed;
 	--pd-cyan: #0891b2;
@@ -44,8 +44,84 @@ body {
 	text-transform: uppercase;
 }
 code {
-	font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+	font-family: var(--nino-admin-mono);
 	font-size: .88em;
+}
+/* ---------------------------------------------------- Local surface roles */
+
+/*	The builder is dense enough to need its own compact vocabulary, but it only
+ *	needs one of each. Three roles carry every panel, inset and icon tile below,
+ *	so a dialog, the inspector and the Area editor share one corner, surface and
+ *	shadow language instead of each inventing a slightly different one. */
+
+.pd-notice, .pd-inspector-section, .pd-form-section, .pd-include-choice, .pd-v3-panel, .pd-v3-component, .pd-v3-add-component, .pd-v3-binding-group, .pd-v3-source-panel {
+	border: 1px solid var(--editor-border);
+	border-radius: var(--editor-radius);
+	background: var(--editor-bg-elevated);
+	box-shadow: var(--editor-shadow-sm);
+}
+.pd-spec-item, .pd-template-code, .pd-resource, .pd-check, .pd-elements-note, .pd-summary-row, .pd-v3-binding-note, .pd-v3-binding-copy code, .pd-v3-quick-identity code {
+	border-radius: var(--editor-radius-sm);
+	background: var(--editor-bg);
+}
+.pd-page-icon, .pd-inspector-icon, .pd-template-preview-icon, .pd-include-icon, .pd-template-library-icon, .pd-v3-number, .pd-v3-area-index, .pd-v3-component-order, .pd-v3-binding-order {
+	display: grid;
+	place-items: center;
+	flex: 0 0 auto;
+	border-radius: var(--editor-radius-sm);
+}
+
+/* ----------------------------------------------------------- Local field */
+
+/*	One field for the workspace toolbar, the inspector and the composer, rather
+ *	than three near-identical ones. The control keeps the design system's border
+ *	and focus ring and only tightens the metrics. */
+
+.pd-slot-setting, .pd-content-field, .pd-form-field {
+	display: grid;
+	align-content: start;
+	gap: .24rem;
+	min-width: 0;
+}
+:is(.pd-slot-setting, .pd-content-field, .pd-form-field) :is(input, select, textarea) {
+	width: 100%;
+	min-height: 2.25rem;
+	padding: .42rem .55rem;
+	border-radius: var(--editor-radius-sm);
+	background: var(--editor-bg);
+	border: 1px solid var(--editor-border);
+	box-shadow: none;
+	font-size: .7rem;
+}
+/*	The design system paints the select's chevron; only the room it needs has to
+ *	survive the tighter padding above */
+:is(.pd-slot-setting, .pd-content-field, .pd-form-field) select {
+	padding-right: var(--nino-admin-select-indicator);
+}
+:is(.pd-content-field, .pd-form-field) textarea {
+	min-height: 5.4rem;
+}
+:is(.pd-slot-setting, .pd-content-field, .pd-form-field) :is(input, select, textarea):focus {
+	border-color: var(--editor-blue);
+	box-shadow: var(--editor-focus);
+}
+:is(.pd-content-field, .pd-form-field) > span {
+	font-size: .65rem;
+	font-weight: 650;
+}
+:is(.pd-content-field, .pd-form-field) small {
+	color: var(--editor-text-secondary);
+	font-size: .58rem;
+	font-weight: 450;
+}
+.pd-content-field > span {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: .5rem;
+}
+.pd-form-field.is-wide {
+	grid-column: 1 / -1;
 }
 /* --------------------------------------------------------------- Top bar */
 
@@ -53,11 +129,11 @@ code {
 	position: relative;
 	z-index: 20;
 	display: grid;
-	grid-template-columns: var(--pd-sidebar-width) minmax(14rem, 1fr) auto;
+	grid-template-columns: var(--pd-sidebar-width) minmax(0, 1fr) auto;
 	align-items: center;
-	gap: 1.25rem;
+	gap: 1rem;
 	height: var(--pd-topbar-height);
-	padding: .75rem 1rem;
+	padding: .6rem 1rem;
 	background: var(--editor-bar-bg);
 	border-bottom: 1px solid var(--editor-separator);
 	backdrop-filter: blur(22px) saturate(175%);
@@ -67,7 +143,7 @@ code {
 	display: grid;
 	align-content: center;
 	align-self: stretch;
-	gap: .65rem;
+	gap: .4rem;
 	min-width: 0;
 	padding-right: .25rem;
 }
@@ -78,51 +154,15 @@ code {
 	min-width: 0;
 	color: var(--editor-text);
 }
-#pd-app .nino-admin-brand-mark {
-	display: grid;
-	place-items: center;
-	width: 2.25rem;
-	height: 2.25rem;
-	flex: 0 0 auto;
-	border-radius: .75rem;
-	background: var(--editor-blue);
-	box-shadow: 0 .45rem 1rem rgba(37,99,235,.2);
-	color: #fff;
-}
-#pd-app .nino-admin-brand-mark svg {
-	width: 1.15rem;
-	height: 1.15rem;
-}
-#pd-app .nino-admin-brand-copy {
-	display: flex;
-	flex-direction: column;
-	line-height: 1.1;
-}
-#pd-app .nino-admin-brand-copy strong, #pd-app .nino-admin-brand-copy small {
-	display: block;
-	white-space: nowrap;
-}
-#pd-app .nino-admin-brand-copy strong {
-	font-size: .95rem;
-	letter-spacing: -.01em;
-}
-#pd-app .nino-admin-brand-copy small {
-	margin-top: .18rem;
-	color: var(--editor-text-secondary);
-	font-size: .72rem;
-	font-weight: 600;
-	letter-spacing: .08em;
-	text-transform: uppercase;
-}
 .pd-back-admin {
 	display: inline-flex;
 	align-items: center;
 	gap: .38rem;
 	min-width: 0;
-	padding-top: .55rem;
+	padding-top: .38rem;
 	border-top: 1px solid var(--editor-separator);
 	color: var(--editor-blue);
-	font-size: .78rem;
+	font-size: .73rem;
 	font-weight: 500;
 }
 .pd-back-admin svg {
@@ -145,16 +185,15 @@ code {
 	white-space: nowrap;
 }
 #pd-document-meta strong {
-	font-size: .88rem;
+	font-size: .86rem;
 }
 #pd-document-meta span {
 	margin-top: .1rem;
 	color: var(--editor-text-secondary);
-	font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+	font-family: var(--nino-admin-mono);
 	font-size: .68rem;
 }
 #pd-save-state {
-	max-width: 13rem;
 	color: var(--editor-text-secondary);
 	font-size: .72rem;
 	text-align: right;
@@ -171,16 +210,10 @@ code {
 	justify-content: flex-end;
 	gap: .45rem;
 }
-button.nino-admin-btn-primary, #pd-app .nino-admin-btn-primary {
-	min-height: 2.55rem;
-	padding: .58rem 1rem;
-	background: var(--editor-blue);
-	box-shadow: 0 .35rem .8rem rgba(37,99,235,.18);
-	color: #fff;
-}
-button.nino-admin-btn-primary:hover:not(:disabled) {
-	background: var(--editor-blue-hover);
-	color: #fff;
+#pd-app #pd-top-actions :is(.nino-admin-btn-primary, .nino-admin-btn-danger) {
+	min-height: 2.2rem;
+	padding: .42rem .72rem;
+	font-size: .69rem;
 }
 /* ----------------------------------------------------------------- Shell */
 
@@ -197,11 +230,11 @@ button.nino-admin-btn-primary:hover:not(:disabled) {
 	background: color-mix(in srgb, var(--editor-sidebar-bg) 94%, transparent);
 }
 #pd-pages {
-	padding: 1.15rem .85rem 1.5rem;
+	padding: .9rem .75rem 1.25rem;
 	border-right: 1px solid var(--editor-separator);
 }
 #pd-inspector {
-	padding: 1.15rem 1rem 2rem;
+	padding: .9rem .75rem 1.25rem;
 	border-left: 1px solid var(--editor-separator);
 }
 .pd-panel-heading {
@@ -209,26 +242,29 @@ button.nino-admin-btn-primary:hover:not(:disabled) {
 	align-items: center;
 	justify-content: space-between;
 	gap: .75rem;
-	padding: 0 .25rem .75rem;
+	padding: 0 .2rem .6rem;
 }
 .pd-heading-actions, .pd-toolbar-actions {
 	display: flex;
 	align-items: center;
 	gap: .4rem;
 }
+.pd-toolbar-actions:empty {
+	display: none;
+}
 .pd-panel-heading h2, .pd-inspector-empty h2, .pd-inspector-title h2, .pd-dialog-header h2 {
 	margin: 0;
-	font-size: 1rem;
+	font-size: .95rem;
 	letter-spacing: -.02em;
 }
 .pd-icon-button {
 	display: inline-grid;
 	place-items: center;
-	width: 2.25rem;
-	height: 2.25rem;
+	width: 2rem;
+	height: 2rem;
 	min-height: 0;
 	padding: 0;
-	border-radius: .7rem;
+	border-radius: var(--editor-radius-sm);
 	font-size: 1.1rem;
 }
 .pd-icon-button svg {
@@ -240,13 +276,12 @@ button.nino-admin-btn-primary:hover:not(:disabled) {
 	display: flex;
 	align-items: center;
 	gap: .4rem;
-	margin: 0 0 .8rem;
-	padding: .05rem .7rem;
+	margin: 0 0 .65rem;
+	padding: .02rem .62rem;
 	border: 1px solid var(--editor-border);
-	border-radius: .75rem;
+	border-radius: var(--editor-radius-sm);
 	background: var(--editor-bg-elevated);
 	color: var(--editor-text-secondary);
-	box-shadow: var(--editor-shadow-sm);
 }
 .pd-search:focus-within {
 	border-color: var(--editor-blue);
@@ -254,7 +289,7 @@ button.nino-admin-btn-primary:hover:not(:disabled) {
 }
 .pd-search input {
 	width: 100%;
-	min-height: 2.35rem;
+	min-height: 2.15rem;
 	padding: 0;
 	border: 0;
 	outline: 0;
@@ -265,38 +300,42 @@ button.nino-admin-btn-primary:hover:not(:disabled) {
 	font-size: .78rem;
 }
 #pd-page-list {
-	display: flex;
-	flex-direction: column;
-	gap: .28rem;
+	overflow: hidden;
+	border: 1px solid var(--editor-border);
+	border-radius: var(--editor-radius);
+	background: var(--editor-bg-grouped);
+	box-shadow: var(--editor-shadow-sm);
 }
 .pd-page-button {
 	display: grid;
-	grid-template-columns: 2rem minmax(0, 1fr) auto;
+	grid-template-columns: 1.7rem minmax(0, 1fr) auto;
 	align-items: center;
-	gap: .55rem;
+	gap: .48rem;
 	width: 100%;
-	min-height: 3.25rem;
-	padding: .42rem .48rem;
+	min-height: 48px;
+	margin: 0;
+	padding: .38rem .55rem;
+	border: 0;
+	border-bottom: 1px solid var(--editor-separator);
+	border-radius: 0;
 	background: transparent;
-	border-radius: .8rem;
 	box-shadow: none;
 	color: var(--editor-text);
 	text-align: left;
 }
-.pd-page-button:hover:not(:disabled) {
+.pd-page-button:last-child {
+	border-bottom: 0;
+}
+.pd-page-button:hover:not(:disabled), .pd-page-button.is-active {
 	background: var(--editor-blue-soft);
+	box-shadow: none;
 }
 .pd-page-button.is-active {
-	background: var(--editor-blue-soft);
-	box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--editor-blue) 25%, transparent);
 	color: var(--editor-blue);
 }
 .pd-page-icon {
-	display: grid;
-	place-items: center;
-	width: 2rem;
-	height: 2rem;
-	border-radius: .55rem;
+	width: 1.7rem;
+	height: 1.7rem;
 	background: var(--editor-bg-elevated);
 	box-shadow: inset 0 0 0 1px var(--editor-border);
 	font-size: .78rem;
@@ -311,11 +350,11 @@ button.nino-admin-btn-primary:hover:not(:disabled) {
 	white-space: nowrap;
 }
 .pd-page-copy strong {
-	font-size: .78rem;
+	font-size: .77rem;
 }
 .pd-page-copy small, .pd-page-count {
 	color: var(--editor-text-secondary);
-	font-size: .65rem;
+	font-size: .63rem;
 }
 .pd-page-count {
 	padding: .18rem .4rem;
@@ -331,7 +370,8 @@ button.nino-admin-btn-primary:hover:not(:disabled) {
 	margin: 1.25rem .2rem 0;
 	padding: .8rem;
 	border: 1px dashed var(--editor-border);
-	border-radius: .8rem;
+	border-radius: var(--editor-radius);
+	box-shadow: var(--editor-shadow-sm);
 	color: var(--editor-text-secondary);
 	font-size: .67rem;
 	line-height: 1.45;
@@ -347,21 +387,25 @@ button.nino-admin-btn-primary:hover:not(:disabled) {
 	height: 100%;
 	overflow-y: auto;
 	overscroll-behavior: contain;
-	scrollbar-gutter: stable;
-	padding: 1.15rem clamp(1rem, 3vw, 3rem) 5rem;
+	padding: 1rem clamp(1rem, 2.6vw, 2.5rem) 2rem;
 }
 #pd-page-toolbar {
+	position: sticky;
+	top: -1rem;
+	z-index: 12;
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
 	gap: 1rem;
-	width: min(100%, 72rem);
-	margin: 0 auto 1rem;
-	padding: .8rem;
-	border: 1px solid var(--editor-border);
-	border-radius: .9rem;
-	background: color-mix(in srgb, var(--editor-bg-elevated) 94%, transparent);
-	box-shadow: var(--editor-shadow-sm);
+	width: calc(100% + clamp(2rem, 5.2vw, 5rem));
+	margin: -1rem calc(clamp(1rem, 2.6vw, 2.5rem) * -1) 1rem;
+	padding: .7rem clamp(1rem, 2.6vw, 2.5rem);
+	border: 0 solid var(--editor-border);
+	border-bottom-width: 1px;
+	background: var(--editor-bar-bg);
+	box-shadow: 0 1px 0 rgba(15,23,42,.025);
+	backdrop-filter: blur(18px) saturate(170%);
+	-webkit-backdrop-filter: blur(18px) saturate(170%);
 }
 .pd-template-settings {
 	min-width: 0;
@@ -373,46 +417,15 @@ button.nino-admin-btn-primary:hover:not(:disabled) {
 	align-items: flex-end;
 	gap: .7rem;
 }
-.pd-slot-setting {
-	display: grid;
-	gap: .22rem;
-	min-width: 9.5rem;
-}
 .pd-name-setting {
 	min-width: 10.5rem;
 }
-.pd-slot-setting span {
+.pd-slot-setting > span {
 	color: var(--editor-text-secondary);
-	font-size: .61rem;
+	font-size: .64rem;
 	font-weight: 700;
+	letter-spacing: .04em;
 	text-transform: uppercase;
-}
-.pd-slot-setting select, .pd-slot-setting input {
-	width: 100%;
-	min-height: 2.15rem;
-	padding: .38rem 2rem .38rem .55rem;
-	border: 1px solid var(--editor-border);
-	border-radius: .58rem;
-	background: var(--editor-bg);
-	color: var(--editor-text);
-	font-size: .69rem;
-}
-.pd-slot-setting input {
-	padding-right: .55rem;
-}
-#pd-app .nino-admin-btn-danger {
-	align-self: center;
-	min-height: 2.15rem;
-	padding: .4rem .65rem;
-	border-color: color-mix(in srgb, var(--editor-red) 32%, var(--editor-border));
-	background: color-mix(in srgb, var(--editor-red) 7%, var(--editor-bg-elevated));
-	color: var(--editor-red);
-	font-size: .69rem;
-}
-#pd-app .nino-admin-btn-danger:hover:not(:disabled) {
-	border-color: var(--editor-red);
-	background: color-mix(in srgb, var(--editor-red) 13%, var(--editor-bg-elevated));
-	color: var(--editor-red);
 }
 .pd-segmented {
 	display: inline-flex;
@@ -449,9 +462,6 @@ button.nino-admin-btn-primary:hover:not(:disabled) {
 .pd-notice {
 	margin: 0 0 .9rem;
 	padding: .72rem .85rem;
-	border: 1px solid var(--editor-border);
-	border-radius: .8rem;
-	background: var(--editor-bg-elevated);
 	font-size: .74rem;
 }
 .pd-notice.is-error {
@@ -529,7 +539,7 @@ button.nino-admin-btn-primary:hover:not(:disabled) {
 	gap: .6rem;
 	padding: .1rem .45rem;
 	color: var(--editor-text-secondary);
-	font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+	font-family: var(--nino-admin-mono);
 	font-size: .62rem;
 	user-select: none;
 }
@@ -546,18 +556,17 @@ button.nino-admin-btn-primary:hover:not(:disabled) {
 	min-height: 9rem;
 	overflow: hidden;
 	border: 1px solid var(--editor-border);
-	border-radius: 1rem;
+	border-radius: var(--editor-radius);
 	background: var(--editor-bg-elevated);
 	box-shadow: var(--editor-shadow-sm);
 	cursor: pointer;
 	user-select: none;
 	-webkit-user-select: none;
-	transition: border-color .16s ease, box-shadow .16s ease, transform .16s ease;
+	transition: border-color .16s ease, box-shadow .16s ease;
 }
 .pd-section-card:hover {
 	border-color: color-mix(in srgb, var(--editor-blue) 32%, var(--editor-border));
 	box-shadow: var(--editor-shadow);
-	transform: translateY(-1px);
 }
 .pd-section-card.is-selected {
 	border-color: var(--editor-blue);
@@ -672,11 +681,8 @@ button.nino-admin-btn-primary:hover:not(:disabled) {
 	gap: .65rem;
 }
 .pd-template-preview-icon {
-	display: grid;
-	place-items: center;
 	width: 2.5rem;
 	height: 2.5rem;
-	border-radius: .7rem;
 	background: color-mix(in srgb, var(--pd-cyan) 14%, transparent);
 	color: var(--pd-cyan);
 	font-size: .72rem;
@@ -777,12 +783,9 @@ button.nino-admin-btn-primary:hover:not(:disabled) {
 	text-align: center;
 }
 .pd-inspector-icon {
-	display: grid;
-	place-items: center;
 	width: 3rem;
 	height: 3rem;
 	margin-bottom: .8rem;
-	border-radius: 1rem;
 	background: var(--editor-blue-soft);
 	color: var(--editor-blue);
 	font-size: 1.35rem;
@@ -807,10 +810,6 @@ button.nino-admin-btn-primary:hover:not(:disabled) {
 .pd-inspector-section {
 	margin: 0 0 .85rem;
 	padding: .85rem;
-	border: 1px solid var(--editor-border);
-	border-radius: .85rem;
-	background: var(--editor-bg-elevated);
-	box-shadow: var(--editor-shadow-sm);
 }
 .pd-inspector-section > h3 {
 	margin: 0 0 .7rem;
@@ -824,8 +823,6 @@ button.nino-admin-btn-primary:hover:not(:disabled) {
 .pd-spec-item {
 	min-width: 0;
 	padding: .45rem .5rem;
-	border-radius: .55rem;
-	background: var(--editor-bg);
 }
 .pd-spec-item small, .pd-spec-item strong {
 	display: block;
@@ -859,8 +856,6 @@ button.nino-admin-btn-primary:hover:not(:disabled) {
 	display: block;
 	overflow: hidden;
 	padding: .55rem .6rem;
-	border-radius: .55rem;
-	background: var(--editor-bg);
 	color: var(--editor-text-secondary);
 	font-size: .64rem;
 	text-overflow: ellipsis;
@@ -869,43 +864,6 @@ button.nino-admin-btn-primary:hover:not(:disabled) {
 .pd-content-fields {
 	display: grid;
 	gap: .65rem;
-}
-.pd-content-field {
-	display: grid;
-	gap: .25rem;
-}
-.pd-content-field > span {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	gap: .5rem;
-	font-size: .66rem;
-	font-weight: 650;
-}
-.pd-content-field small {
-	color: var(--editor-text-secondary);
-	font-weight: 450;
-}
-.pd-content-field input, .pd-content-field textarea, .pd-form-field input, .pd-form-field select, .pd-form-field textarea {
-	width: 100%;
-	min-height: 2.45rem;
-	padding: .55rem .65rem;
-	border: 1px solid var(--editor-border);
-	border-radius: .62rem;
-	outline: 0;
-	background: var(--editor-bg);
-	box-shadow: none;
-	color: var(--editor-text);
-	font: inherit;
-	font-size: .72rem;
-}
-.pd-content-field textarea, .pd-form-field textarea {
-	min-height: 5.4rem;
-	resize: vertical;
-}
-.pd-content-field input:focus, .pd-content-field textarea:focus, .pd-form-field input:focus, .pd-form-field select:focus, .pd-form-field textarea:focus {
-	border-color: var(--editor-blue);
-	box-shadow: var(--editor-focus);
 }
 .pd-content-footer {
 	display: flex;
@@ -933,8 +891,6 @@ button.nino-admin-btn-primary:hover:not(:disabled) {
 	justify-content: space-between;
 	gap: .5rem;
 	padding: .48rem .52rem;
-	border-radius: .58rem;
-	background: var(--editor-bg);
 	font-size: .65rem;
 }
 .pd-resource code {
@@ -959,9 +915,9 @@ button.nino-admin-btn-primary:hover:not(:disabled) {
 	padding: 0;
 	overflow: hidden;
 	border: 1px solid var(--editor-border);
-	border-radius: 1.1rem;
+	border-radius: 12px;
 	background: var(--editor-bg-elevated);
-	box-shadow: 0 2rem 5rem rgba(0,0,0,.24);
+	box-shadow: 0 1.5rem 4rem rgba(0,0,0,.24);
 	color: var(--editor-text);
 }
 .pd-dialog::backdrop {
@@ -979,7 +935,8 @@ button.nino-admin-btn-primary:hover:not(:disabled) {
 	display: flex;
 	align-items: center;
 	gap: .7rem;
-	padding: .85rem 1rem;
+	min-height: 56px;
+	padding: .7rem .85rem;
 	background: var(--editor-bar-bg);
 }
 .pd-dialog-header {
@@ -1044,9 +1001,6 @@ button.nino-admin-btn-primary:hover:not(:disabled) {
 	width: 100%;
 	min-height: 4rem;
 	padding: .55rem;
-	border: 1px solid var(--editor-border);
-	background: var(--editor-bg-elevated);
-	box-shadow: var(--editor-shadow-sm);
 	color: var(--editor-text);
 	text-align: left;
 }
@@ -1055,11 +1009,8 @@ button.nino-admin-btn-primary:hover:not(:disabled) {
 	background: var(--editor-blue-soft);
 }
 .pd-include-icon {
-	display: grid;
-	place-items: center;
 	width: 2.7rem;
 	height: 2.7rem;
-	border-radius: .75rem;
 	background: color-mix(in srgb, var(--pd-cyan) 13%, transparent);
 	color: var(--pd-cyan);
 	font-weight: 750;
@@ -1293,11 +1244,8 @@ button.nino-admin-btn-primary:hover:not(:disabled) {
 		var(--editor-bg);
 }
 .pd-template-library-icon {
-	display: grid;
-	place-items: center;
 	width: 3.5rem;
 	height: 3.5rem;
-	border-radius: 1rem;
 	background: color-mix(in srgb, var(--pd-cyan) 14%, var(--editor-bg-elevated));
 	box-shadow: var(--editor-shadow-sm);
 	color: var(--pd-cyan);
@@ -1433,9 +1381,6 @@ button.nino-admin-btn-primary:hover:not(:disabled) {
 .pd-form-section {
 	margin: 0 0 .8rem;
 	padding: .85rem;
-	border: 1px solid var(--editor-border);
-	border-radius: .85rem;
-	background: var(--editor-bg-elevated);
 }
 .pd-form-section h3 {
 	margin: 0 0 .7rem;
@@ -1446,23 +1391,6 @@ button.nino-admin-btn-primary:hover:not(:disabled) {
 	grid-template-columns: repeat(2, minmax(0, 1fr));
 	gap: .65rem;
 }
-.pd-form-field {
-	display: grid;
-	align-content: start;
-	gap: .24rem;
-	min-width: 0;
-}
-.pd-form-field.is-wide {
-	grid-column: 1 / -1;
-}
-.pd-form-field > span {
-	font-size: .64rem;
-	font-weight: 650;
-}
-.pd-form-field > small {
-	color: var(--editor-text-secondary);
-	font-size: .58rem;
-}
 .pd-check {
 	display: flex;
 	align-items: flex-start;
@@ -1470,8 +1398,6 @@ button.nino-admin-btn-primary:hover:not(:disabled) {
 	grid-column: 1 / -1;
 	padding: .55rem .6rem;
 	border: 1px solid var(--editor-border);
-	border-radius: .6rem;
-	background: var(--editor-bg);
 	font-size: .64rem;
 	line-height: 1.4;
 }
@@ -1538,7 +1464,7 @@ button.nino-admin-btn-primary:hover:not(:disabled) {
 	border-radius: 999px;
 	background: var(--editor-blue-soft);
 	color: var(--editor-blue);
-	font: 650 .56rem ui-monospace, "SFMono-Regular", Consolas, monospace;
+	font: 650 .56rem var(--nino-admin-mono);
 }
 .pd-native-grid {
 	display: grid;
@@ -1551,8 +1477,6 @@ button.nino-admin-btn-primary:hover:not(:disabled) {
 .pd-elements-note {
 	margin-top: .7rem;
 	padding: .55rem .6rem;
-	border-radius: .6rem;
-	background: var(--editor-bg);
 }
 #pd-composer-summary {
 	display: grid;
@@ -1565,8 +1489,6 @@ button.nino-admin-btn-primary:hover:not(:disabled) {
 	justify-content: space-between;
 	gap: .75rem;
 	padding: .42rem .5rem;
-	border-radius: .55rem;
-	background: color-mix(in srgb, var(--editor-bg-elevated) 92%, transparent);
 	font-size: .63rem;
 }
 .pd-summary-row span {
@@ -1610,7 +1532,7 @@ button.nino-admin-btn-primary:hover:not(:disabled) {
 	background: #0c111b;
 	box-shadow: inset 0 0 1.2rem rgba(0,0,0,.25);
 	color: #dbeafe;
-	font: .76rem/1.55 ui-monospace, "SFMono-Regular", Consolas, monospace;
+	font: .76rem/1.55 var(--nino-admin-mono);
 	tab-size: 2;
 	user-select: text;
 	-webkit-user-select: text;
@@ -1674,7 +1596,7 @@ button.nino-admin-btn-primary:hover:not(:disabled) {
 #pd-document-meta {
 		display: none;
 	}
-#pd-save-state, .pd-top-link {
+#pd-save-state {
 		display: none;
 	}
 #pd-shell {
@@ -1751,9 +1673,6 @@ button.nino-admin-btn-primary:hover:not(:disabled) {
 		width: 100%;
 		max-width: none;
 	}
-#pd-app .nino-admin-btn-danger {
-		align-self: stretch;
-	}
 .pd-toolbar-actions {
 		flex-direction: column;
 		width: 100%;
@@ -1813,6 +1732,64 @@ button.nino-admin-btn-primary:hover:not(:disabled) {
 		transition: none;
 	}
 }
+/* ------------------------------------------------------- Desktop app rail */
+
+/* Above the breakpoint the head rail and the template list stop being two
+   separate panels and read as one sidebar, the same rail /_admin, /_editor and
+   /_install show - it is a colour treatment, not a second layout. */
+
+@media (min-width: 58.001rem) {
+	#pd-app .pd-head-rail, #pd-app #pd-pages {
+		border-color: var(--nino-admin-rail-border);
+		background: var(--nino-admin-rail);
+	}
+	#pd-app .pd-head-rail {
+		align-self: stretch;
+		box-sizing: border-box;
+		justify-self: start;
+		width: var(--pd-sidebar-width);
+		margin: -.6rem 0 -.6rem -1rem;
+		padding: .65rem .75rem;
+	}
+	#pd-app :is(.pd-brand, .pd-panel-heading h2, .pd-sidebar-note strong) {
+		color: var(--nino-admin-rail-text);
+	}
+	#pd-app :is(.nino-admin-brand-copy small, .pd-eyebrow, .pd-back-admin, .pd-sidebar-note) {
+		color: var(--nino-admin-rail-muted);
+	}
+	#pd-app .pd-back-admin {
+		border-color: var(--nino-admin-rail-border);
+		color: var(--editor-blue);
+	}
+	#pd-app #pd-pages .pd-search, #pd-app #pd-page-list {
+		border-color: var(--nino-admin-rail-border);
+		background: var(--editor-bg-grouped);
+		box-shadow: none;
+	}
+	#pd-app #pd-pages .pd-search input, #pd-app .pd-page-button {
+		color: var(--editor-text);
+	}
+	#pd-app .pd-page-button {
+		border-color: var(--nino-admin-rail-border);
+	}
+	#pd-app .pd-page-button:hover:not(:disabled), #pd-app .pd-page-button.is-active {
+		background: var(--editor-blue-soft);
+		color: var(--editor-blue);
+	}
+	#pd-app .pd-page-icon, #pd-app .pd-page-count {
+		border-color: var(--nino-admin-rail-border);
+		background: var(--editor-bg);
+		color: var(--nino-admin-rail-text);
+	}
+	#pd-app :is(.pd-page-copy small, .pd-page-count) {
+		color: var(--nino-admin-rail-muted);
+	}
+	#pd-app .pd-heading-actions button {
+		background: var(--editor-bg-elevated);
+		box-shadow: inset 0 0 0 1px var(--nino-admin-rail-border);
+		color: var(--editor-text);
+	}
+}
 }
 
 @layer nino.tool {
@@ -1826,10 +1803,6 @@ button.nino-admin-btn-primary:hover:not(:disabled) {
 .pd-v3-panel {
 	overflow: hidden;
 	padding: 0;
-	border: 1px solid var(--editor-border);
-	border-radius: .9rem;
-	background: var(--editor-bg-elevated);
-	box-shadow: 0 .3rem 1rem rgba(15,23,42,.045);
 }
 .pd-v3-panel-heading {
 	display: grid;
@@ -1844,13 +1817,9 @@ button.nino-admin-btn-primary:hover:not(:disabled) {
 .pd-v3-panel-heading h3 { margin: 0; font-size: .82rem; letter-spacing: -.01em; }
 .pd-v3-panel-heading p { max-width: 34rem; margin: .18rem 0 0; color: var(--editor-text-secondary); font-size: .65rem; line-height: 1.42; }
 .pd-v3-number {
-	display: grid;
-	align-content: center;
-	place-items: center;
 	width: 2.55rem;
 	height: 2.55rem;
 	border: 1px solid color-mix(in srgb, var(--editor-blue) 24%, var(--editor-border));
-	border-radius: .65rem;
 	background: var(--editor-blue-soft);
 	color: var(--editor-blue);
 	line-height: 1;
@@ -1915,15 +1884,11 @@ button.nino-admin-btn-primary:hover:not(:disabled) {
 }
 .pd-v3-area-tabs button.is-active {
 	border-color: color-mix(in srgb, var(--editor-blue) 42%, var(--editor-border));
-	box-shadow: inset 0 -3px 0 var(--editor-blue), 0 .18rem .5rem rgba(15,23,42,.05);
 }
 .pd-v3-area-index {
-	display: grid;
-	place-items: center;
 	width: 1.45rem;
 	height: 1.45rem;
-	border-radius: .48rem;
-	background: var(--editor-bg-grouped);
+	background: var(--editor-bg);
 	color: var(--editor-text-secondary);
 	font-size: .61rem;
 	font-weight: 760;
@@ -1997,16 +1962,12 @@ button.nino-admin-btn-primary:hover:not(:disabled) {
 	align-items: center;
 	gap: .65rem;
 	padding: .58rem .62rem;
-	border: 1px solid var(--editor-border);
-	border-radius: .68rem;
-	background: var(--editor-bg-elevated);
-	box-shadow: 0 1px 2px rgba(15,23,42,.035);
 }
 .pd-v3-component-identity { display: grid; grid-template-columns: 1.65rem minmax(0, 1fr); align-items: center; gap: .52rem; min-width: 0; }
 .pd-v3-component-copy { display: grid; min-width: 0; }
 .pd-v3-component-copy strong { overflow: hidden; font-size: .72rem; text-overflow: ellipsis; white-space: nowrap; }
-.pd-v3-component-copy small { margin-top: .12rem; overflow: hidden; color: var(--editor-text-secondary); font-family: ui-monospace, "SFMono-Regular", Consolas, monospace; font-size: .58rem; text-overflow: ellipsis; white-space: nowrap; }
-.pd-v3-component-order { display: grid; place-items: center; width: 1.65rem; height: 1.65rem; border-radius: .5rem; background: var(--editor-blue-soft); color: var(--editor-blue); font-size: .62rem; font-weight: 760; }
+.pd-v3-component-copy small { margin-top: .12rem; overflow: hidden; color: var(--editor-text-secondary); font-family: var(--nino-admin-mono); font-size: .58rem; text-overflow: ellipsis; white-space: nowrap; }
+.pd-v3-component-order { width: 1.65rem; height: 1.65rem; background: var(--editor-blue-soft); color: var(--editor-blue); font-size: .62rem; font-weight: 760; }
 .pd-v3-component-controls { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .4rem; }
 .pd-v3-component-controls .pd-form-field { min-width: 0; }
 .pd-v3-component-controls .pd-form-field > span { font-size: .58rem; }
@@ -2045,9 +2006,7 @@ button.nino-admin-btn-primary:hover:not(:disabled) {
 	gap: .5rem;
 	margin-top: .7rem;
 	padding: .7rem;
-	border: 1px dashed var(--editor-border);
-	border-radius: .68rem;
-	background: var(--editor-bg-elevated);
+	border-style: dashed;
 }
 .pd-v3-add-component select { min-height: 2.35rem; }
 .pd-v3-add-component button { min-height: 2.35rem; box-shadow: none; }
@@ -2057,10 +2016,6 @@ button.nino-admin-btn-primary:hover:not(:disabled) {
 	grid-template-columns: repeat(2, minmax(0, 1fr));
 	gap: .55rem;
 	padding: .72rem;
-	border: 1px solid var(--editor-border);
-	border-radius: .68rem;
-	background: var(--editor-bg-elevated);
-	box-shadow: 0 1px 1px rgba(15,23,42,.025);
 }
 .pd-v3-binding-heading {
 	display: grid;
@@ -2071,15 +2026,13 @@ button.nino-admin-btn-primary:hover:not(:disabled) {
 	padding-bottom: .55rem;
 	border-bottom: 1px solid var(--editor-separator);
 }
-.pd-v3-binding-order { display: grid; place-items: center; width: 1.65rem; height: 1.65rem; border-radius: .5rem; background: var(--editor-bg-grouped); color: var(--editor-text-secondary); font-size: .62rem; font-weight: 760; }
+.pd-v3-binding-order { width: 1.65rem; height: 1.65rem; background: var(--editor-bg); color: var(--editor-text-secondary); font-size: .62rem; font-weight: 760; }
 .pd-v3-binding-copy { display: flex; align-items: center; justify-content: space-between; gap: .7rem; min-width: 0; }
 .pd-v3-binding-copy strong { font-size: .72rem; }
 .pd-v3-binding-copy code {
 	min-width: 0;
 	overflow: hidden;
 	padding: .18rem .36rem;
-	border-radius: .35rem;
-	background: var(--editor-bg-grouped);
 	color: var(--editor-text-secondary);
 	font-size: .62rem;
 	text-overflow: ellipsis;
@@ -2087,8 +2040,8 @@ button.nino-admin-btn-primary:hover:not(:disabled) {
 }
 .pd-v3-binding-group > .pd-form-field { grid-column: 1 / -1; }
 .pd-v3-generated-value textarea { min-height: 4.5rem; }
-.pd-v3-binding-note { grid-column: 1 / -1; margin: 0; padding: .5rem .58rem; border-radius: .5rem; background: var(--editor-bg-grouped); color: var(--editor-text-secondary); font-size: .59rem; line-height: 1.4; }
-.pd-v3-source-panel { min-width: 0; padding: .72rem; border: 1px solid var(--editor-border); border-radius: .68rem; background: var(--editor-bg-elevated); }
+.pd-v3-binding-note { grid-column: 1 / -1; margin: 0; padding: .5rem .58rem; color: var(--editor-text-secondary); font-size: .59rem; line-height: 1.4; }
+.pd-v3-source-panel { min-width: 0; padding: .72rem; }
 .pd-v3-source-panel > .pd-v3-section-label { margin-top: 0; padding-top: 0; border-top: 0; }
 .pd-v3-source-panel + .pd-v3-section-label { margin-top: .8rem; }
 .pd-composer-dialog.is-edit .pd-stepper { display: none; }
@@ -2099,7 +2052,7 @@ button.nino-admin-btn-primary:hover:not(:disabled) {
 .pd-v3-quick-component .pd-v3-binding-copy { align-items: center; }
 .pd-v3-quick-identity { display: flex; align-items: center; justify-content: space-between; flex: 1 1 auto; gap: .7rem; min-width: 0; }
 .pd-v3-quick-identity strong { font-size: .72rem; }
-.pd-v3-quick-identity code { overflow: hidden; padding: .18rem .36rem; border-radius: .35rem; background: var(--editor-bg-grouped); color: var(--editor-text-secondary); font-size: .62rem; text-overflow: ellipsis; white-space: nowrap; }
+.pd-v3-quick-identity code { overflow: hidden; padding: .18rem .36rem; color: var(--editor-text-secondary); font-size: .62rem; text-overflow: ellipsis; white-space: nowrap; }
 .pd-v3-quick-component .pd-v3-component-actions { flex: 0 0 auto; }
 .pd-v3-quick-component .pd-v3-binding-note { margin: 0 .72rem .72rem; }
 @media (max-width: 48rem) {
@@ -2119,210 +2072,7 @@ button.nino-admin-btn-primary:hover:not(:disabled) {
 }
 
 @layer nino.local {
-/* ------------------------------------------------- Design-system locals */
-/*
-   Tool-local components and overrides (see _nino/Nino.admin.css).
-   Ids are fine here - this file only ever loads inside /_templates - but they
-   stay out of the shared design system, which has to work for all four tools.
-*/
-
-#pd-app {
-	--pd-topbar-height: 5.35rem;
-	--pd-sidebar-width: var(--nino-admin-sidebar-width);
-	--pd-inspector-width: 20rem;
-}
-#pd-app #pd-topbar {
-	grid-template-columns: var(--pd-sidebar-width) minmax(0, 1fr) auto;
-	gap: 1rem;
-	height: var(--pd-topbar-height);
-	padding: .6rem 1rem;
-	box-shadow: none;
-}
-#pd-app .pd-head-rail {
-	gap: .4rem;
-}
-#pd-app :is(.nino-admin-brand-mark, .pd-page-icon, .pd-inspector-icon) {
-	border-radius: var(--editor-radius-sm);
-}
-#pd-app .nino-admin-brand-mark {
-	width: 2rem;
-	height: 2rem;
-	box-shadow: none;
-}
-#pd-app .pd-back-admin {
-	padding-top: .38rem;
-	font-size: .73rem;
-}
-#pd-app #pd-document-meta strong {
-	font-size: .86rem;
-}
-#pd-app #pd-top-actions :is(.nino-admin-btn-primary, .nino-admin-btn-danger) {
-	min-height: 2.2rem;
-	padding: .42rem .72rem;
-	border-radius: var(--editor-radius-sm);
-	font-size: .69rem;
-}
-#pd-app #pd-pages, #pd-app #pd-inspector {
-	padding: .9rem .75rem 1.25rem;
-}
-#pd-app .pd-panel-heading {
-	padding: 0 .2rem .6rem;
-}
-#pd-app :is(.pd-panel-heading h2, .pd-inspector-empty h2, .pd-inspector-title h2, .pd-dialog-header h2) {
-	font-size: .95rem;
-	letter-spacing: -.02em;
-}
-#pd-app .pd-icon-button {
-	width: 2rem;
-	height: 2rem;
-	min-height: 0;
-	padding: 0;
-	border-radius: var(--editor-radius-sm);
-}
-#pd-app .pd-search {
-	margin-bottom: .65rem;
-	padding: .02rem .62rem;
-	border-radius: var(--editor-radius-sm);
-	box-shadow: none;
-}
-#pd-app .pd-search input {
-	min-height: 2.15rem;
-	padding: 0;
-	border: 0;
-	box-shadow: none;
-	font-size: .78rem;
-}
-#pd-app #pd-page-list {
-	display: block;
-	overflow: hidden;
-	border: 1px solid var(--editor-border);
-	border-radius: var(--editor-radius);
-	background: var(--editor-bg-grouped);
-	box-shadow: var(--editor-shadow-sm);
-}
-#pd-app .pd-page-button {
-	grid-template-columns: 1.7rem minmax(0, 1fr) auto;
-	gap: .48rem;
-	min-height: 48px;
-	margin: 0;
-	padding: .38rem .55rem;
-	border: 0;
-	border-bottom: 1px solid var(--editor-separator);
-	border-radius: 0;
-	background: transparent;
-	box-shadow: none;
-}
-#pd-app .pd-page-button:last-child {
-	border-bottom: 0;
-}
-#pd-app .pd-page-button:hover:not(:disabled), #pd-app .pd-page-button.is-active {
-	background: var(--editor-blue-soft);
-	box-shadow: none;
-}
-#pd-app .pd-page-icon {
-	width: 1.7rem;
-	height: 1.7rem;
-}
-#pd-app .pd-page-copy strong {
-	font-size: .77rem;
-}
-#pd-app .pd-page-copy small, #pd-app .pd-page-count {
-	font-size: .63rem;
-}
-#pd-app #pd-workspace {
-	padding: 1rem clamp(1rem, 2.6vw, 2.5rem) 2rem;
-}
-#pd-app #pd-page-toolbar {
-	position: sticky;
-	top: -1rem;
-	z-index: 12;
-	width: calc(100% + clamp(2rem, 5.2vw, 5rem));
-	max-width: none;
-	margin: -1rem calc(clamp(1rem, 2.6vw, 2.5rem) * -1) 1rem;
-	padding: .7rem clamp(1rem, 2.6vw, 2.5rem);
-	border-width: 0 0 1px;
-	border-radius: 0;
-	background: var(--editor-bar-bg);
-	box-shadow: 0 1px 0 rgba(15,23,42,.025);
-	backdrop-filter: blur(18px) saturate(170%);
-	-webkit-backdrop-filter: blur(18px) saturate(170%);
-}
-#pd-app .pd-slot-setting span {
-	font-size: .64rem;
-	letter-spacing: .04em;
-}
-#pd-app :is(.pd-section-card, .pd-inspector-card, .pd-empty-state, .pd-sidebar-note) {
-	border-radius: var(--editor-radius);
-	box-shadow: var(--editor-shadow-sm);
-}
-#pd-app .pd-section-card:hover {
-	box-shadow: var(--editor-shadow);
-	transform: none;
-}
-#pd-app .pd-dialog {
-	border-radius: 12px;
-	box-shadow: 0 1.5rem 4rem rgba(0,0,0,.24);
-}
-#pd-app :is(.pd-dialog-header, .pd-dialog-footer) {
-	min-height: 56px;
-	padding: .7rem .85rem;
-}
-#pd-app #pd-save-state {
-	max-width: none;
-}
-#pd-app .pd-toolbar-actions:empty {
-	display: none;
-}
-@media (min-width: 58.001rem) {
-	#pd-app .pd-head-rail, #pd-app #pd-pages {
-		border-color: var(--nino-admin-rail-border);
-		background: var(--nino-admin-rail);
-	}
-#pd-app .pd-head-rail {
-		align-self: stretch;
-		box-sizing: border-box;
-		justify-self: start;
-		width: var(--pd-sidebar-width);
-		margin: -.6rem 0 -.6rem -1rem;
-		padding: .65rem .75rem;
-	}
-#pd-app :is(.pd-brand, .pd-panel-heading h2, .pd-sidebar-note strong) {
-		color: var(--nino-admin-rail-text);
-	}
-#pd-app :is(.nino-admin-brand-copy small, .pd-eyebrow, .pd-back-admin, .pd-sidebar-note) {
-		color: var(--nino-admin-rail-muted);
-	}
-#pd-app .pd-back-admin {
-		border-color: var(--nino-admin-rail-border);
-		color: var(--editor-blue);
-	}
-#pd-app #pd-pages .pd-search, #pd-app #pd-page-list {
-		border-color: var(--nino-admin-rail-border);
-		background: var(--editor-bg-grouped);
-		box-shadow: none;
-	}
-#pd-app #pd-pages .pd-search input, #pd-app .pd-page-button {
-		color: var(--editor-text);
-	}
-#pd-app .pd-page-button {
-		border-color: var(--nino-admin-rail-border);
-	}
-#pd-app .pd-page-button:hover:not(:disabled), #pd-app .pd-page-button.is-active {
-		background: var(--editor-blue-soft);
-		color: var(--editor-blue);
-	}
-#pd-app .pd-page-icon, #pd-app .pd-page-count {
-		border-color: var(--nino-admin-rail-border);
-		background: var(--editor-bg);
-		color: var(--nino-admin-rail-text);
-	}
-#pd-app :is(.pd-page-copy small, .pd-page-count) {
-		color: var(--nino-admin-rail-muted);
-	}
-#pd-app .pd-heading-actions button {
-		background: var(--editor-bg-elevated);
-		color: var(--editor-text);
-		box-shadow: inset 0 0 0 1px var(--nino-admin-rail-border);
-	}
-}
+	/* Deliberate last-resort overrides of _nino/Nino.admin.css belong here.
+	   Every pd-* component below nino.tool already outranks the shared
+	   baseline through the layer order alone, so none are needed. */
 }

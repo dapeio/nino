@@ -179,24 +179,24 @@
 				a.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.selectTab( 'types' ) } );
 
 				const row = dc.createElement('span');
-				row.className = 'admin-dashboard-meter-row';
+				row.className = 'nino-admin-meter-row';
 
 				const label = dc.createElement('span');
-				label.className = 'admin-dashboard-meter-label';
+				label.className = 'nino-admin-meter-label';
 				label.textContent = t.title;
 				row.appendChild( label );
 
 				const count = dc.createElement('span');
-				count.className = 'admin-dashboard-meter-count';
+				count.className = 'nino-admin-meter-count';
 				count.textContent = t.fieldCount;
 				row.appendChild( count );
 
 				a.appendChild( row );
 
 				const track = dc.createElement('span');
-				track.className = 'admin-dashboard-meter-track';
+				track.className = 'nino-admin-meter-track';
 				const fill = dc.createElement('span');
-				fill.className = 'admin-dashboard-meter-fill';
+				fill.className = 'nino-admin-meter-fill';
 				fill.style.width = ( t.fieldCount / max * 100 )+ '%';
 				track.appendChild( fill );
 				a.appendChild( track );

@@ -1,198 +1,111 @@
 @layer nino.system, nino.tool, nino.local;
 
-/*
-	This file is layered (see _nino/Nino.admin.css). Shared foundations sit in
-	`nino.system`; screen and component rules sit in the later `nino.tool` layer,
-	where they can deliberately refine that low-specificity baseline. The
-	"Design-system locals" section at the bottom remains the explicit last-resort
-	override and sits in `nino.local`, the highest layer.
-*/
-
-@layer nino.tool {
 /**
  *	Nino										A compact filesystembased php framework
- *	style.css								Setup wizard UI - reuses _editor/assets/style.css's design
- *													tokens/components and _admin/assets/style.css's utility classes
- *													(both linked before this file in every template), only adds
- *													what's specific to this wizard
+ *	style.css								What is genuinely local to the setup wizard: the step
+ *													switcher, the environment report, the theme picker and
+ *													the finish screen.
  *
  *	@package								Dape/Nino
  *	@author									David Perchermeier <mail@dape.io>
  *	@link										https://github.com/dapeio/nino
+ *
+ *	The shell, the rail, the step nav, the pane, cards, grouped lists, form
+ *	controls, buttons, the login/locked card and the fixed Back/Next bar all
+ *	come from _nino/Nino.admin.css and are reused, not restated.
+ *
+ *	/_install used to link /_editor's and /_admin's stylesheets too, for a
+ *	handful of their tool-local classes. It no longer does: borrowing a whole
+ *	tool stylesheet for one utility is what let an unrelated /_editor list rule
+ *	push a stray margin onto this wizard's own buttons, and it cost every setup
+ *	run two stylesheets it used almost nothing of.
  */
 
-body {
-	margin: 0;
-	font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
-	background: var(--editor-bg);
-	color: var(--editor-text);
+@layer nino.tool {
+
+/*	Force-hide an element regardless of its own display rules - the wizard's
+ *	own copy of the utility every tool here keeps (.editor-hidden, .pd-hidden) */
+.install-hidden {
+	display: none !important;
 }
-code {
-	font-family: ui-monospace, monospace;
+#install-page-wrap code, #install-locked-wrap code {
+	font-family: var(--nino-admin-mono);
 	font-size: .9em;
 }
-/* ------------------------------------------------------------------ Locked */
 
-#install-locked-wrap {
-	max-width: 31rem;
-	margin: clamp(2rem, 9vh, 6rem) auto;
-	padding: 2rem;
-	background: var(--editor-bg-grouped);
-	border: 1px solid var(--editor-border);
-	border-radius: var(--editor-radius);
-	box-shadow: var(--editor-shadow);
-}
+/* ---------------------------------------------------------------- Locked */
+
 #install-locked-msg {
-	margin: 1.5rem 0 .5rem;
+	margin: 1.25rem 0 .5rem;
+	font-size: 1.35rem;
 	font-weight: 750;
-	font-size: 1.4rem;
 	letter-spacing: -.03em;
 }
-#install-page-wrap .nino-admin-auth-brand {
-	display: flex;
-	align-items: center;
-	gap: .65rem;
-	font-weight: 750;
-	letter-spacing: -.02em;
-}
-#install-page-wrap .nino-admin-auth-brand span, #install-page-wrap .nino-admin-brand-mark {
-	display: inline-grid;
-	place-items: center;
-	width: 2.25rem;
-	height: 2.25rem;
-	flex: 0 0 auto;
-	border-radius: .75rem;
-	background: var(--editor-blue);
-	color: #fff;
-	font-size: 1rem;
-	font-weight: 800;
-	letter-spacing: -.04em;
-	box-shadow: 0 .45rem 1rem rgba(37,99,235,.2);
-}
+
 /* ----------------------------------------------------------------- Wizard */
 
-#install-page-wrap .nino-admin-rail-head {
-	position: sticky;
-	top: 0;
-	z-index: 10;
-	padding: .8rem 1rem;
-	background: var(--editor-bar-bg);
-	backdrop-filter: blur(20px) saturate(180%);
-	border-bottom: 1px solid var(--editor-separator);
-}
 #install-bar-title {
 	display: flex;
 	align-items: center;
 	gap: .65rem;
-	font-weight: 700;
+	min-width: 0;
 }
-#install-page-wrap .nino-admin-brand-copy {
-	display: flex;
-	flex-direction: column;
-	line-height: 1.1;
-}
-#install-page-wrap .nino-admin-brand-copy strong {
-	font-size: .95rem;
-	letter-spacing: -.01em;
-}
-#install-page-wrap .nino-admin-brand-copy small {
-	margin-top: .18rem;
-	color: var(--editor-text-secondary);
-	font-size: .72rem;
-	font-weight: 600;
-	letter-spacing: .08em;
-	text-transform: uppercase;
-}
-#install-page-wrap .nino-admin-nav {
-	display: flex;
-	overflow-x: auto;
-	-webkit-overflow-scrolling: touch;
-	scrollbar-width: none;
-	border-bottom: 1px solid var(--editor-separator);
-	padding: 0 1.25rem;
-}
-#install-page-wrap .nino-admin-nav::-webkit-scrollbar {
+/*	Only one step's content pane is visible at a time - #install-page-wrap's
+ *	class (set by Nino.install.selectStep(), see script.js) picks which */
+#install-content-wrap > div {
 	display: none;
 }
-#install-page-wrap .nino-admin-nav span {
-	display: block;
-	padding: .65rem .1rem;
-	margin-right: 1.5rem;
-	white-space: nowrap;
-	border-bottom: 2px solid transparent;
-	color: var(--editor-text-secondary);
-	font-size: .9rem;
-	font-weight: 500;
-}
-#install-page-wrap .nino-admin-nav span.active {
-	color: var(--editor-blue);
-	font-weight: 600;
-	border-bottom-color: var(--editor-blue);
-}
-#install-page-wrap .nino-admin-pane {
-	width: 100%;
-	padding: 1.5rem 1rem 5rem;
-	max-width: 64rem;
-	margin: 0 auto;
-}
-/* Only one step's content pane is visible at a time - #install-page-wrap's
-   class (set by Nino.install.selectStep(), see script.js) picks which */
-#install-page-wrap .nino-admin-pane > div {
-	display: none;
-}
-#install-page-wrap.nino-admin-shell.show-checks #install-content-checks, #install-page-wrap.nino-admin-shell.show-setup #install-content-setup, #install-page-wrap.nino-admin-shell.show-themes #install-content-themes, #install-page-wrap.nino-admin-shell.show-webpages #install-content-webpages, #install-page-wrap.nino-admin-shell.show-personalinfos #install-content-personalinfos, #install-page-wrap.nino-admin-shell.show-admin #install-content-admin, #install-page-wrap.nino-admin-shell.show-finish #install-content-finish {
+#install-page-wrap.show-checks #install-content-checks, #install-page-wrap.show-setup #install-content-setup, #install-page-wrap.show-themes #install-content-themes, #install-page-wrap.show-webpages #install-content-webpages, #install-page-wrap.show-personalinfos #install-content-personalinfos, #install-page-wrap.show-admin #install-content-admin, #install-page-wrap.show-finish #install-content-finish {
 	display: block;
 }
-/* -------------------------------------------------------------- Setup tab */
 
-.install-setup-group {
-	background: var(--editor-bg-grouped);
-	border: 1px solid var(--editor-border);
-	border-radius: var(--editor-radius);
-	box-shadow: var(--editor-shadow);
-	padding: 1rem;
+/* ------------------------------------------------------------- Environment */
+
+.install-check-group {
+	display: block;
 	margin: 0 0 1rem;
 }
-.install-setup-group h3 {
-	margin: 0 0 .75rem;
-	font-size: .9rem;
+.install-check-group h3 {
+	margin: 0 0 .35rem;
+	color: var(--editor-text-secondary);
 }
-#setup-native-locale-select {
-	width: 100%;
-	box-sizing: border-box;
-	padding: .5rem;
-	border-radius: var(--editor-radius-sm);
-	border: 1px solid var(--editor-border);
-	background: var(--editor-bg-elevated);
-	color: var(--editor-text);
-	font: inherit;
-	font-size: .9rem;
-}
-.install-setup-option {
+.install-check-row {
 	display: flex;
 	align-items: baseline;
-	gap: .5rem;
-	padding: .4rem 0;
-	border-bottom: 1px solid var(--editor-separator);
+	justify-content: space-between;
+	gap: .75rem;
+	font-size: .84rem;
 }
-.install-setup-option:last-child {
-	border-bottom: none;
+.install-check-row-name {
+	font-family: var(--nino-admin-mono);
 }
-.install-setup-option label {
-	display: flex;
-	align-items: center;
-	gap: .5rem;
-	font-size: .9rem;
-}
-.install-setup-option-requires {
+.install-check-row-detail {
 	color: var(--editor-text-secondary);
-	font-size: .8rem;
+	font-size: .76rem;
 }
-/* -------------------------------------------------------------- Themes tab */
+/*	Both a word and a colour: "OK"/"FAIL" has to survive a colour-blind reader
+ *	and a greyscale screenshot */
+.install-check-status {
+	flex: 0 0 auto;
+	padding: .1rem .45rem;
+	border-radius: 999px;
+	font-size: .74rem;
+	font-weight: 700;
+}
+.install-check-status--ok {
+	background: var(--editor-green-soft);
+	color: var(--editor-green);
+}
+.install-check-status--fail {
+	background: var(--editor-red-soft);
+	color: var(--editor-red);
+}
 
-/* One tile per _install/library/themes/<key> unit, each a <label> wrapping a
-   hidden radio - the whole card is the click target for picking, except the
-   preview image itself, which opens the lightbox instead (see themes.js) */
+/* ------------------------------------------------------------- Themes step */
+
+/*	One tile per _install/library/themes/<key> unit, each a <label> wrapping a
+ *	hidden radio - the whole card is the click target for picking, except the
+ *	preview image itself, which opens the lightbox instead (see themes.js) */
 
 #themes-grid {
 	display: grid;
@@ -203,29 +116,28 @@ code {
 .install-theme-tile {
 	display: flex;
 	flex-direction: column;
-	background: var(--editor-bg-grouped);
+	overflow: hidden;
 	border: 1px solid var(--editor-border);
 	border-radius: var(--editor-radius);
-	box-shadow: var(--editor-shadow);
-	overflow: hidden;
+	background: var(--editor-bg-grouped);
+	box-shadow: var(--editor-shadow-sm);
 	cursor: pointer;
-	transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease;
-}
-.install-theme-tile--active {
-	border-color: var(--editor-blue);
-	box-shadow: var(--editor-focus), var(--editor-shadow);
+	transition: border-color .15s ease, box-shadow .15s ease;
 }
 .install-theme-tile:hover {
 	border-color: color-mix(in srgb, var(--editor-blue) 35%, var(--editor-border));
 	box-shadow: var(--editor-shadow);
-	transform: translateY(-2px);
+}
+.install-theme-tile--active {
+	border-color: var(--editor-blue);
+	box-shadow: 0 0 0 3px var(--editor-blue-soft), var(--editor-shadow);
 }
 .install-theme-tile:has(input:focus-visible) {
 	outline: 2px solid var(--editor-blue);
-	outline-offset: 3px;
+	outline-offset: 2px;
 }
-/* Kept focusable/reachable by keyboard, just never drawn - the tile's own
-   border is what shows the selection */
+/*	Kept focusable/reachable by keyboard, just never drawn - the tile's own
+ *	border is what shows the selection */
 .install-theme-tile input[type="radio"] {
 	position: absolute;
 	width: 1px;
@@ -237,30 +149,30 @@ code {
 	display: block;
 	width: 100%;
 	aspect-ratio: 3 / 2;
+	border-bottom: 1px solid var(--editor-separator);
+	background: var(--editor-bg-elevated);
 	object-fit: cover;
 	object-position: top center;
-	background: var(--editor-bg-elevated);
-	border-bottom: 1px solid var(--editor-separator);
 	cursor: zoom-in;
 }
 .install-theme-body {
 	display: flex;
 	flex-direction: column;
-	gap: .25rem;
-	padding: .9rem 1rem 1rem;
+	gap: .2rem;
+	padding: .8rem .85rem .9rem;
 }
 .install-theme-title {
-	font-size: .9rem;
-	font-weight: 600;
+	font-size: .86rem;
+	font-weight: 650;
 }
 .install-theme-description {
-	font-size: .8rem;
-	line-height: 1.4;
 	color: var(--editor-text-secondary);
+	font-size: .76rem;
+	line-height: 1.45;
 }
-/* Lightbox - one reused overlay for every tile, closed by a click anywhere
-   or Escape (see themes.js) */
-
+/*	Lightbox - one reused overlay for every tile, closed by a click anywhere or
+ *	Escape (see themes.js). Sits outside .nino-admin, so it carries its own
+ *	colours rather than the shell's. */
 #themes-lightbox {
 	position: fixed;
 	inset: 0;
@@ -273,6 +185,7 @@ code {
 	padding: 2rem 1rem;
 	background: rgba(0,0,0,.7);
 	backdrop-filter: blur(6px);
+	-webkit-backdrop-filter: blur(6px);
 	cursor: zoom-out;
 }
 #themes-lightbox-image {
@@ -284,351 +197,100 @@ code {
 #themes-lightbox-caption {
 	margin: 0;
 	color: #fff;
-	font-size: .9rem;
-	font-weight: 600;
+	font-size: .84rem;
+	font-weight: 650;
 }
-/* -------------------------------------------------------------- Checklist */
 
-.install-check-group {
-	background: var(--editor-bg-grouped);
-	border: 1px solid var(--editor-border);
-	border-radius: var(--editor-radius);
-	box-shadow: var(--editor-shadow);
-	overflow: hidden;
-	margin: 0 0 1rem;
-}
-.install-check-group h3 {
-	margin: 0;
-	padding: .75rem 1rem;
-	font-size: .85rem;
-	color: var(--editor-text-secondary);
-	border-bottom: 1px solid var(--editor-separator);
-}
-.install-check-row {
-	display: flex;
-	align-items: baseline;
-	justify-content: space-between;
-	gap: .75rem;
-	padding: .65rem 1rem;
-	border-bottom: 1px solid var(--editor-separator);
-	font-size: .9rem;
-}
-.install-check-row:last-child {
-	border-bottom: none;
-}
-.install-check-row-name {
-	font-family: ui-monospace, monospace;
-}
-.install-check-row-detail {
-	color: var(--editor-text-secondary);
-	font-size: .8rem;
-}
-.install-check-status {
-	flex: 0 0 auto;
-	padding: .15rem .45rem;
-	border-radius: 999px;
-	font-weight: 700;
-	font-size: .8rem;
-}
-.install-check-status--ok {
-	color: var(--editor-green);
-	background: var(--editor-green-soft);
-}
-.install-check-status--fail {
-	color: var(--editor-red);
-	background: var(--editor-red-soft);
-}
-/* ---------------------------------------------------------- Webpages tab */
+/* ----------------------------------------------------------- Routes step */
 
-/* List + drill-down-form shape, same as _admin's Pages module - #webpages-list
-   and #webpages-form mirror #pages-list/#pages-form's rules (own copies, not shared, same standalone-per-area convention .install-webpage-locale-row
-   below already follows relative to .admin-page-locale-row); the form itself
-   is bare <fieldset>s styled entirely by _editor/assets/style.css's generic
-   fieldset/legend/.nino-admin-field rules, same as personalinfos.js */
+/*	List + drill-down form, the same shape /_admin's Routes module has: the list
+ *	is a shared .nino-admin-list (see webpages.js) and the form is bare
+ *	<fieldset>s the design system already styles. Only the reorder cluster and
+ *	the per-locale row are local. */
 
-#webpages-list > ul {
-	list-style: none;
-	margin: 0 0 .75rem;
-	padding: 0;
-	background: var(--editor-bg-grouped);
-	border: 1px solid var(--editor-border);
-	border-radius: var(--editor-radius);
-	box-shadow: var(--editor-shadow);
-	overflow: hidden;
-}
-#webpages-list > ul li {
+#webpages-list .nino-admin-list > li {
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
-	border-bottom: 1px solid var(--editor-separator);
 }
-#webpages-list > ul li:last-child {
-	border-bottom: none;
-}
-#webpages-list > ul li a {
-	display: block;
+#webpages-list .nino-admin-list > li > a {
 	flex: 1 1 auto;
 	min-width: 0;
-	padding: .9rem 1rem;
-	font-family: ui-monospace, monospace;
-	font-size: .85rem;
-	color: var(--editor-text);
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
-}
-#webpages-list > ul li:hover {
-	background: var(--editor-blue-soft);
+	font: .78rem/1.4 var(--nino-admin-mono);
 }
 .install-webpage-move {
-	flex: 0 0 auto;
 	display: flex;
+	flex: 0 0 auto;
 	gap: .25rem;
-	padding: 0 .75rem;
+	padding: 0 .65rem;
 }
 .install-webpage-move button {
-	width: 1.75rem;
-	height: 1.75rem;
+	display: inline-grid;
+	place-items: center;
+	width: 1.85rem;
+	height: 1.85rem;
+	min-height: 0;
 	padding: 0;
 	border-radius: var(--editor-radius-sm);
-	border: 1px solid var(--editor-border);
-	background: var(--editor-bg-elevated);
-	color: var(--editor-text);
-	font: inherit;
+	box-shadow: inset 0 0 0 1px var(--editor-border);
+	font-size: .76rem;
 	line-height: 1;
-	cursor: pointer;
 }
 .install-webpage-move button:disabled {
-	opacity: .35;
-	cursor: default;
+	opacity: .32;
 }
 .install-webpage-requires {
 	margin: .5rem 0 0;
 }
 .install-webpage-locale-row {
 	display: grid;
-	grid-template-columns: 3rem 1fr 1fr;
-	gap: .5rem;
+	grid-template-columns: 3.2rem 1fr 1fr;
 	align-items: start;
+	gap: .5rem;
 	padding: .5rem 0;
 	border-top: 1px solid var(--editor-separator);
 }
 .install-webpage-locale-row:first-child {
-	border-top: none;
+	border-top: 0;
 }
 .install-webpage-locale-label {
 	padding-top: .5rem;
-	font-size: .75rem;
 	color: var(--editor-text-secondary);
-	font-family: ui-monospace, monospace;
-}
-.install-webpage-locale-row input, .install-webpage-locale-row textarea {
-	width: 100%;
-	box-sizing: border-box;
-	padding: .5rem;
-	border-radius: var(--editor-radius-sm);
-	border: 1px solid var(--editor-border);
-	background: var(--editor-bg-elevated);
-	color: var(--editor-text);
-	font: inherit;
-	font-size: .85rem;
+	font: .7rem/1.4 var(--nino-admin-mono);
 }
 .install-webpage-locale-row textarea {
 	grid-column: 2 / -1;
 }
-/* ---------------------------------------------------------- Personal Infos */
 
-/* #personalinfos-form-global/-locale are plain <fieldset>s, styled entirely
-   by _editor/assets/style.css's generic fieldset/legend/.nino-admin-field rules -
-   same shape as _editor's Text panel category form, see personalinfos.js */
+/* -------------------------------------------------------------- Admins step */
 
-/* -------------------------------------------------------------- Admins */
+/*	#personalinfos-form-global/-locale and #editor-add-form are plain
+ *	<fieldset>/.nino-admin-card surfaces with .nino-admin-field rows, styled
+ *	entirely by the design system - see personalinfos.js and admin.js */
 
-#editor-list > ul {
-	list-style: none;
-	margin: 0 0 .75rem;
-	padding: 0;
-	background: var(--editor-bg-grouped);
-	border: 1px solid var(--editor-border);
-	border-radius: var(--editor-radius);
-	box-shadow: var(--editor-shadow);
-	overflow: hidden;
+.install-admin-row {
+	font: .8rem/1.4 var(--nino-admin-mono);
 }
-#editor-list > ul li {
-	padding: .75rem 1rem;
-	border-bottom: 1px solid var(--editor-separator);
-	font-family: ui-monospace, monospace;
-	font-size: .85rem;
-}
-#editor-list > ul li:last-child {
-	border-bottom: none;
-}
-#editor-add-form {
-	background: var(--editor-bg-grouped);
-	border: 1px solid var(--editor-border);
-	border-radius: var(--editor-radius);
-	box-shadow: var(--editor-shadow);
-	padding: 1rem;
-	display: flex;
-	flex-direction: column;
-	gap: .75rem;
-}
-#editor-add-form label {
-	display: flex;
-	align-items: center;
-	gap: .5rem;
-	font-size: .85rem;
-	color: var(--editor-text-secondary);
-}
-#editor-add-form input[type="email"], #editor-add-form input[type="password"] {
-	flex: 1 1 auto;
-	padding: .5rem;
-	border-radius: var(--editor-radius-sm);
-	border: 1px solid var(--editor-border);
-	background: var(--editor-bg-elevated);
-	color: var(--editor-text);
-	font: inherit;
-}
-/* -------------------------------------------------------------- Finish */
 
-#finish-form {
-	background: var(--editor-bg-grouped);
-	border: 1px solid var(--editor-border);
-	border-radius: var(--editor-radius);
-	box-shadow: var(--editor-shadow);
-	padding: 1.5rem;
-}
-/* ---------------------------------------------------------- Back/Next */
-
-#install-page-wrap .nino-admin-actionbar {
-	position: sticky;
-	bottom: 0;
-	display: flex;
-	align-items: center;
-	gap: .75rem;
-	z-index: 20;
-	padding: .8rem 1rem max(.8rem, env(safe-area-inset-bottom));
-	background: var(--editor-bar-bg);
-	backdrop-filter: blur(20px) saturate(180%);
-	border-top: 1px solid var(--editor-separator);
-}
-#install-actions-msg {
-	flex: 1 1 auto;
-	margin: 0;
-	font-size: .85rem;
-	color: var(--editor-red);
-	text-align: right;
-}
-#install-back, #install-next {
-	flex: 0 0 auto;
-	padding: .7rem 1.5rem;
-	border-radius: var(--editor-radius-sm);
-	border: none;
-	font: inherit;
-	font-size: .92rem;
-	font-weight: 600;
-	cursor: pointer;
-}
-#install-back {
-	background: var(--editor-bg-elevated);
-	color: var(--editor-text);
-	border: 1px solid var(--editor-border);
-}
-#install-next {
-	background: var(--editor-blue);
-	color: #fff;
-	margin-left: auto;
-}
-#install-back:disabled, #install-next:disabled {
-	opacity: .45;
-	cursor: default;
-}
+/* --------------------------------------------------------- Step messages */
 
 #setup-msg, #themes-msg, #webpages-msg, #personalinfos-msg, #editor-add-msg, #finish-msg {
 	min-height: 1.25rem;
-	font-size: .85rem;
 	color: var(--editor-text-secondary);
+	font-size: .8rem;
 }
-/* ------------------------------------------------------- Desktop app shell */
 
-@media (min-width: 64rem) {
-	#install-page-wrap.nino-admin-shell {
-		display: grid;
-		grid-template-columns: 18rem minmax(0, 1fr);
-		grid-template-rows: minmax(0, 1fr) auto;
-		min-height: 100vh;
-	}
-#install-page-wrap .nino-admin-rail {
-		grid-column: 1;
-		grid-row: 1 / -1;
-		position: sticky;
-		top: 0;
-		align-self: start;
-		display: flex;
-		flex-direction: column;
-		height: 100vh;
-		padding: 1.35rem 1rem;
-		background: var(--editor-sidebar-bg);
-		border-right: 1px solid var(--editor-separator);
-	}
-#install-page-wrap .nino-admin-rail-head {
-		position: static;
-		z-index: auto;
-		padding: 0 .35rem 1.25rem;
-		background: transparent;
-		backdrop-filter: none;
-		border: none;
-	}
-#install-page-wrap .nino-admin-nav {
-		flex: 1 1 auto;
-		flex-direction: column;
-		gap: .3rem;
-		min-height: 0;
-		padding: 0;
-		overflow: auto;
-		border: none;
-	}
-#install-page-wrap .nino-admin-nav span {
-		width: 100%;
-		margin: 0;
-		padding: .72rem .8rem;
-		border: none;
-		border-radius: var(--editor-radius-sm);
-		font-size: .86rem;
-	}
-#install-page-wrap .nino-admin-nav span.active {
-		background: var(--editor-blue-soft);
-		color: var(--editor-blue);
-		border: none;
-	}
-#install-page-wrap .nino-admin-pane {
-		grid-column: 2;
-		grid-row: 1;
-		max-width: 76rem;
-		padding: 3rem clamp(2rem, 4vw, 4rem) 6rem;
-	}
-#install-page-wrap .nino-admin-actionbar {
-		grid-column: 2;
-		grid-row: 2;
-		padding: .85rem clamp(2rem, 4vw, 4rem);
-	}
-}
+/* ------------------------------------------------------------- Responsive */
+
 @media (max-width: 36rem) {
 	.install-webpage-locale-row {
 		grid-template-columns: 1fr;
 	}
-.install-webpage-locale-label, .install-webpage-locale-row textarea {
+	.install-webpage-locale-label, .install-webpage-locale-row textarea {
 		grid-column: 1;
 	}
-#install-page-wrap .nino-admin-actionbar {
-		flex-wrap: wrap;
-	}
-#install-actions-msg {
-		flex-basis: 100%;
-		order: -1;
-		text-align: left;
-	}
 }
+
 }
 
 @layer nino.local {
@@ -639,14 +301,7 @@ code {
    stay out of the shared design system, which has to work for all four tools.
 */
 
-#install-page-wrap .install-theme-card {
-	border-radius: var(--editor-radius);
-	box-shadow: var(--editor-shadow-sm);
-}
-#install-page-wrap .install-theme-card:hover {
-	box-shadow: var(--editor-shadow);
-	transform: none;
-}
+/* The finish screen replaces the wizard chrome rather than sitting inside it */
 #install-page-wrap #finish-done {
 	max-width: 72rem;
 	margin: clamp(1.5rem, 5vh, 3.5rem) auto 0;
@@ -681,14 +336,10 @@ code {
 }
 #install-page-wrap .install-finish-eyebrow {
 	color: var(--editor-green);
-	font-size: .7rem;
-	font-weight: 750;
-	letter-spacing: .07em;
-	text-transform: uppercase;
 }
 #install-page-wrap .install-next-steps {
 	display: grid;
-	grid-template-columns: repeat(3, minmax(0, 1fr));
+	grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
 	gap: .8rem;
 }
 #install-page-wrap .install-next-step {
@@ -698,7 +349,7 @@ code {
 	grid-template-columns: auto minmax(0, 1fr) auto;
 	align-items: center;
 	gap: .8rem;
-	min-height: 9rem;
+	min-height: 8rem;
 	padding: 1.05rem;
 	border: 1px solid var(--editor-border);
 	border-radius: var(--editor-radius);
@@ -707,7 +358,6 @@ code {
 		var(--editor-bg-grouped);
 	box-shadow: var(--editor-shadow-sm);
 	color: var(--editor-text);
-	text-decoration: none;
 }
 #install-page-wrap .install-next-step--admin {
 	--install-next-accent: var(--editor-orange);
@@ -766,29 +416,27 @@ code {
 	color: var(--editor-text-secondary);
 	font-size: .78rem;
 }
-#install-page-wrap.nino-admin-shell.show-finish.is-complete .nino-admin-actionbar {
-	display: none;
-}
-#install-page-wrap.nino-admin-shell.show-finish.is-complete #install-content-finish > :is(.nino-admin-hint, #install-page-wrap .nino-admin-error) {
-	display: none;
-}
-#install-page-wrap .nino-admin-actionbar {
-	grid-column: auto;
-	grid-row: auto;
-}
+
+/* The wizard's own step message is the one place a bottom-bar status is an
+   error rather than a progress note */
 #install-page-wrap .nino-admin-actionbar #install-actions-msg {
 	color: var(--editor-red);
 }
+
+/* Screen-level chrome that only one step wants */
 #install-context-action {
 	display: none;
 }
-#install-page-wrap.nino-admin-shell.show-webpages:not(.is-editing-webpage) #install-context-action {
+#install-page-wrap.show-webpages:not(.is-editing-webpage) #install-context-action {
 	display: inline-flex;
 }
-#install-page-wrap.nino-admin-shell.show-webpages.is-editing-webpage .nino-admin-actionbar {
+#install-page-wrap.show-webpages.is-editing-webpage .nino-admin-actionbar,
+#install-page-wrap.show-finish.is-complete .nino-admin-actionbar {
 	display: none;
 }
-#install-page-wrap.nino-admin-shell.show-webpages.is-editing-webpage #install-content-webpages > .nino-admin-hint {
+#install-page-wrap.show-webpages.is-editing-webpage #install-content-webpages > .nino-admin-hint,
+#install-page-wrap.show-finish.is-complete #install-content-finish > :is(.nino-admin-hint, .nino-admin-error) {
 	display: none;
 }
+
 }

@@ -77,16 +77,23 @@
 		 */
 		_group : function( title, rows ) {
 
-			const group = dc.createElement('div');
+			const group = dc.createElement('section');
 			group.className = 'install-check-group';
 
 			const h3 = dc.createElement('h3');
+			h3.className = 'nino-admin-eyebrow';
 			h3.textContent = title;
 			group.appendChild( h3 );
 
+			// Diagnostics are read, never opened - the shared grouped list's
+			// dense variant supplies the surface and the row separators
+			const list = dc.createElement('ul');
+			list.className = 'nino-admin-list nino-admin-list-dense';
+			group.appendChild( list );
+
 			rows.forEach( function( row ) {
 
-				const div = dc.createElement('div');
+				const div = dc.createElement('li');
 				div.className = 'install-check-row';
 
 				const left = dc.createElement('div');
@@ -109,7 +116,7 @@
 				status.textContent = row.ok ? 'OK' : 'FAIL';
 				div.appendChild( status );
 
-				group.appendChild( div );
+				list.appendChild( div );
 			} );
 
 			return group;
