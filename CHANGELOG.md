@@ -185,6 +185,148 @@ All notable changes to Nino are documented in this file.
   images, structure, and unknown import paths stay untouched.
 - Added inline `<code>` formatting to the shared rich-text editor and its
   server-side HTML sanitizer.
+- Type size is a modifier of the class it changes instead of a utility laid over
+  it. `ui-font-small` and `ui-font-big` are gone: both set an `em` font-size,
+  which *replaces* the `rem` size a class states for itself rather than scaling
+  it - so "loud" on a 1.5rem section title rendered it at 1.25 × the body size,
+  visibly smaller than the title it was supposed to emphasize.
+
+  Every typography class the Builder can put on a component now carries its own
+  `--quiet` and `--loud`: `ui-section-title`, `ui-section-subtitle`,
+  `ui-section-text`, `ui-atf-title`, `ui-atf-subtitle`, `ui-article-title`,
+  `ui-article-descr`, `ui-pricing-title` and `ui-pricing-price`. Each states a
+  `rem` size one step down or up the existing scale, and moves the line height
+  with it. The compiler picks the modifier from whichever class the component
+  ends up with, so the same Title component compiles to
+  `ui-section-title--loud` in a content section, `ui-atf-title--loud` in a hero
+  and `ui-article-title--loud` in a card - the manifest restyles the component,
+  and the step follows.
+
+  `ui-section-text` is new: the third member of the section's typography family
+  next to title and subtitle, and the class the body-copy components had been
+  missing since the `nino-*` cleanup took `nino-area-description` away. The
+  style vocabulary is the same everywhere now - auto, quiet, loud - so `lead`
+  is gone; the two presets that used it say `loud`.
+
+  The `--fontsize-small` and `--fontsize-big` theme variables stay: tables,
+  badges and article prices read them. Only the two utility classes went, along
+  with their last three users - the demo testimonial byline is a `<small>`, the
+  utility catalog demonstrates that instead, and the shipped home page was
+  recomposed.
+- Every **Auto** option in the Template Builder names the value it resolves to:
+  `Auto (Dim)`, `Auto (Wide)`, `Auto (100)`. "Auto" on its own told nobody what
+  the section would actually do, and the answer differs per preset and per
+  Layout - the same Height select means `Auto (Off)` in an articles grid and
+  `Auto (100)` in a fullscreen hero. The label resolves the way the compiler
+  does, Layout recommendation before preset recommendation before fallback, and
+  the two selects that already showed their default (Layout, Area style) now
+  read the same way instead of using a separator of their own.
+
+  Two client-side frame fallbacks still said `overlay: 'medium'` after the scrim
+  became a single `dim`, so a section whose preset recommends nothing would have
+  offered a value the compiler no longer knows. Both now say `dim`.
+- The Template Builder writes the design system's classes and no longer any of
+  its own. Every `nino-*` class is gone - from the compiler, from all sixteen
+  presets, and from `_nino/Nino.css`, which loses its whole Template Builder
+  block and 109 lines with it.
+
+  The namespace had grown into a second design system that duplicated the first.
+  `nino-area--left` was `ui-text-left` with an extra rule, `nino-split-image`
+  was `ui-img-cover`, `nino-component--quiet` was `ui-opacity-70`, and
+  `nino-area`, `nino-area-description` and `nino-fullscreen-stage` were hooks
+  with no rule at all. Those are now the `ui-` class that already existed, or
+  nothing:
+
+  | was | is |
+  |---|---|
+  | `nino-area--left/center/right` | `ui-text-left/center/right` |
+  | `nino-area--heading` / `--action` | `ui-mb-3` / `ui-mt-3` |
+  | `nino-component--quiet` | `ui-opacity-70` |
+  | `nino-component--loud` / `--lead` | `ui-font-big` |
+  | `nino-component--cover`, `nino-split-image` | `ui-img-cover` |
+  | `nino-article-grid-item` | `ui-article--grid` |
+  | `nino-article--borderless` | `ui-article--borderless` |
+  | `nino-timeline--*`, `nino-pricing-row--*`, `nino-form*` | the same modifier in its own `ui-` family |
+  | `nino-area`, `nino-area-*`, `nino-fullscreen-stage*` | dropped, they styled nothing |
+
+  What the design system genuinely lacked was added to it rather than beside it:
+  `ui-grid-row--narrow/--wide` next to the row they resize, `ui-img-focus--1…9`
+  next to the image helpers, `js-cover-top/-bottom` next to `js-cover-center`,
+  `ui-mx-auto` next to the other margin utilities, and the three `ui-text-*`
+  rules that reach into a heading which centers itself - without them
+  "left" moved everything except the title. `ui-form--inline` and
+  `ui-form-trap` replace the inline `style` attributes the demo markup carried.
+
+  The scrim is one decision now instead of three: `overlay` is `none` or `dim`,
+  and the class follows the image layer the background actually uses -
+  `js-cover--dim`, `js-parallex--dim` or `ui-img-background--dim`, each of which
+  the design system already shipped. Sections written against the old
+  `soft`/`medium`/`strong` keep composing; the three levels resolve to `dim`.
+  Two style options went with the cleanup, `rounded` and `narrow`, because
+  neither had a `ui-` counterpart and both are one class of work in HTML+.
+
+  The shipped `page-home.tpl` was recomposed from its own metadata, so the
+  starter page ships the same markup the Builder writes today.
+- Every preview card is scaled to one viewport (1200×760) instead of a height
+  the manifest chose. A gallery of tiles that are all the same size compares
+  presets; one of tiles in six heights compares tile heights. The
+  `previewHeight` manifest key is gone.
+- Five presets whose content is a finished block of markup rather than a
+  composed one: **Table — Static block**, **List — Static block**, **FAQ —
+  Static accordion**, **Newsletter — Signup form** and **Contact — Form**. Each
+  has the same shape - an Intro area with the usual title and subtitle, the
+  block itself, and an Outro area that starts empty and renders nothing until
+  somebody adds a button to it.
+
+  Not everything worth inserting is worth making editable. A table, a
+  `details` accordion or a form is markup a project shapes once and then leaves
+  alone; offering a graphical editor for it would mean inventing components for
+  cells, questions and fields that nothing else needs. The Builder puts the
+  correct house-style markup at the right position, and HTML+ - which drops the
+  section's metadata and hands ownership to the source - takes it from there.
+
+  The table, list and accordion ship each variant twice: once with demo rows to
+  overwrite, once with a hand-written `[elements /example-rows limit="10"]` loop
+  to point at a collection of one's own. A loop over a type that does not exist
+  renders nothing, so the second variant is safe to insert first. `[[section:id]]`
+  is resolved inside the block, which is what keeps the FAQ's `name` grouping
+  and the forms' field IDs unique when the same preset is inserted twice on one
+  page. The forms carry `[csrf]`, the honeypot and the label keys their modules
+  ship, and no preset writes a `style=""` attribute any more - three `nino-*`
+  classes replaced the ones the demo markup carried inline.
+
+  Pricing grew the four-column Layouts: four equal cards, and four with one
+  full-width card above or below them, read from the first or last entry of the
+  collection. The process timeline stopped storing its step number: an ordered
+  list is numbered by nature, so the badge is a CSS counter now and the ordinal
+  lives with the markup that already carries it. **Table — Two columns**, the
+  Elements-managed table from the previous entry, gave way to the static one.
+
+  An Area with no components no longer leaves its blank line behind in the
+  generated source. A deliberately empty outro is normal now, and the section is
+  read by hand afterwards.
+- Seven presets, so the Section Library covers the page shapes the design
+  system already had markup for: **Process — Numbered steps** (connected
+  timeline or stacked), **Pricing — Plan cards** (equal or middle-emphasized),
+  **Table — Two columns** (striped or bordered, with editable column
+  headings), **Features — Checklist and image** (image left or right),
+  **Partners — Logo bar** (caption above or beside), **Call to action —
+  Banner** (message above or beside the buttons) and **Banner — Text over a
+  background image** (text on the image or inside a card).
+
+  Everything repeatable reads an Elements collection rather than being typed
+  into the page: steps, plans, table rows, checklist lines and logos are all
+  content, edited afterwards in `/_admin`. Where a second Layout is offered it
+  changes the composition - a different wrapper, a different column order, a
+  head row - and never merely restyles the item, which is what Area Styles are
+  for. Three of the seven honestly have only one sensible composition and say
+  so by shipping one Layout.
+
+  `AreaComposer::TAGS` grew the tags those presets need for correct markup:
+  `ul`, `ol`, `li`, `tr`, `th` and `td`. They are structural and inert; nothing
+  that loads, submits or scripts joined them, and `section` stays out because
+  the document parser reserves it. A list or table wrapper still belongs in the
+  Layout `.tpl` - only the repeated row is a manifest tag.
 - A page's own Http-URI is now a textfill. `/_install`'s Webpages step and
   `/_admin`'s Routes form already wrote `/webpage<uri>/name`, `/title` and
   `/description` when they saved a page; they now write `/webpage<uri>/uri` next
@@ -451,6 +593,15 @@ All notable changes to Nino are documented in this file.
 
 ### Fixed
 
+- A bound alternative text left its own shortcode's tail standing in the
+  Builder's preview: `Media / Text — Flexible split` renders
+  `[image /page-…/image alt="[[/page-…/image-alt]]"]`, and the preview matched
+  an image shortcode by reading up to the first `]` - which is the one that
+  closes the fill inside `alt`, not the one that closes the shortcode. The
+  replacement stopped there and a literal `]"]` was left behind in the frame.
+  Shortcode arguments are now matched with their quoted values consumed whole,
+  for `[image]`, `[elements]` and the leftover sweep alike, so a `]` inside a
+  fill or a query argument no longer cuts a match short.
 - The Template Builder ignored the background image slot a section actually
   chose. "Existing image slot" was offered, stored in the draft and shown in the
   composer, but the compiler never read `frame.backgroundImage` back out of the

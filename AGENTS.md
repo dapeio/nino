@@ -1554,7 +1554,6 @@ icons, nested structures, or project-specific behavior.
 	'category' => 'Services',
 	'tags' => [ 'services', 'cards', 'grid', 'elements' ],
 	'version' => 3,
-	'previewHeight' => 680,
 	'recommend' => [
 		'layout' => 'default',
 		'frame' => [
@@ -1577,11 +1576,11 @@ icons, nested structures, or project-specific behavior.
 			'allowed' => [ 'title', 'subtitle', 'description' ],
 			'container' => [
 				'tag' => 'div',
-				'class' => 'ui-grid-100 nino-area--heading',
+				'class' => 'ui-grid-100 ui-mb-3',
 			],
 			'styles' => [
-				'left' => [ 'label' => 'Left', 'class' => 'nino-area--left' ],
-				'center' => [ 'label' => 'Centered', 'class' => 'nino-area--center' ],
+				'left' => [ 'label' => 'Left', 'class' => 'ui-text-left' ],
+				'center' => [ 'label' => 'Centered', 'class' => 'ui-text-center' ],
 			],
 			'recommend' => [
 				'style' => 'center',
@@ -1693,12 +1692,58 @@ Only the manifest decides this. Nothing is read from the request: the composer
 has no data-* control, a `data` key inside posted section metadata is ignored,
 and arbitrary attributes remain HTML+ work.
 
+### 10.3a Static blocks
+
+Everything in a Layout that is not an `[[area:<key>]]` token is copied into the
+section verbatim, so a preset MAY ship a finished block of markup instead of
+composing it from components. Use that shape when the content is not a
+collection and not a line of copy - a table, a `details` accordion, a form:
+
+```text
+[[area:intro]]     an ordinary Single Area, title and subtitle
+<static markup>    copied as it stands, refined in HTML+ afterwards
+[[area:outro]]     a Single Area with no recommended components
+```
+
+An Area whose components are all removed renders nothing and its line is
+dropped, so the outro costs nothing until somebody adds a button to it. Ship
+each variant twice where it makes sense: once with demo rows to overwrite, once
+with a hand-written `[elements /example-rows limit="10"]` loop that a project
+points at its own collection. A loop over a type that does not exist renders
+empty, so the second variant is safe to insert before the collection is there.
+
+`[[section:id]]` is resolved inside the block. Use it for every identifier that
+must stay unique when the preset is inserted twice on one page - a `details`
+group `name`, a form field `id` and its `for`, a modal target.
+
+A static preset MUST NOT ship `style=""` attributes; give the block a `nino-*`
+class and put the rule next to the other preset classes in `_nino/Nino.css`.
+Forms MUST keep the pieces the runtime expects: `[csrf]`, the honeypot input,
+`.ui-form-message`, and the label keys the Form or Newsletter module ships.
+
 ### 10.4 Component and binding contract
 
 The finite catalog is `title`, `subtitle`, `description`, `text`, `image`,
 `button`, `price`, `number`, and `template`. A manifest may restrict that
 list, override allowlisted tags/classes/styles and image dimensions, and set a
 maximum component count. It MUST NOT supply arbitrary component HTML.
+
+A preset MUST write the design system's own classes - `ui-*` for structure and
+appearance, `js-*` where `Nino.ui.js` looks for a hook. It MUST NOT invent a
+class namespace of its own: a rule that only the Builder's output uses is a
+second design system nobody maintains, and it drifts from the `ui-` class that
+already does the same thing. What a preset needs and the design system lacks
+belongs in `_nino/Nino.css` next to the family it extends (`ui-timeline--…` by
+`ui-timeline`, `ui-form-…` by `ui-form`), named like its family.
+
+Container, item and component tags come from `AreaComposer::TAGS`: `div`,
+`header`, `footer`, `article`, `aside`, `nav`, `h2`, `h3`, `h4`, `p`, `span`,
+`strong`, `ul`, `ol`, `li`, `tr`, `th`, `td`. They are structural and inert;
+anything that loads, submits or scripts (`img`, `iframe`, `form`, `button`,
+`script`, `style`) stays out, and so does `section`, which the document parser
+reserves for the section itself. A list wrapper (`<ol class="ui-timeline">`) or
+a table (`<table><tbody>`) belongs in the Layout `.tpl`; only the repeated row
+or item is a manifest tag.
 
 Each property persists an explicit `bindingSources` value. Single non-image
 properties allow `new`, `textfill`, or `fixed`; Single images allow `new` or

@@ -177,7 +177,7 @@
 						<img src="[[/nino/public]]/images/demo-00.jpg" style="width:3rem; height:3rem; border-radius:50%; object-fit:cover;">
 						<div class="ui-text-left">
 							<strong>Julia Berger</strong><br>
-							<span class="ui-font-small">Geschäftsführerin, Nordwind GmbH</span>
+							<small>Geschäftsführerin, Nordwind GmbH</small>
 						</div>
 					</div>
 				</div>

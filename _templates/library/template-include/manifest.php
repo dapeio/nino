@@ -4,7 +4,6 @@
 	'category' => 'Structure',
 	'tags' => [ 'template', 'include', 'shortcode', 'reusable', 'form', 'navigation' ],
 	'version' => 3,
-	'previewHeight' => 420,
 	'recommend' => [
 		'layout' => 'default',
 		'frame' => [ 'background' => 'default', 'container' => 'default', 'padding' => 'none', 'margin' => 'none' ],
@@ -19,7 +18,7 @@
 			'source' => 'single',
 			'allowed' => [ 'template' ],
 			'maxComponents' => 1,
-			'container' => [ 'class' => 'ui-grid-100 nino-area nino-area--template' ],
+			'container' => [ 'class' => 'ui-grid-100' ],
 			'recommend' => [ 'components' => [
 				[ 'id' => 'template', 'type' => 'template', 'bindings' => [ 'path' => '' ] ],
 			] ],

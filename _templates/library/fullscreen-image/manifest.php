@@ -4,7 +4,6 @@
 	'category' => 'Hero',
 	'tags' => [ 'hero', 'fullscreen', 'image', 'cover', 'parallax', 'title', 'cta' ],
 	'version' => 3,
-	'previewHeight' => 720,
 	'recommend' => [
 		'layout' => 'cover',
 		'frame' => [ 'container' => 'wide', 'padding' => 'default', 'margin' => 'none', 'focus' => '5', 'overlay' => 'medium' ],
@@ -27,18 +26,18 @@
 			'help' => 'The ordered content displayed over the image.',
 			'source' => 'single',
 			'allowed' => [ 'title', 'subtitle', 'description', 'button', 'template' ],
-			'container' => [ 'class' => 'ui-grid-100 nino-area nino-area--hero' ],
+			'container' => [ 'class' => 'ui-grid-100' ],
 			'styles' => [
-				'left' => [ 'label' => 'Left', 'class' => 'nino-area--left' ],
-				'center' => [ 'label' => 'Centered', 'class' => 'nino-area--center' ],
-				'right' => [ 'label' => 'Right', 'class' => 'nino-area--right' ],
+				'left' => [ 'label' => 'Left', 'class' => 'ui-text-left' ],
+				'center' => [ 'label' => 'Centered', 'class' => 'ui-text-center' ],
+				'right' => [ 'label' => 'Right', 'class' => 'ui-text-right' ],
 			],
 			'recommend' => [
 				'style' => 'center',
 				'components' => [
 					[ 'id' => 'title', 'type' => 'title', 'style' => 'loud', 'bindings' => [ 'text' => 'title' ] ],
 					[ 'id' => 'subtitle', 'type' => 'subtitle', 'bindings' => [ 'text' => 'subtitle' ] ],
-					[ 'id' => 'description', 'type' => 'description', 'style' => 'lead', 'bindings' => [ 'text' => 'description' ] ],
+					[ 'id' => 'description', 'type' => 'description', 'style' => 'loud', 'bindings' => [ 'text' => 'description' ] ],
 					[ 'id' => 'action', 'type' => 'button', 'style' => 'primary', 'bindings' => [ 'label' => 'cta-label', 'href' => 'cta-uri' ] ],
 				],
 			],

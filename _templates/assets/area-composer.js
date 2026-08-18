@@ -200,15 +200,45 @@
 		return draft.layout !== 'auto' && item.layouts[draft.layout] ? draft.layout : item.recommend.layout;
 	}
 
-	function effectiveFrame( draft, item ) {
+	const FRAME_FALLBACK = { screen : 'off', vertical : 'middle', background : 'default', container : 'default', padding : 'default', margin : 'none', focus : '5', overlay : 'dim' };
+
+	/**
+	 *	What "auto" settles on for every frame axis: the Layout's recommendation,
+	 *	then the preset's, then the compiler's own fallback - the same order
+	 *	AreaComposer::effective() resolves in, minus the user's own choice.
+	 */
+	function recommendedFrame( draft, item ) {
 		const layout = item.layouts[effectiveLayout( draft, item )] || {};
 		const frame = {};
-		const fallback = { screen : 'off', vertical : 'middle', background : 'default', container : 'default', padding : 'default', margin : 'none', focus : '5', overlay : 'medium' };
-		Object.keys( fallback ).forEach( function( key ) {
+		Object.keys( FRAME_FALLBACK ).forEach( function( key ) {
 			const recommended = layout.frame && layout.frame[key] && layout.frame[key] !== 'auto' ? layout.frame[key] : item.recommend.frame && item.recommend.frame[key];
-			frame[key] = draft.frame[key] && draft.frame[key] !== 'auto' ? draft.frame[key] : ( recommended && recommended !== 'auto' ? recommended : fallback[key] );
+			frame[key] = recommended && recommended !== 'auto' ? recommended : FRAME_FALLBACK[key];
 		} );
 		return frame;
+	}
+
+	function effectiveFrame( draft, item ) {
+		const recommended = recommendedFrame( draft, item );
+		const frame = {};
+		Object.keys( FRAME_FALLBACK ).forEach( function( key ) {
+			frame[key] = draft.frame[key] && draft.frame[key] !== 'auto' ? draft.frame[key] : recommended[key];
+		} );
+		return frame;
+	}
+
+	/**
+	 *	"Auto" alone tells nobody what it does. Every select that offers it names
+	 *	the value it currently resolves to - Auto (Dim) - so the choice can be
+	 *	read without composing the section first.
+	 */
+	function autoLabel( label ) {
+		return 'Auto ('+ label+ ')';
+	}
+
+	function frameChoices( key, resolved ) {
+		return ( pd._library.choices[key] || [] ).map( function( value ) {
+			return value === 'auto' ? { value : 'auto', label : autoLabel( humanize( resolved[key] ) ) } : value;
+		} );
 	}
 
 	function singleDescriptors( draft, item, kind ) {
@@ -338,18 +368,19 @@
 			: 'Fine-tune identity, layout, dimensions, spacing and background.' );
 		const grid = node( 'div', 'pd-form-grid' );
 		grid.appendChild( formField( 'Section ID', 'id', 'text', draft.id, 'Creates /page-'+ draft.pageId+ '/'+ draft.id+ '/… bindings.', Object.keys( item.layouts ).length < 2 ) );
+		const recommended = recommendedFrame( draft, item );
 		if( Object.keys( item.layouts ).length > 1 ) {
-			const layouts = [ { value : 'auto', label : 'Auto · '+ item.layouts[item.recommend.layout].label } ].concat( Object.keys( item.layouts ).map( function( key ) { return { value : key, label : item.layouts[key].label } } ) );
+			const layouts = [ { value : 'auto', label : autoLabel( item.layouts[item.recommend.layout].label ) } ].concat( Object.keys( item.layouts ).map( function( key ) { return { value : key, label : item.layouts[key].label } } ) );
 			grid.appendChild( formField( 'Layout', 'layout', layouts, draft.layout, 'Changes the preset template, not merely its CSS.' ) );
 		}
 		if( !quick ) {
-			grid.append( formField( 'Height', 'frame.screen', pd._library.choices.screen, draft.frame.screen ), formField( 'Width', 'frame.container', pd._library.choices.container, draft.frame.container ) );
-			if( effectiveFrame( draft, item ).screen !== 'off' ) grid.appendChild( formField( 'Content position', 'frame.vertical', pd._library.choices.vertical, draft.frame.vertical, 'Vertical alignment inside the screen cover.', true ) );
-			grid.append( formField( 'Margin top / bottom', 'frame.margin', pd._library.choices.margin, draft.frame.margin ), formField( 'Padding top / bottom', 'frame.padding', pd._library.choices.padding, draft.frame.padding ) );
+			grid.append( formField( 'Height', 'frame.screen', frameChoices( 'screen', recommended ), draft.frame.screen ), formField( 'Width', 'frame.container', frameChoices( 'container', recommended ), draft.frame.container ) );
+			if( effectiveFrame( draft, item ).screen !== 'off' ) grid.appendChild( formField( 'Content position', 'frame.vertical', frameChoices( 'vertical', recommended ), draft.frame.vertical, 'Vertical alignment inside the screen cover.', true ) );
+			grid.append( formField( 'Margin top / bottom', 'frame.margin', frameChoices( 'margin', recommended ), draft.frame.margin ), formField( 'Padding top / bottom', 'frame.padding', frameChoices( 'padding', recommended ), draft.frame.padding ) );
 		}
-		grid.appendChild( formField( 'Background', 'frame.background', pd._library.choices.background, draft.frame.background, '', true ) );
+		grid.appendChild( formField( 'Background', 'frame.background', frameChoices( 'background', recommended ), draft.frame.background, '', true ) );
 		if( [ 'cover', 'parallax' ].includes( effectiveFrame( draft, item ).background ) ) {
-			grid.append( formField( 'Overlay', 'frame.overlay', pd._library.choices.overlay, draft.frame.overlay ), formField( 'Focus', 'frame.focus', pd._library.choices.focus, draft.frame.focus, '1–3 top · 4–6 middle · 7–9 bottom.' ) );
+			grid.append( formField( 'Overlay', 'frame.overlay', frameChoices( 'overlay', recommended ), draft.frame.overlay ), formField( 'Focus', 'frame.focus', frameChoices( 'focus', recommended ), draft.frame.focus, '1–3 top · 4–6 middle · 7–9 bottom.' ) );
 			const generated = backgroundKey( draft );
 			const imageKey = draft.frame.backgroundImage || generated;
 			const mode = backgroundSource( draft, generated );
@@ -598,7 +629,7 @@
 
 	function renderDesign( section, draft, item, areaKey, area, areaDraft ) {
 		const body = node( 'div', 'pd-v3-area-body' );
-		const styles = [ { value : 'auto', label : 'Auto · '+ area.styles[area.recommend.style].label } ].concat( Object.keys( area.styles ).map( function( key ) { return { value : key, label : area.styles[key].label } } ) );
+		const styles = [ { value : 'auto', label : autoLabel( area.styles[area.recommend.style].label ) } ].concat( Object.keys( area.styles ).map( function( key ) { return { value : key, label : area.styles[key].label } } ) );
 		body.appendChild( formField( 'Area style', 'areas.'+ areaKey+ '.style', styles, areaDraft.style, 'Columns belong here when they are purely visual.', true ) );
 		body.appendChild( sectionLabel( 'Component stack', 'Define what this area contains and in which order it appears.' ) );
 		const list = node( 'div', 'pd-v3-components' );

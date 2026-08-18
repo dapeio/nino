@@ -400,12 +400,12 @@
 	<div class="ui-grid-row">
 		<div class="ui-grid-100">
 			<h3 class="ui-section-title">Utilities</h3>
-			<p class="ui-section-subtitle">Spacing, Text-Align, Font-Size, Opacity, Visibility, Img-Tools</p>
+			<p class="ui-section-subtitle">Spacing, Text-Align, Opacity, Visibility, Img-Tools. Schriftgrößen sind keine Utility, sondern --quiet/--loud an der jeweiligen Klasse</p>
 		</div>
 		<div class="ui-grid-100 ui-grid-m-25 ui-p-1"><div class="ui-alert ui-text-left">ui-text-left</div></div>
 		<div class="ui-grid-100 ui-grid-m-25 ui-p-1"><div class="ui-alert ui-text-center">ui-text-center</div></div>
 		<div class="ui-grid-100 ui-grid-m-25 ui-p-1"><div class="ui-alert ui-text-right">ui-text-right</div></div>
-		<div class="ui-grid-100 ui-grid-m-25 ui-p-1"><div class="ui-alert ui-font-big">ui-font-big</div></div>
+		<div class="ui-grid-100 ui-grid-m-25 ui-p-1"><div class="ui-alert"><small>&lt;small&gt;</small></div></div>
 	</div>
 	<div class="ui-grid-row">
 		<div class="ui-grid-20 ui-p-1"><div class="ui-alert ui-alert--info ui-opacity-30">opacity-30</div></div>

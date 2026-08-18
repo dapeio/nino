@@ -196,8 +196,33 @@ check( 'Area navigation stays horizontal so the editor body keeps the full confi
 	&& /\.pd-v3-area-tabs\s*\{[\s\S]*?display:\s*flex;[\s\S]*?overflow-x:\s*auto;/.test( styleSource )
 	&& !styleSource.includes( 'grid-template-columns: 10.5rem minmax(0, 1fr)' ) );
 check( 'canvas cards and the inspector read named Areas instead of legacy section axes', [ 'isAreaSpec( spec )', 'areaPreview( spec, areaPreset )', "[ 'Areas'", "[ 'Collections'" ].every( function( marker ) { return sectionsSource.includes( marker ) } ) );
-check( 'the Articles preset keeps every margin-bearing card inside its selected grid row', articlesManifestSource.includes( 'nino-article-grid-item' )
-	&& [ '25', '33', '50' ].every( function( width ) { return new RegExp( '\\.nino-article-grid-item\\.ui-grid-m-'+ width+ '\\s*\\{[^}]*width:\\s*calc\\(' ).test( ninoCssSource ) } ) );
+check( 'the Articles preset keeps every margin-bearing card inside its selected grid row', articlesManifestSource.includes( 'ui-article--grid' )
+	&& [ '25', '33', '50' ].every( function( width ) { return new RegExp( '\\.ui-article--grid\\.ui-grid-m-'+ width+ '\\s*\\{[^}]*width:\\s*calc\\(' ).test( ninoCssSource ) } ) );
+check( 'the design system carries no Template Builder classes of its own', ninoCssSource.includes( '.nino-' ) === false );
+check( 'type size is a modifier of the class it changes, not an em utility over it', ninoCssSource.includes( '.ui-font-big' ) === false
+	&& ninoCssSource.includes( '.ui-font-small' ) === false
+	&& [ 'ui-section-title', 'ui-section-subtitle', 'ui-section-text', 'ui-atf-title', 'ui-atf-subtitle', 'ui-article-title', 'ui-article-descr', 'ui-pricing-title', 'ui-pricing-price' ].every( function( base ) {
+		return ninoCssSource.includes( '.'+ base+ '--quiet' ) && ninoCssSource.includes( '.'+ base+ '--loud' );
+	} )
+	&& /\.ui-section-title--loud \{[^}]*var\(--text-5\)/.test( ninoCssSource )
+	&& /--(quiet|loud) \{[^}]*font-size:[^;]*[0-9.]em/.test( ninoCssSource ) === false );
+check( 'every Auto option names the value it resolves to', areaComposerSource.includes( "return 'Auto ('+ label+ ')'" )
+	&& areaComposerSource.includes( "label : autoLabel( humanize( resolved[key] ) )" )
+	&& [ 'screen', 'container', 'vertical', 'margin', 'padding', 'background', 'overlay', 'focus' ].every( function( axis ) {
+		return areaComposerSource.includes( "frameChoices( '"+ axis+ "', recommended )" );
+	} )
+	&& areaComposerSource.includes( 'autoLabel( item.layouts[item.recommend.layout].label )' )
+	&& areaComposerSource.includes( 'autoLabel( area.styles[area.recommend.style].label )' )
+	&& areaComposerSource.includes( "'Auto · '" ) === false );
+const recommendedFrameBody = areaComposerSource.slice( areaComposerSource.indexOf( 'function recommendedFrame(' ) ).split( '\n\tfunction ' )[0];
+check( 'what Auto resolves to is read without the choice the user already made', recommendedFrameBody.includes( 'draft.frame' ) === false
+	&& recommendedFrameBody.includes( 'FRAME_FALLBACK[key]' )
+	&& areaComposerSource.includes( 'const recommended = recommendedFrame( draft, item );' ) );
+check( 'the client frame fallbacks match the compiler\'s own', [ areaComposerSource, sectionsSource ].every( function( source ) {
+	return source.includes( "overlay : 'dim'" ) && source.includes( "overlay : 'medium'" ) === false;
+} ) );
+check( 'every preview card is scaled to one viewport, so the gallery compares presets and not tile heights', composerSource.includes( "frame.dataset.viewportHeight = '760'" )
+	&& composerSource.includes( 'previewHeight' ) === false );
 const resourceSpec = { version : 3, preset : 'sample', pageId : 'home', id : 'services', areas : { copy : { components : [ { id : 'visual', type : 'image', bindings : { src : '/page-home/services/visual' } } ] } } };
 const resourcePreset = { areas : { copy : { label : 'Copy', source : 'single' } } };
 check( 'v3 image creation is limited to generated background and declared Area image slots',

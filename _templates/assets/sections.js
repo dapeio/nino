@@ -49,7 +49,7 @@
 	}
 
 	function effectiveFrameValue( spec, preset, key ) {
-		const fallback = { screen : 'off', vertical : 'middle', background : 'default', container : 'default', padding : 'default', margin : 'none', focus : '5', overlay : 'medium' };
+		const fallback = { screen : 'off', vertical : 'middle', background : 'default', container : 'default', padding : 'default', margin : 'none', focus : '5', overlay : 'dim' };
 		if( spec.frame && spec.frame[key] && spec.frame[key] !== 'auto' )
 			return spec.frame[key];
 		const layoutKey = spec.layout && spec.layout !== 'auto' && preset.layouts[spec.layout] ? spec.layout : preset.recommend.layout;

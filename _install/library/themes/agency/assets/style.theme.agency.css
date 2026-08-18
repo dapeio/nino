@@ -100,6 +100,9 @@ header .sc-nav-content li a {
 header .sc-nav-content li a.active {
 	color: var(--color-primary);
 }
+main {
+	padding-top:0;
+}
 @media (min-width: 768px){
 	header {
 		border-bottom: 1px solid var(--color-border);

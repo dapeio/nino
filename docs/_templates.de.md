@@ -79,6 +79,10 @@ Pfad oder eine `https`-URL — und legt gar keinen Bildplatz an. Letzteres ist f
 ein Bild gedacht, das das Projekt ohnehin mitbringt und das niemand in `/_admin`
 austauschen muss.
 
+Jedes Auswahlfeld mit **Auto** nennt den Wert, auf den Auto gerade auflöst –
+`Auto (Dim)`, `Auto (Wide)`, `Auto (100)`. Aufgelöst wird in dieser Reihenfolge:
+Layout-Empfehlung, Preset-Empfehlung, sicherer Fallback.
+
 Add blendet Section-Höhe/-Breite/-Margin/-Padding, Area Style und Component Style aus. Die Ansicht soll zuerst eine sinnvolle Section erzeugen, die man im echten Frontend beurteilen kann. Edit behält das vollständige grafische Feinjustierungsmodell; beide Ansichten kompilieren dieselben Metadaten. Das Manifest bestimmt, welche Areas, Komponenten, Styles und Layouts kompatibel sind. HTML+ bleibt der ausdrückliche Weg für freie Quelltextänderungen.
 
 ## Quelltext-Sicherheit und HTML+-Escape-Hatch
@@ -125,6 +129,58 @@ Diese Metadaten erlauben das erneute Öffnen der Composer-Einstellungen. Sie sin
 
 System-Presets liegen in `_templates/library/<preset-key>/`. Der erzeugte HTML+-Quelltext wird in die Seite kopiert; die öffentliche Website liest die Library nicht zur Laufzeit.
 
+Die Library liefert zwei Sorten Preset. Die erste verwaltet ihren Inhalt: alles
+Wiederholte liest eine Elements-Collection, jede Textzeile ist ein Textfill.
+
+| Preset | Wofür | Layouts |
+|---|---|---|
+| Fullscreen image | Hero-Bühne mit per JavaScript gesetzter Bildschirmhöhe | Cover · Parallax |
+| Banner — Text over a background image | Ruhiges Vollbild ohne Scroll-Effekt | Text auf dem Bild · Text in einer Karte |
+| Content — Flexible section | Titel, Text und Aktion für redaktionelle Inhalte | Einzeln |
+| Media / Text — Flexible split | Bild und Text nebeneinander | Bild links · Bild rechts |
+| Features — Checklist and image | Häkchenliste neben einem Bild | Bild rechts · Bild links |
+| Articles — Responsive grid | Wiederholte Bildkarten | Einzeln (2/3/4 Spalten als Style) |
+| Process — Numbered steps | Ein Ablauf in Schritten, nummeriert von der Liste selbst | Verbundene Timeline · Gestapelt |
+| Pricing — Plan cards | Eine Karte je Paket | Gleichwertig · Mittlere hervorgehoben · Vierspaltig · Vier unter einer breiten Karte · Vier über einer breiten Karte |
+| Partners — Logo bar | Ruhige Logo-Reihe | Überschrift darüber · daneben |
+| Call to action — Banner | Ein klarer nächster Schritt | Text darüber · Text daneben |
+| Insert reusable template | Ein `.tpl`-Include in einer verwalteten Section | Einzeln |
+
+Die zweite Sorte liefert einen fertigen Markup-Block und überlässt den Rest
+HTML+ – siehe [Statische Blöcke](#statische-blöcke) weiter unten.
+
+| Preset | Wofür | Layouts |
+|---|---|---|
+| Table — Static block | Echte Tabelle zwischen Intro und Outro | Schlicht · Gestreift, je mit Demo-Zeilen oder Elements-Schleife |
+| List — Static block | Häkchen- oder nummerierte Liste | Häkchen · Nummeriert, je mit Demo-Einträgen oder Elements-Schleife |
+| FAQ — Static accordion | Fragen als native `details`, ohne JavaScript | Demo-Fragen · Elements-Schleife |
+| Newsletter — Signup form | Das funktionierende Double-Opt-in-Formular | Formular unter dem Intro · Intro daneben |
+| Contact — Form | Das Kontaktformular des Projekts | Mittig · Kontaktdaten daneben |
+
+### Statische Blöcke
+
+Alles im Layout-`.tpl`, was kein `[[area:…]]`-Token ist, wird unverändert in die
+Section kopiert. Genau das nutzen die statischen Presets: eine **Intro**-Area
+mit Titel und Unterzeile, ein fertiger Markup-Block und eine **Outro**-Area, die
+leer startet und nichts rendert, bis jemand einen Button oder Hinweis ergänzt.
+
+Der Block selbst ist im Composer nicht editierbar – das ist Absicht. Section
+einfügen, dann über **HTML+** öffnen und dort die Zeilen, Fragen oder Felder
+ausformen. Sobald eine Quelltextänderung übernommen wird, verliert die Section
+ihre Metadaten und gilt als codebasiert; der Builder überschreibt Handarbeit
+also nie.
+
+Jede Variante gibt es zweimal:
+
+- **demo** liefert drei Beispielzeilen zum Überschreiben;
+- **elements** liefert stattdessen eine von Hand geschriebene Schleife
+  `[elements /example-rows limit="10"]`. In HTML+ auf die eigene Collection
+  umbiegen – solange die nicht existiert, rendert die Schleife schlicht nichts.
+
+`[[section:id]]` wird auch im statischen Block aufgelöst. Deshalb behält das FAQ
+seine `name="faq-<section>"`-Gruppierung und die Formulare behalten eindeutige
+Feld-IDs, wenn dasselbe Preset zweimal auf einer Seite steht.
+
 ## Manifest v3: benannte Areas
 
 Version 3 ersetzt das universelle Intro/Content/Outro-Modell durch semantische
@@ -160,10 +216,10 @@ wiederholte Elements-Area und eine optionale Action-Area:
 		'heading' => [
 			'label' => 'Title area', 'source' => 'single',
 			'allowed' => [ 'title', 'subtitle', 'description' ],
-			'container' => [ 'tag' => 'div', 'class' => 'ui-grid-100 nino-area--heading' ],
+			'container' => [ 'tag' => 'div', 'class' => 'ui-grid-100 ui-mb-3' ],
 			'styles' => [
-				'left' => [ 'label' => 'Left', 'class' => 'nino-area--left' ],
-				'center' => [ 'label' => 'Centered', 'class' => 'nino-area--center' ],
+				'left' => [ 'label' => 'Left', 'class' => 'ui-text-left' ],
+				'center' => [ 'label' => 'Centered', 'class' => 'ui-text-center' ],
 			],
 			'recommend' => [ 'style' => 'center', 'components' => [
 				[ 'id' => 'title', 'type' => 'title' ],
@@ -251,7 +307,10 @@ Benutzers gewinnt weiterhin:
   Modelfeld, einen vorhandenen gemeinsamen Textfill oder einen festen Wert
   verwenden. Bilder bleiben kompatible Modelfeld-Mappings.
 - Kernkomponenten sind `title`, `subtitle`, `description`, `text`, `image`,
-  `button`, `price`, `number` und `template`. `allowed` ist eine strikte
+  `button`, `price`, `number` und `template`. Jede Textkomponente bietet
+  dieselben drei Styles – **Auto**, **Quiet**, **Loud** –, die zu einem
+  Modifikator der jeweils getragenen Klasse kompilieren
+  (`ui-section-title--loud`, `ui-atf-title--loud`, `ui-article-title--loud`). `allowed` ist eine strikte
   Teilmenge pro Area. Komponenten können sortiert und gelöscht, aber nicht
   verschachtelt werden.
 - Jede Komponente braucht eine eindeutige kleingeschriebene Slug-`id`. Sie ist

@@ -31,13 +31,17 @@ final class AreaComposer {
 		'padding' => [ 'auto', 'none', 'small', 'default', 'big' ],
 		'margin' => [ 'auto', 'none', 'small', 'default', 'big' ],
 		'focus' => [ 'auto', '1', '2', '3', '4', '5', '6', '7', '8', '9' ],
-		'overlay' => [ 'auto', 'none', 'soft', 'medium', 'strong' ],
+		'overlay' => [ 'auto', 'none', 'dim' ],
 	];
 	private const array FRAME_FALLBACKS = [
 		'screen' => 'off', 'vertical' => 'middle', 'background' => 'default', 'container' => 'default',
-		'padding' => 'default', 'margin' => 'none', 'focus' => '5', 'overlay' => 'medium',
+		'padding' => 'default', 'margin' => 'none', 'focus' => '5', 'overlay' => 'dim',
 	];
-	private const array TAGS = [ 'div', 'header', 'footer', 'article', 'aside', 'nav', 'h2', 'h3', 'h4', 'p', 'span', 'strong' ];
+	// Structural, inert elements only. The list grew for the presets that need
+	// a real list or table row - a timeline step is an <li>, a table row is a
+	// <tr> with <td> cells - and it stays free of anything that can load,
+	// submit or script: no img, iframe, form, button, script, style, section.
+	private const array TAGS = [ 'div', 'header', 'footer', 'article', 'aside', 'nav', 'h2', 'h3', 'h4', 'p', 'span', 'strong', 'ul', 'ol', 'li', 'tr', 'th', 'td' ];
 
 	public static function choices(): array {
 		return self::FRAME_CHOICES;
@@ -47,12 +51,12 @@ final class AreaComposer {
 		return [
 			'title' => self::component( 'Title', [ 'text' => self::property( 'Text', 'text', 'string', 'Section title' ) ], 'h3', 'ui-section-title', [ 'auto', 'quiet', 'loud' ] ),
 			'subtitle' => self::component( 'Subtitle', [ 'text' => self::property( 'Text', 'text', 'string', 'A concise supporting line' ) ], 'p', 'ui-section-subtitle', [ 'auto', 'quiet', 'loud' ] ),
-			'description' => self::component( 'Description', [ 'text' => self::property( 'Text', 'textarea', 'string', 'Explain what this area offers.' ) ], 'div', 'nino-area-description', [ 'auto', 'quiet', 'lead' ] ),
-			'text' => self::component( 'Text', [ 'text' => self::property( 'Text', 'textarea', 'string', 'Add useful content here.' ) ], 'div', 'nino-area-text', [ 'auto', 'quiet', 'lead' ] ),
+			'description' => self::component( 'Description', [ 'text' => self::property( 'Text', 'textarea', 'string', 'Explain what this area offers.' ) ], 'div', 'ui-section-text', [ 'auto', 'quiet', 'loud' ] ),
+			'text' => self::component( 'Text', [ 'text' => self::property( 'Text', 'textarea', 'string', 'Add useful content here.' ) ], 'div', 'ui-section-text', [ 'auto', 'quiet', 'loud' ] ),
 			'image' => self::component( 'Image', [
 				'src' => self::property( 'Image', 'image', 'image', '', 1200, 800 ),
 				'alt' => self::property( 'Alternative text', 'text', 'string', '' ),
-			], 'div', 'nino-area-image', [ 'auto', 'rounded', 'cover' ] ),
+			], 'div', '', [ 'auto', 'cover' ] ),
 			'button' => self::component( 'Button', [
 				'label' => self::property( 'Label', 'text', 'string', 'Learn more' ),
 				'href' => self::property( 'URL', 'url', 'string', '#' ),
@@ -60,11 +64,11 @@ final class AreaComposer {
 			'price' => self::component( 'Price', [
 				'value' => self::property( 'Price', 'text', 'string', '99' ),
 				'suffix' => self::property( 'Suffix', 'text', 'string', '€' ),
-			], 'div', 'nino-area-price', [ 'auto', 'quiet', 'loud' ] ),
+			], 'div', 'ui-section-text', [ 'auto', 'quiet', 'loud' ] ),
 			'number' => self::component( 'Number', [
 				'value' => self::property( 'Value', 'text', 'string', '12' ),
 				'label' => self::property( 'Label', 'text', 'string', 'Projects' ),
-			], 'div', 'nino-area-number', [ 'auto', 'quiet', 'loud' ] ),
+			], 'div', 'ui-section-text', [ 'auto', 'quiet', 'loud' ] ),
 			'template' => self::component( 'Template', [ 'path' => self::property( 'Template', 'template', 'template', '' ) ], 'div', '', [ 'auto' ] ),
 		];
 	}
@@ -130,7 +134,6 @@ final class AreaComposer {
 			'category' => trim( (string) ( $manifest['category'] ?? '' ) ) ?: 'Other',
 			'tags' => $tags,
 			'version' => 3,
-			'previewHeight' => max( 360, min( 1000, (int) ( $manifest['previewHeight'] ?? 680 ) ) ),
 			'data' => self::dataAttributes( $manifest['data'] ?? [], self::RESERVED_DATA ),
 			'recommend' => [
 				'layout' => $recommendedLayout,
@@ -262,8 +265,8 @@ final class AreaComposer {
 			'maxComponents' => max( 1, min( 20, (int) ( $definition['maxComponents'] ?? 12 ) ) ),
 			'styles' => $styles,
 			'recommend' => [ 'style' => $recommendedStyle, 'components' => $components ],
-			'container' => self::element( $definition['container'] ?? [], 'div', $source === 'single' ? 'ui-grid-100 nino-area' : '' ),
-			'item' => self::element( $definition['item'] ?? [], 'article', 'ui-grid-m-33 nino-area-item' ),
+			'container' => self::element( $definition['container'] ?? [], 'div', $source === 'single' ? 'ui-grid-100' : '' ),
+			'item' => self::element( $definition['item'] ?? [], 'article', 'ui-grid-m-33' ),
 			'render' => $render,
 			'model' => $model,
 			'typeTitle' => trim( (string) ( $definition['typeTitle'] ?? '' ) ) ?: ucwords( str_replace( '-', ' ', $key ) ),
@@ -315,7 +318,7 @@ final class AreaComposer {
 		$spec['layout'] = $layout;
 		$inputFrame = is_array( $input['frame'] ?? null ) ? $input['frame'] : [];
 		foreach( self::FRAME_CHOICES as $key => $choices )
-			$spec['frame'][$key] = self::choice( (string) ( $inputFrame[$key] ?? 'auto' ), $choices, 'frame.'. $key );
+			$spec['frame'][$key] = self::choice( self::frameValue( $key, (string) ( $inputFrame[$key] ?? 'auto' ) ), $choices, 'frame.'. $key );
 		$spec['frame'] = array_merge( $spec['frame'], self::backgroundBinding( $spec, $inputFrame ) );
 
 		$inputAreas = is_array( $input['areas'] ?? null ) ? $input['areas'] : [];
@@ -443,16 +446,23 @@ final class AreaComposer {
 		$imageMap = array_column( $images, 'key', 'slot' );
 		$replace = [ '[[section:id]]' => self::escape( $spec['id'] ) ];
 		$titleId = '';
+		$body = $preset['_layouts'][$effective['layout']];
 		foreach( $preset['areas'] as $areaKey => $area ) {
-			$replace['[[area:'. $areaKey. ']]'] = self::renderArea( $spec, $areaKey, $area, $effective['areas'][$areaKey], $fieldMap, $imageMap, $titleId );
+			$rendered = self::renderArea( $spec, $areaKey, $area, $effective['areas'][$areaKey], $fieldMap, $imageMap, $titleId );
+			// An Area nobody filled leaves its whole line rather than an empty
+			// one: a deliberately empty outro is normal, and the section source
+			// is read and edited by hand afterwards
+			if( $rendered === '' )
+				$body = preg_replace( '/^[\t ]*\[\[area:'. preg_quote( $areaKey, '/' ). '\]\][\t ]*\R?/m', '', $body ) ?? $body;
+			$replace['[[area:'. $areaKey. ']]'] = $rendered;
 		}
-		$body = strtr( $preset['_layouts'][$effective['layout']], $replace );
+		$body = strtr( $body, $replace );
 		if( preg_match( '/\[\[(?:area:[^\]]+|section:id)\]\]/', $body ) === 1 )
 			throw new \InvalidArgumentException( 'layout contains an unresolved compile token' );
 
 		$rowClasses = [ 'ui-grid-row' ];
 		if( $effective['frame']['container'] !== 'default' )
-			$rowClasses[] = 'nino-section-container--'. $effective['frame']['container'];
+			$rowClasses[] = 'ui-grid-row--'. $effective['frame']['container'];
 		if( $spec['pageMotion'] === 'on' )
 			$rowClasses[] = 'js-vpa';
 		$body = '<div class="'. implode( ' ', $rowClasses ). "\">\n". self::indent( $body, 1 ). '</div>';
@@ -566,6 +576,15 @@ final class AreaComposer {
 				$definition['styles'] = array_keys( $styles );
 				$definition['styleClasses'] = $styles;
 			}
+			// A step down or up the type scale is a modifier of the class the
+			// component actually carries - ui-section-title--loud, and
+			// ui-article-title--loud once a manifest restyles the same
+			// component as a card title. A component without a class of its own
+			// has nothing to modify and keeps its plain look.
+			$base = strtok( $definition['class'], ' ' );
+			foreach( [ 'quiet', 'loud' ] as $modifier )
+				if( isset( $definition['styleClasses'][$modifier] ) )
+					$definition['styleClasses'][$modifier] = $base === false || $base === '' ? '' : $base. '--'. $modifier;
 			if( $type === 'image' && isset( $override['width'] ) )
 				$definition['properties']['src']['width'] = max( 1, min( 8000, (int) $override['width'] ) );
 			if( $type === 'image' && isset( $override['height'] ) )
@@ -594,7 +613,9 @@ final class AreaComposer {
 		$styleClasses = [ 'auto' => '' ];
 		foreach( $styles as $style )
 			$styleClasses[$style] = match( $style ) {
-				'quiet' => 'nino-component--quiet', 'loud' => 'nino-component--loud', 'lead' => 'nino-component--lead', 'rounded' => 'nino-component--rounded', 'cover' => 'nino-component--cover',
+				// quiet and loud are resolved in renderDefinitions(), where the
+				// class they modify is final
+				'cover' => 'ui-img-cover',
 				'link' => '', 'default' => 'ui-btn', 'primary' => 'ui-btn ui-btn--primary', 'outline' => 'ui-btn ui-btn--outline', default => '',
 			};
 		return [ 'label' => $label, 'properties' => $properties, 'tag' => $tag, 'class' => $class, 'data' => [], 'styles' => array_values( array_unique( [ 'auto', ...$styles ] ) ), 'styleClasses' => $styleClasses, 'settings' => $settings ];
@@ -613,11 +634,23 @@ final class AreaComposer {
 		];
 	}
 
+	/**
+	 * One frame value as the current vocabulary spells it. The overlay used to
+	 * be three levels of scrim; it is one now, because the design system has
+	 * exactly one --dim per image layer. Metadata and manifests written against
+	 * the old vocabulary keep resolving instead of failing to compose.
+	 */
+	private static function frameValue( string $key, string $value ): string {
+		if( $key === 'overlay' && in_array( $value, [ 'soft', 'medium', 'strong' ], true ) )
+			return 'dim';
+		return $value;
+	}
+
 	private static function normalizeFrameRecommendation( mixed $frame ): array {
 		$frame = is_array( $frame ) ? $frame : [];
 		$result = [];
 		foreach( self::FRAME_CHOICES as $key => $choices ) {
-			$value = (string) ( $frame[$key] ?? 'auto' );
+			$value = self::frameValue( $key, (string) ( $frame[$key] ?? 'auto' ) );
 			if( in_array( $value, $choices, true ) === false )
 				throw new \InvalidArgumentException( 'unsupported frame recommendation: '. $key );
 			$result[$key] = $value;
@@ -790,19 +823,24 @@ final class AreaComposer {
 	}
 
 	private static function sectionClasses( array $frame ): array {
-		$classes = [ 'ui-section', 'nino-section' ];
+		$classes = [ 'ui-section' ];
 		if( in_array( $frame['background'], [ 'alt', 'primary', 'dark', 'black' ], true ) )
 			$classes[] = 'ui-section--'. $frame['background'];
 		if( in_array( $frame['background'], [ 'cover', 'parallax' ], true ) ) {
 			$classes[] = 'ui-section--fullwidth';
 			$classes[] = 'ui-section--black';
-			$classes[] = $frame['background'] === 'parallax' ? 'js-parallex' : ( $frame['screen'] === 'off' ? 'ui-img-background' : 'js-cover' );
-			$classes[] = 'nino-section-overlay--'. $frame['overlay'];
-			$classes[] = 'nino-section-focus--'. $frame['focus'];
+			// The scrim belongs to whichever image layer this background uses:
+			// each of the three ships its own --dim in the design system
+			$layer = $frame['background'] === 'parallax' ? 'js-parallex' : ( $frame['screen'] === 'off' ? 'ui-img-background' : 'js-cover' );
+			$classes[] = $layer;
+			if( $frame['overlay'] === 'dim' )
+				$classes[] = $layer. '--dim';
+			$classes[] = 'ui-img-focus--'. $frame['focus'];
 		}
 		if( $frame['screen'] !== 'off' )
 			$classes[] = 'js-cover';
-		$classes[] = 'nino-section-vertical--'. $frame['vertical'];
+		if( $frame['vertical'] !== 'middle' )
+			$classes[] = 'js-cover-'. $frame['vertical'];
 		$spacing = [ 'none' => '0', 'small' => '2', 'big' => '6' ];
 		if( isset( $spacing[$frame['padding']] ) ) {
 			$classes[] = 'ui-pt-'. $spacing[$frame['padding']];

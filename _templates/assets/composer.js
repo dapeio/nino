@@ -453,8 +453,11 @@
 				const active = pd.composer._includePath === null && preset.key === pd.composer._presetKey;
 				const card = element( 'article', 'pd-preset'+ ( active ? ' is-active' : '' ) );
 				const frame = element( 'div', 'pd-real-preview' );
+				// One viewport for every card: a gallery of tiles that are all
+				// the same size compares presets, one of tiles in six heights
+				// compares nothing
 				frame.dataset.viewportWidth = '1200';
-				frame.dataset.viewportHeight = String( preset.previewHeight || ( preset.shell === 'hero' ? 760 : 680 ) );
+				frame.dataset.viewportHeight = '760';
 				const iframe = element('iframe');
 				iframe.loading = 'lazy';
 				iframe.tabIndex = -1;

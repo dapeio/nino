@@ -126,6 +126,60 @@ Preset keys and directory names match `^[a-z0-9][a-z0-9-]*$`. Invalid
 manifests are not exposed. Generated HTML+ is copied into the page template;
 the public request never reads the preset library.
 
+The library ships two kinds of preset. The first manages its content: every
+repeatable part reads an Elements collection, and every line of copy is a
+textfill.
+
+| Preset | What it is | Layouts |
+|---|---|---|
+| Fullscreen image | A hero stage with a scripted screen cover | Static cover · Parallax |
+| Banner — Text over a background image | A calm full-bleed image, no scroll effect | Text on the image · Text in a card |
+| Content — Flexible section | Heading, body and action for editorial copy | Single |
+| Media / Text — Flexible split | Image and copy side by side | Image left · Image right |
+| Features — Checklist and image | A checked list next to an image | Image right · Image left |
+| Articles — Responsive grid | Repeatable image cards | Single (2/3/4 columns as a Style) |
+| Process — Numbered steps | An ordered process, numbered by the list itself | Connected timeline · Stacked steps |
+| Pricing — Plan cards | One card per plan | Equal · Middle highlighted · Four · Four below one wide card · Four above one wide card |
+| Partners — Logo bar | A quiet row of logos | Caption above · Caption beside |
+| Call to action — Banner | One clear next step | Message above · Message beside |
+| Insert reusable template | One `.tpl` include inside a managed section | Single |
+
+The second kind ships a finished block of markup and expects HTML+ for the rest
+— see [Static blocks](#static-blocks) below.
+
+| Preset | What it is | Layouts |
+|---|---|---|
+| Table — Static block | A real table between intro and outro | Plain · Striped, each with demo rows or an elements loop |
+| List — Static block | A checked or numbered list | Checked · Numbered, each with demo items or an elements loop |
+| FAQ — Static accordion | Native `details` questions, no JavaScript | Demo questions · Elements loop |
+| Newsletter — Signup form | The working double-opt-in form | Form below the intro · Intro beside the form |
+| Contact — Form | The project contact form | Centered · Details beside the form |
+
+### Static blocks
+
+Everything in a Layout `.tpl` that is not an `[[area:…]]` token is copied into
+the section as it stands. A static preset uses that deliberately: an **Intro**
+area with the usual title and subtitle, a finished block of markup, and an
+**Outro** area that starts empty and renders nothing until you add a button or
+a note to it.
+
+The block itself is not editable in the composer — that is the point. Insert
+the section, then open it in **HTML+** and shape the rows, questions or fields
+there. The moment you accept a source change, the section drops its metadata
+and becomes code-authored, so nothing you write by hand can be overwritten by
+the Builder later.
+
+Each variant comes twice:
+
+- **demo** ships three example rows or items to overwrite;
+- **elements** ships a hand-written `[elements /example-rows limit="10"]` loop
+  instead. Point it at one of your own collections in HTML+ — until that
+  collection exists the loop simply renders nothing.
+
+`[[section:id]]` is resolved inside a static block, which is how the FAQ keeps
+its `name="faq-<section>"` grouping and the forms keep unique field IDs when the
+same preset is inserted twice on one page.
+
 ### Named-area contract (manifest version 3)
 
 Version 3 describes one Section frame and one or more semantic Areas. It does
@@ -159,6 +213,11 @@ URL straight into the section — a project path such as
 URL — and creates no slot at all. The last one is for an image the project
 already ships and nobody needs to swap in Admin.
 
+Every select that offers **Auto** names the value it currently resolves to —
+`Auto (Dim)`, `Auto (Wide)`, `Auto (100)` — so the choice can be read without
+composing the section first. What it resolves to is the Layout's recommendation,
+then the preset's, then the safe fallback.
+
 Semantics such as an additional ARIA label, a different heading level or
 project-specific classes remain deliberate HTML+ work. A preset may recommend
 frame values globally and override them for a particular Layout. The user can
@@ -178,7 +237,12 @@ Every Area defines:
 - an Element model and shortcode defaults for a repeatable Area.
 
 The fixed component catalog is `title`, `subtitle`, `description`,
-`text`, `image`, `button`, `price`, `number` and `template`.
+`text`, `image`, `button`, `price`, `number` and `template`. Every text
+component offers the same three styles — **Auto**, **Quiet** and **Loud** —
+which compile to a modifier of whatever class the component carries:
+`ui-section-title--loud` in a content section, `ui-atf-title--loud` in a hero,
+`ui-article-title--loud` in a card. Each modifier states its own `rem` size, so
+a step never fights the size the class sets for itself.
 Components can be added, reordered, styled or removed, but the Builder never
 accepts arbitrary markup through the visual editor.
 
@@ -258,10 +322,10 @@ only ordinary relative URLs or the `http`, `https`, `mailto` and `tel` schemes.
             'label' => 'Title area',
             'source' => 'single',
             'allowed' => [ 'title', 'subtitle', 'description' ],
-            'container' => [ 'class' => 'ui-grid-100 nino-area--heading' ],
+            'container' => [ 'class' => 'ui-grid-100 ui-mb-3' ],
             'styles' => [
-                'left' => [ 'label' => 'Left', 'class' => 'nino-area--left' ],
-                'center' => [ 'label' => 'Centered', 'class' => 'nino-area--center' ],
+                'left' => [ 'label' => 'Left', 'class' => 'ui-text-left' ],
+                'center' => [ 'label' => 'Centered', 'class' => 'ui-text-center' ],
             ],
             'recommend' => [
                 'style' => 'center',

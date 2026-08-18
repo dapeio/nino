@@ -388,6 +388,13 @@ namespace Nino\Templates {
 	 */
 	class Composer {
 
+		/**
+		 * One shortcode's argument list, for the inert preview's own matching.
+		 * Quoted values are consumed whole because a bound alt text compiles to
+		 * alt="[[/page-…/…-alt]]" - reading up to the first "]" ended the match
+		 * inside that fill and left its tail (]"]) standing in the preview.
+		 */
+		private const string SHORTCODE_ARGUMENTS = '(?:"[^"]*"|\'[^\']*\'|[^\]"\'])*';
 		private const array SURFACES = [ 'default', 'alt', 'primary', 'dark', 'black' ];
 		private const array BACKGROUNDS = [ 'none', 'image-cover', 'image-static', 'parallax' ];
 		private const array HEADERS = [ 'none', 'title', 'title-subtitle', 'title-subtitle-description' ];
@@ -760,9 +767,9 @@ namespace Nino\Templates {
 					return $match[0];
 				return $match[1]. $match[2]. implode( ' ', $previewClasses ). $match[2];
 			}, $source ) ?? $source;
-			$source = preg_replace_callback( '#\[image\s+[^\]]+\]#i', fn(): string => '<img src="'. self::_previewImage( 'Section image' ). '" alt="">', $source ) ?? $source;
+			$source = preg_replace_callback( '#\[image\s+'. self::SHORTCODE_ARGUMENTS. '\]#i', fn(): string => '<img src="'. self::_previewImage( 'Section image' ). '" alt="">', $source ) ?? $source;
 
-			$source = preg_replace_callback( '#\[elements\s+([^\]]*)\](.*?)\[/elements\]#is', function( array $match ): string {
+			$source = preg_replace_callback( '#\[elements\s+('. self::SHORTCODE_ARGUMENTS. ')\](.*?)\[/elements\]#is', function( array $match ): string {
 				$limit = [];
 				preg_match( '/\blimit="(\d+)"/i', $match[1], $limit );
 				$columns = match( true ) {
@@ -798,7 +805,7 @@ namespace Nino\Templates {
 				$source
 			) ?? $source;
 			$source = str_replace( '[csrf]', '', $source );
-			$source = preg_replace( '#\[(?:template|elements|image)\b[^\]]*\](?:.*?\[/elements\])?#is', '', $source ) ?? $source;
+			$source = preg_replace( '#\[(?:template|elements|image)\b\s*'. self::SHORTCODE_ARGUMENTS. '\](?:.*?\[/elements\])?#is', '', $source ) ?? $source;
 			$source = preg_replace( '#(<iframe\b[^>]*\bsrc=)(["\'])[^"\']*\2#i', '$1$2about:blank$2', $source ) ?? $source;
 			$source = preg_replace( '#(<form\b[^>]*\baction=)(["\'])[^"\']*\2#i', '$1$2#$2', $source ) ?? $source;
 
@@ -822,6 +829,7 @@ namespace Nino\Templates {
 				'author' => 'Alex Morgan',
 				'role' => 'Product lead',
 				'number' => (string) ( 24 + ( $number * 17 ) ),
+				'step' => (string) $number,
 				'suffix' => $number % 2 === 0 ? '%' : '+',
 				'price' => (string) ( 49 + ( $number * 50 ) ),
 				'badge' => $number === 2 ? 'Recommended' : 'Popular',

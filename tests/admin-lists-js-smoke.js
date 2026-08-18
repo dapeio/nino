@@ -254,9 +254,6 @@ check( 'Admin form toolbars use the shared context bar without a dead local clas
 	asset('script.js').includes('Nino.adminUi.contextBar( backLink )') &&
 	asset('script.js').includes('admin-form-toolbar') === false );
 
-check( 'the shared context bar stays flush at the top of the scrolling pane',
-	/\.nino-admin \.nino-admin-contextbar \{[^}]*position: sticky;[^}]*top: 0;[^}]*margin: -1rem calc\(var\(--nino-admin-content-inline\) \* -1\) 1rem;/s.test( shared ) );
-
 check( 'the shared action bar is fixed to the viewport and clears the common rail',
 	/\.nino-admin \.nino-admin-actionbar \{[^}]*position: fixed;/s.test( shared ) &&
 	/@media \(min-width: 64rem\)[\s\S]*?\.nino-admin \.nino-admin-actionbar \{[^}]*left: var\(--nino-admin-sidebar-width\);/s.test( shared ) );

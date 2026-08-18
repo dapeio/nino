@@ -17,11 +17,11 @@
 			'help' => 'The optional introduction above the main content.',
 			'source' => 'single',
 			'allowed' => [ 'title', 'subtitle', 'description' ],
-			'container' => [ 'class' => 'ui-grid-100 nino-area nino-area--heading' ],
+			'container' => [ 'class' => 'ui-grid-100 ui-mb-3' ],
 			'styles' => [
-				'left' => [ 'label' => 'Left', 'class' => 'nino-area--left' ],
-				'center' => [ 'label' => 'Centered', 'class' => 'nino-area--center' ],
-				'right' => [ 'label' => 'Right', 'class' => 'nino-area--right' ],
+				'left' => [ 'label' => 'Left', 'class' => 'ui-text-left' ],
+				'center' => [ 'label' => 'Centered', 'class' => 'ui-text-center' ],
+				'right' => [ 'label' => 'Right', 'class' => 'ui-text-right' ],
 			],
 			'recommend' => [ 'style' => 'left', 'components' => [
 				[ 'id' => 'title', 'type' => 'title', 'bindings' => [ 'text' => 'title' ] ],
@@ -34,13 +34,9 @@
 			'help' => 'Ordered text, images or reusable templates.',
 			'source' => 'single',
 			'allowed' => [ 'title', 'subtitle', 'description', 'text', 'image', 'template' ],
-			'container' => [ 'class' => 'ui-grid-100 nino-area nino-area--body' ],
-			'styles' => [
-				'wide' => [ 'label' => 'Wide', 'class' => '' ],
-				'narrow' => [ 'label' => 'Narrow', 'class' => 'nino-area--narrow' ],
-			],
-			'recommend' => [ 'style' => 'wide', 'components' => [
-				[ 'id' => 'content', 'type' => 'text', 'style' => 'lead', 'bindings' => [ 'text' => 'content' ] ],
+			'container' => [ 'class' => 'ui-grid-100' ],
+			'recommend' => [ 'components' => [
+				[ 'id' => 'content', 'type' => 'text', 'style' => 'loud', 'bindings' => [ 'text' => 'content' ] ],
 			] ],
 		],
 		'action' => [
@@ -48,11 +44,11 @@
 			'help' => 'Optional calls to action below the content.',
 			'source' => 'single',
 			'allowed' => [ 'description', 'button', 'template' ],
-			'container' => [ 'class' => 'ui-grid-100 nino-area nino-area--action' ],
+			'container' => [ 'class' => 'ui-grid-100 ui-mt-3' ],
 			'styles' => [
-				'left' => [ 'label' => 'Left', 'class' => 'nino-area--left' ],
-				'center' => [ 'label' => 'Centered', 'class' => 'nino-area--center' ],
-				'right' => [ 'label' => 'Right', 'class' => 'nino-area--right' ],
+				'left' => [ 'label' => 'Left', 'class' => 'ui-text-left' ],
+				'center' => [ 'label' => 'Centered', 'class' => 'ui-text-center' ],
+				'right' => [ 'label' => 'Right', 'class' => 'ui-text-right' ],
 			],
 			'recommend' => [ 'style' => 'left', 'components' => [] ],
 		],
