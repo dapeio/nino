@@ -19,7 +19,10 @@ final class AreaComposer {
 	private const string TEXT_KEY_PATTERN = '#^/[A-Za-z0-9][A-Za-z0-9_./-]*$#';
 	private const string IMAGE_KEY_PATTERN = '#^/[a-z0-9][a-z0-9_/-]*$#';
 	private const string TEMPLATE_PATTERN = '#^/templates/[A-Za-z0-9][A-Za-z0-9._-]*$#';
+	private const string DATA_NAME_PATTERN = '/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/';
 	private const int MAX_LITERAL_LENGTH = 4000;
+	private const int MAX_DATA_LENGTH = 240;
+	private const array RESERVED_DATA = [ 'data-cover-height' ];
 	private const array FRAME_CHOICES = [
 		'screen' => [ 'auto', 'off', '50', '75', '90', '100' ],
 		'vertical' => [ 'auto', 'top', 'middle', 'bottom' ],
@@ -110,6 +113,7 @@ final class AreaComposer {
 			$layouts[$layoutKey] = [
 				'label' => trim( (string) ( $definition['label'] ?? '' ) ) ?: ucwords( str_replace( '-', ' ', $layoutKey ) ),
 				'frame' => self::normalizeFrameRecommendation( $definition['frame'] ?? [] ),
+				'data' => self::dataAttributes( $definition['data'] ?? [], self::RESERVED_DATA ),
 			];
 			$layoutSources[$layoutKey] = $source;
 		}
@@ -127,6 +131,7 @@ final class AreaComposer {
 			'tags' => $tags,
 			'version' => 3,
 			'previewHeight' => max( 360, min( 1000, (int) ( $manifest['previewHeight'] ?? 680 ) ) ),
+			'data' => self::dataAttributes( $manifest['data'] ?? [], self::RESERVED_DATA ),
 			'recommend' => [
 				'layout' => $recommendedLayout,
 				'frame' => self::normalizeFrameRecommendation( $recommend['frame'] ?? [] ),
@@ -149,6 +154,8 @@ final class AreaComposer {
 			'frame' => array_fill_keys( array_keys( self::FRAME_CHOICES ), 'auto' ),
 			'areas' => [],
 		];
+		$spec['frame']['backgroundImage'] = self::generatedKey( $spec, 'background' );
+		$spec['frame']['backgroundImageSource'] = 'new';
 		foreach( $preset['areas'] as $areaKey => $area ) {
 			$components = [];
 			foreach( $area['recommend']['components'] as $node ) {
@@ -309,6 +316,7 @@ final class AreaComposer {
 		$inputFrame = is_array( $input['frame'] ?? null ) ? $input['frame'] : [];
 		foreach( self::FRAME_CHOICES as $key => $choices )
 			$spec['frame'][$key] = self::choice( (string) ( $inputFrame[$key] ?? 'auto' ), $choices, 'frame.'. $key );
+		$spec['frame'] = array_merge( $spec['frame'], self::backgroundBinding( $spec, $inputFrame ) );
 
 		$inputAreas = is_array( $input['areas'] ?? null ) ? $input['areas'] : [];
 		foreach( $preset['areas'] as $areaKey => $area ) {
@@ -397,7 +405,7 @@ final class AreaComposer {
 
 	private static function imageDescriptors( array &$spec, array $preset, array $effective ): array {
 		$result = [];
-		if( in_array( $effective['frame']['background'], [ 'cover', 'parallax' ], true ) ) {
+		if( in_array( $effective['frame']['background'], [ 'cover', 'parallax' ], true ) && ( $spec['frame']['backgroundImageSource'] ?? 'new' ) !== 'fixed' ) {
 			$generated = self::generatedKey( $spec, 'background' );
 			$key = (string) ( $spec['frame']['backgroundImage'] ?? $generated );
 			if( self::validKey( $key, true ) === false )
@@ -454,11 +462,17 @@ final class AreaComposer {
 			$attributes .= ' data-cover-height="'. self::escape( $effective['frame']['screen'] ). '"';
 		if( $titleId !== '' )
 			$attributes .= ' aria-labelledby="'. self::escape( $titleId ). '"';
+		$attributes .= self::attributes( array_replace( $preset['data'], $preset['layouts'][$effective['layout']]['data'] ), $spec['id'] );
 		$meta = '<!-- nino:section '. json_encode( $spec, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE ). ' -->';
-		$inner = $meta. "\n";
+		$background = '';
 		if( isset( $imageMap['background'] ) )
-			$inner .= '[image '. $imageMap['background']. ' alt=""]'. "\n";
-		$needsLayer = isset( $imageMap['background'] ) || $effective['frame']['screen'] !== 'off';
+			$background = '[image '. $imageMap['background']. ' alt=""]';
+		elseif( ( $spec['frame']['backgroundImageSource'] ?? '' ) === 'fixed' && in_array( $effective['frame']['background'], [ 'cover', 'parallax' ], true ) && $spec['frame']['backgroundImage'] !== '' )
+			$background = '<img src="'. self::escape( $spec['frame']['backgroundImage'] ). '" alt="">';
+		$inner = $meta. "\n";
+		if( $background !== '' )
+			$inner .= $background. "\n";
+		$needsLayer = $background !== '' || $effective['frame']['screen'] !== 'off';
 		$inner .= $needsLayer
 			? '<div class="'. ( $effective['frame']['background'] === 'cover' && $effective['frame']['screen'] === 'off' ? 'ui-img-background-content' : 'js-cover-content' ). "\">\n". self::indent( $body, 1 ). '</div>'
 			: $body;
@@ -487,31 +501,32 @@ final class AreaComposer {
 			$componentId = $area['source'] === 'single' && $node['type'] === 'title' && $titleId === '' ? $spec['id']. '-title' : '';
 			if( $componentId !== '' )
 				$titleId = $componentId;
-			$nodes .= self::renderComponent( $node, $area['render'][$node['type']], $values, $area['source'], $componentId );
+			$nodes .= self::renderComponent( $node, $area['render'][$node['type']], $values, $area['source'], $componentId, $spec['id'] );
 		}
 		if( $nodes === '' )
 			return '';
 		if( $area['source'] === 'single' ) {
 			$element = $area['container'];
 			$class = trim( $element['class']. ' '. $styleClass );
-			return '<'. $element['tag']. ( $class === '' ? '' : ' class="'. self::escape( $class ). '"' ). '>'. $nodes. '</'. $element['tag']. '>';
+			return '<'. $element['tag']. ( $class === '' ? '' : ' class="'. self::escape( $class ). '"' ). self::attributes( $element['data'], $spec['id'] ). '>'. $nodes. '</'. $element['tag']. '>';
 		}
 		$source = $spec['areas'][$areaKey]['source'];
 		$shortcode = $source['shortcode'];
 		$element = $area['item'];
 		$class = trim( $element['class']. ' '. $styleClass );
-		$item = '<'. $element['tag']. ( $class === '' ? '' : ' class="'. self::escape( $class ). '"' ). '>'. $nodes. '</'. $element['tag']. '>';
+		$item = '<'. $element['tag']. ( $class === '' ? '' : ' class="'. self::escape( $class ). '"' ). self::attributes( $element['data'], $spec['id'] ). '>'. $nodes. '</'. $element['tag']. '>';
 		return '[elements /'. $source['elementType']
 			. ' locale="'. self::escape( $shortcode['locale'] ). '" callback="'. self::escape( $shortcode['callback'] ). '"'
 			. ' limit="'. $shortcode['limit']. '" query="'. self::escape( $shortcode['query'] ). '"]'. $item. '[/elements]';
 	}
 
-	private static function renderComponent( array $node, array $definition, array $values, string $source, string $id ): string {
+	private static function renderComponent( array $node, array $definition, array $values, string $source, string $id, string $sectionId ): string {
 		$style = $node['style'] === 'auto' ? 'auto' : $node['style'];
 		$class = trim( $definition['class']. ' '. ( $definition['styleClasses'][$style] ?? '' ) );
 		$attribute = $class === '' ? '' : ' class="'. self::escape( $class ). '"';
 		if( $id !== '' )
 			$attribute .= ' id="'. self::escape( $id ). '"';
+		$attribute .= self::attributes( $definition['data'], $sectionId );
 		return match( $node['type'] ) {
 			'image' => $source === 'elements'
 				? '<img src="[[/nino/public]]/images/'. $values['src']. '" alt="'. $values['alt']. '" loading="lazy"'. $attribute. '>'
@@ -537,6 +552,8 @@ final class AreaComposer {
 				$definition['tag'] = self::tag( (string) $override['tag'] );
 			if( isset( $override['class'] ) )
 				$definition['class'] = self::classes( (string) $override['class'] );
+			if( isset( $override['data'] ) )
+				$definition['data'] = self::dataAttributes( $override['data'] );
 			if( isset( $override['styles'] ) ) {
 				$styles = [];
 				foreach( (array) $override['styles'] as $style => $class ) {
@@ -580,7 +597,7 @@ final class AreaComposer {
 				'quiet' => 'nino-component--quiet', 'loud' => 'nino-component--loud', 'lead' => 'nino-component--lead', 'rounded' => 'nino-component--rounded', 'cover' => 'nino-component--cover',
 				'link' => '', 'default' => 'ui-btn', 'primary' => 'ui-btn ui-btn--primary', 'outline' => 'ui-btn ui-btn--outline', default => '',
 			};
-		return [ 'label' => $label, 'properties' => $properties, 'tag' => $tag, 'class' => $class, 'styles' => array_values( array_unique( [ 'auto', ...$styles ] ) ), 'styleClasses' => $styleClasses, 'settings' => $settings ];
+		return [ 'label' => $label, 'properties' => $properties, 'tag' => $tag, 'class' => $class, 'data' => [], 'styles' => array_values( array_unique( [ 'auto', ...$styles ] ) ), 'styleClasses' => $styleClasses, 'settings' => $settings ];
 	}
 
 	private static function property( string $label, string $control, string $fieldType, string $default, int $width = 0, int $height = 0 ): array {
@@ -589,7 +606,11 @@ final class AreaComposer {
 
 	private static function element( mixed $definition, string $tag, string $class ): array {
 		$definition = is_array( $definition ) ? $definition : [];
-		return [ 'tag' => self::tag( (string) ( $definition['tag'] ?? $tag ) ), 'class' => self::classes( (string) ( $definition['class'] ?? $class ) ) ];
+		return [
+			'tag' => self::tag( (string) ( $definition['tag'] ?? $tag ) ),
+			'class' => self::classes( (string) ( $definition['class'] ?? $class ) ),
+			'data' => self::dataAttributes( $definition['data'] ?? [] ),
+		];
 	}
 
 	private static function normalizeFrameRecommendation( mixed $frame ): array {
@@ -649,6 +670,49 @@ final class AreaComposer {
 			$node['bindingSources'][$property] = $source;
 		}
 		return $node;
+	}
+
+	/**
+	 * Resolve the section background image binding from browser data.
+	 * A generated slot, an existing slot and a fixed URL are three different
+	 * things a key alone cannot tell apart, so the choice is stored next to it.
+	 * Metadata written before this field infers its original behavior.
+	 */
+	private static function backgroundBinding( array $spec, array $inputFrame ): array {
+		$generated = self::generatedKey( $spec, 'background' );
+		$value = trim( (string) ( $inputFrame['backgroundImage'] ?? '' ) );
+		$source = (string) ( $inputFrame['backgroundImageSource'] ?? '' );
+		if( in_array( $source, [ 'new', 'image', 'fixed' ], true ) === false )
+			$source = $value === '' || $value === $generated ? 'new' : 'image';
+		if( $source === 'new' )
+			$value = $generated;
+		if( $source === 'image' && self::validKey( $value, true ) === false )
+			throw new \InvalidArgumentException( 'invalid background image binding' );
+		if( $source === 'fixed' && self::validImageLiteral( $value ) === false )
+			throw new \InvalidArgumentException( 'invalid fixed background image' );
+		return [ 'backgroundImage' => $value, 'backgroundImageSource' => $source ];
+	}
+
+	/**
+	 * Whether a fixed background value is a usable image source. Project
+	 * images are addressed through the public prefix, so the two fills that
+	 * resolve it stay allowed; every other bracket, quote, space and control
+	 * character is refused rather than escaped into something meaningless.
+	 */
+	private static function validImageLiteral( string $value ): bool {
+		if( $value === '' || strlen( $value ) > 500 || preg_match( '/[\x00-\x20\x7F"\'<>]/', $value ) === 1 )
+			return false;
+		$path = $value;
+		foreach( [ '[[/nino/public]]', '[[/nino/dir]]' ] as $fill )
+			if( str_starts_with( $path, $fill ) ) {
+				$path = substr( $path, strlen( $fill ) );
+				break;
+			}
+		if( str_contains( $path, '[' ) || str_contains( $path, ']' ) || str_contains( $path, '..' ) )
+			return false;
+		if( preg_match( '#^[A-Za-z][A-Za-z0-9+.-]*:#', $path, $match ) === 1 )
+			return in_array( strtolower( rtrim( $match[0], ':' ) ), [ 'http', 'https' ], true );
+		return str_starts_with( $path, '//' ) === false;
 	}
 
 	private static function bindingSource( string $requested, string $areaSource, array $definition, string $value ): string {
@@ -799,6 +863,39 @@ final class AreaComposer {
 		return $classes;
 	}
 
+	/**
+	 * Normalize the optional data-* attributes a manifest declares for one
+	 * generated element. Frontend behavior such as ui-autoheight, js-slider or
+	 * js-vpa is configured through these attributes, so a preset that owns the
+	 * matching class must be able to own its parameters too.
+	 *
+	 * Only the preset files decide this. Nothing here is read from a request:
+	 * the composer UI has no data-* control, and arbitrary attributes remain an
+	 * HTML+ decision. Names are the attribute without its data- prefix (the
+	 * written prefix is accepted and dropped) and values are bounded literals.
+	 */
+	private static function dataAttributes( mixed $data, array $reserved = [] ): array {
+		if( is_array( $data ) === false || $data === [] )
+			return [];
+		$result = [];
+		foreach( $data as $name => $value ) {
+			$name = strtolower( trim( (string) $name ) );
+			if( str_starts_with( $name, 'data-' ) )
+				$name = substr( $name, 5 );
+			if( preg_match( self::DATA_NAME_PATTERN, $name ) !== 1 )
+				throw new \InvalidArgumentException( 'data attributes need lowercase slug names in area manifest' );
+			if( in_array( 'data-'. $name, $reserved, true ) )
+				throw new \InvalidArgumentException( 'data-'. $name. ' is written by the section frame itself' );
+			if( is_scalar( $value ) === false )
+				throw new \InvalidArgumentException( 'data-'. $name. ' needs a scalar value in area manifest' );
+			$value = is_bool( $value ) ? ( $value ? 'true' : 'false' ) : (string) $value;
+			if( strlen( $value ) > self::MAX_DATA_LENGTH || preg_match( '/[\x00-\x1F\x7F]/', $value ) === 1 )
+				throw new \InvalidArgumentException( 'data-'. $name. ' has an unsupported value in area manifest' );
+			$result['data-'. $name] = $value;
+		}
+		return $result;
+	}
+
 	private static function indent( string $source, int $levels ): string {
 		if( trim( $source ) === '' )
 			return '';
@@ -812,5 +909,17 @@ final class AreaComposer {
 
 	private static function escapeLiteral( string $value ): string {
 		return str_replace( [ '[', ']' ], [ '&#91;', '&#93;' ], self::escape( $value ) );
+	}
+
+	/**
+	 * Serialize normalized data-* attributes for one element. [[section:id]] is
+	 * the same compile token a Layout may use and keeps a value such as an
+	 * autoheight group or a scroll target unique per inserted section.
+	 */
+	private static function attributes( array $data, string $sectionId ): string {
+		$attributes = '';
+		foreach( $data as $name => $value )
+			$attributes .= ' '. $name. '="'. self::escape( strtr( $value, [ '[[section:id]]' => $sectionId ] ) ). '"';
+		return $attributes;
 	}
 }

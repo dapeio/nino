@@ -194,7 +194,7 @@ Der Bereich **Routes** verwaltet die über `/_install` angelegten Seitenrouten, 
 
 Eine Seite besitzt zwei verschiedene URIs:
 
-- **Element URI** ist die stabile interne Identität, an der Seitentexte wie `/webpage<uri>/title` hängen;
+- **Element URI** ist die stabile interne Identität, an der Seitentexte wie `/webpage<uri>/title` hängen. Beim Speichern wird zusätzlich `/webpage<uri>/uri` geschrieben – der erreichbare Pfad der Seite, als ein globaler technischer Wert –, sodass ein Template mit `[[/webpage/site-contact/uri]]` verlinken kann, statt einen Pfad zu wiederholen, den dieses Formular ändern kann;
 - **Http URI** ist der tatsächlich im Browser erreichbare Pfad.
 
 So kann eine Seite intern `/about` heißen und öffentlich beispielsweise unter `/ueber-uns` erreichbar sein.

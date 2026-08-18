@@ -1639,6 +1639,60 @@ icons, nested structures, or project-specific behavior.
 [[area:services]]
 ```
 
+Generated elements MAY declare `data-*` attributes. `Nino.ui.js` is configured
+through them - `ui-autoheight` reads `data-autoheight-group`, `js-slider` reads
+`data-slider-width`, `js-vpa` reads `data-vpa-delay` - so a preset that owns the
+class MUST be able to own its parameters. A `data` map is accepted in five
+places, each attached to exactly one generated element:
+
+| Manifest key | Element |
+| --- | --- |
+| top-level `data` | the `<section>` |
+| `layouts.<key>.data` | the `<section>` of that Layout; overrides the preset default per name |
+| `areas.<key>.container.data` | a Single Area's wrapper |
+| `areas.<key>.item.data` | one repetition of an Elements Area |
+| `areas.<key>.render.<type>.data` | every component of that type in the Area |
+
+```php
+'areas' => [
+	'services' => [
+		'item' => [ 'tag' => 'article', 'class' => 'ui-article' ],
+		'render' => [
+			'title' => [
+				'tag' => 'h3',
+				'class' => 'ui-article-title ui-autoheight',
+				'data' => [
+					'autoheight-group' => 'services-title-[[section:id]]',
+					'autoheight-mobile' => 'skip',
+				],
+			],
+			'button' => [ 'class' => 'js-modal-trigger', 'data' => [ 'modal-target' => 'contact-modal' ] ],
+		],
+	],
+],
+```
+
+A name is the attribute without its `data-` prefix and matches
+`^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$`; a written prefix is accepted and dropped, and
+uppercase is lowercased exactly as the browser would. A value is a single-line
+scalar of at most 240 characters, escaped for the attribute context.
+`[[section:id]]` is substituted, so a value such as a group name stays unique
+when the same preset is inserted twice. `data-cover-height` belongs to the frame and
+is rejected. A `template` component compiles to a shortcode and therefore
+carries no attributes at all.
+
+Attach the map to the element that really carries the class. The `<section>` is
+the element with `js-cover`/`js-parallex`, so `data-cover-width` belongs in a
+top-level or Layout map. `js-vpa` is written onto the generated `ui-grid-row`,
+which no `data` map targets - motion timing belongs in the Layout `.tpl`. An
+Elements `item` is a direct flex child of that row and already stretches to its
+row line, so equalizing heights (`ui-autoheight`) belongs on the boxes inside the
+card through `render.<type>`, not on the item.
+
+Only the manifest decides this. Nothing is read from the request: the composer
+has no data-* control, a `data` key inside posted section metadata is ignored,
+and arbitrary attributes remain HTML+ work.
+
 ### 10.4 Component and binding contract
 
 The finite catalog is `title`, `subtitle`, `description`, `text`, `image`,
@@ -1676,16 +1730,24 @@ recommendation may be overridden by a Layout recommendation. User `auto`
 resolves Layout → preset → safe fallback. Never persist an invalid value
 silently as a custom class.
 
-Cover and parallax backgrounds create or reference one background image slot.
-Focus is positions 1–9 and overlay is none/soft/medium/strong. Mobile and
-reduced-motion behavior must remain meaningful without preview JavaScript.
+Cover and parallax backgrounds bind one background image, and the choice is
+stored as `frame.backgroundImageSource`: `new` generates the slot
+`/page-<pageId>/<sectionId>/background`, `image` references an existing slot,
+and `fixed` writes a plain `<img>` with a literal URL and creates no slot at
+all. A fixed value may start with `[[/nino/public]]` or `[[/nino/dir]]` and is
+otherwise a relative path or an `http`/`https` URL - every other bracket,
+quote, space and scheme is refused. Metadata written before that field infers
+its original slot behavior. Focus is positions 1–9 and overlay is
+none/soft/medium/strong. Mobile and reduced-motion behavior must remain
+meaningful without preview JavaScript.
 
 ### 10.6 Validation and output
 
 A v3 Layout MUST contain no PHP, every declared Area exactly once, no unknown
 Area tokens, and only optional `[[section:id]]` outside Area tokens. The central
-renderer validates slugs, classes, tags, model fields, paths, dimensions,
-component count, styles, target behavior, and shortcode bounds.
+renderer validates slugs, classes, tags, data attribute names and values, model
+fields, paths, dimensions, component count, styles, target behavior, and
+shortcode bounds.
 
 Composition MUST produce exactly one complete top-level `<section>`. It stores
 one inert round-trip comment:
@@ -1712,6 +1774,10 @@ Extend `tests/templates-smoke.php` and `tests/templates-js-smoke.js`. Test:
 - component add/move/remove helpers do not mutate unrelated state;
 - new/existing/fixed Text, Image, Template, and Elements bindings, including
   blacklisted technical textfills and legacy v3 source inference;
+- declared `data-*` attributes on the section, Layout, Area container,
+  collection item and component, their escaping and `[[section:id]]`
+  substitution, the reserved frame attribute, and posted metadata that tries to
+  add an attribute of its own;
 - invalid slugs, paths, tags, classes, styles, mappings, and Layouts;
 - exact collection schema and all shortcode arguments;
 - preview placeholders, column count, VPA visibility, and script isolation;
@@ -1927,6 +1993,19 @@ General page metadata is separate:
 The route's internal URI determines these values. Do not hardcode metadata to a
 library folder when a page can be mounted at another internal URI.
 
+A page's reachable path is available the same way, so one page can link to
+another without repeating a path the Webpages step can change:
+
+```html
+<a href="[[/webpage/site-contact/uri]]">[[/webpage/site-contact/name]]</a>
+```
+
+`/_install` and `/_admin` both write that key whenever they save a page: keyed
+by the internal URI like the other three, valued with the page's Http-URI, in
+`text/global.php` because an entry has one Http-URI for every locale, and
+blacklisted as a technical value. Menus still come from `[navigation]`, which
+reads the routes directly - this key is for a deliberate single link.
+
 ### 11.6 Images
 
 A native section image is an image slot:
@@ -2132,7 +2211,8 @@ return [
 The four `/webpage/<library-slug>/*` keys are suggestions read into the
 installation form. They are stripped from the page fragment during merge.
 `/_install` writes the actual metadata under the internal URI chosen for that
-page instance.
+page instance - `name`, `title` and `description` per locale, and `uri` once in
+`text/global.php`.
 
 All other keys are ordinary project content and are merged into the target text
 files.

@@ -2,7 +2,7 @@
 
 **Language:** English · [Deutsch](_templates.de.md)
 
-**Status:** 17 August 2026 · **Nino version:** Unreleased
+**Status:** 18 August 2026 · **Nino version:** Unreleased
 
 The Template Builder is the fast path from a `page-*.tpl` file to a filled page. It treats a template as an ordered sequence of complete HTML sections and reusable `[template]` sections instead of exposing every nested DOM node.
 
@@ -149,6 +149,15 @@ The shared Section frame offers:
 | Background | Auto, default, alt, primary, dark, black, cover or parallax |
 | Overlay | Auto, none, soft, medium or strong |
 | Image focus | Auto or positions 1–9 |
+| Background image | A new image slot, an existing one, or a fixed URL |
+
+A cover or parallax background binds one image. **New image slot** generates
+`/page-<page>/<section>/background` and creates it on insert, **Existing image
+slot** points at a slot that is already there, and **Fixed value** writes the
+URL straight into the section — a project path such as
+`[[/nino/public]]/images/hero.jpg`, an ordinary relative path or an `https`
+URL — and creates no slot at all. The last one is for an image the project
+already ships and nobody needs to swap in Admin.
 
 Semantics such as an additional ARIA label, a different heading level or
 project-specific classes remain deliberate HTML+ work. A preset may recommend
@@ -165,6 +174,7 @@ Every Area defines:
 - a recommended Style and ordered component list;
 - a safe container or collection-item tag/class;
 - optional per-component tag, class, style and image-size overrides;
+- optional `data-*` attributes for the elements it generates;
 - an Element model and shortcode defaults for a repeatable Area.
 
 The fixed component catalog is `title`, `subtitle`, `description`,
@@ -188,7 +198,9 @@ explicit source:
   normal `[template /templates/<name>]` shortcode at that exact position.
 
 The Builder lists ordinary textfills under **Content textfills** and keys from
-`text/blacklist.php` under **Technical values**. Blacklisting controls normal
+`text/blacklist.php` under **Technical values** — that is where a page's own
+`/webpage/<page>/uri` shows up, so a button can point at another page instead of
+carrying a hardcoded path. Blacklisting controls normal
 editor visibility; it does not make route URIs or other technical values
 invalid template bindings. Existing and technical bindings are referenced only
 and are never rewritten by inserting a section.
@@ -368,6 +380,51 @@ The compiled section contains one inert comment:
 
 This comment is the complete round-trip model. It is ignored at runtime and
 removed intentionally when the section is accepted through HTML+.
+
+### Data attributes
+
+The shared frontend script reads its parameters from `data-*` attributes:
+`ui-autoheight` equalizes the cards sharing one `data-autoheight-group`,
+`js-slider` sizes itself from `data-slider-width`, `js-vpa` delays itself by
+`data-vpa-delay`. A preset that puts such a class on a generated element
+declares the matching attributes next to it:
+
+```php
+'areas' => [
+	'services' => [
+		'item' => [ 'tag' => 'article', 'class' => 'ui-article' ],
+		'render' => [
+			'title' => [
+				'tag' => 'h3',
+				'class' => 'ui-article-title ui-autoheight',
+				'data' => [
+					'autoheight-group' => 'services-title-[[section:id]]',
+					'autoheight-mobile' => 'skip',
+				],
+			],
+			'button' => [ 'class' => 'js-modal-trigger', 'data' => [ 'modal-target' => 'contact-modal' ] ],
+		],
+	],
+],
+```
+
+A `data` map at the top level belongs to the `<section>`, one inside a Layout
+overrides that per name, `container` and `item` carry an Area's wrapper and its
+repetition, and `render.<type>` carries every component of that type. Names are
+written without the `data-` prefix — a written prefix is accepted and dropped —
+values are short single-line literals, and `[[section:id]]` is replaced with the
+section ID so two copies of the same preset stay independent on one page.
+`data-cover-height` stays with the frame. There is no editor control for this:
+data attributes are a preset decision, and anything beyond them is HTML+ work.
+
+Choose the element that actually carries the class. The `<section>` is the one
+with `js-cover`/`js-parallex`, so `data-cover-width` belongs in a top-level or
+Layout map. `js-vpa` is written onto the generated `ui-grid-row`, which no `data`
+map reaches — motion timing stays in the Layout `.tpl`. A collection `item` is a
+direct flex child of that row and already stretches to the height of its row
+line, so equalizing heights belongs on the boxes inside the card via
+`render.<type>` — which is how the Articles preset lines up its cards' calls to
+action.
 
 ### Version contract
 

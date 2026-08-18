@@ -492,6 +492,14 @@ check( 'writes the home entry\'s own en_US meta too', $enAfterWpApply['[[/webpag
 check( 'a field left blank in the post (contact\'s en_US) falls back to the generic placeholder, not the "contact" template\'s own wording', $enAfterWpApply['[[/webpage/site-contact/title]]'] === 'Page Title' );
 check( 'a field that was posted (contact\'s de_DE name) is used as-is', $deAfterWpApply['[[/webpage/site-contact/name]]'] === 'Kontakt' );
 check( 'a template\'s own /webpage/<foldername>/* meta is never merged in - only the Element-URI-keyed one this class writes itself', isset( $deAfterWpApply['[[/webpage/home/name]]'] ) === false );
+$globalAfterWpApply = \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] );
+$blacklistAfterWpApply = \Nino\Filesystem::getFileContent( $appData, '/text/blacklist.php', [] );
+check( 'writes every page\'s reachable Http-URI as one global fill, so a template can link to it by name', ( $globalAfterWpApply['[[/webpage/site-home/uri]]'] ?? null ) === '/'
+	&& ( $globalAfterWpApply['[[/webpage/site-contact/uri]]'] ?? null ) === '/kontakt'
+	&& isset( $deAfterWpApply['[[/webpage/site-home/uri]]'], $enAfterWpApply['[[/webpage/site-home/uri]]'] ) === false );
+check( 'a page uri is a technical value, blacklisted out of the Text panel like every other route key', in_array( '/webpage/site-home/uri', $blacklistAfterWpApply, true )
+	&& in_array( '/webpage/site-contact/uri', $blacklistAfterWpApply, true )
+	&& count( array_unique( $blacklistAfterWpApply ) ) === count( $blacklistAfterWpApply ) );
 check( 'a template\'s own deeper content (unprefixed, shared across instances) still merges in', isset( $deAfterWpApply['[[/page-home/welcome/title]]'] ) === true );
 
 $libraryAfterWpApply = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];

@@ -109,6 +109,7 @@ const sectionsSource = fs.readFileSync( path.join( __dirname, '../_templates/ass
 const scriptSource = fs.readFileSync( path.join( __dirname, '../_templates/assets/script.js' ), 'utf8' );
 const styleSource = fs.readFileSync( path.join( __dirname, '../_templates/assets/style.css' ), 'utf8' );
 const ninoCssSource = fs.readFileSync( path.join( __dirname, '../_nino/Nino.css' ), 'utf8' );
+const ninoAdminCssSource = fs.readFileSync( path.join( __dirname, '../_nino/Nino.admin.css' ), 'utf8' );
 const articlesManifestSource = fs.readFileSync( path.join( __dirname, '../_templates/library/articles-grid/manifest.php' ), 'utf8' );
 const templateMarkup = fs.readFileSync( path.join( __dirname, '../_templates/templates/page-index.tpl' ), 'utf8' );
 const templatesPhpSource = fs.readFileSync( path.join( __dirname, '../_templates/Templates.php' ), 'utf8' );
@@ -167,6 +168,22 @@ check( 'new-section key regeneration preserves manifest-recommended shared and f
 check( 'blacklisted textfills remain selectable in a separate technical group', areaComposerSource.includes( "label : 'Technical values'" )
 	&& templatesPhpSource.includes( "'blacklisted' => ( $entry['blacklisted'] ?? false ) === true" ) );
 check( 'named Areas render as semantic tabs above one Design/Data workspace', [ "'pd-v3-area-workspace'", "setAttribute( 'role', 'tablist' )", "setAttribute( 'role', 'tabpanel' )" ].every( function( marker ) { return areaComposerSource.includes( marker ) } ) );
+check( 'the background image offers a fixed value next to the two slot choices', areaComposerSource.includes( "{ value : 'fixed', label : 'Fixed value' }" )
+	&& /formField\( 'Background image', '', \[[^\]]*value : 'fixed'/.test( areaComposerSource )
+	&& areaComposerSource.includes( "formField( 'Image URL', 'frame.backgroundImage', 'text'" )
+	&& areaComposerSource.includes( "backgroundSource( draft, generated ) !== 'fixed'" ) );
+check( 'every binding keeps its source and its value on one row', areaComposerSource.includes( 'function bindingRow(' )
+	&& areaComposerSource.includes( "node( 'div', 'pd-v3-binding-row' )" )
+	&& /\.pd-v3-binding-row\s*\{[\s\S]*?grid-template-columns:\s*minmax/.test( styleSource ) );
+check( 'a link target is one checkbox after the address it applies to, in the composer\'s own scope', areaComposerSource.includes( "node( 'label', 'pd-check pd-v3-binding-toggle' )" )
+	&& areaComposerSource.includes( 'Target _blank' )
+	&& areaComposerSource.includes( 'dataset.targetToggle' )
+	&& areaComposerSource.includes( '[data-target-toggle]' )
+	&& !areaComposerSource.includes( "label : 'Same tab'" )
+	&& !areaComposerSource.includes( 'Nino.adminUi.switchField(' ) );
+check( 'composer controls are styled by the tool itself, because its dialogs sit outside the .nino-admin scope', templateMarkup.indexOf( '<dialog id="pd-composer"' ) > templateMarkup.indexOf( '</div>' )
+	&& /:where\(\.nino-admin\)\s*\.nino-admin-switch\s*\{/.test( ninoAdminCssSource )
+	&& /(^|\n)\.pd-check\s*\{/.test( styleSource ) );
 check( 'the config pane gives steps, Area tabs, components, sources and bindings explicit UI structure', [
 	'pd-v3-panel-copy', 'pd-v3-area-index', 'pd-v3-area-tab-copy', 'pd-v3-component-copy',
 	'pd-v3-section-label', 'pd-v3-source-panel', 'pd-v3-binding-heading', 'pd-v3-generated-value',

@@ -1248,6 +1248,11 @@ check( 'writes the page\'s own de_DE meta, keyed by its Element-URI', $deAfterSa
 $enAfterSave = \Nino\Filesystem::getFileContent( $appData, '/text/en_US.php', [] );
 check( 'a locale left entirely unposted still gets the generic placeholder, not left unset', $enAfterSave['[[/webpage/site-about/name]]'] === 'Page' );
 
+$globalAfterSave = \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] );
+check( 'writes the page\'s reachable Http-URI as one global fill a template can link to by name', ( $globalAfterSave['[[/webpage/site-about/uri]]'] ?? null ) === '/about'
+	&& isset( $deAfterSave['[[/webpage/site-about/uri]]'], $enAfterSave['[[/webpage/site-about/uri]]'] ) === false );
+check( 'that uri is blacklisted as a technical value, like every other route key', in_array( '/webpage/site-about/uri', \Nino\Filesystem::getFileContent( $appData, '/text/blacklist.php', [] ), true ) );
+
 // Duplicate checks: a second entry may not reuse either uri
 [ $status ] = callDev( $appData, \Nino\Admin\PageEditor::class, 'apiSave', [
 	'originalHttpUri' => '', 'uri' => '/site-about', 'httpUri' => '/contact', 'template' => 'page-contact', 'text' => [],

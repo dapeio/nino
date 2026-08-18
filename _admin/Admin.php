@@ -4452,6 +4452,14 @@ namespace Nino\Admin {
 					'[[/webpage'. $uri. '/description]]' => $text[$locale]['description'],
 				] );
 
+			// The page's reachable path as a fill, so a template can link to
+			// it by name - [[/webpage/site-home/uri]] - rather than repeating
+			// a path this form can change. Global, because an entry has one
+			// Http-URI for every locale, and blacklisted like every other
+			// technical value: /_editor's Text panel edits wording, not routes
+			self::_mergeText( $appData, '/text/global.php', [ '[[/webpage'. $uri. '/uri]]' => $httpUri ] );
+			\Nino\Text::setBlacklisted( $appData, '/webpage'. $uri. '/uri', true );
+
 			\Nino\Http::ok( $request, [ 'pages' => self::pages( $appData, $routes, $locales, $navKeys ) ] );
 		}
 

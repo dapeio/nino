@@ -185,9 +185,94 @@ All notable changes to Nino are documented in this file.
   images, structure, and unknown import paths stay untouched.
 - Added inline `<code>` formatting to the shared rich-text editor and its
   server-side HTML sanitizer.
+- A page's own Http-URI is now a textfill. `/_install`'s Webpages step and
+  `/_admin`'s Routes form already wrote `/webpage<uri>/name`, `/title` and
+  `/description` when they saved a page; they now write `/webpage<uri>/uri` next
+  to them, valued with the path the page is actually reachable at.
+
+  It closes a gap that had been open on both ends. The library page units still
+  ship a `[[/webpage/<folder>/uri]]` in their text fragments, and templates use
+  it - `page-newsletter.tpl`'s way back to the start page, the three demo pages'
+  cross-links - but `_withoutWebpageMeta()` strips every `/webpage/*` key a unit
+  fragment carries, and nothing wrote one back. An unresolved fill is left
+  standing by `_renderFills()`, so those links rendered with the literal
+  `[[/webpage/home/uri]]` as their href. The same absence was visible in the
+  Template Builder, where "Existing textfill" could not offer a page uri that
+  never existed.
+
+  Written into `text/global.php` rather than per locale, because an entry has
+  exactly one Http-URI for every locale, and blacklisted like `/website/url`:
+  it is a route, not wording, so `/_editor`'s Text panel keeps ignoring it while
+  the Builder still offers it under **Technical values**. Menus keep coming from
+  `[navigation]`, which reads the routes themselves - this key is for the
+  deliberate single link. It follows a page whose Http-URI changes, and like
+  every other `/webpage<uri>/*` key it is never deleted on its own.
+- A section's cover or parallax background can be a **fixed value**: the URL is
+  typed into the composer and written straight into the section as a plain
+  `<img>`, with no image slot created and nothing to fill in `/_admin`
+  afterwards. The two existing choices - generate a slot, or point at one that
+  exists - are unchanged and now sit next to it in the same control.
+
+  It is for the image a project already ships: a theme photo, something copied
+  in by an installer package, a file on a CDN. Creating a managed slot for one
+  of those means an editor screen that exists only to hold a value nobody will
+  ever change. A fixed value may start with `[[/nino/public]]` or
+  `[[/nino/dir]]` so the path survives a sub-directory install, and is otherwise
+  an ordinary relative path or an `https` URL; quotes, spaces, angle brackets,
+  traversal, protocol-relative addresses, other shortcode brackets and every
+  scheme but `http`/`https` are refused rather than escaped into something that
+  looks like it works.
+
+  Which of the three a section uses is now stored as
+  `frame.backgroundImageSource` in the section metadata, because a key alone
+  cannot tell a generated slot from a chosen one from a literal path. Sections
+  written before that field keep inferring their original behavior.
+- Section presets can declare the `data-*` attributes of the elements they
+  generate. `Nino.ui.js` takes its parameters from exactly there -
+  `ui-autoheight` equalizes the cards of one `data-autoheight-group`,
+  `js-slider` reads `data-slider-width`, `js-vpa` reads `data-vpa-delay` - so a
+  preset could put the class on a card but never the value that makes it do
+  anything, and the whole behavior stayed a manual HTML+ edit after every
+  insert.
+
+  A `data` map is accepted next to the existing `tag`/`class` keys and belongs
+  to one generated element each: at the top level the `<section>`, inside a
+  Layout the same section (overriding the preset default per name), in an Area's
+  `container` or `item` the wrapper or one repetition, and in `render.<type>`
+  every component of that type. Names are written without the `data-` prefix and
+  are lowercase slugs; values are single-line literals of at most 240 characters
+  and are escaped for the attribute context. `[[section:id]]` is substituted, so
+  `'autoheight-group' => 'services-[[section:id]]'` keeps two copies of one
+  preset on the same page from equalizing against each other.
+  `data-cover-height` is written by the frame itself and stays reserved.
+
+  The manifest is the only source. Nothing is read from the request: the
+  composer has no data-* control, a `data` key smuggled into posted section
+  metadata is ignored, and anything past a configured attribute is still an
+  HTML+ decision rather than a second Advanced panel.
 
 ### Changed
 
+- The Template Builder's Data view puts one binding on one line. A property's
+  source and the value it feeds were two full-width fields stacked on top of
+  each other, so a button with a label and an address read as four unrelated
+  controls in a column; they are now one row each, source left and value right.
+  A link's target moved with them: it was a two-option select sitting above
+  fields it says nothing about (and a second copy of itself in the Design view),
+  and is now the design system's boolean switch - "Target _blank" - at the end
+  of the component, after the address it applies to.
+- The Articles preset equalizes the title and the description of its cards per
+  section, so the calls to action below them line up. A card is a direct flex
+  child of the grid row and was already stretched to the height of its row line;
+  what was not aligned is everything *inside* it, because a one-line and a
+  two-line title push the text below them to different heights. Both boxes now
+  carry `ui-autoheight` with a group of their own
+  (`nino-article-title-<section id>`, `nino-article-descr-<section id>`), which
+  is the one thing the flex row cannot do by itself. The group carries the
+  section ID, so two Articles grids on one page do not equalize against each
+  other, and `data-autoheight-mobile` opts out where the cards stack anyway.
+  Without `Nino.ui.js` - and in the Builder's script-free preview - the markup
+  behaves exactly as before.
 - Split the Template Builder's Section Composer by intent. **Add Section** now
   keeps only the initial ID/Layout/Background choices and combines component
   ordering with Data bindings; **Edit Section** retains frame spacing and the
@@ -366,6 +451,12 @@ All notable changes to Nino are documented in this file.
 
 ### Fixed
 
+- The Template Builder ignored the background image slot a section actually
+  chose. "Existing image slot" was offered, stored in the draft and shown in the
+  composer, but the compiler never read `frame.backgroundImage` back out of the
+  posted metadata - every cover and parallax section was compiled against a
+  freshly generated `/page-<page>/<section>/background` key instead, and the
+  chosen slot was silently dropped on insert.
 - Fixed named-area composer controls rendering with the shared default style:
   all dialogs now remain inside `#pd-app`, which is the scope their component
   rules and design tokens use.

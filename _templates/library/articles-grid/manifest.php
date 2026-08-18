@@ -65,8 +65,14 @@
 			'shortcode' => [ 'locale' => '', 'callback' => '', 'limit' => 6, 'query' => '' ],
 			'render' => [
 				'image' => [ 'class' => 'ui-article-img ui-article-img--maxheight' ],
-				'title' => [ 'tag' => 'h3', 'class' => 'ui-article-title' ],
-				'description' => [ 'class' => 'ui-article-descr' ],
+				'title' => [
+					'tag' => 'h3', 'class' => 'ui-article-title ui-autoheight',
+					'data' => [ 'autoheight-group' => 'nino-article-title-[[section:id]]', 'autoheight-mobile' => 'skip' ],
+				],
+				'description' => [
+					'class' => 'ui-article-descr ui-autoheight',
+					'data' => [ 'autoheight-group' => 'nino-article-descr-[[section:id]]', 'autoheight-mobile' => 'skip' ],
+				],
 			],
 		],
 		'action' => [

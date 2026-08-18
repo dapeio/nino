@@ -1996,6 +1996,20 @@ namespace Nino\Install {
 					unset( $routes[$routeKey]['navs'] );
 			}
 
+			// The page's own Http-URI as a fill, so a template can link to a
+			// page by name - [[/webpage/site-home/uri]] - instead of
+			// hard-coding a path that this step can change on the next apply.
+			// Global rather than per-locale: an entry carries exactly one
+			// Http-URI for every locale (see _suggestions()). Blacklisted for
+			// the same reason /website/url is - a technical value, not
+			// wording anybody edits in /_editor's Text panel
+			if( $routeKey !== null ) {
+				self::_mergeText( $appData, '/text/global.php', [
+					'[[/webpage'. $entry['uri']. '/uri]]' => (string) ( $entry['httpUri'] ?? '' ),
+				] );
+				$blacklist[] = '/webpage'. $entry['uri']. '/uri';
+			}
+
 			// The entry's own meta, whichever tool created it - this is what
 			// the Webpages step's name/title/description fields edit, so it
 			// has to be written back for a unit-less entry too

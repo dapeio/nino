@@ -2039,6 +2039,22 @@ code {
 	white-space: nowrap;
 }
 .pd-v3-binding-group > .pd-form-field { grid-column: 1 / -1; }
+/*	One property, one line: the control that decides where a value comes from
+ *	sits next to the value itself, narrower than it, because the source is a
+ *	fixed vocabulary and the value is the part that needs the room. */
+.pd-v3-binding-row {
+	display: grid;
+	grid-column: 1 / -1;
+	grid-template-columns: minmax(7.5rem, .62fr) minmax(0, 1fr);
+	align-items: start;
+	gap: .55rem;
+}
+.pd-v3-binding-row > .pd-form-field:only-child { grid-column: 1 / -1; }
+.pd-form-grid > .pd-v3-binding-row { grid-column: 1 / -1; }
+.pd-v3-binding-toggle { grid-column: 1 / -1; align-items: center; margin-top: .1rem; }
+.pd-v3-quick-component > .pd-v3-binding-row { padding: 0 .72rem; }
+.pd-v3-quick-component > .pd-v3-binding-row:last-of-type { padding-bottom: .72rem; }
+.pd-v3-quick-component > .pd-v3-binding-toggle { margin: 0 .72rem .72rem; }
 .pd-v3-generated-value textarea { min-height: 4.5rem; }
 .pd-v3-binding-note { grid-column: 1 / -1; margin: 0; padding: .5rem .58rem; color: var(--editor-text-secondary); font-size: .59rem; line-height: 1.4; }
 .pd-v3-source-panel { min-width: 0; padding: .72rem; }
@@ -2068,6 +2084,8 @@ code {
 	.pd-v3-component-actions { justify-content: flex-end; }
 	.pd-v3-binding-group { grid-template-columns: minmax(0, 1fr); }
 	.pd-v3-binding-group > .pd-form-field { grid-column: 1; }
+	.pd-v3-binding-row { grid-template-columns: minmax(0, 1fr); grid-column: 1; }
+	.pd-v3-binding-toggle { grid-column: 1; }
 }
 }
 

@@ -1376,6 +1376,10 @@ a {
 	background: var(--editor-bg-grouped);
 }
 
+:where(.nino-admin) .nino-admin-card:has(legend) {
+	padding-top:1.85rem;
+}
+
 :where(.nino-admin) .nino-admin-card h3 {
 	margin-bottom: .55rem;
 	font-size: .9rem;

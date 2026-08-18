@@ -179,6 +179,17 @@
 		component.bindingSources[property] = source;
 	}
 
+	function backgroundSource( draft, generated ) {
+		const stored = draft.frame && draft.frame.backgroundImageSource;
+		if( [ 'new', 'image', 'fixed' ].includes( stored ) ) return stored;
+		const key = ( draft.frame && draft.frame.backgroundImage ) || generated;
+		return key === generated ? 'new' : 'image';
+	}
+
+	function backgroundKey( draft ) {
+		return '/page-'+ draft.pageId+ '/'+ draft.id+ '/background';
+	}
+
 	function firstTextfill() {
 		const entries = pd.composer._textEntries || [];
 		const content = entries.find( function( entry ) { return entry.blacklisted !== true } );
@@ -234,9 +245,10 @@
 
 	function imageDescriptors( draft, item ) {
 		const images = singleDescriptors( draft, item, 'image' );
-		if( [ 'cover', 'parallax' ].includes( effectiveFrame( draft, item ).background ) ) {
-			const key = draft.frame.backgroundImage || '/page-'+ draft.pageId+ '/'+ draft.id+ '/background';
-			images.unshift( { area : '', index : -1, component : '', property : 'src', slot : 'background', label : 'Background image', width : 1920, height : 1080, generatedKey : '/page-'+ draft.pageId+ '/'+ draft.id+ '/background', key : key, mode : key.endsWith( '/'+ draft.id+ '/background' ) ? 'new' : 'existing' } );
+		const generated = backgroundKey( draft );
+		if( [ 'cover', 'parallax' ].includes( effectiveFrame( draft, item ).background ) && backgroundSource( draft, generated ) !== 'fixed' ) {
+			const key = draft.frame.backgroundImage || generated;
+			images.unshift( { area : '', index : -1, component : '', property : 'src', slot : 'background', label : 'Background image', width : 1920, height : 1080, generatedKey : generated, key : key, mode : key === generated ? 'new' : 'existing' } );
 		}
 		return images;
 	}
@@ -338,11 +350,15 @@
 		grid.appendChild( formField( 'Background', 'frame.background', pd._library.choices.background, draft.frame.background, '', true ) );
 		if( [ 'cover', 'parallax' ].includes( effectiveFrame( draft, item ).background ) ) {
 			grid.append( formField( 'Overlay', 'frame.overlay', pd._library.choices.overlay, draft.frame.overlay ), formField( 'Focus', 'frame.focus', pd._library.choices.focus, draft.frame.focus, '1–3 top · 4–6 middle · 7–9 bottom.' ) );
-			const generated = '/page-'+ draft.pageId+ '/'+ draft.id+ '/background';
+			const generated = backgroundKey( draft );
 			const imageKey = draft.frame.backgroundImage || generated;
-			const source = formField( 'Background image', '', [ { value : 'new', label : 'New image slot · 1920×1080' }, { value : 'existing', label : 'Existing image slot' } ], imageKey === generated ? 'new' : 'existing' );
-			source.querySelector('select').removeAttribute('data-path'); source.querySelector('select').dataset.backgroundMode = 'true'; grid.appendChild( source );
-			if( imageKey !== generated ) grid.appendChild( formField( 'Image slot', 'frame.backgroundImage', ( pd.sectionsUI._images || [] ).map( function( image ) { return { value : image.uri, label : image.uri } } ), imageKey ) );
+			const mode = backgroundSource( draft, generated );
+			const row = node( 'div', 'pd-v3-binding-row' );
+			const source = formField( 'Background image', '', [ { value : 'new', label : 'New image slot · 1920×1080' }, { value : 'image', label : 'Existing image slot' }, { value : 'fixed', label : 'Fixed value' } ], mode );
+			source.querySelector('select').removeAttribute('data-path'); source.querySelector('select').dataset.backgroundMode = 'true'; row.appendChild( source );
+			if( mode === 'image' ) row.appendChild( formField( 'Image slot', 'frame.backgroundImage', ( pd.sectionsUI._images || [] ).map( function( image ) { return { value : image.uri, label : image.uri } } ), imageKey ) );
+			else if( mode === 'fixed' ) row.appendChild( formField( 'Image URL', 'frame.backgroundImage', 'text', imageKey === generated ? '' : imageKey, 'A project path such as [[/nino/public]]/images/hero.jpg, or an https URL.' ) );
+			grid.appendChild( row );
 		}
 		section.appendChild( grid );
 		wrap.appendChild( section );
@@ -399,6 +415,28 @@
 		return formField( propertyDefinition.label+ ' value', path, control, value, 'Stored in the section source and shared by every rendered item.', wide === true );
 	}
 
+	/**
+	 *	One property is one line: what feeds it on the left, the value it is fed
+	 *	with on the right. Appended as separate fields they wrapped onto their
+	 *	own rows, which reads as twice as many unrelated controls as there are.
+	 */
+	function bindingRow( group, label, sourceField, valueField ) {
+		const row = node( 'div', 'pd-v3-binding-row' );
+		row.setAttribute( 'role', 'group' );
+		row.setAttribute( 'aria-label', label );
+		if( sourceField ) row.appendChild( sourceField );
+		if( valueField ) row.appendChild( valueField );
+		group.appendChild( row );
+	}
+
+	function sourceField( label, areaKey, index, property, options, mode ) {
+		const field = formField( label+ ' source', '', options, mode );
+		const select = field.querySelector('select');
+		select.removeAttribute('data-path');
+		select.dataset.bindingMode = areaKey+ ':'+ index+ ':'+ property;
+		return field;
+	}
+
 	function renderBindingFields( group, draft, item, areaKey, area, areaDraft, component, index ) {
 		const definition = componentDefinition( item, area, component );
 		Object.keys( definition.properties || {} ).forEach( function( property ) {
@@ -413,18 +451,13 @@
 
 			const mode = bindingSource( area, component, property, propertyDefinition );
 			if( area.source === 'elements' ) {
-				if( propertyDefinition.fieldType !== 'image' ) {
-					const source = formField( propertyDefinition.label+ ' source', '', [ { value : 'field', label : 'Collection field' }, { value : 'textfill', label : 'Existing textfill' }, { value : 'fixed', label : 'Fixed value' } ], mode );
-					source.querySelector('select').removeAttribute('data-path');
-					source.querySelector('select').dataset.bindingMode = areaKey+ ':'+ index+ ':'+ property;
-					group.appendChild( source );
-				}
-				if( mode === 'textfill' ) group.appendChild( formField( propertyDefinition.label+ ' textfill', path, textfillOptions( current ), current ) );
-				else if( mode === 'fixed' ) group.appendChild( fixedValueField( propertyDefinition, path, current ) );
-				else {
-					const options = modelOptions( area, areaDraft.source.elementMode === 'existing' ? areaDraft.source.elementType : '', propertyDefinition.fieldType );
-					group.appendChild( formField( propertyDefinition.label+ ' maps to', path, options, current, '', propertyDefinition.fieldType === 'image' ) );
-				}
+				const options = [ { value : 'field', label : 'Collection field' }, { value : 'textfill', label : 'Existing textfill' }, { value : 'fixed', label : 'Fixed value' } ];
+				const source = propertyDefinition.fieldType === 'image' ? null : sourceField( propertyDefinition.label, areaKey, index, property, options, mode );
+				let value;
+				if( mode === 'textfill' ) value = formField( 'Textfill key', path, textfillOptions( current ), current );
+				else if( mode === 'fixed' ) value = fixedValueField( propertyDefinition, path, current );
+				else value = formField( propertyDefinition.label+ ' maps to', path, modelOptions( area, areaDraft.source.elementMode === 'existing' ? areaDraft.source.elementType : '', propertyDefinition.fieldType ), current );
+				bindingRow( group, propertyDefinition.label, source, value );
 				return;
 			}
 
@@ -432,29 +465,50 @@
 			const sourceOptions = propertyDefinition.kind === 'image'
 				? [ { value : 'new', label : 'New image slot' }, { value : 'image', label : 'Existing image slot' } ]
 				: [ { value : 'new', label : 'New section value' }, { value : 'textfill', label : 'Existing textfill' }, { value : 'fixed', label : 'Fixed value' } ];
-			const source = formField( propertyDefinition.label+ ' source', '', sourceOptions, mode );
-			source.querySelector('select').removeAttribute('data-path');
-			source.querySelector('select').dataset.bindingMode = areaKey+ ':'+ index+ ':'+ property;
-			group.appendChild( source );
+			const source = sourceField( propertyDefinition.label, areaKey, index, property, sourceOptions, mode );
+			let value = null;
 			if( mode === 'image' ) {
-				const options = ( pd.sectionsUI._images || [] ).map( function( image ) { return { value : image.uri, label : image.uri } } );
-				group.appendChild( formField( 'Image slot', path, options, current ) );
+				value = formField( 'Image slot', path, ( pd.sectionsUI._images || [] ).map( function( image ) { return { value : image.uri, label : image.uri } } ), current );
 			} else if( mode === 'textfill' ) {
-				group.appendChild( formField( 'Textfill key', path, textfillOptions( current ), current ) );
+				value = formField( 'Textfill key', path, textfillOptions( current ), current );
 			} else if( mode === 'fixed' ) {
-				group.appendChild( fixedValueField( propertyDefinition, path, current ) );
+				value = fixedValueField( propertyDefinition, path, current );
 			} else if( propertyDefinition.kind !== 'image' ) {
-				const valueField = node( 'label', 'pd-form-field pd-v3-generated-value' );
+				value = node( 'label', 'pd-form-field pd-v3-generated-value' );
 				const input = node( propertyDefinition.control === 'textarea' ? 'textarea' : 'input' );
 				if( input.tagName === 'INPUT' ) input.type = propertyDefinition.control === 'url' ? 'url' : 'text';
 				input.value = Object.prototype.hasOwnProperty.call( pd.composer._textValues, generated ) ? pd.composer._textValues[generated] : propertyDefinition.default;
 				input.dataset.textKey = generated; input.placeholder = propertyDefinition.default;
-				valueField.append( node( 'span', '', propertyDefinition.label+ ' value' ), input ); group.appendChild( valueField );
+				value.append( node( 'span', '', propertyDefinition.label+ ' value' ), input );
 				input.addEventListener( 'input', function() { pd.composer._textValues[generated] = input.value; pd.composer._touched.add( generated ) } );
-			} else {
-				group.appendChild( node( 'p', 'pd-v3-binding-note', 'The image slot is created when the section is inserted and can then be filled in Admin.' ) );
 			}
+			bindingRow( group, propertyDefinition.label, source, value );
+			if( mode === 'new' && propertyDefinition.kind === 'image' )
+				group.appendChild( node( 'p', 'pd-v3-binding-note', 'The image slot is created when the section is inserted and can then be filled in Admin.' ) );
 		} );
+		if( component.type === 'button' )
+			group.appendChild( targetToggle( areaKey, index, component ) );
+	}
+
+	/**
+	 *	Link target as one checkbox rather than a two-option select: it is a
+	 *	single on/off decision, and it belongs after the address it applies to
+	 *	instead of above the fields it says nothing about.
+	 *
+	 *	Built from the composer's own .pd-check, not the design system's
+	 *	switch: Nino.admin.css scopes its components to :where(.nino-admin),
+	 *	and the composer dialogs deliberately sit outside #pd-app, so a switch
+	 *	rendered in here would arrive without its track, its state word or any
+	 *	of its behavior.
+	 */
+	function targetToggle( areaKey, index, component ) {
+		const field = node( 'label', 'pd-check pd-v3-binding-toggle' );
+		const input = node('input');
+		input.type = 'checkbox';
+		input.checked = component.settings.target === 'new';
+		input.dataset.targetToggle = areaKey+ ':'+ index;
+		field.append( input, node( 'span', '', 'Target _blank · opens the link in a new tab' ) );
+		return field;
 	}
 
 	function renderAreaPanel( wrap, draft, item ) {
@@ -535,7 +589,6 @@
 			headingCopy.append( identity, renderComponentActions( areaDraft, index ) );
 			heading.append( node( 'span', 'pd-v3-binding-order', String( index + 1 ) ), headingCopy );
 			group.appendChild( heading );
-			if( component.type === 'button' ) group.appendChild( formField( 'Opens', 'areas.'+ areaKey+ '.components.'+ index+ '.settings.target', [ { value : 'same', label : 'Same tab' }, { value : 'new', label : 'New tab' } ], component.settings.target ) );
 			renderBindingFields( group, draft, item, areaKey, area, areaDraft, component, index );
 			list.appendChild( group );
 		} );
@@ -560,7 +613,6 @@
 			const controls = node( 'div', 'pd-v3-component-controls' );
 			const styleOptions = definition.styles.map( function( key ) { return { value : key, label : key === 'auto' ? 'Auto' : humanize( key ) } } );
 			controls.appendChild( formField( 'Style', 'areas.'+ areaKey+ '.components.'+ index+ '.style', styleOptions, component.style ) );
-			if( component.type === 'button' ) controls.appendChild( formField( 'Target', 'areas.'+ areaKey+ '.components.'+ index+ '.settings.target', [ { value : 'same', label : 'Same tab' }, { value : 'new', label : 'New tab' } ], component.settings.target ) );
 			row.append( identity, controls, renderComponentActions( areaDraft, index ) ); list.appendChild( row );
 		} );
 		body.appendChild( list );
@@ -613,11 +665,23 @@
 				pd.composer.renderSettings(); pd.composer.loadTextValues(); pd.composer.renderSummary(); pd.composer.requestPreview();
 			} );
 		} );
+		wrap.querySelectorAll('[data-target-toggle]').forEach( function( input ) {
+			input.addEventListener( 'change', function() {
+				const parts = input.dataset.targetToggle.split(':');
+				const component = pd.composer._draft.areas[parts[0]].components[Number( parts[1] )];
+				component.settings = component.settings || {};
+				component.settings.target = input.checked ? 'new' : 'same';
+				pd.composer.requestPreview();
+			} );
+		} );
 		wrap.querySelectorAll('[data-background-mode]').forEach( function( input ) {
 			input.addEventListener( 'change', function() {
 				const draft = pd.composer._draft;
-				const generated = '/page-'+ draft.pageId+ '/'+ draft.id+ '/background';
-				draft.frame.backgroundImage = input.value === 'new' ? generated : ( pd.sectionsUI._images && pd.sectionsUI._images[0] ? pd.sectionsUI._images[0].uri : generated );
+				const generated = backgroundKey( draft );
+				draft.frame.backgroundImageSource = input.value;
+				draft.frame.backgroundImage = input.value === 'fixed'
+					? ''
+					: ( input.value === 'new' ? generated : ( pd.sectionsUI._images && pd.sectionsUI._images[0] ? pd.sectionsUI._images[0].uri : generated ) );
 				pd.composer.renderSettings(); pd.composer.renderSummary(); pd.composer.requestPreview();
 			} );
 		} );
@@ -657,7 +721,7 @@
 				const source = draft.areas[areaKey].source;
 				if( area.source === 'elements' && source.elementMode === 'new' && source.elementType === draft.pageId+ '-'+ oldId+ '-'+ areaKey ) source.elementType = draft.pageId+ '-'+ draft.id+ '-'+ areaKey;
 			} );
-			if( draft.frame.backgroundImage && draft.frame.backgroundImage.startsWith( '/page-'+ draft.pageId+ '/'+ oldId+ '/' ) ) draft.frame.backgroundImage = draft.frame.backgroundImage.replace( '/'+ oldId+ '/', '/'+ draft.id+ '/' );
+			if( draft.frame.backgroundImageSource !== 'fixed' && draft.frame.backgroundImage && draft.frame.backgroundImage.startsWith( '/page-'+ draft.pageId+ '/'+ oldId+ '/' ) ) draft.frame.backgroundImage = draft.frame.backgroundImage.replace( '/'+ oldId+ '/', '/'+ draft.id+ '/' );
 		}
 		const sourceMatch = path.match( /^areas\.([a-z0-9-]+)\.source\.(elementMode|elementType)$/ );
 		if( sourceMatch ) {

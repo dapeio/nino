@@ -2,7 +2,7 @@
 
 **Sprache:** [English](_templates.md) · Deutsch
 
-**Stand:** 17. August 2026 · **Nino-Version:** Unreleased
+**Stand:** 18. August 2026 · **Nino-Version:** Unreleased
 
 Der Template Builder ist der schnelle Weg vom `page-*.tpl` zur befüllten Seite. Er behandelt ein Template als geordnete Abfolge vollständiger HTML-Sections und wiederverwendbarer `[template]`-Sections, statt jeden verschachtelten DOM-Knoten zur Bearbeitung anzubieten.
 
@@ -69,6 +69,15 @@ Add und Edit zeigen absichtlich unterschiedliche Tiefen derselben Version-3-Meta
 | Edit Section → Section | ID, Layout, Höhe, Breite, Abstände, Background und optionale Hintergrundbild-Einstellungen |
 | Edit Section → Area / Design | visueller Area-Style, Komponentenreihenfolge und Component Styles |
 | Edit Section → Area / Data | native Text-/Bild-/Template-Bindings oder eine Elements-Collection mit explizitem Feld-Mapping |
+
+Ein Cover- oder Parallax-Hintergrund bindet genau ein Bild, und die Quelle wird
+mitgespeichert: **New image slot** erzeugt `/page-<seite>/<section>/background`
+und legt den Platz beim Einfügen an, **Existing image slot** verweist auf einen
+vorhandenen, **Fixed value** schreibt die URL direkt in die Section — ein
+Projektpfad wie `[[/nino/public]]/images/hero.jpg`, ein gewöhnlicher relativer
+Pfad oder eine `https`-URL — und legt gar keinen Bildplatz an. Letzteres ist für
+ein Bild gedacht, das das Projekt ohnehin mitbringt und das niemand in `/_admin`
+austauschen muss.
 
 Add blendet Section-Höhe/-Breite/-Margin/-Padding, Area Style und Component Style aus. Die Ansicht soll zuerst eine sinnvolle Section erzeugen, die man im echten Frontend beurteilen kann. Edit behält das vollständige grafische Feinjustierungsmodell; beide Ansichten kompilieren dieselben Metadaten. Das Manifest bestimmt, welche Areas, Komponenten, Styles und Layouts kompatibel sind. HTML+ bleibt der ausdrückliche Weg für freie Quelltextänderungen.
 
@@ -258,6 +267,7 @@ Benutzers gewinnt weiterhin:
 - `container` umschließt eine Single-Area, `item` jede Elements-Wiederholung.
   Responsive Struktur und Full-Bleed bleiben in diesen preseteigenen Klassen
   und Templates.
+- `data` deklariert die `data-*`-Attribute eines erzeugten Elements.
 - `maxComponents` ist standardmäßig 12 und wird auf 1…20 begrenzt.
 - Alle Shortcode-Argumente werden ausgegeben. Seltene Query-/Callback-
   Änderungen bleiben nach dem Ablösen eine HTML+-Aufgabe.
@@ -266,7 +276,9 @@ Beim Hinzufügen liegen Komponentenreihenfolge und Data in einer gemeinsamen
 kompakten Liste. Nach dem Einfügen trennt **Edit** wieder **Design** für Area
 Style, Component Style und Reihenfolge von **Data** für dieselben Bindings.
 Gewöhnliche Textfills stehen unter **Content textfills**, Einträge aus
-`text/blacklist.php` unter **Technical values**. Die Blacklist steuert nur die
+`text/blacklist.php` unter **Technical values** — dort erscheint auch die
+`/webpage/<seite>/uri` einer Seite, sodass ein Button auf eine andere Seite
+zeigen kann, statt einen festen Pfad zu tragen. Die Blacklist steuert nur die
 Sichtbarkeit im normalen Editor; technische Route-URIs bleiben gültige
 Template-Bindings und werden beim Einfügen nicht überschrieben.
 
@@ -304,6 +316,51 @@ Der öffentliche Request liest sie nicht. Nur der Builder öffnet damit die
 Area-/Komponenten-Konfiguration erneut. HTML+ entfernt den Kommentar und
 beendet damit bewusst die grafische Zuständigkeit.
 
+
+### Data-Attribute
+
+Das gemeinsame Frontend-Script liest seine Parameter aus `data-*`-Attributen:
+`ui-autoheight` gleicht die Karten einer `data-autoheight-group` an, `js-slider`
+richtet sich nach `data-slider-width`, `js-vpa` verzögert um `data-vpa-delay`.
+Ein Preset, das eine solche Klasse auf ein erzeugtes Element schreibt, deklariert
+die zugehörigen Attribute direkt daneben:
+
+```php
+'areas' => [
+	'services' => [
+		'item' => [ 'tag' => 'article', 'class' => 'ui-article' ],
+		'render' => [
+			'title' => [
+				'tag' => 'h3',
+				'class' => 'ui-article-title ui-autoheight',
+				'data' => [
+					'autoheight-group' => 'services-title-[[section:id]]',
+					'autoheight-mobile' => 'skip',
+				],
+			],
+			'button' => [ 'class' => 'js-modal-trigger', 'data' => [ 'modal-target' => 'contact-modal' ] ],
+		],
+	],
+],
+```
+
+Ein `data` auf oberster Ebene gehört zur `<section>`, eines im Layout überschreibt
+es je Name, `container` und `item` tragen den Wrapper einer Area bzw. ihre
+Wiederholung, `render.<type>` jede Komponente dieses Typs. Namen stehen ohne
+`data-`-Präfix (ein geschriebenes Präfix wird akzeptiert und entfernt), Werte sind
+kurze einzeilige Literale, und `[[section:id]]` wird durch die Section-ID ersetzt —
+zwei Kopien desselben Presets bleiben auf einer Seite unabhängig.
+`data-cover-height` bleibt beim Frame. Es gibt dafür kein Editor-Feld:
+Data-Attribute sind eine Preset-Entscheidung, alles darüber hinaus bleibt HTML+.
+
+Entscheidend ist das Element, das die Klasse wirklich trägt. `js-cover` und
+`js-parallex` sitzen auf der `<section>`, `data-cover-width` gehört also in eine
+Preset- oder Layout-Map. `js-vpa` schreibt der Compiler auf die erzeugte
+`ui-grid-row`, die keine `data`-Map erreicht — Motion-Timing bleibt Sache des
+Layout-`.tpl`. Ein `item` einer Collection ist ein direktes Flex-Kind dieser Row
+und wird bereits auf die Höhe seiner Zeile gestreckt; Höhenangleich gehört daher
+über `render.<type>` an die Boxen in der Karte — genau so richtet das
+Articles-Preset die Call-to-Actions seiner Karten aneinander aus.
 
 ### Versionsvertrag
 

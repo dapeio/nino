@@ -71,10 +71,10 @@ $appData['/nino/html/images'] = [];
 $appData['/nino/html/assets'] = [ '/.cache/style.css' => [ '/assets/style.preview.css' ] ];
 
 \Nino\Filesystem::putFileContent( $appData, '/config.php', [ '/nino/html/images' => [] ] );
-\Nino\Filesystem::putFileContent( $appData, '/text/global.php', [] );
+\Nino\Filesystem::putFileContent( $appData, '/text/global.php', [ '[[/webpage/contact/uri]]' => '/contact' ] );
 \Nino\Filesystem::putFileContent( $appData, '/text/blacklist.php', [ '/webpage/contact/uri' ] );
-\Nino\Filesystem::putFileContent( $appData, '/text/en_US.php', [ '[[/page-home/hero/title]]' => 'Old title', '[[/webpage/contact/uri]]' => '/contact' ] );
-\Nino\Filesystem::putFileContent( $appData, '/text/de_DE.php', [ '[[/page-home/hero/title]]' => 'Alter Titel', '[[/webpage/contact/uri]]' => '/kontakt' ] );
+\Nino\Filesystem::putFileContent( $appData, '/text/en_US.php', [ '[[/page-home/hero/title]]' => 'Old title' ] );
+\Nino\Filesystem::putFileContent( $appData, '/text/de_DE.php', [ '[[/page-home/hero/title]]' => 'Alter Titel' ] );
 
 echo "Sandbox: $sandbox\n\n";
 
@@ -138,6 +138,63 @@ file_put_contents( $areaPresetDirectory. '/unsafe.tpl', "<?php echo 'unsafe'; ?>
 $unsafeManifest = $multiAreaManifest;
 $unsafeManifest['layouts']['default']['template'] = 'unsafe.tpl';
 check( 'Area manifests reject executable Layout source', throwsInvalidArgument( fn() => \Nino\Templates\AreaComposer::normalizePreset( 'unsafe-layout', $unsafeManifest, $areaPresetDirectory ) ) );
+
+$dataAttributeManifest = [
+	'name' => 'Data attributes', 'description' => 'Frontend behavior configured by declared attributes.',
+	'category' => 'Test', 'tags' => [ 'data', 'attributes' ], 'version' => 3,
+	'data' => [ 'vpa-delay' => '150ms', 'cover-width' => '80' ],
+	'layouts' => [ 'default' => [ 'label' => 'Default', 'template' => 'section.tpl', 'data' => [ 'vpa-delay' => '300ms' ] ] ],
+	'areas' => [
+		'first' => [
+			'label' => 'Cards', 'source' => 'elements', 'allowed' => [ 'title', 'button' ],
+			'item' => [ 'tag' => 'article', 'class' => 'ui-article ui-autoheight', 'data' => [ 'autoheight-group' => 'cards-[[section:id]]', 'data-autoheight-mobile' => 'skip' ] ],
+			'model' => [ 'title' => [ 'type' => 'string', 'locale' => true ] ],
+			'render' => [ 'button' => [ 'class' => 'js-modal-trigger', 'data' => [ 'Modal-Target' => 'contact "one" & <two>' ] ] ],
+			'recommend' => [ 'components' => [
+				[ 'id' => 'title', 'type' => 'title', 'bindings' => [ 'text' => 'title' ] ],
+				[ 'id' => 'more', 'type' => 'button', 'bindings' => [ 'label' => 'title', 'href' => 'title' ] ],
+			] ],
+		],
+		'second' => [
+			'label' => 'Tabs', 'source' => 'single', 'allowed' => [ 'title' ],
+			'container' => [ 'class' => 'ui-grid-100 nino-area js-tabs', 'data' => [ 'tabs-target' => 'panel-1' ] ],
+			'recommend' => [ 'components' => [ [ 'id' => 'title', 'type' => 'title' ] ] ],
+		],
+	],
+];
+$dataAttributePreset = \Nino\Templates\AreaComposer::normalizePreset( 'data-attributes', $dataAttributeManifest, $areaPresetDirectory );
+$dataAttributeInput = \Nino\Templates\AreaComposer::defaults( $dataAttributePreset, 'home', 'stage' );
+$dataAttributeSource = \Nino\Templates\AreaComposer::compose( $dataAttributeInput, $dataAttributePreset )['source'];
+$dataAttributeSection = strtok( $dataAttributeSource, "\n" );
+check( 'a Layout data attribute overrides the preset default on the section element', str_contains( $dataAttributeSection, 'data-cover-width="80"' )
+	&& str_contains( $dataAttributeSection, 'data-vpa-delay="300ms"' )
+	&& substr_count( $dataAttributeSource, 'data-vpa-delay' ) === 1 );
+check( 'Areas emit declared data attributes on their container and collection item', str_contains( $dataAttributeSource, '<div class="ui-grid-100 nino-area js-tabs" data-tabs-target="panel-1">' )
+	&& str_contains( $dataAttributeSource, 'class="ui-article ui-autoheight" data-autoheight-group="cards-stage" data-autoheight-mobile="skip"' ) );
+check( 'component render overrides carry escaped data attributes', str_contains( $dataAttributeSource, 'data-modal-target="contact &quot;one&quot; &amp; &lt;two&gt;"' ) );
+$injectedInput = $dataAttributeInput;
+$injectedInput['data'] = [ 'injected' => 'yes' ];
+$injectedInput['areas']['first']['item'] = [ 'tag' => 'article', 'data' => [ 'injected' => 'yes' ] ];
+$injectedInput['areas']['second']['container'] = [ 'tag' => 'div', 'data' => [ 'injected' => 'yes' ] ];
+$injectedInput['areas']['second']['components'][0]['data'] = [ 'injected' => 'yes' ];
+check( 'browser data never adds an attribute the manifest did not declare', str_contains( \Nino\Templates\AreaComposer::compose( $injectedInput, $dataAttributePreset )['source'], 'injected' ) === false );
+$dataAttributeRejects = function( array $data, string $target ) use ( $dataAttributeManifest, $areaPresetDirectory ): bool {
+	$manifest = $dataAttributeManifest;
+	match( $target ) {
+		'preset' => $manifest['data'] = $data,
+		'layout' => $manifest['layouts']['default']['data'] = $data,
+		'item' => $manifest['areas']['first']['item']['data'] = $data,
+		'render' => $manifest['areas']['first']['render']['button']['data'] = $data,
+	};
+	return throwsInvalidArgument( fn() => \Nino\Templates\AreaComposer::normalizePreset( 'data-attributes', $manifest, $areaPresetDirectory ) );
+};
+check( 'declared data attributes cannot break out of the attribute or the data- namespace', $dataAttributeRejects( [ 'x" onclick="alert(1)' => '1' ], 'item' )
+	&& $dataAttributeRejects( [ 'group name' => '1' ], 'render' )
+	&& $dataAttributeRejects( [ 'group' => [ 'unsupported' ] ], 'item' )
+	&& $dataAttributeRejects( [ 'group' => "line\nbreak" ], 'item' )
+	&& $dataAttributeRejects( [ 'group' => str_repeat( 'a', 241 ) ], 'item' ) );
+check( 'the frame keeps ownership of the data attributes it writes itself', $dataAttributeRejects( [ 'cover-height' => '50' ], 'preset' )
+	&& $dataAttributeRejects( [ 'data-cover-height' => '50' ], 'layout' ) );
 check( 'repeatable articles recommend a localized CTA label', ( $modules['articles']['model']['linkLabel']['locale'] ?? false ) === true );
 check( 'every curated preset composes with its defaults', array_filter( array_keys( $presets ), function( string $key ): bool {
 	try {
@@ -241,6 +298,10 @@ check( 'component order changes markup independently from the four-column Area S
 check( 'one v3 metadata comment preserves the complete graphical area model', substr_count( $textOnly['source'], '<!-- nino:section ' ) === 1
 	&& $textOnly['spec']['version'] === 3
 	&& count( $textOnly['spec']['areas']['articles']['components'] ) === 2 );
+check( 'the Articles preset equalizes its card text per section so the calls to action line up', str_contains( $articles['source'], '<h3 class="ui-article-title ui-autoheight" data-autoheight-group="nino-article-title-services" data-autoheight-mobile="skip">' )
+	&& str_contains( $articles['source'], '<div class="ui-article-descr ui-autoheight" data-autoheight-group="nino-article-descr-services" data-autoheight-mobile="skip">' )
+	&& str_contains( $textOnly['source'], 'data-autoheight-group="nino-article-title-plain-services"' )
+	&& str_contains( $textOnly['source'], 'nino-article-title-services"' ) === false );
 
 $articlePreview = \Nino\Templates\Composer::preview( [
 	'preset' => 'articles-grid', 'pageId' => 'preview', 'id' => 'articles',
@@ -266,6 +327,42 @@ check( 'Layout changes real markup and can recommend a matching frame', str_cont
 	&& $fullscreen['effective']['layout'] === 'parallax'
 	&& $fullscreen['effective']['frame']['background'] === 'parallax'
 	&& ( $fullscreen['images'][0]['key'] ?? '' ) === '/page-home/stage/background' );
+
+$backgroundInput = \Nino\Templates\AreaComposer::defaults( $presets['fullscreen-image'], 'home', 'stage' );
+$backgroundInput['frame']['backgroundImageSource'] = 'image';
+$backgroundInput['frame']['backgroundImage'] = '/shared/hero-image';
+$existingBackground = \Nino\Templates\Composer::compose( $backgroundInput );
+check( 'a chosen existing image slot survives into the composed background', str_contains( $existingBackground['source'], '[image /shared/hero-image alt=""]' )
+	&& ( $existingBackground['images'][0]['key'] ?? '' ) === '/shared/hero-image'
+	&& ( $existingBackground['images'][0]['mode'] ?? '' ) === 'existing' );
+$fixedBackgroundInput = $backgroundInput;
+$fixedBackgroundInput['frame']['backgroundImageSource'] = 'fixed';
+$fixedBackgroundInput['frame']['backgroundImage'] = '[[/nino/public]]/images/demo-00.jpg';
+$fixedBackground = \Nino\Templates\Composer::compose( $fixedBackgroundInput );
+check( 'a fixed background writes a plain image tag and requests no image slot', str_contains( $fixedBackground['source'], '<img src="[[/nino/public]]/images/demo-00.jpg" alt="">' )
+	&& $fixedBackground['images'] === []
+	&& str_contains( $fixedBackground['source'], '[image ' ) === false );
+check( 'the fixed background choice round-trips through the section metadata', ( $fixedBackground['spec']['frame']['backgroundImageSource'] ?? '' ) === 'fixed'
+	&& \Nino\Templates\Composer::compose( $fixedBackground['spec'] )['source'] === $fixedBackground['source'] );
+$legacyBackgroundInput = $backgroundInput;
+unset( $legacyBackgroundInput['frame']['backgroundImageSource'] );
+$legacyBackground = \Nino\Templates\Composer::compose( $legacyBackgroundInput );
+check( 'older section metadata without a background source keeps inferring its slot', str_contains( $legacyBackground['source'], '[image /shared/hero-image alt=""]' ) );
+$rejectsBackground = function( string $source, string $value ) use ( $backgroundInput ): bool {
+	$input = $backgroundInput;
+	$input['frame']['backgroundImageSource'] = $source;
+	$input['frame']['backgroundImage'] = $value;
+	return throwsInvalidArgument( fn() => \Nino\Templates\Composer::compose( $input ) );
+};
+check( 'a fixed background rejects executable schemes, markup and shortcode brackets', $rejectsBackground( 'fixed', 'javascript:alert(1)' )
+	&& $rejectsBackground( 'fixed', '/hero.jpg" onerror="alert(1)' )
+	&& $rejectsBackground( 'fixed', '[elements /x]' )
+	&& $rejectsBackground( 'fixed', '/images/../../private/config.php' )
+	&& $rejectsBackground( 'fixed', '//example.invalid/hero.jpg' )
+	&& $rejectsBackground( 'image', '/shared/../etc' ) );
+check( 'a fixed background still allows the public prefix and ordinary project paths', str_contains( $fixedBackground['source'], '[[/nino/public]]' )
+	&& $rejectsBackground( 'fixed', '/images/hero.jpg' ) === false
+	&& $rejectsBackground( 'fixed', 'https://cdn.example.com/hero.jpg' ) === false );
 
 $templateInput = \Nino\Templates\AreaComposer::defaults( $presets['articles-grid'], 'home', 'with-form' );
 $templateInput['areas']['action']['components'][] = [
@@ -541,6 +638,8 @@ $listedTextfills = $keysRequest['/nino/http/response']['body']['entries'];
 $technicalTextfill = array_values( array_filter( $listedTextfills, fn( array $entry ): bool => $entry['key'] === '/webpage/contact/uri' ) )[0] ?? null;
 check( 'lists content and blacklisted technical textfills for reusable Area bindings', in_array( '/page-home/hero/title', array_column( $listedTextfills, 'key' ), true )
 	&& ( $technicalTextfill['blacklisted'] ?? false ) === true );
+check( 'a page uri written by /_install or /_admin is offered as a global technical value', ( $technicalTextfill['global'] ?? false ) === true
+	&& ( $technicalTextfill['value'] ?? '' ) === '/contact' );
 
 post( [ 'keys' => [ '/page-home/hero/title', '/page-home/hero/subtitle', '/webpage/contact/uri' ] ] );
 $fieldsRequest = response();

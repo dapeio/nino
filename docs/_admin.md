@@ -193,7 +193,7 @@ The **Routes** area manages the page routes created via `/_install`, including w
 
 A page has two different URIs:
 
-- **Element URI** is the stable internal identity to which page texts like `/webpage<uri>/title` are attached;
+- **Element URI** is the stable internal identity to which page texts like `/webpage<uri>/title` are attached. Saving a page also writes `/webpage<uri>/uri` — its reachable path, as one global technical value — so a template can link to the page with `[[/webpage/site-contact/uri]]` instead of repeating a path this form can change;
 - **HTTP URI** is the actually reachable path in the browser.
 
 Thus, a page can internally be called `/about` and publicly be reachable under `/ueber-uns`, for example.
