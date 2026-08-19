@@ -1,6 +1,6 @@
 /**
  *	Nino						A compact filesystembased php framework
- *	nino-ui-form-js-smoke.js	DOM-light checks for the .ui-form submit handler:
+ *	nino-ui-form-js-smoke.js	DOM-light checks for the .nino-form submit handler:
  *								what actually reaches the server, which message a
  *								given status code produces, and which of them locks
  *								the form down.
@@ -58,7 +58,7 @@ function field( name, type, value, required ) {
 	};
 }
 
-// One .ui-form: the fields page-contact.tpl ships, honeypot included
+// One .nino-form: the fields page-contact.tpl ships, honeypot included
 function form() {
 	const fields = [
 		field( '_csrf', 'hidden', 'token-value', false ),
@@ -74,7 +74,7 @@ function form() {
 		fieldList : fields,
 		msg : msg,
 		btn : btn,
-		classList : classList( [ 'ui-form' ] ),
+		classList : classList( [ 'nino-form' ] ),
 		listeners : {},
 		attributes : {},
 		addEventListener : function( event, callback ) { this.listeners[event] = callback },
@@ -118,7 +118,7 @@ const document = {
 	getElementById : function() { return null },
 	querySelector : function() { return null },
 	querySelectorAll : function( selector ) {
-		return selector === '.ui-form:not(.js-newsletter-form)' ? forms : [];
+		return selector === '.nino-form:not(.nino-newsletter-form)' ? forms : [];
 	},
 	createElement : function() { return { classList : classList(), style : {}, setAttribute : function() {}, appendChild : function() {} } },
 	addEventListener : function() {},
@@ -162,7 +162,7 @@ vm.runInContext(
 
 sandbox.Nino.ui.onReady();
 
-check( 'every .ui-form on the page gets a submit handler', typeof forms[0].listeners.submit === 'function' && typeof forms[1].listeners.submit === 'function' );
+check( 'every .nino-form on the page gets a submit handler', typeof forms[0].listeners.submit === 'function' && typeof forms[1].listeners.submit === 'function' );
 
 
 // --- What actually reaches the server -----------------------------------

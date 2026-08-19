@@ -1,6 +1,6 @@
 [[area:intro]]
-<div class="ui-grid-100 ui-table-wrap">
-	<table class="ui-table">
+<div class="nino-grid-100 nino-table-wrap">
+	<table class="nino-table">
 		<thead>
 			<tr><th>Service</th><th>Duration</th></tr>
 		</thead>

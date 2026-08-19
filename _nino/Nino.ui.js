@@ -63,26 +63,26 @@
 			const
 				ui			= Nino.ui,
 				e 			= {
-					arrowDown	: dc.querySelectorAll( '.ui-atf-arrowdown' ),
-					autoheight	: dc.querySelectorAll( '.ui-autoheight' ),
-					backToTop	: dc.querySelectorAll( '.js-back-to-top' ),
-					cookieBanner	: dc.querySelectorAll( '.js-cookie-banner' ),
-					cover			: dc.querySelectorAll( '.js-cover' ),
-					// .js-newsletter-form opts out - it keeps .ui-form only for the
+					arrowDown	: dc.querySelectorAll( '.nino-atf-arrowdown' ),
+					autoheight	: dc.querySelectorAll( '.nino-autoheight' ),
+					backToTop	: dc.querySelectorAll( '.nino-back-to-top' ),
+					cookieBanner	: dc.querySelectorAll( '.nino-cookie-banner' ),
+					cover			: dc.querySelectorAll( '.nino-cover' ),
+					// .nino-newsletter-form opts out - it keeps .nino-form only for the
 					// shared success/error/pending styling, its own submit handler
 					// below binds it separately (needs its own "already subscribed"
 					// vs "new signup" messaging, not just a generic success/error pair)
-					form			: dc.querySelectorAll( '.ui-form:not(.js-newsletter-form)' ),
-					modal			: dc.querySelectorAll( '.js-modal' ),
-					modalTrigger	: dc.querySelectorAll( '.js-modal-trigger' ),
-					newsletterForm	: dc.querySelectorAll( '.js-newsletter-form' ),
-					parallex	: dc.querySelectorAll( '.js-parallex' ),
-					preloader	: dc.querySelectorAll( '.js-preloader' ),
-					slider		: dc.querySelectorAll( '.js-slider' ),
-					statCounter	: dc.querySelectorAll( '.js-stat-counter' ),
-					tabs			: dc.querySelectorAll( '.js-tabs' ),
-					toastTrigger	: dc.querySelectorAll( '.js-toast-trigger' ),
-					vpa				: dc.querySelectorAll( '.js-vpa' ),
+					form			: dc.querySelectorAll( '.nino-form:not(.nino-newsletter-form)' ),
+					modal			: dc.querySelectorAll( '.nino-modal' ),
+					modalTrigger	: dc.querySelectorAll( '.nino-modal-trigger' ),
+					newsletterForm	: dc.querySelectorAll( '.nino-newsletter-form' ),
+					parallex	: dc.querySelectorAll( '.nino-parallex' ),
+					preloader	: dc.querySelectorAll( '.nino-preloader' ),
+					slider		: dc.querySelectorAll( '.nino-slider' ),
+					statCounter	: dc.querySelectorAll( '.nino-stat-counter' ),
+					tabs			: dc.querySelectorAll( '.nino-tabs' ),
+					toastTrigger	: dc.querySelectorAll( '.nino-toast-trigger' ),
+					vpa				: dc.querySelectorAll( '.nino-vpa' ),
 				};
 
 			/*
@@ -120,7 +120,7 @@
 			}
 
 			/*
-			 *	ui-autoheight - equalize the height of every element sharing the
+			 *	nino-autoheight - equalize the height of every element sharing the
 			 *	same data-autoheight-group, so eg. a row of cards with uneven
 			 *	text lengths still line up. Opt out per-element on mobile via
 			 *	data-autoheight-mobile (any non-empty value)
@@ -147,10 +147,10 @@
 			}
 
 			/*
-			 *	js-cover
+			 *	nino-cover
 			 */
 			if( e.cover.length > 0 ) {
-				// Resize each .js-cover element to fill its configured percentage of the viewport
+				// Resize each .nino-cover element to fill its configured percentage of the viewport
 				ui._onResize.push( function( wH, wW ) {
 					for( let i=0, l=e.cover.length; i<l; i++ ) {
 						let
@@ -166,14 +166,14 @@
 				} );
 			}
 			/*
-			 *	js-parallex
+			 *	nino-parallex
 			 */
 			if( e.parallex.length > 0 ) {
 				for( let i=0, l=e.parallex.length; i<l; i++ )
 					e.parallex[i].img = e.parallex[i].querySelector('img');
 
 				/**
-				 *	Apply a parallax offset to .js-parallex images based on scroll position
+				 *	Apply a parallax offset to .nino-parallex images based on scroll position
 				 *
 				 *	@param		{number}	wh							Viewport height
 				 *	@param		{number}	ww							Viewport width
@@ -195,7 +195,7 @@
 
 
 			/*
-			 *	js-preloader
+			 *	nino-preloader
 			 */
 			if( e.preloader.length > 0 ) {
 				wn.addEventListener( 'load', function() {
@@ -208,7 +208,7 @@
 
 
 			/*
-			 *	js-cookie-banner - reveal only if no consent choice was made
+			 *	nino-cookie-banner - reveal only if no consent choice was made
 			 *	yet (see Nino.ui.cookieConsent below). Buttons carry the
 			 *	choice in data-cookie-consent rather than two separate click
 			 *	handlers, since accept/decline only differ in which value
@@ -216,18 +216,18 @@
 			 */
 			if( e.cookieBanner.length > 0 && ui.cookieConsent.get() === null ) {
 				const banner = e.cookieBanner[0];
-				wn.requestAnimationFrame( () => banner.classList.add('js-cookie-banner--visible') );
+				wn.requestAnimationFrame( () => banner.classList.add('nino-cookie-banner--visible') );
 				banner.querySelectorAll('[data-cookie-consent]').forEach( function( btn ) {
 					btn.addEventListener( 'click', function() {
 						ui.cookieConsent.set( this.getAttribute('data-cookie-consent') );
-						banner.classList.remove('js-cookie-banner--visible');
+						banner.classList.remove('nino-cookie-banner--visible');
 					} );
 				} );
 			}
 
 
 			/*
-			 *	js-vpa
+			 *	nino-vpa
 			 */
 			if( e.vpa.length > 0 ) {
 				for( let i=0, ad, al, l=e.vpa.length; i<l; i++ ) {
@@ -238,7 +238,7 @@
 				}
 
 				/**
-				 *	Toggle "visible"/"visible-once" classes on .js-vpa elements
+				 *	Toggle "visible"/"visible-once" classes on .nino-vpa elements
 				 *	as they enter/leave the viewport
 				 *
 				 *	@param		{number}	wh							Viewport height
@@ -252,11 +252,11 @@
 					for( let i=0, l=e.vpa.length; i<l; i++ ) {
 						let br = e.vpa[i].getBoundingClientRect();
 						if( e.vpa[i].vpa === false && br.top < wh && br.bottom > 0 )
-							e.vpa[i].vpa = ! e.vpa[i].classList.add('js-vpa--visible');
+							e.vpa[i].vpa = ! e.vpa[i].classList.add('nino-vpa--visible');
 						else if ( e.vpa[i].vpa === true && ( br.top > wh || br.bottom < 0 ) )
-							e.vpa[i].vpa = !! e.vpa[i].classList.remove('js-vpa--visible');
+							e.vpa[i].vpa = !! e.vpa[i].classList.remove('nino-vpa--visible');
 						if( e.vpa[i].vpat === false && e.vpa[i].vpa === true )
-							e.vpa[i].vpat = ! e.vpa[i].classList.add('js-vpa--visible-once');
+							e.vpa[i].vpat = ! e.vpa[i].classList.add('nino-vpa--visible-once');
 					}
 				};
 				for( let i=0, l=e.vpa.length; i<l; i++ ) {
@@ -270,7 +270,7 @@
 
 
 			/*
-			 *	js-stat-counter - counts up from 0 to data-stat-counter-to once
+			 *	nino-stat-counter - counts up from 0 to data-stat-counter-to once
 			 *	the element scrolls into view
 			 */
 			if( e.statCounter.length > 0 ) {
@@ -279,7 +279,7 @@
 					e.statCounter[i].counted = false;
 
 				/**
-				 *	Animate a .js-stat-counter's text content from 0 up to its
+				 *	Animate a .nino-stat-counter's text content from 0 up to its
 				 *	data-stat-counter-to value
 				 *
 				 *	@param		{Element}	el							Stat counter element
@@ -305,7 +305,7 @@
 				};
 
 				/**
-				 *	Trigger the count-up animation on each .js-stat-counter as it
+				 *	Trigger the count-up animation on each .nino-stat-counter as it
 				 *	scrolls into view (once)
 				 *
 				 *	@param		{number}	wh							Viewport height
@@ -330,9 +330,9 @@
 
 
 			/*
-			 *	Scroll state - toggle body.js-scroll-atf/-btf (above/below the
-			 *	fold) and body.js-scroll-up/-down (scroll direction) so any
-			 *	element (.js-scroll-header, a back-to-top button, ...) can
+			 *	Scroll state - toggle body.nino-scroll-atf/-btf (above/below the
+			 *	fold) and body.nino-scroll-up/-down (scroll direction) so any
+			 *	element (.nino-scroll-header, a back-to-top button, ...) can
 			 *	react to scroll position/direction in CSS
 			 */
 			/**
@@ -348,13 +348,13 @@
 			const headerScroll = function( h, w, t, l ) {
 
 				if( headerScroll.fixed === false && t > 96 ) {
-					bd.classList.add('js-scroll-btf');
-					bd.classList.remove('js-scroll-atf');
+					bd.classList.add('nino-scroll-btf');
+					bd.classList.remove('nino-scroll-atf');
 					headerScroll.fixed = true;
 				}
 				else if ( headerScroll.fixed === true && t < 96 ) {
-					bd.classList.add('js-scroll-atf');
-					bd.classList.remove('js-scroll-btf');
+					bd.classList.add('nino-scroll-atf');
+					bd.classList.remove('nino-scroll-btf');
 					headerScroll.fixed = false;
 				}
 
@@ -362,11 +362,11 @@
 					return;
 
 				if( t > headerScroll.to + 30 ) {
-					bd.classList.add('js-scroll-down');
-					bd.classList.remove('js-scroll-up');
+					bd.classList.add('nino-scroll-down');
+					bd.classList.remove('nino-scroll-up');
 				} else if( t < headerScroll.to - 30 || t < 96 ) {
-					bd.classList.add('js-scroll-up');
-					bd.classList.remove('js-scroll-down');
+					bd.classList.add('nino-scroll-up');
+					bd.classList.remove('nino-scroll-down');
 				} else
 					return;
 
@@ -377,7 +377,7 @@
 			headerScroll.fixed	= false;
 			headerScroll.init	= false;
 
-			bd.classList.add('js-scroll-atf');
+			bd.classList.add('nino-scroll-atf');
 			ui._onResize.push( headerScroll );
 			ui._onScroll.push( headerScroll );
 
@@ -385,15 +385,15 @@
 			setTimeout( function() { headerScroll.init = true; }, 1000 );
 
 			/*
-			 *	js-back-to-top - visibility is handled in CSS via the
-			 *	body.js-scroll-atf/-btf classes above, JS just handles the click
+			 *	nino-back-to-top - visibility is handled in CSS via the
+			 *	body.nino-scroll-atf/-btf classes above, JS just handles the click
 			 */
 			for( let i=0, l=e.backToTop.length; i<l; i++ )
 				e.backToTop[i].addEventListener( 'click', function() { wn.scrollTo( { top: 0, behavior: 'smooth' } ) } );
 
 
 			/*
-			 *	ui-atf-arrowdown - scrolls to whichever element its own
+			 *	nino-atf-arrowdown - scrolls to whichever element its own
 			 *	data-arrow-target (a css selector, eg. "#next-section") points
 			 *	at. The icon itself is a background-image (see Nino.css), so
 			 *	using it never needs more than the one data attribute.
@@ -409,13 +409,13 @@
 
 
 			/*
-			 *	js-slider
+			 *	nino-slider
 			 */
 			if( e.slider.length > 0 ) {
 
 				let
 					/**
-					 *	Recalculate slide widths and re-position each .js-slider track
+					 *	Recalculate slide widths and re-position each .nino-slider track
 					 *	around its currently active slide
 					 *
 					 *	@return		void
@@ -453,13 +453,13 @@
 					 */
 					sliderMove = function( wrap, pos ) {
 
-						wrap.lis[wrap.pos].classList.remove('active');
-						wrap.ips?.[wrap.pos]?.classList.remove('active');
+						wrap.lis[wrap.pos].classList.remove('nino-is-active');
+						wrap.ips?.[wrap.pos]?.classList.remove('nino-is-active');
 
 						wrap.pos = pos;
 
-						wrap.lis[wrap.pos].classList.add('active');
-						wrap.ips?.[wrap.pos]?.classList.add('active');
+						wrap.lis[wrap.pos].classList.add('nino-is-active');
+						wrap.ips?.[wrap.pos]?.classList.add('nino-is-active');
 
 						sliderResize();
 					},
@@ -505,17 +505,17 @@
 					// in one wrapper so they lay out as a single centered row
 					// regardless of how wide the slider itself is
 					slider.controls = document.createElement('DIV');
-					slider.controls.className = 'js-slider-controls';
+					slider.controls.className = 'nino-slider-controls';
 					slider.appendChild( slider.controls );
 
 					slider.prevButton = document.createElement('DIV');
-					slider.prevButton.className = 'js-slider-button prev';
+					slider.prevButton.className = 'nino-slider-button prev';
 					slider.prevButton.innerHTML = '‹';
 					slider.prevButton.addEventListener( 'click', function(){ sliderClick( slider, -1 ) } );
 					slider.controls.appendChild( slider.prevButton );
 
 					slider.pWrap = document.createElement('UL');
-					slider.pWrap.className = 'js-slider-points';
+					slider.pWrap.className = 'nino-slider-points';
 					slider.controls.appendChild( slider.pWrap );
 					slider.ips = [];
 					for( let ip=0, lp=slider.lis.length; ip<lp; ip++ ) {
@@ -525,7 +525,7 @@
 					}
 
 					slider.nextButton = document.createElement('DIV');
-					slider.nextButton.className = 'js-slider-button next';
+					slider.nextButton.className = 'nino-slider-button next';
 					slider.nextButton.innerHTML = '›';
 					slider.nextButton.addEventListener( 'click', function(){ sliderClick( slider, 1 ) } );
 					slider.controls.appendChild( slider.nextButton );
@@ -544,7 +544,7 @@
 							if( typeof touch === 'undefined' )
 								return;
 							if( typeof e.touches !== 'undefined' && e.touches.length > 1 ) {
-								this.classList.remove('touch');
+								this.classList.remove('nino-is-touch');
 								touchAxis = 'y';
 								sliderResize();
 								return;
@@ -576,7 +576,7 @@
 								return;
 
 							e.preventDefault();
-							this.classList.add('touch');
+							this.classList.add('nino-is-touch');
 							this.stage.style.left = ( this.posLeft + deltaX ) +'px';
 						}, { passive : false } );
 
@@ -584,7 +584,7 @@
 						// large enough. Vertical gestures never change the active slide.
 						slider.addEventListener( 'touchend', function(e) {
 
-							this.classList.remove('touch');
+							this.classList.remove('nino-is-touch');
 
 							const touch = e.changedTouches[0];
 							if( typeof touch !== 'undefined' ) {
@@ -610,27 +610,27 @@
 						// Restore the centered track in that case as well.
 						slider.addEventListener( 'touchcancel', function() {
 
-							this.classList.remove('touch');
+							this.classList.remove('nino-is-touch');
 							touchAxis = null;
 							sliderResize();
 						}, false );
 					}
 
-					e.slider[i].lis[e.slider[i].pos].classList.add('active');
-					e.slider[i].ips[e.slider[i].pos].classList.add('active');
+					e.slider[i].lis[e.slider[i].pos].classList.add('nino-is-active');
+					e.slider[i].ips[e.slider[i].pos].classList.add('nino-is-active');
 				}
 				ui._onResize.push( sliderResize );
 			}
 
 
 			/*
-			 *	ui-form
+			 *	nino-form
 			 */
 			if( e.form.length > 0 ) {
 
 				let
 					/**
-					 *	Handle a .ui-form's xhr response: disable the form and
+					 *	Handle a .nino-form's xhr response: disable the form and
 					 *	show a success/error message. Bound as `this.form` before use.
 					 *
 					 *	@param		{XMLHttpRequest}	xhr				Completed (normalized) xhr
@@ -639,12 +639,12 @@
 					 */
 					formResponse = function( xhr ){
 
-						this.form.classList.remove('pending');
+						this.form.classList.remove('nino-is-pending');
 
 						const ok = ( xhr.status === 200 );
 
-						this.form.classList.remove( ok === true ? 'error' : 'success' );
-						this.form.classList.add( ok === true ? 'success' : 'error' );
+						this.form.classList.remove( ok === true ? 'nino-is-error' : 'nino-is-success' );
+						this.form.classList.add( ok === true ? 'nino-is-success' : 'nino-is-error' );
 
 						// A 400 is Form.php repeating the field validation this form
 						// already ran, ie. an address the regex below accepted and
@@ -673,7 +673,7 @@
 					},
 
 					/**
-					 *	Validate and submit a .ui-form via xhr; blocks submission
+					 *	Validate and submit a .nino-form via xhr; blocks submission
 					 *	until all required fields are filled and any email field is valid
 					 *
 					 *	@param		{Event}		e								Submit event
@@ -683,7 +683,7 @@
 					formSubmit = function( e ){
 						e.preventDefault();
 
-						if( this.classList.contains('success') === true )
+						if( this.classList.contains('nino-is-success') === true )
 							return;
 
 						// Loop through inputs
@@ -706,7 +706,7 @@
 
 							// Check required
 							if( this.fields[i].required === true && this.fields[i].value.length === 0 )
-								this.fields[i].classList.add('error') || ( error = Nino.content.getText('/form/info/required') );
+								this.fields[i].classList.add('nino-is-error') || ( error = Nino.content.getText('/form/info/required') );
 
 							// Check email. The local part uses the character set the html
 							// spec allows for input[type=email] (and php's
@@ -718,7 +718,7 @@
 							// deliberately, because a contact form typo'd to "@localhost"
 							// helps nobody
 							if( error === false && this.fields[i].type === 'email' && ( /^[a-zA-Z0-9.!#$%&'*+\/=?^_`{|}~-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*\.[a-zA-Z]{2,}$/.test(this.fields[i].value) === false ) )
-								this.fields[i].classList.add('error') || ( error = Nino.content.getText('/form/info/email') );
+								this.fields[i].classList.add('nino-is-error') || ( error = Nino.content.getText('/form/info/email') );
 						}
 						// Catch error
 						if( error !== false )
@@ -732,12 +732,12 @@
 						// sendRequest() invokes the callback via callback.call(callback,
 						// ...), and a bound function's `this` survives that
 						const boundResponse = formResponse.bind( { form : this } );
-						this.classList.add('pending');
+						this.classList.add('nino-is-pending');
 
 						// action defaults to '/' (the contact form's own POST
 						// handler) - a form targeting a different endpoint (eg.
 						// the newsletter signup) sets its own action="..."
-						Nino.http.sendRequest( this.getAttribute('action') || '/.form', 'POST', boundResponse, data );
+						Nino.http.sendRequest( this.getAttribute('action') || '[[/nino/dir]]/.form', 'POST', boundResponse, data );
 					},
 					/**
 					 *	Toggle the "empty" class on a form field's wrapper,
@@ -772,7 +772,7 @@
 
 
 			/*
-			 *	js-newsletter-form - same validate-then-xhr shape as ui-form
+			 *	nino-newsletter-form - same validate-then-xhr shape as nino-form
 			 *	above, kept separate because the signup is disabled after a
 			 *	successful submit and shows /newsletter/info/success.
 			 *	The endpoint deliberately answers the same way whether or not
@@ -784,7 +784,7 @@
 
 				let
 					/**
-					 *	Handle a .js-newsletter-form's xhr response: disable the
+					 *	Handle a .nino-newsletter-form's xhr response: disable the
 					 *	form and show the matching success/error message.
 					 *	Bound as `this.form` before use.
 					 *
@@ -794,14 +794,14 @@
 					 */
 					newsletterResponse = function( xhr ){
 
-						this.form.classList.remove('pending');
+						this.form.classList.remove('nino-is-pending');
 
 						const ok = ( xhr.status === 200 );
 
-						this.form.classList.remove( ok === true ? 'error' : 'success' );
-						this.form.classList.add( ok === true ? 'success' : 'error' );
+						this.form.classList.remove( ok === true ? 'nino-is-error' : 'nino-is-success' );
+						this.form.classList.add( ok === true ? 'nino-is-success' : 'nino-is-error' );
 
-						// Same split as the .ui-form handler above: a 400 is the
+						// Same split as the .nino-form handler above: a 400 is the
 						// address itself, anything else stays generic. The
 						// "already subscribed" case deliberately answers 200 like
 						// any other signup (see this block's docblock), so it
@@ -819,7 +819,7 @@
 					},
 
 					/**
-					 *	Validate and submit a .js-newsletter-form via xhr
+					 *	Validate and submit a .nino-newsletter-form via xhr
 					 *
 					 *	@param		{Event}		e								Submit event
 					 *
@@ -828,31 +828,31 @@
 					newsletterSubmit = function( e ){
 						e.preventDefault();
 
-						if( this.classList.contains('success') === true || this.classList.contains('existing') === true )
+						if( this.classList.contains('nino-is-success') === true || this.classList.contains('nino-is-existing') === true )
 							return;
 
 						let error = false, data = {};
 						for( let i = 0, l = this.fields.length; i<l; i++) {
 
-							// Stored as typed - see the .ui-form handler above for why
+							// Stored as typed - see the .nino-form handler above for why
 							// the character strip that used to sit here was removed
 							data[this.fields[i].name] = this.fields[i].value;
 
 							if( this.fields[i].required === true && this.fields[i].value.length === 0 )
-								this.fields[i].classList.add('error') || ( error = Nino.content.getText('/newsletter/info/required') );
+								this.fields[i].classList.add('nino-is-error') || ( error = Nino.content.getText('/newsletter/info/required') );
 
-							// Same character set as the .ui-form check above
+							// Same character set as the .nino-form check above
 							if( error === false && this.fields[i].type === 'email' && ( /^[a-zA-Z0-9.!#$%&'*+\/=?^_`{|}~-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*\.[a-zA-Z]{2,}$/.test(this.fields[i].value) === false ) )
-								this.fields[i].classList.add('error') || ( error = Nino.content.getText('/newsletter/info/email') );
+								this.fields[i].classList.add('nino-is-error') || ( error = Nino.content.getText('/newsletter/info/email') );
 						}
 						if( error !== false )
 							return this.msg.textContent = error;
 
-						// Bound per submit - see the .ui-form handler above
+						// Bound per submit - see the .nino-form handler above
 						const boundResponse = newsletterResponse.bind( { form : this } );
-						this.classList.add('pending');
+						this.classList.add('nino-is-pending');
 
-						Nino.http.sendRequest( this.getAttribute('action') || '/.newsletter', 'POST', boundResponse, data );
+						Nino.http.sendRequest( this.getAttribute('action') || '[[/nino/dir]]/.newsletter', 'POST', boundResponse, data );
 					};
 
 				for( let i=0, l=e.newsletterForm.length; i<l; i++ ) {
@@ -867,14 +867,14 @@
 
 
 			/*
-			 *	js-tabs
+			 *	nino-tabs
 			 */
 			if( e.tabs.length > 0 ) {
 				for( let i=0, l=e.tabs.length; i<l; i++ ) {
 
 					const
-						tabs		= e.tabs[i].querySelectorAll('.js-tabs-tab'),
-						panels	= e.tabs[i].querySelectorAll('.js-tabs-panel');
+						tabs		= e.tabs[i].querySelectorAll('.nino-tabs-tab'),
+						panels	= e.tabs[i].querySelectorAll('.nino-tabs-panel');
 
 					if( tabs.length === 0 || panels.length === 0 )
 						continue;
@@ -884,13 +884,13 @@
 
 						for( let x=0, xl=tabs.length; x<xl; x++ ) {
 							const active = tabs[x] === activeTab;
-							tabs[x].classList.toggle( 'active', active );
+							tabs[x].classList.toggle( 'nino-is-active', active );
 							tabs[x].setAttribute( 'aria-selected', active ? 'true' : 'false' );
 							tabs[x].tabIndex = active ? 0 : -1;
 						}
 						for( let p=0, pl=panels.length; p<pl; p++ ) {
 							const active = panels[p].id === target;
-							panels[p].classList.toggle( 'active', active );
+							panels[p].classList.toggle( 'nino-is-active', active );
 							panels[p].hidden = active === false;
 							panels[p].setAttribute( 'aria-hidden', active ? 'false' : 'true' );
 						}
@@ -898,7 +898,7 @@
 							activeTab.focus();
 					};
 
-					e.tabs[i].querySelector('.js-tabs-nav')?.setAttribute( 'role', 'tablist' );
+					e.tabs[i].querySelector('.nino-tabs-nav')?.setAttribute( 'role', 'tablist' );
 
 					for( let t=0, tl=tabs.length; t<tl; t++ ) {
 						const target = tabs[t].getAttribute('data-tabs-target');
@@ -926,13 +926,13 @@
 						} );
 					}
 
-					activateTab( Array.from( tabs ).find( function( tab ) { return tab.classList.contains('active') } ) || tabs[0], false );
+					activateTab( Array.from( tabs ).find( function( tab ) { return tab.classList.contains('nino-is-active') } ) || tabs[0], false );
 				}
 			}
 
 
 			/*
-			 *	js-modal - opens/closes a native <dialog>, see js-modal-trigger
+			 *	nino-modal - opens/closes a native <dialog>, see nino-modal-trigger
 			 *	and data-modal-target below
 			 */
 			if( e.modalTrigger.length > 0 ) {
@@ -948,15 +948,15 @@
 				for( let i=0, l=e.modal.length; i<l; i++ )
 					e.modal[i].addEventListener( 'click', function( ev ) {
 						// A click on the <dialog> element itself (not its content) means
-						// either the ::backdrop or the .js-modal-close button was hit
-						if( ev.target === this || ev.target.closest('.js-modal-close') !== null )
+						// either the ::backdrop or the .nino-modal-close button was hit
+						if( ev.target === this || ev.target.closest('.nino-modal-close') !== null )
 							this.close();
 					} );
 			}
 
 
 			/*
-			 *	js-toast-trigger - declarative wrapper around Nino.ui.toast()
+			 *	nino-toast-trigger - declarative wrapper around Nino.ui.toast()
 			 *	for static markup (CSP blocks inline onclick, so this is the
 			 *	supported way to fire a toast without writing JS)
 			 */
@@ -984,29 +984,29 @@
 		 */
 		toast : function( message, type ) {
 
-			let container = dc.querySelector('.js-toast-container');
+			let container = dc.querySelector('.nino-toast-container');
 			if( container === null ) {
 				container = dc.createElement('div');
-				container.className = 'js-toast-container';
+				container.className = 'nino-toast-container';
 				bd.appendChild( container );
 			}
 
 			const el = dc.createElement('div');
-			el.className = 'js-toast' + ( type ? ' js-toast--' + type : '' );
+			el.className = 'nino-toast' + ( type ? ' nino-toast--' + type : '' );
 			el.textContent = message;
 			container.appendChild( el );
 
-			wn.requestAnimationFrame( () => el.classList.add('js-toast--visible') );
+			wn.requestAnimationFrame( () => el.classList.add('nino-toast--visible') );
 
 			setTimeout( () => {
-				el.classList.remove('js-toast--visible');
+				el.classList.remove('nino-toast--visible');
 				setTimeout( () => el.remove(), 300 );
 			}, 4000 );
 		},
 
 		/**
 		 *	Cookie consent state, backed by Nino.cookie (Nino.js) - the
-		 *	.js-cookie-banner itself only ever calls set(), this is the
+		 *	.nino-cookie-banner itself only ever calls set(), this is the
 		 *	public read side a project's own analytics/tracking script gates
 		 *	on before loading anything non-essential. Also dispatches
 		 *	'nino:cookieconsent' on document so a script loaded later (eg.

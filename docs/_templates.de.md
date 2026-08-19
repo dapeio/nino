@@ -59,7 +59,7 @@ Die schnelle native Befüllung legt neue Schlüssel in der nativen Projektsprach
 
 **Name**, **Header**, **Footer** und **VPA** stehen gemeinsam in einer beschrifteten Zeile der Template Settings. **Delete** und **Save template** bleiben rechts in der Topbar; **Add section** bleibt auch nach dem Einfügen von Content in der Dokument-Toolbar sichtbar. Die Header-/Footer-Selects zeigen die echten `.tpl`-Dateinamen, listen dem Projekt bekannte Nicht-Seiten-Templates und bieten außerdem **None**. Der ausgewählte Wert wird weiterhin als gewöhnlicher `[template /templates/<name>]`-Shortcode geschrieben; die Controls verhindern nur, dass die Seitenschale mit verschiebbarem Content verwechselt wird. **Delete** entfernt genau die aktuell geladene Revision der Datei nach einer ausdrücklichen Bestätigung; eine Wiederherstellung erfordert Versionsverwaltung oder ein anderes externes Backup.
 
-**VPA** auf Template-Ebene liefert den Standard für Sections mit der Einstellung **Page**. Eine Änderung setzt verwaltete Sections neu zusammen, aktualisiert deren `js-vpa`-Klasse und bleibt auch in einem noch leeren Template erhalten. **On** oder **Off** an einer einzelnen Section überschreibt den Template-Standard.
+**VPA** auf Template-Ebene liefert den Standard für Sections mit der Einstellung **Page**. Eine Änderung setzt verwaltete Sections neu zusammen, aktualisiert deren `nino-vpa`-Klasse und bleibt auch in einem noch leeren Template erhalten. **On** oder **Off** an einer einzelnen Section überschreibt den Template-Standard.
 
 Add und Edit zeigen absichtlich unterschiedliche Tiefen derselben Version-3-Metadaten:
 
@@ -216,24 +216,24 @@ wiederholte Elements-Area und eine optionale Action-Area:
 		'heading' => [
 			'label' => 'Title area', 'source' => 'single',
 			'allowed' => [ 'title', 'subtitle', 'description' ],
-			'container' => [ 'tag' => 'div', 'class' => 'ui-grid-100 ui-mb-3' ],
+			'container' => [ 'tag' => 'div', 'class' => 'nino-grid-100 nino-mb-3' ],
 			'styles' => [
-				'left' => [ 'label' => 'Left', 'class' => 'ui-text-left' ],
-				'center' => [ 'label' => 'Centered', 'class' => 'ui-text-center' ],
+				'left' => [ 'label' => 'Left', 'class' => 'nino-text-left' ],
+				'center' => [ 'label' => 'Centered', 'class' => 'nino-text-center' ],
 			],
 			'recommend' => [ 'style' => 'center', 'components' => [
 				[ 'id' => 'title', 'type' => 'title' ],
 				[ 'id' => 'subtitle', 'type' => 'subtitle' ],
 			] ],
-			'render' => [ 'title' => [ 'tag' => 'h2', 'class' => 'ui-section-title' ] ],
+			'render' => [ 'title' => [ 'tag' => 'h2', 'class' => 'nino-section-title' ] ],
 		],
 		'articles' => [
 			'label' => 'Articles', 'source' => 'elements',
 			'allowed' => [ 'image', 'title', 'description', 'button' ],
-			'item' => [ 'tag' => 'article', 'class' => 'ui-article ui-article--alt' ],
+			'item' => [ 'tag' => 'article', 'class' => 'nino-article nino-article--alt' ],
 			'styles' => [
-				'two-columns' => [ 'label' => '2 columns', 'class' => 'ui-grid-m-50' ],
-				'three-columns' => [ 'label' => '3 columns', 'class' => 'ui-grid-m-33' ],
+				'two-columns' => [ 'label' => '2 columns', 'class' => 'nino-grid-m-50' ],
+				'three-columns' => [ 'label' => '3 columns', 'class' => 'nino-grid-m-33' ],
 			],
 			'recommend' => [ 'style' => 'three-columns', 'components' => [
 				[ 'id' => 'image', 'type' => 'image', 'bindings' => [ 'src' => 'image', 'alt' => 'title' ] ],
@@ -310,7 +310,7 @@ Benutzers gewinnt weiterhin:
   `button`, `price`, `number` und `template`. Jede Textkomponente bietet
   dieselben drei Styles – **Auto**, **Quiet**, **Loud** –, die zu einem
   Modifikator der jeweils getragenen Klasse kompilieren
-  (`ui-section-title--loud`, `ui-atf-title--loud`, `ui-article-title--loud`). `allowed` ist eine strikte
+  (`nino-section-title--loud`, `nino-atf-title--loud`, `nino-article-title--loud`). `allowed` ist eine strikte
   Teilmenge pro Area. Komponenten können sortiert und gelöscht, aber nicht
   verschachtelt werden.
 - Jede Komponente braucht eine eindeutige kleingeschriebene Slug-`id`. Sie ist
@@ -379,25 +379,25 @@ beendet damit bewusst die grafische Zuständigkeit.
 ### Data-Attribute
 
 Das gemeinsame Frontend-Script liest seine Parameter aus `data-*`-Attributen:
-`ui-autoheight` gleicht die Karten einer `data-autoheight-group` an, `js-slider`
-richtet sich nach `data-slider-width`, `js-vpa` verzögert um `data-vpa-delay`.
+`nino-autoheight` gleicht die Karten einer `data-autoheight-group` an, `nino-slider`
+richtet sich nach `data-slider-width`, `nino-vpa` verzögert um `data-vpa-delay`.
 Ein Preset, das eine solche Klasse auf ein erzeugtes Element schreibt, deklariert
 die zugehörigen Attribute direkt daneben:
 
 ```php
 'areas' => [
 	'services' => [
-		'item' => [ 'tag' => 'article', 'class' => 'ui-article' ],
+		'item' => [ 'tag' => 'article', 'class' => 'nino-article' ],
 		'render' => [
 			'title' => [
 				'tag' => 'h3',
-				'class' => 'ui-article-title ui-autoheight',
+				'class' => 'nino-article-title nino-autoheight',
 				'data' => [
 					'autoheight-group' => 'services-title-[[section:id]]',
 					'autoheight-mobile' => 'skip',
 				],
 			],
-			'button' => [ 'class' => 'js-modal-trigger', 'data' => [ 'modal-target' => 'contact-modal' ] ],
+			'button' => [ 'class' => 'nino-modal-trigger', 'data' => [ 'modal-target' => 'contact-modal' ] ],
 		],
 	],
 ],
@@ -412,10 +412,10 @@ zwei Kopien desselben Presets bleiben auf einer Seite unabhängig.
 `data-cover-height` bleibt beim Frame. Es gibt dafür kein Editor-Feld:
 Data-Attribute sind eine Preset-Entscheidung, alles darüber hinaus bleibt HTML+.
 
-Entscheidend ist das Element, das die Klasse wirklich trägt. `js-cover` und
-`js-parallex` sitzen auf der `<section>`, `data-cover-width` gehört also in eine
-Preset- oder Layout-Map. `js-vpa` schreibt der Compiler auf die erzeugte
-`ui-grid-row`, die keine `data`-Map erreicht — Motion-Timing bleibt Sache des
+Entscheidend ist das Element, das die Klasse wirklich trägt. `nino-cover` und
+`nino-parallex` sitzen auf der `<section>`, `data-cover-width` gehört also in eine
+Preset- oder Layout-Map. `nino-vpa` schreibt der Compiler auf die erzeugte
+`nino-grid-row`, die keine `data`-Map erreicht — Motion-Timing bleibt Sache des
 Layout-`.tpl`. Ein `item` einer Collection ist ein direktes Flex-Kind dieser Row
 und wird bereits auf die Höhe seiner Zeile gestreckt; Höhenangleich gehört daher
 über `render.<type>` an die Boxen in der Karte — genau so richtet das

@@ -26,8 +26,8 @@ namespace Nino\Modules {
 		public static
 			$html = [
 				'li'					=> '<li><a href="[[uri]]"[[attributes]]>[[title]]</a></li>',
-				'nav-burger'	=> '<div class="sc-nav-wrap sc-nav-fullscreen sc-nav-burger [[class]]" id="[[id]]"><label><input type="checkbox"><div class="sc-nav-bg"></div><svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24"><rect y="3" width="24" height="3"/><rect y="10" width="24" height="3"/><rect y="17" width="24" height="3"/></svg><div class="sc-nav-content">[[content]]</div></label></div>',
-				'nav-regular'	=> '<div class="sc-nav-wrap sc-nav-fullscreen sc-nav-regular [[class]]" id="[[id]]"><div class="sc-nav-content">[[content]]</div></div>',
+				'nav-burger'	=> '<div class="nino-nav-wrap nino-nav-fullscreen nino-nav-burger [[class]]" id="[[id]]"><label><input type="checkbox"><div class="nino-nav-bg"></div><svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24"><rect y="3" width="24" height="3"/><rect y="10" width="24" height="3"/><rect y="17" width="24" height="3"/></svg><div class="nino-nav-content">[[content]]</div></label></div>',
+				'nav-regular'	=> '<div class="nino-nav-wrap nino-nav-fullscreen nino-nav-regular [[class]]" id="[[id]]"><div class="nino-nav-content">[[content]]</div></div>',
 				'ul'					=> '<ul>[[content]]</ul>',
 				'div'					=> '<div>[[content]]</div>',
 			];
@@ -96,7 +96,7 @@ namespace Nino\Modules {
 				$attributes = $element[2] ?? '';
 				$element[0]	= trim( $element[0] );
 
-				$attributes	.= ( $uri === $element[0] ) ? ' class="active"' : '';
+				$attributes	.= ( $uri === $element[0] ) ? ' class="nino-is-active"' : '';
 				$lis				.= str_replace( [ '[[uri]]', '[[attributes]]', '[[title]]' ], [ $element[0]	, $attributes, $element[1] ], self::$html['li'] );
 			}
 			$html .= str_replace( '[[content]]', $lis, self::$html['ul'] );

@@ -1,6 +1,6 @@
 [[area:heading]]
-<div class="ui-grid-100">
-	<div class="ui-pricing-row ui-pricing-row--four ui-pricing-row--four-first">
+<div class="nino-grid-100">
+	<div class="nino-pricing-row nino-pricing-row--four nino-pricing-row--four-first">
 		[[area:plans]]
 	</div>
 </div>

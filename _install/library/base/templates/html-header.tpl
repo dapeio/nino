@@ -39,7 +39,7 @@
 			     raised before that handler is bound, eg. from this project's
 			     own assets/script.js - is left looking at a blank page over
 			     perfectly good markup -->
-			<noscript><style>.js-preloader { display: none }</style></noscript>
+			<noscript><style>.nino-preloader { display: none }</style></noscript>
 
 			<!-- Structured data (schema.org). Values go through [json ...]
 			     rather than "[[...]]" inside the quotes: a textfill is
@@ -69,10 +69,10 @@
 		<body>
 
 		 <header>
-		 	<div  class="ui-grid-row js-scroll-header">
-			    <div class="ui-grid-100">
-			      <a href="[[/nino/dir]]/" class="ui-logo">
-			        <h1 class="ui-sr-only" id="header-title">[[/company/name]] | [[/webpage[[/nino/http/response/uri]]/title]]</h1>
+		 	<div  class="nino-grid-row nino-scroll-header">
+			    <div class="nino-grid-100">
+			      <a href="[[/nino/dir]]/" class="nino-logo">
+			        <h1 class="nino-sr-only" id="header-title">[[/company/name]] | [[/webpage[[/nino/http/response/uri]]/title]]</h1>
 			      </a>
 						[template /templates/html-header-nav]
 			    </div>

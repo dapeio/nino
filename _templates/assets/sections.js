@@ -69,9 +69,9 @@
 	function areaColumns( specArea, area ) {
 		const style = areaStyle( specArea, area );
 		const value = String( style.class || '' )+ ' '+ String( specArea && specArea.style || '' );
-		if( /(?:ui-grid-m-25|four)/.test( value ) ) return 4;
-		if( /(?:ui-grid-m-33|three)/.test( value ) ) return 3;
-		if( /(?:ui-grid-m-50|two)/.test( value ) ) return 2;
+		if( /(?:nino-grid-m-25|four)/.test( value ) ) return 4;
+		if( /(?:nino-grid-m-33|three)/.test( value ) ) return 3;
+		if( /(?:nino-grid-m-50|two)/.test( value ) ) return 2;
 		return 1;
 	}
 
@@ -407,7 +407,7 @@
 				? 'Saving HTML+ detaches this section from its preset, so later composer or page-default changes cannot overwrite the custom source.'
 				: 'Exactly one complete <section> is accepted. Other page source remains locked.';
 			const source = context.detachManaged === true ? detachMetadata( context.source ) : context.source;
-			dc.getElementById('pd-code-source').value = source || '<section id="section-id" class="ui-section">\n\t<div class="ui-grid-row">\n\t</div>\n</section>\n';
+			dc.getElementById('pd-code-source').value = source || '<section id="section-id" class="nino-section">\n\t<div class="nino-grid-row">\n\t</div>\n</section>\n';
 			dc.getElementById('pd-code-error').textContent = '';
 			dialog.showModal();
 			dc.getElementById('pd-code-source').focus();

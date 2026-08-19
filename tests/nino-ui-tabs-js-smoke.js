@@ -63,11 +63,11 @@ tabs.forEach( function( tab, index ) { tab.attributes['data-tabs-target'] = pane
 
 const tabsWrap = {
 	querySelectorAll : function( selector ) {
-		if( selector === '.js-tabs-tab' ) return tabs;
-		if( selector === '.js-tabs-panel' ) return panels;
+		if( selector === '.nino-tabs-tab' ) return tabs;
+		if( selector === '.nino-tabs-panel' ) return panels;
 		return [];
 	},
-	querySelector : function( selector ) { return selector === '.js-tabs-nav' ? nav : null },
+	querySelector : function( selector ) { return selector === '.nino-tabs-nav' ? nav : null },
 };
 
 const body = { classList : classList(), scrollLeft : 0, scrollTop : 0 };
@@ -76,7 +76,7 @@ const document = {
 	body : body,
 	documentElement : documentElement,
 	getElementById : function( id ) { return panels.find( function( panel ) { return panel.id === id } ) || null },
-	querySelectorAll : function( selector ) { return selector === '.js-tabs' ? [ tabsWrap ] : [] },
+	querySelectorAll : function( selector ) { return selector === '.nino-tabs' ? [ tabsWrap ] : [] },
 	createElement : function() { return element() },
 };
 
@@ -105,22 +105,22 @@ vm.runInContext(
 sandbox.Nino.ui.onReady();
 
 check( 'tab navigation receives its semantic role', nav.attributes.role === 'tablist' );
-check( 'the first tab becomes active when markup has no active state', tabs[0].classList.contains('active') && tabs[0].attributes['aria-selected'] === 'true' );
+check( 'the first tab becomes active when markup has no active state', tabs[0].classList.contains('nino-is-active') && tabs[0].attributes['aria-selected'] === 'true' );
 check( 'inactive tabs leave the keyboard tab order', tabs[1].tabIndex === -1 && tabs[2].tabIndex === -1 );
 check( 'the first panel is visible and linked to its tab', panels[0].hidden === false && panels[0].attributes['aria-labelledby'] === tabs[0].id );
 check( 'inactive panels start hidden', panels[1].hidden === true && panels[2].hidden === true );
 
 tabs[1].listeners.click.call( tabs[1] );
-check( 'clicking a tab switches the active state', tabs[1].classList.contains('active') && tabs[0].classList.contains('active') === false );
+check( 'clicking a tab switches the active state', tabs[1].classList.contains('nino-is-active') && tabs[0].classList.contains('nino-is-active') === false );
 check( 'clicking a tab switches the visible panel', panels[1].hidden === false && panels[0].hidden === true );
 
 let prevented = false;
 tabs[1].listeners.keydown.call( tabs[1], { key : 'ArrowRight', preventDefault : function() { prevented = true } } );
 check( 'arrow navigation prevents page movement', prevented === true );
-check( 'arrow navigation activates and focuses the next tab', tabs[2].classList.contains('active') && tabs[2].focused === true );
+check( 'arrow navigation activates and focuses the next tab', tabs[2].classList.contains('nino-is-active') && tabs[2].focused === true );
 
 tabs[2].listeners.keydown.call( tabs[2], { key : 'Home', preventDefault : function() {} } );
-check( 'Home returns to the first tab', tabs[0].classList.contains('active') && tabs[0].focused === true );
+check( 'Home returns to the first tab', tabs[0].classList.contains('nino-is-active') && tabs[0].focused === true );
 
 console.log( '\n'+ checks+ ' checks, '+ failures+ ' failed' );
 process.exitCode = failures === 0 ? 0 : 1;

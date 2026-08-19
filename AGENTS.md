@@ -744,7 +744,7 @@ the API, DOM safety, and lifecycle shape:
 
 			const add = dc.createElement('button');
 			add.type = 'button';
-			add.className = 'ui-btn ui-btn--primary';
+			add.className = 'nino-btn nino-btn--primary';
 			add.textContent = 'New note';
 			add.addEventListener( 'click', function() {
 				Nino.admin.notes._renderForm( null );
@@ -811,7 +811,7 @@ the API, DOM safety, and lifecycle shape:
 			message.setAttribute( 'aria-live', 'polite' );
 
 			save.type = 'submit';
-			save.className = 'ui-btn ui-btn--primary';
+			save.className = 'nino-btn nino-btn--primary';
 			save.textContent = 'Save';
 
 			actions.className = 'nino-admin-actionbar';
@@ -1576,11 +1576,11 @@ icons, nested structures, or project-specific behavior.
 			'allowed' => [ 'title', 'subtitle', 'description' ],
 			'container' => [
 				'tag' => 'div',
-				'class' => 'ui-grid-100 ui-mb-3',
+				'class' => 'nino-grid-100 nino-mb-3',
 			],
 			'styles' => [
-				'left' => [ 'label' => 'Left', 'class' => 'ui-text-left' ],
-				'center' => [ 'label' => 'Centered', 'class' => 'ui-text-center' ],
+				'left' => [ 'label' => 'Left', 'class' => 'nino-text-left' ],
+				'center' => [ 'label' => 'Centered', 'class' => 'nino-text-center' ],
 			],
 			'recommend' => [
 				'style' => 'center',
@@ -1590,17 +1590,17 @@ icons, nested structures, or project-specific behavior.
 				],
 			],
 			'render' => [
-				'title' => [ 'tag' => 'h2', 'class' => 'ui-section-title' ],
+				'title' => [ 'tag' => 'h2', 'class' => 'nino-section-title' ],
 			],
 		],
 		'services' => [
 			'label' => 'Services',
 			'source' => 'elements',
 			'allowed' => [ 'image', 'title', 'description', 'button' ],
-			'item' => [ 'tag' => 'article', 'class' => 'ui-article' ],
+			'item' => [ 'tag' => 'article', 'class' => 'nino-article' ],
 			'styles' => [
-				'two-columns' => [ 'label' => '2 columns', 'class' => 'ui-grid-m-50' ],
-				'three-columns' => [ 'label' => '3 columns', 'class' => 'ui-grid-m-33' ],
+				'two-columns' => [ 'label' => '2 columns', 'class' => 'nino-grid-m-50' ],
+				'three-columns' => [ 'label' => '3 columns', 'class' => 'nino-grid-m-33' ],
 			],
 			'recommend' => [
 				'style' => 'three-columns',
@@ -1639,8 +1639,8 @@ icons, nested structures, or project-specific behavior.
 ```
 
 Generated elements MAY declare `data-*` attributes. `Nino.ui.js` is configured
-through them - `ui-autoheight` reads `data-autoheight-group`, `js-slider` reads
-`data-slider-width`, `js-vpa` reads `data-vpa-delay` - so a preset that owns the
+through them - `nino-autoheight` reads `data-autoheight-group`, `nino-slider` reads
+`data-slider-width`, `nino-vpa` reads `data-vpa-delay` - so a preset that owns the
 class MUST be able to own its parameters. A `data` map is accepted in five
 places, each attached to exactly one generated element:
 
@@ -1655,17 +1655,17 @@ places, each attached to exactly one generated element:
 ```php
 'areas' => [
 	'services' => [
-		'item' => [ 'tag' => 'article', 'class' => 'ui-article' ],
+		'item' => [ 'tag' => 'article', 'class' => 'nino-article' ],
 		'render' => [
 			'title' => [
 				'tag' => 'h3',
-				'class' => 'ui-article-title ui-autoheight',
+				'class' => 'nino-article-title nino-autoheight',
 				'data' => [
 					'autoheight-group' => 'services-title-[[section:id]]',
 					'autoheight-mobile' => 'skip',
 				],
 			],
-			'button' => [ 'class' => 'js-modal-trigger', 'data' => [ 'modal-target' => 'contact-modal' ] ],
+			'button' => [ 'class' => 'nino-modal-trigger', 'data' => [ 'modal-target' => 'contact-modal' ] ],
 		],
 	],
 ],
@@ -1681,11 +1681,11 @@ is rejected. A `template` component compiles to a shortcode and therefore
 carries no attributes at all.
 
 Attach the map to the element that really carries the class. The `<section>` is
-the element with `js-cover`/`js-parallex`, so `data-cover-width` belongs in a
-top-level or Layout map. `js-vpa` is written onto the generated `ui-grid-row`,
+the element with `nino-cover`/`nino-parallex`, so `data-cover-width` belongs in a
+top-level or Layout map. `nino-vpa` is written onto the generated `nino-grid-row`,
 which no `data` map targets - motion timing belongs in the Layout `.tpl`. An
 Elements `item` is a direct flex child of that row and already stretches to its
-row line, so equalizing heights (`ui-autoheight`) belongs on the boxes inside the
+row line, so equalizing heights (`nino-autoheight`) belongs on the boxes inside the
 card through `render.<type>`, not on the item.
 
 Only the manifest decides this. Nothing is read from the request: the composer
@@ -1719,7 +1719,7 @@ group `name`, a form field `id` and its `for`, a modal target.
 A static preset MUST NOT ship `style=""` attributes; give the block a `nino-*`
 class and put the rule next to the other preset classes in `_nino/Nino.css`.
 Forms MUST keep the pieces the runtime expects: `[csrf]`, the honeypot input,
-`.ui-form-message`, and the label keys the Form or Newsletter module ships.
+`.nino-form-message`, and the label keys the Form or Newsletter module ships.
 
 ### 10.4 Component and binding contract
 
@@ -1728,20 +1728,22 @@ The finite catalog is `title`, `subtitle`, `description`, `text`, `image`,
 list, override allowlisted tags/classes/styles and image dimensions, and set a
 maximum component count. It MUST NOT supply arbitrary component HTML.
 
-A preset MUST write the design system's own classes - `ui-*` for structure and
-appearance, `js-*` where `Nino.ui.js` looks for a hook. It MUST NOT invent a
-class namespace of its own: a rule that only the Builder's output uses is a
-second design system nobody maintains, and it drifts from the `ui-` class that
-already does the same thing. What a preset needs and the design system lacks
-belongs in `_nino/Nino.css` next to the family it extends (`ui-timeline--…` by
-`ui-timeline`, `ui-form-…` by `ui-form`), named like its family.
+A preset MUST write the design system's own classes. The frontend has exactly
+one namespace, `nino-*` - the same class carries structure, appearance and, where
+`Nino.ui.js` looks for a hook, behaviour; `nino-is-*` marks a transient state that
+JS or a module sets and removes. A preset MUST NOT invent a class namespace of its
+own: a rule that only the Builder's output uses is a second design system nobody
+maintains, and it drifts from the `nino-` class that already does the same thing.
+What a preset needs and the design system lacks belongs in `_nino/Nino.css` next
+to the family it extends (`nino-timeline--…` by `nino-timeline`, `nino-form-…` by
+`nino-form`), named like its family.
 
 Container, item and component tags come from `AreaComposer::TAGS`: `div`,
 `header`, `footer`, `article`, `aside`, `nav`, `h2`, `h3`, `h4`, `p`, `span`,
 `strong`, `ul`, `ol`, `li`, `tr`, `th`, `td`. They are structural and inert;
 anything that loads, submits or scripts (`img`, `iframe`, `form`, `button`,
 `script`, `style`) stays out, and so does `section`, which the document parser
-reserves for the section itself. A list wrapper (`<ol class="ui-timeline">`) or
+reserves for the section itself. A list wrapper (`<ol class="nino-timeline">`) or
 a table (`<table><tbody>`) belongs in the Layout `.tpl`; only the repeated row
 or item is a manifest tag.
 
@@ -1877,26 +1879,26 @@ New page templates SHOULD use explicit metadata and shell slots:
 <!-- nino:template-vpa on -->
 <!-- nino:template-slot header -->
 [template /templates/html-header]
-<section id="services-intro" class="ui-section">
-	<div class="ui-grid-row ui-grid-middle">
-		<div class="ui-grid-100 ui-grid-m-50">
-			<h1 class="ui-section-title">
+<section id="services-intro" class="nino-section">
+	<div class="nino-grid-row nino-grid-middle">
+		<div class="nino-grid-100 nino-grid-m-50">
+			<h1 class="nino-section-title">
 				[[/page-services/services-intro/title]]
 			</h1>
-			<p class="ui-section-subtitle">
+			<p class="nino-section-subtitle">
 				[[/page-services/services-intro/subtitle]]
 			</p>
 			<div>
 				[[/page-services/services-intro/description]]
 			</div>
 			<a
-				class="ui-btn ui-btn--primary"
+				class="nino-btn nino-btn--primary"
 				href="[[/page-services/services-intro/cta-uri]]"
 			>
 				[[/page-services/services-intro/cta-label]]
 			</a>
 		</div>
-		<div class="ui-grid-100 ui-grid-m-50 ui-img-cover">
+		<div class="nino-grid-100 nino-grid-m-50 nino-img-cover">
 			[image /page-services/services-intro/image alt=""]
 		</div>
 	</div>
@@ -2085,7 +2087,7 @@ title is not a truthful substitute.
 A state-changing form needs:
 
 ```html
-<form class="ui-form" action="[[/nino/dir]]/.feature" method="post">
+<form class="nino-form" action="[[/nino/dir]]/.feature" method="post">
 	[csrf]
 	<label for="feature-email">[[/feature/label/email]]</label>
 	<input
@@ -2097,13 +2099,13 @@ A state-changing form needs:
 	<input
 		name="location"
 		type="text"
-		class="ui-sr-only"
+		class="nino-sr-only"
 		tabindex="-1"
 		autocomplete="off"
 		aria-hidden="true"
 	>
-	<p class="ui-form-message" aria-live="polite"></p>
-	<button type="submit" class="ui-btn ui-btn--primary">
+	<p class="nino-form-message" aria-live="polite"></p>
+	<button type="submit" class="nino-btn nino-btn--primary">
 		[[/feature/label/submit]]
 	</button>
 </form>
@@ -2115,7 +2117,7 @@ must own the endpoint, validate it, and return a documented response.
 For JS-enhanced controls:
 
 - start with meaningful HTML;
-- reuse existing `js-*` hooks and ARIA patterns;
+- reuse the existing `nino-*` hooks `Nino.ui.js` looks for, and existing ARIA patterns;
 - make touch scrolling and keyboard operation possible;
 - avoid trapping focus or pointer gestures;
 - and keep preview inert.
@@ -2493,16 +2495,16 @@ lowercase hyphenated IDs.
 
 ```html
 [elements /services limit="6" query="featured=1"]
-<article id="service-[[.id]]" class="ui-article">
+<article id="service-[[.id]]" class="nino-article">
 	<img
-		class="ui-article-img"
+		class="nino-article-img"
 		src="[[/nino/dir]]/images/[[image]]"
 		alt="[[title]]"
 	>
-	<div class="ui-article-content">
-		<h2 class="ui-article-title">[[title]]</h2>
-		<div class="ui-article-descr">[[description]]</div>
-		<a class="ui-btn ui-btn--primary" href="[[link]]">
+	<div class="nino-article-content">
+		<h2 class="nino-article-title">[[title]]</h2>
+		<div class="nino-article-descr">[[description]]</div>
+		<a class="nino-btn nino-btn--primary" href="[[link]]">
 			[[linkLabel]]
 		</a>
 	</div>
@@ -2692,7 +2694,7 @@ or escaping.
 | Put `limit` in preset `allow` | Set its default; Composer clamps `1..12` |
 | Choose any globally valid layout | Choose one valid for the content module |
 | Put several top-level sections in `section.tpl` | Exactly one complete root section |
-| Add `js-vpa` behavior to preview | Let preview strip VPA and stay visible |
+| Add `nino-vpa` behavior to preview | Let preview strip VPA and stay visible |
 | Enable scripts/remote forms in preview | Keep the sandbox deterministic and inert |
 | Prefix reusable includes with `page-` | Reserve `page-*` for full page templates |
 | Add metadata below markup | Put both metadata comments at byte zero |

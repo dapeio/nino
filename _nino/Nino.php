@@ -100,6 +100,7 @@ namespace Nino {
 		\Nino\Html::addFills( $appData, [
 			'[[/nino/http/request/uri]]'			=> $request['/nino/http/request']['uri'],
 			'[[/nino/http/response/uri]]'		=> $request['/nino/http/response']['uri'],
+			'[[/nino/http/response/uri/clean]]'		=> str_replace( '/', '_', $request['/nino/http/response']['uri'] ),
 			'[[/nino/http/response/locale]]'	=> $request['/nino/http/response']['locale'],
 			'[[/nino/auth/user]]'						=> ( ( $currentUser !== false ) ? $currentUser['mail'] : '' ),
 			'[[/nino/dir]]'				=> \Nino\Filesystem::getDir( $appData ),
@@ -2820,7 +2821,7 @@ namespace Nino {
 					// img-src needs 'data:' spelled out: the '*' source covers
 					// network schemes only, so without it the browser refused
 					// every data: uri image - including the one Nino's own
-					// Nino.css uses for .ui-atf-arrowdown, which therefore
+					// Nino.css uses for .nino-atf-arrowdown, which therefore
 					// rendered as an empty button on every page that has one.
 					'Content-Security-Policy' 		=> 'default-src \'self\'; img-src * data:; style-src \'self\' \'unsafe-inline\'; frame-ancestors \'self\'; base-uri \'self\'; form-action \'self\'',
 					'X-Frame-Options' 						=> 'SAMEORIGIN',

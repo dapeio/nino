@@ -1,3 +1,3 @@
-	      	<div class="ui-footer-localepicker">
+	      	<div class="nino-footer-localepicker">
 	        [localepicker]
 	        </div>

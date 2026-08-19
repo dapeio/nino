@@ -149,7 +149,7 @@
 						<label class="pd-form-field is-wide" for="pd-create-vpa">
 							<span>Default VPA</span>
 							<select id="pd-create-vpa" name="pageMotion"><option value="off">Off</option><option value="on">On</option></select>
-							<small>Automatically adds <code>js-vpa</code> to compatible sections created for this template.</small>
+							<small>Automatically adds <code>nino-vpa</code> to compatible sections created for this template.</small>
 						</label>
 					</div>
 				</div>

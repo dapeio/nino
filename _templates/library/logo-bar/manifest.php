@@ -18,22 +18,22 @@
 			'help' => 'The short line introducing the logos, for example "Trusted by".',
 			'source' => 'single',
 			'allowed' => [ 'subtitle', 'title' ],
-			'container' => [ 'class' => 'ui-grid-100 ui-mb-3 ui-mb-3' ],
+			'container' => [ 'class' => 'nino-grid-100 nino-mb-3 nino-mb-3' ],
 			'styles' => [
-				'center' => [ 'label' => 'Centered', 'class' => 'ui-text-center' ],
-				'left' => [ 'label' => 'Left', 'class' => 'ui-text-left' ],
+				'center' => [ 'label' => 'Centered', 'class' => 'nino-text-center' ],
+				'left' => [ 'label' => 'Left', 'class' => 'nino-text-left' ],
 			],
 			'recommend' => [ 'style' => 'center', 'components' => [
 				[ 'id' => 'caption', 'type' => 'subtitle', 'bindings' => [ 'text' => 'caption' ] ],
 			] ],
-			'render' => [ 'subtitle' => [ 'class' => 'ui-section-subtitle' ], 'title' => [ 'tag' => 'h2', 'class' => 'ui-section-title' ] ],
+			'render' => [ 'subtitle' => [ 'class' => 'nino-section-subtitle' ], 'title' => [ 'tag' => 'h2', 'class' => 'nino-section-title' ] ],
 		],
 		'logos' => [
 			'label' => 'Logos',
 			'help' => 'One entry per partner. Use the Image component for real logo files, or the Title component for plain names.',
 			'source' => 'elements',
 			'allowed' => [ 'image', 'title' ],
-			'item' => [ 'tag' => 'span', 'class' => 'ui-logos-item' ],
+			'item' => [ 'tag' => 'span', 'class' => 'nino-logos-item' ],
 			'typeTitle' => 'Partner logos',
 			'model' => [
 				'title' => [ 'type' => 'string', 'locale' => true, 'required' => true, 'maxlength' => 120 ],

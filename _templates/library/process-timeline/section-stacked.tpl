@@ -1,6 +1,6 @@
 [[area:heading]]
-<div class="ui-grid-100 ui-grid-m-66">
-	<ol class="ui-timeline ui-timeline--counted ui-timeline--stacked">
+<div class="nino-grid-100 nino-grid-m-66">
+	<ol class="nino-timeline nino-timeline--counted nino-timeline--stacked">
 		[[area:steps]]
 	</ol>
 </div>

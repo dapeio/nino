@@ -18,7 +18,7 @@
 			'source' => 'single',
 			'allowed' => [ 'template' ],
 			'maxComponents' => 1,
-			'container' => [ 'class' => 'ui-grid-100' ],
+			'container' => [ 'class' => 'nino-grid-100' ],
 			'recommend' => [ 'components' => [
 				[ 'id' => 'template', 'type' => 'template', 'bindings' => [ 'path' => '' ] ],
 			] ],

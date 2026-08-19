@@ -82,42 +82,42 @@
   }
 }
 
-header .ui-logo {
+header .nino-logo {
 	background-image:url([[/nino/public]]/images/logo-invert.png);
 }
 
-.ui-atf-title,
-.ui-section-title,
-.ui-article-title {
+.nino-atf-title,
+.nino-section-title,
+.nino-article-title {
   font-weight: 700;
   letter-spacing: -.01em;
 }
 
-.ui-atf-title {
+.nino-atf-title {
   line-height: 1.1;
 }
 
-.ui-section-subtitle,
-.ui-atf-subtitle {
+.nino-section-subtitle,
+.nino-atf-subtitle {
   font-style: italic;
 }
 
-.ui-btn {
+.nino-btn {
   font-family: var(--fontfamily-title);
   text-transform: uppercase;
   letter-spacing: .08em;
   font-weight: 700;
 }
 
-.ui-section--border-1 { border-bottom-color: rgb(20 89 94 / 18%); }
-.ui-section--border-2,
-.ui-section--border-3 { border-bottom-color: rgb(20 89 94 / 12%); }
+.nino-section--border-1 { border-bottom-color: rgb(20 89 94 / 18%); }
+.nino-section--border-2,
+.nino-section--border-3 { border-bottom-color: rgb(20 89 94 / 12%); }
 
-.ui-article--alt {
+.nino-article--alt {
   background-color: #f5f7f6;
 }
 
-.ui-article-price {
+.nino-article-price {
   font-family: var(--fontfamily-title);
   color: var(--color-secondary);
 }

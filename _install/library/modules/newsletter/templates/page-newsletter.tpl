@@ -1,11 +1,11 @@
 [template /templates/html-header]
-<section class="ui-atf ui-section--fullwidth ui-section--dark ui-text-center js-cover" data-cover-height="100">
-	<div class="js-cover-content">
-	<div class="ui-grid-row">
-		<div class="ui-grid-100">
-			<h2 class="ui-atf-title">[[/newsletter/page/title]]</h2>
-			<p class="ui-atf-subtitle">[[/newsletter/page/text]]</p>
-			<a href="[[/webpage/home/uri]]" class="ui-btn ui-btn--primary">[[/webpage/home/name]]</a>
+<section class="nino-atf nino-section--fullwidth nino-section--dark nino-text-center nino-cover" data-cover-height="100">
+	<div class="nino-cover-content">
+	<div class="nino-grid-row">
+		<div class="nino-grid-100">
+			<h2 class="nino-atf-title">[[/newsletter/page/title]]</h2>
+			<p class="nino-atf-subtitle">[[/newsletter/page/text]]</p>
+			<a href="[[/webpage/home/uri]]" class="nino-btn nino-btn--primary">[[/webpage/home/name]]</a>
 		</div>
 		</div>
 	</div>

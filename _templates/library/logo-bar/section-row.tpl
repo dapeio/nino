@@ -1,6 +1,6 @@
 [[area:heading]]
-<div class="ui-grid-100">
-	<div class="ui-logos">
+<div class="nino-grid-100">
+	<div class="nino-logos">
 		[[area:logos]]
 	</div>
 </div>

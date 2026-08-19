@@ -1,12 +1,12 @@
 [template /templates/html-header]
-<h2 class="ui-sr-only">[[/webpage[[/nino/http/response/uri]]/name]]</h2>
-<section id="legal-imprint" class="ui-section">
-	<div class="ui-grid-row">
-		<div class="ui-grid-100">
-			<h3 class="ui-section-title">Imprint</h3>
+<h2 class="nino-sr-only">[[/webpage[[/nino/http/response/uri]]/name]]</h2>
+<section id="legal-imprint" class="nino-section">
+	<div class="nino-grid-row">
+		<div class="nino-grid-100">
+			<h3 class="nino-section-title">Imprint</h3>
 		</div>
 
-		<div class="ui-grid-100">
+		<div class="nino-grid-100">
 		  <h4>Information according to § 5 Digital Services Act (DDG)</h4>
 		  <p>[[/website/author]]<br>[[/company/adress]]<br>[[/global/phone]]: [[/company/phone]]<br>[[/global/email]]: [[/company/email]]</p>
 
@@ -15,13 +15,13 @@
 		</div>
 	</div>
 </section>
-<section id="legal-privacy" class="ui-section">
-	<div class="ui-grid-row">
-		<div class="ui-grid-100">
-			<h3 class="ui-section-title">Privacy Policy</h3>
+<section id="legal-privacy" class="nino-section">
+	<div class="nino-grid-row">
+		<div class="nino-grid-100">
+			<h3 class="nino-section-title">Privacy Policy</h3>
 		</div>
 
-		<div class="ui-grid-100">
+		<div class="nino-grid-100">
 		  <h4>1. Privacy at a glance</h4>
 		  <h5>General information</h5>
 		  <p>The following notes provide a simple overview of what happens to your personal data when you visit this website. Personal data is any data that can be used to personally identify you. Detailed information on the subject of data protection can be found in the privacy policy below.</p>
@@ -61,7 +61,7 @@
 
 		  <h5>Server log files</h5>
 		  <p>The provider of the pages automatically collects and stores information in so-called server log files, which your browser automatically transmits to us. These are:</p>
-		  <ul class="ui-list">
+		  <ul class="nino-list">
 		    <li>Browser type and version</li>
 		    <li>Operating system used</li>
 		    <li>Referrer URL</li>

@@ -82,22 +82,22 @@
   }
 }
 
-.ui-section-title {
+.nino-section-title {
 	text-transform:uppercase;
 }
 
 
-header .ui-logo {
+header .nino-logo {
 	background-image:url([[/nino/public]]/images/logo-invert.png);
 }
 
-header .sc-nav-content li a {
+header .nino-nav-content li a {
 	color: var(--color-primary-text);
 	letter-spacing: .05em;
 	font-size: .9rem;
 	padding:1rem .5rem;
 }
-header .sc-nav-content li a.active {
+header .nino-nav-content li a.nino-is-active {
 	color: var(--color-primary);
 }
 main {
@@ -107,7 +107,7 @@ main {
 	header {
 		border-bottom: 1px solid var(--color-border);
 	}
-	body.js-scroll-atf .js-scroll-header {
+	body.nino-scroll-atf .nino-scroll-header {
 		padding-top:var(--space-2);
 	}
 }

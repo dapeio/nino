@@ -89,7 +89,7 @@ check( 'matches preset names and tags case-insensitively', matches( preset, 'acc
 check( 'applies category and text filters together', matches( preset, 'questions', 'Content' ) && !matches( preset, 'questions', 'Hero' ) );
 check( 'empty search keeps the selected category visible', matches( preset, '', 'Content' ) );
 check( 'the library accepts named-area presets only', Nino.templates.composer.isAreaPreset( { version : 3 } ) && !Nino.templates.composer.isAreaPreset( { version : 1 } ) );
-Nino.templates._library.previewCss = '/* project-preview-css */ .ui-section{display:block}';
+Nino.templates._library.previewCss = '/* project-preview-css */ .nino-section{display:block}';
 const previewDocument = Nino.templates.composer.previewDocument( '<section id="sample"></section>' );
 check( 'preview documents inline the project bundle without another stylesheet request', previewDocument.includes( 'project-preview-css' )
 	&& previewDocument.includes( '<section id="sample"></section>' )
@@ -97,7 +97,7 @@ check( 'preview documents inline the project bundle without another stylesheet r
 	&& !previewDocument.includes( '/.cache/style.css' ) );
 check( 'preview documents block scripts, forms and third-party network access', previewDocument.includes( 'Content-Security-Policy' ) && previewDocument.includes( "script-src 'none'" ) && previewDocument.includes( "form-action 'none'" ) );
 check( 'script-free previews reproduce configured cover heights and a stable parallax image', previewDocument.includes( '[data-cover-height="100"]{min-height:100vh!important}' )
-	&& previewDocument.includes( '.js-parallex>img{top:0!important;height:100%!important;transform:none!important}' ) );
+	&& previewDocument.includes( '.nino-parallex>img{top:0!important;height:100%!important;transform:none!important}' ) );
 const hostilePreview = Nino.templates.composer.previewDocument( '<script>alert(1)</script><a href="javascript:alert(2)" onclick="alert(3)">Safe</a><a href=javascript:alert(4)>Still safe</a><img src=x onerror=alert(5)>' );
 check( 'preview documents remove executable markup before assigning srcdoc', !hostilePreview.includes( '<script' )
 	&& !hostilePreview.includes( 'javascript:' )
@@ -110,6 +110,7 @@ const scriptSource = fs.readFileSync( path.join( __dirname, '../_templates/asset
 const styleSource = fs.readFileSync( path.join( __dirname, '../_templates/assets/style.css' ), 'utf8' );
 const ninoCssSource = fs.readFileSync( path.join( __dirname, '../_nino/Nino.css' ), 'utf8' );
 const ninoAdminCssSource = fs.readFileSync( path.join( __dirname, '../_nino/Nino.admin.css' ), 'utf8' );
+const ninoUiJsSource = fs.readFileSync( path.join( __dirname, '../_nino/Nino.ui.js' ), 'utf8' );
 const articlesManifestSource = fs.readFileSync( path.join( __dirname, '../_templates/library/articles-grid/manifest.php' ), 'utf8' );
 const templateMarkup = fs.readFileSync( path.join( __dirname, '../_templates/templates/page-index.tpl' ), 'utf8' );
 const templatesPhpSource = fs.readFileSync( path.join( __dirname, '../_templates/Templates.php' ), 'utf8' );
@@ -196,15 +197,29 @@ check( 'Area navigation stays horizontal so the editor body keeps the full confi
 	&& /\.pd-v3-area-tabs\s*\{[\s\S]*?display:\s*flex;[\s\S]*?overflow-x:\s*auto;/.test( styleSource )
 	&& !styleSource.includes( 'grid-template-columns: 10.5rem minmax(0, 1fr)' ) );
 check( 'canvas cards and the inspector read named Areas instead of legacy section axes', [ 'isAreaSpec( spec )', 'areaPreview( spec, areaPreset )', "[ 'Areas'", "[ 'Collections'" ].every( function( marker ) { return sectionsSource.includes( marker ) } ) );
-check( 'the Articles preset keeps every margin-bearing card inside its selected grid row', articlesManifestSource.includes( 'ui-article--grid' )
-	&& [ '25', '33', '50' ].every( function( width ) { return new RegExp( '\\.ui-article--grid\\.ui-grid-m-'+ width+ '\\s*\\{[^}]*width:\\s*calc\\(' ).test( ninoCssSource ) } ) );
-check( 'the design system carries no Template Builder classes of its own', ninoCssSource.includes( '.nino-' ) === false );
-check( 'type size is a modifier of the class it changes, not an em utility over it', ninoCssSource.includes( '.ui-font-big' ) === false
-	&& ninoCssSource.includes( '.ui-font-small' ) === false
-	&& [ 'ui-section-title', 'ui-section-subtitle', 'ui-section-text', 'ui-atf-title', 'ui-atf-subtitle', 'ui-article-title', 'ui-article-descr', 'ui-pricing-title', 'ui-pricing-price' ].every( function( base ) {
+check( 'the Articles preset keeps every margin-bearing card inside its selected grid row', articlesManifestSource.includes( 'nino-article--grid' )
+	&& [ '25', '33', '50' ].every( function( width ) { return new RegExp( '\\.nino-article--grid\\.nino-grid-m-'+ width+ '\\s*\\{[^}]*width:\\s*calc\\(' ).test( ninoCssSource ) } ) );
+// The frontend speaks one namespace. (?<![-\w]) keeps '-ui-'/'-js-' inside identifiers
+// out of it, the lookahead the CSS system font keywords that merely look like classes.
+const legacyClass = /(?<![-\w])(?:ui|js|sc)-(?!monospace|sans-serif|serif|rounded)[a-z0-9]/;
+check( 'the design system carries no legacy class prefix', legacyClass.test( ninoCssSource ) === false );
+
+// A half-finished rename is what a namespace change actually invites: the JS keeps
+// setting a class the stylesheet no longer knows, and nothing looks broken until a
+// form turns red in the browser. Both sides have to name the same states.
+const statesInJs = new Set( ( ninoUiJsSource.match( /'nino-is-[a-z-]+'/g ) || [] ).map( function( literal ) { return literal.slice( 1, -1 ) } ) );
+const statesInCss = new Set( ( ninoCssSource.match( /\.nino-is-[a-z-]+/g ) || [] ).map( function( selector ) { return selector.slice( 1 ) } ) );
+check( 'every state class the frontend JS sets is one the stylesheet styles', statesInJs.size > 0
+	&& Array.from( statesInJs ).every( function( state ) { return statesInCss.has( state ) } ) );
+check( 'the frontend state vocabulary is namespaced, not a bare English word', [ 'active', 'touch', 'error', 'success', 'pending', 'existing' ].every( function( state ) {
+	return statesInCss.has( 'nino-is-'+ state ) && new RegExp( '\\.'+ state+ '\\b' ).test( ninoCssSource ) === false;
+} ) );
+check( 'type size is a modifier of the class it changes, not an em utility over it', ninoCssSource.includes( '.nino-font-big' ) === false
+	&& ninoCssSource.includes( '.nino-font-small' ) === false
+	&& [ 'nino-section-title', 'nino-section-subtitle', 'nino-section-text', 'nino-atf-title', 'nino-atf-subtitle', 'nino-article-title', 'nino-article-descr', 'nino-pricing-title', 'nino-pricing-price' ].every( function( base ) {
 		return ninoCssSource.includes( '.'+ base+ '--quiet' ) && ninoCssSource.includes( '.'+ base+ '--loud' );
 	} )
-	&& /\.ui-section-title--loud \{[^}]*var\(--text-5\)/.test( ninoCssSource )
+	&& /\.nino-section-title--loud \{[^}]*var\(--text-5\)/.test( ninoCssSource )
 	&& /--(quiet|loud) \{[^}]*font-size:[^;]*[0-9.]em/.test( ninoCssSource ) === false );
 check( 'every Auto option names the value it resolves to', areaComposerSource.includes( "return 'Auto ('+ label+ ')'" )
 	&& areaComposerSource.includes( "label : autoLabel( humanize( resolved[key] ) )" )

@@ -18,23 +18,23 @@
 			'help' => 'The introduction above the steps.',
 			'source' => 'single',
 			'allowed' => [ 'title', 'subtitle', 'description' ],
-			'container' => [ 'class' => 'ui-grid-100 ui-mb-3' ],
+			'container' => [ 'class' => 'nino-grid-100 nino-mb-3' ],
 			'styles' => [
-				'center' => [ 'label' => 'Centered', 'class' => 'ui-text-center' ],
-				'left' => [ 'label' => 'Left', 'class' => 'ui-text-left' ],
+				'center' => [ 'label' => 'Centered', 'class' => 'nino-text-center' ],
+				'left' => [ 'label' => 'Left', 'class' => 'nino-text-left' ],
 			],
 			'recommend' => [ 'style' => 'center', 'components' => [
 				[ 'id' => 'title', 'type' => 'title', 'bindings' => [ 'text' => 'title' ] ],
 				[ 'id' => 'subtitle', 'type' => 'subtitle', 'bindings' => [ 'text' => 'subtitle' ] ],
 			] ],
-			'render' => [ 'title' => [ 'tag' => 'h2', 'class' => 'ui-section-title' ] ],
+			'render' => [ 'title' => [ 'tag' => 'h2', 'class' => 'nino-section-title' ] ],
 		],
 		'steps' => [
 			'label' => 'Steps',
 			'help' => 'One entry per step. The step number is drawn by the ordered list itself, so it is not part of the content.',
 			'source' => 'elements',
 			'allowed' => [ 'title', 'description', 'text' ],
-			'item' => [ 'tag' => 'li', 'class' => 'ui-timeline-step' ],
+			'item' => [ 'tag' => 'li', 'class' => 'nino-timeline-step' ],
 			'typeTitle' => 'Process steps',
 			'model' => [
 				'title' => [ 'type' => 'string', 'locale' => true, 'required' => true, 'maxlength' => 120 ],

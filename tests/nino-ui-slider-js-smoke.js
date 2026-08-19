@@ -69,7 +69,7 @@ const document = {
 	documentElement 	: documentElement,
 	createElement 		: function( tagName ) { return element( tagName ); },
 	getElementById 		: function() { return null; },
-	querySelectorAll 	: function( selector ) { return selector === '.js-slider' ? [ slider ] : []; },
+	querySelectorAll 	: function( selector ) { return selector === '.nino-slider' ? [ slider ] : []; },
 };
 
 const sandbox = {
@@ -130,21 +130,21 @@ check( 'a vertical gesture does not change the active slide', slider.pos === 0 )
 touch( 'touchstart', 200, 100 );
 check( 'a horizontal move prevents the browser gesture', touch( 'touchmove', 165, 104 ) === true );
 check( 'a horizontal move drags the slider track', stage.style.left === ( slider.posLeft - 35 ) +'px' );
-check( 'horizontal dragging disables the track transition', slider.classList.contains('touch') === true );
+check( 'horizontal dragging disables the track transition', slider.classList.contains('nino-is-touch') === true );
 touch( 'touchend', 130, 105 );
 check( 'a horizontal swipe changes the active slide', slider.pos === 1 );
-check( 'touchend leaves the track centered and animated', slider.classList.contains('touch') === false && stage.style.left === slider.posLeft +'px' );
+check( 'touchend leaves the track centered and animated', slider.classList.contains('nino-is-touch') === false && stage.style.left === slider.posLeft +'px' );
 
 touch( 'touchstart', 200, 100 );
 touch( 'touchmove', 170, 103 );
 slider.listeners.touchcancel.callback.call( slider );
-check( 'touchcancel clears dragging mode', slider.classList.contains('touch') === false );
+check( 'touchcancel clears dragging mode', slider.classList.contains('nino-is-touch') === false );
 check( 'touchcancel restores the centered track', stage.style.left === slider.posLeft +'px' );
 
 touch( 'touchstart', 200, 100 );
 touch( 'touchmove', 170, 103 );
 touch( 'touchstart', 160, 100, 2 );
-check( 'a second finger releases horizontal dragging', slider.classList.contains('touch') === false );
+check( 'a second finger releases horizontal dragging', slider.classList.contains('nino-is-touch') === false );
 check( 'a multi-touch move remains available to native pinch zoom', touch( 'touchmove', 150, 100, 2 ) === false );
 
 console.log( '\n'+ checks+ ' checks, '+ failures+ ' failed' );

@@ -52,7 +52,7 @@ mkdir( $sandbox. '/public/assets', 0777, true );
 mkdir( $sandbox. '/public/fonts/text', 0777, true );
 file_put_contents( $sandbox. '/public/.cache/style.css', '/* stale-template-preview-css */' );
 file_put_contents( $sandbox. '/public/fonts/text/preview.woff2', 'preview-font' );
-file_put_contents( $sandbox. '/public/assets/style.preview.css', '/* template-preview-project-css */ @font-face{font-family:Preview;src:url("[[/nino/public]]/fonts/text/preview.woff2") format("woff2")} @font-face{font-family:Remote;src:url("https://example.invalid/remote.woff2")} .ui-section{display:block}' );
+file_put_contents( $sandbox. '/public/assets/style.preview.css', '/* template-preview-project-css */ @font-face{font-family:Preview;src:url("[[/nino/public]]/fonts/text/preview.woff2") format("woff2")} @font-face{font-family:Remote;src:url("https://example.invalid/remote.woff2")} .nino-section{display:block}' );
 
 $_SERVER['REMOTE_ADDR'] = '127.0.0.1';
 
@@ -147,9 +147,9 @@ $dataAttributeManifest = [
 	'areas' => [
 		'first' => [
 			'label' => 'Cards', 'source' => 'elements', 'allowed' => [ 'title', 'button' ],
-			'item' => [ 'tag' => 'article', 'class' => 'ui-article ui-autoheight', 'data' => [ 'autoheight-group' => 'cards-[[section:id]]', 'data-autoheight-mobile' => 'skip' ] ],
+			'item' => [ 'tag' => 'article', 'class' => 'nino-article nino-autoheight', 'data' => [ 'autoheight-group' => 'cards-[[section:id]]', 'data-autoheight-mobile' => 'skip' ] ],
 			'model' => [ 'title' => [ 'type' => 'string', 'locale' => true ] ],
-			'render' => [ 'button' => [ 'class' => 'js-modal-trigger', 'data' => [ 'Modal-Target' => 'contact "one" & <two>' ] ] ],
+			'render' => [ 'button' => [ 'class' => 'nino-modal-trigger', 'data' => [ 'Modal-Target' => 'contact "one" & <two>' ] ] ],
 			'recommend' => [ 'components' => [
 				[ 'id' => 'title', 'type' => 'title', 'bindings' => [ 'text' => 'title' ] ],
 				[ 'id' => 'more', 'type' => 'button', 'bindings' => [ 'label' => 'title', 'href' => 'title' ] ],
@@ -157,7 +157,7 @@ $dataAttributeManifest = [
 		],
 		'second' => [
 			'label' => 'Tabs', 'source' => 'single', 'allowed' => [ 'title' ],
-			'container' => [ 'class' => 'ui-grid-100 js-tabs', 'data' => [ 'tabs-target' => 'panel-1' ] ],
+			'container' => [ 'class' => 'nino-grid-100 nino-tabs', 'data' => [ 'tabs-target' => 'panel-1' ] ],
 			'recommend' => [ 'components' => [ [ 'id' => 'title', 'type' => 'title' ] ] ],
 		],
 	],
@@ -169,8 +169,8 @@ $dataAttributeSection = strtok( $dataAttributeSource, "\n" );
 check( 'a Layout data attribute overrides the preset default on the section element', str_contains( $dataAttributeSection, 'data-cover-width="80"' )
 	&& str_contains( $dataAttributeSection, 'data-vpa-delay="300ms"' )
 	&& substr_count( $dataAttributeSource, 'data-vpa-delay' ) === 1 );
-check( 'Areas emit declared data attributes on their container and collection item', str_contains( $dataAttributeSource, '<div class="ui-grid-100 js-tabs" data-tabs-target="panel-1">' )
-	&& str_contains( $dataAttributeSource, 'class="ui-article ui-autoheight" data-autoheight-group="cards-stage" data-autoheight-mobile="skip"' ) );
+check( 'Areas emit declared data attributes on their container and collection item', str_contains( $dataAttributeSource, '<div class="nino-grid-100 nino-tabs" data-tabs-target="panel-1">' )
+	&& str_contains( $dataAttributeSource, 'class="nino-article nino-autoheight" data-autoheight-group="cards-stage" data-autoheight-mobile="skip"' ) );
 check( 'component render overrides carry escaped data attributes', str_contains( $dataAttributeSource, 'data-modal-target="contact &quot;one&quot; &amp; &lt;two&gt;"' ) );
 $injectedInput = $dataAttributeInput;
 $injectedInput['data'] = [ 'injected' => 'yes' ];
@@ -215,8 +215,8 @@ check( 'composes one ordinary section', str_starts_with( $hero['source'], '<sect
 check( 'writes stable section metadata inside generated source', str_contains( $hero['source'], '<!-- nino:section {' ) );
 check( 'derives textfill keys from page and section ids', in_array( '/page-home/main-hero/title', array_column( $hero['fields'], 'key' ), true ) && str_contains( $hero['source'], '[[/page-home/main-hero/title]]' ) );
 check( 'reports the generated background image slot', ( $hero['images'][0]['slot'] ?? '' ) === 'background' );
-check( 'inherits page motion into generated js-vpa markup', preg_match( '/class="(?=[^"]*\bui-grid-row\b)(?=[^"]*\bjs-vpa\b)[^"]*"/', $hero['source'] ) === 1 );
-check( 'applies Area alignment without forcing it onto the section shell', str_contains( $hero['source'], 'ui-text-center' ) && str_contains( strtok( $hero['source'], "\n" ), 'ui-text-center' ) === false );
+check( 'inherits page motion into generated nino-vpa markup', preg_match( '/class="(?=[^"]*\bnino-grid-row\b)(?=[^"]*\bnino-vpa\b)[^"]*"/', $hero['source'] ) === 1 );
+check( 'applies Area alignment without forcing it onto the section shell', str_contains( $hero['source'], 'nino-text-center' ) && str_contains( strtok( $hero['source'], "\n" ), 'nino-text-center' ) === false );
 $contactBinding = array_values( array_filter( $hero['fields'], fn( array $field ): bool => $field['key'] === '/webpage/contact/uri' ) )[0] ?? null;
 check( 'single-Area actions can reuse technical textfills without creating a new field', str_contains( $hero['source'], 'href="[[/webpage/contact/uri]]"' )
 	&& ( $contactBinding['mode'] ?? '' ) === 'existing'
@@ -232,8 +232,8 @@ check( 'older v3 Single-Area metadata still infers generated text and image bind
 $heroPreview = \Nino\Templates\Composer::preview( [
 	'preset' => 'fullscreen-image', 'pageId' => 'preview', 'id' => 'motion-hero', 'pageMotion' => 'on',
 ] );
-check( 'preview strips VPA classes that would stay hidden without client scripts', $heroPreview !== null && str_contains( $heroPreview, 'js-vpa' ) === false );
-check( 'preview-only VPA cleanup never changes composed template source', str_contains( $hero['source'], 'js-vpa' ) && str_contains( $hero['source'], 'js-vpa--visible' ) === false );
+check( 'preview strips VPA classes that would stay hidden without client scripts', $heroPreview !== null && str_contains( $heroPreview, 'nino-vpa' ) === false );
+check( 'preview-only VPA cleanup never changes composed template source', str_contains( $hero['source'], 'nino-vpa' ) && str_contains( $hero['source'], 'nino-vpa--visible' ) === false );
 
 $articleInput = \Nino\Templates\AreaComposer::defaults( $presets['articles-grid'], 'home', 'services' );
 $articleInput['areas']['articles']['style'] = 'four-columns';
@@ -291,15 +291,15 @@ $textOnlyInput['areas']['articles']['components'] = array_values( array_filter(
 	fn( array $component ): bool => in_array( $component['type'], [ 'title', 'description' ], true )
 ) );
 $textOnly = \Nino\Templates\Composer::compose( $textOnlyInput );
-check( 'component order changes markup independently from the four-column Area Style', str_contains( $textOnly['source'], 'ui-grid-m-25' )
+check( 'component order changes markup independently from the four-column Area Style', str_contains( $textOnly['source'], 'nino-grid-m-25' )
 	&& str_contains( $textOnly['source'], '[[name]]' )
 	&& str_contains( $textOnly['source'], '<img' ) === false
 	&& str_contains( $textOnly['source'], '<a ' ) === false );
 check( 'one v3 metadata comment preserves the complete graphical area model', substr_count( $textOnly['source'], '<!-- nino:section ' ) === 1
 	&& $textOnly['spec']['version'] === 3
 	&& count( $textOnly['spec']['areas']['articles']['components'] ) === 2 );
-check( 'the Articles preset equalizes its card text per section so the calls to action line up', str_contains( $articles['source'], '<h3 class="ui-article-title ui-autoheight" data-autoheight-group="article-title-services" data-autoheight-mobile="skip">' )
-	&& str_contains( $articles['source'], '<div class="ui-article-descr ui-autoheight" data-autoheight-group="article-descr-services" data-autoheight-mobile="skip">' )
+check( 'the Articles preset equalizes its card text per section so the calls to action line up', str_contains( $articles['source'], '<h3 class="nino-article-title nino-autoheight" data-autoheight-group="article-title-services" data-autoheight-mobile="skip">' )
+	&& str_contains( $articles['source'], '<div class="nino-article-descr nino-autoheight" data-autoheight-group="article-descr-services" data-autoheight-mobile="skip">' )
 	&& str_contains( $textOnly['source'], 'data-autoheight-group="article-title-plain-services"' )
 	&& str_contains( $textOnly['source'], 'article-title-services"' ) === false );
 
@@ -323,7 +323,7 @@ check( 'named-area preview mirrors the selected column count', substr_count( $tw
 $fullscreen = \Nino\Templates\Composer::compose( [
 	'preset' => 'fullscreen-image', 'pageId' => 'home', 'id' => 'stage', 'layout' => 'parallax',
 ] );
-check( 'Layout changes real markup and can recommend a matching frame', str_contains( $fullscreen['source'], 'js-parallex' )
+check( 'Layout changes real markup and can recommend a matching frame', str_contains( $fullscreen['source'], 'nino-parallex' )
 	&& $fullscreen['effective']['layout'] === 'parallax'
 	&& $fullscreen['effective']['frame']['background'] === 'parallax'
 	&& ( $fullscreen['images'][0]['key'] ?? '' ) === '/page-home/stage/background' );
@@ -386,9 +386,9 @@ check( 'a bound alt text does not leave its shortcode tail standing in the previ
 	&& str_contains( $splitPreview, ']"]' ) === false
 	&& str_contains( $splitPreview, '[image' ) === false
 	&& substr_count( $splitPreview, '<img ' ) === 1 );
-check( 'media split Layouts change semantic Area order without duplicating presets', strpos( $splitSection['source'], 'ui-p-2' ) !== false
-	&& strpos( $splitSection['source'], 'ui-img-cover' ) !== false
-	&& strpos( $splitSection['source'], 'ui-p-2' ) < strpos( $splitSection['source'], 'ui-img-cover' )
+check( 'media split Layouts change semantic Area order without duplicating presets', strpos( $splitSection['source'], 'nino-p-2' ) !== false
+	&& strpos( $splitSection['source'], 'nino-img-cover' ) !== false
+	&& strpos( $splitSection['source'], 'nino-p-2' ) < strpos( $splitSection['source'], 'nino-img-cover' )
 	&& count( $splitSection['images'] ) === 1 );
 
 $everyLayout = [];
@@ -403,48 +403,52 @@ check( 'every Layout of every preset composes one section without an unresolved 
 	|| substr_count( $source, '<section' ) !== 1
 	|| str_contains( $source, '[[area:' )
 	|| str_contains( $source, '[[section:id]]' ) ) === [] );
-check( 'no Layout nests a second grid row inside the one the compiler writes', array_filter( $everyLayout, fn( string $source ): bool => substr_count( $source, 'class="ui-grid-row' ) > 1 ) === [] );
-check( 'the Builder writes the design system\'s own classes and never one of its own', array_filter( $everyLayout, fn( string $source ): bool => str_contains( $source, 'nino-' ) ) === []
-	&& str_contains( (string) file_get_contents( __DIR__. '/../_nino/Nino.css' ), '.nino-' ) === false
-	&& array_filter( $presets, fn( array $preset ): bool => str_contains( json_encode( $preset ), 'nino-' ) ) === [] );
+check( 'no Layout nests a second grid row inside the one the compiler writes', array_filter( $everyLayout, fn( string $source ): bool => substr_count( $source, 'class="nino-grid-row' ) > 1 ) === [] );
+// One namespace, everywhere: the Builder, the presets and the design system itself
+// all speak nino-*. The lookbehind keeps '-ui-'/'-js-' inside identifiers out of it,
+// the lookahead the CSS system font keywords that merely look like classes.
+$legacyClass = '/(?<![-\\w])(?:ui|js|sc)-(?!monospace|sans-serif|serif|rounded)[a-z0-9]/';
+check( 'the Builder, the presets and the design system carry no legacy class prefix', array_filter( $everyLayout, fn( string $source ): bool => preg_match( $legacyClass, $source ) === 1 ) === []
+	&& preg_match( $legacyClass, (string) file_get_contents( __DIR__. '/../_nino/Nino.css' ) ) === 0
+	&& array_filter( $presets, fn( array $preset ): bool => preg_match( $legacyClass, (string) json_encode( $preset ) ) === 1 ) === [] );
 check( 'a component step is a modifier of whichever class the preset gave it', str_contains( \Nino\Templates\Composer::compose( array_merge(
 	\Nino\Templates\AreaComposer::defaults( $presets['fullscreen-image'], 'home', 'loud-hero' ),
 	[ 'areas' => [ 'content' => [ 'components' => [ [ 'id' => 'title', 'type' => 'title', 'style' => 'loud', 'bindings' => [ 'text' => 'title' ] ] ] ] ] ]
-) )['source'], '<h2 class="ui-atf-title ui-atf-title--loud"' )
+) )['source'], '<h2 class="nino-atf-title nino-atf-title--loud"' )
 	&& str_contains( \Nino\Templates\Composer::compose( array_merge(
 		\Nino\Templates\AreaComposer::defaults( $presets['content-section'], 'home', 'loud-copy' ),
 		[ 'areas' => [ 'heading' => [ 'components' => [ [ 'id' => 'title', 'type' => 'title', 'style' => 'loud', 'bindings' => [ 'text' => 'title' ] ] ] ] ] ]
-	) )['source'], '<h2 class="ui-section-title ui-section-title--loud"' )
+	) )['source'], '<h2 class="nino-section-title nino-section-title--loud"' )
 	&& \Nino\Templates\AreaComposer::catalog()['description']['styles'] === [ 'auto', 'quiet', 'loud' ]
-	&& str_contains( json_encode( $presets ), 'ui-font-big' ) === false );
+	&& str_contains( json_encode( $presets ), 'nino-font-big' ) === false );
 check( 'the scrim is one choice per image layer rather than three levels of its own', \Nino\Templates\AreaComposer::choices()['overlay'] === [ 'auto', 'none', 'dim' ] );
 check( 'metadata written against the old three-level overlay still composes', str_contains( \Nino\Templates\Composer::compose( [
 	'preset' => 'fullscreen-image', 'pageId' => 'home', 'id' => 'legacy-overlay', 'frame' => [ 'overlay' => 'strong' ],
-] )['source'], 'js-cover--dim' ) );
+] )['source'], 'nino-cover--dim' ) );
 check( 'every preset card is measured against the same preview viewport', array_filter( $presets, fn( array $preset ): bool => isset( $preset['previewHeight'] ) ) === [] );
 
 $timeline = \Nino\Templates\Composer::compose( [ 'preset' => 'process-timeline', 'pageId' => 'home', 'id' => 'process' ] );
-check( 'the timeline numbers its steps from the ordered list instead of storing the ordinal as content', str_contains( $timeline['source'], '<ol class="ui-timeline ui-timeline--counted">' )
-	&& str_contains( $timeline['source'], '<li class="ui-timeline-step"><h4>[[title]]</h4>' )
+check( 'the timeline numbers its steps from the ordered list instead of storing the ordinal as content', str_contains( $timeline['source'], '<ol class="nino-timeline nino-timeline--counted">' )
+	&& str_contains( $timeline['source'], '<li class="nino-timeline-step"><h4>[[title]]</h4>' )
 	&& isset( $timeline['content']['collections'][0]['model']['step'] ) === false );
 $stacked = \Nino\Templates\Composer::compose( [ 'preset' => 'process-timeline', 'pageId' => 'home', 'id' => 'process', 'layout' => 'stacked' ] );
-check( 'its second Layout restacks the same steps instead of restyling the item', str_contains( $stacked['source'], 'ui-timeline--stacked' )
-	&& str_contains( $stacked['source'], '<li class="ui-timeline-step">' ) );
+check( 'its second Layout restacks the same steps instead of restyling the item', str_contains( $stacked['source'], 'nino-timeline--stacked' )
+	&& str_contains( $stacked['source'], '<li class="nino-timeline-step">' ) );
 
 $staticTable = \Nino\Templates\Composer::compose( [ 'preset' => 'static-table', 'pageId' => 'home', 'id' => 'hours', 'layout' => 'striped-elements' ] );
-check( 'a static block reaches the section exactly as the Layout wrote it, loop and all', str_contains( $staticTable['source'], '<table class="ui-table ui-table--striped">' )
+check( 'a static block reaches the section exactly as the Layout wrote it, loop and all', str_contains( $staticTable['source'], '<table class="nino-table nino-table--striped">' )
 	&& str_contains( $staticTable['source'], '<tr><th>Service</th><th>Duration</th></tr>' )
 	&& str_contains( $staticTable['source'], '[elements /example-rows limit="10"]' )
 	&& str_contains( $staticTable['source'], '<tr><td>[[columnA]]</td><td>[[columnB]]</td></tr>' )
 	&& $staticTable['content']['collections'] === [] );
 check( 'its intro stays an ordinary textfill Area while the outro renders nothing at all', str_contains( $staticTable['source'], '[[/page-home/hours/title]]' )
-	&& str_contains( $staticTable['source'], 'ui-mt-3' ) === false
+	&& str_contains( $staticTable['source'], 'nino-mt-3' ) === false
 	&& preg_match( '/\n[\t ]*\n/', $staticTable['source'] ) !== 1 );
 $staticOutro = \Nino\Templates\Composer::compose( [
 	'preset' => 'static-table', 'pageId' => 'home', 'id' => 'hours',
 	'areas' => [ 'outro' => [ 'components' => [ [ 'id' => 'action', 'type' => 'button', 'style' => 'primary' ] ] ] ],
 ] );
-check( 'and carries a closing action as soon as the outro gets one', str_contains( $staticOutro['source'], 'ui-mt-3' )
+check( 'and carries a closing action as soon as the outro gets one', str_contains( $staticOutro['source'], 'nino-mt-3' )
 	&& str_contains( $staticOutro['source'], '[[/page-home/hours/action-label]]' ) );
 $accordion = \Nino\Templates\Composer::compose( [ 'preset' => 'static-accordion', 'pageId' => 'home', 'id' => 'faq' ] );
 check( 'a static block resolves [[section:id]], so two of them on one page stay independent', str_contains( $accordion['source'], 'name="faq-faq"' )
@@ -458,17 +462,17 @@ check( 'the shipped forms keep their CSRF token, honeypot and per-section field 
 
 $pricingLayouts = array_keys( $presets['pricing-plans']['layouts'] );
 check( 'pricing offers the three- and four-column Layouts as real compositions', $pricingLayouts === [ 'equal', 'feature-middle', 'four', 'four-feature-first', 'four-feature-last' ]
-	&& str_contains( $everyLayout['pricing-plans/four'], 'ui-pricing-row ui-pricing-row--four"' )
-	&& str_contains( $everyLayout['pricing-plans/four-feature-first'], 'ui-pricing-row--four-first' )
-	&& str_contains( $everyLayout['pricing-plans/four-feature-last'], 'ui-pricing-row--four-last' ) );
+	&& str_contains( $everyLayout['pricing-plans/four'], 'nino-pricing-row nino-pricing-row--four"' )
+	&& str_contains( $everyLayout['pricing-plans/four-feature-first'], 'nino-pricing-row--four-first' )
+	&& str_contains( $everyLayout['pricing-plans/four-feature-last'], 'nino-pricing-row--four-last' ) );
 
 $pricing = \Nino\Templates\Composer::compose( [ 'preset' => 'pricing-plans', 'pageId' => 'home', 'id' => 'plans', 'layout' => 'feature-middle' ] );
-check( 'pricing emphasis is a Layout, not a second collection or a hidden item class', str_contains( $pricing['source'], 'ui-pricing-row ui-pricing-row--feature-middle' )
-	&& str_contains( $pricing['source'], '<div class="ui-pricing-item">' )
-	&& str_contains( $pricing['source'], '<div class="ui-pricing-price"><strong>[[price]]</strong><span>[[suffix]]</span></div>' ) );
+check( 'pricing emphasis is a Layout, not a second collection or a hidden item class', str_contains( $pricing['source'], 'nino-pricing-row nino-pricing-row--feature-middle' )
+	&& str_contains( $pricing['source'], '<div class="nino-pricing-item">' )
+	&& str_contains( $pricing['source'], '<div class="nino-pricing-price"><strong>[[price]]</strong><span>[[suffix]]</span></div>' ) );
 
-check( 'the banner uses the static background layer rather than the scripted cover', str_contains( $everyLayout['image-banner/plain'], 'ui-img-background' )
-	&& str_contains( $everyLayout['image-banner/plain'], 'js-cover' ) === false
+check( 'the banner uses the static background layer rather than the scripted cover', str_contains( $everyLayout['image-banner/plain'], 'nino-img-background' )
+	&& str_contains( $everyLayout['image-banner/plain'], 'nino-cover' ) === false
 	&& str_contains( $everyLayout['image-banner/plain'], 'data-cover-height' ) === false );
 check( 'list and table tags are available to Areas that need them, scripts and media are not', throwsInvalidArgument( fn() => \Nino\Templates\AreaComposer::normalizePreset( 'unsafe-tag', array_replace_recursive( $multiAreaManifest, [ 'areas' => [ 'first' => [ 'item' => [ 'tag' => 'iframe' ] ] ] ] ), $areaPresetDirectory ) )
 	&& \Nino\Templates\AreaComposer::normalizePreset( 'list-tag', array_replace_recursive( $multiAreaManifest, [ 'areas' => [ 'first' => [ 'item' => [ 'tag' => 'li' ] ] ] ] ), $areaPresetDirectory )['areas']['first']['item']['tag'] === 'li' );
@@ -493,7 +497,7 @@ $source = "[template /templates/html-header]\n"
 	. "<!-- <section id=\"not-real\"> -->\n"
 	. "<?php \$sample = '<section>not markup either</section>'; ?>\n"
 	. "<script>const sample = '</scripture><section>not markup</section>';</script>\n"
-	. "<section id=\"hero\" class=\"ui-section\">\n\t<section class=\"nested\"><p>Nested</p></section>\n</section>\n"
+	. "<section id=\"hero\" class=\"nino-section\">\n\t<section class=\"nested\"><p>Nested</p></section>\n</section>\n"
 	. "<section id='content'>[[/page-home/content/title]]</section>\n"
 	. "[template /templates/html-footer]\n";
 

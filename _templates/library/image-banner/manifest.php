@@ -18,18 +18,18 @@
 			'help' => 'The ordered content displayed over the image.',
 			'source' => 'single',
 			'allowed' => [ 'title', 'subtitle', 'description', 'button', 'template' ],
-			'container' => [ 'class' => 'ui-grid-100' ],
+			'container' => [ 'class' => 'nino-grid-100' ],
 			'styles' => [
-				'center' => [ 'label' => 'Centered', 'class' => 'ui-text-center' ],
-				'left' => [ 'label' => 'Left', 'class' => 'ui-text-left' ],
-				'right' => [ 'label' => 'Right', 'class' => 'ui-text-right' ],
+				'center' => [ 'label' => 'Centered', 'class' => 'nino-text-center' ],
+				'left' => [ 'label' => 'Left', 'class' => 'nino-text-left' ],
+				'right' => [ 'label' => 'Right', 'class' => 'nino-text-right' ],
 			],
 			'recommend' => [ 'style' => 'center', 'components' => [
 				[ 'id' => 'title', 'type' => 'title', 'bindings' => [ 'text' => 'title' ] ],
 				[ 'id' => 'subtitle', 'type' => 'subtitle', 'bindings' => [ 'text' => 'subtitle' ] ],
 				[ 'id' => 'action', 'type' => 'button', 'style' => 'primary', 'bindings' => [ 'label' => 'cta-label', 'href' => 'cta-uri' ] ],
 			] ],
-			'render' => [ 'title' => [ 'tag' => 'h2', 'class' => 'ui-atf-title' ], 'subtitle' => [ 'class' => 'ui-atf-subtitle' ] ],
+			'render' => [ 'title' => [ 'tag' => 'h2', 'class' => 'nino-atf-title' ], 'subtitle' => [ 'class' => 'nino-atf-subtitle' ] ],
 		],
 	],
 ];

@@ -103,7 +103,7 @@
 		const previewCss = 'html,body{min-height:100%;margin:0}body{overflow:auto}a,button,input,textarea,select,form{pointer-events:none!important}'
 			+ '[data-cover-height="50"]{min-height:50vh!important}[data-cover-height="75"]{min-height:75vh!important}'
 			+ '[data-cover-height="90"]{min-height:90vh!important}[data-cover-height="100"]{min-height:100vh!important}'
-			+ '.js-parallex>img{top:0!important;height:100%!important;transform:none!important}';
+			+ '.nino-parallex>img{top:0!important;height:100%!important;transform:none!important}';
 		return '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta http-equiv="Content-Security-Policy" content="'+ escapeAttribute( policy )+ '">'
 			+ '<style>'+ projectCss+ '\n'+ previewCss+ '</style>'
 			+ '</head><body>'+ sanitizePreviewMarkup( markup )+ '</body></html>';

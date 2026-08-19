@@ -1,12 +1,12 @@
 [template /templates/html-header]
-<h2 class="ui-sr-only">[[/webpage[[/nino/http/response/uri]]/name]]</h2>
-<section id="legal-imprint" class="ui-section">
-	<div class="ui-grid-row">
-		<div class="ui-grid-100">
-			<h3 class="ui-section-title">Impressum</h3>
+<h2 class="nino-sr-only">[[/webpage[[/nino/http/response/uri]]/name]]</h2>
+<section id="legal-imprint" class="nino-section">
+	<div class="nino-grid-row">
+		<div class="nino-grid-100">
+			<h3 class="nino-section-title">Impressum</h3>
 		</div>
 
-		<div class="ui-grid-100">
+		<div class="nino-grid-100">
 		  <h4>Angaben gemäß § 5 Digitale-Dienste-Gesetz (DDG)</h4>
 		  <p>[[/website/author]]<br>[[/company/adress]]<br>[[/global/phone]]: [[/company/phone]]<br>[[/global/email]]: [[/company/email]]</p>
 
@@ -15,13 +15,13 @@
 		</div>
 	</div>
 </section>
-<section id="legal-privacy" class="ui-section">
-	<div class="ui-grid-row">
-		<div class="ui-grid-100">
-			<h3 class="ui-section-title">Datenschutz&shy;erklärung</h3>
+<section id="legal-privacy" class="nino-section">
+	<div class="nino-grid-row">
+		<div class="nino-grid-100">
+			<h3 class="nino-section-title">Datenschutz&shy;erklärung</h3>
 		</div>
 
-		<div class="ui-grid-100">
+		<div class="nino-grid-100">
 		  <h4>1. Datenschutz auf einen Blick</h4>
 		  <h5>Allgemeine Hinweise</h5>
 		  <p>Die folgenden Hinweise geben einen einfachen Überblick darüber, was mit Ihren personenbezogenen Daten passiert, wenn Sie diese Website besuchen. Personenbezogene Daten sind alle Daten, mit denen Sie persönlich identifiziert werden können. Ausführliche Informationen zum Thema Datenschutz entnehmen Sie der nachfolgenden Datenschutzerklärung.</p>
@@ -61,7 +61,7 @@
 
 		  <h5>Server-Log-Dateien</h5>
 		  <p>Der Provider der Seiten erhebt und speichert automatisch Informationen in sogenannten Server-Log-Dateien, die Ihr Browser automatisch an uns übermittelt. Dies sind:</p>
-		  <ul class="ui-list">
+		  <ul class="nino-list">
 		    <li>Browsertyp und Browserversion</li>
 		    <li>verwendetes Betriebssystem</li>
 		    <li>Referrer URL</li>

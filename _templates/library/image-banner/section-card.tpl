@@ -1,5 +1,5 @@
-<div class="ui-grid-100 ui-grid-m-66 ui-grid-center">
-	<div class="ui-article ui-article--alt ui-p-2">
+<div class="nino-grid-100 nino-grid-m-66 nino-grid-center">
+	<div class="nino-article nino-article--alt nino-p-2">
 		[[area:content]]
 	</div>
 </div>

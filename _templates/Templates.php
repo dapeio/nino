@@ -761,7 +761,7 @@ namespace Nino\Templates {
 				$classes = preg_split( '/\s+/', trim( $match[3] ), -1, PREG_SPLIT_NO_EMPTY ) ?: [];
 				$previewClasses = array_values( array_filter(
 					$classes,
-					fn( string $class ): bool => $class !== 'js-vpa' && str_starts_with( $class, 'js-vpa--' ) === false
+					fn( string $class ): bool => $class !== 'nino-vpa' && str_starts_with( $class, 'nino-vpa--' ) === false
 				) );
 				if( $previewClasses === $classes )
 					return $match[0];
@@ -773,10 +773,10 @@ namespace Nino\Templates {
 				$limit = [];
 				preg_match( '/\blimit="(\d+)"/i', $match[1], $limit );
 				$columns = match( true ) {
-					preg_match( '/(?:^|\s)ui-grid-[a-z]+-25(?:\s|["\'])/i', $match[2] ) === 1 => 4,
-					preg_match( '/(?:^|\s)ui-grid-[a-z]+-33(?:\s|["\'])/i', $match[2] ) === 1 => 3,
-					preg_match( '/(?:^|\s)ui-grid-[a-z]+-50(?:\s|["\'])/i', $match[2] ) === 1 => 2,
-					preg_match( '/(?:^|\s)ui-grid-[a-z]+-100(?:\s|["\'])/i', $match[2] ) === 1 => 1,
+					preg_match( '/(?:^|\s)nino-grid-[a-z]+-25(?:\s|["\'])/i', $match[2] ) === 1 => 4,
+					preg_match( '/(?:^|\s)nino-grid-[a-z]+-33(?:\s|["\'])/i', $match[2] ) === 1 => 3,
+					preg_match( '/(?:^|\s)nino-grid-[a-z]+-50(?:\s|["\'])/i', $match[2] ) === 1 => 2,
+					preg_match( '/(?:^|\s)nino-grid-[a-z]+-100(?:\s|["\'])/i', $match[2] ) === 1 => 1,
 					default => 3,
 				};
 				$count = min( $columns, max( 1, (int) ( $limit[1] ?? $columns ) ) );
@@ -934,7 +934,7 @@ namespace Nino\Templates {
 			$content = self::_renderBody( $spec, $prefix );
 
 			if( $spec['background'] !== 'none' ) {
-				$backgroundContentClass = $spec['background'] === 'image-static' ? 'ui-img-background-content' : 'js-cover-content';
+				$backgroundContentClass = $spec['background'] === 'image-static' ? 'nino-img-background-content' : 'nino-cover-content';
 				$inner .= "\t<div class=\"". $backgroundContentClass. "\">\n". self::_indent( $content, 1 ). "\t</div>\n";
 			}
 			else
@@ -945,13 +945,13 @@ namespace Nino\Templates {
 
 		private static function _renderBody( array $spec, string $prefix ): string {
 
-			$rowClasses = [ 'ui-grid-row' ];
+			$rowClasses = [ 'nino-grid-row' ];
 			if( in_array( $spec['content'], [ 'media-split', 'feature-list' ], true ) )
-				$rowClasses[] = 'ui-grid-middle';
+				$rowClasses[] = 'nino-grid-middle';
 			if( in_array( $spec['layout'], [ 'media-left-full', 'media-right-full' ], true ) )
-				$rowClasses[] = 'ui-grid--fullwidth';
+				$rowClasses[] = 'nino-grid--fullwidth';
 			if( $spec['motion'] === 'on' || ( $spec['motion'] === 'page' && $spec['pageMotion'] === 'on' ) )
-				$rowClasses[] = 'js-vpa';
+				$rowClasses[] = 'nino-vpa';
 
 			$out = "\t<div class=\"". implode( ' ', $rowClasses ). "\">\n";
 			$out .= self::_renderHeader( $spec, $prefix );
@@ -967,15 +967,15 @@ namespace Nino\Templates {
 			if( $spec['header'] === 'none' )
 				return '';
 
-			$classes = [ 'ui-grid-100' ];
+			$classes = [ 'nino-grid-100' ];
 			if( $spec['content'] !== 'none' || $spec['action'] !== 'none' )
-				$classes[] = 'ui-mb-3';
+				$classes[] = 'nino-mb-3';
 			if( $spec['align'] !== 'left' )
-				$classes[] = 'ui-text-'. $spec['align'];
+				$classes[] = 'nino-text-'. $spec['align'];
 
-			$headingAlign = $spec['align'] === 'center' ? '' : ' ui-text-'. $spec['align'];
-			$titleClass = ( $spec['shell'] === 'hero' ? 'ui-atf-title' : 'ui-section-title' ). $headingAlign;
-			$subtitleClass = ( $spec['shell'] === 'hero' ? 'ui-atf-subtitle' : 'ui-section-subtitle' ). $headingAlign;
+			$headingAlign = $spec['align'] === 'center' ? '' : ' nino-text-'. $spec['align'];
+			$titleClass = ( $spec['shell'] === 'hero' ? 'nino-atf-title' : 'nino-section-title' ). $headingAlign;
+			$subtitleClass = ( $spec['shell'] === 'hero' ? 'nino-atf-subtitle' : 'nino-section-subtitle' ). $headingAlign;
 
 			$out = "\t\t<div class=\"". implode( ' ', $classes ). "\">\n";
 			$out .= "\t\t\t<h2 class=\"". $titleClass. "\">[[". $prefix. "/title]]</h2>\n";
@@ -997,13 +997,13 @@ namespace Nino\Templates {
 				return '';
 
 			if( $content === 'text' ) {
-				$width = $spec['layout'] === 'narrow' ? 'ui-grid-m-66' : 'ui-grid-100';
-				return "\t\t<div class=\"ui-grid-100 ". $width. "\">\n\t\t\t<p>[[". $prefix. "/content]]</p>\n\t\t</div>\n";
+				$width = $spec['layout'] === 'narrow' ? 'nino-grid-m-66' : 'nino-grid-100';
+				return "\t\t<div class=\"nino-grid-100 ". $width. "\">\n\t\t\t<p>[[". $prefix. "/content]]</p>\n\t\t</div>\n";
 			}
 
 			if( $content === 'media-split' ) {
-				$media = "\t\t<div class=\"ui-grid-100 ui-grid-m-50 ui-img-cover\">\n\t\t\t[image ". $prefix. "/image alt=\"\"]\n\t\t</div>\n";
-				$text = "\t\t<div class=\"ui-grid-100 ui-grid-m-50\">\n\t\t\t<article class=\"". self::_articleClass( $spec ). "\">\n\t\t\t\t<div class=\"ui-article-content\">[[". $prefix. "/content]]</div>\n\t\t\t</article>\n\t\t</div>\n";
+				$media = "\t\t<div class=\"nino-grid-100 nino-grid-m-50 nino-img-cover\">\n\t\t\t[image ". $prefix. "/image alt=\"\"]\n\t\t</div>\n";
+				$text = "\t\t<div class=\"nino-grid-100 nino-grid-m-50\">\n\t\t\t<article class=\"". self::_articleClass( $spec ). "\">\n\t\t\t\t<div class=\"nino-article-content\">[[". $prefix. "/content]]</div>\n\t\t\t</article>\n\t\t</div>\n";
 				return in_array( $spec['layout'], [ 'media-right', 'media-right-full' ], true ) ? $text. $media : $media. $text;
 			}
 
@@ -1013,174 +1013,174 @@ namespace Nino\Templates {
 
 			if( $content === 'lists' ) {
 				$numbered = str_starts_with( $spec['layout'], 'numbered' );
-				$listClass = 'ui-list '. ( $numbered ? 'ui-list--numbered' : 'ui-list--check' ). ' ui-list--content';
+				$listClass = 'nino-list '. ( $numbered ? 'nino-list--numbered' : 'nino-list--check' ). ' nino-list--content';
 				if( str_ends_with( $spec['layout'], '-2' ) )
-					$listClass .= ' ui-list--columns';
-				return "\t\t<div class=\"ui-grid-100\">\n\t\t\t<ul class=\"". $listClass. "\">\n\t\t\t\t[elements ". $type. " limit=\"". $limit. "\"]\n\t\t\t\t<li>[[title]]</li>\n\t\t\t\t[/elements]\n\t\t\t</ul>\n\t\t</div>\n";
+					$listClass .= ' nino-list--columns';
+				return "\t\t<div class=\"nino-grid-100\">\n\t\t\t<ul class=\"". $listClass. "\">\n\t\t\t\t[elements ". $type. " limit=\"". $limit. "\"]\n\t\t\t\t<li>[[title]]</li>\n\t\t\t\t[/elements]\n\t\t\t</ul>\n\t\t</div>\n";
 			}
 
 			if( in_array( $content, [ 'articles', 'articles-image' ], true ) ) {
 				$grid = self::_gridClass( $spec['layout'] );
-				$image = $content === 'articles-image' ? "\t\t\t\t<img class=\"ui-article-img\" src=\"[[/nino/public]]/images/[[image]]\" alt=\"[[title]]\">\n" : '';
+				$image = $content === 'articles-image' ? "\t\t\t\t<img class=\"nino-article-img\" src=\"[[/nino/public]]/images/[[image]]\" alt=\"[[title]]\">\n" : '';
 				return "\t\t[elements ". $type. " limit=\"". $limit. "\"]\n"
-					. "\t\t<div class=\"ui-grid-100 ". $grid. " ui-mb-3\">\n"
+					. "\t\t<div class=\"nino-grid-100 ". $grid. " nino-mb-3\">\n"
 					. "\t\t\t<article class=\"". $articleClass. "\">\n". $image
-					. "\t\t\t\t<div class=\"ui-article-content\">\n"
-					. "\t\t\t\t\t<h3 class=\"ui-article-title\">[[title]]</h3>\n"
-					. "\t\t\t\t\t<div class=\"ui-article-descr\">[[description]]</div>\n"
-					. "\t\t\t\t\t<a href=\"[[link]]\" class=\"ui-btn ui-btn--primary\">[[linkLabel]]</a>\n"
+					. "\t\t\t\t<div class=\"nino-article-content\">\n"
+					. "\t\t\t\t\t<h3 class=\"nino-article-title\">[[title]]</h3>\n"
+					. "\t\t\t\t\t<div class=\"nino-article-descr\">[[description]]</div>\n"
+					. "\t\t\t\t\t<a href=\"[[link]]\" class=\"nino-btn nino-btn--primary\">[[linkLabel]]</a>\n"
 					. "\t\t\t\t</div>\n\t\t\t</article>\n\t\t</div>\n\t\t[/elements]\n";
 			}
 
 			if( $content === 'cards' ) {
-				$grid = $spec['layout'] === 'spotlight' ? 'ui-grid-m-66' : self::_gridClass( $spec['layout'] );
+				$grid = $spec['layout'] === 'spotlight' ? 'nino-grid-m-66' : self::_gridClass( $spec['layout'] );
 				$center = $spec['layout'] === 'spotlight' ? ' style="margin:0 auto;"' : '';
 				return "\t\t[elements ". $type. " limit=\"". $limit. "\"]\n"
-					. "\t\t<div class=\"ui-grid-100 ". $grid. " ui-mb-3\"". $center. ">\n"
-					. "\t\t\t<article class=\"". $articleClass. " ui-article--fullwidth\">\n"
-					. "\t\t\t\t<div class=\"ui-img-cover\">\n"
-					. "\t\t\t\t\t<img class=\"ui-article-img ui-article-img--maxheight\" src=\"[[/nino/public]]/images/[[image]]\" alt=\"[[title]]\">\n"
-					. "\t\t\t\t\t<span class=\"ui-badge ui-badge--primary\">[[badge]]</span>\n"
+					. "\t\t<div class=\"nino-grid-100 ". $grid. " nino-mb-3\"". $center. ">\n"
+					. "\t\t\t<article class=\"". $articleClass. " nino-article--fullwidth\">\n"
+					. "\t\t\t\t<div class=\"nino-img-cover\">\n"
+					. "\t\t\t\t\t<img class=\"nino-article-img nino-article-img--maxheight\" src=\"[[/nino/public]]/images/[[image]]\" alt=\"[[title]]\">\n"
+					. "\t\t\t\t\t<span class=\"nino-badge nino-badge--primary\">[[badge]]</span>\n"
 					. "\t\t\t\t</div>\n"
-					. "\t\t\t\t<div class=\"ui-article-content\">\n"
-					. "\t\t\t\t\t<h3 class=\"ui-article-title\">[[title]]</h3>\n"
-					. "\t\t\t\t\t<div class=\"ui-article-descr\">[[description]]</div>\n"
-					. "\t\t\t\t\t<div class=\"ui-article-price\">[[price]]</div>\n"
-					. "\t\t\t\t\t<a href=\"[[link]]\" class=\"ui-btn ui-btn--primary\">[[linkLabel]]</a>\n"
+					. "\t\t\t\t<div class=\"nino-article-content\">\n"
+					. "\t\t\t\t\t<h3 class=\"nino-article-title\">[[title]]</h3>\n"
+					. "\t\t\t\t\t<div class=\"nino-article-descr\">[[description]]</div>\n"
+					. "\t\t\t\t\t<div class=\"nino-article-price\">[[price]]</div>\n"
+					. "\t\t\t\t\t<a href=\"[[link]]\" class=\"nino-btn nino-btn--primary\">[[linkLabel]]</a>\n"
 					. "\t\t\t\t</div>\n\t\t\t</article>\n\t\t</div>\n\t\t[/elements]\n";
 			}
 
 			if( $content === 'testimonials' ) {
-				$testimonial = "<article class=\"". $articleClass. " ui-text-center\"><div class=\"ui-article-content\"><blockquote class=\"ui-article-title\">[[quote]]</blockquote><div class=\"ui-testimonial-author\"><img src=\"[[/nino/public]]/images/[[image]]\" alt=\"\"><span><strong>[[author]]</strong><small>[[role]]</small></span></div></div></article>";
+				$testimonial = "<article class=\"". $articleClass. " nino-text-center\"><div class=\"nino-article-content\"><blockquote class=\"nino-article-title\">[[quote]]</blockquote><div class=\"nino-testimonial-author\"><img src=\"[[/nino/public]]/images/[[image]]\" alt=\"\"><span><strong>[[author]]</strong><small>[[role]]</small></span></div></div></article>";
 				if( $spec['layout'] === 'slider' )
-					return "\t\t<div class=\"ui-grid-100\">\n\t\t\t<div class=\"js-slider\" data-slider-pos=\"0\" data-slider-width=\"60%\" data-slider-min=\"280px\">\n\t\t\t\t<ul>\n"
+					return "\t\t<div class=\"nino-grid-100\">\n\t\t\t<div class=\"nino-slider\" data-slider-pos=\"0\" data-slider-width=\"60%\" data-slider-min=\"280px\">\n\t\t\t\t<ul>\n"
 						. "\t\t\t\t\t[elements ". $type. " limit=\"". $limit. "\"]\n\t\t\t\t\t<li>". $testimonial. "</li>\n\t\t\t\t\t[/elements]\n"
 						. "\t\t\t\t</ul>\n\t\t\t</div>\n\t\t</div>\n";
 
-				$grid = $spec['layout'] === 'spotlight' ? 'ui-grid-m-66' : self::_gridClass( $spec['layout'] );
+				$grid = $spec['layout'] === 'spotlight' ? 'nino-grid-m-66' : self::_gridClass( $spec['layout'] );
 				$center = $spec['layout'] === 'spotlight' ? ' style="margin:0 auto;"' : '';
-				return "\t\t[elements ". $type. " limit=\"". $limit. "\"]\n\t\t<div class=\"ui-grid-100 ". $grid. " ui-mb-3\"". $center. ">\n\t\t\t". $testimonial. "\n\t\t</div>\n\t\t[/elements]\n";
+				return "\t\t[elements ". $type. " limit=\"". $limit. "\"]\n\t\t<div class=\"nino-grid-100 ". $grid. " nino-mb-3\"". $center. ">\n\t\t\t". $testimonial. "\n\t\t</div>\n\t\t[/elements]\n";
 			}
 
 			if( $content === 'profiles' ) {
 				if( $spec['layout'] === 'spotlight' )
-					return "\t\t[elements ". $type. " limit=\"". $limit. "\"]\n\t\t<div class=\"ui-grid-100 ui-grid-m-66\" style=\"margin:0 auto;\">\n\t\t\t<article class=\"". $articleClass. " ui-article-cols-m\">\n\t\t\t\t<img class=\"ui-article-img ui-profile-image\" src=\"[[/nino/public]]/images/[[image]]\" alt=\"[[title]]\">\n\t\t\t\t<div class=\"ui-article-content\"><h3 class=\"ui-article-title\">[[title]]</h3><p class=\"ui-article-subtitle\">[[role]]</p><div class=\"ui-article-descr\">[[description]]</div><p class=\"ui-profile-links\"><a href=\"mailto:[[email]]\">[[email]]</a><a href=\"tel:[[phone]]\">[[phone]]</a></p></div>\n\t\t\t</article>\n\t\t</div>\n\t\t[/elements]\n";
+					return "\t\t[elements ". $type. " limit=\"". $limit. "\"]\n\t\t<div class=\"nino-grid-100 nino-grid-m-66\" style=\"margin:0 auto;\">\n\t\t\t<article class=\"". $articleClass. " nino-article-cols-m\">\n\t\t\t\t<img class=\"nino-article-img nino-profile-image\" src=\"[[/nino/public]]/images/[[image]]\" alt=\"[[title]]\">\n\t\t\t\t<div class=\"nino-article-content\"><h3 class=\"nino-article-title\">[[title]]</h3><p class=\"nino-article-subtitle\">[[role]]</p><div class=\"nino-article-descr\">[[description]]</div><p class=\"nino-profile-links\"><a href=\"mailto:[[email]]\">[[email]]</a><a href=\"tel:[[phone]]\">[[phone]]</a></p></div>\n\t\t\t</article>\n\t\t</div>\n\t\t[/elements]\n";
 
 				$grid = self::_gridClass( $spec['layout'] );
-				return "\t\t[elements ". $type. " limit=\"". $limit. "\"]\n\t\t<div class=\"ui-grid-100 ". $grid. " ui-mb-3\">\n\t\t\t<article class=\"". $articleClass. " ui-article--fullwidth\"><img class=\"ui-article-img ui-article-img--maxheight\" src=\"[[/nino/public]]/images/[[image]]\" alt=\"[[title]]\"><div class=\"ui-article-content\"><h3 class=\"ui-article-title\">[[title]]</h3><p class=\"ui-article-subtitle\">[[role]]</p><div class=\"ui-article-descr\">[[description]]</div></div></article>\n\t\t</div>\n\t\t[/elements]\n";
+				return "\t\t[elements ". $type. " limit=\"". $limit. "\"]\n\t\t<div class=\"nino-grid-100 ". $grid. " nino-mb-3\">\n\t\t\t<article class=\"". $articleClass. " nino-article--fullwidth\"><img class=\"nino-article-img nino-article-img--maxheight\" src=\"[[/nino/public]]/images/[[image]]\" alt=\"[[title]]\"><div class=\"nino-article-content\"><h3 class=\"nino-article-title\">[[title]]</h3><p class=\"nino-article-subtitle\">[[role]]</p><div class=\"nino-article-descr\">[[description]]</div></div></article>\n\t\t</div>\n\t\t[/elements]\n";
 			}
 
 			if( $content === 'stats' ) {
 				$grid = self::_gridClass( $spec['layout'] );
-				return "\t\t[elements ". $type. " limit=\"". $limit. "\"]\n\t\t<div class=\"ui-grid-100 ". $grid. " ui-text-center ui-mb-2\"><div class=\"js-stat-counter\" data-stat-counter-to=\"[[number]]\" data-stat-counter-suffix=\"[[suffix]]\">0</div><p>[[title]]</p></div>\n\t\t[/elements]\n";
+				return "\t\t[elements ". $type. " limit=\"". $limit. "\"]\n\t\t<div class=\"nino-grid-100 ". $grid. " nino-text-center nino-mb-2\"><div class=\"nino-stat-counter\" data-stat-counter-to=\"[[number]]\" data-stat-counter-suffix=\"[[suffix]]\">0</div><p>[[title]]</p></div>\n\t\t[/elements]\n";
 			}
 
 			if( $content === 'features' ) {
 				if( $spec['layout'] === 'bento' )
-					return "\t\t<div class=\"ui-grid-100\"><div class=\"ui-bento\">\n\t\t\t[elements ". $type. " limit=\"". $limit. "\"]\n\t\t\t<article class=\"". $articleClass. " ui-bento-item\"><div class=\"ui-article-content\">". self::_checkIcon(). "<h3 class=\"ui-article-title\">[[title]]</h3><div class=\"ui-article-descr\">[[description]]</div></div></article>\n\t\t\t[/elements]\n\t\t</div></div>\n";
+					return "\t\t<div class=\"nino-grid-100\"><div class=\"nino-bento\">\n\t\t\t[elements ". $type. " limit=\"". $limit. "\"]\n\t\t\t<article class=\"". $articleClass. " nino-bento-item\"><div class=\"nino-article-content\">". self::_checkIcon(). "<h3 class=\"nino-article-title\">[[title]]</h3><div class=\"nino-article-descr\">[[description]]</div></div></article>\n\t\t\t[/elements]\n\t\t</div></div>\n";
 
 				$grid = self::_gridClass( $spec['layout'] );
-				return "\t\t[elements ". $type. " limit=\"". $limit. "\"]\n\t\t<div class=\"ui-grid-100 ". $grid. " ui-mb-3\"><article class=\"". $articleClass. "\"><div class=\"ui-article-content\">". self::_checkIcon(). "<h3 class=\"ui-article-title\">[[title]]</h3><div class=\"ui-article-descr\">[[description]]</div></div></article></div>\n\t\t[/elements]\n";
+				return "\t\t[elements ". $type. " limit=\"". $limit. "\"]\n\t\t<div class=\"nino-grid-100 ". $grid. " nino-mb-3\"><article class=\"". $articleClass. "\"><div class=\"nino-article-content\">". self::_checkIcon(). "<h3 class=\"nino-article-title\">[[title]]</h3><div class=\"nino-article-descr\">[[description]]</div></div></article></div>\n\t\t[/elements]\n";
 			}
 
 			if( $content === 'feature-list' ) {
-				$media = "\t\t<div class=\"ui-grid-100 ui-grid-m-50 ui-img-cover\">\n\t\t\t[image ". $prefix. "/image alt=\"\"]\n\t\t</div>\n";
-				$list = "\t\t<div class=\"ui-grid-100 ui-grid-m-50 ui-p-2\">\n\t\t\t<ul class=\"ui-feature-list\">\n\t\t\t\t[elements ". $type. " limit=\"". $limit. "\"]\n\t\t\t\t<li class=\"ui-feature-item\">". self::_checkIcon(). "<div><h3>[[title]]</h3><div>[[description]]</div></div></li>\n\t\t\t\t[/elements]\n\t\t\t</ul>\n\t\t</div>\n";
+				$media = "\t\t<div class=\"nino-grid-100 nino-grid-m-50 nino-img-cover\">\n\t\t\t[image ". $prefix. "/image alt=\"\"]\n\t\t</div>\n";
+				$list = "\t\t<div class=\"nino-grid-100 nino-grid-m-50 nino-p-2\">\n\t\t\t<ul class=\"nino-feature-list\">\n\t\t\t\t[elements ". $type. " limit=\"". $limit. "\"]\n\t\t\t\t<li class=\"nino-feature-item\">". self::_checkIcon(). "<div><h3>[[title]]</h3><div>[[description]]</div></div></li>\n\t\t\t\t[/elements]\n\t\t\t</ul>\n\t\t</div>\n";
 				return $spec['layout'] === 'media-right' ? $list. $media : $media. $list;
 			}
 
 			if( $content === 'slider' ) {
 				$width = $spec['layout'] === 'narrow' ? '60%' : '80%';
-				return "\t\t<div class=\"ui-grid-100\">\n\t\t\t<div class=\"js-slider\" data-slider-pos=\"0\" data-slider-width=\"". $width. "\" data-slider-min=\"280px\">\n\t\t\t\t<ul>\n"
+				return "\t\t<div class=\"nino-grid-100\">\n\t\t\t<div class=\"nino-slider\" data-slider-pos=\"0\" data-slider-width=\"". $width. "\" data-slider-min=\"280px\">\n\t\t\t\t<ul>\n"
 					. "\t\t\t\t\t[elements ". $type. " limit=\"". $limit. "\"]\n"
-					. "\t\t\t\t\t<li><article class=\"". $articleClass. " ui-text-center\"><div class=\"ui-article-content\"><p class=\"ui-article-title\">[[title]]</p><p>[[description]]</p></div></article></li>\n"
+					. "\t\t\t\t\t<li><article class=\"". $articleClass. " nino-text-center\"><div class=\"nino-article-content\"><p class=\"nino-article-title\">[[title]]</p><p>[[description]]</p></div></article></li>\n"
 					. "\t\t\t\t\t[/elements]\n\t\t\t\t</ul>\n\t\t\t</div>\n\t\t</div>\n";
 			}
 
 			if( $content === 'media-slider' ) {
 				$width = $spec['layout'] === 'narrow' ? '72%' : '88%';
-				return "\t\t<div class=\"ui-grid-100\">\n\t\t\t<div class=\"js-slider ui-media-slider\" data-slider-pos=\"0\" data-slider-width=\"". $width. "\" data-slider-min=\"280px\">\n\t\t\t\t<ul>\n"
+				return "\t\t<div class=\"nino-grid-100\">\n\t\t\t<div class=\"nino-slider nino-media-slider\" data-slider-pos=\"0\" data-slider-width=\"". $width. "\" data-slider-min=\"280px\">\n\t\t\t\t<ul>\n"
 					. "\t\t\t\t\t[elements ". $type. " limit=\"". $limit. "\"]\n"
-					. "\t\t\t\t\t<li><article class=\"". $articleClass. " ui-article--fullwidth\"><img class=\"ui-article-img ui-article-img--maxheight\" src=\"[[/nino/public]]/images/[[image]]\" alt=\"[[title]]\"><div class=\"ui-article-content\"><h3 class=\"ui-article-title\">[[title]]</h3><div class=\"ui-article-descr\">[[description]]</div><a href=\"[[link]]\" class=\"ui-btn ui-btn--primary\">[[linkLabel]]</a></div></article></li>\n"
+					. "\t\t\t\t\t<li><article class=\"". $articleClass. " nino-article--fullwidth\"><img class=\"nino-article-img nino-article-img--maxheight\" src=\"[[/nino/public]]/images/[[image]]\" alt=\"[[title]]\"><div class=\"nino-article-content\"><h3 class=\"nino-article-title\">[[title]]</h3><div class=\"nino-article-descr\">[[description]]</div><a href=\"[[link]]\" class=\"nino-btn nino-btn--primary\">[[linkLabel]]</a></div></article></li>\n"
 					. "\t\t\t\t\t[/elements]\n\t\t\t\t</ul>\n\t\t\t</div>\n\t\t</div>\n";
 			}
 
 			if( $content === 'accordion' ) {
-				$width = $spec['layout'] === 'narrow' ? 'ui-grid-m-66' : 'ui-grid-100';
-				return "\t\t<div class=\"ui-grid-100 ". $width. "\">\n\t\t\t[elements ". $type. " limit=\"". $limit. "\"]\n\t\t\t<details class=\"ui-accordion\" name=\"". self::_escape( $spec['id'] ). "\">\n\t\t\t\t<summary class=\"ui-accordion-trigger\">[[title]]</summary>\n\t\t\t\t<div class=\"ui-accordion-panel\">[[description]]</div>\n\t\t\t</details>\n\t\t\t[/elements]\n\t\t</div>\n";
+				$width = $spec['layout'] === 'narrow' ? 'nino-grid-m-66' : 'nino-grid-100';
+				return "\t\t<div class=\"nino-grid-100 ". $width. "\">\n\t\t\t[elements ". $type. " limit=\"". $limit. "\"]\n\t\t\t<details class=\"nino-accordion\" name=\"". self::_escape( $spec['id'] ). "\">\n\t\t\t\t<summary class=\"nino-accordion-trigger\">[[title]]</summary>\n\t\t\t\t<div class=\"nino-accordion-panel\">[[description]]</div>\n\t\t\t</details>\n\t\t\t[/elements]\n\t\t</div>\n";
 			}
 
 			if( $content === 'tabs' ) {
-				$width = $spec['layout'] === 'narrow' ? 'ui-grid-m-75' : 'ui-grid-100';
+				$width = $spec['layout'] === 'narrow' ? 'nino-grid-m-75' : 'nino-grid-100';
 				$tabId = self::_escape( $spec['id'] ). '-tab-[[.id]]';
-				return "\t\t<div class=\"ui-grid-100 ". $width. "\" style=\"margin:0 auto;\">\n\t\t\t<div class=\"js-tabs\">\n\t\t\t\t<div class=\"js-tabs-nav\" role=\"tablist\">\n\t\t\t\t\t[elements ". $type. " limit=\"". $limit. "\"]\n\t\t\t\t\t<button type=\"button\" class=\"js-tabs-tab\" role=\"tab\" data-tabs-target=\"". $tabId. "\">[[title]]</button>\n\t\t\t\t\t[/elements]\n\t\t\t\t</div>\n\t\t\t\t[elements ". $type. " limit=\"". $limit. "\"]\n\t\t\t\t<div class=\"js-tabs-panel\" role=\"tabpanel\" id=\"". $tabId. "\">[[description]]</div>\n\t\t\t\t[/elements]\n\t\t\t</div>\n\t\t</div>\n";
+				return "\t\t<div class=\"nino-grid-100 ". $width. "\" style=\"margin:0 auto;\">\n\t\t\t<div class=\"nino-tabs\">\n\t\t\t\t<div class=\"nino-tabs-nav\" role=\"tablist\">\n\t\t\t\t\t[elements ". $type. " limit=\"". $limit. "\"]\n\t\t\t\t\t<button type=\"button\" class=\"nino-tabs-tab\" role=\"tab\" data-tabs-target=\"". $tabId. "\">[[title]]</button>\n\t\t\t\t\t[/elements]\n\t\t\t\t</div>\n\t\t\t\t[elements ". $type. " limit=\"". $limit. "\"]\n\t\t\t\t<div class=\"nino-tabs-panel\" role=\"tabpanel\" id=\"". $tabId. "\">[[description]]</div>\n\t\t\t\t[/elements]\n\t\t\t</div>\n\t\t</div>\n";
 			}
 
 			if( $content === 'pricing' ) {
-				$rowClass = 'ui-pricing-row'. ( $spec['layout'] === 'featured' ? ' ui-pricing-row--feature-middle' : '' );
-				return "\t\t<div class=\"ui-grid-100\">\n\t\t\t<div class=\"". $rowClass. "\">\n\t\t\t\t[elements ". $type. " limit=\"". $limit. "\"]\n\t\t\t\t<div class=\"ui-pricing-item\"><span class=\"ui-badge ui-badge--primary\">[[badge]]</span><h3 class=\"ui-pricing-title\">[[title]]</h3><div>[[description]]</div><p class=\"ui-pricing-price\">[[price]] &euro;</p><div class=\"ui-pricing-features\">[[features]]</div><a href=\"[[link]]\" class=\"ui-btn ui-btn--primary\">[[linkLabel]]</a></div>\n\t\t\t\t[/elements]\n\t\t\t</div>\n\t\t</div>\n";
+				$rowClass = 'nino-pricing-row'. ( $spec['layout'] === 'featured' ? ' nino-pricing-row--feature-middle' : '' );
+				return "\t\t<div class=\"nino-grid-100\">\n\t\t\t<div class=\"". $rowClass. "\">\n\t\t\t\t[elements ". $type. " limit=\"". $limit. "\"]\n\t\t\t\t<div class=\"nino-pricing-item\"><span class=\"nino-badge nino-badge--primary\">[[badge]]</span><h3 class=\"nino-pricing-title\">[[title]]</h3><div>[[description]]</div><p class=\"nino-pricing-price\">[[price]] &euro;</p><div class=\"nino-pricing-features\">[[features]]</div><a href=\"[[link]]\" class=\"nino-btn nino-btn--primary\">[[linkLabel]]</a></div>\n\t\t\t\t[/elements]\n\t\t\t</div>\n\t\t</div>\n";
 			}
 
 			if( $content === 'comparison' ) {
-				return "\t\t<div class=\"ui-grid-100\"><div class=\"ui-table-wrap\"><table class=\"ui-table ui-table--striped ui-table--bordered\"><thead><tr><th scope=\"col\">&nbsp;</th><th scope=\"col\">[[". $prefix. "/column-a]]</th><th scope=\"col\">[[". $prefix. "/column-b]]</th></tr></thead><tbody>\n\t\t\t[elements ". $type. " limit=\"". $limit. "\"]\n\t\t\t<tr><th scope=\"row\">[[title]]</th><td>[[optionA]]</td><td>[[optionB]]</td></tr>\n\t\t\t[/elements]\n\t\t</tbody></table></div></div>\n";
+				return "\t\t<div class=\"nino-grid-100\"><div class=\"nino-table-wrap\"><table class=\"nino-table nino-table--striped nino-table--bordered\"><thead><tr><th scope=\"col\">&nbsp;</th><th scope=\"col\">[[". $prefix. "/column-a]]</th><th scope=\"col\">[[". $prefix. "/column-b]]</th></tr></thead><tbody>\n\t\t\t[elements ". $type. " limit=\"". $limit. "\"]\n\t\t\t<tr><th scope=\"row\">[[title]]</th><td>[[optionA]]</td><td>[[optionB]]</td></tr>\n\t\t\t[/elements]\n\t\t</tbody></table></div></div>\n";
 			}
 
 			if( $content === 'data-table' ) {
-				$tableClass = 'ui-table';
+				$tableClass = 'nino-table';
 				if( in_array( $spec['layout'], [ 'striped', 'striped-bordered' ], true ) )
-					$tableClass .= ' ui-table--striped';
+					$tableClass .= ' nino-table--striped';
 				if( in_array( $spec['layout'], [ 'bordered', 'striped-bordered' ], true ) )
-					$tableClass .= ' ui-table--bordered';
-				return "\t\t<div class=\"ui-grid-100\"><div class=\"ui-table-wrap\"><table class=\"". $tableClass. "\"><thead><tr><th scope=\"col\">[[". $prefix. "/column-a]]</th><th scope=\"col\">[[". $prefix. "/column-b]]</th><th scope=\"col\">[[". $prefix. "/column-c]]</th></tr></thead><tbody>\n\t\t\t[elements ". $type. " limit=\"". $limit. "\"]\n\t\t\t<tr><td>[[columnA]]</td><td>[[columnB]]</td><td>[[columnC]]</td></tr>\n\t\t\t[/elements]\n\t\t</tbody></table></div></div>\n";
+					$tableClass .= ' nino-table--bordered';
+				return "\t\t<div class=\"nino-grid-100\"><div class=\"nino-table-wrap\"><table class=\"". $tableClass. "\"><thead><tr><th scope=\"col\">[[". $prefix. "/column-a]]</th><th scope=\"col\">[[". $prefix. "/column-b]]</th><th scope=\"col\">[[". $prefix. "/column-c]]</th></tr></thead><tbody>\n\t\t\t[elements ". $type. " limit=\"". $limit. "\"]\n\t\t\t<tr><td>[[columnA]]</td><td>[[columnB]]</td><td>[[columnC]]</td></tr>\n\t\t\t[/elements]\n\t\t</tbody></table></div></div>\n";
 			}
 
 			if( $content === 'logos' ) {
-				return "\t\t<div class=\"ui-grid-100\"><div class=\"ui-logos\">\n\t\t\t[elements ". $type. " limit=\"". $limit. "\"]\n\t\t\t<span class=\"ui-logos-item\"><img src=\"[[/nino/public]]/images/[[image]]\" alt=\"[[title]]\"></span>\n\t\t\t[/elements]\n\t\t</div></div>\n";
+				return "\t\t<div class=\"nino-grid-100\"><div class=\"nino-logos\">\n\t\t\t[elements ". $type. " limit=\"". $limit. "\"]\n\t\t\t<span class=\"nino-logos-item\"><img src=\"[[/nino/public]]/images/[[image]]\" alt=\"[[title]]\"></span>\n\t\t\t[/elements]\n\t\t</div></div>\n";
 			}
 
 			if( $content === 'badges' ) {
-				$badgeClass = 'ui-badge'. ( $spec['layout'] === 'pill' ? ' ui-badge--pill' : '' );
-				$cloudClass = 'ui-badge-cloud'. ( $spec['align'] === 'center' ? '' : ' ui-badge-cloud--'. $spec['align'] );
-				return "\t\t<div class=\"ui-grid-100\"><div class=\"". $cloudClass. "\">\n\t\t\t[elements ". $type. " limit=\"". $limit. "\"]\n\t\t\t<span class=\"". $badgeClass. "\">[[title]]</span>\n\t\t\t[/elements]\n\t\t</div></div>\n";
+				$badgeClass = 'nino-badge'. ( $spec['layout'] === 'pill' ? ' nino-badge--pill' : '' );
+				$cloudClass = 'nino-badge-cloud'. ( $spec['align'] === 'center' ? '' : ' nino-badge-cloud--'. $spec['align'] );
+				return "\t\t<div class=\"nino-grid-100\"><div class=\"". $cloudClass. "\">\n\t\t\t[elements ". $type. " limit=\"". $limit. "\"]\n\t\t\t<span class=\"". $badgeClass. "\">[[title]]</span>\n\t\t\t[/elements]\n\t\t</div></div>\n";
 			}
 
 			if( $content === 'gallery' ) {
-				$galleryClass = 'ui-gallery'. ( $spec['layout'] === 'mosaic' ? ' ui-gallery--mosaic' : '' );
+				$galleryClass = 'nino-gallery'. ( $spec['layout'] === 'mosaic' ? ' nino-gallery--mosaic' : '' );
 				$modalId = self::_escape( $spec['id'] ). '-gallery-[[.id]]';
-				return "\t\t<div class=\"ui-grid-100\"><div class=\"". $galleryClass. "\">\n\t\t\t[elements ". $type. " limit=\"". $limit. "\"]\n\t\t\t<div class=\"ui-gallery-item\"><button type=\"button\" class=\"js-modal-trigger\" data-modal-target=\"". $modalId. "\" aria-label=\"[[title]]\"><img src=\"[[/nino/public]]/images/[[image]]\" alt=\"[[title]]\" loading=\"lazy\"></button></div>\n\t\t\t[/elements]\n\t\t</div></div>\n"
-					. "\t\t[elements ". $type. " limit=\"". $limit. "\"]\n\t\t<dialog class=\"js-modal js-modal--lightbox\" id=\"". $modalId. "\"><button type=\"button\" class=\"js-modal-close\" aria-label=\"Close\">&times;</button><img src=\"[[/nino/public]]/images/[[image]]\" alt=\"[[title]]\"></dialog>\n\t\t[/elements]\n";
+				return "\t\t<div class=\"nino-grid-100\"><div class=\"". $galleryClass. "\">\n\t\t\t[elements ". $type. " limit=\"". $limit. "\"]\n\t\t\t<div class=\"nino-gallery-item\"><button type=\"button\" class=\"nino-modal-trigger\" data-modal-target=\"". $modalId. "\" aria-label=\"[[title]]\"><img src=\"[[/nino/public]]/images/[[image]]\" alt=\"[[title]]\" loading=\"lazy\"></button></div>\n\t\t\t[/elements]\n\t\t</div></div>\n"
+					. "\t\t[elements ". $type. " limit=\"". $limit. "\"]\n\t\t<dialog class=\"nino-modal nino-modal--lightbox\" id=\"". $modalId. "\"><button type=\"button\" class=\"nino-modal-close\" aria-label=\"Close\">&times;</button><img src=\"[[/nino/public]]/images/[[image]]\" alt=\"[[title]]\"></dialog>\n\t\t[/elements]\n";
 			}
 
 			if( $content === 'timeline' ) {
-				return "\t\t<div class=\"ui-grid-100\">\n\t\t\t<ol class=\"ui-timeline\">\n\t\t\t\t[elements ". $type. " limit=\"". $limit. "\"]\n\t\t\t\t<li class=\"ui-timeline-step\"><div class=\"ui-timeline-number\">[[number]]</div><h3>[[title]]</h3><p>[[description]]</p></li>\n\t\t\t\t[/elements]\n\t\t\t</ol>\n\t\t</div>\n";
+				return "\t\t<div class=\"nino-grid-100\">\n\t\t\t<ol class=\"nino-timeline\">\n\t\t\t\t[elements ". $type. " limit=\"". $limit. "\"]\n\t\t\t\t<li class=\"nino-timeline-step\"><div class=\"nino-timeline-number\">[[number]]</div><h3>[[title]]</h3><p>[[description]]</p></li>\n\t\t\t\t[/elements]\n\t\t\t</ol>\n\t\t</div>\n";
 			}
 
 			if( $content === 'video' ) {
-				$width = $spec['layout'] === 'narrow' ? 'ui-grid-m-75' : 'ui-grid-100';
+				$width = $spec['layout'] === 'narrow' ? 'nino-grid-m-75' : 'nino-grid-100';
 				$modalId = self::_escape( $spec['id'] ). '-video';
-				return "\t\t<div class=\"ui-grid-100 ". $width. "\" style=\"margin:0 auto;\"><button type=\"button\" class=\"ui-video-poster js-modal-trigger\" data-modal-target=\"". $modalId. "\" aria-label=\"Play video\">[image ". $prefix. "/image alt=\"\"]<svg class=\"ui-video-play\" aria-hidden=\"true\" viewBox=\"0 0 24 24\"><path d=\"M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z\"></path></svg></button></div>\n\t\t<dialog class=\"js-modal js-modal--video\" id=\"". $modalId. "\"><button type=\"button\" class=\"js-modal-close\" aria-label=\"Close\">&times;</button><div class=\"ui-video\"><iframe src=\"[[". $prefix. "/video-uri]]\" title=\"Video\" loading=\"lazy\" allowfullscreen></iframe></div></dialog>\n";
+				return "\t\t<div class=\"nino-grid-100 ". $width. "\" style=\"margin:0 auto;\"><button type=\"button\" class=\"nino-video-poster nino-modal-trigger\" data-modal-target=\"". $modalId. "\" aria-label=\"Play video\">[image ". $prefix. "/image alt=\"\"]<svg class=\"nino-video-play\" aria-hidden=\"true\" viewBox=\"0 0 24 24\"><path d=\"M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z\"></path></svg></button></div>\n\t\t<dialog class=\"nino-modal nino-modal--video\" id=\"". $modalId. "\"><button type=\"button\" class=\"nino-modal-close\" aria-label=\"Close\">&times;</button><div class=\"nino-video\"><iframe src=\"[[". $prefix. "/video-uri]]\" title=\"Video\" loading=\"lazy\" allowfullscreen></iframe></div></dialog>\n";
 			}
 
 			if( $content === 'video-embed' ) {
-				$width = $spec['layout'] === 'narrow' ? 'ui-grid-m-75' : 'ui-grid-100';
-				$videoClass = 'ui-video'. ( $spec['layout'] === '4-3' ? ' ui-video--4-3' : '' );
-				return "\t\t<div class=\"ui-grid-100 ". $width. "\" style=\"margin:0 auto;\"><div class=\"". $videoClass. "\"><iframe src=\"[[". $prefix. "/video-uri]]\" title=\"Video\" loading=\"lazy\" allowfullscreen></iframe></div></div>\n";
+				$width = $spec['layout'] === 'narrow' ? 'nino-grid-m-75' : 'nino-grid-100';
+				$videoClass = 'nino-video'. ( $spec['layout'] === '4-3' ? ' nino-video--4-3' : '' );
+				return "\t\t<div class=\"nino-grid-100 ". $width. "\" style=\"margin:0 auto;\"><div class=\"". $videoClass. "\"><iframe src=\"[[". $prefix. "/video-uri]]\" title=\"Video\" loading=\"lazy\" allowfullscreen></iframe></div></div>\n";
 			}
 
 			if( $content === 'notice' ) {
-				return "\t\t<div class=\"ui-grid-100 ui-grid-m-75\" style=\"margin:0 auto;\"><div class=\"ui-alert ui-alert--". self::_escape( $spec['layout'] ). " ui-alert--content\">[[". $prefix. "/content]]</div></div>\n";
+				return "\t\t<div class=\"nino-grid-100 nino-grid-m-75\" style=\"margin:0 auto;\"><div class=\"nino-alert nino-alert--". self::_escape( $spec['layout'] ). " nino-alert--content\">[[". $prefix. "/content]]</div></div>\n";
 			}
 
 			if( $content === 'contact' ) {
 				$formId = self::_escape( $spec['id'] );
-				return "\t\t<div class=\"ui-grid-100 ui-grid-m-50\"><div>[[". $prefix. "/content]]</div><address class=\"ui-contact-details\">[[". $prefix. "/address]]<a href=\"tel:[[". $prefix. "/phone]]\">[[". $prefix. "/phone]]</a><a href=\"mailto:[[". $prefix. "/email]]\">[[". $prefix. "/email]]</a></address></div>\n"
-					. "\t\t<div class=\"ui-grid-100 ui-grid-m-50\"><form class=\"ui-form\">[csrf]<label for=\"". $formId. "-name\">[[/form/label/name]]</label><input type=\"text\" id=\"". $formId. "-name\" name=\"name\" class=\"ui-form-input\" required><label for=\"". $formId. "-email\">[[/form/label/email]]</label><input type=\"email\" id=\"". $formId. "-email\" name=\"email\" class=\"ui-form-input\" required><label for=\"". $formId. "-message\">[[/form/label/message]]</label><textarea id=\"". $formId. "-message\" name=\"message\" class=\"ui-form-textarea\" required></textarea><input type=\"text\" name=\"location\" class=\"ui-sr-only\" tabindex=\"-1\" autocomplete=\"off\"><p class=\"ui-form-message\"></p><p><small>[[/form/required]]</small></p><button type=\"submit\" class=\"ui-btn ui-btn--primary ui-form-submit\">[[/form/label/submit]]</button></form></div>\n";
+				return "\t\t<div class=\"nino-grid-100 nino-grid-m-50\"><div>[[". $prefix. "/content]]</div><address class=\"nino-contact-details\">[[". $prefix. "/address]]<a href=\"tel:[[". $prefix. "/phone]]\">[[". $prefix. "/phone]]</a><a href=\"mailto:[[". $prefix. "/email]]\">[[". $prefix. "/email]]</a></address></div>\n"
+					. "\t\t<div class=\"nino-grid-100 nino-grid-m-50\"><form class=\"nino-form\">[csrf]<label for=\"". $formId. "-name\">[[/form/label/name]]</label><input type=\"text\" id=\"". $formId. "-name\" name=\"name\" class=\"nino-form-input\" required><label for=\"". $formId. "-email\">[[/form/label/email]]</label><input type=\"email\" id=\"". $formId. "-email\" name=\"email\" class=\"nino-form-input\" required><label for=\"". $formId. "-message\">[[/form/label/message]]</label><textarea id=\"". $formId. "-message\" name=\"message\" class=\"nino-form-textarea\" required></textarea><input type=\"text\" name=\"location\" class=\"nino-sr-only\" tabindex=\"-1\" autocomplete=\"off\"><p class=\"nino-form-message\"></p><p><small>[[/form/required]]</small></p><button type=\"submit\" class=\"nino-btn nino-btn--primary nino-form-submit\">[[/form/label/submit]]</button></form></div>\n";
 			}
 
 			if( $content === 'newsletter' ) {
-				$width = $spec['layout'] === 'narrow' ? 'ui-grid-m-66' : 'ui-grid-100';
+				$width = $spec['layout'] === 'narrow' ? 'nino-grid-m-66' : 'nino-grid-100';
 				$emailId = self::_escape( $spec['id'] ). '-email';
-				return "\t\t<div class=\"ui-grid-100 ". $width. "\" style=\"margin:0 auto;\"><form class=\"ui-form js-newsletter-form ui-newsletter-inline\" action=\"[[/nino/dir]]/.newsletter\">[csrf]<input type=\"text\" name=\"location\" value=\"\" tabindex=\"-1\" autocomplete=\"off\" aria-hidden=\"true\" class=\"ui-sr-only\"><label for=\"". $emailId. "\" class=\"ui-sr-only\">[[/newsletter/label/email]]</label><input type=\"email\" id=\"". $emailId. "\" name=\"email\" class=\"ui-form-input\" placeholder=\"[[/newsletter/label/email]]\" required><button type=\"submit\" class=\"ui-btn ui-btn--primary ui-form-submit\">[[/newsletter/label/submit]]</button><p class=\"ui-form-message ui-grid-100\"></p></form></div>\n";
+				return "\t\t<div class=\"nino-grid-100 ". $width. "\" style=\"margin:0 auto;\"><form class=\"nino-form nino-newsletter-form nino-newsletter-inline\" action=\"[[/nino/dir]]/.newsletter\">[csrf]<input type=\"text\" name=\"location\" value=\"\" tabindex=\"-1\" autocomplete=\"off\" aria-hidden=\"true\" class=\"nino-sr-only\"><label for=\"". $emailId. "\" class=\"nino-sr-only\">[[/newsletter/label/email]]</label><input type=\"email\" id=\"". $emailId. "\" name=\"email\" class=\"nino-form-input\" placeholder=\"[[/newsletter/label/email]]\" required><button type=\"submit\" class=\"nino-btn nino-btn--primary nino-form-submit\">[[/newsletter/label/submit]]</button><p class=\"nino-form-message nino-grid-100\"></p></form></div>\n";
 			}
 
 			return '';
@@ -1191,80 +1191,80 @@ namespace Nino\Templates {
 			if( $spec['action'] === 'none' )
 				return '';
 
-			$class = in_array( $spec['action'], [ 'button', 'dual-buttons' ], true ) ? 'ui-btn ui-btn--primary' : '';
-			$wrap = 'ui-grid-100 ui-mt-3'. ( $spec['align'] === 'left' ? '' : ' ui-text-'. $spec['align'] );
+			$class = in_array( $spec['action'], [ 'button', 'dual-buttons' ], true ) ? 'nino-btn nino-btn--primary' : '';
+			$wrap = 'nino-grid-100 nino-mt-3'. ( $spec['align'] === 'left' ? '' : ' nino-text-'. $spec['align'] );
 			$secondary = $spec['action'] === 'dual-buttons'
-				? "\t\t\t<a href=\"[[". $prefix. "/secondary-cta-uri]]\" class=\"ui-btn ui-btn--outline\">[[". $prefix. "/secondary-cta-label]]</a>\n"
+				? "\t\t\t<a href=\"[[". $prefix. "/secondary-cta-uri]]\" class=\"nino-btn nino-btn--outline\">[[". $prefix. "/secondary-cta-label]]</a>\n"
 				: '';
 			return "\t\t<div class=\"". $wrap. "\">\n\t\t\t<a href=\"[[". $prefix. "/cta-uri]]\" class=\"". $class. "\">[[". $prefix. "/cta-label]]</a>\n". $secondary. "\t\t</div>\n";
 		}
 
 		private static function _sectionClasses( array $spec ): array {
 
-			$classes = $spec['shell'] === 'hero' ? [ 'ui-atf', 'ui-section--fullwidth' ] : [ 'ui-section' ];
+			$classes = $spec['shell'] === 'hero' ? [ 'nino-atf', 'nino-section--fullwidth' ] : [ 'nino-section' ];
 
 			if( $spec['surface'] !== 'default' )
-				$classes[] = 'ui-section--'. $spec['surface'];
+				$classes[] = 'nino-section--'. $spec['surface'];
 
 			if( $spec['background'] === 'image-cover' ) {
-				$classes[] = 'ui-section--fullwidth';
-				$classes[] = 'js-cover';
-				$classes[] = 'js-cover--dim';
+				$classes[] = 'nino-section--fullwidth';
+				$classes[] = 'nino-cover';
+				$classes[] = 'nino-cover--dim';
 				if( $spec['align'] === 'center' )
-					$classes[] = 'js-cover-center';
+					$classes[] = 'nino-cover-center';
 			} else if( $spec['background'] === 'image-static' ) {
-				$classes[] = 'ui-section--fullwidth';
-				$classes[] = 'ui-img-background';
-				$classes[] = 'ui-img-background--dim';
+				$classes[] = 'nino-section--fullwidth';
+				$classes[] = 'nino-img-background';
+				$classes[] = 'nino-img-background--dim';
 			} else if( $spec['background'] === 'parallax' ) {
-				$classes[] = 'ui-section--fullwidth';
-				$classes[] = 'js-parallex';
-				$classes[] = 'js-parallex--dim';
+				$classes[] = 'nino-section--fullwidth';
+				$classes[] = 'nino-parallex';
+				$classes[] = 'nino-parallex--dim';
 			} else if( $spec['shell'] === 'hero' ) {
-				$classes[] = 'ui-atf--fullscreen';
+				$classes[] = 'nino-atf--fullscreen';
 			}
 
 			if( in_array( $spec['layout'], [ 'media-left-full', 'media-right-full' ], true ) ) {
-				$classes[] = 'ui-section--fullwidth';
-				$classes[] = 'ui-section--fullheight';
+				$classes[] = 'nino-section--fullwidth';
+				$classes[] = 'nino-section--fullheight';
 			}
 
 			$padding = [ 'none' => '0', 'compact' => '2', 'generous' => '6' ][$spec['padding']] ?? null;
 			if( $padding !== null ) {
-				$classes[] = 'ui-pt-'. $padding;
-				$classes[] = 'ui-pb-'. $padding;
+				$classes[] = 'nino-pt-'. $padding;
+				$classes[] = 'nino-pb-'. $padding;
 			}
 
 			$margin = [ 'small' => '1', 'medium' => '2', 'large' => '3' ][$spec['margin']] ?? null;
 			if( $margin !== null ) {
-				$classes[] = 'ui-mt-'. $margin;
-				$classes[] = 'ui-mb-'. $margin;
+				$classes[] = 'nino-mt-'. $margin;
+				$classes[] = 'nino-mb-'. $margin;
 			}
 
 			if( $spec['border'] !== 'none' )
-				$classes[] = 'ui-section--border-'. $spec['border'];
+				$classes[] = 'nino-section--border-'. $spec['border'];
 
 			return array_values( array_unique( $classes ) );
 		}
 
 		private static function _articleClass( array $spec ): string {
-			$classes = [ 'ui-article' ];
+			$classes = [ 'nino-article' ];
 			$autoAlt = in_array( $spec['surface'], [ 'alt', 'primary', 'dark', 'black' ], true );
 			if( $spec['contentStyle'] === 'alt' || ( $spec['contentStyle'] === 'auto' && $autoAlt === true ) )
-				$classes[] = 'ui-article--alt';
+				$classes[] = 'nino-article--alt';
 			return implode( ' ', $classes );
 		}
 
 		private static function _gridClass( string $layout ): string {
 			return match( $layout ) {
-				'2' => 'ui-grid-m-50',
-				'4' => 'ui-grid-m-25',
-				default => 'ui-grid-m-33',
+				'2' => 'nino-grid-m-50',
+				'4' => 'nino-grid-m-25',
+				default => 'nino-grid-m-33',
 			};
 		}
 
 		private static function _checkIcon(): string {
-			return '<svg class="ui-icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"></path></svg>';
+			return '<svg class="nino-icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"></path></svg>';
 		}
 
 		private static function _renderCustom( array $spec, string $template ): string {

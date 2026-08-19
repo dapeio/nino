@@ -19,14 +19,14 @@
 			'source' => 'single',
 			'allowed' => [ 'title', 'subtitle', 'description' ],
 			'styles' => [
-				'left' => [ 'label' => 'Left', 'class' => 'ui-text-left' ],
-				'center' => [ 'label' => 'Centered', 'class' => 'ui-text-center' ],
+				'left' => [ 'label' => 'Left', 'class' => 'nino-text-left' ],
+				'center' => [ 'label' => 'Centered', 'class' => 'nino-text-center' ],
 			],
 			'recommend' => [ 'style' => 'left', 'components' => [
 				[ 'id' => 'title', 'type' => 'title', 'bindings' => [ 'text' => 'title' ] ],
 				[ 'id' => 'subtitle', 'type' => 'subtitle', 'bindings' => [ 'text' => 'subtitle' ] ],
 			] ],
-			'render' => [ 'title' => [ 'tag' => 'h2', 'class' => 'ui-section-title' ], 'subtitle' => [ 'class' => 'ui-section-subtitle' ] ],
+			'render' => [ 'title' => [ 'tag' => 'h2', 'class' => 'nino-section-title' ], 'subtitle' => [ 'class' => 'nino-section-subtitle' ] ],
 		],
 		'features' => [
 			'label' => 'Checklist',
@@ -49,11 +49,11 @@
 			'help' => 'The image column. Layout controls which side it occupies.',
 			'source' => 'single',
 			'allowed' => [ 'image' ],
-			'container' => [ 'class' => 'ui-grid-100 ui-grid-m-50 ui-img-cover' ],
+			'container' => [ 'class' => 'nino-grid-100 nino-grid-m-50 nino-img-cover' ],
 			'recommend' => [ 'components' => [
 				[ 'id' => 'image', 'type' => 'image', 'bindings' => [ 'src' => 'image', 'alt' => 'image-alt' ] ],
 			] ],
-			'render' => [ 'image' => [ 'class' => 'ui-img-cover', 'width' => 1200, 'height' => 900 ] ],
+			'render' => [ 'image' => [ 'class' => 'nino-img-cover', 'width' => 1200, 'height' => 900 ] ],
 		],
 	],
 ];

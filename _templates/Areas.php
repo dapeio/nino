@@ -49,10 +49,10 @@ final class AreaComposer {
 
 	public static function catalog(): array {
 		return [
-			'title' => self::component( 'Title', [ 'text' => self::property( 'Text', 'text', 'string', 'Section title' ) ], 'h3', 'ui-section-title', [ 'auto', 'quiet', 'loud' ] ),
-			'subtitle' => self::component( 'Subtitle', [ 'text' => self::property( 'Text', 'text', 'string', 'A concise supporting line' ) ], 'p', 'ui-section-subtitle', [ 'auto', 'quiet', 'loud' ] ),
-			'description' => self::component( 'Description', [ 'text' => self::property( 'Text', 'textarea', 'string', 'Explain what this area offers.' ) ], 'div', 'ui-section-text', [ 'auto', 'quiet', 'loud' ] ),
-			'text' => self::component( 'Text', [ 'text' => self::property( 'Text', 'textarea', 'string', 'Add useful content here.' ) ], 'div', 'ui-section-text', [ 'auto', 'quiet', 'loud' ] ),
+			'title' => self::component( 'Title', [ 'text' => self::property( 'Text', 'text', 'string', 'Section title' ) ], 'h3', 'nino-section-title', [ 'auto', 'quiet', 'loud' ] ),
+			'subtitle' => self::component( 'Subtitle', [ 'text' => self::property( 'Text', 'text', 'string', 'A concise supporting line' ) ], 'p', 'nino-section-subtitle', [ 'auto', 'quiet', 'loud' ] ),
+			'description' => self::component( 'Description', [ 'text' => self::property( 'Text', 'textarea', 'string', 'Explain what this area offers.' ) ], 'div', 'nino-section-text', [ 'auto', 'quiet', 'loud' ] ),
+			'text' => self::component( 'Text', [ 'text' => self::property( 'Text', 'textarea', 'string', 'Add useful content here.' ) ], 'div', 'nino-section-text', [ 'auto', 'quiet', 'loud' ] ),
 			'image' => self::component( 'Image', [
 				'src' => self::property( 'Image', 'image', 'image', '', 1200, 800 ),
 				'alt' => self::property( 'Alternative text', 'text', 'string', '' ),
@@ -64,11 +64,11 @@ final class AreaComposer {
 			'price' => self::component( 'Price', [
 				'value' => self::property( 'Price', 'text', 'string', '99' ),
 				'suffix' => self::property( 'Suffix', 'text', 'string', '€' ),
-			], 'div', 'ui-section-text', [ 'auto', 'quiet', 'loud' ] ),
+			], 'div', 'nino-section-text', [ 'auto', 'quiet', 'loud' ] ),
 			'number' => self::component( 'Number', [
 				'value' => self::property( 'Value', 'text', 'string', '12' ),
 				'label' => self::property( 'Label', 'text', 'string', 'Projects' ),
-			], 'div', 'ui-section-text', [ 'auto', 'quiet', 'loud' ] ),
+			], 'div', 'nino-section-text', [ 'auto', 'quiet', 'loud' ] ),
 			'template' => self::component( 'Template', [ 'path' => self::property( 'Template', 'template', 'template', '' ) ], 'div', '', [ 'auto' ] ),
 		];
 	}
@@ -265,8 +265,8 @@ final class AreaComposer {
 			'maxComponents' => max( 1, min( 20, (int) ( $definition['maxComponents'] ?? 12 ) ) ),
 			'styles' => $styles,
 			'recommend' => [ 'style' => $recommendedStyle, 'components' => $components ],
-			'container' => self::element( $definition['container'] ?? [], 'div', $source === 'single' ? 'ui-grid-100' : '' ),
-			'item' => self::element( $definition['item'] ?? [], 'article', 'ui-grid-m-33' ),
+			'container' => self::element( $definition['container'] ?? [], 'div', $source === 'single' ? 'nino-grid-100' : '' ),
+			'item' => self::element( $definition['item'] ?? [], 'article', 'nino-grid-m-33' ),
 			'render' => $render,
 			'model' => $model,
 			'typeTitle' => trim( (string) ( $definition['typeTitle'] ?? '' ) ) ?: ucwords( str_replace( '-', ' ', $key ) ),
@@ -460,11 +460,11 @@ final class AreaComposer {
 		if( preg_match( '/\[\[(?:area:[^\]]+|section:id)\]\]/', $body ) === 1 )
 			throw new \InvalidArgumentException( 'layout contains an unresolved compile token' );
 
-		$rowClasses = [ 'ui-grid-row' ];
+		$rowClasses = [ 'nino-grid-row' ];
 		if( $effective['frame']['container'] !== 'default' )
-			$rowClasses[] = 'ui-grid-row--'. $effective['frame']['container'];
+			$rowClasses[] = 'nino-grid-row--'. $effective['frame']['container'];
 		if( $spec['pageMotion'] === 'on' )
-			$rowClasses[] = 'js-vpa';
+			$rowClasses[] = 'nino-vpa';
 		$body = '<div class="'. implode( ' ', $rowClasses ). "\">\n". self::indent( $body, 1 ). '</div>';
 		$classes = self::sectionClasses( $effective['frame'] );
 		$attributes = ' id="'. self::escape( $spec['id'] ). '" class="'. self::escape( implode( ' ', $classes ) ). '"';
@@ -484,7 +484,7 @@ final class AreaComposer {
 			$inner .= $background. "\n";
 		$needsLayer = $background !== '' || $effective['frame']['screen'] !== 'off';
 		$inner .= $needsLayer
-			? '<div class="'. ( $effective['frame']['background'] === 'cover' && $effective['frame']['screen'] === 'off' ? 'ui-img-background-content' : 'js-cover-content' ). "\">\n". self::indent( $body, 1 ). '</div>'
+			? '<div class="'. ( $effective['frame']['background'] === 'cover' && $effective['frame']['screen'] === 'off' ? 'nino-img-background-content' : 'nino-cover-content' ). "\">\n". self::indent( $body, 1 ). '</div>'
 			: $body;
 		return '<section'. $attributes. ">\n". self::indent( $inner, 1 ). '</section>';
 	}
@@ -577,8 +577,8 @@ final class AreaComposer {
 				$definition['styleClasses'] = $styles;
 			}
 			// A step down or up the type scale is a modifier of the class the
-			// component actually carries - ui-section-title--loud, and
-			// ui-article-title--loud once a manifest restyles the same
+			// component actually carries - nino-section-title--loud, and
+			// nino-article-title--loud once a manifest restyles the same
 			// component as a card title. A component without a class of its own
 			// has nothing to modify and keeps its plain look.
 			$base = strtok( $definition['class'], ' ' );
@@ -615,8 +615,8 @@ final class AreaComposer {
 			$styleClasses[$style] = match( $style ) {
 				// quiet and loud are resolved in renderDefinitions(), where the
 				// class they modify is final
-				'cover' => 'ui-img-cover',
-				'link' => '', 'default' => 'ui-btn', 'primary' => 'ui-btn ui-btn--primary', 'outline' => 'ui-btn ui-btn--outline', default => '',
+				'cover' => 'nino-img-cover',
+				'link' => '', 'default' => 'nino-btn', 'primary' => 'nino-btn nino-btn--primary', 'outline' => 'nino-btn nino-btn--outline', default => '',
 			};
 		return [ 'label' => $label, 'properties' => $properties, 'tag' => $tag, 'class' => $class, 'data' => [], 'styles' => array_values( array_unique( [ 'auto', ...$styles ] ) ), 'styleClasses' => $styleClasses, 'settings' => $settings ];
 	}
@@ -823,32 +823,32 @@ final class AreaComposer {
 	}
 
 	private static function sectionClasses( array $frame ): array {
-		$classes = [ 'ui-section' ];
+		$classes = [ 'nino-section' ];
 		if( in_array( $frame['background'], [ 'alt', 'primary', 'dark', 'black' ], true ) )
-			$classes[] = 'ui-section--'. $frame['background'];
+			$classes[] = 'nino-section--'. $frame['background'];
 		if( in_array( $frame['background'], [ 'cover', 'parallax' ], true ) ) {
-			$classes[] = 'ui-section--fullwidth';
-			$classes[] = 'ui-section--black';
+			$classes[] = 'nino-section--fullwidth';
+			$classes[] = 'nino-section--black';
 			// The scrim belongs to whichever image layer this background uses:
 			// each of the three ships its own --dim in the design system
-			$layer = $frame['background'] === 'parallax' ? 'js-parallex' : ( $frame['screen'] === 'off' ? 'ui-img-background' : 'js-cover' );
+			$layer = $frame['background'] === 'parallax' ? 'nino-parallex' : ( $frame['screen'] === 'off' ? 'nino-img-background' : 'nino-cover' );
 			$classes[] = $layer;
 			if( $frame['overlay'] === 'dim' )
 				$classes[] = $layer. '--dim';
-			$classes[] = 'ui-img-focus--'. $frame['focus'];
+			$classes[] = 'nino-img-focus--'. $frame['focus'];
 		}
 		if( $frame['screen'] !== 'off' )
-			$classes[] = 'js-cover';
+			$classes[] = 'nino-cover';
 		if( $frame['vertical'] !== 'middle' )
-			$classes[] = 'js-cover-'. $frame['vertical'];
+			$classes[] = 'nino-cover-'. $frame['vertical'];
 		$spacing = [ 'none' => '0', 'small' => '2', 'big' => '6' ];
 		if( isset( $spacing[$frame['padding']] ) ) {
-			$classes[] = 'ui-pt-'. $spacing[$frame['padding']];
-			$classes[] = 'ui-pb-'. $spacing[$frame['padding']];
+			$classes[] = 'nino-pt-'. $spacing[$frame['padding']];
+			$classes[] = 'nino-pb-'. $spacing[$frame['padding']];
 		}
 		if( isset( $spacing[$frame['margin']] ) ) {
-			$classes[] = 'ui-mt-'. $spacing[$frame['margin']];
-			$classes[] = 'ui-mb-'. $spacing[$frame['margin']];
+			$classes[] = 'nino-mt-'. $spacing[$frame['margin']];
+			$classes[] = 'nino-mb-'. $spacing[$frame['margin']];
 		}
 		return array_values( array_unique( $classes ) );
 	}
@@ -903,8 +903,8 @@ final class AreaComposer {
 
 	/**
 	 * Normalize the optional data-* attributes a manifest declares for one
-	 * generated element. Frontend behavior such as ui-autoheight, js-slider or
-	 * js-vpa is configured through these attributes, so a preset that owns the
+	 * generated element. Frontend behavior such as nino-autoheight, nino-slider or
+	 * nino-vpa is configured through these attributes, so a preset that owns the
 	 * matching class must be able to own its parameters too.
 	 *
 	 * Only the preset files decide this. Nothing here is read from a request:

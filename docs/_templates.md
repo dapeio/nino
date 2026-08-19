@@ -59,7 +59,7 @@ Native quick fill creates new keys in the project’s native locale and changes 
 
 **Name**, **Header**, **Footer** and **VPA** share one labeled Template Settings row. **Delete** and **Save template** stay together at the right of the topbar; **Add section** remains in the document toolbar even after content has been inserted. The header/footer selects show real `.tpl` filenames, list non-page templates known to the project and also offer **None**. The selected value is still written as an ordinary `[template /templates/<name>]` shortcode; the controls only prevent shell includes from being mistaken for movable page content. **Delete** removes exactly the loaded file revision after explicit confirmation; recovery requires version control or another external backup.
 
-**VPA** at template level supplies the default for sections whose motion is set to **Page**. Changing it recomposes managed sections, updates their `js-vpa` class and remains persisted even while a template is still empty. **On** or **Off** on an individual section overrides that default.
+**VPA** at template level supplies the default for sections whose motion is set to **Page**. Changing it recomposes managed sections, updates their `nino-vpa` class and remains persisted even while a template is still empty. **On** or **Off** on an individual section overrides that default.
 
 Add and Edit intentionally expose different depths of the same version-3 metadata:
 
@@ -240,8 +240,8 @@ The fixed component catalog is `title`, `subtitle`, `description`,
 `text`, `image`, `button`, `price`, `number` and `template`. Every text
 component offers the same three styles — **Auto**, **Quiet** and **Loud** —
 which compile to a modifier of whatever class the component carries:
-`ui-section-title--loud` in a content section, `ui-atf-title--loud` in a hero,
-`ui-article-title--loud` in a card. Each modifier states its own `rem` size, so
+`nino-section-title--loud` in a content section, `nino-atf-title--loud` in a hero,
+`nino-article-title--loud` in a card. Each modifier states its own `rem` size, so
 a step never fights the size the class sets for itself.
 Components can be added, reordered, styled or removed, but the Builder never
 accepts arbitrary markup through the visual editor.
@@ -322,10 +322,10 @@ only ordinary relative URLs or the `http`, `https`, `mailto` and `tel` schemes.
             'label' => 'Title area',
             'source' => 'single',
             'allowed' => [ 'title', 'subtitle', 'description' ],
-            'container' => [ 'class' => 'ui-grid-100 ui-mb-3' ],
+            'container' => [ 'class' => 'nino-grid-100 nino-mb-3' ],
             'styles' => [
-                'left' => [ 'label' => 'Left', 'class' => 'ui-text-left' ],
-                'center' => [ 'label' => 'Centered', 'class' => 'ui-text-center' ],
+                'left' => [ 'label' => 'Left', 'class' => 'nino-text-left' ],
+                'center' => [ 'label' => 'Centered', 'class' => 'nino-text-center' ],
             ],
             'recommend' => [
                 'style' => 'center',
@@ -335,18 +335,18 @@ only ordinary relative URLs or the `http`, `https`, `mailto` and `tel` schemes.
                 ],
             ],
             'render' => [
-                'title' => [ 'tag' => 'h2', 'class' => 'ui-section-title' ],
+                'title' => [ 'tag' => 'h2', 'class' => 'nino-section-title' ],
             ],
         ],
         'articles' => [
             'label' => 'Articles',
             'source' => 'elements',
             'allowed' => [ 'image', 'title', 'description', 'button' ],
-            'item' => [ 'tag' => 'article', 'class' => 'ui-article' ],
+            'item' => [ 'tag' => 'article', 'class' => 'nino-article' ],
             'styles' => [
-                'two-columns' => [ 'label' => '2 columns', 'class' => 'ui-grid-m-50' ],
-                'three-columns' => [ 'label' => '3 columns', 'class' => 'ui-grid-m-33' ],
-                'four-columns' => [ 'label' => '4 columns', 'class' => 'ui-grid-m-25' ],
+                'two-columns' => [ 'label' => '2 columns', 'class' => 'nino-grid-m-50' ],
+                'three-columns' => [ 'label' => '3 columns', 'class' => 'nino-grid-m-33' ],
+                'four-columns' => [ 'label' => '4 columns', 'class' => 'nino-grid-m-25' ],
             ],
             'recommend' => [
                 'style' => 'three-columns',
@@ -448,25 +448,25 @@ removed intentionally when the section is accepted through HTML+.
 ### Data attributes
 
 The shared frontend script reads its parameters from `data-*` attributes:
-`ui-autoheight` equalizes the cards sharing one `data-autoheight-group`,
-`js-slider` sizes itself from `data-slider-width`, `js-vpa` delays itself by
+`nino-autoheight` equalizes the cards sharing one `data-autoheight-group`,
+`nino-slider` sizes itself from `data-slider-width`, `nino-vpa` delays itself by
 `data-vpa-delay`. A preset that puts such a class on a generated element
 declares the matching attributes next to it:
 
 ```php
 'areas' => [
 	'services' => [
-		'item' => [ 'tag' => 'article', 'class' => 'ui-article' ],
+		'item' => [ 'tag' => 'article', 'class' => 'nino-article' ],
 		'render' => [
 			'title' => [
 				'tag' => 'h3',
-				'class' => 'ui-article-title ui-autoheight',
+				'class' => 'nino-article-title nino-autoheight',
 				'data' => [
 					'autoheight-group' => 'services-title-[[section:id]]',
 					'autoheight-mobile' => 'skip',
 				],
 			],
-			'button' => [ 'class' => 'js-modal-trigger', 'data' => [ 'modal-target' => 'contact-modal' ] ],
+			'button' => [ 'class' => 'nino-modal-trigger', 'data' => [ 'modal-target' => 'contact-modal' ] ],
 		],
 	],
 ],
@@ -482,8 +482,8 @@ section ID so two copies of the same preset stay independent on one page.
 data attributes are a preset decision, and anything beyond them is HTML+ work.
 
 Choose the element that actually carries the class. The `<section>` is the one
-with `js-cover`/`js-parallex`, so `data-cover-width` belongs in a top-level or
-Layout map. `js-vpa` is written onto the generated `ui-grid-row`, which no `data`
+with `nino-cover`/`nino-parallex`, so `data-cover-width` belongs in a top-level or
+Layout map. `nino-vpa` is written onto the generated `nino-grid-row`, which no `data`
 map reaches — motion timing stays in the Layout `.tpl`. A collection `item` is a
 direct flex child of that row and already stretches to the height of its row
 line, so equalizing heights belongs on the boxes inside the card via

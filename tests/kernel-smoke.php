@@ -1259,7 +1259,7 @@ $seededCsp = $homeRequest['/nino/http/response']['header']['Content-Security-Pol
 check( 'the response header is seeded with the default csp', str_contains( $seededCsp, "default-src 'self'" ) === true );
 
 // img-src '*' covers network schemes only, so a data: uri needs spelling out.
-// Nino.css uses one for .ui-atf-arrowdown, ie. the framework's own default
+// Nino.css uses one for .nino-atf-arrowdown, ie. the framework's own default
 // policy used to block the framework's own icon
 check( 'the default csp allows data: images', str_contains( $seededCsp, 'img-src * data:' ) === true );
 check( '...which is what Nino.css\'s own data: uri needs', str_contains(

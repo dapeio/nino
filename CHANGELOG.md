@@ -395,6 +395,39 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **Breaking:** the frontend speaks one class namespace, `nino-*`. `ui-*`, `js-*`
+  and the shortcode modules' `sc-*` are gone, and so are the bare English state
+  words that rode along with them: `.error`, `.success`, `.pending`, `.existing`,
+  `.touch` and `.active` are now `nino-is-*`, and the one size variant among them,
+  `.nino-icon.small`, became `.nino-icon--small` like every other modifier.
+
+  A framework that ships global CSS has to own its selectors. `ui-btn` and
+  `ui-grid-100` are names anybody's stylesheet might also pick, and the state
+  classes were worse than merely generic: `.ui-form.error` reached into any
+  `class="error"` a project put inside a form, which is a collision nobody finds
+  by reading their own code.
+
+  The `ui-`/`js-` split did not survive the examination it was given first. It is
+  supposed to separate appearance from behaviour, but 51 of the 60 `js-*` classes
+  carried their own styling - `.js-cover` positions, `.js-parallex` sets a height,
+  the 22 `js-vpa--*` modifiers are pure animation - while `Nino.ui.js` reaches for
+  `.ui-autoheight` and `.ui-atf-arrowdown` as behaviour hooks. A boundary that
+  leaks in both directions documents nothing, so it was not carried forward under
+  new names; `nino-is-*` marks the one distinction that does hold, a state that
+  something sets and removes at runtime.
+
+  `Nino.admin.css` keeps its own `nino-*` vocabulary and is untouched. The two
+  never meet - the admin tools are standalone pages, the editor included - and
+  the 89 admin names and the 361 frontend ones do not overlap anywhere.
+
+  Existing projects need a manual pass: `/_install` copies page templates into
+  the project, so their markup and any `assets/style.custom.css` still name the
+  old classes. Compiled sections are the cheap half - a `nino:section` comment
+  stores no class names, only semantics, so re-saving a section in
+  `/_templates` re-emits it with the current vocabulary. Hand-written markup and
+  custom CSS have to be renamed by hand, prefix for prefix, with the state
+  classes above as the only entries that are not a straight `ui-`/`js-`/`sc-` →
+  `nino-` swap.
 - The Template Builder's Data view puts one binding on one line. A property's
   source and the value it feeds were two full-width fields stacked on top of
   each other, so a button with a label and an address read as four unrelated

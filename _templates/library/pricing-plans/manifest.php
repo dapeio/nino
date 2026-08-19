@@ -21,23 +21,23 @@
 			'help' => 'The introduction above the plans.',
 			'source' => 'single',
 			'allowed' => [ 'title', 'subtitle', 'description' ],
-			'container' => [ 'class' => 'ui-grid-100 ui-mb-3' ],
+			'container' => [ 'class' => 'nino-grid-100 nino-mb-3' ],
 			'styles' => [
-				'center' => [ 'label' => 'Centered', 'class' => 'ui-text-center' ],
-				'left' => [ 'label' => 'Left', 'class' => 'ui-text-left' ],
+				'center' => [ 'label' => 'Centered', 'class' => 'nino-text-center' ],
+				'left' => [ 'label' => 'Left', 'class' => 'nino-text-left' ],
 			],
 			'recommend' => [ 'style' => 'center', 'components' => [
 				[ 'id' => 'title', 'type' => 'title', 'bindings' => [ 'text' => 'title' ] ],
 				[ 'id' => 'subtitle', 'type' => 'subtitle', 'bindings' => [ 'text' => 'subtitle' ] ],
 			] ],
-			'render' => [ 'title' => [ 'tag' => 'h2', 'class' => 'ui-section-title' ] ],
+			'render' => [ 'title' => [ 'tag' => 'h2', 'class' => 'nino-section-title' ] ],
 		],
 		'plans' => [
 			'label' => 'Plans',
 			'help' => 'One entry per plan. Which card is emphasized is a Layout choice, not content — the four-column Layouts read the first or the last entry of this collection as the wide one, so raise the limit to 5 for those.',
 			'source' => 'elements',
 			'allowed' => [ 'title', 'price', 'description', 'button' ],
-			'item' => [ 'tag' => 'div', 'class' => 'ui-pricing-item' ],
+			'item' => [ 'tag' => 'div', 'class' => 'nino-pricing-item' ],
 			'typeTitle' => 'Pricing plans',
 			'model' => [
 				'title' => [ 'type' => 'string', 'locale' => true, 'required' => true, 'maxlength' => 120 ],
@@ -49,8 +49,8 @@
 			],
 			'shortcode' => [ 'locale' => '', 'callback' => '', 'limit' => 3, 'query' => '' ],
 			'render' => [
-				'title' => [ 'tag' => 'h3', 'class' => 'ui-pricing-title' ],
-				'price' => [ 'class' => 'ui-pricing-price' ],
+				'title' => [ 'tag' => 'h3', 'class' => 'nino-pricing-title' ],
+				'price' => [ 'class' => 'nino-pricing-price' ],
 				'description' => [ 'tag' => 'div', 'class' => '' ],
 			],
 			'recommend' => [ 'components' => [

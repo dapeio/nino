@@ -126,7 +126,7 @@ html {
    content ended, which on a page-blank.tpl route (the starting point
    /_install writes for every Blank page) left it floating mid-viewport above
    a screen-high strip of empty background. `header` is position:fixed and so
-   out of flow either way; .js-preloader and .js-cookie-banner are fixed too,
+   out of flow either way; .nino-preloader and .nino-cookie-banner are fixed too,
    which leaves `main` and `footer` as the only flex items here */
 body {
 	min-height: 100vh;
@@ -228,14 +228,14 @@ p {
  *			flexbox, mobile-first designed
  *
  *
- *			.ui-grid-row(--*), .ui-grid(-25, -33, -50, -66, -75, -100)
- *			.ui-grid(-top, -middle, -bottom, -center)
- *			.ui-grid(-s,-m, -l, -xl)(-25, -33, -50, -66, -75, -100)
+ *			.nino-grid-row(--*), .nino-grid(-25, -33, -50, -66, -75, -100)
+ *			.nino-grid(-top, -middle, -bottom, -center)
+ *			.nino-grid(-s,-m, -l, -xl)(-25, -33, -50, -66, -75, -100)
  *
  *
  ****************************************************************************************************/
 
-.ui-grid-row {
+.nino-grid-row {
 	display: flex;
 	flex-wrap: wrap;
 	padding: 0 var(--space-2);
@@ -244,73 +244,78 @@ p {
 	max-width: var(--grid-max-width);
 	box-sizing: border-box;
 }
-.ui-grid-row--narrow { max-width: 52rem; }
-.ui-grid-row--wide { max-width: 92rem; }
+.nino-grid-row--narrow { max-width: 52rem; }
+.nino-grid-row--wide { max-width: 92rem; }
 
-.ui-grid--fullwidth {
+.nino-grid--fullwidth {
 	padding-left: 0;
 	padding-right: 0;
 	max-width: none;
 }
 
-.ui-grid-25 { width: 25%; }
-.ui-grid-33 { width: calc(100% / 3); }
-.ui-grid-50 { width: 50%; }
-.ui-grid-66 { width: calc(100% / 1.5); }
-.ui-grid-75 { width: 75%; }
-.ui-grid-100 { width: 100%; }
+.nino-grid--fullheight {
+	padding-top: 0;
+	padding-bottom: 0;
+}
 
-.ui-grid-top { align-items: flex-start; }
-.ui-grid-middle { align-items: center; }
-.ui-grid-bottom { align-items: flex-end; }
-.ui-grid-center { justify-content: center; }
+.nino-grid-25 { width: 25%; }
+.nino-grid-33 { width: calc(100% / 3); }
+.nino-grid-50 { width: 50%; }
+.nino-grid-66 { width: calc(100% / 1.5); }
+.nino-grid-75 { width: 75%; }
+.nino-grid-100 { width: 100%; }
 
-.ui-grid-row > * {
+.nino-grid-top { align-items: flex-start; }
+.nino-grid-middle { align-items: center; }
+.nino-grid-bottom { align-items: flex-end; }
+.nino-grid-center { justify-content: center; }
+
+.nino-grid-row > * {
 	min-width: 0;
 	box-sizing: border-box;
 }
 
 @media (min-width: 640px) {
-	.ui-grid-s-25 { width: 25%; }
-	.ui-grid-s-33 { width: calc(100% / 3); }
-	.ui-grid-s-50 { width: 50%; }
-	.ui-grid-s-66 { width: calc(100% / 1.5); }
-	.ui-grid-s-75 { width: 75%; }
-	.ui-grid-s-100 { width: 100%; }
+	.nino-grid-s-25 { width: 25%; }
+	.nino-grid-s-33 { width: calc(100% / 3); }
+	.nino-grid-s-50 { width: 50%; }
+	.nino-grid-s-66 { width: calc(100% / 1.5); }
+	.nino-grid-s-75 { width: 75%; }
+	.nino-grid-s-100 { width: 100%; }
 }
 
 @media (min-width: 768px) {
-	.ui-grid-row {
+	.nino-grid-row {
 		padding: 0 var(--space-3);
 	}
-	.ui-grid--fullwidth {
+	.nino-grid--fullwidth {
 		padding-left: 0;
 		padding-right: 0;
 	}
-	.ui-grid-m-25 { width: 25%; }
-	.ui-grid-m-33 { width: calc(100% / 3); }
-	.ui-grid-m-50 { width: 50%; }
-	.ui-grid-m-66 { width: calc(100% / 1.5); }
-	.ui-grid-m-75 { width: 75%; }
-	.ui-grid-m-100 { width: 100%; }
+	.nino-grid-m-25 { width: 25%; }
+	.nino-grid-m-33 { width: calc(100% / 3); }
+	.nino-grid-m-50 { width: 50%; }
+	.nino-grid-m-66 { width: calc(100% / 1.5); }
+	.nino-grid-m-75 { width: 75%; }
+	.nino-grid-m-100 { width: 100%; }
 }
 
 @media (min-width: 1024px) {
-	.ui-grid-l-25 { width: 25%; }
-	.ui-grid-l-33 { width: calc(100% / 3); }
-	.ui-grid-l-50 { width: 50%; }
-	.ui-grid-l-66 { width: calc(100% / 1.5); }
-	.ui-grid-l-75 { width: 75%; }
-	.ui-grid-l-100 { width: 100%; }
+	.nino-grid-l-25 { width: 25%; }
+	.nino-grid-l-33 { width: calc(100% / 3); }
+	.nino-grid-l-50 { width: 50%; }
+	.nino-grid-l-66 { width: calc(100% / 1.5); }
+	.nino-grid-l-75 { width: 75%; }
+	.nino-grid-l-100 { width: 100%; }
 }
 
 @media (min-width: 1280px) {
-	.ui-grid-xl-25 { width: 25%; }
-	.ui-grid-xl-33 { width: calc(100% / 3); }
-	.ui-grid-xl-50 { width: 50%; }
-	.ui-grid-xl-66 { width: calc(100% / 1.5); }
-	.ui-grid-xl-75 { width: 75%; }
-	.ui-grid-xl-100 { width: 100%; }
+	.nino-grid-xl-25 { width: 25%; }
+	.nino-grid-xl-33 { width: calc(100% / 3); }
+	.nino-grid-xl-50 { width: 50%; }
+	.nino-grid-xl-66 { width: calc(100% / 1.5); }
+	.nino-grid-xl-75 { width: 75%; }
+	.nino-grid-xl-100 { width: 100%; }
 }
 
 /****************************************************************************************************
@@ -319,8 +324,8 @@ p {
  *			03 HTML Barebone
  *
  *
- *			header, .ui-logo, footer
- *			.js-scroll-header (fades/hides on scroll, see Nino.ui.js)
+ *			header, .nino-logo, footer
+ *			.nino-scroll-header (fades/hides on scroll, see Nino.ui.js)
  *
  *
  ****************************************************************************************************/
@@ -333,15 +338,15 @@ header {
 	width: 100%;
 	z-index: 998;
 }
-/* logo + nav side by side, scoped to header so the generic .ui-grid-100
+/* logo + nav side by side, scoped to header so the generic .nino-grid-100
    utility elsewhere is unaffected */
-header .ui-grid-100 {
+header .nino-grid-100 {
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
 	gap: var(--space-2);
 }
-.ui-logo {
+.nino-logo {
 	display: block;
 	width: 10vw;
 	height: 3vw;
@@ -353,8 +358,8 @@ header .ui-grid-100 {
 	background-size:contain;
 	background-position:center;
 }
-.ui-logo img,
-.ui-logo svg {
+.nino-logo img,
+.nino-logo svg {
 	width: 100%;
 	height: auto;
 }
@@ -364,33 +369,33 @@ footer {
 	background:var(--color-footer-bg);
 	font-size:.8em;
 }
-.ui-footer-main {
+.nino-footer-main {
 	color:var(--color-footer-text-main);
 	padding: var(--space-3) var(--space-3) 0;
 }
-.ui-footer-legal {
+.nino-footer-legal {
 	color:var(--color-footer-text-legal);
 	padding: var(--space-1) var(--space-3);
 }
-.ui-footer-title {
+.nino-footer-title {
 	color:var(--color-section-dark-text);
 	font-size:.9rem;
 	text-transform:uppercase;
 	padding-bottom: var(--space-1);
 }
-.ui-footer-logo {
+.nino-footer-logo {
 	opacity:.7;
 	max-width:8rem;
 }
-.ui-footer-getintouch li {
+.nino-footer-getintouch li {
 	padding-bottom: var(--space-1);
 	display:flex;
 }
-.ui-footer-getintouch .ui-icon {
+.nino-footer-getintouch .nino-icon {
 	fill:var(--color-section-dark-text);
 	margin-right: var(--space-1);
 }
-.ui-footer-localepicker {
+.nino-footer-localepicker {
   display: flex;
   justify-content: flex-end;
   gap:var(--space-4);
@@ -406,28 +411,28 @@ main {
 	flex: 1 0 auto;
 	padding-top: var(--space-6);
 }
-main:has(> .js-cover.ui-atf:first-child),
-main:has(> .js-parallex.ui-atf:first-child),
-main:has(> .ui-atf--fullscreen:first-child) {
+main:has(> .nino-cover.nino-atf:first-child),
+main:has(> .nino-parallex.nino-atf:first-child),
+main:has(> .nino-atf--fullscreen:first-child) {
 	padding-top: 0;
 }
 
-/* Scroll-driven header show/hide, opt-in via .js-scroll-header */
-.js-scroll-header {
+/* Scroll-driven header show/hide, opt-in via .nino-scroll-header */
+.nino-scroll-header {
 	overflow: hidden;
 	max-height: 200px;
 	opacity: .6;
 	transition: max-height .4s, opacity .4s;
 	background-color:var(--color-header-bg);
 }
-body.js-scroll-atf .js-scroll-header {
+body.nino-scroll-atf .nino-scroll-header {
 	opacity: 1;
 	background-color:transparent;
 }
-.js-scroll-header:hover {
+.nino-scroll-header:hover {
 	opacity: 1;
 }
-body.js-scroll-down .js-scroll-header {
+body.nino-scroll-down .nino-scroll-header {
 	max-height: 0;
 }
 
@@ -438,24 +443,24 @@ body.js-scroll-down .js-scroll-header {
  *			04 Content
  *
  *
- *			.ui-atf(--fullscreen), .ui-atf(-title, -subtitle, -arrowdown)
- *			.ui-section(--dark, --black, --primary, --alt, --fullwidth, --border-1/2/3), .ui-section(-title, -subtitle)
- *			.ui-article(--alt, --fullwidth), .ui-article(-content, -title, -subtitle, -descr, -img, -price)
+ *			.nino-atf(--fullscreen), .nino-atf(-title, -subtitle, -arrowdown)
+ *			.nino-section(--dark, --black, --primary, --alt, --fullwidth, --border-1/2/3), .nino-section(-title, -subtitle)
+ *			.nino-article(--alt, --fullwidth), .nino-article(-content, -title, -subtitle, -descr, -img, -price)
  *
  *
  ****************************************************************************************************/
 
-.ui-atf {
+.nino-atf {
 	position: relative;
 }
-.ui-atf-title {
+.nino-atf-title {
 	font-family: var(--fontfamily-title);
 	font-size: calc( var(--text-4) *1.2 );
 	color: var(--color-title);
 	margin-bottom: var(--space-3);
 	line-height: calc( var(--text-4) *1.3 );
 }
-.ui-atf-subtitle {
+.nino-atf-subtitle {
 	font-family: var(--fontfamily-subtitle);
 	font-size: calc( var(--text-2) *1.2 );
 	color: var(--color-subtitle);
@@ -463,17 +468,17 @@ body.js-scroll-down .js-scroll-header {
 	line-height: calc( var(--text-2) *1.3 );
 	margin-bottom: var(--space-3);
 }
-.ui-atf-title--quiet { font-size: calc( var(--text-3) *1.2 ); line-height: calc( var(--text-3) *1.3 ); }
-.ui-atf-title--loud { font-size: calc( var(--text-5) *1.2 ); line-height: calc( var(--text-5) *1.2 ); }
-.ui-atf-subtitle--quiet { font-size: calc( var(--text-1) *1.2 ); line-height: calc( var(--text-1) *1.4 ); opacity: .7; }
-.ui-atf-subtitle--loud { font-size: calc( var(--text-3) *1.2 ); line-height: calc( var(--text-3) *1.3 ); opacity: 1; }
+.nino-atf-title--quiet { font-size: calc( var(--text-3) *1.2 ); line-height: calc( var(--text-3) *1.3 ); }
+.nino-atf-title--loud { font-size: calc( var(--text-5) *1.2 ); line-height: calc( var(--text-5) *1.2 ); }
+.nino-atf-subtitle--quiet { font-size: calc( var(--text-1) *1.2 ); line-height: calc( var(--text-1) *1.4 ); opacity: .7; }
+.nino-atf-subtitle--loud { font-size: calc( var(--text-3) *1.2 ); line-height: calc( var(--text-3) *1.3 ); opacity: 1; }
 /*	Self-contained: the chevron is a background SVG (currentColor, so it
  *	always matches the hero's own text color - dark hero, light hero,
- *	whatever), so using it is just <button class="ui-atf-arrowdown"
+ *	whatever), so using it is just <button class="nino-atf-arrowdown"
  *	data-arrow-target="#some-id">label</button> - no icon markup, no extra
  *	CSS file. Click behavior (smooth-scroll to data-arrow-target) is wired
  *	in Nino.ui.js */
-.ui-atf-arrowdown {
+.nino-atf-arrowdown {
 	position: absolute;
 	bottom: var(--space-2);
 	left: 50%;
@@ -490,70 +495,65 @@ body.js-scroll-down .js-scroll-header {
 	background-size: contain;
 	color: inherit;
 	cursor: pointer;
-	animation: ui-atf-arrowdown-bounce 1.8s ease-in-out infinite;
+	animation: nino-atf-arrowdown-bounce 1.8s ease-in-out infinite;
 }
-@keyframes ui-atf-arrowdown-bounce {
+@keyframes nino-atf-arrowdown-bounce {
 	0%, 100% { transform: translateX(-50%) translateY(0); }
 	50% { transform: translateX(-50%) translateY(.4rem); }
 }
 
-/* Fullscreen hero without an image - js-cover/js-parallex size themselves
+/* Fullscreen hero without an image - nino-cover/nino-parallex size themselves
    via data-cover-height (JS), this is the CSS-only equivalent for a plain
-   ui-atf section with no image to size against */
-.ui-atf--fullscreen {
+   nino-atf section with no image to size against */
+.nino-atf--fullscreen {
 	min-height: 100vh;
 	display: flex;
 	align-items: center;
 	box-sizing: border-box;
 }
 
-.ui-section {
+.nino-section {
 	padding: var(--space-4) 0;
 	background-color: var(--color-section-default-bg);
 	color: var(--color-section-default-text);
 	box-sizing: border-box;
 	width: 100%;
 }
-.ui-section--fullwidth {
+.nino-section--fullwidth {
 	padding-left: 0;
 	padding-right: 0;
 	margin: 0;
 }
-.ui-section--fullwidth {
-	padding-top: 0;
-	padding-bottom: 0;
-	margin: 0;
-}
-.ui-section--dark {
+.nino-section--dark {
 	background-color: var(--color-section-dark-bg);
 	color: var(--color-section-dark-text);
 }
-.ui-section--black {
+.nino-section--black {
 	background-color: var(--color-section-black-bg);
 	color: var(--color-section-black-text);
 }
-.ui-section--primary {
+.nino-section--primary {
 	background-color: var(--color-primary);
 	color: var(--color-primary-text);
 }
-.ui-section--alt {
+.nino-section--alt {
 	background-color: var(--color-section-alt-bg);
 	color: var(--color-section-alt-text);
 }
-.ui-section--dark a:not(.ui-btn) {
+.nino-section--dark a:not(.nino-btn) {
 	color: var(--color-section-dark-text);
 }
-.ui-section--black a:not(.ui-btn) {
+.nino-section--black a:not(.nino-btn) {
 	color: var(--color-section-black-text);
 }
-.ui-section--alt a:not(.ui-btn) {
+.nino-section--alt a:not(.nino-btn) {
 	color: var(--color-section-alt-text);
 }
-.ui-section--primary a:not(.ui-btn) {
+.nino-section--primary a:not(.nino-btn) {
 	color: var(--color-primary-text);
 }
 
-.ui-section-title {
+.nino-section-title {
 	font-family: var(--fontfamily-title);
 	text-align: center;
 	font-size: var(--text-4);
@@ -561,7 +561,7 @@ body.js-scroll-down .js-scroll-header {
 	line-height: calc( var(--text-4) *1.3 );
 	margin: var(--space-1) 0;
 }
-.ui-section-subtitle {
+.nino-section-subtitle {
 	font-family: var(--fontfamily-subtitle);
 	text-align: center;
 	font-size: var(--text-2);
@@ -571,7 +571,7 @@ body.js-scroll-down .js-scroll-header {
 	margin-bottom: var(--space-2);
 }
 /*	Body copy inside a section - the third member of title/subtitle/text */
-.ui-section-text {
+.nino-section-text {
 	font-size: var(--text-1);
 	line-height: var(--line-height);
 	margin-bottom: var(--space-2);
@@ -582,105 +582,107 @@ body.js-scroll-down .js-scroll-header {
  *	replaces the size the class sets for itself instead of adjusting it, so
  *	"loud" on a 1.5rem title used to make it smaller, not bigger. Line height
  *	moves with the step, otherwise the new size sits in the old leading. */
-.ui-section-title--quiet { font-size: var(--text-3); line-height: calc( var(--text-3) *1.3 ); opacity: .8; }
-.ui-section-title--loud { font-size: var(--text-5); line-height: calc( var(--text-5) *1.2 ); }
-.ui-section-subtitle--quiet { font-size: var(--text-1); line-height: calc( var(--text-1) *1.4 ); opacity: .7; }
-.ui-section-subtitle--loud { font-size: var(--text-3); line-height: calc( var(--text-3) *1.3 ); opacity: 1; }
-.ui-section-text--quiet { font-size: calc( var(--text-1) *.9 ); opacity: .8; }
-.ui-section-text--loud { font-size: var(--text-2); line-height: calc( var(--text-2) *1.4 ); max-width: 52rem; }
-.ui-text-center > .ui-section-text--loud { margin-right: auto; margin-left: auto; }
-.ui-section--alt .ui-section-title, .ui-section--alt .ui-section-subtitle,
-.ui-section--alt .ui-atf-title, .ui-section--alt .ui-atf-subtitle, .ui-section--alt .ui-atf-arrowdown {
+.nino-section-title--quiet { font-size: var(--text-3); line-height: calc( var(--text-3) *1.3 ); opacity: .8; }
+.nino-section-title--loud { font-size: var(--text-5); line-height: calc( var(--text-5) *1.2 ); }
+.nino-section-subtitle--quiet { font-size: var(--text-1); line-height: calc( var(--text-1) *1.4 ); opacity: .7; }
+.nino-section-subtitle--loud { font-size: var(--text-3); line-height: calc( var(--text-3) *1.3 ); opacity: 1; }
+.nino-section-text--quiet { font-size: calc( var(--text-1) *.9 ); opacity: .8; }
+.nino-section-text--loud { font-size: var(--text-2); line-height: calc( var(--text-2) *1.4 ); max-width: 52rem; }
+.nino-text-center > .nino-section-text--loud { margin-right: auto; margin-left: auto; }
+.nino-section--alt .nino-section-title, .nino-section--alt .nino-section-subtitle,
+.nino-section--alt .nino-atf-title, .nino-section--alt .nino-atf-subtitle, .nino-section--alt .nino-atf-arrowdown {
 	color: var(--color-section-alt-text);
 }
-.ui-section--dark .ui-section-title, .ui-section--dark .ui-section-subtitle,
-.ui-section--dark .ui-atf-title, .ui-section--dark .ui-atf-subtitle, .ui-section--dark .ui-atf-arrowdown {
+.nino-section--dark .nino-section-title, .nino-section--dark .nino-section-subtitle,
+.nino-section--dark .nino-atf-title, .nino-section--dark .nino-atf-subtitle, .nino-section--dark .nino-atf-arrowdown {
 	color: var(--color-section-dark-text);
 }
-.ui-section--black .ui-section-title, .ui-section--black .ui-section-subtitle,
-.ui-section--black .ui-atf-title, .ui-section--black .ui-atf-subtitle, .ui-section--black .ui-atf-arrowdown {
+.nino-section--black .nino-section-title, .nino-section--black .nino-section-subtitle,
+.nino-section--black .nino-atf-title, .nino-section--black .nino-atf-subtitle, .nino-section--black .nino-atf-arrowdown {
 	color: var(--color-section-black-text);
 }
-.ui-section--primary .ui-section-title, .ui-section--primary .ui-section-subtitle,
-.ui-section--primary .ui-atf-title, .ui-section--primary .ui-atf-subtitle, .ui-section--primary .ui-atf-arrowdown {
+.nino-section--primary .nino-section-title, .nino-section--primary .nino-section-subtitle,
+.nino-section--primary .nino-atf-title, .nino-section--primary .nino-atf-subtitle, .nino-section--primary .nino-atf-arrowdown {
 	color: var(--color-primary-text);
 }
-.js-cover--dim .ui-section-title, .js-cover--dim .ui-section-subtitle,
-.js-cover--dim .ui-atf-title, .js-cover--dim .ui-atf-subtitle, .js-cover--dim .ui-atf-arrowdown {
+.nino-cover--dim .nino-section-title, .nino-cover--dim .nino-section-subtitle,
+.nino-cover--dim .nino-atf-title, .nino-cover--dim .nino-atf-subtitle, .nino-cover--dim .nino-atf-arrowdown {
 	color: var(--color-section-black-text);
 }
 
-.ui-section--border-1 { border-bottom: 1px solid rgba(0,0,0,.1); }
-.ui-section--border-2 { border-bottom: .25rem solid rgba(0,0,0,.1); }
-.ui-section--border-3 { border-bottom: .5rem solid rgba(0,0,0,.1); }
-.ui-section--dark.ui-section--border-1,
-.ui-section--dark.ui-section--border-2,
-.ui-section--dark.ui-section--border-3,
-.ui-section--black.ui-section--border-1,
-.ui-section--black.ui-section--border-2,
-.ui-section--black.ui-section--border-3 {
+.nino-section--border-1 { border-bottom: 1px solid rgba(0,0,0,.1); }
+.nino-section--border-2 { border-bottom: .25rem solid rgba(0,0,0,.1); }
+.nino-section--border-3 { border-bottom: .5rem solid rgba(0,0,0,.1); }
+.nino-section--dark.nino-section--border-1,
+.nino-section--dark.nino-section--border-2,
+.nino-section--dark.nino-section--border-3,
+.nino-section--black.nino-section--border-1,
+.nino-section--black.nino-section--border-2,
+.nino-section--black.nino-section--border-3 {
 	border-color: rgba(255,255,255,.1);
 }
 
 @media (min-width: 768px) {
-	.ui-atf-title { font-size: var(--text-5); line-height: calc( var(--text-5) *1.2 );}
-	.ui-atf-subtitle { font-size: var(--text-3); line-height: calc( var(--text-3) *1.2 );}
-	.ui-section { padding: var(--space-5) var(--space-3); }
-	.ui-section--fullwidth { padding-left: 0; padding-right: 0; }
-	.ui-section--fullheight { padding-top: 0; padding-bottom: 0; }
-	.ui-section--fullheight .ui-article-content { padding: var(--space-1); }
+	.nino-atf-title { font-size: var(--text-5); line-height: calc( var(--text-5) *1.2 );}
+	.nino-atf-subtitle { font-size: var(--text-3); line-height: calc( var(--text-3) *1.2 );}
+	.nino-section { padding: var(--space-5) var(--space-3); }
+	.nino-section--fullwidth { padding-left: 0; padding-right: 0; }
+	.nino-section--fullheight { padding-top: 0; padding-bottom: 0; }
+	.nino-section--fullheight .nino-article-content { padding: var(--space-1); }
 }
 
-.ui-article {
+.nino-article {
 	margin: 0 0 var(--space-1);
 	padding: 0 0 var(--space-1);
 	box-sizing: border-box;
 	border-radius: var(--radius-small);
 }
-.ui-article--fullwidth, .ui-article--fullwidth.ui-article--alt {
+.nino-article--fullwidth, .nino-article--fullwidth.nino-article--alt {
 	padding-left: 0;
 	padding-right: 0;
 	padding-top: 0;
 }
-.ui-article--alt {
+.nino-article--alt {
 	background-color: rgba(0,0,0,.05);
 	color: var(--color-section-alt-text);
 	border: 1px solid var(--color-border);
 	padding: var(--space-1);
 }
-.ui-article--borderless { border: 0; background: transparent; }
-.ui-section--alt .ui-article--alt {
+.nino-article--borderless { border: 0; background: transparent; }
+.nino-section--alt .nino-article--alt {
 	background-color: var(--color-section-default-bg);
 	color: var(--color-section-default-text);
 }
-.ui-section--dark .ui-article--alt, .ui-section--dark.ui-article--alt {
+.nino-section--dark .nino-article--alt, .nino-section--dark.nino-article--alt {
 	background-color: rgba(255,255,255,.1);
 	color: var(--color-section-dark-text);
 }
 
-.ui-article-content {
+.nino-article-content {
 	padding: var(--space-1) var(--space-2);
 	padding-top: var(--space-1);
 	box-sizing: border-box;
 }
 
-.ui-article-title {
+.nino-article-title {
 	font-family: var(--fontfamily-title);
 	color: var(--color-title);
-}
-
-.ui-article-title, .ui-article-subtitle, .ui-article-descr {
+	font-size: var(--text-3);
 	margin-bottom: var(--space-2);
 }
-.ui-article-title--quiet { font-size: var(--text-2); opacity: .8; }
-.ui-article-title--loud { font-size: var(--text-4); line-height: calc( var(--text-4) *1.3 ); }
-.ui-article-descr--quiet { font-size: calc( var(--text-1) *.9 ); opacity: .8; }
-.ui-article-descr--loud { font-size: var(--text-2); line-height: calc( var(--text-2) *1.4 ); }
-.ui-article-title { font-size: var(--text-3); }
-.ui-article-subtitle { font-size: var(--text-2); }
-.ui-article-descr { font-size: var(--text-1); line-height: var(--line-height); }
 
-.ui-article-img {
+.nino-article-subtitle {
+	font-size: var(--text-2);
+	margin-bottom: var(--space-2);
+}
+
+.nino-article-descr {
+	font-size: var(--text-1);
+	line-height: var(--line-height);
+	margin-bottom: var(--space-2);
+}
+
+.nino-article-img {
 	height: auto;
 	width: 100%;
 	object-fit: cover;
@@ -688,64 +690,71 @@ body.js-scroll-down .js-scroll-header {
 	margin-bottom: var(--space-1);
 	border-radius: calc( var(--radius-small) *.7);
 }
-.ui-article-img--maxheight {
+
+
+.nino-article-title--quiet { font-size: var(--text-2); opacity: .8; }
+.nino-article-title--loud { font-size: var(--text-4); line-height: calc( var(--text-4) *1.3 ); }
+.nino-article-descr--quiet { font-size: calc( var(--text-1) *.9 ); opacity: .8; }
+.nino-article-descr--loud { font-size: var(--text-2); line-height: calc( var(--text-2) *1.4 ); }
+
+.nino-article-img--maxheight {
 	max-height: var(--article-img-max-height);
 }
-.ui-article--fullwidth .ui-article-img {
+.nino-article--fullwidth .nino-article-img {
 	border-radius:var(--radius-small) var(--radius-small) 0 0;
 }
-.ui-section--fullheight .ui-article-content {
+.nino-section--fullheight .nino-article-content {
 	padding: var(--space-4) var(--space-2) var(--space-3);
 }
-/* Price display for an .ui-article used as a product/service card - distinct
-   from .ui-pricing-price (used inside .ui-pricing-item, see 05 Helper), for
+/* Price display for an .nino-article used as a product/service card - distinct
+   from .nino-pricing-price (used inside .nino-pricing-item, see 05 Helper), for
    when a priced item is presented as a regular article-grid card instead of
    a dedicated pricing table */
-.ui-article-price {
+.nino-article-price {
 	text-align:center;
 	font-size: 2rem;
 	font-weight: bold;
 	color: var(--color-primary);
 }
 
-/* Multi-column layout, one breakpoint tier at a time (eg. ui-article-cols-m
+/* Multi-column layout, one breakpoint tier at a time (eg. nino-article-cols-m
    only switches to a row layout from the "m" breakpoint up) */
-.ui-article-cols {
+.nino-article-cols {
 	display: flex;
 	flex-direction: row;
 	justify-content: center;
 	column-gap: var(--space-2);
 }
-.ui-article-cols > .ui-article-img {
+.nino-article-cols > .nino-article-img {
 	max-height: none;
 	max-width: var(--article-img-max-width);
 }
 
 @media (min-width: 640px) {
-	.ui-article-cols-s { display: flex; flex-direction: row; justify-content: center; column-gap: var(--space-2); }
-	.ui-article-cols-s > .ui-article-img { max-height: none; max-width: var(--article-img-max-width); }
+	.nino-article-cols-s { display: flex; flex-direction: row; justify-content: center; column-gap: var(--space-2); }
+	.nino-article-cols-s > .nino-article-img { max-height: none; max-width: var(--article-img-max-width); }
 }
 @media (min-width: 768px) {
-	.ui-article { margin: var(--space-1); padding: var(--space-1); }
-	/* ui-article adds horizontal card margins from here on. Account for those
+	.nino-article { margin: var(--space-1); padding: var(--space-1); }
+	/* nino-article adds horizontal card margins from here on. Account for those
 	   gutters when the article itself is also the grid column */
-	.ui-article--grid.ui-grid-m-25 { width: calc(25% - var(--space-1) - var(--space-1)); }
-	.ui-article--grid.ui-grid-m-33 { width: calc((100% / 3) - var(--space-1) - var(--space-1)); }
-	.ui-article--grid.ui-grid-m-50 { width: calc(50% - var(--space-1) - var(--space-1)); }
-	.ui-article-cols-m { display: flex; flex-direction: row; justify-content: center; column-gap: var(--space-2); }
-	.ui-article-cols-m > .ui-article-img { max-height: none; max-width: var(--article-img-max-width); }
+	.nino-article--grid.nino-grid-m-25 { width: calc(25% - var(--space-1) - var(--space-1)); }
+	.nino-article--grid.nino-grid-m-33 { width: calc((100% / 3) - var(--space-1) - var(--space-1)); }
+	.nino-article--grid.nino-grid-m-50 { width: calc(50% - var(--space-1) - var(--space-1)); }
+	.nino-article-cols-m { display: flex; flex-direction: row; justify-content: center; column-gap: var(--space-2); }
+	.nino-article-cols-m > .nino-article-img { max-height: none; max-width: var(--article-img-max-width); }
 }
 @media (min-width: 1024px) {
-	.ui-article-cols-l { display: flex; flex-direction: row; justify-content: center; column-gap: var(--space-2); }
-	.ui-article-cols-l > .ui-article-img { max-height: none; max-width: var(--article-img-max-width); }
+	.nino-article-cols-l { display: flex; flex-direction: row; justify-content: center; column-gap: var(--space-2); }
+	.nino-article-cols-l > .nino-article-img { max-height: none; max-width: var(--article-img-max-width); }
 }
 @media (min-width: 1280px) {
-	.ui-article { padding: var(--space-2); }
-	.ui-article--wide { padding: var(--space-1); }
-	.ui-article--fullwidth { padding:0; }
-	.ui-article--fullwidth .ui-article-content { padding: var(--space-1) var(--space-2); }
-	.ui-article-cols-xl { display: flex; flex-direction: row; justify-content: center; column-gap: var(--space-2); }
-	.ui-article-cols-xl > .ui-article-img { max-height: none; max-width: var(--article-img-max-width); }
+	.nino-article { padding: var(--space-2); }
+	.nino-article--wide { padding: var(--space-1); }
+	.nino-article--fullwidth { padding:0; }
+	.nino-article--fullwidth .nino-article-content { padding: var(--space-1) var(--space-2); }
+	.nino-article-cols-xl { display: flex; flex-direction: row; justify-content: center; column-gap: var(--space-2); }
+	.nino-article-cols-xl > .nino-article-img { max-height: none; max-width: var(--article-img-max-width); }
 }
 
 
@@ -755,51 +764,51 @@ body.js-scroll-down .js-scroll-header {
  *			05 Helper
  *
  *
- *			.ui-icon, .ui-btn(--*),
- *      .ui-form-*, .ui-img-*
- *			.ui-m-*, .ui-mt-*, .ui-mb-*, .ui-ml-*, .ui-mr-*, .ui-p-*, .ui-pt-*, .ui-pb-*
- *			.ui-text(*, -s, -m, -l, -xl)(-left, -center, -right), .ui-font(-small, -big)
- *			.ui-opacity(-10, -20, ..., -90)
- *			.ui-(-hidden, -visible)(*, -s, -m, -l, -xl)
- *			.ui-fx(-vertical-bounce)
- *			.ui-badge(--pill, --primary, --success, --error)
- *			.ui-breadcrumbs
- *			.ui-video(--4-3)
- *			.ui-code
- *			.ui-alert(--success, --error, --info)
- *			.js-stat-counter, .js-back-to-top
- *			.ui-pricing-row, .ui-pricing-item(--featured), .ui-pricing-title, .ui-pricing-price
- *			.ui-accordion, .ui-accordion-trigger, .ui-accordion-panel
- *			.ui-pagination
- *			.ui-logos, .ui-logos-item
- *			.ui-gallery, .ui-gallery-item(--wide, --tall)
- *			.ui-feature-list, .ui-feature-item
- *			.ui-timeline, .ui-timeline-step, .ui-timeline-number
- *			.ui-video-poster, .ui-video-play
- *			.ui-img-background(--dim), .ui-img-background-content
+ *			.nino-icon(--small), .nino-btn(--*),
+ *      .nino-form-*, .nino-img-*
+ *			.nino-m-*, .nino-mt-*, .nino-mb-*, .nino-ml-*, .nino-mr-*, .nino-p-*, .nino-pt-*, .nino-pb-*
+ *			.nino-text(*, -s, -m, -l, -xl)(-left, -center, -right)
+ *			.nino-opacity(-10, -20, ..., -90)
+ *			.nino-(-hidden, -visible)(*, -s, -m, -l, -xl)
+ *			.nino-fx(-vertical-bounce)
+ *			.nino-badge(--pill, --primary, --success, --error)
+ *			.nino-breadcrumbs
+ *			.nino-video(--4-3)
+ *			.nino-code
+ *			.nino-alert(--success, --error, --info)
+ *			.nino-stat-counter, .nino-back-to-top
+ *			.nino-pricing-row, .nino-pricing-item(--featured), .nino-pricing-title, .nino-pricing-price
+ *			.nino-accordion, .nino-accordion-trigger, .nino-accordion-panel
+ *			.nino-pagination
+ *			.nino-logos, .nino-logos-item
+ *			.nino-gallery, .nino-gallery-item(--wide, --tall)
+ *			.nino-feature-list, .nino-feature-item
+ *			.nino-timeline, .nino-timeline-step, .nino-timeline-number
+ *			.nino-video-poster, .nino-video-play
+ *			.nino-img-background(--dim), .nino-img-background-content
  *
  *
  ****************************************************************************************************/
 
 /* Icons */
-.ui-icon {
+.nino-icon {
 	width: 32px;
 	height: 32px;
 	position: relative;
 	top: 2px;
 	color: var(--color-text);
 }
-.ui-section--dark .ui-icon, .ui-section--black .ui-icon {
+.nino-section--dark .nino-icon, .nino-section--black .nino-icon {
 	fill: var(--color-section-dark-text);
 	color: var(--color-section-dark-text);
 }
-.ui-icon.small {
+.nino-icon--small {
 	width: 16px;
 	height: 16px;
 }
 
 /* Buttons */
-.ui-btn {
+.nino-btn {
 	display: inline-block;
 	padding: var(--space-1) var(--space-2);
 	border-radius: var(--radius);
@@ -809,47 +818,47 @@ body.js-scroll-down .js-scroll-header {
 	cursor: pointer;
 	transition: background-color .2s ease, color .2s ease, border-color .2s ease;
 }
-.ui-btn--light {
+.nino-btn--light {
 	background-color: var(--color-background);
 	color: var(--color-text);
 	border: 1px solid var(--color-border);
 }
-.ui-btn--light:hover, .ui-btn--light:focus {
+.nino-btn--light:hover, .nino-btn--light:focus {
 	background-color: var(--color-border);
 }
-.ui-btn--dark {
+.nino-btn--dark {
 	background-color: var(--color-section-dark-bg);
 	color: var(--color-section-dark-text);
 }
-.ui-btn--dark:hover, .ui-btn--dark:focus {
+.nino-btn--dark:hover, .nino-btn--dark:focus {
 	background-color: var(--color-section-black-bg);
 	color: var(--color-section-black-text);
 }
-.ui-btn--primary {
+.nino-btn--primary {
 	background-color: var(--color-primary);
 	color: var(--color-primary-text);
 	border: 1px solid var(--color-primary);
 	transition: opacity .3s;
 }
-.ui-btn--primary:hover, .ui-btn--primary:focus {
+.nino-btn--primary:hover, .nino-btn--primary:focus {
 	background-color: var(--color-primary);
 	opacity: .85;
 }
-.ui-btn--outline {
+.nino-btn--outline {
 	background-color: transparent;
 	color: var(--color-primary);
 	border: 1px solid var(--color-primary);
 }
-.ui-btn--outline:hover, .ui-btn--outline:focus {
+.nino-btn--outline:hover, .nino-btn--outline:focus {
 	background-color: var(--color-primary);
 	color: var(--color-primary-text);
 }
-.ui-btn--small {
+.nino-btn--small {
 	padding: calc( var(--space-1) *.7) calc( var(--space-2) * .7 );
 	font-size: calc( var(--fontsize-btn) * .7);
 	border-radius: calc( var(--radius) * .7 );
 }
-.ui-btn--big {
+.nino-btn--big {
 	padding: calc( var(--space-1) *1.3) calc( var(--space-2) * 1.3 );
 	font-size: calc( var(--fontsize-btn) * 1.3);
 	border-radius: calc( var(--radius) * 1.3 );
@@ -857,7 +866,7 @@ body.js-scroll-down .js-scroll-header {
 
 /* Form fields - generic input skin, independent of whatever wires the
    actual submit (see docs/design-system.md re: contact form) */
-.ui-form-input, .ui-form-textarea, .ui-form-select {
+.nino-form-input, .nino-form-textarea, .nino-form-select {
 	width: 100%;
 	padding: var(--space-1);
 	border: 1px solid var(--color-border);
@@ -867,74 +876,74 @@ body.js-scroll-down .js-scroll-header {
 	transition: border-color .2s ease;
 	margin-bottom: var(--space-1);
 }
-.ui-form-input:focus, .ui-form-textarea:focus, .ui-form-select:focus {
+.nino-form-input:focus, .nino-form-textarea:focus, .nino-form-select:focus {
 	outline: none;
 	border-color: var(--color-primary);
 }
 /* One-line form - an email field and its button on the same row */
-.ui-form--inline { display: flex; flex-wrap: wrap; gap: var(--space-1); align-items: flex-start; justify-content: center; }
+.nino-form--inline { display: flex; flex-wrap: wrap; gap: var(--space-1); align-items: flex-start; justify-content: center; }
 /* The honeypot Form.php and the newsletter endpoint check: off-screen rather
    than display:none, which some browsers refuse to autofill-skip */
-.ui-form-trap { position: absolute; left: -9999px; width: 1px; height: 1px; }
-.ui-form-textarea {
+.nino-form-trap { position: absolute; left: -9999px; width: 1px; height: 1px; }
+.nino-form-textarea {
 	min-height: 6rem;
 	resize: vertical;
 }
-.ui-form-select {
+.nino-form-select {
 	appearance: none;
 	background-repeat: no-repeat;
 	background-position: right .5rem center;
 	background-size: 1.5rem;
 	padding-right: 2.5rem;
 }
-.ui-form-message {
+.nino-form-message {
 	font-size: .875rem;
 	margin-top: .5rem;
 }
-.ui-form.error .ui-form-message { color: var(--color-error); }
-.ui-form.success .ui-form-message, .ui-form.existing .ui-form-message { color: var(--color-success); }
-.ui-form.pending .ui-form-submit { opacity: .6; pointer-events: none; }
+.nino-form.nino-is-error .nino-form-message { color: var(--color-error); }
+.nino-form.nino-is-success .nino-form-message, .nino-form.nino-is-existing .nino-form-message { color: var(--color-success); }
+.nino-form.nino-is-pending .nino-form-submit { opacity: .6; pointer-events: none; }
 
-.js-newsletter-form .ui-form-input {
+.nino-newsletter-form .nino-form-input {
 	max-width:45vw;
 	min-width:300px;
 }
 
 /* Img tools */
-.ui-img-cover {
+.nino-img-cover {
 	position: relative;
 }
-.ui-img-cover > img {
+.nino-img-cover > img {
 	object-fit: cover;
 	width: 100%;
 	height: 100%;
 }
 /* Which part of a cropped image survives the crop - the nine positions a
    picker offers, applied to the image a section frame lays out */
-.ui-img-focus--1 > img { object-position: left top; }
-.ui-img-focus--2 > img { object-position: center top; }
-.ui-img-focus--3 > img { object-position: right top; }
-.ui-img-focus--4 > img { object-position: left center; }
-.ui-img-focus--5 > img { object-position: center center; }
-.ui-img-focus--6 > img { object-position: right center; }
-.ui-img-focus--7 > img { object-position: left bottom; }
-.ui-img-focus--8 > img { object-position: center bottom; }
-.ui-img-focus--9 > img { object-position: right bottom; }
-/* A ui-badge placed as a sibling of the img instead of inside it floats
+.nino-img-focus--1 > img { object-position: left top; }
+.nino-img-focus--2 > img { object-position: center top; }
+.nino-img-focus--3 > img { object-position: right top; }
+.nino-img-focus--4 > img { object-position: left center; }
+.nino-img-focus--5 > img { object-position: center center; }
+.nino-img-focus--6 > img { object-position: right center; }
+.nino-img-focus--7 > img { object-position: left bottom; }
+.nino-img-focus--8 > img { object-position: center bottom; }
+.nino-img-focus--9 > img { object-position: right bottom; }
+/* A nino-badge placed as a sibling of the img instead of inside it floats
    free in the top-right corner - eg. "New"/a discount/a category label */
-.ui-img-cover > .ui-badge {
+.nino-img-cover > .nino-badge {
 	position: absolute;
 	top: var(--space-1);
 	right: var(--space-1);
 }
 /* z-index:0 makes this its own stacking context, so the img/overlay/content
    z-indexes below only ever order against each other - not escape to
-   compete with sibling sections (same reasoning as .js-cover below) */
-.ui-img-background {
+   compete with sibling sections (same reasoning as .nino-cover below) */
+.nino-img-background {
 	position: relative;
 	z-index: 0;
 }
-.ui-img-background > img {
+.nino-img-background > img {
 	position: absolute;
 	top: 0;
 	left: 0;
@@ -948,114 +957,114 @@ body.js-scroll-down .js-scroll-header {
 
 
 /* Spacing */
-.ui-m-0 { margin: 0; }
-.ui-m-1 { margin: var(--space-1); }
-.ui-m-2 { margin: var(--space-2); }
-.ui-m-3 { margin: var(--space-3); }
-.ui-m-4 { margin: var(--space-4); }
-.ui-m-5 { margin: var(--space-5); }
-.ui-m-6 { margin: var(--space-6); }
-.ui-mt-0 { margin-top: 0; }
-.ui-mt-1 { margin-top: var(--space-1); }
-.ui-mt-2 { margin-top: var(--space-2); }
-.ui-mt-3 { margin-top: var(--space-3); }
-.ui-mt-4 { margin-top: var(--space-4); }
-.ui-mt-5 { margin-top: var(--space-5); }
-.ui-mt-6 { margin-top: var(--space-6); }
-.ui-mb-0 { margin-bottom: 0; }
-.ui-mb-1 { margin-bottom: var(--space-1); }
-.ui-mb-2 { margin-bottom: var(--space-2); }
-.ui-mb-3 { margin-bottom: var(--space-3); }
-.ui-mb-4 { margin-bottom: var(--space-4); }
-.ui-mb-5 { margin-bottom: var(--space-5); }
-.ui-mb-6 { margin-bottom: var(--space-6); }
-.ui-mx-auto { margin-right: auto; margin-left: auto; }
-.ui-ml-0 { margin-left: 0; }
-.ui-ml-1 { margin-left: var(--space-1); }
-.ui-ml-2 { margin-left: var(--space-2); }
-.ui-ml-3 { margin-left: var(--space-3); }
-.ui-ml-4 { margin-left: var(--space-4); }
-.ui-ml-5 { margin-left: var(--space-5); }
-.ui-ml-6 { margin-left: var(--space-6); }
-.ui-mr-0 { margin-right: 0; }
-.ui-mr-1 { margin-right: var(--space-1); }
-.ui-mr-2 { margin-right: var(--space-2); }
-.ui-mr-3 { margin-right: var(--space-3); }
-.ui-mr-4 { margin-right: var(--space-4); }
-.ui-mr-5 { margin-right: var(--space-5); }
-.ui-mr-6 { margin-right: var(--space-6); }
-.ui-p-0 { padding: 0; }
-.ui-p-1 { padding: var(--space-1); }
-.ui-p-2 { padding: var(--space-2); }
-.ui-p-3 { padding: var(--space-3); }
-.ui-p-4 { padding: var(--space-4); }
-.ui-p-5 { padding: var(--space-5); }
-.ui-p-6 { padding: var(--space-6); }
-.ui-pt-0 { padding-top: 0; }
-.ui-pt-1 { padding-top: var(--space-1); }
-.ui-pt-2 { padding-top: var(--space-2); }
-.ui-pt-3 { padding-top: var(--space-3); }
-.ui-pt-4 { padding-top: var(--space-4); }
-.ui-pt-5 { padding-top: var(--space-5); }
-.ui-pt-6 { padding-top: var(--space-6); }
-.ui-pb-0 { padding-bottom: 0; }
-.ui-pb-1 { padding-bottom: var(--space-1); }
-.ui-pb-2 { padding-bottom: var(--space-2); }
-.ui-pb-3 { padding-bottom: var(--space-3); }
-.ui-pb-4 { padding-bottom: var(--space-4); }
-.ui-pb-5 { padding-bottom: var(--space-5); }
-.ui-pb-6 { padding-bottom: var(--space-6); }
+.nino-m-0 { margin: 0; }
+.nino-m-1 { margin: var(--space-1); }
+.nino-m-2 { margin: var(--space-2); }
+.nino-m-3 { margin: var(--space-3); }
+.nino-m-4 { margin: var(--space-4); }
+.nino-m-5 { margin: var(--space-5); }
+.nino-m-6 { margin: var(--space-6); }
+.nino-mt-0 { margin-top: 0; }
+.nino-mt-1 { margin-top: var(--space-1); }
+.nino-mt-2 { margin-top: var(--space-2); }
+.nino-mt-3 { margin-top: var(--space-3); }
+.nino-mt-4 { margin-top: var(--space-4); }
+.nino-mt-5 { margin-top: var(--space-5); }
+.nino-mt-6 { margin-top: var(--space-6); }
+.nino-mb-0 { margin-bottom: 0; }
+.nino-mb-1 { margin-bottom: var(--space-1); }
+.nino-mb-2 { margin-bottom: var(--space-2); }
+.nino-mb-3 { margin-bottom: var(--space-3); }
+.nino-mb-4 { margin-bottom: var(--space-4); }
+.nino-mb-5 { margin-bottom: var(--space-5); }
+.nino-mb-6 { margin-bottom: var(--space-6); }
+.nino-mx-auto { margin-right: auto; margin-left: auto; }
+.nino-ml-0 { margin-left: 0; }
+.nino-ml-1 { margin-left: var(--space-1); }
+.nino-ml-2 { margin-left: var(--space-2); }
+.nino-ml-3 { margin-left: var(--space-3); }
+.nino-ml-4 { margin-left: var(--space-4); }
+.nino-ml-5 { margin-left: var(--space-5); }
+.nino-ml-6 { margin-left: var(--space-6); }
+.nino-mr-0 { margin-right: 0; }
+.nino-mr-1 { margin-right: var(--space-1); }
+.nino-mr-2 { margin-right: var(--space-2); }
+.nino-mr-3 { margin-right: var(--space-3); }
+.nino-mr-4 { margin-right: var(--space-4); }
+.nino-mr-5 { margin-right: var(--space-5); }
+.nino-mr-6 { margin-right: var(--space-6); }
+.nino-p-0 { padding: 0; }
+.nino-p-1 { padding: var(--space-1); }
+.nino-p-2 { padding: var(--space-2); }
+.nino-p-3 { padding: var(--space-3); }
+.nino-p-4 { padding: var(--space-4); }
+.nino-p-5 { padding: var(--space-5); }
+.nino-p-6 { padding: var(--space-6); }
+.nino-pt-0 { padding-top: 0; }
+.nino-pt-1 { padding-top: var(--space-1); }
+.nino-pt-2 { padding-top: var(--space-2); }
+.nino-pt-3 { padding-top: var(--space-3); }
+.nino-pt-4 { padding-top: var(--space-4); }
+.nino-pt-5 { padding-top: var(--space-5); }
+.nino-pt-6 { padding-top: var(--space-6); }
+.nino-pb-0 { padding-bottom: 0; }
+.nino-pb-1 { padding-bottom: var(--space-1); }
+.nino-pb-2 { padding-bottom: var(--space-2); }
+.nino-pb-3 { padding-bottom: var(--space-3); }
+.nino-pb-4 { padding-bottom: var(--space-4); }
+.nino-pb-5 { padding-bottom: var(--space-5); }
+.nino-pb-6 { padding-bottom: var(--space-6); }
 
 /* Text alignment */
-.ui-text-left { text-align: left; }
-.ui-text-center { text-align: center; }
-.ui-text-right { text-align: right; }
-/* ui-section-title and its siblings center themselves, so an alignment set on
+.nino-text-left { text-align: left; }
+.nino-text-center { text-align: center; }
+.nino-text-right { text-align: right; }
+/* nino-section-title and its siblings center themselves, so an alignment set on
    the block around them has to reach in - otherwise "left" moves everything
    except the heading */
-.ui-text-left :is(.ui-section-title, .ui-section-subtitle, .ui-atf-title, .ui-atf-subtitle) { text-align: left; }
-.ui-text-center :is(.ui-section-title, .ui-section-subtitle, .ui-atf-title, .ui-atf-subtitle) { text-align: center; }
-.ui-text-right :is(.ui-section-title, .ui-section-subtitle, .ui-atf-title, .ui-atf-subtitle) { text-align: right; }
-.ui-text-center > .ui-btn { margin-right: calc(var(--space-1) / 2); margin-left: calc(var(--space-1) / 2); }
-.ui-text-right > .ui-btn { margin-left: var(--space-1); }
+.nino-text-left :is(.nino-section-title, .nino-section-subtitle, .nino-atf-title, .nino-atf-subtitle) { text-align: left; }
+.nino-text-center :is(.nino-section-title, .nino-section-subtitle, .nino-atf-title, .nino-atf-subtitle) { text-align: center; }
+.nino-text-right :is(.nino-section-title, .nino-section-subtitle, .nino-atf-title, .nino-atf-subtitle) { text-align: right; }
+.nino-text-center > .nino-btn { margin-right: calc(var(--space-1) / 2); margin-left: calc(var(--space-1) / 2); }
+.nino-text-right > .nino-btn { margin-left: var(--space-1); }
 
 @media (min-width: 640px) {
-	.ui-text-s-left { text-align: left; }
-	.ui-text-s-center { text-align: center; }
-	.ui-text-s-right { text-align: right; }
+	.nino-text-s-left { text-align: left; }
+	.nino-text-s-center { text-align: center; }
+	.nino-text-s-right { text-align: right; }
 }
 @media (min-width: 768px) {
-	.ui-text-m-left { text-align: left; }
-	.ui-text-m-center { text-align: center; }
-	.ui-text-m-right { text-align: right; }
+	.nino-text-m-left { text-align: left; }
+	.nino-text-m-center { text-align: center; }
+	.nino-text-m-right { text-align: right; }
 }
 @media (min-width: 1024px) {
-	.ui-text-l-left { text-align: left; }
-	.ui-text-l-center { text-align: center; }
-	.ui-text-l-right { text-align: right; }
+	.nino-text-l-left { text-align: left; }
+	.nino-text-l-center { text-align: center; }
+	.nino-text-l-right { text-align: right; }
 }
 @media (min-width: 1280px) {
-	.ui-text-xl-left { text-align: left; }
-	.ui-text-xl-center { text-align: center; }
-	.ui-text-xl-right { text-align: right; }
+	.nino-text-xl-left { text-align: left; }
+	.nino-text-xl-center { text-align: center; }
+	.nino-text-xl-right { text-align: right; }
 }
 
 
 /* Opacity */
-.ui-opacity-10 { opacity: .1; }
-.ui-opacity-20 { opacity: .2; }
-.ui-opacity-30 { opacity: .3; }
-.ui-opacity-40 { opacity: .4; }
-.ui-opacity-50 { opacity: .5; }
-.ui-opacity-60 { opacity: .6; }
-.ui-opacity-70 { opacity: .7; }
-.ui-opacity-80 { opacity: .8; }
-.ui-opacity-90 { opacity: .9; }
+.nino-opacity-10 { opacity: .1; }
+.nino-opacity-20 { opacity: .2; }
+.nino-opacity-30 { opacity: .3; }
+.nino-opacity-40 { opacity: .4; }
+.nino-opacity-50 { opacity: .5; }
+.nino-opacity-60 { opacity: .6; }
+.nino-opacity-70 { opacity: .7; }
+.nino-opacity-80 { opacity: .8; }
+.nino-opacity-90 { opacity: .9; }
 
 /* Visibility */
-.ui-hidden { display: none !important; }
-.ui-invisible { visibility: hidden !important; }
-.ui-sr-only {
+.nino-hidden { display: none !important; }
+.nino-invisible { visibility: hidden !important; }
+.nino-sr-only {
 	position: absolute;
 	width: 1px;
 	height: 1px;
@@ -1067,27 +1076,27 @@ body.js-scroll-down .js-scroll-header {
 	border: 0;
 }
 
-.ui-hidden-s { display: none !important; }
-.ui-visible-s { display: block !important; }
+.nino-hidden-s { display: none !important; }
+.nino-visible-s { display: block !important; }
 
 @media (min-width: 768px) {
-	.ui-visible-m { display: block !important; }
-	.ui-hidden-m { display: none !important; }
+	.nino-visible-m { display: block !important; }
+	.nino-hidden-m { display: none !important; }
 }
 @media (min-width: 1024px) {
-	.ui-visible-l { display: block !important; }
-	.ui-hidden-l { display: none !important; }
+	.nino-visible-l { display: block !important; }
+	.nino-hidden-l { display: none !important; }
 }
 @media (min-width: 1280px) {
-	.ui-visible-xl { display: block !important; }
-	.ui-hidden-xl { display: none !important; }
+	.nino-visible-xl { display: block !important; }
+	.nino-hidden-xl { display: none !important; }
 }
 
 /* Animations */
-.ui-fx-verticale_bounce {
-	animation: ui-fx-verticale_bounce 7s cubic-bezier(1, -0.66, 0.31, 1.68) infinite;
+.nino-fx-vertical-bounce {
+	animation: nino-fx-vertical-bounce 7s cubic-bezier(1, -0.66, 0.31, 1.68) infinite;
 }
-@keyframes ui-fx-verticale_bounce {
+@keyframes nino-fx-vertical-bounce {
 	0%   { transform: translateY(0); }
 	10%  { transform: translateY(var(--space-1)); }
 	20%  { transform: translateY(0); }
@@ -1096,7 +1105,7 @@ body.js-scroll-down .js-scroll-header {
 }
 
 /* Badge / pill */
-.ui-badge {
+.nino-badge {
 	display: inline-block;
 	padding: .2em .6em;
 	border-radius: var(--radius);
@@ -1106,21 +1115,21 @@ body.js-scroll-down .js-scroll-header {
 	background-color: var(--color-border);
 	color: var(--color-text);
 }
-.ui-badge--pill { border-radius: 999px; }
-.ui-badge--primary { background-color: var(--color-primary); color: var(--color-primary-text); }
-.ui-badge--success { background-color: var(--color-success); color: var(--color-primary-text); }
-.ui-badge--error { background-color: var(--color-error); color: var(--color-primary-text); }
-.ui-badge-cloud {
+.nino-badge--pill { border-radius: 999px; }
+.nino-badge--primary { background-color: var(--color-primary); color: var(--color-primary-text); }
+.nino-badge--success { background-color: var(--color-success); color: var(--color-primary-text); }
+.nino-badge--error { background-color: var(--color-error); color: var(--color-primary-text); }
+.nino-badge-cloud {
 	display: flex;
 	flex-wrap: wrap;
 	justify-content: center;
 	gap: var(--space-1);
 }
-.ui-badge-cloud--left { justify-content: flex-start; }
-.ui-badge-cloud--right { justify-content: flex-end; }
+.nino-badge-cloud--left { justify-content: flex-start; }
+.nino-badge-cloud--right { justify-content: flex-end; }
 
 /* Breadcrumbs */
-.ui-breadcrumbs {
+.nino-breadcrumbs {
 	display: flex;
 	flex-wrap: wrap;
 	align-items: center;
@@ -1129,54 +1138,54 @@ body.js-scroll-down .js-scroll-header {
 	padding: 0;
 	font-size: var(--fontsize-small);
 }
-.ui-breadcrumbs li:not(:last-child)::after {
+.nino-breadcrumbs li:not(:last-child)::after {
 	content: "\203A";
 	margin: 0 var(--space-1);
 	color: var(--color-border);
 }
-.ui-breadcrumbs a {
+.nino-breadcrumbs a {
 	color: var(--color-text);
 	text-decoration: none;
 }
-.ui-breadcrumbs a:hover {
+.nino-breadcrumbs a:hover {
 	color: var(--color-primary);
 }
-.ui-breadcrumbs li:last-child {
+.nino-breadcrumbs li:last-child {
 	color: var(--color-primary);
 	font-weight: bold;
 }
 
 /* List variants - plain content lists (Breadcrumbs/Pagination above are
    structural nav lists with their own fixed shape, not content) */
-.ui-list {
+.nino-list {
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-1);
 }
-.ui-list--check li {
+.nino-list--check li {
 	position: relative;
 	padding-left: var(--space-3);
 }
-.ui-list--check li::before {
+.nino-list--check li::before {
 	content: "\2713";
 	position: absolute;
 	left: 0;
 	color: var(--color-success);
 	font-weight: bold;
 }
-.ui-list--numbered {
-	counter-reset: ui-list-numbered;
+.nino-list--numbered {
+	counter-reset: nino-list-numbered;
 }
-.ui-list--numbered li {
-	counter-increment: ui-list-numbered;
+.nino-list--numbered li {
+	counter-increment: nino-list-numbered;
 	position: relative;
 	min-height: var(--space-3);
 	padding-left: var(--space-4);
 	display: flex;
 	align-items: center;
 }
-.ui-list--numbered li::before {
-	content: counter(ui-list-numbered);
+.nino-list--numbered li::before {
+	content: counter(nino-list-numbered);
 	position: absolute;
 	left: 0;
 	width: var(--space-3);
@@ -1190,12 +1199,12 @@ body.js-scroll-down .js-scroll-header {
 	font-size: var(--fontsize-small);
 	font-weight: bold;
 }
-.ui-list--content {
+.nino-list--content {
 	width: min(100%, 64rem);
 	margin-inline: auto;
 }
 @media (min-width: 768px) {
-	.ui-list--columns {
+	.nino-list--columns {
 		display: grid;
 		grid-template-columns: repeat(2, minmax(0, 1fr));
 		column-gap: var(--space-4);
@@ -1204,15 +1213,15 @@ body.js-scroll-down .js-scroll-header {
 }
 
 /* Video embed wrapper - responsive iframe/video, default 16:9 */
-.ui-video {
+.nino-video {
 	position: relative;
 	width: 100%;
 	aspect-ratio: 16 / 9;
 	overflow: hidden;
 }
-.ui-video--4-3 { aspect-ratio: 4 / 3; }
-.ui-video iframe,
-.ui-video video {
+.nino-video--4-3 { aspect-ratio: 4 / 3; }
+.nino-video iframe,
+.nino-video video {
 	position: absolute;
 	top: 0;
 	left: 0;
@@ -1224,7 +1233,7 @@ body.js-scroll-down .js-scroll-header {
 /* Code block - preserves authored whitespace and scrolls horizontally rather
    than forcing long lines to widen the page. Add tabindex="0" to a <pre>
    when keyboard users should be able to focus and scroll the block. */
-.ui-code {
+.nino-code {
 	display: block;
 	width: 100%;
 	max-width: 100%;
@@ -1242,7 +1251,7 @@ body.js-scroll-down .js-scroll-header {
 	white-space: pre;
 	-webkit-overflow-scrolling: touch;
 }
-.ui-code code {
+.nino-code code {
 	display: block;
 	min-width: max-content;
 	color: inherit;
@@ -1250,37 +1259,37 @@ body.js-scroll-down .js-scroll-header {
 	font: inherit;
 	white-space: inherit;
 }
-.ui-code:focus-visible {
+.nino-code:focus-visible {
 	outline: 2px solid var(--color-primary);
 	outline-offset: 2px;
 }
 
-/* Alert / inline feedback (static - form-specific feedback is .ui-form-message) */
-.ui-alert {
+/* Alert / inline feedback (static - form-specific feedback is .nino-form-message) */
+.nino-alert {
 	padding: var(--space-2);
 	border-radius: var(--radius);
 	border: 1px solid var(--color-border);
 	background-color: var(--color-background);
 	color: var(--color-text);
 }
-.ui-alert--success { border-color: var(--color-success); color: var(--color-success); }
-.ui-alert--error { border-color: var(--color-error); color: var(--color-error); }
-.ui-alert--info { border-color: var(--color-primary); color: var(--color-primary); }
-.ui-alert--content {
+.nino-alert--success { border-color: var(--color-success); color: var(--color-success); }
+.nino-alert--error { border-color: var(--color-error); color: var(--color-error); }
+.nino-alert--info { border-color: var(--color-primary); color: var(--color-primary); }
+.nino-alert--content {
 	padding: var(--space-3);
 	font-size: var(--fontsize-big);
 }
 
 /* Stat counter - see Nino.ui.js for the count-up behavior */
-.js-stat-counter {
+.nino-stat-counter {
 	font-size: 2.5rem;
 	font-weight: bold;
 	color: var(--color-primary);
 	margin-top:var(--space-1);
 }
 
-/* Back-to-top button - visibility driven by body.js-scroll-atf/-btf, see Nino.ui.js */
-.js-back-to-top {
+/* Back-to-top button - visibility driven by body.nino-scroll-atf/-btf, see Nino.ui.js */
+.nino-back-to-top {
 	position: fixed;
 	right: var(--space-2);
 	bottom: var(--space-2);
@@ -1290,7 +1299,7 @@ body.js-scroll-down .js-scroll-header {
 	transform: translateY(10px);
 	transition: opacity .3s, transform .3s;
 }
-body.js-scroll-btf .js-back-to-top {
+body.nino-scroll-btf .nino-back-to-top {
 	opacity: 1;
 	pointer-events: auto;
 	transform: translateY(0);
@@ -1299,7 +1308,7 @@ body.js-scroll-btf .js-back-to-top {
 /* Cookie consent banner - shown until Nino.cookie's 'nino_consent' is
    set, see Nino.ui.js. A bottom bar, not a full-page overlay - the
    consent choice shouldn't block reading the page while deciding */
-.js-cookie-banner {
+.nino-cookie-banner {
 	position: fixed;
 	left: 0;
 	right: 0;
@@ -1317,109 +1326,109 @@ body.js-scroll-btf .js-back-to-top {
 	transform: translateY(100%);
 	transition: transform .3s;
 }
-.js-cookie-banner--visible {
+.nino-cookie-banner--visible {
 	transform: translateY(0);
 }
-.js-cookie-banner a {
+.nino-cookie-banner a {
 	text-decoration: underline;
 }
-.js-cookie-banner-actions {
+.nino-cookie-banner-actions {
 	display: flex;
 	flex-shrink: 0;
 	gap: var(--space-1);
 }
 
-/* Table - .ui-table-wrap scrolls horizontally on narrow viewports instead
+/* Table - .nino-table-wrap scrolls horizontally on narrow viewports instead
    of letting a wide table force the whole page wide (same reasoning as the
    grid: never trust a fixed-width content block on mobile) */
-.ui-table-wrap {
+.nino-table-wrap {
 	width: 100%;
 	overflow-x: auto;
 }
-.ui-table {
+.nino-table {
 	width: 100%;
 	border-collapse: collapse;
 	text-align: left;
 }
-.ui-table th,
-.ui-table td {
+.nino-table th,
+.nino-table td {
 	padding: var(--space-1) var(--space-2);
 	border-bottom: 1px solid var(--color-border);
 }
-.ui-table th {
+.nino-table th {
 	font-size: var(--fontsize-small);
 	text-transform: uppercase;
 	color: var(--color-text);
 }
-.ui-table--striped tbody tr:nth-child(even) {
+.nino-table--striped tbody tr:nth-child(even) {
 	background-color: var(--color-section-alt-bg);
 }
-.ui-table--bordered th,
-.ui-table--bordered td {
+.nino-table--bordered th,
+.nino-table--bordered td {
 	border: 1px solid var(--color-border);
 }
 
 /* Pricing table - card per pricelist entry (via the "elements" shortcode) */
-.ui-pricing-row {
+.nino-pricing-row {
 	display: flex;
 	flex-wrap: wrap;
 	gap: var(--space-2);
 }
-/* ui-pricing-item flexes from a 240px basis, so "exactly four per line" needs
+/* nino-pricing-item flexes from a 240px basis, so "exactly four per line" needs
    a basis of its own - below the medium breakpoint the cards keep wrapping */
 @media (min-width: 768px) {
-	.ui-pricing-row--four > .ui-pricing-item { flex: 1 1 calc(25% - (var(--space-2) * 3 / 4)); }
-	.ui-pricing-row--four-first > .ui-pricing-item:first-child,
-	.ui-pricing-row--four-last > .ui-pricing-item:last-child {
+	.nino-pricing-row--four > .nino-pricing-item { flex: 1 1 calc(25% - (var(--space-2) * 3 / 4)); }
+	.nino-pricing-row--four-first > .nino-pricing-item:first-child,
+	.nino-pricing-row--four-last > .nino-pricing-item:last-child {
 		flex: 1 1 100%;
 		border-color: var(--color-primary);
 		border-width: 2px;
 	}
 }
-.ui-pricing-item {
+.nino-pricing-item {
 	flex: 1 1 240px;
 	padding: var(--space-2);
 	border: 1px solid var(--color-border);
 	border-radius: var(--radius);
 	text-align: center;
 }
-.ui-pricing-item--featured {
+.nino-pricing-item--featured {
 	border-color: var(--color-primary);
 	border-width: 2px;
 }
-.ui-pricing-row--feature-middle > .ui-pricing-item:nth-child(2) {
+.nino-pricing-row--feature-middle > .nino-pricing-item:nth-child(2) {
 	border-color: var(--color-primary);
 	border-width: 2px;
 	box-shadow: 0 .75rem 2rem rgba(0,0,0,.1);
 }
-.ui-pricing-title {
+.nino-pricing-title {
 	font-size: 1.125rem;
 	margin-bottom: var(--space-1);
 }
-.ui-pricing-price {
+.nino-pricing-price {
 	font-size: 2rem;
 	font-weight: bold;
 	color: var(--color-primary);
 }
-.ui-pricing-title--quiet { font-size: var(--text-1); opacity: .8; }
-.ui-pricing-title--loud { font-size: var(--text-4); }
-.ui-pricing-price--quiet { font-size: var(--text-4); opacity: .8; }
-.ui-pricing-price--loud { font-size: var(--text-6); }
-.ui-pricing-item--featured .ui-pricing-title {
+.nino-pricing-title--quiet { font-size: var(--text-1); opacity: .8; }
+.nino-pricing-title--loud { font-size: var(--text-4); }
+.nino-pricing-price--quiet { font-size: var(--text-4); opacity: .8; }
+.nino-pricing-price--loud { font-size: var(--text-6); }
+.nino-pricing-item--featured .nino-pricing-title {
 	font-size: 1.8rem;
 	margin-bottom: var(--space-1);
 }
-.ui-pricing-item--featured .ui-pricing-price {
+.nino-pricing-item--featured .nino-pricing-price {
 	font-size: 2.8rem;
 	color: var(--color-primary);
 }
-.ui-pricing-row--feature-middle > .ui-pricing-item:nth-child(2) .ui-pricing-title {
+.nino-pricing-row--feature-middle > .nino-pricing-item:nth-child(2) .nino-pricing-title {
 	font-size: 1.8rem;
 }
-.ui-pricing-row--feature-middle > .ui-pricing-item:nth-child(2) .ui-pricing-price {
+.nino-pricing-row--feature-middle > .nino-pricing-item:nth-child(2) .nino-pricing-price {
 	font-size: 2.8rem;
 }
-.ui-pricing-features {
+.nino-pricing-features {
 	margin: var(--space-2) 0;
 }
 
@@ -1427,45 +1436,45 @@ body.js-scroll-btf .js-back-to-top {
    sharing the same name="..." attribute behave as an exclusive group
    natively in current browsers (older browsers just allow several open
    at once - harmless fallback) */
-.ui-accordion {
+.nino-accordion {
 	border-bottom: 1px solid var(--color-border);
 }
-.ui-accordion-trigger {
+.nino-accordion-trigger {
 	padding: var(--space-2) 0;
 	cursor: pointer;
 	font-weight: bold;
 	list-style: none;
 }
-.ui-accordion-trigger::-webkit-details-marker {
+.nino-accordion-trigger::-webkit-details-marker {
 	display: none;
 }
-.ui-accordion-trigger::before {
+.nino-accordion-trigger::before {
 	content: "+";
 	display: inline-block;
 	width: 1em;
 	color: var(--color-primary);
 }
-.ui-accordion[open] > .ui-accordion-trigger::before {
+.nino-accordion[open] > .nino-accordion-trigger::before {
 	content: "\2212";
 }
-.ui-accordion-panel {
+.nino-accordion-panel {
 	padding: 0 0 var(--space-2) 1em;
 	transition: opacity .2s ease, transform .2s ease;
 }
-.ui-accordion[open] > .ui-accordion-panel {
+.nino-accordion[open] > .nino-accordion-panel {
 	transform: translateY(0);
 }
 /* Fades the panel in as it's revealed - degrades gracefully (instant show)
    in browsers without @starting-style support */
 @starting-style {
-	.ui-accordion[open] > .ui-accordion-panel {
+	.nino-accordion[open] > .nino-accordion-panel {
 		opacity: 0;
 		transform: translateY(-4px);
 	}
 }
 
 /* Pagination */
-.ui-pagination {
+.nino-pagination {
 	display: flex;
 	flex-wrap: wrap;
 	align-items: center;
@@ -1474,7 +1483,7 @@ body.js-scroll-btf .js-back-to-top {
 	margin: 0;
 	padding: 0;
 }
-.ui-pagination a {
+.nino-pagination a {
 	display: inline-block;
 	min-width: 2rem;
 	padding: var(--space-1);
@@ -1483,35 +1492,35 @@ body.js-scroll-btf .js-back-to-top {
 	color: var(--color-text);
 	border-radius: var(--radius);
 }
-.ui-pagination a:hover {
+.nino-pagination a:hover {
 	background-color: var(--color-border);
 }
-.ui-pagination li.active a {
+.nino-pagination li.nino-is-active a {
 	background-color: var(--color-primary);
 	color: var(--color-primary-text);
 }
 
 /* Logo/Partner strip - text placeholders standing in for real logo
    images (SVG/PNG), grayscale-to-color on hover */
-.ui-logos {
+.nino-logos {
 	display: flex;
 	flex-wrap: wrap;
 	align-items: center;
 	justify-content: center;
 	gap: var(--space-4);
 }
-.ui-logos-item {
+.nino-logos-item {
 	font-size: 1.25rem;
 	font-weight: 700;
 	opacity: .5;
 	filter: grayscale(1);
 	transition: opacity .2s ease, filter .2s ease;
 }
-.ui-logos-item:hover {
+.nino-logos-item:hover {
 	opacity: 1;
 	filter: grayscale(0);
 }
-.ui-logos-item img {
+.nino-logos-item img {
 	display: block;
 	max-width: 9rem;
 	max-height: 3.5rem;
@@ -1520,7 +1529,7 @@ body.js-scroll-btf .js-back-to-top {
 
 /* Gallery/Mosaic grid - fixed row height, items span extra columns/rows
    via --wide/--tall to break up the grid */
-.ui-gallery {
+.nino-gallery {
 	display: grid;
 	grid-template-columns: repeat(2, 1fr);
 	grid-auto-rows: 160px;
@@ -1530,25 +1539,25 @@ body.js-scroll-btf .js-back-to-top {
 	padding: 0 var(--space-1);
 	box-sizing: border-box;
 }
-.ui-gallery-item {
+.nino-gallery-item {
 	position: relative;
 	overflow: hidden;
 	border-radius: var(--radius);
 }
-.ui-gallery-item img {
+.nino-gallery-item img {
 	display: block;
 	width: 100%;
 	height: 100%;
 	object-fit: cover;
 	transition: transform .4s ease;
 }
-.ui-gallery-item:hover img {
+.nino-gallery-item:hover img {
 	transform: scale(1.05);
 }
-/* A gallery item's img optionally sits inside a js-modal-trigger button
+/* A gallery item's img optionally sits inside a nino-modal-trigger button
    instead of being a plain, non-interactive tile - reset the button back to
    filling the grid cell exactly like the plain-img case did */
-.ui-gallery-item button {
+.nino-gallery-item button {
 	display: block;
 	width: 100%;
 	height: 100%;
@@ -1557,123 +1566,123 @@ body.js-scroll-btf .js-back-to-top {
 	background: none;
 	cursor: zoom-in;
 }
-.ui-gallery-item--wide {
+.nino-gallery-item--wide {
 	grid-column: span 2;
 }
-.ui-gallery--mosaic > .ui-gallery-item:nth-child(6n + 1) {
+.nino-gallery--mosaic > .nino-gallery-item:nth-child(6n + 1) {
 	grid-column: span 2;
 }
 @media (min-width: 768px) {
-	.ui-gallery {
+	.nino-gallery {
 		grid-template-columns: repeat(4, 1fr);
 		grid-auto-rows: 200px;
 	}
-	.ui-gallery-item--tall {
+	.nino-gallery-item--tall {
 		grid-row: span 2;
 	}
-	.ui-gallery--mosaic > .ui-gallery-item:nth-child(6n + 1) {
+	.nino-gallery--mosaic > .nino-gallery-item:nth-child(6n + 1) {
 		grid-row: span 2;
 	}
-	.ui-gallery--mosaic > .ui-gallery-item:nth-child(6n + 4) {
+	.nino-gallery--mosaic > .nino-gallery-item:nth-child(6n + 4) {
 		grid-column: span 2;
 	}
 }
 
 /* Modern asymmetric feature grid. The repeating content remains a normal
    Elements collection; visual rhythm comes from the reusable container. */
-.ui-bento {
+.nino-bento {
 	display: grid;
 	grid-template-columns: 1fr;
 	gap: var(--space-2);
 }
-.ui-bento-item {
+.nino-bento-item {
 	min-height: 100%;
 }
 @media (min-width: 768px) {
-	.ui-bento {
+	.nino-bento {
 		grid-template-columns: repeat(6, minmax(0, 1fr));
 	}
-	.ui-bento-item {
+	.nino-bento-item {
 		grid-column: span 3;
 	}
-	.ui-bento-item:nth-child(6n + 1),
-	.ui-bento-item:nth-child(6n + 4) {
+	.nino-bento-item:nth-child(6n + 1),
+	.nino-bento-item:nth-child(6n + 4) {
 		grid-column: span 4;
 	}
-	.ui-bento-item:nth-child(6n + 2),
-	.ui-bento-item:nth-child(6n + 3) {
+	.nino-bento-item:nth-child(6n + 2),
+	.nino-bento-item:nth-child(6n + 3) {
 		grid-column: span 2;
 	}
 }
 
-.ui-testimonial-author {
+.nino-testimonial-author {
 	display: inline-flex;
 	align-items: center;
 	gap: var(--space-1);
 	margin-top: var(--space-2);
 	text-align: left;
 }
-.ui-testimonial-author img {
+.nino-testimonial-author img {
 	width: 3rem;
 	height: 3rem;
 	border-radius: 50%;
 	object-fit: cover;
 }
-.ui-testimonial-author span,
-.ui-testimonial-author small {
+.nino-testimonial-author span,
+.nino-testimonial-author small {
 	display: block;
 }
-.ui-profile-image {
+.nino-profile-image {
 	width: min(16rem, 42vw);
 	aspect-ratio: 4 / 5;
 	object-fit: cover;
 }
-.ui-profile-links {
+.nino-profile-links {
 	display: flex;
 	flex-wrap: wrap;
 	gap: var(--space-1) var(--space-2);
 }
-.ui-contact-details {
+.nino-contact-details {
 	display: grid;
 	gap: var(--space-1);
 	margin-top: var(--space-2);
 	font-style: normal;
 }
-.ui-newsletter-inline {
+.nino-newsletter-inline {
 	display: flex;
 	flex-wrap: wrap;
 	align-items: flex-start;
 	justify-content: center;
 	gap: var(--space-1);
 }
-.ui-newsletter-inline .ui-form-input {
+.nino-newsletter-inline .nino-form-input {
 	flex: 1 1 16rem;
 	margin: 0;
 }
 
 /* Feature-Split - icon + heading + text rows, paired with an image
-   column via the regular ui-grid-row/ui-grid-m-50 pattern */
-.ui-feature-list {
+   column via the regular nino-grid-row/nino-grid-m-50 pattern */
+.nino-feature-list {
 	list-style: none;
 	margin: var(--space-2) 0 0;
 	padding: 0;
 }
-.ui-feature-item {
+.nino-feature-item {
 	display: flex;
 	align-items: flex-start;
 	gap: var(--space-2);
 }
-.ui-feature-item:not(:last-child) {
+.nino-feature-item:not(:last-child) {
 	margin-bottom: var(--space-3);
 }
-.ui-feature-item .ui-icon {
+.nino-feature-item .nino-icon {
 	flex-shrink: 0;
 	top: 0;
 }
 
 /* Process timeline - numbered steps, connected by a horizontal line on
    "m" and up, stacked without the line on mobile */
-.ui-timeline {
+.nino-timeline {
 	display: flex;
 	flex-wrap: wrap;
 	list-style: none;
@@ -1683,10 +1692,10 @@ body.js-scroll-btf .js-back-to-top {
 /* --counted draws the step number from the list instead of the markup: an <ol>
    is numbered by nature, so the badge is decoration. ::before is the connecting
    line, so the badge is ::after, pulled in front with order */
-.ui-timeline--counted { counter-reset: ui-timeline-step; }
-.ui-timeline--counted > .ui-timeline-step { display: flex; flex-direction: column; counter-increment: ui-timeline-step; }
-.ui-timeline--counted > .ui-timeline-step::after {
-	content: counter(ui-timeline-step);
+.nino-timeline--counted { counter-reset: nino-timeline-step; }
+.nino-timeline--counted > .nino-timeline-step { display: flex; flex-direction: column; counter-increment: nino-timeline-step; }
+.nino-timeline--counted > .nino-timeline-step::after {
+	content: counter(nino-timeline-step);
 	position: relative;
 	z-index: 1;
 	order: -1;
@@ -1702,13 +1711,13 @@ body.js-scroll-btf .js-back-to-top {
 	font-weight: 700;
 }
 /* --stacked reads top to bottom, left aligned and without the connecting line */
-.ui-timeline--stacked { flex-direction: column; }
-.ui-timeline--stacked > .ui-timeline-step { flex: 1 1 auto; margin-bottom: var(--space-3); padding: 0; text-align: left; align-items: flex-start; }
-.ui-timeline--stacked > .ui-timeline-step:last-child { margin-bottom: 0; }
-.ui-timeline--stacked > .ui-timeline-step > .ui-timeline-number { margin-left: 0; }
-.ui-timeline--stacked > .ui-timeline-step::after { margin-left: 0; }
-.ui-timeline--stacked > .ui-timeline-step::before { display: none; }
-.ui-timeline-step {
+.nino-timeline--stacked { flex-direction: column; }
+.nino-timeline--stacked > .nino-timeline-step { flex: 1 1 auto; margin-bottom: var(--space-3); padding: 0; text-align: left; align-items: flex-start; }
+.nino-timeline--stacked > .nino-timeline-step:last-child { margin-bottom: 0; }
+.nino-timeline--stacked > .nino-timeline-step > .nino-timeline-number { margin-left: 0; }
+.nino-timeline--stacked > .nino-timeline-step::after { margin-left: 0; }
+.nino-timeline--stacked > .nino-timeline-step::before { display: none; }
+.nino-timeline-step {
 	position: relative;
 	flex: 1 1 100%;
 	text-align: center;
@@ -1716,7 +1725,7 @@ body.js-scroll-btf .js-back-to-top {
 	margin-bottom: var(--space-3);
 	box-sizing: border-box;
 }
-.ui-timeline-number {
+.nino-timeline-number {
 	position: relative;
 	z-index: 1;
 	display: flex;
@@ -1731,11 +1740,11 @@ body.js-scroll-btf .js-back-to-top {
 	font-weight: 700;
 }
 @media (min-width: 768px) {
-	.ui-timeline-step {
+	.nino-timeline-step {
 		flex: 1 1 0;
 		margin-bottom: 0;
 	}
-	.ui-timeline-step::before {
+	.nino-timeline-step::before {
 		content: '';
 		position: absolute;
 		top: 20px;
@@ -1744,14 +1753,14 @@ body.js-scroll-btf .js-back-to-top {
 		height: 2px;
 		background-color: var(--color-border);
 	}
-	.ui-timeline-step:first-child::before {
+	.nino-timeline-step:first-child::before {
 		display: none;
 	}
 }
 
 /* Video poster - static image standing in for a video's first frame,
-   opens the actual embed in a js-modal--lightbox (see 08) on click */
-.ui-video-poster {
+   opens the actual embed in a nino-modal--lightbox (see 08) on click */
+.nino-video-poster {
 	position: relative;
 	display: block;
 	width: 100%;
@@ -1763,13 +1772,13 @@ body.js-scroll-btf .js-back-to-top {
 	background: none;
 	cursor: pointer;
 }
-.ui-video-poster img {
+.nino-video-poster img {
 	display: block;
 	width: 100%;
 	height: 100%;
 	object-fit: cover;
 }
-.ui-video-play {
+.nino-video-play {
 	position: absolute;
 	top: 50%;
 	left: 50%;
@@ -1780,20 +1789,20 @@ body.js-scroll-btf .js-back-to-top {
 	filter: drop-shadow(0 2px 8px rgba(0,0,0,.5));
 	transition: transform .2s ease;
 }
-.ui-video-poster:hover .ui-video-play {
+.nino-video-poster:hover .nino-video-play {
 	transform: translate(-50%,-50%) scale(1.1);
 }
 
 /* Full-bleed background image with a dark scrim for text contrast -
-   static (no JS), unlike js-cover/js-parallex which are JS-sized */
-.ui-img-background--dim::before {
+   static (no JS), unlike nino-cover/nino-parallex which are JS-sized */
+.nino-img-background--dim::before {
 	content: '';
 	position: absolute;
 	inset: 0;
 	z-index: 2;
 	background-color: var(--color-background-dim);
 }
-.ui-img-background-content {
+.nino-img-background-content {
 	position: relative;
 	z-index: 3;
 }
@@ -1811,18 +1820,18 @@ body.js-scroll-btf .js-back-to-top {
  *
  ****************************************************************************************************/
 
-.sc-nav-burger {
+.nino-nav-burger {
 	position: relative;
 }
-.sc-nav-burger label {
+.nino-nav-burger label {
 	cursor: pointer;
 	display: flex;
 	align-items: center;
 }
-.sc-nav-burger input[type="checkbox"] {
+.nino-nav-burger input[type="checkbox"] {
 	display: none;
 }
-.sc-nav-burger svg {
+.nino-nav-burger svg {
 	width: 32px;
 	height: 32px;
 	margin-left: auto;
@@ -1831,7 +1840,7 @@ body.js-scroll-btf .js-back-to-top {
 	transition: transform .3s;
 	fill: var(--color-section-black-text);
 }
-.sc-nav-burger .sc-nav-content {
+.nino-nav-burger .nino-nav-content {
 	position: fixed;
 	top: 0;
 	left: 0;
@@ -1843,38 +1852,38 @@ body.js-scroll-btf .js-back-to-top {
 	transition: max-height .4s;
 	z-index: 100;
 }
-.sc-nav-content ul {
+.nino-nav-content ul {
 	list-style: none;
 	margin: 0;
 	padding: 0;
 }
-.sc-nav-burger .sc-nav-content > div {
+.nino-nav-burger .nino-nav-content > div {
 	display:none;
 }
 
-.sc-nav-burger input:checked ~ .sc-nav-content {
+.nino-nav-burger input:checked ~ .nino-nav-content {
 	max-height: 100vh;
 }
-.sc-nav-burger input:checked ~ .sc-nav-content > div {
+.nino-nav-burger input:checked ~ .nino-nav-content > div {
 	display:block;
 }
-.sc-nav-burger input:checked ~ svg {
+.nino-nav-burger input:checked ~ svg {
 	transform: rotate(90deg);
 }
-.sc-nav-burger input:checked ~ .sc-nav-bg {
+.nino-nav-burger input:checked ~ .nino-nav-bg {
 	position: fixed;
 	inset: 0;
 	z-index: 99;
 }
 /* The open overlay always sits on a plain --color-background surface (see
-   .sc-nav-burger .sc-nav-content's own background-color above), regardless
+   .nino-nav-burger .nino-nav-content's own background-color above), regardless
    of what color the theme gives the header itself (often dark/semi-
    transparent) - so its links need the page's normal text color, not
    whatever a theme sets for header links */
-.sc-nav-burger input:checked ~ .sc-nav-content li a {
+.nino-nav-burger input:checked ~ .nino-nav-content li a {
 	color: var(--color-text);
 }
-.sc-nav-burger input:checked ~ .sc-nav-content li a.active {
+.nino-nav-burger input:checked ~ .nino-nav-content li a.nino-is-active {
 	color: var(--color-primary);
 }
 
@@ -1882,37 +1891,37 @@ body.js-scroll-btf .js-back-to-top {
    Navigation::$html) - it needs top padding to clear the fixed header once
    opened. The 'nav-regular' variant (eg. the footer's nav lists) renders
    inline, so it must not inherit that offset. */
-.sc-nav-burger .sc-nav-content ul {
+.nino-nav-burger .nino-nav-content ul {
 	padding: var(--space-2);
 }
-header .sc-nav-content li a {
+header .nino-nav-content li a {
 	display: block;
 	padding: var(--space-1) 0;
 	font-size: 1.4rem;
 	border-bottom: 1px solid var(--color-border);
 }
-header .ui-headernav-logo {
+header .nino-headernav-logo {
 	width:50%;
 	margin:var(--space-3) auto 0;
 }
 
 @media (min-width: 768px) {
-	.sc-nav-burger svg {
+	.nino-nav-burger svg {
 		display: none;
 	}
-	.sc-nav-burger .sc-nav-content {
+	.nino-nav-burger .nino-nav-content {
 		position: static;
 		max-height: none;
 		background-color: transparent;
 	}
-	.sc-nav-content ul {
+	.nino-nav-content ul {
 		display: flex;
 		gap: var(--space-2);
 	}
-	.sc-nav-burger .sc-nav-content ul {
+	.nino-nav-burger .nino-nav-content ul {
 		padding: 0;
 	}
-	header .sc-nav-content li a {
+	header .nino-nav-content li a {
 		border: none;
 		padding: 0;
 		font-size: 1rem;
@@ -1932,47 +1941,47 @@ header .ui-headernav-logo {
  *
  ****************************************************************************************************/
 
-.sc-localepicker-wrap {
+.nino-localepicker-wrap {
 	display:inline-block;
 	text-align:center;
 }
-.sc-localepicker-wrap div {
+.nino-localepicker-wrap div {
 	display:inline-block;
 }
 
-.sc-localepicker-wrap svg {
+.nino-localepicker-wrap svg {
 	width:16px;
 	height:16px;
 	margin-right:var(--space-1);
 	position:relative;
 	top:3px;
 }
-.sc-localepicker-wrap input {
+.nino-localepicker-wrap input {
 	display:none;
 }
-.sc-localepicker-wrap h6,
-.sc-localepicker-wrap li {
+.nino-localepicker-wrap h6,
+.nino-localepicker-wrap li {
 	display:none;
 	color:var(--color-footer-text);
 	cursor:pointer;
 }
 
-.sc-localepicker-wrap ul {
+.nino-localepicker-wrap ul {
 	margin: 0;
 	padding: 0;
 	list-style-type: none;
 }
 
-.sc-localepicker-wrap li.active {
+.nino-localepicker-wrap li.nino-is-active {
 	display:block;
 }
 
-.sc-localepicker-wrap a {
+.nino-localepicker-wrap a {
 	text-decoration:none;
 	color:var(--color-footer-text-legal);
 }
 
-.sc-localepicker-wrap input:checked + div {
+.nino-localepicker-wrap input:checked + div {
 	display:block;
 	position:fixed;
 	text-indent: 0;
@@ -1984,16 +1993,16 @@ header .ui-headernav-logo {
 	background-color:var(--color-background);
 	border:1px solid var(--color-border);
 }
-.sc-localepicker-wrap input:checked ~ div h6 {
+.nino-localepicker-wrap input:checked ~ div h6 {
 	display:block;
 	text-align:center;
 	padding:.5rem;
 }
-.sc-localepicker-wrap input:checked ~ div li {
+.nino-localepicker-wrap input:checked ~ div li {
 	display:block;
 	border-top:1px solid var(--color-border);
 }
-.sc-localepicker-wrap input:checked + div li a {
+.nino-localepicker-wrap input:checked + div li a {
 	color:var(--color-text);
 	font-size:1.2rem;
 	padding:1rem 0;
@@ -2002,34 +2011,34 @@ header .ui-headernav-logo {
 	transition:color .3s;
 }
 
-.sc-localepicker-wrap input:checked + div li a:hover {
+.nino-localepicker-wrap input:checked + div li a:hover {
 	color:var(--color-primary);
 }
-.sc-localepicker-wrap input:checked + div li.active a:hover {
+.nino-localepicker-wrap input:checked + div li.nino-is-active a:hover {
 	color:var(--color-text);
 	cursor:default;
 }
-.sc-localepicker-wrap input:checked + div li.active {
+.nino-localepicker-wrap input:checked + div li.nino-is-active {
 	font-weight:bold;
 }
 
 @media(min-width:768px) {
-	.sc-localepicker-wrap input:checked + div {
+	.nino-localepicker-wrap input:checked + div {
 		top:25%;
 		left:25%;
 		right:25%;
 		bottom:auto;
 		padding:var(--space-1);
 	}
-	.sc-localepicker-wrap div.sc-localepicker-bg {
+	.nino-localepicker-wrap div.nino-localepicker-bg {
 		opacity:0;
 		transition:opacity .2s;
 	}
 
-	.sc-localepicker-wrap input:checked ~ div li {
+	.nino-localepicker-wrap input:checked ~ div li {
 		border-bottom:none;
 	}
-	.sc-localepicker-wrap input:checked ~ div.sc-localepicker-bg {
+	.nino-localepicker-wrap input:checked ~ div.nino-localepicker-bg {
 		z-index:998;
 		opacity:1;
 		display:block;
@@ -2049,10 +2058,10 @@ header .ui-headernav-logo {
  *
  *			Ensure Nino.ui.js functionality.
  *
- *			.js-parallex(--dim), .js-cover(--dim), .js-slider, .js-vpa, .js-preloader
- *			.js-tabs-nav, .js-tabs-tab, .js-tabs-panel
- *			.js-modal(--lightbox, --video), .js-modal-close
- *			.js-toast-container, .js-toast(--success, --error)
+ *			.nino-parallex(--dim), .nino-cover(--dim), .nino-slider, .nino-vpa, .nino-preloader
+ *			.nino-tabs-nav, .nino-tabs-tab, .nino-tabs-panel
+ *			.nino-modal(--lightbox, --video), .nino-modal-close
+ *			.nino-toast-container, .nino-toast(--success, --error)
  *
  *
  ****************************************************************************************************/
@@ -2060,16 +2069,16 @@ header .ui-headernav-logo {
 
 /* Cover / Parallax - JS-driven sizing (see Nino.ui.js), this only
    provides the structural CSS the JS behavior depends on */
-.js-parallex,
-.js-cover {
+.nino-parallex,
+.nino-cover {
 	position: relative;
 	overflow: hidden;
 }
-.js-parallex {
+.nino-parallex {
 	min-height: 60vh;
 }
-.js-parallex > img,
-.js-cover > img {
+.nino-parallex > img,
+.nino-cover > img {
 	position: absolute;
 	top: 0;
 	left: 0;
@@ -2081,22 +2090,22 @@ header .ui-headernav-logo {
 	z-index: 1;
 	will-change: transform;
 }
-.js-parallex > img {
+.nino-parallex > img {
 	height: 180%;
 }
 /* Optional dark scrim for text-on-photo contrast - z-index sits between
    the image (1) and the content (101), no stacking-context trick needed
-   since nothing here goes negative (unlike ui-img-background, see docs) */
-.js-parallex--dim::before,
-.js-cover--dim::before {
+   since nothing here goes negative (unlike nino-img-background, see docs) */
+.nino-parallex--dim::before,
+.nino-cover--dim::before {
 	content: '';
 	position: absolute;
 	inset: 0;
 	z-index: 50;
 	background-color: var(--color-background-dim);
 }
-.js-parallex > .js-cover-content,
-.js-cover > .js-cover-content {
+.nino-parallex > .nino-cover-content,
+.nino-cover > .nino-cover-content {
 	position: absolute;
 	padding-top:var(--space-3);
 	z-index: 101;
@@ -2104,56 +2113,56 @@ header .ui-headernav-logo {
 	width: 100%;
 	transform: translateY(-50%);
 }
-.js-parallex.js-cover-center > .js-cover-content,
-.js-cover.js-cover-center > .js-cover-content {
+.nino-parallex.nino-cover-center > .nino-cover-content,
+.nino-cover.nino-cover-center > .nino-cover-content {
 	left: 50%;
 	text-align: center;
 	transform: translate(-50%,-50%);
 }
-.js-parallex.js-cover-top > .js-cover-content,
-.js-cover.js-cover-top > .js-cover-content { top: 0; transform: none; }
-.js-parallex.js-cover-bottom > .js-cover-content,
-.js-cover.js-cover-bottom > .js-cover-content { top: auto; bottom: 0; transform: none; }
-.js-parallex.ui-atf,
-.js-cover.ui-atf {
+.nino-parallex.nino-cover-top > .nino-cover-content,
+.nino-cover.nino-cover-top > .nino-cover-content { top: 0; transform: none; }
+.nino-parallex.nino-cover-bottom > .nino-cover-content,
+.nino-cover.nino-cover-bottom > .nino-cover-content { top: auto; bottom: 0; transform: none; }
+.nino-parallex.nino-atf,
+.nino-cover.nino-atf {
 	margin-top: 0 !important;
 	box-sizing: border-box;
 }
 
 @media (prefers-reduced-motion: reduce), (pointer: coarse) {
-	.js-parallex > img { top: 0 !important; height: 100%; transform: none !important; will-change: auto; }
+	.nino-parallex > img { top: 0 !important; height: 100%; transform: none !important; will-change: auto; }
 }
 
 /* Contentslider */
-.js-slider {
+.nino-slider {
 	position: relative;
 	overflow: hidden;
-	padding-bottom: 40px; /* room for .js-slider-controls */
+	padding-bottom: 40px; /* room for .nino-slider-controls */
 }
-.js-slider ul {
+.nino-slider ul {
 	display: flex;
 	position: absolute;
 	padding: 0;
 	margin: 0;
 	transition: left 600ms cubic-bezier(0.4,0,0.2,1);
 }
-.js-slider.touch ul {
+.nino-slider.nino-is-touch ul {
 	transition: none;
 }
-.js-slider li {
+.nino-slider li {
 	opacity: .6;
 	transition: opacity 200ms;
 }
-.js-slider li.active {
+.nino-slider li.nino-is-active {
 	opacity: 1;
 }
-.js-slider li img {
+.nino-slider li img {
 	width: 100%;
 }
 
 /* Controls - prev button, dots, next button, grouped into one centered row
    regardless of how wide the slider itself is */
-.js-slider-controls {
+.nino-slider-controls {
 	position: absolute;
 	left: 50%;
 	bottom: 0;
@@ -2162,16 +2171,16 @@ header .ui-headernav-logo {
 	align-items: center;
 	gap: var(--space-1);
 }
-.js-slider-button {
+.nino-slider-button {
 	cursor: pointer;
 	font-size: 1.8rem;
 	line-height: 1rem;
 	padding: 2px 8px 8px 8px;
 }
-/* Specificity note: .js-slider ul (above) matches this too since it's
-   still a <ul> descendant of .js-slider - needs the extra .js-slider-controls
+/* Specificity note: .nino-slider ul (above) matches this too since it's
+   still a <ul> descendant of .nino-slider - needs the extra .nino-slider-controls
    ancestor class to actually win over position/display/transition */
-.js-slider-controls .js-slider-points {
+.nino-slider-controls .nino-slider-points {
 	position: static;
 	display: flex;
 	align-items: center;
@@ -2180,7 +2189,7 @@ header .ui-headernav-logo {
 	padding: 0;
 	transition: none;
 }
-.js-slider-points li {
+.nino-slider-points li {
 	width: 12px;
 	height: 12px;
 	border-radius: 50%;
@@ -2189,18 +2198,18 @@ header .ui-headernav-logo {
 	cursor: pointer;
 	transition: background-color .2s;
 }
-.js-slider-points li.active {
+.nino-slider-points li.nino-is-active {
 	background-color: var(--color-primary);
 }
 
 /* Viewport animations (vpa) - default is a subtle fade+rise. --zoom/--zoom-
    out/--slide-left/--slide-right/--blur/--flip are drop-in alternatives,
-   each split into a -soft/-medium/-hard intensity (e.g. js-vpa--zoom-soft).
+   each split into a -soft/-medium/-hard intensity (e.g. nino-vpa--zoom-soft).
    --speed-slow/-medium/-fast controls the transition duration, independent
    of which variant is used. Everything is implemented as custom properties
-   (--vpa-t-*/--vpa-f-*/--vpa-origin/--vpa-duration) rather than fixed
+   (--vpa-t-* /--vpa-f-* /--vpa-origin/--vpa-duration) rather than fixed
    values, which makes it all inheritable: put a variant and/or speed class
-   on <body> to set the page-wide default, and any .js-vpa element picks it
+   on <body> to set the page-wide default, and any .nino-vpa element picks it
    up automatically; an element carrying its own variant/speed class always
    overrides what it would otherwise inherit, since a property set directly
    on an element beats one inherited from an ancestor regardless of the
@@ -2215,10 +2224,10 @@ header .ui-headernav-logo {
 	--vpa-origin: center;
 	--vpa-duration: .5s;
 }
-.js-vpa {
+.nino-vpa {
 	transform-origin: var(--vpa-origin);
 }
-.js-vpa, .js-vpa--visible-once.js-vpa--repeat {
+.nino-vpa, .nino-vpa--visible-once.nino-vpa--repeat {
 	opacity: 0;
 	transform: var(--vpa-t-hidden);
 	filter: var(--vpa-f-hidden);
@@ -2226,9 +2235,9 @@ header .ui-headernav-logo {
 	transition-duration: var(--vpa-duration);
 	transition-timing-function: cubic-bezier(0.5, 0, 0.7, 1);
 }
-.js-vpa--visible-once,
-.js-vpa--visible,
-.js-vpa--visible-once.js-vpa--repeat.js-vpa--visible {
+.nino-vpa--visible-once,
+.nino-vpa--visible,
+.nino-vpa--visible-once.nino-vpa--repeat.nino-vpa--visible {
 	opacity: 1;
 	transform: var(--vpa-t-visible);
 	filter: var(--vpa-f-visible);
@@ -2236,48 +2245,48 @@ header .ui-headernav-logo {
 
 /* --speed-*: duration only, combine with any variant below (or the plain
    default) - --speed-slow is deliberately slow, not just "a bit slower" */
-.js-vpa--speed-fast { --vpa-duration: .25s; }
-.js-vpa--speed-medium { --vpa-duration: .5s; }
-.js-vpa--speed-slow { --vpa-duration: 2s; }
+.nino-vpa--speed-fast { --vpa-duration: .25s; }
+.nino-vpa--speed-medium { --vpa-duration: .5s; }
+.nino-vpa--speed-slow { --vpa-duration: 2s; }
 
 /* --zoom-*: scales up into place, a snappier "pop" than the plain
    fade+rise. soft/medium/hard = how far out the scale starts */
-.js-vpa--zoom-soft { --vpa-t-hidden: scale(.94); --vpa-t-visible: scale(1); }
-.js-vpa--zoom-medium { --vpa-t-hidden: scale(.85); --vpa-t-visible: scale(1); }
-.js-vpa--zoom-hard { --vpa-t-hidden: scale(.7); --vpa-t-visible: scale(1); }
+.nino-vpa--zoom-soft { --vpa-t-hidden: scale(.94); --vpa-t-visible: scale(1); }
+.nino-vpa--zoom-medium { --vpa-t-hidden: scale(.85); --vpa-t-visible: scale(1); }
+.nino-vpa--zoom-hard { --vpa-t-hidden: scale(.7); --vpa-t-visible: scale(1); }
 
 /* --zoom-out-*: the mirror of --zoom-* - starts oversized and settles down
    to its actual size, reads as the content "arriving" rather than "growing" */
-.js-vpa--zoom-out-soft { --vpa-t-hidden: scale(1.06); --vpa-t-visible: scale(1); }
-.js-vpa--zoom-out-medium { --vpa-t-hidden: scale(1.15); --vpa-t-visible: scale(1); }
-.js-vpa--zoom-out-hard { --vpa-t-hidden: scale(1.35); --vpa-t-visible: scale(1); }
+.nino-vpa--zoom-out-soft { --vpa-t-hidden: scale(1.06); --vpa-t-visible: scale(1); }
+.nino-vpa--zoom-out-medium { --vpa-t-hidden: scale(1.15); --vpa-t-visible: scale(1); }
+.nino-vpa--zoom-out-hard { --vpa-t-hidden: scale(1.35); --vpa-t-visible: scale(1); }
 
-/* --slide-left-*/--slide-right-*: a horizontal travel instead of the
+/* --slide-left-* /--slide-right-*: a horizontal travel instead of the
    default's vertical rise - good for alternating card/timeline layouts
    where left/right reinforces which "side" a piece of content belongs to */
-.js-vpa--slide-left-soft { --vpa-t-hidden: translateX(1.5rem); --vpa-t-visible: translateX(0); }
-.js-vpa--slide-left-medium { --vpa-t-hidden: translateX(3rem); --vpa-t-visible: translateX(0); }
-.js-vpa--slide-left-hard { --vpa-t-hidden: translateX(6rem); --vpa-t-visible: translateX(0); }
-.js-vpa--slide-right-soft { --vpa-t-hidden: translateX(-1.5rem); --vpa-t-visible: translateX(0); }
-.js-vpa--slide-right-medium { --vpa-t-hidden: translateX(-3rem); --vpa-t-visible: translateX(0); }
-.js-vpa--slide-right-hard { --vpa-t-hidden: translateX(-6rem); --vpa-t-visible: translateX(0); }
+.nino-vpa--slide-left-soft { --vpa-t-hidden: translateX(1.5rem); --vpa-t-visible: translateX(0); }
+.nino-vpa--slide-left-medium { --vpa-t-hidden: translateX(3rem); --vpa-t-visible: translateX(0); }
+.nino-vpa--slide-left-hard { --vpa-t-hidden: translateX(6rem); --vpa-t-visible: translateX(0); }
+.nino-vpa--slide-right-soft { --vpa-t-hidden: translateX(-1.5rem); --vpa-t-visible: translateX(0); }
+.nino-vpa--slide-right-medium { --vpa-t-hidden: translateX(-3rem); --vpa-t-visible: translateX(0); }
+.nino-vpa--slide-right-hard { --vpa-t-hidden: translateX(-6rem); --vpa-t-visible: translateX(0); }
 
 /* --blur-*: soft-focus-in, on top of whatever transform is already in
-   effect (the default rise, or a --zoom-*/--slide-*/--flip-* combined on
+   effect (the default rise, or a --zoom-* /--slide-* /--flip-* combined on
    the same element - only --vpa-f-* is set here, --vpa-t-* is left alone,
    so blur is the one variant that freely combines with any other) */
-.js-vpa--blur-soft { --vpa-f-hidden: blur(6px); --vpa-f-visible: blur(0); }
-.js-vpa--blur-medium { --vpa-f-hidden: blur(12px); --vpa-f-visible: blur(0); }
-.js-vpa--blur-hard { --vpa-f-hidden: blur(24px); --vpa-f-visible: blur(0); }
+.nino-vpa--blur-soft { --vpa-f-hidden: blur(6px); --vpa-f-visible: blur(0); }
+.nino-vpa--blur-medium { --vpa-f-hidden: blur(12px); --vpa-f-visible: blur(0); }
+.nino-vpa--blur-hard { --vpa-f-hidden: blur(24px); --vpa-f-visible: blur(0); }
 
 /* --flip-*: a playful 3D tilt-down into place - the most "auffällig" of the
    set, best used sparingly (one hero/callout, not a whole repeated grid) */
-.js-vpa--flip-soft { --vpa-t-hidden: perspective(800px) rotateX(-20deg); --vpa-t-visible: perspective(800px) rotateX(0deg); --vpa-origin: top center; }
-.js-vpa--flip-medium { --vpa-t-hidden: perspective(800px) rotateX(-40deg); --vpa-t-visible: perspective(800px) rotateX(0deg); --vpa-origin: top center; }
-.js-vpa--flip-hard { --vpa-t-hidden: perspective(800px) rotateX(-65deg); --vpa-t-visible: perspective(800px) rotateX(0deg); --vpa-origin: top center; }
+.nino-vpa--flip-soft { --vpa-t-hidden: perspective(800px) rotateX(-20deg); --vpa-t-visible: perspective(800px) rotateX(0deg); --vpa-origin: top center; }
+.nino-vpa--flip-medium { --vpa-t-hidden: perspective(800px) rotateX(-40deg); --vpa-t-visible: perspective(800px) rotateX(0deg); --vpa-origin: top center; }
+.nino-vpa--flip-hard { --vpa-t-hidden: perspective(800px) rotateX(-65deg); --vpa-t-visible: perspective(800px) rotateX(0deg); --vpa-origin: top center; }
 
 /* Preloader */
-.js-preloader {
+.nino-preloader {
 	position: fixed;
 	top: 0;
 	left: 0;
@@ -2291,28 +2300,28 @@ header .ui-headernav-logo {
 	opacity: 1;
 	transition: opacity 1s ease;
 }
-.js-preloader::after {
+.nino-preloader::after {
 	content: "";
 	width: 50px;
 	height: 50px;
 	border: 5px solid rgba(0, 0, 0, 0.1);
 	border-radius: 50%;
 	border-top-color: var(--color-primary);
-	animation: ui-fx-spin 1s ease-in-out infinite;
+	animation: nino-fx-spin 1s ease-in-out infinite;
 }
-@keyframes ui-fx-spin {
+@keyframes nino-fx-spin {
 	to { transform: rotate(360deg); }
 }
 
 /* Tabs */
-.js-tabs-nav {
+.nino-tabs-nav {
 	display: flex;
 	flex-wrap: wrap;
 	gap: var(--space-1);
 	border-bottom: 1px solid var(--color-border);
 	margin-bottom: var(--space-2);
 }
-.js-tabs-tab {
+.nino-tabs-tab {
 	padding: var(--space-1) var(--space-2);
 	cursor: pointer;
 	border: none;
@@ -2321,17 +2330,17 @@ header .ui-headernav-logo {
 	color: var(--color-text);
 	border-bottom: 2px solid transparent;
 }
-.js-tabs-tab.active {
+.nino-tabs-tab.nino-is-active {
 	color: var(--color-primary);
 	border-bottom-color: var(--color-primary);
 }
-.js-tabs-panel {
+.nino-tabs-panel {
 	display: none;
 	opacity: 0;
 	transform: translateY(4px);
 	transition: opacity .2s ease, transform .2s ease, display .2s allow-discrete;
 }
-.js-tabs-panel.active {
+.nino-tabs-panel.nino-is-active {
 	display: block;
 	opacity: 1;
 	transform: translateY(0);
@@ -2339,7 +2348,7 @@ header .ui-headernav-logo {
 /* Fades the panel in on switch - degrades gracefully (instant show) in
    browsers without @starting-style/allow-discrete support */
 @starting-style {
-	.js-tabs-panel.active {
+	.nino-tabs-panel.nino-is-active {
 		opacity: 0;
 		transform: translateY(4px);
 	}
@@ -2348,7 +2357,7 @@ header .ui-headernav-logo {
 /* Modal / Lightbox - native <dialog>, JS only opens/closes it (see
    Nino.ui.js) - focus-trapping, ESC-to-close and the backdrop click target
    all come from the browser for free */
-.js-modal {
+.nino-modal {
 	/* the global reset zeroes out margin - restore it, since the native
 	   centering (dialog:modal { position:fixed; inset:0 }) relies on it */
 	margin: auto;
@@ -2360,26 +2369,26 @@ header .ui-headernav-logo {
 	background-color: var(--color-background);
 	color: var(--color-text);
 }
-.js-modal::backdrop {
+.nino-modal::backdrop {
 	background-color: rgba(0, 0, 0, .5);
 }
-.js-modal--lightbox {
+.nino-modal--lightbox {
 	width: auto;
 	padding: 0;
 	background: none;
 }
-.js-modal--lightbox img {
+.nino-modal--lightbox img {
 	display: block;
 	max-width: 90vw;
 	max-height: 85vh;
 }
-/* Explicit width instead of --lightbox's auto/shrink-to-fit - a .ui-video
+/* Explicit width instead of --lightbox's auto/shrink-to-fit - a .nino-video
    child has no intrinsic size of its own (percentage width), so shrink-to-fit
    can't resolve a sensible dialog width the way it does for a plain <img> */
-.js-modal--video {
+.nino-modal--video {
 	width: min(90vw, 900px);
 }
-.js-modal-close {
+.nino-modal-close {
 	position: absolute;
 	top: var(--space-1);
 	right: var(--space-1);
@@ -2393,7 +2402,7 @@ header .ui-headernav-logo {
 
 /* Toast - created/removed entirely by JS via Nino.ui.toast(), see
    Nino.ui.js - no markup to author, nothing to add to a template */
-.js-toast-container {
+.nino-toast-container {
 	position: fixed;
 	bottom: var(--space-2);
 	right: var(--space-2);
@@ -2402,7 +2411,7 @@ header .ui-headernav-logo {
 	flex-direction: column;
 	gap: var(--space-1);
 }
-.js-toast {
+.nino-toast {
 	padding: var(--space-2);
 	border-radius: var(--radius);
 	background-color: var(--color-section-black-bg);
@@ -2412,15 +2421,15 @@ header .ui-headernav-logo {
 	transform: translateY(10px);
 	transition: opacity .3s, transform .3s;
 }
-.js-toast--visible {
+.nino-toast--visible {
 	opacity: 1;
 	transform: translateY(0);
 }
-.js-toast--success {
+.nino-toast--success {
 	background-color: var(--color-success);
 	color: var(--color-primary-text);
 }
-.js-toast--error {
+.nino-toast--error {
 	background-color: var(--color-error);
 	color: var(--color-primary-text);
 }
