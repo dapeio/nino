@@ -27,10 +27,11 @@
 					<span id="install-nav-checks" class="active">1. Environment</span>
 					<span id="install-nav-setup">2. Setup</span>
 					<span id="install-nav-themes">3. Themes</span>
-					<span id="install-nav-webpages">4. Routes</span>
-					<span id="install-nav-personalinfos">5. Personal Infos</span>
-					<span id="install-nav-admin">6. Admins</span>
-					<span id="install-nav-finish">7. Finish</span>
+					<span id="install-nav-design">4. Design</span>
+					<span id="install-nav-webpages">5. Routes</span>
+					<span id="install-nav-personalinfos">6. Personal Infos</span>
+					<span id="install-nav-admin">7. Admins</span>
+					<span id="install-nav-finish">8. Finish</span>
 				</div>
 			</aside>
 
@@ -62,7 +63,111 @@
 				<div id="install-content-themes">
 					<p class="nino-admin-hint nino-admin-hint-lead">Pick the site's look - one complete theme from <code>_install/library/themes</code>. Applying copies whatever its manifest lists (its stylesheet, the webfonts that stylesheet uses, any images it ships) into the project and points <code>config.php</code>'s css bundle at it. Click a tile's preview to enlarge it. Exactly one theme is active at a time: picking a different one later overwrites its files rather than adding to them.</p>
 					<div id="themes-grid"></div>
+
+					<!-- Frames and Design, both filled in by themes.js from
+					     themes/list. The Design block removes itself when the
+					     delivery has no /_theme - see Themes::_designAvailable() -->
+					<div id="themes-frames" class="install-theme-panel install-hidden">
+						<h3 class="install-theme-panel-title">Header and footer</h3>
+						<p class="nino-admin-hint">Which frame the site's <code>&lt;header&gt;</code> and <code>&lt;footer&gt;</code> use. The page templates include the installed copy through <code>&#91;template /templates/theme.header&#93;</code>, so this can be changed later by swapping those two files. Picking a theme pre-selects the frames it was drawn against.</p>
+						<!-- A version number says nothing about what a frame looks
+						     like, and unlike a theme there is no preview image to
+						     open. Each select carries the real thing, rendered by
+						     themes/frame into a sandboxed iframe - see
+						     Themes::apiFrame() for why it is a document of its own
+						     and not markup spliced in here -->
+						<div class="install-theme-frames">
+							<div class="install-frame-pick">
+								<label class="install-theme-field">
+									<span>Header</span>
+									<select id="themes-frame-header" class="nino-admin-input"></select>
+								</label>
+								<div class="install-frame-stage">
+									<iframe id="themes-frame-header-preview" class="install-frame-view" title="Header preview" sandbox="" loading="lazy" scrolling="no"></iframe>
+								</div>
+							</div>
+							<div class="install-frame-pick">
+								<label class="install-theme-field">
+									<span>Footer</span>
+									<select id="themes-frame-footer" class="nino-admin-input"></select>
+								</label>
+								<div class="install-frame-stage">
+									<iframe id="themes-frame-footer-preview" class="install-frame-view" title="Footer preview" sandbox="" loading="lazy" scrolling="no"></iframe>
+								</div>
+							</div>
+						</div>
+					</div>
+
 					<p id="themes-msg"></p>
+				</div>
+
+				<div id="install-content-design">
+					<p class="nino-admin-hint nino-admin-hint-lead">The values the theme reads from. <code>/_theme</code> generates them and this step writes them: a background is published together with the text colour that belongs on it, measured against the WCAG contrast formula, so a brand colour cannot produce unreadable text. The theme picked in the previous step fills these in with what it was drawn against, and everything stays editable under <code>/_theme</code> after the installation.</p>
+					<p id="design-unavailable" class="nino-admin-hint install-hidden">This delivery ships without <code>/_theme</code>, so there is nothing to generate here - the theme's own stylesheet decides the colours instead. Press "Next" to continue.</p>
+
+					<div id="design-controls">
+
+						<section class="install-design-section">
+							<h3 class="install-design-section-title">Colour</h3>
+							<div class="install-design-grid">
+								<label class="install-theme-field">
+									<span>Primary</span>
+									<span class="install-theme-color">
+										<input type="color" id="themes-design-primary" class="install-theme-swatch">
+										<input type="text" id="themes-design-primary-hex" class="nino-admin-input" inputmode="text" spellcheck="false" autocomplete="off" maxlength="7">
+									</span>
+								</label>
+								<label class="install-theme-field">
+									<span>Secondary <small>optional</small></span>
+									<span class="install-theme-color">
+										<input type="color" id="themes-design-secondary" class="install-theme-swatch">
+										<input type="text" id="themes-design-secondary-hex" class="nino-admin-input" inputmode="text" spellcheck="false" autocomplete="off" maxlength="7" placeholder="follows Primary">
+									</span>
+								</label>
+								<label class="install-theme-field">
+									<span>Contrast <small>how hard text has to work</small></span>
+									<select id="themes-design-contrast" class="nino-admin-input"></select>
+								</label>
+								<label class="install-theme-field">
+									<span>Colours <small>how saturated</small></span>
+									<select id="themes-design-colors" class="nino-admin-input"></select>
+								</label>
+							</div>
+
+							<!-- Each chip is a real pair - the generated
+							     background carrying the generated text colour.
+							     A row of backgrounds alone would look
+							     convincing in exactly the settings that fail -->
+							<div class="install-design-specimen">
+								<div id="themes-design-preview" class="install-theme-preview-strip" aria-label="Generated surfaces"></div>
+							</div>
+						</section>
+
+						<section class="install-design-section">
+							<h3 class="install-design-section-title">Size</h3>
+							<div class="install-design-grid">
+								<label class="install-theme-field">
+									<span>Volume <small>how far type fans out</small></span>
+									<select id="themes-design-volume" class="nino-admin-input"></select>
+								</label>
+								<label class="install-theme-field">
+									<span>Spacing <small>gaps and line height</small></span>
+									<select id="themes-design-spacing" class="nino-admin-input"></select>
+								</label>
+								<label class="install-theme-field">
+									<span>Shaping <small>corner radius</small></span>
+									<select id="themes-design-shaping" class="nino-admin-input"></select>
+								</label>
+							</div>
+
+							<!-- Drawn at the real generated sizes rather than
+							     listed as numbers: a scale is a thing you look
+							     at, not a table you read -->
+							<div id="themes-design-sizes" class="install-design-specimen" aria-label="Generated size raster"></div>
+						</section>
+					</div>
+
+					<p id="design-msg"></p>
 				</div>
 
 				<div id="install-content-webpages">
@@ -150,6 +255,7 @@
 		<script src="[[/nino/dir]]/_install/assets/checks.js"></script>
 		<script src="[[/nino/dir]]/_install/assets/setup.js"></script>
 		<script src="[[/nino/dir]]/_install/assets/themes.js"></script>
+		<script src="[[/nino/dir]]/_install/assets/design.js"></script>
 		<script src="[[/nino/dir]]/_install/assets/webpages.js"></script>
 		<script src="[[/nino/dir]]/_install/assets/personalinfos.js"></script>
 		<script src="[[/nino/dir]]/_install/assets/admin.js"></script>

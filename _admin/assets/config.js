@@ -132,6 +132,13 @@
 			const actions = dc.createElement('div');
 			actions.className = 'nino-admin-actionbar';
 
+			const searchBtn = dc.createElement('button');
+			searchBtn.type = 'button';
+			searchBtn.id = 'config-searchindex';
+			searchBtn.textContent = 'Create searchindex';
+			searchBtn.addEventListener( 'click', function() { Nino.admin.config._createSearchIndex() } );
+			actions.appendChild( searchBtn );
+
 			const saveBtn = dc.createElement('button');
 			saveBtn.type = 'submit';
 			saveBtn.className = 'nino-admin-btn-primary';
@@ -669,6 +676,34 @@
 			// the backend rejects a native language that is not in the list
 			if( active.some( function( locale ) { return locale.code === current } ) === false && active.length > 0 )
 				select.value = active[0].code;
+		},
+
+		/**
+		 *	Recreate all configured Elements search indexes.
+		 *
+		 *	@return		void
+		 */
+		_createSearchIndex : function() {
+
+			const btn = dc.getElementById('config-searchindex');
+			const msg = dc.getElementById('config-form-msg');
+
+			btn.disabled = true;
+			msg.textContent = 'Creating search indexes …';
+
+			Nino.admin.config._apiCall( 'searchindex', {}, function( status, response ) {
+
+				btn.disabled = false;
+
+				if( status !== 200 || response === null ) {
+					msg.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : 'Failed to create search indexes.' );
+					return;
+				}
+
+				msg.textContent = response.created === 0
+					? 'No search indexes are configured.'
+					: 'Created '+ response.created+ ' search index'+ ( response.created === 1 ? '' : 'es' )+ ' for '+ response.elements+ ' elements.';
+			} );
 		},
 
 		/**

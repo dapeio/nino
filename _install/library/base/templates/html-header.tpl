@@ -68,14 +68,5 @@
 		</head>
 		<body>
 
-		<header>
-			<div class="nino-grid-row nino-scroll-header">
-				<div class="nino-grid-100">
-					<a href="[[/nino/dir]]/" class="nino-logo">
-						<h1 class="nino-sr-only" id="header-title">[[/company/name]] | [[/webpage[[/nino/http/response/uri]]/title]]</h1>
-					</a>
-					[template /templates/html-header-nav]
-				</div>
-			</div>
-		</header>
+		[template /templates/theme.header]
   <main>

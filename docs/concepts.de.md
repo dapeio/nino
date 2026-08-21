@@ -2,12 +2,12 @@
 
 **Sprache:** [English](concepts.md) · Deutsch
 
-**Stand:** 8. August 2026 · **Nino-Version:** 0.11.0-beta.1
+**Stand:** 21. August 2026 · **Nino-Version:** 0.11.0-beta.1
 
 Dieses Handbuch erklärt die Architektur von Nino und das Zusammenspiel von Konfiguration, Daten, Templates und Modulen. Falls du stattdessen direkt eine Webseite einrichten möchtest, beginne mit [Erste Schritte](getting-started.de.md); konkrete APIs und Implementierungsdetails stehen im [Entwickler-Handbuch](development.de.md).
 
 **Weitere Links:**
-[README](../README.de.md) · [Grundkonzepte](concepts.de.md) · [Entwickler-Handbuch](development.de.md) · [Erste Schritte](getting-started.de.md) · [`/_install`-Referenz](_install.de.md) · [`/_admin`-Bedienung](_admin.de.md) · [`/_templates`-Bedienung](_templates.de.md) · [`/_editor`-Bedienung](_editor.de.md) · [Deployment](deployment.de.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
+[README](../README.de.md) · [Grundkonzepte](concepts.de.md) · [Entwickler-Handbuch](development.de.md) · [Erste Schritte](getting-started.de.md) · [`/_install`-Referenz](_install.de.md) · [`/_admin`-Bedienung](_admin.de.md) · [`/_templates`-Bedienung](_templates.de.md) · [`/_editor`-Bedienung](_editor.de.md) · [`/_theme`-Bedienung](_theme.de.md) · [Deployment](deployment.de.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
 
 ## Kernsäulen
 Nino organisiert eine Webseite mit nur wenigen, aber klar getrennten Bausteinen:
@@ -153,7 +153,11 @@ Callbacks sind der gemeinsame Erweiterungsmechanismus von Nino. Ein benannter Ca
 
 Ein Modul bündelt die Callbacks, Shortcodes und Modifikationen eines einzelnen Features. In der Entwicklung sollten Erweiterungen daher sinnvoll auf einzelne Module verteilt werden. Aktivierte Modulklassen stehen in `config.php` unter `/nino/modules` und werden während `init()` aufgerufen. Navigation, Sprachauswahl, Formulare und die Template-Anbindung folgen demselben Prinzip.
 
-Projektspezifische Funktionen verwenden eigene Callback-Pfade und Module, statt Kerneldateien zu verändern. So bleibt die Erweiterung Teil des konkreten Projekts, ohne ein zweites Hook- oder Plugin-System einzuführen.
+Projektspezifische Funktionen verwenden eigene Callback-Pfade und Module,
+statt Kerneldateien zu verändern. Ihre PHP-Klassen gehören unter einem eigenen
+Projekt-Namespace nach `app/`; die kerneigenen Klassen unter `Nino\` bleiben in
+`_nino/`. So bleibt die Erweiterung Teil des konkreten Projekts, `_nino/` kann
+ersetzt werden und es entsteht kein zweites Hook- oder Plugin-System.
 
 ## `/_admin`, `/_templates` und `/_editor`
 
@@ -167,7 +171,7 @@ Die optionalen Oberflächen besitzen eigene Einstiegspunkte und sind keine Front
 
 `/_templates` teilt Passwort und Sitzung mit `/_admin`; `/_editor` besitzt dagegen einzelne Konten und granulare Rechte. Damit liegt die Abgrenzung nicht mehr allein zwischen Struktur und Inhalt, sondern vor allem zwischen vollständigem Entwicklungszugriff und eingeschränkter redaktioneller Arbeit.
 
-Das geplante `/_themes` soll diese Werkzeuge später um eine grafische Bearbeitung von Theme-Vorlagen ergänzen. Es ist noch nicht implementiert und soll zunächst ebenfalls als Alpha erscheinen.
+`/_theme` ergänzt diese Werkzeuge um die Design-Ebene: Es erzeugt die Farb- und Größen-Tokens, aus denen jedes Stylesheet liest, und bleibt auch nach einer Installation nutzbar.
 
 ## Wo gehört eine Änderung hin?
 
@@ -180,7 +184,7 @@ Das geplante `/_themes` soll diese Werkzeuge später um eine grafische Bearbeitu
 | neue öffentliche URL anlegen | Route in `config.php` beziehungsweise über `/_admin` |
 | dynamische Liste ausgeben | Element-Abfrage oder Shortcode mit Callback |
 | technische Funktion ergänzen | projektspezifisches Modul |
-| Farben oder Typografie ändern | Stylesheets und Design-Tokens; später optional über `/_themes` |
+| Farben oder Typografie ändern | `/_theme` für die Design-Tokens; Stylesheets für alles darüber hinaus |
 
 ## Wie es weitergeht
 

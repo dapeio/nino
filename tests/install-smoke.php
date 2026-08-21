@@ -16,6 +16,11 @@ declare(strict_types=1);
 
 require __DIR__. '/../_nino/Nino.php';
 require __DIR__. '/../_admin/Admin.php';
+// The Themes step calls into /_theme when it is there. Loaded here for the
+// same reason _install/index.php loads it: without it the Design half of
+// that step degrades to "not offered", and the tests below would be
+// exercising the degraded path while believing they cover the real one
+require __DIR__. '/../_theme/Theme.php';
 require __DIR__. '/../_install/Install.php';
 
 $failures = 0;
@@ -340,7 +345,16 @@ check( 'copies the webfonts that stylesheet references, keeping their subdirecto
 check( 'never copies the picker-only preview image into the project', is_file( $sandbox. '/preview.svg' ) === false );
 check( 'persists the picked key at /nino/install/theme', ( $configAfterTheme['/nino/install/theme'] ?? null ) === 'nighty' );
 check( 'appends the theme\'s stylesheet to the css bundle', in_array( '/assets/style.theme.nighty.css', $configAfterTheme['/nino/html/assets']['/.cache/style.css'], true ) === true );
-check( 'leaves the project\'s own stylesheets in the bundle alone, in order', array_slice( $configAfterTheme['/nino/html/assets']['/.cache/style.css'], 0, 2 ) === [ '/_nino/Nino.css', '/assets/style.custom.css' ] );
+// The generated design layer now sits between the framework stylesheet and
+// everything else, so this is no longer a fixed prefix - what has to hold is
+// that the project's own stylesheet is still there and still ahead of the
+// theme that reads from it
+$bundleAfterTheme = $configAfterTheme['/nino/html/assets']['/.cache/style.css'];
+check( 'leaves the project\'s own stylesheets in the bundle alone, in order', $bundleAfterTheme[0] === '/_nino/Nino.css'
+	&& array_search( '/assets/style.custom.css', $bundleAfterTheme, true ) < array_search( '/assets/style.theme.nighty.css', $bundleAfterTheme, true ) );
+check( 'the generated design layer leads, so a theme and a frame can both read from it', array_search( '/assets/style.design.css', $bundleAfterTheme, true ) === 1
+	&& array_search( '/assets/style.theme.nighty.css', $bundleAfterTheme, true ) > 1
+	&& array_search( '/assets/style.header.css', $bundleAfterTheme, true ) > array_search( '/assets/style.theme.nighty.css', $bundleAfterTheme, true ) );
 check( 'never touches another bundle in the same array', $configAfterTheme['/nino/html/assets']['/.cache/script.js'] === [ '/_nino/Nino.js' ] );
 
 $themeListAfterApply = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
@@ -355,17 +369,345 @@ $themeSwitchRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 
 $configAfterSwitch = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
 
-check( 'switching themes swaps the bundled stylesheet rather than adding a second one', $configAfterSwitch['/nino/html/assets']['/.cache/style.css'] === [ '/_nino/Nino.css', '/assets/style.custom.css', '/assets/style.theme.wellness.css' ] );
+check( 'switching themes swaps the bundled stylesheet rather than adding a second one', $configAfterSwitch['/nino/html/assets']['/.cache/style.css'] === [
+	'/_nino/Nino.css', '/assets/style.design.css', '/assets/style.custom.css', '/assets/style.theme.wellness.css', '/assets/style.header.css', '/assets/style.footer.css',
+] );
 check( '...and updates the persisted key with it', $configAfterSwitch['/nino/install/theme'] === 'wellness' );
 check( 'copies the new theme\'s own fonts too', is_file( $sandbox. '/public/fonts/text/pt-serif-regular.woff2' ) === true );
 check( 'a file the previous theme wrote is left behind, not deleted - same additive rule as Setup\'s templates/text', is_file( $sandbox. '/public/assets/style.theme.nighty.css' ) === true );
+
+// --- Frames: the site's header/footer as interchangeable units ----------
+
+check( 'the picked frame lands where the base templates include it from', is_file( $sandbox. '/private/templates/theme.header.tpl' ) === true
+	&& is_file( $sandbox. '/private/templates/theme.footer.tpl' ) === true );
+check( '...and its own stylesheet lands in the project, bundled after the theme', is_file( $sandbox. '/public/assets/style.header.css' ) === true
+	&& is_file( $sandbox. '/public/assets/style.footer.css' ) === true );
+check( 'the base html templates call the installed frame rather than carrying the markup', str_contains( (string) file_get_contents( __DIR__. '/../_install/library/base/templates/html-header.tpl' ), '[template /templates/theme.header]' )
+	&& str_contains( (string) file_get_contents( __DIR__. '/../_install/library/base/templates/html-footer.tpl' ), '[template /templates/theme.footer]' )
+	&& str_contains( (string) file_get_contents( __DIR__. '/../_install/library/base/templates/html-header.tpl' ), '<header' ) === false );
+
+// The indirection is only worth anything if it resolves. 'theme.header' has a
+// dot in it, and both the filesystem layer and the [template] shortcode have
+// path rules of their own - a name they quietly refuse renders as nothing at
+// all, which looks like a styling problem rather than a missing include
+\Nino\Modules\Template::init( $appData );
+$frameRender = \Nino\Html::renderHtml( $appData, (string) file_get_contents( __DIR__. '/../_install/library/base/templates/html-footer.tpl' ) );
+
+check( 'the installed frame really renders through [template /templates/theme.footer]', str_contains( $frameRender, '[template' ) === false
+	&& str_contains( $frameRender, '<footer' ) === true
+	&& str_contains( $frameRender, 'nino-footer-legal' ) === true );
+
+// A frame unit with no style.css of its own still gets an empty file, so the
+// bundle entry never points at something that isn't there
+$emptyStyleFrames = array_filter( glob( __DIR__. '/../_install/library/footer/*/style.css' ) ?: [], static fn( string $file ): bool => filesize( $file ) === 0 );
+check( 'a frame that ships no css of its own is still installable', $emptyStyleFrames === [] || is_file( $sandbox. '/public/assets/style.footer.css' ) === true );
+
+// An operator's pick beats the theme's declaration; anything that is not a
+// real unit falls back rather than reaching the filesystem
+$_POST['data'] = json_encode( [ 'theme' => 'wellness', 'header' => 'v3', 'footer' => 'v2' ] );
+$framePickRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Install\Themes::apiApply( $appData, $framePickRequest );
+$configAfterFrames = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
+
+check( 'a posted frame overrides the theme\'s declaration and is persisted', ( $configAfterFrames['/nino/install/header'] ?? null ) === 'v3'
+	&& ( $configAfterFrames['/nino/install/footer'] ?? null ) === 'v2' );
+check( '...and the installed template is really that unit\'s', file_get_contents( $sandbox. '/private/templates/theme.header.tpl' ) === file_get_contents( __DIR__. '/../_install/library/header/v3/template.tpl' ) );
+
+$_POST['data'] = json_encode( [ 'theme' => 'wellness', 'header' => '../../../etc/passwd', 'footer' => 'nope' ] );
+$badFrameRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Install\Themes::apiApply( $appData, $badFrameRequest );
+$configAfterBadFrame = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
+
+check( 'a frame key that names no unit falls back instead of reaching the filesystem', in_array( $configAfterBadFrame['/nino/install/header'] ?? '', [ 'v1', 'v2', 'v3', 'v4', 'v5', 'v6' ], true ) === true
+	&& str_contains( (string) file_get_contents( $sandbox. '/private/templates/theme.header.tpl' ), 'root:' ) === false );
+check( 'switching frames swaps the bundled stylesheet rather than adding a second one', count( array_keys( $configAfterBadFrame['/nino/html/assets']['/.cache/style.css'], '/assets/style.header.css', true ) ) === 1 );
+
+// --- the frame preview -------------------------------------------------
+//
+// A frame is a version number in a dropdown otherwise. Every check below
+// pins a way the rendering went wrong while it was being built, so none of
+// them can come back quietly.
+
+$framePreview = static function( array &$appData, string $kind, string $frame, array $design = [] ): array {
+	$_POST['data'] = json_encode( [ 'kind' => $kind, 'frame' => $frame, 'theme' => 'agency', 'design' => $design ] );
+	$request = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+	\Nino\Install\Themes::apiFrame( $appData, $request );
+	return [ $request['/nino/http/response']['statusCode'], $request['/nino/http/response']['body'] ];
+};
+
+// The markup half is what the fill and shortcode passes produce; the css half
+// is a stylesheet and has to be looked at separately, since css legitimately
+// contains square brackets and the word "navigation" in a comment
+$splitPreview = static function( string $document ): array {
+	$body = substr( $document, (int) strpos( $document, '</head>' ) );
+	preg_match_all( '/<style>(.*?)<\/style>/s', $document, $styles );
+	return [ $body, implode( "\n", $styles[1] ) ];
+};
+
+[ $headerStatus, $headerBody ] = $framePreview( $appData, 'header', 'v1' );
+[ $headerMarkup, $headerCss ]  = $splitPreview( (string) ( $headerBody['html'] ?? '' ) );
+
+check( 'a frame renders as a complete, inert document', $headerStatus === 200
+	&& str_starts_with( (string) ( $headerBody['html'] ?? '' ), '<!doctype html>' )
+	&& str_contains( (string) $headerBody['html'], '<script' ) === false );
+
+// The framework stylesheet is three directories up from library/themes, and
+// getting that depth wrong produced a preview that rendered every frame
+// unstyled - which reads as a broken frame rather than a broken preview
+check( 'the framework stylesheet is really in the preview, not just meant to be', str_contains( $headerCss, '.nino-grid-row' )
+	&& str_contains( $headerCss, '.nino-scroll-header' )
+	&& strlen( $headerCss ) > 50000 );
+check( '...along with the design tokens and the theme that reads from them', str_contains( $headerCss, '--nino-on-alt:' )
+	&& str_contains( $headerCss, '--color-title: var(--nino-default-link);' ) );
+check( '...and the frame unit\'s own stylesheet, last', str_contains( $headerCss, '.nino-frame-header' )
+	&& strrpos( $headerCss, '.nino-frame-header {' ) > strrpos( $headerCss, '--color-title:' ) );
+
+// The fill stripper used to run over the css too. A stylesheet's square
+// brackets are attribute selectors, and [data-nino-mode="dark"] carries the
+// entire dark half of the palette
+check( 'stripping unresolved fills leaves css attribute selectors intact', substr_count( $headerCss, '[data-nino-mode="dark"]' ) === 1
+	&& str_contains( $headerCss, ':root:not([data-nino-mode="light"])' ) );
+
+// Fills have to be substituted before the shortcode pass: html-header-nav.tpl
+// carries [navigation ... title="[[/company/name]]"], and a shortcode pattern
+// run first ends its arguments at the ']]' inside that fill and leaves the
+// remainder on the page as text
+check( 'the navigation resolves to real markup with items', str_contains( $headerMarkup, 'nino-nav-content' )
+	&& substr_count( $headerMarkup, '<li><a href="#"' ) === 4
+	&& str_contains( $headerMarkup, 'class="nino-is-active"' ) );
+check( '...and no half-parsed shortcode is left on the page', preg_match( '/\]"\]|\[navigation|\[template/', $headerMarkup ) === 0 );
+check( 'nothing unresolved is shown as its own source code', preg_match( '/\[\[/', $headerMarkup ) === 0 );
+
+// The shortcode's own content is a burger's logo. The real module wraps each
+// line in a div ahead of the list, and dropping it loses that logo
+check( 'the navigation keeps the content the shortcode wraps', str_contains( $headerMarkup, 'nino-headernav-logo' ) );
+
+[ , $footerBody ] = $framePreview( $appData, 'footer', 'v3' );
+[ $footerMarkup ] = $splitPreview( (string) ( $footerBody['html'] ?? '' ) );
+
+// '[[/global/adress]]' is the label "Address" and '[[/company/adress]]' is the
+// street. A hand-written fixture map guessed both were the street, and the
+// preview showed the address twice under itself
+check( 'labels and values come from the library\'s own text, not from a guess', str_contains( $footerMarkup, '<strong>Address</strong>' )
+	&& str_contains( $footerMarkup, 'Street 1, 12345 City' )
+	&& str_contains( $footerMarkup, '<strong>Phone</strong>' ) );
+
+// glob() returns de_DE before en_US, so a plain merge previewed an english
+// wizard in german
+check( 'the preview is in the installer\'s own language', str_contains( $footerMarkup, 'Germany' )
+	&& str_contains( $footerMarkup, 'Deutschland' ) === false
+	&& str_contains( $footerMarkup, 'Adresse' ) === false );
+
+// Not copied into the project yet, and a srcdoc iframe has an opaque origin
+// that could not fetch them - so a rule per font would be a console error per
+// font and the frame would render in the browser's serif default
+check( 'webfonts are dropped and a real family stack takes their place', str_contains( (string) $footerBody['html'], '@font-face' ) === false
+	&& str_contains( (string) $footerBody['html'], '--fontfamily-text:system-ui' ) );
+
+// The design being previewed drives the preview, not what is stored
+[ , $redPreview ]  = $framePreview( $appData, 'footer', 'v1', [ 'primary' => '#c81e2d' ] );
+[ , $bluePreview ] = $framePreview( $appData, 'footer', 'v1', [ 'primary' => '#1e63c8' ] );
+
+check( 'the preview is rendered with the design being chosen, not the stored one', $redPreview['html'] !== $bluePreview['html'] );
+
+[ $unknownKindStatus ] = $framePreview( $appData, 'sidebar', 'v1' );
+[ , $unknownFrameBody ] = $framePreview( $appData, 'header', '../../../etc/passwd' );
+
+check( 'an unknown frame kind is refused', $unknownKindStatus === 400 );
+// Compared against the fallback's own output rather than searched for a
+// marker: 'root:' looked like a good one until it matched ':root:not(' in
+// every stylesheet the preview embeds
+check( 'previewing a frame key that names no unit falls back instead of reading the filesystem', ( $unknownFrameBody['frame'] ?? '' ) === 'v1'
+	&& $unknownFrameBody['html'] === $headerBody['html'] );
+
+// Every shipped unit has to render - a frame that previews as an empty box is
+// indistinguishable from one that is broken
+$framePreviewFailures = [];
+foreach( [ 'header', 'footer' ] as $kind )
+	foreach( glob( __DIR__. '/../_install/library/'. $kind. '/*/template.tpl' ) ?: [] as $unit ) {
+
+		$key = basename( dirname( $unit ) );
+		[ $status, $body ] = $framePreview( $appData, $kind, $key );
+		[ $markup ] 			 = $splitPreview( (string) ( $body['html'] ?? '' ) );
+
+		if( $status !== 200 || preg_match( '/\[\[|\[template|\]"\]/', $markup ) === 1 || strlen( strip_tags( $markup ) ) < 40 )
+			$framePreviewFailures[] = $kind. '/'. $key;
+	}
+
+check( 'every shipped frame previews'. ( $framePreviewFailures === [] ? '' : ' - '. implode( ', ', $framePreviewFailures ) ), $framePreviewFailures === [] );
+
+// --- Design: the generated token layer ---------------------------------
+
+$_POST['data'] = json_encode( [ 'theme' => 'agency' ] );
+$designDefaultRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Install\Themes::apiApply( $appData, $designDefaultRequest );
+$configAfterDesign = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
+
+check( 'a theme\'s declared design defaults are what a plain "pick and Next" applies', ( $configAfterDesign['/nino/theme/design']['primary'] ?? null ) === '#4faae8' );
+check( 'the generated stylesheet is written and carries the tokens a theme reads from', is_file( $sandbox. '/public/assets/style.design.css' ) === true
+	&& str_contains( (string) file_get_contents( $sandbox. '/public/assets/style.design.css' ), '--nino-on-alt:' ) === true );
+
+// The Design step reads what the Themes step just installed rather than being
+// handed it - one source for the current design, not two that can disagree
+$designReadRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Install\Themes::apiDesignRead( $appData, $designReadRequest );
+$designReadBody = $designReadRequest['/nino/http/response']['body'];
+
+check( 'the Design step opens on what the picked theme declared', ( $designReadBody['settings']['primary'] ?? '' ) === '#4faae8'
+	&& ( $designReadBody['settings']['shaping'] ?? '' ) === 'round'
+	&& ( $designReadBody['settings']['spacing'] ?? '' ) === 'airy' );
+check( '...and is handed the vocabulary its controls render from', ( $designReadBody['choices']['contrast'] ?? [] ) !== []
+	&& ( $designReadBody['choices']['volume'] ?? [] ) !== []
+	&& ( $designReadBody['choices']['shaping'] ?? [] ) !== [] );
+
+$_POST['data'] = json_encode( [ 'design' => [ 'primary' => '#c81e2d', 'secondary' => '#0f766e', 'contrast' => 'high', 'colors' => 'clean', 'volume' => 'compact', 'spacing' => 'tight', 'shaping' => 'sharp' ] ] );
+$designApplyRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Install\Themes::apiDesignApply( $appData, $designApplyRequest );
+$configAfterPick = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
+
+check( 'the operator\'s design beats the theme\'s defaults and is persisted whole', ( $configAfterPick['/nino/theme/design'] ?? [] ) === [
+	'primary' => '#c81e2d', 'secondary' => '#0f766e', 'contrast' => 'high', 'colors' => 'clean',
+	'volume' => 'compact', 'spacing' => 'tight', 'shaping' => 'sharp',
+] );
+check( '...and the size raster it produced is in the stylesheet', str_contains( (string) file_get_contents( $sandbox. '/public/assets/style.design.css' ), '--nino-space-1: 0.375rem;' ) );
+check( '...and regenerating never leaves a second design entry in the bundle', count( array_keys( $configAfterPick['/nino/html/assets']['/.cache/style.css'], '/assets/style.design.css', true ) ) === 1 );
+
+$previewRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+$_POST['data']  = json_encode( [ 'design' => [ 'primary' => '#4faae8', 'volume' => 'generous' ] ] );
+\Nino\Install\Themes::apiPreview( $appData, $previewRequest );
+$previewBody = $previewRequest['/nino/http/response']['body'];
+
+check( 'the picker can ask what a setting produces without storing it', ( $previewBody['palette']['light']['origin']['bg'] ?? '' ) !== ''
+	&& ( $previewBody['palette']['dark']['origin']['bg'] ?? '' ) !== ''
+	&& $previewBody['palette']['light']['origin']['bg'] !== $previewBody['palette']['dark']['origin']['bg'] );
+check( '...including the size raster, so both halves of the step preview the same way', ( $previewBody['raster']['text'][6] ?? '' ) !== ''
+	&& ( $previewBody['raster']['space'][1] ?? '' ) !== ''
+	&& $previewBody['settings']['volume'] === 'generous' );
+check( 'previewing stores nothing', ( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/theme/design']['volume'] ?? '' ) === 'compact' );
+
+$listWithFrames = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Install\Themes::apiList( $appData, $listWithFrames );
+$listBody = $listWithFrames['/nino/http/response']['body'];
+
+check( 'the picker is handed the frames and each theme\'s own defaults', isset( $listBody['frames']['header'], $listBody['frames']['footer'] )
+	&& $listBody['frames']['header'] !== []
+	&& ( $listBody['themes']['agency']['design']['primary'] ?? '' ) === '#4faae8'
+	&& ( $listBody['themes']['agency']['design']['shaping'] ?? '' ) === 'round'
+	&& ( $listBody['themes']['agency']['header'] ?? '' ) === 'v1' );
+
+// The theme is a mapping layer now: a literal colour in a role is a pair
+// /_theme never measured, which is exactly what this split exists to prevent
+$agencyCss = (string) file_get_contents( __DIR__. '/../_install/library/themes/agency/assets/style.theme.agency.css' );
+preg_match_all( '/^\s*(--color-[a-z0-9-]+)\s*:\s*([^;]+);/mi', $agencyCss, $roles, PREG_SET_ORDER );
+$literalRoles = array_values( array_filter( $roles, static fn( array $role ): bool => str_contains( $role[2], 'var(--nino-' ) === false && str_contains( $role[2], 'color-mix' ) === false ) );
+
+check( 'the rewritten theme assigns every colour role to a design token instead of a literal', $roles !== [] && $literalRoles === [] );
+check( '...and never pairs text from one surface with the background of another', str_contains( $agencyCss, '--color-section-alt-bg: var(--nino-alt);' )
+	&& str_contains( $agencyCss, '--color-section-alt-text: var(--nino-on-alt);' )
+	&& str_contains( $agencyCss, '--color-primary-text: var(--nino-on-origin);' ) );
+
+// The theme maps sizes the same way it maps colours - a literal here is a
+// number the raster cannot move
+preg_match_all( '/^\s*(--(?:text|space)-[1-6]|--radius(?:-small)?|--line-height)\s*:\s*([^;]+);/mi', $agencyCss, $sizeRoles, PREG_SET_ORDER );
+$literalSizes = array_values( array_filter( $sizeRoles, static fn( array $role ): bool => str_contains( $role[2], 'var(--nino-' ) === false ) );
+
+check( 'the rewritten theme assigns every size role to a raster step too', count( $sizeRoles ) === 15 && $literalSizes === [] );
+
+// Reading the assignments is not enough: what matters is what the chain
+// resolves to. Every pair Nino.css actually renders together is measured here
+// against the real WCAG formula, in both modes - a mapping that looks correct
+// and lands at 4.3:1 in dark mode is exactly what this split exists to catch
+$designSettings = \Nino\Theme\Design::normalize( [ 'primary' => '#4faae8' ] );
+
+preg_match_all( '/^\s*(--color-[a-z0-9-]+)\s*:\s*var\(\s*(--nino-[a-z0-9-]+)\s*\)\s*;/mi', $agencyCss, $assignments, PREG_SET_ORDER );
+$roleToken = [];
+foreach( $assignments as $assignment )
+	$roleToken[$assignment[1]] = $assignment[2];
+
+$renderedPairs = [
+	[ '--color-background', 					'--color-text' ],
+	[ '--color-background', 					'--color-title' ],
+	[ '--color-background', 					'--color-subtitle' ],
+	[ '--color-section-default-bg', 	'--color-section-default-text' ],
+	[ '--color-section-alt-bg', 			'--color-section-alt-text' ],
+	[ '--color-section-dark-bg', 			'--color-section-dark-text' ],
+	[ '--color-section-black-bg', 		'--color-section-black-text' ],
+	[ '--color-primary', 							'--color-primary-text' ],
+	[ '--color-footer-bg-main', 			'--color-footer-text-main' ],
+	[ '--color-footer-bg-legal', 			'--color-footer-text-legal' ],
+	[ '--color-code-bg', 							'--color-code-text' ],
+];
+
+$relativeLuminance = static function( string $hex ): float {
+	$channels = [];
+	foreach( [ 0, 2, 4 ] as $offset ) {
+		$value = hexdec( substr( ltrim( $hex, '#' ), $offset, 2 ) ) / 255;
+		$channels[] = $value <= 0.04045 ? $value / 12.92 : pow( ( $value + 0.055 ) / 1.055, 2.4 );
+	}
+	return 0.2126 * $channels[0] + 0.7152 * $channels[1] + 0.0722 * $channels[2];
+};
+$contrastRatio = static function( string $back, string $front ) use ( $relativeLuminance ): float {
+	$a = $relativeLuminance( $back );
+	$b = $relativeLuminance( $front );
+	return ( max( $a, $b ) + 0.05 ) / ( min( $a, $b ) + 0.05 );
+};
+$tokenValues = static function( array $settings, string $mode ): array {
+	$values = [];
+	foreach( \Nino\Theme\Design::palette( $settings, $mode ) as $surface => $surfaceValues ) {
+		$values['--nino-'. $surface] 								= $surfaceValues['bg'];
+		$values['--nino-on-'. $surface] 						= $surfaceValues['on'];
+		$values['--nino-on-'. $surface. '-muted'] 	= $surfaceValues['on-muted'];
+		$values['--nino-'. $surface. '-link'] 			= $surfaceValues['link'];
+		$values['--nino-'. $surface. '-border'] 		= $surfaceValues['border'];
+	}
+	return $values;
+};
+
+$unreadable 	= [];
+$measuredPairs = 0;
+
+foreach( [ 'light', 'dark' ] as $mode ) {
+
+	$values = $tokenValues( $designSettings, $mode );
+
+	foreach( $renderedPairs as [ $backRole, $frontRole ] ) {
+
+		$back 	= $values[$roleToken[$backRole] ?? ''] ?? null;
+		$front 	= $values[$roleToken[$frontRole] ?? ''] ?? null;
+
+		if( $back === null || $front === null ) {
+			$unreadable[] = $mode. ' '. $frontRole. ': not mapped to a generated token';
+			continue;
+		}
+
+		$measuredPairs++;
+		$ratio = $contrastRatio( $back, $front );
+
+		if( $ratio < 4.5 )
+			$unreadable[] = sprintf( '%s %s: %s on %s = %.2f:1', $mode, $frontRole, $front, $back, $ratio );
+	}
+}
+
+check( 'every pair the theme renders clears 4.5:1 in both modes'. ( $unreadable === [] ? '' : ' - '. implode( ' | ', $unreadable ) ), $unreadable === [] && $measuredPairs === count( $renderedPairs ) * 2 );
+
+// Nino.css uses --color-primary both as a background (buttons, badges - paired
+// with --color-primary-text) and as ink on the page ground (links, alerts,
+// active nav). One role cannot be both, and a theme cannot split what the
+// framework merged. Pinned rather than asserted away: --nino-origin is solved
+// to carry --nino-on-origin, so reading it as ink on --nino-default is the
+// weakest thing this stylesheet does and must not quietly get weaker
+$darkValues 	= $tokenValues( $designSettings, 'dark' );
+$primaryAsInk = $contrastRatio( $darkValues['--nino-default'], $darkValues['--nino-origin'] );
+
+check( 'the known --color-primary dual-use stays within a step of readable (Nino.css role split pending)', $primaryAsInk >= 4.0
+	&& $contrastRatio( $darkValues['--nino-default'], $darkValues['--nino-default-link'] ) >= 4.5 );
 
 // A config that predates '/nino/install/theme' (or was hand-edited since)
 // still has to resolve its current theme - from the css bundle alone
 unset( $appData['/nino/install/theme'] );
 $themeListLegacy = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Install\Themes::apiList( $appData, $themeListLegacy );
-check( 'falls back to matching the css bundle when /nino/install/theme is absent', $themeListLegacy['/nino/http/response']['body']['activeTheme'] === 'wellness' );
+check( 'falls back to matching the css bundle when /nino/install/theme is absent', $themeListLegacy['/nino/http/response']['body']['activeTheme'] === 'agency' );
 
 echo "\n";
 

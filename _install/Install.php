@@ -750,6 +750,32 @@ namespace Nino\Install {
 	 *												step has to be able to show the current pick every time
 	 *												it's revisited
 	 *
+	 *												The step applies two more things alongside the theme,
+	 *												because all three decide the same thing - what the site
+	 *												looks like - and splitting them across steps would let a
+	 *												project leave with two of the three set:
+	 *
+	 *												Frames. The site's &lt;header&gt; and &lt;footer&gt; are
+	 *												interchangeable units under library/header|footer/&lt;key&gt;,
+	 *												each a template.tpl plus the style.css for the markup it
+	 *												brings. The base html-header/footer templates include the
+	 *												installed copy through [template /templates/theme.header]
+	 *												rather than carrying the markup themselves, so a frame is
+	 *												swapped by copying two files. Picks persist at
+	 *												'/nino/install/header|footer'.
+	 *
+	 *												Design. /_theme owns the --nino-* colour tokens a theme
+	 *												stylesheet assigns to roles; this step calls
+	 *												Theme::write() with either the operator's settings or the
+	 *												defaults the theme's manifest declares. It is optional -
+	 *												see _designAvailable() - so a delivery without /_theme
+	 *												installs exactly as before.
+	 *
+	 *												Bundle order is the whole contract, and each of the three
+	 *												owns one slot in it: Nino.css, then Design's generated
+	 *												values, then the theme's role assignments, then the
+	 *												frames' own markup styling, then the project's overrides.
+	 *
 	 *	@package					Dape/Nino
 	 *	@author						David Perchermeier <mail@dape.io>
 	 *	@link							https://github.com/dapeio/nino
@@ -762,6 +788,17 @@ namespace Nino\Install {
 		// config.php's '/nino/html/assets' this step owns (see _bundle())
 		private const string BUNDLE_KEY = '/.cache/style.css';
 
+		// A frame is the site's <header> or <footer> as an interchangeable
+		// unit: _install/library/<kind>/<key>/template.tpl plus the style.css
+		// for the markup that template brings. The base html-header/footer
+		// templates call the installed copy through
+		// [template /templates/theme.<kind>], so swapping a frame is copying
+		// two files rather than editing a page template
+		private const array FRAMES = [
+			'header' => [ 'template' => '/templates/theme.header.tpl', 'stylesheet' => '/assets/style.header.css' ],
+			'footer' => [ 'template' => '/templates/theme.footer.tpl', 'stylesheet' => '/assets/style.footer.css' ],
+		];
+
 		/**
 		 *	This module's action map, merged into Install::handlePost()'s dispatch
 		 *
@@ -769,8 +806,16 @@ namespace Nino\Install {
 		 */
 		public static function actions(): array {
 			return [
-				'themes/list' 	=> [ self::class, 'apiList' ],
-				'themes/apply' 	=> [ self::class, 'apiApply' ],
+				'themes/list' 		=> [ self::class, 'apiList' ],
+				'themes/frame' 		=> [ self::class, 'apiFrame' ],
+				'themes/apply' 		=> [ self::class, 'apiApply' ],
+				// The Design step is a wizard step of its own (see
+				// page-wizard.tpl), but the same class owns it: a theme's
+				// manifest declares the design it was drawn with, and one
+				// class reading that manifest is one place it can drift
+				'design/read'			=> [ self::class, 'apiDesignRead' ],
+				'design/preview'	=> [ self::class, 'apiPreview' ],
+				'design/apply'		=> [ self::class, 'apiDesignApply' ],
 			];
 		}
 
@@ -790,6 +835,400 @@ namespace Nino\Install {
 			\Nino\Http::ok( $request, [
 				'themes' 			=> self::_themes( $appData ),
 				'activeTheme' => self::_currentTheme( $appData ),
+				'frames' 			=> self::_frames(),
+				'activeFrames'=> [
+					'header' => (string) ( $appData['/nino/install/header'] ?? '' ),
+					'footer' => (string) ( $appData['/nino/install/footer'] ?? '' ),
+				],
+			] );
+		}
+
+		/**
+		 *	What the Design step opens with: the settings currently in force -
+		 *	which, on a fresh install, are the ones the theme picked in the
+		 *	previous step declared - plus the vocabulary its controls render
+		 *	from, so the frontend never carries a second copy of the lists.
+		 *
+		 *	Null settings rather than an empty shape when /_theme is not part
+		 *	of this delivery: the step has to say so and step aside, not render
+		 *	controls that would post into nothing
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		&$request			(reference) Current server request
+		 *
+		 *	@return 	void
+		 */
+		public static function apiDesignRead( array &$appData, array &$request ): void {
+
+			if( self::_designAvailable() === false ) {
+				\Nino\Http::ok( $request, [ 'settings' => null, 'choices' => [] ] );
+				return;
+			}
+
+			\Nino\Http::ok( $request, [
+				'settings' 	=> \Nino\Theme\Theme::settings( $appData ),
+				'choices' 	=> \Nino\Theme\Design::choices(),
+			] );
+		}
+
+		/**
+		 *	Write the design the operator settled on. A delivery without
+		 *	/_theme has nothing to write and says so rather than failing - the
+		 *	step is skippable, not broken
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		&$request			(reference) Current server request
+		 *
+		 *	@return 	void
+		 */
+		public static function apiDesignApply( array &$appData, array &$request ): void {
+
+			if( self::_designAvailable() === false ) {
+				\Nino\Http::ok( $request, [ 'settings' => null ] );
+				return;
+			}
+
+			$data 		= \Nino\Install\Install::postData();
+			$settings	= \Nino\Theme\Design::normalize( is_array( $data['design'] ?? null ) ? $data['design'] : [] );
+
+			if( \Nino\Theme\Theme::write( $appData, $settings ) === false ) {
+				\Nino\Http::fail( $request, 500, 'could not write the design stylesheet' );
+				return;
+			}
+
+			\Nino\Http::ok( $request, [ 'settings' => $settings ] );
+		}
+
+		/**
+		 *	One frame unit rendered as a complete, inert html document, for the
+		 *	picker to show in a sandboxed iframe.
+		 *
+		 *	A frame is a version number in a dropdown otherwise - 'v4' says
+		 *	nothing about what it looks like, and there is nothing to open in a
+		 *	lightbox the way a theme has a preview image. Rendering the real
+		 *	template beats shipping twelve screenshots that go stale the first
+		 *	time one of them is edited.
+		 *
+		 *	Its own document rather than markup spliced into the wizard: a
+		 *	frame's stylesheet sets things like 'body main { padding-top }' and
+		 *	styles bare element selectors, which would land on the installer's
+		 *	own shell. The iframe is the isolation.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		&$request			(reference) Current server request
+		 *
+		 *	@return 	void
+		 */
+		public static function apiFrame( array &$appData, array &$request ): void {
+
+			$data = \Nino\Install\Install::postData();
+			$kind = (string) ( $data['kind'] ?? '' );
+
+			if( isset( self::FRAMES[$kind] ) === false ) {
+				\Nino\Http::fail( $request, 400, 'unknown frame kind' );
+				return;
+			}
+
+			$frame = self::_frameKey( $kind, (string) ( $data['frame'] ?? '' ), '' );
+
+			if( $frame === null ) {
+				\Nino\Http::fail( $request, 400, 'no frame units for "'. $kind. '"' );
+				return;
+			}
+
+			$unitDir = dirname( self::LIBRARY ). '/'. $kind. '/'. $frame;
+			$source 	= @file_get_contents( $unitDir. '/template.tpl' );
+
+			if( $source === false ) {
+				\Nino\Http::fail( $request, 500, 'could not read the frame template' );
+				return;
+			}
+
+			\Nino\Http::ok( $request, [
+				'frame'	=> $frame,
+				'html'	=> self::_framePreviewDocument(
+					self::_framePreviewMarkup( $source ),
+					self::_framePreviewCss( $appData, $data, $unitDir )
+				),
+			] );
+		}
+
+		/**
+		 *	The frame's markup with everything a request would have resolved
+		 *	resolved here instead: its [template] includes, the navigation
+		 *	shortcode, and the textfills. Nothing is looked up in the project -
+		 *	during an installation most of it does not exist yet, and a preview
+		 *	that only works on the last step is no preview at all.
+		 *
+		 *	@param		string		$source				The unit's template.tpl
+		 *
+		 *	@return 	string
+		 */
+		private static function _framePreviewMarkup( string $source ): string {
+
+			// The includes live in whichever unit owns them - the nav pair in
+			// the navigation module, the locale picker in its own, the legal
+			// link in the legal page. Resolved by name across the library
+			// rather than by a hard-coded list, so a frame using a new include
+			// does not need this method edited
+			$source = (string) preg_replace_callback( '/\[template \/templates\/([a-z0-9-]+)\]/', static function( array $include ): string {
+
+				foreach( glob( self::LIBRARY. '/../*/templates/'. $include[1]. '.tpl' ) ?: [] as $path )
+					return (string) file_get_contents( $path );
+
+				foreach( glob( self::LIBRARY. '/../*/*/templates/'. $include[1]. '.tpl' ) ?: [] as $path )
+					return (string) file_get_contents( $path );
+
+				return '';
+			}, $source );
+
+			// Fills before shortcodes, and this order is the whole reason the
+			// header preview is not empty: html-header-nav.tpl carries
+			// [navigation ... title="[[/company/name]]"], so a shortcode
+			// pattern run first ends its argument list at the ']]' inside that
+			// fill and leaves the rest of the tag on the page as text
+			$source = self::_framePreviewFills( $source, false );
+
+			// Built from the module's own markup rather than written out here,
+			// so a change to the real navigation shows up in the preview
+			$items = '';
+			foreach( [ 'Home', 'Services', 'About', 'Contact' ] as $index => $label )
+				$items .= str_replace(
+					[ '[[uri]]', '[[attributes]]', '[[title]]' ],
+					[ '#', $index === 0 ? ' class="nino-is-active"' : '', $label ],
+					\Nino\Modules\Navigation::$html['li']
+				);
+
+			$source = (string) preg_replace_callback( '/\[navigation\b([^\]]*)\](.*?)\[\/navigation\]|\[navigation\b([^\]]*)\]/s', static function( array $nav ) use ( $items ): string {
+
+				$arguments	= ( $nav[1] ?? '' ). ( $nav[3] ?? '' );
+				$shell			= \Nino\Modules\Navigation::$html[str_contains( $arguments, 'burger' ) === true ? 'nav-burger' : 'nav-regular'];
+
+				// The real module wraps each line of the shortcode's own
+				// content in a div and puts it ahead of the list, inside the
+				// same [[content]] - see doShortcode(). A preview that dropped
+				// it would lose the burger's logo
+				$content = '';
+				foreach( array_filter( array_map( 'trim', explode( "\n", $nav[2] ?? '' ) ) ) as $line )
+					$content .= str_replace( '[[content]]', $line, \Nino\Modules\Navigation::$html['div'] );
+
+				$content .= str_replace( '[[content]]', $items, \Nino\Modules\Navigation::$html['ul'] );
+
+				return str_replace(
+					[ '[[class]]', '[[id]]', '[[content]]' ],
+					[ '', 'preview-nav', $content ],
+					$shell
+				);
+			}, $source );
+
+			// Anything a preview could not resolve comes out empty rather than
+			// as its own source code
+			return self::_framePreviewFills( $source );
+		}
+
+		/**
+		 *	Deterministic stand-ins for what a request would have filled in.
+		 *
+		 *	@param		string		$source
+		 *	@param		bool			$stripShortcodes	Markup only - see the bottom of this method
+		 *
+		 *	@return 	string
+		 */
+		private static function _framePreviewFills( string $source, bool $stripShortcodes = true ): string {
+
+			$fills = self::_framePreviewText();
+
+			// Longest first: '[[/nino/public]]/images/logo.png' has to be
+			// matched before the '[[/nino/public]]' inside it
+			uksort( $fills, static fn( string $a, string $b ): int => strlen( $b ) <=> strlen( $a ) );
+
+			$source = str_replace( array_keys( $fills ), array_values( $fills ), $source );
+
+			// The page title fill nests one fill inside another, so it cannot
+			// be a plain key in the map
+			$source = (string) preg_replace( '/\[\[\/webpage\[\[[^\]]*\]\]\/[a-z]+\]\]/', 'Home', $source );
+
+			// Whatever a preview could not resolve comes out empty rather than
+			// as its own source code
+			$source = (string) preg_replace( '/\[\[[^\]]*\]\]/', '', $source );
+
+			if( $stripShortcodes === false )
+				return $source;
+
+			// Markup only. A stylesheet's square brackets are attribute
+			// selectors, and [data-nino-mode="dark"] is what carries the whole
+			// dark half of the palette - stripping it takes the theme with it
+			return (string) preg_replace( '/\[\/?[a-z][a-z0-9]*\b[^\]]*\]/', '', $source );
+		}
+
+		/**
+		 *	The fills a frame preview is rendered with, read from the library's
+		 *	own text files rather than written out here.
+		 *
+		 *	This matters more than it looks: '[[/global/adress]]' is the label
+		 *	"Address" and '[[/company/adress]]' is the street, and a frame that
+		 *	shows both would render the street twice under a hand-written map
+		 *	that guessed wrong. Reading the real files also means a frame using
+		 *	a fill nobody thought of here still previews.
+		 *
+		 *	@return 	array			fill -> value
+		 */
+		private static function _framePreviewText(): array {
+
+			$fills = [];
+
+			// Two orderings, and both matter. Locale-independent text first,
+			// then en_US, then whatever else a unit ships - the installer's own
+			// interface is english, and a plain glob returns de_DE first and
+			// would preview an english wizard in german. And base before the
+			// units whose templates a frame includes, so a module's own labels
+			// resolve the same way its markup does
+			foreach( [ 'global.php', 'en_US.php', '*.php' ] as $file )
+				foreach( [ '/base/text/', '/*/*/text/' ] as $directory )
+					foreach( glob( dirname( self::LIBRARY ). $directory. $file ) ?: [] as $path ) {
+
+						if( str_ends_with( $path, 'blacklist.php' ) === true )
+							continue;
+
+						$text = include $path;
+
+						// += keeps what is already there, so the first pass to
+						// name a fill is the one that wins
+						if( is_array( $text ) === true )
+							$fills += array_filter( $text, static fn( mixed $value ): bool => is_string( $value ) === true );
+					}
+
+			// A neutral placeholder mark: there is no logo yet at this point,
+			// a broken image icon reads as the frame's fault, and a
+			// transparent pixel hides the one thing header variants differ
+			// most in - where the logo sits and how much room it takes
+			$blank = 'data:image/svg+xml;charset=utf-8,'
+				. rawurlencode( '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 40" role="img" aria-label="Logo">'
+					. '<rect width="160" height="40" rx="6" fill="currentColor" opacity=".12"/>'
+					. '<text x="80" y="25" text-anchor="middle" font-family="system-ui,sans-serif" font-size="13"'
+					. ' font-weight="600" letter-spacing="2" fill="currentColor" opacity=".55">LOGO</text></svg>' );
+
+			// What no text file can hold: paths, and the date
+			return [
+				'[[/nino/public]]/images/logo-invert.png'	=> $blank,
+				'[[/nino/public]]/images/logo.png'				=> $blank,
+				'[[/nino/dir]]'														=> '#',
+				'[[/nino/public]]'												=> '#',
+				'[[/date/year]]'													=> date( 'Y' ),
+			] + $fills;
+		}
+
+		/**
+		 *	The css a frame preview is rendered against: the framework, the
+		 *	design tokens for the settings currently being previewed, the
+		 *	picked theme's own stylesheet, and the frame's. Same order as the
+		 *	real bundle - a preview rendered in a different order is a preview
+		 *	of something else.
+		 *
+		 *	Read from the library rather than from the project: none of it is
+		 *	installed yet at the point this step runs.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array			$data					The posted payload, for theme and design
+		 *	@param		string		$unitDir			The frame unit's directory
+		 *
+		 *	@return 	string
+		 */
+		private static function _framePreviewCss( array &$appData, array $data, string $unitDir ): string {
+
+			// library/themes -> library -> _install -> the project root
+			$css = (string) @file_get_contents( dirname( self::LIBRARY, 3 ). '/_nino/Nino.css' );
+
+			if( self::_designAvailable() === true ) {
+
+				$settings = is_array( $data['design'] ?? null )
+					? \Nino\Theme\Design::normalize( $data['design'] )
+					: \Nino\Theme\Theme::settings( $appData );
+
+				$css .= "\n". \Nino\Theme\Design::css( $settings );
+			}
+
+			$themeManifest = self::_readManifest( (string) ( $data['theme'] ?? '' ) );
+
+			if( $themeManifest !== null )
+				foreach( glob( self::LIBRARY. '/'. (string) $data['theme']. '/assets/*.css' ) ?: [] as $themeCss )
+					$css .= "\n". (string) file_get_contents( $themeCss );
+
+			if( is_file( $unitDir. '/style.css' ) === true )
+				$css .= "\n". (string) file_get_contents( $unitDir. '/style.css' );
+
+			// The webfonts are not copied into the project until this step
+			// applies, and a srcdoc iframe has an opaque origin that could not
+			// fetch them anyway - so the preview shows the layout in a system
+			// face rather than one CORS error per rule
+			$css = (string) preg_replace( '~@font-face\s*\{[^{}]*\}~i', '', $css );
+
+			return self::_framePreviewFills( $css, false );
+		}
+
+		/**
+		 *	The document the iframe gets. Inert by construction: no script tag
+		 *	is emitted, and the picker sandboxes it besides
+		 *
+		 *	@param		string		$markup				The resolved frame markup
+		 *	@param		string		$css					The stylesheet to render it against
+		 *
+		 *	@return 	string
+		 */
+		private static function _framePreviewDocument( string $markup, string $css ): string {
+
+			return '<!doctype html><html lang="en"><head><meta charset="utf-8">'
+				. '<meta name="viewport" content="width=device-width, initial-scale=1">'
+				. '<style>'. $css. '</style>'
+				// Two corrections to what the preview cannot have. The webfonts
+				// are not copied yet and a srcdoc iframe could not fetch them
+				// anyway, so the theme's family names would resolve to nothing
+				// and the whole frame would render in the browser's serif
+				// default - a system stack shows the layout instead of a
+				// misleading one. And a frame is drawn against a page: without
+				// something between header and footer the two collapse onto
+				// each other and neither shows its real spacing
+				. '<style>:root{'
+				. '--fontfamily-text:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;'
+				. '--fontfamily-title:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;'
+				. '--fontfamily-subtitle:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}'
+				. '.install-frame-filler{min-height:4rem}</style>'
+				. '</head><body>'. $markup. '<div class="install-frame-filler"></div></body></html>';
+		}
+
+		/**
+		 *	The palette a set of Design settings would produce, without
+		 *	storing anything. The knobs need immediate feedback and the colour
+		 *	maths lives in /_theme - mirroring it in javascript would be a
+		 *	second implementation to keep in step.
+		 *
+		 *	/_theme has an endpoint of its own for exactly this, but it is
+		 *	behind the shared /_admin session; during an installation there is
+		 *	no admin password yet, so this step cannot borrow it and asks
+		 *	Design directly instead
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		&$request			(reference) Current server request
+		 *
+		 *	@return 	void
+		 */
+		public static function apiPreview( array &$appData, array &$request ): void {
+
+			if( self::_designAvailable() === false ) {
+				\Nino\Http::fail( $request, 400, 'no design engine in this delivery' );
+				return;
+			}
+
+			$data 		= \Nino\Install\Install::postData();
+			$settings	= \Nino\Theme\Design::normalize( is_array( $data['design'] ?? null ) ? $data['design'] : [] );
+
+			\Nino\Http::ok( $request, [
+				'settings' => $settings,
+				'palette' 	=> [
+					'light' => \Nino\Theme\Design::palette( $settings, 'light' ),
+					'dark' 	=> \Nino\Theme\Design::palette( $settings, 'dark' ),
+				],
+				'raster' 	=> \Nino\Theme\Design::raster( $settings ),
 			] );
 		}
 
@@ -837,9 +1276,185 @@ namespace Nino\Install {
 			$appData['/nino/install/theme'] = $key;
 			$appData['/nino/html/assets'] 	= self::_bundle( $appData, (string) $manifest['stylesheet'] );
 
-			\Nino\AppData::writeContentData( $appData, [ '/nino/install/theme', '/nino/html/assets' ] );
+			// Frames follow the theme unless the operator picked otherwise:
+			// a theme names the header/footer it was drawn against, and a
+			// project that never touches the two selects still gets a
+			// complete, deliberate frame rather than whichever unit sorts
+			// first
+			$applied = [];
 
-			\Nino\Http::ok( $request, [ 'theme' => $key ] );
+			foreach( self::FRAMES as $kind => $paths ) {
+
+				$frame = self::_frameKey( $kind, (string) ( $data[$kind] ?? '' ), (string) ( $manifest[$kind] ?? '' ) );
+
+				if( $frame === null )
+					continue;
+
+				self::_applyFrame( $appData, $kind, $frame );
+
+				$appData['/nino/install/'. $kind] = $frame;
+				$applied[$kind] = $frame;
+			}
+
+			$appData['/nino/html/assets'] = self::_bundleFrames( $appData, array_keys( $applied ) );
+
+			$keys = array_merge( [ '/nino/install/theme', '/nino/html/assets' ], array_map( static fn( string $kind ): string => '/nino/install/'. $kind, array_keys( $applied ) ) );
+
+			// Design last: Theme::write() generates the stylesheet, splices it
+			// into whatever the bundle looks like by now, and persists both.
+			// Doing it before the frames would place it against a bundle that
+			// is about to change underneath it
+			if( self::_designAvailable() === true ) {
+
+				$design = \Nino\Theme\Design::normalize( is_array( $data['design'] ?? null ) ? $data['design'] : ( is_array( $manifest['design'] ?? null ) ? $manifest['design'] : [] ) );
+
+				if( \Nino\Theme\Theme::write( $appData, $design ) === false ) {
+					\Nino\Http::fail( $request, 500, 'could not write the design stylesheet' );
+					return;
+				}
+			}
+
+			\Nino\AppData::writeContentData( $appData, $keys );
+
+			\Nino\Http::ok( $request, [ 'theme' => $key ] + $applied );
+		}
+
+		/**
+		 *	Whether /_theme is part of this delivery. Install.php is required
+		 *	by a tool folder that may have been stripped from a release, so
+		 *	the Design half of this step degrades to "not offered" rather than
+		 *	to a fatal on a class that isn't there
+		 *
+		 *	@return 	bool
+		 */
+		private static function _designAvailable(): bool {
+			return class_exists( '\Nino\Theme\Theme' ) === true && class_exists( '\Nino\Theme\Design' ) === true;
+		}
+
+		/**
+		 *	Which frame unit to install for one kind: the posted pick, else
+		 *	whatever the theme's manifest names, else the first unit on disk.
+		 *	Every candidate goes through _frames() rather than being trusted,
+		 *	so a posted key can only ever name a unit that really exists
+		 *
+		 *	@param		string		$kind					'header' or 'footer'
+		 *	@param		string		$posted				The operator's pick, straight off the wire
+		 *	@param		string		$declared			What the picked theme's manifest names
+		 *
+		 *	@return 	string|null							Null if this kind ships no units at all
+		 */
+		private static function _frameKey( string $kind, string $posted, string $declared ): ?string {
+
+			$available = self::_frames()[$kind] ?? [];
+
+			foreach( [ $posted, $declared ] as $candidate )
+				if( $candidate !== '' && in_array( $candidate, $available, true ) === true )
+					return $candidate;
+
+			return $available[0] ?? null;
+		}
+
+		/**
+		 *	Copy one frame unit into the project: its template becomes the
+		 *	/templates/theme.&lt;kind&gt;.tpl the base html-header/footer templates
+		 *	include, its style.css the bundled stylesheet for that markup. A
+		 *	unit with no style.css of its own (one built entirely on classes
+		 *	Nino.css already styles) still gets an empty file written, so the
+		 *	bundle entry never points at something that isn't there
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$kind					'header' or 'footer'
+		 *	@param		string		$frame				A key _frames() listed
+		 *
+		 *	@return 	void
+		 */
+		private static function _applyFrame( array &$appData, string $kind, string $frame ): void {
+
+			$unitDir = dirname( self::LIBRARY ). '/'. $kind. '/'. $frame;
+
+			self::_copyFile( $unitDir. '/template.tpl', \Nino\Filesystem::path( $appData, self::FRAMES[$kind]['template'] ) );
+
+			$stylesheet = \Nino\Filesystem::path( $appData, self::FRAMES[$kind]['stylesheet'] );
+
+			if( is_file( $unitDir. '/style.css' ) === true )
+				self::_copyFile( $unitDir. '/style.css', $stylesheet );
+			else
+				file_put_contents( $stylesheet, '' );
+		}
+
+		/**
+		 *	Every frame unit on disk, per kind. A unit is a directory with a
+		 *	template.tpl in it - style.css is optional, and there is no
+		 *	manifest: a frame has nothing to declare that its two files don't
+		 *	already say
+		 *
+		 *	@return 	array			kind -> list of keys
+		 */
+		private static function _frames(): array {
+
+			$frames = [];
+
+			foreach( array_keys( self::FRAMES ) as $kind ) {
+
+				$frames[$kind] = [];
+				$directory 		 = dirname( self::LIBRARY ). '/'. $kind;
+
+				foreach( scandir( $directory ) ?: [] as $entry ) {
+
+					if( preg_match( '/^[a-z0-9][a-z0-9-]*$/', $entry ) !== 1 )
+						continue;
+
+					if( is_file( $directory. '/'. $entry. '/template.tpl' ) === true )
+						$frames[$kind][] = $entry;
+				}
+
+				sort( $frames[$kind] );
+			}
+
+			return $frames;
+		}
+
+		/**
+		 *	'/nino/html/assets' with each applied frame's stylesheet sitting
+		 *	directly after the theme's. The order is the contract: Design
+		 *	supplies the values, the theme assigns them to roles, and a frame
+		 *	styles the markup it brought using those roles - so it has to be
+		 *	able to override the theme and not the other way round. An entry
+		 *	already in the bundle is moved rather than duplicated
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array			$kinds				Which frame kinds were just applied
+		 *
+		 *	@return 	array
+		 */
+		private static function _bundleFrames( array &$appData, array $kinds ): array {
+
+			$assets = $appData['/nino/html/assets'] ?? [];
+
+			$wanted = [];
+			foreach( $kinds as $kind )
+				$wanted[] = self::FRAMES[$kind]['stylesheet'];
+
+			$files = array_values( array_filter(
+				array_map( 'strval', $assets[self::BUNDLE_KEY] ?? [] ),
+				static fn( string $file ): bool => in_array( $file, $wanted, true ) === false
+			) );
+
+			// After the theme stylesheet, or - with no theme in the bundle at
+			// all - after everything, since a frame overriding project css it
+			// has never seen is the worse failure of the two
+			$position = false;
+			foreach( self::_stylesheets() as $stylesheet ) {
+				$found = array_search( $stylesheet, $files, true );
+				if( $found !== false )
+					$position = $found;
+			}
+
+			array_splice( $files, $position === false ? count( $files ) : $position + 1, 0, $wanted );
+
+			$assets[self::BUNDLE_KEY] = $files;
+
+			return $assets;
 		}
 
 		/**
@@ -919,6 +1534,13 @@ namespace Nino\Install {
 					'preview' 		=> ( $preview !== '' && is_file( self::LIBRARY. '/'. $entry. '/'. $preview ) === true )
 						? ( (string) ( $appData['/nino/dir'] ?? '' ) ). '/_install/library/themes/'. $entry. '/'. $preview
 						: null,
+					// What this look was drawn against. The picker pre-fills
+					// the frame selects and the Design controls from these
+					// when the theme is chosen, so a plain "pick a theme,
+					// press Next" produces the look the preview promised
+					'header' 			=> (string) ( $manifest['header'] ?? '' ),
+					'footer' 			=> (string) ( $manifest['footer'] ?? '' ),
+					'design' 			=> is_array( $manifest['design'] ?? null ) ? $manifest['design'] : null,
 				];
 			}
 
@@ -1078,7 +1700,7 @@ namespace Nino\Install {
 		// collision check against the on-disk route array alone cannot see
 		// them. A public page at one of these exact paths would hide the tool's
 		// own GET response once its authenticated/default-password gate passes.
-		private const array RESERVED_HTTP_URIS = [ '/_admin', '/_editor', '/_install', '/_templates' ];
+		private const array RESERVED_HTTP_URIS = [ '/_admin', '/_editor', '/_install', '/_templates', '/_theme' ];
 
 		// The priority a menu membership falls back to when the entry
 		// carries no position of its own - apiApply() numbers every entry by

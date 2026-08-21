@@ -14,7 +14,8 @@
  *													step's own assets/<key>.js.
  *
  *													"Next" both commits the current step's data (if it has any -
- *													Setup applies its picker, Themes applies the picked theme,
+ *													Setup applies its picker, Themes applies the picked theme
+ *													and its frames, Design writes the generated stylesheet,
  *													Webpages applies its page list,
  *													PersonalInfos saves its fields, Admin just checks an
  *													account exists) and advances, replacing what used to be
@@ -35,6 +36,7 @@
 			{ key : 'checks', 				paneClass : 'show-checks' 				},
 			{ key : 'setup', 					paneClass : 'show-setup' 				},
 			{ key : 'themes', 				paneClass : 'show-themes' 				},
+			{ key : 'design', 				paneClass : 'show-design' 				},
 			{ key : 'webpages', 			paneClass : 'show-webpages' 			},
 			{ key : 'personalinfos', paneClass : 'show-personalinfos' },
 			{ key : 'admin', 					paneClass : 'show-admin' 				},
@@ -162,6 +164,9 @@
 
 			if( key === 'themes' && Nino.install.themes !== undefined )
 				return Nino.install.themes.apply( function( ok ) { callback( ok ) } );
+
+			if( key === 'design' && Nino.install.design !== undefined )
+				return Nino.install.design.apply( function( ok ) { callback( ok ) } );
 
 			if( key === 'webpages' && Nino.install.webpages !== undefined )
 				return Nino.install.webpages.apply( function( ok ) { callback( ok ) } );

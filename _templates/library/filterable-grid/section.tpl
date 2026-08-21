@@ -4,7 +4,7 @@
 		<button type="button" class="nino-filter-btn nino-is-active" data-filter-value="" aria-pressed="true">
 			All
 		</button>
-		[elementvalues /[[section:collection:services]] key="category" sort="value"]
+		[elementvalues /[[section:collection:elements]] key="category" sort="value"]
 		<button type="button" class="nino-filter-btn" data-filter-value="[[.value]]" aria-pressed="false">
 			[[.value]] <span class="nino-filter-count">([[.count]])</span>
 		</button>

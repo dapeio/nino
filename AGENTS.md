@@ -106,6 +106,7 @@ Important source directories:
 | --- | --- |
 | `_nino/Nino.php` | Kernel and public core APIs |
 | `_nino/Nino/Modules/<Name>/<Name>.php` | Built-in runtime modules |
+| `app/<Namespace>/<Class>/<Class>.php` | Project-owned PHP classes and runtime modules; defaults to this root unless `NINO_APP_DIR` is defined before loading the kernel |
 | `_nino/Nino.js` | Shared browser helpers |
 | `_nino/Nino.admin.css` | Shared management-interface design |
 | `_admin/Admin.php` | All `\Nino\Admin\*` backend classes |
@@ -121,6 +122,9 @@ Important source directories:
 | `_install/Install.php` | Installer behavior and library application |
 | `_install/library/modules/<slug>/` | Installer module packages |
 | `_install/library/pages/<slug>/` | Installable page units |
+| `_install/library/header/<slug>/`, `_install/library/footer/<slug>/` | Interchangeable page frames: a `template.tpl` plus an optional `style.css`, no manifest. Installed as `templates/theme.header.tpl` / `theme.footer.tpl`, which the base html templates include |
+| `_theme/Theme.php` | Design engine and `/_theme` tool: solves the token palette, writes `/assets/style.design.css` and keeps it ordered in the css bundle |
+| `_theme/assets/theme.js` | `/_theme` frontend; no bundler |
 | `tests/*-smoke.php` | Standalone PHP contract tests |
 | `tests/*-js-smoke.js` | Standalone Node/browser-logic tests |
 | `docs/` | Human manuals in English and German |
@@ -931,7 +935,7 @@ path and appends the class basename as the filename:
 
 ```text
 Class: Project\Catalog\Catalog
-Path:  _nino/Project/Catalog/Catalog/Catalog.php
+Path:  app/Project/Catalog/Catalog/Catalog.php
 ```
 
 ```text
@@ -939,10 +943,21 @@ Class: Nino\Modules\Catalog
 Path:  _nino/Nino/Modules/Catalog/Catalog.php
 ```
 
-The exact formula is:
+The lookup roots are deliberately different:
+
+- `Nino\*` is kernel-owned and resolves only below `_nino/`. A project cannot
+  shadow a kernel class from its application root.
+- Every other namespace resolves below `app/` first. If `NINO_APP_DIR` was
+  defined as an absolute directory path before `_nino/Nino.php` was loaded,
+  that directory replaces `app/`.
+- Non-`Nino\` classes then fall back to `_nino/` for compatibility with
+  existing projects. This fallback is not the destination for new project
+  code; keeping custom classes in `app/` makes `_nino/` replaceable.
+
+Within whichever root applies, the exact formula is:
 
 ```text
-_nino/<namespace-and-class-as-path>/<class-basename>.php
+<root>/<namespace-and-class-as-path>/<class-basename>.php
 ```
 
 Therefore:
@@ -959,7 +974,7 @@ SHOULD use a project namespace so future Nino classes cannot collide.
 ### 8.2 Minimal complete module
 
 Create
-`_nino/Project/Catalog/Catalog/Catalog.php`:
+`app/Project/Catalog/Catalog/Catalog.php`:
 
 ```php
 <?php
@@ -1192,7 +1207,8 @@ an intentional write operation.
 Add focused coverage to `tests/kernel-smoke.php` or a dedicated standalone
 smoke script consistent with the suite. Test:
 
-- autoloading from the exact path;
+- autoloading from the exact default or `NINO_APP_DIR` path, including the
+  kernel namespace guard and legacy fallback;
 - activation through `/nino/modules`;
 - repeated `init()` behavior where relevant;
 - route registration and internal callback identity;
@@ -1207,7 +1223,7 @@ smoke script consistent with the suite. Test:
 Run at least:
 
 ```bash
-php -l _nino/Project/Catalog/Catalog/Catalog.php
+php -l app/Project/Catalog/Catalog/Catalog.php
 php tests/kernel-smoke.php
 php tests/concurrency-smoke.php
 ```
@@ -1221,9 +1237,11 @@ An installer package makes a feature selectable in `/_install`. It can activate
 a runtime class, copy templates/assets/element types, merge text, add owned
 routes, and supply configuration defaults.
 
-It does not execute as the runtime module. The runtime class must already be
-shipped at its valid `_nino` autoload path, or otherwise be placed there by an
-explicit, tested distribution process.
+It does not execute as the runtime module. A built-in runtime class must already
+be shipped at its valid `_nino/Nino/...` autoload path; a project-owned runtime
+class belongs at its valid `app/...` path (or below `NINO_APP_DIR`). The legacy
+non-`Nino\` fallback under `_nino/` is compatibility behavior, not a target for
+new installer output.
 
 ### 9.1 Directory shape
 

@@ -55,7 +55,7 @@
 #install-content-wrap > div {
 	display: none;
 }
-#install-page-wrap.show-checks #install-content-checks, #install-page-wrap.show-setup #install-content-setup, #install-page-wrap.show-themes #install-content-themes, #install-page-wrap.show-webpages #install-content-webpages, #install-page-wrap.show-personalinfos #install-content-personalinfos, #install-page-wrap.show-admin #install-content-admin, #install-page-wrap.show-finish #install-content-finish {
+#install-page-wrap.show-checks #install-content-checks, #install-page-wrap.show-setup #install-content-setup, #install-page-wrap.show-themes #install-content-themes, #install-page-wrap.show-design #install-content-design, #install-page-wrap.show-webpages #install-content-webpages, #install-page-wrap.show-personalinfos #install-content-personalinfos, #install-page-wrap.show-admin #install-content-admin, #install-page-wrap.show-finish #install-content-finish {
 	display: block;
 }
 
@@ -170,6 +170,211 @@
 	font-size: .76rem;
 	line-height: 1.45;
 }
+/*	Frames and Design - the two panels under the theme grid. Both are filled
+ *	in by themes.js from themes/list and hide themselves when there is nothing
+ *	to offer (no frame units on disk, or a delivery without /_theme). */
+
+.install-theme-panel {
+	margin: 0 0 1.25rem;
+	padding: .9rem 1rem 1rem;
+	border: 1px solid var(--editor-border);
+	border-radius: var(--editor-radius);
+	background: var(--editor-bg-grouped);
+}
+.install-theme-panel-title {
+	margin: 0 0 .35rem;
+	font-size: .86rem;
+	font-weight: 650;
+}
+.install-design-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+	gap: .75rem;
+	margin-top: .8rem;
+}
+/*	One column, not two side by side: a frame preview is a full-width strip,
+ *	and half a header tells you nothing about how it lays out */
+.install-theme-frames {
+	display: flex;
+	flex-direction: column;
+	gap: 1.1rem;
+	margin-top: .8rem;
+}
+.install-frame-pick {
+	display: flex;
+	flex-direction: column;
+	gap: .45rem;
+}
+.install-frame-pick .install-theme-field {
+	max-width: 16rem;
+}
+/*	The stage clips the iframe and carries the border, so the preview reads as
+ *	a picture of a page rather than as part of this one */
+.install-frame-stage {
+	overflow: hidden;
+	border: 1px solid var(--editor-border);
+	border-radius: var(--editor-radius);
+	background: var(--editor-bg-elevated);
+}
+/*	A frame is drawn for a page, not for a 900px panel: rendered at a desktop
+ *	width and scaled down, so the preview shows the desktop layout a visitor
+ *	gets rather than the same frame in its mobile arrangement.
+ *
+ *	transform: scale() does not change the space the element takes, so the
+ *	stage would keep a full 15rem of it and leave a gap under the picture. The
+ *	pull-up is derived from the same two variables rather than measured off a
+ *	screenshot, so changing either keeps the two in step. */
+.install-frame-view {
+	--frame-height: 16rem;
+	--frame-scale: .75;
+
+	display: block;
+	/*	Derived, not fixed: at a fixed 1280px the scaled result is wider than
+	 *	the stage on some panel widths and the last nav item gets clipped, and
+	 *	narrower on others and leaves a gap. Dividing by the scale makes the
+	 *	rendered width exactly fill the stage whatever it is - and the result
+	 *	is still a desktop width, which is the point of scaling at all */
+	width: calc( 100% / var(--frame-scale) );
+	height: var(--frame-height);
+	border: 0;
+	transform: scale(var(--frame-scale));
+	transform-origin: top left;
+	margin-bottom: calc( var(--frame-height) * ( var(--frame-scale) - 1 ) );
+}
+@media (max-width: 1250px) {
+	.install-frame-view { --frame-scale: .55; }
+}
+@media (max-width: 900px) {
+	.install-frame-view { --frame-scale: .4; }
+}
+.install-theme-field {
+	display: flex;
+	flex-direction: column;
+	gap: .3rem;
+	font-size: .78rem;
+	font-weight: 600;
+}
+.install-theme-field small {
+	color: var(--editor-text-secondary);
+	font-weight: 400;
+}
+/*	The native picker and the hex field are one control with two ways in, so
+ *	they sit in one box rather than reading as two separate fields */
+.install-theme-color {
+	display: flex;
+	align-items: center;
+	gap: .4rem;
+}
+.install-theme-swatch {
+	flex: 0 0 auto;
+	width: 2.4rem;
+	height: 2.1rem;
+	padding: 0;
+	border: 1px solid var(--editor-border);
+	border-radius: var(--editor-radius-sm, .35rem);
+	background: none;
+	cursor: pointer;
+}
+.install-theme-color .nino-admin-input {
+	min-width: 0;
+	flex: 1 1 auto;
+}
+/* ------------------------------------------------------------------ Design */
+/*	Its own step rather than a third panel under the theme grid: the grid
+ *	already fills the pane, and everything here needs to be looked at while it
+ *	is being changed. Two sections, each ending in the thing it produces. */
+
+.install-design-section {
+	margin: 0 0 1.25rem;
+	padding: .9rem 1rem 1.1rem;
+	border: 1px solid var(--editor-border);
+	border-radius: var(--editor-radius);
+	background: var(--editor-bg-grouped);
+}
+.install-design-section-title {
+	margin: 0;
+	font-size: .86rem;
+	font-weight: 650;
+}
+/*	The specimen is drawn at the generated sizes, so it has to be able to get
+ *	tall without pushing the controls off screen */
+.install-design-specimen {
+	margin-top: 1rem;
+	padding-top: .9rem;
+	border-top: 1px solid var(--editor-separator);
+}
+.install-design-type-line {
+	margin: 0 0 .35rem;
+	font-weight: 600;
+	/*	A generated headline can be wider than the pane on a narrow window;
+	 *	clipping it is better than a horizontal scrollbar on the whole step */
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.install-design-type-line:last-child {
+	font-weight: 400;
+	color: var(--editor-text-secondary);
+}
+/*	The spacing scale as bars of one height: a gap is a distance, and drawing
+ *	it square makes the top of the scale three times taller than the thing it
+ *	is telling you */
+.install-design-spacing {
+	display: flex;
+	flex-direction: column;
+	gap: .3rem;
+	margin-top: .9rem;
+}
+.install-design-space-row {
+	display: flex;
+	align-items: center;
+	gap: .5rem;
+}
+.install-design-space {
+	display: block;
+	flex: 0 0 auto;
+	height: .55rem;
+	border-radius: 2px;
+	background: var(--editor-blue);
+	opacity: .55;
+}
+.install-design-space-row small {
+	color: var(--editor-text-secondary);
+	font-size: .7rem;
+	font-variant-numeric: tabular-nums;
+}
+/*	Radii stay boxes - a corner only reads against the two edges it joins */
+.install-design-corners {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: flex-end;
+	gap: .5rem;
+	margin-top: 1rem;
+}
+.install-design-radius {
+	display: block;
+	width: 2.6rem;
+	height: 2.6rem;
+	border: 2px solid var(--editor-blue);
+}
+
+/*	Each chip is a real pair - the generated background carrying the generated
+ *	text colour. A row of backgrounds alone would look convincing in exactly
+ *	the settings that fail. */
+.install-theme-preview-strip {
+	display: flex;
+	flex-wrap: wrap;
+	gap: .35rem;
+}
+.install-theme-chip {
+	padding: .3rem .6rem;
+	border: 1px solid transparent;
+	border-radius: var(--editor-radius-sm, .35rem);
+	font-size: .72rem;
+	font-weight: 600;
+	line-height: 1.4;
+}
+
 /*	Lightbox - one reused overlay for every tile, closed by a click anywhere or
  *	Escape (see themes.js). Sits outside .nino-admin, so it carries its own
  *	colours rather than the shell's. */

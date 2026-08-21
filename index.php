@@ -20,6 +20,10 @@ declare(strict_types=1);
 // exist and be writable.
 // define( 'NINO_CONTENT_DIR', '/absolute/path/outside/webroot' );
 
+// Optional: load project-owned PHP classes from another application root.
+// It defaults to <project>/app; the Nino\ namespace always stays in _nino/.
+// define( 'NINO_APP_DIR', '/absolute/path/to/app' );
+
 require '_nino/Nino.php';
 
 // Init Nino - the contact form's POST / handler is \Nino\Shortcodes\Form,

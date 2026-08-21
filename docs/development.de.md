@@ -2,12 +2,12 @@
 
 **Sprache:** [English](development.md) · Deutsch
 
-**Stand:** 8. August 2026 · **Nino-Version:** 0.11.0-beta.1
+**Stand:** 21. August 2026 · **Nino-Version:** 0.11.0-beta.1
 
 Dieses Handbuch beschreibt die technische Arbeit mit Nino – vom Einstiegspunkt über Routing und Rendering bis zu eigenen Modulen, dauerhaften Daten und Tests. Falls du stattdessen zuerst die Architektur kennenlernen oder ein frisches Projekt einrichten möchtest, lies die [Grundkonzepte](concepts.de.md) beziehungsweise [Erste Schritte](getting-started.de.md).
 
 **Weitere Links:**
-[README](../README.de.md) · [Grundkonzepte](concepts.de.md) · [Entwickler-Handbuch](development.de.md) · [Erste Schritte](getting-started.de.md) · [`/_install`-Referenz](_install.de.md) · [`/_admin`-Bedienung](_admin.de.md) · [`/_templates`-Bedienung](_templates.de.md) · [`/_editor`-Bedienung](_editor.de.md) · [Deployment](deployment.de.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
+[README](../README.de.md) · [Grundkonzepte](concepts.de.md) · [Entwickler-Handbuch](development.de.md) · [Erste Schritte](getting-started.de.md) · [`/_install`-Referenz](_install.de.md) · [`/_admin`-Bedienung](_admin.de.md) · [`/_templates`-Bedienung](_templates.de.md) · [`/_editor`-Bedienung](_editor.de.md) · [`/_theme`-Bedienung](_theme.de.md) · [Deployment](deployment.de.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
 
 **Entwicklerprofil:** Für einfache Webseiten reichen solide Kenntnisse in HTML, CSS und JavaScript sowie PHP-Grundlagen. Templates bestehen aus HTML+, also HTML mit Textfills und Shortcodes. Erst eigene Anwendungslogik, externe Schnittstellen oder neue Module verlangen tieferes PHP-Wissen. Ein fertiges Projekt kann anschließend weitgehend über `/_admin`, `/_templates` und `/_editor` gepflegt werden.
 
@@ -79,6 +79,20 @@ require_once __DIR__. '/_nino/Nino.php';
 ```
 
 Verwende `NINO_CONTENT_DIR` für den vollständigen privaten Baum und `NINO_CONFIG_DIR` nur für eine getrennte `config.php`. Jedes ausdrücklich konfigurierte Ziel muss existieren und beschreibbar sein; ein ungültiger Pfad wird nicht stillschweigend ersetzt.
+
+Projekteigene PHP-Klassen verwenden einen getrennten Quellcode-Root. Standard
+ist `app/` im Projektverzeichnis. Liegen diese Klassen an einer anderen Stelle,
+wird `NINO_APP_DIR` vor dem Laden des Kernels als absoluter Verzeichnispfad
+definiert:
+
+```php
+define( 'NINO_APP_DIR', '/var/www/nino-example-app' );
+require_once __DIR__. '/_nino/Nino.php';
+```
+
+Das ändert ausschließlich den Application-Root des Projekts. Projektdaten
+werden dadurch nicht verschoben, und der Ladeort von Klassen im kerneigenen
+Namespace `Nino\` bleibt unverändert.
 
 ## Der Request-/Response-Lebenszyklus im Detail
 
@@ -483,13 +497,33 @@ Einige Details sind absichtlich defensiv gestaltet:
 
 ### Verzeichnis und Autoloading
 
-Ninos Autoloader bildet Namespaces direkt auf Verzeichnisse ab. Für die Klasse `Project\Catalog\Catalog` wird beispielsweise folgende Datei erwartet:
+Ninos Autoloader bildet Namespaces direkt auf Verzeichnisse ab. Für die
+projekteigene Klasse `Project\Catalog\Catalog` wird standardmäßig folgende Datei
+erwartet:
 
 ```text
-/_nino/Project/Catalog/Catalog/Catalog.php
+/app/Project/Catalog/Catalog/Catalog.php
 ```
 
-Der Basename der Klasse und der PHP-Datei müssen übereinstimmen. Klassenpfade werden auf erlaubte Zeichen begrenzt; dynamisch zusammengesetzte oder benutzerkontrollierte Klassennamen gehören trotzdem nicht in die Modulliste.
+Die Auflösungsregeln sind bewusst asymmetrisch:
+
+| Klassen-Namespace | Such-Roots |
+| --- | --- |
+| `Nino\...` | ausschließlich `_nino/` |
+| alle anderen Namespaces | `NINO_APP_DIR`, falls definiert, sonst `app/`; anschließend `_nino/` als Kompatibilitäts-Fallback |
+
+Der Namespace `Nino\` gehört dem Kernel und kann aus dem Application-Root des
+Projekts nicht überschrieben werden. Der `_nino/`-Fallback für andere
+Namespaces hält bestehende Projekte lauffähig; neuer und migrierter Projektcode
+gehört jedoch nach `app/` (oder in das ausdrücklich gesetzte `NINO_APP_DIR`),
+damit `_nino/` bei einem Update vollständig ersetzt werden kann.
+
+Innerhalb des gewählten Roots wird der vollständige Klassenname zum
+Verzeichnispfad und der Klassen-Basename noch einmal als Dateiname angehängt.
+Der Basename der Klasse und der PHP-Datei müssen daher übereinstimmen.
+Klassenpfade werden auf erlaubte Zeichen begrenzt; dynamisch zusammengesetzte
+oder benutzerkontrollierte Klassennamen gehören trotzdem nicht in die
+Modulliste.
 
 ### Beispiel: Minimales Modul
 
@@ -592,7 +626,7 @@ Das Beispiel zeigt den Einstiegspunkt von `/_templates`; die übrigen Bereiche i
 - `/_templates` legt `page-*.tpl` an, setzt sie aus vollständigen HTML- und Template-Sections zusammen und befüllt native Inhalte schnell;
 - `/_editor` pflegt Inhalte und Betriebsdaten innerhalb der Kontoberechtigungen.
 
-`/_templates` bindet die Admin-Authentifizierung ein und teilt Passwort, Sperrstatus und Sitzung mit `/_admin`. Wird `_admin/` aus einer Auslieferung entfernt, steht deshalb auch der Builder nicht mehr zur Verfügung. Das geplante `/_themes` ist noch kein Einstiegspunkt im aktuellen Quellstand.
+`/_templates` bindet die Admin-Authentifizierung ein und teilt Passwort, Sperrstatus und Sitzung mit `/_admin`. Wird `_admin/` aus einer Auslieferung entfernt, steht deshalb auch der Builder nicht mehr zur Verfügung. `/_theme` teilt dieselbe Sitzung und unterliegt derselben Regel.
 
 ## Fehlerbehandlung und Protokolle
 

@@ -10,6 +10,13 @@ declare(strict_types=1);
 
 require '../_nino/Nino.php';
 require '../_admin/Admin.php';
+
+// The Design half of the Themes step. Loaded when it is there and skipped
+// when it isn't: a delivery may ship without /_theme, and the installer
+// degrades to "no Design controls" rather than to a fatal
+if( is_file( '../_theme/Theme.php' ) === true )
+	require '../_theme/Theme.php';
+
 require 'Install.php';
 
 // Init Nino Install

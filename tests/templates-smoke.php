@@ -87,6 +87,22 @@ $presets = \Nino\Templates\Library::presets();
 $modules = \Nino\Templates\Composer::modules();
 
 check( 'ships exactly the maintained named-area presets', array_keys( $presets ) === [ 'articles-grid', 'contact-form', 'content-section', 'cta-banner', 'feature-split', 'filterable-grid', 'fullscreen-image', 'image-banner', 'logo-bar', 'media-split-areas', 'newsletter-form', 'pricing-plans', 'process-timeline', 'static-accordion', 'static-list', 'static-table', 'template-include' ] );
+
+// Library::presets() swallows a broken manifest so one bad preset cannot take
+// the whole catalog down. That is right at runtime and wrong here: the check
+// above then just reports a shorter list, and the first test to reach for the
+// missing preset dies on a null far from the cause. Re-normalize each shipped
+// manifest outside the try/catch so the authoring mistake names itself.
+$presetLoadErrors = [];
+foreach( glob( dirname( __DIR__ ). '/_templates/library/*/manifest.php' ) ?: [] as $manifestPath ) {
+	$presetKey = basename( dirname( $manifestPath ) );
+	try {
+		\Nino\Templates\AreaComposer::normalizePreset( $presetKey, include $manifestPath, dirname( $manifestPath ) );
+	} catch( \Throwable $error ) {
+		$presetLoadErrors[] = $presetKey. ': '. $error->getMessage();
+	}
+}
+check( 'every shipped manifest normalizes'. ( $presetLoadErrors === [] ? '' : ' - '. implode( ' | ', $presetLoadErrors ) ), $presetLoadErrors === [] );
 check( 'every preset has searchable metadata and a normalized v3 contract', array_filter( $presets, fn( array $preset ): bool => $preset['name'] === ''
 	|| $preset['category'] === ''
 	|| $preset['tags'] === []
@@ -342,7 +358,7 @@ check( 'named-area preview mirrors the selected column count', substr_count( $tw
 // --- filterable-grid: the [elementvalues]-driven category filter --------
 
 $filterInput = \Nino\Templates\AreaComposer::defaults( $presets['filterable-grid'], 'home', 'services' );
-$filterInput['areas']['services']['source'] = [
+$filterInput['areas']['elements']['source'] = [
 	'elementMode' => 'existing',
 	'elementType' => 'services',
 	'shortcode' => [ 'locale' => '', 'callback' => '', 'limit' => -1, 'query' => '' ],
@@ -373,9 +389,9 @@ $collectionOf = function( string $source ): array {
 $defaultInsert = $collectionOf( \Nino\Templates\Composer::compose( [ 'preset' => 'filterable-grid', 'pageId' => 'home', 'id' => 'work' ] )['source'] );
 $reboundInput = $filterInput;
 $reboundInput['id'] = 'services-rebound';
-$reboundInput['areas']['services']['source']['elementType'] = 'consulting';
+$reboundInput['areas']['elements']['source']['elementType'] = 'consulting';
 $rebound = $collectionOf( \Nino\Templates\Composer::compose( $reboundInput )['source'] );
-check( 'the filter buttons read the same collection as the cards - on a new Area, an existing one, and after a rebind', $defaultInsert === [ 'home-work-services', 'home-work-services' ]
+check( 'the filter buttons read the same collection as the cards - on a new Area, an existing one, and after a rebind', $defaultInsert === [ 'home-work-elements', 'home-work-elements' ]
 	&& $collectionOf( $filterSection['source'] ) === [ 'services', 'services' ]
 	&& $rebound === [ 'consulting', 'consulting' ] );
 check( 'a collection token naming something that is not an Elements area of the preset is refused', throwsInvalidArgument( function() use ( $areaPresetDirectory, $multiAreaManifest ): void {

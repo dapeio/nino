@@ -6,6 +6,139 @@ All notable changes to Nino are documented in this file.
 
 ### Added
 
+- `/_install`'s frame selects now show the frame. Each one carries the real
+  template rendered beneath it - against `Nino.css`, the design tokens for the
+  settings being chosen, the picked theme's stylesheet and the frame's own, in
+  the order the css bundle loads them. `v4` says nothing about a layout, and
+  unlike a theme a frame has no preview image to open; rendering the template
+  also cannot go stale the way twelve screenshots would.
+
+  Everything the project does not have yet is stood in for: a placeholder mark
+  where the logo goes, sample navigation items built from `Navigation::$html`
+  rather than hand-written markup, and the library's own text files for the
+  rest. Delivered as a document of its own into a sandboxed iframe, because a
+  frame's stylesheet styles bare element selectors and sets `body main {
+  padding-top }`, which spliced into the page would land on the installer's own
+  shell.
+
+- The size raster, `/_theme`'s second half. It publishes a fixed set of steps
+  the way the palette publishes a fixed set of surfaces - `--nino-text-1` to
+  `-6`, `--nino-space-1` to `-6`, `--nino-radius-1` to `-3`, `--nino-radius-full`
+  and `--nino-line-height` - and a theme assigns from them instead of writing
+  numbers. Numbered rather than named on purpose: a size has no meaning of its
+  own, where `--nino-alt` does.
+
+  Three settings shape it. **Volume** decides how far the type scale fans out,
+  anchored at body copy: step 1 does not move at any setting, because a scale
+  gets bigger at the display end, not by pushing the size you actually read up
+  with it. **Spacing** scales the gaps and moves the line height with them,
+  biting hardest on the small steps - the large ones are already section-sized.
+  **Shaping** sets the radii as absolute values rather than a multiplier, since
+  a radius has a floor at 0 and a ceiling at half the box.
+
+  Every knob's default reproduces `Nino.css`'s own scale exactly. Turning the
+  design layer on must not move a project that has not asked for anything, or
+  nobody can adopt it. The tests assert that against the framework's literal
+  values, and check monotonicity, a body-copy floor and an only-upward
+  wide-screen override across all 27 combinations. The raster has no light and
+  dark variant, so it is emitted once rather than three times.
+- `/_install` gains a Design step of its own, after Themes. The theme grid
+  already fills a pane, and colour and size both have to be looked at while
+  they are being changed. Themes keeps the grid and the frame selects; Design
+  gets the colour controls, the three size knobs, and a specimen of each -
+  surfaces as real background/text pairs, and the type, spacing and radii drawn
+  at the sizes they generate rather than listed as rem values.
+
+  The two steps do not share state: applying a theme installs the design its
+  manifest declares, and the Design step opens by reading what is stored. One
+  source for the current design rather than two that can disagree, and going
+  back to pick a different theme shows that theme's design rather than a stale
+  copy.
+- The `agency` theme maps its sizes onto the raster as well, and declares
+  `volume: generous, spacing: airy, shaping: round` - which is what its
+  hand-tuned numbers used to spell out one at a time.
+
+- `/_install`'s Themes step now applies the whole look, not just the theme:
+  the header/footer frame and the Design colours go out in the same
+  `themes/apply` post. All three answer the same question, and splitting them
+  across steps is how a project leaves with two of the three set.
+
+  Frames. A site's `<header>` and `<footer>` are interchangeable units under
+  `_install/library/header|footer/<key>` - a `template.tpl` plus the
+  `style.css` for the markup that template brings, and no manifest, because
+  two files are everything a frame has to declare. The base html templates
+  include the installed copy through `[template /templates/theme.header]`
+  instead of carrying the markup, so a frame is swapped by replacing two
+  files. Picks persist at `/nino/install/header|footer`.
+
+  Design. The step calls `Theme::write()` with either the operator's settings
+  or the `design` block the picked theme's manifest declares, so picking a
+  theme and pressing Next produces the look its preview promised. It has a
+  `themes/preview` endpoint of its own rather than borrowing `/_theme`'s:
+  during an installation there is no admin password yet, so the shared session
+  that guards `/_theme` does not exist. Optional throughout - a delivery
+  shipping without `/_theme` installs exactly as before, with the Design block
+  gone from the picker rather than a fatal on a missing class.
+
+  Bundle order is the contract, and each pick owns one slot: `Nino.css`, the
+  generated design values, the theme's role assignments, the frames' own
+  styling, the project's overrides.
+- The `agency` theme is rewritten as a mapping layer: every colour role is
+  assigned to a `--nino-*` token rather than a literal, and the manifest
+  declares the `design` block it was drawn with. A hex in a role would be a
+  pair `/_theme` never measured, which is the whole reason the two are
+  separate.
+
+  The tests measure the resolved chain rather than reading the assignments -
+  every pair Nino.css actually renders together, in both modes, against the
+  real WCAG formula. That caught `--color-title` mapped to `--nino-origin`:
+  the brand as a *surface*, rendered as *ink* on the page ground. It passes in
+  light mode at 4.62:1 by luck and fails in dark mode at 4.33:1. It reads
+  `--nino-default-link` now - the same hue solved as ink for that ground.
+
+  One role resists the split: Nino.css uses `--color-primary` both as a
+  background (buttons and badges, paired with `--color-primary-text`) and as
+  ink on the page ground (links, alerts, active nav). A theme cannot split
+  what the framework merged, so the second use sits at 4.33:1 in dark mode.
+  Pinned by a test rather than asserted away, pending a role split in
+  Nino.css itself.
+
+- `/_theme`, the generated design layer. It owns the colour tokens every
+  stylesheet reads from - `var(--nino-alt)` for a surface, `var(--nino-on-alt)`
+  for the text on it - and solves them from four settings: a primary colour, an
+  optional secondary, a Contrast step and a Colours step. Shares `/_admin`'s
+  password, lock and session, and stays reachable after an installation, so
+  recolouring a live project is a save rather than a reinstall.
+
+  The reason it is a tool and not a set of hand-written values is the pairing.
+  A background is published together with the text colour that belongs on it,
+  and the pair is measured against the real WCAG formula before it is written
+  out - a brand colour cannot produce unreadable text because the text colour
+  is not chosen, it is solved for the background. Nine surfaces (`default`,
+  `alt`, `dark`, `black`, `origin`, `vibrant`, `success`, `warning`, `danger`)
+  each publish ten values: background, body text, muted text, link, border,
+  focus ring, hover, active, disabled and shadow.
+
+  Solved in OKLCH, whose lightness is perceptual: a hue can be moved onto a
+  contrast target without changing what colour it reads as, which neither sRGB
+  nor HSL lightness can do (yellow at 50% is far lighter than blue at 50%).
+  Out-of-gamut results reduce chroma until they fit rather than being clipped,
+  since clipping shifts hue. Contrast sets the target ratio only (`soft`/
+  `default` 4.5:1, `high` 7.0:1 for body text; borders and focus always 3:1)
+  and Colours scales chroma only - keeping the two knobs on separate axes is
+  what makes either predictable. Status hues are fixed against both, because
+  red has to stay red.
+
+  Written to `/assets/style.design.css` and spliced into the css bundle
+  directly after `_nino/Nino.css`, anchored on that file rather than on a fixed
+  index so a project adding stylesheets cannot silently reorder it. Design
+  supplies the base values, the theme decides what to do with them, the
+  project's own stylesheet has the last word. The generated file is rewritten
+  in full on every save and is not meant to be edited.
+
+  Colours only for now; the size raster - volume, spacing, shaping - is the
+  intended second half and is not built yet.
+
 - `Modules\Cache`, an optional full-page cache. A hit skips the render -
   routing, template reads, the fill and shortcode passes - and answers from a
   stored copy; a miss renders as before and stores the result. Off by default,
@@ -444,6 +577,13 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- Project-owned PHP classes now resolve from `app/` by default, or from
+  `NINO_APP_DIR` when that constant is defined before `_nino/Nino.php` is
+  loaded. The `Nino\` namespace remains kernel-owned and resolves exclusively
+  below `_nino/`, so project code cannot shadow built-ins. Non-`Nino\` classes
+  retain `_nino/` as a compatibility fallback for existing projects;
+  `/nino/modules` still controls activation only, not whether a class can be
+  autoloaded.
 - **Breaking:** the frontend speaks one class namespace, `nino-*`. `ui-*`, `js-*`
   and the shortcode modules' `sc-*` are gone, and so are the bare English state
   words that rode along with them: `.error`, `.success`, `.pending`, `.existing`,
@@ -674,6 +814,14 @@ All notable changes to Nino are documented in this file.
   `/_admin` starts behind everything already in that menu.
 
 ### Fixed
+
+- `Design::normalize()` raised a `TypeError` instead of falling back when a
+  knob arrived as an array or an object rather than a string. These come from
+  decoded json, and php raises rather than returning false when a non-string is
+  used as an array offset - `isset()` included. Reachable from the wire through
+  `/_theme`'s `design/save` and `/_install`'s `design/apply`, so it was a 500
+  anybody could ask for. Found by a test written for the size knobs; the colour
+  knobs had it from the start.
 
 - A bound alternative text left its own shortcode's tail standing in the
   Builder's preview: `Media / Text — Flexible split` renders

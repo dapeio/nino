@@ -5,12 +5,15 @@
  *	Install									Step 3: pick the site's look - one tile per
  *													_install/library/themes/&lt;key&gt; unit, each with the
  *													preview image, title and description its own
- *													manifest.php declares. Applying copies that theme's
- *													files into the project and bundles its stylesheet, see
- *													_install/Install.php's Themes class. Driven by the
- *													shared Back/Next bar (script.js) rather than its own
- *													save button - apply() is exposed for Next to call, not
- *													wired to a button here.
+ *													manifest.php declares, plus which header/footer frame
+ *													the site uses - both go out in one themes/apply post,
+ *													see _install/Install.php's Themes class. The colours a
+ *													theme was drawn with are the next step's (design.js);
+ *													applying a theme installs the design its manifest
+ *													declares, so that step opens on exactly what this one
+ *													just chose. Driven by the shared Back/Next bar
+ *													(script.js) rather than its own save button - apply() is
+ *													exposed for Next to call, not wired to a button here.
  *
  *													A tile's preview opens in a plain overlay lightbox
  *													(one reused #themes-lightbox element, see
@@ -32,6 +35,7 @@
 		_ready 		: false,
 		_themes 	: {},
 		_selected : null,
+		_frames 	: {},
 
 		/**
 		 *	Load every theme unit - each flagged with whether it's the one
@@ -50,6 +54,7 @@
 					return Nino.install.showError( wrap, status, response );
 
 				Nino.install.themes._themes = response.themes || {};
+				Nino.install.themes._frames = response.frames || {};
 
 				// Pre-select the applied theme, falling back to the first
 				// one listed - "Next" applies whatever is selected, and a
@@ -60,6 +65,7 @@
 					: ( keys[0] ?? null );
 
 				Nino.install.themes._render();
+				Nino.install.themes._renderFrames( response.activeFrames || {} );
 				Nino.install.themes._ready = true;
 			} );
 		},
@@ -105,6 +111,7 @@
 				Array.prototype.slice.call( dc.querySelectorAll('.install-theme-tile') ).forEach( function( el ) {
 					el.classList.toggle( 'install-theme-tile--active', el.contains( input ) );
 				} );
+				Nino.install.themes._adoptTheme( key );
 			} );
 			tile.appendChild( input );
 
@@ -145,6 +152,137 @@
 			tile.appendChild( body );
 
 			return tile;
+		},
+
+		/**
+		 *	Fill the two frame selects. A theme names the header/footer it was
+		 *	drawn against, so what is already applied wins on a revisit and the
+		 *	theme's own declaration only fills in on a fresh install
+		 *
+		 *	@param		{Object}	active			{ header, footer } as currently installed
+		 *
+		 *	@return		void
+		 */
+		_renderFrames : function( active ) {
+
+			const panel = dc.getElementById('themes-frames');
+			if( panel === null )
+				return;
+
+			const theme = Nino.install.themes._themes[Nino.install.themes._selected] || {};
+			let offered = false;
+
+			[ 'header', 'footer' ].forEach( function( kind ) {
+
+				const select = dc.getElementById('themes-frame-'+ kind);
+				const keys 	 = Nino.install.themes._frames[kind] || [];
+
+				if( select === null )
+					return;
+
+				select.innerHTML = '';
+
+				keys.forEach( function( key ) {
+					const option = dc.createElement('option');
+					option.value = key;
+					option.textContent = key;
+					select.appendChild( option );
+				} );
+
+				const wanted = [ active[kind], theme[kind] ].filter( function( candidate ) {
+					return candidate && keys.indexOf( candidate ) !== -1;
+				} );
+
+				select.value = wanted.length > 0 ? wanted[0] : ( keys[0] || '' );
+				offered = offered || keys.length > 0;
+
+				// Bound once: _renderFrames() runs again on every visit to the
+				// step, and a second listener would fire a second render for
+				// every change from then on
+				if( select.dataset === undefined || select.dataset.framePreviewBound !== '1' ) {
+					if( select.dataset !== undefined )
+						select.dataset.framePreviewBound = '1';
+					select.addEventListener( 'change', function() {
+						Nino.install.themes._renderFramePreview( kind );
+					} );
+				}
+
+				Nino.install.themes._renderFramePreview( kind );
+			} );
+
+			panel.classList.toggle( 'install-hidden', offered === false );
+		},
+
+		/**
+		 *	Show one frame as it will really look. The document comes from the
+		 *	server rather than being assembled here: it needs the library's
+		 *	templates, its text files and the theme's stylesheet, none of which
+		 *	the browser has, and most of which are not in the project yet at
+		 *	this point in the wizard.
+		 *
+		 *	Into a sandboxed iframe rather than into the page: a frame's
+		 *	stylesheet styles bare element selectors and sets things like
+		 *	'body main { padding-top }', which would land on the installer's
+		 *	own shell.
+		 *
+		 *	@param		{string}	kind				'header' or 'footer'
+		 *
+		 *	@return		void
+		 */
+		_renderFramePreview : function( kind ) {
+
+			const select = dc.getElementById('themes-frame-'+ kind);
+			const view 	 = dc.getElementById('themes-frame-'+ kind+ '-preview');
+
+			if( select === null || view === null || select.value === '' )
+				return;
+
+			const wanted = select.value;
+
+			Nino.install.apiCall( 'themes/frame', {
+				kind 	 : kind,
+				frame  : wanted,
+				theme  : Nino.install.themes._selected,
+			}, function( status, response ) {
+
+				// Two answers can be in flight after a quick double change;
+				// only the one for what is selected now may paint
+				if( select.value !== wanted )
+					return;
+
+				if( status !== 200 || response === null || typeof response.html !== 'string' ) {
+					view.removeAttribute('srcdoc');
+					return;
+				}
+
+				view.srcdoc = response.html;
+			} );
+		},
+
+		/**
+		 *	Picking a theme adopts what that theme was drawn against - its
+		 *	frames. A theme tile is a promise about how the site will look,
+		 *	and it can only keep it if choosing it also moves the frames its
+		 *	preview was rendered with
+		 *
+		 *	@param		{string}	key
+		 *
+		 *	@return		void
+		 */
+		_adoptTheme : function( key ) {
+
+			const theme = Nino.install.themes._themes[key] || {};
+
+			[ 'header', 'footer' ].forEach( function( kind ) {
+				const select = dc.getElementById('themes-frame-'+ kind);
+				const keys 	 = Nino.install.themes._frames[kind] || [];
+				if( select !== null && theme[kind] && keys.indexOf( theme[kind] ) !== -1 && select.value !== theme[kind] ) {
+					select.value = theme[kind];
+					// Setting .value does not fire 'change', so the preview
+					// would keep showing the frame the previous theme named
+					Nino.install.themes._renderFramePreview( kind );
+				}
+			} );
 		},
 
 		/**
@@ -201,7 +339,19 @@
 
 			msg.textContent = 'Applying …';
 
-			Nino.install.apiCall( 'themes/apply', { theme : Nino.install.themes._selected }, function( status, response ) {
+			// One post, because the two are one decision: a theme whose frames
+			// failed to apply is not the look that was picked. The colours are
+			// the next step's - applying a theme installs the design it
+			// declares, and Design opens on exactly that
+			const payload = { theme : Nino.install.themes._selected };
+
+			[ 'header', 'footer' ].forEach( function( kind ) {
+				const select = dc.getElementById('themes-frame-'+ kind);
+				if( select !== null && select.value !== '' )
+					payload[kind] = select.value;
+			} );
+
+			Nino.install.apiCall( 'themes/apply', payload, function( status, response ) {
 
 				if( status !== 200 || response === null ) {
 					msg.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : 'Failed to apply.' );

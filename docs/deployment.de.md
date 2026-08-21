@@ -2,12 +2,12 @@
 
 **Sprache:** [English](deployment.md) · Deutsch
 
-**Stand:** 8. August 2026 · **Nino-Version:** 0.11.0-beta.1
+**Stand:** 21. August 2026 · **Nino-Version:** 0.11.0-beta.1
 
 Dieses Handbuch führt eine fertig entwickelte Nino-Webseite in den produktiven Betrieb. Falls du stattdessen ein frisches Projekt einrichten möchtest, beginne mit [Erste Schritte](getting-started.de.md); technische Erweiterungen behandelt das [Entwickler-Handbuch](development.de.md).
 
 **Weitere Links:**
-[README](../README.de.md) · [Grundkonzepte](concepts.de.md) · [Entwickler-Handbuch](development.de.md) · [Erste Schritte](getting-started.de.md) · [`/_install`-Referenz](_install.de.md) · [`/_admin`-Bedienung](_admin.de.md) · [`/_templates`-Bedienung](_templates.de.md) · [`/_editor`-Bedienung](_editor.de.md) · [Deployment](deployment.de.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
+[README](../README.de.md) · [Grundkonzepte](concepts.de.md) · [Entwickler-Handbuch](development.de.md) · [Erste Schritte](getting-started.de.md) · [`/_install`-Referenz](_install.de.md) · [`/_admin`-Bedienung](_admin.de.md) · [`/_templates`-Bedienung](_templates.de.md) · [`/_editor`-Bedienung](_editor.de.md) · [`/_theme`-Bedienung](_theme.de.md) · [Deployment](deployment.de.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
 
 ## Voraussetzungen des Zielsystems
 Nino benötigt weder Datenbankserver noch Composer-Installation auf dem Zielsystem. Das vereinfacht zwar das Deployment, macht die Dateien des Projekts aber umso wichtiger: Konfiguration und redaktionelle Daten liegen direkt im Dateisystem und müssen beim Übertragen, Sichern und Berechtigen vollständig berücksichtigt werden.
@@ -86,7 +86,7 @@ Im laufenden Betrieb benötigt Nino Schreibrechte nur für tatsächlich verände
 
 Vergib diese Rechte an den Benutzer, unter dem PHP ausgeführt wird. Weltweit beschreibbare Rechte wie `0777` sind keine geeignete Dauerlösung. Nach dem Deployment sollten Kernel und übriger PHP-Quellcode nicht allgemein beschreibbar sein.
 
-## Konfiguration außerhalb des Webroots
+## Konfiguration und Application-Quellcode außerhalb des Webroots
 
 Standardmäßig liegt der vollständige private Verzeichnisbaum einschließlich `config.php` in `private/`. `NINO_CONTENT_DIR` verschiebt diesen vollständigen Baum in ein existierendes, beschreibbares Verzeichnis außerhalb des Webroots. Mit `NINO_CONFIG_DIR` kann zusätzlich nur `config.php` auf ein anderes existierendes, beschreibbares Verzeichnis zeigen.
 
@@ -97,6 +97,19 @@ define('NINO_CONTENT_DIR', '/pfad/ausserhalb/des/webroots/nino-private');
 ```
 
 Trage eine der Definitionen vor dem Laden von `_nino/Nino.php` in `index.php` ein. Ein ungültiger ausdrücklich gesetzter Pfad bricht den Start ab; Nino fällt nie still auf ein Verzeichnis im Projekt zurück. Wird der vollständige Baum mit `NINO_CONTENT_DIR` verschoben, muss `private/` nicht mehr durch den Webserver geschützt werden. Wird nur `config.php` verschoben, dürfen die übrigen privaten Dateien weiterhin nicht direkt ausgeliefert werden.
+
+Projekteigene PHP-Klassen werden davon getrennt standardmäßig aus `app/`
+geladen. Mit `NINO_APP_DIR` kann der Autoloader auf ein anderes absolutes
+Quellcode-Verzeichnis zeigen; auch diese Konstante muss vor dem Laden des
+Kernels definiert werden:
+
+```php
+define('NINO_APP_DIR', '/pfad/ausserhalb/des/webroots/nino-app');
+```
+
+Dieser Quellcode-Override verschiebt weder Konfiguration noch Laufzeitdaten und
+benötigt im Produktivbetrieb keine Schreibrechte. Klassen im kerneigenen
+Namespace `Nino\` werden weiterhin ausschließlich aus `_nino/` geladen.
 
 ## Einstellungen für den Produktivbetrieb
 
@@ -193,11 +206,17 @@ Behandle ein Nino-Update wie eine Änderung am konkreten Webseitenprojekt, nicht
 
 1. Sichere den aktuellen produktiven Stand außerhalb des Webroots.
 2. Übernimm die Änderung zunächst in eine Entwicklungs- oder Staging-Umgebung.
-3. Vergleiche eigene Anpassungen in Kernel, Templates und Verwaltungsoberflächen mit dem neuen Stand. Die Verwaltungsoberflächen selbst tragen keinen Projektzustand mehr: Das `/_admin`-Passwort liegt in `private/.auth/pw.php`, `_admin/` lässt sich also komplett ersetzen, ohne den Login zu verlieren oder `/_install` wieder zu öffnen.
+3. Lege projekteigene PHP-Klassen in `app/` (oder `NINO_APP_DIR`) ab und vergleiche nur bewusste Kernel-Anpassungen mit dem neuen Stand. `_nino/` kann dann vollständig ersetzt werden. Die Verwaltungsoberflächen selbst tragen keinen Projektzustand mehr: Das `/_admin`-Passwort liegt in `private/.auth/pw.php`, `_admin/` lässt sich ebenfalls ersetzen, ohne den Login zu verlieren oder `/_install` wieder zu öffnen.
 4. Führe Smoke-Tests und projektspezifische Abnahme aus.
 5. Übertrage den geprüften Stand und behalte die vorherige Version für ein Rollback.
 
-Nino verwendet genau eine Projektstruktur: Private Dateien liegen in `private/`, für den Browser bestimmte Dateien in `public/`. Alternative Verzeichnisstrukturen werden während eines Requests weder erkannt noch migriert. Mit `NINO_CONTENT_DIR` lässt sich der vollständige private Verzeichnisbaum weiterhin bewusst außerhalb des Webroots ablegen.
+Nino verwendet eine Projektstruktur: Private Dateien liegen in `private/`, für
+den Browser bestimmte Dateien in `public/` und projekteigener PHP-Quellcode in
+`app/`. Alternative Verzeichnisstrukturen werden während eines Requests nicht
+migriert. `NINO_CONTENT_DIR` kann den vollständigen privaten Baum verschieben,
+`NINO_APP_DIR` den Application-Root des Projekts ersetzen. Für Klassen außerhalb
+von `Nino\` bleibt ein Kompatibilitäts-Fallback unter `_nino/`; er ist für
+bestehende Projekte gedacht, nicht für neuen Code.
 
 Nino befindet sich in der Beta-Phase. Sicherheitskorrekturen erscheinen auf `main`; eine getrennte LTS-Linie gibt es derzeit nicht. Plane Updates deshalb als aktive Projektpflege ein und prüfe `SECURITY.md` sowie den Changelog vor einer Aktualisierung.
 

@@ -126,6 +126,7 @@ index.php        Haupt-Einstiegspunkt der Webseite
 config.php       Site-Konfiguration
 
 _nino/           Kernel und Frontend-Core
+app/             Projekteigene PHP-Klassen und Laufzeitmodule
 _editor/         Inhaltseditor, Nutzer, Backups, Aktivitätslog
 _admin/          Entwickler-Werkzeuge und Wiederherstellung
 _install/        Einrichtungsassistent
@@ -166,6 +167,7 @@ Nino hält seine Architektur bewusst klein: Ein zentrales `$appData`-Array träg
 * **[`/_admin`-Bedienung](docs/_admin.de.md):** Projektstruktur, Inhalte, Konten, Konfiguration und Wiederherstellung
 * **[`/_templates`-Bedienung](docs/_templates.de.md):** Seitentemplates aus vollständigen HTML- und Template-Sections zusammensetzen
 * **[`/_editor`-Bedienung](docs/_editor.de.md):** Texte, Elemente, Bilder, Anfragen und Newsletter
+* **[`/_theme`-Bedienung](docs/_theme.de.md):** die erzeugte Design-Ebene - Markenfarbe, Kontrast und Token-Palette
 * **[Deployment](docs/deployment.de.md):** Webserver, Sicherheit, Backups und Go-live
 * **[Design-Handbuch](docs/design.de.md):** Frontend, Design-System, CSS und Template-Arbeit **(WIP)**
 * **[Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md):** Sicherheitsmeldungen und unterstützte Versionen

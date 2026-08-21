@@ -2012,6 +2012,19 @@ namespace Nino {
 			if( $success === false )
 				return ! trigger_error( 'Element \''. $uri. '\' could not be written.' );
 
+			// The veto-capable delete callback above runs while the type mutation
+			// is still pending. This second hook is deliberately notification-only:
+			// modules that maintain derived data must not see a delete which the
+			// filesystem never actually persisted.
+			$change = [
+				'operation'		=> 'delete',
+				'type'				=> $typeUri,
+				'uri'					=> $uri,
+				'previousUri'	=> null,
+				'locale'			=> $locale,
+			];
+			\Nino\Callbacks::doCallbacks( $appData, '/nino/elements/committed', $change );
+
 			return true;
 		}
 
@@ -2469,6 +2482,18 @@ namespace Nino {
 			// able to persist it
 			if( $success === false )
 				return ! trigger_error( 'Element \''. $writtenUri. '\' could not be written.' );
+
+			// Unlike the existing type-specific hook inside the mutation, this is
+			// fired only after putFileContent() succeeded. It cannot veto a commit;
+			// it is the safe point for optional modules to refresh derived files.
+			$change = [
+				'operation'		=> $update === true ? 'update' : 'insert',
+				'type'				=> $typeUri,
+				'uri'					=> $resultData['.uri'],
+				'previousUri'	=> $uri !== $resultData['.uri'] ? $uri : null,
+				'locale'			=> $resultData['.locale'],
+			];
+			\Nino\Callbacks::doCallbacks( $appData, '/nino/elements/committed', $change );
 
 			return \Nino\Elements::getElement( $appData, $resultData['.uri'], $resultData['.locale'] );
 		}
@@ -4046,24 +4071,26 @@ namespace {
 	// same way without going through callModules() first
 	spl_autoload_register( function( string $className ): void {
 
-		$relativePath	= str_replace( '\\', '/', $className );
+		$relativePath = str_replace( '\\', '/', $className );
 
-		// A valid namespace path only ever has letters/digits/underscore/
-		// slash - in particular never a '.', which is the only way a '..'
-		// segment could smuggle the resolved path outside __DIR__. Every
-		// caller that reaches the autoloader with an attacker-influenced
-		// class name (config.php's '/nino/modules' list, fed straight into
-		// method_exists() by callModules()) is otherwise turned from
-		// "picks a class" into "requires an arbitrary file". preg_match()
-		// returns 0 (not false) on a clean non-match - false is reserved
-		// for a regex engine error, which this fixed, valid pattern never
-		// raises, so the check must be !== 1, not === false.
 		if( preg_match( '#^[A-Za-z0-9_/]+$#', $relativePath ) !== 1 )
 			return;
 
-		$filename			= __DIR__. '/'. $relativePath. '/'. basename( $relativePath ). '.php';
+		$file = '/'. $relativePath. '/'. basename( $relativePath ). '.php';
 
-		if( is_file( $filename ) === true )
-			require $filename;
+		// The kernel owns Nino\ and nothing else. A project's own classes
+		// resolve against its own root first, so an update can replace
+		// _nino/ wholesale again. The __DIR__ fallback keeps projects that
+		// still ship their module inside the kernel working.
+		$roots = str_starts_with( $relativePath, 'Nino/' ) === true
+			? [ __DIR__ ]
+			: [ defined( 'NINO_APP_DIR' ) === true ? NINO_APP_DIR : dirname( __DIR__ ). '/app', __DIR__ ];
+
+		foreach( $roots as $root )
+
+			if( is_file( $root. $file ) === true ) {
+				require $root. $file;
+				return;
+			}
 	} );
 }

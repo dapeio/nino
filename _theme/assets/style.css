@@ -1,0 +1,59 @@
+@layer nino.system, nino.tool, nino.local;
+
+/*
+ *	/_theme's own screen styles. Everything shared lives in Nino.admin.css;
+ *	only what is genuinely local to this tool belongs here, and every rule is
+ *	scoped to #theme-page-wrap so it cannot reach another tool's screen.
+ */
+
+@layer nino.tool {
+
+	/* The swatch grid is this tool's one real component: a surface with the
+	   values generated for it, shown on the surface itself so the pairing is
+	   visible rather than asserted */
+	#theme-page-wrap .theme-surfaces {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+		gap: var(--editor-gap);
+	}
+
+	#theme-page-wrap .theme-surface {
+		border: 1px solid var(--editor-border);
+		border-radius: var(--editor-radius);
+		overflow: hidden;
+	}
+
+	#theme-page-wrap .theme-surface-head {
+		padding: var(--editor-gap);
+		display: flex;
+		flex-direction: column;
+		gap: .35rem;
+	}
+
+	#theme-page-wrap .theme-surface-name {
+		font-weight: 600;
+		font-size: .95rem;
+	}
+
+	#theme-page-wrap .theme-surface-values {
+		display: flex;
+		flex-wrap: wrap;
+		gap: .3rem;
+		padding: var(--editor-gap);
+		border-top: 1px solid var(--editor-separator);
+	}
+
+	#theme-page-wrap .theme-chip {
+		font-family: var(--nino-admin-mono);
+		font-size: .7rem;
+		padding: .2rem .4rem;
+		border-radius: var(--editor-radius-sm);
+		border: 1px solid var(--editor-border);
+	}
+
+	#theme-page-wrap .theme-ratio {
+		font-family: var(--nino-admin-mono);
+		font-size: .72rem;
+		font-variant-numeric: tabular-nums;
+	}
+}

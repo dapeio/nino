@@ -2,12 +2,12 @@
 
 **Language:** English · [Deutsch](development.de.md)
 
-**Last updated:** August 8, 2026 · **Nino version:** 0.11.0-beta.1
+**Last updated:** August 21, 2026 · **Nino version:** 0.11.0-beta.1
 
 This manual describes the technical work with Nino — from the entry point through routing and rendering to custom modules, persistent data, and tests. If you instead want to first learn about the architecture or set up a fresh project, read the [Concepts](concepts.md) or [Getting Started](getting-started.md).
 
 **Additional Links:**
-[README](../README.md) · [Concepts](concepts.md) · [Developer Manual](development.md) · [Getting Started](getting-started.md) · [`/_install` Reference](_install.md) · [`/_admin` Operation](_admin.md) · [`/_templates` Operation](_templates.md) · [`/_editor` Operation](_editor.md) · [Deployment](deployment.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
+[README](../README.md) · [Concepts](concepts.md) · [Developer Manual](development.md) · [Getting Started](getting-started.md) · [`/_install` Reference](_install.md) · [`/_admin` Operation](_admin.md) · [`/_templates` Operation](_templates.md) · [`/_editor` Operation](_editor.md) · [`/_theme` Operation](_theme.md) · [Deployment](deployment.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
 
 **Developer Profile:** For simple websites, solid knowledge of HTML, CSS, and JavaScript as well as PHP basics is sufficient. Templates consist of HTML+, i.e., HTML with textfills and shortcodes. Only custom application logic, external interfaces, or new modules require deeper PHP knowledge. A finished project can then be largely maintained via `/_admin`, `/_templates`, and `/_editor`.
 
@@ -81,6 +81,19 @@ require_once __DIR__. '/_nino/Nino.php';
 ```
 
 Use `NINO_CONTENT_DIR` for the complete private tree and `NINO_CONFIG_DIR` only for a separate `config.php`. Each explicitly configured target must exist and be writable; an invalid path is not silently replaced.
+
+Project-owned PHP classes use a separate source root. It is `app/` in the
+project directory by default. Define `NINO_APP_DIR` as an absolute directory
+path before loading the kernel when those classes live elsewhere:
+
+```php
+define( 'NINO_APP_DIR', '/var/www/nino-example-app' );
+require_once __DIR__. '/_nino/Nino.php';
+```
+
+This changes only the project application root. It does not move project data,
+and it never changes where classes in the kernel-owned `Nino\` namespace are
+loaded from.
 
 ---
 
@@ -501,13 +514,30 @@ Some details are deliberately defensive:
 
 ### Directory and Autoloading
 
-Nino's autoloader maps namespaces directly to directories. For the class `Project\Catalog\Catalog`, the following file is expected:
+Nino's autoloader maps namespaces directly to directories. For the
+project-owned class `Project\Catalog\Catalog`, the default file is:
 
 ```text
-/_nino/Project/Catalog/Catalog/Catalog.php
+/app/Project/Catalog/Catalog/Catalog.php
 ```
 
-The basename of the class and the PHP file must match. Class paths are limited to allowed characters; dynamically composed or user-controlled class names still do not belong in the module list.
+The resolution rules are intentionally asymmetric:
+
+| Class namespace | Search roots |
+| --- | --- |
+| `Nino\...` | `_nino/` only |
+| every other namespace | `NINO_APP_DIR` when defined, otherwise `app/`; then `_nino/` as a compatibility fallback |
+
+The `Nino\` namespace is kernel-owned and cannot be shadowed from the project
+application root. The `_nino/` fallback for other namespaces keeps existing
+projects working, but new and migrated project code belongs in `app/` (or the
+explicit `NINO_APP_DIR`) so `_nino/` can be replaced during an update.
+
+Within the selected root, the full class name becomes a directory path and the
+class basename is appended once more as the filename. Therefore, the basename
+of the class and the PHP file must match. Class paths are limited to allowed
+characters; dynamically composed or user-controlled class names still do not
+belong in the module list.
 
 ### Example: Minimal Module
 
@@ -612,7 +642,7 @@ The example shows the entry point of `/_templates`; the other areas initialize t
 - `/_templates` creates and composes `page-*.tpl` files from complete HTML and template sections and quick-fills native content;
 - `/_editor` maintains content and operational data within account permissions.
 
-`/_templates` integrates admin authentication and shares password, lock status, and session with `/_admin`. If `_admin/` is removed from a delivery, the builder is therefore also unavailable. The planned `/_themes` is not yet an entry point in the current source state.
+`/_templates` integrates admin authentication and shares password, lock status, and session with `/_admin`. If `_admin/` is removed from a delivery, the builder is therefore also unavailable. `/_theme` shares the same session and is subject to the same rule.
 
 ---
 

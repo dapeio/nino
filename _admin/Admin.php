@@ -2166,6 +2166,7 @@ namespace Nino\Admin {
 				'config/list' 			=> [ self::class, 'apiList' ],
 				'config/save' 			=> [ self::class, 'apiSave' ],
 				'config/addlocale'	=> [ self::class, 'apiAddLocale' ],
+				'config/searchindex'	=> [ self::class, 'apiCreateSearchIndex' ],
 			];
 		}
 
@@ -2426,6 +2427,24 @@ namespace Nino\Admin {
 				'keys' 		=> count( $skeleton ),
 				'from' 		=> $native,
 			] );
+		}
+
+		/**
+		 *	Recreate every Elements search index configured in config.php.
+		 */
+		public static function apiCreateSearchIndex( array &$appData, array &$request ): void {
+
+			if( \Nino\Admin\Admin::guard( $appData, $request ) === false )
+				return;
+
+			$result = \Nino\Modules\Search::createIndexes( $appData );
+
+			if( $result['failed'] !== [] ) {
+				\Nino\Http::fail( $request, 500, 'could not create search indexes for '. implode( ', ', $result['failed'] ) );
+				return;
+			}
+
+			\Nino\Http::ok( $request, $result );
 		}
 
 		/**

@@ -58,5 +58,11 @@ if( str_starts_with( $uri, '/_templates' ) === true ) {
     return true;
 }
 
+if( str_starts_with( $uri, '/_theme' ) === true ) {
+    chdir( __DIR__. '/_theme' );
+    require __DIR__. '/_theme/index.php';
+    return true;
+}
+
 require __DIR__. '/index.php';
 return true;

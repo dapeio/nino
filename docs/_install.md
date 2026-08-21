@@ -7,7 +7,7 @@
 This manual explains the decisions and writing processes of the seven steps of `/_install`. If you instead want to take the shortest path from checkout to a configured website, start with [Getting Started](getting-started.md); the later production operation is covered in [Deployment](deployment.md).
 
 **Additional Links:**
-[README](../README.md) · [Concepts](concepts.md) · [Developer Manual](development.md) · [Getting Started](getting-started.md) · [`/_install` Reference](_install.md) · [`/_admin` Operation](_admin.md) · [`/_templates` Operation](_templates.md) · [`/_editor` Operation](_editor.md) · [Deployment](deployment.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
+[README](../README.md) · [Concepts](concepts.md) · [Developer Manual](development.md) · [Getting Started](getting-started.md) · [`/_install` Reference](_install.md) · [`/_admin` Operation](_admin.md) · [`/_templates` Operation](_templates.md) · [`/_editor` Operation](_editor.md) · [`/_theme` Operation](_theme.md) · [Deployment](deployment.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
 
 **Important:** `/_install` creates the first functional project state from a fresh Nino checkout. The assistant is necessary: Before its execution, the actual project directories such as `templates/`, `text/`, `elements/`, and `images/` do not yet exist.
 
@@ -93,9 +93,44 @@ The position of the stylesheet in the bundle is preserved as much as possible so
 
 **Important:** Theme files with the same name are overwritten. Files that only the previous theme brought remain. Therefore, secure your own changes via Git before switching or reapplying the theme. After completion, `/_install` locks itself; a later theme change via the interface is therefore not planned and is carried out as a normal project change via files and Git.
 
-The planned area `/_themes` is independent of this. It is intended to make theme templates graphically editable later but is not yet implemented in the current state and is planned for its first release as Alpha.
+### Header and Footer
 
-## 4. Routes
+The site's `<header>` and `<footer>` are interchangeable units under `_install/library/header/<key>` and `_install/library/footer/<key>`, each a `template.tpl` plus the `style.css` for the markup that template brings. Applying copies them to `templates/theme.header.tpl` / `templates/theme.footer.tpl` and bundles the two stylesheets after the theme's.
+
+The base page templates include the installed copy through `[template /templates/theme.header]` rather than carrying the markup themselves, so a frame can be swapped later by replacing those two files. A theme names the frames it was drawn against; picking a theme pre-selects them, and the two selects override that.
+
+Each select carries the frame rendered beneath it - the real template, against the framework, the design tokens and the picked theme's stylesheet, in the same order the css bundle loads them. A version number tells you nothing about a layout, and unlike a theme a frame has no preview image to open. The preview stands in for what a project does not have yet: a placeholder mark where the logo goes, sample navigation items, and the library's own text for everything else. It is a sandboxed document of its own rather than markup in the page, because a frame's stylesheet styles bare element selectors that would otherwise land on the installer.
+
+## 4. Design
+
+Its own step, because the theme grid already fills a pane and everything here has to be looked at while it is being changed.
+
+The values the theme reads from. `/_theme` generates the `--nino-*` tokens and a theme stylesheet assigns them to roles rather than writing literals.
+
+**Colour** - a primary, an optional secondary, a Contrast step and a Colors step. Every background is generated together with the text colour that belongs on it, measured against the WCAG contrast formula, so a brand colour cannot produce unreadable text. The chips under the controls show the real pairs, not just the backgrounds.
+
+**Size** - Volume (how far the type scale fans out), Spacing (gaps and line height) and Shaping (corner radii). The specimen below them is drawn at the sizes they generate; a list of rem values would be quicker to read and tell you nothing. Every setting's default reproduces `Nino.css`'s own scale, so a project that changes nothing here is not moved.
+
+See [`_theme.md`](_theme.md) for the token names both halves publish.
+
+A theme's manifest declares the design it was drawn with, so picking a theme and pressing Next produces the look its preview promised. The swatch strip under the controls shows the real pairs, not just the backgrounds.
+
+This part of the step is optional: a delivery that ships without `/_theme` installs exactly as before, with the Design block absent.
+
+The order in the css bundle is the whole contract, and each of the three picks owns one slot in it:
+
+```
+_nino/Nino.css              framework defaults
+assets/style.design.css     Design - the generated values
+assets/style.theme.*.css    the theme - which value goes in which role
+assets/style.header.css     the frames - styling for the markup they brought
+assets/style.footer.css
+assets/style.css            the project's own overrides
+```
+
+`/_theme` stays available after the installation, so a project can be recolored without reinstalling. See [`_theme.md`](_theme.md).
+
+## 5. Routes
 
 This step creates the public page structure. The list can be supplemented, edited, deleted, and sorted. With "Continue", the entire visible list is applied as the new state.
 
@@ -117,7 +152,7 @@ A route on the **Blank** template gets its own copy of that template, named afte
 
 Reserved paths such as `/_admin`, `/_editor`, `/_install`, and `/_templates` cannot be used as public pages.
 
-## 5. Personal Information
+## 6. Personal Information
 
 This step records central company and website values as textfills. The values are stored globally and can be edited later via `/_admin` or `/_editor`.
 
@@ -133,7 +168,7 @@ The following keys are typically created:
 
 These textfills are used in templates, meta tags, and possibly in the footer or contact forms.
 
-## 6. Access for `/_editor`
+## 7. Access for `/_editor`
 
 This step creates the first user account for `/_editor`. The account receives full permissions over `/*` and can manage all content, users, and settings.
 
@@ -144,7 +179,7 @@ Provide:
 
 The email address and password can be changed later via `/_editor` or `/_admin`.
 
-## 7. Completion
+## 8. Completion
 
 The last step sets the technical password for `/_admin` and `/_templates` and locks the installer. This password is separate from the editor accounts and should be treated as a technical access with full control.
 
@@ -188,15 +223,38 @@ _install/library/
 │       ├── module.php
 │       └── templates/
 │           └── form.tpl
+├── header/
+│   └── v1/
+│       ├── template.tpl
+│       └── style.css
+├── footer/
+│   └── v1/
+│       ├── template.tpl
+│       └── style.css
 └── themes/
     └── default/
-        ├── manifest.json
-        ├── style.css
-        └── assets/
-            └── logo.svg
+        ├── manifest.php
+        ├── preview.svg
+        ├── assets/
+        │   └── style.theme.default.css
+        └── fonts/
+            └── text/
+                └── regular.woff2
 ```
 
-Each locale directory contains the text and element files for that language. Modules provide their own files and templates. Themes include a `manifest.json` that lists the files to be copied.
+Each locale directory contains the text and element files for that language. Modules provide their own files and templates.
+
+A theme's `manifest.php` lists the files to be copied plus what the look was drawn against:
+
+| Key | Meaning |
+|---|---|
+| `label`, `description`, `preview` | picker only; the preview image is served from the library and never copied |
+| `stylesheet` | where the copied stylesheet ends up, and what gets bundled |
+| `files` | which of the unit's directories are copied into the project |
+| `header`, `footer` | the frame units this theme was drawn against |
+| `design` | the `/_theme` settings it was drawn with: `primary`, `secondary`, `contrast`, `colors` |
+
+A frame unit has no manifest - a `template.tpl` and an optional `style.css` are everything it has to declare.
 
 ## What `/_install` Deliberately Does Not Do
 

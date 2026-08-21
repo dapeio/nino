@@ -1541,15 +1541,17 @@ check( 'a bare [assets] shortcode without argument renders nothing instead of er
 echo "\n";
 
 
-// --- Modules::callModules() - path resolution for a config-listed module --
+// --- Autoloading - project root, override, kernel guard and fallback ------
 
-echo "Modules::callModules() resolves a module class regardless of a leading backslash\n";
+echo "Autoloading resolves project classes separately from the Nino kernel\n";
 
-// __DIR__ inside callModules() is _nino/ (where it's defined), not this
-// test file's own directory - the dummy module has to live where that
-// method will actually look for it
-$dummyModuleRoot = __DIR__. '/../_nino/KernelSmokeDummyModules';
-$dummyModuleDir = $dummyModuleRoot. '/DummyCallModulesFix';
+$projectAppRoot = __DIR__. '/../app';
+$appDummyRoot = $projectAppRoot. '/KernelSmokeDummyModules';
+$legacyDummyRoot = __DIR__. '/../_nino/KernelSmokeDummyModules';
+$projectAppRootExisted = is_dir( $projectAppRoot );
+$projectAppNinoRootExisted = is_dir( $projectAppRoot. '/Nino' );
+
+$dummyModuleDir = $appDummyRoot. '/DummyCallModulesFix';
 mkdir( $dummyModuleDir, 0777, true );
 file_put_contents( $dummyModuleDir. '/DummyCallModulesFix.php', <<<'PHP'
 <?php
@@ -1567,25 +1569,18 @@ PHP
 
 // No leading backslash - config.php can write either form, both name the
 // same class, and PHP normalizes it away before the autoloader ever sees
-// the name (see the spl_autoload_register() call at the bottom of Nino.php)
+// the name (see the spl_autoload_register() call at the bottom of Nino.php).
 $appData['/nino/modules'] = [ 'KernelSmokeDummyModules\DummyCallModulesFix' ];
 \Nino\Modules::callModules( $appData, 'init' );
-check( 'a module class name without a leading backslash still resolves and loads', \KernelSmokeDummyModules\DummyCallModulesFix::$called === true );
+check( 'a configured project module loads from the default app/ root without a leading backslash', \KernelSmokeDummyModules\DummyCallModulesFix::$called === true );
 
 unset( $appData['/nino/modules'] );
 \Nino\Modules::callModules( $appData, 'init' );
 check( 'callModules() does not warn/crash when /nino/modules is entirely unset', true );
 
-// A second dummy, never listed in '/nino/modules' at all - proves a
-// project's own custom module class now autoloads on a direct reference
-// too, not just when routed through callModules() first. Before the
-// spl_autoload_register() switch, only the ten built-in \Nino\Modules\*
-// classes had that property (require_once'd unconditionally by
-// Nino.php); a custom module's class only ever got loaded via
-// callModules()'s own lazy-load branch - a direct call anywhere else,
-// same as every \Nino\Modules\* call in this test file, would have been
-// a fatal "class not found".
-$directDummyDir = $dummyModuleRoot. '/DummyDirectAutoload';
+// A second project class is never listed in '/nino/modules': activation and
+// class existence are independent, so a direct reference has to autoload it.
+$directDummyDir = $appDummyRoot. '/DummyDirectAutoload';
 mkdir( $directDummyDir, 0777, true );
 file_put_contents( $directDummyDir. '/DummyDirectAutoload.php', <<<'PHP'
 <?php
@@ -1600,9 +1595,149 @@ namespace KernelSmokeDummyModules {
 PHP
 );
 
-check( 'a custom module class autoloads on a direct reference, without ever going through callModules()', \KernelSmokeDummyModules\DummyDirectAutoload::ping() === 'pong' );
+check( 'a project class in app/ autoloads on a direct reference without going through callModules()', \KernelSmokeDummyModules\DummyDirectAutoload::ping() === 'pong' );
 
-\Nino\Filesystem::removeDir( $dummyModuleRoot );
+// A project class in app/ wins over a legacy class with the same name in
+// _nino/. This is what makes _nino/ replaceable without losing project code.
+$appPriorityDir = $appDummyRoot. '/PrioritySource';
+$legacyPriorityDir = $legacyDummyRoot. '/PrioritySource';
+mkdir( $appPriorityDir, 0777, true );
+mkdir( $legacyPriorityDir, 0777, true );
+file_put_contents( $appPriorityDir. '/PrioritySource.php', <<<'PHP'
+<?php
+declare(strict_types=1);
+namespace KernelSmokeDummyModules {
+	class PrioritySource {
+		public static function source(): string {
+			return 'app';
+		}
+	}
+}
+PHP
+);
+file_put_contents( $legacyPriorityDir. '/PrioritySource.php', <<<'PHP'
+<?php
+declare(strict_types=1);
+namespace KernelSmokeDummyModules {
+	class PrioritySource {
+		public static function source(): string {
+			return 'legacy';
+		}
+	}
+}
+PHP
+);
+check( 'app/ takes precedence over the _nino/ compatibility fallback for project classes', \KernelSmokeDummyModules\PrioritySource::source() === 'app' );
+
+// Existing projects that still keep custom classes below _nino/ continue to
+// work when no corresponding class exists in the project application root.
+$legacyOnlyDir = $legacyDummyRoot. '/DummyLegacyAutoload';
+mkdir( $legacyOnlyDir, 0777, true );
+file_put_contents( $legacyOnlyDir. '/DummyLegacyAutoload.php', <<<'PHP'
+<?php
+declare(strict_types=1);
+namespace KernelSmokeDummyModules {
+	class DummyLegacyAutoload {
+		public static function ping(): string {
+			return 'legacy';
+		}
+	}
+}
+PHP
+);
+check( 'a project class absent from app/ still autoloads from the legacy _nino/ location', \KernelSmokeDummyModules\DummyLegacyAutoload::ping() === 'legacy' );
+check( 'the autoload class-path allowlist rejects traversal segments', class_exists( 'KernelSmokeDummyModules\..\PrioritySource' ) === false );
+
+// Nino\ is kernel-owned. Even if a project creates the matching app/ path,
+// it must not be able to shadow a class shipped by the kernel.
+$appKernelGuardDir = $projectAppRoot. '/Nino/KernelSmokeAutoloadGuard';
+$kernelGuardDir = __DIR__. '/../_nino/Nino/KernelSmokeAutoloadGuard';
+mkdir( $appKernelGuardDir, 0777, true );
+mkdir( $kernelGuardDir, 0777, true );
+file_put_contents( $appKernelGuardDir. '/KernelSmokeAutoloadGuard.php', <<<'PHP'
+<?php
+declare(strict_types=1);
+namespace Nino {
+	class KernelSmokeAutoloadGuard {
+		public static function source(): string {
+			return 'app';
+		}
+	}
+}
+PHP
+);
+file_put_contents( $kernelGuardDir. '/KernelSmokeAutoloadGuard.php', <<<'PHP'
+<?php
+declare(strict_types=1);
+namespace Nino {
+	class KernelSmokeAutoloadGuard {
+		public static function source(): string {
+			return 'kernel';
+		}
+	}
+}
+PHP
+);
+check( 'the Nino namespace resolves only inside _nino/ and cannot be shadowed from app/', \Nino\KernelSmokeAutoloadGuard::source() === 'kernel' );
+
+// NINO_APP_DIR replaces the default app/ root when it is defined before the
+// kernel is required. The fallback to _nino/ remains available afterwards.
+$overrideAppRoot = $sandbox. '/custom-app';
+$overrideDummyDir = $overrideAppRoot. '/KernelSmokeDummyModules/OverrideSource';
+$defaultOverrideDir = $appDummyRoot. '/OverrideSource';
+$defaultOnlyDir = $appDummyRoot. '/DefaultOnly';
+mkdir( $overrideDummyDir, 0777, true );
+mkdir( $defaultOverrideDir, 0777, true );
+mkdir( $defaultOnlyDir, 0777, true );
+file_put_contents( $overrideDummyDir. '/OverrideSource.php', <<<'PHP'
+<?php
+declare(strict_types=1);
+namespace KernelSmokeDummyModules {
+	class OverrideSource {
+		public static function source(): string {
+			return 'override';
+		}
+	}
+}
+PHP
+);
+file_put_contents( $defaultOverrideDir. '/OverrideSource.php', <<<'PHP'
+<?php
+declare(strict_types=1);
+namespace KernelSmokeDummyModules {
+	class OverrideSource {
+		public static function source(): string {
+			return 'default';
+		}
+	}
+}
+PHP
+);
+file_put_contents( $defaultOnlyDir. '/DefaultOnly.php', <<<'PHP'
+<?php
+declare(strict_types=1);
+namespace KernelSmokeDummyModules {
+	class DefaultOnly {}
+}
+PHP
+);
+
+$overrideResult = runIsolated(
+	'echo \KernelSmokeDummyModules\OverrideSource::source(). "|".
+		( class_exists( "KernelSmokeDummyModules\\DefaultOnly" ) === true ? "loaded" : "missing" ). "|".
+		\KernelSmokeDummyModules\DummyLegacyAutoload::ping();',
+	'define( "NINO_APP_DIR", '. var_export( $overrideAppRoot, true ). ' );'
+);
+check( 'NINO_APP_DIR replaces the default app/ root and is searched before the legacy fallback', trim( $overrideResult['stdout'] ) === 'override|missing|legacy' && $overrideResult['exitCode'] === 0 );
+
+\Nino\Filesystem::removeDir( $appDummyRoot );
+\Nino\Filesystem::removeDir( $legacyDummyRoot );
+\Nino\Filesystem::removeDir( $appKernelGuardDir );
+\Nino\Filesystem::removeDir( $kernelGuardDir );
+if( $projectAppNinoRootExisted === false )
+	@rmdir( $projectAppRoot. '/Nino' );
+if( $projectAppRootExisted === false )
+	@rmdir( $projectAppRoot );
 
 echo "\n";
 
@@ -1622,11 +1757,11 @@ echo "Runtime::handleError() - a NON_FATAL_LEVELS trigger_error() returns instea
 // inside this same process without taking the whole suite down with it, so
 // this spawns a child php process per case and checks what actually
 // survived to run.
-function runIsolated( string $body ): array {
+function runIsolated( string $body, string $beforeRequire = '' ): array {
 	// php -r's code is implicitly already inside a php open/close pair,
 	// unlike a regular script file - a literal '<?php' prefix here is a
 	// syntax error
-	$script = 'require '. var_export( __DIR__. '/../_nino/Nino.php', true ). '; '. $body;
+	$script = $beforeRequire. ' require '. var_export( __DIR__. '/../_nino/Nino.php', true ). '; '. $body;
 	$descriptors = [ 1 => [ 'pipe', 'w' ], 2 => [ 'pipe', 'w' ] ];
 	$process = proc_open( [ PHP_BINARY, '-r', $script ], $descriptors, $pipes );
 	$stdout = stream_get_contents( $pipes[1] );

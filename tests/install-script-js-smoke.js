@@ -79,13 +79,16 @@ check( 'Back cannot move the wizard while a commit is pending', shown === null )
 install._setBusy( false );
 let beforeLeaveCalls = 0;
 install.webpages = { beforeLeave : function() { beforeLeaveCalls++; return false } };
-install._index = 3;
+// Looked up rather than hardcoded: a step inserted ahead of Routes would
+// otherwise turn this into a test of whichever step landed on index 3
+const webpagesIndex = install.STEPS.findIndex( function( step ) { return step.key === 'webpages' } );
+install._index = webpagesIndex;
 install.back();
 check( 'a step can stop Back when its open editor is invalid', beforeLeaveCalls === 1 && shown === null );
 
 install.webpages.beforeLeave = function() { beforeLeaveCalls++; return true };
 install.back();
-check( 'Back advances only after the current step has preserved its local state', beforeLeaveCalls === 2 && shown === 2 );
+check( 'Back advances only after the current step has preserved its local state', beforeLeaveCalls === 2 && shown === webpagesIndex - 1 );
 
 let commitCallback = null;
 install._index = 1;

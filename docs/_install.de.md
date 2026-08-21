@@ -7,7 +7,7 @@
 Dieses Handbuch erklärt die Entscheidungen und Schreibvorgänge der sieben Schritte von `/_install`. Falls du stattdessen auf dem kürzesten Weg vom Checkout zur eingerichteten Webseite gelangen möchtest, beginne mit [Erste Schritte](getting-started.de.md); den späteren produktiven Betrieb behandelt [Deployment](deployment.de.md).
 
 **Weitere Links:**
-[README](../README.de.md) · [Grundkonzepte](concepts.de.md) · [Entwickler-Handbuch](development.de.md) · [Erste Schritte](getting-started.de.md) · [`/_install`-Referenz](_install.de.md) · [`/_admin`-Bedienung](_admin.de.md) · [`/_templates`-Bedienung](_templates.de.md) · [`/_editor`-Bedienung](_editor.de.md) · [Deployment](deployment.de.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
+[README](../README.de.md) · [Grundkonzepte](concepts.de.md) · [Entwickler-Handbuch](development.de.md) · [Erste Schritte](getting-started.de.md) · [`/_install`-Referenz](_install.de.md) · [`/_admin`-Bedienung](_admin.de.md) · [`/_templates`-Bedienung](_templates.de.md) · [`/_editor`-Bedienung](_editor.de.md) · [`/_theme`-Bedienung](_theme.de.md) · [Deployment](deployment.de.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
 
 **Wichtig:** `/_install` erzeugt aus einem frischen Nino-Checkout den ersten lauffähigen Projektstand. Der Assistent ist notwendig: Vor seiner Ausführung existieren die eigentlichen Projektverzeichnisse wie `templates/`, `text/`, `elements/` und `images/` noch nicht.
 
@@ -94,9 +94,44 @@ Die Position des Stylesheets im Bundle bleibt nach Möglichkeit erhalten, damit 
 
 **Wichtig:** Gleichnamige Theme-Dateien werden überschrieben. Dateien, die nur das vorherige Theme mitgebracht hat, bleiben dagegen liegen. Sichere eigene Änderungen deshalb über Git, bevor du das Theme wechselst oder erneut anwendest. Nach dem Abschluss sperrt sich `/_install`; ein späterer Theme-Wechsel über die Oberfläche ist daher nicht vorgesehen und wird als normale Projektänderung über Dateien und Git durchgeführt.
 
-Der geplante Bereich `/_themes` ist davon unabhängig. Er soll Theme-Vorlagen später grafisch bearbeitbar machen, ist im aktuellen Stand aber noch nicht implementiert und für seine erste Veröffentlichung als Alpha vorgesehen.
+### Header und Footer
 
-## 4. Routes
+`<header>` und `<footer>` der Seite sind austauschbare Einheiten unter `_install/library/header/<key>` und `_install/library/footer/<key>` - je eine `template.tpl` und die `style.css` für das Markup, das diese Vorlage mitbringt. Beim Anwenden werden sie nach `templates/theme.header.tpl` bzw. `templates/theme.footer.tpl` kopiert und die beiden Stylesheets hinter dem des Themes gebündelt.
+
+Die Basis-Seitenvorlagen binden die installierte Kopie über `[template /templates/theme.header]` ein, statt das Markup selbst zu tragen - ein Rahmen lässt sich später also durch Austausch dieser zwei Dateien wechseln. Ein Theme benennt die Rahmen, gegen die es gezeichnet wurde; die Theme-Auswahl wählt sie vor, die beiden Auswahlfelder übersteuern das.
+
+Unter jedem Auswahlfeld steht der Rahmen gerendert: die echte Vorlage, gegen Framework, Design-Tokens und das Stylesheet des gewählten Themes, in derselben Reihenfolge, in der das CSS-Bundle sie lädt. Eine Versionsnummer sagt nichts über ein Layout, und anders als ein Theme hat ein Rahmen kein Vorschaubild zum Öffnen. Die Vorschau setzt ein, was das Projekt noch nicht hat: eine Platzhaltermarke an der Logo-Stelle, Beispiel-Navigationspunkte und für alles Übrige die Texte der Library. Sie ist ein eigenes, abgeschottetes Dokument statt Markup in der Seite, weil das Stylesheet eines Rahmens nackte Elementselektoren stylt, die sonst im Installer landen würden.
+
+## 4. Design
+
+Ein eigener Schritt, weil das Theme-Raster bereits eine Pane füllt und hier alles beim Ändern betrachtet werden muss.
+
+Die Werte, aus denen das Theme liest. `/_theme` erzeugt die `--nino-*`-Tokens, ein Theme-Stylesheet weist sie Rollen zu, statt Literale zu schreiben.
+
+**Farbe** — eine Primärfarbe, eine optionale Sekundärfarbe, eine Kontrast- und eine Farbstufe. Jeder Hintergrund entsteht gemeinsam mit der Textfarbe, die darauf gehört, gemessen gegen die WCAG-Kontrastformel — eine Markenfarbe kann also keinen unlesbaren Text erzeugen. Die Chips unter den Reglern zeigen die echten Paare, nicht nur die Hintergründe.
+
+**Größe** — Volume (wie weit die Typo-Skala auffächert), Spacing (Abstände und Zeilenhöhe) und Shaping (Eckenradien). Das Specimen darunter wird in den erzeugten Größen gezeichnet; eine Liste von rem-Werten wäre schneller zu lesen und würde nichts sagen. Der Standardwert jeder Einstellung reproduziert die Skala von `Nino.css`, ein Projekt, das hier nichts ändert, wird also nicht bewegt.
+
+Die Token-Namen beider Hälften stehen in [`_theme.de.md`](_theme.de.md).
+
+Das Manifest eines Themes erklärt das Design, mit dem es gezeichnet wurde - ein Theme wählen und „Weiter" drücken erzeugt also den Look, den die Vorschau versprochen hat. Der Farbstreifen unter den Reglern zeigt die echten Paare, nicht nur die Hintergründe.
+
+Dieser Teil des Schritts ist optional: Eine Auslieferung ohne `/_theme` installiert genau wie zuvor, nur ohne den Design-Block.
+
+Die Reihenfolge im CSS-Bundle ist der ganze Vertrag, und jede der drei Auswahlen besitzt darin genau einen Platz:
+
+```
+_nino/Nino.css              Framework-Standardwerte
+assets/style.design.css     Design - die erzeugten Werte
+assets/style.theme.*.css    das Theme - welcher Wert in welche Rolle
+assets/style.header.css     die Rahmen - Styling für ihr eigenes Markup
+assets/style.footer.css
+assets/style.css            die eigenen Übersteuerungen des Projekts
+```
+
+`/_theme` bleibt nach der Installation verfügbar, sodass ein Projekt ohne Neuinstallation umgefärbt werden kann. Siehe [`_theme.de.md`](_theme.de.md).
+
+## 5. Routes
 
 Dieser Schritt erzeugt die öffentliche Seitenstruktur. Die Liste lässt sich ergänzen, bearbeiten, löschen und sortieren. Mit „Weiter“ wird die gesamte sichtbare Liste als neuer Stand angewendet.
 
@@ -122,7 +157,7 @@ Eine Route mit dem Template **Blank** erhält eine eigene Kopie davon, benannt n
 
 Beim erneuten Anwenden ersetzt die Liste nur die Routen, die aus ihrem vorherigen Stand entstanden sind. Manuell angelegte Routen bleiben erhalten. Entfernte Seiten löschen ihre bereits erzeugten Templates und tieferen Inhalte nicht automatisch.
 
-## 5. Persönliche Angaben
+## 6. Persönliche Angaben
 
 „Personal Infos“ bündelt zentrale Textwerte, die unabhängig von Theme und Modulauswahl benötigt werden. Der Schritt bearbeitet ausschließlich die vorgesehenen Schlüssel unter `/company/*` und `/website/*`.
 
@@ -137,7 +172,7 @@ Land und Beschreibung werden je Sprache gespeichert. Wechsle deshalb jede aktive
 
 Der Schritt zeigt bewusst nicht alle Textfills des Projekts. Technische Schlüssel, Design-Tokens und tiefere Seiten- oder Modulinhalte werden später vollständig über `/_admin` oder innerhalb der vergebenen Rechte in `/_editor` gepflegt.
 
-## 6. Zugänge für `/_editor`
+## 7. Zugänge für `/_editor`
 
 Lege mindestens ein erstes Konto für `/_editor` an. E-Mail-Adresse und Passwort müssen gültig sein; das Passwort benötigt mindestens acht Zeichen.
 
@@ -150,7 +185,7 @@ Die Zuständigkeiten sind bewusst geteilt:
 
 So bleibt die Menge der Konten eine technische Strukturentscheidung, während die laufende Pflege bestehender Nutzer im Editor möglich bleibt.
 
-## 7. Abschluss
+## 8. Abschluss
 
 Der letzte Schritt setzt das echte Passwort für `/_admin` und damit zugleich für `/_templates`. Es muss mindestens acht Zeichen lang sein und ist unabhängig von den Nutzerkonten in `/_editor`.
 
@@ -179,7 +214,8 @@ Die Library bildet die Ausgangsdaten, aus denen `/_install` das Projekt erzeugt:
 |---|---|
 | `base/` | immer angewendete Grundstruktur, beispielsweise Basis-Routen, Templates, Texte und Assets |
 | `modules/<key>/` | wählbare funktionale Ergänzung mit Abhängigkeiten, Routen und Projektdateien |
-| `themes/<key>/` | visueller Ausgangspunkt mit Vorschau, Stylesheet und weiteren Dateien |
+| `themes/<key>/` | visueller Ausgangspunkt mit Vorschau, Stylesheet und weiteren Dateien; benennt über `header`, `footer` und `design` zusätzlich, wogegen er gezeichnet wurde |
+| `header/<key>/`, `footer/<key>/` | austauschbarer Seitenrahmen: eine `template.tpl` und eine optionale `style.css`, sonst nichts - eine `manifest.php` besitzen diese Einheiten als einzige nicht |
 | `pages/<key>/` | Vorlage für eine konkrete Seite mit Route, Template und Ausgangsinhalten |
 
 Jede Einheit besitzt eine `manifest.php`. Das Manifest beschreibt, was der Assistent anzeigen, kopieren und konfigurieren soll. Je nach Einheit enthält es beispielsweise:
