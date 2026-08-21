@@ -114,6 +114,13 @@ final class AreaComposer {
 					throw new \InvalidArgumentException( $template. ' must contain [[area:'. $areaKey. ']] exactly once' );
 			if( preg_match_all( '/\[\[area:([a-z][a-z0-9-]*)\]\]/', $source, $matches ) !== count( $areas ) || array_diff( $matches[1], array_keys( $areas ) ) !== [] )
 				throw new \InvalidArgumentException( $template. ' contains undeclared or duplicate area tokens' );
+			// [[section:collection:<area>]] compiles to the collection slug that
+			// Area is actually bound to. A typo would otherwise ship as literal
+			// text into the page and quietly query a collection nobody has.
+			preg_match_all( '/\[\[section:collection:([^\]]*)\]\]/', $source, $collectionTokens );
+			foreach( $collectionTokens[1] as $collectionArea )
+				if( ( $areas[$collectionArea]['source'] ?? '' ) !== 'elements' )
+					throw new \InvalidArgumentException( $template. ' references the collection of \''. $collectionArea. '\', which is not an Elements area of this preset' );
 			$layouts[$layoutKey] = [
 				'label' => trim( (string) ( $definition['label'] ?? '' ) ) ?: ucwords( str_replace( '-', ' ', $layoutKey ) ),
 				'frame' => self::normalizeFrameRecommendation( $definition['frame'] ?? [] ),
@@ -246,7 +253,13 @@ final class AreaComposer {
 		$model = Library::normalizeModel( $definition['model'] ?? [] );
 		if( $source === 'elements' && $model === [] )
 			throw new \InvalidArgumentException( 'elements area '. $key. ' requires a model' );
-		$render = self::renderDefinitions( $definition['render'] ?? [], $allowed );
+		// Rich fields are sanitized for element CONTENT, not for an attribute -
+		// sanitizeHtml() leaves '"' alone, so one of them substituted into a
+		// data-* value would close the attribute and hand editor content a live
+		// event handler. Collected here so every data map in this Area can
+		// refuse to reference one.
+		$htmlFields = array_keys( array_filter( $model, static fn( array $field ): bool => ( $field['html'] ?? false ) === true ) );
+		$render = self::renderDefinitions( $definition['render'] ?? [], $allowed, $htmlFields );
 		$components = [];
 		$seen = [];
 		foreach( (array) ( $definition['recommend']['components'] ?? [] ) as $node ) {
@@ -265,8 +278,8 @@ final class AreaComposer {
 			'maxComponents' => max( 1, min( 20, (int) ( $definition['maxComponents'] ?? 12 ) ) ),
 			'styles' => $styles,
 			'recommend' => [ 'style' => $recommendedStyle, 'components' => $components ],
-			'container' => self::element( $definition['container'] ?? [], 'div', $source === 'single' ? 'nino-grid-100' : '' ),
-			'item' => self::element( $definition['item'] ?? [], 'article', 'nino-grid-m-33' ),
+			'container' => self::element( $definition['container'] ?? [], 'div', $source === 'single' ? 'nino-grid-100' : '', $htmlFields ),
+			'item' => self::element( $definition['item'] ?? [], 'article', 'nino-grid-m-33', $htmlFields ),
 			'render' => $render,
 			'model' => $model,
 			'typeTitle' => trim( (string) ( $definition['typeTitle'] ?? '' ) ) ?: ucwords( str_replace( '-', ' ', $key ) ),
@@ -447,6 +460,14 @@ final class AreaComposer {
 		$replace = [ '[[section:id]]' => self::escape( $spec['id'] ) ];
 		$titleId = '';
 		$body = $preset['_layouts'][$effective['layout']];
+		// A static block that loops beside an Elements Area has to name the same
+		// collection it does - and that name is only known here, because a new
+		// Area mints '<page>-<section>-<area>' and Edit Section can later rebind
+		// it to something else entirely. Hard-coding a slug in the .tpl would be
+		// wrong on the very first insert.
+		foreach( $preset['areas'] as $areaKey => $area )
+			if( $area['source'] === 'elements' )
+				$replace['[[section:collection:'. $areaKey. ']]'] = self::escape( $spec['areas'][$areaKey]['source']['elementType'] );
 		foreach( $preset['areas'] as $areaKey => $area ) {
 			$rendered = self::renderArea( $spec, $areaKey, $area, $effective['areas'][$areaKey], $fieldMap, $imageMap, $titleId );
 			// An Area nobody filled leaves its whole line rather than an empty
@@ -457,7 +478,7 @@ final class AreaComposer {
 			$replace['[[area:'. $areaKey. ']]'] = $rendered;
 		}
 		$body = strtr( $body, $replace );
-		if( preg_match( '/\[\[(?:area:[^\]]+|section:id)\]\]/', $body ) === 1 )
+		if( preg_match( '/\[\[(?:area:[^\]]+|section:id|section:collection:[^\]]+)\]\]/', $body ) === 1 )
 			throw new \InvalidArgumentException( 'layout contains an unresolved compile token' );
 
 		$rowClasses = [ 'nino-grid-row' ];
@@ -549,7 +570,7 @@ final class AreaComposer {
 		};
 	}
 
-	private static function renderDefinitions( mixed $overrides, array $allowed ): array {
+	private static function renderDefinitions( mixed $overrides, array $allowed, array $htmlFields = [] ): array {
 		$catalog = self::catalog();
 		$overrides = is_array( $overrides ) ? $overrides : [];
 		if( array_diff( array_keys( $overrides ), $allowed ) !== [] )
@@ -563,7 +584,7 @@ final class AreaComposer {
 			if( isset( $override['class'] ) )
 				$definition['class'] = self::classes( (string) $override['class'] );
 			if( isset( $override['data'] ) )
-				$definition['data'] = self::dataAttributes( $override['data'] );
+				$definition['data'] = self::dataAttributes( $override['data'], [], $htmlFields );
 			if( isset( $override['styles'] ) ) {
 				$styles = [];
 				foreach( (array) $override['styles'] as $style => $class ) {
@@ -625,12 +646,12 @@ final class AreaComposer {
 		return [ 'label' => $label, 'kind' => $control, 'control' => $control === 'image' ? 'image' : $control, 'fieldType' => $fieldType, 'default' => $default, 'width' => $width, 'height' => $height ];
 	}
 
-	private static function element( mixed $definition, string $tag, string $class ): array {
+	private static function element( mixed $definition, string $tag, string $class, array $htmlFields = [] ): array {
 		$definition = is_array( $definition ) ? $definition : [];
 		return [
 			'tag' => self::tag( (string) ( $definition['tag'] ?? $tag ) ),
 			'class' => self::classes( (string) ( $definition['class'] ?? $class ) ),
-			'data' => self::dataAttributes( $definition['data'] ?? [] ),
+			'data' => self::dataAttributes( $definition['data'] ?? [], [], $htmlFields ),
 		];
 	}
 
@@ -912,7 +933,7 @@ final class AreaComposer {
 	 * HTML+ decision. Names are the attribute without its data- prefix (the
 	 * written prefix is accepted and dropped) and values are bounded literals.
 	 */
-	private static function dataAttributes( mixed $data, array $reserved = [] ): array {
+	private static function dataAttributes( mixed $data, array $reserved = [], array $htmlFields = [] ): array {
 		if( is_array( $data ) === false || $data === [] )
 			return [];
 		$result = [];
@@ -929,6 +950,13 @@ final class AreaComposer {
 			$value = is_bool( $value ) ? ( $value ? 'true' : 'false' ) : (string) $value;
 			if( strlen( $value ) > self::MAX_DATA_LENGTH || preg_match( '/[\x00-\x1F\x7F]/', $value ) === 1 )
 				throw new \InvalidArgumentException( 'data-'. $name. ' has an unsupported value in area manifest' );
+			// A '[[field]]' here is resolved per record by the [elements] pass at
+			// request time, which escapes an ordinary field for the attribute but
+			// runs a rich one through sanitizeHtml() instead - and that leaves
+			// '"' intact, so the value would break out of the attribute.
+			foreach( $htmlFields as $htmlField )
+				if( str_contains( $value, '[['. $htmlField. ']]' ) )
+					throw new \InvalidArgumentException( 'data-'. $name. ' cannot carry the rich text field '. $htmlField. ': its value is sanitized for content, not for an attribute' );
 			$result['data-'. $name] = $value;
 		}
 		return $result;

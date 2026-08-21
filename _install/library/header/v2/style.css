@@ -1,0 +1,77 @@
+.nino-frame-header .nino-frame-header-shell {
+	padding: var(--space-1) 0;
+	opacity: 1;
+	background-color: var(--color-background);
+	border-bottom: 1px solid var(--color-border);
+}
+
+body.nino-scroll-atf .nino-frame-header .nino-frame-header-shell {
+	background-color: var(--color-background);
+}
+
+.nino-frame-header .nino-frame-header-inner {
+	flex-direction: column;
+	justify-content: center;
+	gap: var(--space-1);
+}
+
+.nino-frame-header .nino-logo {
+	width: clamp(8rem, 12vw, 11rem);
+	height: auto;
+	min-width: 0;
+	min-height: 0;
+	margin: 0 auto;
+	background-image: none;
+}
+
+.nino-frame-header .nino-frame-header-nav,
+.nino-frame-header .nino-nav-wrap {
+	width: 100%;
+}
+
+.nino-frame-header .nino-nav-burger > label > svg {
+	fill: var(--color-title);
+}
+
+body main {
+	padding-top: clamp(7rem, calc(var(--space-6) + var(--space-2)), 10rem);
+}
+
+body main:has(> .nino-cover:first-child),
+body main:has(> .nino-parallex:first-child) {
+	padding-top: 0;
+}
+
+@media (min-width: 768px) {
+	.nino-frame-header .nino-nav-content ul {
+		justify-content: center;
+		gap: var(--space-3);
+	}
+
+	.nino-frame-header .nino-nav-content li a {
+		padding: .25rem .2rem;
+		font-size: .82rem;
+		letter-spacing: .14em;
+		text-transform: uppercase;
+	}
+
+	.nino-frame-header .nino-nav-content li a.nino-is-active {
+		color: var(--color-primary);
+	}
+}
+
+@media (max-width: 767px) {
+	.nino-frame-header .nino-frame-header-inner {
+		flex-direction: row;
+		justify-content: space-between;
+	}
+
+	.nino-frame-header .nino-logo {
+		margin: 0;
+	}
+
+	.nino-frame-header .nino-frame-header-nav,
+	.nino-frame-header .nino-nav-wrap {
+		width: auto;
+	}
+}

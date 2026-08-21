@@ -1,0 +1,75 @@
+.nino-frame-header {
+	padding: var(--space-1) var(--space-1) 0;
+}
+
+.nino-frame-header .nino-scroll-header {
+	width: min(calc(100% - (var(--space-1) * 2)), 92rem);
+	min-height: 4.5rem;
+	padding-top: .45rem;
+	padding-bottom: .45rem;
+	opacity: 1;
+	background-color: color-mix(in srgb, var(--color-background) 88%, transparent);
+	border: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent);
+	border-radius: max(var(--radius), 1rem);
+	box-shadow: 0 .75rem 2.5rem rgb(0 0 0 / 10%);
+}
+
+body.nino-scroll-atf .nino-frame-header .nino-scroll-header {
+	background-color: color-mix(in srgb, var(--color-background) 78%, transparent);
+}
+
+.nino-frame-header .nino-logo {
+	width: clamp(7rem, 9vw, 9rem);
+	height: auto;
+	min-width: 0;
+	min-height: 0;
+	margin: 0;
+	background-image: none;
+}
+
+.nino-frame-header .nino-frame-header-nav {
+	margin-left: auto;
+}
+
+.nino-frame-header .nino-nav-burger > label > svg {
+	fill: var(--color-title);
+}
+
+body main {
+	padding-top: clamp(6rem, calc(var(--space-6) + var(--space-1)), 9rem);
+}
+
+body main:has(> .nino-cover:first-child),
+body main:has(> .nino-parallex:first-child) {
+	padding-top: 0;
+}
+
+@media (min-width: 768px) {
+	.nino-frame-header .nino-nav-content ul {
+		gap: .35rem;
+	}
+
+	.nino-frame-header .nino-nav-content li a {
+		padding: .55rem .8rem;
+		border-radius: 999px;
+		font-size: .88rem;
+	}
+
+	.nino-frame-header .nino-nav-content li a:hover,
+	.nino-frame-header .nino-nav-content li a:focus,
+	.nino-frame-header .nino-nav-content li a.nino-is-active {
+		color: var(--color-primary-text);
+		background-color: var(--color-primary);
+	}
+}
+
+@media (max-width: 639px) {
+	.nino-frame-header {
+		padding-right: 0;
+		padding-left: 0;
+	}
+
+	.nino-frame-header .nino-scroll-header {
+		width: calc(100% - (var(--space-1) * 2));
+	}
+}

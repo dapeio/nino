@@ -1868,6 +1868,52 @@ namespace Nino {
 			return false;
 		}
 
+		// Get the distinct values of one model field across a type's elements,
+		// each with how many currently matching elements carry it. Built on
+		// queryElements() - same locale resolution and query matching, no
+		// second bucket-merge path that could drift from it over time.
+		static public function queryElementValues( array &$appData, string $typeUri, string $key, array $query = [], string $locale = '', mixed $return = [] ): mixed {
+
+			$model = self::getElementModel( $appData, $typeUri );
+			if( isset( $model[$key] ) === false )
+				return $return;
+
+			$hits = self::queryElements( $appData, $typeUri, $query, $locale, [] );
+
+			$counts = [];
+			foreach( $hits as $element ) {
+				$value = $element[$key] ?? null;
+				if( is_scalar( $value ) === false || (string) $value === '' )
+					continue;
+				$value = (string) $value;
+				$counts[$value] = ( $counts[$value] ?? 0 ) + 1;
+			}
+
+			// Declared options first, in model order - even with count 0, so a
+			// project-wide "these are the categories" list can decide the shown
+			// set instead of just whatever currently has a matching element.
+			$options = $model[$key]['options'] ?? null;
+			$declared = is_array( $options ) && array_is_list( $options ) ? $options : [];
+
+			$result = [];
+			foreach( $declared as $value ) {
+				$value = (string) $value;
+				$result[$value] = [ 'value' => $value, 'count' => $counts[$value] ?? 0 ];
+				unset( $counts[$value] );
+			}
+
+			// Then any observed value that isn't a declared option (a free field).
+			// The (string) cast is not redundant: php silently turns an
+			// integer-like array key back into an int, so a numeric field value
+			// ('2024' on a portfolio filtered by year) would otherwise leave here
+			// as int and break every caller that expects the documented string -
+			// starting with the shortcode's own strnatcasecmp() sort.
+			foreach( $counts as $value => $count )
+				$result[(string) $value] = [ 'value' => (string) $value, 'count' => $count ];
+
+			return $result === [] ? $return : array_values( $result );
+		}
+
 		// Update an element
 		static public function updateElement( array &$appData, string $uri, array $data, string $locale = '' ): mixed {
 

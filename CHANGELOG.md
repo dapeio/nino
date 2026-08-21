@@ -392,6 +392,55 @@ All notable changes to Nino are documented in this file.
   composer has no data-* control, a `data` key smuggled into posted section
   metadata is ignored, and anything past a configured attribute is still an
   HTML+ decision rather than a second Advanced panel.
+- `Elements::queryElementValues()` and its shortcode `[elementvalues]`, the
+  companion to `[elements]`: where `[elements]` loops records, this loops the
+  *distinct values* one model field takes across a type - a filter's button
+  row (one button per category, not per service) needed exactly that, and
+  nothing before could enumerate it, only filter by an already-known value. A
+  field with declared `options` returns them in model order, each with how
+  many current elements carry it, including a count of `0`; a field without
+  `options` falls back to the values actually observed. `query` and `locale`
+  scope the count like `[elements]`; `sort` picks `value` (alphabetical,
+  default), `count` (most-used first) or `declared`; a `count: 0` value is
+  hidden unless `includeEmpty="1"` is set - a filter button that matches
+  nothing is not a useful default. `[[.value]]`, `[[.count]]` and `[[.id]]`
+  are the local fills.
+
+  It turns out the piece needed to mark each *card* with its own field value
+  for that same filter to match against already worked with no kernel change
+  at all: an Elements Area's `item`/`render.<type>` `data` map (see above)
+  only escapes its value for the attribute, it does not require
+  `[[section:id]]` specifically - a `[[fieldname]]` written there survives
+  compiling as plain text and is substituted per record by the ordinary
+  `[elements]` render pass at request time, same as `[[title]]` in the same
+  item. That was true the day the `data` map shipped; it was just never
+  exercised, documented or tested until now (AGENTS.md §10.3).
+- `nino-filter` in `Nino.ui.js`, a client-side category filter: a
+  `.nino-filter` root holds a row of `.nino-filter-btn` toggle buttons and a
+  set of `.nino-filter-item` cards, and a click compares the clicked button's
+  `data-filter-value` (empty means "show everything") against each card's
+  `data-filter-item`, toggling the plain `hidden` attribute - no counting or
+  animation, and no initial-state normalizing on load the way `nino-tabs`
+  does for its panels, since a filter's markup already decides its own
+  starting state. The active button carries `nino-is-active`, the same state
+  class the rest of the design system uses. Buttons are ordinary
+  `<button aria-pressed>`, not a tablist/panel pair, so Tab/Enter/Space
+  already work with no roving-tabindex logic to add.
+- `filterable-grid`, a Section Library preset combining the three points
+  above into a working Services/Portfolio grid with a category filter: an
+  ordinary composer-editable Elements Area for the cards (`category` gets a
+  starter `options` list, its `item` carries `data-filter-item="[[category]]"`)
+  next to a hand-written static block (`§10.3a`) pairing the "All" button
+  with an `[elementvalues /… key="category"]` loop.
+- `[[section:collection:<areaKey>]]`, a Layout compile token resolving to the
+  collection slug an Elements Area is actually bound to. A static block that
+  loops beside a managed Area needs to name the same collection it does, and
+  that name is not knowable when the `.tpl` is written: a new Area is minted
+  `<page>-<section>-<area>` at insert time, and Edit Section can rebind it
+  afterwards. A literal slug is therefore wrong on the very first insert, not
+  just after a later rename. The token names a declared Elements Area of the
+  same preset; anything else is refused when the manifest loads, rather than
+  shipping as text that queries a collection nobody has.
 
 ### Changed
 

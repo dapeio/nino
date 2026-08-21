@@ -255,6 +255,59 @@ check( 'queryElements( locale: * ) finds elements that only exist under a locale
 check( 'queryElements( locale: * ) with a query matches across every locale, not just "*"\'s (empty) data', count( \Nino\Elements::queryElements( $appData, '/wildcardtest', [ 'title' => 'One' ], '*', [] ) ) === 1 );
 check( 'queryElements( locale: de_DE ) is unaffected - still only searches that one locale', count( \Nino\Elements::queryElements( $appData, '/wildcardtest', [ 'title' => 'One' ], 'de_DE', [] ) ) === 0 );
 
+// --- Elements::queryElementValues() - distinct values of one model key ---
+
+\Nino\Elements::insertElementType( $appData, '/valuetest', [
+	'title'		=> [ 'type' => 'string' ],
+	'category'	=> [ 'type' => 'string', 'options' => [ 'Consulting', 'Design', 'Development' ] ],
+	'tag'			=> [ 'type' => 'string' ], // no options - a free field
+] );
+\Nino\Elements::insertElement( $appData, '/valuetest/a', [ 'title' => 'A', 'category' => 'Design', 'tag' => 'red' ], '*' );
+\Nino\Elements::insertElement( $appData, '/valuetest/b', [ 'title' => 'B', 'category' => 'Design', 'tag' => 'blue' ], '*' );
+\Nino\Elements::insertElement( $appData, '/valuetest/c', [ 'title' => 'C', 'category' => 'Consulting', 'tag' => 'red' ], '*' );
+
+$categoryValues = \Nino\Elements::queryElementValues( $appData, '/valuetest', 'category', [], '*', [] );
+check( 'queryElementValues returns declared options in model order', array_column( $categoryValues, 'value' ) === [ 'Consulting', 'Design', 'Development' ] );
+check( 'queryElementValues counts matching elements per declared value, including a count of 0', array_column( $categoryValues, 'count' ) === [ 1, 2, 0 ] );
+
+$tagValues = \Nino\Elements::queryElementValues( $appData, '/valuetest', 'tag', [], '*', [] );
+check( 'queryElementValues falls back to observed values for a field without options', array_column( $tagValues, 'value' ) === [ 'red', 'blue' ] );
+check( '...with counts of how often each was actually used', array_column( $tagValues, 'count' ) === [ 2, 1 ] );
+
+$redOnly = \Nino\Elements::queryElementValues( $appData, '/valuetest', 'category', [ 'tag' => 'red' ], '*', [] );
+check( 'queryElementValues scopes its counts to the given query, exactly like queryElements()', array_column( $redOnly, 'count' ) === [ 1, 1, 0 ] );
+
+check( 'queryElementValues returns the given default for an unknown key', \Nino\Elements::queryElementValues( $appData, '/valuetest', 'nope', [], '*', 'fallback' ) === 'fallback' );
+check( 'queryElementValues returns the given default for an unknown type', \Nino\Elements::queryElementValues( $appData, '/no-such-type', 'category', [], '*', 'fallback' ) === 'fallback' );
+
+\Nino\Elements::insertElementType( $appData, '/emptyvaluetest', [ 'category' => [ 'type' => 'string', 'options' => [ 'X', 'Y' ] ] ] );
+check( 'queryElementValues returns every declared option at count 0 when no element exists yet',
+	\Nino\Elements::queryElementValues( $appData, '/emptyvaluetest', 'category', [], '*', [] ) === [ [ 'value' => 'X', 'count' => 0 ], [ 'value' => 'Y', 'count' => 0 ] ] );
+
+\Nino\Elements::insertElementType( $appData, '/novaluetest', [ 'free' => [ 'type' => 'string' ] ] );
+check( 'queryElementValues returns the given default when a field has neither options nor any elements yet',
+	\Nino\Elements::queryElementValues( $appData, '/novaluetest', 'free', [], '*', 'fallback' ) === 'fallback' );
+
+// Regression: an observed value is collected as an array key, and php turns an
+// integer-like key back into an int on the way out. A portfolio filtered by
+// year ('2024') therefore used to leave here as int, which broke the
+// documented [ 'value' => string ] shape and made the shortcode's own
+// strnatcasecmp() sort fatal under strict_types - a 500 for the whole page
+\Nino\Elements::insertElementType( $appData, '/numericvaluetest', [
+	'year'	=> [ 'type' => 'string' ],
+	'count'	=> [ 'type' => 'integer' ],
+] );
+\Nino\Elements::insertElement( $appData, '/numericvaluetest/a', [ 'year' => '2024', 'count' => 7 ], '*' );
+\Nino\Elements::insertElement( $appData, '/numericvaluetest/b', [ 'year' => '2025', 'count' => 7 ], '*' );
+\Nino\Elements::insertElement( $appData, '/numericvaluetest/c', [ 'year' => '2024', 'count' => 3 ], '*' );
+
+$yearValues = \Nino\Elements::queryElementValues( $appData, '/numericvaluetest', 'year', [], '*', [] );
+check( 'queryElementValues keeps a numeric observed value a string, not an int array key',
+	array_column( $yearValues, 'value' ) === [ '2024', '2025' ] );
+check( '...and still counts it correctly', array_column( $yearValues, 'count' ) === [ 2, 1 ] );
+check( 'the same holds for a genuinely numeric field type',
+	array_column( \Nino\Elements::queryElementValues( $appData, '/numericvaluetest', 'count', [], '*', [] ), 'value' ) === [ '7', '3' ] );
+
 // Regression: deleteElement( ..., '*' ) used to crash with "Cannot unset
 // string offsets" - like queryElements above, it iterated every top-level
 // key of $typeData excluding only 'model', tripping over the type's own
@@ -505,6 +558,56 @@ $appData['/nino/html/images']['logo'] = [ 'label' => 'Logo', 'width' => 400, 'he
 check( '[image] shortcode renders an <img> tag under the public prefix', str_contains( \Nino\Html::renderHtml( $appData, '[image hero]' ), '<img src="/public/images/hero.1600x600.jpg" width="1600" height="600"' ) === true );
 check( '[image] shortcode renders nothing for a slot with no file uploaded yet', \Nino\Html::renderHtml( $appData, '[image logo]' ) === '' );
 check( '[image] shortcode renders nothing for an unknown slot', \Nino\Html::renderHtml( $appData, '[image nope]' ) === '' );
+
+echo "\n";
+
+
+// --- [elementvalues] - the companion shortcode to [elements], looping one
+// model key's distinct values instead of records -------------------------
+
+\Nino\Modules\Elements::init( $appData );
+
+$categoryButtons = \Nino\Html::renderHtml( $appData, '[elementvalues /valuetest key="category" sort="value"]<b>[[.id]]:[[.value]]([[.count]])</b>[/elementvalues]' );
+check( '[elementvalues] renders one iteration per value, hiding a 0-count option by default',
+	$categoryButtons === '<b>0:Consulting(1)</b><b>1:Design(2)</b>' );
+
+$withEmpty = \Nino\Html::renderHtml( $appData, '[elementvalues /valuetest key="category" sort="value" includeEmpty="1"]<b>[[.value]]</b>[/elementvalues]' );
+check( '[elementvalues includeEmpty="1"] also renders a declared option with no matching element',
+	$withEmpty === '<b>Consulting</b><b>Design</b><b>Development</b>' );
+
+$byCount = \Nino\Html::renderHtml( $appData, '[elementvalues /valuetest key="category" sort="count"]<b>[[.value]]</b>[/elementvalues]' );
+check( '[elementvalues sort="count"] orders the most-used value first', $byCount === '<b>Design</b><b>Consulting</b>' );
+
+$declaredOrder = \Nino\Html::renderHtml( $appData, '[elementvalues /valuetest key="category" sort="declared" includeEmpty="1"]<b>[[.value]]</b>[/elementvalues]' );
+check( '[elementvalues sort="declared"] keeps the model\'s own option order', $declaredOrder === '<b>Consulting</b><b>Design</b><b>Development</b>' );
+
+check( '[elementvalues] respects "query", scoping counts like [elements] does',
+	\Nino\Html::renderHtml( $appData, '[elementvalues /valuetest key="category" query="tag=red" sort="value"]<b>[[.value]]([[.count]])</b>[/elementvalues]' )
+	=== '<b>Consulting(1)</b><b>Design(1)</b>' );
+
+check( '[elementvalues] respects "limit"',
+	\Nino\Html::renderHtml( $appData, '[elementvalues /valuetest key="category" sort="value" limit="1"]<b>[[.value]]</b>[/elementvalues]' ) === '<b>Consulting</b>' );
+
+check( '[elementvalues] renders nothing without a "key" argument', \Nino\Html::renderHtml( $appData, '[elementvalues /valuetest]<b>[[.value]]</b>[/elementvalues]' ) === '' );
+check( '[elementvalues] renders nothing for an unknown type', \Nino\Html::renderHtml( $appData, '[elementvalues /no-such-type key="category"]<b>[[.value]]</b>[/elementvalues]' ) === '' );
+
+// A value is editor/import content, not developer-authored markup - it must
+// survive the same escaping [[title]] etc. already get inside [elements]
+\Nino\Elements::insertElementType( $appData, '/unsafevaluetest', [ 'label' => [ 'type' => 'string', 'options' => [ '<b>hi</b> & [[bye]]' ] ] ] );
+\Nino\Elements::insertElement( $appData, '/unsafevaluetest/a', [ 'label' => '<b>hi</b> & [[bye]]' ], '*' );
+check( '[elementvalues] escapes an unsafe value the same way [elements] escapes a field',
+	\Nino\Html::renderHtml( $appData, '[elementvalues /unsafevaluetest key="label"]<b>[[.value]]</b>[/elementvalues]' )
+	=== '<b>&lt;b&gt;hi&lt;/b&gt; &amp; &#91;&#91;bye]]</b>' );
+
+// Regression: the default sort compares values with strnatcasecmp(), which is
+// fatal under strict_types the moment a value arrives as an int - see the
+// numeric-value checks against queryElementValues() above. A portfolio
+// filtered by year is exactly this, and the error handler turns the TypeError
+// into a 500 for the whole page rather than an empty section
+check( '[elementvalues] sorts numeric values without a fatal, on every sort mode',
+	\Nino\Html::renderHtml( $appData, '[elementvalues /numericvaluetest key="year" sort="value"]<b>[[.value]]</b>[/elementvalues]' ) === '<b>2024</b><b>2025</b>'
+	&& \Nino\Html::renderHtml( $appData, '[elementvalues /numericvaluetest key="year" sort="count"]<b>[[.value]]([[.count]])</b>[/elementvalues]' ) === '<b>2024(2)</b><b>2025(1)</b>'
+	&& \Nino\Html::renderHtml( $appData, '[elementvalues /numericvaluetest key="year" sort="declared"]<b>[[.value]]</b>[/elementvalues]' ) === '<b>2024</b><b>2025</b>' );
 
 echo "\n";
 

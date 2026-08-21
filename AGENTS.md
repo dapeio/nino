@@ -1680,6 +1680,26 @@ when the same preset is inserted twice. `data-cover-height` belongs to the frame
 is rejected. A `template` component compiles to a shortcode and therefore
 carries no attributes at all.
 
+`item.data` and `render.<type>.data` on an Elements Area MAY also carry a
+per-record model field as `[[fieldname]]`. Compiling only escapes the literal
+value for the attribute context; it does not resolve `[[fieldname]]`, because
+that is not a compile-time token - the `item` markup this map attaches to sits
+inside the compiled `[elements ...]...[/elements]` block, so the field is
+substituted per record by the ordinary `[elements]` render pass at request
+time, exactly like `[[title]]` inside the same item. This is how a card can
+carry its own field value in a `data-*` attribute (a client-side filter
+matching a card's category against a clicked button, say) with no runtime
+change at all.
+
+Two limits apply, and neither is the 240-character rule above: that one
+measures the compile-time literal (`[[category]]`, twelve characters), never
+the value substituted into it, so a 2000-character `description` in a `data-*`
+map compiles happily and ships in full on every card. Keep such a binding to a
+field that is genuinely short. The second is enforced: the field MUST NOT be
+`'html' => true`. A rich value is sanitized for element *content*, which leaves
+`"` intact - inside an attribute it would close it and turn editor content into
+a live event handler - so the compiler rejects a data value referencing one.
+
 Attach the map to the element that really carries the class. The `<section>` is
 the element with `nino-cover`/`nino-parallex`, so `data-cover-width` belongs in a
 top-level or Layout map. `nino-vpa` is written onto the generated `nino-grid-row`,
@@ -1715,6 +1735,14 @@ empty, so the second variant is safe to insert before the collection is there.
 `[[section:id]]` is resolved inside the block. Use it for every identifier that
 must stay unique when the preset is inserted twice on one page - a `details`
 group `name`, a form field `id` and its `for`, a modal target.
+
+`[[section:collection:<areaKey>]]` is resolved there too, and compiles to the
+collection slug that Elements Area is bound to. A static block that loops
+beside a managed Area - a filter's `[elementvalues]` button row next to the
+`[elements]` cards it filters - MUST use it rather than a literal slug: a new
+Area is named `<page>-<section>-<area>` at insert time and can be rebound
+afterwards, so a hand-written slug is wrong immediately and stays wrong. The
+key must name a declared Elements Area of the same preset.
 
 A static preset MUST NOT ship `style=""` attributes; give the block a `nino-*`
 class and put the rule next to the other preset classes in `_nino/Nino.css`.
@@ -2522,6 +2550,54 @@ lowercase hyphenated IDs.
 
 Do not use absolute `[[/page-*]]` fills for per-record data. Do not use local
 `[[title]]` outside an Element block.
+
+### 12.4a Render one field's distinct values
+
+`[elements]` loops records. Nothing loops the *values* a field takes across a
+type's elements - which a client-side category filter's button row needs
+(one button per distinct `category`, not per record). `[elementvalues]`
+answers that, built on `\Nino\Elements::queryElementValues()`:
+
+```html
+[elementvalues /services key="category" sort="value"]
+<button type="button" class="nino-filter-btn" data-filter-value="[[.value]]">
+	[[.value]] <span class="nino-filter-count">([[.count]])</span>
+</button>
+[/elementvalues]
+```
+
+- `key` (required) is the model field to enumerate; a missing field or type
+  renders nothing.
+- The value set is a hybrid: a field with declared `options` (§12.1) returns
+  them in model order, each with how many current elements carry it,
+  including a count of `0`; a field without `options` falls back to the
+  values actually observed, still with counts. Either way `query` and
+  `locale` scope the counted collection exactly like `[elements]`.
+- A `count: 0` value is hidden by default - a filter button that matches
+  nothing is not a useful default. Pass `includeEmpty="1"` to show it anyway.
+- `sort` is `value` (alphabetical, the default), `count` (most-used first),
+  or `declared` (the order `queryElementValues()` itself returns: declared
+  options, then any other observed value).
+- `limit` and `callback` behave like `[elements]`.
+- `[[.value]]` and `[[.count]]` are the only local fills, plus `[[.id]]` as
+  the 0-based iteration index. `[[.value]]` is escaped the same way a normal
+  Element field is.
+
+`[elementvalues]` and the `[elements]` loop it filters MUST read the same
+collection, or the buttons match nothing. Inside a Section Library preset do
+not write that slug by hand: a Layout MAY use the compile token
+`[[section:collection:<areaKey>]]`, which resolves to the collection the named
+Elements Area is actually bound to - the auto-generated
+`<page>-<section>-<area>` of a new Area as readily as a type picked under Edit
+Section → Data, so the pair stays correct on the very first insert and after
+any later rebind. The token names a declared Elements Area of the same preset;
+anything else is refused at manifest load. `_templates/library/
+filterable-grid/` is a complete worked example: a static block (§10.3a) pairs
+`[elementvalues]` with an Elements Area whose `item.data` stamps each card
+with its own field value per §10.3.
+
+Outside a preset - an ordinary hand-written page template - there is no such
+token and no Area to follow, so both loops simply name the same collection.
 
 ### 12.5 Element changes and translations
 

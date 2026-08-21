@@ -1,0 +1,104 @@
+.nino-frame-header .nino-frame-header-strip {
+	opacity: 1;
+	background-color: var(--color-section-black-bg);
+	border-bottom: 3px solid var(--color-primary);
+}
+
+body.nino-scroll-atf .nino-frame-header .nino-frame-header-strip {
+	background-color: var(--color-section-black-bg);
+}
+
+.nino-frame-header .nino-frame-header-inner {
+	display: grid;
+	grid-template-columns: minmax(9rem, 24rem) minmax(0, 1fr);
+	align-items: stretch;
+	padding: 0;
+}
+
+.nino-frame-header .nino-frame-header-brand {
+	display: flex;
+	align-items: center;
+	min-height: 5.25rem;
+	padding: var(--space-1) var(--space-3);
+	background-color: var(--color-primary);
+}
+
+.nino-frame-header .nino-frame-header-brand img {
+	width: clamp(7rem, 10vw, 10rem);
+	max-height: 3rem;
+	object-fit: contain;
+	object-position: left center;
+}
+
+.nino-frame-header .nino-frame-header-nav {
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
+	min-width: 0;
+	padding: var(--space-1) var(--space-3);
+}
+
+.nino-frame-header .nino-nav-burger > label > svg {
+	fill: var(--color-section-black-text);
+}
+
+.nino-frame-header .nino-nav-burger input:checked ~ svg {
+	fill: var(--color-title);
+}
+
+body main {
+	padding-top: clamp(5.25rem, var(--space-6), 8rem);
+}
+
+body main:has(> .nino-cover:first-child),
+body main:has(> .nino-parallex:first-child) {
+	padding-top: 0;
+}
+
+@media (min-width: 768px) {
+	.nino-frame-header .nino-nav-content ul {
+		justify-content: flex-end;
+	}
+
+	.nino-frame-header .nino-nav-content li a {
+		padding: .6rem .35rem;
+		color: var(--color-section-black-text);
+		font-size: .82rem;
+		font-weight: 700;
+		letter-spacing: .09em;
+		text-transform: uppercase;
+	}
+
+	.nino-frame-header .nino-nav-content li a:hover,
+	.nino-frame-header .nino-nav-content li a:focus,
+	.nino-frame-header .nino-nav-content li a.nino-is-active {
+		color: var(--color-primary);
+	}
+}
+
+@media (max-width: 767px) {
+	.nino-frame-header .nino-frame-header-inner {
+		grid-template-columns: minmax(0, 1fr) auto;
+	}
+
+	.nino-frame-header .nino-frame-header-brand {
+		min-height: 4.75rem;
+		padding-right: var(--space-2);
+		padding-left: var(--space-2);
+	}
+
+	.nino-frame-header .nino-frame-header-nav {
+		padding-right: var(--space-2);
+		padding-left: var(--space-2);
+	}
+
+	body main {
+		padding-top: 4.75rem;
+	}
+
+	body main:has(> .nino-cover.nino-atf:first-child),
+	body main:has(> .nino-parallex.nino-atf:first-child),
+	body main:has(> .nino-atf--fullscreen:first-child) {
+		padding-top: 0;
+	}
+}

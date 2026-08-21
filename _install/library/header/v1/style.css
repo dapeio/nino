@@ -1,0 +1,74 @@
+.nino-frame-header {
+	border-bottom: 1px solid var(--color-border);
+}
+
+.nino-frame-header .nino-scroll-header {
+	min-height: 5rem;
+	opacity: 1;
+	background-color: var(--color-background);
+}
+
+body.nino-scroll-atf .nino-frame-header .nino-scroll-header {
+	background-color: var(--color-background);
+}
+
+.nino-frame-header .nino-logo {
+	width: clamp(7.5rem, 10vw, 10rem);
+	height: auto;
+	min-width: 0;
+	min-height: 0;
+	margin: 0;
+	background-image: none;
+}
+
+.nino-frame-header .nino-frame-header-nav {
+	margin-left: auto;
+}
+
+.nino-frame-header .nino-nav-burger > label > svg {
+	fill: var(--color-title);
+}
+
+body main {
+	padding-top: clamp(5rem, var(--space-6), 8rem);
+}
+
+body main:has(> .nino-cover:first-child),
+body main:has(> .nino-parallex:first-child) {
+	padding-top: 0;
+}
+
+@media (min-width: 768px) {
+	.nino-frame-header .nino-nav-content li a {
+		position: relative;
+		padding: .5rem 0;
+		font-size: .9rem;
+		letter-spacing: .04em;
+	}
+
+	.nino-frame-header .nino-nav-content li a::after {
+		content: "";
+		position: absolute;
+		left: 0;
+		bottom: 0;
+		width: 100%;
+		height: 2px;
+		background-color: var(--color-primary);
+		transform: scaleX(0);
+		transform-origin: right;
+		transition: transform .2s ease;
+	}
+
+	.nino-frame-header .nino-nav-content li a:hover::after,
+	.nino-frame-header .nino-nav-content li a:focus::after,
+	.nino-frame-header .nino-nav-content li a.nino-is-active::after {
+		transform: scaleX(1);
+		transform-origin: left;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.nino-frame-header .nino-nav-content li a::after {
+		transition: none;
+	}
+}

@@ -9,4 +9,6 @@
 	'[[/webpage/contact/title]]' => 'Contact us',
 	'[[/webpage/contact/description]]' => 'Get in touch - we usually reply within one business day.',
 
+	'[[/page-contact/hero/title]]' => 'Contact us',
+	'[[/page-contact/hero/subtitle]]' => 'Write us a message.',
 ];

@@ -799,13 +799,37 @@ namespace Nino\Templates {
 				return $out;
 			}, $source ) ?? $source;
 
+			// [elementvalues] loops one field's distinct values, not records - a
+			// fixed, realistic set of sample category buttons stands in, the same
+			// way [elements] above stands in with sample cards.
+			$source = preg_replace_callback( '#\[elementvalues\s+('. self::SHORTCODE_ARGUMENTS. ')\](.*?)\[/elementvalues\]#is', function( array $match ): string {
+				$sampleValues = [ 'Consulting' => 2, 'Design' => 3, 'Development' => 1 ];
+				// Honour limit the same way the [elements] fixture above does, so
+				// a preset that bounds its button row previews what it ships
+				$limit = [];
+				preg_match( '/\blimit="(\d+)"/i', $match[1], $limit );
+				$count = min( count( $sampleValues ), max( 1, (int) ( $limit[1] ?? count( $sampleValues ) ) ) );
+				$out = '';
+				$index = 0;
+				foreach( array_slice( $sampleValues, 0, $count, true ) as $value => $usage ) {
+					$out .= str_replace( [ '[[.id]]', '[[.value]]', '[[.count]]' ], [ (string) $index, $value, (string) $usage ], $match[2] );
+					$index++;
+				}
+				return $out;
+			}, $source ) ?? $source;
+
 			$source = preg_replace_callback(
 				'#\[\[([^\]]+)\]\]#',
 				fn( array $fill ): string => self::_previewFill( $fill[1], null ),
 				$source
 			) ?? $source;
 			$source = str_replace( '[csrf]', '', $source );
-			$source = preg_replace( '#\[(?:template|elements|image)\b\s*'. self::SHORTCODE_ARGUMENTS. '\](?:.*?\[/elements\])?#is', '', $source ) ?? $source;
+			// Each looping shortcode is paired with its own closer via a
+			// backreference: a shared (?:elements|elementvalues) alternation let a
+			// leftover [elements] swallow everything up to a stray
+			// [/elementvalues] and vice versa.
+			$source = preg_replace( '#\[(elements|elementvalues)\b\s*'. self::SHORTCODE_ARGUMENTS. '\](?:.*?\[/\1\])?#is', '', $source ) ?? $source;
+			$source = preg_replace( '#\[(?:template|image)\b\s*'. self::SHORTCODE_ARGUMENTS. '\]#is', '', $source ) ?? $source;
 			$source = preg_replace( '#(<iframe\b[^>]*\bsrc=)(["\'])[^"\']*\2#i', '$1$2about:blank$2', $source ) ?? $source;
 			$source = preg_replace( '#(<form\b[^>]*\baction=)(["\'])[^"\']*\2#i', '$1$2#$2', $source ) ?? $source;
 

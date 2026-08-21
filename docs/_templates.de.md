@@ -140,6 +140,7 @@ Wiederholte liest eine Elements-Collection, jede Textzeile ist ein Textfill.
 | Media / Text — Flexible split | Bild und Text nebeneinander | Bild links · Bild rechts |
 | Features — Checklist and image | Häkchenliste neben einem Bild | Bild rechts · Bild links |
 | Articles — Responsive grid | Wiederholte Bildkarten | Einzeln (2/3/4 Spalten als Style) |
+| Filterable grid — Services or portfolio | Wiederholte Karten hinter einem clientseitigen Kategorie-Filter | Einzeln (2/3/4 Spalten als Style); Filter-Buttons brauchen einen manuellen HTML+-Schritt, siehe unten |
 | Process — Numbered steps | Ein Ablauf in Schritten, nummeriert von der Liste selbst | Verbundene Timeline · Gestapelt |
 | Pricing — Plan cards | Eine Karte je Paket | Gleichwertig · Mittlere hervorgehoben · Vierspaltig · Vier unter einer breiten Karte · Vier über einer breiten Karte |
 | Partners — Logo bar | Ruhige Logo-Reihe | Überschrift darüber · daneben |
@@ -180,6 +181,24 @@ Jede Variante gibt es zweimal:
 `[[section:id]]` wird auch im statischen Block aufgelöst. Deshalb behält das FAQ
 seine `name="faq-<section>"`-Gruppierung und die Formulare behalten eindeutige
 Feld-IDs, wenn dasselbe Preset zweimal auf einer Seite steht.
+
+Ein statischer Block kann auch die *verteilten Werte* eines Feldes über eine
+Collection schleifen statt der Datensätze selbst – die Button-Reihe, die ein
+clientseitiger Kategorie-Filter braucht. `[elementvalues /services
+key="category"]…[/elementvalues]` rendert eine Wiederholung je Wert, den das
+Feld „category“ trägt (inklusive Nutzungszähler) – das Gegenstück zu
+`[elements]`, das Datensätze schleift. **Filterable grid** in der Tabelle
+oben ist ein vollständiges Beispiel: ein statischer Filter-Block steht neben
+einer gewöhnlichen, im Composer editierbaren Elements-Area, und ein Klick auf
+einen Button blendet passende Karten ein oder aus, ohne Seiten-Reload.
+
+Beide Schleifen müssen dieselbe Collection lesen, und ein Preset darf diesen
+Slug nicht ausschreiben: Eine neue Area heißt beim Einfügen
+`<seite>-<section>-<area>`, und **Edit Section → Data** kann sie später
+umbiegen. Das Layout schreibt deshalb
+`[elementvalues /[[section:collection:services]] …]` – ein Compile-Token, das
+auf die tatsächlich gebundene Collection auflöst. Die Button-Reihe folgt ihr
+damit beim ersten Einfügen und nach jedem Umbiegen.
 
 ## Manifest v3: benannte Areas
 
@@ -411,6 +430,21 @@ kurze einzeilige Literale, und `[[section:id]]` wird durch die Section-ID ersetz
 zwei Kopien desselben Presets bleiben auf einer Seite unabhängig.
 `data-cover-height` bleibt beim Frame. Es gibt dafür kein Editor-Feld:
 Data-Attribute sind eine Preset-Entscheidung, alles darüber hinaus bleibt HTML+.
+
+Ein Wert in `container`/`item`/`render.<type>` darf auch `[[feldname]]` sein –
+ein Collection-Feld, nicht nur `[[section:id]]`. Beim Kompilieren bleibt das
+reiner Text; das gewöhnliche `[elements]`-Rendering, das im selben
+wiederholten Element bereits `[[title]]` einsetzt, ersetzt es bei jedem
+Request pro Datensatz – ganz ohne Laufzeit-Änderung. **Filterable grid**
+nutzt genau das, um jede Karte mit `data-filter-item="[[category]]"` zu
+markieren.
+
+Dafür eignet sich nur ein kurzes Feld: Die 240-Zeichen-Grenze gilt dem
+geschriebenen `[[category]]`, nicht dem eingesetzten Wert – eine lange
+Beschreibung landet also vollständig auf jeder Karte. Ein Rich-Text-Feld
+(`'html' => true`) wird rundheraus abgelehnt: Sein Wert wird für
+Element-*Inhalt* bereinigt und behält `"` – im Attribut würde er es damit
+beenden statt darin zu stehen.
 
 Entscheidend ist das Element, das die Klasse wirklich trägt. `nino-cover` und
 `nino-parallex` sitzen auf der `<section>`, `data-cover-width` gehört also in eine

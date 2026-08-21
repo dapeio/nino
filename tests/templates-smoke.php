@@ -86,7 +86,7 @@ echo "Library / Composer\n";
 $presets = \Nino\Templates\Library::presets();
 $modules = \Nino\Templates\Composer::modules();
 
-check( 'ships exactly the maintained named-area presets', array_keys( $presets ) === [ 'articles-grid', 'contact-form', 'content-section', 'cta-banner', 'feature-split', 'fullscreen-image', 'image-banner', 'logo-bar', 'media-split-areas', 'newsletter-form', 'pricing-plans', 'process-timeline', 'static-accordion', 'static-list', 'static-table', 'template-include' ] );
+check( 'ships exactly the maintained named-area presets', array_keys( $presets ) === [ 'articles-grid', 'contact-form', 'content-section', 'cta-banner', 'feature-split', 'filterable-grid', 'fullscreen-image', 'image-banner', 'logo-bar', 'media-split-areas', 'newsletter-form', 'pricing-plans', 'process-timeline', 'static-accordion', 'static-list', 'static-table', 'template-include' ] );
 check( 'every preset has searchable metadata and a normalized v3 contract', array_filter( $presets, fn( array $preset ): bool => $preset['name'] === ''
 	|| $preset['category'] === ''
 	|| $preset['tags'] === []
@@ -195,6 +195,25 @@ check( 'declared data attributes cannot break out of the attribute or the data- 
 	&& $dataAttributeRejects( [ 'group' => str_repeat( 'a', 241 ) ], 'item' ) );
 check( 'the frame keeps ownership of the data attributes it writes itself', $dataAttributeRejects( [ 'cover-height' => '50' ], 'preset' )
 	&& $dataAttributeRejects( [ 'data-cover-height' => '50' ], 'layout' ) );
+// A '[[field]]' in a data value is resolved per record by the [elements] pass,
+// which escapes an ordinary field for the attribute but runs an 'html' => true
+// one through sanitizeHtml() - and that leaves '"' intact, so editor content
+// would close the attribute and land a live event handler on the card
+$richFieldManifest = $dataAttributeManifest;
+$richFieldManifest['areas']['first']['model']['blurb'] = [ 'type' => 'string', 'html' => true ];
+$richFieldRejects = function( array $data, string $target ) use ( $richFieldManifest, $areaPresetDirectory ): bool {
+	$manifest = $richFieldManifest;
+	match( $target ) {
+		'item' => $manifest['areas']['first']['item']['data'] = $data,
+		'render' => $manifest['areas']['first']['render']['button']['data'] = $data,
+	};
+	return throwsInvalidArgument( fn() => \Nino\Templates\AreaComposer::normalizePreset( 'rich-field-data', $manifest, $areaPresetDirectory ) );
+};
+check( 'a data attribute cannot carry a rich text field, whose value is sanitized for content rather than for an attribute', $richFieldRejects( [ 'filter-item' => '[[blurb]]' ], 'item' )
+	&& $richFieldRejects( [ 'filter-item' => 'prefix [[blurb]] suffix' ], 'render' )
+	// ...while an ordinary field and the compile token stay available
+	&& $richFieldRejects( [ 'filter-item' => '[[title]]' ], 'item' ) === false
+	&& $richFieldRejects( [ 'group' => 'cards-[[section:id]]' ], 'item' ) === false );
 check( 'repeatable articles recommend a localized CTA label', ( $modules['articles']['model']['linkLabel']['locale'] ?? false ) === true );
 check( 'every curated preset composes with its defaults', array_filter( array_keys( $presets ), function( string $key ): bool {
 	try {
@@ -320,6 +339,59 @@ $fourColumnPreview = \Nino\Templates\Composer::preview( [
 check( 'named-area preview mirrors the selected column count', substr_count( $twoColumnPreview ?? '', '<article' ) === 2
 	&& substr_count( $fourColumnPreview ?? '', '<article' ) === 4 );
 
+// --- filterable-grid: the [elementvalues]-driven category filter --------
+
+$filterInput = \Nino\Templates\AreaComposer::defaults( $presets['filterable-grid'], 'home', 'services' );
+$filterInput['areas']['services']['source'] = [
+	'elementMode' => 'existing',
+	'elementType' => 'services',
+	'shortcode' => [ 'locale' => '', 'callback' => '', 'limit' => -1, 'query' => '' ],
+];
+$filterSection = \Nino\Templates\Composer::compose( $filterInput );
+
+check( 'filterable-grid composes one ordinary section with both areas resolved', str_starts_with( $filterSection['source'], '<section' )
+	&& str_contains( $filterSection['source'], '</section>' )
+	&& str_contains( $filterSection['source'], '[[area:' ) === false );
+check( 'the grid Area binds to the chosen collection with no limit, so the filter has the whole set to work with', str_contains( $filterSection['source'], '[elements /services locale="" callback="" limit="-1" query=""]' ) );
+check( 'the hand-written filter block survives compilation untouched, [elementvalues] included', str_contains( $filterSection['source'], '[elementvalues /services key="category" sort="value"]' )
+	&& str_contains( $filterSection['source'], 'class="nino-filter-nav"' )
+	&& str_contains( $filterSection['source'], 'data-filter-value=""' ) );
+check( 'each card is stamped with its own category as still-unresolved [[category]] text - the ordinary per-request [elements] render pass fills it in, not the compiler (AGENTS.md §10.3)', str_contains( $filterSection['source'], 'data-filter-item="[[category]]"' ) );
+check( 'the card keeps its nino-article family styling, including the image class the catalog default omits', str_contains( $filterSection['source'], 'class="nino-article-img nino-article-img--maxheight"' )
+	&& str_contains( $filterSection['source'], 'class="nino-article-descr"' ) );
+
+// The button loop and the card loop have to read one collection, and the
+// static block cannot know its name: a new Area mints '<page>-<section>-<area>'
+// and Edit Section can rebind it later. [[section:collection:<area>]] resolves
+// to whatever the Area is actually bound to, so all three cases agree - the
+// plain first insert included, which a hard-coded slug always got wrong.
+$collectionOf = function( string $source ): array {
+	preg_match( '#\[elements /([a-z0-9_-]+) #', $source, $cards );
+	preg_match( '#\[elementvalues /([a-z0-9_-]+) #', $source, $buttons );
+	return [ $cards[1] ?? 'cards?', $buttons[1] ?? 'buttons?' ];
+};
+$defaultInsert = $collectionOf( \Nino\Templates\Composer::compose( [ 'preset' => 'filterable-grid', 'pageId' => 'home', 'id' => 'work' ] )['source'] );
+$reboundInput = $filterInput;
+$reboundInput['id'] = 'services-rebound';
+$reboundInput['areas']['services']['source']['elementType'] = 'consulting';
+$rebound = $collectionOf( \Nino\Templates\Composer::compose( $reboundInput )['source'] );
+check( 'the filter buttons read the same collection as the cards - on a new Area, an existing one, and after a rebind', $defaultInsert === [ 'home-work-services', 'home-work-services' ]
+	&& $collectionOf( $filterSection['source'] ) === [ 'services', 'services' ]
+	&& $rebound === [ 'consulting', 'consulting' ] );
+check( 'a collection token naming something that is not an Elements area of the preset is refused', throwsInvalidArgument( function() use ( $areaPresetDirectory, $multiAreaManifest ): void {
+	file_put_contents( $areaPresetDirectory. '/bad-collection.tpl', "[[area:first]]\n[[section:collection:nope]]\n[[area:second]]\n" );
+	$manifest = $multiAreaManifest;
+	$manifest['layouts']['default']['template'] = 'bad-collection.tpl';
+	\Nino\Templates\AreaComposer::normalizePreset( 'bad-collection', $manifest, $areaPresetDirectory );
+} ) );
+
+$filterPreview = \Nino\Templates\Composer::preview( [ 'preset' => 'filterable-grid', 'pageId' => 'preview', 'id' => 'grid' ] );
+check( 'renders a real preview with sample filter buttons, no raw shortcode text left visible', $filterPreview !== null
+	&& str_contains( $filterPreview, '[elementvalues' ) === false
+	&& str_contains( $filterPreview, '[[' ) === false
+	&& substr_count( $filterPreview, 'nino-filter-btn' ) === 4  // "All" + 3 sample categories
+	&& str_contains( $filterPreview, '<article' ) === true );
+
 $fullscreen = \Nino\Templates\Composer::compose( [
 	'preset' => 'fullscreen-image', 'pageId' => 'home', 'id' => 'stage', 'layout' => 'parallax',
 ] );
@@ -411,6 +483,14 @@ $legacyClass = '/(?<![-\\w])(?:ui|js|sc)-(?!monospace|sans-serif|serif|rounded)[
 check( 'the Builder, the presets and the design system carry no legacy class prefix', array_filter( $everyLayout, fn( string $source ): bool => preg_match( $legacyClass, $source ) === 1 ) === []
 	&& preg_match( $legacyClass, (string) file_get_contents( __DIR__. '/../_nino/Nino.css' ) ) === 0
 	&& array_filter( $presets, fn( array $preset ): bool => preg_match( $legacyClass, (string) json_encode( $preset ) ) === 1 ) === [] );
+
+// filterable-grid's wrapper has to carry a layout rule of its own: it sits
+// between .nino-grid-row and the cards, so without one the cards stop being
+// flex children and their .nino-grid-m-* widths render as stacked blocks. A
+// string assertion cannot see that, but it can see the rule is there at all -
+// unlike a pure behaviour hook (.nino-autoheight, .nino-filter-item), which
+// Nino.ui.js drives and which correctly has no rule.
+check( 'the filter wrapper carries the layout rule its nested cards depend on', preg_match( '/\.nino-filter\s*\{[^}]*display:\s*flex/', (string) file_get_contents( __DIR__. '/../_nino/Nino.css' ) ) === 1 );
 check( 'a component step is a modifier of whichever class the preset gave it', str_contains( \Nino\Templates\Composer::compose( array_merge(
 	\Nino\Templates\AreaComposer::defaults( $presets['fullscreen-image'], 'home', 'loud-hero' ),
 	[ 'areas' => [ 'content' => [ 'components' => [ [ 'id' => 'title', 'type' => 'title', 'style' => 'loud', 'bindings' => [ 'text' => 'title' ] ] ] ] ] ]

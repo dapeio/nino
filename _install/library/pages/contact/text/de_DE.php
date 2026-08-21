@@ -8,4 +8,6 @@
 	'[[/webpage/contact/title]]' => 'Kontakt',
 	'[[/webpage/contact/description]]' => 'Nimm Kontakt auf - wir antworten in der Regel innerhalb eines Werktages.',
 
+	'[[/page-contact/hero/title]]' => 'Kontaktiere uns',
+	'[[/page-contact/hero/subtitle]]' => 'Schreib uns hier eine Nachricht.',
 ];

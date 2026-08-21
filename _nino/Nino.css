@@ -37,8 +37,9 @@
 	--color-subtitle: var(--color-text);
 	--color-background: #ffffff;
 	--color-header-bg: #ffffff;
-	--color-footer-bg: #1c1917;
+	--color-footer-bg-main: #1c1917;
 	--color-footer-text-main: #9ca3af;
+	--color-footer-bg-legal: #1c1917;
 	--color-footer-text-legal: #666b74;
 	--color-border: #dddddd;
 	--color-background-dim: rgb(20 33 61 / 78%);
@@ -366,14 +367,15 @@ header .nino-grid-100 {
 footer {
 	width: 100%;
 	box-sizing: border-box;
-	background:var(--color-footer-bg);
 	font-size:.8em;
 }
 .nino-footer-main {
+	background:var(--color-footer-bg-main);
 	color:var(--color-footer-text-main);
 	padding: var(--space-3) var(--space-3) 0;
 }
 .nino-footer-legal {
+	background:var(--color-footer-bg-legal);
 	color:var(--color-footer-text-legal);
 	padding: var(--space-1) var(--space-3);
 }
@@ -594,11 +596,13 @@ body.nino-scroll-down .nino-scroll-header {
 	color: var(--color-section-alt-text);
 }
 .nino-section--dark .nino-section-title, .nino-section--dark .nino-section-subtitle,
-.nino-section--dark .nino-atf-title, .nino-section--dark .nino-atf-subtitle, .nino-section--dark .nino-atf-arrowdown {
+.nino-section--dark .nino-atf-title, .nino-section--dark .nino-atf-subtitle, .nino-section--dark .nino-atf-arrowdown,
+.nino-section--dark .nino-btn--outline, .nino-section--dark .nino-filter-btn {
 	color: var(--color-section-dark-text);
 }
 .nino-section--black .nino-section-title, .nino-section--black .nino-section-subtitle,
-.nino-section--black .nino-atf-title, .nino-section--black .nino-atf-subtitle, .nino-section--black .nino-atf-arrowdown {
+.nino-section--black .nino-atf-title, .nino-section--black .nino-atf-subtitle, .nino-section--black .nino-atf-arrowdown,
+.nino-section--black .nino-btn--outline, .nino-section--black .nino-filter-btn {
 	color: var(--color-section-black-text);
 }
 .nino-section--primary .nino-section-title, .nino-section--primary .nino-section-subtitle,
@@ -606,7 +610,8 @@ body.nino-scroll-down .nino-scroll-header {
 	color: var(--color-primary-text);
 }
 .nino-cover--dim .nino-section-title, .nino-cover--dim .nino-section-subtitle,
-.nino-cover--dim .nino-atf-title, .nino-cover--dim .nino-atf-subtitle, .nino-cover--dim .nino-atf-arrowdown {
+.nino-cover--dim .nino-atf-title, .nino-cover--dim .nino-atf-subtitle, .nino-cover--dim .nino-atf-arrowdown,
+.nino-cover--dim .nino-btn--outline, .nino-cover--dim .nino-filter-btn {
 	color: var(--color-section-black-text);
 }
 
@@ -628,7 +633,6 @@ body.nino-scroll-down .nino-scroll-header {
 	.nino-section { padding: var(--space-5) var(--space-3); }
 	.nino-section--fullwidth { padding-left: 0; padding-right: 0; }
 	.nino-section--fullheight { padding-top: 0; padding-bottom: 0; }
-	.nino-section--fullheight .nino-article-content { padding: var(--space-1); }
 }
 
 .nino-article {
@@ -780,6 +784,7 @@ body.nino-scroll-down .nino-scroll-header {
  *			.nino-pricing-row, .nino-pricing-item(--featured), .nino-pricing-title, .nino-pricing-price
  *			.nino-accordion, .nino-accordion-trigger, .nino-accordion-panel
  *			.nino-pagination
+ *			.nino-socialmedia
  *			.nino-logos, .nino-logos-item
  *			.nino-gallery, .nino-gallery-item(--wide, --tall)
  *			.nino-feature-list, .nino-feature-item
@@ -877,8 +882,8 @@ body.nino-scroll-down .nino-scroll-header {
 	margin-bottom: var(--space-1);
 }
 .nino-form-input:focus, .nino-form-textarea:focus, .nino-form-select:focus {
-	outline: none;
-	border-color: var(--color-primary);
+	outline: 2px solid var(--color-primary);
+	border-color: transparent;
 }
 /* One-line form - an email field and its button on the same row */
 .nino-form--inline { display: flex; flex-wrap: wrap; gap: var(--space-1); align-items: flex-start; justify-content: center; }
@@ -1500,6 +1505,28 @@ body.nino-scroll-btf .nino-back-to-top {
 	color: var(--color-primary-text);
 }
 
+
+/* Social Media */
+.nino-socialmedia {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: flex-start;
+	gap: var(--space-1);
+}
+.nino-socialmedia > li {
+	opacity: .7;
+	transition: opacity .2s ease;
+}
+.nino-socialmedia > li:hover {
+	opacity:1;
+}
+.nino-socialmedia > li > svg {
+	width:24px;
+	height:24px;
+	fill:var(--color-primary-text)
+}
+
 /* Logo/Partner strip - text placeholders standing in for real logo
    images (SVG/PNG), grayscale-to-color on hover */
 .nino-logos {
@@ -1992,6 +2019,7 @@ header .nino-headernav-logo {
 	z-index:999;
 	background-color:var(--color-background);
 	border:1px solid var(--color-border);
+	transition:all .5s;
 }
 .nino-localepicker-wrap input:checked ~ div h6 {
 	display:block;
@@ -2032,7 +2060,7 @@ header .nino-headernav-logo {
 	}
 	.nino-localepicker-wrap div.nino-localepicker-bg {
 		opacity:0;
-		transition:opacity .2s;
+		transition:opacity .4s;
 	}
 
 	.nino-localepicker-wrap input:checked ~ div li {
@@ -2047,6 +2075,7 @@ header .nino-headernav-logo {
 		left:0;
 		right:0;
 		bottom:0;
+		background-color:var(--color-background-dim);
 	}
 }
 
@@ -2060,6 +2089,7 @@ header .nino-headernav-logo {
  *
  *			.nino-parallex(--dim), .nino-cover(--dim), .nino-slider, .nino-vpa, .nino-preloader
  *			.nino-tabs-nav, .nino-tabs-tab, .nino-tabs-panel
+ *			.nino-filter-nav, .nino-filter-btn, .nino-filter-count
  *			.nino-modal(--lightbox, --video), .nino-modal-close
  *			.nino-toast-container, .nino-toast(--success, --error)
  *
@@ -2130,7 +2160,7 @@ header .nino-headernav-logo {
 }
 
 @media (prefers-reduced-motion: reduce), (pointer: coarse) {
-	.nino-parallex > img { top: 0 !important; height: 100%; transform: none !important; will-change: auto; }
+	.nino-parallex > img { top: 0 !important; height: 100%; transform: none !important; will-change: auto; animation: none; }
 }
 
 /* Contentslider */
@@ -2352,6 +2382,56 @@ header .nino-headernav-logo {
 		opacity: 0;
 		transform: translateY(4px);
 	}
+}
+
+/* Category filter - a row of toggle buttons, not a tablist: every button
+   stays reachable and keeps its native semantics (aria-pressed), so unlike
+   .nino-tabs-tab above there is no role/tabindex work for the JS to do.
+   .nino-filter-item (the filtered cards) needs no rule of its own -
+   visibility is the plain [hidden] attribute the browser already handles.
+
+   .nino-filter has to re-establish the grid: it wraps both the nav and the
+   cards so one querySelectorAll() finds both, which means the cards are no
+   longer direct children of .nino-grid-row and would lose the flex context
+   their .nino-grid-m-* widths need. It is itself a flex child of that row,
+   so it also has to claim the full line. */
+.nino-filter {
+	display: flex;
+	flex-wrap: wrap;
+	width: 100%;
+}
+.nino-filter-nav {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--space-1);
+	width: 100%;
+	margin-bottom: var(--space-2);
+}
+.nino-filter-btn {
+	display: inline-flex;
+	align-items: center;
+	gap: calc( var(--space-1) / 2 );
+	padding: calc( var(--space-1) / 2 ) var(--space-2);
+	border-radius: var(--radius);
+	border: 1px solid var(--color-border);
+	background: none;
+	font: inherit;
+	font-size: var(--fontsize-btn);
+	color: var(--color-text);
+	cursor: pointer;
+	transition: background-color .2s ease, color .2s ease, border-color .2s ease;
+}
+.nino-filter-btn:hover, .nino-filter-btn:focus {
+	border-color: var(--color-primary);
+}
+.nino-filter-btn.nino-is-active {
+	background-color: var(--color-primary);
+	border-color: var(--color-primary);
+	color: var(--color-primary-text);
+}
+.nino-filter-count {
+	opacity: .7;
+	font-size: .85em;
 }
 
 /* Modal / Lightbox - native <dialog>, JS only opens/closes it (see

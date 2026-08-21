@@ -138,6 +138,7 @@ textfill.
 | Media / Text — Flexible split | Image and copy side by side | Image left · Image right |
 | Features — Checklist and image | A checked list next to an image | Image right · Image left |
 | Articles — Responsive grid | Repeatable image cards | Single (2/3/4 columns as a Style) |
+| Filterable grid — Services or portfolio | Repeatable cards behind a client-side category filter | Single (2/3/4 columns as a Style); filter buttons need one manual HTML+ step, see below |
 | Process — Numbered steps | An ordered process, numbered by the list itself | Connected timeline · Stacked steps |
 | Pricing — Plan cards | One card per plan | Equal · Middle highlighted · Four · Four below one wide card · Four above one wide card |
 | Partners — Logo bar | A quiet row of logos | Caption above · Caption beside |
@@ -179,6 +180,22 @@ Each variant comes twice:
 `[[section:id]]` is resolved inside a static block, which is how the FAQ keeps
 its `name="faq-<section>"` grouping and the forms keep unique field IDs when the
 same preset is inserted twice on one page.
+
+A static block can also loop the *distinct values* one field takes across a
+collection instead of the records themselves — the button row a client-side
+category filter needs. `[elementvalues /services key="category"]…
+[/elementvalues]` renders one iteration per value the "category" field
+carries (with a usage count), the companion to `[elements]` looping records.
+**Filterable grid** in the table above is a complete worked example: a static
+filter block sits next to an ordinary, composer-editable Elements Area, and a
+click on a button shows or hides matching cards without a page reload.
+
+Both loops have to read one collection, and a preset must not spell that slug
+out: a new Area is named `<page>-<section>-<area>` when the section is
+inserted, and **Edit Section → Data** can point it somewhere else later. The
+Layout writes `[elementvalues /[[section:collection:services]] …]` instead —
+a compile token that resolves to whatever the named Area is bound to, so the
+button row follows it on the first insert and after every rebind.
 
 ### Named-area contract (manifest version 3)
 
@@ -480,6 +497,21 @@ values are short single-line literals, and `[[section:id]]` is replaced with the
 section ID so two copies of the same preset stay independent on one page.
 `data-cover-height` stays with the frame. There is no editor control for this:
 data attributes are a preset decision, and anything beyond them is HTML+ work.
+
+A `container`/`item`/`render.<type>` value may also be `[[fieldname]]` — a
+collection field, not just `[[section:id]]`. Compiling leaves it as plain
+text; the ordinary `[elements]` rendering that already fills `[[title]]`
+into the same repeated item substitutes it per record on every request, so
+a card can carry its own field value in a `data-*` attribute without any
+runtime change at all. **Filterable grid** uses exactly this to stamp each
+card with `data-filter-item="[[category]]"`.
+
+Pick a short field for it: the 240-character limit applies to the written
+`[[category]]`, not to the value that replaces it, so a long description
+would ship in full on every card. A rich (`'html' => true`) field is refused
+outright — its value is sanitized for element content, which keeps `"`
+usable, and inside an attribute that would end the attribute rather than
+stay in it.
 
 Choose the element that actually carries the class. The `<section>` is the one
 with `nino-cover`/`nino-parallex`, so `data-cover-width` belongs in a top-level or

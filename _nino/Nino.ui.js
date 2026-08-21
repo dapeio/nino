@@ -68,6 +68,7 @@
 					backToTop	: dc.querySelectorAll( '.nino-back-to-top' ),
 					cookieBanner	: dc.querySelectorAll( '.nino-cookie-banner' ),
 					cover			: dc.querySelectorAll( '.nino-cover' ),
+					filter		: dc.querySelectorAll( '.nino-filter' ),
 					// .nino-newsletter-form opts out - it keeps .nino-form only for the
 					// shared success/error/pending styling, its own submit handler
 					// below binds it separately (needs its own "already subscribed"
@@ -927,6 +928,47 @@
 					}
 
 					activateTab( Array.from( tabs ).find( function( tab ) { return tab.classList.contains('nino-is-active') } ) || tabs[0], false );
+				}
+			}
+
+
+			/*
+			 *	nino-filter - a category filter for a card grid. .nino-filter is
+			 *	the shared root (wraps both the button row and the cards - the two
+			 *	loops live in one DOM subtree so a single querySelectorAll() finds
+			 *	both); a .nino-filter-btn's data-filter-value ('' means "show all")
+			 *	is compared against each .nino-filter-item's data-filter-item.
+			 *	Buttons are plain <button>s with aria-pressed, not a tablist/panel
+			 *	pair - Tab/Enter/Space already work natively, no roving tabindex
+			 *	needed. Visibility uses the native hidden attribute, same as the
+			 *	nino-tabs panels above.
+			 */
+			if( e.filter.length > 0 ) {
+				for( let i=0, l=e.filter.length; i<l; i++ ) {
+
+					const
+						buttons	= e.filter[i].querySelectorAll('.nino-filter-btn'),
+						items		= e.filter[i].querySelectorAll('.nino-filter-item');
+
+					if( buttons.length === 0 || items.length === 0 )
+						continue;
+
+					const applyFilter = function( value ) {
+						for( let b=0, bl=buttons.length; b<bl; b++ ) {
+							const active = buttons[b].getAttribute('data-filter-value') === value;
+							buttons[b].classList.toggle( 'nino-is-active', active );
+							buttons[b].setAttribute( 'aria-pressed', active ? 'true' : 'false' );
+						}
+						for( let x=0, xl=items.length; x<xl; x++ ) {
+							const match = value === '' || items[x].getAttribute('data-filter-item') === value;
+							items[x].hidden = match === false;
+						}
+					};
+
+					for( let b=0, bl=buttons.length; b<bl; b++ )
+						buttons[b].addEventListener( 'click', function() {
+							applyFilter( this.getAttribute('data-filter-value') ?? '' );
+						} );
 				}
 			}
 

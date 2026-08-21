@@ -3,6 +3,9 @@
 	'[[/website/lang]]' => 'en',
 	'[[/company/country]]' => 'Germany',
 	'[[/company/description]]' => 'A short description of your company.',
+	
+  '[[/website/footer/title/followus]]' => 'Follow us',
+	'[[/website/footer/title/getintouch]]' => 'Here we are',
 
 	'[[/global/adress]]' => 'Address',
 	'[[/global/phone]]' => 'Phone',
