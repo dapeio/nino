@@ -134,7 +134,7 @@ The order is the rule that makes the whole thing work: Design supplies the value
 
 ## Where the Settings Come From
 
-`/_install`'s Themes step writes them first: a theme's manifest declares the `design` block it was drawn with, and the installer applies either that or whatever the operator picked. `/_theme` then edits the same stored settings afterwards - it is the same `Theme::write()` on both sides, so there is one generator and one stylesheet, not an install-time copy and a runtime one.
+`/_install`'s Themes step writes the baseline first from the `design` block the picked theme was drawn with. The following Design step writes the operator's choice, and `/_theme` edits those same stored settings afterwards. All three paths use the same `Theme::write()`, so there is one generator and one stylesheet, not separate install-time and runtime copies.
 
 ## Changing the Design Later
 

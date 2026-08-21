@@ -2,9 +2,9 @@
 
 **Sprache:** [English](_install.md) · Deutsch
 
-**Stand:** 8. August 2026 · **Nino-Version:** 0.11.0-beta.1
+**Stand:** 21. August 2026 · **Nino-Version:** 0.11.0-beta.1
 
-Dieses Handbuch erklärt die Entscheidungen und Schreibvorgänge der sieben Schritte von `/_install`. Falls du stattdessen auf dem kürzesten Weg vom Checkout zur eingerichteten Webseite gelangen möchtest, beginne mit [Erste Schritte](getting-started.de.md); den späteren produktiven Betrieb behandelt [Deployment](deployment.de.md).
+Dieses Handbuch erklärt die Entscheidungen und Schreibvorgänge der zehn Schritte von `/_install`. Falls du stattdessen auf dem kürzesten Weg vom Checkout zur eingerichteten Webseite gelangen möchtest, beginne mit [Erste Schritte](getting-started.de.md); den späteren produktiven Betrieb behandelt [Deployment](deployment.de.md).
 
 **Weitere Links:**
 [README](../README.de.md) · [Grundkonzepte](concepts.de.md) · [Entwickler-Handbuch](development.de.md) · [Erste Schritte](getting-started.de.md) · [`/_install`-Referenz](_install.de.md) · [`/_admin`-Bedienung](_admin.de.md) · [`/_templates`-Bedienung](_templates.de.md) · [`/_editor`-Bedienung](_editor.de.md) · [`/_theme`-Bedienung](_theme.de.md) · [Deployment](deployment.de.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
@@ -19,6 +19,7 @@ Der Assistent ist für die einmalige Ersteinrichtung gedacht. Er:
 - legt Sprachen und Module fest;
 - erzeugt die Projektverzeichnisse aus seiner Library;
 - wendet ein Theme an;
+- legt Design, Header und Footer unabhängig fest;
 - richtet die ersten Webseiten ein;
 - erfasst zentrale Angaben zur Webseite;
 - erstellt Zugänge für `/_editor` und `/_admin`; der Admin-Zugang gilt zugleich für `/_templates`.
@@ -38,7 +39,7 @@ Dabei gelten drei unterschiedliche Regeln:
 |---|---|
 | Sprachen, Module, erzeugte Routen und Seitenliste | die sichtbare Auswahl ersetzt den zuvor vom Assistenten verwalteten Stand |
 | Templates, Texte und Element-Typen | werden ergänzt oder aktualisiert, aber nicht automatisch gelöscht |
-| Theme-Dateien | gleichnamige Dateien werden überschrieben; zusätzliche Dateien eines früheren Themes bleiben bestehen |
+| Theme- und Frame-Dateien | gleichnamige Dateien werden überschrieben; zusätzliche Dateien eines früheren Themes bleiben bestehen |
 
 Diese Unterscheidung schützt eigene Änderungen. Das Abwählen eines Moduls darf seine Konfiguration entfernen; eine zwischenzeitlich bearbeitete Template-Datei ungefragt zu löschen wäre dagegen nicht sicher.
 
@@ -88,19 +89,12 @@ Es ist genau ein Theme aktiv. Beim Anwenden:
 
 1. kopiert `/_install` die im Manifest genannten Dateien in das Projekt;
 2. ersetzt das bisherige Theme-Stylesheet im Asset-Bundle `/.cache/style.css`;
-3. speichert den gewählten Theme-Schlüssel unter `/nino/install/theme`.
+3. speichert den gewählten Theme-Schlüssel unter `/nino/install/theme`;
+4. installiert die Design-, Header- und Footer-Vorgaben des Manifests als vollständigen Ausgangspunkt für die folgenden Schritte.
 
 Die Position des Stylesheets im Bundle bleibt nach Möglichkeit erhalten, damit sich die CSS-Kaskade nicht unbeabsichtigt ändert. Eigene zusätzliche Bundle-Einträge werden nicht entfernt.
 
 **Wichtig:** Gleichnamige Theme-Dateien werden überschrieben. Dateien, die nur das vorherige Theme mitgebracht hat, bleiben dagegen liegen. Sichere eigene Änderungen deshalb über Git, bevor du das Theme wechselst oder erneut anwendest. Nach dem Abschluss sperrt sich `/_install`; ein späterer Theme-Wechsel über die Oberfläche ist daher nicht vorgesehen und wird als normale Projektänderung über Dateien und Git durchgeführt.
-
-### Header und Footer
-
-`<header>` und `<footer>` der Seite sind austauschbare Einheiten unter `_install/library/header/<key>` und `_install/library/footer/<key>` - je eine `template.tpl` und die `style.css` für das Markup, das diese Vorlage mitbringt. Beim Anwenden werden sie nach `templates/theme.header.tpl` bzw. `templates/theme.footer.tpl` kopiert und die beiden Stylesheets hinter dem des Themes gebündelt.
-
-Die Basis-Seitenvorlagen binden die installierte Kopie über `[template /templates/theme.header]` ein, statt das Markup selbst zu tragen - ein Rahmen lässt sich später also durch Austausch dieser zwei Dateien wechseln. Ein Theme benennt die Rahmen, gegen die es gezeichnet wurde; die Theme-Auswahl wählt sie vor, die beiden Auswahlfelder übersteuern das.
-
-Unter jedem Auswahlfeld steht der Rahmen gerendert: die echte Vorlage, gegen Framework, Design-Tokens und das Stylesheet des gewählten Themes, in derselben Reihenfolge, in der das CSS-Bundle sie lädt. Eine Versionsnummer sagt nichts über ein Layout, und anders als ein Theme hat ein Rahmen kein Vorschaubild zum Öffnen. Die Vorschau setzt ein, was das Projekt noch nicht hat: eine Platzhaltermarke an der Logo-Stelle, Beispiel-Navigationspunkte und für alles Übrige die Texte der Library. Sie ist ein eigenes, abgeschottetes Dokument statt Markup in der Seite, weil das Stylesheet eines Rahmens nackte Elementselektoren stylt, die sonst im Installer landen würden.
 
 ## 4. Design
 
@@ -118,7 +112,7 @@ Das Manifest eines Themes erklärt das Design, mit dem es gezeichnet wurde - ein
 
 Dieser Teil des Schritts ist optional: Eine Auslieferung ohne `/_theme` installiert genau wie zuvor, nur ohne den Design-Block.
 
-Die Reihenfolge im CSS-Bundle ist der ganze Vertrag, und jede der drei Auswahlen besitzt darin genau einen Platz:
+Die Reihenfolge im CSS-Bundle ist der ganze Vertrag, und jede Ebene besitzt darin genau einen Platz:
 
 ```
 _nino/Nino.css              Framework-Standardwerte
@@ -131,7 +125,25 @@ assets/style.css            die eigenen Übersteuerungen des Projekts
 
 `/_theme` bleibt nach der Installation verfügbar, sodass ein Projekt ohne Neuinstallation umgefärbt werden kann. Siehe [`_theme.de.md`](_theme.de.md).
 
-## 5. Routes
+## 5. Header
+
+Der `<header>` der Seite ist eine austauschbare Einheit unter `_install/library/header/<key>`, bestehend aus einer `template.tpl` und der `style.css` für ihr Markup. Das Theme wählt den Header vor, gegen den es gezeichnet wurde; dieser eigene Schritt übersteuert ausschließlich diese Auswahl, nachdem das Design festgelegt wurde.
+
+Beim Anwenden wird die Einheit nach `templates/theme.header.tpl` und `assets/style.header.css` kopiert, ihr Schlüssel unter `/nino/install/header` gespeichert und das Frame-Stylesheet direkt hinter dem Theme im CSS-Bundle gehalten. Dabei wird weder das Theme erneut kopiert noch das Design zurückgesetzt.
+
+Das höhere Vorschau-Iframe rendert die echte Vorlage gegen Framework, die soeben gewählten Design-Werte, das Theme und das eigene Stylesheet des Frames. Eine Versionsnummer sagt nichts über ein Layout, und anders als ein Theme hat ein Frame kein Vorschaubild zum Öffnen. Die Vorschau setzt ein, was das Projekt noch nicht hat: eine Platzhaltermarke an der Logo-Stelle, Beispiel-Navigationspunkte und für alles Übrige die Texte der Library. Sie ist ein eigenes, abgeschottetes Dokument, weil ein Frame-Stylesheet breite Selektoren verwendet, die nicht im Installer landen dürfen.
+
+Die Basis-Seitenvorlagen binden die installierte Kopie über `[template /templates/theme.header]` ein, statt das Markup selbst zu tragen. Der Header lässt sich später also über dieselben zwei Projektdateien austauschen.
+
+## 6. Footer
+
+Der Footer-Schritt verwendet unabhängig davon denselben Einheitenvertrag unter `_install/library/footer/<key>`. Beim Anwenden schreibt er `templates/theme.footer.tpl` und `assets/style.footer.css`, speichert `/nino/install/footer` und lässt Theme, Design sowie den gewählten Header unangetastet.
+
+Sein höheres Vorschau-Iframe verwendet denselben endgültigen Design- und Theme-Kontext wie die Header-Vorschau. Wird Footer nach Header angewendet, bleibt die kanonische Bundle-Reihenfolge erhalten: Theme, Header-Stylesheet, Footer-Stylesheet.
+
+Die Basis-Seitenvorlagen binden ihn über `[template /templates/theme.footer]` ein.
+
+## 7. Routes
 
 Dieser Schritt erzeugt die öffentliche Seitenstruktur. Die Liste lässt sich ergänzen, bearbeiten, löschen und sortieren. Mit „Weiter“ wird die gesamte sichtbare Liste als neuer Stand angewendet.
 
@@ -157,7 +169,7 @@ Eine Route mit dem Template **Blank** erhält eine eigene Kopie davon, benannt n
 
 Beim erneuten Anwenden ersetzt die Liste nur die Routen, die aus ihrem vorherigen Stand entstanden sind. Manuell angelegte Routen bleiben erhalten. Entfernte Seiten löschen ihre bereits erzeugten Templates und tieferen Inhalte nicht automatisch.
 
-## 6. Persönliche Angaben
+## 8. Persönliche Angaben
 
 „Personal Infos“ bündelt zentrale Textwerte, die unabhängig von Theme und Modulauswahl benötigt werden. Der Schritt bearbeitet ausschließlich die vorgesehenen Schlüssel unter `/company/*` und `/website/*`.
 
@@ -172,7 +184,7 @@ Land und Beschreibung werden je Sprache gespeichert. Wechsle deshalb jede aktive
 
 Der Schritt zeigt bewusst nicht alle Textfills des Projekts. Technische Schlüssel, Design-Tokens und tiefere Seiten- oder Modulinhalte werden später vollständig über `/_admin` oder innerhalb der vergebenen Rechte in `/_editor` gepflegt.
 
-## 7. Zugänge für `/_editor`
+## 9. Zugänge für `/_editor`
 
 Lege mindestens ein erstes Konto für `/_editor` an. E-Mail-Adresse und Passwort müssen gültig sein; das Passwort benötigt mindestens acht Zeichen.
 
@@ -185,7 +197,7 @@ Die Zuständigkeiten sind bewusst geteilt:
 
 So bleibt die Menge der Konten eine technische Strukturentscheidung, während die laufende Pflege bestehender Nutzer im Editor möglich bleibt.
 
-## 8. Abschluss
+## 10. Abschluss
 
 Der letzte Schritt setzt das echte Passwort für `/_admin` und damit zugleich für `/_templates`. Es muss mindestens acht Zeichen lang sein und ist unabhängig von den Nutzerkonten in `/_editor`.
 

@@ -1,8 +1,8 @@
 /**
  *	Nino									A compact filesystembased php framework
- *	install-themes-js-smoke.js		DOM checks for the install wizard's Themes
- *									step: the frame selects and what they put into the
- *									themes/apply post. The Design step is its own file.
+ *	install-themes-js-smoke.js		DOM checks for the install wizard's Theme,
+ *									Header and Footer steps: separate panes, previews and
+ *									independent apply posts. Design has its own test file.
  *
  *	Usage: node tests/install-themes-js-smoke.js
  */
@@ -28,7 +28,7 @@ function check( label, condition ) {
 
 /*	A stand-in for just the parts of the DOM this step touches: elements are
  *	looked up by id, options are appended to selects, and classList carries the
- *	install-hidden state the two panels toggle	*/
+ *	install-hidden state the frame panels toggle	*/
 function element( id, tag ) {
 
 	const el = {
@@ -66,7 +66,9 @@ function element( id, tag ) {
 
 const nodes = {};
 [
-	'themes-grid', 'themes-msg', 'themes-frames',
+	'themes-grid', 'themes-msg', 'header-msg', 'footer-msg',
+	'themes-frame-header-panel', 'themes-frame-footer-panel',
+	'themes-frame-header-unavailable', 'themes-frame-footer-unavailable',
 	'themes-frame-header', 'themes-frame-footer',
 	'themes-frame-header-preview', 'themes-frame-footer-preview',
 ].forEach( function( id ) { nodes[id] = element( id ); } );
@@ -93,6 +95,10 @@ sandbox.Nino = {
 			posted.push( { action : action, payload : JSON.parse( JSON.stringify( payload ) ) } );
 			if( action === 'themes/frame' )
 				callback( 200, { frame : payload.frame, html : '<!doctype html><body data-frame="'+ payload.kind+ '/'+ payload.frame+ '">' } );
+			else if( action === 'themes/apply' )
+				callback( 200, { theme : payload.theme } );
+			else if( action === 'themes/frame/apply' )
+				callback( 200, { kind : payload.kind, frame : payload.frame } );
 		},
 		showError : function() {},
 	},
@@ -106,6 +112,10 @@ vm.runInContext(
 );
 
 const themes = sandbox.Nino.install.themes;
+
+// At the Theme step Design has not loaded yet. Its settings become available
+// before Header opens and that transition has to refresh the hidden preview.
+sandbox.Nino.install.design = { _settings : null };
 
 themes._themes = {
 	agency 	: { label : 'Agency', header : 'v1', footer : 'v1', design : { primary : '#4faae8', secondary : '', contrast : 'default', colors : 'default' } },
@@ -121,7 +131,10 @@ check( 'the frame selects offer every unit on disk', nodes['themes-frame-header'
 	&& nodes['themes-frame-footer'].children.length === 2 );
 check( 'a fresh install pre-selects the frames the picked theme was drawn against', nodes['themes-frame-header'].value === 'v1'
 	&& nodes['themes-frame-footer'].value === 'v1' );
-check( 'the frames panel is shown once there is something to pick', nodes['themes-frames'].classList.contains('install-hidden') === false );
+check( 'Header and Footer each expose their own panel', nodes['themes-frame-header-panel'].classList.contains('install-hidden') === false
+	&& nodes['themes-frame-footer-panel'].classList.contains('install-hidden') === false );
+check( 'the unavailable notes stay hidden while variants exist', nodes['themes-frame-header-unavailable'].classList.contains('install-hidden') === true
+	&& nodes['themes-frame-footer-unavailable'].classList.contains('install-hidden') === true );
 
 // A revisit has to show what is installed, not what the theme would suggest
 themes._renderFrames( { header : 'v3', footer : 'v2' } );
@@ -135,6 +148,16 @@ check( 'each select renders its frame as soon as the step opens', nodes['themes-
 	&& nodes['themes-frame-footer-preview'].srcdoc === '<!doctype html><body data-frame="footer/v2">' );
 
 posted.length = 0;
+sandbox.Nino.install.themes._ready = true;
+sandbox.Nino.install.design._settings = { primary : '#c81e2d', spacing : 'tight' };
+sandbox.Nino.install.header.showCurrent();
+
+check( 'opening Header refreshes its preview with the Design just chosen', posted.length === 1
+	&& posted[0].action === 'themes/frame'
+	&& posted[0].payload.design.primary === '#c81e2d'
+	&& posted[0].payload.design.spacing === 'tight' );
+
+posted.length = 0;
 nodes['themes-frame-header'].value = 'v2';
 nodes['themes-frame-header'].fire('change');
 
@@ -146,7 +169,9 @@ check( 'changing a select re-renders that preview, and only that one', nodes['th
 // text files and the theme's stylesheet, none of which the browser has
 check( 'the preview is asked for, not assembled here', posted[0].payload.kind === 'header'
 	&& posted[0].payload.frame === 'v2'
-	&& posted[0].payload.theme === 'agency' );
+	&& posted[0].payload.theme === 'agency'
+	&& posted[0].payload.design.primary === '#c81e2d'
+	&& posted[0].payload.design.spacing === 'tight' );
 
 // _renderFrames() runs again on every visit to the step, and a second
 // listener would make every later change fire twice
@@ -168,7 +193,8 @@ check( 'picking a theme moves the frame selects to the ones it names', nodes['th
 // the frame the previous theme named
 check( '...and the preview moves with them', nodes['themes-frame-header-preview'].srcdoc === '<!doctype html><body data-frame="header/v4">' );
 
-// One post, because the two picks are one decision
+// Themes no longer owns the frame controls: each following tab persists its
+// own choice without recopying the theme or resetting Design.
 posted.length = 0;
 themes._ready = true;
 nodes['themes-frame-header'].value = 'v2';
@@ -179,11 +205,36 @@ themes.apply( function( success ) { applied = success; } );
 
 const applyPost = posted.filter( function( post ) { return post.action === 'themes/apply' } )[0];
 
-check( 'theme and both frames go out in one apply', applyPost !== undefined
-	&& applyPost.payload.theme === 'nighty'
-	&& applyPost.payload.header === 'v2'
-	&& applyPost.payload.footer === 'v1' );
-check( 'the colours are not this step\'s to send - the Design step writes those', Object.prototype.hasOwnProperty.call( applyPost.payload, 'design' ) === false );
+check( 'the Theme tab posts only its own choice', applied === true
+	&& applyPost !== undefined
+	&& Object.keys( applyPost.payload ).length === 1
+	&& applyPost.payload.theme === 'nighty' );
+
+let headerApplied = null;
+let footerApplied = null;
+sandbox.Nino.install.header.apply( function( success ) { headerApplied = success; } );
+sandbox.Nino.install.footer.apply( function( success ) { footerApplied = success; } );
+
+const frameApplyPosts = posted.filter( function( post ) { return post.action === 'themes/frame/apply' } );
+check( 'Header and Footer are registered as independent wizard modules', typeof sandbox.Nino.install.header.showCurrent === 'function'
+	&& typeof sandbox.Nino.install.footer.showCurrent === 'function' );
+check( 'each frame tab posts only its own kind and selected variant', headerApplied === true && footerApplied === true
+	&& frameApplyPosts.length === 2
+	&& JSON.stringify( frameApplyPosts[0].payload ) === JSON.stringify( { kind : 'header', frame : 'v2' } )
+	&& JSON.stringify( frameApplyPosts[1].payload ) === JSON.stringify( { kind : 'footer', frame : 'v1' } ) );
+
+// A stripped delivery may omit one frame kind. The pane explains that and
+// remains skippable instead of blocking the linear wizard.
+themes._frames.footer = [];
+themes._renderFrames( {} );
+posted.length = 0;
+footerApplied = null;
+sandbox.Nino.install.footer.apply( function( success ) { footerApplied = success; } );
+
+check( 'a missing frame kind hides its panel and shows the explanatory note', nodes['themes-frame-footer-panel'].classList.contains('install-hidden') === true
+	&& nodes['themes-frame-footer-unavailable'].classList.contains('install-hidden') === false );
+check( 'a missing frame kind is a valid no-op on Next', footerApplied === true
+	&& posted.filter( function( post ) { return post.action === 'themes/frame/apply' } ).length === 0 );
 
 console.log( '\n'+ checks+ ' checks, '+ failures+ ' failed' );
 process.exit( failures === 0 ? 0 : 1 );

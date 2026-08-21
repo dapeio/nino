@@ -2,7 +2,7 @@
 
 /**
  *	Nino										A compact filesystembased php framework
- *	Install									Step 7, the last one: set the real /_admin password. Success
+ *	Install									Step 10, the last one: set the real /_admin password. Success
  *													here is what locks /_install back out for good - see
  *													_install/Install.php's Finish class.
  *

@@ -6,9 +6,10 @@ All notable changes to Nino are documented in this file.
 
 ### Added
 
-- `/_install`'s frame selects now show the frame. Each one carries the real
-  template rendered beneath it - against `Nino.css`, the design tokens for the
-  settings being chosen, the picked theme's stylesheet and the frame's own, in
+- `/_install`'s separate Header and Footer steps now show their frame. Each one
+  carries the real template rendered beneath it - against `Nino.css`, the
+  design tokens for the settings being chosen, the picked theme's stylesheet
+  and the frame's own, in
   the order the css bundle loads them. `v4` says nothing about a layout, and
   unlike a theme a frame has no preview image to open; rendering the template
   also cannot go stale the way twelve screenshots would.
@@ -42,26 +43,27 @@ All notable changes to Nino are documented in this file.
   values, and check monotonicity, a body-copy floor and an only-upward
   wide-screen override across all 27 combinations. The raster has no light and
   dark variant, so it is emitted once rather than three times.
-- `/_install` gains a Design step of its own, after Themes. The theme grid
-  already fills a pane, and colour and size both have to be looked at while
-  they are being changed. Themes keeps the grid and the frame selects; Design
-  gets the colour controls, the three size knobs, and a specimen of each -
-  surfaces as real background/text pairs, and the type, spacing and radii drawn
-  at the sizes they generate rather than listed as rem values.
+- `/_install` gains a Design step of its own after Themes, followed by separate
+  Header and Footer steps. The theme grid already fills a pane, and every one
+  of these decisions has to be looked at while it is being changed. Themes
+  keeps only the grid; Design gets the colour controls, the three size knobs,
+  and a specimen of each; Header and Footer each get their own selector and a
+  taller, full-width preview iframe.
 
-  The two steps do not share state: applying a theme installs the design its
-  manifest declares, and the Design step opens by reading what is stored. One
-  source for the current design rather than two that can disagree, and going
-  back to pick a different theme shows that theme's design rather than a stale
-  copy.
+  Applying a theme installs the Design and frame defaults its manifest
+  declares, and the next three steps open on that stored baseline. Design then
+  applies independently; Header and Footer each have a frame-only endpoint, so
+  changing one does not recopy the theme or reset the settled Design. Their
+  previews receive the current Design values and applying Footer after Header
+  restores canonical theme/header/footer bundle order.
 - The `agency` theme maps its sizes onto the raster as well, and declares
   `volume: generous, spacing: airy, shaping: round` - which is what its
   hand-tuned numbers used to spell out one at a time.
 
-- `/_install`'s Themes step now applies the whole look, not just the theme:
-  the header/footer frame and the Design colours go out in the same
-  `themes/apply` post. All three answer the same question, and splitting them
-  across steps is how a project leaves with two of the three set.
+- `/_install`'s Themes step establishes a complete look as a baseline: its
+  `themes/apply` post names only the theme, whose manifest supplies the initial
+  Header, Footer, and Design. The following dedicated steps can override those
+  decisions one at a time.
 
   Frames. A site's `<header>` and `<footer>` are interchangeable units under
   `_install/library/header|footer/<key>` - a `template.tpl` plus the
@@ -74,7 +76,7 @@ All notable changes to Nino are documented in this file.
   Design. The step calls `Theme::write()` with either the operator's settings
   or the `design` block the picked theme's manifest declares, so picking a
   theme and pressing Next produces the look its preview promised. It has a
-  `themes/preview` endpoint of its own rather than borrowing `/_theme`'s:
+  `design/preview` endpoint of its own rather than borrowing `/_theme`'s:
   during an installation there is no admin password yet, so the shared session
   that guards `/_theme` does not exist. Optional throughout - a delivery
   shipping without `/_theme` installs exactly as before, with the Design block

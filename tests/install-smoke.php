@@ -17,8 +17,8 @@ declare(strict_types=1);
 require __DIR__. '/../_nino/Nino.php';
 require __DIR__. '/../_admin/Admin.php';
 // The Themes step calls into /_theme when it is there. Loaded here for the
-// same reason _install/index.php loads it: without it the Design half of
-// that step degrades to "not offered", and the tests below would be
+// same reason _install/index.php loads it: without it the Design step
+// degrades to "not offered", and the tests below would be
 // exercising the degraded path while believing they cover the real one
 require __DIR__. '/../_theme/Theme.php';
 require __DIR__. '/../_install/Install.php';
@@ -402,24 +402,48 @@ check( 'the installed frame really renders through [template /templates/theme.fo
 $emptyStyleFrames = array_filter( glob( __DIR__. '/../_install/library/footer/*/style.css' ) ?: [], static fn( string $file ): bool => filesize( $file ) === 0 );
 check( 'a frame that ships no css of its own is still installable', $emptyStyleFrames === [] || is_file( $sandbox. '/public/assets/style.footer.css' ) === true );
 
-// An operator's pick beats the theme's declaration; anything that is not a
-// real unit falls back rather than reaching the filesystem
-$_POST['data'] = json_encode( [ 'theme' => 'wellness', 'header' => 'v3', 'footer' => 'v2' ] );
-$framePickRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Install\Themes::apiApply( $appData, $framePickRequest );
+// Header and Footer are their own tabs after Design. Each post changes only
+// that frame; the second one must retain the first and restore canonical
+// header/footer bundle order rather than ordering by whichever was last.
+$configBeforeFrames = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
+
+$_POST['data'] = json_encode( [ 'kind' => 'header', 'frame' => 'v3' ] );
+$headerPickRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Install\Themes::apiFrameApply( $appData, $headerPickRequest );
+
+$_POST['data'] = json_encode( [ 'kind' => 'footer', 'frame' => 'v2' ] );
+$footerPickRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Install\Themes::apiFrameApply( $appData, $footerPickRequest );
+
 $configAfterFrames = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
 
-check( 'a posted frame overrides the theme\'s declaration and is persisted', ( $configAfterFrames['/nino/install/header'] ?? null ) === 'v3'
+check( 'each dedicated frame apply succeeds and echoes only its pick', $headerPickRequest['/nino/http/response']['body'] === [ 'kind' => 'header', 'frame' => 'v3' ]
+	&& $footerPickRequest['/nino/http/response']['body'] === [ 'kind' => 'footer', 'frame' => 'v2' ] );
+check( 'each frame overrides the theme\'s declaration and is persisted', ( $configAfterFrames['/nino/install/header'] ?? null ) === 'v3'
 	&& ( $configAfterFrames['/nino/install/footer'] ?? null ) === 'v2' );
 check( '...and the installed template is really that unit\'s', file_get_contents( $sandbox. '/private/templates/theme.header.tpl' ) === file_get_contents( __DIR__. '/../_install/library/header/v3/template.tpl' ) );
+check( 'frame-only applies leave the selected theme and Design untouched', ( $configAfterFrames['/nino/install/theme'] ?? null ) === ( $configBeforeFrames['/nino/install/theme'] ?? null )
+	&& ( $configAfterFrames['/nino/theme/design'] ?? [] ) === ( $configBeforeFrames['/nino/theme/design'] ?? [] ) );
+check( 'applying Footer after Header keeps their canonical bundle order', array_search( '/assets/style.header.css', $configAfterFrames['/nino/html/assets']['/.cache/style.css'], true )
+	< array_search( '/assets/style.footer.css', $configAfterFrames['/nino/html/assets']['/.cache/style.css'], true ) );
 
-$_POST['data'] = json_encode( [ 'theme' => 'wellness', 'header' => '../../../etc/passwd', 'footer' => 'nope' ] );
+// Unlike theme defaults, a choice in a dedicated frame tab is explicit. An
+// invalid key is rejected rather than silently substituting another unit.
+$headerTemplateBeforeBadFrame = (string) file_get_contents( $sandbox. '/private/templates/theme.header.tpl' );
+$_POST['data'] = json_encode( [ 'kind' => 'header', 'frame' => '../../../etc/passwd' ] );
 $badFrameRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Install\Themes::apiApply( $appData, $badFrameRequest );
+\Nino\Install\Themes::apiFrameApply( $appData, $badFrameRequest );
+
+$_POST['data'] = json_encode( [ 'kind' => 'sidebar', 'frame' => 'v1' ] );
+$badFrameKindRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Install\Themes::apiFrameApply( $appData, $badFrameKindRequest );
+
 $configAfterBadFrame = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
 
-check( 'a frame key that names no unit falls back instead of reaching the filesystem', in_array( $configAfterBadFrame['/nino/install/header'] ?? '', [ 'v1', 'v2', 'v3', 'v4', 'v5', 'v6' ], true ) === true
-	&& str_contains( (string) file_get_contents( $sandbox. '/private/templates/theme.header.tpl' ), 'root:' ) === false );
+check( 'a frame key that names no unit is rejected without reaching the filesystem', $badFrameRequest['/nino/http/response']['statusCode'] === 400
+	&& file_get_contents( $sandbox. '/private/templates/theme.header.tpl' ) === $headerTemplateBeforeBadFrame
+	&& ( $configAfterBadFrame['/nino/install/header'] ?? null ) === 'v3' );
+check( 'an unknown frame kind is rejected too', $badFrameKindRequest['/nino/http/response']['statusCode'] === 400 );
 check( 'switching frames swaps the bundled stylesheet rather than adding a second one', count( array_keys( $configAfterBadFrame['/nino/html/assets']['/.cache/style.css'], '/assets/style.header.css', true ) ) === 1 );
 
 // --- the frame preview -------------------------------------------------
@@ -571,6 +595,14 @@ check( 'the operator\'s design beats the theme\'s defaults and is persisted whol
 ] );
 check( '...and the size raster it produced is in the stylesheet', str_contains( (string) file_get_contents( $sandbox. '/public/assets/style.design.css' ), '--nino-space-1: 0.375rem;' ) );
 check( '...and regenerating never leaves a second design entry in the bundle', count( array_keys( $configAfterPick['/nino/html/assets']['/.cache/style.css'], '/assets/style.design.css', true ) ) === 1 );
+
+$_POST['data'] = json_encode( [ 'kind' => 'header', 'frame' => 'v2' ] );
+$frameAfterDesignRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Install\Themes::apiFrameApply( $appData, $frameAfterDesignRequest );
+$configAfterFrameOnDesign = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
+
+check( 'a frame applied after Design preserves the operator\'s full Design settings', $frameAfterDesignRequest['/nino/http/response']['statusCode'] === 200
+	&& ( $configAfterFrameOnDesign['/nino/theme/design'] ?? [] ) === ( $configAfterPick['/nino/theme/design'] ?? [] ) );
 
 $previewRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 $_POST['data']  = json_encode( [ 'design' => [ 'primary' => '#4faae8', 'volume' => 'generous' ] ] );

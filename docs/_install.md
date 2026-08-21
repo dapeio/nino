@@ -2,9 +2,9 @@
 
 **Language:** English · [Deutsch](_install.de.md)
 
-**Last updated:** August 8, 2026 · **Nino version:** 0.11.0-beta.1
+**Last updated:** August 21, 2026 · **Nino version:** 0.11.0-beta.1
 
-This manual explains the decisions and writing processes of the seven steps of `/_install`. If you instead want to take the shortest path from checkout to a configured website, start with [Getting Started](getting-started.md); the later production operation is covered in [Deployment](deployment.md).
+This manual explains the decisions and writing processes of the ten steps of `/_install`. If you instead want to take the shortest path from checkout to a configured website, start with [Getting Started](getting-started.md); the later production operation is covered in [Deployment](deployment.md).
 
 **Additional Links:**
 [README](../README.md) · [Concepts](concepts.md) · [Developer Manual](development.md) · [Getting Started](getting-started.md) · [`/_install` Reference](_install.md) · [`/_admin` Operation](_admin.md) · [`/_templates` Operation](_templates.md) · [`/_editor` Operation](_editor.md) · [`/_theme` Operation](_theme.md) · [Deployment](deployment.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
@@ -19,6 +19,7 @@ The assistant is intended for one-time initial setup. It:
 - sets languages and modules;
 - creates the project directories from its library;
 - applies a theme;
+- sets the Design, Header, and Footer independently;
 - sets up the first web pages;
 - records central website information;
 - creates accesses for `/_editor` and `/_admin`; the admin access also applies to `/_templates`.
@@ -37,7 +38,7 @@ Three different rules apply:
 |---|---|
 | Languages, modules, generated routes, and page list | the visible selection replaces the previously managed state by the assistant |
 | Templates, texts, and element types | are supplemented or updated but not automatically deleted |
-| Theme files | files with the same name are overwritten; additional files from a previous theme remain |
+| Theme and frame files | files with the same name are overwritten; additional files from a previous theme remain |
 
 This distinction protects your own changes. Deselecting a module may remove its configuration; automatically deleting a template file that has been edited in the meantime would not be safe.
 
@@ -87,19 +88,12 @@ Exactly one theme is active. When applying:
 
 1. `/_install` copies the files specified in the manifest into the project;
 2. replaces the previous theme stylesheet in the asset bundle `/.cache/style.css`;
-3. saves the selected theme key under `/nino/install/theme`.
+3. saves the selected theme key under `/nino/install/theme`;
+4. installs the manifest's Design, Header, and Footer defaults as the complete baseline for the following steps.
 
 The position of the stylesheet in the bundle is preserved as much as possible so that the CSS cascade does not change unintentionally. Own additional bundle entries are not removed.
 
 **Important:** Theme files with the same name are overwritten. Files that only the previous theme brought remain. Therefore, secure your own changes via Git before switching or reapplying the theme. After completion, `/_install` locks itself; a later theme change via the interface is therefore not planned and is carried out as a normal project change via files and Git.
-
-### Header and Footer
-
-The site's `<header>` and `<footer>` are interchangeable units under `_install/library/header/<key>` and `_install/library/footer/<key>`, each a `template.tpl` plus the `style.css` for the markup that template brings. Applying copies them to `templates/theme.header.tpl` / `templates/theme.footer.tpl` and bundles the two stylesheets after the theme's.
-
-The base page templates include the installed copy through `[template /templates/theme.header]` rather than carrying the markup themselves, so a frame can be swapped later by replacing those two files. A theme names the frames it was drawn against; picking a theme pre-selects them, and the two selects override that.
-
-Each select carries the frame rendered beneath it - the real template, against the framework, the design tokens and the picked theme's stylesheet, in the same order the css bundle loads them. A version number tells you nothing about a layout, and unlike a theme a frame has no preview image to open. The preview stands in for what a project does not have yet: a placeholder mark where the logo goes, sample navigation items, and the library's own text for everything else. It is a sandboxed document of its own rather than markup in the page, because a frame's stylesheet styles bare element selectors that would otherwise land on the installer.
 
 ## 4. Design
 
@@ -117,7 +111,7 @@ A theme's manifest declares the design it was drawn with, so picking a theme and
 
 This part of the step is optional: a delivery that ships without `/_theme` installs exactly as before, with the Design block absent.
 
-The order in the css bundle is the whole contract, and each of the three picks owns one slot in it:
+The order in the css bundle is the whole contract, and each layer owns one slot in it:
 
 ```
 _nino/Nino.css              framework defaults
@@ -130,7 +124,25 @@ assets/style.css            the project's own overrides
 
 `/_theme` stays available after the installation, so a project can be recolored without reinstalling. See [`_theme.md`](_theme.md).
 
-## 5. Routes
+## 5. Header
+
+The site's `<header>` is an interchangeable unit under `_install/library/header/<key>`, made from a `template.tpl` plus the `style.css` for the markup that template brings. The theme preselects the header it was drawn against; this separate step overrides only that choice after Design has been settled.
+
+Applying copies the unit to `templates/theme.header.tpl` and `assets/style.header.css`, persists its key under `/nino/install/header`, and keeps the frame stylesheets directly after the theme in the CSS bundle. It does not recopy the theme or reset Design.
+
+The taller preview iframe renders the real template against the framework, the just-chosen Design values, the picked theme, and the frame's own stylesheet. A version number says nothing about a layout, and unlike a theme a frame has no preview image to open. The preview stands in for what a project does not have yet: a placeholder mark where the logo goes, sample navigation items, and the library's own text for everything else. It is a sandboxed document of its own because a frame stylesheet uses broad selectors that must not land on the installer.
+
+The base page templates include the installed copy through `[template /templates/theme.header]` rather than carrying the markup themselves, so the header can later be changed by replacing the same two project files.
+
+## 6. Footer
+
+The Footer step follows the same unit contract independently under `_install/library/footer/<key>`. Applying writes `templates/theme.footer.tpl` and `assets/style.footer.css`, persists `/nino/install/footer`, and leaves Theme, Design, and the selected Header untouched.
+
+Its taller preview uses the same final Design and theme context as the Header preview. Applying Footer after Header preserves the canonical bundle order: theme, header stylesheet, footer stylesheet.
+
+The base page templates include it through `[template /templates/theme.footer]`.
+
+## 7. Routes
 
 This step creates the public page structure. The list can be supplemented, edited, deleted, and sorted. With "Continue", the entire visible list is applied as the new state.
 
@@ -152,7 +164,7 @@ A route on the **Blank** template gets its own copy of that template, named afte
 
 Reserved paths such as `/_admin`, `/_editor`, `/_install`, and `/_templates` cannot be used as public pages.
 
-## 6. Personal Information
+## 8. Personal Information
 
 This step records central company and website values as textfills. The values are stored globally and can be edited later via `/_admin` or `/_editor`.
 
@@ -168,7 +180,7 @@ The following keys are typically created:
 
 These textfills are used in templates, meta tags, and possibly in the footer or contact forms.
 
-## 7. Access for `/_editor`
+## 9. Access for `/_editor`
 
 This step creates the first user account for `/_editor`. The account receives full permissions over `/*` and can manage all content, users, and settings.
 
@@ -179,7 +191,7 @@ Provide:
 
 The email address and password can be changed later via `/_editor` or `/_admin`.
 
-## 8. Completion
+## 10. Completion
 
 The last step sets the technical password for `/_admin` and `/_templates` and locks the installer. This password is separate from the editor accounts and should be treated as a technical access with full control.
 

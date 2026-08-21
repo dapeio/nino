@@ -2,16 +2,14 @@
 
 /**
  *	Nino										A compact filesystembased php framework
- *	Install									Step 3: pick the site's look - one tile per
+ *	Install									Steps 3, 5 and 6: pick the site's look - one tile per
  *													_install/library/themes/&lt;key&gt; unit, each with the
  *													preview image, title and description its own
- *													manifest.php declares, plus which header/footer frame
- *													the site uses - both go out in one themes/apply post,
- *													see _install/Install.php's Themes class. The colours a
- *													theme was drawn with are the next step's (design.js);
- *													applying a theme installs the design its manifest
- *													declares, so that step opens on exactly what this one
- *													just chose. Driven by the shared Back/Next bar
+ *													manifest.php declares. Applying the Theme installs its
+ *													declared Design and frame defaults; after Design, Header
+ *													and Footer each get their own full preview step and apply
+ *													only that frame. See _install/Install.php's Themes class.
+ *													Driven by the shared Back/Next bar
  *													(script.js) rather than its own save button - apply() is
  *													exposed for Next to call, not wired to a button here.
  *
@@ -36,6 +34,7 @@
 		_themes 	: {},
 		_selected : null,
 		_frames 	: {},
+		_framePreviewRequests : {},
 
 		/**
 		 *	Load every theme unit - each flagged with whether it's the one
@@ -155,9 +154,9 @@
 		},
 
 		/**
-		 *	Fill the two frame selects. A theme names the header/footer it was
-		 *	drawn against, so what is already applied wins on a revisit and the
-		 *	theme's own declaration only fills in on a fresh install
+		 *	Fill the two later frame steps. A theme names the header/footer it
+		 *	drew against, so what is already applied wins on a revisit and the
+		 *	theme's own declaration only fills in on a fresh install.
 		 *
 		 *	@param		{Object}	active			{ header, footer } as currently installed
 		 *
@@ -165,20 +164,23 @@
 		 */
 		_renderFrames : function( active ) {
 
-			const panel = dc.getElementById('themes-frames');
-			if( panel === null )
-				return;
-
 			const theme = Nino.install.themes._themes[Nino.install.themes._selected] || {};
-			let offered = false;
 
 			[ 'header', 'footer' ].forEach( function( kind ) {
 
-				const select = dc.getElementById('themes-frame-'+ kind);
-				const keys 	 = Nino.install.themes._frames[kind] || [];
+				const select 		= dc.getElementById('themes-frame-'+ kind);
+				const panel 		= dc.getElementById('themes-frame-'+ kind+ '-panel');
+				const unavailable = dc.getElementById('themes-frame-'+ kind+ '-unavailable');
+				const keys 			= Nino.install.themes._frames[kind] || [];
 
 				if( select === null )
 					return;
+
+				if( panel !== null )
+					panel.classList.toggle( 'install-hidden', keys.length === 0 );
+
+				if( unavailable !== null )
+					unavailable.classList.toggle( 'install-hidden', keys.length > 0 );
 
 				select.innerHTML = '';
 
@@ -194,10 +196,9 @@
 				} );
 
 				select.value = wanted.length > 0 ? wanted[0] : ( keys[0] || '' );
-				offered = offered || keys.length > 0;
 
-				// Bound once: _renderFrames() runs again on every visit to the
-				// step, and a second listener would fire a second render for
+				// Bound once: _renderFrames() can run again after a reload, and a
+				// second listener would fire a second render for
 				// every change from then on
 				if( select.dataset === undefined || select.dataset.framePreviewBound !== '1' ) {
 					if( select.dataset !== undefined )
@@ -209,8 +210,25 @@
 
 				Nino.install.themes._renderFramePreview( kind );
 			} );
+		},
 
-			panel.classList.toggle( 'install-hidden', offered === false );
+		/**
+		 *	Refresh one of the dedicated frame steps when it becomes visible.
+		 *	The Design step immediately before it may have changed the token
+		 *	settings since themes/list first rendered the hidden previews.
+		 *
+		 *	@param		{string}	kind				'header' or 'footer'
+		 *
+		 *	@return		void
+		 */
+		showFrame : function( kind ) {
+
+			if( Nino.install.themes._ready === false ) {
+				Nino.install.themes.init();
+				return;
+			}
+
+			Nino.install.themes._renderFramePreview( kind );
 		},
 
 		/**
@@ -234,20 +252,37 @@
 			const select = dc.getElementById('themes-frame-'+ kind);
 			const view 	 = dc.getElementById('themes-frame-'+ kind+ '-preview');
 
-			if( select === null || view === null || select.value === '' )
+			if( select === null || view === null )
 				return;
 
-			const wanted = select.value;
+			const requestId = ( Nino.install.themes._framePreviewRequests[kind] || 0 ) + 1;
+			Nino.install.themes._framePreviewRequests[kind] = requestId;
 
-			Nino.install.apiCall( 'themes/frame', {
+			if( select.value === '' ) {
+				view.removeAttribute('srcdoc');
+				return;
+			}
+
+			const wanted = select.value;
+			const payload = {
 				kind 	 : kind,
 				frame  : wanted,
 				theme  : Nino.install.themes._selected,
-			}, function( status, response ) {
+			};
 
-				// Two answers can be in flight after a quick double change;
-				// only the one for what is selected now may paint
-				if( select.value !== wanted )
+			// Header/Footer follow Design in the wizard, so their preview must
+			// use what the controls just settled on rather than the theme's
+			// manifest defaults that happened to be stored when Themes opened.
+			if( Nino.install.design !== undefined && Nino.install.design._settings !== null && typeof Nino.install.design._settings === 'object' )
+				payload.design = Nino.install.design._settings;
+
+			Nino.install.apiCall( 'themes/frame', payload, function( status, response ) {
+
+				// The initial hidden render and the refresh when its own step opens
+				// can ask for the same frame with different Design values. Selection
+				// alone cannot distinguish those responses, so only the newest
+				// request for this kind may paint.
+				if( Nino.install.themes._framePreviewRequests[kind] !== requestId || select.value !== wanted )
 					return;
 
 				if( status !== 200 || response === null || typeof response.html !== 'string' ) {
@@ -339,17 +374,7 @@
 
 			msg.textContent = 'Applying …';
 
-			// One post, because the two are one decision: a theme whose frames
-			// failed to apply is not the look that was picked. The colours are
-			// the next step's - applying a theme installs the design it
-			// declares, and Design opens on exactly that
 			const payload = { theme : Nino.install.themes._selected };
-
-			[ 'header', 'footer' ].forEach( function( kind ) {
-				const select = dc.getElementById('themes-frame-'+ kind);
-				if( select !== null && select.value !== '' )
-					payload[kind] = select.value;
-			} );
 
 			Nino.install.apiCall( 'themes/apply', payload, function( status, response ) {
 
@@ -365,7 +390,67 @@
 				callback( true );
 			} );
 		},
+
+		/**
+		 *	Apply one frame from its own wizard step. This endpoint deliberately
+		 *	does not reapply the theme or Design: the operator has already
+		 *	settled both in the preceding steps.
+		 *
+		 *	@param		{string}	kind				'header' or 'footer'
+		 *	@param		{Function}	callback		Called with ( success )
+		 *
+		 *	@return		void
+		 */
+		applyFrame : function( kind, callback ) {
+
+			const msg 	 = dc.getElementById(kind+ '-msg');
+			const select = dc.getElementById('themes-frame-'+ kind);
+
+			if( [ 'header', 'footer' ].indexOf( kind ) === -1 ) {
+				callback( false );
+				return;
+			}
+
+			if( Nino.install.themes._ready !== true ) {
+				if( msg !== null ) msg.textContent = 'Frame variants are still loading.';
+				callback( false );
+				return;
+			}
+
+			// A delivery may intentionally ship one of the two kinds without
+			// variants. Its pane says so and remains a valid, skippable step.
+			if( select === null || select.value === '' ) {
+				callback( true );
+				return;
+			}
+
+			if( msg !== null ) msg.textContent = 'Applying …';
+
+			Nino.install.apiCall( 'themes/frame/apply', { kind : kind, frame : select.value }, function( status, response ) {
+
+				if( status !== 200 || response === null ) {
+					if( msg !== null ) msg.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : 'Failed to apply.' );
+					callback( false );
+					return;
+				}
+
+				if( typeof response.frame === 'string' )
+					select.value = response.frame;
+
+				if( msg !== null ) msg.textContent = 'Applied '+ kind+ ': '+ select.value+ '.';
+				callback( true );
+			} );
+		},
 	};
+
+	// Header and Footer are independent wizard steps, but their mechanics are
+	// the same and stay next to the theme/frame state they share.
+	[ 'header', 'footer' ].forEach( function( kind ) {
+		Nino.install[kind] = {
+			showCurrent : function() { Nino.install.themes.showFrame( kind ); },
+			apply : function( callback ) { Nino.install.themes.applyFrame( kind, callback ); },
+		};
+	} );
 
 	Nino.events.bindCallback( 'ready', function() {
 

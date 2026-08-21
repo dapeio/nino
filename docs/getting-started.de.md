@@ -2,7 +2,7 @@
 
 **Sprache:** [English](getting-started.md) · Deutsch
 
-**Stand:** 8. August 2026 · **Nino-Version:** 0.11.0-beta.1
+**Stand:** 21. August 2026 · **Nino-Version:** 0.11.0-beta.1
 
 Dieses Handbuch führt auf dem kürzesten Weg von einem frischen Checkout zu einer lokal laufenden Nino-Webseite. Falls du stattdessen jedes Feld und jeden Schreibvorgang des Assistenten nachschlagen möchtest, lies die [`/_install`-Referenz](_install.de.md); technische Hintergründe stehen in den [Grundkonzepten](concepts.de.md).
 
@@ -29,7 +29,7 @@ php -S 127.0.0.1:8000 router.php
 
 Öffne anschließend <http://127.0.0.1:8000/_install>. `router.php` bildet das lokale Routing ab; für den Produktivbetrieb ist eine eigene Webserver-Konfiguration erforderlich.
 
-## Die sieben Schritte
+## Die zehn Schritte
 
 Solange der Assistent nicht abgeschlossen ist, kannst du zu früheren Schritten zurückkehren und Einstellungen erneut anwenden. Was dabei ersetzt, ergänzt oder erhalten wird, beschreibt die [`/_install`-Referenz](_install.de.md#navigation-und-speichern).
 
@@ -38,12 +38,15 @@ Solange der Assistent nicht abgeschlossen ist, kannst du zu früheren Schritten 
 | [1. Umgebung](_install.de.md#1-umgebung) | Sind PHP, Erweiterungen und Schreibrechte einsatzbereit? |
 | [2. Setup](_install.de.md#2-setup) | Welche Sprachen und funktionalen Module benötigt das Projekt? |
 | [3. Themes](_install.de.md#3-themes) | Welcher visuelle Ausgangspunkt soll kopiert werden? |
-| [4. Routes](_install.de.md#4-routes) | Welche ersten Seiten, öffentlichen Pfade und Metadaten werden angelegt? |
-| [5. Persönliche Angaben](_install.de.md#5-persönliche-angaben) | Welche zentralen Unternehmens- und Webseitenwerte stehen als Textfills bereit? |
-| [6. Editor-Zugang](_install.de.md#6-zugänge-für-_editor) | Welches erste Konto erhält vollständigen Zugriff auf `/_editor`? |
-| [7. Abschluss](_install.de.md#7-abschluss) | Welches getrennte Passwort schützt `/_admin` sowie `/_templates` und sperrt den Installer? |
+| [4. Design](_install.de.md#4-design) | Welche Farben, Typo-Skala, Abstände und Formgebung soll das Theme verwenden? |
+| [5. Header](_install.de.md#5-header) | Welcher separat dargestellte Header-Frame soll installiert werden? |
+| [6. Footer](_install.de.md#6-footer) | Welcher separat dargestellte Footer-Frame soll installiert werden? |
+| [7. Routes](_install.de.md#7-routes) | Welche ersten Seiten, öffentlichen Pfade und Metadaten werden angelegt? |
+| [8. Persönliche Angaben](_install.de.md#8-persönliche-angaben) | Welche zentralen Unternehmens- und Webseitenwerte stehen als Textfills bereit? |
+| [9. Editor-Zugang](_install.de.md#9-zugänge-für-_editor) | Welches erste Konto erhält vollständigen Zugriff auf `/_editor`? |
+| [10. Abschluss](_install.de.md#10-abschluss) | Welches getrennte Passwort schützt `/_admin` sowie `/_templates` und sperrt den Installer? |
 
-Der Assistent löst Abhängigkeiten zwischen gewählten Modulen sowie den verwendeten Seitenvorlagen automatisch auf. Das Theme ist ein Ausgangspunkt für die anschließende Frontend-Entwicklung; nach dem Abschluss ist kein späterer Theme-Wechsel über `/_install` vorgesehen.
+Der Assistent löst Abhängigkeiten zwischen gewählten Modulen sowie den verwendeten Seitenvorlagen automatisch auf. Theme, Design, Header und Footer sind vier aufeinanderfolgende Entscheidungen; nach dem Abschluss ist keine spätere Änderung über `/_install` vorgesehen.
 
 Das erste Editor-Konto besitzt vollständige Rechte. Weitere Konten werden später über `/_admin` angelegt oder gelöscht; bestehende Nutzer verwalten ihre Daten und – mit entsprechender Berechtigung – freigegebene Rechte in `/_editor`.
 

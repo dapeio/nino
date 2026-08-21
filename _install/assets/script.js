@@ -11,11 +11,13 @@
  *													<span id="install-nav-<key>"> + <div id="install-content-<key>">
  *													pair wired up in STEPS below - adding one is: one new pair in
  *													the page-wizard.tpl template, one entry in STEPS, and the
- *													step's own assets/<key>.js.
+ *													step module (one file may serve related steps, as themes.js
+ *													does for Themes, Header and Footer).
  *
  *													"Next" both commits the current step's data (if it has any -
  *													Setup applies its picker, Themes applies the picked theme
- *													and its frames, Design writes the generated stylesheet,
+ *													and defaults, Design writes the generated stylesheet,
+ *													Header/Footer apply their individual frame,
  *													Webpages applies its page list,
  *													PersonalInfos saves its fields, Admin just checks an
  *													account exists) and advances, replacing what used to be
@@ -37,6 +39,8 @@
 			{ key : 'setup', 					paneClass : 'show-setup' 				},
 			{ key : 'themes', 				paneClass : 'show-themes' 				},
 			{ key : 'design', 				paneClass : 'show-design' 				},
+			{ key : 'header', 				paneClass : 'show-header' 				},
+			{ key : 'footer', 				paneClass : 'show-footer' 				},
 			{ key : 'webpages', 			paneClass : 'show-webpages' 			},
 			{ key : 'personalinfos', paneClass : 'show-personalinfos' },
 			{ key : 'admin', 					paneClass : 'show-admin' 				},
@@ -167,6 +171,12 @@
 
 			if( key === 'design' && Nino.install.design !== undefined )
 				return Nino.install.design.apply( function( ok ) { callback( ok ) } );
+
+			if( key === 'header' && Nino.install.header !== undefined )
+				return Nino.install.header.apply( function( ok ) { callback( ok ) } );
+
+			if( key === 'footer' && Nino.install.footer !== undefined )
+				return Nino.install.footer.apply( function( ok ) { callback( ok ) } );
 
 			if( key === 'webpages' && Nino.install.webpages !== undefined )
 				return Nino.install.webpages.apply( function( ok ) { callback( ok ) } );

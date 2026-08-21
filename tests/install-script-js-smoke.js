@@ -67,6 +67,26 @@ vm.runInContext(
 
 const install = sandbox.Nino.install;
 
+const stepKeys = install.STEPS.map( function( step ) { return step.key; } );
+check( 'Header and Footer are separate steps immediately after Design', stepKeys.join(',') === 'checks,setup,themes,design,header,footer,webpages,personalinfos,admin,finish' );
+
+let frameCommit = [];
+install.header = { apply : function( callback ) { frameCommit.push('header'); callback( true ); } };
+install.footer = { apply : function( callback ) { frameCommit.push('footer'); callback( true ); } };
+install._commitStep( 'header', function() {} );
+install._commitStep( 'footer', function() {} );
+check( 'Next dispatches each new frame step to its own apply action', frameCommit.join(',') === 'header,footer' );
+
+const wizardTemplate = fs.readFileSync( path.join( __dirname, '../_install/templates/page-wizard.tpl' ), 'utf8' );
+check( 'the wizard template carries matching nav and content pairs for both tabs', wizardTemplate.includes('id="install-nav-header"')
+	&& wizardTemplate.includes('id="install-content-header"')
+	&& wizardTemplate.includes('id="install-nav-footer"')
+	&& wizardTemplate.includes('id="install-content-footer"')
+	&& wizardTemplate.includes('id="themes-frames"') === false );
+
+const installStyle = fs.readFileSync( path.join( __dirname, '../_install/assets/style.css' ), 'utf8' );
+check( 'the isolated frame previews use the taller viewport', installStyle.includes('--frame-height: 36rem;') );
+
 install._setBusy( true );
 check( 'a pending commit disables both shared navigation buttons', elements['install-back'].disabled === true && elements['install-next'].disabled === true );
 

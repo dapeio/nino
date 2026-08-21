@@ -55,7 +55,7 @@
 #install-content-wrap > div {
 	display: none;
 }
-#install-page-wrap.show-checks #install-content-checks, #install-page-wrap.show-setup #install-content-setup, #install-page-wrap.show-themes #install-content-themes, #install-page-wrap.show-design #install-content-design, #install-page-wrap.show-webpages #install-content-webpages, #install-page-wrap.show-personalinfos #install-content-personalinfos, #install-page-wrap.show-admin #install-content-admin, #install-page-wrap.show-finish #install-content-finish {
+#install-page-wrap.show-checks #install-content-checks, #install-page-wrap.show-setup #install-content-setup, #install-page-wrap.show-themes #install-content-themes, #install-page-wrap.show-design #install-content-design, #install-page-wrap.show-header #install-content-header, #install-page-wrap.show-footer #install-content-footer, #install-page-wrap.show-webpages #install-content-webpages, #install-page-wrap.show-personalinfos #install-content-personalinfos, #install-page-wrap.show-admin #install-content-admin, #install-page-wrap.show-finish #install-content-finish {
 	display: block;
 }
 
@@ -170,9 +170,8 @@
 	font-size: .76rem;
 	line-height: 1.45;
 }
-/*	Frames and Design - the two panels under the theme grid. Both are filled
- *	in by themes.js from themes/list and hide themselves when there is nothing
- *	to offer (no frame units on disk, or a delivery without /_theme). */
+/*	Header/Footer each own a full step after Design. themes.js fills these
+ *	panels from themes/list and hides one when that kind has no units on disk. */
 
 .install-theme-panel {
 	margin: 0 0 1.25rem;
@@ -181,23 +180,10 @@
 	border-radius: var(--editor-radius);
 	background: var(--editor-bg-grouped);
 }
-.install-theme-panel-title {
-	margin: 0 0 .35rem;
-	font-size: .86rem;
-	font-weight: 650;
-}
 .install-design-grid {
 	display: grid;
 	grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
 	gap: .75rem;
-	margin-top: .8rem;
-}
-/*	One column, not two side by side: a frame preview is a full-width strip,
- *	and half a header tells you nothing about how it lays out */
-.install-theme-frames {
-	display: flex;
-	flex-direction: column;
-	gap: 1.1rem;
 	margin-top: .8rem;
 }
 .install-frame-pick {
@@ -221,11 +207,11 @@
  *	gets rather than the same frame in its mobile arrangement.
  *
  *	transform: scale() does not change the space the element takes, so the
- *	stage would keep a full 15rem of it and leave a gap under the picture. The
+ *	stage would keep its full height and leave a gap under the picture. The
  *	pull-up is derived from the same two variables rather than measured off a
  *	screenshot, so changing either keeps the two in step. */
 .install-frame-view {
-	--frame-height: 16rem;
+	--frame-height: 36rem;
 	--frame-scale: .75;
 
 	display: block;
@@ -479,7 +465,7 @@
 
 /* --------------------------------------------------------- Step messages */
 
-#setup-msg, #themes-msg, #webpages-msg, #personalinfos-msg, #editor-add-msg, #finish-msg {
+#setup-msg, #themes-msg, #design-msg, #header-msg, #footer-msg, #webpages-msg, #personalinfos-msg, #editor-add-msg, #finish-msg {
 	min-height: 1.25rem;
 	color: var(--editor-text-secondary);
 	font-size: .8rem;

@@ -2,7 +2,7 @@
 
 /**
  *	Nino										A compact filesystembased php framework
- *	Install									Step 3: the project's actual pages - a free-form, ordered
+ *	Install									Step 7: the project's actual pages - a free-form, ordered
  *													list of { uri, httpUri, template, navs, text } entries
  *													built here, rather than a fixed checkbox per
  *													_install/library/pages/&lt;key&gt; unit (that picker is

@@ -7,8 +7,9 @@ declare(strict_types=1);
  *												_editor/Editor.php and _admin/Admin.php. Walks a fresh checkout through
  *												environment/permission checks, assembling starting content from
  *												_install/library/ (locales/modules -> routes/templates/text,
- *												a theme -> stylesheet/fonts + the css bundle, an ordered
- *												list of actual pages -> routes/templates/text/
+ *												a theme -> stylesheet/fonts + the css bundle, then separate
+ *												Design/Header/Footer choices, an ordered list of actual
+ *												pages -> routes/templates/text/
  *												navigation), bulk-filling the site's always-present "Personal
  *												Infos" text, creating the first _editor account(s) and finally
  *												setting the real _admin password.
@@ -727,7 +728,7 @@ namespace Nino\Install {
 
 	/**
 	 *	Nino							A compact filesystembased php framework
-	 *	Install						Step 3: pick one of _install/library/themes/&lt;key&gt; - a
+	 *	Install						Steps 3-6: pick one of _install/library/themes/&lt;key&gt; - a
 	 *												complete, self-contained look: its own stylesheet, the
 	 *												webfonts that stylesheet actually references, and
 	 *												whatever else its manifest lists (theme images, ...).
@@ -750,10 +751,11 @@ namespace Nino\Install {
 	 *												step has to be able to show the current pick every time
 	 *												it's revisited
 	 *
-	 *												The step applies two more things alongside the theme,
-	 *												because all three decide the same thing - what the site
-	 *												looks like - and splitting them across steps would let a
-	 *												project leave with two of the three set:
+	 *												The Theme apply also installs the manifest's frame and
+	 *												Design defaults, so the next three steps open on the
+	 *												complete look the preview promised. Design, Header and
+	 *												Footer then apply independently rather than making a
+	 *												frame choice recopy the theme or reset a settled Design.
 	 *
 	 *												Frames. The site's &lt;header&gt; and &lt;footer&gt; are
 	 *												interchangeable units under library/header|footer/&lt;key&gt;,
@@ -765,7 +767,7 @@ namespace Nino\Install {
 	 *												'/nino/install/header|footer'.
 	 *
 	 *												Design. /_theme owns the --nino-* colour tokens a theme
-	 *												stylesheet assigns to roles; this step calls
+	 *												stylesheet assigns to roles; the Design action calls
 	 *												Theme::write() with either the operator's settings or the
 	 *												defaults the theme's manifest declares. It is optional -
 	 *												see _designAvailable() - so a delivery without /_theme
@@ -808,6 +810,7 @@ namespace Nino\Install {
 			return [
 				'themes/list' 		=> [ self::class, 'apiList' ],
 				'themes/frame' 		=> [ self::class, 'apiFrame' ],
+				'themes/frame/apply' => [ self::class, 'apiFrameApply' ],
 				'themes/apply' 		=> [ self::class, 'apiApply' ],
 				// The Design step is a wizard step of its own (see
 				// page-wizard.tpl), but the same class owns it: a theme's
@@ -951,6 +954,46 @@ namespace Nino\Install {
 					self::_framePreviewCss( $appData, $data, $unitDir )
 				),
 			] );
+		}
+
+		/**
+		 *	Install the one frame selected in its dedicated wizard step. Theme
+		 *	and Design are deliberately untouched: both were committed before
+		 *	Header/Footer, and applying a frame must not reset either decision.
+		 *
+		 *	All already-active frame stylesheets are rebundled together in
+		 *	FRAMES order. Applying Footer after Header would otherwise move the
+		 *	footer ahead of the existing header merely because it was last.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		&$request			(reference) Current server request
+		 *
+		 *	@return 	void
+		 */
+		public static function apiFrameApply( array &$appData, array &$request ): void {
+
+			$data 	= \Nino\Install\Install::postData();
+			$kind 	= (string) ( $data['kind'] ?? '' );
+			$frame 	= (string) ( $data['frame'] ?? '' );
+
+			if( isset( self::FRAMES[$kind] ) === false ) {
+				\Nino\Http::fail( $request, 400, 'unknown frame kind' );
+				return;
+			}
+
+			if( in_array( $frame, self::_frames()[$kind] ?? [], true ) === false ) {
+				\Nino\Http::fail( $request, 400, 'unknown '. $kind. ' frame: "'. $frame. '"' );
+				return;
+			}
+
+			self::_applyFrame( $appData, $kind, $frame );
+
+			$appData['/nino/install/'. $kind] = $frame;
+			$appData['/nino/html/assets'] = self::_bundleFrames( $appData, self::_activeFrameKinds( $appData ) );
+
+			\Nino\AppData::writeContentData( $appData, [ '/nino/install/'. $kind, '/nino/html/assets' ] );
+
+			\Nino\Http::ok( $request, [ 'kind' => $kind, 'frame' => $frame ] );
 		}
 
 		/**
@@ -1276,11 +1319,11 @@ namespace Nino\Install {
 			$appData['/nino/install/theme'] = $key;
 			$appData['/nino/html/assets'] 	= self::_bundle( $appData, (string) $manifest['stylesheet'] );
 
-			// Frames follow the theme unless the operator picked otherwise:
-			// a theme names the header/footer it was drawn against, and a
-			// project that never touches the two selects still gets a
-			// complete, deliberate frame rather than whichever unit sorts
-			// first
+			// Establish the theme's frame defaults now, so Design and both
+			// dedicated frame steps start from the complete look its preview
+			// promised. The later Header/Footer posts replace one frame without
+			// recopying the theme. Explicit frame values remain accepted for
+			// callers predating those separate steps.
 			$applied = [];
 
 			foreach( self::FRAMES as $kind => $paths ) {
@@ -1322,7 +1365,7 @@ namespace Nino\Install {
 		/**
 		 *	Whether /_theme is part of this delivery. Install.php is required
 		 *	by a tool folder that may have been stripped from a release, so
-		 *	the Design half of this step degrades to "not offered" rather than
+		 *	the Design step degrades to "not offered" rather than
 		 *	to a fatal on a class that isn't there
 		 *
 		 *	@return 	bool
@@ -1412,6 +1455,28 @@ namespace Nino\Install {
 			}
 
 			return $frames;
+		}
+
+		/**
+		 *	Frame kinds already present in the project, in canonical bundle
+		 *	order. The persisted key is the normal signal; recognizing an
+		 *	existing bundle entry too keeps projects created before those keys
+		 *	were introduced stable when only one frame is changed.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	array
+		 */
+		private static function _activeFrameKinds( array &$appData ): array {
+
+			$bundled = array_map( 'strval', $appData['/nino/html/assets'][self::BUNDLE_KEY] ?? [] );
+			$active 	 = [];
+
+			foreach( self::FRAMES as $kind => $paths )
+				if( (string) ( $appData['/nino/install/'. $kind] ?? '' ) !== '' || in_array( $paths['stylesheet'], $bundled, true ) === true )
+					$active[] = $kind;
+
+			return $active;
 		}
 
 		/**
@@ -1534,10 +1599,10 @@ namespace Nino\Install {
 					'preview' 		=> ( $preview !== '' && is_file( self::LIBRARY. '/'. $entry. '/'. $preview ) === true )
 						? ( (string) ( $appData['/nino/dir'] ?? '' ) ). '/_install/library/themes/'. $entry. '/'. $preview
 						: null,
-					// What this look was drawn against. The picker pre-fills
-					// the frame selects and the Design controls from these
-					// when the theme is chosen, so a plain "pick a theme,
-					// press Next" produces the look the preview promised
+					// What this look was drawn against. Theme apply installs
+					// these as the baseline; the later Design/Header/Footer
+					// steps read or preselect them, so a plain trip through
+					// the wizard produces the look the preview promised
 					'header' 			=> (string) ( $manifest['header'] ?? '' ),
 					'footer' 			=> (string) ( $manifest['footer'] ?? '' ),
 					'design' 			=> is_array( $manifest['design'] ?? null ) ? $manifest['design'] : null,
@@ -1657,7 +1722,7 @@ namespace Nino\Install {
 
 	/**
 	 *	Nino							A compact filesystembased php framework
-	 *	Install						Step 4: build the project's actual pages - a free-form,
+	 *	Install						Step 7: build the project's actual pages - a free-form,
 	 *												ordered list of { uri, httpUri, template, nav, text }
 	 *												entries a developer adds/reorders/removes here, rather
 	 *												than a fixed checkbox per _install/library/pages/&lt;key&gt;
@@ -2815,7 +2880,7 @@ namespace Nino\Install {
 
 	/**
 	 *	Nino							A compact filesystembased php framework
-	 *	Install						Step 5: bulk-fill the handful of "Personal Infos" keys every
+	 *	Install						Step 8: bulk-fill the handful of "Personal Infos" keys every
 	 *												project has regardless of what Setup/Webpages picked -
 	 *												/company/* and /website/* (company/contact details,
 	 *												the site's author/hosting info), each with a friendly
@@ -2952,7 +3017,7 @@ namespace Nino\Install {
 
 	/**
 	 *	Nino							A compact filesystembased php framework
-	 *	Install						Step 6: create the first _editor account(s), the same way
+	 *	Install						Step 9: create the first _editor account(s), the same way
 	 *												\Nino\Admin\Users bootstraps them from inside _admin - duplicated
 	 *												rather than depended on, since /_install is meant to work even
 	 *												before a developer has decided whether to keep _admin around
@@ -3058,7 +3123,7 @@ namespace Nino\Install {
 
 	/**
 	 *	Nino							A compact filesystembased php framework
-	 *	Install						Step 7 - the wizard's last step: set the real _admin password.
+	 *	Install						Step 10 - the wizard's last step: set the real _admin password.
 	 *												Writes it under the private directory rather than into any
 	 *												tool folder (see Install::setDevPassword()), and is the one
 	 *												action whose success is itself what locks /_install back out -

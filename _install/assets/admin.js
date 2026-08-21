@@ -2,7 +2,7 @@
 
 /**
  *	Nino										A compact filesystembased php framework
- *	Install									Step 4: create the first _editor account(s). See
+ *	Install									Step 9: create the first _editor account(s). See
  *													_install/Install.php's Admin class. "Create admin" stays
  *													its own repeatable action (unlike Setup/Content, more than
  *													one submit here is the normal case) - only the

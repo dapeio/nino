@@ -28,10 +28,12 @@
 					<span id="install-nav-setup">2. Setup</span>
 					<span id="install-nav-themes">3. Themes</span>
 					<span id="install-nav-design">4. Design</span>
-					<span id="install-nav-webpages">5. Routes</span>
-					<span id="install-nav-personalinfos">6. Personal Infos</span>
-					<span id="install-nav-admin">7. Admins</span>
-					<span id="install-nav-finish">8. Finish</span>
+					<span id="install-nav-header">5. Header</span>
+					<span id="install-nav-footer">6. Footer</span>
+					<span id="install-nav-webpages">7. Routes</span>
+					<span id="install-nav-personalinfos">8. Personal Infos</span>
+					<span id="install-nav-admin">9. Admins</span>
+					<span id="install-nav-finish">10. Finish</span>
 				</div>
 			</aside>
 
@@ -63,41 +65,6 @@
 				<div id="install-content-themes">
 					<p class="nino-admin-hint nino-admin-hint-lead">Pick the site's look - one complete theme from <code>_install/library/themes</code>. Applying copies whatever its manifest lists (its stylesheet, the webfonts that stylesheet uses, any images it ships) into the project and points <code>config.php</code>'s css bundle at it. Click a tile's preview to enlarge it. Exactly one theme is active at a time: picking a different one later overwrites its files rather than adding to them.</p>
 					<div id="themes-grid"></div>
-
-					<!-- Frames and Design, both filled in by themes.js from
-					     themes/list. The Design block removes itself when the
-					     delivery has no /_theme - see Themes::_designAvailable() -->
-					<div id="themes-frames" class="install-theme-panel install-hidden">
-						<h3 class="install-theme-panel-title">Header and footer</h3>
-						<p class="nino-admin-hint">Which frame the site's <code>&lt;header&gt;</code> and <code>&lt;footer&gt;</code> use. The page templates include the installed copy through <code>&#91;template /templates/theme.header&#93;</code>, so this can be changed later by swapping those two files. Picking a theme pre-selects the frames it was drawn against.</p>
-						<!-- A version number says nothing about what a frame looks
-						     like, and unlike a theme there is no preview image to
-						     open. Each select carries the real thing, rendered by
-						     themes/frame into a sandboxed iframe - see
-						     Themes::apiFrame() for why it is a document of its own
-						     and not markup spliced in here -->
-						<div class="install-theme-frames">
-							<div class="install-frame-pick">
-								<label class="install-theme-field">
-									<span>Header</span>
-									<select id="themes-frame-header" class="nino-admin-input"></select>
-								</label>
-								<div class="install-frame-stage">
-									<iframe id="themes-frame-header-preview" class="install-frame-view" title="Header preview" sandbox="" loading="lazy" scrolling="no"></iframe>
-								</div>
-							</div>
-							<div class="install-frame-pick">
-								<label class="install-theme-field">
-									<span>Footer</span>
-									<select id="themes-frame-footer" class="nino-admin-input"></select>
-								</label>
-								<div class="install-frame-stage">
-									<iframe id="themes-frame-footer-preview" class="install-frame-view" title="Footer preview" sandbox="" loading="lazy" scrolling="no"></iframe>
-								</div>
-							</div>
-						</div>
-					</div>
-
 					<p id="themes-msg"></p>
 				</div>
 
@@ -168,6 +135,44 @@
 					</div>
 
 					<p id="design-msg"></p>
+				</div>
+
+				<div id="install-content-header">
+					<p class="nino-admin-hint nino-admin-hint-lead">Pick the site's <code>&lt;header&gt;</code>. The theme chooses the version it was drawn against; this separate step lets you replace it after settling the Design values. The base page templates include the installed copy through <code>&#91;template /templates/theme.header&#93;</code>.</p>
+					<p id="themes-frame-header-unavailable" class="nino-admin-hint install-hidden">This delivery ships no header variants. Press "Next" to continue.</p>
+					<!-- A version number says nothing about what a frame looks
+					     like, so themes/frame renders the real template into an
+					     isolated document rather than splicing its broad CSS into
+					     the installer page. -->
+					<div id="themes-frame-header-panel" class="install-theme-panel install-hidden">
+						<div class="install-frame-pick">
+							<label class="install-theme-field">
+								<span>Header variant</span>
+								<select id="themes-frame-header" class="nino-admin-input"></select>
+							</label>
+							<div class="install-frame-stage">
+								<iframe id="themes-frame-header-preview" class="install-frame-view" title="Header preview" sandbox="" loading="lazy"></iframe>
+							</div>
+						</div>
+					</div>
+					<p id="header-msg"></p>
+				</div>
+
+				<div id="install-content-footer">
+					<p class="nino-admin-hint nino-admin-hint-lead">Pick the site's <code>&lt;footer&gt;</code>. It is installed independently from the Header, using the theme and Design chosen in the preceding steps. The base page templates include the installed copy through <code>&#91;template /templates/theme.footer&#93;</code>.</p>
+					<p id="themes-frame-footer-unavailable" class="nino-admin-hint install-hidden">This delivery ships no footer variants. Press "Next" to continue.</p>
+					<div id="themes-frame-footer-panel" class="install-theme-panel install-hidden">
+						<div class="install-frame-pick">
+							<label class="install-theme-field">
+								<span>Footer variant</span>
+								<select id="themes-frame-footer" class="nino-admin-input"></select>
+							</label>
+							<div class="install-frame-stage">
+								<iframe id="themes-frame-footer-preview" class="install-frame-view" title="Footer preview" sandbox="" loading="lazy"></iframe>
+							</div>
+						</div>
+					</div>
+					<p id="footer-msg"></p>
 				</div>
 
 				<div id="install-content-webpages">

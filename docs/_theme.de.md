@@ -134,7 +134,7 @@ Die Reihenfolge ist die Regel, die das Ganze trägt: Design liefert die Werte, d
 
 ## Woher die Einstellungen kommen
 
-Der Themes-Schritt in `/_install` schreibt sie zuerst: Das Manifest eines Themes erklärt den `design`-Block, mit dem es gezeichnet wurde, und der Installer wendet entweder diesen an oder das, was die Bedienung gewählt hat. `/_theme` bearbeitet danach dieselben gespeicherten Einstellungen - auf beiden Seiten dasselbe `Theme::write()`, also ein Generator und ein Stylesheet, nicht eine Installations- und eine Laufzeitkopie.
+Der Themes-Schritt in `/_install` schreibt zuerst den Ausgangspunkt aus dem `design`-Block, mit dem das gewählte Theme gezeichnet wurde. Der folgende Design-Schritt speichert die Auswahl der Bedienung, und `/_theme` bearbeitet danach dieselben Einstellungen. Alle drei Wege verwenden dasselbe `Theme::write()` - also einen Generator und ein Stylesheet, nicht getrennte Installations- und Laufzeitkopien.
 
 ## Das Design später ändern
 
