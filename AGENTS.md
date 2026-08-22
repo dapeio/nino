@@ -1726,6 +1726,12 @@ Elements `item` is a direct flex child of that row and already stretches to its
 row line, so equalizing heights (`nino-autoheight`) belongs on the boxes inside the
 card through `render.<type>`, not on the item.
 
+At runtime, `data-cover-height` is a percentage of the viewport height;
+`data-cover-width` is a percentage of the cover's containing content box. Keep
+that distinction: a header may reserve a persistent side rail and leave
+`<main>` narrower than the viewport, so a cover width based on `100vw` would
+overflow by precisely that rail width.
+
 Only the manifest decides this. Nothing is read from the request: the composer
 has no data-* control, a `data` key inside posted section metadata is ignored,
 and arbitrary attributes remain HTML+ work.

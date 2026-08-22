@@ -455,6 +455,11 @@ und wird bereits auf die Höhe seiner Zeile gestreckt; Höhenangleich gehört da
 über `render.<type>` an die Boxen in der Karte — genau so richtet das
 Articles-Preset die Call-to-Actions seiner Karten aneinander aus.
 
+Die Cover-Höhe bleibt ein Prozentwert des Viewports. Die Cover-Breite bezieht
+sich dagegen auf die tatsächliche Contentbox des umgebenden Elements. Eine
+dauerhafte Seitennavigation kann `<main>` damit verschmälern, ohne dass das
+Cover um die Navigationsbreite überläuft.
+
 ### Versionsvertrag
 
 Die Section Library lädt ausschließlich Manifeste mit explizitem `version => 3`. Eine fehlende, ältere oder unbekannte Version wird ignoriert, statt in eine andere UI geraten zu werden. Bereits erzeugtes HTML bleibt gültiger Runtime-Quelltext und kann über HTML+ weiterbearbeitet werden; zum neuen Einfügen oder grafischen Wiederöffnen eines verwalteten Presets wird jedoch ein gepflegtes V3-Manifest benötigt.

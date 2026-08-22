@@ -522,6 +522,10 @@ line, so equalizing heights belongs on the boxes inside the card via
 `render.<type>` — which is how the Articles preset lines up its cards' calls to
 action.
 
+Cover height remains a percentage of the viewport. Cover width is a percentage
+of the actual containing content box, so a persistent side navigation can make
+`<main>` narrower without the cover overflowing by the navigation width.
+
 ### Version contract
 
 The Section Library loads explicit `version => 3` manifests only. A missing,

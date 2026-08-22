@@ -839,6 +839,12 @@ All notable changes to Nino are documented in this file.
 
 ### Fixed
 
+- `nino-cover` keeps its viewport-relative height but now derives width from
+  its actual containing content box. A layout with a persistent side rail,
+  such as Header v6, therefore no longer receives `rail + 100vw` and overflow
+  horizontally; custom `data-cover-width` percentages follow the same local
+  width while retaining their fixed-margin allowance.
+
 - Header previews now preserve UTF-8 and HTML-significant characters in live
   project text (for example `Müller & Söhne "Studio"`) instead of letting a
   legacy encoding or an attribute delimiter corrupt the iframe. The shared

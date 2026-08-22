@@ -51,6 +51,29 @@
 		},
 
 		/**
+		 *	Width available to a cover inside its actual containing block.
+		 *	Cover height is intentionally viewport-relative, but its width must
+		 *	respect layouts that reserve part of that viewport for a side rail.
+		 *
+		 *	@param		{Element}	cover				Cover element being resized
+		 *	@param		{number}	viewportWidth	Fallback when there is no measurable parent
+		 *
+		 *	@return		{number}					Parent content-box width in pixels
+		 */
+		_coverContainingWidth : function( cover, viewportWidth ) {
+
+			const parent = cover.parentElement;
+			if( parent === null || Number.isFinite( Number( parent.clientWidth ) ) === false )
+				return viewportWidth;
+
+			const style = wn.getComputedStyle( parent );
+			const padding = ( parseFloat( style.getPropertyValue('padding-left') ) || 0 )
+				+ ( parseFloat( style.getPropertyValue('padding-right') ) || 0 );
+
+			return Math.max( 0, Number( parent.clientWidth ) - padding );
+		},
+
+		/**
 		 *	Initialize all ui behaviors (cover, parallax, vpa, autoheight,
 		 *	scroll header, slider, form) for the elements found on the
 		 *	current page
@@ -151,18 +174,23 @@
 			 *	nino-cover
 			 */
 			if( e.cover.length > 0 ) {
-				// Resize each .nino-cover element to fill its configured percentage of the viewport
+				// Height is a percentage of the viewport. Width is a percentage of
+				// the containing content box: a persistent side navigation (Header
+				// v6) already removes its rail from <main>, so adding 100vw inside
+				// that narrower main would overflow by exactly the rail width.
 				ui._onResize.push( function( wH, wW ) {
 					for( let i=0, l=e.cover.length; i<l; i++ ) {
 						let
 							w 			= e.cover[i].getAttribute( 'data-cover-width' ) ?? 100,
 							h 			= e.cover[i].getAttribute( 'data-cover-height' ) ?? 90,
-							padH		= ( parseInt(window.getComputedStyle(e.cover[i]).getPropertyValue('margin-top').slice(0,-2)) ?? 0 ) + ( parseInt(window.getComputedStyle(e.cover[i]).getPropertyValue('margin-bottom').slice(0,-2)) ?? 0 ),
-							padW		= ( parseInt(window.getComputedStyle(e.cover[i]).getPropertyValue('margin-left').slice(0,-2)) ?? 0 ) + ( parseInt(window.getComputedStyle(e.cover[i]).getPropertyValue('margin-right').slice(0,-2)) ?? 0 ),
-							wrapH		= e.cover[i].querySelector('div').offsetHeight ?? 0;
+							style		= wn.getComputedStyle( e.cover[i] ),
+							marginH		= ( parseFloat( style.getPropertyValue('margin-top') ) || 0 ) + ( parseFloat( style.getPropertyValue('margin-bottom') ) || 0 ),
+							marginW		= ( parseFloat( style.getPropertyValue('margin-left') ) || 0 ) + ( parseFloat( style.getPropertyValue('margin-right') ) || 0 ),
+							contW		= ui._coverContainingWidth( e.cover[i], wW ),
+							wrapH		= e.cover[i].querySelector('div')?.offsetHeight ?? 0;
 
-						if( h !== null ) e.cover[i].style.height = Math.max( ( ( wH / 100 * h ) - padH ), 50 + wrapH ) + 'px';
-						if( w !== null ) e.cover[i].style.width = ( ( wW / 100 * w ) - padW ) + 'px';
+						if( h !== null ) e.cover[i].style.height = Math.max( ( ( wH / 100 * h ) - marginH ), 50 + wrapH ) + 'px';
+						if( w !== null ) e.cover[i].style.width = ( ( contW * w / 100 ) - marginW ) + 'px';
 					}
 				} );
 			}
