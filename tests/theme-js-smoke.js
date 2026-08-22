@@ -83,16 +83,16 @@ nodes['theme-page-wrap'].classList.add('show-theme');
 
 let appearance = {
 	themes : {
-		agency : { label : 'Agency', description : 'Bright corporate', preview : '/agency.svg', header : 'v1', footer : 'v1' },
-		nighty : { label : 'Nighty', description : '<b>server text stays text</b>', preview : '/nighty.svg', header : 'v4', footer : 'v2' },
+		basis : { label : 'Basis', description : 'Neutral starting point', preview : '/basis.svg', header : 'v1', footer : 'v1' },
+		nocturne : { label : 'Nocturne', description : '<b>server text stays text</b>', preview : '/nocturne.svg', header : 'v5', footer : 'v2' },
 	},
-	activeTheme : 'agency',
-	frames : { header : [ 'v1', 'v2', 'v4' ], footer : [ 'v1', 'v2' ] },
+	activeTheme : 'basis',
+	frames : { header : [ 'v1', 'v2', 'v5' ], footer : [ 'v1', 'v2' ] },
 	activeFrames : { header : 'v1', footer : 'v1' },
 };
 
 const designRead = {
-	settings : { primary : '#4faae8', secondary : '', contrast : 'default', colors : 'default', volume : 'generous', spacing : 'airy', shaping : 'round' },
+	settings : { primary : '#b6a6ff', secondary : '', contrast : 'high', colors : 'vibrant', volume : 'default', spacing : 'default', shaping : 'round' },
 	choices : {
 		contrast : [ 'soft', 'default', 'high' ],
 		colors : [ 'clean', 'default', 'vibrant' ],
@@ -135,8 +135,8 @@ sandbox.Nino = {
 			let response = {};
 			if( data.action === 'appearance/read' ) response = appearance;
 			if( data.action === 'theme/apply' ) {
-				appearance = Object.assign( {}, appearance, { activeTheme : payload.theme, activeFrames : { header : 'v4', footer : 'v2' } } );
-				response = { theme : payload.theme, header : 'v4', footer : 'v2' };
+				appearance = Object.assign( {}, appearance, { activeTheme : payload.theme, activeFrames : { header : 'v5', footer : 'v2' } } );
+				response = { theme : payload.theme, header : 'v5', footer : 'v2' };
 			}
 			if( data.action === 'design/read' ) response = designRead;
 			if( data.action === 'design/preview' ) response = designRead;
@@ -162,23 +162,23 @@ check( 'the tool exposes exactly the four requested dialogs', JSON.stringify( th
 check( 'Theme opens first and loads the shared appearance catalogue', nodes['theme-page-wrap'].classList.contains('show-theme') === true
 	&& posts[0].action === 'appearance/read'
 	&& nodes['theme-grid'].children.length === 2 );
-check( 'the applied Theme is also the selected Theme', theme._activeTheme === 'agency'
-	&& theme._selectedTheme === 'agency'
+check( 'the applied Theme is also the selected Theme', theme._activeTheme === 'basis'
+	&& theme._selectedTheme === 'basis'
 	&& nodes['theme-grid'].children[0].classList.contains('theme-tile--active') === true
 	&& nodes['theme-grid'].children[0].classList.contains('theme-tile--selected') === true );
 check( 'API descriptions are inserted as text, never interpreted as markup', nodes['theme-grid'].children[1].children[2].children[1].textContent === '<b>server text stays text</b>' );
 
 // Pick the second card through its radio and apply only that Theme choice.
-const nightyRadio = nodes['theme-grid'].children[1].children[0];
-nightyRadio.checked = true;
-nightyRadio.fire('change');
+const nocturneRadio = nodes['theme-grid'].children[1].children[0];
+nocturneRadio.checked = true;
+nocturneRadio.fire('change');
 nodes['theme-action-save'].fire('click');
 
 const themeApply = posts.filter( function( post ) { return post.action === 'theme/apply'; } )[0];
 check( 'Theme apply posts only the picked Theme', themeApply !== undefined
-	&& JSON.stringify( themeApply.payload ) === JSON.stringify( { theme : 'nighty' } ) );
-check( 'a successful Theme apply refreshes the complete baseline', theme._activeTheme === 'nighty'
-	&& theme._activeFrames.header === 'v4'
+	&& JSON.stringify( themeApply.payload ) === JSON.stringify( { theme : 'nocturne' } ) );
+check( 'a successful Theme apply refreshes the complete baseline', theme._activeTheme === 'nocturne'
+	&& theme._activeFrames.header === 'v5'
 	&& theme._activeFrames.footer === 'v2'
 	&& nodes['theme-action-status'].textContent.indexOf('recommended baseline') !== -1 );
 
@@ -215,10 +215,10 @@ check( 'Design save posts the settings directly and only to design/save', design
 posts.length = 0;
 nodes['theme-nav-header'].fire('click');
 check( 'Header opens on the active frame and renders it server-side', nodes['theme-page-wrap'].classList.contains('show-header') === true
-	&& nodes['theme-frame-header'].value === 'v4'
-	&& nodes['theme-frame-header-preview'].srcdoc === '<!doctype html><body data-frame="header/v4">'
+	&& nodes['theme-frame-header'].value === 'v5'
+	&& nodes['theme-frame-header-preview'].srcdoc === '<!doctype html><body data-frame="header/v5">'
 	&& posts[0].action === 'frame/preview'
-	&& posts[0].payload.theme === 'nighty'
+	&& posts[0].payload.theme === 'nocturne'
 	&& posts[0].payload.design.spacing === 'tight' );
 
 posts.length = 0;

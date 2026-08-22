@@ -3,9 +3,6 @@
 	'routes' 		=> [
 		'GET://' => [ 'uri' => '/home', 'body' => '[template /templates/page-home]', 'navs' => [ 'main' => 5, 'footer' => 5 ] ],
 	],
-	'files' => [
-		'images',
-	],
 	'templates' => [ 'page-home.tpl' ],
 	'files' => [
 		'images/demo.jpg',

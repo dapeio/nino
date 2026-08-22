@@ -20,10 +20,12 @@
 # belt and braces next to the 403 stub each of those files carries itself.
 #
 # Its mirror, public/, is the opposite: everything in there is meant to be
-# served, and nothing else in this project root is - index.php, the tool
-# folders, and library/themes/*/preview.svg aside, a request that resolves to
-# a real file outside public/ is almost always a mistake. library/.htaccess
-# denies every other file in that shared server-side catalogue.
+# served, and nothing else in this project root is - index.php and the tool
+# folders aside, a request that resolves to a real file outside public/ is
+# almost always a mistake. The installer's appearance catalogue is the one
+# place inside a tool folder with a deliberately public file in it, so
+# _install/library/.htaccess denies everything there except the theme
+# picker images.
 
 # Don't let a directory with no index.php list its contents - a plain
 # defence-in-depth default now that nothing relies on an unguessable

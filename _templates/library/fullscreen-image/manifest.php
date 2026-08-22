@@ -6,7 +6,7 @@
 	'version' => 3,
 	'recommend' => [
 		'layout' => 'cover',
-		'frame' => [ 'container' => 'wide', 'padding' => 'default', 'margin' => 'none', 'focus' => '5', 'overlay' => 'medium' ],
+		'frame' => [ 'container' => 'wide', 'padding' => 'default', 'margin' => 'none', 'focus' => '5', 'overlay' => 'dim' ],
 	],
 	'layouts' => [
 		'cover' => [

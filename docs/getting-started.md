@@ -64,7 +64,7 @@ After completion, open:
 
 Also check every language and route, the navigation, and used forms. Save a text and an image in `/_editor` as a test. If you want to use `/_templates`, additionally open a `page-*.tpl`, change nothing at first, and check whether its top-level sections are recognized without warnings.
 
-The last installation step replaces the provided `_admin` password hash and locks `/_install`. Subsequently, remove `_install/` from production delivery, but retain the separate project-root `library/` catalogue used by `/_theme`; the correct order and further security checks are described in the [Deployment Manual](deployment.md#_install-after-setup).
+The last installation step replaces the provided `_admin` password hash and locks `/_install`. Subsequently, remove `_install/` from production delivery; this also retires the catalogue-backed dialogs in `/_theme`, while its Design dialog keeps working; the correct order and further security checks are described in the [Deployment Manual](deployment.md#_install-after-setup).
 
 ## Next Steps
 

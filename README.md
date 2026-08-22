@@ -131,6 +131,7 @@ _editor/         Content editor, users, backups, activity log
 _admin/          Developer tools and restoration
 _install/        Setup wizard
 _templates/      Section-first Template Builder
+_theme/          Theme, Design, Header, and Footer editor
 
 elements/        Element types
 templates/       Page and section templates
@@ -150,7 +151,9 @@ php tests/kernel-smoke.php
 php tests/admin-smoke.php
 php tests/editor-smoke.php
 php tests/install-smoke.php
+php tests/theme-smoke.php
 php tests/templates-smoke.php
+for test in tests/*-js-smoke.js; do node "$test"; done
 php tests/concurrency-smoke.php
 ```
 

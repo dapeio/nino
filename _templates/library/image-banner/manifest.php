@@ -6,7 +6,7 @@
 	'version' => 3,
 	'recommend' => [
 		'layout' => 'plain',
-		'frame' => [ 'screen' => 'off', 'background' => 'cover', 'container' => 'default', 'padding' => 'big', 'margin' => 'none', 'focus' => '5', 'overlay' => 'medium' ],
+		'frame' => [ 'screen' => 'off', 'background' => 'cover', 'container' => 'default', 'padding' => 'big', 'margin' => 'none', 'focus' => '5', 'overlay' => 'dim' ],
 	],
 	'layouts' => [
 		'plain' => [ 'label' => 'Text directly on the image', 'template' => 'section-plain.tpl' ],

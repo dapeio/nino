@@ -143,7 +143,7 @@ Sein höheres Vorschau-Iframe verwendet denselben endgültigen Design- und Theme
 
 Die Basis-Seitenvorlagen binden ihn über `[template /templates/theme.footer]` ein.
 
-Theme und beide Frame-Kataloge liegen unter `library/` in der Projektwurzel, weil `/_theme` sie nach der Installation weiter verwendet. Behalte dieses Verzeichnis beim Entfernen von `/_install/`; nur die installerspezifischen Basis-, Modul- und Seiten-Einheiten bleiben unter `_install/library/`.
+Theme und beide Frame-Kataloge liegen neben den Basis-, Modul- und Seiten-Einheiten unter `_install/library/`. `/_theme` liest sie mit, solange der Installer ausgeliefert ist; sie sind Einrichtungsmaterial und werden beim Anwenden ins Projekt kopiert, nie zur Laufzeit gelesen.
 
 ## 7. Routes
 
@@ -164,6 +164,10 @@ Jede Seite besitzt:
 Element-URI und HTTP-URI müssen innerhalb ihrer jeweiligen Spalte eindeutig sein. Sie dürfen voneinander abweichen: Die Startseite kann intern `/home` heißen und trotzdem unter `/` erreichbar sein.
 
 Eine neue Seite startet mit den Vorschlägen der gewählten Library-Vorlage: HTTP-URI sowie Name, Title und Description in **jeder** aktiven Sprache, gelesen aus den `text/<locale>.php`-Dateien der Vorlage. Ein Wechsel der Vorlage aktualisiert nur Felder, die noch unverändert sind – selbst eingetragener Text bleibt erhalten. Ein leer gelassenes Feld fällt weiterhin auf den allgemeinen Platzhalter („Page“, „Page Title“) zurück.
+
+Eine Seiteneinheit darf außerdem einheitenrelative `files` deklarieren. Sie
+werden auf dieselben virtuellen Projektpfade kopiert; aus `images/demo.jpg`
+wird damit das öffentliche `images/demo.jpg` des Projekts.
 
 `/_install` speichert keine eigene Liste: Der Schritt schreibt ausschließlich `/nino/http/routes` und die `/webpage<uri>/*`-Textschlüssel – `name`, `title` und `description` je Sprache, dazu einmalig `uri` (den erreichbaren Pfad der Seite) in `text/global.php`, als technischer Wert auf der Blacklist – und liest die angezeigte Liste beim nächsten Aufruf wieder daraus. Aus der angewendeten Liste entstehen außerdem Templates und bei Bedarf Modulabhängigkeiten. Die mitgelieferten Ausgangspunkte umfassen Startseite, Fehlerseite, rechtliche Angaben und Kontakt.
 
@@ -219,7 +223,7 @@ Prüfe nach dem Abschluss:
 - den Zugriff auf `/_templates` mit demselben Passwort, sofern der Alpha-Builder verwendet werden soll;
 - das Speichern eines Testtexts und eines Testbildes.
 
-Entferne anschließend `_install/` aus der produktiven Auslieferung. Die installerspezifische Library darunter wird nicht mehr benötigt; der getrennte Darstellungskatalog `library/` in der Projektwurzel bleibt dagegen für `/_theme` bestehen. Seitenstruktur, vollständige Inhalte und technische Konfiguration werden danach über `/_admin`, die Darstellung über `/_theme`, Seitentemplates über `/_templates` und freigegebene redaktionelle Inhalte über `/_editor` gepflegt. Für tiefergehende Strukturarbeit bleiben der HTML+-Escape-Hatch und Code verfügbar.
+Entferne anschließend `_install/` aus der produktiven Auslieferung. Die Library darunter wird damit ebenfalls entfernt: In `/_theme` bleibt der Design-Dialog nutzbar, die katalogbasierten Dialoge Theme, Header und Footer haben danach nichts mehr aufzulisten. Seitenstruktur, vollständige Inhalte und technische Konfiguration werden danach über `/_admin`, die Darstellung über `/_theme`, Seitentemplates über `/_templates` und freigegebene redaktionelle Inhalte über `/_editor` gepflegt. Für tiefergehende Strukturarbeit bleiben der HTML+-Escape-Hatch und Code verfügbar.
 
 ## Library-Format
 
@@ -233,7 +237,7 @@ Nino trennt die einmaligen Installer-Quellen vom Darstellungskatalog, der danach
 | `library/themes/<key>/` | visueller Ausgangspunkt, gemeinsam von `/_install` und `/_theme` verwendet |
 | `library/header/<key>/`, `library/footer/<key>/` | austauschbarer Frame für beide Werkzeuge |
 
-Die ersten drei Pfade können nach dem Abschluss mit `/_install` entfernt werden. `library/` in der Projektwurzel bleibt für den authentifizierten Arbeitsbereich `/_theme` ausgeliefert und ist kein Laufzeit-Plugin-System.
+Alle diese Pfade werden nach dem Abschluss zusammen mit `/_install` entfernt. Der Katalog ist Einrichtungsmaterial für den authentifizierten Arbeitsbereich und kein Laufzeit-Plugin-System.
 
 Theme sowie die installerspezifischen Basis-, Modul- und Seiteneinheiten besitzen eine `manifest.php`. Das Manifest beschreibt, was angezeigt, kopiert und konfiguriert wird. Je nach Einheit enthält es beispielsweise:
 

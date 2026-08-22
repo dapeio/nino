@@ -118,17 +118,17 @@ const themes = sandbox.Nino.install.themes;
 sandbox.Nino.install.design = { _settings : null };
 
 themes._themes = {
-	agency 	: { label : 'Agency', header : 'v1', footer : 'v1', design : { primary : '#4faae8', secondary : '', contrast : 'default', colors : 'default' } },
-	nighty 	: { label : 'Nighty', header : 'v4', footer : 'v2', design : { primary : '#8b5cf6', secondary : '#22d3ee', contrast : 'high', colors : 'vibrant' } },
+	basis 		: { label : 'Basis', header : 'v1', footer : 'v1', design : { primary : '#4faae8', secondary : '', contrast : 'default', colors : 'default' } },
+	nocturne 	: { label : 'Nocturne', header : 'v5', footer : 'v2', design : { primary : '#b6a6ff', secondary : '', contrast : 'high', colors : 'vibrant' } },
 };
-themes._frames 	= { header : [ 'v1', 'v2', 'v3', 'v4' ], footer : [ 'v1', 'v2' ] };
+themes._frames 	= { header : [ 'v1', 'v2', 'v3', 'v4', 'v5', 'v6' ], footer : [ 'v1', 'v2', 'v3', 'v4', 'v5', 'v6' ] };
 // A theme is always picked by the time the frames render - the grid
 // pre-selects one, and the preview is rendered against it
-themes._selected = 'agency';
+themes._selected = 'basis';
 themes._renderFrames( {} );
 
-check( 'the frame selects offer every unit on disk', nodes['themes-frame-header'].children.length === 4
-	&& nodes['themes-frame-footer'].children.length === 2 );
+check( 'the frame selects offer every unit on disk', nodes['themes-frame-header'].children.length === 6
+	&& nodes['themes-frame-footer'].children.length === 6 );
 check( 'a fresh install pre-selects the frames the picked theme was drawn against', nodes['themes-frame-header'].value === 'v1'
 	&& nodes['themes-frame-footer'].value === 'v1' );
 check( 'Header and Footer each expose their own panel', nodes['themes-frame-header-panel'].classList.contains('install-hidden') === false
@@ -169,7 +169,7 @@ check( 'changing a select re-renders that preview, and only that one', nodes['th
 // text files and the theme's stylesheet, none of which the browser has
 check( 'the preview is asked for, not assembled here', posted[0].payload.kind === 'header'
 	&& posted[0].payload.frame === 'v2'
-	&& posted[0].payload.theme === 'agency'
+	&& posted[0].payload.theme === 'basis'
 	&& posted[0].payload.design.primary === '#c81e2d'
 	&& posted[0].payload.design.spacing === 'tight' );
 
@@ -184,14 +184,14 @@ check( 'a revisit does not stack a second listener on each select', posted.filte
 // the tile is promising a look the install will not produce. _adoptTheme() is
 // the second half of the radio's change handler - the first half sets
 // _selected, so the test has to do both to be the real path
-themes._selected = 'nighty';
-themes._adoptTheme( 'nighty' );
+themes._selected = 'nocturne';
+themes._adoptTheme( 'nocturne' );
 
-check( 'picking a theme moves the frame selects to the ones it names', nodes['themes-frame-header'].value === 'v4'
+check( 'picking a theme moves the frame selects to the ones it names', nodes['themes-frame-header'].value === 'v5'
 	&& nodes['themes-frame-footer'].value === 'v2' );
 // Setting .value does not fire 'change', so the preview would keep showing
 // the frame the previous theme named
-check( '...and the preview moves with them', nodes['themes-frame-header-preview'].srcdoc === '<!doctype html><body data-frame="header/v4">' );
+check( '...and the preview moves with them', nodes['themes-frame-header-preview'].srcdoc === '<!doctype html><body data-frame="header/v5">' );
 
 // Themes no longer owns the frame controls: each following tab persists its
 // own choice without recopying the theme or resetting Design.
@@ -208,7 +208,7 @@ const applyPost = posted.filter( function( post ) { return post.action === 'them
 check( 'the Theme tab posts only its own choice', applied === true
 	&& applyPost !== undefined
 	&& Object.keys( applyPost.payload ).length === 1
-	&& applyPost.payload.theme === 'nighty' );
+	&& applyPost.payload.theme === 'nocturne' );
 
 let headerApplied = null;
 let footerApplied = null;

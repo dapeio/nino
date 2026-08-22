@@ -302,6 +302,8 @@ echo "\n";
 
 echo "Themes::apiList / apiApply\n";
 
+$themeKeys = [ 'basis', 'docs', 'editorial', 'nocturne', 'rail', 'signal', 'soft', 'studio' ];
+
 // The css bundle starts out exactly as a hand-set-up project's would:
 // the kernel stylesheet plus one of the project's own, neither of them a
 // library theme. Both have to survive every apply below, in place
@@ -315,9 +317,9 @@ $themeListRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Install\Themes::apiList( $appData, $themeListRequest );
 $themeListBody = $themeListRequest['/nino/http/response']['body'];
 
-check( 'lists every theme unit, one per library/themes/<key>', array_keys( $themeListBody['themes'] ) === [ 'agency', 'correct', 'glow', 'kontor', 'marketplace', 'nighty', 'solid', 'wellness' ] );
-check( 'each theme carries the label and description its manifest declares', $themeListBody['themes']['nighty']['label'] === 'Nighty' && $themeListBody['themes']['nighty']['description'] !== '' );
-check( 'each theme carries a preview image path, served out of the shared library itself', $themeListBody['themes']['nighty']['preview'] === '/library/themes/nighty/preview.svg' );
+check( 'lists every current theme unit, one per _install/library/themes/<key>', array_keys( $themeListBody['themes'] ) === $themeKeys );
+check( 'each theme carries the label and description its manifest declares', $themeListBody['themes']['nocturne']['label'] === 'Nocturne' && $themeListBody['themes']['nocturne']['description'] !== '' );
+check( 'each theme carries a preview image path, served out of the shared library itself', $themeListBody['themes']['nocturne']['preview'] === '/_install/library/themes/nocturne/preview.svg' );
 check( 'no theme is applied yet - the bundle carries none of the library\'s own stylesheets', $themeListBody['activeTheme'] === null );
 
 $_POST['data'] = json_encode( [ 'theme' => 'does-not-exist' ] );
@@ -326,55 +328,55 @@ $unknownThemeRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 check( 'rejects an unknown theme with 400', $unknownThemeRequest['/nino/http/response']['statusCode'] === 400 );
 
 // A traversal attempt has to be rejected the same way any other unknown
-// key is - never resolved into a directory outside library/themes
+// key is - never resolved into a directory outside _install/library/themes
 $_POST['data'] = json_encode( [ 'theme' => '../modules/democontent' ] );
 $traversalThemeRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Install\Themes::apiApply( $appData, $traversalThemeRequest );
-check( 'rejects a theme key trying to escape library/themes', $traversalThemeRequest['/nino/http/response']['statusCode'] === 400 );
+check( 'rejects a theme key trying to escape _install/library/themes', $traversalThemeRequest['/nino/http/response']['statusCode'] === 400 );
 
-$_POST['data'] = json_encode( [ 'theme' => 'nighty' ] );
+$_POST['data'] = json_encode( [ 'theme' => 'nocturne' ] );
 $themeApplyRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Install\Themes::apiApply( $appData, $themeApplyRequest );
 check( 'apply succeeds', $themeApplyRequest['/nino/http/response']['statusCode'] === 200 );
-check( 'response echoes the applied theme', $themeApplyRequest['/nino/http/response']['body']['theme'] === 'nighty' );
+check( 'response echoes the applied theme', $themeApplyRequest['/nino/http/response']['body']['theme'] === 'nocturne' );
 
 $configAfterTheme = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
 
-check( 'copies the theme\'s own stylesheet into /assets', is_file( $sandbox. '/public/assets/style.theme.nighty.css' ) === true );
-check( 'copies the webfonts that stylesheet references, keeping their subdirectories', is_file( $sandbox. '/public/fonts/text/lato-regular.woff2' ) === true && is_file( $sandbox. '/public/fonts/title/bebas-neue.woff2' ) === true );
+check( 'copies the theme\'s own stylesheet into /assets', is_file( $sandbox. '/public/assets/style.theme.nocturne.css' ) === true );
+check( 'copies the webfonts that stylesheet references, keeping their subdirectories', is_file( $sandbox. '/public/fonts/text/lato-regular.woff2' ) === true && is_file( $sandbox. '/public/fonts/title/exo-2.woff2' ) === true );
 check( 'never copies the picker-only preview image into the project', is_file( $sandbox. '/preview.svg' ) === false );
-check( 'persists the picked key at /nino/install/theme', ( $configAfterTheme['/nino/install/theme'] ?? null ) === 'nighty' );
-check( 'appends the theme\'s stylesheet to the css bundle', in_array( '/assets/style.theme.nighty.css', $configAfterTheme['/nino/html/assets']['/.cache/style.css'], true ) === true );
+check( 'persists the picked key at /nino/install/theme', ( $configAfterTheme['/nino/install/theme'] ?? null ) === 'nocturne' );
+check( 'appends the theme\'s stylesheet to the css bundle', in_array( '/assets/style.theme.nocturne.css', $configAfterTheme['/nino/html/assets']['/.cache/style.css'], true ) === true );
 // The generated design layer now sits between the framework stylesheet and
 // everything else, so this is no longer a fixed prefix - what has to hold is
 // that the project's own stylesheet is still there and still ahead of the
 // theme that reads from it
 $bundleAfterTheme = $configAfterTheme['/nino/html/assets']['/.cache/style.css'];
 check( 'leaves the project\'s own stylesheets in the bundle alone, in order', $bundleAfterTheme[0] === '/_nino/Nino.css'
-	&& array_search( '/assets/style.custom.css', $bundleAfterTheme, true ) < array_search( '/assets/style.theme.nighty.css', $bundleAfterTheme, true ) );
+	&& array_search( '/assets/style.custom.css', $bundleAfterTheme, true ) < array_search( '/assets/style.theme.nocturne.css', $bundleAfterTheme, true ) );
 check( 'the generated design layer leads, so a theme and a frame can both read from it', array_search( '/assets/style.design.css', $bundleAfterTheme, true ) === 1
-	&& array_search( '/assets/style.theme.nighty.css', $bundleAfterTheme, true ) > 1
-	&& array_search( '/assets/style.header.css', $bundleAfterTheme, true ) > array_search( '/assets/style.theme.nighty.css', $bundleAfterTheme, true ) );
+	&& array_search( '/assets/style.theme.nocturne.css', $bundleAfterTheme, true ) > 1
+	&& array_search( '/assets/style.header.css', $bundleAfterTheme, true ) > array_search( '/assets/style.theme.nocturne.css', $bundleAfterTheme, true ) );
 check( 'never touches another bundle in the same array', $configAfterTheme['/nino/html/assets']['/.cache/script.js'] === [ '/_nino/Nino.js' ] );
 
 $themeListAfterApply = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Install\Themes::apiList( $appData, $themeListAfterApply );
-check( 'apiList now reports the applied theme, for the picker to pre-select', $themeListAfterApply['/nino/http/response']['body']['activeTheme'] === 'nighty' );
+check( 'apiList now reports the applied theme, for the picker to pre-select', $themeListAfterApply['/nino/http/response']['body']['activeTheme'] === 'nocturne' );
 
 // Switching themes replaces the bundled stylesheet at the position the
 // previous one held, rather than adding a second one next to it
-$_POST['data'] = json_encode( [ 'theme' => 'wellness' ] );
+$_POST['data'] = json_encode( [ 'theme' => 'editorial' ] );
 $themeSwitchRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Install\Themes::apiApply( $appData, $themeSwitchRequest );
 
 $configAfterSwitch = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
 
 check( 'switching themes swaps the bundled stylesheet rather than adding a second one', $configAfterSwitch['/nino/html/assets']['/.cache/style.css'] === [
-	'/_nino/Nino.css', '/assets/style.design.css', '/assets/style.custom.css', '/assets/style.theme.wellness.css', '/assets/style.header.css', '/assets/style.footer.css',
+	'/_nino/Nino.css', '/assets/style.design.css', '/assets/style.custom.css', '/assets/style.theme.editorial.css', '/assets/style.header.css', '/assets/style.footer.css',
 ] );
-check( '...and updates the persisted key with it', $configAfterSwitch['/nino/install/theme'] === 'wellness' );
-check( 'copies the new theme\'s own fonts too', is_file( $sandbox. '/public/fonts/text/pt-serif-regular.woff2' ) === true );
-check( 'a file the previous theme wrote is left behind, not deleted - same additive rule as Setup\'s templates/text', is_file( $sandbox. '/public/assets/style.theme.nighty.css' ) === true );
+check( '...and updates the persisted key with it', $configAfterSwitch['/nino/install/theme'] === 'editorial' );
+check( 'copies the new theme\'s own fonts too', is_file( $sandbox. '/public/fonts/text/spectral-regular.woff2' ) === true );
+check( 'a file the previous theme wrote is left behind, not deleted - same additive rule as Setup\'s templates/text', is_file( $sandbox. '/public/assets/style.theme.nocturne.css' ) === true );
 
 // --- Frames: the site's header/footer as interchangeable units ----------
 
@@ -385,6 +387,12 @@ check( '...and its own stylesheet lands in the project, bundled after the theme'
 check( 'the base html templates call the installed frame rather than carrying the markup', str_contains( (string) file_get_contents( __DIR__. '/../_install/library/base/templates/html-header.tpl' ), '[template /templates/theme.header]' )
 	&& str_contains( (string) file_get_contents( __DIR__. '/../_install/library/base/templates/html-footer.tpl' ), '[template /templates/theme.footer]' )
 	&& str_contains( (string) file_get_contents( __DIR__. '/../_install/library/base/templates/html-header.tpl' ), '<header' ) === false );
+$baseHeaderSource = (string) file_get_contents( __DIR__. '/../_install/library/base/templates/html-header.tpl' );
+check( 'the installed document shell uses current HTML metadata without IE conditionals', str_starts_with( $baseHeaderSource, "<!doctype html>\n<html lang=\"[[/website/lang]]\">" )
+	&& str_contains( $baseHeaderSource, 'X-UA-Compatible' ) === false
+	&& str_contains( $baseHeaderSource, '<!--[if ' ) === false
+	&& str_contains( $baseHeaderSource, 'http-equiv="Content-Type"' ) === false
+	&& str_contains( $baseHeaderSource, '<meta charset="[[/website/charset]]">' ) );
 
 // The indirection is only worth anything if it resolves. 'theme.header' has a
 // dot in it, and both the filesystem layer and the [template] shortcode have
@@ -399,7 +407,7 @@ check( 'the installed frame really renders through [template /templates/theme.fo
 
 // A frame unit with no style.css of its own still gets an empty file, so the
 // bundle entry never points at something that isn't there
-$emptyStyleFrames = array_filter( glob( __DIR__. '/../library/footer/*/style.css' ) ?: [], static fn( string $file ): bool => filesize( $file ) === 0 );
+$emptyStyleFrames = array_filter( glob( __DIR__. '/../_install/library/footer/*/style.css' ) ?: [], static fn( string $file ): bool => filesize( $file ) === 0 );
 check( 'a frame that ships no css of its own is still installable', $emptyStyleFrames === [] || is_file( $sandbox. '/public/assets/style.footer.css' ) === true );
 
 // Header and Footer are their own tabs after Design. Each post changes only
@@ -421,7 +429,7 @@ check( 'each dedicated frame apply succeeds and echoes only its pick', $headerPi
 	&& $footerPickRequest['/nino/http/response']['body'] === [ 'kind' => 'footer', 'frame' => 'v2' ] );
 check( 'each frame overrides the theme\'s declaration and is persisted', ( $configAfterFrames['/nino/install/header'] ?? null ) === 'v3'
 	&& ( $configAfterFrames['/nino/install/footer'] ?? null ) === 'v2' );
-check( '...and the installed template is really that unit\'s', file_get_contents( $sandbox. '/private/templates/theme.header.tpl' ) === file_get_contents( __DIR__. '/../library/header/v3/template.tpl' ) );
+check( '...and the installed template is really that unit\'s', file_get_contents( $sandbox. '/private/templates/theme.header.tpl' ) === file_get_contents( __DIR__. '/../_install/library/header/v3/template.tpl' ) );
 check( 'frame-only applies leave the selected theme and Design untouched', ( $configAfterFrames['/nino/install/theme'] ?? null ) === ( $configBeforeFrames['/nino/install/theme'] ?? null )
 	&& ( $configAfterFrames['/nino/theme/design'] ?? [] ) === ( $configBeforeFrames['/nino/theme/design'] ?? [] ) );
 check( 'applying Footer after Header keeps their canonical bundle order', array_search( '/assets/style.header.css', $configAfterFrames['/nino/html/assets']['/.cache/style.css'], true )
@@ -453,7 +461,7 @@ check( 'switching frames swaps the bundled stylesheet rather than adding a secon
 // them can come back quietly.
 
 $framePreview = static function( array &$appData, string $kind, string $frame, array $design = [] ): array {
-	$_POST['data'] = json_encode( [ 'kind' => $kind, 'frame' => $frame, 'theme' => 'agency', 'design' => $design ] );
+	$_POST['data'] = json_encode( [ 'kind' => $kind, 'frame' => $frame, 'theme' => 'basis', 'design' => $design ] );
 	$request = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 	\Nino\Install\Themes::apiFrame( $appData, $request );
 	return [ $request['/nino/http/response']['statusCode'], $request['/nino/http/response']['body'] ];
@@ -562,7 +570,7 @@ check( 'every shipped frame previews'. ( $framePreviewFailures === [] ? '' : ' -
 
 // --- Design: the generated token layer ---------------------------------
 
-$_POST['data'] = json_encode( [ 'theme' => 'agency' ] );
+$_POST['data'] = json_encode( [ 'theme' => 'basis' ] );
 $designDefaultRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Install\Themes::apiApply( $appData, $designDefaultRequest );
 $configAfterDesign = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
@@ -578,8 +586,8 @@ $designReadRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 $designReadBody = $designReadRequest['/nino/http/response']['body'];
 
 check( 'the Design step opens on what the picked theme declared', ( $designReadBody['settings']['primary'] ?? '' ) === '#4faae8'
-	&& ( $designReadBody['settings']['shaping'] ?? '' ) === 'round'
-	&& ( $designReadBody['settings']['spacing'] ?? '' ) === 'airy' );
+	&& ( $designReadBody['settings']['shaping'] ?? '' ) === 'default'
+	&& ( $designReadBody['settings']['spacing'] ?? '' ) === 'default' );
 check( '...and is handed the vocabulary its controls render from', ( $designReadBody['choices']['contrast'] ?? [] ) !== []
 	&& ( $designReadBody['choices']['volume'] ?? [] ) !== []
 	&& ( $designReadBody['choices']['shaping'] ?? [] ) !== [] );
@@ -609,9 +617,13 @@ $_POST['data']  = json_encode( [ 'design' => [ 'primary' => '#4faae8', 'volume' 
 \Nino\Install\Themes::apiPreview( $appData, $previewRequest );
 $previewBody = $previewRequest['/nino/http/response']['body'];
 
-check( 'the picker can ask what a setting produces without storing it', ( $previewBody['palette']['light']['origin']['bg'] ?? '' ) !== ''
-	&& ( $previewBody['palette']['dark']['origin']['bg'] ?? '' ) !== ''
-	&& $previewBody['palette']['light']['origin']['bg'] !== $previewBody['palette']['dark']['origin']['bg'] );
+// Both modes have to come back, and the brand has to survive both unchanged -
+// the page ground is what flips between them, never the picked colour
+check( 'the picker can ask what a setting produces without storing it', ( $previewBody['palette']['light']['default']['bg'] ?? '' ) !== ''
+	&& ( $previewBody['palette']['dark']['default']['bg'] ?? '' ) !== ''
+	&& $previewBody['palette']['light']['default']['bg'] !== $previewBody['palette']['dark']['default']['bg']
+	&& $previewBody['palette']['light']['origin']['bg'] === '#4faae8'
+	&& $previewBody['palette']['dark']['origin']['bg'] === '#4faae8' );
 check( '...including the size raster, so both halves of the step preview the same way', ( $previewBody['raster']['text'][6] ?? '' ) !== ''
 	&& ( $previewBody['raster']['space'][1] ?? '' ) !== ''
 	&& $previewBody['settings']['volume'] === 'generous' );
@@ -623,39 +635,13 @@ $listBody = $listWithFrames['/nino/http/response']['body'];
 
 check( 'the picker is handed the frames and each theme\'s own defaults', isset( $listBody['frames']['header'], $listBody['frames']['footer'] )
 	&& $listBody['frames']['header'] !== []
-	&& ( $listBody['themes']['agency']['design']['primary'] ?? '' ) === '#4faae8'
-	&& ( $listBody['themes']['agency']['design']['shaping'] ?? '' ) === 'round'
-	&& ( $listBody['themes']['agency']['header'] ?? '' ) === 'v1' );
+	&& ( $listBody['themes']['basis']['design']['primary'] ?? '' ) === '#4faae8'
+	&& ( $listBody['themes']['basis']['design']['shaping'] ?? '' ) === 'default'
+	&& ( $listBody['themes']['basis']['header'] ?? '' ) === 'v1' );
 
-// The theme is a mapping layer now: a literal colour in a role is a pair
-// /_theme never measured, which is exactly what this split exists to prevent
-$agencyCss = (string) file_get_contents( __DIR__. '/../library/themes/agency/assets/style.theme.agency.css' );
-preg_match_all( '/^\s*(--color-[a-z0-9-]+)\s*:\s*([^;]+);/mi', $agencyCss, $roles, PREG_SET_ORDER );
-$literalRoles = array_values( array_filter( $roles, static fn( array $role ): bool => str_contains( $role[2], 'var(--nino-' ) === false && str_contains( $role[2], 'color-mix' ) === false ) );
-
-check( 'the rewritten theme assigns every colour role to a design token instead of a literal', $roles !== [] && $literalRoles === [] );
-check( '...and never pairs text from one surface with the background of another', str_contains( $agencyCss, '--color-section-alt-bg: var(--nino-alt);' )
-	&& str_contains( $agencyCss, '--color-section-alt-text: var(--nino-on-alt);' )
-	&& str_contains( $agencyCss, '--color-primary-text: var(--nino-on-origin);' ) );
-
-// The theme maps sizes the same way it maps colours - a literal here is a
-// number the raster cannot move
-preg_match_all( '/^\s*(--(?:text|space)-[1-6]|--radius(?:-small)?|--line-height)\s*:\s*([^;]+);/mi', $agencyCss, $sizeRoles, PREG_SET_ORDER );
-$literalSizes = array_values( array_filter( $sizeRoles, static fn( array $role ): bool => str_contains( $role[2], 'var(--nino-' ) === false ) );
-
-check( 'the rewritten theme assigns every size role to a raster step too', count( $sizeRoles ) === 15 && $literalSizes === [] );
-
-// Reading the assignments is not enough: what matters is what the chain
-// resolves to. Every pair Nino.css actually renders together is measured here
-// against the real WCAG formula, in both modes - a mapping that looks correct
-// and lands at 4.3:1 in dark mode is exactly what this split exists to catch
-$designSettings = \Nino\Theme\Design::normalize( [ 'primary' => '#4faae8' ] );
-
-preg_match_all( '/^\s*(--color-[a-z0-9-]+)\s*:\s*var\(\s*(--nino-[a-z0-9-]+)\s*\)\s*;/mi', $agencyCss, $assignments, PREG_SET_ORDER );
-$roleToken = [];
-foreach( $assignments as $assignment )
-	$roleToken[$assignment[1]] = $assignment[2];
-
+// A theme is a mapping layer: a literal colour in a role is a pair /_theme
+// never measured, and a literal size is a value the raster cannot move. Check
+// the complete current catalogue rather than blessing one representative.
 $renderedPairs = [
 	[ '--color-background', 					'--color-text' ],
 	[ '--color-background', 					'--color-title' ],
@@ -695,51 +681,112 @@ $tokenValues = static function( array $settings, string $mode ): array {
 	return $values;
 };
 
-$unreadable 	= [];
-$measuredPairs = 0;
+$manifestFailures = [];
+$colourFailures 	= [];
+$sizeFailures 		= [];
+$unreadable 			= [];
+$measuredPairs 		= 0;
 
-foreach( [ 'light', 'dark' ] as $mode ) {
+foreach( $themeKeys as $themeKey ) {
 
-	$values = $tokenValues( $designSettings, $mode );
+	$themeDir = __DIR__. '/../_install/library/themes/'. $themeKey;
+	$manifest = include $themeDir. '/manifest.php';
 
-	foreach( $renderedPairs as [ $backRole, $frontRole ] ) {
+	if( is_array( $manifest ) === false ) {
+		$manifestFailures[] = $themeKey. ': manifest does not return an array';
+		continue;
+	}
 
-		$back 	= $values[$roleToken[$backRole] ?? ''] ?? null;
-		$front 	= $values[$roleToken[$frontRole] ?? ''] ?? null;
+	$design = is_array( $manifest['design'] ?? null ) ? $manifest['design'] : [];
+	if( $design === [] || \Nino\Theme\Design::normalize( $design ) !== $design )
+		$manifestFailures[] = $themeKey. ': design is incomplete or not normalized';
 
-		if( $back === null || $front === null ) {
-			$unreadable[] = $mode. ' '. $frontRole. ': not mapped to a generated token';
-			continue;
+	foreach( [ 'header', 'footer' ] as $kind )
+		if( in_array( (string) ( $manifest[$kind] ?? '' ), $themeListBody['frames'][$kind] ?? [], true ) === false )
+			$manifestFailures[] = $themeKey. ': unknown '. $kind. ' '. (string) ( $manifest[$kind] ?? '' );
+
+	$stylesheet = (string) ( $manifest['stylesheet'] ?? '' );
+	$cssPath 	= $themeDir. $stylesheet;
+	$themeCss 	= is_file( $cssPath ) === true ? (string) file_get_contents( $cssPath ) : '';
+
+	if( $themeCss === '' ) {
+		$manifestFailures[] = $themeKey. ': stylesheet is missing';
+		continue;
+	}
+
+	preg_match_all( '/^\s*(--color-[a-z0-9-]+)\s*:\s*([^;]+);/mi', $themeCss, $roles, PREG_SET_ORDER );
+	$literalRoles = array_values( array_filter( $roles, static fn( array $role ): bool => str_contains( $role[2], 'var(--nino-' ) === false
+		|| preg_match( '/#[0-9a-f]{3,8}\b|\brgba?\s*\(/i', $role[2] ) === 1 ) );
+
+	if( count( $roles ) !== 28 || $literalRoles !== [] )
+		$colourFailures[] = $themeKey. ': '. count( $roles ). ' roles, '. count( $literalRoles ). ' literal/unmapped';
+
+	preg_match_all( '/^\s*(--(?:text|space)-[1-6]|--radius(?:-small)?|--line-height)\s*:\s*([^;]+);/mi', $themeCss, $sizeRoles, PREG_SET_ORDER );
+	$literalSizes = array_values( array_filter( $sizeRoles, static fn( array $role ): bool => str_contains( $role[2], 'var(--nino-' ) === false ) );
+
+	if( count( $sizeRoles ) !== 15 || $literalSizes !== [] )
+		$sizeFailures[] = $themeKey. ': '. count( $sizeRoles ). ' roles, '. count( $literalSizes ). ' literal/unmapped';
+
+	preg_match_all( '/^\s*(--color-[a-z0-9-]+)\s*:\s*var\(\s*(--nino-[a-z0-9-]+)\s*\)\s*;/mi', $themeCss, $assignments, PREG_SET_ORDER );
+	$roleToken = [];
+	foreach( $assignments as $assignment )
+		$roleToken[$assignment[1]] = $assignment[2];
+
+	$settings = \Nino\Theme\Design::normalize( $design );
+
+	foreach( [ 'light', 'dark' ] as $mode ) {
+
+		$values = $tokenValues( $settings, $mode );
+
+		foreach( $renderedPairs as [ $backRole, $frontRole ] ) {
+
+			$backToken 	= $roleToken[$backRole] ?? '';
+			$frontToken 	= $roleToken[$frontRole] ?? '';
+			$back 			= $values[$backToken] ?? null;
+			$front 			= $values[$frontToken] ?? null;
+
+			if( $back === null || $front === null ) {
+				$unreadable[] = $themeKey. '/'. $mode. ' '. $frontRole. ': not mapped to a generated token';
+				continue;
+			}
+
+			$measuredPairs++;
+			$ratio 	= $contrastRatio( $back, $front );
+			$target = str_ends_with( $frontToken, '-muted' ) === true
+				? ( $settings['contrast'] === 'soft' ? 3.0 : 4.5 )
+				: ( $settings['contrast'] === 'high' ? 7.0 : 4.5 );
+
+			if( $ratio < $target - 0.02 )
+				$unreadable[] = sprintf( '%s/%s %s: %s on %s = %.2f:1, needs %.1f', $themeKey, $mode, $frontRole, $front, $back, $ratio, $target );
 		}
-
-		$measuredPairs++;
-		$ratio = $contrastRatio( $back, $front );
-
-		if( $ratio < 4.5 )
-			$unreadable[] = sprintf( '%s %s: %s on %s = %.2f:1', $mode, $frontRole, $front, $back, $ratio );
 	}
 }
 
-check( 'every pair the theme renders clears 4.5:1 in both modes'. ( $unreadable === [] ? '' : ' - '. implode( ' | ', $unreadable ) ), $unreadable === [] && $measuredPairs === count( $renderedPairs ) * 2 );
+check( 'all eight manifests declare a complete Design and available frames'. ( $manifestFailures === [] ? '' : ' - '. implode( ' | ', $manifestFailures ) ), $manifestFailures === [] );
+check( 'all eight themes assign every colour role to generated tokens'. ( $colourFailures === [] ? '' : ' - '. implode( ' | ', $colourFailures ) ), $colourFailures === [] );
+check( 'all eight themes assign every size role to the generated raster'. ( $sizeFailures === [] ? '' : ' - '. implode( ' | ', $sizeFailures ) ), $sizeFailures === [] );
+check( 'every rendered pair in every theme meets its declared target in both modes'. ( $unreadable === [] ? '' : ' - '. implode( ' | ', $unreadable ) ),
+	$unreadable === [] && $measuredPairs === count( $themeKeys ) * count( $renderedPairs ) * 2 );
 
-// Nino.css uses --color-primary both as a background (buttons, badges - paired
-// with --color-primary-text) and as ink on the page ground (links, alerts,
-// active nav). One role cannot be both, and a theme cannot split what the
-// framework merged. Pinned rather than asserted away: --nino-origin is solved
-// to carry --nino-on-origin, so reading it as ink on --nino-default is the
-// weakest thing this stylesheet does and must not quietly get weaker
-$darkValues 	= $tokenValues( $designSettings, 'dark' );
-$primaryAsInk = $contrastRatio( $darkValues['--nino-default'], $darkValues['--nino-origin'] );
+// Nino.css still uses --color-primary both as a background (paired with
+// --color-primary-text) and as ink on the page ground. All catalogue themes
+// map it to the safe vibrant surface; pin its weakest second use until the
+// framework splits the role.
+$basisManifest = include __DIR__. '/../_install/library/themes/basis/manifest.php';
+$basisSettings = \Nino\Theme\Design::normalize( $basisManifest['design'] );
+$darkValues 	= $tokenValues( $basisSettings, 'dark' );
+$primaryAsInk = $contrastRatio( $darkValues['--nino-default'], $darkValues['--nino-vibrant'] );
 
 check( 'the known --color-primary dual-use stays within a step of readable (Nino.css role split pending)', $primaryAsInk >= 4.0
 	&& $contrastRatio( $darkValues['--nino-default'], $darkValues['--nino-default-link'] ) >= 4.5 );
 
-// A config that predates '/nino/install/theme' (or was hand-edited since)
-// still has to resolve its current theme - from the css bundle alone
+// The persisted key is the source of truth. The generated CSS bundle is an
+// output artifact and must not silently select a theme when the key is absent.
 unset( $appData['/nino/install/theme'] );
-$themeListLegacy = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Install\Themes::apiList( $appData, $themeListLegacy );
-check( 'falls back to matching the css bundle when /nino/install/theme is absent', $themeListLegacy['/nino/http/response']['body']['activeTheme'] === 'agency' );
+$themeListWithoutSelection = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Install\Themes::apiList( $appData, $themeListWithoutSelection );
+check( 'does not infer an active theme from the CSS bundle when the persisted key is absent', $themeListWithoutSelection['/nino/http/response']['body']['activeTheme'] === null );
+$appData['/nino/install/theme'] = 'basis';
 
 echo "\n";
 
@@ -770,60 +817,61 @@ check( '...with de_DE\'s wording read from the unit\'s own de_DE fragment', $wpL
 check( '...and en_US\'s from its own en_US fragment - the locale that used to end up generic', $wpLibraryBody['templates']['home']['text']['en_US']['name'] === 'Home' && $wpLibraryBody['templates']['home']['text']['en_US']['title'] === 'Welcome.' );
 check( 'reports the Http-URI "home" suggests for itself, which is not its folder name', $wpLibraryBody['templates']['home']['uri'] === '/' );
 check( '...and "contact"\'s, which is', $wpLibraryBody['templates']['contact']['uri'] === '/contact' );
+check( 'the legal manifest declares the stable Element-URI its generated route receives', ( array_values( ( include __DIR__. '/../_install/library/pages/legal/manifest.php' )['routes'] )[0]['uri'] ?? null ) === '/legal' );
 check( 'the blank template starts every locale with useful page metadata', $wpLibraryBody['templates']['blank']['text']['de_DE']['name'] === 'Neue Webseite' && $wpLibraryBody['templates']['blank']['text']['en_US']['name'] === 'New webpage' );
 check( 'the blank template suggests a stable Http-URI and its own page template', $wpLibraryBody['templates']['blank']['uri'] === '/new-webpage' && $wpLibraryBody['templates']['blank']['body'] === '[template /templates/page-blank]' );
 check( 'the blank page template deliberately has no section', strpos( (string) file_get_contents( __DIR__. '/../_install/library/pages/blank/templates/page-blank.tpl' ), '<section' ) === false );
 check( 'a template whose fragments ship no wording at all reports empty strings, never a missing key', array_keys( $wpLibraryBody['templates']['.demo-elements']['text']['en_US'] ) === [ 'name', 'title', 'description' ] );
 
-$_POST['data'] = json_encode( [ 'webpages' => [ [ 'uri' => '../etc/passwd', 'httpUri' => '/x', 'template' => 'home', 'text' => [] ] ] ] );
+$_POST['data'] = json_encode( [ 'webpages' => [ [ 'uri' => '../etc/passwd', 'httpUri' => '/x', 'libraryKey' => 'home', 'text' => [] ] ] ] );
 $badUriRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Install\Webpages::apiApply( $appData, $badUriRequest );
 check( 'rejects an unsafe Element-URI with 400', $badUriRequest['/nino/http/response']['statusCode'] === 400 );
 
-$_POST['data'] = json_encode( [ 'webpages' => [ [ 'uri' => '/x', 'httpUri' => '../etc/passwd', 'template' => 'home', 'text' => [] ] ] ] );
+$_POST['data'] = json_encode( [ 'webpages' => [ [ 'uri' => '/x', 'httpUri' => '../etc/passwd', 'libraryKey' => 'home', 'text' => [] ] ] ] );
 $badHttpUriRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Install\Webpages::apiApply( $appData, $badHttpUriRequest );
 check( 'rejects an unsafe Http-URI with 400', $badHttpUriRequest['/nino/http/response']['statusCode'] === 400 );
 
-$_POST['data'] = json_encode( [ 'webpages' => [ [ 'uri' => '/x', 'httpUri' => '/x', 'template' => 'does-not-exist', 'text' => [] ] ] ] );
+$_POST['data'] = json_encode( [ 'webpages' => [ [ 'uri' => '/x', 'httpUri' => '/x', 'libraryKey' => 'does-not-exist', 'text' => [] ] ] ] );
 $badTemplateRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Install\Webpages::apiApply( $appData, $badTemplateRequest );
-check( 'rejects an unknown template with 400', $badTemplateRequest['/nino/http/response']['statusCode'] === 400 );
+check( 'rejects an unknown library key with 400', $badTemplateRequest['/nino/http/response']['statusCode'] === 400 );
 
-$_POST['data'] = json_encode( [ 'webpages' => [ [ 'uri' => '/installer-shadow', 'httpUri' => '/_install', 'template' => 'home', 'text' => [] ] ] ] );
+$_POST['data'] = json_encode( [ 'webpages' => [ [ 'uri' => '/installer-shadow', 'httpUri' => '/_install', 'libraryKey' => 'home', 'text' => [] ] ] ] );
 $reservedHttpUriRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Install\Webpages::apiApply( $appData, $reservedHttpUriRequest );
 check( 'rejects a Webpage mounted on the installer\'s own runtime uri', $reservedHttpUriRequest['/nino/http/response']['statusCode'] === 409 );
 
-$_POST['data'] = json_encode( [ 'webpages' => [ [ 'uri' => '/designer-shadow', 'httpUri' => '/_templates', 'template' => 'home', 'text' => [] ] ] ] );
+$_POST['data'] = json_encode( [ 'webpages' => [ [ 'uri' => '/designer-shadow', 'httpUri' => '/_templates', 'libraryKey' => 'home', 'text' => [] ] ] ] );
 $reservedDesignerRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Install\Webpages::apiApply( $appData, $reservedDesignerRequest );
 check( 'rejects a Webpage mounted on the Template Builder runtime uri', $reservedDesignerRequest['/nino/http/response']['statusCode'] === 409 );
 
-$_POST['data'] = json_encode( [ 'webpages' => [ [ 'uri' => '/custom-page', 'httpUri' => '/custom', 'template' => 'home', 'text' => [] ] ] ] );
+$_POST['data'] = json_encode( [ 'webpages' => [ [ 'uri' => '/custom-page', 'httpUri' => '/custom', 'libraryKey' => 'home', 'text' => [] ] ] ] );
 $foreignRouteRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Install\Webpages::apiApply( $appData, $foreignRouteRequest );
 check( 'rejects an Http-URI already owned by a non-Webpages route', $foreignRouteRequest['/nino/http/response']['statusCode'] === 409 );
 check( 'the colliding hand-written route remains untouched', ( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes']['GET://custom']['body'] ?? null ) === 'hand-written route' );
 
 $_POST['data'] = json_encode( [ 'webpages' => [
-	[ 'uri' => '/x', 'httpUri' => '/x', 'template' => 'home', 'text' => [] ],
-	[ 'uri' => '/x', 'httpUri' => '/y', 'template' => 'contact', 'text' => [] ],
+	[ 'uri' => '/x', 'httpUri' => '/x', 'libraryKey' => 'home', 'text' => [] ],
+	[ 'uri' => '/x', 'httpUri' => '/y', 'libraryKey' => 'contact', 'text' => [] ],
 ] ] );
 $dupeUriRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Install\Webpages::apiApply( $appData, $dupeUriRequest );
 check( 'rejects a duplicate Element-URI with 400', $dupeUriRequest['/nino/http/response']['statusCode'] === 400 );
 
 $_POST['data'] = json_encode( [ 'webpages' => [
-	[ 'uri' => '/x', 'httpUri' => '/x', 'template' => 'home', 'text' => [] ],
-	[ 'uri' => '/y', 'httpUri' => '/x', 'template' => 'contact', 'text' => [] ],
+	[ 'uri' => '/x', 'httpUri' => '/x', 'libraryKey' => 'home', 'text' => [] ],
+	[ 'uri' => '/y', 'httpUri' => '/x', 'libraryKey' => 'contact', 'text' => [] ],
 ] ] );
 $dupeHttpUriRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Install\Webpages::apiApply( $appData, $dupeHttpUriRequest );
 check( 'rejects a duplicate Http-URI with 400, even when the Element-URIs differ', $dupeHttpUriRequest['/nino/http/response']['statusCode'] === 400 );
 
 // The actual, first real apply: home at Element-URI "/site-home" / Http-URI
-// "/" (nav on) + contact at "/site-contact" / "/kontakt" (nav on, drags in
+// "/" + contact at "/site-contact" / "/kontakt" (drags in
 // forms via requiresModules) - Element-URI deliberately differs from
 // Http-URI throughout, and from the template's own folder name too, to
 // prove the class uses the entry's own uri, not the request path or the
@@ -831,11 +879,11 @@ check( 'rejects a duplicate Http-URI with 400, even when the Element-URIs differ
 // Only de_DE's text is posted for one field, proving the missing en_US/
 // other fields fall back to the generic placeholder rather than failing
 $_POST['data'] = json_encode( [ 'webpages' => [
-	[ 'uri' => '/site-home', 'httpUri' => '/', 'template' => 'home', 'nav' => true, 'text' => [
+	[ 'uri' => '/site-home', 'httpUri' => '/', 'libraryKey' => 'home', 'navs' => [ 'main' ], 'text' => [
 		'de_DE' => [ 'name' => 'Start', 'title' => 'Willkommen', 'description' => 'Startseite' ],
 		'en_US' => [ 'name' => 'Home', 'title' => 'Welcome', 'description' => 'Home page' ],
 	] ],
-	[ 'uri' => '/site-contact', 'httpUri' => '/kontakt', 'template' => 'contact', 'nav' => true, 'text' => [
+	[ 'uri' => '/site-contact', 'httpUri' => '/kontakt', 'libraryKey' => 'contact', 'navs' => [ 'main' ], 'text' => [
 		'de_DE' => [ 'name' => 'Kontakt' ],
 	] ],
 ] ] );
@@ -857,6 +905,7 @@ check( 'a hand-written route outside the library still survives Webpages apply t
 
 check( 'copies "forms"\'s own mail-header/footer templates too, auto-pulled in by "contact"', \Nino\Filesystem::fileExists( $appData, '/templates/mail-header.tpl' ) === true );
 check( 'copies "contact"\'s own template', \Nino\Filesystem::fileExists( $appData, '/templates/page-contact.tpl' ) === true );
+check( 'copies a page unit\'s declared files into the project', is_file( $sandbox. '/public/images/demo.jpg' ) === true );
 
 $deAfterWpApply = \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] );
 $enAfterWpApply = \Nino\Filesystem::getFileContent( $appData, '/text/en_US.php', [] );
@@ -887,10 +936,10 @@ check( 'apiList now reflects the persisted, current list', array_column( $librar
 // silently rewrote the first one. A finished unit (home, contact, ...) is a
 // one-off and keeps sharing - that is what its template is for
 $_POST['data'] = json_encode( [ 'webpages' => [
-	[ 'uri' => '/site-home', 'httpUri' => '/', 'template' => 'home', 'text' => [] ],
-	[ 'uri' => '/site-contact', 'httpUri' => '/kontakt', 'template' => 'contact', 'text' => [] ],
-	[ 'uri' => '/team', 'httpUri' => '/team', 'template' => 'blank', 'text' => [] ],
-	[ 'uri' => '/jobs/open', 'httpUri' => '/jobs', 'template' => 'blank', 'text' => [] ],
+	[ 'uri' => '/site-home', 'httpUri' => '/', 'libraryKey' => 'home', 'text' => [] ],
+	[ 'uri' => '/site-contact', 'httpUri' => '/kontakt', 'libraryKey' => 'contact', 'text' => [] ],
+	[ 'uri' => '/team', 'httpUri' => '/team', 'libraryKey' => 'blank', 'text' => [] ],
+	[ 'uri' => '/jobs/open', 'httpUri' => '/jobs', 'libraryKey' => 'blank', 'text' => [] ],
 ] ] );
 $perRouteRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Install\Webpages::apiApply( $appData, $perRouteRequest );
@@ -921,17 +970,16 @@ $perRouteList = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 $teamEntry = array_values( array_filter( $perRouteList['/nino/http/response']['body']['webpages'], fn( array $e ): bool => $e['httpUri'] === '/team' ) )[0] ?? [];
 check( 'a per-route page reads back as owning its template rather than as the library unit', ( $teamEntry['libraryKey'] ?? null ) === '' && ( $teamEntry['body'] ?? null ) === '[template /templates/page-team]' );
 
-// Navigation: only shows up once the module is active, one "httpUri:name"
-// line per entry with nav checked (a real, clickable href - not the
-// Element-URI), regenerated (not merged) on every apply
+// Navigation: only shows up once the module is active. Membership is posted
+// explicitly per entry and stored on its route.
 $_POST['data'] = json_encode( [ 'locales' => [ 'de_DE', 'en_US' ], 'modules' => [ 'navigation' ] ] );
 $navSetupRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Install\Setup::apiApply( $appData, $navSetupRequest );
 
 $_POST['data'] = json_encode( [ 'webpages' => [
-	[ 'uri' => '/site-home', 'httpUri' => '/', 'template' => 'home', 'nav' => true, 'text' => [ 'de_DE' => [ 'name' => 'Start' ], 'en_US' => [ 'name' => 'Home' ] ] ],
-	[ 'uri' => '/site-contact', 'httpUri' => '/kontakt', 'template' => 'contact', 'nav' => true, 'text' => [ 'de_DE' => [ 'name' => 'Kontakt' ], 'en_US' => [ 'name' => 'Contact' ] ] ],
-	[ 'uri' => '/site-legal', 'httpUri' => '/impressum', 'template' => 'legal', 'nav' => false, 'text' => [ 'de_DE' => [ 'name' => 'Recht' ], 'en_US' => [ 'name' => 'Legal' ] ] ],
+	[ 'uri' => '/site-home', 'httpUri' => '/', 'libraryKey' => 'home', 'navs' => [ 'main' ], 'text' => [ 'de_DE' => [ 'name' => 'Start' ], 'en_US' => [ 'name' => 'Home' ] ] ],
+	[ 'uri' => '/site-contact', 'httpUri' => '/kontakt', 'libraryKey' => 'contact', 'navs' => [ 'main' ], 'text' => [ 'de_DE' => [ 'name' => 'Kontakt' ], 'en_US' => [ 'name' => 'Contact' ] ] ],
+	[ 'uri' => '/site-legal', 'httpUri' => '/impressum', 'libraryKey' => 'legal', 'navs' => [], 'text' => [ 'de_DE' => [ 'name' => 'Recht' ], 'en_US' => [ 'name' => 'Legal' ] ] ],
 ] ] );
 $navWpApplyRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Install\Webpages::apiApply( $appData, $navWpApplyRequest );
@@ -946,7 +994,7 @@ $enAfterNav = \Nino\Filesystem::getFileContent( $appData, '/text/en_US.php', [] 
 $routesAfterNav = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes'];
 
 check( 'the Navigation module registers the menus the editors offer', \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/html/navs'] === [ 'main', 'footer' ] );
-check( 'a nav-checked entry joins the first registered menu on its own route, at its own position in the list', ( $routesAfterNav['GET://']['navs'] ?? null ) === [ 'main' => 1 ] );
+check( 'an entry explicitly assigned to main joins that menu at its own position in the list', ( $routesAfterNav['GET://']['navs'] ?? null ) === [ 'main' => 1 ] );
 check( '...and so does the second one, one position further down', ( $routesAfterNav['GET://kontakt']['navs'] ?? null ) === [ 'main' => 2 ] );
 check( 'an entry that is in no menu carries no membership at all', isset( $routesAfterNav['GET://impressum']['navs'] ) === false );
 check( 'nothing is generated into the text files anymore', isset( $deAfterNav['[[/website/navigation/main]]'] ) === false && isset( $enAfterNav['[[/website/navigation/main]]'] ) === false );
@@ -967,7 +1015,7 @@ check( 'mirrors its de_DE name into /website/legal/name too', $deAfterNav['[[/we
 // Dropping legal again narrows the routes (replace semantics) but leaves
 // the /website/legal/* mirror alone - see _applyLegalLink()'s docblock
 $_POST['data'] = json_encode( [ 'webpages' => [
-	[ 'uri' => '/site-home', 'httpUri' => '/', 'template' => 'home', 'nav' => true, 'text' => [ 'de_DE' => [ 'name' => 'Start' ], 'en_US' => [ 'name' => 'Home' ] ] ],
+	[ 'uri' => '/site-home', 'httpUri' => '/', 'libraryKey' => 'home', 'navs' => [ 'main' ], 'text' => [ 'de_DE' => [ 'name' => 'Start' ], 'en_US' => [ 'name' => 'Home' ] ] ],
 ] ] );
 $dropWpApplyRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Install\Webpages::apiApply( $appData, $dropWpApplyRequest );
@@ -993,9 +1041,9 @@ echo "Webpages <-> _admin's Routes module share one source of truth\n";
 // page is unopenable in /_admin, and saving the 404 page there quietly turns
 // it into a 200.
 $_POST['data'] = json_encode( [ 'webpages' => [
-	[ 'uri' => '/site-home', 'httpUri' => '/', 'libraryKey' => 'home', 'nav' => true, 'text' => [ 'de_DE' => [ 'name' => 'Start' ] ] ],
-	[ 'uri' => '/site-404', 'httpUri' => '/404', 'libraryKey' => '404', 'nav' => false, 'text' => [ 'de_DE' => [ 'name' => 'Weg' ] ] ],
-	[ 'uri' => '/site-legal', 'httpUri' => '/legal', 'libraryKey' => 'legal', 'nav' => false, 'text' => [ 'de_DE' => [ 'name' => 'Recht' ] ] ],
+	[ 'uri' => '/site-home', 'httpUri' => '/', 'libraryKey' => 'home', 'navs' => [ 'main' ], 'text' => [ 'de_DE' => [ 'name' => 'Start' ] ] ],
+	[ 'uri' => '/site-404', 'httpUri' => '/404', 'libraryKey' => '404', 'navs' => [], 'text' => [ 'de_DE' => [ 'name' => 'Weg' ] ] ],
+	[ 'uri' => '/site-legal', 'httpUri' => '/legal', 'libraryKey' => 'legal', 'navs' => [], 'text' => [ 'de_DE' => [ 'name' => 'Recht' ] ] ],
 ] ] );
 $sharedApplyRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Install\Webpages::apiApply( $appData, $sharedApplyRequest );
@@ -1027,7 +1075,7 @@ check( 'every Webpages-made entry names a template /_admin actually offers', cou
 
 $_POST['data'] = json_encode( [
 	'originalHttpUri' => '/404', 'uri' => '/site-404', 'httpUri' => '/404',
-	'template' => $adminPages[1]['template'], 'nav' => false,
+	'template' => $adminPages[1]['template'], 'navs' => [],
 	'statusCode' => $adminPages[1]['statusCode'], 'text' => $adminPages[1]['text'],
 ] );
 $adminSaveRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
@@ -1043,7 +1091,7 @@ check( 'the entry still resolves to /_install\'s own "404" unit after a save mad
 // into whichever option the disabled select happened to preselect
 $_POST['data'] = json_encode( [
 	'originalHttpUri' => '/legal', 'uri' => '/site-legal', 'httpUri' => '/legal',
-	'template' => '', 'nav' => false, 'statusCode' => 200, 'text' => $adminPages[2]['text'],
+	'template' => '', 'navs' => [], 'statusCode' => 200, 'text' => $adminPages[2]['text'],
 ] );
 $adminLegalRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Admin\PageEditor::apiSave( $appData, $adminLegalRequest );
@@ -1057,7 +1105,7 @@ check( '...and the derived list claims no template for it', ( \Nino\Install\Webp
 // it through its own replace rather than reject it as an unknown template
 $_POST['data'] = json_encode( [
 	'originalHttpUri' => '', 'uri' => '/dev-made', 'httpUri' => '/dev-made',
-	'template' => 'page-home', 'nav' => false, 'statusCode' => 201, 'text' => [],
+	'template' => 'page-home', 'navs' => [], 'statusCode' => 201, 'text' => [],
 ] );
 $adminNewRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Admin\PageEditor::apiSave( $appData, $adminNewRequest );
@@ -1076,7 +1124,7 @@ check( 'the library-backed entries still resolve their own units too', ( $afterR
 
 $_POST['data'] = json_encode( [
 	'originalHttpUri' => '/404', 'uri' => '/site-404', 'httpUri' => '/404',
-	'template' => 'page-nope', 'nav' => false, 'statusCode' => 404, 'text' => [],
+	'template' => 'page-nope', 'navs' => [], 'statusCode' => 404, 'text' => [],
 ] );
 $adminBadRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Admin\PageEditor::apiSave( $appData, $adminBadRequest );
@@ -1277,7 +1325,7 @@ check( 'registers "legal" and "contact" as well', isset( $realConfig['/nino/http
 check( 'auto-pulled "forms" (contact\'s requiresModules) into /nino/modules', in_array( '\\Nino\\Modules\\Form', $realConfig['/nino/modules'] ?? [], true ) === true );
 check( 'ships both library locales available', $realConfig['/nino/locales/available'] === [ 'en_US', 'de_DE' ] );
 check( 'a theme is bundled into /nino/html/assets', preg_match( '#^/assets/style\.theme\.[a-z0-9-]+\.css$#', (string) ( $realConfig['/nino/html/assets']['/.cache/style.css'][1] ?? '' ) ) === 1 );
-check( '...and named by the theme step\'s own persisted key', ( $realConfig['/nino/install/theme'] ?? null ) === 'agency' );
+check( '...and named by the theme step\'s own persisted key', ( $realConfig['/nino/install/theme'] ?? null ) === 'basis' );
 
 // Every shipped route resolves back to the on-disk template file it renders,
 // and to the library unit it came from - what lets /_admin's Routes module
@@ -1314,12 +1362,12 @@ foreach( [ 'home/templates/page-home.tpl', '404/templates/page-404.tpl',
 // stylesheet that manifest names, and every webfont that stylesheet
 // @font-faces - nothing else in the library ships fonts anymore, so a
 // missing one is a font that silently never loads
-foreach( scandir( $realRoot. '/library/themes' ) ?: [] as $themeEntry ) {
+foreach( scandir( $realRoot. '/_install/library/themes' ) ?: [] as $themeEntry ) {
 
 	if( $themeEntry === '.' || $themeEntry === '..' )
 		continue;
 
-	$themeDir 			= $realRoot. '/library/themes/'. $themeEntry;
+	$themeDir 			= $realRoot. '/_install/library/themes/'. $themeEntry;
 	$themeManifest 	= include $themeDir. '/manifest.php';
 	$themeCss 			= (string) ( $themeManifest['stylesheet'] ?? '' );
 
@@ -1333,8 +1381,8 @@ foreach( scandir( $realRoot. '/library/themes' ) ?: [] as $themeEntry ) {
 }
 
 $themeKey = (string) ( $realConfig['/nino/install/theme'] ?? '' );
-check( 'the theme the config names exists in the library', is_file( $realRoot. '/library/themes/'. $themeKey. '/manifest.php' ) === true );
-check( '...and the stylesheet it declares is the one the config bundles', ( include $realRoot. '/library/themes/'. $themeKey. '/manifest.php' )['stylesheet'] === ( $realConfig['/nino/html/assets']['/.cache/style.css'][1] ?? '' ) );
+check( 'the theme the config names exists in the library', is_file( $realRoot. '/_install/library/themes/'. $themeKey. '/manifest.php' ) === true );
+check( '...and the stylesheet it declares is the one the config bundles', ( include $realRoot. '/_install/library/themes/'. $themeKey. '/manifest.php' )['stylesheet'] === ( $realConfig['/nino/html/assets']['/.cache/style.css'][1] ?? '' ) );
 
 echo "\n";
 

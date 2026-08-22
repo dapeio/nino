@@ -164,14 +164,8 @@
 		return !pd.composer._context || pd.composer._context.mode !== 'replace';
 	}
 
-	function bindingSource( area, component, property, definition ) {
-		const stored = component.bindingSources && component.bindingSources[property];
-		if( stored ) return stored;
-		if( definition.kind === 'template' ) return 'template';
-		const value = component.bindings && component.bindings[property] || '';
-		if( area.source === 'elements' ) return value.startsWith('/') ? 'textfill' : 'field';
-		if( value === generatedKey( pd.composer._draft, component, property ) ) return 'new';
-		return definition.kind === 'image' ? 'image' : 'textfill';
+	function bindingSource( component, property ) {
+		return component.bindingSources && component.bindingSources[property] || '';
 	}
 
 	function setBindingSource( component, property, source ) {
@@ -179,11 +173,8 @@
 		component.bindingSources[property] = source;
 	}
 
-	function backgroundSource( draft, generated ) {
-		const stored = draft.frame && draft.frame.backgroundImageSource;
-		if( [ 'new', 'image', 'fixed' ].includes( stored ) ) return stored;
-		const key = ( draft.frame && draft.frame.backgroundImage ) || generated;
-		return key === generated ? 'new' : 'image';
+	function backgroundSource( draft ) {
+		return draft.frame && draft.frame.backgroundImageSource || '';
 	}
 
 	function backgroundKey( draft ) {
@@ -251,7 +242,7 @@
 				Object.keys( definition.properties || {} ).forEach( function( property ) {
 					const propertyDefinition = definition.properties[property];
 					if( propertyDefinition.kind !== kind ) return;
-					const source = bindingSource( area, component, property, propertyDefinition );
+					const source = bindingSource( component, property );
 					if( source === 'fixed' ) return;
 					const generated = generatedKey( draft, component, property );
 					const key = component.bindings[property] || generated;
@@ -276,7 +267,7 @@
 	function imageDescriptors( draft, item ) {
 		const images = singleDescriptors( draft, item, 'image' );
 		const generated = backgroundKey( draft );
-		if( [ 'cover', 'parallax' ].includes( effectiveFrame( draft, item ).background ) && backgroundSource( draft, generated ) !== 'fixed' ) {
+		if( [ 'cover', 'parallax' ].includes( effectiveFrame( draft, item ).background ) && backgroundSource( draft ) !== 'fixed' ) {
 			const key = draft.frame.backgroundImage || generated;
 			images.unshift( { area : '', index : -1, component : '', property : 'src', slot : 'background', label : 'Background image', width : 1920, height : 1080, generatedKey : generated, key : key, mode : key === generated ? 'new' : 'existing' } );
 		}
@@ -330,7 +321,7 @@
 		( draft.areas[areaKey].components || [] ).forEach( function( component ) {
 			const definition = componentDefinition( item, area, component );
 			Object.keys( definition.properties || {} ).forEach( function( property ) {
-				if( bindingSource( area, component, property, definition.properties[property] ) !== 'field' ) return;
+				if( bindingSource( component, property ) !== 'field' ) return;
 				const options = modelOptions( area, source.elementMode === 'existing' ? source.elementType : '', definition.properties[property].fieldType );
 				if( !options.some( function( option ) { return option.value === component.bindings[property] } ) ) component.bindings[property] = preferredMapping( options, component, property );
 				setBindingSource( component, property, 'field' );
@@ -348,7 +339,7 @@
 				const definition = componentDefinition( item, area, component );
 				if( area.source === 'single' ) Object.keys( definition.properties || {} ).forEach( function( property ) {
 					if( definition.properties[property].kind === 'template' ) return;
-					if( bindingSource( area, component, property, definition.properties[property] ) !== 'new' ) return;
+					if( bindingSource( component, property ) !== 'new' ) return;
 					component.bindings[property] = generatedKey( draft, component, property );
 					setBindingSource( component, property, 'new' );
 				} );
@@ -383,7 +374,7 @@
 			grid.append( formField( 'Overlay', 'frame.overlay', frameChoices( 'overlay', recommended ), draft.frame.overlay ), formField( 'Focus', 'frame.focus', frameChoices( 'focus', recommended ), draft.frame.focus, '1–3 top · 4–6 middle · 7–9 bottom.' ) );
 			const generated = backgroundKey( draft );
 			const imageKey = draft.frame.backgroundImage || generated;
-			const mode = backgroundSource( draft, generated );
+			const mode = backgroundSource( draft );
 			const row = node( 'div', 'pd-v3-binding-row' );
 			const source = formField( 'Background image', '', [ { value : 'new', label : 'New image slot · 1920×1080' }, { value : 'image', label : 'Existing image slot' }, { value : 'fixed', label : 'Fixed value' } ], mode );
 			source.querySelector('select').removeAttribute('data-path'); source.querySelector('select').dataset.backgroundMode = 'true'; row.appendChild( source );
@@ -480,7 +471,7 @@
 				return;
 			}
 
-			const mode = bindingSource( area, component, property, propertyDefinition );
+			const mode = bindingSource( component, property );
 			if( area.source === 'elements' ) {
 				const options = [ { value : 'field', label : 'Collection field' }, { value : 'textfill', label : 'Existing textfill' }, { value : 'fixed', label : 'Fixed value' } ];
 				const source = propertyDefinition.fieldType === 'image' ? null : sourceField( propertyDefinition.label, areaKey, index, property, options, mode );
@@ -740,12 +731,9 @@
 			areaKeys( preset() ).forEach( function( areaKey ) {
 				const area = preset().areas[areaKey];
 				draft.areas[areaKey].components.forEach( function( component ) {
-					const definition = componentDefinition( preset(), area, component );
 					Object.keys( component.bindings || {} ).forEach( function( property ) {
 						const value = component.bindings[property];
-						const source = component.bindingSources && component.bindingSources[property]
-							? component.bindingSources[property]
-							: ( typeof value === 'string' && value.startsWith( '/page-'+ draft.pageId+ '/'+ oldId+ '/' ) ? 'new' : ( definition.properties[property] ? bindingSource( area, component, property, definition.properties[property] ) : '' ) );
+						const source = bindingSource( component, property );
 						if( area.source === 'single' && source === 'new' && typeof value === 'string' && value.startsWith( '/page-'+ draft.pageId+ '/'+ oldId+ '/' ) ) component.bindings[property] = value.replace( '/'+ oldId+ '/', '/'+ draft.id+ '/' );
 					} );
 				} );
@@ -813,7 +801,7 @@
 					throw new Error( 'Choose a reusable template for '+ area.label+ '.' );
 				const definition = componentDefinition( item, area, component );
 				Object.keys( definition.properties || {} ).forEach( function( property ) {
-					const source = bindingSource( area, component, property, definition.properties[property] );
+					const source = bindingSource( component, property );
 					if( source === 'textfill' && !( pd.composer._textEntries || [] ).some( function( entry ) { return entry.key === component.bindings[property] } ) )
 						throw new Error( 'Choose an existing textfill for '+ area.label+ ' · '+ definition.properties[property].label+ '.' );
 					if( source === 'image' && !( pd.sectionsUI._images || [] ).some( function( image ) { return image.uri === component.bindings[property] } ) )
@@ -827,7 +815,7 @@
 			areaDraft.components.forEach( function( component ) {
 				const definition = componentDefinition( item, area, component );
 				Object.keys( definition.properties || {} ).forEach( function( property ) {
-					if( bindingSource( area, component, property, definition.properties[property] ) !== 'field' ) return;
+					if( bindingSource( component, property ) !== 'field' ) return;
 					const model = existing ? existing.model : area.model;
 					const mapped = model && model[component.bindings[property]];
 					if( !mapped || ( mapped.type === 'image' ) !== ( definition.properties[property].fieldType === 'image' ) ) throw new Error( 'Map every field in '+ area.label+ ' to a compatible Elements field.' );
@@ -876,20 +864,11 @@
 		nextComponentId : nextComponentId,
 		moveComponent : moveComponent,
 		areaKeys : areaKeys,
-		normalizeExistingSources : function() {
+		reconcileAvailableCollections : function() {
 			const item = preset();
 			if( !item || Number( item.version ) !== 3 ) return;
 			areaKeys( item ).forEach( function( areaKey ) {
 				const area = item.areas[areaKey];
-				pd.composer._draft.areas[areaKey].components.forEach( function( component ) {
-					const definition = componentDefinition( item, area, component );
-					Object.keys( definition.properties || {} ).forEach( function( property ) {
-						const source = bindingSource( area, component, property, definition.properties[property] );
-						setBindingSource( component, property, source );
-						if( source === 'textfill' && !component.bindings[property] && firstTextfill() ) component.bindings[property] = firstTextfill();
-						if( source === 'image' && !component.bindings[property] && pd.sectionsUI._images && pd.sectionsUI._images[0] ) component.bindings[property] = pd.sectionsUI._images[0].uri;
-					} );
-				} );
 				const source = pd.composer._draft.areas[areaKey].source;
 				if( area.source !== 'elements' || source.elementMode !== 'new' ) return;
 				if( ( pd.sectionsUI._types || [] ).some( function( type ) { return type.type === source.elementType } ) ) {

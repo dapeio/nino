@@ -24,12 +24,12 @@ if( preg_match( '#^/private(?:/|$)#', $uri ) === 1 ) {
     return true;
 }
 
-// The durable appearance library is source for /_install and /_theme, not a
-// second public asset tree. Theme picker images are its one intentional public
-// file; mirror library/.htaccess here because PHP's development server ignores
-// Apache configuration entirely.
-if( preg_match( '#^/library(?:/|$)#', $uri ) === 1
-	&& preg_match( '#^/library/themes/[a-z0-9][a-z0-9-]*/preview\.svg$#', $uri ) !== 1 ) {
+// The installer's library is source for /_install's steps and for /_theme's
+// catalogue dialogs, not a second public asset tree. Theme picker images are
+// its one intentional public file; mirror _install/library/.htaccess here
+// because PHP's development server ignores Apache configuration entirely.
+if( preg_match( '#^/_install/library(?:/|$)#', $uri ) === 1
+	&& preg_match( '#^/_install/library/themes/[a-z0-9][a-z0-9-]*/preview\.svg$#', $uri ) !== 1 ) {
 	http_response_code( 404 );
 	return true;
 }

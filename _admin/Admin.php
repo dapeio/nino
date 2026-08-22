@@ -2010,9 +2010,8 @@ namespace Nino\Admin {
 		 *	optional module's file. See Backup::manifest()'s own docblock in
 		 *	_nino/Nino.php for the identical reasoning on the backup side.
 		 *
-		 *	A no-op if the backup being restored predates this feature and
-		 *	carries neither file - nothing to merge, copyDir() below restores
-		 *	them exactly as it always did.
+		 *	A no-op if the backup carries neither file, as in a project without
+		 *	the Newsletter module - there is nothing to merge.
 		 *
 		 *	@param		string 		$dataDir			The live /data directory - read, never written
 		 *	@param		string 		$staging			Extracted backup, rewritten in place
@@ -2176,8 +2175,7 @@ namespace Nino\Admin {
 				'hint' 	=> 'How long a locked account or ip stays locked.',
 			],
 			// Both flags are read by _editor (Backup::maybeRun(), Logs::record()),
-			// which is also where the keys are named after - see apiList()'s note
-			// on the '/nino/admin/*' pair a pre-0.11.1 config.php shipped instead
+			// which is also where the keys are named after.
 			'/nino/editor/backups' => [
 				'type' 	=> 'bool',
 				'group'	=> 'editor',
@@ -2319,17 +2317,6 @@ namespace Nino\Admin {
 		 *	One field's value as stored, falling back to the same default the
 		 *	runtime itself applies when the key is missing.
 		 *
-		 *	Both _editor flags carry one extra step. Until 0.11.1 config.php
-		 *	shipped them as '/nino/admin/backups' and '/nino/admin/logs', while
-		 *	_editor read - and still reads - '/nino/editor/*'. The shipped
-		 *	'false' therefore never did anything: the key the code looks for
-		 *	was absent, so its '?? true' default won and both features ran in
-		 *	every install regardless. An existing project's old key is read here
-		 *	so this panel shows what its owner actually intended rather than
-		 *	the default that has been overriding it, and saving writes the key
-		 *	_editor reads. The stale one is left alone rather than deleted -
-		 *	removing a key out of someone's config.php is not this panel's call.
-		 *
 		 *	@param		array 		$stored				config.php as read from disk
 		 *	@param		string		$key
 		 *	@param		string		$type					FIELDS type
@@ -2340,15 +2327,6 @@ namespace Nino\Admin {
 
 			if( array_key_exists( $key, $stored ) === true )
 				return $stored[$key];
-
-			$legacy = match( $key ) {
-				'/nino/editor/backups'	=> '/nino/admin/backups',
-				'/nino/editor/logs' 		=> '/nino/admin/logs',
-				default 								=> null,
-			};
-
-			if( $legacy !== null && array_key_exists( $legacy, $stored ) === true && is_bool( $stored[$legacy] ) === true )
-				return $stored[$legacy];
 
 			// The runtime's own fallback for a missing key, so the form never
 			// shows a value the site is not actually running with
@@ -4263,8 +4241,7 @@ namespace Nino\Admin {
 		 *	key a template asks for, registered here or not, so a project that
 		 *	never writes this array loses nothing but the checkboxes. Empty
 		 *	while the Navigation module is inactive, which is what tells the
-		 *	frontend to offer no menu fields at all (the old 'navModule' flag
-		 *	said exactly that, and nothing else).
+		 *	frontend to offer no menu fields at all.
 		 *
 		 *	Own copy of /_install's Webpages::navKeys(), same standalone-per-
 		 *	area reasoning every other helper in this class duplicates
@@ -4278,15 +4255,7 @@ namespace Nino\Admin {
 			if( in_array( '\\Nino\\Modules\\Navigation', $appData['/nino/modules'] ?? [], true ) === false )
 				return [];
 
-			$navs = $appData['/nino/html/navs'] ?? null;
-
-			// A project from before this registry existed still has the single
-			// menu the old generated fill was hardcoded to, so it keeps an
-			// editable one rather than none. An array that *is* there and empty
-			// is a deliberate "no menus at all" - the Navigations module can
-			// delete the last one - and stays empty
-			if( is_array( $navs ) === false )
-				return [ 'main' ];
+			$navs = $appData['/nino/html/navs'] ?? [];
 
 			return array_values( array_unique( array_map( 'strval', $navs ) ) );
 		}
@@ -4295,10 +4264,6 @@ namespace Nino\Admin {
 		 *	Which navigations one posted entry asks to be in, narrowed to the
 		 *	navigations this project actually registers.
 		 *
-		 *	'nav' =&gt; true is what a frontend written before per-menu
-		 *	membership existed posts, and means the first registered
-		 *	navigation - the single menu an entry could have been in back then
-		 *
 		 *	@param		array 		$entry				One posted page entry
 		 *	@param		array 		$navs					Registered nav keys (see navKeys())
 		 *
@@ -4306,10 +4271,7 @@ namespace Nino\Admin {
 		 */
 		public static function entryNavs( array $entry, array $navs ): array {
 
-			if( isset( $entry['navs'] ) === true && is_array( $entry['navs'] ) === true )
-				return array_values( array_intersect( $navs, $entry['navs'] ) );
-
-			return ( $entry['nav'] ?? false ) === true ? array_slice( $navs, 0, 1 ) : [];
+			return array_values( array_intersect( $navs, is_array( $entry['navs'] ?? null ) ? $entry['navs'] : [] ) );
 		}
 
 		/**
@@ -5155,14 +5117,7 @@ namespace Nino\Admin {
 		 */
 		public static function registry( array &$appData ): array {
 
-			$navs = $appData['/nino/html/navs'] ?? null;
-
-			// Same legacy rule PageEditor::navKeys() applies, so both areas
-			// offer the same menus: a project from before this registry
-			// existed has the one menu the old generated fill was hardcoded
-			// to, while a registry that is there and empty stays empty
-			if( is_array( $navs ) === false )
-				return [ 'main' ];
+			$navs = $appData['/nino/html/navs'] ?? [];
 
 			return array_values( array_unique( array_map( 'strval', $navs ) ) );
 		}

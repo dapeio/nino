@@ -1,0 +1,9 @@
+# The installer's library is server-side source. Only the deliberately public
+# picker image may be delivered directly; PHP manifests, page and frame
+# templates, stylesheets and bundled font sources are read by /_install and,
+# while the installer is still deployed, by /_theme.
+<FilesMatch "^(?!preview\.svg$)">
+	Require all denied
+</FilesMatch>
+
+Options -Indexes

@@ -154,8 +154,16 @@ sandbox.Nino = {
 	},
 };
 
+const source = fs.readFileSync( path.join( __dirname, '../_nino/Nino.ui.js' ), 'utf8' );
+
+// Nino.ui.js is itself rendered through the normal textfill pipeline before
+// the browser executes it. Mirror that production step here: running the raw
+// source would post to the literal string "[[/nino/dir]]/.form" and test the
+// fixture rather than the form handler. This sandbox represents a root install.
+const renderedSource = source.replaceAll( '[[/nino/dir]]', '' );
+
 vm.runInContext(
-	fs.readFileSync( path.join( __dirname, '../_nino/Nino.ui.js' ), 'utf8' ),
+	renderedSource,
 	vm.createContext( sandbox ),
 	{ filename : 'Nino.ui.js' }
 );
@@ -223,7 +231,7 @@ check( 'a honeypot rejection stays on the generic message', generic.msg.textCont
 
 check( 'messages are written as text, not html', forms[0].msg.innerHTML === '' && forms[1].msg.innerHTML === '' );
 
-const source = fs.readFileSync( path.join( __dirname, '../_nino/Nino.ui.js' ), 'utf8' );
+check( 'the default endpoint remains relative to the rendered project root', source.includes( "'[[/nino/dir]]/.form'" ) );
 check( 'no form handler writes a textfill through innerHTML', /msg\.innerHTML\s*=/.test( source ) === false );
 check( 'no form handler strips characters out of a field value', /value\.replace\(\s*\/\[<>/.test( source.replace( /\s/g, '' ) ) === false && source.includes( "value.replace( /[<>'\";(){}[\\]\\\\|]/g, '' )" ) === false );
 

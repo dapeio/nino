@@ -65,7 +65,7 @@ Prüfe in der Hosting-Konfiguration zusätzlich, wie nicht vorhandene Pfade an `
 - `/_editor`, `/_admin`, `/_theme`, `/_templates` und gegebenenfalls `/_install` an ihre eigenen Einstiegspunkte routen;
 - Zugriffe auf Dotfiles und Dot-Verzeichnisse verweigern;
 - **`private/` vollständig sperren** – es wird nie von einem Browser angefragt, sondern nur von PHP gelesen;
-- direkte Zugriffe auf `library/` bis auf `library/themes/<key>/preview.svg` sperren – die übrigen Dateien sind serverseitige Darstellungsquellen;
+- direkte Zugriffe auf `_install/library/` bis auf `_install/library/themes/<key>/preview.svg` sperren – die übrigen Dateien sind serverseitige Darstellungsquellen;
 - Verzeichnisauflistung deaktivieren;
 - PHP-Quell- und Datendateien nicht als Text ausliefern.
 
@@ -83,7 +83,7 @@ Eine allgemeine Beispielkonfiguration kann die Pfade und PHP-FPM-Einstellungen e
 
 Vor der Ersteinrichtung muss PHP in der Projektwurzel Verzeichnisse und Dateien anlegen dürfen. Die noch fehlenden Projektpfade werden von `/_install` beziehungsweise bei Bedarf vom Kernel erzeugt und sind keine manuell anzulegende Voraussetzung.
 
-Im laufenden Betrieb benötigt Nino Schreibrechte nur für tatsächlich veränderliche Inhalte. Dazu gehören je nach Nutzung `private/config.php`, `private/text/`, `private/elements/`, `private/data/`, `private/.logs/`, `private/.backups/`, `public/images/` und `public/.cache/`. Der Template Builder unter `/_templates` benötigt zusätzlich `private/templates/`; er kann native Textschlüssel, Elementtypen und Bildplatz-Definitionen in der Konfiguration anlegen. Das Anwenden von Darstellungsvarianten in `/_theme` benötigt `private/templates/`, `public/assets/`, `public/fonts/` sowie jedes weitere öffentliche Ziel, das ein Theme-Manifest erklärt. Der gemeinsame Katalog `library/` selbst bleibt schreibgeschützt. `/_admin` schreibt je nach Funktion unter anderem Konfiguration, Texte, Elemente und Bilder. Projektwurzel und PHP-Quellcode können ansonsten nach der Installation schreibgeschützt bleiben.
+Im laufenden Betrieb benötigt Nino Schreibrechte nur für tatsächlich veränderliche Inhalte. Dazu gehören je nach Nutzung `private/config.php`, `private/text/`, `private/elements/`, `private/data/`, `private/.logs/`, `private/.backups/`, `public/images/` und `public/.cache/`. Der Template Builder unter `/_templates` benötigt zusätzlich `private/templates/`; er kann native Textschlüssel, Elementtypen und Bildplatz-Definitionen in der Konfiguration anlegen. Das Anwenden von Darstellungsvarianten in `/_theme` benötigt `private/templates/`, `public/assets/`, `public/fonts/` sowie jedes weitere öffentliche Ziel, das ein Theme-Manifest erklärt. Der Darstellungskatalog unter `_install/library/` selbst bleibt schreibgeschützt. `/_admin` schreibt je nach Funktion unter anderem Konfiguration, Texte, Elemente und Bilder. Projektwurzel und PHP-Quellcode können ansonsten nach der Installation schreibgeschützt bleiben.
 
 Vergib diese Rechte an den Benutzer, unter dem PHP ausgeführt wird. Weltweit beschreibbare Rechte wie `0777` sind keine geeignete Dauerlösung. Nach dem Deployment sollten Kernel und übriger PHP-Quellcode nicht allgemein beschreibbar sein.
 
@@ -145,7 +145,9 @@ Zusätzlicher Webserver-Schutz für `/_admin`, `/_theme` und `/_templates` – e
 
 ## `/_install` nach der Einrichtung
 
-Schließe den Assistenten vollständig ab. Der letzte Schritt setzt das echte Passwort von `/_admin` und sperrt den Installer. Entferne anschließend das Verzeichnis `_install/` aus der produktiven Auslieferung. Behalte das getrennte Verzeichnis `library/` in der Projektwurzel: `/_theme` verwendet dessen Theme-, Header- und Footer-Kataloge nach der Installation weiter.
+Schließe den Assistenten vollständig ab. Der letzte Schritt setzt das echte Passwort von `/_admin` und sperrt den Installer. Entferne anschließend das Verzeichnis `_install/` aus der produktiven Auslieferung.
+
+Damit verschwindet auch der Darstellungskatalog unter `_install/library/`. Das ist beabsichtigt: Der Katalog ist Einrichtungsmaterial, kein Laufzeitfeature. Angewendete Themes und Frames liegen längst als Projektdateien in `assets/` und `templates/` und bleiben von Hand sowie über `/_templates` bearbeitbar. In `/_theme` arbeitet der Design-Dialog unverändert weiter — er erzeugt die Palette und das Raster, statt Dateien zu kopieren; die drei katalogbasierten Dialoge haben danach nichts mehr aufzulisten. Wer Theme, Header und Footer dauerhaft umschaltbar halten will, liefert das gesperrte `_install/` bewusst mit aus.
 
 Die Reihenfolge ist wesentlich:
 
@@ -199,7 +201,7 @@ Ein erfolgreicher Aufruf der Startseite belegt noch nicht, dass sensible Dateien
 - `config.php` und PHP-Datendateien;
 - versteckte Log- und Backup-Verzeichnisse;
 - interne Dateien aus `_admin/`, `_theme/`, `_templates/` und `_editor/`, die nicht als öffentliche Assets vorgesehen sind;
-- Dateien unter `library/` mit Ausnahme von `library/themes/*/preview.svg`;
+- Dateien unter `_install/library/` mit Ausnahme von `_install/library/themes/*/preview.svg`;
 - `_install/`, nachdem es entfernt wurde.
 
 Die erwartete Antwort kann je nach Server `403` oder `404` sein. Entscheidend ist, dass weder Inhalt noch Verzeichnisliste ausgeliefert werden.
@@ -234,7 +236,7 @@ Nino befindet sich in der Beta-Phase. Sicherheitskorrekturen erscheinen auf `mai
 - [ ] `/_install` konnte die Projektverzeichnisse aus der beschreibbaren Projektwurzel selbst erzeugen.
 - [ ] Schreibrechte sind nach der Einrichtung auf die benötigten Pfade begrenzt.
 - [ ] `/_install` wurde vollständig abgeschlossen und anschließend produktiv entfernt.
-- [ ] Der getrennte Katalog `library/` bleibt ausgeliefert, direkt erreichbar sind nur seine Theme-Vorschauen.
+- [ ] Wird `_install/` mitgeliefert, um Theme/Header/Footer umschaltbar zu halten, ist es gesperrt und von seinem Katalog sind nur die Theme-Vorschauen direkt erreichbar.
 - [ ] `/_admin` und `/_editor` besitzen getestete, getrennte Zugänge.
 - [ ] `/_theme` ist entweder gemeinsam mit `/_admin` entfernt oder durch dessen Admin-Zugang geschützt und damit getestet.
 - [ ] `/_templates` ist entweder entfernt oder mit dem Admin-Zugang geschützt und als Alpha bewusst freigegeben.

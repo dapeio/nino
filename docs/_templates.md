@@ -93,7 +93,7 @@ Shell slots use inert comments:
 [template /templates/html-header]
 ```
 
-New page templates contain both markers. For compatibility, an exact leading `html-header` and trailing `html-footer` pair is recognized in memory; the first deliberate save adds the markers. Other `[template]` shortcodes remain ordinary canvas components.
+New page templates contain both markers. An exact leading `html-header` and trailing `html-footer` pair is also a recognized shell convention; the next deliberate save serializes its markers. Other `[template]` shortcodes remain ordinary canvas components.
 
 Inert template metadata also lives at the start of the file and never appears in the canvas:
 
@@ -107,7 +107,7 @@ The name drives the left-rail label and search; the second marker persists the V
 Managed sections carry a comment such as:
 
 ```html
-<!-- nino:section {"preset":"hero-centered","version":1,...} -->
+<!-- nino:section {"version":3,"preset":"fullscreen-image","areas":{...}} -->
 ```
 
 This metadata lets the composer reopen its settings. It is inert HTML and does not add a runtime dependency. Choosing **HTML+** deliberately removes the metadata when the custom source is accepted. The section then becomes code-authored, so a later composer or page-default change cannot overwrite it.
@@ -218,7 +218,7 @@ The shared Section frame offers:
 | Width | Auto, default, narrow or wide |
 | Margin / padding | Auto, none, small, default or big |
 | Background | Auto, default, alt, primary, dark, black, cover or parallax |
-| Overlay | Auto, none, soft, medium or strong |
+| Overlay | Auto, none or dim |
 | Image focus | Auto or positions 1–9 |
 | Background image | A new image slot, an existing one, or a fixed URL |
 
@@ -228,7 +228,9 @@ slot** points at a slot that is already there, and **Fixed value** writes the
 URL straight into the section — a project path such as
 `[[/nino/public]]/images/hero.jpg`, an ordinary relative path or an `https`
 URL — and creates no slot at all. The last one is for an image the project
-already ships and nobody needs to swap in Admin.
+already ships and nobody needs to swap in Admin. The persisted frame always
+stores `backgroundImageSource`; a non-empty image value without that source is
+rejected rather than inferred.
 
 Every select that offers **Auto** names the value it currently resolves to —
 `Auto (Dim)`, `Auto (Wide)`, `Auto (100)` — so the choice can be read without
@@ -291,8 +293,9 @@ shortcode arguments and mappings. The insert operation creates only requested
 new textfills, image slots and Element Types; existing bindings are referenced,
 not overwritten.
 
-The persisted component node records the choice per property in
-`bindingSources`. Manifests may use the same contract for recommendations:
+The persisted component node records the choice for every property in
+`bindingSources`; a saved v3 node with a missing source is invalid rather than
+guessed from its value. Manifests may use the same contract for recommendations:
 
 ```php
 [
@@ -528,8 +531,8 @@ of the actual containing content box, so a persistent side navigation can make
 
 ### Version contract
 
-The Section Library loads explicit `version => 3` manifests only. A missing,
-older or unknown version is ignored instead of being guessed into another UI.
+The Section Library loads explicit `version => 3` manifests only. Any other
+version value is ignored instead of being guessed into another UI.
 Existing generated HTML remains valid runtime source and can still be edited
 through HTML+, but adding or graphically reopening a managed preset requires a
 maintained v3 manifest.

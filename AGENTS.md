@@ -122,8 +122,9 @@ Important source directories:
 | `_install/Install.php` | Installer behavior and library application |
 | `_install/library/modules/<slug>/` | Installer module packages |
 | `_install/library/pages/<slug>/` | Installable page units |
+| `_install/library/themes/<slug>/` | Appearance themes: manifest, preview, and installable assets. Setup material read by `/_install` and, while the installer is deployed, by `/_theme`; applying one copies it into the project |
 | `_install/library/header/<slug>/`, `_install/library/footer/<slug>/` | Interchangeable page frames: a `template.tpl` plus an optional `style.css`, no manifest. Installed as `templates/theme.header.tpl` / `theme.footer.tpl`, which the base html templates include |
-| `_theme/Theme.php` | Design engine and `/_theme` tool: solves the token palette, writes `/assets/style.design.css` and keeps it ordered in the css bundle |
+| `_theme/Theme.php` | Four-dialog appearance tool and Design engine: applies Theme/Header/Footer units, solves the token palette, writes `/assets/style.design.css`, and keeps all layers ordered in the css bundle |
 | `_theme/assets/theme.js` | `/_theme` frontend; no bundler |
 | `tests/*-smoke.php` | Standalone PHP contract tests |
 | `tests/*-js-smoke.js` | Standalone Node/browser-logic tests |
@@ -141,6 +142,7 @@ Project content and generated destinations:
 | `elements/<type>.php` | Element schema plus shared and localized records |
 | `images/` | Project and uploaded images |
 | `data/` | Runtime records, locks, logs, caches; normally not versioned |
+| `data/index-<type>.php` | Derived locale-grouped Elements search index; recreated from the type file, never source content |
 
 A fresh checkout may not yet contain all generated destination directories.
 Do not “fix” their absence by adding empty placeholders. `/_install` creates and
@@ -1506,10 +1508,10 @@ independent of the library at public runtime.
 
 Every library preset MUST use the named-area manifest contract, version `3`.
 `Library::presets()` deliberately ignores manifests without that explicit
-version. Do not restore a parallel Classic gallery, compatibility loader,
-migration branch or Intro/Content/Outro compiler. An older managed section
-whose preset no longer exists remains editable through HTML+ as ordinary
-section source.
+version. Do not add a parallel Classic gallery, alternate-version loader,
+migration branch or Intro/Content/Outro compiler. A managed section whose
+preset is unavailable remains editable through HTML+ as ordinary section
+source.
 
 ### 10.1 Directory, slug, and files
 
@@ -1806,8 +1808,10 @@ properties allow `new`, `textfill`, or `fixed`; Single images allow `new` or
 allow `field`, `textfill`, or `fixed`, while Elements images remain `field`.
 Template properties use `template`, accept only `/templates/<safe-name>`, and
 compile to a normal `[template]` shortcode. Template components are forbidden
-in Elements Areas. Old v3 comments without `bindingSources` MUST continue to
-infer their original generated-key or model-field behavior.
+in Elements Areas. Every persisted v3 component MUST declare a source for every
+property; missing `bindingSources` are invalid rather than inferred. Manifest
+recommendations may omit them because preset normalization expands those
+author-owned defaults before they reach the editor.
 
 The authenticated Builder key list includes blacklisted keys, grouped as
 technical values in the UI. A Text blacklist is an editor-visibility rule, not
@@ -1835,9 +1839,9 @@ stored as `frame.backgroundImageSource`: `new` generates the slot
 and `fixed` writes a plain `<img>` with a literal URL and creates no slot at
 all. A fixed value may start with `[[/nino/public]]` or `[[/nino/dir]]` and is
 otherwise a relative path or an `http`/`https` URL - every other bracket,
-quote, space and scheme is refused. Metadata written before that field infers
-its original slot behavior. Focus is positions 1–9 and overlay is
-none/soft/medium/strong. Mobile and reduced-motion behavior must remain
+quote, space and scheme is refused. Persisted metadata MUST carry the source
+explicitly. Focus is positions 1–9 and overlay is `auto`, `none`, or `dim`.
+Mobile and reduced-motion behavior must remain
 meaningful without preview JavaScript.
 
 ### 10.6 Validation and output
@@ -1872,7 +1876,7 @@ Extend `tests/templates-smoke.php` and `tests/templates-js-smoke.js`. Test:
 - metadata preserves ordered components and independent collections;
 - component add/move/remove helpers do not mutate unrelated state;
 - new/existing/fixed Text, Image, Template, and Elements bindings, including
-  blacklisted technical textfills and legacy v3 source inference;
+  blacklisted technical textfills and rejection of incomplete source metadata;
 - declared `data-*` attributes on the section, Layout, Area container,
   collection item and component, their escaping and `[[section:id]]`
   substitution, the reserved frame attribute, and posted metadata that tries to
@@ -2015,10 +2019,9 @@ Allowed selected include paths match:
 
 or an empty string for `None`.
 
-Historic exact top/bottom
-`[template /templates/html-header]` / `html-footer` includes are recognized in
-memory and receive markers on the next deliberate builder save. New templates
-should not rely on that legacy normalization.
+Exact top/bottom `[template /templates/html-header]` / `html-footer` includes
+are a recognized shell convention. They receive explicit markers on the next
+deliberate Builder save.
 
 Header/footer slots are not regular movable canvas sections. Other standalone
 `[template /templates/name]` shortcodes remain normal movable components.
@@ -2181,6 +2184,8 @@ Create:
 ```text
 _install/library/pages/services/
 ├── manifest.php
+├── images/
+│   └── services-hero.jpg
 ├── templates/
 │   └── page-services.tpl
 ├── text/
@@ -2214,6 +2219,9 @@ return [
 	'elementTypes' => [
 		'services.php',
 	],
+	'files' => [
+		'images/services-hero.jpg',
+	],
 ];
 ```
 
@@ -2224,13 +2232,13 @@ Current page-unit consumers recognize:
 - `routes`;
 - `templates`, including locale-keyed entries;
 - `elementTypes`;
+- `files`, copied from the unit to the same project-relative virtual path;
 - `blacklist`;
 - and `text/global.php` plus selected `text/<locale>.php`.
 
-Some older page manifests contain `files`, but the current Webpages application
-path does not copy that key. Do not rely on page-unit `files` without first
-implementing and testing support in `Install.php`. Put feature assets in a
-required installer module or another supported ownership layer.
+Every declared `files` entry MUST be a unit-relative file or directory that
+exists. Tests should assert its observable copied output, not merely the
+manifest entry.
 
 Normally one page unit has one route. `/_install` uses the route body to
 identify its library unit and lets the developer change:
@@ -2623,6 +2631,57 @@ with its own field value per §10.3.
 Outside a preset - an ordinary hand-written page template - there is no such
 token and no Area to follow, so both loops simply name the same collection.
 
+### 12.4b Search indexed Elements
+
+The built-in `\Nino\Modules\Search` is configured manually. Do not add it to
+`/_install` or infer its fields from templates:
+
+```php
+'/nino/modules' => [
+	// ...
+	'\\Nino\\Modules\\Search',
+],
+'/nino/elements/index' => [
+	'articles' => [
+		0 => 'title',
+		1 => 'summary',
+		2 => 'keywords',
+		3 => 'author',
+	],
+],
+```
+
+The outer key is one flat Element type. Priorities are integer keys `0` through
+`3`, strongest to weakest, and each names one existing model field. The public
+read API is:
+
+```php
+$hits = \Nino\Modules\Search::getElements( $appData, 'articles', $query );
+```
+
+It searches only `Locales::getCurrentLocale()` and returns canonical Elements,
+not index rows or scores. Every normalized query token has to match; priorities
+rank the hits.
+
+Lifecycle is deliberately small and explicit:
+
+- module `init()` only registers `/nino/elements/committed` and performs no I/O;
+- `/_admin` Config's **Create searchindex** rebuilds every configured type on
+  every press;
+- a committed insert, update, or delete rebuilds that configured type;
+- one type owns exactly `/data/index-<type>.php`;
+- reads of a missing or malformed file return `[]` and never self-heal;
+- stale files for no-longer-configured types are inert because the read API
+  checks the current configuration.
+
+Search indexes are the explicit exception to the general mutable-file rule in
+this guide. They are expendable derived data and use one direct, non-atomic
+full-file write: no `Filesystem::mutate()`, temporary rename, sidecar lock,
+signature, or revision. Keep that contract visible in code and docs. Test it in
+`tests/search-smoke.php`, including inactive/active module behavior, all-index
+Admin rebuilds, current-locale search, weighted fuzzy ranking, committed-write
+refresh, missing/malformed reads, and write-failure reporting.
+
 ### 12.5 Element changes and translations
 
 When saving a record with global and localized fields:
@@ -2643,6 +2702,7 @@ values that override the new shape.
 ### 12.6 Element tests
 
 Use `tests/kernel-smoke.php` for model/runtime behavior,
+`tests/search-smoke.php` for the derived search-index contract,
 `tests/admin-smoke.php` for type CRUD and migrations, and the relevant JS tests
 for forms/uploads. Test:
 
@@ -2799,14 +2859,13 @@ or escaping.
 | Prefix reusable includes with `page-` | Reserve `page-*` for full page templates |
 | Add metadata below markup | Put both metadata comments at byte zero |
 | Remove copied installer files on deselect | Update selection only; preserve edited files |
-| Assume page-unit `files` is applied | Use a supported module asset path or add tested support |
+| Declare a page-unit file that does not exist | Keep `files` paths unit-relative and test the copied output |
 | Put translated words in IDs/fill keys | Use stable semantic slugs |
 | Update only English or German behavioral docs | Keep both manuals synchronized |
 | Test for a new file but not behavior | Assert observable response/data/DOM contracts |
 
-When an existing pattern appears to violate this guide, inspect why. It may be
-legacy compatibility covered by a test. Do not duplicate the legacy shape into
-new code unless the compatibility requirement applies.
+When an existing pattern appears to violate this guide, inspect the current
+runtime and tests. A stale pattern is not authority for new code.
 
 ## 15. Test and validation matrix
 
@@ -2822,6 +2881,7 @@ temporary project and must not rely on a previously installed working tree.
 | Editor backend | `tests/editor-smoke.php` |
 | Editor frontend | relevant `tests/editor-*-js-smoke.js` |
 | Installer behavior/library | `tests/install-smoke.php` and relevant install JS test |
+| Appearance catalogue/backend | `tests/theme-smoke.php`, plus `tests/install-smoke.php` when installer application changes |
 | Section preset/Template Builder PHP | `tests/templates-smoke.php` |
 | Template Builder browser behavior | `tests/templates-js-smoke.js` |
 | Shared public UI slider/tabs | corresponding `tests/nino-ui-*-js-smoke.js` |
@@ -2834,6 +2894,7 @@ php tests/kernel-smoke.php
 php tests/editor-smoke.php
 php tests/admin-smoke.php
 php tests/install-smoke.php
+php tests/theme-smoke.php
 php tests/templates-smoke.php
 for test in tests/*-js-smoke.js; do node "$test"; done
 php tests/concurrency-smoke.php

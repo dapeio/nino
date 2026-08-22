@@ -6,12 +6,11 @@ declare(strict_types=1);
  *												live in this single file, same convention as _nino/Nino.php,
  *												_editor/Editor.php and _admin/Admin.php. Walks a fresh checkout through
  *												environment/permission checks, assembling starting content from
- *												_install/library/ (locales/modules -> routes/templates/text,
- *												a theme -> stylesheet/fonts + the css bundle, then separate
- *												Design/Header/Footer choices, an ordered list of actual
- *												pages -> routes/templates/text/
- *												navigation), bulk-filling the site's always-present "Personal
- *												Infos" text, creating the first _editor account(s) and finally
+ *												_install/library/ (locales/modules/pages -> routes/templates/
+ *												text/navigation, and appearance -> stylesheet/fonts + the css
+ *												bundle, then separate Design/Header/Footer choices),
+ *												bulk-filling the site's always-present "Personal Infos" text,
+ *												creating the first _editor account(s) and finally
  *												setting the real _admin password.
  *
  *												Guarded by \Nino\Admin\Admin::isInstalled(): this only ever runs
@@ -728,7 +727,7 @@ namespace Nino\Install {
 
 	/**
 	 *	Nino							A compact filesystembased php framework
-	 *	Install						Steps 3-6: pick one of _install/library/themes/&lt;key&gt; - a
+	 *	Install						Steps 3-6: pick one of library/themes/&lt;key&gt; - a
 	 *												complete, self-contained look: its own stylesheet, the
 	 *												webfonts that stylesheet actually references, and
 	 *												whatever else its manifest lists (theme images, ...).
@@ -784,14 +783,18 @@ namespace Nino\Install {
 	 */
 	class Themes {
 
+		// Appearance units outlive the removable installer and are shared with
+		// /_theme. Installer-only base/module/page material remains below
+		// /_install/library and is used only to construct synthetic previews.
 		private const string LIBRARY = __DIR__. '/library/themes';
+		private const string INSTALL_LIBRARY = __DIR__. '/library';
 
 		// Where a theme's stylesheet gets bundled - the one entry in
 		// config.php's '/nino/html/assets' this step owns (see _bundle())
 		private const string BUNDLE_KEY = '/.cache/style.css';
 
 		// A frame is the site's <header> or <footer> as an interchangeable
-		// unit: _install/library/<kind>/<key>/template.tpl plus the style.css
+		// unit: library/<kind>/<key>/template.tpl plus the style.css
 		// for the markup that template brings. The base html-header/footer
 		// templates call the installed copy through
 		// [template /templates/theme.<kind>], so swapping a frame is copying
@@ -1016,10 +1019,10 @@ namespace Nino\Install {
 			// does not need this method edited
 			$source = (string) preg_replace_callback( '/\[template \/templates\/([a-z0-9-]+)\]/', static function( array $include ): string {
 
-				foreach( glob( self::LIBRARY. '/../*/templates/'. $include[1]. '.tpl' ) ?: [] as $path )
+				foreach( glob( self::INSTALL_LIBRARY. '/*/templates/'. $include[1]. '.tpl' ) ?: [] as $path )
 					return (string) file_get_contents( $path );
 
-				foreach( glob( self::LIBRARY. '/../*/*/templates/'. $include[1]. '.tpl' ) ?: [] as $path )
+				foreach( glob( self::INSTALL_LIBRARY. '/*/*/templates/'. $include[1]. '.tpl' ) ?: [] as $path )
 					return (string) file_get_contents( $path );
 
 				return '';
@@ -1128,7 +1131,7 @@ namespace Nino\Install {
 			// resolve the same way its markup does
 			foreach( [ 'global.php', 'en_US.php', '*.php' ] as $file )
 				foreach( [ '/base/text/', '/*/*/text/' ] as $directory )
-					foreach( glob( dirname( self::LIBRARY ). $directory. $file ) ?: [] as $path ) {
+					foreach( glob( self::INSTALL_LIBRARY. $directory. $file ) ?: [] as $path ) {
 
 						if( str_ends_with( $path, 'blacklist.php' ) === true )
 							continue;
@@ -1179,8 +1182,7 @@ namespace Nino\Install {
 		 */
 		private static function _framePreviewCss( array &$appData, array $data, string $unitDir ): string {
 
-			// library/themes -> library -> _install -> the project root
-			$css = (string) @file_get_contents( dirname( self::LIBRARY, 3 ). '/_nino/Nino.css' );
+			$css = (string) @file_get_contents( dirname( __DIR__ ). '/_nino/Nino.css' );
 
 			if( self::_designAvailable() === true ) {
 
@@ -1272,6 +1274,7 @@ namespace Nino\Install {
 					'dark' 	=> \Nino\Theme\Design::palette( $settings, 'dark' ),
 				],
 				'raster' 	=> \Nino\Theme\Design::raster( $settings ),
+				'brand' 		=> \Nino\Theme\Design::brand( $settings ),
 			] );
 		}
 
@@ -1616,11 +1619,7 @@ namespace Nino\Install {
 
 		/**
 		 *	The currently applied theme: whatever '/nino/install/theme'
-		 *	names, as long as it still resolves to a real unit. A config
-		 *	written before that key existed (or one hand-edited since) falls
-		 *	back to matching the css bundle against every theme's declared
-		 *	stylesheet - which is how the shipped config.php's "agency"
-		 *	pick is recognized without it having to be listed twice
+		 *	names, as long as it still resolves to a real unit.
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *
@@ -1630,22 +1629,13 @@ namespace Nino\Install {
 
 			$key = (string) ( $appData['/nino/install/theme'] ?? '' );
 
-			if( self::_readManifest( $key ) !== null )
-				return $key;
-
-			$bundled = array_map( 'strval', $appData['/nino/html/assets'][self::BUNDLE_KEY] ?? [] );
-
-			foreach( self::_stylesheets() as $candidate => $stylesheet )
-				if( in_array( $stylesheet, $bundled, true ) === true )
-					return $candidate;
-
-			return null;
+			return self::_readManifest( $key ) !== null ? $key : null;
 		}
 
 		/**
 		 *	Every theme's declared project-relative stylesheet path - what
 		 *	_bundle() strips out of the css bundle before adding the picked
-		 *	one back in, and what _currentTheme() falls back to matching
+		 *	one back in.
 		 *
 		 *	@return 	array			key -> stylesheet path
 		 */
@@ -1723,10 +1713,10 @@ namespace Nino\Install {
 	/**
 	 *	Nino							A compact filesystembased php framework
 	 *	Install						Step 7: build the project's actual pages - a free-form,
-	 *												ordered list of { uri, httpUri, template, nav, text }
+	 *												ordered list of { uri, httpUri, libraryKey, navs, text }
 	 *												entries a developer adds/reorders/removes here, rather
 	 *												than a fixed checkbox per _install/library/pages/&lt;key&gt;
-	 *												unit. "template" picks which library page bundle's
+	 *												unit. "libraryKey" picks which library page bundle's
 	 *												routes/templates/deeper content this entry uses (its own
 	 *												manifest.php's 'routes' are reused as-is, only 'uri' is
 	 *												overridden - the same bundle can be mounted more than
@@ -1838,8 +1828,7 @@ namespace Nino\Install {
 		 *	key a template asks for, registered here or not, so a project that
 		 *	never writes this array loses nothing but the checkboxes. Empty
 		 *	while the Navigation module is inactive, which is what tells the
-		 *	frontend to offer no menu fields at all (the old 'navModule' flag
-		 *	said exactly that, and nothing else)
+		 *	frontend to offer no menu fields at all.
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *
@@ -1850,15 +1839,7 @@ namespace Nino\Install {
 			if( in_array( '\\Nino\\Modules\\Navigation', $appData['/nino/modules'] ?? [], true ) === false )
 				return [];
 
-			$navs = $appData['/nino/html/navs'] ?? null;
-
-			// A project from before this registry existed still has the single
-			// menu the old generated fill was hardcoded to, so it keeps an
-			// editable one rather than none. An array that *is* there and empty
-			// is a deliberate "no menus at all" - the Navigations module can
-			// delete the last one - and stays empty
-			if( is_array( $navs ) === false )
-				return [ 'main' ];
+			$navs = $appData['/nino/html/navs'] ?? [];
 
 			return array_values( array_unique( array_map( 'strval', $navs ) ) );
 		}
@@ -1867,10 +1848,6 @@ namespace Nino\Install {
 		 *	Which navigations one posted entry asks to be in, narrowed to the
 		 *	navigations this project actually registers.
 		 *
-		 *	'nav' =&gt; true is what a frontend written before per-menu
-		 *	membership existed posts, and means the first registered
-		 *	navigation - the single menu an entry could have been in back then
-		 *
 		 *	@param		array 		$entry				One posted webpages entry
 		 *	@param		array 		$navs					Registered nav keys (see navKeys())
 		 *
@@ -1878,10 +1855,7 @@ namespace Nino\Install {
 		 */
 		public static function entryNavs( array $entry, array $navs ): array {
 
-			if( isset( $entry['navs'] ) === true && is_array( $entry['navs'] ) === true )
-				return array_values( array_intersect( $navs, $entry['navs'] ) );
-
-			return ( $entry['nav'] ?? false ) === true ? array_slice( $navs, 0, 1 ) : [];
+			return array_values( array_intersect( $navs, is_array( $entry['navs'] ?? null ) ? $entry['navs'] : [] ) );
 		}
 
 		/**
@@ -2166,12 +2140,7 @@ namespace Nino\Install {
 				// declares carries none; it passes through untouched below on
 				// its own body rather than being rejected, which is what lets
 				// this step re-apply a list containing a page /_admin created.
-				// A frontend that only knows the on-disk template name still
-				// names its unit in 'template', so fall back to that when it
-				// resolves
 				$libraryKey = (string) ( $item['libraryKey'] ?? '' );
-				if( $libraryKey === '' && isset( $templates[ (string) ( $item['template'] ?? '' ) ] ) === true )
-					$libraryKey = (string) $item['template'];
 
 				$body = (string) ( $item['body'] ?? '' );
 
@@ -2197,12 +2166,12 @@ namespace Nino\Install {
 				}
 
 				if( $libraryKey !== '' && isset( $templates[$libraryKey] ) === false ) {
-					\Nino\Http::fail( $request, 400, 'unknown template: "'. $libraryKey. '"' );
+					\Nino\Http::fail( $request, 400, 'unknown page library key: "'. $libraryKey. '"' );
 					return;
 				}
 
 				if( $libraryKey === '' && $body === '' ) {
-					\Nino\Http::fail( $request, 400, 'unknown template: "'. ( (string) ( $item['template'] ?? '' ) ). '"' );
+					\Nino\Http::fail( $request, 400, 'page must name a libraryKey or body' );
 					return;
 				}
 
@@ -2480,11 +2449,7 @@ namespace Nino\Install {
 
 		/**
 		 *	The _install/library/pages unit one entry starts from, if it has
-		 *	one at all. 'template' is only read as a fallback for a
-		 *	config.php written before the persisted shape grew its own
-		 *	'libraryKey' field - and only when it actually resolves to a
-		 *	unit, so /_admin's own on-disk template names (page-404, ...) in
-		 *	that same field are never mistaken for one
+		 *	one at all.
 		 *
 		 *	@param		array 		$entry				One webpages-list entry
 		 *
@@ -2492,11 +2457,9 @@ namespace Nino\Install {
 		 */
 		private static function _libraryKey( array $entry ): ?string {
 
-			foreach( [ $entry['libraryKey'] ?? '', $entry['template'] ?? '' ] as $candidate ) {
-				$candidate = (string) $candidate;
-				if( $candidate !== '' && is_dir( self::LIBRARY. '/pages/'. $candidate ) === true )
-					return $candidate;
-			}
+			$candidate = (string) ( $entry['libraryKey'] ?? '' );
+			if( $candidate !== '' && is_dir( self::LIBRARY. '/pages/'. $candidate ) === true )
+				return $candidate;
 
 			return null;
 		}

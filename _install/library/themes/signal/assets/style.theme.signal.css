@@ -1,0 +1,147 @@
+@font-face {
+	font-family: 'Text';
+	font-style: normal;
+	font-weight: normal;
+	font-display: swap;
+	src: local('Text Regular'), url('[[/nino/public]]/fonts/text/open-sans-regular.woff2') format('woff2');
+}
+@font-face {
+	font-family: 'Text';
+	font-style: normal;
+	font-weight: bold;
+	font-display: swap;
+	src: local('Text Bold'), url('[[/nino/public]]/fonts/text/open-sans-bold.woff2') format('woff2');
+}
+@font-face {
+	font-family: 'Title';
+	font-style: normal;
+	font-weight: bold;
+	font-display: swap;
+	src: local('Title Bold'), url('[[/nino/public]]/fonts/title/bebas-neue.woff2') format('woff2');
+}
+
+/*	Signal.
+
+	A brand strip across the top and a full-width accent band through the
+	page - condensed display type for shops, events and campaigns.
+
+	Colours here are assignments, never values. /_theme generates the --nino-*
+	tokens this file reads (assets/style.design.css, loaded immediately before
+	it) and measures every background/text pair it publishes; what this unit
+	decides is which surface each role sits on. Recolouring the site is
+	therefore a /_theme save and nothing below has to change.
+
+	Three rules follow. Never write a literal colour into a role - a hex here
+	is a pair /_theme cannot vouch for. Never pair across surfaces, because
+	--color-section-alt-text belongs to --nino-on-alt and to nothing else. And
+	never put text on --nino-origin: it is the brand exactly as the operator
+	picked it, so it is the one surface with no contrast promise attached -
+	--nino-vibrant is the same colour made safe, and that is what carries ink.	*/
+:root {
+
+	/* Brand. Two roles, and the difference between them is the promise, not the
+	   shade: --color-secondary is the picked colour exactly as it was picked and
+	   is only ever shown, --color-primary is that same colour with its lightness
+	   solved until the text on it clears the contrast target, and is what every
+	   button and filled surface uses */
+	--color-primary: var(--nino-vibrant);
+	--color-primary-text: var(--nino-on-vibrant);
+	--color-secondary: var(--nino-origin);
+
+	/* Page ground */
+	--color-background: var(--nino-default);
+	--color-text: var(--nino-on-default);
+	--color-title: var(--nino-on-default);
+	--color-subtitle: var(--nino-on-default-muted);
+	--color-border: var(--nino-default-border);
+	--color-header-bg: var(--nino-black);
+
+	/* The scrim over a cover image - not a pair /_theme can solve, since
+	   it cannot know the photograph underneath, so the theme derives it
+	   from its deepest surface and owns the light text put on top */
+	--color-background-dim: color-mix(in srgb, var(--nino-black) 78%, transparent);
+
+	/* Footer bands */
+	--color-footer-bg-main: var(--nino-black);
+	--color-footer-text-main: var(--nino-on-black-muted);
+	--color-footer-bg-legal: var(--nino-black);
+	--color-footer-text-legal: var(--nino-on-black-muted);
+	--color-footer-text: var(--nino-on-black-muted);
+
+	/* Sections - the four grounds a page alternates between */
+	--color-section-default-bg: var(--nino-default);
+	--color-section-default-text: var(--nino-on-default);
+	--color-section-alt-bg: var(--nino-alt);
+	--color-section-alt-text: var(--nino-on-alt);
+	--color-section-dark-bg: var(--nino-vibrant);
+	--color-section-dark-text: var(--nino-on-vibrant);
+	--color-section-black-bg: var(--nino-black);
+	--color-section-black-text: var(--nino-on-black);
+
+	/* Code */
+	--color-code-bg: var(--nino-black);
+	--color-code-text: var(--nino-on-black);
+	--color-code-border: var(--nino-black-border);
+
+	/* Status */
+	--color-error: var(--nino-danger);
+	--color-success: var(--nino-success);
+
+	/* Typefaces are the one thing a theme cannot be handed: a webfont is a
+	   file this unit ships, not a value anything can generate */
+	--fontfamily-text: 'Text', system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+	--fontfamily-title: 'Title', system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+	--fontfamily-subtitle: 'Text', system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+	--fontsize-small: .8em;
+	--fontsize-big: 1.25em;
+	--fontsize-btn: 1rem;
+
+	/* Sizes are assignments too. The raster comes from /_theme's Volume,
+	   Spacing and Shaping steps - this unit declares 'generous/default/default' in
+	   its manifest, which is what a hand-tuned block here used to spell out one
+	   number at a time. The wide-screen half of the type scale is the raster's
+	   own media query; there is nothing to repeat for it here */
+	--base-size: 16px;
+	--line-height: var(--nino-line-height);
+
+	--text-1: var(--nino-text-1);
+	--text-2: var(--nino-text-2);
+	--text-3: var(--nino-text-3);
+	--text-4: var(--nino-text-4);
+	--text-5: var(--nino-text-5);
+	--text-6: var(--nino-text-6);
+
+	--space-1: var(--nino-space-1);
+	--space-2: var(--nino-space-2);
+	--space-3: var(--nino-space-3);
+	--space-4: var(--nino-space-4);
+	--space-5: var(--nino-space-5);
+	--space-6: var(--nino-space-6);
+
+	--radius: var(--nino-radius-2);
+	--radius-small: var(--nino-radius-1);
+
+	/* Not raster steps: a viewport-relative image cap and a layout ceiling
+	   are this theme's own proportions, and neither is a step on a scale */
+	--article-img-max-width: 12vw;
+	--article-img-max-height: 20vh;
+	--grid-max-width: 110rem;
+}
+
+@media (min-width: 768px) {
+	:root {
+		--base-size: 18px;
+	}
+}
+
+/*	Bebas Neue is caps-only by design - the letter-spacing is what stops a
+	condensed face from setting as a solid block	*/
+.nino-section-title,
+h1, h2, h3 {
+	letter-spacing: .02em;
+}
+
+/*	The header and footer frames are their own units
+	(library/header|footer/<key>), each shipping the css for the
+	markup it brings - this theme names the pair it was drawn against in its
+	manifest and styles none of it here.	*/

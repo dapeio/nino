@@ -22,7 +22,7 @@ All notable changes to Nino are documented in this file.
   each preview and replace only their own template/stylesheet pair. All new
   posts retain the shared `/_admin` authentication and CSRF contract.
 
-  Their selectable units now live in the durable project-root `library/`
+  Their selectable units live below `_install/library/`
   catalogue shared with `/_install`, so removing the one-time installer no
   longer removes the choices needed by `/_theme`. Only Theme `preview.svg`
   files are public; Apache and development-router rules refuse direct access
@@ -78,9 +78,10 @@ All notable changes to Nino are documented in this file.
   changing one does not recopy the theme or reset the settled Design. Their
   previews receive the current Design values and applying Footer after Header
   restores canonical theme/header/footer bundle order.
-- The `agency` theme maps its sizes onto the raster as well, and declares
-  `volume: generous, spacing: airy, shaping: round` - which is what its
-  hand-tuned numbers used to spell out one at a time.
+- The appearance catalogue is rebuilt as eight distinct baselines: Basis,
+  Docs, Editorial, Nocturne, Rail, Signal, Soft, and Studio. Every theme maps
+  its colour roles onto generated surfaces, maps its sizes onto the raster,
+  and declares the complete Design/Header/Footer baseline shown by its preview.
 
 - `/_install`'s Themes step establishes a complete look as a baseline: its
   `themes/apply` post names only the theme, whose manifest supplies the initial
@@ -88,7 +89,7 @@ All notable changes to Nino are documented in this file.
   decisions one at a time.
 
   Frames. A site's `<header>` and `<footer>` are interchangeable units under
-  `library/header|footer/<key>` - a `template.tpl` plus the
+  `_install/library/header|footer/<key>` - a `template.tpl` plus the
   `style.css` for the markup that template brings, and no manifest, because
   two files are everything a frame has to declare. The base html templates
   include the installed copy through `[template /templates/theme.header]`
@@ -107,25 +108,23 @@ All notable changes to Nino are documented in this file.
   Bundle order is the contract, and each pick owns one slot: `Nino.css`, the
   generated design values, the theme's role assignments, the frames' own
   styling, the project's overrides.
-- The `agency` theme is rewritten as a mapping layer: every colour role is
-  assigned to a `--nino-*` token rather than a literal, and the manifest
-  declares the `design` block it was drawn with. A hex in a role would be a
-  pair `/_theme` never measured, which is the whole reason the two are
-  separate.
+- Theme stylesheets are mapping layers: every colour role is assigned to a
+  `--nino-*` token rather than a literal, and every manifest declares the
+  `design` block it was drawn with. A hex in a role would be a pair `/_theme`
+  never measured, which is the whole reason the two layers are separate.
 
-  The tests measure the resolved chain rather than reading the assignments -
-  every pair Nino.css actually renders together, in both modes, against the
-  real WCAG formula. That caught `--color-title` mapped to `--nino-origin`:
-  the brand as a *surface*, rendered as *ink* on the page ground. It passes in
-  light mode at 4.62:1 by luck and fails in dark mode at 4.33:1. It reads
-  `--nino-default-link` now - the same hue solved as ink for that ground.
+  Catalogue tests now validate all eight manifests and both frame references,
+  reject literal colour and size roles, and resolve every background/text pair
+  through the real generated palette in both light and dark mode. A mapping
+  that looks plausible but misses its declared contrast target therefore fails
+  the suite before it reaches a picker.
 
   One role resists the split: Nino.css uses `--color-primary` both as a
   background (buttons and badges, paired with `--color-primary-text`) and as
   ink on the page ground (links, alerts, active nav). A theme cannot split
-  what the framework merged, so the second use sits at 4.33:1 in dark mode.
-  Pinned by a test rather than asserted away, pending a role split in
-  Nino.css itself.
+  what the framework merged. The second use remains pinned to a minimum in the
+  suite rather than being mistaken for a fully solved pair, pending a role
+  split in Nino.css itself.
 
 - `/_theme`, the generated design layer. It owns the colour tokens every
   stylesheet reads from - `var(--nino-alt)` for a surface, `var(--nino-on-alt)`
@@ -163,6 +162,20 @@ All notable changes to Nino are documented in this file.
   Colours only for now; the size raster - volume, spacing, shaping - is the
   intended second half and is not built yet.
 
+- `Modules\Search`, an optional weighted fuzzy index for Elements. A manual
+  `/nino/elements/index` map assigns one model field to each priority `0`–`3`;
+  `Search::getElements()` searches the current locale and returns complete
+  Elements in score order. Exact, prefix, substring, and Unicode-bigram matches
+  are combined with field weights and a phrase bonus.
+
+  Activating the module registers a post-commit Elements hook, so successful
+  inserts, updates, and deletes rebuild their configured type. The separate
+  **Create searchindex** action in `/_admin` → **Config** rebuilds every
+  configured type on every press and supplies the initial files. Each type owns
+  one directly and non-atomically rewritten `/data/index-<type>.php` with no
+  signature, revision, sidecar lock, or read-time self-healing. The dedicated
+  smoke test covers activation, file shape, fuzzy ranking, locales, refreshes,
+  Admin auth, full rebuilds, malformed reads, and write failures.
 - `Modules\Cache`, an optional full-page cache. A hit skips the render -
   routing, template reads, the fill and shortcode passes - and answers from a
   stored copy; a miss renders as before and stores the result. Off by default,
@@ -379,9 +392,10 @@ All notable changes to Nino are documented in this file.
   the two selects that already showed their default (Layout, Area style) now
   read the same way instead of using a separator of their own.
 
-  Two client-side frame fallbacks still said `overlay: 'medium'` after the scrim
-  became a single `dim`, so a section whose preset recommends nothing would have
-  offered a value the compiler no longer knows. Both now say `dim`.
+  Two client-side frame fallbacks and two image-preset recommendations still
+  said `overlay: 'medium'` after the scrim became a single `dim`, so the UI or a
+  preset could have offered a value the compiler no longer knows. They now use
+  `dim` directly.
 - The Template Builder writes the design system's classes and no longer any of
   its own. Every `nino-*` class is gone - from the compiler, from all sixteen
   presets, and from `_nino/Nino.css`, which loses its whole Template Builder
@@ -524,8 +538,8 @@ All notable changes to Nino are documented in this file.
 
   Which of the three a section uses is now stored as
   `frame.backgroundImageSource` in the section metadata, because a key alone
-  cannot tell a generated slot from a chosen one from a literal path. Sections
-  written before that field keep inferring their original behavior.
+  cannot tell a generated slot from a chosen one from a literal path. The field
+  is required whenever the metadata supplies a background image value.
 - Section presets can declare the `data-*` attributes of the elements they
   generate. `Nino.ui.js` takes its parameters from exactly there -
   `ui-autoheight` equalizes the cards of one `data-autoheight-group`,
@@ -608,6 +622,12 @@ All notable changes to Nino are documented in this file.
   retain `_nino/` as a compatibility fallback for existing projects;
   `/nino/modules` still controls activation only, not whether a class can be
   autoloaded.
+- Management APIs now expose one current schema: Webpages posts `libraryKey`
+  and `navs`, Template creation posts `filename`, navigations come only from
+  `/nino/html/navs`, and the selected Theme comes only from
+  `/nino/install/theme`. Template Builder v3 metadata likewise requires every
+  component binding source and every non-empty background-image source to be
+  explicit.
 - **Breaking:** the frontend speaks one class namespace, `nino-*`. `ui-*`, `js-*`
   and the shortcode modules' `sc-*` are gone, and so are the bare English state
   words that rode along with them: `.error`, `.success`, `.pending`, `.existing`,
@@ -669,18 +689,8 @@ All notable changes to Nino are documented in this file.
   value as appropriate. Authenticated binding selects include blacklisted
   route and other technical textfills in their own group without rewriting
   them on insert.
-- `private/config.php` ships `/nino/editor/backups` and `/nino/editor/logs`
-  instead of `/nino/admin/backups` and `/nino/admin/logs`. The keys `_editor`
-  actually reads have always been the `/nino/editor/*` pair
-  (`Backup::maybeRun()`, `Logs::record()`), so the shipped `false` never took
-  effect: the key those two look for was absent and their `?? true` default
-  won, which means the daily backup and the audit trail have been running in
-  every installation regardless of what config.php said. Both now ship as
-  `true`, which is what every project has actually been doing — no behaviour
-  changes, the file simply stops contradicting the code. An existing project
-  still holding a `/nino/admin/*` key has its value read by Config's panel, so
-  what its owner intended is what the form shows; the stale key is left in
-  place rather than deleted.
+- Backup and audit-trail settings consistently use
+  `/nino/editor/backups` and `/nino/editor/logs`; both defaults are enabled.
 - Config no longer edits `/nino/http/routes`, `/nino/html/navs` or
   `/nino/html/assets`. The first two have had dedicated editors for a while
   (Routes, Navigations) and a second, unvalidated way to write the same data is

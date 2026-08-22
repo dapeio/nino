@@ -1,7 +1,7 @@
 .nino-frame-header .nino-frame-header-strip {
 	opacity: 1;
 	background-color: var(--color-section-black-bg);
-	border-bottom: 3px solid var(--color-primary);
+	border-bottom: 3px solid var(--color-secondary);
 }
 
 body.nino-scroll-atf .nino-frame-header .nino-frame-header-strip {
@@ -20,7 +20,7 @@ body.nino-scroll-atf .nino-frame-header .nino-frame-header-strip {
 	align-items: center;
 	min-height: 5.25rem;
 	padding: var(--space-1) var(--space-3);
-	background-color: var(--color-primary);
+	background-color: var(--color-secondary);
 }
 
 .nino-frame-header .nino-frame-header-brand img {

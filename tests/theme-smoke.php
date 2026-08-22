@@ -58,7 +58,30 @@ echo "Design::palette / css\n";
 
 $lightPalette = \Nino\Theme\Design::palette( [ 'primary' => '#4faae8', 'secondary' => '#94703f' ], 'light' );
 
-check( 'the brand surface really is the brand, not a clipped near-white', \Nino\Theme\Design::contrast( $lightPalette['origin']['bg'], '#ffffff' ) > 3.0 );
+// origin is the one surface the generator does not get to move: whatever the
+// picker returned has to come back byte for byte, in both modes and at every
+// knob position, or the picker is lying about what it does
+$originStable = [];
+foreach( [ '#4faae8', '#767676', '#ffe600', '#0d2b2e', '#e2001a', '#ffffff', '#000000' ] as $brandHex )
+	foreach( [ 'soft', 'default', 'high' ] as $contrastKnob )
+		foreach( [ 'clean', 'default', 'vibrant' ] as $colorsKnob )
+			foreach( [ 'light', 'dark' ] as $paletteMode ) {
+				$settings = \Nino\Theme\Design::normalize( [ 'primary' => $brandHex, 'contrast' => $contrastKnob, 'colors' => $colorsKnob ] );
+				$got = \Nino\Theme\Design::palette( $settings, $paletteMode )['origin']['bg'];
+				if( $got !== $brandHex )
+					$originStable[] = $brandHex. '/'. $contrastKnob. '/'. $colorsKnob. '/'. $paletteMode. ' -> '. $got;
+			}
+
+check( 'the brand surface is the picked colour itself, unmoved by any knob or mode', $originStable === []
+	|| print_r( array_slice( $originStable, 0, 8 ), true ) === '' );
+
+// What that costs, stated rather than hidden: origin is also the one surface
+// whose contrast cannot be promised, and Design::brand() has to say so
+$brandSafe = \Nino\Theme\Design::brand( \Nino\Theme\Design::normalize( [ 'primary' => '#4faae8' ] ) );
+$brandRisk = \Nino\Theme\Design::brand( \Nino\Theme\Design::normalize( [ 'primary' => '#767676' ] ) );
+check( 'the tool reports what the picked brand measures instead of leaving it to the eye',
+	$brandSafe['light']['color'] === '#4faae8' && $brandSafe['light']['safe'] === true
+	&& $brandRisk['light']['safe'] === false && $brandRisk['light']['ratio'] < $brandRisk['light']['target'] );
 check( 'primary text is ink rather than the faintest passing grey', \Nino\Theme\Design::contrast( $lightPalette['default']['on'], '#ffffff' ) > 15.0 );
 
 // The whole feature is this promise, so it is checked across every knob
@@ -77,6 +100,13 @@ foreach( [ '#4faae8', '#14595e', '#f50963', '#ffd400', '#b6a6ff', '#000000', '#f
 
 				foreach( $palette as $surface => $values ) {
 
+					// origin is excluded by construction, not by convenience:
+					// it carries the picked colour, so there is no lightness
+					// left to solve with. vibrant is the same brand made safe,
+					// and it is held to the target like everything else
+					if( $surface === 'origin' )
+						continue;
+
 					$onRatio 		= \Nino\Theme\Design::contrast( $values['on'], $values['bg'] );
 					$mutedRatio	= \Nino\Theme\Design::contrast( $values['on-muted'], $values['bg'] );
 					$borderRatio	= \Nino\Theme\Design::contrast( $values['border'], $values['bg'] );
@@ -94,20 +124,22 @@ foreach( [ '#4faae8', '#14595e', '#f50963', '#ffd400', '#b6a6ff', '#000000', '#f
 				}
 			}
 
-check( 'every generated pair meets its target, across 8 brands x 3 contrasts x 3 colours x 2 modes', $designFailures === []
+check( 'every solved pair meets its target, across 8 brands x 3 contrasts x 3 colours x 2 modes', $designFailures === []
 	|| print_r( array_slice( $designFailures, 0, 8 ), true ) === '' );
 
 // Every knob has to be observable in the output, or it is a control that
 // silently does nothing - the failure mode a generated palette invites
 $soft = \Nino\Theme\Design::palette( [ 'primary' => '#4faae8', 'contrast' => 'soft' ], 'light' );
 $high = \Nino\Theme\Design::palette( [ 'primary' => '#4faae8', 'contrast' => 'high' ], 'light' );
-check( 'the contrast knob moves the brand surface', $soft['origin']['bg'] !== $high['origin']['bg']
-	&& \Nino\Theme\Design::contrast( $high['origin']['on'], $high['origin']['bg'] ) >= 6.98 );
+check( 'the contrast knob moves the safe brand surface and leaves the picked one alone', $soft['vibrant']['bg'] !== $high['vibrant']['bg']
+	&& $soft['origin']['bg'] === $high['origin']['bg']
+	&& \Nino\Theme\Design::contrast( $high['vibrant']['on'], $high['vibrant']['bg'] ) >= 6.98 );
 
 $clean 	= \Nino\Theme\Design::palette( [ 'primary' => '#4faae8', 'colors' => 'clean' ], 'light' );
 $vibrant	= \Nino\Theme\Design::palette( [ 'primary' => '#4faae8', 'colors' => 'vibrant' ], 'light' );
-check( 'the colours knob changes saturation without breaking the target', $clean['origin']['bg'] !== $vibrant['origin']['bg']
-	&& \Nino\Theme\Design::contrast( $vibrant['origin']['on'], $vibrant['origin']['bg'] ) >= 4.48 );
+check( 'the colours knob changes saturation without breaking the target', $clean['vibrant']['bg'] !== $vibrant['vibrant']['bg']
+	&& $clean['origin']['bg'] === $vibrant['origin']['bg']
+	&& \Nino\Theme\Design::contrast( $vibrant['vibrant']['on'], $vibrant['vibrant']['bg'] ) >= 4.48 );
 
 check( 'a secondary of its own reaches the vibrant surface', \Nino\Theme\Design::palette( [ 'primary' => '#4faae8', 'secondary' => '#94703f' ], 'light' )['vibrant']['bg']
 	!== \Nino\Theme\Design::palette( [ 'primary' => '#4faae8' ], 'light' )['vibrant']['bg'] );
@@ -315,7 +347,7 @@ echo "\n";
 
 echo "Theme::write / bundle\n";
 
-$appData['/nino/html/assets'] = [ '/.cache/style.css' => [ '/_nino/Nino.css', '/assets/style.theme.agency.css', '/assets/style.custom.css' ] ];
+$appData['/nino/html/assets'] = [ '/.cache/style.css' => [ '/_nino/Nino.css', '/assets/style.theme.basis.css', '/assets/style.custom.css' ] ];
 
 check( 'writing succeeds', \Nino\Theme\Theme::write( $appData, \Nino\Theme\Design::normalize( [ 'primary' => '#14595e' ] ) ) === true );
 check( 'the stylesheet lands where a project file belongs', \Nino\Filesystem::fileExists( $appData, '/assets/style.design.css' ) === true );
@@ -326,15 +358,15 @@ check( 'it says plainly that it is generated and will be overwritten', str_conta
 
 $bundle = $appData['/nino/html/assets']['/.cache/style.css'];
 check( 'it sits directly behind the framework stylesheet, ahead of everything that reads it', $bundle === [
-	'/_nino/Nino.css', '/assets/style.design.css', '/assets/style.theme.agency.css', '/assets/style.custom.css' ] );
+	'/_nino/Nino.css', '/assets/style.design.css', '/assets/style.theme.basis.css', '/assets/style.custom.css' ] );
 
 // A header/footer variant, a second theme, a project stylesheet - the bundle
 // grows, and the generated file has to keep its place without being counted in
 $appData['/nino/html/assets']['/.cache/style.css'] = [
-	'/_nino/Nino.css', '/assets/style.design.css', '/assets/style.header.v2.css', '/assets/style.theme.agency.css' ];
+	'/_nino/Nino.css', '/assets/style.design.css', '/assets/style.header.v2.css', '/assets/style.theme.basis.css' ];
 \Nino\Theme\Theme::write( $appData, \Nino\Theme\Design::normalize( [ 'primary' => '#8f2d56' ] ) );
 check( 'a second write does not add a second entry', $appData['/nino/html/assets']['/.cache/style.css'] === [
-	'/_nino/Nino.css', '/assets/style.design.css', '/assets/style.header.v2.css', '/assets/style.theme.agency.css' ] );
+	'/_nino/Nino.css', '/assets/style.design.css', '/assets/style.header.v2.css', '/assets/style.theme.basis.css' ] );
 
 // The whole point of the tool: the values stay editable after the install
 $reloaded = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
@@ -367,7 +399,7 @@ echo "Theme::init / guard\n";
 
 check( 'the post-install tool owns appearance changes without loading the removable installer',
 	class_exists( '\\Nino\\Install\\Themes', false ) === false
-	&& is_dir( __DIR__. '/../library/themes' ) === true );
+	&& is_dir( __DIR__. '/../_install/library/themes' ) === true );
 
 $routes = $appData;
 \Nino\Theme\Theme::init( $routes );
@@ -396,12 +428,12 @@ $_POST = [ 'action' => 'appearance/read', 'data' => '{}' ];
 $appearanceBody = $appearance['/nino/http/response']['body'] ?? [];
 
 check( 'the authenticated tool exposes Theme, Header and Footer choices from the shared appearance library',
-	array_keys( $appearanceBody['themes'] ?? [] ) === [ 'agency', 'correct', 'glow', 'kontor', 'marketplace', 'nighty', 'solid', 'wellness' ]
+	array_keys( $appearanceBody['themes'] ?? [] ) === [ 'basis', 'docs', 'editorial', 'nocturne', 'rail', 'signal', 'soft', 'studio' ]
 	&& ( $appearanceBody['frames']['header'] ?? [] ) === [ 'v1', 'v2', 'v3', 'v4', 'v5', 'v6' ]
 	&& ( $appearanceBody['frames']['footer'] ?? [] ) === [ 'v1', 'v2', 'v3', 'v4', 'v5', 'v6' ] );
 
 $badTheme = response();
-$_POST = [ 'action' => 'theme/apply', 'data' => json_encode( [ 'theme' => '../agency' ] ) ];
+$_POST = [ 'action' => 'theme/apply', 'data' => json_encode( [ 'theme' => '../basis' ] ) ];
 \Nino\Theme\Theme::handlePost( $appData, $badTheme );
 check( 'a Theme key cannot leave the shared catalogue', $badTheme['/nino/http/response']['statusCode'] === 400 );
 
@@ -411,12 +443,12 @@ $_POST = [ 'action' => 'frame/apply', 'data' => json_encode( [ 'kind' => 'header
 check( 'a frame key cannot leave its kind catalogue', $badFrame['/nino/http/response']['statusCode'] === 400 );
 
 $themeApply = response();
-$_POST = [ 'action' => 'theme/apply', 'data' => json_encode( [ 'theme' => 'agency' ] ) ];
+$_POST = [ 'action' => 'theme/apply', 'data' => json_encode( [ 'theme' => 'basis' ] ) ];
 \Nino\Theme\Theme::handlePost( $appData, $themeApply );
 $afterTheme = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
 
 check( 'Theme applies the manifest as one complete baseline', $themeApply['/nino/http/response']['statusCode'] === 200
-	&& ( $afterTheme['/nino/install/theme'] ?? '' ) === 'agency'
+	&& ( $afterTheme['/nino/install/theme'] ?? '' ) === 'basis'
 	&& ( $afterTheme['/nino/install/header'] ?? '' ) === 'v1'
 	&& ( $afterTheme['/nino/install/footer'] ?? '' ) === 'v1'
 	&& ( $afterTheme['/nino/theme/design']['primary'] ?? '' ) === '#4faae8' );
@@ -428,7 +460,7 @@ $afterDesign = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
 
 check( 'Design changes only its generated values, not Theme or either frame', ( $afterDesign['/nino/theme/design']['primary'] ?? '' ) === '#14595e'
 	&& ( $afterDesign['/nino/theme/design']['spacing'] ?? '' ) === 'tight'
-	&& ( $afterDesign['/nino/install/theme'] ?? '' ) === 'agency'
+	&& ( $afterDesign['/nino/install/theme'] ?? '' ) === 'basis'
 	&& ( $afterDesign['/nino/install/header'] ?? '' ) === 'v1'
 	&& ( $afterDesign['/nino/install/footer'] ?? '' ) === 'v1' );
 
@@ -443,7 +475,7 @@ $appData['/nino/locales/textfiles'] = '/text';
 	'[[/company/name]]' => "M\xFCller & S\xF6hne \"Studio\"",
 ] );
 
-$_POST = [ 'action' => 'frame/preview', 'data' => json_encode( [ 'kind' => 'header', 'frame' => 'v3', 'theme' => 'agency' ] ) ];
+$_POST = [ 'action' => 'frame/preview', 'data' => json_encode( [ 'kind' => 'header', 'frame' => 'v3', 'theme' => 'basis' ] ) ];
 \Nino\Theme\Theme::handlePost( $appData, $framePreview );
 check( 'Header and Footer previews remain inert server-rendered documents', $framePreview['/nino/http/response']['statusCode'] === 200
 	&& str_starts_with( (string) ( $framePreview['/nino/http/response']['body']['html'] ?? '' ), '<!doctype html>' )
@@ -462,7 +494,7 @@ $afterFrame = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
 check( 'a Header apply changes only Header and preserves the settled Theme, Design and Footer',
 	( $afterFrame['/nino/install/header'] ?? '' ) === 'v3'
 	&& ( $afterFrame['/nino/install/footer'] ?? '' ) === 'v1'
-	&& ( $afterFrame['/nino/install/theme'] ?? '' ) === 'agency'
+	&& ( $afterFrame['/nino/install/theme'] ?? '' ) === 'basis'
 	&& ( $afterFrame['/nino/theme/design'] ?? [] ) === ( $afterDesign['/nino/theme/design'] ?? [] ) );
 
 $unknown = response();

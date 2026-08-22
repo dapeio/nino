@@ -37,7 +37,7 @@
     '/.cache/style.css' => 
     array (
       0 => '/_nino/Nino.css',
-      1 => '/assets/style.theme.agency.css',
+      1 => '/assets/style.theme.basis.css',
     ),
     '/.cache/script.js' => 
     array (
@@ -54,7 +54,7 @@
     0 => 'main',
     1 => 'footer',
   ),
-  '/nino/install/theme' => 'agency',
+  '/nino/install/theme' => 'basis',
   '/nino/http/routes' => 
   array (
     'GET://robots.txt' => 

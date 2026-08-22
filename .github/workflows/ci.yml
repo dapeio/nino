@@ -32,6 +32,9 @@ jobs:
       - name: Run kernel smoke tests
         run: php tests/kernel-smoke.php
 
+      - name: Run Elements search smoke tests
+        run: php tests/search-smoke.php
+
       - name: Run editor backend smoke tests
         run: php tests/editor-smoke.php
 
@@ -40,6 +43,9 @@ jobs:
 
       - name: Run install wizard smoke tests
         run: php tests/install-smoke.php
+
+      - name: Run appearance tooling smoke tests
+        run: php tests/theme-smoke.php
 
       - name: Run template builder smoke tests
         run: php tests/templates-smoke.php

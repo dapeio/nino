@@ -103,7 +103,7 @@
 
 /* ------------------------------------------------------------- Themes step */
 
-/*	One tile per _install/library/themes/<key> unit, each a <label> wrapping a
+/*	One tile per library/themes/<key> unit, each a <label> wrapping a
  *	hidden radio - the whole card is the click target for picking, except the
  *	preview image itself, which opens the lightbox instead (see themes.js) */
 

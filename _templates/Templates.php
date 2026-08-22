@@ -1786,10 +1786,6 @@ namespace Nino\Templates {
 
 			$data = Templates::postData();
 			$filename = trim( (string) ( $data['filename'] ?? '' ) );
-			// Backwards-compatible with the first Template Builder API. The UI now
-			// sends the real filename so it never hides the page- prefix or suffix.
-			if( $filename === '' && isset( $data['id'] ) )
-				$filename = 'page-'. strtolower( trim( (string) $data['id'] ) ). '.tpl';
 			if( preg_match( '/^page-[A-Za-z0-9][A-Za-z0-9._-]*\.tpl$/', $filename ) !== 1 || str_contains( $filename, '..' ) ) {
 				\Nino\Http::fail( $request, 400, 'filename must look like page-services.tpl and may contain only letters, numbers, dots, underscores and hyphens' );
 				return;
@@ -2098,9 +2094,10 @@ namespace Nino\Templates {
 		}
 
 		/**
-		 * Page-only normalization: marked shell includes become fixed slots. The
-		 * historic exact html-header/html-footer pair is migrated in memory and
-		 * receives markers the next time that page is deliberately saved.
+		 * Page-only normalization: marked shell includes become fixed slots. A
+		 * hand-written page using the conventional exact html-header/html-footer
+		 * pair is recognized in memory and receives markers when deliberately
+		 * saved through the Builder.
 		 */
 		private static function _pageSegments( string $source, string $name = 'page' ): array {
 

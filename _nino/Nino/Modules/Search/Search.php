@@ -78,8 +78,8 @@ namespace Nino\Modules {
 
 		/**
 		 *	Search the current locale and return canonical Elements, ordered by a
-		 *	weighted fuzzy score. A missing/invalid index is simply an empty result:
-		 *	version 0.9 never creates or repairs files from a read operation.
+		 *	weighted fuzzy score. A missing or invalid index is simply an empty
+		 *	result; reads never create or repair derived files.
 		 */
 		public static function getElements( array &$appData, string $elementType, string $searchString ): array {
 
@@ -222,8 +222,8 @@ namespace Nino\Modules {
 		}
 
 		/**
-		 *	Version 0.9 intentionally uses one direct full-file replacement: no
-		 *	index mutation, side-car lock, revision or signature.
+		 *	One direct, non-atomic full-file write. Search indexes are deliberately
+		 *	simple derived files: no mutation, side-car lock, revision or signature.
 		 */
 		private static function _writeIndex( array &$appData, string $typeUri, array $index ): bool {
 
@@ -234,6 +234,8 @@ namespace Nino\Modules {
 
 			if( $written === false || $written !== strlen( $content ) )
 				return false;
+
+			clearstatcache( true, $path );
 
 			if( function_exists( 'opcache_invalidate' ) === true )
 				opcache_invalidate( $path, true );

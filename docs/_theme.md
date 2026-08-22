@@ -42,7 +42,7 @@ Both `/_install` and `/_theme` read the same durable project-root catalogue:
 | `library/header/<key>/` | `template.tpl` plus optional `style.css` |
 | `library/footer/<key>/` | `template.tpl` plus optional `style.css` |
 
-Keep `library/` in a deployment even after removing `/_install/`; otherwise the three catalogue-backed dialogs have nothing to list. Only `library/themes/*/preview.svg` is a public asset. `library/.htaccess` and the development router refuse direct access to manifests, templates, stylesheets, and font sources.
+The catalogue lives below `_install/library/`. Removing `/_install/` from a deployment — the recommendation for production — leaves the three catalogue-backed dialogs with nothing to list; the Design dialog is unaffected, because it generates rather than copies. Only `_install/library/themes/*/preview.svg` is a public asset. `_install/library/.htaccess` and the development router refuse direct access to manifests, templates, stylesheets, and font sources.
 
 ## The Settings
 
@@ -166,14 +166,14 @@ Applying another Theme is the intentional reset operation. It overwrites files n
 | The brand color looks different as a surface | Expected. Lightness was moved to reach the contrast target; hue and saturation are preserved. |
 | Secondary elements look identical to primary ones | No Secondary set — `vibrant` falls back to `origin`. Set one. |
 | `style.design.css` keeps losing manual edits | It is generated. Use `assets/style.css`. |
-| Theme, Header, or Footer says no variants are available | The project-root `library/` catalogue is missing or incomplete. Restore it from the same Nino version; do not keep it inside the removed `/_install/` directory. |
+| Theme, Header, or Footer says no variants are available | `_install/` was removed, or its catalogue is incomplete. After the recommended deployment this is the normal state. To switch again, redeploy a locked `_install/` from the same Nino version. |
 | A frame preview differs from the live page | The preview uses the current installed includes and text where available, but remains an inert single-frame document. Check the applied template on the full page for request-specific module output. |
 | `(403) Request failed.` appears after loading the controls | The page's CSRF token is stale, usually after a login, logout, session rotation, or deployment. Reload `/_theme`; sign in through `/_admin` again if needed. |
 | `/_theme` shows the login page repeatedly | Shared `/_admin` session. Check the `/_admin` login and any lock. |
 
-## Current Limitations
+## Catalogue Contract
 
-- **One theme converted so far.** `agency` is rewritten as a mapping layer - every colour role assigned to a `--nino-*` token - and declares the `design` block `/_install` starts it from. The other seven still carry hand-tuned literal colours and ignore these settings until they are converted the same way.
+All eight supplied themes — Basis, Docs, Editorial, Nocturne, Rail, Signal, Soft, and Studio — are mapping layers. Every colour role reads a generated `--nino-*` token, every size role reads the generated raster, and every manifest declares the complete Design and frame baseline the preview represents. A custom catalogue theme must keep that contract or its Design controls cannot reliably recolour and reshape it.
 
 ## Next Steps
 

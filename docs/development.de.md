@@ -485,6 +485,7 @@ Module werden in `/nino/modules` aktiviert. Die Reihenfolge des Arrays ist relev
 | `Localepicker` | `[localepicker …]` | wechselt Locale über Query und Redirect |
 | `Navigation` | `[navigation …]` | rendert Navigationen aus einer kompakten Zeilensyntax |
 | `Newsletter` | POST/GET unter `/.newsletter` | Double-Opt-in, Bestätigung und Abmeldung ohne öffentliche Adressauskunft |
+| `Search` | `Search::getElements()` | durchsucht konfigurierte Element-Felder über einen kleinen sprachabhängigen Fuzzy-Index |
 | `Template` | `[template /path/name]` | lädt den Rohinhalt einer `.tpl`-Datei; die gemeinsame Render-Pipeline verarbeitet ihn weiter |
 
 Einige Details sind absichtlich defensiv gestaltet:
@@ -492,6 +493,76 @@ Einige Details sind absichtlich defensiv gestaltet:
 - Das Formular begrenzt Eingaben, schützt Schreibvorgänge und verwirft alte Protokollmonate.
 - Die öffentliche Newsletter-Anmeldung antwortet unabhängig davon gleich, ob eine Adresse neu oder bereits bekannt ist. Das erschwert die Abfrage fremder Adressen.
 - `Jstext` verwendet JSON-Hex-Escaping und ergänzt die Content-Security-Policy um einen zufälligen Nonce.
+
+### Suchindex für Elements
+
+`Modules\Search` ist eine optionale Entwicklerfunktion und wird nicht über
+`/_install` ausgewählt. Aktiviere und konfiguriere sie direkt in der
+`config.php`:
+
+```php
+return [
+    '/nino/modules' => [
+        // weitere Module …
+        '\\Nino\\Modules\\Search',
+    ],
+
+    '/nino/elements/index' => [
+        'articles' => [
+            0 => 'title',
+            1 => 'summary',
+            2 => 'keywords',
+            3 => 'author',
+        ],
+    ],
+];
+```
+
+Der äußere Schlüssel bezeichnet genau einen flachen Elementtyp, wahlweise mit
+oder ohne führenden Slash. Die inneren Schlüssel sind die vier Prioritäten der
+Rangfolge: `0` ist am stärksten, `3` am schwächsten; jede Priorität nennt genau
+ein Feld aus dem aktuellen Modell dieses Typs. Ungültige Typen, Prioritäten und
+Feldnamen werden ignoriert.
+
+Die Aktivierung registriert den Elements-Callback nach erfolgreichem Schreiben,
+legt selbst aber noch keine Datei an. Den ersten Aufbau startest du mit **Create
+searchindex** unter `/_admin` → **Config**. Jeder Klick erstellt alle gültig
+konfigurierten Indexe vollständig neu. Danach erstellt jedes erfolgreiche
+Einfügen, Ändern oder Löschen eines konfigurierten Typs dessen Index neu,
+nachdem die Elementdatei geschrieben wurde. Der Typ `articles` liegt als eine
+abgeleitete Datei unter `/data/index-articles.php` (normalerweise
+`private/data/index-articles.php`), gegliedert nach Sprache.
+
+Der Index besitzt bewusst weder Signatur noch Revision oder Sidecar-Lock und
+wird als vollständiges PHP-Array direkt und nicht atomar neu geschrieben. Lesen
+bleibt strikt schreibfrei: Eine fehlende oder fehlerhafte Datei liefert keine
+Treffer und wird nicht repariert. Nach Änderungen an der Konfiguration,
+manuellen Eingriffen in Elementdateien oder einem abgebrochenen
+Index-Schreibvorgang erstellt der
+Admin-Button alle Indexe neu. Die erzeugten Dateien enthalten normalisierten
+Suchtext, sind keine Quelldaten und gehören nicht in ein Installer-Paket.
+
+Projektcode durchsucht die aktuelle Sprache und erhält die vollständigen,
+kanonischen Elements in Trefferreihenfolge:
+
+```php
+$hits = \Nino\Modules\Search::getElements(
+    $appData,
+    'articles',
+    (string) ( $_GET['q'] ?? '' )
+);
+```
+
+Die Suche ignoriert Groß-/Kleinschreibung, entfernt Markup, dekodiert
+Entities, flacht Text- und Zahlenwerte aus Arrays ab und schreibt `ä`, `ö`,
+`ü` und `ß` als `ae`, `oe`, `ue` und `ss` — wer „Strasse“ eintippt, findet
+deshalb auch „Straße“. Jedes Suchwort muss treffen. Exakte Wörter, Präfixe und
+Teilstrings werden bevorzugt; andere Wörter verwenden eine längenabhängige
+Unicode-Bigramm-Ähnlichkeit. Feldprioritäten bestimmen die Rangfolge, exakte
+Phrasen erhalten einen zusätzlichen Bonus, bei gleicher Punktzahl entscheidet
+die Element-URI. Der Aufwand ist auf 256 Query-Zeichen und die ersten zwölf
+eindeutigen Tokens begrenzt. Leere Suchen, unbekannte oder nicht konfigurierte
+Typen, fehlende Sprachdaten und unlesbare Indexe liefern `[]`.
 
 ## Ein eigenes Modul entwickeln
 
@@ -699,9 +770,11 @@ Nino verwendet eigenständige Smoke-Tests ohne PHPUnit. Jeder Test erstellt ein 
 | Test | Schwerpunkt |
 | --- | --- |
 | `tests/kernel-smoke.php` | Kernel, Routing, Rendering, Auth, Filesystem und Module |
+| `tests/search-smoke.php` | Elements-Suche: Aktivierung, Index-Lebenszyklus, Fuzzy-Rangfolge, Sprachen und Admin-Neuaufbau |
 | `tests/editor-smoke.php` | Editor-Routen, Rechte, Backups, Protokolle und Inhaltsoperationen |
 | `tests/admin-smoke.php` | Admin-Authentifizierung und technische Verwaltungsfunktionen |
 | `tests/install-smoke.php` | Installationsschritte, erzeugte Struktur und Selbstsperre |
+| `tests/theme-smoke.php` | erzeugte Design-Werte und authentifizierte Theme-/Header-/Footer-Operationen |
 | `tests/templates-smoke.php` | Section-Komposition, Template-Includes, verlustfreie Seitenrahmen, native Schnellbefüllung und Speicherkonflikte |
 | `tests/*-js-smoke.js` | browsernahe Logik der Verwaltungsoberflächen und des Template-Builders |
 | `tests/concurrency-smoke.php` | parallele und atomare Schreibvorgänge |
@@ -710,9 +783,11 @@ Lokal werden sie einzeln ausgeführt:
 
 ```bash
 php tests/kernel-smoke.php
+php tests/search-smoke.php
 php tests/editor-smoke.php
 php tests/admin-smoke.php
 php tests/install-smoke.php
+php tests/theme-smoke.php
 php tests/templates-smoke.php
 for test in tests/*-js-smoke.js; do node "$test"; done
 php tests/concurrency-smoke.php
@@ -749,6 +824,7 @@ Die folgende Tabelle nennt die wichtigsten vom Kernel und den integrierten Modul
 | `/nino/elements<type-uri>/update` | Daten des Elementtyps | Änderung in einem Typ prüfen oder per `false` verwerfen |
 | `/nino/elements/delete<type-uri>` | Daten des Elementtyps | Löschen aus einem Typ prüfen oder per `false` verwerfen |
 | `/nino/elements<type-uri>/update/uri` | Elementdaten | auf eine Änderung der Element-URI reagieren |
+| `/nino/elements/committed` | `{ operation, type, uri, previousUri, locale }` | Benachrichtigung, nachdem ein Element eingefügt, geändert oder gelöscht und gespeichert wurde; kann den abgeschlossenen Schreibvorgang nicht verwerfen |
 
 Callback-Namen sind einfache Strings. Behandle die etablierten Namen und Argumentformen trotzdem wie eine API: Eine Umbenennung oder ein geänderter Argumenttyp kann jedes registrierte Modul betreffen.
 

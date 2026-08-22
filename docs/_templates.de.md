@@ -77,7 +77,8 @@ vorhandenen, **Fixed value** schreibt die URL direkt in die Section — ein
 Projektpfad wie `[[/nino/public]]/images/hero.jpg`, ein gewöhnlicher relativer
 Pfad oder eine `https`-URL — und legt gar keinen Bildplatz an. Letzteres ist für
 ein Bild gedacht, das das Projekt ohnehin mitbringt und das niemand in `/_admin`
-austauschen muss.
+austauschen muss. Der gespeicherte Frame trägt stets `backgroundImageSource`;
+ein nichtleerer Bildwert ohne diese Quelle wird abgelehnt statt erraten.
 
 Jedes Auswahlfeld mit **Auto** nennt den Wert, auf den Auto gerade auflöst –
 `Auto (Dim)`, `Auto (Wide)`, `Auto (100)`. Aufgelöst wird in dieser Reihenfolge:
@@ -106,7 +107,7 @@ Die Shell-Slots verwenden inerte Kommentare:
 [template /templates/html-header]
 ```
 
-Neue Seitentemplates enthalten beide Marker. Aus Kompatibilitätsgründen wird ein exakter führender `html-header` und abschließender `html-footer` zunächst im Speicher erkannt; der erste bewusste Speichervorgang ergänzt die Marker. Andere `[template]`-Shortcodes bleiben gewöhnliche Canvas-Bausteine.
+Neue Seitentemplates enthalten beide Marker. Ein exakter führender `html-header` und abschließender `html-footer` ist ebenfalls eine anerkannte Shell-Konvention; der nächste bewusste Speichervorgang schreibt deren Marker. Andere `[template]`-Shortcodes bleiben gewöhnliche Canvas-Bausteine.
 
 Am Dateianfang liegen ebenfalls inerte Template-Metadaten, die nicht im Canvas erscheinen:
 
@@ -120,7 +121,7 @@ Der Name speist Anzeige und Suche in der linken Liste; der zweite Marker persist
 Verwaltete Sections tragen einen Kommentar wie:
 
 ```html
-<!-- nino:section {"preset":"hero-centered","version":1,...} -->
+<!-- nino:section {"version":3,"preset":"fullscreen-image","areas":{...}} -->
 ```
 
 Diese Metadaten erlauben das erneute Öffnen der Composer-Einstellungen. Sie sind inertes HTML und erzeugen keine Laufzeitabhängigkeit. Die Wahl von **HTML+** entfernt die Metadaten bewusst beim Übernehmen des eigenen Quelltexts. Die Section gilt danach als codebasiert und kann nicht durch eine spätere Composer- oder Seitenstandard-Änderung überschrieben werden.
@@ -294,7 +295,7 @@ können die Frame-Empfehlung des Presets ergänzen; eine explizite Auswahl des
 Benutzers gewinnt weiterhin:
 
 ```php
-'recommend' => [ 'layout' => 'cover', 'frame' => [ 'focus' => '5', 'overlay' => 'medium' ] ],
+'recommend' => [ 'layout' => 'cover', 'frame' => [ 'focus' => '5', 'overlay' => 'dim' ] ],
 'layouts' => [
 	'cover' => [
 		'label' => 'Static cover image', 'template' => 'section-cover.tpl',
@@ -360,8 +361,10 @@ zeigen kann, statt einen festen Pfad zu tragen. Die Blacklist steuert nur die
 Sichtbarkeit im normalen Editor; technische Route-URIs bleiben gültige
 Template-Bindings und werden beim Einfügen nicht überschrieben.
 
-Die Auswahl jeder Eigenschaft wird als `bindingSources` im Komponenten-Knoten
-gespeichert und kann auch als Manifest-Empfehlung angegeben werden:
+Die Auswahl jeder Eigenschaft wird vollständig als `bindingSources` im
+Komponenten-Knoten gespeichert. Fehlt in einem gespeicherten v3-Knoten eine
+Quelle, ist er ungültig; sie wird nicht aus seinem Wert erraten. Derselbe
+Vertrag kann auch als Manifest-Empfehlung angegeben werden:
 
 ```php
 [
@@ -462,7 +465,7 @@ Cover um die Navigationsbreite überläuft.
 
 ### Versionsvertrag
 
-Die Section Library lädt ausschließlich Manifeste mit explizitem `version => 3`. Eine fehlende, ältere oder unbekannte Version wird ignoriert, statt in eine andere UI geraten zu werden. Bereits erzeugtes HTML bleibt gültiger Runtime-Quelltext und kann über HTML+ weiterbearbeitet werden; zum neuen Einfügen oder grafischen Wiederöffnen eines verwalteten Presets wird jedoch ein gepflegtes V3-Manifest benötigt.
+Die Section Library lädt ausschließlich Manifeste mit explizitem `version => 3`. Jeder andere Versionswert wird ignoriert, statt in eine andere UI geraten zu werden. Bereits erzeugtes HTML bleibt gültiger Runtime-Quelltext und kann über HTML+ weiterbearbeitet werden; zum neuen Einfügen oder grafischen Wiederöffnen eines verwalteten Presets wird jedoch ein gepflegtes V3-Manifest benötigt.
 
 ## Aktuelle Grenzen
 

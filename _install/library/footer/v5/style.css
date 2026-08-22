@@ -38,7 +38,7 @@
 	align-content: end;
 	gap: var(--space-4);
 	color: var(--color-footer-text-main);
-	background-color: var(--color-footer-bg);
+	background-color: var(--color-footer-bg-main);
 }
 
 .nino-frame-footer .nino-frame-footer-contact {

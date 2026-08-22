@@ -151,6 +151,7 @@ namespace Nino\Theme {
 					'dark'	=> Design::palette( self::settings( $appData ), 'dark' ),
 				],
 				'raster'	=> Design::raster( self::settings( $appData ) ),
+				'brand'		=> Design::brand( self::settings( $appData ) ),
 			] );
 		}
 
@@ -173,6 +174,7 @@ namespace Nino\Theme {
 					'dark'	=> Design::palette( $settings, 'dark' ),
 				],
 				'raster'	=> Design::raster( $settings ),
+				'brand'		=> Design::brand( $settings ),
 			] );
 		}
 
@@ -267,7 +269,7 @@ namespace Nino\Theme {
 	 */
 	class Appearance {
 
-		private const string LIBRARY = __DIR__. '/../library';
+		private const string LIBRARY = __DIR__. '/../_install/library';
 		private const string BUNDLE_KEY = '/.cache/style.css';
 
 		private const array FRAMES = [
@@ -685,7 +687,7 @@ namespace Nino\Theme {
 					'label' => (string) ( $manifest['label'] ?? $entry ),
 					'description' => (string) ( $manifest['description'] ?? '' ),
 					'preview' => ( $preview !== '' && is_file( $directory. '/'. $entry. '/'. $preview ) === true )
-						? ( (string) ( $appData['/nino/dir'] ?? '' ) ). '/library/themes/'. $entry. '/'. $preview
+						? ( (string) ( $appData['/nino/dir'] ?? '' ) ). '/_install/library/themes/'. $entry. '/'. $preview
 						: null,
 					'header' => (string) ( $manifest['header'] ?? '' ),
 					'footer' => (string) ( $manifest['footer'] ?? '' ),
@@ -772,7 +774,8 @@ namespace Nino\Theme {
 
 		// A Theme addresses these, never a ramp step. default/alt/dark/black
 		// already exist as .nino-section--* and as Areas' frame choices;
-		// origin is the brand surface and vibrant the secondary accent. The
+		// origin is the brand exactly as picked and vibrant its contrast-safe
+		// counterpart - see palette() for why the two are not one surface. The
 		// three status surfaces are the same idea applied to meaning rather
 		// than brand - an alert is a surface with text on it like any other,
 		// so it comes out of the same machinery and carries the same promise.
@@ -883,8 +886,9 @@ namespace Nino\Theme {
 
 			return [
 				'primary'	=> $primary,
-				// An empty secondary is a legitimate answer - it means "use the
-				// brand for the vibrant surface too", not "fall back silently"
+				// An empty secondary is a legitimate answer, and the ordinary
+				// one: it means "solve vibrant from the brand itself", not
+				// "fall back silently"
 				'secondary'	=> self::color( $input['secondary'] ?? '', '' ),
 				'contrast'	=> self::choice( $input['contrast'] ?? null, self::TARGET_TEXT ),
 				'colors'		=> self::choice( $input['colors'] ?? null, self::CHROMA ),
@@ -942,9 +946,10 @@ namespace Nino\Theme {
 			$contrast	= isset( self::TARGET_TEXT[$settings['contrast'] ?? '' ] ) ? $settings['contrast'] : 'default';
 			$chroma		= self::CHROMA[$settings['colors'] ?? ''] ?? self::CHROMA['default'];
 
-			[ , $primaryC, $primaryH ] = self::oklch( (string) ( $settings['primary'] ?? '#4faae8' ) );
-			$secondary = (string) ( $settings['secondary'] ?? '' );
-			[ , $secondC, $secondH ] = self::oklch( $secondary === '' ? (string) ( $settings['primary'] ?? '#4faae8' ) : $secondary );
+			$primary = self::color( $settings['primary'] ?? '', '#4faae8' );
+			[ , $primaryC, $primaryH ] = self::oklch( $primary );
+			$secondary = self::color( $settings['secondary'] ?? '', '' );
+			[ , $secondC, $secondH ] = self::oklch( $secondary === '' ? $primary : $secondary );
 
 			// The neutral surfaces carry a trace of the brand hue rather than
 			// being pure grey - a grey biased toward the accent reads as chosen,
@@ -958,13 +963,36 @@ namespace Nino\Theme {
 				$palette[$surface] = self::pair( $bg, $primaryH, $neutralC, $contrast, $mode );
 			}
 
-			// origin, vibrant and the status surfaces are all "a hue as a
-			// surface": hold hue and chroma, solve lightness until the text on
-			// top clears the target. Status hues are fixed because red has to
-			// stay red - the brand knobs must not be able to turn a danger
-			// surface into something reassuring.
-			$hued = [ 'origin' => [ $primaryC, $primaryH ], 'vibrant' => [ $secondC, $secondH ] ];
+			/*	origin is the brand, and the brand is not a solved value: it is
+				the colour the picker returned, byte for byte, in light mode and
+				in dark. Nothing here moves it - not the Colors knob, not the
+				contrast solver, not the mode. An operator who types their
+				corporate hex has to find that hex in the stylesheet, or the
+				picker is lying about what it does.
 
+				What that costs is the one promise every other surface keeps:
+				there is no lightness left to solve with, so --nino-on-origin is
+				only the better of the two inks, not a guaranteed ratio. A brand
+				colour sitting near the middle of the lightness range clears
+				neither ink by much. That is a real limit, and it is why vibrant
+				exists rather than something a theme has to work around.	*/
+			$palette['origin'] = self::pair( $primary, $primaryH, $primaryC, $contrast, $mode );
+
+			/*	vibrant is that same brand made safe: the brand's hue and chroma,
+				with the lightness solved until text on top clears the target.
+				It is the surface a theme reaches for the moment something has
+				to be legible on it - buttons, badges, filled sections - which
+				is why the themes map --color-primary here and keep origin for
+				identity and decoration.
+
+				An explicit secondary colour takes vibrant's place, since a
+				second brand colour is picked for exactly this slot. With none
+				set - the ordinary case - vibrant is origin, corrected.	*/
+			$hued = [ 'vibrant' => $secondary === '' ? [ $primaryC, $primaryH ] : [ $secondC, $secondH ] ];
+
+			// Status hues are fixed because red has to stay red - the brand
+			// knobs must not be able to turn a danger surface into something
+			// reassuring.
 			foreach( self::STATUS as $surface => $status )
 				$hued[$surface] = [ $status['chroma'], $status['hue'] ];
 
@@ -975,6 +1003,46 @@ namespace Nino\Theme {
 			}
 
 			return $palette;
+		}
+
+		/**
+		 *	What the picked brand actually measures, per mode.
+		 *
+		 *	origin is the one surface the generator does not get to move, so it
+		 *	is also the one whose contrast it cannot promise. Rather than leave
+		 *	that as something a stylesheet author has to find out by eye, the
+		 *	number is published: 'ratio' is what --nino-on-origin achieves on
+		 *	--nino-origin, 'target' is what the current Contrast setting asks
+		 *	for, and 'safe' is simply whether the first clears the second.
+		 *
+		 *	A false here is not a fault to correct. It is the case vibrant was
+		 *	built for, and a theme that maps its text-bearing roles there has
+		 *	already handled it.
+		 *
+		 *	@param		array			$settings			Already-normalized design settings
+		 *
+		 *	@return 	array									mode => { color, ratio, target, safe }
+		 */
+		public static function brand( array $settings ): array {
+
+			$contrast	= isset( self::TARGET_TEXT[$settings['contrast'] ?? ''] ) ? $settings['contrast'] : 'default';
+			$target		= self::TARGET_TEXT[$contrast];
+			$out			= [];
+
+			foreach( [ 'light', 'dark' ] as $mode ) {
+
+				$origin	= self::palette( $settings, $mode )['origin'];
+				$ratio	= round( self::contrast( $origin['on'], $origin['bg'] ), 2 );
+
+				$out[$mode] = [
+					'color'	=> $origin['bg'],
+					'ratio'	=> $ratio,
+					'target'	=> $target,
+					'safe'	=> $ratio >= $target,
+				];
+			}
+
+			return $out;
 		}
 
 		/**

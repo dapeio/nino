@@ -42,7 +42,7 @@ Design bietet Primär, optionale Sekundärfarbe, Kontrast, Farben, Volume, Spaci
 | `library/header/<key>/` | `template.tpl` plus optionale `style.css` |
 | `library/footer/<key>/` | `template.tpl` plus optionale `style.css` |
 
-Behalten Sie `library/` beim Deployment, auch nachdem `/_install/` entfernt wurde; andernfalls können die drei katalogbasierten Dialoge keine Varianten auflisten. Nur `library/themes/*/preview.svg` ist ein öffentliches Asset. `library/.htaccess` und der Entwicklungsrouter verweigern den direkten Zugriff auf Manifeste, Templates, Stylesheets und Font-Quellen.
+Der Katalog liegt unter `_install/library/`. Wird `/_install/` aus der Auslieferung entfernt — die Empfehlung für den Produktivbetrieb —, können die drei katalogbasierten Dialoge keine Varianten mehr auflisten; der Design-Dialog arbeitet unverändert weiter, weil er erzeugt statt kopiert. Nur `_install/library/themes/*/preview.svg` ist ein öffentliches Asset. `_install/library/.htaccess` und der Entwicklungsrouter verweigern den direkten Zugriff auf Manifeste, Templates, Stylesheets und Font-Quellen.
 
 ## Die Einstellungen
 
@@ -166,14 +166,14 @@ Ein anderes Theme anzuwenden ist der bewusste Reset. Dabei werden die vom neuen 
 | Die Markenfarbe wirkt als Fläche anders | So gewollt. Die Helligkeit wurde bis zum Kontrastziel verschoben, Farbton und Sättigung bleiben erhalten. |
 | Sekundäre Elemente sehen aus wie primäre | Keine Sekundärfarbe gesetzt — `vibrant` fällt auf `origin` zurück. Eine setzen. |
 | `style.design.css` verliert manuelle Änderungen | Die Datei wird erzeugt. Nutzen Sie `assets/style.css`. |
-| Theme, Header oder Footer meldet, dass keine Varianten verfügbar sind | Der Katalog `library/` in der Projektwurzel fehlt oder ist unvollständig. Aus derselben Nino-Version wiederherstellen; nicht im entfernten Verzeichnis `/_install/` belassen. |
+| Theme, Header oder Footer meldet, dass keine Varianten verfügbar sind | `_install/` wurde entfernt oder sein Katalog ist unvollständig. Das ist nach dem empfohlenen Deployment der Normalfall. Zum Umschalten `_install/` aus derselben Nino-Version gesperrt wieder ausliefern. |
 | Eine Frame-Vorschau unterscheidet sich von der Live-Seite | Die Vorschau nutzt vorhandene installierte Includes und Texte, bleibt aber ein inertes Einzel-Frame-Dokument. Für Request-abhängige Modulausgabe das angewendete Template auf der vollständigen Seite prüfen. |
 | Nach dem Laden der Regler erscheint `(403) Request failed.` | Der CSRF-Token der Seite ist veraltet, meist nach Anmeldung, Abmeldung, Sitzungswechsel oder Deployment. `/_theme` neu laden; falls nötig erneut über `/_admin` anmelden. |
 | `/_theme` zeigt wiederholt die Anmeldeseite | Gemeinsame `/_admin`-Sitzung. `/_admin`-Anmeldung und eine mögliche Sperre prüfen. |
 
-## Aktuelle Grenzen
+## Katalogvertrag
 
-- **Bisher ein umgestelltes Theme.** `agency` ist als Abbildungsschicht neu geschrieben - jede Farbrolle einem `--nino-*`-Token zugewiesen - und erklärt den `design`-Block, aus dem `/_install` es startet. Die anderen sieben tragen weiterhin handgesetzte literale Farben und ignorieren diese Einstellungen, bis sie ebenso umgestellt sind.
+Alle acht mitgelieferten Themes — Basis, Docs, Editorial, Nocturne, Rail, Signal, Soft und Studio — sind Abbildungsschichten. Jede Farbrolle liest ein erzeugtes `--nino-*`-Token, jede Größenrolle das erzeugte Raster, und jedes Manifest erklärt die vollständige Design- und Frame-Ausgangslage seiner Vorschau. Ein eigenes Katalog-Theme muss diesen Vertrag einhalten, damit die Design-Regler es zuverlässig umfärben und umformen können.
 
 ## Nächste Schritte
 

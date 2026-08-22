@@ -173,14 +173,16 @@ check( 'Add Section omits visual frame and stack styles without dropping backgro
 check( 'binding controls expose collection fields, existing textfills and fixed values', [
 	"{ value : 'field', label : 'Collection field' }", "{ value : 'textfill', label : 'Existing textfill' }", "{ value : 'fixed', label : 'Fixed value' }",
 ].every( function( marker ) { return areaComposerSource.includes( marker ) } ) );
-check( 'new-section key regeneration preserves manifest-recommended shared and fixed bindings', areaComposerSource.includes( "bindingSource( area, component, property, definition.properties[property] ) !== 'new'" ) );
+check( 'new-section key regeneration preserves explicitly stored shared and fixed bindings', areaComposerSource.includes( "bindingSource( component, property ) !== 'new'" ) );
+check( 'binding sources are read from persisted metadata rather than inferred from values', areaComposerSource.includes( "return component.bindingSources && component.bindingSources[property] || '';" )
+	&& areaComposerSource.includes( 'normalizeExistingSources' ) === false );
 check( 'blacklisted textfills remain selectable in a separate technical group', areaComposerSource.includes( "label : 'Technical values'" )
 	&& templatesPhpSource.includes( "'blacklisted' => ( $entry['blacklisted'] ?? false ) === true" ) );
 check( 'named Areas render as semantic tabs above one Design/Data workspace', [ "'pd-v3-area-workspace'", "setAttribute( 'role', 'tablist' )", "setAttribute( 'role', 'tabpanel' )" ].every( function( marker ) { return areaComposerSource.includes( marker ) } ) );
 check( 'the background image offers a fixed value next to the two slot choices', areaComposerSource.includes( "{ value : 'fixed', label : 'Fixed value' }" )
 	&& /formField\( 'Background image', '', \[[^\]]*value : 'fixed'/.test( areaComposerSource )
 	&& areaComposerSource.includes( "formField( 'Image URL', 'frame.backgroundImage', 'text'" )
-	&& areaComposerSource.includes( "backgroundSource( draft, generated ) !== 'fixed'" ) );
+	&& areaComposerSource.includes( "backgroundSource( draft ) !== 'fixed'" ) );
 check( 'every binding keeps its source and its value on one row', areaComposerSource.includes( 'function bindingRow(' )
 	&& areaComposerSource.includes( "node( 'div', 'pd-v3-binding-row' )" )
 	&& /\.pd-v3-binding-row\s*\{[\s\S]*?grid-template-columns:\s*minmax/.test( styleSource ) );

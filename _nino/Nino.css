@@ -29,6 +29,18 @@
  ****************************************************************************************************/
 
 :root {
+	/*	Two brand roles, and the difference between them is a promise, not a
+		shade. --color-primary is the brand as a surface things sit on:
+		everything below that fills with it also puts --color-primary-text on
+		top, so it has to be a value text survives. --color-secondary is the
+		brand as it was actually chosen - it is only ever shown, never written
+		on, which is why nothing here pairs it with an ink.
+
+		A generated design maps them accordingly: --color-secondary to
+		--nino-origin, the picked colour untouched, and --color-primary to
+		--nino-vibrant, the same colour with its lightness solved until the
+		contrast target is met. Where no design layer is present the two
+		collapse, as they do here.	*/
 	--color-primary: #4faae8;
 	--color-primary-text: #ffffff;
 	--color-secondary: var(--color-primary);
@@ -1386,7 +1398,7 @@ body.nino-scroll-btf .nino-back-to-top {
 	.nino-pricing-row--four-first > .nino-pricing-item:first-child,
 	.nino-pricing-row--four-last > .nino-pricing-item:last-child {
 		flex: 1 1 100%;
-		border-color: var(--color-primary);
+		border-color: var(--color-secondary);
 		border-width: 2px;
 	}
 }
@@ -1398,7 +1410,7 @@ body.nino-scroll-btf .nino-back-to-top {
 	text-align: center;
 }
 .nino-pricing-item--featured {
-	border-color: var(--color-primary);
+	border-color: var(--color-secondary);
 	border-width: 2px;
 }
 .nino-pricing-row--feature-middle > .nino-pricing-item:nth-child(2) {
@@ -2229,7 +2241,7 @@ header .nino-headernav-logo {
 	transition: background-color .2s;
 }
 .nino-slider-points li.nino-is-active {
-	background-color: var(--color-primary);
+	background-color: var(--color-secondary);
 }
 
 /* Viewport animations (vpa) - default is a subtle fade+rise. --zoom/--zoom-
@@ -2336,7 +2348,7 @@ header .nino-headernav-logo {
 	height: 50px;
 	border: 5px solid rgba(0, 0, 0, 0.1);
 	border-radius: 50%;
-	border-top-color: var(--color-primary);
+	border-top-color: var(--color-secondary);
 	animation: nino-fx-spin 1s ease-in-out infinite;
 }
 @keyframes nino-fx-spin {
@@ -2362,7 +2374,7 @@ header .nino-headernav-logo {
 }
 .nino-tabs-tab.nino-is-active {
 	color: var(--color-primary);
-	border-bottom-color: var(--color-primary);
+	border-bottom-color: var(--color-secondary);
 }
 .nino-tabs-panel {
 	display: none;

@@ -479,8 +479,8 @@ $aliceHash = hash( 'sha256', 'alice@example.com' );
 file_put_contents( $mergeRoot. '/data/newsletter.php', '<?php return [ [ "email" => "bob@example.com", "status" => "subscribed" ] ];' );
 file_put_contents( $mergeRoot. '/data/newsletter-removed.php', '<?php return [ '. var_export( $aliceHash, true ). ' ];' );
 
-// staging (the backup being restored): older, still has alice subscribed,
-// predates this feature entirely - no removed-file of its own
+// staging (the backup being restored): taken before Alice unsubscribed, so it
+// still has her subscription and no removal record of its own
 file_put_contents( $mergeStaging. '/data/newsletter.php', '<?php return [ [ "email" => "alice@example.com", "status" => "subscribed" ], [ "email" => "bob@example.com", "status" => "subscribed" ] ];' );
 
 $mergeMethod->invoke( null, $mergeRoot. '/data', $mergeStaging );
@@ -495,8 +495,8 @@ check( 'the removal record itself is carried into the restored state, not just t
 \Nino\Filesystem::removeDir( $mergeRoot );
 \Nino\Filesystem::removeDir( $mergeStaging );
 
-// A backup that predates this feature (or a project that never enabled the
-// module) carries neither newsletter file - must be a no-op, not an error
+// A project without the Newsletter module carries neither file. Merging that
+// state must be a no-op, not an error.
 $mergeRoot2 	= sys_get_temp_dir(). '/nino-mergetest-root2-'. bin2hex( random_bytes( 8 ) );
 $mergeStaging2 = sys_get_temp_dir(). '/nino-mergetest-staging2-'. bin2hex( random_bytes( 8 ) );
 mkdir( $mergeRoot2, 0755, true );
@@ -646,20 +646,6 @@ foreach( [ '/nino/http/routes', '/nino/html/navs', '/nino/html/assets' ] as $gon
 // A missing key must report the same default the runtime itself applies, or the
 // form shows a value the site is not actually running with
 check( 'a key absent from config.php reports the runtime default', $byKey['/nino/editor/backups']['value'] === true );
-
-// Until 0.11.1 config.php shipped '/nino/admin/backups'/'/nino/admin/logs' while
-// _editor read - and still reads - '/nino/editor/*', so the shipped 'false' never
-// did anything and both features ran regardless. An existing project's old key is
-// shown so the panel reflects what its owner meant.
-$legacyConfig = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
-$legacyConfig['/nino/admin/logs'] = false;
-\Nino\Filesystem::putFileContent( $appData, '/config.php', $legacyConfig );
-[ , $legacyBody ] = callDev( $appData, \Nino\Admin\Config::class, 'apiList' );
-$legacyByKey = array_column( $legacyBody['fields'], null, 'key' );
-check( 'a pre-0.11.1 /nino/admin/logs is read as the value of /nino/editor/logs', $legacyByKey['/nino/editor/logs']['value'] === false );
-check( '...while /nino/editor/backups still reports its own default', $legacyByKey['/nino/editor/backups']['value'] === true );
-unset( $legacyConfig['/nino/admin/logs'] );
-\Nino\Filesystem::putFileContent( $appData, '/config.php', $legacyConfig );
 
 // The locale inventory is the union of what config.php lists and what has a
 // text file on disk - a translated language that is merely switched off should
@@ -1318,9 +1304,9 @@ check( 'rejects a duplicate Element-URI with 400', $status === 400 );
 ] );
 check( 'rejects a duplicate Http-URI with 400', $status === 400 );
 
-// A real second entry, with a non-200 status code and nav checked
+// A real second entry, with a non-200 status code and explicit menu membership
 [ $status ] = callDev( $appData, \Nino\Admin\PageEditor::class, 'apiSave', [
-	'originalHttpUri' => '', 'uri' => '/site-contact', 'httpUri' => '/contact', 'template' => 'page-contact', 'statusCode' => 404, 'nav' => true, 'text' => [
+	'originalHttpUri' => '', 'uri' => '/site-contact', 'httpUri' => '/contact', 'template' => 'page-contact', 'statusCode' => 404, 'navs' => [ 'main' ], 'text' => [
 		'de_DE' => [ 'name' => 'Kontakt' ],
 	],
 ] );
@@ -1332,9 +1318,12 @@ check( 'both page routes are now persisted, in order', array_keys( array_filter(
 
 // Navigation: only regenerated while the module is active
 $appData['/nino/modules'][] = '\\Nino\\Modules\\Navigation';
+// The registry is what a menu name is checked against, and it is explicit -
+// there is no implied default menu to fall back on
+$appData['/nino/html/navs'] = [ 'main' ];
 
 [ $status ] = callDev( $appData, \Nino\Admin\PageEditor::class, 'apiSave', [
-	'originalHttpUri' => '/contact', 'uri' => '/site-contact', 'httpUri' => '/contact', 'template' => 'page-contact', 'nav' => true, 'text' => [
+	'originalHttpUri' => '/contact', 'uri' => '/site-contact', 'httpUri' => '/contact', 'template' => 'page-contact', 'navs' => [ 'main' ], 'text' => [
 		'de_DE' => [ 'name' => 'Kontakt' ],
 	],
 ] );
@@ -1343,18 +1332,18 @@ check( 'resaving an existing entry unchanged (identified by originalHttpUri) suc
 // Menu membership lives on the route this entry owns, not in a generated
 // textfill - see \Nino\Modules\Navigation::routeLines()
 $routesAfterNav = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes'];
-check( 'a nav-checked page joins the first registered menu on its own route', ( $routesAfterNav['GET://contact']['navs'] ?? null ) === [ 'main' => 1 ] );
+check( 'a page explicitly assigned to main joins that menu on its own route', ( $routesAfterNav['GET://contact']['navs'] ?? null ) === [ 'main' => 1 ] );
 check( 'a page in no menu carries no membership at all', isset( $routesAfterNav['GET://about']['navs'] ) === false );
 check( 'nothing is generated into the text files anymore', isset( \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] )['[[/website/navigation/main]]'] ) === false );
 
-// Reordering: check both entries "nav" so the generated menu actually
+// Reordering: assign both entries to main so the generated menu actually
 // shows a reorder, not just the list itself
 [ $status ] = callDev( $appData, \Nino\Admin\PageEditor::class, 'apiSave', [
-	'originalHttpUri' => '/about', 'uri' => '/site-about', 'httpUri' => '/about', 'template' => 'page-about', 'nav' => true, 'text' => [
+	'originalHttpUri' => '/about', 'uri' => '/site-about', 'httpUri' => '/about', 'template' => 'page-about', 'navs' => [ 'main' ], 'text' => [
 		'de_DE' => [ 'name' => 'About' ],
 	],
 ] );
-check( 'checking "nav" on the first entry too succeeds', $status === 200 );
+check( 'assigning the first entry to main too succeeds', $status === 200 );
 
 // A membership a save newly adds goes behind everything already in that menu
 check( 'the second page to join the menu lands behind the first, not on top of it', ( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes']['GET://about']['navs'] ?? null ) === [ 'main' => 2 ] );
@@ -1572,17 +1561,15 @@ check( 'the routes themselves survive', array_keys( $routesAfterDelete ) === [ '
 [ $status ] = callDev( $appData, \Nino\Admin\Navigations::class, 'apiDelete', [ 'key' => 'primary' ] );
 check( 'deleting an unknown menu 404s', $status === 404 );
 
-// Deleting the last one really does leave none - the "one menu by default"
-// fallback is for a config from before the registry existed, not for one
-// somebody deliberately emptied
+// Deleting the last one really does leave none.
 callDev( $appData, \Nino\Admin\Navigations::class, 'apiDelete', [ 'key' => 'footer' ] );
 [ $status, $body ] = callDev( $appData, \Nino\Admin\Navigations::class, 'apiDelete', [ 'key' => 'meta' ] );
 check( 'the last menu can be deleted, and stays deleted', $navKeys( $body ) === [] );
 
 unset( $appData['/nino/html/navs'] );
-check( 'a config from before the registry existed still offers the one menu the old generated fill was hardcoded to', \Nino\Admin\Navigations::registry( $appData ) === [ 'main' ] );
+check( 'a missing navigation registry exposes no implicit menu', \Nino\Admin\Navigations::registry( $appData ) === [] );
 $appData['/nino/html/navs'] = [];
-check( '...while an empty registry stays empty', \Nino\Admin\Navigations::registry( $appData ) === [] );
+check( 'an empty navigation registry stays empty', \Nino\Admin\Navigations::registry( $appData ) === [] );
 
 \Nino\Runtime::unsetSessionValue( $appData, './nino/admin/authed' );
 [ $status ] = callDev( $appData, \Nino\Admin\Navigations::class, 'apiList' );

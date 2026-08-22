@@ -287,7 +287,7 @@ final class AreaComposer {
 		];
 	}
 
-	private static function normalizeNode( mixed $node, array $allowed, array $render, string $source, array $model, bool $strictModel = true ): array {
+	private static function normalizeNode( mixed $node, array $allowed, array $render, string $source, array $model, bool $strictModel = true, bool $requireSources = false ): array {
 		if( is_array( $node ) === false )
 			throw new \InvalidArgumentException( 'recommended components must be arrays' );
 		$id = (string) ( $node['id'] ?? '' );
@@ -307,6 +307,8 @@ final class AreaComposer {
 				throw new \InvalidArgumentException( 'component '. $id. ' has an invalid binding value' );
 			if( isset( $inputSources[$property] ) && is_string( $inputSources[$property] ) === false )
 				throw new \InvalidArgumentException( 'component '. $id. ' has an invalid binding source' );
+			if( $requireSources === true && (string) ( $inputSources[$property] ?? '' ) === '' )
+				throw new \InvalidArgumentException( 'component '. $id. ' must declare every binding source' );
 			$value = (string) ( $inputBindings[$property] ?? self::suffix( $id, $property, $type ) );
 			$bindingSource = self::bindingSource( (string) ( $inputSources[$property] ?? '' ), $source, $definition, $value );
 			self::validateBinding( $id, $value, $bindingSource, $source, $definition, $model, $strictModel );
@@ -331,7 +333,7 @@ final class AreaComposer {
 		$spec['layout'] = $layout;
 		$inputFrame = is_array( $input['frame'] ?? null ) ? $input['frame'] : [];
 		foreach( self::FRAME_CHOICES as $key => $choices )
-			$spec['frame'][$key] = self::choice( self::frameValue( $key, (string) ( $inputFrame[$key] ?? 'auto' ) ), $choices, 'frame.'. $key );
+			$spec['frame'][$key] = self::choice( (string) ( $inputFrame[$key] ?? 'auto' ), $choices, 'frame.'. $key );
 		$spec['frame'] = array_merge( $spec['frame'], self::backgroundBinding( $spec, $inputFrame ) );
 
 		$inputAreas = is_array( $input['areas'] ?? null ) ? $input['areas'] : [];
@@ -351,7 +353,7 @@ final class AreaComposer {
 			if( count( $nodes ) > $area['maxComponents'] )
 				throw new \InvalidArgumentException( 'too many components in area '. $areaKey );
 			foreach( $nodes as $node ) {
-				$node = self::normalizeNode( $node, $area['allowed'], $area['render'], $area['source'], $area['model'], $area['source'] === 'elements' && $elementMode === 'new' );
+				$node = self::normalizeNode( $node, $area['allowed'], $area['render'], $area['source'], $area['model'], $area['source'] === 'elements' && $elementMode === 'new', true );
 				if( isset( $seen[$node['id']] ) )
 					throw new \InvalidArgumentException( 'duplicate component ID in area '. $areaKey );
 				$seen[$node['id']] = true;
@@ -655,23 +657,11 @@ final class AreaComposer {
 		];
 	}
 
-	/**
-	 * One frame value as the current vocabulary spells it. The overlay used to
-	 * be three levels of scrim; it is one now, because the design system has
-	 * exactly one --dim per image layer. Metadata and manifests written against
-	 * the old vocabulary keep resolving instead of failing to compose.
-	 */
-	private static function frameValue( string $key, string $value ): string {
-		if( $key === 'overlay' && in_array( $value, [ 'soft', 'medium', 'strong' ], true ) )
-			return 'dim';
-		return $value;
-	}
-
 	private static function normalizeFrameRecommendation( mixed $frame ): array {
 		$frame = is_array( $frame ) ? $frame : [];
 		$result = [];
 		foreach( self::FRAME_CHOICES as $key => $choices ) {
-			$value = self::frameValue( $key, (string) ( $frame[$key] ?? 'auto' ) );
+			$value = (string) ( $frame[$key] ?? 'auto' );
 			if( in_array( $value, $choices, true ) === false )
 				throw new \InvalidArgumentException( 'unsupported frame recommendation: '. $key );
 			$result[$key] = $value;
@@ -730,14 +720,16 @@ final class AreaComposer {
 	 * Resolve the section background image binding from browser data.
 	 * A generated slot, an existing slot and a fixed URL are three different
 	 * things a key alone cannot tell apart, so the choice is stored next to it.
-	 * Metadata written before this field infers its original behavior.
+	 * The source is explicit whenever a background value is supplied.
 	 */
 	private static function backgroundBinding( array $spec, array $inputFrame ): array {
 		$generated = self::generatedKey( $spec, 'background' );
 		$value = trim( (string) ( $inputFrame['backgroundImage'] ?? '' ) );
 		$source = (string) ( $inputFrame['backgroundImageSource'] ?? '' );
-		if( in_array( $source, [ 'new', 'image', 'fixed' ], true ) === false )
-			$source = $value === '' || $value === $generated ? 'new' : 'image';
+		if( $source === '' && $value === '' )
+			$source = 'new';
+		elseif( in_array( $source, [ 'new', 'image', 'fixed' ], true ) === false )
+			throw new \InvalidArgumentException( 'invalid background image source' );
 		if( $source === 'new' )
 			$value = $generated;
 		if( $source === 'image' && self::validKey( $value, true ) === false )

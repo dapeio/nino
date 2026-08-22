@@ -27,7 +27,7 @@ Dieses Handbuch erklärt die vollständige technische und inhaltliche Projektver
 | Darstellung | Link zum Werkzeug mit vier Dialogen unter `/_theme` | kein Zugriff |
 | Seitentemplates | Link zum sectionbasierten Template Builder unter `/_templates` | kein Zugriff |
 | Nutzer | Konten anlegen, löschen und Rechte technisch verwalten | Profildaten und freigegebene Rechte pflegen |
-| Konfiguration | ausgewählte technische Werte bearbeiten | kein Zugriff |
+| Konfiguration | ausgewählte technische Werte bearbeiten und Elements-Suchindexe neu aufbauen | kein Zugriff |
 | Backups | vorhandene Sicherungen wiederherstellen | tägliche Sicherung automatisch auslösen |
 
 Die Menübezeichnungen in `/_admin` sind im aktuellen Beta-Stand überwiegend englisch. Dieses Handbuch verwendet die deutschen Begriffe und nennt die sichtbaren Menünamen dazu.
@@ -317,6 +317,24 @@ Aktiviert wird die Sprache dadurch **nicht**. Ihre Schlüssel sind leer, ein Anh
 
 Die Muttersprache kann nur eine der aktuell angehakten Sprachen sein. Beide Schlüssel werden deshalb gemeinsam gespeichert — getrennt gespeichert gäbe es einen Moment, in dem `config.php` eine Muttersprache nennt, die das Projekt nicht hat.
 
+### Suchindexe für Elements
+
+**Create searchindex** ist eine eigene Aktion neben **Save**. Sie speichert das
+Formular nicht und verändert die `config.php` nicht; jeder Klick erstellt alle
+gültigen Typen unter `/nino/elements/index` vollständig neu. Die Bestätigung
+nennt die Zahl der geschriebenen Indexdateien und unterschiedlichen Elements.
+Ohne gültige Konfiguration meldet sie, dass keine Suchindexe eingerichtet sind.
+
+Indexdefinition und Aktivierung von `\Nino\Modules\Search` sind bewusste,
+manuelle Arbeiten an der `config.php`; die Einzelheiten beschreibt der
+[Suchindex im Entwickler-Handbuch](development.de.md). Die Aktivierung hält
+konfigurierte Typen nach erfolgreichen Element-Schreibvorgängen aktuell, legt
+die ersten Dateien aber nicht selbst an. Fehlende oder fehlerhafte Indexe werden
+durch eine Suche nie repariert. Verwende den Button deshalb nach dem Ergänzen
+der Konfiguration, nach Änderungen an indexierten Feldern, nach manuellen
+Eingriffen in Elementdateien oder zur Behebung eines fehlgeschlagenen
+Index-Schreibvorgangs.
+
 Drei Schlüssel bearbeitet dieser Bereich bewusst nicht mehr:
 
 | Schlüssel | Stattdessen bearbeiten unter |
@@ -362,6 +380,7 @@ In Produktion muss `/nino/error/display` ausgeschaltet sein.
 | Seite lässt sich im Template Builder nicht speichern | Nach externer Änderung neu laden, eindeutige Section-IDs und nicht geschlossene `<section>`-Tags prüfen; siehe [`/_templates`-Bedienung](_templates.de.md). |
 | Texte oder Bilder fehlen im Scan | Dynamische Schlüssel und Bilder werden nicht zuverlässig statisch erkannt. |
 | Backup-Liste ist leer | Zuerst mit einem Editor-Konto anmelden und prüfen, ob Backups aktiviert sowie Schreibrechte vorhanden sind. |
+| Die Suche liefert keine Elements | `\Nino\Modules\Search` und `/nino/elements/index` in der `config.php` prüfen, danach unter **Config** auf **Create searchindex** klicken. |
 | Webseite funktioniert nach **Config** nicht | Letzten Git-Stand oder Backup wiederherstellen und JSON sowie Schlüsselstruktur prüfen. |
 
 ## Wie es weitergeht

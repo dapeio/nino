@@ -142,7 +142,7 @@ Its taller preview uses the same final Design and theme context as the Header pr
 
 The base page templates include it through `[template /templates/theme.footer]`.
 
-Theme and both frame catalogues live at project-root `library/` because `/_theme` continues to use them after installation. Keep that directory when removing `/_install/`; only the installer-specific base, module, and page units remain below `_install/library/`.
+Theme and both frame catalogues sit beside the base, module, and page units below `_install/library/`. `/_theme` reads them for as long as the installer is deployed; they are setup material, copied into the project when applied and never read at runtime.
 
 ## 7. Routes
 
@@ -152,7 +152,7 @@ Each page requires:
 
 - an **Element URI** as a stable internal identity;
 - an **HTTP URI** as the publicly accessible path;
-- a **Template** from `templates/page-*.tpl`;
+- a **Template** from the page library, or the route's existing project template;
 - **Navigation Name**, **Page Title**, and **Description** for each active language;
 - one checkbox per navigation registered in `/nino/html/navs`.
 
@@ -161,6 +161,10 @@ The step keeps no list of its own: it writes `/nino/http/routes` and the `/webpa
 The Element URI is the anchor for page texts like `/webpage<uri>/title`. The HTTP URI is the path visible in the browser. This separation allows the internal identity to remain stable even if the public path changes.
 
 A new page starts from the selected library template's own suggestions: its HTTP URI, plus Navigation Name, Page Title, and Description in **every** active language, read from the template's `text/<locale>.php` files. Switching the template only updates fields that are still untouched — anything typed by hand survives the switch. A field left empty still falls back to the generic placeholder ("Page", "Page Title").
+
+A page unit may also declare unit-relative `files`. They are copied to the same
+virtual project paths, so `images/demo.jpg` becomes the project's public
+`images/demo.jpg`.
 
 A route on the **Blank** template gets its own copy of that template, named after its Element URI: a `/team` route is created as `templates/page-team.tpl` and rendered by `[template /templates/page-team]`. Blank is the empty starting point, so every route picking it needs a page of its own — a shared file would mean editing one blank page rewrote all of them. A nested Element URI flattens into a single name (`/jobs/open` → `page-jobs-open.tpl`), because that is the shape the template pickers list. An existing file is never overwritten, so re-running this step leaves work already done in such a page alone. From then on the route owns its template and reads back as its own page rather than as the Blank unit — the same thing a page created in `/_admin` is. Every other template is a finished page and stays shared.
 
@@ -223,7 +227,7 @@ Nino separates one-time installer source from the appearance catalogue that rema
 | `library/themes/<key>/` | visual baseline shared by `/_install` and `/_theme` |
 | `library/header/<key>/`, `library/footer/<key>/` | interchangeable frame shared by both tools |
 
-The first three paths may be removed with `/_install` after completion. The project-root `library/` remains deployed for the authenticated `/_theme` workspace and is not a runtime plugin system.
+All of these paths are removed together with `/_install` after completion. The catalogue is setup material for the authenticated workspace, not a runtime plugin system.
 
 A theme's `manifest.php` lists the files to be copied plus what the look was drawn against:
 

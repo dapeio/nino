@@ -27,7 +27,7 @@ This manual explains the complete technical and content project management under
 | Appearance | Link to the four-dialog `/_theme` workspace | No access |
 | Page templates | Link to the section-first `/_templates` Template Builder | No access |
 | Users | Create, delete, and technically manage accounts | Manage profile data and released permissions |
-| Configuration | Edit selected technical values | No access |
+| Configuration | Edit selected technical values and rebuild Elements search indexes | No access |
 | Backups | Restore existing backups | Trigger daily backup automatically |
 
 The menu items in `/_admin` are predominantly in English in the current beta state. This manual uses the German terms and names the visible menu items accordingly.
@@ -316,6 +316,22 @@ The new language is **not switched on** by that. Its keys are empty, so activati
 
 The native language can only be one of the languages currently ticked. Both keys are therefore saved together — saving them separately would allow a moment in which `config.php` names a native language the project does not have.
 
+### Elements search indexes
+
+**Create searchindex** is a separate action next to **Save**. It does not save
+the form and does not change `config.php`; every click recreates all valid types
+listed under `/nino/elements/index`. The confirmation reports the number of
+index files and distinct Elements written. With no valid configuration, it
+reports that no search indexes are configured.
+
+The index definition and `\Nino\Modules\Search` activation are deliberate,
+manual `config.php` work; see [Elements Search Index in the Developer
+Manual](development.md#elements-search-index). Activation keeps configured
+types current after successful Element writes, but does not create the initial
+files. Missing or malformed indexes are never repaired by a search request, so
+use this button after adding the configuration, changing indexed fields,
+editing Element files by hand, or diagnosing a failed index write.
+
 Three keys this area used to edit are deliberately gone:
 
 | Key | Edit it instead under |
@@ -363,6 +379,7 @@ In production, `/nino/error/display` must be off.
 | Page cannot be saved in Template Builder | Reload after an external edit, check unique section IDs and unmatched `<section>` tags; see [`/_templates` Operation](_templates.md). |
 | Texts or images missing in scan | Dynamic keys and images are not reliably statically recognized. |
 | Backup list is empty | First log in with an editor account and check if backups are enabled and write permissions exist. |
+| Search returns no Elements | Check `\Nino\Modules\Search` and `/nino/elements/index` in `config.php`, then press **Create searchindex** under **Config**. |
 | Website does not work after **Config** | Restore last Git state or backup and check JSON and key structure. |
 
 ## Next Steps

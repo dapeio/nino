@@ -256,13 +256,9 @@ $contactBinding = array_values( array_filter( $hero['fields'], fn( array $field 
 check( 'single-Area actions can reuse technical textfills without creating a new field', str_contains( $hero['source'], 'href="[[/webpage/contact/uri]]"' )
 	&& ( $contactBinding['mode'] ?? '' ) === 'existing'
 	&& ( $hero['spec']['areas']['content']['components'][3]['bindingSources']['href'] ?? '' ) === 'textfill' );
-$legacyHeroInput = \Nino\Templates\AreaComposer::defaults( $presets['fullscreen-image'], 'home', 'legacy-hero' );
-foreach( $legacyHeroInput['areas']['content']['components'] as &$legacyComponent )
-	unset( $legacyComponent['bindingSources'] );
-unset( $legacyComponent );
-$legacyHero = \Nino\Templates\Composer::compose( $legacyHeroInput );
-check( 'older v3 Single-Area metadata still infers generated text and image bindings', str_contains( $legacyHero['source'], '[[/page-home/legacy-hero/title]]' )
-	&& ( $legacyHero['spec']['areas']['content']['components'][0]['bindingSources']['text'] ?? '' ) === 'new' );
+$missingHeroSources = \Nino\Templates\AreaComposer::defaults( $presets['fullscreen-image'], 'home', 'missing-sources' );
+unset( $missingHeroSources['areas']['content']['components'][0]['bindingSources'] );
+check( 'section metadata must declare every Single-Area binding source', throwsInvalidArgument( fn() => \Nino\Templates\Composer::compose( $missingHeroSources ) ) );
 
 $heroPreview = \Nino\Templates\Composer::preview( [
 	'preset' => 'fullscreen-image', 'pageId' => 'preview', 'id' => 'motion-hero', 'pageMotion' => 'on',
@@ -289,13 +285,9 @@ check( 'maps ordered components to compatible existing model fields', str_contai
 	&& str_contains( $articles['source'], '[[buttonLabel]]' ) );
 check( 'returns each independently creatable collection and the complete recommended schema', isset( $articles['content']['collections'][0]['model']['image'], $articles['content']['collections'][0]['model']['linkLabel'] ) );
 check( 'generated Elements images use Nino image storage under the public content prefix', str_contains( $articles['source'], '[[/nino/public]]/images/[[photo]]' ) && str_contains( $articles['source'], '/uploads/' ) === false );
-$legacyArticleInput = $articleInput;
-foreach( $legacyArticleInput['areas']['articles']['components'] as &$legacyComponent )
-	unset( $legacyComponent['bindingSources'] );
-unset( $legacyComponent );
-$legacyArticles = \Nino\Templates\Composer::compose( $legacyArticleInput );
-check( 'older v3 metadata without explicit binding sources still maps Element fields', str_contains( $legacyArticles['source'], '[[name]]' )
-	&& ( $legacyArticles['spec']['areas']['articles']['components'][1]['bindingSources']['text'] ?? '' ) === 'field' );
+$missingArticleSources = $articleInput;
+unset( $missingArticleSources['areas']['articles']['components'][1]['bindingSources'] );
+check( 'section metadata must declare every Elements-Area binding source', throwsInvalidArgument( fn() => \Nino\Templates\Composer::compose( $missingArticleSources ) ) );
 
 $sharedActionInput = $articleInput;
 $sharedActionInput['id'] = 'shared-action';
@@ -432,10 +424,9 @@ check( 'a fixed background writes a plain image tag and requests no image slot',
 	&& str_contains( $fixedBackground['source'], '[image ' ) === false );
 check( 'the fixed background choice round-trips through the section metadata', ( $fixedBackground['spec']['frame']['backgroundImageSource'] ?? '' ) === 'fixed'
 	&& \Nino\Templates\Composer::compose( $fixedBackground['spec'] )['source'] === $fixedBackground['source'] );
-$legacyBackgroundInput = $backgroundInput;
-unset( $legacyBackgroundInput['frame']['backgroundImageSource'] );
-$legacyBackground = \Nino\Templates\Composer::compose( $legacyBackgroundInput );
-check( 'older section metadata without a background source keeps inferring its slot', str_contains( $legacyBackground['source'], '[image /shared/hero-image alt=""]' ) );
+$missingBackgroundSource = $backgroundInput;
+unset( $missingBackgroundSource['frame']['backgroundImageSource'] );
+check( 'a supplied background value requires its explicit source', throwsInvalidArgument( fn() => \Nino\Templates\Composer::compose( $missingBackgroundSource ) ) );
 $rejectsBackground = function( string $source, string $value ) use ( $backgroundInput ): bool {
 	$input = $backgroundInput;
 	$input['frame']['backgroundImageSource'] = $source;
@@ -456,6 +447,7 @@ $templateInput = \Nino\Templates\AreaComposer::defaults( $presets['articles-grid
 $templateInput['areas']['action']['components'][] = [
 	'id' => 'form', 'type' => 'template', 'style' => 'auto', 'settings' => [ 'target' => 'same' ],
 	'bindings' => [ 'path' => '/templates/contact-form' ],
+	'bindingSources' => [ 'path' => 'template' ],
 ];
 $templateSection = \Nino\Templates\Composer::compose( $templateInput );
 check( 'Template is an ordered Area input rather than a gallery pseudo-section', str_contains( $templateSection['source'], '[template /templates/contact-form]' ) );
@@ -509,18 +501,20 @@ check( 'the Builder, the presets and the design system carry no legacy class pre
 check( 'the filter wrapper carries the layout rule its nested cards depend on', preg_match( '/\.nino-filter\s*\{[^}]*display:\s*flex/', (string) file_get_contents( __DIR__. '/../_nino/Nino.css' ) ) === 1 );
 check( 'a component step is a modifier of whichever class the preset gave it', str_contains( \Nino\Templates\Composer::compose( array_merge(
 	\Nino\Templates\AreaComposer::defaults( $presets['fullscreen-image'], 'home', 'loud-hero' ),
-	[ 'areas' => [ 'content' => [ 'components' => [ [ 'id' => 'title', 'type' => 'title', 'style' => 'loud', 'bindings' => [ 'text' => 'title' ] ] ] ] ] ]
+	[ 'areas' => [ 'content' => [ 'components' => [ [ 'id' => 'title', 'type' => 'title', 'style' => 'loud', 'bindings' => [ 'text' => 'title' ], 'bindingSources' => [ 'text' => 'new' ] ] ] ] ] ]
 ) )['source'], '<h2 class="nino-atf-title nino-atf-title--loud"' )
 	&& str_contains( \Nino\Templates\Composer::compose( array_merge(
 		\Nino\Templates\AreaComposer::defaults( $presets['content-section'], 'home', 'loud-copy' ),
-		[ 'areas' => [ 'heading' => [ 'components' => [ [ 'id' => 'title', 'type' => 'title', 'style' => 'loud', 'bindings' => [ 'text' => 'title' ] ] ] ] ] ]
+		[ 'areas' => [ 'heading' => [ 'components' => [ [ 'id' => 'title', 'type' => 'title', 'style' => 'loud', 'bindings' => [ 'text' => 'title' ], 'bindingSources' => [ 'text' => 'new' ] ] ] ] ] ]
 	) )['source'], '<h2 class="nino-section-title nino-section-title--loud"' )
 	&& \Nino\Templates\AreaComposer::catalog()['description']['styles'] === [ 'auto', 'quiet', 'loud' ]
 	&& str_contains( json_encode( $presets ), 'nino-font-big' ) === false );
 check( 'the scrim is one choice per image layer rather than three levels of its own', \Nino\Templates\AreaComposer::choices()['overlay'] === [ 'auto', 'none', 'dim' ] );
-check( 'metadata written against the old three-level overlay still composes', str_contains( \Nino\Templates\Composer::compose( [
-	'preset' => 'fullscreen-image', 'pageId' => 'home', 'id' => 'legacy-overlay', 'frame' => [ 'overlay' => 'strong' ],
-] )['source'], 'nino-cover--dim' ) );
+check( 'the shipped image presets use that current overlay vocabulary directly', ( include __DIR__. '/../_templates/library/fullscreen-image/manifest.php' )['recommend']['frame']['overlay'] === 'dim'
+	&& ( include __DIR__. '/../_templates/library/image-banner/manifest.php' )['recommend']['frame']['overlay'] === 'dim' );
+check( 'overlay values outside the current vocabulary are rejected', throwsInvalidArgument( fn() => \Nino\Templates\Composer::compose( [
+	'preset' => 'fullscreen-image', 'pageId' => 'home', 'id' => 'invalid-overlay', 'frame' => [ 'overlay' => 'strong' ],
+] ) ) );
 check( 'every preset card is measured against the same preview viewport', array_filter( $presets, fn( array $preset ): bool => isset( $preset['previewHeight'] ) ) === [] );
 
 $timeline = \Nino\Templates\Composer::compose( [ 'preset' => 'process-timeline', 'pageId' => 'home', 'id' => 'process' ] );
@@ -542,7 +536,10 @@ check( 'its intro stays an ordinary textfill Area while the outro renders nothin
 	&& preg_match( '/\n[\t ]*\n/', $staticTable['source'] ) !== 1 );
 $staticOutro = \Nino\Templates\Composer::compose( [
 	'preset' => 'static-table', 'pageId' => 'home', 'id' => 'hours',
-	'areas' => [ 'outro' => [ 'components' => [ [ 'id' => 'action', 'type' => 'button', 'style' => 'primary' ] ] ] ],
+	'areas' => [ 'outro' => [ 'components' => [ [
+		'id' => 'action', 'type' => 'button', 'style' => 'primary',
+		'bindings' => [ 'label' => '', 'href' => '' ], 'bindingSources' => [ 'label' => 'new', 'href' => 'new' ],
+	] ] ] ],
 ] );
 check( 'and carries a closing action as soon as the outro gets one', str_contains( $staticOutro['source'], 'nino-mt-3' )
 	&& str_contains( $staticOutro['source'], '[[/page-home/hours/action-label]]' ) );
@@ -694,15 +691,15 @@ $loaded = $loadRequest['/nino/http/response']['body'];
 
 check( 'loads lossless segments with an optimistic revision', count( $loaded['segments'] ) >= 4 && strlen( $loaded['revision'] ) === 64 );
 check( 'loads a valid page as editable', $loaded['readonly'] === null );
-check( 'legacy templates receive a stable fallback display name and VPA', $loaded['displayName'] === 'Home' && $loaded['pageMotion'] === 'on' );
+check( 'an unmarked hand-written template receives a stable display name and inherited VPA', $loaded['displayName'] === 'Home' && $loaded['pageMotion'] === 'on' );
 $loadedSlots = array_values( array_filter( $loaded['segments'], fn( array $segment ): bool => $segment['type'] === 'slot' ) );
-check( 'promotes an exact legacy html-header/html-footer frame into fixed settings slots', count( $loadedSlots ) === 2 && $loadedSlots[0]['slot'] === 'header' && $loadedSlots[1]['slot'] === 'footer' );
+check( 'recognizes an exact html-header/html-footer frame as fixed settings slots', count( $loadedSlots ) === 2 && $loadedSlots[0]['slot'] === 'header' && $loadedSlots[1]['slot'] === 'footer' );
 
 post( [ 'name' => 'page-home', 'revision' => $loaded['revision'], 'segments' => $loaded['segments'] ] );
 $roundTripRequest = response();
 \Nino\Templates\Documents::apiSave( $appData, $roundTripRequest );
 check( 'saving untouched segments succeeds', $roundTripRequest['/nino/http/response']['statusCode'] === 200 );
-check( 'the first deliberate save adds inert markers around legacy shell includes', str_contains( (string) file_get_contents( $sandbox. '/private/templates/page-home.tpl' ), '<!-- nino:template-slot header -->' )
+check( 'the first deliberate save adds inert markers around recognized shell includes', str_contains( (string) file_get_contents( $sandbox. '/private/templates/page-home.tpl' ), '<!-- nino:template-slot header -->' )
 	&& str_contains( (string) file_get_contents( $sandbox. '/private/templates/page-home.tpl' ), '<!-- nino:template-slot footer -->' )
 	&& str_starts_with( (string) file_get_contents( $sandbox. '/private/templates/page-home.tpl' ), "<!-- nino:template-name Home -->\n<!-- nino:template-vpa on -->\n" ) );
 $loaded['revision'] = $roundTripRequest['/nino/http/response']['body']['revision'];
@@ -798,6 +795,10 @@ post( [ 'filename' => 'page-services.tpl', 'displayName' => 'Duplicate' ] );
 $duplicateCreateRequest = response();
 \Nino\Templates\Documents::apiCreate( $appData, $duplicateCreateRequest );
 check( 'refuses to overwrite an existing page template', $duplicateCreateRequest['/nino/http/response']['statusCode'] === 409 );
+post( [ 'id' => 'page-old-field', 'displayName' => 'Missing filename' ] );
+$missingFilenameRequest = response();
+\Nino\Templates\Documents::apiCreate( $appData, $missingFilenameRequest );
+check( 'requires the current filename field when creating a template', $missingFilenameRequest['/nino/http/response']['statusCode'] === 400 );
 post( [ 'filename' => '../unsafe.tpl', 'displayName' => 'Unsafe' ] );
 $invalidCreateRequest = response();
 \Nino\Templates\Documents::apiCreate( $appData, $invalidCreateRequest );

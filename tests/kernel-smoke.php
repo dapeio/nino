@@ -1961,15 +1961,15 @@ check( 'router.php refuses the private root', str_contains( $routerSource, '#^/p
 check( '...before it ever looks for a static file', strpos( $routerSource, '/private' ) < strpos( $routerSource, 'is_file( __DIR__. $uri )' ) );
 
 check( 'the shared appearance library exposes only its deliberate theme previews',
-	str_contains( $routerSource, '#^/library(?:/|$)#' ) === true
-	&& str_contains( $routerSource, '#^/library/themes/[a-z0-9][a-z0-9-]*/preview\\.svg$#' ) === true );
-check( '...and refuses its source before static-file delivery', strpos( $routerSource, '#^/library(?:/|$)#' ) < strpos( $routerSource, 'is_file( __DIR__. $uri )' ) );
+	str_contains( $routerSource, '#^/_install/library(?:/|$)#' ) === true
+	&& str_contains( $routerSource, '#^/_install/library/themes/[a-z0-9][a-z0-9-]*/preview\\.svg$#' ) === true );
+check( '...and refuses its source before static-file delivery', strpos( $routerSource, '#^/_install/library(?:/|$)#' ) < strpos( $routerSource, 'is_file( __DIR__. $uri )' ) );
 
 check( 'the shipped private directory denies itself for a webserver that does apply it', str_contains(
 	(string) @file_get_contents( __DIR__. '/../private/.htaccess' ), 'Require all denied'
 ) === true );
 check( 'the shared appearance library ships the matching Apache protection', str_contains(
-	(string) @file_get_contents( __DIR__. '/../library/.htaccess' ), '^(?!preview\\.svg$)'
+	(string) @file_get_contents( __DIR__. '/../_install/library/.htaccess' ), '^(?!preview\\.svg$)'
 ) === true );
 
 // Nothing private may sit in the public root of a fresh checkout

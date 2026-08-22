@@ -57,6 +57,13 @@ check( 'a switch states its condition in words, not by knob position alone',
 check( 'Config renders booleans with that shared switch', configSource.includes('Nino.adminUi.switchField(') );
 check( 'Config relies on fieldset\'s own shared surface instead of applying card padding twice', configSource.includes( "fieldset.className = 'nino-admin-card'" ) === false );
 check( 'Config uses only the shared pinned action bar for its single Save', configSource.includes( "'nino-admin-actionbar'" ) && configSource.includes( 'editor-form-actions' ) === false );
+check( 'Config exposes the explicit full search-index rebuild action',
+	configSource.includes( "searchBtn.textContent = 'Create searchindex'" ) &&
+	configSource.includes( "_apiCall( 'searchindex'" ) );
+check( 'the search-index action has loading, empty and success feedback',
+	configSource.includes( 'Creating search indexes …' ) &&
+	configSource.includes( 'No search indexes are configured.' ) &&
+	configSource.includes( "'Created '+ response.created" ) );
 check( 'Config keeps its in-flow locale adder separate from fixed list actions', configSource.includes( "adderRow.className = 'admin-config-locale-adder'" ) && configSource.includes( "adderRow.className = 'nino-admin-list-actions'" ) === false );
 check( 'Config lays out the locale input and its Add button as one in-flow row',
 	/#admin-page-wrap \.admin-config-locale-adder \{[^}]*display: grid;[^}]*grid-template-columns: minmax\(0, 1fr\) auto;/s.test( asset('style.css') ) );
@@ -218,6 +225,12 @@ Object.keys( TOOL_TEMPLATES ).forEach( function( tool ) {
 		check( file+ ' links the shared design system', markup.includes('_nino/Nino.admin.css') );
 	} );
 } );
+
+const editorHeader = read('_editor/templates/html-header.tpl');
+check( 'the Editor document shell uses current HTML without IE conditionals', /^<!doctype html>\s*<html lang="\[\[\/website\/lang\]\]">/.test( editorHeader )
+	&& editorHeader.includes('X-UA-Compatible') === false
+	&& editorHeader.includes('<!--[if ') === false
+	&& editorHeader.includes('http-equiv="Content-Type"') === false );
 
 // _editor used to ship a second copy of every design token and base control, in
 // the same cascade layer as the design system but linked before it - so the copy

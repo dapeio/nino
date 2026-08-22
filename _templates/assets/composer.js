@@ -304,7 +304,7 @@
 			Promise.all( [ pd.sectionsUI.ensureTypes(), pd.sectionsUI.ensureImages(), pd.api( 'content/keys', {} ) ] ).then( function( responses ) {
 				pd.composer._textEntries = responses[2].entries || [];
 				if( pd.areaComposer )
-					pd.areaComposer.normalizeExistingSources();
+					pd.areaComposer.reconcileAvailableCollections();
 				if( pd.composer._context === activeContext && pd.composer._step === 'config' )
 					pd.composer.renderSettings();
 			} ).catch( function() {} );

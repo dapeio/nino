@@ -500,6 +500,7 @@ Modules are activated in `/nino/modules`. The order of the array is relevant if 
 | `Localepicker` | `[localepicker ...]` | switches locale via query and redirect |
 | `Navigation` | `[navigation ...]` | renders navigations from a compact line syntax |
 | `Newsletter` | POST/GET under `/.newsletter` | double opt-in, confirmation, and unsubscribe without public address disclosure |
+| `Search` | `Search::getElements()` | searches configured Element fields through a small locale-aware fuzzy index |
 | `Template` | `[template /path/name]` | loads the raw content of a `.tpl` file; the common render pipeline processes it further |
 
 Some details are deliberately defensive:
@@ -507,6 +508,71 @@ Some details are deliberately defensive:
 - The form limits inputs, protects write operations, and discards old log months.
 - The public newsletter signup responds independently of whether an address is new or already known. This makes it harder to query foreign addresses.
 - `Jstext` uses JSON hex escaping and adds a random nonce to the Content Security Policy.
+
+### Elements Search Index
+
+`Modules\Search` is an opt-in developer feature and is not selected by
+`/_install`. Activate and configure it directly in `config.php`:
+
+```php
+return [
+    '/nino/modules' => [
+        // other modules ...
+        '\\Nino\\Modules\\Search',
+    ],
+
+    '/nino/elements/index' => [
+        'articles' => [
+            0 => 'title',
+            1 => 'summary',
+            2 => 'keywords',
+            3 => 'author',
+        ],
+    ],
+];
+```
+
+The outer key is one flat Element type, with or without its leading slash. The
+inner keys are the four ranking priorities: `0` is strongest, `3` is weakest,
+and each priority names one field from that type's current model. Invalid
+types, priorities, and field names are ignored.
+
+Activation registers the post-commit Elements callback but creates no file on
+its own. Use **Create searchindex** under `/_admin` → **Config** for the initial
+build. Every press recreates every valid configured index. Afterwards, every
+successful insert, update, or delete of a configured type recreates that one
+type after the Element file has committed. A type `articles` is stored as the
+single derived file `/data/index-articles.php` (normally
+`private/data/index-articles.php`), grouped by locale.
+
+The index deliberately has no signature, revision, or sidecar lock and is
+rewritten directly and non-atomically as a complete PHP array. Reads are
+strictly read-only: a missing or malformed file returns no hits and is not
+repaired. Press the Admin
+button to recreate all indexes after configuration changes, manual Element-file
+edits, or an interrupted index write. The generated files contain normalized
+search text, are not source content, and do not belong in an installer package.
+
+Project code searches the current locale and receives the complete canonical
+Elements in score order:
+
+```php
+$hits = \Nino\Modules\Search::getElements(
+    $appData,
+    'articles',
+    (string) ( $_GET['q'] ?? '' )
+);
+```
+
+The search is case-insensitive, strips markup, decodes entities, flattens text
+and number values from arrays, and rewrites `ä`, `ö`, `ü`, and `ß` as `ae`,
+`oe`, `ue`, and `ss` — so typing "Strasse" also finds "Straße". Each query
+word must match. Exact, prefix, and substring matches are preferred; other
+words use a length-dependent Unicode-bigram similarity. Field priorities
+affect ranking, exact phrases receive an additional bonus, and equal scores
+are ordered by Element URI. Work is bounded to 256 query characters and the
+first 12 unique tokens. Empty queries, unknown or unconfigured types,
+missing locale data, and unreadable indexes return `[]`.
 
 ---
 
@@ -721,9 +787,11 @@ Nino uses standalone smoke tests without PHPUnit. Each test creates an isolated 
 | Test | Focus |
 | --- | --- |
 | `tests/kernel-smoke.php` | Kernel, routing, rendering, auth, filesystem, and modules |
+| `tests/search-smoke.php` | Elements search activation, index lifecycle, fuzzy ranking, locales, and Admin rebuild action |
 | `tests/editor-smoke.php` | Editor routes, permissions, backups, logs, and content operations |
 | `tests/admin-smoke.php` | Admin authentication and technical management functions |
 | `tests/install-smoke.php` | Installation steps, generated structure, and self-lock |
+| `tests/theme-smoke.php` | generated Design values and authenticated Theme/Header/Footer operations |
 | `tests/templates-smoke.php` | section composition, template includes, lossless page frames, content quick fill, and save conflicts |
 | `tests/*-js-smoke.js` | browser-like logic of management interfaces and template builder |
 | `tests/concurrency-smoke.php` | parallel and atomic write operations |
@@ -732,9 +800,11 @@ Locally, they are executed individually:
 
 ```bash
 php tests/kernel-smoke.php
+php tests/search-smoke.php
 php tests/editor-smoke.php
 php tests/admin-smoke.php
 php tests/install-smoke.php
+php tests/theme-smoke.php
 php tests/templates-smoke.php
 for test in tests/*-js-smoke.js; do node "$test"; done
 php tests/concurrency-smoke.php
@@ -773,6 +843,7 @@ The following table lists the most important hooks used by the kernel and integr
 | `/nino/elements<type-uri>/update` | element type data | check modification in a type or reject with `false` |
 | `/nino/elements/delete<type-uri>` | element type data | check deletion from a type or reject with `false` |
 | `/nino/elements<type-uri>/update/uri` | element data | react to a change in element URI |
+| `/nino/elements/committed` | `{ operation, type, uri, previousUri, locale }` | notification after an Element insert, update, or delete was persisted; cannot veto the completed write |
 
 Callback names are simple strings. Still, treat the established names and argument forms like an API: A rename or changed argument type can affect every registered module.
 
