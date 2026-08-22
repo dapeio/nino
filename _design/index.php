@@ -11,11 +11,11 @@ declare(strict_types=1);
 
 require '../_nino/Nino.php';
 require '../_admin/Admin.php';
-require 'Theme.php';
+require 'Design.php';
 
 $appData = \Nino\init();
 \Nino\Admin\Admin::init( $appData );
-\Nino\Theme\Theme::init( $appData );
+\Nino\Design\Design::init( $appData );
 
 $request = \Nino\request( $appData, $_SERVER );
 \Nino\output( $appData, $request );

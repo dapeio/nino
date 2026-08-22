@@ -1725,7 +1725,7 @@ code {
 
 /* Above the breakpoint the head rail and the template list stop being two
    separate panels and read as one sidebar. The dimensions below deliberately
-   reproduce /_admin and /_theme's shared rail head: keeping only the pills
+   reproduce /_admin and /_design's shared rail head: keeping only the pills
    shared still left this menu visibly narrower and more cramped. */
 
 @media (min-width: 58.001rem) {

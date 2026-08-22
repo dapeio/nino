@@ -5,7 +5,7 @@
 	'stylesheet' 	=> '/assets/style.theme.rail.css',
 	'header' 			=> 'v6',
 	'footer' 			=> 'v2',
-	// What /_theme starts this look from. The stylesheet assigns roles to the
+	// What /_design starts this look from. The stylesheet assigns roles to the
 	// --nino-* tokens these settings generate, so the theme survives whatever
 	// the operator picks here afterwards - including a different brand colour
 	'design' 			=> [

@@ -70,7 +70,7 @@ const nodes = {};
 
 const posted = [];
 
-// What /_theme really returns for these settings, so the specimen is checked
+// What /_design really returns for these settings, so the specimen is checked
 // against the shape it actually gets rather than one invented here
 const previewResponse = {
 	palette : { light : {
@@ -213,7 +213,7 @@ check( 'Next writes the settings, colour and size together', applied === true
 	&& applyPost.payload.design.shaping === 'sharp'
 	&& applyPost.payload.design.volume === 'compact' );
 
-// A delivery without /_theme has to step aside, not block the wizard
+// A delivery without /_design has to step aside, not block the wizard
 nodes['design-controls'].classList.remove('install-hidden');
 readResponse = { settings : null, choices : {} };
 design.showCurrent();

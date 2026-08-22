@@ -6,7 +6,7 @@ All notable changes to Nino are documented in this file.
 
 ### Added
 
-- `/_admin`, `/_templates`, and `/_theme` now share one compact authenticated
+- `/_admin`, `/_templates`, and `/_design` now share one compact authenticated
   tool bridge. It derives availability from each complete tool directory in the
   delivery, omits missing or partially copied tools without another config
   switch, and exposes the current surface both visually and with
@@ -16,7 +16,7 @@ All notable changes to Nino are documented in this file.
   brand geometry, vertical rhythm, and compact-screen wrapping as Admin and
   Theme instead of placing the shared control in its former compressed topbar.
 
-- `/_theme` is now the post-install appearance workspace, with four separate
+- `/_design` is now the post-install appearance workspace, with four separate
   dialogs for Theme, Design, Header, and Footer. Theme applies a complete
   manifest baseline; Design changes only generated tokens; Header and Footer
   each preview and replace only their own template/stylesheet pair. All new
@@ -24,7 +24,7 @@ All notable changes to Nino are documented in this file.
 
   Their selectable units live below `_install/library/`
   catalogue shared with `/_install`, so removing the one-time installer no
-  longer removes the choices needed by `/_theme`. Only Theme `preview.svg`
+  longer removes the choices needed by `/_design`. Only Theme `preview.svg`
   files are public; Apache and development-router rules refuse direct access
   to the catalogue's manifests, templates, stylesheets, and font sources.
 
@@ -44,7 +44,7 @@ All notable changes to Nino are documented in this file.
   padding-top }`, which spliced into the page would land on the installer's own
   shell.
 
-- The size raster, `/_theme`'s second half. It publishes a fixed set of steps
+- The size raster, `/_design`'s second half. It publishes a fixed set of steps
   the way the palette publishes a fixed set of surfaces - `--nino-text-1` to
   `-6`, `--nino-space-1` to `-6`, `--nino-radius-1` to `-3`, `--nino-radius-full`
   and `--nino-line-height` - and a theme assigns from them instead of writing
@@ -99,10 +99,10 @@ All notable changes to Nino are documented in this file.
   Design. The step calls `Theme::write()` with either the operator's settings
   or the `design` block the picked theme's manifest declares, so picking a
   theme and pressing Next produces the look its preview promised. It has a
-  `design/preview` endpoint of its own rather than borrowing `/_theme`'s:
+  `design/preview` endpoint of its own rather than borrowing `/_design`'s:
   during an installation there is no admin password yet, so the shared session
-  that guards `/_theme` does not exist. Optional throughout - a delivery
-  shipping without `/_theme` installs exactly as before, with the Design block
+  that guards `/_design` does not exist. Optional throughout - a delivery
+  shipping without `/_design` installs exactly as before, with the Design block
   gone from the picker rather than a fatal on a missing class.
 
   Bundle order is the contract, and each pick owns one slot: `Nino.css`, the
@@ -110,7 +110,7 @@ All notable changes to Nino are documented in this file.
   styling, the project's overrides.
 - Theme stylesheets are mapping layers: every colour role is assigned to a
   `--nino-*` token rather than a literal, and every manifest declares the
-  `design` block it was drawn with. A hex in a role would be a pair `/_theme`
+  `design` block it was drawn with. A hex in a role would be a pair `/_design`
   never measured, which is the whole reason the two layers are separate.
 
   Catalogue tests now validate all eight manifests and both frame references,
@@ -126,7 +126,7 @@ All notable changes to Nino are documented in this file.
   suite rather than being mistaken for a fully solved pair, pending a role
   split in Nino.css itself.
 
-- `/_theme`, the generated design layer. It owns the colour tokens every
+- `/_design`, the generated design layer. It owns the colour tokens every
   stylesheet reads from - `var(--nino-alt)` for a surface, `var(--nino-on-alt)`
   for the text on it - and solves them from four settings: a primary colour, an
   optional secondary, a Contrast step and a Colours step. Shares `/_admin`'s
@@ -615,6 +615,22 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- The appearance tool moved from `/_theme` to `/_design`, together with its
+  directory, its `Nino\Design` namespace, its docs, and its smoke tests. The
+  name follows what the tool can always do: Design generates the palette and
+  the raster and needs no catalogue, while Theme, Header, and Footer only
+  offer variants for as long as `_install/library/` is deployed.
+
+  The classes moved with it. `Nino\Design\Design` is the tool, matching
+  `Admin\Admin` and `Install\Install`; the token generator that used to be
+  `Theme\Design` is now `Nino\Design\Tokens`; `Appearance` keeps its name.
+  The four dialogs are still called Theme, Design, Header, and Footer - the
+  Theme dialog does pick a theme.
+
+  A deployment that kept `_theme/` has to replace that directory; the
+  persisted `/nino/theme/design` settings key is deliberately unchanged, so no
+  project loses its design on the way over.
+
 - Project-owned PHP classes now resolve from `app/` by default, or from
   `NINO_APP_DIR` when that constant is defined before `_nino/Nino.php` is
   loaded. The `Nino\` namespace remains kernel-owned and resolves exclusively
@@ -861,7 +877,7 @@ All notable changes to Nino are documented in this file.
   Theme/Design/Header/Footer action is also styled as the same blue primary
   action used throughout the other authenticated tools.
 
-- The authenticated `/_theme` page now renders its CSRF field. Its frontend
+- The authenticated `/_design` page now renders its CSRF field. Its frontend
   can therefore attach the session token to `design/read`, `design/preview`,
   and `design/save` instead of having every API request rejected with 403.
 
@@ -869,7 +885,7 @@ All notable changes to Nino are documented in this file.
   knob arrived as an array or an object rather than a string. These come from
   decoded json, and php raises rather than returning false when a non-string is
   used as an array offset - `isset()` included. Reachable from the wire through
-  `/_theme`'s `design/save` and `/_install`'s `design/apply`, so it was a 500
+  `/_design`'s `design/save` and `/_install`'s `design/apply`, so it was a 500
   anybody could ask for. Found by a test written for the size knobs; the colour
   knobs had it from the start.
 

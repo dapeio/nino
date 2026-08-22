@@ -162,7 +162,7 @@ const TOOL_ROOTS = {
 	'_editor/assets/style.css'    : '#editor-page-wrap',
 	'_install/assets/style.css'   : '#install-page-wrap',
 	'_templates/assets/style.css' : '#pd-app',
-	'_theme/assets/style.css'     : '#theme-page-wrap',
+	'_design/assets/style.css'     : '#theme-page-wrap',
 };
 
 Object.keys( TOOL_ROOTS ).forEach( function( file ) {
@@ -211,7 +211,7 @@ const TOOL_TEMPLATES = {
 	'_editor'    : [ '_editor/templates/html-header.tpl' ],
 	'_install'   : [ '_install/templates/page-wizard.tpl', '_install/templates/page-locked.tpl' ],
 	'_templates' : [ '_templates/templates/page-index.tpl' ],
-	'_theme'     : [ '_theme/templates/page-index.tpl' ],
+	'_design'     : [ '_design/templates/page-index.tpl' ],
 };
 
 Object.keys( TOOL_TEMPLATES ).forEach( function( tool ) {
@@ -263,7 +263,7 @@ check( 'Admin no longer depends on the complete Editor stylesheet',
 check( 'each authenticated developer surface mounts the shared tool bridge with its own current key',
 	adminTemplate.includes('[admin-tools admin]') &&
 	read('_templates/templates/page-index.tpl').includes('[admin-tools templates]') &&
-	read('_theme/templates/page-index.tpl').includes('[admin-tools theme]') );
+	read('_design/templates/page-index.tpl').includes('[admin-tools design]') );
 
 check( 'the shared tile is a complete surface rather than a spacing-only refinement',
 	/:where\(\.nino-admin\) \.nino-admin-tile \{[^}]*display: flex;[^}]*border: 1px solid[^}]*background: var\(--editor-bg-elevated\);[^}]*color: var\(--editor-text\);/s.test( shared ) );

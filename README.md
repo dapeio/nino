@@ -131,7 +131,7 @@ _editor/         Content editor, users, backups, activity log
 _admin/          Developer tools and restoration
 _install/        Setup wizard
 _templates/      Section-first Template Builder
-_theme/          Theme, Design, Header, and Footer editor
+_design/          Theme, Design, Header, and Footer editor
 
 elements/        Element types
 templates/       Page and section templates
@@ -151,7 +151,7 @@ php tests/kernel-smoke.php
 php tests/admin-smoke.php
 php tests/editor-smoke.php
 php tests/install-smoke.php
-php tests/theme-smoke.php
+php tests/design-smoke.php
 php tests/templates-smoke.php
 for test in tests/*-js-smoke.js; do node "$test"; done
 php tests/concurrency-smoke.php
@@ -170,7 +170,7 @@ Nino deliberately keeps its architecture small: a central `$appData` array carri
 * **[`/_admin` Manual](docs/_admin.md):** project structure, content, accounts, configuration, and restoration
 * **[`/_templates` Manual](docs/_templates.md):** composing page templates from complete HTML and template sections
 * **[`/_editor` Manual](docs/_editor.md):** texts, elements, images, submissions, and newsletters
-* **[`/_theme` Manual](docs/_theme.md):** post-install Theme, Design, Header, and Footer editing
+* **[`/_design` Manual](docs/_design.md):** post-install Theme, Design, Header, and Footer editing
 * **[Deployment](docs/deployment.md):** web server, security, backups, and go-live
 * **[Design Manual](docs/design.md):** frontend, design system, CSS, and template work **(WIP)**
 * **[Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md):** security reports and supported versions

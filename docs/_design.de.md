@@ -1,19 +1,19 @@
-# `/_theme` — Bedienungsanleitung
+# `/_design` — Bedienungsanleitung
 
-**Sprache:** [English](_theme.md) · Deutsch
+**Sprache:** [English](_design.md) · Deutsch
 
 **Letzte Aktualisierung:** 22. August 2026 · **Nino-Version:** 0.11.0-beta.1
 
-Diese Anleitung erklärt die vier Darstellungsdialoge unter `/_theme`: Theme, Design, Header und Footer. Der strukturelle Seitenaufbau ist in der [`/_templates`-Bedienung](_templates.de.md) beschrieben, die tägliche Inhaltspflege in der [`/_editor`-Bedienung](_editor.de.md).
+Diese Anleitung erklärt die vier Darstellungsdialoge unter `/_design`: Theme, Design, Header und Footer. Der strukturelle Seitenaufbau ist in der [`/_templates`-Bedienung](_templates.de.md) beschrieben, die tägliche Inhaltspflege in der [`/_editor`-Bedienung](_editor.de.md).
 
 **Weiterführende Links:**
-[README](../README.de.md) · [Grundkonzepte](concepts.de.md) · [Entwickler-Handbuch](development.de.md) · [Erste Schritte](getting-started.de.md) · [`/_install`-Referenz](_install.de.md) · [`/_admin`-Bedienung](_admin.de.md) · [`/_templates`-Bedienung](_templates.de.md) · [`/_editor`-Bedienung](_editor.de.md) · [`/_theme`-Bedienung](_theme.de.md) · [Deployment](deployment.de.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
+[README](../README.de.md) · [Grundkonzepte](concepts.de.md) · [Entwickler-Handbuch](development.de.md) · [Erste Schritte](getting-started.de.md) · [`/_install`-Referenz](_install.de.md) · [`/_admin`-Bedienung](_admin.de.md) · [`/_templates`-Bedienung](_templates.de.md) · [`/_editor`-Bedienung](_editor.de.md) · [`/_design`-Bedienung](_design.de.md) · [Deployment](deployment.de.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
 
-**Sicherheit:** `/_theme` nutzt dieselbe Anmeldung, dasselbe Passwort, denselben Sperrstatus und dieselbe Sitzung wie `/_admin`. Wird `_admin/` aus einer Auslieferung entfernt, steht auch `/_theme` nicht zur Verfügung.
+**Sicherheit:** `/_design` nutzt dieselbe Anmeldung, dasselbe Passwort, denselben Sperrstatus und dieselbe Sitzung wie `/_admin`. Wird `_admin/` aus einer Auslieferung entfernt, steht auch `/_design` nicht zur Verfügung.
 
-## Wofür `/_theme` da ist
+## Wofür `/_design` da ist
 
-`/_theme` hält die vier Darstellungsentscheidungen der Seite bearbeitbar, nachdem der einmalige Installer entfernt wurde:
+`/_design` hält die vier Darstellungsentscheidungen der Seite bearbeitbar, nachdem der einmalige Installer entfernt wurde:
 
 - **Theme** wählt einen vollständigen visuellen Ausgangspunkt und installiert sein Stylesheet, seine Schriften sowie die empfohlenen Werte für Design, Header und Footer.
 - **Design** ändert ausschließlich die erzeugte Farbpalette und das Größenraster.
@@ -22,11 +22,11 @@ Diese Anleitung erklärt die vier Darstellungsdialoge unter `/_theme`: Theme, De
 
 Das Anwenden eines Themes ist bewusst umfassend: Es setzt die drei folgenden Entscheidungen auf die Empfehlungen des gewählten Manifests zurück. Design, Header und Footer arbeiten dagegen bewusst schmal, sodass das Festlegen eines Bereichs weder das Theme erneut anwendet noch einen der anderen Bereiche verändert.
 
-Der Design-Teil bleibt auf gemessenen Paaren aufgebaut. Ein Stylesheet fragt eine Farbe über ihren Namen an — `var(--nino-alt)` für einen Abschnittshintergrund, `var(--nino-on-alt)` für den Text darauf — und `/_theme` berechnet den Wert und prüft seinen Kontrast vor dem Schreiben.
+Der Design-Teil bleibt auf gemessenen Paaren aufgebaut. Ein Stylesheet fragt eine Farbe über ihren Namen an — `var(--nino-alt)` für einen Abschnittshintergrund, `var(--nino-on-alt)` für den Text darauf — und `/_design` berechnet den Wert und prüft seinen Kontrast vor dem Schreiben.
 
 ## Anmeldung und Oberfläche
 
-Öffnen Sie `https://ihre-domain.example/_theme` und melden Sie sich mit dem `/_admin`-Passwort an. Oben in der Seitenleiste steht die gemeinsame Brücke **Admin / Builder / Theme**; sie enthält nur die vollständig ausgelieferten Werkzeuge und kennzeichnet **Theme** als aktuelle Oberfläche. Darunter öffnet die Navigation vier unabhängige Dialoge. Die feste Aktionsschaltfläche wechselt mit dem aktiven Dialog zwischen **Apply Theme**, **Save Design**, **Apply Header** und **Apply Footer**.
+Öffnen Sie `https://ihre-domain.example/_design` und melden Sie sich mit dem `/_admin`-Passwort an. Oben in der Seitenleiste steht die gemeinsame Brücke **Admin / Builder / Design**; sie enthält nur die vollständig ausgelieferten Werkzeuge und kennzeichnet **Design** als aktuelle Oberfläche. Darunter öffnet die Navigation vier unabhängige Dialoge. Die feste Aktionsschaltfläche wechselt mit dem aktiven Dialog zwischen **Apply Theme**, **Save Design**, **Apply Header** und **Apply Footer**.
 
 Theme zeigt den verfügbaren Katalog als Karten. Header und Footer besitzen jeweils eine Auswahl und ein hohes, gesandboxtes Vorschau-Iframe aus dem echten Frame-Template, dem aktiven Theme und dem gespeicherten Design. Das Iframe ist inert und kann keine Skripte einer Variante ausführen.
 
@@ -34,7 +34,7 @@ Design bietet Primär, optionale Sekundärfarbe, Kontrast, Farben, Volume, Spaci
 
 ## Gemeinsame Darstellungs-Library
 
-`/_install` und `/_theme` lesen denselben dauerhaften Katalog in der Projektwurzel:
+`/_install` und `/_design` lesen denselben dauerhaften Katalog in der Projektwurzel:
 
 | Pfad | Vertrag der Einheit |
 |---|---|
@@ -72,7 +72,7 @@ Die Statusfarben ignorieren diese Einstellung. Rot muss rot bleiben, damit die M
 
 ## Das Größenraster
 
-Dieselbe Trennung, auf Größen angewandt: `/_theme` veröffentlicht einen festen Satz Stufen, das Theme entscheidet, welche Stufe eine Komponente nutzt. Nummeriert statt benannt, denn eine Größe hat keine eigene Bedeutung — `--nino-space-3` ist eine Stufe, `--nino-alt` eine Fläche.
+Dieselbe Trennung, auf Größen angewandt: `/_design` veröffentlicht einen festen Satz Stufen, das Theme entscheidet, welche Stufe eine Komponente nutzt. Nummeriert statt benannt, denn eine Größe hat keine eigene Bedeutung — `--nino-space-3` ist eine Stufe, `--nino-alt` eine Fläche.
 
 | Token | Stufen |
 |---|---|
@@ -133,7 +133,7 @@ Praktisch bedeutet das: derselbe Token-Name liefert in allen drei Zuständen den
 
 ## Wo die Datei landet
 
-`/_theme` schreibt `/assets/style.design.css` und setzt sie im CSS-Bundle unmittelbar hinter `_nino/Nino.css`:
+`/_design` schreibt `/assets/style.design.css` und setzt sie im CSS-Bundle unmittelbar hinter `_nino/Nino.css`:
 
 ```
 _nino/Nino.css            Framework
@@ -150,11 +150,11 @@ Die Reihenfolge ist die Regel, die das Ganze trägt: Design liefert die Werte, d
 
 ## Woher die Einstellungen kommen
 
-Der Theme-Schritt in `/_install` oder der Theme-Dialog in `/_theme` schreibt zuerst den Ausgangspunkt aus dem `design`-Block, mit dem das gewählte Theme gezeichnet wurde. Der unabhängige Design-Dialog speichert danach die Auswahl der Bedienung. Alle Wege verwenden dasselbe `Theme::write()` - also einen Generator und ein Stylesheet, nicht getrennte Installations- und Laufzeitkopien.
+Der Theme-Schritt in `/_install` oder der Theme-Dialog in `/_design` schreibt zuerst den Ausgangspunkt aus dem `design`-Block, mit dem das gewählte Theme gezeichnet wurde. Der unabhängige Design-Dialog speichert danach die Auswahl der Bedienung. Alle Wege verwenden dasselbe `Theme::write()` - also einen Generator und ein Stylesheet, nicht getrennte Installations- und Laufzeitkopien.
 
 ## Die Darstellung später ändern
 
-`/_theme` bleibt nach der Installation verfügbar. Ein laufendes Projekt umzufärben heißt, Design zu ändern und zu speichern; ein anderer Header oder Footer kopiert nur die beiden Dateien dieses Frames. Keine dieser Änderungen benötigt eine Neuinstallation oder Inhaltsmigration.
+`/_design` bleibt nach der Installation verfügbar. Ein laufendes Projekt umzufärben heißt, Design zu ändern und zu speichern; ein anderer Header oder Footer kopiert nur die beiden Dateien dieses Frames. Keine dieser Änderungen benötigt eine Neuinstallation oder Inhaltsmigration.
 
 Ein anderes Theme anzuwenden ist der bewusste Reset. Dabei werden die vom neuen Manifest benannten Dateien überschrieben, das Theme-Stylesheet im Bundle ersetzt und die empfohlenen Design- und Frame-Werte geschrieben. Dateien, die nur ein vorheriges Theme mitgebracht hat, bleiben bestehen. Sichern Sie projektspezifische Änderungen in Git, bevor Sie ein Theme erneut anwenden.
 
@@ -168,8 +168,8 @@ Ein anderes Theme anzuwenden ist der bewusste Reset. Dabei werden die vom neuen 
 | `style.design.css` verliert manuelle Änderungen | Die Datei wird erzeugt. Nutzen Sie `assets/style.css`. |
 | Theme, Header oder Footer meldet, dass keine Varianten verfügbar sind | `_install/` wurde entfernt oder sein Katalog ist unvollständig. Das ist nach dem empfohlenen Deployment der Normalfall. Zum Umschalten `_install/` aus derselben Nino-Version gesperrt wieder ausliefern. |
 | Eine Frame-Vorschau unterscheidet sich von der Live-Seite | Die Vorschau nutzt vorhandene installierte Includes und Texte, bleibt aber ein inertes Einzel-Frame-Dokument. Für Request-abhängige Modulausgabe das angewendete Template auf der vollständigen Seite prüfen. |
-| Nach dem Laden der Regler erscheint `(403) Request failed.` | Der CSRF-Token der Seite ist veraltet, meist nach Anmeldung, Abmeldung, Sitzungswechsel oder Deployment. `/_theme` neu laden; falls nötig erneut über `/_admin` anmelden. |
-| `/_theme` zeigt wiederholt die Anmeldeseite | Gemeinsame `/_admin`-Sitzung. `/_admin`-Anmeldung und eine mögliche Sperre prüfen. |
+| Nach dem Laden der Regler erscheint `(403) Request failed.` | Der CSRF-Token der Seite ist veraltet, meist nach Anmeldung, Abmeldung, Sitzungswechsel oder Deployment. `/_design` neu laden; falls nötig erneut über `/_admin` anmelden. |
+| `/_design` zeigt wiederholt die Anmeldeseite | Gemeinsame `/_admin`-Sitzung. `/_admin`-Anmeldung und eine mögliche Sperre prüfen. |
 
 ## Katalogvertrag
 

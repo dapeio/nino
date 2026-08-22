@@ -30,7 +30,7 @@ The Template Builder does not create routes, edit the contents of included heade
 
 ## Access and security
 
-Open `https://your-domain.example/_templates`. The tool shares password, lock state and session with `/_admin`. Its top rail carries the common **Admin / Builder / Theme** bridge; only complete tool directories in the current delivery appear, and **Builder** marks the current surface. It depends on `_admin/Admin.php`; removing `/_admin` also removes its authentication backend.
+Open `https://your-domain.example/_templates`. The tool shares password, lock state and session with `/_admin`. Its top rail carries the common **Admin / Builder / Design** bridge; only complete tool directories in the current delivery appear, and **Builder** marks the current surface. It depends on `_admin/Admin.php`; removing `/_admin` also removes its authentication backend.
 
 The tool writes to:
 

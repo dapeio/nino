@@ -52,11 +52,11 @@ namespace Nino\Admin {
 				'uri' => '_templates',
 				'files' => [ '_templates/index.php', '_templates/Templates.php', '_templates/templates/page-index.tpl' ],
 			],
-			'theme' => [
-				'label' => 'Theme',
+			'design' => [
+				'label' => 'Design',
 				'title' => 'Appearance',
-				'uri' => '_theme',
-				'files' => [ '_theme/index.php', '_theme/Theme.php', '_theme/templates/page-index.tpl' ],
+				'uri' => '_design',
+				'files' => [ '_design/index.php', '_design/Design.php', '_design/templates/page-index.tpl' ],
 			],
 		];
 
@@ -2192,7 +2192,7 @@ namespace Nino\Admin {
 				'type' 	=> 'bool',
 				'group'	=> 'cache',
 				'label'	=> 'Cache rendered pages',
-				'hint' 	=> 'Anonymous GET requests only, and never a page with query vars, a tool uri or a signed-in visitor. Any save in /_admin, /_editor, /_theme or /_templates drops the whole cache.',
+				'hint' 	=> 'Anonymous GET requests only, and never a page with query vars, a tool uri or a signed-in visitor. Any save in /_admin, /_editor, /_design or /_templates drops the whole cache.',
 			],
 			'/nino/cache/ttl' => [
 				'type' 	=> 'int',
@@ -4077,7 +4077,7 @@ namespace Nino\Admin {
 		// Kept in sync with _install's Webpages class. These routes are owned
 		// at runtime by the optional tools themselves and therefore do not show
 		// up in the persisted route array used for the general collision check.
-		private const array RESERVED_HTTP_URIS = [ '/_admin', '/_editor', '/_install', '/_templates', '/_theme' ];
+		private const array RESERVED_HTTP_URIS = [ '/_admin', '/_editor', '/_install', '/_templates', '/_design' ];
 
 		// A fresh entry's text fields when none was posted (or a blank one) -
 		// same generic-by-design reasoning _install/Install.php's

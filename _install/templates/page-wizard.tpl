@@ -69,8 +69,8 @@
 				</div>
 
 				<div id="install-content-design">
-					<p class="nino-admin-hint nino-admin-hint-lead">The values the theme reads from. <code>/_theme</code> generates them and this step writes them: a background is published together with the text colour that belongs on it, measured against the WCAG contrast formula, so a brand colour cannot produce unreadable text. The theme picked in the previous step fills these in with what it was drawn against, and everything stays editable under <code>/_theme</code> after the installation.</p>
-					<p id="design-unavailable" class="nino-admin-hint install-hidden">This delivery ships without <code>/_theme</code>, so there is nothing to generate here - the theme's own stylesheet decides the colours instead. Press "Next" to continue.</p>
+					<p class="nino-admin-hint nino-admin-hint-lead">The values the theme reads from. <code>/_design</code> generates them and this step writes them: a background is published together with the text colour that belongs on it, measured against the WCAG contrast formula, so a brand colour cannot produce unreadable text. The theme picked in the previous step fills these in with what it was drawn against, and everything stays editable under <code>/_design</code> after the installation.</p>
+					<p id="design-unavailable" class="nino-admin-hint install-hidden">This delivery ships without <code>/_design</code>, so there is nothing to generate here - the theme's own stylesheet decides the colours instead. Press "Next" to continue.</p>
 
 					<div id="design-controls">
 

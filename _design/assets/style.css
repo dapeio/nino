@@ -1,7 +1,7 @@
 @layer nino.system, nino.tool, nino.local;
 
 /*
- *	/_theme's local components. Shell, rail, navigation, fields, buttons and
+ *	/_design's local components. Shell, rail, navigation, fields, buttons and
  *	the fixed action bar come from Nino.admin.css; this file only owns the four
  *	appearance panes and their visual specimens.
  */
@@ -333,5 +333,5 @@
 }
 
 @layer nino.local {
-	/* Reserved for project-specific /_theme refinements. */
+	/* Reserved for project-specific /_design refinements. */
 }

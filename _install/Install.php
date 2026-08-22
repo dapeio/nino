@@ -765,11 +765,11 @@ namespace Nino\Install {
 	 *												swapped by copying two files. Picks persist at
 	 *												'/nino/install/header|footer'.
 	 *
-	 *												Design. /_theme owns the --nino-* colour tokens a theme
+	 *												Design. /_design owns the --nino-* colour tokens a theme
 	 *												stylesheet assigns to roles; the Design action calls
 	 *												Theme::write() with either the operator's settings or the
 	 *												defaults the theme's manifest declares. It is optional -
-	 *												see _designAvailable() - so a delivery without /_theme
+	 *												see _designAvailable() - so a delivery without /_design
 	 *												installs exactly as before.
 	 *
 	 *												Bundle order is the whole contract, and each of the three
@@ -784,7 +784,7 @@ namespace Nino\Install {
 	class Themes {
 
 		// Appearance units outlive the removable installer and are shared with
-		// /_theme. Installer-only base/module/page material remains below
+		// /_design. Installer-only base/module/page material remains below
 		// /_install/library and is used only to construct synthetic previews.
 		private const string LIBRARY = __DIR__. '/library/themes';
 		private const string INSTALL_LIBRARY = __DIR__. '/library';
@@ -855,7 +855,7 @@ namespace Nino\Install {
 		 *	previous step declared - plus the vocabulary its controls render
 		 *	from, so the frontend never carries a second copy of the lists.
 		 *
-		 *	Null settings rather than an empty shape when /_theme is not part
+		 *	Null settings rather than an empty shape when /_design is not part
 		 *	of this delivery: the step has to say so and step aside, not render
 		 *	controls that would post into nothing
 		 *
@@ -872,14 +872,14 @@ namespace Nino\Install {
 			}
 
 			\Nino\Http::ok( $request, [
-				'settings' 	=> \Nino\Theme\Theme::settings( $appData ),
-				'choices' 	=> \Nino\Theme\Design::choices(),
+				'settings' 	=> \Nino\Design\Design::settings( $appData ),
+				'choices' 	=> \Nino\Design\Tokens::choices(),
 			] );
 		}
 
 		/**
 		 *	Write the design the operator settled on. A delivery without
-		 *	/_theme has nothing to write and says so rather than failing - the
+		 *	/_design has nothing to write and says so rather than failing - the
 		 *	step is skippable, not broken
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
@@ -895,9 +895,9 @@ namespace Nino\Install {
 			}
 
 			$data 		= \Nino\Install\Install::postData();
-			$settings	= \Nino\Theme\Design::normalize( is_array( $data['design'] ?? null ) ? $data['design'] : [] );
+			$settings	= \Nino\Design\Tokens::normalize( is_array( $data['design'] ?? null ) ? $data['design'] : [] );
 
-			if( \Nino\Theme\Theme::write( $appData, $settings ) === false ) {
+			if( \Nino\Design\Design::write( $appData, $settings ) === false ) {
 				\Nino\Http::fail( $request, 500, 'could not write the design stylesheet' );
 				return;
 			}
@@ -1187,10 +1187,10 @@ namespace Nino\Install {
 			if( self::_designAvailable() === true ) {
 
 				$settings = is_array( $data['design'] ?? null )
-					? \Nino\Theme\Design::normalize( $data['design'] )
-					: \Nino\Theme\Theme::settings( $appData );
+					? \Nino\Design\Tokens::normalize( $data['design'] )
+					: \Nino\Design\Design::settings( $appData );
 
-				$css .= "\n". \Nino\Theme\Design::css( $settings );
+				$css .= "\n". \Nino\Design\Tokens::css( $settings );
 			}
 
 			$themeManifest = self::_readManifest( (string) ( $data['theme'] ?? '' ) );
@@ -1244,10 +1244,10 @@ namespace Nino\Install {
 		/**
 		 *	The palette a set of Design settings would produce, without
 		 *	storing anything. The knobs need immediate feedback and the colour
-		 *	maths lives in /_theme - mirroring it in javascript would be a
+		 *	maths lives in /_design - mirroring it in javascript would be a
 		 *	second implementation to keep in step.
 		 *
-		 *	/_theme has an endpoint of its own for exactly this, but it is
+		 *	/_design has an endpoint of its own for exactly this, but it is
 		 *	behind the shared /_admin session; during an installation there is
 		 *	no admin password yet, so this step cannot borrow it and asks
 		 *	Design directly instead
@@ -1265,16 +1265,16 @@ namespace Nino\Install {
 			}
 
 			$data 		= \Nino\Install\Install::postData();
-			$settings	= \Nino\Theme\Design::normalize( is_array( $data['design'] ?? null ) ? $data['design'] : [] );
+			$settings	= \Nino\Design\Tokens::normalize( is_array( $data['design'] ?? null ) ? $data['design'] : [] );
 
 			\Nino\Http::ok( $request, [
 				'settings' => $settings,
 				'palette' 	=> [
-					'light' => \Nino\Theme\Design::palette( $settings, 'light' ),
-					'dark' 	=> \Nino\Theme\Design::palette( $settings, 'dark' ),
+					'light' => \Nino\Design\Tokens::palette( $settings, 'light' ),
+					'dark' 	=> \Nino\Design\Tokens::palette( $settings, 'dark' ),
 				],
-				'raster' 	=> \Nino\Theme\Design::raster( $settings ),
-				'brand' 		=> \Nino\Theme\Design::brand( $settings ),
+				'raster' 	=> \Nino\Design\Tokens::raster( $settings ),
+				'brand' 		=> \Nino\Design\Tokens::brand( $settings ),
 			] );
 		}
 
@@ -1352,9 +1352,9 @@ namespace Nino\Install {
 			// is about to change underneath it
 			if( self::_designAvailable() === true ) {
 
-				$design = \Nino\Theme\Design::normalize( is_array( $data['design'] ?? null ) ? $data['design'] : ( is_array( $manifest['design'] ?? null ) ? $manifest['design'] : [] ) );
+				$design = \Nino\Design\Tokens::normalize( is_array( $data['design'] ?? null ) ? $data['design'] : ( is_array( $manifest['design'] ?? null ) ? $manifest['design'] : [] ) );
 
-				if( \Nino\Theme\Theme::write( $appData, $design ) === false ) {
+				if( \Nino\Design\Design::write( $appData, $design ) === false ) {
 					\Nino\Http::fail( $request, 500, 'could not write the design stylesheet' );
 					return;
 				}
@@ -1366,7 +1366,7 @@ namespace Nino\Install {
 		}
 
 		/**
-		 *	Whether /_theme is part of this delivery. Install.php is required
+		 *	Whether /_design is part of this delivery. Install.php is required
 		 *	by a tool folder that may have been stripped from a release, so
 		 *	the Design step degrades to "not offered" rather than
 		 *	to a fatal on a class that isn't there
@@ -1374,7 +1374,7 @@ namespace Nino\Install {
 		 *	@return 	bool
 		 */
 		private static function _designAvailable(): bool {
-			return class_exists( '\Nino\Theme\Theme' ) === true && class_exists( '\Nino\Theme\Design' ) === true;
+			return class_exists( '\Nino\Design\Design' ) === true && class_exists( '\Nino\Design\Tokens' ) === true;
 		}
 
 		/**
@@ -1755,7 +1755,7 @@ namespace Nino\Install {
 		// collision check against the on-disk route array alone cannot see
 		// them. A public page at one of these exact paths would hide the tool's
 		// own GET response once its authenticated/default-password gate passes.
-		private const array RESERVED_HTTP_URIS = [ '/_admin', '/_editor', '/_install', '/_templates', '/_theme' ];
+		private const array RESERVED_HTTP_URIS = [ '/_admin', '/_editor', '/_install', '/_templates', '/_design' ];
 
 		// The priority a menu membership falls back to when the entry
 		// carries no position of its own - apiApply() numbers every entry by

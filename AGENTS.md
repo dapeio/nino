@@ -122,10 +122,10 @@ Important source directories:
 | `_install/Install.php` | Installer behavior and library application |
 | `_install/library/modules/<slug>/` | Installer module packages |
 | `_install/library/pages/<slug>/` | Installable page units |
-| `_install/library/themes/<slug>/` | Appearance themes: manifest, preview, and installable assets. Setup material read by `/_install` and, while the installer is deployed, by `/_theme`; applying one copies it into the project |
+| `_install/library/themes/<slug>/` | Appearance themes: manifest, preview, and installable assets. Setup material read by `/_install` and, while the installer is deployed, by `/_design`; applying one copies it into the project |
 | `_install/library/header/<slug>/`, `_install/library/footer/<slug>/` | Interchangeable page frames: a `template.tpl` plus an optional `style.css`, no manifest. Installed as `templates/theme.header.tpl` / `theme.footer.tpl`, which the base html templates include |
-| `_theme/Theme.php` | Four-dialog appearance tool and Design engine: applies Theme/Header/Footer units, solves the token palette, writes `/assets/style.design.css`, and keeps all layers ordered in the css bundle |
-| `_theme/assets/theme.js` | `/_theme` frontend; no bundler |
+| `_design/Design.php` | Four-dialog appearance tool and Design engine: applies Theme/Header/Footer units, solves the token palette, writes `/assets/style.design.css`, and keeps all layers ordered in the css bundle |
+| `_design/assets/design.js` | `/_design` frontend; no bundler |
 | `tests/*-smoke.php` | Standalone PHP contract tests |
 | `tests/*-js-smoke.js` | Standalone Node/browser-logic tests |
 | `docs/` | Human manuals in English and German |
@@ -2881,7 +2881,7 @@ temporary project and must not rely on a previously installed working tree.
 | Editor backend | `tests/editor-smoke.php` |
 | Editor frontend | relevant `tests/editor-*-js-smoke.js` |
 | Installer behavior/library | `tests/install-smoke.php` and relevant install JS test |
-| Appearance catalogue/backend | `tests/theme-smoke.php`, plus `tests/install-smoke.php` when installer application changes |
+| Appearance catalogue/backend | `tests/design-smoke.php`, plus `tests/install-smoke.php` when installer application changes |
 | Section preset/Template Builder PHP | `tests/templates-smoke.php` |
 | Template Builder browser behavior | `tests/templates-js-smoke.js` |
 | Shared public UI slider/tabs | corresponding `tests/nino-ui-*-js-smoke.js` |
@@ -2894,7 +2894,7 @@ php tests/kernel-smoke.php
 php tests/editor-smoke.php
 php tests/admin-smoke.php
 php tests/install-smoke.php
-php tests/theme-smoke.php
+php tests/design-smoke.php
 php tests/templates-smoke.php
 for test in tests/*-js-smoke.js; do node "$test"; done
 php tests/concurrency-smoke.php

@@ -7,7 +7,7 @@
 This manual explains the architecture of Nino and the interaction of configuration, data, templates, and modules. If you instead want to set up a website directly, start with [Getting Started](getting-started.md); concrete APIs and implementation details are in the [Developer Manual](development.md).
 
 **Additional Links:**
-[README](../README.md) · [Concepts](concepts.md) · [Developer Manual](development.md) · [Getting Started](getting-started.md) · [`/_install` Reference](_install.md) · [`/_admin` Operation](_admin.md) · [`/_templates` Operation](_templates.md) · [`/_editor` Operation](_editor.md) · [`/_theme` Operation](_theme.md) · [Deployment](deployment.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
+[README](../README.md) · [Concepts](concepts.md) · [Developer Manual](development.md) · [Getting Started](getting-started.md) · [`/_install` Reference](_install.md) · [`/_admin` Operation](_admin.md) · [`/_templates` Operation](_templates.md) · [`/_editor` Operation](_editor.md) · [`/_design` Operation](_design.md) · [Deployment](deployment.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
 
 ## Core Pillars
 
@@ -160,18 +160,18 @@ namespace; the kernel-owned `Nino\` classes remain in `_nino/`. This way, the
 extension remains part of the specific project, `_nino/` stays replaceable, and
 no second hook or plugin system is introduced.
 
-## `/_admin`, `/_theme`, `/_templates`, and `/_editor`
+## `/_admin`, `/_design`, `/_templates`, and `/_editor`
 
 The optional interfaces have their own entry points and are not frontend modules from `/nino/modules`:
 
 | Interface | Responsibility |
 |---|---|
 | [`/_admin`](_admin.md) | full technical access to structure, configuration, texts, and elements |
-| [`/_theme`](_theme.md) | Theme, generated Design tokens, Header, and Footer after installation |
+| [`/_design`](_design.md) | Theme, generated Design tokens, Header, and Footer after installation |
 | [`/_templates`](_templates.md) | section-first composition, reusable template includes, and native quick fill of `page-*.tpl` |
 | [`/_editor`](_editor.md) | daily maintenance of released content, images, user, and operational data |
 
-`/_theme` and `/_templates` share password and session with `/_admin`; `/_editor`, on the other hand, has individual accounts and granular rights. Thus, the separation is no longer solely between structure and content but primarily between full development access and restricted editorial work.
+`/_design` and `/_templates` share password and session with `/_admin`; `/_editor`, on the other hand, has individual accounts and granular rights. Thus, the separation is no longer solely between structure and content but primarily between full development access and restricted editorial work.
 
 ## Where Does a Change Belong?
 
@@ -184,7 +184,7 @@ The optional interfaces have their own entry points and are not frontend modules
 | Create new public URL | route in `config.php` or via `/_admin` |
 | Output dynamic list | element query or shortcode with callback |
 | Add technical function | project-specific module |
-| Change Theme, Design, Header, or Footer | `/_theme`; stylesheets for project-specific overrides beyond the catalogue |
+| Change Theme, Design, Header, or Footer | `/_design`; stylesheets for project-specific overrides beyond the catalogue |
 
 ## Next Steps
 

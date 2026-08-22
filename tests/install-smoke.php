@@ -16,11 +16,11 @@ declare(strict_types=1);
 
 require __DIR__. '/../_nino/Nino.php';
 require __DIR__. '/../_admin/Admin.php';
-// The Themes step calls into /_theme when it is there. Loaded here for the
+// The Themes step calls into /_design when it is there. Loaded here for the
 // same reason _install/index.php loads it: without it the Design step
 // degrades to "not offered", and the tests below would be
 // exercising the degraded path while believing they cover the real one
-require __DIR__. '/../_theme/Theme.php';
+require __DIR__. '/../_design/Design.php';
 require __DIR__. '/../_install/Install.php';
 
 $failures = 0;
@@ -639,7 +639,7 @@ check( 'the picker is handed the frames and each theme\'s own defaults', isset( 
 	&& ( $listBody['themes']['basis']['design']['shaping'] ?? '' ) === 'default'
 	&& ( $listBody['themes']['basis']['header'] ?? '' ) === 'v1' );
 
-// A theme is a mapping layer: a literal colour in a role is a pair /_theme
+// A theme is a mapping layer: a literal colour in a role is a pair /_design
 // never measured, and a literal size is a value the raster cannot move. Check
 // the complete current catalogue rather than blessing one representative.
 $renderedPairs = [
@@ -671,7 +671,7 @@ $contrastRatio = static function( string $back, string $front ) use ( $relativeL
 };
 $tokenValues = static function( array $settings, string $mode ): array {
 	$values = [];
-	foreach( \Nino\Theme\Design::palette( $settings, $mode ) as $surface => $surfaceValues ) {
+	foreach( \Nino\Design\Tokens::palette( $settings, $mode ) as $surface => $surfaceValues ) {
 		$values['--nino-'. $surface] 								= $surfaceValues['bg'];
 		$values['--nino-on-'. $surface] 						= $surfaceValues['on'];
 		$values['--nino-on-'. $surface. '-muted'] 	= $surfaceValues['on-muted'];
@@ -698,7 +698,7 @@ foreach( $themeKeys as $themeKey ) {
 	}
 
 	$design = is_array( $manifest['design'] ?? null ) ? $manifest['design'] : [];
-	if( $design === [] || \Nino\Theme\Design::normalize( $design ) !== $design )
+	if( $design === [] || \Nino\Design\Tokens::normalize( $design ) !== $design )
 		$manifestFailures[] = $themeKey. ': design is incomplete or not normalized';
 
 	foreach( [ 'header', 'footer' ] as $kind )
@@ -732,7 +732,7 @@ foreach( $themeKeys as $themeKey ) {
 	foreach( $assignments as $assignment )
 		$roleToken[$assignment[1]] = $assignment[2];
 
-	$settings = \Nino\Theme\Design::normalize( $design );
+	$settings = \Nino\Design\Tokens::normalize( $design );
 
 	foreach( [ 'light', 'dark' ] as $mode ) {
 
@@ -773,7 +773,7 @@ check( 'every rendered pair in every theme meets its declared target in both mod
 // map it to the safe vibrant surface; pin its weakest second use until the
 // framework splits the role.
 $basisManifest = include __DIR__. '/../_install/library/themes/basis/manifest.php';
-$basisSettings = \Nino\Theme\Design::normalize( $basisManifest['design'] );
+$basisSettings = \Nino\Design\Tokens::normalize( $basisManifest['design'] );
 $darkValues 	= $tokenValues( $basisSettings, 'dark' );
 $primaryAsInk = $contrastRatio( $darkValues['--nino-default'], $darkValues['--nino-vibrant'] );
 

@@ -4,7 +4,7 @@
  *	Nino										A compact filesystembased php framework
  *	Install									Step 4: the values every stylesheet reads from - a brand
  *													colour, an optional second accent, and the two steps
- *													that decide how far each is pushed. /_theme generates
+ *													that decide how far each is pushed. /_design generates
  *													the tokens from them and this step writes the
  *													stylesheet, see _install/Install.php's Themes class.
  *
@@ -15,7 +15,7 @@
  *
  *													Every value shown here is asked for rather than
  *													computed - design/preview returns the real palette. The
- *													colour maths lives in /_theme, and a second copy of it
+ *													colour maths lives in /_design, and a second copy of it
  *													in javascript would be one to keep in step.
  *
  *													Driven by the shared Back/Next bar (script.js) rather
@@ -34,7 +34,7 @@
 	Nino.install.design = {
 
 		_ready 		: false,
-		// Null means "this delivery has no /_theme", which is a different
+		// Null means "this delivery has no /_design", which is a different
 		// thing from "not loaded yet" - the step steps aside rather than
 		// rendering controls that would post into nothing
 		_settings : null,
@@ -110,7 +110,7 @@
 		/**
 		 *	One select, filled from the server's vocabulary. Every knob the
 		 *	server names gets its control here if the markup has one, so
-		 *	adding a knob is a change in /_theme plus one <select> - not a
+		 *	adding a knob is a change in /_design plus one <select> - not a
 		 *	second list to keep in step
 		 *
 		 *	@param		{string}	knob
@@ -361,7 +361,7 @@
 
 		/**
 		 *	Write the stylesheet - called by the shared Next button, not by a
-		 *	button of its own. A delivery without /_theme has nothing to write
+		 *	button of its own. A delivery without /_design has nothing to write
 		 *	and advances rather than blocking
 		 *
 		 *	@param		{Function}	callback			Called with ( success )

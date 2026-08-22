@@ -1,19 +1,19 @@
-# `/_theme` — User Manual
+# `/_design` — User Manual
 
-**Language:** English · [Deutsch](_theme.de.md)
+**Language:** English · [Deutsch](_design.de.md)
 
 **Last updated:** August 22, 2026 · **Nino version:** 0.11.0-beta.1
 
-This manual explains the four appearance editors under `/_theme`: Theme, Design, Header, and Footer. Structural page composition is described in the [`/_templates` Operation Manual](_templates.md); day-to-day content maintenance in the [`/_editor` Operation Manual](_editor.md).
+This manual explains the four appearance editors under `/_design`: Theme, Design, Header, and Footer. Structural page composition is described in the [`/_templates` Operation Manual](_templates.md); day-to-day content maintenance in the [`/_editor` Operation Manual](_editor.md).
 
 **Additional Links:**
-[README](../README.md) · [Concepts](concepts.md) · [Developer Manual](development.md) · [Getting Started](getting-started.md) · [`/_install` Reference](_install.md) · [`/_admin` Operation](_admin.md) · [`/_templates` Operation](_templates.md) · [`/_editor` Operation](_editor.md) · [`/_theme` Operation](_theme.md) · [Deployment](deployment.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
+[README](../README.md) · [Concepts](concepts.md) · [Developer Manual](development.md) · [Getting Started](getting-started.md) · [`/_install` Reference](_install.md) · [`/_admin` Operation](_admin.md) · [`/_templates` Operation](_templates.md) · [`/_editor` Operation](_editor.md) · [`/_design` Operation](_design.md) · [Deployment](deployment.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
 
-**Security:** `/_theme` uses the same login, password, lock status, and session as `/_admin`. If `_admin/` is removed from a delivery, `/_theme` is unavailable too.
+**Security:** `/_design` uses the same login, password, lock status, and session as `/_admin`. If `_admin/` is removed from a delivery, `/_design` is unavailable too.
 
-## What `/_theme` Is For
+## What `/_design` Is For
 
-`/_theme` keeps the site's four appearance decisions editable after the one-time installer has gone:
+`/_design` keeps the site's four appearance decisions editable after the one-time installer has gone:
 
 - **Theme** chooses a complete visual baseline and installs its stylesheet, fonts, recommended Design, Header, and Footer.
 - **Design** changes only the generated color palette and size raster.
@@ -22,11 +22,11 @@ This manual explains the four appearance editors under `/_theme`: Theme, Design,
 
 Theme application is deliberately broad: it resets the following three decisions to the selected manifest's recommendations. Design, Header, and Footer are deliberately narrow, so settling one of them never reapplies the Theme or changes either of the others.
 
-The Design half remains based on measured pairs. A stylesheet asks for a color by name — `var(--nino-alt)` for a section background, `var(--nino-on-alt)` for the text on it — and `/_theme` calculates the value and verifies its contrast before writing it.
+The Design half remains based on measured pairs. A stylesheet asks for a color by name — `var(--nino-alt)` for a section background, `var(--nino-on-alt)` for the text on it — and `/_design` calculates the value and verifies its contrast before writing it.
 
 ## Login and Interface
 
-Open `https://your-domain.example/_theme` and log in with the `/_admin` password. The top of the rail carries the common **Admin / Builder / Theme** bridge, containing only the complete tools present in this delivery and marking **Theme** as current. The rail below opens four independent dialogs. The fixed action button changes with the active dialog: **Apply Theme**, **Save Design**, **Apply Header**, or **Apply Footer**.
+Open `https://your-domain.example/_design` and log in with the `/_admin` password. The top of the rail carries the common **Admin / Builder / Design** bridge, containing only the complete tools present in this delivery and marking **Design** as current. The rail below opens four independent dialogs. The fixed action button changes with the active dialog: **Apply Theme**, **Save Design**, **Apply Header**, or **Apply Footer**.
 
 Theme displays the available catalogue as cards. Header and Footer each show a selector and a tall, sandboxed iframe built from the real frame template, the active Theme, and the saved Design. The iframe is inert and cannot run scripts from a variant.
 
@@ -34,7 +34,7 @@ Design provides Primary, optional Secondary, Contrast, Colors, Volume, Spacing, 
 
 ## Shared Appearance Library
 
-Both `/_install` and `/_theme` read the same durable project-root catalogue:
+Both `/_install` and `/_design` read the same durable project-root catalogue:
 
 | Path | Unit contract |
 |---|---|
@@ -72,7 +72,7 @@ The status colors ignore this setting. Red has to stay red, so the brand knobs c
 
 ## The Size Raster
 
-The same split applied to sizes: `/_theme` publishes a fixed set of steps, the theme decides which step a component uses. Numbered rather than named, because a size has no meaning of its own - `--nino-space-3` is a step, `--nino-alt` is a surface.
+The same split applied to sizes: `/_design` publishes a fixed set of steps, the theme decides which step a component uses. Numbered rather than named, because a size has no meaning of its own - `--nino-space-3` is a step, `--nino-alt` is a surface.
 
 | Token | Steps |
 |---|---|
@@ -133,7 +133,7 @@ The practical effect: the same token name gives the right value in all three sta
 
 ## Where the File Goes
 
-`/_theme` writes `/assets/style.design.css` and places it in the css bundle immediately after `_nino/Nino.css`:
+`/_design` writes `/assets/style.design.css` and places it in the css bundle immediately after `_nino/Nino.css`:
 
 ```
 _nino/Nino.css            framework
@@ -150,11 +150,11 @@ The order is the rule that makes the whole thing work: Design supplies the value
 
 ## Where the Settings Come From
 
-`/_install`'s Theme step or `/_theme`'s Theme dialog writes the baseline first from the `design` block the picked theme was drawn with. The independent Design dialog writes the operator's choice afterwards. Every path uses the same `Theme::write()`, so there is one generator and one stylesheet, not separate install-time and runtime copies.
+`/_install`'s Theme step or `/_design`'s Theme dialog writes the baseline first from the `design` block the picked theme was drawn with. The independent Design dialog writes the operator's choice afterwards. Every path uses the same `Theme::write()`, so there is one generator and one stylesheet, not separate install-time and runtime copies.
 
 ## Changing the Appearance Later
 
-`/_theme` stays available after the installation. Recoloring a live project is a matter of changing Design and saving; replacing a Header or Footer copies only that frame's two files. Neither operation needs a reinstall or content migration.
+`/_design` stays available after the installation. Recoloring a live project is a matter of changing Design and saving; replacing a Header or Footer copies only that frame's two files. Neither operation needs a reinstall or content migration.
 
 Applying another Theme is the intentional reset operation. It overwrites files named by the new theme manifest, replaces the bundled theme stylesheet, writes the manifest's recommended Design and frames, and leaves files unique to a previous Theme in place. Secure project-specific edits in Git before applying a Theme again.
 
@@ -168,8 +168,8 @@ Applying another Theme is the intentional reset operation. It overwrites files n
 | `style.design.css` keeps losing manual edits | It is generated. Use `assets/style.css`. |
 | Theme, Header, or Footer says no variants are available | `_install/` was removed, or its catalogue is incomplete. After the recommended deployment this is the normal state. To switch again, redeploy a locked `_install/` from the same Nino version. |
 | A frame preview differs from the live page | The preview uses the current installed includes and text where available, but remains an inert single-frame document. Check the applied template on the full page for request-specific module output. |
-| `(403) Request failed.` appears after loading the controls | The page's CSRF token is stale, usually after a login, logout, session rotation, or deployment. Reload `/_theme`; sign in through `/_admin` again if needed. |
-| `/_theme` shows the login page repeatedly | Shared `/_admin` session. Check the `/_admin` login and any lock. |
+| `(403) Request failed.` appears after loading the controls | The page's CSRF token is stale, usually after a login, logout, session rotation, or deployment. Reload `/_design`; sign in through `/_admin` again if needed. |
+| `/_design` shows the login page repeatedly | Shared `/_admin` session. Check the `/_admin` login and any lock. |
 
 ## Catalogue Contract
 

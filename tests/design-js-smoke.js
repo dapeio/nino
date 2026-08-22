@@ -1,8 +1,8 @@
 /**
  *	Nino				A compact filesystembased php framework
- *	theme-js-smoke.js	DOM contracts for /_theme's four independent editors.
+ *	design-js-smoke.js	DOM contracts for /_design's four independent editors.
  *
- *	Usage: node tests/theme-js-smoke.js
+ *	Usage: node tests/design-js-smoke.js
  */
 
 'use strict';
@@ -150,10 +150,10 @@ sandbox.Nino = {
 	events : { bindCallback : function() {} },
 };
 
-const source = fs.readFileSync( path.join( __dirname, '../_theme/assets/theme.js' ), 'utf8' );
-vm.runInContext( source, vm.createContext( sandbox ), { filename : 'theme.js' } );
+const source = fs.readFileSync( path.join( __dirname, '../_design/assets/design.js' ), 'utf8' );
+vm.runInContext( source, vm.createContext( sandbox ), { filename : 'design.js' } );
 
-const theme = sandbox.Nino.theme;
+const theme = sandbox.Nino.design;
 theme.init();
 
 check( 'the tool exposes exactly the four requested dialogs', JSON.stringify( theme.TABS ) === JSON.stringify( [ 'theme', 'design', 'header', 'footer' ] )
@@ -242,8 +242,8 @@ check( 'Footer is an independent pane and applies only its own frame', nodes['th
 	&& theme._activeFrames.header === 'v2'
 	&& theme._activeFrames.footer === 'v1' );
 
-const template = fs.readFileSync( path.join( __dirname, '../_theme/templates/page-index.tpl' ), 'utf8' );
-const css = fs.readFileSync( path.join( __dirname, '../_theme/assets/style.css' ), 'utf8' );
+const template = fs.readFileSync( path.join( __dirname, '../_design/templates/page-index.tpl' ), 'utf8' );
+const css = fs.readFileSync( path.join( __dirname, '../_design/assets/style.css' ), 'utf8' );
 const adminTemplate = fs.readFileSync( path.join( __dirname, '../_admin/templates/page-index.tpl' ), 'utf8' );
 const templatesTemplate = fs.readFileSync( path.join( __dirname, '../_templates/templates/page-index.tpl' ), 'utf8' );
 
@@ -257,7 +257,7 @@ check( 'one shared action bar changes responsibility with the active dialog', ( 
 check( 'all authenticated tools mount the same availability-aware bridge',
 	adminTemplate.includes('[admin-tools admin]')
 	&& templatesTemplate.includes('[admin-tools templates]')
-	&& template.includes('[admin-tools theme]')
+	&& template.includes('[admin-tools design]')
 	&& adminTemplate.includes('id="admin-theme"') === false
 	&& templatesTemplate.includes('pd-back-admin') === false );
 check( 'the local stylesheet has an explicit visibility contract for all four panes', [ 'theme', 'design', 'header', 'footer' ].every( function( tab ) {

@@ -7,7 +7,7 @@
 Dieses Handbuch erklärt die Entscheidungen und Schreibvorgänge der zehn Schritte von `/_install`. Falls du stattdessen auf dem kürzesten Weg vom Checkout zur eingerichteten Webseite gelangen möchtest, beginne mit [Erste Schritte](getting-started.de.md); den späteren produktiven Betrieb behandelt [Deployment](deployment.de.md).
 
 **Weitere Links:**
-[README](../README.de.md) · [Grundkonzepte](concepts.de.md) · [Entwickler-Handbuch](development.de.md) · [Erste Schritte](getting-started.de.md) · [`/_install`-Referenz](_install.de.md) · [`/_admin`-Bedienung](_admin.de.md) · [`/_templates`-Bedienung](_templates.de.md) · [`/_editor`-Bedienung](_editor.de.md) · [`/_theme`-Bedienung](_theme.de.md) · [Deployment](deployment.de.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
+[README](../README.de.md) · [Grundkonzepte](concepts.de.md) · [Entwickler-Handbuch](development.de.md) · [Erste Schritte](getting-started.de.md) · [`/_install`-Referenz](_install.de.md) · [`/_admin`-Bedienung](_admin.de.md) · [`/_templates`-Bedienung](_templates.de.md) · [`/_editor`-Bedienung](_editor.de.md) · [`/_design`-Bedienung](_design.de.md) · [Deployment](deployment.de.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
 
 **Wichtig:** `/_install` erzeugt aus einem frischen Nino-Checkout den ersten lauffähigen Projektstand. Der Assistent ist notwendig: Vor seiner Ausführung existieren die eigentlichen Projektverzeichnisse wie `templates/`, `text/`, `elements/` und `images/` noch nicht.
 
@@ -94,23 +94,23 @@ Es ist genau ein Theme aktiv. Beim Anwenden:
 
 Die Position des Stylesheets im Bundle bleibt nach Möglichkeit erhalten, damit sich die CSS-Kaskade nicht unbeabsichtigt ändert. Eigene zusätzliche Bundle-Einträge werden nicht entfernt.
 
-**Wichtig:** Gleichnamige Theme-Dateien werden überschrieben. Dateien, die nur das vorherige Theme mitgebracht hat, bleiben dagegen liegen. Sichere eigene Änderungen deshalb über Git, bevor du das Theme wechselst oder erneut anwendest. Nach dem Abschluss sperrt sich `/_install`; die authentifizierte Oberfläche `/_theme` stellt denselben Theme-Katalog für spätere Änderungen bereit.
+**Wichtig:** Gleichnamige Theme-Dateien werden überschrieben. Dateien, die nur das vorherige Theme mitgebracht hat, bleiben dagegen liegen. Sichere eigene Änderungen deshalb über Git, bevor du das Theme wechselst oder erneut anwendest. Nach dem Abschluss sperrt sich `/_install`; die authentifizierte Oberfläche `/_design` stellt denselben Theme-Katalog für spätere Änderungen bereit.
 
 ## 4. Design
 
 Ein eigener Schritt, weil das Theme-Raster bereits eine Pane füllt und hier alles beim Ändern betrachtet werden muss.
 
-Die Werte, aus denen das Theme liest. `/_theme` erzeugt die `--nino-*`-Tokens, ein Theme-Stylesheet weist sie Rollen zu, statt Literale zu schreiben.
+Die Werte, aus denen das Theme liest. `/_design` erzeugt die `--nino-*`-Tokens, ein Theme-Stylesheet weist sie Rollen zu, statt Literale zu schreiben.
 
 **Farbe** — eine Primärfarbe, eine optionale Sekundärfarbe, eine Kontrast- und eine Farbstufe. Jeder Hintergrund entsteht gemeinsam mit der Textfarbe, die darauf gehört, gemessen gegen die WCAG-Kontrastformel — eine Markenfarbe kann also keinen unlesbaren Text erzeugen. Die Chips unter den Reglern zeigen die echten Paare, nicht nur die Hintergründe.
 
 **Größe** — Volume (wie weit die Typo-Skala auffächert), Spacing (Abstände und Zeilenhöhe) und Shaping (Eckenradien). Das Specimen darunter wird in den erzeugten Größen gezeichnet; eine Liste von rem-Werten wäre schneller zu lesen und würde nichts sagen. Der Standardwert jeder Einstellung reproduziert die Skala von `Nino.css`, ein Projekt, das hier nichts ändert, wird also nicht bewegt.
 
-Die Token-Namen beider Hälften stehen in [`_theme.de.md`](_theme.de.md).
+Die Token-Namen beider Hälften stehen in [`_design.de.md`](_design.de.md).
 
 Das Manifest eines Themes erklärt das Design, mit dem es gezeichnet wurde - ein Theme wählen und „Weiter" drücken erzeugt also den Look, den die Vorschau versprochen hat. Der Farbstreifen unter den Reglern zeigt die echten Paare, nicht nur die Hintergründe.
 
-Dieser Teil des Schritts ist optional: Eine Auslieferung ohne `/_theme` installiert genau wie zuvor, nur ohne den Design-Block.
+Dieser Teil des Schritts ist optional: Eine Auslieferung ohne `/_design` installiert genau wie zuvor, nur ohne den Design-Block.
 
 Die Reihenfolge im CSS-Bundle ist der ganze Vertrag, und jede Ebene besitzt darin genau einen Platz:
 
@@ -123,7 +123,7 @@ assets/style.footer.css
 assets/style.css            die eigenen Übersteuerungen des Projekts
 ```
 
-`/_theme` bleibt nach der Installation verfügbar, sodass ein Projekt ohne Neuinstallation umgefärbt werden kann. Siehe [`_theme.de.md`](_theme.de.md).
+`/_design` bleibt nach der Installation verfügbar, sodass ein Projekt ohne Neuinstallation umgefärbt werden kann. Siehe [`_design.de.md`](_design.de.md).
 
 ## 5. Header
 
@@ -143,7 +143,7 @@ Sein höheres Vorschau-Iframe verwendet denselben endgültigen Design- und Theme
 
 Die Basis-Seitenvorlagen binden ihn über `[template /templates/theme.footer]` ein.
 
-Theme und beide Frame-Kataloge liegen neben den Basis-, Modul- und Seiten-Einheiten unter `_install/library/`. `/_theme` liest sie mit, solange der Installer ausgeliefert ist; sie sind Einrichtungsmaterial und werden beim Anwenden ins Projekt kopiert, nie zur Laufzeit gelesen.
+Theme und beide Frame-Kataloge liegen neben den Basis-, Modul- und Seiten-Einheiten unter `_install/library/`. `/_design` liest sie mit, solange der Installer ausgeliefert ist; sie sind Einrichtungsmaterial und werden beim Anwenden ins Projekt kopiert, nie zur Laufzeit gelesen.
 
 ## 7. Routes
 
@@ -205,7 +205,7 @@ So bleibt die Menge der Konten eine technische Strukturentscheidung, während di
 
 ## 10. Abschluss
 
-Der letzte Schritt setzt das echte Passwort für `/_admin` und damit zugleich für `/_theme` und `/_templates`. Es muss mindestens acht Zeichen lang sein und ist unabhängig von den Nutzerkonten in `/_editor`.
+Der letzte Schritt setzt das echte Passwort für `/_admin` und damit zugleich für `/_design` und `/_templates`. Es muss mindestens acht Zeichen lang sein und ist unabhängig von den Nutzerkonten in `/_editor`.
 
 Vor dem Abschluss muss mindestens ein funktionierender Editor-Nutzer existieren. Der Assistent schreibt den neuen Passwort-Hash nach `private/.auth/pw.php` und setzt `/nino/install/completed` in der `config.php`. Jedes von beiden allein hält `/_install` gesperrt — geht die Passwortdatei verloren, sperrt sich `/_admin` zu, statt den Installer wieder freizugeben.
 
@@ -219,11 +219,11 @@ Prüfe nach dem Abschluss:
 - jede angelegte Route einschließlich `/404`;
 - den Login unter `/_editor`;
 - den Login unter `/_admin`;
-- alle vier Dialoge unter `/_theme` mit demselben Passwort;
+- alle vier Dialoge unter `/_design` mit demselben Passwort;
 - den Zugriff auf `/_templates` mit demselben Passwort, sofern der Alpha-Builder verwendet werden soll;
 - das Speichern eines Testtexts und eines Testbildes.
 
-Entferne anschließend `_install/` aus der produktiven Auslieferung. Die Library darunter wird damit ebenfalls entfernt: In `/_theme` bleibt der Design-Dialog nutzbar, die katalogbasierten Dialoge Theme, Header und Footer haben danach nichts mehr aufzulisten. Seitenstruktur, vollständige Inhalte und technische Konfiguration werden danach über `/_admin`, die Darstellung über `/_theme`, Seitentemplates über `/_templates` und freigegebene redaktionelle Inhalte über `/_editor` gepflegt. Für tiefergehende Strukturarbeit bleiben der HTML+-Escape-Hatch und Code verfügbar.
+Entferne anschließend `_install/` aus der produktiven Auslieferung. Die Library darunter wird damit ebenfalls entfernt: In `/_design` bleibt der Design-Dialog nutzbar, die katalogbasierten Dialoge Theme, Header und Footer haben danach nichts mehr aufzulisten. Seitenstruktur, vollständige Inhalte und technische Konfiguration werden danach über `/_admin`, die Darstellung über `/_design`, Seitentemplates über `/_templates` und freigegebene redaktionelle Inhalte über `/_editor` gepflegt. Für tiefergehende Strukturarbeit bleiben der HTML+-Escape-Hatch und Code verfügbar.
 
 ## Library-Format
 
@@ -234,7 +234,7 @@ Nino trennt die einmaligen Installer-Quellen vom Darstellungskatalog, der danach
 | `_install/library/base/` | immer angewendete Routen, Templates, Texte und Assets |
 | `_install/library/modules/<key>/` | wählbare funktionale Ergänzungen samt Abhängigkeiten |
 | `_install/library/pages/<key>/` | Ausgangspunkt für eine konkrete Seite |
-| `library/themes/<key>/` | visueller Ausgangspunkt, gemeinsam von `/_install` und `/_theme` verwendet |
+| `library/themes/<key>/` | visueller Ausgangspunkt, gemeinsam von `/_install` und `/_design` verwendet |
 | `library/header/<key>/`, `library/footer/<key>/` | austauschbarer Frame für beide Werkzeuge |
 
 Alle diese Pfade werden nach dem Abschluss zusammen mit `/_install` entfernt. Der Katalog ist Einrichtungsmaterial für den authentifizierten Arbeitsbereich und kein Laufzeit-Plugin-System.

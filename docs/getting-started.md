@@ -7,7 +7,7 @@
 This guide leads you on the shortest path from a fresh checkout to a locally running Nino website. If you instead want to look up every field and writing process of the assistant, read the [`/_install` Reference](_install.md); technical backgrounds are explained in the [Concepts](concepts.md).
 
 **Additional Links:**
-[README](../README.md) · [Concepts](concepts.md) · [Developer Manual](development.md) · [Getting Started](getting-started.md) · [`/_install` Reference](_install.md) · [`/_admin` Operation](_admin.md) · [`/_templates` Operation](_templates.md) · [`/_editor` Operation](_editor.md) · [`/_theme` Operation](_theme.md) · [Deployment](deployment.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
+[README](../README.md) · [Concepts](concepts.md) · [Developer Manual](development.md) · [Getting Started](getting-started.md) · [`/_install` Reference](_install.md) · [`/_admin` Operation](_admin.md) · [`/_templates` Operation](_templates.md) · [`/_editor` Operation](_editor.md) · [`/_design` Operation](_design.md) · [Deployment](deployment.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
 
 **Important:** A fresh checkout contains the kernel, interfaces, and the installation library, but not yet a complete project state. `/_install` creates and fills the required project directories; only then does the website run.
 
@@ -59,12 +59,12 @@ After completion, open:
 | `/` | The configured website is delivered with the selected theme. |
 | `/_editor` | The first user account can maintain content. |
 | `/_admin` | The separate technical password opens the full project administration. |
-| `/_theme` | The same technical password opens Theme, Design, Header, and Footer editing. |
+| `/_design` | The same technical password opens Theme, Design, Header, and Footer editing. |
 | `/_templates` | The same technical password opens the section-first Template Builder (Alpha). |
 
 Also check every language and route, the navigation, and used forms. Save a text and an image in `/_editor` as a test. If you want to use `/_templates`, additionally open a `page-*.tpl`, change nothing at first, and check whether its top-level sections are recognized without warnings.
 
-The last installation step replaces the provided `_admin` password hash and locks `/_install`. Subsequently, remove `_install/` from production delivery; this also retires the catalogue-backed dialogs in `/_theme`, while its Design dialog keeps working; the correct order and further security checks are described in the [Deployment Manual](deployment.md#_install-after-setup).
+The last installation step replaces the provided `_admin` password hash and locks `/_install`. Subsequently, remove `_install/` from production delivery; this also retires the catalogue-backed dialogs in `/_design`, while its Design dialog keeps working; the correct order and further security checks are described in the [Deployment Manual](deployment.md#_install-after-setup).
 
 ## Next Steps
 

@@ -24,7 +24,7 @@ if( preg_match( '#^/private(?:/|$)#', $uri ) === 1 ) {
     return true;
 }
 
-// The installer's library is source for /_install's steps and for /_theme's
+// The installer's library is source for /_install's steps and for /_design's
 // catalogue dialogs, not a second public asset tree. Theme picker images are
 // its one intentional public file; mirror _install/library/.htaccess here
 // because PHP's development server ignores Apache configuration entirely.
@@ -68,9 +68,9 @@ if( str_starts_with( $uri, '/_templates' ) === true ) {
     return true;
 }
 
-if( str_starts_with( $uri, '/_theme' ) === true ) {
-    chdir( __DIR__. '/_theme' );
-    require __DIR__. '/_theme/index.php';
+if( str_starts_with( $uri, '/_design' ) === true ) {
+    chdir( __DIR__. '/_design' );
+    require __DIR__. '/_design/index.php';
     return true;
 }
 

@@ -7,7 +7,7 @@
 Dieses Handbuch erklärt die tägliche Arbeit mit freigegebenen Texten, Elementen, Bildern, Nutzern und Betriebsdaten unter `/_editor`. Falls du vollständigen technischen und inhaltlichen Zugriff benötigst, lies die [`/_admin`-Bedienungsanleitung](_admin.de.md); die strukturelle Bearbeitung von Templates beschreibt die [`/_templates`-Bedienung](_templates.de.md).
 
 **Weitere Links:**
-[README](../README.de.md) · [Grundkonzepte](concepts.de.md) · [Entwickler-Handbuch](development.de.md) · [Erste Schritte](getting-started.de.md) · [`/_install`-Referenz](_install.de.md) · [`/_admin`-Bedienung](_admin.de.md) · [`/_templates`-Bedienung](_templates.de.md) · [`/_editor`-Bedienung](_editor.de.md) · [`/_theme`-Bedienung](_theme.de.md) · [Deployment](deployment.de.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
+[README](../README.de.md) · [Grundkonzepte](concepts.de.md) · [Entwickler-Handbuch](development.de.md) · [Erste Schritte](getting-started.de.md) · [`/_install`-Referenz](_install.de.md) · [`/_admin`-Bedienung](_admin.de.md) · [`/_templates`-Bedienung](_templates.de.md) · [`/_editor`-Bedienung](_editor.de.md) · [`/_design`-Bedienung](_design.de.md) · [Deployment](deployment.de.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
 
 **Sicherheit:** Welche Bereiche du siehst und verwenden darfst, hängt von den Rechten deines Kontos ab. Ein fehlender Menüpunkt ist deshalb häufig beabsichtigt und kein Darstellungsfehler.
 

@@ -45,7 +45,7 @@ jobs:
         run: php tests/install-smoke.php
 
       - name: Run appearance tooling smoke tests
-        run: php tests/theme-smoke.php
+        run: php tests/design-smoke.php
 
       - name: Run template builder smoke tests
         run: php tests/templates-smoke.php

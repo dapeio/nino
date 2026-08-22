@@ -7,7 +7,7 @@
 This manual explains the decisions and writing processes of the ten steps of `/_install`. If you instead want to take the shortest path from checkout to a configured website, start with [Getting Started](getting-started.md); the later production operation is covered in [Deployment](deployment.md).
 
 **Additional Links:**
-[README](../README.md) · [Concepts](concepts.md) · [Developer Manual](development.md) · [Getting Started](getting-started.md) · [`/_install` Reference](_install.md) · [`/_admin` Operation](_admin.md) · [`/_templates` Operation](_templates.md) · [`/_editor` Operation](_editor.md) · [`/_theme` Operation](_theme.md) · [Deployment](deployment.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
+[README](../README.md) · [Concepts](concepts.md) · [Developer Manual](development.md) · [Getting Started](getting-started.md) · [`/_install` Reference](_install.md) · [`/_admin` Operation](_admin.md) · [`/_templates` Operation](_templates.md) · [`/_editor` Operation](_editor.md) · [`/_design` Operation](_design.md) · [Deployment](deployment.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
 
 **Important:** `/_install` creates the first functional project state from a fresh Nino checkout. The assistant is necessary: Before its execution, the actual project directories such as `templates/`, `text/`, `elements/`, and `images/` do not yet exist.
 
@@ -93,23 +93,23 @@ Exactly one theme is active. When applying:
 
 The position of the stylesheet in the bundle is preserved as much as possible so that the CSS cascade does not change unintentionally. Own additional bundle entries are not removed.
 
-**Important:** Theme files with the same name are overwritten. Files that only the previous theme brought remain. Therefore, secure your own changes via Git before switching or reapplying the theme. After completion, `/_install` locks itself; the authenticated `/_theme` interface provides the same Theme catalogue for later changes.
+**Important:** Theme files with the same name are overwritten. Files that only the previous theme brought remain. Therefore, secure your own changes via Git before switching or reapplying the theme. After completion, `/_install` locks itself; the authenticated `/_design` interface provides the same Theme catalogue for later changes.
 
 ## 4. Design
 
 Its own step, because the theme grid already fills a pane and everything here has to be looked at while it is being changed.
 
-The values the theme reads from. `/_theme` generates the `--nino-*` tokens and a theme stylesheet assigns them to roles rather than writing literals.
+The values the theme reads from. `/_design` generates the `--nino-*` tokens and a theme stylesheet assigns them to roles rather than writing literals.
 
 **Colour** - a primary, an optional secondary, a Contrast step and a Colors step. Every background is generated together with the text colour that belongs on it, measured against the WCAG contrast formula, so a brand colour cannot produce unreadable text. The chips under the controls show the real pairs, not just the backgrounds.
 
 **Size** - Volume (how far the type scale fans out), Spacing (gaps and line height) and Shaping (corner radii). The specimen below them is drawn at the sizes they generate; a list of rem values would be quicker to read and tell you nothing. Every setting's default reproduces `Nino.css`'s own scale, so a project that changes nothing here is not moved.
 
-See [`_theme.md`](_theme.md) for the token names both halves publish.
+See [`_design.md`](_design.md) for the token names both halves publish.
 
 A theme's manifest declares the design it was drawn with, so picking a theme and pressing Next produces the look its preview promised. The swatch strip under the controls shows the real pairs, not just the backgrounds.
 
-This part of the step is optional: a delivery that ships without `/_theme` installs exactly as before, with the Design block absent.
+This part of the step is optional: a delivery that ships without `/_design` installs exactly as before, with the Design block absent.
 
 The order in the css bundle is the whole contract, and each layer owns one slot in it:
 
@@ -122,7 +122,7 @@ assets/style.footer.css
 assets/style.css            the project's own overrides
 ```
 
-`/_theme` stays available after the installation, so a project can be recolored without reinstalling. See [`_theme.md`](_theme.md).
+`/_design` stays available after the installation, so a project can be recolored without reinstalling. See [`_design.md`](_design.md).
 
 ## 5. Header
 
@@ -142,7 +142,7 @@ Its taller preview uses the same final Design and theme context as the Header pr
 
 The base page templates include it through `[template /templates/theme.footer]`.
 
-Theme and both frame catalogues sit beside the base, module, and page units below `_install/library/`. `/_theme` reads them for as long as the installer is deployed; they are setup material, copied into the project when applied and never read at runtime.
+Theme and both frame catalogues sit beside the base, module, and page units below `_install/library/`. `/_design` reads them for as long as the installer is deployed; they are setup material, copied into the project when applied and never read at runtime.
 
 ## 7. Routes
 
@@ -199,19 +199,19 @@ The email address and password can be changed later via `/_editor` or `/_admin`.
 
 ## 10. Completion
 
-The last step sets the technical password for `/_admin`, `/_theme`, and `/_templates` and locks the installer. This password is separate from the editor accounts and should be treated as a technical access with full control.
+The last step sets the technical password for `/_admin`, `/_design`, and `/_templates` and locks the installer. This password is separate from the editor accounts and should be treated as a technical access with full control.
 
 Provide:
 
-- a **password** for `/_admin`, `/_theme`, and `/_templates`.
+- a **password** for `/_admin`, `/_design`, and `/_templates`.
 
-The hash is written to `private/.auth/pw.php` and the project is marked installed via `/nino/install/completed` in `config.php`. Either of those alone keeps `/_install` locked, so losing the password file locks `/_admin` rather than handing the installer back. Neither lives in a tool folder, which is what lets an update replace `_nino/`, `_admin/`, `_editor/`, `_theme/`, and `_templates/` wholesale.
+The hash is written to `private/.auth/pw.php` and the project is marked installed via `/nino/install/completed` in `config.php`. Either of those alone keeps `/_install` locked, so losing the password file locks `/_admin` rather than handing the installer back. Neither lives in a tool folder, which is what lets an update replace `_nino/`, `_admin/`, `_editor/`, `_design/`, and `_templates/` wholesale.
 
 If completion fails, check the write permissions of the `private/` directory. After setting the password, `/_install` is locked and can no longer be used. The assistant is then removed from production delivery.
 
 ## Verify the Result and Remove the Installer
 
-After completion, open the frontend and the management interfaces. Check at least the start page, every configured language, login to `/_editor`, login to `/_admin`, all four dialogs in `/_theme`, and the selected theme assets.
+After completion, open the frontend and the management interfaces. Check at least the start page, every configured language, login to `/_editor`, login to `/_admin`, all four dialogs in `/_design`, and the selected theme assets.
 
 The installer is intended only for initial setup. Remove or block `/_install` before the website becomes publicly accessible. Keeping it available unnecessarily increases the exposed surface of the project.
 
@@ -224,7 +224,7 @@ Nino separates one-time installer source from the appearance catalogue that rema
 | `_install/library/base/` | always-applied routes, templates, texts, and assets |
 | `_install/library/modules/<key>/` | selectable functional additions and their dependencies |
 | `_install/library/pages/<key>/` | starting point for one concrete page |
-| `library/themes/<key>/` | visual baseline shared by `/_install` and `/_theme` |
+| `library/themes/<key>/` | visual baseline shared by `/_install` and `/_design` |
 | `library/header/<key>/`, `library/footer/<key>/` | interchangeable frame shared by both tools |
 
 All of these paths are removed together with `/_install` after completion. The catalogue is setup material for the authenticated workspace, not a runtime plugin system.
@@ -237,7 +237,7 @@ A theme's `manifest.php` lists the files to be copied plus what the look was dra
 | `stylesheet` | where the copied stylesheet ends up, and what gets bundled |
 | `files` | which of the unit's directories are copied into the project |
 | `header`, `footer` | the frame units this theme was drawn against |
-| `design` | the `/_theme` settings it was drawn with: `primary`, `secondary`, `contrast`, `colors`, `volume`, `spacing`, `shaping` |
+| `design` | the `/_design` settings it was drawn with: `primary`, `secondary`, `contrast`, `colors`, `volume`, `spacing`, `shaping` |
 
 A frame unit has no manifest - a `template.tpl` and an optional `style.css` are everything it has to declare. Theme units and the installer-specific base/module/page units use manifests for their copying and configuration contracts.
 

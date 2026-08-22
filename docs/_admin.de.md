@@ -7,7 +7,7 @@
 Dieses Handbuch erklärt die vollständige technische und inhaltliche Projektverwaltung unter `/_admin`. Falls du stattdessen nur freigegebene Inhalte im Alltag pflegen möchtest, lies die [`/_editor`-Bedienungsanleitung](_editor.de.md); die schnelle sectionbasierte Seitenkomposition beschreibt die [`/_templates`-Bedienung](_templates.de.md).
 
 **Weitere Links:**
-[README](../README.de.md) · [Grundkonzepte](concepts.de.md) · [Entwickler-Handbuch](development.de.md) · [Erste Schritte](getting-started.de.md) · [`/_install`-Referenz](_install.de.md) · [`/_admin`-Bedienung](_admin.de.md) · [`/_templates`-Bedienung](_templates.de.md) · [`/_editor`-Bedienung](_editor.de.md) · [`/_theme`-Bedienung](_theme.de.md) · [Deployment](deployment.de.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
+[README](../README.de.md) · [Grundkonzepte](concepts.de.md) · [Entwickler-Handbuch](development.de.md) · [Erste Schritte](getting-started.de.md) · [`/_install`-Referenz](_install.de.md) · [`/_admin`-Bedienung](_admin.de.md) · [`/_templates`-Bedienung](_templates.de.md) · [`/_editor`-Bedienung](_editor.de.md) · [`/_design`-Bedienung](_design.de.md) · [Deployment](deployment.de.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
 
 **Sicherheitshinweis:** `/_admin` richtet sich an Entwickler. Änderungen werden unmittelbar in Konfiguration und Projektdateien geschrieben und können Routing, Datenmodelle, Inhalte und die sichtbare Webseite verändern. Arbeite deshalb mit einem aktuellen Git-Stand oder einer anderen verlässlichen Sicherung.
 
@@ -24,7 +24,7 @@ Dieses Handbuch erklärt die vollständige technische und inhaltliche Projektver
 | Bilder | Bildplätze und Zielmaße definieren | Bilder hochladen und ersetzen |
 | Routen | Seitenrouten, Templates und Menü-Zugehörigkeit verwalten | Seitentexte pflegen |
 | Navigationen | Menüs anlegen und ihre Reihenfolge festlegen | kein Zugriff |
-| Darstellung | Link zum Werkzeug mit vier Dialogen unter `/_theme` | kein Zugriff |
+| Darstellung | Link zum Werkzeug mit vier Dialogen unter `/_design` | kein Zugriff |
 | Seitentemplates | Link zum sectionbasierten Template Builder unter `/_templates` | kein Zugriff |
 | Nutzer | Konten anlegen, löschen und Rechte technisch verwalten | Profildaten und freigegebene Rechte pflegen |
 | Konfiguration | ausgewählte technische Werte bearbeiten und Elements-Suchindexe neu aufbauen | kein Zugriff |
@@ -44,9 +44,9 @@ Beachte für den Betrieb:
 - teile das technische Passwort nicht mit Redakteuren;
 - melde dich nach der Arbeit über **Logout** ab;
 - schütze den Bereich bei Bedarf zusätzlich über Webserver, VPN oder IP-Freigaben;
-- entferne `_admin/`, `_theme/` und `_templates/` aus der Auslieferung, wenn die Oberflächen im laufenden Betrieb nicht benötigt werden.
+- entferne `_admin/`, `_design/` und `_templates/` aus der Auslieferung, wenn die Oberflächen im laufenden Betrieb nicht benötigt werden.
 
-`/_theme` und `/_templates` verwenden dasselbe Passwort, denselben Sperrstatus und dieselbe Sitzung wie `/_admin`. Deshalb tragen alle drei geschützten Oberflächen dieselbe kompakte Brücke **Admin / Builder / Theme**. Sie entsteht aus den vollständigen Werkzeug-Einstiegspunkten der jeweiligen Auslieferung: Ein weggelassenes oder nur teilweise kopiertes Werkzeug wird nicht verlinkt, die aktuelle Oberfläche ist hervorgehoben. Einen zusätzlichen Konfigurationsschalter gibt es nicht. Ohne `_admin/` kann keines der optionalen Werkzeuge verwendet werden.
+`/_design` und `/_templates` verwenden dasselbe Passwort, denselben Sperrstatus und dieselbe Sitzung wie `/_admin`. Deshalb tragen alle drei geschützten Oberflächen dieselbe kompakte Brücke **Admin / Builder / Design**. Sie entsteht aus den vollständigen Werkzeug-Einstiegspunkten der jeweiligen Auslieferung: Ein weggelassenes oder nur teilweise kopiertes Werkzeug wird nicht verlinkt, die aktuelle Oberfläche ist hervorgehoben. Einen zusätzlichen Konfigurationsschalter gibt es nicht. Ohne `_admin/` kann keines der optionalen Werkzeuge verwendet werden.
 
 Das Passwort lässt sich außerhalb des Installers mit `php _admin/Admin.php <passwort>` neu hashen. Die Ausgabe ist eine vollständige Datei — schreibe sie nach `private/.auth/pw.php` und ersetze damit den vorhandenen Inhalt. Sie liegt bewusst nicht in `_admin/Admin.php` (ein Werkzeugordner muss bei einem Update ersetzbar bleiben) und nicht in der `config.php` (eine Wiederherstellung überschreibt diese Datei, und die Zugangsdaten, die eine Wiederherstellung autorisieren, müssen sie überleben). Führe diesen Vorgang nur in einer geschützten lokalen Umgebung aus; ein als Kommandozeilenargument eingegebenes Passwort kann in Shell-Verlauf oder Prozessliste sichtbar werden.
 
@@ -209,7 +209,7 @@ Beim Anlegen oder Bearbeiten bestimmst du außerdem:
 
 Die Zugehörigkeit steht als `'navs' => [ 'main' => 1, … ]` auf der Route der Seite; der Wert ist eine Priorität (kleiner zuerst). Eine hier neu gesetzte Zugehörigkeit landet hinter allem, was bereits in diesem Menü steht; eine von Hand vergebene Priorität setzt ein späteres Speichern nicht zurück. Eine von Hand in die `config.php` geschriebene Route tritt einem Menü genauso bei – ganz ohne Werkzeug – und wird von `[navigation nav="main"]` gerendert.
 
-Die Pfeile in der Seitenliste vertauschen zwei Seitenrouten in der `config.php`; jede andere Route behält ihren Platz. Menüeinträge gleicher Priorität folgen der Routenreihenfolge. Reservierte Pfade wie `/_admin`, `/_editor`, `/_install`, `/_templates` und `/_theme` können nicht als öffentliche Seiten verwendet werden.
+Die Pfeile in der Seitenliste vertauschen zwei Seitenrouten in der `config.php`; jede andere Route behält ihren Platz. Menüeinträge gleicher Priorität folgen der Routenreihenfolge. Reservierte Pfade wie `/_admin`, `/_editor`, `/_install`, `/_templates` und `/_design` können nicht als öffentliche Seiten verwendet werden.
 
 Einige Routen wählen ihr Template zur Laufzeit. In diesem Fall zeigt `/_admin` den bestehenden Route-Body an und lässt ihn beim Speichern unverändert.
 
@@ -353,7 +353,7 @@ Nie gecacht wird, unabhängig von der Konfiguration: alles außer `GET`, alles m
 
 Zwei Werte in einer gespeicherten Seite gehören dem, der sie abruft, nicht dem, für den sie gerendert wurde — beide werden beim Ausliefern neu gestempelt: der `[csrf]`-Token, damit jeder Besucher mit seinem eigenen absendet, und der `[jstext]`-Nonce, damit er unerratbar bleibt und weiterhin zum `Content-Security-Policy`-Header genau dieser Antwort passt.
 
-Jedes Speichern über `/_admin`, `/_editor`, `/_theme`, `/_templates` oder `/_install` verwirft den kompletten Cache sofort — ein einzelner Textfill oder eine Darstellungsänderung kann jede Seite verändern, eine kleinere sinnvolle Einheit gibt es also nicht. Die Lebensdauer oben begrenzt nur, wie lange eine Seite ganz ohne Änderung überlebt.
+Jedes Speichern über `/_admin`, `/_editor`, `/_design`, `/_templates` oder `/_install` verwirft den kompletten Cache sofort — ein einzelner Textfill oder eine Darstellungsänderung kann jede Seite verändern, eine kleinere sinnvolle Einheit gibt es also nicht. Die Lebensdauer oben begrenzt nur, wie lange eine Seite ganz ohne Änderung überlebt.
 
 Antworten tragen `X-Nino-Cache: hit` oder `miss` — der schnellste Weg zu sehen, ob der Cache überhaupt greift.
 

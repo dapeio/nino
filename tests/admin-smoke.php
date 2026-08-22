@@ -853,21 +853,21 @@ $adminToolPosition = strpos( $toolBridge, 'data-nino-admin-tool="admin"' );
 $templatesToolPosition = strpos( $toolBridge, 'data-nino-admin-tool="templates"' );
 check( 'the bridge lists exactly the complete tools in their stable order', $adminToolPosition !== false && $templatesToolPosition !== false
 	&& $adminToolPosition < $templatesToolPosition
-	&& str_contains( $toolBridge, 'data-nino-admin-tool="theme"' ) === false );
+	&& str_contains( $toolBridge, 'data-nino-admin-tool="design"' ) === false );
 check( 'the bridge keeps links below the configured project directory', str_contains( $toolBridge, 'href="/subdir/_admin/"' )
 	&& str_contains( $toolBridge, 'href="/subdir/_templates/"' ) );
 check( 'the bridge exposes exactly one semantic current tool', substr_count( $toolBridge, 'aria-current="page"' ) === 1
 	&& str_contains( $toolBridge, 'data-nino-admin-tool="templates" aria-current="page"' ) );
 
-$writeToolFile( '_theme/index.php' );
-check( 'a partially copied tool is not advertised', str_contains( \Nino\Admin\ToolBridge::render( $appData, 'admin', $toolRoot ), 'data-nino-admin-tool="theme"' ) === false );
+$writeToolFile( '_design/index.php' );
+check( 'a partially copied tool is not advertised', str_contains( \Nino\Admin\ToolBridge::render( $appData, 'admin', $toolRoot ), 'data-nino-admin-tool="design"' ) === false );
 
-foreach( [ '_theme/Theme.php', '_theme/templates/page-index.tpl' ] as $file )
+foreach( [ '_design/Design.php', '_design/templates/page-index.tpl' ] as $file )
 	$writeToolFile( $file );
 
-$toolBridge = \Nino\Admin\ToolBridge::render( $appData, 'theme', $toolRoot );
+$toolBridge = \Nino\Admin\ToolBridge::render( $appData, 'design', $toolRoot );
 check( 'a complete optional tool joins the bridge without a config switch', substr_count( $toolBridge, 'data-nino-admin-tool=' ) === 3
-	&& str_contains( $toolBridge, 'data-nino-admin-tool="theme" aria-current="page"' ) );
+	&& str_contains( $toolBridge, 'data-nino-admin-tool="design" aria-current="page"' ) );
 
 // Admin::init() may be called more than once in a composed request. The bridge
 // callback must still execute once: a second callback would receive the first
@@ -1244,7 +1244,7 @@ check( 'rejects a page mounted on a runtime-owned tool uri', $status === 409 );
 check( 'rejects a page mounted on the Template Builder runtime uri', $status === 409 );
 
 [ $status ] = callDev( $appData, \Nino\Admin\PageEditor::class, 'apiSave', [
-	'originalHttpUri' => '', 'uri' => '/appearance-shadow', 'httpUri' => '/_theme', 'template' => 'page-about', 'text' => [],
+	'originalHttpUri' => '', 'uri' => '/appearance-shadow', 'httpUri' => '/_design', 'template' => 'page-about', 'text' => [],
 ] );
 check( 'rejects a page mounted on the Appearance runtime uri', $status === 409 );
 

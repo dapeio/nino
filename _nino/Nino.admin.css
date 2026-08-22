@@ -1,7 +1,7 @@
 /**
  * Nino admin UI - the design system for Nino's own tool frontends
  *
- * Shared visual system for /_admin, /_editor, /_install, /_templates and /_theme.
+ * Shared visual system for /_admin, /_editor, /_install, /_templates and /_design.
  * Linked after each tool's own stylesheet, but placed in the lower
  * `nino.system` cascade layer, so it remains an overridable baseline.
  *

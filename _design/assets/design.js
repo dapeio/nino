@@ -1,6 +1,6 @@
 /**
  *	Nino						A compact filesystembased php framework
- *	_theme/assets/theme.js	Four independent appearance editors: Theme,
+ *	_design/assets/design.js	Four independent appearance editors: Theme,
  *							Design, Header and Footer.
  *
  *	Theme establishes the complete manifest baseline. Design then writes only
@@ -13,7 +13,7 @@
 
 	wn.Nino = wn.Nino || {};
 
-	Nino.theme = {
+	Nino.design = {
 
 		TABS : [ 'theme', 'design', 'header', 'footer' ],
 		ACTION_LABELS : {
@@ -48,38 +48,38 @@
 			if( wrap === null )
 				return;
 
-			Nino.theme.TABS.forEach( function( tab ) {
+			Nino.design.TABS.forEach( function( tab ) {
 				const link = dc.getElementById('theme-nav-'+ tab);
 				if( link !== null )
 					link.addEventListener( 'click', function( event ) {
 						event.preventDefault();
-						Nino.theme.selectTab( tab );
+						Nino.design.selectTab( tab );
 					} );
 			} );
 
 			const save = dc.getElementById('theme-action-save');
 			if( save !== null )
-				save.addEventListener( 'click', Nino.theme._applyCurrent );
+				save.addEventListener( 'click', Nino.design._applyCurrent );
 
 			let initial = 'theme';
 			if( typeof wn.URLSearchParams === 'function' ) {
 				const requested = new wn.URLSearchParams( wn.location ? ( wn.location.search || '' ) : '' ).get('tab');
-				if( Nino.theme.TABS.indexOf( requested ) !== -1 )
+				if( Nino.design.TABS.indexOf( requested ) !== -1 )
 					initial = requested;
 			}
 
-			Nino.theme.selectTab( initial );
+			Nino.design.selectTab( initial );
 		},
 
 		selectTab : function( tab ) {
 
-			if( Nino.theme.TABS.indexOf( tab ) === -1 )
+			if( Nino.design.TABS.indexOf( tab ) === -1 )
 				return;
 
-			Nino.theme._tab = tab;
+			Nino.design._tab = tab;
 
 			const wrap = dc.getElementById('theme-page-wrap');
-			Nino.theme.TABS.forEach( function( current ) {
+			Nino.design.TABS.forEach( function( current ) {
 				if( wrap !== null )
 					wrap.classList.toggle( 'show-'+ current, current === tab );
 
@@ -88,21 +88,21 @@
 					link.classList.toggle( 'active', current === tab );
 			} );
 
-			Nino.theme._updateAction();
+			Nino.design._updateAction();
 
 			if( tab === 'design' ) {
-				Nino.theme._loadDesign();
+				Nino.design._loadDesign();
 				return;
 			}
 
-			Nino.theme._loadAppearance( false, function() {
+			Nino.design._loadAppearance( false, function() {
 				if( tab === 'header' || tab === 'footer' )
-					Nino.theme._renderFramePreview( tab );
+					Nino.design._renderFramePreview( tab );
 			} );
 		},
 
 		_call : function( action, payload, callback ) {
-			Nino.http.sendRequest( '/_theme/', 'POST', function( xhr ) {
+			Nino.http.sendRequest( '/_design/', 'POST', function( xhr ) {
 				callback( xhr.status, xhr.responseJSON );
 			}, {
 				action : action,
@@ -112,38 +112,38 @@
 
 		_loadAppearance : function( force, callback ) {
 
-			if( force !== true && Nino.theme._appearanceReady === true ) {
+			if( force !== true && Nino.design._appearanceReady === true ) {
 				if( typeof callback === 'function' ) callback();
 				return;
 			}
 
-			Nino.theme._call( 'appearance/read', {}, function( status, response ) {
+			Nino.design._call( 'appearance/read', {}, function( status, response ) {
 
 				if( status !== 200 || response === null ) {
-					Nino.theme._appearanceReady = false;
-					Nino.theme._themes = {};
-					Nino.theme._frames = {};
-					Nino.theme._renderThemes();
-					Nino.theme._renderFrames();
-					Nino.theme._setStatus( Nino.theme._tab, Nino.theme._errorText( status, response ), true );
+					Nino.design._appearanceReady = false;
+					Nino.design._themes = {};
+					Nino.design._frames = {};
+					Nino.design._renderThemes();
+					Nino.design._renderFrames();
+					Nino.design._setStatus( Nino.design._tab, Nino.design._errorText( status, response ), true );
 					return;
 				}
 
-				Nino.theme._themes = response.themes || {};
-				Nino.theme._frames = response.frames || {};
-				Nino.theme._activeTheme = response.activeTheme || null;
-				Nino.theme._activeFrames = response.activeFrames || {};
+				Nino.design._themes = response.themes || {};
+				Nino.design._frames = response.frames || {};
+				Nino.design._activeTheme = response.activeTheme || null;
+				Nino.design._activeFrames = response.activeFrames || {};
 
-				const keys = Object.keys( Nino.theme._themes );
-				if( keys.indexOf( Nino.theme._activeTheme ) !== -1 )
-					Nino.theme._selectedTheme = Nino.theme._activeTheme;
-				else if( keys.indexOf( Nino.theme._selectedTheme ) === -1 )
-					Nino.theme._selectedTheme = keys[0] || null;
+				const keys = Object.keys( Nino.design._themes );
+				if( keys.indexOf( Nino.design._activeTheme ) !== -1 )
+					Nino.design._selectedTheme = Nino.design._activeTheme;
+				else if( keys.indexOf( Nino.design._selectedTheme ) === -1 )
+					Nino.design._selectedTheme = keys[0] || null;
 
-				Nino.theme._appearanceReady = true;
-				Nino.theme._renderThemes();
-				Nino.theme._renderFrames();
-				Nino.theme._updateAction();
+				Nino.design._appearanceReady = true;
+				Nino.design._renderThemes();
+				Nino.design._renderFrames();
+				Nino.design._updateAction();
 
 				if( typeof callback === 'function' ) callback();
 			} );
@@ -157,28 +157,28 @@
 				return;
 
 			grid.innerHTML = '';
-			const keys = Object.keys( Nino.theme._themes );
+			const keys = Object.keys( Nino.design._themes );
 
 			if( empty !== null )
 				empty.classList.toggle( 'theme-hidden', keys.length > 0 );
 
 			keys.forEach( function( key ) {
 
-				const data = Nino.theme._themes[key] || {};
+				const data = Nino.design._themes[key] || {};
 				const tile = dc.createElement('label');
 				tile.className = 'theme-tile';
-				tile.classList.toggle( 'theme-tile--selected', key === Nino.theme._selectedTheme );
-				tile.classList.toggle( 'theme-tile--active', key === Nino.theme._activeTheme );
+				tile.classList.toggle( 'theme-tile--selected', key === Nino.design._selectedTheme );
+				tile.classList.toggle( 'theme-tile--active', key === Nino.design._activeTheme );
 
 				const input = dc.createElement('input');
 				input.type = 'radio';
 				input.name = 'theme-choice';
 				input.value = key;
-				input.checked = key === Nino.theme._selectedTheme;
+				input.checked = key === Nino.design._selectedTheme;
 				input.addEventListener( 'change', function() {
-					Nino.theme._selectedTheme = key;
-					Nino.theme._renderThemes();
-					Nino.theme._updateAction();
+					Nino.design._selectedTheme = key;
+					Nino.design._renderThemes();
+					Nino.design._updateAction();
 				} );
 				tile.appendChild( input );
 
@@ -198,7 +198,7 @@
 				title.textContent = data.label || key;
 				body.appendChild( title );
 
-				if( key === Nino.theme._activeTheme ) {
+				if( key === Nino.design._activeTheme ) {
 					const active = dc.createElement('small');
 					active.className = 'theme-tile-state';
 					active.textContent = 'Active';
@@ -223,7 +223,7 @@
 				const select = dc.getElementById('theme-frame-'+ kind);
 				const panel = dc.getElementById('theme-frame-'+ kind+ '-panel');
 				const empty = dc.getElementById('theme-frame-'+ kind+ '-empty');
-				const keys = Nino.theme._frames[kind] || [];
+				const keys = Nino.design._frames[kind] || [];
 
 				if( select === null )
 					return;
@@ -239,8 +239,8 @@
 					select.appendChild( option );
 				} );
 
-				const theme = Nino.theme._themes[Nino.theme._activeTheme] || {};
-				const wanted = [ Nino.theme._activeFrames[kind], theme[kind] ].filter( function( key ) {
+				const theme = Nino.design._themes[Nino.design._activeTheme] || {};
+				const wanted = [ Nino.design._activeFrames[kind], theme[kind] ].filter( function( key ) {
 					return key && keys.indexOf( key ) !== -1;
 				} );
 				select.value = wanted[0] || keys[0] || '';
@@ -248,8 +248,8 @@
 				if( select.dataset === undefined || select.dataset.themeFrameBound !== '1' ) {
 					if( select.dataset !== undefined ) select.dataset.themeFrameBound = '1';
 					select.addEventListener( 'change', function() {
-						Nino.theme._renderFramePreview( kind );
-						Nino.theme._updateAction();
+						Nino.design._renderFramePreview( kind );
+						Nino.design._updateAction();
 					} );
 				}
 			} );
@@ -265,26 +265,26 @@
 			}
 
 			const wanted = select.value;
-			const requestId = ( Nino.theme._framePreviewRequests[kind] || 0 ) + 1;
-			Nino.theme._framePreviewRequests[kind] = requestId;
+			const requestId = ( Nino.design._framePreviewRequests[kind] || 0 ) + 1;
+			Nino.design._framePreviewRequests[kind] = requestId;
 
 			const payload = {
 				kind : kind,
 				frame : wanted,
-				theme : Nino.theme._activeTheme,
+				theme : Nino.design._activeTheme,
 			};
-			if( Nino.theme._designStored !== null )
-				payload.design = Nino.theme._designStored;
+			if( Nino.design._designStored !== null )
+				payload.design = Nino.design._designStored;
 
-			Nino.theme._call( 'frame/preview', payload, function( status, response ) {
+			Nino.design._call( 'frame/preview', payload, function( status, response ) {
 
-				if( Nino.theme._framePreviewRequests[kind] !== requestId || select.value !== wanted )
+				if( Nino.design._framePreviewRequests[kind] !== requestId || select.value !== wanted )
 					return;
 
 				if( status !== 200 || response === null || typeof response.html !== 'string' ) {
 					view.removeAttribute('srcdoc');
-					if( Nino.theme._tab === kind )
-						Nino.theme._setStatus( kind, Nino.theme._errorText( status, response ), true );
+					if( Nino.design._tab === kind )
+						Nino.design._setStatus( kind, Nino.design._errorText( status, response ), true );
 					return;
 				}
 
@@ -294,39 +294,39 @@
 
 		_loadDesign : function() {
 
-			Nino.theme._call( 'design/read', {}, function( status, response ) {
+			Nino.design._call( 'design/read', {}, function( status, response ) {
 
 				if( status !== 200 || response === null ) {
-					Nino.theme._designReady = false;
-					Nino.theme._setStatus( 'design', Nino.theme._errorText( status, response ), true );
+					Nino.design._designReady = false;
+					Nino.design._setStatus( 'design', Nino.design._errorText( status, response ), true );
 					return;
 				}
 
-				Nino.theme._designSettings = Nino.theme._clone( response.settings || {} );
-				Nino.theme._designStored = Nino.theme._clone( response.settings || {} );
-				Nino.theme._designChoices = response.choices || {};
-				Nino.theme._designReady = true;
-				Nino.theme._renderDesign( response );
-				Nino.theme._updateAction();
+				Nino.design._designSettings = Nino.design._clone( response.settings || {} );
+				Nino.design._designStored = Nino.design._clone( response.settings || {} );
+				Nino.design._designChoices = response.choices || {};
+				Nino.design._designReady = true;
+				Nino.design._renderDesign( response );
+				Nino.design._updateAction();
 			} );
 		},
 
 		_renderDesign : function( response ) {
 
-			Object.keys( Nino.theme._designChoices ).forEach( function( knob ) {
-				Nino.theme._renderChoice( knob );
+			Object.keys( Nino.design._designChoices ).forEach( function( knob ) {
+				Nino.design._renderChoice( knob );
 			} );
 
-			[ 'primary', 'secondary' ].forEach( Nino.theme._bindColor );
-			Nino.theme._designBound = true;
-			Nino.theme._writeDesignInputs();
+			[ 'primary', 'secondary' ].forEach( Nino.design._bindColor );
+			Nino.design._designBound = true;
+			Nino.design._writeDesignInputs();
 
 			if( response.palette ) {
-				Nino.theme._paintSurfaces( 'light', response.palette.light || {} );
-				Nino.theme._paintSurfaces( 'dark', response.palette.dark || {} );
+				Nino.design._paintSurfaces( 'light', response.palette.light || {} );
+				Nino.design._paintSurfaces( 'dark', response.palette.dark || {} );
 			}
 			if( response.raster )
-				Nino.theme._paintSizes( response.raster );
+				Nino.design._paintSizes( response.raster );
 		},
 
 		_renderChoice : function( knob ) {
@@ -336,24 +336,24 @@
 				return;
 
 			select.innerHTML = '';
-			( Nino.theme._designChoices[knob] || [] ).forEach( function( value ) {
+			( Nino.design._designChoices[knob] || [] ).forEach( function( value ) {
 				const option = dc.createElement('option');
 				option.value = value;
 				option.textContent = value.charAt(0).toUpperCase()+ value.slice(1);
 				select.appendChild( option );
 			} );
-			select.value = Nino.theme._designSettings[knob] || '';
+			select.value = Nino.design._designSettings[knob] || '';
 
-			if( Nino.theme._designBound === false )
+			if( Nino.design._designBound === false )
 				select.addEventListener( 'change', function() {
-					Nino.theme._designSettings[knob] = select.value;
-					Nino.theme._scheduleDesignPreview();
+					Nino.design._designSettings[knob] = select.value;
+					Nino.design._scheduleDesignPreview();
 				} );
 		},
 
 		_bindColor : function( role ) {
 
-			if( Nino.theme._designBound === true )
+			if( Nino.design._designBound === true )
 				return;
 
 			const swatch = dc.getElementById('theme-design-'+ role);
@@ -362,24 +362,24 @@
 				return;
 
 			swatch.addEventListener( 'input', function() {
-				Nino.theme._designSettings[role] = swatch.value;
+				Nino.design._designSettings[role] = swatch.value;
 				hex.value = swatch.value;
-				Nino.theme._scheduleDesignPreview();
+				Nino.design._scheduleDesignPreview();
 			} );
 
 			hex.addEventListener( 'input', function() {
 				const value = hex.value.trim();
 				if( value === '' && role === 'secondary' ) {
-					Nino.theme._designSettings[role] = '';
-					Nino.theme._scheduleDesignPreview();
+					Nino.design._designSettings[role] = '';
+					Nino.design._scheduleDesignPreview();
 					return;
 				}
 				if( /^#[0-9a-fA-F]{6}$/.test( value ) === false )
 					return;
 
-				Nino.theme._designSettings[role] = value.toLowerCase();
+				Nino.design._designSettings[role] = value.toLowerCase();
 				swatch.value = value;
-				Nino.theme._scheduleDesignPreview();
+				Nino.design._scheduleDesignPreview();
 			} );
 		},
 
@@ -388,29 +388,29 @@
 			[ 'primary', 'secondary' ].forEach( function( role ) {
 				const swatch = dc.getElementById('theme-design-'+ role);
 				const hex = dc.getElementById('theme-design-'+ role+ '-hex');
-				const value = Nino.theme._designSettings[role] || '';
+				const value = Nino.design._designSettings[role] || '';
 
 				if( hex !== null ) hex.value = value;
-				if( swatch !== null ) swatch.value = value || Nino.theme._designSettings.primary || '#000000';
+				if( swatch !== null ) swatch.value = value || Nino.design._designSettings.primary || '#000000';
 			} );
 		},
 
 		_scheduleDesignPreview : function() {
 
-			if( Nino.theme._designTimer !== null )
-				wn.clearTimeout( Nino.theme._designTimer );
+			if( Nino.design._designTimer !== null )
+				wn.clearTimeout( Nino.design._designTimer );
 
-			Nino.theme._designTimer = wn.setTimeout( function() {
-				Nino.theme._designTimer = null;
-				Nino.theme._call( 'design/preview', Nino.theme._designSettings, function( status, response ) {
+			Nino.design._designTimer = wn.setTimeout( function() {
+				Nino.design._designTimer = null;
+				Nino.design._call( 'design/preview', Nino.design._designSettings, function( status, response ) {
 					if( status !== 200 || response === null )
 						return;
 
 					if( response.palette ) {
-						Nino.theme._paintSurfaces( 'light', response.palette.light || {} );
-						Nino.theme._paintSurfaces( 'dark', response.palette.dark || {} );
+						Nino.design._paintSurfaces( 'light', response.palette.light || {} );
+						Nino.design._paintSurfaces( 'dark', response.palette.dark || {} );
 					}
-					if( response.raster ) Nino.theme._paintSizes( response.raster );
+					if( response.raster ) Nino.design._paintSizes( response.raster );
 				} );
 			}, 150 );
 		},
@@ -484,109 +484,109 @@
 
 		_applyCurrent : function() {
 
-			const tab = Nino.theme._tab;
-			if( tab === 'theme' ) return Nino.theme._applyTheme();
-			if( tab === 'design' ) return Nino.theme._applyDesign();
-			if( tab === 'header' || tab === 'footer' ) return Nino.theme._applyFrame( tab );
+			const tab = Nino.design._tab;
+			if( tab === 'theme' ) return Nino.design._applyTheme();
+			if( tab === 'design' ) return Nino.design._applyDesign();
+			if( tab === 'header' || tab === 'footer' ) return Nino.design._applyFrame( tab );
 		},
 
 		_applyTheme : function() {
 
-			if( Nino.theme._appearanceReady !== true || Nino.theme._selectedTheme === null )
+			if( Nino.design._appearanceReady !== true || Nino.design._selectedTheme === null )
 				return;
 
-			Nino.theme._setBusy( true );
-			Nino.theme._setStatus( 'theme', 'Applying the complete Theme baseline …', false );
+			Nino.design._setBusy( true );
+			Nino.design._setStatus( 'theme', 'Applying the complete Theme baseline …', false );
 
-			Nino.theme._call( 'theme/apply', { theme : Nino.theme._selectedTheme }, function( status, response ) {
-				Nino.theme._setBusy( false );
+			Nino.design._call( 'theme/apply', { theme : Nino.design._selectedTheme }, function( status, response ) {
+				Nino.design._setBusy( false );
 
 				if( status !== 200 || response === null ) {
-					Nino.theme._setStatus( 'theme', Nino.theme._errorText( status, response ), true );
+					Nino.design._setStatus( 'theme', Nino.design._errorText( status, response ), true );
 					return;
 				}
 
-				Nino.theme._activeTheme = response.theme || Nino.theme._selectedTheme;
-				Nino.theme._designReady = false;
-				Nino.theme._designStored = null;
-				Nino.theme._setStatus( 'theme', 'Theme applied. Design, Header and Footer now use its recommended baseline.', false );
-				Nino.theme._loadAppearance( true );
+				Nino.design._activeTheme = response.theme || Nino.design._selectedTheme;
+				Nino.design._designReady = false;
+				Nino.design._designStored = null;
+				Nino.design._setStatus( 'theme', 'Theme applied. Design, Header and Footer now use its recommended baseline.', false );
+				Nino.design._loadAppearance( true );
 			} );
 		},
 
 		_applyDesign : function() {
 
-			if( Nino.theme._designReady !== true || Nino.theme._designSettings === null )
+			if( Nino.design._designReady !== true || Nino.design._designSettings === null )
 				return;
 
-			Nino.theme._setBusy( true );
-			Nino.theme._setStatus( 'design', 'Writing Design …', false );
-			Nino.theme._call( 'design/save', Nino.theme._designSettings, function( status, response ) {
-				Nino.theme._setBusy( false );
+			Nino.design._setBusy( true );
+			Nino.design._setStatus( 'design', 'Writing Design …', false );
+			Nino.design._call( 'design/save', Nino.design._designSettings, function( status, response ) {
+				Nino.design._setBusy( false );
 
 				if( status !== 200 || response === null ) {
-					Nino.theme._setStatus( 'design', Nino.theme._errorText( status, response ), true );
+					Nino.design._setStatus( 'design', Nino.design._errorText( status, response ), true );
 					return;
 				}
 
-				Nino.theme._designSettings = Nino.theme._clone( response.settings || Nino.theme._designSettings );
-				Nino.theme._designStored = Nino.theme._clone( Nino.theme._designSettings );
-				Nino.theme._writeDesignInputs();
-				Nino.theme._setStatus( 'design', 'Design written.', false );
+				Nino.design._designSettings = Nino.design._clone( response.settings || Nino.design._designSettings );
+				Nino.design._designStored = Nino.design._clone( Nino.design._designSettings );
+				Nino.design._writeDesignInputs();
+				Nino.design._setStatus( 'design', 'Design written.', false );
 			} );
 		},
 
 		_applyFrame : function( kind ) {
 
 			const select = dc.getElementById('theme-frame-'+ kind);
-			if( Nino.theme._appearanceReady !== true || select === null || select.value === '' )
+			if( Nino.design._appearanceReady !== true || select === null || select.value === '' )
 				return;
 
-			Nino.theme._setBusy( true );
-			Nino.theme._setStatus( kind, 'Applying '+ kind+ ' …', false );
-			Nino.theme._call( 'frame/apply', { kind : kind, frame : select.value }, function( status, response ) {
-				Nino.theme._setBusy( false );
+			Nino.design._setBusy( true );
+			Nino.design._setStatus( kind, 'Applying '+ kind+ ' …', false );
+			Nino.design._call( 'frame/apply', { kind : kind, frame : select.value }, function( status, response ) {
+				Nino.design._setBusy( false );
 
 				if( status !== 200 || response === null ) {
-					Nino.theme._setStatus( kind, Nino.theme._errorText( status, response ), true );
+					Nino.design._setStatus( kind, Nino.design._errorText( status, response ), true );
 					return;
 				}
 
-				Nino.theme._activeFrames[kind] = response.frame || select.value;
-				select.value = Nino.theme._activeFrames[kind];
-				Nino.theme._setStatus( kind, ( kind === 'header' ? 'Header' : 'Footer' )+ ' applied.', false );
+				Nino.design._activeFrames[kind] = response.frame || select.value;
+				select.value = Nino.design._activeFrames[kind];
+				Nino.design._setStatus( kind, ( kind === 'header' ? 'Header' : 'Footer' )+ ' applied.', false );
 			} );
 		},
 
 		_setStatus : function( tab, message, error ) {
-			Nino.theme._messages[tab] = message;
-			Nino.theme._errors[tab] = error === true;
-			if( tab === Nino.theme._tab )
-				Nino.theme._updateAction();
+			Nino.design._messages[tab] = message;
+			Nino.design._errors[tab] = error === true;
+			if( tab === Nino.design._tab )
+				Nino.design._updateAction();
 		},
 
 		_updateAction : function() {
 
 			const status = dc.getElementById('theme-action-status');
 			const save = dc.getElementById('theme-action-save');
-			const tab = Nino.theme._tab;
+			const tab = Nino.design._tab;
 
 			if( status !== null ) {
-				status.textContent = Nino.theme._messages[tab] || '';
-				status.classList.toggle( 'theme-status-error', Nino.theme._errors[tab] === true );
+				status.textContent = Nino.design._messages[tab] || '';
+				status.classList.toggle( 'theme-status-error', Nino.design._errors[tab] === true );
 			}
 
 			if( save === null )
 				return;
 
-			save.textContent = Nino.theme.ACTION_LABELS[tab];
+			save.textContent = Nino.design.ACTION_LABELS[tab];
 			if( tab === 'theme' )
-				save.disabled = Nino.theme._appearanceReady !== true || Nino.theme._selectedTheme === null;
+				save.disabled = Nino.design._appearanceReady !== true || Nino.design._selectedTheme === null;
 			else if( tab === 'design' )
-				save.disabled = Nino.theme._designReady !== true;
+				save.disabled = Nino.design._designReady !== true;
 			else {
 				const select = dc.getElementById('theme-frame-'+ tab);
-				save.disabled = Nino.theme._appearanceReady !== true || select === null || select.value === '';
+				save.disabled = Nino.design._appearanceReady !== true || select === null || select.value === '';
 			}
 		},
 
@@ -604,6 +604,6 @@
 		},
 	};
 
-	Nino.events.bindCallback( 'ready', Nino.theme.init );
+	Nino.events.bindCallback( 'ready', Nino.design.init );
 
 } )( window, document );

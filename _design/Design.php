@@ -2,7 +2,7 @@
 declare(strict_types=1);
 /**
  *	Nino								A compact filesystembased php framework
- *	Theme								/_theme - four post-install appearance editors.
+ *	Theme								/_design - four post-install appearance editors.
  *											Theme establishes a complete baseline; Design,
  *											Header and Footer remain independently editable.
  *
@@ -11,18 +11,18 @@ declare(strict_types=1);
  *	@link								https://github.com/dapeio/nino
  */
 
-namespace Nino\Theme {
+namespace Nino\Design {
 
 	/**
-	 *	Bootstrap, routes and the authenticated action map for /_theme.
+	 *	Bootstrap, routes and the authenticated action map for /_design.
 	 *	Authentication is /_admin's, exactly as /_templates does it - the tool
 	 *	writes project files, so it is a developer surface, not a public one.
 	 */
-	class Theme {
+	class Design {
 
 		// Where the generated stylesheet lands. A project file rather than a
 		// tool file: it is part of what gets served, and a backup has to carry
-		// it. Never edited by hand - every /_theme save rewrites it whole.
+		// it. Never edited by hand - every /_design save rewrites it whole.
 		public const string STYLESHEET = '/assets/style.design.css';
 
 		// The settings themselves live beside the routes in config.php, so the
@@ -34,21 +34,21 @@ namespace Nino\Theme {
 		public static function init( array &$appData ): void {
 
 			// Tool-owned routes always win over stale persisted collisions.
-			$appData['/nino/http/routes']['GET://_theme'] = [
-				'uri' 			=> '/_theme',
-				'body'			=> '[template /_theme/templates/page-index]',
+			$appData['/nino/http/routes']['GET://_design'] = [
+				'uri' 			=> '/_design',
+				'body'			=> '[template /_design/templates/page-index]',
 				'statusCode'	=> 200,
 			];
-			$appData['/nino/http/routes']['POST://_theme'] = [ 'uri' => '/_theme' ];
+			$appData['/nino/http/routes']['POST://_design'] = [ 'uri' => '/_design' ];
 
-			\Nino\Callbacks::registerCallback( $appData, '/nino/http/response/GET://_theme', 	[ self::class, 'handleGet' ] );
-			\Nino\Callbacks::registerCallback( $appData, '/nino/http/response/POST://_theme',	[ self::class, 'handlePost' ] );
+			\Nino\Callbacks::registerCallback( $appData, '/nino/http/response/GET://_design', 	[ self::class, 'handleGet' ] );
+			\Nino\Callbacks::registerCallback( $appData, '/nino/http/response/POST://_design',	[ self::class, 'handlePost' ] );
 		}
 
 		public static function handleGet( array &$appData, array &$request ): void {
 
 			if( \Nino\Admin\Admin::isAuthed( $appData ) === false )
-				$request['/nino/http/response']['body'] = '[template /_theme/templates/page-login]';
+				$request['/nino/http/response']['body'] = '[template /_design/templates/page-login]';
 		}
 
 		public static function handlePost( array &$appData, array &$request ): void {
@@ -144,14 +144,14 @@ namespace Nino\Theme {
 
 			\Nino\Http::ok( $request, [
 				'settings'	=> self::settings( $appData ),
-				'choices'	=> Design::choices(),
-				'surfaces'	=> Design::SURFACES,
+				'choices'	=> Tokens::choices(),
+				'surfaces'	=> Tokens::SURFACES,
 				'palette'	=> [
-					'light' => Design::palette( self::settings( $appData ), 'light' ),
-					'dark'	=> Design::palette( self::settings( $appData ), 'dark' ),
+					'light' => Tokens::palette( self::settings( $appData ), 'light' ),
+					'dark'	=> Tokens::palette( self::settings( $appData ), 'dark' ),
 				],
-				'raster'	=> Design::raster( self::settings( $appData ) ),
-				'brand'		=> Design::brand( self::settings( $appData ) ),
+				'raster'	=> Tokens::raster( self::settings( $appData ) ),
+				'brand'		=> Tokens::brand( self::settings( $appData ) ),
 			] );
 		}
 
@@ -165,16 +165,16 @@ namespace Nino\Theme {
 			if( self::guard( $appData, $request ) === false )
 				return;
 
-			$settings = Design::normalize( self::postData() );
+			$settings = Tokens::normalize( self::postData() );
 
 			\Nino\Http::ok( $request, [
 				'settings'	=> $settings,
 				'palette'	=> [
-					'light' => Design::palette( $settings, 'light' ),
-					'dark'	=> Design::palette( $settings, 'dark' ),
+					'light' => Tokens::palette( $settings, 'light' ),
+					'dark'	=> Tokens::palette( $settings, 'dark' ),
 				],
-				'raster'	=> Design::raster( $settings ),
-				'brand'		=> Design::brand( $settings ),
+				'raster'	=> Tokens::raster( $settings ),
+				'brand'		=> Tokens::brand( $settings ),
 			] );
 		}
 
@@ -183,7 +183,7 @@ namespace Nino\Theme {
 			if( self::guard( $appData, $request ) === false )
 				return;
 
-			$settings = Design::normalize( self::postData() );
+			$settings = Tokens::normalize( self::postData() );
 
 			if( self::write( $appData, $settings ) === false ) {
 				\Nino\Http::fail( $request, 500, 'could not write the design stylesheet' );
@@ -195,11 +195,11 @@ namespace Nino\Theme {
 
 		/**
 		 *	The settings currently in force, normalized. A project that has
-		 *	never opened /_theme still gets a complete, valid set rather than
+		 *	never opened /_design still gets a complete, valid set rather than
 		 *	nothing to render.
 		 */
 		public static function settings( array &$appData ): array {
-			return Design::normalize( is_array( $appData[self::SETTINGS_KEY] ?? null ) ? $appData[self::SETTINGS_KEY] : [] );
+			return Tokens::normalize( is_array( $appData[self::SETTINGS_KEY] ?? null ) ? $appData[self::SETTINGS_KEY] : [] );
 		}
 
 		/**
@@ -214,7 +214,7 @@ namespace Nino\Theme {
 		 */
 		public static function write( array &$appData, array $settings ): bool {
 
-			if( \Nino\Filesystem::putFileContent( $appData, self::STYLESHEET, Design::css( $settings ) ) === false )
+			if( \Nino\Filesystem::putFileContent( $appData, self::STYLESHEET, Tokens::css( $settings ) ) === false )
 				return false;
 
 			$appData[self::SETTINGS_KEY] 		= $settings;
@@ -259,7 +259,7 @@ namespace Nino\Theme {
 	}
 
 	/**
-	 *	The selectable appearance units shared by /_install and /_theme. The
+	 *	The selectable appearance units shared by /_install and /_design. The
 	 *	catalogue lives at project-root /library rather than below the removable
 	 *	installer, so a completed project can change its Theme and frames later.
 	 *
@@ -291,7 +291,7 @@ namespace Nino\Theme {
 
 		public static function apiApply( array &$appData, array &$request ): void {
 
-			$data = Theme::postData();
+			$data = Design::postData();
 			$key = (string) ( $data['theme'] ?? '' );
 			$manifest = self::_readManifest( $key );
 
@@ -335,13 +335,13 @@ namespace Nino\Theme {
 				array_map( static fn( string $kind ): string => '/nino/install/'. $kind, array_keys( $applied ) )
 			);
 
-			$design = Design::normalize(
+			$design = Tokens::normalize(
 				is_array( $data['design'] ?? null )
 					? $data['design']
 					: ( is_array( $manifest['design'] ?? null ) ? $manifest['design'] : [] )
 			);
 
-			if( Theme::write( $appData, $design ) === false ) {
+			if( Design::write( $appData, $design ) === false ) {
 				\Nino\Http::fail( $request, 500, 'could not write the design stylesheet' );
 				return;
 			}
@@ -352,7 +352,7 @@ namespace Nino\Theme {
 
 		public static function apiFrame( array &$appData, array &$request ): void {
 
-			$data = Theme::postData();
+			$data = Design::postData();
 			$kind = (string) ( $data['kind'] ?? '' );
 
 			if( isset( self::FRAMES[$kind] ) === false ) {
@@ -386,7 +386,7 @@ namespace Nino\Theme {
 
 		public static function apiFrameApply( array &$appData, array &$request ): void {
 
-			$data = Theme::postData();
+			$data = Design::postData();
 			$kind = (string) ( $data['kind'] ?? '' );
 			$frame = (string) ( $data['frame'] ?? '' );
 
@@ -411,7 +411,7 @@ namespace Nino\Theme {
 
 		private static function _framePreviewMarkup( array &$appData, string $source ): string {
 
-			// Prefer the installed include: /_theme edits a live project, so its
+			// Prefer the installed include: /_design edits a live project, so its
 			// preview should use the navigation/legal/locale markup actually there.
 			$source = (string) preg_replace_callback( '/\[template \/templates\/([a-z0-9.-]+)\]/', static function( array $include ) use ( &$appData ): string {
 				$content = \Nino\Filesystem::getFileContent( $appData, '/templates/'. $include[1]. '.tpl', '' );
@@ -529,9 +529,9 @@ namespace Nino\Theme {
 
 			$css = (string) @file_get_contents( dirname( __DIR__ ). '/_nino/Nino.css' );
 			$settings = is_array( $data['design'] ?? null )
-				? Design::normalize( $data['design'] )
-				: Theme::settings( $appData );
-			$css .= "\n". Design::css( $settings );
+				? Tokens::normalize( $data['design'] )
+				: Design::settings( $appData );
+			$css .= "\n". Tokens::css( $settings );
 
 			$theme = (string) ( $data['theme'] ?? self::_currentTheme( $appData ) ?? '' );
 			if( self::_readManifest( $theme ) !== null )
@@ -769,7 +769,7 @@ namespace Nino\Theme {
 	 *	rather than assumed from a fixed lightness, so the guarantee is one the
 	 *	tests can check and not a convention.
 	 */
-	class Design {
+	class Tokens {
 
 
 		// A Theme addresses these, never a ramp step. default/alt/dark/black
@@ -905,7 +905,7 @@ namespace Nino\Theme {
 		 *	value can be an array or an object as easily as a string, and php
 		 *	raises rather than returning false when one is used as an array
 		 *	offset - isset() included. Reached from the wire through
-		 *	/_theme's design/save and /_install's design/apply, so an
+		 *	/_design's design/save and /_install's design/apply, so an
 		 *	unchecked one is a 500 anybody can ask for.
 		 *
 		 *	@param		mixed			$value				Straight off the wire
@@ -1202,7 +1202,7 @@ namespace Nino\Theme {
 		 */
 		public static function css( array $settings ): string {
 
-			$out = "/* Generated by /_theme. Do not edit - every save rewrites this file. */\n";
+			$out = "/* Generated by /_design. Do not edit - every save rewrites this file. */\n";
 			$out .= ":root {\n\tcolor-scheme: light dark;\n". self::block( $settings, 'light' ). self::sizes( $settings ). "}\n";
 
 			// The raster has no dark variant, so it sits in the bare :root

@@ -7,7 +7,7 @@
 Dieses Handbuch erklärt die Architektur von Nino und das Zusammenspiel von Konfiguration, Daten, Templates und Modulen. Falls du stattdessen direkt eine Webseite einrichten möchtest, beginne mit [Erste Schritte](getting-started.de.md); konkrete APIs und Implementierungsdetails stehen im [Entwickler-Handbuch](development.de.md).
 
 **Weitere Links:**
-[README](../README.de.md) · [Grundkonzepte](concepts.de.md) · [Entwickler-Handbuch](development.de.md) · [Erste Schritte](getting-started.de.md) · [`/_install`-Referenz](_install.de.md) · [`/_admin`-Bedienung](_admin.de.md) · [`/_templates`-Bedienung](_templates.de.md) · [`/_editor`-Bedienung](_editor.de.md) · [`/_theme`-Bedienung](_theme.de.md) · [Deployment](deployment.de.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
+[README](../README.de.md) · [Grundkonzepte](concepts.de.md) · [Entwickler-Handbuch](development.de.md) · [Erste Schritte](getting-started.de.md) · [`/_install`-Referenz](_install.de.md) · [`/_admin`-Bedienung](_admin.de.md) · [`/_templates`-Bedienung](_templates.de.md) · [`/_editor`-Bedienung](_editor.de.md) · [`/_design`-Bedienung](_design.de.md) · [Deployment](deployment.de.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
 
 ## Kernsäulen
 Nino organisiert eine Webseite mit nur wenigen, aber klar getrennten Bausteinen:
@@ -159,18 +159,18 @@ Projekt-Namespace nach `app/`; die kerneigenen Klassen unter `Nino\` bleiben in
 `_nino/`. So bleibt die Erweiterung Teil des konkreten Projekts, `_nino/` kann
 ersetzt werden und es entsteht kein zweites Hook- oder Plugin-System.
 
-## `/_admin`, `/_theme`, `/_templates` und `/_editor`
+## `/_admin`, `/_design`, `/_templates` und `/_editor`
 
 Die optionalen Oberflächen besitzen eigene Einstiegspunkte und sind keine Frontend-Module aus `/nino/modules`:
 
 | Oberfläche | Verantwortung |
 |---|---|
 | [`/_admin`](_admin.de.md) | vollständiger technischer Zugriff auf Struktur, Konfiguration, Texte und Elemente |
-| [`/_theme`](_theme.de.md) | Theme, erzeugte Design-Tokens, Header und Footer nach der Installation |
+| [`/_design`](_design.de.md) | Theme, erzeugte Design-Tokens, Header und Footer nach der Installation |
 | [`/_templates`](_templates.de.md) | sectionbasierte Komposition, wiederverwendbare Template-Includes und native Schnellbefüllung von `page-*.tpl` |
 | [`/_editor`](_editor.de.md) | tägliche Pflege freigegebener Inhalte, Bilder, Nutzer- und Betriebsdaten |
 
-`/_theme` und `/_templates` teilen Passwort und Sitzung mit `/_admin`; `/_editor` besitzt dagegen einzelne Konten und granulare Rechte. Damit liegt die Abgrenzung nicht mehr allein zwischen Struktur und Inhalt, sondern vor allem zwischen vollständigem Entwicklungszugriff und eingeschränkter redaktioneller Arbeit.
+`/_design` und `/_templates` teilen Passwort und Sitzung mit `/_admin`; `/_editor` besitzt dagegen einzelne Konten und granulare Rechte. Damit liegt die Abgrenzung nicht mehr allein zwischen Struktur und Inhalt, sondern vor allem zwischen vollständigem Entwicklungszugriff und eingeschränkter redaktioneller Arbeit.
 
 ## Wo gehört eine Änderung hin?
 
@@ -183,7 +183,7 @@ Die optionalen Oberflächen besitzen eigene Einstiegspunkte und sind keine Front
 | neue öffentliche URL anlegen | Route in `config.php` beziehungsweise über `/_admin` |
 | dynamische Liste ausgeben | Element-Abfrage oder Shortcode mit Callback |
 | technische Funktion ergänzen | projektspezifisches Modul |
-| Theme, Design, Header oder Footer ändern | `/_theme`; Stylesheets für projektspezifische Übersteuerungen jenseits des Katalogs |
+| Theme, Design, Header oder Footer ändern | `/_design`; Stylesheets für projektspezifische Übersteuerungen jenseits des Katalogs |
 
 ## Wie es weitergeht
 

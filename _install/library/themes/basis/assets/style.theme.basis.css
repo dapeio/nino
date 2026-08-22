@@ -26,14 +26,14 @@
 	every size straight off the framework scale. The look to pick when the
 	content should do the talking.
 
-	Colours here are assignments, never values. /_theme generates the --nino-*
+	Colours here are assignments, never values. /_design generates the --nino-*
 	tokens this file reads (assets/style.design.css, loaded immediately before
 	it) and measures every background/text pair it publishes; what this unit
 	decides is which surface each role sits on. Recolouring the site is
-	therefore a /_theme save and nothing below has to change.
+	therefore a /_design save and nothing below has to change.
 
 	Three rules follow. Never write a literal colour into a role - a hex here
-	is a pair /_theme cannot vouch for. Never pair across surfaces, because
+	is a pair /_design cannot vouch for. Never pair across surfaces, because
 	--color-section-alt-text belongs to --nino-on-alt and to nothing else. And
 	never put text on --nino-origin: it is the brand exactly as the operator
 	picked it, so it is the one surface with no contrast promise attached -
@@ -57,7 +57,7 @@
 	--color-border: var(--nino-default-border);
 	--color-header-bg: var(--nino-default);
 
-	/* The scrim over a cover image - not a pair /_theme can solve, since
+	/* The scrim over a cover image - not a pair /_design can solve, since
 	   it cannot know the photograph underneath, so the theme derives it
 	   from its deepest surface and owns the light text put on top */
 	--color-background-dim: color-mix(in srgb, var(--nino-black) 78%, transparent);
@@ -97,7 +97,7 @@
 	--fontsize-big: 1.25em;
 	--fontsize-btn: 1rem;
 
-	/* Sizes are assignments too. The raster comes from /_theme's Volume,
+	/* Sizes are assignments too. The raster comes from /_design's Volume,
 	   Spacing and Shaping steps - this unit declares 'default/default/default' in
 	   its manifest, which is what a hand-tuned block here used to spell out one
 	   number at a time. The wide-screen half of the type scale is the raster's

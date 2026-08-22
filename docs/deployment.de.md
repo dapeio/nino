@@ -7,7 +7,7 @@
 Dieses Handbuch führt eine fertig entwickelte Nino-Webseite in den produktiven Betrieb. Falls du stattdessen ein frisches Projekt einrichten möchtest, beginne mit [Erste Schritte](getting-started.de.md); technische Erweiterungen behandelt das [Entwickler-Handbuch](development.de.md).
 
 **Weitere Links:**
-[README](../README.de.md) · [Grundkonzepte](concepts.de.md) · [Entwickler-Handbuch](development.de.md) · [Erste Schritte](getting-started.de.md) · [`/_install`-Referenz](_install.de.md) · [`/_admin`-Bedienung](_admin.de.md) · [`/_templates`-Bedienung](_templates.de.md) · [`/_editor`-Bedienung](_editor.de.md) · [`/_theme`-Bedienung](_theme.de.md) · [Deployment](deployment.de.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
+[README](../README.de.md) · [Grundkonzepte](concepts.de.md) · [Entwickler-Handbuch](development.de.md) · [Erste Schritte](getting-started.de.md) · [`/_install`-Referenz](_install.de.md) · [`/_admin`-Bedienung](_admin.de.md) · [`/_templates`-Bedienung](_templates.de.md) · [`/_editor`-Bedienung](_editor.de.md) · [`/_design`-Bedienung](_design.de.md) · [Deployment](deployment.de.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
 
 ## Voraussetzungen des Zielsystems
 Nino benötigt weder Datenbankserver noch Composer-Installation auf dem Zielsystem. Das vereinfacht zwar das Deployment, macht die Dateien des Projekts aber umso wichtiger: Konfiguration und redaktionelle Daten liegen direkt im Dateisystem und müssen beim Übertragen, Sichern und Berechtigen vollständig berücksichtigt werden.
@@ -35,7 +35,7 @@ In beiden Fällen muss `/_install` einen frischen Checkout einmal in einen gült
 
 ## Webroot und Routing
 
-Der Einstiegspunkt der öffentlichen Webseite ist `index.php`. Die Bereiche `/_editor`, `/_admin`, `/_theme`, `/_templates` und während der Einrichtung `/_install` besitzen eigene Einstiegspunkte. Der Webserver muss vorhandene statische Dateien direkt ausliefern und alle übrigen Webseitenanfragen an Nino weiterreichen.
+Der Einstiegspunkt der öffentlichen Webseite ist `index.php`. Die Bereiche `/_editor`, `/_admin`, `/_design`, `/_templates` und während der Einrichtung `/_install` besitzen eigene Einstiegspunkte. Der Webserver muss vorhandene statische Dateien direkt ausliefern und alle übrigen Webseitenanfragen an Nino weiterreichen.
 
 Für die lokale Entwicklung übernimmt `router.php` dieses Verhalten:
 
@@ -62,7 +62,7 @@ Prüfe in der Hosting-Konfiguration zusätzlich, wie nicht vorhandene Pfade an `
 
 - vorhandene öffentliche Assets direkt ausliefern;
 - normale Webseitenrouten an `index.php` weitergeben;
-- `/_editor`, `/_admin`, `/_theme`, `/_templates` und gegebenenfalls `/_install` an ihre eigenen Einstiegspunkte routen;
+- `/_editor`, `/_admin`, `/_design`, `/_templates` und gegebenenfalls `/_install` an ihre eigenen Einstiegspunkte routen;
 - Zugriffe auf Dotfiles und Dot-Verzeichnisse verweigern;
 - **`private/` vollständig sperren** – es wird nie von einem Browser angefragt, sondern nur von PHP gelesen;
 - direkte Zugriffe auf `_install/library/` bis auf `_install/library/themes/<key>/preview.svg` sperren – die übrigen Dateien sind serverseitige Darstellungsquellen;
@@ -83,7 +83,7 @@ Eine allgemeine Beispielkonfiguration kann die Pfade und PHP-FPM-Einstellungen e
 
 Vor der Ersteinrichtung muss PHP in der Projektwurzel Verzeichnisse und Dateien anlegen dürfen. Die noch fehlenden Projektpfade werden von `/_install` beziehungsweise bei Bedarf vom Kernel erzeugt und sind keine manuell anzulegende Voraussetzung.
 
-Im laufenden Betrieb benötigt Nino Schreibrechte nur für tatsächlich veränderliche Inhalte. Dazu gehören je nach Nutzung `private/config.php`, `private/text/`, `private/elements/`, `private/data/`, `private/.logs/`, `private/.backups/`, `public/images/` und `public/.cache/`. Der Template Builder unter `/_templates` benötigt zusätzlich `private/templates/`; er kann native Textschlüssel, Elementtypen und Bildplatz-Definitionen in der Konfiguration anlegen. Das Anwenden von Darstellungsvarianten in `/_theme` benötigt `private/templates/`, `public/assets/`, `public/fonts/` sowie jedes weitere öffentliche Ziel, das ein Theme-Manifest erklärt. Der Darstellungskatalog unter `_install/library/` selbst bleibt schreibgeschützt. `/_admin` schreibt je nach Funktion unter anderem Konfiguration, Texte, Elemente und Bilder. Projektwurzel und PHP-Quellcode können ansonsten nach der Installation schreibgeschützt bleiben.
+Im laufenden Betrieb benötigt Nino Schreibrechte nur für tatsächlich veränderliche Inhalte. Dazu gehören je nach Nutzung `private/config.php`, `private/text/`, `private/elements/`, `private/data/`, `private/.logs/`, `private/.backups/`, `public/images/` und `public/.cache/`. Der Template Builder unter `/_templates` benötigt zusätzlich `private/templates/`; er kann native Textschlüssel, Elementtypen und Bildplatz-Definitionen in der Konfiguration anlegen. Das Anwenden von Darstellungsvarianten in `/_design` benötigt `private/templates/`, `public/assets/`, `public/fonts/` sowie jedes weitere öffentliche Ziel, das ein Theme-Manifest erklärt. Der Darstellungskatalog unter `_install/library/` selbst bleibt schreibgeschützt. `/_admin` schreibt je nach Funktion unter anderem Konfiguration, Texte, Elemente und Bilder. Projektwurzel und PHP-Quellcode können ansonsten nach der Installation schreibgeschützt bleiben.
 
 Vergib diese Rechte an den Benutzer, unter dem PHP ausgeführt wird. Weltweit beschreibbare Rechte wie `0777` sind keine geeignete Dauerlösung. Nach dem Deployment sollten Kernel und übriger PHP-Quellcode nicht allgemein beschreibbar sein.
 
@@ -133,7 +133,7 @@ Fehlermeldungen sollten im Browser keine Dateipfade, Konfigurationswerte oder St
 Vor dem Go-live müssen beide Zugänge funktionieren und voneinander getrennte, starke Passwörter besitzen:
 
 - `/_admin` ist die vollständige technische und inhaltliche Verwaltung für Entwickler.
-- `/_theme` bearbeitet Theme, Design, Header und Footer und verwendet Passwort, Sperrstatus und Sitzung von `/_admin`.
+- `/_design` bearbeitet Theme, Design, Header und Footer und verwendet Passwort, Sperrstatus und Sitzung von `/_admin`.
 - `/_templates` ist das sectionbasierte Alpha-Werkzeug und verwendet Passwort, Sperrstatus und Sitzung von `/_admin`.
 - `/_editor` besitzt einzelne Nutzerkonten und Berechtigungen für Betreiber und Redakteure.
 
@@ -141,13 +141,13 @@ Vergib Editor-Rechte so eng wie praktisch möglich. Das während `/_install` ang
 
 HTTPS schützt nicht nur Anmeldedaten, sondern auch die Session-Cookies und alle redaktionell übertragenen Inhalte. Leite HTTP-Anfragen dauerhaft auf HTTPS um und teste die Anmeldung erst über die endgültige öffentliche Adresse.
 
-Zusätzlicher Webserver-Schutz für `/_admin`, `/_theme` und `/_templates` – etwa IP-Freigaben oder HTTP-Authentifizierung – kann bei passenden Betriebsbedingungen eine sinnvolle zweite Barriere bilden. Er ersetzt das Nino-Passwort nicht. Werden die Werkzeuge nach Entwicklung und Abnahme nicht benötigt, können alle drei aus der produktiven Auslieferung entfernt werden.
+Zusätzlicher Webserver-Schutz für `/_admin`, `/_design` und `/_templates` – etwa IP-Freigaben oder HTTP-Authentifizierung – kann bei passenden Betriebsbedingungen eine sinnvolle zweite Barriere bilden. Er ersetzt das Nino-Passwort nicht. Werden die Werkzeuge nach Entwicklung und Abnahme nicht benötigt, können alle drei aus der produktiven Auslieferung entfernt werden.
 
 ## `/_install` nach der Einrichtung
 
 Schließe den Assistenten vollständig ab. Der letzte Schritt setzt das echte Passwort von `/_admin` und sperrt den Installer. Entferne anschließend das Verzeichnis `_install/` aus der produktiven Auslieferung.
 
-Damit verschwindet auch der Darstellungskatalog unter `_install/library/`. Das ist beabsichtigt: Der Katalog ist Einrichtungsmaterial, kein Laufzeitfeature. Angewendete Themes und Frames liegen längst als Projektdateien in `assets/` und `templates/` und bleiben von Hand sowie über `/_templates` bearbeitbar. In `/_theme` arbeitet der Design-Dialog unverändert weiter — er erzeugt die Palette und das Raster, statt Dateien zu kopieren; die drei katalogbasierten Dialoge haben danach nichts mehr aufzulisten. Wer Theme, Header und Footer dauerhaft umschaltbar halten will, liefert das gesperrte `_install/` bewusst mit aus.
+Damit verschwindet auch der Darstellungskatalog unter `_install/library/`. Das ist beabsichtigt: Der Katalog ist Einrichtungsmaterial, kein Laufzeitfeature. Angewendete Themes und Frames liegen längst als Projektdateien in `assets/` und `templates/` und bleiben von Hand sowie über `/_templates` bearbeitbar. In `/_design` arbeitet der Design-Dialog unverändert weiter — er erzeugt die Palette und das Raster, statt Dateien zu kopieren; die drei katalogbasierten Dialoge haben danach nichts mehr aufzulisten. Wer Theme, Header und Footer dauerhaft umschaltbar halten will, liefert das gesperrte `_install/` bewusst mit aus.
 
 Die Reihenfolge ist wesentlich:
 
@@ -188,7 +188,7 @@ Die Smoke-Tests ersetzen keinen projektspezifischen Abnahmetest. Prüfe zusätzl
 - Formulare einschließlich Validierung, Versand und Fehlermeldungen;
 - Anmeldung, Abmeldung und Rechte in `/_editor`;
 - technischen Zugang zu `/_admin`;
-- alle vier Darstellungsdialoge in `/_theme` einschließlich einer Frame-Vorschau;
+- alle vier Darstellungsdialoge in `/_design` einschließlich einer Frame-Vorschau;
 - Zugriff und unveränderten Round-Trip in `/_templates`, sofern der Alpha-Builder ausgeliefert wird;
 - Schreiben und erneutes Laden eines redaktionellen Inhalts;
 - Verhalten hinter CDN, Proxy oder Cache, sofern eingesetzt.
@@ -200,7 +200,7 @@ Ein erfolgreicher Aufruf der Startseite belegt noch nicht, dass sensible Dateien
 - Dotfiles und Dot-Verzeichnisse;
 - `config.php` und PHP-Datendateien;
 - versteckte Log- und Backup-Verzeichnisse;
-- interne Dateien aus `_admin/`, `_theme/`, `_templates/` und `_editor/`, die nicht als öffentliche Assets vorgesehen sind;
+- interne Dateien aus `_admin/`, `_design/`, `_templates/` und `_editor/`, die nicht als öffentliche Assets vorgesehen sind;
 - Dateien unter `_install/library/` mit Ausnahme von `_install/library/themes/*/preview.svg`;
 - `_install/`, nachdem es entfernt wurde.
 
@@ -238,7 +238,7 @@ Nino befindet sich in der Beta-Phase. Sicherheitskorrekturen erscheinen auf `mai
 - [ ] `/_install` wurde vollständig abgeschlossen und anschließend produktiv entfernt.
 - [ ] Wird `_install/` mitgeliefert, um Theme/Header/Footer umschaltbar zu halten, ist es gesperrt und von seinem Katalog sind nur die Theme-Vorschauen direkt erreichbar.
 - [ ] `/_admin` und `/_editor` besitzen getestete, getrennte Zugänge.
-- [ ] `/_theme` ist entweder gemeinsam mit `/_admin` entfernt oder durch dessen Admin-Zugang geschützt und damit getestet.
+- [ ] `/_design` ist entweder gemeinsam mit `/_admin` entfernt oder durch dessen Admin-Zugang geschützt und damit getestet.
 - [ ] `/_templates` ist entweder entfernt oder mit dem Admin-Zugang geschützt und als Alpha bewusst freigegeben.
 - [ ] Editor-Nutzer haben nur die benötigten Berechtigungen.
 - [ ] HTTPS und sichere Session-Cookies funktionieren an der endgültigen Adresse.

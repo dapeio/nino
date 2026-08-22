@@ -30,7 +30,7 @@ Der Template Builder erzeugt keine Routen, bearbeitet nicht den Inhalt eingebund
 
 ## Zugang und Sicherheit
 
-Öffne `https://deine-domain.example/_templates`. Das Werkzeug teilt Passwort, Sperrstatus und Sitzung mit `/_admin`. Seine Kopfleiste trägt die gemeinsame Brücke **Admin / Builder / Theme**; nur vollständig ausgelieferte Werkzeugordner erscheinen, **Builder** kennzeichnet die aktuelle Oberfläche. Das Werkzeug benötigt `_admin/Admin.php`; ohne `/_admin` fehlt auch sein Authentifizierungs-Backend.
+Öffne `https://deine-domain.example/_templates`. Das Werkzeug teilt Passwort, Sperrstatus und Sitzung mit `/_admin`. Seine Kopfleiste trägt die gemeinsame Brücke **Admin / Builder / Design**; nur vollständig ausgelieferte Werkzeugordner erscheinen, **Builder** kennzeichnet die aktuelle Oberfläche. Das Werkzeug benötigt `_admin/Admin.php`; ohne `/_admin` fehlt auch sein Authentifizierungs-Backend.
 
 Geschrieben werden:
 

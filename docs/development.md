@@ -7,7 +7,7 @@
 This manual describes the technical work with Nino — from the entry point through routing and rendering to custom modules, persistent data, and tests. If you instead want to first learn about the architecture or set up a fresh project, read the [Concepts](concepts.md) or [Getting Started](getting-started.md).
 
 **Additional Links:**
-[README](../README.md) · [Concepts](concepts.md) · [Developer Manual](development.md) · [Getting Started](getting-started.md) · [`/_install` Reference](_install.md) · [`/_admin` Operation](_admin.md) · [`/_templates` Operation](_templates.md) · [`/_editor` Operation](_editor.md) · [`/_theme` Operation](_theme.md) · [Deployment](deployment.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
+[README](../README.md) · [Concepts](concepts.md) · [Developer Manual](development.md) · [Getting Started](getting-started.md) · [`/_install` Reference](_install.md) · [`/_admin` Operation](_admin.md) · [`/_templates` Operation](_templates.md) · [`/_editor` Operation](_editor.md) · [`/_design` Operation](_design.md) · [Deployment](deployment.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
 
 **Developer Profile:** For simple websites, solid knowledge of HTML, CSS, and JavaScript as well as PHP basics is sufficient. Templates consist of HTML+, i.e., HTML with textfills and shortcodes. Only custom application logic, external interfaces, or new modules require deeper PHP knowledge. A finished project can then be largely maintained via `/_admin`, `/_templates`, and `/_editor`.
 
@@ -708,7 +708,7 @@ The example shows the entry point of `/_templates`; the other areas initialize t
 - `/_templates` creates and composes `page-*.tpl` files from complete HTML and template sections and quick-fills native content;
 - `/_editor` maintains content and operational data within account permissions.
 
-`/_templates` integrates admin authentication and shares password, lock status, and session with `/_admin`. If `_admin/` is removed from a delivery, the builder is therefore also unavailable. `/_theme` shares the same session and is subject to the same rule.
+`/_templates` integrates admin authentication and shares password, lock status, and session with `/_admin`. If `_admin/` is removed from a delivery, the builder is therefore also unavailable. `/_design` shares the same session and is subject to the same rule.
 
 ---
 
@@ -791,7 +791,7 @@ Nino uses standalone smoke tests without PHPUnit. Each test creates an isolated 
 | `tests/editor-smoke.php` | Editor routes, permissions, backups, logs, and content operations |
 | `tests/admin-smoke.php` | Admin authentication and technical management functions |
 | `tests/install-smoke.php` | Installation steps, generated structure, and self-lock |
-| `tests/theme-smoke.php` | generated Design values and authenticated Theme/Header/Footer operations |
+| `tests/design-smoke.php` | generated Design values and authenticated Theme/Header/Footer operations |
 | `tests/templates-smoke.php` | section composition, template includes, lossless page frames, content quick fill, and save conflicts |
 | `tests/*-js-smoke.js` | browser-like logic of management interfaces and template builder |
 | `tests/concurrency-smoke.php` | parallel and atomic write operations |
@@ -804,7 +804,7 @@ php tests/search-smoke.php
 php tests/editor-smoke.php
 php tests/admin-smoke.php
 php tests/install-smoke.php
-php tests/theme-smoke.php
+php tests/design-smoke.php
 php tests/templates-smoke.php
 for test in tests/*-js-smoke.js; do node "$test"; done
 php tests/concurrency-smoke.php
