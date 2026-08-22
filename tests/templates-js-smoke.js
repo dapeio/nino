@@ -122,6 +122,14 @@ check( 'gallery and detail previews use an opaque sandbox while CSP still denies
 check( 'the initial detail preview uses the same opaque sandbox', templateMarkup.includes( 'sandbox="allow-scripts"' )
 	&& !templateMarkup.includes( 'sandbox="allow-same-origin"' )
 	&& templateMarkup.includes( 'sandbox=""' ) === false );
+check( 'the top rail mounts the shared dynamic tool bridge instead of a fixed Admin back-link', templateMarkup.includes('[admin-tools templates]')
+	&& templateMarkup.includes('class="pd-head-rail nino-admin-rail-head"')
+	&& templateMarkup.includes('pd-back-admin') === false );
+check( 'the Template bridge uses the same desktop rail geometry as Admin and Theme', styleSource.includes('--pd-topbar-height: 6.85rem')
+	&& /#pd-app \.pd-head-rail \{[^}]*flex-direction: column;[^}]*width: var\(--pd-sidebar-width\);[^}]*padding: 1rem 1\.07rem \.85rem;/s.test( styleSource )
+	&& styleSource.includes('@media (min-width: 58.001rem) and (max-width: 63.999rem)')
+	&& /#pd-app \.pd-head-rail \.nino-admin-brand-mark \{[^}]*width: 2rem;[^}]*height: 2rem;[^}]*box-shadow: none;/s.test( styleSource ) );
+check( 'the Template bridge follows the shared compact-screen wrap', /@media \(max-width: 38rem\)[\s\S]*?#pd-app \.pd-head-rail \{[^}]*flex-wrap: wrap;[\s\S]*?#pd-app \.pd-head-rail \.nino-admin-tools \{[^}]*flex: 1 0 100%;/.test( styleSource ) );
 check( 'new-template UI asks for filename, name, shell slots and VPA', [ 'pd-create-filename', 'pd-create-name', 'pd-create-header', 'pd-create-footer', 'pd-create-vpa' ].every( function( id ) { return templateMarkup.includes( 'id="'+ id+ '"' ) } ) );
 check( 'the primary toolbar exposes one Add Section entry point', templateMarkup.includes( 'id="pd-add-section"' ) && templateMarkup.includes( 'id="pd-add-template"' ) === false );
 check( 'Add Section is the final workspace control instead of a template setting',

@@ -24,6 +24,16 @@ if( preg_match( '#^/private(?:/|$)#', $uri ) === 1 ) {
     return true;
 }
 
+// The durable appearance library is source for /_install and /_theme, not a
+// second public asset tree. Theme picker images are its one intentional public
+// file; mirror library/.htaccess here because PHP's development server ignores
+// Apache configuration entirely.
+if( preg_match( '#^/library(?:/|$)#', $uri ) === 1
+	&& preg_match( '#^/library/themes/[a-z0-9][a-z0-9-]*/preview\.svg$#', $uri ) !== 1 ) {
+	http_response_code( 404 );
+	return true;
+}
+
 // Dotfiles/dotdirs never get served as static files, .cache/ (the
 // bundled/minified css+js the [assets ...] shortcode generates) and
 // .demo/ (the bundled demo images) are the two exceptions - without

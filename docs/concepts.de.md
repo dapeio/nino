@@ -159,19 +159,18 @@ Projekt-Namespace nach `app/`; die kerneigenen Klassen unter `Nino\` bleiben in
 `_nino/`. So bleibt die Erweiterung Teil des konkreten Projekts, `_nino/` kann
 ersetzt werden und es entsteht kein zweites Hook- oder Plugin-System.
 
-## `/_admin`, `/_templates` und `/_editor`
+## `/_admin`, `/_theme`, `/_templates` und `/_editor`
 
 Die optionalen Oberflächen besitzen eigene Einstiegspunkte und sind keine Frontend-Module aus `/nino/modules`:
 
 | Oberfläche | Verantwortung |
 |---|---|
 | [`/_admin`](_admin.de.md) | vollständiger technischer Zugriff auf Struktur, Konfiguration, Texte und Elemente |
+| [`/_theme`](_theme.de.md) | Theme, erzeugte Design-Tokens, Header und Footer nach der Installation |
 | [`/_templates`](_templates.de.md) | sectionbasierte Komposition, wiederverwendbare Template-Includes und native Schnellbefüllung von `page-*.tpl` |
 | [`/_editor`](_editor.de.md) | tägliche Pflege freigegebener Inhalte, Bilder, Nutzer- und Betriebsdaten |
 
-`/_templates` teilt Passwort und Sitzung mit `/_admin`; `/_editor` besitzt dagegen einzelne Konten und granulare Rechte. Damit liegt die Abgrenzung nicht mehr allein zwischen Struktur und Inhalt, sondern vor allem zwischen vollständigem Entwicklungszugriff und eingeschränkter redaktioneller Arbeit.
-
-`/_theme` ergänzt diese Werkzeuge um die Design-Ebene: Es erzeugt die Farb- und Größen-Tokens, aus denen jedes Stylesheet liest, und bleibt auch nach einer Installation nutzbar.
+`/_theme` und `/_templates` teilen Passwort und Sitzung mit `/_admin`; `/_editor` besitzt dagegen einzelne Konten und granulare Rechte. Damit liegt die Abgrenzung nicht mehr allein zwischen Struktur und Inhalt, sondern vor allem zwischen vollständigem Entwicklungszugriff und eingeschränkter redaktioneller Arbeit.
 
 ## Wo gehört eine Änderung hin?
 
@@ -184,7 +183,7 @@ Die optionalen Oberflächen besitzen eigene Einstiegspunkte und sind keine Front
 | neue öffentliche URL anlegen | Route in `config.php` beziehungsweise über `/_admin` |
 | dynamische Liste ausgeben | Element-Abfrage oder Shortcode mit Callback |
 | technische Funktion ergänzen | projektspezifisches Modul |
-| Farben oder Typografie ändern | `/_theme` für die Design-Tokens; Stylesheets für alles darüber hinaus |
+| Theme, Design, Header oder Footer ändern | `/_theme`; Stylesheets für projektspezifische Übersteuerungen jenseits des Katalogs |
 
 ## Wie es weitergeht
 

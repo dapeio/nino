@@ -2,9 +2,9 @@
 
 **Language:** English · [Deutsch](_theme.de.md)
 
-**Last updated:** August 21, 2026 · **Nino version:** 0.11.0-beta.1
+**Last updated:** August 22, 2026 · **Nino version:** 0.11.0-beta.1
 
-This manual explains the design layer under `/_theme`: the colors every stylesheet in a project reads from, where they come from, and what changing them does. Structural page composition is described in the [`/_templates` Operation Manual](_templates.md); day-to-day content maintenance in the [`/_editor` Operation Manual](_editor.md).
+This manual explains the four appearance editors under `/_theme`: Theme, Design, Header, and Footer. Structural page composition is described in the [`/_templates` Operation Manual](_templates.md); day-to-day content maintenance in the [`/_editor` Operation Manual](_editor.md).
 
 **Additional Links:**
 [README](../README.md) · [Concepts](concepts.md) · [Developer Manual](development.md) · [Getting Started](getting-started.md) · [`/_install` Reference](_install.md) · [`/_admin` Operation](_admin.md) · [`/_templates` Operation](_templates.md) · [`/_editor` Operation](_editor.md) · [`/_theme` Operation](_theme.md) · [Deployment](deployment.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
@@ -13,22 +13,36 @@ This manual explains the design layer under `/_theme`: the colors every styleshe
 
 ## What `/_theme` Is For
 
-A stylesheet asks for a color by name — `var(--nino-alt)` for a section background, `var(--nino-on-alt)` for the text on it. `/_theme` decides what those names are worth.
+`/_theme` keeps the site's four appearance decisions editable after the one-time installer has gone:
 
-You supply a brand color and a handful of preferences. `/_theme` calculates the whole palette and the size raster from them and writes both to one file. Nothing about the layout changes; only the values behind the names.
+- **Theme** chooses a complete visual baseline and installs its stylesheet, fonts, recommended Design, Header, and Footer.
+- **Design** changes only the generated color palette and size raster.
+- **Header** changes only `templates/theme.header.tpl` and `assets/style.header.css`.
+- **Footer** changes only `templates/theme.footer.tpl` and `assets/style.footer.css`.
 
-The point is the pairing. Every background comes with the text color that belongs on it, and that pair is measured against the WCAG contrast formula before it is written out. You cannot pick a brand color that produces unreadable text, because the text color is not something you pick — it is solved for the background you chose.
+Theme application is deliberately broad: it resets the following three decisions to the selected manifest's recommendations. Design, Header, and Footer are deliberately narrow, so settling one of them never reapplies the Theme or changes either of the others.
+
+The Design half remains based on measured pairs. A stylesheet asks for a color by name — `var(--nino-alt)` for a section background, `var(--nino-on-alt)` for the text on it — and `/_theme` calculates the value and verifies its contrast before writing it.
 
 ## Login and Interface
 
-Open `https://your-domain.example/_theme` and log in with the `/_admin` password. You will find:
+Open `https://your-domain.example/_theme` and log in with the `/_admin` password. The top of the rail carries the common **Admin / Builder / Theme** bridge, containing only the complete tools present in this delivery and marking **Theme** as current. The rail below opens four independent dialogs. The fixed action button changes with the active dialog: **Apply Theme**, **Save Design**, **Apply Header**, or **Apply Footer**.
 
-- **Primary** — the brand color. Everything else is derived from it.
-- **Secondary** — an optional second accent. Left empty, it follows Primary.
-- **Contrast** — `Soft`, `Default`, or `High`.
-- **Colors** — `Clean`, `Default`, or `Vibrant`.
+Theme displays the available catalogue as cards. Header and Footer each show a selector and a tall, sandboxed iframe built from the real frame template, the active Theme, and the saved Design. The iframe is inert and cannot run scripts from a variant.
 
-**Preview** recalculates without saving. **Save** writes the stylesheet.
+Design provides Primary, optional Secondary, Contrast, Colors, Volume, Spacing, and Shaping. Changes are recalculated for the on-page specimens without writing project files; **Save Design** commits them.
+
+## Shared Appearance Library
+
+Both `/_install` and `/_theme` read the same durable project-root catalogue:
+
+| Path | Unit contract |
+|---|---|
+| `library/themes/<key>/` | `manifest.php`, preview, and every file the manifest installs |
+| `library/header/<key>/` | `template.tpl` plus optional `style.css` |
+| `library/footer/<key>/` | `template.tpl` plus optional `style.css` |
+
+Keep `library/` in a deployment even after removing `/_install/`; otherwise the three catalogue-backed dialogs have nothing to list. Only `library/themes/*/preview.svg` is a public asset. `library/.htaccess` and the development router refuse direct access to manifests, templates, stylesheets, and font sources.
 
 ## The Settings
 
@@ -125,6 +139,8 @@ The practical effect: the same token name gives the right value in all three sta
 _nino/Nino.css            framework
 assets/style.design.css   ← generated here
 assets/style.theme.*.css  the theme
+assets/style.header.css   the selected Header frame
+assets/style.footer.css   the selected Footer frame
 assets/style.css          your own overrides
 ```
 
@@ -134,11 +150,13 @@ The order is the rule that makes the whole thing work: Design supplies the value
 
 ## Where the Settings Come From
 
-`/_install`'s Themes step writes the baseline first from the `design` block the picked theme was drawn with. The following Design step writes the operator's choice, and `/_theme` edits those same stored settings afterwards. All three paths use the same `Theme::write()`, so there is one generator and one stylesheet, not separate install-time and runtime copies.
+`/_install`'s Theme step or `/_theme`'s Theme dialog writes the baseline first from the `design` block the picked theme was drawn with. The independent Design dialog writes the operator's choice afterwards. Every path uses the same `Theme::write()`, so there is one generator and one stylesheet, not separate install-time and runtime copies.
 
-## Changing the Design Later
+## Changing the Appearance Later
 
-`/_theme` stays available after the installation. Recoloring a live project is a matter of picking a new Primary and saving; no reinstall, no content migration. Templates, sections, and elements are unaffected — they only ever referred to the token names.
+`/_theme` stays available after the installation. Recoloring a live project is a matter of changing Design and saving; replacing a Header or Footer copies only that frame's two files. Neither operation needs a reinstall or content migration.
+
+Applying another Theme is the intentional reset operation. It overwrites files named by the new theme manifest, replaces the bundled theme stylesheet, writes the manifest's recommended Design and frames, and leaves files unique to a previous Theme in place. Secure project-specific edits in Git before applying a Theme again.
 
 ## Troubleshooting
 
@@ -148,6 +166,9 @@ The order is the rule that makes the whole thing work: Design supplies the value
 | The brand color looks different as a surface | Expected. Lightness was moved to reach the contrast target; hue and saturation are preserved. |
 | Secondary elements look identical to primary ones | No Secondary set — `vibrant` falls back to `origin`. Set one. |
 | `style.design.css` keeps losing manual edits | It is generated. Use `assets/style.css`. |
+| Theme, Header, or Footer says no variants are available | The project-root `library/` catalogue is missing or incomplete. Restore it from the same Nino version; do not keep it inside the removed `/_install/` directory. |
+| A frame preview differs from the live page | The preview uses the current installed includes and text where available, but remains an inert single-frame document. Check the applied template on the full page for request-specific module output. |
+| `(403) Request failed.` appears after loading the controls | The page's CSRF token is stale, usually after a login, logout, session rotation, or deployment. Reload `/_theme`; sign in through `/_admin` again if needed. |
 | `/_theme` shows the login page repeatedly | Shared `/_admin` session. Check the `/_admin` login and any lock. |
 
 ## Current Limitations

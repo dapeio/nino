@@ -2,9 +2,9 @@
 
 **Sprache:** [English](_theme.md) · Deutsch
 
-**Letzte Aktualisierung:** 21. August 2026 · **Nino-Version:** 0.11.0-beta.1
+**Letzte Aktualisierung:** 22. August 2026 · **Nino-Version:** 0.11.0-beta.1
 
-Diese Anleitung erklärt die Design-Ebene unter `/_theme`: die Farben, aus denen jedes Stylesheet eines Projekts liest, woher sie kommen und was eine Änderung bewirkt. Der strukturelle Seitenaufbau ist in der [`/_templates`-Bedienung](_templates.de.md) beschrieben, die tägliche Inhaltspflege in der [`/_editor`-Bedienung](_editor.de.md).
+Diese Anleitung erklärt die vier Darstellungsdialoge unter `/_theme`: Theme, Design, Header und Footer. Der strukturelle Seitenaufbau ist in der [`/_templates`-Bedienung](_templates.de.md) beschrieben, die tägliche Inhaltspflege in der [`/_editor`-Bedienung](_editor.de.md).
 
 **Weiterführende Links:**
 [README](../README.de.md) · [Grundkonzepte](concepts.de.md) · [Entwickler-Handbuch](development.de.md) · [Erste Schritte](getting-started.de.md) · [`/_install`-Referenz](_install.de.md) · [`/_admin`-Bedienung](_admin.de.md) · [`/_templates`-Bedienung](_templates.de.md) · [`/_editor`-Bedienung](_editor.de.md) · [`/_theme`-Bedienung](_theme.de.md) · [Deployment](deployment.de.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
@@ -13,22 +13,36 @@ Diese Anleitung erklärt die Design-Ebene unter `/_theme`: die Farben, aus denen
 
 ## Wofür `/_theme` da ist
 
-Ein Stylesheet fragt eine Farbe über ihren Namen an — `var(--nino-alt)` für einen Abschnittshintergrund, `var(--nino-on-alt)` für den Text darauf. `/_theme` legt fest, was diese Namen wert sind.
+`/_theme` hält die vier Darstellungsentscheidungen der Seite bearbeitbar, nachdem der einmalige Installer entfernt wurde:
 
-Sie geben eine Markenfarbe und einige Vorlieben an. `/_theme` berechnet daraus die vollständige Palette und das Größenraster und schreibt beides in eine Datei. Am Layout ändert sich nichts, nur an den Werten hinter den Namen.
+- **Theme** wählt einen vollständigen visuellen Ausgangspunkt und installiert sein Stylesheet, seine Schriften sowie die empfohlenen Werte für Design, Header und Footer.
+- **Design** ändert ausschließlich die erzeugte Farbpalette und das Größenraster.
+- **Header** ändert ausschließlich `templates/theme.header.tpl` und `assets/style.header.css`.
+- **Footer** ändert ausschließlich `templates/theme.footer.tpl` und `assets/style.footer.css`.
 
-Der eigentliche Punkt ist die Paarung. Zu jedem Hintergrund gehört die Textfarbe, die darauf gehört, und dieses Paar wird vor dem Schreiben gegen die WCAG-Kontrastformel gemessen. Sie können keine Markenfarbe wählen, die unleserlichen Text erzeugt — denn die Textfarbe wählen Sie nicht, sie wird für den gewählten Hintergrund berechnet.
+Das Anwenden eines Themes ist bewusst umfassend: Es setzt die drei folgenden Entscheidungen auf die Empfehlungen des gewählten Manifests zurück. Design, Header und Footer arbeiten dagegen bewusst schmal, sodass das Festlegen eines Bereichs weder das Theme erneut anwendet noch einen der anderen Bereiche verändert.
+
+Der Design-Teil bleibt auf gemessenen Paaren aufgebaut. Ein Stylesheet fragt eine Farbe über ihren Namen an — `var(--nino-alt)` für einen Abschnittshintergrund, `var(--nino-on-alt)` für den Text darauf — und `/_theme` berechnet den Wert und prüft seinen Kontrast vor dem Schreiben.
 
 ## Anmeldung und Oberfläche
 
-Öffnen Sie `https://ihre-domain.example/_theme` und melden Sie sich mit dem `/_admin`-Passwort an. Sie finden dort:
+Öffnen Sie `https://ihre-domain.example/_theme` und melden Sie sich mit dem `/_admin`-Passwort an. Oben in der Seitenleiste steht die gemeinsame Brücke **Admin / Builder / Theme**; sie enthält nur die vollständig ausgelieferten Werkzeuge und kennzeichnet **Theme** als aktuelle Oberfläche. Darunter öffnet die Navigation vier unabhängige Dialoge. Die feste Aktionsschaltfläche wechselt mit dem aktiven Dialog zwischen **Apply Theme**, **Save Design**, **Apply Header** und **Apply Footer**.
 
-- **Primär** — die Markenfarbe. Alles Weitere wird daraus abgeleitet.
-- **Sekundär** — ein optionaler zweiter Akzent. Bleibt das Feld leer, folgt er der Primärfarbe.
-- **Kontrast** — `Soft`, `Default` oder `High`.
-- **Farben** — `Clean`, `Default` oder `Vibrant`.
+Theme zeigt den verfügbaren Katalog als Karten. Header und Footer besitzen jeweils eine Auswahl und ein hohes, gesandboxtes Vorschau-Iframe aus dem echten Frame-Template, dem aktiven Theme und dem gespeicherten Design. Das Iframe ist inert und kann keine Skripte einer Variante ausführen.
 
-**Vorschau** rechnet neu, ohne zu speichern. **Speichern** schreibt das Stylesheet.
+Design bietet Primär, optionale Sekundärfarbe, Kontrast, Farben, Volume, Spacing und Shaping. Änderungen werden für die Specimens in der Oberfläche neu berechnet, ohne Projektdateien zu schreiben; **Save Design** übernimmt sie.
+
+## Gemeinsame Darstellungs-Library
+
+`/_install` und `/_theme` lesen denselben dauerhaften Katalog in der Projektwurzel:
+
+| Pfad | Vertrag der Einheit |
+|---|---|
+| `library/themes/<key>/` | `manifest.php`, Vorschau und alle vom Manifest installierten Dateien |
+| `library/header/<key>/` | `template.tpl` plus optionale `style.css` |
+| `library/footer/<key>/` | `template.tpl` plus optionale `style.css` |
+
+Behalten Sie `library/` beim Deployment, auch nachdem `/_install/` entfernt wurde; andernfalls können die drei katalogbasierten Dialoge keine Varianten auflisten. Nur `library/themes/*/preview.svg` ist ein öffentliches Asset. `library/.htaccess` und der Entwicklungsrouter verweigern den direkten Zugriff auf Manifeste, Templates, Stylesheets und Font-Quellen.
 
 ## Die Einstellungen
 
@@ -125,6 +139,8 @@ Praktisch bedeutet das: derselbe Token-Name liefert in allen drei Zuständen den
 _nino/Nino.css            Framework
 assets/style.design.css   ← hier erzeugt
 assets/style.theme.*.css  das Theme
+assets/style.header.css   der gewählte Header-Frame
+assets/style.footer.css   der gewählte Footer-Frame
 assets/style.css          eigene Übersteuerungen
 ```
 
@@ -134,11 +150,13 @@ Die Reihenfolge ist die Regel, die das Ganze trägt: Design liefert die Werte, d
 
 ## Woher die Einstellungen kommen
 
-Der Themes-Schritt in `/_install` schreibt zuerst den Ausgangspunkt aus dem `design`-Block, mit dem das gewählte Theme gezeichnet wurde. Der folgende Design-Schritt speichert die Auswahl der Bedienung, und `/_theme` bearbeitet danach dieselben Einstellungen. Alle drei Wege verwenden dasselbe `Theme::write()` - also einen Generator und ein Stylesheet, nicht getrennte Installations- und Laufzeitkopien.
+Der Theme-Schritt in `/_install` oder der Theme-Dialog in `/_theme` schreibt zuerst den Ausgangspunkt aus dem `design`-Block, mit dem das gewählte Theme gezeichnet wurde. Der unabhängige Design-Dialog speichert danach die Auswahl der Bedienung. Alle Wege verwenden dasselbe `Theme::write()` - also einen Generator und ein Stylesheet, nicht getrennte Installations- und Laufzeitkopien.
 
-## Das Design später ändern
+## Die Darstellung später ändern
 
-`/_theme` bleibt nach der Installation verfügbar. Ein laufendes Projekt umzufärben heißt: eine neue Primärfarbe wählen und speichern. Keine Neuinstallation, keine Inhaltsmigration. Vorlagen, Abschnitte und Elemente bleiben unberührt — sie haben immer nur die Token-Namen verwendet.
+`/_theme` bleibt nach der Installation verfügbar. Ein laufendes Projekt umzufärben heißt, Design zu ändern und zu speichern; ein anderer Header oder Footer kopiert nur die beiden Dateien dieses Frames. Keine dieser Änderungen benötigt eine Neuinstallation oder Inhaltsmigration.
+
+Ein anderes Theme anzuwenden ist der bewusste Reset. Dabei werden die vom neuen Manifest benannten Dateien überschrieben, das Theme-Stylesheet im Bundle ersetzt und die empfohlenen Design- und Frame-Werte geschrieben. Dateien, die nur ein vorheriges Theme mitgebracht hat, bleiben bestehen. Sichern Sie projektspezifische Änderungen in Git, bevor Sie ein Theme erneut anwenden.
 
 ## Fehlerbehebung
 
@@ -148,6 +166,9 @@ Der Themes-Schritt in `/_install` schreibt zuerst den Ausgangspunkt aus dem `des
 | Die Markenfarbe wirkt als Fläche anders | So gewollt. Die Helligkeit wurde bis zum Kontrastziel verschoben, Farbton und Sättigung bleiben erhalten. |
 | Sekundäre Elemente sehen aus wie primäre | Keine Sekundärfarbe gesetzt — `vibrant` fällt auf `origin` zurück. Eine setzen. |
 | `style.design.css` verliert manuelle Änderungen | Die Datei wird erzeugt. Nutzen Sie `assets/style.css`. |
+| Theme, Header oder Footer meldet, dass keine Varianten verfügbar sind | Der Katalog `library/` in der Projektwurzel fehlt oder ist unvollständig. Aus derselben Nino-Version wiederherstellen; nicht im entfernten Verzeichnis `/_install/` belassen. |
+| Eine Frame-Vorschau unterscheidet sich von der Live-Seite | Die Vorschau nutzt vorhandene installierte Includes und Texte, bleibt aber ein inertes Einzel-Frame-Dokument. Für Request-abhängige Modulausgabe das angewendete Template auf der vollständigen Seite prüfen. |
+| Nach dem Laden der Regler erscheint `(403) Request failed.` | Der CSRF-Token der Seite ist veraltet, meist nach Anmeldung, Abmeldung, Sitzungswechsel oder Deployment. `/_theme` neu laden; falls nötig erneut über `/_admin` anmelden. |
 | `/_theme` zeigt wiederholt die Anmeldeseite | Gemeinsame `/_admin`-Sitzung. `/_admin`-Anmeldung und eine mögliche Sperre prüfen. |
 
 ## Aktuelle Grenzen

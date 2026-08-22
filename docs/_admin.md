@@ -2,7 +2,7 @@
 
 **Language:** English · [Deutsch](_admin.de.md)
 
-**Last updated:** August 11, 2026 · **Nino version:** 0.11.0-beta.1
+**Last updated:** August 22, 2026 · **Nino version:** 0.11.0-beta.1
 
 This manual explains the complete technical and content project management under `/_admin`. If you instead only want to maintain released content on a daily basis, read the [`/_editor` Operation Manual](_editor.md); fast section-based page composition is described in the [`/_templates` Operation](_templates.md).
 
@@ -24,6 +24,7 @@ This manual explains the complete technical and content project management under
 | Images | Define image slots and target dimensions | Upload and replace images |
 | Routes | Manage page routes, templates, and menu membership | Maintain page texts |
 | Navigations | Create menus and set their running order | No access |
+| Appearance | Link to the four-dialog `/_theme` workspace | No access |
 | Page templates | Link to the section-first `/_templates` Template Builder | No access |
 | Users | Create, delete, and technically manage accounts | Manage profile data and released permissions |
 | Configuration | Edit selected technical values | No access |
@@ -43,9 +44,9 @@ For operation, note:
 - do not share the technical password with editors;
 - log out via **Logout** after work;
 - additionally protect the area if needed via web server, VPN, or IP allowances;
-- remove `_admin/` and `_templates/` from delivery if the interfaces are not needed in live operation.
+- remove `_admin/`, `_theme/`, and `_templates/` from delivery if the interfaces are not needed in live operation.
 
-`/_templates` uses the same password, lock status, and session as `/_admin`. The **Template Builder** link in the header opens the section-first Alpha tool. Without `_admin/`, the standalone builder cannot be used.
+`/_theme` and `/_templates` use the same password, lock status, and session as `/_admin`. All three authenticated surfaces therefore carry the same compact **Admin / Builder / Theme** bridge. It is assembled from the complete tool entry points found in the delivery: a tool that was omitted or only partially copied is not linked, and the current surface is highlighted. No separate configuration switch is involved. Without `_admin/`, neither optional tool can be used.
 
 The password can be rehashed outside the installer with `php _admin/Admin.php <password>`. The output is a complete file — write it to `private/.auth/pw.php`, replacing whatever is there. It is deliberately not in `_admin/Admin.php` (a tool folder must stay replaceable on an update) and not in `config.php` (a restore rewrites that file, and the credential that authorises restoring has to survive it). Perform this process only in a protected local environment; a password entered as a command-line argument may be visible in shell history or process list.
 
@@ -207,7 +208,7 @@ When creating or editing, you also determine:
 
 Membership is stored on the page's own route as `'navs' => [ 'main' => 1, ... ]`, where the value is a priority (lower first). A membership added here starts behind everything already in that menu; a priority you tuned by hand is never reset by a later save. A route added to `config.php` by hand joins a menu the same way, without any tool, and is rendered by `[navigation nav="main"]`.
 
-The arrows in the page list swap two page routes in `config.php`; every other route keeps its own slot. Menu entries of equal priority follow route order. Reserved paths such as `/_admin`, `/_editor`, `/_install`, and `/_templates` cannot be used as public pages.
+The arrows in the page list swap two page routes in `config.php`; every other route keeps its own slot. Menu entries of equal priority follow route order. Reserved paths such as `/_admin`, `/_editor`, `/_install`, `/_templates`, and `/_theme` cannot be used as public pages.
 
 Some routes select their template at runtime. In this case, `/_admin` shows the existing route body and leaves it unchanged when saving.
 
@@ -333,7 +334,7 @@ Never cached, whatever the configuration says: anything but a `GET`, anything ca
 
 Two values in a stored page belong to whoever asks for it rather than to whoever it was rendered for, and both are re-stamped on the way out: the `[csrf]` token, so every visitor submits with their own, and the `[jstext]` nonce, so it stays unguessable and keeps matching the `Content-Security-Policy` header of that one response.
 
-Any save through `/_admin`, `/_editor`, `/_templates` or `/_install` drops the whole cache immediately — a single textfill can change every page, so there is no smaller useful unit. The lifetime above only bounds how long a page survives without any edit at all.
+Any save through `/_admin`, `/_editor`, `/_theme`, `/_templates` or `/_install` drops the whole cache immediately — a single textfill or appearance change can change every page, so there is no smaller useful unit. The lifetime above only bounds how long a page survives without any edit at all.
 
 Responses carry `X-Nino-Cache: hit` or `miss`, which is the quickest way to see whether the cache is doing anything.
 

@@ -36,7 +36,7 @@ In both cases, `/_install` must convert a fresh checkout into a valid project st
 
 ## Webroot and Routing
 
-The entry point of the public website is `index.php`. The areas `/_editor`, `/_admin`, `/_templates`, and during setup `/_install` have their own entry points. The web server must deliver existing static files directly and forward all other website requests to Nino.
+The entry point of the public website is `index.php`. The areas `/_editor`, `/_admin`, `/_theme`, `/_templates`, and during setup `/_install` have their own entry points. The web server must deliver existing static files directly and forward all other website requests to Nino.
 
 For local development, `router.php` takes over this behavior:
 
@@ -63,9 +63,10 @@ Transfer the same behavior explicitly to the server configuration:
 
 - deliver existing public assets directly;
 - forward normal website routes to `index.php`;
-- route `/_editor`, `/_admin`, `/_templates`, and possibly `/_install` to their own entry points;
+- route `/_editor`, `/_admin`, `/_theme`, `/_templates`, and possibly `/_install` to their own entry points;
 - deny access to dotfiles and dot directories;
 - **deny `private/` entirely** — it is never requested by a browser, only read by PHP;
+- deny direct access to `library/` except `library/themes/<key>/preview.svg` — the remaining files are server-side appearance source;
 - disable directory listing;
 - do not deliver PHP source and data files as text.
 
@@ -83,7 +84,7 @@ A general example configuration cannot reliably guess the paths and PHP-FPM sett
 
 Before initial setup, PHP must be able to create directories and files in the project root. The still missing project paths are created by `/_install` or, if needed, by the kernel and are not a manually required prerequisite.
 
-During operation, Nino only needs write permissions for actually changeable content. Depending on usage, this includes `private/config.php`, `private/text/`, `private/elements/`, `private/data/`, `private/.logs/`, `private/.backups/`, `public/images/`, and `public/.cache/`. The Template Builder under `/_templates` additionally needs `private/templates/`; it can create native text keys, Element Types, and image-slot definitions in the configuration. `/_admin` writes, depending on the function, configuration, texts, elements, and images, among others. The project root and PHP source can remain read-only after installation.
+During operation, Nino only needs write permissions for actually changeable content. Depending on usage, this includes `private/config.php`, `private/text/`, `private/elements/`, `private/data/`, `private/.logs/`, `private/.backups/`, `public/images/`, and `public/.cache/`. The Template Builder under `/_templates` additionally needs `private/templates/`; it can create native text keys, Element Types, and image-slot definitions in the configuration. Applying appearance variants in `/_theme` needs `private/templates/`, `public/assets/`, `public/fonts/`, and any other public destination declared by a Theme manifest. The shared `library/` itself remains read-only. `/_admin` writes, depending on the function, configuration, texts, elements, and images, among others. The project root and PHP source can otherwise remain read-only after installation.
 
 Grant these permissions to the user under which PHP is executed. World-writable permissions such as `0777` are not a suitable permanent solution. After deployment, the kernel and other PHP source code should not be generally writable.
 
@@ -132,6 +133,7 @@ Error messages should not expose file paths, configuration values, or stack trac
 Before go-live, both accesses must work and have separate, strong passwords:
 
 - `/_admin` is the full technical and content management for developers.
+- `/_theme` edits Theme, Design, Header, and Footer and uses the password, lock status, and session of `/_admin`.
 - `/_templates` is the section-first Alpha tool and uses the password, lock status, and session of `/_admin`.
 - `/_editor` has individual user accounts and permissions for operators and editors.
 
@@ -139,11 +141,11 @@ Grant editor permissions as narrowly as practically possible. The first account 
 
 HTTPS protects not only login data but also session cookies and all editorially transmitted content. Permanently redirect HTTP requests to HTTPS and only test login via the final public address.
 
-Additional web server protection for `/_admin` and `/_templates`—such as IP allowances or HTTP authentication—can form a useful second barrier under suitable operating conditions. It does not replace the Nino password. If the tools are not needed after development and acceptance, `_templates/` and `_admin/` can be removed from production delivery.
+Additional web server protection for `/_admin`, `/_theme`, and `/_templates`—such as IP allowances or HTTP authentication—can form a useful second barrier under suitable operating conditions. It does not replace the Nino password. If the tools are not needed after development and acceptance, all three can be removed from production delivery.
 
 ## `/_install` After Setup
 
-Complete the assistant fully. The last step sets the real password for `/_admin` and locks the installer. Then remove the `_install/` directory from production delivery.
+Complete the assistant fully. The last step sets the real password for `/_admin` and locks the installer. Then remove the `_install/` directory from production delivery. Keep the separate project-root `library/` directory: `/_theme` uses its Theme, Header, and Footer catalogues after installation.
 
 The order is essential:
 
@@ -184,6 +186,7 @@ The smoke tests do not replace project-specific acceptance testing. Additionally
 - forms including validation, sending, and error messages;
 - login, logout, and permissions in `/_editor`;
 - technical access to `/_admin`;
+- all four appearance dialogs in `/_theme`, including one frame preview;
 - access and unchanged round-trip in `/_templates`, if the Alpha builder is delivered;
 - writing and reloading editorial content;
 - behavior behind CDN, proxy, or cache, if used.
@@ -195,7 +198,8 @@ A successful call to the homepage does not yet prove that sensitive files are pr
 - dotfiles and dot directories;
 - `config.php` and PHP data files;
 - hidden log and backup directories;
-- internal files from `_admin/`, `_templates/`, and `_editor/` that are not intended as public assets;
+- internal files from `_admin/`, `_theme/`, `_templates/`, and `_editor/` that are not intended as public assets;
+- files below `library/` other than `library/themes/*/preview.svg`;
 - `_install/`, after it has been removed.
 
 The expected response may be `403` or `404` depending on the server. The decisive factor is that neither content nor directory list is delivered.
@@ -229,7 +233,9 @@ Nino is in the beta phase. Security fixes appear on `main`; there is currently n
 - [ ] `/_install` was able to create the project directories from the writable project root itself.
 - [ ] Write permissions are limited to the required paths after setup.
 - [ ] `/_install` was fully completed and subsequently removed from production.
+- [ ] The separate `library/` catalogue remains deployed and only its Theme previews are directly accessible.
 - [ ] `/_admin` and `/_editor` have tested, separate accesses.
+- [ ] `/_theme` is either removed together with `/_admin` or protected by and tested with that admin access.
 - [ ] `/_templates` is either removed or protected with the admin access and consciously released as Alpha.
 - [ ] Editor users only have the necessary permissions.
 - [ ] HTTPS and secure session cookies work at the final address.

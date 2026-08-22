@@ -2,7 +2,7 @@
 
 **Language:** English · [Deutsch](_templates.de.md)
 
-**Status:** 18 August 2026 · **Nino version:** Unreleased
+**Status:** 22 August 2026 · **Nino version:** Unreleased
 
 The Template Builder is the fast path from a `page-*.tpl` file to a filled page. It treats a template as an ordered sequence of complete HTML sections and reusable `[template]` sections instead of exposing every nested DOM node.
 
@@ -30,7 +30,7 @@ The Template Builder does not create routes, edit the contents of included heade
 
 ## Access and security
 
-Open `https://your-domain.example/_templates`. The tool shares password, lock state and session with `/_admin`. It depends on `_admin/Admin.php`; removing `/_admin` also removes its authentication backend.
+Open `https://your-domain.example/_templates`. The tool shares password, lock state and session with `/_admin`. Its top rail carries the common **Admin / Builder / Theme** bridge; only complete tool directories in the current delivery appear, and **Builder** marks the current surface. It depends on `_admin/Admin.php`; removing `/_admin` also removes its authentication backend.
 
 The tool writes to:
 

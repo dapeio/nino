@@ -35,13 +35,8 @@
 	min-width: 0;
 }
 
-#admin-templates,
 #admin-logout {
 	font-weight: 600;
-}
-
-#admin-templates {
-	color: var(--editor-blue);
 }
 
 #admin-logout {
@@ -585,27 +580,21 @@
 	}
 }
 
-/* ------------------------------------------------------------ Desktop */
-
-@media (min-width: 64rem) {
-	#admin-templates {
-		flex: 1 0 100%;
-	}
-}
-
 /* -------------------------------------------------------------- Mobile */
 
 @media (max-width: 38rem) {
+	#admin-bar-wrap {
+		flex-wrap: wrap;
+	}
+
+	#admin-bar-wrap .nino-admin-tools {
+		order: 3;
+		flex: 1 0 100%;
+	}
+
 	#admin-page-wrap .nino-admin-rail-actions {
 		gap: .45rem;
 		font-size: .75rem;
-	}
-
-	#admin-templates {
-		max-width: 7.5rem;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
 	}
 
 	#admin-page-wrap .admin-translation-card {

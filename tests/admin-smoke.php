@@ -843,6 +843,55 @@ $shadowed['/nino/http/routes']['POST://_admin'] = [ 'uri' => '/_admin', 'body' =
 check( 'init always restores the tool-owned GET route over a stale/hand-written collision', $shadowed['/nino/http/routes']['GET://_admin']['body'] === '[template /_admin/templates/page-index]' );
 check( 'init always restores the tool-owned POST route too', ( $shadowed['/nino/http/routes']['POST://_admin']['body'] ?? null ) === null );
 
+// --- shared Admin / Templates / Theme bridge -----------------------------
+
+$toolRoot = $sandbox. '/tool-delivery';
+$writeToolFile = static function( string $file ) use ( $toolRoot ): void {
+	$path = $toolRoot. '/'. $file;
+	if( is_dir( dirname( $path ) ) === false )
+		mkdir( dirname( $path ), 0777, true );
+	file_put_contents( $path, '' );
+};
+
+foreach( [ '_admin/index.php', '_admin/Admin.php', '_admin/templates/page-index.tpl' ] as $file )
+	$writeToolFile( $file );
+
+check( 'the tool bridge stays out of a delivery that has nowhere else to go', \Nino\Admin\ToolBridge::render( $appData, 'admin', $toolRoot ) === '' );
+
+foreach( [ '_templates/index.php', '_templates/Templates.php', '_templates/templates/page-index.tpl' ] as $file )
+	$writeToolFile( $file );
+
+$appData['/nino/dir'] = '/subdir';
+$toolBridge = \Nino\Admin\ToolBridge::render( $appData, 'templates', $toolRoot );
+$adminToolPosition = strpos( $toolBridge, 'data-nino-admin-tool="admin"' );
+$templatesToolPosition = strpos( $toolBridge, 'data-nino-admin-tool="templates"' );
+check( 'the bridge lists exactly the complete tools in their stable order', $adminToolPosition !== false && $templatesToolPosition !== false
+	&& $adminToolPosition < $templatesToolPosition
+	&& str_contains( $toolBridge, 'data-nino-admin-tool="theme"' ) === false );
+check( 'the bridge keeps links below the configured project directory', str_contains( $toolBridge, 'href="/subdir/_admin/"' )
+	&& str_contains( $toolBridge, 'href="/subdir/_templates/"' ) );
+check( 'the bridge exposes exactly one semantic current tool', substr_count( $toolBridge, 'aria-current="page"' ) === 1
+	&& str_contains( $toolBridge, 'data-nino-admin-tool="templates" aria-current="page"' ) );
+
+$writeToolFile( '_theme/index.php' );
+check( 'a partially copied tool is not advertised', str_contains( \Nino\Admin\ToolBridge::render( $appData, 'admin', $toolRoot ), 'data-nino-admin-tool="theme"' ) === false );
+
+foreach( [ '_theme/Theme.php', '_theme/templates/page-index.tpl' ] as $file )
+	$writeToolFile( $file );
+
+$toolBridge = \Nino\Admin\ToolBridge::render( $appData, 'theme', $toolRoot );
+check( 'a complete optional tool joins the bridge without a config switch', substr_count( $toolBridge, 'data-nino-admin-tool=' ) === 3
+	&& str_contains( $toolBridge, 'data-nino-admin-tool="theme" aria-current="page"' ) );
+
+// Admin::init() may be called more than once in a composed request. The bridge
+// callback must still execute once: a second callback would receive the first
+// callback's rendered string instead of the shortcode argument array.
+\Nino\Admin\Admin::init( $shadowed );
+$renderedToolBridge = \Nino\Html::renderHtml( $shadowed, '[admin-tools admin]' );
+check( 'repeated Admin init registers the shared shortcode only once', substr_count( $renderedToolBridge, '<nav class="nino-admin-tools"' ) === 1
+	&& substr_count( $renderedToolBridge, 'aria-current="page"' ) === 1 );
+$appData['/nino/dir'] = '';
+
 \Nino\Runtime::unsetSessionValue( $appData, './nino/admin/authed' );
 [ $status ] = callDev( $appData, \Nino\Admin\Config::class, 'apiList' );
 check( 'Config actions require an authed _admin session too', $status === 401 );
@@ -1207,6 +1256,11 @@ check( 'rejects a page mounted on a runtime-owned tool uri', $status === 409 );
 	'originalHttpUri' => '', 'uri' => '/designer-shadow', 'httpUri' => '/_templates', 'template' => 'page-about', 'text' => [],
 ] );
 check( 'rejects a page mounted on the Template Builder runtime uri', $status === 409 );
+
+[ $status ] = callDev( $appData, \Nino\Admin\PageEditor::class, 'apiSave', [
+	'originalHttpUri' => '', 'uri' => '/appearance-shadow', 'httpUri' => '/_theme', 'template' => 'page-about', 'text' => [],
+] );
+check( 'rejects a page mounted on the Appearance runtime uri', $status === 409 );
 
 \Nino\Filesystem::mutate( $appData, '/config.php', function( array $config ): array {
 	$config['/nino/http/routes']['GET://owned'] = [ 'uri' => '/owned', 'body' => 'hand-written route' ];

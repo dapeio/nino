@@ -5,8 +5,8 @@ declare(strict_types=1);
  *	Dev								Dev-only tooling - all \Nino\Admin\* classes live in this single
  *												file, same convention as _nino/Nino.php and _editor/Editor.php.
  *												Meant to be deployed only when actually needed and removed
- *												afterwards (rm -rf _admin) - not part of the shipped admin
- *												dashboard, not linked from it, no config.php registration
+ *												afterwards (rm -rf _admin) - never linked from the public
+ *												site, and no config.php registration
  *												required to work (self-registers its route, same as Admin).
  *
  *	@package					Dape/Nino
@@ -30,6 +30,100 @@ namespace {
 }
 
 namespace Nino\Admin {
+
+	/**
+	 *	The small navigation shared by the authenticated developer tools.
+	 *	Availability comes from the delivery itself: removing an optional tool
+	 *	directory removes its link everywhere without a second config switch that
+	 *	can drift away from the files on disk.
+	 */
+	class ToolBridge {
+
+		private const array TOOLS = [
+			'admin' => [
+				'label' => 'Admin',
+				'title' => 'Admin',
+				'uri' => '_admin',
+				'files' => [ '_admin/index.php', '_admin/Admin.php', '_admin/templates/page-index.tpl' ],
+			],
+			'templates' => [
+				'label' => 'Builder',
+				'title' => 'Template Builder',
+				'uri' => '_templates',
+				'files' => [ '_templates/index.php', '_templates/Templates.php', '_templates/templates/page-index.tpl' ],
+			],
+			'theme' => [
+				'label' => 'Theme',
+				'title' => 'Appearance',
+				'uri' => '_theme',
+				'files' => [ '_theme/index.php', '_theme/Theme.php', '_theme/templates/page-index.tpl' ],
+			],
+		];
+
+		public static function init( array &$appData ): void {
+
+			// Admin::init() can be called again by a composed tool or a test. A
+			// shortcode callback is an ordered list, so registering the same one
+			// twice would run its second copy against the first copy's string result.
+			if( ( $appData['./nino/admin/tool-bridge'] ?? false ) === true )
+				return;
+
+			$appData['./nino/admin/tool-bridge'] = true;
+			\Nino\Html::addShortcode( $appData, 'admin-tools', [ self::class, 'doShortcode' ] );
+		}
+
+		public static function doShortcode( array &$appData, array $args ): string {
+			return self::render( $appData, (string) ( $args[0] ?? '' ) );
+		}
+
+		/**
+		 *	Render only complete tool installations. $root is public so diagnostics
+		 *	and the dependency-free smoke test can evaluate a staged delivery before
+		 *	it replaces the live project; normal requests use Admin.php's own root.
+		 */
+		public static function render( array &$appData, string $current, string $root = '' ): string {
+
+			$root = $root === '' ? dirname( __DIR__ ) : rtrim( $root, '/\\' );
+			$available = [];
+
+			foreach( self::TOOLS as $key => $tool ) {
+				$complete = true;
+
+				foreach( $tool['files'] as $file )
+					if( is_file( $root. '/'. $file ) === false ) {
+						$complete = false;
+						break;
+					}
+
+				if( $complete === true )
+					$available[$key] = $tool;
+			}
+
+			// With no destination there is no bridge, only decorative chrome.
+			if( count( $available ) < 2 )
+				return '';
+
+			$base = rtrim( (string) \Nino\Filesystem::getDir( $appData ), '/' );
+			$html = '<nav class="nino-admin-tools" aria-label="Nino tools">';
+
+			foreach( $available as $key => $tool ) {
+				$href = self::_escape( $base. '/'. $tool['uri']. '/' );
+				$title = self::_escape( $tool['title'] );
+				$label = self::_escape( $tool['label'] );
+				$html .= '<a href="'. $href. '" title="'. $title. '" aria-label="'. $title. '"'
+					. ' data-nino-admin-tool="'. $key. '"'
+					. ( $key === $current ? ' aria-current="page"' : '' )
+					. '>'. $label. '</a>';
+			}
+
+			return $html. '</nav>';
+		}
+
+		private static function _escape( string $value ): string {
+			$value = htmlspecialchars( $value, ENT_QUOTES | ENT_SUBSTITUTE | ENT_HTML5, 'UTF-8' );
+			return str_replace( [ '[', ']' ], [ '&#91;', '&#93;' ], $value );
+		}
+	}
 
 	/**
 	 *	Nino							A compact filesystembased php framework
@@ -87,6 +181,8 @@ namespace Nino\Admin {
 		 *	@return 	void
 		 */
 		public static function init( array &$appData ): void {
+
+			ToolBridge::init( $appData );
 
 			// These runtime-only routes are owned by the tool itself and must win
 			// over a stale or hand-written config entry at the same uri - the same
@@ -2098,7 +2194,7 @@ namespace Nino\Admin {
 				'type' 	=> 'bool',
 				'group'	=> 'cache',
 				'label'	=> 'Cache rendered pages',
-				'hint' 	=> 'Anonymous GET requests only, and never a page with query vars, a tool uri or a signed-in visitor. Any save in /_admin, /_editor or /_templates drops the whole cache.',
+				'hint' 	=> 'Anonymous GET requests only, and never a page with query vars, a tool uri or a signed-in visitor. Any save in /_admin, /_editor, /_theme or /_templates drops the whole cache.',
 			],
 			'/nino/cache/ttl' => [
 				'type' 	=> 'int',
@@ -4003,7 +4099,7 @@ namespace Nino\Admin {
 		// Kept in sync with _install's Webpages class. These routes are owned
 		// at runtime by the optional tools themselves and therefore do not show
 		// up in the persisted route array used for the general collision check.
-		private const array RESERVED_HTTP_URIS = [ '/_admin', '/_editor', '/_install', '/_templates' ];
+		private const array RESERVED_HTTP_URIS = [ '/_admin', '/_editor', '/_install', '/_templates', '/_theme' ];
 
 		// A fresh entry's text fields when none was posted (or a blank one) -
 		// same generic-by-design reasoning _install/Install.php's

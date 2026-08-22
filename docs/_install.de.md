@@ -83,7 +83,7 @@ Sprachen, Module und die von Setup verwalteten Routen werden ersetzt. Manuell od
 
 ## 3. Themes
 
-Ein Theme ist ein vollständiger visueller Ausgangspunkt. Es kann Stylesheet, Schriften, Bilder und weitere Assets enthalten. Die Vorschau im Auswahlraster gehört nur zum Assistenten und wird nicht in das Projekt kopiert.
+Ein Theme ist ein vollständiger visueller Ausgangspunkt unter `library/themes/<key>`. Es kann Stylesheet, Schriften, Bilder und weitere Assets enthalten. Die Vorschau im Auswahlraster gehört zum gemeinsamen Darstellungskatalog und wird nicht in das Projekt kopiert.
 
 Es ist genau ein Theme aktiv. Beim Anwenden:
 
@@ -94,7 +94,7 @@ Es ist genau ein Theme aktiv. Beim Anwenden:
 
 Die Position des Stylesheets im Bundle bleibt nach Möglichkeit erhalten, damit sich die CSS-Kaskade nicht unbeabsichtigt ändert. Eigene zusätzliche Bundle-Einträge werden nicht entfernt.
 
-**Wichtig:** Gleichnamige Theme-Dateien werden überschrieben. Dateien, die nur das vorherige Theme mitgebracht hat, bleiben dagegen liegen. Sichere eigene Änderungen deshalb über Git, bevor du das Theme wechselst oder erneut anwendest. Nach dem Abschluss sperrt sich `/_install`; ein späterer Theme-Wechsel über die Oberfläche ist daher nicht vorgesehen und wird als normale Projektänderung über Dateien und Git durchgeführt.
+**Wichtig:** Gleichnamige Theme-Dateien werden überschrieben. Dateien, die nur das vorherige Theme mitgebracht hat, bleiben dagegen liegen. Sichere eigene Änderungen deshalb über Git, bevor du das Theme wechselst oder erneut anwendest. Nach dem Abschluss sperrt sich `/_install`; die authentifizierte Oberfläche `/_theme` stellt denselben Theme-Katalog für spätere Änderungen bereit.
 
 ## 4. Design
 
@@ -127,7 +127,7 @@ assets/style.css            die eigenen Übersteuerungen des Projekts
 
 ## 5. Header
 
-Der `<header>` der Seite ist eine austauschbare Einheit unter `_install/library/header/<key>`, bestehend aus einer `template.tpl` und der `style.css` für ihr Markup. Das Theme wählt den Header vor, gegen den es gezeichnet wurde; dieser eigene Schritt übersteuert ausschließlich diese Auswahl, nachdem das Design festgelegt wurde.
+Der `<header>` der Seite ist eine austauschbare Einheit unter `library/header/<key>`, bestehend aus einer `template.tpl` und der `style.css` für ihr Markup. Das Theme wählt den Header vor, gegen den es gezeichnet wurde; dieser eigene Schritt übersteuert ausschließlich diese Auswahl, nachdem das Design festgelegt wurde.
 
 Beim Anwenden wird die Einheit nach `templates/theme.header.tpl` und `assets/style.header.css` kopiert, ihr Schlüssel unter `/nino/install/header` gespeichert und das Frame-Stylesheet direkt hinter dem Theme im CSS-Bundle gehalten. Dabei wird weder das Theme erneut kopiert noch das Design zurückgesetzt.
 
@@ -137,11 +137,13 @@ Die Basis-Seitenvorlagen binden die installierte Kopie über `[template /templat
 
 ## 6. Footer
 
-Der Footer-Schritt verwendet unabhängig davon denselben Einheitenvertrag unter `_install/library/footer/<key>`. Beim Anwenden schreibt er `templates/theme.footer.tpl` und `assets/style.footer.css`, speichert `/nino/install/footer` und lässt Theme, Design sowie den gewählten Header unangetastet.
+Der Footer-Schritt verwendet unabhängig davon denselben Einheitenvertrag unter `library/footer/<key>`. Beim Anwenden schreibt er `templates/theme.footer.tpl` und `assets/style.footer.css`, speichert `/nino/install/footer` und lässt Theme, Design sowie den gewählten Header unangetastet.
 
 Sein höheres Vorschau-Iframe verwendet denselben endgültigen Design- und Theme-Kontext wie die Header-Vorschau. Wird Footer nach Header angewendet, bleibt die kanonische Bundle-Reihenfolge erhalten: Theme, Header-Stylesheet, Footer-Stylesheet.
 
 Die Basis-Seitenvorlagen binden ihn über `[template /templates/theme.footer]` ein.
+
+Theme und beide Frame-Kataloge liegen unter `library/` in der Projektwurzel, weil `/_theme` sie nach der Installation weiter verwendet. Behalte dieses Verzeichnis beim Entfernen von `/_install/`; nur die installerspezifischen Basis-, Modul- und Seiten-Einheiten bleiben unter `_install/library/`.
 
 ## 7. Routes
 
@@ -199,7 +201,7 @@ So bleibt die Menge der Konten eine technische Strukturentscheidung, während di
 
 ## 10. Abschluss
 
-Der letzte Schritt setzt das echte Passwort für `/_admin` und damit zugleich für `/_templates`. Es muss mindestens acht Zeichen lang sein und ist unabhängig von den Nutzerkonten in `/_editor`.
+Der letzte Schritt setzt das echte Passwort für `/_admin` und damit zugleich für `/_theme` und `/_templates`. Es muss mindestens acht Zeichen lang sein und ist unabhängig von den Nutzerkonten in `/_editor`.
 
 Vor dem Abschluss muss mindestens ein funktionierender Editor-Nutzer existieren. Der Assistent schreibt den neuen Passwort-Hash nach `private/.auth/pw.php` und setzt `/nino/install/completed` in der `config.php`. Jedes von beiden allein hält `/_install` gesperrt — geht die Passwortdatei verloren, sperrt sich `/_admin` zu, statt den Installer wieder freizugeben.
 
@@ -213,24 +215,27 @@ Prüfe nach dem Abschluss:
 - jede angelegte Route einschließlich `/404`;
 - den Login unter `/_editor`;
 - den Login unter `/_admin`;
+- alle vier Dialoge unter `/_theme` mit demselben Passwort;
 - den Zugriff auf `/_templates` mit demselben Passwort, sofern der Alpha-Builder verwendet werden soll;
 - das Speichern eines Testtexts und eines Testbildes.
 
-Entferne anschließend `_install/` aus der produktiven Auslieferung. Der abgeschlossene Projektstand benötigt die Library und den Assistenten nicht mehr. Seitenstruktur, vollständige Inhalte und technische Konfiguration werden danach über `/_admin`, Seitentemplates über `/_templates` und freigegebene redaktionelle Inhalte über `/_editor` gepflegt. Für tiefergehende Strukturarbeit bleiben der HTML+-Escape-Hatch und Code verfügbar.
+Entferne anschließend `_install/` aus der produktiven Auslieferung. Die installerspezifische Library darunter wird nicht mehr benötigt; der getrennte Darstellungskatalog `library/` in der Projektwurzel bleibt dagegen für `/_theme` bestehen. Seitenstruktur, vollständige Inhalte und technische Konfiguration werden danach über `/_admin`, die Darstellung über `/_theme`, Seitentemplates über `/_templates` und freigegebene redaktionelle Inhalte über `/_editor` gepflegt. Für tiefergehende Strukturarbeit bleiben der HTML+-Escape-Hatch und Code verfügbar.
 
 ## Library-Format
 
-Die Library bildet die Ausgangsdaten, aus denen `/_install` das Projekt erzeugt:
+Nino trennt die einmaligen Installer-Quellen vom Darstellungskatalog, der danach bearbeitbar bleibt:
 
-| Einheit | Aufgabe |
+| Pfad | Aufgabe |
 |---|---|
-| `base/` | immer angewendete Grundstruktur, beispielsweise Basis-Routen, Templates, Texte und Assets |
-| `modules/<key>/` | wählbare funktionale Ergänzung mit Abhängigkeiten, Routen und Projektdateien |
-| `themes/<key>/` | visueller Ausgangspunkt mit Vorschau, Stylesheet und weiteren Dateien; benennt über `header`, `footer` und `design` zusätzlich, wogegen er gezeichnet wurde |
-| `header/<key>/`, `footer/<key>/` | austauschbarer Seitenrahmen: eine `template.tpl` und eine optionale `style.css`, sonst nichts - eine `manifest.php` besitzen diese Einheiten als einzige nicht |
-| `pages/<key>/` | Vorlage für eine konkrete Seite mit Route, Template und Ausgangsinhalten |
+| `_install/library/base/` | immer angewendete Routen, Templates, Texte und Assets |
+| `_install/library/modules/<key>/` | wählbare funktionale Ergänzungen samt Abhängigkeiten |
+| `_install/library/pages/<key>/` | Ausgangspunkt für eine konkrete Seite |
+| `library/themes/<key>/` | visueller Ausgangspunkt, gemeinsam von `/_install` und `/_theme` verwendet |
+| `library/header/<key>/`, `library/footer/<key>/` | austauschbarer Frame für beide Werkzeuge |
 
-Jede Einheit besitzt eine `manifest.php`. Das Manifest beschreibt, was der Assistent anzeigen, kopieren und konfigurieren soll. Je nach Einheit enthält es beispielsweise:
+Die ersten drei Pfade können nach dem Abschluss mit `/_install` entfernt werden. `library/` in der Projektwurzel bleibt für den authentifizierten Arbeitsbereich `/_theme` ausgeliefert und ist kein Laufzeit-Plugin-System.
+
+Theme sowie die installerspezifischen Basis-, Modul- und Seiteneinheiten besitzen eine `manifest.php`. Das Manifest beschreibt, was angezeigt, kopiert und konfiguriert wird. Je nach Einheit enthält es beispielsweise:
 
 - Titel, Beschreibung und Vorschaubild;
 - benötigte Module;
@@ -239,7 +244,7 @@ Jede Einheit besitzt eine `manifest.php`. Das Manifest beschreibt, was der Assis
 - Textfragmente pro Sprache;
 - Assets und weitere zu kopierende Dateien.
 
-Die Library ist kein zur Laufzeit geladenes Plugin-System. Sie dient ausschließlich dazu, während der Ersteinrichtung einen kontrollierten, nachvollziehbaren Projektstand zu erzeugen. Eigene Library-Einheiten gehören deshalb wie der übrige Code zum Projekt und sollten gemeinsam mit ihm versioniert und geprüft werden.
+Ein Frame besitzt dagegen kein Manifest: `template.tpl` und eine optionale `style.css` sind alles, was er erklärt. Eigene Library-Einheiten gehören wie der übrige Code zum Projekt und sollten gemeinsam mit ihm versioniert und geprüft werden.
 
 ## Was `/_install` bewusst nicht übernimmt
 

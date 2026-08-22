@@ -82,7 +82,7 @@ Languages, modules, and the routes managed by Setup are replaced. Manually or by
 
 ## 3. Themes
 
-A theme is a complete visual starting point. It can include stylesheets, fonts, images, and other assets. The preview in the selection grid belongs only to the assistant and is not copied into the project.
+A theme is a complete visual starting point under `library/themes/<key>`. It can include stylesheets, fonts, images, and other assets. The preview in the selection grid belongs to the shared appearance catalogue and is not copied into the project.
 
 Exactly one theme is active. When applying:
 
@@ -93,7 +93,7 @@ Exactly one theme is active. When applying:
 
 The position of the stylesheet in the bundle is preserved as much as possible so that the CSS cascade does not change unintentionally. Own additional bundle entries are not removed.
 
-**Important:** Theme files with the same name are overwritten. Files that only the previous theme brought remain. Therefore, secure your own changes via Git before switching or reapplying the theme. After completion, `/_install` locks itself; a later theme change via the interface is therefore not planned and is carried out as a normal project change via files and Git.
+**Important:** Theme files with the same name are overwritten. Files that only the previous theme brought remain. Therefore, secure your own changes via Git before switching or reapplying the theme. After completion, `/_install` locks itself; the authenticated `/_theme` interface provides the same Theme catalogue for later changes.
 
 ## 4. Design
 
@@ -126,7 +126,7 @@ assets/style.css            the project's own overrides
 
 ## 5. Header
 
-The site's `<header>` is an interchangeable unit under `_install/library/header/<key>`, made from a `template.tpl` plus the `style.css` for the markup that template brings. The theme preselects the header it was drawn against; this separate step overrides only that choice after Design has been settled.
+The site's `<header>` is an interchangeable unit under `library/header/<key>`, made from a `template.tpl` plus the `style.css` for the markup that template brings. The theme preselects the header it was drawn against; this separate step overrides only that choice after Design has been settled.
 
 Applying copies the unit to `templates/theme.header.tpl` and `assets/style.header.css`, persists its key under `/nino/install/header`, and keeps the frame stylesheets directly after the theme in the CSS bundle. It does not recopy the theme or reset Design.
 
@@ -136,11 +136,13 @@ The base page templates include the installed copy through `[template /templates
 
 ## 6. Footer
 
-The Footer step follows the same unit contract independently under `_install/library/footer/<key>`. Applying writes `templates/theme.footer.tpl` and `assets/style.footer.css`, persists `/nino/install/footer`, and leaves Theme, Design, and the selected Header untouched.
+The Footer step follows the same unit contract independently under `library/footer/<key>`. Applying writes `templates/theme.footer.tpl` and `assets/style.footer.css`, persists `/nino/install/footer`, and leaves Theme, Design, and the selected Header untouched.
 
 Its taller preview uses the same final Design and theme context as the Header preview. Applying Footer after Header preserves the canonical bundle order: theme, header stylesheet, footer stylesheet.
 
 The base page templates include it through `[template /templates/theme.footer]`.
+
+Theme and both frame catalogues live at project-root `library/` because `/_theme` continues to use them after installation. Keep that directory when removing `/_install/`; only the installer-specific base, module, and page units remain below `_install/library/`.
 
 ## 7. Routes
 
@@ -193,68 +195,35 @@ The email address and password can be changed later via `/_editor` or `/_admin`.
 
 ## 10. Completion
 
-The last step sets the technical password for `/_admin` and `/_templates` and locks the installer. This password is separate from the editor accounts and should be treated as a technical access with full control.
+The last step sets the technical password for `/_admin`, `/_theme`, and `/_templates` and locks the installer. This password is separate from the editor accounts and should be treated as a technical access with full control.
 
 Provide:
 
-- a **password** for `/_admin` and `/_templates`.
+- a **password** for `/_admin`, `/_theme`, and `/_templates`.
 
-The hash is written to `private/.auth/pw.php` and the project is marked installed via `/nino/install/completed` in `config.php`. Either of those alone keeps `/_install` locked, so losing the password file locks `/_admin` rather than handing the installer back. Neither lives in a tool folder, which is what lets an update replace `_nino/`, `_admin/`, `_editor/`, and `_templates/` wholesale.
+The hash is written to `private/.auth/pw.php` and the project is marked installed via `/nino/install/completed` in `config.php`. Either of those alone keeps `/_install` locked, so losing the password file locks `/_admin` rather than handing the installer back. Neither lives in a tool folder, which is what lets an update replace `_nino/`, `_admin/`, `_editor/`, `_theme/`, and `_templates/` wholesale.
 
 If completion fails, check the write permissions of the `private/` directory. After setting the password, `/_install` is locked and can no longer be used. The assistant is then removed from production delivery.
 
 ## Verify the Result and Remove the Installer
 
-After completion, open the frontend and both management interfaces. Check at least the start page, every configured language, login to `/_editor`, login to `/_admin`, and the selected theme assets.
+After completion, open the frontend and the management interfaces. Check at least the start page, every configured language, login to `/_editor`, login to `/_admin`, all four dialogs in `/_theme`, and the selected theme assets.
 
 The installer is intended only for initial setup. Remove or block `/_install` before the website becomes publicly accessible. Keeping it available unnecessarily increases the exposed surface of the project.
 
 ## Library Format
 
-The library in `/_install/library/` contains the files for the initial setup. It is structured as follows:
+Nino separates one-time installer source from the appearance catalogue that remains editable afterwards:
 
-```
-_install/library/
-├── locales/
-│   ├── de_DE/
-│   │   ├── text/
-│   │   │   └── global.php
-│   │   └── elements/
-│   │       └── services.php
-│   └── en_US/
-│       ├── text/
-│       │   └── global.php
-│       └── elements/
-│           └── services.php
-├── modules/
-│   ├── navigation/
-│   │   ├── module.php
-│   │   └── templates/
-│   │       └── navigation.tpl
-│   └── form/
-│       ├── module.php
-│       └── templates/
-│           └── form.tpl
-├── header/
-│   └── v1/
-│       ├── template.tpl
-│       └── style.css
-├── footer/
-│   └── v1/
-│       ├── template.tpl
-│       └── style.css
-└── themes/
-    └── default/
-        ├── manifest.php
-        ├── preview.svg
-        ├── assets/
-        │   └── style.theme.default.css
-        └── fonts/
-            └── text/
-                └── regular.woff2
-```
+| Path | Purpose |
+|---|---|
+| `_install/library/base/` | always-applied routes, templates, texts, and assets |
+| `_install/library/modules/<key>/` | selectable functional additions and their dependencies |
+| `_install/library/pages/<key>/` | starting point for one concrete page |
+| `library/themes/<key>/` | visual baseline shared by `/_install` and `/_theme` |
+| `library/header/<key>/`, `library/footer/<key>/` | interchangeable frame shared by both tools |
 
-Each locale directory contains the text and element files for that language. Modules provide their own files and templates.
+The first three paths may be removed with `/_install` after completion. The project-root `library/` remains deployed for the authenticated `/_theme` workspace and is not a runtime plugin system.
 
 A theme's `manifest.php` lists the files to be copied plus what the look was drawn against:
 
@@ -264,9 +233,9 @@ A theme's `manifest.php` lists the files to be copied plus what the look was dra
 | `stylesheet` | where the copied stylesheet ends up, and what gets bundled |
 | `files` | which of the unit's directories are copied into the project |
 | `header`, `footer` | the frame units this theme was drawn against |
-| `design` | the `/_theme` settings it was drawn with: `primary`, `secondary`, `contrast`, `colors` |
+| `design` | the `/_theme` settings it was drawn with: `primary`, `secondary`, `contrast`, `colors`, `volume`, `spacing`, `shaping` |
 
-A frame unit has no manifest - a `template.tpl` and an optional `style.css` are everything it has to declare.
+A frame unit has no manifest - a `template.tpl` and an optional `style.css` are everything it has to declare. Theme units and the installer-specific base/module/page units use manifests for their copying and configuration contracts.
 
 ## What `/_install` Deliberately Does Not Do
 

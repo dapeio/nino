@@ -3,7 +3,7 @@
 /**
  *	Nino										A compact filesystembased php framework
  *	Install									Steps 3, 5 and 6: pick the site's look - one tile per
- *													_install/library/themes/&lt;key&gt; unit, each with the
+ *													library/themes/&lt;key&gt; unit, each with the
  *													preview image, title and description its own
  *													manifest.php declares. Applying the Theme installs its
  *													declared Design and frame defaults; after Design, Header

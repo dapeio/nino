@@ -1,59 +1,337 @@
 @layer nino.system, nino.tool, nino.local;
 
 /*
- *	/_theme's own screen styles. Everything shared lives in Nino.admin.css;
- *	only what is genuinely local to this tool belongs here, and every rule is
- *	scoped to #theme-page-wrap so it cannot reach another tool's screen.
+ *	/_theme's local components. Shell, rail, navigation, fields, buttons and
+ *	the fixed action bar come from Nino.admin.css; this file only owns the four
+ *	appearance panes and their visual specimens.
  */
 
 @layer nino.tool {
 
-	/* The swatch grid is this tool's one real component: a surface with the
-	   values generated for it, shown on the surface itself so the pairing is
-	   visible rather than asserted */
-	#theme-page-wrap .theme-surfaces {
+	#theme-page-wrap code {
+		font-family: var(--nino-admin-mono);
+		font-size: .9em;
+	}
+
+	#theme-page-wrap .theme-rail-brand {
+		display: flex;
+		align-items: center;
+		gap: .65rem;
+		min-width: 0;
+	}
+
+	#theme-page-wrap .theme-hidden {
+		display: none !important;
+	}
+
+	#theme-page-wrap #theme-pane > section {
+		display: none;
+	}
+
+	#theme-page-wrap.show-theme #theme-content-theme,
+	#theme-page-wrap.show-design #theme-content-design,
+	#theme-page-wrap.show-header #theme-content-header,
+	#theme-page-wrap.show-footer #theme-content-footer {
+		display: block;
+	}
+
+	/* --------------------------------------------------------------- Theme */
+
+	#theme-page-wrap #theme-grid {
 		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
-		gap: var(--editor-gap);
+		grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+		gap: .8rem;
+		margin-bottom: 1rem;
 	}
 
-	#theme-page-wrap .theme-surface {
-		border: 1px solid var(--editor-border);
-		border-radius: var(--editor-radius);
-		overflow: hidden;
-	}
-
-	#theme-page-wrap .theme-surface-head {
-		padding: var(--editor-gap);
+	#theme-page-wrap .theme-tile {
+		position: relative;
 		display: flex;
 		flex-direction: column;
-		gap: .35rem;
+		overflow: hidden;
+		border: 1px solid var(--editor-border);
+		border-radius: var(--editor-radius);
+		background: var(--editor-bg-grouped);
+		box-shadow: var(--editor-shadow-sm);
+		cursor: pointer;
+		transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease;
 	}
 
-	#theme-page-wrap .theme-surface-name {
-		font-weight: 600;
-		font-size: .95rem;
+	#theme-page-wrap .theme-tile:hover {
+		border-color: color-mix(in srgb, var(--editor-blue) 38%, var(--editor-border));
+		box-shadow: var(--editor-shadow);
+		transform: translateY(-1px);
 	}
 
-	#theme-page-wrap .theme-surface-values {
+	#theme-page-wrap .theme-tile--selected {
+		border-color: var(--editor-blue);
+		box-shadow: 0 0 0 3px var(--editor-blue-soft), var(--editor-shadow);
+	}
+
+	#theme-page-wrap .theme-tile--active::after {
+		content: "";
+		position: absolute;
+		inset: .65rem .65rem auto auto;
+		width: .55rem;
+		height: .55rem;
+		border: 2px solid var(--editor-bg-grouped);
+		border-radius: 50%;
+		background: var(--editor-green);
+		box-shadow: 0 1px 3px rgba(0,0,0,.18);
+	}
+
+	#theme-page-wrap .theme-tile:has(input:focus-visible) {
+		outline: 2px solid var(--editor-blue);
+		outline-offset: 2px;
+	}
+
+	#theme-page-wrap .theme-tile input[type="radio"] {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		opacity: 0;
+		pointer-events: none;
+	}
+
+	#theme-page-wrap .theme-tile-preview {
+		display: block;
+		width: 100%;
+		aspect-ratio: 3 / 2;
+		border-bottom: 1px solid var(--editor-separator);
+		background: var(--editor-bg-elevated);
+		object-fit: cover;
+		object-position: top center;
+	}
+
+	#theme-page-wrap .theme-tile-body {
 		display: flex;
-		flex-wrap: wrap;
-		gap: .3rem;
-		padding: var(--editor-gap);
+		flex-direction: column;
+		gap: .25rem;
+		padding: .85rem .9rem 1rem;
+	}
+
+	#theme-page-wrap .theme-tile-body strong {
+		font-size: .88rem;
+		font-weight: 700;
+	}
+
+	#theme-page-wrap .theme-tile-body > span {
+		color: var(--editor-text-secondary);
+		font-size: .76rem;
+		line-height: 1.45;
+	}
+
+	#theme-page-wrap .theme-tile-state {
+		align-self: flex-start;
+		padding: .08rem .42rem;
+		border-radius: 999px;
+		background: var(--editor-green-soft);
+		color: var(--editor-green);
+		font-size: .68rem;
+		font-weight: 700;
+	}
+
+	/* -------------------------------------------------------------- Design */
+
+	#theme-page-wrap .theme-design-section,
+	#theme-page-wrap .theme-frame-panel {
+		margin: 0 0 1.25rem;
+		padding: 1rem;
+		border: 1px solid var(--editor-border);
+		border-radius: var(--editor-radius);
+		background: var(--editor-bg-grouped);
+	}
+
+	#theme-page-wrap .theme-design-section > h2 {
+		margin: 0;
+		font-size: .9rem;
+		font-weight: 700;
+	}
+
+	#theme-page-wrap .theme-design-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+		gap: .8rem;
+		margin-top: .85rem;
+	}
+
+	#theme-page-wrap .theme-field {
+		display: flex;
+		flex-direction: column;
+		gap: .32rem;
+		font-size: .78rem;
+		font-weight: 650;
+	}
+
+	#theme-page-wrap .theme-field small {
+		color: var(--editor-text-secondary);
+		font-weight: 400;
+	}
+
+	#theme-page-wrap .theme-color-control {
+		display: flex;
+		align-items: center;
+		gap: .45rem;
+	}
+
+	#theme-page-wrap .theme-color-swatch {
+		flex: 0 0 auto;
+		width: 2.5rem;
+		height: 2.15rem;
+		padding: 0;
+		border: 1px solid var(--editor-border);
+		border-radius: var(--editor-radius-sm);
+		background: none;
+		cursor: pointer;
+	}
+
+	#theme-page-wrap .theme-color-control .nino-admin-input {
+		min-width: 0;
+		flex: 1 1 auto;
+	}
+
+	#theme-page-wrap .theme-design-specimen {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+		gap: 1rem;
+		margin-top: 1rem;
+		padding-top: 1rem;
 		border-top: 1px solid var(--editor-separator);
 	}
 
-	#theme-page-wrap .theme-chip {
-		font-family: var(--nino-admin-mono);
-		font-size: .7rem;
-		padding: .2rem .4rem;
-		border-radius: var(--editor-radius-sm);
-		border: 1px solid var(--editor-border);
+	#theme-page-wrap .theme-design-specimen h3 {
+		margin: 0 0 .5rem;
+		color: var(--editor-text-secondary);
+		font-size: .72rem;
+		font-weight: 700;
+		letter-spacing: .06em;
+		text-transform: uppercase;
 	}
 
-	#theme-page-wrap .theme-ratio {
-		font-family: var(--nino-admin-mono);
+	#theme-page-wrap .theme-design-surfaces {
+		display: flex;
+		flex-wrap: wrap;
+		gap: .35rem;
+	}
+
+	#theme-page-wrap .theme-design-chip {
+		padding: .3rem .6rem;
+		border: 1px solid transparent;
+		border-radius: var(--editor-radius-sm);
 		font-size: .72rem;
+		font-weight: 650;
+		line-height: 1.4;
+	}
+
+	#theme-page-wrap .theme-design-type-line {
+		margin: 0 0 .35rem;
+		font-weight: 650;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	#theme-page-wrap .theme-design-type-line:last-child {
+		color: var(--editor-text-secondary);
+		font-weight: 400;
+	}
+
+	#theme-page-wrap .theme-design-spacing {
+		display: flex;
+		flex-direction: column;
+		gap: .3rem;
+	}
+
+	#theme-page-wrap .theme-design-space-row {
+		display: flex;
+		align-items: center;
+		gap: .5rem;
+	}
+
+	#theme-page-wrap .theme-design-space {
+		display: block;
+		flex: 0 0 auto;
+		height: .55rem;
+		border-radius: 2px;
+		background: var(--editor-blue);
+		opacity: .55;
+	}
+
+	#theme-page-wrap .theme-design-space-row small {
+		color: var(--editor-text-secondary);
+		font-size: .7rem;
 		font-variant-numeric: tabular-nums;
 	}
+
+	#theme-page-wrap .theme-design-corners {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: flex-end;
+		gap: .5rem;
+	}
+
+	#theme-page-wrap .theme-design-radius {
+		display: block;
+		width: 2.7rem;
+		height: 2.7rem;
+		border: 2px solid var(--editor-blue);
+	}
+
+	/* --------------------------------------------------------------- Frame */
+
+	#theme-page-wrap .theme-frame-panel {
+		display: flex;
+		flex-direction: column;
+		gap: .75rem;
+	}
+
+	#theme-page-wrap .theme-frame-select {
+		max-width: 18rem;
+	}
+
+	#theme-page-wrap .theme-frame-stage {
+		overflow: hidden;
+		border: 1px solid var(--editor-border);
+		border-radius: var(--editor-radius);
+		background: var(--editor-bg-elevated);
+	}
+
+	#theme-page-wrap .theme-frame-view {
+		--theme-frame-height: 42rem;
+		--theme-frame-scale: .75;
+
+		display: block;
+		width: calc(100% / var(--theme-frame-scale));
+		height: var(--theme-frame-height);
+		margin-bottom: calc(var(--theme-frame-height) * (var(--theme-frame-scale) - 1));
+		border: 0;
+		transform: scale(var(--theme-frame-scale));
+		transform-origin: top left;
+	}
+
+	#theme-page-wrap .theme-status-error {
+		color: var(--editor-red);
+	}
+
+	@media (max-width: 78rem) {
+		#theme-page-wrap .theme-frame-view { --theme-frame-scale: .55; }
+	}
+
+	@media (max-width: 56rem) {
+		#theme-page-wrap .theme-frame-view { --theme-frame-scale: .4; }
+	}
+
+	@media (max-width: 38rem) {
+		#theme-page-wrap .nino-admin-rail-head {
+			flex-wrap: wrap;
+		}
+
+		#theme-page-wrap .nino-admin-tools {
+			flex: 1 0 100%;
+		}
+	}
+}
+
+@layer nino.local {
+	/* Reserved for project-specific /_theme refinements. */
 }

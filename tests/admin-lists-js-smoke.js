@@ -146,11 +146,16 @@ check( 'the shared design system styles only nino-admin-* classes',
 check( 'the shared design system declares its own cascade layer',
 	shared.includes('@layer nino.system {') );
 
+check( 'the shared tool bridge owns both its compact layout and current-page state',
+	shared.includes('.nino-admin-tools') &&
+	shared.includes('.nino-admin-tools > a[aria-current="page"]') );
+
 const TOOL_ROOTS = {
 	'_admin/assets/style.css'     : '#admin-page-wrap',
 	'_editor/assets/style.css'    : '#editor-page-wrap',
 	'_install/assets/style.css'   : '#install-page-wrap',
 	'_templates/assets/style.css' : '#pd-app',
+	'_theme/assets/style.css'     : '#theme-page-wrap',
 };
 
 Object.keys( TOOL_ROOTS ).forEach( function( file ) {
@@ -199,13 +204,14 @@ const TOOL_TEMPLATES = {
 	'_editor'    : [ '_editor/templates/html-header.tpl' ],
 	'_install'   : [ '_install/templates/page-wizard.tpl', '_install/templates/page-locked.tpl' ],
 	'_templates' : [ '_templates/templates/page-index.tpl' ],
+	'_theme'     : [ '_theme/templates/page-index.tpl' ],
 };
 
 Object.keys( TOOL_TEMPLATES ).forEach( function( tool ) {
 	TOOL_TEMPLATES[tool].forEach( function( file ) {
 
 		const markup = read( file );
-		const foreign = ( markup.match(/_(?:admin|editor|install|templates)\/assets\/style\.css/g) || [] )
+		const foreign = ( markup.match(/_(?:admin|editor|install|templates|theme)\/assets\/style\.css/g) || [] )
 			.filter( function( reference ) { return reference.startsWith( tool+ '/' ) === false } );
 
 		check( file+ ' links no other tool\'s stylesheet', foreign.length === 0, foreign.join(', ') );
@@ -240,6 +246,11 @@ const adminLoginTemplate = read('_admin/templates/page-login.tpl');
 check( 'Admin no longer depends on the complete Editor stylesheet',
 	[ adminTemplate, adminLoginTemplate ].every( source => source.includes('_editor/assets/style.css') === false ) &&
 	[ adminTemplate, adminLoginTemplate ].every( source => source.includes('_nino/Nino.admin.css') ) );
+
+check( 'each authenticated developer surface mounts the shared tool bridge with its own current key',
+	adminTemplate.includes('[admin-tools admin]') &&
+	read('_templates/templates/page-index.tpl').includes('[admin-tools templates]') &&
+	read('_theme/templates/page-index.tpl').includes('[admin-tools theme]') );
 
 check( 'the shared tile is a complete surface rather than a spacing-only refinement',
 	/:where\(\.nino-admin\) \.nino-admin-tile \{[^}]*display: flex;[^}]*border: 1px solid[^}]*background: var\(--editor-bg-elevated\);[^}]*color: var\(--editor-text\);/s.test( shared ) );

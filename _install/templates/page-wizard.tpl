@@ -63,7 +63,7 @@
 				</div>
 
 				<div id="install-content-themes">
-					<p class="nino-admin-hint nino-admin-hint-lead">Pick the site's look - one complete theme from <code>_install/library/themes</code>. Applying copies whatever its manifest lists (its stylesheet, the webfonts that stylesheet uses, any images it ships) into the project and points <code>config.php</code>'s css bundle at it. Click a tile's preview to enlarge it. Exactly one theme is active at a time: picking a different one later overwrites its files rather than adding to them.</p>
+					<p class="nino-admin-hint nino-admin-hint-lead">Pick the site's look - one complete theme from <code>library/themes</code>. Applying copies whatever its manifest lists (its stylesheet, the webfonts that stylesheet uses, any images it ships) into the project and points <code>config.php</code>'s css bundle at it. Click a tile's preview to enlarge it. Exactly one theme is active at a time: picking a different one later overwrites its files rather than adding to them.</p>
 					<div id="themes-grid"></div>
 					<p id="themes-msg"></p>
 				</div>

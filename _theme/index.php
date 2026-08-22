@@ -2,7 +2,7 @@
 declare(strict_types=1);
 /**
  *	Nino					A compact filesystembased php framework
- *	Design					The generated palette and scale a project is built from
+ *	Appearance			Theme, Design, Header and Footer after installation
  *
  *	@package			Dape/Nino
  *	@author				David Perchermeier <mail@dape.io>

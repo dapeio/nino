@@ -59,11 +59,12 @@ After completion, open:
 | `/` | The configured website is delivered with the selected theme. |
 | `/_editor` | The first user account can maintain content. |
 | `/_admin` | The separate technical password opens the full project administration. |
+| `/_theme` | The same technical password opens Theme, Design, Header, and Footer editing. |
 | `/_templates` | The same technical password opens the section-first Template Builder (Alpha). |
 
 Also check every language and route, the navigation, and used forms. Save a text and an image in `/_editor` as a test. If you want to use `/_templates`, additionally open a `page-*.tpl`, change nothing at first, and check whether its top-level sections are recognized without warnings.
 
-The last installation step replaces the provided `_admin` password hash and locks `/_install`. Subsequently, remove `_install/` from production delivery; the correct order and further security checks are described in the [Deployment Manual](deployment.md#_install-after-setup).
+The last installation step replaces the provided `_admin` password hash and locks `/_install`. Subsequently, remove `_install/` from production delivery, but retain the separate project-root `library/` catalogue used by `/_theme`; the correct order and further security checks are described in the [Deployment Manual](deployment.md#_install-after-setup).
 
 ## Next Steps
 

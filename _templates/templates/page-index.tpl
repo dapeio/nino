@@ -14,12 +14,12 @@
 		[csrf]
 		<div id="pd-app" class="nino-admin nino-admin-shell" data-dir="[[/nino/dir]]" data-public="[[/nino/public]]">
 			<header id="pd-topbar">
-				<div class="pd-head-rail">
+				<div class="pd-head-rail nino-admin-rail-head">
 					<a class="pd-brand" href="[[/nino/dir]]/_templates/" aria-label="Templates home">
 						<span class="nino-admin-brand-mark" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg></span>
 						<span class="nino-admin-brand-copy"><strong>Nino</strong><small>Templates</small></span>
 					</a>
-					<a href="[[/nino/dir]]/_admin/" class="pd-back-admin"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/><path d="M21 12H9"/></svg><span>Back to Admin</span></a>
+					[admin-tools templates]
 				</div>
 				<div id="pd-document-meta" aria-live="polite">
 					<strong id="pd-document-title">No template selected</strong>

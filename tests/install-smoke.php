@@ -315,9 +315,9 @@ $themeListRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Install\Themes::apiList( $appData, $themeListRequest );
 $themeListBody = $themeListRequest['/nino/http/response']['body'];
 
-check( 'lists every theme unit, one per _install/library/themes/<key>', array_keys( $themeListBody['themes'] ) === [ 'agency', 'correct', 'glow', 'kontor', 'marketplace', 'nighty', 'solid', 'wellness' ] );
+check( 'lists every theme unit, one per library/themes/<key>', array_keys( $themeListBody['themes'] ) === [ 'agency', 'correct', 'glow', 'kontor', 'marketplace', 'nighty', 'solid', 'wellness' ] );
 check( 'each theme carries the label and description its manifest declares', $themeListBody['themes']['nighty']['label'] === 'Nighty' && $themeListBody['themes']['nighty']['description'] !== '' );
-check( 'each theme carries a preview image path, served out of the library itself', $themeListBody['themes']['nighty']['preview'] === '/_install/library/themes/nighty/preview.svg' );
+check( 'each theme carries a preview image path, served out of the shared library itself', $themeListBody['themes']['nighty']['preview'] === '/library/themes/nighty/preview.svg' );
 check( 'no theme is applied yet - the bundle carries none of the library\'s own stylesheets', $themeListBody['activeTheme'] === null );
 
 $_POST['data'] = json_encode( [ 'theme' => 'does-not-exist' ] );
@@ -399,7 +399,7 @@ check( 'the installed frame really renders through [template /templates/theme.fo
 
 // A frame unit with no style.css of its own still gets an empty file, so the
 // bundle entry never points at something that isn't there
-$emptyStyleFrames = array_filter( glob( __DIR__. '/../_install/library/footer/*/style.css' ) ?: [], static fn( string $file ): bool => filesize( $file ) === 0 );
+$emptyStyleFrames = array_filter( glob( __DIR__. '/../library/footer/*/style.css' ) ?: [], static fn( string $file ): bool => filesize( $file ) === 0 );
 check( 'a frame that ships no css of its own is still installable', $emptyStyleFrames === [] || is_file( $sandbox. '/public/assets/style.footer.css' ) === true );
 
 // Header and Footer are their own tabs after Design. Each post changes only
@@ -421,7 +421,7 @@ check( 'each dedicated frame apply succeeds and echoes only its pick', $headerPi
 	&& $footerPickRequest['/nino/http/response']['body'] === [ 'kind' => 'footer', 'frame' => 'v2' ] );
 check( 'each frame overrides the theme\'s declaration and is persisted', ( $configAfterFrames['/nino/install/header'] ?? null ) === 'v3'
 	&& ( $configAfterFrames['/nino/install/footer'] ?? null ) === 'v2' );
-check( '...and the installed template is really that unit\'s', file_get_contents( $sandbox. '/private/templates/theme.header.tpl' ) === file_get_contents( __DIR__. '/../_install/library/header/v3/template.tpl' ) );
+check( '...and the installed template is really that unit\'s', file_get_contents( $sandbox. '/private/templates/theme.header.tpl' ) === file_get_contents( __DIR__. '/../library/header/v3/template.tpl' ) );
 check( 'frame-only applies leave the selected theme and Design untouched', ( $configAfterFrames['/nino/install/theme'] ?? null ) === ( $configBeforeFrames['/nino/install/theme'] ?? null )
 	&& ( $configAfterFrames['/nino/theme/design'] ?? [] ) === ( $configBeforeFrames['/nino/theme/design'] ?? [] ) );
 check( 'applying Footer after Header keeps their canonical bundle order', array_search( '/assets/style.header.css', $configAfterFrames['/nino/html/assets']['/.cache/style.css'], true )
@@ -475,9 +475,9 @@ check( 'a frame renders as a complete, inert document', $headerStatus === 200
 	&& str_starts_with( (string) ( $headerBody['html'] ?? '' ), '<!doctype html>' )
 	&& str_contains( (string) $headerBody['html'], '<script' ) === false );
 
-// The framework stylesheet is three directories up from library/themes, and
-// getting that depth wrong produced a preview that rendered every frame
-// unstyled - which reads as a broken frame rather than a broken preview
+// The framework stylesheet is project-root relative to the installer, not to
+// the shared library. Getting that base wrong produced a preview that rendered
+// every frame unstyled - which reads as a broken frame rather than a broken preview
 check( 'the framework stylesheet is really in the preview, not just meant to be', str_contains( $headerCss, '.nino-grid-row' )
 	&& str_contains( $headerCss, '.nino-scroll-header' )
 	&& strlen( $headerCss ) > 50000 );
@@ -629,7 +629,7 @@ check( 'the picker is handed the frames and each theme\'s own defaults', isset( 
 
 // The theme is a mapping layer now: a literal colour in a role is a pair
 // /_theme never measured, which is exactly what this split exists to prevent
-$agencyCss = (string) file_get_contents( __DIR__. '/../_install/library/themes/agency/assets/style.theme.agency.css' );
+$agencyCss = (string) file_get_contents( __DIR__. '/../library/themes/agency/assets/style.theme.agency.css' );
 preg_match_all( '/^\s*(--color-[a-z0-9-]+)\s*:\s*([^;]+);/mi', $agencyCss, $roles, PREG_SET_ORDER );
 $literalRoles = array_values( array_filter( $roles, static fn( array $role ): bool => str_contains( $role[2], 'var(--nino-' ) === false && str_contains( $role[2], 'color-mix' ) === false ) );
 
@@ -1314,12 +1314,12 @@ foreach( [ 'home/templates/page-home.tpl', '404/templates/page-404.tpl',
 // stylesheet that manifest names, and every webfont that stylesheet
 // @font-faces - nothing else in the library ships fonts anymore, so a
 // missing one is a font that silently never loads
-foreach( scandir( $realRoot. '/_install/library/themes' ) ?: [] as $themeEntry ) {
+foreach( scandir( $realRoot. '/library/themes' ) ?: [] as $themeEntry ) {
 
 	if( $themeEntry === '.' || $themeEntry === '..' )
 		continue;
 
-	$themeDir 			= $realRoot. '/_install/library/themes/'. $themeEntry;
+	$themeDir 			= $realRoot. '/library/themes/'. $themeEntry;
 	$themeManifest 	= include $themeDir. '/manifest.php';
 	$themeCss 			= (string) ( $themeManifest['stylesheet'] ?? '' );
 
@@ -1333,8 +1333,8 @@ foreach( scandir( $realRoot. '/_install/library/themes' ) ?: [] as $themeEntry )
 }
 
 $themeKey = (string) ( $realConfig['/nino/install/theme'] ?? '' );
-check( 'the theme the config names exists in the library', is_file( $realRoot. '/_install/library/themes/'. $themeKey. '/manifest.php' ) === true );
-check( '...and the stylesheet it declares is the one the config bundles', ( include $realRoot. '/_install/library/themes/'. $themeKey. '/manifest.php' )['stylesheet'] === ( $realConfig['/nino/html/assets']['/.cache/style.css'][1] ?? '' ) );
+check( 'the theme the config names exists in the library', is_file( $realRoot. '/library/themes/'. $themeKey. '/manifest.php' ) === true );
+check( '...and the stylesheet it declares is the one the config bundles', ( include $realRoot. '/library/themes/'. $themeKey. '/manifest.php' )['stylesheet'] === ( $realConfig['/nino/html/assets']['/.cache/style.css'][1] ?? '' ) );
 
 echo "\n";
 

@@ -59,11 +59,12 @@ Das erste Editor-Konto besitzt vollständige Rechte. Weitere Konten werden spät
 | `/` | Die eingerichtete Webseite wird mit dem gewählten Theme ausgeliefert. |
 | `/_editor` | Das erste Nutzerkonto kann Inhalte pflegen. |
 | `/_admin` | Das getrennte technische Passwort öffnet die vollständige Projektverwaltung. |
+| `/_theme` | Dasselbe technische Passwort öffnet die Bearbeitung von Theme, Design, Header und Footer. |
 | `/_templates` | Dasselbe technische Passwort öffnet den sectionbasierten Template Builder (Alpha). |
 
 Prüfe außerdem jede Sprache und Route, die Navigation sowie verwendete Formulare. Speichere testweise einen Text und ein Bild in `/_editor`. Falls du `/_templates` einsetzen möchtest, öffne zusätzlich ein `page-*.tpl`, ändere zunächst nichts und prüfe, ob seine obersten Sections ohne Warnung erkannt werden.
 
-Der letzte Installationsschritt ersetzt den mitgelieferten `_admin`-Passworthash und sperrt `/_install`. Entferne anschließend `_install/` aus der produktiven Auslieferung; die korrekte Reihenfolge und weitere Sicherheitsprüfungen stehen im [Deployment-Handbuch](deployment.de.md#_install-nach-der-einrichtung).
+Der letzte Installationsschritt ersetzt den mitgelieferten `_admin`-Passworthash und sperrt `/_install`. Entferne anschließend `_install/` aus der produktiven Auslieferung, behalte aber den getrennten Katalog `library/` in der Projektwurzel für `/_theme`; die korrekte Reihenfolge und weitere Sicherheitsprüfungen stehen im [Deployment-Handbuch](deployment.de.md#_install-nach-der-einrichtung).
 
 ## Danach weiterarbeiten
 

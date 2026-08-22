@@ -160,19 +160,18 @@ namespace; the kernel-owned `Nino\` classes remain in `_nino/`. This way, the
 extension remains part of the specific project, `_nino/` stays replaceable, and
 no second hook or plugin system is introduced.
 
-## `/_admin`, `/_templates`, and `/_editor`
+## `/_admin`, `/_theme`, `/_templates`, and `/_editor`
 
 The optional interfaces have their own entry points and are not frontend modules from `/nino/modules`:
 
 | Interface | Responsibility |
 |---|---|
 | [`/_admin`](_admin.md) | full technical access to structure, configuration, texts, and elements |
+| [`/_theme`](_theme.md) | Theme, generated Design tokens, Header, and Footer after installation |
 | [`/_templates`](_templates.md) | section-first composition, reusable template includes, and native quick fill of `page-*.tpl` |
 | [`/_editor`](_editor.md) | daily maintenance of released content, images, user, and operational data |
 
-`/_templates` shares password and session with `/_admin`; `/_editor`, on the other hand, has individual accounts and granular rights. Thus, the separation is no longer solely between structure and content but primarily between full development access and restricted editorial work.
-
-`/_theme` complements these tools with the design layer: it generates the color and size tokens every stylesheet reads from, and remains usable after an installation.
+`/_theme` and `/_templates` share password and session with `/_admin`; `/_editor`, on the other hand, has individual accounts and granular rights. Thus, the separation is no longer solely between structure and content but primarily between full development access and restricted editorial work.
 
 ## Where Does a Change Belong?
 
@@ -185,7 +184,7 @@ The optional interfaces have their own entry points and are not frontend modules
 | Create new public URL | route in `config.php` or via `/_admin` |
 | Output dynamic list | element query or shortcode with callback |
 | Add technical function | project-specific module |
-| Change colors or typography | `/_theme` for the design tokens; stylesheets for everything beyond them |
+| Change Theme, Design, Header, or Footer | `/_theme`; stylesheets for project-specific overrides beyond the catalogue |
 
 ## Next Steps
 

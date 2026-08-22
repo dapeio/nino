@@ -20,9 +20,10 @@
 # belt and braces next to the 403 stub each of those files carries itself.
 #
 # Its mirror, public/, is the opposite: everything in there is meant to be
-# served, and nothing else in this project root is - index.php and the tool
-# folders aside, a request that resolves to a real file outside public/ is
-# almost always a mistake.
+# served, and nothing else in this project root is - index.php, the tool
+# folders, and library/themes/*/preview.svg aside, a request that resolves to
+# a real file outside public/ is almost always a mistake. library/.htaccess
+# denies every other file in that shared server-side catalogue.
 
 # Don't let a directory with no index.php list its contents - a plain
 # defence-in-depth default now that nothing relies on an unguessable

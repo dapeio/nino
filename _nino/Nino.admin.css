@@ -1,7 +1,7 @@
 /**
  * Nino admin UI - the design system for Nino's own tool frontends
  *
- * Shared visual system for /_admin, /_editor, /_install and /_templates.
+ * Shared visual system for /_admin, /_editor, /_install, /_templates and /_theme.
  * Linked after each tool's own stylesheet, but placed in the lower
  * `nino.system` cascade layer, so it remains an overridable baseline.
  *
@@ -41,7 +41,8 @@
  *              .nino-admin-rail
  *              .nino-admin-rail-head  .nino-admin-rail-actions
  *              .nino-admin-rail-user  .nino-admin-rail-accent
- *              .nino-admin-rail-danger  .nino-admin-nav  .nino-admin-pane
+ *              .nino-admin-rail-danger  .nino-admin-tools
+ *              .nino-admin-nav  .nino-admin-pane
  *   Auth       .nino-admin-auth  .nino-admin-auth-card
  *              .nino-admin-auth-brand  .nino-admin-auth-title
  *   Brand      .nino-admin-brand-mark  .nino-admin-brand-copy
@@ -304,6 +305,55 @@ a {
 
 :where(.nino-admin) .nino-admin-rail-danger {
 	color: var(--editor-red);
+}
+
+/* One compact bridge between the developer tools. It is deliberately a
+   separate navigation from a tool's own sections: the current item describes
+   application context, while the rail below describes work inside it. */
+:where(.nino-admin) .nino-admin-tools {
+	display: inline-flex;
+	align-items: center;
+	gap: .16rem;
+	width: 100%;
+	max-width: 100%;
+	padding: .18rem;
+	overflow-x: auto;
+	border: 1px solid var(--nino-admin-rail-border);
+	border-radius: var(--editor-radius-sm);
+	background: var(--editor-bg);
+	box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 4%, transparent);
+	scrollbar-width: none;
+}
+
+:where(.nino-admin) .nino-admin-tools::-webkit-scrollbar {
+	display: none;
+}
+
+:where(.nino-admin) .nino-admin-tools > a {
+	display: block;
+	flex: 1 1 auto;
+	min-width: 0;
+	padding: .34rem .48rem;
+	overflow: hidden;
+	border-radius: calc(var(--editor-radius-sm) - 2px);
+	color: var(--nino-admin-rail-muted);
+	font-size: .7rem;
+	font-weight: 650;
+	line-height: 1.2;
+	text-align: center;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+:where(.nino-admin) .nino-admin-tools > a:hover {
+	background: var(--editor-blue-soft);
+	color: var(--editor-blue);
+}
+
+:where(.nino-admin) .nino-admin-tools > a[aria-current="page"] {
+	background: var(--editor-blue);
+	color: var(--nino-admin-active-text);
+	box-shadow: 0 1px 2px color-mix(in srgb, var(--editor-blue) 24%, transparent);
 }
 
 :where(.nino-admin) .nino-admin-nav {

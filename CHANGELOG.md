@@ -6,6 +6,28 @@ All notable changes to Nino are documented in this file.
 
 ### Added
 
+- `/_admin`, `/_templates`, and `/_theme` now share one compact authenticated
+  tool bridge. It derives availability from each complete tool directory in the
+  delivery, omits missing or partially copied tools without another config
+  switch, and exposes the current surface both visually and with
+  `aria-current="page"`.
+
+  The Template Builder now gives that bridge the same rail width, inner edge,
+  brand geometry, vertical rhythm, and compact-screen wrapping as Admin and
+  Theme instead of placing the shared control in its former compressed topbar.
+
+- `/_theme` is now the post-install appearance workspace, with four separate
+  dialogs for Theme, Design, Header, and Footer. Theme applies a complete
+  manifest baseline; Design changes only generated tokens; Header and Footer
+  each preview and replace only their own template/stylesheet pair. All new
+  posts retain the shared `/_admin` authentication and CSRF contract.
+
+  Their selectable units now live in the durable project-root `library/`
+  catalogue shared with `/_install`, so removing the one-time installer no
+  longer removes the choices needed by `/_theme`. Only Theme `preview.svg`
+  files are public; Apache and development-router rules refuse direct access
+  to the catalogue's manifests, templates, stylesheets, and font sources.
+
 - `/_install`'s separate Header and Footer steps now show their frame. Each one
   carries the real template rendered beneath it - against `Nino.css`, the
   design tokens for the settings being chosen, the picked theme's stylesheet
@@ -66,7 +88,7 @@ All notable changes to Nino are documented in this file.
   decisions one at a time.
 
   Frames. A site's `<header>` and `<footer>` are interchangeable units under
-  `_install/library/header|footer/<key>` - a `template.tpl` plus the
+  `library/header|footer/<key>` - a `template.tpl` plus the
   `style.css` for the markup that template brings, and no manifest, because
   two files are everything a frame has to declare. The base html templates
   include the installed copy through `[template /templates/theme.header]`
@@ -817,6 +839,16 @@ All notable changes to Nino are documented in this file.
 
 ### Fixed
 
+- Header previews now preserve UTF-8 and HTML-significant characters in live
+  project text (for example `Müller & Söhne "Studio"`) instead of letting a
+  legacy encoding or an attribute delimiter corrupt the iframe. The shared
+  Theme/Design/Header/Footer action is also styled as the same blue primary
+  action used throughout the other authenticated tools.
+
+- The authenticated `/_theme` page now renders its CSRF field. Its frontend
+  can therefore attach the session token to `design/read`, `design/preview`,
+  and `design/save` instead of having every API request rejected with 403.
+
 - `Design::normalize()` raised a `TypeError` instead of falling back when a
   knob arrived as an array or an object rather than a string. These come from
   decoded json, and php raises rather than returning false when a non-string is
@@ -1146,7 +1178,7 @@ Development tooling, installation workflow, content management, and documentatio
 - Opening and saving an unchanged template therefore remains a no-op.
 - Template changes remain normal readable HTML+ and can still be edited
   directly.
-- Theme units live below `_install/library/themes/` and contain their own:
+- Theme units live below `library/themes/` and contain their own:
   - manifest;
   - stylesheet;
   - preview;

@@ -140,12 +140,8 @@ code {
 	-webkit-backdrop-filter: blur(22px) saturate(175%);
 }
 .pd-head-rail {
-	display: grid;
-	align-content: center;
 	align-self: stretch;
-	gap: .4rem;
 	min-width: 0;
-	padding-right: .25rem;
 }
 .pd-brand {
 	display: flex;
@@ -153,26 +149,6 @@ code {
 	gap: .65rem;
 	min-width: 0;
 	color: var(--editor-text);
-}
-.pd-back-admin {
-	display: inline-flex;
-	align-items: center;
-	gap: .38rem;
-	min-width: 0;
-	padding-top: .38rem;
-	border-top: 1px solid var(--editor-separator);
-	color: var(--editor-blue);
-	font-size: .73rem;
-	font-weight: 500;
-}
-.pd-back-admin svg {
-	width: 1rem;
-	height: 1rem;
-	flex: 0 0 auto;
-	transition: transform .16s ease;
-}
-.pd-back-admin:hover svg {
-	transform: translateX(-2px);
 }
 #pd-document-meta {
 	min-width: 0;
@@ -1569,7 +1545,6 @@ code {
 
 @media (max-width: 76rem) {
 	:root {
-		--pd-sidebar-width: 13.5rem;
 		--pd-inspector-width: 18rem;
 	}
 .pd-section-main {
@@ -1580,6 +1555,14 @@ code {
 	}
 .pd-config-step {
 		grid-template-columns: minmax(24rem, 30rem) minmax(24rem, 1fr);
+	}
+}
+/* The Builder already uses its three-column workspace here while Admin and
+   Theme still use their compact top bars. Preserve the narrow transition
+   width; from the shared 64rem rail breakpoint onward all three are 15rem. */
+@media (min-width: 58.001rem) and (max-width: 63.999rem) {
+	:root {
+		--pd-sidebar-width: 13.5rem;
 	}
 }
 @media (max-width: 58rem) {
@@ -1658,6 +1641,12 @@ code {
 	#pd-app .nino-admin-brand-copy small {
 		display: none;
 	}
+	#pd-app .pd-head-rail {
+		flex-wrap: wrap;
+	}
+	#pd-app .pd-head-rail .nino-admin-tools {
+		flex: 1 0 100%;
+	}
 #pd-topbar {
 		padding-right: .7rem;
 		padding-left: .7rem;
@@ -1735,31 +1724,40 @@ code {
 /* ------------------------------------------------------- Desktop app rail */
 
 /* Above the breakpoint the head rail and the template list stop being two
-   separate panels and read as one sidebar, the same rail /_admin, /_editor and
-   /_install show - it is a colour treatment, not a second layout. */
+   separate panels and read as one sidebar. The dimensions below deliberately
+   reproduce /_admin and /_theme's shared rail head: keeping only the pills
+   shared still left this menu visibly narrower and more cramped. */
 
 @media (min-width: 58.001rem) {
+	:root {
+		--pd-topbar-height: 6.85rem;
+	}
+
 	#pd-app .pd-head-rail, #pd-app #pd-pages {
 		border-color: var(--nino-admin-rail-border);
 		background: var(--nino-admin-rail);
 	}
 	#pd-app .pd-head-rail {
+		align-items: stretch;
 		align-self: stretch;
 		box-sizing: border-box;
+		flex-direction: column;
+		justify-content: flex-start;
 		justify-self: start;
 		width: var(--pd-sidebar-width);
 		margin: -.6rem 0 -.6rem -1rem;
-		padding: .65rem .75rem;
+		padding: 1rem 1.07rem .85rem;
+	}
+	#pd-app .pd-head-rail .nino-admin-brand-mark {
+		width: 2rem;
+		height: 2rem;
+		box-shadow: none;
 	}
 	#pd-app :is(.pd-brand, .pd-panel-heading h2, .pd-sidebar-note strong) {
 		color: var(--nino-admin-rail-text);
 	}
-	#pd-app :is(.nino-admin-brand-copy small, .pd-eyebrow, .pd-back-admin, .pd-sidebar-note) {
+	#pd-app :is(.nino-admin-brand-copy small, .pd-eyebrow, .pd-sidebar-note) {
 		color: var(--nino-admin-rail-muted);
-	}
-	#pd-app .pd-back-admin {
-		border-color: var(--nino-admin-rail-border);
-		color: var(--editor-blue);
 	}
 	#pd-app #pd-pages .pd-search, #pd-app #pd-page-list {
 		border-color: var(--nino-admin-rail-border);

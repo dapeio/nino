@@ -32,6 +32,7 @@ set_error_handler( function() { return true; } );
 
 $sandbox = sys_get_temp_dir(). '/nino-theme-smoke-'. uniqid();
 mkdir( $sandbox. '/private', 0777, true );
+mkdir( $sandbox. '/private/templates', 0777, true );
 mkdir( $sandbox. '/public/assets', 0777, true );
 
 $_SERVER['REMOTE_ADDR'] = '127.0.0.1';
@@ -364,21 +365,105 @@ echo "\n";
 
 echo "Theme::init / guard\n";
 
+check( 'the post-install tool owns appearance changes without loading the removable installer',
+	class_exists( '\\Nino\\Install\\Themes', false ) === false
+	&& is_dir( __DIR__. '/../library/themes' ) === true );
+
 $routes = $appData;
 \Nino\Theme\Theme::init( $routes );
 check( 'the tool owns its routes', ( $routes['/nino/http/routes']['GET://_theme']['uri'] ?? '' ) === '/_theme'
 	&& ( $routes['/nino/http/routes']['POST://_theme']['uri'] ?? '' ) === '/_theme' );
 
+$authenticatedPage = (string) file_get_contents( __DIR__. '/../_theme/templates/page-index.tpl' );
+check( 'the authenticated page carries the CSRF field its POST API needs', substr_count( $authenticatedPage, '[csrf]' ) === 1 );
+
 $anonymous = response();
 check( 'guard rejects an unauthenticated request', \Nino\Theme\Theme::guard( $appData, $anonymous ) === false
 	&& $anonymous['/nino/http/response']['statusCode'] === 401 );
 
-foreach( [ 'design/read', 'design/preview', 'design/save' ] as $action ) {
+foreach( [ 'appearance/read', 'theme/apply', 'frame/preview', 'frame/apply', 'design/read', 'design/preview', 'design/save' ] as $action ) {
 	$request = response();
 	$_POST = [ 'action' => $action, 'data' => '{}' ];
 	\Nino\Theme\Theme::handlePost( $appData, $request );
 	check( $action. ' requires an authed session of its own', $request['/nino/http/response']['statusCode'] === 401 );
 }
+
+\Nino\Runtime::setSessionValue( $appData, './nino/admin/authed', true );
+
+$appearance = response();
+$_POST = [ 'action' => 'appearance/read', 'data' => '{}' ];
+\Nino\Theme\Theme::handlePost( $appData, $appearance );
+$appearanceBody = $appearance['/nino/http/response']['body'] ?? [];
+
+check( 'the authenticated tool exposes Theme, Header and Footer choices from the shared appearance library',
+	array_keys( $appearanceBody['themes'] ?? [] ) === [ 'agency', 'correct', 'glow', 'kontor', 'marketplace', 'nighty', 'solid', 'wellness' ]
+	&& ( $appearanceBody['frames']['header'] ?? [] ) === [ 'v1', 'v2', 'v3', 'v4', 'v5', 'v6' ]
+	&& ( $appearanceBody['frames']['footer'] ?? [] ) === [ 'v1', 'v2', 'v3', 'v4', 'v5', 'v6' ] );
+
+$badTheme = response();
+$_POST = [ 'action' => 'theme/apply', 'data' => json_encode( [ 'theme' => '../agency' ] ) ];
+\Nino\Theme\Theme::handlePost( $appData, $badTheme );
+check( 'a Theme key cannot leave the shared catalogue', $badTheme['/nino/http/response']['statusCode'] === 400 );
+
+$badFrame = response();
+$_POST = [ 'action' => 'frame/apply', 'data' => json_encode( [ 'kind' => 'header', 'frame' => '../v1' ] ) ];
+\Nino\Theme\Theme::handlePost( $appData, $badFrame );
+check( 'a frame key cannot leave its kind catalogue', $badFrame['/nino/http/response']['statusCode'] === 400 );
+
+$themeApply = response();
+$_POST = [ 'action' => 'theme/apply', 'data' => json_encode( [ 'theme' => 'agency' ] ) ];
+\Nino\Theme\Theme::handlePost( $appData, $themeApply );
+$afterTheme = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
+
+check( 'Theme applies the manifest as one complete baseline', $themeApply['/nino/http/response']['statusCode'] === 200
+	&& ( $afterTheme['/nino/install/theme'] ?? '' ) === 'agency'
+	&& ( $afterTheme['/nino/install/header'] ?? '' ) === 'v1'
+	&& ( $afterTheme['/nino/install/footer'] ?? '' ) === 'v1'
+	&& ( $afterTheme['/nino/theme/design']['primary'] ?? '' ) === '#4faae8' );
+
+$designSave = response();
+$_POST = [ 'action' => 'design/save', 'data' => json_encode( [ 'primary' => '#14595e', 'spacing' => 'tight' ] ) ];
+\Nino\Theme\Theme::handlePost( $appData, $designSave );
+$afterDesign = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
+
+check( 'Design changes only its generated values, not Theme or either frame', ( $afterDesign['/nino/theme/design']['primary'] ?? '' ) === '#14595e'
+	&& ( $afterDesign['/nino/theme/design']['spacing'] ?? '' ) === 'tight'
+	&& ( $afterDesign['/nino/install/theme'] ?? '' ) === 'agency'
+	&& ( $afterDesign['/nino/install/header'] ?? '' ) === 'v1'
+	&& ( $afterDesign['/nino/install/footer'] ?? '' ) === 'v1' );
+
+$framePreview = response();
+
+// A legacy text file may still carry Windows-1252 bytes, and company names
+// commonly contain characters that are syntax in the shortcode argument and
+// the generated HTML attribute. The preview has to recover the text and quote
+// those boundaries while leaving the visible spelling unchanged.
+$appData['/nino/locales/textfiles'] = '/text';
+\Nino\Filesystem::putFileContent( $appData, '/text/global.php', [
+	'[[/company/name]]' => "M\xFCller & S\xF6hne \"Studio\"",
+] );
+
+$_POST = [ 'action' => 'frame/preview', 'data' => json_encode( [ 'kind' => 'header', 'frame' => 'v3', 'theme' => 'agency' ] ) ];
+\Nino\Theme\Theme::handlePost( $appData, $framePreview );
+check( 'Header and Footer previews remain inert server-rendered documents', $framePreview['/nino/http/response']['statusCode'] === 200
+	&& str_starts_with( (string) ( $framePreview['/nino/http/response']['body']['html'] ?? '' ), '<!doctype html>' )
+	&& str_contains( (string) ( $framePreview['/nino/http/response']['body']['html'] ?? '' ), '<script' ) === false );
+check( 'Header previews preserve special characters without breaking their HTML boundaries',
+	str_contains(
+		(string) ( $framePreview['/nino/http/response']['body']['html'] ?? '' ),
+		"M\u{00FC}ller &amp; S\u{00F6}hne &quot;Studio&quot;"
+	) );
+
+$frameApply = response();
+$_POST = [ 'action' => 'frame/apply', 'data' => json_encode( [ 'kind' => 'header', 'frame' => 'v3' ] ) ];
+\Nino\Theme\Theme::handlePost( $appData, $frameApply );
+$afterFrame = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
+
+check( 'a Header apply changes only Header and preserves the settled Theme, Design and Footer',
+	( $afterFrame['/nino/install/header'] ?? '' ) === 'v3'
+	&& ( $afterFrame['/nino/install/footer'] ?? '' ) === 'v1'
+	&& ( $afterFrame['/nino/install/theme'] ?? '' ) === 'agency'
+	&& ( $afterFrame['/nino/theme/design'] ?? [] ) === ( $afterDesign['/nino/theme/design'] ?? [] ) );
 
 $unknown = response();
 $_POST = [ 'action' => 'design/../../etc', 'data' => '{}' ];
