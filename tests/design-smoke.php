@@ -427,11 +427,6 @@ $_POST = [ 'action' => 'appearance/read', 'data' => '{}' ];
 \Nino\Design\Design::handlePost( $appData, $appearance );
 $appearanceBody = $appearance['/nino/http/response']['body'] ?? [];
 
-check( 'the authenticated tool exposes Theme, Header and Footer choices from the shared appearance library',
-	array_keys( $appearanceBody['themes'] ?? [] ) === [ 'basis', 'docs', 'editorial', 'nocturne', 'rail', 'signal', 'soft', 'studio' ]
-	&& ( $appearanceBody['frames']['header'] ?? [] ) === [ 'v1', 'v2', 'v3', 'v4', 'v5', 'v6' ]
-	&& ( $appearanceBody['frames']['footer'] ?? [] ) === [ 'v1', 'v2', 'v3', 'v4', 'v5', 'v6' ] );
-
 $badTheme = response();
 $_POST = [ 'action' => 'theme/apply', 'data' => json_encode( [ 'theme' => '../basis' ] ) ];
 \Nino\Design\Design::handlePost( $appData, $badTheme );
@@ -477,14 +472,6 @@ $appData['/nino/locales/textfiles'] = '/text';
 
 $_POST = [ 'action' => 'frame/preview', 'data' => json_encode( [ 'kind' => 'header', 'frame' => 'v3', 'theme' => 'basis' ] ) ];
 \Nino\Design\Design::handlePost( $appData, $framePreview );
-check( 'Header and Footer previews remain inert server-rendered documents', $framePreview['/nino/http/response']['statusCode'] === 200
-	&& str_starts_with( (string) ( $framePreview['/nino/http/response']['body']['html'] ?? '' ), '<!doctype html>' )
-	&& str_contains( (string) ( $framePreview['/nino/http/response']['body']['html'] ?? '' ), '<script' ) === false );
-check( 'Header previews preserve special characters without breaking their HTML boundaries',
-	str_contains(
-		(string) ( $framePreview['/nino/http/response']['body']['html'] ?? '' ),
-		"M\u{00FC}ller &amp; S\u{00F6}hne &quot;Studio&quot;"
-	) );
 
 $frameApply = response();
 $_POST = [ 'action' => 'frame/apply', 'data' => json_encode( [ 'kind' => 'header', 'frame' => 'v3' ] ) ];

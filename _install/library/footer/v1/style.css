@@ -1,0 +1,7 @@
+.nino-footer-nav h6 {
+	display:none;
+}
+.nino-footer-nav {
+	display:flex;
+	gap:var(--space-3)
+}

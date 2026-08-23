@@ -29,6 +29,7 @@ body.nino-scroll-atf .nino-frame-header .nino-scroll-header {
 	fill: var(--color-title);
 }
 
+
 body main {
 	padding-top: clamp(5rem, var(--space-6), 8rem);
 }

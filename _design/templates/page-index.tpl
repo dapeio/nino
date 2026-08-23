@@ -34,7 +34,7 @@
 					<h1>Theme</h1>
 					<p class="nino-admin-hint nino-admin-hint-lead">Choose the component mapping, typography and visual character. Applying a Theme establishes its complete recommended baseline: its Design values plus its Header and Footer. Each of those remains independently editable in the following dialogs.</p>
 					<div id="theme-grid" aria-live="polite"></div>
-					<p id="theme-empty" class="nino-admin-hint theme-hidden">No theme variants are available.</p>
+					<p id="theme-empty" class="nino-admin-hint theme-hidden"><strong>No theme variants are available.</strong><br>The directory /_install/library must exist.</p>
 				</section>
 
 				<section id="theme-content-design">
@@ -89,7 +89,7 @@
 				<section id="theme-content-header">
 					<h1>Header</h1>
 					<p class="nino-admin-hint nino-admin-hint-lead">Choose the site's <code>&lt;header&gt;</code> independently. The preview combines the current Theme and saved Design with the selected frame.</p>
-					<p id="theme-frame-header-empty" class="nino-admin-hint theme-hidden">No Header variants are available.</p>
+					<p id="theme-frame-header-empty" class="nino-admin-hint theme-hidden"><strong>No Header variants are available.</strong><br>The directory /_install/library must exist.</p>
 					<div id="theme-frame-header-panel" class="theme-frame-panel theme-hidden">
 						<label class="theme-field theme-frame-select"><span>Header variant</span><select id="theme-frame-header" class="nino-admin-input"></select></label>
 						<div class="theme-frame-stage"><iframe id="theme-frame-header-preview" class="theme-frame-view" title="Header preview" sandbox="" loading="lazy"></iframe></div>
@@ -99,7 +99,7 @@
 				<section id="theme-content-footer">
 					<h1>Footer</h1>
 					<p class="nino-admin-hint nino-admin-hint-lead">Choose the site's <code>&lt;footer&gt;</code> without changing Theme, Design or Header. Its own template and stylesheet are replaced together.</p>
-					<p id="theme-frame-footer-empty" class="nino-admin-hint theme-hidden">No Footer variants are available.</p>
+					<p id="theme-frame-footer-empty" class="nino-admin-hint theme-hidden"><strong>No Footer variants are available.</strong><br>The directory /_install/library must exist.</p>
 					<div id="theme-frame-footer-panel" class="theme-frame-panel theme-hidden">
 						<label class="theme-field theme-frame-select"><span>Footer variant</span><select id="theme-frame-footer" class="nino-admin-input"></select></label>
 						<div class="theme-frame-stage"><iframe id="theme-frame-footer-preview" class="theme-frame-view" title="Footer preview" sandbox="" loading="lazy"></iframe></div>

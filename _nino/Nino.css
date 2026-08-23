@@ -430,7 +430,6 @@ main:has(> .nino-parallex.nino-atf:first-child),
 main:has(> .nino-atf--fullscreen:first-child) {
 	padding-top: 0;
 }
-
 /* Scroll-driven header show/hide, opt-in via .nino-scroll-header */
 .nino-scroll-header {
 	overflow: hidden;

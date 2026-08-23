@@ -33,6 +33,10 @@ namespace Nino\Design {
 
 		public static function init( array &$appData ): void {
 
+			// Check _install
+			if( is_file( $appData['./nino/uid']. '/_install/Install.php' ) === true )
+				require_once $appData['./nino/uid']. '/_install/Install.php';
+
 			// Tool-owned routes always win over stale persisted collisions.
 			$appData['/nino/http/routes']['GET://_design'] = [
 				'uri' 			=> '/_design',
@@ -122,7 +126,10 @@ namespace Nino\Design {
 			if( self::guard( $appData, $request ) === false )
 				return;
 
-			Appearance::apiFrame( $appData, $request );
+			if( method_exists( "\\Nino\\Install\\Themes", 'apiFrame' ) === false )
+				return;
+
+			\Nino\Install\Themes::apiFrame( $appData, $request );
 		}
 
 		public static function apiFrameApply( array &$appData, array &$request ): void {
@@ -350,40 +357,6 @@ namespace Nino\Design {
 			\Nino\Http::ok( $request, [ 'theme' => $key ] + $applied );
 		}
 
-		public static function apiFrame( array &$appData, array &$request ): void {
-
-			$data = Design::postData();
-			$kind = (string) ( $data['kind'] ?? '' );
-
-			if( isset( self::FRAMES[$kind] ) === false ) {
-				\Nino\Http::fail( $request, 400, 'unknown frame kind' );
-				return;
-			}
-
-			$frame = self::_frameKey( $kind, (string) ( $data['frame'] ?? '' ), '' );
-
-			if( $frame === null ) {
-				\Nino\Http::fail( $request, 400, 'no frame units for "'. $kind. '"' );
-				return;
-			}
-
-			$unitDir = self::LIBRARY. '/'. $kind. '/'. $frame;
-			$source = @file_get_contents( $unitDir. '/template.tpl' );
-
-			if( $source === false ) {
-				\Nino\Http::fail( $request, 500, 'could not read the frame template' );
-				return;
-			}
-
-			\Nino\Http::ok( $request, [
-				'frame' => $frame,
-				'html' => self::_framePreviewDocument(
-					self::_framePreviewMarkup( $appData, $source ),
-					self::_framePreviewCss( $appData, $data, $unitDir )
-				),
-			] );
-		}
-
 		public static function apiFrameApply( array &$appData, array &$request ): void {
 
 			$data = Design::postData();
@@ -407,159 +380,6 @@ namespace Nino\Design {
 			\Nino\AppData::writeContentData( $appData, [ '/nino/install/'. $kind, '/nino/html/assets' ] );
 
 			\Nino\Http::ok( $request, [ 'kind' => $kind, 'frame' => $frame ] );
-		}
-
-		private static function _framePreviewMarkup( array &$appData, string $source ): string {
-
-			// Prefer the installed include: /_design edits a live project, so its
-			// preview should use the navigation/legal/locale markup actually there.
-			$source = (string) preg_replace_callback( '/\[template \/templates\/([a-z0-9.-]+)\]/', static function( array $include ) use ( &$appData ): string {
-				$content = \Nino\Filesystem::getFileContent( $appData, '/templates/'. $include[1]. '.tpl', '' );
-				return is_string( $content ) ? $content : '';
-			}, $source );
-
-			$fills = self::_framePreviewFills( $appData );
-			uksort( $fills, static fn( string $a, string $b ): int => strlen( $b ) <=> strlen( $a ) );
-			$source = str_replace( array_keys( $fills ), array_values( $fills ), $source );
-			$source = (string) preg_replace( '/\[\[\/webpage\[\[[^\]]*\]\]\/[a-z]+\]\]/', 'Home', $source );
-
-			// Let active project modules render first. The deterministic fallback
-			// below only handles a Navigation shortcode that was not registered.
-			$source = \Nino\Html::renderHtml( $appData, $source );
-
-			$items = '';
-			foreach( [ 'Home', 'Services', 'About', 'Contact' ] as $index => $label )
-				$items .= str_replace(
-					[ '[[uri]]', '[[attributes]]', '[[title]]' ],
-					[ '#', $index === 0 ? ' class="nino-is-active"' : '', $label ],
-					\Nino\Modules\Navigation::$html['li']
-				);
-
-			$source = (string) preg_replace_callback( '/\[navigation\b([^\]]*)\](.*?)\[\/navigation\]|\[navigation\b([^\]]*)\]/s', static function( array $nav ) use ( $items ): string {
-
-				$arguments = ( $nav[1] ?? '' ). ( $nav[3] ?? '' );
-				$shell = \Nino\Modules\Navigation::$html[str_contains( $arguments, 'burger' ) === true ? 'nav-burger' : 'nav-regular'];
-				$content = '';
-
-				foreach( array_filter( array_map( 'trim', explode( "\n", $nav[2] ?? '' ) ) ) as $line )
-					$content .= str_replace( '[[content]]', $line, \Nino\Modules\Navigation::$html['div'] );
-
-				$content .= str_replace( '[[content]]', $items, \Nino\Modules\Navigation::$html['ul'] );
-
-				return str_replace(
-					[ '[[class]]', '[[id]]', '[[content]]' ],
-					[ '', 'theme-preview-nav', $content ],
-					$shell
-				);
-			}, $source );
-
-			$source = (string) preg_replace( '/\[\[[^\]]*\]\]/', '', $source );
-
-			return (string) preg_replace( '/\[\/?[a-z][a-z0-9]*\b[^\]]*\]/', '', $source );
-		}
-
-		private static function _framePreviewFills( array &$appData ): array {
-			$blank = 'data:image/svg+xml;charset=utf-8,'
-				. rawurlencode( '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 40" role="img" aria-label="Logo">'
-					. '<rect width="160" height="40" rx="6" fill="currentColor" opacity=".12"/>'
-					. '<text x="80" y="25" text-anchor="middle" font-family="system-ui,sans-serif" font-size="13"'
-					. ' font-weight="600" letter-spacing="2" fill="currentColor" opacity=".55">LOGO</text></svg>' );
-
-			$fills = [
-				'[[/nino/public]]/images/logo-invert.png' => $blank,
-				'[[/nino/public]]/images/logo.png' => $blank,
-				'[[/nino/dir]]' => '#',
-				'[[/nino/public]]' => '#',
-				'[[/date/year]]' => date( 'Y' ),
-				'[[/company/name]]' => 'Your Company',
-				'[[/company/description]]' => 'A concise description of the company and its work.',
-				'[[/company/adress]]' => 'Street 1, 12345 City',
-				'[[/company/country]]' => 'Germany',
-				'[[/company/phone]]' => '+49 123 456789',
-				'[[/company/email]]' => 'contact@example.com',
-				'[[/global/adress]]' => 'Address',
-				'[[/global/phone]]' => 'Phone',
-				'[[/global/email]]' => 'Email',
-				'[[/website/footer/title/followus]]' => 'Follow us',
-				'[[/website/footer/title/getintouch]]' => 'Get in touch',
-			];
-
-			$textfiles = (string) ( $appData['/nino/locales/textfiles'] ?? '/text' );
-			$locale = (string) ( $appData['/nino/locales/native'] ?? '' );
-
-			foreach( [ $textfiles. '/global.php', $locale === '' ? '' : $textfiles. '/'. $locale. '.php' ] as $path ) {
-				if( $path === '' )
-					continue;
-
-				$text = \Nino\Filesystem::getFileContent( $appData, $path, [] );
-				if( is_array( $text ) === true )
-					$fills = $text + $fills;
-			}
-
-			// Preview fills cross two syntax boundaries before they reach the iframe:
-			// first the Navigation shortcode's quoted arguments, then the new HTML
-			// document itself. Keep plain text plain across both. The
-			// false double_encode flag preserves an intentional entity such as
-			// &shy;, while quotes, raw ampersands and angle brackets can no longer
-			// terminate an attribute or become preview markup of their own.
-			foreach( $fills as $key => $value ) {
-				if( is_string( $value ) === false ) {
-					unset( $fills[$key] );
-					continue;
-				}
-
-				// Existing projects can predate Nino's UTF-8-only browser editors.
-				// Recover their common Windows-1252 text here instead of letting one
-				// umlaut make json_encode() reject the complete preview response.
-				if( function_exists( 'mb_check_encoding' ) === true && mb_check_encoding( $value, 'UTF-8' ) === false )
-					$value = mb_convert_encoding( $value, 'UTF-8', 'Windows-1252' );
-
-				// Textfills that deliberately contain one of Nino's allowed inline
-				// HTML tags keep that markup. Everything else is text, including a
-				// company name such as: Müller & Söhne "Studio".
-				$fills[$key] = \Nino\Html::containsHtml( $value ) === true
-					? $value
-					: htmlspecialchars( $value, ENT_QUOTES | ENT_SUBSTITUTE | ENT_HTML5, 'UTF-8', false );
-			}
-
-			return $fills;
-		}
-
-		private static function _framePreviewCss( array &$appData, array $data, string $unitDir ): string {
-
-			$css = (string) @file_get_contents( dirname( __DIR__ ). '/_nino/Nino.css' );
-			$settings = is_array( $data['design'] ?? null )
-				? Tokens::normalize( $data['design'] )
-				: Design::settings( $appData );
-			$css .= "\n". Tokens::css( $settings );
-
-			$theme = (string) ( $data['theme'] ?? self::_currentTheme( $appData ) ?? '' );
-			if( self::_readManifest( $theme ) !== null )
-				foreach( glob( self::LIBRARY. '/themes/'. $theme. '/assets/*.css' ) ?: [] as $themeCss )
-					$css .= "\n". (string) file_get_contents( $themeCss );
-
-			if( is_file( $unitDir. '/style.css' ) === true )
-				$css .= "\n". (string) file_get_contents( $unitDir. '/style.css' );
-
-			$css = (string) preg_replace( '~@font-face\s*\{[^{}]*\}~i', '', $css );
-
-			return str_replace(
-				[ '[[/nino/dir]]', '[[/nino/public]]' ],
-				[ (string) ( $appData['/nino/dir'] ?? '' ), (string) ( $appData['/nino/public'] ?? '' ) ],
-				$css
-			);
-		}
-
-		private static function _framePreviewDocument( string $markup, string $css ): string {
-			return '<!doctype html><html lang="en"><head><meta charset="utf-8">'
-				. '<meta name="viewport" content="width=device-width, initial-scale=1">'
-				. '<style>'. $css. '</style>'
-				. '<style>:root{'
-				. '--fontfamily-text:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;'
-				. '--fontfamily-title:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;'
-				. '--fontfamily-subtitle:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}'
-				. '.theme-frame-filler{min-height:4rem}</style>'
-				. '</head><body>'. $markup. '<div class="theme-frame-filler"></div></body></html>';
 		}
 
 		private static function _frameKey( string $kind, string $posted, string $declared ): ?string {
