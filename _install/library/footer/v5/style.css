@@ -63,7 +63,7 @@
 
 .nino-frame-footer a:hover,
 .nino-frame-footer a:focus {
-	color: var(--color-primary);
+	color: var(--color-accent);
 	text-decoration: underline;
 	text-underline-offset: .25em;
 }

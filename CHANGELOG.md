@@ -6,6 +6,29 @@ All notable changes to Nino are documented in this file.
 
 ### Added
 
+- `Demo: Catalogue`, a page unit that shows the whole system on one page: every
+  Section Preset the Template Builder ships, in every layout it declares, plus
+  the variants that actually change how a preset looks - the styles of its
+  areas and the frame settings of its section - and below that every `nino-*`
+  building block `Nino.css` defines, grouped the way the stylesheet groups
+  them.
+
+  The preset half is real Builder output. Each specimen was composed through
+  `Composer::compose()` with literal values, so what the page renders is what
+  the Builder writes into a document, minus the editing marker (the Builder
+  lists `page-*.tpl` documents, and this is a demo page). Its Elements loops
+  are written out with sample records and its image slots filled with three
+  svg stand-ins the unit ships, which is why the page needs no element types,
+  no textfills and no uploads: it renders completely the moment it is
+  installed.
+
+  A strip above every specimen names the preset, the layout and the frame it
+  was composed with, and carries `data-demo-preset` / `data-demo-layout` for
+  `tests/demo-catalogue-smoke.php` to count. That test is the unit's actual
+  contract: every preset shown, every layout shown, every class `Nino.css`
+  defines present on the page - with one explicit list of the classes a page
+  template cannot carry, because a frame or `Nino.ui.js` writes them.
+
 - `/_admin`, `/_templates`, and `/_design` now share one compact authenticated
   tool bridge. It derives availability from each complete tool directory in the
   delivery, omits missing or partially copied tools without another config
@@ -864,6 +887,95 @@ All notable changes to Nino are documented in this file.
   `/_admin` starts behind everything already in that menu.
 
 ### Fixed
+
+- Spacing, alignment, opacity and visibility utilities now win. They sat in the
+  middle of the stylesheet, so every component defined below them - an alert, a
+  table, a modal, a pricing card, a pagination link - beat them on any property
+  it set itself: `nino-pt-4` on a `nino-alert` did exactly nothing, while the
+  same class on a `nino-article` worked, purely because of where the two
+  components happen to be written. The four blocks are one chapter now, and it
+  is the last one in the file: equal specificity, later position.
+
+- `.nino-pagination` links took the page ground's ink instead of the ink of
+  whatever section they are in, so a pagination inside a section whose surface
+  is dark rendered near-invisible (1.03:1 in Studio, whose alt surface is
+  black). Same fix as the breadcrumbs, the table head and the filter buttons
+  already carry: `color: inherit`.
+
+- A form's status message used the status *surface* colour as text on the page
+  ground - 2.6:1 on a dark theme, for the one line that has to be read after a
+  send fails. It now carries that surface with the ink solved for it, exactly
+  like `.nino-alert--error` does, and stays out of the layout while it is
+  empty.
+
+- Brand colour written as ink. `--color-primary` is a *surface*: everything
+  filling with it puts `--color-primary-text` on top, so its contrast is
+  measured against that ink and against nothing else. A dozen components in
+  `Nino.css` painted text with it anyway - outline buttons, prices, stat
+  counters, info alerts, breadcrumbs, tabs, the accordion marker, active nav
+  entries - which put every one of them under the 4.5:1 text target on any
+  ground that is not near-white, and at 1.9:1 on a dark theme's.
+
+  `--color-accent` is the role that was missing: the brand as ink on the ground
+  it is actually on. It exists per surface (`--color-accent-default/-alt/-dark
+  /-black`), every theme maps it to the `--nino-<surface>-link` value `/_design`
+  already solves for that ground, and the section classes re-point it - so a
+  component follows whatever section it was dropped into without knowing which
+  one that is. A theme that maps nothing falls back to the ink the surface
+  already carries.
+
+- Sections now hand their ink roles down with their background. `.nino-section--alt/
+  --dark/--black/--primary`, `.nino-cover--dim`, the cookie banner, the toast
+  and a striped table row set `color` but left `--color-title` and the brand
+  ink pointing at the page ground, so an article title, a filter button or a
+  table cell inside them paired one surface's ink with another's background -
+  invisible outright in a theme whose alt surface is dark. Anything that paints
+  the page ground again inside such a section (an alert, a modal, the open
+  burger overlay) restores both roles with it.
+
+- `.nino-article--alt` took the alt surface's ink onto a `rgba(0,0,0,.05)` wash
+  of whatever was behind it. It is a surface now, with the solved pair that
+  belongs to it, and on a dark section it steps down to the deepest one instead
+  of washing white over it - a transparent tint is a value no ink was ever
+  measured against.
+
+- Status alerts carry their own surface. `.nino-alert--success/--error` used the
+  status *background* colour as text on the page ground: 2.6:1 on a dark theme.
+  They now fill with that surface and use the ink solved for it, published as
+  `--color-success-text` / `--color-error-text` (defaulting to the brand ink, so
+  a theme that maps nothing is unchanged).
+
+- `.nino-footer-title` and the footer's contact/hover accents named the dark
+  section's ink while sitting on the theme's own footer band, and the locale
+  picker named the footer's ink while some header frames mount it in the bar.
+  All of them take the ink of the band they are in.
+
+- `.nino-cover-content` hung over the right edge of its section by exactly the
+  section's left padding: an absolutely positioned box measures `width: 100%`
+  against the padding box but starts at its static position inside the padding,
+  and `.nino-cover`'s `overflow: hidden` then clipped the difference. It is
+  pinned to both edges and inherits the section's horizontal padding, so a
+  cover's content sits on the same inset as every other section's.
+
+- A viewport animation no longer widens the page. `nino-vpa--zoom-out-*` and
+  `--slide-*` start outside their own box, and on a full-width element that left
+  the document scrolling sideways until the animation had played; `main` clips
+  the overflow (`overflow-x: clip`, which does not turn it into a scroll
+  container, so `position: sticky` inside it still works). A bare `<pre>` gets
+  the same treatment it already had as `.nino-code`: it scrolls in its own box
+  rather than pushing the page wide.
+
+- Three target sizes under WCAG 2.2 SC 2.5.8's 24px, with neither the inline nor
+  the spacing exception to fall back on: footer navigation and the locale picker
+  at the footer's `.8em`, a list entry that is nothing but a link, and
+  `.nino-btn--small` at 22px - two of which sit side by side in the cookie
+  banner.
+
+- The `Demo: Sections` page pointed at demo photography that moved into the
+  `home` unit and at a module (`democontent`) this library no longer ships, so
+  the installer promised a module it could not pick and the page rendered empty
+  image frames. The unit ships its own stand-ins now, in the visual language the
+  Template Builder's own section previews use.
 
 - `nino-cover` keeps its viewport-relative height but now derives width from
   its actual containing content box. A layout with a persistent side rail,

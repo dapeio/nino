@@ -436,11 +436,10 @@
 
 		_paintSizes : function( raster ) {
 
-			const wrap = dc.getElementById('theme-design-sizes');
-			if( wrap === null )
+			const wrapVolume = dc.getElementById('theme-design-volume-preview');
+			if( wrapVolume === null )
 				return;
-
-			wrap.innerHTML = '';
+			wrapVolume.innerHTML = '';
 
 			const type = dc.createElement('div');
 			type.className = 'theme-design-type';
@@ -452,8 +451,13 @@
 				line.textContent = pair[1];
 				type.appendChild( line );
 			} );
-			wrap.appendChild( type );
+			wrapVolume.appendChild( type );
 
+			const wrapSpacing = dc.getElementById('theme-design-spacing-preview');
+			if( wrapSpacing === null )
+				return;
+			wrapSpacing.innerHTML = '';
+			
 			const spacing = dc.createElement('div');
 			spacing.className = 'theme-design-spacing';
 			Object.keys( raster.space || {} ).forEach( function( step ) {
@@ -468,8 +472,13 @@
 				row.appendChild( label );
 				spacing.appendChild( row );
 			} );
-			wrap.appendChild( spacing );
+			wrapSpacing.appendChild( spacing );
 
+			const wrapShaping = dc.getElementById('theme-design-shaping-preview');
+			if( wrapShaping === null )
+				return;
+			wrapShaping.innerHTML = '';
+			
 			const corners = dc.createElement('div');
 			corners.className = 'theme-design-corners';
 			Object.keys( raster.radius || {} ).forEach( function( step ) {
@@ -479,7 +488,7 @@
 				corner.title = 'radius-'+ step+ ': '+ raster.radius[step];
 				corners.appendChild( corner );
 			} );
-			wrap.appendChild( corners );
+			wrapShaping.appendChild( corners );
 		},
 
 		_applyCurrent : function() {

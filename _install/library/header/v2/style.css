@@ -56,7 +56,7 @@ body main:has(> .nino-parallex:first-child) {
 	}
 
 	.nino-frame-header .nino-nav-content li a.nino-is-active {
-		color: var(--color-primary);
+		color: var(--color-accent);
 	}
 }
 

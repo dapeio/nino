@@ -54,6 +54,16 @@
 	--color-primary-text: var(--nino-on-vibrant);
 	--color-secondary: var(--nino-origin);
 
+	/* ...and the brand as ink, which is a third value again: --color-primary
+	   is solved so text survives *on* it, and says nothing about what it does
+	   written on a page surface. Every ground gets the one /_design solved for
+	   it, so a price, a stat, an outline button or an info alert clears the
+	   text target wherever it lands */
+	--color-accent-default: var(--nino-black-link);
+	--color-accent-alt: var(--nino-dark-link);
+	--color-accent-dark: var(--nino-dark-link);
+	--color-accent-black: var(--nino-black-link);
+
 	/* Page ground */
 	--color-background: var(--nino-black);
 	--color-text: var(--nino-on-black);
@@ -89,9 +99,11 @@
 	--color-code-text: var(--nino-on-dark);
 	--color-code-border: var(--nino-dark-border);
 
-	/* Status */
+	/* Status - each one is a surface with its own ink, never the brand's */
 	--color-error: var(--nino-danger);
+	--color-error-text: var(--nino-on-danger);
 	--color-success: var(--nino-success);
+	--color-success-text: var(--nino-on-success);
 
 	/* Typefaces are the one thing a theme cannot be handed: a webfont is a
 	   file this unit ships, not a value anything can generate */

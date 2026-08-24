@@ -50,6 +50,9 @@ jobs:
       - name: Run template builder smoke tests
         run: php tests/templates-smoke.php
 
+      - name: Run demo catalogue smoke tests
+        run: php tests/demo-catalogue-smoke.php
+
       - name: Run frontend smoke tests
         run: for test in tests/*-js-smoke.js; do node "$test"; done
 

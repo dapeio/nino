@@ -63,7 +63,7 @@
 }
 
 .nino-frame-header .nino-nav-burger input:focus-visible ~ svg {
-	outline: 2px solid var(--color-primary);
+	outline: 2px solid var(--color-accent);
 	outline-offset: .3rem;
 }
 
@@ -142,7 +142,7 @@
 .nino-frame-header .nino-nav-burger input:checked ~ .nino-nav-content li a:hover,
 .nino-frame-header .nino-nav-burger input:checked ~ .nino-nav-content li a:focus,
 .nino-frame-header .nino-nav-burger input:checked ~ .nino-nav-content li a.nino-is-active {
-	color: var(--color-primary);
+	color: var(--color-accent);
 }
 
 body:has(.nino-frame-header .nino-nav-burger input:checked) {

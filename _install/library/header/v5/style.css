@@ -1,6 +1,9 @@
 .nino-frame-header .nino-frame-header-strip {
 	opacity: 1;
 	background-color: var(--color-section-black-bg);
+	color: var(--color-section-black-text);
+	--color-title: var(--color-section-black-text);
+	--color-accent: var(--color-accent-black);
 	border-bottom: 3px solid var(--color-secondary);
 }
 
@@ -72,7 +75,7 @@ body main:has(> .nino-parallex:first-child) {
 	.nino-frame-header .nino-nav-content li a:hover,
 	.nino-frame-header .nino-nav-content li a:focus,
 	.nino-frame-header .nino-nav-content li a.nino-is-active {
-		color: var(--color-primary);
+		color: var(--color-accent);
 	}
 }
 

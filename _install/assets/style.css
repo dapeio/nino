@@ -173,6 +173,15 @@
 /*	Header/Footer each own a full step after Design. themes.js fills these
  *	panels from themes/list and hides one when that kind has no units on disk. */
 
+#design-controls {
+	display: flex;
+	gap: 1rem;
+	justify-content: space-between;
+}
+	#design-controls .install-design-section {
+		width:100%;
+	}
+
 .install-theme-panel {
 	margin: 0 0 1.25rem;
 	padding: .9rem 1rem 1rem;

@@ -72,65 +72,67 @@
 					<p class="nino-admin-hint nino-admin-hint-lead">The values the theme reads from. <code>/_design</code> generates them and this step writes them: a background is published together with the text colour that belongs on it, measured against the WCAG contrast formula, so a brand colour cannot produce unreadable text. The theme picked in the previous step fills these in with what it was drawn against, and everything stays editable under <code>/_design</code> after the installation.</p>
 					<p id="design-unavailable" class="nino-admin-hint install-hidden">This delivery ships without <code>/_design</code>, so there is nothing to generate here - the theme's own stylesheet decides the colours instead. Press "Next" to continue.</p>
 
+					<section class="install-design-section">
+						<h3 class="install-design-section-title">Colour</h3>
+						<div class="install-design-grid">
+							<label class="install-theme-field">
+								<span>Primary</span>
+								<span class="install-theme-color">
+									<input type="color" id="themes-design-primary" class="install-theme-swatch">
+									<input type="text" id="themes-design-primary-hex" class="nino-admin-input" inputmode="text" spellcheck="false" autocomplete="off" maxlength="7">
+								</span>
+							</label>
+							<label class="install-theme-field">
+								<span>Secondary <small>optional</small></span>
+								<span class="install-theme-color">
+									<input type="color" id="themes-design-secondary" class="install-theme-swatch">
+									<input type="text" id="themes-design-secondary-hex" class="nino-admin-input" inputmode="text" spellcheck="false" autocomplete="off" maxlength="7" placeholder="follows Primary">
+								</span>
+							</label>
+							<label class="install-theme-field">
+								<span>Contrast <small>how hard text has to work</small></span>
+								<select id="themes-design-contrast" class="nino-admin-input"></select>
+							</label>
+							<label class="install-theme-field">
+								<span>Colours <small>how saturated</small></span>
+								<select id="themes-design-colors" class="nino-admin-input"></select>
+							</label>
+						</div>
+
+						<!-- Each chip is a real pair - the generated
+						     background carrying the generated text colour.
+						     A row of backgrounds alone would look
+						     convincing in exactly the settings that fail -->
+						<div class="install-design-specimen">
+							<div id="themes-design-preview" class="install-theme-preview-strip" aria-label="Generated surfaces"></div>
+						</div>
+					</section>
+
 					<div id="design-controls">
-
 						<section class="install-design-section">
-							<h3 class="install-design-section-title">Colour</h3>
 							<div class="install-design-grid">
+								<h3 class="install-design-section-title">Volume</h3>
 								<label class="install-theme-field">
-									<span>Primary</span>
-									<span class="install-theme-color">
-										<input type="color" id="themes-design-primary" class="install-theme-swatch">
-										<input type="text" id="themes-design-primary-hex" class="nino-admin-input" inputmode="text" spellcheck="false" autocomplete="off" maxlength="7">
-									</span>
-								</label>
-								<label class="install-theme-field">
-									<span>Secondary <small>optional</small></span>
-									<span class="install-theme-color">
-										<input type="color" id="themes-design-secondary" class="install-theme-swatch">
-										<input type="text" id="themes-design-secondary-hex" class="nino-admin-input" inputmode="text" spellcheck="false" autocomplete="off" maxlength="7" placeholder="follows Primary">
-									</span>
-								</label>
-								<label class="install-theme-field">
-									<span>Contrast <small>how hard text has to work</small></span>
-									<select id="themes-design-contrast" class="nino-admin-input"></select>
-								</label>
-								<label class="install-theme-field">
-									<span>Colours <small>how saturated</small></span>
-									<select id="themes-design-colors" class="nino-admin-input"></select>
-								</label>
-							</div>
-
-							<!-- Each chip is a real pair - the generated
-							     background carrying the generated text colour.
-							     A row of backgrounds alone would look
-							     convincing in exactly the settings that fail -->
-							<div class="install-design-specimen">
-								<div id="themes-design-preview" class="install-theme-preview-strip" aria-label="Generated surfaces"></div>
-							</div>
-						</section>
-
-						<section class="install-design-section">
-							<h3 class="install-design-section-title">Size</h3>
-							<div class="install-design-grid">
-								<label class="install-theme-field">
-									<span>Volume <small>how far type fans out</small></span>
 									<select id="themes-design-volume" class="nino-admin-input"></select>
 								</label>
+								<div id="themes-design-volume-preview"></div>
+						</section>
+						<section class="install-design-section">
+							<div class="install-design-grid">
+								<h3 class="install-design-section-title">Spacing</h3>
 								<label class="install-theme-field">
-									<span>Spacing <small>gaps and line height</small></span>
 									<select id="themes-design-spacing" class="nino-admin-input"></select>
 								</label>
+								<div id="themes-design-spacing-preview"></div>
+						</section>
+						<section class="install-design-section">
+							<div class="install-design-grid">
+								<h3 class="install-design-section-title">Shaping</h3>
 								<label class="install-theme-field">
-									<span>Shaping <small>corner radius</small></span>
 									<select id="themes-design-shaping" class="nino-admin-input"></select>
 								</label>
+								<div id="themes-design-shaping-preview"></div>
 							</div>
-
-							<!-- Drawn at the real generated sizes rather than
-							     listed as numbers: a scale is a thing you look
-							     at, not a table you read -->
-							<div id="themes-design-sizes" class="install-design-specimen" aria-label="Generated size raster"></div>
 						</section>
 					</div>
 

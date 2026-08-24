@@ -73,15 +73,28 @@
 								</div>
 							</div>
 						</section>
-
+					</div>
+					<div id="theme-design-sizes">
 						<section class="theme-design-section">
-							<h2>Size</h2>
+							<h2>Volume</h2>
 							<div class="theme-design-grid">
-								<label class="theme-field"><span>Volume <small>type scale</small></span><select id="theme-design-volume" class="nino-admin-input"></select></label>
-								<label class="theme-field"><span>Spacing <small>gaps and line height</small></span><select id="theme-design-spacing" class="nino-admin-input"></select></label>
-								<label class="theme-field"><span>Shaping <small>corner radius</small></span><select id="theme-design-shaping" class="nino-admin-input"></select></label>
+								<label class="theme-field"><select id="theme-design-volume" class="nino-admin-input"></select></label>
+								<div id="theme-design-volume-preview"></div>
 							</div>
-							<div id="theme-design-sizes" class="theme-design-specimen" aria-label="Generated size raster"></div>
+						</section>
+						<section class="theme-design-section">
+							<h2>Spacing</h2>
+							<div class="theme-design-grid">
+								<label class="theme-field"><select id="theme-design-spacing" class="nino-admin-input"></select></label>
+								<div id="theme-design-spacing-preview"></div>
+							</div>
+						</section>
+						<section class="theme-design-section">
+							<h2>Shaping</h2>
+							<div class="theme-design-grid">
+								<label class="theme-field"><select id="theme-design-shaping" class="nino-admin-input"></select></label>
+								<div id="theme-design-shaping-preview"></div>
+							</div>
 						</section>
 					</div>
 				</section>

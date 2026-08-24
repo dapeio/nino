@@ -296,11 +296,11 @@
 		 */
 		_paintSizes : function( raster ) {
 
-			const wrap = dc.getElementById('themes-design-sizes');
-			if( wrap === null )
+			const wrapVolume = dc.getElementById('themes-design-volume-preview');
+			if( wrapVolume === null )
 				return;
 
-			wrap.innerHTML = '';
+			wrapVolume.innerHTML = '';
 
 			// Type: the two ends of the scale plus body copy, which is the one
 			// step a reader actually spends time in
@@ -316,11 +316,18 @@
 				type.appendChild( line );
 			} );
 
-			wrap.appendChild( type );
+			wrapVolume.appendChild( type );
 
 			// One bar per spacing step, at a fixed height: a gap is a distance,
 			// not an area, and drawing it square makes the top of the scale
 			// three times taller than anything it is telling you
+
+			const wrapSpacing = dc.getElementById('themes-design-spacing-preview');
+			if( wrapSpacing === null )
+				return;
+
+			wrapSpacing.innerHTML = '';
+
 			const spacing = dc.createElement('div');
 			spacing.className = 'install-design-spacing';
 
@@ -341,10 +348,15 @@
 				spacing.appendChild( row );
 			} );
 
-			wrap.appendChild( spacing );
+			wrapSpacing.appendChild( spacing );
 
 			// Radii are areas, so these stay boxes - a corner only reads
 			// against the two edges it joins
+			const wrapShaping = dc.getElementById('themes-design-shaping-preview');
+			if( wrapShaping === null )
+				return;
+
+			wrapShaping.innerHTML = '';
 			const corners = dc.createElement('div');
 			corners.className = 'install-design-corners';
 
@@ -356,7 +368,7 @@
 				corners.appendChild( corner );
 			} );
 
-			wrap.appendChild( corners );
+			wrapShaping.appendChild( corners );
 		},
 
 		/**

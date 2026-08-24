@@ -47,6 +47,30 @@
 	--color-text: #333333;
 	--color-title: var(--color-primary);
 	--color-subtitle: var(--color-text);
+
+	/*	The brand as ink, which is not the same value as the brand as a
+		surface. Everything that fills with --color-primary puts
+		--color-primary-text on top, so that colour is measured against its own
+		ink and against nothing else. Written *on* a page surface it carries no
+		promise at all - which is what put brand-coloured prices, stat counters,
+		outline buttons and info alerts under the text target on every ground
+		that is not near-white, and far under it on a dark one.
+
+		--color-accent is that missing role: the brand as ink on the ground it
+		is actually on. A generated design solves one per surface
+		(--nino-<surface>-link, see /_design); a theme without one falls back to
+		the ink the surface already carries, which is legible by construction.
+		The section classes further down re-point --color-accent and
+		--color-title to the ground they paint, so a component never has to know
+		which section it was dropped into. Anything that paints the page ground
+		again inside such a section (an alert, a modal, the burger overlay)
+		restores both from the -default pair.	*/
+	--color-accent: var(--color-accent-default);
+	--color-accent-default: var(--color-title);
+	--color-accent-alt: var(--color-section-alt-text);
+	--color-accent-dark: var(--color-section-dark-text);
+	--color-accent-black: var(--color-section-black-text);
+	--color-title-default: var(--color-title);
 	--color-background: #ffffff;
 	--color-header-bg: #ffffff;
 	--color-footer-bg-main: #1c1917;
@@ -68,6 +92,10 @@
 	--color-code-border: rgb(255 255 255 / 12%);
 	--color-error: #f44336;
 	--color-success: #4caf50;
+	/*	Status surfaces are surfaces: they need their own ink rather than the
+		brand's, which is solved against the brand and not against them	*/
+	--color-error-text: var(--color-primary-text);
+	--color-success-text: var(--color-primary-text);
 
 	--fontfamily-text: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
 	--fontfamily-title: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
@@ -219,6 +247,13 @@ progress {
 }
 
 textarea {
+	overflow: auto;
+}
+
+/*	Preformatted text is the one element that cannot reflow, so it scrolls in
+	its own box instead of pushing the page wide (.nino-code adds the skin) */
+pre {
+	max-width: 100%;
 	overflow: auto;
 }
 
@@ -381,6 +416,18 @@ footer {
 	box-sizing: border-box;
 	font-size:.8em;
 }
+/*	Footer navigation and the locale picker are the one place a link is a
+	standalone control rather than part of a sentence, and at the footer's
+	.8em they came out 18px tall with 19px between them - under WCAG 2.2 SC
+	2.5.8's 24px minimum, with neither the inline nor the spacing exception to
+	fall back on. The header frames already pad their own nav links; this is
+	the same padding for the bands that do not.	*/
+footer .nino-nav-content li a,
+footer .nino-localepicker-wrap li a {
+	display: inline-block;
+	padding-top: var(--space-1);
+	padding-bottom: var(--space-1);
+}
 .nino-footer-main {
 	background:var(--color-footer-bg-main);
 	color:var(--color-footer-text-main);
@@ -391,8 +438,10 @@ footer {
 	color:var(--color-footer-text-legal);
 	padding: var(--space-1) var(--space-3);
 }
+/*	Both bands render this, and they are not the same surface - naming the
+	dark section's ink here put a white label on a light footer	*/
 .nino-footer-title {
-	color:var(--color-section-dark-text);
+	color:inherit;
 	font-size:.9rem;
 	text-transform:uppercase;
 	padding-bottom: var(--space-1);
@@ -406,7 +455,7 @@ footer {
 	display:flex;
 }
 .nino-footer-getintouch .nino-icon {
-	fill:var(--color-section-dark-text);
+	fill:currentColor;
 	margin-right: var(--space-1);
 }
 .nino-footer-localepicker {
@@ -424,6 +473,13 @@ main {
 	   auto + no shrink so a long page still lays out from its content */
 	flex: 1 0 auto;
 	padding-top: var(--space-6);
+	/* A viewport animation starts outside its own box - nino-vpa--zoom-out-*
+	   scales past it, nino-vpa--slide-* shifts it sideways - and any of them
+	   on a full-width element used to widen the document and leave the page
+	   scrolling horizontally until the animation had played. `clip` rather
+	   than `hidden`: it stops the overflow without turning main into a scroll
+	   container, so position:sticky inside it keeps working */
+	overflow-x: clip;
 }
 main:has(> .nino-cover.nino-atf:first-child),
 main:has(> .nino-parallex.nino-atf:first-child),
@@ -537,33 +593,33 @@ body.nino-scroll-down .nino-scroll-header {
 	padding-right: 0;
 	margin: 0;
 }
+/*	A section that paints its own ground also owns the ink on it - the plain
+	`color` below only reaches what inherits, and a component that names a
+	colour role (a title, a price, an outline button) would otherwise keep the
+	page ground's value and pair it across surfaces.	*/
 .nino-section--dark {
 	background-color: var(--color-section-dark-bg);
 	color: var(--color-section-dark-text);
+	--color-title: var(--color-section-dark-text);
+	--color-accent: var(--color-accent-dark);
 }
 .nino-section--black {
 	background-color: var(--color-section-black-bg);
 	color: var(--color-section-black-text);
+	--color-title: var(--color-section-black-text);
+	--color-accent: var(--color-accent-black);
 }
 .nino-section--primary {
 	background-color: var(--color-primary);
 	color: var(--color-primary-text);
+	--color-title: var(--color-primary-text);
+	--color-accent: var(--color-primary-text);
 }
 .nino-section--alt {
 	background-color: var(--color-section-alt-bg);
 	color: var(--color-section-alt-text);
-}
-.nino-section--dark a:not(.nino-btn) {
-	color: var(--color-section-dark-text);
-}
-.nino-section--black a:not(.nino-btn) {
-	color: var(--color-section-black-text);
-}
-.nino-section--alt a:not(.nino-btn) {
-	color: var(--color-section-alt-text);
-}
-.nino-section--primary a:not(.nino-btn) {
-	color: var(--color-primary-text);
+	--color-title: var(--color-section-alt-text);
+	--color-accent: var(--color-accent-alt);
 }
 
 .nino-section-title {
@@ -625,6 +681,11 @@ body.nino-scroll-down .nino-scroll-header {
 .nino-cover--dim .nino-btn--outline, .nino-cover--dim .nino-filter-btn {
 	color: var(--color-section-black-text);
 }
+/*	The scrim is a dark ground like any other, so the roles follow it	*/
+.nino-cover--dim {
+	--color-title: var(--color-section-black-text);
+	--color-accent: var(--color-accent-black);
+}
 
 .nino-section--border-1 { border-bottom: 1px solid rgba(0,0,0,.1); }
 .nino-section--border-2 { border-bottom: .25rem solid rgba(0,0,0,.1); }
@@ -657,9 +718,15 @@ body.nino-scroll-down .nino-scroll-header {
 	padding-right: 0;
 	padding-top: 0;
 }
+/*	A card is a surface of its own, so it takes a solved pair rather than a
+	wash: rgba(0,0,0,.05) over the page ground darkened it just enough that
+	the ink /_design solved against that ground no longer cleared the target,
+	and the ink named here belonged to a surface the card was not on	*/
 .nino-article--alt {
-	background-color: rgba(0,0,0,.05);
+	background-color: var(--color-section-alt-bg);
 	color: var(--color-section-alt-text);
+	--color-title: var(--color-section-alt-text);
+	--color-accent: var(--color-accent-alt);
 	border: 1px solid var(--color-border);
 	padding: var(--space-1);
 }
@@ -667,10 +734,17 @@ body.nino-scroll-down .nino-scroll-header {
 .nino-section--alt .nino-article--alt {
 	background-color: var(--color-section-default-bg);
 	color: var(--color-section-default-text);
+	--color-title: var(--color-title-default);
+	--color-accent: var(--color-accent-default);
 }
+/*	...and on a dark section the card steps down to the deepest surface for
+	the same reason - a white wash over a dark ground is a value nothing
+	solved an ink against	*/
 .nino-section--dark .nino-article--alt, .nino-section--dark.nino-article--alt {
-	background-color: rgba(255,255,255,.1);
-	color: var(--color-section-dark-text);
+	background-color: var(--color-section-black-bg);
+	color: var(--color-section-black-text);
+	--color-title: var(--color-section-black-text);
+	--color-accent: var(--color-accent-black);
 }
 
 .nino-article-content {
@@ -729,7 +803,7 @@ body.nino-scroll-down .nino-scroll-header {
 	text-align:center;
 	font-size: 2rem;
 	font-weight: bold;
-	color: var(--color-primary);
+	color: var(--color-accent);
 }
 
 /* Multi-column layout, one breakpoint tier at a time (eg. nino-article-cols-m
@@ -862,17 +936,25 @@ body.nino-scroll-down .nino-scroll-header {
 }
 .nino-btn--outline {
 	background-color: transparent;
-	color: var(--color-primary);
-	border: 1px solid var(--color-primary);
+	color: var(--color-accent);
+	border: 1px solid var(--color-accent);
 }
 .nino-btn--outline:hover, .nino-btn--outline:focus {
 	background-color: var(--color-primary);
 	color: var(--color-primary-text);
 }
+/*	The scaled-down padding put a small button at 22px, just under WCAG 2.2 SC
+	2.5.8's 24px, and two of them side by side (the cookie banner's) are too
+	close for the spacing exception. inline-flex rather than more padding, so
+	the label stays centred in the taller box	*/
 .nino-btn--small {
 	padding: calc( var(--space-1) *.7) calc( var(--space-2) * .7 );
 	font-size: calc( var(--fontsize-btn) * .7);
 	border-radius: calc( var(--radius) * .7 );
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-height: 24px;
 }
 .nino-btn--big {
 	padding: calc( var(--space-1) *1.3) calc( var(--space-2) * 1.3 );
@@ -893,7 +975,7 @@ body.nino-scroll-down .nino-scroll-header {
 	margin-bottom: var(--space-1);
 }
 .nino-form-input:focus, .nino-form-textarea:focus, .nino-form-select:focus {
-	outline: 2px solid var(--color-primary);
+	outline: 2px solid var(--color-accent);
 	border-color: transparent;
 }
 /* One-line form - an email field and its button on the same row */
@@ -916,8 +998,18 @@ body.nino-scroll-down .nino-scroll-header {
 	font-size: .875rem;
 	margin-top: .5rem;
 }
-.nino-form.nino-is-error .nino-form-message { color: var(--color-error); }
-.nino-form.nino-is-success .nino-form-message, .nino-form.nino-is-existing .nino-form-message { color: var(--color-success); }
+/*	The status carries its own surface and the ink solved for it, exactly like
+	.nino-alert--error does: --color-error is a background, and used as text on
+	the page ground it lands at 2.6:1 on a dark theme	*/
+.nino-form-message:empty { display: none; }
+.nino-form.nino-is-error .nino-form-message,
+.nino-form.nino-is-success .nino-form-message,
+.nino-form.nino-is-existing .nino-form-message {
+	padding: var(--space-1) var(--space-2);
+	border-radius: var(--radius);
+}
+.nino-form.nino-is-error .nino-form-message { background-color: var(--color-error); color: var(--color-error-text); }
+.nino-form.nino-is-success .nino-form-message, .nino-form.nino-is-existing .nino-form-message { background-color: var(--color-success); color: var(--color-success-text); }
 .nino-form.nino-is-pending .nino-form-submit { opacity: .6; pointer-events: none; }
 
 .nino-newsletter-form .nino-form-input {
@@ -972,142 +1064,6 @@ body.nino-scroll-down .nino-scroll-header {
 }
 
 
-/* Spacing */
-.nino-m-0 { margin: 0; }
-.nino-m-1 { margin: var(--space-1); }
-.nino-m-2 { margin: var(--space-2); }
-.nino-m-3 { margin: var(--space-3); }
-.nino-m-4 { margin: var(--space-4); }
-.nino-m-5 { margin: var(--space-5); }
-.nino-m-6 { margin: var(--space-6); }
-.nino-mt-0 { margin-top: 0; }
-.nino-mt-1 { margin-top: var(--space-1); }
-.nino-mt-2 { margin-top: var(--space-2); }
-.nino-mt-3 { margin-top: var(--space-3); }
-.nino-mt-4 { margin-top: var(--space-4); }
-.nino-mt-5 { margin-top: var(--space-5); }
-.nino-mt-6 { margin-top: var(--space-6); }
-.nino-mb-0 { margin-bottom: 0; }
-.nino-mb-1 { margin-bottom: var(--space-1); }
-.nino-mb-2 { margin-bottom: var(--space-2); }
-.nino-mb-3 { margin-bottom: var(--space-3); }
-.nino-mb-4 { margin-bottom: var(--space-4); }
-.nino-mb-5 { margin-bottom: var(--space-5); }
-.nino-mb-6 { margin-bottom: var(--space-6); }
-.nino-mx-auto { margin-right: auto; margin-left: auto; }
-.nino-ml-0 { margin-left: 0; }
-.nino-ml-1 { margin-left: var(--space-1); }
-.nino-ml-2 { margin-left: var(--space-2); }
-.nino-ml-3 { margin-left: var(--space-3); }
-.nino-ml-4 { margin-left: var(--space-4); }
-.nino-ml-5 { margin-left: var(--space-5); }
-.nino-ml-6 { margin-left: var(--space-6); }
-.nino-mr-0 { margin-right: 0; }
-.nino-mr-1 { margin-right: var(--space-1); }
-.nino-mr-2 { margin-right: var(--space-2); }
-.nino-mr-3 { margin-right: var(--space-3); }
-.nino-mr-4 { margin-right: var(--space-4); }
-.nino-mr-5 { margin-right: var(--space-5); }
-.nino-mr-6 { margin-right: var(--space-6); }
-.nino-p-0 { padding: 0; }
-.nino-p-1 { padding: var(--space-1); }
-.nino-p-2 { padding: var(--space-2); }
-.nino-p-3 { padding: var(--space-3); }
-.nino-p-4 { padding: var(--space-4); }
-.nino-p-5 { padding: var(--space-5); }
-.nino-p-6 { padding: var(--space-6); }
-.nino-pt-0 { padding-top: 0; }
-.nino-pt-1 { padding-top: var(--space-1); }
-.nino-pt-2 { padding-top: var(--space-2); }
-.nino-pt-3 { padding-top: var(--space-3); }
-.nino-pt-4 { padding-top: var(--space-4); }
-.nino-pt-5 { padding-top: var(--space-5); }
-.nino-pt-6 { padding-top: var(--space-6); }
-.nino-pb-0 { padding-bottom: 0; }
-.nino-pb-1 { padding-bottom: var(--space-1); }
-.nino-pb-2 { padding-bottom: var(--space-2); }
-.nino-pb-3 { padding-bottom: var(--space-3); }
-.nino-pb-4 { padding-bottom: var(--space-4); }
-.nino-pb-5 { padding-bottom: var(--space-5); }
-.nino-pb-6 { padding-bottom: var(--space-6); }
-
-/* Text alignment */
-.nino-text-left { text-align: left; }
-.nino-text-center { text-align: center; }
-.nino-text-right { text-align: right; }
-/* nino-section-title and its siblings center themselves, so an alignment set on
-   the block around them has to reach in - otherwise "left" moves everything
-   except the heading */
-.nino-text-left :is(.nino-section-title, .nino-section-subtitle, .nino-atf-title, .nino-atf-subtitle) { text-align: left; }
-.nino-text-center :is(.nino-section-title, .nino-section-subtitle, .nino-atf-title, .nino-atf-subtitle) { text-align: center; }
-.nino-text-right :is(.nino-section-title, .nino-section-subtitle, .nino-atf-title, .nino-atf-subtitle) { text-align: right; }
-.nino-text-center > .nino-btn { margin-right: calc(var(--space-1) / 2); margin-left: calc(var(--space-1) / 2); }
-.nino-text-right > .nino-btn { margin-left: var(--space-1); }
-
-@media (min-width: 640px) {
-	.nino-text-s-left { text-align: left; }
-	.nino-text-s-center { text-align: center; }
-	.nino-text-s-right { text-align: right; }
-}
-@media (min-width: 768px) {
-	.nino-text-m-left { text-align: left; }
-	.nino-text-m-center { text-align: center; }
-	.nino-text-m-right { text-align: right; }
-}
-@media (min-width: 1024px) {
-	.nino-text-l-left { text-align: left; }
-	.nino-text-l-center { text-align: center; }
-	.nino-text-l-right { text-align: right; }
-}
-@media (min-width: 1280px) {
-	.nino-text-xl-left { text-align: left; }
-	.nino-text-xl-center { text-align: center; }
-	.nino-text-xl-right { text-align: right; }
-}
-
-
-/* Opacity */
-.nino-opacity-10 { opacity: .1; }
-.nino-opacity-20 { opacity: .2; }
-.nino-opacity-30 { opacity: .3; }
-.nino-opacity-40 { opacity: .4; }
-.nino-opacity-50 { opacity: .5; }
-.nino-opacity-60 { opacity: .6; }
-.nino-opacity-70 { opacity: .7; }
-.nino-opacity-80 { opacity: .8; }
-.nino-opacity-90 { opacity: .9; }
-
-/* Visibility */
-.nino-hidden { display: none !important; }
-.nino-invisible { visibility: hidden !important; }
-.nino-sr-only {
-	position: absolute;
-	width: 1px;
-	height: 1px;
-	padding: 0;
-	margin: -1px;
-	overflow: hidden;
-	clip: rect(0, 0, 0, 0);
-	white-space: nowrap;
-	border: 0;
-}
-
-.nino-hidden-s { display: none !important; }
-.nino-visible-s { display: block !important; }
-
-@media (min-width: 768px) {
-	.nino-visible-m { display: block !important; }
-	.nino-hidden-m { display: none !important; }
-}
-@media (min-width: 1024px) {
-	.nino-visible-l { display: block !important; }
-	.nino-hidden-l { display: none !important; }
-}
-@media (min-width: 1280px) {
-	.nino-visible-xl { display: block !important; }
-	.nino-hidden-xl { display: none !important; }
-}
-
 /* Animations */
 .nino-fx-vertical-bounce {
 	animation: nino-fx-vertical-bounce 7s cubic-bezier(1, -0.66, 0.31, 1.68) infinite;
@@ -1133,8 +1089,8 @@ body.nino-scroll-down .nino-scroll-header {
 }
 .nino-badge--pill { border-radius: 999px; }
 .nino-badge--primary { background-color: var(--color-primary); color: var(--color-primary-text); }
-.nino-badge--success { background-color: var(--color-success); color: var(--color-primary-text); }
-.nino-badge--error { background-color: var(--color-error); color: var(--color-primary-text); }
+.nino-badge--success { background-color: var(--color-success); color: var(--color-success-text); }
+.nino-badge--error { background-color: var(--color-error); color: var(--color-error-text); }
 .nino-badge-cloud {
 	display: flex;
 	flex-wrap: wrap;
@@ -1160,14 +1116,14 @@ body.nino-scroll-down .nino-scroll-header {
 	color: var(--color-border);
 }
 .nino-breadcrumbs a {
-	color: var(--color-text);
+	color: inherit;
 	text-decoration: none;
 }
 .nino-breadcrumbs a:hover {
-	color: var(--color-primary);
+	color: var(--color-accent);
 }
 .nino-breadcrumbs li:last-child {
-	color: var(--color-primary);
+	color: var(--color-accent);
 	font-weight: bold;
 }
 
@@ -1177,6 +1133,14 @@ body.nino-scroll-down .nino-scroll-header {
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-1);
+}
+/*	An entry that is nothing but a link is a standalone target, not a link in
+	a sentence, so it carries its own 24px rather than relying on the list's
+	gap - which is a raster step and gets tighter with the Spacing setting	*/
+.nino-list li > a:only-child {
+	display: inline-block;
+	padding-top: .15rem;
+	padding-bottom: .15rem;
 }
 .nino-list--check li {
 	position: relative;
@@ -1276,21 +1240,26 @@ body.nino-scroll-down .nino-scroll-header {
 	white-space: inherit;
 }
 .nino-code:focus-visible {
-	outline: 2px solid var(--color-primary);
+	outline: 2px solid var(--color-accent);
 	outline-offset: 2px;
 }
 
 /* Alert / inline feedback (static - form-specific feedback is .nino-form-message) */
+/*	Paints the page ground wherever it is dropped, so it restores that
+	ground's ink roles too - inside a dark section the -info variant would
+	otherwise take that section's accent onto its own light box	*/
 .nino-alert {
 	padding: var(--space-2);
 	border-radius: var(--radius);
 	border: 1px solid var(--color-border);
 	background-color: var(--color-background);
 	color: var(--color-text);
+	--color-title: var(--color-title-default);
+	--color-accent: var(--color-accent-default);
 }
-.nino-alert--success { border-color: var(--color-success); color: var(--color-success); }
-.nino-alert--error { border-color: var(--color-error); color: var(--color-error); }
-.nino-alert--info { border-color: var(--color-primary); color: var(--color-primary); }
+.nino-alert--success { background-color: var(--color-success); border-color: var(--color-success); color: var(--color-success-text); }
+.nino-alert--error { background-color: var(--color-error); border-color: var(--color-error); color: var(--color-error-text); }
+.nino-alert--info { border-color: var(--color-accent); color: var(--color-accent); }
 .nino-alert--content {
 	padding: var(--space-3);
 	font-size: var(--fontsize-big);
@@ -1300,7 +1269,7 @@ body.nino-scroll-down .nino-scroll-header {
 .nino-stat-counter {
 	font-size: 2.5rem;
 	font-weight: bold;
-	color: var(--color-primary);
+	color: var(--color-accent);
 	margin-top:var(--space-1);
 }
 
@@ -1338,6 +1307,8 @@ body.nino-scroll-btf .nino-back-to-top {
 	padding: var(--space-2);
 	background-color: var(--color-section-black-bg);
 	color: var(--color-section-black-text);
+	--color-title: var(--color-section-black-text);
+	--color-accent: var(--color-accent-black);
 	box-shadow: 0 -2px 8px rgba(0, 0, 0, .2);
 	transform: translateY(100%);
 	transition: transform .3s;
@@ -1374,10 +1345,13 @@ body.nino-scroll-btf .nino-back-to-top {
 .nino-table th {
 	font-size: var(--fontsize-small);
 	text-transform: uppercase;
-	color: var(--color-text);
+	color: inherit;
 }
 .nino-table--striped tbody tr:nth-child(even) {
 	background-color: var(--color-section-alt-bg);
+	color: var(--color-section-alt-text);
+	--color-title: var(--color-section-alt-text);
+	--color-accent: var(--color-accent-alt);
 }
 .nino-table--bordered th,
 .nino-table--bordered td {
@@ -1424,7 +1398,7 @@ body.nino-scroll-btf .nino-back-to-top {
 .nino-pricing-price {
 	font-size: 2rem;
 	font-weight: bold;
-	color: var(--color-primary);
+	color: var(--color-accent);
 }
 .nino-pricing-title--quiet { font-size: var(--text-1); opacity: .8; }
 .nino-pricing-title--loud { font-size: var(--text-4); }
@@ -1436,7 +1410,7 @@ body.nino-scroll-btf .nino-back-to-top {
 }
 .nino-pricing-item--featured .nino-pricing-price {
 	font-size: 2.8rem;
-	color: var(--color-primary);
+	color: var(--color-accent);
 }
 .nino-pricing-row--feature-middle > .nino-pricing-item:nth-child(2) .nino-pricing-title {
 	font-size: 1.8rem;
@@ -1468,7 +1442,7 @@ body.nino-scroll-btf .nino-back-to-top {
 	content: "+";
 	display: inline-block;
 	width: 1em;
-	color: var(--color-primary);
+	color: var(--color-accent);
 }
 .nino-accordion[open] > .nino-accordion-trigger::before {
 	content: "\2212";
@@ -1505,7 +1479,7 @@ body.nino-scroll-btf .nino-back-to-top {
 	padding: var(--space-1);
 	text-align: center;
 	text-decoration: none;
-	color: var(--color-text);
+	color: inherit;
 	border-radius: var(--radius);
 }
 .nino-pagination a:hover {
@@ -1899,8 +1873,16 @@ body.nino-scroll-btf .nino-back-to-top {
 	display:none;
 }
 
+/*	Open, the overlay paints the page ground over whatever the header frame
+	paints, so it restores that ground's ink and roles with it - a frame
+	drawing its bar on the deepest surface otherwise handed its own white ink
+	down into this one. Closed, the same element is the inline nav on a wide
+	screen and has to keep inheriting the bar's	*/
 .nino-nav-burger input:checked ~ .nino-nav-content {
 	max-height: 100vh;
+	color: var(--color-text);
+	--color-title: var(--color-title-default);
+	--color-accent: var(--color-accent-default);
 }
 .nino-nav-burger input:checked ~ .nino-nav-content > div {
 	display:block;
@@ -1922,7 +1904,7 @@ body.nino-scroll-btf .nino-back-to-top {
 	color: var(--color-text);
 }
 .nino-nav-burger input:checked ~ .nino-nav-content li a.nino-is-active {
-	color: var(--color-primary);
+	color: var(--color-accent);
 }
 
 /* Only the burger variant is a fullscreen overlay (see 'nav-burger' in
@@ -1997,10 +1979,12 @@ header .nino-headernav-logo {
 .nino-localepicker-wrap input {
 	display:none;
 }
+/*	The picker is mounted in a footer band by some frames and in the header by
+	others, so it takes the ink of wherever it is rather than the footer's	*/
 .nino-localepicker-wrap h6,
 .nino-localepicker-wrap li {
 	display:none;
-	color:var(--color-footer-text);
+	color:inherit;
 	cursor:pointer;
 }
 
@@ -2016,11 +2000,13 @@ header .nino-headernav-logo {
 
 .nino-localepicker-wrap a {
 	text-decoration:none;
-	color:var(--color-footer-text-legal);
+	color:inherit;
 }
 
 .nino-localepicker-wrap input:checked + div {
 	display:block;
+	--color-title: var(--color-title-default);
+	--color-accent: var(--color-accent-default);
 	position:fixed;
 	text-indent: 0;
 	top:0;
@@ -2051,7 +2037,7 @@ header .nino-headernav-logo {
 }
 
 .nino-localepicker-wrap input:checked + div li a:hover {
-	color:var(--color-primary);
+	color:var(--color-accent);
 }
 .nino-localepicker-wrap input:checked + div li.nino-is-active a:hover {
 	color:var(--color-text);
@@ -2145,20 +2131,32 @@ header .nino-headernav-logo {
 	z-index: 50;
 	background-color: var(--color-background-dim);
 }
+/*	Pinned to both edges rather than sized at width:100%: an absolutely
+	positioned box measures that 100% against the padding box but starts at its
+	static position *inside* the padding, so the content hung over the right
+	edge by exactly the section's left padding and was clipped there by
+	.nino-cover's own overflow:hidden. Inheriting the horizontal padding keeps
+	the cover's content on the same inset as every other section's	*/
 .nino-parallex > .nino-cover-content,
 .nino-cover > .nino-cover-content {
 	position: absolute;
 	padding-top:var(--space-3);
+	padding-left: inherit;
+	padding-right: inherit;
+	box-sizing: border-box;
 	z-index: 101;
 	top: 50%;
-	width: 100%;
+	left: 0;
+	right: 0;
+	width: auto;
 	transform: translateY(-50%);
 }
+/*	The box already spans both edges, so centring is the text's alignment and
+	nothing else - the left:50% + translateX(-50%) pair this used to carry was
+	compensating for the static-position offset fixed above	*/
 .nino-parallex.nino-cover-center > .nino-cover-content,
 .nino-cover.nino-cover-center > .nino-cover-content {
-	left: 50%;
 	text-align: center;
-	transform: translate(-50%,-50%);
 }
 .nino-parallex.nino-cover-top > .nino-cover-content,
 .nino-cover.nino-cover-top > .nino-cover-content { top: 0; transform: none; }
@@ -2368,12 +2366,12 @@ header .nino-headernav-logo {
 	border: none;
 	background: none;
 	font: inherit;
-	color: var(--color-text);
+	color: inherit;
 	border-bottom: 2px solid transparent;
 }
 .nino-tabs-tab.nino-is-active {
-	color: var(--color-primary);
-	border-bottom-color: var(--color-secondary);
+	color: var(--color-accent);
+	border-bottom-color: var(--color-accent);
 }
 .nino-tabs-panel {
 	display: none;
@@ -2428,12 +2426,12 @@ header .nino-headernav-logo {
 	background: none;
 	font: inherit;
 	font-size: var(--fontsize-btn);
-	color: var(--color-text);
+	color: inherit;
 	cursor: pointer;
 	transition: background-color .2s ease, color .2s ease, border-color .2s ease;
 }
 .nino-filter-btn:hover, .nino-filter-btn:focus {
-	border-color: var(--color-primary);
+	border-color: var(--color-accent);
 }
 .nino-filter-btn.nino-is-active {
 	background-color: var(--color-primary);
@@ -2459,6 +2457,8 @@ header .nino-headernav-logo {
 	width: 480px;
 	background-color: var(--color-background);
 	color: var(--color-text);
+	--color-title: var(--color-title-default);
+	--color-accent: var(--color-accent-default);
 }
 .nino-modal::backdrop {
 	background-color: rgba(0, 0, 0, .5);
@@ -2507,6 +2507,8 @@ header .nino-headernav-logo {
 	border-radius: var(--radius);
 	background-color: var(--color-section-black-bg);
 	color: var(--color-section-black-text);
+	--color-title: var(--color-section-black-text);
+	--color-accent: var(--color-accent-black);
 	box-shadow: 0 2px 8px rgba(0, 0, 0, .2);
 	opacity: 0;
 	transform: translateY(10px);
@@ -2518,9 +2520,168 @@ header .nino-headernav-logo {
 }
 .nino-toast--success {
 	background-color: var(--color-success);
-	color: var(--color-primary-text);
+	color: var(--color-success-text);
 }
 .nino-toast--error {
 	background-color: var(--color-error);
-	color: var(--color-primary-text);
+	color: var(--color-error-text);
+}
+
+/****************************************************************************************************
+ *
+ *
+ *			09 Utilities
+ *
+ *
+ *			Spacing, alignment, opacity and visibility - and deliberately the last
+ *			chapter in this file. A utility only earns its name if it wins: while
+ *			these sat in the middle of the stylesheet, every component defined
+ *			below them (an alert, a table, a modal, a pricing card) quietly beat
+ *			their own padding, so nino-p-3 on a nino-alert did nothing at all.
+ *			Equal specificity, later position - that is the whole mechanism.
+ *
+ *
+ *			.nino-m(t,r,b,l)(-0 … -6), .nino-p(t,r,b,l)(-0 … -6), .nino-mx-auto
+ *			.nino-text(*, -s, -m, -l, -xl)(-left, -center, -right)
+ *			.nino-opacity(-10 … -90)
+ *			.nino-hidden(*, -s, -m, -l, -xl), .nino-visible(-s, -m, -l, -xl)
+ *			.nino-invisible, .nino-sr-only
+ *
+ *
+ ****************************************************************************************************/
+
+/* Spacing */
+.nino-m-0 { margin: 0; }
+.nino-m-1 { margin: var(--space-1); }
+.nino-m-2 { margin: var(--space-2); }
+.nino-m-3 { margin: var(--space-3); }
+.nino-m-4 { margin: var(--space-4); }
+.nino-m-5 { margin: var(--space-5); }
+.nino-m-6 { margin: var(--space-6); }
+.nino-mt-0 { margin-top: 0; }
+.nino-mt-1 { margin-top: var(--space-1); }
+.nino-mt-2 { margin-top: var(--space-2); }
+.nino-mt-3 { margin-top: var(--space-3); }
+.nino-mt-4 { margin-top: var(--space-4); }
+.nino-mt-5 { margin-top: var(--space-5); }
+.nino-mt-6 { margin-top: var(--space-6); }
+.nino-mb-0 { margin-bottom: 0; }
+.nino-mb-1 { margin-bottom: var(--space-1); }
+.nino-mb-2 { margin-bottom: var(--space-2); }
+.nino-mb-3 { margin-bottom: var(--space-3); }
+.nino-mb-4 { margin-bottom: var(--space-4); }
+.nino-mb-5 { margin-bottom: var(--space-5); }
+.nino-mb-6 { margin-bottom: var(--space-6); }
+.nino-mx-auto { margin-right: auto; margin-left: auto; }
+.nino-ml-0 { margin-left: 0; }
+.nino-ml-1 { margin-left: var(--space-1); }
+.nino-ml-2 { margin-left: var(--space-2); }
+.nino-ml-3 { margin-left: var(--space-3); }
+.nino-ml-4 { margin-left: var(--space-4); }
+.nino-ml-5 { margin-left: var(--space-5); }
+.nino-ml-6 { margin-left: var(--space-6); }
+.nino-mr-0 { margin-right: 0; }
+.nino-mr-1 { margin-right: var(--space-1); }
+.nino-mr-2 { margin-right: var(--space-2); }
+.nino-mr-3 { margin-right: var(--space-3); }
+.nino-mr-4 { margin-right: var(--space-4); }
+.nino-mr-5 { margin-right: var(--space-5); }
+.nino-mr-6 { margin-right: var(--space-6); }
+.nino-p-0 { padding: 0; }
+.nino-p-1 { padding: var(--space-1); }
+.nino-p-2 { padding: var(--space-2); }
+.nino-p-3 { padding: var(--space-3); }
+.nino-p-4 { padding: var(--space-4); }
+.nino-p-5 { padding: var(--space-5); }
+.nino-p-6 { padding: var(--space-6); }
+.nino-pt-0 { padding-top: 0; }
+.nino-pt-1 { padding-top: var(--space-1); }
+.nino-pt-2 { padding-top: var(--space-2); }
+.nino-pt-3 { padding-top: var(--space-3); }
+.nino-pt-4 { padding-top: var(--space-4); }
+.nino-pt-5 { padding-top: var(--space-5); }
+.nino-pt-6 { padding-top: var(--space-6); }
+.nino-pb-0 { padding-bottom: 0; }
+.nino-pb-1 { padding-bottom: var(--space-1); }
+.nino-pb-2 { padding-bottom: var(--space-2); }
+.nino-pb-3 { padding-bottom: var(--space-3); }
+.nino-pb-4 { padding-bottom: var(--space-4); }
+.nino-pb-5 { padding-bottom: var(--space-5); }
+.nino-pb-6 { padding-bottom: var(--space-6); }
+
+/* Text alignment */
+.nino-text-left { text-align: left; }
+.nino-text-center { text-align: center; }
+.nino-text-right { text-align: right; }
+/* nino-section-title and its siblings center themselves, so an alignment set on
+   the block around them has to reach in - otherwise "left" moves everything
+   except the heading */
+.nino-text-left :is(.nino-section-title, .nino-section-subtitle, .nino-atf-title, .nino-atf-subtitle) { text-align: left; }
+.nino-text-center :is(.nino-section-title, .nino-section-subtitle, .nino-atf-title, .nino-atf-subtitle) { text-align: center; }
+.nino-text-right :is(.nino-section-title, .nino-section-subtitle, .nino-atf-title, .nino-atf-subtitle) { text-align: right; }
+.nino-text-center > .nino-btn { margin-right: calc(var(--space-1) / 2); margin-left: calc(var(--space-1) / 2); }
+.nino-text-right > .nino-btn { margin-left: var(--space-1); }
+
+@media (min-width: 640px) {
+	.nino-text-s-left { text-align: left; }
+	.nino-text-s-center { text-align: center; }
+	.nino-text-s-right { text-align: right; }
+}
+@media (min-width: 768px) {
+	.nino-text-m-left { text-align: left; }
+	.nino-text-m-center { text-align: center; }
+	.nino-text-m-right { text-align: right; }
+}
+@media (min-width: 1024px) {
+	.nino-text-l-left { text-align: left; }
+	.nino-text-l-center { text-align: center; }
+	.nino-text-l-right { text-align: right; }
+}
+@media (min-width: 1280px) {
+	.nino-text-xl-left { text-align: left; }
+	.nino-text-xl-center { text-align: center; }
+	.nino-text-xl-right { text-align: right; }
+}
+
+
+/* Opacity */
+.nino-opacity-10 { opacity: .1; }
+.nino-opacity-20 { opacity: .2; }
+.nino-opacity-30 { opacity: .3; }
+.nino-opacity-40 { opacity: .4; }
+.nino-opacity-50 { opacity: .5; }
+.nino-opacity-60 { opacity: .6; }
+.nino-opacity-70 { opacity: .7; }
+.nino-opacity-80 { opacity: .8; }
+.nino-opacity-90 { opacity: .9; }
+
+/* Visibility */
+.nino-hidden { display: none !important; }
+.nino-invisible { visibility: hidden !important; }
+.nino-sr-only {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	padding: 0;
+	margin: -1px;
+	overflow: hidden;
+	clip: rect(0, 0, 0, 0);
+	white-space: nowrap;
+	border: 0;
+}
+
+.nino-hidden-s { display: none !important; }
+.nino-visible-s { display: block !important; }
+
+@media (min-width: 768px) {
+	.nino-visible-m { display: block !important; }
+	.nino-hidden-m { display: none !important; }
+}
+@media (min-width: 1024px) {
+	.nino-visible-l { display: block !important; }
+	.nino-hidden-l { display: none !important; }
+}
+@media (min-width: 1280px) {
+	.nino-visible-xl { display: block !important; }
+	.nino-hidden-xl { display: none !important; }
 }

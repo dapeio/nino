@@ -26,7 +26,7 @@
 }
 
 .nino-frame-footer .nino-frame-footer-contact strong {
-	color: var(--color-section-dark-text);
+	color: inherit;
 	font-size: .72rem;
 	letter-spacing: .1em;
 	text-transform: uppercase;
@@ -61,7 +61,7 @@
 
 .nino-frame-footer a:hover,
 .nino-frame-footer a:focus {
-	color: var(--color-section-dark-text);
+	color: inherit;
 	text-decoration: underline;
 	text-underline-offset: .25em;
 }

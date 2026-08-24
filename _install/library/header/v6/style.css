@@ -4,6 +4,9 @@ body {
 
 .nino-frame-header {
 	background-color: var(--color-section-black-bg);
+	color: var(--color-section-black-text);
+	--color-title: var(--color-section-black-text);
+	--color-accent: var(--color-accent-black);
 }
 
 .nino-frame-header .nino-frame-header-rail {
@@ -61,7 +64,7 @@ body main:has(> .nino-parallex:first-child) {
 	}
 
 	.nino-frame-header .nino-nav-content li a.nino-is-active {
-		color: var(--color-primary);
+		color: var(--color-accent);
 	}
 }
 
@@ -120,7 +123,7 @@ body main:has(> .nino-parallex:first-child) {
 	.nino-frame-header .nino-nav-content li a:hover,
 	.nino-frame-header .nino-nav-content li a:focus,
 	.nino-frame-header .nino-nav-content li a.nino-is-active {
-		color: var(--color-primary);
+		color: var(--color-accent);
 		padding-left: var(--space-1);
 	}
 

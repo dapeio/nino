@@ -134,7 +134,7 @@ namespace Nino\Modules {
 				// Loop through files and collect file details - resolved one
 				// by one, since a bundle mixes public content (/assets/...)
 				// with a tool folder's own source (/_nino/Nino.css)
-				foreach( $assetFiles AS $file ) {
+				foreach( $assetFiles as $file ) {
 					$filepath = \Nino\Filesystem::path( $appData, $file );
 
 					if( is_file( $filepath ) === true )

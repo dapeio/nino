@@ -654,6 +654,16 @@ $renderedPairs = [
 	[ '--color-footer-bg-main', 			'--color-footer-text-main' ],
 	[ '--color-footer-bg-legal', 			'--color-footer-text-legal' ],
 	[ '--color-code-bg', 							'--color-code-text' ],
+	// The brand as ink, per ground: --color-primary is solved against its own
+	// ink and says nothing about what it does written on a page surface, so
+	// every surface a section can paint carries the accent solved for it
+	[ '--color-section-default-bg', 	'--color-accent-default' ],
+	[ '--color-section-alt-bg', 			'--color-accent-alt' ],
+	[ '--color-section-dark-bg', 			'--color-accent-dark' ],
+	[ '--color-section-black-bg', 		'--color-accent-black' ],
+	// ...and a status surface carries its own ink rather than the brand's
+	[ '--color-error', 								'--color-error-text' ],
+	[ '--color-success', 							'--color-success-text' ],
 ];
 
 $relativeLuminance = static function( string $hex ): float {
@@ -718,7 +728,7 @@ foreach( $themeKeys as $themeKey ) {
 	$literalRoles = array_values( array_filter( $roles, static fn( array $role ): bool => str_contains( $role[2], 'var(--nino-' ) === false
 		|| preg_match( '/#[0-9a-f]{3,8}\b|\brgba?\s*\(/i', $role[2] ) === 1 ) );
 
-	if( count( $roles ) !== 28 || $literalRoles !== [] )
+	if( count( $roles ) !== 34 || $literalRoles !== [] )
 		$colourFailures[] = $themeKey. ': '. count( $roles ). ' roles, '. count( $literalRoles ). ' literal/unmapped';
 
 	preg_match_all( '/^\s*(--(?:text|space)-[1-6]|--radius(?:-small)?|--line-height)\s*:\s*([^;]+);/mi', $themeCss, $sizeRoles, PREG_SET_ORDER );

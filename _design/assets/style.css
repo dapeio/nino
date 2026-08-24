@@ -142,6 +142,15 @@
 		background: var(--editor-bg-grouped);
 	}
 
+	#theme-design-sizes {
+		display: flex;
+		gap: 1rem;
+		justify-content: space-between;
+	}
+	#theme-design-sizes .theme-design-section {
+		width:100%;
+	}
+
 	#theme-page-wrap .theme-design-section > h2 {
 		margin: 0;
 		font-size: .9rem;
