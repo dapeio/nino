@@ -3,27 +3,29 @@
 	font-style: normal;
 	font-weight: normal;
 	font-display: swap;
-	src: local('Text Regular'), url('[[/nino/public]]/fonts/source-sans-3-regular.woff2') format('woff2');
+	src: local('Text Regular'), url('[[/nino/public]]/fonts/roboto-regular.woff2') format('woff2');
 }
 @font-face {
 	font-family: 'Text';
 	font-style: normal;
 	font-weight: bold;
 	font-display: swap;
-	src: local('Text Bold'), url('[[/nino/public]]/fonts/source-sans-3-bold.woff2') format('woff2');
+	src: local('Text Bold'), url('[[/nino/public]]/fonts/roboto-bold.woff2') format('woff2');
 }
 @font-face {
 	font-family: 'Title';
 	font-style: normal;
 	font-weight: bold;
 	font-display: swap;
-	src: local('Title Bold'), url('[[/nino/public]]/fonts/archivo-black.woff2') format('woff2');
+	src: local('Title Bold'), url('[[/nino/public]]/fonts/outfit.woff2') format('woff2');
 }
 
-/*	Studio.
+/*	Surface.
 
-	Poster typography and heavy black bands - an overlay navigation, a
-	statement footer and headlines that take the whole width.
+	Large tonal areas, wide margins and light that falls from one side - the
+	page is built from surfaces that lie on each other rather than from lines
+	that separate them. For product sites, apps and anything that should read
+	as current.
 
 	Colours here are assignments, never values. /_design generates the --nino-*
 	tokens this file reads (assets/style.design.css, loaded immediately before
@@ -54,7 +56,7 @@
 	   it, so a price, a stat, an outline button or an info alert clears the
 	   text target wherever it lands */
 	--color-accent-default: var(--nino-default-link);
-	--color-accent-alt: var(--nino-black-link);
+	--color-accent-alt: var(--nino-alt-link);
 	--color-accent-dark: var(--nino-dark-link);
 	--color-accent-black: var(--nino-black-link);
 
@@ -69,20 +71,22 @@
 	/* The scrim over a cover image - not a pair /_design can solve, since
 	   it cannot know the photograph underneath, so the theme derives it
 	   from its deepest surface and owns the light text put on top */
-	--color-background-dim: color-mix(in srgb, var(--nino-black) 78%, transparent);
+	--color-background-dim: color-mix(in srgb, var(--nino-black) 72%, transparent);
 
-	/* Footer bands */
-	--color-footer-bg-main: var(--nino-black);
-	--color-footer-text-main: var(--nino-on-black-muted);
-	--color-footer-bg-legal: var(--nino-black);
-	--color-footer-text-legal: var(--nino-on-black-muted);
-	--color-footer-text: var(--nino-on-black-muted);
+	/* Footer bands. The main band is the brand surface this theme is named
+	   for; the legal line steps down to the tone below it rather than to a
+	   line, which is the same idea one layer further down */
+	--color-footer-bg-main: var(--nino-vibrant);
+	--color-footer-text-main: var(--nino-on-vibrant);
+	--color-footer-bg-legal: var(--nino-vibrant);
+	--color-footer-text-legal: var(--nino-on-vibrant-muted);
+	--color-footer-text: var(--nino-on-vibrant);
 
 	/* Sections - the four grounds a page alternates between */
 	--color-section-default-bg: var(--nino-default);
 	--color-section-default-text: var(--nino-on-default);
-	--color-section-alt-bg: var(--nino-black);
-	--color-section-alt-text: var(--nino-on-black);
+	--color-section-alt-bg: var(--nino-alt);
+	--color-section-alt-text: var(--nino-on-alt);
 	--color-section-dark-bg: var(--nino-dark);
 	--color-section-dark-text: var(--nino-on-dark);
 	--color-section-black-bg: var(--nino-black);
@@ -104,12 +108,12 @@
 	--fontfamily-text: 'Text', system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 	--fontfamily-title: 'Title', system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 	--fontfamily-subtitle: 'Text', system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-	--fontsize-small: .78em;
-	--fontsize-big: 1.3em;
-	--fontsize-btn: .9rem;
+	--fontsize-small: .8em;
+	--fontsize-big: 1.25em;
+	--fontsize-btn: .95rem;
 
 	/* Sizes are assignments too. The raster comes from /_design's Volume,
-	   Spacing and Shaping steps - this unit declares 'generous/tight/sharp' in
+	   Spacing and Shaping steps - this unit declares 'default/airy/round' in
 	   its manifest, which is what a hand-tuned block here used to spell out one
 	   number at a time. The wide-screen half of the type scale is the raster's
 	   own media query; there is nothing to repeat for it here */
@@ -130,33 +134,87 @@
 	--space-5: var(--nino-space-5);
 	--space-6: var(--nino-space-6);
 
+	/* Shaping is 'round', so step 2 is the wide corner this look is built on
+	   and step 1 the one small enough for an input or a badge */
 	--radius: var(--nino-radius-2);
 	--radius-small: var(--nino-radius-1);
 
 	/* Not raster steps: a viewport-relative image cap and a layout ceiling
 	   are this theme's own proportions, and neither is a step on a scale */
-	--article-img-max-width: 12vw;
-	--article-img-max-height: 20vh;
-	--grid-max-width: 120rem;
+	--article-img-max-width: 14vw;
+	--article-img-max-height: 22vh;
+	--grid-max-width: 108rem;
+
+	/*	Elevation is this theme's own idea, so it is this theme's own variable.
+		Both steps are built from --nino-*-shadow, the one shadow colour the
+		design layer publishes per mode - it goes from 12% black on a light page
+		to 55% on a dark one, which is the whole reason a hand-written rgba()
+		here would look wrong in the other mode.	*/
+	--surface-lift-1: 0 1px 2px color-mix(in srgb, var(--nino-default-shadow) 70%, transparent), 0 2px 6px var(--nino-default-shadow);
+	--surface-lift-2: 0 2px 4px color-mix(in srgb, var(--nino-default-shadow) 70%, transparent), 0 8px 20px var(--nino-default-shadow);
 }
 
 @media (min-width: 768px) {
 	:root {
-		--base-size: 18px;
+		--base-size: 17px;
 	}
 }
 
-/*	Archivo Black has one weight and it is already the statement - what makes
-	it read as a poster is the tracking and the case, not a heavier cut	*/
-.nino-section-title,
-h1, h2 {
-	text-transform: uppercase;
-	letter-spacing: -.01em;
+/*	A card is a surface that lies on the page, so it carries light instead of
+	a line. The border stays in the box model and only loses its colour -
+	removing it would move every card by a pixel in each direction.	*/
+.nino-article--alt,
+.nino-pricing-item {
+	border-color: transparent;
+	box-shadow: var(--surface-lift-1);
+}
+.nino-pricing-item--featured {
+	box-shadow: var(--surface-lift-2);
 }
 
+/*	The dialog is the one element that is genuinely above everything else	*/
+.nino-modal {
+	box-shadow: var(--surface-lift-2);
+}
+
+/*	Full-round buttons, and the filled one lifts off the page the way the
+	cards do. --fontsize-btn is already the smaller of the two sizes this
+	theme sets; the tracking is what makes a wide pill read as a label
+	rather than as a gap	*/
 .nino-btn {
-	text-transform: uppercase;
-	letter-spacing: .06em;
+	border-radius: var(--nino-radius-full);
+	padding-left: var(--space-3);
+	padding-right: var(--space-3);
+	letter-spacing: .01em;
+}
+.nino-btn--primary {
+	box-shadow: var(--surface-lift-1);
+}
+
+/*	The gradient the whole look is named for. It is deliberately shallow: a
+	filled surface mixes at most a tenth of the neighbouring tone into itself,
+	so the pair /_design measured for that surface still describes what a
+	visitor sees. Anything deeper would be a colour nothing solved an ink
+	against.	*/
+.nino-section--primary {
+	background-image: linear-gradient(160deg, color-mix(in oklab, var(--color-primary) 90%, var(--nino-origin)) 0%, var(--color-primary) 55%, color-mix(in oklab, var(--color-primary) 92%, var(--nino-black)) 100%);
+}
+.nino-section--dark {
+	background-image: linear-gradient(160deg, color-mix(in oklab, var(--nino-dark) 92%, var(--nino-origin)) 0%, var(--nino-dark) 60%, var(--nino-black) 100%);
+}
+.nino-section--black {
+	background-image: linear-gradient(160deg, var(--nino-black) 0%, color-mix(in oklab, var(--nino-black) 92%, var(--nino-origin)) 100%);
+}
+.nino-section--alt {
+	background-image: linear-gradient(180deg, color-mix(in oklab, var(--nino-alt) 60%, var(--nino-default)) 0%, var(--nino-alt) 100%);
+}
+
+/*	Outfit sets tight at display sizes, which is where this theme spends most
+	of its type	*/
+.nino-section-title,
+.nino-atf-title,
+h1, h2 {
+	letter-spacing: -.015em;
 }
 
 /*	The header and footer frames are their own units

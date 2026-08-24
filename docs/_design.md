@@ -173,7 +173,7 @@ Applying another Theme is the intentional reset operation. It overwrites files n
 
 ## Catalogue Contract
 
-All eight supplied themes — Basis, Docs, Editorial, Nocturne, Rail, Signal, Soft, and Studio — are mapping layers. Every colour role reads a generated `--nino-*` token, every size role reads the generated raster, and every manifest declares the complete Design and frame baseline the preview represents. A custom catalogue theme must keep that contract or its Design controls cannot reliably recolour and reshape it.
+All ten supplied themes — Aperture, Basis, Docs, Editorial, Nocturne, Rail, Signal, Soft, Studio, and Surface — are mapping layers. Every colour role reads a generated `--nino-*` token, every size role reads the generated raster, and every manifest declares the complete Design and frame baseline the preview represents. A custom catalogue theme must keep that contract or its Design controls cannot reliably recolour and reshape it.
 
 ## Next Steps
 

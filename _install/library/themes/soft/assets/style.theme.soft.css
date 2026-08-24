@@ -3,21 +3,21 @@
 	font-style: normal;
 	font-weight: normal;
 	font-display: swap;
-	src: local('Text Regular'), url('[[/nino/public]]/fonts/text/open-sans-regular.woff2') format('woff2');
+	src: local('Text Regular'), url('[[/nino/public]]/fonts/open-sans-regular.woff2') format('woff2');
 }
 @font-face {
 	font-family: 'Text';
 	font-style: normal;
 	font-weight: bold;
 	font-display: swap;
-	src: local('Text Bold'), url('[[/nino/public]]/fonts/text/open-sans-bold.woff2') format('woff2');
+	src: local('Text Bold'), url('[[/nino/public]]/fonts/open-sans-bold.woff2') format('woff2');
 }
 @font-face {
 	font-family: 'Title';
 	font-style: normal;
 	font-weight: bold;
 	font-display: swap;
-	src: local('Title Bold'), url('[[/nino/public]]/fonts/title/alegreya-sans.woff2') format('woff2');
+	src: local('Title Bold'), url('[[/nino/public]]/fonts/alegreya-sans.woff2') format('woff2');
 }
 
 /*	Soft.

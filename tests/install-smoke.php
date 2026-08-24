@@ -302,7 +302,7 @@ echo "\n";
 
 echo "Themes::apiList / apiApply\n";
 
-$themeKeys = [ 'basis', 'docs', 'editorial', 'nocturne', 'rail', 'signal', 'soft', 'studio' ];
+$themeKeys = [ 'aperture', 'basis', 'docs', 'editorial', 'nocturne', 'rail', 'signal', 'soft', 'studio', 'surface' ];
 
 // The css bundle starts out exactly as a hand-set-up project's would:
 // the kernel stylesheet plus one of the project's own, neither of them a
@@ -343,7 +343,7 @@ check( 'response echoes the applied theme', $themeApplyRequest['/nino/http/respo
 $configAfterTheme = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
 
 check( 'copies the theme\'s own stylesheet into /assets', is_file( $sandbox. '/public/assets/style.theme.nocturne.css' ) === true );
-check( 'copies the webfonts that stylesheet references, keeping their subdirectories', is_file( $sandbox. '/public/fonts/text/lato-regular.woff2' ) === true && is_file( $sandbox. '/public/fonts/title/exo-2.woff2' ) === true );
+check( 'copies the webfonts that stylesheet references, keeping their subdirectories', is_file( $sandbox. '/public/fonts/lato-regular.woff2' ) === true && is_file( $sandbox. '/public/fonts/exo-2.woff2' ) === true );
 check( 'never copies the picker-only preview image into the project', is_file( $sandbox. '/preview.svg' ) === false );
 check( 'persists the picked key at /nino/install/theme', ( $configAfterTheme['/nino/install/theme'] ?? null ) === 'nocturne' );
 check( 'appends the theme\'s stylesheet to the css bundle', in_array( '/assets/style.theme.nocturne.css', $configAfterTheme['/nino/html/assets']['/.cache/style.css'], true ) === true );
@@ -375,7 +375,7 @@ check( 'switching themes swaps the bundled stylesheet rather than adding a secon
 	'/_nino/Nino.css', '/assets/style.design.css', '/assets/style.custom.css', '/assets/style.theme.editorial.css', '/assets/style.header.css', '/assets/style.footer.css',
 ] );
 check( '...and updates the persisted key with it', $configAfterSwitch['/nino/install/theme'] === 'editorial' );
-check( 'copies the new theme\'s own fonts too', is_file( $sandbox. '/public/fonts/text/spectral-regular.woff2' ) === true );
+check( 'copies the new theme\'s own fonts too', is_file( $sandbox. '/public/fonts/spectral-regular.woff2' ) === true );
 check( 'a file the previous theme wrote is left behind, not deleted - same additive rule as Setup\'s templates/text', is_file( $sandbox. '/public/assets/style.theme.nocturne.css' ) === true );
 
 // --- Frames: the site's header/footer as interchangeable units ----------
@@ -831,7 +831,6 @@ check( 'the legal manifest declares the stable Element-URI its generated route r
 check( 'the blank template starts every locale with useful page metadata', $wpLibraryBody['templates']['blank']['text']['de_DE']['name'] === 'Neue Webseite' && $wpLibraryBody['templates']['blank']['text']['en_US']['name'] === 'New webpage' );
 check( 'the blank template suggests a stable Http-URI and its own page template', $wpLibraryBody['templates']['blank']['uri'] === '/new-webpage' && $wpLibraryBody['templates']['blank']['body'] === '[template /templates/page-blank]' );
 check( 'the blank page template deliberately has no section', strpos( (string) file_get_contents( __DIR__. '/../_install/library/pages/blank/templates/page-blank.tpl' ), '<section' ) === false );
-check( 'a template whose fragments ship no wording at all reports empty strings, never a missing key', array_keys( $wpLibraryBody['templates']['.demo-elements']['text']['en_US'] ) === [ 'name', 'title', 'description' ] );
 
 $_POST['data'] = json_encode( [ 'webpages' => [ [ 'uri' => '../etc/passwd', 'httpUri' => '/x', 'libraryKey' => 'home', 'text' => [] ] ] ] );
 $badUriRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];

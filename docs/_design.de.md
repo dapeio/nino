@@ -173,7 +173,7 @@ Ein anderes Theme anzuwenden ist der bewusste Reset. Dabei werden die vom neuen 
 
 ## Katalogvertrag
 
-Alle acht mitgelieferten Themes — Basis, Docs, Editorial, Nocturne, Rail, Signal, Soft und Studio — sind Abbildungsschichten. Jede Farbrolle liest ein erzeugtes `--nino-*`-Token, jede Größenrolle das erzeugte Raster, und jedes Manifest erklärt die vollständige Design- und Frame-Ausgangslage seiner Vorschau. Ein eigenes Katalog-Theme muss diesen Vertrag einhalten, damit die Design-Regler es zuverlässig umfärben und umformen können.
+Alle zehn mitgelieferten Themes — Aperture, Basis, Docs, Editorial, Nocturne, Rail, Signal, Soft, Studio und Surface — sind Abbildungsschichten. Jede Farbrolle liest ein erzeugtes `--nino-*`-Token, jede Größenrolle das erzeugte Raster, und jedes Manifest erklärt die vollständige Design- und Frame-Ausgangslage seiner Vorschau. Ein eigenes Katalog-Theme muss diesen Vertrag einhalten, damit die Design-Regler es zuverlässig umfärben und umformen können.
 
 ## Nächste Schritte
 

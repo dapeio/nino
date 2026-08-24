@@ -6,6 +6,31 @@ All notable changes to Nino are documented in this file.
 
 ### Added
 
+- Two themes, bringing the catalogue to ten.
+
+  **Surface** is built from areas rather than from lines: a floating header
+  card, wide margins, cards that carry light instead of a border, pill buttons
+  and shallow gradients on every filled band. The elevation is one theme-owned
+  variable pair built from `--nino-*-shadow`, the shadow colour the design
+  layer publishes per mode, so it stays right when the page turns dark. The
+  gradients mix at most a tenth of a neighbouring tone into a surface, which
+  keeps the pair `/_design` measured for that surface an honest description of
+  what a visitor sees. Roboto and Outfit, `default/airy/round`, header `v3` and
+  footer `v7`.
+
+  **Aperture** is a gallery wall for photography: the page sits on the paper
+  tone rather than on white, the section that alternates against it is the
+  white one below, corners are square and the header is a wordmark and a
+  burger. Captions are small, tracked and upper case; a card image is allowed a
+  quarter of the viewport where every other theme keeps it to a thumbnail, and
+  the gallery gets rows a photograph can live in. Inter and Jost Light,
+  `generous/airy/sharp`, header `v4` and footer `v1`.
+
+  Both are mapping layers like the other eight: every colour role reads a
+  generated `--nino-*` token, every size role reads the generated raster, and
+  both were measured on all twelve demo pages at 375/768/1440 in light and in
+  dark.
+
 - `Demo: Catalogue`, a page unit that shows the whole system on one page: every
   Section Preset the Template Builder ships, in every layout it declares, plus
   the variants that actually change how a preset looks - the styles of its
@@ -887,6 +912,12 @@ All notable changes to Nino are documented in this file.
   `/_admin` starts behind everything already in that menu.
 
 ### Fixed
+
+- The footer frame `v7`'s legal line put a standalone link at 22px, just under
+  WCAG 2.2 SC 2.5.8's 24px, with the row's gap - a raster step the Spacing
+  setting can tighten - as its only allowance. It carries its own padding now,
+  the same way a link that is a whole list entry already does. The frame had no
+  theme until Surface, which is why nothing measured it before.
 
 - Spacing, alignment, opacity and visibility utilities now win. They sat in the
   middle of the stylesheet, so every component defined below them - an alert, a

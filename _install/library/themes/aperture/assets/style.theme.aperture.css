@@ -3,27 +3,29 @@
 	font-style: normal;
 	font-weight: normal;
 	font-display: swap;
-	src: local('Text Regular'), url('[[/nino/public]]/fonts/source-sans-3-regular.woff2') format('woff2');
+	src: local('Text Regular'), url('[[/nino/public]]/fonts/inter-regular.woff2') format('woff2');
 }
 @font-face {
 	font-family: 'Text';
 	font-style: normal;
 	font-weight: bold;
 	font-display: swap;
-	src: local('Text Bold'), url('[[/nino/public]]/fonts/source-sans-3-bold.woff2') format('woff2');
+	src: local('Text Bold'), url('[[/nino/public]]/fonts/inter-bold.woff2') format('woff2');
 }
 @font-face {
 	font-family: 'Title';
 	font-style: normal;
 	font-weight: bold;
 	font-display: swap;
-	src: local('Title Bold'), url('[[/nino/public]]/fonts/archivo-black.woff2') format('woff2');
+	src: local('Title Bold'), url('[[/nino/public]]/fonts/jost-light.woff2') format('woff2');
 }
 
-/*	Studio.
+/*	Aperture.
 
-	Poster typography and heavy black bands - an overlay navigation, a
-	statement footer and headlines that take the whole width.
+	A gallery wall: paper-white ground, no colour of its own, square corners
+	and a page that gets out of the way. Wide images, small tracked captions
+	and a header that is a wordmark and nothing else. For photography,
+	portfolios and anything where the picture is the content.
 
 	Colours here are assignments, never values. /_design generates the --nino-*
 	tokens this file reads (assets/style.design.css, loaded immediately before
@@ -53,25 +55,29 @@
 	   written on a page surface. Every ground gets the one /_design solved for
 	   it, so a price, a stat, an outline button or an info alert clears the
 	   text target wherever it lands */
-	--color-accent-default: var(--nino-default-link);
-	--color-accent-alt: var(--nino-black-link);
+	--color-accent-default: var(--nino-alt-link);
+	--color-accent-alt: var(--nino-default-link);
 	--color-accent-dark: var(--nino-dark-link);
 	--color-accent-black: var(--nino-black-link);
 
-	/* Page ground */
-	--color-background: var(--nino-default);
-	--color-text: var(--nino-on-default);
-	--color-title: var(--nino-on-default);
-	--color-subtitle: var(--nino-on-default-muted);
-	--color-border: var(--nino-default-border);
-	--color-header-bg: var(--nino-default);
+	/*	Page ground. The one surface swap this theme makes: the page sits on
+		--nino-alt, the paper tone, and the section that alternates against it
+		is the white one below. A gallery wall is never pure white, and a
+		photograph shown on one looks like a photograph rather than like a
+		screenshot. Both are solved pairs, so the swap costs no contrast.	*/
+	--color-background: var(--nino-alt);
+	--color-text: var(--nino-on-alt);
+	--color-title: var(--nino-on-alt);
+	--color-subtitle: var(--nino-on-alt-muted);
+	--color-border: var(--nino-alt-border);
+	--color-header-bg: var(--nino-alt);
 
 	/* The scrim over a cover image - not a pair /_design can solve, since
 	   it cannot know the photograph underneath, so the theme derives it
 	   from its deepest surface and owns the light text put on top */
-	--color-background-dim: color-mix(in srgb, var(--nino-black) 78%, transparent);
+	--color-background-dim: color-mix(in srgb, var(--nino-black) 70%, transparent);
 
-	/* Footer bands */
+	/* Footer bands - one quiet line under the last image */
 	--color-footer-bg-main: var(--nino-black);
 	--color-footer-text-main: var(--nino-on-black-muted);
 	--color-footer-bg-legal: var(--nino-black);
@@ -79,10 +85,10 @@
 	--color-footer-text: var(--nino-on-black-muted);
 
 	/* Sections - the four grounds a page alternates between */
-	--color-section-default-bg: var(--nino-default);
-	--color-section-default-text: var(--nino-on-default);
-	--color-section-alt-bg: var(--nino-black);
-	--color-section-alt-text: var(--nino-on-black);
+	--color-section-default-bg: var(--nino-alt);
+	--color-section-default-text: var(--nino-on-alt);
+	--color-section-alt-bg: var(--nino-default);
+	--color-section-alt-text: var(--nino-on-default);
 	--color-section-dark-bg: var(--nino-dark);
 	--color-section-dark-text: var(--nino-on-dark);
 	--color-section-black-bg: var(--nino-black);
@@ -105,11 +111,11 @@
 	--fontfamily-title: 'Title', system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 	--fontfamily-subtitle: 'Text', system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 	--fontsize-small: .78em;
-	--fontsize-big: 1.3em;
-	--fontsize-btn: .9rem;
+	--fontsize-big: 1.2em;
+	--fontsize-btn: .82rem;
 
 	/* Sizes are assignments too. The raster comes from /_design's Volume,
-	   Spacing and Shaping steps - this unit declares 'generous/tight/sharp' in
+	   Spacing and Shaping steps - this unit declares 'generous/airy/sharp' in
 	   its manifest, which is what a hand-tuned block here used to spell out one
 	   number at a time. The wide-screen half of the type scale is the raster's
 	   own media query; there is nothing to repeat for it here */
@@ -130,33 +136,60 @@
 	--space-5: var(--nino-space-5);
 	--space-6: var(--nino-space-6);
 
-	--radius: var(--nino-radius-2);
+	--radius: var(--nino-radius-1);
 	--radius-small: var(--nino-radius-1);
 
-	/* Not raster steps: a viewport-relative image cap and a layout ceiling
-	   are this theme's own proportions, and neither is a step on a scale */
-	--article-img-max-width: 12vw;
-	--article-img-max-height: 20vh;
-	--grid-max-width: 120rem;
+	/*	Not raster steps, and the two numbers this theme exists for: an image
+		in a card is allowed a quarter of the viewport and most of its height,
+		where every other theme keeps it to a thumbnail. The layout ceiling
+		goes with them - a wide picture needs somewhere to be wide.	*/
+	--article-img-max-width: 26vw;
+	--article-img-max-height: 62vh;
+	--grid-max-width: 132rem;
 }
 
 @media (min-width: 768px) {
 	:root {
-		--base-size: 18px;
+		--base-size: 17px;
 	}
 }
 
-/*	Archivo Black has one weight and it is already the statement - what makes
-	it read as a poster is the tracking and the case, not a heavier cut	*/
+/*	Jost is drawn light, and the light cut is the point: a gallery title is
+	set large and thin, never bold. Nino.css asks for bold, the face has one
+	weight, and a browser would synthesise the difference - naming the weight
+	here is what stops it	*/
 .nino-section-title,
-h1, h2 {
+.nino-atf-title,
+h1, h2, h3 {
+	font-weight: 400;
+	letter-spacing: .01em;
+}
+
+/*	A caption under a picture: small, tracked, upper case. The subtitle role
+	is the one Nino.css puts directly under a card's title, which is exactly
+	where a photographer writes the place and the year	*/
+.nino-article-subtitle,
+.nino-logos-item {
 	text-transform: uppercase;
-	letter-spacing: -.01em;
+	letter-spacing: .12em;
+	font-size: var(--fontsize-small);
 }
 
 .nino-btn {
 	text-transform: uppercase;
-	letter-spacing: .06em;
+	letter-spacing: .1em;
+}
+
+/*	The gallery is this theme's main component, so it gets rows a photograph
+	can live in rather than the framework's thumbnail height	*/
+.nino-gallery {
+	grid-auto-rows: 220px;
+	gap: var(--space-2);
+}
+@media (min-width: 768px) {
+	.nino-gallery {
+		grid-auto-rows: 300px;
+	}
 }
 
 /*	The header and footer frames are their own units

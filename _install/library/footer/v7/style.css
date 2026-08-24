@@ -77,6 +77,16 @@
 	gap: var(--space-2);
 }
 
+/*	A link that is the whole entry is a target of its own, not a link inside a
+	sentence: at the legal line's size its box is 22px, just under WCAG 2.2 SC
+	2.5.8's 24px, and the row's gap is a raster step that the Spacing setting
+	can tighten rather than a guaranteed allowance	*/
+.nino-frame-footer .nino-frame-footer-utility a {
+	display: inline-block;
+	padding-top: .15rem;
+	padding-bottom: .15rem;
+}
+
 .nino-frame-footer .nino-footer-localepicker {
 	justify-content: flex-end;
 }
