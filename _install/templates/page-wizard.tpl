@@ -69,74 +69,69 @@
 				</div>
 
 				<div id="install-content-design">
-					<p class="nino-admin-hint nino-admin-hint-lead">The values the theme reads from. <code>/_design</code> generates them and this step writes them: a background is published together with the text colour that belongs on it, measured against the WCAG contrast formula, so a brand colour cannot produce unreadable text. The theme picked in the previous step fills these in with what it was drawn against, and everything stays editable under <code>/_design</code> after the installation.</p>
 					<p id="design-unavailable" class="nino-admin-hint install-hidden">This delivery ships without <code>/_design</code>, so there is nothing to generate here - the theme's own stylesheet decides the colours instead. Press "Next" to continue.</p>
 
-					<section class="install-design-section">
-						<h3 class="install-design-section-title">Colour</h3>
-						<div class="install-design-grid">
-							<label class="install-theme-field">
-								<span>Primary</span>
-								<span class="install-theme-color">
-									<input type="color" id="themes-design-primary" class="install-theme-swatch">
-									<input type="text" id="themes-design-primary-hex" class="nino-admin-input" inputmode="text" spellcheck="false" autocomplete="off" maxlength="7">
-								</span>
-							</label>
-							<label class="install-theme-field">
-								<span>Secondary <small>optional</small></span>
-								<span class="install-theme-color">
-									<input type="color" id="themes-design-secondary" class="install-theme-swatch">
-									<input type="text" id="themes-design-secondary-hex" class="nino-admin-input" inputmode="text" spellcheck="false" autocomplete="off" maxlength="7" placeholder="follows Primary">
-								</span>
-							</label>
-							<label class="install-theme-field">
-								<span>Contrast <small>how hard text has to work</small></span>
-								<select id="themes-design-contrast" class="nino-admin-input"></select>
-							</label>
-							<label class="install-theme-field">
-								<span>Colours <small>how saturated</small></span>
-								<select id="themes-design-colors" class="nino-admin-input"></select>
-							</label>
-						</div>
+					<!--	Same split as /_design: every setting visible at once on
+								the left, one page on the right showing what all of them
+								together produce. The example itself is built by /_design -
+								see Install.php's apiDesignRead.	-->
+					<div id="design-controls" class="install-design-split">
 
-						<!-- Each chip is a real pair - the generated
-						     background carrying the generated text colour.
-						     A row of backgrounds alone would look
-						     convincing in exactly the settings that fail -->
-						<div class="install-design-specimen">
-							<div id="themes-design-preview" class="install-theme-preview-strip" aria-label="Generated surfaces"></div>
-						</div>
-					</section>
-
-					<div id="design-controls">
-						<section class="install-design-section">
-							<div class="install-design-grid">
-								<h3 class="install-design-section-title">Volume</h3>
-								<label class="install-theme-field">
-									<select id="themes-design-volume" class="nino-admin-input"></select>
-								</label>
-								<div id="themes-design-volume-preview"></div>
-						</section>
-						<section class="install-design-section">
-							<div class="install-design-grid">
-								<h3 class="install-design-section-title">Spacing</h3>
-								<label class="install-theme-field">
-									<select id="themes-design-spacing" class="nino-admin-input"></select>
-								</label>
-								<div id="themes-design-spacing-preview"></div>
-						</section>
-						<section class="install-design-section">
-							<div class="install-design-grid">
-								<h3 class="install-design-section-title">Shaping</h3>
-								<label class="install-theme-field">
-									<select id="themes-design-shaping" class="nino-admin-input"></select>
-								</label>
-								<div id="themes-design-shaping-preview"></div>
+						<div class="install-design-controls">
+							<div class="nino-admin-tabs" role="tablist" aria-label="Design settings">
+								<button type="button" role="tab" id="themes-design-tab-colour" class="nino-admin-tab is-active" aria-selected="true" aria-controls="themes-design-panel-colour">Colour</button>
+								<button type="button" role="tab" id="themes-design-tab-raster" class="nino-admin-tab" aria-selected="false" aria-controls="themes-design-panel-raster">Raster</button>
 							</div>
-						</section>
+
+							<div class="nino-admin-tabpanel install-design-panel" role="tabpanel" id="themes-design-panel-colour" aria-labelledby="themes-design-tab-colour">
+								<div id="themes-design-colours">
+									<label class="install-theme-field" id="themes-design-primary-field">
+										<span>Primary</span>
+										<span class="install-theme-color">
+											<input type="color" id="themes-design-primary" class="install-theme-swatch">
+											<input type="text" id="themes-design-primary-hex" class="nino-admin-input" inputmode="text" spellcheck="false" autocomplete="off" maxlength="7">
+										</span>
+									</label>
+									<label class="install-theme-field" id="themes-design-secondary-field">
+										<span>Secondary</span>
+										<span class="install-theme-color">
+											<input type="color" id="themes-design-secondary" class="install-theme-swatch">
+											<input type="text" id="themes-design-secondary-hex" class="nino-admin-input" inputmode="text" spellcheck="false" autocomplete="off" maxlength="7" placeholder="auto">
+										</span>
+										<small>overrides Harmony</small>
+									</label>
+								</div>
+								<div id="themes-design-knobs-colour"></div>
+							</div>
+
+							<div class="nino-admin-tabpanel install-design-panel" role="tabpanel" id="themes-design-panel-raster" aria-labelledby="themes-design-tab-raster" hidden>
+								<div id="themes-design-knobs-raster"></div>
+							</div>
+						</div>
+
+						<div class="install-design-stage">
+							<div class="install-design-modes" role="group" aria-label="Preview mode">
+								<button type="button" id="themes-design-mode-light" class="install-design-mode is-active" aria-pressed="true">Light</button>
+								<button type="button" id="themes-design-mode-dark" class="install-design-mode" aria-pressed="false">Dark</button>
+							</div>
+							<!--	The frame renders at a desktop's layout width and is
+										scaled into this box - see Nino.adminUi.scaleFrame().
+										Without it the panel is narrower than the narrowest
+										content ceiling Width offers, and all three settings
+										for it look the same	-->
+							<div class="install-design-port" id="themes-design-example-port">
+								<iframe id="themes-design-example" class="install-design-view" title="Live preview of the current design" sandbox="" loading="lazy"></iframe>
+							</div>
+						</div>
 					</div>
 
-					<p id="design-msg"></p>
+					<!--	Nothing here is written until Next, so the position to
+								offer a way back to is the one the theme handed over -
+								see design.js's _reset. Shown only while the two differ. -->
+					<div class="install-design-footer">
+						<p id="design-msg" role="status" aria-live="polite"></p>
+						<button type="button" id="design-reset" class="nino-admin-btn-secondary" hidden>Back to the theme&rsquo;s values</button>
+					</div>
 				</div>
 
 				<div id="install-content-header">
@@ -258,6 +253,7 @@
 			<p id="themes-lightbox-caption"></p>
 		</div>
 		<script src="[[/nino/dir]]/_nino/Nino.js"></script>
+		<script src="[[/nino/dir]]/_nino/Nino.admin.js"></script>
 		<script src="[[/nino/dir]]/_install/assets/script.js"></script>
 		<script src="[[/nino/dir]]/_install/assets/checks.js"></script>
 		<script src="[[/nino/dir]]/_install/assets/setup.js"></script>

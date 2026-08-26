@@ -72,6 +72,7 @@
 				<a href="#slider" class="nino-btn nino-btn--outline nino-btn--small">Slider</a>
 				<a href="#dialoge" class="nino-btn nino-btn--outline nino-btn--small">Dialogs and messages</a>
 				<a href="#rahmen" class="nino-btn nino-btn--outline nino-btn--small">Dividers and height</a>
+				<a href="#grundflaechen" class="nino-btn nino-btn--outline nino-btn--small">Grounds</a>
 				<a href="#bewegung" class="nino-btn nino-btn--outline nino-btn--small">Motion</a>
 				<a href="#laufzeit" class="nino-btn nino-btn--outline nino-btn--small">Classes set at runtime</a>
 				<a href="#raster-stufen" class="nino-btn nino-btn--outline nino-btn--small">Grid, all breakpoints</a>
@@ -989,6 +990,56 @@
 	</div>
 </section>
 
+<section class="nino-section nino-section--primary nino-pt-4 nino-pb-4 nino-mt-0 nino-mb-0" id="grundflaechen">
+	<div class="nino-grid-row nino-grid-row--wide">
+		<div class="nino-grid-100">
+			<h2 class="nino-section-title nino-text-left">Grounds</h2>
+			<p class="nino-section-subtitle nino-text-left">The surfaces a section may paint itself with, beyond the page ground it inherits.</p>
+		</div>
+	</div>
+</section>
+
+<!--	The tint ground: the page with the brand washed into it rather than a
+			near-grey step away from it. Quiet enough to read a whole section on,
+			which is what separates it from the two brand grounds below.	-->
+<section class="nino-section nino-section--tint nino-pt-3 nino-pb-3 nino-mt-0 nino-mb-0" id="v-ground-tint">
+	<div class="nino-grid-row nino-grid-row--wide">
+		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left">
+			<span class="nino-badge nino-badge--pill">.nino-section--tint</span>
+		</div>
+		<div class="nino-grid-100 nino-grid-m-66">
+			<h3 class="nino-section-title nino-text-left">A band that carries the brand quietly</h3>
+			<p>Body copy sits on it for a whole section, and <a href="#grundflaechen">a link</a> is solved against this ground rather than the page it steps away from.</p>
+		</div>
+		<div class="nino-grid-100 nino-grid-m-33">
+			<div class="nino-article nino-article--alt">
+				<h4 class="nino-article-title">A card on the tint</h4>
+				<p>Steps onto the page ground, the way it does on the alternate band.</p>
+			</div>
+		</div>
+	</div>
+</section>
+
+<!--	...and the second brand colour as a surface, which is the same promise
+			.nino-section--primary makes for the first: filled with, written on,
+			and solved until the text on it clears the target.	-->
+<section class="nino-section nino-section--brand-alt nino-pt-3 nino-pb-3 nino-mt-0 nino-mb-0" id="v-ground-brand-alt">
+	<div class="nino-grid-row nino-grid-row--wide">
+		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left">
+			<span class="nino-badge nino-badge--pill">.nino-section--brand-alt</span>
+			<span class="nino-badge nino-badge--pill">.nino-btn--brand-alt</span>
+		</div>
+		<div class="nino-grid-100">
+			<h3 class="nino-section-title nino-text-left">The second brand colour, as a ground</h3>
+			<p class="nino-section-subtitle nino-text-left">Where Harmony or a Secondary colour puts it. With neither set it is the first colour, so nothing here changes shape.</p>
+			<p>
+				<span class="nino-btn nino-btn--brand-alt">Second action</span>
+				<span class="nino-btn nino-btn--outline">Outline beside it</span>
+			</p>
+		</div>
+	</div>
+</section>
+
 <section class="nino-section nino-section--primary nino-pt-4 nino-pb-4 nino-mt-0 nino-mb-0" id="gruppe-frame">
 	<div class="nino-grid-row nino-grid-row--wide">
 		<div class="nino-grid-100">
@@ -1529,11 +1580,12 @@
 			<h3 class="nino-section-title nino-text-left" id="alerts-title">Alerts</h3>
 			<p class="nino-section-subtitle nino-text-left">Three states plus a large variant for an alert that fills an entire section.</p>
 		</div>
-		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left nino-mb-3"><span class="nino-badge nino-badge--pill">.nino-alert</span> <span class="nino-badge nino-badge--pill">.nino-alert--info</span> <span class="nino-badge nino-badge--pill">.nino-alert--success</span> <span class="nino-badge nino-badge--pill">.nino-alert--error</span> <span class="nino-badge nino-badge--pill">.nino-alert--content</span></div>
+		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left nino-mb-3"><span class="nino-badge nino-badge--pill">.nino-alert</span> <span class="nino-badge nino-badge--pill">.nino-alert--info</span> <span class="nino-badge nino-badge--pill">.nino-alert--success</span> <span class="nino-badge nino-badge--pill">.nino-alert--warning</span> <span class="nino-badge nino-badge--pill">.nino-alert--error</span> <span class="nino-badge nino-badge--pill">.nino-alert--content</span></div>
 		<div class="nino-grid-100 nino-grid-m-50 nino-pr-2 nino-mb-3">
 			<p class="nino-alert nino-mb-1">.nino-alert — the neutral box</p>
 			<p class="nino-alert nino-alert--info nino-mb-1">.nino-alert--info — uses the surface accent colour</p>
 			<p class="nino-alert nino-alert--success nino-mb-1">.nino-alert--success — success surface with the appropriate text colour</p>
+			<p class="nino-alert nino-alert--warning nino-mb-1">.nino-alert--warning — the state between success and error, on its own surface</p>
 			<p class="nino-alert nino-alert--error nino-mb-1">.nino-alert--error — the same rule for the error state</p>
 		</div>
 		<div class="nino-grid-100 nino-grid-m-50">

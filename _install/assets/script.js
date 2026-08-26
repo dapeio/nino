@@ -199,10 +199,22 @@
 		 *
 		 *	@return		void
 		 */
-		apiCall : function( action, payload, callback ) {
+		/**
+		 *	`fields` are sent beside the payload rather than inside it, for the
+		 *	things a step needs the server to know but must never store - the
+		 *	Design step's previewed mode is the one that exists
+		 */
+		apiCall : function( action, payload, callback, fields ) {
+
+			const data = { action : action, data : JSON.stringify( payload ) };
+
+			Object.keys( fields || {} ).forEach( function( key ) {
+				data[key] = fields[key];
+			} );
+
 			Nino.http.sendRequest( '/_install/', 'POST', function( xhr ) {
 				callback( xhr.status, xhr.responseJSON );
-			}, { action : action, data : JSON.stringify( payload ) } );
+			}, data );
 		},
 
 		/**

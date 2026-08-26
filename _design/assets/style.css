@@ -133,7 +133,6 @@
 
 	/* -------------------------------------------------------------- Design */
 
-	#theme-page-wrap .theme-design-section,
 	#theme-page-wrap .theme-frame-panel {
 		margin: 0 0 1.25rem;
 		padding: 1rem;
@@ -142,26 +141,123 @@
 		background: var(--editor-bg-grouped);
 	}
 
-	#theme-design-sizes {
-		display: flex;
-		gap: 1rem;
-		justify-content: space-between;
-	}
-	#theme-design-sizes .theme-design-section {
-		width:100%;
-	}
-
-	#theme-page-wrap .theme-design-section > h2 {
-		margin: 0;
-		font-size: .9rem;
-		font-weight: 700;
-	}
-
-	#theme-page-wrap .theme-design-grid {
+	/*	Controls left, one page right. The column is deliberately narrow - a
+		setting is a word and a select, and giving it half the pane only pushes
+		the thing it changes off screen. Below the breakpoint it stacks, with the
+		preview first: on a phone the controls are a scroll away either way, and
+		what the operator came to look at should not be.	*/
+	#theme-page-wrap .theme-design-split {
 		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+		grid-template-columns: minmax(0, 1fr);
+		gap: 1.25rem;
+		/*	Both columns take the row's height, so the preview is exactly as
+			tall as the settings beside it. Stretch is the grid default - it is
+			named here because it is load-bearing rather than incidental	*/
+		align-items: stretch;
+	}
+
+	#theme-page-wrap .theme-design-controls {
+		display: flex;
+		flex-direction: column;
 		gap: .8rem;
-		margin-top: .85rem;
+		padding: 1rem;
+		border: 1px solid var(--editor-border);
+		border-radius: var(--editor-radius);
+		background: var(--editor-bg-grouped);
+	}
+
+	/*	The knobs stack rather than grid: one column of label-over-select reads
+		top to bottom as a list of decisions, where two columns read as a form.
+
+		Scoped to the panel rather than to every child of the column - the tab
+		row is a child too, and a flex-direction meant for the settings would
+		have stood it on end	*/
+	/*	:not([hidden]) because this selector carries an id and the design
+		system's own [hidden] rule deliberately carries none - without it the
+		display here wins and the tab that is supposed to be closed stays open */
+	#theme-page-wrap .theme-design-panel:not([hidden]),
+	#theme-page-wrap .theme-design-panel > div {
+		display: flex;
+		flex-direction: column;
+		gap: .8rem;
+	}
+
+	/*	The open panel takes what the column has spare, for the row where the
+		preview beside it is the taller of the two. It does not equalise the
+		two tabs - Colour carries two more controls than Raster, so the column
+		is shorter on Raster and the preview follows it down	*/
+	#theme-page-wrap .theme-design-panel:not([hidden]) {
+		flex: 1 1 auto;
+	}
+
+	#theme-page-wrap .theme-design-stage {
+		display: flex;
+		flex-direction: column;
+		gap: .6rem;
+		min-width: 0;
+	}
+
+	#theme-page-wrap .theme-design-modes {
+		display: flex;
+		gap: .3rem;
+	}
+
+	#theme-page-wrap .theme-design-mode {
+		padding: .3rem .8rem;
+		border: 1px solid var(--editor-border);
+		border-radius: 999px;
+		background: var(--editor-bg-elevated);
+		color: var(--editor-text-secondary);
+		font-size: .75rem;
+		font-weight: 600;
+		cursor: pointer;
+	}
+
+	#theme-page-wrap .theme-design-mode.is-active {
+		border-color: var(--editor-blue);
+		background: var(--editor-blue-soft);
+		color: var(--editor-blue);
+	}
+
+	#theme-page-wrap .theme-design-mode:focus-visible {
+		outline: 2px solid var(--editor-blue);
+		outline-offset: 2px;
+	}
+
+	/*	The frame takes whatever the column has left after the mode buttons,
+		which is what makes the preview end level with the last setting. It
+		scrolls inside itself rather than growing the pane.
+
+		min-height rather than height, for the row where that gives it nothing
+		to take: stacked under the controls below the breakpoint, the stage is
+		a row of its own, and an iframe with no intrinsic height would collapse
+		to the replaced-element default of 150px	*/
+	/*	The box the frame is shown inside. The frame itself is wider than this
+		and scaled down into it, so the overflow is deliberate - and clipped	*/
+	#theme-page-wrap .theme-design-port {
+		position: relative;
+		flex: 1 1 auto;
+		min-height: min(70vh, 38rem);
+		overflow: hidden;
+		border: 1px solid var(--editor-border);
+		border-radius: var(--editor-radius);
+		background: var(--editor-bg-elevated);
+	}
+
+	/*	Width and height are set by Nino.adminUi.scaleFrame(): they are the
+		layout size the page renders at, not the size it is shown at	*/
+	#theme-page-wrap .theme-design-view {
+		position: absolute;
+		top: 0;
+		left: 0;
+		border: 0;
+		transform-origin: 0 0;
+	}
+
+	@media (min-width: 62rem) {
+		#theme-page-wrap .theme-design-split {
+			grid-template-columns: minmax(15rem, 20rem) minmax(0, 1fr);
+		}
 	}
 
 	#theme-page-wrap .theme-field {
@@ -199,93 +295,6 @@
 		flex: 1 1 auto;
 	}
 
-	#theme-page-wrap .theme-design-specimen {
-		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
-		gap: 1rem;
-		margin-top: 1rem;
-		padding-top: 1rem;
-		border-top: 1px solid var(--editor-separator);
-	}
-
-	#theme-page-wrap .theme-design-specimen h3 {
-		margin: 0 0 .5rem;
-		color: var(--editor-text-secondary);
-		font-size: .72rem;
-		font-weight: 700;
-		letter-spacing: .06em;
-		text-transform: uppercase;
-	}
-
-	#theme-page-wrap .theme-design-surfaces {
-		display: flex;
-		flex-wrap: wrap;
-		gap: .35rem;
-	}
-
-	#theme-page-wrap .theme-design-chip {
-		padding: .3rem .6rem;
-		border: 1px solid transparent;
-		border-radius: var(--editor-radius-sm);
-		font-size: .72rem;
-		font-weight: 650;
-		line-height: 1.4;
-	}
-
-	#theme-page-wrap .theme-design-type-line {
-		margin: 0 0 .35rem;
-		font-weight: 650;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-	}
-
-	#theme-page-wrap .theme-design-type-line:last-child {
-		color: var(--editor-text-secondary);
-		font-weight: 400;
-	}
-
-	#theme-page-wrap .theme-design-spacing {
-		display: flex;
-		flex-direction: column;
-		gap: .3rem;
-	}
-
-	#theme-page-wrap .theme-design-space-row {
-		display: flex;
-		align-items: center;
-		gap: .5rem;
-	}
-
-	#theme-page-wrap .theme-design-space {
-		display: block;
-		flex: 0 0 auto;
-		height: .55rem;
-		border-radius: 2px;
-		background: var(--editor-blue);
-		opacity: .55;
-	}
-
-	#theme-page-wrap .theme-design-space-row small {
-		color: var(--editor-text-secondary);
-		font-size: .7rem;
-		font-variant-numeric: tabular-nums;
-	}
-
-	#theme-page-wrap .theme-design-corners {
-		display: flex;
-		flex-wrap: wrap;
-		align-items: flex-end;
-		gap: .5rem;
-	}
-
-	#theme-page-wrap .theme-design-radius {
-		display: block;
-		width: 2.7rem;
-		height: 2.7rem;
-		border: 2px solid var(--editor-blue);
-	}
-
 	/* --------------------------------------------------------------- Frame */
 
 	#theme-page-wrap .theme-frame-panel {
@@ -320,6 +329,12 @@
 
 	#theme-page-wrap .theme-status-error {
 		color: var(--editor-red);
+	}
+
+	/*	Unsaved is a state, not a mistake - the same orange /_templates marks
+		its own unsaved editor with, so the two read as one signal	*/
+	#theme-page-wrap .theme-status-dirty {
+		color: var(--editor-orange);
 	}
 
 	@media (max-width: 78rem) {

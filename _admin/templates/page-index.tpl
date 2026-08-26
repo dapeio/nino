@@ -85,6 +85,7 @@
 			</main>
 		</div>
 		<script src="[[/nino/dir]]/_nino/Nino.js"></script>
+		<script src="[[/nino/dir]]/_nino/Nino.admin.js"></script>
 		<script src="[[/nino/dir]]/_editor/assets/html-editor.js"></script>
 		<script src="[[/nino/dir]]/_admin/assets/script.js"></script>
 		<script src="[[/nino/dir]]/_admin/assets/dashboard.js"></script>

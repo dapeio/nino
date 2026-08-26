@@ -53,6 +53,7 @@ namespace Nino\Editor {
 			];
 			$appData['/nino/html/assets']['/_editor/.cache/script.js'] = [
 				'/_nino/Nino.js',
+				'/_nino/Nino.admin.js',
 				'/_editor/assets/script.js',
 				'/_editor/assets/html-editor.js',
 				'/_editor/assets/dashboard.js',
@@ -66,6 +67,7 @@ namespace Nino\Editor {
 			];
 			$appData['/nino/html/assets']['/_editor/.cache/login.js'] = [
 				'/_nino/Nino.js',
+				'/_nino/Nino.admin.js',
 				'/_editor/assets/login.js',
 			];
 

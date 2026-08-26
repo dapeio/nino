@@ -25,6 +25,7 @@
 			</form>
 		</div>
 		<script src="[[/nino/dir]]/_nino/Nino.js"></script>
+		<script src="[[/nino/dir]]/_nino/Nino.admin.js"></script>
 		<script src="[[/nino/dir]]/_admin/assets/script.js"></script>
 	</body>
 </html>

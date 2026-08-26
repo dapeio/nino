@@ -38,9 +38,20 @@
 		_designReady : false,
 		_designSettings : null,
 		_designStored : null,
+		// Which mode the example is shown in. Not a design setting - it is
+		// which half of a design that always has both halves is on screen
+		_mode : 'light',
+		_rowsBound : false,
+		PREVIEW_WIDTH : 1600,
+		_refit : null,
 		_designChoices : {},
 		_designBound : false,
 		_designTimer : null,
+		/*	The field elements the settings are rendered into, by key - the
+			knobs plus the two colour rows the template carries. Kept so a
+			value can be written back into its control without hunting for it,
+			and so every saved-value mark can be repainted in one pass	*/
+		_designFields : {},
 
 		init : function() {
 
@@ -60,6 +71,22 @@
 			const save = dc.getElementById('theme-action-save');
 			if( save !== null )
 				save.addEventListener( 'click', Nino.design._applyCurrent );
+
+			const revert = dc.getElementById('theme-action-revert');
+			if( revert !== null )
+				revert.addEventListener( 'click', Nino.design._revertDesign );
+
+			/*	The one loss this pane cannot undo afterwards. Everything else
+				it does is a request the operator can repeat; a closed tab with
+				unsaved settings in it is gone	*/
+			if( typeof wn.addEventListener === 'function' )
+				wn.addEventListener( 'beforeunload', function( event ) {
+					if( Nino.design._designChanges().length === 0 )
+						return;
+
+					event.preventDefault();
+					event.returnValue = '';
+				} );
 
 			let initial = 'theme';
 			if( typeof wn.URLSearchParams === 'function' ) {
@@ -91,7 +118,7 @@
 			Nino.design._updateAction();
 
 			if( tab === 'design' ) {
-				Nino.design._loadDesign();
+				Nino.design._loadDesign( false );
 				return;
 			}
 
@@ -101,12 +128,18 @@
 			} );
 		},
 
+		/**
+		 *	The previewed mode rides beside the settings rather than inside
+		 *	them: it is not a design value and must never reach a save, but the
+		 *	server has to know it to stamp the example's document
+		 */
 		_call : function( action, payload, callback ) {
 			Nino.http.sendRequest( '/_design/', 'POST', function( xhr ) {
 				callback( xhr.status, xhr.responseJSON );
 			}, {
 				action : action,
 				data : JSON.stringify( payload || {} ),
+				mode : Nino.design._mode,
 			} );
 		},
 
@@ -292,7 +325,31 @@
 			} );
 		},
 
-		_loadDesign : function() {
+		/**
+		 *	Read the stored Design, once.
+		 *
+		 *	Guarded the same way _loadAppearance() is, and for a reason this
+		 *	pane learned the hard way: it used to re-read on every visit, so
+		 *	opening Header to check something and coming back replaced whatever
+		 *	had been set here with the file on disk - without a word. A read is
+		 *	only owed when there is nothing in hand yet, or when something that
+		 *	rewrites the file server-side has just run.
+		 *
+		 *	@param		{boolean}	force			Re-read even if settings are held
+		 *
+		 *	@return		void
+		 */
+		_loadDesign : function( force ) {
+
+			if( force !== true && Nino.design._designReady === true ) {
+				// The panel was hidden while the window may have changed size,
+				// and a scaled frame only knows what its port measured last
+				if( typeof Nino.design._refit === 'function' )
+					Nino.design._refit();
+
+				Nino.design._updateAction();
+				return;
+			}
 
 			Nino.design._call( 'design/read', {}, function( status, response ) {
 
@@ -307,51 +364,93 @@
 				Nino.design._designChoices = response.choices || {};
 				Nino.design._designReady = true;
 				Nino.design._renderDesign( response );
-				Nino.design._updateAction();
+				Nino.design._markChanges();
 			} );
 		},
 
 		_renderDesign : function( response ) {
 
-			Object.keys( Nino.design._designChoices ).forEach( function( knob ) {
-				Nino.design._renderChoice( knob );
-			} );
+			Nino.design._designFields = {};
+			Nino.design._renderKnobs( response.groups || {} );
 
 			[ 'primary', 'secondary' ].forEach( Nino.design._bindColor );
 			Nino.design._designBound = true;
 			Nino.design._writeDesignInputs();
 
-			if( response.palette ) {
-				Nino.design._paintSurfaces( 'light', response.palette.light || {} );
-				Nino.design._paintSurfaces( 'dark', response.palette.dark || {} );
-			}
-			if( response.raster )
-				Nino.design._paintSizes( response.raster );
+			Nino.design._bindRows();
+			Nino.design._paintExample( response.example );
 		},
 
-		_renderChoice : function( knob ) {
+		/**
+		 *	Build one control per knob the server named, into the panel it
+		 *	named. Nothing here knows what a knob is called or how many there
+		 *	are - adding one is a change in /_design's Tokens and nothing else,
+		 *	which is the only way ten settings stay maintainable.
+		 *
+		 *	@param		{Object}	groups			group key -> heading
+		 *
+		 *	@return		void
+		 */
+		_renderKnobs : function( groups ) {
 
-			const select = dc.getElementById('theme-design-'+ knob);
-			if( select === null )
-				return;
-
-			select.innerHTML = '';
-			( Nino.design._designChoices[knob] || [] ).forEach( function( value ) {
-				const option = dc.createElement('option');
-				option.value = value;
-				option.textContent = value.charAt(0).toUpperCase()+ value.slice(1);
-				select.appendChild( option );
+			Object.keys( groups ).forEach( function( group ) {
+				const panel = dc.getElementById('theme-design-knobs-'+ group);
+				if( panel !== null )
+					panel.innerHTML = '';
 			} );
-			select.value = Nino.design._designSettings[knob] || '';
 
-			if( Nino.design._designBound === false )
-				select.addEventListener( 'change', function() {
-					Nino.design._designSettings[knob] = select.value;
-					Nino.design._scheduleDesignPreview();
+			Object.keys( Nino.design._designChoices ).forEach( function( knob ) {
+
+				const meta = Nino.design._designChoices[knob] || {};
+				const panel = dc.getElementById('theme-design-knobs-'+ ( meta.group || '' ));
+
+				if( panel === null )
+					return;
+
+				const field = Nino.adminUi.selectField( {
+					key       : knob,
+					className : 'theme-field',
+					label     : meta.label,
+					note      : meta.note,
+					hint      : meta.hint,
+					options   : Nino.design._knobOptions( meta ),
+					value     : Nino.design._designSettings[knob],
+					onChange  : function( value ) {
+						Nino.design._designSettings[knob] = parseInt( value, 10 );
+						Nino.design._changed();
+					},
 				} );
+
+				Nino.design._designFields[knob] = field;
+				panel.appendChild( field );
+			} );
+		},
+
+		/**
+		 *	One option per position: the number is what gets stored and the
+		 *	name is what the operator reads, so neither side has to translate
+		 *	the other's vocabulary
+		 *
+		 *	@param		{Object}	meta			{ min, max, steps }
+		 *
+		 *	@return		{Array}							[ { value, label } ]
+		 */
+		_knobOptions : function( meta ) {
+
+			const options = [];
+
+			for( let step = meta.min; step <= meta.max; step++ )
+				options.push( { value : step, label : ( meta.steps || [] )[step - meta.min] || String( step ) } );
+
+			return options;
 		},
 
 		_bindColor : function( role ) {
+
+			// The two colour rows are markup rather than rendered, so they are
+			// registered here instead of at render time - the marks and the
+			// reset need the same handle on them the knobs hand over themselves
+			Nino.design._designFields[role] = dc.getElementById('theme-design-'+ role+ '-field');
 
 			if( Nino.design._designBound === true )
 				return;
@@ -364,23 +463,74 @@
 			swatch.addEventListener( 'input', function() {
 				Nino.design._designSettings[role] = swatch.value;
 				hex.value = swatch.value;
-				Nino.design._scheduleDesignPreview();
+				Nino.design._hexState( hex, true );
+				Nino.design._changed();
 			} );
 
 			hex.addEventListener( 'input', function() {
 				const value = hex.value.trim();
 				if( value === '' && role === 'secondary' ) {
+					Nino.design._hexState( hex, true );
 					Nino.design._designSettings[role] = '';
-					Nino.design._scheduleDesignPreview();
+					Nino.design._changed();
 					return;
 				}
-				if( /^#[0-9a-fA-F]{6}$/.test( value ) === false )
-					return;
 
+				/*	A half-typed colour is not a colour, so it cannot be sent -
+					but silence at that point reads as "accepted", and the
+					operator walks away from a field showing something the
+					design does not have. It says so instead	*/
+				if( /^#[0-9a-fA-F]{6}$/.test( value ) === false ) {
+					Nino.design._hexState( hex, false );
+					return;
+				}
+
+				Nino.design._hexState( hex, true );
 				Nino.design._designSettings[role] = value.toLowerCase();
 				swatch.value = value;
-				Nino.design._scheduleDesignPreview();
+				Nino.design._changed();
 			} );
+
+			// Leaving an incomplete value behind would leave the field lying
+			// about the setting for as long as the pane is open
+			hex.addEventListener( 'blur', function() {
+
+				const held = Nino.design._designSettings === null ? '' : ( Nino.design._designSettings[role] || '' );
+
+				if( hex.value.trim() === held )
+					return;
+
+				hex.value = held;
+				Nino.design._hexState( hex, true );
+			} );
+		},
+
+		/**
+		 *	Say whether a colour field holds a colour.
+		 *
+		 *	Never on the class alone: aria-invalid is what a screen reader
+		 *	reads, and the sentence in the action bar is what says why - a red
+		 *	border on its own is a colour telling a colour-blind operator that
+		 *	their colour is wrong.
+		 *
+		 *	@param		{Element}	input			The hex field
+		 *	@param		{boolean}	valid			Whether it holds a full #rrggbb
+		 *
+		 *	@return		void
+		 */
+		_hexState : function( input, valid ) {
+
+			const was = input.getAttribute('aria-invalid') === 'true';
+			const now = valid !== true;
+
+			// The attribute is the state and the styling hook both - a class
+			// beside it would be a second place to keep the same fact
+			input.setAttribute( 'aria-invalid', now === true ? 'true' : 'false' );
+
+			if( now === was )
+				return;
+
+			Nino.design._setStatus( 'design', now === true ? 'A colour needs a full #rrggbb - this one is kept out of the design until it is.' : '', now );
 		},
 
 		_writeDesignInputs : function() {
@@ -390,9 +540,121 @@
 				const hex = dc.getElementById('theme-design-'+ role+ '-hex');
 				const value = Nino.design._designSettings[role] || '';
 
-				if( hex !== null ) hex.value = value;
+				if( hex !== null ) {
+					hex.value = value;
+					Nino.design._hexState( hex, true );
+				}
 				if( swatch !== null ) swatch.value = value || Nino.design._designSettings.primary || '#000000';
 			} );
+
+			/*	The knobs are written back too: a reset moves values the
+				operator changed, and a select does not read its own model.
+
+				Over the choices rather than over every field, because a label
+				hands out its own .control - and for the two colour rows that
+				is the swatch, which is not the thing being written here	*/
+			Object.keys( Nino.design._designChoices ).forEach( function( knob ) {
+
+				const field = Nino.design._designFields[knob];
+
+				if( field !== null && typeof field !== 'undefined' && field.control !== null && typeof field.control !== 'undefined' )
+					field.control.value = String( Nino.design._designSettings[knob] );
+			} );
+		},
+
+		/**
+		 *	Which settings differ from the ones on disk.
+		 *
+		 *	Compared as text rather than by identity: a knob comes back from a
+		 *	select as a number and a colour as a string, and "3" and 3 are the
+		 *	same decision however the control that produced it feels about it.
+		 *
+		 *	@return		{Array}						The keys that differ
+		 */
+		_designChanges : function() {
+
+			const changed = [];
+
+			if( Nino.design._designSettings === null || Nino.design._designStored === null )
+				return changed;
+
+			Object.keys( Nino.design._designSettings ).forEach( function( key ) {
+				if( String( Nino.design._designSettings[key] ) !== String( Nino.design._designStored[key] ) )
+					changed.push( key );
+			} );
+
+			return changed;
+		},
+
+		/**
+		 *	What a setting was before it was touched, in the words its control
+		 *	uses - the position's name for a knob, the colour for a colour
+		 *
+		 *	@param		{string}	key				A settings key
+		 *
+		 *	@return		{string}
+		 */
+		_savedLabel : function( key ) {
+
+			const saved = Nino.design._designStored[key];
+			const meta = Nino.design._designChoices[key];
+
+			if( meta !== null && typeof meta !== 'undefined' )
+				return ( meta.steps || [] )[saved - meta.min] || String( saved );
+
+			return saved === '' || saved === null || typeof saved === 'undefined' ? 'none' : String( saved );
+		},
+
+		/**
+		 *	Repaint the saved-value marks and the action bar from the current
+		 *	comparison. One pass over every field, so a mark is never left
+		 *	behind on a setting that has been put back where it was
+		 *
+		 *	@return		void
+		 */
+		_markChanges : function() {
+
+			const changed = Nino.design._designChanges();
+
+			Object.keys( Nino.design._designFields ).forEach( function( key ) {
+				Nino.adminUi.fieldChange( Nino.design._designFields[key],
+					changed.indexOf( key ) === -1 ? '' : 'saved: '+ Nino.design._savedLabel( key ) );
+			} );
+
+			Nino.design._updateAction();
+		},
+
+		/**
+		 *	One setting moved: say so, and ask for the picture it produces
+		 *
+		 *	@return		void
+		 */
+		_changed : function() {
+			Nino.design._markChanges();
+			Nino.design._scheduleDesignPreview();
+		},
+
+		/**
+		 *	Put every setting back to the one on disk.
+		 *
+		 *	The other half of a dirty state: knowing something is unsaved is
+		 *	only useful next to a way back that does not mean remembering ten
+		 *	positions by hand
+		 *
+		 *	@return		void
+		 */
+		_revertDesign : function() {
+
+			if( Nino.design._designReady !== true || Nino.design._designStored === null )
+				return;
+
+			if( Nino.design._designChanges().length === 0 )
+				return;
+
+			Nino.design._designSettings = Nino.design._clone( Nino.design._designStored );
+			Nino.design._writeDesignInputs();
+			Nino.design._setStatus( 'design', 'Back to the saved Design.', false );
+			Nino.design._changed();
 		},
 
 		_scheduleDesignPreview : function() {
@@ -406,89 +668,97 @@
 					if( status !== 200 || response === null )
 						return;
 
-					if( response.palette ) {
-						Nino.design._paintSurfaces( 'light', response.palette.light || {} );
-						Nino.design._paintSurfaces( 'dark', response.palette.dark || {} );
-					}
-					if( response.raster ) Nino.design._paintSizes( response.raster );
+					Nino.design._paintExample( response.example );
 				} );
 			}, 150 );
 		},
 
-		_paintSurfaces : function( mode, palette ) {
+		/**
+		 *	Show the page these settings produce.
+		 *
+		 *	The server builds the document because it is the only side that has
+		 *	the pieces: the framework stylesheet, the generated tokens for
+		 *	settings that are not stored yet, and whatever the project itself has
+		 *	bundled. srcdoc rather than a src, so nothing is written to disk to
+		 *	preview something the operator may not keep.
+		 *
+		 *	@param		{string}	html			A complete document
+		 *
+		 *	@return		void
+		 */
+		_paintExample : function( html ) {
 
-			const wrap = dc.getElementById('theme-design-preview-'+ mode);
-			if( wrap === null )
+			const frame = dc.getElementById('theme-design-example');
+
+			if( frame === null || typeof html !== 'string' || html === '' )
 				return;
 
-			wrap.innerHTML = '';
-			Object.keys( palette ).forEach( function( surface ) {
-				const values = palette[surface] || {};
-				const chip = dc.createElement('span');
-				chip.className = 'theme-design-chip';
-				chip.style.backgroundColor = values.bg || 'transparent';
-				chip.style.color = values.on || 'inherit';
-				chip.style.borderColor = values.border || 'transparent';
-				chip.textContent = surface;
-				wrap.appendChild( chip );
-			} );
+			frame.srcdoc = html;
 		},
 
-		_paintSizes : function( raster ) {
+		/**
+		 *	The two button rows this pane has: which set of settings is on
+		 *	screen, and which mode the example is shown in.
+		 *
+		 *	Bound once. Both rows are markup rather than rendered, so a second
+		 *	call would stack a second listener on every button.
+		 *
+		 *	@return		void
+		 */
+		_bindRows : function() {
 
-			const wrapVolume = dc.getElementById('theme-design-volume-preview');
-			if( wrapVolume === null )
+			if( Nino.design._rowsBound === true )
 				return;
-			wrapVolume.innerHTML = '';
 
-			const type = dc.createElement('div');
-			type.className = 'theme-design-type';
-			type.style.lineHeight = raster.lineHeight || '1.5';
-			[ [ 6, 'Headline' ], [ 4, 'Subhead' ], [ 1, 'Body copy at its generated size' ] ].forEach( function( pair ) {
-				const line = dc.createElement('p');
-				line.className = 'theme-design-type-line';
-				line.style.fontSize = ( raster.text || {} )[pair[0]] || '1rem';
-				line.textContent = pair[1];
-				type.appendChild( line );
-			} );
-			wrapVolume.appendChild( type );
+			Nino.design._rowsBound = true;
 
-			const wrapSpacing = dc.getElementById('theme-design-spacing-preview');
-			if( wrapSpacing === null )
-				return;
-			wrapSpacing.innerHTML = '';
-			
-			const spacing = dc.createElement('div');
-			spacing.className = 'theme-design-spacing';
-			Object.keys( raster.space || {} ).forEach( function( step ) {
-				const row = dc.createElement('span');
-				row.className = 'theme-design-space-row';
-				const bar = dc.createElement('span');
-				bar.className = 'theme-design-space';
-				bar.style.width = raster.space[step];
-				const label = dc.createElement('small');
-				label.textContent = raster.space[step];
-				row.appendChild( bar );
-				row.appendChild( label );
-				spacing.appendChild( row );
-			} );
-			wrapSpacing.appendChild( spacing );
+			/*	Which settings are on screen. Hidden rather than unmounted, so
+				the panel the operator is not looking at keeps its controls,
+				their values and their listeners.
 
-			const wrapShaping = dc.getElementById('theme-design-shaping-preview');
-			if( wrapShaping === null )
-				return;
-			wrapShaping.innerHTML = '';
-			
-			const corners = dc.createElement('div');
-			corners.className = 'theme-design-corners';
-			Object.keys( raster.radius || {} ).forEach( function( step ) {
-				const corner = dc.createElement('span');
-				corner.className = 'theme-design-radius';
-				corner.style.borderRadius = raster.radius[step];
-				corner.title = 'radius-'+ step+ ': '+ raster.radius[step];
-				corners.appendChild( corner );
+				The opening state is set here rather than left to the template's
+				hidden attribute. The markup still carries it, so the panel is
+				right before this runs and right without javascript at all - but
+				two places deciding one thing is two places that can disagree,
+				and the one that loses is the one nobody looks at.	*/
+			const show = function( group ) {
+
+				[ 'colour', 'raster' ].forEach( function( candidate ) {
+
+					const panel = dc.getElementById('theme-design-panel-'+ candidate);
+
+					if( panel !== null )
+						panel.hidden = candidate !== group;
+				} );
+			};
+
+			Nino.adminUi.buttonRow( {
+				colour : dc.getElementById('theme-design-tab-colour'),
+				raster : dc.getElementById('theme-design-tab-raster'),
+			}, 'colour', show, 'aria-selected' );
+
+			show( 'colour' );
+
+			// Which mode the example is shown in. A server question: the frame is
+			// sandboxed, so it has an opaque origin and nothing out here can reach
+			// in to stamp data-nino-mode on it
+			/*	The page renders at a desktop's layout width and is scaled into
+				the panel. Without it the panel is narrower than the narrowest
+				content ceiling Width offers, so all three of its settings
+				produced the same picture	*/
+			const frame = dc.getElementById('theme-design-example');
+			const port = dc.getElementById('theme-design-example-port');
+
+			if( frame !== null && port !== null )
+				Nino.design._refit = Nino.adminUi.scaleFrame( frame, port, Nino.design.PREVIEW_WIDTH );
+
+			Nino.adminUi.buttonRow( {
+				light : dc.getElementById('theme-design-mode-light'),
+				dark : dc.getElementById('theme-design-mode-dark'),
+			}, Nino.design._mode, function( mode ) {
+				Nino.design._mode = mode;
+				Nino.design._scheduleDesignPreview();
 			} );
-			wrapShaping.appendChild( corners );
 		},
 
 		_applyCurrent : function() {
@@ -502,6 +772,15 @@
 		_applyTheme : function() {
 
 			if( Nino.design._appearanceReady !== true || Nino.design._selectedTheme === null )
+				return;
+
+			/*	A theme apply writes the design its manifest declares, so
+				anything set in the Design pane and not saved is about to be
+				overwritten on disk. The one place in this tool where a loss is
+				unavoidable is the one place it has to be asked about	*/
+			if( Nino.design._designChanges().length > 0
+				&& typeof wn.confirm === 'function'
+				&& wn.confirm( 'Applying a Theme replaces the Design with the one it declares. Discard the unsaved design changes?' ) === false )
 				return;
 
 			Nino.design._setBusy( true );
@@ -542,6 +821,7 @@
 				Nino.design._designStored = Nino.design._clone( Nino.design._designSettings );
 				Nino.design._writeDesignInputs();
 				Nino.design._setStatus( 'design', 'Design written.', false );
+				Nino.design._markChanges();
 			} );
 		},
 
@@ -578,12 +858,27 @@
 
 			const status = dc.getElementById('theme-action-status');
 			const save = dc.getElementById('theme-action-save');
+			const revert = dc.getElementById('theme-action-revert');
 			const tab = Nino.design._tab;
+			const changed = tab === 'design' && Nino.design._designReady === true ? Nino.design._designChanges().length : 0;
 
 			if( status !== null ) {
-				status.textContent = Nino.design._messages[tab] || '';
+				/*	The count outranks the last thing that happened, because
+					it is the thing that is still true: "Design written." beside
+					three moved settings is a sentence about the past	*/
+				const dirty = changed > 0 && Nino.design._errors[tab] !== true;
+
+				status.textContent = dirty === true
+					? ( changed === 1 ? '1 unsaved design change' : changed+ ' unsaved design changes' )
+					: ( Nino.design._messages[tab] || '' );
 				status.classList.toggle( 'theme-status-error', Nino.design._errors[tab] === true );
+				status.classList.toggle( 'theme-status-dirty', dirty );
 			}
+
+			// Shown only where it means something, which is the one pane that
+			// has something of its own to lose
+			if( revert !== null )
+				revert.hidden = changed === 0;
 
 			if( save === null )
 				return;
@@ -592,7 +887,9 @@
 			if( tab === 'theme' )
 				save.disabled = Nino.design._appearanceReady !== true || Nino.design._selectedTheme === null;
 			else if( tab === 'design' )
-				save.disabled = Nino.design._designReady !== true;
+				// Nothing moved is nothing to write - and a Save that is live
+				// when there is nothing to save is a Save nobody reads
+				save.disabled = Nino.design._designReady !== true || changed === 0;
 			else {
 				const select = dc.getElementById('theme-frame-'+ tab);
 				save.disabled = Nino.design._appearanceReady !== true || select === null || select.value === '';
@@ -602,6 +899,11 @@
 		_setBusy : function( busy ) {
 			const save = dc.getElementById('theme-action-save');
 			if( save !== null ) save.disabled = busy === true;
+
+			// Both ways out of an unsaved state, not just the one: a revert
+			// landing mid-write would race the answer it is reverting from
+			const revert = dc.getElementById('theme-action-revert');
+			if( revert !== null ) revert.disabled = busy === true;
 		},
 
 		_errorText : function( status, response ) {

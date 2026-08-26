@@ -35,12 +35,12 @@
 	<rect x="408" y="292" width="112" height="6" rx="3" fill="#0b0e0d" opacity=".45"/>
 
 	<!-- footer (v5) -->
-	<rect x="0" y="332" width="600" height="68" fill="#2b2f2d"/>
-	<rect x="24" y="352" width="70" height="10" rx="6" fill="#939594"/>
-	<g fill="#939594" opacity=".8">
+	<rect x="0" y="332" width="600" height="68" fill="#e2f6ec"/>
+	<rect x="24" y="352" width="70" height="10" rx="6" fill="#6a6f6d"/>
+	<g fill="#6a6f6d" opacity=".8">
 		<rect x="404" y="354" width="42" height="6" rx="3"/>
 		<rect x="458" y="354" width="42" height="6" rx="3"/>
 		<rect x="512" y="354" width="42" height="6" rx="3"/>
 	</g>
-	<rect x="24" y="378" width="180" height="5" rx="3" fill="#939594" opacity=".6"/>
+	<rect x="24" y="378" width="180" height="5" rx="3" fill="#6a6f6d" opacity=".6"/>
 </svg>

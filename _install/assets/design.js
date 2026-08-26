@@ -39,8 +39,24 @@
 		// rendering controls that would post into nothing
 		_settings : null,
 		_choices 	: {},
+		_groups 	: {},
+		// Which half of the design is on screen. Not a design setting, so it
+		// never reaches _settings and never reaches the config
+		_mode 		: 'light',
+		_rowsBound	: false,
+		PREVIEW_WIDTH : 2400,
+		_refit : null,
+		_example 	: '',
 		_bound 		: false,
 		_timer 		: null,
+		// What the theme declared, kept beside what is on screen: the two are
+		// what "changed" means in a wizard that has not written anything yet
+		_baseline : null,
+		// The theme the baseline was read for. A re-read is owed when that
+		// changes and at no other time - see showCurrent()
+		_theme 		: null,
+		// The field elements the settings are rendered into, by key
+		_fields 	: {},
 
 		/**
 		 *	Read what the previous step installed and render the controls on it
@@ -53,27 +69,67 @@
 			if( wrap === null )
 				return;
 
+			const previous = Nino.install.design._theme;
+
 			Nino.install.apiCall( 'design/read', {}, function( status, response ) {
 
 				if( status !== 200 || response === null )
 					return Nino.install.showError( wrap, status, response );
 
 				Nino.install.design._settings = response.settings || null;
+				Nino.install.design._baseline = response.settings ? JSON.parse( JSON.stringify( response.settings ) ) : null;
 				Nino.install.design._choices 	= response.choices || {};
+				Nino.install.design._groups 	= response.groups || {};
+				Nino.install.design._example 	= response.example || '';
+				Nino.install.design._theme 		= Nino.install.design._selectedTheme();
 				Nino.install.design._ready 		= true;
 
 				Nino.install.design._render();
+
+				// A reload the operator did not ask for is a reload they get
+				// told about - it is their own values that were replaced
+				const msg = dc.getElementById('design-msg');
+				if( msg !== null && previous !== null && previous !== Nino.install.design._theme )
+					msg.textContent = 'The theme changed, so these values were read from it again.';
 			} );
 		},
 
 		/**
-		 *	Re-read on every visit rather than once: the operator may have gone
-		 *	back and picked a different theme, and this step's whole starting
-		 *	point is what that theme declared
+		 *	Which theme the previous step has settled on, or null where the
+		 *	step is not there to ask
+		 *
+		 *	@return		{?string}
+		 */
+		_selectedTheme : function() {
+
+			const themes = wn.Nino.install.themes;
+
+			return themes && typeof themes._selected !== 'undefined' ? themes._selected : null;
+		},
+
+		/**
+		 *	Re-read when the theme changed, and only then.
+		 *
+		 *	This step's starting point is what the theme declared, so a trip
+		 *	back to pick a different one has to be followed here. It used to
+		 *	re-read on every visit for that reason - which also meant a trip
+		 *	back to correct a typo two steps earlier threw away every setting
+		 *	made here, without a word. The theme is the thing that changed the
+		 *	answer, so the theme is what the re-read hangs on.
 		 *
 		 *	@return		void
 		 */
 		showCurrent : function() {
+
+			if( Nino.install.design._ready === true && Nino.install.design._selectedTheme() === Nino.install.design._theme ) {
+				// The step was off screen while the window may have changed
+				// size, and a scaled frame only knows what its port measured
+				if( typeof Nino.install.design._refit === 'function' )
+					Nino.install.design._refit();
+
+				return;
+			}
+
 			Nino.install.design.init();
 		},
 
@@ -94,53 +150,81 @@
 
 			controls.classList.remove('install-hidden');
 
-			Object.keys( Nino.install.design._choices ).forEach( function( knob ) {
-				Nino.install.design._renderChoice( knob );
-			} );
+			Nino.install.design._fields = {};
+			Nino.install.design._renderKnobs();
 
 			[ 'primary', 'secondary' ].forEach( function( role ) {
 				Nino.install.design._bindColor( role );
 			} );
 
+			Nino.install.design._bindRows();
 			Nino.install.design._bound = true;
 			Nino.install.design._writeInputs();
-			Nino.install.design._schedulePreview();
+			Nino.install.design._markChanges();
+			Nino.install.design._paintExample( Nino.install.design._example );
 		},
 
 		/**
-		 *	One select, filled from the server's vocabulary. Every knob the
-		 *	server names gets its control here if the markup has one, so
-		 *	adding a knob is a change in /_design plus one <select> - not a
-		 *	second list to keep in step
+		 *	One control per knob the server named, in the panel it named.
 		 *
-		 *	@param		{string}	knob
+		 *	Nothing here knows what a knob is called or how many there are, so
+		 *	a knob added to /_design's Tokens appears in this step without the
+		 *	wizard template gaining a line - which is what keeps the installer
+		 *	and /_design showing the same set rather than drifting apart.
 		 *
 		 *	@return		void
 		 */
-		_renderChoice : function( knob ) {
+		_renderKnobs : function() {
 
-			const select = dc.getElementById('themes-design-'+ knob);
-			if( select === null )
-				return;
-
-			select.innerHTML = '';
-
-			( Nino.install.design._choices[knob] || [] ).forEach( function( value ) {
-				const option = dc.createElement('option');
-				option.value = value;
-				option.textContent = value.charAt(0).toUpperCase()+ value.slice(1);
-				select.appendChild( option );
+			Object.keys( Nino.install.design._groups ).forEach( function( group ) {
+				const panel = dc.getElementById('themes-design-knobs-'+ group);
+				if( panel !== null )
+					panel.innerHTML = '';
 			} );
 
-			select.value = Nino.install.design._settings[knob] || '';
+			Object.keys( Nino.install.design._choices ).forEach( function( knob ) {
 
-			if( Nino.install.design._bound === true )
-				return;
+				const meta = Nino.install.design._choices[knob] || {};
+				const panel = dc.getElementById('themes-design-knobs-'+ ( meta.group || '' ));
 
-			select.addEventListener( 'change', function() {
-				Nino.install.design._settings[knob] = select.value;
-				Nino.install.design._schedulePreview();
+				if( panel === null )
+					return;
+
+				const field = Nino.adminUi.selectField( {
+					key       : knob,
+					className : 'install-theme-field',
+					label     : meta.label,
+					note      : meta.note,
+					hint      : meta.hint,
+					options   : Nino.install.design._knobOptions( meta ),
+					value     : Nino.install.design._settings[knob],
+					onChange  : function( value ) {
+						Nino.install.design._settings[knob] = parseInt( value, 10 );
+						Nino.install.design._changed();
+					},
+				} );
+
+				Nino.install.design._fields[knob] = field;
+				panel.appendChild( field );
 			} );
+		},
+
+		/**
+		 *	One option per position: the number is what gets stored and the
+		 *	name is what the operator reads
+		 *
+		 *	@param		{Object}	meta			{ min, max, steps }
+		 *
+		 *	@return		{Array}							[ { value, label } ]
+		 */
+		_knobOptions : function( meta ) {
+
+			const options = [];
+
+			for( let step = meta.min; step <= meta.max; step++ )
+				options.push( { value : step, label : ( meta.steps || [] )[step - meta.min] || String( step ) } );
+
+			return options;
 		},
 
 		/**
@@ -156,6 +240,10 @@
 		 */
 		_bindColor : function( role ) {
 
+			// The colour rows are markup rather than rendered, so they are
+			// registered here rather than at render time
+			Nino.install.design._fields[role] = dc.getElementById('themes-design-'+ role+ '-field');
+
 			if( Nino.install.design._bound === true )
 				return;
 
@@ -168,7 +256,8 @@
 			swatch.addEventListener( 'input', function() {
 				Nino.install.design._settings[role] = swatch.value;
 				hex.value = swatch.value;
-				Nino.install.design._schedulePreview();
+				Nino.install.design._hexState( hex, true );
+				Nino.install.design._changed();
 			} );
 
 			hex.addEventListener( 'input', function() {
@@ -178,18 +267,70 @@
 				// Secondary is legitimately empty - it then follows Primary,
 				// which is a different thing from "not filled in yet"
 				if( value === '' && role === 'secondary' ) {
+					Nino.install.design._hexState( hex, true );
 					Nino.install.design._settings[role] = '';
-					Nino.install.design._schedulePreview();
+					Nino.install.design._changed();
 					return;
 				}
 
-				if( /^#[0-9a-fA-F]{6}$/.test( value ) === false )
+				/*	Half a colour cannot be sent - but saying nothing about it
+					reads as "accepted", and the field is left showing a value
+					the design does not have	*/
+				if( /^#[0-9a-fA-F]{6}$/.test( value ) === false ) {
+					Nino.install.design._hexState( hex, false );
 					return;
+				}
 
+				Nino.install.design._hexState( hex, true );
 				Nino.install.design._settings[role] = value.toLowerCase();
 				swatch.value = value;
-				Nino.install.design._schedulePreview();
+				Nino.install.design._changed();
 			} );
+
+			// Leaving an incomplete value behind would leave the field lying
+			// about the setting for as long as the step is open
+			hex.addEventListener( 'blur', function() {
+
+				const held = Nino.install.design._settings === null ? '' : ( Nino.install.design._settings[role] || '' );
+
+				if( hex.value.trim() === held )
+					return;
+
+				hex.value = held;
+				Nino.install.design._hexState( hex, true );
+			} );
+		},
+
+		/**
+		 *	Say whether a colour field holds a colour - in the field for the
+		 *	eye, in aria-invalid for a screen reader, and in words beneath,
+		 *	because a red border alone is a colour telling a colour-blind
+		 *	operator that their colour is wrong
+		 *
+		 *	@param		{Element}	input			The hex field
+		 *	@param		{boolean}	valid			Whether it holds a full #rrggbb
+		 *
+		 *	@return		void
+		 */
+		_hexState : function( input, valid ) {
+
+			const was = input.getAttribute('aria-invalid') === 'true';
+			const now = valid !== true;
+
+			// The attribute is the state and the styling hook both - a class
+			// beside it would be a second place to keep the same fact
+			input.setAttribute( 'aria-invalid', now === true ? 'true' : 'false' );
+
+			if( now === was )
+				return;
+
+			const msg = dc.getElementById('design-msg');
+
+			if( msg === null )
+				return;
+
+			msg.textContent = now === true ? 'A colour needs a full #rrggbb - this one is kept out of the design until it is.' : '';
+			msg.classList.toggle( 'is-error', now );
 		},
 
 		/**
@@ -210,14 +351,126 @@
 				const hex 	 = dc.getElementById('themes-design-'+ role+ '-hex');
 				const value  = Nino.install.design._settings[role] || '';
 
-				if( hex !== null )
+				if( hex !== null ) {
 					hex.value = value;
+					Nino.install.design._hexState( hex, true );
+				}
 
 				// A colour input has no empty state, so an unset Secondary
 				// shows the colour it would fall back to rather than black
 				if( swatch !== null )
 					swatch.value = value !== '' ? value : ( Nino.install.design._settings.primary || '#000000' );
 			} );
+
+			/*	The knobs too, for the reset - a select does not read its own
+				model. Over the choices rather than over every field: a label
+				hands out its own .control, and for the colour rows that is the
+				swatch, which is not what is being written here	*/
+			Object.keys( Nino.install.design._choices ).forEach( function( knob ) {
+
+				const field = Nino.install.design._fields[knob];
+
+				if( field !== null && typeof field !== 'undefined' && field.control !== null && typeof field.control !== 'undefined' )
+					field.control.value = String( Nino.install.design._settings[knob] );
+			} );
+		},
+
+		/**
+		 *	Which settings differ from the ones the theme declared.
+		 *
+		 *	Compared as text: a knob comes back from a select as a number and a
+		 *	colour as a string, and "3" and 3 are the same decision however the
+		 *	control that produced it feels about it
+		 *
+		 *	@return		{Array}						The keys that differ
+		 */
+		_changes : function() {
+
+			const changed = [];
+
+			if( Nino.install.design._settings === null || Nino.install.design._baseline === null )
+				return changed;
+
+			Object.keys( Nino.install.design._settings ).forEach( function( key ) {
+				if( String( Nino.install.design._settings[key] ) !== String( Nino.install.design._baseline[key] ) )
+					changed.push( key );
+			} );
+
+			return changed;
+		},
+
+		/**
+		 *	What a setting was when the theme handed it over, in the words its
+		 *	own control uses
+		 *
+		 *	@param		{string}	key				A settings key
+		 *
+		 *	@return		{string}
+		 */
+		_baseLabel : function( key ) {
+
+			const base = Nino.install.design._baseline[key];
+			const meta = Nino.install.design._choices[key];
+
+			if( meta !== null && typeof meta !== 'undefined' )
+				return ( meta.steps || [] )[base - meta.min] || String( base );
+
+			return base === '' || base === null || typeof base === 'undefined' ? 'none' : String( base );
+		},
+
+		/**
+		 *	Repaint the marks and the reset button from the current comparison.
+		 *
+		 *	Nothing is written until Next, so there is no "saved" to compare
+		 *	against here - the theme's own values are the position the operator
+		 *	started from and the one they can ask to be put back
+		 *
+		 *	@return		void
+		 */
+		_markChanges : function() {
+
+			const changed = Nino.install.design._changes();
+
+			Object.keys( Nino.install.design._fields ).forEach( function( key ) {
+				Nino.adminUi.fieldChange( Nino.install.design._fields[key],
+					changed.indexOf( key ) === -1 ? '' : 'nino-admin-changed' );
+			} );
+
+			const reset = dc.getElementById('design-reset');
+
+			if( reset !== null )
+				reset.hidden = changed.length === 0;
+		},
+
+		/**
+		 *	One setting moved: say so, and ask for the picture it produces
+		 *
+		 *	@return		void
+		 */
+		_changed : function() {
+			Nino.install.design._markChanges();
+			Nino.install.design._schedulePreview();
+		},
+
+		/**
+		 *	Put every setting back where the theme had it
+		 *
+		 *	@return		void
+		 */
+		_reset : function() {
+
+			if( Nino.install.design._baseline === null || Nino.install.design._changes().length === 0 )
+				return;
+
+			Nino.install.design._settings = JSON.parse( JSON.stringify( Nino.install.design._baseline ) );
+			Nino.install.design._writeInputs();
+
+			const msg = dc.getElementById('design-msg');
+
+			if( msg !== null )
+				msg.textContent = 'Back to the theme\u2019s own values.';
+
+			Nino.install.design._changed();
 		},
 
 		/**
@@ -243,132 +496,102 @@
 					if( status !== 200 || response === null )
 						return;
 
-					if( response.palette )
-						Nino.install.design._paintSurfaces( response.palette.light || {} );
-
-					if( response.raster )
-						Nino.install.design._paintSizes( response.raster );
-				} );
+					Nino.install.design._paintExample( response.example );
+				}, { mode : Nino.install.design._mode } );
 			}, 150 );
 		},
 
 		/**
-		 *	One chip per surface, each showing the pair it really is - the
-		 *	generated background with the generated text colour on it. A row
-		 *	of backgrounds alone would look fine in every setting, including
-		 *	the ones that fail
+		 *	Show the page these settings produce.
 		 *
-		 *	@param		{Object}	palette			surface -> { bg, on, ... }
+		 *	The document is built by /_design - one answer to "what does this
+		 *	look like", borrowed rather than reimplemented here. srcdoc rather
+		 *	than a src, so nothing is written to disk to preview something the
+		 *	operator has not pressed Next on yet.
+		 *
+		 *	@param		{string}	html			A complete document
 		 *
 		 *	@return		void
 		 */
-		_paintSurfaces : function( palette ) {
+		_paintExample : function( html ) {
 
-			const strip = dc.getElementById('themes-design-preview');
-			if( strip === null )
+			const frame = dc.getElementById('themes-design-example');
+
+			if( frame === null || typeof html !== 'string' || html === '' )
 				return;
 
-			strip.innerHTML = '';
-
-			Object.keys( palette ).forEach( function( surface ) {
-
-				const values = palette[surface] || {};
-				const chip 	 = dc.createElement('span');
-
-				chip.className = 'install-theme-chip';
-				chip.style.backgroundColor = values.bg || 'transparent';
-				chip.style.color = values.on || 'inherit';
-				chip.style.borderColor = values.border || 'transparent';
-				chip.textContent = surface;
-
-				strip.appendChild( chip );
-			} );
+			frame.srcdoc = html;
 		},
 
 		/**
-		 *	The size raster, drawn at the sizes it really produces. Listing the
-		 *	rem values would be quicker to build and useless to look at - what
-		 *	a scale does is only visible as type next to type.
+		 *	The two button rows this step has: which set of settings is on
+		 *	screen, and which mode the example is shown in.
 		 *
-		 *	@param		{Object}	raster			{ text, space, radius, lineHeight }
+		 *	Bound once. The step is re-entered on every visit and both rows are
+		 *	markup rather than rendered, so a second call would stack a second
+		 *	listener on every button.
 		 *
 		 *	@return		void
 		 */
-		_paintSizes : function( raster ) {
+		_bindRows : function() {
 
-			const wrapVolume = dc.getElementById('themes-design-volume-preview');
-			if( wrapVolume === null )
+			if( Nino.install.design._rowsBound === true )
 				return;
 
-			wrapVolume.innerHTML = '';
+			Nino.install.design._rowsBound = true;
 
-			// Type: the two ends of the scale plus body copy, which is the one
-			// step a reader actually spends time in
-			const type = dc.createElement('div');
-			type.className = 'install-design-type';
-			type.style.lineHeight = raster.lineHeight || '1.5';
+			/*	Which settings are on screen. Hidden rather than unmounted, so
+				the panel the operator is not looking at keeps its controls,
+				their values and their listeners.
 
-			[ [ 6, 'Headline' ], [ 4, 'Subhead' ], [ 1, 'Body copy at its generated size' ] ].forEach( function( pair ) {
-				const line = dc.createElement('p');
-				line.className = 'install-design-type-line';
-				line.style.fontSize = ( raster.text || {} )[pair[0]] || '1rem';
-				line.textContent = pair[1];
-				type.appendChild( line );
+				The opening state is set here rather than left to the template's
+				hidden attribute. The markup still carries it, so the panel is
+				right before this runs and right without javascript at all - but
+				two places deciding one thing is two places that can disagree,
+				and the one that loses is the one nobody looks at.	*/
+			const show = function( group ) {
+
+				[ 'colour', 'raster' ].forEach( function( candidate ) {
+
+					const panel = dc.getElementById('themes-design-panel-'+ candidate);
+
+					if( panel !== null )
+						panel.hidden = candidate !== group;
+				} );
+			};
+
+			Nino.adminUi.buttonRow( {
+				colour : dc.getElementById('themes-design-tab-colour'),
+				raster : dc.getElementById('themes-design-tab-raster'),
+			}, 'colour', show, 'aria-selected' );
+
+			show( 'colour' );
+
+			// Which mode the example is shown in. A server question: the frame is
+			// sandboxed, so it has an opaque origin and nothing out here can reach
+			// in to stamp data-nino-mode on it
+			/*	The page renders at a desktop's layout width and is scaled into
+				the panel. Without it the panel is narrower than the narrowest
+				content ceiling Width offers, so all three of its settings
+				produced the same picture	*/
+			const frame = dc.getElementById('themes-design-example');
+			const port = dc.getElementById('themes-design-example-port');
+
+			if( frame !== null && port !== null )
+				Nino.install.design._refit = Nino.adminUi.scaleFrame( frame, port, Nino.install.design.PREVIEW_WIDTH );
+
+			Nino.adminUi.buttonRow( {
+				light : dc.getElementById('themes-design-mode-light'),
+				dark : dc.getElementById('themes-design-mode-dark'),
+			}, Nino.install.design._mode, function( mode ) {
+				Nino.install.design._mode = mode;
+				Nino.install.design._schedulePreview();
 			} );
 
-			wrapVolume.appendChild( type );
+			const reset = dc.getElementById('design-reset');
 
-			// One bar per spacing step, at a fixed height: a gap is a distance,
-			// not an area, and drawing it square makes the top of the scale
-			// three times taller than anything it is telling you
-
-			const wrapSpacing = dc.getElementById('themes-design-spacing-preview');
-			if( wrapSpacing === null )
-				return;
-
-			wrapSpacing.innerHTML = '';
-
-			const spacing = dc.createElement('div');
-			spacing.className = 'install-design-spacing';
-
-			Object.keys( raster.space || {} ).forEach( function( step ) {
-
-				const row = dc.createElement('span');
-				row.className = 'install-design-space-row';
-
-				const bar = dc.createElement('span');
-				bar.className = 'install-design-space';
-				bar.style.width = raster.space[step];
-
-				const label = dc.createElement('small');
-				label.textContent = raster.space[step];
-
-				row.appendChild( bar );
-				row.appendChild( label );
-				spacing.appendChild( row );
-			} );
-
-			wrapSpacing.appendChild( spacing );
-
-			// Radii are areas, so these stay boxes - a corner only reads
-			// against the two edges it joins
-			const wrapShaping = dc.getElementById('themes-design-shaping-preview');
-			if( wrapShaping === null )
-				return;
-
-			wrapShaping.innerHTML = '';
-			const corners = dc.createElement('div');
-			corners.className = 'install-design-corners';
-
-			Object.keys( raster.radius || {} ).forEach( function( step ) {
-				const corner = dc.createElement('span');
-				corner.className = 'install-design-radius';
-				corner.style.borderRadius = raster.radius[step];
-				corner.title = 'radius-'+ step+ ': '+ raster.radius[step];
-				corners.appendChild( corner );
-			} );
-
-			wrapShaping.appendChild( corners );
+			if( reset !== null )
+				reset.addEventListener( 'click', Nino.install.design._reset );
 		},
 
 		/**

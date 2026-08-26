@@ -20,7 +20,7 @@
 	<text x="224" y="188" font-family="system-ui, sans-serif" font-size="13" font-weight="600" fill="#3b568e" text-anchor="middle">Learn more</text>
 
 	<!-- alternating section -->
-	<rect x="0" y="224" width="600" height="108" fill="#eff4fc"/>
+	<rect x="0" y="224" width="600" height="108" fill="#e9f1ff"/>
 	<rect x="24" y="244" width="168" height="68" rx="0.8" fill="#0c0d10" opacity=".08"/>
 	<rect x="40" y="260" width="102" height="9" rx="0.8" fill="#0c0d10" opacity=".85"/>
 	<rect x="40" y="280" width="136" height="6" rx="0.8" fill="#0c0d10" opacity=".45"/>

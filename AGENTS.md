@@ -107,8 +107,9 @@ Important source directories:
 | `_nino/Nino.php` | Kernel and public core APIs |
 | `_nino/Nino/Modules/<Name>/<Name>.php` | Built-in runtime modules |
 | `app/<Namespace>/<Class>/<Class>.php` | Project-owned PHP classes and runtime modules; defaults to this root unless `NINO_APP_DIR` is defined before loading the kernel |
-| `_nino/Nino.js` | Shared browser helpers |
+| `_nino/Nino.js` | Shared browser helpers, tool frontends and public site alike - so it is in the public script bundle, and anything only one audience needs belongs beside it rather than in it |
 | `_nino/Nino.admin.css` | Shared management-interface design |
+| `_nino/Nino.admin.js` | The behaviour half of that design system: `Nino.adminUi`'s DOM primitives and the pure table model. Loaded after `Nino.js`, by the tool frontends only |
 | `_admin/Admin.php` | All `\Nino\Admin\*` backend classes |
 | `public/` | The project's public half — everything a browser loads directly: `images/`, `assets/`, `favicon/`, `fonts/`, the generated `.cache/`. Reached through `Filesystem::path()` on disk and `Filesystem::url()` (or the `[[/nino/public]]` fill) for urls. Never build a public url by hand from `[[/nino/dir]]` |
 | project root | `index.php`, `router.php` and the tool folders. `Filesystem::getPath()`. The tool folders serve their own js/css from here, so a tool file's url uses the plain project dir, not the public prefix |
@@ -124,8 +125,9 @@ Important source directories:
 | `_install/library/pages/<slug>/` | Installable page units |
 | `_install/library/themes/<slug>/` | Appearance themes: manifest, preview, and installable assets. Setup material read by `/_install` and, while the installer is deployed, by `/_design`; applying one copies it into the project |
 | `_install/library/header/<slug>/`, `_install/library/footer/<slug>/` | Interchangeable page frames: a `template.tpl` plus an optional `style.css`, no manifest. Installed as `templates/theme.header.tpl` / `theme.footer.tpl`, which the base html templates include |
-| `_design/Design.php` | Four-dialog appearance tool and Design engine: applies Theme/Header/Footer units, solves the token palette, writes `/assets/style.design.css`, and keeps all layers ordered in the css bundle |
+| `_design/Design.php` | Four-dialog appearance tool and Design engine: applies Theme/Header/Footer units, solves the token palette, writes `/assets/style.design.css`, keeps all layers ordered in the css bundle, and builds the live preview `/_install` borrows |
 | `_design/assets/design.js` | `/_design` frontend; no bundler |
+| `_design/templates/preview-example.tpl` | The page both pickers preview against. Framework classes only - `Design\Preview` wraps it in a document with the generated tokens and serves it to a sandboxed iframe |
 | `tests/*-smoke.php` | Standalone PHP contract tests |
 | `tests/*-js-smoke.js` | Standalone Node/browser-logic tests |
 | `docs/` | Human manuals in English and German |
@@ -311,6 +313,11 @@ See "Designing an admin frontend" below before writing any markup or CSS for
 `_nino/Nino.admin.css` is the design system for all four tool frontends. It is
 not a stylesheet one tool happens to share - it defines the vocabulary, and a
 tool's own stylesheet supplies only what is genuinely local to it.
+`_nino/Nino.admin.js` is the same idea for behaviour: a component that assembles
+markup (`Nino.adminUi.switchField()`, `.table()`, `.selectField()`) lives there,
+never as a per-tool copy. It extends the namespace `Nino.js` creates, so it loads
+after it - and it is deliberately *not* in the public script bundle, which is why
+it is a file of its own rather than more of `Nino.js`.
 
 **A tool links its own stylesheet and `Nino.admin.css`, nothing else.**
 `/_install` and `/_templates` used to load `/_editor`'s and `/_admin`'s complete
@@ -3044,7 +3051,7 @@ Read these before designing a new implementation:
 | Admin backend patterns | `_admin/Admin.php` |
 | Admin list/form JS | `_admin/assets/elementtypes.js`, `elements.js`, `pages.js` |
 | Ordered Admin relationships | `\Nino\Admin\Navigations` and `_admin/assets/navs.js` |
-| Shared Admin UI | `_nino/Nino.admin.css` and `_nino/Nino.js` |
+| Shared Admin UI | `_nino/Nino.admin.css` and `_nino/Nino.admin.js` |
 | Installer package shape | `_install/library/modules/*/manifest.php` |
 | Installer semantics | `_install/Install.php` and `tests/install-smoke.php` |
 | Generic Section presets | `_templates/library/*/manifest.php` |

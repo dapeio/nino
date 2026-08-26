@@ -200,6 +200,7 @@
 		<div id="pd-toast" role="status" aria-live="polite"></div>
 		</div>
 		<script src="[[/nino/dir]]/_nino/Nino.js"></script>
+		<script src="[[/nino/dir]]/_nino/Nino.admin.js"></script>
 		<script src="[[/nino/dir]]/_templates/assets/script.js"></script>
 		<script src="[[/nino/dir]]/_templates/assets/sections.js"></script>
 		<script src="[[/nino/dir]]/_templates/assets/composer.js"></script>

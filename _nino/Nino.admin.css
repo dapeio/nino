@@ -66,11 +66,14 @@
  *              .nino-admin-fieldgrid  .nino-admin-checkbox-fieldset
  *              .nino-admin-checkbox-field  .nino-admin-field-header
  *              .nino-admin-char-counter  .nino-admin-field-radios
+ *              .nino-admin-changed
  *              .nino-admin-field-image  .nino-admin-field-suffixed
  *              .nino-admin-checklist  .nino-admin-checklist-state
  *              .nino-admin-richtext
  *   Boolean    .nino-admin-switch  .nino-admin-switch-track
  *              .nino-admin-switch-copy  .nino-admin-switch-state
+ *   Tabs       .nino-admin-tabs  .nino-admin-tab
+ *              .nino-admin-tabpanel
  *   Controls   .nino-admin-locale-select
  *              .nino-admin-locale-select--corner
  *   Chrome     .nino-admin-contextbar  .nino-admin-contextbar-select
@@ -682,6 +685,35 @@ a {
 	line-height: 1.45;
 }
 
+/* What a field held before it was touched, beside its name - written by
+   Nino.adminUi.fieldChange() and shown only while the two differ.
+
+   Orange rather than red: an unsaved change is a state, not a mistake. It is
+   the same orange the /_templates editor marks its unsaved state with, which
+   is what makes it readable as one across the tools rather than as this
+   pane's own invention.
+
+   A span, so a rule a tool writes for the <small> notes in its own fields
+   does not also land here. */
+:where(.nino-admin) .nino-admin-changed {
+	margin-left: .35rem;
+	color: var(--editor-orange);
+	font-size: .72rem;
+	font-weight: 600;
+}
+
+/* A control holding something that is not yet a value - a half-typed colour,
+   an incomplete number. The field keeps what was typed; what it stops doing
+   is looking like it was accepted. */
+/*	:not(:disabled) is here for weight, not for the state: the hover and focus
+   rules above are more specific than a bare class-plus-attribute, and an
+   invalid field that goes back to looking ordinary under the pointer is a
+   field that reports its state only when nobody is touching it. */
+:where(.nino-admin) .nino-admin-input[aria-invalid="true"]:not(:disabled) {
+	border-color: var(--editor-red);
+	box-shadow: inset 0 0 0 1px var(--editor-red);
+}
+
 :where(.nino-admin) .nino-admin-field-suffixed {
 	display: flex;
 	align-items: center;
@@ -949,6 +981,63 @@ a {
 	:where(.nino-admin) .nino-admin-switch-track::after {
 		transition: none;
 	}
+}
+
+/* One set of controls at a time, where showing both at once would be a
+   column too long to take in. Underlined rather than boxed: a tab is a place
+   in the panel below it, and a box would read as a second control beside the
+   ones it switches between.
+
+   The markup is what the role expects, so a screen reader gets the same
+   structure the eye does - Nino.adminUi.buttonRow() keeps aria-selected in
+   step with the class.
+
+     <div class="nino-admin-tabs" role="tablist">
+       <button class="nino-admin-tab is-active" role="tab" aria-selected="true"
+               aria-controls="…">Colour</button>
+       <button class="nino-admin-tab" role="tab" aria-selected="false"
+               aria-controls="…">Raster</button>
+     </div>
+     <div class="nino-admin-tabpanel" role="tabpanel">…</div> */
+:where(.nino-admin) .nino-admin-tabs {
+	display: flex;
+	gap: .15rem;
+	margin: 0 0 .9rem;
+}
+
+:where(.nino-admin) .nino-admin-tab {
+	flex: 1 1 auto;
+	padding: .5rem .3rem;
+	border: 0;
+	/* The indicator is a border on the tab itself, sitting on top of the
+	   row's own - so the active tab breaks the line rather than adding a
+	   second one under it */
+	margin-bottom: -1px;
+	background: none;
+	color: var(--editor-text-secondary);
+	font-size: .8rem;
+	font-weight: 600;
+	cursor: pointer;
+}
+
+:where(.nino-admin) .nino-admin-tab:hover {
+	color: var(--editor-text);
+}
+
+:where(.nino-admin) .nino-admin-tab.is-active {
+	background-color: var(--editor-blue);
+	color: var(--nino-admin-active-text);
+}
+
+:where(.nino-admin) .nino-admin-tab:focus-visible {
+	outline: 2px solid var(--editor-blue);
+	outline-offset: -2px;
+}
+
+/* Hidden rather than unmounted: the panel keeps its controls, their values
+   and their listeners, so switching tabs cannot lose a half-made choice */
+:where(.nino-admin) .nino-admin-tabpanel[hidden] {
+	display: none;
 }
 
 /* A run of checkbox rows that reads as one control (locales, modules).

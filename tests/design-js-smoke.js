@@ -49,15 +49,34 @@ function element( id, tag ) {
 				else el.classList.remove( name );
 			},
 		},
+		_attrs : {},
+		hidden : false,
+		// scaleFrame() measures the port and writes the frame's layout size
+		_box : { width : 800, height : 600 },
+		getBoundingClientRect : function() { return { width : el._box.width, height : el._box.height } },
 		appendChild : function( child ) { el.children.push( child ); return child; },
-		removeAttribute : function( name ) { if( name === 'srcdoc' ) el.srcdoc = null; },
+		setAttribute : function( name, value ) { el._attrs[name] = String( value ); },
+		getAttribute : function( name ) { return el._attrs[name] !== undefined ? el._attrs[name] : null; },
+		removeAttribute : function( name ) { if( name === 'srcdoc' ) el.srcdoc = null; delete el._attrs[name]; },
 		addEventListener : function( type, handler ) { ( el._listeners[type] = el._listeners[type] || [] ).push( handler ); },
 		fire : function( type ) {
+			const event = { preventDefault : function() { event.prevented = true; }, prevented : false };
 			( el._listeners[type] || [] ).forEach( function( handler ) {
-				handler( { preventDefault : function() {} } );
+				handler( event );
 			} );
+			return event;
 		},
 	};
+
+	// A <label> reaches its own control - which is how a field built by
+	// Nino.adminUi.selectField() is written back into without an id
+	Object.defineProperty( el, 'control', {
+		get : function() {
+			return el.children.filter( function( child ) {
+				return [ 'SELECT', 'INPUT', 'TEXTAREA' ].indexOf( child.tagName ) !== -1;
+			} )[0] || null;
+		},
+	} );
 
 	Object.defineProperty( el, 'innerHTML', {
 		get : function() { return ''; },
@@ -70,16 +89,26 @@ function element( id, tag ) {
 const nodes = {};
 [
 	'theme-page-wrap', 'theme-pane', 'theme-grid', 'theme-empty',
-	'theme-action-status', 'theme-action-save',
+	'theme-action-status', 'theme-action-save', 'theme-action-revert',
 	'theme-nav-theme', 'theme-nav-design', 'theme-nav-header', 'theme-nav-footer',
-	'theme-design-controls', 'theme-design-preview-light', 'theme-design-preview-dark', 'theme-design-sizes',
+	'theme-design-controls', 'theme-design-example', 'theme-design-example-port',
+	'theme-design-mode-light', 'theme-design-mode-dark',
+	'theme-design-tab-colour', 'theme-design-tab-raster',
+	'theme-design-panel-colour', 'theme-design-panel-raster',
 	'theme-design-primary', 'theme-design-primary-hex', 'theme-design-secondary', 'theme-design-secondary-hex',
-	'theme-design-contrast', 'theme-design-colors', 'theme-design-volume', 'theme-design-spacing', 'theme-design-shaping',
+	'theme-design-primary-field', 'theme-design-secondary-field',
+	'theme-design-knobs-colour', 'theme-design-knobs-raster',
 	'theme-frame-header-panel', 'theme-frame-footer-panel', 'theme-frame-header-empty', 'theme-frame-footer-empty',
 	'theme-frame-header', 'theme-frame-footer', 'theme-frame-header-preview', 'theme-frame-footer-preview',
 ].forEach( function( id ) { nodes[id] = element( id ); } );
 
 nodes['theme-page-wrap'].classList.add('show-theme');
+
+// The two colour rows are markup rather than rendered, and their name is
+// where the saved value gets written
+[ 'theme-design-primary-field', 'theme-design-secondary-field' ].forEach( function( id ) {
+	nodes[id].appendChild( element( '', 'span' ) );
+} );
 
 let appearance = {
 	themes : {
@@ -91,18 +120,26 @@ let appearance = {
 	activeFrames : { header : 'v1', footer : 'v1' },
 };
 
+const knob = function( group, label, dflt ) {
+	return { group : group, label : label, note : label+ ' note', 'default' : dflt, min : 1, max : 3,
+	         hint : label+ ' hint', steps : [ 'less', 'as it is', 'more' ] };
+};
+
 const designRead = {
-	settings : { primary : '#b6a6ff', secondary : '', contrast : 'high', colors : 'vibrant', volume : 'default', spacing : 'default', shaping : 'round' },
+	settings : { primary : '#b6a6ff', secondary : '', harmony : 1, temperature : 2, saturation : 3, contrast : 3, depth : 2, scale : 2, volume : 2, spacing : 2, shaping : 3 },
+	groups : { colour : 'Colour', raster : 'Raster' },
+	example : '<!doctype html><html data-nino-mode="light"><body>preview</body></html>',
 	choices : {
-		contrast : [ 'soft', 'default', 'high' ],
-		colors : [ 'clean', 'default', 'vibrant' ],
-		volume : [ 'compact', 'default', 'generous' ],
-		spacing : [ 'tight', 'default', 'airy' ],
-		shaping : [ 'sharp', 'default', 'round' ],
-	},
-	palette : {
-		light : { default : { bg : '#ffffff', on : '#111111', border : '#999999' }, origin : { bg : '#147bb7', on : '#ffffff', border : '#c2d3df' } },
-		dark : { default : { bg : '#111111', on : '#ffffff', border : '#777777' }, origin : { bg : '#65b9e9', on : '#111111', border : '#c2d3df' } },
+		harmony : knob( 'colour', 'Harmony', 1 ),
+		temperature : knob( 'colour', 'Temperature', 2 ),
+		saturation : knob( 'colour', 'Saturation', 2 ),
+		contrast : knob( 'colour', 'Contrast', 2 ),
+		depth : knob( 'colour', 'Depth', 2 ),
+		scale : knob( 'raster', 'Size', 2 ),
+		volume : knob( 'raster', 'Headings', 2 ),
+		spacing : knob( 'raster', 'Spacing', 2 ),
+		shaping : knob( 'raster', 'Corners', 2 ),
+		measure : knob( 'raster', 'Width', 2 ),
 	},
 	raster : {
 		text : { 1 : '1rem', 4 : '1.5rem', 6 : '2.5rem' },
@@ -126,11 +163,24 @@ const sandbox = {
 	},
 };
 sandbox.window = sandbox;
+
+// What the operator answers when the tool asks before discarding something
+let confirmAnswer = true;
+const confirmed = [];
+sandbox.confirm = function( question ) { confirmed.push( question ); return confirmAnswer; };
+
+const unload = [];
+sandbox.addEventListener = function( type, handler ) {
+	if( type === 'beforeunload' )
+		unload.push( handler );
+};
 sandbox.Nino = {
 	http : {
 		sendRequest : function( uri, method, callback, data ) {
 			const payload = JSON.parse( data.data || '{}' );
-			posts.push( { uri : uri, method : method, action : data.action, payload : JSON.parse( JSON.stringify( payload ) ) } );
+			// mode rides beside the payload rather than inside it, so the
+			// stub has to record it separately or the distinction is untested
+			posts.push( { uri : uri, method : method, action : data.action, mode : data.mode, payload : JSON.parse( JSON.stringify( payload ) ) } );
 
 			let response = {};
 			if( data.action === 'appearance/read' ) response = appearance;
@@ -150,8 +200,13 @@ sandbox.Nino = {
 	events : { bindCallback : function() {} },
 };
 
+// The knobs are drawn by the design system's own control, so the test runs
+// the real Nino.admin.js rather than stubbing it - a stub would pass while the
+// component it stands in for is broken
 const source = fs.readFileSync( path.join( __dirname, '../_design/assets/design.js' ), 'utf8' );
-vm.runInContext( source, vm.createContext( sandbox ), { filename : 'design.js' } );
+const context = vm.createContext( sandbox );
+vm.runInContext( fs.readFileSync( path.join( __dirname, '../_nino/Nino.admin.js' ), 'utf8' ), context, { filename : 'Nino.admin.js' } );
+vm.runInContext( source, context, { filename : 'design.js' } );
 
 const theme = sandbox.Nino.design;
 theme.init();
@@ -188,28 +243,182 @@ check( 'Design has its own pane and action', nodes['theme-page-wrap'].classList.
 	&& nodes['theme-page-wrap'].classList.contains('show-theme') === false
 	&& nodes['theme-action-save'].textContent === 'Save Design'
 	&& posts.filter( function( post ) { return post.action === 'design/read'; } ).length === 1 );
-check( 'Design renders every server-owned choice and both colour modes', nodes['theme-design-volume'].children.length === 3
-	&& nodes['theme-design-shaping'].value === 'round'
-	&& nodes['theme-design-preview-light'].children.length === 2
-	&& nodes['theme-design-preview-dark'].children.length === 2 );
-check( 'the size specimen uses the generated sizes', nodes['theme-design-sizes'].children[0].children[0].style.fontSize === '2.5rem'
-	&& nodes['theme-design-sizes'].children[1].children[2].children[0].style.width === '2rem'
-	&& nodes['theme-design-sizes'].children[2].children[2].style.borderRadius === '0.7rem' );
+// Every knob the server names gets a select, in the panel it named - the
+// markup lists neither, so a knob added server-side cannot be missed here
+const knobSelect = function( panel, index ) { return nodes[panel].children[index].children[1]; };
+
+check( 'Design renders every server-owned choice into the panel it belongs to', nodes['theme-design-knobs-colour'].children.length === 5
+	&& nodes['theme-design-knobs-raster'].children.length === 5 );
+check( '...each opening on the stored position', knobSelect( 'theme-design-knobs-colour', 0 ).getAttribute('data-key') === 'harmony'
+	&& knobSelect( 'theme-design-knobs-colour', 3 ).getAttribute('data-key') === 'contrast'
+	&& knobSelect( 'theme-design-knobs-colour', 3 ).value === '3'
+	&& knobSelect( 'theme-design-knobs-raster', 3 ).value === '3' );
+// The option text is the position's name and its value is the number that
+// gets stored, so neither side has to translate the other's vocabulary
+check( '...with one option per position, named rather than numbered', knobSelect( 'theme-design-knobs-colour', 3 ).children.length === 3
+	&& knobSelect( 'theme-design-knobs-colour', 3 ).children[2].textContent === 'more'
+	&& knobSelect( 'theme-design-knobs-colour', 3 ).children[2].value === '3' );
+// One page rather than a strip of chips and three size specimens: a design
+// decision cannot be judged one token at a time
+check( 'the example is delivered whole, as a document into the sandboxed frame', nodes['theme-design-example'].srcdoc === designRead.example );
+// A pane that matches the file has nothing to write and nothing to discard,
+// and says so with both of its buttons rather than with neither
+check( 'Design opens clean, with nothing to save and nothing to revert', nodes['theme-action-save'].disabled === true
+	&& nodes['theme-action-revert'].hidden === true );
+
+/*	A preview panel is around 800px wide and Nino's narrowest content ceiling
+	is wider than that, so every Width setting used to render identically - the
+	frame was narrower than the difference the operator was choosing between.
+	The page is given a desktop's layout width and scaled into the panel
+	instead, which keeps every proportion inside it exact.	*/
+check( 'the page renders at a desktop layout width, not at the panel\'s', nodes['theme-design-example'].style.width === '1600px' );
+// At scale f, filling a box h tall takes h/f of document - so the page gets
+// exactly as much vertical room as the panel can show, and no more
+check( '...scaled into the room the panel has, height solved to match', nodes['theme-design-example'].style.transform === 'scale(0.5)'
+	&& nodes['theme-design-example'].style.height === '1200px' );
+
+// Two tabs rather than one long column. Both panels stay in the DOM - the one
+// not being looked at keeps its controls, their values and their listeners
+check( 'the pane opens on Colour, with Raster present but hidden', nodes['theme-design-panel-colour'].hidden === false
+	&& nodes['theme-design-panel-raster'].hidden === true
+	&& nodes['theme-design-tab-colour'].classList.contains('is-active') === true );
 
 posts.length = 0;
-nodes['theme-design-spacing'].value = 'tight';
-nodes['theme-design-spacing'].fire('change');
+nodes['theme-design-tab-raster'].fire('click');
+check( 'switching tabs swaps which settings are on screen', nodes['theme-design-panel-raster'].hidden === false
+	&& nodes['theme-design-panel-colour'].hidden === true
+	&& nodes['theme-design-tab-raster'].classList.contains('is-active') === true
+	&& nodes['theme-design-tab-colour'].classList.contains('is-active') === false );
+// A tab is a place in the panel below it, so the row says so to a screen
+// reader as well as to the eye
+check( '...and says so with aria-selected, not by the class alone', nodes['theme-design-tab-raster'].getAttribute('aria-selected') === 'true'
+	&& nodes['theme-design-tab-colour'].getAttribute('aria-selected') === 'false' );
+check( '...without asking the server for anything', posts.length === 0 );
+
+// The knobs are rendered into the panels, so they have to survive the switch
+check( 'the settings behind the other tab are still there', nodes['theme-design-knobs-colour'].children.length === 5
+	&& nodes['theme-design-knobs-raster'].children.length === 5 );
+// Which mode is previewed is a server question - the frame is sandboxed, so
+// nothing out here can reach in and stamp the attribute on it
+posts.length = 0;
+nodes['theme-design-mode-dark'].fire('click');
+check( 'the mode buttons re-ask rather than trying to reach into the frame', posts.length === 1
+	&& posts[0].action === 'design/preview'
+	&& posts[0].mode === 'dark'
+	&& nodes['theme-design-mode-dark'].classList.contains('is-active') === true
+	&& nodes['theme-design-mode-light'].classList.contains('is-active') === false );
+check( '...and the mode never becomes a design setting', typeof posts[0].payload.mode === 'undefined' );
+
+posts.length = 0;
+const spacingKnob = knobSelect( 'theme-design-knobs-raster', 2 );
+spacingKnob.value = '1';
+spacingKnob.fire('change');
 check( 'a Design change asks the server for a preview without changing Theme or frames', posts.length === 1
 	&& posts[0].action === 'design/preview'
-	&& posts[0].payload.spacing === 'tight'
+	&& posts[0].payload.spacing === 1
 	&& typeof posts[0].payload.design === 'undefined' );
 
+/*	Saved against current, per field. A count on its own says something is
+	different without saying what, which leaves discarding everything as the
+	only way back to a position the operator recognises	*/
+const fieldMark = function( key ) {
+	const field = theme._designFields[key];
+	return field && field.changeMark && field.changeMark.hidden === false ? field.changeMark.textContent : '';
+};
+
+check( 'an unsaved change is counted in the bar and named in its own field', nodes['theme-action-status'].textContent === '1 unsaved design change'
+	&& nodes['theme-action-status'].classList.contains('theme-status-dirty') === true
+	&& fieldMark('spacing') === 'saved: as it is'
+	&& fieldMark('shaping') === '' );
+check( '...and the way back out is offered beside the way through', nodes['theme-action-revert'].hidden === false
+	&& nodes['theme-action-save'].disabled === false );
+
+/*	The defect this pane had: opening another dialog and coming back re-read
+	the file and put it over whatever had been set here, without a word	*/
+posts.length = 0;
+nodes['theme-nav-header'].fire('click');
+nodes['theme-nav-design'].fire('click');
+check( 'leaving Design and returning keeps the unsaved settings rather than re-reading over them',
+	posts.filter( function( post ) { return post.action === 'design/read'; } ).length === 0
+	&& theme._designSettings.spacing === 1
+	&& knobSelect( 'theme-design-knobs-raster', 2 ).value === '1'
+	&& nodes['theme-action-status'].textContent === '1 unsaved design change' );
+
+// Knowing something is unsaved is only useful next to a way back that is not
+// "remember where ten settings were"
+posts.length = 0;
+nodes['theme-action-revert'].fire('click');
+check( 'Revert puts every control back on the stored value and clears the marks', theme._designSettings.spacing === 2
+	&& knobSelect( 'theme-design-knobs-raster', 2 ).value === '2'
+	&& fieldMark('spacing') === ''
+	&& nodes['theme-action-revert'].hidden === true
+	&& nodes['theme-action-save'].disabled === true );
+check( '...and asks for the picture that produces', posts.length === 1
+	&& posts[0].action === 'design/preview'
+	&& posts[0].payload.spacing === 2 );
+
+/*	A half-typed colour is not a colour and cannot be sent - but silence at
+	that point reads as "accepted", and the field is left showing a value the
+	design does not have	*/
+posts.length = 0;
+const hex = nodes['theme-design-primary-hex'];
+hex.value = '#b6a';
+hex.fire('input');
+check( 'an incomplete colour is refused out loud rather than dropped in silence', posts.length === 0
+	&& theme._designSettings.primary === '#b6a6ff'
+	&& hex.getAttribute('aria-invalid') === 'true'
+	&& nodes['theme-action-status'].textContent.indexOf('#rrggbb') !== -1
+	&& nodes['theme-action-status'].classList.contains('theme-status-error') === true );
+// Said in words as well as in colour - a red border alone is a colour telling
+// a colour-blind operator that their colour is wrong
+check( '...in words, not by the border alone', nodes['theme-action-status'].textContent.length > 20 );
+
+hex.fire('blur');
+check( '...and leaving the field puts back the value the design does have', hex.value === '#b6a6ff'
+	&& hex.getAttribute('aria-invalid') === 'false'
+	&& nodes['theme-action-status'].classList.contains('theme-status-error') === false );
+
+hex.value = '#101820';
+hex.fire('input');
+check( 'a complete one is taken, and counted', theme._designSettings.primary === '#101820'
+	&& nodes['theme-design-primary'].value === '#101820'
+	&& fieldMark('primary') === 'saved: #b6a6ff' );
+
+// The one loss this pane cannot undo afterwards
+const leaving = unload.map( function( handler ) {
+	const event = { prevented : false, preventDefault : function() { event.prevented = true; } };
+	handler( event );
+	return event;
+} );
+check( 'closing the tab on unsaved settings is stopped rather than silently taken', leaving.length === 1
+	&& leaving[0].prevented === true
+	&& leaving[0].returnValue === '' );
+
+/*	Applying a Theme writes the design its manifest declares, so it is the one
+	place in this tool where an unsaved change cannot be kept - and therefore
+	the one place it has to be asked about	*/
+posts.length = 0;
+confirmAnswer = false;
+nodes['theme-nav-theme'].fire('click');
+nodes['theme-action-save'].fire('click');
+check( 'applying a Theme over unsaved design changes asks first, and takes no for an answer', confirmed.length === 1
+	&& confirmed[0].indexOf('Discard') !== -1
+	&& posts.filter( function( post ) { return post.action === 'theme/apply'; } ).length === 0 );
+confirmAnswer = true;
+nodes['theme-nav-design'].fire('click');
+
+posts.length = 0;
 nodes['theme-action-save'].fire('click');
 const designSave = posts.filter( function( post ) { return post.action === 'design/save'; } )[0];
 check( 'Design save posts the settings directly and only to design/save', designSave !== undefined
-	&& designSave.payload.spacing === 'tight'
+	&& designSave.payload.spacing === 2
+	&& designSave.payload.primary === '#101820'
 	&& typeof designSave.payload.theme === 'undefined'
 	&& typeof designSave.payload.header === 'undefined' );
+check( 'a written Design is a clean one', nodes['theme-action-status'].textContent === 'Design written.'
+	&& nodes['theme-action-save'].disabled === true
+	&& nodes['theme-action-revert'].hidden === true
+	&& fieldMark('primary') === '' );
 
 // Header and Footer each preview and apply one frame only.
 posts.length = 0;
@@ -219,7 +428,8 @@ check( 'Header opens on the active frame and renders it server-side', nodes['the
 	&& nodes['theme-frame-header-preview'].srcdoc === '<!doctype html><body data-frame="header/v5">'
 	&& posts[0].action === 'frame/preview'
 	&& posts[0].payload.theme === 'nocturne'
-	&& posts[0].payload.design.spacing === 'tight' );
+	&& posts[0].payload.design.spacing === 2
+	&& posts[0].payload.design.primary === '#101820' );
 
 posts.length = 0;
 nodes['theme-frame-header'].value = 'v2';

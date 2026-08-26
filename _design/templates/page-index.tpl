@@ -39,63 +39,57 @@
 
 				<section id="theme-content-design">
 					<h1>Design</h1>
-					<p class="nino-admin-hint nino-admin-hint-lead">Set the values every stylesheet reads from. Colours are generated as measured background/text pairs; Volume, Spacing and Shaping produce the shared size raster.</p>
+					<p class="nino-admin-hint nino-admin-hint-lead">Set the values every stylesheet reads from. Most settings are a scale &ndash; <em>less</em>, <em>as it is</em>, <em>more</em> &ndash; and their middle position is the framework&rsquo;s own: with all of them there the generated stylesheet reproduces Nino.css exactly. <em>Harmony</em> and <em>Temperature</em> are choices rather than scales, so they name their alternatives instead. Colours are generated as measured background/text pairs and clear WCAG&nbsp;AA at every position.</p>
 
-					<div id="theme-design-controls">
-						<section class="theme-design-section">
-							<h2>Colour</h2>
-							<div class="theme-design-grid">
-								<label class="theme-field">
+					<!--	Two columns, and the split is the point: every knob is
+								visible at once on the left, and one page on the right shows
+								what all of them together produce. Colour chips and size
+								specimens showed each setting in isolation, which is exactly
+								where a design decision cannot be judged.	-->
+					<div class="theme-design-split">
+
+						<div class="theme-design-controls" id="theme-design-controls">
+							<div class="nino-admin-tabs" role="tablist" aria-label="Design settings">
+								<button type="button" role="tab" id="theme-design-tab-colour" class="nino-admin-tab is-active" aria-selected="true" aria-controls="theme-design-panel-colour">Colour</button>
+								<button type="button" role="tab" id="theme-design-tab-raster" class="nino-admin-tab" aria-selected="false" aria-controls="theme-design-panel-raster">Raster</button>
+							</div>
+
+							<div class="nino-admin-tabpanel theme-design-panel" role="tabpanel" id="theme-design-panel-colour" aria-labelledby="theme-design-tab-colour">
+								<label class="theme-field" id="theme-design-primary-field">
 									<span>Primary</span>
 									<span class="theme-color-control">
 										<input type="color" id="theme-design-primary" class="theme-color-swatch">
 										<input type="text" id="theme-design-primary-hex" class="nino-admin-input" inputmode="text" spellcheck="false" autocomplete="off" maxlength="7">
 									</span>
 								</label>
-								<label class="theme-field">
-									<span>Secondary <small>optional</small></span>
+								<label class="theme-field" id="theme-design-secondary-field">
+									<span>Secondary <small>overrides Harmony</small></span>
 									<span class="theme-color-control">
 										<input type="color" id="theme-design-secondary" class="theme-color-swatch">
-										<input type="text" id="theme-design-secondary-hex" class="nino-admin-input" inputmode="text" spellcheck="false" autocomplete="off" maxlength="7" placeholder="follows Primary">
+										<input type="text" id="theme-design-secondary-hex" class="nino-admin-input" inputmode="text" spellcheck="false" autocomplete="off" maxlength="7" placeholder="solved from Harmony">
 									</span>
 								</label>
-								<label class="theme-field"><span>Contrast <small>text strength</small></span><select id="theme-design-contrast" class="nino-admin-input"></select></label>
-								<label class="theme-field"><span>Colours <small>saturation</small></span><select id="theme-design-colors" class="nino-admin-input"></select></label>
+								<div id="theme-design-knobs-colour"></div>
 							</div>
-							<div class="theme-design-specimen">
-								<div>
-									<h3>Light</h3>
-									<div id="theme-design-preview-light" class="theme-design-surfaces" aria-label="Light generated surfaces"></div>
-								</div>
-								<div>
-									<h3>Dark</h3>
-									<div id="theme-design-preview-dark" class="theme-design-surfaces" aria-label="Dark generated surfaces"></div>
-								</div>
+
+							<div class="nino-admin-tabpanel theme-design-panel" role="tabpanel" id="theme-design-panel-raster" aria-labelledby="theme-design-tab-raster" hidden>
+								<div id="theme-design-knobs-raster"></div>
 							</div>
-						</section>
-					</div>
-					<div id="theme-design-sizes">
-						<section class="theme-design-section">
-							<h2>Volume</h2>
-							<div class="theme-design-grid">
-								<label class="theme-field"><select id="theme-design-volume" class="nino-admin-input"></select></label>
-								<div id="theme-design-volume-preview"></div>
+						</div>
+
+						<div class="theme-design-stage">
+							<div class="theme-design-modes" role="group" aria-label="Preview mode">
+								<button type="button" id="theme-design-mode-light" class="theme-design-mode is-active" aria-pressed="true">Light</button>
+								<button type="button" id="theme-design-mode-dark" class="theme-design-mode" aria-pressed="false">Dark</button>
 							</div>
-						</section>
-						<section class="theme-design-section">
-							<h2>Spacing</h2>
-							<div class="theme-design-grid">
-								<label class="theme-field"><select id="theme-design-spacing" class="nino-admin-input"></select></label>
-								<div id="theme-design-spacing-preview"></div>
+							<!--	Sandboxed, and delivered as a document rather than
+										spliced in: the example styles bare element selectors
+										and sets :root variables that would otherwise land on
+										this tool's own shell	-->
+							<div class="theme-design-port" id="theme-design-example-port">
+								<iframe id="theme-design-example" class="theme-design-view" title="Live preview of the current design" sandbox="" loading="lazy"></iframe>
 							</div>
-						</section>
-						<section class="theme-design-section">
-							<h2>Shaping</h2>
-							<div class="theme-design-grid">
-								<label class="theme-field"><select id="theme-design-shaping" class="nino-admin-input"></select></label>
-								<div id="theme-design-shaping-preview"></div>
-							</div>
-						</section>
+						</div>
 					</div>
 				</section>
 
@@ -122,10 +116,15 @@
 
 			<div class="nino-admin-actionbar">
 				<p id="theme-action-status" class="nino-admin-actionbar-status" role="status" aria-live="polite"></p>
+				<!--	The way back out of an unsaved state, beside the way
+							forward through it. Present only while the Design pane has
+							something to discard - see design.js's _updateAction	-->
+				<button type="button" class="nino-admin-btn-secondary" id="theme-action-revert" hidden>Revert</button>
 				<button type="button" class="nino-admin-btn-primary" id="theme-action-save">Apply Theme</button>
 			</div>
 		</div>
 		<script src="[[/nino/dir]]/_nino/Nino.js"></script>
+		<script src="[[/nino/dir]]/_nino/Nino.admin.js"></script>
 		<script src="[[/nino/dir]]/_design/assets/design.js"></script>
 	</body>
 </html>

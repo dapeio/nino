@@ -6,6 +6,195 @@ All notable changes to Nino are documented in this file.
 
 ### Added
 
+- Five new Design settings.
+
+  **Harmony** solves the second accent instead of asking for it: each position
+  is a hue distance from the brand - its own, a third of the wheel, the whole
+  way round. A Secondary colour of your own still overrides it whole, which is
+  what somebody typing a second corporate hex has already decided.
+  **Temperature** decides which way the greys lean, mixed along the shortest arc
+  toward a committed cool or warm hue so the middle positions stay related to
+  the brand rather than jumping to an unrelated grey. **Depth** moves the three
+  things that say "this panel is separate" together - how far the alternate
+  surface sits from the page, how firmly a border draws, how densely a shadow
+  falls. **Size** sets the root size, which is the widest-reaching knob in the
+  class: `html { font-size }` is what every rem resolves against, so one
+  position moves type, spacing and radii together and keeps their proportions
+  exact. **Width** sets the ceiling the layout grows to.
+
+  Those last two were theme-owned numbers before this - the catalogue spread
+  16-18px and 78-132rem across ten stylesheets with no way to change either -
+  so both are now assignments like every other size, and each theme declares the
+  step it was drawn at.
+
+- A live preview, and the two-column pane it needs. Colour and Raster sit
+  behind a pair of tabs in a narrow left column; the right half is one page
+  showing what all of them together produce, with a light/dark switch above it.
+  Both panels stay in the document - the tab nobody is looking at keeps its
+  controls, their values and their listeners, so switching cannot lose a
+  half-made choice. Colour chips and
+  size specimens showed each setting in isolation, which is exactly where a
+  design decision cannot be judged - and between them they still did not show
+  what a card, a filled button or a form field actually came out looking like.
+
+- `.nino-admin-tabs` / `.nino-admin-tab` and `Nino.adminUi.buttonRow()`: one set
+  of controls at a time, and the row of buttons that switches between them.
+  `buttonRow()` owns the state and the aria rather than the look, so the tabs
+  and the light/dark switch are the same three lines in both pickers - four
+  copies of "toggle is-active on one of these and set aria on all of them" is
+  how one of them ends up without the aria.
+
+  The page itself is written in design-system classes and nothing else - the
+  framework's own card, alerts, form field and grounds - so what it shows is
+  what a project built on these settings gets. The suite fails on any class
+  `Nino.css` does not define: the moment the preview needs a rule of its own it
+  has stopped being evidence, and a component the framework is missing would be
+  hidden behind a local copy instead of noticed.
+
+  `Design\Preview` builds it, and `/_install`'s Design step borrows it through
+  `class_exists` the same way it borrows `Tokens`: what a set of settings looks
+  like is Design's own question, and a second answer in the installer would be a
+  second one to keep in step. The document loads what a real page loads, in the
+  order a real page loads it - the framework, the tokens for the settings being
+  previewed, then whatever the project itself has bundled. Reading the project's
+  own bundle rather than the installer's library is what keeps it working after
+  `/_install` is deleted.
+
+  The page renders at a desktop's layout width and is scaled into the panel as
+  a whole. A preview panel is around 800px wide, so a page designed for a
+  desktop browser never met its own layout limits there and everything that
+  depends on width rendered the same. Scaling the frame keeps every proportion
+  inside it exact - which is what separates it from shrinking the root font,
+  where the type would move against everything measured in px and the preview
+  would start lying about the thing it was just taught to tell the truth about.
+  `Nino.adminUi.scaleFrame()` solves the height too: at scale f, filling a box
+  h tall takes h/f of document, so the page gets exactly as much vertical room
+  as the panel can show and no more.
+
+  The example is laid out for that width rather than for a column: the card and
+  the field sit beside the type, the four alerts share one short band, and a
+  `<main>` puts the last band at the foot of the frame the way `Nino.css` does
+  on a real page. It no longer scrolls.
+
+  The theme's own webfonts travel into the document as data uris rather than
+  being stripped. A sandboxed frame has an opaque origin and cannot fetch
+  anything, which is why they used to go - leaving the preview showing every
+  part of a theme except the loudest one it decides. A face whose file cannot
+  be carried is dropped whole rather than left pointing at a url nothing can
+  fetch, because a family that resolves to nothing puts the page in the
+  browser's serif default; the system stack then stands in as before.
+
+  Delivered whole into a sandboxed iframe, because the example styles bare
+  element selectors and sets `:root` variables that would otherwise land on the
+  tool's own shell. Which mode is previewed therefore travels with the request
+  rather than being toggled in the browser: an opaque origin is not something
+  the page outside can reach into.
+
+- `Nino.adminUi.selectField()`, so the two pickers stop building the same
+  labelled select twice. It owns the control and its options, never the wrapper:
+  the caller passes the field class its own panel already styles, so a generated
+  field sits beside a hand-written one without either knowing about the other.
+
+  Both pickers render every knob from the server's vocabulary into the panel it
+  names, and neither template lists a knob - so a setting added to `Tokens`
+  reaches `/_design` and the installer together instead of one of them silently
+  missing it. Each option's text is the position's name and its value the number
+  that gets stored, so neither side translates the other's vocabulary.
+
+- The catalogue spans the system. Every position of every setting is now
+  shipped by at least one of the ten themes, and a test says so - a position no
+  theme uses is a position nobody has ever looked at, and both ends of the root
+  size were exactly that. **Docs** takes the smallest (its description already
+  claimed a compact scale; the root size now agrees) and **Soft** the largest,
+  along with the gentler contrast nothing shipped either.
+
+  Five looks carry a real second brand colour rather than a Secondary field
+  nobody filled in. **Signal** asks for Complementary, so the strip across the
+  top and the band through the page are two different colours - which is what
+  its own description always said. **Nocturne** and **Editorial** take
+  Complementary too, **Soft** and **Surface** Triadic, **Rail** Analogous. All
+  of them derive it from the brand rather than naming a hex, so changing the
+  brand colour keeps the pairing intact.
+
+  Analogous was the first assignment for Editorial and Soft and it is not what
+  they ship: at the saturation those two run, a 30° neighbour lands within a
+  hair of the brand, and a second colour a look cannot show is not a second
+  colour. Each took the nearest harmony that separates.
+
+  Three looks paint with the tint: **Docs** makes it its one band, because the
+  only thing a reference page bands for is a note; **Soft** makes it the footer
+  panel it is named for; **Surface** makes it the floating header card. And
+  three temperatures beyond Brand are in use - **Aperture** and **Rail** at
+  Neutral, where the greys finally carry no colour at all (Aperture's
+  description has claimed exactly that since it shipped), **Docs** at Cool,
+  **Soft** at Warm.
+
+- Four brand roles where there were two, and a fifth ground under them.
+
+  `--nino-brand` is the primary exactly as it was picked and `--nino-brand-safe`
+  is that colour with its lightness solved until text on it clears the target;
+  `--nino-accent` and `--nino-accent-safe` are the same pair for the second
+  colour. Two questions, four answers - is it the first brand colour or the
+  second, and is it the one that was picked or the one text survives on.
+
+  The palette used to publish one safe surface for whichever colour Harmony or
+  a Secondary had settled on. Setting a second colour therefore moved every
+  button, badge and filled section onto it, quietly, and left no
+  contrast-safe *brand* colour anywhere in the palette to put them back on.
+  Both are published now and both clear the target at the same time, which is
+  what it takes for a look to use two colours rather than choose between them.
+
+  `--nino-tint` is the fifth ground: the page with the brand washed into it
+  rather than a near-grey step away from it. Quiet enough to read a whole
+  section on, coloured enough to read as chosen - and capped by the brand's own
+  chroma, so a grey corporate hex produces a grey tint instead of a beige band
+  nobody asked for. `Nino.css` gains `.nino-section--tint` to paint with it,
+  `.nino-section--brand-alt` and `.nino-btn--brand-alt` for the second brand
+  colour, and the `--color-section-tint-*`, `--color-accent-tint`,
+  `--color-focus-tint` and `--color-brand-alt*` roles behind them. All ten
+  catalogue themes assign the new roles, and the demo catalogue shows them.
+
+  `--nino-origin` and `--nino-vibrant` keep working: they are emitted once in
+  the bare `:root` as `var()` indirections onto the role that carries their
+  exact former meaning, so a stylesheet that never touched Harmony or Secondary
+  renders identically. A `var()` resolves where it is used, so one line follows
+  both dark blocks without being repeated in either.
+
+- A dirty state for Design, in both pickers. The pane counts what differs from
+  what is stored, each field that moved says what it was ("saved: as it is",
+  "theme: #4faae8"), Save is dead until there is something to write, and Revert
+  puts every control back in one press. A count on its own says something is
+  different without saying what, which leaves discarding everything as the only
+  way back to a position the operator recognises.
+
+  Closing the tab on unsaved settings is stopped, and applying a Theme over
+  them asks first - a theme apply writes the design its manifest declares, so it
+  is the one place in the tool where the loss is unavoidable rather than a bug.
+
+- `Nino.adminUi.fieldChange()`, which writes that mark into a field built by
+  `selectField()` or by hand, and `.nino-admin-changed` to style it. Orange
+  rather than red, and the same orange `/_templates` marks its own unsaved
+  editor with: an unsaved change is a state, not a mistake, and one signal
+  across the tools reads as one signal.
+
+- `_nino/Nino.admin.js`. `Nino.adminUi` was 658 of `Nino.js`'s ~1000 lines, and
+  `Nino.js` is in the *public* script bundle - so every visitor to every Nino
+  site was being served the complete admin table renderer, the field builders
+  and the switch, none of which a page has any use for. Three files, three
+  audiences: `Nino.js` everywhere, `Nino.ui.js` on the public site,
+  `Nino.admin.js` behind the login.
+
+- The four generated values nothing consumed. `--nino-*-focus` now backs a
+  global `:focus-visible` ring - WCAG 2.2 SC 2.4.7 is AA and `Nino.css` had one
+  on two components out of all of them - split per ground as `--color-focus-*`
+  for exactly the reason `--color-accent` is, since a ring solved against the
+  page and carried onto a dark section is unreadable there.
+  `--nino-*-disabled` backs `--color-disabled` and a `:disabled` skin,
+  `--nino-warning` backs `.nino-alert--warning`, the state the alert vocabulary
+  was missing between success and error, and `--nino-radius-3` backs
+  `--radius-large`. `Nino.css`'s own `.1 / .2 / .4` is exactly what the raster
+  publishes, so the framework's radii and the generated ones are one ladder.
+
 - Two themes, bringing the catalogue to ten.
 
   **Surface** is built from areas rather than from lines: a floating header
@@ -663,6 +852,54 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **Harmony and Temperature are choices rather than scales.** A knob is now a
+  `scale` - three positions, the middle one the framework's own - or a `choice`,
+  a named list with its own default, and `choices()` publishes which. Which hue
+  the greys lean on is not "less" or "more" of anything and the classical
+  harmonies are not a track you slide along; both were pretending to be scales,
+  and the pane was telling the operator that the middle position is always
+  Nino's own while two knobs' were not. The lead copy says what is true instead.
+
+  Harmony names the four relationships it actually offers - Monochrome,
+  Analogous, Triadic, Complementary, at 0°, 30°, 120° and 180° from the brand.
+  "Shifted" told nobody anything they could check. Temperature gains the
+  position it was missing: **Neutral**, where the grounds carry no colour cast
+  at all. A grey biased toward something reads as chosen - but that is a claim
+  about a page whose brand is meant to be everywhere, and a design that wants
+  its colour only where it puts it had no way to say so.
+
+  Both knobs are renumbered by that: Temperature's positions are now
+  Neutral/Cool/Brand/Warm, so a stored `temperature: 2` that meant *Brand*
+  means *Cool* until it is set again, and Harmony's old position 3 (Opposite)
+  is position 4. The ten theme manifests are updated; a project that saved a
+  Design during the beta should reopen `/_design` and check those two.
+
+- Design settings are steps from 1 to 3 rather than named values, and step 2 is
+  the framework itself: with every scale at 2 the generated stylesheet reproduces
+  `Nino.css` exactly, which is the property that makes the layer adoptable. (Two
+  of them are choices rather than scales - see the entry above.)
+
+  Three, because the in-between positions were not decisions anybody made. A
+  setting that reads *less, as it is, more* is one an operator can hold in their
+  head; asking them to choose between "Restrained" and "Even" is asking them to
+  have an opinion they do not have. Positions rather than names because that is
+  what they are - "airy" invites the question what lies past it, where 3 of 3
+  does not - and the name each position carries is a label the server publishes,
+  never a stored value.
+
+  Where a knob replaces one that shipped with three named values, its three
+  positions are those exact values, so no theme in the catalogue had to be
+  redrawn. Settings written with the old vocabulary still resolve to the
+  position that carries their value, `colors` included after being renamed to
+  `saturation` - with one deliberate exception: `soft` used to hold muted text
+  at 3.0:1, below WCAG AA for body copy, and the position it lands on keeps its
+  softer ink while lifting that floor to 4.5.
+
+- `Volume`, `Shaping` and `Measure` are labelled Headings, Corners and Width in
+  the pickers. The stored keys are unchanged - a rename that reached the config
+  would be a migration to buy a clearer word - but "Measure" is a typographer's
+  term for something every operator would call the width.
+
 - The appearance tool moved from `/_theme` to `/_design`, together with its
   directory, its `Nino\Design` namespace, its docs, and its smoke tests. The
   name follows what the tool can always do: Design generates the palette and
@@ -912,6 +1149,64 @@ All notable changes to Nino are documented in this file.
   `/_admin` starts behind everything already in that menu.
 
 ### Fixed
+
+- **Leaving Design and coming back threw away everything set in it.** The pane
+  re-read the stored settings on every visit, so opening Header to check
+  something and returning replaced whatever had been changed with the file on
+  disk, silently and without a way back. It reads when there is nothing in hand
+  yet and when something that rewrites the file server-side has just run, the
+  way the Theme/Header/Footer read beside it always has.
+
+  The installer's step had the same shape for a better reason - its starting
+  point is what the theme declared, so a trip back to pick a different theme has
+  to be followed here. It now hangs the re-read on the theme actually changing,
+  which leaves a trip back to correct a typo two steps earlier with the design
+  settings intact, and says so when a reload did replace them.
+
+- **A half-typed colour was dropped in silence.** The hex field waits for a
+  complete `#rrggbb` before reporting one, which is right - but saying nothing
+  in the meantime reads as "accepted", and the operator walks away from a field
+  showing a value the design does not have. It is refused out loud now: in the
+  field, in `aria-invalid`, and in a sentence beside it, because a red border on
+  its own is a colour telling a colour-blind operator that their colour is
+  wrong. Leaving the field puts back the value the design does have.
+
+- **Saturation reached the brand and nothing else.** The four surfaces a page is
+  actually made of - the ground, the alternate band and the two dark ones - came
+  back byte-identical at all three of its old positions, as did every border and
+  every link, because the neutral tint was capped by a constant the knob never
+  touched and the link chroma had a floor it never cleared. All three scale with
+  it now.
+
+- **...and turning it up could come back less saturated.** `hex()` reduced
+  out-of-gamut chroma by 15% a step, which is not monotonic in what was asked
+  for: the default brand blue measured 0.126 at the middle position and 0.115 at
+  the top, yellow 0.111 against 0.102. The reduction bisects onto the gamut
+  boundary now, and a surface whose chroma the bisection loses is re-solved for
+  the lightness that holds the most of it - measured, that recovers up to 0.061
+  chroma on 26 of 210 solves.
+
+- **Contrast named three positions and produced two results.** `soft` and
+  `default` were the same 4.5:1 target and the body ink never moved between
+  them, because primary text is a lightness rather than a solved value. That
+  lightness is what the knob moves now, so every position is visibly different -
+  and every position still clears WCAG AA, muted text included. The old `soft`
+  let muted down to 3.0:1, which only passes for large type; it maps to the
+  nearest position that passes.
+
+- **Rail loaded none of its webfonts.** Its `@font-face` rules pointed at
+  `fonts/text/` and `fonts/title/`, where its `fonts/` directory holds the files
+  flat - the only theme in the catalogue that did, so all three of its faces
+  404'd and it fell back to `system-ui`.
+
+- `tests/design-js-smoke.js` and `tests/install-design-js-smoke.js` both crashed
+  before reaching their size assertions: the specimen containers were never
+  registered in their DOM stubs, so the code under test returned early and the
+  checks read an empty node.
+
+- Two unclosed `<div>`s in the installer's Design step, and its colour controls
+  sitting outside `#design-controls` - so a delivery shipping without `/_design`
+  hid the size knobs and left the colour fields on screen.
 
 - The footer frame `v7`'s legal line put a standalone link at 22px, just under
   WCAG 2.2 SC 2.5.8's 24px, with the row's gap - a raster step the Spacing

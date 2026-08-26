@@ -9,13 +9,18 @@
 	// --nino-* tokens these settings generate, so the theme survives whatever
 	// the operator picks here afterwards - including a different brand colour
 	'design' 			=> [
-		'primary' 	=> '#f24405',
-		'secondary' => '',
-		'contrast' 	=> 'high',
-		'colors' 		=> 'default',
-		'volume' 		=> 'generous',
-		'spacing' 	=> 'tight',
-		'shaping' 	=> 'sharp',
+		'primary' 		=> '#f24405',
+		'secondary' 	=> '',
+		'harmony' 		=> 1,
+		'temperature' => 3,
+		'saturation' 	=> 2,
+		'contrast' 		=> 3,
+		'depth' 			=> 1,
+		'scale' 			=> 2,
+		'volume' 			=> 3,
+		'spacing' 		=> 1,
+		'shaping' 		=> 1,
+		'measure' 		=> 2,
 	],
 	'files' 			=> [
 		'assets',

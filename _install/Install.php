@@ -867,13 +867,20 @@ namespace Nino\Install {
 		public static function apiDesignRead( array &$appData, array &$request ): void {
 
 			if( self::_designAvailable() === false ) {
-				\Nino\Http::ok( $request, [ 'settings' => null, 'choices' => [] ] );
+				\Nino\Http::ok( $request, [ 'settings' => null, 'choices' => [], 'groups' => [] ] );
 				return;
 			}
 
+			$settings = \Nino\Design\Design::settings( $appData );
+
 			\Nino\Http::ok( $request, [
-				'settings' 	=> \Nino\Design\Design::settings( $appData ),
+				'settings' 	=> $settings,
 				'choices' 	=> \Nino\Design\Tokens::choices(),
+				'groups' 		=> \Nino\Design\Tokens::GROUPS,
+				// Borrowed rather than rebuilt: what a set of design settings
+				// looks like is Design's question, and a second answer here
+				// would be a second one to keep in step
+				'example' 	=> \Nino\Design\Preview::document( $appData, $settings, self::_previewMode() ),
 			] );
 		}
 
@@ -1268,14 +1275,23 @@ namespace Nino\Install {
 			$settings	= \Nino\Design\Tokens::normalize( is_array( $data['design'] ?? null ) ? $data['design'] : [] );
 
 			\Nino\Http::ok( $request, [
-				'settings' => $settings,
-				'palette' 	=> [
-					'light' => \Nino\Design\Tokens::palette( $settings, 'light' ),
-					'dark' 	=> \Nino\Design\Tokens::palette( $settings, 'dark' ),
-				],
-				'raster' 	=> \Nino\Design\Tokens::raster( $settings ),
+				'settings' 	=> $settings,
+				'raster' 		=> \Nino\Design\Tokens::raster( $settings ),
 				'brand' 		=> \Nino\Design\Tokens::brand( $settings ),
+				'example' 	=> \Nino\Design\Preview::document( $appData, $settings, self::_previewMode() ),
 			] );
+		}
+
+		/**
+		 *	Which mode the example is being asked for. Not a design setting -
+		 *	it is which half of a design that always has both halves is on
+		 *	screen - so it travels beside the settings rather than inside them,
+		 *	where it would end up written to the config.
+		 *
+		 *	@return 	string								'light' or 'dark'
+		 */
+		private static function _previewMode(): string {
+			return ( $_POST['mode'] ?? '' ) === 'dark' ? 'dark' : 'light';
 		}
 
 		/**

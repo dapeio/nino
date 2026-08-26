@@ -49,7 +49,7 @@ check( 'Config is one form rather than a drill-down list', configSource.includes
 // The switch itself lives in Nino.adminUi, because the Element Types editor
 // needs the same control for its numbering option - two hand-rolled copies of
 // one component is how the written on/off state gets dropped from one of them.
-const adminUiSource = fs.readFileSync( path.join( __dirname, '../_nino/Nino.js' ), 'utf8' );
+const adminUiSource = fs.readFileSync( path.join( __dirname, '../_nino/Nino.admin.js' ), 'utf8' );
 check( 'the switch is a shared component, not a copy per tool',
 	adminUiSource.includes('switchField : function') && adminUiSource.includes( "'nino-admin-switch-track'" ) );
 check( 'a switch states its condition in words, not by knob position alone',

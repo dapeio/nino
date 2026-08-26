@@ -586,21 +586,38 @@ $designReadRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 $designReadBody = $designReadRequest['/nino/http/response']['body'];
 
 check( 'the Design step opens on what the picked theme declared', ( $designReadBody['settings']['primary'] ?? '' ) === '#4faae8'
-	&& ( $designReadBody['settings']['shaping'] ?? '' ) === 'default'
-	&& ( $designReadBody['settings']['spacing'] ?? '' ) === 'default' );
-check( '...and is handed the vocabulary its controls render from', ( $designReadBody['choices']['contrast'] ?? [] ) !== []
-	&& ( $designReadBody['choices']['volume'] ?? [] ) !== []
-	&& ( $designReadBody['choices']['shaping'] ?? [] ) !== [] );
+	&& ( $designReadBody['settings']['shaping'] ?? '' ) === 2
+	&& ( $designReadBody['settings']['spacing'] ?? '' ) === 2 );
+// Every control this step draws comes out of that vocabulary, so it has to
+// carry a full description of each knob rather than a list of values - and the
+// panels to sort them into, or ten knobs arrive as one column
+check( '...and is handed the vocabulary its controls render from', count( $designReadBody['choices']['contrast']['steps'] ?? [] ) === 3
+	&& ( $designReadBody['choices']['volume']['note'] ?? '' ) !== ''
+	&& ( $designReadBody['choices']['harmony']['label'] ?? '' ) !== ''
+	&& ( $designReadBody['choices']['measure']['default'] ?? 0 ) === 2
+	&& ( $designReadBody['groups'] ?? [] ) !== [] );
+/*	The step borrows the example from /_design rather than building one: what
+	a set of settings looks like is Design's question, and a second answer in
+	the installer is a second one to keep in step. A complete document, because
+	it is delivered into a sandboxed iframe.	*/
+check( '...and the page those settings produce, built by /_design', str_starts_with( (string) ( $designReadBody['example'] ?? '' ), '<!doctype html>' )
+	&& str_contains( (string) ( $designReadBody['example'] ?? '' ), '--nino-on-alt:' )
+	&& str_contains( (string) ( $designReadBody['example'] ?? '' ), 'nino-alert--warning' ) );
 
-$_POST['data'] = json_encode( [ 'design' => [ 'primary' => '#c81e2d', 'secondary' => '#0f766e', 'contrast' => 'high', 'colors' => 'clean', 'volume' => 'compact', 'spacing' => 'tight', 'shaping' => 'sharp' ] ] );
+$_POST['data'] = json_encode( [ 'design' => [ 'primary' => '#c81e2d', 'secondary' => '#0f766e', 'harmony' => 1, 'temperature' => 1, 'saturation' => 1, 'contrast' => 3, 'depth' => 3, 'scale' => 1, 'volume' => 1, 'spacing' => 1, 'shaping' => 1, 'measure' => 1 ] ] );
 $designApplyRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Install\Themes::apiDesignApply( $appData, $designApplyRequest );
 $configAfterPick = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
 
 check( 'the operator\'s design beats the theme\'s defaults and is persisted whole', ( $configAfterPick['/nino/theme/design'] ?? [] ) === [
-	'primary' => '#c81e2d', 'secondary' => '#0f766e', 'contrast' => 'high', 'colors' => 'clean',
-	'volume' => 'compact', 'spacing' => 'tight', 'shaping' => 'sharp',
+	'primary' => '#c81e2d', 'secondary' => '#0f766e', 'harmony' => 1, 'temperature' => 1,
+	'saturation' => 1, 'contrast' => 3, 'depth' => 3, 'scale' => 1,
+	'volume' => 1, 'spacing' => 1, 'shaping' => 1, 'measure' => 1,
 ] );
+// Scale and Measure reach the stylesheet as their own tokens rather than as
+// numbers a theme has to restate
+check( '...and the root size and the layout ceiling with it', str_contains( (string) file_get_contents( $sandbox. '/public/assets/style.design.css' ), '--nino-base-size: 14px;' )
+	&& str_contains( (string) file_get_contents( $sandbox. '/public/assets/style.design.css' ), '--nino-measure: 88rem;' ) );
 check( '...and the size raster it produced is in the stylesheet', str_contains( (string) file_get_contents( $sandbox. '/public/assets/style.design.css' ), '--nino-space-1: 0.375rem;' ) );
 check( '...and regenerating never leaves a second design entry in the bundle', count( array_keys( $configAfterPick['/nino/html/assets']['/.cache/style.css'], '/assets/style.design.css', true ) ) === 1 );
 
@@ -613,21 +630,34 @@ check( 'a frame applied after Design preserves the operator\'s full Design setti
 	&& ( $configAfterFrameOnDesign['/nino/theme/design'] ?? [] ) === ( $configAfterPick['/nino/theme/design'] ?? [] ) );
 
 $previewRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-$_POST['data']  = json_encode( [ 'design' => [ 'primary' => '#4faae8', 'volume' => 'generous' ] ] );
+$_POST['data']  = json_encode( [ 'design' => [ 'primary' => '#4faae8', 'volume' => 3 ] ] );
 \Nino\Install\Themes::apiPreview( $appData, $previewRequest );
 $previewBody = $previewRequest['/nino/http/response']['body'];
 
-// Both modes have to come back, and the brand has to survive both unchanged -
-// the page ground is what flips between them, never the picked colour
-check( 'the picker can ask what a setting produces without storing it', ( $previewBody['palette']['light']['default']['bg'] ?? '' ) !== ''
-	&& ( $previewBody['palette']['dark']['default']['bg'] ?? '' ) !== ''
-	&& $previewBody['palette']['light']['default']['bg'] !== $previewBody['palette']['dark']['default']['bg']
-	&& $previewBody['palette']['light']['origin']['bg'] === '#4faae8'
-	&& $previewBody['palette']['dark']['origin']['bg'] === '#4faae8' );
+// The example is a whole page rather than a palette, so what it has to carry
+// is the generated stylesheet for the settings just posted - not the ones on
+// disk, which are what the operator is trying to change
+$previewLight = (string) ( $previewBody['example'] ?? '' );
+check( 'the picker can ask what a setting produces without storing it', str_starts_with( $previewLight, '<!doctype html>' )
+	&& str_contains( $previewLight, '--nino-brand: #4faae8;' )
+	&& str_contains( $previewLight, 'data-nino-mode="light"' ) );
+
+// The previewed mode travels beside the settings, never inside them: a
+// sandboxed iframe has an opaque origin, so nothing in the browser can stamp
+// the attribute the generated stylesheet keys its dark block on
+$darkRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+$_POST['mode'] = 'dark';
+\Nino\Install\Themes::apiPreview( $appData, $darkRequest );
+$previewDark = (string) ( $darkRequest['/nino/http/response']['body']['example'] ?? '' );
+unset( $_POST['mode'] );
+
+check( '...in either mode, with the picked brand surviving both', str_contains( $previewDark, 'data-nino-mode="dark"' )
+	&& str_contains( $previewDark, '--nino-brand: #4faae8;' )
+	&& $previewDark !== $previewLight );
 check( '...including the size raster, so both halves of the step preview the same way', ( $previewBody['raster']['text'][6] ?? '' ) !== ''
 	&& ( $previewBody['raster']['space'][1] ?? '' ) !== ''
-	&& $previewBody['settings']['volume'] === 'generous' );
-check( 'previewing stores nothing', ( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/theme/design']['volume'] ?? '' ) === 'compact' );
+	&& $previewBody['settings']['volume'] === 3 );
+check( 'previewing stores nothing', ( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/theme/design']['volume'] ?? '' ) === 1 );
 
 $listWithFrames = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Install\Themes::apiList( $appData, $listWithFrames );
@@ -636,7 +666,7 @@ $listBody = $listWithFrames['/nino/http/response']['body'];
 check( 'the picker is handed the frames and each theme\'s own defaults', isset( $listBody['frames']['header'], $listBody['frames']['footer'] )
 	&& $listBody['frames']['header'] !== []
 	&& ( $listBody['themes']['basis']['design']['primary'] ?? '' ) === '#4faae8'
-	&& ( $listBody['themes']['basis']['design']['shaping'] ?? '' ) === 'default'
+	&& ( $listBody['themes']['basis']['design']['shaping'] ?? '' ) === 2
 	&& ( $listBody['themes']['basis']['header'] ?? '' ) === 'v1' );
 
 // A theme is a mapping layer: a literal colour in a role is a pair /_design
@@ -648,9 +678,13 @@ $renderedPairs = [
 	[ '--color-background', 					'--color-subtitle' ],
 	[ '--color-section-default-bg', 	'--color-section-default-text' ],
 	[ '--color-section-alt-bg', 			'--color-section-alt-text' ],
+	[ '--color-section-tint-bg', 		'--color-section-tint-text' ],
 	[ '--color-section-dark-bg', 			'--color-section-dark-text' ],
 	[ '--color-section-black-bg', 		'--color-section-black-text' ],
 	[ '--color-primary', 							'--color-primary-text' ],
+	// The second brand colour makes the same promise as the first: filled
+	// with, written on, and solved until the text on it clears the target
+	[ '--color-brand-alt', 						'--color-brand-alt-text' ],
 	[ '--color-footer-bg-main', 			'--color-footer-text-main' ],
 	[ '--color-footer-bg-legal', 			'--color-footer-text-legal' ],
 	[ '--color-code-bg', 							'--color-code-text' ],
@@ -659,11 +693,26 @@ $renderedPairs = [
 	// every surface a section can paint carries the accent solved for it
 	[ '--color-section-default-bg', 	'--color-accent-default' ],
 	[ '--color-section-alt-bg', 			'--color-accent-alt' ],
+	[ '--color-section-tint-bg', 		'--color-accent-tint' ],
 	[ '--color-section-dark-bg', 			'--color-accent-dark' ],
 	[ '--color-section-black-bg', 		'--color-accent-black' ],
 	// ...and a status surface carries its own ink rather than the brand's
 	[ '--color-error', 								'--color-error-text' ],
 	[ '--color-success', 							'--color-success-text' ],
+	[ '--color-warning', 							'--color-warning-text' ],
+];
+
+/*	The focus ring is not a text pair - SC 1.4.11 asks 3:1 of it, not 4.5 -
+	but it is the same cross-surface trap: a ring solved against the page and
+	carried onto a dark section is unreadable there, which is exactly what
+	--color-accent was split per ground to avoid. So it is measured the same
+	way, against its own ground, at the UI target.	*/
+$renderedUiPairs = [
+	[ '--color-section-default-bg', 	'--color-focus-default' ],
+	[ '--color-section-alt-bg', 			'--color-focus-alt' ],
+	[ '--color-section-tint-bg', 		'--color-focus-tint' ],
+	[ '--color-section-dark-bg', 			'--color-focus-dark' ],
+	[ '--color-section-black-bg', 		'--color-focus-black' ],
 ];
 
 $relativeLuminance = static function( string $hex ): float {
@@ -687,6 +736,8 @@ $tokenValues = static function( array $settings, string $mode ): array {
 		$values['--nino-on-'. $surface. '-muted'] 	= $surfaceValues['on-muted'];
 		$values['--nino-'. $surface. '-link'] 			= $surfaceValues['link'];
 		$values['--nino-'. $surface. '-border'] 		= $surfaceValues['border'];
+		$values['--nino-'. $surface. '-focus'] 			= $surfaceValues['focus'];
+		$values['--nino-'. $surface. '-disabled'] 	= $surfaceValues['disabled'];
 	}
 	return $values;
 };
@@ -696,6 +747,7 @@ $colourFailures 	= [];
 $sizeFailures 		= [];
 $unreadable 			= [];
 $measuredPairs 		= 0;
+$measuredUiPairs 	= 0;
 
 foreach( $themeKeys as $themeKey ) {
 
@@ -728,13 +780,18 @@ foreach( $themeKeys as $themeKey ) {
 	$literalRoles = array_values( array_filter( $roles, static fn( array $role ): bool => str_contains( $role[2], 'var(--nino-' ) === false
 		|| preg_match( '/#[0-9a-f]{3,8}\b|\brgba?\s*\(/i', $role[2] ) === 1 ) );
 
-	if( count( $roles ) !== 34 || $literalRoles !== [] )
+	// 47 since the brand became four roles and the tint ground joined the four
+	// neutral ones: the second brand colour as a surface and its ink, the tint
+	// ground and its ink, and the accent and focus values solved for it
+	if( count( $roles ) !== 47 || $literalRoles !== [] )
 		$colourFailures[] = $themeKey. ': '. count( $roles ). ' roles, '. count( $literalRoles ). ' literal/unmapped';
 
-	preg_match_all( '/^\s*(--(?:text|space)-[1-6]|--radius(?:-small)?|--line-height)\s*:\s*([^;]+);/mi', $themeCss, $sizeRoles, PREG_SET_ORDER );
+	// The root size and the layout ceiling are raster values now, so a theme
+	// assigns them like every other size instead of writing a number
+	preg_match_all( '/^\s*(--(?:text|space)-[1-6]|--radius(?:-small|-large)?|--line-height|--base-size|--grid-max-width)\s*:\s*([^;]+);/mi', $themeCss, $sizeRoles, PREG_SET_ORDER );
 	$literalSizes = array_values( array_filter( $sizeRoles, static fn( array $role ): bool => str_contains( $role[2], 'var(--nino-' ) === false ) );
 
-	if( count( $sizeRoles ) !== 15 || $literalSizes !== [] )
+	if( count( $sizeRoles ) !== 18 || $literalSizes !== [] )
 		$sizeFailures[] = $themeKey. ': '. count( $sizeRoles ). ' roles, '. count( $literalSizes ). ' literal/unmapped';
 
 	preg_match_all( '/^\s*(--color-[a-z0-9-]+)\s*:\s*var\(\s*(--nino-[a-z0-9-]+)\s*\)\s*;/mi', $themeCss, $assignments, PREG_SET_ORDER );
@@ -762,30 +819,74 @@ foreach( $themeKeys as $themeKey ) {
 
 			$measuredPairs++;
 			$ratio 	= $contrastRatio( $back, $front );
-			$target = str_ends_with( $frontToken, '-muted' ) === true
-				? ( $settings['contrast'] === 'soft' ? 3.0 : 4.5 )
-				: ( $settings['contrast'] === 'high' ? 7.0 : 4.5 );
+			// WCAG AA is the floor at every position; the knob only ever asks
+			// for more. Muted text is text, so it gets the same floor
+			$target = [ 1 => 4.5, 2 => 4.5, 3 => 7.0 ][$settings['contrast']];
 
 			if( $ratio < $target - 0.02 )
 				$unreadable[] = sprintf( '%s/%s %s: %s on %s = %.2f:1, needs %.1f', $themeKey, $mode, $frontRole, $front, $back, $ratio, $target );
+		}
+
+		foreach( $renderedUiPairs as [ $backRole, $frontRole ] ) {
+
+			$back 	= $values[$roleToken[$backRole] ?? ''] ?? null;
+			$front	= $values[$roleToken[$frontRole] ?? ''] ?? null;
+
+			if( $back === null || $front === null ) {
+				$unreadable[] = $themeKey. '/'. $mode. ' '. $frontRole. ': not mapped to a generated token';
+				continue;
+			}
+
+			$measuredUiPairs++;
+			$ratio = $contrastRatio( $back, $front );
+
+			// SC 1.4.11, and the one value no knob is allowed to soften
+			if( $ratio < 2.98 )
+				$unreadable[] = sprintf( '%s/%s %s: %s on %s = %.2f:1, needs 3.0', $themeKey, $mode, $frontRole, $front, $back, $ratio );
 		}
 	}
 }
 
 check( 'all eight manifests declare a complete Design and available frames'. ( $manifestFailures === [] ? '' : ' - '. implode( ' | ', $manifestFailures ) ), $manifestFailures === [] );
+
+/*	The catalogue is meant to span the system rather than cluster in the middle
+	of it: ten looks that all sit at the framework default would leave the
+	operator to discover every position for themselves, and a position no
+	shipped look uses is a position nobody has ever looked at. Every knob, every
+	position, at least once - which is also how a knob that produces something
+	unusable at one end gets found before a project does.	*/
+$catalogueDesigns = [];
+foreach( $themeKeys as $themeKey ) {
+	$manifest = include __DIR__. '/../_install/library/themes/'. $themeKey. '/manifest.php';
+	$catalogueDesigns[$themeKey] = \Nino\Design\Tokens::normalize( (array) ( $manifest['design'] ?? [] ) );
+}
+
+$unvisited = [];
+foreach( \Nino\Design\Tokens::choices() as $knob => $meta )
+	for( $position = $meta['min']; $position <= $meta['max']; $position++ )
+		if( in_array( $position, array_column( $catalogueDesigns, $knob ), true ) === false )
+			$unvisited[] = $knob. ' '. $meta['steps'][$position - $meta['min']];
+
+check( 'every position of every setting is shipped by at least one theme'. ( $unvisited === [] ? '' : ' - never used: '. implode( ', ', $unvisited ) ), $unvisited === [] );
+// ...and no two looks are the same look. Ten themes that differ only in their
+// stylesheets would be ten themes the Design pane cannot tell apart
+$catalogueRows = array_map( static fn( array $design ): string => json_encode( $design ), $catalogueDesigns );
+check( 'no two themes start from the same Design'. ( count( array_unique( $catalogueRows ) ) === count( $catalogueRows ) ? '' : ' - '. implode( ', ', array_keys( array_diff_key( $catalogueRows, array_unique( $catalogueRows ) ) ) ) ),
+	count( array_unique( $catalogueRows ) ) === count( $catalogueRows ) );
 check( 'all eight themes assign every colour role to generated tokens'. ( $colourFailures === [] ? '' : ' - '. implode( ' | ', $colourFailures ) ), $colourFailures === [] );
 check( 'all eight themes assign every size role to the generated raster'. ( $sizeFailures === [] ? '' : ' - '. implode( ' | ', $sizeFailures ) ), $sizeFailures === [] );
 check( 'every rendered pair in every theme meets its declared target in both modes'. ( $unreadable === [] ? '' : ' - '. implode( ' | ', $unreadable ) ),
-	$unreadable === [] && $measuredPairs === count( $themeKeys ) * count( $renderedPairs ) * 2 );
+	$unreadable === [] && $measuredPairs === count( $themeKeys ) * count( $renderedPairs ) * 2
+	&& $measuredUiPairs === count( $themeKeys ) * count( $renderedUiPairs ) * 2 );
 
 // Nino.css still uses --color-primary both as a background (paired with
 // --color-primary-text) and as ink on the page ground. All catalogue themes
-// map it to the safe vibrant surface; pin its weakest second use until the
+// map it to the safe brand surface; pin its weakest second use until the
 // framework splits the role.
 $basisManifest = include __DIR__. '/../_install/library/themes/basis/manifest.php';
 $basisSettings = \Nino\Design\Tokens::normalize( $basisManifest['design'] );
 $darkValues 	= $tokenValues( $basisSettings, 'dark' );
-$primaryAsInk = $contrastRatio( $darkValues['--nino-default'], $darkValues['--nino-vibrant'] );
+$primaryAsInk = $contrastRatio( $darkValues['--nino-default'], $darkValues['--nino-brand-safe'] );
 
 check( 'the known --color-primary dual-use stays within a step of readable (Nino.css role split pending)', $primaryAsInk >= 4.0
 	&& $contrastRatio( $darkValues['--nino-default'], $darkValues['--nino-default-link'] ) >= 4.5 );

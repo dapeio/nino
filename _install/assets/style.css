@@ -55,7 +55,7 @@
 #install-content-wrap > div {
 	display: none;
 }
-#install-page-wrap.show-checks #install-content-checks, #install-page-wrap.show-setup #install-content-setup, #install-page-wrap.show-themes #install-content-themes, #install-page-wrap.show-design #install-content-design, #install-page-wrap.show-header #install-content-header, #install-page-wrap.show-footer #install-content-footer, #install-page-wrap.show-webpages #install-content-webpages, #install-page-wrap.show-personalinfos #install-content-personalinfos, #install-page-wrap.show-admin #install-content-admin, #install-page-wrap.show-finish #install-content-finish {
+#install-page-wrap.show-checks #install-content-checks, #install-page-wrap.show-setup #install-content-setup, #install-page-wrap.show-themes #install-content-themes, #install-page-wrap.show-header #install-content-header, #install-page-wrap.show-footer #install-content-footer, #install-page-wrap.show-webpages #install-content-webpages, #install-page-wrap.show-personalinfos #install-content-personalinfos, #install-page-wrap.show-admin #install-content-admin, #install-page-wrap.show-finish #install-content-finish {
 	display: block;
 }
 
@@ -173,27 +173,12 @@
 /*	Header/Footer each own a full step after Design. themes.js fills these
  *	panels from themes/list and hides one when that kind has no units on disk. */
 
-#design-controls {
-	display: flex;
-	gap: 1rem;
-	justify-content: space-between;
-}
-	#design-controls .install-design-section {
-		width:100%;
-	}
-
 .install-theme-panel {
 	margin: 0 0 1.25rem;
 	padding: .9rem 1rem 1rem;
 	border: 1px solid var(--editor-border);
 	border-radius: var(--editor-radius);
 	background: var(--editor-bg-grouped);
-}
-.install-design-grid {
-	display: grid;
-	grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
-	gap: .75rem;
-	margin-top: .8rem;
 }
 .install-frame-pick {
 	display: flex;
@@ -253,6 +238,13 @@
 	color: var(--editor-text-secondary);
 	font-weight: 400;
 }
+.install-theme-field.is-changed > span:first-child:before {
+	content:"*";
+	display:inline-block;
+	padding-right:3px;
+	transform:scale(1.5);
+	color: #ffa834;
+}
 /*	The native picker and the hex field are one control with two ways in, so
  *	they sit in one box rather than reading as two separate fields */
 .install-theme-color {
@@ -262,7 +254,7 @@
 }
 .install-theme-swatch {
 	flex: 0 0 auto;
-	width: 2.4rem;
+	width: 1.4rem;
 	height: 2.1rem;
 	padding: 0;
 	border: 1px solid var(--editor-border);
@@ -277,97 +269,141 @@
 /* ------------------------------------------------------------------ Design */
 /*	Its own step rather than a third panel under the theme grid: the grid
  *	already fills the pane, and everything here needs to be looked at while it
- *	is being changed. Two sections, each ending in the thing it produces. */
+ *	is being changed. Settings left behind two tabs, one page right. */
 
-.install-design-section {
-	margin: 0 0 1.25rem;
+/*	Controls left, one page right. The column is deliberately narrow - a
+	setting is a word and a select, and giving it half the step only pushes the
+	thing it changes off screen.	*/
+.install-design-split {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr);
+	gap: 1.1rem;
+	/*	Both columns take the row's height, so the preview is exactly as tall
+		as the settings beside it. Stretch is the grid default - it is named
+		here because it is load-bearing rather than incidental	*/
+	align-items: stretch;
+}
+.install-design-controls {
+	display: flex;
+	flex-direction: column;
+	gap: 0;
 	padding: .9rem 1rem 1.1rem;
 	border: 1px solid var(--editor-border);
 	border-radius: var(--editor-radius);
 	background: var(--editor-bg-grouped);
 }
-.install-design-section-title {
-	margin: 0;
-	font-size: .86rem;
-	font-weight: 650;
+.install-design-controls .nino-admin-tabs {
+	gap:0;
 }
-/*	The specimen is drawn at the generated sizes, so it has to be able to get
- *	tall without pushing the controls off screen */
-.install-design-specimen {
-	margin-top: 1rem;
-	padding-top: .9rem;
-	border-top: 1px solid var(--editor-separator);
+.install-design-controls .nino-admin-tabs button:first-child {
+	border-radius: var(--editor-radius-sm) 0 0 var(--editor-radius-sm);
 }
-.install-design-type-line {
-	margin: 0 0 .35rem;
-	font-weight: 600;
-	/*	A generated headline can be wider than the pane on a narrow window;
-	 *	clipping it is better than a horizontal scrollbar on the whole step */
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
+.install-design-controls .nino-admin-tabs button:last-child {
+	border-radius: 0 var(--editor-radius-sm) var(--editor-radius-sm) 0;
 }
-.install-design-type-line:last-child {
-	font-weight: 400;
-	color: var(--editor-text-secondary);
+.install-design-controls .nino-admin-tabs button.is-active:hover {
+	background-color: var(--editor-blue);
 }
-/*	The spacing scale as bars of one height: a gap is a distance, and drawing
- *	it square makes the top of the scale three times taller than the thing it
- *	is telling you */
-.install-design-spacing {
+/*	The knobs stack rather than grid: one column of label-over-select reads top
+	to bottom as a list of decisions, where two columns read as a form.
+
+	Scoped to the panel rather than to every child of the column - the tab row
+	is a child too, and a flex-direction meant for the settings would have
+	stood it on end	*/
+/*	:not([hidden]) so a tool rule can never outrank the design system's own
+	[hidden] and hold open a tab that is supposed to be closed	*/
+.install-design-panel:not([hidden]),
+.install-design-panel > div {
 	display: flex;
 	flex-direction: column;
 	gap: .3rem;
-	margin-top: .9rem;
 }
-.install-design-space-row {
+/*	The open panel takes what the column has spare, for the row where the
+	preview beside it is the taller of the two. It does not equalise the two
+	tabs - Colour carries two more controls than Raster, so the column is
+	shorter on Raster and the preview follows it down	*/
+.install-design-panel:not([hidden]) {
+	flex: 1 1 auto;
+}
+.install-design-stage {
 	display: flex;
-	align-items: center;
-	gap: .5rem;
+	flex-direction: column;
+	gap: .55rem;
+	min-width: 0;
 }
-.install-design-space {
-	display: block;
-	flex: 0 0 auto;
-	height: .55rem;
-	border-radius: 2px;
-	background: var(--editor-blue);
-	opacity: .55;
+.install-design-modes {
+	display: flex;
+	gap: .3rem;
 }
-.install-design-space-row small {
+.install-design-mode {
+	padding: .3rem .8rem;
+	border: 1px solid var(--editor-border);
+	border-radius: 999px;
+	background: var(--editor-bg-elevated);
 	color: var(--editor-text-secondary);
-	font-size: .7rem;
-	font-variant-numeric: tabular-nums;
+	font-size: .75rem;
+	font-weight: 600;
+	cursor: pointer;
 }
-/*	Radii stay boxes - a corner only reads against the two edges it joins */
-.install-design-corners {
-	display: flex;
-	flex-wrap: wrap;
-	align-items: flex-end;
-	gap: .5rem;
-	margin-top: 1rem;
+.install-design-mode.is-active {
+	border-color: var(--editor-blue);
+	background: var(--editor-blue-soft);
+	color: var(--editor-blue);
 }
-.install-design-radius {
-	display: block;
-	width: 2.6rem;
-	height: 2.6rem;
-	border: 2px solid var(--editor-blue);
+.install-design-mode:focus-visible {
+	outline: 2px solid var(--editor-blue);
+	outline-offset: 2px;
+}
+/*	The frame takes whatever the column has left after the mode buttons, which
+	is what makes the preview end level with the last setting.
+
+	min-height rather than height, for the row where that gives it nothing to
+	take: stacked under the controls below the breakpoint, the stage is a row
+	of its own, and an iframe with no intrinsic height would collapse to the
+	replaced-element default of 150px	*/
+/*	The box the frame is shown inside. The frame itself is wider than this and
+	scaled down into it, so the overflow is deliberate - and clipped	*/
+.install-design-port {
+	position: relative;
+	flex: 1 1 auto;
+	min-height: min(60vh, 32rem);
+	overflow: hidden;
+	border: 1px solid var(--editor-border);
+	border-radius: var(--editor-radius);
+	background: var(--editor-bg-elevated);
 }
 
-/*	Each chip is a real pair - the generated background carrying the generated
- *	text colour. A row of backgrounds alone would look convincing in exactly
- *	the settings that fail. */
-.install-theme-preview-strip {
-	display: flex;
-	flex-wrap: wrap;
-	gap: .35rem;
+/*	Width and height are set by Nino.adminUi.scaleFrame(): they are the layout
+	size the page renders at, not the size it is shown at	*/
+.install-design-view {
+	position: absolute;
+	top: 0;
+	left: 0;
+	border: 0;
+	transform-origin: 0 0;
 }
-.install-theme-chip {
-	padding: .3rem .6rem;
-	border: 1px solid transparent;
-	border-radius: var(--editor-radius-sm, .35rem);
-	font-size: .72rem;
-	font-weight: 600;
-	line-height: 1.4;
+
+@media (min-width: 62rem) {
+	.install-design-split {
+		grid-template-columns: minmax(14rem, 16rem) minmax(0, 1fr);
+	}
+}
+#install-page-wrap.show-design #install-content-design {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+#themes-design-colours {
+	flex-wrap:wrap;
+	flex-direction:row;
+}
+#themes-design-colours > label {
+    flex: 1 1 calc(50% - .4rem);
+    min-width: 4rem;
+}
+#design-controls {
+    flex: 1 1 auto;
+    min-height: 0; /* Verhindert Overflow durch flex-children */
 }
 
 /*	Lightbox - one reused overlay for every tile, closed by a click anywhere or
@@ -478,6 +514,30 @@
 	min-height: 1.25rem;
 	color: var(--editor-text-secondary);
 	font-size: .8rem;
+}
+#design-msg {
+	min-height:0;
+}
+
+/*	The step's own messages are notes; this one is a refusal. Said in a word as
+	well as in a colour - see design.js's _hexState */
+#design-msg.is-error {
+	color: var(--editor-red);
+}
+
+/*	The step's message and its way back out, on one line under the split. The
+	message takes the room so the button keeps its place as it comes and goes */
+.install-design-footer {
+	display: flex;
+	align-items: center;
+	gap: .6rem;
+	margin-top: .5rem;
+}
+
+.install-design-footer #design-msg {
+	flex: 1 1 auto;
+	min-width: 0;
+	margin: 0;
 }
 
 /* ------------------------------------------------------------- Responsive */
