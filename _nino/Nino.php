@@ -185,6 +185,9 @@ namespace Nino {
 				'\\Nino\\Modules\\Csrf',
 				'\\Nino\\Modules\\Images',
 				'\\Nino\\Modules\\Cache',
+				'\\Nino\\Modules\\Form',
+				'\\Nino\\Modules\\Navigation',
+				'\\Nino\\Modules\\Localepicker',
 			],
 			'/nino/cache/status'		=> false,
 			'/nino/cache/ttl'			=> 3600,
@@ -206,10 +209,68 @@ namespace Nino {
 			// The four registries the tools fill. Empty is the honest starting
 			// value for all of them: no bundle, no image slots, no menus, no
 			// accounts, no routes - a kernel that boots and serves a 404
-			'/nino/html/assets'		=> [],
+			'/nino/html/assets'		=> [
+		    '/.cache/style.css' => [
+		      '/_nino/Nino.css',
+		    ],
+		    '/.cache/script.js' => [
+		      '/_nino/Nino.js',
+		      '/_nino/Nino.ui.js',
+		    ],
+		  ],
 			'/nino/html/images'		=> [],
-			'/nino/html/navs'			=> [],
-			'/nino/http/routes'		=> [],
+			'/nino/html/navs'			=> [
+		    'main',
+		    'footer',
+			],
+			'/nino/http/routes'		=> [
+			  'GET://robots.txt' => [
+			      'uri' => '/robots.txt',
+			      'body' => '[template /templates/robots]',
+			      'header' => [
+			        'Content-Type' => 'text/plain; charset=utf-8',
+			      ],
+			    ],
+			    'GET://sitemap.xml' => [
+			      'uri' => '/sitemap.xml',
+			      'body' => '[template /templates/sitemap-xml]',
+			      'header' => [
+			        'Content-Type' => 'application/xml; charset=utf-8',
+			      ],
+			    ],
+			    'GET://llms.txt' => [
+			      'uri' => '/llms.txt',
+			      'body' => '[template /templates/llms-txt]',
+			      'header' => [
+			        'Content-Type' => 'text/plain; charset=utf-8',
+			      ],
+			    ],
+			    'GET://' => [
+			      'uri' => '/home',
+			      'body' => '[template /templates/page-home]',
+			      'navs' => [
+			        'footer' => 1,
+			      ],
+			    ],
+					'GET://contact' => [
+			      'uri' => '/contact',
+			      'body' => '[template /templates/page-contact]',
+			      'navs' => [
+			      	'main' => 1,
+			        'footer' => 2,
+			      ],
+			    ],
+			    'GET://404' => [
+			      'uri' => '/404',
+			      'body' => '[template /templates/page-404]',
+			      'statusCode' => 404,
+			    ],
+			    'GET://legal' =>
+			    [
+			      'body' => '[template /templates/page-legal.[[/nino/http/response/locale]]]',
+			      'uri' => '/legal',
+			    ],
+			],
 			'/nino/auth/user'			=> [],
 		];
 

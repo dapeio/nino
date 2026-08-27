@@ -557,7 +557,7 @@ namespace Nino\Install {
 			}
 			$appData['/nino/modules'] = array_values( array_unique( $moduleClasses ) );
 
-			$routes = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes'] ?? [];
+			$routes = $appData['/nino/http/routes'] ?? \Nino\AppData::DEFAULTS['/nino/http/routes'] ?? [];
 			foreach( self::_libraryRouteKeys() as $routeKey )
 				unset( $routes[$routeKey] );
 
@@ -2683,7 +2683,7 @@ namespace Nino\Install {
 						self::_copyFile( $unitDir. '/templates/'. $file, \Nino\Filesystem::path( $appData, '/templates/'. $file ) );
 					}
 				}
-					
+
 				if( count( $manifest['files'] ?? [] ) > 0 ) {
 					foreach( $manifest['files'] as $file )
 						if( is_dir( $unitDir. '/'. $file ) === true )
@@ -2927,7 +2927,7 @@ namespace Nino\Install {
 
 			if( is_file( $to ) === true )
 				@unlink( $to );
-			
+
 			if( is_dir( dirname( $to ) ) === false )
 				@mkdir( dirname( $to ), 0755, true );
 
