@@ -23,23 +23,19 @@
 				</div>
 				<nav class="nino-admin-nav" id="theme-nav">
 					<a href="#" id="theme-nav-theme" class="active">Theme</a>
-					<a href="#" id="theme-nav-design">Design</a>
 					<a href="#" id="theme-nav-header">Header</a>
 					<a href="#" id="theme-nav-footer">Footer</a>
+					<a href="#" id="theme-nav-design">Design</a>
 				</nav>
 			</aside>
 
 			<main class="nino-admin-pane" id="theme-pane">
 				<section id="theme-content-theme">
-					<h1>Theme</h1>
-					<p class="nino-admin-hint nino-admin-hint-lead">Choose the component mapping, typography and visual character. Applying a Theme establishes its complete recommended baseline: its Design values plus its Header and Footer. Each of those remains independently editable in the following dialogs.</p>
 					<div id="theme-grid" aria-live="polite"></div>
 					<p id="theme-empty" class="nino-admin-hint theme-hidden"><strong>No theme variants are available.</strong><br>The directory /_install/library must exist.</p>
 				</section>
 
 				<section id="theme-content-design">
-					<h1>Design</h1>
-					<p class="nino-admin-hint nino-admin-hint-lead">Set the values every stylesheet reads from. Most settings are a scale &ndash; <em>less</em>, <em>as it is</em>, <em>more</em> &ndash; and their middle position is the framework&rsquo;s own: with all of them there the generated stylesheet reproduces Nino.css exactly. <em>Harmony</em> and <em>Temperature</em> are choices rather than scales, so they name their alternatives instead. Colours are generated as measured background/text pairs and clear WCAG&nbsp;AA at every position.</p>
 
 					<!--	Two columns, and the split is the point: every knob is
 								visible at once on the left, and one page on the right shows
@@ -94,8 +90,6 @@
 				</section>
 
 				<section id="theme-content-header">
-					<h1>Header</h1>
-					<p class="nino-admin-hint nino-admin-hint-lead">Choose the site's <code>&lt;header&gt;</code> independently. The preview combines the current Theme and saved Design with the selected frame.</p>
 					<p id="theme-frame-header-empty" class="nino-admin-hint theme-hidden"><strong>No Header variants are available.</strong><br>The directory /_install/library must exist.</p>
 					<div id="theme-frame-header-panel" class="theme-frame-panel theme-hidden">
 						<label class="theme-field theme-frame-select"><span>Header variant</span><select id="theme-frame-header" class="nino-admin-input"></select></label>
@@ -104,8 +98,6 @@
 				</section>
 
 				<section id="theme-content-footer">
-					<h1>Footer</h1>
-					<p class="nino-admin-hint nino-admin-hint-lead">Choose the site's <code>&lt;footer&gt;</code> without changing Theme, Design or Header. Its own template and stylesheet are replaced together.</p>
 					<p id="theme-frame-footer-empty" class="nino-admin-hint theme-hidden"><strong>No Footer variants are available.</strong><br>The directory /_install/library must exist.</p>
 					<div id="theme-frame-footer-panel" class="theme-frame-panel theme-hidden">
 						<label class="theme-field theme-frame-select"><span>Footer variant</span><select id="theme-frame-footer" class="nino-admin-input"></select></label>

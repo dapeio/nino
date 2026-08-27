@@ -39,7 +39,7 @@
 
 	#theme-page-wrap #theme-grid {
 		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+		grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
 		gap: .8rem;
 		margin-bottom: 1rem;
 	}
@@ -164,6 +164,19 @@
 		border: 1px solid var(--editor-border);
 		border-radius: var(--editor-radius);
 		background: var(--editor-bg-grouped);
+	}
+	
+	.theme-design-controls .nino-admin-tabs {
+		gap:0;
+	}
+	.theme-design-controls .nino-admin-tabs button:first-child {
+		border-radius: var(--editor-radius-sm) 0 0 var(--editor-radius-sm);
+	}
+	.theme-design-controls .nino-admin-tabs button:last-child {
+		border-radius: 0 var(--editor-radius-sm) var(--editor-radius-sm) 0;
+	}
+	.theme-design-controls .nino-admin-tabs button.is-active:hover {
+		background-color: var(--editor-blue);
 	}
 
 	/*	The knobs stack rather than grid: one column of label-over-select reads
