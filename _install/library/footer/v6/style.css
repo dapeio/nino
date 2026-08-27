@@ -69,21 +69,13 @@
 	margin-top: .45rem;
 }
 
-.nino-frame-footer .nino-frame-footer-legal {
+.nino-frame-footer .nino-frame-footer-legal > div {
 	display: flex;
 	align-items: center;
-	justify-content: space-between;
-	gap: var(--space-2);
 	padding-top: var(--space-2);
 	padding-bottom: var(--space-2);
 	color: var(--color-subtitle);
 	border-top: 1px solid var(--color-border);
-}
-
-.nino-frame-footer .nino-frame-footer-utility {
-	display: flex;
-	align-items: center;
-	gap: var(--space-2);
 }
 
 .nino-frame-footer .nino-footer-localepicker {

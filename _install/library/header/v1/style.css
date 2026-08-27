@@ -6,6 +6,7 @@
 	min-height: 5rem;
 	opacity: 1;
 	background-color: var(--color-background);
+	display:flex;
 }
 
 body.nino-scroll-atf .nino-frame-header .nino-scroll-header {

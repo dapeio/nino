@@ -16,6 +16,10 @@
 	display: block;
 }
 
+.nino-frame-footer .nino-frame-footer-copyright {
+	display:flex;
+}
+
 .nino-frame-footer .nino-footer-logo {
 	width: clamp(7rem, 10vw, 9rem);
 	max-width: none;
@@ -55,6 +59,7 @@
 	display: flex;
 	justify-content: flex-end;
 	gap: var(--space-2);
+	align-items: center;
 }
 
 .nino-frame-footer .nino-footer-localepicker {

@@ -1,105 +1,183 @@
 <!--	The page /_design previews against.
 
-	One element per thing a setting changes, and nothing else. The type scale
-	is what Headings and Size fan out, the grid row is what Width bounds, the
-	grounds are what Depth separates, the card border and the field outline
-	are what Depth and Contrast draw, and the alerts are the status surfaces
-	the brand knobs are not allowed to reach. Anything that showed the same
-	token twice has been taken out - a preview earns its height by showing a
-	difference, not by looking like a website.
+	A whole page rather than a strip of specimens: a design decision cannot be
+	judged one token at a time, and what an operator is deciding is how a site
+	feels, not what any single value is. So this is an ordinary Nino page,
+	written the way a real one is, and every class in it is one the framework
+	defines. Nothing here belongs to /_design.
 
-	The two brand buttons sit side by side because that is the only way
-	Harmony is visible at all: it decides where the second brand colour lands
-	relative to the first, and one button can only ever show one of them. The
-	tinted band is there for the same reason - it is the ground the brand hue
-	actually reaches, so the tint and Temperature's Neutral position have
-	somewhere to be seen.
+	The markup is the live markup, lifted from the section presets the Template
+	Builder inserts (_install/library/pages/.demo-catalogue): the same nesting,
+	the same utilities, the same spacing classes. That is the whole point of it
+	- a mock with margins of its own would preview its own margins.
 
-	Laid out to be taken in at once. The frame renders at a desktop's layout
-	width and is scaled into the panel, so the room here is horizontal rather
-	than vertical: the card and the field sit beside the type instead of under
-	it, and the four alerts share one short band. Scrolling a preview to find
-	the rest of it is scrolling to find out whether a decision was right.
+	What this file does *not* carry is the bar and the footer. Those are the
+	project's own header and footer units, prepared by /_install and pasted
+	around this markup by Preview::document(): a bar drawn here out of framework
+	classes is a bar no site has, and on a look built around a vertical rail
+	rather than a top bar it was not a simplification but the wrong picture.
+	Everything between them is this file.
 
-	Design-system classes only: no class here belongs to /_design, and there
-	is no literal colour or size anywhere. That is the point of it. What it
-	shows is what a project built on these settings gets, which it can only be
-	if it is an ordinary page - .nino-article--alt is the framework's own card,
-	down to stepping onto a different surface inside a dark section, and
-	repeating that here by hand would only prove the copy right.
+	Four bands, each there for something the settings move:
 
-	Sections rather than <header> and <footer>, deliberately. Nino.css gives a
-	bare <header> position:fixed, and a real page's frame stylesheet pays for
-	that with a body main { padding-top } this document has no reason to carry
-	- without it the first heading renders underneath the bar. Which frame a
-	site uses is the Header and Footer dialogs' question anyway; this one is
-	about the tokens every frame reads from.	-->
+		the cover        the display end of the scale over a photograph, and
+		                 all three button roles at once
+		three cards      the alternate surface, borders, corners, images
+		the split band   a second ground, body copy, and the four status
+		                 surfaces the brand knobs are not allowed to reach
+		the closing band the second brand colour as a surface of its own
 
-<!--	<main> because Nino.css gives it flex: 1 0 auto inside a body that is a
-	column at least a viewport tall - which is what puts the last band at the
-	bottom of the frame instead of leaving the rest of it blank. A real page
-	behaves this way; the preview had simply never told it to.	-->
+	Sized to be taken in at once. The frame renders at a desktop's layout width
+	and is scaled into the panel, so the room is horizontal rather than
+	vertical, and the page is one screen of a site rather than all of one -
+	scrolling a preview to find the rest of it is scrolling to find out whether
+	a decision was right.
+
+	The pictures are named the way a page names them, a path under the public
+	directory, and Preview::images() carries them into the document - a srcdoc
+	frame has an opaque origin and fetches nothing. They are the same demo
+	images the catalogue page uses, so the preview shows the project's own
+	pictures rather than a grey rectangle standing in for one.	-->
 <main>
 
-<section class="nino-section">
-	<div class="nino-grid-row">
-		<div class="nino-grid-100 nino-grid-m-66 nino-p-1">
-			<h1 class="nino-section-title nino-text-left">Design that survives the brief</h1>
-			<p class="nino-section-subtitle nino-text-left">The muted tier, one step below the ink above it.</p>
-			<p>Body copy sits at the one size the scale never moves. Everything above it fans out from here &mdash; and <a href="#">a link like this one</a> is solved against this exact ground, not against the page it was designed on.</p>
-			<p>
-				<span class="nino-btn nino-btn--primary">Start a project</span>
-				<span class="nino-btn nino-btn--brand-alt">The second colour</span>
-				<span class="nino-btn nino-btn--outline">See the work</span>
-				<span class="nino-btn nino-btn--primary" aria-disabled="true">Unavailable</span>
-			</p>
-		</div>
-		<div class="nino-grid-100 nino-grid-m-33 nino-p-1">
-			<div class="nino-article nino-article--alt">
-				<h3 class="nino-article-title">A card on the page ground</h3>
-				<p>Its border, its corners and its distance from the page are one decision.</p>
+<section style="min-height:50vh" class="nino-atf nino-pt-1 nino-pb-2 nino-mt-0 nino-mb-0 nino-cover nino-cover--dim">
+	<img src="[[/nino/public]]/images/.demo/demo-00.svg" alt="">
+	<div class="nino-cover-content">
+		<div class="nino-grid-row">
+			<div class="nino-grid-100 nino-grid-m-66 nino-pt-6 nino-text-left">
+				<h2 class="nino-atf-title">Design that survives the brief</h2>
+				<p class="nino-atf-subtitle">Furniture made to last &mdash; designed and built in Regensburg.</p>
+				<p>
+					<a href="#" class="nino-btn nino-btn--primary">Start a project</a>
+					<a href="#" class="nino-btn nino-btn--brand-alt">The second colour</a>
+					<a href="#" class="nino-btn nino-btn--outline">See the work</a>
+				</p>
 			</div>
-			<form class="nino-form">
-				<label for="preview-email">Work email</label>
-				<input type="email" id="preview-email" class="nino-form-input" value="you@studio.com">
+		</div>
+	</div>
+</section>
+
+<section class="nino-section nino-section--alt nino-mt-0 nino-mb-0" aria-labelledby="karten-borderless-title">
+	<div class="nino-grid-row nino-pb-3">
+		<div class="nino-grid-100">
+			<h4 class="nino-section-title">What we do</h4>
+			<p class="nino-section-subtitle">Everything for your success</p>
+		</div>
+	</div>
+	<div class="nino-grid-row">
+		<div class="nino-grid-25">
+			<article class="nino-article nino-article--alt nino-mb-3 nino-article--borderless">
+				<img src="[[/nino/public]]/images/.demo/demo-00.svg" alt="Consulting" class="nino-article-img">
+				<div class="nino-article-content">
+					<h3 class="nino-article-title">Consulting</h3>
+					<div class="nino-article-descr">In a conversation, we determine what the project really needs.</div>
+					<a class="nino-btn" href="#">Learn more</a>
+				</div>
+			</article>
+		</div>
+		<div class="nino-grid-25">
+			<article class="nino-article nino-article--alt nino-mb-3 nino-article--borderless">
+				<img src="[[/nino/public]]/images/.demo/demo-00.svg" alt="Consulting" class="nino-article-img">
+				<div class="nino-article-content">
+					<h3 class="nino-article-title">Design</h3>
+					<div class="nino-article-descr">The requirements become a design that works always in practice.</div>
+					<a class="nino-btn" href="#">Learn more</a>
+				</div>
+			</article>
+		</div>
+		<div class="nino-grid-25">
+			<article class="nino-article nino-article--alt nino-mb-3 nino-article--borderless">
+				<img src="[[/nino/public]]/images/.demo/demo-00.svg" alt="Consulting" class="nino-article-img">
+				<div class="nino-article-content">
+					<h3 class="nino-article-title">Implementation</h3>
+					<div class="nino-article-descr">Clean markup, clear structure and perfect maintainable for years.</div>
+					<a class="nino-btn" href="#">Learn more</a>
+				</div>
+			</article>
+		</div>
+		<div class="nino-grid-25">
+			<article class="nino-article nino-article--alt nino-mb-3 nino-article--borderless">
+				<img src="[[/nino/public]]/images/.demo/demo-00.svg" alt="Consulting" class="nino-article-img">
+				<div class="nino-article-content">
+					<h3 class="nino-article-title">Support</h3>
+					<div class="nino-article-descr">Updates, small changes and one contact who knows your project.</div>
+					<a class="nino-btn" href="#">Learn more</a>
+				</div>
+			</article>
+		</div>
+		<div class="nino-grid-100 nino-text-center nino-mt-3">
+			<a href="#" class="nino-btn nino-btn--primary nino-btn--big">Read more</a>
+		</div>
+	</div>
+</section>
+<section class="nino-section nino-section--primary nino-p-6">
+	<div class="nino-grid-row">
+		<div class="nino-grid-100 nino-text-center"><h2 class="nino-section-title" id="cta-centered-title">Have a piece of furniture in mind?</h2><p class="nino-section-subtitle">We take a look at the space and provide a no-obligation quote.</p></div>
+		<div class="nino-grid-100 nino-mt-3 nino-text-center"><a href="#v-contact-form-split" class="nino-btn nino-btn--light">Book an appointment</a><a href="#katalog-presets" class="nino-btn nino-btn--outline">Browse first</a></div>
+	</div>
+</section>
+<section class="nino-section nino-section--alt" aria-labelledby="preview-split-title">
+	<div class="nino-grid-row nino-grid-middle">
+		<div class="nino-grid-50"><div class="nino-img-cover"><img src="[[/nino/public]]/images/.demo/demo-01.svg" style="max-height:30vh" alt=""></div></div>
+		<div class="nino-grid-50">
+			<div class="nino-article">
+				<div class="nino-article-content">
+					<h3 class="nino-article-title" id="preview-split-title">Always included</h3>
+					<p class="nino-article-subtitle">At no extra cost, in every package.</p>
+						<ul class="nino-list nino-list--check">
+
+						<li>Concept, copy and design from one source</li>
+
+						<li>One appointment per week while the project is running</li>
+
+						<li>Handover with backend training</li>
+
+						</ul>
+				</div>
+			</div>
+		</div>
+	</div>
+</section>
+<section id="ablauf-timeline" class="nino-section nino-mt-0 nino-mb-0" aria-labelledby="ablauf-timeline-title">
+	<div class="nino-grid-row">
+		<div class="nino-grid-100 nino-mb-3 nino-text-center"><h2 class="nino-section-title" id="ablauf-timeline-title">From enquiry to handover</h2><p class="nino-section-subtitle">Four steps every project goes through.</p></div>
+		<div class="nino-grid-100">
+			<ol class="nino-timeline nino-timeline--counted">
+				<li class="nino-timeline-step"><h4>Getting to know each other</h4><p>A conversation about goals, scope and timeframe.</p></li><li class="nino-timeline-step"><h4>Concept</h4><p>Structure, content and design are defined.</p></li><li class="nino-timeline-step"><h4>Implementation</h4><p>The site takes shape, and you see every stage along the way.</p></li><li class="nino-timeline-step"><h4>Handover</h4><p>Backend handover and training, with continued support afterwards.</p></li>
+			</ol>
+		</div>
+	</div>
+</section>
+<section class="nino-section nino-section--tint" aria-labelledby="preview-split-title">
+	<div class="nino-grid-row nino-grid-middle">
+		<div class="nino-grid-50">
+			<div class="nino-article">
+				<div class="nino-article-content">
+					<h3 class="nino-article-title" id="preview-split-title">Always included</h3>
+					<p class="nino-article-subtitle">At no extra cost, in every package.</p>
+					<p class="nino-article-descr">
+						Body copy sits at the one size the scale never moves, and <a href="#">a link like this one</a> is solved against this exact ground rather than against the page it was designed on.
+					</p>
+				</div>
+			</div>
+		</div>
+		<div class="nino-grid-50"><div class="nino-img-cover"><img src="[[/nino/public]]/images/.demo/demo-01.svg" style="max-height:30vh" alt=""></div></div>
+	</div>
+</section>
+
+<section class="nino-section nino-section--dark nino-mt-0 nino-mb-0 nino-section" aria-labelledby="newsletter-centered-title">
+	<div class="nino-grid-row nino-pt-4 nino-pb-4">
+		<div class="nino-grid-100 nino-mb-3 nino-text-center"><h2 class="nino-section-title" id="newsletter-centered-title">Workshop newsletter</h2><p class="nino-section-subtitle">Four times a year, a look at what is currently being made.</p></div>
+		<div class="nino-grid-100 nino-grid-m-66 nino-mx-auto">
+			<form class="nino-form nino-newsletter-form nino-form--inline">
+				<input type="text" name="location" value="" tabindex="-1" autocomplete="off" aria-hidden="true" class="nino-form-trap">
+				<label for="newsletter-centered-email" class="nino-sr-only">Email address</label>
+				<input style="width:50%" type="email" name="email" class="nino-form-input" placeholder="Email address" required="">
+				<button type="submit" class="nino-btn nino-btn--primary nino-form-submit">Subscribe</button>
+				<p class="nino-form-message nino-grid-100"></p>
 			</form>
 		</div>
 	</div>
 </section>
-
-<!--	Tinted rather than the alternate grey: the alternate ground is already
-	on screen as the card above, and this is the one surface that carries the
-	brand hue rather than a trace of it.	-->
-<section class="nino-section nino-section--tint nino-pt-2 nino-pb-2">
-	<div class="nino-grid-row">
-		<div class="nino-grid-50 nino-grid-m-25 nino-p-1"><p class="nino-alert nino-alert--info">Info takes the brand as ink.</p></div>
-		<div class="nino-grid-50 nino-grid-m-25 nino-p-1"><p class="nino-alert nino-alert--success">Success carries its own text.</p></div>
-		<div class="nino-grid-50 nino-grid-m-25 nino-p-1"><p class="nino-alert nino-alert--warning">Warning sits between the two.</p></div>
-		<div class="nino-grid-50 nino-grid-m-25 nino-p-1"><p class="nino-alert nino-alert--error">And red stays red.</p></div>
-	</div>
-</section>
-
-<section class="nino-section nino-section--dark nino-pt-3 nino-pb-3">
-	<div class="nino-grid-row">
-		<div class="nino-grid-100 nino-grid-m-66 nino-p-1">
-			<h2 class="nino-section-title nino-text-left">A band that paints its own ground</h2>
-			<p>So it owns the ink on it too &mdash; <a href="#">including this link</a>, solved for this surface and no other.</p>
-		</div>
-		<div class="nino-grid-100 nino-grid-m-33 nino-p-1">
-			<div class="nino-article nino-article--alt">
-				<h3 class="nino-article-title">...and the card steps down</h3>
-				<p>On a dark band the framework moves it to the deepest ground.</p>
-			</div>
-		</div>
-	</div>
-</section>
-
 </main>
 
-<section class="nino-section nino-section--black nino-pt-2 nino-pb-2">
-	<div class="nino-grid-row">
-		<div class="nino-grid-100">
-			<p>The deepest ground, which is where most themes put their footer. <a href="#">One link</a> to measure it by.</p>
-		</div>
-	</div>
-</section>

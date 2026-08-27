@@ -271,11 +271,35 @@ check( 'Design opens clean, with nothing to save and nothing to revert', nodes['
 	frame was narrower than the difference the operator was choosing between.
 	The page is given a desktop's layout width and scaled into the panel
 	instead, which keeps every proportion inside it exact.	*/
-check( 'the page renders at a desktop layout width, not at the panel\'s', nodes['theme-design-example'].style.width === '1600px' );
-// At scale f, filling a box h tall takes h/f of document - so the page gets
-// exactly as much vertical room as the panel can show, and no more
-check( '...scaled into the room the panel has, height solved to match', nodes['theme-design-example'].style.transform === 'scale(0.5)'
-	&& nodes['theme-design-example'].style.height === '1200px' );
+check( 'the page renders at a desktop layout width, not at the panel\'s', nodes['theme-design-example'].style.width === String( theme.PREVIEW_WIDTH )+ 'px' );
+
+/*	Two ways to fit, and PREVIEW_HEIGHT picks which. With a height both
+	dimensions are fixed and the scale is whichever of the two fits, so the whole
+	page is on screen; without one the page is given the panel's height solved
+	back through the scale - as much document as the port can show, and the rest
+	scrolls. The stub's port is 800x600.	*/
+const scaled = function( width, height ) {
+	const frame = element( 'probe-frame' );
+	sandbox.Nino.adminUi.scaleFrame( frame, element( 'probe-port' ), width, height );
+	return frame.style;
+};
+
+const whole = scaled( 2400, 2000 );
+check( 'given a layout height, the whole page is fitted into the panel', whole.height === '2000px'
+	&& whole.transform === 'scale('+ Math.min( 1, 800 / 2400, 600 / 2000 )+ ')' );
+// A page is taller than it is wide and a panel is the other way round, so the
+// room left over reads as a margin rather than as a page that failed to fill it
+check( '...and centred in the room that leaves', whole.left !== '0px' && whole.left !== '0'
+	&& whole.top !== '0' );
+
+const tall = scaled( 2400, 0 );
+check( 'without one it is given the panel\'s height, solved back through the scale', tall.transform === 'scale('+ ( 800 / 2400 )+ ')'
+	&& tall.height === String( Math.round( 600 / ( 800 / 2400 ) ) )+ 'px'
+	&& tall.left === '0' );
+// Which of the two this tool ships is one number, and the example is 4700-6200px
+// tall at this width - too much page to fit a panel and still be looked at
+check( '...which is what the pane uses, the example being a whole site', theme.PREVIEW_HEIGHT === 0
+	&& nodes['theme-design-example'].style.transform === 'scale('+ ( 800 / theme.PREVIEW_WIDTH )+ ')' );
 
 // Two tabs rather than one long column. Both panels stay in the DOM - the one
 // not being looked at keeps its controls, their values and their listeners
@@ -323,13 +347,14 @@ check( 'a Design change asks the server for a preview without changing Theme or 
 	only way back to a position the operator recognises	*/
 const fieldMark = function( key ) {
 	const field = theme._designFields[key];
-	return field && field.changeMark && field.changeMark.hidden === false ? field.changeMark.textContent : '';
+	return field !== undefined && field.changeMark !== undefined && field.changeMark.hidden === false
+		&& field.classList.contains('is-changed') === true;
 };
 
 check( 'an unsaved change is counted in the bar and named in its own field', nodes['theme-action-status'].textContent === '1 unsaved design change'
 	&& nodes['theme-action-status'].classList.contains('theme-status-dirty') === true
-	&& fieldMark('spacing') === 'saved: as it is'
-	&& fieldMark('shaping') === '' );
+	&& fieldMark('spacing') === true
+	&& fieldMark('shaping') === false );
 check( '...and the way back out is offered beside the way through', nodes['theme-action-revert'].hidden === false
 	&& nodes['theme-action-save'].disabled === false );
 
@@ -350,7 +375,7 @@ posts.length = 0;
 nodes['theme-action-revert'].fire('click');
 check( 'Revert puts every control back on the stored value and clears the marks', theme._designSettings.spacing === 2
 	&& knobSelect( 'theme-design-knobs-raster', 2 ).value === '2'
-	&& fieldMark('spacing') === ''
+	&& fieldMark('spacing') === false
 	&& nodes['theme-action-revert'].hidden === true
 	&& nodes['theme-action-save'].disabled === true );
 check( '...and asks for the picture that produces', posts.length === 1
@@ -382,7 +407,7 @@ hex.value = '#101820';
 hex.fire('input');
 check( 'a complete one is taken, and counted', theme._designSettings.primary === '#101820'
 	&& nodes['theme-design-primary'].value === '#101820'
-	&& fieldMark('primary') === 'saved: #b6a6ff' );
+	&& fieldMark('primary') === true );
 
 // The one loss this pane cannot undo afterwards
 const leaving = unload.map( function( handler ) {
@@ -418,7 +443,7 @@ check( 'Design save posts the settings directly and only to design/save', design
 check( 'a written Design is a clean one', nodes['theme-action-status'].textContent === 'Design written.'
 	&& nodes['theme-action-save'].disabled === true
 	&& nodes['theme-action-revert'].hidden === true
-	&& fieldMark('primary') === '' );
+	&& fieldMark('primary') === false );
 
 // Header and Footer each preview and apply one frame only.
 posts.length = 0;

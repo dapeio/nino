@@ -8,10 +8,12 @@
  *													the tokens from them and this step writes the
  *													stylesheet, see _install/Install.php's Themes class.
  *
- *													It opens on whatever the previous step just installed:
- *													applying a theme also applies the design its manifest
- *													declares, so this step starts from the look the theme's
- *													preview promised rather than from a neutral default.
+ *													It opens on whatever the Themes step installed: applying
+ *													a theme also applies the design its manifest declares,
+ *													so this step starts from the look the theme's preview
+ *													promised rather than from a neutral default. The Header
+ *													and Footer steps run before this one, and the example is
+ *													drawn inside the frames they settled - see _readFor().
  *
  *													Every value shown here is asked for rather than
  *													computed - design/preview returns the real palette. The
@@ -44,7 +46,24 @@
 		// never reaches _settings and never reaches the config
 		_mode 		: 'light',
 		_rowsBound	: false,
+		/*	The layout the example is rendered at, and then scaled into the
+			panel. A desktop's width, because a page never meets its own layout
+			limits in a box half a pane wide.
+
+			The height is off. It fixes both dimensions so the whole page fits
+			the port at once, which is worth having - but only for a page that
+			is roughly as tall as the panel is deep. The example is a full site
+			now, seven bands at the section default spacing, and it measures
+			4700-6200px depending on the theme: fitted whole into a 1100x665
+			panel that draws at 11%, and at the 2000-2200 it was set to it was
+			simply cut in half. So the page is given the panel's height and
+			scrolls, the way the site it stands for does.
+
+			Put a height back the moment the example is short enough for one -
+			the mechanism is in Nino.adminUi.scaleFrame() and nothing else has
+			to change.	*/
 		PREVIEW_WIDTH : 2400,
+		PREVIEW_HEIGHT : 0,
 		_refit : null,
 		_example 	: '',
 		_bound 		: false,
@@ -52,14 +71,16 @@
 		// What the theme declared, kept beside what is on screen: the two are
 		// what "changed" means in a wizard that has not written anything yet
 		_baseline : null,
-		// The theme the baseline was read for. A re-read is owed when that
-		// changes and at no other time - see showCurrent()
-		_theme 		: null,
+		// What the baseline was read for - the theme and the two frames. A
+		// re-read is owed when any of them changes and at no other time; see
+		// showCurrent() and _readFor()
+		_source 	: null,
 		// The field elements the settings are rendered into, by key
 		_fields 	: {},
 
 		/**
-		 *	Read what the previous step installed and render the controls on it
+		 *	Read what the steps before this one installed, and render the
+		 *	controls on it
 		 *
 		 *	@return		void
 		 */
@@ -69,7 +90,7 @@
 			if( wrap === null )
 				return;
 
-			const previous = Nino.install.design._theme;
+			const previous = Nino.install.design._source;
 
 			Nino.install.apiCall( 'design/read', {}, function( status, response ) {
 
@@ -81,7 +102,7 @@
 				Nino.install.design._choices 	= response.choices || {};
 				Nino.install.design._groups 	= response.groups || {};
 				Nino.install.design._example 	= response.example || '';
-				Nino.install.design._theme 		= Nino.install.design._selectedTheme();
+				Nino.install.design._source 	= Nino.install.design._readFor();
 				Nino.install.design._ready 		= true;
 
 				Nino.install.design._render();
@@ -89,22 +110,34 @@
 				// A reload the operator did not ask for is a reload they get
 				// told about - it is their own values that were replaced
 				const msg = dc.getElementById('design-msg');
-				if( msg !== null && previous !== null && previous !== Nino.install.design._theme )
-					msg.textContent = 'The theme changed, so these values were read from it again.';
+				if( msg !== null && previous !== null && previous !== Nino.install.design._source )
+					msg.textContent = 'The theme or a frame changed, so these values were read again.';
 			} );
 		},
 
 		/**
-		 *	Which theme the previous step has settled on, or null where the
-		 *	step is not there to ask
+		 *	What this step's values were read for: the theme, and the two frames
+		 *	the example is drawn inside. Re-reading is owed when any of them
+		 *	moves and at no other time.
 		 *
-		 *	@return		{?string}
+		 *	@return		{string}
 		 */
-		_selectedTheme : function() {
+		_readFor : function() {
 
 			const themes = wn.Nino.install.themes;
+			const parts = [ themes && typeof themes._selected !== 'undefined' ? themes._selected : '' ];
 
-			return themes && typeof themes._selected !== 'undefined' ? themes._selected : null;
+			/*	...and the two frames, because the example is a whole page drawn
+				inside them. The frame steps run before this one now, so coming
+				back here after changing the header has to re-read: a Design
+				judged inside the bar the operator just replaced is a Design
+				judged in a layout that no longer exists.	*/
+			[ 'header', 'footer' ].forEach( function( kind ) {
+				const select = dc.getElementById('themes-frame-'+ kind);
+				parts.push( select !== null ? select.value : '' );
+			} );
+
+			return parts.join('/');
 		},
 
 		/**
@@ -121,7 +154,7 @@
 		 */
 		showCurrent : function() {
 
-			if( Nino.install.design._ready === true && Nino.install.design._selectedTheme() === Nino.install.design._theme ) {
+			if( Nino.install.design._ready === true && Nino.install.design._readFor() === Nino.install.design._source ) {
 				// The step was off screen while the window may have changed
 				// size, and a scaled frame only knows what its port measured
 				if( typeof Nino.install.design._refit === 'function' )
@@ -578,7 +611,7 @@
 			const port = dc.getElementById('themes-design-example-port');
 
 			if( frame !== null && port !== null )
-				Nino.install.design._refit = Nino.adminUi.scaleFrame( frame, port, Nino.install.design.PREVIEW_WIDTH );
+				Nino.install.design._refit = Nino.adminUi.scaleFrame( frame, port, Nino.install.design.PREVIEW_WIDTH, Nino.install.design.PREVIEW_HEIGHT );
 
 			Nino.adminUi.buttonRow( {
 				light : dc.getElementById('themes-design-mode-light'),

@@ -94,10 +94,12 @@
 	--color-border: var(--nino-default-border);
 	--color-header-bg: var(--nino-default);
 
-	/* The scrim over a cover image - not a pair /_design can solve, since
-	   it cannot know the photograph underneath, so the theme derives it
-	   from its deepest surface and owns the light text put on top */
-	--color-background-dim: color-mix(in srgb, var(--nino-black) 78%, transparent);
+	/* The scrim over a cover image. /_design solves it against the worst
+	   photograph it could be asked to cover - a white one - so this is the
+	   lightest scrim that still carries the ink on top of it, and the most
+	   of the picture a look can show. A theme may darken it for mood; it
+	   must not lighten it. */
+	--color-background-dim: var(--nino-scrim);
 
 	/* Footer bands */
 	--color-footer-bg-main: var(--nino-black);

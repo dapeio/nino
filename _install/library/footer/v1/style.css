@@ -3,5 +3,10 @@
 }
 .nino-footer-nav {
 	display:flex;
-	gap:var(--space-3)
+	gap:var(--space-3);
+	align-items: center;
+}
+.nino-footer-copyright {
+	display:flex;
+	align-items: center;
 }

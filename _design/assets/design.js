@@ -42,7 +42,24 @@
 		// which half of a design that always has both halves is on screen
 		_mode : 'light',
 		_rowsBound : false,
-		PREVIEW_WIDTH : 1600,
+		/*	The layout the example is rendered at, and then scaled into the
+			panel. A desktop's width, because a page never meets its own layout
+			limits in a box half a pane wide.
+
+			The height is off. It fixes both dimensions so the whole page fits
+			the port at once, which is worth having - but only for a page that
+			is roughly as tall as the panel is deep. The example is a full site
+			now, seven bands at the section default spacing, and it measures
+			4700-6200px depending on the theme: fitted whole into a 1100x665
+			panel that draws at 11%, and at the 2000-2200 it was set to it was
+			simply cut in half. So the page is given the panel's height and
+			scrolls, the way the site it stands for does.
+
+			Put a height back the moment the example is short enough for one -
+			the mechanism is in Nino.adminUi.scaleFrame() and nothing else has
+			to change.	*/
+		PREVIEW_WIDTH : 2400,
+		PREVIEW_HEIGHT : 0,
 		_refit : null,
 		_designChoices : {},
 		_designBound : false,
@@ -750,7 +767,7 @@
 			const port = dc.getElementById('theme-design-example-port');
 
 			if( frame !== null && port !== null )
-				Nino.design._refit = Nino.adminUi.scaleFrame( frame, port, Nino.design.PREVIEW_WIDTH );
+				Nino.design._refit = Nino.adminUi.scaleFrame( frame, port, Nino.design.PREVIEW_WIDTH, Nino.design.PREVIEW_HEIGHT );
 
 			Nino.adminUi.buttonRow( {
 				light : dc.getElementById('theme-design-mode-light'),

@@ -8,7 +8,7 @@
 .nino-frame-footer .nino-frame-footer-statement {
 	gap: var(--space-4) 0;
 	max-width: none;
-	padding: var(--space-5) max(var(--space-3), calc((100vw - var(--grid-max-width)) / 2));
+	padding: var(--space-5) max(var(--space-3), calc((100vw - var(--grid-max-width)) / 2)) var(--space-1);
 	color: var(--color-primary-text);
 	background-color: var(--color-primary);
 }

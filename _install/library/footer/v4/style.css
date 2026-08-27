@@ -11,7 +11,8 @@
 }
 
 .nino-frame-footer .nino-frame-footer-panel {
-	min-height: 26rem;
+	min-height: 18rem;
+	max-height: 80vh;
 	padding: clamp(var(--space-4), 7vw, var(--space-6));
 }
 

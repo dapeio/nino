@@ -949,10 +949,9 @@ namespace Nino\Install {
 				return;
 			}
 
-			$unitDir = dirname( self::LIBRARY ). '/'. $kind. '/'. $frame;
-			$source 	= @file_get_contents( $unitDir. '/template.tpl' );
+			$unit = self::frameUnit( $kind, $frame );
 
-			if( $source === false ) {
+			if( $unit === null ) {
 				\Nino\Http::fail( $request, 500, 'could not read the frame template' );
 				return;
 			}
@@ -960,10 +959,76 @@ namespace Nino\Install {
 			\Nino\Http::ok( $request, [
 				'frame'	=> $frame,
 				'html'	=> self::_framePreviewDocument(
-					self::_framePreviewMarkup( $source ),
-					self::_framePreviewCss( $appData, $data, $unitDir )
+					$unit['markup'],
+					self::_framePreviewCss( $appData, $data, dirname( self::LIBRARY ). '/'. $kind. '/'. $frame )
 				),
 			] );
+		}
+
+		/**
+		 *	One frame unit, prepared for a preview: its markup with the
+		 *	includes, fills and shortcodes a request would have resolved, and
+		 *	the stylesheet it ships.
+		 *
+		 *	Public because /_design's Design pane composes its example page out
+		 *	of the same pieces. Its preview used to draw a bar and a footer of
+		 *	its own out of framework classes, which is a bar and a footer no
+		 *	site has - and on a look whose whole idea is a vertical rail it was
+		 *	not a simplification but a wrong answer.
+		 *
+		 *	@param		string		$kind					'header' or 'footer'
+		 *	@param		string		$frame				A unit key
+		 *
+		 *	@return 	?array								{ frame, markup, css }, or null
+		 */
+		public static function frameUnit( string $kind, string $frame ): ?array {
+
+			if( isset( self::FRAMES[$kind] ) === false || in_array( $frame, self::_frames()[$kind] ?? [], true ) === false )
+				return null;
+
+			$unitDir	= dirname( self::LIBRARY ). '/'. $kind. '/'. $frame;
+			$source		= @file_get_contents( $unitDir. '/template.tpl' );
+
+			if( $source === false )
+				return null;
+
+			return [
+				'frame'		=> $frame,
+				'markup'	=> self::_framePreviewMarkup( $source ),
+				'css'		=> is_file( $unitDir. '/style.css' ) === true ? (string) file_get_contents( $unitDir. '/style.css' ) : '',
+			];
+		}
+
+		/**
+		 *	Which frame a preview of this project should show.
+		 *
+		 *	The installed one, or - before the frame steps have run, which is
+		 *	where the installer's Design step sits - the one the active theme
+		 *	declares. A theme names the pair it was drawn against, so that is a
+		 *	better answer than the first unit in the directory, and the first
+		 *	unit is only there so a preview is never frameless.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$kind					'header' or 'footer'
+		 *
+		 *	@return 	?string
+		 */
+		public static function previewFrameKey( array &$appData, string $kind ): ?string {
+
+			$available = self::_frames()[$kind] ?? [];
+
+			if( $available === [] )
+				return null;
+
+			$installed = (string) ( $appData['/nino/install/'. $kind] ?? '' );
+
+			if( in_array( $installed, $available, true ) === true )
+				return $installed;
+
+			$manifest = self::_readManifest( (string) ( $appData['/nino/install/theme'] ?? '' ) );
+			$declared = (string) ( $manifest[$kind] ?? '' );
+
+			return in_array( $declared, $available, true ) === true ? $declared : $available[0];
 		}
 
 		/**

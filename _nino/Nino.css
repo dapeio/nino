@@ -757,9 +757,14 @@ body.nino-scroll-down .nino-scroll-header {
 .nino-cover--dim .nino-btn--outline, .nino-cover--dim .nino-filter-btn {
 	color: var(--color-section-black-text);
 }
-/*	The scrim is a dark ground like any other, so the roles follow it	*/
+/*	The scrim is a dark ground like any other, so the roles follow it - the
+	ink itself included. Body copy, icons and anything else placed in a cover
+	take their colour from the page, and on a dimmed photograph the page's ink
+	is dark ink on a dark ground	*/
 .nino-cover--dim {
+	color: var(--color-section-black-text);
 	--color-title: var(--color-section-black-text);
+	--color-text: var(--color-section-black-text);
 	--color-accent: var(--color-accent-black);
 }
 
@@ -773,6 +778,9 @@ body.nino-scroll-down .nino-scroll-header {
 .nino-section--black.nino-section--border-2,
 .nino-section--black.nino-section--border-3 {
 	border-color: rgba(255,255,255,.1);
+}
+.nino-section--border-primary {
+	border-color:var(--color-primary);
 }
 
 @media (min-width: 768px) {
@@ -1935,6 +1943,15 @@ body.nino-scroll-btf .nino-back-to-top {
 
 /* Full-bleed background image with a dark scrim for text contrast -
    static (no JS), unlike nino-cover/nino-parallex which are JS-sized */
+/*	Same scrim, same consequence as .nino-cover--dim: what is laid over the
+	dimmed picture has to be given the dark ground's ink, or it keeps the
+	page's	*/
+.nino-img-background--dim {
+	color: var(--color-section-black-text);
+	--color-title: var(--color-section-black-text);
+	--color-text: var(--color-section-black-text);
+	--color-accent: var(--color-accent-black);
+}
 .nino-img-background--dim::before {
 	content: '';
 	position: absolute;

@@ -1,5 +1,5 @@
 		<header class="nino-frame-header">
-			<div class="nino-grid-row nino-grid-row--wide nino-grid-middle nino-scroll-header">
+			<div class="nino-scroll-header nino-grid-row nino-grid-row--wide nino-grid-middle">
 				<div class="nino-grid-100">
 					<a href="[[/nino/dir]]/" class="nino-logo">
 						<img src="[[/nino/public]]/images/logo.png" alt="">

@@ -101,33 +101,153 @@ All notable changes to Nino are documented in this file.
   missing it. Each option's text is the position's name and its value the number
   that gets stored, so neither side translates the other's vocabulary.
 
-- The catalogue spans the system. Every position of every setting is now
-  shipped by at least one of the ten themes, and a test says so - a position no
-  theme uses is a position nobody has ever looked at, and both ends of the root
-  size were exactly that. **Docs** takes the smallest (its description already
-  claimed a compact scale; the root size now agrees) and **Soft** the largest,
-  along with the gentler contrast nothing shipped either.
+- Header and Footer come before Design in the installer, not after.
 
-  Five looks carry a real second brand colour rather than a Secondary field
-  nobody filled in. **Signal** asks for Complementary, so the strip across the
-  top and the band through the page are two different colours - which is what
-  its own description always said. **Nocturne** and **Editorial** take
-  Complementary too, **Soft** and **Surface** Triadic, **Rail** Analogous. All
-  of them derive it from the brand rather than naming a hex, so changing the
-  brand colour keeps the pairing intact.
+  That is the direction the dependency runs. The Design step previews a whole
+  page inside the project's own header and footer, so the frame decides its
+  layout - a rail down the side is a different page from a bar across the top,
+  and a Design judged in the wrong one was judged wrong. The frame steps only
+  preview the frame itself, whose structure the Design does not touch at all;
+  what they lose by running first is a colour, and the theme's own design is a
+  coherent one to draw them in. `Themes::apiApply()` already installs the
+  frames and generates the design last, for the same reason.
 
-  Analogous was the first assignment for Editorial and Soft and it is not what
-  they ship: at the saturation those two run, a 30° neighbour lands within a
-  hair of the brand, and a second colour a look cannot show is not a second
-  colour. Each took the nearest harmony that separates.
+  The Design step re-reads when a frame changes, the way it already did for the
+  theme - its starting point is what the steps before it installed, and the
+  example is drawn inside those frames. Nothing is lost on the way past:
+  `Design::bundle()` and `_bundleFrames()` each replace only their own entries,
+  so the bundle keeps its order whichever step wrote last.
 
-  Three looks paint with the tint: **Docs** makes it its one band, because the
-  only thing a reference page bands for is a note; **Soft** makes it the footer
-  panel it is named for; **Surface** makes it the floating header card. And
-  three temperatures beyond Brand are in use - **Aperture** and **Rail** at
-  Neutral, where the greys finally carry no colour at all (Aperture's
-  description has claimed exactly that since it shipped), **Docs** at Cool,
-  **Soft** at Warm.
+- Every installer step's message is in the action bar, beside the button that
+  acts on it. They used to sit at the foot of their own pane, which on the
+  taller steps is a scroll away from "Next" - so a step said "Applying …" or
+  named what went wrong somewhere the operator was not looking. Each keeps the
+  id its module writes to, and the pane class decides which one is on screen.
+  Left rather than right, because it is read before the button is pressed.
+
+- The preview's placeholder pictures are desaturated. They are there to show
+  what a picture does to a layout - how much room it takes, where it crops,
+  what a card looks like with one in it - and their own colours are the one
+  thing on the page nobody picked: a blue-violet demo gradient beside a red
+  brand reads as a clash the design does not have.
+
+- The Design preview shows the project's own header and footer, its own
+  pictures, and the whole page rather than the first screen of it.
+
+  The bar and the footer used to be drawn in the example template out of
+  framework classes. That is a bar and a footer no site has - and on **Console**,
+  whose whole idea is a vertical navigation rail instead of a top bar, it was
+  not a simplification but the wrong picture: the operator was judging colours
+  on a layout the theme does not use. `/_install` already knew how to prepare a
+  frame unit for a preview, so `Preview` asks rather than rebuilding
+  (`Themes::frameUnit()`, `Themes::previewFrameKey()`); the installed frame
+  decides, or - before the Header and Footer steps have run - the one the
+  active theme declares.
+
+  The pictures are the demo images the catalogue page ships, named in the
+  markup the way a page names them and carried into the document by
+  `Preview::images()`, since a srcdoc frame has an opaque origin and fetches
+  nothing. Grey rectangles previewed a design against no photograph at all,
+  which is not what any of these themes are for.
+
+  `Nino.adminUi.scaleFrame()` takes a layout height beside the layout width.
+  With both fixed the scale is whichever of the two fits, so the whole page is
+  on screen at a stable layout and what changes with the panel is how small it
+  is drawn - not how much of it there is. It also stops the cover's own `vh`
+  lengths changing with the operator's window. 2400x2800 fits all ten themes,
+  the tallest with 34px to spare.
+
+  And more of the brand is on the page: the services band is the tint ground -
+  the one surface the brand hue actually reaches, which had no band of its own -
+  and the cards carry a filled `--color-primary` badge, which is that role at
+  text size rather than at button size.
+
+- The example the Design pane previews against is a page now, not a strip of
+  specimens: a bar, a hero, three cards, a split band with a photograph and the
+  four status surfaces, and a footer. What an operator is deciding is how a
+  site feels, and the old example - four bands of prose with no chrome around
+  them - read as a stylesheet test rather than as a site.
+
+  The markup is the live markup, lifted from the section presets the Template
+  Builder inserts, down to the nesting and the spacing utilities. A mock with
+  margins of its own would preview its own margins. The header and the footer
+  are the framework's own `<header>` and the two `.nino-footer-*` bands, which
+  is what lets them be there without a frame unit at all; the two rules every
+  frame in the library does carry - the padding that keeps a fixed bar off the
+  first heading, and the row its nav links sit in - come from
+  `Preview::scaffold()`, so no length in the markup is one the preview invented.
+
+  Sized to be taken in at once: about 1430px at a 2400px layout width, which is
+  what the panel solves for at a typical window. The one thing that gives is
+  the band padding - the sections take `space-2` where a live page usually
+  takes the section default of `space-4` - and every other distance in it is
+  the one a real page gets. The photographs are data uris, because a srcdoc
+  frame has an opaque origin and can fetch nothing.
+
+- A new catalogue of ten looks, drawn to cover the range `/_design` can reach
+  rather than to be ten variations on one page. **Basis** is unchanged and stays
+  at the head of the list - it is the reference the others are read against.
+
+  **Bureau** is a company page that reads as settled: a plain bar, cool greys,
+  square corners, a second brand colour one step from the first. **Chronicle**
+  sets serif body copy on warm paper with a sans headline over it, narrow
+  measure, no shadows - a magazine or long-form documentation. **Console** puts
+  a navigation rail down the side at the smallest root size of the ten and bands
+  with the tint, because the one band a reference page has is a note.
+  **Gallery** is a wall rather than a page: greys with no colour cast at all, an
+  overlay menu behind one mark, wide rows, no card borders, the brand only where
+  it is put. **Market** runs a brand strip across the top and the opposite
+  colour through the page in a full-width band, condensed display type, rounded
+  buttons. **Midnight** commits to dark in every light rather than following the
+  visitor's system setting, with a third brand colour to stand off it.
+  **Platform** stacks surfaces instead of drawing lines between them - a
+  floating bar, raised cards, wide margins, a second colour marking whatever is
+  chosen. **Poster** takes the largest root size, sets it solid and uppercase,
+  and alternates the page with hard black bands. **Practice** is rounded, warm
+  and unhurried, closing on a brand-tinted panel rather than a black one.
+
+  Every position of every setting is shipped by at least one of them and a test
+  says so - a position no theme uses is a position nobody has ever looked at.
+  So is every header and footer frame: all six headers and all seven footers are
+  now the pair some look was drawn against, where the previous catalogue left
+  several of them unused. No two looks start from the same Design.
+
+- The cover scrim is solved rather than picked, and each look decides how far
+  past the floor it goes. All ten stylesheets used to carry the same
+  hand-written `color-mix(in srgb, var(--nino-black) 78%, transparent)`, which
+  is how ten different looks ended up with the same hero.
+
+  `/_design` publishes `--nino-scrim`: this design's own deepest surface at an
+  alpha bisected until the ink on top of it clears the Contrast target over the
+  worst photograph it could be handed - a white one. Composited on white a scrim
+  is as light as it will ever get, so an alpha that carries the ink there
+  carries it over any picture, and the value moves with Contrast, with the mode
+  and with how deep the design's own black sits: 64% to 80% across the
+  catalogue, against one flat 78% before. It is solved for the ink at opacity
+  .8, which is what `.nino-section-subtitle` - the second line of every hero -
+  is painted at.
+
+  A look may darken it and four do. **Chronicle** dims with the mid-dark ground
+  rather than black, laid on thick, so a cover reads as a picture printed on
+  paper; **Practice** does the same more gently; **Midnight** goes well past the
+  floor so the picture emerges from the page; **Poster** all but blacks it out,
+  because there the picture is a texture behind the headline. **Gallery** shows
+  the most of any of them - which is why it starts at Standard contrast rather
+  than Strong, since the scrim follows that knob and a wall of pictures behind
+  the heaviest dimming of the ten is the wrong trade.
+
+  A theme may not lighten it below the floor, and the installer's suite measures
+  every look's `--color-background-dim` in both modes to say so.
+
+- Content laid over a dimmed cover takes the dark ground's ink.
+  `.nino-cover--dim` re-pointed `--color-title` and `--color-accent` but not the
+  ink itself, and `.nino-img-background--dim` re-pointed nothing at all - so a
+  `.nino-section-text`, an icon or anything else placed on a dimmed photograph
+  kept the page's colour, which is dark ink on a dark ground. Both now set
+  `color` and `--color-text` alongside the roles they already carried. The
+  muted tier deliberately stays out of it: a scrim is translucent, and an ink
+  solved to sit *at* the target against the opaque surface cannot clear it
+  against a lighter composite of that surface.
 
 - Four brand roles where there were two, and a fifth ground under them.
 
@@ -195,30 +315,12 @@ All notable changes to Nino are documented in this file.
   `--radius-large`. `Nino.css`'s own `.1 / .2 / .4` is exactly what the raster
   publishes, so the framework's radii and the generated ones are one ladder.
 
-- Two themes, bringing the catalogue to ten.
-
-  **Surface** is built from areas rather than from lines: a floating header
-  card, wide margins, cards that carry light instead of a border, pill buttons
-  and shallow gradients on every filled band. The elevation is one theme-owned
-  variable pair built from `--nino-*-shadow`, the shadow colour the design
-  layer publishes per mode, so it stays right when the page turns dark. The
-  gradients mix at most a tenth of a neighbouring tone into a surface, which
-  keeps the pair `/_design` measured for that surface an honest description of
-  what a visitor sees. Roboto and Outfit, `default/airy/round`, header `v3` and
-  footer `v7`.
-
-  **Aperture** is a gallery wall for photography: the page sits on the paper
-  tone rather than on white, the section that alternates against it is the
-  white one below, corners are square and the header is a wordmark and a
-  burger. Captions are small, tracked and upper case; a card image is allowed a
-  quarter of the viewport where every other theme keeps it to a thumbnail, and
-  the gallery gets rows a photograph can live in. Inter and Jost Light,
-  `generous/airy/sharp`, header `v4` and footer `v1`.
-
-  Both are mapping layers like the other eight: every colour role reads a
-  generated `--nino-*` token, every size role reads the generated raster, and
-  both were measured on all twelve demo pages at 375/768/1440 in light and in
-  dark.
+- Two techniques the catalogue needed and no theme had. Elevation as a
+  theme-owned variable pair built from `--nino-*-shadow`, the shadow colour the
+  design layer publishes per mode, so a raised look stays right when the page
+  turns dark - **Platform** is drawn on it. And a gallery row a photograph can
+  live in, where a card image used to be held to a thumbnail everywhere -
+  **Gallery** is drawn on that.
 
 - `Demo: Catalogue`, a page unit that shows the whole system on one page: every
   Section Preset the Template Builder ships, in every layout it declares, plus
@@ -315,10 +417,10 @@ All notable changes to Nino are documented in this file.
   changing one does not recopy the theme or reset the settled Design. Their
   previews receive the current Design values and applying Footer after Header
   restores canonical theme/header/footer bundle order.
-- The appearance catalogue is rebuilt as eight distinct baselines: Basis,
-  Docs, Editorial, Nocturne, Rail, Signal, Soft, and Studio. Every theme maps
-  its colour roles onto generated surfaces, maps its sizes onto the raster,
-  and declares the complete Design/Header/Footer baseline shown by its preview.
+- The appearance catalogue is rebuilt as distinct baselines rather than
+  recolourings of one. Every theme maps its colour roles onto generated
+  surfaces, maps its sizes onto the raster, and declares the complete
+  Design/Header/Footer baseline shown by its preview.
 
 - `/_install`'s Themes step establishes a complete look as a baseline: its
   `themes/apply` post names only the theme, whose manifest supplies the initial
@@ -1193,11 +1295,6 @@ All notable changes to Nino are documented in this file.
   and every position still clears WCAG AA, muted text included. The old `soft`
   let muted down to 3.0:1, which only passes for large type; it maps to the
   nearest position that passes.
-
-- **Rail loaded none of its webfonts.** Its `@font-face` rules pointed at
-  `fonts/text/` and `fonts/title/`, where its `fonts/` directory holds the files
-  flat - the only theme in the catalogue that did, so all three of its faces
-  404'd and it fell back to `system-ui`.
 
 - `tests/design-js-smoke.js` and `tests/install-design-js-smoke.js` both crashed
   before reaching their size assertions: the specimen containers were never

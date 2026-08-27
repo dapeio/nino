@@ -393,8 +393,11 @@
 
 		/**
 		 *	Apply one frame from its own wizard step. This endpoint deliberately
-		 *	does not reapply the theme or Design: the operator has already
-		 *	settled both in the preceding steps.
+		 *	does not reapply the theme or Design: the theme was settled in the
+		 *	step before, and the Design comes after this one and would be
+		 *	overwritten by the theme's own the moment it were reapplied here.
+		 *	The bundle survives either way - _bundleFrames() replaces the frame
+		 *	stylesheets and nothing else.
 		 *
 		 *	@param		{string}	kind				'header' or 'footer'
 		 *	@param		{Function}	callback		Called with ( success )

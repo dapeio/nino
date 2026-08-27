@@ -109,7 +109,7 @@
 
 #themes-grid {
 	display: grid;
-	grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
+	grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
 	gap: .75rem;
 	margin: 0 0 1rem;
 }
@@ -303,6 +303,9 @@
 }
 .install-design-controls .nino-admin-tabs button.is-active:hover {
 	background-color: var(--editor-blue);
+}
+.install-design-modes #design-reset {
+	margin-left:auto;
 }
 /*	The knobs stack rather than grid: one column of label-over-select reads top
 	to bottom as a list of decisions, where two columns read as a form.
@@ -510,18 +513,45 @@
 
 /* --------------------------------------------------------- Step messages */
 
-#setup-msg, #themes-msg, #design-msg, #header-msg, #footer-msg, #webpages-msg, #personalinfos-msg, #editor-add-msg, #finish-msg {
-	min-height: 1.25rem;
+/*	Every step's message lives in the action bar now, beside the button that
+	acts on it - see page-wizard.tpl. Left rather than right, because it is read
+	before the button is pressed and the eye starts on that side; the design
+	system's own status slot is right-aligned, so this overrides it. */
+#install-actions-status {
+	flex: 1 1 auto;
+	min-width: 0;
+	text-align: left;
+}
+
+#install-actions-status p {
+	margin: 0;
 	color: var(--editor-text-secondary);
 	font-size: .8rem;
+	line-height: 1.35;
 }
-#design-msg {
-	min-height:0;
+
+/*	One step's message is on screen at a time, and which one is the same pane
+	class the panes themselves are shown by. The wizard's own
+	#install-actions-msg is not a step's and is always there. */
+.install-step-msg {
+	display: none;
+}
+
+#install-page-wrap.show-setup #setup-msg,
+#install-page-wrap.show-themes #themes-msg,
+#install-page-wrap.show-design #design-msg,
+#install-page-wrap.show-header #header-msg,
+#install-page-wrap.show-footer #footer-msg,
+#install-page-wrap.show-webpages #webpages-msg,
+#install-page-wrap.show-personalinfos #personalinfos-msg,
+#install-page-wrap.show-admin #editor-add-msg,
+#install-page-wrap.show-finish #finish-msg {
+	display: block;
 }
 
 /*	The step's own messages are notes; this one is a refusal. Said in a word as
 	well as in a colour - see design.js's _hexState */
-#design-msg.is-error {
+#install-actions-status #design-msg.is-error {
 	color: var(--editor-red);
 }
 
@@ -530,14 +560,9 @@
 .install-design-footer {
 	display: flex;
 	align-items: center;
+	justify-content: flex-end;
 	gap: .6rem;
 	margin-top: .5rem;
-}
-
-.install-design-footer #design-msg {
-	flex: 1 1 auto;
-	min-width: 0;
-	margin: 0;
 }
 
 /* ------------------------------------------------------------- Responsive */

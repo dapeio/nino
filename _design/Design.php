@@ -926,6 +926,13 @@ namespace Nino\Design {
 			'dark'	=> [ 1 => 0.30, 2 => 0.55, 3 => 0.82 ],
 		];
 
+		/*	The weakest the framework ever paints the ink it puts on a scrim.
+			.nino-section-subtitle - the second line of every hero - carries
+			opacity .8, so a scrim solved for the ink at full strength would
+			hold the headline above the target and let the line under it fall
+			below. The scrim is solved for the quieter of the two instead.	*/
+		private const float SCRIM_INK = 0.8;
+
 		// How far a surface sits from the page ground. dark and black are
 		// deliberate steps a theme bands with and stay put; they are absolute
 		// OKLCH lightnesses rather than offsets so a brand hue cannot drag
@@ -1442,6 +1449,99 @@ namespace Nino\Design {
 		}
 
 		/**
+		 *	The scrim over a cover photograph - the one ground the design layer
+		 *	has to answer for without knowing what is underneath it.
+		 *
+		 *	A photograph can be anything, so the promise is made against the
+		 *	worst thing it can be: a white frame. Composited on white the scrim
+		 *	is as light as it will ever get, so an alpha that carries the ink
+		 *	there carries it over any picture. The alpha is bisected rather
+		 *	than tabled because what it has to clear moves with Contrast, with
+		 *	the mode, and with how deep this design's own black sits.
+		 *
+		 *	Tinted rather than pure black: it is this design's deepest surface
+		 *	at an alpha, so a warm page dims warm and a cool one cool, and the
+		 *	scrim reads as part of the page rather than as a lid dropped on it.
+		 *
+		 *	A theme may paint its own scrim over this - a brand-coloured one,
+		 *	or a heavier one for mood - but it starts from a value that already
+		 *	keeps the promise, and it can only ever darken from here.
+		 *
+		 *	@param		array			$palette			The built palette for this mode
+		 *	@param		int				$contrast			Knob position, which is what the ink has to clear
+		 *
+		 *	@return 	string								'rgb(r g b / n%)'
+		 */
+		private static function scrim( array $palette, int $contrast ): string {
+
+			$deepest	= $palette['black']['bg'];
+			$ink		= $palette['black']['on'];
+			$target		= self::TARGET_TEXT[$contrast];
+
+			$lo = 0.0;
+			$hi = 1.0;
+
+			/*	At alpha 1 the scrim *is* the black surface, where the ink was
+				solved to clear this exact target - so the search always has an
+				answer above it and only ever looks for the lightest one.	*/
+			for( $i = 0; $i < 24; $i++ ) {
+
+				$mid		= ( $lo + $hi ) / 2;
+				$ground		= self::over( $deepest, '#ffffff', $mid );
+
+				self::contrast( self::over( $ink, $ground, self::SCRIM_INK ), $ground ) >= $target
+					? $hi = $mid
+					: $lo = $mid;
+			}
+
+			// Rounded up, never down: the published percent has to be at least
+			// the one that was solved for, or the value ships a hair under AA
+			$alpha = min( 100, (int) ceil( $hi * 100 ) );
+
+			return 'rgb('. implode( ' ', self::channels( $deepest ) ). ' / '. $alpha. '%)';
+		}
+
+		/**
+		 *	One colour painted on another at an alpha, the way a browser paints
+		 *	it: straight sRGB compositing, no colour space in between.
+		 *
+		 *	@param		string		$hex					The colour being painted
+		 *	@param		string		$ground				What it is painted on
+		 *	@param		float			$alpha				0..1
+		 *
+		 *	@return 	string
+		 */
+		private static function over( string $hex, string $ground, float $alpha ): string {
+
+			$front	= self::channels( $hex );
+			$back	= self::channels( $ground );
+			$out	= '';
+
+			foreach( $front as $index => $value )
+				$out .= sprintf( '%02x', (int) round( $value * $alpha + $back[$index] * ( 1 - $alpha ) ) );
+
+			return '#'. $out;
+		}
+
+		/**
+		 *	A hex colour as its three 0..255 channels.
+		 *
+		 *	@param		string		$hex
+		 *
+		 *	@return 	array									[ r, g, b ]
+		 */
+		private static function channels( string $hex ): array {
+
+			$hex = ltrim( $hex, '#' );
+
+			return [
+				(int) hexdec( substr( $hex, 0, 2 ) ),
+				(int) hexdec( substr( $hex, 2, 2 ) ),
+				(int) hexdec( substr( $hex, 4, 2 ) ),
+			];
+		}
+
+		/**
 		 *	The two inks every surface chooses between. Both the surface solver
 		 *	and the pair builder read them here, so a surface is never solved
 		 *	against one white and then painted with a slightly different one -
@@ -1830,12 +1930,15 @@ namespace Nino\Design {
 
 		private static function block( array $settings, string $mode, int $depth = 1 ): string {
 
-			$indent	= str_repeat( "\t", $depth );
+			$indent		= str_repeat( "\t", $depth );
 			$out		= '';
+			$palette	= self::palette( $settings, $mode );
 
-			foreach( self::palette( $settings, $mode ) as $surface => $values )
+			foreach( $palette as $surface => $values )
 				foreach( $values as $part => $hex )
 					$out .= $indent. self::token( $surface, $part ). ': '. $hex. ";\n";
+
+			$out .= $indent. '--nino-scrim: '. self::scrim( $palette, self::normalize( $settings )['contrast'] ). ";\n";
 
 			return $out;
 		}
@@ -1988,6 +2091,17 @@ namespace Nino\Design {
 
 		private const BUNDLE_KEY = '/.cache/style.css';
 
+		// A ceiling per picture. The demo images are half a kilobyte of svg,
+		// so this is generous - it is here so a project that dropped a 12mb
+		// photograph into the path cannot turn one preview request into one
+		// too large to send
+		private const int IMAGE_LIMIT = 262144;
+
+		private const array IMAGE_TYPES = [
+			'svg' => 'image/svg+xml', 'png' => 'image/png',
+			'jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'webp' => 'image/webp',
+		];
+
 		/**
 		 *	One complete html document showing what these settings produce.
 		 *
@@ -2005,12 +2119,115 @@ namespace Nino\Design {
 				return '';
 
 			$mode = $mode === 'dark' ? 'dark' : 'light';
+			$frames = self::frames( $appData );
+
+			$css = self::css( $appData, $settings );
+
+			foreach( $frames as $frame )
+				$css .= "\n". $frame['css'];
+
+			$markup = ( $frames['header']['markup'] ?? '' )
+				. self::images( $appData, $markup )
+				. ( $frames['footer']['markup'] ?? '' );
 
 			return '<!doctype html><html lang="en" data-nino-mode="'. $mode. '"><head><meta charset="utf-8">'
 				. '<meta name="viewport" content="width=device-width, initial-scale=1">'
-				. '<style>'. self::css( $appData, $settings ). '</style>'
-				. '<style>'. self::scaffold(). '</style>'
+				. '<style>'. $css. '</style>'
+				. '<style>'. self::scaffold( isset( $frames['header'] ) ). '</style>'
 				. '</head><body>'. $markup. '</body></html>';
+		}
+
+		/**
+		 *	The header and footer this project actually has, ready to paste
+		 *	around the example.
+		 *
+		 *	The pane used to draw a bar and a footer of its own out of framework
+		 *	classes. That is a bar and a footer no site has, and on a look whose
+		 *	whole idea is a vertical rail rather than a top bar it was not a
+		 *	simplification but the wrong picture - the operator was judging the
+		 *	colours of a layout the theme does not use. The real units are right
+		 *	there in the library, and /_install already knows how to prepare one
+		 *	for a preview, so this asks rather than rebuilding.
+		 *
+		 *	A delivery may ship without /_install, and then there are no frames
+		 *	to have: the example stands on its own, as it did before.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	array									kind => { frame, markup, css }
+		 */
+		private static function frames( array &$appData ): array {
+
+			if( class_exists( "\\Nino\\Install\\Themes" ) === false
+				|| method_exists( "\\Nino\\Install\\Themes", 'frameUnit' ) === false )
+				return [];
+
+			$frames = [];
+
+			foreach( [ 'header', 'footer' ] as $kind ) {
+
+				$key = \Nino\Install\Themes::previewFrameKey( $appData, $kind );
+
+				if( $key === null )
+					continue;
+
+				$unit = \Nino\Install\Themes::frameUnit( $kind, $key );
+
+				if( $unit !== null )
+					$frames[$kind] = $unit;
+			}
+
+			return $frames;
+		}
+
+		/**
+		 *	The pictures the example points at, carried into it.
+		 *
+		 *	The markup names them the way a page does - a path under the public
+		 *	directory - because that is the whole rule this example lives by.
+		 *	But a srcdoc frame has an opaque origin and fetches nothing, so the
+		 *	file travels as data or not at all. The project's own copy first,
+		 *	then the library's, so a preview has pictures before the page unit
+		 *	that ships them has been installed.
+		 *
+		 *	Only files under the public directory, and only images: the src is
+		 *	written in a template this project owns, but a template is still not
+		 *	a reason to read an arbitrary path.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$markup				The example
+		 *
+		 *	@return 	string
+		 */
+		private static function images( array &$appData, string $markup ): string {
+
+			return (string) preg_replace_callback( '~\[\[/nino/public\]\](/[a-z0-9./_-]+\.(?:svg|png|jpe?g|webp))~i', static function( array $match ) use ( &$appData ): string {
+
+				$relative = $match[1];
+
+				if( str_contains( $relative, '..' ) === true )
+					return '';
+
+				$candidates = [ (string) \Nino\Filesystem::path( $appData, $relative ) ];
+
+				// The same file as the demo page unit ships, read from the
+				// library when the project has not installed that unit
+				$candidates[] = __DIR__. '/../_install/library/pages/.demo-catalogue'. $relative;
+
+				foreach( $candidates as $path )
+					if( is_file( $path ) === true && filesize( $path ) <= self::IMAGE_LIMIT ) {
+
+						$data = (string) @file_get_contents( $path );
+
+						if( $data !== '' )
+							return 'data:'. self::IMAGE_TYPES[strtolower( pathinfo( $path, PATHINFO_EXTENSION ) )]
+								. ';base64,'. base64_encode( $data );
+					}
+
+				// Better an empty frame than a broken-image icon, which reads
+				// as the design's fault rather than as a missing file
+				return '';
+			}, $markup );
 		}
 
 		/**
@@ -2096,9 +2313,27 @@ namespace Nino\Design {
 		 *
 		 *	@return 	string
 		 */
-		private static function scaffold(): string {
+		private static function scaffold( bool $framed = false ): string {
 
-			return 'body{margin:0}'
+			/*	Two rules a real page gets from its header unit rather than from
+				the framework: the padding that keeps a fixed bar off the first
+				heading, and the row the nav links sit in. When the example is
+				shown inside the project's actual frame that unit supplies both,
+				and repeating them here would override what it decided - so they
+				are only here for a delivery that has no frames at all.	*/
+			$frame = $framed === true ? '' : 'body main{padding-top:clamp(5rem,var(--space-6),8rem)}'
+				. 'header .nino-nav-content ul{display:flex;gap:var(--space-2)}'
+				. 'header .nino-nav-content li a{display:inline-block;padding:var(--space-1) 0}';
+
+			return 'body{margin:0}'. $frame
+				/*	The pictures are placeholders, and they are here to show what
+					a picture does to a layout - how much room it takes, where it
+					crops, what a card looks like with one in it. Their own colours
+					are not part of that and are the one thing on the page nobody
+					picked: a blue-violet demo gradient beside a red brand reads as
+					a clash the design does not have. Desaturated, so the only
+					colours on screen are the generated ones.	*/
+				. 'body :is(main,header,footer) img{filter:grayscale(1)}'
 				// A face the iframe can actually resolve, since the theme's own
 				// were stripped with the @font-face rules that declared them
 				. ':root{'

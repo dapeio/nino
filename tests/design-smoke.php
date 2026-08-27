@@ -336,9 +336,10 @@ $designMalformed = array_filter( $designDeclarations, static function( array $de
 			:root follows both dark blocks without being repeated in either -
 			which is the whole reason they are var() and not a hex	*/
 		(bool) preg_match( '/^--nino-(on-)?(origin|vibrant)/', $declaration[1] )	=> preg_match( '/^var\( *--nino-[a-z-]+ *\)$/', $value ) !== 1,
-		// Shadows are the one non-hex colour: they carry an alpha, which a
-		// solid colour cannot express
-		str_ends_with( $declaration[1], '-shadow' )	=> preg_match( '/^rgb\( *\d+ \d+ \d+ *\/ *\d+% *\)$/', $value ) !== 1,
+		// Shadows and the cover scrim are the non-hex colours: both carry an
+		// alpha, which a solid colour cannot express
+		str_ends_with( $declaration[1], '-shadow' )
+		|| $declaration[1] === '--nino-scrim'	=> preg_match( '/^rgb\( *\d+ \d+ \d+ *\/ *\d+% *\)$/', $value ) !== 1,
 		// The size raster - a length, or a bare ratio for line-height
 		$declaration[1] === '--nino-line-height'	=> preg_match( '/^\d+(\.\d+)?$/', $value ) !== 1,
 		// The root size is the one length that cannot be in rem: it is what
@@ -355,7 +356,66 @@ check( 'every declaration in the generated stylesheet is a resolvable value', $d
 	// plus the raster: the root size, line-height, the measure, 6 text, 6
 	// space, 3 radius, the pill, and the wide-screen block's root size and 3
 	// text steps. The raster is emitted once, not per mode either
-	&& count( $designDeclarations ) === 12 * 10 * 3 + 1 + 20 + 23 );
+	// ...plus the scrim, which is one value per colour block rather than one
+	// per surface: a photograph is not a surface the palette can solve
+	&& count( $designDeclarations ) === 12 * 10 * 3 + 3 + 1 + 20 + 23 );
+
+/*	The scrim is the one ground solved against something the palette cannot
+	see. The promise it makes is that the ink a theme puts on it stays
+	readable over *any* photograph, so it is measured against the worst one
+	there is - a white frame - with the ink at the weakest the framework ever
+	paints it (.nino-section-subtitle carries opacity .8).
+
+	Measured at every Contrast position and in both modes, since all three
+	move it: the target, the ink and how deep this design's own black sits.	*/
+$scrimOver = static function( string $hex, string $ground, float $alpha ): string {
+	$out = '';
+	foreach( [ 0, 2, 4 ] as $offset ) {
+		$front = hexdec( substr( ltrim( $hex, '#' ), $offset, 2 ) );
+		$back  = hexdec( substr( ltrim( $ground, '#' ), $offset, 2 ) );
+		$out .= sprintf( '%02x', (int) round( $front * $alpha + $back * ( 1 - $alpha ) ) );
+	}
+	return '#'. $out;
+};
+$scrimFailures = [];
+$scrimAlphas   = [];
+
+foreach( [ 1, 2, 3 ] as $contrastStep ) {
+
+	$scrimSettings = \Nino\Design\Tokens::normalize( [ 'primary' => '#4faae8', 'contrast' => $contrastStep ] );
+	$scrimTarget   = [ 1 => 4.5, 2 => 4.5, 3 => 7.0 ][$contrastStep];
+	// The bare :root carries light, both dark blocks carry the same dark value
+	$scrimBlocks   = preg_split( '/@media \(prefers-color-scheme: dark\)/', \Nino\Design\Tokens::css( $scrimSettings ) );
+
+	foreach( [ 'light' => 0, 'dark' => 1 ] as $scrimMode => $scrimBlock ) {
+
+		if( preg_match( '/--nino-scrim: rgb\((\d+) (\d+) (\d+) \/ (\d+)%\)/', $scrimBlocks[$scrimBlock], $scrimMatch ) !== 1 ) {
+			$scrimFailures[] = $scrimMode. '/'. $contrastStep. ': no scrim published';
+			continue;
+		}
+
+		$scrimPalette = \Nino\Design\Tokens::palette( $scrimSettings, $scrimMode );
+		$scrimColour  = sprintf( '#%02x%02x%02x', (int) $scrimMatch[1], (int) $scrimMatch[2], (int) $scrimMatch[3] );
+		$scrimAlphas[] = (int) $scrimMatch[4];
+
+		// It is the design's own deepest surface, not a black invented for it -
+		// a warm page has to dim warm or the scrim reads as a lid dropped on it
+		if( $scrimColour !== $scrimPalette['black']['bg'] )
+			$scrimFailures[] = $scrimMode. '/'. $contrastStep. ': '. $scrimColour. ' is not the deepest surface '. $scrimPalette['black']['bg'];
+
+		$scrimGround = $scrimOver( $scrimColour, '#ffffff', (int) $scrimMatch[4] / 100 );
+		$scrimRatio  = \Nino\Design\Tokens::contrast( $scrimOver( $scrimPalette['black']['on'], $scrimGround, 0.8 ), $scrimGround );
+
+		if( $scrimRatio < $scrimTarget - 0.02 )
+			$scrimFailures[] = sprintf( '%s/%d: %.2f:1 over a white photograph, needs %.1f', $scrimMode, $contrastStep, $scrimRatio, $scrimTarget );
+	}
+}
+
+check( 'the cover scrim carries its ink over the worst photograph it could be handed', $scrimFailures === [] );
+// The point of solving it rather than tabling it: a scrim that came back the
+// same at every setting would be the hand-written 78% the themes used to carry
+check( '...at an alpha the settings actually move', count( array_unique( $scrimAlphas ) ) >= 4
+	&& min( $scrimAlphas ) < max( $scrimAlphas ) );
 
 echo "\n";
 
@@ -681,11 +741,34 @@ check( 'the example is written in the design system, with no class of its own'. 
 
 check( 'no unresolved fill is left in a value', str_contains( $example, '[[' ) === false );
 
-/*	Typography is usually the loudest thing a theme decides, and it used to be
-	the one part the preview could not show: a srcdoc iframe has an opaque
-	origin, so every @font-face was stripped rather than left to fail. The
-	files are on disk beside the stylesheet that names them, so they travel as
-	data instead of as a request.	*/
+/*	The example is a page, not a strip of specimens - a bar, a hero, cards, a
+	split band and a footer, in the markup a real one uses. The bar and the
+	footer are the framework's own <header> and <footer>, which is what lets
+	them be here without a frame unit; the two rules every frame in the library
+	does carry - the padding that keeps a fixed bar off the first heading, and
+	the row its nav links sit in - come from the scaffold, so no length in the
+	markup is one this preview invented.	*/
+foreach( [ 'nino-atf-title', 'nino-article', 'nino-section--dark', 'nino-alert--error' ] as $part )
+	check( 'the example is a page, not a specimen strip: '. $part, str_contains( $example, $part ) );
+
+/*	A delivery may ship without /_install, and then there are no frame units to
+	have. The example stands on its own, and the two rules a header unit would
+	have brought - the padding that keeps a fixed bar off the first heading, and
+	the row its nav links sit in - come from the scaffold instead.	*/
+check( 'without /_install the example stands on its own, and the scaffold stands in', str_contains( $example, 'body main{padding-top:' )
+	&& str_contains( $example, 'header .nino-nav-content ul{display:flex' ) );
+
+// A srcdoc frame fetches nothing, so the photographs travel as data - and a
+// grey placeholder is honest about being one
+preg_match_all( '~<img\b[^>]*\ssrc="([^"]*)"~i', $example, $exampleImages );
+check( '...and every image in it is carried, not requested', $exampleImages[1] !== []
+	&& array_filter( $exampleImages[1], static fn( string $src ): bool => str_starts_with( $src, 'data:image/' ) === false ) === [] );
+
+/*	Typography is the one part of a theme the preview does not show. A srcdoc
+	iframe has an opaque origin, so every @font-face in it is a request that
+	cannot be made - and a family that resolves to nothing puts the whole page
+	in the browser's serif default, which is a worse lie than a system stack.
+	The rules go, and the scaffold names faces the frame can actually resolve.	*/
 \Nino\Filesystem::putFileContent( $appData, '/fonts/demo.woff2', 'not really a font, but a file that exists' );
 \Nino\Filesystem::putFileContent( $appData, '/assets/style.theme.demo.css',
 	'@font-face{font-family:\'Demo\';src:local(\'Demo\'),url(\'[[/nino/public]]/fonts/demo.woff2\') format(\'woff2\')}'
@@ -693,24 +776,16 @@ check( 'no unresolved fill is left in a value', str_contains( $example, '[[' ) =
 
 $withFonts = \Nino\Design\Preview::document( $appData, $exampleSettings, 'light' );
 
-check( 'the theme\'s own faces are carried into the document rather than dropped', str_contains( $withFonts, '@font-face' )
-	&& str_contains( $withFonts, 'url(\'data:font/woff2;base64,' ) );
-// Forcing a system stack on top of them would throw away the thing the
-// preview was just given
-check( '...and the system stack stands aside once they are there', str_contains( $withFonts, '--fontfamily-text:system-ui' ) === false );
+check( 'a face the frame could never fetch is dropped rather than left to fail', str_contains( $withFonts, '@font-face' ) === false
+	&& str_contains( $withFonts, 'demo.woff2' ) === false );
+check( '...and the scaffold names one it can resolve instead', str_contains( $withFonts, '--fontfamily-text:system-ui' ) );
+// Nothing off the disk travels into the document either: the file above exists
+// and is still not in it
+check( '...without carrying the file into the document', str_contains( $withFonts, 'data:font/' ) === false
+	&& str_contains( $withFonts, 'not really a font' ) === false );
 
-/*	A family that resolves to nothing puts the whole page in the browser's
-	serif default, which is a worse lie than a system stack - so a rule whose
-	file cannot be carried goes whole, and the scaffold takes over again.	*/
-@unlink( (string) \Nino\Filesystem::path( $appData, '/fonts/demo.woff2' ) );
-$noFonts = \Nino\Design\Preview::document( $appData, $exampleSettings, 'light' );
-
-check( 'a face whose file is missing is dropped whole, not left pointing at nothing', str_contains( $noFonts, '@font-face' ) === false
-	&& str_contains( $noFonts, 'demo.woff2' ) === false
-	&& str_contains( $noFonts, '--fontfamily-text:system-ui' ) );
-
-// Only files this project ships. Anything with a scheme or a traversal in it
-// is not one, and is not worth guessing at
+// A url with a scheme or a traversal in it is not a file this project ships,
+// and goes the same way as the rest
 \Nino\Filesystem::putFileContent( $appData, '/assets/style.theme.demo.css',
 	'@font-face{font-family:\'Remote\';src:url(\'https://example.com/x.woff2\')}'
 	. '@font-face{font-family:\'Up\';src:url(\'[[/nino/public]]/../../etc/passwd\')}'
@@ -718,9 +793,11 @@ check( 'a face whose file is missing is dropped whole, not left pointing at noth
 
 $foreign = \Nino\Design\Preview::document( $appData, $exampleSettings, 'light' );
 
-check( 'a url that is not a file this project ships is never inlined', str_contains( $foreign, '@font-face' ) === false
-	&& str_contains( $foreign, 'data:font/' ) === false
+check( 'a foreign url never reaches the document', str_contains( $foreign, '@font-face' ) === false
+	&& str_contains( $foreign, 'example.com' ) === false
 	&& str_contains( $foreign, 'passwd' ) === false );
+
+@unlink( (string) \Nino\Filesystem::path( $appData, '/fonts/demo.woff2' ) );
 
 // ...and back to the stylesheet the ordering check above reads
 \Nino\Filesystem::putFileContent( $appData, '/assets/style.theme.demo.css', ':root{--color-primary:var(--nino-brand-safe)}.demo-theme-marker{color:red}' );
@@ -768,7 +845,10 @@ check( 'and the bundle entry is persisted with them', in_array( '/assets/style.d
 $firstWrite = (string) \Nino\Filesystem::getFileContent( $appData, '/assets/style.design.css', '' );
 \Nino\Design\Design::write( $appData, \Nino\Design\Tokens::normalize( [ 'primary' => '#14595e' ] ) );
 $secondWrite = (string) \Nino\Filesystem::getFileContent( $appData, '/assets/style.design.css', '' );
-check( 'rewriting regenerates rather than appending', strlen( $firstWrite ) === strlen( $secondWrite )
+// Line for line rather than byte for byte: the scrim's alpha is a percent and
+// its colour three decimal channels, so two different brands legitimately
+// write two different lengths of the same stylesheet
+check( 'rewriting regenerates rather than appending', substr_count( $firstWrite, "\n" ) === substr_count( $secondWrite, "\n" )
 	&& $firstWrite !== $secondWrite
 	&& substr_count( $secondWrite, '/* Generated by /_design' ) === 1
 	&& substr_count( $secondWrite, '--nino-space-1:' ) === 1 );

@@ -1,0 +1,210 @@
+@font-face {
+	font-family: 'Text';
+	font-style: normal;
+	font-weight: normal;
+	font-display: swap;
+	src: local('Text Normal'), url('[[/nino/public]]/fonts/spectral-regular.woff2') format('woff2');
+}
+@font-face {
+	font-family: 'Text';
+	font-style: normal;
+	font-weight: bold;
+	font-display: swap;
+	src: local('Text Bold'), url('[[/nino/public]]/fonts/spectral-bold.woff2') format('woff2');
+}
+@font-face {
+	font-family: 'Title';
+	font-style: normal;
+	font-weight: bold;
+	font-display: swap;
+	src: local('Title Bold'), url('[[/nino/public]]/fonts/alegreya-sans.woff2') format('woff2');
+}
+
+/*	Chronicle.
+
+	Serif body copy on a warm page, a sans headline above it and a tinted band for what is quoted rather than said. Narrow measure, hard corners, no shadows. For magazines, journals, long-form writing and documentation that is read rather than searched.
+
+	Colours here are assignments, never values. /_design generates the --nino-*
+	tokens this file reads (assets/style.design.css, loaded immediately before
+	it) and measures every background/text pair it publishes; what this unit
+	decides is which surface each role sits on. Recolouring the site is
+	therefore a /_design save and nothing below has to change.
+
+	Three rules follow. Never write a literal colour into a role - a hex here
+	is a pair /_design cannot vouch for. Never pair across surfaces, because
+	--color-section-alt-text belongs to --nino-on-alt and to nothing else. And
+	never put text on --nino-brand or --nino-accent: those are the two brand
+	colours exactly as they were picked, so they are the surfaces with no
+	contrast promise attached - --nino-brand-safe and --nino-accent-safe are the
+	same two colours made safe, and those are what carry ink.	*/
+:root {
+
+	/* Brand. Four roles from two questions - is it the first brand colour or the
+	   second, and is it the one that was picked or the one text survives on.
+	   --color-secondary is the primary exactly as it was picked and is only ever
+	   shown; --color-primary is that same colour with its lightness solved until
+	   the text on it clears the contrast target, and is what every button and
+	   filled surface uses. --color-brand-alt is the second colour playing the
+	   same part as --color-primary: filled with, written on, and safe.
+
+	   The palette used to publish one safe surface for whichever of the two
+	   colours had been settled on, so setting a Secondary quietly moved every
+	   button onto it and left no contrast-safe brand anywhere. Naming both is
+	   what lets a look use two colours instead of choosing between them. */
+	--color-primary: var(--nino-brand-safe);
+	--color-primary-text: var(--nino-on-brand-safe);
+	--color-secondary: var(--nino-accent);
+	--color-brand-alt: var(--nino-accent-safe);
+	--color-brand-alt-text: var(--nino-on-accent-safe);
+
+	/* ...and the brand as ink, which is a third value again: --color-primary
+	   is solved so text survives *on* it, and says nothing about what it does
+	   written on a page surface. Every ground gets the one /_design solved for
+	   it, so a price, a stat, an outline button or an info alert clears the
+	   text target wherever it lands */
+	--color-accent-default: var(--nino-default-link);
+	--color-accent-alt: var(--nino-alt-link);
+	--color-accent-tint: var(--nino-tint-link);
+	--color-accent-dark: var(--nino-dark-link);
+	--color-accent-black: var(--nino-black-link);
+
+
+	/* ...and the focus ring, which is the same role again with a different
+	   target: 3:1 rather than 4.5, per WCAG 2.2 SC 1.4.11. Each ground takes
+	   the ring solved for the surface it actually paints - the line above it
+	   names that surface, and a ring solved against a different one is the
+	   cross-surface pairing this whole split exists to prevent */
+	--color-focus-default: var(--nino-default-focus);
+	--color-focus-alt: var(--nino-alt-focus);
+	--color-focus-tint: var(--nino-tint-focus);
+	--color-focus-dark: var(--nino-dark-focus);
+	--color-focus-black: var(--nino-black-focus);
+
+	/* The one role that is meant to fail the text target - see Nino.css.
+	   Solved against the page ground, which is where a form sits */
+	--color-disabled: var(--nino-default-disabled);
+
+	/* Page ground */
+	--color-background: var(--nino-default);
+	--color-text: var(--nino-on-default);
+	--color-title: var(--nino-default-link);
+	--color-subtitle: var(--nino-on-default-muted);
+	--color-border: var(--nino-default-border);
+	--color-header-bg: var(--nino-default);
+
+	/* A cover here is a printed page with a picture behind it, not a
+	   photograph with type on it: the scrim is the flat mid-dark ground
+	   rather than black, laid on thick enough that the picture reads as
+	   paper stock */
+	--color-background-dim: color-mix(in srgb, var(--nino-dark) 92%, transparent);
+
+	/* Footer bands */
+	--color-footer-bg-main: var(--nino-dark);
+	--color-footer-text-main: var(--nino-on-dark-muted);
+	--color-footer-bg-legal: var(--nino-dark);
+	--color-footer-text-legal: var(--nino-on-dark-muted);
+	--color-footer-text: var(--nino-on-dark-muted);
+
+	/* Sections - the four grounds a page alternates between */
+	--color-section-default-bg: var(--nino-default);
+	--color-section-default-text: var(--nino-on-default);
+	--color-section-alt-bg: var(--nino-alt);
+	--color-section-alt-text: var(--nino-on-alt);
+	/*	The fifth ground: the page with the brand in it rather than a near-grey
+		step away from it. Quiet enough to read a whole section on, coloured
+		enough to read as chosen. */
+	--color-section-tint-bg: var(--nino-tint);
+	--color-section-tint-text: var(--nino-on-tint);
+	--color-section-dark-bg: var(--nino-dark);
+	--color-section-dark-text: var(--nino-on-dark);
+	--color-section-black-bg: var(--nino-black);
+	--color-section-black-text: var(--nino-on-black);
+
+	/* Code */
+	--color-code-bg: var(--nino-black);
+	--color-code-text: var(--nino-on-black);
+	--color-code-border: var(--nino-black-border);
+
+	/* Status - each one is a surface with its own ink, never the brand's */
+	--color-error: var(--nino-danger);
+	--color-error-text: var(--nino-on-danger);
+	--color-success: var(--nino-success);
+	--color-success-text: var(--nino-on-success);
+	--color-warning: var(--nino-warning);
+	--color-warning-text: var(--nino-on-warning);
+
+	/* Typefaces are the one thing a theme cannot be handed: a webfont is a
+	   file this unit ships, not a value anything can generate */
+	--fontfamily-text: 'Text', "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+	--fontfamily-title: 'Title', system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+	--fontfamily-subtitle: 'Text', "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+	--fontsize-small: .75em;
+	--fontsize-big: 1.25em;
+	--fontsize-btn: 1rem;
+
+	/* Sizes are assignments too. The raster comes from /_design's Volume,
+	   Spacing and Shaping steps - this unit declares 'default/default/default' in
+	   its manifest, which is what a hand-tuned block here used to spell out one
+	   number at a time. The wide-screen half of the type scale is the raster's
+	   own media query; there is nothing to repeat for it here */
+	--base-size: var(--nino-base-size);
+	--line-height: var(--nino-line-height);
+
+	--text-1: var(--nino-text-1);
+	--text-2: var(--nino-text-2);
+	--text-3: var(--nino-text-3);
+	--text-4: var(--nino-text-4);
+	--text-5: var(--nino-text-5);
+	--text-6: var(--nino-text-6);
+
+	--space-1: var(--nino-space-1);
+	--space-2: var(--nino-space-2);
+	--space-3: var(--nino-space-3);
+	--space-4: var(--nino-space-4);
+	--space-5: var(--nino-space-5);
+	--space-6: var(--nino-space-6);
+
+	--radius: var(--nino-radius-2);
+	--radius-small: var(--nino-radius-1);
+	--radius-large: var(--nino-radius-3);
+
+	/*	The reference unit. Every size below is the framework's own value,
+	reached through the raster rather than restated - with the manifest's
+	default knobs this stylesheet reproduces Nino.css exactly, which is the
+	guarantee the whole design layer rests on: switching it on must not move
+	a project that has not asked for anything.	*/
+	--article-img-max-width: 12vw;
+	--article-img-max-height: 20vh;
+	--grid-max-width: var(--nino-measure);
+}
+
+
+/*	The header and footer frames are their own units
+	(library/header|footer/<key>), each shipping the css for the
+	markup it brings - this theme names the pair it was drawn against in its
+	manifest and styles none of it here.	*/
+
+
+/*	A serif sets its own colour on the page: the same measure that reads
+	comfortably in a sans is too tight for it, and the framework's line height
+	is the one thing a long-form look cannot inherit unchanged.	*/
+.nino-section-text,
+.nino-article-descr,
+p {
+	line-height: 1.7;
+}
+
+/*	The headline is the one place this look is not a serif, so it says so:
+	a sans at a heavier weight over a serif column reads as a magazine rather
+	than as a mistake	*/
+.nino-section-title,
+.nino-atf-title,
+h1, h2, h3 {
+	letter-spacing: -.015em;
+}
+
+
+/*	The header and footer frames are their own units
+	(library/header|footer/<key>), each shipping the css for the
+	markup it brings - this theme names the pair it was drawn against in its
+	manifest and styles none of it here.	*/

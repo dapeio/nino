@@ -67,8 +67,21 @@ vm.runInContext(
 
 const install = sandbox.Nino.install;
 
+/*	Frames before Design, because that is the direction the dependency runs: the
+	Design step previews a whole page inside the project's own header and footer,
+	so the frame decides its layout - a rail down the side is a different page
+	from a bar across the top. The frame steps only preview the frame itself,
+	whose structure the Design does not touch. Themes::apiApply() writes them in
+	this order for the same reason.	*/
 const stepKeys = install.STEPS.map( function( step ) { return step.key; } );
-check( 'Header and Footer are separate steps immediately after Design', stepKeys.join(',') === 'checks,setup,themes,design,header,footer,webpages,personalinfos,admin,finish' );
+check( 'Header and Footer are separate steps, and both come before Design', stepKeys.join(',') === 'checks,setup,themes,header,footer,design,webpages,personalinfos,admin,finish' );
+
+// The rail is read top to bottom, so it has to number the steps in the order
+// they actually run
+const wizardNav = fs.readFileSync( path.join( __dirname, '../_install/templates/page-wizard.tpl' ), 'utf8' );
+check( '...and the rail numbers them in that order', stepKeys.every( function( key, index ) {
+	return new RegExp( 'id="install-nav-'+ key+ '"[^>]*>'+ ( index + 1 )+ '\\.' ).test( wizardNav );
+} ) );
 
 let frameCommit = [];
 install.header = { apply : function( callback ) { frameCommit.push('header'); callback( true ); } };

@@ -83,10 +83,13 @@
 		 *	@param	{Element}		frame			The iframe, absolutely placed in its port
 		 *	@param	{Element}		port			The box it is shown inside
 		 *	@param	{number}		width			The layout width to render at
+		 *	@param	{number}		[height]	The layout height to render at. Given, the
+		 *														whole page is fitted into the port; omitted, the
+		 *														page is given as much height as the port shows
 		 *
 		 *	@return	{Function}						fit(), for calling after a layout change
 		 */
-		scaleFrame : function( frame, port, width ) {
+		scaleFrame : function( frame, port, width, height ) {
 
 			const fit = function() {
 
@@ -95,13 +98,33 @@
 				if( room.width < 1 || room.height < 1 )
 					return;
 
+				/*	Without a height the page is given the panel's, solved back
+					through the scale: as much document as the port can show and
+					no more. That fits by width alone, so a page taller than the
+					port scrolls - and a page whose own lengths are viewport
+					relative gets a different viewport on every window size.
+
+					With one, both dimensions are fixed and the scale is
+					whichever of the two fits: the whole page is on screen at a
+					stable layout, and what changes with the panel is how small
+					it is drawn rather than how much of it there is.	*/
+				const solved = height > 0 ? height : Math.round( room.height / Math.min( 1, room.width / width ) );
+
 				// Never magnified: on a panel wider than a desktop browser the page
 				// should be shown at its own size, not blown up past it
-				const factor = Math.min( 1, room.width / width );
+				const factor = Math.min( 1, room.width / width, room.height / solved );
 
 				frame.style.width = width+ 'px';
-				frame.style.height = Math.round( room.height / factor )+ 'px';
+				frame.style.height = solved+ 'px';
 				frame.style.transform = 'scale('+ factor+ ')';
+
+				/*	A page is taller than it is wide and a preview panel is the
+					other way round, so fitting the whole page leaves room at the
+					sides. Centred rather than left in the corner: the empty half
+					of the port then reads as a margin instead of as a page that
+					failed to fill it.	*/
+				frame.style.left = height > 0 ? Math.round( ( room.width - width * factor ) / 2 )+ 'px' : '0';
+				frame.style.top = height > 0 ? Math.round( ( room.height - solved * factor ) / 2 )+ 'px' : '0';
 			};
 
 			fit();

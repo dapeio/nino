@@ -85,6 +85,8 @@ const nodes = {};
 	'themes-design-example', 'themes-design-example-port', 'themes-design-mode-light', 'themes-design-mode-dark',
 	'themes-design-tab-colour', 'themes-design-tab-raster',
 	'themes-design-panel-colour', 'themes-design-panel-raster',
+	// The frame steps' own selects - what the design step re-reads on
+	'themes-frame-header', 'themes-frame-footer',
 ].forEach( function( id ) { nodes[id] = element( id ); } );
 
 // The two colour rows are markup rather than rendered, and their name is where
@@ -205,11 +207,17 @@ check( 'the example is delivered whole, as a document into the sandboxed frame',
 	frame was narrower than the difference the operator was choosing between.
 	The page is given a desktop's layout width and scaled into the panel
 	instead, which keeps every proportion inside it exact.	*/
-check( 'the page renders at a desktop layout width, not at the panel\'s', nodes['themes-design-example'].style.width === '1600px' );
-// At scale f, filling a box h tall takes h/f of document - so the page gets
-// exactly as much vertical room as the panel can show, and no more
-check( '...scaled into the room the panel has, height solved to match', nodes['themes-design-example'].style.transform === 'scale(0.5)'
-	&& nodes['themes-design-example'].style.height === '1200px' );
+check( 'the page renders at a desktop layout width, not at the panel\'s', nodes['themes-design-example'].style.width === String( design.PREVIEW_WIDTH )+ 'px' );
+/*	PREVIEW_HEIGHT picks how it fits: with one, both dimensions are fixed and the
+	whole page is on screen; without one the page is given the panel's height
+	solved back through the scale and the rest scrolls. This step ships without,
+	the example being a whole site rather than a screen of one - and whichever it
+	is, it has to be the same in both pickers or the same Design previews at two
+	different layouts. The stub's port is 800x600.	*/
+check( '...and at the same one /_design uses, or Width means two things', design.PREVIEW_WIDTH === 2400
+	&& design.PREVIEW_HEIGHT === 0 );
+check( '...given the panel\'s height, solved back through the scale', nodes['themes-design-example'].style.transform === 'scale('+ ( 800 / design.PREVIEW_WIDTH )+ ')'
+	&& nodes['themes-design-example'].style.height === String( Math.round( 600 / ( 800 / design.PREVIEW_WIDTH ) ) )+ 'px' );
 
 // Two tabs rather than one long column, the same pair /_design has
 check( 'the step opens on Colour, with Raster present but hidden', nodes['themes-design-panel-colour'].hidden === false
@@ -275,12 +283,13 @@ check( 'clearing Secondary is a real value - it then follows Primary', design._s
 	comparison rather than a warning light	*/
 const fieldMark = function( key ) {
 	const field = design._fields[key];
-	return field && field.changeMark && field.changeMark.hidden === false ? field.changeMark.textContent : '';
+	return field !== undefined && field.changeMark !== undefined && field.changeMark.hidden === false
+		&& field.classList.contains('is-changed') === true;
 };
 
-check( 'a setting moved off the theme says what the theme had', fieldMark('primary') === 'theme: #4faae8'
-	&& fieldMark('volume') === 'theme: more'
-	&& fieldMark('shaping') === ''
+check( 'a setting moved off the theme is marked, and one left alone is not', fieldMark('primary') === true
+	&& fieldMark('volume') === true
+	&& fieldMark('shaping') === false
 	&& nodes['design-reset'].hidden === false );
 
 /*	The step used to re-read on every visit. That kept a changed theme from
@@ -302,7 +311,7 @@ check( 'Reset puts every control back where the theme had it', design._settings.
 	&& design._settings.volume === 3
 	&& nodes['themes-design-primary-hex'].value === '#4faae8'
 	&& knobSelect( 'themes-design-knobs-raster', 1 ).value === '3'
-	&& fieldMark('primary') === ''
+	&& fieldMark('primary') === false
 	&& nodes['design-reset'].hidden === true );
 check( '...and asks for the picture that produces', posted.filter( function( p ) { return p.action === 'design/preview' } ).length === 1 );
 
@@ -315,9 +324,24 @@ check( 'picking another theme two steps back is followed here', design._settings
 	&& knobSelect( 'themes-design-knobs-raster', 1 ).value === '2' );
 // A reload the operator did not ask for is one they get told about: it is
 // their own values that were replaced
-check( '...and said out loud, because it replaced values that were set here', nodes['design-msg'].textContent.indexOf('theme changed') !== -1 );
+check( '...and said out loud, because it replaced values that were set here', nodes['design-msg'].textContent.indexOf('changed') !== -1 );
 check( '...by rebuilding the selects rather than re-filling them, so a revisit cannot stack listeners on one',
 	nodes['themes-design-knobs-raster'].children.length === 5 );
+
+/*	The frames are part of the starting point too: the Header and Footer steps
+	run before this one, and the example is a whole page drawn inside what they
+	settled. A Design judged inside the bar the operator just replaced is a
+	Design judged in a layout that no longer exists.	*/
+posted.length = 0;
+nodes['themes-frame-header'].value = 'v5';
+design.showCurrent();
+check( 'changing a frame one step back is followed here as well',
+	posted.filter( function( p ) { return p.action === 'design/read' } ).length === 1 );
+
+posted.length = 0;
+design.showCurrent();
+check( '...and once it has been, coming back again reads nothing',
+	posted.filter( function( p ) { return p.action === 'design/read' } ).length === 0 );
 
 // The colour inputs are markup rather than rebuilt controls, so they are the
 // ones a revisit could bind twice

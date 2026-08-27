@@ -1,6 +1,12 @@
 .nino-frame-header .nino-scroll-header {
 	min-height: 4.5rem;
 	opacity: 1;
+	display: flex;
+	background-color:transparent;
+	transition:background-color .4s;
+}
+body.nino-scroll-up .nino-frame-header .nino-scroll-header {
+	background-color:var(--color-header-bg);
 }
 
 .nino-frame-header .nino-frame-header-inner {
@@ -178,5 +184,8 @@ body main:has(> .nino-parallex:first-child) {
 	.nino-frame-header .nino-nav-burger > label > svg rect,
 	.nino-frame-header .nino-nav-burger .nino-nav-content {
 		transition: none;
+	}
+	.nino-frame-header .nino-scroll-header {
+		transition:none;
 	}
 }
