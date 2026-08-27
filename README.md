@@ -38,8 +38,16 @@ The frontend is built from simple HTML-based templates, textfills, shortcodes, a
 The included design system, with its base components and modules, provides a quick starting point for conventional websites. Multilingual content, responsive design, performance, and security remain part of the project.
 
 ### `/_install` — a quick start for the project
-
-![Environment check in the setup wizard](docs/assets/screenshots/install.webp)
+<a href="docs/assets/screenshots/_install1.webp" target="_blank">
+  <img src="docs/assets/screenshots/_install1.webp"
+       alt="Nino Installer"
+       style="width:49%">
+</a>
+<a href="docs/assets/screenshots/_install2.webp" target="_blank">
+  <img src="docs/assets/screenshots/_install2.webp"
+       alt="Nino Installer"
+       style="width:49%">
+</a>
 
 Every fresh checkout is configured through `/_install`. The wizard checks the environment, guides you through languages, modules, and the theme, copies the required assets, creates initial pages and basic information, and sets up access to `/_editor` and `/_admin`.
 
@@ -47,7 +55,7 @@ The developer can then begin working on the project immediately.
 
 ### `/_admin` — optional: the GUI for developers
 
-![Dashboard of the technical project administration](docs/assets/screenshots/admin.webp)
+![Dashboard of the technical project administration](docs/assets/screenshots/_admin1.webp)
 
 In `/_admin`, the developer manages the website’s technical and content structure: element types, elements and texts, images, pages and routes, users, and configuration.
 
@@ -55,19 +63,64 @@ The interface provides full access for development, diagnostics, and corrections
 
 ### `/_editor` — optional: maintain content with ease
 
-![Dashboard of the editorial interface](docs/assets/screenshots/editor.webp)
+<a href="docs/assets/screenshots/_editor1.webp" target="_blank">
+  <img src="docs/assets/screenshots/_editor1.webp"
+       alt="Nino Installer"
+       style="width:49%">
+</a>
+<a href="docs/assets/screenshots/_editor2.webp" target="_blank">
+  <img src="docs/assets/screenshots/_editor2.webp"
+       alt="Nino Installer"
+       style="width:49%">
+</a>
 
 `/_editor` is the everyday interface for editors and site owners. It is used to maintain texts, recurring content, and images, as well as to manage form submissions, newsletter subscribers, user permissions, and logs.
 
 The developer determines which content is visible and which areas an account actually needs.
 
 ### `/_templates` — optional, Alpha
-
-`/_templates` turns `page-*.tpl` files into a focused sequence of complete HTML and `[template]` sections. Developers can create a template, choose from 43 curated section presets, assign meaningful IDs, configure content and layout, and immediately fill native textfills or connect an Elements collection.
+<a href="docs/assets/screenshots/_templates1.webp" target="_blank">
+  <img src="docs/assets/screenshots/_templates1.webp"
+       alt="Nino Installer"
+       style="width:31%">
+</a>
+<a href="docs/assets/screenshots/_templates2.webp" target="_blank">
+  <img src="docs/assets/screenshots/_templates2.webp"
+       alt="Nino Installer"
+       style="width:31%">
+</a>
+<a href="docs/assets/screenshots/_templates3.webp" target="_blank">
+  <img src="docs/assets/screenshots/_templates3.webp"
+       alt="Nino Installer"
+       style="width:31%">
+</a>
+`/_design` turns `page-*.tpl` files into a focused sequence of complete HTML and `[template]` sections. Developers can create a template, choose from different section presets, assign meaningful IDs, configure content and layout, and immediately fill native textfills or connect an Elements collection.
 
 The Template Builder preserves ordinary HTML+ source. Standalone template shortcodes can be chosen directly through **Add section** and remain movable canvas items, while the page header and footer are ordinary `[template]` shortcodes managed safely through fixed Template Settings. A display name and VPA default live as inert metadata at the start of the file. Unrelated source remains locked and byte-identical. A deliberate HTML+ escape hatch is available for code-authored sections. The former DOM-oriented builder has been removed.
 
+### `/_design` — optional, Alpha
+<a href="docs/assets/screenshots/_design1.webp" target="_blank">
+  <img src="docs/assets/screenshots/_design1.webp"
+       alt="Nino Installer"
+       style="width:31%">
+</a>
+<a href="docs/assets/screenshots/_design2.webp" target="_blank">
+  <img src="docs/assets/screenshots/_design2.webp"
+       alt="Nino Installer"
+       style="width:31%">
+</a>
+<a href="docs/assets/screenshots/_design3.webp" target="_blank">
+  <img src="docs/assets/screenshots/_design3.webp"
+       alt="Nino Installer"
+       style="width:31%">
+</a>
+
 > **Status: Alpha.** Preset manifests and generated `.tpl` markup are readable and extensible, but the library and composition workflow may still evolve.
+
+`/_design` turns the site’s visual foundation into a focused set of controlled choices. Developers can select a curated Theme, switch Header and Footer frames independently, and refine the shared colour palette and layout raster while previewing the complete website.
+
+The Design tool keeps presentation separate from content and template structure. Themes and frames are installed as ordinary CSS and `.tpl` files, while custom settings are written to the project’s shared design layer. Changes can be previewed, reverted, and applied without rewriting page templates, and the resulting source remains available for precise manual refinement.
+> **Status: Alpha.** 
 
 ## What Nino includes
 
@@ -195,6 +248,7 @@ Nino as a whole is currently in the **Beta phase**. Individual optional tools ha
 | --- | --- |
 | Kernel, frontend, and existing project foundation | Beta |
 | `/_templates` | Alpha |
+| `/_design` | Alpha |
 
 Security fixes land directly on `main`; there is no separate LTS version yet.
 
