@@ -954,6 +954,48 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **Every legacy path and compatibility fallback is gone.** Nino is pre-1.0 and
+  there is no installed base to carry, so nothing here is kept for the shape it
+  used to have. Roughly 750 lines came out.
+
+  *The pre-v3 section composer.* `Library::presets()` skips any manifest that
+  does not declare `version: 3`, so `Composer::compose()` could never receive
+  anything else - and everything past its early hand-off to `AreaComposer` was
+  unreachable, along with the seventeen render methods only it called and the
+  fourteen choice tables only those read. `apiCreateImage()` no longer guesses a
+  slot from the shape of a uri either: a caller names the preset and the slot,
+  and the dimensions come from the manifest.
+
+  *Two token names.* `--nino-origin` and `--nino-vibrant`, the names the palette
+  published before the brand became four roles, are no longer emitted. Nothing
+  in the framework, the catalogue or the demo pages read them.
+
+  *The old Design vocabulary.* A knob position is a number. `contrast: 'high'`,
+  `colors: 'clean'`, `spacing: 'airy'` and the rest no longer resolve - they
+  fall back like any other value the generator cannot use, and `colors` is no
+  longer accepted as a second name for `saturation`.
+
+  *The kernel's second autoload root.* A class outside `Nino\` resolves against
+  the application root (`app/`, or `NINO_APP_DIR`) and nowhere else. `_nino/` was
+  searched afterwards so that projects shipping their own classes inside the
+  kernel kept working; now a class that lands there fails loudly instead of
+  being found and then disappearing on the next update.
+
+  *The Design settings key.* `/nino/theme/design` was held unchanged so a
+  project surviving the `/_theme` → `/_design` rename would not lose its design.
+  It is `/nino/design/settings` now, named for the tool that owns it.
+
+  Several comments kept a guard while dropping the reason: an `is_array()` on a
+  session entry, an `is_string()` on a session value, the `required`-on-image
+  exemption and the new-uri slug rule are all still there. None of them was ever
+  really about an old shape - they are about `config.php` being a file a
+  developer edits by hand, a cookie outliving a deploy, and validation that
+  applies to what is created rather than to what already exists.
+
+  One "legacy fallback" deliberately stays: `X-Frame-Options` beside
+  `frame-ancestors`. That one is about older *browsers*, not older projects.
+
+
 - **A checkout ships no project any more.** There is no `private/` directory
   in the repository: no `config.php`, no deny rule, nothing. The wizard creates
   the directory, brings the `.htaccess` that protects it, and writes the first
@@ -1092,9 +1134,9 @@ All notable changes to Nino are documented in this file.
   The four dialogs are still called Theme, Design, Header, and Footer - the
   Theme dialog does pick a theme.
 
-  A deployment that kept `_theme/` has to replace that directory; the
-  persisted `/nino/theme/design` settings key is deliberately unchanged, so no
-  project loses its design on the way over.
+  A deployment that kept `_theme/` has to replace that directory, and the
+  persisted settings key moved with the tool: `/nino/theme/design` is now
+  `/nino/design/settings`.
 
 - Project-owned PHP classes now resolve from `app/` by default, or from
   `NINO_APP_DIR` when that constant is defined before `_nino/Nino.php` is

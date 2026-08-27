@@ -467,7 +467,7 @@ check( 'each frame overrides the theme\'s declaration and is persisted', ( $conf
 	&& ( $configAfterFrames['/nino/install/footer'] ?? null ) === 'v2' );
 check( '...and the installed template is really that unit\'s', file_get_contents( $sandbox. '/private/templates/theme.header.tpl' ) === file_get_contents( __DIR__. '/../_install/library/header/v3/template.tpl' ) );
 check( 'frame-only applies leave the selected theme and Design untouched', ( $configAfterFrames['/nino/install/theme'] ?? null ) === ( $configBeforeFrames['/nino/install/theme'] ?? null )
-	&& ( $configAfterFrames['/nino/theme/design'] ?? [] ) === ( $configBeforeFrames['/nino/theme/design'] ?? [] ) );
+	&& ( $configAfterFrames['/nino/design/settings'] ?? [] ) === ( $configBeforeFrames['/nino/design/settings'] ?? [] ) );
 check( 'applying Footer after Header keeps their canonical bundle order', array_search( '/assets/style.header.css', $configAfterFrames['/nino/html/assets']['/.cache/style.css'], true )
 	< array_search( '/assets/style.footer.css', $configAfterFrames['/nino/html/assets']['/.cache/style.css'], true ) );
 
@@ -611,7 +611,7 @@ $designDefaultRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Install\Themes::apiApply( $appData, $designDefaultRequest );
 $configAfterDesign = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
 
-check( 'a theme\'s declared design defaults are what a plain "pick and Next" applies', ( $configAfterDesign['/nino/theme/design']['primary'] ?? null ) === '#4faae8' );
+check( 'a theme\'s declared design defaults are what a plain "pick and Next" applies', ( $configAfterDesign['/nino/design/settings']['primary'] ?? null ) === '#4faae8' );
 check( 'the generated stylesheet is written and carries the tokens a theme reads from', is_file( $sandbox. '/private/assets/style.design.css' ) === true
 	&& str_contains( (string) file_get_contents( $sandbox. '/private/assets/style.design.css' ), '--nino-on-alt:' ) === true );
 
@@ -645,7 +645,7 @@ $designApplyRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Install\Themes::apiDesignApply( $appData, $designApplyRequest );
 $configAfterPick = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
 
-check( 'the operator\'s design beats the theme\'s defaults and is persisted whole', ( $configAfterPick['/nino/theme/design'] ?? [] ) === [
+check( 'the operator\'s design beats the theme\'s defaults and is persisted whole', ( $configAfterPick['/nino/design/settings'] ?? [] ) === [
 	'primary' => '#c81e2d', 'secondary' => '#0f766e', 'harmony' => 1, 'temperature' => 1,
 	'saturation' => 1, 'contrast' => 3, 'depth' => 3, 'scale' => 1,
 	'volume' => 1, 'spacing' => 1, 'shaping' => 1, 'measure' => 1,
@@ -663,7 +663,7 @@ $frameAfterDesignRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 $configAfterFrameOnDesign = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
 
 check( 'a frame applied after Design preserves the operator\'s full Design settings', $frameAfterDesignRequest['/nino/http/response']['statusCode'] === 200
-	&& ( $configAfterFrameOnDesign['/nino/theme/design'] ?? [] ) === ( $configAfterPick['/nino/theme/design'] ?? [] ) );
+	&& ( $configAfterFrameOnDesign['/nino/design/settings'] ?? [] ) === ( $configAfterPick['/nino/design/settings'] ?? [] ) );
 
 $previewRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 $_POST['data']  = json_encode( [ 'design' => [ 'primary' => '#4faae8', 'volume' => 3 ] ] );
@@ -706,7 +706,7 @@ check( '...in either mode, with the picked brand surviving both', str_contains( 
 check( '...including the size raster, so both halves of the step preview the same way', ( $previewBody['raster']['text'][6] ?? '' ) !== ''
 	&& ( $previewBody['raster']['space'][1] ?? '' ) !== ''
 	&& $previewBody['settings']['volume'] === 3 );
-check( 'previewing stores nothing', ( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/theme/design']['volume'] ?? '' ) === 1 );
+check( 'previewing stores nothing', ( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/design/settings']['volume'] ?? '' ) === 1 );
 
 $listWithFrames = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Install\Themes::apiList( $appData, $listWithFrames );

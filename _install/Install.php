@@ -3117,9 +3117,9 @@ namespace Nino\Install {
 		}
 
 		/**
-		 *	Every account that can actually pass Auth's login-status gate. Disabled
-		 *	legacy placeholders must not satisfy the wizard's "at least one admin"
-		 *	precondition merely because an array key for them still exists.
+		 *	Every account that can actually pass Auth's login-status gate. A
+		 *	disabled or password-less entry must not satisfy the wizard's "at
+		 *	least one admin" precondition merely because an array key exists.
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *

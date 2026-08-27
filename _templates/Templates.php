@@ -395,48 +395,6 @@ namespace Nino\Templates {
 		 * inside that fill and left its tail (]"]) standing in the preview.
 		 */
 		private const string SHORTCODE_ARGUMENTS = '(?:"[^"]*"|\'[^\']*\'|[^\]"\'])*';
-		private const array SURFACES = [ 'default', 'alt', 'primary', 'dark', 'black' ];
-		private const array BACKGROUNDS = [ 'none', 'image-cover', 'image-static', 'parallax' ];
-		private const array HEADERS = [ 'none', 'title', 'title-subtitle', 'title-subtitle-description' ];
-		private const array ALIGNS = [ 'left', 'center', 'right' ];
-		private const array CONTENTS = [
-			'none', 'text', 'media-split', 'articles', 'articles-image', 'cards',
-			'lists', 'slider', 'media-slider', 'testimonials', 'profiles', 'stats',
-			'features', 'feature-list', 'accordion', 'tabs', 'pricing', 'comparison',
-			'data-table', 'logos', 'badges', 'gallery', 'timeline', 'video',
-			'video-embed', 'notice', 'contact', 'newsletter',
-		];
-		private const array CONTENT_STYLES = [ 'auto', 'default', 'alt' ];
-		private const array ACTIONS = [ 'none', 'link', 'button', 'dual-buttons' ];
-		private const array MOTIONS = [ 'page', 'on', 'off' ];
-		private const array PAGE_MOTIONS = [ 'on', 'off' ];
-		private const array PADDINGS = [ 'default', 'none', 'compact', 'generous' ];
-		private const array MARGINS = [ 'none', 'small', 'medium', 'large' ];
-		private const array BORDERS = [ 'none', '1', '2', '3' ];
-		private const array LAYOUTS = [
-			'auto', '2', '3', '4', 'media-left', 'media-right', 'media-left-full',
-			'media-right-full', 'narrow', 'wide', 'spotlight', 'slider', 'grid',
-			'mosaic', 'bento', 'split', 'featured', 'check', 'check-2', 'numbered',
-			'numbered-2', 'plain', 'striped', 'bordered', 'striped-bordered',
-			'pill', 'info', 'success', 'error', '4-3',
-		];
-
-		public static function choices(): array {
-			return [
-				'surface'		=> self::SURFACES,
-				'background'	=> self::BACKGROUNDS,
-				'header'		=> self::HEADERS,
-				'align'			=> self::ALIGNS,
-				'content'		=> self::CONTENTS,
-				'contentStyle'	=> self::CONTENT_STYLES,
-				'action'		=> self::ACTIONS,
-				'motion'		=> self::MOTIONS,
-				'padding'		=> self::PADDINGS,
-				'margin'		=> self::MARGINS,
-				'border'		=> self::BORDERS,
-				'layout'		=> self::LAYOUTS,
-			];
-		}
 
 		public static function modules(): array {
 
@@ -645,79 +603,27 @@ namespace Nino\Templates {
 			];
 		}
 
+		/**
+		 *	Compose one section from a preset.
+		 *
+		 *	Every preset in the library is an Area preset - Library::presets()
+		 *	skips a manifest that does not declare version 3 - so this resolves
+		 *	the key and hands straight over. It stays a method of its own
+		 *	because the key lookup and the "unknown preset" answer belong to the
+		 *	caller's vocabulary, not to the Area composer's.
+		 *
+		 *	@param		array			$input				Preset key plus the browser's own values
+		 *
+		 *	@return 	array								{ source, spec, fields, imageSlots, elementSchema, segment }
+		 */
 		public static function compose( array $input ): array {
 
-			$presetKey = (string) ( $input['preset'] ?? 'blank' );
-			$preset = Library::preset( $presetKey );
+			$preset = Library::preset( (string) ( $input['preset'] ?? 'blank' ) );
 
 			if( $preset === null )
 				throw new \InvalidArgumentException( 'unknown section preset' );
-			if( (int) ( $preset['version'] ?? 0 ) === 3 )
-				return AreaComposer::compose( $input, $preset );
 
-			$raw = array_merge( $preset['defaults'], $input );
-			$pageId = self::_slug( (string) ( $raw['pageId'] ?? '' ), 'page id' );
-			$id = self::_slug( (string) ( $raw['id'] ?? '' ), 'section id' );
-
-			$spec = [
-				'preset'		=> $presetKey,
-				'version'		=> $preset['version'],
-				'pageId'		=> $pageId,
-				'id'			=> $id,
-				'shell'			=> $preset['shell'],
-				'surface'		=> self::_choice( $raw, 'surface', $preset ),
-				'background'	=> self::_choice( $raw, 'background', $preset ),
-				'header'		=> self::_choice( $raw, 'header', $preset ),
-				'align'			=> self::_choice( $raw, 'align', $preset ),
-				'content'		=> self::_choice( $raw, 'content', $preset ),
-				'contentStyle'	=> self::_choice( $raw, 'contentStyle', $preset ),
-				'action'		=> self::_choice( $raw, 'action', $preset ),
-				'motion'		=> self::_choice( $raw, 'motion', $preset ),
-				'pageMotion'	=> in_array( $raw['pageMotion'] ?? '', self::PAGE_MOTIONS, true ) ? $raw['pageMotion'] : 'off',
-				'padding'		=> self::_choice( $raw, 'padding', $preset ),
-				'margin'		=> self::_choice( $raw, 'margin', $preset ),
-				'border'		=> self::_choice( $raw, 'border', $preset ),
-				'layout'		=> self::_choice( $raw, 'layout', $preset ),
-				'limit'			=> min( 12, max( 1, (int) ( $raw['limit'] ?? 3 ) ) ),
-			];
-
-			$modules = self::modules();
-			$module = $modules[$spec['content']] ?? null;
-			if( $module === null )
-				throw new \InvalidArgumentException( 'unknown content module' );
-
-			if( in_array( $spec['layout'], $module['layouts'], true ) === false )
-				$spec['layout'] = $module['layouts'][0];
-
-			$elementType = trim( (string) ( $raw['elementType'] ?? '' ) );
-			if( $module['source'] === 'elements' ) {
-				if( $elementType === '' )
-					$elementType = $pageId. '-'. $id;
-				if( preg_match( '/^[a-z][a-z0-9_-]*$/', $elementType ) !== 1 )
-					throw new \InvalidArgumentException( 'invalid element type' );
-			} else {
-				$elementType = '';
-			}
-			$spec['elementType'] = $elementType;
-
-			$source = ( $preset['custom'] === true )
-				? self::_renderCustom( $spec, Library::template( $presetKey ) ?? '' )
-				: self::_renderGeneric( $spec );
-
-			$source = rtrim( $source, "\r\n" ). "\n";
-			$inspected = SectionDocument::inspectSection( $source );
-
-			if( $inspected['valid'] !== true )
-				throw new \InvalidArgumentException( 'preset did not produce exactly one valid section' );
-
-			return [
-				'source'		=> $source,
-				'spec'			=> $spec,
-				'fields'		=> self::fieldSuffixes( $spec ),
-				'imageSlots'	=> self::imageSuffixes( $spec ),
-				'elementSchema'	=> $module['model'],
-				'segment'		=> $inspected['segment'],
-			];
+			return AreaComposer::compose( $input, $preset );
 		}
 
 		/**
@@ -893,438 +799,6 @@ namespace Nino\Templates {
 			return 'data:image/svg+xml,'. rawurlencode( $svg );
 		}
 
-		public static function fieldSuffixes( array $spec ): array {
-
-			$fields = [];
-			if( $spec['header'] !== 'none' )
-				$fields[] = 'title';
-			if( in_array( $spec['header'], [ 'title-subtitle', 'title-subtitle-description' ], true ) )
-				$fields[] = 'subtitle';
-			if( $spec['header'] === 'title-subtitle-description' )
-				$fields[] = 'description';
-			$module = self::modules()[$spec['content']] ?? null;
-			if( $module !== null )
-				$fields = array_merge( $fields, $module['fields'] );
-			if( $spec['action'] !== 'none' ) {
-				$fields[] = 'cta-label';
-				$fields[] = 'cta-uri';
-			}
-			if( $spec['action'] === 'dual-buttons' ) {
-				$fields[] = 'secondary-cta-label';
-				$fields[] = 'secondary-cta-uri';
-			}
-
-			return array_values( array_unique( $fields ) );
-		}
-
-		public static function imageSuffixes( array $spec ): array {
-			$images = [];
-			if( $spec['background'] !== 'none' )
-				$images[] = 'background';
-			$module = self::modules()[$spec['content']] ?? null;
-			if( $module !== null )
-				$images = array_merge( $images, $module['images'] );
-			return array_values( array_unique( $images ) );
-		}
-
-		private static function _choice( array $raw, string $key, array $preset ): string {
-			$allowed = $preset['allow'][$key];
-			$value = (string) ( $raw[$key] ?? '' );
-			return in_array( $value, $allowed, true ) ? $value : $allowed[0];
-		}
-
-		private static function _slug( string $value, string $label ): string {
-			$value = strtolower( trim( $value ) );
-			if( preg_match( '/^[a-z][a-z0-9-]*$/', $value ) !== 1 )
-				throw new \InvalidArgumentException( 'invalid '. $label );
-			return $value;
-		}
-
-		private static function _renderGeneric( array $spec ): string {
-
-			$prefix = '/page-'. $spec['pageId']. '/'. $spec['id'];
-			$classes = self::_sectionClasses( $spec );
-			$attributes = ' id="'. self::_escape( $spec['id'] ). '" class="'. self::_escape( implode( ' ', $classes ) ). '"';
-
-			if( $spec['shell'] === 'hero' )
-				$attributes .= ' data-cover-height="100"';
-
-			$meta = '<!-- nino:section '. json_encode( $spec, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE ). ' -->';
-			$inner = "\t". $meta. "\n";
-
-			if( $spec['background'] !== 'none' )
-				$inner .= "\t[image ". $prefix. "/background alt=\"\"]\n";
-
-			$content = self::_renderBody( $spec, $prefix );
-
-			if( $spec['background'] !== 'none' ) {
-				$backgroundContentClass = $spec['background'] === 'image-static' ? 'nino-img-background-content' : 'nino-cover-content';
-				$inner .= "\t<div class=\"". $backgroundContentClass. "\">\n". self::_indent( $content, 1 ). "\t</div>\n";
-			}
-			else
-				$inner .= $content;
-
-			return '<section'. $attributes. ">\n". $inner. '</section>';
-		}
-
-		private static function _renderBody( array $spec, string $prefix ): string {
-
-			$rowClasses = [ 'nino-grid-row' ];
-			if( in_array( $spec['content'], [ 'media-split', 'feature-list' ], true ) )
-				$rowClasses[] = 'nino-grid-middle';
-			if( in_array( $spec['layout'], [ 'media-left-full', 'media-right-full' ], true ) )
-				$rowClasses[] = 'nino-grid--fullwidth';
-			if( $spec['motion'] === 'on' || ( $spec['motion'] === 'page' && $spec['pageMotion'] === 'on' ) )
-				$rowClasses[] = 'nino-vpa';
-
-			$out = "\t<div class=\"". implode( ' ', $rowClasses ). "\">\n";
-			$out .= self::_renderHeader( $spec, $prefix );
-			$out .= self::_renderContent( $spec, $prefix );
-			$out .= self::_renderAction( $spec, $prefix );
-			$out .= "\t</div>\n";
-
-			return $out;
-		}
-
-		private static function _renderHeader( array $spec, string $prefix ): string {
-
-			if( $spec['header'] === 'none' )
-				return '';
-
-			$classes = [ 'nino-grid-100' ];
-			if( $spec['content'] !== 'none' || $spec['action'] !== 'none' )
-				$classes[] = 'nino-mb-3';
-			if( $spec['align'] !== 'left' )
-				$classes[] = 'nino-text-'. $spec['align'];
-
-			$headingAlign = $spec['align'] === 'center' ? '' : ' nino-text-'. $spec['align'];
-			$titleClass = ( $spec['shell'] === 'hero' ? 'nino-atf-title' : 'nino-section-title' ). $headingAlign;
-			$subtitleClass = ( $spec['shell'] === 'hero' ? 'nino-atf-subtitle' : 'nino-section-subtitle' ). $headingAlign;
-
-			$out = "\t\t<div class=\"". implode( ' ', $classes ). "\">\n";
-			$out .= "\t\t\t<h2 class=\"". $titleClass. "\">[[". $prefix. "/title]]</h2>\n";
-
-			if( in_array( $spec['header'], [ 'title-subtitle', 'title-subtitle-description' ], true ) )
-				$out .= "\t\t\t<p class=\"". $subtitleClass. "\">[[". $prefix. "/subtitle]]</p>\n";
-
-			if( $spec['header'] === 'title-subtitle-description' )
-				$out .= "\t\t\t<p>[[". $prefix. "/description]]</p>\n";
-
-			$out .= "\t\t</div>\n";
-			return $out;
-		}
-
-		private static function _renderContent( array $spec, string $prefix ): string {
-
-			$content = $spec['content'];
-			if( $content === 'none' )
-				return '';
-
-			if( $content === 'text' ) {
-				$width = $spec['layout'] === 'narrow' ? 'nino-grid-m-66' : 'nino-grid-100';
-				return "\t\t<div class=\"nino-grid-100 ". $width. "\">\n\t\t\t<p>[[". $prefix. "/content]]</p>\n\t\t</div>\n";
-			}
-
-			if( $content === 'media-split' ) {
-				$media = "\t\t<div class=\"nino-grid-100 nino-grid-m-50 nino-img-cover\">\n\t\t\t[image ". $prefix. "/image alt=\"\"]\n\t\t</div>\n";
-				$text = "\t\t<div class=\"nino-grid-100 nino-grid-m-50\">\n\t\t\t<article class=\"". self::_articleClass( $spec ). "\">\n\t\t\t\t<div class=\"nino-article-content\">[[". $prefix. "/content]]</div>\n\t\t\t</article>\n\t\t</div>\n";
-				return in_array( $spec['layout'], [ 'media-right', 'media-right-full' ], true ) ? $text. $media : $media. $text;
-			}
-
-			$type = '/'. $spec['elementType'];
-			$limit = $spec['limit'];
-			$articleClass = self::_articleClass( $spec );
-
-			if( $content === 'lists' ) {
-				$numbered = str_starts_with( $spec['layout'], 'numbered' );
-				$listClass = 'nino-list '. ( $numbered ? 'nino-list--numbered' : 'nino-list--check' ). ' nino-list--content';
-				if( str_ends_with( $spec['layout'], '-2' ) )
-					$listClass .= ' nino-list--columns';
-				return "\t\t<div class=\"nino-grid-100\">\n\t\t\t<ul class=\"". $listClass. "\">\n\t\t\t\t[elements ". $type. " limit=\"". $limit. "\"]\n\t\t\t\t<li>[[title]]</li>\n\t\t\t\t[/elements]\n\t\t\t</ul>\n\t\t</div>\n";
-			}
-
-			if( in_array( $content, [ 'articles', 'articles-image' ], true ) ) {
-				$grid = self::_gridClass( $spec['layout'] );
-				$image = $content === 'articles-image' ? "\t\t\t\t<img class=\"nino-article-img\" src=\"[[/nino/public]]/images/[[image]]\" alt=\"[[title]]\">\n" : '';
-				return "\t\t[elements ". $type. " limit=\"". $limit. "\"]\n"
-					. "\t\t<div class=\"nino-grid-100 ". $grid. " nino-mb-3\">\n"
-					. "\t\t\t<article class=\"". $articleClass. "\">\n". $image
-					. "\t\t\t\t<div class=\"nino-article-content\">\n"
-					. "\t\t\t\t\t<h3 class=\"nino-article-title\">[[title]]</h3>\n"
-					. "\t\t\t\t\t<div class=\"nino-article-descr\">[[description]]</div>\n"
-					. "\t\t\t\t\t<a href=\"[[link]]\" class=\"nino-btn nino-btn--primary\">[[linkLabel]]</a>\n"
-					. "\t\t\t\t</div>\n\t\t\t</article>\n\t\t</div>\n\t\t[/elements]\n";
-			}
-
-			if( $content === 'cards' ) {
-				$grid = $spec['layout'] === 'spotlight' ? 'nino-grid-m-66' : self::_gridClass( $spec['layout'] );
-				$center = $spec['layout'] === 'spotlight' ? ' style="margin:0 auto;"' : '';
-				return "\t\t[elements ". $type. " limit=\"". $limit. "\"]\n"
-					. "\t\t<div class=\"nino-grid-100 ". $grid. " nino-mb-3\"". $center. ">\n"
-					. "\t\t\t<article class=\"". $articleClass. " nino-article--fullwidth\">\n"
-					. "\t\t\t\t<div class=\"nino-img-cover\">\n"
-					. "\t\t\t\t\t<img class=\"nino-article-img nino-article-img--maxheight\" src=\"[[/nino/public]]/images/[[image]]\" alt=\"[[title]]\">\n"
-					. "\t\t\t\t\t<span class=\"nino-badge nino-badge--primary\">[[badge]]</span>\n"
-					. "\t\t\t\t</div>\n"
-					. "\t\t\t\t<div class=\"nino-article-content\">\n"
-					. "\t\t\t\t\t<h3 class=\"nino-article-title\">[[title]]</h3>\n"
-					. "\t\t\t\t\t<div class=\"nino-article-descr\">[[description]]</div>\n"
-					. "\t\t\t\t\t<div class=\"nino-article-price\">[[price]]</div>\n"
-					. "\t\t\t\t\t<a href=\"[[link]]\" class=\"nino-btn nino-btn--primary\">[[linkLabel]]</a>\n"
-					. "\t\t\t\t</div>\n\t\t\t</article>\n\t\t</div>\n\t\t[/elements]\n";
-			}
-
-			if( $content === 'testimonials' ) {
-				$testimonial = "<article class=\"". $articleClass. " nino-text-center\"><div class=\"nino-article-content\"><blockquote class=\"nino-article-title\">[[quote]]</blockquote><div class=\"nino-testimonial-author\"><img src=\"[[/nino/public]]/images/[[image]]\" alt=\"\"><span><strong>[[author]]</strong><small>[[role]]</small></span></div></div></article>";
-				if( $spec['layout'] === 'slider' )
-					return "\t\t<div class=\"nino-grid-100\">\n\t\t\t<div class=\"nino-slider\" data-slider-pos=\"0\" data-slider-width=\"60%\" data-slider-min=\"280px\">\n\t\t\t\t<ul>\n"
-						. "\t\t\t\t\t[elements ". $type. " limit=\"". $limit. "\"]\n\t\t\t\t\t<li>". $testimonial. "</li>\n\t\t\t\t\t[/elements]\n"
-						. "\t\t\t\t</ul>\n\t\t\t</div>\n\t\t</div>\n";
-
-				$grid = $spec['layout'] === 'spotlight' ? 'nino-grid-m-66' : self::_gridClass( $spec['layout'] );
-				$center = $spec['layout'] === 'spotlight' ? ' style="margin:0 auto;"' : '';
-				return "\t\t[elements ". $type. " limit=\"". $limit. "\"]\n\t\t<div class=\"nino-grid-100 ". $grid. " nino-mb-3\"". $center. ">\n\t\t\t". $testimonial. "\n\t\t</div>\n\t\t[/elements]\n";
-			}
-
-			if( $content === 'profiles' ) {
-				if( $spec['layout'] === 'spotlight' )
-					return "\t\t[elements ". $type. " limit=\"". $limit. "\"]\n\t\t<div class=\"nino-grid-100 nino-grid-m-66\" style=\"margin:0 auto;\">\n\t\t\t<article class=\"". $articleClass. " nino-article-cols-m\">\n\t\t\t\t<img class=\"nino-article-img nino-profile-image\" src=\"[[/nino/public]]/images/[[image]]\" alt=\"[[title]]\">\n\t\t\t\t<div class=\"nino-article-content\"><h3 class=\"nino-article-title\">[[title]]</h3><p class=\"nino-article-subtitle\">[[role]]</p><div class=\"nino-article-descr\">[[description]]</div><p class=\"nino-profile-links\"><a href=\"mailto:[[email]]\">[[email]]</a><a href=\"tel:[[phone]]\">[[phone]]</a></p></div>\n\t\t\t</article>\n\t\t</div>\n\t\t[/elements]\n";
-
-				$grid = self::_gridClass( $spec['layout'] );
-				return "\t\t[elements ". $type. " limit=\"". $limit. "\"]\n\t\t<div class=\"nino-grid-100 ". $grid. " nino-mb-3\">\n\t\t\t<article class=\"". $articleClass. " nino-article--fullwidth\"><img class=\"nino-article-img nino-article-img--maxheight\" src=\"[[/nino/public]]/images/[[image]]\" alt=\"[[title]]\"><div class=\"nino-article-content\"><h3 class=\"nino-article-title\">[[title]]</h3><p class=\"nino-article-subtitle\">[[role]]</p><div class=\"nino-article-descr\">[[description]]</div></div></article>\n\t\t</div>\n\t\t[/elements]\n";
-			}
-
-			if( $content === 'stats' ) {
-				$grid = self::_gridClass( $spec['layout'] );
-				return "\t\t[elements ". $type. " limit=\"". $limit. "\"]\n\t\t<div class=\"nino-grid-100 ". $grid. " nino-text-center nino-mb-2\"><div class=\"nino-stat-counter\" data-stat-counter-to=\"[[number]]\" data-stat-counter-suffix=\"[[suffix]]\">0</div><p>[[title]]</p></div>\n\t\t[/elements]\n";
-			}
-
-			if( $content === 'features' ) {
-				if( $spec['layout'] === 'bento' )
-					return "\t\t<div class=\"nino-grid-100\"><div class=\"nino-bento\">\n\t\t\t[elements ". $type. " limit=\"". $limit. "\"]\n\t\t\t<article class=\"". $articleClass. " nino-bento-item\"><div class=\"nino-article-content\">". self::_checkIcon(). "<h3 class=\"nino-article-title\">[[title]]</h3><div class=\"nino-article-descr\">[[description]]</div></div></article>\n\t\t\t[/elements]\n\t\t</div></div>\n";
-
-				$grid = self::_gridClass( $spec['layout'] );
-				return "\t\t[elements ". $type. " limit=\"". $limit. "\"]\n\t\t<div class=\"nino-grid-100 ". $grid. " nino-mb-3\"><article class=\"". $articleClass. "\"><div class=\"nino-article-content\">". self::_checkIcon(). "<h3 class=\"nino-article-title\">[[title]]</h3><div class=\"nino-article-descr\">[[description]]</div></div></article></div>\n\t\t[/elements]\n";
-			}
-
-			if( $content === 'feature-list' ) {
-				$media = "\t\t<div class=\"nino-grid-100 nino-grid-m-50 nino-img-cover\">\n\t\t\t[image ". $prefix. "/image alt=\"\"]\n\t\t</div>\n";
-				$list = "\t\t<div class=\"nino-grid-100 nino-grid-m-50 nino-p-2\">\n\t\t\t<ul class=\"nino-feature-list\">\n\t\t\t\t[elements ". $type. " limit=\"". $limit. "\"]\n\t\t\t\t<li class=\"nino-feature-item\">". self::_checkIcon(). "<div><h3>[[title]]</h3><div>[[description]]</div></div></li>\n\t\t\t\t[/elements]\n\t\t\t</ul>\n\t\t</div>\n";
-				return $spec['layout'] === 'media-right' ? $list. $media : $media. $list;
-			}
-
-			if( $content === 'slider' ) {
-				$width = $spec['layout'] === 'narrow' ? '60%' : '80%';
-				return "\t\t<div class=\"nino-grid-100\">\n\t\t\t<div class=\"nino-slider\" data-slider-pos=\"0\" data-slider-width=\"". $width. "\" data-slider-min=\"280px\">\n\t\t\t\t<ul>\n"
-					. "\t\t\t\t\t[elements ". $type. " limit=\"". $limit. "\"]\n"
-					. "\t\t\t\t\t<li><article class=\"". $articleClass. " nino-text-center\"><div class=\"nino-article-content\"><p class=\"nino-article-title\">[[title]]</p><p>[[description]]</p></div></article></li>\n"
-					. "\t\t\t\t\t[/elements]\n\t\t\t\t</ul>\n\t\t\t</div>\n\t\t</div>\n";
-			}
-
-			if( $content === 'media-slider' ) {
-				$width = $spec['layout'] === 'narrow' ? '72%' : '88%';
-				return "\t\t<div class=\"nino-grid-100\">\n\t\t\t<div class=\"nino-slider nino-media-slider\" data-slider-pos=\"0\" data-slider-width=\"". $width. "\" data-slider-min=\"280px\">\n\t\t\t\t<ul>\n"
-					. "\t\t\t\t\t[elements ". $type. " limit=\"". $limit. "\"]\n"
-					. "\t\t\t\t\t<li><article class=\"". $articleClass. " nino-article--fullwidth\"><img class=\"nino-article-img nino-article-img--maxheight\" src=\"[[/nino/public]]/images/[[image]]\" alt=\"[[title]]\"><div class=\"nino-article-content\"><h3 class=\"nino-article-title\">[[title]]</h3><div class=\"nino-article-descr\">[[description]]</div><a href=\"[[link]]\" class=\"nino-btn nino-btn--primary\">[[linkLabel]]</a></div></article></li>\n"
-					. "\t\t\t\t\t[/elements]\n\t\t\t\t</ul>\n\t\t\t</div>\n\t\t</div>\n";
-			}
-
-			if( $content === 'accordion' ) {
-				$width = $spec['layout'] === 'narrow' ? 'nino-grid-m-66' : 'nino-grid-100';
-				return "\t\t<div class=\"nino-grid-100 ". $width. "\">\n\t\t\t[elements ". $type. " limit=\"". $limit. "\"]\n\t\t\t<details class=\"nino-accordion\" name=\"". self::_escape( $spec['id'] ). "\">\n\t\t\t\t<summary class=\"nino-accordion-trigger\">[[title]]</summary>\n\t\t\t\t<div class=\"nino-accordion-panel\">[[description]]</div>\n\t\t\t</details>\n\t\t\t[/elements]\n\t\t</div>\n";
-			}
-
-			if( $content === 'tabs' ) {
-				$width = $spec['layout'] === 'narrow' ? 'nino-grid-m-75' : 'nino-grid-100';
-				$tabId = self::_escape( $spec['id'] ). '-tab-[[.id]]';
-				return "\t\t<div class=\"nino-grid-100 ". $width. "\" style=\"margin:0 auto;\">\n\t\t\t<div class=\"nino-tabs\">\n\t\t\t\t<div class=\"nino-tabs-nav\" role=\"tablist\">\n\t\t\t\t\t[elements ". $type. " limit=\"". $limit. "\"]\n\t\t\t\t\t<button type=\"button\" class=\"nino-tabs-tab\" role=\"tab\" data-tabs-target=\"". $tabId. "\">[[title]]</button>\n\t\t\t\t\t[/elements]\n\t\t\t\t</div>\n\t\t\t\t[elements ". $type. " limit=\"". $limit. "\"]\n\t\t\t\t<div class=\"nino-tabs-panel\" role=\"tabpanel\" id=\"". $tabId. "\">[[description]]</div>\n\t\t\t\t[/elements]\n\t\t\t</div>\n\t\t</div>\n";
-			}
-
-			if( $content === 'pricing' ) {
-				$rowClass = 'nino-pricing-row'. ( $spec['layout'] === 'featured' ? ' nino-pricing-row--feature-middle' : '' );
-				return "\t\t<div class=\"nino-grid-100\">\n\t\t\t<div class=\"". $rowClass. "\">\n\t\t\t\t[elements ". $type. " limit=\"". $limit. "\"]\n\t\t\t\t<div class=\"nino-pricing-item\"><span class=\"nino-badge nino-badge--primary\">[[badge]]</span><h3 class=\"nino-pricing-title\">[[title]]</h3><div>[[description]]</div><p class=\"nino-pricing-price\">[[price]] &euro;</p><div class=\"nino-pricing-features\">[[features]]</div><a href=\"[[link]]\" class=\"nino-btn nino-btn--primary\">[[linkLabel]]</a></div>\n\t\t\t\t[/elements]\n\t\t\t</div>\n\t\t</div>\n";
-			}
-
-			if( $content === 'comparison' ) {
-				return "\t\t<div class=\"nino-grid-100\"><div class=\"nino-table-wrap\"><table class=\"nino-table nino-table--striped nino-table--bordered\"><thead><tr><th scope=\"col\">&nbsp;</th><th scope=\"col\">[[". $prefix. "/column-a]]</th><th scope=\"col\">[[". $prefix. "/column-b]]</th></tr></thead><tbody>\n\t\t\t[elements ". $type. " limit=\"". $limit. "\"]\n\t\t\t<tr><th scope=\"row\">[[title]]</th><td>[[optionA]]</td><td>[[optionB]]</td></tr>\n\t\t\t[/elements]\n\t\t</tbody></table></div></div>\n";
-			}
-
-			if( $content === 'data-table' ) {
-				$tableClass = 'nino-table';
-				if( in_array( $spec['layout'], [ 'striped', 'striped-bordered' ], true ) )
-					$tableClass .= ' nino-table--striped';
-				if( in_array( $spec['layout'], [ 'bordered', 'striped-bordered' ], true ) )
-					$tableClass .= ' nino-table--bordered';
-				return "\t\t<div class=\"nino-grid-100\"><div class=\"nino-table-wrap\"><table class=\"". $tableClass. "\"><thead><tr><th scope=\"col\">[[". $prefix. "/column-a]]</th><th scope=\"col\">[[". $prefix. "/column-b]]</th><th scope=\"col\">[[". $prefix. "/column-c]]</th></tr></thead><tbody>\n\t\t\t[elements ". $type. " limit=\"". $limit. "\"]\n\t\t\t<tr><td>[[columnA]]</td><td>[[columnB]]</td><td>[[columnC]]</td></tr>\n\t\t\t[/elements]\n\t\t</tbody></table></div></div>\n";
-			}
-
-			if( $content === 'logos' ) {
-				return "\t\t<div class=\"nino-grid-100\"><div class=\"nino-logos\">\n\t\t\t[elements ". $type. " limit=\"". $limit. "\"]\n\t\t\t<span class=\"nino-logos-item\"><img src=\"[[/nino/public]]/images/[[image]]\" alt=\"[[title]]\"></span>\n\t\t\t[/elements]\n\t\t</div></div>\n";
-			}
-
-			if( $content === 'badges' ) {
-				$badgeClass = 'nino-badge'. ( $spec['layout'] === 'pill' ? ' nino-badge--pill' : '' );
-				$cloudClass = 'nino-badge-cloud'. ( $spec['align'] === 'center' ? '' : ' nino-badge-cloud--'. $spec['align'] );
-				return "\t\t<div class=\"nino-grid-100\"><div class=\"". $cloudClass. "\">\n\t\t\t[elements ". $type. " limit=\"". $limit. "\"]\n\t\t\t<span class=\"". $badgeClass. "\">[[title]]</span>\n\t\t\t[/elements]\n\t\t</div></div>\n";
-			}
-
-			if( $content === 'gallery' ) {
-				$galleryClass = 'nino-gallery'. ( $spec['layout'] === 'mosaic' ? ' nino-gallery--mosaic' : '' );
-				$modalId = self::_escape( $spec['id'] ). '-gallery-[[.id]]';
-				return "\t\t<div class=\"nino-grid-100\"><div class=\"". $galleryClass. "\">\n\t\t\t[elements ". $type. " limit=\"". $limit. "\"]\n\t\t\t<div class=\"nino-gallery-item\"><button type=\"button\" class=\"nino-modal-trigger\" data-modal-target=\"". $modalId. "\" aria-label=\"[[title]]\"><img src=\"[[/nino/public]]/images/[[image]]\" alt=\"[[title]]\" loading=\"lazy\"></button></div>\n\t\t\t[/elements]\n\t\t</div></div>\n"
-					. "\t\t[elements ". $type. " limit=\"". $limit. "\"]\n\t\t<dialog class=\"nino-modal nino-modal--lightbox\" id=\"". $modalId. "\"><button type=\"button\" class=\"nino-modal-close\" aria-label=\"Close\">&times;</button><img src=\"[[/nino/public]]/images/[[image]]\" alt=\"[[title]]\"></dialog>\n\t\t[/elements]\n";
-			}
-
-			if( $content === 'timeline' ) {
-				return "\t\t<div class=\"nino-grid-100\">\n\t\t\t<ol class=\"nino-timeline\">\n\t\t\t\t[elements ". $type. " limit=\"". $limit. "\"]\n\t\t\t\t<li class=\"nino-timeline-step\"><div class=\"nino-timeline-number\">[[number]]</div><h3>[[title]]</h3><p>[[description]]</p></li>\n\t\t\t\t[/elements]\n\t\t\t</ol>\n\t\t</div>\n";
-			}
-
-			if( $content === 'video' ) {
-				$width = $spec['layout'] === 'narrow' ? 'nino-grid-m-75' : 'nino-grid-100';
-				$modalId = self::_escape( $spec['id'] ). '-video';
-				return "\t\t<div class=\"nino-grid-100 ". $width. "\" style=\"margin:0 auto;\"><button type=\"button\" class=\"nino-video-poster nino-modal-trigger\" data-modal-target=\"". $modalId. "\" aria-label=\"Play video\">[image ". $prefix. "/image alt=\"\"]<svg class=\"nino-video-play\" aria-hidden=\"true\" viewBox=\"0 0 24 24\"><path d=\"M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z\"></path></svg></button></div>\n\t\t<dialog class=\"nino-modal nino-modal--video\" id=\"". $modalId. "\"><button type=\"button\" class=\"nino-modal-close\" aria-label=\"Close\">&times;</button><div class=\"nino-video\"><iframe src=\"[[". $prefix. "/video-uri]]\" title=\"Video\" loading=\"lazy\" allowfullscreen></iframe></div></dialog>\n";
-			}
-
-			if( $content === 'video-embed' ) {
-				$width = $spec['layout'] === 'narrow' ? 'nino-grid-m-75' : 'nino-grid-100';
-				$videoClass = 'nino-video'. ( $spec['layout'] === '4-3' ? ' nino-video--4-3' : '' );
-				return "\t\t<div class=\"nino-grid-100 ". $width. "\" style=\"margin:0 auto;\"><div class=\"". $videoClass. "\"><iframe src=\"[[". $prefix. "/video-uri]]\" title=\"Video\" loading=\"lazy\" allowfullscreen></iframe></div></div>\n";
-			}
-
-			if( $content === 'notice' ) {
-				return "\t\t<div class=\"nino-grid-100 nino-grid-m-75\" style=\"margin:0 auto;\"><div class=\"nino-alert nino-alert--". self::_escape( $spec['layout'] ). " nino-alert--content\">[[". $prefix. "/content]]</div></div>\n";
-			}
-
-			if( $content === 'contact' ) {
-				$formId = self::_escape( $spec['id'] );
-				return "\t\t<div class=\"nino-grid-100 nino-grid-m-50\"><div>[[". $prefix. "/content]]</div><address class=\"nino-contact-details\">[[". $prefix. "/address]]<a href=\"tel:[[". $prefix. "/phone]]\">[[". $prefix. "/phone]]</a><a href=\"mailto:[[". $prefix. "/email]]\">[[". $prefix. "/email]]</a></address></div>\n"
-					. "\t\t<div class=\"nino-grid-100 nino-grid-m-50\"><form class=\"nino-form\">[csrf]<label for=\"". $formId. "-name\">[[/form/label/name]]</label><input type=\"text\" id=\"". $formId. "-name\" name=\"name\" class=\"nino-form-input\" required><label for=\"". $formId. "-email\">[[/form/label/email]]</label><input type=\"email\" id=\"". $formId. "-email\" name=\"email\" class=\"nino-form-input\" required><label for=\"". $formId. "-message\">[[/form/label/message]]</label><textarea id=\"". $formId. "-message\" name=\"message\" class=\"nino-form-textarea\" required></textarea><input type=\"text\" name=\"location\" class=\"nino-sr-only\" tabindex=\"-1\" autocomplete=\"off\"><p class=\"nino-form-message\"></p><p><small>[[/form/required]]</small></p><button type=\"submit\" class=\"nino-btn nino-btn--primary nino-form-submit\">[[/form/label/submit]]</button></form></div>\n";
-			}
-
-			if( $content === 'newsletter' ) {
-				$width = $spec['layout'] === 'narrow' ? 'nino-grid-m-66' : 'nino-grid-100';
-				$emailId = self::_escape( $spec['id'] ). '-email';
-				return "\t\t<div class=\"nino-grid-100 ". $width. "\" style=\"margin:0 auto;\"><form class=\"nino-form nino-newsletter-form nino-newsletter-inline\" action=\"[[/nino/dir]]/.newsletter\">[csrf]<input type=\"text\" name=\"location\" value=\"\" tabindex=\"-1\" autocomplete=\"off\" aria-hidden=\"true\" class=\"nino-sr-only\"><label for=\"". $emailId. "\" class=\"nino-sr-only\">[[/newsletter/label/email]]</label><input type=\"email\" id=\"". $emailId. "\" name=\"email\" class=\"nino-form-input\" placeholder=\"[[/newsletter/label/email]]\" required><button type=\"submit\" class=\"nino-btn nino-btn--primary nino-form-submit\">[[/newsletter/label/submit]]</button><p class=\"nino-form-message nino-grid-100\"></p></form></div>\n";
-			}
-
-			return '';
-		}
-
-		private static function _renderAction( array $spec, string $prefix ): string {
-
-			if( $spec['action'] === 'none' )
-				return '';
-
-			$class = in_array( $spec['action'], [ 'button', 'dual-buttons' ], true ) ? 'nino-btn nino-btn--primary' : '';
-			$wrap = 'nino-grid-100 nino-mt-3'. ( $spec['align'] === 'left' ? '' : ' nino-text-'. $spec['align'] );
-			$secondary = $spec['action'] === 'dual-buttons'
-				? "\t\t\t<a href=\"[[". $prefix. "/secondary-cta-uri]]\" class=\"nino-btn nino-btn--outline\">[[". $prefix. "/secondary-cta-label]]</a>\n"
-				: '';
-			return "\t\t<div class=\"". $wrap. "\">\n\t\t\t<a href=\"[[". $prefix. "/cta-uri]]\" class=\"". $class. "\">[[". $prefix. "/cta-label]]</a>\n". $secondary. "\t\t</div>\n";
-		}
-
-		private static function _sectionClasses( array $spec ): array {
-
-			$classes = $spec['shell'] === 'hero' ? [ 'nino-atf', 'nino-section--fullwidth' ] : [ 'nino-section' ];
-
-			if( $spec['surface'] !== 'default' )
-				$classes[] = 'nino-section--'. $spec['surface'];
-
-			if( $spec['background'] === 'image-cover' ) {
-				$classes[] = 'nino-section--fullwidth';
-				$classes[] = 'nino-cover';
-				$classes[] = 'nino-cover--dim';
-				if( $spec['align'] === 'center' )
-					$classes[] = 'nino-cover-center';
-			} else if( $spec['background'] === 'image-static' ) {
-				$classes[] = 'nino-section--fullwidth';
-				$classes[] = 'nino-img-background';
-				$classes[] = 'nino-img-background--dim';
-			} else if( $spec['background'] === 'parallax' ) {
-				$classes[] = 'nino-section--fullwidth';
-				$classes[] = 'nino-parallex';
-				$classes[] = 'nino-parallex--dim';
-			} else if( $spec['shell'] === 'hero' ) {
-				$classes[] = 'nino-atf--fullscreen';
-			}
-
-			if( in_array( $spec['layout'], [ 'media-left-full', 'media-right-full' ], true ) ) {
-				$classes[] = 'nino-section--fullwidth';
-				$classes[] = 'nino-section--fullheight';
-			}
-
-			$padding = [ 'none' => '0', 'compact' => '2', 'generous' => '6' ][$spec['padding']] ?? null;
-			if( $padding !== null ) {
-				$classes[] = 'nino-pt-'. $padding;
-				$classes[] = 'nino-pb-'. $padding;
-			}
-
-			$margin = [ 'small' => '1', 'medium' => '2', 'large' => '3' ][$spec['margin']] ?? null;
-			if( $margin !== null ) {
-				$classes[] = 'nino-mt-'. $margin;
-				$classes[] = 'nino-mb-'. $margin;
-			}
-
-			if( $spec['border'] !== 'none' )
-				$classes[] = 'nino-section--border-'. $spec['border'];
-
-			return array_values( array_unique( $classes ) );
-		}
-
-		private static function _articleClass( array $spec ): string {
-			$classes = [ 'nino-article' ];
-			$autoAlt = in_array( $spec['surface'], [ 'alt', 'primary', 'dark', 'black' ], true );
-			if( $spec['contentStyle'] === 'alt' || ( $spec['contentStyle'] === 'auto' && $autoAlt === true ) )
-				$classes[] = 'nino-article--alt';
-			return implode( ' ', $classes );
-		}
-
-		private static function _gridClass( string $layout ): string {
-			return match( $layout ) {
-				'2' => 'nino-grid-m-50',
-				'4' => 'nino-grid-m-25',
-				default => 'nino-grid-m-33',
-			};
-		}
-
-		private static function _checkIcon(): string {
-			return '<svg class="nino-icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"></path></svg>';
-		}
-
-		private static function _renderCustom( array $spec, string $template ): string {
-
-			if( trim( $template ) === '' )
-				throw new \InvalidArgumentException( 'custom preset has no section template' );
-
-			$prefix = '/page-'. $spec['pageId']. '/'. $spec['id'];
-			$replace = [
-				'{{section:id}}'		=> self::_escape( $spec['id'] ),
-				'{{section:classes}}'	=> self::_escape( implode( ' ', self::_sectionClasses( $spec ) ) ),
-				'{{section:meta}}'		=> '<!-- nino:section '. json_encode( $spec, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE ). ' -->',
-				'{{content:prefix}}'		=> $prefix,
-				'{{elements:type}}'		=> $spec['elementType'],
-			];
-
-			foreach( self::fieldSuffixes( $spec ) as $suffix )
-				$replace['{{text:'. $suffix. '}}'] = '[['. $prefix. '/'. $suffix. ']]';
-			foreach( self::imageSuffixes( $spec ) as $suffix )
-				$replace['{{image:'. $suffix. '}}'] = '[image '. $prefix. '/'. $suffix. ' alt=""]';
-
-			$rendered = strtr( $template, $replace );
-			if( preg_match( '/\{\{(?:section|content|elements|text|image):[^}]+\}\}/', $rendered ) === 1 )
-				throw new \InvalidArgumentException( 'custom preset contains an unresolved token' );
-
-			return $rendered;
-		}
-
-		private static function _indent( string $source, int $levels ): string {
-			$indent = str_repeat( "\t", $levels );
-			return $indent. str_replace( "\n", "\n". $indent, rtrim( $source, "\r\n" ) ). "\n";
-		}
-
-		private static function _escape( string $value ): string {
-			return htmlspecialchars( $value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8' );
-		}
 	}
 
 	/**
@@ -2461,19 +1935,20 @@ namespace Nino\Templates {
 			$uri = (string) ( $data['uri'] ?? '' );
 			$slot = (string) ( $data['slot'] ?? '' );
 			$component = (string) ( $data['component'] ?? '' );
-			$isAreaPreset = is_array( $preset ) && (int) ( $preset['version'] ?? 0 ) === 3;
-			$legacySuffix = str_ends_with( $uri, '/background' ) ? 'background' : ( str_ends_with( $uri, '/image' ) ? 'image' : '' );
-			$definition = $isAreaPreset && $slot !== 'background'
-				? AreaComposer::imageDefinition(
-					$preset,
-					(string) ( $data['area'] ?? '' ),
-					$component,
-					(string) ( $data['property'] ?? '' )
-				)
-				: ( ( $isAreaPreset && $slot === 'background' ) || $legacySuffix === 'background'
-				? [ 'label' => 'Background image', 'width' => 1920, 'height' => 1080 ]
-				: ( $legacySuffix === 'image' ? [ 'label' => 'Section image', 'width' => 1200, 'height' => 900 ] : null ) );
-			$expectedSuffix = $isAreaPreset ? ( $slot === 'background' ? 'background' : $component ) : $legacySuffix;
+			// Every preset in the library is an Area preset (Library::presets()
+			// skips anything else), so the slot is either the section background
+			// or a component's own image property
+			$definition = $preset === null
+				? null
+				: ( $slot === 'background'
+					? [ 'label' => 'Background image', 'width' => 1920, 'height' => 1080 ]
+					: AreaComposer::imageDefinition(
+						$preset,
+						(string) ( $data['area'] ?? '' ),
+						$component,
+						(string) ( $data['property'] ?? '' )
+					) );
+			$expectedSuffix = $slot === 'background' ? 'background' : $component;
 
 			if( $definition === null || preg_match( '#^/page-[a-z][a-z0-9-]*/[a-z][a-z0-9-]*/[a-z][a-z0-9-]*$#', $uri ) !== 1 || str_ends_with( $uri, '/'. $expectedSuffix ) === false ) {
 				\Nino\Http::fail( $request, 400, 'invalid page image slot' );

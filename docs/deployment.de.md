@@ -109,7 +109,8 @@ define('NINO_APP_DIR', '/pfad/ausserhalb/des/webroots/nino-app');
 ```
 
 Dieser Quellcode-Override verschiebt weder Konfiguration noch Laufzeitdaten und
-benötigt im Produktivbetrieb keine Schreibrechte. Klassen im kerneigenen
+benötigt im Produktivbetrieb keine Schreibrechte. Eine projekteigene Klasse wird
+ausschließlich dort gesucht – `_nino/` ist kein zweiter Fundort. Klassen im kerneigenen
 Namespace `Nino\` werden weiterhin ausschließlich aus `_nino/` geladen.
 
 ## Einstellungen für den Produktivbetrieb

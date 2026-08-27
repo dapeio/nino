@@ -1597,55 +1597,27 @@ PHP
 
 check( 'a project class in app/ autoloads on a direct reference without going through callModules()', \KernelSmokeDummyModules\DummyDirectAutoload::ping() === 'pong' );
 
-// A project class in app/ wins over a legacy class with the same name in
-// _nino/. This is what makes _nino/ replaceable without losing project code.
-$appPriorityDir = $appDummyRoot. '/PrioritySource';
-$legacyPriorityDir = $legacyDummyRoot. '/PrioritySource';
-mkdir( $appPriorityDir, 0777, true );
-mkdir( $legacyPriorityDir, 0777, true );
-file_put_contents( $appPriorityDir. '/PrioritySource.php', <<<'PHP'
+/*	A class outside Nino\ resolves against the application root and nowhere
+	else. _nino/ is not a second place to look: that is what keeps the kernel
+	replaceable wholesale, and what makes a project class accidentally dropped
+	in there fail loudly instead of being found and then vanishing on the next
+	update.	*/
+$strayDir = $legacyDummyRoot. '/StraySource';
+mkdir( $strayDir, 0777, true );
+file_put_contents( $strayDir. '/StraySource.php', <<<'PHP'
 <?php
 declare(strict_types=1);
 namespace KernelSmokeDummyModules {
-	class PrioritySource {
+	class StraySource {
 		public static function source(): string {
-			return 'app';
+			return 'kernel';
 		}
 	}
 }
 PHP
 );
-file_put_contents( $legacyPriorityDir. '/PrioritySource.php', <<<'PHP'
-<?php
-declare(strict_types=1);
-namespace KernelSmokeDummyModules {
-	class PrioritySource {
-		public static function source(): string {
-			return 'legacy';
-		}
-	}
-}
-PHP
-);
-check( 'app/ takes precedence over the _nino/ compatibility fallback for project classes', \KernelSmokeDummyModules\PrioritySource::source() === 'app' );
+check( 'a project class below _nino/ does not autoload', class_exists( 'KernelSmokeDummyModules\StraySource' ) === false );
 
-// Existing projects that still keep custom classes below _nino/ continue to
-// work when no corresponding class exists in the project application root.
-$legacyOnlyDir = $legacyDummyRoot. '/DummyLegacyAutoload';
-mkdir( $legacyOnlyDir, 0777, true );
-file_put_contents( $legacyOnlyDir. '/DummyLegacyAutoload.php', <<<'PHP'
-<?php
-declare(strict_types=1);
-namespace KernelSmokeDummyModules {
-	class DummyLegacyAutoload {
-		public static function ping(): string {
-			return 'legacy';
-		}
-	}
-}
-PHP
-);
-check( 'a project class absent from app/ still autoloads from the legacy _nino/ location', \KernelSmokeDummyModules\DummyLegacyAutoload::ping() === 'legacy' );
 check( 'the autoload class-path allowlist rejects traversal segments', class_exists( 'KernelSmokeDummyModules\..\PrioritySource' ) === false );
 
 // Nino\ is kernel-owned. Even if a project creates the matching app/ path,
@@ -1681,7 +1653,8 @@ PHP
 check( 'the Nino namespace resolves only inside _nino/ and cannot be shadowed from app/', \Nino\KernelSmokeAutoloadGuard::source() === 'kernel' );
 
 // NINO_APP_DIR replaces the default app/ root when it is defined before the
-// kernel is required. The fallback to _nino/ remains available afterwards.
+// kernel is required - it is the only root a project class resolves against,
+// so what app/ held before is no longer found.
 $overrideAppRoot = $sandbox. '/custom-app';
 $overrideDummyDir = $overrideAppRoot. '/KernelSmokeDummyModules/OverrideSource';
 $defaultOverrideDir = $appDummyRoot. '/OverrideSource';
@@ -1724,11 +1697,10 @@ PHP
 
 $overrideResult = runIsolated(
 	'echo \KernelSmokeDummyModules\OverrideSource::source(). "|".
-		( class_exists( "KernelSmokeDummyModules\\DefaultOnly" ) === true ? "loaded" : "missing" ). "|".
-		\KernelSmokeDummyModules\DummyLegacyAutoload::ping();',
+		( class_exists( "KernelSmokeDummyModules\\DefaultOnly" ) === true ? "loaded" : "missing" );',
 	'define( "NINO_APP_DIR", '. var_export( $overrideAppRoot, true ). ' );'
 );
-check( 'NINO_APP_DIR replaces the default app/ root and is searched before the legacy fallback', trim( $overrideResult['stdout'] ) === 'override|missing|legacy' && $overrideResult['exitCode'] === 0 );
+check( 'NINO_APP_DIR replaces the default app/ root outright', trim( $overrideResult['stdout'] ) === 'override|missing' && $overrideResult['exitCode'] === 0 );
 
 \Nino\Filesystem::removeDir( $appDummyRoot );
 \Nino\Filesystem::removeDir( $legacyDummyRoot );

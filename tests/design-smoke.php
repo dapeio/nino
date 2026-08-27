@@ -331,11 +331,6 @@ $designMalformed = array_filter( $designDeclarations, static function( array $de
 	$value = trim( $declaration[2] );
 	return match( true ) {
 		$declaration[1] === 'color-scheme'	=> $value !== 'light dark',
-		/*	The two names the palette published before the brand became four
-			roles. Indirections rather than copies, so one line in the bare
-			:root follows both dark blocks without being repeated in either -
-			which is the whole reason they are var() and not a hex	*/
-		(bool) preg_match( '/^--nino-(on-)?(origin|vibrant)/', $declaration[1] )	=> preg_match( '/^var\( *--nino-[a-z-]+ *\)$/', $value ) !== 1,
 		// Shadows and the cover scrim are the non-hex colours: both carry an
 		// alpha, which a solid colour cannot express
 		str_ends_with( $declaration[1], '-shadow' )
@@ -352,13 +347,12 @@ $designMalformed = array_filter( $designDeclarations, static function( array $de
 } );
 check( 'every declaration in the generated stylesheet is a resolvable value', $designMalformed === []
 	// 12 surfaces x 10 values x 3 colour blocks, plus the one colour-scheme,
-	// plus the two legacy aliases at 10 values each - once, not per mode -
 	// plus the raster: the root size, line-height, the measure, 6 text, 6
 	// space, 3 radius, the pill, and the wide-screen block's root size and 3
-	// text steps. The raster is emitted once, not per mode either
+	// text steps. The raster is emitted once, not per mode
 	// ...plus the scrim, which is one value per colour block rather than one
 	// per surface: a photograph is not a surface the palette can solve
-	&& count( $designDeclarations ) === 12 * 10 * 3 + 3 + 1 + 20 + 23 );
+	&& count( $designDeclarations ) === 12 * 10 * 3 + 3 + 1 + 23 );
 
 /*	The scrim is the one ground solved against something the palette cannot
 	see. The promise it makes is that the ink a theme puts on it stays
@@ -629,20 +623,13 @@ check( 'an unknown knob position falls back rather than reaching the generator',
 // A number off a form post arrives as a string, and a step is still a step
 check( 'a numeric string is a position, not a name that failed to match', \Nino\Design\Tokens::normalize( [ 'contrast' => '3' ] )['contrast'] === 3 );
 
-/*	A stored config outlives a release. Every one of these was a valid setting
-	before the knobs were numbered, and a project that never opens /_design
-	again has to keep the look it saved - which is also why 'colors' still
-	resolves after being renamed to 'saturation'.	*/
-$legacy = \Nino\Design\Tokens::normalize( [ 'contrast' => 'high', 'colors' => 'clean', 'volume' => 'generous', 'spacing' => 'airy', 'shaping' => 'round' ] );
-check( 'the old vocabulary still resolves to the position it described', $legacy['contrast'] === 3
-	&& $legacy['saturation'] === 1
-	&& $legacy['volume'] === 3
-	&& $legacy['spacing'] === 3
-	&& $legacy['shaping'] === 3 );
-// 'soft' held muted text at 3.0:1, which is below AA for body copy. It lands
-// on the nearest position that still passes rather than the one it named
-check( '...and the one position that was below AA keeps its ink but not its sub-AA muted floor', \Nino\Design\Tokens::normalize( [ 'contrast' => 'soft' ] )['contrast'] === 1
-	&& \Nino\Design\Tokens::contrast(
+// A knob position is a number. A name is not one, so it falls back like any
+// other value the generator cannot use
+check( 'a name is not a position', \Nino\Design\Tokens::normalize( [ 'contrast' => 'high', 'volume' => 'generous', 'shaping' => 'round' ] )
+	=== \Nino\Design\Tokens::normalize( [] ) );
+// The softest position is still held to AA for the muted tier - it is the one
+// place where "less contrast" could quietly mean "below the floor"
+check( 'the softest contrast position keeps muted text at AA', \Nino\Design\Tokens::contrast(
 		\Nino\Design\Tokens::palette( [ 'primary' => '#4faae8', 'contrast' => 1 ], 'light' )['default']['on-muted'],
 		\Nino\Design\Tokens::palette( [ 'primary' => '#4faae8', 'contrast' => 1 ], 'light' )['default']['bg'] ) >= 4.48 );
 check( 'the knobs a picker renders all carry a group, a note and a name per position', ( static function(): bool {
@@ -837,7 +824,7 @@ check( 'a second write does not add a second entry', $appData['/nino/html/assets
 
 // The whole point of the tool: the values stay editable after the install
 $reloaded = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
-check( 'the settings are persisted, so they can be reopened and changed later', ( $reloaded['/nino/theme/design']['primary'] ?? '' ) === '#8f2d56' );
+check( 'the settings are persisted, so they can be reopened and changed later', ( $reloaded['/nino/design/settings']['primary'] ?? '' ) === '#8f2d56' );
 check( 'and the bundle entry is persisted with them', in_array( '/assets/style.design.css', $reloaded['/nino/html/assets']['/.cache/style.css'] ?? [], true ) === true );
 
 // Written twice: the file has to be replaced, not grown, and has to carry the
@@ -916,16 +903,16 @@ check( 'Theme applies the manifest as one complete baseline', $themeApply['/nino
 	&& ( $afterTheme['/nino/install/theme'] ?? '' ) === 'basis'
 	&& ( $afterTheme['/nino/install/header'] ?? '' ) === 'v1'
 	&& ( $afterTheme['/nino/install/footer'] ?? '' ) === 'v1'
-	&& ( $afterTheme['/nino/theme/design']['primary'] ?? '' ) === '#4faae8' );
+	&& ( $afterTheme['/nino/design/settings']['primary'] ?? '' ) === '#4faae8' );
 
 $designSave = response();
 $_POST = [ 'action' => 'design/save', 'data' => json_encode( [ 'primary' => '#14595e', 'spacing' => 1, 'measure' => 3 ] ) ];
 \Nino\Design\Design::handlePost( $appData, $designSave );
 $afterDesign = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
 
-check( 'Design changes only its generated values, not Theme or either frame', ( $afterDesign['/nino/theme/design']['primary'] ?? '' ) === '#14595e'
-	&& ( $afterDesign['/nino/theme/design']['spacing'] ?? '' ) === 1
-	&& ( $afterDesign['/nino/theme/design']['measure'] ?? '' ) === 3
+check( 'Design changes only its generated values, not Theme or either frame', ( $afterDesign['/nino/design/settings']['primary'] ?? '' ) === '#14595e'
+	&& ( $afterDesign['/nino/design/settings']['spacing'] ?? '' ) === 1
+	&& ( $afterDesign['/nino/design/settings']['measure'] ?? '' ) === 3
 	&& ( $afterDesign['/nino/install/theme'] ?? '' ) === 'basis'
 	&& ( $afterDesign['/nino/install/header'] ?? '' ) === 'v1'
 	&& ( $afterDesign['/nino/install/footer'] ?? '' ) === 'v1' );
@@ -953,7 +940,7 @@ check( 'a Header apply changes only Header and preserves the settled Theme, Desi
 	( $afterFrame['/nino/install/header'] ?? '' ) === 'v3'
 	&& ( $afterFrame['/nino/install/footer'] ?? '' ) === 'v1'
 	&& ( $afterFrame['/nino/install/theme'] ?? '' ) === 'basis'
-	&& ( $afterFrame['/nino/theme/design'] ?? [] ) === ( $afterDesign['/nino/theme/design'] ?? [] ) );
+	&& ( $afterFrame['/nino/design/settings'] ?? [] ) === ( $afterDesign['/nino/design/settings'] ?? [] ) );
 
 $unknown = response();
 $_POST = [ 'action' => 'design/../../etc', 'data' => '{}' ];

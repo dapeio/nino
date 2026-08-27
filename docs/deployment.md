@@ -109,8 +109,9 @@ define('NINO_APP_DIR', '/path/outside/the/webroot/nino-app');
 ```
 
 This source override does not move configuration or runtime data and does not
-need write access in production. Classes in the kernel-owned `Nino\` namespace
-continue to load exclusively from `_nino/`.
+need write access in production. A project-owned class is looked for there and
+nowhere else - `_nino/` is not a second location. Classes in the kernel-owned
+`Nino\` namespace continue to load exclusively from `_nino/`.
 
 ## Settings for Production
 
@@ -220,8 +221,8 @@ Nino uses one project layout: private files belong in `private/`, browser-facing
 files in `public/`, and project-owned PHP source in `app/`. It does not migrate
 alternative directory layouts during a request. `NINO_CONTENT_DIR` can move the
 complete private tree, while `NINO_APP_DIR` can replace the project application
-root. Non-`Nino\` classes still have a compatibility fallback below `_nino/`,
-but that fallback is for existing projects rather than new code.
+root. A non-`Nino\` class resolves against that root and nowhere else - `_nino/`
+holds the kernel and nothing of the project's own.
 
 Nino is in the beta phase. Security fixes appear on `main`; there is currently no separate LTS line. Therefore, plan updates as active project maintenance and check `SECURITY.md` and the changelog before an update.
 

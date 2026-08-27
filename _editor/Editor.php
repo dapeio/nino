@@ -1015,8 +1015,9 @@ namespace Nino\Editor {
 		}
 
 		// A new element uri becomes both an array key and (for image fields) a
-		// filename component. Keep it to the slug syntax the form's own hint
-		// promises; existing legacy uris remain readable/deletable.
+		// filename component, so it is held to the slug syntax the form's own
+		// hint promises. Only new ones: reading and deleting never re-validate,
+		// so a uri written by hand stays reachable.
 		private static function _validNewUri( string $uri ): bool {
 			return preg_match( '/^[A-Za-z0-9][A-Za-z0-9_-]*$/', $uri ) === 1;
 		}

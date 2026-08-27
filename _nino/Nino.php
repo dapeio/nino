@@ -441,11 +441,11 @@ namespace Nino {
 			// Only mail + token live in $_SESSION (see loginUser()) - the user
 			// array itself, pw hash included, is reloaded fresh from appData's
 			// in-memory content on every request instead
-			// is_string() guards both against a pre-migration or hand-edited
-			// session that still holds an array under either key - used as an
-			// array key/isset() offset below, that would be a TypeError rather
-			// than a miss, 500ing every request from that client instead of
-			// just treating it as logged out
+			// is_string() guards against a session that holds something else
+			// under either key - a cookie outliving a deploy, or a hand-edited
+			// session store. Used as an array key/isset() offset below, that
+			// would be a TypeError rather than a miss, 500ing every request
+			// from that client instead of just treating it as logged out
 			$sessionMail 	= \Nino\Runtime::getSessionValue( $appData, './nino/auth/current', '' );
 			$sessionToken	= \Nino\Runtime::getSessionValue( $appData, './nino/auth/token', '' );
 			if( is_string( $sessionMail ) === true && $sessionMail !== '' && is_string( $sessionToken ) === true && $sessionToken !== '' )
@@ -584,19 +584,19 @@ namespace Nino {
 			// some unrelated per-route callback instead
 			\Nino\Callbacks::doCallbacks( $appData, '/nino/auth/login', $user );
 
-			// Prune stale/legacy session entries opportunistically, on the
-			// one write this method was already going to make - same "clean
-			// up on write" idea as Mail::_hit(). is_array() also catches any
-			// pre-migration ip-keyed entry (a plain int timestamp, not the
-			// current ['time','ip'] shape) left over from before this fix.
+			// Prune expired session entries opportunistically, on the one write
+			// this method was already going to make - same "clean up on write"
+			// idea as Mail::_hit(). The is_array() half is not about age: these
+			// entries come out of config.php, which is a file a developer edits
+			// by hand, and a scalar where the ['time','ip'] shape is expected
+			// would be a TypeError rather than a stale entry.
 			$now = time();
 			foreach( $user['sessions'] as $sessionToken => $sessionData )
 				if( is_array( $sessionData ) === false || ( $sessionData['time'] ?? 0 ) < $now - self::SESSION_TTL )
 					unset( $user['sessions'][$sessionToken] );
 
-			// Every login mints a new token, so - unlike the old ip-keyed
-			// bucket - there is no "already have a session for this key" case
-			// to skip the write for
+			// Every login mints a new token, so there is never an "already have
+			// a session for this key" case to skip the write for
 			$user['sessions'][$token] = [ 'time' => $now, 'ip' => \Nino\Http::getClientIp() ];
 			$appData['/nino/auth/user'][$user['mail']] = $user;
 			\Nino\AppData::writeContentData( $appData, [ '/nino/auth/user' ] );
@@ -2459,10 +2459,9 @@ namespace Nino {
 					// attach the upload to, so a required image would reject the
 					// very insert that has to happen first - making the element
 					// impossible to create at all. Neither tool writes the flag onto
-					// an image field anymore (see _admin/Admin.php's cleanModel());
-					// this keeps a model that still carries one from an older
-					// version, or from hand-editing, out of that dead end. A caller
-					// that does pass an image filename is unaffected either way
+					// an image field (see _admin/Admin.php's cleanModel()); this
+					// keeps a hand-edited model that does out of that dead end. A
+					// caller that does pass an image filename is unaffected either way
 					if( isset( $field['required'] ) === true && $field['required'] === true && $field['type'] !== 'image' ) {
 						$isEmpty = match( true ) {
 							isset( $data[$key] ) === false 																								=> true,
@@ -4184,19 +4183,15 @@ namespace {
 
 		$file = '/'. $relativePath. '/'. basename( $relativePath ). '.php';
 
-		// The kernel owns Nino\ and nothing else. A project's own classes
-		// resolve against its own root first, so an update can replace
-		// _nino/ wholesale again. The __DIR__ fallback keeps projects that
-		// still ship their module inside the kernel working.
-		$roots = str_starts_with( $relativePath, 'Nino/' ) === true
-			? [ __DIR__ ]
-			: [ defined( 'NINO_APP_DIR' ) === true ? NINO_APP_DIR : dirname( __DIR__ ). '/app', __DIR__ ];
+		// The kernel owns Nino\ and nothing else, and a project's own classes
+		// resolve against the application root alone - so _nino/ stays pure
+		// code an update may replace wholesale, and a class that lands in it
+		// by accident fails loudly instead of being found there.
+		$root = str_starts_with( $relativePath, 'Nino/' ) === true
+			? __DIR__
+			: ( defined( 'NINO_APP_DIR' ) === true ? NINO_APP_DIR : dirname( __DIR__ ). '/app' );
 
-		foreach( $roots as $root )
-
-			if( is_file( $root. $file ) === true ) {
-				require $root. $file;
-				return;
-			}
+		if( is_file( $root. $file ) === true )
+			require $root. $file;
 	} );
 }

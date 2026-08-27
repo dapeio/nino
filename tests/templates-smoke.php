@@ -869,19 +869,25 @@ $createdAreaType = \Nino\Filesystem::getFileContent( $appData, '/elements/home-a
 check( 'creates only the Elements model declared by the requested Area', $createAreaTypeRequest['/nino/http/response']['statusCode'] === 200
 	&& isset( $createdAreaType['model']['title'], $createdAreaType['model']['linkLabel'], $createdAreaType['model']['image'] ) );
 
-post( [ 'uri' => '/page-home/main-hero/background', 'label' => 'Main Hero Background' ] );
-$createImageRequest = response();
-\Nino\Templates\Content::apiCreateImage( $appData, $createImageRequest );
-check( 'creates a background image slot with safe recommended dimensions', $createImageRequest['/nino/http/response']['statusCode'] === 200 && $appData['/nino/html/images']['/page-home/main-hero/background']['width'] === 1920 && $appData['/nino/html/images']['/page-home/main-hero/background']['height'] === 1080 );
-
+/*	A slot is always named by the preset it belongs to: every preset in the
+	library is an Area preset, so the caller says which one and which slot,
+	and the dimensions come from the manifest rather than from the shape of
+	the uri.	*/
 post( [
 	'preset' => 'fullscreen-image', 'slot' => 'background',
 	'uri' => '/page-home/area-stage/background', 'label' => 'Area Stage Background',
 ] );
 $createAreaImageRequest = response();
 \Nino\Templates\Content::apiCreateImage( $appData, $createAreaImageRequest );
-check( 'creates a v3 frame image only for the selected preset slot', $createAreaImageRequest['/nino/http/response']['statusCode'] === 200
-	&& $appData['/nino/html/images']['/page-home/area-stage/background']['width'] === 1920 );
+check( 'creates a background image slot with safe recommended dimensions', $createAreaImageRequest['/nino/http/response']['statusCode'] === 200
+	&& $appData['/nino/html/images']['/page-home/area-stage/background']['width'] === 1920
+	&& $appData['/nino/html/images']['/page-home/area-stage/background']['height'] === 1080 );
+
+// ...and a request that names no preset cannot invent one from the uri
+post( [ 'uri' => '/page-home/main-hero/background', 'label' => 'Main Hero Background' ] );
+$presetlessImageRequest = response();
+\Nino\Templates\Content::apiCreateImage( $appData, $presetlessImageRequest );
+check( 'refuses a slot whose preset it was never told', $presetlessImageRequest['/nino/http/response']['statusCode'] === 400 );
 
 post( [ 'uri' => '/arbitrary/slot', 'label' => 'Unsafe' ] );
 $invalidImageRequest = response();
