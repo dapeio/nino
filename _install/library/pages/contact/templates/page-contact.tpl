@@ -13,7 +13,7 @@
 	<!-- nino:section {"version":3,"preset":"contact-form","pageId":"contact","id":"contact-form","pageMotion":"on","layout":"auto","frame":{"screen":"auto","vertical":"auto","background":"auto","container":"auto","padding":"auto","margin":"auto","focus":"auto","overlay":"auto","backgroundImage":"/page-contact/contact-form/background","backgroundImageSource":"new"},"areas":{"intro":{"style":"auto","components":[{"id":"title","type":"title","style":"auto","settings":{"target":"same"},"bindings":{"text":"/company/name"},"bindingSources":{"text":"textfill"}},{"id":"subtitle","type":"subtitle","style":"auto","settings":{"target":"same"},"bindings":{"text":"/company/description"},"bindingSources":{"text":"textfill"}}],"source":{"elementMode":"new","elementType":"preview-preview-contact-form-intro","shortcode":{"locale":"","callback":"","limit":6,"query":""}}},"outro":{"style":"auto","components":[],"source":{"elementMode":"new","elementType":"preview-preview-contact-form-outro","shortcode":{"locale":"","callback":"","limit":6,"query":""}}}}} -->
 	<div class="nino-grid-row nino-vpa">
 		<div class="nino-grid-100 nino-grid-m-50 nino-p-2">
-			<div class="nino-grid-100 nino-mb-3 nino-text-left"><h2 class="nino-section-title" id="contact-form-title">[[/company/name]]</h2><p class="nino-section-subtitle">[[/company/description]]</p></div>
+			<div class="nino-mb-3 nino-text-left"><h2 class="nino-section-title" id="contact-form-title">[[/company/name]]</h2><p class="nino-section-subtitle">[[/company/description]]</p></div>
 			<ul class="nino-list">
 				<li><strong>[[/company/name]]</strong></li>
 				<li>[[/company/adress]]</li>
@@ -22,7 +22,7 @@
 			</ul>
 		</div>
 		<div class="nino-grid-100 nino-grid-m-50 nino-p-2">
-			<form class="nino-form">
+			<form class="nino-form" action="[[/nino/dir]]/.form" method="post">
 				[csrf]
 				<label for="contact-form-name">[[/form/label/name]] *</label>
 				<input type="text" id="contact-form-name" name="name" class="nino-form-input" required>
@@ -35,7 +35,7 @@
 		
 				<input type="text" name="location" value="" tabindex="-1" autocomplete="off" aria-hidden="true" class="nino-form-trap">
 		
-				<p class="nino-form-message"></p>
+				<p class="nino-form-message" aria-live="polite"></p>
 				<p><small>* [[/form/required]]</small></p>
 				<button type="submit" class="nino-btn nino-btn--primary nino-form-submit">[[/form/label/submit]]</button>
 			</form>

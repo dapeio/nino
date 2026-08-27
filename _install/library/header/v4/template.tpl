@@ -6,7 +6,7 @@
 							<img src="[[/nino/public]]/images/logo-invert.png" alt="">
 							<h1 class="nino-sr-only" id="header-title">[[/company/name]] | [[/webpage[[/nino/http/response/uri]]/title]]</h1>
 						</a>
-						<nav class="nino-frame-header-nav">
+						<nav class="nino-frame-header-nav" aria-label="[[/website/header/title/navigation]]">
 							[template /templates/html-header-nav]
 						</nav>
 					</div>

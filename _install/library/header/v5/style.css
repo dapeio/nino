@@ -18,6 +18,10 @@ body.nino-scroll-atf .nino-frame-header .nino-frame-header-strip {
 	padding: 0;
 }
 
+.nino-frame-header .nino-frame-header-inner > * {
+	min-width: 0;
+}
+
 .nino-frame-header .nino-frame-header-brand {
 	display: flex;
 	align-items: center;

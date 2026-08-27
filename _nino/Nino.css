@@ -1642,7 +1642,7 @@ body.nino-scroll-btf .nino-back-to-top {
 .nino-socialmedia > li:hover {
 	opacity:1;
 }
-.nino-socialmedia > li > svg {
+.nino-socialmedia > li > a > svg {
 	width:24px;
 	height:24px;
 	fill:var(--color-primary-text)

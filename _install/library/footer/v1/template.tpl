@@ -4,10 +4,10 @@
 		      <div class="nino-grid-100 nino-grid-l-25 nino-footer-copyright">
 		        <p>&copy; [[/date/year]] [[/company/name]]</p>
 		      </div>
-		      <div class="nino-grid-100 nino-grid-l-50 nino-footer-nav">
+		      <nav class="nino-grid-100 nino-grid-l-50 nino-footer-nav" aria-label="[[/website/footer/title/navigation]]">
 		      	[template /templates/html-footer-nav]
 		      	[template /templates/html-footer-legal]
-		      </div>
+		      </nav>
 		      <div class="nino-grid-100 nino-grid-l-25">
 		        [template /templates/html-footer-localepicker]
 		      </div>

@@ -72,6 +72,10 @@
 	opacity: .75;
 }
 
+.nino-frame-footer .nino-frame-footer-legal > * {
+	min-width: 0;
+}
+
 .nino-frame-footer .nino-frame-footer-utility {
 	display: flex;
 	align-items: center;

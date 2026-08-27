@@ -11,7 +11,7 @@
 						<p><strong>[[/global/phone]]</strong><br>[[/company/phone]]</p>
 						<p><strong>[[/global/email]]</strong><br>[[/company/email]]</p>
 					</address>
-					<nav class="nino-grid-100 nino-grid-m-50 nino-grid-l-25 nino-frame-footer-nav">
+					<nav class="nino-grid-100 nino-grid-m-50 nino-grid-l-25 nino-frame-footer-nav" aria-label="[[/website/footer/title/navigation]]">
 						[template /templates/html-footer-nav]
 					</nav>
 				</div>

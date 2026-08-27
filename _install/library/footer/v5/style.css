@@ -16,10 +16,6 @@
 	display: block;
 }
 
-.nino-frame-footer .nino-frame-footer-copyright {
-	display:flex;
-}
-
 .nino-frame-footer .nino-footer-logo {
 	width: clamp(7rem, 10vw, 9rem);
 	max-width: none;
@@ -49,6 +45,11 @@
 	color: var(--color-subtitle);
 	font-size: .72rem;
 	border-top: 1px solid var(--color-border);
+}
+
+.nino-frame-footer .nino-frame-footer-primary > *,
+.nino-frame-footer .nino-frame-footer-meta > * {
+	min-width: 0;
 }
 
 .nino-frame-footer .nino-frame-footer-contact {

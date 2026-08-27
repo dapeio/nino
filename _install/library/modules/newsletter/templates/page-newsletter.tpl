@@ -1,5 +1,5 @@
 [template /templates/html-header]
-<section class="nino-atf nino-section--fullwidth nino-section--dark nino-text-center nino-cover" data-cover-height="100">
+<section class="nino-atf nino-section nino-section--fullwidth nino-section--dark nino-text-center nino-cover nino-p-0" data-cover-height="100">
 	<div class="nino-cover-content">
 	<div class="nino-grid-row">
 		<div class="nino-grid-100">
