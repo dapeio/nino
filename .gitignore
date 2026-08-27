@@ -1,18 +1,13 @@
 /_admin/.cache/
 /_editor/.cache/
 
-# The project's private half. config.php is tracked deliberately - it is the
-# starter configuration a checkout ships - but everything the wizard
-# generates below it is that project's own output, and the runtime data and
-# management state additionally hold PII and credentials
-/private/templates/
-/private/text/
-/private/elements/
-/private/data/
-/private/assets/
-/private/.auth/
-/private/.logs/
-/private/.backups/
+# The project's private half - all of it. A checkout ships no private/ at
+# all: the wizard creates the directory, brings its own deny rule with it
+# (_install/library/base/private/.htaccess) and writes the first config.php
+# at the end of its Setup step. Nothing in here is repository content -
+# it is one installation's configuration, its pages and text, the data its
+# visitors produce, and management state holding PII and credentials
+/private/
 
 # The project's public half - everything a browser loads directly. All of it
 # is the wizard's output (fonts, the favicon set, the generated css/js bundles)

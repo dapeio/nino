@@ -216,10 +216,16 @@ namespace Nino\Install {
 		// Virtual paths, resolved per entry - the private ones land under the
 		// private directory, the public ones stay where the webserver reaches
 		// them (see \Nino\Filesystem::path())
+		//
+		// Neither half is tracked any more, so on a fresh checkout this step
+		// is the only thing that says whether the wizard will be able to
+		// create them at all - which is why it runs first and why a
+		// not-yet-existing directory is judged by its parent's writability
+		// (see _directories())
 		private const array DIRECTORIES = [
 			''				=> true,	// project root - index.php, the tool folders
-			'private'	=> true,	// config.php, templates, text, elements, data
-			'public'	=> true,	// images, assets, fonts, favicon, the cache
+			'private'	=> false,	// config.php, templates, text, elements, data, assets
+			'public'	=> false,	// images, fonts, favicon, the generated bundles
 		];
 
 		/**
@@ -634,6 +640,21 @@ namespace Nino\Install {
 				$routes[$routeKey] = $route;
 			}
 
+			/*	Files before templates, and it is not cosmetic: base ships the
+				deny rule for the private tree itself (private/.htaccess), and
+				base is the first unit applied. Copying templates first would
+				create private/ through forceDir() and only protect it a few
+				statements later - a window, however short, in which a failed
+				request could leave the directory readable with a project's
+				templates already in it.	*/
+			if( count( $manifest['files'] ?? [] ) > 0 ) {
+				foreach( $manifest['files'] as $file )
+					if( is_dir( $unitDir. '/'. $file ) === true )
+						\Nino\Filesystem::copyDir( $unitDir. '/'. $file, \Nino\Filesystem::path( $appData, '/'. $file ) );
+					else if( is_file( $unitDir. '/'. $file ) === true )
+						self::_copyFile( $unitDir. '/'. $file, \Nino\Filesystem::path( $appData, '/'. $file ) );
+			}
+
 			if( count( $manifest['templates'] ?? [] ) > 0 ) {
 				\Nino\Filesystem::forceDir( $appData, '/templates' );
 				foreach( $manifest['templates'] as $locale => $file ) {
@@ -641,14 +662,6 @@ namespace Nino\Install {
 						continue;
 					self::_copyFile( $unitDir. '/templates/'. $file, \Nino\Filesystem::path( $appData, '/templates/'. $file ) );
 				}
-			}
-
-			if( count( $manifest['files'] ?? [] ) > 0 ) {
-				foreach( $manifest['files'] as $file )
-					if( is_dir( $unitDir. '/'. $file ) === true )
-						\Nino\Filesystem::copyDir( $unitDir. '/'. $file, \Nino\Filesystem::path( $appData, '/'. $file ) );
-					else if( is_file( $unitDir. '/'. $file ) === true )
-						self::_copyFile( $unitDir. '/'. $file, \Nino\Filesystem::path( $appData, '/'. $file ) );
 			}
 
 			if( count( $manifest['elementTypes'] ?? [] ) > 0 ) {

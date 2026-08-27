@@ -232,6 +232,24 @@ check( 'a hand-written route outside the library survives apply untouched', isse
 check( '/_install\'s own runtime-only route never leaks into the persisted routes', isset( $configAfterApply['/nino/http/routes']['GET://_install'] ) === false && isset( $configAfterApply['/nino/http/routes']['POST://_install'] ) === false );
 check( 'a module\'s self-registered runtime route (POST://.form) never leaks in either', isset( $configAfterApply['/nino/http/routes']['POST://.form'] ) === false );
 
+/*	The deny rule for the private tree, which a checkout no longer ships:
+	base brings it, so the directory the wizard creates is protected by the
+	same step that creates it.	*/
+check( 'copies base\'s deny rule into the private root it just filled', is_file( \Nino\Filesystem::getContentPath( $appData ). '/.htaccess' ) === true
+	&& str_contains( (string) file_get_contents( \Nino\Filesystem::getContentPath( $appData ). '/.htaccess' ), 'Require all denied' ) === true );
+
+/*	...and it has to land *first*. A unit's templates are copied through
+	forceDir(), which creates private/ on its own - do that before the files
+	block and the directory exists unprotected for the rest of the request,
+	with a project's templates already in it if the request then fails. The
+	order is load-bearing, so it is pinned here rather than left to whoever
+	next tidies that method.	*/
+$applyUnitSource = (string) file_get_contents( __DIR__. '/../_install/Install.php' );
+$applyUnitBody 	= substr( $applyUnitSource, strpos( $applyUnitSource, 'private static function _applyUnit(' ) );
+$applyUnitBody 	= substr( $applyUnitBody, 0, strpos( $applyUnitBody, "\n\t\t}" ) );
+
+check( '...before any template can create that directory unprotected', strpos( $applyUnitBody, "\$manifest['files']" ) < strpos( $applyUnitBody, "forceDir( \$appData, '/templates' )" ) );
+
 check( 'copies base\'s html-header.tpl', \Nino\Filesystem::fileExists( $appData, '/templates/html-header.tpl' ) === true );
 check( 'copies "forms"\'s own mail-header/footer templates', \Nino\Filesystem::fileExists( $appData, '/templates/mail-header.tpl' ) === true );
 check( 'does not copy a module that was never picked (newsletter)', \Nino\Filesystem::fileExists( $appData, '/templates/page-newsletter.tpl' ) === false );
@@ -1533,64 +1551,102 @@ echo "\n";
 
 // --- Shipped defaults (the real, git-tracked config.php + library) ---------
 
-// Read-only sanity check on the actual checkout, not the sandbox above. The
-// project ships config.php already describing the four default pages, but
-// not the templates/text/assets they render from - those live in
-// _install/library and only land on disk once the wizard runs (see
-// docs/_install.md). So this guards two things: that the shipped config
-// still describes that starter site, and that the library it draws on can
-// actually produce it
-echo "Shipped defaults (real config.php + _install/library)\n";
+/*	Read-only sanity check on the actual checkout, not the sandbox above.
+	A checkout ships no project at all now - no private/, no config.php, no
+	templates, no assets - so what has to hold is that _install/library can
+	still produce one. Every route a starter site gets, every template it
+	renders from and the deny rule that protects the directory it lands in
+	come from a unit here, and nowhere else.	*/
+echo "Shipped defaults (_install/library, the only source of a starter site)\n";
 
-$realRoot 	= __DIR__. '/..';
-$realConfig = include $realRoot. '/private/config.php';
+$realRoot = __DIR__. '/..';
 
-$realAppData 		= [ '/nino/locales/available' => $realConfig['/nino/locales/available'] ?? [], '/nino/configpath' => $realRoot ];
-$realPageRoutes = array_filter( $realConfig['/nino/http/routes'] ?? [], fn( array $r, string $k ): bool => \Nino\Install\Webpages::isPageRoute( $k, $r ), ARRAY_FILTER_USE_BOTH );
-$realPages 			= \Nino\Install\Webpages::pages( $realAppData, $realConfig['/nino/http/routes'] ?? [], [], $realConfig['/nino/html/navs'] ?? [] );
+// The whole point of the move: nothing of one installation's own state is
+// repository content any more
+check( 'a checkout ships no private directory at all - the wizard creates it', is_dir( $realRoot. '/private' ) === false );
+check( '...and no public one either', is_dir( $realRoot. '/public' ) === false );
+check( 'the deny rule for the private tree travels with the base unit instead', str_contains(
+	(string) @file_get_contents( $realRoot. '/_install/library/base/private/.htaccess' ), 'Require all denied'
+) === true );
+// ...and it is declared, or it ships without ever being copied
+check( '...and the base unit actually copies it', in_array( 'private', ( include $realRoot. '/_install/library/base/manifest.php' )['files'] ?? [], true ) === true );
 
-check( 'the real config.php returns an array', is_array( $realConfig ) === true );
-check( 'ships exactly the four default page routes, in order, Element-URI', array_column( $realPages, 'uri' ) === [ '/home', '/contact', '/404', '/legal' ] );
-check( '...and Http-URI', array_column( $realPages, 'httpUri' ) === [ '/', '/contact', '/404', '/legal' ] );
-check( 'no second copy of that list is shipped alongside the routes', isset( $realConfig['/nino/install/webpages'] ) === false );
-check( 'registers the home entry\'s route at "/" (its Http-URI), "uri" data field is its Element-URI', ( ( $realConfig['/nino/http/routes']['GET://'] ?? [] )['uri'] ?? null ) === '/home' );
-check( 'registers the 404 entry at "/404" too - the exact key Http::response()\'s own fallback lookup needs', isset( $realConfig['/nino/http/routes']['GET://404'] ) === true );
-check( 'registers "legal" and "contact" as well', isset( $realConfig['/nino/http/routes']['GET://legal'] ) === true && isset( $realConfig['/nino/http/routes']['GET://contact'] ) === true );
-check( 'auto-pulled "forms" (contact\'s requiresModules) into /nino/modules', in_array( '\\Nino\\Modules\\Form', $realConfig['/nino/modules'] ?? [], true ) === true );
-check( 'ships both library locales available', $realConfig['/nino/locales/available'] === [ 'en_US', 'de_DE' ] );
-check( 'a theme is bundled into /nino/html/assets', preg_match( '#^/assets/style\.theme\.[a-z0-9-]+\.css$#', (string) ( $realConfig['/nino/html/assets']['/.cache/style.css'][1] ?? '' ) ) === 1 );
-check( '...and named by the theme step\'s own persisted key', ( $realConfig['/nino/install/theme'] ?? null ) === 'basis' );
-
-// Every shipped route resolves back to the on-disk template file it renders,
-// and to the library unit it came from - what lets /_admin's Routes module
-// work with the shipped pages at all (see the shared-source-of-truth section
-// above)
-check( 'each shipped route resolves to its own on-disk template', array_column( $realPages, 'template' ) === [ 'page-home', 'page-contact', 'page-404', '' ] );
-check( '...and to the library unit behind it', array_column( $realPages, 'libraryKey' ) === [ 'home', 'contact', '404', 'legal' ] );
-check( 'the shipped 404 route really carries a 404', array_column( $realPages, 'statusCode' ) === [ 200, 200, 404, 200 ] );
-
-// The menus are on the routes themselves, densely numbered by the position
-// the wizard's list had them in (see Webpages::apiApply())
-check( 'the registry the page editors offer checkboxes for is shipped', ( $realConfig['/nino/html/navs'] ?? null ) === [ 'main', 'footer' ] );
-// Contact ships in the footer as well: the footer nav is registered and
-// rendered out of the box, and a contact link is what a footer menu is for
-check( 'the two menu pages carry their membership on their own route', array_column( $realPages, 'navs' ) === [ [ 'main' ], [ 'main', 'footer' ], [], [] ] );
-check( '...at their own position in that list', [ $realPageRoutes['GET://']['navs'], $realPageRoutes['GET://contact']['navs'] ] === [ [ 'main' => 1 ], [ 'main' => 2, 'footer' => 1 ] ] );
-
-// The generated site itself is deliberately not tracked - it is the
-// wizard's output, not repository content
-foreach( [ 'private/templates', 'private/text', 'private/elements', 'assets' ] as $dir )
-	check( "does not ship a generated /$dir - the wizard writes it", is_dir( $realRoot. '/'. $dir ) === false );
-
-// ...but everything needed to generate it has to be in the library, or a
-// fresh checkout could never produce the pages config.php already describes
+// The shell every page renders inside
 foreach( [ 'html-header.tpl', 'html-footer.tpl' ] as $file )
 	check( "the base unit ships $file", is_file( $realRoot. '/_install/library/base/templates/'. $file ) === true );
 
-foreach( [ 'home/templates/page-home.tpl', '404/templates/page-404.tpl',
-           'legal/templates/page-legal.de_DE.tpl', 'contact/templates/page-contact.tpl',
-           'blank/templates/page-blank.tpl' ] as $file )
-	check( "the page library ships $file", is_file( $realRoot. '/_install/library/pages/'. $file ) === true );
+/*	Every page unit stands on its own: the routes it declares, the templates
+	those routes render, and the files they reference. A unit whose route
+	points at a template it does not ship is a page the wizard can offer and
+	then fail to produce.	*/
+$pageUnits 		= [];
+$pageFailures 	= [];
+
+foreach( scandir( $realRoot. '/_install/library/pages' ) ?: [] as $pageEntry ) {
+
+	if( is_file( $realRoot. '/_install/library/pages/'. $pageEntry. '/manifest.php' ) === false )
+		continue;
+
+	$pageDir 			= $realRoot. '/_install/library/pages/'. $pageEntry;
+	$pageManifest 	= include $pageDir. '/manifest.php';
+	$pageUnits[] 	= $pageEntry;
+
+	if( ( $pageManifest['label'] ?? '' ) === '' )
+		$pageFailures[] = $pageEntry. ': no label for the picker';
+
+	foreach( ( $pageManifest['templates'] ?? [] ) as $pageTemplate )
+		if( is_file( $pageDir. '/templates/'. $pageTemplate ) === false )
+			$pageFailures[] = $pageEntry. ': declares '. $pageTemplate. ' and does not ship it';
+
+	/*	The body is what ties a route to a file on disk. A route naming a
+		template no unit ships is the one failure this whole block exists for.
+		Every route is checked, not only the page routes: the demo units
+		deliberately register something Webpages::isPageRoute() does not
+		recognise (so the Routes editor leaves them alone), and their
+		templates still have to exist.	*/
+	foreach( ( $pageManifest['routes'] ?? [] ) as $routeKey => $route ) {
+
+		if( preg_match( '#\[template /templates/([a-z0-9._-]+)#i', (string) ( $route['body'] ?? '' ), $routeTemplate ) !== 1 )
+			continue;
+
+		// A locale-suffixed body ('page-legal.[[/nino/http/response/locale]]')
+		// matches whichever locales the unit ships, so the stem is what counts
+		$stem 			= preg_replace( '/\.$/', '', $routeTemplate[1] );
+		$candidates = glob( $pageDir. '/templates/'. $stem. '*.tpl' ) ?: [];
+
+		if( $candidates === [] )
+			$pageFailures[] = $pageEntry. ': '. $routeKey. ' renders '. $stem. ', which no template file matches';
+	}
+}
+
+check( 'every page unit ships the templates its own routes render'. ( $pageFailures === [] ? '' : ' - '. implode( ' | ', $pageFailures ) ), $pageFailures === [] );
+// The four a starter site is normally built from have to be among them, or
+// the Routes step has nothing to offer on a fresh install
+check( 'the page library offers the four a starter site is built from', count( array_intersect( [ 'home', 'contact', '404', 'legal' ], $pageUnits ) ) === 4 );
+check( '...and a blank one to start a page of your own from', in_array( 'blank', $pageUnits, true ) === true );
+
+// The 404 unit is the one whose route Http::response() looks up by an exact
+// key of its own when nothing else matches
+$notFound = ( include $realRoot. '/_install/library/pages/404/manifest.php' )['routes'] ?? [];
+check( 'the 404 unit registers the exact key the fallback lookup needs', isset( $notFound['GET://404'] ) === true
+	&& ( $notFound['GET://404']['statusCode'] ?? null ) === 404 );
+// ...and home is the one that has to register at "/" while carrying its own
+// Element-URI in the data field
+$home = ( include $realRoot. '/_install/library/pages/home/manifest.php' )['routes'] ?? [];
+check( 'the home unit registers at "/" and keeps "/home" as its Element-URI', isset( $home['GET://'] ) === true
+	&& ( $home['GET://']['uri'] ?? null ) === '/home' );
+
+// The optional modules a page can pull in with it are units too, so a page
+// declaring one the library does not have would be a dead requirement
+$moduleUnits = array_values( array_filter( scandir( $realRoot. '/_install/library/modules' ) ?: [],
+	static fn( string $entry ): bool => is_file( $realRoot. '/_install/library/modules/'. $entry. '/manifest.php' ) ) );
+
+check( 'the contact page can pull the forms module in with it', in_array( 'forms', $moduleUnits, true ) === true );
+// Everything the always-on half does not cover is a unit somebody can decline
+check( 'the always-on module list carries no unit the wizard offers', array_intersect(
+	array_map( static fn( string $unit ): string => (string) ( ( include $realRoot. '/_install/library/modules/'. $unit. '/manifest.php' )['moduleClass'] ?? '' ), $moduleUnits ),
+	\Nino\AppData::DEFAULTS['/nino/modules']
+) === [] );
 
 // Every theme unit has to be self-contained: its own manifest, the
 // stylesheet that manifest names, and every webfont that stylesheet
@@ -1614,9 +1670,10 @@ foreach( scandir( $realRoot. '/_install/library/themes' ) ?: [] as $themeEntry )
 	check( "the \"$themeEntry\" theme ships every webfont its stylesheet references", $missingFonts === [] );
 }
 
-$themeKey = (string) ( $realConfig['/nino/install/theme'] ?? '' );
-check( 'the theme the config names exists in the library', is_file( $realRoot. '/_install/library/themes/'. $themeKey. '/manifest.php' ) === true );
-check( '...and the stylesheet it declares is the one the config bundles', ( include $realRoot. '/_install/library/themes/'. $themeKey. '/manifest.php' )['stylesheet'] === ( $realConfig['/nino/html/assets']['/.cache/style.css'][1] ?? '' ) );
+// Basis is the one look the catalogue is read against, so it is the one a
+// fresh install has to be able to fall back on
+check( 'the reference look is in the library and names a stylesheet it ships', is_file( $realRoot. '/_install/library/themes/basis/manifest.php' ) === true
+	&& is_file( $realRoot. '/_install/library/themes/basis/'. ( include $realRoot. '/_install/library/themes/basis/manifest.php' )['stylesheet'] ) === true );
 
 echo "\n";
 

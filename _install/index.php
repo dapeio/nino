@@ -19,8 +19,11 @@ if( is_file( '../_design/Design.php' ) === true )
 
 require 'Install.php';
 
-// Init Nino Install
-$appData = \Nino\init();
+// Init Nino Install. The one entry point that may boot without config.php:
+// there is no project yet, and writing the first one is what this is for
+// (see \Nino\AppData::init()). Every other entry point 500s until Setup
+// has run.
+$appData = \Nino\init( true );
 \Nino\Install\Install::init( $appData );
 
 // Output Nino Install

@@ -954,6 +954,58 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **A checkout ships no project any more.** There is no `private/` directory
+  in the repository: no `config.php`, no deny rule, nothing. The wizard creates
+  the directory, brings the `.htaccess` that protects it, and writes the first
+  configuration at the end of its Setup step.
+
+  `private/config.php` was tracked in git *and* was the running site's live
+  state - the one file in there that worked that way, while `templates/`,
+  `text/`, `elements/`, `data/` and `assets/` were all ignored. So an update by
+  `git pull` landed on the file every save rewrites: the routes, the module
+  list, the css bundle, the theme key, the accounts. That is exactly the
+  collision the rest of the layout is built to avoid, and it is why
+  `deployment.md` can say `_nino/` and `_admin/` are replaceable wholesale.
+
+  It was also a second source of truth. Every route it shipped was already
+  declared by a unit under `_install/library/` - `robots.txt`, `sitemap.xml`
+  and `llms.txt` by `base`, the four pages by `pages/home`, `pages/contact`,
+  `pages/404` and `pages/legal`, the menu registry by `modules/navigation` -
+  and the two copies had already drifted: the shipped config gave Home
+  `main: 1` and Contact `main: 2, footer: 1` where the units say `5` and `5`.
+  It described a site a fresh checkout could not render either, since the
+  templates and stylesheets it pointed at are the wizard's output.
+
+- **Framework defaults live in `\Nino\AppData::DEFAULTS`.** Everything a
+  project does not have to decide - the always-on module list, cache ttl, the
+  auth throttle, the error flags, the empty registries - is kernel policy, and
+  a `config.php` that omits one of them is a project that never had an opinion
+  rather than a project missing a key. The defaults sit *under* the file, so an
+  existing `config.php` keeps working unchanged: it simply overrides each of
+  them with the value it already had. A first install now writes four keys
+  where the shipped file carried twenty-one.
+
+  Form, Navigation and Localepicker are deliberately not in the defaults. They
+  are units the wizard offers and a project may decline, so they are its answer
+  to give.
+
+- **`\Nino\init()` takes one flag, and `_install/index.php` is the only caller
+  that passes it.** The installer has to run before a project exists, so it is
+  the one entry point allowed to boot on the defaults alone. Every other entry
+  point keeps the fatal it always had - and keeps it *silent*:
+  `Runtime::handleError()` cannot know `/nino/error/display` that early, so it
+  defaults to not displaying and an unfinished install answers a stranger with
+  a bare 500. That is deliberate. "Not installed yet, go to /_install" would be
+  an invitation; the person doing the installing came to `/_install` on purpose
+  and never sees it.
+
+- A unit's `files` are copied before its `templates`. `base` ships the deny rule
+  for the private tree and is the first unit applied, while a template copy
+  creates `private/` through `forceDir()` on its own - so the old order left a
+  window, however short, in which the directory existed unprotected with a
+  project's templates already in it. The installer's suite pins the order.
+
+
 - **The asset sources moved out of the webroot.** `/assets` is a private
   directory now, so a project's stylesheets and scripts live at
   `private/assets/` next to the templates and the text they belong to, and

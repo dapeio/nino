@@ -1779,6 +1779,82 @@ $invalidContentDir = runIsolated( '
 ' );
 check( 'an invalid NINO_CONTENT_DIR fails before boot instead of falling back elsewhere', trim( $invalidContentDir['stdout'] ) === 'before' && $invalidContentDir['exitCode'] !== 0 );
 
+/*	Booting with no project at all. The checkout itself is that case now -
+	it ships no private/config.php - so these run against the real root.
+
+	The site half stops, and stops *quietly*: Runtime::handleError() cannot
+	know '/nino/error/display' before config.php has been read, so it
+	defaults to not displaying and the visitor gets a bare 500. That is the
+	deliberate answer. Somebody who stumbles onto an unfinished install must
+	not be told that an installer exists, let alone where - the person doing
+	the installing came to /_install on purpose.	*/
+$noProject = runIsolated( '
+	echo "before\n";
+	\Nino\init();
+	echo "after\n";
+' );
+/*	Judged by what stopped running, not by the exit code: this failure lands
+	*after* Runtime::init() has installed Nino's own handler, which answers
+	with a 500 header and a bare exit() - status 0. The NINO_CONTENT_DIR case
+	above fails one step earlier, before the handler exists, so php's own
+	fatal handling gives it a non-zero code. Both stop; only one can say so
+	in $?.	*/
+check( 'a site with no config.php stops at boot', trim( $noProject['stdout'] ) === 'before' );
+check( '...without naming the file, the path or the installer', preg_match( '/config\.php|_install|NINO_CONFIG_DIR/i', $noProject['stdout'] ) !== 1 );
+
+// ...and the installer half boots on the defaults alone, which is the whole
+// reason the flag exists: it is what has to write the first config.php
+$installing = runIsolated( '
+	$appData = \Nino\init( true );
+	echo json_encode( [
+		"modules"	=> $appData["/nino/modules"] ?? null,
+		"routes"		=> $appData["/nino/http/routes"] ?? null,
+		"ttl"			=> $appData["/nino/cache/ttl"] ?? null,
+		"display"	=> $appData["/nino/error/display"] ?? null,
+	] );
+' );
+$installingData = json_decode( $installing['stdout'], true ) ?? [];
+
+check( 'the installer boots without one', $installing['exitCode'] === 0 && $installingData !== [] );
+check( '...on the framework defaults', ( $installingData['ttl'] ?? null ) === 3600
+	&& ( $installingData['display'] ?? null ) === false
+	&& in_array( '\\Nino\\Modules\\Assets', $installingData['modules'] ?? [], true ) === true );
+/*	Nothing the project has decided is present - the routes it does carry are
+	the kernel's own, registered at runtime by Auth::init() rather than read
+	from a file. Not one of them renders a template, which is what a page
+	route is: on a fresh install every url falls through to a 404 the wizard
+	has not installed either.	*/
+$installingPages = array_filter( $installingData['routes'] ?? [], static fn( array $route ): bool => str_contains( (string) ( $route['body'] ?? '' ), '[template' ) );
+check( '...carrying no page the project has not made yet', $installingPages === [] );
+
+/*	And the half of the split that every existing project depends on: the
+	defaults sit *under* config.php, so a file that omits a key gets the
+	default and a file that carries one wins. That is what lets a config.php
+	written before the defaults existed keep working unchanged - it simply
+	overrides each of them with the same value it always had.	*/
+$partialRoot = $sandbox. '/partial';
+mkdir( $partialRoot. '/private', 0777, true );
+file_put_contents( $partialRoot. '/private/config.php', '<?php return '. var_export( [
+	'/nino/cache/ttl'			=> 99,
+	'/nino/locales/available'	=> [ 'en_US', 'fr_FR' ],
+], true ). ';' );
+
+$partial = [ './nino/uid' => $partialRoot ];
+\Nino\AppData::prepare( $partial );
+$partial['./nino/filesystem/path'] 				= $partialRoot;
+$partial['./nino/filesystem/configpath'] 	= $partialRoot. '/private';
+$partial['./nino/filesystem/contentpath'] = $partialRoot. '/private';
+$partial['./nino/filesystem/privatepath'] = $partialRoot. '/private';
+$partial['./nino/filesystem/publicpath'] 	= $partialRoot. '/public';
+\Nino\AppData::init( $partial );
+
+check( 'a config.php that omits a key gets the framework default', ( $partial['/nino/auth/maxtries'] ?? null ) === 5
+	&& ( $partial['/nino/error/log'] ?? null ) === true );
+check( '...and a key it does carry overrides that default', ( $partial['/nino/cache/ttl'] ?? null ) === 99 );
+// A list is replaced wholesale rather than merged - see AppData::_merge(). A
+// project that drops a locale has to actually lose it
+check( '...including a list, which is replaced rather than appended to', ( $partial['/nino/locales/available'] ?? null ) === [ 'en_US', 'fr_FR' ] );
+
 $bootstrap = '
 	$sandbox = sys_get_temp_dir(). "/nino-handleerror-". bin2hex( random_bytes( 4 ) );
 	mkdir( $sandbox, 0755, true );
@@ -1982,8 +2058,13 @@ check( 'the shared appearance library exposes only its deliberate theme previews
 	&& str_contains( $routerSource, '#^/_install/library/themes/[a-z0-9][a-z0-9-]*/preview\\.svg$#' ) === true );
 check( '...and refuses its source before static-file delivery', strpos( $routerSource, '#^/_install/library(?:/|$)#' ) < strpos( $routerSource, 'is_file( __DIR__. $uri )' ) );
 
-check( 'the shipped private directory denies itself for a webserver that does apply it', str_contains(
-	(string) @file_get_contents( __DIR__. '/../private/.htaccess' ), 'Require all denied'
+/*	A checkout ships no private directory at all - it is one installation's
+	own state, not repository content. The wizard creates it and brings the
+	deny rule that protects it (see _install/library/base), so what has to
+	hold here is that the rule exists to be brought.	*/
+check( 'a checkout ships no private directory - the wizard creates it', is_dir( __DIR__. '/../private' ) === false );
+check( '...and the deny rule that protects it travels with the installer', str_contains(
+	(string) @file_get_contents( __DIR__. '/../_install/library/base/private/.htaccess' ), 'Require all denied'
 ) === true );
 check( 'the shared appearance library ships the matching Apache protection', str_contains(
 	(string) @file_get_contents( __DIR__. '/../_install/library/.htaccess' ), '^(?!preview\\.svg$)'
@@ -1993,7 +2074,7 @@ check( 'the shared appearance library ships the matching Apache protection', str
 foreach( \Nino\Filesystem::PRIVATE_DIRS as $private )
 	check( "a checkout ships no $private in the public root", file_exists( __DIR__. '/..'. $private ) === false );
 
-check( 'config.php ships under the private directory instead', is_file( __DIR__. '/../private/config.php' ) === true );
+check( 'and no config.php either - the wizard writes the first one', is_file( __DIR__. '/../private/config.php' ) === false );
 
 echo "\n";
 

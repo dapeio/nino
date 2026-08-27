@@ -121,25 +121,36 @@ The complete process is described in **[Getting Started](docs/getting-started.md
 
 ## Project Structure
 
+A checkout is code and nothing else. Everything below `private/` and
+`public/` is one installation's own state, created by the wizard and tracked
+by nobody:
+
 ```text
 index.php        Main entry point of the website
-config.php       Site configuration
+router.php       Built-in server routing, for local development
 
 _nino/           Kernel and frontend core
 app/             Project-owned PHP classes and runtime modules
 _editor/         Content editor, users, backups, activity log
 _admin/          Developer tools and restoration
-_install/        Setup wizard
+_install/        Setup wizard, and the library it installs from
 _templates/      Section-first Template Builder
-_design/          Theme, Design, Header, and Footer editor
-
-elements/        Element types
-templates/       Page and section templates
-text/            Texts by language and global settings
-assets/          Project-specific CSS and JavaScript
-images/          Uploaded images
+_design/         Theme, Design, Header, and Footer editor
 docs/            Documentation
-data/            Runtime data, not tracked in Git
+
+private/         Never served, only read by PHP - created by the wizard
+  config.php       Site configuration
+  templates/       Page and section templates
+  text/            Texts by language and global settings
+  elements/        Element types
+  assets/          Project-specific CSS and JavaScript, bundled into public/.cache/
+  data/            Runtime data
+
+public/          Everything a browser loads directly - created by the wizard
+  images/          Uploaded images
+  fonts/           Webfonts the active theme ships
+  favicon/         The generated favicon set
+  .cache/          The css and js bundles, built from private/assets/
 ```
 
 ## Tests

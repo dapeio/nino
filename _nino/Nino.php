@@ -11,7 +11,18 @@ namespace Nino {
 
 	const VERSION = '0.11.0-beta.1';
 
-	function init(): array {
+	/**
+	 *	Boot Nino.
+	 *
+	 *	@param		bool			$installing		True only from _install/index.php: the
+	 *															wizard is the one caller that has to run
+	 *															*before* a project exists, so it is the one
+	 *															caller allowed to boot without config.php.
+	 *															Every other entry point keeps the fatal.
+	 *
+	 *	@return 	array
+	 */
+	function init( bool $installing = false ): array {
 
 		$root 		= dirname(__DIR__);
 
@@ -76,7 +87,7 @@ namespace Nino {
 		\Nino\Runtime::init( $appData );
 
 		\Nino\Filesystem::init( $appData );
-		\Nino\AppData::init( $appData );
+		\Nino\AppData::init( $appData, $installing );
 		\Nino\Locales::init( $appData );
 		\Nino\Csrf::init( $appData );
 		\Nino\Html::init( $appData );
@@ -149,6 +160,59 @@ namespace Nino {
 				'./nino/auth/currentUser'			=> [],
 			];
 
+		/*	Everything a project does not have to decide. These are framework
+			policy, not project state: a value here is the same on every Nino
+			site until somebody deliberately changes it, and a config.php that
+			omits one is a project that never had an opinion rather than a
+			project missing a key.
+
+			Two things follow. A fresh install starts from a working kernel
+			with nothing written yet - which is what lets /_install boot before
+			a project exists at all - and config.php shrinks to what this
+			particular site decided: its locales, its routes, its pages, its
+			theme, its accounts.
+
+			The module list is the always-on half only. Form, Navigation and
+			Localepicker are units the wizard offers and a project may not
+			want, so they are its answer to give (see
+			_install/library/modules/).	*/
+		public const array DEFAULTS = [
+			'/nino/modules'		=> [
+				'\\Nino\\Modules\\Assets',
+				'\\Nino\\Modules\\Elements',
+				'\\Nino\\Modules\\Template',
+				'\\Nino\\Modules\\Jstext',
+				'\\Nino\\Modules\\Csrf',
+				'\\Nino\\Modules\\Images',
+				'\\Nino\\Modules\\Cache',
+			],
+			'/nino/cache/status'		=> false,
+			'/nino/cache/ttl'			=> 3600,
+			'/nino/cache/blacklist'	=> [],
+			'/nino/editor/backups'	=> true,
+			'/nino/editor/logs'		=> true,
+			'/nino/dir'					=> '',
+			// Log by default, never display: a site that wants a stack trace on
+			// the page has to ask for it, and asking is a decision worth writing
+			// down. See Runtime::handleError().
+			'/nino/error/log'			=> true,
+			'/nino/error/display'		=> false,
+			'/nino/session/force-secure-cookie'	=> false,
+			'/nino/locales/native'		=> 'en_US',
+			'/nino/locales/available'	=> [ 'en_US' ],
+			'/nino/locales/textfiles'	=> '/text',
+			'/nino/auth/maxtries'		=> 5,
+			'/nino/auth/cooldown'		=> 3600,
+			// The four registries the tools fill. Empty is the honest starting
+			// value for all of them: no bundle, no image slots, no menus, no
+			// accounts, no routes - a kernel that boots and serves a 404
+			'/nino/html/assets'		=> [],
+			'/nino/html/images'		=> [],
+			'/nino/html/navs'			=> [],
+			'/nino/http/routes'		=> [],
+			'/nino/auth/user'			=> [],
+		];
+
 		public static function prepare( array &$appData ): void {
 
 			$appData = self::_merge( self::$_initialInstance, $appData );
@@ -180,21 +244,54 @@ namespace Nino {
 					$appData[$key] = $value;
 		}
 
-		public static function init( array &$appData ): void {
+		/**
+		 *	Load config.php over the framework defaults.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		bool			$installing		True only from _install/index.php - see \Nino\init()
+		 *
+		 *	@return 	void
+		 */
+		public static function init( array &$appData, bool $installing = false ): void {
 
 			// getFileContent()'s $default is itself [], so an is_array() check
 			// alone never caught a missing file - checked directly here so a
-			// typo'd NINO_CONFIG_DIR (or a fresh install) fails loud instead
-			// of silently booting empty
-			if( \Nino\Filesystem::fileExists( $appData, '/config.php' ) === false )
-				trigger_error( 'AppData::init(): config.php was not found under \''. ( $appData['./nino/filesystem/configpath'] ?? $appData['./nino/filesystem/path'] ). '\' - check NINO_CONFIG_DIR if it is set.', E_USER_ERROR );
+			// typo'd NINO_CONFIG_DIR fails loud instead of silently booting empty
+			if( \Nino\Filesystem::fileExists( $appData, '/config.php' ) === false ) {
+
+				/*	No project here yet. The wizard is the one caller that has
+					to run before one exists, so it - and only it - boots on the
+					defaults alone and writes the file at the end of its Setup
+					step.
+
+					Everything else fails, and fails the way it already did:
+					Runtime::handleError() cannot know '/nino/error/display'
+					this early, so it defaults to not displaying and the visitor
+					gets a bare 500. That is the intended answer. A passing
+					stranger who finds an unfinished install must not be told
+					where the installer is - a 500 says nothing, where "not
+					installed yet, go to /_install" is an invitation. The person
+					who *is* installing came to /_install on purpose and never
+					sees this.	*/
+				if( $installing !== true )
+					trigger_error( 'AppData::init(): config.php was not found under \''. ( $appData['./nino/filesystem/configpath'] ?? $appData['./nino/filesystem/path'] ). '\' - run /_install, or check NINO_CONFIG_DIR if it is set.', E_USER_ERROR );
+
+				$appData = self::_merge( $appData, self::DEFAULTS );
+				return;
+			}
 
 			$staticAppData = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
 
 			if( is_array( $staticAppData ) === false )
 				trigger_error( 'AppData::init(): config.php exists but did not return an array.', E_USER_ERROR );
 
-			$appData = self::_merge( $appData, $staticAppData );
+			/*	Defaults first, the project's own file over them: a key the file
+				does not carry is one this site never decided, not one it lost.
+				That is what lets config.php hold only what this project chose -
+				and what keeps every config.php written before the defaults
+				existed working unchanged, since it simply overrides each of
+				them with the same value.	*/
+			$appData = self::_merge( $appData, self::_merge( self::DEFAULTS, $staticAppData ) );
 		}
 
 		// Merges $overlay into $base: associative arrays merge key-by-key

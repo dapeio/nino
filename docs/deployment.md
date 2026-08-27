@@ -232,7 +232,7 @@ Nino is in the beta phase. Security fixes appear on `main`; there is currently n
 - [ ] Dotfiles, dot directories, and PHP data files are not directly accessible.
 - [ ] `private/` is not served — its own `.htaccess` denies it, and each PHP file inside carries a 403 stub; verify both apply on your webserver, or move the directory out of the webroot with `NINO_CONTENT_DIR`. The templates and the asset sources are not PHP and have only the server rule.
 - [ ] Directory listing is disabled.
-- [ ] `/_install` was able to create the project directories from the writable project root itself.
+- [ ] `/_install` was able to create the project directories from the writable project root itself — a checkout ships neither `private/` nor `public/`, so the first step of the wizard is where that is confirmed.
 - [ ] Write permissions are limited to the required paths after setup.
 - [ ] `/_install` was fully completed and subsequently removed from production.
 - [ ] If `_install/` is deployed to keep Theme/Header/Footer switchable, it is locked and only its catalogue's Theme previews are directly accessible.

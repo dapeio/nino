@@ -29,7 +29,15 @@
 		'/website/charset',
 		'/website/url',
 	],
+	/*	Copied wherever this project keeps that kind of file, so each entry
+		follows \Nino\Filesystem::path() rather than a literal directory.
+
+		'private' is the deny rule for the private tree itself. It ships here
+		rather than in the repository because a checkout has no private/ at
+		all - the wizard creates it, so the wizard has to bring the rule that
+		protects it, and Setup is the first step that writes anything.	*/
 	'files' => [
+		'private',
 		'assets',
 		'images',
 		'favicon'

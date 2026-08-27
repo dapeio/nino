@@ -121,25 +121,36 @@ Der vollständige Ablauf steht unter **[Erste Schritte](docs/getting-started.de.
 
 ## Projektstruktur
 
+Ein Checkout enthält nur Code. Alles unterhalb von `private/` und `public/`
+ist der Zustand einer einzelnen Installation, wird vom Assistenten angelegt
+und von niemandem getrackt:
+
 ```text
 index.php        Haupt-Einstiegspunkt der Webseite
-config.php       Site-Konfiguration
+router.php       Routing für den eingebauten Server, lokale Entwicklung
 
 _nino/           Kernel und Frontend-Core
 app/             Projekteigene PHP-Klassen und Laufzeitmodule
 _editor/         Inhaltseditor, Nutzer, Backups, Aktivitätslog
 _admin/          Entwickler-Werkzeuge und Wiederherstellung
-_install/        Einrichtungsassistent
+_install/        Einrichtungsassistent und die Bibliothek, aus der er installiert
 _templates/      Sectionbasierter Template Builder
-_design/          Editor für Theme, Design, Header und Footer
-
-elements/        Element-Typen
-templates/       Seiten- und Sektions-Templates
-text/            Texte je Sprache und globale Einstellungen
-assets/          Projekt-eigenes CSS und JavaScript
-images/          Hochgeladene Bilder
+_design/         Editor für Theme, Design, Header und Footer
 docs/            Dokumentation
-data/            Laufzeitdaten, nicht in Git getrackt
+
+private/         Wird nie ausgeliefert, nur von PHP gelesen - vom Assistenten angelegt
+  config.php       Site-Konfiguration
+  templates/       Seiten- und Sektions-Templates
+  text/            Texte je Sprache und globale Einstellungen
+  elements/        Element-Typen
+  assets/          Projekt-eigenes CSS und JavaScript, gebündelt nach public/.cache/
+  data/            Laufzeitdaten
+
+public/          Alles, was ein Browser direkt lädt - vom Assistenten angelegt
+  images/          Hochgeladene Bilder
+  fonts/           Webfonts des aktiven Themes
+  favicon/         Der erzeugte Favicon-Satz
+  .cache/          Die CSS- und JS-Bundles, gebaut aus private/assets/
 ```
 
 ## Tests

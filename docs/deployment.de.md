@@ -233,7 +233,7 @@ Nino befindet sich in der Beta-Phase. Sicherheitskorrekturen erscheinen auf `mai
 - [ ] Dotfiles, Dot-Verzeichnisse und PHP-Datendateien sind nicht direkt erreichbar.
 - [ ] `private/` wird nicht ausgeliefert — die eigene `.htaccess` sperrt das Verzeichnis, und jede PHP-Datei darin trägt einen 403-Stub; prüfe, ob beides auf deinem Webserver greift, oder verlege das Verzeichnis mit `NINO_CONTENT_DIR` aus dem Webroot. Die Templates und die Asset-Quellen sind kein PHP und haben nur die Serverregel.
 - [ ] Verzeichnisauflistung ist deaktiviert.
-- [ ] `/_install` konnte die Projektverzeichnisse aus der beschreibbaren Projektwurzel selbst erzeugen.
+- [ ] `/_install` konnte die Projektverzeichnisse aus der beschreibbaren Projektwurzel selbst erzeugen — ein Checkout liefert weder `private/` noch `public/` mit, der erste Schritt des Assistenten prüft genau das.
 - [ ] Schreibrechte sind nach der Einrichtung auf die benötigten Pfade begrenzt.
 - [ ] `/_install` wurde vollständig abgeschlossen und anschließend produktiv entfernt.
 - [ ] Wird `_install/` mitgeliefert, um Theme/Header/Footer umschaltbar zu halten, ist es gesperrt und von seinem Katalog sind nur die Theme-Vorschauen direkt erreichbar.
