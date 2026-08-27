@@ -53,7 +53,7 @@ The included `.htaccess` sets two basic protection rules, provided the server al
 - Files with a leading dot are not delivered directly.
 - Directories without an index file do not show a file list.
 
-A third rule lives in `private/.htaccess` and denies that directory outright. It is the one that matters most: `private/` holds `config.php`, the templates, the text and elements they render from, and the data your visitors produce. Without it, a request for `private/templates/page-home.tpl` returns the template source as plain text.
+A third rule lives in `private/.htaccess` and denies that directory outright. It is the one that matters most: `private/` holds `config.php`, the templates, the text and elements they render from, the data your visitors produce, and the stylesheet and script sources the asset bundle is built out of. Without it, a request for `private/templates/page-home.tpl` returns the template source as plain text.
 
 Additionally, check in the hosting configuration how non-existent paths are passed to `index.php`. An `.htaccess` ignored by the server has no protective effect — and for `private/` that is not a hardening detail but a disclosure. If you cannot rely on `.htaccess`, point `NINO_CONTENT_DIR` in `index.php` at a directory outside the webroot instead; then no server rule is needed at all.
 
@@ -84,7 +84,7 @@ A general example configuration cannot reliably guess the paths and PHP-FPM sett
 
 Before initial setup, PHP must be able to create directories and files in the project root. The still missing project paths are created by `/_install` or, if needed, by the kernel and are not a manually required prerequisite.
 
-During operation, Nino only needs write permissions for actually changeable content. Depending on usage, this includes `private/config.php`, `private/text/`, `private/elements/`, `private/data/`, `private/.logs/`, `private/.backups/`, `public/images/`, and `public/.cache/`. The Template Builder under `/_templates` additionally needs `private/templates/`; it can create native text keys, Element Types, and image-slot definitions in the configuration. Applying appearance variants in `/_design` needs `private/templates/`, `public/assets/`, `public/fonts/`, and any other public destination declared by a Theme manifest. The appearance catalogue under `_install/library/` itself remains read-only. `/_admin` writes, depending on the function, configuration, texts, elements, and images, among others. The project root and PHP source can otherwise remain read-only after installation.
+During operation, Nino only needs write permissions for actually changeable content. Depending on usage, this includes `private/config.php`, `private/text/`, `private/elements/`, `private/data/`, `private/.logs/`, `private/.backups/`, `private/assets/`, `public/images/`, and `public/.cache/`. The Template Builder under `/_templates` additionally needs `private/templates/`; it can create native text keys, Element Types, and image-slot definitions in the configuration. Applying appearance variants in `/_design` needs `private/templates/`, `private/assets/`, `public/fonts/`, and any other destination declared by a Theme manifest. The appearance catalogue under `_install/library/` itself remains read-only. `/_admin` writes, depending on the function, configuration, texts, elements, and images, among others. The project root and PHP source can otherwise remain read-only after installation.
 
 Grant these permissions to the user under which PHP is executed. World-writable permissions such as `0777` are not a suitable permanent solution. After deployment, the kernel and other PHP source code should not be generally writable.
 
@@ -230,7 +230,7 @@ Nino is in the beta phase. Security fixes appear on `main`; there is currently n
 - [ ] PHP version and extensions meet the requirements.
 - [ ] Public routes are correctly forwarded to Nino.
 - [ ] Dotfiles, dot directories, and PHP data files are not directly accessible.
-- [ ] `private/` is not served — its own `.htaccess` denies it, and each file inside carries a 403 stub; verify both apply on your webserver, or move the directory out of the webroot with `NINO_CONTENT_DIR`.
+- [ ] `private/` is not served — its own `.htaccess` denies it, and each PHP file inside carries a 403 stub; verify both apply on your webserver, or move the directory out of the webroot with `NINO_CONTENT_DIR`. The templates and the asset sources are not PHP and have only the server rule.
 - [ ] Directory listing is disabled.
 - [ ] `/_install` was able to create the project directories from the writable project root itself.
 - [ ] Write permissions are limited to the required paths after setup.

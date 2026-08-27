@@ -33,7 +33,7 @@ set_error_handler( function() { return true; } );
 $sandbox = sys_get_temp_dir(). '/nino-design-smoke-'. uniqid();
 mkdir( $sandbox. '/private', 0777, true );
 mkdir( $sandbox. '/private/templates', 0777, true );
-mkdir( $sandbox. '/public/assets', 0777, true );
+mkdir( $sandbox. '/private/assets', 0777, true );
 
 $_SERVER['REMOTE_ADDR'] = '127.0.0.1';
 

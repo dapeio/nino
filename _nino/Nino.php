@@ -1322,16 +1322,25 @@ namespace Nino {
 		public const string CONTENT_DIR = '/private';
 		// Everything a project keeps that a webserver must never serve: its
 		// configuration, the templates it renders, the text and elements it
-		// renders them from, and the data its visitors produce. Addressed by
+		// renders them from, the data its visitors produce, and the stylesheet
+		// and script sources the asset bundle is built out of. Addressed by
 		// these virtual paths throughout, resolved against the private root -
 		// see path(), and getPath()'s own docblock for the other half.
-		public const array PRIVATE_DIRS = [ '/config.php', '/templates', '/text', '/elements', '/data' ];
+		//
+		// /assets is here rather than opposite because nothing ever requests
+		// one of those files: Modules\Assets reads them off disk, concatenates
+		// them into /.cache/<bundle> and links only that. A source served
+		// alongside its own bundle is the same css twice on one host, one copy
+		// of it unversioned, and a preview of the project's private authoring
+		// state on top - see url(), which no caller ever hands an /assets path.
+		public const array PRIVATE_DIRS = [ '/config.php', '/templates', '/text', '/elements', '/data', '/assets' ];
 
-		// The mirror of it: everything a browser loads directly. Kept
-		// together under the public root so the project root is code and
-		// nothing else - the tool folders stay put, since they serve their
-		// own js/css from where they are
-		public const array PUBLIC_DIRS = [ '/images', '/assets', '/favicon', '/fonts', '/.cache' ];
+		// The mirror of it: everything a browser loads directly - the pictures,
+		// the webfonts a stylesheet points at, the favicon set, and the bundles
+		// built out of the sources above. Kept together under the public root
+		// so the project root is code and nothing else - the tool folders stay
+		// put, since they serve their own js/css from where they are
+		public const array PUBLIC_DIRS = [ '/images', '/favicon', '/fonts', '/.cache' ];
 
 		// Map a virtual, project-relative path onto its real location on
 		// disk:
@@ -1340,7 +1349,7 @@ namespace Nino {
 		//	- everything under CONTENT_DIR is this project's own state and
 		//	  moves with NINO_CONTENT_DIR
 		//	- everything under PRIVATE_DIRS resolves against the private root
-		//	- everything else - /images, /assets, the asset cache - is public
+		//	- everything else - /images, /fonts, the asset cache - is public
 		//	  and stays where the webserver can reach it
 		//
 		private static function _resolvePath( array &$appData, string $filename ): string {
@@ -1423,15 +1432,15 @@ namespace Nino {
 		}
 
 		// The project's *private* root - config.php, templates, text,
-		// elements and data (see PRIVATE_DIRS)
+		// elements, data and the asset sources (see PRIVATE_DIRS)
 		public static function getPrivatePath( array &$appData ): string {
 
 			return $appData['./nino/filesystem/privatepath'];
 
 		}
 
-		// The project's *public content* root - images, assets, fonts, the
-		// favicon set and the generated cache (see PUBLIC_DIRS). Inside the
+		// The project's *public content* root - images, fonts, the favicon
+		// set and the generated bundles (see PUBLIC_DIRS). Inside the
 		// webroot, one level down from it, so the project root keeps only
 		// the code that runs the site
 		public static function getPublicPath( array &$appData ): string {

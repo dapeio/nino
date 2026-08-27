@@ -13,11 +13,15 @@
 	Require all denied
 </FilesMatch>
 
-# The project's private half (see \Nino\Filesystem::PRIVATE_DIRS) is only
-# ever read by php, never served - denied by private/.htaccess rather than
-# from here, since a rule written here would have to name an absolute url
-# path and would therefore miss a subdirectory install (/nino/dir). Both are
-# belt and braces next to the 403 stub each of those files carries itself.
+# The project's private half (see \Nino\Filesystem::PRIVATE_DIRS) is only ever
+# read by php, never served - the stylesheet and script sources under
+# private/assets/ included, since nothing requests one of those either: they
+# are read off disk and concatenated into public/.cache/. Denied by
+# private/.htaccess rather than from here, since a rule written here would have
+# to name an absolute url path and would therefore miss a subdirectory install
+# (/nino/dir). Both are belt and braces next to the 403 stub the php files in
+# there carry themselves - the templates and the asset sources are not php and
+# have only the two server rules.
 #
 # Its mirror, public/, is the opposite: everything in there is meant to be
 # served, and nothing else in this project root is - index.php and the tool

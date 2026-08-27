@@ -71,7 +71,7 @@ $appData['/nino/modules']								= [ '\\Nino\\Modules\\Assets', '\\Nino\\Modules
 mkdir( $sandbox. '/private/templates', 0777, true );
 mkdir( $sandbox. '/public/images', 0777, true );
 mkdir( $sandbox. '/private/text', 0777, true );
-mkdir( $sandbox. '/public/assets', 0777, true );
+mkdir( $sandbox. '/private/assets', 0777, true );
 
 \Nino\Filesystem::putFileContent( $appData, '/config.php', [
 	'/nino/error/log'					=> false,
@@ -360,7 +360,7 @@ check( 'response echoes the applied theme', $themeApplyRequest['/nino/http/respo
 
 $configAfterTheme = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
 
-check( 'copies the theme\'s own stylesheet into /assets', is_file( $sandbox. '/public/assets/style.theme.'. $themeSample. '.css' ) === true );
+check( 'copies the theme\'s own stylesheet into /assets', is_file( $sandbox. '/private/assets/style.theme.'. $themeSample. '.css' ) === true );
 check( 'copies the webfonts that stylesheet references, keeping their subdirectories', is_file( $sandbox. '/public/fonts/lato-regular.woff2' ) === true && is_file( $sandbox. '/public/fonts/exo-2.woff2' ) === true );
 check( 'never copies the picker-only preview image into the project', is_file( $sandbox. '/preview.svg' ) === false );
 check( 'persists the picked key at /nino/install/theme', ( $configAfterTheme['/nino/install/theme'] ?? null ) === $themeSample );
@@ -394,14 +394,14 @@ check( 'switching themes swaps the bundled stylesheet rather than adding a secon
 ] );
 check( '...and updates the persisted key with it', $configAfterSwitch['/nino/install/theme'] === $themeSwitch );
 check( 'copies the new theme\'s own fonts too', is_file( $sandbox. '/public/fonts/spectral-regular.woff2' ) === true );
-check( 'a file the previous theme wrote is left behind, not deleted - same additive rule as Setup\'s templates/text', is_file( $sandbox. '/public/assets/style.theme.'. $themeSample. '.css' ) === true );
+check( 'a file the previous theme wrote is left behind, not deleted - same additive rule as Setup\'s templates/text', is_file( $sandbox. '/private/assets/style.theme.'. $themeSample. '.css' ) === true );
 
 // --- Frames: the site's header/footer as interchangeable units ----------
 
 check( 'the picked frame lands where the base templates include it from', is_file( $sandbox. '/private/templates/theme.header.tpl' ) === true
 	&& is_file( $sandbox. '/private/templates/theme.footer.tpl' ) === true );
-check( '...and its own stylesheet lands in the project, bundled after the theme', is_file( $sandbox. '/public/assets/style.header.css' ) === true
-	&& is_file( $sandbox. '/public/assets/style.footer.css' ) === true );
+check( '...and its own stylesheet lands in the project, bundled after the theme', is_file( $sandbox. '/private/assets/style.header.css' ) === true
+	&& is_file( $sandbox. '/private/assets/style.footer.css' ) === true );
 check( 'the base html templates call the installed frame rather than carrying the markup', str_contains( (string) file_get_contents( __DIR__. '/../_install/library/base/templates/html-header.tpl' ), '[template /templates/theme.header]' )
 	&& str_contains( (string) file_get_contents( __DIR__. '/../_install/library/base/templates/html-footer.tpl' ), '[template /templates/theme.footer]' )
 	&& str_contains( (string) file_get_contents( __DIR__. '/../_install/library/base/templates/html-header.tpl' ), '<header' ) === false );
@@ -426,7 +426,7 @@ check( 'the installed frame really renders through [template /templates/theme.fo
 // A frame unit with no style.css of its own still gets an empty file, so the
 // bundle entry never points at something that isn't there
 $emptyStyleFrames = array_filter( glob( __DIR__. '/../_install/library/footer/*/style.css' ) ?: [], static fn( string $file ): bool => filesize( $file ) === 0 );
-check( 'a frame that ships no css of its own is still installable', $emptyStyleFrames === [] || is_file( $sandbox. '/public/assets/style.footer.css' ) === true );
+check( 'a frame that ships no css of its own is still installable', $emptyStyleFrames === [] || is_file( $sandbox. '/private/assets/style.footer.css' ) === true );
 
 // Header and Footer are their own tabs after Design. Each post changes only
 // that frame; the second one must retain the first and restore canonical
@@ -594,8 +594,8 @@ $designDefaultRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 $configAfterDesign = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
 
 check( 'a theme\'s declared design defaults are what a plain "pick and Next" applies', ( $configAfterDesign['/nino/theme/design']['primary'] ?? null ) === '#4faae8' );
-check( 'the generated stylesheet is written and carries the tokens a theme reads from', is_file( $sandbox. '/public/assets/style.design.css' ) === true
-	&& str_contains( (string) file_get_contents( $sandbox. '/public/assets/style.design.css' ), '--nino-on-alt:' ) === true );
+check( 'the generated stylesheet is written and carries the tokens a theme reads from', is_file( $sandbox. '/private/assets/style.design.css' ) === true
+	&& str_contains( (string) file_get_contents( $sandbox. '/private/assets/style.design.css' ), '--nino-on-alt:' ) === true );
 
 // The Design step reads what the Themes step just installed rather than being
 // handed it - one source for the current design, not two that can disagree
@@ -634,9 +634,9 @@ check( 'the operator\'s design beats the theme\'s defaults and is persisted whol
 ] );
 // Scale and Measure reach the stylesheet as their own tokens rather than as
 // numbers a theme has to restate
-check( '...and the root size and the layout ceiling with it', str_contains( (string) file_get_contents( $sandbox. '/public/assets/style.design.css' ), '--nino-base-size: 14px;' )
-	&& str_contains( (string) file_get_contents( $sandbox. '/public/assets/style.design.css' ), '--nino-measure: 88rem;' ) );
-check( '...and the size raster it produced is in the stylesheet', str_contains( (string) file_get_contents( $sandbox. '/public/assets/style.design.css' ), '--nino-space-1: 0.375rem;' ) );
+check( '...and the root size and the layout ceiling with it', str_contains( (string) file_get_contents( $sandbox. '/private/assets/style.design.css' ), '--nino-base-size: 14px;' )
+	&& str_contains( (string) file_get_contents( $sandbox. '/private/assets/style.design.css' ), '--nino-measure: 88rem;' ) );
+check( '...and the size raster it produced is in the stylesheet', str_contains( (string) file_get_contents( $sandbox. '/private/assets/style.design.css' ), '--nino-space-1: 0.375rem;' ) );
 check( '...and regenerating never leaves a second design entry in the bundle', count( array_keys( $configAfterPick['/nino/html/assets']['/.cache/style.css'], '/assets/style.design.css', true ) ) === 1 );
 
 $_POST['data'] = json_encode( [ 'kind' => 'header', 'frame' => 'v2' ] );

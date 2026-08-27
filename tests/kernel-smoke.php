@@ -1891,8 +1891,15 @@ $pathAppData['./nino/filesystem/contentpath'] = '/srv/site/private';
 $pathAppData['./nino/filesystem/privatepath'] = '/srv/site/private';
 $pathAppData['./nino/filesystem/publicpath'] 	= '/srv/site/public';
 
-foreach( [ '/images/hero.jpg', '/assets/style.css', '/.cache/script.js' ] as $public )
+foreach( [ '/images/hero.jpg', '/fonts/text.woff2', '/.cache/script.js' ] as $public )
 	check( "$public stays on the public root", \Nino\Filesystem::path( $pathAppData, $public ) === '/srv/site/public'. $public );
+
+/*	The one that reads like public content and is not. Nothing ever requests an
+	/assets file - Modules\Assets reads them off disk and links only the bundle
+	it writes into /.cache - so the sources sit with the templates and the text
+	they belong to, and the webroot holds only what a browser actually loads.	*/
+check( 'the asset sources are private, the bundle they build is not', \Nino\Filesystem::path( $pathAppData, '/assets/style.custom.css' ) === '/srv/site/private/assets/style.custom.css'
+	&& \Nino\Filesystem::path( $pathAppData, '/.cache/style.css' ) === '/srv/site/public/.cache/style.css' );
 
 check( 'tool code stays on the project root', \Nino\Filesystem::path( $pathAppData, '/_editor/x' ) === '/srv/site/_editor/x' );
 
@@ -1915,6 +1922,7 @@ check( '...and text, elements and data', [
 	\Nino\Filesystem::path( $pathAppData, '/elements' ),
 	\Nino\Filesystem::path( $pathAppData, '/data' ),
 ] === [ '/var/nino-private/text', '/var/nino-private/elements', '/var/nino-private/data' ] );
+check( '...and the asset sources, which are private content like the rest', \Nino\Filesystem::path( $pathAppData, '/assets/style.design.css' ) === '/var/nino-private/assets/style.design.css' );
 check( 'but leaves the public ones where the webserver reaches them', \Nino\Filesystem::path( $pathAppData, '/images/hero.jpg' ) === '/srv/site/public/images/hero.jpg' );
 
 // config.php keeps its own, older override - it wins over the private root
@@ -1935,6 +1943,15 @@ check( 'public content is reached under the public prefix', \Nino\Filesystem::ur
 check( '...including the generated bundle', \Nino\Filesystem::url( $pathAppData, '/.cache/style.css' ) === '/public/.cache/style.css' );
 check( "a tool's own bundle keeps resolving next to the tool", \Nino\Filesystem::url( $pathAppData, '/_editor/.cache/login.js' ) === '/_editor/.cache/login.js' );
 check( '...and so does any other tool file', \Nino\Filesystem::url( $pathAppData, '/_admin/assets/script.js' ) === '/_admin/assets/script.js' );
+
+/*	The two lists have to stay disjoint or path() answers whichever it tests
+	first, and a directory that is private on disk but public by url is the
+	worst of both: written where nothing serves it, linked where nothing is.	*/
+check( 'nothing is on both sides of the split', array_intersect( \Nino\Filesystem::PRIVATE_DIRS, \Nino\Filesystem::PUBLIC_DIRS ) === [] );
+// The asset sources are the one thing that looks public and is not - and the
+// invariant that lets them be private is that no caller ever builds a url for
+// one. If that ever changes, this is where it breaks first
+check( 'an asset source has no public url to be reached under', \Nino\Filesystem::url( $pathAppData, '/assets/style.custom.css' ) === '/assets/style.custom.css' );
 
 $pathAppData['/nino/dir'] = '/subdir';
 check( 'a subdirectory install carries into both', [

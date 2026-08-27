@@ -48,11 +48,11 @@ mkdir( $sandbox. '/private/templates', 0777, true );
 mkdir( $sandbox. '/private/text', 0777, true );
 mkdir( $sandbox. '/private/elements', 0777, true );
 mkdir( $sandbox. '/public/.cache', 0777, true );
-mkdir( $sandbox. '/public/assets', 0777, true );
+mkdir( $sandbox. '/private/assets', 0777, true );
 mkdir( $sandbox. '/public/fonts/text', 0777, true );
 file_put_contents( $sandbox. '/public/.cache/style.css', '/* stale-template-preview-css */' );
 file_put_contents( $sandbox. '/public/fonts/text/preview.woff2', 'preview-font' );
-file_put_contents( $sandbox. '/public/assets/style.preview.css', '/* template-preview-project-css */ @font-face{font-family:Preview;src:url("[[/nino/public]]/fonts/text/preview.woff2") format("woff2")} @font-face{font-family:Remote;src:url("https://example.invalid/remote.woff2")} .nino-section{display:block}' );
+file_put_contents( $sandbox. '/private/assets/style.preview.css', '/* template-preview-project-css */ @font-face{font-family:Preview;src:url("[[/nino/public]]/fonts/text/preview.woff2") format("woff2")} @font-face{font-family:Remote;src:url("https://example.invalid/remote.woff2")} .nino-section{display:block}' );
 
 $_SERVER['REMOTE_ADDR'] = '127.0.0.1';
 

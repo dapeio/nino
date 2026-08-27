@@ -52,7 +52,7 @@ Die mitgelieferte `.htaccess` setzt zwei grundlegende Schutzregeln, sofern der S
 - Dateien mit einem führenden Punkt werden nicht direkt ausgeliefert.
 - Verzeichnisse ohne Indexdatei zeigen keine Dateiliste.
 
-Eine dritte Regel liegt in `private/.htaccess` und sperrt dieses Verzeichnis vollständig. Sie ist die wichtigste: In `private/` liegen `config.php`, die Templates sowie die Texte und Elemente, aus denen sie rendern, und die Daten deiner Besucher. Ohne sie liefert ein Aufruf von `private/templates/page-home.tpl` den Template-Quelltext im Klartext aus.
+Eine dritte Regel liegt in `private/.htaccess` und sperrt dieses Verzeichnis vollständig. Sie ist die wichtigste: In `private/` liegen `config.php`, die Templates sowie die Texte und Elemente, aus denen sie rendern, die Daten deiner Besucher und die Stylesheet- und Skriptquellen, aus denen das Asset-Bundle gebaut wird. Ohne sie liefert ein Aufruf von `private/templates/page-home.tpl` den Template-Quelltext im Klartext aus.
 
 Prüfe in der Hosting-Konfiguration zusätzlich, wie nicht vorhandene Pfade an `index.php` übergeben werden. Eine `.htaccess`, die vom Server ignoriert wird, entfaltet keinerlei Schutzwirkung – und bei `private/` ist das keine Härtungsfrage, sondern eine Offenlegung. Wenn du dich auf `.htaccess` nicht verlassen kannst, richte stattdessen `NINO_CONTENT_DIR` in der `index.php` auf ein Verzeichnis außerhalb des Webroots; dann braucht es gar keine Serverregel.
 
@@ -83,7 +83,7 @@ Eine allgemeine Beispielkonfiguration kann die Pfade und PHP-FPM-Einstellungen e
 
 Vor der Ersteinrichtung muss PHP in der Projektwurzel Verzeichnisse und Dateien anlegen dürfen. Die noch fehlenden Projektpfade werden von `/_install` beziehungsweise bei Bedarf vom Kernel erzeugt und sind keine manuell anzulegende Voraussetzung.
 
-Im laufenden Betrieb benötigt Nino Schreibrechte nur für tatsächlich veränderliche Inhalte. Dazu gehören je nach Nutzung `private/config.php`, `private/text/`, `private/elements/`, `private/data/`, `private/.logs/`, `private/.backups/`, `public/images/` und `public/.cache/`. Der Template Builder unter `/_templates` benötigt zusätzlich `private/templates/`; er kann native Textschlüssel, Elementtypen und Bildplatz-Definitionen in der Konfiguration anlegen. Das Anwenden von Darstellungsvarianten in `/_design` benötigt `private/templates/`, `public/assets/`, `public/fonts/` sowie jedes weitere öffentliche Ziel, das ein Theme-Manifest erklärt. Der Darstellungskatalog unter `_install/library/` selbst bleibt schreibgeschützt. `/_admin` schreibt je nach Funktion unter anderem Konfiguration, Texte, Elemente und Bilder. Projektwurzel und PHP-Quellcode können ansonsten nach der Installation schreibgeschützt bleiben.
+Im laufenden Betrieb benötigt Nino Schreibrechte nur für tatsächlich veränderliche Inhalte. Dazu gehören je nach Nutzung `private/config.php`, `private/text/`, `private/elements/`, `private/data/`, `private/.logs/`, `private/.backups/`, `private/assets/`, `public/images/` und `public/.cache/`. Der Template Builder unter `/_templates` benötigt zusätzlich `private/templates/`; er kann native Textschlüssel, Elementtypen und Bildplatz-Definitionen in der Konfiguration anlegen. Das Anwenden von Darstellungsvarianten in `/_design` benötigt `private/templates/`, `private/assets/`, `public/fonts/` sowie jedes weitere Ziel, das ein Theme-Manifest erklärt. Der Darstellungskatalog unter `_install/library/` selbst bleibt schreibgeschützt. `/_admin` schreibt je nach Funktion unter anderem Konfiguration, Texte, Elemente und Bilder. Projektwurzel und PHP-Quellcode können ansonsten nach der Installation schreibgeschützt bleiben.
 
 Vergib diese Rechte an den Benutzer, unter dem PHP ausgeführt wird. Weltweit beschreibbare Rechte wie `0777` sind keine geeignete Dauerlösung. Nach dem Deployment sollten Kernel und übriger PHP-Quellcode nicht allgemein beschreibbar sein.
 
@@ -231,7 +231,7 @@ Nino befindet sich in der Beta-Phase. Sicherheitskorrekturen erscheinen auf `mai
 - [ ] PHP-Version und Erweiterungen entsprechen den Anforderungen.
 - [ ] Öffentliche Routen werden korrekt an Nino übergeben.
 - [ ] Dotfiles, Dot-Verzeichnisse und PHP-Datendateien sind nicht direkt erreichbar.
-- [ ] `private/` wird nicht ausgeliefert — die eigene `.htaccess` sperrt das Verzeichnis, und jede Datei darin trägt einen 403-Stub; prüfe, ob beides auf deinem Webserver greift, oder verlege das Verzeichnis mit `NINO_CONTENT_DIR` aus dem Webroot.
+- [ ] `private/` wird nicht ausgeliefert — die eigene `.htaccess` sperrt das Verzeichnis, und jede PHP-Datei darin trägt einen 403-Stub; prüfe, ob beides auf deinem Webserver greift, oder verlege das Verzeichnis mit `NINO_CONTENT_DIR` aus dem Webroot. Die Templates und die Asset-Quellen sind kein PHP und haben nur die Serverregel.
 - [ ] Verzeichnisauflistung ist deaktiviert.
 - [ ] `/_install` konnte die Projektverzeichnisse aus der beschreibbaren Projektwurzel selbst erzeugen.
 - [ ] Schreibrechte sind nach der Einrichtung auf die benötigten Pfade begrenzt.

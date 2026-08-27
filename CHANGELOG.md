@@ -954,6 +954,32 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **The asset sources moved out of the webroot.** `/assets` is a private
+  directory now, so a project's stylesheets and scripts live at
+  `private/assets/` next to the templates and the text they belong to, and
+  `public/` holds only what a browser actually loads: the pictures, the
+  webfonts, the favicon set and the generated bundles.
+
+  Nothing ever requested one of those files. `Modules\Assets` reads each source
+  off disk, concatenates them into `/.cache/<bundle>` and links only that -
+  `Filesystem::url()` is never handed an `/assets` path anywhere in the
+  codebase. Serving them alongside the bundle they build meant the same css
+  twice on one host, one copy of it unversioned and uncacheable, and a readable
+  preview of a project's authoring state on top: `style.custom.css` before the
+  bundle picked it up, and every theme in the catalogue that had ever been
+  applied, still sitting there.
+
+  Every write goes through `Filesystem::path()`, so `/_design`, `/_install` and
+  the theme manifests' `files` lists follow the move with no change of their
+  own; the virtual paths in a manifest, in `config.php` and in the docs are the
+  same `/assets/...` they were.
+
+  **An existing installation has to move the directory**: `mv public/assets
+  private/assets`. Left where it is, the bundle rebuilds out of files that are
+  no longer found - the sources resolve to nothing and the site comes back with
+  the framework stylesheet alone. `private/.htaccess` already denies the whole
+  tree, and the nginx equivalent in the deployment guide is unchanged.
+
 - **Harmony and Temperature are choices rather than scales.** A knob is now a
   `scale` - three positions, the middle one the framework's own - or a `choice`,
   a named list with its own default, and `choices()` publishes which. Which hue

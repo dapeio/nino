@@ -9,13 +9,14 @@
 /private/text/
 /private/elements/
 /private/data/
+/private/assets/
 /private/.auth/
 /private/.logs/
 /private/.backups/
 
 # The project's public half - everything a browser loads directly. All of it
-# is the wizard's output (themes, fonts, the favicon set) or runtime content
-# (uploaded images), never repository content
+# is the wizard's output (fonts, the favicon set, the generated css/js bundles)
+# or runtime content (uploaded images), never repository content
 /public/
 
 .DS_Store
