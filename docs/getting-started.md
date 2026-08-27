@@ -44,7 +44,7 @@ As long as the assistant is not completed, you can return to earlier steps and r
 | [7. Routes](_install.md#7-routes) | Which first pages, public paths, and metadata are created? |
 | [8. Personal Information](_install.md#8-personal-information) | Which central company and website values are available as textfills? |
 | [9. Editor Access](_install.md#9-access-for-_editor) | Which first account receives full access to `/_editor`? |
-| [10. Completion](_install.md#10-completion) | Which separate password protects `/_admin` and `/_templates` and locks the installer? |
+| [10. Completion](_install.md#10-completion) | Which separate password protects `/_admin`, `/_design`, and `/_templates` and locks the installer? |
 
 The assistant automatically resolves dependencies between selected modules and the page templates used. Theme, Design, Header, and Footer are separate consecutive decisions; after completion, no later change via `/_install` is planned.
 

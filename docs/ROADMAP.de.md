@@ -14,31 +14,29 @@ Die Dokumentation richtet sich primär an selbstständige Webentwickler und klei
 | Betreiber | Installation, Deployment, Updates, Backups und Sicherheit nachvollziehen |
 | Redakteure | Inhalte über `/_editor` ohne Programmierkenntnisse pflegen |
 
-## Geplante Dokumentstruktur
+## Dokumentstruktur
 
 | Deutsche Arbeitsfassung | Englische Hauptfassung | Inhalt | Status |
 |---|---|---|---|
-| `../README.de.md` | `../README.md` | Positionierung, Produktüberblick und Einstieg | in Arbeit |
-| `getting-started.de.md` | `getting-started.md` | vom Checkout zur fertig eingerichteten ersten Webseite | deutscher Entwurf |
-| `concepts.de.md` | `concepts.md` | AppData, Textfills, Elemente, Templates und Shortcodes | deutscher Entwurf |
+| `../README.de.md` | `../README.md` | Positionierung, Produktüberblick und Einstieg | veröffentlicht |
+| `getting-started.de.md` | `getting-started.md` | vom Checkout zur fertig eingerichteten ersten Webseite | veröffentlicht |
+| `concepts.de.md` | `concepts.md` | AppData, Textfills, Elemente, Templates und Shortcodes | veröffentlicht |
 | `design.de.md` | `design.md` | Frontend, Designsystem, CSS und praktische Template-Arbeit | **WIP** |
-| `development.de.md` | `development.md` | Architektur, Kernel, Callbacks, Module und Referenz | bestehend, neu zu gliedern |
-| `deployment.de.md` | `deployment.md` | Webserver, Go-live, Sicherheit, Backups und Updates | deutscher Entwurf |
-| `_install.de.md` | `_install.md` | notwendige Ersteinrichtung und Library-Format | bestehend, neu zu gliedern |
-| `_admin.de.md` | `_admin.md` | technische Projektverwaltung für Entwickler | unvollständig |
-| `_editor.de.md` | `_editor.md` | redaktionelle Pflege für Betreiber | bestehend, neu zu gliedern |
+| `development.de.md` | `development.md` | Architektur, Kernel, Callbacks, Module und Referenz | veröffentlicht |
+| `deployment.de.md` | `deployment.md` | Webserver, Go-live, Sicherheit, Backups und Updates | veröffentlicht |
+| `_install.de.md` | `_install.md` | notwendige Ersteinrichtung und Library-Format | veröffentlicht |
+| `_admin.de.md` | `_admin.md` | technische Projektverwaltung für Entwickler | veröffentlicht |
+| `_design.de.md` | `_design.md` | Theme, Design, Header und Footer nach der Installation | veröffentlicht (Alpha) |
+| `_templates.de.md` | `_templates.md` | sectionbasierte Komposition von Seitentemplates | veröffentlicht (Alpha) |
+| `_editor.de.md` | `_editor.md` | redaktionelle Pflege für Betreiber | veröffentlicht |
 
-## Arbeitsreihenfolge
+## Laufende Arbeitsreihenfolge
 
-1. Deutsche README abschließen.
-2. Screenshots und Alt-Texte ergänzen.
-3. Getting Started als vollständigen Erfolgsweg schreiben.
-4. Grundkonzepte aus den bestehenden Handbüchern herauslösen.
-5. Design- und Entwickler-Handbuch auf Aufgaben und Referenzen aufteilen.
-6. Deployment- und Sicherheitsweg vervollständigen.
-7. Rollenhandbücher für `/_install`, `/_admin` und `/_editor` überarbeiten.
-8. Jede freigegebene deutsche Fassung in ein stilistisch entsprechendes Englisch übertragen.
-9. Inhalte und Navigation für die spätere Dokumentationswebseite bzw. das Wiki ableiten.
+1. Deutsche und englische README einschließlich Screenshots gemeinsam pflegen.
+2. Das Design-Handbuch aus dem WIP-Status bis zu einem vollständigen Arbeitsweg ausbauen.
+3. Rollenhandbücher für `/_install`, `/_admin`, `/_design`, `/_templates` und `/_editor` bei Verhaltensänderungen paarweise aktualisieren.
+4. Technische Beispiele, Versionsangaben und Sicherheitsanforderungen regelmäßig mit dem Repository abgleichen.
+5. Inhalte und Navigation für die spätere Dokumentationswebseite beziehungsweise das Wiki ableiten.
 
 ## Veröffentlichungsregeln
 

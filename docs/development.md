@@ -9,7 +9,7 @@ This manual describes the technical work with Nino — from the entry point thro
 **Additional Links:**
 [README](../README.md) · [Concepts](concepts.md) · [Developer Manual](development.md) · [Getting Started](getting-started.md) · [`/_install` Reference](_install.md) · [`/_admin` Operation](_admin.md) · [`/_templates` Operation](_templates.md) · [`/_editor` Operation](_editor.md) · [`/_design` Operation](_design.md) · [Deployment](deployment.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
 
-**Developer Profile:** For simple websites, solid knowledge of HTML, CSS, and JavaScript as well as PHP basics is sufficient. Templates consist of HTML+, i.e., HTML with textfills and shortcodes. Only custom application logic, external interfaces, or new modules require deeper PHP knowledge. A finished project can then be largely maintained via `/_admin`, `/_templates`, and `/_editor`.
+**Developer Profile:** For simple websites, solid knowledge of HTML, CSS, and JavaScript as well as PHP basics is sufficient. Templates consist of HTML+, i.e., HTML with textfills and shortcodes. Only custom application logic, external interfaces, or new modules require deeper PHP knowledge. A finished project can then be largely maintained via `/_admin`, `/_design`, `/_templates`, and `/_editor`.
 
 ---
 
@@ -691,7 +691,7 @@ Additionally, the handler should:
 
 ## Separate Entry Points
 
-`/_admin`, `/_templates`, `/_editor`, and `/_install` use the same kernel as the frontend but each have their own `index.php`. After `\Nino\init()`, the entry point initializes its area and then hands over to the common request/response lifecycle again.
+`/_admin`, `/_design`, `/_templates`, `/_editor`, and `/_install` use the same kernel as the frontend, and each has its own `index.php`. After `\Nino\init()`, the entry point initializes its area and then hands over to the common request/response lifecycle again.
 
 ```php
 $appData = \Nino\init();
@@ -705,6 +705,7 @@ The example shows the entry point of `/_templates`; the other areas initialize t
 
 - `/_install` creates the first project state and then locks itself;
 - `/_admin` provides full access to technical structure as well as texts and elements;
+- `/_design` edits Theme, Design, Header, and Footer after installation;
 - `/_templates` creates and composes `page-*.tpl` files from complete HTML and template sections and quick-fills native content;
 - `/_editor` maintains content and operational data within account permissions.
 

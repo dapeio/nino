@@ -2,7 +2,7 @@
 
 **Language:** English · [Deutsch](README.de.md)
 
-**[Live Demo](https://demo.getnino.dev)** ·
+**[Live Demo](https://demo.getnino.dev)**
 
 ## Build websites, not programs.
 
@@ -38,15 +38,16 @@ The frontend is built from simple HTML-based templates, textfills, shortcodes, a
 The included design system, with its base components and modules, provides a quick starting point for conventional websites. Multilingual content, responsive design, performance, and security remain part of the project.
 
 ### `/_install` — a quick start for the project
+
 <a href="docs/assets/screenshots/_install1.webp" target="_blank">
   <img src="docs/assets/screenshots/_install1.webp"
-       alt="Nino Installer"
-       style="width:49%">
+       alt="Route configuration in the Nino installer"
+       width="49%">
 </a>
 <a href="docs/assets/screenshots/_install2.webp" target="_blank">
   <img src="docs/assets/screenshots/_install2.webp"
-       alt="Nino Installer"
-       style="width:49%">
+       alt="Completion screen in the Nino installer"
+       width="49%">
 </a>
 
 Every fresh checkout is configured through `/_install`. The wizard checks the environment, guides you through languages, modules, and the theme, copies the required assets, creates initial pages and basic information, and sets up access to `/_editor` and `/_admin`.
@@ -65,13 +66,13 @@ The interface provides full access for development, diagnostics, and corrections
 
 <a href="docs/assets/screenshots/_editor1.webp" target="_blank">
   <img src="docs/assets/screenshots/_editor1.webp"
-       alt="Nino Installer"
-       style="width:49%">
+       alt="Editing a localized element in Nino Editor"
+       width="49%">
 </a>
 <a href="docs/assets/screenshots/_editor2.webp" target="_blank">
   <img src="docs/assets/screenshots/_editor2.webp"
-       alt="Nino Installer"
-       style="width:49%">
+       alt="Image slot management in Nino Editor"
+       width="49%">
 </a>
 
 `/_editor` is the everyday interface for editors and site owners. It is used to maintain texts, recurring content, and images, as well as to manage form submissions, newsletter subscribers, user permissions, and logs.
@@ -79,48 +80,52 @@ The interface provides full access for development, diagnostics, and corrections
 The developer determines which content is visible and which areas an account actually needs.
 
 ### `/_templates` — optional, Alpha
+
 <a href="docs/assets/screenshots/_templates1.webp" target="_blank">
   <img src="docs/assets/screenshots/_templates1.webp"
-       alt="Nino Installer"
-       style="width:31%">
+       alt="Template overview and section canvas in the Nino Template Builder"
+       width="31%">
 </a>
 <a href="docs/assets/screenshots/_templates2.webp" target="_blank">
   <img src="docs/assets/screenshots/_templates2.webp"
-       alt="Nino Installer"
-       style="width:31%">
+       alt="Section preset library in the Nino Template Builder"
+       width="31%">
 </a>
 <a href="docs/assets/screenshots/_templates3.webp" target="_blank">
   <img src="docs/assets/screenshots/_templates3.webp"
-       alt="Nino Installer"
-       style="width:31%">
+       alt="Configuring an articles section with live preview"
+       width="31%">
 </a>
-`/_design` turns `page-*.tpl` files into a focused sequence of complete HTML and `[template]` sections. Developers can create a template, choose from different section presets, assign meaningful IDs, configure content and layout, and immediately fill native textfills or connect an Elements collection.
+
+`/_templates` turns `page-*.tpl` files into a focused sequence of complete HTML and `[template]` sections. Developers can create a template, choose from different section presets, assign meaningful IDs, configure content and layout, and immediately fill native textfills or connect an Elements collection.
 
 The Template Builder preserves ordinary HTML+ source. Standalone template shortcodes can be chosen directly through **Add section** and remain movable canvas items, while the page header and footer are ordinary `[template]` shortcodes managed safely through fixed Template Settings. A display name and VPA default live as inert metadata at the start of the file. Unrelated source remains locked and byte-identical. A deliberate HTML+ escape hatch is available for code-authored sections. The former DOM-oriented builder has been removed.
 
+> **Status: Alpha.** Preset manifests and generated `.tpl` markup are readable and extensible, but the library and composition workflow may still evolve.
+
 ### `/_design` — optional, Alpha
+
 <a href="docs/assets/screenshots/_design1.webp" target="_blank">
   <img src="docs/assets/screenshots/_design1.webp"
-       alt="Nino Installer"
-       style="width:31%">
+       alt="Theme catalogue in Nino Design"
+       width="31%">
 </a>
 <a href="docs/assets/screenshots/_design2.webp" target="_blank">
   <img src="docs/assets/screenshots/_design2.webp"
-       alt="Nino Installer"
-       style="width:31%">
+       alt="Footer frame preview in Nino Design"
+       width="31%">
 </a>
 <a href="docs/assets/screenshots/_design3.webp" target="_blank">
   <img src="docs/assets/screenshots/_design3.webp"
-       alt="Nino Installer"
-       style="width:31%">
+       alt="Colour settings and live page preview in Nino Design"
+       width="31%">
 </a>
-
-> **Status: Alpha.** Preset manifests and generated `.tpl` markup are readable and extensible, but the library and composition workflow may still evolve.
 
 `/_design` turns the site’s visual foundation into a focused set of controlled choices. Developers can select a curated Theme, switch Header and Footer frames independently, and refine the shared colour palette and layout raster while previewing the complete website.
 
 The Design tool keeps presentation separate from content and template structure. Themes and frames are installed as ordinary CSS and `.tpl` files, while custom settings are written to the project’s shared design layer. Changes can be previewed, reverted, and applied without rewriting page templates, and the resulting source remains available for precise manual refinement.
-> **Status: Alpha.** 
+
+> **Status: Alpha.** The appearance catalogue and editing workflow may still evolve.
 
 ## What Nino includes
 
@@ -158,7 +163,7 @@ By dispensing with an open plugin system and third-party runtime packages, Nino 
 
 ## Quick Start
 
-Nino requires **PHP 8.4 or newer** with the `gd` extension and `phar.ini` support for `PharData`. It starts without a package manager or build step:
+Nino requires **PHP 8.4 or newer** with the `gd`, `mbstring`, `session`, and `json` extensions plus the `PharData` class provided by `Phar`. It starts without a package manager or build step:
 
 ```bash
 git clone https://github.com/dapeio/nino.git
@@ -166,7 +171,7 @@ cd nino
 php -S 127.0.0.1:8000 router.php
 ```
 
-Then open http://127.0.0.1:8000/_install.
+Then open <http://127.0.0.1:8000/_install>.
 
 The wizard is required for a fresh checkout and creates the first working project state.
 

@@ -6,7 +6,7 @@
 
 The Template Builder is the fast path from a `page-*.tpl` file to a filled page. It treats a template as an ordered sequence of complete HTML sections and reusable `[template]` sections instead of exposing every nested DOM node.
 
-[README](../README.md) · [`/_admin` Operation](_admin.md) · [`/_templates` Operation](_templates.md) · [`/_editor` Operation](_editor.md) · [Developer Manual](development.md)
+[README](../README.md) · [`/_admin` Operation](_admin.md) · [`/_templates` Operation](_templates.md) · [`/_design` Operation](_design.md) · [`/_editor` Operation](_editor.md) · [Developer Manual](development.md)
 
 > **Alpha:** Page files remain ordinary HTML+ and therefore do not depend on the tool at runtime. The preset library and composer workflow can still change.
 

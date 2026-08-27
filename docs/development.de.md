@@ -9,7 +9,7 @@ Dieses Handbuch beschreibt die technische Arbeit mit Nino – vom Einstiegspunkt
 **Weitere Links:**
 [README](../README.de.md) · [Grundkonzepte](concepts.de.md) · [Entwickler-Handbuch](development.de.md) · [Erste Schritte](getting-started.de.md) · [`/_install`-Referenz](_install.de.md) · [`/_admin`-Bedienung](_admin.de.md) · [`/_templates`-Bedienung](_templates.de.md) · [`/_editor`-Bedienung](_editor.de.md) · [`/_design`-Bedienung](_design.de.md) · [Deployment](deployment.de.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
 
-**Entwicklerprofil:** Für einfache Webseiten reichen solide Kenntnisse in HTML, CSS und JavaScript sowie PHP-Grundlagen. Templates bestehen aus HTML+, also HTML mit Textfills und Shortcodes. Erst eigene Anwendungslogik, externe Schnittstellen oder neue Module verlangen tieferes PHP-Wissen. Ein fertiges Projekt kann anschließend weitgehend über `/_admin`, `/_templates` und `/_editor` gepflegt werden.
+**Entwicklerprofil:** Für einfache Webseiten reichen solide Kenntnisse in HTML, CSS und JavaScript sowie PHP-Grundlagen. Templates bestehen aus HTML+, also HTML mit Textfills und Shortcodes. Erst eigene Anwendungslogik, externe Schnittstellen oder neue Module verlangen tieferes PHP-Wissen. Ein fertiges Projekt kann anschließend weitgehend über `/_admin`, `/_design`, `/_templates` und `/_editor` gepflegt werden.
 
 ## Einstiegspunkt und Laufzeitmodell
 
@@ -680,7 +680,7 @@ Zusätzlich sollte der Handler:
 
 ## Separate Einstiegspunkte
 
-`/_admin`, `/_templates`, `/_editor` und `/_install` verwenden denselben Kernel wie das Frontend, besitzen aber jeweils eine eigene `index.php`. Nach `\Nino\init()` initialisiert der Einstiegspunkt seinen Bereich und übergibt anschließend wieder an den gemeinsamen Request-/Response-Lebenszyklus.
+`/_admin`, `/_design`, `/_templates`, `/_editor` und `/_install` verwenden denselben Kernel wie das Frontend und besitzen jeweils eine eigene `index.php`. Nach `\Nino\init()` initialisiert der Einstiegspunkt seinen Bereich und übergibt anschließend wieder an den gemeinsamen Request-/Response-Lebenszyklus.
 
 ```php
 $appData = \Nino\init();
@@ -694,6 +694,7 @@ Das Beispiel zeigt den Einstiegspunkt von `/_templates`; die übrigen Bereiche i
 
 - `/_install` erzeugt den ersten Projektstand und sperrt sich anschließend;
 - `/_admin` bietet vollständigen Zugriff auf technische Struktur sowie Texte und Elemente;
+- `/_design` bearbeitet Theme, Design, Header und Footer nach der Installation;
 - `/_templates` legt `page-*.tpl` an, setzt sie aus vollständigen HTML- und Template-Sections zusammen und befüllt native Inhalte schnell;
 - `/_editor` pflegt Inhalte und Betriebsdaten innerhalb der Kontoberechtigungen.
 

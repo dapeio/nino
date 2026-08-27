@@ -4,6 +4,8 @@
 	'[[/company/country]]' => 'Deutschland',
 	'[[/company/description]]' => 'Kurze Beschreibung Ihres Unternehmens.',
 
+	'[[/website/header/title/navigation]]' => 'Hauptnavigation',
+	'[[/website/footer/title/navigation]]' => 'Navigation',
 	'[[/global/adress]]' => 'Adresse',
 	'[[/global/phone]]' => 'Telefon',
 	'[[/global/email]]' => 'E-Mail',

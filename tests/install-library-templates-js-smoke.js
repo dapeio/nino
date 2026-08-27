@@ -252,6 +252,55 @@ publicTemplates.forEach( function( file ) {
 
 check( 'finished templates keep non-visual HTML semantics'+ ( semanticProblems.length === 0 ? '' : ' - '+ semanticProblems.join('; ') ), semanticProblems.length === 0 );
 
-console.log( '\n'+ checks+ ' checks, '+ failures+ ' failures' );
-if( failures > 0 )
-	process.exit(1);
+/* Frame units are installed independently of optional modules. Any textfill
+ * used by their own accessible labels therefore has to be part of base in
+ * every shipped locale, or Html::_renderFills() leaves the raw [[...]] key. */
+const frameAriaLabels = new Set();
+publicTemplates.filter( function( file ) {
+	const name = relative( file );
+	return name.includes('/header/') || name.includes('/footer/');
+} ).forEach( function( file ) {
+	const source = fs.readFileSync( file, 'utf8' );
+	for( const match of source.matchAll( /\baria-label=["'](\[\[[^"']+\]\])["']/g ) )
+		frameAriaLabels.add( match[1] );
+} );
+
+const missingBaseFrameLabels = [];
+filesBelow( path.join( LIBRARY, 'base/text' ) ).filter( function( file ) {
+	return /^[a-z]{2}_[A-Z]{2}\.php$/.test( path.basename( file ) );
+} ).forEach( function( file ) {
+	const keys = new Set( Array.from(
+		fs.readFileSync( file, 'utf8' ).matchAll( /'(\[\[[^']+\]\])'\s*=>/g ),
+		function( match ) { return match[1]; }
+	) );
+	frameAriaLabels.forEach( function( key ) {
+		if( keys.has( key ) === false )
+			missingBaseFrameLabels.push( path.basename( file )+ ': '+ key );
+	} );
+} );
+
+check( 'frame aria-label fills resolve from base without optional modules'
+	+ ( missingBaseFrameLabels.length === 0 ? '' : ' - '+ missingBaseFrameLabels.join(', ') ),
+	frameAriaLabels.size === 2 && missingBaseFrameLabels.length === 0
+);
+
+/* The social list currently renders only on footer v2. Its icons must use the
+ * text role of that surface; presentation attributes on a path or svg would
+ * override the shared CSS fill and make Console's light footer unreadable. */
+const socialMarkup = fs.readFileSync( path.join( LIBRARY, 'base/templates/html-socialmedia.tpl' ), 'utf8' );
+const fixedSocialPaint = Array.from( socialMarkup.matchAll( /\b(?:fill|stroke)=["'](?!none["']|currentColor["'])[^"']+["']/g ), function( match ) {
+	return match[0];
+} );
+const publicCss = fs.readFileSync( path.join( ROOT, '_nino/Nino.css' ), 'utf8' );
+const socialRule = publicCss.match( /\.nino-socialmedia\s*>\s*li\s*>\s*a\s*>\s*svg\s*\{([^}]*)\}/ );
+const usesFooterTextRole = socialRule !== null
+	&& /\bfill\s*:\s*var\(\s*--color-footer-text-main\s*\)\s*;?/.test( socialRule[1] )
+	&& /--color-primary-text/.test( socialRule[1] ) === false;
+
+check( 'social icons inherit the footer text role without fixed SVG paint'
+	+ ( fixedSocialPaint.length === 0 ? '' : ' - '+ fixedSocialPaint.join(', ') ),
+	fixedSocialPaint.length === 0 && usesFooterTextRole
+);
+
+console.log( '\n'+ checks+ ' checks, '+ failures+ ' failed' );
+process.exitCode = failures === 0 ? 0 : 1;

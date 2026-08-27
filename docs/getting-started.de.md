@@ -44,7 +44,7 @@ Solange der Assistent nicht abgeschlossen ist, kannst du zu früheren Schritten 
 | [7. Routes](_install.de.md#7-routes) | Welche ersten Seiten, öffentlichen Pfade und Metadaten werden angelegt? |
 | [8. Persönliche Angaben](_install.de.md#8-persönliche-angaben) | Welche zentralen Unternehmens- und Webseitenwerte stehen als Textfills bereit? |
 | [9. Editor-Zugang](_install.de.md#9-zugänge-für-_editor) | Welches erste Konto erhält vollständigen Zugriff auf `/_editor`? |
-| [10. Abschluss](_install.de.md#10-abschluss) | Welches getrennte Passwort schützt `/_admin` sowie `/_templates` und sperrt den Installer? |
+| [10. Abschluss](_install.de.md#10-abschluss) | Welches getrennte Passwort schützt `/_admin`, `/_design` sowie `/_templates` und sperrt den Installer? |
 
 Der Assistent löst Abhängigkeiten zwischen gewählten Modulen sowie den verwendeten Seitenvorlagen automatisch auf. Theme, Design, Header und Footer sind vier aufeinanderfolgende Entscheidungen; nach dem Abschluss ist keine spätere Änderung über `/_install` vorgesehen.
 

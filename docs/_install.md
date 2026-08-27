@@ -22,7 +22,7 @@ The assistant is intended for one-time initial setup. It:
 - sets the Design, Header, and Footer independently;
 - sets up the first web pages;
 - records central website information;
-- creates accesses for `/_editor` and `/_admin`; the admin access also applies to `/_templates`.
+- creates accesses for `/_editor` and `/_admin`; the admin access also applies to `/_design` and `/_templates`.
 
 `/_install` is not an update tool for a running project. After successful completion, the assistant locks itself and can be removed from production delivery.
 
@@ -168,7 +168,7 @@ virtual project paths, so `images/demo.jpg` becomes the project's public
 
 A route on the **Blank** template gets its own copy of that template, named after its Element URI: a `/team` route is created as `templates/page-team.tpl` and rendered by `[template /templates/page-team]`. Blank is the empty starting point, so every route picking it needs a page of its own — a shared file would mean editing one blank page rewrote all of them. A nested Element URI flattens into a single name (`/jobs/open` → `page-jobs-open.tpl`), because that is the shape the template pickers list. An existing file is never overwritten, so re-running this step leaves work already done in such a page alone. From then on the route owns its template and reads back as its own page rather than as the Blank unit — the same thing a page created in `/_admin` is. Every other template is a finished page and stays shared.
 
-Reserved paths such as `/_admin`, `/_editor`, `/_install`, and `/_templates` cannot be used as public pages.
+Reserved paths such as `/_admin`, `/_editor`, `/_install`, `/_design`, and `/_templates` cannot be used as public pages.
 
 ## 8. Personal Information
 

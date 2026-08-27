@@ -6,7 +6,7 @@
 
 Der Template Builder ist der schnelle Weg vom `page-*.tpl` zur befüllten Seite. Er behandelt ein Template als geordnete Abfolge vollständiger HTML-Sections und wiederverwendbarer `[template]`-Sections, statt jeden verschachtelten DOM-Knoten zur Bearbeitung anzubieten.
 
-[README](../README.de.md) · [`/_admin`-Bedienung](_admin.de.md) · [`/_templates`-Bedienung](_templates.de.md) · [`/_editor`-Bedienung](_editor.de.md) · [Entwickler-Handbuch](development.de.md)
+[README](../README.de.md) · [`/_admin`-Bedienung](_admin.de.md) · [`/_templates`-Bedienung](_templates.de.md) · [`/_design`-Bedienung](_design.de.md) · [`/_editor`-Bedienung](_editor.de.md) · [Entwickler-Handbuch](development.de.md)
 
 > **Alpha:** Seitendateien bleiben gewöhnliches HTML+ und sind zur Laufzeit nicht vom Werkzeug abhängig. Preset-Library und Composer-Ablauf können sich noch verändern.
 
@@ -201,7 +201,7 @@ umbiegen. Das Layout schreibt deshalb
 auf die tatsächlich gebundene Collection auflöst. Die Button-Reihe folgt ihr
 damit beim ersten Einfügen und nach jedem Umbiegen.
 
-## Manifest v3: benannte Areas
+### Manifest v3: benannte Areas
 
 Version 3 ersetzt das universelle Intro/Content/Outro-Modell durch semantische
 Slots des Presets. Ein Layout enthält jede deklarierte `[[area:<key>]]` genau

@@ -1645,7 +1645,7 @@ body.nino-scroll-btf .nino-back-to-top {
 .nino-socialmedia > li > a > svg {
 	width:24px;
 	height:24px;
-	fill:var(--color-primary-text)
+	fill: var(--color-footer-text-main);
 }
 
 /* Logo/Partner strip - text placeholders standing in for real logo

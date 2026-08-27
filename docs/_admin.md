@@ -69,7 +69,7 @@ Element types describe recurring content such as services, team members, or refe
 
 1. Open **Element Types** and select **New type**.
 2. Assign a technical URI. It starts with a lowercase letter and may then contain lowercase letters, digits, hyphens, and underscores, e.g., `team` or `service_items`.
-3. Assign a understandable title for display in `/_editor`.
+3. Assign an understandable title for display in `/_editor`.
 4. Add the required fields with **Add field**.
 5. Save the type.
 
@@ -236,7 +236,7 @@ There is no language switch here: a menu has nothing per-language about it, and 
 
 ## Images: Define Image Slots
 
-An image slot connects a technical URI with a understandable designation and fixed target dimensions. Editors then see these slots under **Images** in `/_editor` and can upload the actual file there.
+An image slot connects a technical URI with an understandable designation and fixed target dimensions. Editors then see these slots under **Images** in `/_editor` and can upload the actual file there.
 
 For a new slot, the following are required:
 

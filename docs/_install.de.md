@@ -22,7 +22,7 @@ Der Assistent ist für die einmalige Ersteinrichtung gedacht. Er:
 - legt Design, Header und Footer unabhängig fest;
 - richtet die ersten Webseiten ein;
 - erfasst zentrale Angaben zur Webseite;
-- erstellt Zugänge für `/_editor` und `/_admin`; der Admin-Zugang gilt zugleich für `/_templates`.
+- erstellt Zugänge für `/_editor` und `/_admin`; der Admin-Zugang gilt zugleich für `/_design` und `/_templates`.
 
 `/_install` ist kein Updatewerkzeug für ein laufendes Projekt. Nach dem erfolgreichen Abschluss sperrt sich der Assistent selbst und kann aus der produktiven Auslieferung entfernt werden.
 

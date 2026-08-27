@@ -16,7 +16,7 @@ Nino requires neither a database server nor a Composer installation on the targe
 The production system requires:
 
 - PHP 8.4 or newer;
-- `gd`, `mbstring`, `session`, `json`, `Phar`, and `PharData`;
+- the `gd`, `mbstring`, `session`, and `json` extensions plus the `PharData` class provided by `Phar`;
 - a web server that delivers public files directly and forwards dynamic requests to Nino;
 - HTTPS for all publicly accessible management interfaces;
 - a writable project root before setup so that `/_install` can create the still missing project directories.
@@ -154,7 +154,7 @@ The order is essential:
 
 1. create at least one working user for `/_editor`;
 2. set the password for `/_admin` and complete the assistant;
-3. check frontend, `/_editor`, and `/_admin`;
+3. check the frontend, `/_editor`, and `/_admin`, plus `/_design` and `/_templates` if they remain deployed;
 4. remove `_install/` from the production system.
 
 An incomplete installation does not become valid by deleting its installer.

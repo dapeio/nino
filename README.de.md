@@ -2,7 +2,7 @@
 
 **Sprache:** [English](README.md) · Deutsch
 
-**[Live Demo](https://demo.getnino.dev)** ·
+**[Live Demo](https://demo.getnino.dev)**
 
 ## Erstelle Webseiten, keine Programme.
 
@@ -39,7 +39,16 @@ Das mitgelieferte Design-System mit Basiskomponenten und Modulen bietet einen sc
 
 ### `/_install` – der schnelle Einstieg zum Projekt
 
-![Umgebungsprüfung im Installationsassistenten](docs/assets/screenshots/install.webp)
+<a href="docs/assets/screenshots/_install1.webp" target="_blank">
+  <img src="docs/assets/screenshots/_install1.webp"
+       alt="Routenkonfiguration im Nino-Installer"
+       width="49%">
+</a>
+<a href="docs/assets/screenshots/_install2.webp" target="_blank">
+  <img src="docs/assets/screenshots/_install2.webp"
+       alt="Abschlussansicht des Nino-Installers"
+       width="49%">
+</a>
 
 Jeder frische Checkout wird über `/_install` eingerichtet. Der Assistent prüft die Umgebung, führt durch Sprachen, Module und Theme, übernimmt die benötigten Assets, legt erste Seiten und Basisinformationen an und erstellt die Zugänge für `/_editor` und `/_admin`.
 
@@ -47,7 +56,7 @@ Danach kann der Entwickler direkt mit dem Projekt beginnen.
 
 ### `/_admin` – optional: die GUI für Entwickler
 
-![Dashboard der technischen Projektverwaltung](docs/assets/screenshots/admin.webp)
+![Textfill-Übersicht in Nino Admin](docs/assets/screenshots/_admin1.webp)
 
 In `/_admin` verwaltet der Entwickler die technische und inhaltliche Struktur der Webseite: Elementtypen, Elemente und Texte, Bilder, Seiten und Routen, Benutzer sowie die Konfiguration.
 
@@ -55,7 +64,16 @@ Die Oberfläche bietet vollständigen Zugriff für Entwicklung, Diagnose und Kor
 
 ### `/_editor` – optional: Inhalte einfach weiterpflegen
 
-![Dashboard der Redaktionsoberfläche](docs/assets/screenshots/editor.webp)
+<a href="docs/assets/screenshots/_editor1.webp" target="_blank">
+  <img src="docs/assets/screenshots/_editor1.webp"
+       alt="Sprachabhängiges Element in Nino Editor bearbeiten"
+       width="49%">
+</a>
+<a href="docs/assets/screenshots/_editor2.webp" target="_blank">
+  <img src="docs/assets/screenshots/_editor2.webp"
+       alt="Bildplatzverwaltung in Nino Editor"
+       width="49%">
+</a>
 
 `/_editor` ist die tägliche Oberfläche für Redakteure und Betreiber. Hier werden Texte, wiederkehrende Inhalte und Bilder gepflegt sowie Formulareingänge, Newsletter-Abonnements, Benutzerrechte und Logs verwaltet.
 
@@ -63,11 +81,51 @@ Der Entwickler legt fest, welche Inhalte sichtbar sind und welche Bereiche ein A
 
 ### `/_templates` – optional, Alpha
 
-`/_templates` macht aus `page-*.tpl`-Dateien eine übersichtliche Abfolge vollständiger HTML- und `[template]`-Sections. Entwickler können ein Template anlegen, aus 43 kuratierten Section-Presets wählen, sinnvolle IDs vergeben, Content und Layout konfigurieren und Textfills unmittelbar in der nativen Sprache befüllen oder mit einer Elements-Collection verbinden.
+<a href="docs/assets/screenshots/_templates1.webp" target="_blank">
+  <img src="docs/assets/screenshots/_templates1.webp"
+       alt="Template-Übersicht und Section-Canvas im Nino Template Builder"
+       width="31%">
+</a>
+<a href="docs/assets/screenshots/_templates2.webp" target="_blank">
+  <img src="docs/assets/screenshots/_templates2.webp"
+       alt="Section-Preset-Library im Nino Template Builder"
+       width="31%">
+</a>
+<a href="docs/assets/screenshots/_templates3.webp" target="_blank">
+  <img src="docs/assets/screenshots/_templates3.webp"
+       alt="Articles-Section mit Live-Vorschau konfigurieren"
+       width="31%">
+</a>
+
+`/_templates` macht aus `page-*.tpl`-Dateien eine übersichtliche Abfolge vollständiger HTML- und `[template]`-Sections. Entwickler können ein Template anlegen, aus verschiedenen Section-Presets wählen, sinnvolle IDs vergeben, Content und Layout konfigurieren und Textfills unmittelbar in der nativen Sprache befüllen oder mit einer Elements-Collection verbinden.
 
 Der Template Builder bewahrt normales HTML+. Alleinstehende Template-Shortcodes lassen sich direkt über **Add section** wählen und bleiben verschiebbare Canvas-Bausteine; Header und Footer sind gewöhnliche `[template]`-Shortcodes, werden aber sicher über feste Template Settings verwaltet. Anzeigename und VPA-Standard stehen als inerte Metadaten am Dateianfang. Sonstiger Quelltext bleibt gesperrt und bytegenau erhalten. Für codebasierte Sections gibt es einen bewussten HTML+-Escape-Hatch. Der frühere DOM-orientierte Builder wurde entfernt.
 
 > **Status: Alpha.** Preset-Manifeste und erzeugtes `.tpl`-Markup bleiben lesbar und erweiterbar; Library und Arbeitsablauf können sich noch weiterentwickeln.
+
+### `/_design` – optional, Alpha
+
+<a href="docs/assets/screenshots/_design1.webp" target="_blank">
+  <img src="docs/assets/screenshots/_design1.webp"
+       alt="Theme-Katalog in Nino Design"
+       width="31%">
+</a>
+<a href="docs/assets/screenshots/_design2.webp" target="_blank">
+  <img src="docs/assets/screenshots/_design2.webp"
+       alt="Footer-Frame-Vorschau in Nino Design"
+       width="31%">
+</a>
+<a href="docs/assets/screenshots/_design3.webp" target="_blank">
+  <img src="docs/assets/screenshots/_design3.webp"
+       alt="Farbeinstellungen und vollständige Live-Vorschau in Nino Design"
+       width="31%">
+</a>
+
+`/_design` macht das visuelle Fundament der Webseite über eine übersichtliche Auswahl klarer Einstellungen bearbeitbar. Entwickler können ein kuratiertes Theme wählen, Header- und Footer-Frames unabhängig voneinander wechseln und die gemeinsame Farbpalette sowie das Layout-Raster verfeinern, während sie das Ergebnis an der vollständigen Webseite in der Vorschau prüfen.
+
+Das Design-Werkzeug hält Darstellung, Inhalte und Template-Struktur voneinander getrennt. Themes und Frames werden als gewöhnliche CSS- und `.tpl`-Dateien installiert; individuelle Einstellungen werden in die gemeinsame Design-Schicht des Projekts geschrieben. Änderungen lassen sich in der Vorschau prüfen, zurücksetzen und anwenden, ohne Seitentemplates neu zu schreiben. Der resultierende Quelltext bleibt für präzise manuelle Anpassungen zugänglich.
+
+> **Status: Alpha.** Der Darstellungskatalog und der Bearbeitungsablauf können sich noch weiterentwickeln.
 
 ## Was Nino mitbringt
 
@@ -105,7 +163,7 @@ Durch den Verzicht auf ein offenes Plugin-System und fremde Laufzeitpakete reduz
 
 ## Schnellstart
 
-Nino benötigt **PHP 8.4 oder neuer** mit der `gd`-Erweiterung und `phar.ini`-Unterstützung für `PharData`. Es wird ohne Paketmanager oder Build-Schritt gestartet:
+Nino benötigt **PHP 8.4 oder neuer** mit den Erweiterungen `gd`, `mbstring`, `session` und `json` sowie der von `Phar` bereitgestellten Klasse `PharData`. Es wird ohne Paketmanager oder Build-Schritt gestartet:
 
 ```bash
 git clone https://github.com/dapeio/nino.git
@@ -113,7 +171,7 @@ cd nino
 php -S 127.0.0.1:8000 router.php
 ```
 
-Öffne anschließend http://127.0.0.1:8000/_install.
+Öffne anschließend <http://127.0.0.1:8000/_install>.
 
 Der Assistent ist für einen frischen Checkout notwendig und erzeugt den ersten lauffähigen Projektstand.
 
@@ -172,7 +230,7 @@ php tests/concurrency-smoke.php
 
 Nino hält seine Architektur bewusst klein: Ein zentrales `$appData`-Array trägt den Anwendungszustand, `$request` bleibt für HTTP-Anfrage und -Antwort zuständig, und Callbacks verbinden Kernel, Module und Templates.
 
-## Weitere Dokumente:
+## Weitere Dokumente
 
 * **[Grundkonzepte](docs/concepts.de.md):** Architektur, Datenfluss und Aufgabentrennung
 * **[Entwickler-Handbuch](docs/development.de.md):** Laufzeitverträge, APIs, Module und Tests
@@ -195,6 +253,7 @@ Nino befindet sich als Gesamtprojekt derzeit in der **Beta-Phase**. Einzelne opt
 | ------------------------------------------------ | ----------------------------------------- |
 | Kernel, Frontend und bestehende Projektgrundlage | Beta                                      |
 | `/_templates`                                    | Alpha                                     |
+| `/_design`                                       | Alpha                                     |
 
 Sicherheitskorrekturen landen direkt auf `main`; eine separate LTS-Version gibt es noch nicht.
 

@@ -302,7 +302,7 @@ events; `/nino/*` is reserved for Nino.
 ### CSS and management UI
 
 See "Designing an admin frontend" below before writing any markup or CSS for
-`/_admin`, `/_editor`, `/_install` or `/_templates`.
+`/_admin`, `/_editor`, `/_install`, `/_design` or `/_templates`.
 
 - Maintain keyboard focus, labels, error text, small viewports, coarse pointers,
   and `prefers-reduced-motion`.
@@ -328,7 +328,7 @@ one exception, because it renders `/_admin`'s login markup with `/_admin`'s own
 script. A rule written without a scope in a tool stylesheet still reaches every
 screen that file is loaded on, so keep scoping them.
 
-#### The five rules
+### The five rules
 
 1. **The shared file contains no id selectors.** An id names one element in one
    tool. A tool's own stylesheet may use ids freely - that is where one-off
@@ -352,7 +352,7 @@ screen that file is loaded on, so keep scoping them.
    `nino.local` for a deliberate final override, not every normal component
    difference.
 
-#### When adding a screen
+### When adding a screen
 
 Reach for an existing class first; only invent one when no role fits.
 
@@ -382,7 +382,7 @@ Reach for an existing class first; only invent one when no role fits.
 | Explanatory text / screen intro | `.nino-admin-hint`, `.nino-admin-hint-lead` |
 | Error text | `.nino-admin-error` |
 
-#### The shared data table
+### The shared data table
 
 `Nino.adminUi.table()` renders a sortable, searchable, paged table of records.
 Use it where the values themselves are what the screen is for; the grouped list
@@ -410,7 +410,7 @@ The pure half (`Nino.adminUi.tableModel`) is filtering, sorting, paging and cell
 formatting as plain functions — extend and test there, not in the renderer.
 `tests/nino-ui-table-js-smoke.js` covers it.
 
-#### Two traps
+### Two traps
 
 - **Never assign `className` on an element that carries a design-system class.**
   The shells carry `.nino-admin` plus their `show-<panel>` state, so switching

@@ -33,6 +33,8 @@ Kurze Absätze sind langen Einschüben vorzuziehen. Klammern bleiben für echte 
 | `_nino` | Kernel, Module und Frontend-Grundlagen |
 | `/_install` | notwendiger Assistent, der aus einem frischen Checkout die Projektverzeichnisse und den ersten lauffähigen Stand erzeugt |
 | `/_admin` | technische Verwaltung für Entwickler |
+| `/_design` | Bearbeitung von Theme, Design, Header und Footer nach der Installation |
+| `/_templates` | sectionbasierter Template Builder für Entwickler |
 | `/_editor` | redaktionelle Verwaltung für Betreiber und Redakteure |
 | Entwickler | richtet Struktur, Design und technische Funktionen ein |
 | Redakteur | pflegt Texte, Elemente und Bilder |
