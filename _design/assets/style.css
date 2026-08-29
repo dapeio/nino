@@ -20,7 +20,11 @@
 		min-width: 0;
 	}
 
-	#theme-page-wrap .theme-hidden {
+	/*	Force-hide an element regardless of its own display rules - /_design's
+		own copy of the utility every tool here keeps (.install-hidden,
+		.editor-hidden). Unscoped, because the theme lightbox is an overlay
+		outside #theme-page-wrap	*/
+	.theme-hidden {
 		display: none !important;
 	}
 
@@ -40,8 +44,8 @@
 	#theme-page-wrap #theme-grid {
 		display: grid;
 		grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
-		gap: .8rem;
-		margin-bottom: 1rem;
+		gap: .75rem;
+		margin: 0 0 1rem;
 	}
 
 	#theme-page-wrap .theme-tile {
@@ -54,13 +58,12 @@
 		background: var(--editor-bg-grouped);
 		box-shadow: var(--editor-shadow-sm);
 		cursor: pointer;
-		transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease;
+		transition: border-color .15s ease, box-shadow .15s ease;
 	}
 
 	#theme-page-wrap .theme-tile:hover {
-		border-color: color-mix(in srgb, var(--editor-blue) 38%, var(--editor-border));
+		border-color: color-mix(in srgb, var(--editor-blue) 35%, var(--editor-border));
 		box-shadow: var(--editor-shadow);
-		transform: translateY(-1px);
 	}
 
 	#theme-page-wrap .theme-tile--selected {
@@ -93,6 +96,9 @@
 		pointer-events: none;
 	}
 
+	/*	zoom-in rather than the tile's own pointer: the preview is the one
+		part of the card that does not pick the theme - it enlarges instead,
+		see design.js's _openLightbox()	*/
 	#theme-page-wrap .theme-tile-preview {
 		display: block;
 		width: 100%;
@@ -101,21 +107,22 @@
 		background: var(--editor-bg-elevated);
 		object-fit: cover;
 		object-position: top center;
+		cursor: zoom-in;
 	}
 
 	#theme-page-wrap .theme-tile-body {
 		display: flex;
 		flex-direction: column;
-		gap: .25rem;
-		padding: .85rem .9rem 1rem;
+		gap: .2rem;
+		padding: .8rem .85rem .9rem;
 	}
 
-	#theme-page-wrap .theme-tile-body strong {
-		font-size: .88rem;
-		font-weight: 700;
+	#theme-page-wrap .theme-tile-title {
+		font-size: .86rem;
+		font-weight: 650;
 	}
 
-	#theme-page-wrap .theme-tile-body > span {
+	#theme-page-wrap .theme-tile-description {
 		color: var(--editor-text-secondary);
 		font-size: .76rem;
 		line-height: 1.45;
@@ -149,18 +156,35 @@
 	#theme-page-wrap .theme-design-split {
 		display: grid;
 		grid-template-columns: minmax(0, 1fr);
-		gap: 1.25rem;
+		gap: 1.1rem;
 		/*	Both columns take the row's height, so the preview is exactly as
 			tall as the settings beside it. Stretch is the grid default - it is
 			named here because it is load-bearing rather than incidental	*/
 		align-items: stretch;
+		/*	...and the row takes what the pane has, so "as tall as the settings
+			beside it" is as tall as the tool - see the show-design rule below.
+			min-height:0 because a grid item's automatic minimum is its content,
+			which the scaled preview would push past the pane's own height	*/
+		flex: 1 1 auto;
+		min-height: 0;
 	}
 
+	/*	The Design pane is the one that is looked at rather than scrolled: the
+		preview has to end where the tool does, so the section becomes the
+		column its split stretches inside	*/
+	#theme-page-wrap.show-design #theme-content-design {
+		display: flex;
+		flex-direction: column;
+		height: 100%;
+	}
+
+	/*	No gap: the tab row carries its own bottom margin (Nino.admin.css), and
+		a gap on top of it spaced the settings off the tabs twice	*/
 	#theme-page-wrap .theme-design-controls {
 		display: flex;
 		flex-direction: column;
-		gap: .8rem;
-		padding: 1rem;
+		gap: 0;
+		padding: .9rem 1rem 1.1rem;
 		border: 1px solid var(--editor-border);
 		border-radius: var(--editor-radius);
 		background: var(--editor-bg-grouped);
@@ -192,7 +216,20 @@
 	#theme-page-wrap .theme-design-panel > div {
 		display: flex;
 		flex-direction: column;
-		gap: .8rem;
+		gap: .3rem;
+	}
+
+	/*	The two colour rows are one decision in two halves, so they sit side by
+		side rather than above one another - a full-width row for a swatch and
+		six characters of hex is a row of empty space	*/
+	#theme-page-wrap #theme-design-colours {
+		flex-direction: row;
+		flex-wrap: wrap;
+	}
+
+	#theme-page-wrap #theme-design-colours > label {
+		flex: 1 1 calc(50% - .4rem);
+		min-width: 4rem;
 	}
 
 	/*	The open panel takes what the column has spare, for the row where the
@@ -206,13 +243,19 @@
 	#theme-page-wrap .theme-design-stage {
 		display: flex;
 		flex-direction: column;
-		gap: .6rem;
+		gap: .55rem;
 		min-width: 0;
 	}
 
 	#theme-page-wrap .theme-design-modes {
 		display: flex;
 		gap: .3rem;
+	}
+
+	/*	Pushed to the far end, away from the two mode buttons: it is in the row
+		for its position, not because it is one of them	*/
+	#theme-page-wrap .theme-design-modes #theme-design-reset {
+		margin-left: auto;
 	}
 
 	#theme-page-wrap .theme-design-mode {
@@ -250,7 +293,7 @@
 	#theme-page-wrap .theme-design-port {
 		position: relative;
 		flex: 1 1 auto;
-		min-height: min(70vh, 38rem);
+		min-height: min(60vh, 32rem);
 		overflow: hidden;
 		border: 1px solid var(--editor-border);
 		border-radius: var(--editor-radius);
@@ -269,16 +312,16 @@
 
 	@media (min-width: 62rem) {
 		#theme-page-wrap .theme-design-split {
-			grid-template-columns: minmax(15rem, 20rem) minmax(0, 1fr);
+			grid-template-columns: minmax(14rem, 16rem) minmax(0, 1fr);
 		}
 	}
 
 	#theme-page-wrap .theme-field {
 		display: flex;
 		flex-direction: column;
-		gap: .32rem;
+		gap: .3rem;
 		font-size: .78rem;
-		font-weight: 650;
+		font-weight: 600;
 	}
 
 	#theme-page-wrap .theme-field small {
@@ -286,16 +329,34 @@
 		font-weight: 400;
 	}
 
+	/*	A setting that no longer matches the file, marked where the setting is
+		rather than only counted in the action bar - a count says something
+		moved, this says which. Nino.adminUi.fieldChange() sets .is-changed;
+		the bar's own count and the button beside it stay as they are.
+
+		The literal orange rather than --editor-orange: /_install marks its own
+		changed fields with exactly this value, and the two tools showing the
+		same state in two shades is the difference this was meant to close	*/
+	#theme-page-wrap .theme-field.is-changed > span:first-child:before {
+		content: "*";
+		display: inline-block;
+		padding-right: 3px;
+		transform: scale(1.5);
+		color: #ffa834;
+	}
+
+	/*	The native picker and the hex field are one control with two ways in, so
+		they sit in one box rather than reading as two separate fields	*/
 	#theme-page-wrap .theme-color-control {
 		display: flex;
 		align-items: center;
-		gap: .45rem;
+		gap: .4rem;
 	}
 
 	#theme-page-wrap .theme-color-swatch {
 		flex: 0 0 auto;
-		width: 2.5rem;
-		height: 2.15rem;
+		width: 1.4rem;
+		height: 2.1rem;
 		padding: 0;
 		border: 1px solid var(--editor-border);
 		border-radius: var(--editor-radius-sm);
@@ -366,6 +427,41 @@
 		#theme-page-wrap .nino-admin-tools {
 			flex: 1 0 100%;
 		}
+	}
+
+	/* ------------------------------------------------------------ Lightbox */
+
+	/*	One reused overlay for every tile, closed by a click anywhere or Escape
+		(see design.js). Sits outside #theme-page-wrap - and outside
+		.nino-admin - so it carries its own colours rather than the shell's.	*/
+	#theme-lightbox {
+		position: fixed;
+		inset: 0;
+		z-index: 100;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		gap: .75rem;
+		padding: 2rem 1rem;
+		background: rgba(0,0,0,.7);
+		backdrop-filter: blur(6px);
+		-webkit-backdrop-filter: blur(6px);
+		cursor: zoom-out;
+	}
+
+	#theme-lightbox-image {
+		max-width: min(60rem, 100%);
+		max-height: 80vh;
+		border-radius: var(--editor-radius);
+		box-shadow: 0 1.5rem 3rem rgba(0,0,0,.45);
+	}
+
+	#theme-lightbox-caption {
+		margin: 0;
+		color: #fff;
+		font-size: .84rem;
+		font-weight: 650;
 	}
 }
 

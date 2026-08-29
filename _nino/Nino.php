@@ -177,6 +177,13 @@ namespace Nino {
 			want, so they are its answer to give (see
 			_install/library/modules/).	*/
 		public const array DEFAULTS = [
+			// The always-on half, and only that: a unit /_install offers as a
+			// checkbox must never be listed here, or unchecking it in the
+			// wizard changes nothing and the step lies about what it controls.
+			// Form, Navigation and Localepicker are such units
+			// (_install/library/modules/*) - Setup::apiApply() adds their
+			// moduleClass when they are picked, and a page unit that needs one
+			// pulls it in through its own requiresModules.
 			'/nino/modules'		=> [
 				'\\Nino\\Modules\\Assets',
 				'\\Nino\\Modules\\Elements',
@@ -185,9 +192,6 @@ namespace Nino {
 				'\\Nino\\Modules\\Csrf',
 				'\\Nino\\Modules\\Images',
 				'\\Nino\\Modules\\Cache',
-				'\\Nino\\Modules\\Form',
-				'\\Nino\\Modules\\Navigation',
-				'\\Nino\\Modules\\Localepicker',
 			],
 			'/nino/cache/status'		=> false,
 			'/nino/cache/ttl'			=> 3600,
@@ -223,54 +227,7 @@ namespace Nino {
 		    'main',
 		    'footer',
 			],
-			'/nino/http/routes'		=> [
-			  'GET://robots.txt' => [
-			      'uri' => '/robots.txt',
-			      'body' => '[template /templates/robots]',
-			      'header' => [
-			        'Content-Type' => 'text/plain; charset=utf-8',
-			      ],
-			    ],
-			    'GET://sitemap.xml' => [
-			      'uri' => '/sitemap.xml',
-			      'body' => '[template /templates/sitemap-xml]',
-			      'header' => [
-			        'Content-Type' => 'application/xml; charset=utf-8',
-			      ],
-			    ],
-			    'GET://llms.txt' => [
-			      'uri' => '/llms.txt',
-			      'body' => '[template /templates/llms-txt]',
-			      'header' => [
-			        'Content-Type' => 'text/plain; charset=utf-8',
-			      ],
-			    ],
-			    'GET://' => [
-			      'uri' => '/home',
-			      'body' => '[template /templates/page-home]',
-			      'navs' => [
-			        'footer' => 1,
-			      ],
-			    ],
-					'GET://contact' => [
-			      'uri' => '/contact',
-			      'body' => '[template /templates/page-contact]',
-			      'navs' => [
-			      	'main' => 1,
-			        'footer' => 2,
-			      ],
-			    ],
-			    'GET://404' => [
-			      'uri' => '/404',
-			      'body' => '[template /templates/page-404]',
-			      'statusCode' => 404,
-			    ],
-			    'GET://legal' =>
-			    [
-			      'body' => '[template /templates/page-legal.[[/nino/http/response/locale]]]',
-			      'uri' => '/legal',
-			    ],
-			],
+			'/nino/http/routes'		=> [],
 			'/nino/auth/user'			=> [],
 		];
 

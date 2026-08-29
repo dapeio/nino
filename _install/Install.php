@@ -397,10 +397,22 @@ namespace Nino\Install {
 
 			$activeModules = $appData['/nino/modules'] ?? [];
 
+			/*	Whether this project has answered this step before. Its own
+				answer is the only one that counts from then on - a manifest
+				flag that kept re-checking a box the operator unchecked would
+				be a step lying about what it controls, which is the whole
+				reason the recommended set is not simply always-on in
+				AppData::DEFAULTS. Read from disk rather than from $appData,
+				which carries the defaults merged in underneath	*/
+			$decided = array_key_exists( '/nino/modules', \Nino\Filesystem::getFileContent( $appData, '/config.php', [] ) );
+
 			$modules = self::_listUnits( self::LIBRARY. '/modules' );
 			foreach( $modules as $key => &$unit ) {
 				$manifest 			= self::_readManifest( self::LIBRARY. '/modules/'. $key );
-				$unit['active'] = ( isset( $manifest['moduleClass'] ) === true && in_array( $manifest['moduleClass'], $activeModules, true ) === true ) || ( ( $manifest['active'] ?? false ) === true );
+				// Active, or - on a project that has decided nothing yet - part
+				// of the set the library recommends a site start from
+				$unit['active'] = ( isset( $manifest['moduleClass'] ) === true && in_array( $manifest['moduleClass'], $activeModules, true ) === true )
+					|| ( $decided === false && ( $manifest['preset'] ?? false ) === true );
 			}
 			unset( $unit );
 
@@ -557,7 +569,16 @@ namespace Nino\Install {
 			}
 			$appData['/nino/modules'] = array_values( array_unique( $moduleClasses ) );
 
-			$routes = $appData['/nino/http/routes'] ?? \Nino\AppData::DEFAULTS['/nino/http/routes'] ?? [];
+			/*	The persisted route array, never the live one: by the time any
+				/_install request reaches here $appData carries this request's
+				own runtime-only routes (/_install's GET/POST pair, plus
+				whatever the currently active modules self-registered at boot,
+				eg. POST://.form). Reading them here would persist them into
+				config.php - and would drop, in the same move, every route that
+				only exists on disk, a developer's own hand-written ones among
+				them. Webpages::apiApply()/apiList() read it the same way.	*/
+			$routes = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes']
+				?? \Nino\AppData::DEFAULTS['/nino/http/routes'] ?? [];
 			foreach( self::_libraryRouteKeys() as $routeKey )
 				unset( $routes[$routeKey] );
 
@@ -1906,10 +1927,27 @@ namespace Nino\Install {
 			// /_install's and the modules' own bootstrap routes
 			$routes 	= \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes'] ?? [];
 
+			$webpages = self::pages( $appData, $routes, $locales, $navs );
+
+			/*	A project that has not written a page yet opens on the starter
+				site its library declares rather than on an empty list - the
+				handful of pages a site is normally built from, already filled
+				in and ready to be edited, reordered or thrown out.
+
+				Seeded here rather than in AppData::DEFAULTS, and the
+				difference is the whole point: this is a proposal in a list
+				nothing has been written from yet, so removing an entry removes
+				it for good. A default underneath config.php is a floor, not a
+				starting value - '/nino/http/routes' merges key by key, so a
+				page deleted here or in /_admin would come back on the next
+				boot, forever.	*/
+			if( $webpages === [] )
+				$webpages = self::_presetPages( $locales, $navs );
+
 			\Nino\Http::ok( $request, [
 				'templates' 	=> self::_templates( $locales ),
 				'locales' 		=> $locales,
-				'webpages' 		=> self::pages( $appData, $routes, $locales, $navs ),
+				'webpages' 		=> $webpages,
 				'navs' 				=> $navs,
 			] );
 		}
@@ -2132,6 +2170,81 @@ namespace Nino\Install {
 					'statusCode' 	=> (int) ( $route['statusCode'] ?? 200 ),
 					'body' 				=> $body,
 					'text' 				=> $entryText,
+				];
+			}
+
+			return $pages;
+		}
+
+		/**
+		 *	The starter site: one entry per page unit whose manifest claims a
+		 *	'preset' position, in that order, in exactly the shape pages()
+		 *	produces - so the step, the form and apiApply() cannot tell a
+		 *	proposed entry from a real one and none of them needs to.
+		 *
+		 *	Built from the units' own suggestions, the same ones a template
+		 *	picked by hand starts from (see _suggestions()): the Http-URI and
+		 *	the per-locale wording each unit ships, its manifest route's menu
+		 *	membership and status code. So the library stays the single
+		 *	description of what a page is, here as everywhere else - a second
+		 *	copy of these four pages somewhere else is a second one to keep in
+		 *	step.
+		 *
+		 *	Menu membership is narrowed to the menus this project actually
+		 *	registers, which is none while the Navigation module is off - the
+		 *	same rule pages() applies to a real entry.
+		 *
+		 *	@param		array 		$locales			The active locales
+		 *	@param		array 		$navKeys			The menus this project registers
+		 *
+		 *	@return 	array									[ { uri, httpUri, libraryKey, navs, ... } ]
+		 */
+		private static function _presetPages( array $locales, array $navKeys ): array {
+
+			$units = [];
+
+			foreach( scandir( self::LIBRARY. '/pages' ) ?: [] as $entry ) {
+
+				if( $entry === '.' || $entry === '..' )
+					continue;
+
+				$manifest = self::_readManifest( self::LIBRARY. '/pages/'. $entry );
+
+				if( $manifest === null || isset( $manifest['preset'] ) === false )
+					continue;
+
+				$units[$entry] = (int) $manifest['preset'];
+			}
+
+			// By the position each unit claims, not by folder name - the order
+			// here is the order of the list, and the list is what orders the
+			// menus (see apiApply()'s 'prio')
+			asort( $units );
+
+			$pages = [];
+
+			foreach( array_keys( $units ) as $key ) {
+
+				$suggested 		= self::_suggestions( (string) $key, $locales );
+				$manifestRoute = array_values( ( self::_readManifest( self::LIBRARY. '/pages/'. $key ) ?? [] )['routes'] ?? [] )[0] ?? [];
+				$body 				= (string) ( $suggested['body'] ?? '' );
+
+				/*	The Element-URI is the unit's own name, the same one the
+					form's "new entry" builds (see webpages.js's _suggest()).
+					The Http-URI is the one the unit suggests for itself and
+					falls back to it - a unit shipping no /uri text key still
+					lands somewhere reachable rather than at ''	*/
+				$uri = '/'. $key;
+
+				$pages[] = [
+					'uri' 				=> $uri,
+					'httpUri' 		=> ( $suggested['uri'] ?? '' ) !== '' ? (string) $suggested['uri'] : $uri,
+					'template' 		=> self::_templateFromBody( $body ) ?? '',
+					'libraryKey' 	=> (string) $key,
+					'navs' 				=> array_values( array_intersect( $navKeys, $suggested['navs'] ?? [] ) ),
+					'statusCode' 	=> (int) ( $manifestRoute['statusCode'] ?? 200 ),
+					'body' 				=> $body,
+					'text' 				=> $suggested['text'] ?? [],
 				];
 			}
 

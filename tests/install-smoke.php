@@ -1059,8 +1059,33 @@ $wpLibraryBody = $wpLibraryRequest['/nino/http/response']['body'];
 
 check( 'lists every page template, one per _install/library/pages/<key>', in_array( 'home', array_keys( $wpLibraryBody['templates'] ), true ) === true && in_array( 'blank', array_keys( $wpLibraryBody['templates'] ), true ) === true && in_array( 'contact', array_keys( $wpLibraryBody['templates'] ), true ) === true );
 check( '"contact" declares it requires "forms"', $wpLibraryBody['templates']['contact']['requiresModules'] === [ 'forms' ] );
-check( 'starts with an empty list - nothing persisted yet', $wpLibraryBody['webpages'] === [] );
+/*	A project that has written no page yet opens on the starter site the
+	library declares - the pages a site is normally built from, already
+	filled in. A proposal in a list nothing has been written from yet, not a
+	default underneath config.php: see Webpages::_presetPages()	*/
+$presetUnits = array_values( array_filter( array_map(
+	static fn( string $entry ): array => [ $entry, ( @include __DIR__. '/../_install/library/pages/'. $entry. '/manifest.php' ) ?: [] ],
+	array_values( array_diff( scandir( __DIR__. '/../_install/library/pages' ) ?: [], [ '.', '..' ] ) ) ),
+	static fn( array $unit ): bool => isset( $unit[1]['preset'] ) ) );
+usort( $presetUnits, static fn( array $a, array $b ): int => $a[1]['preset'] <=> $b[1]['preset'] );
+$presetKeys = array_map( static fn( array $unit ): string => $unit[0], $presetUnits );
+
+check( 'starts on the starter site the library declares, in the order its units claim',
+	array_column( $wpLibraryBody['webpages'], 'libraryKey' ) === $presetKeys );
+// Derived from the units rather than restated here: a page added to or
+// dropped from the starter set is one manifest key, not an edit in two places
+check( '...which is the handful a site is normally built from', count( array_intersect( [ 'home', 'contact', '404', 'legal' ], $presetKeys ) ) === 4 );
+check( '...each carrying its own suggested Http-URI, not its folder name', ( $wpLibraryBody['webpages'][0]['httpUri'] ?? null ) === '/'
+	&& ( $wpLibraryBody['webpages'][0]['uri'] ?? null ) === '/home' );
+check( '...its own per-locale wording rather than the generic fallback', ( $wpLibraryBody['webpages'][0]['text']['de_DE']['name'] ?? null ) === 'Startseite'
+	&& ( $wpLibraryBody['webpages'][0]['text']['en_US']['name'] ?? null ) === 'Home' );
+// The one field no form offers and apiApply() takes straight off the entry
+check( '...and the status code its manifest route declares', ( array_values( array_filter( $wpLibraryBody['webpages'],
+	static fn( array $e ): bool => $e['libraryKey'] === '404' ) )[0]['statusCode'] ?? null ) === 404 );
 check( 'no navigations are offered - Navigation was never picked', $wpLibraryBody['navs'] === [] );
+// ...so the proposal carries no menu membership either, the same rule a real
+// entry goes through
+check( '...and no proposed page claims one', array_filter( array_column( $wpLibraryBody['webpages'], 'navs' ) ) === [] );
 
 // Each template also reports the starter wording its own text fragments
 // ship, so the form can prefill a new entry per locale instead of leaving
@@ -1277,6 +1302,33 @@ check( 'dropping "kontakt"/"impressum" removes their routes (replace, not merge)
 check( 'the home route survives, still keyed the same way', isset( $configAfterDrop['/nino/http/routes']['GET://'] ) === true );
 check( 'a hand-written route still survives this replace too', isset( $configAfterDrop['/nino/http/routes']['GET://custom'] ) === true );
 check( '/website/legal/uri is only ever set, never cleared - known v1 limitation, see docs/_install.md', ( \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] )['[[/website/legal/uri]]'] ?? null ) === '/impressum' );
+
+/*	...and the starter site stays gone. The one property that separates a
+	proposal in the step's list from a default underneath config.php: this
+	project has decided which pages it has, so reopening the step shows that
+	decision rather than putting the four back. Seeded in AppData::DEFAULTS
+	the dropped pages would be merged in again on the very next boot	*/
+$reopenWpRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Install\Webpages::apiList( $appData, $reopenWpRequest );
+$reopened = $reopenWpRequest['/nino/http/response']['body']['webpages'] ?? [];
+
+check( 'reopening the step shows the pages this project kept, not the starter site again',
+	array_column( $reopened, 'httpUri' ) === [ '/' ] );
+
+// The same rule one step earlier: a unit the library recommends is only ever
+// the opening position, never an answer that outlives the operator's own
+$_POST['data'] = json_encode( [ 'locales' => [ 'de_DE', 'en_US' ], 'modules' => [] ] );
+$declineRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Install\Setup::apiApply( $appData, $declineRequest );
+
+$reopenSetupRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Install\Setup::apiLibrary( $appData, $reopenSetupRequest );
+$reopenedModules = $reopenSetupRequest['/nino/http/response']['body']['modules'] ?? [];
+
+check( 'a recommended module the operator unchecked stays unchecked when the step reopens',
+	array_keys( array_filter( $reopenedModules, static fn( array $unit ): bool => $unit['active'] === true ) ) === [] );
+check( '...while the library still recommends it for the next fresh project',
+	( ( include __DIR__. '/../_install/library/modules/navigation/manifest.php' )['preset'] ?? false ) === true );
 
 echo "\n";
 

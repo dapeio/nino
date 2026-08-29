@@ -1,4 +1,8 @@
 <?php return [
+	// Checked when the Setup step opens on a project that has decided
+	// nothing yet. Only the opening position - once Setup has applied once,
+	// the operator's own answer is the only one that counts
+	'preset' 		=> true,
 	'label' 			=> 'Navigation',
 	'moduleClass' => '\\Nino\\Modules\\Navigation',
 	// The menus /_install and /_admin offer a checkbox for. Only an editing

@@ -51,20 +51,23 @@
 							</div>
 
 							<div class="nino-admin-tabpanel theme-design-panel" role="tabpanel" id="theme-design-panel-colour" aria-labelledby="theme-design-tab-colour">
-								<label class="theme-field" id="theme-design-primary-field">
-									<span>Primary</span>
-									<span class="theme-color-control">
-										<input type="color" id="theme-design-primary" class="theme-color-swatch">
-										<input type="text" id="theme-design-primary-hex" class="nino-admin-input" inputmode="text" spellcheck="false" autocomplete="off" maxlength="7">
-									</span>
-								</label>
-								<label class="theme-field" id="theme-design-secondary-field">
-									<span>Secondary <small>overrides Harmony</small></span>
-									<span class="theme-color-control">
-										<input type="color" id="theme-design-secondary" class="theme-color-swatch">
-										<input type="text" id="theme-design-secondary-hex" class="nino-admin-input" inputmode="text" spellcheck="false" autocomplete="off" maxlength="7" placeholder="solved from Harmony">
-									</span>
-								</label>
+								<div id="theme-design-colours">
+									<label class="theme-field" id="theme-design-primary-field">
+										<span>Primary</span>
+										<span class="theme-color-control">
+											<input type="color" id="theme-design-primary" class="theme-color-swatch">
+											<input type="text" id="theme-design-primary-hex" class="nino-admin-input" inputmode="text" spellcheck="false" autocomplete="off" maxlength="7">
+										</span>
+									</label>
+									<label class="theme-field" id="theme-design-secondary-field">
+										<span>Secondary</span>
+										<span class="theme-color-control">
+											<input type="color" id="theme-design-secondary" class="theme-color-swatch">
+											<input type="text" id="theme-design-secondary-hex" class="nino-admin-input" inputmode="text" spellcheck="false" autocomplete="off" maxlength="7" placeholder="auto">
+										</span>
+										<small>overrides Harmony</small>
+									</label>
+								</div>
 								<div id="theme-design-knobs-colour"></div>
 							</div>
 
@@ -77,6 +80,11 @@
 							<div class="theme-design-modes" role="group" aria-label="Preview mode">
 								<button type="button" id="theme-design-mode-light" class="theme-design-mode is-active" aria-pressed="true">Light</button>
 								<button type="button" id="theme-design-mode-dark" class="theme-design-mode" aria-pressed="false">Dark</button>
+								<!--	The way back out, at the top of the settings it undoes
+											rather than at the foot of the pane - the same place
+											/_install keeps it. Present only while there is
+											something to discard, see design.js's _updateAction	-->
+								<button type="button" id="theme-design-reset" class="nino-admin-btn-secondary" hidden>Back to the theme&rsquo;s values</button>
 							</div>
 							<!--	Sandboxed, and delivered as a document rather than
 										spliced in: the example styles bare element selectors
@@ -108,12 +116,15 @@
 
 			<div class="nino-admin-actionbar">
 				<p id="theme-action-status" class="nino-admin-actionbar-status" role="status" aria-live="polite"></p>
-				<!--	The way back out of an unsaved state, beside the way
-							forward through it. Present only while the Design pane has
-							something to discard - see design.js's _updateAction	-->
-				<button type="button" class="nino-admin-btn-secondary" id="theme-action-revert" hidden>Revert</button>
 				<button type="button" class="nino-admin-btn-primary" id="theme-action-save">Apply Theme</button>
 			</div>
+		</div>
+
+		<!-- Theme preview lightbox - a single, reused overlay filled by
+		     design.js rather than one per tile, see its _openLightbox() -->
+		<div id="theme-lightbox" class="theme-hidden">
+			<img id="theme-lightbox-image" src="" alt="">
+			<p id="theme-lightbox-caption"></p>
 		</div>
 		<script src="[[/nino/dir]]/_nino/Nino.js"></script>
 		<script src="[[/nino/dir]]/_nino/Nino.admin.js"></script>

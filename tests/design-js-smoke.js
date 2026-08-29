@@ -89,7 +89,7 @@ function element( id, tag ) {
 const nodes = {};
 [
 	'theme-page-wrap', 'theme-pane', 'theme-grid', 'theme-empty',
-	'theme-action-status', 'theme-action-save', 'theme-action-revert',
+	'theme-action-status', 'theme-action-save', 'theme-design-reset',
 	'theme-nav-theme', 'theme-nav-design', 'theme-nav-header', 'theme-nav-footer',
 	'theme-design-controls', 'theme-design-example', 'theme-design-example-port',
 	'theme-design-mode-light', 'theme-design-mode-dark',
@@ -264,7 +264,7 @@ check( 'the example is delivered whole, as a document into the sandboxed frame',
 // A pane that matches the file has nothing to write and nothing to discard,
 // and says so with both of its buttons rather than with neither
 check( 'Design opens clean, with nothing to save and nothing to revert', nodes['theme-action-save'].disabled === true
-	&& nodes['theme-action-revert'].hidden === true );
+	&& nodes['theme-design-reset'].hidden === true );
 
 /*	A preview panel is around 800px wide and Nino's narrowest content ceiling
 	is wider than that, so every Width setting used to render identically - the
@@ -355,7 +355,7 @@ check( 'an unsaved change is counted in the bar and named in its own field', nod
 	&& nodes['theme-action-status'].classList.contains('theme-status-dirty') === true
 	&& fieldMark('spacing') === true
 	&& fieldMark('shaping') === false );
-check( '...and the way back out is offered beside the way through', nodes['theme-action-revert'].hidden === false
+check( '...and the way back out is offered at the top of the settings it undoes', nodes['theme-design-reset'].hidden === false
 	&& nodes['theme-action-save'].disabled === false );
 
 /*	The defect this pane had: opening another dialog and coming back re-read
@@ -372,11 +372,11 @@ check( 'leaving Design and returning keeps the unsaved settings rather than re-r
 // Knowing something is unsaved is only useful next to a way back that is not
 // "remember where ten settings were"
 posts.length = 0;
-nodes['theme-action-revert'].fire('click');
-check( 'Revert puts every control back on the stored value and clears the marks', theme._designSettings.spacing === 2
+nodes['theme-design-reset'].fire('click');
+check( 'the way back out puts every control back on the stored value and clears the marks', theme._designSettings.spacing === 2
 	&& knobSelect( 'theme-design-knobs-raster', 2 ).value === '2'
 	&& fieldMark('spacing') === false
-	&& nodes['theme-action-revert'].hidden === true
+	&& nodes['theme-design-reset'].hidden === true
 	&& nodes['theme-action-save'].disabled === true );
 check( '...and asks for the picture that produces', posts.length === 1
 	&& posts[0].action === 'design/preview'
@@ -442,7 +442,7 @@ check( 'Design save posts the settings directly and only to design/save', design
 	&& typeof designSave.payload.header === 'undefined' );
 check( 'a written Design is a clean one', nodes['theme-action-status'].textContent === 'Design written.'
 	&& nodes['theme-action-save'].disabled === true
-	&& nodes['theme-action-revert'].hidden === true
+	&& nodes['theme-design-reset'].hidden === true
 	&& fieldMark('primary') === false );
 
 // Header and Footer each preview and apply one frame only.
@@ -498,6 +498,30 @@ check( 'all authenticated tools mount the same availability-aware bridge',
 check( 'the local stylesheet has an explicit visibility contract for all four panes', [ 'theme', 'design', 'header', 'footer' ].every( function( tab ) {
 	return css.indexOf('#theme-page-wrap.show-'+ tab+ ' #theme-content-'+ tab) !== -1;
 } ) );
+
+/*	The two places this tool used to differ from the same settings in
+	/_install, both of them things the operator reads rather than presses:
+	where the way back out sits, and whether a moved setting says so in its
+	own row	*/
+const installCss 			= fs.readFileSync( path.join( __dirname, '../_install/assets/style.css' ), 'utf8' );
+const installTemplate = fs.readFileSync( path.join( __dirname, '../_install/templates/page-wizard.tpl' ), 'utf8' );
+
+check( 'the way back out sits in the Design pane, not in the shared action bar', template.indexOf('id="theme-design-reset"') !== -1
+	&& template.indexOf('id="theme-design-reset"') < template.indexOf('class="nino-admin-actionbar"')
+	&& ( template.match(/id="theme-action-save"/g) || [] ).length === 1 );
+// ...at the far end of the mode row, the same way /_install places its own
+check( '...pushed to the far end of the mode row, as /_install places it', css.indexOf('.theme-design-modes #theme-design-reset') !== -1
+	&& installCss.indexOf('.install-design-modes #design-reset') !== -1 );
+check( '...and carries the same words the wizard\'s does', template.indexOf('Back to the theme&rsquo;s values') !== -1
+	&& installTemplate.indexOf('Back to the theme&rsquo;s values') !== -1 );
+
+/*	Marked in the field, not only counted in the bar. Nino.adminUi.
+	fieldChange() sets .is-changed on every field this tool renders, so the
+	mark is a stylesheet rule rather than anything the pane has to remember	*/
+check( 'a changed setting is marked in its own row, in the orange /_install uses', css.indexOf('.theme-field.is-changed > span:first-child:before') !== -1
+	&& /\.theme-field\.is-changed > span:first-child:before \{[^}]*content: *"\*"/.test( css ) === true
+	&& /\.theme-field\.is-changed > span:first-child:before \{[^}]*#ffa834/.test( css ) === true
+	&& /\.install-theme-field\.is-changed > span:first-child:before \{[^}]*#ffa834/.test( installCss ) === true );
 
 console.log( '\n'+ checks+ ' checks, '+ failures+ ' failed' );
 process.exit( failures === 0 ? 0 : 1 );

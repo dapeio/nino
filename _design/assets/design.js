@@ -89,9 +89,21 @@
 			if( save !== null )
 				save.addEventListener( 'click', Nino.design._applyCurrent );
 
-			const revert = dc.getElementById('theme-action-revert');
+			const revert = dc.getElementById('theme-design-reset');
 			if( revert !== null )
 				revert.addEventListener( 'click', Nino.design._revertDesign );
+
+			/*	The theme preview overlay: a click anywhere on it or Escape
+				closes it, which are the two gestures an overlay with no
+				chrome of its own can be expected to answer	*/
+			const lightbox = dc.getElementById('theme-lightbox');
+			if( lightbox !== null ) {
+				lightbox.addEventListener( 'click', Nino.design.closeLightbox );
+				dc.addEventListener( 'keydown', function( event ) {
+					if( event.key === 'Escape' )
+						Nino.design.closeLightbox();
+				} );
+			}
 
 			/*	The one loss this pane cannot undo afterwards. Everything else
 				it does is a request the operator can repeat; a closed tab with
@@ -238,13 +250,25 @@
 					preview.src = data.preview;
 					preview.alt = ( data.label || key )+ ' preview';
 					preview.loading = 'lazy';
+
+					/*	The tile is a <label>, so a plain click here would also
+						toggle the radio - enlarging a preview is deliberately not
+						the same gesture as picking the theme it belongs to. A
+						tile is 12rem wide, which is where a theme's layout and
+						type stop being legible at all	*/
+					preview.addEventListener( 'click', function( event ) {
+						event.preventDefault();
+						Nino.design._openLightbox( key, data );
+					} );
+
 					tile.appendChild( preview );
 				}
 
 				const body = dc.createElement('span');
 				body.className = 'theme-tile-body';
 
-				const title = dc.createElement('strong');
+				const title = dc.createElement('span');
+				title.className = 'theme-tile-title';
 				title.textContent = data.label || key;
 				body.appendChild( title );
 
@@ -257,6 +281,7 @@
 
 				if( data.description ) {
 					const description = dc.createElement('span');
+					description.className = 'theme-tile-description';
 					description.textContent = data.description;
 					body.appendChild( description );
 				}
@@ -264,6 +289,52 @@
 				tile.appendChild( body );
 				grid.appendChild( tile );
 			} );
+		},
+
+		/**
+		 *	Show one theme's preview at a size its layout and type can be read
+		 *	at. One reused overlay filled here rather than one per tile - see
+		 *	page-index.tpl's #theme-lightbox
+		 *
+		 *	@param		{string}	key				The theme's catalogue key
+		 *	@param		{Object}	data			{ label, description, preview }
+		 *
+		 *	@return		void
+		 */
+		_openLightbox : function( key, data ) {
+
+			const box = dc.getElementById('theme-lightbox');
+			if( box === null )
+				return;
+
+			const image = dc.getElementById('theme-lightbox-image');
+			const caption = dc.getElementById('theme-lightbox-caption');
+			const label = data.label || key;
+
+			if( image !== null ) {
+				image.src = data.preview;
+				image.alt = label+ ' preview';
+			}
+
+			if( caption !== null )
+				caption.textContent = label;
+
+			box.classList.remove('theme-hidden');
+		},
+
+		closeLightbox : function() {
+
+			const box = dc.getElementById('theme-lightbox');
+			if( box === null )
+				return;
+
+			box.classList.add('theme-hidden');
+
+			// The overlay stays in the document, so the image it last showed
+			// would stay decoded and would flash on the next open
+			const image = dc.getElementById('theme-lightbox-image');
+			if( image !== null )
+				image.src = '';
 		},
 
 		_renderFrames : function() {
@@ -670,7 +741,7 @@
 
 			Nino.design._designSettings = Nino.design._clone( Nino.design._designStored );
 			Nino.design._writeDesignInputs();
-			Nino.design._setStatus( 'design', 'Back to the saved Design.', false );
+			Nino.design._setStatus( 'design', 'Back to the theme\u2019s own values.', false );
 			Nino.design._changed();
 		},
 
@@ -875,7 +946,7 @@
 
 			const status = dc.getElementById('theme-action-status');
 			const save = dc.getElementById('theme-action-save');
-			const revert = dc.getElementById('theme-action-revert');
+			const revert = dc.getElementById('theme-design-reset');
 			const tab = Nino.design._tab;
 			const changed = tab === 'design' && Nino.design._designReady === true ? Nino.design._designChanges().length : 0;
 
@@ -919,7 +990,7 @@
 
 			// Both ways out of an unsaved state, not just the one: a revert
 			// landing mid-write would race the answer it is reverting from
-			const revert = dc.getElementById('theme-action-revert');
+			const revert = dc.getElementById('theme-design-reset');
 			if( revert !== null ) revert.disabled = busy === true;
 		},
 
