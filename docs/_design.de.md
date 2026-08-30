@@ -2,7 +2,7 @@
 
 **Sprache:** [English](_design.md) · Deutsch
 
-**Letzte Aktualisierung:** 22. August 2026 · **Nino-Version:** 0.11.0-beta.1
+**Letzte Aktualisierung:** 22. August 2026 · **Nino-Version:** 0.12.0-beta
 
 Diese Anleitung erklärt die vier Darstellungsdialoge unter `/_design`: Theme, Design, Header und Footer. Der strukturelle Seitenaufbau ist in der [`/_templates`-Bedienung](_templates.de.md) beschrieben, die tägliche Inhaltspflege in der [`/_editor`-Bedienung](_editor.de.md).
 

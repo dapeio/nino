@@ -2,7 +2,7 @@
 
 **Sprache:** [English](_admin.md) · Deutsch
 
-**Stand:** 22. August 2026 · **Nino-Version:** 0.11.0-beta.1
+**Stand:** 22. August 2026 · **Nino-Version:** 0.12.0-beta
 
 Dieses Handbuch erklärt die vollständige technische und inhaltliche Projektverwaltung unter `/_admin`. Falls du stattdessen nur freigegebene Inhalte im Alltag pflegen möchtest, lies die [`/_editor`-Bedienungsanleitung](_editor.de.md); die schnelle sectionbasierte Seitenkomposition beschreibt die [`/_templates`-Bedienung](_templates.de.md).
 

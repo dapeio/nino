@@ -2,7 +2,7 @@
 
 **Language:** English · [Deutsch](getting-started.de.md)
 
-**Last updated:** August 21, 2026 · **Nino version:** 0.11.0-beta.1
+**Last updated:** August 21, 2026 · **Nino version:** 0.12.0-beta
 
 This guide leads you on the shortest path from a fresh checkout to a locally running Nino website. If you instead want to look up every field and writing process of the assistant, read the [`/_install` Reference](_install.md); technical backgrounds are explained in the [Concepts](concepts.md).
 

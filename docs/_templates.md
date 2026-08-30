@@ -2,7 +2,7 @@
 
 **Language:** English · [Deutsch](_templates.de.md)
 
-**Status:** 22 August 2026 · **Nino version:** Unreleased
+**Last updated:** August 22, 2026 · **Nino version:** 0.12.0-beta
 
 The Template Builder is the fast path from a `page-*.tpl` file to a filled page. It treats a template as an ordered sequence of complete HTML sections and reusable `[template]` sections instead of exposing every nested DOM node.
 

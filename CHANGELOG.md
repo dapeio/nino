@@ -4,6 +4,23 @@ All notable changes to Nino are documented in this file.
 
 ## Unreleased
 
+No unreleased changes yet.
+
+## 0.12.0-beta — 2026-08-30
+
+Appearance tooling, project layout, optional search and caching, and the
+removal of every pre-1.0 compatibility path.
+
+> Nino remains in beta. The optional Template Builder under `/_templates`
+> is released as an alpha feature. Its interface, block library, and
+> workflows may still change significantly.
+>
+> This release is not backward compatible with projects built on an earlier
+> version. The frontend speaks one `nino-*` class namespace, the Design
+> settings key is `/nino/design/settings`, the project tree lives under
+> `private/`, and every legacy path and compatibility fallback has been
+> removed. Read **Changed** before updating an existing project.
+
 ### Added
 
 - Five new Design settings.

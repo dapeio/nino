@@ -2,7 +2,7 @@
 
 **Language:** English · [Deutsch](concepts.de.md)
 
-**Last updated:** August 21, 2026 · **Nino version:** 0.11.0-beta.1
+**Last updated:** August 21, 2026 · **Nino version:** 0.12.0-beta
 
 This manual explains the architecture of Nino and the interaction of configuration, data, templates, and modules. If you instead want to set up a website directly, start with [Getting Started](getting-started.md); concrete APIs and implementation details are in the [Developer Manual](development.md).
 

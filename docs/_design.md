@@ -2,7 +2,7 @@
 
 **Language:** English · [Deutsch](_design.de.md)
 
-**Last updated:** August 22, 2026 · **Nino version:** 0.11.0-beta.1
+**Last updated:** August 22, 2026 · **Nino version:** 0.12.0-beta
 
 This manual explains the four appearance editors under `/_design`: Theme, Design, Header, and Footer. Structural page composition is described in the [`/_templates` Operation Manual](_templates.md); day-to-day content maintenance in the [`/_editor` Operation Manual](_editor.md).
 

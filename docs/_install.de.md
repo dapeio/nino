@@ -2,7 +2,7 @@
 
 **Sprache:** [English](_install.md) · Deutsch
 
-**Stand:** 21. August 2026 · **Nino-Version:** 0.11.0-beta.1
+**Stand:** 21. August 2026 · **Nino-Version:** 0.12.0-beta
 
 Dieses Handbuch erklärt die Entscheidungen und Schreibvorgänge der zehn Schritte von `/_install`. Falls du stattdessen auf dem kürzesten Weg vom Checkout zur eingerichteten Webseite gelangen möchtest, beginne mit [Erste Schritte](getting-started.de.md); den späteren produktiven Betrieb behandelt [Deployment](deployment.de.md).
 

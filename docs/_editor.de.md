@@ -2,7 +2,7 @@
 
 **Sprache:** [English](_editor.md) · Deutsch
 
-**Stand:** 8. August 2026 · **Nino-Version:** 0.11.0-beta.1
+**Stand:** 8. August 2026 · **Nino-Version:** 0.12.0-beta
 
 Dieses Handbuch erklärt die tägliche Arbeit mit freigegebenen Texten, Elementen, Bildern, Nutzern und Betriebsdaten unter `/_editor`. Falls du vollständigen technischen und inhaltlichen Zugriff benötigst, lies die [`/_admin`-Bedienungsanleitung](_admin.de.md); die strukturelle Bearbeitung von Templates beschreibt die [`/_templates`-Bedienung](_templates.de.md).
 

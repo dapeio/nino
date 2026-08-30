@@ -2,7 +2,7 @@
 
 **Language:** English · [Deutsch](deployment.de.md)
 
-**Last updated:** August 21, 2026 · **Nino version:** 0.11.0-beta.1
+**Last updated:** August 21, 2026 · **Nino version:** 0.12.0-beta
 
 This manual guides a fully developed Nino website into production. If you instead want to set up a fresh project, start with [Getting Started](getting-started.md); technical extensions are covered in the [Developer Manual](development.md).
 

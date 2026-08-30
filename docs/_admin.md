@@ -2,7 +2,7 @@
 
 **Language:** English · [Deutsch](_admin.de.md)
 
-**Last updated:** August 22, 2026 · **Nino version:** 0.11.0-beta.1
+**Last updated:** August 22, 2026 · **Nino version:** 0.12.0-beta
 
 This manual explains the complete technical and content project management under `/_admin`. If you instead only want to maintain released content on a daily basis, read the [`/_editor` Operation Manual](_editor.md); fast section-based page composition is described in the [`/_templates` Operation](_templates.md).
 

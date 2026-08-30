@@ -2,7 +2,7 @@
 
 **Sprache:** [English](getting-started.md) · Deutsch
 
-**Stand:** 21. August 2026 · **Nino-Version:** 0.11.0-beta.1
+**Stand:** 21. August 2026 · **Nino-Version:** 0.12.0-beta
 
 Dieses Handbuch führt auf dem kürzesten Weg von einem frischen Checkout zu einer lokal laufenden Nino-Webseite. Falls du stattdessen jedes Feld und jeden Schreibvorgang des Assistenten nachschlagen möchtest, lies die [`/_install`-Referenz](_install.de.md); technische Hintergründe stehen in den [Grundkonzepten](concepts.de.md).
 

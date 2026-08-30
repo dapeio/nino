@@ -2,7 +2,7 @@
 
 **Sprache:** [English](concepts.md) · Deutsch
 
-**Stand:** 21. August 2026 · **Nino-Version:** 0.11.0-beta.1
+**Stand:** 21. August 2026 · **Nino-Version:** 0.12.0-beta
 
 Dieses Handbuch erklärt die Architektur von Nino und das Zusammenspiel von Konfiguration, Daten, Templates und Modulen. Falls du stattdessen direkt eine Webseite einrichten möchtest, beginne mit [Erste Schritte](getting-started.de.md); konkrete APIs und Implementierungsdetails stehen im [Entwickler-Handbuch](development.de.md).
 

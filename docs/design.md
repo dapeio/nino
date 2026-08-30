@@ -2,7 +2,7 @@
 
 **Language:** English · [Deutsch](design.de.md)
 
-**Status:** August 8, 2026 · **Status:** **Work in Progress**
+**Last updated:** August 8, 2026 · **Status:** **Work in Progress**
 
 > **Note:** This manual is currently being revised. Until completion, please use the information from:
 > - **[Developer Manual](development.md)** (for backend integration)

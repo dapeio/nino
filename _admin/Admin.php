@@ -2228,7 +2228,7 @@ namespace Nino\Admin {
 		private const array GROUPS = [
 			'diagnostics'	=> [ 'Errors and diagnostics', 'What happens when php raises an error, and how the session cookie is issued.' ],
 			'auth' 				=> [ 'Login protection', 'The throttle that sits in front of /_editor and /_admin.' ],
-			'editor' 			=> [ 'Editor features', 'Background work /_editor does on its own. Both were silently on in every project before 0.11.1 - see the changelog.' ],
+			'editor' 			=> [ 'Editor features', 'Background work /_editor does on its own. Both were silently on in every project before 0.12.0-beta - see the changelog.' ],
 			'cache' 			=> [ 'Page cache', 'Serving a stored copy skips the render. Off by default - switch it on once the site is finished, not while building it.' ],
 			'locales' 		=> [ 'Languages', 'Which languages exist, and which one a visitor gets before choosing.' ],
 		];

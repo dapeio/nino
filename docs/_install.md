@@ -2,7 +2,7 @@
 
 **Language:** English · [Deutsch](_install.de.md)
 
-**Last updated:** August 21, 2026 · **Nino version:** 0.11.0-beta.1
+**Last updated:** August 21, 2026 · **Nino version:** 0.12.0-beta
 
 This manual explains the decisions and writing processes of the ten steps of `/_install`. If you instead want to take the shortest path from checkout to a configured website, start with [Getting Started](getting-started.md); the later production operation is covered in [Deployment](deployment.md).
 

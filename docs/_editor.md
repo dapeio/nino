@@ -2,7 +2,7 @@
 
 **Language:** English · [Deutsch](_editor.de.md)
 
-**Last updated:** August 8, 2026 · **Nino version:** 0.11.0-beta.1
+**Last updated:** August 8, 2026 · **Nino version:** 0.12.0-beta
 
 This manual explains the daily work with released texts, elements, images, users, and operational data under `/_editor`. If you need full technical and content access, read the [`/_admin` Operation Manual](_admin.md); the structural editing of templates is described in the [`/_templates` Operation](_templates.md).
 
