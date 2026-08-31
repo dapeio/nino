@@ -2203,10 +2203,21 @@ namespace Nino {
 				if( $data['type'] === 'element' && trim( (string) ( $data['elementType'] ?? '' ) ) === '' )
 					continue;
 
+				// How many elements one reference may hold. Presence of an int is
+				// the switch, the same shape a numbered type's 'autoincrement'
+				// uses: 0 is "as many as you like", a positive number caps the
+				// list, and an absent key is the single reference this field has
+				// always been - so every model written before this keeps its exact
+				// meaning. Anything else is a mistake rather than a smaller cap,
+				// and dropping the key leaves the field single rather than
+				// silently unlimited
+				if( $data['type'] === 'element' && ( is_int( $data['multiple'] ?? null ) === false || $data['multiple'] < 0 ) )
+					unset( $data['multiple'] );
+
 				if( isset( $data['default'] ) === true ) {
 					if( $data['type'] === 'double' && gettype( $data['default'] ) === 'integer' )
 						$data['default'] = (float) $data['default'];
-					if( gettype( $data['default'] ) !== self::_expectedGettype( $data['type'] ) )
+					if( gettype( $data['default'] ) !== self::_expectedGettype( $data ) )
 						continue;
 				}
 
@@ -2326,13 +2337,39 @@ namespace Nino {
 			return str_pad( (string) $number, self::AUTOINCREMENT_PAD, '0', STR_PAD_LEFT );
 		}
 
+		/**
+		 *	Whether an element reference holds a list rather than a single uri.
+		 *
+		 *	Presence of an int under 'multiple' is the switch, the same shape a
+		 *	numbered type's 'autoincrement' uses: 0 means "as many as you like",
+		 *	a positive number caps the list. An absent key is the single
+		 *	reference the field has always been, which is what makes every model
+		 *	written before this keep its exact meaning - and what lets the
+		 *	setting stay optional in both element forms.
+		 *
+		 *	@param		array 		$field				One model field definition
+		 *
+		 *	@return 	bool										True for a list-valued element field
+		 */
+		static public function isMultiElement( array $field ): bool {
+			return ( $field['type'] ?? '' ) === 'element' && is_int( $field['multiple'] ?? null ) === true;
+		}
+
 		// The PHP gettype() a model field's declared type is expected to hold
 		// as - 'date'/'datetime' values are plain ISO strings (php has no
 		// native date type), an 'image' field stores its uploaded file's
 		// generated filename and an 'element' field the referenced element's
 		// full uri, both also strings; everything else matches its type name
-		// directly
-		static private function _expectedGettype( string $type ): string {
+		// directly. A *multi* element field is the one case the type name alone
+		// cannot answer: it holds the same uris as a php list, so the whole
+		// field rather than its type decides
+		static private function _expectedGettype( array $field ): string {
+
+			if( self::isMultiElement( $field ) === true )
+				return 'array';
+
+			$type = (string) ( $field['type'] ?? '' );
+
 			return in_array( $type, [ 'date', 'datetime', 'image', 'element' ], true ) ? 'string' : $type;
 		}
 
@@ -2519,7 +2556,7 @@ namespace Nino {
 						continue;
 					}
 
-					if( gettype( $data[$key] ) !== self::_expectedGettype( $field['type'] ) ) {
+					if( gettype( $data[$key] ) !== self::_expectedGettype( $field ) ) {
 						trigger_error( 'Wrong var type \''. $key. '\' in \''. $uri. '\'. \''. $field['type']. '\' required, \''. gettype( $data[$key] ). '\' given.' );
 						$outcome = 'error';
 						return null;
@@ -2548,11 +2585,59 @@ namespace Nino {
 					// way (both element forms show it as missing rather than
 					// dropping it). An empty value is "no reference" - 'required'
 					// above is what makes one mandatory
-					if( $field['type'] === 'element' && $data[$key] !== ''
-						&& str_starts_with( $data[$key], '/'. trim( (string) ( $field['elementType'] ?? '' ), '/' ). '/' ) === false ) {
-						trigger_error( 'Element reference \''. $key. '\' in \''. $uri. '\' must point into \''. ( $field['elementType'] ?? '' ). '\', got \''. $data[$key]. '\'.' );
-						$outcome = 'error';
-						return null;
+					if( $field['type'] === 'element' ) {
+
+						$referencePrefix = '/'. trim( (string) ( $field['elementType'] ?? '' ), '/' ). '/';
+
+						// A list reference holds exactly the uris a single one
+						// holds, so each entry answers the same question. The cap
+						// is checked here rather than left to the form that drew
+						// the list: an api caller is every bit as able to post one
+						// entry too many, and a model that promises "at most three"
+						// is not a hint the ui happens to render
+						if( self::isMultiElement( $field ) === true ) {
+
+							$limit = (int) $field['multiple'];
+							$seen 	= [];
+
+							foreach( $data[$key] as $reference ) {
+
+								if( is_string( $reference ) === false || $reference === '' || str_starts_with( $reference, $referencePrefix ) === false ) {
+									trigger_error( 'Element reference \''. $key. '\' in \''. $uri. '\' must point into \''. ( $field['elementType'] ?? '' ). '\', got \''. ( is_string( $reference ) === true ? $reference : gettype( $reference ) ). '\'.' );
+									$outcome = 'error';
+									return null;
+								}
+
+								// The list is an ordered set. The same element twice
+								// is one choice stored twice - nothing reading it
+								// could tell the copies apart, and the up/down
+								// controls would move two identical rows
+								if( isset( $seen[$reference] ) === true ) {
+									trigger_error( 'Element reference \''. $key. '\' in \''. $uri. '\' lists \''. $reference. '\' twice.' );
+									$outcome = 'error';
+									return null;
+								}
+
+								$seen[$reference] = true;
+							}
+
+							if( $limit > 0 && count( $data[$key] ) > $limit ) {
+								trigger_error( 'Element reference \''. $key. '\' in \''. $uri. '\' holds '. count( $data[$key] ). ' entries, at most '. $limit. ' allowed.' );
+								$outcome = 'error';
+								return null;
+							}
+
+							// Stored as a list, never as the gapped or string-keyed
+							// array a partial removal client-side or a json object
+							// can arrive as - a template iterating it would other-
+							// wise see the keys rather than the order
+							$data[$key] = array_values( $data[$key] );
+
+						} else if( $data[$key] !== '' && str_starts_with( $data[$key], $referencePrefix ) === false ) {
+							trigger_error( 'Element reference \''. $key. '\' in \''. $uri. '\' must point into \''. ( $field['elementType'] ?? '' ). '\', got \''. $data[$key]. '\'.' );
+							$outcome = 'error';
+							return null;
+						}
 					}
 
 					// Set value

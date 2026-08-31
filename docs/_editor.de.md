@@ -103,6 +103,8 @@ Die URI ist die dauerhafte technische Kennung. Wähle sie kurz und sprechend; si
 
 Öffne den Typ und anschließend den gewünschten Eintrag. Globale Felder werden einmal gespeichert, übersetzte Felder je Sprache. Eingaben können je nach Modell als Text, Zahl, Datum, Auswahl, Ja/Nein-Wert, Liste oder Bild erscheinen.
 
+Ein Feld, das auf andere Elemente verweist, erscheint entweder als einzelne Auswahlliste oder — wenn der Entwickler mehrere erlaubt hat — als Liste der von dir gewählten Einträge. Über das Suchfeld unter der Liste fügst du einen hinzu, mit ↑ und ↓ ordnest du die Liste, mit ✕ nimmst du einen Eintrag wieder heraus. Die Reihenfolge ist bedeutsam: Sie ist die Reihenfolge, in der die Webseite die referenzierten Einträge ausgibt. Hat der Entwickler eine Höchstzahl festgelegt, zeigt die Zählung über dem Suchfeld, wie viel davon belegt ist, und sobald sie erreicht ist, wird nichts mehr angeboten. Ein Eintrag, dessen Ziel gelöscht wurde, wird als *missing* angezeigt statt entfernt — es verschwindet also nichts, ohne dass du es siehst.
+
 Ein Bildfeld ist erst verfügbar, nachdem das neue Element einmal gespeichert wurde. Beim anschließenden Upload verarbeitet Nino die Datei auf die vom Entwickler festgelegten Zielmaße.
 
 **Löschen** entfernt das Element in allen Sprachen. Auch Bilder, die ausschließlich zu seinen Bildfeldern gehören, werden gelöscht. Die Aktion lässt sich nur über eine Sicherung rückgängig machen.

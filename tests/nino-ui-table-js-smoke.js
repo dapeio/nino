@@ -79,6 +79,12 @@ check( 'an unset value renders as nothing, not as "null"',
 check( 'a boolean renders as a glyph, so no caller has to translate it',
 	model.format( true, 'boolean' ) === '✓' && model.format( false, 'boolean' ) === '–' );
 check( 'zero is a value, not an absence', model.format( 0, 'integer' ) === '0' );
+// An element reference that holds a list arrives as an array. String() would
+// join it with a bare comma, which reads as one run-on uri
+check( 'a list of references is joined readably',
+	model.format( [ '/tag/php', '/tag/css' ], 'element' ) === '/tag/php, /tag/css' );
+check( 'an empty list is as absent as a blank string, so sort() places it with them',
+	model.isEmpty( [] ) === true && model.isEmpty( [ '/tag/php' ] ) === false );
 
 // --- ordering -------------------------------------------------------------
 

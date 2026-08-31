@@ -354,6 +354,40 @@ $danglingSaveRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 check( 'apiSave refuses the same dangling reference', $danglingSaveRequest['/nino/http/response']['statusCode'] === 400 );
 check( '...leaving the stored model untouched', ( \Nino\Filesystem::getFileContent( $appData, '/elements/refholder.php', false )['model']['author']['elementType'] ?? null ) === 'brandnewtype' );
 
+// The type editor asks "several elements?" and "how many?" as two controls;
+// the model carries one int, and its mere presence is what makes the field
+// multi-valued. So the fold has to happen server-side too - a hand-written or
+// api-posted model goes through exactly the same rule
+$_POST['data'] = json_encode( [ 'uri' => 'refholder', 'title' => 'Ref Holder', 'model' => [
+	'author' 	=> [ 'type' => 'element', 'elementType' => 'brandnewtype' ],
+	'tags' 		=> [ 'type' => 'element', 'elementType' => 'brandnewtype', 'multiple' => true, 'multipleMax' => '3' ],
+	'crew' 		=> [ 'type' => 'element', 'elementType' => 'brandnewtype', 'multiple' => true, 'multipleMax' => '' ],
+] ] );
+$multiSaveRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Admin\ElementTypes::apiSave( $appData, $multiSaveRequest );
+check( 'apiSave accepts an element reference marked as a list', $multiSaveRequest['/nino/http/response']['statusCode'] === 200 );
+
+$multiSaved = \Nino\Filesystem::getFileContent( $appData, '/elements/refholder.php', false );
+check( 'the cap is folded onto the field as a plain int', ( $multiSaved['model']['tags']['multiple'] ?? null ) === 3 );
+check( 'an unfilled cap becomes 0 - the list is wanted, the ceiling is not', ( $multiSaved['model']['crew']['multiple'] ?? null ) === 0 );
+// Presence is the switch, so writing the key on a field nobody asked to be a
+// list would silently turn every existing single reference into one
+check( 'a reference nobody marked keeps no key at all', isset( $multiSaved['model']['author']['multiple'] ) === false );
+check( '...which is exactly what the kernel reads it as',
+	\Nino\Elements::isMultiElement( $multiSaved['model']['author'] ) === false
+	&& \Nino\Elements::isMultiElement( $multiSaved['model']['tags'] ) === true );
+
+// Only an element reference can be a list: the key on any other type would be
+// a promise nothing enforces
+$_POST['data'] = json_encode( [ 'uri' => 'refholder', 'title' => 'Ref Holder', 'model' => [
+	'author' 	=> [ 'type' => 'element', 'elementType' => 'brandnewtype' ],
+	'headline' => [ 'type' => 'string', 'multiple' => true, 'multipleMax' => '2' ],
+] ] );
+$strayMultiRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Admin\ElementTypes::apiSave( $appData, $strayMultiRequest );
+check( 'a cap on a field that is not a reference is dropped',
+	isset( \Nino\Filesystem::getFileContent( $appData, '/elements/refholder.php', false )['model']['headline']['multiple'] ) === false );
+
 check( '"element" is offered as a field type by apiList', in_array( 'element', \Nino\Admin\ElementTypes::FIELD_TYPES, true ) === true );
 
 echo "\n";

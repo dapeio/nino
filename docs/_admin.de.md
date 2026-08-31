@@ -97,9 +97,12 @@ Je nach Typ stehen zusätzliche Eigenschaften bereit:
 - feste Werte begrenzen ein Textfeld auf eine vorgegebene Auswahl;
 - Breite und Höhe bestimmen bei Bildern die Zielmaße;
 - eine Einheit oder ein Suffix ergänzt beispielsweise `€`, `km` oder `%` in der Eingabe;
-- **References element type** legt beim Typ `element` fest, auf welchen Typ dieses Feld zeigen darf.
+- **References element type** legt beim Typ `element` fest, auf welchen Typ dieses Feld zeigen darf;
+- **Several elements** erlaubt einem `element`-Feld eine Liste statt einer einzelnen Referenz, **Max. elements** ist deren Obergrenze — `0` bedeutet keine Obergrenze.
 
 Ein `element`-Feld verknüpft ein Element mit einem anderen. Beim Anlegen des Feldes wählst du den Elementtyp, auf den es verweist; beim Bearbeiten eines Elements wählst du dann per Auswahlliste einen Eintrag dieses Typs. Gespeichert wird die vollständige Uri des referenzierten Elements (`/<typ>/<slug>`) — genau das, was Templates an `\Nino\Elements::getElement()` übergeben. Ein Feld lässt sich erst speichern, wenn der referenzierte Typ existiert, und sein Wert darf nur in diesen Typ zeigen. Wird das referenzierte Element später gelöscht, bleibt der Verweis erhalten und wird als *missing* angezeigt — es geht nichts stillschweigend verloren. Referenzen sind nicht Teil eines Übersetzungsexports, denn eine Uri ist eine Auswahl und kein übersetzbarer Text.
+
+Eine Referenz kann mehrere Elemente aufnehmen. Ist **Several elements** aktiv, speichert das Feld eine geordnete Liste von Uris statt einer einzelnen, und beide Elementformulare zeigen statt der Auswahlliste eine Liste der gewählten Einträge mit Verschieben und Entfernen sowie ein Suchfeld, das die noch hinzufügbaren Elemente anbietet. Die Reihenfolge gehört zum Wert: Sie ist die Reihenfolge, in der ein Template die referenzierten Elemente ausgibt. **Max. elements** begrenzt die Liste — `0` nimmt beliebig viele — und der Kernel setzt diese Grenze beim Speichern durch, sodass ein Eintrag zu viel abgelehnt wird, gleich ob er aus dem Formular oder aus einem API-Aufruf kommt. Dasselbe Element kann nicht zweimal in der Liste stehen. Ein Feld ohne diese Einstellung bleibt die einzelne Referenz, die es immer war — bestehende Typen ändern sich also nicht.
 
 Beim Wechsel zwischen globalen und sprachabhängigen Feldern migriert Nino bestehende Werte. Prüfe das Ergebnis trotzdem in jeder Sprache. Das Speichern eines Typmodells löscht keine vorhandenen Einträge; entfernte Felder erscheinen jedoch nicht mehr in `/_editor`.
 

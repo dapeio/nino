@@ -97,9 +97,12 @@ Depending on the type, additional properties are available:
 - fixed values limit a text field to a predefined selection;
 - width and height determine the target dimensions for images;
 - a unit or suffix adds, for example, `€`, `km`, or `%` in the input;
-- **References element type** determines, for the `element` type, which type this field may point at.
+- **References element type** determines, for the `element` type, which type this field may point at;
+- **Several elements** lets an `element` field hold a list rather than a single reference, with **Max. elements** as its ceiling — `0` means no ceiling.
 
 An `element` field links one element to another. When defining the field you pick the element type it references; when editing an element you then pick one of that type's entries from a select. The stored value is the referenced element's full uri (`/<type>/<slug>`), which templates hand straight to `\Nino\Elements::getElement()`. A field may only be saved once the referenced type exists, and its value may only point into that type. If the referenced element is deleted later, the reference is kept and shown as *missing* — nothing is silently dropped. References are not part of a Translations export, since a uri is a choice rather than translatable text.
+
+A reference may hold several elements. Switch **Several elements** on and the field stores an ordered list of uris instead of one, and both element forms swap the select for a list of the chosen entries with move and remove controls, plus a search field offering what may still be added. The order is part of the value: it is the order a template renders the referenced elements in. **Max. elements** caps the list — `0` takes as many as you like — and the kernel enforces that cap on save, so an entry too many is refused whether it arrives from the form or from an api call. The same element cannot be listed twice. A field left without the setting stays the single reference it always was, so existing types are unaffected.
 
 When switching between global and language-dependent fields, Nino migrates existing values. Still, check the result in each language. Saving a type model does not delete existing entries; however, removed fields no longer appear in `/_editor`.
 

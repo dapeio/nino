@@ -774,8 +774,21 @@ namespace Nino\Admin {
 				// method has no $appData; apiSave()/apiCreate() reject an
 				// unknown one outright (see _unknownReferencedType()) so the
 				// author gets told, instead of the field silently vanishing
-				if( $data['type'] === 'element' )
+				if( $data['type'] === 'element' ) {
+
 					$field['elementType'] = trim( (string) ( $data['elementType'] ?? '' ) );
+
+					// The type editor asks whether the reference is a list and
+					// where it stops as two controls; the model carries one int.
+					// Folded here rather than client-side so a hand-written or
+					// api-posted model goes through the same rule: the key is
+					// written only when the list is actually wanted, because its
+					// mere presence is what makes the field multi-valued
+					// (\Nino\Elements::isMultiElement()) - an absent key is the
+					// single reference every existing type still means
+					if( ( $data['multiple'] ?? false ) === true )
+						$field['multiple'] = max( 0, (int) ( $data['multipleMax'] ?? 0 ) );
+				}
 
 				// Only rendered for a string field (elements.js's maxlength+counter and
 				// html-editor branches) - 0/absent falls back to DEFAULT_MAXLENGTH client-side

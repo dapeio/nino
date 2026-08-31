@@ -348,6 +348,36 @@
 
 					refLabel.appendChild( refSelect );
 					optionsWrap.appendChild( refLabel );
+
+					// How many elements the field may hold. Two controls because
+					// the model asks two things: whether this is a list at all
+					// (an absent key is the single reference every existing type
+					// still means), and where it stops. 0 is the honest way to
+					// say "no ceiling" - the alternative, an empty box meaning
+					// unlimited, is indistinguishable from one nobody filled in
+					const multiLabel = dc.createElement('label');
+					const multiCheck = dc.createElement('input');
+					multiCheck.type = 'checkbox';
+					multiCheck.className = 'admin-field-multiple';
+					multiCheck.checked = typeof field.multiple === 'number';
+					multiLabel.appendChild( multiCheck );
+					multiLabel.appendChild( dc.createTextNode(' Several elements') );
+					optionsWrap.appendChild( multiLabel );
+
+					const maxInput = dc.createElement('input');
+					maxInput.type = 'number';
+					maxInput.min = '0';
+					maxInput.className = 'admin-field-multiple-max';
+					maxInput.placeholder = 'Max. elements (0 = unlimited)';
+					maxInput.value = ( typeof field.multiple === 'number' ) ? String( field.multiple ) : '';
+					maxInput.disabled = ( multiCheck.checked === false );
+					optionsWrap.appendChild( maxInput );
+
+					multiCheck.addEventListener( 'change', function() {
+						maxInput.disabled = ( multiCheck.checked === false );
+						if( multiCheck.checked === true && maxInput.value === '' )
+							maxInput.value = '0';
+					} );
 				}
 
 				if( type === 'image' ) {
@@ -492,6 +522,11 @@
 					suffix 		: ( row.querySelector('.admin-field-suffix')?.value ) ?? '',
 					// Absent on every row but an element reference
 					elementType : ( row.querySelector('.admin-field-element-type')?.value ) ?? '',
+					// Whether that reference holds a list, and its ceiling. Sent
+					// as the two controls collect them; Admin.php's cleanModel()
+					// is what folds them into the model's single 'multiple' int
+					multiple 		: ( row.querySelector('.admin-field-multiple')?.checked ) ?? false,
+					multipleMax : row.querySelector('.admin-field-multiple-max')?.value,
 					options 	: options ? options.value.split(',').map( function(s) { return s.trim() } ).filter( function(s) { return s !== '' } ) : [],
 				} );
 			} );
@@ -646,6 +681,8 @@
 					height 			: field.height,
 					suffix 			: field.suffix,
 					elementType : field.elementType,
+					multiple 		: field.multiple,
+					multipleMax : field.multipleMax,
 					options 		: field.options,
 				};
 			} );

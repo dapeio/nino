@@ -2419,6 +2419,7 @@ Common model properties:
 | `options` | supported controls, never element | Fixed choices presented by the editing UI |
 | `width`, `height` | image | Required generated image dimensions |
 | `elementType` | element | Required uri of the element type this field may reference |
+| `multiple` | element | Int: the field holds an ordered list of references, capped at this number (`0` = uncapped). Absent = a single reference |
 
 An image MUST NOT be required: the element must exist before its deterministic
 upload path can be created.
@@ -2432,6 +2433,25 @@ drops a field without one, and the Admin editor refuses to save a reference to a
 type that does not exist. A target deleted later is tolerated — the stored value
 survives and both forms mark it as missing. Element references never enter a
 Translations export: a uri is a choice, not translatable text.
+
+Adding `multiple` makes that reference a list. Presence of an **int** is the
+switch, the same shape `autoincrement` uses on a type: `0` is uncapped, a
+positive number is the ceiling, and an absent key is the single reference every
+model written before this still means. `Elements::isMultiElement()` is the one
+place that rule lives; `Nino.adminUi.isMultiElement()` is its client-side twin.
+
+The value is then a php list of those same uris, so `_expectedGettype()` answers
+`array` for the field and the kernel checks every entry against `elementType`,
+rejects a duplicate, enforces the cap, and stores the result through
+`array_values()` — a template iterating the value sees the order, never the keys
+a partial removal left behind. The cap is enforced in the kernel rather than in
+the form that drew the list: an api caller never went near that control.
+
+Both element forms swap the select for `Nino.adminUi.elementList()`, the shared
+ordered-list control (chosen entries with move/remove, plus a search field over
+the options the form already loaded). It owns no strings — `/_admin` passes
+English literals, `/_editor` passes `Nino.content.getText()` lookups. Do not
+restate it in a tool; see §6a's trap about tool copies of shared components.
 
 ### 12.2 Named or numbered element uris
 
@@ -2893,6 +2913,7 @@ temporary project and must not rely on a previously installed working tree.
 | Template Builder browser behavior | `tests/templates-js-smoke.js` |
 | Shared public UI slider/tabs | corresponding `tests/nino-ui-*-js-smoke.js` |
 | Shared management UI/CSS structure | owner tests plus `tests/admin-lists-js-smoke.js` |
+| Multi-element reference control | `tests/nino-ui-elementlist-js-smoke.js` plus both element forms' own tests |
 
 Complete suite:
 

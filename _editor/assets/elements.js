@@ -602,6 +602,48 @@
 			// element's full uri - exactly what \Nino\Elements::getElement()
 			// takes, so a template never has to re-join it with the model
 			if( field.type === 'element' ) {
+
+				const referenceOptions = ( Nino.editor.elements._referenceOptions[field.elementType] ?? [] ).map( function( element ) {
+					return { value : '/'+ field.elementType+ '/'+ element.uri, label : element.label };
+				} );
+
+				// A model that allows several references gets the ordered list
+				// control instead of the select. It builds its own field wrapper
+				// (and must: the up/down/remove buttons and the search box are
+				// several controls, which a <label> may not wrap), so the label
+				// created above is not used on this path
+				if( Nino.adminUi.isMultiElement( field ) === true ) {
+
+					const list = Nino.adminUi.elementList( {
+						key 		: key,
+						label 	: displayName,
+						value 	: Array.isArray( value ) ? value : [],
+						limit 	: field.multiple,
+						options : referenceOptions,
+						text 		: {
+							search 		: Nino.content.getText('/_editor/elements/label/reference-search'),
+							empty 		: Nino.content.getText('/_editor/elements/label/reference-list-empty'),
+							noMatches : Nino.content.getText('/_editor/elements/label/reference-no-matches'),
+							more 			: Nino.content.getText('/_editor/elements/label/reference-more'),
+							missing 	: Nino.content.getText('/_editor/elements/label/reference-missing'),
+							up 				: Nino.content.getText('/_editor/elements/label/reference-up'),
+							down 			: Nino.content.getText('/_editor/elements/label/reference-down'),
+							remove 		: Nino.content.getText('/_editor/elements/label/reference-remove'),
+							add 			: Nino.content.getText('/_editor/elements/label/reference-add'),
+							full 			: Nino.content.getText('/_editor/elements/label/reference-full'),
+						},
+					} );
+
+					if( referenceOptions.length === 0 ) {
+						const hint = dc.createElement('p');
+						hint.className = 'nino-admin-field-hint';
+						hint.textContent = Nino.content.getText('/_editor/elements/label/reference-empty');
+						list.appendChild( hint );
+					}
+
+					return list;
+				}
+
 				const span = dc.createElement('span');
 				span.textContent = displayName;
 				label.appendChild( span );
@@ -610,7 +652,7 @@
 				select.dataset.field = key;
 				select.dataset.type = field.type;
 
-				const options = Nino.editor.elements._referenceOptions[field.elementType] ?? [];
+				const options = referenceOptions;
 				const current = ( value === null || value === undefined ) ? '' : String( value );
 
 				// Always offered, even on a required field: the browser's own
@@ -627,7 +669,7 @@
 
 				options.forEach( function( element ) {
 					const option = dc.createElement('option');
-					option.value = '/'+ field.elementType+ '/'+ element.uri;
+					option.value = element.value;
 					option.textContent = element.label;
 					option.selected = ( option.value === current );
 					select.appendChild( option );
@@ -636,7 +678,7 @@
 				// A reference whose target was deleted since keeps its value
 				// instead of silently resetting to none - a save the editor did
 				// not intend would otherwise drop the reference for good
-				if( current !== '' && options.some( function( e ) { return '/'+ field.elementType+ '/'+ e.uri === current } ) === false ) {
+				if( current !== '' && options.some( function( e ) { return e.value === current } ) === false ) {
 					const dangling = dc.createElement('option');
 					dangling.value = current;
 					dangling.textContent = current+ ' ('+ Nino.content.getText('/_editor/elements/label/reference-missing')+ ')';
@@ -874,7 +916,7 @@
 				return editor === undefined || editor.getValue().replace(/<[^>]+>/g, '').trim() === '';
 			}
 
-			if( field.type === 'array' ) {
+			if( field.type === 'array' || Nino.adminUi.isMultiElement( field ) === true ) {
 				const value = Nino.editor.elements._readFieldByKey( key, field );
 				return Array.isArray( value ) === false || value.length === 0;
 			}
@@ -943,6 +985,13 @@
 			if( input.dataset.type === 'array' )
 				try { return JSON.parse( input.value ); } catch( e ) { return []; }
 
+			// The multi-reference control stores its ordered list as json in a
+			// hidden input, and marks it with data-multiple - a single reference
+			// is a plain select carrying one uri, so the type alone cannot tell
+			// the two apart
+			if( input.dataset.type === 'element' && input.dataset.multiple !== undefined )
+				try { return JSON.parse( input.value ); } catch( e ) { return []; }
+
 			return input.value;
 		},
 
@@ -987,7 +1036,7 @@
 			function normalized( value ) {
 				if( value !== null && value !== undefined )
 					return value;
-				if( field.type === 'array' )
+				if( field.type === 'array' || Nino.adminUi.isMultiElement( field ) === true )
 					return [];
 				if( field.type === 'boolean' )
 					return false;

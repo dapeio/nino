@@ -386,6 +386,88 @@ check( 'a reference whose target is gone keeps its value',
 
 echo "\n";
 
+// --- An element reference holding several elements ----------------------
+
+echo "Elements multi references - one field, an ordered list of elements\n";
+
+\Nino\Elements::insertElementType( $appData, '/tag', [ 'name' => [ 'type' => 'string' ] ] );
+\Nino\Elements::insertElement( $appData, '/tag/php', [ 'name' => 'PHP' ], '*' );
+\Nino\Elements::insertElement( $appData, '/tag/css', [ 'name' => 'CSS' ], '*' );
+\Nino\Elements::insertElement( $appData, '/tag/html', [ 'name' => 'HTML' ], '*' );
+
+check( 'insertElementType keeps a multi reference\'s cap on the field',
+	\Nino\Elements::insertElementType( $appData, '/post', [
+		'title' => [ 'type' => 'string' ],
+		'tags' 	=> [ 'type' => 'element', 'elementType' => 'tag', 'multiple' => 2 ],
+	] ) !== false
+	&& ( \Nino\Elements::getElementModel( $appData, '/post' )['tags']['multiple'] ?? null ) === 2 );
+
+// Presence of an int is the switch. Anything else is a mistake rather than a
+// smaller cap, and dropping the key leaves the field the single reference it
+// has always been - never a silently unlimited list
+\Nino\Elements::insertElementType( $appData, '/loosemulti', [
+	'a' => [ 'type' => 'element', 'elementType' => 'tag', 'multiple' => 'many' ],
+	'b' => [ 'type' => 'element', 'elementType' => 'tag', 'multiple' => -1 ],
+	'c' => [ 'type' => 'element', 'elementType' => 'tag', 'multiple' => true ],
+] );
+$loose = \Nino\Elements::getElementModel( $appData, '/loosemulti' );
+check( 'a cap that is not a whole number at least zero is dropped',
+	isset( $loose['a']['multiple'] ) === false
+	&& isset( $loose['b']['multiple'] ) === false
+	&& isset( $loose['c']['multiple'] ) === false );
+check( '...and isMultiElement() reads the model the writer just wrote',
+	\Nino\Elements::isMultiElement( $loose['a'] ) === false
+	&& \Nino\Elements::isMultiElement( \Nino\Elements::getElementModel( $appData, '/post' )['tags'] ) === true );
+
+$multi = \Nino\Elements::insertElement( $appData, '/post/first', [ 'title' => 'Hi', 'tags' => [ '/tag/php', '/tag/css' ] ], '*' );
+check( 'insertElement stores a multi reference as an ordered list',
+	is_array( $multi ) === true && $multi['tags'] === [ '/tag/php', '/tag/css' ] );
+check( '...and the order is what a read gives back',
+	( \Nino\Elements::getElement( $appData, '/post/first', '*' )['tags'] ?? null ) === [ '/tag/php', '/tag/css' ] );
+check( '...each entry being exactly what getElement() takes, as a single one is',
+	( \Nino\Elements::getElement( $appData, \Nino\Elements::getElement( $appData, '/post/first', '*' )['tags'][1], '*' )['name'] ?? null ) === 'CSS' );
+
+// The cap is the model's promise about the value, so the kernel is what keeps
+// it - an api caller never went near the control that drew the list
+check( 'a list longer than the cap is rejected',
+	\Nino\Elements::insertElement( $appData, '/post/toomany', [ 'title' => 'x', 'tags' => [ '/tag/php', '/tag/css', '/tag/html' ] ], '*' ) === false );
+check( 'the same element twice is rejected - the list is an ordered set',
+	\Nino\Elements::insertElement( $appData, '/post/dupe', [ 'title' => 'x', 'tags' => [ '/tag/php', '/tag/php' ] ], '*' ) === false );
+check( 'one entry pointing into another type rejects the whole list',
+	\Nino\Elements::insertElement( $appData, '/post/wrong', [ 'title' => 'x', 'tags' => [ '/tag/php', '/author/ada' ] ], '*' ) === false );
+check( 'a non-string entry is rejected',
+	\Nino\Elements::insertElement( $appData, '/post/nonstring', [ 'title' => 'x', 'tags' => [ '/tag/php', 42 ] ], '*' ) === false );
+check( 'a bare string is rejected where the model promises a list',
+	\Nino\Elements::insertElement( $appData, '/post/scalar', [ 'title' => 'x', 'tags' => '/tag/php' ], '*' ) === false );
+check( 'an empty list is accepted - "no references" is a legitimate value',
+	is_array( \Nino\Elements::insertElement( $appData, '/post/none', [ 'title' => 'x', 'tags' => [] ], '*' ) ) === true );
+
+// 0 is the honest way to say "no ceiling": an empty box meaning unlimited
+// cannot be told apart from one nobody filled in
+\Nino\Elements::insertElementType( $appData, '/unlimited', [ 'tags' => [ 'type' => 'element', 'elementType' => 'tag', 'multiple' => 0 ] ] );
+check( 'a cap of 0 takes as many as are offered',
+	is_array( \Nino\Elements::insertElement( $appData, '/unlimited/all', [ 'tags' => [ '/tag/php', '/tag/css', '/tag/html' ] ], '*' ) ) === true );
+
+// A removal in the form, or a json object, can arrive with gaps or string keys.
+// A template iterating the value would see those keys instead of the order
+$gapped = \Nino\Elements::insertElement( $appData, '/unlimited/gapped', [ 'tags' => [ 2 => '/tag/php', 5 => '/tag/css' ] ], '*' );
+check( 'a gapped list is stored as a list, so its order is what iterates',
+	is_array( $gapped ) === true
+	&& ( \Nino\Elements::getElement( $appData, '/unlimited/gapped', '*' )['tags'] ?? null ) === [ '/tag/php', '/tag/css' ] );
+
+\Nino\Elements::insertElementType( $appData, '/reqmulti', [ 'tags' => [ 'type' => 'element', 'elementType' => 'tag', 'multiple' => 0, 'required' => true ] ] );
+check( 'a required multi reference is empty when its list is',
+	\Nino\Elements::insertElement( $appData, '/reqmulti/none', [ 'tags' => [] ], '*' ) === false );
+
+// The whole point of keying the behaviour off the key's presence: a type file
+// written before any of this existed means exactly what it always meant
+check( 'a field carrying no cap is still a single string reference',
+	is_array( \Nino\Elements::insertElement( $appData, '/article/compat', [ 'headline' => 'x', 'author' => '/author/ada' ], '*' ) ) === true );
+check( '...and a list posted into that single reference is rejected',
+	\Nino\Elements::insertElement( $appData, '/article/listintosingle', [ 'headline' => 'x', 'author' => [ '/author/ada' ] ], '*' ) === false );
+
+echo "\n";
+
 
 // --- Sequential element uris (the type file's own AUTO_INCREMENT) --------
 

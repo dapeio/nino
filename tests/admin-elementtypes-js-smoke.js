@@ -72,6 +72,8 @@ function fakeRow( field ) {
 		'.admin-field-height' 				: field.type === 'image' ? { value : field.height ?? '' } : null,
 		'.admin-field-suffix' 				: [ 'boolean', 'image', 'element' ].indexOf( field.type ) === -1 ? { value : field.suffix ?? '' } : null,
 		'.admin-field-element-type' 	: field.type === 'element' ? { value : field.elementType ?? '' } : null,
+		'.admin-field-multiple' 			: field.type === 'element' ? { checked : field.multiple === true } : null,
+		'.admin-field-multiple-max' 	: field.type === 'element' ? { value : field.multipleMax ?? '' } : null,
 	};
 	return { querySelector : function( selector ) { return controls[selector] ?? null } };
 }
@@ -159,6 +161,24 @@ const forwarded = Object.keys( built.title );
 check( 'every key _storeFields() reads is forwarded by _buildModel()', readBack.every( function( k ) { return forwarded.indexOf( k ) !== -1 } ) );
 
 
+// --- an element reference that holds a list -------------------------------
+//
+// The model asks two things - whether the reference is a list at all, and
+// where it stops - so the editor offers two controls and Admin.php's
+// cleanModel() folds them into the single int the model carries.
+
+elementTypes._fields = [
+	{ key : 'tags', 	type : 'element', elementType : 'tag', multiple : true, multipleMax : '3' },
+	{ key : 'author', type : 'element', elementType : 'people' },
+];
+mountRows( elementTypes._fields );
+
+const multiBuilt = elementTypes._buildModel();
+check( 'both halves of the list setting reach the payload', multiBuilt.tags.multiple === true && multiBuilt.tags.multipleMax === '3' );
+// Without this the server cannot tell "not a list" from "a list nobody capped"
+check( 'a reference left single says so rather than saying nothing', multiBuilt.author.multiple === false );
+
+
 // --- the numbering option -------------------------------------------------
 //
 // Whether a type names its elements or numbers them is a property of the type,
@@ -168,6 +188,17 @@ const typesSource = fs.readFileSync( path.join( __dirname, '../_admin/assets/ele
 
 check( 'the type editor offers the numbering option through the shared switch',
 	typesSource.includes('Nino.adminUi.switchField(') && typesSource.includes("key \t\t\t: 'autoincrement'") );
+// The element branch of _renderFieldRow() is a dom branch this sandbox cannot
+// reach, so its two controls are pinned at source level the same way
+check( 'the element branch offers a "several elements" checkbox and a cap',
+	typesSource.includes("className = 'admin-field-multiple'") && typesSource.includes("className = 'admin-field-multiple-max'") );
+check( '...whose placeholder says what 0 means instead of leaving it to be guessed',
+	/placeholder = '[^']*0 = unlimited/.test( typesSource ) );
+// A cap of 0 is falsy, so a truthiness test would render the box unchecked on
+// exactly the unlimited lists it is meant to show as on
+check( 'the checkbox reads the stored int rather than its truthiness',
+	typesSource.includes("typeof field.multiple === 'number'") );
+
 check( 'both save paths send it, so it is not silently dropped on create',
 	typesSource.split('autoincrement : autoincrement').length === 3 );
 check( 'the form is told the current setting rather than defaulting to off',

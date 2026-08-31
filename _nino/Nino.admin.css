@@ -70,6 +70,12 @@
  *              .nino-admin-field-image  .nino-admin-field-suffixed
  *              .nino-admin-checklist  .nino-admin-checklist-state
  *              .nino-admin-richtext
+ *              .nino-admin-elementlist  .nino-admin-elementlist-chosen
+ *              .nino-admin-elementlist-results  .nino-admin-elementlist-label
+ *              .nino-admin-elementlist-actions  .nino-admin-elementlist-remove
+ *              .nino-admin-elementlist-add  .nino-admin-elementlist-search
+ *              .nino-admin-elementlist-count  .nino-admin-elementlist-empty
+ *              .nino-admin-elementlist-note
  *   Boolean    .nino-admin-switch  .nino-admin-switch-track
  *              .nino-admin-switch-copy  .nino-admin-switch-state
  *   Tabs       .nino-admin-tabs  .nino-admin-tab
@@ -829,6 +835,107 @@ a {
 :where(.nino-admin) .nino-admin-field-image-msg.is-error {
 	color: var(--editor-red);
 	font-weight: 650;
+}
+
+/* The multi-reference control (Nino.adminUi.elementList()): the chosen
+   elements as an ordered list, then a search field and what it still offers.
+
+   Both lists are capped in height and scroll inside themselves rather than
+   growing the form. A reference field sits among ordinary inputs, and one that
+   grows to forty rows pushes every field after it off the screen - the point of
+   the control is that a long list stays a field-sized thing. */
+:where(.nino-admin) .nino-admin-elementlist-chosen,
+:where(.nino-admin) .nino-admin-elementlist-results {
+	max-height: 11rem;
+	margin: 0;
+	padding: 0;
+	overflow-y: auto;
+	border: 1px solid var(--editor-border);
+	border-radius: var(--editor-radius-sm);
+	background: var(--editor-bg-elevated);
+	list-style: none;
+}
+
+:where(.nino-admin) .nino-admin-elementlist-results {
+	margin-top: .35rem;
+}
+
+:where(.nino-admin) .nino-admin-elementlist-chosen > li,
+:where(.nino-admin) .nino-admin-elementlist-results > li {
+	display: flex;
+	align-items: center;
+	gap: .4rem;
+	padding: .3rem .45rem;
+	font-size: .8rem;
+}
+
+:where(.nino-admin) .nino-admin-elementlist-chosen > li + li,
+:where(.nino-admin) .nino-admin-elementlist-results > li + li {
+	border-top: 1px solid var(--editor-border);
+}
+
+/* The name takes the row and the controls keep their size, so a long element
+   title truncates instead of pushing ↑/↓/✕ out of reach */
+:where(.nino-admin) .nino-admin-elementlist-label {
+	flex: 1 1 auto;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+:where(.nino-admin) .nino-admin-elementlist-actions {
+	display: flex;
+	flex: 0 0 auto;
+	gap: .15rem;
+}
+
+:where(.nino-admin) .nino-admin-elementlist :is(.nino-admin-elementlist-actions, li) > button {
+	min-height: auto;
+	padding: .1rem .35rem;
+	border: 1px solid var(--editor-border);
+	border-radius: var(--editor-radius-sm);
+	background: var(--editor-bg-grouped);
+	color: var(--editor-text);
+	font-size: .78rem;
+	line-height: 1.3;
+	cursor: pointer;
+}
+
+:where(.nino-admin) .nino-admin-elementlist :is(.nino-admin-elementlist-actions, li) > button:disabled {
+	opacity: .4;
+	cursor: default;
+}
+
+:where(.nino-admin) .nino-admin-elementlist-remove:not(:disabled):hover {
+	border-color: var(--editor-red);
+	color: var(--editor-red);
+}
+
+/* Nothing chosen yet, no search hits, or the cap reached - the same quiet
+   secondary line in all three cases, because none of them is an error */
+:where(.nino-admin) .nino-admin-elementlist-empty,
+:where(.nino-admin) .nino-admin-elementlist-note {
+	color: var(--editor-text-secondary);
+	font-style: italic;
+}
+
+:where(.nino-admin) .nino-admin-elementlist-count {
+	display: block;
+	margin: .25rem 0 0;
+	color: var(--editor-text-secondary);
+	font-size: .72rem;
+	font-variant-numeric: tabular-nums;
+	text-align: right;
+}
+
+:where(.nino-admin) .nino-admin-elementlist-count.is-limit {
+	color: var(--editor-orange);
+	font-weight: 650;
+}
+
+:where(.nino-admin) .nino-admin-elementlist-search {
+	margin-top: .35rem;
 }
 
 /* The "which translation am I looking at" switch. A view control rather than a
@@ -1878,7 +1985,6 @@ a {
 	.nino-admin fieldset > .nino-admin-field:not(.nino-admin-field-wide) > :is(span, .nino-admin-field-header),
 	.nino-admin fieldset > .nino-admin-fieldgrid > .nino-admin-field:not(.nino-admin-field-wide) > :is(span, .nino-admin-field-header) {
 		grid-column: 1;
-		align-self: center;
 		margin: .18rem 0 0;
 	}
 

@@ -103,6 +103,8 @@ The URI is the permanent technical identifier. Keep it short and meaningful; it 
 
 Open the type and then the required entry. Global fields are stored once, while translated fields are stored per language. Depending on the model, inputs may appear as text, number, date, selection, yes/no value, list, or image.
 
+A field that references other elements appears either as a single selection list or, when the developer allowed several, as a list of the entries you have chosen. Add one through the search field below the list, order the list with the ↑ and ↓ buttons, and take an entry back out with ✕. The order matters: it is the order the website renders the referenced entries in. Where the developer set a maximum, the count above the search field says how many of it are used, and nothing more is offered once it is reached. An entry whose target has been deleted is shown as *missing* rather than dropped, so nothing disappears without you seeing it.
+
 An image field becomes available only after a new element has been saved once. Nino then processes the uploaded file to the dimensions specified by the developer.
 
 **Delete** removes the element in every language. Images used exclusively by its image fields are deleted as well. Only a backup can restore the operation.

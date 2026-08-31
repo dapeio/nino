@@ -34,6 +34,12 @@
 	 */
 	wn.Nino.adminUi = {
 
+		// How many search hits elementList() draws at once. The search itself
+		// always runs over the whole catalogue - this caps the rows, so a type
+		// with thousands of elements stays a panel rather than a page, and the
+		// control says how many more it found
+		ELEMENTLIST_RESULTS : 50,
+
 
 		contextBar : function( backLink, controls ) {
 			const bar = dc.createElement('div');
@@ -364,6 +370,276 @@
 		},
 
 		/**
+		 *	Whether one model field holds a list of element references rather
+		 *	than a single uri - the client-side half of
+		 *	\Nino\Elements::isMultiElement(), and deliberately the same rule:
+		 *	presence of a number under 'multiple' is the switch, so a model
+		 *	written before the setting existed stays a single reference in both
+		 *	element forms exactly as it does in the kernel.
+		 *
+		 *	@param	{Object}	field		Model field definition
+		 *
+		 *	@return	{boolean}
+		 */
+		isMultiElement : function( field ) {
+			return ( field || {} ).type === 'element' && typeof ( field || {} ).multiple === 'number';
+		},
+
+		/**
+		 *	The control an element field uses once its model lets it hold more
+		 *	than one reference: the chosen elements as an ordered, scrollable
+		 *	list with move/remove per row, and a search field below it that
+		 *	offers what may still be added.
+		 *
+		 *	A multi-select would have been the smaller control and the wrong
+		 *	one. Order is part of this value - it is the order a template
+		 *	renders the referenced elements in - and a `<select multiple>`
+		 *	has no notion of one, nor anywhere to put the up/down that gives
+		 *	the operator a way to say it. It also shows the chosen entries
+		 *	scattered through the whole catalogue rather than together, which
+		 *	is exactly backwards for a field whose question is "which of these,
+		 *	in what order".
+		 *
+		 *	Searching is done here, over the options the caller already
+		 *	loaded, rather than against an endpoint of its own. Both element
+		 *	forms fetch the referenced type's elements up front to build the
+		 *	single-reference select (see either tool's
+		 *	_loadReferenceOptions()), so the data is in the page before this
+		 *	control is built - a request per keystroke would ask a second time
+		 *	for what is already here, and would have to grow a debounce and a
+		 *	race guard to do it.
+		 *
+		 *	Owns no strings, same rule as table() and switchField(): /_admin is
+		 *	English and /_editor translates, so every word comes from the
+		 *	caller through options.text.
+		 *
+		 *	@param	{Object}	options		{ key, label, value, limit, options, text, onChange }
+		 *													- key      the model key, written onto the hidden input
+		 *													- value    array of currently chosen uris, in order
+		 *													- limit    max entries, 0 for unlimited
+		 *													- options  [ { value, label } ] everything selectable
+		 *													- text     { search, empty, noMatches, more, missing,
+		 *													             up, down, remove, add, full }
+		 *
+		 *	@return	{Element}						The field wrapper; its hidden input carries
+		 *													data-field/data-type and holds the value as json
+		 */
+		elementList : function( options ) {
+
+			const text 	= options.text || {};
+			const limit = Math.max( 0, parseInt( options.limit, 10 ) || 0 );
+			const all 	= Array.isArray( options.options ) ? options.options : [];
+
+			// A stored value survives a target that was deleted since, exactly
+			// as the single-reference select does - dropping it here would turn
+			// "this points at something gone" into a silent data loss the next
+			// save makes permanent
+			let chosen = Array.isArray( options.value ) ? options.value.slice() : [];
+
+			const field = dc.createElement('div');
+			field.className = 'nino-admin-field nino-admin-elementlist';
+
+			const name = dc.createElement('span');
+			name.textContent = options.label || options.key;
+			field.appendChild( name );
+
+			// The value itself. A hidden input rather than component state the
+			// form would have to know about: every other field in both forms is
+			// read back out of the dom by [data-field], and a control that
+			// needed its own read path would be the one field that breaks
+			// locale switching, dirty tracking and save alike
+			const store = dc.createElement('input');
+			store.type = 'hidden';
+			store.dataset.field = options.key;
+			store.dataset.type = 'element';
+			store.dataset.multiple = String( limit );
+			field.appendChild( store );
+
+			const list = dc.createElement('ul');
+			list.className = 'nino-admin-elementlist-chosen';
+			field.appendChild( list );
+
+			const counter = dc.createElement('span');
+			counter.className = 'nino-admin-elementlist-count';
+			field.appendChild( counter );
+
+			const search = dc.createElement('input');
+			search.type = 'search';
+			search.className = 'nino-admin-input nino-admin-elementlist-search';
+			search.placeholder = text.search || '';
+			field.appendChild( search );
+
+			const results = dc.createElement('ul');
+			results.className = 'nino-admin-elementlist-results';
+			field.appendChild( results );
+
+			/**
+			 *	The label an option carries, or the uri itself marked as
+			 *	missing when nothing on offer matches it any more
+			 */
+			function labelFor( uri ) {
+				const match = all.find( function( option ) { return option.value === uri } );
+				return ( match === undefined ) ? uri + ( text.missing ? ' (' + text.missing + ')' : '' ) : match.label;
+			}
+
+			function commit() {
+				store.value = JSON.stringify( chosen );
+				if( typeof options.onChange === 'function' )
+					options.onChange( chosen.slice() );
+			}
+
+			function move( index, delta ) {
+				const target = index + delta;
+				if( target < 0 || target >= chosen.length )
+					return;
+				const moved = chosen[index];
+				chosen[index] = chosen[target];
+				chosen[target] = moved;
+				commit();
+				draw();
+			}
+
+			function remove( index ) {
+				chosen.splice( index, 1 );
+				commit();
+				draw();
+			}
+
+			function add( uri ) {
+				// The cap is the model's, so the control refuses past it rather
+				// than letting the save be the thing that says no. The kernel
+				// checks it again either way - this is the courtesy, not the
+				// boundary
+				if( chosen.indexOf( uri ) !== -1 || ( limit > 0 && chosen.length >= limit ) )
+					return;
+				chosen.push( uri );
+				commit();
+				draw();
+			}
+
+			function button( className, title, glyph, disabled, onClick ) {
+				const el = dc.createElement('button');
+				el.type = 'button';
+				el.className = className;
+				el.textContent = glyph;
+				if( title ) {
+					el.title = title;
+					el.setAttribute( 'aria-label', title );
+				}
+				el.disabled = disabled === true;
+				el.addEventListener( 'click', onClick );
+				return el;
+			}
+
+			function drawChosen() {
+
+				list.innerHTML = '';
+
+				if( chosen.length === 0 ) {
+					const empty = dc.createElement('li');
+					empty.className = 'nino-admin-elementlist-empty';
+					empty.textContent = text.empty || '';
+					list.appendChild( empty );
+					return;
+				}
+
+				chosen.forEach( function( uri, index ) {
+
+					const row = dc.createElement('li');
+
+					const rowLabel = dc.createElement('span');
+					rowLabel.className = 'nino-admin-elementlist-label';
+					rowLabel.textContent = labelFor( uri );
+					rowLabel.title = uri;
+					row.appendChild( rowLabel );
+
+					const actions = dc.createElement('span');
+					actions.className = 'nino-admin-elementlist-actions';
+					actions.appendChild( button( '', text.up, '↑', index === 0, function() { move( index, -1 ) } ) );
+					actions.appendChild( button( '', text.down, '↓', index === chosen.length - 1, function() { move( index, 1 ) } ) );
+					actions.appendChild( button( 'nino-admin-elementlist-remove', text.remove, '✕', false, function() { remove( index ) } ) );
+					row.appendChild( actions );
+
+					list.appendChild( row );
+				} );
+			}
+
+			function drawResults() {
+
+				results.innerHTML = '';
+
+				const full = ( limit > 0 && chosen.length >= limit );
+
+				counter.textContent = ( limit > 0 ) ? chosen.length + ' / ' + limit : String( chosen.length );
+				counter.classList.toggle( 'is-limit', full );
+				search.disabled = full;
+
+				if( full === true ) {
+					const note = dc.createElement('li');
+					note.className = 'nino-admin-elementlist-note';
+					note.textContent = text.full || '';
+					results.appendChild( note );
+					return;
+				}
+
+				const query = search.value.trim().toLowerCase();
+
+				const matches = all.filter( function( option ) {
+					if( chosen.indexOf( option.value ) !== -1 )
+						return false;
+					if( query === '' )
+						return true;
+					return ( option.label || '' ).toLowerCase().indexOf( query ) !== -1
+						|| ( option.value || '' ).toLowerCase().indexOf( query ) !== -1;
+				} );
+
+				if( matches.length === 0 ) {
+					const none = dc.createElement('li');
+					none.className = 'nino-admin-elementlist-note';
+					none.textContent = text.noMatches || '';
+					results.appendChild( none );
+					return;
+				}
+
+				// A catalogue of any size still has to render into a panel. The
+				// cap is on the rows drawn, never on what the search looked
+				// through, and the note says so - a silently truncated result
+				// list would read as "there is nothing else", which is the one
+				// thing it must not mean
+				matches.slice( 0, Nino.adminUi.ELEMENTLIST_RESULTS ).forEach( function( option ) {
+					const row = dc.createElement('li');
+					const addButton = button( 'nino-admin-elementlist-add', text.add, '+', false, function() { add( option.value ) } );
+					const rowLabel = dc.createElement('span');
+					rowLabel.className = 'nino-admin-elementlist-label';
+					rowLabel.textContent = option.label;
+					rowLabel.title = option.value;
+					row.appendChild( addButton );
+					row.appendChild( rowLabel );
+					results.appendChild( row );
+				} );
+
+				if( matches.length > Nino.adminUi.ELEMENTLIST_RESULTS && text.more ) {
+					const more = dc.createElement('li');
+					more.className = 'nino-admin-elementlist-note';
+					more.textContent = text.more.replace( '%d', String( matches.length ) );
+					results.appendChild( more );
+				}
+			}
+
+			function draw() {
+				drawChosen();
+				drawResults();
+			}
+
+			search.addEventListener( 'input', drawResults );
+
+			store.value = JSON.stringify( chosen );
+			draw();
+
+			return field;
+		},
+
+		/**
 		 *	The data table's pure half: filtering, sorting, paging and cell
 		 *	formatting as plain functions over arrays, with no DOM and no
 		 *	state. table() below is the rendering half and owns neither.
@@ -410,6 +686,12 @@
 				if( type === 'boolean' )
 					return ( value === true || value === 1 || value === '1' ) ? '\u2713' : '\u2013';
 
+				// A multi element field holds its references as a list. Joined
+				// with a separator rather than left to String(), whose comma
+				// carries no space and reads as one run-on uri
+				if( Array.isArray( value ) === true )
+					return value.join(', ');
+
 				return String( value );
 			},
 
@@ -425,6 +707,11 @@
 			 *	@return		{number}
 			 */
 			isEmpty : function( value ) {
+				// An element field holding an empty list is as absent as a blank
+				// string, and sort() has to place it with the other absent
+				// values rather than among the present ones
+				if( Array.isArray( value ) === true )
+					return value.length === 0;
 				return value === null || value === undefined || value === '';
 			},
 

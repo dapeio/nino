@@ -45,9 +45,20 @@ sandbox.Nino = {
 
 const source = fs.readFileSync( path.join( __dirname, '../_admin/assets/elements.js' ), 'utf8' );
 
+const context = vm.createContext( sandbox );
+
+// The shared admin layer, loaded first exactly as the tool's own shell loads
+// it: elements.js asks Nino.adminUi whether a model field is a multi element
+// reference, so a sandbox without it tests a module the page never runs
+vm.runInContext(
+	fs.readFileSync( path.join( __dirname, '../_nino/Nino.admin.js' ), 'utf8' ),
+	context,
+	{ filename : 'Nino.admin.js' }
+);
+
 vm.runInContext(
 	source,
-	vm.createContext( sandbox ),
+	context,
 	{ filename : 'elements.js' }
 );
 
@@ -226,6 +237,35 @@ check( 'the "a uri is required" guard is skipped for a numbered insert',
 	/uri === '' && numberedInsert === false/.test( source ) === true );
 check( 'the saved element\'s own .uri is what the form adopts afterwards',
 	/response\.element\['\.uri'\]/.test( source ) === true );
+
+// --- an element reference holding a list ----------------------------------
+//
+// The control stores its ordered list as json in a hidden input, so the form
+// reads it back through the same [data-field] path as every other field. Only
+// data-multiple separates it from a single reference's select, which carries
+// one uri as a plain string.
+
+check( 'a list reference is read back as the array it holds',
+	JSON.stringify( elements._readField( { dataset : { type : 'element', multiple : '0' }, value : '["/tag/php","/tag/css"]' } ) ) === '["/tag/php","/tag/css"]' );
+check( 'a single reference is still read back as its plain uri',
+	elements._readField( { dataset : { type : 'element' }, value : '/tag/php' } ) === '/tag/php' );
+// A half-written value must not take the whole save down with it
+check( 'unreadable json falls back to an empty list rather than throwing',
+	JSON.stringify( elements._readField( { dataset : { type : 'element', multiple : '2' }, value : '[' } ) ) === '[]' );
+
+// Merely visiting a translation must not mark it as edited
+check( 'an absent list equals its untouched empty control',
+	elements._fieldValuesEqual( { type : 'element', multiple : 0 }, null, [] ) === true );
+check( 'a reordered list is an actual edit',
+	elements._fieldValuesEqual( { type : 'element', multiple : 0 }, [ '/tag/php', '/tag/css' ], [ '/tag/css', '/tag/php' ] ) === false );
+// Without the multiple key this is the old single reference, whose empty
+// value is the empty string - normalizing it to [] would call every untouched
+// single reference edited
+check( 'a single reference still normalizes to an empty string, not a list',
+	elements._fieldValuesEqual( { type : 'element' }, null, '' ) === true );
+
+check( 'the form renders the shared control rather than a second copy of it',
+	source.includes('Nino.adminUi.elementList(') && source.includes('Nino.adminUi.isMultiElement( field )') );
 
 console.log( '\n'+ checks+ ' checks, '+ failures+ ' failed' );
 process.exitCode = failures === 0 ? 0 : 1;
