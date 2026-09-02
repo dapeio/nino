@@ -306,7 +306,7 @@
 		/**
 		 *	Decode html entities back to plain text (eg. "&amp;" -> "&") -
 		 *	Submissions/Newsletter fields are stored htmlspecialchars()-encoded
-		 *	(see Shortcodes\Form/Newsletter::callbackResponse()), so anything
+		 *	(see Modules\Form/Newsletter::callbackResponse()), so anything
 		 *	rendering their raw value for display or export needs this first.
 		 *	Safe regardless of what the string contains: assigning to a
 		 *	detached <textarea>'s innerHTML never executes markup, it's

@@ -2,7 +2,7 @@
 
 /**
  *	Nino										A compact filesystembased php framework
- *	Install									Step 4: the values every stylesheet reads from - a brand
+ *	Install									Step 6: the values every stylesheet reads from - a brand
  *													colour, an optional second accent, and the two steps
  *													that decide how far each is pushed. /_design generates
  *													the tokens from them and this step writes the

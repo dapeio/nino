@@ -1,14 +1,15 @@
 # Nino - minimal Apache hardening defaults. Harmless if AllowOverride
 # doesn't apply this file (eg. a PHP-FPM/nginx deployment) - see
-# docs/deployment.md's "Webserver (production)" for the equivalent nginx rules.
+# docs/deployment.md's "Nginx and Other Web Servers" for the equivalent rules
+# there.
 
 # Never serve a dotfile directly - matches the filename only (not the
 # containing directory, so _editor/.cache/script.js is unaffected).
 # private/.auth/ and private/.logs/ are dotdirs whose files inside
 # (eg. 2026-01-01.php) aren't themselves dotfiles - the complete private tree
 # is denied by private/.htaccess, with self-exiting .php stubs as an additional
-# safeguard (see docs/development.md's
-# "Encryption / stub conventions").
+# safeguard (see docs/development.md's "Outputs and Uploads", and the
+# go-live checklist in docs/deployment.md).
 <FilesMatch "^\.">
 	Require all denied
 </FilesMatch>

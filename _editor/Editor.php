@@ -1945,7 +1945,7 @@ namespace Nino\Editor {
 	 *												this reads its storage independently (same shape as
 	 *												Dev\Restore reading Admin\Backup's output: fixed path,
 	 *												never writes anything here). Project-root /data, plain
-	 *												array files - not an _editor concern, see Shortcodes\Form's
+	 *												array files - not an _editor concern, see Modules\Form's
 	 *												own docblock.
 	 *
 	 *	@package					Dape/Nino
@@ -1958,7 +1958,7 @@ namespace Nino\Editor {
 
 		/**
 		 *	List every recorded submission within the retention window
-		 *	(see Shortcodes\Form::RETENTION_MONTHS), most recent first
+		 *	(see Modules\Form::RETENTION_MONTHS), most recent first
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
@@ -2017,11 +2017,11 @@ namespace Nino\Editor {
 	 *	Newsletter				View + delete of the newsletter signups -
 	 *												\Nino\Modules\Newsletter (in _nino/Nino.php) writes
 	 *												these, this reads/deletes its storage independently (same
-	 *												shape as Admin\Submissions reading Shortcodes\Form's
+	 *												shape as Admin\Submissions reading Modules\Form's
 	 *												output: fixed path). Project-root /data, plain array file -
-	 *												not an _editor concern, see Shortcodes\Newsletter's own
+	 *												not an _editor concern, see Modules\Newsletter's own
 	 *												docblock. Besides apiDelete, entries also go away via the
-	 *												self-service unsubscribe link (Shortcodes\Newsletter).
+	 *												self-service unsubscribe link (Modules\Newsletter).
 	 *
 	 *	@package					Dape/Nino
 	 *	@author						David Perchermeier <mail@dape.io>
@@ -2073,7 +2073,7 @@ namespace Nino\Editor {
 		/**
 		 *	Delete one subscriber by email - the admin-side counterpart to
 		 *	the visitor's own self-service unsubscribe link (see
-		 *	Shortcodes\Newsletter in _nino/Nino.php)
+		 *	Modules\Newsletter in _nino/Nino/Modules/Newsletter/Newsletter.php)
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request

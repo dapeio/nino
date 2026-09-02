@@ -26,7 +26,7 @@ declare(strict_types=1);
 
 require '_nino/Nino.php';
 
-// Init Nino - the contact form's POST / handler is \Nino\Shortcodes\Form,
+// Init Nino - the contact form's POST /.form handler is \Nino\Modules\Form,
 // registered like every other module via config.php's /nino/modules
 $appData    = \Nino\init();
 

@@ -291,11 +291,10 @@ removal of every pre-1.0 compatibility path.
   `--color-focus-tint` and `--color-brand-alt*` roles behind them. All ten
   catalogue themes assign the new roles, and the demo catalogue shows them.
 
-  `--nino-origin` and `--nino-vibrant` keep working: they are emitted once in
-  the bare `:root` as `var()` indirections onto the role that carries their
-  exact former meaning, so a stylesheet that never touched Harmony or Secondary
-  renders identically. A `var()` resolves where it is used, so one line follows
-  both dark blocks without being repeated in either.
+  `--nino-origin` and `--nino-vibrant` are gone with the rest of the legacy
+  fallbacks in this release, and no alias is emitted for them. The roles that
+  carry their former meaning are `--nino-brand` and `--nino-accent`; a
+  stylesheet still naming the old tokens has to be pointed at those.
 
 - A dirty state for Design, in both pickers. The pane counts what differs from
   what is stored, each field that moved says what it was ("saved: as it is",
@@ -469,7 +468,7 @@ removal of every pre-1.0 compatibility path.
   `design` block it was drawn with. A hex in a role would be a pair `/_design`
   never measured, which is the whole reason the two layers are separate.
 
-  Catalogue tests now validate all eight manifests and both frame references,
+  Catalogue tests now validate all ten manifests and both frame references,
   reject literal colour and size roles, and resolve every background/text pair
   through the real generated palette in both light and dark mode. A mapping
   that looks plausible but misses its declared contrast target therefore fails
@@ -1158,10 +1157,11 @@ removal of every pre-1.0 compatibility path.
 - Project-owned PHP classes now resolve from `app/` by default, or from
   `NINO_APP_DIR` when that constant is defined before `_nino/Nino.php` is
   loaded. The `Nino\` namespace remains kernel-owned and resolves exclusively
-  below `_nino/`, so project code cannot shadow built-ins. Non-`Nino\` classes
-  retain `_nino/` as a compatibility fallback for existing projects;
-  `/nino/modules` still controls activation only, not whether a class can be
-  autoloaded.
+  below `_nino/`, so project code cannot shadow built-ins. A non-`Nino\` class
+  resolves against the application root alone - `_nino/` is not searched for
+  it, so a class that lands there by accident fails loudly instead of being
+  found; `/nino/modules` still controls activation only, not whether a class
+  can be autoloaded.
 - Management APIs now expose one current schema: Webpages posts `libraryKey`
   and `navs`, Template creation posts `filename`, navigations come only from
   `/nino/html/navs`, and the selected Theme comes only from

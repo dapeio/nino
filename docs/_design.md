@@ -48,21 +48,23 @@ The catalogue lives below `_install/library/`. Removing `/_install/` from a depl
 
 ### Primary and Secondary
 
-Two hex colors. Primary becomes the `origin` surface and tints the neutral greys — a grey biased toward the brand hue reads as chosen rather than as an accident. Secondary becomes the `vibrant` surface. With no Secondary set, `vibrant` and `origin` are identical, which is a valid single-accent design.
+Two hex colors. Primary becomes the `brand` surface and tints the neutral greys — a grey biased toward the brand hue reads as chosen rather than as an accident. Secondary becomes the `accent` surface. With no Secondary set, the accent is the brand's own lightness and chroma carried round the wheel to wherever Harmony puts it; under Monochrome that lands back on the brand itself, which is a valid single-accent design.
 
-Your brand color is not used verbatim as a background. It is moved along the perceptual lightness axis until the text on it passes the contrast target — the hue and the saturation are what stay recognizable. A brand blue may come out slightly darker as a surface than it is in your logo; it is still the same blue.
+`brand` and `accent` are the colors the picker returned, byte for byte, in light mode and in dark. Nothing moves them — not the Saturation knob, not the contrast solver, not the mode: an operator who types their corporate hex has to find that hex in the stylesheet. The cost is that they are the one pair without a guaranteed contrast ratio, which is exactly why `brand-safe` and `accent-safe` exist beside them. Those two are the same color moved along the perceptual lightness axis until the text on them passes the target — hue and saturation stay recognizable. A brand blue may come out slightly darker as `brand-safe` than it is in your logo; it is still the same blue.
 
 ### Contrast
 
-Sets the ratio that has to be met, nothing else.
+4.5:1 is the floor at every position, muted text included. The knob decides how far *above* that floor the type sits.
 
-| Setting | Body text | Secondary text |
+| Setting | Solved ratio (links, brand surfaces) | Body ink on white |
 |---|---|---|
-| Soft | 4.5:1 | 3.0:1 |
-| Default | 4.5:1 | 4.5:1 |
-| High | 7.0:1 | 4.5:1 |
+| Soft | 4.5:1 | a soft near-black, around 9:1 |
+| Default | 4.5:1 | near-black |
+| High | 7.0:1 | black |
 
-4.5:1 is the WCAG AA requirement for body text (SC 1.4.3), 7.0:1 is AAA. `Soft` does not go below AA for body text — it only relaxes the subordinate tier. Borders and focus rings always target 3:1 (SC 1.4.11) regardless of the setting.
+The two columns move for different reasons. The solved targets — `TARGET_TEXT` and `TARGET_MUTED`, which are the same value at every position — apply where a ratio has to be reached: links, and the lightness a brand surface is moved to so text survives on it. Body text is not solved against a target at all, because solving it would put grey copy on white at exactly 4.5:1 — legal and visibly washed out. It is a lightness instead, and that lightness is what a reader actually feels.
+
+The muted tier used to be allowed down to 3.0:1, which only passes for large type; a muted paragraph is not large type, so it carries the same floor the body does. 4.5:1 is the WCAG AA requirement for body text (SC 1.4.3), 7.0:1 is AAA. Borders target 3:1 (SC 1.4.11), and the focus ring is held at 3:1 at every setting — it is the one value no knob may soften.
 
 ### Colors
 
@@ -96,17 +98,22 @@ The default of every setting reproduces `Nino.css`'s own scale exactly. Turning 
 
 ## The Surfaces
 
-A surface is a background plus everything readable on it. There are nine:
+A surface is a background plus everything readable on it. There are twelve, in the order `Tokens::SURFACES` names them:
 
 | Surface | Use |
 |---|---|
 | `default` | the page ground |
 | `alt` | a barely-there step off the ground, for alternating sections |
+| `tint` | the fifth ground: the page ground carrying the brand hue rather than a near-grey |
 | `dark` | a deliberate dark block; the same in light and dark mode |
 | `black` | the deepest step, for footers and heavy sections |
-| `origin` | the brand surface |
-| `vibrant` | the second accent |
+| `brand` | the primary exactly as picked, never written on |
+| `brand-safe` | that same colour, lightness solved until text survives on it |
+| `accent` | the second colour exactly as picked or derived |
+| `accent-safe` | that same colour, made safe the same way |
 | `success`, `warning`, `danger` | status, at fixed hues |
+
+The brand is four roles rather than two. Each answers one of two questions — is it the brand or the second colour, and is it the one that was picked or the one text survives on. Two roles broke as soon as a Secondary colour was set: the safe surface became the *accent* made safe, leaving no contrast-safe brand colour in the palette at all.
 
 Each publishes ten values:
 
@@ -163,8 +170,8 @@ Applying another Theme is the intentional reset operation. It overwrites files n
 | Symptom | Cause and fix |
 |---|---|
 | Colors do not change after saving | Browser cache. Reload with cache bypass; the bundle is regenerated on write. |
-| The brand color looks different as a surface | Expected. Lightness was moved to reach the contrast target; hue and saturation are preserved. |
-| Secondary elements look identical to primary ones | No Secondary set — `vibrant` falls back to `origin`. Set one. |
+| The brand color looks different as a surface | Expected on `brand-safe`, where lightness was moved to reach the contrast target; hue and saturation are preserved. `brand` itself is never moved. |
+| Secondary elements look identical to primary ones | No Secondary set and Harmony on Monochrome — the derived accent lands on the brand. Set a Secondary, or pick another Harmony. |
 | `style.design.css` keeps losing manual edits | It is generated. Use `assets/style.css`. |
 | Theme, Header, or Footer says no variants are available | `_install/` was removed, or its catalogue is incomplete. After the recommended deployment this is the normal state. To switch again, redeploy a locked `_install/` from the same Nino version. |
 | A frame preview differs from the live page | The preview uses the current installed includes and text where available, but remains an inert single-frame document. Check the applied template on the full page for request-specific module output. |
@@ -173,7 +180,7 @@ Applying another Theme is the intentional reset operation. It overwrites files n
 
 ## Catalogue Contract
 
-All ten supplied themes — Aperture, Basis, Docs, Editorial, Nocturne, Rail, Signal, Soft, Studio, and Surface — are mapping layers. Every colour role reads a generated `--nino-*` token, every size role reads the generated raster, and every manifest declares the complete Design and frame baseline the preview represents. A custom catalogue theme must keep that contract or its Design controls cannot reliably recolour and reshape it.
+All ten supplied themes — Basis, Bureau, Chronicle, Console, Gallery, Market, Midnight, Platform, Poster, and Practice — are mapping layers. Every colour role reads a generated `--nino-*` token, every size role reads the generated raster, and every manifest declares the complete Design and frame baseline the preview represents. A custom catalogue theme must keep that contract or its Design controls cannot reliably recolour and reshape it.
 
 ## Next Steps
 

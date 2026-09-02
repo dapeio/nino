@@ -3,13 +3,13 @@
  *	Modules									Optional modules
  *	Nino										Framework
  *	newsletter.js						Admin "Newsletter" panel: view of every signup
- *													\Nino\Shortcodes\Newsletter records - see _editor/Editor.php's
+ *													\Nino\Modules\Newsletter records - see _editor/Editor.php's
  *													Newsletter class - plus a one-line, copyable BCC address
  *													field, since the actual send always happens elsewhere (own
  *													mail client, or a project-specific ESP), never from Nino
  *													itself. The only write this panel does is delete - there's
  *													deliberately no self-service unsubscribe (see
- *													Shortcodes\Newsletter's docblock), this "Löschen" button is
+ *													Modules\Newsletter's docblock), this "Löschen" button is
  *													the only way an entry is ever removed.
  *
  *	@package								Dape/Nino

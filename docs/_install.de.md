@@ -96,9 +96,27 @@ Die Position des Stylesheets im Bundle bleibt nach Möglichkeit erhalten, damit 
 
 **Wichtig:** Gleichnamige Theme-Dateien werden überschrieben. Dateien, die nur das vorherige Theme mitgebracht hat, bleiben dagegen liegen. Sichere eigene Änderungen deshalb über Git, bevor du das Theme wechselst oder erneut anwendest. Nach dem Abschluss sperrt sich `/_install`; die authentifizierte Oberfläche `/_design` stellt denselben Theme-Katalog für spätere Änderungen bereit.
 
-## 4. Design
+## 4. Header
 
-Ein eigener Schritt, weil das Theme-Raster bereits eine Pane füllt und hier alles beim Ändern betrachtet werden muss.
+Der `<header>` der Seite ist eine austauschbare Einheit unter `library/header/<key>`, bestehend aus einer `template.tpl` und der `style.css` für ihr Markup. Das Theme wählt den Header vor, gegen den es gezeichnet wurde; dieser eigene Schritt übersteuert ausschließlich diese Auswahl — die Design-Werte sind zu diesem Zeitpunkt noch die vom Theme erklärten.
+
+Beim Anwenden wird die Einheit nach `templates/theme.header.tpl` und `assets/style.header.css` kopiert, ihr Schlüssel unter `/nino/install/header` gespeichert und das Frame-Stylesheet direkt hinter dem Theme im CSS-Bundle gehalten. Dabei wird weder das Theme erneut kopiert noch das Design zurückgesetzt.
+
+Das höhere Vorschau-Iframe rendert die echte Vorlage gegen Framework, das gewählte Theme, dessen erklärte Design-Werte und das eigene Stylesheet des Frames. Wer nach dem Design-Schritt hierher zurückgeht, sieht die Vorschau stattdessen gegen die festgelegten Werte — der Frame wird also immer auf dem gezeigt, was das nächste Weiter auch schreibt. Eine Versionsnummer sagt nichts über ein Layout, und anders als ein Theme hat ein Frame kein Vorschaubild zum Öffnen. Die Vorschau setzt ein, was das Projekt noch nicht hat: eine Platzhaltermarke an der Logo-Stelle, Beispiel-Navigationspunkte und für alles Übrige die Texte der Library. Sie ist ein eigenes, abgeschottetes Dokument, weil ein Frame-Stylesheet breite Selektoren verwendet, die nicht im Installer landen dürfen.
+
+Die Basis-Seitenvorlagen binden die installierte Kopie über `[template /templates/theme.header]` ein, statt das Markup selbst zu tragen. Der Header lässt sich später also über dieselben zwei Projektdateien austauschen.
+
+## 5. Footer
+
+Der Footer-Schritt verwendet unabhängig davon denselben Einheitenvertrag unter `library/footer/<key>`. Beim Anwenden schreibt er `templates/theme.footer.tpl` und `assets/style.footer.css`, speichert `/nino/install/footer` und lässt Theme, Design sowie den gewählten Header unangetastet.
+
+Sein höheres Vorschau-Iframe verwendet denselben Design- und Theme-Kontext wie die Header-Vorschau. Wird Footer nach Header angewendet, bleibt die kanonische Bundle-Reihenfolge erhalten: Theme, Header-Stylesheet, Footer-Stylesheet.
+
+Die Basis-Seitenvorlagen binden ihn über `[template /templates/theme.footer]` ein.
+
+## 6. Design
+
+Ein eigener Schritt — und der letzte der drei, die den Look festlegen —, weil das Theme-Raster bereits eine Pane füllt und hier alles beim Ändern betrachtet werden muss. Beide Frames stehen zu diesem Zeitpunkt, das Specimen wird also auf der Seite gezeichnet, die das Projekt tatsächlich bekommt.
 
 Die Werte, aus denen das Theme liest. `/_design` erzeugt die `--nino-*`-Tokens, ein Theme-Stylesheet weist sie Rollen zu, statt Literale zu schreiben.
 
@@ -110,7 +128,7 @@ Die Token-Namen beider Hälften stehen in [`_design.de.md`](_design.de.md).
 
 Das Manifest eines Themes erklärt das Design, mit dem es gezeichnet wurde - ein Theme wählen und „Weiter" drücken erzeugt also den Look, den die Vorschau versprochen hat. Der Farbstreifen unter den Reglern zeigt die echten Paare, nicht nur die Hintergründe.
 
-Dieser Teil des Schritts ist optional: Eine Auslieferung ohne `/_design` installiert genau wie zuvor, nur ohne den Design-Block.
+Dieser Schritt ist optional: Eine Auslieferung ohne `/_design` installiert genau wie zuvor, nur ohne den Design-Block.
 
 Die Reihenfolge im CSS-Bundle ist der ganze Vertrag, und jede Ebene besitzt darin genau einen Platz:
 
@@ -123,25 +141,9 @@ assets/style.footer.css
 assets/style.css            die eigenen Übersteuerungen des Projekts
 ```
 
+Die Bundle-Reihenfolge steht fest und ist unabhängig von der Reihenfolge der Schritte: Das Design wird zuletzt festgelegt, sein Stylesheet bleibt aber die Ebene, aus der das Theme liest.
+
 `/_design` bleibt nach der Installation verfügbar, sodass ein Projekt ohne Neuinstallation umgefärbt werden kann. Siehe [`_design.de.md`](_design.de.md).
-
-## 5. Header
-
-Der `<header>` der Seite ist eine austauschbare Einheit unter `library/header/<key>`, bestehend aus einer `template.tpl` und der `style.css` für ihr Markup. Das Theme wählt den Header vor, gegen den es gezeichnet wurde; dieser eigene Schritt übersteuert ausschließlich diese Auswahl, nachdem das Design festgelegt wurde.
-
-Beim Anwenden wird die Einheit nach `templates/theme.header.tpl` und `assets/style.header.css` kopiert, ihr Schlüssel unter `/nino/install/header` gespeichert und das Frame-Stylesheet direkt hinter dem Theme im CSS-Bundle gehalten. Dabei wird weder das Theme erneut kopiert noch das Design zurückgesetzt.
-
-Das höhere Vorschau-Iframe rendert die echte Vorlage gegen Framework, die soeben gewählten Design-Werte, das Theme und das eigene Stylesheet des Frames. Eine Versionsnummer sagt nichts über ein Layout, und anders als ein Theme hat ein Frame kein Vorschaubild zum Öffnen. Die Vorschau setzt ein, was das Projekt noch nicht hat: eine Platzhaltermarke an der Logo-Stelle, Beispiel-Navigationspunkte und für alles Übrige die Texte der Library. Sie ist ein eigenes, abgeschottetes Dokument, weil ein Frame-Stylesheet breite Selektoren verwendet, die nicht im Installer landen dürfen.
-
-Die Basis-Seitenvorlagen binden die installierte Kopie über `[template /templates/theme.header]` ein, statt das Markup selbst zu tragen. Der Header lässt sich später also über dieselben zwei Projektdateien austauschen.
-
-## 6. Footer
-
-Der Footer-Schritt verwendet unabhängig davon denselben Einheitenvertrag unter `library/footer/<key>`. Beim Anwenden schreibt er `templates/theme.footer.tpl` und `assets/style.footer.css`, speichert `/nino/install/footer` und lässt Theme, Design sowie den gewählten Header unangetastet.
-
-Sein höheres Vorschau-Iframe verwendet denselben endgültigen Design- und Theme-Kontext wie die Header-Vorschau. Wird Footer nach Header angewendet, bleibt die kanonische Bundle-Reihenfolge erhalten: Theme, Header-Stylesheet, Footer-Stylesheet.
-
-Die Basis-Seitenvorlagen binden ihn über `[template /templates/theme.footer]` ein.
 
 Theme und beide Frame-Kataloge liegen neben den Basis-, Modul- und Seiten-Einheiten unter `_install/library/`. `/_design` liest sie mit, solange der Installer ausgeliefert ist; sie sind Einrichtungsmaterial und werden beim Anwenden ins Projekt kopiert, nie zur Laufzeit gelesen.
 

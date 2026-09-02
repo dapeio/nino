@@ -55,7 +55,7 @@ namespace Nino\Modules {
 		 *	are registered here rather than hand-declared in config.php
 		 *	(unlike the page GET routes, which are genuinely per-project
 		 *	content): this module owns the endpoints it needs, so a project
-		 *	enabling Shortcodes\Newsletter (see config.php's /nino/modules)
+		 *	enabling Modules\Newsletter (see config.php's /nino/modules)
 		 *	gets a working signup + confirm/unsubscribe flow without also
 		 *	having to remember to wire up the routes
 		 *

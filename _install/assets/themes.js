@@ -2,13 +2,14 @@
 
 /**
  *	Nino										A compact filesystembased php framework
- *	Install									Steps 3, 5 and 6: pick the site's look - one tile per
+ *	Install									Steps 3, 4 and 5: pick the site's look - one tile per
  *													library/themes/&lt;key&gt; unit, each with the
  *													preview image, title and description its own
  *													manifest.php declares. Applying the Theme installs its
- *													declared Design and frame defaults; after Design, Header
- *													and Footer each get their own full preview step and apply
- *													only that frame. See _install/Install.php's Themes class.
+ *													declared Design and frame defaults; Header and Footer
+ *													then each get their own full preview step and apply only
+ *													that frame, before Design settles the values in step 6.
+ *													See _install/Install.php's Themes class.
  *													Driven by the shared Back/Next bar
  *													(script.js) rather than its own save button - apply() is
  *													exposed for Next to call, not wired to a button here.
@@ -270,9 +271,12 @@
 				theme  : Nino.install.themes._selected,
 			};
 
-			// Header/Footer follow Design in the wizard, so their preview must
-			// use what the controls just settled on rather than the theme's
-			// manifest defaults that happened to be stored when Themes opened.
+			// Header/Footer run before Design (STEPS in script.js), so normally
+			// there is nothing settled yet and the backend previews against the
+			// theme's declared defaults. The exception is the way back: once
+			// Design has run, its controls hold values the theme manifest does
+			// not, and a frame previewed against the stale defaults would not
+			// be the frame the next Next writes.
 			if( Nino.install.design !== undefined && Nino.install.design._settings !== null && typeof Nino.install.design._settings === 'object' )
 				payload.design = Nino.install.design._settings;
 

@@ -5,7 +5,7 @@
  *	Modules									Optional modules
  *	Nino										Framework
  *	submissions.js					Admin "Anfragen" panel: read-only view of every contact-form
- *													submission \Nino\Shortcodes\Form records (in addition to
+ *													submission \Nino\Modules\Form records (in addition to
  *													the mail itself) - see _editor/Editor.php's Submissions class.
  *													Nothing here writes anything, it only lists.
  *

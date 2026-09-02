@@ -95,9 +95,27 @@ The position of the stylesheet in the bundle is preserved as much as possible so
 
 **Important:** Theme files with the same name are overwritten. Files that only the previous theme brought remain. Therefore, secure your own changes via Git before switching or reapplying the theme. After completion, `/_install` locks itself; the authenticated `/_design` interface provides the same Theme catalogue for later changes.
 
-## 4. Design
+## 4. Header
 
-Its own step, because the theme grid already fills a pane and everything here has to be looked at while it is being changed.
+The site's `<header>` is an interchangeable unit under `library/header/<key>`, made from a `template.tpl` plus the `style.css` for the markup that template brings. The theme preselects the header it was drawn against; this separate step overrides only that choice, while the Design values are still the ones the theme declared.
+
+Applying copies the unit to `templates/theme.header.tpl` and `assets/style.header.css`, persists its key under `/nino/install/header`, and keeps the frame stylesheets directly after the theme in the CSS bundle. It does not recopy the theme or reset Design.
+
+The taller preview iframe renders the real template against the framework, the picked theme, that theme's declared Design values, and the frame's own stylesheet. Stepping back here after Design has been settled previews against the settled values instead, so what the frame is shown on always matches what the next Next writes. A version number says nothing about a layout, and unlike a theme a frame has no preview image to open. The preview stands in for what a project does not have yet: a placeholder mark where the logo goes, sample navigation items, and the library's own text for everything else. It is a sandboxed document of its own because a frame stylesheet uses broad selectors that must not land on the installer.
+
+The base page templates include the installed copy through `[template /templates/theme.header]` rather than carrying the markup themselves, so the header can later be changed by replacing the same two project files.
+
+## 5. Footer
+
+The Footer step follows the same unit contract independently under `library/footer/<key>`. Applying writes `templates/theme.footer.tpl` and `assets/style.footer.css`, persists `/nino/install/footer`, and leaves Theme, Design, and the selected Header untouched.
+
+Its taller preview uses the same Design and theme context as the Header preview. Applying Footer after Header preserves the canonical bundle order: theme, header stylesheet, footer stylesheet.
+
+The base page templates include it through `[template /templates/theme.footer]`.
+
+## 6. Design
+
+Its own step, and the last of the three that decide the look, because the theme grid already fills a pane and everything here has to be looked at while it is being changed. Both frames are in place by now, so the specimen is drawn on the page the project will actually have.
 
 The values the theme reads from. `/_design` generates the `--nino-*` tokens and a theme stylesheet assigns them to roles rather than writing literals.
 
@@ -107,9 +125,9 @@ The values the theme reads from. `/_design` generates the `--nino-*` tokens and 
 
 See [`_design.md`](_design.md) for the token names both halves publish.
 
-A theme's manifest declares the design it was drawn with, so picking a theme and pressing Next produces the look its preview promised. The swatch strip under the controls shows the real pairs, not just the backgrounds.
+A theme's manifest declares the design it was drawn with, so picking a theme and walking through to here produces the look its preview promised. The swatch strip under the controls shows the real pairs, not just the backgrounds.
 
-This part of the step is optional: a delivery that ships without `/_design` installs exactly as before, with the Design block absent.
+This step is optional: a delivery that ships without `/_design` installs exactly as before, with the Design block absent.
 
 The order in the css bundle is the whole contract, and each layer owns one slot in it:
 
@@ -122,25 +140,9 @@ assets/style.footer.css
 assets/style.css            the project's own overrides
 ```
 
+The bundle order is fixed and independent of the order the steps run in: Design is settled last, but its stylesheet stays the layer the theme reads from.
+
 `/_design` stays available after the installation, so a project can be recolored without reinstalling. See [`_design.md`](_design.md).
-
-## 5. Header
-
-The site's `<header>` is an interchangeable unit under `library/header/<key>`, made from a `template.tpl` plus the `style.css` for the markup that template brings. The theme preselects the header it was drawn against; this separate step overrides only that choice after Design has been settled.
-
-Applying copies the unit to `templates/theme.header.tpl` and `assets/style.header.css`, persists its key under `/nino/install/header`, and keeps the frame stylesheets directly after the theme in the CSS bundle. It does not recopy the theme or reset Design.
-
-The taller preview iframe renders the real template against the framework, the just-chosen Design values, the picked theme, and the frame's own stylesheet. A version number says nothing about a layout, and unlike a theme a frame has no preview image to open. The preview stands in for what a project does not have yet: a placeholder mark where the logo goes, sample navigation items, and the library's own text for everything else. It is a sandboxed document of its own because a frame stylesheet uses broad selectors that must not land on the installer.
-
-The base page templates include the installed copy through `[template /templates/theme.header]` rather than carrying the markup themselves, so the header can later be changed by replacing the same two project files.
-
-## 6. Footer
-
-The Footer step follows the same unit contract independently under `library/footer/<key>`. Applying writes `templates/theme.footer.tpl` and `assets/style.footer.css`, persists `/nino/install/footer`, and leaves Theme, Design, and the selected Header untouched.
-
-Its taller preview uses the same final Design and theme context as the Header preview. Applying Footer after Header preserves the canonical bundle order: theme, header stylesheet, footer stylesheet.
-
-The base page templates include it through `[template /templates/theme.footer]`.
 
 Theme and both frame catalogues sit beside the base, module, and page units below `_install/library/`. `/_design` reads them for as long as the installer is deployed; they are setup material, copied into the project when applied and never read at runtime.
 

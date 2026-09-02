@@ -48,21 +48,23 @@ Der Katalog liegt unter `_install/library/`. Wird `/_install/` aus der Ausliefer
 
 ### Primär und Sekundär
 
-Zwei Hex-Farben. Die Primärfarbe wird zur `origin`-Fläche und färbt die neutralen Grautöne ein — ein zur Markenfarbe hin verschobenes Grau wirkt gewählt und nicht zufällig. Die Sekundärfarbe wird zur `vibrant`-Fläche. Ohne Sekundärfarbe sind `vibrant` und `origin` identisch, was für ein Ein-Akzent-Design richtig ist.
+Zwei Hex-Farben. Die Primärfarbe wird zur `brand`-Fläche und färbt die neutralen Grautöne ein — ein zur Markenfarbe hin verschobenes Grau wirkt gewählt und nicht zufällig. Die Sekundärfarbe wird zur `accent`-Fläche. Ohne Sekundärfarbe entsteht der Akzent aus Helligkeit und Chroma der Marke, um den Winkel der Harmonie über den Farbkreis getragen; bei Monochrome landet er wieder auf der Marke selbst, was für ein Ein-Akzent-Design richtig ist.
 
-Ihre Markenfarbe wird nicht unverändert als Hintergrund verwendet. Sie wird entlang der wahrnehmungsbezogenen Helligkeitsachse verschoben, bis der Text darauf das Kontrastziel erreicht — erkennbar bleiben Farbton und Sättigung. Ein Markenblau kann als Fläche etwas dunkler herauskommen als im Logo; es ist trotzdem dasselbe Blau.
+`brand` und `accent` sind exakt die Farben, die der Picker geliefert hat — Byte für Byte, im hellen wie im dunklen Modus. Nichts verschiebt sie: weder der Sättigungsregler noch der Kontrastlöser noch der Modus. Wer seinen Firmen-Hex eintippt, muss genau diesen Hex im Stylesheet wiederfinden. Der Preis dafür ist, dass sie das einzige Paar ohne garantiertes Kontrastverhältnis sind — genau deshalb stehen `brand-safe` und `accent-safe` daneben. Diese beiden sind dieselbe Farbe, entlang der wahrnehmungsbezogenen Helligkeitsachse verschoben, bis der Text darauf das Kontrastziel erreicht; erkennbar bleiben Farbton und Sättigung. Ein Markenblau kann als `brand-safe` etwas dunkler herauskommen als im Logo; es ist trotzdem dasselbe Blau.
 
 ### Kontrast
 
-Legt ausschließlich das zu erreichende Verhältnis fest.
+4,5:1 ist der Boden an jeder Position, gedämpfter Text eingeschlossen. Der Regler entscheidet, wie weit *über* diesem Boden die Schrift sitzt.
 
-| Einstellung | Fließtext | Sekundärtext |
+| Einstellung | Gelöstes Verhältnis (Links, Markenflächen) | Fließtext-Tinte auf Weiß |
 |---|---|---|
-| Soft | 4,5:1 | 3,0:1 |
-| Default | 4,5:1 | 4,5:1 |
-| High | 7,0:1 | 4,5:1 |
+| Soft | 4,5:1 | ein weiches Fast-Schwarz, rund 9:1 |
+| Default | 4,5:1 | Fast-Schwarz |
+| High | 7,0:1 | Schwarz |
 
-4,5:1 ist die WCAG-AA-Anforderung für Fließtext (SC 1.4.3), 7,0:1 entspricht AAA. `Soft` unterschreitet AA für Fließtext nicht — es lockert nur die untergeordnete Stufe. Rahmen und Fokusringe zielen unabhängig von dieser Einstellung immer auf 3:1 (SC 1.4.11).
+Die beiden Spalten bewegen sich aus verschiedenen Gründen. Die gelösten Ziele — `TARGET_TEXT` und `TARGET_MUTED`, an jeder Position derselbe Wert — gelten dort, wo ein Verhältnis erreicht werden muss: bei Links und bei der Helligkeit, auf die eine Markenfläche verschoben wird, damit Text darauf besteht. Fließtext wird überhaupt nicht gegen ein Ziel gelöst, denn das ergäbe graue Schrift auf Weiß bei exakt 4,5:1 — zulässig und sichtbar ausgewaschen. Er ist stattdessen eine Helligkeit, und genau die nimmt eine lesende Person wahr.
+
+Die gedämpfte Stufe durfte früher bis 3,0:1 gehen, was nur für große Schrift ausreicht; ein gedämpfter Absatz ist keine große Schrift und trägt deshalb denselben Boden wie der Fließtext. 4,5:1 ist die WCAG-AA-Anforderung für Fließtext (SC 1.4.3), 7,0:1 entspricht AAA. Rahmen zielen auf 3:1 (SC 1.4.11), und der Fokusring wird bei jeder Einstellung dort gehalten — er ist der eine Wert, den kein Regler aufweichen darf.
 
 ### Farben
 
@@ -96,17 +98,22 @@ Der Standardwert jeder Einstellung reproduziert exakt die Skala von `Nino.css`. 
 
 ## Die Flächen
 
-Eine Fläche ist ein Hintergrund samt allem, was darauf lesbar ist. Es gibt neun:
+Eine Fläche ist ein Hintergrund samt allem, was darauf lesbar ist. Es gibt zwölf, in der Reihenfolge, die `Tokens::SURFACES` nennt:
 
 | Fläche | Verwendung |
 |---|---|
 | `default` | der Seitengrund |
 | `alt` | ein kaum wahrnehmbarer Schritt davon weg, für abwechselnde Abschnitte |
+| `tint` | der fünfte Grund: der Seitengrund, der den Markenton trägt statt eines Fast-Graus |
 | `dark` | ein bewusst dunkler Block; in hellem und dunklem Modus gleich |
 | `black` | die tiefste Stufe, für Footer und schwere Abschnitte |
-| `origin` | die Markenfläche |
-| `vibrant` | der zweite Akzent |
+| `brand` | die Primärfarbe exakt wie gewählt; es wird nie darauf geschrieben |
+| `brand-safe` | dieselbe Farbe, in der Helligkeit gelöst, bis Text darauf besteht |
+| `accent` | die zweite Farbe exakt wie gewählt oder abgeleitet |
+| `accent-safe` | dieselbe Farbe, auf demselben Weg sicher gemacht |
 | `success`, `warning`, `danger` | Status, mit festen Farbtönen |
+
+Die Marke besteht aus vier Rollen statt aus zwei. Jede beantwortet eine von zwei Fragen: Ist es die Marke oder die zweite Farbe, und ist es die gewählte oder die, auf der Text besteht? Mit zwei Rollen brach das Modell, sobald eine Sekundärfarbe gesetzt war: Die sichere Fläche wurde zum sicher gemachten *Akzent*, und in der Palette blieb keine kontrastsichere Markenfarbe übrig.
 
 Jede veröffentlicht zehn Werte:
 
@@ -163,8 +170,8 @@ Ein anderes Theme anzuwenden ist der bewusste Reset. Dabei werden die vom neuen 
 | Symptom | Ursache und Abhilfe |
 |---|---|
 | Farben ändern sich nach dem Speichern nicht | Browser-Cache. Mit Cache-Umgehung neu laden; das Bundle wird beim Schreiben neu erzeugt. |
-| Die Markenfarbe wirkt als Fläche anders | So gewollt. Die Helligkeit wurde bis zum Kontrastziel verschoben, Farbton und Sättigung bleiben erhalten. |
-| Sekundäre Elemente sehen aus wie primäre | Keine Sekundärfarbe gesetzt — `vibrant` fällt auf `origin` zurück. Eine setzen. |
+| Die Markenfarbe wirkt als Fläche anders | So gewollt bei `brand-safe`, wo die Helligkeit bis zum Kontrastziel verschoben wurde; Farbton und Sättigung bleiben erhalten. `brand` selbst wird nie verschoben. |
+| Sekundäre Elemente sehen aus wie primäre | Keine Sekundärfarbe gesetzt und Harmonie auf Monochrome — der abgeleitete Akzent landet auf der Marke. Eine Sekundärfarbe setzen oder eine andere Harmonie wählen. |
 | `style.design.css` verliert manuelle Änderungen | Die Datei wird erzeugt. Nutzen Sie `assets/style.css`. |
 | Theme, Header oder Footer meldet, dass keine Varianten verfügbar sind | `_install/` wurde entfernt oder sein Katalog ist unvollständig. Das ist nach dem empfohlenen Deployment der Normalfall. Zum Umschalten `_install/` aus derselben Nino-Version gesperrt wieder ausliefern. |
 | Eine Frame-Vorschau unterscheidet sich von der Live-Seite | Die Vorschau nutzt vorhandene installierte Includes und Texte, bleibt aber ein inertes Einzel-Frame-Dokument. Für Request-abhängige Modulausgabe das angewendete Template auf der vollständigen Seite prüfen. |
@@ -173,7 +180,7 @@ Ein anderes Theme anzuwenden ist der bewusste Reset. Dabei werden die vom neuen 
 
 ## Katalogvertrag
 
-Alle zehn mitgelieferten Themes — Aperture, Basis, Docs, Editorial, Nocturne, Rail, Signal, Soft, Studio und Surface — sind Abbildungsschichten. Jede Farbrolle liest ein erzeugtes `--nino-*`-Token, jede Größenrolle das erzeugte Raster, und jedes Manifest erklärt die vollständige Design- und Frame-Ausgangslage seiner Vorschau. Ein eigenes Katalog-Theme muss diesen Vertrag einhalten, damit die Design-Regler es zuverlässig umfärben und umformen können.
+Alle zehn mitgelieferten Themes — Basis, Bureau, Chronicle, Console, Gallery, Market, Midnight, Platform, Poster und Practice — sind Abbildungsschichten. Jede Farbrolle liest ein erzeugtes `--nino-*`-Token, jede Größenrolle das erzeugte Raster, und jedes Manifest erklärt die vollständige Design- und Frame-Ausgangslage seiner Vorschau. Ein eigenes Katalog-Theme muss diesen Vertrag einhalten, damit die Design-Regler es zuverlässig umfärben und umformen können.
 
 ## Nächste Schritte
 

@@ -56,7 +56,7 @@ The developer can then begin working on the project immediately.
 
 ### `/_admin` — optional: the GUI for developers
 
-![Dashboard of the technical project administration](docs/assets/screenshots/_admin1.webp)
+![Textfill overview in Nino Admin](docs/assets/screenshots/_admin1.webp)
 
 In `/_admin`, the developer manages the website’s technical and content structure: element types, elements and texts, images, pages and routes, users, and configuration.
 
