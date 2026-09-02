@@ -129,19 +129,22 @@ Thus, a module can rely on the core functions and the loaded configuration. Conv
 
 ### 2. `\Nino\request()`
 
-Processing a request consists of four steps:
+Processing a request consists of these steps:
 
 ```php
 Http::request( $appData, $request );
+Html::addFills( $appData, [ /* values that depend on $appData alone */ ], '*' );
 Http::response( $appData, $request );
 Locales::response( $appData, $request );
-Html::addFills( $appData, [ /* runtime values */ ], '*' );
+Html::addFills( $appData, [ /* values that depend on the request */ ], '*' );
 Html::response( $appData, $request );
 ```
 
 `Http::request()` does not read directly into arbitrary project variables but normalizes method, URI, query, header, body, basic auth data, and client IP under `/nino/http/request`. Simultaneously, a response is created with an empty body, status `200`, and the preset security headers.
 
-`Http::response()` searches for a matching route under `/nino/http/routes`, takes over its values into the prepared response, and then executes the global and route-specific response callbacks. `Locales::response()` takes over the language resolved by the route. After that, Nino adds runtime textfills such as request URI, response URI, locale, current user, `/nino/dir`, and the current year.
+The runtime textfills are added in two passes, and the split matters. `/nino/dir`, `/nino/public`, and `/date/year` answer to `$appData` alone, so they are registered **before** `Http::response()`: a response callback that renders a template is a real caller — `Modules\Form` and `Modules\Newsletter` build their HTML mails in exactly that window, and a fill registered after it would reach them as the literal `[[/nino/public]]`.
+
+`Http::response()` searches for a matching route under `/nino/http/routes`, takes over its values into the prepared response, and then executes the global and route-specific response callbacks. `Locales::response()` takes over the language resolved by the route. Only after that does Nino add the textfills that need the resolved request: request URI, response URI, locale, and current user.
 
 `Html::response()` renders the body only if it is a string. Arrays and other structured values remain unchanged and are later output as JSON.
 

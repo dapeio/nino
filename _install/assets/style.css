@@ -715,8 +715,13 @@
 #install-page-wrap.show-webpages:not(.is-editing-webpage) #install-context-action {
 	display: inline-flex;
 }
-#install-page-wrap.show-webpages.is-editing-webpage .nino-admin-actionbar,
-#install-page-wrap.show-finish.is-complete .nino-admin-actionbar {
+/* #install-actions-wrap, not a bare descendant .nino-admin-actionbar: the
+   webpage form builds an action bar of its own (see webpages.js) and mounts
+   it inside #webpages-form, ie. inside #install-page-wrap - a descendant
+   selector took that one down too, hiding the form's own Save/Delete
+   buttons exactly while a route was being edited. */
+#install-page-wrap.show-webpages.is-editing-webpage #install-actions-wrap,
+#install-page-wrap.show-finish.is-complete #install-actions-wrap {
 	display: none;
 }
 #install-page-wrap.show-webpages.is-editing-webpage #install-content-webpages > .nino-admin-hint,

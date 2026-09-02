@@ -1415,6 +1415,15 @@ a {
    for the case where the values themselves are what you came to read.
    Rendered by Nino.adminUi.table(), which owns none of the wording. */
 
+/* The hide state the shared components switch. It lives here, next to the
+   component that uses it, rather than in a tool's own stylesheet: /_admin
+   has a local .admin-hidden of its own, /_editor has none, and a shared
+   component reaching for a class only one of its two hosts defines is a
+   component that silently stops working in the other one. */
+:where(.nino-admin) .nino-admin-hidden {
+	display: none !important;
+}
+
 :where(.nino-admin) .nino-admin-table-toolbar {
 	display: flex;
 	align-items: center;

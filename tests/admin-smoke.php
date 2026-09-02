@@ -1101,6 +1101,24 @@ check( 'apiCreate creates the html-flagged fixture key', $status === 200 );
 ] ] );
 check( 'apiSaveBatch sanitizes html and preserves inline code', $body['results']['/company/note']['value'] === '<strong>Wichtig</strong><em>auch</em><code>x()</code>' );
 
+// A plain-text value is substituted raw by Html::_renderFills(), attribute
+// values included ('<a href="[[/company/facebook]]">'), so a stored quote is
+// an attribute break-out that strip_tags() never sees. Entities render as the
+// character itself in both contexts, and re-encode to themselves on a re-save
+[ $status, $body ] = callDev( $appData, \Nino\Admin\Text::class, 'apiSaveBatch', [ 'items' => [
+	[ 'key' => '/company/tagline', 'locale' => '*', 'value' => 'x" onmouseover="alert(1)' ],
+] ] );
+check( 'apiSaveBatch entity-encodes quotes in a plain-text value', $body['results']['/company/tagline']['value'] === 'x&quot; onmouseover=&quot;alert(1)' );
+
+[ $status, $body ] = callDev( $appData, \Nino\Admin\Text::class, 'apiSaveBatch', [ 'items' => [
+	[ 'key' => '/company/tagline', 'locale' => '*', 'value' => 'x&quot; onmouseover=&quot;alert(1)' ],
+] ] );
+check( '...and saving that value again does not escape it a second time', $body['results']['/company/tagline']['value'] === 'x&quot; onmouseover=&quot;alert(1)' );
+
+[ $status, $body ] = callDev( $appData, \Nino\Admin\Text::class, 'apiSaveBatch', [ 'items' => [
+	[ 'key' => '/company/tagline', 'locale' => '*', 'value' => 'Immer und ewig' ],
+] ] );
+
 [ $status, $body ] = callDev( $appData, \Nino\Admin\Text::class, 'apiSaveBatch', [ 'items' => [
 	[ 'key' => '/does/not/exist', 'locale' => '*', 'value' => 'x' ],
 ] ] );
@@ -1126,6 +1144,14 @@ check( 'apiRename rejects a new key that already exists', $status === 409 );
 
 [ $status ] = callDev( $appData, \Nino\Admin\Text::class, 'apiRename', [ 'key' => '/does/not/exist', 'newKey' => '/also/new' ] );
 check( 'apiRename 404s for an unknown key', $status === 404 );
+
+// Renaming a key to the name it already has is a no-op, not a delete. The
+// mutate pair below it ("write the new bracket, unset the old one") collapses
+// into a plain unset when both are the same string, so this used to answer 200
+// and drop the value - text.js guards it in the ui, the endpoint has to too
+[ $status ] = callDev( $appData, \Nino\Admin\Text::class, 'apiRename', [ 'key' => '/company/motto', 'newKey' => '/company/motto' ] );
+check( 'apiRename accepts a rename to the key\'s own name', $status === 200 );
+check( '...and leaves the value where it was instead of deleting it', ( \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] )['[[/company/motto]]'] ?? null ) === 'Immer und ewig' );
 
 [ $status ] = callDev( $appData, \Nino\Admin\Text::class, 'apiDelete', [ 'key' => '/company/note' ] );
 check( 'apiDelete succeeds for a global key', $status === 200 );

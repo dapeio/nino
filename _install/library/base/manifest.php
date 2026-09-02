@@ -20,6 +20,12 @@
 	'templates' => [
 		'html-header.tpl',
 		'html-footer.tpl',
+		// Not included by the base templates themselves, but by the frames
+		// that can replace them: footer/v2 renders it through
+		// [template /templates/html-socialmedia]. Without it here nothing
+		// ever copies the file into the project and that include silently
+		// resolves to an empty string
+		'html-socialmedia.tpl',
 		'robots.tpl',
 		'sitemap-xml.tpl',
 		'llms-txt.tpl',

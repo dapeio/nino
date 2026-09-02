@@ -447,8 +447,14 @@ namespace Nino\Admin {
 				return;
 			}
 
-			// Defend against session fixation, same as Auth::loginUser()
+			// Defend against session fixation, same as Auth::loginUser() - which
+			// rotates the csrf token alongside the session id, because a token
+			// an attacker fixed or read while the session was still
+			// unauthenticated stays valid for the authenticated one otherwise.
+			// script.js reloads the page (and with it the [csrf] field) after a
+			// successful login, so rotating here costs the client nothing
 			session_regenerate_id( true );
+			\Nino\Csrf::rotateToken( $appData );
 			\Nino\Runtime::setSessionValue( $appData, './nino/admin/authed', true );
 		}
 
@@ -568,6 +574,10 @@ namespace Nino\Admin {
 		 */
 		private static function apiLogout( array &$appData, array &$request ): void {
 			\Nino\Runtime::unsetSessionValue( $appData, './nino/admin/authed' );
+
+			// Same rotation on the way out that Auth::logoutUser() does: the
+			// session's identity is changing here too
+			\Nino\Csrf::rotateToken( $appData );
 		}
 
 		/**
@@ -1082,7 +1092,14 @@ namespace Nino\Admin {
 			if( ( $data['autoincrement'] ?? false ) === true )
 				$typeData['autoincrement'] = 1;
 
-			\Nino\Filesystem::putFileContent( $appData, '/elements/'. $typeUri. '.php', $typeData );
+			// Checked, same as apiSave() does: answering 200 on a failed write
+			// leaves the frontend believing the type exists (elementtypes.js
+			// clears _isNew and adopts the uri), so its next Save posts
+			// against a file that was never created and comes back 404
+			if( \Nino\Filesystem::putFileContent( $appData, '/elements/'. $typeUri. '.php', $typeData ) === false ) {
+				\Nino\Http::fail( $request, 500, 'could not save the type file' );
+				return;
+			}
 
 			\Nino\Http::ok( $request, [
 				'uri' 					=> $typeUri,
@@ -3481,7 +3498,20 @@ namespace Nino\Admin {
 				return;
 			}
 
-			if( $newKey !== $key && \Nino\Text::entry( $appData, $newKey ) !== null ) {
+			// Renaming a key to the name it already has is the no-op the
+			// collision check below already treats it as - but it has to
+			// return before the mutate further down, whose "write the new
+			// key, unset the old one" pair collapses into a plain delete
+			// when both brackets are the same string. _admin/assets/text.js
+			// guards this in the ui; the endpoint has to guard it too, or a
+			// direct post drops the value from every locale file and still
+			// answers 200
+			if( $newKey === $key ) {
+				\Nino\Http::ok( $request, [ 'ok' => true, 'key' => $newKey ] );
+				return;
+			}
+
+			if( \Nino\Text::entry( $appData, $newKey ) !== null ) {
 				\Nino\Http::fail( $request, 409, 'key already exists' );
 				return;
 			}

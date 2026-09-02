@@ -774,6 +774,38 @@ check( 'loginUser locks out after maxtries failed attempts', \Nino\Auth::loginUs
 check( 'deleteUser removes the user', \Nino\Auth::deleteUser( $appData, 'test@example.com' ) === true );
 check( 'getUser no longer finds the deleted user', \Nino\Auth::getUser( $appData, 'test@example.com' ) === false );
 
+// A successful login has to clear the buckets that were counting towards a
+// lockout. They used to survive it - _dropTries() ran on deleteUser() only -
+// so a user's occasional typos added up across months of correct logins until
+// the maxtries'th one, years apart, tripped the cooldown
+\Nino\Auth::insertUser( $appData, 'counter@example.com', 'correct horse battery staple' );
+\Nino\Auth::loginUser( $appData, 'counter@example.com', 'wrong' );
+\Nino\Auth::loginUser( $appData, 'counter@example.com', 'wrong' );
+check( 'a login still succeeds with failed attempts on the record', is_array( \Nino\Auth::loginUser( $appData, 'counter@example.com', 'correct horse battery staple' ) ) === true );
+check( '...and drops the account\'s bucket from auth-tries.php', isset( \Nino\Filesystem::getFileContent( $appData, '/data/auth-tries.php', [] )['counter@example.com'] ) === false );
+
+\Nino\Auth::loginUser( $appData, 'counter@example.com', 'wrong' );
+\Nino\Auth::loginUser( $appData, 'counter@example.com', 'wrong' );
+check( '...so two more typos later do not add up to a lockout', is_array( \Nino\Auth::loginUser( $appData, 'counter@example.com', 'correct horse battery staple' ) ) === true );
+\Nino\Auth::deleteUser( $appData, 'counter@example.com' );
+
+// Disabling an account must end the sessions it already holds. _resumeSession()
+// checked only that the token was listed and unexpired, so a disabled account
+// stayed fully authorised in every browser holding one - for up to SESSION_TTL
+\Nino\Auth::insertUser( $appData, 'disabled@example.com', 'correct horse battery staple' );
+\Nino\Auth::loginUser( $appData, 'disabled@example.com', 'correct horse battery staple' );
+
+unset( $appData['./nino/auth/current'] );
+\Nino\Auth::init( $appData );
+check( 'a live account is resumed from its session token on the next request', ( \Nino\Auth::getCurrentUser( $appData )['mail'] ?? null ) === 'disabled@example.com' );
+
+$appData['/nino/auth/user']['disabled@example.com']['status'] = 0;
+unset( $appData['./nino/auth/current'] );
+\Nino\Auth::init( $appData );
+check( 'a disabled account is not resumed from that same token', \Nino\Auth::getCurrentUser( $appData ) === false );
+check( '...and the token is dropped rather than left to age out', \Nino\Auth::getUser( $appData, 'disabled@example.com' )['sessions'] === [] );
+\Nino\Auth::deleteUser( $appData, 'disabled@example.com' );
+
 echo "\n";
 
 

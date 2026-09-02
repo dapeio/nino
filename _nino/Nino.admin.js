@@ -312,7 +312,7 @@
 
 			const changed = typeof text === 'string' && text !== '';
 
-			// mark.textContent = changed === true ? text : '';
+			mark.textContent = changed === true ? text : '';
 			mark.hidden = changed === false;
 			field.classList.toggle( 'is-changed', changed );
 		},
@@ -1061,12 +1061,17 @@
 				prev.disabled = ( view.page <= 1 );
 				next.disabled = ( view.page >= view.pages );
 
-				scroller.classList.toggle( 'admin-hidden', view.total === 0 );
+				// .nino-admin-hidden, not /_admin's own .admin-hidden: this
+				// component is shared, and that class is defined in
+				// _admin/assets/style.css only - in /_editor every toggle
+				// below was a no-op, leaving the empty hint and the pager on
+				// screen for an empty table
+				scroller.classList.toggle( 'nino-admin-hidden', view.total === 0 );
 				// The toolbar stays put when a search emptied the table -
 				// hiding it would trap the user with no way to clear the box
-				toolbar.classList.toggle( 'admin-hidden', rows.length === 0 && query === '' );
-				empty.classList.toggle( 'admin-hidden', view.total !== 0 );
-				pager.classList.toggle( 'admin-hidden', view.total === 0 );
+				toolbar.classList.toggle( 'nino-admin-hidden', rows.length === 0 && query === '' );
+				empty.classList.toggle( 'nino-admin-hidden', view.total !== 0 );
+				pager.classList.toggle( 'nino-admin-hidden', view.total === 0 );
 			}
 
 			draw();

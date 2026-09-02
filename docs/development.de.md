@@ -126,19 +126,22 @@ Ein Modul kann sich daher auf die Kernfunktionen und die geladene Konfiguration 
 
 ### 2. `\Nino\request()`
 
-Die Verarbeitung eines Requests besteht aus vier Schritten:
+Die Verarbeitung eines Requests besteht aus diesen Schritten:
 
 ```php
 Http::request( $appData, $request );
+Html::addFills( $appData, [ /* Werte, die nur von $appData abhängen */ ], '*' );
 Http::response( $appData, $request );
 Locales::response( $appData, $request );
-Html::addFills( $appData, [ /* Laufzeitwerte */ ], '*' );
+Html::addFills( $appData, [ /* Werte, die den Request brauchen */ ], '*' );
 Html::response( $appData, $request );
 ```
 
 `Http::request()` liest nicht direkt in beliebige Projektvariablen, sondern normalisiert Methode, URI, Query, Header, Body, Basic-Auth-Daten und Client-IP unter `/nino/http/request`. Gleichzeitig entsteht eine Response mit leerem Body, Status `200` und den voreingestellten Sicherheitsheadern.
 
-`Http::response()` sucht unter `/nino/http/routes` nach einer passenden Route, übernimmt deren Werte in die vorbereitete Response und führt anschließend die globalen und routenspezifischen Response-Callbacks aus. `Locales::response()` übernimmt die durch die Route aufgelöste Sprache. Danach ergänzt Nino die Laufzeit-Textfills wie Request-URI, Response-URI, Locale, aktuellen Nutzer, `/nino/dir` und das aktuelle Jahr.
+Die Laufzeit-Textfills werden in zwei Durchgängen ergänzt, und die Trennung ist wesentlich. `/nino/dir`, `/nino/public` und `/date/year` hängen nur von `$appData` ab und werden deshalb **vor** `Http::response()` registriert: Ein Response-Callback, der ein Template rendert, ist ein realer Aufrufer — `Modules\Form` und `Modules\Newsletter` bauen ihre HTML-Mails genau in diesem Fenster, und ein danach registrierter Fill erreichte sie als das Literal `[[/nino/public]]`.
+
+`Http::response()` sucht unter `/nino/http/routes` nach einer passenden Route, übernimmt deren Werte in die vorbereitete Response und führt anschließend die globalen und routenspezifischen Response-Callbacks aus. `Locales::response()` übernimmt die durch die Route aufgelöste Sprache. Erst danach ergänzt Nino die Textfills, die den aufgelösten Request brauchen: Request-URI, Response-URI, Locale und aktuellen Nutzer.
 
 `Html::response()` rendert den Body nur, wenn er ein String ist. Arrays und andere strukturierte Werte bleiben unverändert und werden später als JSON ausgegeben.
 

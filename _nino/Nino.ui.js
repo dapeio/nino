@@ -523,7 +523,14 @@
 					slider				= e.slider[i];
 					slider.stage	= slider.getElementsByTagName('ul')[0];
 					slider.lis 		= slider.stage.getElementsByTagName('li');
-					slider.pos 		= parseInt(slider.getAttribute( 'data-slider-pos' )) ?? Math.floor( slider.lis.length / 2 );
+					// Not `parseInt(...) ?? fallback`: a missing or unparsable
+					// attribute makes parseInt() answer NaN, and NaN is not nullish,
+					// so that fallback never ran - a slider without data-slider-pos
+					// started at pos NaN and every sliderMove() from it was a no-op
+					slider.pos 		= parseInt( slider.getAttribute( 'data-slider-pos' ) );
+
+					if( Number.isNaN( slider.pos ) === true )
+						slider.pos = Math.floor( slider.lis.length / 2 );
 
 					let
 						touchStartX = 0,

@@ -101,6 +101,20 @@ namespace Nino {
 
 		\Nino\Http::request( $appData, $request );
 
+		// Before Http::response(), because these three answer to $appData
+		// alone - no resolved route, no locale, nothing the response phase
+		// produces. A '/nino/http/response/...' callback that renders a
+		// template is a real caller: Modules\Form and Modules\Newsletter
+		// build their html mails in that window, and a fill registered after
+		// it would reach them as the literal '[[/nino/public]]' inside the
+		// mail's logo url. Everything that genuinely needs the request stays
+		// in the second call below
+		\Nino\Html::addFills( $appData, [
+			'[[/nino/dir]]'										=> \Nino\Filesystem::getDir( $appData ),
+			'[[/nino/public]]'								=> \Nino\Filesystem::getPublicDir( $appData ),
+			'[[/date/year]]'									=> date('Y'),
+		], '*' );
+
 		\Nino\Http::response( $appData, $request );
 
 		// After Http::response(), not before: only there has the route been
@@ -114,9 +128,6 @@ namespace Nino {
 			'[[/nino/http/response/uri/clean]]'		=> str_replace( '/', '_', $request['/nino/http/response']['uri'] ),
 			'[[/nino/http/response/locale]]'	=> $request['/nino/http/response']['locale'],
 			'[[/nino/auth/user]]'						=> ( ( $currentUser !== false ) ? $currentUser['mail'] : '' ),
-			'[[/nino/dir]]'				=> \Nino\Filesystem::getDir( $appData ),
-			'[[/nino/public]]'								=> \Nino\Filesystem::getPublicDir( $appData ),
-			'[[/date/year]]'									=> date('Y'),
 		], '*' );
 
 		\Nino\Html::response( $appData, $request );
@@ -558,6 +569,17 @@ namespace Nino {
 				return self::_registerFailedAttemp( $appData, $keys );
 			}
 
+			// The attempt succeeded, so the buckets that counted towards a
+			// lockout are cleared. Without this a sub-threshold counter is
+			// never reset: a user's occasional typos accumulate across months
+			// of successful logins until the maxtries'th one - years apart,
+			// each followed by a correct password - trips the cooldown, and
+			// everyone behind one nat shares that through the ip bucket.
+			// The ip bucket goes too: whoever just proved a valid credential
+			// is authenticated either way, so keeping their ip half-locked
+			// only ever punishes the neighbours sharing it
+			self::_clearTries( $appData, array_merge( $ipKeys, [ $username ] ) );
+
 			// Rotate the session id + csrf token now that the session's identity
 			// is changing (session-fixation defense) - the status guard keeps
 			// cli callers (tests) without an active session working
@@ -859,7 +881,14 @@ namespace Nino {
 			if( $user === false || is_array( $user['sessions'][$token] ?? null ) === false )
 				return;
 
-			if( ( $user['sessions'][$token]['time'] ?? 0 ) < time() - self::SESSION_TTL ) {
+			// The same 'status' gate loginUser() applies, enforced on read as
+			// well as on write: an account that can no longer log in must not
+			// keep the sessions it was handed before it was disabled.
+			// Disabling one is a direct-json task (see updateUser()), and
+			// without this the account stays fully authorised in every browser
+			// still holding a listed token - up to SESSION_TTL later
+			if( ( $user['status'] ?? 0 ) !== 2
+				|| ( $user['sessions'][$token]['time'] ?? 0 ) < time() - self::SESSION_TTL ) {
 
 				unset( $appData['/nino/auth/user'][$mail]['sessions'][$token] );
 				\Nino\AppData::writeContentData( $appData, [ '/nino/auth/user' ] );
@@ -903,6 +932,27 @@ namespace Nino {
 
 				unset( $state[$username] );
 				return $state;
+			} );
+		}
+
+		// Clear several tries buckets in one read-modify-write - the success
+		// counterpart to _registerFailedAttemp(). _dropTries() stays the
+		// single-key version deleteUser() uses; null means "nothing to
+		// change", so a login by an account with a clean record does not
+		// rewrite the file at all
+		private static function _clearTries( array &$appData, array $keys ): void {
+
+			\Nino\Filesystem::mutate( $appData, self::TRIES_PATH, function( array $state ) use ( $keys ): ?array {
+
+				$changed = false;
+
+				foreach( $keys as $key )
+					if( isset( $state[$key] ) === true ) {
+						unset( $state[$key] );
+						$changed = true;
+					}
+
+				return ( $changed === true ) ? $state : null;
 			} );
 		}
 
@@ -3923,7 +3973,24 @@ namespace Nino {
 
 			$value = substr( $value, 0, self::HARD_MAXLENGTH );
 
-			return $html === true ? \Nino\Html::sanitizeHtml( $value ) : strip_tags( $value );
+			if( $html === true )
+				return \Nino\Html::sanitizeHtml( $value );
+
+			// strip_tags() answers "no markup of its own", which is the whole
+			// requirement as long as a fill lands in text content. It does not
+			// survive an attribute though, and Html::_renderFills() is a blind
+			// str_replace over the finished document: the shipped templates put
+			// plain-text fills inside href/src/alt/content/title (eg.
+			// '<a href="[[/company/facebook]]">' in html-socialmedia.tpl), where
+			// a stored value of  x" onmouseover="...  closes the attribute and
+			// opens an event handler that fires for every visitor. The quotes go
+			// in as entities, which render as themselves in text and as
+			// themselves in an attribute, so nothing on screen changes.
+			// Deliberately not htmlspecialchars(): that also encodes '&', and a
+			// value re-saved from the editor would gain a round of escaping on
+			// every pass. Neither entity below contains a quote, so this stays
+			// idempotent.
+			return str_replace( [ '"', "'" ], [ '&quot;', '&#039;' ], strip_tags( $value ) );
 		}
 	}
 

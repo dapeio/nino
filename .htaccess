@@ -13,6 +13,27 @@
 	Require all denied
 </FilesMatch>
 
+# ...and the contents of a dot *directory*, which the rule above cannot see:
+# it matches filenames, so a checkout's .git/config reads as a plain "config"
+# to it and is served - local history, remotes and hooks with it.
+# docs/getting-started.md installs by cloning into the webroot, so that is the
+# normal case rather than an exotic one, and docs/deployment.md already
+# requires the equivalent for nginx.
+# Conditioned on the request actually resolving to something on disk, which is
+# the same line router.php draws on the dev server: dot-uris that are routes
+# rather than files (/.form, /.newsletter, /.demo-catalogue) never touch the
+# filesystem and have to keep falling through to index.php.
+# .cache/ (the generated css+js bundles) and .demo/ (the demo images) are
+# served deliberately - the two exceptions router.php makes as well.
+# .well-known/ is a third one here: certificate renewal reads it on a
+# production host, which is the one environment this file applies to.
+<IfModule mod_rewrite.c>
+	RewriteEngine On
+	RewriteCond %{REQUEST_FILENAME} -f [OR]
+	RewriteCond %{REQUEST_FILENAME} -d
+	RewriteRule "(^|/)\.(?!cache/|demo/|well-known/)" - [F]
+</IfModule>
+
 # The project's private half (see \Nino\Filesystem::PRIVATE_DIRS) is only ever
 # read by php, never served - the stylesheet and script sources under
 # private/assets/ included, since nothing requests one of those either: they

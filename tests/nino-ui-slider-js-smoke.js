@@ -147,5 +147,14 @@ touch( 'touchstart', 160, 100, 2 );
 check( 'a second finger releases horizontal dragging', slider.classList.contains('nino-is-touch') === false );
 check( 'a multi-touch move remains available to native pinch zoom', touch( 'touchmove', 150, 100, 2 ) === false );
 
+// A slider that names no start position falls back to the middle slide.
+// parseInt() answers NaN for the missing attribute, and NaN is not nullish,
+// so the `?? Math.floor(...)` that used to stand here never ran: pos was NaN,
+// and every sliderMove() computed from it a no-op.
+// Last in the file on purpose - it re-runs onReady() on the same fixture
+delete slider.attributes['data-slider-pos'];
+ui.onReady();
+check( 'a slider without data-slider-pos starts on the middle slide', slider.pos === 1 );
+
 console.log( '\n'+ checks+ ' checks, '+ failures+ ' failed' );
 process.exitCode = failures === 0 ? 0 : 1;

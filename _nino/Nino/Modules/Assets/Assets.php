@@ -204,10 +204,16 @@ namespace Nino\Modules {
 			// registered shortcode - including ones that take admin-controlled
 			// arguments. Since this content is written out as a static file served
 			// straight from the webroot, that would turn any admin-editable fill
-			// into stored XSS on every page that includes the bundle. Only the one
-			// developer/kernel-controlled token the shipped assets actually use is
-			// substituted here.
-			$content = str_replace( '[[/nino/public]]', \Nino\Filesystem::getPublicDir( $appData ), $content );
+			// into stored XSS on every page that includes the bundle. Only the
+			// developer/kernel-controlled tokens the shipped assets actually use are
+			// substituted here - both of them: Nino.ui.js falls back to
+			// '[[/nino/dir]]/.form' for a form that carries no action of its own,
+			// and with only the public one handled that shipped as a literal.
+			$content = str_replace(
+				[ '[[/nino/public]]', '[[/nino/dir]]' ],
+				[ \Nino\Filesystem::getPublicDir( $appData ), \Nino\Filesystem::getDir( $appData ) ],
+				$content
+			);
 
 			// Minify
 			if( substr( $pathinfo['filename'], -4 ) === '.min' )

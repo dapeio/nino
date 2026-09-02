@@ -90,9 +90,10 @@ namespace Nino\Modules {
 				return;
 
 			// Send emails
-			// [[/nino/dir]] is resolved manually here (not via the normal
-			// Text-fill mechanism), since this callback runs inside
-			// Http::response() - before \Nino\request() adds it as a fill
+			// [[/nino/dir]] and [[/nino/public]] are ordinary fills by the time
+			// this callback runs - \Nino\request() registers them before
+			// Http::response(), precisely so a mail rendered in here resolves
+			// them instead of shipping the literal.
 			// Escaped here, on the way into the html mail templates - the one
 			// place these values actually become markup
 			$safe = fn( string $value ): string => htmlspecialchars( $value, ENT_QUOTES, 'UTF-8' );
@@ -103,7 +104,6 @@ namespace Nino\Modules {
 				'[[message]]'				=> nl2br( $safe( $message ) ),
 				'[[subject]]'				=> $safe( $cat ),
 				'[[date]]'					=> date("Y-m-d H:i:s"),
-				'[[/nino/dir]]'		=> \Nino\Filesystem::getDir( $appData ),
 			];
 
 			// Recipient/subject are Text values ([[/form/...]], editable via _editor) -
