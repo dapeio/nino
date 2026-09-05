@@ -9,12 +9,12 @@ declare(strict_types=1);
  */
 namespace Nino {
 
-	const VERSION = '0.12.0-beta';
+	const VERSION = '0.13.0-beta';
 
 	/**
 	 *	Boot Nino.
 	 *
-	 *	@param		bool			$installing		True only from _install/index.php: the
+	 *	@param		bool			$installing		True only from the workbench's entry points: the
 	 *															wizard is the one caller that has to run
 	 *															*before* a project exists, so it is the one
 	 *															caller allowed to boot without config.php.
@@ -29,18 +29,18 @@ namespace Nino {
 		// These paths are needed before Runtime installs Nino's error handler:
 		// AppData::prepareSession() already reads config.php from them. Validate
 		// them before any path concatenation can obscure the real problem.
-		if( defined( 'NINO_CONTENT_DIR' ) === true && ( is_string( NINO_CONTENT_DIR ) === false || NINO_CONTENT_DIR === '' || is_dir( NINO_CONTENT_DIR ) === false || is_writable( NINO_CONTENT_DIR ) === false ) )
-			trigger_error( 'NINO_CONTENT_DIR must point to an existing, writable directory.', E_USER_ERROR );
+		if( defined( 'NINO_PRIVATE_DIR' ) === true && ( is_string( NINO_PRIVATE_DIR ) === false || NINO_PRIVATE_DIR === '' || is_dir( NINO_PRIVATE_DIR ) === false || is_writable( NINO_PRIVATE_DIR ) === false ) )
+			trigger_error( 'NINO_PRIVATE_DIR must point to an existing, writable directory.', E_USER_ERROR );
 
 		if( defined( 'NINO_CONFIG_DIR' ) === true && ( is_string( NINO_CONFIG_DIR ) === false || NINO_CONFIG_DIR === '' || is_dir( NINO_CONFIG_DIR ) === false || is_writable( NINO_CONFIG_DIR ) === false ) )
 			trigger_error( 'NINO_CONFIG_DIR must point to an existing, writable directory.', E_USER_ERROR );
 
 		// Everything this project *is*, as opposed to the code that runs it:
 		// configuration, templates, content and management state all live in
-		// private/. NINO_CONTENT_DIR may deliberately move that complete tree
+		// private/. NINO_PRIVATE_DIR may deliberately move that complete tree
 		// outside the webroot; no alternative in-project layout is detected.
-		$private = defined( 'NINO_CONTENT_DIR' ) === true
-			? NINO_CONTENT_DIR
+		$private = defined( 'NINO_PRIVATE_DIR' ) === true
+			? NINO_PRIVATE_DIR
 			: $root. '/private';
 
 		$config = defined( 'NINO_CONFIG_DIR' ) === true
@@ -178,21 +178,21 @@ namespace Nino {
 			project missing a key.
 
 			Two things follow. A fresh install starts from a working kernel
-			with nothing written yet - which is what lets /_install boot before
+			with nothing written yet - which is what lets the setup wizard boot before
 			a project exists at all - and config.php shrinks to what this
 			particular site decided: its locales, its routes, its pages, its
 			theme, its accounts.
 
 			The module list is the always-on half only. Form, Navigation and
 			Localepicker are units the wizard offers and a project may not
-			want, so they are its answer to give (see
-			_install/library/modules/).	*/
+			want, so they are its answer to give (each ships its unit as
+			install/ beside its class - see \Nino\Install\Setup::units()).	*/
 		public const array DEFAULTS = [
-			// The always-on half, and only that: a unit /_install offers as a
+			// The always-on half, and only that: a unit the setup wizard offers as a
 			// checkbox must never be listed here, or unchecking it in the
 			// wizard changes nothing and the step lies about what it controls.
-			// Form, Navigation and Localepicker are such units
-			// (_install/library/modules/*) - Setup::apiApply() adds their
+			// Form, Navigation and Localepicker are such units (each module's
+			// own install/ directory) - Setup::apiApply() adds their
 			// moduleClass when they are picked, and a page unit that needs one
 			// pulls it in through its own requiresModules.
 			'/nino/modules'		=> [
@@ -207,8 +207,8 @@ namespace Nino {
 			'/nino/cache/status'		=> false,
 			'/nino/cache/ttl'			=> 3600,
 			'/nino/cache/blacklist'	=> [],
-			'/nino/editor/backups'	=> true,
-			'/nino/editor/logs'		=> true,
+			'/nino/admin/backups'		=> true,
+			'/nino/admin/logs'			=> true,
 			'/nino/dir'					=> '',
 			// Log by default, never display: a site that wants a stack trace on
 			// the page has to ask for it, and asking is a decision worth writing
@@ -240,6 +240,7 @@ namespace Nino {
 			],
 			'/nino/http/routes'		=> [],
 			'/nino/auth/user'			=> [],
+			'/nino/auth/roles'		=> [],
 		];
 
 		public static function prepare( array &$appData ): void {
@@ -277,7 +278,7 @@ namespace Nino {
 		 *	Load config.php over the framework defaults.
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		bool			$installing		True only from _install/index.php - see \Nino\init()
+		 *	@param		bool			$installing		True only from the workbench's entry points - see \Nino\init()
 		 *
 		 *	@return 	void
 		 */
@@ -299,11 +300,11 @@ namespace Nino {
 					gets a bare 500. That is the intended answer. A passing
 					stranger who finds an unfinished install must not be told
 					where the installer is - a 500 says nothing, where "not
-					installed yet, go to /_install" is an invitation. The person
-					who *is* installing came to /_install on purpose and never
+					installed yet, go to /_admin" is an invitation. The person
+					who *is* installing came to /_admin on purpose and never
 					sees this.	*/
 				if( $installing !== true )
-					trigger_error( 'AppData::init(): config.php was not found under \''. ( $appData['./nino/filesystem/configpath'] ?? $appData['./nino/filesystem/path'] ). '\' - run /_install, or check NINO_CONFIG_DIR if it is set.', E_USER_ERROR );
+					trigger_error( 'AppData::init(): config.php was not found under \''. ( $appData['./nino/filesystem/configpath'] ?? $appData['./nino/filesystem/path'] ). '\' - run the setup wizard at /_admin, or check NINO_CONFIG_DIR if it is set.', E_USER_ERROR );
 
 				$appData = self::_merge( $appData, self::DEFAULTS );
 				return;
@@ -691,9 +692,67 @@ namespace Nino {
 
 
 
-		public static function insertUser( array &$appData, string $username, string $pw, array $perms = [] ): bool {
+		/**
+		 *	The permissions an account actually holds: its own, plus those of
+		 *	its role. A role is a named set of permissions kept under
+		 *	'/nino/auth/roles' ([ id => [ 'label' => ..., 'perms' => [ ... ] ] ])
+		 *	and edited in the workbench's Users panel; an account carries the
+		 *	role's id under 'role'. A role the config no longer has grants
+		 *	nothing, silently - the account keeps what it holds itself, and
+		 *	the Users panel shows the dangling role for what it is
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array			$user					A user record (see getUser())
+		 *
+		 *	@return 	array										Permission strings, deduplicated
+		 */
+		public static function permissions( array &$appData, array $user ): array {
+
+			$perms = is_array( $user['perms'] ?? null ) === true ? array_values( array_filter( $user['perms'], 'is_string' ) ) : [];
+			$role  = (string) ( $user['role'] ?? '' );
+
+			if( $role !== '' && is_array( $appData['/nino/auth/roles'][$role]['perms'] ?? null ) === true )
+				$perms = array_merge( $perms, array_values( array_filter( $appData['/nino/auth/roles'][$role]['perms'], 'is_string' ) ) );
+
+			return array_values( array_unique( $perms ) );
+		}
+
+		/**
+		 *	Give an account a role, or none ('') - the role has to exist
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$username			The account's mail
+		 *	@param		string		$role					A key of '/nino/auth/roles', or ''
+		 *
+		 *	@return 	bool										False for an unknown account or role
+		 */
+		public static function setRole( array &$appData, string $username, string $role ): bool {
+
+			if( self::getUser( $appData, $username ) === false )
+				return false;
+
+			if( $role !== '' && isset( $appData['/nino/auth/roles'][$role] ) === false )
+				return false;
+
+			$appData['/nino/auth/user'][$username]['role'] = $role;
+			\Nino\AppData::writeContentData( $appData, [ '/nino/auth/user' ] );
+
+			// The session's copy of its own record follows, so a role changed
+			// on yourself applies to the very request that changed it
+			if( ( $appData['./nino/auth/current']['mail'] ?? '' ) === $username )
+				$appData['./nino/auth/current'] = self::getUser( $appData, $username );
+
+			return true;
+		}
+
+		public static function insertUser( array &$appData, string $username, string $pw, array $perms = [], string $role = '' ): bool {
 
 			if( self::getUser( $appData, $username ) !== false )
+				return false;
+
+			// A role the config does not have is a typo, not an account with
+			// no rights - refused here rather than stored as a dangling name
+			if( $role !== '' && isset( $appData['/nino/auth/roles'][$role] ) === false )
 				return false;
 
 			$appData['/nino/auth/user'][$username] = [
@@ -701,6 +760,7 @@ namespace Nino {
 				'status'		=> 2,
 				'sessions'	=> [],
 				'perms'			=> $perms,
+				'role'			=> $role,
 			];
 
 			\Nino\AppData::writeContentData( $appData, [ '/nino/auth/user' ] );
@@ -726,7 +786,14 @@ namespace Nino {
 				return false;
 
 			unset( $appData['/nino/auth/user'][$username] );
-			unset( $appData['./nino/auth/current'] );
+
+			// Only a deleted *own* account ends the session it is deleted
+			// from - a manager removing someone else stays logged in for the
+			// rest of the request, the same as the next request would find
+			// them anyway (see _resumeSession())
+			if( ( $appData['./nino/auth/current']['mail'] ?? null ) === $username )
+				unset( $appData['./nino/auth/current'] );
+
 
 			\Nino\AppData::writeContentData( $appData, [ '/nino/auth/user' ] );
 			self::_dropTries( $appData, $username );
@@ -835,10 +902,11 @@ namespace Nino {
 			if( $user === false )
 				return false;
 
-			// Strict comparison: without it a single truthy non-string in perms
-			// (a config typo like 'perms' => [ true ]) loosely matches every
-			// permission there is, ie. silently grants everything
-			$perms = ( is_array( $user['perms'] ?? null ) === true ) ? $user['perms'] : [];
+			// The account's own permissions plus its role's - strings only:
+			// without that a single truthy non-string in perms (a config typo
+			// like 'perms' => [ true ]) loosely matches every permission there
+			// is, ie. silently grants everything
+			$perms = self::permissions( $appData, $user );
 
 			// Check exact perm
 			if( in_array( $perm, $perms, true ) === true )
@@ -1482,7 +1550,7 @@ namespace Nino {
 
 		// The virtual path prefix everything under the private directory is
 		// addressed by. Callers keep using '/private/...' whatever
-		// NINO_CONTENT_DIR points at, so a moved private directory changes
+		// NINO_PRIVATE_DIR points at, so a moved private directory changes
 		// no call site - the same indirection '/config.php' already has
 		public const string CONTENT_DIR = '/private';
 		// Everything a project keeps that a webserver must never serve: its
@@ -1512,7 +1580,7 @@ namespace Nino {
 		//
 		//	- config.php may live outside the webroot on its own (NINO_CONFIG_DIR)
 		//	- everything under CONTENT_DIR is this project's own state and
-		//	  moves with NINO_CONTENT_DIR
+		//	  moves with NINO_PRIVATE_DIR
 		//	- everything under PRIVATE_DIRS resolves against the private root
 		//	- everything else - /images, /fonts, the asset cache - is public
 		//	  and stays where the webserver can reach it
@@ -1617,13 +1685,13 @@ namespace Nino {
 		/**
 		 *	The url one virtual path is reached under - the mirror of path().
 		 *	A public-content path (PUBLIC_DIRS) gets the public prefix, a tool
-		 *	folder's own file gets the plain project dir: /_editor bundles its
-		 *	login css into /_editor/.cache/, which is code shipped with the
+		 *	folder's own file gets the plain project dir: /_admin bundles its
+		 *	login css into /_admin/.cache/, which is code shipped with the
 		 *	tool, not this project's public content, and must keep resolving
 		 *	next to the tool itself
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		string		$filename			Eg. '/.cache/style.css', '/_editor/.cache/login.js'
+		 *	@param		string		$filename			Eg. '/.cache/style.css', '/_admin/.cache/login.js'
 		 *
 		 *	@return 	string
 		 */
@@ -1667,7 +1735,7 @@ namespace Nino {
 		}
 
 		// Return the path this project's own, non-code state lives under -
-		// normally <project>/private, moved by NINO_CONTENT_DIR (see
+		// normally <project>/private, moved by NINO_PRIVATE_DIR (see
 		// \Nino\init()). The generalisation of getConfigPath(): where that
 		// one moves a single file, this moves everything that makes one
 		// installation differ from another, so the tool folders stay pure
@@ -1778,7 +1846,7 @@ namespace Nino {
 		// type/image, and the /data/ content a project actually accumulates
 		// (newsletter subscribers, form submissions, the error/activity
 		// log). Deliberately not developer code (_nino/, templates,
-		// _editor/ itself, ...) - that's already versioned in git and would
+		// _admin/ itself, ...) - that's already versioned in git and would
 		// just bloat every backup. Also deliberately not auth-tries.php or
 		// ratelimit.php - both are transient throttling counters, not data
 		// a restore should bring back.
@@ -1786,7 +1854,7 @@ namespace Nino {
 		// Shared by Admin\Backup::_create() and Dev\Restore::_safetySnapshot(),
 		// which both need the exact same manifest for the exact same reason -
 		// kept here rather than in either since Restore deliberately doesn't
-		// depend on _editor/Editor.php (see that class' own docblock).
+		// depend on _admin/Nino/Modules/Backups/Backups.php (see that class' own docblock).
 		public static function manifest( array &$appData ): array {
 
 			// Defensive: a caller right after writing config.php
@@ -1845,7 +1913,7 @@ namespace Nino {
 
 			// The removal record \Nino\Modules\Newsletter writes on every
 			// unsubscribe (a sha256 per removed address, not the address
-			// itself) - Dev\Restore::_mergeNewsletterRestore() needs this
+			// itself) - Modules\Newsletter::callbackRestore() needs this
 			// backed up too, as the fallback source of truth for a restore
 			// where the live copy is itself what's being recovered from.
 			// '/data/newsletter-removed.php' as a plain literal, deliberately
@@ -2507,7 +2575,7 @@ namespace Nino {
 
 				// Keep the set of fields this update is actually meant to write.
 				// updateElement() also serves deliberately-partial updates (most
-				// notably _editor's immediate image upload). The previous wildcard
+				// notably the Images panel's immediate image upload). The previous wildcard
 				// merge filled every omitted key from whichever locale happened to
 				// occur first in the type file, then wrote all of those values into
 				// the requested locale below - uploading an English image could
@@ -2834,7 +2902,7 @@ namespace Nino {
 		 *	html-header.tpl is the reason it exists: a fill goes into the
 		 *	page verbatim (see _renderFills()), and '/company/adress' is
 		 *	multi-line by design - it renders as a postal address and
-		 *	_install's own PersonalInfos step offers it as a <textarea>. A
+		 *	the wizard's own PersonalInfos step offers it as a <textarea>. A
 		 *	raw newline inside a json string is not valid json, so that
 		 *	block failed to parse on every page of every install. A quote
 		 *	or a backslash in any of the other values does the same.
@@ -2971,7 +3039,7 @@ namespace Nino {
 			// (eg. /form/subject/owner containing [[/website/url]]) - a
 			// same-count swap would otherwise look "stable" after one pass.
 			// The pass cap guards against a fill value that references
-			// itself (possible via _editor's Text editor, not just the
+			// itself (possible via the Text panel, not just the
 			// developer-authored defaults).
 			for( $pass = 0; $pass < 10; $pass++ ) {
 				$rendered = str_replace( $fillKeys, $fillValues, $html );
@@ -3024,7 +3092,7 @@ namespace Nino {
 			// which is what makes [template] able to contain other shortcodes -
 			// and also what makes a template including itself, directly or
 			// through a second one, recurse until the memory limit kills the
-			// request. Templates and textfills are editable from _admin/_editor, so
+			// request. Templates and textfills are editable from the workbench, so
 			// that is one typo away. The depth cap stops the recursion without
 			// putting a rule on any single shortcode; MAX_RENDER_DEPTH is far
 			// above what real nesting (page -> section -> element) reaches.
@@ -3043,7 +3111,7 @@ namespace Nino {
 		// Whether a value currently contains one of the allowed inline tags -
 		// used to auto-decide whether a field/key gets the html editor.
 		// Shared by every domain class with a model/entry 'html' flag
-		// (_editor's Text/Elements, _admin's Text).
+		// (the Text, Text Keys and Elements panels).
 		public static function containsHtml( string $value ): bool {
 			return preg_match( '/<(?:'. implode( '|', self::HTML_TAGS ). ')[ >]/i', $value ) === 1;
 		}
@@ -3584,7 +3652,7 @@ namespace Nino {
 
 		// Read a previously processed image for a short-lived rollback snapshot.
 		// Element image replacement normally overwrites a deterministic filename
-		// in place; if the following metadata update is vetoed, _editor must be
+		// in place; if the following metadata update is vetoed, the panel must be
 		// able to restore those old bytes rather than deleting the only copy.
 		public static function read( array &$appData, string $filename ): string|false {
 
@@ -3693,7 +3761,7 @@ namespace Nino {
 				\Nino\Locales::setCurrentLocale( $appData, $currentLocale );
 
 			// Registered rather than called directly out of \Nino\request(): a
-			// route can declare its own 'statusCode' (eg. GET://_editor), and
+			// route can declare its own 'statusCode' (eg. GET://_admin), and
 			// Http::response() array_merge()s the route into the response array
 			// *after* seeding it - calling this any earlier had the merge wipe
 			// the 302 this sets right back to the route's own status, so the
@@ -3784,7 +3852,7 @@ namespace Nino {
 		}
 	}
 
-	// Text - the [[key]] textfill layer _editor's Text panel and _admin's text
+	// Text - the [[key]] textfill layer the workbench's Text and Text Keys
 	// editor both sit on top of: reads every key out of /text/global.php +
 	// every /text/{locale}.php, batches a save into one lock/read/write per
 	// file. Only holds what was byte-for-byte identical between the two
@@ -3802,7 +3870,7 @@ namespace Nino {
 		// currently holds markup, a maxlength derived from its longest
 		// current value, and whether it's blacklisted (see blacklist()).
 		// $includeBlacklisted controls whether a blacklisted key is skipped
-		// entirely or just flagged - _editor's Text panel hides them, _admin's
+		// entirely or just flagged - the Text panel hides them, Text Keys
 		// editor needs to see them to be able to un-blacklist one.
 		public static function entries( array &$appData, bool $includeBlacklisted = true ): array {
 
@@ -3869,7 +3937,7 @@ namespace Nino {
 			return null;
 		}
 
-		// Read the developer-maintained list of keys hidden from _editor's
+		// Read the developer-maintained list of keys hidden from the workbench's
 		// Text panel (technical values, not content - uris, colors,
 		// typography, ...)
 		public static function blacklist( array &$appData ): array {
@@ -3877,7 +3945,7 @@ namespace Nino {
 		}
 
 		// Add or remove one key from /text/blacklist.php - _admin-only,
-		// _editor's Text panel only ever reads the list
+		// the Text panel only ever reads the list
 		public static function setBlacklisted( array &$appData, string $key, bool $blacklisted ): void {
 
 			\Nino\Filesystem::mutate( $appData, '/text/blacklist.php', function( array $list ) use ( $key, $blacklisted ): ?array {
@@ -4135,7 +4203,8 @@ namespace Nino {
 
 
 	// Modules - calls a method (init/request/response) on every module
-	// enabled in config.php's '/nino/modules'
+	// enabled in config.php's '/nino/modules', or collects what every
+	// module answers to one
 	class Modules {
 
 		public static function callModules( array &$appData, string $method ): void {
@@ -4149,6 +4218,42 @@ namespace Nino {
 			foreach( $appData['/nino/modules'] ?? [] as $className )
 				if( method_exists( $className, $method ) === true )
 					$className::$method( $appData );
+		}
+
+		/**
+		 *	Ask every active module one question and merge the answers - the
+		 *	read-only twin of callModules(). This is how the workbench learns
+		 *	what a module brings along: /_admin asks 'adminPanels', and a
+		 *	module that has nothing to say simply doesn't implement the
+		 *	method.
+		 *
+		 *	Deliberately driven by '/nino/modules' and not by scanning
+		 *	directories: a module that is switched off contributes nothing,
+		 *	exactly as it renders nothing - and a class under app/ is found
+		 *	the same way as one under _nino/, since the autoloader makes no
+		 *	difference between them.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$method				Method name every module may implement
+		 *
+		 *	@return 	array										Every answer's entries, in module order
+		 */
+		public static function collect( array &$appData, string $method ): array {
+
+			$collected = [];
+
+			foreach( $appData['/nino/modules'] ?? [] as $className ) {
+
+				if( method_exists( $className, $method ) === false )
+					continue;
+
+				$answer = $className::$method( $appData );
+
+				if( is_array( $answer ) === true )
+					$collected = array_merge( $collected, array_values( $answer ) );
+			}
+
+			return $collected;
 		}
 	}
 
@@ -4357,11 +4462,35 @@ namespace {
 		// resolve against the application root alone - so _nino/ stays pure
 		// code an update may replace wholesale, and a class that lands in it
 		// by accident fails loudly instead of being found there.
-		$root = str_starts_with( $relativePath, 'Nino/' ) === true
-			? __DIR__
-			: ( defined( 'NINO_APP_DIR' ) === true ? NINO_APP_DIR : dirname( __DIR__ ). '/app' );
+		//
+		// The one deliberate exception is Nino\Modules\, which is a merged
+		// view over three roots rather than one directory: the always-on
+		// runtime modules ship in _nino/, the workbench's own screens in
+		// _admin/Nino/Modules/ (a module's Admin panel, its tabs, its assets
+		// and its words - see \Nino\Admin\Admin::modules()), and the
+		// optional runtime modules in the application root
+		// (app/Nino/Modules/), where a project keeps the ones it uses and
+		// deletes the rest. The order is what the roots are allowed to do to
+		// each other: _nino/ first, so a shipped module can never be shadowed;
+		// _admin/ before app/, so a project cannot replace a workbench screen
+		// by dropping a file next to its own modules; app/ last, which can
+		// only add.
+		//
+		// The same module name may hold a class in more than one root, since
+		// it is the whole relative path that is resolved and not the first
+		// segment: \Nino\Modules\Elements is the kernel's runtime module in
+		// _nino/, \Nino\Modules\Elements\Admin the workbench panel for it
+		// in _admin/ - two halves of one module, each where it belongs.
+		$appRoot 	 = defined( 'NINO_APP_DIR' ) === true ? NINO_APP_DIR : dirname( __DIR__ ). '/app';
+		$adminRoot = dirname( __DIR__ ). '/_admin';
+		$roots 	 	 = str_starts_with( $relativePath, 'Nino/Modules/' ) === true
+			? [ __DIR__, $adminRoot, $appRoot ]
+			: ( str_starts_with( $relativePath, 'Nino/' ) === true ? [ __DIR__ ] : [ $appRoot ] );
 
-		if( is_file( $root. $file ) === true )
-			require $root. $file;
+		foreach( $roots as $root )
+			if( is_file( $root. $file ) === true ) {
+				require $root. $file;
+				return;
+			}
 	} );
 }

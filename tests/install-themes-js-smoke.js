@@ -33,7 +33,7 @@ function check( label, condition ) {
 	console.log( 'FAIL  - '+ label );
 }
 
-const LIBRARY = path.join( __dirname, '../_install/library' );
+const LIBRARY = path.join( __dirname, '../_admin/install/library' );
 
 /*	Every frame unit the delivery ships, in the order the api reports them -
  *	one directory per unit, exactly what Install\Themes::_frames() scans	*/
@@ -222,7 +222,7 @@ sandbox.Nino = {
 };
 
 vm.runInContext(
-	fs.readFileSync( path.join( __dirname, '../_install/assets/themes.js' ), 'utf8' ),
+	fs.readFileSync( path.join( __dirname, '../_admin/install/assets/themes.js' ), 'utf8' ),
 	vm.createContext( sandbox ),
 	{ filename : 'themes.js' }
 );

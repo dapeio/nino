@@ -168,8 +168,8 @@ sandbox.Nino = {
 // real Nino.admin.js rather than stubbing it - and this step and /_design have
 // to end up with the same control from the same source
 const context = vm.createContext( sandbox );
-vm.runInContext( fs.readFileSync( path.join( __dirname, '../_nino/Nino.admin.js' ), 'utf8' ), context, { filename : 'Nino.admin.js' } );
-vm.runInContext( fs.readFileSync( path.join( __dirname, '../_install/assets/design.js' ), 'utf8' ), context, { filename : 'design.js' } );
+vm.runInContext( fs.readFileSync( path.join( __dirname, '../_admin/assets/Nino.admin.js' ), 'utf8' ), context, { filename : 'Nino.admin.js' } );
+vm.runInContext( fs.readFileSync( path.join( __dirname, '../_admin/install/assets/design.js' ), 'utf8' ), context, { filename : 'design.js' } );
 
 const design = sandbox.Nino.install.design;
 

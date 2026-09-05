@@ -16,12 +16,11 @@ declare(strict_types=1);
 
 require __DIR__. '/../_nino/Nino.php';
 require __DIR__. '/../_admin/Admin.php';
-// The Themes step calls into /_design when it is there. Loaded here for the
-// same reason _install/index.php loads it: without it the Design step
-// degrades to "not offered", and the tests below would be
-// exercising the degraded path while believing they cover the real one
-require __DIR__. '/../_design/Design.php';
-require __DIR__. '/../_install/Install.php';
+require __DIR__. '/../_admin/install/Install.php';
+// The Themes step calls into the Design module when it is there - found
+// through the autoloader like every module, so nothing to load by hand:
+// without it the Design step degrades to "not offered", and the tests below
+// cover the real path because app/Nino/Modules/Design is part of this checkout
 
 $failures = 0;
 $checks		= 0;
@@ -100,7 +99,7 @@ echo "Install::guard / postData\n";
 // The sandbox has no password file and no marker, which is exactly what a
 // project that never finished the wizard looks like
 check( 'Admin::isInstalled() is false on a project that never ran the wizard', \Nino\Admin\Admin::isInstalled( $appData ) === false );
-check( '...because there is no stored hash at all', \Nino\Admin\Admin::passwordHash( $appData ) === null );
+check( '...because there is no stored hash at all', \Nino\Admin\Recovery::hash( $appData ) === null );
 
 $nonOkRequest = [ '/nino/http/response' => [ 'statusCode' => 404 ] ];
 check( 'guard rejects a request an earlier callback already failed', \Nino\Install\Install::guard( $appData, $nonOkRequest ) === false );
@@ -122,10 +121,10 @@ check( 'postData() decodes the json payload', \Nino\Install\Install::postData() 
 $_POST['data'] = 'not json';
 check( 'postData() falls back to an empty array on invalid json', \Nino\Install\Install::postData() === [] );
 
-$appData['/nino/http/routes']['GET://_install'] = [ 'uri' => '/_install', 'body' => 'stale persisted page' ];
+$appData['/nino/http/routes']['GET://_admin'] = [ 'uri' => '/_admin', 'body' => 'stale persisted page' ];
 \Nino\Install\Install::init( $appData );
-check( 'init always restores the installer-owned GET route over a stale collision', $appData['/nino/http/routes']['GET://_install']['body'] === '[template /_install/templates/page-wizard]' );
-check( 'init always restores the installer-owned POST route too', $appData['/nino/http/routes']['POST://_install']['uri'] === '/_install' );
+check( 'init always restores the installer-owned GET route over a stale collision', $appData['/nino/http/routes']['GET://_admin']['body'] === '[template /_admin/install/templates/page-wizard]' );
+check( 'init always restores the installer-owned POST route too', $appData['/nino/http/routes']['POST://_admin']['uri'] === '/_admin' );
 
 echo "\n";
 
@@ -208,8 +207,8 @@ check( 'rejects a selection with no locale at all', $noLocaleRequest['/nino/http
 // runtime-only routes to $appData['/nino/http/routes'] at boot - never
 // persisted to config.php themselves, but present in memory all the same.
 // apiApply() must not let any of these leak into the persisted routes.
-$appData['/nino/http/routes']['GET://_install'] 	= [ 'uri' => '/_install', 'body' => '[template /_install/templates/page-wizard]', 'statusCode' => 200 ];
-$appData['/nino/http/routes']['POST://_install'] = [ 'uri' => '/_install' ];
+$appData['/nino/http/routes']['GET://_admin'] 	= [ 'uri' => '/_admin', 'body' => '[template /_admin/install/templates/page-wizard]', 'statusCode' => 200 ];
+$appData['/nino/http/routes']['POST://_admin'] = [ 'uri' => '/_admin' ];
 $appData['/nino/http/routes']['POST://.form'] 		= [ 'uri' => '/.form' ];
 
 // de_DE only, "forms" picked directly
@@ -227,9 +226,16 @@ check( 'picking only the already-native de_DE does not pull in en_US too', $conf
 check( 'core structural modules are always present', in_array( '\\Nino\\Modules\\Template', $configAfterApply['/nino/modules'], true ) === true );
 check( 'the auto-required Form module is present', in_array( '\\Nino\\Modules\\Form', $configAfterApply['/nino/modules'], true ) === true );
 check( 'a module nobody picked (Newsletter) is absent', in_array( '\\Nino\\Modules\\Newsletter', $configAfterApply['/nino/modules'], true ) === false );
+check( 'the developer tools that ship as modules are active from the first config on', in_array( '\\Nino\\Modules\\Design', $configAfterApply['/nino/modules'], true ) === true
+	&& in_array( '\\Nino\\Modules\\Templates', $configAfterApply['/nino/modules'], true ) === true );
+check( 'apply writes the two roles a project starts with', array_keys( $configAfterApply['/nino/auth/roles'] ) === [ 'editor', 'developer' ] && $configAfterApply['/nino/auth/roles']['developer'] === [ 'label' => 'Developer', 'perms' => [ '/*' ] ] );
+check( 'the Editor role is every content panel\'s permission - the picked Form module\'s included - and no structure, system or tab permission', in_array( '/_admin/elements/manage', $configAfterApply['/nino/auth/roles']['editor']['perms'], true ) === true
+	&& in_array( '/_admin/submissions/view', $configAfterApply['/nino/auth/roles']['editor']['perms'], true ) === true
+	&& in_array( '/_admin/types/manage', $configAfterApply['/nino/auth/roles']['editor']['perms'], true ) === false
+	&& in_array( '/_admin/users/manage', $configAfterApply['/nino/auth/roles']['editor']['perms'], true ) === false );
 check( 'registers base\'s always-on robots.txt route', isset( $configAfterApply['/nino/http/routes']['GET://robots.txt'] ) === true );
 check( 'a hand-written route outside the library survives apply untouched', isset( $configAfterApply['/nino/http/routes']['GET://custom'] ) === true );
-check( '/_install\'s own runtime-only route never leaks into the persisted routes', isset( $configAfterApply['/nino/http/routes']['GET://_install'] ) === false && isset( $configAfterApply['/nino/http/routes']['POST://_install'] ) === false );
+check( '/_install\'s own runtime-only route never leaks into the persisted routes', isset( $configAfterApply['/nino/http/routes']['GET://_admin'] ) === false && isset( $configAfterApply['/nino/http/routes']['POST://_admin'] ) === false );
 check( 'a module\'s self-registered runtime route (POST://.form) never leaks in either', isset( $configAfterApply['/nino/http/routes']['POST://.form'] ) === false );
 
 /*	The deny rule for the private tree, which a checkout no longer ships:
@@ -244,7 +250,7 @@ check( 'copies base\'s deny rule into the private root it just filled', is_file(
 	with a project's templates already in it if the request then fails. The
 	order is load-bearing, so it is pinned here rather than left to whoever
 	next tidies that method.	*/
-$applyUnitSource = (string) file_get_contents( __DIR__. '/../_install/Install.php' );
+$applyUnitSource = (string) file_get_contents( __DIR__. '/../_admin/install/Install.php' );
 $applyUnitBody 	= substr( $applyUnitSource, strpos( $applyUnitSource, 'private static function _applyUnit(' ) );
 $applyUnitBody 	= substr( $applyUnitBody, 0, strpos( $applyUnitBody, "\n\t\t}" ) );
 
@@ -284,8 +290,9 @@ check( 'replaces rather than grows: de_DE is gone, only en_US is available now',
 check( 'the native locale follows along once it is no longer available', $configAfterSecondApply['/nino/locales/native'] === 'en_US' );
 check( 'the no-longer-picked Form module is gone', in_array( '\\Nino\\Modules\\Form', $configAfterSecondApply['/nino/modules'], true ) === false );
 check( 'the newly-picked Navigation module is present', in_array( '\\Nino\\Modules\\Navigation', $configAfterSecondApply['/nino/modules'], true ) === true );
+check( 'the Editor role follows the modules - the dropped Form module\'s permission is gone from it', in_array( '/_admin/submissions/view', $configAfterSecondApply['/nino/auth/roles']['editor']['perms'], true ) === false );
 check( 'a hand-written route outside the library still survives the replace', isset( $configAfterSecondApply['/nino/http/routes']['GET://custom'] ) === true );
-check( 'the still-present simulated runtime pollution still never leaks in, on this second apply either', isset( $configAfterSecondApply['/nino/http/routes']['GET://_install'] ) === false && isset( $configAfterSecondApply['/nino/http/routes']['POST://.form'] ) === false );
+check( 'the still-present simulated runtime pollution still never leaks in, on this second apply either', isset( $configAfterSecondApply['/nino/http/routes']['GET://_admin'] ) === false && isset( $configAfterSecondApply['/nino/http/routes']['POST://.form'] ) === false );
 check( 'text/de_DE.php from the first run is left in place - replace only touches routes/modules/locales, never deletes content already written', \Nino\Filesystem::fileExists( $appData, '/text/de_DE.php' ) === true );
 check( 'text/en_US.php now exists, written by the second run', \Nino\Filesystem::fileExists( $appData, '/text/en_US.php' ) === true );
 
@@ -311,7 +318,7 @@ check( 'a posted native locale outside the picked set is ignored, falling back t
 // Drop the simulated runtime-only routes again - nothing below this point
 // exercises routes, but leaving them in $appData would misrepresent what
 // a fresh request actually looks like for any test added here later
-unset( $appData['/nino/http/routes']['GET://_install'], $appData['/nino/http/routes']['POST://_install'], $appData['/nino/http/routes']['POST://.form'] );
+unset( $appData['/nino/http/routes']['GET://_admin'], $appData['/nino/http/routes']['POST://_admin'], $appData['/nino/http/routes']['POST://.form'] );
 
 echo "\n";
 
@@ -325,8 +332,8 @@ echo "Themes::apiList / apiApply\n";
 	pinned is the shape of the set - ten of them, and Basis first, because it is
 	the one the others are read against and the picker shows them in this order.	*/
 $themeKeys = array_values( array_filter(
-	scandir( __DIR__. '/../_install/library/themes' ) ?: [],
-	static fn( string $entry ): bool => is_file( __DIR__. '/../_install/library/themes/'. $entry. '/manifest.php' )
+	scandir( __DIR__. '/../_admin/install/library/themes' ) ?: [],
+	static fn( string $entry ): bool => is_file( __DIR__. '/../_admin/install/library/themes/'. $entry. '/manifest.php' )
 ) );
 
 check( 'the catalogue is ten looks with Basis at the head of it', count( $themeKeys ) === 10 && $themeKeys[0] === 'basis' );
@@ -353,9 +360,9 @@ $themeListRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Install\Themes::apiList( $appData, $themeListRequest );
 $themeListBody = $themeListRequest['/nino/http/response']['body'];
 
-check( 'lists every current theme unit, one per _install/library/themes/<key>', array_keys( $themeListBody['themes'] ) === $themeKeys );
+check( 'lists every current theme unit, one per _admin/install/library/themes/<key>', array_keys( $themeListBody['themes'] ) === $themeKeys );
 check( 'each theme carries the label and description its manifest declares', $themeListBody['themes'][$themeSample]['label'] !== '' && $themeListBody['themes'][$themeSample]['description'] !== '' );
-check( 'each theme carries a preview image path, served out of the shared library itself', $themeListBody['themes'][$themeSample]['preview'] === '/_install/library/themes/'. $themeSample. '/preview.svg' );
+check( 'each theme carries a preview image path, served out of the shared library itself', $themeListBody['themes'][$themeSample]['preview'] === '/_admin/install/library/themes/'. $themeSample. '/preview.svg' );
 check( 'no theme is applied yet - the bundle carries none of the library\'s own stylesheets', $themeListBody['activeTheme'] === null );
 
 $_POST['data'] = json_encode( [ 'theme' => 'does-not-exist' ] );
@@ -364,11 +371,11 @@ $unknownThemeRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 check( 'rejects an unknown theme with 400', $unknownThemeRequest['/nino/http/response']['statusCode'] === 400 );
 
 // A traversal attempt has to be rejected the same way any other unknown
-// key is - never resolved into a directory outside _install/library/themes
+// key is - never resolved into a directory outside _admin/install/library/themes
 $_POST['data'] = json_encode( [ 'theme' => '../modules/democontent' ] );
 $traversalThemeRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Install\Themes::apiApply( $appData, $traversalThemeRequest );
-check( 'rejects a theme key trying to escape _install/library/themes', $traversalThemeRequest['/nino/http/response']['statusCode'] === 400 );
+check( 'rejects a theme key trying to escape _admin/install/library/themes', $traversalThemeRequest['/nino/http/response']['statusCode'] === 400 );
 
 $_POST['data'] = json_encode( [ 'theme' => $themeSample ] );
 $themeApplyRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
@@ -420,10 +427,10 @@ check( 'the picked frame lands where the base templates include it from', is_fil
 	&& is_file( $sandbox. '/private/templates/theme.footer.tpl' ) === true );
 check( '...and its own stylesheet lands in the project, bundled after the theme', is_file( $sandbox. '/private/assets/style.header.css' ) === true
 	&& is_file( $sandbox. '/private/assets/style.footer.css' ) === true );
-check( 'the base html templates call the installed frame rather than carrying the markup', str_contains( (string) file_get_contents( __DIR__. '/../_install/library/base/templates/html-header.tpl' ), '[template /templates/theme.header]' )
-	&& str_contains( (string) file_get_contents( __DIR__. '/../_install/library/base/templates/html-footer.tpl' ), '[template /templates/theme.footer]' )
-	&& str_contains( (string) file_get_contents( __DIR__. '/../_install/library/base/templates/html-header.tpl' ), '<header' ) === false );
-$baseHeaderSource = (string) file_get_contents( __DIR__. '/../_install/library/base/templates/html-header.tpl' );
+check( 'the base html templates call the installed frame rather than carrying the markup', str_contains( (string) file_get_contents( __DIR__. '/../_admin/install/library/base/templates/html-header.tpl' ), '[template /templates/theme.header]' )
+	&& str_contains( (string) file_get_contents( __DIR__. '/../_admin/install/library/base/templates/html-footer.tpl' ), '[template /templates/theme.footer]' )
+	&& str_contains( (string) file_get_contents( __DIR__. '/../_admin/install/library/base/templates/html-header.tpl' ), '<header' ) === false );
+$baseHeaderSource = (string) file_get_contents( __DIR__. '/../_admin/install/library/base/templates/html-header.tpl' );
 check( 'the installed document shell uses current HTML metadata without IE conditionals', str_starts_with( $baseHeaderSource, "<!doctype html>\n<html lang=\"[[/website/lang]]\">" )
 	&& str_contains( $baseHeaderSource, 'X-UA-Compatible' ) === false
 	&& str_contains( $baseHeaderSource, '<!--[if ' ) === false
@@ -435,7 +442,7 @@ check( 'the installed document shell uses current HTML metadata without IE condi
 // path rules of their own - a name they quietly refuse renders as nothing at
 // all, which looks like a styling problem rather than a missing include
 \Nino\Modules\Template::init( $appData );
-$frameRender = \Nino\Html::renderHtml( $appData, (string) file_get_contents( __DIR__. '/../_install/library/base/templates/html-footer.tpl' ) );
+$frameRender = \Nino\Html::renderHtml( $appData, (string) file_get_contents( __DIR__. '/../_admin/install/library/base/templates/html-footer.tpl' ) );
 
 check( 'the installed frame really renders through [template /templates/theme.footer]', str_contains( $frameRender, '[template' ) === false
 	&& str_contains( $frameRender, '<footer' ) === true
@@ -443,7 +450,7 @@ check( 'the installed frame really renders through [template /templates/theme.fo
 
 // A frame unit with no style.css of its own still gets an empty file, so the
 // bundle entry never points at something that isn't there
-$emptyStyleFrames = array_filter( glob( __DIR__. '/../_install/library/footer/*/style.css' ) ?: [], static fn( string $file ): bool => filesize( $file ) === 0 );
+$emptyStyleFrames = array_filter( glob( __DIR__. '/../_admin/install/library/footer/*/style.css' ) ?: [], static fn( string $file ): bool => filesize( $file ) === 0 );
 check( 'a frame that ships no css of its own is still installable', $emptyStyleFrames === [] || is_file( $sandbox. '/private/assets/style.footer.css' ) === true );
 
 // Header and Footer are their own tabs after Design. Each post changes only
@@ -465,7 +472,7 @@ check( 'each dedicated frame apply succeeds and echoes only its pick', $headerPi
 	&& $footerPickRequest['/nino/http/response']['body'] === [ 'kind' => 'footer', 'frame' => 'v2' ] );
 check( 'each frame overrides the theme\'s declaration and is persisted', ( $configAfterFrames['/nino/install/header'] ?? null ) === 'v3'
 	&& ( $configAfterFrames['/nino/install/footer'] ?? null ) === 'v2' );
-check( '...and the installed template is really that unit\'s', file_get_contents( $sandbox. '/private/templates/theme.header.tpl' ) === file_get_contents( __DIR__. '/../_install/library/header/v3/template.tpl' ) );
+check( '...and the installed template is really that unit\'s', file_get_contents( $sandbox. '/private/templates/theme.header.tpl' ) === file_get_contents( __DIR__. '/../_admin/install/library/header/v3/template.tpl' ) );
 check( 'frame-only applies leave the selected theme and Design untouched', ( $configAfterFrames['/nino/install/theme'] ?? null ) === ( $configBeforeFrames['/nino/install/theme'] ?? null )
 	&& ( $configAfterFrames['/nino/design/settings'] ?? [] ) === ( $configBeforeFrames['/nino/design/settings'] ?? [] ) );
 check( 'applying Footer after Header keeps their canonical bundle order', array_search( '/assets/style.header.css', $configAfterFrames['/nino/html/assets']['/.cache/style.css'], true )
@@ -592,7 +599,7 @@ check( 'previewing a frame key that names no unit falls back instead of reading 
 // indistinguishable from one that is broken
 $framePreviewFailures = [];
 foreach( [ 'header', 'footer' ] as $kind )
-	foreach( glob( __DIR__. '/../_install/library/'. $kind. '/*/template.tpl' ) ?: [] as $unit ) {
+	foreach( glob( __DIR__. '/../_admin/install/library/'. $kind. '/*/template.tpl' ) ?: [] as $unit ) {
 
 		$key = basename( dirname( $unit ) );
 		[ $status, $body ] = $framePreview( $appData, $kind, $key );
@@ -779,7 +786,7 @@ $contrastRatio = static function( string $back, string $front ) use ( $relativeL
 };
 $tokenValues = static function( array $settings, string $mode ): array {
 	$values = [];
-	foreach( \Nino\Design\Tokens::palette( $settings, $mode ) as $surface => $surfaceValues ) {
+	foreach( \Nino\Modules\Design\Tokens::palette( $settings, $mode ) as $surface => $surfaceValues ) {
 		$values['--nino-'. $surface] 								= $surfaceValues['bg'];
 		$values['--nino-on-'. $surface] 						= $surfaceValues['on'];
 		$values['--nino-on-'. $surface. '-muted'] 	= $surfaceValues['on-muted'];
@@ -804,7 +811,7 @@ $composite = static function( string $hex, string $ground, float $alpha ): strin
 // resolve var(--nino-scrim) - one value in the bare :root, one in both dark
 // blocks
 $generatedScrim = static function( array $settings ): array {
-	$blocks = preg_split( '/@media \(prefers-color-scheme: dark\)/', \Nino\Design\Tokens::css( $settings ) );
+	$blocks = preg_split( '/@media \(prefers-color-scheme: dark\)/', \Nino\Modules\Design\Tokens::css( $settings ) );
 	$out = [];
 	foreach( [ 'light' => 0, 'dark' => 1 ] as $mode => $block ) {
 		preg_match( '/--nino-scrim: rgb\((\d+) (\d+) (\d+) \/ (\d+)%\)/', $blocks[$block], $found );
@@ -826,7 +833,7 @@ $measuredScrims 	= 0;
 
 foreach( $themeKeys as $themeKey ) {
 
-	$themeDir = __DIR__. '/../_install/library/themes/'. $themeKey;
+	$themeDir = __DIR__. '/../_admin/install/library/themes/'. $themeKey;
 	$manifest = include $themeDir. '/manifest.php';
 
 	if( is_array( $manifest ) === false ) {
@@ -835,7 +842,7 @@ foreach( $themeKeys as $themeKey ) {
 	}
 
 	$design = is_array( $manifest['design'] ?? null ) ? $manifest['design'] : [];
-	if( $design === [] || \Nino\Design\Tokens::normalize( $design ) !== $design )
+	if( $design === [] || \Nino\Modules\Design\Tokens::normalize( $design ) !== $design )
 		$manifestFailures[] = $themeKey. ': design is incomplete or not normalized';
 
 	foreach( [ 'header', 'footer' ] as $kind )
@@ -874,7 +881,7 @@ foreach( $themeKeys as $themeKey ) {
 	foreach( $assignments as $assignment )
 		$roleToken[$assignment[1]] = $assignment[2];
 
-	$settings 		= \Nino\Design\Tokens::normalize( $design );
+	$settings 		= \Nino\Modules\Design\Tokens::normalize( $design );
 	$scrimValues	= $generatedScrim( $settings );
 
 	foreach( [ 'light', 'dark' ] as $mode ) {
@@ -967,8 +974,8 @@ foreach( $themeKeys as $themeKey ) {
 	Each keeps the id its module writes to, so nothing else moved; which one is
 	on screen is the same pane class the panes themselves are shown by, and every
 	one of them needs that rule or its step goes quiet.	*/
-$wizard = (string) file_get_contents( __DIR__. '/../_install/templates/page-wizard.tpl' );
-$wizardCss = (string) file_get_contents( __DIR__. '/../_install/assets/style.css' );
+$wizard = (string) file_get_contents( __DIR__. '/../_admin/install/templates/page-wizard.tpl' );
+$wizardCss = (string) file_get_contents( __DIR__. '/../_admin/install/assets/style.css' );
 
 preg_match_all( '/<p id="([a-z-]+-msg)" class="install-step-msg"/', $wizard, $stepMessages );
 $strayMessages = [];
@@ -998,12 +1005,12 @@ check( 'all eight manifests declare a complete Design and available frames'. ( $
 	unusable at one end gets found before a project does.	*/
 $catalogueDesigns = [];
 foreach( $themeKeys as $themeKey ) {
-	$manifest = include __DIR__. '/../_install/library/themes/'. $themeKey. '/manifest.php';
-	$catalogueDesigns[$themeKey] = \Nino\Design\Tokens::normalize( (array) ( $manifest['design'] ?? [] ) );
+	$manifest = include __DIR__. '/../_admin/install/library/themes/'. $themeKey. '/manifest.php';
+	$catalogueDesigns[$themeKey] = \Nino\Modules\Design\Tokens::normalize( (array) ( $manifest['design'] ?? [] ) );
 }
 
 $unvisited = [];
-foreach( \Nino\Design\Tokens::choices() as $knob => $meta )
+foreach( \Nino\Modules\Design\Tokens::choices() as $knob => $meta )
 	for( $position = $meta['min']; $position <= $meta['max']; $position++ )
 		if( in_array( $position, array_column( $catalogueDesigns, $knob ), true ) === false )
 			$unvisited[] = $knob. ' '. $meta['steps'][$position - $meta['min']];
@@ -1025,8 +1032,8 @@ check( 'every rendered pair in every theme meets its declared target in both mod
 // --color-primary-text) and as ink on the page ground. All catalogue themes
 // map it to the safe brand surface; pin its weakest second use until the
 // framework splits the role.
-$basisManifest = include __DIR__. '/../_install/library/themes/basis/manifest.php';
-$basisSettings = \Nino\Design\Tokens::normalize( $basisManifest['design'] );
+$basisManifest = include __DIR__. '/../_admin/install/library/themes/basis/manifest.php';
+$basisSettings = \Nino\Modules\Design\Tokens::normalize( $basisManifest['design'] );
 $darkValues 	= $tokenValues( $basisSettings, 'dark' );
 $primaryAsInk = $contrastRatio( $darkValues['--nino-default'], $darkValues['--nino-brand-safe'] );
 
@@ -1057,15 +1064,15 @@ $wpLibraryRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Install\Webpages::apiList( $appData, $wpLibraryRequest );
 $wpLibraryBody = $wpLibraryRequest['/nino/http/response']['body'];
 
-check( 'lists every page template, one per _install/library/pages/<key>', in_array( 'home', array_keys( $wpLibraryBody['templates'] ), true ) === true && in_array( 'blank', array_keys( $wpLibraryBody['templates'] ), true ) === true && in_array( 'contact', array_keys( $wpLibraryBody['templates'] ), true ) === true );
+check( 'lists every page template, one per _admin/install/library/pages/<key>', in_array( 'home', array_keys( $wpLibraryBody['templates'] ), true ) === true && in_array( 'blank', array_keys( $wpLibraryBody['templates'] ), true ) === true && in_array( 'contact', array_keys( $wpLibraryBody['templates'] ), true ) === true );
 check( '"contact" declares it requires "forms"', $wpLibraryBody['templates']['contact']['requiresModules'] === [ 'forms' ] );
 /*	A project that has written no page yet opens on the starter site the
 	library declares - the pages a site is normally built from, already
 	filled in. A proposal in a list nothing has been written from yet, not a
 	default underneath config.php: see Webpages::_presetPages()	*/
 $presetUnits = array_values( array_filter( array_map(
-	static fn( string $entry ): array => [ $entry, ( @include __DIR__. '/../_install/library/pages/'. $entry. '/manifest.php' ) ?: [] ],
-	array_values( array_diff( scandir( __DIR__. '/../_install/library/pages' ) ?: [], [ '.', '..' ] ) ) ),
+	static fn( string $entry ): array => [ $entry, ( @include __DIR__. '/../_admin/install/library/pages/'. $entry. '/manifest.php' ) ?: [] ],
+	array_values( array_diff( scandir( __DIR__. '/../_admin/install/library/pages' ) ?: [], [ '.', '..' ] ) ) ),
 	static fn( array $unit ): bool => isset( $unit[1]['preset'] ) ) );
 usort( $presetUnits, static fn( array $a, array $b ): int => $a[1]['preset'] <=> $b[1]['preset'] );
 $presetKeys = array_map( static fn( array $unit ): string => $unit[0], $presetUnits );
@@ -1095,10 +1102,10 @@ check( '...with de_DE\'s wording read from the unit\'s own de_DE fragment', $wpL
 check( '...and en_US\'s from its own en_US fragment - the locale that used to end up generic', $wpLibraryBody['templates']['home']['text']['en_US']['name'] === 'Home' && $wpLibraryBody['templates']['home']['text']['en_US']['title'] === 'Welcome.' );
 check( 'reports the Http-URI "home" suggests for itself, which is not its folder name', $wpLibraryBody['templates']['home']['uri'] === '/' );
 check( '...and "contact"\'s, which is', $wpLibraryBody['templates']['contact']['uri'] === '/contact' );
-check( 'the legal manifest declares the stable Element-URI its generated route receives', ( array_values( ( include __DIR__. '/../_install/library/pages/legal/manifest.php' )['routes'] )[0]['uri'] ?? null ) === '/legal' );
+check( 'the legal manifest declares the stable Element-URI its generated route receives', ( array_values( ( include __DIR__. '/../_admin/install/library/pages/legal/manifest.php' )['routes'] )[0]['uri'] ?? null ) === '/legal' );
 check( 'the blank template starts every locale with useful page metadata', $wpLibraryBody['templates']['blank']['text']['de_DE']['name'] === 'Neue Webseite' && $wpLibraryBody['templates']['blank']['text']['en_US']['name'] === 'New webpage' );
 check( 'the blank template suggests a stable Http-URI and its own page template', $wpLibraryBody['templates']['blank']['uri'] === '/new-webpage' && $wpLibraryBody['templates']['blank']['body'] === '[template /templates/page-blank]' );
-check( 'the blank page template deliberately has no section', strpos( (string) file_get_contents( __DIR__. '/../_install/library/pages/blank/templates/page-blank.tpl' ), '<section' ) === false );
+check( 'the blank page template deliberately has no section', strpos( (string) file_get_contents( __DIR__. '/../_admin/install/library/pages/blank/templates/page-blank.tpl' ), '<section' ) === false );
 
 $_POST['data'] = json_encode( [ 'webpages' => [ [ 'uri' => '../etc/passwd', 'httpUri' => '/x', 'libraryKey' => 'home', 'text' => [] ] ] ] );
 $badUriRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
@@ -1115,15 +1122,11 @@ $badTemplateRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Install\Webpages::apiApply( $appData, $badTemplateRequest );
 check( 'rejects an unknown library key with 400', $badTemplateRequest['/nino/http/response']['statusCode'] === 400 );
 
-$_POST['data'] = json_encode( [ 'webpages' => [ [ 'uri' => '/installer-shadow', 'httpUri' => '/_install', 'libraryKey' => 'home', 'text' => [] ] ] ] );
+$_POST['data'] = json_encode( [ 'webpages' => [ [ 'uri' => '/installer-shadow', 'httpUri' => '/_admin', 'libraryKey' => 'home', 'text' => [] ] ] ] );
 $reservedHttpUriRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Install\Webpages::apiApply( $appData, $reservedHttpUriRequest );
 check( 'rejects a Webpage mounted on the installer\'s own runtime uri', $reservedHttpUriRequest['/nino/http/response']['statusCode'] === 409 );
 
-$_POST['data'] = json_encode( [ 'webpages' => [ [ 'uri' => '/designer-shadow', 'httpUri' => '/_templates', 'libraryKey' => 'home', 'text' => [] ] ] ] );
-$reservedDesignerRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Install\Webpages::apiApply( $appData, $reservedDesignerRequest );
-check( 'rejects a Webpage mounted on the Template Builder runtime uri', $reservedDesignerRequest['/nino/http/response']['statusCode'] === 409 );
 
 $_POST['data'] = json_encode( [ 'webpages' => [ [ 'uri' => '/custom-page', 'httpUri' => '/custom', 'libraryKey' => 'home', 'text' => [] ] ] ] );
 $foreignRouteRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
@@ -1301,7 +1304,7 @@ $configAfterDrop = \Nino\Filesystem::getFileContent( $appData, '/config.php', []
 check( 'dropping "kontakt"/"impressum" removes their routes (replace, not merge)', isset( $configAfterDrop['/nino/http/routes']['GET://kontakt'] ) === false && isset( $configAfterDrop['/nino/http/routes']['GET://impressum'] ) === false );
 check( 'the home route survives, still keyed the same way', isset( $configAfterDrop['/nino/http/routes']['GET://'] ) === true );
 check( 'a hand-written route still survives this replace too', isset( $configAfterDrop['/nino/http/routes']['GET://custom'] ) === true );
-check( '/website/legal/uri is only ever set, never cleared - known v1 limitation, see docs/_install.md', ( \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] )['[[/website/legal/uri]]'] ?? null ) === '/impressum' );
+check( '/website/legal/uri is only ever set, never cleared - known v1 limitation, see docs/setup.md', ( \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] )['[[/website/legal/uri]]'] ?? null ) === '/impressum' );
 
 /*	...and the starter site stays gone. The one property that separates a
 	proposal in the step's list from a default underneath config.php: this
@@ -1328,7 +1331,7 @@ $reopenedModules = $reopenSetupRequest['/nino/http/response']['body']['modules']
 check( 'a recommended module the operator unchecked stays unchecked when the step reopens',
 	array_keys( array_filter( $reopenedModules, static fn( array $unit ): bool => $unit['active'] === true ) ) === [] );
 check( '...while the library still recommends it for the next fresh project',
-	( ( include __DIR__. '/../_install/library/modules/navigation/manifest.php' )['preset'] ?? false ) === true );
+	( ( include \Nino\Install\Setup::units()['navigation']. '/manifest.php' )['preset'] ?? false ) === true );
 
 echo "\n";
 
@@ -1364,11 +1367,12 @@ check( '"legal" reports no single template - its body resolves one per locale', 
 
 // Now the other direction: open one of those entries in /_admin's Routes module
 // and save it back unchanged, exactly as pages.js posts it
-\Nino\Runtime::setSessionValue( $appData, './nino/admin/authed', true );
+\Nino\Auth::insertUser( $appData, 'dev@example.com', 'correct horse battery staple', [ '/*' ] );
+\Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );
 
 $adminListRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 $_POST['data'] 	= json_encode( [] );
-\Nino\Admin\PageEditor::apiList( $appData, $adminListRequest );
+\Nino\Modules\Routes\Admin::apiList( $appData, $adminListRequest );
 $adminPages = $adminListRequest['/nino/http/response']['body']['pages'];
 $adminTemplates = $adminListRequest['/nino/http/response']['body']['templates'];
 
@@ -1383,7 +1387,7 @@ $_POST['data'] = json_encode( [
 	'statusCode' => $adminPages[1]['statusCode'], 'text' => $adminPages[1]['text'],
 ] );
 $adminSaveRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Admin\PageEditor::apiSave( $appData, $adminSaveRequest );
+\Nino\Modules\Routes\Admin::apiSave( $appData, $adminSaveRequest );
 check( 'saving a Webpages-made entry from /_admin succeeds', $adminSaveRequest['/nino/http/response']['statusCode'] === 200 );
 
 $afterDevSave = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
@@ -1398,7 +1402,7 @@ $_POST['data'] = json_encode( [
 	'template' => '', 'navs' => [], 'statusCode' => 200, 'text' => $adminPages[2]['text'],
 ] );
 $adminLegalRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Admin\PageEditor::apiSave( $appData, $adminLegalRequest );
+\Nino\Modules\Routes\Admin::apiSave( $appData, $adminLegalRequest );
 check( 'saving the locale-resolving entry from /_admin succeeds', $adminLegalRequest['/nino/http/response']['statusCode'] === 200 );
 
 $afterLegalSave = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
@@ -1412,7 +1416,7 @@ $_POST['data'] = json_encode( [
 	'template' => 'page-home', 'navs' => [], 'statusCode' => 201, 'text' => [],
 ] );
 $adminNewRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Admin\PageEditor::apiSave( $appData, $adminNewRequest );
+\Nino\Modules\Routes\Admin::apiSave( $appData, $adminNewRequest );
 check( 'creating a page in /_admin succeeds', $adminNewRequest['/nino/http/response']['statusCode'] === 200 );
 
 $beforeReapply = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
@@ -1431,10 +1435,11 @@ $_POST['data'] = json_encode( [
 	'template' => 'page-nope', 'navs' => [], 'statusCode' => 404, 'text' => [],
 ] );
 $adminBadRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Admin\PageEditor::apiSave( $appData, $adminBadRequest );
+\Nino\Modules\Routes\Admin::apiSave( $appData, $adminBadRequest );
 check( 'a genuinely unknown template is still rejected', $adminBadRequest['/nino/http/response']['statusCode'] === 400 );
 
-\Nino\Runtime::unsetSessionValue( $appData, './nino/admin/authed' );
+\Nino\Auth::logoutUser( $appData );
+\Nino\Auth::deleteUser( $appData, 'dev@example.com' );
 
 echo "\n";
 
@@ -1445,7 +1450,7 @@ echo "PersonalInfos::apiList / apiSaveBatch\n";
 
 // Deliberately overwrites whatever the Webpages section left behind above -
 // this section is independently scoped, only real
-// _install/library/base key *names* matter here (apiList() filters
+// _admin/install/library/base key *names* matter here (apiList() filters
 // against the real library on disk, not anything sandboxed), plus a
 // couple of made-up, clearly-out-of-scope keys to prove both "not
 // /company or /website" and "webpage meta, even though it looks similar"
@@ -1492,12 +1497,12 @@ check( 'saves the en_US value', ( \Nino\Filesystem::getFileContent( $appData, '/
 echo "\n";
 
 
-// --- Editor::apiList / apiCreate -------------------------------------------
+// --- Admin::apiList / apiCreate -------------------------------------------
 
-echo "Editor::apiList / apiCreate\n";
+echo "Admin::apiList / apiCreate\n";
 
 $adminListRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Install\Admin::apiList( $appData, $adminListRequest );
+\Nino\Install\Accounts::apiList( $appData, $adminListRequest );
 check( 'does not count the shipped, disabled placeholder as a usable admin account', $adminListRequest['/nino/http/response']['body']['users'] === [] );
 
 $_POST['data'] = json_encode( [ 'password' => 'a-long-enough-admin-password' ] );
@@ -1507,18 +1512,19 @@ check( 'refuses to lock the installer before an active _editor account exists', 
 
 $_POST['data'] = json_encode( [ 'mail' => 'not-an-email', 'pw' => 'a-long-enough-password' ] );
 $invalidMailRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Install\Admin::apiCreate( $appData, $invalidMailRequest );
+\Nino\Install\Accounts::apiCreate( $appData, $invalidMailRequest );
 check( 'rejects an invalid email with 400', $invalidMailRequest['/nino/http/response']['statusCode'] === 400 );
 
 $_POST['data'] = json_encode( [ 'mail' => 'admin@example.com', 'pw' => 'short' ] );
 $shortPwRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Install\Admin::apiCreate( $appData, $shortPwRequest );
+\Nino\Install\Accounts::apiCreate( $appData, $shortPwRequest );
 check( 'rejects a too-short password with 400', $shortPwRequest['/nino/http/response']['statusCode'] === 400 );
 
 $_POST['data'] = json_encode( [ 'mail' => 'admin@example.com', 'pw' => 'a-long-enough-password' ] );
 $createRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Install\Admin::apiCreate( $appData, $createRequest );
+\Nino\Install\Accounts::apiCreate( $appData, $createRequest );
 check( 'creates the account', \Nino\Auth::getUser( $appData, 'admin@example.com' ) !== false );
+check( 'the root account holds the Developer role the Setup step wrote, and full access through it', \Nino\Auth::getUser( $appData, 'admin@example.com' )['role'] === 'developer' && \Nino\Auth::getUser( $appData, 'admin@example.com' )['perms'] === [] && \Nino\Auth::checkPermission( $appData, '/_admin/config/manage', 'admin@example.com' ) === true );
 check( 'drops the shipped placeholder account once a real admin exists', \Nino\Auth::getUser( $appData, 'changeme@domain.com' ) === false );
 check( 'returns only the newly usable account to the frontend', $createRequest['/nino/http/response']['body']['users'] === [ 'admin@example.com' ] );
 check( 'the new account can actually authenticate', \Nino\Auth::loginUser( $appData, 'admin@example.com', 'a-long-enough-password' ) !== false );
@@ -1526,7 +1532,7 @@ check( 'the new account can actually authenticate', \Nino\Auth::loginUser( $appD
 
 $_POST['data'] = json_encode( [ 'mail' => 'admin@example.com', 'pw' => 'a-different-password' ] );
 $replaceRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Install\Admin::apiCreate( $appData, $replaceRequest );
+\Nino\Install\Accounts::apiCreate( $appData, $replaceRequest );
 check( 'creating the same address again replaces it rather than failing', $replaceRequest['/nino/http/response']['statusCode'] === 200 );
 check( 'the replaced account uses the new password', \Nino\Auth::loginUser( $appData, 'admin@example.com', 'a-different-password' ) !== false );
 \Nino\Auth::logoutUser( $appData );
@@ -1534,9 +1540,9 @@ check( 'the replaced account uses the new password', \Nino\Auth::loginUser( $app
 echo "\n";
 
 
-// --- Finish::apiComplete / Install::setDevPassword ------------------------
+// --- Finish::apiComplete / Install::setRecoverySecret ------------------------
 
-echo "Finish::apiComplete / Install::setDevPassword\n";
+echo "Finish::apiComplete / Install::setRecoverySecret\n";
 
 $_POST['data'] = json_encode( [ 'password' => 'short' ] );
 $shortFinishRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
@@ -1546,7 +1552,7 @@ check( 'rejects a too-short _admin password with 400', $shortFinishRequest['/nin
 // setDevPassword() no longer rewrites php source: it stores the hash under
 // the private directory, outside every tool folder and outside config.php.
 // _admin/Admin.php therefore stays byte-identical, which is what makes it
-// replaceable on an update (see Install::setDevPassword()'s docblock)
+// replaceable on an update (see Install::setRecoverySecret()'s docblock)
 $adminBefore = file_get_contents( __DIR__. '/../_admin/Admin.php' );
 
 $_POST['data'] = json_encode( [ 'password' => 'a brand new dev password' ] );
@@ -1556,18 +1562,18 @@ check( 'apiComplete succeeds once an editor account exists', $finishRequest['/ni
 
 check( 'the real _admin/Admin.php was not touched', file_get_contents( __DIR__. '/../_admin/Admin.php' ) === $adminBefore );
 
-$pwPath = \Nino\Admin\Admin::passwordPath( $appData );
+$pwPath = \Nino\Admin\Recovery::path( $appData );
 check( 'the hash lands under the private directory', $pwPath === $sandbox. '/private/.auth/pw.php' && is_file( $pwPath ) === true );
 
 $pwRaw = file_get_contents( $pwPath );
-check( 'it is wrapped in the self-exiting 403 stub', str_starts_with( $pwRaw, \Nino\Admin\Admin::STUB_PREFIX ) === true && str_ends_with( $pwRaw, \Nino\Admin\Admin::STUB_SUFFIX ) === true );
+check( 'it is wrapped in the self-exiting 403 stub', str_starts_with( $pwRaw, \Nino\Admin\Recovery::STUB_PREFIX ) === true && str_ends_with( $pwRaw, \Nino\Admin\Recovery::STUB_SUFFIX ) === true );
 // Run in a subprocess, not inline: the stub's whole job is to exit(), which
 // would take this test run with it. What matters is that executing the file -
 // which is what a webserver that happily serves it would do - prints nothing
 $stubOutput = (string) shell_exec( 'php -r '. escapeshellarg( 'include '. var_export( $pwPath, true ). ';' ). ' 2>&1' );
 check( 'executing that file prints nothing - the hash never reaches a response body', trim( $stubOutput ) === '' );
 
-check( 'passwordHash() reads it back', password_verify( 'a brand new dev password', (string) \Nino\Admin\Admin::passwordHash( $appData ) ) === true );
+check( 'passwordHash() reads it back', password_verify( 'a brand new dev password', (string) \Nino\Admin\Recovery::hash( $appData ) ) === true );
 check( 'the project is now installed', \Nino\Admin\Admin::isInstalled( $appData ) === true );
 check( '...and the marker is persisted, so losing the file cannot re-open the wizard', ( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/install/completed'] ?? false ) === true );
 
@@ -1580,7 +1586,7 @@ check( 'the password file is not in the backup manifest', count( array_filter(
 
 // Deleting it locks the admin area rather than handing back the installer
 unlink( $pwPath );
-check( 'a missing password file leaves no usable hash', \Nino\Admin\Admin::passwordHash( $appData ) === null );
+check( 'a missing password file leaves no usable hash', \Nino\Admin\Recovery::hash( $appData ) === null );
 check( '...but the project still counts as installed', \Nino\Admin\Admin::isInstalled( $appData ) === true );
 
 $reopenRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
@@ -1588,13 +1594,13 @@ check( 'so /_install stays locked', \Nino\Install\Install::guard( $appData, $reo
 
 // A half-written file must read as "no password", never as a hash that just
 // happens not to match
-file_put_contents( $pwPath, \Nino\Admin\Admin::STUB_PREFIX );
-check( 'a truncated password file reads as no password at all', \Nino\Admin\Admin::passwordHash( $appData ) === null );
+file_put_contents( $pwPath, \Nino\Admin\Recovery::STUB_PREFIX );
+check( 'a truncated password file reads as no password at all', \Nino\Admin\Recovery::hash( $appData ) === null );
 unlink( $pwPath );
 
-check( 'writePasswordHash() refuses an empty hash rather than storing one nothing can match', \Nino\Admin\Admin::writePasswordHash( $appData, '' ) === false );
-check( 'setDevPassword() can write the file again afterwards', \Nino\Install\Install::setDevPassword( $appData, 'another dev password' ) === true );
-check( '...and the new password is the one that verifies', password_verify( 'another dev password', (string) \Nino\Admin\Admin::passwordHash( $appData ) ) === true );
+check( 'writePasswordHash() refuses an empty hash rather than storing one nothing can match', \Nino\Admin\Recovery::writeHash( $appData, '' ) === false );
+check( 'setDevPassword() can write the file again afterwards', \Nino\Install\Install::setRecoverySecret( $appData, 'another dev password' ) === true );
+check( '...and the new password is the one that verifies', password_verify( 'another dev password', (string) \Nino\Admin\Recovery::hash( $appData ) ) === true );
 
 check( 'the private directory carries its own deny rule', is_file( $sandbox. '/private/.htaccess' ) === true );
 
@@ -1605,11 +1611,11 @@ echo "\n";
 
 /*	Read-only sanity check on the actual checkout, not the sandbox above.
 	A checkout ships no project at all now - no private/, no config.php, no
-	templates, no assets - so what has to hold is that _install/library can
+	templates, no assets - so what has to hold is that _admin/install/library can
 	still produce one. Every route a starter site gets, every template it
 	renders from and the deny rule that protects the directory it lands in
 	come from a unit here, and nowhere else.	*/
-echo "Shipped defaults (_install/library, the only source of a starter site)\n";
+echo "Shipped defaults (_admin/install/library, the only source of a starter site)\n";
 
 $realRoot = __DIR__. '/..';
 
@@ -1618,14 +1624,14 @@ $realRoot = __DIR__. '/..';
 check( 'a checkout ships no private directory at all - the wizard creates it', is_dir( $realRoot. '/private' ) === false );
 check( '...and no public one either', is_dir( $realRoot. '/public' ) === false );
 check( 'the deny rule for the private tree travels with the base unit instead', str_contains(
-	(string) @file_get_contents( $realRoot. '/_install/library/base/private/.htaccess' ), 'Require all denied'
+	(string) @file_get_contents( $realRoot. '/_admin/install/library/base/private/.htaccess' ), 'Require all denied'
 ) === true );
 // ...and it is declared, or it ships without ever being copied
-check( '...and the base unit actually copies it', in_array( 'private', ( include $realRoot. '/_install/library/base/manifest.php' )['files'] ?? [], true ) === true );
+check( '...and the base unit actually copies it', in_array( 'private', ( include $realRoot. '/_admin/install/library/base/manifest.php' )['files'] ?? [], true ) === true );
 
 // The shell every page renders inside
 foreach( [ 'html-header.tpl', 'html-footer.tpl' ] as $file )
-	check( "the base unit ships $file", is_file( $realRoot. '/_install/library/base/templates/'. $file ) === true );
+	check( "the base unit ships $file", is_file( $realRoot. '/_admin/install/library/base/templates/'. $file ) === true );
 
 /*	Every page unit stands on its own: the routes it declares, the templates
 	those routes render, and the files they reference. A unit whose route
@@ -1634,12 +1640,12 @@ foreach( [ 'html-header.tpl', 'html-footer.tpl' ] as $file )
 $pageUnits 		= [];
 $pageFailures 	= [];
 
-foreach( scandir( $realRoot. '/_install/library/pages' ) ?: [] as $pageEntry ) {
+foreach( scandir( $realRoot. '/_admin/install/library/pages' ) ?: [] as $pageEntry ) {
 
-	if( is_file( $realRoot. '/_install/library/pages/'. $pageEntry. '/manifest.php' ) === false )
+	if( is_file( $realRoot. '/_admin/install/library/pages/'. $pageEntry. '/manifest.php' ) === false )
 		continue;
 
-	$pageDir 			= $realRoot. '/_install/library/pages/'. $pageEntry;
+	$pageDir 			= $realRoot. '/_admin/install/library/pages/'. $pageEntry;
 	$pageManifest 	= include $pageDir. '/manifest.php';
 	$pageUnits[] 	= $pageEntry;
 
@@ -1679,24 +1685,35 @@ check( '...and a blank one to start a page of your own from', in_array( 'blank',
 
 // The 404 unit is the one whose route Http::response() looks up by an exact
 // key of its own when nothing else matches
-$notFound = ( include $realRoot. '/_install/library/pages/404/manifest.php' )['routes'] ?? [];
+$notFound = ( include $realRoot. '/_admin/install/library/pages/404/manifest.php' )['routes'] ?? [];
 check( 'the 404 unit registers the exact key the fallback lookup needs', isset( $notFound['GET://404'] ) === true
 	&& ( $notFound['GET://404']['statusCode'] ?? null ) === 404 );
 // ...and home is the one that has to register at "/" while carrying its own
 // Element-URI in the data field
-$home = ( include $realRoot. '/_install/library/pages/home/manifest.php' )['routes'] ?? [];
+$home = ( include $realRoot. '/_admin/install/library/pages/home/manifest.php' )['routes'] ?? [];
 check( 'the home unit registers at "/" and keeps "/home" as its Element-URI', isset( $home['GET://'] ) === true
 	&& ( $home['GET://']['uri'] ?? null ) === '/home' );
 
 // The optional modules a page can pull in with it are units too, so a page
-// declaring one the library does not have would be a dead requirement
-$moduleUnits = array_values( array_filter( scandir( $realRoot. '/_install/library/modules' ) ?: [],
-	static fn( string $entry ): bool => is_file( $realRoot. '/_install/library/modules/'. $entry. '/manifest.php' ) ) );
+// declaring one nobody ships would be a dead requirement. A unit travels
+// with its module - install/ beside the class file - and Setup::units()
+// finds it there without /_install listing it anywhere
+$moduleUnits = \Nino\Install\Setup::units();
+$modulesDirs 	= [ realpath( $realRoot. '/_nino/Nino/Modules' ), realpath( $realRoot. '/app/Nino/Modules' ) ];
 
-check( 'the contact page can pull the forms module in with it', in_array( 'forms', $moduleUnits, true ) === true );
+check( 'the contact page can pull the forms module in with it', isset( $moduleUnits['forms'] ) === true );
+check( 'a checkout keeps no module unit in _admin/install/library any more - every one sits in its module as install/', $moduleUnits !== [] && array_filter( $moduleUnits,
+	static fn( string $unitDir ): bool => basename( $unitDir ) !== 'install' || in_array( dirname( realpath( $unitDir ) ?: '', 2 ), $modulesDirs, true ) === false ) === [] );
+check( 'the optional modules are delivered below app/Nino/Modules, where a project keeps or drops them', str_ends_with( $moduleUnits['forms'], '/app/Nino/Modules/Form/install' ) === true );
+check( 'the forms unit takes its key from its manifest - its directory is "Form"', basename( dirname( $moduleUnits['forms'] ) ) === 'Form' && isset( $moduleUnits['form'] ) === false );
+check( '...the others from their directory\'s lowercased name', basename( dirname( $moduleUnits['newsletter'] ) ) === 'Newsletter' && basename( dirname( $moduleUnits['localepicker'] ) ) === 'Localepicker' );
+// ...and each unit activates the module it sits in, or the wizard would
+// switch one module on and copy another's templates
+check( 'each unit activates the module it ships with', array_filter( $moduleUnits, static fn( string $unitDir ): bool =>
+	( ( include $unitDir. '/manifest.php' )['moduleClass'] ?? '' ) !== '\\Nino\\Modules\\'. basename( dirname( $unitDir ) ) ) === [] );
 // Everything the always-on half does not cover is a unit somebody can decline
 check( 'the always-on module list carries no unit the wizard offers', array_intersect(
-	array_map( static fn( string $unit ): string => (string) ( ( include $realRoot. '/_install/library/modules/'. $unit. '/manifest.php' )['moduleClass'] ?? '' ), $moduleUnits ),
+	array_map( static fn( string $unitDir ): string => (string) ( ( include $unitDir. '/manifest.php' )['moduleClass'] ?? '' ), $moduleUnits ),
 	\Nino\AppData::DEFAULTS['/nino/modules']
 ) === [] );
 
@@ -1704,12 +1721,12 @@ check( 'the always-on module list carries no unit the wizard offers', array_inte
 // stylesheet that manifest names, and every webfont that stylesheet
 // @font-faces - nothing else in the library ships fonts anymore, so a
 // missing one is a font that silently never loads
-foreach( scandir( $realRoot. '/_install/library/themes' ) ?: [] as $themeEntry ) {
+foreach( scandir( $realRoot. '/_admin/install/library/themes' ) ?: [] as $themeEntry ) {
 
 	if( $themeEntry === '.' || $themeEntry === '..' )
 		continue;
 
-	$themeDir 			= $realRoot. '/_install/library/themes/'. $themeEntry;
+	$themeDir 			= $realRoot. '/_admin/install/library/themes/'. $themeEntry;
 	$themeManifest 	= include $themeDir. '/manifest.php';
 	$themeCss 			= (string) ( $themeManifest['stylesheet'] ?? '' );
 
@@ -1724,8 +1741,90 @@ foreach( scandir( $realRoot. '/_install/library/themes' ) ?: [] as $themeEntry )
 
 // Basis is the one look the catalogue is read against, so it is the one a
 // fresh install has to be able to fall back on
-check( 'the reference look is in the library and names a stylesheet it ships', is_file( $realRoot. '/_install/library/themes/basis/manifest.php' ) === true
-	&& is_file( $realRoot. '/_install/library/themes/basis/'. ( include $realRoot. '/_install/library/themes/basis/manifest.php' )['stylesheet'] ) === true );
+check( 'the reference look is in the library and names a stylesheet it ships', is_file( $realRoot. '/_admin/install/library/themes/basis/manifest.php' ) === true
+	&& is_file( $realRoot. '/_admin/install/library/themes/basis/'. ( include $realRoot. '/_admin/install/library/themes/basis/manifest.php' )['stylesheet'] ) === true );
+
+echo "\n";
+
+
+// --- Install units travel with their modules ---------------------------------
+
+/*	A module is added to a project by adding its directory: its install unit
+	sits beside its class as install/, and Setup::units() finds it there
+	without the wizard listing it anywhere. A project's own modules are found
+	the same way below the app dir - the directory the autoloader resolves
+	project classes against, so NINO_APP_DIR moves both together: a project
+	that relocates its app dir takes the delivered optional modules along.	*/
+echo "Install units travel with their modules\n";
+
+if( defined( 'NINO_APP_DIR' ) === true ) {
+
+	echo "  (NINO_APP_DIR is already defined - the app dir checks are skipped)\n";
+
+} else {
+
+	$appDir = $sandbox. '/app';
+
+	// Two levels down (Vendor/Module) and three (Vendor/Modules/Module) -
+	// the autoloader allows either shape, so both have to be found
+	foreach( [
+		'/Acme/Widget/install' 				=> [ 'label' => 'Widget', 'moduleClass' => '\\Acme\\Widget', 'requiresModules' => [ 'forms' ] ],
+		'/Acme/Modules/Deep/install' 	=> [ 'label' => 'Deep', 'moduleClass' => '\\Acme\\Modules\\Deep', 'key' => 'deep-unit' ],
+		// A second unit claiming "forms" - Nino's own module (copied below,
+		// as a relocated app dir has it) keeps the key
+		'/Acme/Forms/install' 				=> [ 'label' => 'Shadow', 'moduleClass' => '\\Acme\\Forms' ],
+		// Not a slug: dropped
+		'/Acme/Bad/install' 					=> [ 'label' => 'Bad', 'moduleClass' => '\\Acme\\Bad', 'key' => 'Not A Slug' ],
+	] as $unitPath => $unitManifest ) {
+		$unitTemplate = 'page-'. strtolower( basename( dirname( $unitPath ) ) ). '.tpl';
+		@mkdir( $appDir. $unitPath. '/templates', 0755, true );
+		file_put_contents( $appDir. $unitPath. '/manifest.php', '<?php return '. var_export( $unitManifest + [ 'templates' => [ $unitTemplate ] ], true ). ';' );
+		file_put_contents( $appDir. $unitPath. '/templates/'. $unitTemplate, '<p>'. $unitManifest['label']. '</p>' );
+	}
+
+	// The delivered Form module travels with the relocated app dir - its
+	// unit is enough for the wizard's question, the class autoloads from
+	// the checkout either way
+	\Nino\Filesystem::copyDir( $realRoot. '/app/Nino/Modules/Form/install', $appDir. '/Nino/Modules/Form/install' );
+
+	define( 'NINO_APP_DIR', $appDir );
+
+	$foundUnits = \Nino\Install\Setup::units();
+
+	check( 'a project module\'s install/ is found below the app dir', ( $foundUnits['widget'] ?? '' ) === $appDir. '/Acme/Widget/install' );
+	check( '...three levels down too', ( $foundUnits['deep-unit'] ?? '' ) === $appDir. '/Acme/Modules/Deep/install' );
+	check( 'the key comes from the manifest when it names one, else from the directory', isset( $foundUnits['deep'] ) === false && isset( $foundUnits['widget'] ) === true );
+	check( 'Nino\'s own unit keeps a key a project module also claims', $foundUnits['forms'] === $appDir. '/Nino/Modules/Form/install' );
+	check( 'a key that is not a slug is dropped', array_filter( $foundUnits, static fn( string $dir ): bool => str_ends_with( $dir, '/Acme/Bad/install' ) === true ) === [] );
+	$sortedKeys = array_keys( $foundUnits );
+	sort( $sortedKeys );
+	check( 'the map is sorted by key', array_keys( $foundUnits ) === $sortedKeys );
+
+	// The picker offers it like any other unit, and applying it activates
+	// the class and copies the template - with its requirement pulled in
+	$appLibraryRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+	\Nino\Install\Setup::apiLibrary( $appData, $appLibraryRequest );
+	$appLibraryBody = $appLibraryRequest['/nino/http/response']['body'];
+	check( 'the Setup step offers the project module', ( $appLibraryBody['modules']['widget']['label'] ?? null ) === 'Widget'
+		&& ( $appLibraryBody['modules']['widget']['requiresModules'] ?? null ) === [ 'forms' ] );
+
+	$_POST['data'] = json_encode( [ 'locales' => [ 'de_DE' ], 'modules' => [ 'widget' ] ] );
+	$appApplyRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+	\Nino\Install\Setup::apiApply( $appData, $appApplyRequest );
+	$appApplyBody = $appApplyRequest['/nino/http/response']['body'] ?? [];
+
+	check( 'applying it activates the class and its requirement', ( $appApplyBody['modules'] ?? null ) === [ 'widget', 'forms' ]
+		&& in_array( '\\Acme\\Widget', $appData['/nino/modules'], true ) === true
+		&& in_array( '\\Nino\\Modules\\Form', $appData['/nino/modules'], true ) === true );
+	check( '...and copies its template out of the module directory', \Nino\Filesystem::fileExists( $appData, '/templates/page-widget.tpl' ) === true );
+
+	// A requirement nobody answers to is skipped, not applied
+	file_put_contents( $appDir. '/Acme/Widget/install/manifest.php', '<?php return '. var_export( [ 'label' => 'Widget', 'moduleClass' => '\\Acme\\Widget', 'requiresModules' => [ 'nonexistent' ] ], true ). ';' );
+	$_POST['data'] = json_encode( [ 'locales' => [ 'de_DE' ], 'modules' => [ 'widget' ] ] );
+	$unknownRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+	\Nino\Install\Setup::apiApply( $appData, $unknownRequest );
+	check( 'a requirement no unit answers to is left out of the applied set', ( $unknownRequest['/nino/http/response']['body']['modules'] ?? null ) === [ 'widget' ] );
+}
 
 echo "\n";
 

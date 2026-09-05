@@ -1,6 +1,6 @@
 /**
  * Behaviour checks for the shared admin data table's pure half
- * (Nino.adminUi.tableModel in _nino/Nino.admin.js).
+ * (Nino.adminUi.tableModel in _admin/assets/Nino.admin.js).
  *
  * The renderer needs a DOM; the model does not, so the parts that are easy to
  * get wrong - type-aware ordering, page clamping, which fields may appear at
@@ -32,7 +32,7 @@ function check( label, condition, detail ) {
 // exactly what a browser gives it. The model half touches none of this.
 const vm = require('vm');
 const source = fs.readFileSync( path.join( __dirname, '../_nino/Nino.js' ), 'utf8' )
-	+ fs.readFileSync( path.join( __dirname, '../_nino/Nino.admin.js' ), 'utf8' );
+	+ fs.readFileSync( path.join( __dirname, '../_admin/assets/Nino.admin.js' ), 'utf8' );
 
 const noop = () => {};
 const stubEl = () => ( { classList : { add : noop, remove : noop, toggle : noop, contains : () => false },

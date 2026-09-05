@@ -7,7 +7,7 @@
  *	Nino.ui.js							Frontend design-system behaviors (cover, parallax, vpa,
  *													autoheight, slider, scroll-header, generic forms, tabs,
  *													modal/lightbox, toast) - split out of Nino.js since
- *													only the public site needs this, never _editor/_admin.
+ *													only the public site needs this, never the workbench.
  *													Load order: Nino.js, then this file (depends on
  *													Nino.client/content/dom/events/http).
  *

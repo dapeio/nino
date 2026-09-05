@@ -1,0 +1,160 @@
+@layer nino.system, nino.tool, nino.local;
+
+/**
+ *	Nino										A compact filesystembased php framework
+ *	Modules\Elements		Element data and the types behind it
+ *	admin.css								What the module's /_admin panel needs beyond the design
+ *													system in _admin/assets/style.css: the raw-data drawer of
+ *													an element, and the field editor of the Element Types tab.
+ *													Bundled while the module is there (see the panel's
+ *													assets()), so the same layer rules apply - the shell's
+ *													stylesheet fixes the layer order, this one only ever adds
+ *													to nino.tool, scoped to the panel's own ids.
+ *
+ *	@package								Dape/Nino
+ *	@author									David Perchermeier <mail@dape.io>
+ *	@link										https://github.com/dapeio/nino
+ */
+
+@layer nino.tool {
+
+/* ---------------------------------------------------------- App modules */
+
+/* ----------------------------------------------------- Element raw data */
+
+#elements-form-raw {
+	margin-top: 1.5rem;
+	padding-top: 1rem;
+	border-top: 1px solid var(--editor-separator);
+}
+
+#elements-form-raw summary {
+	cursor: pointer;
+	font-size: .82rem;
+	font-weight: 650;
+}
+
+#admin-page-wrap .elements-raw-bucket {
+	margin-top: .75rem;
+	font-family: var(--nino-admin-mono);
+	font-size: .78rem;
+	font-weight: 650;
+}
+
+#admin-page-wrap .elements-raw-json {
+	margin: .3rem 0 0;
+	padding: .65rem .75rem;
+	overflow-x: auto;
+	border: 1px solid var(--editor-separator);
+	border-radius: var(--editor-radius-sm);
+	background: var(--nino-admin-surface-muted);
+	font: .76rem/1.5 var(--nino-admin-mono);
+	white-space: pre;
+}
+
+/* ---------------------------------------------------- Element type form */
+
+#admin-page-wrap .admin-field-row {
+	display: flex;
+	flex-direction: column;
+	gap: .45rem;
+	margin: 0 0 .65rem;
+	padding: .75rem .85rem;
+	border: 1px solid var(--editor-border);
+	border-radius: var(--editor-radius);
+	background: var(--editor-bg-grouped);
+	box-shadow: var(--editor-shadow-sm);
+}
+
+#admin-page-wrap .admin-field-options {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: .55rem .8rem;
+}
+
+#admin-page-wrap .admin-field-options label {
+	display: inline-flex;
+	align-items: center;
+	gap: .3rem;
+	color: var(--editor-text-secondary);
+	font-size: .76rem;
+}
+
+#admin-page-wrap .admin-field-options :is(input[type="text"], input[type="number"]) {
+	flex: 1 1 9rem;
+	width: auto;
+}
+
+#admin-page-wrap .admin-field-actions {
+	display: flex;
+	align-items: center;
+	gap: .4rem;
+}
+
+#admin-page-wrap .admin-field-actions > .nino-admin-btn-danger {
+	margin-left: auto;
+}
+
+/* ------------------------------------------ A field this account may read */
+
+/* Locked rather than hidden: the value is the context the writable fields
+   around it are edited in, so it is shown and simply cannot be typed into.
+   The permission that decides this is /_admin/elements/<type>/update/<field> */
+#admin-page-wrap .admin-field-readonly > span,
+#admin-page-wrap .admin-field-readonly > .nino-admin-field-header {
+	opacity: .75;
+}
+
+#admin-page-wrap .admin-field-readonly :is(input, textarea, select):disabled {
+	background: var(--nino-admin-surface-muted);
+	color: var(--editor-text-secondary);
+	cursor: default;
+}
+
+#admin-page-wrap .admin-field-readonly .nino-admin-richtext-toolbar {
+	display: none;
+}
+
+/* --------------------------------------------------- Delete a type --- */
+
+/* The only control in the type form that destroys content, so it does not
+   look like the rest of it: its own card, in the red the workbench already
+   uses for a destructive button, sitting below every field and above the
+   pinned Save row - nothing here is passed on the way to saving */
+#admin-page-wrap .admin-type-danger {
+	margin-top: 1.5rem;
+	border-color: color-mix(in srgb, var(--editor-red) 30%, var(--editor-border));
+	background: color-mix(in srgb, var(--editor-red-soft) 55%, transparent);
+}
+
+#admin-page-wrap .admin-type-danger > legend {
+	color: var(--editor-red);
+}
+
+#admin-page-wrap .admin-type-danger-row {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: .5rem;
+	margin-top: .65rem;
+}
+
+/* The input is what unlocks the button next to it, so the two read as one
+   control: the field takes the room, the button stays its own size */
+#admin-page-wrap .admin-type-danger-row input[type="text"] {
+	flex: 1 1 12rem;
+	width: auto;
+}
+
+#admin-page-wrap #admin-form-delete-msg:empty {
+	display: none;
+}
+
+#admin-page-wrap #admin-form-delete-msg {
+	margin: .55rem 0 0;
+	color: var(--editor-text-secondary);
+	font-size: .78rem;
+}
+
+}

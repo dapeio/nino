@@ -34,7 +34,7 @@ function searchUris( array &$appData, string $type, string $query ): array {
 
 function callSearchIndexAction( array &$appData ): array {
 	$request = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-	\Nino\Admin\Config::apiCreateSearchIndex( $appData, $request );
+	\Nino\Modules\Search\Admin::apiCreateIndex( $appData, $request );
 	return [
 		$request['/nino/http/response']['statusCode'],
 		$request['/nino/http/response']['body'],
@@ -190,7 +190,7 @@ if( function_exists( 'opcache_invalidate' ) === true )
 check( 'a non-array index is treated as empty', \Nino\Modules\Search::getElements( $appData, 'articles', 'neuer' ) === [] );
 check( 'a read does not replace the malformed file', file_get_contents( $articleIndexPath ) === $brokenIndex );
 
-\Nino\Runtime::setSessionValue( $appData, './nino/admin/authed', false );
+\Nino\Auth::logoutUser( $appData );
 [ $status ] = callSearchIndexAction( $appData );
 check( 'the Admin rebuild action rejects an unauthenticated request', $status === 401 );
 check( 'a rejected request does not touch an index', file_get_contents( $articleIndexPath ) === $brokenIndex );
@@ -198,7 +198,8 @@ check( 'a rejected request does not touch an index', file_get_contents( $article
 // Add the second type to the configuration only now. The button contract is to
 // rebuild every currently configured index, independently of which one is stale.
 $appData['/nino/elements/index']['notes'] = [ 0 => 'title' ];
-\Nino\Runtime::setSessionValue( $appData, './nino/admin/authed', true );
+\Nino\Auth::insertUser( $appData, 'dev@example.com', 'correct horse battery staple', [ '/*' ] );
+\Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );
 [ $status, $body ] = callSearchIndexAction( $appData );
 check( 'the authenticated Admin rebuild succeeds', $status === 200 );
 check( 'one button press rebuilds every configured index', $body === [ 'created' => 2, 'elements' => 3, 'failed' => [] ] );

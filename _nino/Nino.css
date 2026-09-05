@@ -5,13 +5,13 @@
  *
  *
  *			Design tokens as native CSS custom properties. --color-primary defaults
- *			to _editor's blue - everything else is a project-neutral placeholder.
+ *			to the workbench's blue - everything else is a project-neutral placeholder.
  *			A project overrides whatever it needs in its own stylesheet (eg.
  *			assets/style.theme01.css), loaded after this file, via a plain
  *			:root { --token: value; } block - no build step, no load-order
  *			juggling, the cascade resolves var() at compute time.
  *
- *			If a token still needs to stay _editor-editable per project, define it
+ *			If a token still needs to stay editable per project, define it
  *			as --token: [[/nino/path]]; instead of a literal value.
  *
  *			--text-1 .. --text-6 is a small type scale for titles/subtitles,
@@ -72,7 +72,7 @@
 
 		--color-accent is that missing role: the brand as ink on the ground it
 		is actually on. A generated design solves one per surface
-		(--nino-<surface>-link, see /_design); a theme without one falls back to
+		(--nino-<surface>-link, see the Design module); a theme without one falls back to
 		the ink the surface already carries, which is legible by construction.
 		The section classes further down re-point --color-accent and
 		--color-title to the ground they paint, so a component never has to know
@@ -172,7 +172,7 @@
 	--radius: .2rem;
 	--radius-small: .1rem;
 	/*	The third step the scale always implied and never named: .1 / .2 / .4
-		is exactly what /_design's raster publishes as --nino-radius-1 to -3,
+		is exactly what the Design module's raster publishes as --nino-radius-1 to -3,
 		so the framework's own radii and the generated ones are one ladder */
 	--radius-large: .4rem
 }
@@ -215,7 +215,7 @@ html {
 /* Column flow so a short page still puts the footer on the bottom edge.
    min-height alone only stretched the body - the footer stayed wherever the
    content ended, which on a page-blank.tpl route (the starting point
-   /_install writes for every Blank page) left it floating mid-viewport above
+   the wizard writes for every Blank page) left it floating mid-viewport above
    a screen-high strip of empty background. `header` is position:fixed and so
    out of flow either way; .nino-preloader and .nino-cookie-banner are fixed too,
    which leaves `main` and `footer` as the only flex items here */
@@ -804,7 +804,7 @@ body.nino-scroll-down .nino-scroll-header {
 }
 /*	A card is a surface of its own, so it takes a solved pair rather than a
 	wash: rgba(0,0,0,.05) over the page ground darkened it just enough that
-	the ink /_design solved against that ground no longer cleared the target,
+	the ink the Design module solved against that ground no longer cleared the target,
 	and the ink named here belonged to a surface the card was not on	*/
 .nino-article--alt {
 	background-color: var(--color-section-alt-bg);

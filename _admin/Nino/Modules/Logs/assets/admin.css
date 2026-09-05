@@ -1,0 +1,27 @@
+@layer nino.system, nino.tool, nino.local;
+
+/**
+ *	Nino										A compact filesystembased php framework
+ *	Modules\Logs			The activity log
+ *	admin.css								What the module's /_admin panel needs beyond the design
+ *													system in _admin/assets/style.css: the one rule the log
+ *													needs - its lines are code, not prose. Bundled while the
+ *													module is there (see the panel's assets()), so the same
+ *													layer rules apply - the shell's stylesheet fixes the layer
+ *													order, this one only ever adds to nino.tool, scoped to the
+ *													panel's own ids.
+ *
+ *	@package								Dape/Nino
+ *	@author									David Perchermeier <mail@dape.io>
+ *	@link										https://github.com/dapeio/nino
+ */
+
+@layer nino.tool {
+
+/* --------------------------------------------------------------- Logs tab */
+
+#logs-entries {
+	font: .78rem/1.5 var(--nino-admin-mono);
+}
+
+}

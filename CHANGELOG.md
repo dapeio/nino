@@ -2,9 +2,400 @@
 
 All notable changes to Nino are documented in this file.
 
-## Unreleased
+## 0.13.0-beta — 2026-09-05
 
-No unreleased changes yet.
+One workbench. `/_admin`, `/_editor`, `/_install`, `/_design` and
+`/_templates` were five tools with three logins; they are one now, `/_admin`,
+with accounts and roles, and every screen in it is a panel a module can bring.
+
+> No project built on an earlier version carries over: the tool directories,
+> their routes, the `/_editor/*` permissions, the `/nino/editor/*` keys and
+> the shared `_admin` password are gone, and there is no compatibility path.
+> Nino is pre-1.0 and this is the shape it settles on before the first
+> release. Read **Removed** before touching a checkout that predates it.
+
+### Added
+
+- **Accounts and roles.** The workbench signs everyone in with an account
+  (mail and password, `\Nino\Auth`). A permission is one string per panel
+  or tab, `/_admin/<uri>/manage` by convention; a **role** is a named set of
+  them under `/nino/auth/roles`, and an account holds one (`'role'`;
+  `\Nino\Auth::permissions()` is its own `perms` plus the role's,
+  `setRole()` and `insertUser( ..., $role )` write it). The wizard's Setup
+  step writes **Editor** (every content panel's permission, read off the
+  registry, `\Nino\Modules\Users\Roles::defaults()`) and **Developer** (`/*`); its
+  Accounts step creates the root account with the Developer role. The Users
+  panel creates and deletes accounts (never your own, never the last full
+  access, its own or its role's) and hands out roles; its **User roles** tab
+  edits the roles - a full-access switch, and the permissions themselves in
+  the shared multi-reference picker (`Nino.adminUi.elementList()` with the new
+  `ordered: false`, since a permission set has no first and no last), named
+  after the panel each opens and in the rail's group order. The list is every
+  permission a panel or tab offers *and* every one this installation actually
+  holds without a panel behind it - a module switched off, a module deleted, a
+  permission written by hand: it shows under **Not offered** by its own string,
+  because the picker only sends back the rows it could show and leaving one out
+  is how the next save of that role drops it. What a role may hold is wider
+  than what the picker offers: `Roles::apiSave()` checks each permission for
+  shape and refuses a malformed one by name.
+  A change that would take *Manage users* from your own account or leave no
+  full access behind is refused; the **Login protection** tab holds the
+  throttle (`\Nino\Modules\Users\Lockout`, `/_admin/lockout/manage`).
+- **The Template Builder speaks the interface language.** Its four scripts
+  carried every word in the source - 3400 lines, not one fill - and its
+  markup (`templates/panel.tpl`) carried the rest, so the panel stayed English
+  whatever the workbench was set to. All of it is a fill now
+  (`app/Nino/Modules/Templates/text/<locale>.php`, 350 keys): the scripts ask
+  through `Nino.content.getText()`, the markup reads ordinary `[[fills]]`, and
+  the component catalogue `AreaComposer::catalog()` sends to the client names
+  its components and their properties with fill keys for
+  `Nino.adminUi.text()` to resolve. Two values that were both shown *and*
+  compared became slugs so the comparison holds in every language: a reusable
+  template's `kind` (`frame`/`section`/`partial`, named by `includeKind()`)
+  and the composer's own two category chips (`*` and `tpl`, named by
+  `categoryLabel()`). The section library's own manifests keep their English
+  names and descriptions - they are shipped content rather than module code -
+  but every place the panel renders one now goes through
+  `Nino.adminUi.text()`, so a manifest may name itself with fill keys.
+  `tests/admin-lists-js-smoke.js` fails on a sentence written straight into the
+  dom or into a panel's markup, and `tests/admin-system-smoke.php` both on a key
+  a panel's scripts or markup ask for that either language lacks and - the check
+  nothing slips past - on rendering the whole workbench in both interface
+  languages and finding a `[[fill]]` left unresolved.
+- **The Design panel's settings are named in the interface language.** The
+  ten knobs, their notes, hints and every position's name
+  (`/_admin/design/knob/<knob>/…`). The schema itself
+  (`\Nino\Modules\Design\Tokens::KNOBS`) keeps its English on purpose: the
+  setup wizard renders the very same knobs and reaches no fills at all, so it
+  stays the fallback the panel falls back to (`design.js`'s `_knobText()`) -
+  a knob added to Tokens still appears in both without either gaining a line.
+  The CSV export filenames of Submissions and Newsletter are fills too;
+  Submissions' was a hardcoded German `anfragen.csv`.
+- **`/nino/admin/action`, the workbench's one reaction point.** A panel
+  declares what it *is* through `\Nino\Admin\Panels`; this says what just
+  *happened* in the tool - `{ action, panel, status, user, data }`, fired once a
+  dispatched action has answered. Until now a module could only observe the
+  panel it owned itself: an audit or notification module, one reacting to
+  another panel's save, one dropping a cache after any change, had nowhere to
+  attach (`/nino/admin/restore` was the same need, solved once for one case).
+  Notification only and after the fact by construction - the response is already
+  written, so refusing stays `guardPerm()`'s job - and it fires for a failed
+  action too, which is the half the activity log leaves out. The log itself is
+  still a direct call rather than the first listener: an audit line that can be
+  lost by not registering a callback is not an audit line. `docs/development.md`
+  now describes both extension surfaces together - callbacks for *reaction*,
+  the panel contract for *declaration*.
+- **Scoped permissions.** A panel permission is a door; what may be done once
+  inside Elements and Text can now be described action by action and field by
+  field: `/_admin/elements/services/insert`,
+  `/_admin/elements/services/update/title`, `/_admin/elements/services/delete`,
+  `/_admin/text/update/page-home/atf/title`. They are ordinary permission
+  strings, so `\Nino\Auth::checkPermission()`'s existing `/*` rule is what
+  makes `/_admin/elements/services/*` a whole type and
+  `/_admin/text/update/page-home/*` a whole group, and nothing in the shell
+  knows about types, fields or keys.
+  `\Nino\Admin\Admin::scoped()`/`isScoped()` decide whether they apply at
+  all: an account holding none of them under a panel's prefix keeps exactly
+  what that panel's permission has always meant, so no existing role changes
+  until it is given its first scoped permission. `apiSave()`, `apiDelete()`
+  and `apiUploadImage()` enforce them (a save carrying a field the account may
+  not write is refused by name rather than filtered), and the panels send what
+  the account may do along with their data - `Elements\Admin::rights()` per
+  type, a `writable` flag per key from `Text\Admin::apiKeys()` - so a
+  read-only field is shown locked, "New element", "Duplicate" and "Delete"
+  disappear, and a text group with nothing writable in it loses its Save
+  button. Because the list of them grows with every type, field and key, the
+  **User roles** editor does not offer it as a list: a field under the picker
+  takes one typed by hand, checks its shape, and adds it as an ordinary row.
+- **Duplicate an element.** The element form offers **Duplicate** beside
+  Delete: every value of the open entry, in every language, becomes the
+  starting point of a new one - except the uri, which is what makes it a
+  different element, and the images, which belong to the entry they were
+  uploaded for. Nothing is written until the copy has a uri and is saved.
+- **Deleting an element type.** The Element Types form ends in a delete box:
+  it removes the type file, every element in it and the images those elements
+  hold. Doing it by hand was the same removal with no reference check, no
+  image cleanup and no log line, so the checks live here instead - the type's
+  own uri has to be typed to unlock the button, a type another type's
+  `element` field points at is refused by name, and the line it writes to the
+  activity log says how many elements went with it. It is not reversible; the
+  daily backup is.
+- **The text-key scan answers three questions per key.** "Scan templates for
+  missing keys" used to create every row that was not ticked, empty ones
+  included, and a ticked row came back on the next scan. Now a row with a
+  value becomes a key, a row left empty is passed over this once, and a row
+  ticked **Ignore permanently** goes into `/text/blacklist.php` and leaves the
+  scan, the Dashboard tile and the Text panel for good - so a long list is
+  workable in several sittings. One request (`keys/scanapply`) instead of one
+  create per row, and its outcome is a fill rather than an `alert()` with a
+  hardcoded English sentence. A retired key has no value anywhere, so
+  `\Nino\Text::entries()` cannot see it: the **Text Keys** tab merges it back
+  in as a hidden key, which is what makes un-ignoring it - or deleting it -
+  possible without editing the file.
+- **The Log panel sits in the content group**, last (weight 90), where the
+  manual has always listed it - so the Editor role the wizard writes from the
+  content permissions carries `/_admin/logs/view`.
+- **Tabs.** A panel may answer `tabs()` with further panel classes, each a
+  complete panel with its own permission, script and hash prefix, rendered
+  as a tab strip at the top of the pane (`.nino-admin-tabs--bar`, the bar the
+  Design panel's four editors use as well; in the workbench it carries the
+  shell's `.admin-panel-tabs` on top, which gives it the context bar's surface
+  - `--editor-bar-bg`, edge to edge through the pane's padding and flush
+  against its top) - and `tab()` names its own tab.
+  The core panels use it: Element Types under Elements, Text Keys under Text,
+  Image Slots under Images, User roles and Login protection under Users,
+  Translations under **Language**, the new System panel that holds the two
+  locale settings and the language inventory (`\Nino\Modules\Language\Admin`,
+  `/_admin/language/manage`). `Admin::allPanels()` lists panels and tabs
+  flat; `Nino.admin.router.exists()` knows both.
+- **`_admin/recovery.php`.** The way back in when the accounts themselves are
+  broken: it asks for the recovery password the wizard's last step sets
+  (`\Nino\Admin\Recovery`, hash under `private/.auth/pw.php`, rate-limited)
+  and offers exactly two things - restore a backup, reset a password. Nothing
+  in the workbench asks for it.
+- **The panel contract grew.** Every panel declares `perm()`; `nav()` takes a
+  fourth element, the group (`content`, `structure`, `system`), and the shell
+  renders the three groups with headings. A panel may answer `template()` (a
+  `.tpl` rendered whole into its pane through `[template]`, instead of mount
+  points), `layout()` (`'page'` or `'workspace'`), `icon()` (an inline svg
+  for the rail), `tabs()` and `tab()`. `\Nino\Admin\Panels::relative()` turns a path taken from
+  `__DIR__` into the project-relative form `assets()`, `text()` and
+  `template()` answer, so a module's files move with it.
+- **The shell.** A foldable rail: a workspace panel folds it to a column of
+  icons and takes the reading-width ceiling off the pane; the chevron beside
+  the brand pins it either way (`localStorage`, `Nino.admin.rail`). Panels
+  without an icon show their initial. Deep links reach into every panel
+  (`#design/header`), and a panel loads its data on `showCurrent()`, the
+  first time its tab is selected.
+- **Optional modules live in `app/Nino/Modules/`.** `Form`, `Newsletter`,
+  `Navigation`, `Search`, `Localepicker`, `Design` and `Templates` are
+  delivered there and owned by the project from then on - delete what you do
+  not need, update what you keep. The autoloader resolves `Nino\Modules\*`
+  below `_nino/` first, then below the application root; every other `Nino\`
+  class stays kernel-only, every other namespace app-only.
+- **Design and Templates are modules with a panel each.** `\Nino\Modules\Design`
+  (`Admin`, `Appearance`, `Tokens`, `Preview`, one class per file) is the
+  Design panel: Theme, Header, Footer and Design as tabs, the wizard's
+  renderer loaded on demand for the frame previews. `\Nino\Modules\Templates`
+  (`Admin`, `Documents`, `Library`, `Content`, `Composer`, `SectionDocument`,
+  `AreaComposer`) is the Templates panel, a workspace, with its section
+  library under `app/Nino/Modules/Templates/library/`; the module widens the
+  workbench page's CSP by the `data:` font source its previews need. The
+  wizard lists both in `/nino/modules` whenever their directory exists
+  (`Setup::TOOL_MODULES`).
+- **Install units keep their keys.** `Setup::units()` scans `_nino/Nino/Modules`,
+  then `<app>/Nino/Modules`, then the rest of the app dir, so Nino's delivered
+  modules claim a key before a project unit of the same name; a unit found
+  twice is not a shadow.
+- **Dashboard tiles** for every panel with something to count, the Elements
+  panel's read-only **Raw storage** view, `/_admin/user/rail` and the module
+  panels' nav fills; every label follows the interface language.
+- A workbench-wide test: `tests/admin-lists-js-smoke.js` checks that every
+  script speaks the `Nino.admin` namespace and that a module panel's template
+  is a fragment.
+
+### Changed
+
+- **`NINO_PRIVATE_DIR` replaces `NINO_CONTENT_DIR`.** The constant moves the
+  project's private half - config, templates, text, elements, data and
+  management state - and is named after it, next to `NINO_APP_DIR` for the
+  application half; `NINO_CONFIG_DIR`, the narrower override for `config.php`
+  alone, stays. A deployment that defined the old name renames it. The three
+  constants are read by every entry point on its own - `index.php`,
+  `_admin/index.php` and `_admin/recovery.php` each boot the kernel - so a
+  deployment defines the ones it uses in all three, with the same values
+  (all three files carry the commented lines); one defined in the site's
+  `index.php` alone left the workbench booting from the default path,
+  finding no `config.php` and offering the setup wizard on an installed
+  site. `NINO_APP_DIR` replaces `app/` as a whole, and Nino's own optional
+  modules live there: a project that points it elsewhere moves them along,
+  or the kernel skips them without a word - said in `index.php` and both
+  deployment manuals now.
+- **`app/` is denied like `private/`.** The module install units moved out
+  from under `_install/library/.htaccess` into `app/Nino/Modules/*/install/`
+  and were served from there; `app/.htaccess` and the matching rule in
+  `router.php` refuse the whole tree.
+- **The Config panel's field validation lives in the shell.**
+  `\Nino\Admin\Admin::cleanInt()` and `typeError()`, so the Login
+  protection tab no longer depends on the Config module being delivered.
+- The workbench falls back to English for a site language it has no words
+  in (`\Nino\Admin\Admin::textFills()`): the interface language follows the
+  site's, and a French site rendered every label as its own fill key.
+
+- **Every workbench screen is a module.** `_admin` is the base and holds the
+  shell alone: `_admin/Admin.php` with `\Nino\Admin\Admin` (routes, bundles,
+  fills, dispatch), `\Nino\Admin\Panels` (the registry, ex `\Nino\Panels`
+  in the kernel) and `\Nino\Admin\Recovery`; `_admin/assets/` with the design
+  system, its behaviour, the shell script, the login screen and the rich-text
+  primitive; `_admin/text/<locale>.php` with what the shell itself renders and
+  the shared `/_admin/common/*`. Everything else moved into
+  `_admin/Nino/Modules/<Name>/`, one directory per screen in the shape
+  `app/Nino/Modules` and `_nino/Nino/Modules` already had: `Admin/Admin.php` is
+  the panel, `<Tab>/<Tab>.php` a tab of it, `assets/` its scripts and
+  stylesheet, `text/` its words. Ten of them - `Dashboard`, `Elements`,
+  `Text`, `Images`, `Logs`, `Routes`, `Users`, `Language`, `Backups`,
+  `Config`. `Admin::PANELS` and the `require glob( panels/*.php )` loop are
+  gone: `Admin::modules()` reads the directory, so a screen is added by adding
+  a directory and removed by deleting one, and a workbench without the
+  directory is a login and an empty rail rather than a broken one. The kernel
+  autoloader takes `_admin/` as a third root for `Nino\Modules\*`, between
+  `_nino/` and `app/` - it resolves the whole relative path, so
+  `\Nino\Modules\Elements` (the kernel's runtime module) and
+  `\Nino\Modules\Elements\Admin` (the screen for it) are two halves of one
+  module in two roots. Both bundles (`/_admin/.cache/script.js`, `style.css`)
+  are built from the registry, so every panel's script and stylesheet join
+  them - the workbench no longer prints one tag per file.
+- The shell no longer names a panel anywhere. `Admin::record()` hands a line
+  to the Logs module if there is one, `guard()` asks the Backups module for
+  its daily snapshot the same way, the recovery page offers a restore only
+  while Backups is there, the Dashboard leaves out what a missing module
+  cannot answer, and `script.js` opens on the first panel in the rail rather
+  than on `dashboard`.
+- Three fills two panels each rendered are the shell's now:
+  `/_admin/common/label/global` (the Elements copy is gone),
+  `/_admin/common/label/locale` and `/_admin/common/label/image-target`. A
+  module's words no longer reach into another module's text file.
+- The design system moved into the workbench: the `nino.system` half of
+  `_admin/assets/style.css` (one stylesheet for one tool - the former
+  `_nino/Nino.admin.css` and the workbench's own rules, still kept apart by
+  the cascade layers) and `Nino.admin.js`. `.nino-admin-tools` (the tool bridge) is gone;
+  `.nino-admin-rail-toggle`, `.nino-admin-nav-group`, `.nino-admin-nav-icon`,
+  `.nino-admin-nav-label`, `.nino-admin-shell--workspace` and
+  `.nino-admin-shell--folded` are new.
+- **One language, one empty state.** Every word the workbench renders is a
+  fill - the structure and system panels included, their labels, tabs,
+  dashboard tiles, schemas and messages - and every panel brings the
+  `text/<locale>.php` its own words live in: the workbench's ten modules as
+  much as the Navigation, Search and Design panels. `_admin/text/<locale>.php`
+  is what is left over, what the shell itself renders and the shared
+  `/_admin/common/*`; a script reads them through `Nino.content.getText()`, a label the
+  backend sends through `Nino.adminUi.text()`. "Nothing here yet" is one
+  component, `Nino.adminUi.emptyState()` (`.nino-admin-empty`), on every list
+  screen, dashboard card and module panel instead of a hint here and a bare
+  paragraph there. `tests/admin-lists-js-smoke.js` fails on a literal sentence
+  in a panel script and on a fill key one of the two languages lacks; the
+  recovery page stays English.
+- The panels merged: **Text** (values) and **Text Keys** (keys), **Images**
+  (uploads) and **Image Slots** (slots), one **Users** panel, one **Elements**
+  panel with the raw view, **Backups** (the daily backup and its restore),
+  **Log**. Permissions are `/_admin/<uri>/manage` (`/view` for Submissions
+  and Log); the backup and log switches are `/nino/admin/backups` and
+  `/nino/admin/logs`.
+- The rail for the daily workflow: the three groups are Content (Dashboard,
+  Elements, Text, Images, Submissions, Newsletter, Log), Structure (Templates,
+  Design, Routes, Navigations) and System (Users, Language, Backups, Config,
+  Search); the shape of the content sits on tabs beside it, see **Tabs**.
+  **Config** keeps errors, the workbench switches and the page cache - the
+  login throttle moved to the Users panel, the languages to the Language
+  panel (`config/addlocale` is `language/addlocale`), both with their
+  validation. `Users::permOptions()` carries each entry's nav group; the
+  Users panel's `users/permissions` is `users/role` (`apiSetRole()`), and
+  `users/list` answers each account's `role` and the roles there are.
+  `Nino.adminUi.numberField()` and `humanDuration()` render a bounded number
+  with its reading aid for the Config panel and the Login protection tab.
+- The setup wizard is the workbench's first-run mode: `_admin/install/Install.php`
+  takes over `GET`/`POST /_admin` while `Admin::isInstalled()` says no, its
+  library is `_admin/install/library/`, and `_admin/install/` is what a delivery
+  drops after setup. Its steps run Environment, Setup, Themes, Header, Footer,
+  Design, Routes, Personal Infos, **Accounts** (root accounts) and **Finish**
+  (the recovery password).
+- `Modules\Cache` drops the cache on any successful `POST` to `/_admin`, the
+  one tool uri left; the Routes panel and the wizard reserve `/_admin` alone.
+- `router.php` routes `/_admin` and `/_admin/recovery.php`, and denies
+  `_admin/install/library` except the theme previews.
+- `Nino.editor.*`, `Nino.design` and `Nino.templates` are `Nino.admin.<uri>`;
+  the Template Builder's link into the Elements panel is a hash deep-link.
+- Tests: `editor-smoke.php` is `admin-smoke.php` (shell, accounts, content
+  panels), the old `admin-smoke.php` is `admin-system-smoke.php` (structure and
+  system panels, registry, recovery); `design-smoke.php`, `templates-smoke.php`
+  and the install suites cover the modules where they live now.
+- Docs: one workbench manual (`docs/_admin.md`) with the three references
+  `docs/setup.md`, `docs/appearance.md` and `docs/templates.md`; the developer
+  manual's "Panels of the Workbench" and "Directory and Autoloading"; `AGENTS.md`
+  recipes 4, 7, 8, 9, 10, 15, 16 and 18; README, getting started, concepts and
+  deployment in both languages.
+
+### Removed
+
+- `_editor/`, `_install/`, `_design/` and `_templates/` with their entry
+  points, routes, login pages and the `[admin-tools]` shortcode
+  (`\Nino\Admin\ToolBridge`); `_nino/Nino/Panels/`; `_nino/Nino.admin.css`
+  and `_nino/Nino.admin.js`.
+- `editorPanels()`; the `/_editor/*` permissions; the shared `_admin`
+  password and its login page; the `/nino/editor/*` keys.
+- `Users::presets()` and `Users::apiSetPermissions()` - roles are data now;
+  the `/_admin/users/role/editor` and `/developer` fills.
+- `\Nino\Design\*` and `\Nino\Templates\*` - they are
+  `\Nino\Modules\Design\*` and `\Nino\Modules\Templates\*` now, one class
+  per file.
+- `docs/_editor.md`, `docs/_install.md`, `docs/_design.md`,
+  `docs/_templates.md` (and the German versions) - consolidated, see above.
+
+### Fixed
+
+- **A users manager could give itself full access.** The direct way was
+  refused - nobody may change their own role - but not the detour: a
+  full-access role written through `roles/save`, an account holding it
+  created through `users/create` with a password of the manager's choosing,
+  a login as that account. Granting is now bounded by holding
+  (`Roles::notHeld()`): a role may not gain a permission its author does not
+  hold, and an account may not be created with or moved to a role wider than
+  the one handing it out. `docs/_admin.md`'s "nobody can widen their own
+  rights here" is enforced rather than asserted.
+- **Activity-log lines were forgeable.** A posted value reaches the line
+  verbatim, and a line break in a template name or a type uri wrote a second
+  line - dated, attributed to any account, saying anything. Control
+  characters collapse to a space before the line is written.
+- **The activity log skipped most of the workbench.** The shell asks the
+  class that ran an action for its line, and the Templates panel's lines sat
+  on its panel class, which runs none - every one of them was unreachable -
+  while Routes, Config, Image Slots, Translations, Backups, Navigation and
+  Search described nothing at all. Each tab and panel now answers for its
+  own writes; the `content/image-create` line names the slot it reads
+  rather than a field the action never receives.
+- `.github/workflows/ci.yml` ran the deleted `tests/editor-smoke.php` and
+  never `tests/admin-system-smoke.php`; the js loop reported the last
+  file's status alone. `docs/development.md` listed the same stale suites.
+- The wizard's Setup hint and a test pointed at `docs/_install.md`;
+  `.gitignore` at `_admin/setup/`; a sitemap template every project ships
+  at `/_install`, the demo catalogue at `/_design`; two class names in this
+  changelog at `\Nino\Admin\` - none of which exist.
+- Two English strings survived the i18n pass (the image-slot scan's summary,
+  the "(missing)" marker on a dangling element-type reference);
+  `Backups\Admin::lastDate()` had no caller left after the move.
+
+- `\Nino\Auth::deleteUser()` ended the current session whoever was deleted;
+  it does so only for the caller's own account now.
+- The Keys panel's rich-text fields called `Nino.editor.htmlEditor`, a
+  namespace that no longer existed, and never opened.
+- **The workbench's language switcher rendered an option with no name** for any
+  locale the Localepicker module's install step had not named - a module an
+  operator may uncheck at setup, and one that cannot know about a locale the
+  Language panel adds later. The switcher stands in the code (`de_DE`) where the
+  word is missing, so it is always usable.
+- **A failed element list was invisible.** `elements/list` wrote its error into
+  the list pane but left that pane hidden, because the type picker is the level
+  the request runs from - clicking a type whose list could not be loaded simply
+  did nothing. It shows the pane now, the way the element form's own error path
+  always did.
+- **A literal shortcode token inside a text fill was executed rather than
+  shown.** Fill values are substituted into the page before
+  `\Nino\Html`'s shortcode pass runs - and the `[jstext]` payload carries the
+  same stored value - so the five Template Builder strings naming the
+  `[template]` shortcode lost the word in both languages and on both paths. The
+  token stays out of the stored value now: the one value that is only ever
+  markup escapes its bracket, and the ones a script renders carry a `%s` the
+  script fills from its own source, where nothing renders it.
+- **Saving, creating or deleting an element type threw, and left the Elements
+  pane on the type it had just changed.** `Nino.admin.elements.invalidate()` -
+  the Element Types tab's contract with the Elements tab next door, "your save
+  invalidates my cache" - was lost when the panels became modules, while the
+  call to it stayed. It is back: the cached type list, models, rights and the
+  open element are dropped, the list and form panes are emptied, and the next
+  switch to Elements fetches again, so a deleted type cannot leave a list of
+  elements that no longer exist standing. `init()` carries a request counter
+  again too, so a types response still in flight cannot land afterwards and
+  mark the module ready with what it fetched before the change.
 
 ## 0.12.0-beta — 2026-08-30
 

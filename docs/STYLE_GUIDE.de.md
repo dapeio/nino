@@ -31,11 +31,10 @@ Kurze Absätze sind langen Einschüben vorzuziehen. Klammern bleiben für echte 
 |---|---|
 | Nino | das gesamte Framework und die mitgelieferten Oberflächen |
 | `_nino` | Kernel, Module und Frontend-Grundlagen |
-| `/_install` | notwendiger Assistent, der aus einem frischen Checkout die Projektverzeichnisse und den ersten lauffähigen Stand erzeugt |
-| `/_admin` | technische Verwaltung für Entwickler |
-| `/_design` | Bearbeitung von Theme, Design, Header und Footer nach der Installation |
-| `/_templates` | sectionbasierter Template Builder für Entwickler |
-| `/_editor` | redaktionelle Verwaltung für Betreiber und Redakteure |
+| `/_admin` | die Workbench: eine Verwaltungsoberfläche mit einer Anmeldung für Entwickler und Redakteure; jeder Bildschirm ist ein Panel |
+| Einrichtungsassistent | der Erststart-Modus von `/_admin`, der aus einem frischen Checkout die Projektverzeichnisse und den ersten lauffähigen Stand erzeugt (`_admin/install/`) |
+| Design-Panel | Bearbeitung von Theme, Design, Header und Footer nach der Installation |
+| Templates-Panel | der sectionbasierte Template Builder für Entwickler |
 | Entwickler | richtet Struktur, Design und technische Funktionen ein |
 | Redakteur | pflegt Texte, Elemente und Bilder |
 | Betreiber | verantwortet den laufenden Betrieb; kann zugleich Redakteur sein |
@@ -44,7 +43,7 @@ Kurze Absätze sind langen Einschüben vorzuziehen. Klammern bleiben für echte 
 | Shortcode | Verbindung zwischen Template und dynamischer Logik |
 | Template | HTML-basierte `.tpl`-Datei ohne PHP-Logik |
 
-Pfade wie `templates/`, `text/`, `elements/` und `images/` bezeichnen immer den eingerichteten Projektstand. Sie existieren in einem frischen Checkout noch nicht, sondern werden von `/_install` erzeugt und befüllt.
+Pfade wie `templates/`, `text/`, `elements/` und `images/` bezeichnen immer den eingerichteten Projektstand. Sie existieren in einem frischen Checkout noch nicht, sondern werden vom Einrichtungsassistenten erzeugt und befüllt.
 
 `Admin` allein wird vermieden, weil es sowohl eine Rolle als auch den technischen Bereich `/_admin` meinen kann. Pfade und Nino-Begriffe stehen in Codeformat.
 

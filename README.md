@@ -37,49 +37,30 @@ The frontend is built from simple HTML-based templates, textfills, shortcodes, a
 
 The included design system, with its base components and modules, provides a quick starting point for conventional websites. Multilingual content, responsive design, performance, and security remain part of the project.
 
-### `/_install` — a quick start for the project
+### `/_admin` — the workbench
+
+![Textfill overview in the Nino workbench](docs/assets/screenshots/_admin1.webp)
+
+One management interface with one login. Developers set the project up and build its structure and appearance here; editors maintain its content here. Every screen is a panel, grouped into **Content** (elements, texts, images, submissions, newsletter, log), **Structure** (templates, design, routes, navigations) and **System** (users and roles, languages and translations, backups, config, search); the shape of the content – element types, text keys, image slots – sits on tabs beside it. An account holds a role, a role one permission per panel or tab; the wizard writes Editor and Developer, and a panel an account may not use is not rendered.
+
+The workbench provides full access for development, diagnostics and corrections, and a narrow, permission-controlled surface for daily editorial work. All changes can alternatively be made directly in the file system. `/_admin/recovery.php` is the way back in when the accounts themselves are broken.
+
+#### The setup wizard — a quick start for the project
 
 <a href="docs/assets/screenshots/_install1.webp" target="_blank">
   <img src="docs/assets/screenshots/_install1.webp"
-       alt="Route configuration in the Nino installer"
+       alt="Route configuration in the Nino setup wizard"
        width="49%">
 </a>
 <a href="docs/assets/screenshots/_install2.webp" target="_blank">
   <img src="docs/assets/screenshots/_install2.webp"
-       alt="Completion screen in the Nino installer"
+       alt="Completion screen in the Nino setup wizard"
        width="49%">
 </a>
 
-Every fresh checkout is configured through `/_install`. The wizard checks the environment, guides you through languages, modules, and the theme, copies the required assets, creates initial pages and basic information, and sets up access to `/_editor` and `/_admin`.
+Every fresh checkout is configured through the wizard, which is what `/_admin` shows until it is done. It checks the environment, guides you through languages, modules, theme, header, footer and design, copies the required assets, creates initial pages and basic information, creates the first developer accounts and sets the recovery password. Afterwards it locks itself out, and `_admin/install/` can be removed from a production delivery.
 
-The developer can then begin working on the project immediately.
-
-### `/_admin` — optional: the GUI for developers
-
-![Textfill overview in Nino Admin](docs/assets/screenshots/_admin1.webp)
-
-In `/_admin`, the developer manages the website’s technical and content structure: element types, elements and texts, images, pages and routes, users, and configuration.
-
-The interface provides full access for development, diagnostics, and corrections and is therefore reserved for a separate technical account. All changes can alternatively be made directly in the file system.
-
-### `/_editor` — optional: maintain content with ease
-
-<a href="docs/assets/screenshots/_editor1.webp" target="_blank">
-  <img src="docs/assets/screenshots/_editor1.webp"
-       alt="Editing a localized element in Nino Editor"
-       width="49%">
-</a>
-<a href="docs/assets/screenshots/_editor2.webp" target="_blank">
-  <img src="docs/assets/screenshots/_editor2.webp"
-       alt="Image slot management in Nino Editor"
-       width="49%">
-</a>
-
-`/_editor` is the everyday interface for editors and site owners. It is used to maintain texts, recurring content, and images, as well as to manage form submissions, newsletter subscribers, user permissions, and logs.
-
-The developer determines which content is visible and which areas an account actually needs.
-
-### `/_templates` — optional, Alpha
+#### The Templates panel — optional, Alpha
 
 <a href="docs/assets/screenshots/_templates1.webp" target="_blank">
   <img src="docs/assets/screenshots/_templates1.webp"
@@ -97,41 +78,41 @@ The developer determines which content is visible and which areas an account act
        width="31%">
 </a>
 
-`/_templates` turns `page-*.tpl` files into a focused sequence of complete HTML and `[template]` sections. Developers can create a template, choose from different section presets, assign meaningful IDs, configure content and layout, and immediately fill native textfills or connect an Elements collection.
+The Template Builder turns `page-*.tpl` files into a focused sequence of complete HTML and `[template]` sections. Developers can create a template, choose from different section presets, assign meaningful IDs, configure content and layout, and immediately fill native textfills or connect an Elements collection. It is a workspace panel: the rail folds to its icons and the template list, the section canvas and the inspector share the whole width.
 
-The Template Builder preserves ordinary HTML+ source. Standalone template shortcodes can be chosen directly through **Add section** and remain movable canvas items, while the page header and footer are ordinary `[template]` shortcodes managed safely through fixed Template Settings. A display name and VPA default live as inert metadata at the start of the file. Unrelated source remains locked and byte-identical. A deliberate HTML+ escape hatch is available for code-authored sections. The former DOM-oriented builder has been removed.
+The Template Builder preserves ordinary HTML+ source. Standalone template shortcodes can be chosen directly through **Add section** and remain movable canvas items, while the page header and footer are ordinary `[template]` shortcodes managed safely through fixed Template Settings. A display name and VPA default live as inert metadata at the start of the file. Unrelated source remains locked and byte-identical. A deliberate HTML+ escape hatch is available for code-authored sections.
 
-> **Status: Alpha.** Preset manifests and generated `.tpl` markup are readable and extensible, but the library and composition workflow may still evolve.
+> **Status: Alpha.** Preset manifests and generated `.tpl` markup are readable and extensible, but the library and composition workflow may still evolve. The panel is the module `app/Nino/Modules/Templates/` and disappears with its directory.
 
-### `/_design` — optional, Alpha
+#### The Design panel — optional, Alpha
 
 <a href="docs/assets/screenshots/_design1.webp" target="_blank">
   <img src="docs/assets/screenshots/_design1.webp"
-       alt="Theme catalogue in Nino Design"
+       alt="Theme catalogue in the Nino Design panel"
        width="31%">
 </a>
 <a href="docs/assets/screenshots/_design2.webp" target="_blank">
   <img src="docs/assets/screenshots/_design2.webp"
-       alt="Footer frame preview in Nino Design"
+       alt="Footer frame preview in the Nino Design panel"
        width="31%">
 </a>
 <a href="docs/assets/screenshots/_design3.webp" target="_blank">
   <img src="docs/assets/screenshots/_design3.webp"
-       alt="Colour settings and live page preview in Nino Design"
+       alt="Colour settings and live page preview in the Nino Design panel"
        width="31%">
 </a>
 
-`/_design` turns the site’s visual foundation into a focused set of controlled choices. Developers can select a curated Theme, switch Header and Footer frames independently, and refine the shared colour palette and layout raster while previewing the complete website.
+The Design panel turns the site's visual foundation into a focused set of controlled choices. Developers can select a curated Theme, switch Header and Footer frames independently, and refine the shared colour palette and layout raster while previewing the complete website.
 
-The Design tool keeps presentation separate from content and template structure. Themes and frames are installed as ordinary CSS and `.tpl` files, while custom settings are written to the project’s shared design layer. Changes can be previewed, reverted, and applied without rewriting page templates, and the resulting source remains available for precise manual refinement.
+It keeps presentation separate from content and template structure. Themes and frames are installed as ordinary CSS and `.tpl` files, while custom settings are written to the project's shared design layer. Changes can be previewed, reverted, and applied without rewriting page templates, and the resulting source remains available for precise manual refinement.
 
-> **Status: Alpha.** The appearance catalogue and editing workflow may still evolve.
+> **Status: Alpha.** The appearance catalogue and editing workflow may still evolve. The panel is the module `app/Nino/Modules/Design/` and disappears with its directory.
 
 ## What Nino includes
 
 * multilingual routing, texts, and content
 * a dedicated template system with shortcodes and a clear separation of HTML and PHP
-* an optional section-first Template Builder for `.tpl` files (Alpha)
+* one workbench for developers and editors, with roles, recovery and an optional section-first Template Builder for `.tpl` files (Alpha)
 * a file-based content model for textfills and recurring elements
 * themes, asset bundling, and frontend base components
 * forms, newsletters, navigation, language selection, and image processing
@@ -171,11 +152,11 @@ cd nino
 php -S 127.0.0.1:8000 router.php
 ```
 
-Then open <http://127.0.0.1:8000/_install>.
+Then open <http://127.0.0.1:8000/_admin>.
 
-The wizard is required for a fresh checkout and creates the first working project state.
+The setup wizard is required for a fresh checkout and creates the first working project state.
 
-The complete process is described in **[Getting Started](docs/getting-started.md)**. All options and write operations are covered in the **[`/_install` Reference Manual](docs/_install.md)**.
+The complete process is described in **[Getting Started](docs/getting-started.md)**. All options and write operations are covered in the **[Setup Wizard](docs/setup.md)** reference.
 
 ## Project Structure
 
@@ -187,13 +168,14 @@ by nobody:
 index.php        Main entry point of the website
 router.php       Built-in server routing, for local development
 
-_nino/           Kernel and frontend core
-app/             Project-owned PHP classes and runtime modules
-_editor/         Content editor, users, backups, activity log
-_admin/          Developer tools and restoration
-_install/        Setup wizard, and the library it installs from
-_templates/      Section-first Template Builder
-_design/         Theme, Design, Header, and Footer editor
+_nino/           Kernel and frontend core, with the modules every project needs
+app/             Project-owned PHP classes, and Nino's optional modules under
+                 app/Nino/Modules/ (Form, Newsletter, Navigation, Search,
+                 Localepicker, Design, Templates) - delete what you do not need
+_admin/          The workbench: the shell alone, recovery.php, its own screens
+                 as modules under _admin/Nino/Modules/ (Dashboard, Elements,
+                 Text, Images, Logs, Routes, Users, Language, Backups, Config),
+                 and the setup wizard with its library under _admin/install/
 docs/            Documentation
 
 private/         Never served, only read by PHP - created by the wizard
@@ -218,10 +200,12 @@ Each file is a standalone script and runs against an isolated sandbox directory:
 ```bash
 php tests/kernel-smoke.php
 php tests/admin-smoke.php
-php tests/editor-smoke.php
+php tests/admin-system-smoke.php
 php tests/install-smoke.php
 php tests/design-smoke.php
 php tests/templates-smoke.php
+php tests/search-smoke.php
+php tests/demo-catalogue-smoke.php
 for test in tests/*-js-smoke.js; do node "$test"; done
 php tests/concurrency-smoke.php
 ```
@@ -235,11 +219,10 @@ Nino deliberately keeps its architecture small: a central `$appData` array carri
 * **[Concepts](docs/concepts.md):** architecture, data flow, and separation of concerns
 * **[Developer Manual](docs/development.md):** runtime contracts, APIs, modules, and tests
 * **[Getting Started](docs/getting-started.md):** from checkout to a configured website
-* **[`/_install` Reference](docs/_install.md):** steps, writing rules, and library format
-* **[`/_admin` Manual](docs/_admin.md):** project structure, content, accounts, configuration, and restoration
-* **[`/_templates` Manual](docs/_templates.md):** composing page templates from complete HTML and template sections
-* **[`/_editor` Manual](docs/_editor.md):** texts, elements, images, submissions, and newsletters
-* **[`/_design` Manual](docs/_design.md):** post-install Theme, Design, Header, and Footer editing
+* **[Setup Wizard](docs/setup.md):** steps, writing rules, and library format
+* **[`/_admin` Workbench](docs/_admin.md):** every panel, accounts, roles, configuration, backups and recovery
+* **[Templates Panel](docs/templates.md):** composing page templates from complete HTML and template sections
+* **[Design Panel](docs/appearance.md):** post-install Theme, Design, Header, and Footer editing
 * **[Deployment](docs/deployment.md):** web server, security, backups, and go-live
 * **[Design Manual](docs/design.md):** frontend, design system, CSS, and template work **(WIP)**
 * **[Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md):** security reports and supported versions
@@ -251,9 +234,9 @@ Nino as a whole is currently in the **Beta phase**. Individual optional tools ha
 
 | Area | Status |
 | --- | --- |
-| Kernel, frontend, and existing project foundation | Beta |
-| `/_templates` | Alpha |
-| `/_design` | Alpha |
+| Kernel, frontend, workbench and existing project foundation | Beta |
+| Templates panel (Template Builder) | Alpha |
+| Design panel | Alpha |
 
 Security fixes land directly on `main`; there is no separate LTS version yet.
 

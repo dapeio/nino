@@ -2,13 +2,12 @@
 declare(strict_types=1);
 
 /**
- *	Dependency-free backend smoke test for /_design.
+ *	Dependency-free backend smoke test for the Design module and its panel.
  *	All writes stay inside an isolated temporary project.
  */
 
 require __DIR__. '/../_nino/Nino.php';
 require __DIR__. '/../_admin/Admin.php';
-require __DIR__. '/../_design/Design.php';
 
 $failures = 0;
 $checks = 0;
@@ -50,23 +49,26 @@ $appData['/nino/locales/available'] = [ 'en_US' ];
 
 \Nino\Filesystem::putFileContent( $appData, '/config.php', [] );
 
+// The module is active the way every module is: listed in /nino/modules
+$appData['/nino/modules'][] = '\\Nino\\Modules\\Design';
+
 echo "Sandbox: $sandbox\n\n";
 
 // --- Design - generated palettes that keep their contrast promise -------
 
 echo "Design::palette / css\n";
 
-$lightPalette = \Nino\Design\Tokens::palette( [ 'primary' => '#4faae8', 'secondary' => '#94703f' ], 'light' );
+$lightPalette = \Nino\Modules\Design\Tokens::palette( [ 'primary' => '#4faae8', 'secondary' => '#94703f' ], 'light' );
 
 // brand is the one surface the generator does not get to move: whatever the
 // picker returned has to come back byte for byte, in both modes and at every
 // knob position, or the picker is lying about what it does
 $originStable = [];
 foreach( [ '#4faae8', '#767676', '#ffe600', '#0d2b2e', '#e2001a', '#ffffff', '#000000' ] as $brandHex )
-	foreach( range( 1, \Nino\Design\Tokens::STEPS ) as $knobStep )
+	foreach( range( 1, \Nino\Modules\Design\Tokens::STEPS ) as $knobStep )
 		foreach( [ 'light', 'dark' ] as $paletteMode ) {
-			$settings = \Nino\Design\Tokens::normalize( [ 'primary' => $brandHex, 'contrast' => $knobStep, 'saturation' => $knobStep, 'temperature' => $knobStep, 'depth' => $knobStep, 'harmony' => $knobStep ] );
-			$got = \Nino\Design\Tokens::palette( $settings, $paletteMode )['brand']['bg'];
+			$settings = \Nino\Modules\Design\Tokens::normalize( [ 'primary' => $brandHex, 'contrast' => $knobStep, 'saturation' => $knobStep, 'temperature' => $knobStep, 'depth' => $knobStep, 'harmony' => $knobStep ] );
+			$got = \Nino\Modules\Design\Tokens::palette( $settings, $paletteMode )['brand']['bg'];
 			if( $got !== $brandHex )
 				$originStable[] = $brandHex. '/'. $knobStep. '/'. $paletteMode. ' -> '. $got;
 		}
@@ -76,12 +78,12 @@ check( 'the brand surface is the picked colour itself, unmoved by any knob or mo
 
 // What that costs, stated rather than hidden: brand is also the one surface
 // whose contrast cannot be promised, and Design::brand() has to say so
-$brandSafe = \Nino\Design\Tokens::brand( \Nino\Design\Tokens::normalize( [ 'primary' => '#4faae8' ] ) );
-$brandRisk = \Nino\Design\Tokens::brand( \Nino\Design\Tokens::normalize( [ 'primary' => '#767676' ] ) );
+$brandSafe = \Nino\Modules\Design\Tokens::brand( \Nino\Modules\Design\Tokens::normalize( [ 'primary' => '#4faae8' ] ) );
+$brandRisk = \Nino\Modules\Design\Tokens::brand( \Nino\Modules\Design\Tokens::normalize( [ 'primary' => '#767676' ] ) );
 check( 'the tool reports what the picked brand measures instead of leaving it to the eye',
 	$brandSafe['light']['color'] === '#4faae8' && $brandSafe['light']['safe'] === true
 	&& $brandRisk['light']['safe'] === false && $brandRisk['light']['ratio'] < $brandRisk['light']['target'] );
-check( 'primary text is ink rather than the faintest passing grey', \Nino\Design\Tokens::contrast( $lightPalette['default']['on'], '#ffffff' ) > 15.0 );
+check( 'primary text is ink rather than the faintest passing grey', \Nino\Modules\Design\Tokens::contrast( $lightPalette['default']['on'], '#ffffff' ) > 15.0 );
 
 /*	The whole feature is this promise, so it is checked across the full
 	contrast x saturation grid, both modes and a set of brands chosen to break
@@ -95,11 +97,11 @@ check( 'primary text is ink rather than the faintest passing grey', \Nino\Design
 $designFailures = [];
 $AA = 4.5;
 foreach( [ '#4faae8', '#14595e', '#f50963', '#ffd400', '#b6a6ff', '#000000', '#ffffff', '#7f7f7f' ] as $brand )
-	foreach( range( 1, \Nino\Design\Tokens::STEPS ) as $contrastKnob )
-		foreach( range( 1, \Nino\Design\Tokens::STEPS ) as $saturationKnob )
+	foreach( range( 1, \Nino\Modules\Design\Tokens::STEPS ) as $contrastKnob )
+		foreach( range( 1, \Nino\Modules\Design\Tokens::STEPS ) as $saturationKnob )
 			foreach( [ 'light', 'dark' ] as $mode ) {
 
-				$palette = \Nino\Design\Tokens::palette( [ 'primary' => $brand, 'contrast' => $contrastKnob, 'saturation' => $saturationKnob ], $mode );
+				$palette = \Nino\Modules\Design\Tokens::palette( [ 'primary' => $brand, 'contrast' => $contrastKnob, 'saturation' => $saturationKnob ], $mode );
 				$textTarget = max( $AA, [ 1 => 4.5, 2 => 4.5, 3 => 7.0 ][$contrastKnob] );
 				$where = $brand. '/c'. $contrastKnob. '/s'. $saturationKnob. '/'. $mode;
 
@@ -113,10 +115,10 @@ foreach( [ '#4faae8', '#14595e', '#f50963', '#ffd400', '#b6a6ff', '#000000', '#f
 					if( $surface === 'brand' || $surface === 'accent' )
 						continue;
 
-					$onRatio		= \Nino\Design\Tokens::contrast( $values['on'], $values['bg'] );
-					$mutedRatio		= \Nino\Design\Tokens::contrast( $values['on-muted'], $values['bg'] );
-					$borderRatio	= \Nino\Design\Tokens::contrast( $values['border'], $values['bg'] );
-					$focusRatio		= \Nino\Design\Tokens::contrast( $values['focus'], $values['bg'] );
+					$onRatio		= \Nino\Modules\Design\Tokens::contrast( $values['on'], $values['bg'] );
+					$mutedRatio		= \Nino\Modules\Design\Tokens::contrast( $values['on-muted'], $values['bg'] );
+					$borderRatio	= \Nino\Modules\Design\Tokens::contrast( $values['border'], $values['bg'] );
+					$focusRatio		= \Nino\Modules\Design\Tokens::contrast( $values['focus'], $values['bg'] );
 
 					if( $onRatio < $textTarget - 0.02 )
 						$designFailures[] = $where. ' '. $surface. ' on '. round( $onRatio, 2 );
@@ -147,14 +149,14 @@ check( 'every solved pair clears WCAG AA, across 8 brands x 3 contrasts x 3 satu
 // 'default' were the same 4.5 target and the body ink never moved between
 // them. What the reader feels is the ink, so that is what the knob moves now
 $inkByStep = [];
-foreach( range( 1, \Nino\Design\Tokens::STEPS ) as $step )
-	$inkByStep[$step] = \Nino\Design\Tokens::palette( [ 'primary' => '#4faae8', 'contrast' => $step ], 'light' )['default']['on'];
+foreach( range( 1, \Nino\Modules\Design\Tokens::STEPS ) as $step )
+	$inkByStep[$step] = \Nino\Modules\Design\Tokens::palette( [ 'primary' => '#4faae8', 'contrast' => $step ], 'light' )['default']['on'];
 
-check( 'contrast moves the body ink at every position, not just at the top', count( array_unique( $inkByStep ) ) === \Nino\Design\Tokens::STEPS );
+check( 'contrast moves the body ink at every position, not just at the top', count( array_unique( $inkByStep ) ) === \Nino\Modules\Design\Tokens::STEPS );
 check( '...and it moves it monotonically toward black', ( static function( array $ink ): bool {
 	$previous = 0.0;
 	foreach( $ink as $hex ) {
-		$ratio = \Nino\Design\Tokens::contrast( $hex, '#ffffff' );
+		$ratio = \Nino\Modules\Design\Tokens::contrast( $hex, '#ffffff' );
 		if( $ratio <= $previous )
 			return false;
 		$previous = $ratio;
@@ -162,19 +164,19 @@ check( '...and it moves it monotonically toward black', ( static function( array
 	return true;
 } )( $inkByStep ) );
 
-$soft = \Nino\Design\Tokens::palette( [ 'primary' => '#4faae8', 'contrast' => 1 ], 'light' );
-$high = \Nino\Design\Tokens::palette( [ 'primary' => '#4faae8', 'contrast' => 3 ], 'light' );
+$soft = \Nino\Modules\Design\Tokens::palette( [ 'primary' => '#4faae8', 'contrast' => 1 ], 'light' );
+$high = \Nino\Modules\Design\Tokens::palette( [ 'primary' => '#4faae8', 'contrast' => 3 ], 'light' );
 check( 'the contrast knob moves the safe brand surface and leaves the picked one alone', $soft['brand-safe']['bg'] !== $high['brand-safe']['bg']
 	&& $soft['brand']['bg'] === $high['brand']['bg']
-	&& \Nino\Design\Tokens::contrast( $high['brand-safe']['on'], $high['brand-safe']['bg'] ) >= 6.98 );
+	&& \Nino\Modules\Design\Tokens::contrast( $high['brand-safe']['on'], $high['brand-safe']['bg'] ) >= 6.98 );
 
 /*	Saturation used to scale the brand and nothing else. The four surfaces a
 	page is actually made of - the ground, the alternate band, and the two dark
 	ones - came back byte-identical at all three of its old positions, as did
 	every border and every link, because the neutral tint and the link floor
 	were both constants the knob never touched.	*/
-$muted	= \Nino\Design\Tokens::palette( [ 'primary' => '#4faae8', 'saturation' => 1 ], 'light' );
-$rich	= \Nino\Design\Tokens::palette( [ 'primary' => '#4faae8', 'saturation' => 3 ], 'light' );
+$muted	= \Nino\Modules\Design\Tokens::palette( [ 'primary' => '#4faae8', 'saturation' => 1 ], 'light' );
+$rich	= \Nino\Modules\Design\Tokens::palette( [ 'primary' => '#4faae8', 'saturation' => 3 ], 'light' );
 
 check( 'saturation reaches the page ground, not only the brand', $muted['default']['bg'] !== $rich['default']['bg']
 	|| $muted['alt']['bg'] !== $rich['alt']['bg'] );
@@ -193,9 +195,9 @@ foreach( [ '#4faae8', '#ffd400', '#e02329', '#215d63', '#b6a6ff' ] as $brand )
 
 		$previous = -1.0;
 
-		foreach( range( 1, \Nino\Design\Tokens::STEPS ) as $step ) {
+		foreach( range( 1, \Nino\Modules\Design\Tokens::STEPS ) as $step ) {
 
-			[ , $chroma ] = \Nino\Design\Tokens::oklch( \Nino\Design\Tokens::palette( [ 'primary' => $brand, 'saturation' => $step ], $mode )['brand-safe']['bg'] );
+			[ , $chroma ] = \Nino\Modules\Design\Tokens::oklch( \Nino\Modules\Design\Tokens::palette( [ 'primary' => $brand, 'saturation' => $step ], $mode )['brand-safe']['bg'] );
 
 			if( $chroma < $previous - 0.002 )
 				$notMonotonicChroma[] = $brand. '/'. $mode. ' step '. $step. ' '. round( $chroma, 3 ). ' < '. round( $previous, 3 );
@@ -205,12 +207,12 @@ foreach( [ '#4faae8', '#ffd400', '#e02329', '#215d63', '#b6a6ff' ] as $brand )
 	}
 
 check( 'turning saturation up never comes back less saturated'. ( $notMonotonicChroma === [] ? '' : ' - '. implode( ', ', array_slice( $notMonotonicChroma, 0, 4 ) ) ), $notMonotonicChroma === [] );
-check( 'the saturation knob keeps its target while it does it', \Nino\Design\Tokens::contrast( $rich['brand-safe']['on'], $rich['brand-safe']['bg'] ) >= 4.48 );
+check( 'the saturation knob keeps its target while it does it', \Nino\Modules\Design\Tokens::contrast( $rich['brand-safe']['on'], $rich['brand-safe']['bg'] ) >= 4.48 );
 
 // Temperature: which way the greys lean, and nothing else. The brand is the
 // brand at every position
-$cool = \Nino\Design\Tokens::palette( [ 'primary' => '#4faae8', 'temperature' => 2 ], 'light' );
-$warm = \Nino\Design\Tokens::palette( [ 'primary' => '#4faae8', 'temperature' => 4 ], 'light' );
+$cool = \Nino\Modules\Design\Tokens::palette( [ 'primary' => '#4faae8', 'temperature' => 2 ], 'light' );
+$warm = \Nino\Modules\Design\Tokens::palette( [ 'primary' => '#4faae8', 'temperature' => 4 ], 'light' );
 check( 'temperature moves the neutral surfaces', $cool['alt']['bg'] !== $warm['alt']['bg']
 	&& $cool['black']['bg'] !== $warm['black']['bg'] );
 check( '...and leaves the brand and the status hues where they are', $cool['brand']['bg'] === $warm['brand']['bg']
@@ -221,11 +223,11 @@ check( '...and leaves the brand and the status hues where they are', $cool['bran
 	something reads as chosen - but that is a claim about a page whose brand is
 	meant to be everywhere, and a design that wants its colour only where it is
 	put had no way to say so while every ground carried a trace of it	*/
-$neutral = \Nino\Design\Tokens::palette( [ 'primary' => '#f50963', 'temperature' => 1 ], 'light' );
+$neutral = \Nino\Modules\Design\Tokens::palette( [ 'primary' => '#f50963', 'temperature' => 1 ], 'light' );
 $neutralFailures = [];
 
 foreach( [ 'default', 'alt', 'dark', 'black' ] as $ground ) {
-	[ , $chroma ] = \Nino\Design\Tokens::oklch( $neutral[$ground]['bg'] );
+	[ , $chroma ] = \Nino\Modules\Design\Tokens::oklch( $neutral[$ground]['bg'] );
 	if( $chroma > 0.0005 )
 		$neutralFailures[] = $ground. ' '. round( $chroma, 4 );
 }
@@ -235,7 +237,7 @@ check( 'Neutral takes the colour cast off the grounds entirely', $neutralFailure
 // Off the grounds, not off the page: the brand is still the brand, and the
 // tint is still the surface that carries it
 check( '...without touching the brand or the tint', $neutral['brand']['bg'] === '#f50963'
-	&& \Nino\Design\Tokens::oklch( $neutral['tint']['bg'] )[1] > 0.01 );
+	&& \Nino\Modules\Design\Tokens::oklch( $neutral['tint']['bg'] )[1] > 0.01 );
 
 /*	Harmony: where the second brand colour sits, as the four classical
 	relationships rather than as a track. Monochrome is where there is no second
@@ -244,77 +246,77 @@ check( '...without touching the brand or the tint', $neutral['brand']['bg'] === 
 $angles = [];
 
 foreach( [ 1, 2, 3, 4 ] as $position ) {
-	[ , , $hue ] = \Nino\Design\Tokens::oklch( \Nino\Design\Tokens::palette( [ 'primary' => '#4faae8', 'harmony' => $position ], 'light' )['accent']['bg'] );
-	$angles[$position] = round( fmod( rad2deg( $hue ) - rad2deg( \Nino\Design\Tokens::oklch( '#4faae8' )[2] ) + 360, 360 ) );
+	[ , , $hue ] = \Nino\Modules\Design\Tokens::oklch( \Nino\Modules\Design\Tokens::palette( [ 'primary' => '#4faae8', 'harmony' => $position ], 'light' )['accent']['bg'] );
+	$angles[$position] = round( fmod( rad2deg( $hue ) - rad2deg( \Nino\Modules\Design\Tokens::oklch( '#4faae8' )[2] ) + 360, 360 ) );
 }
 
 check( 'harmony places the second colour at the interval it names', $angles === [ 1 => 0.0, 2 => 30.0, 3 => 120.0, 4 => 180.0 ]
 	|| print_r( $angles, true ) === '' );
-$mono		= \Nino\Design\Tokens::palette( [ 'primary' => '#4faae8', 'harmony' => 1 ], 'light' );
-$complement	= \Nino\Design\Tokens::palette( [ 'primary' => '#4faae8', 'harmony' => 4 ], 'light' );
+$mono		= \Nino\Modules\Design\Tokens::palette( [ 'primary' => '#4faae8', 'harmony' => 1 ], 'light' );
+$complement	= \Nino\Modules\Design\Tokens::palette( [ 'primary' => '#4faae8', 'harmony' => 4 ], 'light' );
 check( '...monochrome is the brand itself, which is what no harmony meant before', $mono['accent']['bg'] === $mono['brand']['bg']
 	&& $mono['accent-safe']['bg'] === $mono['brand-safe']['bg'] );
 check( '...and it turns the second colour away from the brand at every other position', $mono['accent-safe']['bg'] !== $complement['accent-safe']['bg'] );
 check( '...it never reaches the page ground or the status surfaces', $mono['default']['bg'] === $complement['default']['bg']
 	&& $mono['alt']['bg'] === $complement['alt']['bg']
 	&& $mono['danger']['bg'] === $complement['danger']['bg'] );
-check( '...and a secondary colour of its own overrides it entirely', \Nino\Design\Tokens::palette( [ 'primary' => '#4faae8', 'secondary' => '#94703f', 'harmony' => 4 ], 'light' )['accent-safe']['bg']
-	=== \Nino\Design\Tokens::palette( [ 'primary' => '#4faae8', 'secondary' => '#94703f', 'harmony' => 1 ], 'light' )['accent-safe']['bg'] );
+check( '...and a secondary colour of its own overrides it entirely', \Nino\Modules\Design\Tokens::palette( [ 'primary' => '#4faae8', 'secondary' => '#94703f', 'harmony' => 4 ], 'light' )['accent-safe']['bg']
+	=== \Nino\Modules\Design\Tokens::palette( [ 'primary' => '#4faae8', 'secondary' => '#94703f', 'harmony' => 1 ], 'light' )['accent-safe']['bg'] );
 
 /*	The defect the four roles exist for. With a Secondary set, the one safe
 	surface the palette used to publish became the *second* colour made safe -
 	so a theme's buttons quietly stopped being the brand, and there was no
 	contrast-safe brand colour anywhere in the palette to put them back on	*/
-$two = \Nino\Design\Tokens::palette( [ 'primary' => '#4faae8', 'secondary' => '#94703f' ], 'light' );
+$two = \Nino\Modules\Design\Tokens::palette( [ 'primary' => '#4faae8', 'secondary' => '#94703f' ], 'light' );
 check( 'a second colour never takes the brand\'s place', $two['brand']['bg'] === '#4faae8'
 	&& $two['accent']['bg'] === '#94703f'
 	&& $two['brand-safe']['bg'] !== $two['accent-safe']['bg'] );
-check( '...and both of them are safe at the same time', \Nino\Design\Tokens::contrast( $two['brand-safe']['on'], $two['brand-safe']['bg'] ) >= 4.48
-	&& \Nino\Design\Tokens::contrast( $two['accent-safe']['on'], $two['accent-safe']['bg'] ) >= 4.48 );
+check( '...and both of them are safe at the same time', \Nino\Modules\Design\Tokens::contrast( $two['brand-safe']['on'], $two['brand-safe']['bg'] ) >= 4.48
+	&& \Nino\Modules\Design\Tokens::contrast( $two['accent-safe']['on'], $two['accent-safe']['bg'] ) >= 4.48 );
 // The safe brand follows the brand rather than whatever else is set: it is the
 // hue and chroma that were picked, with only the lightness solved
-check( '...the safe brand keeps the picked hue', abs( \Nino\Design\Tokens::oklch( $two['brand-safe']['bg'] )[2] - \Nino\Design\Tokens::oklch( '#4faae8' )[2] ) < 0.02 );
+check( '...the safe brand keeps the picked hue', abs( \Nino\Modules\Design\Tokens::oklch( $two['brand-safe']['bg'] )[2] - \Nino\Modules\Design\Tokens::oklch( '#4faae8' )[2] ) < 0.02 );
 
 /*	The fifth ground: the page with the brand in it rather than a trace of it.
 	Recognisably the brand rather than a warm grey, and still a surface body
 	copy can sit on for a whole section	*/
-$tinted = \Nino\Design\Tokens::palette( [ 'primary' => '#4faae8' ], 'light' );
-check( 'the tint ground carries the brand rather than a trace of it', \Nino\Design\Tokens::oklch( $tinted['tint']['bg'] )[1]
-	> \Nino\Design\Tokens::oklch( $tinted['alt']['bg'] )[1] * 2 );
+$tinted = \Nino\Modules\Design\Tokens::palette( [ 'primary' => '#4faae8' ], 'light' );
+check( 'the tint ground carries the brand rather than a trace of it', \Nino\Modules\Design\Tokens::oklch( $tinted['tint']['bg'] )[1]
+	> \Nino\Modules\Design\Tokens::oklch( $tinted['alt']['bg'] )[1] * 2 );
 // Within a degree and a half, which is what fitting a requested chroma back
 // into sRGB costs at a lightness this high
-check( '...at the brand\'s own hue, not the one Temperature leans the greys to', abs( \Nino\Design\Tokens::oklch( $tinted['tint']['bg'] )[2] - \Nino\Design\Tokens::oklch( '#4faae8' )[2] ) < 0.03 );
+check( '...at the brand\'s own hue, not the one Temperature leans the greys to', abs( \Nino\Modules\Design\Tokens::oklch( $tinted['tint']['bg'] )[2] - \Nino\Modules\Design\Tokens::oklch( '#4faae8' )[2] ) < 0.03 );
 // A brand with no colour in it has to produce a tint with no colour in it, or
 // a grey corporate hex comes back as a beige band nobody asked for
-check( '...and a colourless brand gets a colourless tint, not a beige one', \Nino\Design\Tokens::oklch( \Nino\Design\Tokens::palette( [ 'primary' => '#7f7f7f' ], 'light' )['tint']['bg'] )[1] < 0.002 );
-check( '...and is a ground, not a brand surface: quiet enough to read a section on', \Nino\Design\Tokens::contrast( $tinted['tint']['bg'], $tinted['default']['bg'] ) < 1.35 );
+check( '...and a colourless brand gets a colourless tint, not a beige one', \Nino\Modules\Design\Tokens::oklch( \Nino\Modules\Design\Tokens::palette( [ 'primary' => '#7f7f7f' ], 'light' )['tint']['bg'] )[1] < 0.002 );
+check( '...and is a ground, not a brand surface: quiet enough to read a section on', \Nino\Modules\Design\Tokens::contrast( $tinted['tint']['bg'], $tinted['default']['bg'] ) < 1.35 );
 
 // Depth: three ways of saying the same thing, moved by one control
-$flat		= \Nino\Design\Tokens::palette( [ 'primary' => '#4faae8', 'depth' => 1 ], 'light' );
-$layered	= \Nino\Design\Tokens::palette( [ 'primary' => '#4faae8', 'depth' => 3 ], 'light' );
-check( 'depth separates the alternate surface from the page', \Nino\Design\Tokens::contrast( $layered['alt']['bg'], $layered['default']['bg'] )
-	> \Nino\Design\Tokens::contrast( $flat['alt']['bg'], $flat['default']['bg'] ) );
-check( '...draws the border more firmly with it', \Nino\Design\Tokens::contrast( $layered['default']['border'], $layered['default']['bg'] )
-	> \Nino\Design\Tokens::contrast( $flat['default']['border'], $flat['default']['bg'] ) );
+$flat		= \Nino\Modules\Design\Tokens::palette( [ 'primary' => '#4faae8', 'depth' => 1 ], 'light' );
+$layered	= \Nino\Modules\Design\Tokens::palette( [ 'primary' => '#4faae8', 'depth' => 3 ], 'light' );
+check( 'depth separates the alternate surface from the page', \Nino\Modules\Design\Tokens::contrast( $layered['alt']['bg'], $layered['default']['bg'] )
+	> \Nino\Modules\Design\Tokens::contrast( $flat['alt']['bg'], $flat['default']['bg'] ) );
+check( '...draws the border more firmly with it', \Nino\Modules\Design\Tokens::contrast( $layered['default']['border'], $layered['default']['bg'] )
+	> \Nino\Modules\Design\Tokens::contrast( $flat['default']['border'], $flat['default']['bg'] ) );
 check( '...and casts a denser shadow', $flat['default']['shadow'] !== $layered['default']['shadow'] );
 // A border identifies a control under SC 1.4.11 wherever Nino.css spends
 // --color-border on one, and Nino.css spends it on form fields. Flat says what
 // it has to say through the surface and the shadow, never by going below 3:1
-check( '...but never lets the border fall below its 3:1 floor', \Nino\Design\Tokens::contrast( $flat['default']['border'], $flat['default']['bg'] ) >= 2.98
-	&& \Nino\Design\Tokens::contrast( $flat['black']['border'], $flat['black']['bg'] ) >= 2.98 );
+check( '...but never lets the border fall below its 3:1 floor', \Nino\Modules\Design\Tokens::contrast( $flat['default']['border'], $flat['default']['bg'] ) >= 2.98
+	&& \Nino\Modules\Design\Tokens::contrast( $flat['black']['border'], $flat['black']['bg'] ) >= 2.98 );
 
-check( 'a secondary of its own reaches the accent surface', \Nino\Design\Tokens::palette( [ 'primary' => '#4faae8', 'secondary' => '#94703f' ], 'light' )['accent-safe']['bg']
-	!== \Nino\Design\Tokens::palette( [ 'primary' => '#4faae8' ], 'light' )['accent-safe']['bg'] );
+check( 'a secondary of its own reaches the accent surface', \Nino\Modules\Design\Tokens::palette( [ 'primary' => '#4faae8', 'secondary' => '#94703f' ], 'light' )['accent-safe']['bg']
+	!== \Nino\Modules\Design\Tokens::palette( [ 'primary' => '#4faae8' ], 'light' )['accent-safe']['bg'] );
 
 // Out-of-gamut OKLCH does not darken when it clips, it shifts hue - which is
 // how a brand blue once came back as pale cyan
-check( 'an out-of-gamut request is brought into sRGB instead of clipping to a different hue', \Nino\Design\Tokens::contrast( \Nino\Design\Tokens::hex( 0.6, 0.4, 4.2 ), '#ffffff' ) > 1.0
-	&& preg_match( '/^#[0-9a-f]{6}$/', \Nino\Design\Tokens::hex( 0.6, 0.4, 4.2 ) ) === 1 );
+check( 'an out-of-gamut request is brought into sRGB instead of clipping to a different hue', \Nino\Modules\Design\Tokens::contrast( \Nino\Modules\Design\Tokens::hex( 0.6, 0.4, 4.2 ), '#ffffff' ) > 1.0
+	&& preg_match( '/^#[0-9a-f]{6}$/', \Nino\Modules\Design\Tokens::hex( 0.6, 0.4, 4.2 ) ) === 1 );
 
-check( 'a malformed brand falls back instead of emitting garbage', preg_match( '/^#[0-9a-f]{6}$/', \Nino\Design\Tokens::palette( [ 'primary' => 'not-a-colour' ], 'light' )['brand']['bg'] ) === 1 );
-check( 'a three-digit hex is accepted', \Nino\Design\Tokens::palette( [ 'primary' => '#4ae' ], 'light' )['brand']['bg'] === \Nino\Design\Tokens::palette( [ 'primary' => '#44aaee' ], 'light' )['brand']['bg'] );
+check( 'a malformed brand falls back instead of emitting garbage', preg_match( '/^#[0-9a-f]{6}$/', \Nino\Modules\Design\Tokens::palette( [ 'primary' => 'not-a-colour' ], 'light' )['brand']['bg'] ) === 1 );
+check( 'a three-digit hex is accepted', \Nino\Modules\Design\Tokens::palette( [ 'primary' => '#4ae' ], 'light' )['brand']['bg'] === \Nino\Modules\Design\Tokens::palette( [ 'primary' => '#44aaee' ], 'light' )['brand']['bg'] );
 
-$designCss = \Nino\Design\Tokens::css( [ 'primary' => '#4faae8', 'secondary' => '#94703f' ] );
+$designCss = \Nino\Modules\Design\Tokens::css( [ 'primary' => '#4faae8', 'secondary' => '#94703f' ] );
 check( 'the stylesheet declares both modes and the three-state pattern', str_contains( $designCss, 'color-scheme: light dark' )
 	&& str_contains( $designCss, '@media (prefers-color-scheme: dark)' )
 	&& str_contains( $designCss, ':root:not([data-nino-mode="light"])' )
@@ -376,10 +378,10 @@ $scrimAlphas   = [];
 
 foreach( [ 1, 2, 3 ] as $contrastStep ) {
 
-	$scrimSettings = \Nino\Design\Tokens::normalize( [ 'primary' => '#4faae8', 'contrast' => $contrastStep ] );
+	$scrimSettings = \Nino\Modules\Design\Tokens::normalize( [ 'primary' => '#4faae8', 'contrast' => $contrastStep ] );
 	$scrimTarget   = [ 1 => 4.5, 2 => 4.5, 3 => 7.0 ][$contrastStep];
 	// The bare :root carries light, both dark blocks carry the same dark value
-	$scrimBlocks   = preg_split( '/@media \(prefers-color-scheme: dark\)/', \Nino\Design\Tokens::css( $scrimSettings ) );
+	$scrimBlocks   = preg_split( '/@media \(prefers-color-scheme: dark\)/', \Nino\Modules\Design\Tokens::css( $scrimSettings ) );
 
 	foreach( [ 'light' => 0, 'dark' => 1 ] as $scrimMode => $scrimBlock ) {
 
@@ -388,7 +390,7 @@ foreach( [ 1, 2, 3 ] as $contrastStep ) {
 			continue;
 		}
 
-		$scrimPalette = \Nino\Design\Tokens::palette( $scrimSettings, $scrimMode );
+		$scrimPalette = \Nino\Modules\Design\Tokens::palette( $scrimSettings, $scrimMode );
 		$scrimColour  = sprintf( '#%02x%02x%02x', (int) $scrimMatch[1], (int) $scrimMatch[2], (int) $scrimMatch[3] );
 		$scrimAlphas[] = (int) $scrimMatch[4];
 
@@ -398,7 +400,7 @@ foreach( [ 1, 2, 3 ] as $contrastStep ) {
 			$scrimFailures[] = $scrimMode. '/'. $contrastStep. ': '. $scrimColour. ' is not the deepest surface '. $scrimPalette['black']['bg'];
 
 		$scrimGround = $scrimOver( $scrimColour, '#ffffff', (int) $scrimMatch[4] / 100 );
-		$scrimRatio  = \Nino\Design\Tokens::contrast( $scrimOver( $scrimPalette['black']['on'], $scrimGround, 0.8 ), $scrimGround );
+		$scrimRatio  = \Nino\Modules\Design\Tokens::contrast( $scrimOver( $scrimPalette['black']['on'], $scrimGround, 0.8 ), $scrimGround );
 
 		if( $scrimRatio < $scrimTarget - 0.02 )
 			$scrimFailures[] = sprintf( '%s/%d: %.2f:1 over a white photograph, needs %.1f', $scrimMode, $contrastStep, $scrimRatio, $scrimTarget );
@@ -419,7 +421,7 @@ echo "\n";
 
 echo "Design - surfaces, states and status\n";
 
-$vocabulary = \Nino\Design\Tokens::palette( \Nino\Design\Tokens::normalize( [ 'primary' => '#4faae8' ] ), 'light' );
+$vocabulary = \Nino\Modules\Design\Tokens::palette( \Nino\Modules\Design\Tokens::normalize( [ 'primary' => '#4faae8' ] ), 'light' );
 
 check( 'status surfaces come out of the same machinery as the brand ones', array_keys( $vocabulary ) === [ 'default', 'alt', 'tint', 'dark', 'black', 'brand', 'brand-safe', 'accent', 'accent-safe', 'success', 'warning', 'danger' ] );
 check( 'every surface carries the full state set', array_keys( $vocabulary['default'] ) === [ 'bg', 'on', 'on-muted', 'link', 'border', 'focus', 'hover', 'active', 'disabled', 'shadow' ] );
@@ -427,35 +429,35 @@ check( 'every surface carries the full state set', array_keys( $vocabulary['defa
 // A link solved against the page ground and then dropped onto a dark section
 // is the failure this value exists to prevent
 check( 'a link is solved per surface, not once for the whole page', $vocabulary['default']['link'] !== $vocabulary['dark']['link']
-	&& \Nino\Design\Tokens::contrast( $vocabulary['dark']['link'], $vocabulary['dark']['bg'] ) >= 4.48
-	&& \Nino\Design\Tokens::contrast( $vocabulary['black']['link'], $vocabulary['black']['bg'] ) >= 4.48 );
+	&& \Nino\Modules\Design\Tokens::contrast( $vocabulary['dark']['link'], $vocabulary['dark']['bg'] ) >= 4.48
+	&& \Nino\Modules\Design\Tokens::contrast( $vocabulary['black']['link'], $vocabulary['black']['bg'] ) >= 4.48 );
 
 // SC 1.4.11 - and the defect the audit found in Nino.css, where the ring is
 // removed and replaced by a 1.87:1 border change
 check( 'the focus ring clears 3:1 on every surface, in both modes', array_filter(
 	array_merge(
-		\Nino\Design\Tokens::palette( \Nino\Design\Tokens::normalize( [ 'primary' => '#4faae8' ] ), 'light' ),
-		\Nino\Design\Tokens::palette( \Nino\Design\Tokens::normalize( [ 'primary' => '#4faae8' ] ), 'dark' )
+		\Nino\Modules\Design\Tokens::palette( \Nino\Modules\Design\Tokens::normalize( [ 'primary' => '#4faae8' ] ), 'light' ),
+		\Nino\Modules\Design\Tokens::palette( \Nino\Modules\Design\Tokens::normalize( [ 'primary' => '#4faae8' ] ), 'dark' )
 	),
-	static fn( array $values ): bool => \Nino\Design\Tokens::contrast( $values['focus'], $values['bg'] ) < 2.98
+	static fn( array $values ): bool => \Nino\Modules\Design\Tokens::contrast( $values['focus'], $values['bg'] ) < 2.98
 ) === [] );
 
 check( 'active is a visible step past hover, not the same nudge twice', $vocabulary['default']['hover'] !== $vocabulary['default']['active']
-	&& \Nino\Design\Tokens::contrast( $vocabulary['default']['active'], $vocabulary['default']['bg'] )
-		> \Nino\Design\Tokens::contrast( $vocabulary['default']['hover'], $vocabulary['default']['bg'] ) );
+	&& \Nino\Modules\Design\Tokens::contrast( $vocabulary['default']['active'], $vocabulary['default']['bg'] )
+		> \Nino\Modules\Design\Tokens::contrast( $vocabulary['default']['hover'], $vocabulary['default']['bg'] ) );
 
 // Disabled is the one value that must NOT meet the text target - it has to
 // read as unavailable rather than merely quiet
-$disabledRatio = \Nino\Design\Tokens::contrast( $vocabulary['default']['disabled'], $vocabulary['default']['bg'] );
+$disabledRatio = \Nino\Modules\Design\Tokens::contrast( $vocabulary['default']['disabled'], $vocabulary['default']['bg'] );
 check( 'disabled sits below the text target on purpose, but stays perceivable', $disabledRatio < 4.5 && $disabledRatio > 1.9 );
 
 check( 'the dark palette casts its own shadow instead of reusing the light one', $vocabulary['default']['shadow']
-	!== \Nino\Design\Tokens::palette( \Nino\Design\Tokens::normalize( [ 'primary' => '#4faae8' ] ), 'dark' )['default']['shadow'] );
+	!== \Nino\Modules\Design\Tokens::palette( \Nino\Modules\Design\Tokens::normalize( [ 'primary' => '#4faae8' ] ), 'dark' )['default']['shadow'] );
 
 // Red has to stay red: the brand knobs must not be able to turn a danger
 // surface into something reassuring
-$brandA = \Nino\Design\Tokens::palette( \Nino\Design\Tokens::normalize( [ 'primary' => '#4faae8' ] ), 'light' );
-$brandB = \Nino\Design\Tokens::palette( \Nino\Design\Tokens::normalize( [ 'primary' => '#2f6d4f', 'colors' => 'vibrant' ] ), 'light' );
+$brandA = \Nino\Modules\Design\Tokens::palette( \Nino\Modules\Design\Tokens::normalize( [ 'primary' => '#4faae8' ] ), 'light' );
+$brandB = \Nino\Modules\Design\Tokens::palette( \Nino\Modules\Design\Tokens::normalize( [ 'primary' => '#2f6d4f', 'colors' => 'vibrant' ] ), 'light' );
 check( 'status hues are fixed and survive a change of brand', $brandA['danger']['bg'] === $brandB['danger']['bg']
 	&& $brandA['success']['bg'] === $brandB['success']['bg'] );
 
@@ -471,7 +473,7 @@ $rem = static fn( string $value ): float => (float) rtrim( $value, 'rem' );
 // The one property that makes the layer adoptable: turning it on without
 // asking for anything must not move a project. These are Nino.css's own
 // values, and they are here rather than derived so a drift in either shows up
-$defaultRaster = \Nino\Design\Tokens::raster( \Nino\Design\Tokens::normalize( [] ) );
+$defaultRaster = \Nino\Modules\Design\Tokens::raster( \Nino\Modules\Design\Tokens::normalize( [] ) );
 
 check( 'the default raster is Nino.css\'s own scale, so switching the layer on moves nothing', array_values( $defaultRaster['text'] ) === [ '1rem', '1.125rem', '1.25rem', '1.5rem', '1.8rem', '2.5rem' ]
 	&& array_values( $defaultRaster['space'] ) === [ '0.5rem', '1rem', '2rem', '3rem', '5rem', '8rem' ]
@@ -484,11 +486,11 @@ check( 'the default raster is Nino.css\'s own scale, so switching the layer on m
 	produces a scale that runs backwards or type below the base size - is
 	exactly the kind that only breaks at a corner.	*/
 $rasterSettings = [];
-foreach( range( 1, \Nino\Design\Tokens::STEPS ) as $scale )
-	foreach( range( 1, \Nino\Design\Tokens::STEPS ) as $volume )
-		foreach( range( 1, \Nino\Design\Tokens::STEPS ) as $spacing )
-			foreach( range( 1, \Nino\Design\Tokens::STEPS ) as $shaping )
-				foreach( range( 1, \Nino\Design\Tokens::STEPS ) as $measure )
+foreach( range( 1, \Nino\Modules\Design\Tokens::STEPS ) as $scale )
+	foreach( range( 1, \Nino\Modules\Design\Tokens::STEPS ) as $volume )
+		foreach( range( 1, \Nino\Modules\Design\Tokens::STEPS ) as $spacing )
+			foreach( range( 1, \Nino\Modules\Design\Tokens::STEPS ) as $shaping )
+				foreach( range( 1, \Nino\Modules\Design\Tokens::STEPS ) as $measure )
 					$rasterSettings[] = [ 'scale' => $scale, 'volume' => $volume, 'spacing' => $spacing, 'shaping' => $shaping, 'measure' => $measure ];
 
 $notMonotonic	= [];
@@ -498,7 +500,7 @@ $rootTooSmall	= [];
 
 foreach( $rasterSettings as $settings ) {
 
-	$raster = \Nino\Design\Tokens::raster( \Nino\Design\Tokens::normalize( $settings ) );
+	$raster = \Nino\Modules\Design\Tokens::raster( \Nino\Modules\Design\Tokens::normalize( $settings ) );
 	$label	= implode( '/', $settings );
 
 	foreach( [ 'text', 'space' ] as $group ) {
@@ -548,11 +550,11 @@ check( 'the wide-screen steps only ever override upwards'. ( $wideNotBigger === 
 check( 'all 243 combinations produce a complete raster', count( $rasterSettings ) === 243 );
 
 // The knobs have to be separable, or a picker cannot explain them
-$scaleOnly		= \Nino\Design\Tokens::raster( \Nino\Design\Tokens::normalize( [ 'scale' => 3 ] ) );
-$volumeOnly		= \Nino\Design\Tokens::raster( \Nino\Design\Tokens::normalize( [ 'volume' => 3 ] ) );
-$spacingOnly	= \Nino\Design\Tokens::raster( \Nino\Design\Tokens::normalize( [ 'spacing' => 3 ] ) );
-$shapingOnly	= \Nino\Design\Tokens::raster( \Nino\Design\Tokens::normalize( [ 'shaping' => 3 ] ) );
-$measureOnly	= \Nino\Design\Tokens::raster( \Nino\Design\Tokens::normalize( [ 'measure' => 3 ] ) );
+$scaleOnly		= \Nino\Modules\Design\Tokens::raster( \Nino\Modules\Design\Tokens::normalize( [ 'scale' => 3 ] ) );
+$volumeOnly		= \Nino\Modules\Design\Tokens::raster( \Nino\Modules\Design\Tokens::normalize( [ 'volume' => 3 ] ) );
+$spacingOnly	= \Nino\Modules\Design\Tokens::raster( \Nino\Modules\Design\Tokens::normalize( [ 'spacing' => 3 ] ) );
+$shapingOnly	= \Nino\Modules\Design\Tokens::raster( \Nino\Modules\Design\Tokens::normalize( [ 'shaping' => 3 ] ) );
+$measureOnly	= \Nino\Modules\Design\Tokens::raster( \Nino\Modules\Design\Tokens::normalize( [ 'measure' => 3 ] ) );
 
 check( 'Volume moves type and leaves spacing and radius alone', $volumeOnly['text'] !== $defaultRaster['text']
 	&& $volumeOnly['space'] === $defaultRaster['space']
@@ -583,7 +585,7 @@ check( 'Volume is anchored at body copy and fans out toward the display end', $v
 	&& $rem( $volumeOnly['text'][6] ) > $rem( $defaultRaster['text'][6] ) * 1.2 );
 
 // A size has no light and dark variant, so it is emitted once
-$rasterCss = \Nino\Design\Tokens::css( \Nino\Design\Tokens::normalize( [ 'shaping' => 3 ] ) );
+$rasterCss = \Nino\Modules\Design\Tokens::css( \Nino\Modules\Design\Tokens::normalize( [ 'shaping' => 3 ] ) );
 check( 'the raster is emitted once, not repeated per colour mode', substr_count( $rasterCss, '--nino-space-3:' ) === 1
 	&& substr_count( $rasterCss, '--nino-radius-2:' ) === 1
 	&& substr_count( $rasterCss, '--nino-measure:' ) === 1
@@ -594,20 +596,20 @@ check( '...and only its wide-screen half gets a media query of its own', substr_
 	// has to come first: every rem below resolves against it
 	&& substr_count( $rasterCss, '--nino-base-size:' ) === 2 );
 check( 'a pill is the same answer at every shaping setting', str_contains( $rasterCss, '--nino-radius-full: 999rem;' )
-	&& str_contains( \Nino\Design\Tokens::css( \Nino\Design\Tokens::normalize( [ 'shaping' => 1 ] ) ), '--nino-radius-full: 999rem;' ) );
+	&& str_contains( \Nino\Modules\Design\Tokens::css( \Nino\Modules\Design\Tokens::normalize( [ 'shaping' => 1 ] ) ), '--nino-radius-full: 999rem;' ) );
 
 /*	Where a knob replaces one that shipped with three named values, its three
 	positions are those exact values - so a theme drawn against the old
 	vocabulary renders identically under the new one. Pinned here rather than
 	described, since it is the whole reason the catalogue did not have to be
 	redrawn.	*/
-check( 'the outer positions are the values the old vocabulary named', array_values( \Nino\Design\Tokens::raster( \Nino\Design\Tokens::normalize( [ 'shaping' => 1 ] ) )['radius'] ) === [ '0.05rem', '0.1rem', '0.2rem' ]
-	&& array_values( \Nino\Design\Tokens::raster( \Nino\Design\Tokens::normalize( [ 'shaping' => 3 ] ) )['radius'] ) === [ '0.5rem', '1.5rem', '2.5rem' ]
-	&& \Nino\Design\Tokens::raster( \Nino\Design\Tokens::normalize( [ 'spacing' => 1 ] ) )['lineHeight'] === '1.45'
-	&& \Nino\Design\Tokens::raster( \Nino\Design\Tokens::normalize( [ 'spacing' => 3 ] ) )['lineHeight'] === '1.65' );
+check( 'the outer positions are the values the old vocabulary named', array_values( \Nino\Modules\Design\Tokens::raster( \Nino\Modules\Design\Tokens::normalize( [ 'shaping' => 1 ] ) )['radius'] ) === [ '0.05rem', '0.1rem', '0.2rem' ]
+	&& array_values( \Nino\Modules\Design\Tokens::raster( \Nino\Modules\Design\Tokens::normalize( [ 'shaping' => 3 ] ) )['radius'] ) === [ '0.5rem', '1.5rem', '2.5rem' ]
+	&& \Nino\Modules\Design\Tokens::raster( \Nino\Modules\Design\Tokens::normalize( [ 'spacing' => 1 ] ) )['lineHeight'] === '1.45'
+	&& \Nino\Modules\Design\Tokens::raster( \Nino\Modules\Design\Tokens::normalize( [ 'spacing' => 3 ] ) )['lineHeight'] === '1.65' );
 
 // Same rule as the colours: nothing off the wire is trusted
-check( 'an unknown size setting falls back rather than reaching the raster', \Nino\Design\Tokens::raster( \Nino\Design\Tokens::normalize( [ 'volume' => 'enormous', 'spacing' => [], 'shaping' => '../../etc', 'scale' => 99, 'measure' => -3 ] ) ) === $defaultRaster );
+check( 'an unknown size setting falls back rather than reaching the raster', \Nino\Modules\Design\Tokens::raster( \Nino\Modules\Design\Tokens::normalize( [ 'volume' => 'enormous', 'spacing' => [], 'shaping' => '../../etc', 'scale' => 99, 'measure' => -3 ] ) ) === $defaultRaster );
 
 echo "\n";
 
@@ -616,26 +618,26 @@ echo "\n";
 
 echo "Design::normalize\n";
 
-check( 'a complete set comes back from nothing at all', array_keys( \Nino\Design\Tokens::normalize( [] ) )
+check( 'a complete set comes back from nothing at all', array_keys( \Nino\Modules\Design\Tokens::normalize( [] ) )
 	=== [ 'primary', 'secondary', 'harmony', 'temperature', 'saturation', 'contrast', 'depth', 'scale', 'volume', 'spacing', 'shaping', 'measure' ] );
-check( 'an unknown knob position falls back rather than reaching the generator', \Nino\Design\Tokens::normalize( [ 'contrast' => 'enormous', 'saturation' => '../etc', 'depth' => [ 'x' ], 'scale' => 9, 'measure' => 0 ] )
-	=== \Nino\Design\Tokens::normalize( [] ) );
+check( 'an unknown knob position falls back rather than reaching the generator', \Nino\Modules\Design\Tokens::normalize( [ 'contrast' => 'enormous', 'saturation' => '../etc', 'depth' => [ 'x' ], 'scale' => 9, 'measure' => 0 ] )
+	=== \Nino\Modules\Design\Tokens::normalize( [] ) );
 // A number off a form post arrives as a string, and a step is still a step
-check( 'a numeric string is a position, not a name that failed to match', \Nino\Design\Tokens::normalize( [ 'contrast' => '3' ] )['contrast'] === 3 );
+check( 'a numeric string is a position, not a name that failed to match', \Nino\Modules\Design\Tokens::normalize( [ 'contrast' => '3' ] )['contrast'] === 3 );
 
 // A knob position is a number. A name is not one, so it falls back like any
 // other value the generator cannot use
-check( 'a name is not a position', \Nino\Design\Tokens::normalize( [ 'contrast' => 'high', 'volume' => 'generous', 'shaping' => 'round' ] )
-	=== \Nino\Design\Tokens::normalize( [] ) );
+check( 'a name is not a position', \Nino\Modules\Design\Tokens::normalize( [ 'contrast' => 'high', 'volume' => 'generous', 'shaping' => 'round' ] )
+	=== \Nino\Modules\Design\Tokens::normalize( [] ) );
 // The softest position is still held to AA for the muted tier - it is the one
 // place where "less contrast" could quietly mean "below the floor"
-check( 'the softest contrast position keeps muted text at AA', \Nino\Design\Tokens::contrast(
-		\Nino\Design\Tokens::palette( [ 'primary' => '#4faae8', 'contrast' => 1 ], 'light' )['default']['on-muted'],
-		\Nino\Design\Tokens::palette( [ 'primary' => '#4faae8', 'contrast' => 1 ], 'light' )['default']['bg'] ) >= 4.48 );
+check( 'the softest contrast position keeps muted text at AA', \Nino\Modules\Design\Tokens::contrast(
+		\Nino\Modules\Design\Tokens::palette( [ 'primary' => '#4faae8', 'contrast' => 1 ], 'light' )['default']['on-muted'],
+		\Nino\Modules\Design\Tokens::palette( [ 'primary' => '#4faae8', 'contrast' => 1 ], 'light' )['default']['bg'] ) >= 4.48 );
 check( 'the knobs a picker renders all carry a group, a note and a name per position', ( static function(): bool {
-	foreach( \Nino\Design\Tokens::choices() as $knob => $meta )
+	foreach( \Nino\Modules\Design\Tokens::choices() as $knob => $meta )
 		if( count( $meta['steps'] ) !== $meta['max'] || $meta['min'] !== 1 || ( $meta['note'] ?? '' ) === ''
-			|| isset( \Nino\Design\Tokens::GROUPS[$meta['group']] ) === false
+			|| isset( \Nino\Modules\Design\Tokens::GROUPS[$meta['group']] ) === false
 			|| $meta['default'] < $meta['min'] || $meta['default'] > $meta['max'] )
 			return false;
 	return true;
@@ -645,21 +647,21 @@ check( 'the knobs a picker renders all carry a group, a note and a name per posi
 	list with its own default - which is what Harmony and Temperature always
 	were while the pane told the operator the middle position is Nino's own	*/
 check( 'a scale is three positions and a choice is as many as it names', ( static function(): bool {
-	foreach( \Nino\Design\Tokens::choices() as $knob => $meta ) {
+	foreach( \Nino\Modules\Design\Tokens::choices() as $knob => $meta ) {
 		if( in_array( $meta['kind'], [ 'scale', 'choice' ], true ) === false )
 			return false;
-		if( $meta['kind'] === 'scale' && ( $meta['max'] !== \Nino\Design\Tokens::STEPS || $meta['default'] !== 2 ) )
+		if( $meta['kind'] === 'scale' && ( $meta['max'] !== \Nino\Modules\Design\Tokens::STEPS || $meta['default'] !== 2 ) )
 			return false;
 	}
 	return true;
 } )() );
-check( '...and a position past the end of a choice falls back rather than indexing off it', \Nino\Design\Tokens::normalize( [ 'harmony' => 5 ] )['harmony'] === 1
-	&& \Nino\Design\Tokens::normalize( [ 'temperature' => 9 ] )['temperature'] === 3
-	&& \Nino\Design\Tokens::normalize( [ 'harmony' => 4 ] )['harmony'] === 4 );
-check( 'a colour without its hash is still accepted', \Nino\Design\Tokens::normalize( [ 'primary' => '4faae8' ] )['primary'] === '#4faae8' );
-check( 'a three-digit colour is expanded once, here', \Nino\Design\Tokens::normalize( [ 'primary' => '#4AE' ] )['primary'] === '#44aaee' );
-check( 'a value that is not a colour is refused, not silently carried', \Nino\Design\Tokens::normalize( [ 'primary' => 'url(evil)' ] )['primary'] === '#4faae8' );
-check( 'an empty secondary stays empty - it means "use the brand", not "fall back"', \Nino\Design\Tokens::normalize( [] )['secondary'] === '' );
+check( '...and a position past the end of a choice falls back rather than indexing off it', \Nino\Modules\Design\Tokens::normalize( [ 'harmony' => 5 ] )['harmony'] === 1
+	&& \Nino\Modules\Design\Tokens::normalize( [ 'temperature' => 9 ] )['temperature'] === 3
+	&& \Nino\Modules\Design\Tokens::normalize( [ 'harmony' => 4 ] )['harmony'] === 4 );
+check( 'a colour without its hash is still accepted', \Nino\Modules\Design\Tokens::normalize( [ 'primary' => '4faae8' ] )['primary'] === '#4faae8' );
+check( 'a three-digit colour is expanded once, here', \Nino\Modules\Design\Tokens::normalize( [ 'primary' => '#4AE' ] )['primary'] === '#44aaee' );
+check( 'a value that is not a colour is refused, not silently carried', \Nino\Modules\Design\Tokens::normalize( [ 'primary' => 'url(evil)' ] )['primary'] === '#4faae8' );
+check( 'an empty secondary stays empty - it means "use the brand", not "fall back"', \Nino\Modules\Design\Tokens::normalize( [] )['secondary'] === '' );
 
 echo "\n";
 
@@ -674,8 +676,8 @@ $appData['/nino/html/assets'] = [ '/.cache/style.css' => [
 \Nino\Filesystem::putFileContent( $appData, '/assets/style.theme.demo.css', ':root{--color-primary:var(--nino-brand-safe)}.demo-theme-marker{color:red}' );
 \Nino\Filesystem::putFileContent( $appData, '/assets/style.header.css', '.demo-frame-marker{display:block}' );
 
-$exampleSettings = \Nino\Design\Tokens::normalize( [ 'primary' => '#c81e2d', 'shaping' => 3 ] );
-$example = \Nino\Design\Preview::document( $appData, $exampleSettings, 'light' );
+$exampleSettings = \Nino\Modules\Design\Tokens::normalize( [ 'primary' => '#c81e2d', 'shaping' => 3 ] );
+$example = \Nino\Modules\Design\Preview::document( $appData, $exampleSettings, 'light' );
 
 check( 'the preview is a complete document, since it is delivered into a sandboxed frame', str_starts_with( $example, '<!doctype html>' )
 	&& str_contains( $example, '</head><body>' )
@@ -713,7 +715,7 @@ check( 'the tokens are the settings it was handed', str_contains( $example, '--n
 	its own it has stopped showing what a project gets and started showing
 	what /_design can draw, and a component the framework is missing gets
 	hidden behind a local copy instead of being noticed.	*/
-$exampleMarkup = (string) file_get_contents( __DIR__. '/../_design/templates/preview-example.tpl' );
+$exampleMarkup = (string) file_get_contents( __DIR__. '/../app/Nino/Modules/Design/templates/preview-example.tpl' );
 $frameworkCss  = (string) file_get_contents( __DIR__. '/../_nino/Nino.css' );
 
 preg_match_all( '/class="([^"]+)"/', $exampleMarkup, $exampleClasses );
@@ -738,12 +740,14 @@ check( 'no unresolved fill is left in a value', str_contains( $example, '[[' ) =
 foreach( [ 'nino-atf-title', 'nino-article', 'nino-section--dark', 'nino-alert--error' ] as $part )
 	check( 'the example is a page, not a specimen strip: '. $part, str_contains( $example, $part ) );
 
-/*	A delivery may ship without /_install, and then there are no frame units to
-	have. The example stands on its own, and the two rules a header unit would
-	have brought - the padding that keeps a fixed bar off the first heading, and
-	the row its nav links sit in - come from the scaffold instead.	*/
-check( 'without /_install the example stands on its own, and the scaffold stands in', str_contains( $example, 'body main{padding-top:' )
-	&& str_contains( $example, 'header .nino-nav-content ul{display:flex' ) );
+/*	The wizard's catalogue is at hand in a checkout, so the example is shown
+	inside the project's real header and footer units - the two rules the
+	scaffold would otherwise supply (the padding that keeps a fixed bar off
+	the first heading, the row its nav links sit in) are the unit's to decide
+	then, and stay out. A delivery without the wizard has no frames to have,
+	and the scaffold stands in (see Preview::scaffold()).	*/
+check( 'with the wizard at hand the example is wrapped in the project\'s real frames, and the scaffold stays out of their way', str_contains( $example, 'nino-frame-header' )
+	&& str_contains( $example, 'body main{padding-top:' ) === false );
 
 // A srcdoc frame fetches nothing, so the photographs travel as data - and a
 // grey placeholder is honest about being one
@@ -761,7 +765,7 @@ check( '...and every image in it is carried, not requested', $exampleImages[1] !
 	'@font-face{font-family:\'Demo\';src:local(\'Demo\'),url(\'[[/nino/public]]/fonts/demo.woff2\') format(\'woff2\')}'
 	. ':root{--color-primary:var(--nino-brand-safe)}.demo-theme-marker{color:red}' );
 
-$withFonts = \Nino\Design\Preview::document( $appData, $exampleSettings, 'light' );
+$withFonts = \Nino\Modules\Design\Preview::document( $appData, $exampleSettings, 'light' );
 
 check( 'a face the frame could never fetch is dropped rather than left to fail', str_contains( $withFonts, '@font-face' ) === false
 	&& str_contains( $withFonts, 'demo.woff2' ) === false );
@@ -778,7 +782,7 @@ check( '...without carrying the file into the document', str_contains( $withFont
 	. '@font-face{font-family:\'Up\';src:url(\'[[/nino/public]]/../../etc/passwd\')}'
 	. ':root{--color-primary:var(--nino-brand-safe)}.demo-theme-marker{color:red}' );
 
-$foreign = \Nino\Design\Preview::document( $appData, $exampleSettings, 'light' );
+$foreign = \Nino\Modules\Design\Preview::document( $appData, $exampleSettings, 'light' );
 
 check( 'a foreign url never reaches the document', str_contains( $foreign, '@font-face' ) === false
 	&& str_contains( $foreign, 'example.com' ) === false
@@ -789,12 +793,12 @@ check( 'a foreign url never reaches the document', str_contains( $foreign, '@fon
 // ...and back to the stylesheet the ordering check above reads
 \Nino\Filesystem::putFileContent( $appData, '/assets/style.theme.demo.css', ':root{--color-primary:var(--nino-brand-safe)}.demo-theme-marker{color:red}' );
 
-$dark = \Nino\Design\Preview::document( $appData, $exampleSettings, 'dark' );
+$dark = \Nino\Modules\Design\Preview::document( $appData, $exampleSettings, 'dark' );
 check( 'the mode is stamped on the document, since nothing can reach into the frame to do it', str_contains( $example, 'data-nino-mode="light"' )
 	&& str_contains( $dark, 'data-nino-mode="dark"' )
 	&& $dark !== $example );
 // Anything but 'dark' is light, same rule the rest of the class follows
-check( 'an unknown mode is light rather than a third state', \Nino\Design\Preview::document( $appData, $exampleSettings, '../etc' ) === $example );
+check( 'an unknown mode is light rather than a third state', \Nino\Modules\Design\Preview::document( $appData, $exampleSettings, '../etc' ) === $example );
 
 echo "\n";
 // --- Theme::write - the stylesheet and its place in the bundle ----------
@@ -803,12 +807,12 @@ echo "Theme::write / bundle\n";
 
 $appData['/nino/html/assets'] = [ '/.cache/style.css' => [ '/_nino/Nino.css', '/assets/style.theme.basis.css', '/assets/style.custom.css' ] ];
 
-check( 'writing succeeds', \Nino\Design\Design::write( $appData, \Nino\Design\Tokens::normalize( [ 'primary' => '#14595e' ] ) ) === true );
+check( 'writing succeeds', \Nino\Modules\Design::write( $appData, \Nino\Modules\Design\Tokens::normalize( [ 'primary' => '#14595e' ] ) ) === true );
 check( 'the stylesheet lands where a project file belongs', \Nino\Filesystem::fileExists( $appData, '/assets/style.design.css' ) === true );
 
 $written = (string) \Nino\Filesystem::getFileContent( $appData, '/assets/style.design.css', '' );
 check( 'it carries the generated palette', str_contains( $written, '--nino-brand:' ) && str_contains( $written, '--nino-on-danger:' ) );
-check( 'it says plainly that it is generated and will be overwritten', str_contains( $written, 'Generated by /_design' ) && str_contains( $written, 'Do not edit' ) );
+check( 'it says plainly that it is generated and will be overwritten', str_contains( $written, 'Generated by the Design panel' ) && str_contains( $written, 'Do not edit' ) );
 
 $bundle = $appData['/nino/html/assets']['/.cache/style.css'];
 check( 'it sits directly behind the framework stylesheet, ahead of everything that reads it', $bundle === [
@@ -818,7 +822,7 @@ check( 'it sits directly behind the framework stylesheet, ahead of everything th
 // grows, and the generated file has to keep its place without being counted in
 $appData['/nino/html/assets']['/.cache/style.css'] = [
 	'/_nino/Nino.css', '/assets/style.design.css', '/assets/style.header.v2.css', '/assets/style.theme.basis.css' ];
-\Nino\Design\Design::write( $appData, \Nino\Design\Tokens::normalize( [ 'primary' => '#8f2d56' ] ) );
+\Nino\Modules\Design::write( $appData, \Nino\Modules\Design\Tokens::normalize( [ 'primary' => '#8f2d56' ] ) );
 check( 'a second write does not add a second entry', $appData['/nino/html/assets']['/.cache/style.css'] === [
 	'/_nino/Nino.css', '/assets/style.design.css', '/assets/style.header.v2.css', '/assets/style.theme.basis.css' ] );
 
@@ -830,21 +834,21 @@ check( 'and the bundle entry is persisted with them', in_array( '/assets/style.d
 // Written twice: the file has to be replaced, not grown, and has to carry the
 // second set of settings rather than both
 $firstWrite = (string) \Nino\Filesystem::getFileContent( $appData, '/assets/style.design.css', '' );
-\Nino\Design\Design::write( $appData, \Nino\Design\Tokens::normalize( [ 'primary' => '#14595e' ] ) );
+\Nino\Modules\Design::write( $appData, \Nino\Modules\Design\Tokens::normalize( [ 'primary' => '#14595e' ] ) );
 $secondWrite = (string) \Nino\Filesystem::getFileContent( $appData, '/assets/style.design.css', '' );
 // Line for line rather than byte for byte: the scrim's alpha is a percent and
 // its colour three decimal channels, so two different brands legitimately
 // write two different lengths of the same stylesheet
 check( 'rewriting regenerates rather than appending', substr_count( $firstWrite, "\n" ) === substr_count( $secondWrite, "\n" )
 	&& $firstWrite !== $secondWrite
-	&& substr_count( $secondWrite, '/* Generated by /_design' ) === 1
+	&& substr_count( $secondWrite, '/* Generated by the Design panel' ) === 1
 	&& substr_count( $secondWrite, '--nino-space-1:' ) === 1 );
 
 // A hand-emptied bundle still has to end up with the generated file first,
 // since everything else reads from it
 $emptyBundle = $appData;
 $emptyBundle['/nino/html/assets'] = [ '/.cache/style.css' => [ '/assets/style.custom.css' ] ];
-check( 'with no framework stylesheet in the bundle it still leads', \Nino\Design\Design::bundle( $emptyBundle )['/.cache/style.css']
+check( 'with no framework stylesheet in the bundle it still leads', \Nino\Modules\Design::bundle( $emptyBundle )['/.cache/style.css']
 	=== [ '/assets/style.design.css', '/assets/style.custom.css' ] );
 
 echo "\n";
@@ -852,51 +856,68 @@ echo "\n";
 
 // --- the tool's own surface --------------------------------------------
 
-echo "Theme::init / guard\n";
+echo "Design panel / guard\n";
 
-check( 'the post-install tool owns appearance changes without loading the removable installer',
-	class_exists( '\\Nino\\Install\\Themes', false ) === false
-	&& is_dir( __DIR__. '/../_install/library/themes' ) === true );
+// The frame previews and the example's frames are the wizard's rendering of
+// a unit, borrowed on demand from wherever the workbench keeps the wizard
+check( 'the panel reads the wizard\'s catalogue and loads its renderer only when it needs one',
+	class_exists( '\\Nino\\Install\\Themes', false ) === true
+	&& \Nino\Modules\Design::library() === realpath( __DIR__. '/../_admin/install/library' )
+	&& is_dir( \Nino\Modules\Design::library(). '/themes' ) === true );
 
-$routes = $appData;
-\Nino\Design\Design::init( $routes );
-check( 'the tool owns its routes', ( $routes['/nino/http/routes']['GET://_design']['uri'] ?? '' ) === '/_design'
-	&& ( $routes['/nino/http/routes']['POST://_design']['uri'] ?? '' ) === '/_design' );
+$registry = \Nino\Admin\Admin::panels( $appData );
+check( 'the module contributes the Design panel to the workbench, with its own template and files', ( $registry['design']['class'] ?? null ) === \Nino\Modules\Design\Admin::class
+	&& $registry['design']['template'] === '/app/Nino/Modules/Design/templates/panel'
+	&& $registry['design']['assets'] === [ '/app/Nino/Modules/Design/assets/design.js', '/app/Nino/Modules/Design/assets/style.css' ]
+	&& $registry['design']['group'] === 'structure'
+	&& str_starts_with( $registry['design']['icon'], '<svg' ) === true );
+$actions = \Nino\Admin\Admin::actions( $appData );
+check( 'every action of the panel reaches the workbench dispatcher under its own name', array_diff( [ 'appearance/read', 'theme/apply', 'frame/preview', 'frame/apply', 'design/read', 'design/preview', 'design/save' ], array_keys( $actions ) ) === []
+	&& $actions['design/save'] === [ \Nino\Modules\Design\Admin::class, 'apiSave' ] );
+check( 'with the module off, the panel and its actions are gone', ( static function() use ( $appData ): bool {
+	$without = $appData;
+	$without['/nino/modules'] = array_values( array_diff( $without['/nino/modules'], [ '\\Nino\\Modules\\Design' ] ) );
+	return isset( \Nino\Admin\Admin::panels( $without )['design'] ) === false && isset( \Nino\Admin\Admin::actions( $without )['design/save'] ) === false;
+} )() );
 
-$authenticatedPage = (string) file_get_contents( __DIR__. '/../_design/templates/page-index.tpl' );
-check( 'the authenticated page carries the CSRF field its POST API needs', substr_count( $authenticatedPage, '[csrf]' ) === 1 );
+$panelMarkup = (string) file_get_contents( __DIR__. '/../app/Nino/Modules/Design/templates/panel.tpl' );
+check( 'the panel is a fragment the workbench renders into its pane - the CSRF field is the page\'s', str_contains( $panelMarkup, '<html' ) === false
+	&& str_contains( $panelMarkup, '[csrf]' ) === false
+	&& str_contains( $panelMarkup, 'id="theme-page-wrap"' ) === true
+	&& substr_count( (string) file_get_contents( __DIR__. '/../_admin/templates/page-index.tpl' ), '[csrf]' ) === 1 );
 
 $anonymous = response();
-check( 'guard rejects an unauthenticated request', \Nino\Design\Design::guard( $appData, $anonymous ) === false
+check( 'guard rejects an unauthenticated request', \Nino\Modules\Design\Admin::guard( $appData, $anonymous ) === false
 	&& $anonymous['/nino/http/response']['statusCode'] === 401 );
 
 foreach( [ 'appearance/read', 'theme/apply', 'frame/preview', 'frame/apply', 'design/read', 'design/preview', 'design/save' ] as $action ) {
 	$request = response();
 	$_POST = [ 'action' => $action, 'data' => '{}' ];
-	\Nino\Design\Design::handlePost( $appData, $request );
+	\Nino\Admin\Admin::handlePost( $appData, $request );
 	check( $action. ' requires an authed session of its own', $request['/nino/http/response']['statusCode'] === 401 );
 }
 
-\Nino\Runtime::setSessionValue( $appData, './nino/admin/authed', true );
+\Nino\Auth::insertUser( $appData, 'dev@example.com', 'correct horse battery staple', [ '/*' ] );
+\Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );
 
 $appearance = response();
 $_POST = [ 'action' => 'appearance/read', 'data' => '{}' ];
-\Nino\Design\Design::handlePost( $appData, $appearance );
+\Nino\Admin\Admin::handlePost( $appData, $appearance );
 $appearanceBody = $appearance['/nino/http/response']['body'] ?? [];
 
 $badTheme = response();
 $_POST = [ 'action' => 'theme/apply', 'data' => json_encode( [ 'theme' => '../basis' ] ) ];
-\Nino\Design\Design::handlePost( $appData, $badTheme );
+\Nino\Admin\Admin::handlePost( $appData, $badTheme );
 check( 'a Theme key cannot leave the shared catalogue', $badTheme['/nino/http/response']['statusCode'] === 400 );
 
 $badFrame = response();
 $_POST = [ 'action' => 'frame/apply', 'data' => json_encode( [ 'kind' => 'header', 'frame' => '../v1' ] ) ];
-\Nino\Design\Design::handlePost( $appData, $badFrame );
+\Nino\Admin\Admin::handlePost( $appData, $badFrame );
 check( 'a frame key cannot leave its kind catalogue', $badFrame['/nino/http/response']['statusCode'] === 400 );
 
 $themeApply = response();
 $_POST = [ 'action' => 'theme/apply', 'data' => json_encode( [ 'theme' => 'basis' ] ) ];
-\Nino\Design\Design::handlePost( $appData, $themeApply );
+\Nino\Admin\Admin::handlePost( $appData, $themeApply );
 $afterTheme = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
 
 check( 'Theme applies the manifest as one complete baseline', $themeApply['/nino/http/response']['statusCode'] === 200
@@ -907,7 +928,7 @@ check( 'Theme applies the manifest as one complete baseline', $themeApply['/nino
 
 $designSave = response();
 $_POST = [ 'action' => 'design/save', 'data' => json_encode( [ 'primary' => '#14595e', 'spacing' => 1, 'measure' => 3 ] ) ];
-\Nino\Design\Design::handlePost( $appData, $designSave );
+\Nino\Admin\Admin::handlePost( $appData, $designSave );
 $afterDesign = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
 
 check( 'Design changes only its generated values, not Theme or either frame', ( $afterDesign['/nino/design/settings']['primary'] ?? '' ) === '#14595e'
@@ -929,11 +950,11 @@ $appData['/nino/locales/textfiles'] = '/text';
 ] );
 
 $_POST = [ 'action' => 'frame/preview', 'data' => json_encode( [ 'kind' => 'header', 'frame' => 'v3', 'theme' => 'basis' ] ) ];
-\Nino\Design\Design::handlePost( $appData, $framePreview );
+\Nino\Admin\Admin::handlePost( $appData, $framePreview );
 
 $frameApply = response();
 $_POST = [ 'action' => 'frame/apply', 'data' => json_encode( [ 'kind' => 'header', 'frame' => 'v3' ] ) ];
-\Nino\Design\Design::handlePost( $appData, $frameApply );
+\Nino\Admin\Admin::handlePost( $appData, $frameApply );
 $afterFrame = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
 
 check( 'a Header apply changes only Header and preserves the settled Theme, Design and Footer',
@@ -944,8 +965,8 @@ check( 'a Header apply changes only Header and preserves the settled Theme, Desi
 
 $unknown = response();
 $_POST = [ 'action' => 'design/../../etc', 'data' => '{}' ];
-\Nino\Design\Design::handlePost( $appData, $unknown );
-check( 'an unknown action is refused before anything else happens', $unknown['/nino/http/response']['statusCode'] === 400 );
+\Nino\Admin\Admin::handlePost( $appData, $unknown );
+check( 'an unknown action is refused before anything else happens', $unknown['/nino/http/response']['statusCode'] === 404 );
 
 echo "\n". $checks. ' checks, '. $failures. " failed\n";
 

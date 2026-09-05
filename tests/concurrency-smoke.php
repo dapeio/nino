@@ -20,7 +20,7 @@ declare(strict_types=1);
  */
 
 require __DIR__. '/../_nino/Nino.php';
-require __DIR__. '/../_editor/Editor.php';
+require __DIR__. '/../_admin/Admin.php';
 
 const ROUNDS = 50;
 
@@ -100,9 +100,9 @@ function runElementWorker( string $sandbox, string $prefix ): void {
 function runBackupWorker( string $sandbox ): void {
 
 	$appData = bootAppData( $sandbox );
-	$appData['/nino/editor/backups'] = true;
+	$appData['/nino/admin/backups'] = true;
 
-	\Nino\Editor\Backup::maybeRun( $appData );
+	\Nino\Modules\Backups::maybeRun( $appData );
 }
 
 /**

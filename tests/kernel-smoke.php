@@ -867,6 +867,28 @@ check( 'a truthy non-string in perms grants nothing', \Nino\Auth::checkPermissio
 
 \Nino\Auth::deleteUser( $appData, 'perms@example.com' );
 
+// Roles: a named set of permissions under '/nino/auth/roles' an account
+// holds one of - what it may do is its own permissions plus the role's
+$appData['/nino/auth/roles'] = [ 'section' => [ 'label' => 'Section', 'perms' => [ '/section/*', 42 ] ] ];
+check( 'insertUser refuses a role the config does not have', \Nino\Auth::insertUser( $appData, 'role@example.com', 'correct horse battery staple', [], 'nope' ) === false && \Nino\Auth::getUser( $appData, 'role@example.com' ) === false );
+check( 'insertUser stores a known role', \Nino\Auth::insertUser( $appData, 'role@example.com', 'correct horse battery staple', [ '/own/thing' ], 'section' ) === true && \Nino\Auth::getUser( $appData, 'role@example.com' )['role'] === 'section' );
+check( 'permissions() is the account\'s own plus the role\'s, strings only', \Nino\Auth::permissions( $appData, \Nino\Auth::getUser( $appData, 'role@example.com' ) ) === [ '/own/thing', '/section/*' ] );
+check( 'checkPermission grants through the role', \Nino\Auth::checkPermission( $appData, '/section/thing/manage', 'role@example.com' ) === true );
+check( 'setRole refuses an unknown role and an unknown account', \Nino\Auth::setRole( $appData, 'role@example.com', 'nope' ) === false && \Nino\Auth::setRole( $appData, 'nobody@example.com', 'section' ) === false && \Nino\Auth::getUser( $appData, 'role@example.com' )['role'] === 'section' );
+check( 'setRole to none takes the role\'s permissions away, the own ones stay', \Nino\Auth::setRole( $appData, 'role@example.com', '' ) === true && \Nino\Auth::checkPermission( $appData, '/section/thing/manage', 'role@example.com' ) === false && \Nino\Auth::checkPermission( $appData, '/own/thing', 'role@example.com' ) === true );
+\Nino\Auth::setRole( $appData, 'role@example.com', 'section' );
+check( 'the role is persisted with the account', \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/auth/user']['role@example.com']['role'] === 'section' );
+unset( $appData['/nino/auth/roles']['section'] );
+check( 'a role the config no longer has grants nothing', \Nino\Auth::checkPermission( $appData, '/section/thing/manage', 'role@example.com' ) === false );
+$appData['/nino/auth/roles']['section'] = [ 'label' => 'Section', 'perms' => [ '/section/*' ] ];
+\Nino\Auth::loginUser( $appData, 'role@example.com', 'correct horse battery staple' );
+check( 'the signed-in account holds its role\'s permissions', \Nino\Auth::checkPermission( $appData, '/section/thing/manage' ) === true );
+\Nino\Auth::setRole( $appData, 'role@example.com', '' );
+check( 'a role changed on the signed-in account applies to the very request that changed it', \Nino\Auth::checkPermission( $appData, '/section/thing/manage' ) === false );
+\Nino\Auth::logoutUser( $appData );
+\Nino\Auth::deleteUser( $appData, 'role@example.com' );
+$appData['/nino/auth/roles'] = [];
+
 echo "\n";
 
 
@@ -1177,7 +1199,7 @@ check( 'neither rejected submission created the form data file', is_file( \Nino\
 
 $okRequest = submitForm( $appData, [ 'name' => 'Jo Client', 'email' => 'jo@example.com', 'message' => "Line one\nLine two", 'cat' => 'General' ] );
 check( 'a valid submission succeeds (200)', $okRequest['/nino/http/response']['statusCode'] === 200 );
-check( 'a valid submission bootstraps the data dir on the private root, not under _editor', is_dir( \Nino\Filesystem::path( $appData, '/data' ) ) === true && is_dir( \Nino\Filesystem::getPath( $appData ). '/_editor/data' ) === false );
+check( 'a valid submission bootstraps the data dir on the private root, not under _editor', is_dir( \Nino\Filesystem::path( $appData, '/data' ) ) === true && is_dir( \Nino\Filesystem::getPath( $appData ). '/_admin/data' ) === false );
 
 $formsDir 	= \Nino\Filesystem::path( $appData, '/data' );
 $monthFile 	= $formsDir. '/forms.'. date( 'Y-m' ). '.php';
@@ -1247,7 +1269,7 @@ check( 'a csrf-blocked signup does not create the newsletter file', is_file( \Ni
 $okNewsletterRequest = submitNewsletter( $appData, [ 'email' => 'jo@example.com' ] );
 check( 'a valid signup succeeds (200)', $okNewsletterRequest['/nino/http/response']['statusCode'] === 200 );
 check( 'a valid new signup reports the generic status', $okNewsletterRequest['/nino/http/response']['body']['status'] === 'ok' );
-check( 'a valid signup bootstraps the newsletter file on the private root, not under _editor', is_file( \Nino\Filesystem::path( $appData, '/data/newsletter.php' ) ) === true && is_dir( \Nino\Filesystem::getPath( $appData ). '/_editor/data' ) === false );
+check( 'a valid signup bootstraps the newsletter file on the private root, not under _editor', is_file( \Nino\Filesystem::path( $appData, '/data/newsletter.php' ) ) === true && is_dir( \Nino\Filesystem::getPath( $appData ). '/_admin/data' ) === false );
 
 $subscribersPath 	= '/data/newsletter.php';
 $subscribersFile 	= \Nino\Filesystem::path( $appData, $subscribersPath );
@@ -1300,7 +1322,7 @@ check( 'an unsubscribe link with the subscriber\'s token answers 200', $unsubscr
 check( 'and removes the entry from the list', count( \Nino\Filesystem::getFileContent( $appData, $subscribersPath, [] ) ) === 0 );
 check( 'and prepares the "unsubscribed" page fills', ( $appData['./nino/html/fills']['*']['[[/newsletter/page/title]]'] ?? '' ) === '[[/newsletter/page/unsubscribed/title]]' );
 
-// Dev\Restore::_mergeNewsletterRestore() relies on this record surviving
+// Modules\Newsletter::callbackRestore() relies on this record surviving
 // every unsubscribe - see its own test in dev-smoke.php for the restore side.
 // A sha256 of the address, not the address itself - see
 // \Nino\Modules\Newsletter's own REMOVED_PATH docblock for why
@@ -1413,7 +1435,7 @@ echo "Http::request/response - header composition, csp, locale redirects\n";
 $appData['/nino/http/routes'] = [
 	'GET://' 						=> [ 'uri' => '/home', 'body' => '' ],
 	'GET://rechtliches'	=> [ 'uri' => '/legal', 'body' => '', 'locale' => 'de_DE' ],
-	// statusCode mirrors a route like GET://_editor declaring its own status -
+	// statusCode mirrors a route like GET://_admin declaring its own status -
 	// exactly the shape that used to swallow the locale-switch redirect below
 	'GET://legal'				=> [ 'uri' => '/legal', 'body' => '', 'locale' => 'en_US', 'statusCode' => 201 ],
 	'GET://robots.txt'	=> [ 'uri' => '/robots.txt', 'body' => '', 'header' => [ 'Content-Type' => 'text/plain; charset=utf-8' ] ],
@@ -1692,6 +1714,31 @@ unset( $appData['/nino/modules'] );
 \Nino\Modules::callModules( $appData, 'init' );
 check( 'callModules() does not warn/crash when /nino/modules is entirely unset', true );
 
+// Modules::collect() - the read-only twin: every active module answers one
+// question, the answers are merged in module order, and a module without
+// the method contributes nothing rather than failing the call
+$collectDummyDir = $appDummyRoot. '/DummyCollect';
+mkdir( $collectDummyDir, 0777, true );
+file_put_contents( $collectDummyDir. '/DummyCollect.php', <<<'PHP'
+<?php
+declare(strict_types=1);
+namespace KernelSmokeDummyModules {
+	class DummyCollect {
+		public static function adminPanels( array &$appData ): array {
+			return [ 'DummyCollectPanelA', 'DummyCollectPanelB' ];
+		}
+	}
+}
+PHP
+);
+
+$appData['/nino/modules'] = [ 'KernelSmokeDummyModules\DummyCallModulesFix', '\\KernelSmokeDummyModules\\DummyCollect', '\\KernelSmokeDummyModules\\DummyCollect' ];
+check( 'collect() merges every module\'s answer in module order and skips modules without the method', \Nino\Modules::collect( $appData, 'adminPanels' ) === [ 'DummyCollectPanelA', 'DummyCollectPanelB', 'DummyCollectPanelA', 'DummyCollectPanelB' ] );
+check( 'collect() answers an empty list for a question no module implements', \Nino\Modules::collect( $appData, 'somethingNobodyImplements' ) === [] );
+
+unset( $appData['/nino/modules'] );
+check( 'collect() answers an empty list when /nino/modules is entirely unset', \Nino\Modules::collect( $appData, 'adminPanels' ) === [] );
+
 // A second project class is never listed in '/nino/modules': activation and
 // class existence are independent, so a direct reference has to autoload it.
 $directDummyDir = $appDummyRoot. '/DummyDirectAutoload';
@@ -1710,6 +1757,14 @@ PHP
 );
 
 check( 'a project class in app/ autoloads on a direct reference without going through callModules()', \KernelSmokeDummyModules\DummyDirectAutoload::ping() === 'pong' );
+
+/*	The one namespace both roots serve: Nino\Modules\* is looked for below
+	_nino/ first, then below the application root - which is where the
+	optional modules (Form, Newsletter, Navigation, Search, Localepicker,
+	Design, Templates) are delivered, so a project drops the ones it does
+	not want and updates the ones it keeps itself.	*/
+check( 'an optional module below app/Nino/Modules/ autoloads through the Nino\Modules namespace', class_exists( '\Nino\Modules\Search' ) === true
+	&& class_exists( '\Nino\Modules\Navigation\Admin' ) === true );
 
 /*	A class outside Nino\ resolves against the application root and nowhere
 	else. _nino/ is not a second place to look: that is what keeps the kernel
@@ -1858,12 +1913,12 @@ function runIsolated( string $body, string $beforeRequire = '' ): array {
 }
 
 $invalidContentDir = runIsolated( '
-	define( "NINO_CONTENT_DIR", "/definitely/not/a/nino-private-directory" );
+	define( "NINO_PRIVATE_DIR", "/definitely/not/a/nino-private-directory" );
 	echo "before\n";
 	\Nino\init();
 	echo "after\n";
 ' );
-check( 'an invalid NINO_CONTENT_DIR fails before boot instead of falling back elsewhere', trim( $invalidContentDir['stdout'] ) === 'before' && $invalidContentDir['exitCode'] !== 0 );
+check( 'an invalid NINO_PRIVATE_DIR fails before boot instead of falling back elsewhere', trim( $invalidContentDir['stdout'] ) === 'before' && $invalidContentDir['exitCode'] !== 0 );
 
 /*	Booting with no project at all. The checkout itself is that case now -
 	it ships no private/config.php - so these run against the real root.
@@ -1881,7 +1936,7 @@ $noProject = runIsolated( '
 ' );
 /*	Judged by what stopped running, not by the exit code: this failure lands
 	*after* Runtime::init() has installed Nino's own handler, which answers
-	with a 500 header and a bare exit() - status 0. The NINO_CONTENT_DIR case
+	with a 500 header and a bare exit() - status 0. The NINO_PRIVATE_DIR case
 	above fails one step earlier, before the handler exists, so php's own
 	fatal handling gives it a non-zero code. Both stop; only one can say so
 	in $?.	*/
@@ -2063,7 +2118,7 @@ foreach( [ '/images/hero.jpg', '/fonts/text.woff2', '/.cache/script.js' ] as $pu
 check( 'the asset sources are private, the bundle they build is not', \Nino\Filesystem::path( $pathAppData, '/assets/style.custom.css' ) === '/srv/site/private/assets/style.custom.css'
 	&& \Nino\Filesystem::path( $pathAppData, '/.cache/style.css' ) === '/srv/site/public/.cache/style.css' );
 
-check( 'tool code stays on the project root', \Nino\Filesystem::path( $pathAppData, '/_editor/x' ) === '/srv/site/_editor/x' );
+check( 'tool code stays on the project root', \Nino\Filesystem::path( $pathAppData, '/_admin/x' ) === '/srv/site/_admin/x' );
 
 foreach( \Nino\Filesystem::PRIVATE_DIRS as $private )
 	check( "$private resolves against the private root", \Nino\Filesystem::path( $pathAppData, $private ) === '/srv/site/private'. $private );
@@ -2093,17 +2148,17 @@ check( 'NINO_CONFIG_DIR still wins for config.php alone', \Nino\Filesystem::path
 
 // --- and the url side, which has to split exactly the same way ----------
 //
-// A tool bundles its own login css into /_editor/.cache/ - that is code
+// A tool bundles its own login css into /_admin/.cache/ - that is code
 // shipped with the tool, not this project's public content. Giving every
-// /.cache path the public prefix pointed /_editor's stylesheet and login
-// script at /public/_editor/.cache/... and left the login page unstyled
+// /.cache path the public prefix pointed /_admin's stylesheet and login
+// script at /public/_admin/.cache/... and left the login page unstyled
 // with its script 404ing, which no unit assertion here noticed
 $pathAppData['./nino/filesystem/publicpath'] = '/srv/site/public';
 $pathAppData['/nino/dir'] = '';
 
 check( 'public content is reached under the public prefix', \Nino\Filesystem::url( $pathAppData, '/images/hero.jpg' ) === '/public/images/hero.jpg' );
 check( '...including the generated bundle', \Nino\Filesystem::url( $pathAppData, '/.cache/style.css' ) === '/public/.cache/style.css' );
-check( "a tool's own bundle keeps resolving next to the tool", \Nino\Filesystem::url( $pathAppData, '/_editor/.cache/login.js' ) === '/_editor/.cache/login.js' );
+check( "a tool's own bundle keeps resolving next to the tool", \Nino\Filesystem::url( $pathAppData, '/_admin/.cache/login.js' ) === '/_admin/.cache/login.js' );
 check( '...and so does any other tool file', \Nino\Filesystem::url( $pathAppData, '/_admin/assets/script.js' ) === '/_admin/assets/script.js' );
 
 /*	The two lists have to stay disjoint or path() answers whichever it tests
@@ -2132,7 +2187,7 @@ echo "router.php - the private root is never served\n";
 // them back at their new path. The dev server applies no .htaccess at all,
 // so router.php has to refuse /private itself - a plain request for
 // /private/templates/page-home.tpl returned the full template source until
-// it did. Production has private/.htaccess (and NINO_CONTENT_DIR for a
+// it did. Production has private/.htaccess (and NINO_PRIVATE_DIR for a
 // setup that cannot rely on it), see docs/deployment.md
 $routerSource = file_get_contents( __DIR__. '/../router.php' );
 
@@ -2140,20 +2195,20 @@ check( 'router.php refuses the private root', str_contains( $routerSource, '#^/p
 check( '...before it ever looks for a static file', strpos( $routerSource, '/private' ) < strpos( $routerSource, 'is_file( __DIR__. $uri )' ) );
 
 check( 'the shared appearance library exposes only its deliberate theme previews',
-	str_contains( $routerSource, '#^/_install/library(?:/|$)#' ) === true
-	&& str_contains( $routerSource, '#^/_install/library/themes/[a-z0-9][a-z0-9-]*/preview\\.svg$#' ) === true );
-check( '...and refuses its source before static-file delivery', strpos( $routerSource, '#^/_install/library(?:/|$)#' ) < strpos( $routerSource, 'is_file( __DIR__. $uri )' ) );
+	str_contains( $routerSource, '#^/_admin/install/library(?:/|$)#' ) === true
+	&& str_contains( $routerSource, '#^/_admin/install/library/themes/[a-z0-9][a-z0-9-]*/preview\\.svg$#' ) === true );
+check( '...and refuses its source before static-file delivery', strpos( $routerSource, '#^/_admin/install/library(?:/|$)#' ) < strpos( $routerSource, 'is_file( __DIR__. $uri )' ) );
 
 /*	A checkout ships no private directory at all - it is one installation's
 	own state, not repository content. The wizard creates it and brings the
-	deny rule that protects it (see _install/library/base), so what has to
+	deny rule that protects it (see _admin/install/library/base), so what has to
 	hold here is that the rule exists to be brought.	*/
 check( 'a checkout ships no private directory - the wizard creates it', is_dir( __DIR__. '/../private' ) === false );
 check( '...and the deny rule that protects it travels with the installer', str_contains(
-	(string) @file_get_contents( __DIR__. '/../_install/library/base/private/.htaccess' ), 'Require all denied'
+	(string) @file_get_contents( __DIR__. '/../_admin/install/library/base/private/.htaccess' ), 'Require all denied'
 ) === true );
 check( 'the shared appearance library ships the matching Apache protection', str_contains(
-	(string) @file_get_contents( __DIR__. '/../_install/library/.htaccess' ), '^(?!preview\\.svg$)'
+	(string) @file_get_contents( __DIR__. '/../_admin/install/library/.htaccess' ), '^(?!preview\\.svg$)'
 ) === true );
 
 // Nothing private may sit in the public root of a fresh checkout
@@ -2212,7 +2267,7 @@ foreach( [
 	'a redirect' 										=> [ cacheRequest( '/home', 'GET', [ 'header' => [ 'Location' => '/other' ] ] ), [] ],
 	'a json body' 									=> [ cacheRequest( '/home', 'GET', [ 'body' => [ 'ok' => true ] ] ), [] ],
 	'an empty body' 								=> [ cacheRequest( '/home', 'GET', [ 'body' => '' ] ), [] ],
-	'a tool uri' 										=> [ cacheRequest( '/_editor' ), [] ],
+	'a tool uri' 										=> [ cacheRequest( '/_admin' ), [] ],
 	'a module endpoint' 						=> [ cacheRequest( '/.newsletter' ), [] ],
 ] as $label => $case ) {
 	\Nino\Modules\Cache::_invalidate( $appData );
@@ -2302,7 +2357,7 @@ check( '...and the locale it rendered in, which serving has to re-apply', ( $ent
 
 // --- a write through a tool drops everything ------------------------------
 
-foreach( [ '/_admin', '/_editor', '/_templates', '/_install' ] as $tool ) {
+foreach( [ '/_admin' ] as $tool ) {
 	\Nino\Modules\Cache::_invalidate( $appData );
 	$seed = cacheRequest( '/home' );
 	\Nino\Modules\Cache::callbackOutput( $appData, $seed );

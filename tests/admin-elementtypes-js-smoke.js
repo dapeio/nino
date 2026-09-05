@@ -4,7 +4,7 @@
  *											Types editor's field-order handling. A field's
  *											position in the model is not cosmetic: it is the
  *											order every element form renders that type's
- *											fields in (see _admin/assets/elements.js's
+ *											fields in (see _admin/Nino/Modules/Elements/assets/admin.js's
  *											_globalKeys/_localeKeys, built from the model's
  *											own key order), and it survives all the way into
  *											the type file - tests/admin-smoke.php pins the
@@ -49,7 +49,7 @@ sandbox.Nino = {
 };
 
 vm.runInContext(
-	fs.readFileSync( path.join( __dirname, '../_admin/assets/elementtypes.js' ), 'utf8' ),
+	fs.readFileSync( path.join( __dirname, '../_admin/Nino/Modules/Elements/assets/types.js' ), 'utf8' ),
 	vm.createContext( sandbox ),
 	{ filename : 'elementtypes.js' }
 );
@@ -184,7 +184,7 @@ check( 'a reference left single says so rather than saying nothing', multiBuilt.
 // Whether a type names its elements or numbers them is a property of the type,
 // so it is set here rather than per element. Source-level: _renderForm() is a
 // dom branch this sandbox cannot reach.
-const typesSource = fs.readFileSync( path.join( __dirname, '../_admin/assets/elementtypes.js' ), 'utf8' );
+const typesSource = fs.readFileSync( path.join( __dirname, '../_admin/Nino/Modules/Elements/assets/types.js' ), 'utf8' );
 
 check( 'the type editor offers the numbering option through the shared switch',
 	typesSource.includes('Nino.adminUi.switchField(') && typesSource.includes("key \t\t\t: 'autoincrement'") );
@@ -192,8 +192,14 @@ check( 'the type editor offers the numbering option through the shared switch',
 // reach, so its two controls are pinned at source level the same way
 check( 'the element branch offers a "several elements" checkbox and a cap',
 	typesSource.includes("className = 'admin-field-multiple'") && typesSource.includes("className = 'admin-field-multiple-max'") );
+// The words are a fill, and a panel's fills travel with its module (see
+// text() in the panel contract), so the wording is checked where it lives -
+// _admin/Nino/Modules/Elements/text/ - and the script is checked for asking
+// for it
+const enFills = require('fs').readFileSync( require('path').join( __dirname, '../_admin/Nino/Modules/Elements/text/en_US.php' ), 'utf8' );
 check( '...whose placeholder says what 0 means instead of leaving it to be guessed',
-	/placeholder = '[^']*0 = unlimited/.test( typesSource ) );
+	typesSource.includes( "maxInput.placeholder = Nino.content.getText('/_admin/types/placeholder/max')" )
+	&& /placeholder\/max\]\]'\s*=> '[^']*0 = unlimited/.test( enFills ) );
 // A cap of 0 is falsy, so a truthiness test would render the box unchecked on
 // exactly the unlimited lists it is meant to show as on
 check( 'the checkbox reads the stored int rather than its truthiness',
@@ -204,7 +210,62 @@ check( 'both save paths send it, so it is not silently dropped on create',
 check( 'the form is told the current setting rather than defaulting to off',
 	/_renderForm\( response\.title, response\.autoincrement === true/.test( typesSource ) === true );
 check( 'and says that existing elements keep their uris',
-	typesSource.includes('Existing elements keep the uris they have') );
+	typesSource.includes( "Nino.content.getText('/_admin/types/hint/numbering-existing')" )
+	&& enFills.includes( 'Existing elements keep the uris they have' ) );
+
+
+// --- deleting a type ------------------------------------------------------
+//
+// The one control in this module that destroys content: the type file, every
+// element in it and the images those elements hold. It is offered because
+// doing it by hand is the same removal with none of the checks - but it is
+// only ever reached by typing the type's own uri, and _delete() re-checks
+// that before it posts, so a caller that bypasses the disabled button still
+// gets nowhere.
+
+sandbox.Nino.content = { getText : function( key ) { return key } };
+
+const deleteControls = {};
+sandbox.document.getElementById = function( id ) { return deleteControls[id] ?? null };
+
+let posted = null;
+elementTypes._apiCall = function( endpoint, payload ) { posted = { endpoint : endpoint, payload : payload } };
+
+elementTypes._currentUri = 'services';
+deleteControls['admin-form-delete-confirm'] = { value : 'servces' };
+deleteControls['admin-form-delete-msg'] 		= { textContent : '' };
+
+elementTypes._delete();
+check( 'a mistyped confirmation posts nothing at all', posted === null );
+
+deleteControls['admin-form-delete-confirm'].value = ' services ';
+elementTypes._delete();
+check( 'the typed uri is what unlocks the request', posted !== null && posted.endpoint === 'delete' );
+check( '...and travels with it, so the server can re-check it', posted !== null && posted.payload.uri === 'services' && posted.payload.confirm === 'services' );
+
+// Nothing to post against once the uri is gone - the form is showing a type
+// that no longer exists, and the list is where it goes back to
+posted = null;
+elementTypes._currentUri = null;
+elementTypes._delete();
+check( 'a form with no type open cannot delete anything', posted === null );
+
+check( 'the delete button starts disabled and is unlocked by the input',
+	typesSource.includes( 'delBtn.disabled = true' )
+	&& /delBtn\.disabled = \( confirmInput\.value\.trim\(\) !== uri \)/.test( typesSource ) );
+// A type another type's element field points at is not offered the control at
+// all: the server refuses it (see Types::apiDelete()), so offering a button
+// that can only fail would be a lie about what is possible
+check( 'a referenced type is told why instead of being offered the button',
+	typesSource.includes( "Nino.content.getText('/_admin/types/hint/delete-referenced')" )
+	&& /_referencedBy\.length > 0 \)\s*\{[\s\S]*?return wrap;/.test( typesSource ) );
+check( 'the cost is named before the click, not after',
+	typesSource.includes( "Nino.content.getText('/_admin/types/hint/delete')" )
+	&& /hint\/delete\]\]'\s*=> '[^']*no undo/.test( enFills ) );
+// Only on a saved type: a form that has never been saved has no file to remove
+check( 'the danger zone is not rendered while creating a new type',
+	/_isNew === false \)\s*\n\s*form\.appendChild\( Nino\.admin\.elementTypes\._renderDangerZone\(\) \);/.test( typesSource ) );
+
 
 console.log( '\n'+ checks+ ' checks, '+ failures+ ' failed' );
 process.exitCode = failures === 0 ? 0 : 1;

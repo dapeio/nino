@@ -37,49 +37,30 @@ Das Frontend entsteht aus einfachen HTML-basierten Templates, Textfills, Shortco
 
 Das mitgelieferte Design-System mit Basiskomponenten und Modulen bietet einen schnellen Ausgangspunkt für klassische Webseiten. Mehrsprachige Inhalte, Responsive Design, Performance und Sicherheit bleiben dabei Teil des Projekts.
 
-### `/_install` – der schnelle Einstieg zum Projekt
+### `/_admin` – die Workbench
+
+![Textfill-Übersicht in der Nino-Workbench](docs/assets/screenshots/_admin1.webp)
+
+Eine Verwaltungsoberfläche mit einer Anmeldung. Entwickler richten das Projekt hier ein und bauen Struktur und Erscheinungsbild; Redakteure pflegen hier die Inhalte. Jeder Bildschirm ist ein Panel, gruppiert in **Inhalt** (Elemente, Texte, Bilder, Anfragen, Newsletter, Log), **Struktur** (Templates, Design, Routen, Navigationen) und **System** (Nutzer und Rollen, Sprachen und Übersetzungen, Backups, Konfiguration, Suche); die Form der Inhalte – Elementtypen, Textschlüssel, Bildplätze – liegt auf Tabs daneben. Ein Konto hält eine Rolle, eine Rolle eine Berechtigung je Panel oder Tab; der Assistent schreibt Editor und Developer, und ein Panel, das ein Konto nicht verwenden darf, wird nicht gerendert.
+
+Die Workbench bietet vollständigen Zugriff für Entwicklung, Diagnose und Korrekturen und eine schmale, berechtigungsgesteuerte Oberfläche für die tägliche redaktionelle Arbeit. Alle Änderungen lassen sich alternativ direkt im Dateisystem vornehmen. `/_admin/recovery.php` ist der Weg zurück, wenn die Konten selbst kaputt sind.
+
+#### Der Einrichtungsassistent – der schnelle Einstieg zum Projekt
 
 <a href="docs/assets/screenshots/_install1.webp" target="_blank">
   <img src="docs/assets/screenshots/_install1.webp"
-       alt="Routenkonfiguration im Nino-Installer"
+       alt="Routenkonfiguration im Nino-Einrichtungsassistenten"
        width="49%">
 </a>
 <a href="docs/assets/screenshots/_install2.webp" target="_blank">
   <img src="docs/assets/screenshots/_install2.webp"
-       alt="Abschlussansicht des Nino-Installers"
+       alt="Abschlussansicht des Nino-Einrichtungsassistenten"
        width="49%">
 </a>
 
-Jeder frische Checkout wird über `/_install` eingerichtet. Der Assistent prüft die Umgebung, führt durch Sprachen, Module und Theme, übernimmt die benötigten Assets, legt erste Seiten und Basisinformationen an und erstellt die Zugänge für `/_editor` und `/_admin`.
+Jeder frische Checkout wird über den Assistenten eingerichtet – das, was `/_admin` zeigt, bis er abgeschlossen ist. Er prüft die Umgebung, führt durch Sprachen, Module, Theme, Header, Footer und Design, übernimmt die benötigten Assets, legt erste Seiten und Basisinformationen an, erstellt die ersten Entwicklerkonten und setzt das Recovery-Passwort. Danach sperrt er sich selbst aus, und `_admin/install/` kann aus einer Produktivauslieferung entfernt werden.
 
-Danach kann der Entwickler direkt mit dem Projekt beginnen.
-
-### `/_admin` – optional: die GUI für Entwickler
-
-![Textfill-Übersicht in Nino Admin](docs/assets/screenshots/_admin1.webp)
-
-In `/_admin` verwaltet der Entwickler die technische und inhaltliche Struktur der Webseite: Elementtypen, Elemente und Texte, Bilder, Seiten und Routen, Benutzer sowie die Konfiguration.
-
-Die Oberfläche bietet vollständigen Zugriff für Entwicklung, Diagnose und Korrekturen und bleibt deshalb einem separaten technischen Zugang vorbehalten. Alle Änderungen lassen sich alternativ direkt im Dateisystem vornehmen.
-
-### `/_editor` – optional: Inhalte einfach weiterpflegen
-
-<a href="docs/assets/screenshots/_editor1.webp" target="_blank">
-  <img src="docs/assets/screenshots/_editor1.webp"
-       alt="Sprachabhängiges Element in Nino Editor bearbeiten"
-       width="49%">
-</a>
-<a href="docs/assets/screenshots/_editor2.webp" target="_blank">
-  <img src="docs/assets/screenshots/_editor2.webp"
-       alt="Bildplatzverwaltung in Nino Editor"
-       width="49%">
-</a>
-
-`/_editor` ist die tägliche Oberfläche für Redakteure und Betreiber. Hier werden Texte, wiederkehrende Inhalte und Bilder gepflegt sowie Formulareingänge, Newsletter-Abonnements, Benutzerrechte und Logs verwaltet.
-
-Der Entwickler legt fest, welche Inhalte sichtbar sind und welche Bereiche ein Account tatsächlich benötigt.
-
-### `/_templates` – optional, Alpha
+#### Das Templates-Panel – optional, Alpha
 
 <a href="docs/assets/screenshots/_templates1.webp" target="_blank">
   <img src="docs/assets/screenshots/_templates1.webp"
@@ -88,44 +69,44 @@ Der Entwickler legt fest, welche Inhalte sichtbar sind und welche Bereiche ein A
 </a>
 <a href="docs/assets/screenshots/_templates2.webp" target="_blank">
   <img src="docs/assets/screenshots/_templates2.webp"
-       alt="Section-Preset-Library im Nino Template Builder"
+       alt="Section-Preset-Bibliothek im Nino Template Builder"
        width="31%">
 </a>
 <a href="docs/assets/screenshots/_templates3.webp" target="_blank">
   <img src="docs/assets/screenshots/_templates3.webp"
-       alt="Articles-Section mit Live-Vorschau konfigurieren"
+       alt="Konfiguration einer Articles-Section mit Live-Vorschau"
        width="31%">
 </a>
 
-`/_templates` macht aus `page-*.tpl`-Dateien eine übersichtliche Abfolge vollständiger HTML- und `[template]`-Sections. Entwickler können ein Template anlegen, aus verschiedenen Section-Presets wählen, sinnvolle IDs vergeben, Content und Layout konfigurieren und Textfills unmittelbar in der nativen Sprache befüllen oder mit einer Elements-Collection verbinden.
+Der Template Builder macht aus `page-*.tpl`-Dateien eine übersichtliche Abfolge vollständiger HTML- und `[template]`-Sections. Entwickler können ein Template anlegen, aus verschiedenen Section-Presets wählen, sinnvolle IDs vergeben, Content und Layout konfigurieren und Textfills unmittelbar in der nativen Sprache befüllen oder mit einer Elements-Collection verbinden. Er ist ein Workspace-Panel: Die Leiste klappt zu ihren Symbolen zusammen, und Templateliste, Section-Canvas und Inspektor teilen sich die ganze Breite.
 
-Der Template Builder bewahrt normales HTML+. Alleinstehende Template-Shortcodes lassen sich direkt über **Add section** wählen und bleiben verschiebbare Canvas-Bausteine; Header und Footer sind gewöhnliche `[template]`-Shortcodes, werden aber sicher über feste Template Settings verwaltet. Anzeigename und VPA-Standard stehen als inerte Metadaten am Dateianfang. Sonstiger Quelltext bleibt gesperrt und bytegenau erhalten. Für codebasierte Sections gibt es einen bewussten HTML+-Escape-Hatch. Der frühere DOM-orientierte Builder wurde entfernt.
+Der Template Builder bewahrt normales HTML+. Alleinstehende Template-Shortcodes lassen sich direkt über **Add section** wählen und bleiben verschiebbare Canvas-Bausteine; Header und Footer sind gewöhnliche `[template]`-Shortcodes, werden aber sicher über feste Template Settings verwaltet. Anzeigename und VPA-Standard stehen als inerte Metadaten am Dateianfang. Sonstiger Quelltext bleibt gesperrt und bytegenau erhalten. Für codebasierte Sections gibt es einen bewussten HTML+-Escape-Hatch.
 
-> **Status: Alpha.** Preset-Manifeste und erzeugtes `.tpl`-Markup bleiben lesbar und erweiterbar; Library und Arbeitsablauf können sich noch weiterentwickeln.
+> **Status: Alpha.** Preset-Manifeste und erzeugtes `.tpl`-Markup bleiben lesbar und erweiterbar; Library und Arbeitsablauf können sich noch weiterentwickeln. Das Panel ist das Modul `app/Nino/Modules/Templates/` und verschwindet mit seinem Verzeichnis.
 
-### `/_design` – optional, Alpha
+#### Das Design-Panel – optional, Alpha
 
 <a href="docs/assets/screenshots/_design1.webp" target="_blank">
   <img src="docs/assets/screenshots/_design1.webp"
-       alt="Theme-Katalog in Nino Design"
+       alt="Theme-Katalog im Nino-Design-Panel"
        width="31%">
 </a>
 <a href="docs/assets/screenshots/_design2.webp" target="_blank">
   <img src="docs/assets/screenshots/_design2.webp"
-       alt="Footer-Frame-Vorschau in Nino Design"
+       alt="Footer-Frame-Vorschau im Nino-Design-Panel"
        width="31%">
 </a>
 <a href="docs/assets/screenshots/_design3.webp" target="_blank">
   <img src="docs/assets/screenshots/_design3.webp"
-       alt="Farbeinstellungen und vollständige Live-Vorschau in Nino Design"
+       alt="Farbeinstellungen und vollständige Live-Vorschau im Nino-Design-Panel"
        width="31%">
 </a>
 
-`/_design` macht das visuelle Fundament der Webseite über eine übersichtliche Auswahl klarer Einstellungen bearbeitbar. Entwickler können ein kuratiertes Theme wählen, Header- und Footer-Frames unabhängig voneinander wechseln und die gemeinsame Farbpalette sowie das Layout-Raster verfeinern, während sie das Ergebnis an der vollständigen Webseite in der Vorschau prüfen.
+Das Design-Panel macht das visuelle Fundament der Webseite über eine übersichtliche Auswahl klarer Einstellungen bearbeitbar. Entwickler können ein kuratiertes Theme wählen, Header- und Footer-Frames unabhängig voneinander wechseln und die gemeinsame Farbpalette sowie das Layout-Raster verfeinern, während sie das Ergebnis an der vollständigen Webseite in der Vorschau prüfen.
 
-Das Design-Werkzeug hält Darstellung, Inhalte und Template-Struktur voneinander getrennt. Themes und Frames werden als gewöhnliche CSS- und `.tpl`-Dateien installiert; individuelle Einstellungen werden in die gemeinsame Design-Schicht des Projekts geschrieben. Änderungen lassen sich in der Vorschau prüfen, zurücksetzen und anwenden, ohne Seitentemplates neu zu schreiben. Der resultierende Quelltext bleibt für präzise manuelle Anpassungen zugänglich.
+Es hält Darstellung, Inhalte und Template-Struktur voneinander getrennt. Themes und Frames werden als gewöhnliche CSS- und `.tpl`-Dateien installiert; individuelle Einstellungen werden in die gemeinsame Design-Schicht des Projekts geschrieben. Änderungen lassen sich in der Vorschau prüfen, zurücksetzen und anwenden, ohne Seitentemplates neu zu schreiben. Der resultierende Quelltext bleibt für präzise manuelle Anpassungen zugänglich.
 
-> **Status: Alpha.** Der Darstellungskatalog und der Bearbeitungsablauf können sich noch weiterentwickeln.
+> **Status: Alpha.** Der Darstellungskatalog und der Bearbeitungsablauf können sich noch weiterentwickeln. Das Panel ist das Modul `app/Nino/Modules/Design/` und verschwindet mit seinem Verzeichnis.
 
 ## Was Nino mitbringt
 
@@ -171,11 +152,11 @@ cd nino
 php -S 127.0.0.1:8000 router.php
 ```
 
-Öffne anschließend <http://127.0.0.1:8000/_install>.
+Öffne anschließend <http://127.0.0.1:8000/_admin>.
 
 Der Assistent ist für einen frischen Checkout notwendig und erzeugt den ersten lauffähigen Projektstand.
 
-Der vollständige Ablauf steht unter **[Erste Schritte](docs/getting-started.de.md)**. Alle Optionen und Schreibvorgänge erklärt das **[`/_install`-Referenzhandbuch](docs/_install.de.md)**.
+Der vollständige Ablauf steht unter **[Erste Schritte](docs/getting-started.de.md)**. Alle Optionen und Schreibvorgänge erklärt die Referenz **[Einrichtungsassistent](docs/setup.de.md)**.
 
 ## Projektstruktur
 
@@ -187,13 +168,15 @@ und von niemandem getrackt:
 index.php        Haupt-Einstiegspunkt der Webseite
 router.php       Routing für den eingebauten Server, lokale Entwicklung
 
-_nino/           Kernel und Frontend-Core
-app/             Projekteigene PHP-Klassen und Laufzeitmodule
-_editor/         Inhaltseditor, Nutzer, Backups, Aktivitätslog
-_admin/          Entwickler-Werkzeuge und Wiederherstellung
-_install/        Einrichtungsassistent und die Bibliothek, aus der er installiert
-_templates/      Sectionbasierter Template Builder
-_design/         Editor für Theme, Design, Header und Footer
+_nino/           Kernel und Frontend-Core, mit den Modulen, die jedes Projekt braucht
+app/             Projekteigene PHP-Klassen und Ninos optionale Module unter
+                 app/Nino/Modules/ (Form, Newsletter, Navigation, Search,
+                 Localepicker, Design, Templates) - lösche, was du nicht brauchst
+_admin/          Die Workbench: nur die Shell, recovery.php, ihre eigenen
+                 Ansichten als Module unter _admin/Nino/Modules/ (Dashboard,
+                 Elements, Text, Images, Logs, Routes, Users, Language,
+                 Backups, Config) und der Einrichtungsassistent mit seiner
+                 Bibliothek unter _admin/install/
 docs/            Dokumentation
 
 private/         Wird nie ausgeliefert, nur von PHP gelesen - vom Assistenten angelegt
@@ -218,10 +201,12 @@ Jede Datei ist ein eigenständiges Skript und läuft gegen ein isoliertes Sandbo
 ```bash
 php tests/kernel-smoke.php
 php tests/admin-smoke.php
-php tests/editor-smoke.php
+php tests/admin-system-smoke.php
 php tests/install-smoke.php
 php tests/design-smoke.php
 php tests/templates-smoke.php
+php tests/search-smoke.php
+php tests/demo-catalogue-smoke.php
 for test in tests/*-js-smoke.js; do node "$test"; done
 php tests/concurrency-smoke.php
 ```
@@ -235,11 +220,10 @@ Nino hält seine Architektur bewusst klein: Ein zentrales `$appData`-Array träg
 * **[Grundkonzepte](docs/concepts.de.md):** Architektur, Datenfluss und Aufgabentrennung
 * **[Entwickler-Handbuch](docs/development.de.md):** Laufzeitverträge, APIs, Module und Tests
 * **[Erste Schritte](docs/getting-started.de.md):** vom Checkout zur eingerichteten Webseite
-* **[`/_install`-Referenz](docs/_install.de.md):** Schritte, Schreibregeln und Library-Format
-* **[`/_admin`-Bedienung](docs/_admin.de.md):** Projektstruktur, Inhalte, Konten, Konfiguration und Wiederherstellung
-* **[`/_templates`-Bedienung](docs/_templates.de.md):** Seitentemplates aus vollständigen HTML- und Template-Sections zusammensetzen
-* **[`/_editor`-Bedienung](docs/_editor.de.md):** Texte, Elemente, Bilder, Anfragen und Newsletter
-* **[`/_design`-Bedienung](docs/_design.de.md):** Theme, Design, Header und Footer nach der Installation bearbeiten
+* **[Einrichtungsassistent](docs/setup.de.md):** Schritte, Schreibregeln und Library-Format
+* **[`/_admin`-Workbench](docs/_admin.de.md):** jedes Panel, Konten, Rollen, Konfiguration, Backups und Recovery
+* **[Templates-Panel](docs/templates.de.md):** Seitentemplates aus vollständigen HTML- und Template-Sections zusammensetzen
+* **[Design-Panel](docs/appearance.de.md):** Theme, Design, Header und Footer nach der Installation bearbeiten
 * **[Deployment](docs/deployment.de.md):** Webserver, Sicherheit, Backups und Go-live
 * **[Design-Handbuch](docs/design.de.md):** Frontend, Design-System, CSS und Template-Arbeit **(WIP)**
 * **[Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md):** Sicherheitsmeldungen und unterstützte Versionen
@@ -251,9 +235,9 @@ Nino befindet sich als Gesamtprojekt derzeit in der **Beta-Phase**. Einzelne opt
 
 | Bereich                                          | Status                                    |
 | ------------------------------------------------ | ----------------------------------------- |
-| Kernel, Frontend und bestehende Projektgrundlage | Beta                                      |
-| `/_templates`                                    | Alpha                                     |
-| `/_design`                                       | Alpha                                     |
+| Kernel, Frontend, Workbench und bestehende Projektgrundlage | Beta                           |
+| Templates-Panel (Template Builder)               | Alpha                                     |
+| Design-Panel                                     | Alpha                                     |
 
 Sicherheitskorrekturen landen direkt auf `main`; eine separate LTS-Version gibt es noch nicht.
 

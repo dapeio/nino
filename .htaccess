@@ -50,7 +50,7 @@
 # folders aside, a request that resolves to a real file outside public/ is
 # almost always a mistake. The installer's appearance catalogue is the one
 # place inside a tool folder with a deliberately public file in it, so
-# _install/library/.htaccess denies everything there except the theme
+# _admin/install/library/.htaccess denies everything there except the theme
 # picker images.
 
 # Don't let a directory with no index.php list its contents - a plain

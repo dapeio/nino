@@ -6,7 +6,7 @@
 
 > **Note:** This manual is currently being revised. Until completion, please use the information from:
 > - **[Developer Manual](development.md)** (for backend integration)
-> - **[`/_templates` Operation](_templates.md)** (for template structure)
+> - **[Templates Panel](templates.md)** (for template structure)
 > - **[Main Repository `dapeio/nino`](https://github.com/dapeio/nino)** (for current frontend conventions)
 
 ## Planned Content

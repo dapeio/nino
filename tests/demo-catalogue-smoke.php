@@ -4,7 +4,7 @@ declare(strict_types=1);
 /**
  *	Nino											A compact filesystembased php framework
  *	demo-catalogue-smoke.php	Dependency-free smoke test for the "Demo: Catalogue"
- *														page unit (_install/library/pages/.demo-catalogue).
+ *														page unit (_admin/install/library/pages/.demo-catalogue).
  *
  *														The unit makes one promise: it shows every Section
  *														Preset the Template Builder ships, in every layout
@@ -19,7 +19,7 @@ declare(strict_types=1);
 
 require __DIR__. '/../_nino/Nino.php';
 require __DIR__. '/../_admin/Admin.php';
-require __DIR__. '/../_templates/Templates.php';
+require __DIR__. '/../_admin/install/Install.php';
 
 $failures = 0;
 $checks		= 0;
@@ -43,7 +43,7 @@ function check( string $label, bool $condition ): void {
 	echo "FAIL  - $label\n";
 }
 
-$unit 		= __DIR__. '/../_install/library/pages/.demo-catalogue';
+$unit 		= __DIR__. '/../_admin/install/library/pages/.demo-catalogue';
 $template = $unit. '/templates/.demo-catalogue.tpl';
 
 
@@ -86,7 +86,7 @@ $shown = [];
 foreach( $demoMatches as $match )
 	$shown[$match[1]][$match[2]] = ( $shown[$match[1]][$match[2]] ?? 0 ) + 1;
 
-$presets = \Nino\Templates\Library::presets();
+$presets = \Nino\Modules\Templates\Library::presets();
 
 check( 'the page marks its specimens for this test to count', $demoMatches !== [] );
 check( 'every preset in the library is shown', array_diff( array_keys( $presets ), array_keys( $shown ) ) === [] );
@@ -137,7 +137,7 @@ foreach( $classMatches[1] as $attribute )
 	incomplete and this test is the place that says so.	*/
 $elsewhere = [
 	// The header and footer units own these - every page renders them, none
-	// declares them (see _install/library/header|footer/<key>/template.tpl)
+	// declares them (see _admin/install/library/header|footer/<key>/template.tpl)
 	'nino-logo', 'nino-headernav-logo', 'nino-nav-burger', 'nino-nav-content', 'nino-nav-bg',
 	'nino-footer-main', 'nino-footer-legal', 'nino-footer-title', 'nino-footer-logo',
 	'nino-footer-getintouch', 'nino-footer-localepicker', 'nino-localepicker-wrap', 'nino-localepicker-bg',
@@ -179,11 +179,13 @@ echo "Rendering\n";
 preg_match_all( '/\[\[([^\]]+)\]\]/', $source, $fillMatches );
 $fills = array_values( array_unique( array_filter( $fillMatches[1], static fn( string $fill ): bool => $fill !== '/nino/public' ) ) );
 
-$library = __DIR__. '/../_install/library';
+$library 	= __DIR__. '/../_admin/install/library';
+// A module's unit sits beside the module itself - Setup::units() knows where
+$units 		= \Nino\Install\Setup::units();
 $available = [];
 $fragments = glob( $library. '/base/text/*.php' ) ?: [];
 foreach( (array) ( $manifest['requiresModules'] ?? [] ) as $module )
-	$fragments = array_merge( $fragments, glob( $library. '/modules/'. $module. '/text/*.php' ) ?: [] );
+	$fragments = array_merge( $fragments, isset( $units[$module] ) === true ? ( glob( $units[$module]. '/text/*.php' ) ?: [] ) : [] );
 foreach( $fragments as $fragment )
 	foreach( array_keys( (array) ( include $fragment ) ) as $key )
 		$available[trim( (string) $key, '[]' )] = true;
@@ -206,7 +208,7 @@ check( 'the page includes the shell and the one demonstrated template, nothing e
 // needs one, the framework is what should change
 check( 'no specimen falls back to an inline style', preg_match( '/\sstyle="/i', $source ) !== 1 );
 
-$parsed = \Nino\Templates\SectionDocument::split( $source );
+$parsed = \Nino\Modules\Templates\SectionDocument::split( $source );
 check( 'the page parses as one well-formed document'. ( $parsed['error'] === null ? '' : ' - '. $parsed['error'] ), $parsed['error'] === null );
 check( 'it is built from sections, not from one big block', $parsed['sectionCount'] > 50 );
 

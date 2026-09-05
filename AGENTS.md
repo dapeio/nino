@@ -71,10 +71,10 @@ Do not use “page”, “template”, “module”, and “admin module” inte
 
 | Goal | Correct extension |
 | --- | --- |
-| Add developer-only CRUD or diagnostics inside `/_admin` | Admin backend and frontend tab |
+| Add a screen to the workbench `/_admin` | Panel - answered by a runtime module's `adminPanels()`, or a module directory under `_admin/Nino/Modules/` |
 | Add behavior to public requests or a new shortcode | Runtime module |
-| Make a feature selectable and copyable during `/_install` | Installer module package |
-| Add an insertable visual building block to `/_templates` | Section preset |
+| Make a feature selectable and copyable during the setup wizard | Installer module package |
+| Add an insertable visual building block to the Templates panel | Section preset |
 | Add a complete starting page to the installation library | Page library unit |
 | Add reusable HTML+ included by other templates | Reusable `.tpl` template |
 | Map a public HTTP URL to output | Route |
@@ -90,13 +90,14 @@ These pieces can cooperate but remain separate:
 - A **runtime module** registers PHP behavior at boot.
 - An **installer module package** selects, copies, and configures a runtime
   feature. It is not the runtime feature itself.
-- An **Admin backend** is a developer UI extension. It is not an entry in
-  `/nino/modules`.
+- A **panel** is one screen of the workbench `/_admin`. It is not an entry in
+  `/nino/modules`; a runtime module answers `adminPanels()` with it, and an
+  account sees it only with the permission the panel declares.
 
 When a feature spans types, implement each layer explicitly. For example, a
 catalog can need a runtime module, an installer package, an element type, a
-reusable template, and an Admin tab. One of those does not automatically create
-the others.
+reusable template, and an `/_admin` panel. One of those does not automatically
+create the others - though a module's directory is where all of its own live.
 
 ## 4. Repository map and ownership
 
@@ -105,29 +106,30 @@ Important source directories:
 | Path | Ownership |
 | --- | --- |
 | `_nino/Nino.php` | Kernel and public core APIs |
-| `_nino/Nino/Modules/<Name>/<Name>.php` | Built-in runtime modules |
+| `_nino/Nino/Modules/<Name>/<Name>.php` | Kernel runtime modules every project needs: Assets, Cache, Csrf, Elements, Images, Jstext, Template |
+| `app/Nino/Modules/<Name>/` | Nino's optional modules, delivered with the checkout and owned by the project from then on: `Form`, `Newsletter`, `Navigation`, `Search`, `Localepicker`, `Design`, `Templates`. A project deletes the ones it does not need and updates the ones it keeps. The autoloader resolves `Nino\Modules\*` below `_nino/` first, then here |
+| `app/Nino/Modules/<Name>/Admin/Admin.php`, `assets/`, `text/`, `templates/`, `install/` | A module's own workbench panel class with its scripts, stylesheets, fills and (for a template panel) its markup, and its installer unit - everything a feature brings, in one directory |
 | `app/<Namespace>/<Class>/<Class>.php` | Project-owned PHP classes and runtime modules; defaults to this root unless `NINO_APP_DIR` is defined before loading the kernel |
-| `_nino/Nino.js` | Shared browser helpers, tool frontends and public site alike - so it is in the public script bundle, and anything only one audience needs belongs beside it rather than in it |
-| `_nino/Nino.admin.css` | Shared management-interface design |
-| `_nino/Nino.admin.js` | The behaviour half of that design system: `Nino.adminUi`'s DOM primitives and the pure table model. Loaded after `Nino.js`, by the tool frontends only |
-| `_admin/Admin.php` | All `\Nino\Admin\*` backend classes |
+| `_nino/Nino.js` | Shared browser helpers, workbench and public site alike - so it is in the public script bundle, and anything only one audience needs belongs beside it rather than in it |
+| `_admin/Admin.php` | The workbench: `\Nino\Admin\Admin` (shell, routes, bundles, fills, dispatch), `\Nino\Admin\Panels` (the panel registry: reads a panel class, orders the panels, renders navigation and panes) and `\Nino\Admin\Recovery` (the recovery secret) |
+| `_admin/Nino/Modules/<Name>/` | The workbench's own screens, one module each, in the same shape and the same namespace `app/Nino/Modules` and `_nino/Nino/Modules` use: `Admin/Admin.php` is the panel, `<Tab>/<Tab>.php` a tab of it, `assets/` its scripts and stylesheet, `text/` its words. `Admin::modules()` reads the directory - there is no list to keep. Take the directory away and `/_admin` is a login and an empty rail, which is the point: `_admin` is the base, the modules fill it |
+| `_admin/assets/style.css` | The workbench's one stylesheet: the design system in the `nino.system` layer (classes only, `nino-admin-*`), the workbench's own rules in `nino.tool` below it |
+| `_admin/assets/Nino.admin.js` | The behaviour half of the design system: `Nino.adminUi`'s DOM primitives and the pure table model. Loaded after `Nino.js`, by the workbench only |
+| `_admin/assets/script.js`, `login.js`, `html-editor.js` | The shell script (router, theme, rail fold, panel switching), the login screen's, and the rich-text primitive a panel names in its own `assets()`. No panel script lives here; no bundler - `Admin::init()` builds `/_admin/.cache/` from the registry |
+| `_admin/templates/page-index.tpl` | The shell; navigation, panes and panel assets are rendered into it from the registry |
+| `_admin/recovery.php`, `templates/page-recovery.tpl`, `assets/recovery.js` | The recovery page: restore a backup, reset a password, with the recovery secret |
+| `_admin/install/Install.php` | The setup wizard - the workbench's first-run mode, served by the same route while `Admin::isInstalled()` says no; deletable after setup |
+| `_admin/install/library/base/`, `modules/`, `pages/<slug>/` | The wizard's library: always-applied base, units without a runtime class, installable page units |
+| `_admin/install/library/themes/<slug>/` | Appearance themes: manifest, preview, and installable assets. Setup material read by the wizard and, while the directory is deployed, by the Design panel; applying one copies it into the project |
+| `_admin/install/library/header/<slug>/`, `footer/<slug>/` | Interchangeable page frames: a `template.tpl` plus an optional `style.css`, no manifest. Installed as `templates/theme.header.tpl` / `theme.footer.tpl`, which the base html templates include |
+| `app/Nino/Modules/Design/Design.php`, `Admin/`, `Appearance/`, `Tokens/`, `Preview/` | The Design module: the settings and the generated stylesheet's place in the bundle (module class), the panel, the catalogue units, the token palette solver, the live preview the wizard borrows |
+| `app/Nino/Modules/Design/templates/preview-example.tpl` | The page both pickers preview against. Framework classes only - `Design\Preview` wraps it in a document with the generated tokens and serves it to a sandboxed iframe |
+| `app/Nino/Modules/Templates/Templates.php`, `Admin/`, `Documents/`, `Library/`, `Content/`, `Composer/`, `SectionDocument/`, `AreaComposer/` | The Template Builder module: the CSP hook and the panel (a workspace), the page files, the presets, the native content, the section compiler, the document parser and the named-area manifest-v3 normalizer |
+| `app/Nino/Modules/Templates/assets/area-composer.js` | Named-area Design/Data editor layered on the composer dialog |
+| `app/Nino/Modules/Templates/library/<slug>/` | Section preset library |
 | `public/` | The project's public half — everything a browser loads directly: `images/`, `favicon/`, `fonts/`, and the generated `.cache/` bundles. Reached through `Filesystem::path()` on disk and `Filesystem::url()` (or the `[[/nino/public]]` fill) for urls. Never build a public url by hand from `[[/nino/dir]]`. `assets/` is *not* here — the bundle sources are private, see below |
-| project root | `index.php`, `router.php` and the tool folders. `Filesystem::getPath()`. The tool folders serve their own js/css from here, so a tool file's url uses the plain project dir, not the public prefix |
-| `private/` | The project's private half — never served, only read by PHP: `config.php`, `templates/`, `text/`, `elements/`, `data/`, `assets/` (the stylesheet and script sources `Modules\Assets` concatenates into `public/.cache/` — nothing ever requests one directly), plus `.auth/` (the `/_admin` hash, login throttle, backup key), `.logs/` and `.backups/`. Reached through `Filesystem::path()` (which resolves `PRIVATE_DIRS` against it) or the virtual `Filesystem::CONTENT_DIR` prefix (`/private`); moved by `NINO_CONTENT_DIR`. Never write project state into a tool folder or into `config.php` — the first breaks updates, the second is rolled back by a Restore. **A checkout ships none of this**: the wizard creates the directory, brings its own deny rule (`_install/library/base/private/.htaccess`) and writes the first `config.php` at the end of Setup. Framework defaults live in `\Nino\AppData::DEFAULTS` and sit *under* that file, so config.php holds only what this project decided |
-| `_admin/assets/*.js` | Admin frontend modules; no bundler |
-| `_admin/templates/page-index.tpl` | Admin shell, tabs, panes, assets |
-| `_templates/Templates.php` | Template Builder API, document parser, preview sanitizer and preset dispatch |
-| `_templates/Areas.php` | Named-area manifest-v3 normalizer, validator and compiler |
-| `_templates/assets/area-composer.js` | Named-area Design/Data editor layered on the shared wizard shell |
-| `_templates/library/<slug>/` | Section preset library |
-| `_install/Install.php` | Installer behavior and library application |
-| `_install/library/modules/<slug>/` | Installer module packages |
-| `_install/library/pages/<slug>/` | Installable page units |
-| `_install/library/themes/<slug>/` | Appearance themes: manifest, preview, and installable assets. Setup material read by `/_install` and, while the installer is deployed, by `/_design`; applying one copies it into the project |
-| `_install/library/header/<slug>/`, `_install/library/footer/<slug>/` | Interchangeable page frames: a `template.tpl` plus an optional `style.css`, no manifest. Installed as `templates/theme.header.tpl` / `theme.footer.tpl`, which the base html templates include |
-| `_design/Design.php` | Four-dialog appearance tool and Design engine: applies Theme/Header/Footer units, solves the token palette, writes `/assets/style.design.css`, keeps all layers ordered in the css bundle, and builds the live preview `/_install` borrows |
-| `_design/assets/design.js` | `/_design` frontend; no bundler |
-| `_design/templates/preview-example.tpl` | The page both pickers preview against. Framework classes only - `Design\Preview` wraps it in a document with the generated tokens and serves it to a sandboxed iframe |
+| project root | `index.php`, `router.php`, `_nino/`, `_admin/` and `app/`. `Filesystem::getPath()`. The workbench serves its own js/css from here, so a tool file's url uses the plain project dir, not the public prefix |
+| `private/` | The project's private half — never served, only read by PHP: `config.php` (the accounts among it), `templates/`, `text/`, `elements/`, `data/`, `assets/` (the stylesheet and script sources `Modules\Assets` concatenates into `public/.cache/` — nothing ever requests one directly), plus `.auth/` (the recovery secret, the login throttle, the backup key), `.logs/` and `.backups/`. Reached through `Filesystem::path()` (which resolves `PRIVATE_DIRS` against it) or the virtual `Filesystem::CONTENT_DIR` prefix (`/private`); moved by `NINO_CONTENT_DIR`. Never write project state into a tool folder or into `config.php` — the first breaks updates, the second is rolled back by a Restore. **A checkout ships none of this**: the wizard creates the directory, brings its own deny rule (`_admin/install/library/base/private/.htaccess`) and writes the first `config.php` at the end of Setup. Framework defaults live in `\Nino\AppData::DEFAULTS` and sit *under* that file, so config.php holds only what this project decided |
 | `tests/*-smoke.php` | Standalone PHP contract tests |
 | `tests/*-js-smoke.js` | Standalone Node/browser-logic tests |
 | `docs/` | Human manuals in English and German |
@@ -147,11 +149,11 @@ Project content and generated destinations:
 | `data/index-<type>.php` | Derived locale-grouped Elements search index; recreated from the type file, never source content |
 
 A fresh checkout may not yet contain all generated destination directories.
-Do not “fix” their absence by adding empty placeholders. `/_install` creates and
+Do not “fix” their absence by adding empty placeholders. The setup wizard creates and
 populates them.
 
 Library files are sources, not live project files. Editing
-`_install/library/pages/home/templates/page-home.tpl` changes future
+`_admin/install/library/pages/home/templates/page-home.tpl` changes future
 installations; it does not update an already generated
 `templates/page-home.tpl`. Modify the correct ownership layer.
 
@@ -302,7 +304,7 @@ events; `/nino/*` is reserved for Nino.
 ### CSS and management UI
 
 See "Designing an admin frontend" below before writing any markup or CSS for
-`/_admin`, `/_editor`, `/_install`, `/_design` or `/_templates`.
+the workbench - the shell, a panel, the setup wizard or the recovery page.
 
 - Maintain keyboard focus, labels, error text, small viewports, coarse pointers,
   and `prefers-reduced-motion`.
@@ -310,23 +312,28 @@ See "Designing an admin frontend" below before writing any markup or CSS for
 
 ## 6a. Designing an admin frontend
 
-`_nino/Nino.admin.css` is the design system for all four tool frontends. It is
-not a stylesheet one tool happens to share - it defines the vocabulary, and a
-tool's own stylesheet supplies only what is genuinely local to it.
-`_nino/Nino.admin.js` is the same idea for behaviour: a component that assembles
+The `nino.system` half of `_admin/assets/style.css` is the design system for
+the workbench and every panel in it, the setup wizard and the recovery page
+included. It is not a stylesheet one screen happens to share - it defines the
+vocabulary, and a panel's own stylesheet - `assets/admin.css` beside its
+class, whether the module is the workbench's own or a project's - supplies only
+what is genuinely local to it. The `nino.tool` half of the same file is the
+shell's own: the rail, the panel switching, the login screen.
+`_admin/assets/Nino.admin.js` is the same idea for behaviour: a component that assembles
 markup (`Nino.adminUi.switchField()`, `.table()`, `.selectField()`) lives there,
 never as a per-tool copy. It extends the namespace `Nino.js` creates, so it loads
 after it - and it is deliberately *not* in the public script bundle, which is why
 it is a file of its own rather than more of `Nino.js`.
 
-**A tool links its own stylesheet and `Nino.admin.css`, nothing else.**
-`/_install` and `/_templates` used to load `/_editor`'s and `/_admin`'s complete
-stylesheets for a handful of their classes; they no longer do. Copy the class
-you need into the tool that needs it, or promote it to the design system - do
-not link another tool's stylesheet. The Template Builder's *login* screen is the
-one exception, because it renders `/_admin`'s login markup with `/_admin`'s own
-script. A rule written without a scope in a tool stylesheet still reaches every
-screen that file is loaded on, so keep scoping them.
+**A panel ships its own stylesheet and nothing else.** A panel's `assets()`
+join the workbench's bundle after the shell's own files, and a module panel's
+template is a fragment that links nothing. The old tools used to load each
+other's complete stylesheets for a handful of classes; copy the class you need
+into the panel that needs it, or promote it to the design system - never
+restate the shell. Every rule of a panel stylesheet is loaded on every screen
+of the workbench, so scope every one of them to the panel's own root
+(`#pd-app .pd-canvas`, `#theme-page-wrap .theme-tile`) - a bare `body {}` or
+`code {}` in a panel file lands on the whole workbench.
 
 ### The five rules
 
@@ -342,11 +349,11 @@ screen that file is loaded on, so keep scoping them.
 4. **A class name describes a role, never a place.** `.nino-admin-btn-primary`
    is "the primary action", not "the button under a list". A class carrying the
    margins of wherever it first appeared breaks the moment it is reused - which
-   is exactly how `/_install`'s "New Route" button inherited a stray
-   `margin-top` from an `/_editor` list class.
-5. **Cascade layers decide who wins before specificity.** Every tool stylesheet
-   opens with `@layer nino.system, nino.tool, nino.local;`. Shared foundations
-   and `Nino.admin.css` live in `nino.system`; normal screen and component rules
+   is exactly how the wizard's "New Route" button once inherited a stray
+   `margin-top` from another screen's list class.
+5. **Cascade layers decide who wins before specificity.** Every stylesheet of
+   the workbench opens with `@layer nino.system, nino.tool, nino.local;`. The
+   design system lives in `nino.system`; normal screen and component rules
    live in the later `nino.tool` layer, so they can refine the low-specificity
    `:where(.nino-admin)` baseline without selector escalation. Reserve
    `nino.local` for a deliberate final override, not every normal component
@@ -366,7 +373,6 @@ Reach for an existing class first; only invent one when no role fits.
 | Fixed bottom actions | `.nino-admin-actionbar` via `Nino.adminUi.actionBar()` |
 | Fixed actions above a list | `.nino-admin-list-actions` via `Nino.adminUi.listActions()` |
 | Status text in a bottom bar | `.nino-admin-actionbar-status` |
-| Secondary action, desktop only | `.nino-admin-desktop-action` |
 | Primary / destructive button | `.nino-admin-btn-primary`, `.nino-admin-btn-danger` |
 | Raised panel | `.nino-admin-card` (a `fieldset` is one already) |
 | Clickable drill-down list | `.nino-admin-list` (+ `.nino-admin-list-copy` per row) |
@@ -380,7 +386,38 @@ Reach for an existing class first; only invent one when no role fits.
 | Run of checkbox rows | `.nino-admin-checklist` |
 | Rich-text editor mount | `.nino-admin-richtext` |
 | Explanatory text / screen intro | `.nino-admin-hint`, `.nino-admin-hint-lead` |
+| Nothing here yet (a list without entries, a scan that found nothing) | `.nino-admin-empty` via `Nino.adminUi.emptyState()` |
 | Error text | `.nino-admin-error` |
+
+**Every word is a fill.** A panel script never renders a literal English
+sentence: the workbench's strings are `_admin/text/<locale>.php`, a module's are
+the `text()` directory beside its panel, and `[jstext]` hands all of them to
+`Nino.content.getText()`. A placeholder is `%s`, `%d` or `%n`, filled with
+`.replace()`. A label the backend sends - a schema's `label` and `hint`, a
+dashboard tile's or a permission's label - may be a fill key or literal text;
+`Nino.adminUi.text()` resolves it either way - which is also how a value that
+is both shown and compared stays translatable: send a slug and name it on the
+client (see the Template Builder's `includeKind()` and `categoryLabel()`), never
+compare against a word a locale file can change.
+A workspace panel's markup (`templates/panel.tpl`) is the other place a
+sentence hides, and reads ordinary `[[fills]]`. A fill's *value* is substituted
+into the page before the shortcode pass runs, and `[jstext]` ships the same
+stored value, so a value must never contain a live shortcode token: escape the
+bracket (`&#91;template]`) in a value that is only ever markup, and put a `%s`
+in one a script renders, filling it from the script's own source - a `.js` file
+is a static asset and is never rendered.
+`tests/admin-lists-js-smoke.js` fails on a literal sentence in a panel script
+or in that markup, and `tests/admin-system-smoke.php` twice over: statically on
+a key a panel's scripts or markup ask for that either language lacks, and end to
+end - it renders the whole workbench in both interface languages and fails on any
+`[[fill]]` that came out the other side unresolved, which is the only version a
+key its regexes do not recognise cannot slip past. A schema two surfaces share - the Design
+knobs, which the setup wizard renders as well and which reaches no fills -
+keeps its English as the fallback, and the panel looks for a fill of its own
+first (`design.js`'s `_knobText()`). The recovery page and the setup wizard are English by design, as
+is the section library's own preset content (a manifest's `name`, `description`,
+`category` and area labels) - the panel renders all of it through
+`Nino.adminUi.text()`, so a manifest may use fill keys instead.
 
 ### The shared data table
 
@@ -390,10 +427,10 @@ stays right for a handful of rows you only drill into.
 
 It owns **no strings**. Everything that can be a number or a glyph is one - the
 pager arrows, the row range, a boolean cell - so a caller supplies only
-`labels: { search, empty, noMatch }`. That is deliberate: `/_admin` is
-English-only and labels a field by its raw model key, `/_editor` translates
-through `Nino.content`, and a component that hardcoded one word would be
-half-translated in the other tool.
+`labels: { search, empty, noMatch }`. That is deliberate: the type editor labels
+a field by its raw model key, the element form translates through
+`Nino.content`, and a component that hardcoded one word would be half-translated
+in the other.
 
 Pass the **whole set** and let it page. An element type is one file read whole
 on every request (`\Nino\Elements::queryElements`), so asking for one page costs
@@ -416,15 +453,15 @@ formatting as plain functions — extend and test there, not in the renderer.
   The shells carry `.nino-admin` plus their `show-<panel>` state, so switching
   panels with `el.className = 'show-x'` silently deletes the entire shared
   layout. Use `Nino.adminUi.setStateClass()`, or `classList` for anything else.
-- **A tool stylesheet must scope every `nino-admin-*` rule to its own root**
-  (`#editor-page-wrap .nino-admin-rail`, not `.nino-admin-rail`) - see the
-  cross-loading note above.
-- **Restating a shared component in a tool is not "refining" it.** A tool copy
+- **A panel stylesheet must scope every `nino-admin-*` rule to its own root**
+  (`#pd-app .nino-admin-btn-primary`, not `.nino-admin-btn-primary`) - see the
+  bundling note above.
+- **Restating a shared component in a panel is not "refining" it.** A panel copy
   sits in the later `nino.tool` layer, so it wins over the design system whole
-  and the two drift apart silently. `/_editor` carried a second copy of every
+  and the two drift apart silently. The old editor carried a second copy of every
   token, button, input, field, tile, card and rich-text rule this way. Delete
-  the copy; if the shared version is genuinely wrong for every tool, fix it in
-  `Nino.admin.css`.
+  the copy; if the shared version is genuinely wrong for every screen, fix it in
+  the design-system half of `style.css`.
 
 ### Templates
 
@@ -435,149 +472,331 @@ formatting as plain functions — extend and test there, not in the renderer.
 - Do not add inline event handlers.
 - Do not assume JavaScript is available for essential content.
 
-## 7. Recipe: add an Admin backend and UI tab
+## 7. Recipe: add a panel to the workbench
 
-Use this recipe for developer-only project management inside `/_admin`. Do not
-put ordinary public-site behavior in Admin.
+A panel is one screen of the workbench: a navigation link, a content pane,
+an action map, a permission, and the script that renders into the pane.
+`/_admin` builds its shell from a panel registry (`\Nino\Admin\Panels`), so a
+panel is added by writing one class. The navigation, the pane, the bundles,
+the text fills, the dashboard tile and the roles tab's permission checkbox
+are rendered from what that class answers; the shell template is never edited.
 
-### 7.1 Files that MUST be considered
+Two kinds of panel exist, and the class looks the same for both:
 
-A visible Admin extension currently requires all of these:
+- A **module panel** is answered by a runtime module's `adminPanels()` (see
+  8.7) and exists exactly while that module is active. Prefer it whenever the
+  screen belongs to a feature: the feature then ships, and is removed, as one
+  directory. `Modules\Form` (Submissions), `Modules\Newsletter`,
+  `Modules\Navigation`, `Modules\Search`, `Modules\Design` and
+  `Modules\Templates` are built this way.
+- A **workbench panel** is a module under `_admin/Nino/Modules/<Name>/`, the
+  same shape as above but delivered with the tool rather than with a runtime
+  feature: `Admin/Admin.php` is the panel, `<Tab>/<Tab>.php` a tab of it.
+  `Admin::modules()` finds it by reading the directory, so there is no list to
+  add it to. Use it only for a screen every project has regardless of its
+  modules - Dashboard, Elements, Text, Images, Logs, Routes, Users, Language,
+  Backups and Config are built this way.
 
-1. A backend class in `_admin/Admin.php`.
-2. Its class in `Admin::MODULES`.
-3. A navigation link in `_admin/templates/page-index.tpl`.
-4. A content pane in that template.
-5. A script tag for the frontend file.
-6. A `TABS` entry in `_admin/assets/script.js`.
-7. A frontend file `_admin/assets/<slug>.js`.
-8. Backend and JavaScript smoke-test coverage.
-9. CSS only when shared primitives cannot express the UI.
+Which accounts see a panel is its `perm()` and nothing else: a content panel
+(editors and developers) declares one under the `content` group, a developer
+panel one under `structure` or `system`. Do not put public-site behavior in a
+panel.
 
-The class's `nav()` method is useful module metadata but the current HTML shell
-does not render it dynamically. Adding only `actions()`, `nav()`, and
-`Admin::MODULES` creates API actions but no visible tab.
+### 7.1 The panel contract
 
-Choose one stable slug and use it consistently:
+A panel is a class with two required and a handful of optional static methods.
+There is no interface and no base class, the same way a runtime module is a
+class with `init()`. `\Nino\Admin\Panels::collect()` reads them once per
+request:
+
+| Method | Required | Returns |
+| --- | --- | --- |
+| `actions()` | yes | `[ 'slug/action' => [ Class::class, 'apiMethod' ], ... ]` |
+| `nav()` | yes | `[ uri, label, weight = 50, group = 'content' ]`, see below |
+| `perm()` | yes in practice | the permission that shows the link and gates the panel's actions; `''` only for a panel every account may use (the Dashboard) |
+| `panes()` | no | mount ids rendered inside the pane, default `[ '<uri>-list' ]` |
+| `template()` | no | instead of mount points: a `.tpl` rendered whole into the pane through the `[template]` shortcode - project-relative, no extension, no `..` |
+| `layout()` | no | `'page'` (default: a column of content at reading width) or `'workspace'` (the whole pane, the rail folded to its icons) |
+| `icon()` | no | an inline `<svg>` for the rail; without one the folded rail shows the label's initial. Held to that one shape: nothing that runs |
+| `tabs()` | no | further panel classes shown as tabs of this panel's pane, see below |
+| `tab()` | no | what the tab strip calls this panel's own screen, when its nav label will not do (Language: `'Languages'`) |
+| `assets()` | no | project-relative `.js`/`.css` files the panel brings, bundled into `/_admin/.cache/` after the shell's own |
+| `text()` | no | directory holding the panel's `<locale>.php` fill files |
+| `summary( &$appData )` | no | a Dashboard tile `[ 'value' => ..., 'label' => ... ]`, `null` for none |
+| `log( $action, $data )` | no | the activity-log line for a completed action, `''` for none |
+
+`nav()` rules:
+
+- `uri` is a slug (`/^[a-z][a-z0-9-]*$/`) and MUST be unique. It names the
+  link (`admin-nav-<uri>`), the pane (`admin-content-<uri>`), the shell state
+  class `show-<uri>`, the hash prefix (`#<uri>/...`) and the JS namespace the
+  shell calls (`Nino.admin.<uri>`). A second class claiming a taken uri is
+  dropped with a warning, so a module cannot replace a core screen.
+- A `label` starting with `/` is a fill key, resolved by the normal fill pass
+  from `_admin/text/<locale>.php` and the panel's `text()` files; anything
+  else is literal text and is escaped. Every shipped panel uses a fill - the
+  workbench speaks one language per account, so a module panel brings a
+  `text/<locale>.php` for every interface language rather than an English
+  literal. The same goes for `tab()`, a `summary()` tile's label and the
+  labels and hints a schema hands to the frontend (`Nino.adminUi.text()`
+  resolves a value that starts with `/`, `tests/admin-system-smoke.php` fails
+  on a key one of the two languages lacks).
+- `group` is `content`, `structure` or `system` and decides the heading the
+  link sits under; an unknown group falls back to `content` with a warning.
+  The **Editor** role the wizard writes is every `content` panel's `perm()`
+  at that moment (`Roles::defaults()`); a content panel a module brings later
+  is offered on the roles tab like every other.
+- `weight` orders the navigation within the group, lowest first, stable for
+  equal weights. Core content panels sit at 0 (Dashboard), 20 (Elements), 30
+  (Text), 40 (Images) and 90 (Logs); structure at 2 (Templates), 5 (Design)
+  and 20 (Routes); system at 2 (Users), 5 (Language), 10 (Backups) and 20
+  (Config). A module panel picks the slot it wants: Submissions 60,
+  Newsletter 65, Navigations 25 (after Routes), Search 30 (system).
+
+`tabs()` rules:
+
+- A tab is a full panel class - `actions()`, `nav()`, `perm()`, `panes()`,
+  `assets()` - whose uri is unique across panels and tabs alike. It is never
+  a rail entry: its `nav()` group only says where its permission is listed,
+  its weight orders the strip. The shell selects it through `#<uri>`, shows
+  `admin-tab-<uri>` and calls `Nino.admin.<uri>.showCurrent()` exactly like a
+  panel; `Nino.admin.router.exists()` knows both kinds.
+- The strip is rendered only when the account holds more than one screen of
+  the pane, the panel's own first. An account holding a tab's permission but
+  not the panel's still gets the pane, on that tab alone
+  (`Admin::visiblePanels()`, `'own' => false`). A tab has no tabs of its own.
+- The workbench's own modules use it: Element Types under Elements, Text Keys under Text,
+  Image Slots under Images (each a structure permission beside the content it
+  shapes), User roles (sharing `/_admin/users/manage`) and Login protection
+  (`/_admin/lockout/manage`) under Users, Translations under Language. The
+  strip is the design system's `.nino-admin-tabs--bar`, the same the Design
+  panel renders for its four editors.
+
+A dispatched action announces itself on `/nino/admin/action`
+(`{ action, panel, status, user, data }`) once it has answered - the one place a
+module reacts to what the workbench does without owning the panel the action
+belongs to. Notification only: the response is already written, so refusing
+stays `guardPerm()`'s job, and *what changed* is the kernel's own events
+(`/nino/elements/committed`, `/nino/auth/user/*`). The activity log is not a
+listener on it but a direct call, deliberately - an audit line that can be lost
+by not registering a callback is not an audit line.
+
+Actions are the panel's slug plus a verb, and every action method guards
+itself with `\Nino\Admin\Admin::guardPerm( $appData, $request, self::MANAGE_PERM )`
+even though `handlePost()` dispatches through the registry: the method-level
+guard protects direct calls in tests and future dispatch changes, and it is
+what answers `401` without an account and `403` without the permission.
+Core actions are merged first; a module action reusing a core action's name is
+ignored.
+
+Assets are validated (`^/[A-Za-z0-9_./-]+\.(js|css)$`, no `..`) and bundled
+into `/_admin/.cache/script.js` and `style.css` after the shell's own files.
+A panel names them from where its class is, so they move with the module:
+
+```php
+public static function assets(): array {
+	return [ \Nino\Admin\Panels::relative( dirname( __DIR__ ). '/assets/admin.js' ) ];
+}
+```
+
+A panel's stylesheet opens with `@layer nino.system, nino.tool, nino.local;`
+and puts its rules in `@layer nino.tool {}`, every one scoped to the panel's
+own root (6a).
+
+Permissions declared through `perm()` are offered automatically: the Users
+panel's roles tab (`Users\Admin::permOptions()`) lists every active panel's and
+tab's permission once, under its nav label and in its nav group, and
+`Roles::defaults()` builds the Editor role the wizard writes from the content
+ones. That list also carries every permission this installation actually holds
+- on a role or directly on an account - that no panel is offering right now
+(`offered => false`, group `other`, named by its own string), because the
+picker only sends back the rows it could show and leaving one out would make
+the next save of the role that holds it drop it silently; nothing is invented
+that nobody holds. It is not the limit of what a role may hold, though:
+`Roles::apiSave()` checks each permission for shape (`PERM_PATTERN`) and
+refuses a malformed one by name, so a scoped permission can be typed into the
+roles form. What an account may do is `\Nino\Auth::permissions()`: its own
+`perms` plus its role's (`/nino/auth/roles`), and every guard reads that.
+
+A panel's own permission is a door. What may be done once inside it can be
+described further with a **scoped permission** - one string per action, and per
+field or key where that is the unit:
+`/_admin/elements/services/update/title`, `/_admin/text/update/page-home/*`.
+They are ordinary permission strings, so `\Nino\Auth::checkPermission()`'s
+`/*` ancestor rule is what makes a whole type or group grantable at once, and
+`\Nino\Admin\Admin::scoped( $appData, $prefix, $perm )` is what a panel calls:
+it answers true unmodified for an account holding none of them under `$prefix`
+(`isScoped()`), so a panel permission keeps meaning what it always meant, and
+checks the specific string for an account that holds one. A panel that grows
+scoped permissions sends what the current account may do along with its data
+(see `Elements\Admin::rights()`, `Text\Admin::apiKeys()`) so its form can draw
+itself accordingly - the enforcement stays in the action methods.
+
+Choose one stable slug and use it everywhere:
 
 | Place | Example |
 | --- | --- |
-| Backend class | `ProjectNotes` |
-| Action prefix | `devnotes/*` |
-| `nav()` URI | `notes` |
-| Nav ID | `admin-nav-notes` |
-| Pane ID | `admin-content-notes` |
-| Shell class | `show-notes` |
-| JS namespace | `Nino.admin.notes` |
-| Asset | `_admin/assets/notes.js` |
-
-Action names MUST be globally unique across all classes in `Admin::MODULES`.
+| Panel class | `Project\Catalog\Catalog\Admin` (module) or `Nino\Admin\ProjectNotes` (core) |
+| Permission | `/_admin/catalog/manage` |
+| Action prefix | `catalog/*` |
+| `nav()` uri | `catalog` |
+| Pane mount ids | `catalog-list`, `catalog-form` |
+| JS namespace | `Nino.admin.catalog` |
+| Asset | `app/Project/Catalog/Catalog/assets/admin.js` |
 
 ### 7.2 Backend skeleton
 
-Put the class in the existing `namespace Nino\Admin` block:
+A panel of the project module from recipe 8, in
+`app/Project/Catalog/Catalog/Admin/Admin.php`:
 
 ```php
-class ProjectNotes {
+<?php
+declare(strict_types=1);
 
-	private const string STORAGE = '/data/project-notes.php';
-	private const int MAX_TITLE_LENGTH = 160;
-	private const int MAX_BODY_LENGTH = 5000;
+namespace Project\Catalog\Catalog {
 
-	public static function actions(): array {
-		return [
-			'devnotes/list' => [ self::class, 'apiList' ],
-			'devnotes/save' => [ self::class, 'apiSave' ],
-		];
-	}
+	class Admin {
 
-	public static function nav(): array {
-		return [ 'notes', 'Project Notes' ];
-	}
+		public const string MANAGE_PERM = '/_admin/catalog/manage';
 
-	public static function apiList( array &$appData, array &$request ): void {
+		private const string STORAGE = '/data/catalog-notes.php';
+		private const int MAX_TITLE_LENGTH = 160;
+		private const int MAX_BODY_LENGTH = 5000;
 
-		if( Admin::guard( $appData, $request ) === false )
-			return;
-
-		$notes = \Nino\Filesystem::getFileContent(
-			$appData,
-			self::STORAGE,
-			[]
-		);
-
-		if( is_array( $notes ) === false )
-			$notes = [];
-
-		\Nino\Http::ok( $request, [
-			'notes' => array_values( $notes ),
-		] );
-	}
-
-	public static function apiSave( array &$appData, array &$request ): void {
-
-		if( Admin::guard( $appData, $request ) === false )
-			return;
-
-		$data  = Admin::postData();
-		$id    = strtolower( trim( (string) ( $data['id'] ?? '' ) ) );
-		$title = trim( (string) ( $data['title'] ?? '' ) );
-		$body  = trim( (string) ( $data['body'] ?? '' ) );
-
-		if( preg_match( '/^[a-z][a-z0-9-]*$/', $id ) !== 1 ) {
-			\Nino\Http::fail( $request, 400, 'invalid note id' );
-			return;
+		public static function actions(): array {
+			return [
+				'catalog/list' => [ self::class, 'apiList' ],
+				'catalog/save' => [ self::class, 'apiSave' ],
+			];
 		}
 
-		if(
-			$title === ''
-			|| strlen( $title ) > self::MAX_TITLE_LENGTH
-			|| strlen( $body ) > self::MAX_BODY_LENGTH
-		) {
-			\Nino\Http::fail( $request, 400, 'invalid note content' );
-			return;
+		public static function nav(): array {
+			return [ 'catalog', '/_admin/nav/catalog', 60, 'content' ];
 		}
 
-		$entry = [
-			'id'      => $id,
-			'title'   => $title,
-			'body'    => $body,
-			'updated' => date( DATE_ATOM ),
-		];
+		public static function perm(): string {
+			return self::MANAGE_PERM;
+		}
 
-		$written = \Nino\Filesystem::mutate(
-			$appData,
-			self::STORAGE,
-			function( mixed $state ) use ( $id, $entry ): array {
+		public static function panes(): array {
+			return [ 'catalog-list', 'catalog-form' ];
+		}
+
+		public static function assets(): array {
+			return [ \Nino\Admin\Panels::relative( dirname( __DIR__ ). '/assets/admin.js' ) ];
+		}
+
+		public static function text(): string {
+			return \Nino\Admin\Panels::relative( dirname( __DIR__ ). '/text' );
+		}
+
+		public static function summary( array &$appData ): array {
+			return [ 'value' => count( self::_notes( $appData ) ), 'label' => '/_admin/catalog/label/count' ];
+		}
+
+		public static function log( string $action, array $data ): string {
+			return $action === 'catalog/save' ? 'Saved catalog note "'. (string) ( $data['id'] ?? '' ). '"' : '';
+		}
+
+		public static function apiList( array &$appData, array &$request ): void {
+
+			if( \Nino\Admin\Admin::guardPerm( $appData, $request, self::MANAGE_PERM ) === false )
+				return;
+
+			\Nino\Http::ok( $request, [ 'notes' => array_values( self::_notes( $appData ) ) ] );
+		}
+
+		public static function apiSave( array &$appData, array &$request ): void {
+
+			if( \Nino\Admin\Admin::guardPerm( $appData, $request, self::MANAGE_PERM ) === false )
+				return;
+
+			$data  = \Nino\Admin\Admin::postData();
+			$id    = strtolower( trim( (string) ( $data['id'] ?? '' ) ) );
+			$title = trim( (string) ( $data['title'] ?? '' ) );
+			$body  = trim( (string) ( $data['body'] ?? '' ) );
+
+			if( preg_match( '/^[a-z][a-z0-9-]*$/', $id ) !== 1 ) {
+				\Nino\Http::fail( $request, 400, 'invalid note id' );
+				return;
+			}
+
+			if( $title === '' || strlen( $title ) > self::MAX_TITLE_LENGTH || strlen( $body ) > self::MAX_BODY_LENGTH ) {
+				\Nino\Http::fail( $request, 400, 'invalid note content' );
+				return;
+			}
+
+			$entry = [
+				'id'      => $id,
+				'title'   => $title,
+				'body'    => $body,
+				'updated' => date( DATE_ATOM ),
+			];
+
+			$written = \Nino\Filesystem::mutate( $appData, self::STORAGE, function( mixed $state ) use ( $id, $entry ): array {
 				$notes = is_array( $state ) ? $state : [];
 				$notes[$id] = $entry;
 				ksort( $notes );
 				return $notes;
-			},
-			[]
-		);
+			}, [] );
 
-		if( $written === false ) {
-			\Nino\Http::fail( $request, 500, 'could not save note' );
-			return;
+			if( $written === false ) {
+				\Nino\Http::fail( $request, 500, 'could not save note' );
+				return;
+			}
+
+			\Nino\Http::ok( $request, [ 'note' => $entry ] );
 		}
 
-		\Nino\Http::ok( $request, [ 'note' => $entry ] );
+		private static function _notes( array &$appData ): array {
+
+			$notes = \Nino\Filesystem::getFileContent( $appData, self::STORAGE, [] );
+
+			return is_array( $notes ) === true ? $notes : [];
+		}
 	}
+
 }
 ```
 
+The module answers with the class name, and nothing else is registered
+anywhere:
+
+```php
+public static function adminPanels( array &$appData ): array {
+	return [ \Project\Catalog\Catalog\Admin::class ];
+}
+```
+
+`text()` names a directory of `<locale>.php` files with the same shape as
+`_admin/text/<locale>.php`; they are merged into the workbench's fills for the
+current UI locale, so `[[/_admin/nav/catalog]]` and the tile label resolve
+like the tool's own:
+
+```php
+<?php
+return [
+	'[[/_admin/nav/catalog]]'         => 'Catalog',
+	'[[/_admin/catalog/label/count]]' => 'Catalog entries',
+];
+```
+
+A workbench panel has the identical body; it lives in
+`_admin/Nino/Modules/<Name>/Admin/Admin.php` (namespace `Nino\Modules\<Name>`,
+so `\Nino\Admin\Admin::guardPerm()` is spelled out there too) and needs no
+registration at all - `Admin::modules()` reads the directory. The runtime half
+of the same module name stays where it belongs: `\Nino\Modules\Elements` is
+the kernel's module in `_nino/`, `\Nino\Modules\Elements\Admin` the screen
+for it in `_admin/`.
+
 This skeleton demonstrates the required invariants:
 
-- Every API method calls `Admin::guard()` itself.
+- Every API method calls the guard itself, with the panel's permission.
 - Payload comes from `Admin::postData()`, which decodes the JSON `data` field.
 - IDs, lengths, and required fields are validated server-side.
 - The file update is atomic.
 - The response uses `Http::ok()` or `Http::fail()`.
 - Nothing is directly printed.
-
-Do not rely only on `Admin::handlePost()` having already authenticated. The
-method-level guard protects direct calls in tests and future dispatch changes.
 
 For configuration rather than module-owned records, update only the intended
 `$appData` key and call `AppData::writeContentData()`. For Elements, Text,
@@ -593,102 +812,95 @@ Destructive actions need:
 - cleanup limited to resources actually owned by the record,
 - and tests that unrelated files/data survive.
 
-### 7.3 Register the backend
+### 7.3 A panel with its own template, layout and icon
 
-Add the class to `Admin::MODULES`:
+A panel that lays out its own regions - a two-column editor, a three-column
+workspace - answers `template()` instead of `panes()`, and the registry
+renders that file whole into the pane through the `[template]` shortcode, so
+its fills (`[[/nino/dir]]`, the panel's own text keys) resolve like the
+shell's. The file is a fragment: no `<html>`, no `[csrf]` (the page has one),
+no `<link>` or `<script>` (the panel's `assets()` are bundled). Every id and
+class in it is the panel's own; the components are the design system's.
+`app/Nino/Modules/Design` (four editors under a tab strip, `layout()` =
+`'page'`) and `app/Nino/Modules/Templates` (the Template Builder, `layout()` =
+`'workspace'`) are the shipped references:
 
 ```php
-private const array MODULES = [
-	// Existing modules...
-	\Nino\Admin\ProjectNotes::class,
-];
+public static function template(): string {
+	return \Nino\Admin\Panels::relative( dirname( __DIR__ ). '/templates/panel' );
+}
+
+public static function layout(): string {
+	return 'workspace';
+}
+
+public static function icon(): string {
+	return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="18" height="7" x="3" y="3" rx="1"/><rect width="9" height="7" x="3" y="14" rx="1"/><rect width="5" height="7" x="16" y="14" rx="1"/></svg>';
+}
 ```
 
-Do not add runtime project modules here. This list only supplies Admin action
-maps.
+A `workspace` panel gets the whole pane (no reading-width ceiling, no
+padding) and folds the rail to its icons when it is selected; the account can
+pin the rail either way, and the shell remembers that in `localStorage`. The
+panel lays out its own regions inside `#<its-root>` and scrolls them itself -
+on a desktop the pane is `100dvh` tall. A `page` panel is a column of content
+at reading width, like every other panel.
 
-### 7.4 Extend the Admin shell
+### 7.4 Frontend skeleton
 
-Add all three shell pieces to `_admin/templates/page-index.tpl`:
-
-```html
-<a href="#" id="admin-nav-notes">Project Notes</a>
-```
-
-```html
-<div id="admin-content-notes">
-	<div id="notes-list"></div>
-	<div id="notes-form"></div>
-</div>
-```
-
-```html
-<script src="[[/nino/dir]]/_admin/assets/notes.js"></script>
-```
-
-Then register the tab in `_admin/assets/script.js`:
-
-```js
-notes : [ 'show-notes', function() { Nino.admin.notes.showCurrent() } ],
-```
-
-Keep the template nav order, content order, `TABS` order, and
-`Admin::MODULES` order intentionally aligned.
-
-### 7.5 Frontend skeleton
-
-The following is a minimal list/edit lifecycle. Adapt field names, but preserve
-the API, DOM safety, and lifecycle shape:
+The shell shows the pane whose `data-panel` matches the selected link and
+calls `Nino.admin.<uri>.showCurrent()` when a tab is selected, if such a
+function exists - which is also where a panel loads its data the first time,
+so a panel nobody opens costs no request. Inside the pane the panel owns its
+mount points (`panes()`), and toggles between them with the shell's
+`admin-hidden` class. The url hash is the panel's to deep-link into:
+`Nino.admin.router.set( 'catalog', [ id ] )` while the panel is on screen,
+`Nino.admin.router.current()` to read it back on load. The following is a minimal list/edit
+lifecycle; adapt field names, but preserve the API, DOM safety, and lifecycle
+shape:
 
 ```js
 ( function(wn,dc) {
 
 	wn.Nino.admin = wn.Nino.admin || {};
 
-	Nino.admin.notes = {
+	Nino.admin.catalog = {
 
 		_items : [],
 		_ready : false,
 
 		init : function() {
 
-			if( dc.getElementById('notes-list') === null )
+			if( dc.getElementById('catalog-list') === null )
 				return;
 
-			Nino.admin.notes._apiCall( 'list', {}, function( status, response ) {
+			Nino.admin.catalog._apiCall( 'list', {}, function( status, response ) {
 				if( status !== 200 || response === null )
-					return Nino.admin.notes._showError(
-						dc.getElementById('notes-list'),
-						status,
-						response
-					);
+					return Nino.admin.catalog._showError( dc.getElementById('catalog-list'), status, response );
 
-				Nino.admin.notes._items = response.notes || [];
-				Nino.admin.notes._renderList();
-				Nino.admin.notes._showList();
-				Nino.admin.notes._ready = true;
+				Nino.admin.catalog._items = response.notes || [];
+				Nino.admin.catalog._renderList();
+				Nino.admin.catalog._showList();
+				Nino.admin.catalog._ready = true;
 			} );
 		},
 
 		showCurrent : function() {
 
-			if( Nino.admin.notes._ready === false )
+			if( Nino.admin.catalog._ready === false )
 				return;
 
-			if(
-				dc.getElementById('notes-form')
-					.classList.contains('admin-hidden') === false
-			)
+			if( dc.getElementById('catalog-form').classList.contains('admin-hidden') === false )
 				return;
 
-			Nino.admin.notes._showList();
+			Nino.admin.catalog._showList();
 		},
 
 		_apiCall : function( endpoint, payload, callback ) {
 			Nino.http.sendRequest( '/_admin/', 'POST', function( xhr ) {
 				callback( xhr.status, xhr.responseJSON );
 			}, {
-				action : 'devnotes/'+ endpoint,
+				action : 'catalog/'+ endpoint,
 				data : JSON.stringify( payload ),
 			} );
 		},
@@ -697,42 +909,39 @@ the API, DOM safety, and lifecycle shape:
 			container.innerHTML = '';
 			const message = dc.createElement('p');
 			message.className = 'nino-admin-error';
-			message.textContent = '('+ status+ ') '
-				+ ( response && response.error
-					? response.error
-					: 'Request failed.' );
+			message.textContent = '('+ status+ ') '+ ( response && response.error ? response.error : 'Request failed.' );
 			container.appendChild( message );
 		},
 
 		_showList : function() {
-			dc.getElementById('notes-list').classList.remove('admin-hidden');
-			dc.getElementById('notes-form').classList.add('admin-hidden');
+			dc.getElementById('catalog-list').classList.remove('admin-hidden');
+			dc.getElementById('catalog-form').classList.add('admin-hidden');
 		},
 
 		_showForm : function() {
-			dc.getElementById('notes-list').classList.add('admin-hidden');
-			dc.getElementById('notes-form').classList.remove('admin-hidden');
+			dc.getElementById('catalog-list').classList.add('admin-hidden');
+			dc.getElementById('catalog-form').classList.remove('admin-hidden');
 		},
 
 		_renderList : function() {
 
-			const wrap = dc.getElementById('notes-list');
+			const wrap = dc.getElementById('catalog-list');
 			wrap.innerHTML = '';
 
 			const heading = dc.createElement('h2');
-			heading.textContent = 'Project Notes';
+			heading.textContent = 'Catalog';
 			wrap.appendChild( heading );
 
 			const list = dc.createElement('ul');
 			list.className = 'nino-admin-list';
 
-			if( Nino.admin.notes._items.length === 0 ) {
+			if( Nino.admin.catalog._items.length === 0 ) {
 				const empty = dc.createElement('p');
-				empty.textContent = 'No project notes yet.';
+				empty.textContent = 'No catalog notes yet.';
 				wrap.appendChild( empty );
 			}
 
-			Nino.admin.notes._items.forEach( function( item ) {
+			Nino.admin.catalog._items.forEach( function( item ) {
 				const li = dc.createElement('li');
 				const link = dc.createElement('a');
 				const title = dc.createElement('strong');
@@ -746,7 +955,7 @@ the API, DOM safety, and lifecycle shape:
 				link.appendChild( meta );
 				link.addEventListener( 'click', function( event ) {
 					event.preventDefault();
-					Nino.admin.notes._renderForm( item );
+					Nino.admin.catalog._renderForm( item );
 				} );
 
 				li.appendChild( link );
@@ -760,23 +969,23 @@ the API, DOM safety, and lifecycle shape:
 			add.className = 'nino-btn nino-btn--primary';
 			add.textContent = 'New note';
 			add.addEventListener( 'click', function() {
-				Nino.admin.notes._renderForm( null );
+				Nino.admin.catalog._renderForm( null );
 			} );
 			wrap.appendChild( Nino.adminUi.listActions( [ add ] ) );
 		},
 
 		_renderForm : function( item ) {
 
-			const wrap = dc.getElementById('notes-form');
+			const wrap = dc.getElementById('catalog-form');
 			wrap.innerHTML = '';
 
 			const back = dc.createElement('a');
 			back.href = '#';
 			back.className = 'nino-admin-back-link';
-			back.textContent = 'Back to project notes';
+			back.textContent = 'Back to catalog';
 			back.addEventListener( 'click', function( event ) {
 				event.preventDefault();
-				Nino.admin.notes._showList();
+				Nino.admin.catalog._showList();
 			} );
 			wrap.appendChild( Nino.admin.formToolbar( back ) );
 
@@ -795,8 +1004,8 @@ the API, DOM safety, and lifecycle shape:
 			heading.textContent = item ? 'Edit note' : 'New note';
 
 			idLabel.textContent = 'ID';
-			idLabel.htmlFor = 'notes-id';
-			id.id = 'notes-id';
+			idLabel.htmlFor = 'catalog-id';
+			id.id = 'catalog-id';
 			id.type = 'text';
 			id.name = 'id';
 			id.pattern = '[a-z][a-z0-9-]*';
@@ -805,8 +1014,8 @@ the API, DOM safety, and lifecycle shape:
 			id.disabled = item !== null;
 
 			titleLabel.textContent = 'Title';
-			titleLabel.htmlFor = 'notes-title';
-			title.id = 'notes-title';
+			titleLabel.htmlFor = 'catalog-title';
+			title.id = 'catalog-title';
 			title.type = 'text';
 			title.name = 'title';
 			title.maxLength = 160;
@@ -814,8 +1023,8 @@ the API, DOM safety, and lifecycle shape:
 			title.value = item ? item.title : '';
 
 			bodyLabel.textContent = 'Body';
-			bodyLabel.htmlFor = 'notes-body';
-			body.id = 'notes-body';
+			bodyLabel.htmlFor = 'catalog-body';
+			body.id = 'catalog-body';
 			body.name = 'body';
 			body.maxLength = 5000;
 			body.value = item ? item.body : '';
@@ -845,7 +1054,7 @@ the API, DOM safety, and lifecycle shape:
 				save.disabled = true;
 				message.textContent = 'Saving …';
 
-				Nino.admin.notes._apiCall( 'save', {
+				Nino.admin.catalog._apiCall( 'save', {
 					id : id.value,
 					title : title.value,
 					body : body.value,
@@ -853,83 +1062,89 @@ the API, DOM safety, and lifecycle shape:
 					save.disabled = false;
 
 					if( status !== 200 ) {
-						message.textContent = response && response.error
-							? response.error
-							: 'Could not save.';
+						message.textContent = response && response.error ? response.error : 'Could not save.';
 						return;
 					}
 
-					const index = Nino.admin.notes._items.findIndex(
-						function( current ) {
-							return current.id === response.note.id;
-						}
-					);
+					const index = Nino.admin.catalog._items.findIndex( function( current ) {
+						return current.id === response.note.id;
+					} );
 					if( index === -1 )
-						Nino.admin.notes._items.push( response.note );
+						Nino.admin.catalog._items.push( response.note );
 					else
-						Nino.admin.notes._items[index] = response.note;
+						Nino.admin.catalog._items[index] = response.note;
 
-					Nino.admin.notes._items.sort( function( a, b ) {
+					Nino.admin.catalog._items.sort( function( a, b ) {
 						return a.id.localeCompare( b.id );
 					} );
-					Nino.admin.notes._renderList();
-					Nino.admin.notes._showList();
+					Nino.admin.catalog._renderList();
+					Nino.admin.catalog._showList();
 				} );
 			} );
 
 			wrap.appendChild( form );
-			Nino.admin.notes._showForm();
+			Nino.admin.catalog._showForm();
 			title.focus();
 		},
 
 	};
 
-	Nino.events.bindCallback( 'ready', Nino.admin.notes.init );
+	Nino.events.bindCallback( 'ready', Nino.admin.catalog.init );
 
 } )(window,document);
 ```
 
-Do not copy the skeleton blindly if an existing Admin module already solves the
-same list, locale, upload, rich-text, reorder, relationship, or confirmation
+Do not copy the skeleton blindly if an existing panel already solves the same
+list, locale, upload, rich-text, reorder, relationship, or confirmation
 problem. Reuse its exact public helper and adapt the nearest implementation.
-For a registry plus ordered route membership, inspect `Navigations` and
-`_admin/assets/navs.js`.
+For a registry plus ordered route membership, inspect
+`\Nino\Modules\Navigation\Admin` and
+`app/Nino/Modules/Navigation/assets/admin.js`; for the smallest complete
+panel, `\Nino\Modules\Search\Admin` and its `assets/admin.js`.
 
-### 7.6 Admin tests
+### 7.5 Panel tests
 
-Backend tests belong in `tests/admin-smoke.php`. They MUST exercise:
+Backend tests belong in `tests/admin-smoke.php` (content panels, accounts)
+or `tests/admin-system-smoke.php` (structure and system panels, the registry
+contract, recovery). They MUST exercise:
 
-- unauthenticated rejection,
+- unauthenticated rejection (`401`) and a missing permission (`403`),
 - successful list and save,
 - malformed IDs and fields,
 - maximum lengths and unexpected payload shape,
 - persistence after a fresh read,
 - an existing-record update,
 - a failed or vetoed write if the feature supports one,
-- and survival of unrelated records during update/delete.
+- survival of unrelated records during update/delete,
+- and, for a module panel, that the panel is absent from the registry and its
+  actions are unknown while the module is not in `/nino/modules`.
 
-JavaScript behavior belongs in a focused `tests/admin-<slug>-js-smoke.js` or an
-existing shared Admin smoke test. At minimum assert:
+The registry itself is covered once, in the "registry contract" blocks of
+both suites; a new panel does not repeat those checks.
 
-- asset and namespace load,
+JavaScript behavior belongs in a focused `tests/admin-<slug>-js-smoke.js` or
+an existing shared smoke test. At minimum assert:
+
+- asset and namespace load, and the namespace equals the nav uri,
 - action names and JSON payload shape,
 - list-to-form and back lifecycle,
 - server text is inserted safely,
 - save updates the model/UI,
-- shared list/context/action bars are used,
-- and the Admin template and `TABS` contain matching IDs.
+- and shared list/context/action bars are used.
 
 Run:
 
 ```bash
-php -l _admin/Admin.php
-node --check _admin/assets/notes.js
+php -l app/Project/Catalog/Catalog/Admin/Admin.php
+node --check app/Project/Catalog/Catalog/assets/admin.js
 php tests/admin-smoke.php
-node tests/admin-notes-js-smoke.js
+php tests/admin-system-smoke.php
+node tests/admin-catalog-js-smoke.js
 node tests/admin-lists-js-smoke.js
 ```
 
 Use the actual test filename created by the change.
+
 
 ## 8. Recipe: add a runtime module
 
@@ -948,20 +1163,25 @@ Path:  app/Project/Catalog/Catalog/Catalog.php
 ```
 
 ```text
-Class: Nino\Modules\Catalog
-Path:  _nino/Nino/Modules/Catalog/Catalog.php
+Class: Nino\Modules\Form
+Path:  _nino/Nino/Modules/Form/Form.php   (looked for first)
+       app/Nino/Modules/Form/Form.php     (where it is delivered)
 ```
 
 The lookup roots are deliberately different:
 
 - `Nino\*` is kernel-owned and resolves only below `_nino/`. A project cannot
   shadow a kernel class from its application root.
-- Every other namespace resolves below `app/` first. If `NINO_APP_DIR` was
-  defined as an absolute directory path before `_nino/Nino.php` was loaded,
-  that directory replaces `app/`.
-- Non-`Nino\` classes then fall back to `_nino/` for compatibility with
-  existing projects. This fallback is not the destination for new project
-  code; keeping custom classes in `app/` makes `_nino/` replaceable.
+- `Nino\Modules\*` is the one opening: looked for below `_nino/` first, then
+  below the application root. Nino's optional modules - `Form`, `Newsletter`,
+  `Navigation`, `Search`, `Localepicker`, `Design`, `Templates` - are delivered
+  at `app/Nino/Modules/<Name>/`, where a project deletes the ones it does not
+  need and updates the ones it keeps itself; `_nino/` stays replaceable
+  wholesale. A kernel module of the same name would win.
+- Every other namespace resolves below `app/` and nowhere else. If
+  `NINO_APP_DIR` was defined as an absolute directory path before
+  `_nino/Nino.php` was loaded, that directory replaces `app/` - for the
+  delivered optional modules too, so a relocated app dir takes them along.
 
 Within whichever root applies, the exact formula is:
 
@@ -977,8 +1197,20 @@ Therefore:
 - class names MUST never be built from request data;
 - do not add manual `require` calls for a correctly located module.
 
-Built-in Nino modules use namespace `Nino\Modules`. Project-specific modules
-SHOULD use a project namespace so future Nino classes cannot collide.
+Nino's own modules use namespace `Nino\Modules`. Project-specific modules
+MUST use a project namespace so future Nino classes cannot collide.
+
+Everything a module brings lives in its directory, below the class file:
+
+```text
+app/Project/Catalog/Catalog/
+├── Catalog.php            the runtime module, class Project\Catalog\Catalog
+├── Admin/Admin.php        optional workbench panel, answered by adminPanels() (7.)
+├── assets/                the panel's own .js/.css
+├── text/<locale>.php      the panel's fills
+├── templates/panel.tpl    the panel's markup, when it answers template() (7.3)
+└── install/               optional installer unit, found by Setup::units() (9.)
+```
 
 ### 8.2 Minimal complete module
 
@@ -1217,7 +1449,7 @@ Add focused coverage to `tests/kernel-smoke.php` or a dedicated standalone
 smoke script consistent with the suite. Test:
 
 - autoloading from the exact default or `NINO_APP_DIR` path, including the
-  kernel namespace guard and legacy fallback;
+  kernel namespace guard and the `Nino\Modules\*` second root;
 - activation through `/nino/modules`;
 - repeated `init()` behavior where relevant;
 - route registration and internal callback identity;
@@ -1240,43 +1472,74 @@ php tests/concurrency-smoke.php
 If the module adds frontend JavaScript, also run `node --check` and add a Node
 smoke test for its behavior rather than testing only for the file's presence.
 
+### 8.7 Panels, the installer unit and Restore
+
+A feature is one directory: add it and everything appears, remove it and
+everything is gone. Three optional hooks make that true for the management
+tools and the installer:
+
+- `adminPanels( array &$appData ): array` returns panel class names (recipe
+  7). The kernel asks through `\Nino\Modules::collect()`, in `/nino/modules`
+  order and only while the module is active, so the screens come and go with
+  the module.
+- `install/manifest.php` beside the class makes the module selectable in
+  the setup wizard (recipe 9). No wizard file lists it. A module that is a
+  panel and nothing else - Design, Templates - has no unit: the wizard's
+  Setup step lists `Install\Setup::TOOL_MODULES` in `/nino/modules` whenever
+  their class exists.
+- `'/nino/admin/restore'` (args `dataDir`, `staging`) is the callback a module
+  registers in `init()` when it keeps its own files under `data/` that a
+  backup carries: the Backups panel (and the recovery page) call it with the
+  staged backup and the live data directory, and the module merges what is
+  its own - `Newsletter::callbackRestore()` is the reference. Restore itself
+  knows no module.
+
 ## 9. Recipe: add an installer module package
 
-An installer package makes a feature selectable in `/_install`. It can activate
-a runtime class, copy templates/assets/element types, merge text, add owned
-routes, and supply configuration defaults.
+An installer package (a *unit*) makes a feature selectable in the setup
+wizard. It can activate a runtime class, copy templates/assets/element types,
+merge text, add owned routes, and supply configuration defaults.
 
-It does not execute as the runtime module. A built-in runtime class must already
-be shipped at its valid `_nino/Nino/...` autoload path; a project-owned runtime
-class belongs at its valid `app/...` path (or below `NINO_APP_DIR`). The legacy
-non-`Nino\` fallback under `_nino/` is compatibility behavior, not a target for
-new installer output.
+It does not execute as the runtime module. The unit is a directory named
+`install/` beside the module's class file, and the wizard finds it there:
+`\Nino\Install\Setup::units()` scans `_nino/Nino/Modules/<Name>/install/`,
+then `<app>/Nino/Modules/<Name>/install/` (Nino's delivered optional modules),
+then the whole app dir (`app/`, or `NINO_APP_DIR`) up to four levels deep, and
+`_admin/install/library/modules/<key>/` for a unit that has no runtime class.
+Nothing in `_admin/install/` lists a module. A runtime class must already be
+shipped at its valid autoload path - `_nino/Nino/Modules/<Name>/` for a kernel
+module, `app/Nino/Modules/<Name>/` for one of Nino's optional modules,
+`app/<Vendor>/...` (or below `NINO_APP_DIR`) for a project's own.
 
 ### 9.1 Directory shape
 
 ```text
-_install/library/modules/catalog/
-├── manifest.php
-├── templates/
-│   └── section-catalog.tpl
-├── text/
-│   ├── global.php
-│   ├── en_US.php
-│   └── de_DE.php
-├── catalog-items.php
-└── assets/
-    └── catalog/
-        ├── catalog.css
-        └── catalog.js
+app/Project/Catalog/Catalog/
+├── Catalog.php
+└── install/
+    ├── manifest.php
+    ├── templates/
+    │   └── section-catalog.tpl
+    ├── text/
+    │   ├── global.php
+    │   ├── en_US.php
+    │   └── de_DE.php
+    ├── catalog-items.php
+    └── assets/
+        └── catalog/
+            ├── catalog.css
+            └── catalog.js
 ```
 
-The matching runtime class could be:
-
-```text
-_nino/Nino/Modules/Catalog/Catalog.php
-```
-
-with class `\Nino\Modules\Catalog`.
+Nino's own optional modules keep theirs at `app/Nino/Modules/<Name>/install/`
+the same way, and keep their keys: they are scanned before the rest of the
+app dir. The unit's key - what the picker posts and what `requiresModules`
+lists - is the manifest's `key` or, without one, the module directory's
+lowercased name (`Catalog` -> `catalog`). It MUST be a slug
+(`/^[a-z][a-z0-9-]*$/`) and unique across every unit: the first unit to claim a
+key keeps it, a later one is dropped with a warning naming both directories.
+`Modules\Form` declares `'key' => 'forms'` because the page library has always
+required `forms`.
 
 ### 9.2 Complete manifest example
 
@@ -1285,8 +1548,9 @@ with class `\Nino\Modules\Catalog`.
 declare(strict_types=1);
 
 return [
+	'key' => 'catalog',
 	'label' => 'Catalog',
-	'moduleClass' => '\\Nino\\Modules\\Catalog',
+	'moduleClass' => '\\Project\\Catalog\\Catalog',
 	'requiresModules' => [],
 	'templates' => [
 		'section-catalog.tpl',
@@ -1312,9 +1576,11 @@ Supported unit keys in the current installer:
 
 | Key | Meaning |
 | --- | --- |
+| `key` | Unit key; default is the module directory's lowercased name |
 | `label` | Picker label |
+| `preset` | `true` pre-checks the unit on a project that has never applied Setup |
 | `moduleClass` | Full runtime class added to `/nino/modules` |
-| `requiresModules` | Other installer module directory slugs |
+| `requiresModules` | Other units' keys |
 | `routes` | Installer-owned route map |
 | `templates` | Files copied from the unit's `templates/` |
 | `files` | Files/directories copied to the same project-relative path |
@@ -1329,13 +1595,14 @@ frontend.
 
 ### 9.3 Requirements
 
-`requiresModules` contains installer directory keys, not PHP class names:
+`requiresModules` contains unit keys, not PHP class names:
 
 ```php
 'requiresModules' => [ 'forms', 'navigation' ],
 ```
 
-The Setup step resolves module requirements transitively. Keep the dependency
+The Setup step resolves module requirements transitively. A requirement no
+unit answers to is skipped with a warning, never applied. Keep the dependency
 graph small and acyclic even though the resolver terminates cycles. A cycle
 usually indicates mixed responsibilities.
 
@@ -1400,7 +1667,7 @@ or another broad tree when the feature owns only one subdirectory.
 ```
 
 The source is
-`_install/library/modules/catalog/catalog-items.php` and the destination is
+`app/Project/Catalog/Catalog/install/catalog-items.php` and the destination is
 `elements/catalog-items.php`. Keep these source filenames flat and validate
 them in tests.
 
@@ -1408,7 +1675,7 @@ them in tests.
 
 Text files return bracketed textfill keys:
 
-`_install/library/modules/catalog/text/global.php`:
+`install/text/global.php`:
 
 ```php
 <?php
@@ -1419,7 +1686,7 @@ return [
 ];
 ```
 
-`_install/library/modules/catalog/text/en_US.php`:
+`install/text/en_US.php`:
 
 ```php
 <?php
@@ -1431,7 +1698,7 @@ return [
 ];
 ```
 
-`_install/library/modules/catalog/text/de_DE.php`:
+`install/text/de_DE.php`:
 
 ```php
 <?php
@@ -1482,7 +1749,8 @@ potentially edited project files would be destructive.
 
 Extend `tests/install-smoke.php`. Test:
 
-- the unit appears with label and requirements;
+- `Setup::units()` finds the unit under its key, and the unit appears in the
+  picker with label and requirements;
 - direct selection activates `moduleClass`;
 - requirements are selected transitively;
 - reapplying the complete selection does not duplicate modules;
@@ -1497,11 +1765,11 @@ Extend `tests/install-smoke.php`. Test:
 Run:
 
 ```bash
-php -l _install/library/modules/catalog/manifest.php
-php -l _install/library/modules/catalog/text/global.php
-php -l _install/library/modules/catalog/text/en_US.php
-php -l _install/library/modules/catalog/text/de_DE.php
-php -l _install/library/modules/catalog/catalog-items.php
+php -l app/Project/Catalog/Catalog/install/manifest.php
+php -l app/Project/Catalog/Catalog/install/text/global.php
+php -l app/Project/Catalog/Catalog/install/text/en_US.php
+php -l app/Project/Catalog/Catalog/install/text/de_DE.php
+php -l app/Project/Catalog/Catalog/install/catalog-items.php
 php tests/install-smoke.php
 node tests/install-script-js-smoke.js
 ```
@@ -1509,8 +1777,8 @@ node tests/install-script-js-smoke.js
 
 ## 10. Recipe: add a Section Library preset
 
-A Section Library preset is a discoverable compile-time recipe used by
-`/_templates`. Generated HTML+ is copied into a page template and must remain
+A Section Library preset is a discoverable compile-time recipe used by the
+Templates panel. Generated HTML+ is copied into a page template and must remain
 independent of the library at public runtime.
 
 Every library preset MUST use the named-area manifest contract, version `3`.
@@ -1523,7 +1791,7 @@ source.
 ### 10.1 Directory, slug, and files
 
 ```text
-_templates/library/services-grid/
+app/Nino/Modules/Templates/library/services-grid/
 ├── manifest.php
 └── section.tpl
 ```
@@ -1531,7 +1799,7 @@ _templates/library/services-grid/
 A preset with genuinely different markup can provide several Layout files:
 
 ```text
-_templates/library/fullscreen-image/
+app/Nino/Modules/Templates/library/fullscreen-image/
 ├── manifest.php
 ├── section-cover.tpl
 └── section-parallax.tpl
@@ -1897,8 +2165,8 @@ Extend `tests/templates-smoke.php` and `tests/templates-js-smoke.js`. Test:
 Run:
 
 ```bash
-php -l _templates/Areas.php
-php -l _templates/library/services-grid/manifest.php
+php -l app/Nino/Modules/Templates/AreaComposer/AreaComposer.php
+php -l app/Nino/Modules/Templates/library/services-grid/manifest.php
 php tests/templates-smoke.php
 node tests/templates-js-smoke.js
 ```
@@ -1922,7 +2190,7 @@ route.
 | Locale variant | `page-legal.de_DE.tpl` | Structure that truly differs per locale |
 
 Only `templates/page-*.tpl` files appear as editable documents in
-`/_templates`. Do not prefix reusable includes with `page-`.
+the Templates panel. Do not prefix reusable includes with `page-`.
 
 Include a template without its `.tpl` extension:
 
@@ -2109,7 +2377,7 @@ another without repeating a path the Webpages step can change:
 <a href="[[/webpage/site-contact/uri]]">[[/webpage/site-contact/name]]</a>
 ```
 
-`/_install` and `/_admin` both write that key whenever they save a page: keyed
+The wizard's Routes step and the Routes panel both write that key whenever they save a page: keyed
 by the internal URI like the other three, valued with the page's Http-URI, in
 `text/global.php` because an entry has one Http-URI for every locale, and
 blacklisted as a technical value. Menus still come from `[navigation]`, which
@@ -2189,7 +2457,7 @@ For JS-enhanced controls:
 Create:
 
 ```text
-_install/library/pages/services/
+_admin/install/library/pages/services/
 ├── manifest.php
 ├── images/
 │   └── services-hero.jpg
@@ -2247,7 +2515,7 @@ Every declared `files` entry MUST be a unit-relative file or directory that
 exists. Tests should assert its observable copied output, not merely the
 manifest entry.
 
-Normally one page unit has one route. `/_install` uses the route body to
+Normally one page unit has one route. The wizard uses the route body to
 identify its library unit and lets the developer change:
 
 - its public HTTP URI;
@@ -2324,7 +2592,7 @@ return [
 
 The four `/webpage/<library-slug>/*` keys are suggestions read into the
 installation form. They are stripped from the page fragment during merge.
-`/_install` writes the actual metadata under the internal URI chosen for that
+The wizard writes the actual metadata under the internal URI chosen for that
 page instance - `name`, `title` and `description` per locale, and `uri` once in
 `text/global.php`.
 
@@ -2384,9 +2652,9 @@ Extend `tests/install-smoke.php` for a new page unit and
 Run:
 
 ```bash
-php -l _install/library/pages/services/manifest.php
-php -l _install/library/pages/services/text/en_US.php
-php -l _install/library/pages/services/text/de_DE.php
+php -l _admin/install/library/pages/services/manifest.php
+php -l _admin/install/library/pages/services/text/en_US.php
+php -l _admin/install/library/pages/services/text/de_DE.php
 php tests/install-smoke.php
 php tests/templates-smoke.php
 node tests/templates-js-smoke.js
@@ -2448,10 +2716,13 @@ a partial removal left behind. The cap is enforced in the kernel rather than in
 the form that drew the list: an api caller never went near that control.
 
 Both element forms swap the select for `Nino.adminUi.elementList()`, the shared
-ordered-list control (chosen entries with move/remove, plus a search field over
-the options the form already loaded). It owns no strings — `/_admin` passes
-English literals, `/_editor` passes `Nino.content.getText()` lookups. Do not
-restate it in a tool; see §6a's trap about tool copies of shared components.
+multi-reference control (chosen entries with move/remove, plus a search field
+over the options the form already loaded). It owns no strings — both element
+forms pass `Nino.content.getText()` lookups. Pass `ordered: false` for a value
+that is a set rather than a list: the move buttons go away, because offering
+them says the order carries meaning. The Roles tab's permission picker is that
+mode. Do not restate it in a tool; see §6a's trap about tool copies of shared
+components.
 
 ### 12.2 Named or numbered element uris
 
@@ -2650,7 +2921,7 @@ Elements Area is actually bound to - the auto-generated
 `<page>-<section>-<area>` of a new Area as readily as a type picked under Edit
 Section → Data, so the pair stays correct on the very first insert and after
 any later rebind. The token names a declared Elements Area of the same preset;
-anything else is refused at manifest load. `_templates/library/
+anything else is refused at manifest load. `app/Nino/Modules/Templates/library/
 filterable-grid/` is a complete worked example: a static block (§10.3a) pairs
 `[elementvalues]` with an Elements Area whose `item.data` stamps each card
 with its own field value per §10.3.
@@ -2661,7 +2932,7 @@ token and no Area to follow, so both loops simply name the same collection.
 ### 12.4b Search indexed Elements
 
 The built-in `\Nino\Modules\Search` is configured manually. Do not add it to
-`/_install` or infer its fields from templates:
+the wizard or infer its fields from templates:
 
 ```php
 '/nino/modules' => [
@@ -2769,15 +3040,15 @@ valid or safe for HTML, a path, a header, or a class name.
 
 ### 13.2 Authentication and authorization
 
-- Every Admin API method calls `Admin::guard()`.
-- Every Editor API method follows the Editor's existing auth and permission
-  guard pattern.
+- Every panel API method calls `Admin::guardPerm()` with the panel's own
+  permission; `Admin::guard()` alone is for the one screen every account may
+  use.
 - Runtime management endpoints check a specific
   `Auth::checkPermission()` value.
 - Read and write permissions are distinct when their risk differs.
 - Do not accept a username in the request and check that user's permission as
   authorization for the current caller.
-- Do not expose Admin or Template Builder actions through a new public route.
+- Do not expose workbench actions through a new public route.
 - Session fixation protection and cookie policy remain in the kernel; do not
   implement parallel ad-hoc auth cookies.
 
@@ -2863,11 +3134,11 @@ or escaping.
 
 | Incorrect | Correct |
 | --- | --- |
-| Edit a generated `templates/` file when changing future installs | Edit the owning `_install/library/...` source |
+| Edit a generated `templates/` file when changing future installs | Edit the owning `_admin/install/library/...` source |
 | Assume a page template creates a route | Add a route separately |
 | Call a route “the template” | Keep public route, internal URI, and template body distinct |
-| Add a runtime module to `Admin::MODULES` | Add runtime class to `/nino/modules` |
-| Add only Admin `actions()` and `nav()` | Wire registry, shell, `TABS`, asset, and tests |
+| Register a workbench panel in a list | Nothing to register - put the module under `_admin/Nino/Modules/<Name>/`, `Admin::modules()` reads the directory |
+| Edit the shell template or a tab list to add a screen | Write a panel class; a runtime module answers `adminPanels()`, a workbench module is a directory under `_admin/Nino/Modules/` |
 | Rely only on dispatcher auth | Guard every API method |
 | Use direct `echo`/`header()` | Modify `$request` / use `Http` |
 | Read then write a shared PHP array | Use `Filesystem::mutate()` |
@@ -2903,14 +3174,14 @@ temporary project and must not rely on a previously installed working tree.
 | --- | --- |
 | Kernel, callbacks, rendering, runtime module | `tests/kernel-smoke.php` |
 | Shared writes, locks, logs | `tests/concurrency-smoke.php` plus owner test |
-| Admin backend | `tests/admin-smoke.php` |
-| Admin frontend | relevant `tests/admin-*-js-smoke.js` |
-| Editor backend | `tests/editor-smoke.php` |
-| Editor frontend | relevant `tests/editor-*-js-smoke.js` |
-| Installer behavior/library | `tests/install-smoke.php` and relevant install JS test |
-| Appearance catalogue/backend | `tests/design-smoke.php`, plus `tests/install-smoke.php` when installer application changes |
+| Workbench shell, accounts, content panels | `tests/admin-smoke.php` |
+| Structure/system panels, registry contract, recovery | `tests/admin-system-smoke.php` |
+| Workbench frontend | relevant `tests/admin-*-js-smoke.js` |
+| Setup wizard behavior/library | `tests/install-smoke.php` and relevant install JS test |
+| Design module/panel | `tests/design-smoke.php` and `tests/design-js-smoke.js`, plus `tests/install-smoke.php` when the wizard's application changes |
 | Section preset/Template Builder PHP | `tests/templates-smoke.php` |
 | Template Builder browser behavior | `tests/templates-js-smoke.js` |
+| Search module | `tests/search-smoke.php` |
 | Shared public UI slider/tabs | corresponding `tests/nino-ui-*-js-smoke.js` |
 | Shared management UI/CSS structure | owner tests plus `tests/admin-lists-js-smoke.js` |
 | Multi-element reference control | `tests/nino-ui-elementlist-js-smoke.js` plus both element forms' own tests |
@@ -2919,11 +3190,13 @@ Complete suite:
 
 ```bash
 php tests/kernel-smoke.php
-php tests/editor-smoke.php
 php tests/admin-smoke.php
+php tests/admin-system-smoke.php
 php tests/install-smoke.php
 php tests/design-smoke.php
 php tests/templates-smoke.php
+php tests/search-smoke.php
+php tests/demo-catalogue-smoke.php
 for test in tests/*-js-smoke.js; do node "$test"; done
 php tests/concurrency-smoke.php
 ```
@@ -2989,15 +3262,16 @@ dirty or older tree is not a valid handoff.
 
 ## 16. Definition of done by artifact
 
-### Admin backend done
+### Panel done
 
-- [ ] Backend class has unique actions and per-method guards.
+- [ ] The class answers `actions()`, `nav()` and `perm()`; a runtime module's panel is returned by `adminPanels()`, a workbench one is `_admin/Nino/Modules/<Name>/Admin/Admin.php`.
+- [ ] Actions carry the panel's slug and every method guards itself with `Admin::guardPerm()` and the panel's permission.
 - [ ] Payload, IDs, enums, lengths, and paths are validated.
 - [ ] Persistence is atomic and failures are returned.
-- [ ] `Admin::MODULES`, shell nav/pane/script, and `TABS` are synchronized.
+- [ ] `assets()` names project-relative `.js`/`.css` only (through `Panels::relative()` for a module); the JS namespace equals the nav uri; a `template()` is a fragment with no head, link or script of its own.
 - [ ] JS uses existing UI primitives and safe DOM construction.
 - [ ] Empty, loading, error, list, form, and saved states are usable.
-- [ ] Backend and JS tests cover denial and mutation.
+- [ ] Backend and JS tests cover denial, mutation, and - for a module panel - absence while the module is off.
 
 ### Runtime module done
 
@@ -3011,6 +3285,7 @@ dirty or older tree is not a valid handoff.
 
 ### Installer module package done
 
+- [ ] The unit is the module's own `install/` directory and its key is a unique slug.
 - [ ] Runtime class exists independently of the manifest.
 - [ ] Manifest uses recognized keys and installer slugs for requirements.
 - [ ] Templates/files/types/text land in exact paths.
@@ -3066,22 +3341,24 @@ Read these before designing a new implementation:
 | Need | Start with |
 | --- | --- |
 | Runtime lifecycle/APIs | `docs/development.md` and `_nino/Nino.php` |
-| Simple shortcode module | `_nino/Nino/Modules/Navigation/Navigation.php` |
-| Public validated form | `_nino/Nino/Modules/Form/Form.php` |
-| Privacy-sensitive public flow | `_nino/Nino/Modules/Newsletter/Newsletter.php` |
-| Admin backend patterns | `_admin/Admin.php` |
-| Admin list/form JS | `_admin/assets/elementtypes.js`, `elements.js`, `pages.js` |
-| Ordered Admin relationships | `\Nino\Admin\Navigations` and `_admin/assets/navs.js` |
-| Shared Admin UI | `_nino/Nino.admin.css` and `_nino/Nino.admin.js` |
-| Installer package shape | `_install/library/modules/*/manifest.php` |
-| Installer semantics | `_install/Install.php` and `tests/install-smoke.php` |
-| Generic Section presets | `_templates/library/*/manifest.php` |
-| Custom Section preset | `_templates/library/hero-split/` |
-| Composer/parser contracts | `_templates/Templates.php` and `tests/templates-smoke.php` |
-| Basic page unit | `_install/library/pages/home/` |
-| Module-dependent page | `_install/library/pages/contact/` |
-| Locale-structural page | `_install/library/pages/legal/` |
-| Element file example | `_install/library/pages/.demo-elements/demo-services.php` |
+| Simple shortcode module | `app/Nino/Modules/Navigation/Navigation.php` |
+| Public validated form | `app/Nino/Modules/Form/Form.php` |
+| Privacy-sensitive public flow | `app/Nino/Modules/Newsletter/Newsletter.php` |
+| Workbench shell, registry, recovery | `_admin/Admin.php` |
+| Workbench panel backend patterns | `_admin/Nino/Modules/Elements/Admin/Admin.php`, `Routes/Admin/Admin.php`, `Users/Admin/Admin.php` |
+| Panel list/form JS | `_admin/Nino/Modules/Elements/assets/types.js` and `admin.js`, `_admin/Nino/Modules/Routes/assets/admin.js`; the shell `_admin/assets/script.js` |
+| Panel contract | `\Nino\Admin\Panels` in `_admin/Admin.php`; smallest panel `app/Nino/Modules/Search/Admin/Admin.php`; fills and a tile `app/Nino/Modules/Form/Admin/Admin.php`; own template `app/Nino/Modules/Design/Admin/Admin.php`; workspace `app/Nino/Modules/Templates/Admin/Admin.php` |
+| Ordered Admin relationships | `\Nino\Modules\Navigation\Admin` and `app/Nino/Modules/Navigation/assets/admin.js` |
+| Shared Admin UI | the `nino.system` half of `_admin/assets/style.css` and `_admin/assets/Nino.admin.js` |
+| Installer package shape | `app/Nino/Modules/*/install/manifest.php` |
+| Setup wizard semantics | `_admin/install/Install.php` and `tests/install-smoke.php` |
+| Generic Section presets | `app/Nino/Modules/Templates/library/*/manifest.php` |
+| Section preset with several layouts | `app/Nino/Modules/Templates/library/feature-split/` |
+| Composer/parser contracts | `app/Nino/Modules/Templates/Composer/Composer.php`, `SectionDocument/SectionDocument.php`, `AreaComposer/AreaComposer.php` and `tests/templates-smoke.php` |
+| Basic page unit | `_admin/install/library/pages/home/` |
+| Module-dependent page | `_admin/install/library/pages/contact/` |
+| Locale-structural page | `_admin/install/library/pages/legal/` |
+| Element file example | `_admin/install/library/pages/.demo-elements/demo-services.php` |
 
 Human behavior changes normally require matching updates in both English and
 German manuals. This AI guide stays in one canonical English file so agents do

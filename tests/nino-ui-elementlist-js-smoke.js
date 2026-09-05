@@ -6,7 +6,7 @@
  *											reference.
  *
  *											Both element forms render it (see _admin/assets/
- *											elements.js and _editor/assets/elements.js), so its
+ *											elements.js and _admin/Nino/Modules/Elements/assets/admin.js), so its
  *											behaviour is pinned once here rather than twice
  *											over there: what the hidden input holds after every
  *											move, the cap, and that a target deleted since is
@@ -111,7 +111,7 @@ sandbox.window = sandbox;
 sandbox.Nino = {};
 
 vm.runInContext(
-	fs.readFileSync( path.join( __dirname, '../_nino/Nino.admin.js' ), 'utf8' ),
+	fs.readFileSync( path.join( __dirname, '../_admin/assets/Nino.admin.js' ), 'utf8' ),
 	vm.createContext( sandbox ),
 	{ filename : 'Nino.admin.js' }
 );
@@ -264,7 +264,7 @@ check( '...and is shown as its uri, marked missing', chosenRows( dangling )[1].c
 
 // --- the caller owns every string -----------------------------------------
 
-const source = fs.readFileSync( path.join( __dirname, '../_nino/Nino.admin.js' ), 'utf8' );
+const source = fs.readFileSync( path.join( __dirname, '../_admin/assets/Nino.admin.js' ), 'utf8' );
 const control = source.slice( source.indexOf('elementList : function'), source.indexOf('tableModel : {') );
 check( 'the control hard-codes no user-facing words', /textContent = '[A-Za-z]/.test( control ) === false );
 

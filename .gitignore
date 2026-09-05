@@ -1,9 +1,8 @@
 /_admin/.cache/
-/_editor/.cache/
 
 # The project's private half - all of it. A checkout ships no private/ at
 # all: the wizard creates the directory, brings its own deny rule with it
-# (_install/library/base/private/.htaccess) and writes the first config.php
+# (_admin/install/library/base/private/.htaccess) and writes the first config.php
 # at the end of its Setup step. Nothing in here is repository content -
 # it is one installation's configuration, its pages and text, the data its
 # visitors produce, and management state holding PII and credentials

@@ -35,11 +35,11 @@ jobs:
       - name: Run Elements search smoke tests
         run: php tests/search-smoke.php
 
-      - name: Run editor backend smoke tests
-        run: php tests/editor-smoke.php
-
-      - name: Run admin tooling smoke tests
+      - name: Run workbench shell and content panel smoke tests
         run: php tests/admin-smoke.php
+
+      - name: Run workbench structure and system panel smoke tests
+        run: php tests/admin-system-smoke.php
 
       - name: Run install wizard smoke tests
         run: php tests/install-smoke.php
@@ -54,7 +54,9 @@ jobs:
         run: php tests/demo-catalogue-smoke.php
 
       - name: Run frontend smoke tests
-        run: for test in tests/*-js-smoke.js; do node "$test"; done
+        # || exit 1: a bare loop answers with the last file's status alone,
+        # so a failure in the middle would be reported as green
+        run: for test in tests/*-js-smoke.js; do node "$test" || exit 1; done
 
       - name: Run concurrency smoke tests
         run: php tests/concurrency-smoke.php

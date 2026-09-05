@@ -1,0 +1,8 @@
+# The application half is server-side source: the project's own PHP classes
+# and Nino's optional modules with their install units - manifests, mail and
+# page templates, text files. Nothing in here is ever requested by a browser;
+# a module's browser-facing assets are read off disk and bundled into
+# public/.cache/ like everything else (see \Nino\Modules\Assets).
+Require all denied
+
+Options -Indexes

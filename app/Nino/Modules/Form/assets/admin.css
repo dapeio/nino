@@ -1,0 +1,70 @@
+@layer nino.system, nino.tool, nino.local;
+
+/**
+ *	Nino										A compact filesystembased php framework
+ *	Modules\Form					The contact form
+ *	editor.css							What the module's /_admin panel needs beyond the design
+ *													system in _admin/assets/style.css. Joins the editor's own
+ *													style bundle while the module is active (see the panel's
+ *													assets()), so the same layer rules apply: scoped to what
+ *													this panel renders, nothing shared restated.
+ *
+ *	@package								Dape/Nino
+ *	@author									David Perchermeier <mail@dape.io>
+ *	@link										https://github.com/dapeio/nino
+ */
+
+@layer nino.tool {
+
+.submissions-entry-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: .75rem;
+	margin-bottom: .3rem;
+}
+.submissions-entry-date {
+	color: var(--editor-text-secondary);
+	font-size: .76rem;
+}
+.submissions-entry-cat {
+	display: inline-block;
+	padding: .15rem .5rem;
+	border-radius: 999px;
+	background: var(--editor-blue-soft);
+	color: var(--editor-blue);
+	font-size: .72rem;
+	font-weight: 650;
+}
+.submissions-entry-name {
+	margin-bottom: .3rem;
+	font-weight: 650;
+}
+.submissions-entry-name a {
+	color: var(--editor-text);
+}
+.submissions-entry-message {
+	display: -webkit-box;
+	margin: 0;
+	overflow: hidden;
+	color: var(--editor-text-secondary);
+	white-space: pre-wrap;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 1;
+}
+.submissions-entry.expanded .submissions-entry-message {
+	display: block;
+	overflow: visible;
+	-webkit-line-clamp: unset;
+}
+.submissions-entry-toggle {
+	display: none;
+	margin-top: .4rem;
+	color: var(--editor-blue);
+	font-size: .76rem;
+}
+.submissions-entry.has-overflow .submissions-entry-toggle {
+	display: inline-block;
+}
+
+}

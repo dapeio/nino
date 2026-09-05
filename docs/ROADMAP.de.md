@@ -12,7 +12,7 @@ Die Dokumentation richtet sich primär an selbstständige Webentwickler und klei
 | Webseitenentwickler | eine Webseite einrichten, gestalten und sicher veröffentlichen |
 | PHP-Entwickler | Kernel, Callbacks und Module verstehen und erweitern |
 | Betreiber | Installation, Deployment, Updates, Backups und Sicherheit nachvollziehen |
-| Redakteure | Inhalte über `/_editor` ohne Programmierkenntnisse pflegen |
+| Redakteure | Inhalte in der Workbench `/_admin` ohne Programmierkenntnisse pflegen |
 
 ## Dokumentstruktur
 
@@ -24,17 +24,16 @@ Die Dokumentation richtet sich primär an selbstständige Webentwickler und klei
 | `design.de.md` | `design.md` | Frontend, Designsystem, CSS und praktische Template-Arbeit | **WIP** |
 | `development.de.md` | `development.md` | Architektur, Kernel, Callbacks, Module und Referenz | veröffentlicht |
 | `deployment.de.md` | `deployment.md` | Webserver, Go-live, Sicherheit, Backups und Updates | veröffentlicht |
-| `_install.de.md` | `_install.md` | notwendige Ersteinrichtung und Library-Format | veröffentlicht |
-| `_admin.de.md` | `_admin.md` | technische Projektverwaltung für Entwickler | veröffentlicht |
-| `_design.de.md` | `_design.md` | Theme, Design, Header und Footer nach der Installation | veröffentlicht (Alpha) |
-| `_templates.de.md` | `_templates.md` | sectionbasierte Komposition von Seitentemplates | veröffentlicht (Alpha) |
-| `_editor.de.md` | `_editor.md` | redaktionelle Pflege für Betreiber | veröffentlicht |
+| `setup.de.md` | `setup.md` | der Einrichtungsassistent: notwendige Ersteinrichtung und Library-Format | veröffentlicht |
+| `_admin.de.md` | `_admin.md` | die Workbench: jedes Panel, Konten, Rollen und Recovery | veröffentlicht |
+| `appearance.de.md` | `appearance.md` | das Design-Panel: Theme, Design, Header und Footer | veröffentlicht (Alpha) |
+| `templates.de.md` | `templates.md` | das Templates-Panel: sectionbasierte Komposition von Seitentemplates | veröffentlicht (Alpha) |
 
 ## Laufende Arbeitsreihenfolge
 
 1. Deutsche und englische README einschließlich Screenshots gemeinsam pflegen.
 2. Das Design-Handbuch aus dem WIP-Status bis zu einem vollständigen Arbeitsweg ausbauen.
-3. Rollenhandbücher für `/_install`, `/_admin`, `/_design`, `/_templates` und `/_editor` bei Verhaltensänderungen paarweise aktualisieren.
+3. Das Workbench-Handbuch und die drei Referenzen (Assistent, Design-Panel, Templates-Panel) bei Verhaltensänderungen paarweise aktualisieren.
 4. Technische Beispiele, Versionsangaben und Sicherheitsanforderungen regelmäßig mit dem Repository abgleichen.
 5. Inhalte und Navigation für die spätere Dokumentationswebseite beziehungsweise das Wiki ableiten.
 

@@ -2,135 +2,38 @@
 declare(strict_types=1);
 /**
  *	Nino							A compact filesystembased php framework
- *	Dev								Dev-only tooling - all \Nino\Admin\* classes live in this single
- *												file, same convention as _nino/Nino.php and _editor/Editor.php.
- *												Meant to be deployed only when actually needed and removed
- *												afterwards (rm -rf _admin) - never linked from the public
- *												site, and no config.php registration
- *												required to work (self-registers its route, same as Admin).
+ *	Admin							The workbench: setup wizard, developer tooling and editorial
+ *												work behind one login. This file is the base and nothing
+ *												else - the shell (Admin), the panel registry (Panels) and
+ *												the recovery secret (Recovery). Every screen is a module
+ *												under _admin/Nino/Modules/, or one a runtime module brings
+ *												along (see Panels).
  *
  *	@package					Dape/Nino
  *	@author						David Perchermeier <mail@dape.io>
  *	@link							https://github.com/dapeio/nino
  */
-
-namespace {
-
-	// Password hash helper - deliberately only reachable via the CLI SAPI,
-	// never over HTTP (a webserver never runs PHP as "cli"), so this can stay
-	// in the file without being a usable-over-the-web endpoint:
-	// `php _admin/Admin.php <pw>`
-	//
-	// The hash it prints goes into the project's private/.auth/pw.php, wrapped
-	// in the stub below - not into this file. Nothing here is project state
-	// any more, which is what lets an update replace it (see
-	// Admin::passwordHash())
-	if( php_sapi_name() === 'cli' && isset( $argv[1] ) === true )
-		die( \Nino\Admin\Admin::STUB_PREFIX. password_hash( $argv[1], PASSWORD_DEFAULT ). \Nino\Admin\Admin::STUB_SUFFIX );
-}
-
 namespace Nino\Admin {
 
 	/**
-	 *	The small navigation shared by the authenticated developer tools.
-	 *	Availability comes from the delivery itself: removing an optional tool
-	 *	directory removes its link everywhere without a second config switch that
-	 *	can drift away from the files on disk.
-	 */
-	class ToolBridge {
-
-		private const array TOOLS = [
-			'admin' => [
-				'label' => 'Admin',
-				'title' => 'Admin',
-				'uri' => '_admin',
-				'files' => [ '_admin/index.php', '_admin/Admin.php', '_admin/templates/page-index.tpl' ],
-			],
-			'templates' => [
-				'label' => 'Builder',
-				'title' => 'Template Builder',
-				'uri' => '_templates',
-				'files' => [ '_templates/index.php', '_templates/Templates.php', '_templates/templates/page-index.tpl' ],
-			],
-			'design' => [
-				'label' => 'Design',
-				'title' => 'Appearance',
-				'uri' => '_design',
-				'files' => [ '_design/index.php', '_design/Design.php', '_design/templates/page-index.tpl' ],
-			],
-		];
-
-		public static function init( array &$appData ): void {
-
-			// Admin::init() can be called again by a composed tool or a test. A
-			// shortcode callback is an ordered list, so registering the same one
-			// twice would run its second copy against the first copy's string result.
-			if( ( $appData['./nino/admin/tool-bridge'] ?? false ) === true )
-				return;
-
-			$appData['./nino/admin/tool-bridge'] = true;
-			\Nino\Html::addShortcode( $appData, 'admin-tools', [ self::class, 'doShortcode' ] );
-		}
-
-		public static function doShortcode( array &$appData, array $args ): string {
-			return self::render( $appData, (string) ( $args[0] ?? '' ) );
-		}
-
-		/**
-		 *	Render only complete tool installations. $root is public so diagnostics
-		 *	and the dependency-free smoke test can evaluate a staged delivery before
-		 *	it replaces the live project; normal requests use Admin.php's own root.
-		 */
-		public static function render( array &$appData, string $current, string $root = '' ): string {
-
-			$root = $root === '' ? dirname( __DIR__ ) : rtrim( $root, '/\\' );
-			$available = [];
-
-			foreach( self::TOOLS as $key => $tool ) {
-				$complete = true;
-
-				foreach( $tool['files'] as $file )
-					if( is_file( $root. '/'. $file ) === false ) {
-						$complete = false;
-						break;
-					}
-
-				if( $complete === true )
-					$available[$key] = $tool;
-			}
-
-			// With no destination there is no bridge, only decorative chrome.
-			if( count( $available ) < 2 )
-				return '';
-
-			$base = rtrim( (string) \Nino\Filesystem::getDir( $appData ), '/' );
-			$html = '<nav class="nino-admin-tools" aria-label="Nino tools">';
-
-			foreach( $available as $key => $tool ) {
-				$href = self::_escape( $base. '/'. $tool['uri']. '/' );
-				$title = self::_escape( $tool['title'] );
-				$label = self::_escape( $tool['label'] );
-				$html .= '<a href="'. $href. '" title="'. $title. '" aria-label="'. $title. '"'
-					. ' data-nino-admin-tool="'. $key. '"'
-					. ( $key === $current ? ' aria-current="page"' : '' )
-					. '>'. $label. '</a>';
-			}
-
-			return $html. '</nav>';
-		}
-
-		private static function _escape( string $value ): string {
-			$value = htmlspecialchars( $value, ENT_QUOTES | ENT_SUBSTITUTE | ENT_HTML5, 'UTF-8' );
-			return str_replace( [ '[', ']' ], [ '&#91;', '&#93;' ], $value );
-		}
-	}
-
-	/**
 	 *	Nino							A compact filesystembased php framework
-	 *	Dev								Bootstraps the dev area: one private-password session gate
-	 *												in front of a small registry of dev-only modules. Add a new
-	 *												tool by writing a class with actions()/nav() and listing it
-	 *												in MODULES - nothing else here needs to change.
+	 *	Admin							The workbench's shell: one login for developers and editors
+	 *											alike, and what an account sees is what its permissions
+	 *											allow. The shell brings no screen of its own. Everything
+	 *											on screen is a panel a module brought - the workbench's
+	 *											own under _admin/Nino/Modules/ (modules()), a runtime
+	 *											module's wherever that module lives (adminPanels()) - and
+	 *											the navigation, the panes, the bundles and the text fills
+	 *											are rendered from that registry (see Panels). Take the
+	 *											modules away and this is a login and an empty rail, which
+	 *											is what it is meant to be. The only class _admin/index.php
+	 *											calls into: routes, assets and the GET/POST /_admin handling
+	 *											are registered here, the panels only fill the response.
+	 *
+	 *											Until a project exists this same route serves the setup
+	 *											wizard instead (see init() and _admin/install/Install.php),
+	 *											and _admin/recovery.php is the way back in when the
+	 *											accounts themselves are what is broken (see Recovery).
 	 *
 	 *	@package					Dape/Nino
 	 *	@author						David Perchermeier <mail@dape.io>
@@ -138,43 +41,19 @@ namespace Nino\Admin {
 	 */
 	class Admin {
 
-		// Where the real password hash lives, relative to the content
-		// directory (see \Nino\Filesystem::getContentPath()). /_install's
-		// last wizard step writes it; passwordHash() reads it
-		public const string PASSWORD_PATH = '/.auth/pw.php';
+		// Where the workbench is, and the project root it sits in - the two
+		// anchors a module reaches for when it needs a tool path (the setup
+		// library, the framework stylesheet) rather than a project file
+		public const string DIR = __DIR__;
+		public const string ROOT = __DIR__. '/..';
 
-		// The login throttle counter, next to the credential it guards. A
-		// virtual path (see \Nino\Filesystem::CONTENT_DIR), so it goes
-		// through mutate() and keeps its lock - two concurrent wrong attempts
-		// must not both read the same "tries" and each write back the same +1
-		private const string LOCKOUT_PATH = \Nino\Filesystem::CONTENT_DIR. '/.auth/lockout.json';
-
-		// The stub that file is wrapped in - a php file that 403s and exits
-		// before it ever returns the hash, so it stays useless even where a
-		// webserver happily serves it. Same convention (and same constants)
-		// Backup uses for its key and its archives
-		public const string STUB_PREFIX = "<?php http_response_code(403); exit; return '";
-		public const string STUB_SUFFIX = "';\n";
-
-		private const int MAX_TRIES = 5;
-		private const int COOLDOWN = 3600;
-
-		private const array MODULES = [
-			\Nino\Admin\Dashboard::class,
-			\Nino\Admin\ElementTypes::class,
-			\Nino\Admin\Elements::class,
-			\Nino\Admin\Text::class,
-			\Nino\Admin\Translations::class,
-			\Nino\Admin\PageEditor::class,
-			\Nino\Admin\Navigations::class,
-			\Nino\Admin\Images::class,
-			\Nino\Admin\Users::class,
-			\Nino\Admin\Restore::class,
-			\Nino\Admin\Config::class,
-		];
+		// The appearance catalogue the wizard ships - themes, header and
+		// footer units - read by the Design panel after setup as well
+		public const string LIBRARY = __DIR__. '/install/library';
 
 		/**
-		 *	Register the /_admin route and its response callbacks
+		 *	Bootstrap the admin area: register routes, assets, textfills and
+		 *	the response callbacks for every admin route
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *
@@ -182,15 +61,12 @@ namespace Nino\Admin {
 		 */
 		public static function init( array &$appData ): void {
 
-			ToolBridge::init( $appData );
-
 			// These runtime-only routes are owned by the tool itself and must win
-			// over a stale or hand-written config entry at the same uri - the same
-			// reasoning (and the same former '+=' bug) as Install::init()'s own
-			// routes. '/nino/http/routes' is editable as raw json through this very
-			// tool's Config module, so a persisted 'GET://_admin' would otherwise
-			// shadow the dashboard and leave no ui path back to the route that did
-			// it - locking an operator out of the one tool that could remove it
+			// over a stale or hand-written config entry at the same uri - a
+			// persisted 'GET://_admin' (hand-written through the Config panel,
+			// or a webpage entry created before the reserved-uri check existed)
+			// would otherwise shadow the whole tool, and leave no ui path back
+			// to the route that did it
 			$appData['/nino/http/routes']['GET://_admin'] = [
 				'uri' 				=> '/_admin',
 				'body'				=> '[template /_admin/templates/page-index]',
@@ -198,12 +74,91 @@ namespace Nino\Admin {
 			];
 			$appData['/nino/http/routes']['POST://_admin'] = [ 'uri' => '/_admin' ];
 
+			// No project yet: the same route serves the setup wizard, which
+			// registers its own handlers on it and locks itself out for good
+			// with its last step (see isInstalled()). The wizard is a
+			// directory a delivery may drop after setup - without it, an
+			// uninstalled project gets a notice rather than a login form that
+			// has no accounts behind it
+			if( self::isInstalled( $appData ) === false ) {
+
+				if( is_file( __DIR__. '/install/Install.php' ) === true ) {
+					require_once __DIR__. '/install/Install.php';
+					\Nino\Install\Install::init( $appData );
+					return;
+				}
+
+				$appData['/nino/http/routes']['GET://_admin']['body'] = '[template /_admin/templates/page-locked]';
+				return;
+			}
+
+			// Both bundles are built from the panel registry, so every panel
+			// ships its own script and stylesheet (see panels()) and nothing
+			// here has to know which ones exist. What is listed here is the
+			// base a panel is written against and nothing a screen owns: the
+			// framework's browser half, the design system's behaviour, and
+			// the shell script that seeds the namespace every panel file
+			// attaches to. html-editor.js is not among them - it is a
+			// primitive the panels that want it name in their own assets()
+			$styles 	= [ '/_admin/assets/style.css' ];
+			$scripts	= [
+				'/_nino/Nino.js',
+				'/_admin/assets/Nino.admin.js',
+				'/_admin/assets/script.js',
+			];
+
+			foreach( self::allPanels( $appData ) as $panel )
+				foreach( $panel['assets'] as $asset )
+					if( str_ends_with( $asset, '.css' ) === true )
+						$styles[] = $asset;
+					else
+						$scripts[] = $asset;
+
+			$appData['/nino/html/assets']['/_admin/.cache/style.css'] = array_values( array_unique( $styles ) );
+			$appData['/nino/html/assets']['/_admin/.cache/script.js'] = array_values( array_unique( $scripts ) );
+			$appData['/nino/html/assets']['/_admin/.cache/login.js'] = [
+				'/_nino/Nino.js',
+				'/_admin/assets/Nino.admin.js',
+				'/_admin/assets/login.js',
+			];
+
+			// A GET ?locale=xx (used by the UI-chrome picker) works even
+			// logged out, login screen included - unlike the POST
+			// admin/locale action Elements/Text's live content-locale
+			// switch uses, this needs no guard() at all: GET /_admin is
+			// already reachable without a session, so there's nothing to
+			// loosen. Persists to the same ./admin/locale session key.
+			$queryLocale = (string) ( $_GET['locale'] ?? '' );
+			if( $queryLocale !== '' && \Nino\Locales::verifyLocale( $appData, $queryLocale ) === true )
+				\Nino\Runtime::setSessionValue( $appData, './admin/locale', $queryLocale );
+
+			// Sync the shared "current locale" to the admin's own remembered
+			// locale (session locale) before loading the tool's own text fills -
+			// reuses the exact mechanism Elements/Text's locale switch already
+			// persists (POST admin/locale), so switching it also switches
+			// which language the admin UI chrome itself renders in
+			\Nino\Locales::setCurrentLocale( $appData, self::sessionLocale( $appData ) );
+
+			$currentLocale = \Nino\Locales::getCurrentLocale( $appData );
+			\Nino\Html::addFills( $appData, self::textFills( $appData, '/_admin/text', $currentLocale ), $currentLocale );
+
+			// A panel's own words join the shell's - the same file shape
+			// _admin/text/<locale>.php has, read from wherever the panel
+			// says its text lives (see panels()). The shell's own file holds
+			// what the shell renders and what every panel may reach for
+			// (/_admin/common/*); everything a screen says travels with it
+			foreach( self::allPanels( $appData ) as $panel )
+				if( $panel['text'] !== '' )
+					\Nino\Html::addFills( $appData, self::textFills( $appData, $panel['text'], $currentLocale ), $currentLocale );
+
+			\Nino\Html::addFills( $appData, [ '[[/_admin/localepicker]]' => self::_localePickerHtml( $appData, $currentLocale ) ], '*' );
+
 			\Nino\Callbacks::registerCallback( $appData, '/nino/http/response/GET://_admin', 	[ self::class, 'handleGet' ] );
 			\Nino\Callbacks::registerCallback( $appData, '/nino/http/response/POST://_admin', [ self::class, 'handlePost' ] );
 		}
 
 		/**
-		 *	Fill the GET /_admin response: the tool dashboard if authed, else the login form
+		 *	Fill the GET /_admin response: dashboard if logged in, else the login form
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
@@ -212,15 +167,240 @@ namespace Nino\Admin {
 		 */
 		public static function handleGet( array &$appData, array &$request ): void {
 
-			if( self::isAuthed( $appData ) === false )
+			self::_logLoginOnce( $appData );
+
+			if( \Nino\Auth::getCurrentUser( $appData ) === false ) {
 				$request['/nino/http/response']['body'] = '[template /_admin/templates/page-login]';
+				return;
+			}
+
+			// Only the panels this account may use are rendered at all - the
+			// permission checks in every action stay authoritative, this keeps
+			// the navigation honest and the page free of predictable 403s
+			\Nino\Html::addFills( $appData, [
+				'[[/_admin/nav]]'		=> self::navHtml( $appData ),
+				'[[/_admin/panes]]'	=> self::panesHtml( $appData ),
+			], '*' );
 		}
 
 		/**
-		 *	Fill the POST /_admin response. Every dev api request goes through
-		 *	this single route, dispatched by $_POST['action'] - same shape as
-		 *	Editor::handlePost(), except the login action itself must stay
-		 *	reachable before the auth gate, since there is no separate route
+		 *	The navigation for the current account - see Panels::navHtml()
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	string
+		 */
+		public static function navHtml( array &$appData ): string {
+
+			return Panels::navHtml( self::visiblePanels( $appData ) );
+		}
+
+		/**
+		 *	The content panes for the current account - see Panels::panesHtml()
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	string
+		 */
+		public static function panesHtml( array &$appData ): string {
+
+			return Panels::panesHtml( self::visiblePanels( $appData ) );
+		}
+
+		/**
+		 *	The panels the current account holds the permission for - a
+		 *	panel without perm() is everyone's
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	array										Same shape as panels(), filtered
+		 */
+		public static function visiblePanels( array &$appData ): array {
+
+			$allowed = static fn( array $panel ): bool => $panel['perm'] === '' || \Nino\Auth::checkPermission( $appData, $panel['perm'] ) === true;
+			$visible = [];
+
+			foreach( self::panels( $appData ) as $uri => $panel ) {
+
+				// A tab is its own screen with its own permission: the pane
+				// shows the tabs the account holds, and stays in the rail as
+				// long as one of them - or the panel's own screen - is
+				$panel['own']		= $allowed( $panel );
+				$panel['tabs']	= array_filter( $panel['tabs'], $allowed );
+
+				if( $panel['own'] === true || $panel['tabs'] !== [] )
+					$visible[$uri] = $panel;
+			}
+
+			return $visible;
+		}
+
+		/**
+		 *	Every panel and every tab of the registry as one flat list, in
+		 *	navigation order with a panel's tabs right after it - for the
+		 *	callers that care about screens rather than the rail: the action
+		 *	map, the bundles, the fills, the dashboard tiles, the permission
+		 *	lists
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	array										[ uri => entry ], see panels()
+		 */
+		public static function allPanels( array &$appData ): array {
+
+			$all = [];
+
+			foreach( self::panels( $appData ) as $uri => $panel ) {
+				$all[$uri] = $panel;
+				foreach( $panel['tabs'] as $tabUri => $tab )
+					$all[$tabUri] = $tab;
+			}
+
+			return $all;
+		}
+
+		/**
+		 *	Whether this project has been set up: the wizard's last step
+		 *	writes the recovery secret and a marker, and either alone keeps
+		 *	the wizard shut - losing one file must not hand it back to
+		 *	whoever asks for it on a live site
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	bool
+		 */
+		public static function isInstalled( array &$appData ): bool {
+
+			if( ( $appData['/nino/install/completed'] ?? false ) === true )
+				return true;
+
+			return Recovery::hash( $appData ) !== null;
+		}
+
+		// Where the workbench's own modules live - one directory per screen,
+		// the same shape a runtime module has under _nino/ or app/ (see
+		// modules(), and the autoloader at the bottom of _nino/Nino.php)
+		public const string MODULES = __DIR__. '/Nino/Modules';
+
+		/**
+		 *	The workbench's own panels: one per module directory under
+		 *	_admin/Nino/Modules/, read off the disk rather than a list kept
+		 *	here. The shell is the base and brings no screen of its own -
+		 *	every one of them is a module that can be added, updated or
+		 *	deleted on its own, and a workbench without the directory is a
+		 *	login and an empty rail rather than a broken one.
+		 *
+		 *	A module's screen is <Name>/Admin/Admin.php, the class
+		 *	\Nino\Modules\<Name>\Admin - the same file the autoloader
+		 *	resolves, so nothing here has to require anything. Its tabs are
+		 *	its own business (see tabs() in the panel contract), and the
+		 *	order of this list is irrelevant: each panel's nav() says where
+		 *	it sits.
+		 *
+		 *	@return 	array										Class names, alphabetically by module
+		 */
+		public static function modules(): array {
+
+			$classes = [];
+
+			foreach( glob( self::MODULES. '/*/Admin/Admin.php' ) ?: [] as $file ) {
+
+				$name = basename( dirname( dirname( $file ) ) );
+
+				// Written the way ::class writes it - no leading separator -
+				// so a core panel and a module-contributed one compare equal
+				if( preg_match( '/^[A-Z][A-Za-z0-9]*$/', $name ) === 1 )
+					$classes[] = 'Nino\\Modules\\'. $name. '\\Admin';
+			}
+
+			return $classes;
+		}
+
+		/**
+		 *	Every panel on offer, in navigation order - the one place the
+		 *	shell reads. The workbench's own modules come first (see
+		 *	modules()), then every panel a runtime module contributes by
+		 *	answering adminPanels() with a class name, so a runtime module
+		 *	can add a screen but never take one over. A panel is a class
+		 *	with actions() and nav(), and optionally perm(), panes(),
+		 *	assets(), text(), summary() and log() (see Panels, and
+		 *	docs/development.md).
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	array										[ uri => { class, uri, label, weight, group, perm, panes, assets, text } ]
+		 */
+		public static function panels( array &$appData ): array {
+
+			return Panels::collect( $appData, self::modules(), 'adminPanels' );
+		}
+
+		/**
+		 *	Every action every panel dispatches, core first so a module can
+		 *	never take over a core action by reusing its name
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	array										[ 'panel/action' => [ class, method ] ]
+		 */
+		public static function actions( array &$appData ): array {
+
+			$actions = [ 'admin/locale' => [ Admin::class, 'apiSetLocale' ] ];
+
+			foreach( self::allPanels( $appData ) as $panel )
+				$actions += $panel['class']::actions();
+
+			return $actions;
+		}
+
+		/**
+		 *	Record a successful login to the activity log, the first time
+		 *	the now-authenticated session touches the workbench.
+		 *
+		 *	Not hooked directly into Auth's login (the obvious-seeming
+		 *	approach) because that goes through the kernel's generic
+		 *	/.nino/auth/login uri, which - unlike GET/POST /_admin - isn't
+		 *	guaranteed to be routed through _admin/index.php at all: a
+		 *	typical webserver config maps /_admin/* to _admin/index.php via
+		 *	its own directory/file, but /.nino/auth/login matches no real
+		 *	file under _admin/ and falls through to the site's root
+		 *	index.php instead, which never calls Admin::init() and so never
+		 *	registers any workbench callback. Piggybacking on guard()/
+		 *	handleGet() instead sidesteps that entirely, since the workbench's own
+		 *	bootstrap is guaranteed to run for every real GET/POST /_admin
+		 *	request regardless of which uri physically carried the login.
+		 *
+		 *	The "loginLoggedFor" session marker is cleared as soon as
+		 *	there's no current user, so a logout followed by a fresh login
+		 *	(same or different user, same browser session) is always logged
+		 *	again, not just the first login of the session
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	void
+		 */
+		private static function _logLoginOnce( array &$appData ): void {
+
+			$user = \Nino\Auth::getCurrentUser( $appData );
+
+			if( $user === false ) {
+				\Nino\Runtime::unsetSessionValue( $appData, './admin/loginLoggedFor' );
+				return;
+			}
+
+			if( \Nino\Runtime::getSessionValue( $appData, './admin/loginLoggedFor', '' ) === $user['mail'] )
+				return;
+
+			\Nino\Runtime::setSessionValue( $appData, './admin/loginLoggedFor', $user['mail'] );
+
+			self::record( $appData, $user['mail'], 'Login' );
+		}
+
+		/**
+		 *	Fill the POST /_admin response. Every admin api request goes
+		 *	through this single route and is dispatched by $_POST['action'],
+		 *	so the frontend never depends on the webserver routing anything
+		 *	beyond the one already-required /_admin uri.
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
@@ -233,26 +413,8 @@ namespace Nino\Admin {
 			if( $request['/nino/http/response']['statusCode'] !== 200 )
 				return;
 
-			$action = $_POST['action'] ?? '';
-
-			if( $action === 'dev/login' ) {
-				self::apiLogin( $appData, $request );
-				return;
-			}
-
-			if( self::isAuthed( $appData ) === false ) {
-				\Nino\Http::fail( $request, 401, 'not logged in' );
-				return;
-			}
-
-			if( $action === 'dev/logout' ) {
-				self::apiLogout( $appData, $request );
-				return;
-			}
-
-			$actions = [];
-			foreach( self::MODULES as $module )
-				$actions += $module::actions();
+			$actions = self::actions( $appData );
+			$action	 = $_POST['action'] ?? '';
 
 			if( isset( $actions[$action] ) === false ) {
 				\Nino\Http::fail( $request, 404, 'unknown action' );
@@ -263,107 +425,122 @@ namespace Nino\Admin {
 			// dynamic static call instead - same pattern as Callbacks::doCallbacks()
 			[ $class, $method ] = $actions[$action];
 			$class::{$method}( $appData, $request );
+
+			// Deliberately not a listener on the event below: an audit line that
+			// can be lost by not registering a callback is not an audit line.
+			// The log is the tool's own guarantee, the event is for modules
+			if( $request['/nino/http/response']['statusCode'] === 200 )
+				self::_logAction( $appData, $class, $action );
+
+			self::_announce( $appData, $class, $action, $request );
 		}
 
 		/**
-		 *	Whether the current session already passed the password gate
+		 *	Tell whoever is listening that a panel action ran - the workbench's
+		 *	one reaction point, and the counterpart to the declarations a panel
+		 *	makes through \Nino\Admin\Panels.
+		 *
+		 *	The registry says what a module *is* in the workbench; this says what
+		 *	just *happened* in it. Without it a module could only ever observe
+		 *	the panel it owns itself: an audit or notification module, one that
+		 *	reacts to another panel's save, or one that needs to drop a cache
+		 *	after any change at all had nowhere to attach. '/nino/admin/restore'
+		 *	was the same need, solved once for one case.
+		 *
+		 *	Notification only, and after the fact by construction: the action has
+		 *	already run and written its response, so a listener can act on what
+		 *	happened but cannot change or refuse it. Refusing is guardPerm()'s
+		 *	job and stays there.
+		 *
+		 *	Fires for a failed action too, with its status - a listener watching
+		 *	for repeated 403s wants exactly the ones the log leaves out. It does
+		 *	not fire for an action no panel registered: nothing ran.
+		 *
+		 *	What changed to the *content* is not this event's business - the
+		 *	kernel says that itself, per element ('/nino/elements/committed'),
+		 *	per account ('/nino/auth/user/...'). This one says who did what in
+		 *	the tool.
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$class				The panel class that handled the action
+		 *	@param		string		$action				The dispatched action name (eg. "elements/save")
+		 *	@param		array 		$request			The request, already answered
 		 *
-		 *	@return 	bool
+		 *	@return 	void
 		 */
-		public static function isAuthed( array &$appData ): bool {
-			return \Nino\Runtime::getSessionValue( $appData, './nino/admin/authed', false ) === true;
+		private static function _announce( array &$appData, string $class, string $action, array $request ): void {
+
+			$user = \Nino\Auth::getCurrentUser( $appData );
+
+			// A plain description rather than the request itself: handed the
+			// response by reference, a listener could rewrite an answer the
+			// panel has already given, which is a veto through the back door
+			$event = [
+				'action' 	=> $action,
+				'panel' 	=> $class,
+				'status' 	=> (int) ( $request['/nino/http/response']['statusCode'] ?? 0 ),
+				'user' 		=> ( $user !== false ) ? (string) $user['mail'] : '',
+				'data' 		=> self::postData(),
+			];
+
+			\Nino\Callbacks::doCallbacks( $appData, '/nino/admin/action', $event );
 		}
 
 		/**
-		 *	The password hash currently in effect, or null when this project
-		 *	has none yet.
-		 *
-		 *	Canonically PASSWORD_PATH, under the private directory - never
-		 *	config.php: a Restore rewrites config.php, and a credential that
-		 *	authorises restoring must not be part of what gets restored (the
-		 *	same reasoning Backup already applies to the encryption key, see
-		 *	Restore::_key()). It is also outside every tool folder, so
-		 *	replacing _admin/Admin.php on an update no longer takes the
-		 *	password with it.
+		 *	Describe one mutating action for the activity log, and record
+		 *	it - a no-op for actions that only read data (eg. elements/list,
+		 *	users/list), since those aren't meaningful audit events
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$class				The panel class that handled the action
+		 *	@param		string		$action				The dispatched action name (eg. "elements/save")
 		 *
-		 *	@return 	string|null							Null when no password has been set at all
+		 *	@return 	void
 		 */
-		public static function passwordHash( array &$appData ): ?string {
+		private static function _logAction( array &$appData, string $class, string $action ): void {
 
-			return self::_readPasswordFile( $appData );
+			// The panel that handled the action phrases the line itself - its
+			// log() answers '' for a read, and a panel without one logs nothing
+			if( method_exists( $class, 'log' ) === false )
+				return;
+
+			$message = (string) $class::log( $action, self::postData() );
+
+			if( $message === '' )
+				return;
+
+			$user = \Nino\Auth::getCurrentUser( $appData );
+
+			if( $user !== false )
+				self::record( $appData, $user['mail'], $message );
 		}
 
 		/**
-		 *	Whether this project has been through /_install already - the one
-		 *	thing /_install checks before it lets itself run at all.
+		 *	Hand one line to the activity log, if this installation has one.
 		 *
-		 *	Deliberately not "a password exists": that alone would mean
-		 *	deleting one file re-opens the installer on a live site, which is
-		 *	exactly the hazard moving the hash out of the source file is meant
-		 *	to remove. The persisted marker is what makes the answer stick, so
-		 *	a project missing its password file locks its admin area rather
-		 *	than handing out a fresh installer (put the file back by hand -
-		 *	the same escape hatch editing the constant used to be)
+		 *	The log is a module like every other screen
+		 *	(_admin/Nino/Modules/Logs) and a delivery may drop it, so the
+		 *	shell asks rather than assumes: without it the workbench keeps
+		 *	working and records nothing. class_exists() is what asks - it
+		 *	runs the autoloader, so a present module answers true without
+		 *	anything here naming a file.
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$actor				Who did it - an account's mail address
+		 *	@param		string		$message			The line, already phrased
 		 *
-		 *	@return 	bool
+		 *	@return 	void
 		 */
-		public static function isInstalled( array &$appData ): bool {
+		public static function record( array &$appData, string $actor, string $message ): void {
 
-			if( ( $appData['/nino/install/completed'] ?? false ) === true )
-				return true;
-
-			return self::passwordHash( $appData ) !== null;
+			if( class_exists( '\\Nino\\Modules\\Logs\\Admin' ) === true )
+				\Nino\Modules\Logs\Admin::record( $appData, $actor, $message );
 		}
 
 		/**
-		 *	The absolute path of the file passwordHash() reads
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *
-		 *	@return 	string
-		 */
-		public static function passwordPath( array &$appData ): string {
-			return \Nino\Filesystem::getContentPath( $appData ). self::PASSWORD_PATH;
-		}
-
-		/**
-		 *	Read the stored hash back out of its self-exiting php stub - the
-		 *	same shape (and the same reason) Backup writes its key and its
-		 *	archives with: the file sits under a path a webserver may well
-		 *	serve, and a stub that 403s before returning anything is the one
-		 *	protection that does not depend on .htaccess applying
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *
-		 *	@return 	string|null							Null if there is no readable, well-formed file
-		 */
-		private static function _readPasswordFile( array &$appData ): ?string {
-
-			$raw = @file_get_contents( self::passwordPath( $appData ) );
-
-			if( is_string( $raw ) === false )
-				return null;
-
-			if( str_starts_with( $raw, self::STUB_PREFIX ) === false || str_ends_with( $raw, self::STUB_SUFFIX ) === false )
-				return null;
-
-			$hash = substr( $raw, strlen( self::STUB_PREFIX ), -strlen( self::STUB_SUFFIX ) );
-
-			// A truncated or half-written file must read as "no password" and
-			// therefore fail every login, never as a hash password_verify()
-			// would happily reject in a way that looks like a wrong password
-			return $hash !== '' ? $hash : null;
-		}
-
-		/**
-		 *	Require an authed session - shared by every module's api methods
-		 *	(same role as Editor::guard())
+		 *	Require an authenticated admin user and a request not already
+		 *	rejected by an earlier global callback (eg. Csrf). Shared by every
+		 *	domain class (Elements, Text, ...) that fills a POST /_admin response.
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
@@ -375,8 +552,45 @@ namespace Nino\Admin {
 			if( $request['/nino/http/response']['statusCode'] !== 200 )
 				return false;
 
-			if( self::isAuthed( $appData ) === false ) {
+			self::_logLoginOnce( $appData );
+
+			if( \Nino\Auth::getCurrentUser( $appData ) === false ) {
 				\Nino\Http::fail( $request, 401, 'not logged in' );
+				return false;
+			}
+
+			// Same as the activity log: the daily backup belongs to the
+			// Backups module, and a workbench delivered without it simply
+			// takes none (see record())
+			if( class_exists( '\\Nino\\Modules\\Backups' ) === true )
+				\Nino\Modules\Backups::maybeRun( $appData );
+
+			return true;
+		}
+
+		/**
+		 *	Same as guard(), plus a specific permission - the check every
+		 *	domain class (Elements, Text, ...) other than Users/Dashboard/
+		 *	locale uses, now that access can be tailored per competency
+		 *	instead of "any logged-in user may do anything". Users keeps its
+		 *	own bespoke self-or-manage rule (see Users::_authorize()) since
+		 *	"edit your own account" never depends on a permission; Dashboard
+		 *	and admin/locale stay guard()-only since they're not module-
+		 *	specific actions.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		&$request			(reference) Current server request
+		 *	@param		string		$perm					Required permission (eg. Elements::MANAGE_PERM)
+		 *
+		 *	@return 	bool										If the request may proceed
+		 */
+		public static function guardPerm( array &$appData, array &$request, string $perm ): bool {
+
+			if( self::guard( $appData, $request ) === false )
+				return false;
+
+			if( \Nino\Auth::checkPermission( $appData, $perm ) === false ) {
+				\Nino\Http::fail( $request, 403, 'not allowed' );
 				return false;
 			}
 
@@ -384,34 +598,881 @@ namespace Nino\Admin {
 		}
 
 		/**
-		 *	Check the posted password against the private hash and open
-		 *	the session gate. Rate-limited the same shape as Auth's per-user
-		 *	tries/cooldown (see _nino/Nino.php Auth::_registerFailedAttemp()),
-		 *	just against one shared counter instead of a per-user record,
-		 *	since there's only the one hardcoded password to guess. This
-		 *	tool was originally meant to be deployed only briefly, which
-		 *	didn't need this - now that a project might reasonably leave it
-		 *	up permanently (for Restore, see below), an unlimited-attempts
-		 *	single password stops being an acceptable tradeoff
+		 *	Scoped permissions - the finer half of the permission model.
+		 *
+		 *	A panel's own permission ('/_admin/elements/manage') is a door: it
+		 *	says the account may work in that panel at all, and guardPerm()
+		 *	above is where it is checked. A scoped permission describes what
+		 *	the account may do once inside - '/_admin/elements/services/insert',
+		 *	'/_admin/elements/services/update/title',
+		 *	'/_admin/text/update/page-home/atf/title'. Both kinds are ordinary
+		 *	strings checked with the same \Nino\Auth::checkPermission(), so
+		 *	'/_admin/elements/services/*' covers every action on that type and
+		 *	'/_admin/text/update/page-home/*' every key of that group, without
+		 *	this file knowing anything about types, fields or keys.
+		 *
+		 *	Enforcement is opt-in per account, and deliberately so. An account
+		 *	that holds no scoped permission for a panel keeps exactly what the
+		 *	panel permission has always meant - all of it. The other way round,
+		 *	every role in every existing installation would have lost write
+		 *	access on the day this arrived, silently. Giving a role its first
+		 *	scoped permission for a panel is what says "describe this one in
+		 *	detail"; from then on that panel allows what the role names and
+		 *	nothing else.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$prefix				The panel's scope, with its slash (eg. '/_admin/elements/')
+		 *	@param		string		$perm					The specific permission the action needs
+		 *
+		 *	@return 	bool										Whether this account may do it
+		 */
+		public static function scoped( array &$appData, string $prefix, string $perm ): bool {
+
+			if( self::isScoped( $appData, $prefix ) === false )
+				return true;
+
+			return \Nino\Auth::checkPermission( $appData, $perm );
+		}
+
+		/**
+		 *	Whether this account is described in detail for a panel - ie.
+		 *	holds at least one permission naming a single action inside it,
+		 *	rather than only the door or a blanket over the whole panel.
+		 *
+		 *	'/_admin/elements/manage' is the door and '/_admin/elements/*' the
+		 *	blanket: neither names an action, so neither switches the panel
+		 *	into described-in-detail mode. '/_admin/elements/services/insert'
+		 *	does, and so does '/_admin/elements/services/*' - a role limited
+		 *	to one type is still a role that was described.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$prefix				The panel's scope, with its slash
+		 *
+		 *	@return 	bool
+		 */
+		public static function isScoped( array &$appData, string $prefix ): bool {
+
+			$user = \Nino\Auth::getCurrentUser( $appData );
+
+			if( $user === false )
+				return false;
+
+			foreach( \Nino\Auth::permissions( $appData, $user ) as $held ) {
+
+				if( str_starts_with( $held, $prefix ) === false )
+					continue;
+
+				$rest = substr( $held, strlen( $prefix ) );
+
+				if( $rest === '*' || str_contains( $rest, '/' ) === false )
+					continue;
+
+				return true;
+			}
+
+			return false;
+		}
+
+		/**
+		 *	The admin's remembered locale for this session (Elements/Text's
+		 *	locale switch), so opening the next form - in this or another
+		 *	panel - starts on it instead of always resetting to whichever
+		 *	locale happens to come first. Falls back to the site's native
+		 *	locale if nothing has been chosen yet, or the stored one is no
+		 *	longer available (eg. removed from config since).
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	string
+		 */
+		public static function sessionLocale( array &$appData ): string {
+
+			$locale = \Nino\Runtime::getSessionValue( $appData, './admin/locale', '' );
+
+			if( $locale === '' || \Nino\Locales::verifyLocale( $appData, $locale ) === false )
+				return \Nino\Locales::getNativeLocale( $appData );
+
+			return $locale;
+		}
+
+		/**
+		 *	Build the [[/_admin/localepicker]] fill: a <select> (stays
+		 *	compact regardless of how many locales are configured, unlike a
+		 *	row of links) with one <option> per available locale (label via
+		 *	the same [[/nino/locales/locale/xx]] fills the public site's
+		 *	[localepicker] shortcode uses), the current one pre-selected.
+		 *	Options carry a real ?locale=xx value - login.js/script.js just
+		 *	navigate to it on change, no fetch/POST involved. init()'s query
+		 *	handling picks that GET up identically on the login screen (no
+		 *	session yet) and the dashboard. Locale codes/labels are
+		 *	developer-controlled config, not user input - no escaping
+		 *	needed, same as [localepicker] itself.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string 		$currentLocale
+		 *
+		 *	@return 	string
+		 */
+		private static function _localePickerHtml( array &$appData, string $currentLocale ): string {
+
+			$options = '';
+
+			foreach( \Nino\Locales::getAvailableLocales( $appData ) as $locale ) {
+
+				// The name of a language is the project's to give, and the fill
+				// that carries it is written by the Localepicker module's install
+				// step - an optional unit an operator may uncheck, and one that
+				// cannot know about a locale the Language panel adds later either.
+				// Without the fallback every such option renders empty, which is
+				// a language switcher with nothing readable in it
+				$label = \Nino\Html::renderTextfill( $appData, '/nino/locales/locale/'. $locale );
+
+				$options .= '<option value="?locale='. $locale. '"'. ( $locale === $currentLocale ? ' selected' : '' ). '>'.
+					( $label !== '' ? $label : $locale ). '</option>';
+			}
+
+			return '<select id="admin-localepicker">'. $options. '</select>';
+		}
+
+		/**
+		 *	Remember the admin's currently selected locale for this session
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
 		 *
 		 *	@return 	void
 		 */
-		private static function apiLogin( array &$appData, array &$request ): void {
+		public static function apiSetLocale( array &$appData, array &$request ): void {
 
-			$password 	= (string) ( json_decode( $_POST['data'] ?? '{}', true )['password'] ?? '' );
-			$hash 			= self::passwordHash( $appData );
+			if( self::guard( $appData, $request ) === false )
+				return;
+
+			$locale = (string) ( self::postData()['locale'] ?? '' );
+
+			if( \Nino\Locales::verifyLocale( $appData, $locale ) === false ) {
+				\Nino\Http::fail( $request, 400, 'unknown locale' );
+				return;
+			}
+
+			\Nino\Runtime::setSessionValue( $appData, './admin/locale', $locale );
+		}
+
+		/**
+		 *	Read the "data" post field as a json object
+		 *
+		 *	@return 	array
+		 */
+		public static function postData(): array {
+			$data = json_decode( $_POST['data'] ?? '', true );
+			return is_array( $data ) ? $data : [];
+		}
+
+		/**
+		 *	The words of one text directory in the interface language - or in
+		 *	English when there are none in that language. The interface
+		 *	language follows the site's (see sessionLocale()), and the
+		 *	workbench speaks two; a site in a third would otherwise render
+		 *	every label of every panel as its own fill key
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$dir					A text directory, virtual path (eg. '/_admin/text')
+		 *	@param		string		$locale				The interface language
+		 *
+		 *	@return 	array										The fills of that file, or of en_US.php
+		 */
+		public static function textFills( array &$appData, string $dir, string $locale ): array {
+
+			$fills = \Nino\Filesystem::getFileContent( $appData, $dir. '/'. $locale. '.php', false );
+
+			if( is_array( $fills ) === true )
+				return $fills;
+
+			return (array) \Nino\Filesystem::getFileContent( $appData, $dir. '/en_US.php', [] );
+		}
+
+		/**
+		 *	A whole number within a field's 'min'/'max', or null - shared by
+		 *	the panels that write typed values into config.php (Config, the
+		 *	Login protection tab), so a panel a delivery drops takes no
+		 *	validation with it that another one relies on
+		 *
+		 *	@param		mixed			$value				As posted
+		 *	@param		array			$field				Its FIELDS entry, for 'min'/'max'
+		 *
+		 *	@return 	int|null								Null if not an int or out of range
+		 */
+		public static function cleanInt( mixed $value, array $field ): ?int {
+
+			// A float, a bool or "5 " are all rejected rather than cast: this
+			// writes into config.php, where the value has to be an int and
+			// nothing else
+			if( is_int( $value ) === false && ( is_string( $value ) === false || preg_match( '/^-?\d+$/', $value ) !== 1 ) )
+				return null;
+
+			$int = (int) $value;
+
+			if( $int < ( $field['min'] ?? PHP_INT_MIN ) || $int > ( $field['max'] ?? PHP_INT_MAX ) )
+				return null;
+
+			return $int;
+		}
+
+		/**
+		 *	The message a rejected field answers with - specific enough to fix
+		 *	the value from, which "invalid value" is not
+		 *
+		 *	@param		string		$key
+		 *	@param		array			$field
+		 *
+		 *	@return 	string
+		 */
+		public static function typeError( string $key, array $field ): string {
+
+			return match( $field['type'] ) {
+				'int' 		=> $key. ': expected a whole number between '. ( $field['min'] ?? PHP_INT_MIN ). ' and '. ( $field['max'] ?? PHP_INT_MAX ),
+				'bool' 		=> $key. ': expected true or false',
+				'lines' 	=> $key. ': expected one entry per line',
+				default 	=> $key. ': invalid value',
+			};
+		}
+
+	}
+
+	/**
+	 *	Nino								A compact filesystembased php framework
+	 *	Panels							The panel registry the shell is rendered from: reading a
+	 *											panel class, ordering the panels, rendering the navigation
+	 *											and the content panes from that list rather than from a
+	 *											hand-written template. The PHP half of assets/Nino.admin.js
+	 *											and style.css.
+	 *
+	 *	A panel							is a class with two required and six optional static
+	 *											methods - no interface, no base class, same as a runtime
+	 *											module is a class with init():
+	 *
+	 *											  actions(): array          'panel/action' => [ class, method ]
+	 *											  nav(): array              [ uri, label, weight = 50, group = 'content' ]
+	 *											  perm(): string            permission gating nav and api, '' = none
+	 *											  panes(): array            mount ids inside the pane, default [ '<uri>-list' ]
+	 *											  template(): string        a .tpl (project-relative, without the
+	 *											                            extension) included into the pane instead
+	 *											                            of mount points - for a screen with a lot
+	 *											                            of static markup
+	 *											  layout(): string          'page' (default: a column of content) or
+	 *											                            'workspace' (the whole pane, edge to
+	 *											                            edge, the rail folded away)
+	 *											  tabs(): array             further panel classes shown as tabs of this
+	 *											                            panel's pane, each with its own perm(), script
+	 *											                            and hash prefix; tab(): string names the tab
+	 *											                            when the nav label will not do
+	 *											  icon(): string            an inline <svg> for the folded rail;
+	 *											                            without one the label's initial stands in
+	 *											  assets(): array           its own .js/.css files, project-relative
+	 *											  text(): string            directory of its <locale>.php fills
+	 *											  summary( &$appData ): ?array   a dashboard tile { value, label }
+	 *											  log( $action, $data ): string  the activity-log line, '' for none
+	 *
+	 *											The navigation has three groups, in this order: 'content'
+	 *											(what editors work in), 'structure' (the shape of the
+	 *											project) and 'system'. Weight orders within a group. A
+	 *											label starting with '/' is a fill key, resolved by the
+	 *											normal fill pass; anything else is literal text.
+	 *
+	 *	Where a panel			lives is what kind of panel it is. The workbench's own
+	 *											screens are modules under _admin/Nino/Modules/<Name>/, one
+	 *											directory each: Admin/Admin.php is the panel, <Tab>/<Tab>.php
+	 *											a tab of it, assets/ its scripts and stylesheet, text/ its
+	 *											words - the same shape _nino/Nino/Modules and app/Nino/Modules
+	 *											have, and the same namespace, so \Nino\Modules\Elements is
+	 *											the runtime module and \Nino\Modules\Elements\Admin the
+	 *											screen for it. A runtime module contributes a panel of its own
+	 *											by answering adminPanels() with the class name - see
+	 *											\Nino\Modules::collect(). Paths a panel answers are
+	 *											project-relative; relative() turns the directory its class
+	 *											file sits in into one.
+	 *
+	 *	@package						Dape/Nino
+	 *	@author							David Perchermeier <mail@dape.io>
+	 *	@link								https://github.com/dapeio/nino
+	 */
+
+	class Panels {
+
+		// The navigation's groups, in the order they are rendered
+		public const array GROUPS = [ 'content', 'structure', 'system' ];
+
+		/**
+		 *	Build one tool's registry: its own panels first, then every
+		 *	panel the active modules contribute, the whole list stable-sorted
+		 *	by nav() weight - which is what lets a module panel sit between
+		 *	two core ones.
+		 *
+		 *	A second panel claiming an already taken uri is dropped with a
+		 *	warning rather than allowed to shadow the first: a module must
+		 *	not be able to replace a core screen by picking its name. The
+		 *	same goes for a class missing actions() or nav() - the tool keeps
+		 *	working without it, and the warning names it.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		$core					The tool's own panel classes
+		 *	@param		string		$method				The module question, 'adminPanels'
+		 *
+		 *	@return 	array										[ uri => { class, uri, label, tab, weight, group, perm, panes, template, layout, icon, assets, text, tabs, parent, own } ]
+		 */
+		public static function collect( array &$appData, array $core, string $method ): array {
+
+			$panels = [];
+			$taken	= [];
+
+			foreach( array_merge( $core, \Nino\Modules::collect( $appData, $method ) ) as $class ) {
+
+				$entry = self::_entry( $class, $taken );
+
+				if( $entry === null )
+					continue;
+
+				$taken[$entry['uri']] = $class;
+
+				// A panel may bring further panels along as tabs of its own
+				// pane - each a complete panel with its own permission,
+				// script and hash prefix, placed here rather than in the rail.
+				// A uri is taken across panels and tabs alike, and a tab has no
+				// tabs of its own
+				if( method_exists( $class, 'tabs' ) === true )
+					foreach( (array) $class::tabs() as $tabClass ) {
+
+						$tab = self::_entry( $tabClass, $taken );
+
+						if( $tab === null )
+							continue;
+
+						$tab['parent'] = $entry['uri'];
+						$taken[$tab['uri']] = $tabClass;
+						$entry['tabs'][$tab['uri']] = $tab;
+					}
+
+				uasort( $entry['tabs'], static fn( array $a, array $b ): int => $a['weight'] <=> $b['weight'] );
+
+				$panels[$entry['uri']] = $entry;
+			}
+
+			// Group first, weight within the group - stable, so two panels
+			// of equal weight keep their registration order
+			$order = array_flip( self::GROUPS );
+			uasort( $panels, static fn( array $a, array $b ): int => [ $order[$a['group']], $a['weight'] ] <=> [ $order[$b['group']], $b['weight'] ] );
+
+			return $panels;
+		}
+
+		/**
+		 *	One panel class read into its registry entry, or null with a
+		 *	warning naming what is wrong with it - a module must never be
+		 *	able to replace a core screen by picking its name, and a class
+		 *	missing actions() or nav() must not take the tool down
+		 *
+		 *	@param		mixed 		$class				What a module answered - a class name, hopefully
+		 *	@param		array 		$taken				uri => class, everything registered so far
+		 *
+		 *	@return 	array|null
+		 */
+		private static function _entry( mixed $class, array $taken ): ?array {
+
+			if( is_string( $class ) === false || method_exists( $class, 'actions' ) === false || method_exists( $class, 'nav' ) === false ) {
+				trigger_error( 'Panel '. ( is_string( $class ) === true ? $class : gettype( $class ) ). ' needs actions() and nav()', E_USER_WARNING );
+				return null;
+			}
+
+			$nav = (array) $class::nav();
+			$uri = (string) ( $nav[0] ?? '' );
+
+			if( preg_match( '/^[a-z][a-z0-9-]*$/', $uri ) !== 1 ) {
+				trigger_error( 'Panel '. $class. ' has no usable nav uri', E_USER_WARNING );
+				return null;
+			}
+
+			if( isset( $taken[$uri] ) === true ) {
+				trigger_error( 'Panel '. $class. ' wants uri \''. $uri. '\', already taken by '. $taken[$uri], E_USER_WARNING );
+				return null;
+			}
+
+			// An asset path reaches a <script src> or a bundle list:
+			// project-relative, no traversal, only the two kinds of file
+			// a panel can bring. A file that is not there is kept in the
+			// list (the bundler skips it) but named: a panel whose script
+			// silently never loads is a pane that stays empty, and the
+			// warning is the only thing that says why
+			$assets = [];
+			if( method_exists( $class, 'assets' ) === true )
+				foreach( (array) $class::assets() as $asset )
+					if( is_string( $asset ) === true && preg_match( '#^/[A-Za-z0-9_./-]+\.(js|css)$#', $asset ) === 1 && str_contains( $asset, '..' ) === false ) {
+						if( is_file( Admin::ROOT. $asset ) === false )
+							trigger_error( 'Panel '. $class. ' names an asset that does not exist: '. $asset, E_USER_WARNING );
+						$assets[] = $asset;
+					}
+
+			$panes = [ $uri. '-list' ];
+			if( method_exists( $class, 'panes' ) === true )
+				$panes = array_values( array_filter( (array) $class::panes(), static fn( mixed $pane ): bool => is_string( $pane ) === true && preg_match( '/^[a-z][a-z0-9-]*$/', $pane ) === 1 ) );
+
+			// A template reaches the [template] shortcode: project-relative,
+			// no traversal, and only ever a path - the shortcode adds .tpl
+			$template = method_exists( $class, 'template' ) === true ? (string) $class::template() : '';
+			if( $template !== '' && ( preg_match( '#^/[A-Za-z0-9_./-]+$#', $template ) !== 1 || str_contains( $template, '..' ) === true ) ) {
+				trigger_error( 'Panel '. $class. ' names an unusable template path', E_USER_WARNING );
+				$template = '';
+			}
+
+			$layout = method_exists( $class, 'layout' ) === true ? (string) $class::layout() : 'page';
+			if( in_array( $layout, [ 'page', 'workspace' ], true ) === false )
+				$layout = 'page';
+
+			// An icon is markup a panel class ships - trusted code, but
+			// held to one shape: an inline svg and nothing that runs
+			$icon = method_exists( $class, 'icon' ) === true ? trim( (string) $class::icon() ) : '';
+			if( $icon !== '' && ( str_starts_with( $icon, '<svg' ) === false || stripos( $icon, '<script' ) !== false || stripos( $icon, 'on' ) !== false && preg_match( '/\son[a-z]+\s*=/i', $icon ) === 1 ) )
+				$icon = '';
+
+			$group = (string) ( $nav[3] ?? 'content' );
+			if( in_array( $group, self::GROUPS, true ) === false ) {
+				trigger_error( 'Panel '. $class. ' names an unknown nav group \''. $group. '\'', E_USER_WARNING );
+				$group = 'content';
+			}
+
+			$label = (string) ( $nav[1] ?? $uri );
+
+			return [
+				'class'		=> $class,
+				'uri'			=> $uri,
+				'label'		=> $label,
+				// What the tab strip calls it when the panel is one of
+				// several in a pane - the nav label unless tab() says otherwise
+				'tab'			=> method_exists( $class, 'tab' ) === true ? (string) $class::tab() : $label,
+				'weight'	=> (int) ( $nav[2] ?? 50 ),
+				'group'		=> $group,
+				'perm'		=> method_exists( $class, 'perm' ) === true ? (string) $class::perm() : '',
+				'panes'		=> $panes,
+				'template'=> $template,
+				'layout'	=> $layout,
+				'icon'		=> $icon,
+				'assets'	=> $assets,
+				'text'		=> method_exists( $class, 'text' ) === true ? (string) $class::text() : '',
+				'tabs'		=> [],
+				'parent'	=> '',
+				// Whether the panel's own screen is on offer - false once
+				// visiblePanels() found the account lacks its permission but
+				// holds one of its tabs'
+				'own'			=> true,
+			];
+		}
+
+		/**
+		 *	The navigation, one link per panel under its group's heading -
+		 *	rendered here rather than written into the shell template, which
+		 *	is what lets a module's panel appear without touching the shell.
+		 *	The link ids follow the convention the tool always had
+		 *	(admin-nav-<uri>); data-panel is what the shell script reads. A
+		 *	heading is only rendered when more than one group is on screen:
+		 *	an account that sees content alone gets a plain list
+		 *
+		 *	@param		array 		$panels				A registry, see collect() - already filtered to what the account may see
+		 *
+		 *	@return 	string
+		 */
+		public static function navHtml( array $panels ): string {
+
+			$groups = array_unique( array_column( $panels, 'group' ) );
+			$html 	= '';
+			$open 	= '';
+
+			foreach( $panels as $panel ) {
+
+				if( count( $groups ) > 1 && $panel['group'] !== $open ) {
+					$open = $panel['group'];
+					$html .= '<span class="nino-admin-nav-group" data-group="'. $open. '">[[/_admin/nav/group/'. $open. ']]</span>';
+				}
+
+				$html .= '<a href="#" id="admin-nav-'. $panel['uri']. '" data-panel="'. $panel['uri']. '" data-layout="'. $panel['layout']. '">'
+					. '<span class="nino-admin-nav-icon" aria-hidden="true">'. ( $panel['icon'] !== '' ? $panel['icon'] : '<b>'. self::initial( $panel['label'] ). '</b>' ). '</span>'
+					. '<span class="nino-admin-nav-label">'. self::label( $panel['label'] ). '</span></a>';
+			}
+
+			return $html;
+		}
+
+		/**
+		 *	The letter that stands in for a panel without an icon on the
+		 *	folded rail - a fill key's last segment, else the label's first
+		 *	character
+		 *
+		 *	@param		string		$label				Fill key or literal text
+		 *
+		 *	@return 	string
+		 */
+		public static function initial( string $label ): string {
+
+			$word = str_starts_with( $label, '/' ) === true ? (string) substr( $label, strrpos( $label, '/' ) + 1 ) : $label;
+
+			return htmlspecialchars( mb_strtoupper( mb_substr( trim( $word ), 0, 1 ) ), ENT_QUOTES | ENT_SUBSTITUTE | ENT_HTML5, 'UTF-8' );
+		}
+
+		/**
+		 *	A file's project-relative path, the form every path a panel
+		 *	answers takes - so a panel says where its files are from where
+		 *	its class is, and moves with its module:
+		 *
+		 *	  Panels::relative( dirname( __DIR__ ). '/assets/admin.js' )
+		 *
+		 *	@param		string		$absolute			An absolute path inside the project
+		 *
+		 *	@return 	string										'' when the path is not inside the project
+		 */
+		public static function relative( string $absolute ): string {
+
+			$root = dirname( __DIR__ );
+
+			if( str_starts_with( $absolute, $root. '/' ) === false )
+				return '';
+
+			return str_replace( '\\', '/', substr( $absolute, strlen( $root ) ) );
+		}
+
+		/**
+		 *	The content panes, one per panel - the other half of navHtml().
+		 *	A pane holds the mount points the panel's own script renders
+		 *	into, or its template included whole. A panel with tabs (see
+		 *	collect()) holds a strip of tab buttons and one tab pane per
+		 *	tab, its own screen first; the strip is only rendered when there
+		 *	is more than one tab to choose from. Every pane and tab pane
+		 *	starts hidden; the shell script shows the selected ones and
+		 *	reads a panel's layout off data-layout
+		 *
+		 *	@param		array 		$panels				A registry, see collect() - already filtered to what the account may see
+		 *
+		 *	@return 	string
+		 */
+		public static function panesHtml( array $panels ): string {
+
+			$html = '';
+
+			foreach( $panels as $panel ) {
+
+				$html .= '<div id="admin-content-'. $panel['uri']. '" data-panel="'. $panel['uri']. '" data-layout="'. $panel['layout']. '" hidden>';
+
+				if( $panel['tabs'] === [] ) {
+					$html .= self::_paneContent( $panel ). '</div>';
+					continue;
+				}
+
+				$tabs = ( $panel['own'] === true ? [ $panel['uri'] => $panel ] : [] ) + $panel['tabs'];
+
+				if( count( $tabs ) > 1 ) {
+					$html .= '<div class="nino-admin-tabs nino-admin-tabs--bar admin-panel-tabs" role="tablist">';
+					foreach( $tabs as $tab )
+						$html .= '<button type="button" role="tab" class="nino-admin-tab" data-tab="'. $tab['uri']. '" aria-selected="false">'. self::label( $tab['tab'] ). '</button>';
+					$html .= '</div>';
+				}
+
+				foreach( $tabs as $tab )
+					$html .= '<div id="admin-tab-'. $tab['uri']. '" data-tab="'. $tab['uri']. '" hidden>'. self::_paneContent( $tab ). '</div>';
+
+				$html .= '</div>';
+			}
+
+			return $html;
+		}
+
+		/**
+		 *	What one panel renders into: its template, or its mount points
+		 *
+		 *	@param		array 		$panel				A registry entry
+		 *
+		 *	@return 	string
+		 */
+		private static function _paneContent( array $panel ): string {
+
+			if( $panel['template'] !== '' )
+				return '[template '. $panel['template']. ']';
+
+			$html = '';
+			foreach( $panel['panes'] as $pane )
+				$html .= '<div id="'. $pane. '"></div>';
+
+			return $html;
+		}
+
+		/**
+		 *	A nav label as it goes into the shell markup: a fill key wrapped
+		 *	for the fill pass, literal text escaped for html and against the
+		 *	bracket syntax that same pass would otherwise read
+		 *
+		 *	@param		string		$label				Fill key ('/_admin/nav/x') or literal text
+		 *
+		 *	@return 	string
+		 */
+		public static function label( string $label ): string {
+
+			if( str_starts_with( $label, '/' ) === true )
+				return '[['. $label. ']]';
+
+			return str_replace( [ '[', ']' ], [ '&#91;', '&#93;' ], htmlspecialchars( $label, ENT_QUOTES | ENT_SUBSTITUTE | ENT_HTML5, 'UTF-8' ) );
+		}
+	}
+
+	/**
+	 *	Nino							A compact filesystembased php framework
+	 *	Recovery					The way back in when the accounts are what is broken: a
+	 *											second secret, set by the wizard's last step and kept under
+	 *											private/.auth/ - outside config.php, so a Restore cannot roll
+	 *											it back, and outside every tool folder, so an update cannot
+	 *											take it along. _admin/recovery.php verifies it (rate-limited,
+	 *											one shared counter) and offers exactly two things: restoring
+	 *											a backup and resetting an account's password. Nothing in the
+	 *											workbench itself ever asks for it.
+	 *
+	 *	@package					Dape/Nino
+	 *	@author						David Perchermeier <mail@dape.io>
+	 *	@link							https://github.com/dapeio/nino
+	 */
+	class Recovery {
+
+		// Where the secret's hash lives, relative to the content directory
+		// (see \Nino\Filesystem::getContentPath()). The wizard's last step
+		// writes it; hash() reads it
+		public const string PASSWORD_PATH = '/.auth/pw.php';
+
+		// The attempt counter, next to the credential it guards. A virtual
+		// path (see \Nino\Filesystem::CONTENT_DIR), so it goes through
+		// mutate() and keeps its lock - two concurrent wrong attempts must
+		// not both read the same "tries" and each write back the same +1
+		private const string LOCKOUT_PATH = \Nino\Filesystem::CONTENT_DIR. '/.auth/lockout.json';
+
+		// The stub that file is wrapped in - a php file that 403s and exits
+		// before it ever returns the hash, so it stays useless even where a
+		// webserver happily serves it. Same convention (and same constants)
+		// Backup uses for its key and its archives
+		public const string STUB_PREFIX = "<?php http_response_code(403); exit; return '";
+		public const string STUB_SUFFIX = "';\n";
+
+		private const int MAX_TRIES = 5;
+		private const int COOLDOWN = 3600;
+
+		// The session flag recovery.php sets once the secret was verified
+		public const string SESSION_KEY = './nino/admin/recovery';
+
+		private const int MIN_PW_LENGTH = 8;
+
+		/**
+		 *	Register recovery.php's own route pair - the file is its own
+		 *	entry point, so nothing the workbench registers applies here
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	void
+		 */
+		public static function init( array &$appData ): void {
+
+			$appData['/nino/http/routes']['GET://_admin/recovery.php'] = [
+				'uri' 				=> '/_admin/recovery.php',
+				'body'				=> '[template /_admin/templates/page-recovery]',
+				'statusCode'	=> 200
+			];
+			$appData['/nino/http/routes']['POST://_admin/recovery.php'] = [ 'uri' => '/_admin/recovery.php' ];
+
+			\Nino\Callbacks::registerCallback( $appData, '/nino/http/response/GET://_admin/recovery.php', 	[ self::class, 'handleGet' ] );
+			\Nino\Callbacks::registerCallback( $appData, '/nino/http/response/POST://_admin/recovery.php', [ self::class, 'handlePost' ] );
+		}
+
+		/**
+		 *	Tell the page whether the gate is open - the one thing it renders
+		 *	differently. The tools' markup is in the page either way; what
+		 *	they do is guarded server-side by handlePost()
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		&$request			(reference) Current server request
+		 *
+		 *	@return 	void
+		 */
+		public static function handleGet( array &$appData, array &$request ): void {
+
+			\Nino\Html::addFills( $appData, [ '[[/_admin/recovery/open]]' => self::isOpen( $appData ) === true ? '1' : '0' ], '*' );
+		}
+
+		/**
+		 *	Dispatch recovery.php's four actions: login opens the gate, the
+		 *	other three need it open. Same one-route/$_POST['action'] shape as
+		 *	Admin::handlePost(), deliberately without the panel registry -
+		 *	this runs when config.php may be the very thing that is broken
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		&$request			(reference) Current server request
+		 *
+		 *	@return 	void
+		 */
+		public static function handlePost( array &$appData, array &$request ): void {
+
+			if( $request['/nino/http/response']['statusCode'] !== 200 )
+				return;
+
+			$action = (string) ( $_POST['action'] ?? '' );
+			$data 	= Admin::postData();
+
+			if( $action === 'recovery/login' ) {
+
+				$status = self::verify( $appData, (string) ( $data['password'] ?? '' ) );
+
+				if( $status !== 200 ) {
+					\Nino\Http::fail( $request, $status, $status === 429 ? 'too many attempts' : 'wrong password' );
+					return;
+				}
+
+				// Same fixation defence as a login through Auth
+				session_regenerate_id( true );
+				\Nino\Csrf::rotateToken( $appData );
+				\Nino\Runtime::setSessionValue( $appData, self::SESSION_KEY, true );
+				\Nino\Http::ok( $request );
+				return;
+			}
+
+			if( self::isOpen( $appData ) === false ) {
+				\Nino\Http::fail( $request, 401, 'not logged in' );
+				return;
+			}
+
+			switch( $action ) {
+
+				case 'recovery/logout':
+					\Nino\Runtime::unsetSessionValue( $appData, self::SESSION_KEY );
+					\Nino\Csrf::rotateToken( $appData );
+					\Nino\Http::ok( $request );
+					return;
+
+				case 'recovery/list':
+					// No Backups module, no backups to offer - the page then
+					// has the password reset alone, which is the half that
+					// needs nothing but this file (see \Nino\Admin\Admin::record())
+					\Nino\Http::ok( $request, [
+						'dates' => class_exists( '\\Nino\\Modules\\Backups\\Admin' ) === true ? \Nino\Modules\Backups\Admin::dates( $appData ) : [],
+						'users' => array_keys( $appData['/nino/auth/user'] ?? [] )
+					] );
+					return;
+
+				case 'recovery/restore':
+					$date = (string) ( $data['date'] ?? '' );
+					if( preg_match( '/^\d{4}-\d{2}-\d{2}$/', $date ) !== 1 ) {
+						\Nino\Http::fail( $request, 400, 'invalid date' );
+						return;
+					}
+					if( class_exists( '\\Nino\\Modules\\Backups\\Admin' ) === false ) {
+						\Nino\Http::fail( $request, 501, 'no backups module' );
+						return;
+					}
+					$result = \Nino\Modules\Backups\Admin::restore( $appData, $date );
+					if( $result !== true ) {
+						\Nino\Http::fail( $request, $result[0], $result[1] );
+						return;
+					}
+					\Nino\Http::ok( $request, [ 'restoredDate' => $date ] );
+					return;
+
+				case 'recovery/reset':
+					self::_reset( $appData, $request, $data );
+					return;
+			}
+
+			\Nino\Http::fail( $request, 404, 'unknown action' );
+		}
+
+		/**
+		 *	Whether this session has passed the secret
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	bool
+		 */
+		public static function isOpen( array &$appData ): bool {
+			return \Nino\Runtime::getSessionValue( $appData, self::SESSION_KEY, false ) === true;
+		}
+
+		/**
+		 *	Give an account a new password - or, when no account of that
+		 *	name exists, create it with full access: the case where every
+		 *	developer account was deleted and there is nothing left to log
+		 *	in with. Logs every session of the account out on the way, the
+		 *	same as changing a password through the Users panel would not
+		 *	- a reset from here is a takeover by whoever holds the secret
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		&$request			(reference) Current server request
+		 *	@param		array 		$data					The posted payload
+		 *
+		 *	@return 	void
+		 */
+		private static function _reset( array &$appData, array &$request, array $data ): void {
+
+			$mail = trim( (string) ( $data['mail'] ?? '' ) );
+			$pw 	= (string) ( $data['pw'] ?? '' );
+
+			if( $mail === '' || filter_var( $mail, FILTER_VALIDATE_EMAIL ) === false ) {
+				\Nino\Http::fail( $request, 400, 'invalid mail' );
+				return;
+			}
+
+			if( strlen( $pw ) < self::MIN_PW_LENGTH ) {
+				\Nino\Http::fail( $request, 400, 'password must be at least '. self::MIN_PW_LENGTH. ' characters' );
+				return;
+			}
+
+			if( \Nino\Auth::getUser( $appData, $mail ) === false ) {
+
+				// Full access of its own, whatever the roles say - this is
+				// the emergency path - and the Developer role beside it
+				// where there is one, so the account reads as what it is
+				$role = isset( $appData['/nino/auth/roles']['developer'] ) === true ? 'developer' : '';
+
+				if( \Nino\Auth::insertUser( $appData, $mail, $pw, [ '/*' ], $role ) === false ) {
+					\Nino\Http::fail( $request, 500, 'could not create the account' );
+					return;
+				}
+
+				\Nino\Http::ok( $request, [ 'mail' => $mail, 'created' => true ] );
+				return;
+			}
+
+			if( \Nino\Auth::updateUser( $appData, $mail, $mail, $pw ) === false ) {
+				\Nino\Http::fail( $request, 500, 'could not update the account' );
+				return;
+			}
+
+			\Nino\Auth::logoutAllSessions( $appData, $mail );
+
+			\Nino\Http::ok( $request, [ 'mail' => $mail, 'created' => false ] );
+		}
+
+		/**
+		 *	Check a posted secret against the stored hash, under the shared
+		 *	attempt counter, and answer with the http status recovery.php
+		 *	should send: 200, 401 (wrong), or 429 (locked out).
+		 *
+		 *	The cooldown check, the verify and the tries update all happen
+		 *	inside one lock: as three separate steps, two concurrent wrong
+		 *	attempts could both read the same "tries" and both write back the
+		 *	same +1, losing an increment - the exact way to dodge the lockout
+		 *	with two requests instead of one. A project without a hash at all
+		 *	(one whose file went missing) still runs the counter: answering
+		 *	instantly would tell an unauthenticated caller which of the two
+		 *	states this installation is in
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$password
+		 *
+		 *	@return 	int											200 | 401 | 429
+		 */
+		public static function verify( array &$appData, string $password ): int {
+
+			$hash 			= self::hash( $appData );
 			$lockedOut 	= false;
 			$verified 	= false;
 
-			// The cooldown check, password verify and tries update all happen
-			// inside one lock: reading the counter, verifying, then writing as
-			// three separate steps would let two concurrent wrong attempts both
-			// read the same "tries" and both write back the same +1, losing an
-			// increment - the exact way to dodge the lockout with two requests
-			// instead of one
 			\Nino\Filesystem::mutate( $appData, self::LOCKOUT_PATH, function( array $state ) use ( $password, $hash, &$lockedOut, &$verified ): ?array {
 
 				if( (int) $state['until'] > time() ) {
@@ -419,10 +1480,6 @@ namespace Nino\Admin {
 					return null;
 				}
 
-				// No password at all - a project whose file went missing, or
-				// one that never finished /_install. Still run the counter:
-				// answering instantly would tell an unauthenticated caller
-				// which of the two states this installation is in
 				$verified = $hash !== null && password_verify( $password, $hash );
 
 				if( $verified === true )
@@ -437,43 +1494,75 @@ namespace Nino\Admin {
 				return $state;
 			}, [ 'tries' => 0, 'until' => 0 ] );
 
-			if( $lockedOut === true ) {
-				\Nino\Http::fail( $request, 429, 'too many attempts' );
-				return;
-			}
+			if( $lockedOut === true )
+				return 429;
 
-			if( $verified === false ) {
-				\Nino\Http::fail( $request, 401, 'wrong password' );
-				return;
-			}
+			return $verified === true ? 200 : 401;
+		}
 
-			// Defend against session fixation, same as Auth::loginUser() - which
-			// rotates the csrf token alongside the session id, because a token
-			// an attacker fixed or read while the session was still
-			// unauthenticated stays valid for the authenticated one otherwise.
-			// script.js reloads the page (and with it the [csrf] field) after a
-			// successful login, so rotating here costs the client nothing
-			session_regenerate_id( true );
-			\Nino\Csrf::rotateToken( $appData );
-			\Nino\Runtime::setSessionValue( $appData, './nino/admin/authed', true );
+		/**
+		 *	Hash a new secret and store it - the wizard's last step, and
+		 *	recovery.php itself when the secret is changed
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$password			The plaintext secret
+		 *
+		 *	@return 	bool										Whether the hash was stored
+		 */
+		public static function set( array &$appData, string $password ): bool {
+
+			return self::writeHash( $appData, password_hash( $password, PASSWORD_DEFAULT ) );
+		}
+
+		/**
+		 *	The password hash currently in effect, or null when this project
+		 *	has none yet.
+		 *
+		 *	Canonically PASSWORD_PATH, under the private directory - never
+		 *	config.php: a Restore rewrites config.php, and a credential that
+		 *	authorises restoring must not be part of what gets restored (the
+		 *	same reasoning Backup already applies to the encryption key, see
+		 *	Backup::_key()). It is also outside every tool folder, so
+		 *	replacing _admin/ on an update no longer takes the
+		 *	password with it.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	string|null							Null when no password has been set at all
+		 */
+		public static function hash( array &$appData ): ?string {
+
+			$raw = @file_get_contents( self::path( $appData ) );
+
+			if( is_string( $raw ) === false )
+				return null;
+
+			if( str_starts_with( $raw, self::STUB_PREFIX ) === false || str_ends_with( $raw, self::STUB_SUFFIX ) === false )
+				return null;
+
+			$hash = substr( $raw, strlen( self::STUB_PREFIX ), -strlen( self::STUB_SUFFIX ) );
+
+			// A truncated or half-written file must read as "no secret" and
+			// therefore fail every attempt, never as a hash password_verify()
+			// would happily reject in a way that looks like a wrong password
+			return $hash !== '' ? $hash : null;
 		}
 
 		/**
 		 *	Write a hash to PASSWORD_PATH, creating the private directory if
-		 *	it isn't there yet. The one writer - /_install's finish step goes
-		 *	through Install::setDevPassword(), which calls this
+		 *	it isn't there yet - see set()
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		string		$hash					An already-hashed password, never a plaintext one
 		 *
 		 *	@return 	bool										False when the file could not be written
 		 */
-		public static function writePasswordHash( array &$appData, string $hash ): bool {
+		public static function writeHash( array &$appData, string $hash ): bool {
 
 			if( $hash === '' )
 				return false;
 
-			$path = self::passwordPath( $appData );
+			$path = self::path( $appData );
 			$dir 	= dirname( $path );
 
 			// @ throughout, same reasoning Filesystem::forceDir() documents:
@@ -532,7 +1621,7 @@ namespace Nino\Admin {
 				return false;
 			}
 
-			// passwordHash() reads these bytes directly rather than including
+			// hash() reads these bytes directly rather than including
 			// them, so opcache never sits in that path - but the file is
 			// still php a webserver may compile if it is requested, and
 			// leaving a stale compiled copy of a credential file around is
@@ -565,4819 +1654,14 @@ namespace Nino\Admin {
 		}
 
 		/**
-		 *	End the session gate
+		 *	The absolute path of the file hash() reads
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		array 		&$request			(reference) Current server request
-		 *
-		 *	@return 	void
-		 */
-		private static function apiLogout( array &$appData, array &$request ): void {
-			\Nino\Runtime::unsetSessionValue( $appData, './nino/admin/authed' );
-
-			// Same rotation on the way out that Auth::logoutUser() does: the
-			// session's identity is changing here too
-			\Nino\Csrf::rotateToken( $appData );
-		}
-
-		/**
-		 *	Decode the json-encoded "data" POST field every module action reads
-		 *	its payload from - same shape as Editor::postData(), duplicated
-		 *	rather than depending on _editor/Editor.php, since this whole folder
-		 *	is meant to work standalone
-		 *
-		 *	@return 	array
-		 */
-		public static function postData(): array {
-			$data = json_decode( $_POST['data'] ?? '', true );
-			return is_array( $data ) ? $data : [];
-		}
-	}
-
-	/**
-	 *	Nino							A compact filesystembased php framework
-	 *	Dev								Manage element types (elements/<type>.php): title + model
-	 *												(field definitions) only - never touches a type's actual
-	 *												content ('*' and locale buckets), so existing elements are
-	 *												never at risk from a save here. Type deletion is deliberately
-	 *												not exposed - that would destroy real content; use rm.
-	 *
-	 *	@package					Dape/Nino
-	 *	@author						David Perchermeier <mail@dape.io>
-	 *	@link							https://github.com/dapeio/nino
-	 */
-	class ElementTypes {
-
-		public const array FIELD_TYPES = [ 'string', 'integer', 'double', 'boolean', 'array', 'date', 'datetime', 'image', 'element' ];
-
-		/**
-		 *	This module's action map, merged into Admin::handlePost()'s dispatch
-		 *
-		 *	@return 	array
-		 */
-		public static function actions(): array {
-			return [
-				'devtypes/list' 	=> [ self::class, 'apiList' ],
-				'devtypes/get' 		=> [ self::class, 'apiGet' ],
-				'devtypes/save' 	=> [ self::class, 'apiSave' ],
-				'devtypes/create' => [ self::class, 'apiCreate' ],
-			];
-		}
-
-		/**
-		 *	Nav entry for this module, rendered into the dashboard's tab bar
-		 *
-		 *	@return 	array										[ uri, label ]
-		 */
-		public static function nav(): array {
-			return [ 'types', 'Element-Typen' ];
-		}
-
-		/**
-		 *	A type uri is always a single flat filename segment (elements/<type>.php,
-		 *	no nesting) - reject anything else outright, same defensive spirit as
-		 *	Images::process()'s basePath check, before it ever reaches a filesystem call
-		 *
-		 *	@param		string		$typeUri
-		 *
-		 *	@return 	bool
-		 */
-		private static function isValidTypeUri( string $typeUri ): bool {
-			return preg_match( '/^[a-z][a-z0-9_-]*$/', $typeUri ) === 1;
-		}
-
-		/**
-		 *	Every element type with its title and field count, sorted by
-		 *	uri - shared by apiList() and Dashboard::apiSummary()
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *
-		 *	@return 	array										[ [ 'uri', 'title', 'fieldCount' ], ... ]
-		 */
-		public static function summaries( array &$appData ): array {
-
-			$types = [];
-			foreach( glob( \Nino\Filesystem::path( $appData, '/elements' ). '/*.php' ) ?: [] as $file ) {
-
-				$typeUri 	= basename( $file, '.php' );
-				$typeData = \Nino\Filesystem::getFileContent( $appData, '/elements/'. $typeUri. '.php', [] );
-
-				$types[] = [
-					'uri' 				=> $typeUri,
-					'title' 			=> $typeData['title'] ?? $typeUri,
-					'fieldCount' 	=> count( $typeData['model'] ?? [] ),
-				];
-			}
-
-			usort( $types, fn( array $a, array $b ) => strcmp( $a['uri'], $b['uri'] ) );
-
-			return $types;
-		}
-
-		/**
-		 *	List every element type with its title and field count
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		array 		&$request			(reference) Current server request
-		 *
-		 *	@return 	void
-		 */
-		public static function apiList( array &$appData, array &$request ): void {
-
-			if( \Nino\Admin\Admin::guard( $appData, $request ) === false )
-				return;
-
-			\Nino\Http::ok( $request, [ 'types' => self::summaries( $appData ), 'fieldTypes' => self::FIELD_TYPES ] );
-		}
-
-		/**
-		 *	Read one type's title + model
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		array 		&$request			(reference) Current server request
-		 *
-		 *	@return 	void
-		 */
-		public static function apiGet( array &$appData, array &$request ): void {
-
-			if( \Nino\Admin\Admin::guard( $appData, $request ) === false )
-				return;
-
-			$typeUri = (string) ( \Nino\Admin\Admin::postData()['uri'] ?? '' );
-
-			if( self::isValidTypeUri( $typeUri ) === false ) {
-				\Nino\Http::fail( $request, 400, 'invalid type uri' );
-				return;
-			}
-
-			$typeData = \Nino\Filesystem::getFileContent( $appData, '/elements/'. $typeUri. '.php', false );
-
-			if( $typeData === false ) {
-				\Nino\Http::fail( $request, 404, 'unknown type' );
-				return;
-			}
-
-			\Nino\Http::ok( $request, [
-				'uri' 					=> $typeUri,
-				'title' 				=> $typeData['title'] ?? $typeUri,
-				'model' 				=> $typeData['model'] ?? [],
-				// The uri form of the type: named by whoever adds an element, or
-				// numbered by the type itself. 'next' is what the following
-				// element would be called, so the form can show it rather than
-				// describe it.
-				'autoincrement' => \Nino\Elements::readAutoincrement( $typeData ) !== null,
-				'next' 					=> \Nino\Elements::autoincrementUri( \Nino\Elements::readAutoincrement( $typeData ) ?? \Nino\Elements::autoincrementSeed( $typeData ) ),
-			] );
-		}
-
-		/**
-		 *	Validate a posted model definition, dropping anything malformed -
-		 *	same rules as Elements::insertElementType(), plus width/height for
-		 *	image fields, maxlength for string fields, the referenced type for
-		 *	element fields, a fixed unit suffix for every type but boolean/
-		 *	image/element, and a plain string list for options
-		 *
-		 *	@param		mixed			$model				Posted model, expected array<string,array>
-		 *
-		 *	@return 	array										Cleaned model
-		 */
-		private static function cleanModel( mixed $model ): array {
-
-			if( is_array( $model ) === false )
-				return [];
-
-			$clean = [];
-
-			foreach( $model as $key => $data ) {
-
-				$key = trim( (string) $key );
-
-				if( $key === '' || is_array( $data ) === false || in_array( $data['type'] ?? '', self::FIELD_TYPES, true ) === false )
-					continue;
-
-				$field = [ 'type' => $data['type'] ];
-
-				if( ( $data['locale'] ?? false ) === true )
-					$field['locale'] = true;
-
-				if( $data['type'] === 'string' && ( $data['html'] ?? false ) === true )
-					$field['html'] = true;
-
-				// Never on an image, whatever was posted: its file is uploaded
-				// separately, once the element already exists and has a uri to
-				// attach it to (see assets/elements.js's image branch), so a
-				// required image could not be satisfied by the very save that
-				// creates the element - the type would be impossible to add an
-				// element to at all. The frontend stops offering the checkbox
-				// for image fields (see assets/elementtypes.js), and this drops
-				// it from a hand-written or older model on the next save
-				if( $data['type'] !== 'image' && ( $data['required'] ?? false ) === true )
-					$field['required'] = true;
-
-				if( $data['type'] === 'image' ) {
-					$field['width'] 	= max( 1, (int) ( $data['width'] ?? 0 ) );
-					$field['height'] 	= max( 1, (int) ( $data['height'] ?? 0 ) );
-				}
-
-				// Which type an element reference may point at. Kept as posted
-				// rather than checked against the types on disk here - this
-				// method has no $appData; apiSave()/apiCreate() reject an
-				// unknown one outright (see _unknownReferencedType()) so the
-				// author gets told, instead of the field silently vanishing
-				if( $data['type'] === 'element' ) {
-
-					$field['elementType'] = trim( (string) ( $data['elementType'] ?? '' ) );
-
-					// The type editor asks whether the reference is a list and
-					// where it stops as two controls; the model carries one int.
-					// Folded here rather than client-side so a hand-written or
-					// api-posted model goes through the same rule: the key is
-					// written only when the list is actually wanted, because its
-					// mere presence is what makes the field multi-valued
-					// (\Nino\Elements::isMultiElement()) - an absent key is the
-					// single reference every existing type still means
-					if( ( $data['multiple'] ?? false ) === true )
-						$field['multiple'] = max( 0, (int) ( $data['multipleMax'] ?? 0 ) );
-				}
-
-				// Only rendered for a string field (elements.js's maxlength+counter and
-				// html-editor branches) - 0/absent falls back to DEFAULT_MAXLENGTH client-side
-				if( $data['type'] === 'string' ) {
-					$maxlength = (int) ( $data['maxlength'] ?? 0 );
-					if( $maxlength > 0 )
-						$field['maxlength'] = $maxlength;
-				}
-
-				// A fixed unit/label shown next to the input (eg. a "price" field's
-				// "€") - elements.js applies it to every type except boolean,
-				// image and element, none of which render an input a unit could
-				// sit next to
-				if( in_array( $data['type'], [ 'boolean', 'image', 'element' ], true ) === false ) {
-					$suffix = trim( (string) ( $data['suffix'] ?? '' ) );
-					if( $suffix !== '' )
-						$field['suffix'] = $suffix;
-				}
-
-				// Never on an element reference: its choices are the referenced
-				// type's elements, and a second fixed list next to them would
-				// be two selects fighting over the same value (elements.js
-				// renders the options list ahead of the type's own branches)
-				if( $data['type'] !== 'element' && is_array( $data['options'] ?? null ) === true && count( $data['options'] ) > 0 )
-					$field['options'] = array_values( array_map( 'strval', $data['options'] ) );
-
-				$clean[$key] = $field;
-			}
-
-			return $clean;
-		}
-
-		/**
-		 *	The first element field in a cleaned model whose referenced type
-		 *	does not exist on disk, as a ready-made error message - or null
-		 *	when every reference resolves.
-		 *
-		 *	Checked before the type file is written rather than silently
-		 *	dropping the field: a reference nobody can satisfy would render as
-		 *	an empty, permanently unusable select in both element forms, and
-		 *	the author has no way of telling that from "this type simply has
-		 *	no elements yet". A type deleted *later* is a different case and
-		 *	stays tolerated - the forms show the dangling value rather than
-		 *	discard it (see assets/elements.js's element branch).
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		array 		$model				Model as returned by cleanModel()
-		 *
-		 *	@return 	string|null								Error message, or null when every reference resolves
-		 */
-		private static function _unknownReferencedType( array &$appData, array $model ): ?string {
-
-			$known = array_column( self::summaries( $appData ), 'uri' );
-
-			foreach( $model as $key => $field ) {
-
-				if( ( $field['type'] ?? '' ) !== 'element' )
-					continue;
-
-				$referenced = (string) ( $field['elementType'] ?? '' );
-
-				if( $referenced === '' )
-					return 'field "'. $key. '" is an element reference without a type to point at';
-
-				if( in_array( $referenced, $known, true ) === false )
-					return 'field "'. $key. '" references the unknown element type "'. $referenced. '"';
-			}
-
-			return null;
-		}
-
-		/**
-		 *	Save an existing type's title + model. '*' and every locale
-		 *	bucket (the type's actual content) are read back and written
-		 *	right along with them - untouched, EXCEPT for a field whose
-		 *	locale/global shape just changed, whose stored value(s) are
-		 *	migrated via _migrateFieldShape() the same way Text::apiSave()
-		 *	already migrates a text key's value(s) on the same kind of
-		 *	change. Without that, a field switched to global keeps its old
-		 *	per-locale value(s) sitting in the locale buckets - and since
-		 *	_cacheElement() merges locale data over '*' data (so a locale
-		 *	can legitimately override a global default), that stale locale
-		 *	value would keep winning over the new global one forever.
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		array 		&$request			(reference) Current server request
-		 *
-		 *	@return 	void
-		 */
-		public static function apiSave( array &$appData, array &$request ): void {
-
-			if( \Nino\Admin\Admin::guard( $appData, $request ) === false )
-				return;
-
-			$data 	= \Nino\Admin\Admin::postData();
-			$typeUri = (string) ( $data['uri'] ?? '' );
-
-			if( self::isValidTypeUri( $typeUri ) === false ) {
-				\Nino\Http::fail( $request, 400, 'invalid type uri' );
-				return;
-			}
-
-			$danglingReference = self::_unknownReferencedType( $appData, self::cleanModel( $data['model'] ?? [] ) );
-
-			if( $danglingReference !== null ) {
-				\Nino\Http::fail( $request, 400, $danglingReference );
-				return;
-			}
-
-			// Locking and re-reading through mutate() means the "unknown type"
-			// 404 below can return null from inside the callback and let
-			// mutate() release the lock itself - unlike the manual lock/read/
-			// write this used to be, there is no early-return branch left that
-			// could walk away holding the lock (see Filesystem::mutate()'s
-			// docblock)
-			$notFound 			= false;
-			$resultTypeData	= null;
-
-			$written = \Nino\Filesystem::mutate( $appData, '/elements/'. $typeUri. '.php', function( mixed $typeData ) use ( $appData, $data, $typeUri, &$notFound, &$resultTypeData ): ?array {
-
-				if( $typeData === false ) {
-					$notFound = true;
-					return null;
-				}
-
-				$title 		= trim( (string) ( $data['title'] ?? '' ) );
-				$oldModel = $typeData['model'] ?? [];
-				$newModel = self::cleanModel( $data['model'] ?? [] );
-
-				foreach( $newModel as $key => $field ) {
-					if( array_key_exists( $key, $oldModel ) === false )
-						continue;
-					$wasLocale = ( $oldModel[$key]['locale'] ?? false ) === true;
-					$isLocale 	= ( $field['locale'] ?? false ) === true;
-					if( $wasLocale !== $isLocale )
-						self::_migrateFieldShape( $appData, $typeData, $key, $isLocale );
-				}
-
-				$typeData['title'] = ( $title !== '' ) ? $title : ( $typeData['title'] ?? $typeUri );
-				$typeData['model'] = $newModel;
-
-				// Switching numbering on seeds the counter past every element this
-				// type already has, so turning it on later - on a type that was
-				// named by hand until now - cannot collide with one of them.
-				// Switching it off drops the counter: the type stops numbering,
-				// and re-enabling it seeds again from what is there. Set inside
-				// this same mutation as the model, so the file never holds one
-				// half of a save.
-				if( ( $data['autoincrement'] ?? false ) === true ) {
-					if( \Nino\Elements::readAutoincrement( $typeData ) === null )
-						$typeData['autoincrement'] = \Nino\Elements::autoincrementSeed( $typeData );
-				} else {
-					unset( $typeData['autoincrement'] );
-				}
-
-				$resultTypeData = $typeData;
-
-				return $typeData;
-			}, false );
-
-			if( $notFound === true ) {
-				\Nino\Http::fail( $request, 404, 'unknown type' );
-				return;
-			}
-
-			if( $written === false ) {
-				\Nino\Http::fail( $request, 500, 'could not save the type file' );
-				return;
-			}
-
-			\Nino\Http::ok( $request, [
-				'uri' 					=> $typeUri,
-				'title' 				=> $resultTypeData['title'],
-				'model' 				=> $resultTypeData['model'],
-				'autoincrement' => \Nino\Elements::readAutoincrement( $resultTypeData ) !== null,
-			] );
-		}
-
-		/**
-		 *	Move one field's stored value(s), across every element of this
-		 *	type, between the '*' bucket and every locale bucket - called
-		 *	from apiSave() when that field's model 'locale' flag just
-		 *	changed. Same migrate-don't-discard reasoning as
-		 *	Text::_convertShape(): global -> per-locale copies the current
-		 *	'*' value into every locale; per-locale -> global keeps the
-		 *	native locale's value (falling back to the first non-empty one)
-		 *	and removes the now-stale per-locale copies so they can't keep
-		 *	shadowing the new global value in _cacheElement()'s merge
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		array 		&$typeData		(reference) This type's file content ('*' + locale buckets)
-		 *	@param		string		$key					The field key whose shape just changed
-		 *	@param		bool			$toLocale			Target shape (true = per-locale, false = global)
-		 *
-		 *	@return 	void
-		 */
-		private static function _migrateFieldShape( array &$appData, array &$typeData, string $key, bool $toLocale ): void {
-
-			$locales = \Nino\Locales::getAvailableLocales( $appData );
-
-			$elementUris = array_keys( $typeData['*'] ?? [] );
-			foreach( $locales as $locale )
-				$elementUris = array_merge( $elementUris, array_keys( $typeData[$locale] ?? [] ) );
-			$elementUris = array_unique( $elementUris );
-
-			if( $toLocale === true ) {
-
-				foreach( $elementUris as $elementUri ) {
-
-					if( isset( $typeData['*'][$elementUri][$key] ) === false )
-						continue;
-
-					foreach( $locales as $locale ) {
-						$typeData[$locale][$elementUri] = $typeData[$locale][$elementUri] ?? [];
-						$typeData[$locale][$elementUri][$key] = $typeData['*'][$elementUri][$key];
-					}
-
-					unset( $typeData['*'][$elementUri][$key] );
-				}
-
-			} else {
-
-				$native = \Nino\Locales::getNativeLocale( $appData );
-
-				foreach( $elementUris as $elementUri ) {
-
-					$value = null;
-
-					if( isset( $typeData[$native][$elementUri][$key] ) === true )
-						$value = $typeData[$native][$elementUri][$key];
-					else
-						foreach( $locales as $locale )
-							if( isset( $typeData[$locale][$elementUri][$key] ) === true && $typeData[$locale][$elementUri][$key] !== '' ) {
-								$value = $typeData[$locale][$elementUri][$key];
-								break;
-							}
-
-					if( $value !== null )
-						$typeData['*'][$elementUri][$key] = $value;
-
-					foreach( $locales as $locale )
-						unset( $typeData[$locale][$elementUri][$key] );
-				}
-			}
-		}
-
-		/**
-		 *	Create a brand new, empty element type
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		array 		&$request			(reference) Current server request
-		 *
-		 *	@return 	void
-		 */
-		public static function apiCreate( array &$appData, array &$request ): void {
-
-			if( \Nino\Admin\Admin::guard( $appData, $request ) === false )
-				return;
-
-			$data 		= \Nino\Admin\Admin::postData();
-			$typeUri 	= (string) ( $data['uri'] ?? '' );
-
-			if( self::isValidTypeUri( $typeUri ) === false ) {
-				\Nino\Http::fail( $request, 400, 'invalid type uri' );
-				return;
-			}
-
-			if( \Nino\Filesystem::getFileContent( $appData, '/elements/'. $typeUri. '.php', '' ) !== '' ) {
-				\Nino\Http::fail( $request, 409, 'type already exists' );
-				return;
-			}
-
-			$title = trim( (string) ( $data['title'] ?? '' ) );
-			$model = self::cleanModel( $data['model'] ?? [] );
-
-			$danglingReference = self::_unknownReferencedType( $appData, $model );
-
-			if( $danglingReference !== null ) {
-				\Nino\Http::fail( $request, 400, $danglingReference );
-				return;
-			}
-
-			$typeData = [
-				'title' 	=> ( $title !== '' ) ? $title : $typeUri,
-				'model' 	=> $model,
-				'*' 			=> [ '*' => [] ],
-			];
-
-			// A type created numbered starts at the first number - there is
-			// nothing yet to seed past (see Elements::AUTOINCREMENT_PAD)
-			if( ( $data['autoincrement'] ?? false ) === true )
-				$typeData['autoincrement'] = 1;
-
-			// Checked, same as apiSave() does: answering 200 on a failed write
-			// leaves the frontend believing the type exists (elementtypes.js
-			// clears _isNew and adopts the uri), so its next Save posts
-			// against a file that was never created and comes back 404
-			if( \Nino\Filesystem::putFileContent( $appData, '/elements/'. $typeUri. '.php', $typeData ) === false ) {
-				\Nino\Http::fail( $request, 500, 'could not save the type file' );
-				return;
-			}
-
-			\Nino\Http::ok( $request, [
-				'uri' 					=> $typeUri,
-				'title' 				=> $typeData['title'],
-				'model' 				=> $typeData['model'],
-				'autoincrement' => isset( $typeData['autoincrement'] ),
-			] );
-		}
-	}
-
-	/**
-	 *	Nino							A compact filesystembased php framework
-	 *	Dev								Edit Element instances and their locale-specific values.
-	 *
-	 *	@package					Dape/Nino
-	 *	@author						David Perchermeier <mail@dape.io>
-	 *	@link							https://github.com/dapeio/nino
-	 */
-	class Elements {
-
-		// Same DEFAULT_MAXLENGTH the frontend falls back to - kept here only
-		// so the two can't drift apart silently; nothing server-side enforces
-		// it (the kernel's own model validation does), it's a form hint
-		private const int DEFAULT_MAXLENGTH = 2000;
-
-		/**
-		 *	This module's action map, merged into Admin::handlePost()'s dispatch
-		 *
-		 *	@return 	array
-		 */
-		public static function actions(): array {
-			return [
-				'develements/types' 			=> [ self::class, 'apiTypes' ],
-				'develements/list' 				=> [ self::class, 'apiList' ],
-				'develements/get' 				=> [ self::class, 'apiGet' ],
-				'develements/save' 				=> [ self::class, 'apiSave' ],
-				'develements/delete' 			=> [ self::class, 'apiDelete' ],
-				'develements/uploadimage' => [ self::class, 'apiUploadImage' ],
-			];
-		}
-
-		/**
-		 *	Nav entry for this module, rendered into the dashboard's tab bar
-		 *
-		 *	@return 	array										[ uri, label ]
-		 */
-		public static function nav(): array {
-			return [ 'elements', 'Elements' ];
-		}
-
-		/**
-		 *	List all element types with their model. 'selectedLocale' is the
-		 *	native locale rather than a remembered per-session one: _editor
-		 *	persists that choice (Editor::sessionLocale) because an editor works
-		 *	in one language for a whole session, whereas here it is only the
-		 *	locale select's initial value - the pick itself stays client-side
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		array 		&$request			(reference) Current server request
-		 *
-		 *	@return 	void
-		 */
-		public static function apiTypes( array &$appData, array &$request ): void {
-
-			if( \Nino\Admin\Admin::guard( $appData, $request ) === false )
-				return;
-
-			$types = [];
-			foreach( self::types( $appData ) as $type ) {
-				$typeData = self::typeData( $appData, $type );
-				$next 		= \Nino\Elements::readAutoincrement( $typeData );
-				$types[] = [
-					'type' 	=> $type,
-					'title' => $typeData['title'] ?? $type,
-					'descr' => self::typeDescr( $appData, $type ),
-					'model' => $typeData['model'] ?? [],
-					// A numbered type has no uri to ask for - the form shows the
-					// number the next element would get instead of a text field
-					'autoincrement' => $next !== null,
-					'nextUri' 			=> ( $next === null ) ? '' : \Nino\Elements::autoincrementUri( max( $next, \Nino\Elements::autoincrementSeed( $typeData ) ) ),
-				];
-			}
-
-			\Nino\Http::ok( $request, [
-				'types' 					=> $types,
-				'locales' 				=> \Nino\Locales::getAvailableLocales( $appData ),
-				'selectedLocale' 	=> \Nino\Locales::getNativeLocale( $appData ),
-				'maxlength' 			=> self::DEFAULT_MAXLENGTH,
-			] );
-		}
-
-		/**
-		 *	List all elements of a type
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		array 		&$request			(reference) Current server request
-		 *
-		 *	@return 	void
-		 */
-		public static function apiList( array &$appData, array &$request ): void {
-
-			if( \Nino\Admin\Admin::guard( $appData, $request ) === false )
-				return;
-
-			$type = (string) ( \Nino\Admin\Admin::postData()['type'] ?? '' );
-
-			if( in_array( $type, self::types( $appData ), true ) === false ) {
-				\Nino\Http::fail( $request, 404, 'unknown type' );
-				return;
-			}
-
-			$model 		= self::typeData( $appData, $type )['model'] ?? [];
-			$locale 	= (string) ( \Nino\Admin\Admin::postData()['locale'] ?? '' );
-
-			// The table view reads one translation at a time: global fields plus
-			// the picked locale's. Without one, fall back to the old "any locale"
-			// behaviour, which is what the plain list wants
-			$results 	= \Nino\Elements::queryElements( $appData, '/'. $type, [],
-				$locale !== '' && \Nino\Locales::verifyLocale( $appData, $locale ) === true ? $locale : '*', [] );
-
-			$columns = self::displayableColumns( $model );
-
-			$elements = [];
-			foreach( $results as $element ) {
-
-				$uri 		= basename( $element['.uri'] ?? '' );
-				$values = [];
-
-				// Only the fields a cell can actually show, so a type with a
-				// large rich-text or image field does not ship it to a list
-				// that would never render it.
-				//
-				// Nested rather than merged into the row: a model is free to
-				// name a field "label" or "uri", and flattening let such a field
-				// overwrite the row's own identity
-				foreach( $columns as $key )
-					$values[$key] = $element[$key] ?? null;
-
-				$elements[] = [
-					'uri' 		=> $uri,
-					'label' 	=> self::label( $model, $element, $uri ),
-					'values' 	=> $values,
-				];
-			}
-
-			\Nino\Http::ok( $request, [
-				'model' 		=> $model,
-				'columns' 	=> $columns,
-				'elements' 	=> $elements,
-				'total' 		=> count( $elements ),
-			] );
-		}
-
-		/**
-		 *	Get one element's global fields + per-locale field values, for
-		 *	editing - plus, unlike _editor's equivalent, the element's raw
-		 *	per-bucket storage exactly as it sits in elements/&lt;type&gt;.php.
-		 *	Same reasoning as this tool's Text module seeing blacklisted keys:
-		 *	_admin is the developer-facing view, and the resolved form alone
-		 *	can't show *which* bucket a value actually came from - a locale
-		 *	falling back to '*', or a translation that only looks present
-		 *	because another locale supplies it, is invisible otherwise
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		array 		&$request			(reference) Current server request
-		 *
-		 *	@return 	void
-		 */
-		public static function apiGet( array &$appData, array &$request ): void {
-
-			if( \Nino\Admin\Admin::guard( $appData, $request ) === false )
-				return;
-
-			$data = \Nino\Admin\Admin::postData();
-			$type = (string) ( $data['type'] ?? '' );
-			$uri	= (string) ( $data['uri'] ?? '' );
-
-			if( in_array( $type, self::types( $appData ), true ) === false || $uri === '' || str_contains( $uri, '/' ) === true ) {
-				\Nino\Http::fail( $request, 404, 'unknown type or element' );
-				return;
-			}
-
-			$typeData = self::typeData( $appData, $type );
-			$model 		= $typeData['model'] ?? [];
-			[ $globalKeys, $localeKeys ] = self::splitModel( $model );
-
-			$global 	= [];
-			$locales	= [];
-			$found		= false;
-
-			foreach( \Nino\Locales::getAvailableLocales( $appData ) as $locale ) {
-
-				$element = \Nino\Elements::getElement( $appData, '/'. $type. '/'. $uri, $locale, [] );
-
-				if( $element === [] )
-					continue;
-
-				$found = true;
-
-				foreach( $globalKeys as $key )
-					$global[$key] = $element[$key] ?? null;
-
-				$locales[$locale] = [];
-				foreach( $localeKeys as $key )
-					$locales[$locale][$key] = $element[$key] ?? null;
-			}
-
-			if( $found === false ) {
-				\Nino\Http::fail( $request, 404, 'element not found' );
-				return;
-			}
-
-			\Nino\Http::ok( $request, [
-				'model' 	=> $model,
-				'global' 	=> $global,
-				'locales' => $locales,
-				'raw' 		=> self::rawBuckets( $typeData, $uri ),
-			] );
-		}
-
-		/**
-		 *	One element's untouched per-bucket storage: the '*' (global) bucket
-		 *	and every locale bucket that actually carries an entry for it.
-		 *
-		 *	Deliberately not iterating $typeData's keys blindly - a type file
-		 *	also has non-bucket top-level keys (its own display 'title', a plain
-		 *	string, and 'model'), which is the exact shape that used to crash
-		 *	the kernel's own deleteElement()/queryElements() (see their
-		 *	docblocks). Anything that isn't an array of entries is skipped.
-		 *
-		 *	@param		array 		$typeData			Raw elements/<type>.php content
-		 *	@param		string		$uri					Bare element uri (eg. "item1")
-		 *
-		 *	@return 	array										bucket => that bucket's entry for $uri
-		 */
-		public static function rawBuckets( array $typeData, string $uri ): array {
-
-			$raw = [];
-
-			foreach( $typeData as $bucket => $entries ) {
-
-				if( $bucket === 'model' || is_array( $entries ) === false )
-					continue;
-
-				if( array_key_exists( $uri, $entries ) === true )
-					$raw[(string) $bucket] = $entries[$uri];
-			}
-
-			return $raw;
-		}
-
-		/**
-		 *	Upload, process and store a new image for one "image"-typed model
-		 *	field of an already-saved element - identical contract to _editor's
-		 *	own (deterministic path, committed immediately, previous file only
-		 *	removed once the new one is safely written and the element record
-		 *	actually updated). See _editor/Editor.php's Elements::apiUploadImage()
-		 *	for the full reasoning behind the rollback handling below
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		array 		&$request			(reference) Current server request
-		 *
-		 *	@return 	void
-		 */
-		public static function apiUploadImage( array &$appData, array &$request ): void {
-
-			if( \Nino\Admin\Admin::guard( $appData, $request ) === false )
-				return;
-
-			$data 		= \Nino\Admin\Admin::postData();
-			$type 		= (string) ( $data['type'] ?? '' );
-			$uri 			= (string) ( $data['uri'] ?? '' );
-			$locale 	= (string) ( $data['locale'] ?? '' );
-			$key 			= (string) ( $data['key'] ?? '' );
-
-			if( in_array( $type, self::types( $appData ), true ) === false || $uri === '' || str_contains( $uri, '/' ) === true || \Nino\Locales::verifyLocale( $appData, $locale ) === false ) {
-				\Nino\Http::fail( $request, 400, 'invalid type, uri or locale' );
-				return;
-			}
-
-			$model = self::typeData( $appData, $type )['model'] ?? [];
-			if( ( $model[$key]['type'] ?? '' ) !== 'image' ) {
-				\Nino\Http::fail( $request, 400, 'not an image field' );
-				return;
-			}
-
-			$elementUri 		= '/'. $type. '/'. $uri;
-			$isLocaleField 	= ( $model[$key]['locale'] ?? false ) === true;
-
-			if( \Nino\Elements::getElement( $appData, $elementUri, '*' ) === false ) {
-				\Nino\Http::fail( $request, 404, 'element not found - save it once before uploading an image' );
-				return;
-			}
-
-			if( isset( $_FILES['file'] ) === false || $_FILES['file']['error'] !== UPLOAD_ERR_OK ) {
-				\Nino\Http::fail( $request, 400, 'no file uploaded' );
-				return;
-			}
-
-			$bytes = file_get_contents( $_FILES['file']['tmp_name'] );
-			if( $bytes === false ) {
-				\Nino\Http::fail( $request, 400, 'could not read upload' );
-				return;
-			}
-
-			$oldElement 	= \Nino\Elements::getElement( $appData, $elementUri, $isLocaleField ? $locale : '*' );
-			$oldFilename 	= is_array( $oldElement ) ? ( $oldElement[$key] ?? null ) : null;
-			$oldBytes 		= is_string( $oldFilename ) && $oldFilename !== '' ? \Nino\Images::read( $appData, $oldFilename ) : false;
-
-			$width 		= (int) ( $model[$key]['width'] ?? 0 );
-			$height 	= (int) ( $model[$key]['height'] ?? 0 );
-
-			$imageFieldCount = 0;
-			foreach( $model as $modelField )
-				if( ( $modelField['type'] ?? '' ) === 'image' )
-					$imageFieldCount++;
-
-			$basePath = 'elements/'. $type. '/'. $uri;
-			if( $imageFieldCount > 1 )
-				$basePath .= '-'. $key;
-			if( $isLocaleField === true )
-				$basePath .= '-'. $locale;
-
-			$filename = \Nino\Images::process( $appData, $bytes, $width, $height, $basePath );
-
-			if( $filename === false ) {
-				\Nino\Http::fail( $request, 400, 'invalid or oversized image' );
-				return;
-			}
-
-			$result = \Nino\Elements::updateElement( $appData, $elementUri, [ $key => $filename ], $locale );
-
-			if( is_array( $result ) === false ) {
-				if( $filename === $oldFilename && is_string( $oldBytes ) === true )
-					\Nino\Images::restore( $appData, $filename, $oldBytes );
-				else
-					\Nino\Images::delete( $appData, $filename );
-				\Nino\Http::fail( $request, 400, 'save failed' );
-				return;
-			}
-
-			if( is_string( $oldFilename ) === true && $oldFilename !== '' && $oldFilename !== $filename )
-				\Nino\Images::delete( $appData, $oldFilename );
-
-			\Nino\Http::ok( $request, [ 'filename' => $filename, 'url' => \Nino\Images::getUrl( $appData, $filename ) ] );
-		}
-
-		/**
-		 *	Insert or update an element
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		array 		&$request			(reference) Current server request
-		 *
-		 *	@return 	void
-		 */
-		public static function apiSave( array &$appData, array &$request ): void {
-
-			if( \Nino\Admin\Admin::guard( $appData, $request ) === false )
-				return;
-
-			$data 		= \Nino\Admin\Admin::postData();
-			$type 		= (string) ( $data['type'] ?? '' );
-			$uri 			= (string) ( $data['uri'] ?? '' );
-			$locale 	= (string) ( $data['locale'] ?? '' );
-			$isNew 		= ( $data['isNew'] ?? false ) === true;
-			$fields 	= is_array( $data['fields'] ?? null ) ? $data['fields'] : [];
-
-			// A numbered type assigns the uri, so an insert into one arrives
-			// without one and the kernel allocates it under the type file's lock
-			// (see Elements::AUTOINCREMENT_PAD). An update always names its
-			// element - by then it has a uri like any other.
-			$numbered = $isNew === true && $uri === ''
-				&& in_array( $type, self::types( $appData ), true ) === true
-				&& \Nino\Elements::readAutoincrement( self::typeData( $appData, $type ) ) !== null;
-
-			if( in_array( $type, self::types( $appData ), true ) === false || ( $uri === '' && $numbered === false ) || str_contains( $uri, '/' ) === true || ( $isNew === true && $numbered === false && self::validNewUri( $uri ) === false ) || \Nino\Locales::verifyLocale( $appData, $locale ) === false ) {
-				\Nino\Http::fail( $request, 400, 'invalid type, uri or locale' );
-				return;
-			}
-
-			// A model field with 'html' => true gets the same whitelist-tag
-			// sanitizing Text uses - never trust the client's html
-			$model = self::typeData( $appData, $type )['model'] ?? [];
-			foreach( $fields as $key => $value )
-				if( is_string( $value ) === true && ( $model[$key]['html'] ?? false ) === true )
-					$fields[$key] = \Nino\Html::sanitizeHtml( $value );
-
-			// Required-field enforcement lives in the kernel itself
-			// (Elements::insertElement()/updateElement()) - $errorMsg below
-			// already captures its "Missing required element key '...'" message
-			$errorMsg = null;
-			set_error_handler( function( int $errno, string $errstr ) use ( &$errorMsg ): bool { $errorMsg = $errstr; return true; } );
-
-			$result = ( $isNew === true )
-				? \Nino\Elements::insertElement( $appData, '/'. $type. '/'. $uri, $fields, $locale )
-				: \Nino\Elements::updateElement( $appData, '/'. $type. '/'. $uri, $fields, $locale );
-
-			restore_error_handler();
-
-			if( is_array( $result ) === false ) {
-				\Nino\Http::fail( $request, 400, $errorMsg ?? 'save failed' );
-				return;
-			}
-
-			// A numbered type's counter has just moved on, so the form's "saving
-			// creates /type/00007" promise would otherwise still name the number
-			// this very save consumed
-			$next = \Nino\Elements::getAutoincrement( $appData, '/'. $type );
-
-			\Nino\Http::ok( $request, [
-				'element' => $result,
-				'nextUri' => ( $next === null ) ? '' : \Nino\Elements::autoincrementUri( $next ),
-			] );
-		}
-
-		/**
-		 *	Delete an element (all locales)
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		array 		&$request			(reference) Current server request
-		 *
-		 *	@return 	void
-		 */
-		public static function apiDelete( array &$appData, array &$request ): void {
-
-			if( \Nino\Admin\Admin::guard( $appData, $request ) === false )
-				return;
-
-			$data = \Nino\Admin\Admin::postData();
-			$type = (string) ( $data['type'] ?? '' );
-			$uri	= (string) ( $data['uri'] ?? '' );
-
-			if( in_array( $type, self::types( $appData ), true ) === false || $uri === '' || str_contains( $uri, '/' ) === true ) {
-				\Nino\Http::fail( $request, 400, 'invalid type or uri' );
-				return;
-			}
-
-			$elementUri 		= '/'. $type. '/'. $uri;
-			$imageFilenames = self::collectImageFilenames( $appData, $type, $elementUri );
-
-			$errorMsg = null;
-			set_error_handler( function( int $errno, string $errstr ) use ( &$errorMsg ): bool { $errorMsg = $errstr; return true; } );
-
-			$deleted = \Nino\Elements::deleteElement( $appData, $elementUri, '*' );
-
-			restore_error_handler();
-
-			if( $errorMsg !== null || $deleted !== true ) {
-				\Nino\Http::fail( $request, 409, $errorMsg ?? 'delete vetoed' );
-				return;
-			}
-
-			// Only once the element itself is actually gone - an "image" field's
-			// value is just a filename reference, deleting the element wouldn't
-			// otherwise touch the file it points to at all
-			foreach( $imageFilenames as $filename )
-				\Nino\Images::delete( $appData, $filename );
-
-			\Nino\Http::ok( $request );
-		}
-
-		/**
-		 *	Every uploaded image filename currently stored on an element - a
-		 *	locale-scoped image field can differ per locale, so all of them
-		 *	need checking, not just the global bucket
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		string		$type					Element type
-		 *	@param		string		$elementUri		Full element uri (eg. "/portfolio/item1")
-		 *
-		 *	@return 	array										Distinct, non-empty filenames
-		 */
-		private static function collectImageFilenames( array &$appData, string $type, string $elementUri ): array {
-
-			$model 		= self::typeData( $appData, $type )['model'] ?? [];
-			$imageKeys = [];
-			foreach( $model as $key => $field )
-				if( ( $field['type'] ?? '' ) === 'image' )
-					$imageKeys[] = $key;
-
-			if( $imageKeys === [] )
-				return [];
-
-			$filenames = [];
-
-			foreach( \Nino\Locales::getAvailableLocales( $appData ) as $locale ) {
-				$element = \Nino\Elements::getElement( $appData, $elementUri, $locale, [] );
-				foreach( $imageKeys as $key )
-					if( is_string( $element[$key] ?? null ) === true && $element[$key] !== '' )
-						$filenames[$element[$key]] = true;
-			}
-
-			return array_keys( $filenames );
-		}
-
-		/**
-		 *	Return all element type uris (bare names, eg. "services") found on disk
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *
-		 *	@return 	array										List of type names
-		 */
-		private static function types( array &$appData ): array {
-
-			$types = [];
-			foreach( glob( \Nino\Filesystem::path( $appData, '/elements' ). '/*.php' ) ?: [] as $file )
-				$types[] = basename( $file, '.php' );
-
-			sort( $types );
-
-			return $types;
-		}
-
-		/**
-		 *	Read a type's data
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		string		$type					Type name (eg. "services")
-		 *
-		 *	@return 	array										Raw elements/<type>.php content
-		 */
-		private static function typeData( array &$appData, string $type ): array {
-			return \Nino\Filesystem::getFileContent( $appData, '/elements/'. $type. '.php', [] );
-		}
-
-		/**
-		 *	Pick a human readable description for a type
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		string		$type					Type name (eg. "services")
-		 *
-		 *	@return 	string									Readable description
-		 */
-		private static function typeDescr( array &$appData, string $type ): string {
-
-			$elements = \Nino\Elements::queryElements( $appData, '/'. $type, [], '*', [] );
-			$info = '('. count( $elements ). ') ';
-
-			foreach( $elements as $elData )
-				$info .= str_replace( '/'. $type, '', $elData['.uri'] ). ', ';
-
-			return ( strlen( $info ) > 150 ) ? substr( $info, 0, 150 ). ' ..' : $info;
-		}
-
-		/**
-		 *	The model field keys a table cell can show: everything except an
-		 *	image (a file), an array (a structure) and a rich-text string (its
-		 *	value is markup, and a cell renders text).
-		 *
-		 *	Mirrored by Nino.adminUi.tableModel.isDisplayable() on the frontend -
-		 *	the server decides what to send, the client what to draw, and the two
-		 *	have to agree on the same rule.
-		 *
-		 *	@param		array 		$model				Type model definition
-		 *
-		 *	@return 	array										Field keys, in model order
-		 */
-		public static function displayableColumns( array $model ): array {
-
-			$keys = [];
-
-			foreach( $model as $key => $field ) {
-
-				$type = (string) ( $field['type'] ?? '' );
-
-				if( in_array( $type, [ 'image', 'array' ], true ) === true )
-					continue;
-
-				if( $type === 'string' && ( $field['html'] ?? false ) === true )
-					continue;
-
-				$keys[] = (string) $key;
-			}
-
-			return $keys;
-		}
-
-		/**
-		 *	Pick a human readable label for an element (for the list view):
-		 *	its 'title' field, or its own uri.
-		 *
-		 *	Deliberately only 'title'. Guessing - 'label'/'name', then the
-		 *	first string field in model order - meant the list showed whichever
-		 *	field happened to come first, so two types with the same content
-		 *	labelled their rows differently and reordering a model silently
-		 *	relabelled every row in it. A uri is not as pretty, but it is the
-		 *	thing the row actually is, and it matches how the type overview
-		 *	already lists its elements (see typeDescr()).
-		 *
-		 *	@param		array 		$model				Type model definition (unused, kept for call-site symmetry)
-		 *	@param		array 		$element			Resolved element data
-		 *	@param		string		$uri					Element uri, used when there is no title
-		 *
-		 *	@return 	string									Label
-		 */
-		private static function label( array $model, array $element, string $uri ): string {
-
-			if( isset( $element['title'] ) === true && is_scalar( $element['title'] ) === true && (string) $element['title'] !== '' )
-				return (string) $element['title'];
-
-			return '/'. $uri;
-		}
-
-		/**
-		 *	Split a model into its global-only and locale-specific field keys
-		 *
-		 *	@param		array 		$model				Type model definition
-		 *
-		 *	@return 	array										[ globalKeys[], localeKeys[] ]
-		 */
-		private static function splitModel( array $model ): array {
-
-			$globalKeys = [];
-			$localeKeys = [];
-
-			foreach( $model as $key => $field )
-				if( ( $field['locale'] ?? false ) === true )
-					$localeKeys[] = $key;
-				else
-					$globalKeys[] = $key;
-
-			return [ $globalKeys, $localeKeys ];
-		}
-
-		// A new element uri becomes both an array key and (for image fields) a
-		// filename component, so it is held to the slug syntax the form's own
-		// hint promises. Only new ones: reading and deleting never re-validate,
-		// so a uri written by hand stays reachable.
-		private static function validNewUri( string $uri ): bool {
-			return preg_match( '/^[A-Za-z0-9][A-Za-z0-9_-]*$/', $uri ) === 1;
-		}
-	}
-
-	/**
-	 *	Nino							A compact filesystembased php framework
-	 *	Dev								Disaster recovery: restore a _editor daily backup.
-	 *
-	 *											Deliberately independent of config.php's own backup keys:
-	 *											- the archives are found under private/.backups, never
-	 *											  addressed through a config value
-	 *											- the decryption key has its own independent copy outside
-	 *											  config.php (private/.auth/backup-key.php), rewritten by
-	 *											  Backup::_bootstrap() whenever it goes missing
-	 *											So this still works even if config.php's *data* (not
-	 *											syntax) is what's broken - eg. a wrecked admin user
-	 *											record. A genuine config.php syntax error is out of scope:
-	 *											_admin boots through the same kernel bootstrap as _editor
-	 *											and can't survive that either - that's a manual recovery.
-	 *
-	 *	@package					Dape/Nino
-	 *	@author						David Perchermeier <mail@dape.io>
-	 *	@link							https://github.com/dapeio/nino
-	 */
-	class Restore {
-
-		private const string STUB_PREFIX = "<?php http_response_code(403); exit; return '";
-		private const string STUB_SUFFIX = "';\n";
-
-		/**
-		 *	This module's action map, merged into Admin::handlePost()'s dispatch
-		 *
-		 *	@return 	array
-		 */
-		public static function actions(): array {
-			return [
-				'restore/list' 		=> [ self::class, 'apiList' ],
-				'restore/restore' 	=> [ self::class, 'apiRestore' ],
-			];
-		}
-
-		/**
-		 *	Nav entry for this module, rendered into the dashboard's tab bar
-		 *
-		 *	@return 	array										[ uri, label ]
-		 */
-		public static function nav(): array {
-			return [ 'restore', 'Wiederherstellung' ];
-		}
-
-		/**
-		 *	Find the private backup directory.
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *
-		 *	@return 	array
-		 */
-		private static function _backupDirs( array &$appData ): array {
-
-			// Own copies of the two paths rather than \Nino\Editor\Backup's
-			// own constants: this class exists to work when nothing else
-			// does, and /_editor is separately deletable - reaching into it
-			// would make Restore fail in exactly the situation it is for
-			// (see this class's docblock, and the standalone-per-area
-			// reasoning every other cross-area helper in this file follows)
-			$dir = \Nino\Filesystem::getContentPath( $appData ). '/.backups';
-			return is_dir( $dir ) === true ? [ $dir ] : [];
-		}
-
-		/**
-		 *	The directory one dated archive actually sits in
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		string		$date					"Y-m-d", already validated
-		 *
-		 *	@return 	string|false
-		 */
-		private static function _backupDir( array &$appData, string $date = '' ): string|false {
-
-			$dirs = self::_backupDirs( $appData );
-
-			if( $date !== '' )
-				foreach( $dirs as $dir )
-					if( is_file( $dir. '/'. $date. '.php' ) === true )
-						return $dir;
-
-			return $dirs[0] ?? false;
-		}
-
-		/**
-		 *	Read the encryption key's independent copy under private/.auth/
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *
-		 *	@return 	string|false						Raw (not base64) key bytes
-		 */
-		private static function _key( array &$appData ): string|false {
-
-			$path = \Nino\Filesystem::getContentPath( $appData ). '/.auth/backup-key.php';
-			if( is_file( $path ) === false )
-				return false;
-
-			$raw = file_get_contents( $path );
-			return base64_decode( substr( $raw, strlen( self::STUB_PREFIX ), -strlen( self::STUB_SUFFIX ) ) );
-		}
-
-		/**
-		 *	Decrypt one backup/snapshot file's payload
-		 *
-		 *	@param		string		$path					Absolute path to the .php file
-		 *	@param		string		$key					Raw (not base64) 32-byte AES key
-		 *
-		 *	@return 	string|false						Decrypted tar.gz bytes, or false if decryption failed
-		 */
-		private static function _decrypt( string $path, string $key ): string|false {
-
-			$raw 			= file_get_contents( $path );
-			$payload 	= base64_decode( substr( $raw, strlen( self::STUB_PREFIX ), -strlen( self::STUB_SUFFIX ) ) );
-			$iv 			= substr( $payload, 0, 12 );
-			$tag 			= substr( $payload, 12, 16 );
-			$cipher 	= substr( $payload, 28 );
-
-			return openssl_decrypt( $cipher, 'aes-256-gcm', $key, OPENSSL_RAW_DATA, $iv, $tag );
-		}
-
-		/**
-		 *	Available backup dates, most recent first - shared by
-		 *	apiList() and Dashboard::apiSummary()
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *
-		 *	@return 	array										[ "Y-m-d", ... ]
-		 */
-		public static function dates( array &$appData ): array {
-
-			$dates = [];
-
-			// Every location, not just the current one: an archive written
-			// before the directory moved is still a restorable archive
-			foreach( self::_backupDirs( $appData ) as $dir )
-				foreach( glob( $dir. '/*.php' ) ?: [] as $file )
-					if( preg_match( '/^\d{4}-\d{2}-\d{2}$/', basename( $file, '.php' ) ) === 1 )
-						$dates[] = basename( $file, '.php' );
-
-			$dates = array_values( array_unique( $dates ) );
-
-			rsort( $dates );
-
-			return $dates;
-		}
-
-		/**
-		 *	Most recent backup date on file, if any - shared by
-		 *	Dashboard::apiSummary
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *
-		 *	@return 	string|null							"Y-m-d", or null if none exist yet
-		 */
-		public static function lastDate( array &$appData ): ?string {
-			return self::dates( $appData )[0] ?? null;
-		}
-
-		/**
-		 *	List available backup dates, most recent first
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		array 		&$request			(reference) Current server request
-		 *
-		 *	@return 	void
-		 */
-		public static function apiList( array &$appData, array &$request ): void {
-
-			if( \Nino\Admin\Admin::guard( $appData, $request ) === false )
-				return;
-
-			\Nino\Http::ok( $request, [ 'dates' => self::dates( $appData ) ] );
-		}
-
-		/**
-		 *	Restore one chosen backup date: snapshot the *current* state
-		 *	first (see _safetySnapshot()), so a wrong choice is itself
-		 *	undoable, then overwrite every file the backup contains
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		array 		&$request			(reference) Current server request
-		 *
-		 *	@return 	void
-		 */
-		public static function apiRestore( array &$appData, array &$request ): void {
-
-			if( \Nino\Admin\Admin::guard( $appData, $request ) === false )
-				return;
-
-			$date = (string) ( \Nino\Admin\Admin::postData()['date'] ?? '' );
-
-			if( preg_match( '/^\d{4}-\d{2}-\d{2}$/', $date ) !== 1 ) {
-				\Nino\Http::fail( $request, 400, 'invalid date' );
-				return;
-			}
-
-			$dir = self::_backupDir( $appData, $date );
-			$key = self::_key( $appData );
-
-			if( $dir === false || $key === false ) {
-				\Nino\Http::fail( $request, 404, 'no backup available' );
-				return;
-			}
-
-			$path = $dir. '/'. $date. '.php';
-
-			if( is_file( $path ) === false ) {
-				\Nino\Http::fail( $request, 404, 'unknown backup date' );
-				return;
-			}
-
-			$gz = self::_decrypt( $path, $key );
-
-			if( $gz === false ) {
-				\Nino\Http::fail( $request, 500, 'decryption failed' );
-				return;
-			}
-
-			self::_safetySnapshot( $appData, $dir, $key );
-
-			$configPath	= \Nino\Filesystem::getConfigPath( $appData );
-			$tmpGz 			= tempnam( sys_get_temp_dir(), 'ninorestore' ). '.tar.gz';
-			$staging		= sys_get_temp_dir(). '/ninorestore-'. bin2hex( random_bytes( 8 ) );
-
-			file_put_contents( $tmpGz, $gz );
-			mkdir( $staging, 0755, true );
-			( new \PharData( $tmpGz ) )->extractTo( $staging, null, true );
-			unlink( $tmpGz );
-
-			// config.php belongs under configPath, not root - see
-			// \Nino\Filesystem::getConfigPath()'s docblock. Extracting it straight
-			// to root like every other file would restore it to the wrong place,
-			// and under a hardened NINO_CONFIG_DIR setup would additionally leak
-			// a stray copy back into the webroot - so it's staged first and moved
-			// separately from the rest of the archive.
-			$stagedConfig = $staging. '/config.php';
-
-			if( is_file( $stagedConfig ) === true ) {
-				file_put_contents( $configPath. '/config.php', file_get_contents( $stagedConfig ) );
-				unlink( $stagedConfig );
-			}
-
-			// Newsletter: merged, not overwritten - see _mergeNewsletterRestore()
-			self::_mergeNewsletterRestore( \Nino\Filesystem::path( $appData, '/data' ), $staging );
-
-			// The archive's own layout is flat - text/, elements/, images/,
-			// data/ - but those no longer share one destination on disk:
-			// everything but images is private and resolves against the
-			// private root (see \Nino\Filesystem::PRIVATE_DIRS). Copied one
-			// top-level entry at a time rather than as a single tree, so each
-			// lands wherever this project actually keeps it
-			foreach( glob( $staging. '/*' ) ?: [] as $entry ) {
-
-				$target = \Nino\Filesystem::path( $appData, '/'. basename( $entry ) );
-
-				if( is_dir( $entry ) === true )
-					\Nino\Filesystem::copyDir( $entry, $target );
-				else
-					@copy( $entry, $target );
-			}
-
-			\Nino\Filesystem::removeDir( $staging );
-
-			// extractTo()/copyDir() write straight to disk, bypassing Filesystem's own
-			// cache tracking entirely - drop it so any getFileContent() call
-			// later in this same request (or a request landing in the same
-			// wall-clock second - see AppData::writeContentData()'s docblock
-			// for why that specifically matters) re-reads the restored files
-			// instead of whatever was cached from before the restore
-			unset( $appData['./nino/filesystem/cache'] );
-
-			if( function_exists( 'opcache_reset' ) === true )
-				opcache_reset();
-
-			\Nino\Http::ok( $request, [ 'ok' => true, 'restoredDate' => $date ] );
-		}
-
-		/**
-		 *	Rewrite the staged newsletter files in place, before copyDir()
-		 *	copies the staged directories over the live ones, so a restore merges instead of
-		 *	overwriting: an address someone removed (self-service unsubscribe
-		 *	or an admin delete, see \Nino\Modules\Newsletter's own removal
-		 *	record docblock) stays removed no matter how old the backup being
-		 *	restored is - Art. 17 (right to erasure), once exercised, must
-		 *	survive a later disaster-recovery restore the same way it
-		 *	survives everything else.
-		 *
-		 *	The removal list itself is unioned rather than replaced (a removal
-		 *	recorded on either side stays a removal) since the live copy
-		 *	could itself be the very thing being recovered from and is not to
-		 *	be trusted as complete. A resubscribe clears its own address from
-		 *	that list already (see \Nino\Modules\Newsletter's own
-		 *	_clearRemoval() call site) - this merge only ever excludes, never
-		 *	decides who should be excluded. The list holds a sha256 per
-		 *	address, not the address itself (see REMOVED_PATH's own
-		 *	docblock), so an entry is matched by hashing it the same way,
-		 *	not by comparing emails directly.
-		 *
-		 *	'/data/newsletter.php' / '/data/newsletter-removed.php' as plain
-		 *	literals throughout, deliberately not
-		 *	\Nino\Modules\Newsletter::PATH/REMOVED_PATH: a class constant
-		 *	read autoloads the class unconditionally, same as a method call
-		 *	would, turning a restore - the exact tool a broken install needs
-		 *	most - into a fatal error for a project that deleted this
-		 *	optional module's file. See Backup::manifest()'s own docblock in
-		 *	_nino/Nino.php for the identical reasoning on the backup side.
-		 *
-		 *	A no-op if the backup carries neither file, as in a project without
-		 *	the Newsletter module - there is nothing to merge.
-		 *
-		 *	@param		string 		$dataDir			The live /data directory - read, never written
-		 *	@param		string 		$staging			Extracted backup, rewritten in place
-		 *
-		 *	@return 	void
-		 */
-		private static function _mergeNewsletterRestore( string $dataDir, string $staging ): void {
-
-			$stagedEntries = $staging. '/data/newsletter.php';
-			$stagedRemoved = $staging. '/data/newsletter-removed.php';
-
-			if( is_file( $stagedEntries ) === false && is_file( $stagedRemoved ) === false )
-				return;
-
-			$removed = array_values( array_unique( array_merge(
-				self::_readDataFile( $dataDir. '/newsletter-removed.php' ),
-				self::_readDataFile( $stagedRemoved )
-			) ) );
-
-			$entries = array_values( array_filter(
-				self::_readDataFile( $stagedEntries ),
-				function( array $entry ) use ( $removed ): bool {
-					$hash = hash( 'sha256', mb_strtolower( trim( (string) ( $entry['email'] ?? '' ) ) ) );
-					return in_array( $hash, $removed, true ) === false;
-				}
-			) );
-
-			file_put_contents( $stagedEntries, '<?php return '. var_export( $entries, true ). ';' );
-			file_put_contents( $stagedRemoved, '<?php return '. var_export( $removed, true ). ';' );
-		}
-
-		// Reads one of Filesystem's own "<?php return [...];" data files
-		// straight off disk, bypassing $appData/Filesystem entirely - used
-		// here for files under $staging (a tempdir, not the project root
-		// Filesystem resolves against) and, for the same reason, for $root's
-		// own copy alongside it, so both sides of the merge above go through
-		// the identical read path
-		private static function _readDataFile( string $path ): array {
-
-			if( is_file( $path ) === false )
-				return [];
-
-			$data = include $path;
-
-			return is_array( $data ) ? $data : [];
-		}
-
-		/**
-		 *	Archive the *current* on-disk state before overwriting it, same
-		 *	tar+gzip+encrypt shape as Backup::_create() (duplicated, not
-		 *	called into - see this class' own docblock; the file manifest
-		 *	itself is shared via \Nino\Backup::manifest(), which carries
-		 *	no such coupling). Named distinctly from a dated backup so it's
-		 *	never mistaken for one and never collides with/gets pruned by
-		 *	Backup's own retention sweep
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		string		$dir					Absolute path to the backup directory
-		 *	@param		string		$key					Raw (not base64) 32-byte AES key
-		 *
-		 *	@return 	void
-		 */
-		private static function _safetySnapshot( array &$appData, string $dir, string $key ): void {
-
-			$tmpTar = tempnam( sys_get_temp_dir(), 'ninosnapshot' ). '.tar';
-			$phar 	= new \PharData( $tmpTar );
-
-			foreach( \Nino\Backup::manifest( $appData ) as $absolute => $archiveName )
-				$phar->addFromString( $archiveName, file_get_contents( $absolute ) );
-
-			$phar->compress( \Phar::GZ );
-			unset( $phar );
-			unlink( $tmpTar );
-
-			$gz = file_get_contents( $tmpTar. '.gz' );
-			unlink( $tmpTar. '.gz' );
-
-			$iv 		= random_bytes( 12 );
-			$tag 		= '';
-			$cipher = openssl_encrypt( $gz, 'aes-256-gcm', $key, OPENSSL_RAW_DATA, $iv, $tag );
-
-			file_put_contents( $dir. '/pre-restore-'. date( 'Y-m-d-His' ). '.php', self::STUB_PREFIX. base64_encode( $iv. $tag. $cipher ). self::STUB_SUFFIX );
-		}
-	}
-
-	/**
-	 *	Nino							A compact filesystembased php framework
-	 *	Dev								The project's settings, as a form rather than as raw json:
-	 *												error handling, login throttling, the _editor features
-	 *												that can be switched off, and the site's languages.
-	 *												Deliberately excludes "hard" values a wrong edit could
-	 *												brick the whole site over - modules, filesystem/dir,
-	 *												locales/textfiles - those stay a by-hand, deliberate-only
-	 *												task.
-	 *
-	 *												Three keys this used to edit are gone from here because
-	 *												they now have real editors of their own, and a second,
-	 *												unvalidated way to write the same data is a way to
-	 *												corrupt it: '/nino/http/routes' belongs to Pages,
-	 *												'/nino/html/navs' to Navigations, and '/nino/html/assets'
-	 *												is a build concern - its order is load-bearing for the css
-	 *												cascade, which a json textarea shows nobody, so it stays a
-	 *												deliberate config.php edit (or a rerun of /_install's theme
-	 *												step) rather than a field that looks safe to change.
-	 *
-	 *												'/nino/html/images' and '/nino/auth/user' were never part of
-	 *												this either, for the same reason: both get their own richer
-	 *												editors (Images and Users below).
-	 *
-	 *	@package					Dape/Nino
-	 *	@author						David Perchermeier <mail@dape.io>
-	 *	@link							https://github.com/dapeio/nino
-	 */
-	class Config {
-
-		// Every setting this panel offers, in render order: the type its value
-		// has to have, the group it renders under, and the copy that explains
-		// it. The type is what apiSave() validates against before anything is
-		// written - a value of the wrong shape would otherwise silently corrupt
-		// that key for the rest of the site.
-		//
-		// 'min'/'max' bound an int field. They are not cosmetic: a maxtries of 0
-		// locks every account out permanently on the first failed attempt, and a
-		// cooldown of 0 removes the throttle entirely - both are reachable by
-		// typing a plausible-looking number, so the bound belongs next to the
-		// field rather than in a comment somewhere.
-		private const array FIELDS = [
-			'/nino/error/log' => [
-				'type' 	=> 'bool',
-				'group'	=> 'diagnostics',
-				'label'	=> 'Write errors to a log',
-				'hint' 	=> 'Appends php errors to /data/logs.<month>.php, pruned after three months.',
-			],
-			'/nino/error/display' => [
-				'type' 	=> 'bool',
-				'group'	=> 'diagnostics',
-				'label'	=> 'Show errors in the frontend',
-				'hint' 	=> 'Development only. A live site must leave this off - the dump includes file paths and a stack trace.',
-			],
-			'/nino/session/force-secure-cookie' => [
-				'type' 	=> 'bool',
-				'group'	=> 'diagnostics',
-				'label'	=> 'Always set the session cookie as secure',
-				'hint' 	=> 'Turn on behind a tls-terminating proxy, where php sees no HTTPS of its own and would otherwise leave the flag off.',
-			],
-			'/nino/auth/maxtries' => [
-				'type' 	=> 'int',
-				'group'	=> 'auth',
-				'min' 	=> 1,
-				'max' 	=> 100,
-				'label'	=> 'Failed logins before lockout',
-				'hint' 	=> 'Counted per account. The per-ip bucket trips at ten times this, so one person mistyping cannot lock out everyone behind the same connection.',
-			],
-			'/nino/auth/cooldown' => [
-				'type' 	=> 'int',
-				'group'	=> 'auth',
-				'min' 	=> 60,
-				'max' 	=> 604800,
-				'unit' 	=> 'seconds',
-				'label'	=> 'Lockout duration',
-				'hint' 	=> 'How long a locked account or ip stays locked.',
-			],
-			// Both flags are read by _editor (Backup::maybeRun(), Logs::record()),
-			// which is also where the keys are named after.
-			'/nino/editor/backups' => [
-				'type' 	=> 'bool',
-				'group'	=> 'editor',
-				'label'	=> 'Daily encrypted backup',
-				'hint' 	=> 'Runs once a day on the first request after midnight and keeps fourteen days. Restore them under Wiederherstellung.',
-			],
-			'/nino/editor/logs' => [
-				'type' 	=> 'bool',
-				'group'	=> 'editor',
-				'label'	=> 'Record an audit trail',
-				'hint' 	=> 'One line per login and per change made in /_editor, kept for fourteen days. Who may read it stays a permission.',
-			],
-			'/nino/cache/status' => [
-				'type' 	=> 'bool',
-				'group'	=> 'cache',
-				'label'	=> 'Cache rendered pages',
-				'hint' 	=> 'Anonymous GET requests only, and never a page with query vars, a tool uri or a signed-in visitor. Any save in /_admin, /_editor, /_design or /_templates drops the whole cache.',
-			],
-			'/nino/cache/ttl' => [
-				'type' 	=> 'int',
-				'group'	=> 'cache',
-				'min' 	=> 10,
-				'max' 	=> 2592000,
-				'unit' 	=> 'seconds',
-				'label'	=> 'Lifetime of a cached page',
-				'hint' 	=> 'How long a stored page is served before it is rendered again. Edits do not wait for this - they drop the cache immediately.',
-			],
-			'/nino/cache/blacklist' => [
-				'type' 	=> 'lines',
-				'group'	=> 'cache',
-				'label'	=> 'Never cache these',
-				'hint' 	=> 'One uri per line. A trailing /* covers a whole subtree: /blog/* matches /blog and everything below it. Use it for anything that has to be rendered per visit.',
-			],
-			'/nino/locales/available' => [
-				'type' 	=> 'locales',
-				'group'	=> 'locales',
-				'label'	=> 'Languages',
-				'hint' 	=> 'Every language the site serves. Each one reads its texts from its own text/<locale>.php - a language without that file renders every per-locale fill unresolved.',
-			],
-			'/nino/locales/native' => [
-				'type' 	=> 'native',
-				'group'	=> 'locales',
-				'label'	=> 'Native language',
-				'hint' 	=> 'The fallback for a visitor who has not picked one yet, and the language the owner notification of a contact form is sent in.',
-			],
-		];
-
-		// Group key -> heading + intro, in render order
-		private const array GROUPS = [
-			'diagnostics'	=> [ 'Errors and diagnostics', 'What happens when php raises an error, and how the session cookie is issued.' ],
-			'auth' 				=> [ 'Login protection', 'The throttle that sits in front of /_editor and /_admin.' ],
-			'editor' 			=> [ 'Editor features', 'Background work /_editor does on its own. Both were silently on in every project before 0.12.0-beta - see the changelog.' ],
-			'cache' 			=> [ 'Page cache', 'Serving a stored copy skips the render. Off by default - switch it on once the site is finished, not while building it.' ],
-			'locales' 		=> [ 'Languages', 'Which languages exist, and which one a visitor gets before choosing.' ],
-		];
-
-		// A locale id is exactly language_TERRITORY. Narrow on purpose: the
-		// value becomes a filename (text/<locale>.php), so anything looser is a
-		// path question, and every locale Nino itself ships uses this shape
-		private const string LOCALE_PATTERN = '/^[a-z]{2}_[A-Z]{2}$/';
-
-		// Display names for the locales that actually turn up in practice. A
-		// code with no entry renders as itself - this is a convenience for
-		// reading the list, never a whitelist of what may be added
-		private const array LOCALE_NAMES = [
-			'de_DE' => 'German (Germany)',			'de_AT' => 'German (Austria)',
-			'de_CH' => 'German (Switzerland)',	'en_US' => 'English (US)',
-			'en_GB' => 'English (UK)', 					'fr_FR' => 'French (France)',
-			'it_IT' => 'Italian (Italy)', 			'es_ES' => 'Spanish (Spain)',
-			'nl_NL' => 'Dutch (Netherlands)', 	'pl_PL' => 'Polish (Poland)',
-			'pt_PT' => 'Portuguese (Portugal)',	'cs_CZ' => 'Czech (Czechia)',
-			'da_DK' => 'Danish (Denmark)', 			'sv_SE' => 'Swedish (Sweden)',
-		];
-
-		/**
-		 *	This module's action map, merged into Admin::handlePost()'s dispatch
-		 *
-		 *	@return 	array
-		 */
-		public static function actions(): array {
-			return [
-				'config/list' 			=> [ self::class, 'apiList' ],
-				'config/save' 			=> [ self::class, 'apiSave' ],
-				'config/addlocale'	=> [ self::class, 'apiAddLocale' ],
-				'config/searchindex'	=> [ self::class, 'apiCreateSearchIndex' ],
-			];
-		}
-
-		/**
-		 *	Nav entry for this module, rendered into the dashboard's tab bar
-		 *
-		 *	@return 	array										[ uri, label ]
-		 */
-		public static function nav(): array {
-			return [ 'config', 'Konfiguration' ];
-		}
-
-		/**
-		 *	Every setting's current value, plus the schema the frontend renders
-		 *	it with and the locale inventory the language group needs.
-		 *
-		 *	Reads config.php fresh rather than $appData directly: by the time
-		 *	this runs, Admin::init() has already added _admin's own GET/POST
-		 *	/_admin route into $appData['/nino/http/routes'] at runtime (same
-		 *	as Editor::init() does for /_editor, self-registered, never
-		 *	persisted - see Admin::init()'s docblock). That no longer matters
-		 *	for routes, which this panel stopped editing, but the same applies
-		 *	to anything a module writes at runtime, so the fresh read stays.
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		array 		&$request			(reference) Current server request
-		 *
-		 *	@return 	void
-		 */
-		public static function apiList( array &$appData, array &$request ): void {
-
-			if( \Nino\Admin\Admin::guard( $appData, $request ) === false )
-				return;
-
-			$stored = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
-
-			$fields = [];
-			foreach( self::FIELDS as $key => $field ) {
-
-				$fields[] = $field + [
-					'key' 		=> $key,
-					'value'		=> self::_currentValue( $stored, $key, $field['type'] ),
-				];
-			}
-
-			\Nino\Http::ok( $request, [
-				'groups' 	=> self::GROUPS,
-				'fields' 	=> $fields,
-				'locales'	=> self::_localeInventory( $appData, $stored ),
-			] );
-		}
-
-		/**
-		 *	One field's value as stored, falling back to the same default the
-		 *	runtime itself applies when the key is missing.
-		 *
-		 *	@param		array 		$stored				config.php as read from disk
-		 *	@param		string		$key
-		 *	@param		string		$type					FIELDS type
-		 *
-		 *	@return 	mixed
-		 */
-		private static function _currentValue( array $stored, string $key, string $type ): mixed {
-
-			if( array_key_exists( $key, $stored ) === true )
-				return $stored[$key];
-
-			// The runtime's own fallback for a missing key, so the form never
-			// shows a value the site is not actually running with
-			return match( $key ) {
-				'/nino/error/log' 									=> true,
-				'/nino/editor/backups', '/nino/editor/logs' => true,
-				'/nino/auth/maxtries' 							=> 5,
-				'/nino/auth/cooldown' 							=> 3600,
-				'/nino/cache/ttl' 									=> 3600,
-				default 														=> match( $type ) {
-					'bool' 								=> false,
-					'int' 								=> 0,
-					'locales', 'lines' 		=> [],
-					default 							=> '',
-				},
-			};
-		}
-
-		/**
-		 *	Every locale this project could sensibly list, and what actually
-		 *	exists on disk for each one.
-		 *
-		 *	The union of two sources, not just the configured list: a
-		 *	text/<locale>.php whose locale is not (or no longer) configured is
-		 *	worth showing, because it is a language that has been translated and
-		 *	is simply switched off. The other direction is the one that breaks a
-		 *	site - a configured locale with no text file of its own renders every
-		 *	per-locale fill as a raw [[key]], the exact case \Nino\Locales::init()
-		 *	guards the native locale against - so 'hasText' is reported per entry
-		 *	and the frontend says so before the language is ever saved.
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		array 		$stored				config.php as read from disk
-		 *
-		 *	@return 	array										[ [ code, name, hasText, keys, active ], ... ]
-		 */
-		private static function _localeInventory( array &$appData, array $stored ): array {
-
-			$configured = array_values( array_filter(
-				(array) ( $stored['/nino/locales/available'] ?? [] ),
-				fn( mixed $locale ): bool => is_string( $locale ) === true && preg_match( self::LOCALE_PATTERN, $locale ) === 1
-			) );
-
-			$textDir 	= (string) ( $stored['/nino/locales/textfiles'] ?? '/text' );
-			$files 		= glob( \Nino\Filesystem::path( $appData, $textDir ). '/*.php' ) ?: [];
-
-			$onDisk = [];
-			foreach( $files as $file ) {
-				$code = basename( $file, '.php' );
-				if( preg_match( self::LOCALE_PATTERN, $code ) === 1 )
-					$onDisk[$code] = $file;
-			}
-
-			$codes = array_values( array_unique( array_merge( $configured, array_keys( $onDisk ) ) ) );
-			sort( $codes );
-
-			$inventory = [];
-			foreach( $codes as $code ) {
-
-				$keys = 0;
-				if( isset( $onDisk[$code] ) === true ) {
-					$content 	= \Nino\Filesystem::getFileContent( $appData, $textDir. '/'. $code. '.php', [] );
-					$keys 		= is_array( $content ) === true ? count( $content ) : 0;
-				}
-
-				$inventory[] = [
-					'code' 		=> $code,
-					'name' 		=> self::LOCALE_NAMES[$code] ?? $code,
-					'hasText'	=> isset( $onDisk[$code] ),
-					'keys' 		=> $keys,
-					'active'	=> in_array( $code, $configured, true ),
-				];
-			}
-
-			return $inventory;
-		}
-
-		/**
-		 *	Create a new language's text file as a translation skeleton: every
-		 *	key the native locale has, in its order, with empty values.
-		 *
-		 *	Without this, adding a language left the project in the one state
-		 *	\Nino\Locales::init() warns about - a configured locale with no
-		 *	text/<locale>.php renders every per-locale fill as a raw [[key]] -
-		 *	and the only ways out were copying a file by hand or importing a
-		 *	translation. \Nino\Text::saveBatch() cannot bootstrap one either:
-		 *	it validates against the keys that already exist, so there is
-		 *	nothing to save into an empty locale.
-		 *
-		 *	Empty values, not the native language's own: an untranslated key
-		 *	has to be visibly untranslated. /_editor's and /_admin's Text
-		 *	panels both list a key with an empty value as work to do, while a
-		 *	copied German sentence sitting in the French file reads as
-		 *	finished and is what actually ships.
-		 *
-		 *	The language itself is not activated here. That is the form's
-		 *	Save, together with the native language it has to agree with - so
-		 *	a file created and then abandoned shows up next time as an
-		 *	inactive language that already has its keys, which is a state the
-		 *	inventory reports and one tick undoes.
-		 *
-		 *	An existing file is never overwritten. It is answered with its own
-		 *	current key count instead: this is reachable from a button, and a
-		 *	button must not be one click away from emptying a finished
-		 *	translation.
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		array 		&$request			(reference) Current server request
-		 *
-		 *	@return 	void
-		 */
-		public static function apiAddLocale( array &$appData, array &$request ): void {
-
-			if( \Nino\Admin\Admin::guard( $appData, $request ) === false )
-				return;
-
-			$data 	= \Nino\Admin\Admin::postData();
-			$locale = (string) ( $data['locale'] ?? '' );
-
-			if( preg_match( self::LOCALE_PATTERN, $locale ) !== 1 ) {
-				\Nino\Http::fail( $request, 400, 'a language id looks like de_DE' );
-				return;
-			}
-
-			$stored 	= \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
-			$textDir	= (string) ( $stored['/nino/locales/textfiles'] ?? '/text' );
-			$native 	= (string) ( $stored['/nino/locales/native'] ?? '' );
-
-			// Answered before the native locale is even looked at: this path
-			// creates nothing, so a project whose native language is itself
-			// unset must still be able to see what an existing file holds
-			if( \Nino\Filesystem::fileExists( $appData, $textDir. '/'. $locale. '.php' ) === true ) {
-				$existing = \Nino\Filesystem::getFileContent( $appData, $textDir. '/'. $locale. '.php', [] );
-				\Nino\Http::ok( $request, [
-					'locale' 	=> $locale,
-					'created'	=> false,
-					'keys' 		=> is_array( $existing ) === true ? count( $existing ) : 0,
-				] );
-				return;
-			}
-
-			if( preg_match( self::LOCALE_PATTERN, $native ) !== 1 ) {
-				\Nino\Http::fail( $request, 400, 'no native language is configured to copy the keys from' );
-				return;
-			}
-
-			if( $native === $locale ) {
-				\Nino\Http::fail( $request, 400, 'the native language has no text file of its own to copy' );
-				return;
-			}
-
-			$nativeContent = \Nino\Filesystem::getFileContent( $appData, $textDir. '/'. $native. '.php', [] );
-
-			if( is_array( $nativeContent ) === false || $nativeContent === [] ) {
-				\Nino\Http::fail( $request, 400, 'the native language '. $native. ' has no text file to copy the keys from' );
-				return;
-			}
-
-			// array_fill_keys over array_keys, so the new file carries the
-			// native one's key order - which is what makes the two readable
-			// side by side, in the Text panel and in a diff alike
-			$skeleton = array_fill_keys( array_keys( $nativeContent ), '' );
-
-			if( \Nino\Filesystem::putFileContent( $appData, $textDir. '/'. $locale. '.php', $skeleton ) === false ) {
-				\Nino\Http::fail( $request, 500, 'could not write '. $textDir. '/'. $locale. '.php' );
-				return;
-			}
-
-			\Nino\Http::ok( $request, [
-				'locale' 	=> $locale,
-				'created'	=> true,
-				'keys' 		=> count( $skeleton ),
-				'from' 		=> $native,
-			] );
-		}
-
-		/**
-		 *	Recreate every Elements search index configured in config.php.
-		 */
-		public static function apiCreateSearchIndex( array &$appData, array &$request ): void {
-
-			if( \Nino\Admin\Admin::guard( $appData, $request ) === false )
-				return;
-
-			$result = \Nino\Modules\Search::createIndexes( $appData );
-
-			if( $result['failed'] !== [] ) {
-				\Nino\Http::fail( $request, 500, 'could not create search indexes for '. implode( ', ', $result['failed'] ) );
-				return;
-			}
-
-			\Nino\Http::ok( $request, $result );
-		}
-
-		/**
-		 *	Save the whole form in one write.
-		 *
-		 *	One request for every field rather than one per key, and one
-		 *	writeContentData() call for all of them: a settings form is saved as
-		 *	a unit, and the two locale keys have to be, since the native locale
-		 *	is only valid against the language list being saved alongside it.
-		 *	Writing them one at a time would mean a moment - or, if the second
-		 *	write fails, permanently - where config.php names a native locale
-		 *	the project does not have.
-		 *
-		 *	Nothing is written until every field validates, so a single bad
-		 *	value leaves config.php exactly as it was.
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		array 		&$request			(reference) Current server request
-		 *
-		 *	@return 	void
-		 */
-		public static function apiSave( array &$appData, array &$request ): void {
-
-			if( \Nino\Admin\Admin::guard( $appData, $request ) === false )
-				return;
-
-			$data 	= \Nino\Admin\Admin::postData();
-			$posted = $data['fields'] ?? null;
-
-			if( is_array( $posted ) === false ) {
-				\Nino\Http::fail( $request, 400, 'no fields posted' );
-				return;
-			}
-
-			$clean = [];
-			foreach( self::FIELDS as $key => $field ) {
-
-				// A field the frontend did not send keeps whatever config.php
-				// currently holds - this must never read as "set it to empty"
-				if( array_key_exists( $key, $posted ) === false )
-					continue;
-
-				$value = self::_cleanValue( $posted[$key], $field );
-
-				if( $value === null ) {
-					\Nino\Http::fail( $request, 400, self::_typeError( $key, $field ) );
-					return;
-				}
-
-				$clean[$key] = $value;
-			}
-
-			if( $clean === [] ) {
-				\Nino\Http::fail( $request, 400, 'no known fields posted' );
-				return;
-			}
-
-			// The two locale keys constrain each other, so they are checked
-			// against the values being saved - not against what is on disk,
-			// which is what they are about to stop being
-			$locales = $clean['/nino/locales/available'] ?? ( $appData['/nino/locales/available'] ?? [] );
-			$native 	= $clean['/nino/locales/native'] ?? ( $appData['/nino/locales/native'] ?? '' );
-
-			if( isset( $clean['/nino/locales/available'] ) === true && $locales === [] ) {
-				\Nino\Http::fail( $request, 400, 'at least one language is required' );
-				return;
-			}
-
-			if( ( isset( $clean['/nino/locales/available'] ) === true || isset( $clean['/nino/locales/native'] ) === true )
-				&& in_array( $native, $locales, true ) === false ) {
-				\Nino\Http::fail( $request, 400, 'the native language must be one of the site\'s languages' );
-				return;
-			}
-
-			foreach( $clean as $key => $value )
-				$appData[$key] = $value;
-
-			\Nino\AppData::writeContentData( $appData, array_keys( $clean ) );
-
-			\Nino\Http::ok( $request, [ 'saved' => array_keys( $clean ) ] );
-		}
-
-		/**
-		 *	Coerce and validate one posted value against its field definition.
-		 *
-		 *	Coerce, because a form posts strings: a number field's "5" is the
-		 *	int 5 and a switch's "true" is the bool true, both of which
-		 *	config.php has to receive as the real type - a "5" written into
-		 *	'/nino/auth/maxtries' compares differently everywhere it is used.
-		 *	Anything that is not exactly one of the accepted forms is rejected
-		 *	rather than cast, so a typo cannot become a 0.
-		 *
-		 *	@param		mixed			$value				As posted
-		 *	@param		array			$field				Its FIELDS entry
-		 *
-		 *	@return 	mixed										The clean value, or null if it does not validate
-		 */
-		private static function _cleanValue( mixed $value, array $field ): mixed {
-
-			return match( $field['type'] ) {
-
-				'bool' => match( true ) {
-					is_bool( $value ) 												=> $value,
-					$value === 'true', $value === 1, $value === '1' 	=> true,
-					$value === 'false', $value === 0, $value === '0' => false,
-					default 																	=> null,
-				},
-
-				'int' => self::_cleanInt( $value, $field ),
-
-				'native' => ( is_string( $value ) === true && preg_match( self::LOCALE_PATTERN, $value ) === 1 ) ? $value : null,
-
-				'lines' => self::_cleanLines( $value ),
-
-				'locales' => self::_cleanLocales( $value ),
-
-				default => null,
-			};
-		}
-
-		/**
-		 *	@param		mixed			$value
-		 *	@param		array			$field				Its FIELDS entry, for 'min'/'max'
-		 *
-		 *	@return 	int|null								Null if not an int or out of range
-		 */
-		private static function _cleanInt( mixed $value, array $field ): ?int {
-
-			// A float, a bool or "5 " are all rejected rather than cast: this
-			// writes into config.php, where the value has to be an int and
-			// nothing else
-			if( is_int( $value ) === false && ( is_string( $value ) === false || preg_match( '/^-?\d+$/', $value ) !== 1 ) )
-				return null;
-
-			$int = (int) $value;
-
-			if( $int < ( $field['min'] ?? PHP_INT_MIN ) || $int > ( $field['max'] ?? PHP_INT_MAX ) )
-				return null;
-
-			return $int;
-		}
-
-		/**
-		 *	A list typed one entry per line. Blank lines and surrounding
-		 *	whitespace go, because they are how a textarea ends up looking
-		 *	after editing and none of them mean anything to a consumer.
-		 *
-		 *	@param		mixed			$value				As posted - a list, or the raw textarea string
-		 *
-		 *	@return 	array|null							The cleaned list, or null if it is not a list of strings
-		 */
-		private static function _cleanLines( mixed $value ): ?array {
-
-			if( is_string( $value ) === true )
-				$value = preg_split( '/\r\n|\r|\n/', $value );
-
-			if( is_array( $value ) === false )
-				return null;
-
-			$lines = [];
-			foreach( $value as $line ) {
-
-				if( is_string( $line ) === false )
-					return null;
-
-				$line = trim( $line );
-
-				if( $line !== '' && in_array( $line, $lines, true ) === false )
-					$lines[] = $line;
-			}
-
-			return $lines;
-		}
-
-		/**
-		 *	@param		mixed			$value				As posted
-		 *
-		 *	@return 	array|null							Deduplicated locale list, or null if any entry is malformed
-		 */
-		private static function _cleanLocales( mixed $value ): ?array {
-
-			if( is_array( $value ) === false )
-				return null;
-
-			$locales = [];
-			foreach( $value as $locale ) {
-
-				if( is_string( $locale ) === false || preg_match( self::LOCALE_PATTERN, $locale ) !== 1 )
-					return null;
-
-				if( in_array( $locale, $locales, true ) === false )
-					$locales[] = $locale;
-			}
-
-			return $locales;
-		}
-
-		/**
-		 *	The message a rejected field answers with - specific enough to fix
-		 *	the value from, which "invalid value" is not
-		 *
-		 *	@param		string		$key
-		 *	@param		array			$field
 		 *
 		 *	@return 	string
 		 */
-		private static function _typeError( string $key, array $field ): string {
-
-			return match( $field['type'] ) {
-				'int' 		=> $key. ': expected a whole number between '. ( $field['min'] ?? PHP_INT_MIN ). ' and '. ( $field['max'] ?? PHP_INT_MAX ),
-				'bool' 		=> $key. ': expected true or false',
-				'native' 	=> $key. ': expected a locale id like de_DE',
-				'locales'	=> $key. ': expected a list of locale ids like de_DE',
-				'lines' 	=> $key. ': expected one entry per line',
-				default 	=> $key. ': invalid value',
-			};
-		}
-	}
-	/**
-	 *	Nino							A compact filesystembased php framework
-	 *	Dev								Manage admin accounts: create/delete - the "set" half of what
-	 *												_editor's Users panel edits ("values" half: mail/password
-	 *												for an existing account). Same split as ElementTypes/Elements.
-	 *												This is also the only way to bootstrap the very first
-	 *												_editor user without hand-editing config.php, which nothing
-	 *												else in the project can do.
-	 *
-	 *												Permissions are the one exception to that split: this also
-	 *												exposes a raw, unwhitelisted permissions editor, deliberately
-	 *												independent of _editor's own manager-only, whitelisted
-	 *												apiSetPermissions() - the recovery path for when nobody with
-	 *												/_editor/users/manage is left to use that one.
-	 *
-	 *	@package					Dape/Nino
-	 *	@author						David Perchermeier <mail@dape.io>
-	 *	@link							https://github.com/dapeio/nino
-	 */
-	class Users {
-
-		private const string MANAGE_PERM = '/_editor/users/manage';
-
-		// The individual _editor content perms (deliberately duplicated as plain
-		// strings rather than referencing \Nino\Editor\*::MANAGE_PERM/VIEW_PERM -
-		// this file stays independent of _editor/Editor.php, see class docblock
-		// above). A non-manager account created here still gets full content
-		// access, same as every admin account had before per-module permissions
-		// existed - only /_editor/users/manage is gated by the checkbox
-		private const array CONTENT_PERMS = [
-			'/_editor/elements/manage',
-			'/_editor/text/manage',
-			'/_editor/images/manage',
-			'/_editor/submissions/view',
-			'/_editor/newsletter/manage',
-			'/_editor/logs/view',
-		];
-
-		/**
-		 *	This module's action map, merged into Admin::handlePost()'s dispatch
-		 *
-		 *	@return 	array
-		 */
-		public static function actions(): array {
-			return [
-				'devusers/list' 				=> [ self::class, 'apiList' ],
-				'devusers/create' 			=> [ self::class, 'apiCreate' ],
-				'devusers/delete' 			=> [ self::class, 'apiDelete' ],
-				'devusers/permissions' 	=> [ self::class, 'apiSetPermissions' ],
-			];
-		}
-
-		/**
-		 *	Nav entry for this module, rendered into the dashboard's tab bar
-		 *
-		 *	@return 	array										[ uri, label ]
-		 */
-		public static function nav(): array {
-			return [ 'users', 'Nutzer' ];
-		}
-
-		/**
-		 *	How many admin accounts exist - shared by Dashboard::apiSummary
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *
-		 *	@return 	int
-		 */
-		public static function count( array &$appData ): int {
-			return count( $appData['/nino/auth/user'] ?? [] );
-		}
-
-		/**
-		 *	List every admin user (mail/status/permissions, never the
-		 *	password hash)
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		array 		&$request			(reference) Current server request
-		 *
-		 *	@return 	void
-		 */
-		public static function apiList( array &$appData, array &$request ): void {
-
-			if( \Nino\Admin\Admin::guard( $appData, $request ) === false )
-				return;
-
-			$users = [];
-			foreach( ( $appData['/nino/auth/user'] ?? [] ) as $mail => $user )
-				$users[] = [
-					'mail' 			=> $mail,
-					'status' 		=> $user['status'] ?? 0,
-					'perms' 		=> $user['perms'] ?? [],
-					// checkPermission(), not a raw in_array() - a '/*' grant (see
-					// apiCreate()) implies this too, same recursive wildcard match
-					// _editor's own guardPerm() uses
-					'isManager' => \Nino\Auth::checkPermission( $appData, self::MANAGE_PERM, $mail ),
-				];
-
-			\Nino\Http::ok( $request, [ 'users' => $users ] );
-		}
-
-		/**
-		 *	Create a new admin user
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		array 		&$request			(reference) Current server request
-		 *
-		 *	@return 	void
-		 */
-		public static function apiCreate( array &$appData, array &$request ): void {
-
-			if( \Nino\Admin\Admin::guard( $appData, $request ) === false )
-				return;
-
-			$data 			= \Nino\Admin\Admin::postData();
-			$mail 			= trim( (string) ( $data['mail'] ?? '' ) );
-			$password 	= (string) ( $data['password'] ?? '' );
-			$isManager 	= ( $data['isManager'] ?? false ) === true;
-
-			if( filter_var( $mail, FILTER_VALIDATE_EMAIL ) === false || strlen( $password ) < 8 ) {
-				\Nino\Http::fail( $request, 400, 'invalid mail or password too short' );
-				return;
-			}
-
-			$ok = \Nino\Auth::insertUser( $appData, $mail, $password, $isManager === true ? [ '/*' ] : self::CONTENT_PERMS );
-
-			if( $ok === false ) {
-				\Nino\Http::fail( $request, 409, 'a user with this mail already exists' );
-				return;
-			}
-
-			\Nino\Http::ok( $request );
-		}
-
-		/**
-		 *	Delete an admin user
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		array 		&$request			(reference) Current server request
-		 *
-		 *	@return 	void
-		 */
-		public static function apiDelete( array &$appData, array &$request ): void {
-
-			if( \Nino\Admin\Admin::guard( $appData, $request ) === false )
-				return;
-
-			$mail = trim( (string) ( \Nino\Admin\Admin::postData()['mail'] ?? '' ) );
-			$ok 	= \Nino\Auth::deleteUser( $appData, $mail );
-
-			if( $ok === false ) {
-				\Nino\Http::fail( $request, 404, 'unknown user' );
-				return;
-			}
-
-			\Nino\Http::ok( $request );
-		}
-
-		/**
-		 *	Directly set a user's permissions - unlike _editor's own
-		 *	Admin\Users::apiSetPermissions() this isn't whitelisted against a
-		 *	known set of permission strings: this file is the deliberate
-		 *	developer bypass for exactly the "wrecked config.php data"
-		 *	scenario _editor's own docblock already points back here for, eg.
-		 *	the last remaining manager accidentally removing their own
-		 *	/_editor/users/manage permission with no self-service recovery
-		 *	path in _editor itself
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		array 		&$request			(reference) Current server request
-		 *
-		 *	@return 	void
-		 */
-		public static function apiSetPermissions( array &$appData, array &$request ): void {
-
-			if( \Nino\Admin\Admin::guard( $appData, $request ) === false )
-				return;
-
-			$data 	= \Nino\Admin\Admin::postData();
-			$mail 	= trim( (string) ( $data['mail'] ?? '' ) );
-			$perms 	= $data['perms'] ?? null;
-
-			if( \Nino\Auth::getUser( $appData, $mail ) === false ) {
-				\Nino\Http::fail( $request, 404, 'unknown user' );
-				return;
-			}
-
-			if( is_array( $perms ) === false || count( array_filter( $perms, 'is_string' ) ) !== count( $perms ) ) {
-				\Nino\Http::fail( $request, 400, 'perms must be an array of strings' );
-				return;
-			}
-
-			$appData['/nino/auth/user'][$mail]['perms'] = array_values( $perms );
-			\Nino\AppData::writeContentData( $appData, [ '/nino/auth/user' ] );
-
-			\Nino\Http::ok( $request, [ 'perms' => $appData['/nino/auth/user'][$mail]['perms'] ] );
-		}
-	}
-
-	/**
-	 *	Nino							A compact filesystembased php framework
-	 *	Dev								Manage image slots (/nino/html/images): create, edit label/
-	 *												width/height, delete - the "set" half of what _editor's
-	 *												Images panel edits ("values" half: which file currently
-	 *												fills a slot). Same split as ElementTypes/Elements. Only
-	 *												ever touches a slot's filename when deleting the slot
-	 *												itself (cleans up its uploaded file via \Nino\Images::
-	 *												delete()) - replacing it stays _editor's job via the actual
-	 *												upload/crop pipeline (\Nino\Images::process()/
-	 *												setSlotFilename()).
-	 *
-	 *	@package					Dape/Nino
-	 *	@author						David Perchermeier <mail@dape.io>
-	 *	@link							https://github.com/dapeio/nino
-	 */
-	class Images {
-
-		/**
-		 *	This module's action map, merged into Admin::handlePost()'s dispatch
-		 *
-		 *	@return 	array
-		 */
-		public static function actions(): array {
-			return [
-				'devimages/list' 	=> [ self::class, 'apiList' ],
-				'devimages/save' 	=> [ self::class, 'apiSave' ],
-				'devimages/create' => [ self::class, 'apiCreate' ],
-				'devimages/delete' => [ self::class, 'apiDelete' ],
-				'devimages/scan' 	=> [ self::class, 'apiScan' ],
-			];
-		}
-
-		/**
-		 *	Nav entry for this module, rendered into the dashboard's tab bar
-		 *
-		 *	@return 	array										[ uri, label ]
-		 */
-		public static function nav(): array {
-			return [ 'images', 'Bilder' ];
-		}
-
-		/**
-		 *	A slot uri follows the same shape as an element uri (Elements/
-		 *	Images shortcodes address slots by a "/segment/segment" path)
-		 *
-		 *	@param		string		$uri
-		 *
-		 *	@return 	bool
-		 */
-		private static function isValidUri( string $uri ): bool {
-			return preg_match( '#^/[a-z][a-z0-9_-]*(/[a-z][a-z0-9_-]*)*$#', $uri ) === 1;
-		}
-
-		/**
-		 *	List every image slot with its current filename (if any)
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		array 		&$request			(reference) Current server request
-		 *
-		 *	@return 	void
-		 */
-		public static function apiList( array &$appData, array &$request ): void {
-
-			if( \Nino\Admin\Admin::guard( $appData, $request ) === false )
-				return;
-
-			$slots = [];
-			foreach( ( $appData['/nino/html/images'] ?? [] ) as $uri => $slot )
-				$slots[] = [
-					'uri' 			=> $uri,
-					'label' 		=> $slot['label'] ?? $uri,
-					'width' 		=> $slot['width'] ?? 0,
-					'height' 		=> $slot['height'] ?? 0,
-					'hasImage' 	=> ( $slot['filename'] ?? null ) !== null,
-				];
-
-			usort( $slots, fn( array $a, array $b ) => strcmp( $a['uri'], $b['uri'] ) );
-
-			\Nino\Http::ok( $request, [ 'slots' => $slots ] );
-		}
-
-		/**
-		 *	Edit an existing slot's label/width/height - never its filename
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		array 		&$request			(reference) Current server request
-		 *
-		 *	@return 	void
-		 */
-		public static function apiSave( array &$appData, array &$request ): void {
-
-			if( \Nino\Admin\Admin::guard( $appData, $request ) === false )
-				return;
-
-			$data = \Nino\Admin\Admin::postData();
-			$uri 	= (string) ( $data['uri'] ?? '' );
-
-			if( isset( $appData['/nino/html/images'][$uri] ) === false ) {
-				\Nino\Http::fail( $request, 404, 'unknown slot' );
-				return;
-			}
-
-			$label 	= trim( (string) ( $data['label'] ?? '' ) );
-			$width 	= max( 1, (int) ( $data['width'] ?? 0 ) );
-			$height = max( 1, (int) ( $data['height'] ?? 0 ) );
-
-			if( $label === '' ) {
-				\Nino\Http::fail( $request, 400, 'label is required' );
-				return;
-			}
-
-			$appData['/nino/html/images'][$uri]['label'] 	= $label;
-			$appData['/nino/html/images'][$uri]['width'] 	= $width;
-			$appData['/nino/html/images'][$uri]['height'] = $height;
-
-			\Nino\AppData::writeContentData( $appData, [ '/nino/html/images' ] );
-
-			\Nino\Http::ok( $request );
-		}
-
-		/**
-		 *	Create a brand new, empty (no filename yet) image slot
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		array 		&$request			(reference) Current server request
-		 *
-		 *	@return 	void
-		 */
-		public static function apiCreate( array &$appData, array &$request ): void {
-
-			if( \Nino\Admin\Admin::guard( $appData, $request ) === false )
-				return;
-
-			$data 	= \Nino\Admin\Admin::postData();
-			$uri 		= (string) ( $data['uri'] ?? '' );
-			$label 	= trim( (string) ( $data['label'] ?? '' ) );
-			$width 	= max( 1, (int) ( $data['width'] ?? 0 ) );
-			$height = max( 1, (int) ( $data['height'] ?? 0 ) );
-
-			if( self::isValidUri( $uri ) === false || $label === '' ) {
-				\Nino\Http::fail( $request, 400, 'invalid uri or missing label' );
-				return;
-			}
-
-			if( isset( $appData['/nino/html/images'][$uri] ) === true ) {
-				\Nino\Http::fail( $request, 409, 'slot already exists' );
-				return;
-			}
-
-			$appData['/nino/html/images'][$uri] = [
-				'label' 		=> $label,
-				'width' 		=> $width,
-				'height' 		=> $height,
-				'filename' 	=> null,
-			];
-
-			\Nino\AppData::writeContentData( $appData, [ '/nino/html/images' ] );
-
-			\Nino\Http::ok( $request, [ 'ok' => true, 'uri' => $uri ] );
-		}
-
-		/**
-		 *	Delete an image slot - its currently uploaded file too, if any
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		array 		&$request			(reference) Current server request
-		 *
-		 *	@return 	void
-		 */
-		public static function apiDelete( array &$appData, array &$request ): void {
-
-			if( \Nino\Admin\Admin::guard( $appData, $request ) === false )
-				return;
-
-			$data = \Nino\Admin\Admin::postData();
-			$uri 	= (string) ( $data['uri'] ?? '' );
-
-			$slot = $appData['/nino/html/images'][$uri] ?? null;
-
-			if( $slot === null ) {
-				\Nino\Http::fail( $request, 404, 'unknown slot' );
-				return;
-			}
-
-			if( ( $slot['filename'] ?? null ) !== null )
-				\Nino\Images::delete( $appData, $slot['filename'] );
-
-			unset( $appData['/nino/html/images'][$uri] );
-
-			\Nino\AppData::writeContentData( $appData, [ '/nino/html/images' ] );
-
-			\Nino\Http::ok( $request );
-		}
-
-		/**
-		 *	Scan every public-site template (templates/*.tpl) for literal
-		 *	<img src="/images/..."> tags not backed by any image slot - the
-		 *	gap this closes: a template built with a placeholder/demo photo
-		 *	hardcoded straight into the markup instead of going through the
-		 *	[image /uri] shortcode (see \Nino\Modules\Images), so an
-		 *	admin can never swap it without editing code. Proposes a slot
-		 *	per file (uri guessed from the filename, width/height read off
-		 *	the <img> tag's own attributes or, failing that, probed from the
-		 *	actual file), filename deliberately left for apiCreate() to
-		 *	leave empty - same "dev only ever creates the empty slot, a real
-		 *	upload is _editor's job" rule the class docblock already states.
-		 *	An <img> outside /images/ (external url, data: uri, favicon,
-		 *	logo) is skipped entirely, none of those fit this slot system
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		array 		&$request			(reference) Current server request
-		 *
-		 *	@return 	void
-		 */
-		public static function apiScan( array &$appData, array &$request ): void {
-
-			if( \Nino\Admin\Admin::guard( $appData, $request ) === false )
-				return;
-
-			\Nino\Http::ok( $request, [ 'missing' => self::_scanMissing( $appData ) ] );
-		}
-
-		/**
-		 *	How many <img> tags apiScan() above would currently report as
-		 *	missing a slot - shared by Dashboard::apiSummary
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *
-		 *	@return 	int
-		 */
-		public static function missingCount( array &$appData ): int {
-			return count( self::_scanMissing( $appData ) );
-		}
-
-		/**
-		 *	Scan every public-site template for <img src="/images/..."> tags
-		 *	not backed by any image slot - the actual work behind
-		 *	apiScan()/missingCount() above
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *
-		 *	@return 	array										[ [ 'filename', 'src', 'suggestedUri', 'width', 'height', 'files' ], ... ]
-		 */
-		private static function _scanMissing( array &$appData ): array {
-
-			$known = [];
-			foreach( ( $appData['/nino/html/images'] ?? [] ) as $slot )
-				if( ( $slot['filename'] ?? null ) !== null )
-					$known[ $slot['filename'] ] = true;
-
-			// Two roots: the templates being scanned are private, the images
-			// they reference are public (see \Nino\Filesystem::PRIVATE_DIRS)
-			$templates 	= \Nino\Filesystem::path( $appData, '/templates' );
-			$images 		= \Nino\Filesystem::path( $appData, '/images' );
-			$found 			= [];
-
-			foreach( glob( $templates. '/*.tpl' ) ?: [] as $file ) {
-
-				$content = file_get_contents( $file );
-				if( $content === false || preg_match_all( '/<img\b[^>]*\bsrc="([^"]+)"[^>]*>/i', $content, $matches, PREG_SET_ORDER ) === false )
-					continue;
-
-				foreach( $matches as $match ) {
-
-					// A local image is referenced as [[/nino/public]]/images/...
-					// in current template source. Also accept [[/nino/dir]] here:
-					// scanning developer-authored templates should diagnose that
-					// form rather than silently ignoring the image altogether.
-					$src = preg_replace( '#^\[\[/nino/(?:public|dir)\]\]#', '', $match[1] );
-
-					if( str_starts_with( $src, '/images/' ) === false )
-						continue;
-
-					$relative = substr( $src, strlen( '/images/' ) );
-
-					if( isset( $known[$relative] ) === true )
-						continue;
-
-					if( isset( $found[$relative] ) === false ) {
-
-						$width 	= 0;
-						$height = 0;
-
-						if( preg_match( '/\bwidth="(\d+)"/i', $match[0], $w ) === 1 )
-							$width = (int) $w[1];
-						if( preg_match( '/\bheight="(\d+)"/i', $match[0], $h ) === 1 )
-							$height = (int) $h[1];
-
-						if( ( $width === 0 || $height === 0 ) && is_file( $images. '/'. $relative ) === true ) {
-							$size = @getimagesize( $images. '/'. $relative );
-							if( $size !== false ) {
-								$width 	= $width ?: $size[0];
-								$height = $height ?: $size[1];
-							}
-						}
-
-						$suggestedUri = '/'. preg_replace( '/[^a-z0-9-]+/', '-', strtolower( pathinfo( $relative, PATHINFO_FILENAME ) ) );
-
-						$found[$relative] = [ 'src' => $src, 'suggestedUri' => $suggestedUri, 'width' => $width, 'height' => $height, 'files' => [] ];
-					}
-
-					$found[$relative]['files'][] = basename( $file );
-				}
-			}
-
-			foreach( $found as &$entry )
-				$entry['files'] = array_values( array_unique( $entry['files'] ) );
-			unset( $entry );
-
-			ksort( $found );
-
-			return array_map( fn( $filename, $entry ) => array_merge( [ 'filename' => $filename ], $entry ), array_keys( $found ), array_values( $found ) );
-		}
-	}
-
-	/**
-	 *	Nino							A compact filesystembased php framework
-	 *	Dev								Full CRUD for text keys: create, rename, delete, change global/
-	 *												per-locale shape, toggle whether a key is hidden from
-	 *												_editor's Text panel (/text/blacklist.php) - plus, same as
-	 *												_editor's Text panel, edit every key's actual value(s).
-	 *												Unlike _editor, _admin also sees blacklisted keys and can still
-	 *												edit/rename/delete them (the blacklist only hides a key
-	 *												from _editor, not from _admin). Converting a key between global
-	 *												and per-locale, or renaming it, migrates its current
-	 *												value(s) rather than discarding them - see _convertShape()/
-	 *												apiRename().
-	 *
-	 *	@package					Dape/Nino
-	 *	@author						David Perchermeier <mail@dape.io>
-	 *	@link							https://github.com/dapeio/nino
-	 */
-	class Text {
-
-		/**
-		 *	This module's action map, merged into Admin::handlePost()'s dispatch
-		 *
-		 *	@return 	array
-		 */
-		public static function actions(): array {
-			return [
-				'devtext/list' 			=> [ self::class, 'apiList' ],
-				'devtext/create' 		=> [ self::class, 'apiCreate' ],
-				'devtext/save' 			=> [ self::class, 'apiSave' ],
-				'devtext/savebatch' => [ self::class, 'apiSaveBatch' ],
-				'devtext/rename' 		=> [ self::class, 'apiRename' ],
-				'devtext/delete' 		=> [ self::class, 'apiDelete' ],
-				'devtext/scan' 			=> [ self::class, 'apiScan' ],
-			];
-		}
-
-		/**
-		 *	Nav entry for this module, rendered into the dashboard's tab bar
-		 *
-		 *	@return 	array										[ uri, label ]
-		 */
-		public static function nav(): array {
-			return [ 'text', 'Texte' ];
-		}
-
-		/**
-		 *	A text key follows the same "/segment/segment" shape _editor's
-		 *	Text panel groups by (first segment = category)
-		 *
-		 *	@param		string		$key
-		 *
-		 *	@return 	bool
-		 */
-		private static function isValidKey( string $key ): bool {
-			return preg_match( '#^/[a-z][a-z0-9_-]*(/[a-z0-9_-]+)+$#', $key ) === 1;
-		}
-
-		/**
-		 *	List every known text key, blacklisted or not (unlike _editor's
-		 *	own panel, this is exactly where you'd come to un-blacklist one)
-		 *	- see \Nino\Text::entries()
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		array 		&$request			(reference) Current server request
-		 *
-		 *	@return 	void
-		 */
-		public static function apiList( array &$appData, array &$request ): void {
-
-			if( \Nino\Admin\Admin::guard( $appData, $request ) === false )
-				return;
-
-			\Nino\Http::ok( $request, [
-				'keys' 		=> \Nino\Text::entries( $appData ),
-				'locales' => \Nino\Locales::getAvailableLocales( $appData ),
-			] );
-		}
-
-		/**
-		 *	Create a brand new key with an initial value - global.php gets
-		 *	one value, or every locale file gets the same starting value,
-		 *	depending on $isGlobal
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		array 		&$request			(reference) Current server request
-		 *
-		 *	@return 	void
-		 */
-		public static function apiCreate( array &$appData, array &$request ): void {
-
-			if( \Nino\Admin\Admin::guard( $appData, $request ) === false )
-				return;
-
-			$data 		= \Nino\Admin\Admin::postData();
-			$key 			= (string) ( $data['key'] ?? '' );
-			$isGlobal = ( $data['global'] ?? false ) === true;
-			$value 		= (string) ( $data['value'] ?? '' );
-
-			if( self::isValidKey( $key ) === false ) {
-				\Nino\Http::fail( $request, 400, 'invalid key' );
-				return;
-			}
-
-			if( \Nino\Text::entry( $appData, $key ) !== null ) {
-				\Nino\Http::fail( $request, 409, 'key already exists' );
-				return;
-			}
-
-			$bracketKey = '[['. $key. ']]';
-
-			if( $isGlobal === true ) {
-				\Nino\Filesystem::mutate( $appData, '/text/global.php', function( array $global ) use ( $bracketKey, $value ): array {
-					$global[$bracketKey] = $value;
-					return $global;
-				} );
-			} else {
-				foreach( \Nino\Locales::getAvailableLocales( $appData ) as $locale )
-					\Nino\Filesystem::mutate( $appData, '/text/'. $locale. '.php', function( array $localeData ) use ( $bracketKey, $value ): array {
-						$localeData[$bracketKey] = $value;
-						return $localeData;
-					} );
-			}
-
-			\Nino\Http::ok( $request, [ 'ok' => true, 'key' => $key ] );
-		}
-
-		/**
-		 *	Edit an existing key's global/per-locale shape and/or blacklist
-		 *	status. Converting shape migrates the current value(s) instead
-		 *	of discarding them: global -> per-locale copies the one value
-		 *	into every locale; per-locale -> global keeps the native
-		 *	locale's value (falling back to the first non-empty one)
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		array 		&$request			(reference) Current server request
-		 *
-		 *	@return 	void
-		 */
-		public static function apiSave( array &$appData, array &$request ): void {
-
-			if( \Nino\Admin\Admin::guard( $appData, $request ) === false )
-				return;
-
-			$data 		= \Nino\Admin\Admin::postData();
-			$key 			= (string) ( $data['key'] ?? '' );
-			$isGlobal = ( $data['global'] ?? false ) === true;
-			$blacklisted = ( $data['blacklisted'] ?? false ) === true;
-
-			$entry = \Nino\Text::entry( $appData, $key );
-
-			if( $entry === null ) {
-				\Nino\Http::fail( $request, 404, 'unknown key' );
-				return;
-			}
-
-			if( $entry['global'] !== $isGlobal )
-				self::_convertShape( $appData, $key, $entry, $isGlobal );
-
-			\Nino\Text::setBlacklisted( $appData, $key, $blacklisted );
-
-			\Nino\Http::ok( $request );
-		}
-
-		/**
-		 *	Save several keys' values in one request - see \Nino\Text::saveBatch().
-		 *	Unlike _editor, a blacklisted key is still a valid save target here -
-		 *	blacklist only hides a key from _editor's Text panel, not from _admin's.
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		array 		&$request			(reference) Current server request
-		 *
-		 *	@return 	void
-		 */
-		public static function apiSaveBatch( array &$appData, array &$request ): void {
-
-			if( \Nino\Admin\Admin::guard( $appData, $request ) === false )
-				return;
-
-			$data 	= \Nino\Admin\Admin::postData();
-			$items 	= is_array( $data['items'] ?? null ) ? $data['items'] : [];
-
-			\Nino\Http::ok( $request, [ 'results' => \Nino\Text::saveBatch( $appData, $items, true ) ] );
-		}
-
-		/**
-		 *	Rename a key, moving its current value(s) and blacklist status
-		 *	to the new name - the file(s)/shape don't change, only the
-		 *	bracket key itself
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		array 		&$request			(reference) Current server request
-		 *
-		 *	@return 	void
-		 */
-		public static function apiRename( array &$appData, array &$request ): void {
-
-			if( \Nino\Admin\Admin::guard( $appData, $request ) === false )
-				return;
-
-			$data 	= \Nino\Admin\Admin::postData();
-			$key 		= (string) ( $data['key'] ?? '' );
-			$newKey = (string) ( $data['newKey'] ?? '' );
-
-			if( self::isValidKey( $newKey ) === false ) {
-				\Nino\Http::fail( $request, 400, 'invalid new key' );
-				return;
-			}
-
-			$entry = \Nino\Text::entry( $appData, $key );
-
-			if( $entry === null ) {
-				\Nino\Http::fail( $request, 404, 'unknown key' );
-				return;
-			}
-
-			// Renaming a key to the name it already has is the no-op the
-			// collision check below already treats it as - but it has to
-			// return before the mutate further down, whose "write the new
-			// key, unset the old one" pair collapses into a plain delete
-			// when both brackets are the same string. _admin/assets/text.js
-			// guards this in the ui; the endpoint has to guard it too, or a
-			// direct post drops the value from every locale file and still
-			// answers 200
-			if( $newKey === $key ) {
-				\Nino\Http::ok( $request, [ 'ok' => true, 'key' => $newKey ] );
-				return;
-			}
-
-			if( \Nino\Text::entry( $appData, $newKey ) !== null ) {
-				\Nino\Http::fail( $request, 409, 'key already exists' );
-				return;
-			}
-
-			$oldBracket = '[['. $key. ']]';
-			$newBracket = '[['. $newKey. ']]';
-
-			if( $entry['global'] === true ) {
-				\Nino\Filesystem::mutate( $appData, '/text/global.php', function( array $global ) use ( $oldBracket, $newBracket ): array {
-					$global[$newBracket] = $global[$oldBracket] ?? '';
-					unset( $global[$oldBracket] );
-					return $global;
-				} );
-			} else {
-				foreach( \Nino\Locales::getAvailableLocales( $appData ) as $locale )
-					\Nino\Filesystem::mutate( $appData, '/text/'. $locale. '.php', function( array $localeData ) use ( $oldBracket, $newBracket ): array {
-						$localeData[$newBracket] = $localeData[$oldBracket] ?? '';
-						unset( $localeData[$oldBracket] );
-						return $localeData;
-					} );
-			}
-
-			if( $entry['blacklisted'] === true ) {
-				\Nino\Text::setBlacklisted( $appData, $key, false );
-				\Nino\Text::setBlacklisted( $appData, $newKey, true );
-			}
-
-			\Nino\Http::ok( $request, [ 'ok' => true, 'key' => $newKey ] );
-		}
-
-		/**
-		 *	Delete a key entirely - its value(s) from global.php or every
-		 *	locale file, and its blacklist entry if any
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		array 		&$request			(reference) Current server request
-		 *
-		 *	@return 	void
-		 */
-		public static function apiDelete( array &$appData, array &$request ): void {
-
-			if( \Nino\Admin\Admin::guard( $appData, $request ) === false )
-				return;
-
-			$data = \Nino\Admin\Admin::postData();
-			$key 	= (string) ( $data['key'] ?? '' );
-
-			$entry = \Nino\Text::entry( $appData, $key );
-
-			if( $entry === null ) {
-				\Nino\Http::fail( $request, 404, 'unknown key' );
-				return;
-			}
-
-			$bracketKey = '[['. $key. ']]';
-
-			if( $entry['global'] === true ) {
-				\Nino\Filesystem::mutate( $appData, '/text/global.php', function( array $global ) use ( $bracketKey ): array {
-					unset( $global[$bracketKey] );
-					return $global;
-				} );
-			} else {
-				foreach( \Nino\Locales::getAvailableLocales( $appData ) as $locale )
-					\Nino\Filesystem::mutate( $appData, '/text/'. $locale. '.php', function( array $localeData ) use ( $bracketKey ): array {
-						unset( $localeData[$bracketKey] );
-						return $localeData;
-					} );
-			}
-
-			if( $entry['blacklisted'] === true )
-				\Nino\Text::setBlacklisted( $appData, $key, false );
-
-			\Nino\Http::ok( $request );
-		}
-
-		/**
-		 *	Move a key's current value(s) between global.php and every
-		 *	locale file - see apiSave()'s docblock for the exact migration
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		string		$key
-		 *	@param		array 		$entry					This key's current entry (see \Nino\Text::entries())
-		 *	@param		bool			$toGlobal				Target shape
-		 *
-		 *	@return 	void
-		 */
-		private static function _convertShape( array &$appData, string $key, array $entry, bool $toGlobal ): void {
-
-			$bracketKey = '[['. $key. ']]';
-			$locales 		= \Nino\Locales::getAvailableLocales( $appData );
-
-			if( $toGlobal === true ) {
-
-				// A locale missing this key entirely is null (see
-				// \Nino\Text::entries()), not '' - both are excluded here, so
-				// "the first non-empty value" doesn't pick a locale that never
-				// had one
-				$native = \Nino\Locales::getNativeLocale( $appData );
-				$value 	= $entry['values'][$native] ?? ( array_values( array_filter( $entry['values'], fn( $v ) => $v !== null && $v !== '' ) )[0] ?? '' );
-
-				foreach( $locales as $locale )
-					\Nino\Filesystem::mutate( $appData, '/text/'. $locale. '.php', function( array $localeData ) use ( $bracketKey ): array {
-						unset( $localeData[$bracketKey] );
-						return $localeData;
-					} );
-
-				\Nino\Filesystem::mutate( $appData, '/text/global.php', function( array $global ) use ( $bracketKey, $value ): array {
-					$global[$bracketKey] = $value;
-					return $global;
-				} );
-
-			} else {
-
-				$value = $entry['values']['*'] ?? '';
-
-				\Nino\Filesystem::mutate( $appData, '/text/global.php', function( array $global ) use ( $bracketKey ): array {
-					unset( $global[$bracketKey] );
-					return $global;
-				} );
-
-				foreach( $locales as $locale )
-					\Nino\Filesystem::mutate( $appData, '/text/'. $locale. '.php', function( array $localeData ) use ( $bracketKey, $value ): array {
-						$localeData[$bracketKey] = $value;
-						return $localeData;
-					} );
-			}
-		}
-
-		/**
-		 *	A handful of fills the kernel itself injects at request time
-		 *	(Nino::request()'s Html::addFills() call) - never stored in any
-		 *	/text/*.php file, so apiScan() below would otherwise flag them as
-		 *	"missing" forever. Only the innermost, non-nested [[...]] a
-		 *	static regex scan can even see (eg. the [[/nino/http/response/
-		 *	uri]] inside html-header.tpl's [[/webpage[[/nino/http/response/
-		 *	uri]]/title]]) - the outer, dynamically-constructed key itself
-		 *	isn't something a scan of the raw template source can resolve at
-		 *	all, since its final shape depends on which page is rendering
-		 */
-		private const array KERNEL_FILLS = [
-			'/nino/http/request/uri', '/nino/http/response/uri', '/nino/http/response/locale',
-			'/nino/auth/user', '/nino/dir', '/nino/public', '/date/year',
-		];
-
-		/**
-		 *	Scan every public-site template (templates/*.tpl - not _editor's
-		 *	or _admin's own, those are separate text systems entirely) for
-		 *	[[/key]] placeholders that aren't yet defined for any locale -
-		 *	the exact gap this module exists to close: designing a template,
-		 *	inventing a [[/key]] along the way, then forgetting to actually
-		 *	add it anywhere. Doesn't write anything - apiCreate() (already
-		 *	existing) is what turns an accepted result into a real key
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		array 		&$request			(reference) Current server request
-		 *
-		 *	@return 	void
-		 */
-		public static function apiScan( array &$appData, array &$request ): void {
-
-			if( \Nino\Admin\Admin::guard( $appData, $request ) === false )
-				return;
-
-			\Nino\Http::ok( $request, [ 'missing' => self::_scanMissing( $appData ) ] );
-		}
-
-		/**
-		 *	How many [[/key]] placeholders apiScan() above would currently
-		 *	report as missing - shared by Dashboard::apiSummary
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *
-		 *	@return 	int
-		 */
-		public static function missingCount( array &$appData ): int {
-			return count( self::_scanMissing( $appData ) );
-		}
-
-		/**
-		 *	Scan every public-site template for [[/key]] placeholders that
-		 *	aren't yet defined for any locale - the actual work behind
-		 *	apiScan()/missingCount() above
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *
-		 *	@return 	array										[ [ 'key', 'files' ], ... ]
-		 */
-		private static function _scanMissing( array &$appData ): array {
-
-			$known = [];
-			foreach( \Nino\Text::entries( $appData ) as $entry )
-				$known[$entry['key']] = true;
-			foreach( self::KERNEL_FILLS as $key )
-				$known[$key] = true;
-
-			$found = [];
-
-			foreach( glob( \Nino\Filesystem::path( $appData, '/templates' ). '/*.tpl' ) ?: [] as $file ) {
-
-				$content = file_get_contents( $file );
-				if( $content === false || preg_match_all( '/\[\[([^\[\]]+)\]\]/', $content, $matches ) === false )
-					continue;
-
-				foreach( array_unique( $matches[1] ) as $key ) {
-
-					if( isset( $known[$key] ) === true || self::isValidKey( $key ) === false )
-						continue;
-
-					$found[$key] 			= $found[$key] ?? [];
-					$found[$key][] 		= basename( $file );
-				}
-			}
-
-			ksort( $found );
-
-			return array_map( fn( $key, $files ) => [ 'key' => $key, 'files' => $files ], array_keys( $found ), array_values( $found ) );
-		}
-	}
-
-	/**
-	 *	Nino							A compact filesystembased php framework
-	 *	Admin						Batch translation hand-off for the complete native
-	 *										content layer: public textfills and locale-scoped
-	 *										element fields. The JSON deliberately contains no
-	 *										global/technical values, images or element structure.
-	 *										Import is merge-only and validates every posted path
-	 *										against a fresh native export before it writes.
-	 *
-	 *	@package					Dape/Nino
-	 *	@author					David Perchermeier <mail@dape.io>
-	 *	@link						https://github.com/dapeio/nino
-	 */
-	class Translations {
-
-		private const string FORMAT = 'nino.translation';
-		private const int VERSION = 1;
-
-		// Locale-flagged element fields whose value is not translatable text
-		// and therefore never leaves in an export, nor is accepted back from
-		// one. An image field holds a generated filename, an element field a
-		// referenced element's uri: both may legitimately differ per locale,
-		// but neither is something a translator can translate - and both are
-		// picked in the element form, where the choice is shown as what it is
-		// rather than as a string to overwrite
-		private const array UNTRANSLATABLE_TYPES = [ 'image', 'element' ];
-
-		/**
-		 *	This module's action map, merged into Admin::handlePost()
-		 *
-		 *	@return 	array
-		 */
-		public static function actions(): array {
-			return [
-				'translations/info' 		=> [ self::class, 'apiInfo' ],
-				'translations/export' 	=> [ self::class, 'apiExport' ],
-				'translations/import' 	=> [ self::class, 'apiImport' ],
-			];
-		}
-
-		public static function nav(): array {
-			return [ 'translations', 'Translations' ];
-		}
-
-		/**
-		 *	Report the fixed source language, possible targets and package size
-		 */
-		public static function apiInfo( array &$appData, array &$request ): void {
-
-			if( \Nino\Admin\Admin::guard( $appData, $request ) === false )
-				return;
-
-			$translation = self::_translationData( $appData );
-
-			$elementFields = 0;
-			foreach( $translation['elements'] as $elements )
-				foreach( $elements as $fields )
-					$elementFields += count( $fields );
-
-			\Nino\Http::ok( $request, [
-				'nativeLocale' 	=> $translation['sourceLocale'],
-				'locales' 			=> \Nino\Locales::getAvailableLocales( $appData ),
-				'textCount' 		=> count( $translation['text'] ),
-				'elementCount' 	=> $elementFields,
-			] );
-		}
-
-		/**
-		 *	Return the versioned native-language hand-off document
-		 */
-		public static function apiExport( array &$appData, array &$request ): void {
-
-			if( \Nino\Admin\Admin::guard( $appData, $request ) === false )
-				return;
-
-			\Nino\Http::ok( $request, self::_translationData( $appData ) );
-		}
-
-		/**
-		 *	Merge a translated hand-off document into one configured locale.
-		 *	The document's keys are untrusted: only paths which still occur in
-		 *	a freshly generated native package may reach the write APIs.
-		 */
-		public static function apiImport( array &$appData, array &$request ): void {
-
-			if( \Nino\Admin\Admin::guard( $appData, $request ) === false )
-				return;
-
-			$data 			= \Nino\Admin\Admin::postData();
-			$targetLocale = (string) ( $data['targetLocale'] ?? '' );
-			$translation 	= $data['translation'] ?? null;
-
-			if( \Nino\Locales::verifyLocale( $appData, $targetLocale ) === false ) {
-				\Nino\Http::fail( $request, 400, 'invalid target locale' );
-				return;
-			}
-
-			if(
-				is_array( $translation ) === false ||
-				( $translation['format'] ?? null ) !== self::FORMAT ||
-				( $translation['version'] ?? null ) !== self::VERSION ||
-				( $translation['sourceLocale'] ?? null ) !== \Nino\Locales::getNativeLocale( $appData ) ||
-				is_array( $translation['text'] ?? null ) === false ||
-				is_array( $translation['elements'] ?? null ) === false
-			) {
-				\Nino\Http::fail( $request, 400, 'invalid or incompatible translation document' );
-				return;
-			}
-
-			$reference = self::_translationData( $appData );
-
-			$textItems 		= [];
-			$textSkipped 	= 0;
-
-			foreach( $translation['text'] as $key => $value ) {
-				if( is_string( $key ) === false || array_key_exists( $key, $reference['text'] ) === false || is_string( $value ) === false ) {
-					$textSkipped++;
-					continue;
-				}
-				$textItems[] = [ 'key' => $key, 'locale' => $targetLocale, 'value' => $value ];
-			}
-
-			$textImported = 0;
-			foreach( \Nino\Text::saveBatch( $appData, $textItems, false ) as $result ) {
-				if( ( $result['ok'] ?? false ) === true )
-					$textImported++;
-				else
-					$textSkipped++;
-			}
-
-			$elementImported = 0;
-			$elementSkipped 	= 0;
-			$errors 				= [];
-
-			foreach( $translation['elements'] as $type => $submittedElements ) {
-
-				$referenceElements = is_string( $type ) ? ( $reference['elements'][$type] ?? null ) : null;
-				if( is_array( $submittedElements ) === false || is_array( $referenceElements ) === false ) {
-					$elementSkipped += self::_submittedFieldCount( $submittedElements );
-					continue;
-				}
-
-				$typeData = \Nino\Filesystem::getFileContent( $appData, '/elements/'. $type. '.php', [] );
-				$model 		= is_array( $typeData['model'] ?? null ) ? $typeData['model'] : [];
-				$changes 	= [];
-
-				foreach( $submittedElements as $elementUri => $submittedFields ) {
-
-					$elementUri = is_string( $elementUri ) || is_int( $elementUri ) ? (string) $elementUri : '';
-					$referenceFields = $elementUri !== '' ? ( $referenceElements[$elementUri] ?? null ) : null;
-					if( is_array( $submittedFields ) === false || is_array( $referenceFields ) === false ) {
-						$elementSkipped += is_array( $submittedFields ) ? count( $submittedFields ) : 1;
-						continue;
-					}
-
-					foreach( $submittedFields as $key => $value ) {
-						$key = is_string( $key ) || is_int( $key ) ? (string) $key : '';
-						$field = $key !== '' ? ( $model[$key] ?? null ) : null;
-						if(
-							is_array( $field ) === false ||
-							array_key_exists( $key, $referenceFields ) === false ||
-							( $field['locale'] ?? false ) !== true ||
-							in_array( $field['type'] ?? '', self::UNTRANSLATABLE_TYPES, true ) === true
-						) {
-							$elementSkipped++;
-							continue;
-						}
-
-						$value = self::_sanitizeElementValue( $value, $field );
-						if( self::_validElementValue( $value, $field ) === false ) {
-							$elementSkipped++;
-							continue;
-						}
-
-						$changes[$elementUri][$key] = $value;
-					}
-				}
-
-				if( $changes === [] )
-					continue;
-
-				// Old hand-authored type files sometimes only carry a native
-				// bucket. The kernel needs the empty global identity stub to see
-				// that same element from a target locale which has no bucket yet.
-				$missingStubs = array_values( array_filter( array_keys( $changes ), fn( string|int $uri ): bool => isset( $typeData['*'][$uri] ) === false ) );
-
-				if( $missingStubs !== [] ) {
-					$stubWritten = \Nino\Filesystem::mutate( $appData, '/elements/'. $type. '.php', function( array $fresh ) use ( $missingStubs ): array {
-						foreach( $missingStubs as $uri )
-							$fresh['*'][$uri] = $fresh['*'][$uri] ?? [];
-						return $fresh;
-					} );
-
-					if( $stubWritten === false ) {
-						foreach( $changes as $fields )
-							$elementSkipped += count( $fields );
-						$errors[] = $type. ': element identities could not be written';
-						continue;
-					}
-					unset( $appData['./nino/elements/cache'] );
-				}
-
-				foreach( $changes as $elementUri => $fields ) {
-					$result = \Nino\Elements::updateElement( $appData, '/'. $type. '/'. $elementUri, $fields, $targetLocale );
-					if( is_array( $result ) === true )
-						$elementImported += count( $fields );
-					else {
-						$elementSkipped += count( $fields );
-						$errors[] = $type. '/'. $elementUri. ': values were rejected';
-					}
-				}
-			}
-
-			\Nino\Http::ok( $request, [
-				'targetLocale' 	=> $targetLocale,
-				'text' 				=> [ 'imported' => $textImported, 'skipped' => $textSkipped ],
-				'elements' 		=> [ 'imported' => $elementImported, 'skipped' => $elementSkipped ],
-				'errors' 			=> $errors,
-			] );
-		}
-
-		/**
-		 *	Build the deterministic source document from raw native buckets
-		 */
-		private static function _translationData( array &$appData ): array {
-
-			$native = \Nino\Locales::getNativeLocale( $appData );
-			$text 	= [];
-
-			foreach( \Nino\Text::entries( $appData, false ) as $entry )
-				if( $entry['global'] === false && array_key_exists( $native, $entry['values'] ) === true && $entry['values'][$native] !== null )
-					$text[$entry['key']] = $entry['values'][$native];
-
-			$elements = [];
-
-			foreach( glob( \Nino\Filesystem::path( $appData, '/elements' ). '/*.php' ) ?: [] as $file ) {
-
-				$type 		= basename( $file, '.php' );
-				$typeData = \Nino\Filesystem::getFileContent( $appData, '/elements/'. $type. '.php', [] );
-				$model 		= is_array( $typeData['model'] ?? null ) ? $typeData['model'] : [];
-				$nativeData = is_array( $typeData[$native] ?? null ) ? $typeData[$native] : [];
-
-				foreach( $nativeData as $elementUri => $rawFields ) {
-					$elementUri = (string) $elementUri;
-					if( $elementUri === '*' || is_array( $rawFields ) === false )
-						continue;
-
-					foreach( $model as $key => $field )
-						if(
-							is_array( $field ) === true &&
-							( $field['locale'] ?? false ) === true &&
-							in_array( $field['type'] ?? '', self::UNTRANSLATABLE_TYPES, true ) === false &&
-							array_key_exists( $key, $rawFields ) === true
-						)
-							$elements[$type][$elementUri][$key] = $rawFields[$key];
-				}
-			}
-
-			ksort( $text );
-			ksort( $elements );
-			foreach( $elements as &$typeElements ) {
-				ksort( $typeElements );
-				foreach( $typeElements as &$fields )
-					ksort( $fields );
-				unset( $fields );
-			}
-			unset( $typeElements );
-
-			return [
-				'format' 			=> self::FORMAT,
-				'version' 			=> self::VERSION,
-				'sourceLocale' 	=> $native,
-				'instructions' 	=> [
-					'Translate values only. Never change, add, or remove object keys.',
-					'Keep JSON value types unchanged and preserve HTML tags, URLs, [[placeholders]], [shortcodes], and identifiers.',
-				],
-				'text' 				=> $text,
-				'elements' 		=> $elements,
-			];
-		}
-
-		/**
-		 *	Normalize external values before the kernel validates/stores them
-		 */
-		private static function _sanitizeElementValue( mixed $value, array $field ): mixed {
-
-			$type = (string) ( $field['type'] ?? '' );
-
-			if( is_string( $value ) === true )
-				return $type === 'string' && ( $field['html'] ?? false ) === true
-					? \Nino\Html::sanitizeHtml( $value )
-					: strip_tags( $value );
-
-			if( $type === 'array' && is_array( $value ) === true )
-				return array_map( function( mixed $item ): mixed {
-					if( is_string( $item ) === true )
-						return strip_tags( $item );
-					if( is_array( $item ) === true )
-						return self::_sanitizeElementValue( $item, [ 'type' => 'array' ] );
-					return $item;
-				}, $value );
-
-			return $value;
-		}
-
-		/**
-		 *	Reject one malformed field without making the kernel reject all
-		 *	valid sibling fields in that element's partial update.
-		 */
-		private static function _validElementValue( mixed $value, array $field ): bool {
-
-			$type = (string) ( $field['type'] ?? '' );
-			$expected = in_array( $type, [ 'date', 'datetime', 'image', 'element' ], true ) ? 'string' : $type;
-
-			if( $type === 'double' && is_int( $value ) === true ) {
-				// The kernel accepts and coerces whole-number JSON values too.
-			} else if( gettype( $value ) !== $expected )
-				return false;
-
-			if( ( $field['required'] ?? false ) === true ) {
-				if( is_string( $value ) === true && $value === '' )
-					return false;
-				if( is_array( $value ) === true && $value === [] )
-					return false;
-			}
-
-			if( isset( $field['whitelist'] ) === true && in_array( $value, $field['whitelist'] ) === false )
-				return false;
-
-			if( is_array( $field['options'] ?? null ) === true && $field['options'] !== [] && in_array( $value, $field['options'], true ) === false )
-				return false;
-
-			if( isset( $field['blacklist'] ) === true && in_array( $value, $field['blacklist'] ) === true )
-				return false;
-
-			return true;
-		}
-
-		/**
-		 *	Count field-shaped entries in an unknown submitted element branch
-		 */
-		private static function _submittedFieldCount( mixed $elements ): int {
-
-			if( is_array( $elements ) === false )
-				return 1;
-
-			$count = 0;
-			foreach( $elements as $fields )
-				$count += is_array( $fields ) ? count( $fields ) : 1;
-
-			return $count;
-		}
-	}
-
-	/**
-	 *	Nino							A compact filesystembased php framework
-	 *	Dev								"Pages" module: create/edit/delete the site's actual page
-	 *												routes without hand-editing /nino/http/routes as raw json
-	 *												(Config still covers everything this doesn't, see its own
-	 *												docblock). A friendlier continuation of /_install's
-	 *												Webpages step (see _install/Install.php's Webpages class -
-	 *												not depended on here, same standalone-folder reasoning
-	 *												every other class in this file follows) for once _install
-	 *												has been deleted: template selection is restricted to
-	 *												whichever templates/page-*.tpl files already exist on
-	 *												disk - no copying, no library units, just wiring an
-	 *												existing template up to a uri.
-	 *
-	 *												Same Element-URI/Http-URI split Webpages introduced (see
-	 *												_routeKey()'s docblock for why), and the same single
-	 *												source of truth: /nino/http/routes plus the
-	 *												/webpage&lt;uri&gt;/* keys in /text/*.php. There is no
-	 *												second list to keep in sync - pages() derives the whole
-	 *												thing from the routes on every request, so a route
-	 *												written here, in /_install or by hand in config.php is
-	 *												the same page to all three. apiMove() swaps one page
-	 *												route with its neighbor, the same ↑/↓ reordering
-	 *												Webpages' own list does while _install is still around;
-	 *												the route order is also what breaks a tie between two
-	 *												equal menu priorities (see Modules\Navigation).
-	 *
-	 *	@package					Dape/Nino
-	 *	@author						David Perchermeier <mail@dape.io>
-	 *	@link							https://github.com/dapeio/nino
-	 */
-	class PageEditor {
-
-		// Kept in sync with _install's Webpages class. These routes are owned
-		// at runtime by the optional tools themselves and therefore do not show
-		// up in the persisted route array used for the general collision check.
-		private const array RESERVED_HTTP_URIS = [ '/_admin', '/_editor', '/_install', '/_templates', '/_design' ];
-
-		// A fresh entry's text fields when none was posted (or a blank one) -
-		// same generic-by-design reasoning _install/Install.php's
-		// Webpages::DEFAULT_TEXT docblock explains
-		private const array DEFAULT_TEXT = [
-			'name' 				=> 'Page',
-			'title' 			=> 'Page Title',
-			'description' => 'Page description.',
-		];
-
-		/**
-		 *	This module's action map, merged into Admin::handlePost()'s dispatch
-		 *
-		 *	@return 	array
-		 */
-		public static function actions(): array {
-			return [
-				'pages/list' 		=> [ self::class, 'apiList' ],
-				'pages/save' 		=> [ self::class, 'apiSave' ],
-				'pages/delete' 	=> [ self::class, 'apiDelete' ],
-				'pages/move' 		=> [ self::class, 'apiMove' ],
-			];
-		}
-
-		/**
-		 *	Nav entry for this module, rendered into the dashboard's tab bar
-		 *
-		 *	@return 	array										[ uri, label ]
-		 */
-		public static function nav(): array {
-			return [ 'pages', 'Routes' ];
-		}
-
-		/**
-		 *	How many pages are persisted - shared by Dashboard::apiSummary()
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *
-		 *	@return 	int
-		 */
-		public static function count( array &$appData ): int {
-
-			$routes = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes'] ?? [];
-
-			return count( array_filter( $routes, fn( array $r, string $k ): bool => self::isPageRoute( $k, $r ), ARRAY_FILTER_USE_BOTH ) );
-		}
-
-		/**
-		 *	List the page routes, every templates/page-*.tpl file available to
-		 *	pick from, the active locales and the navigations a page can be
-		 *	put into (empty while the Navigation module is inactive, which is
-		 *	what tells the frontend to offer no menu fields at all)
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		array 		&$request			(reference) Current server request
-		 *
-		 *	@return 	void
-		 */
-		public static function apiList( array &$appData, array &$request ): void {
-
-			if( \Nino\Admin\Admin::guard( $appData, $request ) === false )
-				return;
-
-			$config 	= \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
-			$navs 		= self::navKeys( $appData );
-			$locales 	= \Nino\Locales::getAvailableLocales( $appData );
-
-			\Nino\Http::ok( $request, [
-				'pages' 			=> self::pages( $appData, $config['/nino/http/routes'] ?? [], $locales, $navs ),
-				'templates' 	=> self::_templates( $appData ),
-				'locales' 		=> $locales,
-				'navs' 				=> $navs,
-			] );
-		}
-
-		/**
-		 *	Whether one route is a page this module manages.
-		 *
-		 *	A page is a GET route rendering a templates/page-*.tpl file -
-		 *	the same criterion the template picker below already uses, and
-		 *	the one thing that keeps robots.txt/sitemap.xml/llms.txt (GET
-		 *	routes with their own headers and no page template) out of the
-		 *	list. Matched on the body's prefix rather than through
-		 *	_templateFromBody(), which deliberately reports null for a body
-		 *	that resolves its file at runtime - /_install's "legal" unit's
-		 *	[[/nino/http/response/locale]] body is a page like any other
-		 *
-		 *	@param		string		$routeKey			Eg. 'GET://kontakt'
-		 *	@param		array 		$route
-		 *
-		 *	@return 	bool
-		 */
-		public static function isPageRoute( string $routeKey, array $route ): bool {
-
-			return str_starts_with( $routeKey, 'GET://' ) === true
-				&& preg_match( '~^\[template /templates/page-~', trim( (string) ( $route['body'] ?? '' ) ) ) === 1;
-		}
-
-		/**
-		 *	The page list, derived from the routes and the text files rather
-		 *	than from a second, parallel array that could drift against
-		 *	them - /_install's Webpages step builds the very same shape from
-		 *	the very same places (see its own pages()).
-		 *
-		 *	The route key is the Http-URI, the route's own 'uri' data field
-		 *	the Element-URI, 'navs' the menu membership, and the per-locale
-		 *	name/title/description are the /webpage&lt;uri&gt;/* keys both
-		 *	tools write into /text/&lt;locale&gt;.php
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		array 		$routes				The persisted route array
-		 *	@param		array 		$locales			Available locales
-		 *	@param		array 		$navKeys			Registered nav keys (see navKeys())
-		 *
-		 *	@return 	array										One entry per page route, in route order
-		 */
-		public static function pages( array &$appData, array $routes, array $locales, array $navKeys ): array {
-
-			$text = [];
-			foreach( $locales as $locale )
-				$text[$locale] = \Nino\Filesystem::getFileContent( $appData, '/text/'. $locale. '.php', [] );
-
-			$pages = [];
-
-			foreach( $routes as $routeKey => $route ) {
-
-				if( self::isPageRoute( $routeKey, $route ) === false )
-					continue;
-
-				$httpUri 	= substr( $routeKey, strlen( 'GET:/' ) );
-				$uri 			= (string) ( $route['uri'] ?? $httpUri );
-				$body 		= (string) ( $route['body'] ?? '' );
-
-				$entryText = [];
-				foreach( $locales as $locale )
-					$entryText[$locale] = [
-						'name' 				=> (string) ( $text[$locale]['[[/webpage'. $uri. '/name]]'] 				?? '' ),
-						'title' 			=> (string) ( $text[$locale]['[[/webpage'. $uri. '/title]]'] 			?? '' ),
-						'description' => (string) ( $text[$locale]['[[/webpage'. $uri. '/description]]'] ?? '' ),
-					];
-
-				$pages[] = [
-					'uri' 				=> $uri,
-					'httpUri' 		=> $httpUri,
-					'template' 		=> self::_templateFromBody( $body ) ?? '',
-					'navs' 				=> array_values( array_intersect( $navKeys, array_keys( (array) ( $route['navs'] ?? [] ) ) ) ),
-					'statusCode' 	=> (int) ( $route['statusCode'] ?? 200 ),
-					'body' 				=> $body,
-					'text' 				=> $entryText,
-				];
-			}
-
-			return $pages;
-		}
-
-		/**
-		 *	The navigations this project offers, in the order a menu picker
-		 *	should list them: '/nino/html/navs', a plain list of keys.
-		 *
-		 *	Purely an editing affordance - Modules\Navigation renders whatever
-		 *	key a template asks for, registered here or not, so a project that
-		 *	never writes this array loses nothing but the checkboxes. Empty
-		 *	while the Navigation module is inactive, which is what tells the
-		 *	frontend to offer no menu fields at all.
-		 *
-		 *	Own copy of /_install's Webpages::navKeys(), same standalone-per-
-		 *	area reasoning every other helper in this class duplicates
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *
-		 *	@return 	array										Nav keys, eg. [ 'main', 'footer' ]
-		 */
-		public static function navKeys( array &$appData ): array {
-
-			if( in_array( '\\Nino\\Modules\\Navigation', $appData['/nino/modules'] ?? [], true ) === false )
-				return [];
-
-			$navs = $appData['/nino/html/navs'] ?? [];
-
-			return array_values( array_unique( array_map( 'strval', $navs ) ) );
-		}
-
-		/**
-		 *	Which navigations one posted entry asks to be in, narrowed to the
-		 *	navigations this project actually registers.
-		 *
-		 *	@param		array 		$entry				One posted page entry
-		 *	@param		array 		$navs					Registered nav keys (see navKeys())
-		 *
-		 *	@return 	array										Nav keys this entry belongs to
-		 */
-		public static function entryNavs( array $entry, array $navs ): array {
-
-			return array_values( array_intersect( $navs, is_array( $entry['navs'] ?? null ) ? $entry['navs'] : [] ) );
-		}
-
-		/**
-		 *	Every templates/page-*.tpl file on disk, sorted, stripped of its
-		 *	extension - the [template ...] shortcode's own path argument
-		 *	(see \Nino\Modules\Template::doShortcode()), and the whitelist
-		 *	apiSave() checks a posted template against so this can never be
-		 *	pointed at an arbitrary file
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *
-		 *	@return 	array
-		 */
-		private static function _templates( array &$appData ): array {
-
-			$files = glob( \Nino\Filesystem::path( $appData, '/templates' ). '/page-*.tpl' ) ?: [];
-			$names = array_map( fn( string $file ): string => basename( $file, '.tpl' ), $files );
-
-			sort( $names );
-
-			return $names;
-		}
-
-		/**
-		 *	'/foo', '/foo/', 'foo' all normalize to '/foo'; '/' stays '/'.
-		 *	Rejects anything empty, without a leading slash once normalized
-		 *	is impossible anyway, or containing '..'/characters outside a
-		 *	plain path - same rules _install/Install.php's
-		 *	Webpages::_normalizeUri() enforces, duplicated rather than
-		 *	depended on (this folder stays standalone, see class docblock)
-		 *
-		 *	@param		string		$uri
-		 *
-		 *	@return 	string|null							Null if $uri can't be normalized into a safe path
-		 */
-		private static function _normalizeUri( string $uri ): ?string {
-
-			$uri = trim( $uri );
-			if( $uri === '' )
-				return null;
-
-			if( $uri[0] !== '/' )
-				$uri = '/'. $uri;
-			if( $uri !== '/' )
-				$uri = rtrim( $uri, '/' );
-
-			if( str_contains( $uri, '..' ) === true || preg_match( '#^/[a-zA-Z0-9\-_./]*$#', $uri ) !== 1 )
-				return null;
-
-			return $uri;
-		}
-
-		/**
-		 *	@param		string		$value
-		 *	@param		string		$default
-		 *
-		 *	@return 	string
-		 */
-		private static function _orDefault( string $value, string $default ): string {
-			$value = trim( $value );
-			return $value !== '' ? $value : $default;
-		}
-
-		/**
-		 *	The /nino/http/routes array key one page entry occupies - always
-		 *	derived from its httpUri (the real, reachable path), never its
-		 *	uri (a stable identifier used only for the route's own 'uri'
-		 *	data field and this entry's /webpage&lt;uri&gt;/* text meta):
-		 *	\Nino\Http::requestRoute() matches a route by looking up
-		 *	'&lt;METHOD&gt;:/'.$httpUri as a literal array key, not by scanning
-		 *	for a route whose own 'uri' field matches - see
-		 *	_install/Install.php's Webpages::_routeKeys() docblock for the
-		 *	full reasoning (identical here, just GET-only and without that
-		 *	class's multi-route-manifest case, since a page here is always
-		 *	exactly one template)
-		 *
-		 *	@param		string		$httpUri
-		 *
-		 *	@return 	string
-		 */
-		private static function _routeKey( string $httpUri ): string {
-			return 'GET://'. trim( $httpUri, '/' );
-		}
-
-		/**
-		 *	The on-disk template a route body names, when it names exactly
-		 *	one. Bodies /_install's library ships aren't always a plain
-		 *	template reference (its "legal" unit resolves the file per locale
-		 *	via [[/nino/http/response/locale]]); null reports that rather
-		 *	than handing back something shaped like a filename but isn't one,
-		 *	which is what keeps apiSave() from flattening such an entry. Kept
-		 *	as its own copy rather than reaching into _install, same as every
-		 *	other helper in this class - /_install is meant to be deleted
-		 *
-		 *	@param		string		$body					A route's body
-		 *
-		 *	@return 	string|null							Null if $body isn't a plain template reference
-		 */
-		private static function _templateFromBody( string $body ): ?string {
-			return preg_match( '~^\[template /templates/([A-Za-z0-9._-]+)\]$~', trim( $body ), $match ) === 1 ? $match[1] : null;
-		}
-
-		/**
-		 *	Create a brand new page entry, or save an existing one -
-		 *	identified by $data['originalHttpUri'] (empty for a new entry),
-		 *	since httpUri is this list's real, unique identity. Both uris
-		 *	are independently validated and deduped against every *other*
-		 *	entry (the one being edited, found via originalHttpUri, is
-		 *	excluded from its own dedupe check, so re-saving an entry
-		 *	unchanged - or renaming only one of its two uris - never
-		 *	falsely collides with itself); template is checked against
-		 *	_templates()'s whitelist.
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		array 		&$request			(reference) Current server request
-		 *
-		 *	@return 	void
-		 */
-		public static function apiSave( array &$appData, array &$request ): void {
-
-			if( \Nino\Admin\Admin::guard( $appData, $request ) === false )
-				return;
-
-			$data 						= \Nino\Admin\Admin::postData();
-			$originalHttpUri 	= (string) ( $data['originalHttpUri'] ?? '' );
-
-			$uri 			= self::_normalizeUri( (string) ( $data['uri'] ?? '' ) );
-			$httpUri 	= self::_normalizeUri( (string) ( $data['httpUri'] ?? '' ) );
-			$template = (string) ( $data['template'] ?? '' );
-
-			if( $uri === null ) {
-				\Nino\Http::fail( $request, 400, 'invalid uri: "'. ( (string) ( $data['uri'] ?? '' ) ). '"' );
-				return;
-			}
-
-			if( $httpUri === null ) {
-				\Nino\Http::fail( $request, 400, 'invalid http uri: "'. ( (string) ( $data['httpUri'] ?? '' ) ). '"' );
-				return;
-			}
-
-			if( in_array( $httpUri, self::RESERVED_HTTP_URIS, true ) === true ) {
-				\Nino\Http::fail( $request, 409, 'reserved http uri: "'. $httpUri. '"' );
-				return;
-			}
-
-
-			$statusCode = (int) ( $data['statusCode'] ?? 200 );
-			if( $statusCode < 100 || $statusCode > 599 )
-				$statusCode = 200;
-
-			$locales = \Nino\Locales::getAvailableLocales( $appData );
-
-			$text = [];
-			foreach( $locales as $locale ) {
-				$row = (array) ( $data['text'][$locale] ?? [] );
-				$text[$locale] = [
-					'name' 				=> self::_orDefault( $row['name'] 				?? '', self::DEFAULT_TEXT['name'] ),
-					'title' 			=> self::_orDefault( $row['title'] 			?? '', self::DEFAULT_TEXT['title'] ),
-					'description' => self::_orDefault( $row['description'] ?? '', self::DEFAULT_TEXT['description'] ),
-				];
-			}
-
-			$config = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
-			$routes = $config['/nino/http/routes'] ?? [];
-			$navKeys = self::navKeys( $appData );
-			$pages 	= self::pages( $appData, $routes, $locales, $navKeys );
-
-			$selfIndex = null;
-
-			foreach( $pages as $index => $existing ) {
-
-				if( $originalHttpUri !== '' && ( $existing['httpUri'] ?? null ) === $originalHttpUri ) {
-					$selfIndex = $index;
-					continue;
-				}
-
-				if( ( $existing['uri'] ?? null ) === $uri ) {
-					\Nino\Http::fail( $request, 400, 'duplicate uri: "'. $uri. '"' );
-					return;
-				}
-
-				if( ( $existing['httpUri'] ?? null ) === $httpUri ) {
-					\Nino\Http::fail( $request, 400, 'duplicate http uri: "'. $httpUri. '"' );
-					return;
-				}
-			}
-
-			$routeKey 			= self::_routeKey( $httpUri );
-			$previousRouteKey = $selfIndex !== null ? self::_routeKey( (string) $pages[$selfIndex]['httpUri'] ) : null;
-
-			// Every route counts here, not just the page ones: a page may
-			// never take a uri robots.txt, a module or a developer already
-			// answers on
-			if( isset( $routes[$routeKey] ) === true && $routeKey !== $previousRouteKey ) {
-				\Nino\Http::fail( $request, 409, 'http uri already belongs to another route: "'. $httpUri. '"' );
-				return;
-			}
-
-			$previous = $selfIndex !== null ? $pages[$selfIndex] : [];
-
-			$body = '[template /templates/'. $template. ']';
-
-			// A route body /_install's library shipped can be more than a
-			// plain template reference - its "legal" unit picks the template
-			// file per locale via [[/nino/http/response/locale]] - and the
-			// template <select> has no way to spell that. Keep the body such
-			// an entry already carries instead of flattening it into
-			// whichever single option happened to be preselected
-			if( isset( $previous['body'] ) === true && self::_templateFromBody( (string) $previous['body'] ) === null ) {
-				$body 		= (string) $previous['body'];
-				// ...and with it the template field, which for such an entry
-				// names nothing: the disabled <select> still posts whichever
-				// option the browser preselected, and storing that would
-				// leave the list claiming a template this page never uses
-				$template = (string) ( $previous['template'] ?? '' );
-			}
-
-			// Checked here rather than up front: an entry whose body the
-			// <select> can't spell keeps the template field it already had
-			// (empty, for /_install's locale-resolving "legal" unit), and
-			// posts an empty value from its own disabled option - neither of
-			// which names a real file, and neither of which is an error
-			if( $body === '[template /templates/'. $template. ']' && in_array( $template, self::_templates( $appData ), true ) === false ) {
-				\Nino\Http::fail( $request, 400, 'unknown template: "'. $template. '"' );
-				return;
-			}
-
-			// Menu membership lives on the route and nowhere else - that is
-			// what Modules\Navigation::routeLines() reads, and the only copy
-			// that renders
-			$navs = self::entryNavs( $data, $navKeys );
-
-			$routeData = [ 'uri' => $uri, 'body' => $body ];
-			if( $statusCode !== 200 )
-				$routeData['statusCode'] = $statusCode;
-
-			// A priority someone tuned on this route is not this save's to
-			// reset - only the set of keys is rewritten (see the shortcode's
-			// own routeLines() for what the value means). A membership this
-			// save adds starts behind everything already in that menu
-			$prios = $routes[$previousRouteKey ?? $routeKey]['navs'] ?? [];
-			foreach( $navs as $navKey )
-				$routeData['navs'][$navKey] = (int) ( $prios[$navKey] ?? self::_nextPrio( $routes, $navKey ) );
-
-			$routes = self::_putRoute( $routes, $previousRouteKey, $routeKey, $routeData );
-
-			$appData['/nino/http/routes'] = $routes;
-
-			\Nino\AppData::writeContentData( $appData, [ '/nino/http/routes' ] );
-
-			foreach( $locales as $locale )
-				self::_mergeText( $appData, '/text/'. $locale. '.php', [
-					'[[/webpage'. $uri. '/name]]' 				=> $text[$locale]['name'],
-					'[[/webpage'. $uri. '/title]]' 			=> $text[$locale]['title'],
-					'[[/webpage'. $uri. '/description]]' => $text[$locale]['description'],
-				] );
-
-			// The page's reachable path as a fill, so a template can link to
-			// it by name - [[/webpage/site-home/uri]] - rather than repeating
-			// a path this form can change. Global, because an entry has one
-			// Http-URI for every locale, and blacklisted like every other
-			// technical value: /_editor's Text panel edits wording, not routes
-			self::_mergeText( $appData, '/text/global.php', [ '[[/webpage'. $uri. '/uri]]' => $httpUri ] );
-			\Nino\Text::setBlacklisted( $appData, '/webpage'. $uri. '/uri', true );
-
-			\Nino\Http::ok( $request, [ 'pages' => self::pages( $appData, $routes, $locales, $navKeys ) ] );
-		}
-
-		/**
-		 *	Where a membership this save newly adds goes: behind everything
-		 *	already in that menu. Read across every route rather than just the
-		 *	page ones, so a hand-written route in the same menu is counted too
-		 *
-		 *	@param		array 		$routes				The persisted route array
-		 *	@param		string		$navKey				Eg. 'main'
-		 *
-		 *	@return 	int
-		 */
-		private static function _nextPrio( array $routes, string $navKey ): int {
-
-			$last = 0;
-			foreach( $routes as $route )
-				$last = max( $last, (int) ( $route['navs'][$navKey] ?? 0 ) );
-
-			return $last + 1;
-		}
-
-		/**
-		 *	Write one route, keeping the slot it already occupies even when
-		 *	its key changes: the route array's own order is what breaks a tie
-		 *	between two equal menu priorities (see
-		 *	Modules\Navigation::routeLines()) and what the list in the browser
-		 *	is sorted by, so renaming a page's http uri must not quietly move
-		 *	it to the bottom of both
-		 *
-		 *	@param		array 		$routes				The persisted route array
-		 *	@param		string|null	$previousKey	The key this route currently occupies, null for a new one
-		 *	@param		string		$routeKey			The key it should occupy afterwards
-		 *	@param		array 		$routeData
-		 *
-		 *	@return 	array
-		 */
-		private static function _putRoute( array $routes, ?string $previousKey, string $routeKey, array $routeData ): array {
-
-			if( $previousKey === null || isset( $routes[$previousKey] ) === false ) {
-				$routes[$routeKey] = $routeData;
-				return $routes;
-			}
-
-			$out = [];
-
-			foreach( $routes as $key => $route )
-				if( $key === $previousKey )
-					$out[$routeKey] = $routeData;
-				else
-					$out[$key] = $route;
-
-			return $out;
-		}
-
-		/**
-		 *	Remove one page route. Its /webpage&lt;uri&gt;/* text meta is
-		 *	deliberately left in place - same additive-only philosophy every
-		 *	other apply/save in this codebase follows, deleting a file/key a
-		 *	developer may have since hand-edited is a much riskier "undo" than
-		 *	dropping one route
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		array 		&$request			(reference) Current server request
-		 *
-		 *	@return 	void
-		 */
-		public static function apiDelete( array &$appData, array &$request ): void {
-
-			if( \Nino\Admin\Admin::guard( $appData, $request ) === false )
-				return;
-
-			$httpUri 	= (string) ( \Nino\Admin\Admin::postData()['httpUri'] ?? '' );
-			$routes 	= \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes'] ?? [];
-			$routeKey = self::_routeKey( $httpUri );
-
-			// Only ever a page route: this module lists nothing else, so
-			// anything else under that key is a module's or a developer's and
-			// not this button's to delete
-			if( isset( $routes[$routeKey] ) === false || self::isPageRoute( $routeKey, $routes[$routeKey] ) === false ) {
-				\Nino\Http::fail( $request, 404, 'unknown page' );
-				return;
-			}
-
-			unset( $routes[$routeKey] );
-
-			$appData['/nino/http/routes'] = $routes;
-
-			\Nino\AppData::writeContentData( $appData, [ '/nino/http/routes' ] );
-
-			\Nino\Http::ok( $request, [ 'pages' => self::pages( $appData, $routes, \Nino\Locales::getAvailableLocales( $appData ), self::navKeys( $appData ) ) ] );
-		}
-
-		/**
-		 *	Swap one page route with its immediate neighbor - the order this
-		 *	list stands in, and the tie-breaker between two equal menu
-		 *	priorities (see Modules\Navigation::routeLines()). A swap rather
-		 *	than an arbitrary posted index: the list itself never leaves the
-		 *	browser, only which of two neighbors should trade places - nothing
-		 *	to validate beyond "is this still a valid direction from here"
-		 *
-		 *	Only page routes take part. Everything else in the array - a
-		 *	module's route, a hand-written one - keeps the exact slot it
-		 *	stands in, so reordering pages can never reshuffle a route this
-		 *	module does not own
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		array 		&$request			(reference) Current server request
-		 *
-		 *	@return 	void
-		 */
-		public static function apiMove( array &$appData, array &$request ): void {
-
-			if( \Nino\Admin\Admin::guard( $appData, $request ) === false )
-				return;
-
-			$data 			= \Nino\Admin\Admin::postData();
-			$httpUri 		= (string) ( $data['httpUri'] ?? '' );
-			$direction 	= (string) ( $data['direction'] ?? '' );
-
-			if( in_array( $direction, [ 'up', 'down' ], true ) === false ) {
-				\Nino\Http::fail( $request, 400, 'direction must be "up" or "down"' );
-				return;
-			}
-
-			$routes 	= \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes'] ?? [];
-			$pageKeys = array_keys( array_filter( $routes, fn( array $r, string $k ): bool => self::isPageRoute( $k, $r ), ARRAY_FILTER_USE_BOTH ) );
-
-			$index = array_search( self::_routeKey( $httpUri ), $pageKeys, true );
-
-			if( $index === false ) {
-				\Nino\Http::fail( $request, 404, 'unknown page' );
-				return;
-			}
-
-			$swapWith = $direction === 'up' ? $index - 1 : $index + 1;
-
-			if( $swapWith < 0 || $swapWith >= count( $pageKeys ) ) {
-				\Nino\Http::fail( $request, 400, 'already at the '. ( $direction === 'up' ? 'top' : 'bottom' ) );
-				return;
-			}
-
-			[ $pageKeys[$index], $pageKeys[$swapWith] ] = [ $pageKeys[$swapWith], $pageKeys[$index] ];
-
-			// Refill the slots the page routes occupy, in the swapped order -
-			// every other route stays exactly where it was
-			$ordered 	= [];
-			$next 		= 0;
-
-			foreach( $routes as $routeKey => $route )
-				if( self::isPageRoute( $routeKey, $route ) === true ) {
-					$ordered[ $pageKeys[$next] ] = $routes[ $pageKeys[$next] ];
-					$next++;
-				} else {
-					$ordered[$routeKey] = $route;
-				}
-
-			$appData['/nino/http/routes'] = $ordered;
-
-			\Nino\AppData::writeContentData( $appData, [ '/nino/http/routes' ] );
-
-			\Nino\Http::ok( $request, [ 'pages' => self::pages( $appData, $ordered, \Nino\Locales::getAvailableLocales( $appData ), self::navKeys( $appData ) ) ] );
-		}
-
-		/**
-		 *	Merge a text fragment's keys into a /text/*.php file - later
-		 *	keys win a key collision
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		string		$path					Filesystem-relative path, eg. '/text/de_DE.php'
-		 *	@param		array 		$fragment			Bracket-key => value pairs to merge in
-		 *
-		 *	@return 	void
-		 */
-		private static function _mergeText( array &$appData, string $path, array $fragment ): void {
-			\Nino\Filesystem::mutate( $appData, $path, function( array $content ) use ( $fragment ): array {
-				return array_merge( $content, $fragment );
-			} );
-		}
-
-		/**
-		 *	Set (overwrite) a single text key - unlike _mergeText(), used
-		 *	only for fully-derived content that has to track its source on
-		 *	every save rather than merge on top of a possibly-stale
-		 *	previous value
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		string		$path					Filesystem-relative path, eg. '/text/de_DE.php'
-		 *	@param		string		$bracketKey		Eg. '[[/website/legal/name]]'
-		 *	@param		string		$value
-		 *
-		 *	@return 	void
-		 */
-		private static function _setText( array &$appData, string $path, string $bracketKey, string $value ): void {
-			\Nino\Filesystem::mutate( $appData, $path, function( array $content ) use ( $bracketKey, $value ): array {
-				$content[$bracketKey] = $value;
-				return $content;
-			} );
-		}
-	}
-
-	/**
-	 *	Nino							A compact filesystembased php framework
-	 *	Dev								"Navigations" module: which menus this project has, and
-	 *												which routes stand in each of them, in which order.
-	 *
-	 *												The other half of what the Routes module edits. Over
-	 *												there a page ticks the menus it belongs to, one page at
-	 *												a time; here one menu is opened and its whole running
-	 *												order set - which is the only view in which "third entry
-	 *												in the footer" is a thing you can see, let alone move.
-	 *
-	 *												Two config keys, and no third copy of anything:
-	 *												'/nino/html/navs' is the plain list of menu keys both
-	 *												page editors offer a checkbox for, and each route's own
-	 *												'navs' =&gt; [ &lt;key&gt; =&gt; &lt;prio&gt; ] is the membership that
-	 *												actually renders (see \Nino\Modules\Navigation).
-	 *												Priorities are kept dense, 1..n per menu, so a position
-	 *												in this list reads as the position in the menu rather
-	 *												than as an arbitrary number someone has to space out by
-	 *												hand. A hand-written route joins a menu exactly the same
-	 *												way and shows up here like any other.
-	 *
-	 *												No locale picker, deliberately: a menu has nothing
-	 *												per-locale about it. The wording it renders is each
-	 *												page's own /webpage&lt;uri&gt;/name key, edited in Routes (or
-	 *												in Text), and the same running order serves every
-	 *												language.
-	 *
-	 *	@package					Dape/Nino
-	 *	@author						David Perchermeier <mail@dape.io>
-	 *	@link							https://github.com/dapeio/nino
-	 */
-	class Navigations {
-
-		/**
-		 *	This module's action map, merged into Admin::handlePost()'s dispatch
-		 *
-		 *	@return 	array
-		 */
-		public static function actions(): array {
-			return [
-				'navs/list' 			=> [ self::class, 'apiList' ],
-				'navs/save' 			=> [ self::class, 'apiSave' ],
-				'navs/delete' 		=> [ self::class, 'apiDelete' ],
-				'navs/assign' 		=> [ self::class, 'apiAssign' ],
-				'navs/unassign' 	=> [ self::class, 'apiUnassign' ],
-				'navs/move' 			=> [ self::class, 'apiMove' ],
-			];
-		}
-
-		/**
-		 *	Nav entry for this module, rendered into the dashboard's tab bar
-		 *
-		 *	@return 	array										[ uri, label ]
-		 */
-		public static function nav(): array {
-			return [ 'navs', 'Navigations' ];
-		}
-
-		/**
-		 *	A menu key ends up as a config array key and inside a template's
-		 *	[navigation nav="main"] argument, so it stays a plain lowercase
-		 *	slug - the same shape every other key this tool creates has
-		 *
-		 *	@param		string		$key
-		 *
-		 *	@return 	bool
-		 */
-		private static function isValidKey( string $key ): bool {
-			return preg_match( '#^[a-z][a-z0-9_-]*$#', $key ) === 1;
-		}
-
-		/**
-		 *	Every menu, each with the routes standing in it in their running
-		 *	order, plus every route that could be added to one.
-		 *
-		 *	Also the whole response of every other action here: each of them
-		 *	changes what this returns, and the frontend simply re-renders from
-		 *	it rather than patching its own copy
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		array 		&$request			(reference) Current server request
-		 *
-		 *	@return 	void
-		 */
-		public static function apiList( array &$appData, array &$request ): void {
-
-			if( \Nino\Admin\Admin::guard( $appData, $request ) === false )
-				return;
-
-			\Nino\Http::ok( $request, self::_payload( $appData ) );
-		}
-
-		/**
-		 *	Create a menu, or rename one - identified by $data['originalKey']
-		 *	(empty for a new one). A rename follows the key everywhere it is
-		 *	used as a key: the registry, keeping its place in it, and every
-		 *	route that is a member, keeping its priority. Templates are
-		 *	deliberately not rewritten - a [navigation nav="..."] argument is
-		 *	content, and silently editing template files out from under a
-		 *	developer is not this dialog's business (the renamed menu simply
-		 *	renders nowhere until the template is updated too)
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		array 		&$request			(reference) Current server request
-		 *
-		 *	@return 	void
-		 */
-		public static function apiSave( array &$appData, array &$request ): void {
-
-			if( \Nino\Admin\Admin::guard( $appData, $request ) === false )
-				return;
-
-			$data 				= \Nino\Admin\Admin::postData();
-			$key 					= trim( (string) ( $data['key'] ?? '' ) );
-			$originalKey 	= trim( (string) ( $data['originalKey'] ?? '' ) );
-
-			if( self::isValidKey( $key ) === false ) {
-				\Nino\Http::fail( $request, 400, 'invalid navigation id: "'. $key. '"' );
-				return;
-			}
-
-			$registry = self::registry( $appData );
-			$routes 	= \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes'] ?? [];
-
-			// Free means free everywhere, not just in the registry: a route
-			// carrying an unregistered menu key by hand would otherwise have
-			// its two memberships silently collapsed into one by the rename
-			// below - and a "new" menu would start out with members nobody
-			// put in it
-			if( $key !== $originalKey && self::_isTaken( $key, $registry, $routes ) === true ) {
-				\Nino\Http::fail( $request, 409, 'navigation id already taken: "'. $key. '"' );
-				return;
-			}
-
-			if( $originalKey === '' ) {
-
-				$registry[] = $key;
-
-				$appData['/nino/html/navs'] = $registry;
-
-				\Nino\AppData::writeContentData( $appData, [ '/nino/html/navs' ] );
-
-				\Nino\Http::ok( $request, self::_payload( $appData ) );
-				return;
-			}
-
-			$index = array_search( $originalKey, $registry, true );
-
-			if( $index === false ) {
-				\Nino\Http::fail( $request, 404, 'unknown navigation' );
-				return;
-			}
-
-			$registry[$index] = $key;
-
-			foreach( $routes as $routeKey => $route ) {
-
-				if( isset( $route['navs'][$originalKey] ) === false )
-					continue;
-
-				// Rebuilt rather than added-and-unset, so the renamed key keeps
-				// the place it had among this route's other memberships
-				$renamed = [];
-				foreach( $route['navs'] as $navKey => $prio )
-					$renamed[ $navKey === $originalKey ? $key : $navKey ] = $prio;
-
-				$routes[$routeKey]['navs'] = $renamed;
-			}
-
-			$appData['/nino/html/navs'] 	= $registry;
-			$appData['/nino/http/routes'] = $routes;
-
-			\Nino\AppData::writeContentData( $appData, [ '/nino/html/navs', '/nino/http/routes' ] );
-
-			\Nino\Http::ok( $request, self::_payload( $appData ) );
-		}
-
-		/**
-		 *	Remove a menu: out of the registry, and off every route that was
-		 *	a member. Templates asking for it by name are left alone, same
-		 *	reasoning as apiSave()'s rename - the menu they name simply
-		 *	renders empty afterwards
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		array 		&$request			(reference) Current server request
-		 *
-		 *	@return 	void
-		 */
-		public static function apiDelete( array &$appData, array &$request ): void {
-
-			if( \Nino\Admin\Admin::guard( $appData, $request ) === false )
-				return;
-
-			$key 			= (string) ( \Nino\Admin\Admin::postData()['key'] ?? '' );
-			$registry = self::registry( $appData );
-			$index 		= array_search( $key, $registry, true );
-
-			if( $index === false ) {
-				\Nino\Http::fail( $request, 404, 'unknown navigation' );
-				return;
-			}
-
-			unset( $registry[$index] );
-
-			$routes = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes'] ?? [];
-
-			foreach( $routes as $routeKey => $route ) {
-
-				if( isset( $route['navs'][$key] ) === false )
-					continue;
-
-				unset( $routes[$routeKey]['navs'][$key] );
-
-				// A route in no menu at all carries no 'navs' rather than an
-				// empty one - the same shape /_install writes (see its
-				// _applyWebpage()), so a config.php stays readable by hand
-				if( count( $routes[$routeKey]['navs'] ) === 0 )
-					unset( $routes[$routeKey]['navs'] );
-			}
-
-			$appData['/nino/html/navs'] 	= array_values( $registry );
-			$appData['/nino/http/routes'] = $routes;
-
-			\Nino\AppData::writeContentData( $appData, [ '/nino/html/navs', '/nino/http/routes' ] );
-
-			\Nino\Http::ok( $request, self::_payload( $appData ) );
-		}
-
-		/**
-		 *	Put one route into a menu, at the end of it - a menu is a running
-		 *	order, and "somewhere in the middle" is not something an add
-		 *	button can guess. Moving it up from there is one click per step
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		array 		&$request			(reference) Current server request
-		 *
-		 *	@return 	void
-		 */
-		public static function apiAssign( array &$appData, array &$request ): void {
-
-			if( \Nino\Admin\Admin::guard( $appData, $request ) === false )
-				return;
-
-			$data 		= \Nino\Admin\Admin::postData();
-			$key 			= (string) ( $data['key'] ?? '' );
-			$routeKey = self::_routeKey( (string) ( $data['httpUri'] ?? '' ) );
-
-			$routes = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes'] ?? [];
-
-			if( in_array( $key, self::registry( $appData ), true ) === false ) {
-				\Nino\Http::fail( $request, 404, 'unknown navigation' );
-				return;
-			}
-
-			if( isset( $routes[$routeKey] ) === false ) {
-				\Nino\Http::fail( $request, 404, 'unknown route' );
-				return;
-			}
-
-			if( isset( $routes[$routeKey]['navs'][$key] ) === true ) {
-				\Nino\Http::fail( $request, 409, 'route is already in this navigation' );
-				return;
-			}
-
-			$order 	 = self::_members( $routes, $key );
-			$order[] = $routeKey;
-
-			$appData['/nino/http/routes'] = self::_applyOrder( $routes, $key, $order );
-
-			\Nino\AppData::writeContentData( $appData, [ '/nino/http/routes' ] );
-
-			\Nino\Http::ok( $request, self::_payload( $appData ) );
-		}
-
-		/**
-		 *	Take one route back out of a menu. Only its membership goes - the
-		 *	route itself, and everything else about it, is the Routes module's
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		array 		&$request			(reference) Current server request
-		 *
-		 *	@return 	void
-		 */
-		public static function apiUnassign( array &$appData, array &$request ): void {
-
-			if( \Nino\Admin\Admin::guard( $appData, $request ) === false )
-				return;
-
-			$data 		= \Nino\Admin\Admin::postData();
-			$key 			= (string) ( $data['key'] ?? '' );
-			$routeKey = self::_routeKey( (string) ( $data['httpUri'] ?? '' ) );
-
-			$routes = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes'] ?? [];
-
-			if( isset( $routes[$routeKey]['navs'][$key] ) === false ) {
-				\Nino\Http::fail( $request, 404, 'route is not in this navigation' );
-				return;
-			}
-
-			unset( $routes[$routeKey]['navs'][$key] );
-
-			if( count( $routes[$routeKey]['navs'] ) === 0 )
-				unset( $routes[$routeKey]['navs'] );
-
-			// The gap the removed entry left is closed right away, so the
-			// numbers in config.php keep reading as positions
-			$appData['/nino/http/routes'] = self::_applyOrder( $routes, $key, self::_members( $routes, $key ) );
-
-			\Nino\AppData::writeContentData( $appData, [ '/nino/http/routes' ] );
-
-			\Nino\Http::ok( $request, self::_payload( $appData ) );
-		}
-
-		/**
-		 *	Swap one entry with its neighbor inside one menu - the same ↑/↓
-		 *	reordering the Routes module's own list has, except that this one
-		 *	really is the menu's order rather than the route array's
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		array 		&$request			(reference) Current server request
-		 *
-		 *	@return 	void
-		 */
-		public static function apiMove( array &$appData, array &$request ): void {
-
-			if( \Nino\Admin\Admin::guard( $appData, $request ) === false )
-				return;
-
-			$data 			= \Nino\Admin\Admin::postData();
-			$key 				= (string) ( $data['key'] ?? '' );
-			$routeKey 	= self::_routeKey( (string) ( $data['httpUri'] ?? '' ) );
-			$direction 	= (string) ( $data['direction'] ?? '' );
-
-			if( in_array( $direction, [ 'up', 'down' ], true ) === false ) {
-				\Nino\Http::fail( $request, 400, 'direction must be "up" or "down"' );
-				return;
-			}
-
-			$routes = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes'] ?? [];
-			$order 	= self::_members( $routes, $key );
-			$index 	= array_search( $routeKey, $order, true );
-
-			if( $index === false ) {
-				\Nino\Http::fail( $request, 404, 'route is not in this navigation' );
-				return;
-			}
-
-			$swapWith = $direction === 'up' ? $index - 1 : $index + 1;
-
-			if( $swapWith < 0 || $swapWith >= count( $order ) ) {
-				\Nino\Http::fail( $request, 400, 'already at the '. ( $direction === 'up' ? 'top' : 'bottom' ) );
-				return;
-			}
-
-			[ $order[$index], $order[$swapWith] ] = [ $order[$swapWith], $order[$index] ];
-
-			$appData['/nino/http/routes'] = self::_applyOrder( $routes, $key, $order );
-
-			\Nino\AppData::writeContentData( $appData, [ '/nino/http/routes' ] );
-
-			\Nino\Http::ok( $request, self::_payload( $appData ) );
-		}
-
-		/**
-		 *	The menu keys this project registered, in the order a picker
-		 *	should list them.
-		 *
-		 *	Unlike PageEditor::navKeys() this is not gated on the Navigation
-		 *	module being active: the registry is editable either way, and the
-		 *	frontend is told separately (see _payload()'s 'active') so it can
-		 *	say so rather than show an empty dialog for no visible reason
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *
-		 *	@return 	array										Nav keys, eg. [ 'main', 'footer' ]
-		 */
-		public static function registry( array &$appData ): array {
-
-			$navs = $appData['/nino/html/navs'] ?? [];
-
-			return array_values( array_unique( array_map( 'strval', $navs ) ) );
-		}
-
-		/**
-		 *	Whether a menu key is already in use - registered, or carried by
-		 *	a route that was wired up by hand without registering it
-		 *
-		 *	@param		string		$key
-		 *	@param		array 		$registry			See registry()
-		 *	@param		array 		$routes				The persisted route array
-		 *
-		 *	@return 	bool
-		 */
-		private static function _isTaken( string $key, array $registry, array $routes ): bool {
-
-			if( in_array( $key, $registry, true ) === true )
-				return true;
-
-			foreach( $routes as $route )
-				if( isset( $route['navs'][$key] ) === true )
-					return true;
-
-			return false;
-		}
-
-		/**
-		 *	The route keys standing in one menu, in their running order -
-		 *	priority first, the route array's own order breaking a tie, which
-		 *	is exactly the order \Nino\Modules\Navigation::routeLines() renders
-		 *
-		 *	@param		array 		$routes				The persisted route array
-		 *	@param		string		$navKey
-		 *
-		 *	@return 	array										Route keys, eg. [ 'GET://', 'GET://contact' ]
-		 */
-		private static function _members( array $routes, string $navKey ): array {
-
-			$members = [];
-			foreach( $routes as $routeKey => $route )
-				if( str_starts_with( $routeKey, 'GET://' ) === true && isset( $route['navs'][$navKey] ) === true )
-					$members[$routeKey] = (int) $route['navs'][$navKey];
-
-			// asort() is stable as of php 8, so equal priorities keep the
-			// order the routes stand in rather than an arbitrary one
-			asort( $members );
-
-			return array_keys( $members );
-		}
-
-		/**
-		 *	Write one menu's running order back onto its routes as dense
-		 *	priorities, 1..n. Renumbering on every change is what keeps the
-		 *	numbers in config.php readable as positions - and what makes
-		 *	"move up" a swap of two adjacent numbers rather than arithmetic
-		 *	on whatever gaps a previous edit happened to leave
-		 *
-		 *	@param		array 		$routes				The persisted route array
-		 *	@param		string		$navKey
-		 *	@param		array 		$order				Route keys, in the intended order
-		 *
-		 *	@return 	array
-		 */
-		private static function _applyOrder( array $routes, string $navKey, array $order ): array {
-
-			$prio = 1;
-			foreach( $order as $routeKey )
-				if( isset( $routes[$routeKey] ) === true )
-					$routes[$routeKey]['navs'][$navKey] = $prio++;
-
-			return $routes;
-		}
-
-		/**
-		 *	Mirrors PageEditor::_routeKey() - a page's route key is derived
-		 *	from its Http-URI, never its Element-URI (see that method's own
-		 *	docblock for the full reasoning)
-		 *
-		 *	@param		string		$httpUri
-		 *
-		 *	@return 	string
-		 */
-		private static function _routeKey( string $httpUri ): string {
-			return 'GET://'. trim( $httpUri, '/' );
-		}
-
-		/**
-		 *	Everything the dialog draws itself from: the menus with their
-		 *	members in order, every route that could join one, and whether
-		 *	the Navigation module that renders any of this is even active
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *
-		 *	@return 	array
-		 */
-		private static function _payload( array &$appData ): array {
-
-			$routes = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes'] ?? [];
-			$labels = self::_labels( $appData, $routes );
-
-			$navs = [];
-			foreach( self::registry( $appData ) as $key ) {
-
-				$entries = [];
-				foreach( self::_members( $routes, $key ) as $routeKey )
-					$entries[] = $labels[$routeKey];
-
-				$navs[] = [ 'key' => $key, 'entries' => $entries ];
-			}
-
-			return [
-				'navs' 		=> $navs,
-				'routes' 	=> array_values( $labels ),
-				'active' 	=> in_array( '\\Nino\\Modules\\Navigation', $appData['/nino/modules'] ?? [], true ),
-			];
-		}
-
-		/**
-		 *	Every route a menu could contain, labelled the way the menu would
-		 *	label it.
-		 *
-		 *	Every GET route qualifies, not just the page ones the Routes
-		 *	module manages - a menu entry is only ever "a path with a name",
-		 *	and a route a module or a developer owns is as good a target as
-		 *	any. 'named' reports whether the /webpage&lt;uri&gt;/name key the menu
-		 *	renders from exists at all: a route without one is skipped by
-		 *	\Nino\Modules\Navigation::routeLines(), so offering it silently
-		 *	would be offering an entry that never shows up
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		array 		$routes				The persisted route array
-		 *
-		 *	@return 	array										Route key => { httpUri, uri, label, named }
-		 */
-		private static function _labels( array &$appData, array $routes ): array {
-
-			$text 	= \Nino\Filesystem::getFileContent( $appData, '/text/'. \Nino\Locales::getNativeLocale( $appData ). '.php', [] );
-			$labels = [];
-
-			foreach( $routes as $routeKey => $route ) {
-
-				if( str_starts_with( $routeKey, 'GET://' ) === false )
-					continue;
-
-				$httpUri 	= substr( $routeKey, strlen( 'GET:/' ) );
-				$uri 			= (string) ( $route['uri'] ?? $httpUri );
-				$name 		= (string) ( $text['[[/webpage'. $uri. '/name]]'] ?? '' );
-
-				$labels[$routeKey] = [
-					'httpUri' => $httpUri,
-					'uri' 		=> $uri,
-					'label' 	=> $name !== '' ? $name : $httpUri,
-					'named' 	=> $name !== '',
-				];
-			}
-
-			return $labels;
-		}
-	}
-
-	/**
-	 *	Nino							A compact filesystembased php framework
-	 *	Dev								Dashboard: landing panel with the numbers the other
-	 *												modules already compute (element types, admin accounts,
-	 *												last backup, missing text keys, missing image slots),
-	 *												pulled together into one overview instead of having to
-	 *												open each tab in turn to find them. Doesn't add any
-	 *												storage of its own
-	 *
-	 *	@package					Dape/Nino
-	 *	@author						David Perchermeier <mail@dape.io>
-	 *	@link							https://github.com/dapeio/nino
-	 */
-	class Dashboard {
-
-		/**
-		 *	This module's action map, merged into Admin::handlePost()'s dispatch
-		 *
-		 *	@return 	array
-		 */
-		public static function actions(): array {
-			return [
-				'dashboard/summary' => [ self::class, 'apiSummary' ],
-			];
-		}
-
-		/**
-		 *	Nav entry for this module, rendered into the dashboard's tab bar
-		 *
-		 *	@return 	array										[ uri, label ]
-		 */
-		public static function nav(): array {
-			return [ 'dashboard', 'Dashboard' ];
-		}
-
-		/**
-		 *	Gather the overview numbers
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		array 		&$request			(reference) Current server request
-		 *
-		 *	@return 	void
-		 */
-		public static function apiSummary( array &$appData, array &$request ): void {
-
-			if( \Nino\Admin\Admin::guard( $appData, $request ) === false )
-				return;
-
-			\Nino\Http::ok( $request, [
-				'types' 					=> ElementTypes::summaries( $appData ),
-				'pages' 					=> PageEditor::count( $appData ),
-				'users' 					=> Users::count( $appData ),
-				'lastBackup' 			=> Restore::lastDate( $appData ),
-				'missingText' 		=> Text::missingCount( $appData ),
-				'missingImages' 	=> Images::missingCount( $appData ),
-			] );
+		public static function path( array &$appData ): string {
+			return \Nino\Filesystem::getContentPath( $appData ). self::PASSWORD_PATH;
 		}
 	}
 }

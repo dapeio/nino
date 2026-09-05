@@ -2,12 +2,12 @@
 
 **Sprache:** [English](concepts.md) · Deutsch
 
-**Stand:** 21. August 2026 · **Nino-Version:** 0.12.0-beta
+**Stand:** 5. September 2026 · **Nino-Version:** 0.13.0-beta
 
 Dieses Handbuch erklärt die Architektur von Nino und das Zusammenspiel von Konfiguration, Daten, Templates und Modulen. Falls du stattdessen direkt eine Webseite einrichten möchtest, beginne mit [Erste Schritte](getting-started.de.md); konkrete APIs und Implementierungsdetails stehen im [Entwickler-Handbuch](development.de.md).
 
 **Weitere Links:**
-[README](../README.de.md) · [Grundkonzepte](concepts.de.md) · [Entwickler-Handbuch](development.de.md) · [Erste Schritte](getting-started.de.md) · [`/_install`-Referenz](_install.de.md) · [`/_admin`-Bedienung](_admin.de.md) · [`/_templates`-Bedienung](_templates.de.md) · [`/_editor`-Bedienung](_editor.de.md) · [`/_design`-Bedienung](_design.de.md) · [Deployment](deployment.de.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
+[README](../README.de.md) · [Grundkonzepte](concepts.de.md) · [Entwickler-Handbuch](development.de.md) · [Erste Schritte](getting-started.de.md) · [Einrichtungsassistent](setup.de.md) · [`/_admin`-Workbench](_admin.de.md) · [Templates-Panel](templates.de.md) · [Design-Panel](appearance.de.md) · [Deployment](deployment.de.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
 
 ## Kernsäulen
 Nino organisiert eine Webseite mit nur wenigen, aber klar getrennten Bausteinen:
@@ -18,7 +18,7 @@ Nino organisiert eine Webseite mit nur wenigen, aber klar getrennten Bausteinen:
 - `data/` enthält die Bewegungsdaten des laufenden Betriebs;
 - PHP-Module ergänzen den Ablauf über Callbacks.
 
-Die folgenden Pfade beschreiben den eingerichteten Projektstand; vor dem Abschluss von `/_install` existieren sie noch nicht.
+Die folgenden Pfade beschreiben den eingerichteten Projektstand; vor dem Abschluss des Einrichtungsassistenten existieren sie noch nicht.
 
 Die Architektur folgt vier Grundentscheidungen:
 
@@ -133,7 +133,7 @@ Die geladene `.tpl`-Datei kann neben HTML auch wieder Shortcodes und Textfills e
 
 So können mehrere Template-Dateien zu einer komplexen HTML-Struktur zusammengesetzt werden.
 
-Seitentemplates lassen sich über den optionalen [Template Builder `/_templates`](_templates.de.md) aus vollständigen HTML- und `[template]`-Sections zusammensetzen. Er speichert normales, lesbares `.tpl`-Markup und ersetzt nicht die Prüfung der fertigen Webseite im Browser; tiefergehende Strukturarbeit bleibt über HTML+ oder Code möglich.
+Seitentemplates lassen sich über das optionale [Templates-Panel](templates.de.md) der Workbench aus vollständigen HTML- und `[template]`-Sections zusammensetzen. Er speichert normales, lesbares `.tpl`-Markup und ersetzt nicht die Prüfung der fertigen Webseite im Browser; tiefergehende Strukturarbeit bleibt über HTML+ oder Code möglich.
 
 Nino verarbeitet einen HTML-String bei jedem Rendering-Durchlauf in einer festen Reihenfolge:
 
@@ -143,7 +143,7 @@ Nino verarbeitet einen HTML-String bei jedem Rendering-Durchlauf in einer festen
 
 **Textfills** sind einzelne globale oder sprachabhängige Werte. Sie eignen sich für Seitentitel, Beschreibungen und andere Textinhalte an einer festen Stelle.
 
-**Elemente** bilden wiederkehrende Inhalte nach einem vordefinierten Typmodell ab, beispielsweise Leistungen, Teammitglieder oder Referenzen. Entwickler definieren die Felder und können sämtliche Einträge über `/_admin` bearbeiten; Redakteure pflegen die für sie freigegebenen Einträge über `/_editor`.
+**Elemente** bilden wiederkehrende Inhalte nach einem vordefinierten Typmodell ab, beispielsweise Leistungen, Teammitglieder oder Referenzen. Entwickler definieren die Felder unter Elementtypen; Entwickler und Redakteure pflegen die Einträge unter Elemente, jeder im Rahmen seiner Rechte.
 
 **Shortcodes** verbinden Templates bei Bedarf mit dynamischer Logik. Sie laden beispielsweise ein Template, geben Elemente aus oder rufen eine projektspezifische Funktion auf. Entwickler können eigene Shortcodes registrieren; ihre technische Callback-Signatur beschreibt das Entwickler-Handbuch. Die Ausgabe kann wiederum Textfills und weitere Shortcodes enthalten.
 
@@ -159,36 +159,35 @@ Projekt-Namespace nach `app/`; die kerneigenen Klassen unter `Nino\` bleiben in
 `_nino/`. So bleibt die Erweiterung Teil des konkreten Projekts, `_nino/` kann
 ersetzt werden und es entsteht kein zweites Hook- oder Plugin-System.
 
-## `/_admin`, `/_design`, `/_templates` und `/_editor`
+## Die Workbench `/_admin`
 
-Die optionalen Oberflächen besitzen eigene Einstiegspunkte und sind keine Frontend-Module aus `/nino/modules`:
+Eine Verwaltungsoberfläche mit einer Anmeldung. Sie hat einen eigenen Einstiegspunkt (`_admin/index.php`) und ist kein Frontend-Modul aus `/nino/modules`; jeder Bildschirm darin ist ein Panel, und ein Modul kann eines beisteuern:
 
-| Oberfläche | Verantwortung |
-|---|---|
-| [`/_admin`](_admin.de.md) | vollständiger technischer Zugriff auf Struktur, Konfiguration, Texte und Elemente |
-| [`/_design`](_design.de.md) | Theme, erzeugte Design-Tokens, Header und Footer nach der Installation |
-| [`/_templates`](_templates.de.md) | sectionbasierte Komposition, wiederverwendbare Template-Includes und native Schnellbefüllung von `page-*.tpl` |
-| [`/_editor`](_editor.de.md) | tägliche Pflege freigegebener Inhalte, Bilder, Nutzer- und Betriebsdaten |
+| Gruppe | Panels | Verantwortung |
+|---|---|---|
+| Inhalt | Dashboard, Elemente (mit Elementtypen), Texte (mit Textschlüsseln), Bilder (mit Bildplätzen), Anfragen, Newsletter, Log | tägliche Pflege von Inhalten, Bildern und Betriebsdaten; die Tabs in Klammern halten die Form dieser Inhalte und gehören dem Entwickler |
+| Struktur | [Templates](templates.de.md), [Design](appearance.de.md), Routen, Navigationen | die Struktur des Projekts: Seitentemplates, Erscheinungsbild, Routen und Menüs |
+| System | Nutzer (mit Nutzerrollen und Anmeldeschutz), Sprache (mit Übersetzungen), Backups, Konfiguration, Suche | Konten und Rollen, Sprachen und Übersetzungsübergabe, Wiederherstellung, technische Konfiguration, Suchindexe |
 
-`/_design` und `/_templates` teilen Passwort und Sitzung mit `/_admin`; `/_editor` besitzt dagegen einzelne Konten und granulare Rechte. Damit liegt die Abgrenzung nicht mehr allein zwischen Struktur und Inhalt, sondern vor allem zwischen vollständigem Entwicklungszugriff und eingeschränkter redaktioneller Arbeit.
+Ein Konto hält eine Rolle, eine Rolle eine Menge von Berechtigungen, eine je Panel oder Tab; der Assistent schreibt **Editor** (jede Inhalt-Berechtigung) und **Developer** (`/*`), und der Tab Nutzerrollen des Panels Nutzer bearbeitet sie. Ein Panel, das ein Konto nicht verwenden darf, wird nicht gerendert. Die Abgrenzung verläuft damit zwischen vollständigem Entwicklungszugriff und berechtigungsgesteuerter redaktioneller Arbeit – innerhalb eines Werkzeugs. Solange das Projekt noch nicht existiert, liefert dieselbe Route den [Einrichtungsassistenten](setup.de.md); `/_admin/recovery.php` ist der Weg zurück, wenn die Konten selbst kaputt sind. Siehe das [`/_admin`-Handbuch](_admin.de.md).
 
 ## Wo gehört eine Änderung hin?
 
 | Vorhaben | Passender Ort |
 |---|---|
-| Seitentitel ändern | Textfill in `text/` oder über `/_editor` |
-| neues Teammitglied ergänzen | Element über `/_editor` |
-| Seite aus vollständigen Sections zusammensetzen | `/_templates` (Alpha) |
+| Seitentitel ändern | Textfill in `text/` oder im Panel Texte |
+| neues Teammitglied ergänzen | Element im Panel Elemente |
+| Seite aus vollständigen Sections zusammensetzen | das Templates-Panel (Alpha) |
 | tiefergehende HTML-Struktur ändern | HTML+-Escape-Hatch oder `.tpl`-Datei in `templates/` |
-| neue öffentliche URL anlegen | Route in `config.php` beziehungsweise über `/_admin` |
+| neue öffentliche URL anlegen | Route in `config.php` beziehungsweise im Panel Routes |
 | dynamische Liste ausgeben | Element-Abfrage oder Shortcode mit Callback |
 | technische Funktion ergänzen | projektspezifisches Modul |
-| Theme, Design, Header oder Footer ändern | `/_design`; Stylesheets für projektspezifische Übersteuerungen jenseits des Katalogs |
+| Theme, Design, Header oder Footer ändern | das Design-Panel; Stylesheets für projektspezifische Übersteuerungen jenseits des Katalogs |
 
 ## Wie es weitergeht
 
 - [Erste Schritte](getting-started.de.md) führt durch die notwendige Ersteinrichtung.
-- [`/_admin`-Bedienung](_admin.de.md) erklärt den vollständigen technischen und inhaltlichen Zugriff.
-- [`/_templates`-Bedienung](_templates.de.md) erklärt den strukturellen Template-Builder im Alpha-Status.
-- [`/_editor`-Bedienung](_editor.de.md) begleitet die berechtigungsgesteuerte Inhaltspflege.
+- [`/_admin`-Workbench](_admin.de.md) erklärt jedes Panel, die Rollen und die Recovery-Seite.
+- [Templates-Panel](templates.de.md) erklärt den strukturellen Template-Builder im Alpha-Status.
+- [Design-Panel](appearance.de.md) erklärt die vier Erscheinungsbild-Editoren.
 - [Deployment](deployment.de.md) beschreibt den Weg von der lokalen Webseite in den sicheren Betrieb.

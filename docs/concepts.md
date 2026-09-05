@@ -2,12 +2,12 @@
 
 **Language:** English · [Deutsch](concepts.de.md)
 
-**Last updated:** August 21, 2026 · **Nino version:** 0.12.0-beta
+**Last updated:** September 5, 2026 · **Nino version:** 0.13.0-beta
 
 This manual explains the architecture of Nino and the interaction of configuration, data, templates, and modules. If you instead want to set up a website directly, start with [Getting Started](getting-started.md); concrete APIs and implementation details are in the [Developer Manual](development.md).
 
 **Additional Links:**
-[README](../README.md) · [Concepts](concepts.md) · [Developer Manual](development.md) · [Getting Started](getting-started.md) · [`/_install` Reference](_install.md) · [`/_admin` Operation](_admin.md) · [`/_templates` Operation](_templates.md) · [`/_editor` Operation](_editor.md) · [`/_design` Operation](_design.md) · [Deployment](deployment.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
+[README](../README.md) · [Concepts](concepts.md) · [Developer Manual](development.md) · [Getting Started](getting-started.md) · [Setup Wizard](setup.md) · [`/_admin` Workbench](_admin.md) · [Templates Panel](templates.md) · [Design Panel](appearance.md) · [Deployment](deployment.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
 
 ## Core Pillars
 
@@ -19,7 +19,7 @@ Nino organizes a website with only a few but clearly separated components:
 - `data/` contains the operational data of the running system;
 - PHP modules extend the process via callbacks.
 
-The following paths describe the configured project state; before completing `/_install`, they do not yet exist.
+The following paths describe the configured project state; before completing the setup wizard, they do not yet exist.
 
 The architecture follows four fundamental decisions:
 
@@ -134,7 +134,7 @@ The loaded `.tpl` file can contain shortcodes and textfills in addition to HTML:
 
 This way, multiple template files can be combined into a complex HTML structure.
 
-Page templates can be composed from complete HTML and `[template]` sections via the optional [Template Builder `/_templates`](_templates.md). It saves normal, readable `.tpl` markup and does not replace testing the finished website in the browser; lower-level structure work remains possible through HTML+ or code.
+Page templates can be composed from complete HTML and `[template]` sections via the workbench's optional [Templates panel](templates.md). It saves normal, readable `.tpl` markup and does not replace testing the finished website in the browser; lower-level structure work remains possible through HTML+ or code.
 
 Nino processes an HTML string in a fixed order during each rendering pass:
 
@@ -144,7 +144,7 @@ Nino processes an HTML string in a fixed order during each rendering pass:
 
 **Textfills** are individual global or language-dependent values. They are suitable for page titles, descriptions, and other text content at a fixed location.
 
-**Elements** represent recurring content according to a predefined type model, such as services, team members, or references. Developers define the fields and can edit all entries via `/_admin`; editors maintain the entries released to them via `/_editor`.
+**Elements** represent recurring content according to a predefined type model, such as services, team members, or references. Developers define the fields under Element Types; developers and editors maintain the entries under Elements, each within their permissions.
 
 **Shortcodes** connect templates with dynamic logic as needed. For example, they load a template, output elements, or call a project-specific function. Developers can register their own shortcodes; their technical callback signature is described in the Developer Manual. The output can in turn contain textfills and further shortcodes.
 
@@ -160,36 +160,35 @@ namespace; the kernel-owned `Nino\` classes remain in `_nino/`. This way, the
 extension remains part of the specific project, `_nino/` stays replaceable, and
 no second hook or plugin system is introduced.
 
-## `/_admin`, `/_design`, `/_templates`, and `/_editor`
+## The Workbench `/_admin`
 
-The optional interfaces have their own entry points and are not frontend modules from `/nino/modules`:
+One management interface with one login. It has its own entry point (`_admin/index.php`) and is not a frontend module from `/nino/modules`; every screen in it is a panel, and a module can contribute one:
 
-| Interface | Responsibility |
-|---|---|
-| [`/_admin`](_admin.md) | full technical access to structure, configuration, texts, and elements |
-| [`/_design`](_design.md) | Theme, generated Design tokens, Header, and Footer after installation |
-| [`/_templates`](_templates.md) | section-first composition, reusable template includes, and native quick fill of `page-*.tpl` |
-| [`/_editor`](_editor.md) | daily maintenance of released content, images, user, and operational data |
+| Group | Panels | Responsibility |
+|---|---|---|
+| Content | Dashboard, Elements (with Element Types), Text (with Text Keys), Images (with Image Slots), Submissions, Newsletter, Log | daily maintenance of content, images and operational data; the tabs in brackets hold the shape of that content and are the developer's |
+| Structure | [Templates](templates.md), [Design](appearance.md), Routes, Navigations | the project's structure: page templates, the appearance, routes and menus |
+| System | Users (with User roles and Login protection), Language (with Translations), Backups, Config, Search | accounts and roles, languages and the translation hand-off, restore, technical configuration, search indexes |
 
-`/_design` and `/_templates` share password and session with `/_admin`; `/_editor`, on the other hand, has individual accounts and granular rights. Thus, the separation is no longer solely between structure and content but primarily between full development access and restricted editorial work.
+An account holds a role, a role a set of permissions, one per panel or tab; the wizard writes **Editor** (every Content permission) and **Developer** (`/*`), and the Users panel's roles tab edits them. A panel an account may not use is not rendered. The separation therefore runs between full development access and permission-controlled editorial work - inside one tool. Until the project exists, the same route serves the [setup wizard](setup.md); `/_admin/recovery.php` is the way back in when the accounts themselves are broken. See the [`/_admin` manual](_admin.md).
 
 ## Where Does a Change Belong?
 
 | Task | Suitable Location |
 |---|---|
-| Change page title | textfill in `text/` or via `/_editor` |
-| Add new team member | element via `/_editor` |
-| Compose a page from complete sections | `/_templates` (Alpha) |
+| Change page title | textfill in `text/` or the Text panel |
+| Add new team member | element in the Elements panel |
+| Compose a page from complete sections | the Templates panel (Alpha) |
 | Change lower-level HTML structure | HTML+ escape hatch or `.tpl` file in `templates/` |
-| Create new public URL | route in `config.php` or via `/_admin` |
+| Create new public URL | route in `config.php` or the Routes panel |
 | Output dynamic list | element query or shortcode with callback |
 | Add technical function | project-specific module |
-| Change Theme, Design, Header, or Footer | `/_design`; stylesheets for project-specific overrides beyond the catalogue |
+| Change Theme, Design, Header, or Footer | the Design panel; stylesheets for project-specific overrides beyond the catalogue |
 
 ## Next Steps
 
 - [Getting Started](getting-started.md) guides through the necessary initial setup.
-- [`/_admin` Operation](_admin.md) explains full technical and content access.
-- [`/_templates` Operation](_templates.md) explains the structural template builder in Alpha status.
-- [`/_editor` Operation](_editor.md) accompanies permission-controlled content maintenance.
+- [`/_admin` Workbench](_admin.md) explains every panel, the roles and the recovery page.
+- [Templates Panel](templates.md) explains the structural template builder in Alpha status.
+- [Design Panel](appearance.md) explains the four appearance editors.
 - [Deployment](deployment.md) describes the path from the local website to secure operation.

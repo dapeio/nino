@@ -25,7 +25,8 @@ function check( label, condition ) {
 }
 
 const ROOT = path.join( __dirname, '..' );
-const LIBRARY = path.join( ROOT, '_install/library' );
+const LIBRARY = path.join( ROOT, '_admin/install/library' );
+const MODULE_ROOTS = [ path.join( ROOT, '_nino/Nino/Modules' ), path.join( ROOT, 'app/Nino/Modules' ) ];
 
 function filesBelow( directory ) {
 	const files = [];
@@ -43,10 +44,21 @@ function relative( file ) {
 	return path.relative( ROOT, file ).replaceAll( path.sep, '/' );
 }
 
+/* A module's install unit travels with the module - install/ beside its
+ * class, below _nino/ or below app/, where Setup::units() finds it - so its
+ * templates are audited from there rather than from the library. */
+const moduleUnitFiles = MODULE_ROOTS.flatMap( function( MODULES ) {
+	return fs.readdirSync( MODULES, { withFileTypes : true } )
+		.filter( function( entry ) {
+			return entry.isDirectory() === true && fs.existsSync( path.join( MODULES, entry.name, 'install/manifest.php' ) );
+		} )
+		.flatMap( function( entry ) { return filesBelow( path.join( MODULES, entry.name, 'install' ) ); } );
+} );
+
 /* Mail has its own inline design and the three text/XML templates are not
  * HTML. The dot-prefixed catalogue is an intentionally generated specimen,
  * not one of the finished units offered as a starter page. */
-const publicTemplates = filesBelow( LIBRARY ).filter( function( file ) {
+const publicTemplates = filesBelow( LIBRARY ).concat( moduleUnitFiles ).filter( function( file ) {
 	const name = path.basename( file );
 	return name.endsWith('.tpl')
 		&& relative( file ).includes('/.demo-') === false
@@ -58,7 +70,7 @@ check( 'the audit reaches every finished public template kind',
 	publicTemplates.some( function( file ) { return relative( file ).includes('/header/'); } )
 	&& publicTemplates.some( function( file ) { return relative( file ).includes('/footer/'); } )
 	&& publicTemplates.some( function( file ) { return relative( file ).includes('/pages/'); } )
-	&& publicTemplates.some( function( file ) { return relative( file ).includes('/modules/'); } )
+	&& publicTemplates.some( function( file ) { return relative( file ).includes('/Modules/') && relative( file ).includes('/install/templates/'); } )
 	&& publicTemplates.some( function( file ) { return relative( file ).includes('/base/templates/'); } )
 );
 
@@ -145,8 +157,8 @@ function inspect( file, source ) {
 /* html-header/html-footer deliberately split one document. Test that pair as
  * a pair and keep the individual fragment check for complete units only. */
 const splitDocument = new Set( [
-	'_install/library/base/templates/html-header.tpl',
-	'_install/library/base/templates/html-footer.tpl',
+	'_admin/install/library/base/templates/html-header.tpl',
+	'_admin/install/library/base/templates/html-footer.tpl',
 ] );
 const structureProblems = [];
 const gridProblems = [];

@@ -2,14 +2,14 @@
 
 **Sprache:** [English](development.md) · Deutsch
 
-**Stand:** 21. August 2026 · **Nino-Version:** 0.12.0-beta
+**Stand:** 5. September 2026 · **Nino-Version:** 0.13.0-beta
 
 Dieses Handbuch beschreibt die technische Arbeit mit Nino – vom Einstiegspunkt über Routing und Rendering bis zu eigenen Modulen, dauerhaften Daten und Tests. Falls du stattdessen zuerst die Architektur kennenlernen oder ein frisches Projekt einrichten möchtest, lies die [Grundkonzepte](concepts.de.md) beziehungsweise [Erste Schritte](getting-started.de.md).
 
 **Weitere Links:**
-[README](../README.de.md) · [Grundkonzepte](concepts.de.md) · [Entwickler-Handbuch](development.de.md) · [Erste Schritte](getting-started.de.md) · [`/_install`-Referenz](_install.de.md) · [`/_admin`-Bedienung](_admin.de.md) · [`/_templates`-Bedienung](_templates.de.md) · [`/_editor`-Bedienung](_editor.de.md) · [`/_design`-Bedienung](_design.de.md) · [Deployment](deployment.de.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
+[README](../README.de.md) · [Grundkonzepte](concepts.de.md) · [Entwickler-Handbuch](development.de.md) · [Erste Schritte](getting-started.de.md) · [Einrichtungsassistent](setup.de.md) · [`/_admin`-Workbench](_admin.de.md) · [Templates-Panel](templates.de.md) · [Design-Panel](appearance.de.md) · [Deployment](deployment.de.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
 
-**Entwicklerprofil:** Für einfache Webseiten reichen solide Kenntnisse in HTML, CSS und JavaScript sowie PHP-Grundlagen. Templates bestehen aus HTML+, also HTML mit Textfills und Shortcodes. Erst eigene Anwendungslogik, externe Schnittstellen oder neue Module verlangen tieferes PHP-Wissen. Ein fertiges Projekt kann anschließend weitgehend über `/_admin`, `/_design`, `/_templates` und `/_editor` gepflegt werden.
+**Entwicklerprofil:** Für einfache Webseiten reichen solide Kenntnisse in HTML, CSS und JavaScript sowie PHP-Grundlagen. Templates bestehen aus HTML+, also HTML mit Textfills und Shortcodes. Erst eigene Anwendungslogik, externe Schnittstellen oder neue Module verlangen tieferes PHP-Wissen. Ein fertiges Projekt kann anschließend weitgehend in der Workbench `/_admin` gepflegt werden.
 
 ## Einstiegspunkt und Laufzeitmodell
 
@@ -72,18 +72,21 @@ Der relevante Teil von `$request` sieht vereinfacht so aus:
 Ohne Override liest Nino `config.php` aus `private/`. Um den vollständigen privaten Verzeichnisbaum oder nur diese Datei außerhalb des öffentlich erreichbaren Verzeichnisses abzulegen, wird der Pfad vor dem Laden des Kernels definiert:
 
 ```php
-define( 'NINO_CONTENT_DIR', '/var/www/private/nino-example' );
+define( 'NINO_PRIVATE_DIR', '/var/www/private/nino-example' );
 // Oder, um nur config.php zu verschieben:
 // define( 'NINO_CONFIG_DIR', '/var/www/private/nino-example' );
 require_once __DIR__. '/_nino/Nino.php';
 ```
 
-Verwende `NINO_CONTENT_DIR` für den vollständigen privaten Baum und `NINO_CONFIG_DIR` nur für eine getrennte `config.php`. Jedes ausdrücklich konfigurierte Ziel muss existieren und beschreibbar sein; ein ungültiger Pfad wird nicht stillschweigend ersetzt.
+Verwende `NINO_PRIVATE_DIR` für den vollständigen privaten Baum und `NINO_CONFIG_DIR` nur für eine getrennte `config.php`. Jedes ausdrücklich konfigurierte Ziel muss existieren und beschreibbar sein; ein ungültiger Pfad wird nicht stillschweigend ersetzt. Jeder Einstiegspunkt startet den Kernel für sich – `index.php`, `_admin/index.php` und `_admin/recovery.php` –, also werden die verwendeten Konstanten in allen dreien mit denselben Werten definiert: Eine nur in der `index.php` der Site gesetzte lässt den Workbench auf dem Standardpfad, wo er keine `config.php` findet und den Setup-Assistenten anbietet.
 
 Projekteigene PHP-Klassen verwenden einen getrennten Quellcode-Root. Standard
 ist `app/` im Projektverzeichnis. Liegen diese Klassen an einer anderen Stelle,
 wird `NINO_APP_DIR` vor dem Laden des Kernels als absoluter Verzeichnispfad
-definiert:
+definiert. Der Root wird als Ganzes ersetzt, und Ninos eigene optionale Module
+– Design, Templates, Form, Newsletter, Navigation, Localepicker, Search – liegen
+unter `app/Nino/Modules/`: Sie ziehen mit, oder der Kernel überspringt ein
+Modul, das er nicht mehr laden kann, ohne ein Wort.
 
 ```php
 define( 'NINO_APP_DIR', '/var/www/nino-example-app' );
@@ -491,6 +494,8 @@ Module werden in `/nino/modules` aktiviert. Die Reihenfolge des Arrays ist relev
 | `Search` | `Search::getElements()` | durchsucht konfigurierte Element-Felder über einen kleinen sprachabhängigen Fuzzy-Index |
 | `Template` | `[template /path/name]` | lädt den Rohinhalt einer `.tpl`-Datei; die gemeinsame Render-Pipeline verarbeitet ihn weiter |
 
+`Form`, `Newsletter`, `Navigation` und `Search` bringen ihre Workbench-Panels mit (Anfragen, Newsletter, Navigationen, Suche), `Design` und `Templates` sind nichts als je ein Panel: Jedes ist genau dann vorhanden, wenn sein Modul aktiv ist. Die ersten vier sind im Einrichtungsassistenten wählbar, weil jedes eine `install/`-Einheit neben seiner Klasse mitliefert; die letzten beiden trägt der Assistent in `/nino/modules` ein, sobald ihr Verzeichnis existiert. Alle werden unter `app/Nino/Modules/` ausgeliefert, neben den eigenen Klassen des Projekts – siehe [Panels der Workbench](#panels-der-workbench) und [Verzeichnis und Autoloading](#verzeichnis-und-autoloading) weiter unten.
+
 Einige Details sind absichtlich defensiv gestaltet:
 
 - Das Formular begrenzt Eingaben, schützt Schreibvorgänge und verwirft alte Protokollmonate.
@@ -500,7 +505,7 @@ Einige Details sind absichtlich defensiv gestaltet:
 ### Suchindex für Elements
 
 `Modules\Search` ist eine optionale Entwicklerfunktion und wird nicht über
-`/_install` ausgewählt. Aktiviere und konfiguriere sie direkt in der
+den Einrichtungsassistenten ausgewählt. Aktiviere und konfiguriere sie direkt in der
 `config.php`:
 
 ```php
@@ -528,8 +533,8 @@ ein Feld aus dem aktuellen Modell dieses Typs. Ungültige Typen, Prioritäten un
 Feldnamen werden ignoriert.
 
 Die Aktivierung registriert den Elements-Callback nach erfolgreichem Schreiben,
-legt selbst aber noch keine Datei an. Den ersten Aufbau startest du mit **Create
-searchindex** unter `/_admin` → **Config**. Jeder Klick erstellt alle gültig
+legt selbst aber noch keine Datei an. Den ersten Aufbau startest du mit **Suchindex
+erstellen** unter `/_admin` → **Suche**. Jeder Klick erstellt alle gültig
 konfigurierten Indexe vollständig neu. Danach erstellt jedes erfolgreiche
 Einfügen, Ändern oder Löschen eines konfigurierten Typs dessen Index neu,
 nachdem die Elementdatei geschrieben wurde. Der Typ `articles` liegt als eine
@@ -583,14 +588,31 @@ Die Auflösungsregeln sind bewusst asymmetrisch:
 
 | Klassen-Namespace | Such-Roots |
 | --- | --- |
-| `Nino\...` | ausschließlich `_nino/` |
-| alle anderen Namespaces | `NINO_APP_DIR`, falls definiert, sonst `app/`; anschließend `_nino/` als Kompatibilitäts-Fallback |
+| `Nino\Modules\...` | zuerst `_nino/`, dann `_admin/`, dann `NINO_APP_DIR`, falls definiert, sonst `app/` |
+| jeder andere `Nino\...` | ausschließlich `_nino/` |
+| alle anderen Namespaces | `NINO_APP_DIR`, falls definiert, sonst `app/` |
 
 Der Namespace `Nino\` gehört dem Kernel und kann aus dem Application-Root des
-Projekts nicht überschrieben werden. Der `_nino/`-Fallback für andere
-Namespaces hält bestehende Projekte lauffähig; neuer und migrierter Projektcode
-gehört jedoch nach `app/` (oder in das ausdrücklich gesetzte `NINO_APP_DIR`),
-damit `_nino/` bei einem Update vollständig ersetzt werden kann.
+Projekts nicht überschrieben werden – mit einer bewussten Öffnung:
+`Nino\Modules\*` ist kein Verzeichnis, sondern eine zusammengeführte Sicht
+über drei Roots. Die immer aktiven Laufzeitmodule liegen in `_nino/`; die
+eigenen Ansichten der Workbench in `_admin/Nino/Modules/` (`Dashboard`,
+`Elements`, `Text`, `Images`, `Logs`, `Routes`, `Users`, `Language`,
+`Backups`, `Config`); Ninos optionale Laufzeitmodule unterhalb des
+Application-Roots (`app/Nino/Modules/Form`, `Newsletter`, `Navigation`,
+`Search`, `Localepicker`, `Design`, `Templates`), wo ein Projekt löscht, was es
+nicht braucht, und selbst aktualisiert, was es behält, während `_nino/`
+vollständig ersetzbar bleibt. Die Reihenfolge sagt, was ein Root dem anderen
+antun darf: `_nino/` zuerst, damit ein ausgeliefertes Modul nicht verdeckt
+werden kann; `_admin/` vor `app/`, damit ein Projekt keine Workbench-Ansicht
+ersetzen kann; `app/` zuletzt und damit nur ergänzend.
+
+Aufgelöst wird der vollständige relative Pfad, nicht das erste Segment – ein
+Modulname darf deshalb Klassen in mehreren Roots halten:
+`\Nino\Modules\Elements` ist das Laufzeitmodul des Kernels in `_nino/`,
+`\Nino\Modules\Elements\Admin` die Workbench-Ansicht dazu in `_admin/` –
+zwei Hälften eines Moduls, jede dort, wo sie hingehört. Die eigenen Module
+eines Projekts behalten ihren eigenen Namespace unter `app/`.
 
 Innerhalb des gewählten Roots wird der vollständige Klassenname zum
 Verzeichnispfad und der Klassen-Basename noch einmal als Dateiname angehängt.
@@ -669,6 +691,47 @@ Ein gutes Modul hält sich an vier Regeln:
 3. Templating bleibt in Shortcodes und `.tpl`-Dateien; PHP gibt keine Seitenfragmente ungeplant per `echo` aus.
 4. Veränderliche Dateien werden bei Read-modify-write mit `Filesystem::mutate()` geschützt.
 
+### Panels der Workbench
+
+Ein Modul kann der Workbench eine eigene Ansicht mitbringen. `/_admin` baut Navigation, Inhaltsbereiche, Bundles und Textfills aus einer Panel-Registry (`\Nino\Admin\Panels`), und ein Modul tritt ihr bei, indem es eine Frage beantwortet:
+
+```php
+public static function adminPanels( array &$appData ): array {
+    return [ \Project\Catalog\Admin::class ];
+}
+```
+
+Der Kernel fragt jedes aktive Modul in der Reihenfolge von `/nino/modules` (`\Nino\Modules::collect()`); die Ansicht existiert also genau so lange wie das Modul.
+
+Die eigenen Ansichten der Workbench sind dasselbe in einem anderen Root: `_admin` hält die Hülle – Login, Leiste, Flächen, Registry, Bundles – und sonst nichts, und jede Ansicht darin ist ein Modul unter `_admin/Nino/Modules/<Name>/`, aufgebaut genau wie die obigen: `Admin/Admin.php` ist das Panel, `<Tab>/<Tab>.php` ein Tab davon, `assets/` seine Skripte und sein Stylesheet, `text/` seine Worte. `\Nino\Admin\Admin::modules()` liest das Verzeichnis statt einer Liste; eine Ansicht kommt also durch ein Verzeichnis hinzu und geht durch Löschen wieder – ohne das Verzeichnis ist `/_admin` ein Login und eine leere Leiste. Ein Panel ist eine Klasse mit zwei erforderlichen und einer Handvoll optionaler statischer Methoden, ohne Interface und ohne Basisklasse:
+
+| Methode | Rückgabe |
+| --- | --- |
+| `actions()` | `[ 'catalog/list' => [ Class::class, 'apiList' ], ... ]` – vom `POST`-Handler der Workbench verteilt |
+| `nav()` | `[ uri, label, weight = 50, group = 'content' ]` – die URI ist ein Slug und benennt Link, Inhaltsbereich und JS-Namensraum (`Nino.admin.<uri>`); ein Label, das mit `/` beginnt, ist ein Textfill-Schlüssel, alles andere wörtlicher Text – jedes ausgelieferte Panel nutzt einen Schlüssel, ein Modul liefert dafür seine `text/<locale>.php` mit; die Gruppe ist `content`, `structure` oder `system` |
+| `perm()` | die Berechtigung, die den Link zeigt und die Aktionen schützt – per Konvention `/_admin/<uri>/manage`; auf dem Tab Nutzerrollen des Panels Nutzer automatisch als Kästchen angeboten und Teil der Rolle **Editor**, die der Assistent schreibt, wenn die Gruppe `content` ist |
+| `panes()` | Mount-Ids innerhalb des Inhaltsbereichs, Standard `[ '<uri>-list' ]` |
+| `template()` | statt Mount-Ids: ein `.tpl`, das ganz in den Inhaltsbereich gerendert wird, projektrelativ und ohne Endung – für ein Panel, das seine Bereiche selbst anordnet |
+| `layout()` | `'page'` (Standard: eine Spalte Inhalt in Lesebreite) oder `'workspace'` (die ganze Breite, die Leiste zu ihren Symbolen eingeklappt) |
+| `icon()` | ein Inline-`<svg>` für die Leiste; ein Panel ohne eines zeigt bei eingeklappter Leiste den Anfangsbuchstaben seines Labels |
+| `tabs()` | weitere Panel-Klassen, die als Tabs der Fläche dieses Panels erscheinen – jede ein vollständiges Panel mit eigenem `perm()`, Script und Hash-Präfix, in der Leiste nach dem Gewicht ihres `nav()` geordnet; `tab()` benennt den eigenen Tab dieses Panels, wenn das Nav-Label nicht passt. Die eigenen Module der Workbench tun das: Elementtypen unter Elemente, Textschlüssel unter Texte, Bildplätze unter Bilder, Nutzerrollen und Anmeldeschutz unter Nutzer, Übersetzungen unter Sprache |
+| `assets()` | projektrelative `.js`-/`.css`-Dateien, nach den eigenen der Workbench nach `/_admin/.cache/` gebündelt |
+| `text()` | ein Verzeichnis mit `<locale>.php`-Textfill-Dateien, die mit den eigenen der Workbench zusammengeführt werden |
+| `summary( &$appData )` | eine Dashboard-Kachel `[ 'value' => ..., 'label' => ... ]` |
+| `log( $action, $data )` | die Protokollzeile einer abgeschlossenen Aktion, `''` für keine |
+
+Ein Modul benennt seine Dateien von dort aus, wo seine Klasse liegt, damit sie mit ihm umziehen:
+
+```php
+public static function assets(): array {
+    return [ \Nino\Admin\Panels::relative( dirname( __DIR__ ). '/assets/admin.js' ) ];
+}
+```
+
+Jede Aktionsmethode schützt sich selbst mit `\Nino\Admin\Admin::guardPerm( $appData, $request, self::MANAGE_PERM )`, das ohne Konto mit `401` und ohne Berechtigung mit `403` antwortet. Die Panels der Workbench selbst werden zuerst zusammengeführt; eine URI oder ein Aktionsname, den ein solches Panel bereits besitzt, geht nie an ein Modul. Die mitgelieferten Module sind die Referenz: `app/Nino/Modules/Search/Admin/Admin.php` ist das kleinste vollständige Panel, `app/Nino/Modules/Form/Admin/Admin.php` eines mit Textfills und Dashboard-Kachel, `app/Nino/Modules/Design/Admin/Admin.php` eines mit eigenem Template, `app/Nino/Modules/Templates/Admin/Admin.php` ein Workspace. Der KI-Leitfaden (`AGENTS.md`, Rezept 7) führt durch ein vollständiges Panel samt Frontend.
+
+Ein Modul, das eigene Dateien unter `data/` führt, registriert in `init()` den Callback `'/nino/admin/restore'`; das Panel Backups ruft ihn mit dem entpackten Backup und dem aktiven Datenverzeichnis auf, und das Modul führt zusammen, was ihm gehört (`Newsletter::callbackRestore()`). Ein Verzeichnis `install/` neben der Klassendatei – `manifest.php`, `templates/`, `text/` – macht das Modul schließlich im Einrichtungsassistenten wählbar; siehe das [Library-Format](setup.de.md#library-format).
+
 ### Eigene Schreiboperationen absichern
 
 Bei schreibenden Routen ist CSRF standardmäßig aktiv. Ein bewusstes `csrf => false` ist nur für Endpunkte sinnvoll, die einen anderen überprüfbaren Authentisierungsmechanismus besitzen, beispielsweise signierte Webhooks. Die Ausnahme gehört an die Route und sollte im Code begründet werden.
@@ -683,25 +746,18 @@ Zusätzlich sollte der Handler:
 
 ## Separate Einstiegspunkte
 
-`/_admin`, `/_design`, `/_templates`, `/_editor` und `/_install` verwenden denselben Kernel wie das Frontend und besitzen jeweils eine eigene `index.php`. Nach `\Nino\init()` initialisiert der Einstiegspunkt seinen Bereich und übergibt anschließend wieder an den gemeinsamen Request-/Response-Lebenszyklus.
+Die Workbench verwendet denselben Kernel wie das Frontend und besitzt eine eigene `index.php`. Nach `\Nino\init()` initialisiert der Einstiegspunkt die Workbench und übergibt anschließend wieder an den gemeinsamen Request-/Response-Lebenszyklus:
 
 ```php
-$appData = \Nino\init();
+$appData = \Nino\init( true );
 \Nino\Admin\Admin::init( $appData );
-\Nino\Templates\Templates::init( $appData );
 $request = \Nino\request( $appData, $_SERVER );
 \Nino\output( $appData, $request );
 ```
 
-Das Beispiel zeigt den Einstiegspunkt von `/_templates`; die übrigen Bereiche initialisieren entsprechend ihre eigenen Klassen. Die Bereiche sind keine regulären Module aus `/nino/modules`:
+`init( true )` startet ohne `config.php`, denn bis der Einrichtungsassistent gelaufen ist, gibt es keine. `Admin::init()` entscheidet dann, was die Route ausliefert: den Assistenten (`_admin/install/Install.php`), solange `Admin::isInstalled()` verneint, danach die Anmeldung und die Panels. Der Assistent ist kein Modul aus `/nino/modules`; die Panels, die als Module ausgeliefert werden – Design und Templates –, sind es und kommen wie jedes andere über `adminPanels()`.
 
-- `/_install` erzeugt den ersten Projektstand und sperrt sich anschließend;
-- `/_admin` bietet vollständigen Zugriff auf technische Struktur sowie Texte und Elemente;
-- `/_design` bearbeitet Theme, Design, Header und Footer nach der Installation;
-- `/_templates` legt `page-*.tpl` an, setzt sie aus vollständigen HTML- und Template-Sections zusammen und befüllt native Inhalte schnell;
-- `/_editor` pflegt Inhalte und Betriebsdaten innerhalb der Kontoberechtigungen.
-
-`/_templates` bindet die Admin-Authentifizierung ein und teilt Passwort, Sperrstatus und Sitzung mit `/_admin`. Wird `_admin/` aus einer Auslieferung entfernt, steht deshalb auch der Builder nicht mehr zur Verfügung. `/_design` teilt dieselbe Sitzung und unterliegt derselben Regel.
+`_admin/recovery.php` ist der dritte Einstiegspunkt und startet auf dieselbe Weise: Er prüft das Recovery-Geheimnis (`\Nino\Admin\Recovery`) und bietet eine Wiederherstellung und ein Zurücksetzen eines Passworts, sonst nichts.
 
 ## Fehlerbehandlung und Protokolle
 
@@ -775,11 +831,12 @@ Nino verwendet eigenständige Smoke-Tests ohne PHPUnit. Jeder Test erstellt ein 
 | --- | --- |
 | `tests/kernel-smoke.php` | Kernel, Routing, Rendering, Auth, Filesystem und Module |
 | `tests/search-smoke.php` | Elements-Suche: Aktivierung, Index-Lebenszyklus, Fuzzy-Rangfolge, Sprachen und Admin-Neuaufbau |
-| `tests/editor-smoke.php` | Editor-Routen, Rechte, Backups, Protokolle und Inhaltsoperationen |
-| `tests/admin-smoke.php` | Admin-Authentifizierung und technische Verwaltungsfunktionen |
+| `tests/admin-smoke.php` | die Shell des Workbench und seine Inhalts-Panels: Text-Blacklist und HTML-Sanitizer, Element- und Bildoperationen |
+| `tests/admin-system-smoke.php` | die Struktur- und System-Panels: Session-Gate, Konten, Rollen und Rechte, Elementtypen, Backups und Wiederherstellung, das Aktivitätsprotokoll und ein Rendern jedes Panels in jeder Oberflächensprache |
 | `tests/install-smoke.php` | Installationsschritte, erzeugte Struktur und Selbstsperre |
 | `tests/design-smoke.php` | erzeugte Design-Werte und authentifizierte Theme-/Header-/Footer-Operationen |
 | `tests/templates-smoke.php` | Section-Komposition, Template-Includes, verlustfreie Seitenrahmen, native Schnellbefüllung und Speicherkonflikte |
+| `tests/demo-catalogue-smoke.php` | die Demo-Katalogseite zeigt jedes Section-Preset in jedem Layout und jede `nino-*`-Klasse |
 | `tests/*-js-smoke.js` | browsernahe Logik der Verwaltungsoberflächen und des Template-Builders |
 | `tests/concurrency-smoke.php` | parallele und atomare Schreibvorgänge |
 
@@ -787,12 +844,13 @@ Lokal werden sie einzeln ausgeführt:
 
 ```bash
 php tests/kernel-smoke.php
-php tests/search-smoke.php
-php tests/editor-smoke.php
 php tests/admin-smoke.php
+php tests/admin-system-smoke.php
 php tests/install-smoke.php
 php tests/design-smoke.php
 php tests/templates-smoke.php
+php tests/search-smoke.php
+php tests/demo-catalogue-smoke.php
 for test in tests/*-js-smoke.js; do node "$test"; done
 php tests/concurrency-smoke.php
 ```
@@ -829,16 +887,47 @@ Die folgende Tabelle nennt die wichtigsten vom Kernel und den integrierten Modul
 | `/nino/elements/delete<type-uri>` | Daten des Elementtyps | Löschen aus einem Typ prüfen oder per `false` verwerfen |
 | `/nino/elements<type-uri>/update/uri` | Elementdaten | auf eine Änderung der Element-URI reagieren |
 | `/nino/elements/committed` | `{ operation, type, uri, previousUri, locale }` | Benachrichtigung, nachdem ein Element eingefügt, geändert oder gelöscht und gespeichert wurde; kann den abgeschlossenen Schreibvorgang nicht verwerfen |
+| `/nino/admin/restore` | `{ dataDir, staging }` | `/_admin` stellt ein Backup wieder her: Ein Modul führt seine eigenen `data/`-Dateien aus der entpackten Kopie in das aktive Verzeichnis zusammen |
+| `/nino/admin/action` | `{ action, panel, status, user, data }` | Eine Panel-Aktion in `/_admin` ist gelaufen und hat geantwortet – reine Benachrichtigung, und auch für eine gescheiterte Aktion. Sagt, wer im Werkzeug was getan hat; *was sich geändert hat*, sagen die Kernel-Events darüber |
 
 Callback-Namen sind einfache Strings. Behandle die etablierten Namen und Argumentformen trotzdem wie eine API: Eine Umbenennung oder ein geänderter Argumenttyp kann jedes registrierte Modul betreffen.
+
+### Zwei Erweiterungsflächen, ein Gedanke
+
+Ein Modul erreicht das Framework auf zwei Wegen, und der Unterschied ist nicht
+Events gegen Methoden – es ist *Reaktion* gegen *Deklaration*.
+
+**Reaktion** ist die Aufgabe der Callbacks. Etwas ist passiert, wer will, läuft
+mit. Die feuernde Seite kennt keinen Listener, mehrere laufen nach Priorität,
+und manche dürfen ablehnen (`/nino/elements<typ>/insert` und Geschwister geben
+`false` zurück). Jeder Name in der Tabelle oben ist von dieser Art.
+
+**Deklaration** ist die Aufgabe des Panel-Contracts von `/_admin`. Ein Modul
+beantwortet `adminPanels()` mit einer Klasse, und diese Klasse *sagt, was sie
+ist*: Uri, Label, Gewicht, Gruppe, Berechtigung, Panes, Assets, Texte, Tabs
+(siehe `\Nino\Admin\Panels` und Abschnitt 7). Daraus baut das Werkzeug eine
+Registry, die es prüfen kann (eine kaputte Uri, eine belegte Uri, ein fehlendes
+`actions()`/`nav()`, ein Asset, das es nicht gibt – jeweils mit der Klasse
+benannt, die es verursacht hat), nach Gruppe und Gewicht sortieren und aus der
+es Rail, Panes, Asset-Bundle, Fills und Rechteliste ableitet. Ein Callback-Bus
+kann das nicht, ohne selbst zur Registry zu werden, und er hat die falsche
+Grundregel dafür: Bei `doCallbacks()` gewinnt der letzte Schreiber, während in
+einer Panel-Registry der *erste* Anspruch auf eine Uri stehen bleiben muss –
+sonst könnte ein Modul ein Kernpanel ersetzen, indem es dessen Namen wählt.
+
+Die Grenze lautet also: **Events über die Werkzeuggrenze, Contract darin.**
+`/_admin` registriert seine eigenen Routen wie alles andere als Callback, und
+`/nino/admin/action` und `/nino/admin/restore` sind die beiden Punkte, an denen
+ein Modul auf das reagiert, was die Workbench tut, ohne dort ein Panel zu
+besitzen.
 
 ## Weiterführende Handbücher
 
 - [Konzepte](concepts.de.md) erklärt die Kernsäulen und den technischen Gesamtzusammenhang.
 - [Erste Schritte](getting-started.de.md) führt vom Checkout zum eingerichteten Projekt.
-- [_install-Referenz](_install.de.md) dokumentiert alle Installationsschritte und Schreibregeln.
-- [`/_admin`-Bedienung](_admin.de.md) beschreibt den vollständigen technischen und inhaltlichen Zugriff.
-- [`/_templates`-Bedienung](_templates.de.md) erklärt den strukturellen Template-Builder im Alpha-Status.
-- [`/_editor`-Bedienung](_editor.de.md) erklärt die redaktionelle Arbeit und das Berechtigungsmodell.
+- [Einrichtungsassistent](setup.de.md) dokumentiert alle Installationsschritte und Schreibregeln.
+- [`/_admin`-Workbench](_admin.de.md) beschreibt jedes Panel, die Rollen und die Recovery-Seite.
+- [Templates-Panel](templates.de.md) erklärt den strukturellen Template-Builder im Alpha-Status.
+- [Design-Panel](appearance.de.md) erklärt die vier Erscheinungsbild-Editoren und den Token-Vertrag.
 - [Deployment](deployment.de.md) beschreibt Webserver, Sicherheit und Go-live.
 - [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) erklärt den Umgang mit Sicherheitsmeldungen.

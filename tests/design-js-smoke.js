@@ -1,6 +1,6 @@
 /**
  *	Nino				A compact filesystembased php framework
- *	design-js-smoke.js	DOM contracts for /_design's four independent editors.
+ *	design-js-smoke.js	DOM contracts for the Design panel's four independent editors.
  *
  *	Usage: node tests/design-js-smoke.js
  */
@@ -198,18 +198,44 @@ sandbox.Nino = {
 		},
 	},
 	events : { bindCallback : function() {} },
+	// The panel's words are fills (see the module's text/ and the workbench's
+	// own); the test reads the English files, so the assertions below keep
+	// checking real sentences rather than keys
+	content : ( function() {
+		const text = {};
+		[ '../_admin/text/en_US.php', '../app/Nino/Modules/Design/text/en_US.php' ].forEach( function( file ) {
+			const php = fs.readFileSync( path.join( __dirname, file ), 'utf8' );
+			for( const m of php.matchAll( /'\[\[([^\]]+)\]\]'\s*=>\s*'((?:[^'\\]|\\.)*)'/g ) )
+				text[ m[1] ] = m[2].replace( /\\(['\\])/g, '$1' );
+		} );
+		return { text : text, getText : function( key ) { return text[key] || ''; } };
+	} )(),
+	// The workbench's hash router (see _admin/assets/script.js): the panel
+	// reads the editor to open from it and writes the open one back
+	admin : {
+		router : {
+			current : function() { return { panel : 'design', parts : [] }; },
+			set : function( panel, parts ) { hashes.push( [ panel ].concat( parts ).join('/') ); },
+		},
+	},
 };
+const hashes = [];
 
 // The knobs are drawn by the design system's own control, so the test runs
 // the real Nino.admin.js rather than stubbing it - a stub would pass while the
 // component it stands in for is broken
-const source = fs.readFileSync( path.join( __dirname, '../_design/assets/design.js' ), 'utf8' );
+const source = fs.readFileSync( path.join( __dirname, '../app/Nino/Modules/Design/assets/design.js' ), 'utf8' );
 const context = vm.createContext( sandbox );
-vm.runInContext( fs.readFileSync( path.join( __dirname, '../_nino/Nino.admin.js' ), 'utf8' ), context, { filename : 'Nino.admin.js' } );
+vm.runInContext( fs.readFileSync( path.join( __dirname, '../_admin/assets/Nino.admin.js' ), 'utf8' ), context, { filename : 'Nino.admin.js' } );
 vm.runInContext( source, context, { filename : 'design.js' } );
 
-const theme = sandbox.Nino.design;
+const theme = sandbox.Nino.admin.design;
 theme.init();
+
+check( 'the panel attaches to the workbench namespace and loads nothing until its tab is selected', typeof theme.showCurrent === 'function'
+	&& posts.length === 0 );
+
+theme.showCurrent();
 
 check( 'the tool exposes exactly the four requested dialogs', JSON.stringify( theme.TABS ) === JSON.stringify( [ 'theme', 'design', 'header', 'footer' ] )
 	&& nodes['theme-nav-theme']._listeners.click.length === 1
@@ -254,10 +280,47 @@ check( '...each opening on the stored position', knobSelect( 'theme-design-knobs
 	&& knobSelect( 'theme-design-knobs-colour', 3 ).value === '3'
 	&& knobSelect( 'theme-design-knobs-raster', 3 ).value === '3' );
 // The option text is the position's name and its value is the number that
-// gets stored, so neither side has to translate the other's vocabulary
+// gets stored, so neither side has to translate the other's vocabulary. The
+// name is the panel's own fill where there is one - the schema in
+// \Nino\Modules\Design\Tokens stays English because the setup wizard renders
+// the same knobs and reaches no fills at all
 check( '...with one option per position, named rather than numbered', knobSelect( 'theme-design-knobs-colour', 3 ).children.length === 3
-	&& knobSelect( 'theme-design-knobs-colour', 3 ).children[2].textContent === 'more'
+	&& knobSelect( 'theme-design-knobs-colour', 3 ).children[2].textContent === 'Strong'
 	&& knobSelect( 'theme-design-knobs-colour', 3 ).children[2].value === '3' );
+// ...and the schema's own word wherever no fill names it, so a knob added to
+// Tokens shows up here at once rather than as a raw key
+check( '...falling back to the schema for a knob no fill names', sandbox.Nino.admin.design._knobText( 'nosuchknob', 'label', 'Schema word' ) === 'Schema word'
+	&& sandbox.Nino.admin.design._knobText( 'contrast', 'label', 'Schema word' ) === 'Contrast' );
+
+// The key is composed ('/_admin/design/knob/'+ knob+ '/'+ part), so nothing
+// static sees it and no coverage check can either: a knob renamed in Tokens or
+// a position added to it goes silently untranslated. Read the schema and walk
+// every key it implies, in both languages
+const tokens = fs.readFileSync( path.join( __dirname, '../app/Nino/Modules/Design/Tokens/Tokens.php' ), 'utf8' );
+const knobBody = tokens.slice( tokens.indexOf( 'KNOBS = [' ) );
+const knobKeys = Array.from( knobBody.matchAll( /^\t\t\t'([a-z]+)' => \[/gm ) ).map( function( m ) { return m[1] } );
+
+const knobFills = {};
+[ 'en_US', 'de_DE' ].forEach( function( locale ) {
+	const php = fs.readFileSync( path.join( __dirname, '../app/Nino/Modules/Design/text/', locale+ '.php' ), 'utf8' );
+	knobFills[locale] = new Set( Array.from( php.matchAll( /'\[\[([^\]]+)\]\]'/g ) ).map( function( m ) { return m[1] } ) );
+} );
+
+const missingKnobFills = [];
+knobKeys.forEach( function( knob ) {
+	const segment = knobBody.slice( knobBody.indexOf( "'"+ knob+ "' => [" ) );
+	const steps = ( segment.match( /'steps'\s*=>\s*\[([^\]]*)\]/ ) || [ '', '' ] )[1].match( /'[^']*'/g ) || [];
+	const parts = [ 'label', 'note', 'hint' ].concat( steps.map( function( _, index ) { return 'step/'+ ( index + 1 ) } ) );
+	parts.forEach( function( part ) {
+		[ 'en_US', 'de_DE' ].forEach( function( locale ) {
+			const key = '/_admin/design/knob/'+ knob+ '/'+ part;
+			if( knobFills[locale].has( key ) === false )
+				missingKnobFills.push( key+ ' '+ locale );
+		} );
+	} );
+} );
+check( 'every knob the schema declares is named in both languages'+ ( missingKnobFills.length ? ' - missing: '+ missingKnobFills.slice( 0, 6 ).join( ', ' ) : '' ),
+	knobKeys.length > 0 && missingKnobFills.length === 0 );
 // One page rather than a strip of chips and three size specimens: a design
 // decision cannot be judged one token at a time
 check( 'the example is delivered whole, as a document into the sandboxed frame', nodes['theme-design-example'].srcdoc === designRead.example );
@@ -477,24 +540,33 @@ check( 'Footer is an independent pane and applies only its own frame', nodes['th
 	&& theme._activeFrames.header === 'v2'
 	&& theme._activeFrames.footer === 'v1' );
 
-const template = fs.readFileSync( path.join( __dirname, '../_design/templates/page-index.tpl' ), 'utf8' );
-const css = fs.readFileSync( path.join( __dirname, '../_design/assets/style.css' ), 'utf8' );
+const template = fs.readFileSync( path.join( __dirname, '../app/Nino/Modules/Design/templates/panel.tpl' ), 'utf8' );
+const css = fs.readFileSync( path.join( __dirname, '../app/Nino/Modules/Design/assets/style.css' ), 'utf8' );
 const adminTemplate = fs.readFileSync( path.join( __dirname, '../_admin/templates/page-index.tpl' ), 'utf8' );
-const templatesTemplate = fs.readFileSync( path.join( __dirname, '../_templates/templates/page-index.tpl' ), 'utf8' );
+const templatesTemplate = fs.readFileSync( path.join( __dirname, '../app/Nino/Modules/Templates/templates/panel.tpl' ), 'utf8' );
 
 check( 'template navigation and content contain one matching pair per dialog', [ 'theme', 'design', 'header', 'footer' ].every( function( tab ) {
 	return template.indexOf('id="theme-nav-'+ tab+ '"') !== -1 && template.indexOf('id="theme-content-'+ tab+ '"') !== -1;
 } ) );
-check( 'one shared action bar changes responsibility with the active dialog', ( template.match(/id="theme-action-save"/g) || [] ).length === 1
-	&& source.indexOf("theme \t: 'Apply Theme'") !== -1
-	&& source.indexOf("design \t: 'Save Design'") !== -1
-	&& template.indexOf('class="nino-admin-btn-primary" id="theme-action-save"') !== -1 );
-check( 'all authenticated tools mount the same availability-aware bridge',
-	adminTemplate.includes('[admin-tools admin]')
-	&& templatesTemplate.includes('[admin-tools templates]')
-	&& template.includes('[admin-tools design]')
-	&& adminTemplate.includes('id="admin-theme"') === false
-	&& templatesTemplate.includes('pd-back-admin') === false );
+check( 'one shared action bar changes responsibility with the active dialog - its words fills of the module\'s own', ( template.match(/id="theme-action-save"/g) || [] ).length === 1
+	&& source.indexOf("theme \t: '/_admin/design/label/apply-theme'") !== -1
+	&& source.indexOf("design \t: '/_admin/design/label/save-design'") !== -1
+	&& template.indexOf('class="nino-admin-btn-primary" id="theme-action-save">[[/_admin/design/label/apply-theme]]</button>') !== -1
+	&& sandbox.Nino.content.getText('/_admin/design/label/save-design') === 'Save Design' );
+check( 'the two module panels are fragments the workbench renders into its pane, with no chrome of their own',
+	template.includes('<html') === false
+	&& template.includes('nino-admin-rail') === false
+	&& templatesTemplate.includes('<html') === false
+	&& templatesTemplate.includes('nino-admin-rail') === false
+	&& adminTemplate.includes('[[/_admin/panes]]')
+	&& adminTemplate.includes('admin-tools') === false );
+check( 'the four editors are a tab strip inside the pane - the shell\'s own tab bar, not a second rail', template.includes('class="nino-admin-tabs nino-admin-tabs--bar theme-tabs" role="tablist"')
+	&& ( template.match(/<button[^>]*id="theme-nav-[a-z]+"[^>]*class="nino-admin-tab[ "]/g) || [] ).length === 4
+	&& nodes['theme-nav-footer'].classList.contains('is-active') === true
+	&& nodes['theme-nav-footer'].getAttribute('aria-selected') === 'true'
+	&& nodes['theme-nav-theme'].getAttribute('aria-selected') === 'false' );
+check( 'the open editor is written to the hash the way every panel deep-links', hashes[0] === 'design/theme'
+	&& hashes[hashes.length - 1] === 'design/footer' );
 check( 'the local stylesheet has an explicit visibility contract for all four panes', [ 'theme', 'design', 'header', 'footer' ].every( function( tab ) {
 	return css.indexOf('#theme-page-wrap.show-'+ tab+ ' #theme-content-'+ tab) !== -1;
 } ) );
@@ -503,8 +575,8 @@ check( 'the local stylesheet has an explicit visibility contract for all four pa
 	/_install, both of them things the operator reads rather than presses:
 	where the way back out sits, and whether a moved setting says so in its
 	own row	*/
-const installCss 			= fs.readFileSync( path.join( __dirname, '../_install/assets/style.css' ), 'utf8' );
-const installTemplate = fs.readFileSync( path.join( __dirname, '../_install/templates/page-wizard.tpl' ), 'utf8' );
+const installCss 			= fs.readFileSync( path.join( __dirname, '../_admin/install/assets/style.css' ), 'utf8' );
+const installTemplate = fs.readFileSync( path.join( __dirname, '../_admin/install/templates/page-wizard.tpl' ), 'utf8' );
 
 check( 'the way back out sits in the Design pane, not in the shared action bar', template.indexOf('id="theme-design-reset"') !== -1
 	&& template.indexOf('id="theme-design-reset"') < template.indexOf('class="nino-admin-actionbar"')
@@ -512,7 +584,8 @@ check( 'the way back out sits in the Design pane, not in the shared action bar',
 // ...at the far end of the mode row, the same way /_install places its own
 check( '...pushed to the far end of the mode row, as /_install places it', css.indexOf('.theme-design-modes #theme-design-reset') !== -1
 	&& installCss.indexOf('.install-design-modes #design-reset') !== -1 );
-check( '...and carries the same words the wizard\'s does', template.indexOf('Back to the theme&rsquo;s values') !== -1
+check( '...and carries the same words the wizard\'s does - as a fill, since the panel speaks the interface language', template.indexOf('>[[/_admin/design/label/reset]]</button>') !== -1
+	&& sandbox.Nino.content.getText('/_admin/design/label/reset') === 'Back to the theme\u2019s values'
 	&& installTemplate.indexOf('Back to the theme&rsquo;s values') !== -1 );
 
 /*	Marked in the field, not only counted in the bar. Nino.adminUi.

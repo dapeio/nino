@@ -1,15 +1,7 @@
 /**
  *	Nino									A compact filesystembased php framework
- *	admin-elements-js-smoke.js	DOM-free checks for the _admin Elements
- *											editor's multi-locale save planning - the same
- *											contract tests/editor-elements-js-smoke.js pins
- *											down for _editor's own copy. Both modules carry
- *											this logic independently (see the class docblock
- *											in _admin/assets/elements.js for why), so it needs
- *											guarding on both sides: the bug it prevents -
- *											submitting only the last visible locale and
- *											silently dropping every translation edited before
- *											it - is exactly what was fixed once already.
+ *	admin-elements-js-smoke.js	DOM-free checks for the Elements editor's
+ *											multi-locale save planning.
  *
  *	Usage: node tests/admin-elements-js-smoke.js
  */
@@ -39,11 +31,11 @@ const sandbox = {
 };
 sandbox.window = sandbox;
 sandbox.Nino = {
-	admin : {},
+	editor : {},
 	events : { bindCallback : function() {} },
 };
 
-const source = fs.readFileSync( path.join( __dirname, '../_admin/assets/elements.js' ), 'utf8' );
+const source = fs.readFileSync( path.join( __dirname, '../_admin/Nino/Modules/Elements/assets/admin.js' ), 'utf8' );
 
 const context = vm.createContext( sandbox );
 
@@ -51,7 +43,7 @@ const context = vm.createContext( sandbox );
 // it: elements.js asks Nino.adminUi whether a model field is a multi element
 // reference, so a sandbox without it tests a module the page never runs
 vm.runInContext(
-	fs.readFileSync( path.join( __dirname, '../_nino/Nino.admin.js' ), 'utf8' ),
+	fs.readFileSync( path.join( __dirname, '../_admin/assets/Nino.admin.js' ), 'utf8' ),
 	context,
 	{ filename : 'Nino.admin.js' }
 );
@@ -68,9 +60,9 @@ const elements = sandbox.Nino.admin.elements;
 // filename>", a directory no deployment has - every upload is stored under
 // /images (Nino\Images::UPLOAD_DIR). The preview shown right after an upload
 // renders the server's own url and always looked right, so the 404 only
-// appeared once the form was re-rendered from the stored value. Checked
-// against the source: the url is only ever built inside _renderField()'s dom
-// branch, which this dom-free sandbox cannot reach
+// appeared once the form was re-rendered from the stored value. Same bug and
+// same guard as _admin's own copy of this module (see
+// tests/admin-elements-js-smoke.js)
 check( 'no image url is built under a /uploads directory', /(?:asset|public)Url\(\s*'\/uploads\//.test( source ) === false );
 check( 'the image preview is built under /images, via the public content prefix', /publicUrl\(\s*'\/images\/'\+ value\s*\)/.test( source ) === true );
 
@@ -91,32 +83,18 @@ check( 'a type without translated fields still needs only one save', JSON.string
 check( 'an absent string equals its untouched empty control', elements._fieldValuesEqual( { type : 'string' }, null, '' ) === true );
 check( 'an absent array equals its untouched empty control', elements._fieldValuesEqual( { type : 'array' }, undefined, [] ) === true );
 check( 'an absent boolean equals its untouched false control', elements._fieldValuesEqual( { type : 'boolean' }, null, false ) === true );
-check( 'an absent number equals its untouched zero control', elements._fieldValuesEqual( { type : 'integer' }, null, 0 ) === true );
 check( 'actual text edits are detected', elements._fieldValuesEqual( { type : 'string' }, 'Before', 'After' ) === false );
-
-// _admin labels a field by its raw model key on purpose - _editor looks up a
-// translated, editor-facing name instead (see the class docblock)
-check( 'a field is labeled by its raw model key', elements._fieldLabel( 'someKey' ) === 'someKey' );
-
-// The raw-bucket view is _admin-only, and renders nothing at all rather than
-// an empty block when the element has no stored buckets (a brand-new one)
-elements._raw = {};
-check( 'the raw view renders nothing for an element with no stored buckets', elements._renderRaw() === null );
-
-// invalidate() is this module's contract with _admin's Element Types module
-// (see elementtypes.js's _invalidateElements()): the schema every form here
-// is built from is read exactly once per page load, so a type saved next
-// door has to drop that cache or the change stays invisible until a full
-// reload. Only the state half is exercised here - the DOM half returns early
-// against this sandbox's stub, which is also what a page without the panel does
-sandbox.document.getElementById = function() { return null };
 
 // An image field never blocks a save, even when its model says required: its
 // file is uploaded separately, only once the element exists and has a uri to
 // attach it to, so on a new element it is empty by construction. Enforcing it
-// would make the element impossible to create at all - the Element Types
-// editor no longer writes the flag onto an image field (see
-// tests/admin-smoke.php), and a model that still carries one is ignored here
+// would make the element impossible to create at all - the same rule _admin's
+// own copy of this module and its Element Types editor apply (see
+// tests/admin-elements-js-smoke.js and tests/admin-smoke.php)
+sandbox.document.getElementById = function() { return null };
+sandbox.Nino.content = { getText : function() { return '' } };
+
+elements._currentType 	= 'service';
 elements._globalKeys 		= [ 'photo' ];
 elements._localeKeys 		= [ 'title' ];
 elements._currentModel	= {
@@ -126,28 +104,6 @@ elements._currentModel	= {
 
 check( 'a required image field is never reported as missing', elements._missingRequiredFields().indexOf( 'photo' ) === -1 );
 check( '...while an empty required field of any other type still is', JSON.stringify( elements._missingRequiredFields() ) === JSON.stringify( [ 'title' ] ) );
-
-const beforeTypes = elements._typesRequest;
-const beforeList 	= elements._listRequest;
-const beforeForm 	= elements._formRequest;
-
-elements._ready 			= true;
-elements._currentType = 'service';
-elements._currentModel = { title : { locale : true } };
-elements._globalKeys 	= [ 'sort' ];
-elements._localeKeys 	= [ 'title' ];
-elements._currentUri 	= 'consulting';
-elements._localeValues = { en_US : { title : 'Consulting' } };
-elements._dirtyLocales = [ 'en_US' ];
-
-elements.invalidate();
-
-check( 'invalidate drops the ready flag, so the next showCurrent() fetches again', elements._ready === false );
-check( 'invalidate forgets the type it was drilled into', elements._currentType === null && elements._currentUri === null );
-check( 'invalidate forgets the model it rendered fields from', elements._currentModel === null && elements._globalKeys.length === 0 && elements._localeKeys.length === 0 );
-check( 'invalidate drops edits belonging to the old model rather than carrying them over', JSON.stringify( elements._localeValues ) === '{}' && elements._dirtyLocales.length === 0 );
-check( 'invalidate bumps every request counter, so responses in flight are dropped on arrival',
-	elements._typesRequest === beforeTypes + 1 && elements._listRequest === beforeList + 1 && elements._formRequest === beforeForm + 1 );
 
 // --- _loadReferenceOptions(): what an element field's select is built from --
 //
@@ -266,6 +222,96 @@ check( 'a single reference still normalizes to an empty string, not a list',
 
 check( 'the form renders the shared control rather than a second copy of it',
 	source.includes('Nino.adminUi.elementList(') && source.includes('Nino.adminUi.isMultiElement( field )') );
+
+
+// --- scoped permissions, as the form reads them ---------------------------
+//
+// apiTypes() sends what the account may do per type; the form draws itself
+// from it so a control the save would refuse is never offered. A type the
+// server said nothing about has to stay fully usable - the enforcement is
+// server-side, and a missing answer must not lock a working panel down.
+
+elements._currentType = 'services';
+elements._rights = {};
+check( 'a type with no answer is unrestricted', elements._mayInsert() === true && elements._mayDelete() === true && elements._mayUpdate('title') === true );
+
+elements._rights = { services : { insert : false, delete : false, update : { title : true, price : false } } };
+check( 'adding is refused where the server said so', elements._mayInsert() === false );
+check( 'deleting is refused where the server said so', elements._mayDelete() === false );
+check( 'a field it may write is writable', elements._mayUpdate('title') === true );
+check( '...and one it may not is not', elements._mayUpdate('price') === false );
+// A field the answer does not mention at all - a model changed since the list
+// was loaded - is not a field to lock: the save decides
+check( 'a field the answer does not mention stays writable', elements._mayUpdate('subtitle') === true );
+
+elements._currentType = 'other';
+check( 'another type is judged by its own answer, not this one', elements._mayInsert() === true );
+
+check( 'the save sends only the fields it may write',
+	source.includes( '.filter( function( key ) { return Nino.admin.elements._mayUpdate( key ) } )' ) );
+// Locking, not hiding: the value is the context the writable fields around it
+// are edited in
+check( 'a field it may not write is rendered and then locked',
+	source.includes( "label.classList.add( 'admin-field-readonly' )" ) && source.includes( "el.disabled = true" ) );
+// _setFormPending( false ) used to re-enable every control in the form, which
+// would hand back exactly the fields this account may not write
+check( 'a save cycle does not unlock them again',
+	source.includes( "el.disabled = pending || el.closest('.admin-field-readonly') !== null" ) );
+check( 'Duplicate is offered where adding is, and only there',
+	source.includes( "Nino.admin.elements._isNew === false && Nino.admin.elements._mayInsert() === true" ) );
+
+
+// --- invalidate(): the contract with the Element Types tab ----------------
+//
+// The schema this module renders every form from belongs to the tab next
+// door, and is read once per page load. When a type is saved, created or
+// deleted over there, this cache is stale - a deleted type leaves this pane
+// on a list of elements that no longer exist. types.js calls
+// Nino.admin.elements.invalidate() for exactly that, so the method has to be
+// here: the call is silent about a namespace member that does not exist until
+// it throws in the browser.
+check( 'the module answers the invalidate() its sibling calls',
+	typeof elements.invalidate === 'function' );
+
+const typesSource = fs.readFileSync( path.join( __dirname, '../_admin/Nino/Modules/Elements/assets/types.js' ), 'utf8' );
+check( '...and that sibling is the one calling it',
+	typesSource.includes( 'Nino.admin.elements.invalidate()' ) );
+
+sandbox.document.getElementById = function() { return null };
+
+elements._ready 			= true;
+elements._loading 		= true;
+elements._currentType = 'services';
+elements._currentModel = { title : { type : 'string' } };
+elements._currentUri 	= 'first';
+elements._globalKeys 	= [ 'title' ];
+elements._localeKeys 	= [ 'body' ];
+elements._globalValues = { title : 'x' };
+elements._localeValues = { de_DE : { body : 'y' } };
+elements._dirtyLocales = [ 'de_DE' ];
+elements._raw 				= { '*' : {} };
+elements._referenceOptions = { tag : [] };
+elements._pendingUri 	= 'first';
+const typesRequestBefore = elements._typesRequest;
+
+elements.invalidate();
+
+// _ready false is what makes the next showCurrent() fetch again rather than
+// re-showing a drill-down level built from the deleted type
+check( 'invalidate drops the cached schema and the open element', elements._ready === false && elements._currentType === null && elements._currentModel === null && elements._currentUri === null );
+check( '...every value the form was holding', JSON.stringify( [ elements._globalKeys, elements._localeKeys, elements._globalValues, elements._localeValues, elements._dirtyLocales, elements._raw ] ) === '[[],[],{},{},[],{}]' );
+check( '...and the leftovers that would outlive it', elements._referenceOptions !== undefined && Object.keys( elements._referenceOptions ).length === 0 && elements._pendingUri === undefined );
+// A types request in flight would otherwise land after this and mark the
+// module ready again, with the list it fetched before the type was deleted
+check( 'a request still in flight is invalidated with it', elements._typesRequest === typesRequestBefore + 1 && elements._loading === false );
+
+// Every drill-down level that writes an error into its pane has to show that
+// pane too - the list one runs while the type picker is still the visible
+// level, so without it a failed elements/list is a click that does nothing
+const errorPaths = source.split( '_showError(' ).length - 1;
+check( 'every error path shows the pane it writes into', errorPaths === 3
+	&& /_showError\( dc\.getElementById\('elements-list'\)[\s\S]{0,120}_showList\(\)/.test( source )
+	&& /_showError\( dc\.getElementById\('elements-form'\)[\s\S]{0,120}_showFormView\(\)/.test( source ) );
 
 console.log( '\n'+ checks+ ' checks, '+ failures+ ' failed' );
 process.exitCode = failures === 0 ? 0 : 1;

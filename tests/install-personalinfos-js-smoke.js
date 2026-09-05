@@ -36,7 +36,7 @@ sandbox.Nino = {
 };
 
 vm.runInContext(
-	fs.readFileSync( path.join( __dirname, '../_install/assets/personalinfos.js' ), 'utf8' ),
+	fs.readFileSync( path.join( __dirname, '../_admin/install/assets/personalinfos.js' ), 'utf8' ),
 	vm.createContext( sandbox ),
 	{ filename : 'personalinfos.js' }
 );

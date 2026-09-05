@@ -30,6 +30,17 @@ const documentStub = {
 const Nino = {
 	events : { bindCallback : function( event, callback ) { if( event === 'ready' ) callbacks.push( callback ) } },
 	http : { sendRequest : function() {} },
+	// The panel says nothing in its own words any more - every string it
+	// renders is a fill (see app/Nino/Modules/Templates/text/). The key stands
+	// in for the sentence here, so the checks below read the same either way
+	content : { getText : function( key ) { return key } },
+	// And a label the server sends is either a fill key or literal text - the
+	// same rule the workbench applies everywhere (Nino.adminUi.text()), so a
+	// section library manifest may keep naming its areas in plain words
+	adminUi : { text : function( value ) {
+		value = String( value ?? '' );
+		return value.charAt(0) === '/' ? ( Nino.content.getText( value ) || value ) : value;
+	} },
 };
 const context = vm.createContext( {
 	window : { Nino : Nino, clearTimeout : clearTimeout, setTimeout : setTimeout, confirm : function() { return true } },
@@ -42,10 +53,10 @@ const context = vm.createContext( {
 } );
 
 [ 'script.js', 'sections.js', 'composer.js', 'area-composer.js' ].forEach( function( file ) {
-	vm.runInContext( fs.readFileSync( path.join( __dirname, '../_templates/assets/', file ), 'utf8' ), context, { filename : file } );
+	vm.runInContext( fs.readFileSync( path.join( __dirname, '../app/Nino/Modules/Templates/assets/', file ), 'utf8' ), context, { filename : file } );
 } );
 
-const model = Nino.templates.model;
+const model = Nino.admin.templates.model;
 
 console.log('Template Builder model');
 
@@ -79,18 +90,21 @@ check( 'document search covers display name, filename and page id', model.matche
 check( 'validates real page template filenames without hiding prefix or suffix', model.validFilename('page-error-404.tpl') && !model.validFilename('error-404') && !model.validFilename('page-../config.tpl') );
 check( 'derives a readable initial name from the filename', model.displayNameFromFilename('page-error-404.tpl') === 'Error 404' );
 check( 'rejects names that cannot be safely stored in an HTML comment', model.validDisplayName('Error 404') && !model.validDisplayName('Broken --> comment') );
-check( 'HTML+ editing detaches generated composer metadata', Nino.templates.sectionsUI.detachMetadata( '<section>\n\t<!-- nino:section {"preset":"blank"} -->\n\t<p>Kept</p>\n</section>' ) === '<section>\n\t<p>Kept</p>\n</section>' );
+check( 'HTML+ editing detaches generated composer metadata', Nino.admin.templates.sectionsUI.detachMetadata( '<section>\n\t<!-- nino:section {"preset":"blank"} -->\n\t<p>Kept</p>\n</section>' ) === '<section>\n\t<p>Kept</p>\n</section>' );
 
 console.log('\nSection Library filtering');
 
-const matches = Nino.templates.composer.matchesPreset;
+const matches = Nino.admin.templates.composer.matchesPreset;
 const preset = { name : 'FAQ — Accordion', description : 'Questions and answers', category : 'Content', tags : [ 'faq', 'support' ] };
-check( 'matches preset names and tags case-insensitively', matches( preset, 'accordion', 'All' ) && matches( preset, 'SUPPORT', 'All' ) );
+// '*' rather than 'All': the two chips this panel adds itself are slugs, so
+// the comparison holds in every interface language (see composer.js's
+// categoryLabel(), which is what names them on screen)
+check( 'matches preset names and tags case-insensitively', matches( preset, 'accordion', '*' ) && matches( preset, 'SUPPORT', '*' ) );
 check( 'applies category and text filters together', matches( preset, 'questions', 'Content' ) && !matches( preset, 'questions', 'Hero' ) );
 check( 'empty search keeps the selected category visible', matches( preset, '', 'Content' ) );
-check( 'the library accepts named-area presets only', Nino.templates.composer.isAreaPreset( { version : 3 } ) && !Nino.templates.composer.isAreaPreset( { version : 1 } ) );
-Nino.templates._library.previewCss = '/* project-preview-css */ .nino-section{display:block}';
-const previewDocument = Nino.templates.composer.previewDocument( '<section id="sample"></section>' );
+check( 'the library accepts named-area presets only', Nino.admin.templates.composer.isAreaPreset( { version : 3 } ) && !Nino.admin.templates.composer.isAreaPreset( { version : 1 } ) );
+Nino.admin.templates._library.previewCss = '/* project-preview-css */ .nino-section{display:block}';
+const previewDocument = Nino.admin.templates.composer.previewDocument( '<section id="sample"></section>' );
 check( 'preview documents inline the project bundle without another stylesheet request', previewDocument.includes( 'project-preview-css' )
 	&& previewDocument.includes( '<section id="sample"></section>' )
 	&& !previewDocument.includes( '<link rel="stylesheet"' )
@@ -98,22 +112,24 @@ check( 'preview documents inline the project bundle without another stylesheet r
 check( 'preview documents block scripts, forms and third-party network access', previewDocument.includes( 'Content-Security-Policy' ) && previewDocument.includes( "script-src 'none'" ) && previewDocument.includes( "form-action 'none'" ) );
 check( 'script-free previews reproduce configured cover heights and a stable parallax image', previewDocument.includes( '[data-cover-height="100"]{min-height:100vh!important}' )
 	&& previewDocument.includes( '.nino-parallex>img{top:0!important;height:100%!important;transform:none!important}' ) );
-const hostilePreview = Nino.templates.composer.previewDocument( '<script>alert(1)</script><a href="javascript:alert(2)" onclick="alert(3)">Safe</a><a href=javascript:alert(4)>Still safe</a><img src=x onerror=alert(5)>' );
+const hostilePreview = Nino.admin.templates.composer.previewDocument( '<script>alert(1)</script><a href="javascript:alert(2)" onclick="alert(3)">Safe</a><a href=javascript:alert(4)>Still safe</a><img src=x onerror=alert(5)>' );
 check( 'preview documents remove executable markup before assigning srcdoc', !hostilePreview.includes( '<script' )
 	&& !hostilePreview.includes( 'javascript:' )
 	&& !/\son[a-z]+=/i.test( hostilePreview ) );
 
-const composerSource = fs.readFileSync( path.join( __dirname, '../_templates/assets/composer.js' ), 'utf8' );
-const areaComposerSource = fs.readFileSync( path.join( __dirname, '../_templates/assets/area-composer.js' ), 'utf8' );
-const sectionsSource = fs.readFileSync( path.join( __dirname, '../_templates/assets/sections.js' ), 'utf8' );
-const scriptSource = fs.readFileSync( path.join( __dirname, '../_templates/assets/script.js' ), 'utf8' );
-const styleSource = fs.readFileSync( path.join( __dirname, '../_templates/assets/style.css' ), 'utf8' );
+const composerSource = fs.readFileSync( path.join( __dirname, '../app/Nino/Modules/Templates/assets/composer.js' ), 'utf8' );
+const areaComposerSource = fs.readFileSync( path.join( __dirname, '../app/Nino/Modules/Templates/assets/area-composer.js' ), 'utf8' );
+const sectionsSource = fs.readFileSync( path.join( __dirname, '../app/Nino/Modules/Templates/assets/sections.js' ), 'utf8' );
+const scriptSource = fs.readFileSync( path.join( __dirname, '../app/Nino/Modules/Templates/assets/script.js' ), 'utf8' );
+const styleSource = fs.readFileSync( path.join( __dirname, '../app/Nino/Modules/Templates/assets/style.css' ), 'utf8' );
 const ninoCssSource = fs.readFileSync( path.join( __dirname, '../_nino/Nino.css' ), 'utf8' );
-const ninoAdminCssSource = fs.readFileSync( path.join( __dirname, '../_nino/Nino.admin.css' ), 'utf8' );
+const ninoAdminCssSource = fs.readFileSync( path.join( __dirname, '../_admin/assets/style.css' ), 'utf8' );
 const ninoUiJsSource = fs.readFileSync( path.join( __dirname, '../_nino/Nino.ui.js' ), 'utf8' );
-const articlesManifestSource = fs.readFileSync( path.join( __dirname, '../_templates/library/articles-grid/manifest.php' ), 'utf8' );
-const templateMarkup = fs.readFileSync( path.join( __dirname, '../_templates/templates/page-index.tpl' ), 'utf8' );
-const templatesPhpSource = fs.readFileSync( path.join( __dirname, '../_templates/Templates.php' ), 'utf8' );
+const articlesManifestSource = fs.readFileSync( path.join( __dirname, '../app/Nino/Modules/Templates/library/articles-grid/manifest.php' ), 'utf8' );
+const templateMarkup = fs.readFileSync( path.join( __dirname, '../app/Nino/Modules/Templates/templates/panel.tpl' ), 'utf8' );
+const templatesPhpSource = fs.readFileSync( path.join( __dirname, '../app/Nino/Modules/Templates/Library/Library.php' ), 'utf8' );
+const panelPhpSource = fs.readFileSync( path.join( __dirname, '../app/Nino/Modules/Templates/Admin/Admin.php' ), 'utf8' );
+const contentPhpSource = fs.readFileSync( path.join( __dirname, '../app/Nino/Modules/Templates/Content/Content.php' ), 'utf8' );
 const sandboxAssignments = composerSource.match( /iframe\.setAttribute\(\s*'sandbox',\s*PREVIEW_SANDBOX\s*\)/g ) || [];
 check( 'the backend refreshes the configured CSS bundle before embedding it', /Assets::doShortcode\(\s*\$appData,\s*\[\s*'\/\.cache\/style\.css'\s*\]/.test( templatesPhpSource ) );
 check( 'gallery and detail previews use an opaque sandbox while CSP still denies scripts', composerSource.includes( "const PREVIEW_SANDBOX = 'allow-scripts'" )
@@ -122,14 +138,23 @@ check( 'gallery and detail previews use an opaque sandbox while CSP still denies
 check( 'the initial detail preview uses the same opaque sandbox', templateMarkup.includes( 'sandbox="allow-scripts"' )
 	&& !templateMarkup.includes( 'sandbox="allow-same-origin"' )
 	&& templateMarkup.includes( 'sandbox=""' ) === false );
-check( 'the top rail mounts the shared dynamic tool bridge instead of a fixed Admin back-link', templateMarkup.includes('[admin-tools templates]')
-	&& templateMarkup.includes('class="pd-head-rail nino-admin-rail-head"')
-	&& templateMarkup.includes('pd-back-admin') === false );
-check( 'the Template bridge uses the same desktop rail geometry as Admin and Theme', styleSource.includes('--pd-topbar-height: 6.85rem')
-	&& /#pd-app \.pd-head-rail \{[^}]*flex-direction: column;[^}]*width: var\(--pd-sidebar-width\);[^}]*padding: 1rem 1\.07rem \.85rem;/s.test( styleSource )
-	&& styleSource.includes('@media (min-width: 58.001rem) and (max-width: 63.999rem)')
-	&& /#pd-app \.pd-head-rail \.nino-admin-brand-mark \{[^}]*width: 2rem;[^}]*height: 2rem;[^}]*box-shadow: none;/s.test( styleSource ) );
-check( 'the Template bridge follows the shared compact-screen wrap', /@media \(max-width: 38rem\)[\s\S]*?#pd-app \.pd-head-rail \{[^}]*flex-wrap: wrap;[\s\S]*?#pd-app \.pd-head-rail \.nino-admin-tools \{[^}]*flex: 1 0 100%;/.test( styleSource ) );
+check( 'the panel keeps a top bar for the document and its actions only - brand, rail and account are the workbench\'s', templateMarkup.includes('id="pd-topbar"')
+	&& templateMarkup.includes('pd-head-rail') === false
+	&& templateMarkup.includes('admin-tools') === false
+	&& templateMarkup.includes('<html') === false
+	&& templateMarkup.includes('<script') === false );
+check( 'the panel declares itself a workspace, which folds the workbench rail and drops the reading width', panelPhpSource.includes("return 'workspace'")
+	&& styleSource.includes('--pd-topbar-height: 6.85rem') === false
+	&& styleSource.includes('@media (min-width: 58.001rem) and (max-width: 63.999rem)') );
+check( 'no element-wide rule leaks out of the panel\'s stylesheet into the workbench', /^body\s*\{/m.test( styleSource ) === false
+	&& /^code\s*\{/m.test( styleSource ) === false
+	&& styleSource.includes('#pd-app code {') );
+check( 'the panel loads nothing until its tab is selected, then keeps its state across switches', scriptSource.includes('showCurrent : function()')
+	&& scriptSource.includes('Nino.admin.templates._loaded === true')
+	&& scriptSource.includes("Nino.http.sendRequest( '/_admin/', 'POST'") );
+check( 'a link into the Elements panel is a hash deep-link, the way the workbench routes', composerSource.includes("'/_admin/#elements/'")
+	&& sectionsSource.includes("'/_admin/#elements/'")
+	&& composerSource.includes('?tab=elements') === false );
 check( 'new-template UI asks for filename, name, shell slots and VPA', [ 'pd-create-filename', 'pd-create-name', 'pd-create-header', 'pd-create-footer', 'pd-create-vpa' ].every( function( id ) { return templateMarkup.includes( 'id="'+ id+ '"' ) } ) );
 check( 'the primary toolbar exposes one Add Section entry point', templateMarkup.includes( 'id="pd-add-section"' ) && templateMarkup.includes( 'id="pd-add-template"' ) === false );
 check( 'Add Section is the final workspace control instead of a template setting',
@@ -143,51 +168,55 @@ check( 'dialog close controls use the shared stroke SVG instead of text glyphs',
 	&& templateMarkup.includes( '<path d="M18 6 6 18"/>' ) );
 check( 'Add Section lists presets only while reusable templates remain Area data inputs', composerSource.includes( 'const includes = []' )
 	&& areaComposerSource.includes( "propertyDefinition.kind === 'template'" )
-	&& areaComposerSource.includes( "include.kind !== 'Page frame'" ) );
+	&& areaComposerSource.includes( "include.kind !== 'frame'" ) );
 check( 'the removed Classic switch cannot reappear in the library UI', !templateMarkup.includes( 'pd-library-scope' )
 	&& !composerSource.includes( 'matchesScope' )
 	&& !composerSource.includes( 'selectScope' ) );
-check( 'dialogs share the #pd-app design scope instead of sitting beside it', /<div id="pd-app"[\s\S]*<dialog id="pd-composer"[\s\S]*<div id="pd-toast"[\s\S]*<\/div>\s*<\/div>\s*<script/.test( templateMarkup ) );
+check( 'dialogs share the #pd-app design scope instead of sitting beside it', /<div id="pd-app"[\s\S]*<dialog id="pd-composer"[\s\S]*<div id="pd-toast"[\s\S]*<\/div>\s*<\/div>\s*$/.test( templateMarkup ) );
 
 console.log('\nNamed area composer');
 
-check( 'the Area editor loads after the established composer and exposes bounded pure helpers', templateMarkup.indexOf( 'composer.js' ) < templateMarkup.indexOf( 'area-composer.js' )
-	&& typeof Nino.templates.areaComposer.nextComponentId === 'function'
-	&& typeof Nino.templates.areaComposer.moveComponent === 'function' );
+check( 'the Area editor loads after the established composer and exposes bounded pure helpers', panelPhpSource.indexOf( "'composer.js'" ) < panelPhpSource.indexOf( "'area-composer.js'" )
+	&& typeof Nino.admin.templates.areaComposer.nextComponentId === 'function'
+	&& typeof Nino.admin.templates.areaComposer.moveComponent === 'function' );
 const componentList = [ { id : 'title' }, { id : 'title-2' }, { id : 'image' } ];
-check( 'new component IDs remain stable and unique within an Area', Nino.templates.areaComposer.nextComponentId( componentList, 'title' ) === 'title-3'
-	&& Nino.templates.areaComposer.nextComponentId( componentList, 'button' ) === 'button' );
-const movedComponents = Nino.templates.areaComposer.moveComponent( componentList, 2, -1 );
+check( 'new component IDs remain stable and unique within an Area', Nino.admin.templates.areaComposer.nextComponentId( componentList, 'title' ) === 'title-3'
+	&& Nino.admin.templates.areaComposer.nextComponentId( componentList, 'button' ) === 'button' );
+const movedComponents = Nino.admin.templates.areaComposer.moveComponent( componentList, 2, -1 );
 check( 'ordered components move without mutating the previous state', movedComponents[1].id === 'image'
 	&& componentList[1].id === 'title-2'
-	&& Nino.templates.areaComposer.moveComponent( componentList, 0, -1 ) === componentList );
-check( 'the editor keeps Area-level Design/Data views and independent collection creation', [ "[ 'design', 'data' ]", "'Content areas'", 'collection.area', 'image.component' ].every( function( marker ) { return areaComposerSource.includes( marker ) } ) );
+	&& Nino.admin.templates.areaComposer.moveComponent( componentList, 0, -1 ) === componentList );
+check( 'the editor keeps Area-level Design/Data views and independent collection creation', [ "[ 'design', 'data' ]", "'/_admin/templates/label/panel-areas'", 'collection.area', 'image.component' ].every( function( marker ) { return areaComposerSource.includes( marker ) } ) );
 check( 'Add Section uses a reduced combined component/data view while Edit keeps fine tuning', [
-	'function quickMode()', 'function renderQuickArea(', "'Components and data'", "if( !quick ) {",
+	'function quickMode()', 'function renderQuickArea(', "'/_admin/templates/label/components-data'", "if( !quick ) {",
 ].every( function( marker ) { return areaComposerSource.includes( marker ) } )
 	&& composerSource.includes( "step === 'library' && pd.composer._context && pd.composer._context.mode === 'replace'" )
 	&& styleSource.includes( '.pd-composer-dialog.is-edit .pd-stepper' ) );
-check( 'Add Section omits visual frame and stack styles without dropping background or data controls', /if\( !quick \) \{[\s\S]*?'Height'[\s\S]*?'Width'[\s\S]*?'Margin top \/ bottom'[\s\S]*?'Padding top \/ bottom'[\s\S]*?\}\s*grid\.appendChild\( formField\( 'Background'/.test( areaComposerSource )
-	&& areaComposerSource.includes( "formField( 'Area style'" )
+// The frame axes rather than their labels: the labels are fills now, and the
+// paths are what actually says which control the quick view leaves out
+check( 'Add Section omits visual frame and stack styles without dropping background or data controls', /if\( !quick \) \{[\s\S]*?'frame\.screen'[\s\S]*?'frame\.container'[\s\S]*?'frame\.margin'[\s\S]*?'frame\.padding'[\s\S]*?\}\s*grid\.appendChild\( formField\([\s\S]{0,120}?'frame\.background'/.test( areaComposerSource )
+	&& areaComposerSource.includes( "'/_admin/templates/label/area-style'" )
 	&& areaComposerSource.includes( 'renderBindingFields( group' ) );
 check( 'binding controls expose collection fields, existing textfills and fixed values', [
-	"{ value : 'field', label : 'Collection field' }", "{ value : 'textfill', label : 'Existing textfill' }", "{ value : 'fixed', label : 'Fixed value' }",
+	"{ value : 'field', label : Nino.content.getText('/_admin/templates/label/collection-field') }",
+	"{ value : 'textfill', label : Nino.content.getText('/_admin/templates/label/textfill-existing') }",
+	"{ value : 'fixed', label : Nino.content.getText('/_admin/templates/label/value-fixed') }",
 ].every( function( marker ) { return areaComposerSource.includes( marker ) } ) );
 check( 'new-section key regeneration preserves explicitly stored shared and fixed bindings', areaComposerSource.includes( "bindingSource( component, property ) !== 'new'" ) );
 check( 'binding sources are read from persisted metadata rather than inferred from values', areaComposerSource.includes( "return component.bindingSources && component.bindingSources[property] || '';" )
 	&& areaComposerSource.includes( 'normalizeExistingSources' ) === false );
-check( 'blacklisted textfills remain selectable in a separate technical group', areaComposerSource.includes( "label : 'Technical values'" )
-	&& templatesPhpSource.includes( "'blacklisted' => ( $entry['blacklisted'] ?? false ) === true" ) );
+check( 'blacklisted textfills remain selectable in a separate technical group', areaComposerSource.includes( "label : Nino.content.getText('/_admin/templates/label/fills-technical')" )
+	&& contentPhpSource.includes( "'blacklisted' => ( $entry['blacklisted'] ?? false ) === true" ) );
 check( 'named Areas render as semantic tabs above one Design/Data workspace', [ "'pd-v3-area-workspace'", "setAttribute( 'role', 'tablist' )", "setAttribute( 'role', 'tabpanel' )" ].every( function( marker ) { return areaComposerSource.includes( marker ) } ) );
-check( 'the background image offers a fixed value next to the two slot choices', areaComposerSource.includes( "{ value : 'fixed', label : 'Fixed value' }" )
-	&& /formField\( 'Background image', '', \[[^\]]*value : 'fixed'/.test( areaComposerSource )
-	&& areaComposerSource.includes( "formField( 'Image URL', 'frame.backgroundImage', 'text'" )
+check( 'the background image offers a fixed value next to the two slot choices', areaComposerSource.includes( "{ value : 'fixed', label : Nino.content.getText('/_admin/templates/label/value-fixed') }" )
+	&& /formField\( Nino\.content\.getText\('\/_admin\/templates\/label\/background-image'\), '', \[[^\]]*value : 'fixed'/.test( areaComposerSource )
+	&& areaComposerSource.includes( "'frame.backgroundImage', 'text'" )
 	&& areaComposerSource.includes( "backgroundSource( draft ) !== 'fixed'" ) );
 check( 'every binding keeps its source and its value on one row', areaComposerSource.includes( 'function bindingRow(' )
 	&& areaComposerSource.includes( "node( 'div', 'pd-v3-binding-row' )" )
 	&& /\.pd-v3-binding-row\s*\{[\s\S]*?grid-template-columns:\s*minmax/.test( styleSource ) );
 check( 'a link target is one checkbox after the address it applies to, in the composer\'s own scope', areaComposerSource.includes( "node( 'label', 'pd-check pd-v3-binding-toggle' )" )
-	&& areaComposerSource.includes( 'Target _blank' )
+	&& areaComposerSource.includes( "'/_admin/templates/label/link-target'" )
 	&& areaComposerSource.includes( 'dataset.targetToggle' )
 	&& areaComposerSource.includes( '[data-target-toggle]' )
 	&& !areaComposerSource.includes( "label : 'Same tab'" )
@@ -206,7 +235,7 @@ check( 'named-area rules use maintainable component specificity in the normal to
 check( 'Area navigation stays horizontal so the editor body keeps the full config-pane width', /\.pd-v3-area-workspace\s*\{[\s\S]*?grid-template-columns:\s*minmax\(0,\s*1fr\)/.test( styleSource )
 	&& /\.pd-v3-area-tabs\s*\{[\s\S]*?display:\s*flex;[\s\S]*?overflow-x:\s*auto;/.test( styleSource )
 	&& !styleSource.includes( 'grid-template-columns: 10.5rem minmax(0, 1fr)' ) );
-check( 'canvas cards and the inspector read named Areas instead of legacy section axes', [ 'isAreaSpec( spec )', 'areaPreview( spec, areaPreset )', "[ 'Areas'", "[ 'Collections'" ].every( function( marker ) { return sectionsSource.includes( marker ) } ) );
+check( 'canvas cards and the inspector read named Areas instead of legacy section axes', [ 'isAreaSpec( spec )', 'areaPreview( spec, areaPreset )', "'/_admin/templates/label/areas'", "'/_admin/templates/label/collections'" ].every( function( marker ) { return sectionsSource.includes( marker ) } ) );
 check( 'the Articles preset keeps every margin-bearing card inside its selected grid row', articlesManifestSource.includes( 'nino-article--grid' )
 	&& [ '25', '33', '50' ].every( function( width ) { return new RegExp( '\\.nino-article--grid\\.nino-grid-m-'+ width+ '\\s*\\{[^}]*width:\\s*calc\\(' ).test( ninoCssSource ) } ) );
 // The frontend speaks one namespace. (?<![-\w]) keeps '-ui-'/'-js-' inside identifiers
@@ -231,13 +260,16 @@ check( 'type size is a modifier of the class it changes, not an em utility over 
 	} )
 	&& /\.nino-section-title--loud \{[^}]*var\(--text-5\)/.test( ninoCssSource )
 	&& /--(quiet|loud) \{[^}]*font-size:[^;]*[0-9.]em/.test( ninoCssSource ) === false );
-check( 'every Auto option names the value it resolves to', areaComposerSource.includes( "return 'Auto ('+ label+ ')'" )
+// The sentence is a fill now (label/auto, "Auto (%s)"), so what is pinned here
+// is that autoLabel() still puts the resolved value into it
+check( 'every Auto option names the value it resolves to', /return Nino\.content\.getText\('\/_admin\/templates\/label\/auto'\)\.replace\( '%s', label \)/.test( areaComposerSource )
+	&& /label\/auto\]\]'\s*\t*=> 'Auto \(%s\)'/.test( fs.readFileSync( path.join( __dirname, '../app/Nino/Modules/Templates/text/en_US.php' ), 'utf8' ) )
 	&& areaComposerSource.includes( "label : autoLabel( humanize( resolved[key] ) )" )
 	&& [ 'screen', 'container', 'vertical', 'margin', 'padding', 'background', 'overlay', 'focus' ].every( function( axis ) {
 		return areaComposerSource.includes( "frameChoices( '"+ axis+ "', recommended )" );
 	} )
-	&& areaComposerSource.includes( 'autoLabel( item.layouts[item.recommend.layout].label )' )
-	&& areaComposerSource.includes( 'autoLabel( area.styles[area.recommend.style].label )' )
+	&& areaComposerSource.includes( 'autoLabel( Nino.adminUi.text( item.layouts[item.recommend.layout].label ) )' )
+	&& areaComposerSource.includes( 'autoLabel( Nino.adminUi.text( area.styles[area.recommend.style].label ) )' )
 	&& areaComposerSource.includes( "'Auto · '" ) === false );
 const recommendedFrameBody = areaComposerSource.slice( areaComposerSource.indexOf( 'function recommendedFrame(' ) ).split( '\n\tfunction ' )[0];
 check( 'what Auto resolves to is read without the choice the user already made', recommendedFrameBody.includes( 'draft.frame' ) === false
@@ -251,9 +283,9 @@ check( 'every preview card is scaled to one viewport, so the gallery compares pr
 const resourceSpec = { version : 3, preset : 'sample', pageId : 'home', id : 'services', areas : { copy : { components : [ { id : 'visual', type : 'image', bindings : { src : '/page-home/services/visual' } } ] } } };
 const resourcePreset = { areas : { copy : { label : 'Copy', source : 'single' } } };
 check( 'v3 image creation is limited to generated background and declared Area image slots',
-	Nino.templates.sectionsUI.areaImageRequest( resourceSpec, resourcePreset, '/page-home/services/background' ).slot === 'background'
-	&& Nino.templates.sectionsUI.areaImageRequest( resourceSpec, resourcePreset, '/page-home/services/visual' ).component === 'visual'
-	&& Nino.templates.sectionsUI.areaImageRequest( resourceSpec, resourcePreset, '/shared/existing-image' ) === null );
+	Nino.admin.templates.sectionsUI.areaImageRequest( resourceSpec, resourcePreset, '/page-home/services/background' ).slot === 'background'
+	&& Nino.admin.templates.sectionsUI.areaImageRequest( resourceSpec, resourcePreset, '/page-home/services/visual' ).component === 'visual'
+	&& Nino.admin.templates.sectionsUI.areaImageRequest( resourceSpec, resourcePreset, '/shared/existing-image' ) === null );
 
 console.log( '\n'+ checks+ ' checks, '+ failures+ ' failed' );
 process.exit( failures > 0 ? 1 : 0 );

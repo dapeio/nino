@@ -60,7 +60,7 @@ sandbox.Nino = { events : { bindCallback : function() {} } };
 
 const context = vm.createContext( sandbox );
 vm.runInContext(
-	fs.readFileSync( path.join( __dirname, '../_install/assets/script.js' ), 'utf8' ),
+	fs.readFileSync( path.join( __dirname, '../_admin/install/assets/script.js' ), 'utf8' ),
 	context,
 	{ filename : 'script.js' }
 );
@@ -74,11 +74,11 @@ const install = sandbox.Nino.install;
 	whose structure the Design does not touch. Themes::apiApply() writes them in
 	this order for the same reason.	*/
 const stepKeys = install.STEPS.map( function( step ) { return step.key; } );
-check( 'Header and Footer are separate steps, and both come before Design', stepKeys.join(',') === 'checks,setup,themes,header,footer,design,webpages,personalinfos,admin,finish' );
+check( 'Header and Footer are separate steps, and both come before Design', stepKeys.join(',') === 'checks,setup,themes,header,footer,design,webpages,personalinfos,accounts,finish' );
 
 // The rail is read top to bottom, so it has to number the steps in the order
 // they actually run
-const wizardNav = fs.readFileSync( path.join( __dirname, '../_install/templates/page-wizard.tpl' ), 'utf8' );
+const wizardNav = fs.readFileSync( path.join( __dirname, '../_admin/install/templates/page-wizard.tpl' ), 'utf8' );
 check( '...and the rail numbers them in that order', stepKeys.every( function( key, index ) {
 	return new RegExp( 'id="install-nav-'+ key+ '"[^>]*>'+ ( index + 1 )+ '\\.' ).test( wizardNav );
 } ) );
@@ -90,14 +90,14 @@ install._commitStep( 'header', function() {} );
 install._commitStep( 'footer', function() {} );
 check( 'Next dispatches each new frame step to its own apply action', frameCommit.join(',') === 'header,footer' );
 
-const wizardTemplate = fs.readFileSync( path.join( __dirname, '../_install/templates/page-wizard.tpl' ), 'utf8' );
+const wizardTemplate = fs.readFileSync( path.join( __dirname, '../_admin/install/templates/page-wizard.tpl' ), 'utf8' );
 check( 'the wizard template carries matching nav and content pairs for both tabs', wizardTemplate.includes('id="install-nav-header"')
 	&& wizardTemplate.includes('id="install-content-header"')
 	&& wizardTemplate.includes('id="install-nav-footer"')
 	&& wizardTemplate.includes('id="install-content-footer"')
 	&& wizardTemplate.includes('id="themes-frames"') === false );
 
-const installStyle = fs.readFileSync( path.join( __dirname, '../_install/assets/style.css' ), 'utf8' );
+const installStyle = fs.readFileSync( path.join( __dirname, '../_admin/install/assets/style.css' ), 'utf8' );
 check( 'the isolated frame previews use the taller viewport', installStyle.includes('--frame-height: 36rem;') );
 
 install._setBusy( true );
@@ -137,7 +137,7 @@ check( 'a successful callback advances from its captured starting index', shown 
 check( 'navigation unlocks after the commit callback', install._busy === false && elements['install-back'].disabled === false && elements['install-next'].disabled === false );
 
 vm.runInContext(
-	fs.readFileSync( path.join( __dirname, '../_install/assets/webpages.js' ), 'utf8' ),
+	fs.readFileSync( path.join( __dirname, '../_admin/install/assets/webpages.js' ), 'utf8' ),
 	context,
 	{ filename : 'webpages.js' }
 );

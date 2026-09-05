@@ -33,6 +33,8 @@ const Nino = {
 	admin : {},
 	events : { bindCallback : function( event, callback ) { if( event === 'ready' ) callbacks.push( callback ) } },
 	http : { sendRequest : function() {} },
+	// The panel's words are fills; the parser's one message is one of them
+	content : { getText : function( key ) { return key } },
 };
 const context = vm.createContext( {
 	window : { Nino : Nino },
@@ -43,7 +45,7 @@ const context = vm.createContext( {
 	TypeError : TypeError,
 } );
 
-vm.runInContext( source('_admin/assets/translations.js'), context, { filename : 'translations.js' } );
+vm.runInContext( source('_admin/Nino/Modules/Language/assets/translations.js'), context, { filename : 'translations.js' } );
 
 console.log('Admin Translations');
 
@@ -60,24 +62,25 @@ try { parse('{broken') } catch( error ) { rejectedInvalid = true }
 check( 'rejects malformed JSON', rejectedInvalid );
 check( 'registers its ready callback', callbacks.length === 1 );
 
-const editorText = source('_editor/assets/text.js');
-const editorPhp = source('_editor/Editor.php');
+const editorText = source('_admin/Nino/Modules/Text/assets/admin.js');
+const editorPhp = source('_admin/Nino/Modules/Text/Admin/Admin.php');
 check( 'Editor no longer renders the old text-only translation toolbar', editorText.includes('_renderTranslateTools') === false && editorText.includes('text-translate-tools') === false );
 check( 'Editor no longer exposes batch translation endpoints', editorPhp.includes("'text/export'") === false && editorPhp.includes("'text/import'") === false );
 
-const adminTemplate = source('_admin/templates/page-index.tpl');
-check( 'Admin exposes Translations and labels the route module correctly', adminTemplate.includes('id="admin-nav-translations">Translations') && adminTemplate.includes('id="admin-nav-pages">Routes') );
+// The shell's nav is rendered from each panel's nav() - see \Nino\Panels
+const adminPhp = source('_admin/Nino/Modules/Language/Translations/Translations.php')+ source('_admin/Nino/Modules/Routes/Admin/Admin.php');
+check( 'Admin exposes Translations as a tab of the Language panel and labels both it and Routes with fills', /\[ 'translations', '\/_admin\/nav\/translations', \d+, 'system' \]/.test( adminPhp ) && source('_admin/Nino/Modules/Language/Admin/Admin.php').includes( 'return [ Translations::class ];' ) && /\[ 'routes', '\/_admin\/nav\/routes', \d+, 'structure' \]/.test( adminPhp ) );
+check( 'the tab renders into its own mount point, not the pane it shares', source('_admin/Nino/Modules/Language/assets/translations.js').includes( "getElementById('translations-content')" ) && source('_admin/Nino/Modules/Language/assets/translations.js').includes( 'admin-content-translations' ) === false && /return \[ 'translations-content' \];/.test( adminPhp ) );
 
 console.log('\nShared HTML editor');
 
-const htmlEditor = source('_editor/assets/html-editor.js');
-// The rich-text surface is shared markup: /_admin and /_editor mount the same
-// html-editor.js, so its rules belong to the design system rather than to one
-// tool's stylesheet - a tool copy only ever reached one of the two callers
-const editorCss = source('_nino/Nino.admin.css');
+const htmlEditor = source('_admin/assets/html-editor.js');
+// The rich-text surface is shared markup, so its rules belong to the design
+// system half of the workbench stylesheet rather than to one panel's own
+const editorCss = source('_admin/assets/style.css');
 const kernel = source('_nino/Nino.php');
-const editorElements = source('_editor/assets/elements.js');
-const adminElements = source('_admin/assets/elements.js');
+const editorElements = source('_admin/Nino/Modules/Elements/assets/admin.js');
+const adminElements = source('_admin/Nino/Modules/Elements/assets/admin.js');
 check( 'toolbar and server sanitizer both whitelist code', htmlEditor.includes("'span', 'code', 'a'") && kernel.includes("'span', 'code', 'a'") );
 check( 'the editable surface explicitly restores drag selection', editorCss.includes('.nino-admin-richtext-content *') && editorCss.includes('-webkit-user-select: text') && editorCss.includes('user-select: text') );
 check( 'rich text is not nested inside an interactive label', editorText.includes("dc.createElement( entry.html === true ? 'div' : 'label' )") && editorElements.includes("dc.createElement( isHtml ? 'div' : 'label' )") && adminElements.includes("dc.createElement( isHtml ? 'div' : 'label' )") );
