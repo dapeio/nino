@@ -1,0 +1,23 @@
+# Static analysis - run with `phpstan analyse` (CI installs PHPStan via
+# setup-php's tools, locally: https://phpstan.org/user-guide/getting-started).
+# Level 5 is the baseline the code passes today; phpstan-baseline.neon lists
+# the findings that were open when the check was introduced, so the check
+# only ever fails on something new. Raise the level (and regenerate the
+# baseline with `phpstan analyse --generate-baseline`) release by release.
+includes:
+  - phpstan-baseline.neon
+
+parameters:
+  level: 5
+  phpVersion: 80400
+  paths:
+    - _nino
+    - _admin
+    - app
+    - index.php
+    - router.php
+  excludePaths:
+    # Installer library: page/theme/frame packages - templates, text and
+    # manifest data, no logic
+    - _admin/install/library
+  reportUnmatchedIgnoredErrors: false

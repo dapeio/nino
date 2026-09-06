@@ -1,0 +1,73 @@
+@layer nino.system, nino.tool, nino.local;
+
+/**
+ *	Nino										A compact filesystembased php framework
+ *	Modules\Routes			The routes and the pages behind them
+ *	admin.css								What the module's /_admin panel needs beyond the design
+ *													system in _admin/assets/style.css: the route list, its
+ *													per-locale content rows, and those rows on a phone.
+ *													Bundled while the module is there (see the panel's
+ *													assets()), so the same layer rules apply - the shell's
+ *													stylesheet fixes the layer order, this one only ever adds
+ *													to nino.tool, scoped to the panel's own ids.
+ *
+ *	@package								Dape/Nino
+ *	@author									David Perchermeier <mail@dape.io>
+ *	@link										https://github.com/dapeio/nino
+ */
+
+@layer nino.tool {
+
+#routes-list > .nino-admin-list {
+	margin-bottom: .75rem;
+}
+
+#routes-list > .nino-admin-list > li {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+}
+
+#routes-list > .nino-admin-list > li > a {
+	flex: 1 1 auto;
+	min-width: 0;
+	font: .78rem/1.4 var(--nino-admin-mono);
+}
+
+#admin-page-wrap .admin-page-locale-row {
+	display: grid;
+	grid-template-columns: 3.2rem 1fr 1fr;
+	gap: .5rem;
+	align-items: start;
+	padding: .5rem 0;
+	border-top: 1px solid var(--editor-separator);
+}
+
+#admin-page-wrap .admin-page-locale-row:first-child {
+	border-top: 0;
+}
+
+#admin-page-wrap .admin-page-locale-label {
+	padding-top: .5rem;
+	color: var(--editor-text-secondary);
+	font: .7rem/1.4 var(--nino-admin-mono);
+}
+
+#admin-page-wrap .admin-page-locale-row textarea {
+	grid-column: 2 / -1;
+}
+
+@media (max-width: 38rem) {
+
+	#admin-page-wrap .admin-page-locale-row {
+		grid-template-columns: 1fr;
+	}
+
+	#admin-page-wrap .admin-page-locale-label,
+	#admin-page-wrap .admin-page-locale-row textarea {
+		grid-column: 1;
+	}
+
+}
+
+}

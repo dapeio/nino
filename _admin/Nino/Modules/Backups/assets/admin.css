@@ -1,0 +1,37 @@
+@layer nino.system, nino.tool, nino.local;
+
+/**
+ *	Nino										A compact filesystembased php framework
+ *	Modules\Backups		The daily backup and restoring one
+ *	admin.css								What the module's /_admin panel needs beyond the design
+ *													system in _admin/assets/style.css: the date rows, which
+ *													read as filenames rather than as prose. Bundled while the
+ *													module is there (see the panel's assets()), so the same
+ *													layer rules apply - the shell's stylesheet fixes the layer
+ *													order, this one only ever adds to nino.tool, scoped to the
+ *													panel's own ids.
+ *
+ *	@package								Dape/Nino
+ *	@author									David Perchermeier <mail@dape.io>
+ *	@link										https://github.com/dapeio/nino
+ */
+
+@layer nino.tool {
+
+/* ------------------------------------------------------- Backups / Users */
+
+#backups-dates > li {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 1rem;
+	min-height: var(--nino-admin-row-height);
+	padding: .55rem .75rem;
+	font: .8rem/1.4 var(--nino-admin-mono);
+}
+
+#backups-dates > li > button {
+	flex: 0 0 auto;
+}
+
+}

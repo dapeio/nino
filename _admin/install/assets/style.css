@@ -1,0 +1,730 @@
+@layer nino.system, nino.tool, nino.local;
+
+/**
+ *	Nino										A compact filesystembased php framework
+ *	style.css								What is genuinely local to the setup wizard: the step
+ *													switcher, the environment report, the theme picker and
+ *													the finish screen.
+ *
+ *	@package								Dape/Nino
+ *	@author									David Perchermeier <mail@dape.io>
+ *	@link										https://github.com/dapeio/nino
+ *
+ *	The shell, the rail, the step nav, the pane, cards, grouped lists, form
+ *	controls, buttons, the login/locked card and the fixed Back/Next bar all
+ *	come from _admin/assets/style.css and are reused, not restated.
+ *
+ *	The wizard used to link the old tools' stylesheets too, for a
+ *	handful of their tool-local classes. It no longer does: borrowing a whole
+ *	tool stylesheet for one utility is what let an unrelated /_admin list rule
+ *	push a stray margin onto this wizard's own buttons, and it cost every setup
+ *	run two stylesheets it used almost nothing of.
+ */
+
+@layer nino.tool {
+
+/*	Force-hide an element regardless of its own display rules - the wizard's
+ *	own copy of the utility every tool here keeps (.editor-hidden, .pd-hidden) */
+.install-hidden {
+	display: none !important;
+}
+#install-page-wrap code, #install-locked-wrap code {
+	font-family: var(--nino-admin-mono);
+	font-size: .9em;
+}
+
+/* ---------------------------------------------------------------- Locked */
+
+#install-locked-msg {
+	margin: 1.25rem 0 .5rem;
+	font-size: 1.35rem;
+	font-weight: 750;
+	letter-spacing: -.03em;
+}
+
+/* ----------------------------------------------------------------- Wizard */
+
+#install-bar-title {
+	display: flex;
+	align-items: center;
+	gap: .65rem;
+	min-width: 0;
+}
+/*	Only one step's content pane is visible at a time - #install-page-wrap's
+ *	class (set by Nino.install.selectStep(), see script.js) picks which */
+#install-content-wrap > div {
+	display: none;
+}
+#install-page-wrap.show-checks #install-content-checks, #install-page-wrap.show-setup #install-content-setup, #install-page-wrap.show-themes #install-content-themes, #install-page-wrap.show-header #install-content-header, #install-page-wrap.show-footer #install-content-footer, #install-page-wrap.show-webpages #install-content-webpages, #install-page-wrap.show-personalinfos #install-content-personalinfos, #install-page-wrap.show-accounts #install-content-accounts, #install-page-wrap.show-finish #install-content-finish {
+	display: block;
+}
+
+/* ------------------------------------------------------------- Environment */
+
+.install-check-group {
+	display: block;
+	margin: 0 0 1rem;
+}
+.install-check-group h3 {
+	margin: 0 0 .35rem;
+	color: var(--editor-text-secondary);
+}
+.install-check-row {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: .75rem;
+	font-size: .84rem;
+}
+.install-check-row-name {
+	font-family: var(--nino-admin-mono);
+}
+.install-check-row-detail {
+	color: var(--editor-text-secondary);
+	font-size: .76rem;
+}
+/*	Both a word and a colour: "OK"/"FAIL" has to survive a colour-blind reader
+ *	and a greyscale screenshot */
+.install-check-status {
+	flex: 0 0 auto;
+	padding: .1rem .45rem;
+	border-radius: 999px;
+	font-size: .74rem;
+	font-weight: 700;
+}
+.install-check-status--ok {
+	background: var(--editor-green-soft);
+	color: var(--editor-green);
+}
+.install-check-status--fail {
+	background: var(--editor-red-soft);
+	color: var(--editor-red);
+}
+
+/* ------------------------------------------------------------- Themes step */
+
+/*	One tile per library/themes/<key> unit, each a <label> wrapping a
+ *	hidden radio - the whole card is the click target for picking, except the
+ *	preview image itself, which opens the lightbox instead (see themes.js) */
+
+#themes-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
+	gap: .75rem;
+	margin: 0 0 1rem;
+}
+.install-theme-tile {
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+	border: 1px solid var(--editor-border);
+	border-radius: var(--editor-radius);
+	background: var(--editor-bg-grouped);
+	box-shadow: var(--editor-shadow-sm);
+	cursor: pointer;
+	transition: border-color .15s ease, box-shadow .15s ease;
+}
+.install-theme-tile:hover {
+	border-color: color-mix(in srgb, var(--editor-blue) 35%, var(--editor-border));
+	box-shadow: var(--editor-shadow);
+}
+.install-theme-tile--active {
+	border-color: var(--editor-blue);
+	box-shadow: 0 0 0 3px var(--editor-blue-soft), var(--editor-shadow);
+}
+.install-theme-tile:has(input:focus-visible) {
+	outline: 2px solid var(--editor-blue);
+	outline-offset: 2px;
+}
+/*	Kept focusable/reachable by keyboard, just never drawn - the tile's own
+ *	border is what shows the selection */
+.install-theme-tile input[type="radio"] {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	opacity: 0;
+	pointer-events: none;
+}
+.install-theme-preview {
+	display: block;
+	width: 100%;
+	aspect-ratio: 3 / 2;
+	border-bottom: 1px solid var(--editor-separator);
+	background: var(--editor-bg-elevated);
+	object-fit: cover;
+	object-position: top center;
+	cursor: zoom-in;
+}
+.install-theme-body {
+	display: flex;
+	flex-direction: column;
+	gap: .2rem;
+	padding: .8rem .85rem .9rem;
+}
+.install-theme-title {
+	font-size: .86rem;
+	font-weight: 650;
+}
+.install-theme-description {
+	color: var(--editor-text-secondary);
+	font-size: .76rem;
+	line-height: 1.45;
+}
+/*	Header/Footer each own a full step after Design. themes.js fills these
+ *	panels from themes/list and hides one when that kind has no units on disk. */
+
+.install-theme-panel {
+	margin: 0 0 1.25rem;
+	padding: .9rem 1rem 1rem;
+	border-radius: var(--editor-radius);
+}
+.install-frame-pick {
+	display: flex;
+	flex-direction: column;
+	gap: .45rem;
+}
+.install-frame-pick .install-theme-field {
+	max-width: 16rem;
+}
+/*	The stage clips the iframe and carries the border, so the preview reads as
+ *	a picture of a page rather than as part of this one */
+.install-frame-stage {
+	overflow: hidden;
+	border: 1px solid var(--editor-border);
+	border-radius: var(--editor-radius);
+	background: var(--editor-bg-elevated);
+}
+/*	A frame is drawn for a page, not for a 900px panel: rendered at a desktop
+ *	width and scaled down, so the preview shows the desktop layout a visitor
+ *	gets rather than the same frame in its mobile arrangement.
+ *
+ *	transform: scale() does not change the space the element takes, so the
+ *	stage would keep its full height and leave a gap under the picture. The
+ *	pull-up is derived from the same two variables rather than measured off a
+ *	screenshot, so changing either keeps the two in step. */
+.install-frame-view {
+	--frame-height: 36rem;
+	--frame-scale: .75;
+
+	display: block;
+	/*	Derived, not fixed: at a fixed 1280px the scaled result is wider than
+	 *	the stage on some panel widths and the last nav item gets clipped, and
+	 *	narrower on others and leaves a gap. Dividing by the scale makes the
+	 *	rendered width exactly fill the stage whatever it is - and the result
+	 *	is still a desktop width, which is the point of scaling at all */
+	width: calc( 100% / var(--frame-scale) );
+	height: var(--frame-height);
+	border: 0;
+	transform: scale(var(--frame-scale));
+	transform-origin: top left;
+	margin-bottom: calc( var(--frame-height) * ( var(--frame-scale) - 1 ) );
+}
+@media (max-width: 1250px) {
+	.install-frame-view { --frame-scale: .55; }
+}
+@media (max-width: 900px) {
+	.install-frame-view { --frame-scale: .4; }
+}
+.install-theme-field {
+	display: flex;
+	flex-direction: column;
+	gap: .3rem;
+	font-size: .78rem;
+	font-weight: 600;
+}
+.install-theme-field small {
+	color: var(--editor-text-secondary);
+	font-weight: 400;
+}
+.install-theme-field.is-changed > span:first-child:before {
+	content:"*";
+	display:inline-block;
+	padding-right:3px;
+	transform:scale(1.5);
+	color: #ffa834;
+}
+/*	The native picker and the hex field are one control with two ways in, so
+ *	they sit in one box rather than reading as two separate fields */
+.install-theme-color {
+	display: flex;
+	align-items: center;
+	gap: .4rem;
+}
+.install-theme-swatch {
+	flex: 0 0 auto;
+	width: 1.4rem;
+	height: 2.1rem;
+	padding: 0;
+	border: 1px solid var(--editor-border);
+	border-radius: var(--editor-radius-sm, .35rem);
+	background: none;
+	cursor: pointer;
+}
+.install-theme-color .nino-admin-input {
+	min-width: 0;
+	flex: 1 1 auto;
+}
+/* ------------------------------------------------------------------ Design */
+/*	Its own step rather than a third panel under the theme grid: the grid
+ *	already fills the pane, and everything here needs to be looked at while it
+ *	is being changed. Settings left behind two tabs, one page right. */
+
+/*	Controls left, one page right. The column is deliberately narrow - a
+	setting is a word and a select, and giving it half the step only pushes the
+	thing it changes off screen.	*/
+.install-design-split {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr);
+	gap: 1.1rem;
+	/*	Both columns take the row's height, so the preview is exactly as tall
+		as the settings beside it. Stretch is the grid default - it is named
+		here because it is load-bearing rather than incidental	*/
+	align-items: stretch;
+}
+.install-design-controls {
+	display: flex;
+	flex-direction: column;
+	gap: 0;
+	padding: .9rem 1rem 1.1rem;
+	border: 1px solid var(--editor-border);
+	border-radius: var(--editor-radius);
+	background: var(--editor-bg-grouped);
+}
+.install-design-controls .nino-admin-tabs {
+	gap:0;
+}
+.install-design-controls .nino-admin-tabs button:first-child {
+	border-radius: var(--editor-radius-sm) 0 0 var(--editor-radius-sm);
+}
+.install-design-controls .nino-admin-tabs button:last-child {
+	border-radius: 0 var(--editor-radius-sm) var(--editor-radius-sm) 0;
+}
+.install-design-controls .nino-admin-tabs button.is-active:hover {
+	background-color: var(--editor-blue);
+}
+.install-design-modes #design-reset {
+	margin-left:auto;
+}
+/*	The knobs stack rather than grid: one column of label-over-select reads top
+	to bottom as a list of decisions, where two columns read as a form.
+
+	Scoped to the panel rather than to every child of the column - the tab row
+	is a child too, and a flex-direction meant for the settings would have
+	stood it on end	*/
+/*	:not([hidden]) so a tool rule can never outrank the design system's own
+	[hidden] and hold open a tab that is supposed to be closed	*/
+.install-design-panel:not([hidden]),
+.install-design-panel > div {
+	display: flex;
+	flex-direction: column;
+	gap: .3rem;
+}
+/*	The open panel takes what the column has spare, for the row where the
+	preview beside it is the taller of the two. It does not equalise the two
+	tabs - Colour carries two more controls than Raster, so the column is
+	shorter on Raster and the preview follows it down	*/
+.install-design-panel:not([hidden]) {
+	flex: 1 1 auto;
+}
+.install-design-stage {
+	display: flex;
+	flex-direction: column;
+	gap: .55rem;
+	min-width: 0;
+}
+.install-design-modes {
+	display: flex;
+	gap: .3rem;
+}
+.install-design-mode {
+	padding: .3rem .8rem;
+	border: 1px solid var(--editor-border);
+	border-radius: 999px;
+	background: var(--editor-bg-elevated);
+	color: var(--editor-text-secondary);
+	font-size: .75rem;
+	font-weight: 600;
+	cursor: pointer;
+}
+.install-design-mode.is-active {
+	border-color: var(--editor-blue);
+	background: var(--editor-blue-soft);
+	color: var(--editor-blue);
+}
+.install-design-mode:focus-visible {
+	outline: 2px solid var(--editor-blue);
+	outline-offset: 2px;
+}
+/*	The frame takes whatever the column has left after the mode buttons, which
+	is what makes the preview end level with the last setting.
+
+	min-height rather than height, for the row where that gives it nothing to
+	take: stacked under the controls below the breakpoint, the stage is a row
+	of its own, and an iframe with no intrinsic height would collapse to the
+	replaced-element default of 150px	*/
+/*	The box the frame is shown inside. The frame itself is wider than this and
+	scaled down into it, so the overflow is deliberate - and clipped	*/
+.install-design-port {
+	position: relative;
+	flex: 1 1 auto;
+	min-height: min(60vh, 32rem);
+	overflow: hidden;
+	border: 1px solid var(--editor-border);
+	border-radius: var(--editor-radius);
+	background: var(--editor-bg-elevated);
+}
+
+/*	Width and height are set by Nino.adminUi.scaleFrame(): they are the layout
+	size the page renders at, not the size it is shown at	*/
+.install-design-view {
+	position: absolute;
+	top: 0;
+	left: 0;
+	border: 0;
+	transform-origin: 0 0;
+}
+
+@media (min-width: 62rem) {
+	.install-design-split {
+		grid-template-columns: minmax(14rem, 16rem) minmax(0, 1fr);
+	}
+}
+#install-page-wrap.show-design #install-content-design {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+#themes-design-colours {
+	flex-wrap:wrap;
+	flex-direction:row;
+}
+#themes-design-colours > label {
+    flex: 1 1 calc(50% - .4rem);
+    min-width: 4rem;
+}
+#design-controls {
+    flex: 1 1 auto;
+    min-height: 0; /* Verhindert Overflow durch flex-children */
+}
+
+/*	Lightbox - one reused overlay for every tile, closed by a click anywhere or
+ *	Escape (see themes.js). Sits outside .nino-admin, so it carries its own
+ *	colours rather than the shell's. */
+#themes-lightbox {
+	position: fixed;
+	inset: 0;
+	z-index: 100;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: .75rem;
+	padding: 2rem 1rem;
+	background: rgba(0,0,0,.7);
+	backdrop-filter: blur(6px);
+	-webkit-backdrop-filter: blur(6px);
+	cursor: zoom-out;
+}
+#themes-lightbox-image {
+	max-width: min(60rem, 100%);
+	max-height: 80vh;
+	border-radius: var(--editor-radius);
+	box-shadow: 0 1.5rem 3rem rgba(0,0,0,.45);
+}
+#themes-lightbox-caption {
+	margin: 0;
+	color: #fff;
+	font-size: .84rem;
+	font-weight: 650;
+}
+
+/* ----------------------------------------------------------- Routes step */
+
+/*	List + drill-down form, the same shape /_admin's Routes module has: the list
+ *	is a shared .nino-admin-list (see webpages.js) and the form is bare
+ *	<fieldset>s the design system already styles. Only the reorder cluster and
+ *	the per-locale row are local. */
+
+#webpages-list .nino-admin-list > li {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+}
+#webpages-list .nino-admin-list > li > a {
+	flex: 1 1 auto;
+	min-width: 0;
+	font: .78rem/1.4 var(--nino-admin-mono);
+}
+.install-webpage-move {
+	display: flex;
+	flex: 0 0 auto;
+	gap: .25rem;
+	padding: 0 .65rem;
+}
+.install-webpage-move button {
+	display: inline-grid;
+	place-items: center;
+	width: 1.85rem;
+	height: 1.85rem;
+	min-height: 0;
+	padding: 0;
+	border-radius: var(--editor-radius-sm);
+	box-shadow: inset 0 0 0 1px var(--editor-border);
+	font-size: .76rem;
+	line-height: 1;
+}
+.install-webpage-move button:disabled {
+	opacity: .32;
+}
+.install-webpage-requires {
+	margin: .5rem 0 0;
+}
+.install-webpage-locale-row {
+	display: grid;
+	grid-template-columns: 3.2rem 1fr 1fr;
+	align-items: start;
+	gap: .5rem;
+	padding: .5rem 0;
+	border-top: 1px solid var(--editor-separator);
+}
+.install-webpage-locale-row:first-child {
+	border-top: 0;
+}
+.install-webpage-locale-label {
+	padding-top: .5rem;
+	color: var(--editor-text-secondary);
+	font: .7rem/1.4 var(--nino-admin-mono);
+}
+.install-webpage-locale-row textarea {
+	grid-column: 2 / -1;
+}
+
+/* -------------------------------------------------------------- Admins step */
+
+/*	#personalinfos-form-global/-locale and #accounts-add-form are plain
+ *	<fieldset>/.nino-admin-card surfaces with .nino-admin-field rows, styled
+ *	entirely by the design system - see personalinfos.js and admin.js */
+
+.install-admin-row {
+	font: .8rem/1.4 var(--nino-admin-mono);
+}
+
+/* --------------------------------------------------------- Step messages */
+
+/*	Every step's message lives in the action bar now, beside the button that
+	acts on it - see page-wizard.tpl. Left rather than right, because it is read
+	before the button is pressed and the eye starts on that side; the design
+	system's own status slot is right-aligned, so this overrides it. */
+#install-actions-status {
+	flex: 1 1 auto;
+	min-width: 0;
+	text-align: left;
+}
+
+#install-actions-status p {
+	margin: 0;
+	color: var(--editor-text-secondary);
+	font-size: .8rem;
+	line-height: 1.35;
+}
+
+/*	One step's message is on screen at a time, and which one is the same pane
+	class the panes themselves are shown by. The wizard's own
+	#install-actions-msg is not a step's and is always there. */
+.install-step-msg {
+	display: none;
+}
+
+#install-page-wrap.show-setup #setup-msg,
+#install-page-wrap.show-themes #themes-msg,
+#install-page-wrap.show-design #design-msg,
+#install-page-wrap.show-header #header-msg,
+#install-page-wrap.show-footer #footer-msg,
+#install-page-wrap.show-webpages #webpages-msg,
+#install-page-wrap.show-personalinfos #personalinfos-msg,
+#install-page-wrap.show-admin #accounts-add-msg,
+#install-page-wrap.show-finish #finish-msg {
+	display: block;
+}
+
+/*	The step's own messages are notes; this one is a refusal. Said in a word as
+	well as in a colour - see design.js's _hexState */
+#install-actions-status #design-msg.is-error {
+	color: var(--editor-red);
+}
+
+/*	The step's message and its way back out, on one line under the split. The
+	message takes the room so the button keeps its place as it comes and goes */
+.install-design-footer {
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
+	gap: .6rem;
+	margin-top: .5rem;
+}
+
+/* ------------------------------------------------------------- Responsive */
+
+@media (max-width: 36rem) {
+	.install-webpage-locale-row {
+		grid-template-columns: 1fr;
+	}
+	.install-webpage-locale-label, .install-webpage-locale-row textarea {
+		grid-column: 1;
+	}
+}
+
+}
+
+@layer nino.local {
+/* ------------------------------------------------- Design-system locals */
+/*
+   Tool-local components and overrides (see _admin/assets/style.css).
+   Ids are fine here - this file only ever loads inside the setup wizard - but they
+   stay out of the shared design system, which has to work for all four tools.
+*/
+
+/* The finish screen replaces the wizard chrome rather than sitting inside it */
+#install-page-wrap #finish-done {
+	max-width: 72rem;
+	margin: clamp(1.5rem, 5vh, 3.5rem) auto 0;
+}
+#install-page-wrap .install-finish-intro {
+	display: flex;
+	align-items: center;
+	gap: 1rem;
+	margin-bottom: 1.25rem;
+}
+#install-page-wrap .install-finish-mark {
+	display: grid;
+	place-items: center;
+	width: 3.25rem;
+	height: 3.25rem;
+	flex: 0 0 auto;
+	border-radius: 50%;
+	background: var(--editor-green-soft);
+	color: var(--editor-green);
+}
+#install-page-wrap .install-finish-mark svg {
+	width: 1.55rem;
+	height: 1.55rem;
+}
+#install-page-wrap .install-finish-intro h1 {
+	margin: .1rem 0 .22rem;
+	font-size: clamp(1.35rem, 3vw, 1.8rem);
+}
+#install-page-wrap .install-finish-intro p {
+	margin: 0;
+	color: var(--editor-text-secondary);
+}
+#install-page-wrap .install-finish-eyebrow {
+	color: var(--editor-green);
+}
+#install-page-wrap .install-next-steps {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+	gap: .8rem;
+}
+#install-page-wrap .install-next-step {
+	--install-next-accent: var(--editor-blue);
+	--install-next-soft: var(--editor-blue-soft);
+	display: grid;
+	grid-template-columns: auto minmax(0, 1fr) auto;
+	align-items: center;
+	gap: .8rem;
+	min-height: 8rem;
+	padding: 1.05rem;
+	border: 1px solid var(--editor-border);
+	border-radius: var(--editor-radius);
+	background:
+		linear-gradient(145deg, var(--install-next-soft), transparent 55%),
+		var(--editor-bg-grouped);
+	box-shadow: var(--editor-shadow-sm);
+	color: var(--editor-text);
+}
+#install-page-wrap .install-next-step--admin {
+	--install-next-accent: var(--editor-orange);
+	--install-next-soft: color-mix(in srgb, var(--editor-orange) 11%, transparent);
+}
+#install-page-wrap .install-next-step--editor {
+	--install-next-accent: var(--editor-green);
+	--install-next-soft: var(--editor-green-soft);
+}
+#install-page-wrap .install-next-step:hover {
+	border-color: color-mix(in srgb, var(--install-next-accent) 48%, var(--editor-border));
+	box-shadow: var(--editor-shadow);
+}
+#install-page-wrap .install-next-step-icon {
+	display: grid;
+	place-items: center;
+	width: 2.7rem;
+	height: 2.7rem;
+	border-radius: var(--editor-radius-sm);
+	background: var(--install-next-soft);
+	color: var(--install-next-accent);
+}
+#install-page-wrap .install-next-step-icon svg {
+	width: 1.25rem;
+	height: 1.25rem;
+}
+#install-page-wrap .install-next-step-copy {
+	display: flex;
+	flex-direction: column;
+	gap: .28rem;
+	min-width: 0;
+}
+#install-page-wrap .install-next-step-copy strong {
+	font-size: .92rem;
+	line-height: 1.25;
+}
+#install-page-wrap .install-next-step-copy small {
+	color: var(--editor-text-secondary);
+	font-size: .74rem;
+	line-height: 1.45;
+}
+#install-page-wrap .install-next-step-arrow {
+	width: 1.1rem;
+	height: 1.1rem;
+	color: var(--install-next-accent);
+	transition: transform .15s ease;
+}
+#install-page-wrap .install-next-step:hover .install-next-step-arrow {
+	transform: translateX(2px);
+}
+#install-page-wrap .install-cleanup-note {
+	margin: 1rem 0 0;
+	padding: .75rem .85rem;
+	border-radius: var(--editor-radius-sm);
+	background: var(--nino-admin-surface-muted);
+	color: var(--editor-text-secondary);
+	font-size: .78rem;
+}
+
+/* The wizard's own step message is the one place a bottom-bar status is an
+   error rather than a progress note */
+#install-page-wrap .nino-admin-actionbar #install-actions-msg {
+	color: var(--editor-red);
+}
+
+/* Screen-level chrome that only one step wants */
+#install-context-action {
+	display: none;
+}
+#install-page-wrap.show-webpages:not(.is-editing-webpage) #install-context-action {
+	display: inline-flex;
+}
+/* #install-actions-wrap, not a bare descendant .nino-admin-actionbar: the
+   webpage form builds an action bar of its own (see webpages.js) and mounts
+   it inside #webpages-form, ie. inside #install-page-wrap - a descendant
+   selector took that one down too, hiding the form's own Save/Delete
+   buttons exactly while a route was being edited. */
+#install-page-wrap.show-webpages.is-editing-webpage #install-actions-wrap,
+#install-page-wrap.show-finish.is-complete #install-actions-wrap {
+	display: none;
+}
+#install-page-wrap.show-webpages.is-editing-webpage #install-content-webpages > .nino-admin-hint,
+#install-page-wrap.show-finish.is-complete #install-content-finish > :is(.nino-admin-hint, .nino-admin-error) {
+	display: none;
+}
+
+}

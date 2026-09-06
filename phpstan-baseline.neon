@@ -1,0 +1,127 @@
+parameters:
+	ignoreErrors:
+		-
+			message: '#^Strict comparison using \=\=\= between 200 and 200 will always evaluate to true\.$#'
+			identifier: identical.alwaysTrue
+			count: 1
+			path: _admin/Admin.php
+
+		-
+			message: '#^Call to function is_int\(\) with int will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 2
+			path: _admin/Nino/Modules/Language/Translations/Translations.php
+
+		-
+			message: '#^Offset ''/nino/http/routes'' on array\{''/nino/modules''\: array\{''\\\\Nino\\\\Modules\\\\Assets'', ''\\\\Nino\\\\Modules…'', ''\\\\Nino\\\\Modules…'', ''\\\\Nino\\\\Modules\\\\Jstext'', ''\\\\Nino\\\\Modules\\\\Csrf'', ''\\\\Nino\\\\Modules\\\\Images'', ''\\\\Nino\\\\Modules\\\\Cache''\}, ''/nino/cache/status''\: false, ''/nino/cache/ttl''\: 3600, ''/nino/cache/blacklist''\: array\{\}, ''/nino/admin/backups''\: true, ''/nino/admin/logs''\: true, ''/nino/dir''\: '''', ''/nino/error/log''\: true, \.\.\.\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: _admin/install/Install.php
+
+		-
+			message: '#^Offset 1 on array\{0\: non\-falsy\-string, 1\: string, 2\: string, 3\?\: string\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: _admin/install/Install.php
+
+		-
+			message: '#^Offset 2 on array\{0\: non\-falsy\-string, 1\: string, 2\: string, 3\?\: string\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: _admin/install/Install.php
+
+		-
+			message: '#^Strict comparison using \!\=\= between true and false will always evaluate to true\.$#'
+			identifier: notIdentical.alwaysTrue
+			count: 1
+			path: _nino/Nino/AppData/AppData.php
+
+		-
+			message: '#^Unreachable statement \- code above always terminates\.$#'
+			identifier: deadCode.unreachable
+			count: 1
+			path: _nino/Nino/AppData/AppData.php
+
+		-
+			message: '#^Comparison operation "\<\=" between int\<min, 0\> and int\<1, max\> is always true\.$#'
+			identifier: smallerOrEqual.alwaysTrue
+			count: 1
+			path: _nino/Nino/Auth/Auth.php
+
+		-
+			message: '#^Expression on left side of \?\? is not nullable\.$#'
+			identifier: nullCoalesce.expr
+			count: 1
+			path: _nino/Nino/Auth/Auth.php
+
+		-
+			message: '#^Negated boolean expression is always false\.$#'
+			identifier: booleanNot.alwaysFalse
+			count: 10
+			path: _nino/Nino/Elements/Elements.php
+
+		-
+			message: '#^Variable \$hits on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.variable
+			count: 1
+			path: _nino/Nino/Elements/Elements.php
+
+		-
+			message: '#^Unreachable statement \- code above always terminates\.$#'
+			identifier: deadCode.unreachable
+			count: 2
+			path: _nino/Nino/Filesystem/Filesystem.php
+
+		-
+			message: '#^Call to an undefined method DOMNode\:\:getAttribute\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: _nino/Nino/Html/Html.php
+
+		-
+			message: '#^Offset ''\./nino/html…'' on non\-empty\-array on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: _nino/Nino/Html/Html.php
+
+		-
+			message: '#^Call to function is_string\(\) with string will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: app/Nino/Modules/Design/Preview/Preview.php
+
+		-
+			message: '#^Call to function method_exists\(\) with ''\\\\Nino\\\\Install\\\\Themes'' and ''frameUnit'' will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: app/Nino/Modules/Design/Preview/Preview.php
+
+		-
+			message: '#^Strict comparison using \=\=\= between true and true will always evaluate to true\.$#'
+			identifier: identical.alwaysTrue
+			count: 1
+			path: app/Nino/Modules/Design/Preview/Preview.php
+
+		-
+			message: '#^Strict comparison using \=\=\= between non\-empty\-string and '''' will always evaluate to false\.$#'
+			identifier: identical.alwaysFalse
+			count: 1
+			path: app/Nino/Modules/Templates/AreaComposer/AreaComposer.php
+
+		-
+			message: '#^Offset 1 on array\{0\: non\-falsy\-string, 1\: non\-empty\-string, 2\?\: ''off''\|''on''\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Nino/Modules/Templates/Documents/Documents.php
+
+		-
+			message: '#^Strict comparison using \!\=\= between ''off''\|''on'' and '''' will always evaluate to true\.$#'
+			identifier: notIdentical.alwaysTrue
+			count: 1
+			path: app/Nino/Modules/Templates/Documents/Documents.php
+
+		-
+			message: '#^Offset 2 on array\{non\-falsy\-string, '''', '''', non\-empty\-string\}\|array\{non\-falsy\-string, non\-empty\-string, string\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Nino/Modules/Templates/Library/Library.php

@@ -1,0 +1,51 @@
+@layer nino.system, nino.tool, nino.local;
+
+/**
+ *	Nino										A compact filesystembased php framework
+ *	Modules\Newsletter			The newsletter signup
+ *	editor.css							What the module's /_admin panel needs beyond the design
+ *													system in _admin/assets/style.css. Joins the editor's own
+ *													style bundle while the module is active (see the panel's
+ *													assets()), so the same layer rules apply: scoped to what
+ *													this panel renders, nothing shared restated.
+ *
+ *	@package								Dape/Nino
+ *	@author									David Perchermeier <mail@dape.io>
+ *	@link										https://github.com/dapeio/nino
+ */
+
+@layer nino.tool {
+
+#newsletter-summary {
+	margin: 0 0 .8rem;
+	font-weight: 650;
+}
+#newsletter-bcc label {
+	display: block;
+	margin-bottom: .3rem;
+	color: var(--editor-text-secondary);
+	font-size: .76rem;
+}
+#newsletter-bcc-field {
+	min-height: 5rem;
+	font: .8rem/1.5 var(--nino-admin-mono);
+}
+#newsletter-bcc-actions {
+	display: flex;
+	align-items: center;
+	gap: .75rem;
+	margin-top: .5rem;
+}
+#newsletter-bcc-copied {
+	color: var(--editor-green);
+	font-size: .8rem;
+	font-weight: 650;
+}
+/*	A row action, not a screen action: it has to fit a table cell */
+.newsletter-entry-delete {
+	min-height: 30px;
+	padding: .25rem .55rem;
+	font-size: .74rem;
+}
+
+}

@@ -1,0 +1,149 @@
+@layer nino.system, nino.tool, nino.local;
+
+/**
+ *	Nino										A compact filesystembased php framework
+ *	Modules\Language		The interface languages and their translations
+ *	admin.css								What the module's /_admin panel needs beyond the design
+ *													system in _admin/assets/style.css: the locale adder, the
+ *													Translations tab's three-step layout, and both of them on
+ *													a phone. Bundled while the module is there (see the
+ *													panel's assets()), so the same layer rules apply - the
+ *													shell's stylesheet fixes the layer order, this one only
+ *													ever adds to nino.tool, scoped to the panel's own ids.
+ *
+ *	@package								Dape/Nino
+ *	@author									David Perchermeier <mail@dape.io>
+ *	@link										https://github.com/dapeio/nino
+ */
+
+@layer nino.tool {
+
+#admin-page-wrap .admin-success {
+	color: var(--editor-green);
+	font-weight: 650;
+}
+
+/* ------------------------------------------------------------- Language */
+
+/* This is an input and its local action, not a viewport action bar. Keeping
+   the two controls in one named row also lets the input absorb long locale
+   values without pushing Add outside the fieldset. */
+#admin-page-wrap .admin-language-adder {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) auto;
+	gap: .5rem;
+	align-items: center;
+}
+
+#admin-page-wrap .admin-language-adder button {
+	min-width: 4.5rem;
+}
+
+/* --------------------------------------------------------- Translations */
+
+#admin-page-wrap .admin-translations-intro {
+	max-width: 48rem;
+	margin-bottom: .9rem;
+}
+
+#admin-page-wrap .admin-translations-intro > span {
+	display: inline-flex;
+	margin-bottom: .55rem;
+	padding: .25rem .55rem;
+	border-radius: 999px;
+	background: var(--editor-blue-soft);
+	color: var(--editor-blue);
+	font-size: .68rem;
+	font-weight: 750;
+	letter-spacing: .065em;
+	text-transform: uppercase;
+}
+
+#admin-page-wrap .admin-translations-intro h1 {
+	margin: 0 0 .4rem;
+	font-size: clamp(1.35rem, 3vw, 1.65rem);
+	letter-spacing: -.035em;
+}
+
+#admin-page-wrap :is(.admin-translations-intro, .admin-translation-card-copy) p {
+	margin: 0;
+	color: var(--editor-text-secondary);
+	font-size: .82rem;
+	line-height: 1.55;
+}
+
+#admin-page-wrap .admin-translations-flow {
+	display: grid;
+	gap: .75rem;
+}
+
+#admin-page-wrap .admin-translation-card {
+	display: grid;
+	grid-template-columns: auto minmax(0, 1fr);
+	gap: .65rem .8rem;
+	align-items: start;
+	padding: .9rem;
+}
+
+#admin-page-wrap .admin-step-number {
+	display: grid;
+	place-items: center;
+	width: 1.85rem;
+	height: 1.85rem;
+	border-radius: var(--editor-radius-sm);
+	background: var(--editor-blue);
+	color: #fff;
+	font-size: .78rem;
+	font-weight: 800;
+}
+
+#admin-page-wrap .admin-translation-card-copy h2 {
+	margin: .1rem 0 .28rem;
+	font-size: .95rem;
+}
+
+#admin-page-wrap .admin-translation-card > button,
+#admin-page-wrap .admin-translation-fields {
+	grid-column: 2;
+}
+
+#admin-page-wrap .admin-translation-fields {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 0 .8rem;
+}
+
+#admin-page-wrap .admin-translation-json {
+	grid-column: 1 / -1;
+}
+
+#translations-json {
+	font: .78rem/1.5 var(--nino-admin-mono);
+	resize: vertical;
+	tab-size: 2;
+}
+
+#translations-message {
+	min-height: 1.4em;
+	margin: .75rem 0 0;
+	font-size: .8rem;
+}
+
+@media (max-width: 38rem) {
+
+	#admin-page-wrap .admin-translation-card {
+		grid-template-columns: 1fr;
+	}
+
+	#admin-page-wrap .admin-translation-card > button,
+	#admin-page-wrap .admin-translation-fields {
+		grid-column: 1;
+	}
+
+	#admin-page-wrap .admin-translation-fields {
+		grid-template-columns: 1fr;
+	}
+
+}
+
+}

@@ -1,0 +1,67 @@
+# Nino - minimal Apache hardening defaults. Harmless if AllowOverride
+# doesn't apply this file (eg. a PHP-FPM/nginx deployment) - see
+# docs/deployment.md's "Nginx and Other Web Servers" for the equivalent rules
+# there.
+
+# The workbench login sends its credential pair as HTTP Basic authorization.
+# Apache hides that header from CGI/FastCGI scripts by default; Nino needs it
+# in PHP so the login endpoint can validate the pair and create its session.
+# Needs Apache 2.4.13 or newer - an older one does not know the directive and
+# answers every request with a 500, so remove this line there and pass the
+# header through the server configuration instead (see docs/deployment.md).
+CGIPassAuth On
+
+# Never serve a dotfile directly - matches the filename only (not the
+# containing directory, so _editor/.cache/script.js is unaffected).
+# private/.auth/ and private/.logs/ are dotdirs whose files inside
+# (eg. 2026-01-01.php) aren't themselves dotfiles - the complete private tree
+# is denied by private/.htaccess, with self-exiting .php stubs as an additional
+# safeguard (see docs/development.md's "Outputs and Uploads", and the
+# go-live checklist in docs/deployment.md).
+<FilesMatch "^\.">
+	Require all denied
+</FilesMatch>
+
+# ...and the contents of a dot *directory*, which the rule above cannot see:
+# it matches filenames, so a checkout's .git/config reads as a plain "config"
+# to it and is served - local history, remotes and hooks with it.
+# docs/getting-started.md installs by cloning into the webroot, so that is the
+# normal case rather than an exotic one, and docs/deployment.md already
+# requires the equivalent for nginx.
+# Conditioned on the request actually resolving to something on disk, which is
+# the same line router.php draws on the dev server: dot-uris that are routes
+# rather than files (/.form, /.newsletter, /.demo-catalogue) never touch the
+# filesystem and have to keep falling through to index.php.
+# .cache/ (the generated css+js bundles) and .demo/ (the demo images) are
+# served deliberately - the two exceptions router.php makes as well.
+# .well-known/ is a third one here: certificate renewal reads it on a
+# production host, which is the one environment this file applies to.
+<IfModule mod_rewrite.c>
+	RewriteEngine On
+	RewriteCond %{REQUEST_FILENAME} -f [OR]
+	RewriteCond %{REQUEST_FILENAME} -d
+	RewriteRule "(^|/)\.(?!cache/|demo/|well-known/)" - [F]
+</IfModule>
+
+# The project's private half (see \Nino\Filesystem::PRIVATE_DIRS) is only ever
+# read by php, never served - the stylesheet and script sources under
+# private/assets/ included, since nothing requests one of those either: they
+# are read off disk and concatenated into public/.cache/. Denied by
+# private/.htaccess rather than from here, since a rule written here would have
+# to name an absolute url path and would therefore miss a subdirectory install
+# (/nino/dir). Both are belt and braces next to the 403 stub the php files in
+# there carry themselves - the templates and the asset sources are not php and
+# have only the two server rules.
+#
+# Its mirror, public/, is the opposite: everything in there is meant to be
+# served, and nothing else in this project root is - index.php and the tool
+# folders aside, a request that resolves to a real file outside public/ is
+# almost always a mistake. The installer's appearance catalogue is the one
+# place inside a tool folder with a deliberately public file in it, so
+# _admin/install/library/.htaccess denies everything there except the theme
+# picker images.
+
+# Don't let a directory with no index.php list its contents - a plain
+# defence-in-depth default now that nothing relies on an unguessable
+# directory name any more
+Options -Indexes

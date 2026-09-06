@@ -1,0 +1,73 @@
+@layer nino.system, nino.tool, nino.local;
+
+/**
+ *	Nino										A compact filesystembased php framework
+ *	Modules\Users			Accounts, roles and login protection
+ *	admin.css								What the module's /_admin panel needs beyond the design
+ *													system in _admin/assets/style.css: the in-flow button row
+ *													of the role form, and what the account list turns into on
+ *													a phone. Bundled while the module is there (see the
+ *													panel's assets()), so the same layer rules apply - the
+ *													shell's stylesheet fixes the layer order, this one only
+ *													ever adds to nino.tool, scoped to the panel's own ids.
+ *
+ *	@package								Dape/Nino
+ *	@author									David Perchermeier <mail@dape.io>
+ *	@link										https://github.com/dapeio/nino
+ */
+
+@layer nino.tool {
+
+/* -------------------------------------------------------------------- Form */
+
+/*	An in-flow row of form buttons, for a form that has no pinned bottom bar of
+ *	its own (the role form inside a user's screen). A form that owns the
+ *	screen uses the shared pinned action bar instead. */
+.admin-form-actions {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: .5rem;
+	margin: .75rem 0 0;
+}
+
+/* ------------------------------------ Typing a permission by hand ---- */
+
+/* Under the picker, in the same box: the finer permissions are a path per
+   action and field, so there is no list to offer and they are typed. The
+   field takes the room, the button stays its own size */
+#roles-form-permissions .admin-perm-add {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: .5rem;
+	margin-top: .75rem;
+}
+
+#roles-form-permissions .admin-perm-add > input[type="text"] {
+	flex: 1 1 16rem;
+	width: auto;
+	font-family: var(--nino-admin-mono);
+	font-size: .78rem;
+}
+
+@media (max-width: 38rem) {
+
+	#users-list > .nino-admin-list > li {
+		grid-template-columns: minmax(0, 1fr) auto;
+	}
+
+	#users-list > .nino-admin-list > li > a {
+		grid-column: 1;
+		grid-row: 2;
+		justify-self: start;
+	}
+
+	#users-list > .nino-admin-list > li > button {
+		grid-column: 2;
+		grid-row: 2;
+	}
+
+}
+
+}

@@ -1,0 +1,20 @@
+/_admin/.cache/
+
+# The project's private half - all of it. A checkout ships no private/ at
+# all: the wizard creates the directory, brings its own deny rule with it
+# (_admin/install/library/base/private/.htaccess) and writes the first config.php
+# at the end of its Setup step. Nothing in here is repository content -
+# it is one installation's configuration, its pages and text, the data its
+# visitors produce, and management state holding PII and credentials
+/private/
+
+# The project's public half - everything a browser loads directly. All of it
+# is the wizard's output (fonts, the favicon set, the generated css/js bundles)
+# or runtime content (uploaded images), never repository content
+/public/
+
+.DS_Store
+Thumbs.db
+
+# Patches are handed around, never versioned - the change itself is
+*.patch

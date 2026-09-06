@@ -1,0 +1,31 @@
+<?php
+// Die eigenen Workbench-Texte des Text-Moduls, in seine Fills gemischt,
+// solange das Modul aktiv ist (siehe text() des Panels) - dieselben
+// Schlüssel und dieselbe Form wie text/<locale>.php der Workbench
+return [
+	'[[/_admin/nav/text]]'					=> 'Texte',
+	'[[/_admin/text/label/save]]'					=> 'Speichern',
+	'[[/_admin/text/label/back]]'					=> 'Zurück zur Liste',
+	'[[/_admin/text/msg/pending]]'					=> 'Wird gespeichert …',
+	'[[/_admin/text/msg/saved]]'						=> 'Gespeichert.',
+	'[[/_admin/text/error/save]]'					=> 'Speichern fehlgeschlagen.',
+	'[[/_admin/text/error/load]]'					=> 'Laden fehlgeschlagen.',
+	'[[/_admin/nav/keys]]'							=> 'Textschlüssel',
+	'[[/_admin/keys/empty]]'						=> 'Noch keine Textschlüssel. Lege unten einen an oder durchsuche die Templates.',
+	'[[/_admin/keys/label/scan]]'				=> 'Templates nach fehlenden Schlüsseln durchsuchen',
+	'[[/_admin/keys/label/new]]'				=> 'Neuer Textschlüssel',
+	'[[/_admin/keys/label/blacklist]]'	=> 'Im Panel Texte ausgeblendet',
+	'[[/_admin/keys/label/perlocale]]'	=> 'Pro Sprache',
+	'[[/_admin/keys/label/key]]'				=> 'Schlüssel (z. B. /home/welcome/subtitle)',
+	'[[/_admin/keys/label/global-hint]]'	=> 'Global (eine Fassung für alle Sprachen statt eine je Sprache)',
+	'[[/_admin/keys/label/initial]]'		=> 'Anfangswert (global, oder als Ausgangspunkt für jede Sprache)',
+	'[[/_admin/keys/label/scan-value]]'	=> 'Anfangswert für jede Sprache',
+	'[[/_admin/keys/label/scan-create]]'	=> 'Übernehmen',
+	'[[/_admin/keys/label/scan-ignore]]'	=> 'Dauerhaft ignorieren',
+	'[[/_admin/keys/scan/hint]]'			=> 'Ein Schlüssel mit Wert wird in jeder Sprache angelegt. Ein leer gelassener Schlüssel wird dieses eine Mal übergangen und beim nächsten Scan wieder angeboten. Ein mit „Dauerhaft ignorieren“ markierter Schlüssel wird stillgelegt: Er verschwindet aus diesem Scan und aus dem Panel Texte – zurückholen lässt er sich in der Liste der Textschlüssel.',
+	'[[/_admin/keys/scan/result]]'		=> '%c Schlüssel angelegt, %i dauerhaft ignoriert, %s für später gelassen.',
+	'[[/_admin/keys/scan/none]]'				=> 'Keine fehlenden Schlüssel. Jeder in templates/*.tpl referenzierte Schlüssel ist bereits definiert.',
+	'[[/_admin/keys/confirm/delete]]'		=> 'Textschlüssel „%s“ wirklich löschen? Der Wert geht in jeder Sprache verloren.',
+	'[[/_admin/keys/error/save-partial]]'	=> 'Speichern fehlgeschlagen für %s',
+	'[[/_admin/dashboard/label/keys]]'	=> 'Fehlende Textschlüssel',
+];
