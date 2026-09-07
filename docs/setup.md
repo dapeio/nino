@@ -2,12 +2,12 @@
 
 **Language:** English · [Deutsch](setup.de.md)
 
-**Last updated:** September 6, 2026 · **Nino version:** 1.0.0-beta
+**Last updated:** September 7, 2026 · **Nino version:** 1.0.0-beta
 
 This manual explains the decisions and writing processes of the ten steps of the setup wizard - the first-run mode of the [`/_admin` workbench](_admin.md). If you instead want to take the shortest path from checkout to a configured website, start with [Getting Started](getting-started.md); the later production operation is covered in [Deployment](deployment.md).
 
 **Additional Links:**
-[README](../README.md) · [Concepts](concepts.md) · [Developer Manual](development.md) · [Recipes](recipes/README.md) · [Getting Started](getting-started.md) · [Setup Wizard](setup.md) · [`/_admin` Workbench](_admin.md) · [Templates Panel](templates.md) · [Design Panel](appearance.md) · [Deployment](deployment.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
+[README](../README.md) · [Concepts](concepts.md) · [Developer Manual](development.md) · [Recipes](recipes/README.md) · [Getting Started](getting-started.md) · [Setup Wizard](setup.md) · [`/_admin` Workbench](_admin.md) · [Templates Panel](templates.md) · [Design Panel](appearance.md) · [Features](features.md) · [Deployment](deployment.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
 
 **Important:** The wizard creates the first functional project state from a fresh Nino checkout. It is necessary: before its execution, the actual project directories such as `templates/`, `text/`, `elements/`, and `images/` do not yet exist.
 
@@ -67,7 +67,7 @@ When reapplying, the visible language selection replaces the previous state. The
 
 ### Modules
 
-The list offers every module that ships an installer unit: navigation, language selection, contact form, and newsletter in a fresh checkout, plus any module a project has added. If a selected module requires another module, the assistant automatically includes this dependency in the selection. A used page template can also pull in required modules; a contact page, for example, activates its form and mail functions.
+The list offers every module that ships an installer unit: navigation, language selection and contact form in a fresh checkout, plus any module a project has added. Features - the catalogue's Newsletter and Search, for instance - are not offered here: a feature is copied into `features/` from [dapeio/nino-features](https://github.com/dapeio/nino-features) and switched on in the workbench's [Features panel](features.md) after setup. If a selected module requires another module, the assistant automatically includes this dependency in the selection. A used page template can also pull in required modules; a contact page, for example, activates its form and mail functions.
 
 Setup writes:
 
@@ -128,7 +128,7 @@ See the [Design panel](appearance.md) reference for the token names both halves 
 
 A theme's manifest declares the design it was drawn with, so picking a theme and walking through to here produces the look its preview promised. The swatch strip under the controls shows the real pairs, not just the backgrounds.
 
-This step is optional: a delivery that ships without the Design module (`app/Nino/Modules/Design/`) installs exactly as before, with the Design block absent.
+This step is optional: a delivery that ships without the Design module (`_nino/Nino/Modules/Design/`) installs exactly as before, with the Design block absent.
 
 The order in the css bundle is the whole contract, and each layer owns one slot in it:
 
@@ -225,17 +225,19 @@ Nino separates one-time installer source from the appearance catalogue that rema
 | Path | Purpose |
 |---|---|
 | `_admin/install/library/base/` | always-applied routes, templates, texts, and assets |
-| `app/Nino/Modules/<Module>/install/`, `app/…/<Module>/install/` | a module's own unit: the selectable functional addition, beside the class it activates |
+| `_nino/Nino/Modules/<Module>/install/`, `app/…/<Module>/install/` | a module's own unit: the selectable functional addition, beside the class it activates |
 | `_admin/install/library/modules/<key>/` | a selectable unit without a runtime class of its own |
 | `_admin/install/library/pages/<key>/` | starting point for one concrete page |
 | `_admin/install/library/themes/<key>/` | visual baseline shared by the wizard and the Design panel |
 | `_admin/install/library/header/<key>/`, `_admin/install/library/footer/<key>/` | interchangeable frame shared by both |
 
-Everything below `_admin/install/` is removed together with the wizard after completion; a module's `install/` directory stays with its module and is never read at runtime. The catalogue is setup material, not a runtime plugin system.
+Everything below `_admin/install/` is removed together with the wizard after completion; a module's `install/` directory stays with its module, and only the wizard reads it. The catalogue is setup material, not a runtime plugin system.
 
-Module units are found, not listed: the wizard scans `_nino/Nino/Modules/*/install/`, then `<app>/Nino/Modules/*/install/` - where Nino's optional modules are delivered - and then the whole application directory (`app/`, or `NINO_APP_DIR`) up to four levels deep, plus `_admin/install/library/modules/`. A unit's key - what the picker posts and what `requiresModules` names - is the manifest's `key` or, without one, the module directory's lowercased name; it must be a slug and unique, and the first unit to claim a key keeps it, so Nino's own modules keep theirs.
+Module units are found, not listed: the wizard scans `_nino/Nino/Modules/*/install/` - Nino's own optional modules - and then the whole application directory (`app/`, or `NINO_APP_DIR`) up to four levels deep, plus `_admin/install/library/modules/`. A unit's key - what the picker posts and what `requiresModules` names - is the manifest's `key` or, without one, the module directory's lowercased name; it must be a slug and unique, and the first unit to claim a key keeps it, so Nino's own modules keep theirs.
 
-The Design module and the Template Builder have no unit to pick: the Setup step lists them in `/nino/modules` whenever their directory is part of the delivery, so both panels are in the workbench from the first `config.php` on.
+Not scanned: `features/`. A feature carries an `install/` unit of the same shape, but `\Nino\Features::activate()` applies it when the feature is switched on in the workbench - through the same `applyUnit()` the wizard uses, with overwrite on here and add-only there, so that the unit application survives the removal of `_admin/install/`. See [Features](features.md).
+
+The Design module and the Template Builder have no unit to pick: the Setup step lists them in `/nino/modules` whenever their class exists, so both panels are in the workbench from the first `config.php` on.
 
 A theme's `manifest.php` lists the files to be copied plus what the look was drawn against:
 

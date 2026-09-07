@@ -25,12 +25,17 @@ declare(strict_types=1);
 // staying where it is. Rarely what a deployment wants - see docs/deployment.md.
 // define( 'NINO_CONFIG_DIR', '/absolute/path/outside/webroot' );
 
-// The application half - project-owned PHP classes and the optional runtime
-// modules Nino ships (Design, Templates, Form, Newsletter, Navigation,
-// Localepicker, Search). It defaults to <project>/app, and it is replaced as
-// a whole: a project that points it elsewhere moves those modules along, or
-// loses them silently. The Nino\ namespace always stays in _nino/.
+// The application half - the project's own PHP classes and modules. It
+// defaults to <project>/app. The Nino\ namespace always stays in _nino/,
+// the optional modules Nino ships (Design, Templates, Form, Navigation,
+// Localepicker) among them.
 // define( 'NINO_APP_DIR', '/absolute/path/to/app' );
+
+// The installed features - one directory each, activated in the workbench's
+// Features panel (see \Nino\Features). Defaults to <project>/features and
+// is replaced as a whole: a project that points it elsewhere moves the
+// features along, or loses them silently.
+// define( 'NINO_FEATURES_DIR', '/absolute/path/to/features' );
 
 require '_nino/Nino.php';
 

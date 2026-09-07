@@ -2,12 +2,12 @@
 
 **Sprache:** [English](development.md) · Deutsch
 
-**Stand:** 6. September 2026 · **Nino-Version:** 1.0.0-beta
+**Stand:** 7. September 2026 · **Nino-Version:** 1.0.0-beta
 
 Dieses Handbuch beschreibt die technische Arbeit mit Nino – vom Einstiegspunkt über Routing und Rendering bis zu eigenen Modulen, dauerhaften Daten und Tests. Falls du stattdessen zuerst die Architektur kennenlernen oder ein frisches Projekt einrichten möchtest, lies die [Grundkonzepte](concepts.de.md) beziehungsweise [Erste Schritte](getting-started.de.md).
 
 **Weitere Links:**
-[README](../README.de.md) · [Grundkonzepte](concepts.de.md) · [Entwickler-Handbuch](development.de.md) · [Rezepte](recipes/README.md) · [Erste Schritte](getting-started.de.md) · [Einrichtungsassistent](setup.de.md) · [`/_admin`-Workbench](_admin.de.md) · [Templates-Panel](templates.de.md) · [Design-Panel](appearance.de.md) · [Deployment](deployment.de.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
+[README](../README.de.md) · [Grundkonzepte](concepts.de.md) · [Entwickler-Handbuch](development.de.md) · [Rezepte](recipes/README.md) · [Erste Schritte](getting-started.de.md) · [Einrichtungsassistent](setup.de.md) · [`/_admin`-Workbench](_admin.de.md) · [Templates-Panel](templates.de.md) · [Design-Panel](appearance.de.md) · [Features](features.de.md) · [Deployment](deployment.de.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
 
 **Entwicklerprofil:** Für einfache Webseiten reichen solide Kenntnisse in HTML, CSS und JavaScript sowie PHP-Grundlagen. Templates bestehen aus HTML+, also HTML mit Textfills und Shortcodes. Erst eigene Anwendungslogik, externe Schnittstellen oder neue Module verlangen tieferes PHP-Wissen. Ein fertiges Projekt kann anschließend weitgehend in der Workbench `/_admin` gepflegt werden.
 
@@ -83,19 +83,21 @@ Verwende `NINO_PRIVATE_DIR` für den vollständigen privaten Baum und `NINO_CONF
 Projekteigene PHP-Klassen verwenden einen getrennten Quellcode-Root. Standard
 ist `app/` im Projektverzeichnis. Liegen diese Klassen an einer anderen Stelle,
 wird `NINO_APP_DIR` vor dem Laden des Kernels als absoluter Verzeichnispfad
-definiert. Der Root wird als Ganzes ersetzt, und Ninos eigene optionale Module
-– Design, Templates, Form, Newsletter, Navigation, Localepicker, Search – liegen
-unter `app/Nino/Modules/`: Sie ziehen mit, oder der Kernel überspringt ein
-Modul, das er nicht mehr laden kann, ohne ein Wort.
+definiert. Der Root wird als Ganzes ersetzt. Installierte Features haben einen
+eigenen Root, `features/`, den `NINO_FEATURES_DIR` auf dieselbe Weise verlegt
+– und ebenso als Ganzes ersetzt: Ein Projekt, das ihn woandershin zeigen
+lässt, nimmt seine Features mit, oder der Kernel überspringt ein Modul, das er
+nicht mehr laden kann, ohne ein Wort.
 
 ```php
 define( 'NINO_APP_DIR', '/var/www/nino-example-app' );
+define( 'NINO_FEATURES_DIR', '/var/www/nino-example-features' );
 require_once __DIR__. '/_nino/Nino.php';
 ```
 
-Das ändert ausschließlich den Application-Root des Projekts. Projektdaten
-werden dadurch nicht verschoben, und der Ladeort von Klassen im kerneigenen
-Namespace `Nino\` bleibt unverändert.
+Das ändert ausschließlich die beiden Quellcode-Roots. Projektdaten werden
+dadurch nicht verschoben, und der Ladeort von Klassen im kerneigenen Namespace
+`Nino\` – Ninos eigene Module eingeschlossen – bleibt unverändert.
 
 ## Der Request-/Response-Lebenszyklus im Detail
 
@@ -465,6 +467,7 @@ Die folgende Übersicht ist eine Arbeitsreferenz, keine vollständige Auflistung
 | `Backup` | verschlüsselte Backup-Manifeste verarbeiten |
 | `RotatingLog` | datierte Protokolldateien nach Aufbewahrungsfrist bereinigen |
 | `Elements` | einzelne Elemente laden sowie Typen und Elemente abfragen, anlegen, ändern und löschen |
+| `Features` | die Features unter `features/` finden, ihre Manifeste lesen und prüfen, ihre Einstellungen beantworten und speichern, sie aktivieren und deaktivieren und eine Install-Einheit anwenden – auch die des Assistenten |
 | `Html` | Fills und Shortcodes registrieren, HTML+ rendern und erlaubtes Inline-HTML bereinigen |
 | `Http` | Requests normalisieren, Routen auflösen, Responses erzeugen und ausgeben |
 | `Images` | Uploads verarbeiten, Varianten verwalten und URLs erzeugen |
@@ -490,87 +493,31 @@ Module werden in `/nino/modules` aktiviert. Die Reihenfolge des Arrays ist relev
 | `Jstext` | `[jstext]` | stellt Textwerte als sicher kodiertes JSON mit CSP-Nonce bereit |
 | `Localepicker` | `[localepicker …]` | wechselt Locale über Query und Redirect |
 | `Navigation` | `[navigation …]` | rendert Navigationen aus einer kompakten Zeilensyntax |
-| `Newsletter` | POST/GET unter `/.newsletter` | Double-Opt-in, Bestätigung und Abmeldung ohne öffentliche Adressauskunft |
-| `Search` | `Search::getElements()` | durchsucht konfigurierte Element-Felder über einen kleinen sprachabhängigen Fuzzy-Index |
 | `Template` | `[template /path/name]` | lädt den Rohinhalt einer `.tpl`-Datei; die gemeinsame Render-Pipeline verarbeitet ihn weiter |
 
-`Form`, `Newsletter`, `Navigation` und `Search` bringen ihre Workbench-Panels mit (Anfragen, Newsletter, Navigationen, Suche), `Design` und `Templates` sind nichts als je ein Panel: Jedes ist genau dann vorhanden, wenn sein Modul aktiv ist. Die ersten vier sind im Einrichtungsassistenten wählbar, weil jedes eine `install/`-Einheit neben seiner Klasse mitliefert; die letzten beiden trägt der Assistent in `/nino/modules` ein, sobald ihr Verzeichnis existiert. Alle werden unter `app/Nino/Modules/` ausgeliefert, neben den eigenen Klassen des Projekts – siehe [Panels der Workbench](#panels-der-workbench) und [Verzeichnis und Autoloading](#verzeichnis-und-autoloading) weiter unten.
+Jedes Modul der Tabelle liegt in `_nino/Nino/Modules/`, neben den immer aktiven Kernel-Modulen. `Form` und `Navigation` bringen ihre Workbench-Panels mit (Anfragen, Navigationen), `Design` und `Templates` sind nichts als je ein Panel: Jedes ist genau dann vorhanden, wenn sein Modul aktiv ist. `Form`, `Navigation` und `Localepicker` sind im Einrichtungsassistenten wählbar, weil jedes eine `install/`-Einheit neben seiner Klasse mitliefert; `Design` und `Templates` trägt der Assistent in `/nino/modules` ein, sobald ihre Klasse existiert. Ein Projekt schaltet jedes davon in `/nino/modules` ein oder aus, und `_nino/` bleibt vollständig ersetzbar. Alles jenseits der Tabelle ist ein **Feature** – ein installierbares Paket unter `features/<Name>/` mit einem Manifest `feature.php`, eingeschaltet im Panel Features der Workbench, das sein Panel auf dieselbe Weise mitbringt. Ein Checkout bringt keines mit: `Newsletter` (Double-Opt-in, Bestätigung und Abmeldung unter `/.newsletter`) und `Search` (ein sprachabhängiger Fuzzy-Index über Element-Felder) kommen aus dem Katalog [dapeio/nino-features](https://github.com/dapeio/nino-features), nach `features/` kopiert. Siehe [Features](features.de.md), [Panels der Workbench](#panels-der-workbench) und [Verzeichnis und Autoloading](#verzeichnis-und-autoloading) weiter unten.
 
 Einige Details sind absichtlich defensiv gestaltet:
 
 - Das Formular begrenzt Eingaben, schützt Schreibvorgänge und verwirft alte Protokollmonate.
-- Die öffentliche Newsletter-Anmeldung antwortet unabhängig davon gleich, ob eine Adresse neu oder bereits bekannt ist. Das erschwert die Abfrage fremder Adressen.
+- Die öffentliche Anmeldung des Newsletter-Features aus dem Katalog antwortet unabhängig davon gleich, ob eine Adresse neu oder bereits bekannt ist. Das erschwert die Abfrage fremder Adressen.
 - `Jstext` verwendet JSON-Hex-Escaping und ergänzt die Content-Security-Policy um einen zufälligen Nonce.
 
 ### Suchindex für Elements
 
-`Modules\Search` ist eine optionale Entwicklerfunktion und wird nicht über
-den Einrichtungsassistenten ausgewählt. Aktiviere und konfiguriere sie direkt in der
-`config.php`:
-
-```php
-return [
-    '/nino/modules' => [
-        // weitere Module …
-        '\\Nino\\Modules\\Search',
-    ],
-
-    '/nino/elements/index' => [
-        'articles' => [
-            0 => 'title',
-            1 => 'summary',
-            2 => 'keywords',
-            3 => 'author',
-        ],
-    ],
-];
-```
-
-Der äußere Schlüssel bezeichnet genau einen flachen Elementtyp, wahlweise mit
-oder ohne führenden Slash. Die inneren Schlüssel sind die vier Prioritäten der
-Rangfolge: `0` ist am stärksten, `3` am schwächsten; jede Priorität nennt genau
-ein Feld aus dem aktuellen Modell dieses Typs. Ungültige Typen, Prioritäten und
-Feldnamen werden ignoriert.
-
-Die Aktivierung registriert den Elements-Callback nach erfolgreichem Schreiben,
-legt selbst aber noch keine Datei an. Den ersten Aufbau startest du mit **Suchindex
-erstellen** unter `/_admin` → **Suche**. Jeder Klick erstellt alle gültig
-konfigurierten Indexe vollständig neu. Danach erstellt jedes erfolgreiche
-Einfügen, Ändern oder Löschen eines konfigurierten Typs dessen Index neu,
-nachdem die Elementdatei geschrieben wurde. Der Typ `articles` liegt als eine
-abgeleitete Datei unter `/data/index-articles.php` (normalerweise
-`private/data/index-articles.php`), gegliedert nach Sprache.
-
-Der Index besitzt bewusst weder Signatur noch Revision oder Sidecar-Lock und
-wird als vollständiges PHP-Array direkt und nicht atomar neu geschrieben. Lesen
-bleibt strikt schreibfrei: Eine fehlende oder fehlerhafte Datei liefert keine
-Treffer und wird nicht repariert. Nach Änderungen an der Konfiguration,
-manuellen Eingriffen in Elementdateien oder einem abgebrochenen
-Index-Schreibvorgang erstellt der
-Admin-Button alle Indexe neu. Die erzeugten Dateien enthalten normalisierten
-Suchtext, sind keine Quelldaten und gehören nicht in ein Installer-Paket.
-
-Projektcode durchsucht die aktuelle Sprache und erhält die vollständigen,
-kanonischen Elements in Trefferreihenfolge:
-
-```php
-$hits = \Nino\Modules\Search::getElements(
-    $appData,
-    'articles',
-    (string) ( $_GET['q'] ?? '' )
-);
-```
-
-Die Suche ignoriert Groß-/Kleinschreibung, entfernt Markup, dekodiert
-Entities, flacht Text- und Zahlenwerte aus Arrays ab und schreibt `ä`, `ö`,
-`ü` und `ß` als `ae`, `oe`, `ue` und `ss` — wer „Strasse“ eintippt, findet
-deshalb auch „Straße“. Jedes Suchwort muss treffen. Exakte Wörter, Präfixe und
-Teilstrings werden bevorzugt; andere Wörter verwenden eine längenabhängige
-Unicode-Bigramm-Ähnlichkeit. Feldprioritäten bestimmen die Rangfolge, exakte
-Phrasen erhalten einen zusätzlichen Bonus, bei gleicher Punktzahl entscheidet
-die Element-URI. Der Aufwand ist auf 256 Query-Zeichen und die ersten zwölf
-eindeutigen Tokens begrenzt. Leere Suchen, unbekannte oder nicht konfigurierte
-Typen, fehlende Sprachdaten und unlesbare Indexe liefern `[]`.
+`Modules\Search` ist ein Feature und kein Teil des Checkouts: Es kommt aus dem
+Katalog [dapeio/nino-features](https://github.com/dapeio/nino-features), wird
+nach `features/Search/` kopiert und im Panel Features der Workbench
+eingeschaltet. Es führt einen kleinen sprachabhängigen Fuzzy-Index über
+konfigurierte Felder flacher Elementtypen – definiert unter
+`/nino/elements/index` in der `config.php`, abgelegt als je eine abgeleitete
+Datei pro Typ unter `data/`, neu aufgebaut durch **Suchindex erstellen** in
+seinem Panel Suche und nach jedem bestätigten Schreiben eines Elements – und
+beantwortet `\Nino\Modules\Search::getElements( $appData, $type, $query )` mit
+den passenden Elements der aktuellen Sprache in Trefferreihenfolge. Die
+Indexkonfiguration, die Regeln der Rangfolge, der Lebenszyklus der
+abgeleiteten Dateien und die API stehen in der eigenen README des Features im
+Katalog: [features/Search/README.md](https://github.com/dapeio/nino-features/blob/main/features/Search/README.md).
 
 ## Ein eigenes Modul entwickeln
 
@@ -588,24 +535,31 @@ Die Auflösungsregeln sind bewusst asymmetrisch:
 
 | Klassen-Namespace | Such-Roots |
 | --- | --- |
-| `Nino\Modules\...` | zuerst `_nino/`, dann `_admin/`, dann `NINO_APP_DIR`, falls definiert, sonst `app/` |
+| `Nino\Modules\...` | zuerst `_nino/`, dann `_admin/`, dann `features/` (`NINO_FEATURES_DIR`, falls definiert), dann `app/` (`NINO_APP_DIR`, falls definiert) |
 | jeder andere `Nino\...` | ausschließlich `_nino/` |
 | alle anderen Namespaces | `NINO_APP_DIR`, falls definiert, sonst `app/` |
 
 Der Namespace `Nino\` gehört dem Kernel und kann aus dem Application-Root des
 Projekts nicht überschrieben werden – mit einer bewussten Öffnung:
 `Nino\Modules\*` ist kein Verzeichnis, sondern eine zusammengeführte Sicht
-über drei Roots. Die immer aktiven Laufzeitmodule liegen in `_nino/`; die
-eigenen Ansichten der Workbench in `_admin/Nino/Modules/` (`Dashboard`,
-`Elements`, `Text`, `Images`, `Logs`, `Routes`, `Users`, `Language`,
-`Backups`, `Config`); Ninos optionale Laufzeitmodule unterhalb des
-Application-Roots (`app/Nino/Modules/Form`, `Newsletter`, `Navigation`,
-`Search`, `Localepicker`, `Design`, `Templates`), wo ein Projekt löscht, was es
-nicht braucht, und selbst aktualisiert, was es behält, während `_nino/`
-vollständig ersetzbar bleibt. Die Reihenfolge sagt, was ein Root dem anderen
-antun darf: `_nino/` zuerst, damit ein ausgeliefertes Modul nicht verdeckt
-werden kann; `_admin/` vor `app/`, damit ein Projekt keine Workbench-Ansicht
-ersetzen kann; `app/` zuletzt und damit nur ergänzend.
+über vier Roots. Die Laufzeitmodule, die Nino mitbringt, liegen in `_nino/` –
+die immer aktiven und die optionalen, die ein Projekt in `/nino/modules` ein-
+oder ausschaltet (`Form`, `Navigation`, `Localepicker`, `Design`,
+`Templates`); die eigenen Ansichten der Workbench in `_admin/Nino/Modules/`
+(`Dashboard`, `Elements`, `Text`, `Images`, `Logs`, `Routes`, `Users`,
+`Language`, `Backups`, `Config`, `Features`); die Features, die ein Projekt
+unter `features/` (oder `NINO_FEATURES_DIR`) installiert, je ein Verzeichnis
+mit einem Manifest `feature.php` – `Newsletter` und `Search` aus dem Katalog
+kommen so an, ein Checkout bringt keines mit; und der Application-Root, wo der
+eigene Code des Projekts liegt.
+Unter dem Features-Root ist das Präfix `Nino/Modules/` das Verzeichnis selbst:
+`features/Newsletter/Newsletter.php` ist `\Nino\Modules\Newsletter`, nicht
+`features/Nino/Modules/Newsletter/`. Die Reihenfolge sagt, was ein Root dem
+anderen antun darf: `_nino/` zuerst, damit ein ausgeliefertes Modul nie
+verdeckt werden kann; `_admin/` vor `features/`, damit ein Feature keine
+Workbench-Ansicht ersetzen kann; `features/` vor `app/`, damit ein Projekt
+kein installiertes Feature ersetzen kann, indem es eine Datei neben seine
+eigenen Module legt; `app/` zuletzt und damit nur ergänzend.
 
 Aufgelöst wird der vollständige relative Pfad, nicht das erste Segment – ein
 Modulname darf deshalb Klassen in mehreren Roots halten:
@@ -735,9 +689,9 @@ public static function assets(): array {
 }
 ```
 
-Jede Aktionsmethode schützt sich selbst mit `\Nino\Admin\Admin::guardPerm( $appData, $request, self::MANAGE_PERM )`, das ohne Konto mit `401` und ohne Berechtigung mit `403` antwortet. Die Panels der Workbench selbst werden zuerst zusammengeführt; eine URI oder ein Aktionsname, den ein solches Panel bereits besitzt, geht nie an ein Modul. Die mitgelieferten Module sind die Referenz: `app/Nino/Modules/Search/Admin/Admin.php` ist das kleinste vollständige Panel, `app/Nino/Modules/Form/Admin/Admin.php` eines mit Textfills und Dashboard-Kachel, `app/Nino/Modules/Design/Admin/Admin.php` eines mit eigenem Template, `app/Nino/Modules/Templates/Admin/Admin.php` ein Workspace. Das [Panel-Rezept](recipes/admin-panel.md) des KI-Leitfadens führt durch ein vollständiges Panel samt Frontend.
+Jede Aktionsmethode schützt sich selbst mit `\Nino\Admin\Admin::guardPerm( $appData, $request, self::MANAGE_PERM )`, das ohne Konto mit `401` und ohne Berechtigung mit `403` antwortet. Die Panels der Workbench selbst werden zuerst zusammengeführt; eine URI oder ein Aktionsname, den ein solches Panel bereits besitzt, geht nie an ein Modul. Die mitgelieferten Module sind die Referenz: `features/Search/Admin/Admin.php` ist das kleinste vollständige Panel, `_nino/Nino/Modules/Form/Admin/Admin.php` eines mit Textfills und Dashboard-Kachel, `_nino/Nino/Modules/Design/Admin/Admin.php` eines mit eigenem Template, `_nino/Nino/Modules/Templates/Admin/Admin.php` ein Workspace. Das [Panel-Rezept](recipes/admin-panel.md) des KI-Leitfadens führt durch ein vollständiges Panel samt Frontend.
 
-Ein Modul, das eigene Dateien unter `data/` führt, registriert in `init()` den Callback `'/nino/admin/restore'`; das Panel Backups ruft ihn mit dem entpackten Backup und dem aktiven Datenverzeichnis auf, und das Modul führt zusammen, was ihm gehört (`Newsletter::callbackRestore()`). Ein Verzeichnis `install/` neben der Klassendatei – `manifest.php`, `templates/`, `text/` – macht das Modul schließlich im Einrichtungsassistenten wählbar; siehe das [Library-Format](setup.de.md#library-format).
+Ein Modul, das eigene Dateien unter `data/` führt, registriert in `init()` den Callback `'/nino/admin/restore'`; das Panel Backups ruft ihn mit dem entpackten Backup und dem aktiven Datenverzeichnis auf, und das Modul führt zusammen, was ihm gehört (`Newsletter::callbackRestore()` im Newsletter-Feature des Katalogs). Ein Verzeichnis `install/` neben der Klassendatei – `manifest.php`, `templates/`, `text/` – macht ein Kernel- oder Projektmodul schließlich im Einrichtungsassistenten wählbar; siehe das [Library-Format](setup.de.md#library-format). Ein Feature trägt dieselbe Einheit, und `\Nino\Features::activate()` wendet sie an – ohne etwas zu überschreiben, das das Projekt hat –, wenn das Feature im Panel Features eingeschaltet wird; Manifest, Einstellungen und Lebenszyklus stehen unter [Features](features.de.md).
 
 ### Eigene Schreiboperationen absichern
 
@@ -824,7 +778,7 @@ Projektcode darf diese Header gezielt erweitern. Er sollte sie nicht pauschal er
 
 - Elementfelder werden HTML-kodiert oder bei ausdrücklich erlaubtem HTML bereinigt.
 - `Jstext` überträgt Daten JSON-kodiert und CSP-gebunden in JavaScript.
-- Der Newsletter verrät nicht, ob eine E-Mail-Adresse bereits existiert.
+- Das Newsletter-Feature des Katalogs verrät nicht, ob eine E-Mail-Adresse bereits existiert.
 - Bildverarbeitung begrenzt Uploads auf 8 MiB und Quelldateien auf 20 Millionen Pixel, bevor speicherintensive Verarbeitung beginnt.
 - PHP-Datendateien in öffentlich erreichbaren Verzeichnissen erhalten Schutzstubs oder liefern ausschließlich Werte zurück.
 
@@ -837,7 +791,8 @@ Nino verwendet eigenständige Smoke-Tests ohne PHPUnit. Jeder Test erstellt ein 
 | Test | Schwerpunkt |
 | --- | --- |
 | `tests/kernel-smoke.php` | Kernel, Routing, Rendering, Auth, Filesystem und Module |
-| `tests/search-smoke.php` | Elements-Suche: Aktivierung, Index-Lebenszyklus, Fuzzy-Rangfolge, Sprachen und Admin-Neuaufbau |
+| `tests/features-smoke.php` | der Feature-Vertrag gegen `tests/fixtures/features/`: Erkennung, Manifestprüfung, Versions-Constraints, jeder Settings-Typ, Aktivierung mit nur ergänzend angewendeter Einheit, Updates über den Upgrade-Haken, Deaktivierung und die ausgelieferten Manifeste |
+| `features/<Name>/tests/<key>-smoke.php` | der eigene Test eines Features, der mit ihm reist – `features/Search/tests/search-smoke.php` des Katalogs etwa prüft Aktivierung, Index-Lebenszyklus, Fuzzy-Rangfolge, Sprachen und den Admin-Neuaufbau. In einem Checkout leer, denn der bringt kein Feature mit |
 | `tests/admin-smoke.php` | die Shell des Workbench und seine Inhalts-Panels: Text-Blacklist und HTML-Sanitizer, Element- und Bildoperationen |
 | `tests/admin-system-smoke.php` | die Struktur- und System-Panels: Session-Gate, Konten, Rollen und Rechte, Elementtypen, Backups und Wiederherstellung, das Aktivitätsprotokoll und ein Rendern jedes Panels in jeder Oberflächensprache |
 | `tests/install-smoke.php` | Installationsschritte, erzeugte Struktur und Selbstsperre |
@@ -856,20 +811,23 @@ php tests/admin-system-smoke.php
 php tests/install-smoke.php
 php tests/design-smoke.php
 php tests/templates-smoke.php
-php tests/search-smoke.php
+php tests/features-smoke.php
+for test in features/*/tests/*-smoke.php; do [ -e "$test" ] || continue; php "$test" || exit 1; done
 php tests/demo-catalogue-smoke.php
 for test in tests/*-js-smoke.js; do node "$test"; done
 php tests/concurrency-smoke.php
 ```
 
-Neben den Tests läuft statische Analyse. PHPStan liest `phpstan.neon` (Level 5, der Kernel, die Workbench und `app/`); `phpstan-baseline.neon` daneben führt die Funde, die beim Einführen der Prüfung offen waren, sodass nur ein neuer Fund fehlschlägt. Wer einen der gelisteten Funde behebt, entfernt seinen Eintrag; ein neuer Fund wird nie in die Baseline aufgenommen, um ihn zum Schweigen zu bringen. ESLint liest `eslint.config.mjs` und prüft die Browser-Skripte auf undefinierte Namen, ungenutzten Code und `==`; es deklariert die Browser-Globals und den Namensraum `Nino`, sonst nichts. Beides ist keine Abhängigkeit des Produkts: Es gibt keine `composer.json` und keine `package.json`, CI installiert beide Werkzeuge selbst.
+`tests/harness.php` ist der gemeinsame Bootstrap: Er lädt den Kernel und die Shell der Workbench und stellt `check()`, `ninoSandbox()` (ein isoliertes Projektverzeichnis, zwei Sprachen, keine Module), `ninoSandboxDir()`, `ninoWarnings()` (die seit dem letzten Aufruf aufgezeichneten Warnungen, für einen Test, der eine erwartet) und `ninoDone()` bereit. Der Test eines Features lädt ihn aus dem Checkout drei Ebenen über sich oder aus dem, das `NINO_ROOT` nennt – so läuft derselbe Test gegen eine andere Nino-Version.
+
+Neben den Tests läuft statische Analyse. PHPStan liest `phpstan.neon` (Level 5, der Kernel, die Workbench, `app/` und `features/`, ohne die eigenen Tests eines Features); `phpstan-baseline.neon` daneben führt die Funde, die beim Einführen der Prüfung offen waren, sodass nur ein neuer Fund fehlschlägt. Wer einen der gelisteten Funde behebt, entfernt seinen Eintrag; ein neuer Fund wird nie in die Baseline aufgenommen, um ihn zum Schweigen zu bringen. ESLint liest `eslint.config.mjs` und prüft die Browser-Skripte auf undefinierte Namen, ungenutzten Code und `==`; es deklariert die Browser-Globals und den Namensraum `Nino`, sonst nichts. Beides ist keine Abhängigkeit des Produkts: Es gibt keine `composer.json` und keine `package.json`, CI installiert beide Werkzeuge selbst.
 
 ```bash
 phpstan analyse
 npx eslint .
 ```
 
-Die GitHub-Actions-Pipeline verwendet PHP 8.4 und Node 22, führt die Syntaxchecks über alle PHP- und JavaScript-Dateien aus, dann PHPStan und ESLint, dann diese PHP- und JavaScript-Smoke-Tests.
+Die GitHub-Actions-Pipeline verwendet PHP 8.4 und Node 22, führt die Syntaxchecks über alle PHP- und JavaScript-Dateien aus, dann PHPStan und ESLint, dann diese PHP- und JavaScript-Smoke-Tests. Ein zweiter Job, `features`, klont den Katalog [dapeio/nino-features](https://github.com/dapeio/nino-features) und kopiert jedes seiner Features in den Checkout, prüft dann ihre Manifeste und führt ihre eigenen Tests und PHPStan dagegen aus – die Sperre gegen eine Kernel-Änderung, die ein veröffentlichtes Feature bricht; die CI des Katalogs macht das Umgekehrte gegen Ninos `main` und den jüngsten Tag. `features/*/tests/` selbst ist in einem Checkout leer, weshalb die Schleife oben ein Glob ohne Treffer überspringt.
 
 Für Änderungen am Kernel oder an einem Modul empfiehlt sich dieser Ablauf:
 
@@ -943,5 +901,6 @@ besitzen.
 - [`/_admin`-Workbench](_admin.de.md) beschreibt jedes Panel, die Rollen und die Recovery-Seite.
 - [Templates-Panel](templates.de.md) erklärt den strukturellen Template-Builder im Alpha-Status.
 - [Design-Panel](appearance.de.md) erklärt die vier Erscheinungsbild-Editoren und den Token-Vertrag.
+- [Features](features.de.md) erklärt installierbare Features: Manifest, Einstellungen, Aktivierung, Updates und die Tests eines Features.
 - [Deployment](deployment.de.md) beschreibt Webserver, Sicherheit und Go-live.
 - [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) erklärt den Umgang mit Sicherheitsmeldungen.

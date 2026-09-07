@@ -31,7 +31,7 @@ const Nino = {
 	events : { bindCallback : function( event, callback ) { if( event === 'ready' ) callbacks.push( callback ) } },
 	http : { sendRequest : function() {} },
 	// The panel says nothing in its own words any more - every string it
-	// renders is a fill (see app/Nino/Modules/Templates/text/). The key stands
+	// renders is a fill (see _nino/Nino/Modules/Templates/text/). The key stands
 	// in for the sentence here, so the checks below read the same either way
 	content : { getText : function( key ) { return key } },
 	// And a label the server sends is either a fill key or literal text - the
@@ -53,7 +53,7 @@ const context = vm.createContext( {
 } );
 
 [ 'script.js', 'sections.js', 'composer.js', 'area-composer.js' ].forEach( function( file ) {
-	vm.runInContext( fs.readFileSync( path.join( __dirname, '../app/Nino/Modules/Templates/assets/', file ), 'utf8' ), context, { filename : file } );
+	vm.runInContext( fs.readFileSync( path.join( __dirname, '../_nino/Nino/Modules/Templates/assets/', file ), 'utf8' ), context, { filename : file } );
 } );
 
 const model = Nino.admin.templates.model;
@@ -117,19 +117,19 @@ check( 'preview documents remove executable markup before assigning srcdoc', !ho
 	&& !hostilePreview.includes( 'javascript:' )
 	&& !/\son[a-z]+=/i.test( hostilePreview ) );
 
-const composerSource = fs.readFileSync( path.join( __dirname, '../app/Nino/Modules/Templates/assets/composer.js' ), 'utf8' );
-const areaComposerSource = fs.readFileSync( path.join( __dirname, '../app/Nino/Modules/Templates/assets/area-composer.js' ), 'utf8' );
-const sectionsSource = fs.readFileSync( path.join( __dirname, '../app/Nino/Modules/Templates/assets/sections.js' ), 'utf8' );
-const scriptSource = fs.readFileSync( path.join( __dirname, '../app/Nino/Modules/Templates/assets/script.js' ), 'utf8' );
-const styleSource = fs.readFileSync( path.join( __dirname, '../app/Nino/Modules/Templates/assets/style.css' ), 'utf8' );
+const composerSource = fs.readFileSync( path.join( __dirname, '../_nino/Nino/Modules/Templates/assets/composer.js' ), 'utf8' );
+const areaComposerSource = fs.readFileSync( path.join( __dirname, '../_nino/Nino/Modules/Templates/assets/area-composer.js' ), 'utf8' );
+const sectionsSource = fs.readFileSync( path.join( __dirname, '../_nino/Nino/Modules/Templates/assets/sections.js' ), 'utf8' );
+const scriptSource = fs.readFileSync( path.join( __dirname, '../_nino/Nino/Modules/Templates/assets/script.js' ), 'utf8' );
+const styleSource = fs.readFileSync( path.join( __dirname, '../_nino/Nino/Modules/Templates/assets/style.css' ), 'utf8' );
 const ninoCssSource = fs.readFileSync( path.join( __dirname, '../_nino/Nino.css' ), 'utf8' );
 const ninoAdminCssSource = fs.readFileSync( path.join( __dirname, '../_admin/assets/style.css' ), 'utf8' );
 const ninoUiJsSource = fs.readFileSync( path.join( __dirname, '../_nino/Nino.ui.js' ), 'utf8' );
-const articlesManifestSource = fs.readFileSync( path.join( __dirname, '../app/Nino/Modules/Templates/library/articles-grid/manifest.php' ), 'utf8' );
-const templateMarkup = fs.readFileSync( path.join( __dirname, '../app/Nino/Modules/Templates/templates/panel.tpl' ), 'utf8' );
-const templatesPhpSource = fs.readFileSync( path.join( __dirname, '../app/Nino/Modules/Templates/Library/Library.php' ), 'utf8' );
-const panelPhpSource = fs.readFileSync( path.join( __dirname, '../app/Nino/Modules/Templates/Admin/Admin.php' ), 'utf8' );
-const contentPhpSource = fs.readFileSync( path.join( __dirname, '../app/Nino/Modules/Templates/Content/Content.php' ), 'utf8' );
+const articlesManifestSource = fs.readFileSync( path.join( __dirname, '../_nino/Nino/Modules/Templates/library/articles-grid/manifest.php' ), 'utf8' );
+const templateMarkup = fs.readFileSync( path.join( __dirname, '../_nino/Nino/Modules/Templates/templates/panel.tpl' ), 'utf8' );
+const templatesPhpSource = fs.readFileSync( path.join( __dirname, '../_nino/Nino/Modules/Templates/Library/Library.php' ), 'utf8' );
+const panelPhpSource = fs.readFileSync( path.join( __dirname, '../_nino/Nino/Modules/Templates/Admin/Admin.php' ), 'utf8' );
+const contentPhpSource = fs.readFileSync( path.join( __dirname, '../_nino/Nino/Modules/Templates/Content/Content.php' ), 'utf8' );
 const sandboxAssignments = composerSource.match( /iframe\.setAttribute\(\s*'sandbox',\s*PREVIEW_SANDBOX\s*\)/g ) || [];
 check( 'the backend refreshes the configured CSS bundle before embedding it', /Assets::doShortcode\(\s*\$appData,\s*\[\s*'\/\.cache\/style\.css'\s*\]/.test( templatesPhpSource ) );
 check( 'gallery and detail previews use an opaque sandbox while CSP still denies scripts', composerSource.includes( "const PREVIEW_SANDBOX = 'allow-scripts'" )
@@ -263,7 +263,7 @@ check( 'type size is a modifier of the class it changes, not an em utility over 
 // The sentence is a fill now (label/auto, "Auto (%s)"), so what is pinned here
 // is that autoLabel() still puts the resolved value into it
 check( 'every Auto option names the value it resolves to', /return Nino\.content\.getText\('\/_admin\/templates\/label\/auto'\)\.replace\( '%s', label \)/.test( areaComposerSource )
-	&& /label\/auto\]\]'\s*\t*=> 'Auto \(%s\)'/.test( fs.readFileSync( path.join( __dirname, '../app/Nino/Modules/Templates/text/en_US.php' ), 'utf8' ) )
+	&& /label\/auto\]\]'\s*\t*=> 'Auto \(%s\)'/.test( fs.readFileSync( path.join( __dirname, '../_nino/Nino/Modules/Templates/text/en_US.php' ), 'utf8' ) )
 	&& areaComposerSource.includes( "label : autoLabel( humanize( resolved[key] ) )" )
 	&& [ 'screen', 'container', 'vertical', 'margin', 'padding', 'background', 'overlay', 'focus' ].every( function( axis ) {
 		return areaComposerSource.includes( "frameChoices( '"+ axis+ "', recommended )" );

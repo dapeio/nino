@@ -2,6 +2,132 @@
 
 All notable changes to Nino are documented in this file.
 
+## 1.1.0-beta — 2026-09-07
+
+Features. An installable package is one directory below `features/` with a
+`feature.php` manifest, switched on in the workbench rather than picked in
+the wizard; Nino's optional modules ship with the kernel again, and `app/`
+is the project's alone. The features themselves are published from the
+catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features) -
+a checkout ships none.
+
+### Added
+
+- **`\Nino\Features`** (`_nino/Nino/Features/Features.php`): discovers the
+  directories below `features/`, reads and validates their manifests, matches
+  the `nino` version constraint (`*`, exact, `>=`/`<=`/`>`/`<`/`!=`, `^1.0`,
+  `~1.2`, `~1.2.3`, parts joined by comma or space, `||` alternatives; a
+  pre-release kernel counts as its release), answers a feature's settings
+  with the schema's defaults, validates a posted settings form, and
+  activates, updates and deactivates a feature.
+- **The manifest** `feature.php`: `key`, `name` and `description` (a string
+  or a `locale => string` map), `version`, `nino`, `php => [ 'ext' ]`,
+  `requires`, `settings` and `data`. The class is derived from the directory
+  - `\Nino\Modules\<Directory>` - and a `module` entry naming anything else
+  is refused; a manifest that does not validate is skipped with a warning,
+  and so is a second directory claiming a key.
+- **Settings** with the types `bool`, `int`, `string`, `text`, `email`,
+  `url`, `select`, `secret` and `lines`, each with `label`, `hint`,
+  `required` and a validated `default` (none on a `secret`); `min`, `max` and
+  `unit` for an int, `maxlength` and `pattern` for a string, `options` for a
+  select. Stored under `/nino/features` in `config.php` as
+  `key => { version, settings }`, read through
+  `\Nino\Features::setting()` / `settings()`; a form posts strings and gets
+  real types back, a secret posted empty keeps the stored one and `null`
+  clears it, every setting is validated before any is written.
+- **Activation** applies the feature's `install/` unit without overwriting
+  anything the project has - an existing route key, template, file or text
+  key stays, a unit `config` default fills in only where the project has
+  nothing - activates required features first, lists the class in
+  `/nino/modules` and records the version. Activating an active feature
+  applies an update: the unit adds what is new, and a module implementing
+  `upgrade( array &$appData, string $fromVersion ): bool` migrates its own
+  data first (`false` refuses). Deactivation removes the class and nothing
+  else, and is refused while another active feature requires it.
+- **The Features panel** in the workbench's System group (permission
+  `/_admin/features/manage`, actions `features/list`, `features/activate`,
+  `features/deactivate`, `features/settings`): lists every feature in the
+  directory with its state and its problems, activates, deactivates, updates
+  and edits settings. A reload of the workbench shows or removes a panel a
+  feature brings.
+- **`NINO_FEATURES_DIR`** relocates `features/` the way `NINO_APP_DIR` does
+  `app/`; `index.php`, `_admin/index.php` and `_admin/recovery.php` carry the
+  line. `features/.htaccess` denies the tree like `app/.htaccess`,
+  `router.php` mirrors it.
+- **`tests/harness.php`**, the shared bootstrap of a smoke test: `check()`,
+  `ninoSandbox()`, `ninoSandboxDir()`, `ninoWarnings()`, `ninoDone()`. A
+  feature's own test lives in `features/<Name>/tests/<key>-smoke.php` and
+  loads it from the checkout three levels up or from `NINO_ROOT`.
+  `tests/features-smoke.php` covers the contract against
+  `tests/fixtures/features/` (`Sample/` with every settings type, a panel,
+  an install unit and `upgrade()`; `Helper/`, `Old/`, `Broken/`). CI runs it
+  and then every feature's test; PHPStan analyses `features/` and excludes
+  `features/*/tests/*`.
+- **A `features` job in CI** clones the catalogue
+  [dapeio/nino-features](https://github.com/dapeio/nino-features), copies
+  every feature of it into the checkout and runs the features' own tests and
+  PHPStan against it on every push - the gate against a kernel change that
+  breaks a published feature. The catalogue's CI does the reverse against
+  Nino's `main` and latest tag. The checkout's own feature-test loop
+  survives an empty `features/`.
+- `'/nino/features' => []` in `AppData::DEFAULTS`; `Features` in the kernel
+  class list.
+- Docs: `docs/features.md` and `docs/features.de.md`, the feature manual and
+  contract; `docs/recipes/feature.md`, the seventh recipe; Features in every
+  manual's navigation line, in `AGENTS.md`'s map and tables, and in the
+  roadmap.
+
+### Changed
+
+- **Nino's optional modules ship with the kernel.** `Form`, `Navigation`,
+  `Localepicker`, `Design` and `Templates` moved from `app/Nino/Modules/` to
+  `_nino/Nino/Modules/`, beside the always-on kernel modules; a project
+  switches them on or off in `/nino/modules`, and `_nino/` is replaceable
+  wholesale again. `app/` holds project-owned classes only (`app/.htaccess`
+  stays).
+- **`Newsletter` and `Search` are features**, each with a manifest, and
+  live in the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features)
+  rather than in the checkout (see Removed); the wizard's Setup step no
+  longer offers them - it offers navigation, language selection and the
+  contact form - and a feature is switched on in the Features panel after
+  setup. The demo catalogue page unit no longer requires `newsletter` and
+  ships its two newsletter labels itself.
+- **The autoloader resolves `Nino\Modules\*` over four roots**, in this
+  order: `_nino/`, `_admin/`, `features/` (or `NINO_FEATURES_DIR`), then
+  `app/` (or `NINO_APP_DIR`). Below the features root the `Nino/Modules/`
+  prefix is the directory itself (`features/<Name>/<Name>.php`). A shipped
+  module cannot be shadowed, a feature cannot replace a workbench screen, a
+  project cannot replace an installed feature, `app/` can only add.
+- **The wizard applies its units through `\Nino\Features::applyUnit()`**,
+  with overwrite on, so `_admin/install/` may still be deleted after setup
+  and a feature's activation - add-only - shares one implementation with it.
+  `Setup::units()` scans `_nino/Nino/Modules/*/install/`, the app dir and
+  `_admin/install/library/modules/`, never `features/`.
+- The Search feature's own test, `features/Search/tests/search-smoke.php`
+  in the catalogue, runs over the harness; Nino's suites keep the kernel and
+  workbench contract, with `Modules\Form` as the example of a module whose
+  panel comes and goes.
+- Docs: the READMEs, `AGENTS.md`, the developer, setup, workbench,
+  deployment, concepts, templates, design and getting-started manuals and the
+  recipes describe the layout above; the test lists name
+  `tests/features-smoke.php` and the feature tests.
+
+### Removed
+
+- `app/Nino/Modules/` - nothing of Nino's is delivered below `app/` any more.
+- **`Newsletter` and `Search` no longer ship with the checkout.** They live in
+  the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features)
+  (`features/Newsletter/`, `features/Search/`, each with `feature.php`,
+  tests, README and changelog); a project installs one by copying its
+  directory into `features/` and activating it in the Features panel.
+  `features/` holds nothing but `.htaccess` in a checkout. The Newsletter's
+  own tests - signup, confirm and unsubscribe, its panel, its restore merge -
+  travel with it. The `newsletter-form` section preset of the Template
+  Builder still ships with the kernel and needs the Newsletter feature to
+  answer its form.
+- `tests/search-smoke.php` - see the Search feature's own test,
+  `features/Search/tests/search-smoke.php` in the catalogue.
+
 ## 1.0.0-beta — 2026-09-06
 
 The 1.0 baseline: the shape 0.13.0-beta settled on, with static analysis in

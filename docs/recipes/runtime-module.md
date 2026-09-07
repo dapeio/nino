@@ -1,9 +1,9 @@
 # Recipe: Add a runtime module
 
 **Additional Links:**
-[Agent guide](../../AGENTS.md) · [All recipes](README.md) · [Developer Manual](../development.md) · [Concepts](../concepts.md) · [`/_admin` Workbench](../_admin.md) · [Setup Wizard](../setup.md) · [Templates Panel](../templates.md)
+[Agent guide](../../AGENTS.md) · [All recipes](README.md) · [Developer Manual](../development.md) · [Concepts](../concepts.md) · [`/_admin` Workbench](../_admin.md) · [Setup Wizard](../setup.md) · [Templates Panel](../templates.md) · [Features](../features.md)
 
-One of the six extension recipes of the [Nino agent guide](../../AGENTS.md). Its
+One of the seven extension recipes of the [Nino agent guide](../../AGENTS.md). Its
 rules - the required workflow, the core runtime model, the conventions and the
 security review - apply to every step below.
 
@@ -24,24 +24,31 @@ Path:  app/Project/Catalog/Catalog/Catalog.php
 
 ```text
 Class: Nino\Modules\Form
-Path:  _nino/Nino/Modules/Form/Form.php   (looked for first)
-       app/Nino/Modules/Form/Form.php     (where it is delivered)
+Path:  _nino/Nino/Modules/Form/Form.php        (a kernel module, optional or not)
+
+Class: Nino\Modules\Newsletter
+Path:  features/Newsletter/Newsletter.php      (a feature, copied in from the catalogue: the directory is the module name)
 ```
 
 The lookup roots are deliberately different:
 
 - `Nino\*` is kernel-owned and resolves only below `_nino/`. A project cannot
   shadow a kernel class from its application root.
-- `Nino\Modules\*` is the one opening: looked for below `_nino/` first, then
-  below the application root. Nino's optional modules - `Form`, `Newsletter`,
-  `Navigation`, `Search`, `Localepicker`, `Design`, `Templates` - are delivered
-  at `app/Nino/Modules/<Name>/`, where a project deletes the ones it does not
-  need and updates the ones it keeps itself; `_nino/` stays replaceable
-  wholesale. A kernel module of the same name would win.
+- `Nino\Modules\*` is the one opening: a merged view over four roots, looked
+  for in this order - `_nino/` (every module Nino ships: the always-on ones
+  and the optional `Form`, `Navigation`, `Localepicker`, `Design`, `Templates`
+  a project switches on or off in `/nino/modules`), `_admin/` (the workbench's
+  own screens), `features/` (the installed features, one directory each with
+  a `feature.php` manifest - the catalogue's `Newsletter` and `Search` arrive
+  this way, a checkout ships none; below this root the `Nino/Modules/` prefix
+  is the directory itself), then the
+  application root. The order is what a root may do to the others: a shipped
+  module can never be shadowed, a feature cannot replace a workbench screen,
+  a project cannot replace an installed feature, `app/` can only add.
 - Every other namespace resolves below `app/` and nowhere else. If
   `NINO_APP_DIR` was defined as an absolute directory path before
-  `_nino/Nino.php` was loaded, that directory replaces `app/` - for the
-  delivered optional modules too, so a relocated app dir takes them along.
+  `_nino/Nino.php` was loaded, that directory replaces `app/`;
+  `NINO_FEATURES_DIR` does the same for `features/`.
 
 Within whichever root applies, the exact formula is:
 
@@ -57,8 +64,10 @@ Therefore:
 - class names MUST never be built from request data;
 - do not add manual `require` calls for a correctly located module.
 
-Nino's own modules use namespace `Nino\Modules`. Project-specific modules
-MUST use a project namespace so future Nino classes cannot collide.
+Nino's own modules use namespace `Nino\Modules`, and so does a feature -
+the autoloader serves `\Nino\Modules\<Name>` from `features/<Name>/`, and a
+feature is never in `app/`. Project-specific modules MUST use a project
+namespace so future Nino classes cannot collide.
 
 Everything a module brings lives in its directory, below the class file:
 
@@ -309,7 +318,7 @@ Add focused coverage to `tests/kernel-smoke.php` or a dedicated standalone
 smoke script consistent with the suite. Test:
 
 - autoloading from the exact default or `NINO_APP_DIR` path, including the
-  kernel namespace guard and the `Nino\Modules\*` second root;
+  kernel namespace guard and the `Nino\Modules\*` roots;
 - activation through `/nino/modules`;
 - repeated `init()` behavior where relevant;
 - route registration and internal callback identity;
@@ -334,7 +343,7 @@ smoke test for its behavior rather than testing only for the file's presence.
 
 ## Panels, the installer unit and Restore
 
-A feature is one directory: add it and everything appears, remove it and
+A module is one directory: add it and everything appears, remove it and
 everything is gone. Three optional hooks make that true for the management
 tools and the installer:
 
@@ -342,14 +351,16 @@ tools and the installer:
   7). The kernel asks through `\Nino\Modules::collect()`, in `/nino/modules`
   order and only while the module is active, so the screens come and go with
   the module.
-- `install/manifest.php` beside the class makes the module selectable in
-  the setup wizard (the [installer package recipe](installer-package.md)). No wizard file lists it. A module that is a
+- `install/manifest.php` beside the class makes a kernel or project module
+  selectable in the setup wizard (the [installer package recipe](installer-package.md)). No wizard file lists it. A module that is a
   panel and nothing else - Design, Templates - has no unit: the wizard's
   Setup step lists `Install\Setup::TOOL_MODULES` in `/nino/modules` whenever
-  their class exists.
+  their class exists. A feature carries the same unit and
+  `\Nino\Features::activate()` applies it, add-only, when the feature is
+  switched on in the workbench - the [feature recipe](feature.md).
 - `'/nino/admin/restore'` (args `dataDir`, `staging`) is the callback a module
   registers in `init()` when it keeps its own files under `data/` that a
   backup carries: the Backups panel (and the recovery page) call it with the
   staged backup and the live data directory, and the module merges what is
-  its own - `Newsletter::callbackRestore()` is the reference. Restore itself
-  knows no module.
+  its own - `Newsletter::callbackRestore()` in the catalogue's Newsletter
+  feature is the reference. Restore itself knows no module.

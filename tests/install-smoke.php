@@ -20,7 +20,7 @@ require __DIR__. '/../_admin/install/Install.php';
 // The Themes step calls into the Design module when it is there - found
 // through the autoloader like every module, so nothing to load by hand:
 // without it the Design step degrades to "not offered", and the tests below
-// cover the real path because app/Nino/Modules/Design is part of this checkout
+// cover the real path because _nino/Nino/Modules/Design is part of this checkout
 
 $failures = 0;
 $checks		= 0;
@@ -182,7 +182,7 @@ $libraryBody = $libraryRequest['/nino/http/response']['body'];
 check( 'lists the two locales the library ships translations for', $libraryBody['locales'] === [ 'de_DE', 'en_US' ] );
 check( 'reports the config\'s current native locale as already active', $libraryBody['activeLocales'] === [ 'de_DE' ] );
 check( 'reports the config\'s current native locale itself, for the Native Locale dropdown to pre-select', $libraryBody['nativeLocale'] === 'de_DE' );
-check( 'lists every module unit - pages have their own step now (Webpages), not listed here', array_keys( $libraryBody['modules'] ) === [ 'forms', 'localepicker', 'navigation', 'newsletter' ] );
+check( 'lists every module unit - pages have their own step now (Webpages), not listed here', array_keys( $libraryBody['modules'] ) === [ 'forms', 'localepicker', 'navigation' ] );
 check( 'no module is active yet', $libraryBody['modules']['forms']['active'] === false );
 
 $_POST['data'] = json_encode( [ 'locales' => [], 'modules' => [] ] );
@@ -225,7 +225,7 @@ $configAfterApply = \Nino\Filesystem::getFileContent( $appData, '/config.php', [
 check( 'picking only the already-native de_DE does not pull in en_US too', $configAfterApply['/nino/locales/available'] === [ 'de_DE' ] );
 check( 'core structural modules are always present', in_array( '\\Nino\\Modules\\Template', $configAfterApply['/nino/modules'], true ) === true );
 check( 'the auto-required Form module is present', in_array( '\\Nino\\Modules\\Form', $configAfterApply['/nino/modules'], true ) === true );
-check( 'a module nobody picked (Newsletter) is absent', in_array( '\\Nino\\Modules\\Newsletter', $configAfterApply['/nino/modules'], true ) === false );
+check( 'a module nobody picked (Navigation) is absent', in_array( '\\Nino\\Modules\\Navigation', $configAfterApply['/nino/modules'], true ) === false );
 check( 'the developer tools that ship as modules are active from the first config on', in_array( '\\Nino\\Modules\\Design', $configAfterApply['/nino/modules'], true ) === true
 	&& in_array( '\\Nino\\Modules\\Templates', $configAfterApply['/nino/modules'], true ) === true );
 check( 'apply writes the two roles a project starts with', array_keys( $configAfterApply['/nino/auth/roles'] ) === [ 'editor', 'developer' ] && $configAfterApply['/nino/auth/roles']['developer'] === [ 'label' => 'Developer', 'perms' => [ '/*' ] ] );
@@ -249,16 +249,18 @@ check( 'copies base\'s deny rule into the private root it just filled', is_file(
 	block and the directory exists unprotected for the rest of the request,
 	with a project's templates already in it if the request then fails. The
 	order is load-bearing, so it is pinned here rather than left to whoever
-	next tidies that method.	*/
-$applyUnitSource = (string) file_get_contents( __DIR__. '/../_admin/install/Install.php' );
-$applyUnitBody 	= substr( $applyUnitSource, strpos( $applyUnitSource, 'private static function _applyUnit(' ) );
+	next tidies that method - which is the kernel's \Nino\Features::applyUnit()
+	now, the one unit application the wizard and a feature activation share.	*/
+$applyUnitSource = (string) file_get_contents( __DIR__. '/../_nino/Nino/Features/Features.php' );
+$applyUnitBody 	= substr( $applyUnitSource, strpos( $applyUnitSource, 'public static function applyUnit(' ) );
 $applyUnitBody 	= substr( $applyUnitBody, 0, strpos( $applyUnitBody, "\n\t\t}" ) );
+check( 'the wizard\'s Setup applies a unit through the kernel, with overwrite on', str_contains( (string) file_get_contents( __DIR__. '/../_admin/install/Install.php' ), '\\Nino\\Features::applyUnit( $appData, $unitDir, $locales, $routes, $blacklist, true )' ) === true );
 
 check( '...before any template can create that directory unprotected', strpos( $applyUnitBody, "\$manifest['files']" ) < strpos( $applyUnitBody, "forceDir( \$appData, '/templates' )" ) );
 
 check( 'copies base\'s html-header.tpl', \Nino\Filesystem::fileExists( $appData, '/templates/html-header.tpl' ) === true );
 check( 'copies "forms"\'s own mail-header/footer templates', \Nino\Filesystem::fileExists( $appData, '/templates/mail-header.tpl' ) === true );
-check( 'does not copy a module that was never picked (newsletter)', \Nino\Filesystem::fileExists( $appData, '/templates/page-newsletter.tpl' ) === false );
+check( 'does not copy a module that was never picked (navigation)', \Nino\Filesystem::fileExists( $appData, '/templates/html-header-nav.tpl' ) === false );
 
 $blacklistAfterApply = \Nino\Filesystem::getFileContent( $appData, '/text/blacklist.php', [] );
 check( 'base\'s blacklist entries (design tokens) landed in text/blacklist.php', in_array( '/website/lang', $blacklistAfterApply, true ) === true );
@@ -274,7 +276,7 @@ $libraryAfterApplyBody = $libraryAfterApply['/nino/http/response']['body'];
 
 check( 'apiLibrary now reports de_DE as the active locale', $libraryAfterApplyBody['activeLocales'] === [ 'de_DE' ] );
 check( 'apiLibrary now reports "forms" as active', $libraryAfterApplyBody['modules']['forms']['active'] === true );
-check( 'apiLibrary now reports "newsletter" as still inactive', $libraryAfterApplyBody['modules']['newsletter']['active'] === false );
+check( 'apiLibrary now reports "navigation" as still inactive', $libraryAfterApplyBody['modules']['navigation']['active'] === false );
 
 // A second run with a different, non-overlapping selection replaces the
 // first run rather than adding to it: de_DE drops out, "forms" drops out
@@ -1699,14 +1701,17 @@ check( 'the home unit registers at "/" and keeps "/home" as its Element-URI', is
 // with its module - install/ beside the class file - and Setup::units()
 // finds it there without /_install listing it anywhere
 $moduleUnits = \Nino\Install\Setup::units();
-$modulesDirs 	= [ realpath( $realRoot. '/_nino/Nino/Modules' ), realpath( $realRoot. '/app/Nino/Modules' ) ];
+$modulesDirs 	= [ realpath( $realRoot. '/_nino/Nino/Modules' ) ];
 
 check( 'the contact page can pull the forms module in with it', isset( $moduleUnits['forms'] ) === true );
 check( 'a checkout keeps no module unit in _admin/install/library any more - every one sits in its module as install/', $moduleUnits !== [] && array_filter( $moduleUnits,
 	static fn( string $unitDir ): bool => basename( $unitDir ) !== 'install' || in_array( dirname( realpath( $unitDir ) ?: '', 2 ), $modulesDirs, true ) === false ) === [] );
-check( 'the optional modules are delivered below app/Nino/Modules, where a project keeps or drops them', str_ends_with( $moduleUnits['forms'], '/app/Nino/Modules/Form/install' ) === true );
+check( 'the optional modules ship below _nino/Nino/Modules, switched on or off in /nino/modules', str_ends_with( $moduleUnits['forms'], '/_nino/Nino/Modules/Form/install' ) === true );
+// A feature is not a wizard unit: it is activated in the Features panel after
+// setup (see \Nino\Features), so its install/ is never offered here
+check( 'nothing below features/ is offered by the wizard', array_filter( $moduleUnits, static fn( string $unitDir ): bool => str_contains( $unitDir, '/features/' ) === true ) === [] );
 check( 'the forms unit takes its key from its manifest - its directory is "Form"', basename( dirname( $moduleUnits['forms'] ) ) === 'Form' && isset( $moduleUnits['form'] ) === false );
-check( '...the others from their directory\'s lowercased name', basename( dirname( $moduleUnits['newsletter'] ) ) === 'Newsletter' && basename( dirname( $moduleUnits['localepicker'] ) ) === 'Localepicker' );
+check( '...the others from their directory\'s lowercased name', basename( dirname( $moduleUnits['navigation'] ) ) === 'Navigation' && basename( dirname( $moduleUnits['localepicker'] ) ) === 'Localepicker' );
 // ...and each unit activates the module it sits in, or the wizard would
 // switch one module on and copy another's templates
 check( 'each unit activates the module it ships with', array_filter( $moduleUnits, static fn( string $unitDir ): bool =>
@@ -1753,8 +1758,9 @@ echo "\n";
 	sits beside its class as install/, and Setup::units() finds it there
 	without the wizard listing it anywhere. A project's own modules are found
 	the same way below the app dir - the directory the autoloader resolves
-	project classes against, so NINO_APP_DIR moves both together: a project
-	that relocates its app dir takes the delivered optional modules along.	*/
+	project classes against, so NINO_APP_DIR moves them along. Nino's own
+	optional modules stay where the kernel is, below _nino/Nino/Modules, and
+	keep their keys against a project unit claiming the same one.	*/
 echo "Install units travel with their modules\n";
 
 if( defined( 'NINO_APP_DIR' ) === true ) {
@@ -1770,8 +1776,8 @@ if( defined( 'NINO_APP_DIR' ) === true ) {
 	foreach( [
 		'/Acme/Widget/install' 				=> [ 'label' => 'Widget', 'moduleClass' => '\\Acme\\Widget', 'requiresModules' => [ 'forms' ] ],
 		'/Acme/Modules/Deep/install' 	=> [ 'label' => 'Deep', 'moduleClass' => '\\Acme\\Modules\\Deep', 'key' => 'deep-unit' ],
-		// A second unit claiming "forms" - Nino's own module (copied below,
-		// as a relocated app dir has it) keeps the key
+		// A second unit claiming "forms" - Nino's own Form module below
+		// _nino/Nino/Modules keeps the key
 		'/Acme/Forms/install' 				=> [ 'label' => 'Shadow', 'moduleClass' => '\\Acme\\Forms' ],
 		// Not a slug: dropped
 		'/Acme/Bad/install' 					=> [ 'label' => 'Bad', 'moduleClass' => '\\Acme\\Bad', 'key' => 'Not A Slug' ],
@@ -1782,11 +1788,6 @@ if( defined( 'NINO_APP_DIR' ) === true ) {
 		file_put_contents( $appDir. $unitPath. '/templates/'. $unitTemplate, '<p>'. $unitManifest['label']. '</p>' );
 	}
 
-	// The delivered Form module travels with the relocated app dir - its
-	// unit is enough for the wizard's question, the class autoloads from
-	// the checkout either way
-	\Nino\Filesystem::copyDir( $realRoot. '/app/Nino/Modules/Form/install', $appDir. '/Nino/Modules/Form/install' );
-
 	define( 'NINO_APP_DIR', $appDir );
 
 	$foundUnits = \Nino\Install\Setup::units();
@@ -1794,7 +1795,7 @@ if( defined( 'NINO_APP_DIR' ) === true ) {
 	check( 'a project module\'s install/ is found below the app dir', ( $foundUnits['widget'] ?? '' ) === $appDir. '/Acme/Widget/install' );
 	check( '...three levels down too', ( $foundUnits['deep-unit'] ?? '' ) === $appDir. '/Acme/Modules/Deep/install' );
 	check( 'the key comes from the manifest when it names one, else from the directory', isset( $foundUnits['deep'] ) === false && isset( $foundUnits['widget'] ) === true );
-	check( 'Nino\'s own unit keeps a key a project module also claims', $foundUnits['forms'] === $appDir. '/Nino/Modules/Form/install' );
+	check( 'Nino\'s own unit keeps a key a project module also claims', str_ends_with( $foundUnits['forms'], '/_nino/Nino/Modules/Form/install' ) === true );
 	check( 'a key that is not a slug is dropped', array_filter( $foundUnits, static fn( string $dir ): bool => str_ends_with( $dir, '/Acme/Bad/install' ) === true ) === [] );
 	$sortedKeys = array_keys( $foundUnits );
 	sort( $sortedKeys );

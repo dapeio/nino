@@ -12,6 +12,11 @@ declare(strict_types=1);
  *	Usage: php tests/kernel-smoke.php
  */
 
+// The features root is the fixture directory: a checkout ships no feature of
+// its own (they come from dapeio/nino-features), and the autoload check
+// below needs one to resolve. Before the kernel loads, like every constant
+define( 'NINO_FEATURES_DIR', __DIR__. '/fixtures/features' );
+
 require __DIR__. '/../_nino/Nino.php';
 
 $failures = 0;
@@ -1231,121 +1236,6 @@ check( 'a csrf-blocked request does not send mail or record a submission', count
 echo "\n";
 
 
-// --- Modules\Newsletter ---------------------------------------------------
-
-echo "Modules\\Newsletter - double opt-in signup, confirm, unsubscribe\n";
-
-function submitNewsletter( array &$appData, array $post ): array {
-	$_POST = array_merge( [ 'email' => '', 'location' => '' ], $post );
-	$request = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-	\Nino\Modules\Newsletter::callbackResponse( $appData, $request );
-	return $request;
-}
-
-function visitNewsletterLink( array &$appData, array $query ): array {
-	$request = [ '/nino/http/request' => [ 'query' => $query ], '/nino/http/response' => [ 'statusCode' => 200 ] ];
-	\Nino\Modules\Newsletter::callbackAction( $appData, $request );
-	return $request;
-}
-
-\Nino\Modules\Newsletter::init( $appData );
-check( 'init registers the POST route under /.newsletter', isset( $appData['/nino/http/routes']['POST://.newsletter'] ) === true );
-check( 'init registers the GET route (confirm/unsubscribe page) under /.newsletter', isset( $appData['/nino/http/routes']['GET://.newsletter'] ) === true );
-check( 'init does not register the old /newsletter route anymore', isset( $appData['/nino/http/routes']['POST://newsletter'] ) === false );
-
-$missingEmailRequest = submitNewsletter( $appData, [] );
-check( 'a missing email is rejected (400)', $missingEmailRequest['/nino/http/response']['statusCode'] === 400 );
-
-$invalidEmailRequest = submitNewsletter( $appData, [ 'email' => 'not-an-email' ] );
-check( 'an invalid email is rejected (400)', $invalidEmailRequest['/nino/http/response']['statusCode'] === 400 );
-
-$honeypotRequest = submitNewsletter( $appData, [ 'email' => 'jo@example.com', 'location' => 'filled-by-a-bot' ] );
-check( 'a filled honeypot is rejected (418)', $honeypotRequest['/nino/http/response']['statusCode'] === 418 );
-
-check( 'none of the rejected signups created the newsletter file', is_file( \Nino\Filesystem::getPath( $appData ). '/data/newsletter.php' ) === false );
-
-$_POST['_csrf'] = 'wrong-token';
-$blockedNewsletterRequest = [ '/nino/http/request' => [ 'method' => 'POST' ], '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Csrf::callbackResponse( $appData, $blockedNewsletterRequest );
-$_POST = array_merge( $_POST, [ 'email' => 'jo@example.com', 'location' => '' ] );
-\Nino\Modules\Newsletter::callbackResponse( $appData, $blockedNewsletterRequest );
-check( 'a csrf-blocked signup is rejected too', $blockedNewsletterRequest['/nino/http/response']['statusCode'] === 403 );
-check( 'a csrf-blocked signup does not create the newsletter file', is_file( \Nino\Filesystem::getPath( $appData ). '/data/newsletter.php' ) === false );
-
-$okNewsletterRequest = submitNewsletter( $appData, [ 'email' => 'jo@example.com' ] );
-check( 'a valid signup succeeds (200)', $okNewsletterRequest['/nino/http/response']['statusCode'] === 200 );
-check( 'a valid new signup reports the generic status', $okNewsletterRequest['/nino/http/response']['body']['status'] === 'ok' );
-check( 'a valid signup bootstraps the newsletter file on the private root, not under _editor', is_file( \Nino\Filesystem::path( $appData, '/data/newsletter.php' ) ) === true && is_dir( \Nino\Filesystem::getPath( $appData ). '/_admin/data' ) === false );
-
-$subscribersPath 	= '/data/newsletter.php';
-$subscribersFile 	= \Nino\Filesystem::path( $appData, $subscribersPath );
-
-$subscribers = \Nino\Filesystem::getFileContent( $appData, $subscribersPath, [] );
-check( 'exactly one entry was recorded', count( $subscribers ) === 1 );
-check( 'the entry is pending, not subscribed - the form submit alone must not subscribe', ( $subscribers[0]['status'] ?? '' ) === 'pending' );
-check( 'the entry has the submitted email, a confirm token, a date and ip', $subscribers[0]['email'] === 'jo@example.com' && empty( $subscribers[0]['token'] ) === false && isset( $subscribers[0]['date'] ) === true && $subscribers[0]['ip'] === '127.0.0.1' );
-
-check( 'the file is a plain, human-readable php array file - not an encoded stub', str_starts_with( file_get_contents( $subscribersFile ), "<?php return array (" ) === true );
-
-$pendingToken = $subscribers[0]['token'];
-
-$dupeRequest = submitNewsletter( $appData, [ 'email' => 'jo@example.com' ] );
-check( 'a repeated signup while still pending succeeds (200)', $dupeRequest['/nino/http/response']['statusCode'] === 200 );
-check( 'and reports the same generic status - the confirm mail is simply re-sent', $dupeRequest['/nino/http/response']['body']['status'] === 'ok' );
-$subscribers = \Nino\Filesystem::getFileContent( $appData, $subscribersPath, [] );
-check( 'without creating a duplicate entry', count( $subscribers ) === 1 );
-check( 'and without rotating the pending token', $subscribers[0]['token'] === $pendingToken );
-
-$wrongTokenRequest = visitNewsletterLink( $appData, [ 'confirm' => 'not-the-token' ] );
-check( 'a confirm link with an unknown token answers 404', $wrongTokenRequest['/nino/http/response']['statusCode'] === 404 );
-check( 'and leaves the entry pending', \Nino\Filesystem::getFileContent( $appData, $subscribersPath, [] )[0]['status'] === 'pending' );
-check( 'and prepares the "invalid" page fills', ( $appData['./nino/html/fills']['*']['[[/newsletter/page/title]]'] ?? '' ) === '[[/newsletter/page/invalid/title]]' );
-
-$confirmRequest = visitNewsletterLink( $appData, [ 'confirm' => $pendingToken ] );
-check( 'a confirm link with the mailed token answers 200', $confirmRequest['/nino/http/response']['statusCode'] === 200 );
-check( 'and flips the entry to subscribed', \Nino\Filesystem::getFileContent( $appData, $subscribersPath, [] )[0]['status'] === 'subscribed' );
-check( 'and prepares the "confirmed" page fills', ( $appData['./nino/html/fills']['*']['[[/newsletter/page/title]]'] ?? '' ) === '[[/newsletter/page/confirmed/title]]' );
-
-$reconfirmRequest = visitNewsletterLink( $appData, [ 'confirm' => $pendingToken ] );
-check( 'confirming twice stays a friendly 200, not an error', $reconfirmRequest['/nino/http/response']['statusCode'] === 200 );
-
-$subscribedRequest = submitNewsletter( $appData, [ 'email' => 'jo@example.com' ] );
-// The response must not distinguish a known address from a new one - that
-// would let anyone test whether a given address is subscribed
-check( 'signing up a confirmed subscriber again reports the same generic status', $subscribedRequest['/nino/http/response']['body']['status'] === 'ok' );
-check( 'and does not create a duplicate entry', count( \Nino\Filesystem::getFileContent( $appData, $subscribersPath, [] ) ) === 1 );
-
-$unsubscribeLink = \Nino\Modules\Newsletter::getUnsubscribeLink( $appData, 'jo@example.com' );
-check( 'getUnsubscribeLink builds the /.newsletter unsubscribe url for a subscriber', is_string( $unsubscribeLink ) === true && str_contains( $unsubscribeLink, '/.newsletter?unsubscribe='. $pendingToken ) === true );
-check( 'getUnsubscribeLink is case-insensitive about the email', \Nino\Modules\Newsletter::getUnsubscribeLink( $appData, 'JO@example.com' ) === $unsubscribeLink );
-check( 'getUnsubscribeLink returns false for an unknown email', \Nino\Modules\Newsletter::getUnsubscribeLink( $appData, 'nobody@example.com' ) === false );
-
-$badUnsubscribeRequest = visitNewsletterLink( $appData, [ 'unsubscribe' => 'not-the-token' ] );
-check( 'an unsubscribe link with an unknown token answers 404 and removes nothing', $badUnsubscribeRequest['/nino/http/response']['statusCode'] === 404 && count( \Nino\Filesystem::getFileContent( $appData, $subscribersPath, [] ) ) === 1 );
-
-$unsubscribeRequest = visitNewsletterLink( $appData, [ 'unsubscribe' => $pendingToken ] );
-check( 'an unsubscribe link with the subscriber\'s token answers 200', $unsubscribeRequest['/nino/http/response']['statusCode'] === 200 );
-check( 'and removes the entry from the list', count( \Nino\Filesystem::getFileContent( $appData, $subscribersPath, [] ) ) === 0 );
-check( 'and prepares the "unsubscribed" page fills', ( $appData['./nino/html/fills']['*']['[[/newsletter/page/title]]'] ?? '' ) === '[[/newsletter/page/unsubscribed/title]]' );
-
-// Modules\Newsletter::callbackRestore() relies on this record surviving
-// every unsubscribe - see its own test in dev-smoke.php for the restore side.
-// A sha256 of the address, not the address itself - see
-// \Nino\Modules\Newsletter's own REMOVED_PATH docblock for why
-$joRemovalHash = hash( 'sha256', 'jo@example.com' );
-check( 'the unsubscribe is recorded, for a later restore not to undo it', in_array( $joRemovalHash, \Nino\Filesystem::getFileContent( $appData, '/data/newsletter-removed.php', [] ), true ) === true );
-
-$resubscribeRequest = submitNewsletter( $appData, [ 'email' => 'jo@example.com' ] );
-check( 'resubscribing after an unsubscribe succeeds', $resubscribeRequest['/nino/http/response']['statusCode'] === 200 );
-check( 'and creates a fresh pending entry', count( \Nino\Filesystem::getFileContent( $appData, $subscribersPath, [] ) ) === 1 );
-check( 'and clears the earlier removal record - a fresh signup is a fresh consent', in_array( $joRemovalHash, \Nino\Filesystem::getFileContent( $appData, '/data/newsletter-removed.php', [] ), true ) === false );
-
-$bareVisitRequest = visitNewsletterLink( $appData, [] );
-check( 'a bare GET /.newsletter without confirm/unsubscribe answers 404', $bareVisitRequest['/nino/http/response']['statusCode'] === 404 );
-
-echo "\n";
-
-
 // --- Mail::_hit - per-ip send rate limiting --------------------------------
 
 echo "Mail::_hit - fixed-window rate limiting (private, exercised via Reflection)\n";
@@ -1785,13 +1675,16 @@ PHP
 
 check( 'a project class in app/ autoloads on a direct reference without going through callModules()', \KernelSmokeDummyModules\DummyDirectAutoload::ping() === 'pong' );
 
-/*	The one namespace both roots serve: Nino\Modules\* is looked for below
-	_nino/ first, then below the application root - which is where the
-	optional modules (Form, Newsletter, Navigation, Search, Localepicker,
-	Design, Templates) are delivered, so a project drops the ones it does
-	not want and updates the ones it keeps itself.	*/
-check( 'an optional module below app/Nino/Modules/ autoloads through the Nino\Modules namespace', class_exists( '\Nino\Modules\Search' ) === true
-	&& class_exists( '\Nino\Modules\Navigation\Admin' ) === true );
+/*	The one namespace every root serves: Nino\Modules\* is looked for below
+	_nino/ first - where the runtime modules Nino ships live, the optional
+	ones (Form, Navigation, Localepicker, Design, Templates) among them -
+	then below _admin/, then below features/, where a project installs a
+	feature as one directory (see \Nino\Features), then below the
+	application root.	*/
+check( 'an optional kernel module below _nino/Nino/Modules/ autoloads through the Nino\Modules namespace', class_exists( '\Nino\Modules\Navigation\Admin' ) === true
+	&& class_exists( '\Nino\Modules\Form' ) === true );
+check( 'a feature below features/ autoloads through the same namespace, the directory standing for the Nino/Modules prefix', class_exists( '\Nino\Modules\Sample' ) === true
+	&& class_exists( '\Nino\Modules\Sample\Admin' ) === true && class_exists( '\Nino\Modules\Helper' ) === true );
 
 /*	A class outside Nino\ resolves against the application root and nowhere
 	else. _nino/ is not a second place to look: that is what keeps the kernel

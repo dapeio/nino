@@ -2,12 +2,12 @@
 
 **Language:** English · [Deutsch](deployment.de.md)
 
-**Last updated:** September 6, 2026 · **Nino version:** 1.0.0-beta
+**Last updated:** September 7, 2026 · **Nino version:** 1.0.0-beta
 
 This manual guides a fully developed Nino website into production. If you instead want to set up a fresh project, start with [Getting Started](getting-started.md); technical extensions are covered in the [Developer Manual](development.md).
 
 **Additional Links:**
-[README](../README.md) · [Concepts](concepts.md) · [Developer Manual](development.md) · [Recipes](recipes/README.md) · [Getting Started](getting-started.md) · [Setup Wizard](setup.md) · [`/_admin` Workbench](_admin.md) · [Templates Panel](templates.md) · [Design Panel](appearance.md) · [Deployment](deployment.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
+[README](../README.md) · [Concepts](concepts.md) · [Developer Manual](development.md) · [Recipes](recipes/README.md) · [Getting Started](getting-started.md) · [Setup Wizard](setup.md) · [`/_admin` Workbench](_admin.md) · [Templates Panel](templates.md) · [Design Panel](appearance.md) · [Features](features.md) · [Deployment](deployment.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
 
 ## Target System Requirements
 
@@ -67,18 +67,21 @@ Transfer the same behavior explicitly to the server configuration:
 - route `/_admin` to `_admin/index.php` and leave `/_admin/recovery.php` to its own file;
 - deny access to dotfiles and dot directories;
 - **deny `private/` entirely** — it is never requested by a browser, only read by PHP;
-- deny direct access to `_admin/install/library/` except `_admin/install/library/themes/<key>/preview.svg` — the remaining files are server-side appearance source; the same goes for the section presets under `app/Nino/Modules/Templates/library/`;
+- **deny `app/` and `features/` entirely** — the project's own classes and the installed features are server-side source, never requested by a browser; each ships its own `.htaccess` for Apache;
+- deny direct access to `_admin/install/library/` except `_admin/install/library/themes/<key>/preview.svg` — the remaining files are server-side appearance source; the same goes for the section presets under `_nino/Nino/Modules/Templates/library/`;
 - disable directory listing;
 - forward the HTTP `Authorization` header to PHP. With nginx/PHP-FPM this normally requires `fastcgi_param HTTP_AUTHORIZATION $http_authorization;` in the PHP location;
 - do not deliver PHP source and data files as text.
 
-For nginx the private-directory rule is one block:
+For nginx each of the three denied trees is one block:
 
 ```nginx
-location ^~ /private/ { deny all; return 404; }
+location ^~ /private/  { deny all; return 404; }
+location ^~ /app/      { deny all; return 404; }
+location ^~ /features/ { deny all; return 404; }
 ```
 
-Or avoid the question by moving the directory out of the webroot with `NINO_PRIVATE_DIR`.
+Or avoid the question for `private/` by moving the directory out of the webroot with `NINO_PRIVATE_DIR`; `NINO_APP_DIR` and `NINO_FEATURES_DIR` do the same for the other two.
 
 A general example configuration cannot reliably guess the paths and PHP-FPM settings of a specific hosting. Therefore, after setup, check both desired routes and deliberately forbidden direct accesses.
 
@@ -102,22 +105,25 @@ define('NINO_PRIVATE_DIR', '/path/outside/the/webroot/nino-private');
 
 Enter either definition before loading `_nino/Nino.php` - in every entry point. `index.php`, `_admin/index.php` and `_admin/recovery.php` each boot the kernel on their own, and a constant defined in one of them is not in force for the others: with it in the site's `index.php` alone, the workbench looks for `config.php` under the default path, finds none, and offers the setup wizard on a live site. The three files carry the lines commented out. An invalid explicit path stops boot; Nino never silently falls back to an in-project directory. Moving the complete tree with `NINO_PRIVATE_DIR` removes the need to protect `private/` through the webserver. Moving only `config.php` does not: the remaining private files must still not be delivered directly.
 
-Separately, project-owned PHP classes load from `app/` by default.
-`NINO_APP_DIR` can point the autoloader at another absolute source directory
-and must also be defined before loading the kernel - in every entry point, like
-the two above. It replaces `app/` as a whole, and Nino's own optional modules -
-Design, Templates, Form, Newsletter, Navigation, Localepicker, Search - live
-under `app/Nino/Modules/`: a project that points the root elsewhere moves them
-along, or the kernel skips a module it can no longer load without a word:
+Separately, project-owned PHP classes load from `app/` by default and the
+installed features from `features/`. `NINO_APP_DIR` and `NINO_FEATURES_DIR`
+point the autoloader at other absolute source directories and must also be
+defined before loading the kernel - in every entry point, like the two above.
+Each replaces its directory as a whole: a project that points the features
+root elsewhere moves its features along, or the kernel skips a module it can
+no longer load without a word:
 
 ```php
 define('NINO_APP_DIR', '/path/outside/the/webroot/nino-app');
+define('NINO_FEATURES_DIR', '/path/outside/the/webroot/nino-features');
 ```
 
-This source override does not move configuration or runtime data and does not
-need write access in production. A project-owned class is looked for there and
-nowhere else - `_nino/` is not a second location. Classes in the kernel-owned
-`Nino\` namespace continue to load exclusively from `_nino/`.
+These source overrides do not move configuration or runtime data and do not
+need write access in production - a feature's settings live in `config.php`,
+its data under `data/`. A project-owned class is looked for in the app root
+and nowhere else, a feature's class in the features root - `_nino/` is not a
+second location for either. Classes in the kernel-owned `Nino\` namespace,
+Nino's own modules among them, continue to load exclusively from `_nino/`.
 
 ## Settings for Production
 
@@ -144,7 +150,7 @@ Grant editor permissions as narrowly as practically possible; the accounts the w
 
 HTTPS protects not only login data but also session cookies and all editorially transmitted content. Permanently redirect HTTP requests to HTTPS and only test login via the final public address.
 
-Additional web server protection for `/_admin` - such as IP allowances or HTTP authentication - can form a useful second barrier under suitable operating conditions. It does not replace the accounts. The two developer panels that ship as modules, Templates and Design, can be removed from a production delivery by deleting `app/Nino/Modules/Templates/` and `app/Nino/Modules/Design/`; the workbench itself stays, because the editors work in it.
+Additional web server protection for `/_admin` - such as IP allowances or HTTP authentication - can form a useful second barrier under suitable operating conditions. It does not replace the accounts. The two developer panels that ship as optional kernel modules, Templates and Design, can be taken out of a production delivery by removing `\Nino\Modules\Templates` and `\Nino\Modules\Design` from `/nino/modules`; the workbench itself stays, because the editors work in it.
 
 ## The Wizard After Setup
 
@@ -180,7 +186,8 @@ php tests/admin-system-smoke.php
 php tests/install-smoke.php
 php tests/design-smoke.php
 php tests/templates-smoke.php
-php tests/search-smoke.php
+php tests/features-smoke.php
+for test in features/*/tests/*-smoke.php; do [ -e "$test" ] || continue; php "$test" || exit 1; done
 php tests/demo-catalogue-smoke.php
 for test in tests/*-js-smoke.js; do node "$test"; done
 php tests/concurrency-smoke.php
@@ -206,7 +213,7 @@ A successful call to the homepage does not yet prove that sensitive files are pr
 - dotfiles and dot directories;
 - `config.php` and PHP data files;
 - hidden log and backup directories;
-- internal files from `_admin/` and `app/` that are not intended as public assets - the panel templates and the section presets among them;
+- internal files from `_admin/`, `app/` and `features/` that are not intended as public assets - the panel templates, the section presets and a feature's install unit among them;
 - files below `_admin/install/library/` other than `_admin/install/library/themes/*/preview.svg`;
 - `_admin/install/`, after it has been removed.
 
@@ -218,16 +225,17 @@ Treat a Nino update like a change to the specific website project, not like blin
 
 1. Secure the current production state outside the webroot.
 2. First transfer the change to a development or staging environment.
-3. Keep project-owned PHP classes in `app/` (or `NINO_APP_DIR`) and compare only deliberate kernel changes with the new state. `_nino/` can then be replaced wholesale, and so can `_admin/`: the workbench holds no project state - the accounts live in `config.php`, the recovery secret in `private/.auth/pw.php`. Nino's optional modules under `app/Nino/Modules/` are the project's to update: compare each directory you kept with the new release's copy and take the changes over, or replace it wholesale when you never changed it.
+3. Keep project-owned PHP classes in `app/` (or `NINO_APP_DIR`) and compare only deliberate kernel changes with the new state. `_nino/` can then be replaced wholesale - Nino's optional modules under `_nino/Nino/Modules/` included, since a project switches them on or off in `/nino/modules` rather than editing them - and so can `_admin/`: the workbench holds no project state - the accounts live in `config.php`, the recovery secret in `private/.auth/pw.php`. A feature is updated on its own: replace its directory under `features/` with the new release and press **Update** in the workbench's Features panel. The feature's install unit adds what is new and overwrites nothing the project has, and the feature migrates its own data before the new version is recorded; see [Features](features.md#updating).
 4. Run smoke tests and project-specific acceptance.
 5. Transfer the tested state and keep the previous version for rollback.
 
 Nino uses one project layout: private files belong in `private/`, browser-facing
-files in `public/`, and project-owned PHP source in `app/`. It does not migrate
-alternative directory layouts during a request. `NINO_PRIVATE_DIR` can move the
-complete private tree, while `NINO_APP_DIR` can replace the project application
-root. A non-`Nino\` class resolves against that root and nowhere else - `_nino/`
-holds the kernel and nothing of the project's own.
+files in `public/`, project-owned PHP source in `app/`, and installed features
+in `features/`. It does not migrate alternative directory layouts during a
+request. `NINO_PRIVATE_DIR` can move the complete private tree, `NINO_APP_DIR`
+can replace the project application root and `NINO_FEATURES_DIR` the features
+root. A non-`Nino\` class resolves against the app root and nowhere else -
+`_nino/` holds the kernel and nothing of the project's own.
 
 Nino is in the beta phase. Security fixes appear on `main`; there is currently no separate LTS line. Therefore, plan updates as active project maintenance and check `SECURITY.md` and the changelog before an update.
 
@@ -236,7 +244,7 @@ Nino is in the beta phase. Security fixes appear on `main`; there is currently n
 - [ ] PHP version and extensions meet the requirements.
 - [ ] Public routes are correctly forwarded to Nino.
 - [ ] Dotfiles, dot directories, and PHP data files are not directly accessible.
-- [ ] `app/` is not served — its own `.htaccess` denies it; verify with a request for a module's install template, e.g. `/app/Nino/Modules/Newsletter/install/templates/mail-header.tpl`.
+- [ ] `app/` and `features/` are not served — each carries its own `.htaccess`; verify with a request for a file of an installed feature, e.g. `/features/Newsletter/install/templates/mail-header.tpl` once the catalogue's Newsletter feature is in place - a checkout ships no feature, so there has to be one to ask for.
 - [ ] `private/` is not served — its own `.htaccess` denies it, and each PHP file inside carries a 403 stub; verify both apply on your webserver, or move the directory out of the webroot with `NINO_PRIVATE_DIR`. The templates and the asset sources are not PHP and have only the server rule.
 - [ ] Directory listing is disabled.
 - [ ] The setup wizard was able to create the project directories from the writable project root itself — a checkout ships neither `private/` nor `public/`, so the first step of the wizard is where that is confirmed.
@@ -244,12 +252,13 @@ Nino is in the beta phase. Security fixes appear on `main`; there is currently n
 - [ ] The setup wizard was fully completed and `_admin/install/` subsequently removed from production.
 - [ ] If `_admin/install/` is deployed to keep Theme/Header/Footer switchable, it is locked and only its catalogue's Theme previews are directly accessible.
 - [ ] Developer and editor accounts are tested, and the recovery password is stored safely.
-- [ ] The Design and Templates modules are either removed or consciously delivered as Alpha, and only developer accounts reach them.
+- [ ] The Design and Templates modules are either switched off in `/nino/modules` or consciously kept as Alpha, and only developer accounts reach them.
 - [ ] Editor accounts only have the necessary permissions.
 - [ ] HTTPS and secure session cookies work at the final address.
 - [ ] Error display is disabled and error logging is checked.
 - [ ] Smoke tests and browser acceptance are successful.
 - [ ] Backups are running, additionally stored externally, and can be restored.
+- [ ] Every feature the site needs is activated in the Features panel and shows no pending update; every feature it does not need is deactivated.
 - [ ] The previous project state is available for rollback.
 
 ## Next Steps

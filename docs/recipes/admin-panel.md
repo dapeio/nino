@@ -1,9 +1,9 @@
 # Recipe: Add a panel to the workbench
 
 **Additional Links:**
-[Agent guide](../../AGENTS.md) · [All recipes](README.md) · [Developer Manual](../development.md) · [Concepts](../concepts.md) · [`/_admin` Workbench](../_admin.md) · [Setup Wizard](../setup.md) · [Templates Panel](../templates.md)
+[Agent guide](../../AGENTS.md) · [All recipes](README.md) · [Developer Manual](../development.md) · [Concepts](../concepts.md) · [`/_admin` Workbench](../_admin.md) · [Setup Wizard](../setup.md) · [Templates Panel](../templates.md) · [Features](../features.md)
 
-One of the six extension recipes of the [Nino agent guide](../../AGENTS.md). Its
+One of the seven extension recipes of the [Nino agent guide](../../AGENTS.md). Its
 rules - the required workflow, the core runtime model, the conventions and the
 security review - apply to every step below.
 
@@ -20,10 +20,12 @@ Two kinds of panel exist, and the class looks the same for both:
 - A **module panel** is answered by a runtime module's `adminPanels()` (see
   "Panels, the installer unit and Restore" in the [runtime module
   recipe](runtime-module.md)) and exists exactly while that module is active. Prefer it whenever the
-  screen belongs to a feature: the feature then ships, and is removed, as one
-  directory. `Modules\Form` (Submissions), `Modules\Newsletter`,
-  `Modules\Navigation`, `Modules\Search`, `Modules\Design` and
-  `Modules\Templates` are built this way.
+  screen belongs to a module or a feature: it then ships, and is removed, as
+  one directory. `Modules\Form` (Submissions), `Modules\Navigation`,
+  `Modules\Design` and `Modules\Templates` are built this way as kernel
+  modules, `Modules\Newsletter` and `Modules\Search` as features from the
+  catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features),
+  copied under `features/` (the [feature recipe](feature.md)).
 - A **workbench panel** is a module under `_admin/Nino/Modules/<Name>/`, the
   same shape as above but delivered with the tool rather than with a runtime
   feature: `Admin/Admin.php` is the panel, `<Tab>/<Tab>.php` a tab of it.
@@ -86,7 +88,8 @@ request:
   (Text), 40 (Images) and 90 (Logs); structure at 2 (Templates), 5 (Design)
   and 20 (Routes); system at 2 (Users), 5 (Language), 10 (Backups) and 20
   (Config). A module panel picks the slot it wants: Submissions 60,
-  Newsletter 65, Navigations 25 (after Routes), Search 30 (system).
+  Navigations 25 (after Routes); the catalogue's Newsletter 65, its Search 30
+  (system).
 
 `tabs()` rules:
 
@@ -356,8 +359,8 @@ its fills (`[[/nino/dir]]`, the panel's own text keys) resolve like the
 shell's. The file is a fragment: no `<html>`, no `[csrf]` (the page has one),
 no `<link>` or `<script>` (the panel's `assets()` are bundled). Every id and
 class in it is the panel's own; the components are the design system's.
-`app/Nino/Modules/Design` (four editors under a tab strip, `layout()` =
-`'page'`) and `app/Nino/Modules/Templates` (the Template Builder, `layout()` =
+`_nino/Nino/Modules/Design` (four editors under a tab strip, `layout()` =
+`'page'`) and `_nino/Nino/Modules/Templates` (the Template Builder, `layout()` =
 `'workspace'`) are the shipped references:
 
 ```php
@@ -634,8 +637,12 @@ list, locale, upload, rich-text, reorder, relationship, or confirmation
 problem. Reuse its exact public helper and adapt the nearest implementation.
 For a registry plus ordered route membership, inspect
 `\Nino\Modules\Navigation\Admin` and
-`app/Nino/Modules/Navigation/assets/admin.js`; for the smallest complete
-panel, `\Nino\Modules\Search\Admin` and its `assets/admin.js`.
+`_nino/Nino/Modules/Navigation/assets/admin.js`; for the smallest complete
+panel, `\Nino\Modules\Sample\Admin` in `tests/fixtures/features/Sample/Admin/Admin.php`,
+the reference feature of the contract test - or, with a script beside it,
+the catalogue's `\Nino\Modules\Search\Admin` in
+[features/Search/Admin/Admin.php](https://github.com/dapeio/nino-features/tree/main/features/Search/Admin/Admin.php)
+and its `assets/admin.js`.
 
 ## Panel tests
 

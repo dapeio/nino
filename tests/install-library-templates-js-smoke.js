@@ -26,7 +26,9 @@ function check( label, condition ) {
 
 const ROOT = path.join( __dirname, '..' );
 const LIBRARY = path.join( ROOT, '_admin/install/library' );
-const MODULE_ROOTS = [ path.join( ROOT, '_nino/Nino/Modules' ), path.join( ROOT, 'app/Nino/Modules' ) ];
+// The optional kernel modules and the installed features both ship install
+// units beside their class
+const MODULE_ROOTS = [ path.join( ROOT, '_nino/Nino/Modules' ), path.join( ROOT, 'features' ) ];
 
 function filesBelow( directory ) {
 	const files = [];

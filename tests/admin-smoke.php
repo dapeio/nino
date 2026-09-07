@@ -72,14 +72,13 @@ $appData['/nino/auth/cooldown']					= 3600;
 $appData['/nino/auth/user']							= [];
 // A set-up project: the shell serves the workbench, not the wizard
 $appData['/nino/install/completed']			= true;
-// The two optional modules whose /_admin panels the sections below
+// The optional kernel module whose /_admin panel the sections below
 // exercise - a panel exists in the editor exactly while its module is
-// active (see Admin::panels()), so they have to be switched on here the
-// way a project's config.php would
+// active (see Admin::panels()), so it has to be switched on here the way a
+// project's config.php would
 $appData['/nino/modules'][]							= '\\Nino\\Modules\\Form';
-$appData['/nino/modules'][]							= '\\Nino\\Modules\\Newsletter';
 // The two roles the wizard writes (see Roles::defaults()), read off this
-// registry: the Editor role holds the two modules' content permissions too
+// registry: the Editor role holds the module's content permission too
 $appData['/nino/auth/roles']						= \Nino\Modules\Users\Roles::defaults( $appData );
 
 // '/*' - the main test account throughout this file exercises every module,
@@ -787,7 +786,7 @@ echo "\n";
 
 // --- Admin::guardPerm - per-module permissions ------------------------------
 
-echo "Admin::guardPerm - per-module permissions (Elements/Text/Images/Submissions/Newsletter/Logs)\n";
+echo "Admin::guardPerm - per-module permissions (Elements/Text/Images/Submissions/Features/Logs)\n";
 
 // plain3@example.com (renamed from plain2/plain earlier) has no perms at all
 \Nino\Auth::loginUser( $appData, 'plain3@example.com', 'plain password' );
@@ -804,8 +803,8 @@ check( 'a user with no perms is rejected from images/list', $status === 403 );
 [ $status ] = callAdminPost( $appData, 'submissions/list' );
 check( 'a user with no perms is rejected from submissions/list', $status === 403 );
 
-[ $status ] = callAdminPost( $appData, 'newsletter/list' );
-check( 'a user with no perms is rejected from newsletter/list', $status === 403 );
+[ $status ] = callAdminPost( $appData, 'features/list' );
+check( 'a user with no perms is rejected from features/list', $status === 403 );
 
 [ $status ] = callAdminPost( $appData, 'logs/list' );
 check( 'a user with no perms is rejected from logs/list', $status === 403 );
@@ -833,7 +832,7 @@ check( 'elements/lastBackup are not module-specific and stay in the body regardl
 // tile list is where a withheld number shows as absent
 $tilePanels = array_column( $body['tiles'] ?? [], 'panel' );
 check( 'the submissions tile is withheld without Submissions::VIEW_PERM', in_array( 'submissions', $tilePanels, true ) === false );
-check( 'the newsletter tile is withheld without Newsletter::MANAGE_PERM', in_array( 'newsletter', $tilePanels, true ) === false );
+check( 'the features tile is withheld without Features::MANAGE_PERM', in_array( 'features', $tilePanels, true ) === false );
 check( 'recentActivity is withheld without Logs::VIEW_PERM - the exact leak the field-level gate closes', array_key_exists( 'recentActivity', $body ) === false );
 
 $getRequest = [ '/nino/http/response' => [ 'statusCode' => 200, 'body' => '[template /_admin/templates/page-index]' ] ];
@@ -849,7 +848,7 @@ check( 'the Elements pane opens without its Element Types tab for this account',
 $getRequest = [ '/nino/http/response' => [ 'statusCode' => 200, 'body' => '[template /_admin/templates/page-index]' ] ];
 \Nino\Admin\Admin::handleGet( $appData, $getRequest );
 $visiblePanels = array_keys( \Nino\Admin\Admin::visiblePanels( $appData ) );
-check( 'a full-access account gets every panel in its navigation, content first, then structure, then system', $visiblePanels === [ 'dashboard', 'elements', 'text', 'images', 'submissions', 'newsletter', 'logs', 'routes', 'users', 'language', 'backups', 'config' ] );
+check( 'a full-access account gets every panel in its navigation, content first, then structure, then system', $visiblePanels === [ 'dashboard', 'elements', 'text', 'images', 'submissions', 'logs', 'routes', 'users', 'language', 'backups', 'features', 'config' ] );
 check( '...with every tab on its pane', array_keys( \Nino\Admin\Admin::visiblePanels( $appData )['users']['tabs'] ) === [ 'roles', 'lockout' ] && substr_count( \Nino\Html::renderTextfill( $appData, '/_admin/panes' ), 'admin-panel-tabs' ) === 5 );
 check( 'the rendered nav then carries the three group headings', substr_count( \Nino\Html::renderTextfill( $appData, '/_admin/nav' ), 'nino-admin-nav-group' ) === 3 );
 
@@ -1095,69 +1094,37 @@ check( 'submissions/list requires an authed admin session too', $status === 401 
 echo "\n";
 
 
-// --- Newsletter: Modules\Newsletter writes, its own Editor panel reads/deletes independently ---
+// --- A module's panel comes and goes with the module -----------------------
 
-echo "Newsletter (Modules\\Newsletter writes, Modules\\Newsletter\\Editor::apiList/apiDelete)\n";
-
-$_POST = [ 'email' => 'jo@example.com', 'location' => '' ];
-$newsletterRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Modules\Newsletter::callbackResponse( $appData, $newsletterRequest );
-check( 'a valid newsletter signup succeeds', $newsletterRequest['/nino/http/response']['statusCode'] === 200 );
-
-$_POST = [ 'email' => 'anna@example.com', 'location' => '' ];
-$newsletterRequest2 = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Modules\Newsletter::callbackResponse( $appData, $newsletterRequest2 );
-check( 'a second valid newsletter signup succeeds', $newsletterRequest2['/nino/http/response']['statusCode'] === 200 );
-
-[ $status, $body ] = callAdminPost( $appData, 'newsletter/list' );
-check( 'newsletter/list succeeds', $status === 200 );
-check( 'newsletter/list finds both signups just sent', count( $body['entries'] ) === 2 );
-
-check( 'newsletter data lives on the private root, not under _editor', is_file( \Nino\Filesystem::path( $appData, '/data/newsletter.php' ) ) === true && is_dir( \Nino\Filesystem::getPath( $appData ). '/_admin/data' ) === false );
-
-unset( $appData['./nino/auth/current'] );
-[ $status ] = callAdminPost( $appData, 'newsletter/list' );
-check( 'newsletter/list requires an authed admin session too', $status === 401 );
-[ $status ] = callAdminPost( $appData, 'newsletter/delete', [ 'email' => 'jo@example.com' ] );
-check( 'newsletter/delete requires an authed admin session too', $status === 401 );
-\Nino\Auth::loginUser( $appData, 'manager@example.com', 'manager password' );
-
-[ $status ] = callAdminPost( $appData, 'newsletter/delete', [ 'email' => 'does-not-exist@example.com' ] );
-check( 'newsletter/delete 404s for an email that was never subscribed', $status === 404 );
-
-[ $status ] = callAdminPost( $appData, 'newsletter/delete', [ 'email' => 'jo@example.com' ] );
-check( 'newsletter/delete succeeds for an existing subscriber', $status === 200 );
-
-[ , $body ] = callAdminPost( $appData, 'newsletter/list' );
-check( 'the deleted subscriber is gone, the other one remains', count( $body['entries'] ) === 1 && $body['entries'][0]['email'] === 'anna@example.com' );
-
-check( 'the admin delete also records the removal, same as a self-service unsubscribe', in_array( hash( 'sha256', 'jo@example.com' ), \Nino\Filesystem::getFileContent( $appData, '/data/newsletter-removed.php', [] ), true ) === true );
+echo "Admin::panels - a module's panel, actions, permission and script leave with the module\n";
 
 // The panel is the module's: switch the module off and the screen, its
-// actions and its permission are gone from the editor - which is what makes
-// a project without a newsletter carry no newsletter admin either
-$withoutNewsletter = $appData;
-$withoutNewsletter['/nino/modules'] = array_values( array_diff( $withoutNewsletter['/nino/modules'], [ '\\Nino\\Modules\\Newsletter' ] ) );
-check( 'with the Newsletter module off, its panel is not in the registry', isset( \Nino\Admin\Admin::panels( $withoutNewsletter )['newsletter'] ) === false );
+// actions and its permission are gone from the workbench - which is what
+// makes a project without a contact form carry no Submissions panel either.
+// Modules\Form is the example here; a feature's panel behaves the same way
+// (see tests/features-smoke.php)
+$withoutForm = $appData;
+$withoutForm['/nino/modules'] = array_values( array_diff( $withoutForm['/nino/modules'], [ '\\Nino\\Modules\\Form' ] ) );
+check( 'with the Form module off, its panel is not in the registry', isset( \Nino\Admin\Admin::panels( $withoutForm )['submissions'] ) === false );
 $request = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-$_POST['action'] = 'newsletter/list';
+$_POST['action'] = 'submissions/list';
 $_POST['data'] = json_encode( [] );
-\Nino\Admin\Admin::handlePost( $withoutNewsletter, $request );
-check( 'with the Newsletter module off, newsletter/list is an unknown action', $request['/nino/http/response']['statusCode'] === 404 );
+\Nino\Admin\Admin::handlePost( $withoutForm, $request );
+check( 'with the Form module off, submissions/list is an unknown action', $request['/nino/http/response']['statusCode'] === 404 );
 // ...but a permission the module declared does not vanish from the list while
 // a role still holds it. It cannot: permOptions() is the whitelist apiSave()
 // filters against and the only thing the Roles picker can send back, so a
 // permission missing from here is one the next save of that role drops. The
 // Editor role the wizard wrote holds this one, so it stays - marked as offered
 // by nothing, which is what the picker shows it as
-$offNewsletter = \Nino\Modules\Users\Admin::permOptions( $withoutNewsletter );
-check( 'with the Newsletter module off, no panel offers its permission any more', in_array( \Nino\Modules\Newsletter\Admin::MANAGE_PERM, array_column( array_filter( $offNewsletter, fn( array $o ): bool => $o['offered'] === true ), 'perm' ), true ) === false );
-check( '...but the Editor role still holds it, so it stays assignable rather than being dropped on the next save', in_array( [ 'perm' => \Nino\Modules\Newsletter\Admin::MANAGE_PERM, 'label' => \Nino\Modules\Newsletter\Admin::MANAGE_PERM, 'group' => 'other', 'offered' => false ], $offNewsletter, true ) === true );
-$roundTrip = $withoutNewsletter;
+$offForm = \Nino\Modules\Users\Admin::permOptions( $withoutForm );
+check( 'with the Form module off, no panel offers its permission any more', in_array( \Nino\Modules\Form\Admin::VIEW_PERM, array_column( array_filter( $offForm, fn( array $o ): bool => $o['offered'] === true ), 'perm' ), true ) === false );
+check( '...but the Editor role still holds it, so it stays assignable rather than being dropped on the next save', in_array( [ 'perm' => \Nino\Modules\Form\Admin::VIEW_PERM, 'label' => \Nino\Modules\Form\Admin::VIEW_PERM, 'group' => 'other', 'offered' => false ], $offForm, true ) === true );
+$roundTrip = $withoutForm;
 [ $rtStatus, $rtBody ] = callAdminPost( $roundTrip, 'roles/save', [ 'id' => 'editor', 'label' => 'Editor', 'perms' => $roundTrip['/nino/auth/roles']['editor']['perms'] ] );
-check( '...and saving that role back unchanged keeps it', $rtStatus === 200 && in_array( \Nino\Modules\Newsletter\Admin::MANAGE_PERM, $rtBody['perms'], true ) === true );
-check( 'a permission nothing holds and no panel offers is still refused', in_array( '/_admin/nowhere/manage', array_column( $offNewsletter, 'perm' ), true ) === false );
-check( 'with the Newsletter module off, its script leaves the bundle', ( static function() use ( $withoutNewsletter ): bool { \Nino\Admin\Admin::init( $withoutNewsletter ); return in_array( '/app/Nino/Modules/Newsletter/assets/admin.js', $withoutNewsletter['/nino/html/assets']['/_admin/.cache/script.js'], true ) === false; } )() );
+check( '...and saving that role back unchanged keeps it', $rtStatus === 200 && in_array( \Nino\Modules\Form\Admin::VIEW_PERM, $rtBody['perms'], true ) === true );
+check( 'a permission nothing holds and no panel offers is still refused', in_array( '/_admin/nowhere/manage', array_column( $offForm, 'perm' ), true ) === false );
+check( 'with the Form module off, its script leaves the bundle', ( static function() use ( $withoutForm ): bool { \Nino\Admin\Admin::init( $withoutForm ); return in_array( '/_nino/Nino/Modules/Form/assets/admin.js', $withoutForm['/nino/html/assets']['/_admin/.cache/script.js'], true ) === false; } )() );
 
 echo "\n";
 
@@ -1170,8 +1137,10 @@ echo "Dashboard::apiSummary\n";
 check( 'dashboard/summary succeeds', $status === 200 );
 $tilesByPanel = array_column( $body['tiles'] ?? [], null, 'panel' );
 check( 'the submissions tile matches Submissions::count (1 sent above, none deleted)', ( $tilesByPanel['submissions']['value'] ?? null ) === '1' );
-check( 'the newsletter tile matches what remains after the delete above (jo removed, anna remains)', ( $tilesByPanel['newsletter']['value'] ?? null ) === '1' );
-check( 'a tile carries the fill key its panel labels it with', ( $tilesByPanel['newsletter']['label'] ?? null ) === '/_admin/dashboard/label/newsletter' );
+// The Features panel's tile counts the active features - none in a checkout,
+// which ships no feature of its own
+check( 'the features tile counts the active features', (string) ( $tilesByPanel['features']['value'] ?? '' ) === '0' );
+check( 'a tile carries the fill key its panel labels it with', ( $tilesByPanel['features']['label'] ?? null ) === '/_admin/features/label/active' );
 
 $imagedemo = array_values( array_filter( $body['elements'], fn( $e ) => $e['type'] === 'imagedemo' ) )[0] ?? null;
 check( 'elements includes imagedemo with its final count (item1 remains, item2 was deleted above)', $imagedemo !== null && $imagedemo['count'] === 1 );

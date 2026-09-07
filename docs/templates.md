@@ -2,11 +2,11 @@
 
 **Language:** English · [Deutsch](templates.de.md)
 
-**Last updated:** September 6, 2026 · **Nino version:** 1.0.0-beta
+**Last updated:** September 7, 2026 · **Nino version:** 1.0.0-beta
 
 The Template Builder - the workbench's **Templates** panel - is the fast path from a `page-*.tpl` file to a filled page. It treats a template as an ordered sequence of complete HTML sections and reusable `[template]` sections instead of exposing every nested DOM node.
 
-[README](../README.md) · [Concepts](concepts.md) · [Developer Manual](development.md) · [Recipes](recipes/README.md) · [Getting Started](getting-started.md) · [Setup Wizard](setup.md) · [`/_admin` Workbench](_admin.md) · [Templates Panel](templates.md) · [Design Panel](appearance.md) · [Deployment](deployment.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
+[README](../README.md) · [Concepts](concepts.md) · [Developer Manual](development.md) · [Recipes](recipes/README.md) · [Getting Started](getting-started.md) · [Setup Wizard](setup.md) · [`/_admin` Workbench](_admin.md) · [Templates Panel](templates.md) · [Design Panel](appearance.md) · [Features](features.md) · [Deployment](deployment.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
 
 > **Alpha:** Page files remain ordinary HTML+ and therefore do not depend on the tool at runtime. The preset library and composer workflow can still change.
 
@@ -30,7 +30,7 @@ The Template Builder does not create routes, edit the contents of included heade
 
 ## Access and security
 
-Sign in to `/_admin` and open **Templates** in the Structure group. Every action asks for `/_admin/templates/manage` - a developer's permission, never an editor's. The panel is a workspace: the workbench rail folds to its icons and the template list, the section canvas and the inspector share the whole width; unfold the rail with the chevron beside the brand whenever you need the other panels' labels. The panel is the Templates module (`app/Nino/Modules/Templates/`) and disappears from the workbench with its directory. It speaks the interface language you set in the workbench's settings gear; its own words – in the panel's markup as much as in its scripts – live in `app/Nino/Modules/Templates/text/<locale>.php`. The section library's presets keep the names and descriptions their manifests carry – English in the shipped library – and a manifest may use a fill key instead of a word wherever it names something.
+Sign in to `/_admin` and open **Templates** in the Structure group. Every action asks for `/_admin/templates/manage` - a developer's permission, never an editor's. The panel is a workspace: the workbench rail folds to its icons and the template list, the section canvas and the inspector share the whole width; unfold the rail with the chevron beside the brand whenever you need the other panels' labels. The panel is the Templates module, an optional kernel module (`_nino/Nino/Modules/Templates/`) that leaves the workbench when it is switched off in `/nino/modules`. It speaks the interface language you set in the workbench's settings gear; its own words – in the panel's markup as much as in its scripts – live in `_nino/Nino/Modules/Templates/text/<locale>.php`. The section library's presets keep the names and descriptions their manifests carry – English in the shipped library – and a manifest may use a fill key instead of a word wherever it names something.
 
 The tool writes to:
 
@@ -117,7 +117,7 @@ This metadata lets the composer reopen its settings. It is inert HTML and does n
 System presets live under:
 
 ```text
-app/Nino/Modules/Templates/library/<preset-key>/
+_nino/Nino/Modules/Templates/library/<preset-key>/
 ├── manifest.php
 └── one or more .tpl layout files
 ```
@@ -153,7 +153,7 @@ The second kind ships a finished block of markup and expects HTML+ for the rest
 | Table — Static block | A real table between intro and outro | Plain · Striped, each with demo rows or an elements loop |
 | List — Static block | A checked or numbered list | Checked · Numbered, each with demo items or an elements loop |
 | FAQ — Static accordion | Native `details` questions, no JavaScript | Demo questions · Elements loop |
-| Newsletter — Signup form | The working double-opt-in form | Form below the intro · Intro beside the form |
+| Newsletter — Signup form | The double-opt-in form; answered by the Newsletter feature from the [dapeio/nino-features](https://github.com/dapeio/nino-features) catalogue, installed and switched on | Form below the intro · Intro beside the form |
 | Contact — Form | The project contact form | Centered · Details beside the form |
 
 ### Static blocks

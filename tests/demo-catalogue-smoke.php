@@ -172,10 +172,12 @@ echo "\n";
 
 echo "Rendering\n";
 
-/*	The unit ships no textfills of its own, so every fill left on the page has
-	to come from somewhere every installation of it has: the base unit, or a
-	module the manifest actually requires. A fill from anywhere else renders as
-	its own key on a project that did not happen to pick that module.	*/
+/*	Every fill left on the page has to come from somewhere every installation
+	of it has: the base unit, a module the manifest actually requires, or the
+	unit's own text/ fragments. A fill from anywhere else renders as its own
+	key on a project that did not happen to pick that module - the newsletter
+	specimen's labels are the case in point: Newsletter is a feature, not a
+	wizard unit, so the page carries those two labels itself.	*/
 preg_match_all( '/\[\[([^\]]+)\]\]/', $source, $fillMatches );
 $fills = array_values( array_unique( array_filter( $fillMatches[1], static fn( string $fill ): bool => $fill !== '/nino/public' ) ) );
 
@@ -183,7 +185,7 @@ $library 	= __DIR__. '/../_admin/install/library';
 // A module's unit sits beside the module itself - Setup::units() knows where
 $units 		= \Nino\Install\Setup::units();
 $available = [];
-$fragments = glob( $library. '/base/text/*.php' ) ?: [];
+$fragments = array_merge( glob( $library. '/base/text/*.php' ) ?: [], glob( $unit. '/text/*.php' ) ?: [] );
 foreach( (array) ( $manifest['requiresModules'] ?? [] ) as $module )
 	$fragments = array_merge( $fragments, isset( $units[$module] ) === true ? ( glob( $units[$module]. '/text/*.php' ) ?: [] ) : [] );
 foreach( $fragments as $fragment )

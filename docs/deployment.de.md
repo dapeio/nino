@@ -2,12 +2,12 @@
 
 **Sprache:** [English](deployment.md) · Deutsch
 
-**Stand:** 6. September 2026 · **Nino-Version:** 1.0.0-beta
+**Stand:** 7. September 2026 · **Nino-Version:** 1.0.0-beta
 
 Dieses Handbuch führt eine fertig entwickelte Nino-Webseite in den produktiven Betrieb. Falls du stattdessen ein frisches Projekt einrichten möchtest, beginne mit [Erste Schritte](getting-started.de.md); technische Erweiterungen behandelt das [Entwickler-Handbuch](development.de.md).
 
 **Weitere Links:**
-[README](../README.de.md) · [Grundkonzepte](concepts.de.md) · [Entwickler-Handbuch](development.de.md) · [Rezepte](recipes/README.md) · [Erste Schritte](getting-started.de.md) · [Einrichtungsassistent](setup.de.md) · [`/_admin`-Workbench](_admin.de.md) · [Templates-Panel](templates.de.md) · [Design-Panel](appearance.de.md) · [Deployment](deployment.de.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
+[README](../README.de.md) · [Grundkonzepte](concepts.de.md) · [Entwickler-Handbuch](development.de.md) · [Rezepte](recipes/README.md) · [Erste Schritte](getting-started.de.md) · [Einrichtungsassistent](setup.de.md) · [`/_admin`-Workbench](_admin.de.md) · [Templates-Panel](templates.de.md) · [Design-Panel](appearance.de.md) · [Features](features.de.md) · [Deployment](deployment.de.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
 
 ## Voraussetzungen des Zielsystems
 Nino benötigt weder Datenbankserver noch Composer-Installation auf dem Zielsystem. Das vereinfacht zwar das Deployment, macht die Dateien des Projekts aber umso wichtiger: Konfiguration und redaktionelle Daten liegen direkt im Dateisystem und müssen beim Übertragen, Sichern und Berechtigen vollständig berücksichtigt werden.
@@ -66,18 +66,21 @@ Prüfe in der Hosting-Konfiguration zusätzlich, wie nicht vorhandene Pfade an `
 - `/_admin` an `_admin/index.php` routen und `/_admin/recovery.php` seiner eigenen Datei überlassen;
 - Zugriffe auf Dotfiles und Dot-Verzeichnisse verweigern;
 - **`private/` vollständig sperren** – es wird nie von einem Browser angefragt, sondern nur von PHP gelesen;
-- direkte Zugriffe auf `_admin/install/library/` bis auf `_admin/install/library/themes/<key>/preview.svg` sperren – die übrigen Dateien sind serverseitige Darstellungsquellen; dasselbe gilt für die Section-Presets unter `app/Nino/Modules/Templates/library/`;
+- **`app/` und `features/` vollständig sperren** – die eigenen Klassen des Projekts und die installierten Features sind serverseitiger Quelltext, den nie ein Browser anfragt; beide bringen für Apache eine eigene `.htaccess` mit;
+- direkte Zugriffe auf `_admin/install/library/` bis auf `_admin/install/library/themes/<key>/preview.svg` sperren – die übrigen Dateien sind serverseitige Darstellungsquellen; dasselbe gilt für die Section-Presets unter `_nino/Nino/Modules/Templates/library/`;
 - Verzeichnisauflistung deaktivieren;
 - den HTTP-Header `Authorization` an PHP weitergeben. Bei nginx/PHP-FPM ist dafür normalerweise `fastcgi_param HTTP_AUTHORIZATION $http_authorization;` in der PHP-Location erforderlich;
 - PHP-Quell- und Datendateien nicht als Text ausliefern.
 
-Für nginx ist die Regel für das private Verzeichnis ein einzelner Block:
+Für nginx ist jeder der drei gesperrten Bäume ein einzelner Block:
 
 ```nginx
-location ^~ /private/ { deny all; return 404; }
+location ^~ /private/  { deny all; return 404; }
+location ^~ /app/      { deny all; return 404; }
+location ^~ /features/ { deny all; return 404; }
 ```
 
-Oder du umgehst die Frage, indem du das Verzeichnis mit `NINO_PRIVATE_DIR` aus dem Webroot verlegst.
+Oder du umgehst die Frage für `private/`, indem du das Verzeichnis mit `NINO_PRIVATE_DIR` aus dem Webroot verlegst; `NINO_APP_DIR` und `NINO_FEATURES_DIR` tun dasselbe für die beiden anderen.
 
 Eine allgemeine Beispielkonfiguration kann die Pfade und PHP-FPM-Einstellungen eines konkreten Hostings nicht zuverlässig erraten. Prüfe deshalb nach dem Einrichten sowohl gewünschte Routen als auch bewusst verbotene Direktzugriffe.
 
@@ -102,23 +105,26 @@ define('NINO_PRIVATE_DIR', '/pfad/ausserhalb/des/webroots/nino-private');
 Trage eine der Definitionen vor dem Laden von `_nino/Nino.php` ein – in jedem Einstiegspunkt. `index.php`, `_admin/index.php` und `_admin/recovery.php` starten den Kernel jeweils für sich, und eine nur in einer davon definierte Konstante gilt für die anderen nicht: Steht sie allein in der `index.php` der Site, sucht der Workbench die `config.php` unter dem Standardpfad, findet keine und bietet auf einer laufenden Site den Setup-Assistenten an. Alle drei Dateien tragen die Zeilen auskommentiert. Ein ungültiger ausdrücklich gesetzter Pfad bricht den Start ab; Nino fällt nie still auf ein Verzeichnis im Projekt zurück. Wird der vollständige Baum mit `NINO_PRIVATE_DIR` verschoben, muss `private/` nicht mehr durch den Webserver geschützt werden. Wird nur `config.php` verschoben, dürfen die übrigen privaten Dateien weiterhin nicht direkt ausgeliefert werden.
 
 Projekteigene PHP-Klassen werden davon getrennt standardmäßig aus `app/`
-geladen. Mit `NINO_APP_DIR` kann der Autoloader auf ein anderes absolutes
-Quellcode-Verzeichnis zeigen; auch diese Konstante muss vor dem Laden des
-Kernels definiert werden – in jedem Einstiegspunkt, wie die beiden oben. Sie
-ersetzt `app/` als Ganzes, und Ninos eigene optionale Module – Design,
-Templates, Form, Newsletter, Navigation, Localepicker, Search – liegen unter
-`app/Nino/Modules/`: Ein Projekt, das den Root woandershin zeigen lässt, nimmt
-sie mit, oder der Kernel überspringt ein Modul, das er nicht mehr laden kann,
-ohne ein Wort:
+geladen, die installierten Features aus `features/`. Mit `NINO_APP_DIR` und
+`NINO_FEATURES_DIR` kann der Autoloader auf andere absolute
+Quellcode-Verzeichnisse zeigen; auch diese Konstanten müssen vor dem Laden des
+Kernels definiert werden – in jedem Einstiegspunkt, wie die beiden oben. Jede
+ersetzt ihr Verzeichnis als Ganzes: Ein Projekt, das den Features-Root
+woandershin zeigen lässt, nimmt seine Features mit, oder der Kernel
+überspringt ein Modul, das er nicht mehr laden kann, ohne ein Wort:
 
 ```php
 define('NINO_APP_DIR', '/pfad/ausserhalb/des/webroots/nino-app');
+define('NINO_FEATURES_DIR', '/pfad/ausserhalb/des/webroots/nino-features');
 ```
 
-Dieser Quellcode-Override verschiebt weder Konfiguration noch Laufzeitdaten und
-benötigt im Produktivbetrieb keine Schreibrechte. Eine projekteigene Klasse wird
-ausschließlich dort gesucht – `_nino/` ist kein zweiter Fundort. Klassen im kerneigenen
-Namespace `Nino\` werden weiterhin ausschließlich aus `_nino/` geladen.
+Diese Quellcode-Overrides verschieben weder Konfiguration noch Laufzeitdaten
+und benötigen im Produktivbetrieb keine Schreibrechte – die Einstellungen eines
+Features liegen in der `config.php`, seine Daten unter `data/`. Eine
+projekteigene Klasse wird ausschließlich im App-Root gesucht, die Klasse eines
+Features im Features-Root – `_nino/` ist für keine von beiden ein zweiter
+Fundort. Klassen im kerneigenen Namespace `Nino\`, Ninos eigene Module
+eingeschlossen, werden weiterhin ausschließlich aus `_nino/` geladen.
 
 ## Einstellungen für den Produktivbetrieb
 
@@ -145,7 +151,7 @@ Vergib Redaktionsrechte so eng wie praktisch möglich; die Konten, die der Assis
 
 HTTPS schützt nicht nur Anmeldedaten, sondern auch Sitzungs-Cookies und alle redaktionell übertragenen Inhalte. Leite HTTP-Anfragen dauerhaft auf HTTPS um und teste die Anmeldung nur über die endgültige öffentliche Adresse.
 
-Zusätzlicher Webserver-Schutz für `/_admin` – etwa IP-Freigaben oder HTTP-Authentifizierung – kann bei passenden Betriebsbedingungen eine sinnvolle zweite Barriere bilden. Er ersetzt die Konten nicht. Die beiden Entwickler-Panels, die als Module ausgeliefert werden, Templates und Design, lassen sich aus einer Produktivauslieferung entfernen, indem `app/Nino/Modules/Templates/` und `app/Nino/Modules/Design/` gelöscht werden; die Workbench selbst bleibt, weil die Redaktion darin arbeitet.
+Zusätzlicher Webserver-Schutz für `/_admin` – etwa IP-Freigaben oder HTTP-Authentifizierung – kann bei passenden Betriebsbedingungen eine sinnvolle zweite Barriere bilden. Er ersetzt die Konten nicht. Die beiden Entwickler-Panels, die als optionale Kernel-Module ausgeliefert werden, Templates und Design, lassen sich aus einer Produktivauslieferung herausnehmen, indem `\Nino\Modules\Templates` und `\Nino\Modules\Design` aus `/nino/modules` entfernt werden; die Workbench selbst bleibt, weil die Redaktion darin arbeitet.
 
 ## Der Assistent nach der Einrichtung
 
@@ -181,7 +187,8 @@ php tests/admin-system-smoke.php
 php tests/install-smoke.php
 php tests/design-smoke.php
 php tests/templates-smoke.php
-php tests/search-smoke.php
+php tests/features-smoke.php
+for test in features/*/tests/*-smoke.php; do [ -e "$test" ] || continue; php "$test" || exit 1; done
 php tests/demo-catalogue-smoke.php
 for test in tests/*-js-smoke.js; do node "$test"; done
 php tests/concurrency-smoke.php
@@ -207,7 +214,7 @@ Ein erfolgreicher Aufruf der Startseite belegt noch nicht, dass sensible Dateien
 - Dotfiles und Dot-Verzeichnisse;
 - `config.php` und PHP-Datendateien;
 - versteckte Log- und Backup-Verzeichnisse;
-- interne Dateien aus `_admin/` und `app/`, die nicht als öffentliche Assets vorgesehen sind – die Panel-Templates und die Section-Presets darunter;
+- interne Dateien aus `_admin/`, `app/` und `features/`, die nicht als öffentliche Assets vorgesehen sind – die Panel-Templates, die Section-Presets und die Install-Einheit eines Features darunter;
 - Dateien unter `_admin/install/library/` mit Ausnahme von `_admin/install/library/themes/*/preview.svg`;
 - `_admin/install/`, nachdem es entfernt wurde.
 
@@ -219,17 +226,19 @@ Behandle ein Nino-Update wie eine Änderung am konkreten Webseitenprojekt, nicht
 
 1. Sichere den aktuellen produktiven Stand außerhalb des Webroots.
 2. Übernimm die Änderung zunächst in eine Entwicklungs- oder Staging-Umgebung.
-3. Lege projekteigene PHP-Klassen in `app/` (oder `NINO_APP_DIR`) ab und vergleiche nur bewusste Kernel-Anpassungen mit dem neuen Stand. `_nino/` kann dann vollständig ersetzt werden, und `_admin/` ebenso: Die Workbench trägt keinen Projektzustand – die Konten liegen in der `config.php`, das Recovery-Geheimnis in `private/.auth/pw.php`. Ninos optionale Module unter `app/Nino/Modules/` aktualisiert das Projekt selbst: Vergleiche jedes behaltene Verzeichnis mit der Kopie der neuen Version und übernimm die Änderungen, oder ersetze es vollständig, wenn du es nie verändert hast.
+3. Lege projekteigene PHP-Klassen in `app/` (oder `NINO_APP_DIR`) ab und vergleiche nur bewusste Kernel-Anpassungen mit dem neuen Stand. `_nino/` kann dann vollständig ersetzt werden – Ninos optionale Module unter `_nino/Nino/Modules/` eingeschlossen, denn ein Projekt schaltet sie in `/nino/modules` ein oder aus, statt sie zu bearbeiten –, und `_admin/` ebenso: Die Workbench trägt keinen Projektzustand – die Konten liegen in der `config.php`, das Recovery-Geheimnis in `private/.auth/pw.php`. Ein Feature wird für sich aktualisiert: Ersetze sein Verzeichnis unter `features/` durch die neue Fassung und drücke **Update** im Panel Features der Workbench. Die Install-Einheit des Features ergänzt, was neu ist, und überschreibt nichts, was das Projekt hat, und das Feature migriert seine eigenen Daten, bevor die neue Version aufgezeichnet wird; siehe [Features](features.de.md#aktualisieren).
 4. Führe Smoke-Tests und projektspezifische Abnahme aus.
 5. Übertrage den geprüften Stand und behalte die vorherige Version für ein Rollback.
 
 Nino verwendet eine Projektstruktur: Private Dateien liegen in `private/`, für
-den Browser bestimmte Dateien in `public/` und projekteigener PHP-Quellcode in
-`app/`. Alternative Verzeichnisstrukturen werden während eines Requests nicht
-migriert. `NINO_PRIVATE_DIR` kann den vollständigen privaten Baum verschieben,
-`NINO_APP_DIR` den Application-Root des Projekts ersetzen. Für Klassen außerhalb
-von `Nino\` bleibt ein Kompatibilitäts-Fallback unter `_nino/`; er ist für
-bestehende Projekte gedacht, nicht für neuen Code.
+den Browser bestimmte Dateien in `public/`, projekteigener PHP-Quellcode in
+`app/` und installierte Features in `features/`. Alternative
+Verzeichnisstrukturen werden während eines Requests nicht migriert.
+`NINO_PRIVATE_DIR` kann den vollständigen privaten Baum verschieben,
+`NINO_APP_DIR` den Application-Root des Projekts ersetzen und
+`NINO_FEATURES_DIR` den Features-Root. Eine Klasse außerhalb von `Nino\` wird
+im App-Root aufgelöst und nirgends sonst – `_nino/` hält den Kernel und nichts
+Projekteigenes.
 
 Nino befindet sich in der Beta-Phase. Sicherheitskorrekturen erscheinen auf `main`; eine getrennte LTS-Linie gibt es derzeit nicht. Plane Updates deshalb als aktive Projektpflege ein und prüfe `SECURITY.md` sowie den Changelog vor einer Aktualisierung.
 
@@ -238,7 +247,7 @@ Nino befindet sich in der Beta-Phase. Sicherheitskorrekturen erscheinen auf `mai
 - [ ] PHP-Version und Erweiterungen entsprechen den Anforderungen.
 - [ ] Öffentliche Routen werden korrekt an Nino übergeben.
 - [ ] Dotfiles, Dot-Verzeichnisse und PHP-Datendateien sind nicht direkt erreichbar.
-- [ ] `app/` wird nicht ausgeliefert — die eigene `.htaccess` sperrt das Verzeichnis; prüfe es mit einer Anfrage nach einem Modul-Installationstemplate, z. B. `/app/Nino/Modules/Newsletter/install/templates/mail-header.tpl`.
+- [ ] `app/` und `features/` werden nicht ausgeliefert — beide tragen eine eigene `.htaccess`; prüfe es mit einer Anfrage nach einer Datei eines installierten Features, z. B. `/features/Newsletter/install/templates/mail-header.tpl`, sobald das Newsletter-Feature des Katalogs an Ort und Stelle ist – ein Checkout bringt kein Feature mit, also muss eines da sein, nach dem sich fragen lässt.
 - [ ] `private/` wird nicht ausgeliefert — die eigene `.htaccess` sperrt das Verzeichnis, und jede PHP-Datei darin trägt einen 403-Stub; prüfe, ob beides auf deinem Webserver greift, oder verlege das Verzeichnis mit `NINO_PRIVATE_DIR` aus dem Webroot. Die Templates und die Asset-Quellen sind kein PHP und haben nur die Serverregel.
 - [ ] Verzeichnisauflistung ist deaktiviert.
 - [ ] Der Einrichtungsassistent konnte die Projektverzeichnisse aus der beschreibbaren Projektwurzel selbst erzeugen — ein Checkout liefert weder `private/` noch `public/` mit, der erste Schritt des Assistenten prüft genau das.
@@ -246,12 +255,13 @@ Nino befindet sich in der Beta-Phase. Sicherheitskorrekturen erscheinen auf `mai
 - [ ] Der Einrichtungsassistent wurde vollständig abgeschlossen und `_admin/install/` anschließend produktiv entfernt.
 - [ ] Wird `_admin/install/` mitgeliefert, um Theme/Header/Footer umschaltbar zu halten, ist es gesperrt und von seinem Katalog sind nur die Theme-Vorschauen direkt erreichbar.
 - [ ] Entwickler- und Redaktionskonten sind getestet, und das Recovery-Passwort ist sicher verwahrt.
-- [ ] Die Module Design und Templates sind entweder entfernt oder bewusst als Alpha ausgeliefert, und nur Entwicklerkonten erreichen sie.
+- [ ] Die Module Design und Templates sind entweder in `/nino/modules` abgeschaltet oder bewusst als Alpha behalten, und nur Entwicklerkonten erreichen sie.
 - [ ] Editor-Nutzer haben nur die benötigten Berechtigungen.
 - [ ] HTTPS und sichere Session-Cookies funktionieren an der endgültigen Adresse.
 - [ ] Fehleranzeige ist deaktiviert und Fehlerprotokollierung geprüft.
 - [ ] Smoke-Tests und Browser-Abnahme sind erfolgreich.
 - [ ] Backups laufen, liegen zusätzlich extern vor und lassen sich wiederherstellen.
+- [ ] Jedes Feature, das die Seite braucht, ist im Panel Features aktiviert und zeigt kein ausstehendes Update; jedes, das sie nicht braucht, ist deaktiviert.
 - [ ] Der vorherige Projektstand ist für ein Rollback verfügbar.
 
 ## Wie es weitergeht

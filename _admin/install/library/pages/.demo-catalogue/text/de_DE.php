@@ -8,4 +8,9 @@
 	'[[/webpage/.demo-catalogue/name]]' => 'Katalog',
 	'[[/webpage/.demo-catalogue/title]]' => 'Katalog: Presets und Bausteine',
 	'[[/webpage/.demo-catalogue/description]]' => 'Jedes Section-Preset des Template Builders und jeder Baustein aus Nino.css, im Design dieses Projekts.',
+
+	// The newsletter specimen's labels - the same two keys the Newsletter
+	// feature's own unit writes, so activating it later changes nothing here
+	'[[/newsletter/label/email]]' => 'E-Mail-Adresse',
+	'[[/newsletter/label/submit]]' => 'Anmelden',
 ];

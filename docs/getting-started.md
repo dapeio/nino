@@ -2,14 +2,14 @@
 
 **Language:** English · [Deutsch](getting-started.de.md)
 
-**Last updated:** September 6, 2026 · **Nino version:** 1.0.0-beta
+**Last updated:** September 7, 2026 · **Nino version:** 1.0.0-beta
 
 This guide leads you on the shortest path from a fresh checkout to a locally running Nino website. If you instead want to look up every field and writing process of the wizard, read the [Setup Wizard](setup.md) reference; technical backgrounds are explained in the [Concepts](concepts.md).
 
 **Additional Links:**
-[README](../README.md) · [Concepts](concepts.md) · [Developer Manual](development.md) · [Recipes](recipes/README.md) · [Getting Started](getting-started.md) · [Setup Wizard](setup.md) · [`/_admin` Workbench](_admin.md) · [Templates Panel](templates.md) · [Design Panel](appearance.md) · [Deployment](deployment.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
+[README](../README.md) · [Concepts](concepts.md) · [Developer Manual](development.md) · [Recipes](recipes/README.md) · [Getting Started](getting-started.md) · [Setup Wizard](setup.md) · [`/_admin` Workbench](_admin.md) · [Templates Panel](templates.md) · [Design Panel](appearance.md) · [Features](features.md) · [Deployment](deployment.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
 
-**Important:** A fresh checkout contains the kernel, the workbench, the modules and the installation library, but not yet a complete project state. The setup wizard - what `/_admin` shows until it is done - creates and fills the required project directories; only then does the website run.
+**Important:** A fresh checkout contains the kernel, the workbench, the modules, the features and the installation library, but not yet a complete project state. The setup wizard - what `/_admin` shows until it is done - creates and fills the required project directories; only then does the website run.
 
 ## Prerequisites
 
@@ -63,6 +63,8 @@ After completion, open:
 
 Also check every language and route, the navigation, and used forms. Save a text and an image as a test. In the Templates panel, open a `page-*.tpl`, change nothing at first, and check whether its top-level sections are recognized without warnings.
 
+Newsletter and Search are features, not wizard modules, and a checkout ships none: when the project needs one, copy its directory from the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features) into `features/`, switch it on in the workbench's **Features** panel (System group), then reload the workbench for its panel to appear. See [Features](features.md).
+
 The last step sets the recovery password and locks the wizard. Subsequently, remove `_admin/install/` from production delivery; this also retires the catalogue-backed tabs of the Design panel, while its Design tab keeps working. The correct order and further security checks are described in the [Deployment Manual](deployment.md#the-wizard-after-setup).
 
 ## Next Steps
@@ -73,4 +75,5 @@ The last step sets the recovery password and locks the wizard. Subsequently, rem
 - [`/_admin` Workbench](_admin.md) guides through every panel, the accounts and the recovery page.
 - [Templates Panel](templates.md) explains the section-first Template Builder in Alpha status.
 - [Design Panel](appearance.md) explains the four appearance editors.
+- [Features](features.md) explains how an installable feature is switched on, configured and updated.
 - [Deployment](deployment.md) guides through web server configuration, security, backups, and go-live.

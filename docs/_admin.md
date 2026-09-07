@@ -2,12 +2,12 @@
 
 **Language:** English · [Deutsch](_admin.de.md)
 
-**Last updated:** September 6, 2026 · **Nino version:** 1.0.0-beta
+**Last updated:** September 7, 2026 · **Nino version:** 1.0.0-beta
 
 This manual explains the one management interface of a Nino project: `/_admin`, the workbench. Developers set the project up, build its structure and appearance here; editors maintain its content here. What an account sees is what its permissions allow. The wizard that turns a fresh checkout into a project is the workbench's first-run mode and has its own reference, the [Setup Wizard](setup.md); the two large developer panels have theirs as well: [Templates](templates.md) and [Design](appearance.md).
 
 **Additional Links:**
-[README](../README.md) · [Concepts](concepts.md) · [Developer Manual](development.md) · [Recipes](recipes/README.md) · [Getting Started](getting-started.md) · [Setup Wizard](setup.md) · [`/_admin` Workbench](_admin.md) · [Templates Panel](templates.md) · [Design Panel](appearance.md) · [Deployment](deployment.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
+[README](../README.md) · [Concepts](concepts.md) · [Developer Manual](development.md) · [Recipes](recipes/README.md) · [Getting Started](getting-started.md) · [Setup Wizard](setup.md) · [`/_admin` Workbench](_admin.md) · [Templates Panel](templates.md) · [Design Panel](appearance.md) · [Features](features.md) · [Deployment](deployment.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
 
 **Security Note:** Every panel writes directly to configuration and project files. A developer account can change routing, data models, templates and the visible website; an editor account can change content. Work from a current Git state or another reliable backup, use HTTPS only, and give every account exactly the role it needs.
 
@@ -17,13 +17,13 @@ One login, one navigation, every screen a panel. The panels are grouped by what 
 
 | Group | Panels | Who |
 |---|---|---|
-| **Content** | Dashboard, Elements (Element Types), Text (Text Keys), Images (Image Slots), Submissions, Newsletter, Log | editors and developers |
+| **Content** | Dashboard, Elements (Element Types), Text (Text Keys), Images (Image Slots), Submissions, Log | editors and developers |
 | **Structure** | Templates, Design, Routes, Navigations | developers |
-| **System** | Users (User roles, Login protection), Language (Translations), Backups, Config, Search | developers – and every account for its own profile under Users |
+| **System** | Users (User roles, Login protection), Language (Translations), Backups, Config, Features | developers – and every account for its own profile under Users |
 
 A screen in brackets is a **tab** of the panel before it: the Elements panel opens on the entries and carries Element Types as its second tab, so the shape of the content sits right beside the content. A tab is a screen of its own – with its own permission, so an editor sees Elements without Element Types, and its own deep link, `#types`.
 
-Submissions, Newsletter, Navigations and Search belong to optional modules and are present while their module is active. Templates and Design are modules too: they ship with every checkout, and a project that does not want them deletes their directory. So are the panels above that are not in that list - `_admin` holds the shell, and every screen in it is a module under `_admin/Nino/Modules/<Name>/`, brought and taken away one directory at a time. A module a project adds can bring a panel of its own the same way; see the [Developer Manual](development.md#panels-of-the-workbench).
+Submissions and Navigations belong to optional kernel modules and are present while their module is active; Templates and Design are optional kernel modules too, nothing but a panel each, switched on or off in `/nino/modules`. A **feature** - an installable package under `features/`, copied in from the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features) and switched on in the Features panel - brings its panel the same way: the catalogue's Newsletter feature adds a Newsletter panel to the Content group, its Search feature a Search panel to the System group, and a checkout ships neither. The panels above that are in neither list are the workbench's own: `_admin` holds the shell, and every screen in it is a module under `_admin/Nino/Modules/<Name>/`, brought and taken away one directory at a time. A module a project adds, or a feature it installs, can bring a panel of its own the same way; see the [Developer Manual](development.md#panels-of-the-workbench) and [Features](features.md).
 
 There is no second tool. `/_editor`, `/_install`, `/_design` and `/_templates` of earlier versions are all here, and a reserved path of theirs is an ordinary page path now.
 
@@ -58,7 +58,6 @@ A permission is one string per panel or tab; `/*` matches every path below it, s
 | Images | `/_admin/images/manage` |
 | Image Slots (tab of Images) | `/_admin/slots/manage` |
 | Submissions | `/_admin/submissions/view` |
-| Newsletter | `/_admin/newsletter/manage` |
 | Log | `/_admin/logs/view` |
 | Templates | `/_admin/templates/manage` |
 | Design | `/_admin/design/manage` |
@@ -71,7 +70,9 @@ A permission is one string per panel or tab; `/*` matches every path below it, s
 | Translations (tab of Language) | `/_admin/translations/manage` |
 | Backups | `/_admin/backups/manage` |
 | Config | `/_admin/config/manage` |
-| Search | `/_admin/search/manage` |
+| Features | `/_admin/features/manage` |
+
+A feature's panel brings its permission along - the catalogue's Newsletter feature `/_admin/newsletter/manage`, its Search feature `/_admin/search/manage` - and the roles tab of the Users panel offers it while the feature is active.
 
 ### Finer permissions inside a panel
 
@@ -126,7 +127,7 @@ Whatever panel is open, saving writes the project files immediately. There is no
 
 ### Dashboard
 
-The **Dashboard** is the first panel and summarizes what the account may see: a tile per panel that has something to count – elements by type, submissions, newsletter subscribers, users, element types, routes, text keys and image slots still missing – plus the date of the latest backup and the most recent log entries. Every tile leads to the panel it counts for when clicked; the dashboard itself changes nothing.
+The **Dashboard** is the first panel and summarizes what the account may see: a tile per panel that has something to count – elements by type, submissions, users, element types, routes, text keys and image slots still missing, and whatever a feature's panel counts, subscribers for the catalogue's Newsletter – plus the date of the latest backup and the most recent log entries. Every tile leads to the panel it counts for when clicked; the dashboard itself changes nothing.
 
 ### Elements
 
@@ -161,7 +162,7 @@ A key that does not appear here is either hidden from editing or technical. Crea
 
 ### Newsletter
 
-**Newsletter** lists the subscriptions while the Newsletter module is active. Copy every address as a BCC line, export the list as CSV, or delete a subscription after confirmation. A deleted address is also recorded as removed, so restoring an older backup cannot silently undo the unsubscribe.
+**Newsletter** belongs to the Newsletter feature from the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features) and is there while that feature is copied into `features/` and switched on in the Features panel. The feature's own README documents the panel: the subscription list, its exports, and the deletion an older backup cannot undo.
 
 ### Log
 
@@ -173,13 +174,13 @@ A key that does not appear here is either hidden from editing or technical. Crea
 
 The **Templates** panel is the Template Builder: it composes the project's `page-*.tpl` files from complete sections – a searchable library of section presets, reusable `[template]` sections, the page's header and footer, and a native quick fill of the text a section brings. It is a workspace panel: the rail folds, and the template list, the section canvas and the inspector sit side by side.
 
-Everything it can do, its source safety rules and the preset library's manifest contract are in the [Templates Panel](templates.md) reference. The panel is a module (`app/Nino/Modules/Templates/`) and disappears with its directory.
+Everything it can do, its source safety rules and the preset library's manifest contract are in the [Templates Panel](templates.md) reference. The panel is the optional kernel module `_nino/Nino/Modules/Templates/`; switched off in `/nino/modules`, it leaves the workbench.
 
 ### Design
 
 The **Design** panel keeps the site's four appearance decisions editable after the wizard: **Theme** installs a complete visual baseline, **Header** and **Footer** replace one frame each, **Design** generates the colour palette and the size raster from a handful of settings and writes `assets/style.design.css`. The four are tabs inside the panel; the action button at the foot changes with the active tab.
 
-Theme, Header and Footer read the wizard's catalogue under `_admin/install/library/` and say so when it has been removed; Design generates rather than copies and keeps working either way. The settings, the token contract and the bundle order are in the [Design Panel](appearance.md) reference. The panel is a module (`app/Nino/Modules/Design/`) and disappears with its directory.
+Theme, Header and Footer read the wizard's catalogue under `_admin/install/library/` and say so when it has been removed; Design generates rather than copies and keeps working either way. The settings, the token contract and the bundle order are in the [Design Panel](appearance.md) reference. The panel is the optional kernel module `_nino/Nino/Modules/Design/`; switched off in `/nino/modules`, it leaves the workbench.
 
 ### Element Types
 
@@ -295,7 +296,7 @@ With backups switched on, the first authenticated request of a day writes an enc
 
 **Backups** lists the available dates and restores one. Before a restore, the current state is backed up once more, so a wrong pick can itself be undone. Afterwards test at least the frontend in every language, the login and the permissions, pages, texts, elements, images, and the form and newsletter data.
 
-A module that keeps files of its own under `data/` merges them during a restore through the `/nino/admin/restore` callback (the Newsletter module does). The daily backup is a safety net for editorial mistakes, not a replacement for an external backup of the whole project.
+A module that keeps files of its own under `data/` merges them during a restore through the `/nino/admin/restore` callback (the catalogue's Newsletter feature does). The daily backup is a safety net for editorial mistakes, not a replacement for an external backup of the whole project.
 
 ### Config
 
@@ -318,9 +319,15 @@ The login throttle is the Users panel's **Login protection** tab, the languages 
 
 In production, `/nino/error/display` must be off.
 
+### Features
+
+**Features** lists every feature in the `features/` directory - an installable package with a `feature.php` manifest, copied in from the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features); a checkout ships none - whether switched on or not, with its name, description and version, and with whatever stands in the way of switching it on: a Nino version it was not written for, a missing PHP extension, a required feature that is not there. Activating a feature applies its install unit without overwriting anything the project already has, lists its class in `/nino/modules` and records its version; deactivating removes the class and nothing else, and is refused while another active feature requires it. A feature whose directory has been replaced with a newer release shows an update, applied by activating it again. A feature that declares settings gets a form here, stored under `/nino/features` in `config.php`; every value is validated before any is written.
+
+A panel a feature brings appears with the next load of the workbench after activating, and goes with the next load after deactivating - reload the page. A content panel's permission is offered on the roles tab of the Users panel and has to be granted to the Editor role there. The manifest, the settings schema and the lifecycle are in the [Features](features.md) manual.
+
 ### Search
 
-**Search** belongs to the Search module. **Create searchindex** recreates every valid index listed under `/nino/elements/index` and reports how many index files and elements it wrote. The index definition is deliberate `config.php` work, see [Elements Search Index](development.md#elements-search-index); use the button after adding it, after changing indexed fields, or after editing element files by hand.
+**Search** belongs to the Search feature from the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features) and is there while that feature is copied into `features/` and switched on in the Features panel; its one action, **Create searchindex**, rebuilds the indexes configured under `/nino/elements/index`. The feature's own README documents the panel and the index configuration; see also [Elements Search Index](development.md#elements-search-index).
 
 ## Recovery
 
@@ -360,7 +367,7 @@ The output is the complete file; write it to `private/.auth/pw.php`. Do this in 
 | **Design** says no variants are available | `_admin/install/library/` was removed; the Design tab keeps working. |
 | Texts or images missing in a scan | Dynamic keys and images are not statically recognizable. |
 | Backup list is empty | Backups are switched off, or no authenticated request has happened today. |
-| Search returns no elements | `/nino/elements/index` and the Search module in `config.php`, then **Create searchindex**. |
+| Search returns no elements | The catalogue's Search feature in `features/` and switched on in the Features panel, `/nino/elements/index` in `config.php`, then **Create searchindex**. |
 | Website broken after **Config** | Restore the last Git state or backup. |
 | No developer password works any more | `/_admin/recovery.php` with the recovery password. |
 

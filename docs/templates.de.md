@@ -2,11 +2,11 @@
 
 **Sprache:** [English](templates.md) · Deutsch
 
-**Stand:** 6. September 2026 · **Nino-Version:** 1.0.0-beta
+**Stand:** 7. September 2026 · **Nino-Version:** 1.0.0-beta
 
 Der Template Builder – das Panel **Templates** der Workbench – ist der schnelle Weg vom `page-*.tpl` zur befüllten Seite. Er behandelt ein Template als geordnete Abfolge vollständiger HTML-Sections und wiederverwendbarer `[template]`-Sections, statt jeden verschachtelten DOM-Knoten zur Bearbeitung anzubieten.
 
-[README](../README.de.md) · [Grundkonzepte](concepts.de.md) · [Entwickler-Handbuch](development.de.md) · [Rezepte](recipes/README.md) · [Erste Schritte](getting-started.de.md) · [Einrichtungsassistent](setup.de.md) · [`/_admin`-Workbench](_admin.de.md) · [Templates-Panel](templates.de.md) · [Design-Panel](appearance.de.md) · [Deployment](deployment.de.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
+[README](../README.de.md) · [Grundkonzepte](concepts.de.md) · [Entwickler-Handbuch](development.de.md) · [Rezepte](recipes/README.md) · [Erste Schritte](getting-started.de.md) · [Einrichtungsassistent](setup.de.md) · [`/_admin`-Workbench](_admin.de.md) · [Templates-Panel](templates.de.md) · [Design-Panel](appearance.de.md) · [Features](features.de.md) · [Deployment](deployment.de.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
 
 > **Alpha:** Seitendateien bleiben gewöhnliches HTML+ und sind zur Laufzeit nicht vom Werkzeug abhängig. Preset-Library und Composer-Ablauf können sich noch verändern.
 
@@ -30,7 +30,7 @@ Der Template Builder erzeugt keine Routen, bearbeitet nicht den Inhalt eingebund
 
 ## Zugang und Sicherheit
 
-Melde dich unter `/_admin` an und öffne **Templates** in der Gruppe Struktur. Jede Aktion verlangt `/_admin/templates/manage` – eine Entwicklerberechtigung, nie eine der Redaktion. Das Panel ist ein Workspace: Die Leiste der Workbench klappt zu ihren Symbolen zusammen, und Templateliste, Section-Canvas und Inspektor teilen sich die ganze Breite; klappe die Leiste mit dem Doppelpfeil neben der Marke wieder auf, wenn du die Beschriftungen der anderen Panels brauchst. Das Panel ist das Templates-Modul (`app/Nino/Modules/Templates/`) und verschwindet mit seinem Verzeichnis aus der Workbench. Es spricht die Oberflächensprache, die du im Zahnrad der Workbench einstellst; seine eigenen Worte – im Markup des Panels wie in seinen Skripten – liegen in `app/Nino/Modules/Templates/text/<locale>.php`. Die Presets der Abschnittsbibliothek behalten die Namen und Beschreibungen aus ihren Manifesten – in der mitgelieferten Bibliothek Englisch –, und ein Manifest darf überall dort, wo es etwas benennt, statt eines Wortes einen Fill-Schlüssel verwenden.
+Melde dich unter `/_admin` an und öffne **Templates** in der Gruppe Struktur. Jede Aktion verlangt `/_admin/templates/manage` – eine Entwicklerberechtigung, nie eine der Redaktion. Das Panel ist ein Workspace: Die Leiste der Workbench klappt zu ihren Symbolen zusammen, und Templateliste, Section-Canvas und Inspektor teilen sich die ganze Breite; klappe die Leiste mit dem Doppelpfeil neben der Marke wieder auf, wenn du die Beschriftungen der anderen Panels brauchst. Das Panel ist das Templates-Modul, ein optionales Kernel-Modul (`_nino/Nino/Modules/Templates/`), das die Workbench verlässt, wenn es in `/nino/modules` abgeschaltet wird. Es spricht die Oberflächensprache, die du im Zahnrad der Workbench einstellst; seine eigenen Worte – im Markup des Panels wie in seinen Skripten – liegen in `_nino/Nino/Modules/Templates/text/<locale>.php`. Die Presets der Abschnittsbibliothek behalten die Namen und Beschreibungen aus ihren Manifesten – in der mitgelieferten Bibliothek Englisch –, und ein Manifest darf überall dort, wo es etwas benennt, statt eines Wortes einen Fill-Schlüssel verwenden.
 
 Geschrieben werden:
 
@@ -128,7 +128,7 @@ Diese Metadaten erlauben das erneute Öffnen der Composer-Einstellungen. Sie sin
 
 ## Section-Library
 
-System-Presets liegen in `app/Nino/Modules/Templates/library/<preset-key>/`. Der erzeugte HTML+-Quelltext wird in die Seite kopiert; die öffentliche Website liest die Library nicht zur Laufzeit.
+System-Presets liegen in `_nino/Nino/Modules/Templates/library/<preset-key>/`. Der erzeugte HTML+-Quelltext wird in die Seite kopiert; die öffentliche Website liest die Library nicht zur Laufzeit.
 
 Die Library liefert zwei Sorten Preset. Die erste verwaltet ihren Inhalt: alles
 Wiederholte liest eine Elements-Collection, jede Textzeile ist ein Textfill.
@@ -156,7 +156,7 @@ HTML+ – siehe [Statische Blöcke](#statische-blöcke) weiter unten.
 | Table — Static block | Echte Tabelle zwischen Intro und Outro | Schlicht · Gestreift, je mit Demo-Zeilen oder Elements-Schleife |
 | List — Static block | Häkchen- oder nummerierte Liste | Häkchen · Nummeriert, je mit Demo-Einträgen oder Elements-Schleife |
 | FAQ — Static accordion | Fragen als native `details`, ohne JavaScript | Demo-Fragen · Elements-Schleife |
-| Newsletter — Signup form | Das funktionierende Double-Opt-in-Formular | Formular unter dem Intro · Intro daneben |
+| Newsletter — Signup form | Das Double-Opt-in-Formular; beantwortet vom Newsletter-Feature aus dem Katalog [dapeio/nino-features](https://github.com/dapeio/nino-features), installiert und eingeschaltet | Formular unter dem Intro · Intro daneben |
 | Contact — Form | Das Kontaktformular des Projekts | Mittig · Kontaktdaten daneben |
 
 ### Statische Blöcke

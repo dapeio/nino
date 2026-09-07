@@ -2,12 +2,12 @@
 
 **Sprache:** [English](concepts.md) · Deutsch
 
-**Stand:** 6. September 2026 · **Nino-Version:** 1.0.0-beta
+**Stand:** 7. September 2026 · **Nino-Version:** 1.0.0-beta
 
 Dieses Handbuch erklärt die Architektur von Nino und das Zusammenspiel von Konfiguration, Daten, Templates und Modulen. Falls du stattdessen direkt eine Webseite einrichten möchtest, beginne mit [Erste Schritte](getting-started.de.md); konkrete APIs und Implementierungsdetails stehen im [Entwickler-Handbuch](development.de.md).
 
 **Weitere Links:**
-[README](../README.de.md) · [Grundkonzepte](concepts.de.md) · [Entwickler-Handbuch](development.de.md) · [Rezepte](recipes/README.md) · [Erste Schritte](getting-started.de.md) · [Einrichtungsassistent](setup.de.md) · [`/_admin`-Workbench](_admin.de.md) · [Templates-Panel](templates.de.md) · [Design-Panel](appearance.de.md) · [Deployment](deployment.de.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
+[README](../README.de.md) · [Grundkonzepte](concepts.de.md) · [Entwickler-Handbuch](development.de.md) · [Rezepte](recipes/README.md) · [Erste Schritte](getting-started.de.md) · [Einrichtungsassistent](setup.de.md) · [`/_admin`-Workbench](_admin.de.md) · [Templates-Panel](templates.de.md) · [Design-Panel](appearance.de.md) · [Features](features.de.md) · [Deployment](deployment.de.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
 
 ## Kernsäulen
 Nino organisiert eine Webseite mit nur wenigen, aber klar getrennten Bausteinen:
@@ -159,15 +159,28 @@ Projekt-Namespace nach `app/`; die kerneigenen Klassen unter `Nino\` bleiben in
 `_nino/`. So bleibt die Erweiterung Teil des konkreten Projekts, `_nino/` kann
 ersetzt werden und es entsteht kein zweites Hook- oder Plugin-System.
 
+Ein Modul erreicht ein Projekt in einer von drei Formen. Ein **Kernel-Modul**
+wird in `_nino/Nino/Modules/` mitgeliefert – die immer aktiven und die
+optionalen (Formular, Navigation, Sprachauswahl, die Panels Design und
+Templates), die ein Projekt in `/nino/modules` ein- oder ausschaltet. Ein
+**Feature** ist ein installierbares Paket: ein Verzeichnis unterhalb von
+`features/` mit einem Manifest `feature.php`, aus dem Katalog
+[dapeio/nino-features](https://github.com/dapeio/nino-features) hineinkopiert
+– Newsletter und Suche liegen dort, ein Checkout bringt keines mit – und im
+Panel Features der Workbench eingeschaltet, das seine Version aufzeichnet und
+seine Einstellungen anbietet. Ein **Projektmodul** ist der eigene Code des
+Projekts unter `app/`. Siehe
+[Features](features.de.md).
+
 ## Die Workbench `/_admin`
 
-Eine Verwaltungsoberfläche mit einer Anmeldung. Sie hat einen eigenen Einstiegspunkt (`_admin/index.php`) und ist kein Frontend-Modul aus `/nino/modules`; jeder Bildschirm darin ist ein Panel, und ein Modul kann eines beisteuern:
+Eine Verwaltungsoberfläche mit einer Anmeldung. Sie hat einen eigenen Einstiegspunkt (`_admin/index.php`) und ist kein Frontend-Modul aus `/nino/modules`; jeder Bildschirm darin ist ein Panel, und ein Modul oder ein installiertes Feature kann eines beisteuern – der Newsletter des Katalogs sein Panel unter Inhalt, seine Suche eines unter System:
 
 | Gruppe | Panels | Verantwortung |
 |---|---|---|
-| Inhalt | Dashboard, Elemente (mit Elementtypen), Texte (mit Textschlüsseln), Bilder (mit Bildplätzen), Anfragen, Newsletter, Log | tägliche Pflege von Inhalten, Bildern und Betriebsdaten; die Tabs in Klammern halten die Form dieser Inhalte und gehören dem Entwickler |
+| Inhalt | Dashboard, Elemente (mit Elementtypen), Texte (mit Textschlüsseln), Bilder (mit Bildplätzen), Anfragen, Log | tägliche Pflege von Inhalten, Bildern und Betriebsdaten; die Tabs in Klammern halten die Form dieser Inhalte und gehören dem Entwickler |
 | Struktur | [Templates](templates.de.md), [Design](appearance.de.md), Routen, Navigationen | die Struktur des Projekts: Seitentemplates, Erscheinungsbild, Routen und Menüs |
-| System | Nutzer (mit Nutzerrollen und Anmeldeschutz), Sprache (mit Übersetzungen), Backups, Konfiguration, Suche | Konten und Rollen, Sprachen und Übersetzungsübergabe, Wiederherstellung, technische Konfiguration, Suchindexe |
+| System | Nutzer (mit Nutzerrollen und Anmeldeschutz), Sprache (mit Übersetzungen), Backups, Konfiguration, Features | Konten und Rollen, Sprachen und Übersetzungsübergabe, Wiederherstellung, technische Konfiguration, installierte Features |
 
 Ein Konto hält eine Rolle, eine Rolle eine Menge von Berechtigungen, eine je Panel oder Tab; der Assistent schreibt **Editor** (jede Inhalt-Berechtigung) und **Developer** (`/*`), und der Tab Nutzerrollen des Panels Nutzer bearbeitet sie. Ein Panel, das ein Konto nicht verwenden darf, wird nicht gerendert. Die Abgrenzung verläuft damit zwischen vollständigem Entwicklungszugriff und berechtigungsgesteuerter redaktioneller Arbeit – innerhalb eines Werkzeugs. Solange das Projekt noch nicht existiert, liefert dieselbe Route den [Einrichtungsassistenten](setup.de.md); `/_admin/recovery.php` ist der Weg zurück, wenn die Konten selbst kaputt sind. Siehe das [`/_admin`-Handbuch](_admin.de.md).
 
@@ -182,6 +195,7 @@ Ein Konto hält eine Rolle, eine Rolle eine Menge von Berechtigungen, eine je Pa
 | neue öffentliche URL anlegen | Route in `config.php` beziehungsweise im Panel Routes |
 | dynamische Liste ausgeben | Element-Abfrage oder Shortcode mit Callback |
 | technische Funktion ergänzen | projektspezifisches Modul |
+| paketierte Funktion ergänzen – ein Newsletter, eine Suche | ein Feature aus dem Katalog [dapeio/nino-features](https://github.com/dapeio/nino-features), nach `features/` kopiert und im Panel Features eingeschaltet |
 | Theme, Design, Header oder Footer ändern | das Design-Panel; Stylesheets für projektspezifische Übersteuerungen jenseits des Katalogs |
 
 ## Wie es weitergeht
@@ -190,4 +204,5 @@ Ein Konto hält eine Rolle, eine Rolle eine Menge von Berechtigungen, eine je Pa
 - [`/_admin`-Workbench](_admin.de.md) erklärt jedes Panel, die Rollen und die Recovery-Seite.
 - [Templates-Panel](templates.de.md) erklärt den strukturellen Template-Builder im Alpha-Status.
 - [Design-Panel](appearance.de.md) erklärt die vier Erscheinungsbild-Editoren.
+- [Features](features.de.md) erklärt installierbare Features und ihr Manifest.
 - [Deployment](deployment.de.md) beschreibt den Weg von der lokalen Webseite in den sicheren Betrieb.

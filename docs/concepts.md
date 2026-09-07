@@ -2,12 +2,12 @@
 
 **Language:** English · [Deutsch](concepts.de.md)
 
-**Last updated:** September 6, 2026 · **Nino version:** 1.0.0-beta
+**Last updated:** September 7, 2026 · **Nino version:** 1.0.0-beta
 
 This manual explains the architecture of Nino and the interaction of configuration, data, templates, and modules. If you instead want to set up a website directly, start with [Getting Started](getting-started.md); concrete APIs and implementation details are in the [Developer Manual](development.md).
 
 **Additional Links:**
-[README](../README.md) · [Concepts](concepts.md) · [Developer Manual](development.md) · [Recipes](recipes/README.md) · [Getting Started](getting-started.md) · [Setup Wizard](setup.md) · [`/_admin` Workbench](_admin.md) · [Templates Panel](templates.md) · [Design Panel](appearance.md) · [Deployment](deployment.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
+[README](../README.md) · [Concepts](concepts.md) · [Developer Manual](development.md) · [Recipes](recipes/README.md) · [Getting Started](getting-started.md) · [Setup Wizard](setup.md) · [`/_admin` Workbench](_admin.md) · [Templates Panel](templates.md) · [Design Panel](appearance.md) · [Features](features.md) · [Deployment](deployment.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
 
 ## Core Pillars
 
@@ -160,15 +160,26 @@ namespace; the kernel-owned `Nino\` classes remain in `_nino/`. This way, the
 extension remains part of the specific project, `_nino/` stays replaceable, and
 no second hook or plugin system is introduced.
 
+A module reaches a project in one of three shapes. A **kernel module** ships in
+`_nino/Nino/Modules/` - the always-on ones and the optional ones (form,
+navigation, language selection, the Design and Templates panels) a project
+switches on or off in `/nino/modules`. A **feature** is an installable package:
+one directory below `features/` with a `feature.php` manifest, copied in from
+the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features) -
+Newsletter and Search live there, a checkout ships none - and switched on in
+the workbench's Features panel, which records its version and offers its
+settings. A **project module** is the project's own code under
+`app/`. See [Features](features.md).
+
 ## The Workbench `/_admin`
 
-One management interface with one login. It has its own entry point (`_admin/index.php`) and is not a frontend module from `/nino/modules`; every screen in it is a panel, and a module can contribute one:
+One management interface with one login. It has its own entry point (`_admin/index.php`) and is not a frontend module from `/nino/modules`; every screen in it is a panel, and a module or an installed feature can contribute one - the catalogue's Newsletter its panel in Content, its Search one in System:
 
 | Group | Panels | Responsibility |
 |---|---|---|
-| Content | Dashboard, Elements (with Element Types), Text (with Text Keys), Images (with Image Slots), Submissions, Newsletter, Log | daily maintenance of content, images and operational data; the tabs in brackets hold the shape of that content and are the developer's |
+| Content | Dashboard, Elements (with Element Types), Text (with Text Keys), Images (with Image Slots), Submissions, Log | daily maintenance of content, images and operational data; the tabs in brackets hold the shape of that content and are the developer's |
 | Structure | [Templates](templates.md), [Design](appearance.md), Routes, Navigations | the project's structure: page templates, the appearance, routes and menus |
-| System | Users (with User roles and Login protection), Language (with Translations), Backups, Config, Search | accounts and roles, languages and the translation hand-off, restore, technical configuration, search indexes |
+| System | Users (with User roles and Login protection), Language (with Translations), Backups, Config, Features | accounts and roles, languages and the translation hand-off, restore, technical configuration, installed features |
 
 An account holds a role, a role a set of permissions, one per panel or tab; the wizard writes **Editor** (every Content permission) and **Developer** (`/*`), and the Users panel's roles tab edits them. A panel an account may not use is not rendered. The separation therefore runs between full development access and permission-controlled editorial work - inside one tool. Until the project exists, the same route serves the [setup wizard](setup.md); `/_admin/recovery.php` is the way back in when the accounts themselves are broken. See the [`/_admin` manual](_admin.md).
 
@@ -183,6 +194,7 @@ An account holds a role, a role a set of permissions, one per panel or tab; the 
 | Create new public URL | route in `config.php` or the Routes panel |
 | Output dynamic list | element query or shortcode with callback |
 | Add technical function | project-specific module |
+| Add a packaged function - a newsletter, a search | a feature from the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features), copied into `features/` and switched on in the Features panel |
 | Change Theme, Design, Header, or Footer | the Design panel; stylesheets for project-specific overrides beyond the catalogue |
 
 ## Next Steps
@@ -191,4 +203,5 @@ An account holds a role, a role a set of permissions, one per panel or tab; the 
 - [`/_admin` Workbench](_admin.md) explains every panel, the roles and the recovery page.
 - [Templates Panel](templates.md) explains the structural template builder in Alpha status.
 - [Design Panel](appearance.md) explains the four appearance editors.
+- [Features](features.md) explains installable features and their manifest.
 - [Deployment](deployment.md) describes the path from the local website to secure operation.

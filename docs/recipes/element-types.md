@@ -1,9 +1,9 @@
 # Recipe: Define Element types for repeated content
 
 **Additional Links:**
-[Agent guide](../../AGENTS.md) · [All recipes](README.md) · [Developer Manual](../development.md) · [Concepts](../concepts.md) · [`/_admin` Workbench](../_admin.md) · [Setup Wizard](../setup.md) · [Templates Panel](../templates.md)
+[Agent guide](../../AGENTS.md) · [All recipes](README.md) · [Developer Manual](../development.md) · [Concepts](../concepts.md) · [`/_admin` Workbench](../_admin.md) · [Setup Wizard](../setup.md) · [Templates Panel](../templates.md) · [Features](../features.md)
 
-One of the six extension recipes of the [Nino agent guide](../../AGENTS.md). Its
+One of the seven extension recipes of the [Nino agent guide](../../AGENTS.md). Its
 rules - the required workflow, the core runtime model, the conventions and the
 security review - apply to every step below.
 
@@ -268,7 +268,7 @@ Elements Area is actually bound to - the auto-generated
 `<page>-<section>-<area>` of a new Area as readily as a type picked under Edit
 Section → Data, so the pair stays correct on the very first insert and after
 any later rebind. The token names a declared Elements Area of the same preset;
-anything else is refused at manifest load. `app/Nino/Modules/Templates/library/
+anything else is refused at manifest load. `_nino/Nino/Modules/Templates/library/
 filterable-grid/` is a complete worked example: a static block (§10.3a) pairs
 `[elementvalues]` with an Elements Area whose `item.data` stamps each card
 with its own field value per §10.3.
@@ -278,8 +278,11 @@ token and no Area to follow, so both loops simply name the same collection.
 
 ## Search indexed Elements
 
-The built-in `\Nino\Modules\Search` is configured manually. Do not add it to
-the wizard or infer its fields from templates:
+`\Nino\Modules\Search` is a feature from the catalogue
+[dapeio/nino-features](https://github.com/dapeio/nino-features), copied into
+`features/Search/`: it is switched on in the workbench's Features panel, or by
+listing its class by hand, and its fields are configured manually. Do not add it to the wizard or infer its
+fields from templates:
 
 ```php
 '/nino/modules' => [
@@ -311,8 +314,8 @@ rank the hits.
 Lifecycle is deliberately small and explicit:
 
 - module `init()` only registers `/nino/elements/committed` and performs no I/O;
-- `/_admin` Config's **Create searchindex** rebuilds every configured type on
-  every press;
+- the Search panel's **Create searchindex** under `/_admin` rebuilds every
+  configured type on every press;
 - a committed insert, update, or delete rebuilds that configured type;
 - one type owns exactly `/data/index-<type>.php`;
 - reads of a missing or malformed file return `[]` and never self-heal;
@@ -323,7 +326,9 @@ Search indexes are the explicit exception to the general mutable-file rule in
 the agent guide. They are expendable derived data and use one direct, non-atomic
 full-file write: no `Filesystem::mutate()`, temporary rename, sidecar lock,
 signature, or revision. Keep that contract visible in code and docs. Test it in
-`tests/search-smoke.php`, including inactive/active module behavior, all-index
+the feature's own test, `features/Search/tests/search-smoke.php` in the
+catalogue, including
+inactive/active module behavior, all-index
 Admin rebuilds, current-locale search, weighted fuzzy ranking, committed-write
 refresh, missing/malformed reads, and write-failure reporting.
 
@@ -347,7 +352,8 @@ values that override the new shape.
 ## Element tests
 
 Use `tests/kernel-smoke.php` for model/runtime behavior,
-`tests/search-smoke.php` for the derived search-index contract,
+the catalogue's `features/Search/tests/search-smoke.php` for the derived
+search-index contract,
 `tests/admin-smoke.php` for type CRUD and migrations, and the relevant JS tests
 for forms/uploads. Test:
 

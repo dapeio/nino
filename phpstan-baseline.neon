@@ -88,40 +88,40 @@ parameters:
 			message: '#^Call to function is_string\(\) with string will always evaluate to true\.$#'
 			identifier: function.alreadyNarrowedType
 			count: 1
-			path: app/Nino/Modules/Design/Preview/Preview.php
+			path: _nino/Nino/Modules/Design/Preview/Preview.php
 
 		-
 			message: '#^Call to function method_exists\(\) with ''\\\\Nino\\\\Install\\\\Themes'' and ''frameUnit'' will always evaluate to true\.$#'
 			identifier: function.alreadyNarrowedType
 			count: 1
-			path: app/Nino/Modules/Design/Preview/Preview.php
+			path: _nino/Nino/Modules/Design/Preview/Preview.php
 
 		-
 			message: '#^Strict comparison using \=\=\= between true and true will always evaluate to true\.$#'
 			identifier: identical.alwaysTrue
 			count: 1
-			path: app/Nino/Modules/Design/Preview/Preview.php
+			path: _nino/Nino/Modules/Design/Preview/Preview.php
 
 		-
 			message: '#^Strict comparison using \=\=\= between non\-empty\-string and '''' will always evaluate to false\.$#'
 			identifier: identical.alwaysFalse
 			count: 1
-			path: app/Nino/Modules/Templates/AreaComposer/AreaComposer.php
+			path: _nino/Nino/Modules/Templates/AreaComposer/AreaComposer.php
 
 		-
 			message: '#^Offset 1 on array\{0\: non\-falsy\-string, 1\: non\-empty\-string, 2\?\: ''off''\|''on''\} on left side of \?\? always exists and is not nullable\.$#'
 			identifier: nullCoalesce.offset
 			count: 1
-			path: app/Nino/Modules/Templates/Documents/Documents.php
+			path: _nino/Nino/Modules/Templates/Documents/Documents.php
 
 		-
 			message: '#^Strict comparison using \!\=\= between ''off''\|''on'' and '''' will always evaluate to true\.$#'
 			identifier: notIdentical.alwaysTrue
 			count: 1
-			path: app/Nino/Modules/Templates/Documents/Documents.php
+			path: _nino/Nino/Modules/Templates/Documents/Documents.php
 
 		-
 			message: '#^Offset 2 on array\{non\-falsy\-string, '''', '''', non\-empty\-string\}\|array\{non\-falsy\-string, non\-empty\-string, string\} on left side of \?\? always exists and is not nullable\.$#'
 			identifier: nullCoalesce.offset
 			count: 1
-			path: app/Nino/Modules/Templates/Library/Library.php
+			path: _nino/Nino/Modules/Templates/Library/Library.php

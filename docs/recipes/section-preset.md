@@ -1,9 +1,9 @@
 # Recipe: Add a Section Library preset
 
 **Additional Links:**
-[Agent guide](../../AGENTS.md) · [All recipes](README.md) · [Developer Manual](../development.md) · [Concepts](../concepts.md) · [`/_admin` Workbench](../_admin.md) · [Setup Wizard](../setup.md) · [Templates Panel](../templates.md)
+[Agent guide](../../AGENTS.md) · [All recipes](README.md) · [Developer Manual](../development.md) · [Concepts](../concepts.md) · [`/_admin` Workbench](../_admin.md) · [Setup Wizard](../setup.md) · [Templates Panel](../templates.md) · [Features](../features.md)
 
-One of the six extension recipes of the [Nino agent guide](../../AGENTS.md). Its
+One of the seven extension recipes of the [Nino agent guide](../../AGENTS.md). Its
 rules - the required workflow, the core runtime model, the conventions and the
 security review - apply to every step below.
 
@@ -22,7 +22,7 @@ source.
 ## Directory, slug, and files
 
 ```text
-app/Nino/Modules/Templates/library/services-grid/
+_nino/Nino/Modules/Templates/library/services-grid/
 ├── manifest.php
 └── section.tpl
 ```
@@ -30,7 +30,7 @@ app/Nino/Modules/Templates/library/services-grid/
 A preset with genuinely different markup can provide several Layout files:
 
 ```text
-app/Nino/Modules/Templates/library/fullscreen-image/
+_nino/Nino/Modules/Templates/library/fullscreen-image/
 ├── manifest.php
 ├── section-cover.tpl
 └── section-parallax.tpl
@@ -396,8 +396,8 @@ Extend `tests/templates-smoke.php` and `tests/templates-js-smoke.js`. Test:
 Run:
 
 ```bash
-php -l app/Nino/Modules/Templates/AreaComposer/AreaComposer.php
-php -l app/Nino/Modules/Templates/library/services-grid/manifest.php
+php -l _nino/Nino/Modules/Templates/AreaComposer/AreaComposer.php
+php -l _nino/Nino/Modules/Templates/library/services-grid/manifest.php
 php tests/templates-smoke.php
 node tests/templates-js-smoke.js
 ```

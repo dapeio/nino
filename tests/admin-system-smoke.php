@@ -565,70 +565,17 @@ check( 'restoring a malformed date is rejected before touching the filesystem', 
 echo "\n";
 
 
-// --- Dev\Restore - newsletter restore merges instead of overwriting -------
+// --- Restore - a module merges its own files through the callback ----------
 
-echo "Restore - a module merges its own files on restore (Newsletter, Art. 17)\n";
+echo "Restore - a module merges its own data files through /nino/admin/restore\n";
 
-// The merge is the Newsletter module's own, reached from Restore through
-// the '/nino/admin/restore' callback it registers - exercised here directly
-// rather than through a real two-backup apiRestore() round trip:
-// Backup::maybeRun() only ever creates one backup per calendar day, so a
-// sandboxed test run can't produce an "older backup" and a "current,
-// since-changed state" the way a real installation would days apart
-$mergeInvoke = static function( string $dataDir, string $staging ) use ( &$appData ): void {
-	$args = [ 'dataDir' => $dataDir, 'staging' => $staging ];
-	\Nino\Modules\Newsletter::callbackRestore( $appData, $args );
-};
-
-$mergeRoot 		= sys_get_temp_dir(). '/nino-mergetest-root-'. bin2hex( random_bytes( 8 ) );
-$mergeStaging = sys_get_temp_dir(). '/nino-mergetest-staging-'. bin2hex( random_bytes( 8 ) );
-mkdir( $mergeRoot. '/data', 0755, true );
-mkdir( $mergeStaging. '/data', 0755, true );
-
-// root (current): alice unsubscribed since the backup was taken - gone from
-// newsletter.php, recorded (as a sha256, see \Nino\Modules\Newsletter's own
-// REMOVED_PATH docblock) in newsletter-removed.php; bob untouched
-$aliceHash = hash( 'sha256', 'alice@example.com' );
-file_put_contents( $mergeRoot. '/data/newsletter.php', '<?php return [ [ "email" => "bob@example.com", "status" => "subscribed" ] ];' );
-file_put_contents( $mergeRoot. '/data/newsletter-removed.php', '<?php return [ '. var_export( $aliceHash, true ). ' ];' );
-
-// staging (the backup being restored): taken before Alice unsubscribed, so it
-// still has her subscription and no removal record of its own
-file_put_contents( $mergeStaging. '/data/newsletter.php', '<?php return [ [ "email" => "alice@example.com", "status" => "subscribed" ], [ "email" => "bob@example.com", "status" => "subscribed" ] ];' );
-
-$mergeInvoke( $mergeRoot. '/data', $mergeStaging );
-
-$mergedEntries = include $mergeStaging. '/data/newsletter.php';
-$mergedRemoved = include $mergeStaging. '/data/newsletter-removed.php';
-
-check( 'a restore does not resurrect an address unsubscribed since the backup was taken', in_array( 'alice@example.com', array_column( $mergedEntries, 'email' ), true ) === false );
-check( 'an untouched subscriber survives the restore', in_array( 'bob@example.com', array_column( $mergedEntries, 'email' ), true ) === true );
-check( 'the removal record itself is carried into the restored state, not just the filtered entries', in_array( $aliceHash, $mergedRemoved, true ) === true );
-
-\Nino\Filesystem::removeDir( $mergeRoot );
-\Nino\Filesystem::removeDir( $mergeStaging );
-
-// A project without the Newsletter module carries neither file. Merging that
-// state must be a no-op, not an error.
-$mergeRoot2 	= sys_get_temp_dir(). '/nino-mergetest-root2-'. bin2hex( random_bytes( 8 ) );
-$mergeStaging2 = sys_get_temp_dir(). '/nino-mergetest-staging2-'. bin2hex( random_bytes( 8 ) );
-mkdir( $mergeRoot2, 0755, true );
-mkdir( $mergeStaging2, 0755, true );
-
-$mergeInvoke( $mergeRoot2, $mergeStaging2 );
-check( 'a backup with no newsletter files at all is a no-op, not an error', is_file( $mergeStaging2. '/data/newsletter.php' ) === false );
-
-// Restore itself carries no newsletter knowledge any more - the module
-// registers the merge in its init(), so a project without the module has
+// Restore itself carries no knowledge of any module's data: a module that
+// keeps files under data/ registers '/nino/admin/restore' in its init() and
+// merges its own (the Newsletter feature in dapeio/nino-features is the
+// reference, tested in its own suite), so a project without the module has
 // nothing to merge and Restore has nothing to know
 $restoreSource = file_get_contents( __DIR__. '/../_admin/Nino/Modules/Backups/Admin/Admin.php' );
-check( 'Restore fires the module callback instead of naming the newsletter', str_contains( $restoreSource, "'/nino/admin/restore'" ) === true && str_contains( $restoreSource, 'newsletter' ) === false );
-$initProbe = [ '/nino/modules' => [] ];
-\Nino\Modules\Newsletter::init( $initProbe );
-check( 'the Newsletter module registers itself on /nino/admin/restore', isset( $initProbe['./nino/callbacks']['/nino/admin/restore'] ) === true );
-
-\Nino\Filesystem::removeDir( $mergeRoot2 );
-\Nino\Filesystem::removeDir( $mergeStaging2 );
+check( 'Restore fires the module callback instead of naming any module', str_contains( $restoreSource, "'/nino/admin/restore'" ) === true && str_contains( $restoreSource, 'newsletter' ) === false );
 
 echo "\n";
 
@@ -2266,7 +2213,7 @@ $withModule['/nino/modules'] = [ 'AdminSmokeDummyModule', '\\Nino\\Modules\\Navi
 
 $registry = \Nino\Admin\Admin::panels( $withModule );
 $order 		= array_keys( $registry );
-check( 'the tool\'s own panels are all there, content first, then structure, then system, from nav() alone', array_values( array_diff( $order, [ 'dummy', 'navs' ] ) ) === [ 'dashboard', 'elements', 'text', 'images', 'logs', 'routes', 'users', 'language', 'backups', 'config' ] );
+check( 'the tool\'s own panels are all there, content first, then structure, then system, from nav() alone', array_values( array_diff( $order, [ 'dummy', 'navs' ] ) ) === [ 'dashboard', 'elements', 'text', 'images', 'logs', 'routes', 'users', 'language', 'backups', 'features', 'config' ] );
 check( 'the module panel sits where its weight puts it - in the content group, after images (40), before logs (90)', array_search( 'dummy', $order, true ) === array_search( 'images', $order, true ) + 1 && array_search( 'logs', $order, true ) === array_search( 'dummy', $order, true ) + 1 );
 check( 'the tool\'s own tabs sit on their panes', array_map( static fn( array $p ): array => array_keys( $p['tabs'] ), array_intersect_key( $registry, array_flip( [ 'elements', 'text', 'images', 'users', 'language' ] ) ) ) === [ 'elements' => [ 'types' ], 'text' => [ 'keys' ], 'images' => [ 'slots' ], 'users' => [ 'roles', 'lockout' ], 'language' => [ 'translations' ] ] );
 check( 'the Navigations panel names the structure group and sits after routes (20)', array_search( 'navs', $order, true ) === array_search( 'routes', $order, true ) + 1 );
@@ -2288,7 +2235,7 @@ check( 'a pane with tabs carries the shared tab bar, its own screen first, and a
 // pane spelled differently on the two sides is a panel whose tab opens on
 // nothing, with no error anywhere (the bundler skips a missing file)
 $shipped = $appData;
-$shipped['/nino/modules'] = array_merge( \Nino\AppData::DEFAULTS['/nino/modules'], [ '\\Nino\\Modules\\Form', '\\Nino\\Modules\\Newsletter', '\\Nino\\Modules\\Navigation', '\\Nino\\Modules\\Search', '\\Nino\\Modules\\Design', '\\Nino\\Modules\\Templates' ] );
+$shipped['/nino/modules'] = array_merge( \Nino\AppData::DEFAULTS['/nino/modules'], [ '\\Nino\\Modules\\Form', '\\Nino\\Modules\\Navigation', '\\Nino\\Modules\\Design', '\\Nino\\Modules\\Templates' ] );
 $missingAssets = [];
 $missingPanes = [];
 foreach( \Nino\Admin\Admin::allPanels( $shipped ) as $uri => $panel ) {
@@ -2412,14 +2359,15 @@ foreach( [ 'en_US', 'de_DE', 'fr_FR' ] as $locale ) {
 	$render['/nino/locales/available'] = [ 'de_DE', 'en_US', 'fr_FR' ];
 
 	// Every runtime module that brings a panel, not just the workbench's own:
-	// the app modules are where a whole .tpl is rendered into a pane, and a
-	// registry without them would leave exactly those files unchecked
+	// the optional kernel modules are where a whole .tpl is rendered into a
+	// pane, and the features ship panels of their own - a registry without
+	// them would leave exactly those files unchecked
 	$render['/nino/modules'] = array_values( array_filter( array_map(
 		static function( string $dir ): string {
 			$class = '\\Nino\\Modules\\'. basename( $dir );
 			return class_exists( $class ) === true && method_exists( $class, 'adminPanels' ) === true ? $class : '';
 		},
-		glob( dirname( __DIR__ ). '/app/Nino/Modules/*', GLOB_ONLYDIR ) ?: []
+		array_merge( glob( dirname( __DIR__ ). '/_nino/Nino/Modules/*', GLOB_ONLYDIR ) ?: [], glob( dirname( __DIR__ ). '/features/*', GLOB_ONLYDIR ) ?: [] )
 	) ) );
 
 	// The two fills \Nino::request() registers before any template is rendered
@@ -2483,7 +2431,7 @@ check( 'a panel naming a file that is not there is reported, and the file stays 
 $getRequest = [ '/nino/http/response' => [ 'statusCode' => 200, 'body' => '[template /_admin/templates/page-index]' ] ];
 \Nino\Admin\Admin::handleGet( $withModule, $getRequest );
 \Nino\Admin\Admin::init( $withModule );
-check( 'init bundles every panel script, the module\'s included, after the shell\'s own', in_array( '/app/Dummy/assets/admin.js', $withModule['/nino/html/assets']['/_admin/.cache/script.js'], true ) === true && in_array( '/app/Nino/Modules/Navigation/assets/admin.js', $withModule['/nino/html/assets']['/_admin/.cache/script.js'], true ) === true && $withModule['/nino/html/assets']['/_admin/.cache/script.js'][0] === '/_nino/Nino.js' );
+check( 'init bundles every panel script, the module\'s included, after the shell\'s own', in_array( '/app/Dummy/assets/admin.js', $withModule['/nino/html/assets']['/_admin/.cache/script.js'], true ) === true && in_array( '/_nino/Nino/Modules/Navigation/assets/admin.js', $withModule['/nino/html/assets']['/_admin/.cache/script.js'], true ) === true && $withModule['/nino/html/assets']['/_admin/.cache/script.js'][0] === '/_nino/Nino.js' );
 check( 'and every panel stylesheet', in_array( '/app/Dummy/assets/admin.css', $withModule['/nino/html/assets']['/_admin/.cache/style.css'], true ) === true );
 check( 'the nav and the panes reach the template as fills', str_contains( \Nino\Html::renderTextfill( $withModule, '/_admin/nav' ), 'data-panel="dummy"' ) === true && str_contains( \Nino\Html::renderTextfill( $withModule, '/_admin/panes' ), 'id="dummy-list"' ) === true );
 
@@ -2506,12 +2454,9 @@ $_POST['action'] = 'navs/list';
 check( 'with the Navigation module off, navs/list is an unknown action and the panel is gone', $request['/nino/http/response']['statusCode'] === 404 && isset( \Nino\Admin\Admin::panels( $withoutModule )['navs'] ) === false );
 
 $request = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-$_POST['action'] = 'search/createindex';
-$withSearch = $appData;
-$withSearch['/nino/modules'] = [ '\\Nino\\Modules\\Search' ];
-\Nino\Admin\Admin::handlePost( $withSearch, $request );
-check( 'the search-index rebuild is the Search module\'s own action, reachable while it is active', $request['/nino/http/response']['statusCode'] === 200 );
-check( 'and Config no longer carries it', isset( \Nino\Modules\Config\Admin::actions()['config/searchindex'] ) === false );
+// The search-index rebuild is the Search feature's own action (tested in
+// dapeio/nino-features); Config no longer carries it
+check( 'Config no longer carries the search-index rebuild', isset( \Nino\Modules\Config\Admin::actions()['config/searchindex'] ) === false );
 
 echo "\n";
 
@@ -2840,7 +2785,7 @@ $described = [
 	[ \Nino\Modules\Language\Translations::class,	'translations/import',	[ 'targetLocale' => 'fr_FR' ],			'fr_FR' ],
 	[ \Nino\Modules\Backups\Admin::class,					'backups/restore',		[ 'date' => '2026-09-05' ],				'2026-09-05' ],
 	[ \Nino\Modules\Navigation\Admin::class,				'navs/delete',				[ 'key' => 'main' ],								'main' ],
-	[ \Nino\Modules\Search\Admin::class,						'search/createindex',	[],															'Index' ],
+	[ \Nino\Modules\Features\Admin::class,					'features/activate',	[ 'key' => 'sample' ],							'sample' ],
 ];
 $silent = [];
 foreach( $described as [ $class, $action, $data, $needle ] ) {

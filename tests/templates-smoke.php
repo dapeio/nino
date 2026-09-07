@@ -90,12 +90,12 @@ $appData['/nino/modules'][] = '\\Nino\\Modules\\Templates';
 $registry = \Nino\Admin\Admin::panels( $appData );
 check( 'the module contributes the Templates panel to the workbench, as a workspace with its own template', ( $registry['templates']['class'] ?? null ) === \Nino\Modules\Templates\Admin::class
 	&& $registry['templates']['layout'] === 'workspace'
-	&& $registry['templates']['template'] === '/app/Nino/Modules/Templates/templates/panel'
+	&& $registry['templates']['template'] === '/_nino/Nino/Modules/Templates/templates/panel'
 	&& $registry['templates']['group'] === 'structure'
 	&& str_starts_with( $registry['templates']['icon'], '<svg' ) === true );
-check( 'its assets are the four scripts and the stylesheet, project-relative, the namespace seed first', $registry['templates']['assets'][0] === '/app/Nino/Modules/Templates/assets/script.js'
-	&& array_search( '/app/Nino/Modules/Templates/assets/composer.js', $registry['templates']['assets'], true ) < array_search( '/app/Nino/Modules/Templates/assets/area-composer.js', $registry['templates']['assets'], true )
-	&& in_array( '/app/Nino/Modules/Templates/assets/style.css', $registry['templates']['assets'], true ) === true );
+check( 'its assets are the four scripts and the stylesheet, project-relative, the namespace seed first', $registry['templates']['assets'][0] === '/_nino/Nino/Modules/Templates/assets/script.js'
+	&& array_search( '/_nino/Nino/Modules/Templates/assets/composer.js', $registry['templates']['assets'], true ) < array_search( '/_nino/Nino/Modules/Templates/assets/area-composer.js', $registry['templates']['assets'], true )
+	&& in_array( '/_nino/Nino/Modules/Templates/assets/style.css', $registry['templates']['assets'], true ) === true );
 $actions = \Nino\Admin\Admin::actions( $appData );
 check( 'every Documents, Library and Content action reaches the workbench dispatcher under its own name', array_diff( [ 'documents/list', 'documents/create', 'documents/save', 'documents/delete', 'library/list', 'library/compose', 'library/preview', 'content/keys', 'content/save', 'content/type-create', 'content/image-create' ], array_keys( $actions ) ) === []
 	&& $actions['documents/list'] === [ \Nino\Modules\Templates\Documents::class, 'apiList' ] );
@@ -113,7 +113,7 @@ $notAuthedList = response();
 \Nino\Modules\Templates\Documents::apiList( $appData, $notAuthedList );
 check( 'every action guards itself rather than trusting the dispatcher', $notAuthedList['/nino/http/response']['statusCode'] === 401 );
 
-$panelMarkup = (string) file_get_contents( __DIR__. '/../app/Nino/Modules/Templates/templates/panel.tpl' );
+$panelMarkup = (string) file_get_contents( __DIR__. '/../_nino/Nino/Modules/Templates/templates/panel.tpl' );
 check( 'the panel is a fragment the workbench renders into its pane, not a page of its own', str_contains( $panelMarkup, '<html' ) === false
 	&& str_contains( $panelMarkup, '[csrf]' ) === false
 	&& str_contains( $panelMarkup, 'id="pd-app"' ) === true );
@@ -139,7 +139,7 @@ check( 'ships exactly the maintained named-area presets', array_keys( $presets )
 // missing preset dies on a null far from the cause. Re-normalize each shipped
 // manifest outside the try/catch so the authoring mistake names itself.
 $presetLoadErrors = [];
-foreach( glob( dirname( __DIR__ ). '/app/Nino/Modules/Templates/library/*/manifest.php' ) ?: [] as $manifestPath ) {
+foreach( glob( dirname( __DIR__ ). '/_nino/Nino/Modules/Templates/library/*/manifest.php' ) ?: [] as $manifestPath ) {
 	$presetKey = basename( dirname( $manifestPath ) );
 	try {
 		\Nino\Modules\Templates\AreaComposer::normalizePreset( $presetKey, include $manifestPath, dirname( $manifestPath ) );
@@ -555,8 +555,8 @@ check( 'a component step is a modifier of whichever class the preset gave it', s
 	&& \Nino\Modules\Templates\AreaComposer::catalog()['description']['styles'] === [ 'auto', 'quiet', 'loud' ]
 	&& str_contains( json_encode( $presets ), 'nino-font-big' ) === false );
 check( 'the scrim is one choice per image layer rather than three levels of its own', \Nino\Modules\Templates\AreaComposer::choices()['overlay'] === [ 'auto', 'none', 'dim' ] );
-check( 'the shipped image presets use that current overlay vocabulary directly', ( include __DIR__. '/../app/Nino/Modules/Templates/library/fullscreen-image/manifest.php' )['recommend']['frame']['overlay'] === 'dim'
-	&& ( include __DIR__. '/../app/Nino/Modules/Templates/library/image-banner/manifest.php' )['recommend']['frame']['overlay'] === 'dim' );
+check( 'the shipped image presets use that current overlay vocabulary directly', ( include __DIR__. '/../_nino/Nino/Modules/Templates/library/fullscreen-image/manifest.php' )['recommend']['frame']['overlay'] === 'dim'
+	&& ( include __DIR__. '/../_nino/Nino/Modules/Templates/library/image-banner/manifest.php' )['recommend']['frame']['overlay'] === 'dim' );
 check( 'overlay values outside the current vocabulary are rejected', throwsInvalidArgument( fn() => \Nino\Modules\Templates\Composer::compose( [
 	'preset' => 'fullscreen-image', 'pageId' => 'home', 'id' => 'invalid-overlay', 'frame' => [ 'overlay' => 'strong' ],
 ] ) ) );

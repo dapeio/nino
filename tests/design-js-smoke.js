@@ -203,7 +203,7 @@ sandbox.Nino = {
 	// checking real sentences rather than keys
 	content : ( function() {
 		const text = {};
-		[ '../_admin/text/en_US.php', '../app/Nino/Modules/Design/text/en_US.php' ].forEach( function( file ) {
+		[ '../_admin/text/en_US.php', '../_nino/Nino/Modules/Design/text/en_US.php' ].forEach( function( file ) {
 			const php = fs.readFileSync( path.join( __dirname, file ), 'utf8' );
 			for( const m of php.matchAll( /'\[\[([^\]]+)\]\]'\s*=>\s*'((?:[^'\\]|\\.)*)'/g ) )
 				text[ m[1] ] = m[2].replace( /\\(['\\])/g, '$1' );
@@ -224,7 +224,7 @@ const hashes = [];
 // The knobs are drawn by the design system's own control, so the test runs
 // the real Nino.admin.js rather than stubbing it - a stub would pass while the
 // component it stands in for is broken
-const source = fs.readFileSync( path.join( __dirname, '../app/Nino/Modules/Design/assets/design.js' ), 'utf8' );
+const source = fs.readFileSync( path.join( __dirname, '../_nino/Nino/Modules/Design/assets/design.js' ), 'utf8' );
 const context = vm.createContext( sandbox );
 vm.runInContext( fs.readFileSync( path.join( __dirname, '../_admin/assets/Nino.admin.js' ), 'utf8' ), context, { filename : 'Nino.admin.js' } );
 vm.runInContext( source, context, { filename : 'design.js' } );
@@ -296,13 +296,13 @@ check( '...falling back to the schema for a knob no fill names', sandbox.Nino.ad
 // static sees it and no coverage check can either: a knob renamed in Tokens or
 // a position added to it goes silently untranslated. Read the schema and walk
 // every key it implies, in both languages
-const tokens = fs.readFileSync( path.join( __dirname, '../app/Nino/Modules/Design/Tokens/Tokens.php' ), 'utf8' );
+const tokens = fs.readFileSync( path.join( __dirname, '../_nino/Nino/Modules/Design/Tokens/Tokens.php' ), 'utf8' );
 const knobBody = tokens.slice( tokens.indexOf( 'KNOBS = [' ) );
 const knobKeys = Array.from( knobBody.matchAll( /^\t\t\t'([a-z]+)' => \[/gm ) ).map( function( m ) { return m[1] } );
 
 const knobFills = {};
 [ 'en_US', 'de_DE' ].forEach( function( locale ) {
-	const php = fs.readFileSync( path.join( __dirname, '../app/Nino/Modules/Design/text/', locale+ '.php' ), 'utf8' );
+	const php = fs.readFileSync( path.join( __dirname, '../_nino/Nino/Modules/Design/text/', locale+ '.php' ), 'utf8' );
 	knobFills[locale] = new Set( Array.from( php.matchAll( /'\[\[([^\]]+)\]\]'/g ) ).map( function( m ) { return m[1] } ) );
 } );
 
@@ -540,10 +540,10 @@ check( 'Footer is an independent pane and applies only its own frame', nodes['th
 	&& theme._activeFrames.header === 'v2'
 	&& theme._activeFrames.footer === 'v1' );
 
-const template = fs.readFileSync( path.join( __dirname, '../app/Nino/Modules/Design/templates/panel.tpl' ), 'utf8' );
-const css = fs.readFileSync( path.join( __dirname, '../app/Nino/Modules/Design/assets/style.css' ), 'utf8' );
+const template = fs.readFileSync( path.join( __dirname, '../_nino/Nino/Modules/Design/templates/panel.tpl' ), 'utf8' );
+const css = fs.readFileSync( path.join( __dirname, '../_nino/Nino/Modules/Design/assets/style.css' ), 'utf8' );
 const adminTemplate = fs.readFileSync( path.join( __dirname, '../_admin/templates/page-index.tpl' ), 'utf8' );
-const templatesTemplate = fs.readFileSync( path.join( __dirname, '../app/Nino/Modules/Templates/templates/panel.tpl' ), 'utf8' );
+const templatesTemplate = fs.readFileSync( path.join( __dirname, '../_nino/Nino/Modules/Templates/templates/panel.tpl' ), 'utf8' );
 
 check( 'template navigation and content contain one matching pair per dialog', [ 'theme', 'design', 'header', 'footer' ].every( function( tab ) {
 	return template.indexOf('id="theme-nav-'+ tab+ '"') !== -1 && template.indexOf('id="theme-content-'+ tab+ '"') !== -1;

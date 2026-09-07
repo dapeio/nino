@@ -35,10 +35,18 @@ if( preg_match( '#^/_admin/install/library(?:/|$)#', $uri ) === 1
 }
 
 // The application half is source, never a static tree: the project's own
-// classes and Nino's optional modules with their install units - manifests,
-// mail and page templates, text files. Mirrors app/.htaccess, for the same
-// reason the rule above mirrors _admin/install/library/.htaccess
+// classes and modules with their install units - manifests, mail and page
+// templates, text files. Mirrors app/.htaccess, for the same reason the
+// rule above mirrors _admin/install/library/.htaccess
 if( preg_match( '#^/app(?:/|$)#', $uri ) === 1 ) {
+	http_response_code( 404 );
+	return true;
+}
+
+// The installed features are source as well - a feature's runtime class,
+// its panel and its install unit (see \Nino\Features). Mirrors
+// features/.htaccess
+if( preg_match( '#^/features(?:/|$)#', $uri ) === 1 ) {
 	http_response_code( 404 );
 	return true;
 }

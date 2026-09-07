@@ -715,7 +715,7 @@ check( 'the tokens are the settings it was handed', str_contains( $example, '--n
 	its own it has stopped showing what a project gets and started showing
 	what /_design can draw, and a component the framework is missing gets
 	hidden behind a local copy instead of being noticed.	*/
-$exampleMarkup = (string) file_get_contents( __DIR__. '/../app/Nino/Modules/Design/templates/preview-example.tpl' );
+$exampleMarkup = (string) file_get_contents( __DIR__. '/../_nino/Nino/Modules/Design/templates/preview-example.tpl' );
 $frameworkCss  = (string) file_get_contents( __DIR__. '/../_nino/Nino.css' );
 
 preg_match_all( '/class="([^"]+)"/', $exampleMarkup, $exampleClasses );
@@ -867,8 +867,8 @@ check( 'the panel reads the wizard\'s catalogue and loads its renderer only when
 
 $registry = \Nino\Admin\Admin::panels( $appData );
 check( 'the module contributes the Design panel to the workbench, with its own template and files', ( $registry['design']['class'] ?? null ) === \Nino\Modules\Design\Admin::class
-	&& $registry['design']['template'] === '/app/Nino/Modules/Design/templates/panel'
-	&& $registry['design']['assets'] === [ '/app/Nino/Modules/Design/assets/design.js', '/app/Nino/Modules/Design/assets/style.css' ]
+	&& $registry['design']['template'] === '/_nino/Nino/Modules/Design/templates/panel'
+	&& $registry['design']['assets'] === [ '/_nino/Nino/Modules/Design/assets/design.js', '/_nino/Nino/Modules/Design/assets/style.css' ]
 	&& $registry['design']['group'] === 'structure'
 	&& str_starts_with( $registry['design']['icon'], '<svg' ) === true );
 $actions = \Nino\Admin\Admin::actions( $appData );
@@ -880,7 +880,7 @@ check( 'with the module off, the panel and its actions are gone', ( static funct
 	return isset( \Nino\Admin\Admin::panels( $without )['design'] ) === false && isset( \Nino\Admin\Admin::actions( $without )['design/save'] ) === false;
 } )() );
 
-$panelMarkup = (string) file_get_contents( __DIR__. '/../app/Nino/Modules/Design/templates/panel.tpl' );
+$panelMarkup = (string) file_get_contents( __DIR__. '/../_nino/Nino/Modules/Design/templates/panel.tpl' );
 check( 'the panel is a fragment the workbench renders into its pane - the CSRF field is the page\'s', str_contains( $panelMarkup, '<html' ) === false
 	&& str_contains( $panelMarkup, '[csrf]' ) === false
 	&& str_contains( $panelMarkup, 'id="theme-page-wrap"' ) === true

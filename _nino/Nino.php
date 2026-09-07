@@ -9,7 +9,7 @@ declare(strict_types=1);
  */
 namespace Nino {
 
-	const VERSION = '1.0.0-beta';
+	const VERSION = '1.1.0-beta';
 
 	/**
 	 *	Boot Nino.
@@ -149,9 +149,9 @@ namespace Nino {
 		\Nino\Http::output( $appData, $request );
 	}
 
-	// The kernel classes - AppData, Auth, Callbacks, Csrf, Filesystem,
-	// Backup, RotatingLog, Elements, Html, Http, Images, Locales, Text,
-	// Mail, Modules and Runtime - each live in their own file under
+	// The kernel classes - AppData, Auth, Callbacks, Csrf, Features,
+	// Filesystem, Backup, RotatingLog, Elements, Html, Http, Images, Locales,
+	// Text, Mail, Modules and Runtime - each live in their own file under
 	// _nino/Nino/<Class>/<Class>.php and are autoloaded on first use by
 	// the spl_autoload_register() call at the bottom of this file, from
 	// the same <namespace-as-path>/<basename>.php layout every module
@@ -185,33 +185,44 @@ namespace {
 		// by accident fails loudly instead of being found there.
 		//
 		// The one deliberate exception is Nino\Modules\, which is a merged
-		// view over three roots rather than one directory: the always-on
-		// runtime modules ship in _nino/, the workbench's own screens in
-		// _admin/Nino/Modules/ (a module's Admin panel, its tabs, its assets
-		// and its words - see \Nino\Admin\Admin::modules()), and the
-		// optional runtime modules in the application root
-		// (app/Nino/Modules/), where a project keeps the ones it uses and
-		// deletes the rest. The order is what the roots are allowed to do to
-		// each other: _nino/ first, so a shipped module can never be shadowed;
-		// _admin/ before app/, so a project cannot replace a workbench screen
-		// by dropping a file next to its own modules; app/ last, which can
-		// only add.
+		// view over four roots rather than one directory: the runtime modules
+		// Nino ships in _nino/ (the always-on ones and the optional ones a
+		// project switches on or off in '/nino/modules'), the workbench's own
+		// screens in _admin/Nino/Modules/ (a module's Admin panel, its tabs,
+		// its assets and its words - see \Nino\Admin\Admin::modules()), the
+		// features a project installs below features/ (one directory each,
+		// with a feature.php manifest - see \Nino\Features), and the
+		// application root, where a project's own code lives. The order is
+		// what the roots are allowed to do to each other: _nino/ first, so a
+		// shipped module can never be shadowed; _admin/ before features/, so a
+		// feature cannot replace a workbench screen; features/ before app/, so
+		// a project cannot replace an installed feature by dropping a file
+		// next to its own modules; app/ last, which can only add.
 		//
 		// The same module name may hold a class in more than one root, since
 		// it is the whole relative path that is resolved and not the first
 		// segment: \Nino\Modules\Elements is the kernel's runtime module in
 		// _nino/, \Nino\Modules\Elements\Admin the workbench panel for it
 		// in _admin/ - two halves of one module, each where it belongs.
-		$appRoot 	 = defined( 'NINO_APP_DIR' ) === true ? NINO_APP_DIR : dirname( __DIR__ ). '/app';
-		$adminRoot = dirname( __DIR__ ). '/_admin';
-		$roots 	 	 = str_starts_with( $relativePath, 'Nino/Modules/' ) === true
-			? [ __DIR__, $adminRoot, $appRoot ]
+		$appRoot 			= defined( 'NINO_APP_DIR' ) === true ? NINO_APP_DIR : dirname( __DIR__ ). '/app';
+		$featuresRoot	= defined( 'NINO_FEATURES_DIR' ) === true ? NINO_FEATURES_DIR : dirname( __DIR__ ). '/features';
+		$adminRoot 		= dirname( __DIR__ ). '/_admin';
+		$roots 	 	 		= str_starts_with( $relativePath, 'Nino/Modules/' ) === true
+			? [ __DIR__, $adminRoot, $featuresRoot, $appRoot ]
 			: ( str_starts_with( $relativePath, 'Nino/' ) === true ? [ __DIR__ ] : [ $appRoot ] );
 
-		foreach( $roots as $root )
-			if( is_file( $root. $file ) === true ) {
-				require $root. $file;
+		foreach( $roots as $root ) {
+
+			// A feature is one directory named after its module - features/
+			// Newsletter/Newsletter.php, features/Newsletter/Admin/Admin.php -
+			// so below that root the Nino/Modules/ prefix is the directory
+			// itself rather than two levels of it
+			$path = ( $root === $featuresRoot ) ? $root. substr( $file, strlen( '/Nino/Modules' ) ) : $root. $file;
+
+			if( is_file( $path ) === true ) {
+				require $path;
 				return;
 			}
+		}
 	} );
 }

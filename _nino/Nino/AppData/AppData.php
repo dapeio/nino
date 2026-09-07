@@ -102,6 +102,10 @@ namespace Nino {
 			'/nino/http/routes'		=> [],
 			'/nino/auth/user'			=> [],
 			'/nino/auth/roles'		=> [],
+			// What the Features panel records per installed feature: the
+			// version it activated and the settings it saved (see
+			// \Nino\Features). Empty until the first activation
+			'/nino/features'			=> [],
 		];
 
 		public static function prepare( array &$appData ): void {

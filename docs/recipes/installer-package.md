@@ -1,27 +1,32 @@
 # Recipe: Add an installer module package
 
 **Additional Links:**
-[Agent guide](../../AGENTS.md) · [All recipes](README.md) · [Developer Manual](../development.md) · [Concepts](../concepts.md) · [`/_admin` Workbench](../_admin.md) · [Setup Wizard](../setup.md) · [Templates Panel](../templates.md)
+[Agent guide](../../AGENTS.md) · [All recipes](README.md) · [Developer Manual](../development.md) · [Concepts](../concepts.md) · [`/_admin` Workbench](../_admin.md) · [Setup Wizard](../setup.md) · [Templates Panel](../templates.md) · [Features](../features.md)
 
-One of the six extension recipes of the [Nino agent guide](../../AGENTS.md). Its
+One of the seven extension recipes of the [Nino agent guide](../../AGENTS.md). Its
 rules - the required workflow, the core runtime model, the conventions and the
 security review - apply to every step below.
 
 
-An installer package (a *unit*) makes a feature selectable in the setup
+An installer package (a *unit*) makes a module selectable in the setup
 wizard. It can activate a runtime class, copy templates/assets/element types,
 merge text, add owned routes, and supply configuration defaults.
 
 It does not execute as the runtime module. The unit is a directory named
 `install/` beside the module's class file, and the wizard finds it there:
-`\Nino\Install\Setup::units()` scans `_nino/Nino/Modules/<Name>/install/`,
-then `<app>/Nino/Modules/<Name>/install/` (Nino's delivered optional modules),
-then the whole app dir (`app/`, or `NINO_APP_DIR`) up to four levels deep, and
+`\Nino\Install\Setup::units()` scans `_nino/Nino/Modules/<Name>/install/`
+(Nino's own optional modules), then the whole app dir (`app/`, or
+`NINO_APP_DIR`) up to four levels deep, and
 `_admin/install/library/modules/<key>/` for a unit that has no runtime class.
 Nothing in `_admin/install/` lists a module. A runtime class must already be
 shipped at its valid autoload path - `_nino/Nino/Modules/<Name>/` for a kernel
-module, `app/Nino/Modules/<Name>/` for one of Nino's optional modules,
-`app/<Vendor>/...` (or below `NINO_APP_DIR`) for a project's own.
+module, `app/<Vendor>/...` (or below `NINO_APP_DIR`) for a project's own.
+
+The wizard does not scan `features/`. A feature's `install/` has the same
+shape, but `\Nino\Features::activate()` applies it - add-only, through the
+same `\Nino\Features::applyUnit()` the wizard calls with overwrite on - when
+the feature is switched on in the workbench: the [feature recipe](feature.md).
+The catalogue's `Newsletter` and `Search` ([dapeio/nino-features](https://github.com/dapeio/nino-features)) are features and are not offered here.
 
 ## Directory shape
 
@@ -43,10 +48,10 @@ app/Project/Catalog/Catalog/
             └── catalog.js
 ```
 
-Nino's own optional modules keep theirs at `app/Nino/Modules/<Name>/install/`
-the same way, and keep their keys: they are scanned before the rest of the
-app dir. The unit's key - what the picker posts and what `requiresModules`
-lists - is the manifest's `key` or, without one, the module directory's
+Nino's own optional modules keep theirs at `_nino/Nino/Modules/<Name>/install/`
+the same way, and keep their keys: they are scanned before the app dir. The
+unit's key - what the picker posts and what `requiresModules` lists - is the
+manifest's `key` or, without one, the module directory's
 lowercased name (`Catalog` -> `catalog`). It MUST be a slug
 (`/^[a-z][a-z0-9-]*$/`) and unique across every unit: the first unit to claim a
 key keeps it, a later one is dropped with a warning naming both directories.
@@ -118,7 +123,7 @@ unit answers to is skipped with a warning, never applied. Keep the dependency
 graph small and acyclic even though the resolver terminates cycles. A cycle
 usually indicates mixed responsibilities.
 
-A page unit that requires this feature names the same installer slug:
+A page unit that requires this module names the same installer slug:
 
 ```php
 'requiresModules' => [ 'catalog' ],
@@ -170,7 +175,7 @@ manifest are source names relative to the unit's `templates/` directory.
 
 The directory above is copied to project `assets/catalog`. Prefer listing an
 owned directory over a broad shared directory. Do not copy `assets`, `_nino`,
-or another broad tree when the feature owns only one subdirectory.
+or another broad tree when the module owns only one subdirectory.
 
 `elementTypes` has different behavior:
 

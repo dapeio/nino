@@ -10,7 +10,7 @@ Nino ist eine schlanke PHP-Grundlage für individuelle Webseiten – ohne Datenb
 Nino verliert sich nicht in Möglichkeiten – es bringt Inhalte ins Internet.
 
 Das gesamte Projekt ist jederzeit ein lesbarer, mit Git versionierbarer Dateibestand und läuft auf klassischem PHP-Hosting. Die erste Installation ist in wenigen Minuten abgeschlossen und hinterlässt ein funktionierendes Gerüst für die Weiterentwicklung. Entwickler können es mit den notwendigen Tools füllen und über ein flexibles Callback-System eigene Funktionen hinzufügen.
-Mehrsprachigkeit, Beiträge und Elemente, Formulare, Newsletter, Benutzerrechte und Backups sind bereits enthalten.
+Mehrsprachigkeit, Beiträge und Elemente, Formulare, Benutzerrechte und Backups sind bereits enthalten; Newsletter, Suche und weitere Features kommen aus dem Katalog [dapeio/nino-features](https://github.com/dapeio/nino-features).
 
 ## Warum noch ein CMS?
 
@@ -41,7 +41,7 @@ Das mitgelieferte Design-System mit Basiskomponenten und Modulen bietet einen sc
 
 ![Textfill-Übersicht in der Nino-Workbench](docs/assets/screenshots/_admin1.webp)
 
-Eine Verwaltungsoberfläche mit einer Anmeldung. Entwickler richten das Projekt hier ein und bauen Struktur und Erscheinungsbild; Redakteure pflegen hier die Inhalte. Jeder Bildschirm ist ein Panel, gruppiert in **Inhalt** (Elemente, Texte, Bilder, Anfragen, Newsletter, Log), **Struktur** (Templates, Design, Routen, Navigationen) und **System** (Nutzer und Rollen, Sprachen und Übersetzungen, Backups, Konfiguration, Suche); die Form der Inhalte – Elementtypen, Textschlüssel, Bildplätze – liegt auf Tabs daneben. Ein Konto hält eine Rolle, eine Rolle eine Berechtigung je Panel oder Tab; der Assistent schreibt Editor und Developer, und ein Panel, das ein Konto nicht verwenden darf, wird nicht gerendert.
+Eine Verwaltungsoberfläche mit einer Anmeldung. Entwickler richten das Projekt hier ein und bauen Struktur und Erscheinungsbild; Redakteure pflegen hier die Inhalte. Jeder Bildschirm ist ein Panel, gruppiert in **Inhalt** (Elemente, Texte, Bilder, Anfragen, Log), **Struktur** (Templates, Design, Routen, Navigationen) und **System** (Nutzer und Rollen, Sprachen und Übersetzungen, Backups, Konfiguration, Features); die Form der Inhalte – Elementtypen, Textschlüssel, Bildplätze – liegt auf Tabs daneben, und ein installiertes Feature bringt sein eigenes Panel mit. Ein Konto hält eine Rolle, eine Rolle eine Berechtigung je Panel oder Tab; der Assistent schreibt Editor und Developer, und ein Panel, das ein Konto nicht verwenden darf, wird nicht gerendert.
 
 Die Workbench bietet vollständigen Zugriff für Entwicklung, Diagnose und Korrekturen und eine schmale, berechtigungsgesteuerte Oberfläche für die tägliche redaktionelle Arbeit. Alle Änderungen lassen sich alternativ direkt im Dateisystem vornehmen. `/_admin/recovery.php` ist der Weg zurück, wenn die Konten selbst kaputt sind.
 
@@ -82,7 +82,7 @@ Der Template Builder macht aus `page-*.tpl`-Dateien eine übersichtliche Abfolge
 
 Der Template Builder bewahrt normales HTML+. Alleinstehende Template-Shortcodes lassen sich direkt über **Add section** wählen und bleiben verschiebbare Canvas-Bausteine; Header und Footer sind gewöhnliche `[template]`-Shortcodes, werden aber sicher über feste Template Settings verwaltet. Anzeigename und VPA-Standard stehen als inerte Metadaten am Dateianfang. Sonstiger Quelltext bleibt gesperrt und bytegenau erhalten. Für codebasierte Sections gibt es einen bewussten HTML+-Escape-Hatch.
 
-> **Status: Alpha.** Preset-Manifeste und erzeugtes `.tpl`-Markup bleiben lesbar und erweiterbar; Library und Arbeitsablauf können sich noch weiterentwickeln. Das Panel ist das Modul `app/Nino/Modules/Templates/` und verschwindet mit seinem Verzeichnis.
+> **Status: Alpha.** Preset-Manifeste und erzeugtes `.tpl`-Markup bleiben lesbar und erweiterbar; Library und Arbeitsablauf können sich noch weiterentwickeln. Das Panel ist das optionale Kernel-Modul `_nino/Nino/Modules/Templates/`; ein Projekt schaltet es in `/nino/modules` ab.
 
 #### Das Design-Panel – optional, Alpha
 
@@ -106,7 +106,7 @@ Das Design-Panel macht das visuelle Fundament der Webseite über eine übersicht
 
 Es hält Darstellung, Inhalte und Template-Struktur voneinander getrennt. Themes und Frames werden als gewöhnliche CSS- und `.tpl`-Dateien installiert; individuelle Einstellungen werden in die gemeinsame Design-Schicht des Projekts geschrieben. Änderungen lassen sich in der Vorschau prüfen, zurücksetzen und anwenden, ohne Seitentemplates neu zu schreiben. Der resultierende Quelltext bleibt für präzise manuelle Anpassungen zugänglich.
 
-> **Status: Alpha.** Der Darstellungskatalog und der Bearbeitungsablauf können sich noch weiterentwickeln. Das Panel ist das Modul `app/Nino/Modules/Design/` und verschwindet mit seinem Verzeichnis.
+> **Status: Alpha.** Der Darstellungskatalog und der Bearbeitungsablauf können sich noch weiterentwickeln. Das Panel ist das optionale Kernel-Modul `_nino/Nino/Modules/Design/`; ein Projekt schaltet es in `/nino/modules` ab.
 
 ## Was Nino mitbringt
 
@@ -115,7 +115,8 @@ Es hält Darstellung, Inhalte und Template-Struktur voneinander getrennt. Themes
 * optionaler sectionbasierter Template Builder für `.tpl`-Dateien (Alpha)
 * dateibasiertes Content-Modell für Textfills und wiederkehrende Elemente
 * Themes, Asset-Bundling und Frontend-Basiskomponenten
-* Formulare, Newsletter, Navigation, Sprachauswahl und Bildverarbeitung
+* Formulare, Navigation, Sprachauswahl und Bildverarbeitung
+* installierbare Features mit Manifest, Einstellungen und versionierten Updates, eingeschaltet in der Workbench – Newsletter und Suche darunter, aus dem Katalog [dapeio/nino-features](https://github.com/dapeio/nino-features)
 * Benutzer, granulare Rechte, Login-Schutz und Aktivitätenprotokolle
 * automatische, verschlüsselte Backups und Wiederherstellung
 * integriertes Callback-System für eigene Module und Integrationen
@@ -169,10 +170,15 @@ index.php        Haupt-Einstiegspunkt der Webseite
 router.php       Routing für den eingebauten Server, lokale Entwicklung
 
 _nino/           Kernel und Frontend-Core, eine Klasse je Datei unter _nino/Nino/,
-                 mit den Modulen, die jedes Projekt braucht
-app/             Projekteigene PHP-Klassen und Ninos optionale Module unter
-                 app/Nino/Modules/ (Form, Newsletter, Navigation, Search,
-                 Localepicker, Design, Templates) - lösche, was du nicht brauchst
+                 mit jedem Modul, das Nino unter _nino/Nino/Modules/ mitbringt:
+                 denen, die jedes Projekt braucht, und den optionalen Form,
+                 Navigation, Localepicker, Design und Templates, die in
+                 /nino/modules ein- oder ausgeschaltet werden
+app/             Projekteigene PHP-Klassen unter eigenem Namespace
+features/        Die Features, die ein Projekt installiert, je ein Verzeichnis
+                 mit feature.php-Manifest, aus dem Katalog
+                 github.com/dapeio/nino-features kopiert und im Panel Features
+                 der Workbench eingeschaltet - ein Checkout bringt keines mit
 _admin/          Die Workbench: nur die Shell, recovery.php, ihre eigenen
                  Ansichten als Module unter _admin/Nino/Modules/ (Dashboard,
                  Elements, Text, Images, Logs, Routes, Users, Language,
@@ -206,11 +212,15 @@ php tests/admin-system-smoke.php
 php tests/install-smoke.php
 php tests/design-smoke.php
 php tests/templates-smoke.php
-php tests/search-smoke.php
+php tests/features-smoke.php
+for test in features/*/tests/*-smoke.php; do [ -e "$test" ] && php "$test"; done
 php tests/demo-catalogue-smoke.php
 for test in tests/*-js-smoke.js; do node "$test"; done
 php tests/concurrency-smoke.php
 ```
+
+`tests/harness.php` ist der gemeinsame Bootstrap; der eigene Test eines
+Features liegt in dessen Verzeichnis und lädt ihn von dort.
 
 Daneben läuft statische Analyse, ohne Paketmanager: PHPStan liest
 `phpstan.neon`, ESLint `eslint.config.mjs`. `phpstan-baseline.neon` führt die
@@ -230,12 +240,14 @@ Nino hält seine Architektur bewusst klein: Ein zentrales `$appData`-Array träg
 
 * **[Grundkonzepte](docs/concepts.de.md):** Architektur, Datenfluss und Aufgabentrennung
 * **[Entwickler-Handbuch](docs/development.de.md):** Laufzeitverträge, APIs, Module und Tests
-* **[Erweiterungsrezepte](docs/recipes/README.md):** ein Panel, ein Laufzeitmodul, ein Installer-Paket, ein Section-Preset, Templates und Seiten-Units, Elementtypen - Schritt für Schritt (englisch)
+* **[Erweiterungsrezepte](docs/recipes/README.md):** ein Panel, ein Laufzeitmodul, ein Installer-Paket, ein Section-Preset, Templates und Seiten-Units, Elementtypen, ein Feature - Schritt für Schritt (englisch)
 * **[Erste Schritte](docs/getting-started.de.md):** vom Checkout zur eingerichteten Webseite
 * **[Einrichtungsassistent](docs/setup.de.md):** Schritte, Schreibregeln und Library-Format
 * **[`/_admin`-Workbench](docs/_admin.de.md):** jedes Panel, Konten, Rollen, Konfiguration, Backups und Recovery
 * **[Templates-Panel](docs/templates.de.md):** Seitentemplates aus vollständigen HTML- und Template-Sections zusammensetzen
 * **[Design-Panel](docs/appearance.de.md):** Theme, Design, Header und Footer nach der Installation bearbeiten
+* **[Features](docs/features.de.md):** installierbare Pakete – Manifest, Einstellungen, Aktivierung und Updates
+* **[Feature-Katalog](https://github.com/dapeio/nino-features):** die Features, die Nino veröffentlicht – Newsletter und Suche darunter –, installiert durch Kopieren eines Verzeichnisses nach `features/`
 * **[Deployment](docs/deployment.de.md):** Webserver, Sicherheit, Backups und Go-live
 * **[Design-Handbuch](docs/design.de.md):** Frontend, Design-System, CSS und Template-Arbeit **(WIP)**
 * **[Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md):** Sicherheitsmeldungen und unterstützte Versionen

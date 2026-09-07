@@ -2,12 +2,12 @@
 
 **Sprache:** [English](setup.md) · Deutsch
 
-**Stand:** 6. September 2026 · **Nino-Version:** 1.0.0-beta
+**Stand:** 7. September 2026 · **Nino-Version:** 1.0.0-beta
 
 Dieses Handbuch erklärt die Entscheidungen und Schreibvorgänge der zehn Schritte des Einrichtungsassistenten – des Erststart-Modus der [`/_admin`-Workbench](_admin.de.md). Falls du stattdessen auf dem kürzesten Weg vom Checkout zur eingerichteten Webseite gelangen möchtest, beginne mit [Erste Schritte](getting-started.de.md); den späteren produktiven Betrieb behandelt [Deployment](deployment.de.md).
 
 **Weitere Links:**
-[README](../README.de.md) · [Grundkonzepte](concepts.de.md) · [Entwickler-Handbuch](development.de.md) · [Rezepte](recipes/README.md) · [Erste Schritte](getting-started.de.md) · [Einrichtungsassistent](setup.de.md) · [`/_admin`-Workbench](_admin.de.md) · [Templates-Panel](templates.de.md) · [Design-Panel](appearance.de.md) · [Deployment](deployment.de.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
+[README](../README.de.md) · [Grundkonzepte](concepts.de.md) · [Entwickler-Handbuch](development.de.md) · [Rezepte](recipes/README.md) · [Erste Schritte](getting-started.de.md) · [Einrichtungsassistent](setup.de.md) · [`/_admin`-Workbench](_admin.de.md) · [Templates-Panel](templates.de.md) · [Design-Panel](appearance.de.md) · [Features](features.de.md) · [Deployment](deployment.de.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
 
 **Wichtig:** Der Assistent erzeugt aus einem frischen Nino-Checkout den ersten lauffähigen Projektstand. Er ist notwendig: Vor seiner Ausführung existieren die eigentlichen Projektverzeichnisse wie `templates/`, `text/`, `elements/` und `images/` noch nicht.
 
@@ -68,7 +68,7 @@ Beim erneuten Anwenden ersetzt die sichtbare Sprachauswahl den bisherigen Stand.
 
 ### Module
 
-Die Liste bietet jedes Modul an, das eine Installer-Einheit mitliefert: in einem frischen Checkout Navigation, Sprachauswahl, Kontaktformular und Newsletter, dazu jedes Modul, das ein Projekt hinzugefügt hat. Benötigt ein gewähltes Modul ein weiteres Modul, nimmt der Assistent diese Abhängigkeit automatisch in die Auswahl auf. Auch eine verwendete Seitenvorlage kann benötigte Module nachziehen; eine Kontaktseite aktiviert beispielsweise ihre Formular- und Mail-Funktionen.
+Die Liste bietet jedes Modul an, das eine Installer-Einheit mitliefert: in einem frischen Checkout Navigation, Sprachauswahl und Kontaktformular, dazu jedes Modul, das ein Projekt hinzugefügt hat. Features – etwa Newsletter und Suche aus dem Katalog – werden hier nicht angeboten: Ein Feature wird aus [dapeio/nino-features](https://github.com/dapeio/nino-features) nach `features/` kopiert und nach der Einrichtung im [Panel Features](features.de.md) der Workbench eingeschaltet. Benötigt ein gewähltes Modul ein weiteres Modul, nimmt der Assistent diese Abhängigkeit automatisch in die Auswahl auf. Auch eine verwendete Seitenvorlage kann benötigte Module nachziehen; eine Kontaktseite aktiviert beispielsweise ihre Formular- und Mail-Funktionen.
 
 Setup schreibt:
 
@@ -129,7 +129,7 @@ Die Token-Namen beider Hälften stehen in der Referenz [Design-Panel](appearance
 
 Das Manifest eines Themes erklärt das Design, mit dem es gezeichnet wurde - ein Theme wählen und „Weiter" drücken erzeugt also den Look, den die Vorschau versprochen hat. Der Farbstreifen unter den Reglern zeigt die echten Paare, nicht nur die Hintergründe.
 
-Dieser Schritt ist optional: Eine Auslieferung ohne das Design-Modul (`app/Nino/Modules/Design/`) installiert genau wie zuvor, nur ohne den Design-Block.
+Dieser Schritt ist optional: Eine Auslieferung ohne das Design-Modul (`_nino/Nino/Modules/Design/`) installiert genau wie zuvor, nur ohne den Design-Block.
 
 Die Reihenfolge im CSS-Bundle ist der ganze Vertrag, und jede Ebene besitzt darin genau einen Platz:
 
@@ -236,17 +236,19 @@ Nino trennt die einmaligen Installer-Quellen vom Darstellungskatalog, der danach
 | Pfad | Aufgabe |
 |---|---|
 | `_admin/install/library/base/` | immer angewendete Routen, Templates, Texte und Assets |
-| `app/Nino/Modules/<Modul>/install/`, `app/…/<Modul>/install/` | die eigene Einheit eines Moduls: die wählbare funktionale Ergänzung, neben der Klasse, die sie aktiviert |
+| `_nino/Nino/Modules/<Modul>/install/`, `app/…/<Modul>/install/` | die eigene Einheit eines Moduls: die wählbare funktionale Ergänzung, neben der Klasse, die sie aktiviert |
 | `_admin/install/library/modules/<key>/` | eine wählbare Einheit ohne eigene Laufzeitklasse |
 | `_admin/install/library/pages/<key>/` | Ausgangspunkt für eine konkrete Seite |
 | `_admin/install/library/themes/<key>/` | visueller Ausgangspunkt, gemeinsam vom Assistenten und dem Design-Panel verwendet |
 | `_admin/install/library/header/<key>/`, `_admin/install/library/footer/<key>/` | austauschbarer Frame für beide |
 
-Alles unterhalb von `_admin/install/` wird nach dem Abschluss zusammen mit dem Assistenten entfernt; das `install/`-Verzeichnis eines Moduls bleibt bei seinem Modul und wird zur Laufzeit nie gelesen. Der Katalog ist Einrichtungsmaterial und kein Laufzeit-Plugin-System.
+Alles unterhalb von `_admin/install/` wird nach dem Abschluss zusammen mit dem Assistenten entfernt; das `install/`-Verzeichnis eines Moduls bleibt bei seinem Modul, und nur der Assistent liest es. Der Katalog ist Einrichtungsmaterial und kein Laufzeit-Plugin-System.
 
-Modul-Einheiten werden gefunden, nicht aufgelistet: Der Assistent durchsucht `_nino/Nino/Modules/*/install/`, dann `<app>/Nino/Modules/*/install/` – wo Ninos optionale Module ausgeliefert werden – und dann das gesamte Anwendungsverzeichnis (`app/` oder `NINO_APP_DIR`) bis zu vier Ebenen tief, dazu `_admin/install/library/modules/`. Der Schlüssel einer Einheit – das, was die Auswahl zurückschickt und `requiresModules` nennt – ist das `key` des Manifests oder, ohne eines, der kleingeschriebene Name des Modulverzeichnisses; er muss ein Slug und eindeutig sein, und die erste Einheit, die einen Schlüssel beansprucht, behält ihn – Ninos eigene Module behalten also ihre.
+Modul-Einheiten werden gefunden, nicht aufgelistet: Der Assistent durchsucht `_nino/Nino/Modules/*/install/` – Ninos eigene optionale Module – und dann das gesamte Anwendungsverzeichnis (`app/` oder `NINO_APP_DIR`) bis zu vier Ebenen tief, dazu `_admin/install/library/modules/`. Der Schlüssel einer Einheit – das, was die Auswahl zurückschickt und `requiresModules` nennt – ist das `key` des Manifests oder, ohne eines, der kleingeschriebene Name des Modulverzeichnisses; er muss ein Slug und eindeutig sein, und die erste Einheit, die einen Schlüssel beansprucht, behält ihn – Ninos eigene Module behalten also ihre.
 
-Das Design-Modul und der Template Builder haben keine Einheit zum Auswählen: Der Setup-Schritt trägt sie in `/nino/modules` ein, sobald ihr Verzeichnis Teil der Auslieferung ist, sodass beide Panels von der ersten `config.php` an in der Workbench sind.
+Nicht durchsucht wird `features/`. Ein Feature trägt eine `install/`-Einheit derselben Form, aber `\Nino\Features::activate()` wendet sie an, wenn das Feature in der Workbench eingeschaltet wird – über dasselbe `applyUnit()`, das der Assistent verwendet, hier mit Überschreiben, dort nur ergänzend, damit die Anwendung der Einheit das Entfernen von `_admin/install/` überlebt. Siehe [Features](features.de.md).
+
+Das Design-Modul und der Template Builder haben keine Einheit zum Auswählen: Der Setup-Schritt trägt sie in `/nino/modules` ein, sobald ihre Klasse existiert, sodass beide Panels von der ersten `config.php` an in der Workbench sind.
 
 Theme sowie die installerspezifischen Basis-, Modul- und Seiteneinheiten besitzen eine `manifest.php`. Das Manifest beschreibt, was angezeigt, kopiert und konfiguriert wird. Je nach Einheit enthält es beispielsweise:
 

@@ -882,7 +882,7 @@ namespace Nino\Admin {
 	 *											screens are modules under _admin/Nino/Modules/<Name>/, one
 	 *											directory each: Admin/Admin.php is the panel, <Tab>/<Tab>.php
 	 *											a tab of it, assets/ its scripts and stylesheet, text/ its
-	 *											words - the same shape _nino/Nino/Modules and app/Nino/Modules
+	 *											words - the same shape _nino/Nino/Modules and features/<Name>
 	 *											have, and the same namespace, so \Nino\Modules\Elements is
 	 *											the runtime module and \Nino\Modules\Elements\Admin the
 	 *											screen for it. A runtime module contributes a panel of its own

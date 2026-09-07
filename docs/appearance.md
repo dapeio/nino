@@ -2,14 +2,14 @@
 
 **Language:** English · [Deutsch](appearance.de.md)
 
-**Last updated:** September 6, 2026 · **Nino version:** 1.0.0-beta
+**Last updated:** September 7, 2026 · **Nino version:** 1.0.0-beta
 
 This manual explains the four appearance editors of the workbench's **Design** panel: Theme, Design, Header, and Footer. Structural page composition is described in the [Templates panel](templates.md) reference; everything else about the workbench in the [`/_admin` manual](_admin.md).
 
 **Additional Links:**
-[README](../README.md) · [Concepts](concepts.md) · [Developer Manual](development.md) · [Recipes](recipes/README.md) · [Getting Started](getting-started.md) · [Setup Wizard](setup.md) · [`/_admin` Workbench](_admin.md) · [Templates Panel](templates.md) · [Design Panel](appearance.md) · [Deployment](deployment.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
+[README](../README.md) · [Concepts](concepts.md) · [Developer Manual](development.md) · [Recipes](recipes/README.md) · [Getting Started](getting-started.md) · [Setup Wizard](setup.md) · [`/_admin` Workbench](_admin.md) · [Templates Panel](templates.md) · [Design Panel](appearance.md) · [Features](features.md) · [Deployment](deployment.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
 
-**Security:** The panel is part of `/_admin` and asks for `/_admin/design/manage` on every action - a developer's permission, never an editor's. It is the Design module (`app/Nino/Modules/Design/`) and disappears from the workbench with its directory. The panel names its settings in the interface language (`app/Nino/Modules/Design/text/<locale>.php`); the schema they come from stays English, because the setup wizard renders the same settings and has no text system of its own – so a setting added there appears in both, in the schema's words, until a fill names it.
+**Security:** The panel is part of `/_admin` and asks for `/_admin/design/manage` on every action - a developer's permission, never an editor's. It is the Design module, an optional kernel module (`_nino/Nino/Modules/Design/`) that leaves the workbench when it is switched off in `/nino/modules`. The panel names its settings in the interface language (`_nino/Nino/Modules/Design/text/<locale>.php`); the schema they come from stays English, because the setup wizard renders the same settings and has no text system of its own – so a setting added there appears in both, in the schema's words, until a fill names it.
 
 ## What the Panel Is For
 

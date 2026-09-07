@@ -51,8 +51,14 @@ jobs:
       - name: Run kernel smoke tests
         run: php tests/kernel-smoke.php
 
-      - name: Run Elements search smoke tests
-        run: php tests/search-smoke.php
+      - name: Run features smoke tests
+        run: php tests/features-smoke.php
+
+      # A feature's own tests travel with it - features/<Name>/tests/ - and
+      # run against this checkout (see tests/harness.php). A checkout ships
+      # no feature of its own, so the loop has to survive an empty glob
+      - name: Run every feature's own smoke tests
+        run: for test in features/*/tests/*-smoke.php; do [ -e "$test" ] || continue; php "$test" || exit 1; done
 
       - name: Run workbench shell and content panel smoke tests
         run: php tests/admin-smoke.php
@@ -79,3 +85,40 @@ jobs:
 
       - name: Run concurrency smoke tests
         run: php tests/concurrency-smoke.php
+
+  # The gate against a kernel change that breaks a feature: every feature of
+  # the catalogue (dapeio/nino-features) is copied into this checkout and its
+  # own tests run against it. The catalogue's CI does the reverse - runs its
+  # features against Nino's main and latest tag - and records what passed
+  features:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          tools: phpstan:2.2.13
+
+      - name: Fetch the feature catalogue
+        run: git clone --depth 1 https://github.com/dapeio/nino-features.git ../nino-features && cp -R ../nino-features/features/. features/
+
+      - name: Validate every feature's manifest against this kernel
+        run: |
+          php -r '
+            require "_nino/Nino.php";
+            $a = []; $bad = 0;
+            foreach( \Nino\Features::all( $a ) as $f ) {
+              echo $f["key"], " ", $f["version"], $f["problems"] === [] ? "" : " - PROBLEMS: ". implode( "; ", $f["problems"] ), "\n";
+              if( $f["problems"] !== [] ) $bad = 1;
+            }
+            exit( $bad );
+          '
+
+      - name: Run every feature's own smoke tests against this checkout
+        run: for test in features/*/tests/*-smoke.php; do [ -e "$test" ] || continue; php "$test" || exit 1; done
+
+      - name: Analyse the features with PHPStan
+        run: phpstan analyse --no-progress --memory-limit=1G

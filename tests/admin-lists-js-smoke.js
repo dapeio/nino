@@ -26,9 +26,15 @@ function asset( filename ) {
 	return fs.readFileSync( path.join( __dirname, '../_admin/assets/', filename ), 'utf8' );
 }
 
-// A module's own workbench panel ships beside the module, not in _admin/assets
+// A module's own workbench panel ships beside the module, not in _admin/assets:
+// an optional kernel module's below _nino/Nino/Modules/<Name>/, an installed
+// feature's below features/<Name>/ (see \Nino\Features)
+function moduleDir( module ) {
+	const kernel = path.join( __dirname, '../_nino/Nino/Modules/', module );
+	return fs.existsSync( kernel ) ? kernel : path.join( __dirname, '../features/', module );
+}
 function moduleAsset( module, filename ) {
-	return fs.readFileSync( path.join( __dirname, '../app/Nino/Modules/', module, 'assets', filename ), 'utf8' );
+	return fs.readFileSync( path.join( moduleDir( module ), 'assets', filename ), 'utf8' );
 }
 
 // ...and so do the workbench's own screens: _admin holds the shell, every
@@ -50,7 +56,11 @@ function moduleScripts( root, modules ) {
 			.map( f => [ m+ '/'+ f, fs.readFileSync( path.join( dir, f ), 'utf8' ) ] ) : [];
 	} );
 }
-const APP_MODULES = [ 'Form', 'Newsletter', 'Navigation', 'Search', 'Design', 'Templates' ];
+// The optional kernel modules that bring a panel, and every feature the
+// checkout carries - the directory is the list, as for the workbench's own
+const KERNEL_MODULES = [ 'Form', 'Navigation', 'Design', 'Templates' ];
+const FEATURES = fs.readdirSync( path.join( __dirname, '../features' ), { withFileTypes : true } ).filter( e => e.isDirectory() ).map( e => e.name ).sort();
+const APP_MODULES = KERNEL_MODULES.concat( FEATURES );
 
 // The words a panel renders: the workbench's own text/<locale>.php, and a
 // module's text() directory beside its panel
@@ -58,7 +68,7 @@ function workbenchText( locale ) {
 	return fs.readFileSync( path.join( __dirname, '../_admin/text/', locale+ '.php' ), 'utf8' );
 }
 function moduleText( module, locale ) {
-	return fs.readFileSync( path.join( __dirname, '../app/Nino/Modules/', module, 'text', locale+ '.php' ), 'utf8' );
+	return fs.readFileSync( path.join( moduleDir( module ), 'text', locale+ '.php' ), 'utf8' );
 }
 
 console.log('Workbench modules');
@@ -108,20 +118,9 @@ check( 'a switch states its condition in words, not by knob position alone',
 check( 'Config renders booleans with that shared switch', configSource.includes('Nino.adminUi.switchField(') );
 check( 'Config relies on fieldset\'s own shared surface instead of applying card padding twice', configSource.includes( "fieldset.className = 'nino-admin-card'" ) === false );
 check( 'Config uses only the shared pinned action bar for its single Save', configSource.includes( "'nino-admin-actionbar'" ) && configSource.includes( 'admin-form-actions' ) === false );
-// The search-index rebuild is the Search module's own panel now - Config
-// no longer has to know that module exists
-const searchSource = moduleAsset( 'Search', 'admin.js' );
+// The search-index rebuild is the Search feature's own panel (dapeio/
+// nino-features, tested there) - Config no longer has to know it exists
 check( 'Config carries no search-index action any more', configSource.includes( 'searchindex' ) === false );
-check( 'the Search module\'s panel exposes the explicit full search-index rebuild action',
-	searchSource.includes( "btn.textContent = Nino.content.getText('/_admin/search/label/create')" ) &&
-	searchSource.includes( "action : 'search/createindex'" ) );
-check( 'the search-index action has loading, empty and success feedback - every word a fill the module brings in both languages',
-	searchSource.includes( "'/_admin/search/msg/creating'" ) &&
-	searchSource.includes( "'/_admin/search/msg/none'" ) &&
-	searchSource.includes( "'/_admin/search/msg/created'" ) &&
-	[ 'en_US', 'de_DE' ].every( locale => [ 'creating', 'none', 'created', 'created-plural' ].every( key => moduleText( 'Search', locale ).includes( "'[[/_admin/search/msg/"+ key+ "]]'" ) ) ) );
-check( 'the Search panel puts its one action in the shared action bar and attaches under its nav uri',
-	searchSource.includes( 'Nino.adminUi.actionBar(' ) && searchSource.includes( 'Nino.admin.search = {' ) );
 check( 'Config no longer edits routes, navigations or asset bundles', [ '/nino/http/routes', '/nino/html/navs', '/nino/html/assets' ].every( function( key ) { return configSource.includes( key ) === false } ) );
 check( 'Config renders no raw json textarea any more', configSource.includes( 'config-form-value' ) === false );
 // The login throttle and the languages left Config for screens of their own:
@@ -230,14 +229,15 @@ check( 'and the shell\'s own stylesheet is balanced too, so a module\'s rules la
 // every module panel renders the same thing
 const emptyStateScripts = [ [ 'Elements', 'types.js' ], [ 'Text', 'keys.js' ], [ 'Images', 'slots.js' ], [ 'Routes', 'admin.js' ],
 	[ 'Users', 'roles.js' ], [ 'Backups', 'admin.js' ], [ 'Logs', 'admin.js' ], [ 'Dashboard', 'admin.js' ] ].map( e => adminAsset( e[0], e[1] ) )
-	.concat( [ 'Navigation', 'Form', 'Newsletter' ].map( m => moduleAsset( m, 'admin.js' ) ) );
+	.concat( [ 'Navigation', 'Form' ].map( m => moduleAsset( m, 'admin.js' ) ) )
+	.concat( FEATURES.map( m => moduleAsset( m, 'admin.js' ) ) );
 check( 'the empty state is one shared component with a class of its own',
 	adminUiSource.includes( 'emptyState : function' ) && adminUiSource.includes( "empty.className = 'nino-admin-empty'" ) && sharedCss.includes( '.nino-admin-empty {' ) );
 check( 'every empty list screen renders that component rather than a paragraph of its own',
 	emptyStateScripts.every( s => s.includes( 'Nino.adminUi.emptyState(' ) && s.includes( "empty.className = 'nino-admin-hint'" ) === false ) );
 check( 'the shared table\'s empty row and the Design panel\'s empty catalogue notes carry the same class',
 	adminUiSource.split( "className = 'nino-admin-empty'" ).length === 3 &&
-	( fs.readFileSync( path.join( __dirname, '../app/Nino/Modules/Design/templates/panel.tpl' ), 'utf8' ).match( /class="nino-admin-empty theme-hidden"/g ) || [] ).length === 3 );
+	( fs.readFileSync( path.join( __dirname, '../_nino/Nino/Modules/Design/templates/panel.tpl' ), 'utf8' ).match( /class="nino-admin-empty theme-hidden"/g ) || [] ).length === 3 );
 
 const usersSource = adminAsset( 'Users', 'admin.js' );
 check( 'the user and role forms expose real labels and live status text',
@@ -302,9 +302,12 @@ check( '...while full access stays the switch it already is',
 // was written in, and no locale file can reach it. The workbench has one text
 // system and every screen speaks through it; this is the shape a regression
 // takes - a literal assigned straight to what the user reads.
+// A checkout may carry no feature at all, so the feature scripts are listed
+// from the directory rather than through a shell glob that would fail empty
 const panelScripts = require('child_process')
-	.execSync( "ls _admin/Nino/Modules/*/assets/*.js app/Nino/Modules/*/assets/*.js", { cwd : path.join( __dirname, '..' ) } )
-	.toString().trim().split('\n');
+	.execSync( "ls _admin/Nino/Modules/*/assets/*.js _nino/Nino/Modules/*/assets/*.js", { cwd : path.join( __dirname, '..' ) } )
+	.toString().trim().split('\n')
+	.concat( moduleScripts( 'features', FEATURES ).map( e => 'features/'+ e[0].replace( '/', '/assets/' ) ) );
 
 const hardcoded = [];
 panelScripts.forEach( function( file ) {
@@ -327,7 +330,7 @@ check( 'no panel writes a sentence of its own into the dom'+ ( hardcoded.length 
 // other place a sentence can hide - it was where the Template Builder kept
 // most of its own
 const panelMarkup = require('child_process')
-	.execSync( "ls app/Nino/Modules/*/templates/panel.tpl _admin/templates/page-index.tpl", { cwd : path.join( __dirname, '..' ) } )
+	.execSync( "ls _nino/Nino/Modules/*/templates/panel.tpl _admin/templates/page-index.tpl", { cwd : path.join( __dirname, '..' ) } )
 	.toString().trim().split('\n');
 
 const hardcodedMarkup = [];
@@ -350,7 +353,7 @@ check( 'no panel writes a sentence of its own into its markup'+ ( hardcodedMarku
 // The Template Builder is the panel this was written for: 3400 lines that used
 // to carry every word in the source, and now carry none
 [ 'script.js', 'sections.js', 'composer.js', 'area-composer.js' ].forEach( function( file ) {
-	const source = fs.readFileSync( path.join( __dirname, '../app/Nino/Modules/Templates/assets/', file ), 'utf8' );
+	const source = fs.readFileSync( path.join( __dirname, '../_nino/Nino/Modules/Templates/assets/', file ), 'utf8' );
 	check( 'the Template Builder\'s '+ file+ ' speaks through the text system', source.includes( "Nino.content.getText('/_admin/templates/" ) );
 } );
 
@@ -396,7 +399,8 @@ check( 'the shared design system declares its own cascade layer',
 const fs2 = require('fs'), path2 = require('path');
 const workbenchScripts = fs2.readdirSync( path2.join( __dirname, '../_admin/assets' ) ).filter( f => f.endsWith('.js') ).map( f => asset( f ) )
 	.concat( moduleScripts( '_admin/Nino/Modules', ADMIN_MODULES ).map( e => e[1] ) )
-	.concat( moduleScripts( 'app/Nino/Modules', APP_MODULES ).map( e => e[1] ) );
+	.concat( moduleScripts( '_nino/Nino/Modules', KERNEL_MODULES ).map( e => e[1] ) )
+	.concat( moduleScripts( 'features', FEATURES ).map( e => e[1] ) );
 check( 'every workbench script speaks the Nino.admin namespace - nothing left of Nino.editor, Nino.design or Nino.templates',
 	workbenchScripts.every( s => s.includes('Nino.editor') === false && /Nino\.(?:design|templates)\b/.test( s.replace( /Nino\.admin\.(?:design|templates)/g, '' ) ) === false ) );
 
@@ -410,8 +414,8 @@ check( 'the shared design system owns the rail fold and the workspace layout, so
 const TOOL_ROOTS = {
 	'_admin/assets/style.css'                        : '#admin-page-wrap',
 	'_admin/install/assets/style.css'                  : '#install-page-wrap',
-	'app/Nino/Modules/Templates/assets/style.css'    : '#pd-app',
-	'app/Nino/Modules/Design/assets/style.css'       : '#theme-page-wrap',
+	'_nino/Nino/Modules/Templates/assets/style.css'    : '#pd-app',
+	'_nino/Nino/Modules/Design/assets/style.css'       : '#theme-page-wrap',
 };
 
 // The workbench's own stylesheet carries the design system in its first half;
@@ -468,7 +472,7 @@ const TOOL_TEMPLATES = {
 // A module panel's template is a fragment the workbench renders into its
 // pane: it links nothing, its files join the workbench's bundles (see the
 // panel's assets())
-[ 'app/Nino/Modules/Templates/templates/panel.tpl', 'app/Nino/Modules/Design/templates/panel.tpl' ].forEach( function( file ) {
+[ '_nino/Nino/Modules/Templates/templates/panel.tpl', '_nino/Nino/Modules/Design/templates/panel.tpl' ].forEach( function( file ) {
 	const markup = read( file );
 	check( file+ ' is a fragment with no head, no stylesheet link and no script of its own',
 		markup.includes('<html') === false && markup.includes('<link') === false && markup.includes('<script') === false );
@@ -575,7 +579,8 @@ console.log('\nOne language');
 // this yet - neither is checked here.
 const localizedScripts = fs2.readdirSync( path2.join( __dirname, '../_admin/assets' ) ).filter( f => f.endsWith('.js') && f !== 'recovery.js' ).map( f => [ f, asset( f ) ] )
 	.concat( moduleScripts( '_admin/Nino/Modules', ADMIN_MODULES ) )
-	.concat( moduleScripts( 'app/Nino/Modules', [ 'Form', 'Newsletter', 'Navigation', 'Search', 'Design' ] ) );
+	.concat( moduleScripts( '_nino/Nino/Modules', [ 'Form', 'Navigation', 'Design' ] ) )
+	.concat( moduleScripts( 'features', FEATURES ) );
 const literalSentence = /\.(?:textContent|placeholder|title|alt) = '[A-Z][^']*'|(?:confirm|alert)\( '[A-Z]|innerHTML = '<[^']*>[A-Za-z]{3,}/;
 const literals = localizedScripts.filter( e => literalSentence.test( e[1] ) ).map( e => e[0] );
 check( 'no workbench script renders a literal English sentence - every word is a fill'+ ( literals.length ? ' - found in '+ literals.join(', ') : '' ), literals.length === 0 );
@@ -595,7 +600,8 @@ localizedScripts.forEach( e => { for( const m of e[1].matchAll( /getText\(\s*'(\
 // dashboard tiles, a schema's labels and hints
 [ ...ADMIN_MODULES.flatMap( m => fs2.readdirSync( path2.join( __dirname, '../_admin/Nino/Modules', m ), { recursive : true } )
 	.filter( f => String( f ).endsWith('.php') ).map( f => read( '_admin/Nino/Modules/'+ m+ '/'+ f ) ) ),
-  ...[ 'Navigation', 'Search', 'Design' ].map( m => read( 'app/Nino/Modules/'+ m+ '/Admin/Admin.php' ) ) ].forEach( php => {
+  ...[ 'Navigation', 'Design' ].map( m => read( '_nino/Nino/Modules/'+ m+ '/Admin/Admin.php' ) ),
+  ...FEATURES.map( m => read( 'features/'+ m+ '/Admin/Admin.php' ) ) ].forEach( php => {
 	for( const m of php.matchAll( /'(\/_admin\/(?:nav|dashboard|config|lockout|language|users)\/[^'\s]+)'/g ) )
 		if( m[1].endsWith('/manage') === false )
 			usedKeys.add( m[1] );

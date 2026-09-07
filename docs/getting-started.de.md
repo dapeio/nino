@@ -2,14 +2,14 @@
 
 **Sprache:** [English](getting-started.md) · Deutsch
 
-**Stand:** 6. September 2026 · **Nino-Version:** 1.0.0-beta
+**Stand:** 7. September 2026 · **Nino-Version:** 1.0.0-beta
 
 Dieses Handbuch führt auf dem kürzesten Weg von einem frischen Checkout zu einer lokal laufenden Nino-Webseite. Falls du stattdessen jedes Feld und jeden Schreibvorgang des Assistenten nachschlagen möchtest, lies die Referenz [Einrichtungsassistent](setup.de.md); technische Hintergründe stehen in den [Grundkonzepten](concepts.de.md).
 
 **Weitere Links:**
-[README](../README.de.md) · [Grundkonzepte](concepts.de.md) · [Entwickler-Handbuch](development.de.md) · [Rezepte](recipes/README.md) · [Erste Schritte](getting-started.de.md) · [Einrichtungsassistent](setup.de.md) · [`/_admin`-Workbench](_admin.de.md) · [Templates-Panel](templates.de.md) · [Design-Panel](appearance.de.md) · [Deployment](deployment.de.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
+[README](../README.de.md) · [Grundkonzepte](concepts.de.md) · [Entwickler-Handbuch](development.de.md) · [Rezepte](recipes/README.md) · [Erste Schritte](getting-started.de.md) · [Einrichtungsassistent](setup.de.md) · [`/_admin`-Workbench](_admin.de.md) · [Templates-Panel](templates.de.md) · [Design-Panel](appearance.de.md) · [Features](features.de.md) · [Deployment](deployment.de.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
 
-**Wichtig:** Ein frischer Checkout enthält Kernel, Workbench, Module und die Installations-Library, aber noch keinen vollständigen Projektstand. Der Einrichtungsassistent – das, was `/_admin` zeigt, bis er abgeschlossen ist – erzeugt und befüllt die benötigten Projektverzeichnisse; erst danach läuft die Webseite.
+**Wichtig:** Ein frischer Checkout enthält Kernel, Workbench, Module, Features und die Installations-Library, aber noch keinen vollständigen Projektstand. Der Einrichtungsassistent – das, was `/_admin` zeigt, bis er abgeschlossen ist – erzeugt und befüllt die benötigten Projektverzeichnisse; erst danach läuft die Webseite.
 
 ## Voraussetzungen
 
@@ -63,6 +63,8 @@ Die Konten aus Schritt 9 sind Entwickler mit vollen Rechten. Redaktionskonten mi
 
 Prüfe außerdem jede Sprache und Route, die Navigation sowie verwendete Formulare. Speichere testweise einen Text und ein Bild. Öffne im Templates-Panel ein `page-*.tpl`, ändere zunächst nichts und prüfe, ob seine obersten Sections ohne Warnung erkannt werden.
 
+Newsletter und Suche sind Features, keine Module des Assistenten, und ein Checkout bringt keines mit: Kopiere das Verzeichnis eines Features aus dem Katalog [dapeio/nino-features](https://github.com/dapeio/nino-features) nach `features/`, wenn das Projekt es braucht, schalte es im Panel **Features** der Workbench (Gruppe System) ein und lade die Workbench danach neu, damit sein Panel erscheint. Siehe [Features](features.de.md).
+
 Der letzte Schritt setzt das Recovery-Passwort und sperrt den Assistenten. Entferne anschließend `_admin/install/` aus der produktiven Auslieferung; damit entfallen auch die katalogbasierten Tabs des Design-Panels, während dessen Tab Design weiterarbeitet. Die korrekte Reihenfolge und weitere Sicherheitsprüfungen stehen im [Deployment-Handbuch](deployment.de.md#der-assistent-nach-der-einrichtung).
 
 ## Danach weiterarbeiten
@@ -73,4 +75,5 @@ Der letzte Schritt setzt das Recovery-Passwort und sperrt den Assistenten. Entfe
 - [`/_admin`-Workbench](_admin.de.md) führt durch jedes Panel, die Konten und die Recovery-Seite.
 - [Templates-Panel](templates.de.md) erklärt den sectionbasierten Template Builder im Alpha-Status.
 - [Design-Panel](appearance.de.md) erklärt die vier Erscheinungsbild-Editoren.
+- [Features](features.de.md) erklärt, wie ein installierbares Feature eingeschaltet, konfiguriert und aktualisiert wird.
 - [Deployment](deployment.de.md) führt durch Webserver-Konfiguration, Sicherheit, Backups und Go-live.

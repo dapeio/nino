@@ -14,10 +14,14 @@ parameters:
     - _nino
     - _admin
     - app
+    - features
     - index.php
     - router.php
   excludePaths:
     # Installer library: page/theme/frame packages - templates, text and
     # manifest data, no logic
     - _admin/install/library
+    # A feature's own smoke tests, like tests/: standalone scripts over the
+    # harness, not product code
+    - features/*/tests/*
   reportUnmatchedIgnoredErrors: false

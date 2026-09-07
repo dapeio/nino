@@ -322,11 +322,13 @@ namespace Nino\Install {
 	/**
 	 *	Nino							A compact filesystembased php framework
 	 *	Install						Step 2: assembles locales and "modules" (navigation,
-	 *												localepicker, forms, mail, newsletter - each their own
-	 *												text and/or mail templates) into the project's
-	 *												config.php/templates/text. Pages live in their own step
-	 *												now (Webpages, below) - this class only ever touches
-	 *												base + modules/&lt;key&gt;.
+	 *												localepicker, forms - each their own text and/or mail
+	 *												templates) into the project's config.php/templates/text.
+	 *												Pages live in their own step now (Webpages, below) -
+	 *												this class only ever touches base + modules/&lt;key&gt;.
+	 *												Features (Newsletter, Search, ...) are not offered here:
+	 *												they are switched on in the workbench's Features panel
+	 *												after setup (see \Nino\Features).
 	 *
 	 *												The picked locales/modules fully replace whatever was
 	 *												picked before - see apiApply()'s docblock - so the picker
@@ -452,19 +454,24 @@ namespace Nino\Install {
 		 *
 		 *	- _admin/install/library/modules/<key>/ - units without a module class
 		 *	  of their own, or a project's fork of a module's unit
-		 *	- _nino/Nino/Modules/<Module>/install/ - Nino's own modules
+		 *	- _nino/Nino/Modules/<Module>/install/ - Nino's own optional
+		 *	  modules (Form, Navigation, Localepicker)
 		 *	- <app dir>/(...)/<Module>/install/ - project modules, up to four
 		 *	  levels below the directory the autoloader resolves project
 		 *	  classes against (app/, or NINO_APP_DIR)
 		 *
+		 *	Not searched: features/. A feature is activated in the Features
+		 *	panel after setup, which applies its install/ unit then (see
+		 *	\Nino\Features::activate()) - the wizard offers the kernel's
+		 *	modules and nothing it would have to download first.
+		 *
 		 *	The key is the manifest's 'key' or, without one, the module
-		 *	directory's lowercased name ('Newsletter' -> 'newsletter'); under
+		 *	directory's lowercased name ('Navigation' -> 'navigation'); under
 		 *	library/modules it is the directory name. It is a slug, because
 		 *	the picker posts it back and requiresModules lists it. The first
 		 *	unit to claim a key keeps it; a later one is dropped with a
 		 *	warning naming both - and Nino's own modules come first: the
-		 *	kernel's below _nino/, then the delivered optional ones below
-		 *	<app>/Nino/Modules, then whatever else the app dir holds.
+		 *	kernel's below _nino/, then whatever the app dir holds.
 		 *
 		 *	The filesystem rather than '/nino/modules', deliberately: the
 		 *	wizard runs before a module is active - offering it is the whole
@@ -484,7 +491,7 @@ namespace Nino\Install {
 
 			$appDir = defined( 'NINO_APP_DIR' ) === true ? NINO_APP_DIR : dirname( __DIR__, 2 ). '/app';
 
-			foreach( [ dirname( __DIR__, 2 ). '/_nino/Nino/Modules', $appDir. '/Nino/Modules', $appDir ] as $root )
+			foreach( [ dirname( __DIR__, 2 ). '/_nino/Nino/Modules', $appDir ] as $root )
 				self::_scanUnits( $units, $root, 4 );
 
 			ksort( $units );
@@ -562,9 +569,7 @@ namespace Nino\Install {
 		 */
 		private static function _readManifest( string $unitDir ): ?array {
 
-			$path = $unitDir. '/manifest.php';
-
-			return is_file( $path ) ? include $path : null;
+			return \Nino\Features::readUnitManifest( $unitDir );
 		}
 
 		/**
@@ -755,11 +760,12 @@ namespace Nino\Install {
 		}
 
 		/**
-		 *	Apply one unit's manifest.php: merge its routes into $routes
-		 *	(skipping any locale-gated route whose locale wasn't picked),
-		 *	copy its template/element-type files (same locale gating),
-		 *	collect its blacklist entries, and merge its text/global.php +
-		 *	text/<locale>.php fragments into the real /text files
+		 *	Apply one unit's manifest.php - routes, files, templates, element
+		 *	types, blacklist, config defaults and text fragments. The work is
+		 *	the kernel's, \Nino\Features::applyUnit(), because a feature
+		 *	activation applies its install/ unit the same way after setup,
+		 *	when this directory may already be gone. The wizard applies with
+		 *	overwrite on: a re-applied unit replaces what it copied before.
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		string		$unitDir			Absolute path to the unit (base or modules/<key>)
@@ -772,109 +778,7 @@ namespace Nino\Install {
 		 */
 		private static function _applyUnit( array &$appData, string $unitDir, array $locales, array &$routes, array &$blacklist ): void {
 
-			$manifest = self::_readManifest( $unitDir ) ?? [];
-
-			foreach( ( $manifest['routes'] ?? [] ) as $routeKey => $route ) {
-				if( isset( $route['locale'] ) === true && in_array( $route['locale'], $locales, true ) === false )
-					continue;
-				$routes[$routeKey] = $route;
-			}
-
-			/*	Files before templates, and it is not cosmetic: base ships the
-				deny rule for the private tree itself (private/.htaccess), and
-				base is the first unit applied. Copying templates first would
-				create private/ through forceDir() and only protect it a few
-				statements later - a window, however short, in which a failed
-				request could leave the directory readable with a project's
-				templates already in it.	*/
-			if( count( $manifest['files'] ?? [] ) > 0 ) {
-				foreach( $manifest['files'] as $file )
-					if( is_dir( $unitDir. '/'. $file ) === true )
-						\Nino\Filesystem::copyDir( $unitDir. '/'. $file, \Nino\Filesystem::path( $appData, '/'. $file ) );
-					else if( is_file( $unitDir. '/'. $file ) === true )
-						self::_copyFile( $unitDir. '/'. $file, \Nino\Filesystem::path( $appData, '/'. $file ) );
-			}
-
-			if( count( $manifest['templates'] ?? [] ) > 0 ) {
-				\Nino\Filesystem::forceDir( $appData, '/templates' );
-				foreach( $manifest['templates'] as $locale => $file ) {
-					if( is_string( $locale ) === true && in_array( $locale, $locales, true ) === false )
-						continue;
-					self::_copyFile( $unitDir. '/templates/'. $file, \Nino\Filesystem::path( $appData, '/templates/'. $file ) );
-				}
-			}
-
-			if( count( $manifest['elementTypes'] ?? [] ) > 0 ) {
-				\Nino\Filesystem::forceDir( $appData, '/elements' );
-				foreach( $manifest['elementTypes'] as $file )
-					self::_copyFile( $unitDir. '/'. $file, \Nino\Filesystem::path( $appData, '/elements/'. $file ) );
-			}
-
-			foreach( ( $manifest['blacklist'] ?? [] ) as $key )
-				$blacklist[] = $key;
-
-			// A unit's own config defaults - only filled in where the project
-			// has nothing yet, never overwritten: re-applying a unit must not
-			// reset a value the developer has edited since
-			foreach( ( $manifest['config'] ?? [] ) as $configKey => $configValue )
-				if( isset( $appData[$configKey] ) === false ) {
-					$appData[$configKey] = $configValue;
-					\Nino\AppData::writeContentData( $appData, [ $configKey ] );
-				}
-
-			$globalFragment = $unitDir. '/text/global.php';
-			if( is_file( $globalFragment ) === true )
-				self::_mergeText( $appData, '/text/global.php', include $globalFragment );
-
-			foreach( $locales as $locale ) {
-				$localeFragment = $unitDir. '/text/'. $locale. '.php';
-				if( is_file( $localeFragment ) === true )
-					self::_mergeText( $appData, '/text/'. $locale. '.php', include $localeFragment );
-			}
-		}
-
-		/**
-		 *	Merge a text fragment's keys into a /text/*.php file - later
-		 *	units win a key collision (see apiApply()'s docblock)
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		string		$path					Filesystem-relative path, eg. '/text/de_DE.php'
-		 *	@param		array 		$fragment			Bracket-key => value pairs to merge in
-		 *
-		 *	@return 	void
-		 */
-		private static function _mergeText( array &$appData, string $path, array $fragment ): void {
-			\Nino\Filesystem::mutate( $appData, $path, function( array $content ) use ( $fragment ): array {
-				return array_merge( $content, $fragment );
-			} );
-		}
-
-		/**
-		 *	Copy one library file into the project - plain file_get_contents/
-		 *	put_contents rather than \Nino\Filesystem (which only knows how
-		 *	to read/write .php files shaped as `<?php return [...];` - these
-		 *	are either .tpl markup or, for elementTypes, a .php file that
-		 *	has to survive the copy byte-for-byte, not round-trip through
-		 *	var_export())
-		 *
-		 *	@param		string		$from
-		 *	@param		string		$to
-		 *
-		 *	@return 	void
-		 */
-		private static function _copyFile( string $from, string $to ): void {
-
-			$content = @file_get_contents( $from );
-			if( $content === false )
-				return;
-
-			if( is_file( $to ) === true )
-				@unlink( $to );
-
-			if( is_dir( dirname( $to ) ) === false )
-				@mkdir( dirname( $to ), 0755, true );
-
-			file_put_contents( $to, $content );
+			\Nino\Features::applyUnit( $appData, $unitDir, $locales, $routes, $blacklist, true );
 		}
 	}
 

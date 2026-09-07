@@ -10,14 +10,15 @@ declare(strict_types=1);
  *	@link							https://github.com/dapeio/nino
  */
 // The kernel boots here on its own, not through the site's index.php: a
-// NINO_PRIVATE_DIR, NINO_CONFIG_DIR or NINO_APP_DIR defined there is not in
-// force for the workbench. A deployment that uses one defines the same
+// NINO_PRIVATE_DIR, NINO_CONFIG_DIR, NINO_APP_DIR or NINO_FEATURES_DIR defined
+// there is not in force for the workbench. A deployment that uses one defines the same
 // constant, with the same value, here as well - and in recovery.php
 // (without it the workbench finds no config.php, takes the project for
 // uninstalled and offers the setup wizard).
 // define( 'NINO_PRIVATE_DIR', '/absolute/path/outside/webroot' );
 // define( 'NINO_CONFIG_DIR', '/absolute/path/outside/webroot' );
 // define( 'NINO_APP_DIR', '/absolute/path/to/app' );
+// define( 'NINO_FEATURES_DIR', '/absolute/path/to/features' );
 
 require '../_nino/Nino.php';
 require 'Admin.php';
