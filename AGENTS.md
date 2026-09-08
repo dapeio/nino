@@ -113,7 +113,8 @@ Important source directories:
 | Path | Ownership |
 | --- | --- |
 | `_nino/Nino.php` | Boot: `\Nino\init()`, `request()`, `output()` and the autoloader. `Nino\*` resolves below `_nino/` alone, every other namespace below `app/` (or `NINO_APP_DIR`) alone; `Nino\Modules\*` is a merged view over four roots in this order: `_nino/`, `_admin/`, `features/` (or `NINO_FEATURES_DIR`, where the `Nino/Modules/` prefix is the directory itself), `app/` |
-| `_nino/Nino/<Class>/<Class>.php` | The kernel classes and public core APIs: AppData, Auth, Callbacks, Csrf, Features, Filesystem, Backup, RotatingLog, Elements, Html, Http, Images, Locales, Text, Mail, Modules, Runtime |
+| `_nino/Nino/<Class>/<Class>.php` | The kernel classes and public core APIs: AppData, Auth, Callbacks, Catalogue, Csrf, Features, Fetch, Filesystem, Backup, RotatingLog, Elements, Html, Http, Images, Locales, Text, Mail, Modules, Runtime |
+| `_nino/Nino/Catalogue/Catalogue.php`, `_nino/Nino/Fetch/Fetch.php` | The feature catalogue: `Fetch` is the kernel's one http client (https only, no redirects, a byte cap, stubbed in tests through `./nino/fetch/stub`); `Catalogue` fetches `catalogue.json` and its detached ECDSA signature, verifies it against `PUBLIC_KEY` or `/nino/catalogue/key`, parses format 1, answers `offers()` per key, and `install()`s an archive: re-fetched catalogue, sha256 and size, staging below `data/.features/`, every entry validated, manifest matched, directory replaced. Nothing is fetched unless the Features panel asks. Contract test `tests/catalogue-smoke.php`, no network |
 | `_nino/Nino/Features/Features.php` | The feature contract: discovery below `features/`, manifest validation, version constraints, settings, `activate()`, `deactivate()`, and `applyUnit()` - the unit application the wizard shares (overwrite on there, add-only for a feature). Contract test `tests/features-smoke.php` against `tests/fixtures/features/` |
 | `_nino/Nino/Modules/<Name>/<Name>.php` | Kernel runtime modules: the always-on ones every project needs (Assets, Cache, Csrf, Elements, Images, Jstext, Template) and the optional ones a project switches on or off in `/nino/modules` (`Form`, `Navigation`, `Localepicker`, `Design`, `Templates`). Replaced wholesale with `_nino/` |
 | `_nino/Nino/Modules/<Name>/Admin/Admin.php`, `assets/`, `text/`, `templates/`, `install/` | A kernel module's own workbench panel class with its scripts, stylesheets, fills and (for a template panel) its markup, and its installer unit - everything the module brings, in one directory |
@@ -559,7 +560,11 @@ valid or safe for HTML, a path, a header, or a class name.
 - Validate schemes for links. Reject `javascript:` and unexpected data schemes
   where the value can enter an `href` or `src`.
 - For outbound HTTP, allowlist destinations where possible, set time/size
-  limits, and prevent redirects to local/private addresses.
+  limits, and prevent redirects to local/private addresses. The kernel's one
+  client is `\Nino\Fetch::get()` - https only, no redirects, a timeout and a
+  byte cap, stubbed in tests - and the catalogue is its only caller; a
+  feature that needs the network goes through it rather than calling curl
+  itself, and never on a page request.
 
 Escaping does not make path traversal safe. Validate structure before resolving
 or escaping.
@@ -670,6 +675,7 @@ temporary project and must not rely on a previously installed working tree.
 | Section preset/Template Builder PHP | `tests/templates-smoke.php` |
 | Template Builder browser behavior | `tests/templates-js-smoke.js` |
 | The feature contract (`\Nino\Features`, the wizard's unit application) | `tests/features-smoke.php` |
+| The catalogue (`\Nino\Catalogue`, `\Nino\Fetch`, the panel's catalogue and install actions) | `tests/catalogue-smoke.php` - a keypair, signed catalogues and archives built in the test, the network stubbed |
 | A feature (a new one, or one of the catalogue's such as Newsletter or Search) | its own `features/<Name>/tests/<key>-smoke.php`, plus `tests/features-smoke.php`; CI's `features` job runs the catalogue's features against every push |
 | Shared public UI slider/tabs | corresponding `tests/nino-ui-*-js-smoke.js` |
 | Shared management UI/CSS structure | owner tests plus `tests/admin-lists-js-smoke.js` |
@@ -685,6 +691,7 @@ php tests/install-smoke.php
 php tests/design-smoke.php
 php tests/templates-smoke.php
 php tests/features-smoke.php
+php tests/catalogue-smoke.php
 for test in features/*/tests/*-smoke.php; do [ -e "$test" ] || continue; php "$test" || exit 1; done
 php tests/demo-catalogue-smoke.php
 for test in tests/*-js-smoke.js; do node "$test"; done

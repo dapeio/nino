@@ -46,6 +46,8 @@ Die vier Aktionen des Panels sind `features/list`, `features/activate`, `feature
 - **Update** bietet das Panel für ein aktives Feature an, dessen Manifest eine andere Version nennt als die aufgezeichnete – nach dem Ersetzen des Verzeichnisses durch eine neue Fassung. Die Aktualisierung ist dieselbe Aktion wie das Aktivieren: Die Einheit ergänzt, was neu ist, und das Modul darf seine eigenen Daten migrieren, bevor die neue Version aufgezeichnet wird.
 - **Einstellungen** zeigt das Formular, das das Manifest beschreibt, und speichert es unter `/nino/features` in der `config.php`. Jede Einstellung wird geprüft, bevor eine geschrieben wird; ein Fehler nennt die Einstellung, und nichts wird gespeichert.
 
+Unter der Liste steht der Block **Katalog**, und mit ihm zwei weitere Aktionen, `features/catalogue` und `features/install`, hinter denen `\Nino\Catalogue::fetch()`, `offers()` und `install()` stehen. Nichts wird von selbst geladen: Der Block nennt die URL des Katalogs und lädt ihn erst, wenn du **Katalog laden** drückst. Dann listet er je Feature, das der Katalog veröffentlicht, die neueste Version, die dieses Nino ausführen kann – **Installieren** für eines, das nicht im Verzeichnis liegt, **Update** für eines, das in einer älteren Version dort liegt, „installiert“ für eines, das aktuell ist, und ausgegraut, mit dem, was es verlangt, eines, von dem keine Version passt. Das Installieren lädt das Archiv, prüft es gegen den signierten Katalog und legt das Verzeichnis an; eine Aktualisierung ersetzt das Verzeichnis und wendet bei einem aktiven Feature das Update im selben Schritt an. Wo `features/` nicht beschreibbar ist, verlinkt der Block stattdessen das Archiv, zum Entpacken von Hand. Siehe [Der Katalog](#der-katalog).
+
 **Wichtig:** Ein Panel, das ein Feature mitbringt, erscheint nach dem Aktivieren erst mit dem nächsten Laden der Workbench, und verschwindet nach dem Deaktivieren ebenso erst dann – die Leiste wird einmal je Seitenaufruf aus der Panel-Registry gebaut. Lade die Seite neu. Ein Panel in der Gruppe Inhalt bietet seine Berechtigung auf dem Tab Nutzerrollen des Panels Nutzer an; die Rolle **Editor**, die der Assistent vor der Aktivierung geschrieben hat, erhält sie nicht von selbst – gib sie ihr dort.
 
 ## Das Manifest `feature.php`
@@ -199,6 +201,38 @@ Was ein Feature unter `data/` schreibt, gehört dem Projekt: Das tägliche Backu
 
 Der Setup-Schritt des Einrichtungsassistenten bietet keine Features an. Er kennt die Kernel-Module mit einer Einheit – Navigation, Sprachauswahl, Kontaktformular –, die eigenen Module des Projekts unter `app/` und die Einheiten unter `_admin/install/library/modules/`; ein Feature wird nach der Einrichtung im Panel Features eingeschaltet. Beide wenden ihre Einheiten über dieselbe Methode an, `\Nino\Features::applyUnit()`: der Assistent mit Überschreiben, weil eine erneut angewendete Einheit dort ersetzen soll, was sie zuvor kopiert hat; eine Aktivierung ohne. Deshalb liegt die Anwendung im Kernel und nicht im Assistenten – `_admin/install/` darf nach der Einrichtung gelöscht werden, und ein Feature muss sich danach noch aktivieren lassen.
 
+## Der Katalog
+
+Ein Feature, das nicht von Hand hineinkopiert wird, kommt aus einem Katalog: einer `catalogue.json`, über https veröffentlicht neben den Archiven, die sie auflistet, und daneben eine abgetrennte Signatur `catalogue.json.sig`. Ninos eigener ist `https://getnino.dev/features/catalogue.json`, gebaut und signiert vom Katalog-Repository [dapeio/nino-features](https://github.com/dapeio/nino-features) aus denselben Verzeichnissen, aus denen auch eine Handkopie stammt. Die Kernel-Seite ist `\Nino\Catalogue` in `_nino/Nino/Catalogue/Catalogue.php` und der eine HTTP-Client des Kernels, `\Nino\Fetch`; `tests/catalogue-smoke.php` prüft beide ohne Netz.
+
+### Was der Katalog sagt
+
+Format 1 ist ein JSON-Dokument: `format` (`1`), `generated` (wann) und `features`, eine Liste von Einträgen – einer je veröffentlichter Version:
+
+| Feld | Bedeutung |
+| --- | --- |
+| `key`, `name`, `description`, `version`, `nino`, `php.ext`, `requires` | was das Manifest des Features sagt, siehe [Das Manifest](#das-manifest-featurephp) |
+| `directory` | das Verzeichnis, das das Archiv enthält – `Newsletter`, das Klassenname-Segment des Features |
+| `archive` | die https-URL des `.tar.gz` |
+| `sha256`, `size` | Prüfsumme und Bytelänge genau dieser Datei |
+| `released` | das Datum |
+
+Ein Archiv ist ein `.tar.gz` mit genau diesem einen Verzeichnis – das, was unter `features/` landet, und nichts daneben; die `tests/` eines Features werden nicht veröffentlicht. Ein Katalog, der irgendwo falsch ist, wird als Ganzes abgewiesen: `\Nino\Catalogue::parse()` nennt Eintrag und Feld.
+
+### Vertrauen
+
+Die Signatur ist das Vertrauen. Sie ist eine ECDSA-Signatur (Kurve P-256) über SHA-256 der exakten Bytes des Dokuments, DER-kodiert und base64 – das, was `openssl dgst -sha256 -sign key.pem catalogue.json | base64` schreibt. Die öffentliche Hälfte von Ninos Schlüssel wird mit dem Kernel ausgeliefert, als `\Nino\Catalogue::PUBLIC_KEY`; `/nino/catalogue/key` in der `config.php` ersetzt sie durch einen anderen Schlüssel, PEM, für einen eigenen Katalog, und `/nino/catalogue/url` nennt diesen Katalog. Ein leerer Schlüssel prüft nichts, also wird gar kein Katalog angenommen, bis ein Schlüssel konfiguriert ist – die Konstante des Kernels ist leer, bis Ninos erster Schlüssel existiert. `/nino/catalogue/url` auf `''` schaltet den Katalog ab: Der Block im Panel sagt das, und Nino stellt keine Anfrage.
+
+Nichts wird geglaubt, bevor die Signatur hält: Das Dokument wird geladen, seine Signatur wird geladen, und nur ein Dokument, das der Schlüssel signiert hat, wird gelesen. Eine Installation lädt den Katalog erneut, statt dem zu trauen, was das Panel gezeigt hat, lädt das Archiv mit der Bytegrenze, die der Eintrag nennt, und weist ein Archiv ab, dessen Größe oder SHA-256 vom Eintrag abweicht. Das Archiv wird unterhalb von `data/.features/` entpackt – nie in `features/` selbst –, nachdem jeder Eintrag angesehen wurde: ein Verzeichnis, benannt wie der Eintrag sagt, nur gewöhnliche Dateien und Verzeichnisse, kein Pfad außerhalb, begrenzt in Anzahl und Größe; was herauskam, wird als Feature gelesen und muss Schlüssel und Version sein, die der Katalog versprochen hat, und zu diesem Kernel passen, wie es der Eintrag tat. Erst dann wird das Verzeichnis nach `features/` verschoben und ersetzt, was dort lag; ein Verschieben, das auf halbem Weg scheitert, legt das alte Verzeichnis zurück. Das Staging-Verzeichnis wird so oder so entfernt.
+
+### Was Installieren nicht tut
+
+Installieren legt Dateien ab, mehr nicht. Ein frisch installiertes Feature wird im Panel eingeschaltet wie ein von Hand kopiertes, mit allem, was [Aktivieren](#aktivieren) sagt. Auf die Aktualisierung eines aktiven Features folgt vom Panel aus dieses Aktivieren im selben Schritt, damit die Einheit ergänzt, was neu ist, und das Modul seine Daten migrieren darf – siehe [Aktualisieren](#aktualisieren) –, aber `\Nino\Catalogue::install()` selbst aktiviert nichts. Auch Abhängigkeiten löst der Katalog nicht auf: Ein Feature, das ein anderes unter `requires` nennt, wird nach diesem installiert, jedes für sich, und das Panel sagt beim Aktivieren, was fehlt.
+
+### Voraussetzungen und Datenschutz
+
+Eine Installation braucht die Erweiterung `curl` oder `allow_url_fopen`, die Erweiterung `openssl`, `phar` für das Archiv und ein beschreibbares Verzeichnis `features/` – wo es nicht beschreibbar ist, verlinkt das Panel das Archiv, zum Entpacken von Hand wie bisher. Jede Anfrage geht über https an den Host des Katalogs und nirgendwo sonst hin: Keine Weiterleitung wird verfolgt, kein anderes Schema geladen, das Zertifikat wird geprüft, der User-Agent sagt `Nino` und sonst nichts – nicht die Version, nicht die Site. Nino stellt diese Anfragen, wenn jemand **Katalog laden** oder **Installieren** drückt, und zu keiner anderen Zeit; es gibt keine Suche nach Updates im Hintergrund, keine Telemetrie, nichts wird gesendet. Der Weg von Hand bleibt: Ein nach `features/` kopiertes Verzeichnis ist ein Feature wie jedes andere.
+
 ## Ein Feature schreiben
 
 ### Verzeichnisaufbau
@@ -260,7 +294,7 @@ CI führt `php tests/features-smoke.php` – den Vertragstest gegen `tests/fixtu
 
 ## Ausblick
 
-Die Features, die Nino veröffentlicht, kommen heute aus dem Katalog-Repository [dapeio/nino-features](https://github.com/dapeio/nino-features): dort je ein Verzeichnis unterhalb von `features/`, mit Manifest, Tests, README und Changelog, von Hand in das `features/` eines Projekts kopiert und im Panel eingeschaltet. Geplant ist der nächste Schritt: Das Panel Features soll die Features des Katalogs auflisten, die zur laufenden Nino-Version passen, und ein signiertes `.tar.gz`-Archiv nach `features/` installieren können. Das Manifest ist dafür ausgelegt – `nino`, `requires`, `version` sind die Angaben, die ein Katalog braucht –, aber nichts davon existiert heute: Es gibt keinen Download und keine Signaturprüfung, und Nino stellt weiterhin keine ausgehende Verbindung her. Ein Feature kommt bis dahin als Kopie in das Verzeichnis.
+Die Features, die Nino veröffentlicht, kommen aus dem Katalog-Repository [dapeio/nino-features](https://github.com/dapeio/nino-features): dort je ein Verzeichnis unterhalb von `features/`, mit Manifest, Tests, README und Changelog – von Hand in das `features/` eines Projekts kopiert, oder aus dem signierten Katalog installiert, den das Repository auf getnino.dev veröffentlicht, siehe [Der Katalog](#der-katalog). Was der Katalog noch nicht tut, ist Abhängigkeiten von selbst auflösen: Ein Feature, das ein anderes unter `requires` nennt, wird nach diesem installiert, jedes für sich. Und ein eigener Katalog ist eine Frage von URL und Schlüssel – das Format ist klein genug, um es mit dem `bin/build.php` des Repositorys aus einem Verzeichnis voller Features zu veröffentlichen.
 
 ## Weiterführende Handbücher
 

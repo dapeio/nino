@@ -16,10 +16,27 @@ namespace Nino {
 	// returns false, the same outcome as any other mail() failure, which
 	// Form/Newsletter already treat as non-fatal, so a rate-limited burst
 	// just becomes silently-missing mail
+	//
+	// mail() is the default transport, not the only one: a module or a
+	// feature that delivers another way (smtp, an api) registers a
+	// callback under '/nino/mail/send' (see TRANSPORT) and gets every
+	// mail after the cap and the header cleaning, with everything it
+	// needs to send it itself
 	class Mail {
 
 		private const int MAX_TRIES 	= 5;
 		private const int WINDOW 		= 3600;
+
+		// The transport callback. Called with the mail as an array -
+		//
+		//   [ 'to' => address, 'subject' => raw utf-8 subject, 'body' => html,
+		//     'replyTo' => address or '', 'sender' => From/envelope address or '',
+		//     'headers' => the header block mail() would get, 'sent' => null ]
+		//
+		// - and a transport that took the mail sets 'sent' to true (delivered)
+		// or false (refused). A transport that leaves 'sent' at null passes
+		// the mail on: to the next callback, and finally to mail()
+		public const string TRANSPORT = '/nino/mail/send';
 
 		// Send an html mail with a Reply-To header, unless the current
 		// client ip has hit the send cap for this window
@@ -77,6 +94,19 @@ namespace Nino {
 
 			if( $replyTo !== '' )
 				$headers .= "\r\n". 'Reply-To: '. $replyTo;
+
+			// Another transport gets the mail first - cleaned and capped, with
+			// the subject still raw, since how a subject is encoded is the
+			// transport's business. Only when none took it does mail() run
+			if( isset( $appData['./nino/callbacks'][ self::TRANSPORT ] ) === true ) {
+
+				$mail = [ 'to' => $to, 'subject' => $subject, 'body' => $body, 'replyTo' => $replyTo, 'sender' => $sender, 'headers' => $headers, 'sent' => null ];
+
+				\Nino\Callbacks::doCallbacks( $appData, self::TRANSPORT, $mail );
+
+				if( is_bool( $mail['sent'] ?? null ) === true )
+					return $mail['sent'];
+			}
 
 			// Encoded after _headerValue() above, not before: the CR/LF strip
 			// has to run against the raw, untrusted subject - encoding first

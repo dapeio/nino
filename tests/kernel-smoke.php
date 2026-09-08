@@ -699,6 +699,53 @@ check( '[elementvalues] sorts numeric values without a fatal, on every sort mode
 echo "\n";
 
 
+// --- Elements::queryElements - sort, offset, limit - and [elements] ------
+
+echo "Elements::queryElements / sortElements - order and window\n";
+
+// Four elements, deliberately out of order in the file, with a localized
+// title, a number that is missing on one and a string on another, and a
+// group two of them share
+\Nino\Filesystem::putFileContent( $appData, '/elements/sorttest.php', [
+	'title'	=> 'Sort Test',
+	'model'	=> [ 'title' => [ 'type' => 'string', 'locale' => true ], 'weight' => [ 'type' => 'integer' ], 'group' => [ 'type' => 'string' ] ],
+	'*'			=> [ '*' => [], 'a' => [ 'weight' => 10, 'group' => 'b' ], 'b' => [ 'weight' => 9, 'group' => 'a' ], 'c' => [ 'group' => 'a' ], 'd' => [ 'weight' => '100', 'group' => 'b' ] ],
+	'de_DE'	=> [ 'a' => [ 'title' => 'Item 10' ], 'b' => [ 'title' => 'item 9' ], 'c' => [ 'title' => 'Item 2' ], 'd' => [ 'title' => 'Item 1' ] ],
+] );
+
+function sortedUris( array &$appData, array $options ): string {
+	return implode( ',', array_map( static fn( array $e ): string => basename( (string) $e['.uri'] ), \Nino\Elements::queryElements( $appData, '/sorttest', [], 'de_DE', [], $options ) ) );
+}
+
+check( 'without options the file order stands', sortedUris( $appData, [] ) === 'a,b,c,d' );
+check( 'sort by a string field is natural and case-insensitive: Item 9 before Item 10', sortedUris( $appData, [ 'sort' => 'title' ] ) === 'd,c,b,a' );
+check( 'a leading minus turns it around', sortedUris( $appData, [ 'sort' => '-title' ] ) === 'a,b,c,d' );
+check( 'two numbers compare as numbers, even one stored as a string; an element without the field comes last', sortedUris( $appData, [ 'sort' => 'weight' ] ) === 'b,a,d,c' );
+check( 'descending, the element without the field still comes last', sortedUris( $appData, [ 'sort' => '-weight' ] ) === 'd,a,b,c' );
+check( 'a second field breaks ties of the first', sortedUris( $appData, [ 'sort' => 'group,-weight' ] ) === 'b,c,d,a' );
+check( 'the sort is stable: equal values keep the file order', sortedUris( $appData, [ 'sort' => 'group' ] ) === 'b,c,a,d' );
+check( 'an empty or meaningless sort leaves the order alone', sortedUris( $appData, [ 'sort' => '' ] ) === 'a,b,c,d' && sortedUris( $appData, [ 'sort' => ' , - ' ] ) === 'a,b,c,d' );
+check( 'offset skips, limit cuts, both together page', sortedUris( $appData, [ 'offset' => 1 ] ) === 'b,c,d' && sortedUris( $appData, [ 'limit' => 2 ] ) === 'a,b'
+	&& sortedUris( $appData, [ 'sort' => 'title', 'offset' => 1, 'limit' => 2 ] ) === 'c,b' && sortedUris( $appData, [ 'offset' => 9 ] ) === '' );
+check( 'a negative offset or limit means none', sortedUris( $appData, [ 'offset' => -3, 'limit' => -1 ] ) === 'a,b,c,d' );
+check( 'sort and query combine: filtered first, then ordered', sortedUris( $appData, [ 'sort' => '-weight' ] ) === 'd,a,b,c'
+	&& implode( ',', array_map( static fn( array $e ): string => basename( (string) $e['.uri'] ), \Nino\Elements::queryElements( $appData, '/sorttest', [ 'group' => 'b' ], 'de_DE', [], [ 'sort' => '-weight' ] ) ) ) === 'd,a' );
+check( 'sortElements() tolerates what is not an element: it sorts last', \Nino\Elements::sortElements( [ 'x', [ 'title' => 'b' ], [ 'title' => 'a' ] ], 'title' ) === [ [ 'title' => 'a' ], [ 'title' => 'b' ], 'x' ] );
+
+check( '[elements] takes sort, offset and limit; ids count from 0 after the cut',
+	\Nino\Html::renderHtml( $appData, '[elements /sorttest sort="-weight" offset="1" limit="2"][[.id]]:[[title]];[/elements]' ) === '0:Item 10;1:item 9;' );
+
+// A callback that drops the first hit: the page has to be a page of what
+// the callback let through, so offset and limit apply after it
+\Nino\Callbacks::registerCallback( $appData, 'sorttest-drop-first', static function( array &$appData, array &$elements ): void {
+	array_shift( $elements );
+} );
+check( '[elements] with a callback: sorted before it, offset and limit after it',
+	\Nino\Html::renderHtml( $appData, '[elements /sorttest sort="-weight" callback="sorttest-drop-first" offset="1" limit="1"][[title]];[/elements]' ) === 'item 9;' );
+
+echo "\n";
+
+
 // --- [json] textfills into a hand-written json document -----------------
 //
 // html-header.tpl's schema.org block writes json by hand and used to drop
@@ -1272,6 +1319,59 @@ $rateState[$rateKey]['reset'] = time() - 1;
 check( 'a hit after the window elapsed starts a fresh budget (true)', hitRateLimit( $hit, $appData, $rateKey ) === true );
 $rateState = \Nino\Filesystem::getFileContent( $appData, $ratelimitPath, [] );
 check( 'and the stale entry was dropped rather than accumulating forever', $rateState[$rateKey]['tries'] === 1 );
+
+echo "\n";
+
+
+// --- Mail::send - the transport callback -----------------------------------
+
+echo "Mail::send - '/nino/mail/send' takes a mail before mail() does\n";
+
+check( 'the callback name is a constant', \Nino\Mail::TRANSPORT === '/nino/mail/send' );
+
+// A fresh budget for this test's client ip, whatever ran before
+$rateState = \Nino\Filesystem::getFileContent( $appData, $ratelimitPath, [] );
+unset( $rateState['127.0.0.1'] );
+\Nino\Filesystem::putFileContent( $appData, $ratelimitPath, $rateState );
+unset( $appData['./nino/mail/ratelimited'] );
+
+$appData['/nino/mail/sender'] = 'noreply@example.org';
+
+$taken = [];
+\Nino\Callbacks::registerCallback( $appData, \Nino\Mail::TRANSPORT, static function( array &$appData, array &$mail ) use ( &$taken ): void {
+	$taken[] = $mail;
+	$mail['sent'] = true;
+} );
+
+check( 'a transport that sets sent = true makes send() answer true without mail()', \Nino\Mail::send( $appData, 'to@example.org', "Grüße\r\nBcc: x@example.org", '<p>Hallo</p>', 'reply@example.org' ) === true && count( $taken ) === 1 );
+check( 'it gets the mail as an array with every key', array_keys( $taken[0] ) === [ 'to', 'subject', 'body', 'replyTo', 'sender', 'headers', 'sent' ] );
+check( 'the subject is raw utf-8, not mime-encoded - but cleaned of anything that starts a header line', $taken[0]['subject'] === 'GrüßeBcc: x@example.org' );
+check( 'to, body, replyTo and the sender arrive as given', $taken[0]['to'] === 'to@example.org' && $taken[0]['body'] === '<p>Hallo</p>' && $taken[0]['replyTo'] === 'reply@example.org' && $taken[0]['sender'] === 'noreply@example.org' );
+check( 'the headers are what mail() would get', str_contains( $taken[0]['headers'], 'Content-Type: text/html; charset=UTF-8' ) && str_contains( $taken[0]['headers'], "\r\nFrom: noreply@example.org" ) && str_contains( $taken[0]['headers'], "\r\nReply-To: reply@example.org" ) );
+check( 'a display-name address is reduced to the address before the transport sees it', \Nino\Mail::send( $appData, 'Max Mustermann <max@example.org>', 'x', 'y', '' ) === true && $taken[1]['to'] === 'max@example.org' && $taken[1]['replyTo'] === '' );
+check( 'an invalid address is refused before any transport', \Nino\Mail::send( $appData, 'not an address', 'x', 'y', '' ) === false && count( $taken ) === 2 );
+
+// A first transport that leaves sent alone passes the mail on; the one
+// after it decides
+unset( $appData['./nino/callbacks'][ \Nino\Mail::TRANSPORT ] );
+$seen = [];
+\Nino\Callbacks::registerCallback( $appData, \Nino\Mail::TRANSPORT, static function( array &$appData, array &$mail ) use ( &$seen ): void {
+	$seen[] = 'looked';
+}, 1 );
+\Nino\Callbacks::registerCallback( $appData, \Nino\Mail::TRANSPORT, static function( array &$appData, array &$mail ) use ( &$seen ): void {
+	$seen[] = 'refused';
+	$mail['sent'] = false;
+}, 2 );
+check( 'a transport that leaves sent at null passes the mail on; sent = false is a refusal', \Nino\Mail::send( $appData, 'to@example.org', 'x', 'y', '' ) === false && $seen === [ 'looked', 'refused' ] );
+
+// The cap comes first: over budget, no transport is asked
+$rateState = \Nino\Filesystem::getFileContent( $appData, $ratelimitPath, [] );
+$rateState['127.0.0.1'] = [ 'tries' => 5, 'reset' => time() + 3600 ];
+\Nino\Filesystem::putFileContent( $appData, $ratelimitPath, $rateState );
+$seen = [];
+check( 'the per-ip cap applies before any transport', \Nino\Mail::send( $appData, 'to@example.org', 'x', 'y', '' ) === false && $seen === [] && ( $appData['./nino/mail/ratelimited'] ?? false ) === true );
+
+unset( $appData['./nino/callbacks'][ \Nino\Mail::TRANSPORT ], $appData['/nino/mail/sender'], $appData['./nino/mail/ratelimited'] );
 
 echo "\n";
 

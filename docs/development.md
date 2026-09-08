@@ -410,13 +410,15 @@ The output of a shortcode is sent through `renderHtml()` again. Therefore, templ
 The shortcodes `[element]` and `[elements]` load structured content. Within their block, fields are addressed with `[[field]]`; `[[.id]]` contains the internal element ID.
 
 ```html
-[elements /services limit="6" query="featured=1"]
+[elements /services sort="-date" limit="6" query="featured=1"]
     <article id="service-[[.id]]">
         <h2>[[title]]</h2>
         <p>[[description]]</p>
     </article>
 [/elements]
 ```
+
+`query` filters - `key=value`, several joined with `&`, `%` as a wildcard at either end. `sort` orders by a field: `sort="title"` ascending, `sort="-date"` descending, `sort="category,-date"` by the first and, where that is equal, the second; two numbers compare as numbers, everything else naturally and without regard to case ("Item 9" before "Item 10"), and an element without the field comes last in either direction. `offset` and `limit` cut a window out of the sorted list. A `callback` runs between: it sees the sorted list and may drop or reorder, and `offset` and `limit` apply to what it let through - a page is a page of that. In PHP the same is `\Nino\Elements::queryElements( $appData, $typeUri, $query, $locale, $return, $options )` with `sort`, `offset` and `limit` under `$options`, and `\Nino\Elements::sortElements( $elements, $sort )` orders a list you already hold.
 
 Normal field values are HTML-encoded. A field released in the model with `html => true` may only contain a limited, sanitized amount of inline HTML. The protection deliberately takes place in the Elements module: Element placeholders are local data of the respective block and not part of the global textfill space.
 
@@ -475,18 +477,20 @@ The following overview is a working reference, not a complete listing of every i
 | `AppData` | Prepare basic state, load `config.php`, save selected keys with `writeContentData()` |
 | `Auth` | Login, logout, user management, session revocation, and permission checking |
 | `Callbacks` | Register and execute callbacks |
+| `Catalogue` | Fetch and verify the signed feature catalogue, say what it offers this kernel, and install an archive below `features/` |
 | `Csrf` | Read/rotate tokens and check requests |
 | `Filesystem` | Read/write files, resolve paths, lock, and atomically mutate |
 | `Backup` | Process encrypted backup manifests |
 | `RotatingLog` | Clean dated log files after retention period |
 | `Elements` | Load individual elements, query, create, modify, and delete types and elements |
 | `Features` | Discover the features below `features/`, read and validate their manifests, answer and save their settings, activate and deactivate them, and apply an install unit - the wizard's too |
+| `Fetch` | The kernel's one http client: a GET over https with a timeout and a byte cap, used by the catalogue and by nothing else |
 | `Html` | Register fills and shortcodes, render HTML+, and sanitize allowed inline HTML |
 | `Http` | Normalize requests, resolve routes, create and output responses |
 | `Images` | Process uploads, manage variants, and generate URLs |
 | `Locales` | Manage current, native, and available languages |
 | `Text` | Read text definitions, lock, and save in batch |
-| `Mail` | Send emails via project configuration |
+| `Mail` | Send emails via project configuration, through `mail()` or a transport registered under `/nino/mail/send` |
 | `Modules` | Load and initialize released modules |
 | `Runtime` | Provide session and error handling |
 
@@ -502,7 +506,7 @@ Modules are activated in `/nino/modules`. The order of the array is relevant if 
 | --- | --- | --- |
 | `Assets` | `[assets ...]` | bundles, caches, and optionally minifies CSS/JS |
 | `Csrf` | `[csrf]` | renders a hidden token field; core protection itself is always active |
-| `Elements` | `[element ...]`, `[elements ...]` | loads typed content; lists support `limit`, query, and optional callback |
+| `Elements` | `[element ...]`, `[elements ...]` | loads typed content; lists support query, `sort`, `offset`, `limit`, and optional callback |
 | `Form` | `POST://.form` | validates contact forms, uses honeypot and rate limit, sends emails, and logs successful submissions |
 | `Images` | `[image ...]` | creates an escaped `<img>` from an image slot or URI |
 | `Jstext` | `[jstext]` | provides text values as securely encoded JSON with CSP nonce |
@@ -810,6 +814,7 @@ Nino uses standalone smoke tests without PHPUnit. Each test creates an isolated 
 | --- | --- |
 | `tests/kernel-smoke.php` | Kernel, routing, rendering, auth, filesystem, and modules |
 | `tests/features-smoke.php` | the feature contract against `tests/fixtures/features/`: discovery, manifest validation, version constraints, every settings type, activation with the unit applied add-only, updates through the upgrade hook, deactivation, and the delivered manifests |
+| `tests/catalogue-smoke.php` | the catalogue: the https client behind a stub, the detached signature, what a catalogue document must say, what it offers this kernel, an installation and an update from archive bytes built in the test, and every refusal on the way - a hostile archive among them |
 | `features/<Name>/tests/<key>-smoke.php` | a feature's own test, travelling with it - the catalogue's `features/Search/tests/search-smoke.php`, for one, covers activation, index lifecycle, fuzzy ranking, locales, and the Admin rebuild action. Empty in a checkout, which ships no feature |
 | `tests/admin-smoke.php` | the workbench shell and its content panels: the text blacklist and html sanitizer, element and image operations |
 | `tests/admin-system-smoke.php` | the structure and system panels: the session gate, accounts, roles and permissions, element types, backups and recovery, the activity log, and a render of every panel in every interface language |
@@ -830,6 +835,7 @@ php tests/install-smoke.php
 php tests/design-smoke.php
 php tests/templates-smoke.php
 php tests/features-smoke.php
+php tests/catalogue-smoke.php
 for test in features/*/tests/*-smoke.php; do [ -e "$test" ] || continue; php "$test" || exit 1; done
 php tests/demo-catalogue-smoke.php
 for test in tests/*-js-smoke.js; do node "$test"; done
@@ -879,8 +885,11 @@ The following table lists the most important hooks used by the kernel and integr
 | `/nino/elements/delete<type-uri>` | element type data | check deletion from a type or reject with `false` |
 | `/nino/elements<type-uri>/update/uri` | element data | react to a change in element URI |
 | `/nino/elements/committed` | `{ operation, type, uri, previousUri, locale }` | notification after an Element insert, update, or delete was persisted; cannot veto the completed write |
+| `/nino/mail/send` | `{ to, subject, body, replyTo, sender, headers, sent }` | deliver a mail another way than `mail()`: a transport that took it sets `sent` to `true` or `false`, and `mail()` is skipped; `sent` left at `null` passes the mail on |
 | `/nino/admin/restore` | `{ dataDir, staging }` | `/_admin` restores a backup: a module merges its own `data/` files from the staged copy into the live directory |
 | `/nino/admin/action` | `{ action, panel, status, user, data }` | a `/_admin` panel action has run and answered - notification only, and fired for a failed action too. Says who did what in the workbench; *what changed* is the kernel's own events above |
+
+`/nino/mail/send` is the one hook that replaces a kernel action rather than reacting to it. `\Nino\Mail::send()` fires it after the per-ip cap and after every header value was cleaned - with the subject still raw, since how a subject is encoded is the transport's business - and calls `mail()` only where no handler set `sent`. A module or feature that delivers over SMTP or an API registers here in `init()`; `\Nino\Mail::TRANSPORT` is the name.
 
 Callback names are simple strings. Still, treat the established names and argument forms like an API: A rename or changed argument type can affect every registered module.
 

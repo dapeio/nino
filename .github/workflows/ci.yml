@@ -54,6 +54,9 @@ jobs:
       - name: Run features smoke tests
         run: php tests/features-smoke.php
 
+      - name: Run catalogue smoke tests
+        run: php tests/catalogue-smoke.php
+
       # A feature's own tests travel with it - features/<Name>/tests/ - and
       # run against this checkout (see tests/harness.php). A checkout ships
       # no feature of its own, so the loop has to survive an empty glob

@@ -145,15 +145,23 @@ namespace Nino\Modules {
 			$content	= $args['content'] ?? '';
 			$locale 	= $args['locale'] ?? '';
 			$callback	= $args['callback'] ?? '';
+			$sort			= (string) ( $args['sort'] ?? '' );
+			$offset		= (int) ( $args['offset'] ?? 0 );
 			$limit		= (int) ( $args['limit'] ?? -1 );
 			$queryArr	= self::_parseQuery( $args['query'] ?? '' );
 
-			$result = \Nino\Elements::queryElements( $appData, $uri, $queryArr, $locale, [] );
+			// Sorted by the query, cut here: offset and limit come after the
+			// callback, which may drop or reorder hits of its own, so a page
+			// is a page of what the callback let through
+			$result = \Nino\Elements::queryElements( $appData, $uri, $queryArr, $locale, [], [ 'sort' => $sort ] );
 			if( $result === [] )
 				return '';
 
 			if( $callback !== '' )
 				\Nino\Callbacks::doCallbacks( $appData, $callback, $result );
+
+			if( $offset > 0 )
+				$result = array_slice( $result, $offset );
 
 			if( $limit > 0 )
 				$result = array_slice( $result, 0, $limit );

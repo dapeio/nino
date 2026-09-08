@@ -176,9 +176,10 @@ _nino/           Kernel und Frontend-Core, eine Klasse je Datei unter _nino/Nino
                  /nino/modules ein- oder ausgeschaltet werden
 app/             Projekteigene PHP-Klassen unter eigenem Namespace
 features/        Die Features, die ein Projekt installiert, je ein Verzeichnis
-                 mit feature.php-Manifest, aus dem Katalog
-                 github.com/dapeio/nino-features kopiert und im Panel Features
-                 der Workbench eingeschaltet - ein Checkout bringt keines mit
+                 mit feature.php-Manifest, aus dem signierten Katalog von
+                 github.com/dapeio/nino-features im Panel Features der
+                 Workbench installiert oder von Hand kopiert, und dort
+                 eingeschaltet - ein Checkout bringt keines mit
 _admin/          Die Workbench: nur die Shell, recovery.php, ihre eigenen
                  Ansichten als Module unter _admin/Nino/Modules/ (Dashboard,
                  Elements, Text, Images, Logs, Routes, Users, Language,
@@ -213,6 +214,7 @@ php tests/install-smoke.php
 php tests/design-smoke.php
 php tests/templates-smoke.php
 php tests/features-smoke.php
+php tests/catalogue-smoke.php
 for test in features/*/tests/*-smoke.php; do [ -e "$test" ] && php "$test"; done
 php tests/demo-catalogue-smoke.php
 for test in tests/*-js-smoke.js; do node "$test"; done

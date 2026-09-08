@@ -650,7 +650,8 @@ NINO_ROOT=/path/to/other/nino php features/Catalog/tests/catalog-smoke.php
   and nothing else. Copied files, texts, routes, settings and data stay.
 - It does not overwrite: neither activation nor an update replaces a file, a
   route key or a text key the project already has.
-- It does not download: a feature is copied into `features/` by hand - the
-  published ones from the catalogue repository [dapeio/nino-features](https://github.com/dapeio/nino-features).
-  The Features panel installing a signed archive from a catalogue is planned
-  and does not exist. Nino makes no outbound request.
+- It does not download itself: a feature is copied into `features/` by hand,
+  or installed there from the signed catalogue by the Features panel - the
+  published ones come from the catalogue repository [dapeio/nino-features](https://github.com/dapeio/nino-features),
+  see [The Catalogue](../features.md#the-catalogue). Nino makes no outbound
+  request unless someone presses **Load catalogue** or **Install** there.

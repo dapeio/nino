@@ -26,8 +26,11 @@ namespace Nino {
 			return $appData['./nino/elements/cache'][ $uri ][ $locale ] ?? $return;
 		}
 
-		// Get an element from file
-		static public function queryElements( array &$appData, string $typeUri, array $query, string $locale = '', mixed $return = false ): mixed {
+		// The elements of a type that match a query - and, through $options,
+		// in an order and a window: 'sort' as sortElements() reads it,
+		// 'offset' skips that many hits, 'limit' keeps at most that many
+		// (0 or less: all). Filtered first, then sorted, then cut
+		static public function queryElements( array &$appData, string $typeUri, array $query, string $locale = '', mixed $return = false, array $options = [] ): mixed {
 
 			// Verify locale
 			if( $locale !== '*' && ( $locale === '' || \Nino\Locales::verifyLocale( $appData, $locale ) === false ) )
@@ -98,7 +101,63 @@ namespace Nino {
 
 			}
 
-			return $hits ?? $return;
+			$hits = self::sortElements( $hits, (string) ( $options['sort'] ?? '' ) );
+
+			$offset	= max( 0, (int) ( $options['offset'] ?? 0 ) );
+			$limit	= (int) ( $options['limit'] ?? 0 );
+
+			if( $offset > 0 || $limit > 0 )
+				$hits = array_slice( $hits, $offset, $limit > 0 ? $limit : null );
+
+			return $hits;
+		}
+
+		// Order a list of elements by one or more fields: 'title' ascending,
+		// '-date' descending, 'category,-date' by the first and, where that
+		// is equal, the second. Two numbers compare as numbers, anything else
+		// naturally and without regard to case ("Item 9" before "Item 10");
+		// an element without the field, or with one that is not a scalar,
+		// comes last in either direction. Stable: what compares equal keeps
+		// its order. '' leaves the list as it is
+		static public function sortElements( array $elements, string $sort ): array {
+
+			$keys = [];
+			foreach( explode( ',', $sort ) as $field ) {
+				$field = trim( $field );
+				if( $field === '' || $field === '-' )
+					continue;
+				$keys[] = $field[0] === '-' ? [ substr( $field, 1 ), -1 ] : [ $field, 1 ];
+			}
+
+			if( $keys === [] )
+				return $elements;
+
+			usort( $elements, static function( mixed $a, mixed $b ) use ( $keys ): int {
+
+				foreach( $keys as [ $field, $direction ] ) {
+
+					$valueA = is_array( $a ) === true && is_scalar( $a[$field] ?? null ) === true ? $a[$field] : null;
+					$valueB = is_array( $b ) === true && is_scalar( $b[$field] ?? null ) === true ? $b[$field] : null;
+
+					if( $valueA === null && $valueB === null )
+						continue;
+					if( $valueA === null )
+						return 1;
+					if( $valueB === null )
+						return -1;
+
+					$order = ( is_numeric( $valueA ) === true && is_numeric( $valueB ) === true )
+						? (float) $valueA <=> (float) $valueB
+						: strnatcasecmp( (string) $valueA, (string) $valueB );
+
+					if( $order !== 0 )
+						return $order * $direction;
+				}
+
+				return 0;
+			} );
+
+			return $elements;
 		}
 
 		// Whether one element value satisfies one query value, including the

@@ -399,13 +399,15 @@ Die Ausgabe eines Shortcodes wird erneut durch `renderHtml()` geschickt. Deshalb
 Die Shortcodes `[element]` und `[elements]` laden strukturierte Inhalte. Innerhalb ihres Blocks werden Felder mit `[[field]]` angesprochen; `[[.id]]` enthält die interne Element-ID.
 
 ```html
-[elements /services limit="6" query="featured=1"]
+[elements /services sort="-date" limit="6" query="featured=1"]
     <article id="service-[[.id]]">
         <h2>[[title]]</h2>
         <p>[[description]]</p>
     </article>
 [/elements]
 ```
+
+`query` filtert – `key=value`, mehrere mit `&` verbunden, `%` als Platzhalter an einem der Enden. `sort` ordnet nach einem Feld: `sort="title"` aufsteigend, `sort="-date"` absteigend, `sort="category,-date"` nach dem ersten und, wo das gleich ist, dem zweiten; zwei Zahlen vergleichen sich als Zahlen, alles andere natürlich und ohne Rücksicht auf Groß- und Kleinschreibung („Item 9“ vor „Item 10“), und ein Element ohne das Feld kommt in beiden Richtungen zuletzt. `offset` und `limit` schneiden ein Fenster aus der sortierten Liste. Ein `callback` läuft dazwischen: Er sieht die sortierte Liste und darf streichen oder umordnen, und `offset` und `limit` gelten für das, was er durchgelassen hat – eine Seite ist eine Seite davon. In PHP ist dasselbe `\Nino\Elements::queryElements( $appData, $typeUri, $query, $locale, $return, $options )` mit `sort`, `offset` und `limit` unter `$options`, und `\Nino\Elements::sortElements( $elements, $sort )` ordnet eine Liste, die du schon hast.
 
 Normale Feldwerte werden HTML-kodiert. Ein im Modell mit `html => true` freigegebenes Feld darf nur eine begrenzte, bereinigte Menge an Inline-HTML enthalten. Der Schutz findet bewusst im Elements-Modul statt: Element-Platzhalter sind lokale Daten des jeweiligen Blocks und nicht Teil des globalen Textfill-Raums.
 
@@ -462,18 +464,20 @@ Die folgende Übersicht ist eine Arbeitsreferenz, keine vollständige Auflistung
 | `AppData` | Grundzustand vorbereiten, `config.php` laden, ausgewählte Schlüssel mit `writeContentData()` speichern |
 | `Auth` | Login, Logout, Nutzerverwaltung, Session-Widerruf und Berechtigungsprüfung |
 | `Callbacks` | Callbacks registrieren und ausführen |
+| `Catalogue` | den signierten Feature-Katalog laden und prüfen, sagen, was er diesem Kernel anbietet, und ein Archiv unter `features/` installieren |
 | `Csrf` | Token lesen/rotieren und Requests prüfen |
 | `Filesystem` | Dateien lesen/schreiben, Pfade auflösen, sperren und atomar mutieren |
 | `Backup` | verschlüsselte Backup-Manifeste verarbeiten |
 | `RotatingLog` | datierte Protokolldateien nach Aufbewahrungsfrist bereinigen |
 | `Elements` | einzelne Elemente laden sowie Typen und Elemente abfragen, anlegen, ändern und löschen |
 | `Features` | die Features unter `features/` finden, ihre Manifeste lesen und prüfen, ihre Einstellungen beantworten und speichern, sie aktivieren und deaktivieren und eine Install-Einheit anwenden – auch die des Assistenten |
+| `Fetch` | der eine HTTP-Client des Kernels: ein GET über https mit Timeout und Bytegrenze, vom Katalog benutzt und von sonst nichts |
 | `Html` | Fills und Shortcodes registrieren, HTML+ rendern und erlaubtes Inline-HTML bereinigen |
 | `Http` | Requests normalisieren, Routen auflösen, Responses erzeugen und ausgeben |
 | `Images` | Uploads verarbeiten, Varianten verwalten und URLs erzeugen |
 | `Locales` | aktuelle, native und verfügbare Sprachen verwalten |
 | `Text` | Textdefinitionen lesen, sperren und als Batch speichern |
-| `Mail` | E-Mails über die Projektkonfiguration versenden |
+| `Mail` | E-Mails über die Projektkonfiguration versenden, durch `mail()` oder einen unter `/nino/mail/send` registrierten Transport |
 | `Modules` | freigegebene Module laden und initialisieren |
 | `Runtime` | Session- und Fehlerbehandlung bereitstellen |
 
@@ -487,7 +491,7 @@ Module werden in `/nino/modules` aktiviert. Die Reihenfolge des Arrays ist relev
 | --- | --- | --- |
 | `Assets` | `[assets …]` | bündelt, zwischenspeichert und optional minifiziert CSS/JS |
 | `Csrf` | `[csrf]` | rendert ein verstecktes Token-Feld; der Kernschutz selbst ist immer aktiv |
-| `Elements` | `[element …]`, `[elements …]` | lädt typisierte Inhalte; Listen unterstützen `limit`, Query und optionalen Callback |
+| `Elements` | `[element …]`, `[elements …]` | lädt typisierte Inhalte; Listen unterstützen Query, `sort`, `offset`, `limit` und optionalen Callback |
 | `Form` | `POST://.form` | validiert Kontaktformulare, nutzt Honeypot und Rate-Limit, versendet Mails und protokolliert erfolgreiche Einsendungen |
 | `Images` | `[image …]` | erzeugt ein escaped `<img>` aus einem Bildslot oder einer URI |
 | `Jstext` | `[jstext]` | stellt Textwerte als sicher kodiertes JSON mit CSP-Nonce bereit |
@@ -792,6 +796,7 @@ Nino verwendet eigenständige Smoke-Tests ohne PHPUnit. Jeder Test erstellt ein 
 | --- | --- |
 | `tests/kernel-smoke.php` | Kernel, Routing, Rendering, Auth, Filesystem und Module |
 | `tests/features-smoke.php` | der Feature-Vertrag gegen `tests/fixtures/features/`: Erkennung, Manifestprüfung, Versions-Constraints, jeder Settings-Typ, Aktivierung mit nur ergänzend angewendeter Einheit, Updates über den Upgrade-Haken, Deaktivierung und die ausgelieferten Manifeste |
+| `tests/catalogue-smoke.php` | der Katalog: der https-Client hinter einem Stub, die abgetrennte Signatur, was ein Katalogdokument sagen muss, was er diesem Kernel anbietet, eine Installation und ein Update aus im Test gebauten Archivbytes und jede Abweisung auf dem Weg – ein feindliches Archiv darunter |
 | `features/<Name>/tests/<key>-smoke.php` | der eigene Test eines Features, der mit ihm reist – `features/Search/tests/search-smoke.php` des Katalogs etwa prüft Aktivierung, Index-Lebenszyklus, Fuzzy-Rangfolge, Sprachen und den Admin-Neuaufbau. In einem Checkout leer, denn der bringt kein Feature mit |
 | `tests/admin-smoke.php` | die Shell des Workbench und seine Inhalts-Panels: Text-Blacklist und HTML-Sanitizer, Element- und Bildoperationen |
 | `tests/admin-system-smoke.php` | die Struktur- und System-Panels: Session-Gate, Konten, Rollen und Rechte, Elementtypen, Backups und Wiederherstellung, das Aktivitätsprotokoll und ein Rendern jedes Panels in jeder Oberflächensprache |
@@ -812,6 +817,7 @@ php tests/install-smoke.php
 php tests/design-smoke.php
 php tests/templates-smoke.php
 php tests/features-smoke.php
+php tests/catalogue-smoke.php
 for test in features/*/tests/*-smoke.php; do [ -e "$test" ] || continue; php "$test" || exit 1; done
 php tests/demo-catalogue-smoke.php
 for test in tests/*-js-smoke.js; do node "$test"; done
@@ -859,8 +865,11 @@ Die folgende Tabelle nennt die wichtigsten vom Kernel und den integrierten Modul
 | `/nino/elements/delete<type-uri>` | Daten des Elementtyps | Löschen aus einem Typ prüfen oder per `false` verwerfen |
 | `/nino/elements<type-uri>/update/uri` | Elementdaten | auf eine Änderung der Element-URI reagieren |
 | `/nino/elements/committed` | `{ operation, type, uri, previousUri, locale }` | Benachrichtigung, nachdem ein Element eingefügt, geändert oder gelöscht und gespeichert wurde; kann den abgeschlossenen Schreibvorgang nicht verwerfen |
+| `/nino/mail/send` | `{ to, subject, body, replyTo, sender, headers, sent }` | eine Mail anders zustellen als durch `mail()`: Ein Transport, der sie genommen hat, setzt `sent` auf `true` oder `false`, und `mail()` wird übersprungen; ein `sent`, das `null` bleibt, reicht die Mail weiter |
 | `/nino/admin/restore` | `{ dataDir, staging }` | `/_admin` stellt ein Backup wieder her: Ein Modul führt seine eigenen `data/`-Dateien aus der entpackten Kopie in das aktive Verzeichnis zusammen |
 | `/nino/admin/action` | `{ action, panel, status, user, data }` | Eine Panel-Aktion in `/_admin` ist gelaufen und hat geantwortet – reine Benachrichtigung, und auch für eine gescheiterte Aktion. Sagt, wer im Werkzeug was getan hat; *was sich geändert hat*, sagen die Kernel-Events darüber |
+
+`/nino/mail/send` ist der eine Hook, der eine Kernel-Aktion ersetzt, statt auf sie zu reagieren. `\Nino\Mail::send()` löst ihn nach der Sendegrenze je IP und nach dem Bereinigen jedes Header-Werts aus – mit dem Betreff noch roh, denn wie ein Betreff kodiert wird, ist Sache des Transports – und ruft `mail()` nur, wo kein Handler `sent` gesetzt hat. Ein Modul oder Feature, das über SMTP oder eine API zustellt, registriert sich hier in `init()`; `\Nino\Mail::TRANSPORT` ist der Name.
 
 Callback-Namen sind einfache Strings. Behandle die etablierten Namen und Argumentformen trotzdem wie eine API: Eine Umbenennung oder ein geänderter Argumenttyp kann jedes registrierte Modul betreffen.
 
