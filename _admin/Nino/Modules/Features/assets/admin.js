@@ -5,13 +5,14 @@
  *													the catalogue offers that is not already current, so
  *													an install or an update), Inactive and Active - a
  *													shared action bar above them holding the one Refresh
- *													catalogue button, and below an active feature its
- *													settings form. See Admin/Admin.php beside it: the
- *													entries arrive with their words already in the
- *													interface language and the settings schema normalized
- *													by \Nino\Features, so this file only knows how to sort
- *													a feature into its tab, draw each setting type and
- *													collect it back.
+ *													catalogue button. An active feature's settings are a
+ *													screen of their own, behind its Settings button and
+ *													left again through the back link. See Admin/Admin.php
+ *													beside it: the entries arrive with their words already
+ *													in the interface language and the settings schema
+ *													normalized by \Nino\Features, so this file only knows
+ *													how to sort a feature into its tab, draw each setting
+ *													type and collect it back.
  *
  *													Activating and deactivating end in a reload: the rail
  *													is rendered server-side, so the panel a feature brings
@@ -64,6 +65,10 @@
 		// Which tab is on screen - kept across a re-render so an action does
 		// not jump the panel back to Available
 		_tab 				: 'available',
+		// The key of the feature whose settings are on screen, '' while the
+		// list is - as state, so the reload a save ends in comes back to the
+		// same screen rather than dropping to the list
+		_settingsOf : '',
 
 		/**
 		 *	Load every feature with its state, settings and the cached
@@ -80,8 +85,12 @@
 				return;
 
 			Nino.admin.features._apiCall( 'list', {}, function( status, response ) {
-				if( status !== 200 || response === null )
+				// Back to the list first: an error written into a pane a settings
+				// screen is covering would not be read
+				if( status !== 200 || response === null ) {
+					Nino.admin.features._showList();
 					return Nino.admin.features._showError( wrap, status, response );
+				}
 
 				Nino.admin.features._dir 					= response.dir || '';
 				Nino.admin.features._catalogueUrl	= response.catalogueUrl || '';
@@ -149,6 +158,7 @@
 				wrap.appendChild( Nino.admin.features._renderActionBar() );
 
 			Nino.admin.features._renderTabContent( wrap );
+			Nino.admin.features._renderSettingsScreen();
 		},
 
 		/**
@@ -386,10 +396,11 @@
 
 		/**
 		 *	One feature: name, version and, where it differs, the version on
-		 *	disk, description, requirements, every problem, the buttons its
-		 *	state allows, and - switched on, with settings declared - its
-		 *	settings form. No status badge: which tab it is in already says
-		 *	that, and a problem line names anything a word could not
+		 *	disk, description, requirements, every problem and the buttons
+		 *	its state allows - its settings among them, as the button that
+		 *	opens their own screen. No status badge: which tab it is in
+		 *	already says that, and a problem line names anything a word
+		 *	could not
 		 *
 		 *	@param		{Object}	feature			An entry of features/list
 		 *
@@ -440,17 +451,15 @@
 
 			card.appendChild( Nino.admin.features._renderActions( feature ) );
 
-			if( feature.active === true && feature.settings.length > 0 )
-				card.appendChild( Nino.admin.features._renderSettings( feature ) );
-
 			return card;
 		},
 
 		/**
 		 *	The buttons a feature's state allows: Activate while it is off
 		 *	and nothing stands in the way, Update while its manifest moved
-		 *	ahead of the record, Deactivate while it is on - and the message
-		 *	line they report into
+		 *	ahead of the record, Settings while it is on and declares any,
+		 *	Deactivate while it is on - and the message line the three that
+		 *	post something report into
 		 *
 		 *	@param		{Object}	feature
 		 *
@@ -481,6 +490,15 @@
 				update.textContent = Nino.content.getText('/_admin/features/label/update').replace( '%s', feature.version );
 				update.addEventListener( 'click', function() { Nino.admin.features._switch( feature, 'update', update, msg ) } );
 				actions.appendChild( update );
+			}
+
+			if( feature.active === true && feature.settings.length > 0 ) {
+				const settings = dc.createElement('button');
+				settings.type = 'button';
+				settings.className = 'nino-admin-btn-secondary';
+				settings.textContent = Nino.content.getText('/_admin/features/label/settings');
+				settings.addEventListener( 'click', function() { Nino.admin.features._showSettings( feature ) } );
+				actions.appendChild( settings );
 			}
 
 			if( feature.active === true ) {
@@ -711,8 +729,73 @@
 		},
 
 		/**
+		 *	The second level, and which of the two is on screen: the settings
+		 *	of the feature _settingsOf names - a back link and its form -
+		 *	while that feature is still installed, switched on and declaring
+		 *	any. Else the list, which is where a feature that lost its
+		 *	settings between two renders ends up rather than on an empty
+		 *	screen
+		 *
+		 *	@return		void
+		 */
+		_renderSettingsScreen : function() {
+
+			const list		= dc.getElementById('features-list');
+			const wrap		= dc.getElementById('features-settings');
+			const feature	= Nino.admin.features._features.filter( function( f ) {
+				return f.key === Nino.admin.features._settingsOf && f.active === true && f.settings.length > 0;
+			} )[0];
+
+			wrap.innerHTML = '';
+
+			if( feature === undefined ) {
+				Nino.admin.features._settingsOf = '';
+				list.classList.remove('admin-hidden');
+				wrap.classList.add('admin-hidden');
+				return;
+			}
+
+			const backLink = dc.createElement('a');
+			backLink.href = '#';
+			backLink.className = 'nino-admin-back-link';
+			backLink.textContent = Nino.content.getText('/_admin/common/label/back');
+			backLink.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.features._showList() } );
+			wrap.appendChild( Nino.admin.formToolbar( backLink ) );
+
+			wrap.appendChild( Nino.admin.features._renderSettings( feature ) );
+
+			list.classList.add('admin-hidden');
+			wrap.classList.remove('admin-hidden');
+		},
+
+		/**
+		 *	Open one feature's settings on their own screen
+		 *
+		 *	@param		{Object}	feature
+		 *
+		 *	@return		void
+		 */
+		_showSettings : function( feature ) {
+			Nino.admin.features._settingsOf = feature.key;
+			Nino.admin.features._renderSettingsScreen();
+		},
+
+		/**
+		 *	Leave a settings screen for the list it was opened from - the tab
+		 *	it stands on is the one it was left on
+		 *
+		 *	@return		void
+		 */
+		_showList : function() {
+			Nino.admin.features._settingsOf = '';
+			Nino.admin.features._renderSettingsScreen();
+		},
+
+		/**
 		 *	The settings form of one feature: every declared setting by its
-		 *	type, one Save posting all of them at once
+		 *	type, one Save posting all of them at once. The form the screen
+		 *	is for, so its legend names the feature and its Save sits in the
+		 *	bar the workbench pins to the bottom of a form screen
 		 *
 		 *	@param		{Object}	feature
 		 *
@@ -726,31 +809,30 @@
 			const fieldset = dc.createElement('fieldset');
 
 			const legend = dc.createElement('legend');
-			legend.textContent = Nino.content.getText('/_admin/features/label/settings');
+			legend.textContent = Nino.content.getText('/_admin/features/label/settings-of').replace( '%s', feature.name );
 			fieldset.appendChild( legend );
 
 			feature.settings.forEach( function( field ) {
 				fieldset.appendChild( Nino.admin.features._renderField( field ) );
 			} );
 
-			// One Save per feature, in the flow of its own block - the
-			// shared pinned action bar is for a screen with one form
+			// The one form of its own screen, so its Save belongs in the bar
+			// the workbench pins to the bottom of every form screen - a
+			// submit button is the primary action there without asking
 			const actions = dc.createElement('div');
-			actions.className = 'admin-features-actions';
+			actions.className = 'nino-admin-actionbar';
 
 			const save = dc.createElement('button');
 			save.type = 'submit';
-			save.className = 'nino-admin-btn-primary';
 			save.textContent = Nino.content.getText('/_admin/common/label/save');
 			actions.appendChild( save );
 
 			const msg = dc.createElement('p');
-			msg.className = 'nino-admin-hint';
 			msg.setAttribute( 'aria-live', 'polite' );
 			actions.appendChild( msg );
 
-			fieldset.appendChild( actions );
 			form.appendChild( fieldset );
+			form.appendChild( actions );
 
 			form.addEventListener( 'submit', function( ev ) { ev.preventDefault(); Nino.admin.features._save( feature, form, save, msg ) } );
 

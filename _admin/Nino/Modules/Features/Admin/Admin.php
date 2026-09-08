@@ -15,7 +15,8 @@ namespace Nino\Modules\Features {
 	 *	Dev								Every feature installed below features/ (see
 	 *												\Nino\Features), one block each: what it is, whether
 	 *												it is switched on, what stands in the way of switching
-	 *												it on, and the settings its manifest declares, as a
+	 *												it on, and - behind a button of its own, on a screen of
+	 *												its own - the settings its manifest declares, as a
 	 *												form. The kernel class does the work - discovery,
 	 *												validation, the install unit, the module list, the
 	 *												record in config.php - and this panel only drives it
@@ -24,7 +25,7 @@ namespace Nino\Modules\Features {
 	 *												here, once, in the interface language, so the script
 	 *												renders what it gets.
 	 *
-	 *												One pane, one script-built tab strip: Available (what
+	 *												Two panes and one script-built tab strip: Available (what
 	 *												the catalogue offers that is not already current -
 	 *												install or update), Inactive and Active. apiList()
 	 *												answers the installed features and, alongside them,
@@ -91,14 +92,18 @@ namespace Nino\Modules\Features {
 			return '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-blocks-icon lucide-blocks"><path d="M10 22V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v11a3 3 0 0 0 3 3h15a1 1 0 0 0 1-1v-5a1 1 0 0 0-1-1H10"/><rect x="14" y="2" width="8" height="8" rx="1"/></svg>';
 		}
 
-		// One pane: a tab strip and an action bar the script builds, then the
-		// content of whichever tab is current
+		// Two panes, the levels the script steps through: the list - a tab
+		// strip and an action bar it builds, then the content of whichever
+		// tab is current - and one feature's settings
 		public static function panes(): array {
-			return [ 'features-list' ];
+			return [ 'features-list', 'features-settings' ];
 		}
 
 		public static function assets(): array {
-			return [ \Nino\Admin\Panels::relative( dirname( __DIR__ ). '/assets/admin.js' ) ];
+			return [
+				\Nino\Admin\Panels::relative( dirname( __DIR__ ). '/assets/admin.js' ),
+				\Nino\Admin\Panels::relative( dirname( __DIR__ ). '/assets/admin.css' ),
+			];
 		}
 
 		// The module's own words, one <locale>.php per interface language

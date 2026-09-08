@@ -6,7 +6,9 @@
  *										with what payload, that every word it renders is a fill
  *										both interface languages define, that a secret's input
  *										is always empty, and that one Save collects every
- *										setting of its feature by data-key - and the three tabs
+ *										setting of its feature by data-key - on the screen of
+ *										its own the Settings button steps into and the back
+ *										link leaves - and the three tabs
  *										(Available, Inactive, Active) with their counts, the
  *										action bar's Refresh catalogue button and status line,
  *										that the Available tab fills from what features/list
@@ -176,13 +178,18 @@ function text( key ) {
 
 const mount = element('div');
 mount.id = 'features-list';
+// The panel's second pane: the screen one feature's settings drill into
+const screen = element('div');
+screen.id = 'features-settings';
 
 const callbacks = [];
 const requests = [];
 let reloads = 0;
 
 const Nino = {
-	admin : {},
+	// The shell's own one-line delegation (see _admin/assets/script.js), so
+	// the panel reaches the same context bar every drill-down level uses
+	admin : { formToolbar : function( backLink ) { return Nino.adminUi.contextBar( backLink ) } },
 	events : { bindCallback : function( event, callback ) { if( event === 'ready' ) callbacks.push( callback ) } },
 	http : { sendRequest : function( uri, method, callback, data ) {
 		requests.push( { uri : uri, method : method, action : data.action, payload : JSON.parse( data.data ), callback : callback } );
@@ -194,7 +201,7 @@ const sandbox = {
 	document : {
 		createElement : element,
 		createTextNode : textNode,
-		getElementById : function( id ) { return id === 'features-list' ? mount : null },
+		getElementById : function( id ) { return id === 'features-list' ? mount : ( id === 'features-settings' ? screen : null ) },
 		documentElement : null,
 		body : null,
 	},
@@ -269,9 +276,17 @@ check( 'and binds its ready callback', callbacks.length === 1 && callbacks[0] ==
 
 // The backend half of the same contract, read from the class
 const admin = source('_admin/Nino/Modules/Features/Admin/Admin.php');
-check( 'the panel is a system entry with the nav uri the script speaks, one mount point and six actions',
-	admin.includes( "return [ 'features', '/_admin/nav/features', 15, 'system' ];" ) && admin.includes( "return [ 'features-list' ];" ) && script.includes( "'features-list'" )
+check( 'the panel is a system entry with the nav uri the script speaks, two mount points and six actions',
+	admin.includes( "return [ 'features', '/_admin/nav/features', 15, 'system' ];" ) && admin.includes( "return [ 'features-list', 'features-settings' ];" )
+	&& script.includes( "'features-list'" ) && script.includes( "'features-settings'" )
 	&& [ 'features/list', 'features/activate', 'features/deactivate', 'features/settings', 'features/catalogue', 'features/install' ].every( function( action ) { return admin.includes( "'"+ action+ "'" ) } ) );
+// The one thing the module's own stylesheet is for: the script builds a
+// card's buttons as siblings with no whitespace between them, so the row
+// carries its gap itself
+const moduleCss = source('_admin/Nino/Modules/Features/assets/admin.css');
+check( 'the panel bundles a stylesheet of its own, in the workbench\'s layer, spacing the row of buttons a card and an offer carry',
+	admin.includes( "'/assets/admin.css'" ) && moduleCss.includes( '@layer nino.tool {' )
+	&& /#features-list \.admin-features-actions \{[^}]*display: flex;[^}]*gap:/s.test( moduleCss ) && script.includes( "actions.className = 'admin-features-actions'" ) );
 check( 'every action method guards itself with the panel\'s permission', ( admin.match( /guardPerm\( \$appData, \$request, self::MANAGE_PERM \)/g ) || [] ).length === 6 );
 check( 'the script posts those six actions and no other',
 	script.includes( "action : 'features/'+ endpoint" ) && script.includes( "_apiCall( 'list'" ) && script.includes( "_apiCall( 'settings'" )
@@ -368,13 +383,31 @@ check( 'Active lists the features that are on', byTag( mount, 'section' ).map( f
 check( 'an update offers Update and Deactivate, its installed version named', byTag( section( mount, 'plain' ), 'p' ).some( function( el ) { return el.textContent === text('/_admin/features/label/version').replace( '%s', '1.0.0' )+ ' – '+ text('/_admin/features/label/installed').replace( '%s', '0.9.0' ) } )
 	&& byTag( section( mount, 'plain' ), 'button' ).map( function( el ) { return el.textContent } ).join('|') === text('/_admin/features/label/update').replace( '%s', '1.0.0' )+ '|'+ text('/_admin/features/label/deactivate') );
 
-// --- the settings form (Active tab)
+// --- the settings screen (from the Active tab)
 
 const sample = section( mount, 'sample' );
-const form 	 = byTag( sample, 'form' )[0];
+check( 'an active feature with settings holds no form in its card any more - a Settings button instead, ahead of Deactivate', byTag( sample, 'form' ).length === 0
+	&& byTag( sample, 'button' ).map( function( el ) { return el.textContent } ).join('|') === text('/_admin/features/label/settings')+ '|'+ text('/_admin/features/label/deactivate') );
+check( 'an active feature that declares no setting is offered none', byTag( section( mount, 'plain' ), 'button' ).some( function( el ) { return el.textContent === text('/_admin/features/label/settings') } ) === false );
+
+const settingsBtn = byTag( sample, 'button' )[0];
+check( 'Settings is a secondary action: it steps into a screen rather than posting anything', settingsBtn.type === 'button' && hasClass( settingsBtn, 'nino-admin-btn-secondary' ) );
+
+const asked = requests.length;
+fire( settingsBtn, 'click' );
+check( 'opening the screen asks the backend for nothing - features/list already carried the schema', requests.length === asked );
+check( 'the list is stepped out of and the settings pane shown, the way every drill-down level is', mount.classList.contains('admin-hidden') === true && screen.classList.contains('admin-hidden') === false );
+
+const backLink = byTag( screen.children[0], 'a' )[0];
+check( 'the screen opens with the shared context bar and the workbench\'s own back link', hasClass( screen.children[0], 'nino-admin-contextbar' )
+	&& hasClass( backLink, 'nino-admin-back-link' ) && backLink.textContent === text('/_admin/common/label/back') );
+
+const form 	 = byTag( screen, 'form' )[0];
 const controls = form ? form.querySelectorAll('[data-key]') : [];
-check( 'an active feature with settings gets a form, every setting a control carrying its name in schema order', form !== undefined && controls.map( function( el ) { return el.dataset.key } ).join(',') === 'enabled,limit,title,notes,contact,site,mode,apiKey,hosts' );
-check( 'the form sits in a fieldset legended from the text system', byTag( form, 'fieldset' ).length === 1 && byTag( form, 'legend' )[0].textContent === text('/_admin/features/label/settings') );
+check( 'the form is on that screen and nowhere in the list, every setting a control carrying its name in schema order', form !== undefined && byTag( mount, 'form' ).length === 0
+	&& controls.map( function( el ) { return el.dataset.key } ).join(',') === 'enabled,limit,title,notes,contact,site,mode,apiKey,hosts' );
+check( 'its fieldset is legended with the feature the screen is for', byTag( form, 'fieldset' ).length === 1
+	&& byTag( form, 'legend' )[0].textContent === text('/_admin/features/label/settings-of').replace( '%s', 'Beispiel-Feature' ) );
 
 const byKey = {};
 controls.forEach( function( el ) { byKey[el.dataset.key] = el } );
@@ -391,7 +424,8 @@ check( 'and its hint says one is stored and how to keep it', byTag( apiKeyLabel,
 check( 'no field label is the raw setting name - every one is the schema\'s label', findAll( form, function( el ) { return el.tagName === 'SPAN' && [ 'enabled', 'limit', 'title', 'apiKey', 'hosts' ].indexOf( el.textContent ) !== -1 } ).length === 0 );
 
 const save = byTag( form, 'button' )[0];
-check( 'one Save per feature, the primary action, labelled from the workbench\'s words', byTag( form, 'button' ).length === 1 && save.type === 'submit' && save.textContent === text('/_admin/common/label/save') );
+check( 'one Save, in the bar the workbench pins to the bottom of a form screen - a submit button, which is the primary action there without asking', byTag( form, 'button' ).length === 1
+	&& save.type === 'submit' && save.textContent === text('/_admin/common/label/save') && hasClass( form.children[1], 'nino-admin-actionbar' ) && form.children[1].children.indexOf( save ) === 0 );
 
 fire( form, 'submit' );
 const posted = requests[requests.length - 1];
@@ -409,9 +443,23 @@ fire( form, 'submit' );
 answer( 200, { feature : FEATURES[2] } );
 check( 'a saved form reloads the list rather than trusting what was typed', requests[requests.length - 1].action === 'features/list' );
 answer( 200, listAnswer( CACHE.url, true, null ) );
-check( 'the panel stayed on Active across the reload, and the confirmation survives the re-render', byTag( mount, 'section' ).map( function( el ) { return el.dataset.feature } ).join(',') === 'plain,sample' );
-const rebuilt = byTag( section( mount, 'sample' ), 'form' )[0];
-check( '...on the rebuilt form', rebuilt !== form && byTag( rebuilt, 'p' ).some( function( el ) { return el.textContent === text('/_admin/common/msg/saved') } ) );
+check( 'the reload comes back to the settings screen rather than dropping to the list', screen.classList.contains('admin-hidden') === false && mount.classList.contains('admin-hidden') === true );
+const rebuilt = byTag( screen, 'form' )[0];
+check( '...on the rebuilt form, where the confirmation survives the re-render', rebuilt !== form && byTag( rebuilt, 'p' ).some( function( el ) { return el.textContent === text('/_admin/common/msg/saved') } ) );
+
+fire( byTag( screen.children[0], 'a' )[0], 'click' );
+check( 'the back link returns to the list on the tab it was left on, and empties the pane behind it', mount.classList.contains('admin-hidden') === false && screen.classList.contains('admin-hidden') === true
+	&& screen.children.length === 0 && byTag( mount, 'section' ).map( function( el ) { return el.dataset.feature } ).join(',') === 'plain,sample' );
+
+// A feature switched off somewhere else - another tab, another account - must
+// not leave a screen standing for settings that are no longer offered
+fire( byTag( section( mount, 'sample' ), 'button' )[0], 'click' );
+panel.init();
+answer( 200, listAnswer( CACHE.url, true, null, FEATURES.map( function( f ) { return f.key === 'sample' ? Object.assign( {}, f, { active : false, settings : [] } ) : f } ) ) );
+check( 'a feature that is no longer switched on drops its screen and comes back to the list', mount.classList.contains('admin-hidden') === false && screen.classList.contains('admin-hidden') === true && screen.children.length === 0 );
+
+panel.init();
+answer( 200, listAnswer( CACHE.url, true, null ) );
 
 // --- switching on and off (from the tab the feature is on)
 

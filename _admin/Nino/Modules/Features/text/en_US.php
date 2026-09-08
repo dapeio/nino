@@ -17,6 +17,7 @@ return [
 	'[[/_admin/features/label/installed]]'		=> 'installed as %s',
 	'[[/_admin/features/label/requires]]'			=> 'Requires: %s',
 	'[[/_admin/features/label/settings]]'			=> 'Settings',
+	'[[/_admin/features/label/settings-of]]'	=> 'Settings – %s',
 	'[[/_admin/features/label/none]]'					=> '– none –',
 	'[[/_admin/features/label/activate]]'			=> 'Activate',
 	'[[/_admin/features/label/deactivate]]'		=> 'Deactivate',

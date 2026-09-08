@@ -107,6 +107,18 @@ hooks for features: another mail transport, and sorted, paged element lists.
 - A panel naming the `features` group from outside `features/` is refused
   with the existing "unknown nav group" warning and falls back to `content`,
   the same as any other invalid group.
+- **Features panel:** a feature's settings are no longer a form inside its
+  card. An active feature that declares any carries a **Settings** button,
+  which steps into a screen of its own - the pane `features-settings`, a
+  context bar with the workbench's back link, the form legended with the
+  feature, and Save in the bar pinned to the bottom the way every other
+  form screen has it. The screen survives the reload a save ends in, and
+  falls back to the list when the feature it is for stops being switched
+  on or stops declaring settings. The panel bundles a stylesheet of its
+  own now (`_admin/Nino/Modules/Features/assets/admin.css`) for the one
+  thing it needs beyond the design system: the row of buttons a card and
+  a catalogue offer carry, which the script builds without whitespace
+  between them and which therefore had none.
 
 ## 1.1.0-beta — 2026-09-07
 

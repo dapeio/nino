@@ -13,6 +13,8 @@
 # or runtime content (uploaded images), never repository content
 /public/
 
+/features/
+
 .DS_Store
 Thumbs.db
 

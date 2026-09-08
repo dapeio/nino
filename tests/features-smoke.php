@@ -409,8 +409,8 @@ $panelActions = [
 	'apiInstall' 		=> [ 'key' => 'helper', 'version' => '1.0.0' ],
 ];
 
-check( 'the panel is a system entry between Backups (10) and Config (20), with its one mount point and its permission', \Nino\Modules\Features\Admin::nav() === [ 'features', '/_admin/nav/features', 15, 'system' ]
-	&& \Nino\Modules\Features\Admin::panes() === [ 'features-list' ] && \Nino\Modules\Features\Admin::perm() === '/_admin/features/manage' );
+check( 'the panel is a system entry between Backups (10) and Config (20), with its two mount points and its permission', \Nino\Modules\Features\Admin::nav() === [ 'features', '/_admin/nav/features', 15, 'system' ]
+	&& \Nino\Modules\Features\Admin::panes() === [ 'features-list', 'features-settings' ] && \Nino\Modules\Features\Admin::perm() === '/_admin/features/manage' );
 check( 'it offers exactly the six actions', array_keys( \Nino\Modules\Features\Admin::actions() ) === [ 'features/list', 'features/activate', 'features/deactivate', 'features/settings', 'features/catalogue', 'features/install' ] );
 check( 'the workbench finds it by reading the directory, nothing registered', in_array( \Nino\Modules\Features\Admin::class, \Nino\Admin\Admin::modules(), true ) === true && isset( \Nino\Admin\Admin::panels( $appData )['features'] ) === true );
 

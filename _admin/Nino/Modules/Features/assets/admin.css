@@ -1,0 +1,39 @@
+@layer nino.system, nino.tool, nino.local;
+
+/**
+ *	Nino										A compact filesystembased php framework
+ *	Modules\Features				The features installed below features/, and the catalogue
+ *	admin.css								What the module's /_admin panel needs beyond the design
+ *													system in _admin/assets/style.css: the row of buttons a
+ *													feature's card and a catalogue offer carry. Bundled while
+ *													the module is there (see the panel's assets()), so the
+ *													same layer rules apply - the shell's stylesheet fixes the
+ *													layer order, this one only ever adds to nino.tool, scoped
+ *													to the panel's own pane.
+ *
+ *	@package								Dape/Nino
+ *	@author									David Perchermeier <mail@dape.io>
+ *	@link										https://github.com/dapeio/nino
+ */
+
+@layer nino.tool {
+
+/*	Activate, Update, Settings, Deactivate on a feature; Install or the
+	archive link on an offer. The script builds them as siblings with no
+	whitespace between them, so without a gap of their own they touch. */
+#features-list .admin-features-actions {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: .5rem;
+}
+
+/*	The line they report into - "Activating …", or a kernel refusal that is
+	a whole sentence. It takes what is left of the row and wraps onto a row
+	of its own before it squeezes the buttons. */
+#features-list .admin-features-actions > p {
+	flex: 1 1 14rem;
+	margin: 0;
+}
+
+}
