@@ -52,6 +52,12 @@ hooks for features: another mail transport, and sorted, paged element lists.
   archives written byte by byte (a hostile one too), the network stubbed;
   kernel-smoke covers the transport callback and the sorted, paged query.
 
+- **`\Nino\Filesystem::path()`** resolves `/features/...` against
+  `\Nino\Features::dir()`, so a feature names its own files - a stylesheet or
+  script it adds to the project's bundles with `\Nino\Html::addAsset()` -
+  as `/features/<Name>/...` and they are found after a relocation with
+  `NINO_FEATURES_DIR` too.
+
 ### Changed
 
 - `\Nino\Features::constraintValid()` is public - the catalogue validates

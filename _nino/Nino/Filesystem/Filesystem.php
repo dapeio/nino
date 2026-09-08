@@ -345,6 +345,11 @@ namespace Nino {
 		// put, since they serve their own js/css from where they are
 		public const array PUBLIC_DIRS = [ '/images', '/favicon', '/fonts', '/.cache' ];
 
+		// The installed features: resolved against \Nino\Features::dir(), which
+		// is features/ below the project root or wherever NINO_FEATURES_DIR
+		// points - never served, but read for a feature's own files
+		public const string FEATURES_DIR = '/features';
+
 		// Map a virtual, project-relative path onto its real location on
 		// disk:
 		//
@@ -370,6 +375,12 @@ namespace Nino {
 
 			if( self::_isIn( self::PRIVATE_DIRS, $filename ) === true && ( $appData['./nino/filesystem/privatepath'] ?? '' ) !== '' )
 				return rtrim( $appData['./nino/filesystem/privatepath']. $filename, '/' );
+
+			// The installed features, wherever NINO_FEATURES_DIR put them - so
+			// a feature names its own files as '/features/<Name>/...', for an
+			// asset it adds to a bundle, and they are found after a relocation
+			if( $filename === self::FEATURES_DIR || str_starts_with( $filename, self::FEATURES_DIR. '/' ) === true )
+				return rtrim( \Nino\Features::dir(). substr( $filename, strlen( self::FEATURES_DIR ) ), '/' );
 
 			if( self::_isIn( self::PUBLIC_DIRS, $filename ) === true && ( $appData['./nino/filesystem/publicpath'] ?? '' ) !== '' )
 				return rtrim( $appData['./nino/filesystem/publicpath']. $filename, '/' );

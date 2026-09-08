@@ -42,6 +42,7 @@ $all = \Nino\Features::all( $appData );
 $warnings = ninoWarnings();
 
 check( 'dir() is the constant', \Nino\Features::dir() === __DIR__. '/fixtures/features' );
+check( 'a virtual /features path resolves there too, so a feature can name its own files', \Nino\Filesystem::path( $appData, '/features/Sample/feature.php' ) === __DIR__. '/fixtures/features/Sample/feature.php' );
 check( 'every readable manifest is listed, sorted by key', array_keys( $all ) === [ 'helper', 'old', 'sample' ] );
 check( 'a directory whose manifest does not validate is skipped with a warning naming it', isset( $all['broken'] ) === false
 	&& count( array_filter( $warnings, static fn( string $w ): bool => str_contains( $w, '/Broken/feature.php' ) && str_contains( $w, 'version' ) ) ) === 1 );

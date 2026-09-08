@@ -2139,6 +2139,7 @@ check( 'the asset sources are private, the bundle they build is not', \Nino\File
 	&& \Nino\Filesystem::path( $pathAppData, '/.cache/style.css' ) === '/srv/site/public/.cache/style.css' );
 
 check( 'tool code stays on the project root', \Nino\Filesystem::path( $pathAppData, '/_admin/x' ) === '/srv/site/_admin/x' );
+check( 'the installed features resolve against Features::dir(), wherever that is', \Nino\Filesystem::path( $pathAppData, '/features/Sample/assets/x.css' ) === \Nino\Features::dir(). '/Sample/assets/x.css' && \Nino\Filesystem::path( $pathAppData, '/features' ) === \Nino\Features::dir() && \Nino\Filesystem::path( $pathAppData, '/featuresets/x' ) === '/srv/site/featuresets/x' );
 
 foreach( \Nino\Filesystem::PRIVATE_DIRS as $private )
 	check( "$private resolves against the private root", \Nino\Filesystem::path( $pathAppData, $private ) === '/srv/site/private'. $private );
