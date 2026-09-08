@@ -214,7 +214,7 @@ const panel 	= Nino.admin.features;
 
 const LIST = {
 	dir : '/features',
-	catalogue : 'https://getnino.dev/features/catalogue.json',
+	catalogue : 'https://catalogue.getnino.dev/catalogue.json',
 	features : [
 		{ key : 'old', name : 'Old', description : '', version : '3.0.0', installed : null, active : false, update : false, requires : [ 'nowhere' ],
 			problems : [ 'requires Nino ^0.9, this is 1.0.0', 'requires the php extension "no_such_extension"' ], settings : [] },

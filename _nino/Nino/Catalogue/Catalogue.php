@@ -50,13 +50,18 @@ namespace Nino {
 
 		// Where Nino's own catalogue is published. '' under '/nino/catalogue/url'
 		// switches the catalogue off altogether
-		public const string DEFAULT_URL = 'https://getnino.dev/features/catalogue.json';
+		public const string DEFAULT_URL = 'https://catalogue.getnino.dev/catalogue.json';
 
 		// The public half of the key Nino's catalogue is signed with, PEM.
 		// Empty until the first key exists - and an empty key verifies nothing,
 		// so until then no catalogue is accepted. '/nino/catalogue/key' names
 		// another key for a catalogue of your own
-		public const string PUBLIC_KEY = '';
+public const string PUBLIC_KEY = <<<'PEM'
+-----BEGIN PUBLIC KEY-----
+MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE84ucNcgOiSyR6iujeBqNtxpoFEBg
+tRm6k5xjrlISP9l8GO5qX54XWFpzt18fsm8bDfH5+HEoJRgyI8ogDogNvQ==
+-----END PUBLIC KEY-----
+PEM;
 
 		public const int FORMAT = 1;
 

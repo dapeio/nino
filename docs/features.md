@@ -203,7 +203,7 @@ The setup wizard's Setup step offers no features. It knows the kernel modules th
 
 ## The Catalogue
 
-A feature that is not copied in by hand comes from a catalogue: a `catalogue.json` published over https beside the archives it lists, and beside it a detached signature `catalogue.json.sig`. Nino's own is `https://getnino.dev/features/catalogue.json`, built and signed by the catalogue repository [dapeio/nino-features](https://github.com/dapeio/nino-features) from the same directories a hand copy comes from. The kernel side is `\Nino\Catalogue` in `_nino/Nino/Catalogue/Catalogue.php` and the kernel's one http client, `\Nino\Fetch`; `tests/catalogue-smoke.php` checks both without a network.
+A feature that is not copied in by hand comes from a catalogue: a `catalogue.json` published over https beside the archives it lists, and beside it a detached signature `catalogue.json.sig`. Nino's own is `https://catalogue.getnino.dev/catalogue.json`, built and signed by the catalogue repository [dapeio/nino-features](https://github.com/dapeio/nino-features) from the same directories a hand copy comes from. The kernel side is `\Nino\Catalogue` in `_nino/Nino/Catalogue/Catalogue.php` and the kernel's one http client, `\Nino\Fetch`; `tests/catalogue-smoke.php` checks both without a network.
 
 ### What the Catalogue Says
 

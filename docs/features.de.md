@@ -203,7 +203,7 @@ Der Setup-Schritt des Einrichtungsassistenten bietet keine Features an. Er kennt
 
 ## Der Katalog
 
-Ein Feature, das nicht von Hand hineinkopiert wird, kommt aus einem Katalog: einer `catalogue.json`, über https veröffentlicht neben den Archiven, die sie auflistet, und daneben eine abgetrennte Signatur `catalogue.json.sig`. Ninos eigener ist `https://getnino.dev/features/catalogue.json`, gebaut und signiert vom Katalog-Repository [dapeio/nino-features](https://github.com/dapeio/nino-features) aus denselben Verzeichnissen, aus denen auch eine Handkopie stammt. Die Kernel-Seite ist `\Nino\Catalogue` in `_nino/Nino/Catalogue/Catalogue.php` und der eine HTTP-Client des Kernels, `\Nino\Fetch`; `tests/catalogue-smoke.php` prüft beide ohne Netz.
+Ein Feature, das nicht von Hand hineinkopiert wird, kommt aus einem Katalog: einer `catalogue.json`, über https veröffentlicht neben den Archiven, die sie auflistet, und daneben eine abgetrennte Signatur `catalogue.json.sig`. Ninos eigener ist `https://catalogue.getnino.dev/catalogue.json`, gebaut und signiert vom Katalog-Repository [dapeio/nino-features](https://github.com/dapeio/nino-features) aus denselben Verzeichnissen, aus denen auch eine Handkopie stammt. Die Kernel-Seite ist `\Nino\Catalogue` in `_nino/Nino/Catalogue/Catalogue.php` und der eine HTTP-Client des Kernels, `\Nino\Fetch`; `tests/catalogue-smoke.php` prüft beide ohne Netz.
 
 ### Was der Katalog sagt
 
