@@ -6,13 +6,15 @@
  *										with what payload, that every word it renders is a fill
  *										both interface languages define, that a secret's input
  *										is always empty, and that one Save collects every
- *										setting of its feature by data-key - and, below the
- *										list, the catalogue block: nothing fetched until its
- *										button is pressed, one card per offer with the button
- *										its state allows, and an install that reads the list
- *										and the catalogue again rather than reloading. The
- *										real Nino.adminUi renders the shared controls, over a
- *										dependency-free element stand-in.
+ *										setting of its feature by data-key - and the three tabs
+ *										(Available, Inactive, Active) with their counts, the
+ *										action bar's Refresh catalogue button and status line,
+ *										that the Available tab fills from what features/list
+ *										already carries (no request of its own), that Refresh
+ *										posts features/catalogue, every empty state, and the
+ *										switched-off catalogue. The real Nino.adminUi renders
+ *										the shared controls, over a dependency-free element
+ *										stand-in.
  *
  *	Usage: node tests/admin-features-js-smoke.js
  */
@@ -155,6 +157,10 @@ function section( root, key ) {
 	return byTag( root, 'section' ).filter( function( el ) { return el.dataset.feature === key } )[0];
 }
 
+function offer( root, key ) {
+	return byTag( root, 'section' ).filter( function( el ) { return el.dataset.offer === key } )[0];
+}
+
 // --- the words
 
 const moduleEn 		= fills('_admin/Nino/Modules/Features/text/en_US.php');
@@ -170,8 +176,6 @@ function text( key ) {
 
 const mount = element('div');
 mount.id = 'features-list';
-const catalogueMount = element('div');
-catalogueMount.id = 'features-catalogue';
 
 const callbacks = [];
 const requests = [];
@@ -190,7 +194,7 @@ const sandbox = {
 	document : {
 		createElement : element,
 		createTextNode : textNode,
-		getElementById : function( id ) { return id === 'features-list' ? mount : ( id === 'features-catalogue' ? catalogueMount : null ) },
+		getElementById : function( id ) { return id === 'features-list' ? mount : null },
 		documentElement : null,
 		body : null,
 	},
@@ -212,27 +216,51 @@ function answer( status, body ) {
 const script = source('_admin/Nino/Modules/Features/assets/admin.js');
 const panel 	= Nino.admin.features;
 
-const LIST = {
-	dir : '/features',
-	catalogue : 'https://catalogue.getnino.dev/catalogue.json',
-	features : [
-		{ key : 'old', name : 'Old', description : '', version : '3.0.0', installed : null, active : false, update : false, requires : [ 'nowhere' ],
-			problems : [ 'requires Nino ^0.9, this is 1.0.0', 'requires the php extension "no_such_extension"' ], settings : [] },
-		{ key : 'plain', name : 'Plain', description : 'Nothing to set.', version : '1.0.0', installed : '0.9.0', active : true, update : true, requires : [], problems : [], settings : [] },
-		{ key : 'sample', name : 'Beispiel-Feature', description : 'Prüft den ganzen Feature-Vertrag.', version : '1.2.0', installed : '1.2.0', active : true, update : false, requires : [ 'helper' ], problems : [], settings : [
-			{ name : 'enabled', type : 'bool', label : 'Aktiv', hint : '', required : false, min : null, max : null, maxlength : null, unit : '', options : [], value : true },
-			{ name : 'limit', type : 'int', label : 'Limit', hint : 'Items per page', required : false, min : 1, max : 50, maxlength : null, unit : 'items', options : [], value : 7 },
-			{ name : 'title', type : 'string', label : 'Title', hint : '', required : true, min : null, max : null, maxlength : 40, unit : '', options : [], value : 'Again' },
-			{ name : 'notes', type : 'text', label : 'Notes', hint : '', required : false, min : null, max : null, maxlength : 10000, unit : '', options : [], value : 'a\nb' },
-			{ name : 'contact', type : 'email', label : 'Contact', hint : '', required : false, min : null, max : null, maxlength : 1000, unit : '', options : [], value : '' },
-			{ name : 'site', type : 'url', label : 'Site', hint : '', required : false, min : null, max : null, maxlength : 1000, unit : '', options : [], value : 'https://example.com' },
-			{ name : 'mode', type : 'select', label : 'Mode', hint : '', required : false, min : null, max : null, maxlength : null, unit : '', options : [ { value : 'fast', label : 'Fast' }, { value : 'safe', label : 'Sicher' } ], value : 'fast' },
-			{ name : 'apiKey', type : 'secret', label : 'API key', hint : '', required : false, min : null, max : null, maxlength : 1000, unit : '', options : [], set : true },
-			{ name : 'hosts', type : 'lines', label : 'Hosts', hint : '', required : false, min : null, max : null, maxlength : null, unit : '', options : [], value : [ 'one', 'two' ] },
-		] },
-		{ key : 'fresh', name : 'Fresh', description : 'Not switched on yet.', version : '0.1.0', installed : null, active : false, update : false, requires : [], problems : [], settings : [] },
-	],
-};
+// The installed features fixture: 'old' inactive with problems (no button at
+// all), 'fresh' inactive without problems (Activate alone), 'plain' active
+// with an update waiting (Update + Deactivate), 'sample' active with a full
+// settings schema - so Inactive is { old, fresh } and Active is { plain, sample }
+const FEATURES = [
+	{ key : 'old', name : 'Old', description : '', version : '3.0.0', installed : null, active : false, update : false, requires : [ 'nowhere' ],
+		problems : [ 'requires Nino ^0.9, this is 1.0.0', 'requires the php extension "no_such_extension"' ], settings : [] },
+	{ key : 'plain', name : 'Plain', description : 'Nothing to set.', version : '1.0.0', installed : '0.9.0', active : true, update : true, requires : [], problems : [], settings : [] },
+	{ key : 'sample', name : 'Beispiel-Feature', description : 'Prüft den ganzen Feature-Vertrag.', version : '1.2.0', installed : '1.2.0', active : true, update : false, requires : [ 'helper' ], problems : [], settings : [
+		{ name : 'enabled', type : 'bool', label : 'Aktiv', hint : '', required : false, min : null, max : null, maxlength : null, unit : '', options : [], value : true },
+		{ name : 'limit', type : 'int', label : 'Limit', hint : 'Items per page', required : false, min : 1, max : 50, maxlength : null, unit : 'items', options : [], value : 7 },
+		{ name : 'title', type : 'string', label : 'Title', hint : '', required : true, min : null, max : null, maxlength : 40, unit : '', options : [], value : 'Again' },
+		{ name : 'notes', type : 'text', label : 'Notes', hint : '', required : false, min : null, max : null, maxlength : 10000, unit : '', options : [], value : 'a\nb' },
+		{ name : 'contact', type : 'email', label : 'Contact', hint : '', required : false, min : null, max : null, maxlength : 1000, unit : '', options : [], value : '' },
+		{ name : 'site', type : 'url', label : 'Site', hint : '', required : false, min : null, max : null, maxlength : 1000, unit : '', options : [], value : 'https://example.com' },
+		{ name : 'mode', type : 'select', label : 'Mode', hint : '', required : false, min : null, max : null, maxlength : null, unit : '', options : [ { value : 'fast', label : 'Fast' }, { value : 'safe', label : 'Sicher' } ], value : 'fast' },
+		{ name : 'apiKey', type : 'secret', label : 'API key', hint : '', required : false, min : null, max : null, maxlength : 1000, unit : '', options : [], set : true },
+		{ name : 'hosts', type : 'lines', label : 'Hosts', hint : '', required : false, min : null, max : null, maxlength : null, unit : '', options : [], value : [ 'one', 'two' ] },
+	] },
+	{ key : 'fresh', name : 'Fresh', description : 'Not switched on yet.', version : '0.1.0', installed : null, active : false, update : false, requires : [], problems : [], settings : [] },
+];
+
+/** A features/list answer: the catalogue url, whether features/ is writable, the cache - null unless given - and the installed features, FEATURES unless a list of its own is given (an install adds one the fixture does not carry) */
+function listAnswer( catalogueUrl, writable, cache, features ) {
+	return { dir : '/features', catalogueUrl : catalogueUrl, writable : writable, catalogue : cache || null, features : features || FEATURES };
+}
+
+// The catalogue as features/catalogue - and, once cached, features/list - name
+// its offers: 'ancient' and 'needy' incompatible (never on disk), 'extra'
+// available, 'helper' an upgrade over what is on disk, 'sample' already
+// current - the one state the Available tab excludes
+const OFFERS = [
+	{ key : 'ancient', name : 'Ancient', description : 'Ein ancient', version : '1.0.0', nino : '^0.9', ext : [], requires : [], directory : 'Ancient', archive : 'https://catalogue.test/features/ancient-1.0.0.tar.gz', size : 10, released : '2026-09-07', state : 'incompatible', fits : false, local : null, active : false },
+	{ key : 'extra', name : 'Zusatz', description : 'Ein extra', version : '1.0.0', nino : '^1.0', ext : [], requires : [ 'helper' ], directory : 'Extra', archive : 'https://catalogue.test/features/extra-1.0.0.tar.gz', size : 10, released : '2026-09-07', state : 'available', fits : true, local : null, active : false },
+	{ key : 'helper', name : 'Helper', description : '', version : '1.2.0', nino : '^1.0', ext : [], requires : [], directory : 'Helper', archive : 'https://catalogue.test/features/helper-1.2.0.tar.gz', size : 10, released : '', state : 'upgrade', fits : true, local : '1.1.0', active : true },
+	{ key : 'needy', name : 'Needy', description : 'Ein needy', version : '1.0.0', nino : '^1.0', ext : [ 'no_such_extension', 'other' ], requires : [], directory : 'Needy', archive : 'https://catalogue.test/features/needy-1.0.0.tar.gz', size : 10, released : '2026-09-07', state : 'incompatible', fits : false, local : null, active : false },
+	{ key : 'sample', name : 'Beispiel-Feature', description : 'Ein sample', version : '1.2.0', nino : '^1.0', ext : [], requires : [ 'helper' ], directory : 'Sample', archive : 'https://catalogue.test/features/sample-1.2.0.tar.gz', size : 10, released : '2026-09-07', state : 'current', fits : true, local : '1.2.0', active : true },
+];
+
+const CACHE = { url : 'https://catalogue.getnino.dev/catalogue.json', fetched : '2026-09-07 12:00', offers : OFFERS };
+
+// features/catalogue's own shape - 'generated' and 'writable' beside it, no 'url' collision
+function catalogueAnswer( writable, offers, fetched ) {
+	return { url : CACHE.url, generated : '2026-09-07T12:00:00Z', fetched : fetched || CACHE.fetched, writable : writable, offers : offers || OFFERS };
+}
 
 console.log('Features panel');
 
@@ -241,8 +269,8 @@ check( 'and binds its ready callback', callbacks.length === 1 && callbacks[0] ==
 
 // The backend half of the same contract, read from the class
 const admin = source('_admin/Nino/Modules/Features/Admin/Admin.php');
-check( 'the panel is a system entry with the nav uri the script speaks, two mount points and six actions',
-	admin.includes( "return [ 'features', '/_admin/nav/features', 15, 'system' ];" ) && admin.includes( "return [ 'features-list', 'features-catalogue' ];" ) && script.includes( "'features-list'" ) && script.includes( "'features-catalogue'" )
+check( 'the panel is a system entry with the nav uri the script speaks, one mount point and six actions',
+	admin.includes( "return [ 'features', '/_admin/nav/features', 15, 'system' ];" ) && admin.includes( "return [ 'features-list' ];" ) && script.includes( "'features-list'" )
 	&& [ 'features/list', 'features/activate', 'features/deactivate', 'features/settings', 'features/catalogue', 'features/install' ].every( function( action ) { return admin.includes( "'"+ action+ "'" ) } ) );
 check( 'every action method guards itself with the panel\'s permission', ( admin.match( /guardPerm\( \$appData, \$request, self::MANAGE_PERM \)/g ) || [] ).length === 6 );
 check( 'the script posts those six actions and no other',
@@ -261,7 +289,8 @@ const missing = keys.filter( function( key ) {
 	return ( moduleEn[key] || workbenchEn[key] ) === undefined || ( moduleDe[key] || workbenchDe[key] ) === undefined;
 } );
 check( 'every fill the script asks for exists in both interface languages'+ ( missing.length ? ' - missing: '+ missing.join(', ') : '' ), keys.length > 0 && missing.length === 0 );
-check( 'the six status words and the reload hint are among them', [ 'active', 'inactive', 'update', 'incompatible', 'available', 'installed' ].every( function( s ) { return keys.indexOf( '/_admin/features/status/'+ s ) !== -1 } ) && keys.indexOf( '/_admin/features/msg/reload' ) !== -1 );
+check( 'the three tab labels and the reload hint are among them', [ 'available', 'inactive', 'active' ].every( function( t ) { return keys.indexOf( '/_admin/features/tab/'+ t ) !== -1 } ) && keys.indexOf( '/_admin/features/msg/reload' ) !== -1 );
+check( 'no eyebrow status word is asked for any more - the tab and the version line carry that now', keys.indexOf( '/_admin/features/status/active' ) === -1 && keys.indexOf( '/_admin/features/status/incompatible' ) === -1 );
 
 // The words the class phrases itself - a catalogue refusal, an update that
 // did not apply - are fills too, read server-side in the interface language
@@ -270,7 +299,7 @@ const phrasedRe = /_say\( \$appData, '(\/_admin\/[^']+)'/g;
 while( ( match = phrasedRe.exec( admin ) ) )
 	if( phrased.indexOf( match[1] ) === -1 )
 		phrased.push( match[1] );
-const unphrased = phrased.filter( function( key ) { return moduleEn[key] === undefined || moduleDe[key] === undefined } );
+const unphrased = phrased.filter( function( key ) { return moduleEn[key] === undefined || moduleDe[key] === undefined; } );
 check( 'every message the class phrases itself is a fill of the module in both languages'+ ( unphrased.length ? ' - missing: '+ unphrased.join(', ') : '' ), phrased.length >= 4 && unphrased.length === 0
 	&& phrased.indexOf( '/_admin/features/error/catalogue-off' ) !== -1 && phrased.indexOf( '/_admin/features/error/catalogue-key' ) !== -1
 	&& moduleEn['/_admin/features/error/catalogue-reason'].includes( '%s' ) && moduleDe['/_admin/features/error/catalogue-reason'].includes( '%s' )
@@ -278,6 +307,8 @@ check( 'every message the class phrases itself is a fill of the module in both l
 check( 'the module\'s two text files declare the same keys', Object.keys( moduleEn ).sort().join(',') === Object.keys( moduleDe ).sort().join(',') && Object.keys( moduleEn ).length > 20 );
 check( 'the nav label and the dashboard tile are among them, and no value carries a live shortcode', moduleEn['/_admin/nav/features'] !== undefined && moduleEn['/_admin/features/label/active'] !== undefined
 	&& Object.keys( moduleEn ).every( function( key ) { return /[[\]]/.test( moduleEn[key] ) === false && /[[\]]/.test( moduleDe[key] ) === false } ) );
+check( 'the intro hint and the eyebrow badge fills are gone', moduleEn['/_admin/features/hint/intro'] === undefined && moduleEn['/_admin/features/label/catalogue'] === undefined
+	&& moduleEn['/_admin/features/label/catalogue-load'] === undefined && moduleEn['/_admin/features/label/generated'] === undefined );
 
 // The same rule tests/admin-lists-js-smoke.js applies to every panel script:
 // no sentence assigned straight to what the user reads
@@ -292,40 +323,52 @@ script.split('\n').forEach( function( line, index ) {
 } );
 check( 'the script writes no sentence of its own into the dom'+ ( hardcoded.length ? ' - '+ hardcoded.join(', ') : '' ), hardcoded.length === 0 );
 
-// --- the list
+// --- opening the panel: no cache yet
 
 panel.init();
 check( 'init loads features/list through the shell\'s one endpoint', requests.length === 1 && requests[0].action === 'features/list' && requests[0].uri === '/_admin/' && requests[0].method === 'POST' );
 
-answer( 200, LIST );
-check( 'opening the panel fetches nothing but the list - the catalogue block is drawn from the url alone', requests.length === 1 && catalogueMount.children.length === 1 && catalogueMount.children[0].dataset.catalogue === 'on'
-	&& byTag( catalogueMount, 'h3' )[0].textContent === text('/_admin/features/label/catalogue') && byTag( catalogueMount, 'p' ).some( function( el ) { return el.textContent === text('/_admin/features/hint/catalogue').replace( '%s', LIST.catalogue ) && el.textContent.includes( LIST.catalogue ) } )
-	&& byTag( catalogueMount, 'button' ).map( function( el ) { return el.textContent } ).join('|') === text('/_admin/features/label/catalogue-load') && hasClass( byTag( catalogueMount, 'button' )[0], 'nino-admin-btn-secondary' ) && byTag( catalogueMount, 'section' ).length === 1 );
-check( 'the intro names the directory, as the tinted lead hint', mount.children.length > 0 && hasClass( mount.children[0], 'nino-admin-hint-lead' ) && mount.children[0].textContent.includes( '/features' ) && mount.children[0].textContent === text('/_admin/features/hint/intro').replace( '%s', '/features' ) );
-check( 'one card per feature, in the order the backend sorted them', byTag( mount, 'section' ).map( function( el ) { return el.dataset.feature } ).join(',') === 'old,plain,sample,fresh' && byTag( mount, 'section' ).every( function( el ) { return hasClass( el, 'nino-admin-card' ) } ) );
+answer( 200, listAnswer( CACHE.url, true, null ) );
+check( 'opening the panel fetches nothing but the list - no catalogue request follows on its own', requests.length === 1 );
+check( 'there is no intro line and no eyebrow badge - just the tab strip, the action bar and the current tab', mount.children.length === 3
+	&& hasClass( mount.children[0], 'nino-admin-tabs' ) && hasClass( mount.children[0], 'nino-admin-tabs--bar' ) && hasClass( mount.children[0], 'admin-panel-tabs' )
+	&& findAll( mount, function( el ) { return hasClass( el, 'nino-admin-hint-lead' ) } ).length === 0 && findAll( mount, function( el ) { return hasClass( el, 'nino-admin-eyebrow' ) } ).length === 0 );
 
-const statuses = {};
-findAll( mount, function( el ) { return typeof el.dataset.status === 'string' } ).forEach( function( el ) { statuses[el.dataset.status] = el } );
-check( 'the status is a word from the text system: incompatible, update, active, inactive', Object.keys( statuses ).sort().join(',') === 'active,inactive,incompatible,update'
-	&& statuses.active.textContent === text('/_admin/features/status/active') && statuses.inactive.textContent === text('/_admin/features/status/inactive')
-	&& statuses.update.textContent === text('/_admin/features/status/update') && statuses.incompatible.textContent === text('/_admin/features/status/incompatible') );
-check( 'an incompatible one is underlined as an error, but by the word first', hasClass( statuses.incompatible, 'nino-admin-error' ) && hasClass( statuses.incompatible, 'nino-admin-eyebrow' ) && hasClass( statuses.active, 'nino-admin-error' ) === false );
+// --- the tab strip
 
-const old = section( mount, 'old' );
-check( 'every problem is a line of its own, in the kernel\'s words', byTag( old, 'p' ).filter( function( el ) { return hasClass( el, 'nino-admin-error' ) } ).map( function( el ) { return el.textContent } ).join('|') === LIST.features[0].problems.join('|') );
-check( 'and a feature with problems offers no button at all', byTag( old, 'button' ).length === 0 && byTag( old, 'form' ).length === 0 );
-check( 'the requirements are named', byTag( old, 'p' ).some( function( el ) { return el.textContent === text('/_admin/features/label/requires').replace( '%s', 'nowhere' ) } ) );
+const tabs = byTag( mount.children[0], 'button' );
+check( 'three tabs, in order, each labelled with its count - Inactive 2 (old, fresh), Active 2 (plain, sample)', tabs.length === 3
+	&& tabs[0].textContent === text('/_admin/features/tab/available')+ ' (0)' && tabs[1].textContent === text('/_admin/features/tab/inactive')+ ' (2)' && tabs[2].textContent === text('/_admin/features/tab/active')+ ' (2)' );
+check( 'Available is the tab on screen, role=tab/tablist throughout, aria-selected in step with the active one', mount.children[0].attributes.role === 'tablist' && tabs.every( function( t ) { return t.attributes.role === 'tab' } )
+	&& hasClass( tabs[0], 'is-active' ) && tabs[0].attributes['aria-selected'] === 'true' && hasClass( tabs[1], 'is-active' ) === false && tabs[1].attributes['aria-selected'] === 'false' );
 
-const plain = section( mount, 'plain' );
-check( 'an installed version behind the manifest is shown beside it', byTag( plain, 'p' ).some( function( el ) { return el.textContent === text('/_admin/features/label/version').replace( '%s', '1.0.0' )+ ' – '+ text('/_admin/features/label/installed').replace( '%s', '0.9.0' ) } )
-	&& byTag( section( mount, 'sample' ), 'p' ).some( function( el ) { return el.textContent === text('/_admin/features/label/version').replace( '%s', '1.2.0' ) } ) );
-check( 'an update offers Update and Deactivate, no settings form without settings', byTag( plain, 'button' ).map( function( el ) { return el.textContent } ).join('|') === text('/_admin/features/label/update').replace( '%s', '1.0.0' )+ '|'+ text('/_admin/features/label/deactivate') && byTag( plain, 'form' ).length === 0 );
+// --- the action bar
 
-const fresh = section( mount, 'fresh' );
-check( 'an inactive feature without problems offers Activate alone', byTag( fresh, 'button' ).map( function( el ) { return el.textContent } ).join('|') === text('/_admin/features/label/activate') && hasClass( byTag( fresh, 'button' )[0], 'nino-admin-btn-primary' ) );
-check( 'the description is shown as it arrived', byTag( fresh, 'p' ).some( function( el ) { return el.textContent === 'Not switched on yet.' } ) );
+check( 'the action bar carries the shared classes and one button plus a status line', hasClass( mount.children[1], 'nino-admin-actionbar' ) && hasClass( mount.children[1], 'nino-admin-list-actions' )
+	&& byTag( mount.children[1], 'button' ).length === 1 && byTag( mount.children[1], 'button' )[0].textContent === text('/_admin/features/label/catalogue-refresh') && hasClass( byTag( mount.children[1], 'button' )[0], 'nino-admin-btn-secondary' ) );
+const status = byTag( mount.children[1], 'p' )[0];
+check( 'without a cache yet the status says so, not an error', status.textContent === text('/_admin/features/label/catalogue-unloaded') && hasClass( status, 'nino-admin-error' ) === false && status.attributes['aria-live'] === 'polite' );
 
-// --- the settings form
+// --- the Available tab before anything was ever fetched
+
+check( 'the Available tab explains there is nothing cached yet', findAll( mount.children[2], function( el ) { return hasClass( el, 'nino-admin-empty' ) } )[0].textContent === text('/_admin/features/hint/available-unloaded') );
+
+// --- Inactive and Active
+
+fire( tabs[1], 'click' );
+check( 'Inactive lists the features that are off, in the backend\'s order, no button at all for one with problems', byTag( mount, 'section' ).map( function( el ) { return el.dataset.feature } ).join(',') === 'old,fresh'
+	&& byTag( section( mount, 'old' ), 'button' ).length === 0 && byTag( section( mount, 'old' ), 'form' ).length === 0 );
+check( 'a card carries no status badge any more - just its name', section( mount, 'fresh' ).children[0].tagName === 'H3' && section( mount, 'fresh' ).children[0].textContent === 'Fresh' );
+check( 'and an inactive feature without problems offers Activate alone', byTag( section( mount, 'fresh' ), 'button' ).map( function( el ) { return el.textContent } ).join('|') === text('/_admin/features/label/activate') && hasClass( byTag( section( mount, 'fresh' ), 'button' )[0], 'nino-admin-btn-primary' ) );
+check( 'the requirements of a problem feature are still named', byTag( section( mount, 'old' ), 'p' ).some( function( el ) { return el.textContent === text('/_admin/features/label/requires').replace( '%s', 'nowhere' ) } )
+	&& byTag( section( mount, 'old' ), 'p' ).filter( function( el ) { return hasClass( el, 'nino-admin-error' ) } ).map( function( el ) { return el.textContent } ).join('|') === FEATURES[0].problems.join('|') );
+
+fire( tabs[2], 'click' );
+check( 'Active lists the features that are on', byTag( mount, 'section' ).map( function( el ) { return el.dataset.feature } ).join(',') === 'plain,sample' );
+check( 'an update offers Update and Deactivate, its installed version named', byTag( section( mount, 'plain' ), 'p' ).some( function( el ) { return el.textContent === text('/_admin/features/label/version').replace( '%s', '1.0.0' )+ ' – '+ text('/_admin/features/label/installed').replace( '%s', '0.9.0' ) } )
+	&& byTag( section( mount, 'plain' ), 'button' ).map( function( el ) { return el.textContent } ).join('|') === text('/_admin/features/label/update').replace( '%s', '1.0.0' )+ '|'+ text('/_admin/features/label/deactivate') );
+
+// --- the settings form (Active tab)
 
 const sample = section( mount, 'sample' );
 const form 	 = byTag( sample, 'form' )[0];
@@ -363,14 +406,16 @@ answer( 400, { error : 'limit: must be at most 50' } );
 check( 'a rejected form shows the fields the backend named, as an error, and frees the button', save.disabled === false && hasClass( saveMsg, 'nino-admin-error' ) && saveMsg.textContent === '(400) limit: must be at most 50' );
 
 fire( form, 'submit' );
-answer( 200, { feature : LIST.features[2] } );
+answer( 200, { feature : FEATURES[2] } );
 check( 'a saved form reloads the list rather than trusting what was typed', requests[requests.length - 1].action === 'features/list' );
-answer( 200, LIST );
+answer( 200, listAnswer( CACHE.url, true, null ) );
+check( 'the panel stayed on Active across the reload, and the confirmation survives the re-render', byTag( mount, 'section' ).map( function( el ) { return el.dataset.feature } ).join(',') === 'plain,sample' );
 const rebuilt = byTag( section( mount, 'sample' ), 'form' )[0];
-check( 'and the confirmation survives the re-render', rebuilt !== form && byTag( rebuilt, 'p' ).some( function( el ) { return el.textContent === text('/_admin/common/msg/saved') } ) );
+check( '...on the rebuilt form', rebuilt !== form && byTag( rebuilt, 'p' ).some( function( el ) { return el.textContent === text('/_admin/common/msg/saved') } ) );
 
-// --- switching on and off
+// --- switching on and off (from the tab the feature is on)
 
+fire( tabs[1], 'click' );
 const activate = byTag( section( mount, 'fresh' ), 'button' )[0];
 const freshMsg = byTag( section( mount, 'fresh' ), 'p' ).filter( function( el ) { return el.attributes['aria-live'] === 'polite' } )[0];
 fire( activate, 'click' );
@@ -378,13 +423,14 @@ check( 'Activate posts features/activate with the key', requests[requests.length
 answer( 400, { error : 'feature "fresh" cannot be activated: nope' } );
 check( 'a refusal shows the kernel\'s reason and reloads nothing', reloads === 0 && activate.disabled === false && hasClass( freshMsg, 'nino-admin-error' ) && freshMsg.textContent === '(400) feature "fresh" cannot be activated: nope' );
 fire( activate, 'click' );
-answer( 200, { feature : LIST.features[3] } );
+answer( 200, { feature : FEATURES[3] } );
 check( 'success says so, keeps the hash on the panel and reloads the workbench', reloads === 1 && sandbox.window.location.hash === '#features' && freshMsg.textContent === text('/_admin/features/msg/activated')+ ' '+ text('/_admin/features/msg/reload') );
 
+fire( tabs[2], 'click' );
 const deactivate = byTag( section( mount, 'sample' ), 'button' ).filter( function( el ) { return el.textContent === text('/_admin/features/label/deactivate') } )[0];
 fire( deactivate, 'click' );
 check( 'Deactivate posts features/deactivate with the key', requests[requests.length - 1].action === 'features/deactivate' && requests[requests.length - 1].payload.key === 'sample' && hasClass( deactivate, 'nino-admin-btn-secondary' ) );
-answer( 200, { feature : LIST.features[2] } );
+answer( 200, { feature : FEATURES[2] } );
 check( '...and reloads too', reloads === 2 );
 
 const update = byTag( section( mount, 'plain' ), 'button' )[0];
@@ -393,145 +439,136 @@ check( 'Update posts features/activate - the kernel\'s one step for an update is
 answer( 500, null );
 check( 'a failed update falls back to its own error line', byTag( section( mount, 'plain' ), 'p' ).some( function( el ) { return el.textContent === '(500) '+ text('/_admin/features/error/update') } ) );
 
-// --- the catalogue
-
-const CATALOGUE = {
-	url : LIST.catalogue,
-	generated : '2026-09-07T12:00:00Z',
-	writable : true,
-	offers : [
-		{ key : 'ancient', name : 'Ancient', description : 'Ein ancient', version : '1.0.0', nino : '^0.9', ext : [], requires : [], directory : 'Ancient', archive : 'https://catalogue.test/features/ancient-1.0.0.tar.gz', size : 10, released : '2026-09-07', state : 'incompatible', fits : false, local : null, active : false },
-		{ key : 'extra', name : 'Zusatz', description : 'Ein extra', version : '1.0.0', nino : '^1.0', ext : [], requires : [ 'helper' ], directory : 'Extra', archive : 'https://catalogue.test/features/extra-1.0.0.tar.gz', size : 10, released : '2026-09-07', state : 'available', fits : true, local : null, active : false },
-		{ key : 'helper', name : 'Helper', description : '', version : '1.2.0', nino : '^1.0', ext : [], requires : [], directory : 'Helper', archive : 'https://catalogue.test/features/helper-1.2.0.tar.gz', size : 10, released : '', state : 'upgrade', fits : true, local : '1.1.0', active : true },
-		{ key : 'needy', name : 'Needy', description : 'Ein needy', version : '1.0.0', nino : '^1.0', ext : [ 'no_such_extension', 'other' ], requires : [], directory : 'Needy', archive : 'https://catalogue.test/features/needy-1.0.0.tar.gz', size : 10, released : '2026-09-07', state : 'incompatible', fits : false, local : null, active : false },
-		{ key : 'sample', name : 'Beispiel-Feature', description : 'Ein sample', version : '1.2.0', nino : '^1.0', ext : [], requires : [ 'helper' ], directory : 'Sample', archive : 'https://catalogue.test/features/sample-1.2.0.tar.gz', size : 10, released : '2026-09-07', state : 'current', fits : true, local : '1.2.0', active : true },
-	],
-};
-
-function offer( key ) {
-	return byTag( catalogueMount, 'section' ).filter( function( el ) { return el.dataset.offer === key } )[0];
-}
-
-function offerMsg( key ) {
-	return byTag( offer( key ), 'p' ).filter( function( el ) { return el.attributes['aria-live'] === 'polite' } )[0];
-}
-
-function loadButton() {
-	return byTag( catalogueMount, 'button' ).filter( function( el ) { return el.textContent === text('/_admin/features/label/catalogue-load') } )[0];
-}
-
-function loadMsg() {
-	return byTag( catalogueMount.children[0], 'p' ).filter( function( el ) { return el.attributes['aria-live'] === 'polite' } )[0];
-}
+// --- opening with a cache already on disk: the Available tab fills with no request
 
 panel.init();
-answer( 200, LIST );
-const reloadsBefore = reloads;
-const requestsBefore = requests.length;
+answer( 200, listAnswer( CACHE.url, true, CACHE ) );
+check( 'a cached catalogue fills the Available tab straight from features/list - no features/catalogue request at all', requests.filter( function( r ) { return r.action === 'features/catalogue' } ).length === 0 );
 
-fire( loadButton(), 'click' );
-check( 'Load catalogue posts features/catalogue with nothing, holds the button and says it is loading', requests.length === requestsBefore + 1 && requests[requests.length - 1].action === 'features/catalogue' && Object.keys( requests[requests.length - 1].payload ).length === 0
-	&& loadButton().disabled === true && loadMsg().textContent === text('/_admin/features/msg/catalogue-loading') );
-answer( 400, { error : 'Der Katalog konnte nicht geladen werden: the catalogue signature does not verify' } );
-check( 'a refusal shows the backend\'s message as an error, frees the button and offers nothing', loadButton().disabled === false && hasClass( loadMsg(), 'nino-admin-error' ) && loadMsg().textContent === '(400) Der Katalog konnte nicht geladen werden: the catalogue signature does not verify' && byTag( catalogueMount, 'section' ).length === 1 );
-fire( loadButton(), 'click' );
-answer( 500, null );
-check( 'a failed load falls back to its own error line', loadMsg().textContent === '(500) '+ text('/_admin/features/error/catalogue') );
+// The panel stayed on Active from the previous section (a re-render keeps
+// whichever tab is current) - switch back to look at the freshly cached one
+fire( tabs[0], 'click' );
 
-fire( loadButton(), 'click' );
-answer( 200, CATALOGUE );
-check( 'a loaded catalogue is one card per offer, in the backend\'s order, below the block that names its stamp', byTag( catalogueMount, 'section' ).map( function( el ) { return el.dataset.offer } ).filter( Boolean ).join(',') === 'ancient,extra,helper,needy,sample'
-	&& loadMsg().textContent === '' && hasClass( loadMsg(), 'nino-admin-error' ) === false && loadButton().disabled === false
-	&& byTag( catalogueMount.children[0], 'p' ).some( function( el ) { return el.textContent === text('/_admin/features/label/generated').replace( '%s', CATALOGUE.generated ) } ) );
+const availableTabs = byTag( mount.children[0], 'button' );
+check( 'Available\'s count is the offers that are not already current: ancient, extra, helper, needy - not sample', availableTabs[0].textContent === text('/_admin/features/tab/available')+ ' (4)' );
+check( 'the status line reads the cache\'s own stamp', byTag( mount.children[1], 'p' )[0].textContent === text('/_admin/features/label/catalogue-status').replace( '%s', CACHE.fetched ) );
 
-const states = {};
-findAll( catalogueMount, function( el ) { return typeof el.dataset.state === 'string' } ).forEach( function( el ) { states[el.dataset.state] = el } );
-check( 'the state is a word from the text system: available, update, installed, incompatible', Object.keys( states ).sort().join(',') === 'available,current,incompatible,upgrade'
-	&& states.available.textContent === text('/_admin/features/status/available') && states.upgrade.textContent === text('/_admin/features/status/update')
-	&& states.current.textContent === text('/_admin/features/status/installed') && states.incompatible.textContent === text('/_admin/features/status/incompatible')
-	&& hasClass( states.incompatible, 'nino-admin-error' ) && hasClass( states.upgrade, 'nino-admin-changed' ) && hasClass( states.available, 'nino-admin-eyebrow' ) );
-
-check( 'an available offer has Install as the primary action, its version, description and requirements', byTag( offer( 'extra' ), 'button' ).map( function( el ) { return el.textContent } ).join('|') === text('/_admin/features/label/install') && hasClass( byTag( offer( 'extra' ), 'button' )[0], 'nino-admin-btn-primary' )
-	&& byTag( offer( 'extra' ), 'h3' )[0].textContent === 'Zusatz '
-	&& byTag( offer( 'extra' ), 'p' ).some( function( el ) { return el.textContent === text('/_admin/features/label/version').replace( '%s', '1.0.0' )+ ' – '+ text('/_admin/features/label/released').replace( '%s', '2026-09-07' ) } )
-	&& byTag( offer( 'extra' ), 'p' ).some( function( el ) { return el.textContent === 'Ein extra' } ) && byTag( offer( 'extra' ), 'p' ).some( function( el ) { return el.textContent === text('/_admin/features/label/requires').replace( '%s', 'helper' ) } ) );
-check( 'an upgrade offers Update to the new version and names the one on disk', byTag( offer( 'helper' ), 'button' ).map( function( el ) { return el.textContent } ).join('|') === text('/_admin/features/label/update').replace( '%s', '1.2.0' )
-	&& byTag( offer( 'helper' ), 'p' ).some( function( el ) { return el.textContent === text('/_admin/features/label/version').replace( '%s', '1.2.0' )+ ' – '+ text('/_admin/features/label/installed').replace( '%s', '1.1.0' ) } ) );
-check( 'a current one says installed and offers no button', byTag( offer( 'sample' ), 'button' ).length === 0 && byTag( offer( 'sample' ), 'a' ).length === 0 && byTag( offer( 'sample' ), 'span' )[0].dataset.state === 'current' );
-check( 'an incompatible one is greyed, offers nothing, and says what it asks for: the Nino constraint, and the extensions where it names some', byTag( offer( 'needy' ), 'button' ).length === 0 && offer( 'needy' ).attributes['aria-disabled'] === 'true'
-	&& byTag( offer( 'needy' ), 'p' ).some( function( el ) { return el.textContent === text('/_admin/features/label/nino').replace( '%s', '^1.0' ) } ) && byTag( offer( 'needy' ), 'p' ).some( function( el ) { return el.textContent === text('/_admin/features/label/extensions').replace( '%s', 'no_such_extension, other' ) } )
-	&& byTag( offer( 'ancient' ), 'p' ).some( function( el ) { return el.textContent === text('/_admin/features/label/nino').replace( '%s', '^0.9' ) } ) && byTag( offer( 'ancient' ), 'p' ).every( function( el ) { return el.textContent.indexOf( text('/_admin/features/label/extensions').split('%s')[0] ) !== 0 } )
-	&& offer( 'extra' ).attributes['aria-disabled'] === undefined );
-check( 'the installed list is untouched by a catalogue load', byTag( mount, 'section' ).map( function( el ) { return el.dataset.feature } ).join(',') === 'old,plain,sample,fresh' );
+check( 'the Available tab is one card per offer that is not current, ancient/extra/helper/needy but not sample', byTag( mount, 'section' ).map( function( el ) { return el.dataset.offer } ).filter( Boolean ).join(',') === 'ancient,extra,helper,needy' );
+check( 'a card carries no status badge - just its name', offer( mount, 'extra' ).children[0].tagName === 'H3' && offer( mount, 'extra' ).children[0].textContent === 'Zusatz' );
+check( 'an available offer has Install as the primary action, its version, description and requirements', byTag( offer( mount, 'extra' ), 'button' ).map( function( el ) { return el.textContent } ).join('|') === text('/_admin/features/label/install') && hasClass( byTag( offer( mount, 'extra' ), 'button' )[0], 'nino-admin-btn-primary' )
+	&& byTag( offer( mount, 'extra' ), 'p' ).some( function( el ) { return el.textContent === text('/_admin/features/label/version').replace( '%s', '1.0.0' )+ ' – '+ text('/_admin/features/label/released').replace( '%s', '2026-09-07' ) } )
+	&& byTag( offer( mount, 'extra' ), 'p' ).some( function( el ) { return el.textContent === 'Ein extra' } ) && byTag( offer( mount, 'extra' ), 'p' ).some( function( el ) { return el.textContent === text('/_admin/features/label/requires').replace( '%s', 'helper' ) } ) );
+check( 'an upgrade offers Update to the new version and names the one on disk', byTag( offer( mount, 'helper' ), 'button' ).map( function( el ) { return el.textContent } ).join('|') === text('/_admin/features/label/update').replace( '%s', '1.2.0' )
+	&& byTag( offer( mount, 'helper' ), 'p' ).some( function( el ) { return el.textContent === text('/_admin/features/label/version').replace( '%s', '1.2.0' )+ ' – '+ text('/_admin/features/label/installed').replace( '%s', '1.1.0' ) } ) );
+check( 'an incompatible one is greyed, offers nothing, and says what it asks for: the Nino constraint, and the extensions where it names some', byTag( offer( mount, 'needy' ), 'button' ).length === 0 && offer( mount, 'needy' ).attributes['aria-disabled'] === 'true'
+	&& byTag( offer( mount, 'needy' ), 'p' ).some( function( el ) { return el.textContent === text('/_admin/features/label/nino').replace( '%s', '^1.0' ) } ) && byTag( offer( mount, 'needy' ), 'p' ).some( function( el ) { return el.textContent === text('/_admin/features/label/extensions').replace( '%s', 'no_such_extension, other' ) } )
+	&& byTag( offer( mount, 'ancient' ), 'p' ).some( function( el ) { return el.textContent === text('/_admin/features/label/nino').replace( '%s', '^0.9' ) } ) && byTag( offer( mount, 'ancient' ), 'p' ).every( function( el ) { return el.textContent.indexOf( text('/_admin/features/label/extensions').split('%s')[0] ) !== 0 } )
+	&& offer( mount, 'extra' ).attributes['aria-disabled'] === undefined );
+check( 'a current offer (sample) is excluded from Available entirely', offer( mount, 'sample' ) === undefined );
 
 // --- installing from it
 
-const install = byTag( offer( 'extra' ), 'button' )[0];
+const install = byTag( offer( mount, 'extra' ), 'button' )[0];
 fire( install, 'click' );
 check( 'Install posts features/install with key and version, holds the button and says so', requests[requests.length - 1].action === 'features/install' && requests[requests.length - 1].payload.key === 'extra' && requests[requests.length - 1].payload.version === '1.0.0'
-	&& install.disabled === true && offerMsg( 'extra' ).textContent === text('/_admin/features/msg/installing') );
+	&& install.disabled === true && byTag( offer( mount, 'extra' ), 'p' ).filter( function( el ) { return el.attributes['aria-live'] === 'polite' } )[0].textContent === text('/_admin/features/msg/installing') );
 answer( 400, { error : 'the archive does not match what the catalogue promised' } );
-check( 'a refusal shows the kernel\'s reason, frees the button and reads nothing again', install.disabled === false && hasClass( offerMsg( 'extra' ), 'nino-admin-error' ) && offerMsg( 'extra' ).textContent === '(400) the archive does not match what the catalogue promised' && requests[requests.length - 1].action === 'features/install' );
+const extraMsg = byTag( offer( mount, 'extra' ), 'p' ).filter( function( el ) { return el.attributes['aria-live'] === 'polite' } )[0];
+check( 'a refusal shows the kernel\'s reason, frees the button and reads nothing again', install.disabled === false && hasClass( extraMsg, 'nino-admin-error' ) && extraMsg.textContent === '(400) the archive does not match what the catalogue promised' && requests[requests.length - 1].action === 'features/install' );
 fire( install, 'click' );
 answer( 500, null );
-check( 'a failed install falls back to its own error line', offerMsg( 'extra' ).textContent === '(500) '+ text('/_admin/features/error/install') );
+check( 'a failed install falls back to its own error line', byTag( offer( mount, 'extra' ), 'p' ).filter( function( el ) { return el.attributes['aria-live'] === 'polite' } )[0].textContent === '(500) '+ text('/_admin/features/error/install') );
 
 const EXTRA = { key : 'extra', name : 'Extra', description : 'Ein extra', version : '1.0.0', installed : null, active : false, update : false, requires : [ 'helper' ], problems : [], settings : [] };
+const FEATURES_WITH_EXTRA = FEATURES.concat( [ EXTRA ] );
+const requestsBeforeInstall = requests.length;
 fire( install, 'click' );
 answer( 200, { feature : EXTRA, updated : false } );
-check( 'success reads the list again first, and reloads no page', requests[requests.length - 1].action === 'features/list' && reloads === reloadsBefore );
-answer( 200, { dir : LIST.dir, catalogue : LIST.catalogue, features : LIST.features.concat( [ EXTRA ] ) } );
-check( 'then the catalogue - the list already shows the new feature, off, with Activate', requests[requests.length - 1].action === 'features/catalogue' && section( mount, 'extra' ) !== undefined
-	&& byTag( section( mount, 'extra' ), 'button' ).map( function( el ) { return el.textContent } ).join('|') === text('/_admin/features/label/activate') );
-const installed = JSON.parse( JSON.stringify( CATALOGUE ) );
-installed.offers[1].state = 'current'; installed.offers[1].local = '1.0.0';
-answer( 200, installed );
-check( 'the refreshed offer says installed, keeps the install\'s answer on its line and offers no button', offer( 'extra' ).children.length > 0 && byTag( offer( 'extra' ), 'span' )[0].dataset.state === 'current' && byTag( offer( 'extra' ), 'button' ).length === 0
-	&& offerMsg( 'extra' ).textContent === text('/_admin/features/msg/installed') && loadMsg().textContent === '' );
+check( 'success reads the list again, and only the list - the cached catalogue\'s offers are recomputed there, no catalogue request and no page reload', requests.length === requestsBeforeInstall + 2 && requests[requests.length - 1].action === 'features/list' && reloads === 2 );
 
-const upgrade = byTag( offer( 'helper' ), 'button' )[0];
-fire( upgrade, 'click' );
-check( 'Update posts features/install with the offered version and says it is updating', requests[requests.length - 1].action === 'features/install' && requests[requests.length - 1].payload.key === 'helper' && requests[requests.length - 1].payload.version === '1.2.0'
-	&& offerMsg( 'helper' ).textContent === text('/_admin/features/msg/updating') );
+// The list answers a catalogue whose offers already reflect the install:
+// extra now current - features/list itself would only carry this once the
+// backend saw it, which is exactly what a fresh cache read gives it - and
+// the installed feature itself, which the fixture above did not carry
+const installedOffers = JSON.parse( JSON.stringify( OFFERS ) );
+installedOffers[1] = Object.assign( {}, installedOffers[1], { state : 'current', local : '1.0.0' } );
+answer( 200, listAnswer( CACHE.url, true, Object.assign( {}, CACHE, { offers : installedOffers } ), FEATURES_WITH_EXTRA ) );
+check( 'the installed feature now shows on Inactive, off, with Activate - and Available lost it, straight from the cache', byTag( mount.children[0], 'button' )[0].textContent === text('/_admin/features/tab/available')+ ' (3)' );
+
+fire( byTag( mount.children[0], 'button' )[1], 'click' );
+check( 'the just-installed feature is on Inactive now, with Activate', section( mount, 'extra' ) !== undefined && byTag( section( mount, 'extra' ), 'button' ).map( function( el ) { return el.textContent } ).join('|') === text('/_admin/features/label/activate') );
+
+fire( byTag( mount.children[0], 'button' )[0], 'click' );
+check( 'and the offer itself is gone from Available - excluded as current, not shown with a disabled button', offer( mount, 'extra' ) === undefined );
+
+// --- a directory the web server cannot write
+
+const helperBtn = byTag( offer( mount, 'helper' ), 'button' )[0];
+fire( helperBtn, 'click' );
+check( 'Update posts features/install with the offered version', requests[requests.length - 1].action === 'features/install' && requests[requests.length - 1].payload.key === 'helper' && requests[requests.length - 1].payload.version === '1.2.0' );
+answer( 200, { feature : FEATURES[1], updated : true } );
+answer( 200, listAnswer( CACHE.url, false, Object.assign( {}, CACHE, { offers : installedOffers } ) ) );
+check( 'without a writable directory the tab says so, naming it, and every remaining offer links its archive instead of a button', byTag( mount.children[2], 'p' ).some( function( el ) { return hasClass( el, 'nino-admin-error' ) && el.textContent === text('/_admin/features/hint/catalogue-readonly').replace( '%s', '/features' ) } )
+	&& byTag( offer( mount, 'ancient' ), 'button' ).length === 0 && byTag( offer( mount, 'needy' ), 'button' ).length === 0
+	&& byTag( offer( mount, 'helper' ), 'a' ).length === 1 && byTag( offer( mount, 'helper' ), 'a' )[0].href === CACHE.offers[2].archive && byTag( offer( mount, 'helper' ), 'a' )[0].textContent === text('/_admin/features/label/archive') );
+
+// --- an empty catalogue, one offering nothing new, and the catalogue switched off
+
+panel.init();
+answer( 200, listAnswer( CACHE.url, true, Object.assign( {}, CACHE, { offers : [] } ) ) );
+check( 'a cached catalogue listing no features at all is the shared empty state, naming none of the module\'s regular hints', findAll( mount.children[2], function( el ) { return hasClass( el, 'nino-admin-empty' ) } )[0].textContent === text('/_admin/features/hint/catalogue-empty') );
+
+panel.init();
+const allCurrent = OFFERS.map( function( o ) { return Object.assign( {}, o, { state : 'current' } ) } );
+answer( 200, listAnswer( CACHE.url, true, Object.assign( {}, CACHE, { offers : allCurrent } ) ) );
+check( 'a cache whose offers are all already current says everything is up to date, count 0', findAll( mount.children[2], function( el ) { return hasClass( el, 'nino-admin-empty' ) } )[0].textContent === text('/_admin/features/hint/available-empty')
+	&& byTag( mount.children[0], 'button' )[0].textContent === text('/_admin/features/tab/available')+ ' (0)' );
+
+panel.showCurrent();
+answer( 200, listAnswer( '', true, null ) );
+check( 'switched off: no action bar at all, and the Available tab says so, naming the directory', mount.children.length === 2 && findAll( mount, function( el ) { return hasClass( el, 'nino-admin-actionbar' ) } ).length === 0
+	&& byTag( mount.children[1], 'p' ).some( function( el ) { return el.textContent === text('/_admin/features/hint/catalogue-off').replace( '%s', '/features' ) } ) );
+check( 'and a fetch was never made on its own throughout all of this', requests.filter( function( r ) { return r.action === 'features/catalogue' } ).length === 0 );
+
+// --- Refresh catalogue
+
+panel.showCurrent();
+answer( 200, listAnswer( CACHE.url, true, null ) );
+const refreshBtn = byTag( mount.children[1], 'button' )[0];
+const requestsBeforeRefresh = requests.length;
+
+fire( refreshBtn, 'click' );
+// The click rebuilt the whole action bar - re-query rather than trust the
+// button reference from before the click, which the rebuild detached
+check( 'Refresh catalogue posts features/catalogue with nothing, holds the button and says it is loading', requests.length === requestsBeforeRefresh + 1 && requests[requests.length - 1].action === 'features/catalogue' && Object.keys( requests[requests.length - 1].payload ).length === 0
+	&& byTag( mount.children[1], 'button' )[0].disabled === true && byTag( mount.children[1], 'p' )[0].textContent === text('/_admin/features/msg/catalogue-loading') );
+answer( 400, { error : 'Der Katalog konnte nicht geladen werden: the catalogue signature does not verify' } );
+check( 'a refusal shows the backend\'s message as an error and frees the button, the Available tab unchanged (still unloaded)', byTag( mount.children[1], 'button' )[0].disabled === false && hasClass( byTag( mount.children[1], 'p' )[0], 'nino-admin-error' )
+	&& byTag( mount.children[1], 'p' )[0].textContent === '(400) Der Katalog konnte nicht geladen werden: the catalogue signature does not verify'
+	&& findAll( mount.children[2], function( el ) { return hasClass( el, 'nino-admin-empty' ) } )[0].textContent === text('/_admin/features/hint/available-unloaded') );
+
+fire( byTag( mount.children[1], 'button' )[0], 'click' );
 answer( 500, null );
-check( 'a failed update falls back to the update error line', offerMsg( 'helper' ).textContent === '(500) '+ text('/_admin/features/error/update') );
-fire( upgrade, 'click' );
-answer( 200, { feature : LIST.features[1], updated : true } );
-answer( 200, LIST );
-installed.offers[2].state = 'current'; installed.offers[2].local = '1.2.0';
-answer( 200, installed );
-check( 'an applied update reads both again and says updated', requests.slice( -2 ).map( function( r ) { return r.action } ).join(',') === 'features/list,features/catalogue'
-	&& offerMsg( 'helper' ).textContent === text('/_admin/features/msg/updated') && byTag( offer( 'helper' ), 'button' ).length === 0 && reloads === reloadsBefore );
+check( 'a failed refresh falls back to its own error line', byTag( mount.children[1], 'p' )[0].textContent === '(500) '+ text('/_admin/features/error/catalogue') );
 
-// --- a directory the web server cannot write, an empty catalogue, and the catalogue switched off
+fire( byTag( mount.children[1], 'button' )[0], 'click' );
+answer( 200, catalogueAnswer( true, OFFERS, '2026-09-08 09:00' ) );
+check( 'a successful refresh clears the error, frees the button and the status now names when it was fetched', hasClass( byTag( mount.children[1], 'p' )[0], 'nino-admin-error' ) === false && byTag( mount.children[1], 'button' )[0].disabled === false
+	&& byTag( mount.children[1], 'p' )[0].textContent === text('/_admin/features/label/catalogue-status').replace( '%s', '2026-09-08 09:00' ) );
+check( 'the Available tab now shows the refreshed offers, count 4', byTag( mount.children[0], 'button' )[0].textContent === text('/_admin/features/tab/available')+ ' (4)'
+	&& byTag( mount, 'section' ).map( function( el ) { return el.dataset.offer } ).filter( Boolean ).join(',') === 'ancient,extra,helper,needy' );
+check( 'switching tabs and back leaves the refreshed cache in place - the tab bar rebuild does not lose state', ( fire( byTag( mount.children[0], 'button' )[2], 'click' ), fire( byTag( mount.children[0], 'button' )[0], 'click' ), byTag( mount, 'section' ).map( function( el ) { return el.dataset.offer } ).filter( Boolean ).length === 4 ) );
 
-fire( loadButton(), 'click' );
-const readonly = JSON.parse( JSON.stringify( CATALOGUE ) );
-readonly.writable = false;
-answer( 200, readonly );
-check( 'without a writable directory the block says so, naming it', byTag( catalogueMount.children[0], 'p' ).some( function( el ) { return hasClass( el, 'nino-admin-error' ) && el.textContent === text('/_admin/features/hint/catalogue-readonly').replace( '%s', '/features' ) } ) );
-check( 'and every offer that could be installed links its archive instead of a button', byTag( catalogueMount, 'button' ).length === 1
-	&& byTag( offer( 'extra' ), 'a' ).length === 1 && byTag( offer( 'extra' ), 'a' )[0].href === CATALOGUE.offers[1].archive && byTag( offer( 'extra' ), 'a' )[0].textContent === text('/_admin/features/label/archive')
-	&& byTag( offer( 'helper' ), 'a' )[0].href === CATALOGUE.offers[2].archive && byTag( offer( 'sample' ), 'a' ).length === 0 && byTag( offer( 'needy' ), 'a' ).length === 0 );
-
-fire( loadButton(), 'click' );
-answer( 200, { url : LIST.catalogue, generated : '', writable : true, offers : [] } );
-check( 'a catalogue listing nothing is the shared empty state', findAll( catalogueMount, function( el ) { return hasClass( el, 'nino-admin-empty' ) } ).length === 1 && findAll( catalogueMount, function( el ) { return hasClass( el, 'nino-admin-empty' ) } )[0].textContent === text('/_admin/features/hint/catalogue-empty')
-	&& byTag( catalogueMount, 'section' ).length === 1 && byTag( catalogueMount.children[0], 'p' ).every( function( el ) { return el.textContent.indexOf( text('/_admin/features/label/generated').split('%s')[0] ) !== 0 } ) );
+// --- nothing installed at all, and a failed load
 
 panel.showCurrent();
-answer( 200, { dir : '/features', catalogue : '', features : LIST.features } );
-check( 'switched off, the block says so and offers no button - and a fetch was never made on its own', catalogueMount.children[0].dataset.catalogue === 'off' && byTag( catalogueMount, 'button' ).length === 0 && byTag( catalogueMount, 'section' ).length === 1
-	&& byTag( catalogueMount, 'p' ).some( function( el ) { return el.textContent === text('/_admin/features/hint/catalogue-off').replace( '%s', '/features' ) } )
-	&& requests.filter( function( r ) { return r.action === 'features/catalogue' } ).length === 7 );
-
-// --- nothing installed, and a failed load
-
-panel.showCurrent();
-answer( 200, { dir : '/features', catalogue : LIST.catalogue, features : [] } );
-check( 'showCurrent reloads, and an empty directory is the shared empty state naming it - the catalogue block still there below', requests[requests.length - 1].action === 'features/list'
-	&& findAll( mount, function( el ) { return hasClass( el, 'nino-admin-empty' ) } ).length === 1 && findAll( mount, function( el ) { return hasClass( el, 'nino-admin-empty' ) } )[0].textContent === text('/_admin/features/hint/empty').replace( '%s', '/features' ) && byTag( mount, 'section' ).length === 0
-	&& catalogueMount.children[0].dataset.catalogue === 'on' && byTag( catalogueMount, 'button' ).length === 1 );
+answer( 200, { dir : '/features', catalogueUrl : CACHE.url, writable : true, catalogue : null, features : [] } );
+check( 'showCurrent reloads, and Inactive\'s empty state names the directory - Active empty too, both counted 0', requests[requests.length - 1].action === 'features/list'
+	&& byTag( mount.children[0], 'button' )[1].textContent === text('/_admin/features/tab/inactive')+ ' (0)' && byTag( mount.children[0], 'button' )[2].textContent === text('/_admin/features/tab/active')+ ' (0)' );
+fire( byTag( mount.children[0], 'button' )[1], 'click' );
+check( 'Inactive, empty, names the features directory', findAll( mount.children[2], function( el ) { return hasClass( el, 'nino-admin-empty' ) } )[0].textContent === text('/_admin/features/hint/empty').replace( '%s', '/features' ) );
+fire( byTag( mount.children[0], 'button' )[2], 'click' );
+check( 'Active, empty, says no feature is on', findAll( mount.children[2], function( el ) { return hasClass( el, 'nino-admin-empty' ) } )[0].textContent === text('/_admin/features/hint/active-empty') );
 
 panel.init();
 answer( 500, null );

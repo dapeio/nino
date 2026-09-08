@@ -958,6 +958,61 @@ check( '...apiSave too', $status === 401 );
 echo "\n";
 
 
+// --- Modules\Maintenance\Admin ---------------------------------------------
+
+echo "Modules\\Maintenance\\Admin - the one switch, from the workbench\n";
+
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Maintenance\Admin::class, 'apiStatus' );
+check( 'apiStatus answers the current, unconfigured state', $status === 200 && $body === [ 'status' => false, 'retry' => 3600 ] );
+
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Maintenance\Admin::class, 'apiSet', [ 'status' => true, 'retry' => 120 ] );
+check( 'apiSet accepts a valid switch', $status === 200 && $body === [ 'status' => true, 'retry' => 120 ] );
+check( '...and writes both keys to config.php', \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/maintenance/status'] === true
+	&& \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/maintenance/retry'] === 120 );
+
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Maintenance\Admin::class, 'apiStatus' );
+check( 'apiStatus reflects the just-saved state', $status === 200 && $body === [ 'status' => true, 'retry' => 120 ] );
+
+[ $status ] = callDev( $appData, \Nino\Modules\Maintenance\Admin::class, 'apiSet', [ 'status' => 'yes', 'retry' => 120 ] );
+check( 'apiSet rejects a status that is not a bool', $status === 400 );
+
+[ $status ] = callDev( $appData, \Nino\Modules\Maintenance\Admin::class, 'apiSet', [ 'status' => false, 'retry' => 30 ] );
+check( 'apiSet rejects a retry below its minimum', $status === 400 );
+
+[ $status ] = callDev( $appData, \Nino\Modules\Maintenance\Admin::class, 'apiSet', [ 'status' => false, 'retry' => 999999999 ] );
+check( 'apiSet rejects a retry above its maximum', $status === 400 );
+
+[ $status ] = callDev( $appData, \Nino\Modules\Maintenance\Admin::class, 'apiSet', [ 'status' => false, 'retry' => 'nope' ] );
+check( 'apiSet rejects a non-integer retry rather than casting it', $status === 400 );
+
+check( 'a rejected field leaves config.php exactly as it was', \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/maintenance/status'] === true
+	&& \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/maintenance/retry'] === 120 );
+
+check( 'log() names the direction of the switch', \Nino\Modules\Maintenance\Admin::log( 'maintenance/set', [ 'status' => true ] ) === 'Switch maintenance on'
+	&& \Nino\Modules\Maintenance\Admin::log( 'maintenance/set', [ 'status' => false ] ) === 'Switch maintenance off' );
+
+// Back off, so the rest of the suite runs against a normal site
+[ $status ] = callDev( $appData, \Nino\Modules\Maintenance\Admin::class, 'apiSet', [ 'status' => false, 'retry' => 3600 ] );
+check( 'switched back off for the rest of the suite', $status === 200 && $appData['/nino/maintenance/status'] === false );
+
+// 401/403, the same way every other panel is checked
+\Nino\Auth::logoutUser( $appData );
+[ $status ] = callDev( $appData, \Nino\Modules\Maintenance\Admin::class, 'apiStatus' );
+check( 'apiStatus requires an authed _admin session too', $status === 401 );
+\Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );
+
+\Nino\Auth::insertUser( $appData, 'noswitch@example.com', 'correct horse battery staple', [ '/_admin/text/manage' ] );
+\Nino\Auth::loginUser( $appData, 'noswitch@example.com', 'correct horse battery staple' );
+[ $status ] = callDev( $appData, \Nino\Modules\Maintenance\Admin::class, 'apiStatus' );
+check( 'apiStatus is 403 for an account without the permission', $status === 403 );
+[ $status ] = callDev( $appData, \Nino\Modules\Maintenance\Admin::class, 'apiSet', [ 'status' => true, 'retry' => 120 ] );
+check( '...apiSet too', $status === 403 );
+\Nino\Auth::deleteUser( $appData, 'noswitch@example.com' );
+\Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );
+
+echo "\n";
+
+
 // --- Dev\Users ------------------------------------------------------------
 
 echo "Users - accounts with a role, deletion and the role change\n";
@@ -2208,6 +2263,17 @@ class AdminSmokeGhostAssetModule {
 	public static function adminPanels( array &$appData ): array { return [ 'AdminSmokeGhostPanel' ]; }
 }
 
+/** A kernel-side panel naming the 'features' group - not below \Nino\Features::dir(), so this is refused */
+class AdminSmokeFeatureNamerPanel {
+	public static function actions(): array { return [ 'featurenamer/list' => [ self::class, 'apiList' ] ]; }
+	public static function nav(): array { return [ 'featurenamer', 'Feature namer', 57, 'features' ]; }
+	public static function apiList( array &$appData, array &$request ): void { \Nino\Http::ok( $request ); }
+}
+
+class AdminSmokeFeatureNamerModule {
+	public static function adminPanels( array &$appData ): array { return [ 'AdminSmokeFeatureNamerPanel' ]; }
+}
+
 $withModule = $appData;
 $withModule['/nino/modules'] = [ 'AdminSmokeDummyModule', '\\Nino\\Modules\\Navigation' ];
 
@@ -2223,7 +2289,20 @@ check( 'a panel reusing a core uri is dropped, the core panel keeps it', $regist
 $navHtml = \Nino\Admin\Panels::navHtml( $registry );
 check( 'nav() is rendered - every panel has its link, the module\'s included, an icon or its initial beside the label', str_contains( $navHtml, 'id="admin-nav-dummy" data-panel="dummy" data-layout="page"><span class="nino-admin-nav-icon" aria-hidden="true"><b>D</b></span><span class="nino-admin-nav-label">Dummy</span></a>' ) === true && str_contains( $navHtml, 'id="admin-nav-navs" data-panel="navs" data-layout="page">' ) === true && str_contains( $navHtml, '<span class="nino-admin-nav-label">[[/_admin/nav/navs]]</span></a>' ) === true );
 check( 'every label is a fill - structure and system panels the same as the content ones, so the rail speaks one language', str_contains( $navHtml, '>[[/_admin/nav/routes]]</span></a>' ) === true && str_contains( $navHtml, '>[[/_admin/nav/backups]]</span></a>' ) === true && str_contains( $navHtml, '>[[/_admin/nav/text]]</span></a>' ) === true && str_contains( $navHtml, '>[[/_admin/nav/user]]</span></a>' ) === true );
-check( 'the three groups get their headings, in order', preg_match( '/nav-group" data-group="content".*data-group="structure".*data-group="system"/s', $navHtml ) === 1 );
+check( 'the three groups actually on screen get their headings, in the GROUPS order - features carries no heading while nothing sits in it', preg_match( '/nav-group" data-group="content".*data-group="structure".*data-group="system"/s', $navHtml ) === 1
+	&& str_contains( $navHtml, 'data-group="features"' ) === false );
+check( 'GROUPS lists all four, features between structure and system', \Nino\Admin\Panels::GROUPS === [ 'content', 'structure', 'features', 'system' ] );
+
+check( 'a panel naming the features group from outside features/ is refused and falls back to content, with a warning', ( static function() use ( $withModule ): bool {
+	$withFeatureNamer = $withModule;
+	$withFeatureNamer['/nino/modules'] = array_merge( $withFeatureNamer['/nino/modules'], [ 'AdminSmokeFeatureNamerModule' ] );
+	$warnings = [];
+	set_error_handler( static function( int $no, string $message ) use ( &$warnings ): bool { $warnings[] = $message; return true; } );
+	$registry = \Nino\Admin\Admin::panels( $withFeatureNamer );
+	restore_error_handler();
+	return ( $registry['featurenamer']['group'] ?? null ) === 'content'
+		&& count( array_filter( $warnings, static fn( string $m ): bool => str_contains( $m, 'AdminSmokeFeatureNamerPanel' ) && str_contains( $m, 'features' ) ) ) === 1;
+} )() );
 
 $panesHtml = \Nino\Admin\Panels::panesHtml( $registry );
 check( 'every pane carries the mount points its script renders into', str_contains( $panesHtml, '<div id="admin-content-navs" data-panel="navs" data-layout="page" hidden><div id="navs-list"></div><div id="navs-form"></div></div>' ) === true );
@@ -2235,7 +2314,7 @@ check( 'a pane with tabs carries the shared tab bar, its own screen first, and a
 // pane spelled differently on the two sides is a panel whose tab opens on
 // nothing, with no error anywhere (the bundler skips a missing file)
 $shipped = $appData;
-$shipped['/nino/modules'] = array_merge( \Nino\AppData::DEFAULTS['/nino/modules'], [ '\\Nino\\Modules\\Form', '\\Nino\\Modules\\Navigation', '\\Nino\\Modules\\Design', '\\Nino\\Modules\\Templates' ] );
+$shipped['/nino/modules'] = array_merge( \Nino\AppData::DEFAULTS['/nino/modules'], [ '\\Nino\\Modules\\Form', '\\Nino\\Modules\\Navigation', '\\Nino\\Modules\\Design', '\\Nino\\Modules\\Templates', '\\Nino\\Modules\\Maintenance' ] );
 $missingAssets = [];
 $missingPanes = [];
 foreach( \Nino\Admin\Admin::allPanels( $shipped ) as $uri => $panel ) {

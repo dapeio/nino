@@ -496,10 +496,11 @@ Module werden in `/nino/modules` aktiviert. Die Reihenfolge des Arrays ist relev
 | `Images` | `[image …]` | erzeugt ein escaped `<img>` aus einem Bildslot oder einer URI |
 | `Jstext` | `[jstext]` | stellt Textwerte als sicher kodiertes JSON mit CSP-Nonce bereit |
 | `Localepicker` | `[localepicker …]` | wechselt Locale über Query und Redirect |
+| `Maintenance` | `/nino/http/response`, Priorität 1 | beantwortet, solange `/nino/maintenance/status` an ist, jede Seite und jeden Modul-Endpunkt mit 503 und Retry-After-Header, für jeden nicht in der Workbench angemeldeten Besuch |
 | `Navigation` | `[navigation …]` | rendert Navigationen aus einer kompakten Zeilensyntax |
 | `Template` | `[template /path/name]` | lädt den Rohinhalt einer `.tpl`-Datei; die gemeinsame Render-Pipeline verarbeitet ihn weiter |
 
-Jedes Modul der Tabelle liegt in `_nino/Nino/Modules/`, neben den immer aktiven Kernel-Modulen. `Form` und `Navigation` bringen ihre Workbench-Panels mit (Anfragen, Navigationen), `Design` und `Templates` sind nichts als je ein Panel: Jedes ist genau dann vorhanden, wenn sein Modul aktiv ist. `Form`, `Navigation` und `Localepicker` sind im Einrichtungsassistenten wählbar, weil jedes eine `install/`-Einheit neben seiner Klasse mitliefert; `Design` und `Templates` trägt der Assistent in `/nino/modules` ein, sobald ihre Klasse existiert. Ein Projekt schaltet jedes davon in `/nino/modules` ein oder aus, und `_nino/` bleibt vollständig ersetzbar. Alles jenseits der Tabelle ist ein **Feature** – ein installierbares Paket unter `features/<Name>/` mit einem Manifest `feature.php`, eingeschaltet im Panel Features der Workbench, das sein Panel auf dieselbe Weise mitbringt. Ein Checkout bringt keines mit: `Newsletter` (Double-Opt-in, Bestätigung und Abmeldung unter `/.newsletter`) und `Search` (ein sprachabhängiger Fuzzy-Index über Element-Felder) kommen aus dem Katalog [dapeio/nino-features](https://github.com/dapeio/nino-features), nach `features/` kopiert. Siehe [Features](features.de.md), [Panels der Workbench](#panels-der-workbench) und [Verzeichnis und Autoloading](#verzeichnis-und-autoloading) weiter unten.
+Jedes Modul der Tabelle liegt in `_nino/Nino/Modules/`, neben den immer aktiven Kernel-Modulen. `Form` und `Navigation` bringen ihre Workbench-Panels mit (Anfragen, Navigationen), `Design`, `Templates` und `Maintenance` sind nichts als je ein Panel: Jedes ist genau dann vorhanden, wenn sein Modul aktiv ist. `Form`, `Navigation` und `Localepicker` sind im Einrichtungsassistenten keine Wahl mehr - der Assistent wendet die `install/`-Einheit jedes einzelnen an und trägt seine Klasse bei jedem Durchlauf in `/nino/modules` ein (`\Nino\Install\Setup::ALWAYS_MODULES`), genau wie er `Design`, `Templates` und `Maintenance` einträgt, sobald ihre Klasse existiert. Ein Projekt kann jedes der sechs weiterhin von Hand in `/nino/modules` aus- oder einschalten, und `_nino/` bleibt vollständig ersetzbar. Alles jenseits der Tabelle ist ein **Feature** – ein installierbares Paket unter `features/<Name>/` mit einem Manifest `feature.php`, eingeschaltet im Panel Features der Workbench, das sein Panel auf dieselbe Weise mitbringt. Ein Checkout bringt keines mit: `Newsletter` (Double-Opt-in, Bestätigung und Abmeldung unter `/.newsletter`) und `Search` (ein sprachabhängiger Fuzzy-Index über Element-Felder) kommen aus dem Katalog [dapeio/nino-features](https://github.com/dapeio/nino-features), nach `features/` kopiert. Siehe [Features](features.de.md), [Panels der Workbench](#panels-der-workbench) und [Verzeichnis und Autoloading](#verzeichnis-und-autoloading) weiter unten.
 
 Einige Details sind absichtlich defensiv gestaltet:
 
@@ -549,7 +550,7 @@ Projekts nicht überschrieben werden – mit einer bewussten Öffnung:
 über vier Roots. Die Laufzeitmodule, die Nino mitbringt, liegen in `_nino/` –
 die immer aktiven und die optionalen, die ein Projekt in `/nino/modules` ein-
 oder ausschaltet (`Form`, `Navigation`, `Localepicker`, `Design`,
-`Templates`); die eigenen Ansichten der Workbench in `_admin/Nino/Modules/`
+`Templates`, `Maintenance`); die eigenen Ansichten der Workbench in `_admin/Nino/Modules/`
 (`Dashboard`, `Elements`, `Text`, `Images`, `Logs`, `Routes`, `Users`,
 `Language`, `Backups`, `Config`, `Features`); die Features, die ein Projekt
 unter `features/` (oder `NINO_FEATURES_DIR`) installiert, je ein Verzeichnis
@@ -673,7 +674,7 @@ Die eigenen Ansichten der Workbench sind dasselbe in einem anderen Root: `_admin
 | Methode | Rückgabe |
 | --- | --- |
 | `actions()` | `[ 'catalog/list' => [ Class::class, 'apiList' ], ... ]` – vom `POST`-Handler der Workbench verteilt |
-| `nav()` | `[ uri, label, weight = 50, group = 'content' ]` – die URI ist ein Slug und benennt Link, Inhaltsbereich und JS-Namensraum (`Nino.admin.<uri>`); ein Label, das mit `/` beginnt, ist ein Textfill-Schlüssel, alles andere wörtlicher Text – jedes ausgelieferte Panel nutzt einen Schlüssel, ein Modul liefert dafür seine `text/<locale>.php` mit; die Gruppe ist `content`, `structure` oder `system` |
+| `nav()` | `[ uri, label, weight = 50, group = 'content' ]` – die URI ist ein Slug und benennt Link, Inhaltsbereich und JS-Namensraum (`Nino.admin.<uri>`); ein Label, das mit `/` beginnt, ist ein Textfill-Schlüssel, alles andere wörtlicher Text – jedes ausgelieferte Panel nutzt einen Schlüssel, ein Modul liefert dafür seine `text/<locale>.php` mit; die Gruppe ist `content`, `structure`, `features` oder `system` – außer ein Panel, das ein Feature mitbringt (seine Klassendatei liegt unterhalb von `\Nino\Features::dir()`): das landet immer in `features`, gleich was es selbst nennt, und `features` von außerhalb zu nennen wird wie eine unbekannte Gruppe abgelehnt |
 | `perm()` | die Berechtigung, die den Link zeigt und die Aktionen schützt – per Konvention `/_admin/<uri>/manage`; auf dem Tab Nutzerrollen des Panels Nutzer automatisch als Kästchen angeboten und Teil der Rolle **Editor**, die der Assistent schreibt, wenn die Gruppe `content` ist |
 | `panes()` | Mount-Ids innerhalb des Inhaltsbereichs, Standard `[ '<uri>-list' ]` |
 | `template()` | statt Mount-Ids: ein `.tpl`, das ganz in den Inhaltsbereich gerendert wird, projektrelativ und ohne Endung – für ein Panel, das seine Bereiche selbst anordnet |
@@ -720,7 +721,7 @@ $request = \Nino\request( $appData, $_SERVER );
 \Nino\output( $appData, $request );
 ```
 
-`init( true )` startet ohne `config.php`, denn bis der Einrichtungsassistent gelaufen ist, gibt es keine. `Admin::init()` entscheidet dann, was die Route ausliefert: den Assistenten (`_admin/install/Install.php`), solange `Admin::isInstalled()` verneint, danach die Anmeldung und die Panels. Der Assistent ist kein Modul aus `/nino/modules`; die Panels, die als Module ausgeliefert werden – Design und Templates –, sind es und kommen wie jedes andere über `adminPanels()`.
+`init( true )` startet ohne `config.php`, denn bis der Einrichtungsassistent gelaufen ist, gibt es keine. `Admin::init()` entscheidet dann, was die Route ausliefert: den Assistenten (`_admin/install/Install.php`), solange `Admin::isInstalled()` verneint, danach die Anmeldung und die Panels. Der Assistent ist kein Modul aus `/nino/modules`; die Panels, die als Module ausgeliefert werden – Design, Templates und Maintenance –, sind es und kommen wie jedes andere über `adminPanels()`.
 
 `_admin/recovery.php` ist der dritte Einstiegspunkt und startet auf dieselbe Weise: Er prüft das Recovery-Geheimnis (`\Nino\Admin\Recovery`) und bietet eine Wiederherstellung und ein Zurücksetzen eines Passworts, sonst nichts.
 

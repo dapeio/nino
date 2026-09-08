@@ -297,6 +297,14 @@ class Admin {
 }
 ```
 
+The `nav()` above names `content`, but the registry never actually places it
+there: a panel whose class file lies below `\Nino\Features::dir()` always
+lands in the rail's own **Features** group, between Structure and System,
+whatever it names - and the roles tab offers its permission under that same
+group. Naming `content` (or leaving the fourth entry off, since it defaults
+to `content`) costs nothing and reads naturally if the class is ever moved
+out of `features/`.
+
 `features/Catalog/text/en_US.php`:
 
 ```php
@@ -654,4 +662,4 @@ NINO_ROOT=/path/to/other/nino php features/Catalog/tests/catalog-smoke.php
   or installed there from the signed catalogue by the Features panel - the
   published ones come from the catalogue repository [dapeio/nino-features](https://github.com/dapeio/nino-features),
   see [The Catalogue](../features.md#the-catalogue). Nino makes no outbound
-  request unless someone presses **Load catalogue** or **Install** there.
+  request unless someone presses **Refresh catalogue** or **Install** there.

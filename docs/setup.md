@@ -57,7 +57,7 @@ Fix failed checks before continuing. Without sufficient write permissions, the a
 
 ## 2. Setup
 
-Setup sets languages and functional modules and creates the basis of the project.
+Setup sets languages and creates the basis of the project.
 
 ### Languages
 
@@ -67,19 +67,21 @@ When reapplying, the visible language selection replaces the previous state. The
 
 ### Modules
 
-The list offers every module that ships an installer unit: navigation, language selection and contact form in a fresh checkout, plus any module a project has added. Features - the catalogue's Newsletter and Search, for instance - are not offered here: a feature is copied into `features/` from [dapeio/nino-features](https://github.com/dapeio/nino-features) and switched on in the workbench's [Features panel](features.md) after setup. If a selected module requires another module, the assistant automatically includes this dependency in the selection. A used page template can also pull in required modules; a contact page, for example, activates its form and mail functions.
+Navigation, language selection (the locale picker) and the contact form are no longer a choice: `\Nino\Install\Setup::ALWAYS_MODULES` names their unit keys, and every Setup run applies all three units and lists all three classes in `/nino/modules`, exactly as it would for a module actually picked. `Design` and `Templates` are handled the same way they always were - listed whenever their class exists (`TOOL_MODULES`), no unit to apply.
+
+The list that remains offers every *other* module that ships an installer unit: nothing, in a fresh checkout, plus any module a project has added below `app/`, or a fork below `_admin/install/library/modules/`. Features - the catalogue's Newsletter and Search, for instance - are not offered here either: a feature is copied into `features/` from [dapeio/nino-features](https://github.com/dapeio/nino-features) and switched on in the workbench's [Features panel](features.md) after setup. If a selected module requires another module, the assistant automatically includes this dependency in the selection - and finds it already present when that dependency happens to be one of the three always-on ones. A used page template can also pull in required modules; a contact page, for example, works because the contact form's own module is always there.
 
 Setup writes:
 
 - available and native language to `config.php`;
-- the activated module classes to `/nino/modules`;
-- the routes provided by the base and modules to `/nino/http/routes`;
+- the activated module classes - the always-on three, the developer tools whose class exists, and whatever else was picked - to `/nino/modules`;
+- the routes provided by the base and every applied module to `/nino/http/routes`;
 - templates to `templates/`;
 - global and language-dependent texts to `text/`;
 - provided element types to `elements/`;
 - other declared files to their project paths.
 
-Languages, modules, and the routes managed by Setup are replaced. Manually or by other areas created routes remain preserved. Templates, texts, and element types that have already been copied are not deleted by later deselection.
+Languages, the picked *other* modules, and the routes managed by Setup are replaced on a later reapply; the three always-on units and the routes/templates/text they bring are never removed by it. Manually or by other areas created routes remain preserved. Templates, texts, and element types that have already been copied are not deleted by later deselection.
 
 ## 3. Themes
 

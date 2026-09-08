@@ -247,6 +247,17 @@ check( 'the module boots on the next request and its shortcode reads its setting
 	return ( $appData['./helper/booted'] ?? false ) === true && \Nino\Html::renderHtml( $appData, '[sample]' ) === 'Again';
 } )() );
 check( 'the workbench lists its panel while it is active', isset( \Nino\Admin\Admin::panels( $appData )['sample'] ) === true );
+check( 'its class file sits below NINO_FEATURES_DIR, so the registry moves it into the features group though its own nav() names content', \Nino\Admin\Admin::panels( $appData )['sample']['group'] === 'features' );
+check( 'the registry sits it in the rail between the structure and the system panels, GROUPS order rather than its own nav()', ( static function() use ( $appData ): bool {
+	$order = array_keys( \Nino\Admin\Admin::panels( $appData ) );
+	return array_search( 'routes', $order, true ) < array_search( 'sample', $order, true )
+		&& array_search( 'sample', $order, true ) < array_search( 'users', $order, true );
+} )() );
+check( 'the Roles tab offers the panel\'s permission under the features group, the same way it offers a content panel\'s', in_array(
+	[ 'perm' => \Nino\Modules\Sample\Admin::MANAGE_PERM, 'label' => '/_admin/nav/sample', 'group' => 'features', 'offered' => true ],
+	\Nino\Modules\Users\Admin::permOptions( $appData ),
+	true
+) === true );
 
 $again = \Nino\Features::activate( $appData, 'sample' );
 check( 'activating again is harmless: nothing changes', $again === true && \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/modules'] === $stored['/nino/modules'] && isset( $appData['./sample/upgraded-from'] ) === false );
@@ -398,8 +409,8 @@ $panelActions = [
 	'apiInstall' 		=> [ 'key' => 'helper', 'version' => '1.0.0' ],
 ];
 
-check( 'the panel is a system entry between Backups (10) and Config (20), with its two mount points and its permission', \Nino\Modules\Features\Admin::nav() === [ 'features', '/_admin/nav/features', 15, 'system' ]
-	&& \Nino\Modules\Features\Admin::panes() === [ 'features-list', 'features-catalogue' ] && \Nino\Modules\Features\Admin::perm() === '/_admin/features/manage' );
+check( 'the panel is a system entry between Backups (10) and Config (20), with its one mount point and its permission', \Nino\Modules\Features\Admin::nav() === [ 'features', '/_admin/nav/features', 15, 'system' ]
+	&& \Nino\Modules\Features\Admin::panes() === [ 'features-list' ] && \Nino\Modules\Features\Admin::perm() === '/_admin/features/manage' );
 check( 'it offers exactly the six actions', array_keys( \Nino\Modules\Features\Admin::actions() ) === [ 'features/list', 'features/activate', 'features/deactivate', 'features/settings', 'features/catalogue', 'features/install' ] );
 check( 'the workbench finds it by reading the directory, nothing registered', in_array( \Nino\Modules\Features\Admin::class, \Nino\Admin\Admin::modules(), true ) === true && isset( \Nino\Admin\Admin::panels( $appData )['features'] ) === true );
 
@@ -424,8 +435,9 @@ foreach( $panelActions as $method => $data )
 \Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );
 
 [ $status, $body ] = callFeatures( $appData, 'apiList' );
-check( 'apiList answers the directory the panel reads from, the catalogue url, and every feature, sorted by key', $status === 200 && $body['dir'] === '/tests/fixtures/features' && $body['catalogue'] === \Nino\Catalogue::DEFAULT_URL
-	&& array_keys( $body ) === [ 'dir', 'catalogue', 'features' ] && array_column( $body['features'], 'key' ) === [ 'helper', 'old', 'sample' ] );
+check( 'apiList answers the directory the panel reads from, the catalogue url, whether it is writable, no cached catalogue yet, and every feature, sorted by key', $status === 200 && $body['dir'] === '/tests/fixtures/features'
+	&& $body['catalogueUrl'] === \Nino\Catalogue::DEFAULT_URL && $body['writable'] === true && $body['catalogue'] === null
+	&& array_keys( $body ) === [ 'dir', 'catalogueUrl', 'writable', 'catalogue', 'features' ] && array_column( $body['features'], 'key' ) === [ 'helper', 'old', 'sample' ] );
 $byKey = array_column( $body['features'], null, 'key' );
 check( 'every entry has the same keys', array_keys( $byKey['sample'] ) === [ 'key', 'name', 'description', 'version', 'installed', 'active', 'update', 'requires', 'problems', 'settings' ] );
 check( 'names and descriptions arrive in the session locale - de_DE, the native language, since none was chosen', $byKey['sample']['name'] === 'Beispiel-Feature' && $byKey['sample']['description'] === 'Prüft den ganzen Feature-Vertrag.'
@@ -498,7 +510,8 @@ $off = $appData;
 $off['/nino/catalogue/url']			= '';
 $off['./nino/filesystem/path']	= dirname( __DIR__ );
 $offWords = (array) include dirname( __DIR__ ). '/_admin/Nino/Modules/Features/text/de_DE.php';
-check( 'apiCatalogue with the catalogue switched off is a 400 in the panel\'s own words, in the session locale, and apiList says the same with an empty url',
-	callFeatures( $off, 'apiCatalogue' ) === [ 400, [ 'error' => $offWords['[[/_admin/features/error/catalogue-off]]'] ] ] && callFeatures( $off, 'apiList' )[1]['catalogue'] === '' );
+check( 'apiCatalogue with the catalogue switched off is a 400 in the panel\'s own words, in the session locale, and apiList says the same with an empty catalogueUrl and no cached catalogue',
+	callFeatures( $off, 'apiCatalogue' ) === [ 400, [ 'error' => $offWords['[[/_admin/features/error/catalogue-off]]'] ] ]
+	&& callFeatures( $off, 'apiList' )[1]['catalogueUrl'] === '' && callFeatures( $off, 'apiList' )[1]['catalogue'] === null );
 
 ninoDone( $appData );

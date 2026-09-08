@@ -321,20 +321,27 @@ namespace Nino\Install {
 
 	/**
 	 *	Nino							A compact filesystembased php framework
-	 *	Install						Step 2: assembles locales and "modules" (navigation,
-	 *												localepicker, forms - each their own text and/or mail
-	 *												templates) into the project's config.php/templates/text.
-	 *												Pages live in their own step now (Webpages, below) -
-	 *												this class only ever touches base + modules/&lt;key&gt;.
-	 *												Features (Newsletter, Search, ...) are not offered here:
-	 *												they are switched on in the workbench's Features panel
-	 *												after setup (see \Nino\Features).
+	 *	Install						Step 2: assembles the picked locales, plus every module unit,
+	 *												into the project's config.php/templates/text. Navigation,
+	 *												the locale picker and the contact form (each their own
+	 *												text and/or mail templates) are no longer a choice here -
+	 *												ALWAYS_MODULES lists their unit keys, and apiApply() applies
+	 *												their units the same way it applies a picked one, on every
+	 *												run. What the picker (apiLibrary()) still offers is any
+	 *												*other* unit - a project's own module below the app dir, or
+	 *												a fork below library/modules - which is why the mechanism
+	 *												itself (units(), the posted 'modules' list, requiresModules)
+	 *												stays exactly as it was. Pages live in their own step now
+	 *												(Webpages, below) - this class only ever touches base +
+	 *												modules/&lt;key&gt;. Features (Newsletter, Search, ...) are
+	 *												not offered here: they are switched on in the workbench's
+	 *												Features panel after setup (see \Nino\Features).
 	 *
 	 *												The picked locales/modules fully replace whatever was
 	 *												picked before - see apiApply()'s docblock - so the picker
-	 *												itself (apiLibrary()) reports each module's current active
-	 *												state, letting the frontend pre-check what's already on
-	 *												rather than starting blank every time.
+	 *												itself (apiLibrary()) reports each remaining module's
+	 *												current active state, letting the frontend pre-check what's
+	 *												already on rather than starting blank every time.
 	 *
 	 *												Every unit (base, modules/&lt;key&gt;) is a directory with a
 	 *												manifest.php (routes/templates/blacklist/requiresModules)
@@ -374,8 +381,21 @@ namespace Nino\Install {
 			'\\Nino\\Modules\\Cache',
 		];
 
-		// The developer tools delivered as modules (see Setup::apiApply())
-		public const array TOOL_MODULES = [ '\\Nino\\Modules\\Design', '\\Nino\\Modules\\Templates' ];
+		// The developer tools delivered as modules (see Setup::apiApply()).
+		// Modules\Maintenance joins them rather than CORE_MODULES above for
+		// the same reason Design and Templates do: it ships no install/
+		// unit the wizard would apply (see the module's own docblock), so
+		// there is nothing for a picker checkbox to control - only whether
+		// its class is part of this delivery
+		public const array TOOL_MODULES = [ '\\Nino\\Modules\\Design', '\\Nino\\Modules\\Templates', '\\Nino\\Modules\\Maintenance' ];
+
+		// Unit keys (see units()) that used to be a picker choice and are now
+		// applied on every apply, exactly like a module a project actually
+		// picked - Navigation, the locale picker and the contact form. Not a
+		// class list like CORE_MODULES/TOOL_MODULES: a unit key still has to
+		// go through the normal _applyUnit()/moduleClass path in apiApply(),
+		// so its routes/templates/text land the same way they always did
+		public const array ALWAYS_MODULES = [ 'forms', 'navigation', 'localepicker' ];
 
 		private const string LIBRARY = __DIR__. '/library';
 
@@ -392,14 +412,16 @@ namespace Nino\Install {
 		}
 
 		/**
-		 *	List everything the picker can offer: available locales, and
-		 *	every module's label + auto-selected requirements - each also
-		 *	flagged with whether it's currently active, so the picker can
-		 *	pre-check the real, current state rather than starting blank
-		 *	every time. That matters because apiApply() replaces the whole
-		 *	selection: a picker that didn't show what's already on would
-		 *	make "go back and add one more module" silently turn everything
-		 *	else off
+		 *	List everything the picker can still offer: available locales,
+		 *	and every *other* module's label + auto-selected requirements -
+		 *	ALWAYS_MODULES is left out, since Navigation, the locale picker
+		 *	and the contact form are no longer a choice (see apiApply()) -
+		 *	each remaining one also flagged with whether it's currently
+		 *	active, so the picker can pre-check the real, current state
+		 *	rather than starting blank every time. That matters because
+		 *	apiApply() replaces the whole selection: a picker that didn't
+		 *	show what's already on would make "go back and add one more
+		 *	module" silently turn everything else off
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
@@ -421,6 +443,10 @@ namespace Nino\Install {
 
 			$modules = [];
 			foreach( self::units() as $key => $unitDir ) {
+
+				if( in_array( $key, self::ALWAYS_MODULES, true ) === true )
+					continue;
+
 				$manifest = self::_readManifest( $unitDir ) ?? [];
 				$modules[$key] = [
 					'label' 					=> (string) ( $manifest['label'] ?? $key ),
@@ -605,7 +631,10 @@ namespace Nino\Install {
 		 *	Locales, modules and routes are a full replace, not a merge: the
 		 *	posted selection is the complete, authoritative picture, every
 		 *	time this runs - unchecking a locale/module and re-applying
-		 *	actually removes it, the same way any settings form works. Only
+		 *	actually removes it, the same way any settings form works. The
+		 *	one exception is ALWAYS_MODULES: Navigation, the locale picker
+		 *	and the contact form are folded into the applied set regardless
+		 *	of what was posted, so they can never be "unchecked" away. Only
 		 *	routes need care doing that: by the time any wizard request
 		 *	reaches here, $appData['/nino/http/routes'] already carries this
 		 *	request's own runtime-only entries (the wizard's own GET/POST
@@ -634,7 +663,16 @@ namespace Nino\Install {
 			$data 		= \Nino\Install\Install::postData();
 			$locales 	= array_values( array_intersect( (array) ( $data['locales'] ?? [] ), self::AVAILABLE_LOCALES ) );
 			$units 		= self::units();
-			$modules 	= array_values( array_intersect( (array) ( $data['modules'] ?? [] ), array_keys( $units ) ) );
+
+			// Navigation, the locale picker and the contact form are no
+			// longer posted - they are unconditionally part of the applied
+			// set, ahead of whatever else was actually picked, so their
+			// units go through the exact same _applyUnit()/moduleClass path
+			// below as any other module a project chose
+			$modules 	= array_values( array_unique( array_merge(
+				array_intersect( self::ALWAYS_MODULES, array_keys( $units ) ),
+				array_intersect( (array) ( $data['modules'] ?? [] ), array_keys( $units ) )
+			) ) );
 
 			if( count( $locales ) === 0 ) {
 				\Nino\Http::fail( $request, 400, 'select at least one locale' );

@@ -78,18 +78,24 @@ request:
   labels and hints a schema hands to the frontend (`Nino.adminUi.text()`
   resolves a value that starts with `/`, `tests/admin-system-smoke.php` fails
   on a key one of the two languages lacks).
-- `group` is `content`, `structure` or `system` and decides the heading the
-  link sits under; an unknown group falls back to `content` with a warning.
+- `group` is `content`, `structure`, `features` or `system` and decides the
+  heading the link sits under; an unknown group falls back to `content` with
+  a warning. `features` is not a free choice: it is refused the same way an
+  unknown group is unless the panel's own class file lies below
+  `\Nino\Features::dir()`, and a panel that does live there lands in
+  `features` regardless of what it names - see `Panels::_isFeaturePanel()`.
   The **Editor** role the wizard writes is every `content` panel's `perm()`
   at that moment (`Roles::defaults()`); a content panel a module brings later
-  is offered on the roles tab like every other.
+  is offered on the roles tab like every other, and so is a feature's under
+  the `features` group.
 - `weight` orders the navigation within the group, lowest first, stable for
   equal weights. Core content panels sit at 0 (Dashboard), 20 (Elements), 30
   (Text), 40 (Images) and 90 (Logs); structure at 2 (Templates), 5 (Design)
   and 20 (Routes); system at 2 (Users), 5 (Language), 10 (Backups) and 20
   (Config). A module panel picks the slot it wants: Submissions 60,
-  Navigations 25 (after Routes); the catalogue's Newsletter 65, its Search 30
-  (system).
+  Navigations 25 (after Routes); the catalogue's Newsletter and Search name
+  weights of their own too, but land in `features` rather than wherever they
+  name, since both ship below `features/`.
 
 `tabs()` rules:
 

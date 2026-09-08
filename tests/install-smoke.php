@@ -182,8 +182,7 @@ $libraryBody = $libraryRequest['/nino/http/response']['body'];
 check( 'lists the two locales the library ships translations for', $libraryBody['locales'] === [ 'de_DE', 'en_US' ] );
 check( 'reports the config\'s current native locale as already active', $libraryBody['activeLocales'] === [ 'de_DE' ] );
 check( 'reports the config\'s current native locale itself, for the Native Locale dropdown to pre-select', $libraryBody['nativeLocale'] === 'de_DE' );
-check( 'lists every module unit - pages have their own step now (Webpages), not listed here', array_keys( $libraryBody['modules'] ) === [ 'forms', 'localepicker', 'navigation' ] );
-check( 'no module is active yet', $libraryBody['modules']['forms']['active'] === false );
+check( 'lists no module unit at all: forms/navigation/localepicker are no longer a choice, and a fresh checkout ships no other unit - pages have their own step now (Webpages), not listed here', $libraryBody['modules'] === [] );
 
 $_POST['data'] = json_encode( [ 'locales' => [], 'modules' => [] ] );
 $noLocaleRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
@@ -211,25 +210,28 @@ $appData['/nino/http/routes']['GET://_admin'] 	= [ 'uri' => '/_admin', 'body' =>
 $appData['/nino/http/routes']['POST://_admin'] = [ 'uri' => '/_admin' ];
 $appData['/nino/http/routes']['POST://.form'] 		= [ 'uri' => '/.form' ];
 
-// de_DE only, "forms" picked directly
-$_POST['data'] = json_encode( [ 'locales' => [ 'de_DE' ], 'modules' => [ 'forms' ] ] );
+// de_DE only, nothing left to pick - forms/navigation/localepicker are
+// applied regardless
+$_POST['data'] = json_encode( [ 'locales' => [ 'de_DE' ], 'modules' => [] ] );
 $applyRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Install\Setup::apiApply( $appData, $applyRequest );
 $applyBody = $applyRequest['/nino/http/response']['body'];
 
 check( 'apply succeeds', $applyRequest['/nino/http/response']['statusCode'] === 200 );
-check( 'reports back exactly what was picked - "forms" has no requiresModules of its own to pull in anything else', $applyBody['modules'] === [ 'forms' ] );
+check( 'reports back the three always-on units, nothing was picked to add to them', $applyBody['modules'] === [ 'forms', 'navigation', 'localepicker' ] );
 
 $configAfterApply = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
 
 check( 'picking only the already-native de_DE does not pull in en_US too', $configAfterApply['/nino/locales/available'] === [ 'de_DE' ] );
 check( 'core structural modules are always present', in_array( '\\Nino\\Modules\\Template', $configAfterApply['/nino/modules'], true ) === true );
-check( 'the auto-required Form module is present', in_array( '\\Nino\\Modules\\Form', $configAfterApply['/nino/modules'], true ) === true );
-check( 'a module nobody picked (Navigation) is absent', in_array( '\\Nino\\Modules\\Navigation', $configAfterApply['/nino/modules'], true ) === false );
+check( 'the always-on Form module is present, with nothing picked', in_array( '\\Nino\\Modules\\Form', $configAfterApply['/nino/modules'], true ) === true );
+check( 'the always-on Navigation module is present too', in_array( '\\Nino\\Modules\\Navigation', $configAfterApply['/nino/modules'], true ) === true );
+check( 'and so is the always-on Localepicker module', in_array( '\\Nino\\Modules\\Localepicker', $configAfterApply['/nino/modules'], true ) === true );
 check( 'the developer tools that ship as modules are active from the first config on', in_array( '\\Nino\\Modules\\Design', $configAfterApply['/nino/modules'], true ) === true
-	&& in_array( '\\Nino\\Modules\\Templates', $configAfterApply['/nino/modules'], true ) === true );
+	&& in_array( '\\Nino\\Modules\\Templates', $configAfterApply['/nino/modules'], true ) === true
+	&& in_array( '\\Nino\\Modules\\Maintenance', $configAfterApply['/nino/modules'], true ) === true );
 check( 'apply writes the two roles a project starts with', array_keys( $configAfterApply['/nino/auth/roles'] ) === [ 'editor', 'developer' ] && $configAfterApply['/nino/auth/roles']['developer'] === [ 'label' => 'Developer', 'perms' => [ '/*' ] ] );
-check( 'the Editor role is every content panel\'s permission - the picked Form module\'s included - and no structure, system or tab permission', in_array( '/_admin/elements/manage', $configAfterApply['/nino/auth/roles']['editor']['perms'], true ) === true
+check( 'the Editor role is every content panel\'s permission - the always-on Form module\'s included - and no structure, system or tab permission', in_array( '/_admin/elements/manage', $configAfterApply['/nino/auth/roles']['editor']['perms'], true ) === true
 	&& in_array( '/_admin/submissions/view', $configAfterApply['/nino/auth/roles']['editor']['perms'], true ) === true
 	&& in_array( '/_admin/types/manage', $configAfterApply['/nino/auth/roles']['editor']['perms'], true ) === false
 	&& in_array( '/_admin/users/manage', $configAfterApply['/nino/auth/roles']['editor']['perms'], true ) === false );
@@ -260,7 +262,8 @@ check( '...before any template can create that directory unprotected', strpos( $
 
 check( 'copies base\'s html-header.tpl', \Nino\Filesystem::fileExists( $appData, '/templates/html-header.tpl' ) === true );
 check( 'copies "forms"\'s own mail-header/footer templates', \Nino\Filesystem::fileExists( $appData, '/templates/mail-header.tpl' ) === true );
-check( 'does not copy a module that was never picked (navigation)', \Nino\Filesystem::fileExists( $appData, '/templates/html-header-nav.tpl' ) === false );
+check( 'copies "navigation"\'s own templates too - always-on now, nothing had to pick it', \Nino\Filesystem::fileExists( $appData, '/templates/html-header-nav.tpl' ) === true );
+check( '...and "localepicker"\'s', \Nino\Filesystem::fileExists( $appData, '/templates/html-footer-localepicker.tpl' ) === true );
 
 $blacklistAfterApply = \Nino\Filesystem::getFileContent( $appData, '/text/blacklist.php', [] );
 check( 'base\'s blacklist entries (design tokens) landed in text/blacklist.php', in_array( '/website/lang', $blacklistAfterApply, true ) === true );
@@ -268,6 +271,8 @@ check( '"forms"\'s own blacklist entries (its mail design tokens) landed too', i
 
 $deAfterApply = \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] );
 check( 'merges the picked locale\'s text fragments (base + forms)', ( $deAfterApply['[[/form/title]]'] ?? null ) !== null );
+check( '...and "localepicker"\'s, always-on now too', ( $deAfterApply['[[/nino/locales/title]]'] ?? null ) === 'Wählen Sie Ihre Sprache' );
+check( 'the navigation menus config default lands even though nothing picked navigation', $configAfterApply['/nino/html/navs'] === [ 'main', 'footer' ] );
 check( 'never writes a fragment for a locale that was not picked', \Nino\Filesystem::fileExists( $appData, '/text/en_US.php' ) === false );
 
 $libraryAfterApply = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
@@ -275,14 +280,13 @@ $libraryAfterApply = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 $libraryAfterApplyBody = $libraryAfterApply['/nino/http/response']['body'];
 
 check( 'apiLibrary now reports de_DE as the active locale', $libraryAfterApplyBody['activeLocales'] === [ 'de_DE' ] );
-check( 'apiLibrary now reports "forms" as active', $libraryAfterApplyBody['modules']['forms']['active'] === true );
-check( 'apiLibrary now reports "navigation" as still inactive', $libraryAfterApplyBody['modules']['navigation']['active'] === false );
+check( 'apiLibrary still lists no module choice at all - forms/navigation/localepicker never appear here', $libraryAfterApplyBody['modules'] === [] );
 
-// A second run with a different, non-overlapping selection replaces the
-// first run rather than adding to it: de_DE drops out, "forms" drops out
-// with it, "navigation" (en_US) comes in - the hand-written and
-// runtime-only routes above still have to survive
-$_POST['data'] = json_encode( [ 'locales' => [ 'en_US' ], 'modules' => [ 'navigation' ] ] );
+// A second run with a different locale selection replaces the first run's
+// locales, exactly as before - but nothing about the always-on three can be
+// "unpicked" any more, so this only ever exercises the locale replace now.
+// The hand-written and runtime-only routes above still have to survive
+$_POST['data'] = json_encode( [ 'locales' => [ 'en_US' ], 'modules' => [] ] );
 $secondApplyRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Install\Setup::apiApply( $appData, $secondApplyRequest );
 check( 'second apply succeeds', $secondApplyRequest['/nino/http/response']['statusCode'] === 200 );
@@ -290,9 +294,9 @@ check( 'second apply succeeds', $secondApplyRequest['/nino/http/response']['stat
 $configAfterSecondApply = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
 check( 'replaces rather than grows: de_DE is gone, only en_US is available now', $configAfterSecondApply['/nino/locales/available'] === [ 'en_US' ] );
 check( 'the native locale follows along once it is no longer available', $configAfterSecondApply['/nino/locales/native'] === 'en_US' );
-check( 'the no-longer-picked Form module is gone', in_array( '\\Nino\\Modules\\Form', $configAfterSecondApply['/nino/modules'], true ) === false );
-check( 'the newly-picked Navigation module is present', in_array( '\\Nino\\Modules\\Navigation', $configAfterSecondApply['/nino/modules'], true ) === true );
-check( 'the Editor role follows the modules - the dropped Form module\'s permission is gone from it', in_array( '/_admin/submissions/view', $configAfterSecondApply['/nino/auth/roles']['editor']['perms'], true ) === false );
+check( 'the always-on Form module survives a reapply that picks nothing at all', in_array( '\\Nino\\Modules\\Form', $configAfterSecondApply['/nino/modules'], true ) === true );
+check( 'so does Navigation', in_array( '\\Nino\\Modules\\Navigation', $configAfterSecondApply['/nino/modules'], true ) === true );
+check( 'the Editor role keeps the contact form\'s permission - it can no longer be dropped by unpicking a module', in_array( '/_admin/submissions/view', $configAfterSecondApply['/nino/auth/roles']['editor']['perms'], true ) === true );
 check( 'a hand-written route outside the library still survives the replace', isset( $configAfterSecondApply['/nino/http/routes']['GET://custom'] ) === true );
 check( 'the still-present simulated runtime pollution still never leaks in, on this second apply either', isset( $configAfterSecondApply['/nino/http/routes']['GET://_admin'] ) === false && isset( $configAfterSecondApply['/nino/http/routes']['POST://.form'] ) === false );
 check( 'text/de_DE.php from the first run is left in place - replace only touches routes/modules/locales, never deletes content already written', \Nino\Filesystem::fileExists( $appData, '/text/de_DE.php' ) === true );
@@ -1091,10 +1095,11 @@ check( '...its own per-locale wording rather than the generic fallback', ( $wpLi
 // The one field no form offers and apiApply() takes straight off the entry
 check( '...and the status code its manifest route declares', ( array_values( array_filter( $wpLibraryBody['webpages'],
 	static fn( array $e ): bool => $e['libraryKey'] === '404' ) )[0]['statusCode'] ?? null ) === 404 );
-check( 'no navigations are offered - Navigation was never picked', $wpLibraryBody['navs'] === [] );
-// ...so the proposal carries no menu membership either, the same rule a real
-// entry goes through
-check( '...and no proposed page claims one', array_filter( array_column( $wpLibraryBody['webpages'], 'navs' ) ) === [] );
+check( 'navigations are offered - Navigation is always active now, not something that had to be picked', $wpLibraryBody['navs'] === [ 'main', 'footer' ] );
+// ...so a preset page proposes whatever menus its own manifest route
+// suggests, intersected with what the project actually registers - home/
+// contact suggest both, legal only footer, 404 none
+check( '...and each proposed page carries the menu membership its own unit suggests', array_column( $wpLibraryBody['webpages'], 'navs' ) === [ [ 'main', 'footer' ], [ 'main', 'footer' ], [], [ 'footer' ] ] );
 
 // Each template also reports the starter wording its own text fragments
 // ship, so the form can prefill a new entry per locale instead of leaving
@@ -1252,9 +1257,9 @@ $perRouteList = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 $teamEntry = array_values( array_filter( $perRouteList['/nino/http/response']['body']['webpages'], fn( array $e ): bool => $e['httpUri'] === '/team' ) )[0] ?? [];
 check( 'a per-route page reads back as owning its template rather than as the library unit', ( $teamEntry['libraryKey'] ?? null ) === '' && ( $teamEntry['body'] ?? null ) === '[template /templates/page-team]' );
 
-// Navigation: only shows up once the module is active. Membership is posted
-// explicitly per entry and stored on its route.
-$_POST['data'] = json_encode( [ 'locales' => [ 'de_DE', 'en_US' ], 'modules' => [ 'navigation' ] ] );
+// Navigation: always active now (see ALWAYS_MODULES above). Membership is
+// posted explicitly per entry and stored on its route.
+$_POST['data'] = json_encode( [ 'locales' => [ 'de_DE', 'en_US' ], 'modules' => [] ] );
 $navSetupRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Install\Setup::apiApply( $appData, $navSetupRequest );
 
@@ -1320,8 +1325,9 @@ $reopened = $reopenWpRequest['/nino/http/response']['body']['webpages'] ?? [];
 check( 'reopening the step shows the pages this project kept, not the starter site again',
 	array_column( $reopened, 'httpUri' ) === [ '/' ] );
 
-// The same rule one step earlier: a unit the library recommends is only ever
-// the opening position, never an answer that outlives the operator's own
+// One step earlier, re-applying with nothing posted still leaves navigation,
+// the locale picker and the contact form active - there is no "opening
+// position" to decline any more, nor a choice that could outlive it
 $_POST['data'] = json_encode( [ 'locales' => [ 'de_DE', 'en_US' ], 'modules' => [] ] );
 $declineRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Install\Setup::apiApply( $appData, $declineRequest );
@@ -1329,11 +1335,14 @@ $declineRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 $reopenSetupRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Install\Setup::apiLibrary( $appData, $reopenSetupRequest );
 $reopenedModules = $reopenSetupRequest['/nino/http/response']['body']['modules'] ?? [];
+$configAfterDecline = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
 
-check( 'a recommended module the operator unchecked stays unchecked when the step reopens',
-	array_keys( array_filter( $reopenedModules, static fn( array $unit ): bool => $unit['active'] === true ) ) === [] );
-check( '...while the library still recommends it for the next fresh project',
-	( ( include \Nino\Install\Setup::units()['navigation']. '/manifest.php' )['preset'] ?? false ) === true );
+check( 'reopening the step still offers nothing to choose - nothing else ships in this checkout',
+	$reopenedModules === [] );
+check( '...and the three always-on modules are still there, unaffected by posting nothing',
+	in_array( '\\Nino\\Modules\\Navigation', $configAfterDecline['/nino/modules'], true ) === true
+	&& in_array( '\\Nino\\Modules\\Form', $configAfterDecline['/nino/modules'], true ) === true
+	&& in_array( '\\Nino\\Modules\\Localepicker', $configAfterDecline['/nino/modules'], true ) === true );
 
 echo "\n";
 
@@ -1808,13 +1817,14 @@ if( defined( 'NINO_APP_DIR' ) === true ) {
 	$appLibraryBody = $appLibraryRequest['/nino/http/response']['body'];
 	check( 'the Setup step offers the project module', ( $appLibraryBody['modules']['widget']['label'] ?? null ) === 'Widget'
 		&& ( $appLibraryBody['modules']['widget']['requiresModules'] ?? null ) === [ 'forms' ] );
+	check( '...and forms/navigation/localepicker stay excluded even once other project modules exist', array_intersect( [ 'forms', 'navigation', 'localepicker' ], array_keys( $appLibraryBody['modules'] ) ) === [] );
 
 	$_POST['data'] = json_encode( [ 'locales' => [ 'de_DE' ], 'modules' => [ 'widget' ] ] );
 	$appApplyRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 	\Nino\Install\Setup::apiApply( $appData, $appApplyRequest );
 	$appApplyBody = $appApplyRequest['/nino/http/response']['body'] ?? [];
 
-	check( 'applying it activates the class and its requirement', ( $appApplyBody['modules'] ?? null ) === [ 'widget', 'forms' ]
+	check( 'applying it activates the class and its requirement, alongside the three always-on units', ( $appApplyBody['modules'] ?? null ) === [ 'forms', 'navigation', 'localepicker', 'widget' ]
 		&& in_array( '\\Acme\\Widget', $appData['/nino/modules'], true ) === true
 		&& in_array( '\\Nino\\Modules\\Form', $appData['/nino/modules'], true ) === true );
 	check( '...and copies its template out of the module directory', \Nino\Filesystem::fileExists( $appData, '/templates/page-widget.tpl' ) === true );
@@ -1824,7 +1834,7 @@ if( defined( 'NINO_APP_DIR' ) === true ) {
 	$_POST['data'] = json_encode( [ 'locales' => [ 'de_DE' ], 'modules' => [ 'widget' ] ] );
 	$unknownRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 	\Nino\Install\Setup::apiApply( $appData, $unknownRequest );
-	check( 'a requirement no unit answers to is left out of the applied set', ( $unknownRequest['/nino/http/response']['body']['modules'] ?? null ) === [ 'widget' ] );
+	check( 'a requirement no unit answers to is left out of the applied set - only the always-on three plus what was actually picked remain', ( $unknownRequest['/nino/http/response']['body']['modules'] ?? null ) === [ 'forms', 'navigation', 'localepicker', 'widget' ] );
 }
 
 echo "\n";

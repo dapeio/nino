@@ -511,10 +511,11 @@ Modules are activated in `/nino/modules`. The order of the array is relevant if 
 | `Images` | `[image ...]` | creates an escaped `<img>` from an image slot or URI |
 | `Jstext` | `[jstext]` | provides text values as securely encoded JSON with CSP nonce |
 | `Localepicker` | `[localepicker ...]` | switches locale via query and redirect |
+| `Maintenance` | `/nino/http/response`, priority 1 | while `/nino/maintenance/status` is on, answers every site page and module endpoint with a 503 and a Retry-After header, for every visitor not signed in to the workbench |
 | `Navigation` | `[navigation ...]` | renders navigations from a compact line syntax |
 | `Template` | `[template /path/name]` | loads the raw content of a `.tpl` file; the common render pipeline processes it further |
 
-Every module in the table ships in `_nino/Nino/Modules/`, beside the always-on kernel modules. `Form` and `Navigation` bring their workbench panels along (Submissions, Navigations), `Design` and `Templates` are nothing but a panel each: every one is present exactly while its module is active. `Form`, `Navigation` and `Localepicker` are selectable in the setup wizard because each ships an `install/` unit beside its class; `Design` and `Templates` are listed in `/nino/modules` by the wizard whenever their class exists. A project switches any of them on or off in `/nino/modules`, and `_nino/` stays replaceable wholesale. Everything beyond the table is a **feature** - an installable package under `features/<Name>/` with a `feature.php` manifest, switched on in the workbench's Features panel, bringing its panel the same way. A checkout ships none: `Newsletter` (double opt-in, confirmation and unsubscribe under `/.newsletter`) and `Search` (a locale-aware fuzzy index over Element fields) come from the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features), copied into `features/`. See [Features](features.md), [Panels of the Workbench](#panels-of-the-workbench) and [Directory and Autoloading](#directory-and-autoloading) below.
+Every module in the table ships in `_nino/Nino/Modules/`, beside the always-on kernel modules. `Form` and `Navigation` bring their workbench panels along (Submissions, Navigations), `Design`, `Templates` and `Maintenance` are nothing but a panel each: every one is present exactly while its module is active. `Form`, `Navigation` and `Localepicker` are no longer a setup wizard choice - the wizard applies each one's `install/` unit and lists its class in `/nino/modules` on every run (`\Nino\Install\Setup::ALWAYS_MODULES`), the same way `Design`, `Templates` and `Maintenance` are listed whenever their class exists. A project may still switch any of the six off by hand in `/nino/modules`, and `_nino/` stays replaceable wholesale. Everything beyond the table is a **feature** - an installable package under `features/<Name>/` with a `feature.php` manifest, switched on in the workbench's Features panel, bringing its panel the same way. A checkout ships none: `Newsletter` (double opt-in, confirmation and unsubscribe under `/.newsletter`) and `Search` (a locale-aware fuzzy index over Element fields) come from the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features), copied into `features/`. See [Features](features.md), [Panels of the Workbench](#panels-of-the-workbench) and [Directory and Autoloading](#directory-and-autoloading) below.
 
 Some details are deliberately defensive:
 
@@ -563,7 +564,7 @@ application root - with one deliberate opening: `Nino\Modules\*` is a merged
 view over four roots rather than one directory. The runtime modules Nino ships
 live in `_nino/` - the always-on ones and the optional ones a project switches
 on or off in `/nino/modules` (`Form`, `Navigation`, `Localepicker`, `Design`,
-`Templates`); the workbench's own screens in `_admin/Nino/Modules/`
+`Templates`, `Maintenance`); the workbench's own screens in `_admin/Nino/Modules/`
 (`Dashboard`, `Elements`, `Text`, `Images`, `Logs`, `Routes`, `Users`,
 `Language`, `Backups`, `Config`, `Features`); the features a project installs
 below `features/` (or `NINO_FEATURES_DIR`), one directory each with a
@@ -683,7 +684,7 @@ The workbench's own screens are the same thing in a different root: `_admin` hol
 | Method | Returns |
 | --- | --- |
 | `actions()` | `[ 'catalog/list' => [ Class::class, 'apiList' ], ... ]` - dispatched by the workbench's `POST` handler |
-| `nav()` | `[ uri, label, weight = 50, group = 'content' ]` - the uri is a slug and names the link, the pane and the JS namespace (`Nino.admin.<uri>`); a label starting with `/` is a fill key, anything else literal text - every shipped panel uses a fill, a module brings its `text/<locale>.php` for it; the group is `content`, `structure` or `system` |
+| `nav()` | `[ uri, label, weight = 50, group = 'content' ]` - the uri is a slug and names the link, the pane and the JS namespace (`Nino.admin.<uri>`); a label starting with `/` is a fill key, anything else literal text - every shipped panel uses a fill, a module brings its `text/<locale>.php` for it; the group is `content`, `structure`, `features` or `system` - except a panel a feature brought (its class file lies below `\Nino\Features::dir()`) always lands in `features` regardless of what it names, and naming `features` from anywhere else is refused like an unknown group |
 | `perm()` | the permission that shows the link and gates the actions - `/_admin/<uri>/manage` by convention; offered as a checkbox on the Users panel's roles tab automatically, and part of the **Editor** role the wizard writes when the group is `content` |
 | `panes()` | mount ids rendered inside the pane, default `[ '<uri>-list' ]` |
 | `template()` | instead of mount points: a `.tpl` rendered whole into the pane, project-relative and without the extension - for a panel that lays out its own regions |
@@ -732,7 +733,7 @@ $request = \Nino\request( $appData, $_SERVER );
 \Nino\output( $appData, $request );
 ```
 
-`init( true )` boots without a `config.php`, because until the setup wizard has run there is none. `Admin::init()` then decides what the route serves: the wizard (`_admin/install/Install.php`) while `Admin::isInstalled()` says no, the login and the panels afterwards. The wizard is not a module from `/nino/modules`; the panels that ship as modules - Design and Templates - are, and come through `adminPanels()` like any other.
+`init( true )` boots without a `config.php`, because until the setup wizard has run there is none. `Admin::init()` then decides what the route serves: the wizard (`_admin/install/Install.php`) while `Admin::isInstalled()` says no, the login and the panels afterwards. The wizard is not a module from `/nino/modules`; the panels that ship as modules - Design, Templates and Maintenance - are, and come through `adminPanels()` like any other.
 
 `_admin/recovery.php` is the third entry point, booting the same way: it verifies the recovery secret (`\Nino\Admin\Recovery`) and offers a restore and a password reset, nothing else.
 

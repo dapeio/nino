@@ -2430,6 +2430,112 @@ $appData['/nino/cache/status'] = false;
 
 echo "\n";
 
+
+// --- Modules\Maintenance ---------------------------------------------------
+
+echo "Modules\\Maintenance - one switch answers every page with 503\n";
+
+// A request as Http::request()/response() would leave it before this
+// module's global callback runs - same shape as cacheRequest() above.
+function maintenanceRequest( string $uri, string $method = 'GET' ): array {
+	return [
+		'/nino/http/request' => [
+			'method' 		=> $method,
+			'rawMethod'	=> $method,
+			'uri' 			=> $uri,
+			'query' 		=> [],
+		],
+		'/nino/http/response' => [
+			'uri' 				=> $uri,
+			'locale' 			=> 'de_DE',
+			'statusCode'	=> 200,
+			'header' 			=> [],
+			'body' 				=> '<html>page</html>',
+		],
+	];
+}
+
+unset( $appData['./nino/auth/current'] );
+$appData['/nino/maintenance/status'] = false;
+unset( $appData['/nino/maintenance/retry'] );
+
+$off = maintenanceRequest( '/' );
+check( 'status off changes nothing', \Nino\Modules\Maintenance::_prepare( $appData, $off ) === false );
+check( '...the response is left exactly as it was', $off['/nino/http/response']['statusCode'] === 200 && $off['/nino/http/response']['body'] === '<html>page</html>' );
+
+// --- status on ---
+
+$appData['/nino/maintenance/status'] = true;
+$appData['/nino/maintenance/retry'] = 120;
+
+$home = maintenanceRequest( '/' );
+check( 'status on: an anonymous GET of / is answered here', \Nino\Modules\Maintenance::_prepare( $appData, $home ) === true );
+check( '...with statusCode 503', $home['/nino/http/response']['statusCode'] === 503 );
+check( '...Retry-After from the configured seconds', $home['/nino/http/response']['header']['Retry-After'] === '120' );
+check( '...Cache-Control: no-store', $home['/nino/http/response']['header']['Cache-Control'] === 'no-store' );
+check( '...the built-in fallback body, no /templates/page-maintenance.tpl on this sandbox',
+	str_contains( $home['/nino/http/response']['body'], 'Under maintenance' ) === true
+	&& str_contains( $home['/nino/http/response']['body'], 'We will be back shortly.' ) === true );
+
+// /_admin and everything below it keeps working, so an operator can still
+// log in and switch this back off
+check( '/_admin is untouched', \Nino\Modules\Maintenance::_prepare( $appData, maintenanceRequest( '/_admin' ) ) === false );
+check( '...and a screen below it too', \Nino\Modules\Maintenance::_prepare( $appData, maintenanceRequest( '/_admin/config' ) ) === false );
+
+// A module endpoint is answered too - the site is down for a form
+// submission exactly as much as for the page it sits on
+$formPost = maintenanceRequest( '/.form', 'POST' );
+check( 'a /.form POST is answered with the maintenance page as well', \Nino\Modules\Maintenance::_prepare( $appData, $formPost ) === true );
+check( '...with statusCode 503', $formPost['/nino/http/response']['statusCode'] === 503 );
+
+// A signed-in account sees the site as it is
+$appData['./nino/auth/current'] = [ 'mail' => 'operator@example.com', 'perms' => [] ];
+$signedIn = maintenanceRequest( '/' );
+check( 'a signed-in user gets the page, not the 503', \Nino\Modules\Maintenance::_prepare( $appData, $signedIn ) === false );
+check( '...the response is left exactly as it was', $signedIn['/nino/http/response']['statusCode'] === 200 && $signedIn['/nino/http/response']['body'] === '<html>page</html>' );
+unset( $appData['./nino/auth/current'] );
+
+// init() takes the full-page cache out of the loop at runtime, without
+// persisting anything - config.php's own /nino/cache/status is untouched
+$appData['/nino/cache/status'] = true;
+\Nino\Modules\Maintenance::init( $appData );
+check( '/nino/cache/status is false at runtime while maintenance is on', $appData['/nino/cache/status'] === false );
+
+$appData['/nino/maintenance/status'] = false;
+$appData['/nino/cache/status'] = true;
+\Nino\Modules\Maintenance::init( $appData );
+check( '...and left alone while maintenance is off', $appData['/nino/cache/status'] === true );
+
+// The fallback page renders both fills - a project's own text (however it
+// got there) always wins over the hardcoded default
+$appData['/nino/maintenance/status'] = true;
+\Nino\Html::addFills( $appData, [
+	'/maintenance/title'	=> 'Back soon',
+	'/maintenance/text'		=> 'Custom maintenance notice',
+], '*' );
+
+$filled = maintenanceRequest( '/' );
+\Nino\Modules\Maintenance::_prepare( $appData, $filled );
+check( 'the fallback page renders both fills', str_contains( $filled['/nino/http/response']['body'], 'Back soon' ) === true
+	&& str_contains( $filled['/nino/http/response']['body'], 'Custom maintenance notice' ) === true );
+
+// A project's own template wears the site's header, and that header names
+// the request fills \Nino\request() only adds after this callback round -
+// so the module adds them itself before it renders
+\Nino\Filesystem::putFileContent( $appData, '/templates/page-maintenance.tpl', '<main data-uri="[[/nino/http/request/uri]]" data-locale="[[/nino/http/response/locale]]"><h1>[[/maintenance/title]]</h1></main>' );
+\Nino\Modules\Template::init( $appData );
+$templated = maintenanceRequest( '/kontakt' );
+\Nino\Modules\Maintenance::_prepare( $appData, $templated );
+check( 'a project\'s page-maintenance.tpl renders with the request fills the kernel would have added', str_contains( $templated['/nino/http/response']['body'], 'data-uri="/kontakt"' ) === true
+	&& str_contains( $templated['/nino/http/response']['body'], '<h1>Back soon</h1>' ) === true && str_contains( $templated['/nino/http/response']['body'], '[[/nino' ) === false );
+@unlink( \Nino\Filesystem::path( $appData, '/templates/page-maintenance.tpl' ) );
+
+$appData['/nino/maintenance/status'] = false;
+$appData['/nino/cache/status'] = false;
+unset( $appData['/nino/maintenance/retry'] );
+
+echo "\n";
+
 // --- Cleanup ------------------------------------------------------------
 
 \Nino\Filesystem::removeDir( $sandbox );

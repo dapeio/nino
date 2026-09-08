@@ -872,11 +872,17 @@ namespace Nino\Admin {
 	 *											  summary( &$appData ): ?array   a dashboard tile { value, label }
 	 *											  log( $action, $data ): string  the activity-log line, '' for none
 	 *
-	 *											The navigation has three groups, in this order: 'content'
+	 *											The navigation has four groups, in this order: 'content'
 	 *											(what editors work in), 'structure' (the shape of the
-	 *											project) and 'system'. Weight orders within a group. A
-	 *											label starting with '/' is a fill key, resolved by the
-	 *											normal fill pass; anything else is literal text.
+	 *											project), 'features' (what an installed feature brings)
+	 *											and 'system'. Weight orders within a group. A label
+	 *											starting with '/' is a fill key, resolved by the normal
+	 *											fill pass; anything else is literal text.
+	 *
+	 *											A panel whose class file lies below \Nino\Features::dir()
+	 *											always lands in 'features', whatever its own nav() names -
+	 *											see _entry()'s docblock. Naming 'features' from anywhere
+	 *											else is refused the same way an unknown group is.
 	 *
 	 *	Where a panel			lives is what kind of panel it is. The workbench's own
 	 *											screens are modules under _admin/Nino/Modules/<Name>/, one
@@ -899,7 +905,7 @@ namespace Nino\Admin {
 	class Panels {
 
 		// The navigation's groups, in the order they are rendered
-		public const array GROUPS = [ 'content', 'structure', 'system' ];
+		public const array GROUPS = [ 'content', 'structure', 'features', 'system' ];
 
 		/**
 		 *	Build one tool's registry: its own panels first, then every
@@ -1032,8 +1038,17 @@ namespace Nino\Admin {
 			if( $icon !== '' && ( str_starts_with( $icon, '<svg' ) === false || stripos( $icon, '<script' ) !== false || stripos( $icon, 'on' ) !== false && preg_match( '/\son[a-z]+\s*=/i', $icon ) === 1 ) )
 				$icon = '';
 
+			// A panel a feature brought lands in 'features' regardless of
+			// what it named - see self::_isFeaturePanel() - so an editor
+			// granted that one group sees every feature's panel and nothing
+			// a kernel or app/ module could pick its way into. Naming
+			// 'features' from outside features/ is refused exactly like an
+			// unknown group: the value a panel names is never trusted to
+			// place itself in a group only a feature may sit in
 			$group = (string) ( $nav[3] ?? 'content' );
-			if( in_array( $group, self::GROUPS, true ) === false ) {
+			if( self::_isFeaturePanel( $class ) === true ) {
+				$group = 'features';
+			} elseif( in_array( $group, self::GROUPS, true ) === false || $group === 'features' ) {
 				trigger_error( 'Panel '. $class. ' names an unknown nav group \''. $group. '\'', E_USER_WARNING );
 				$group = 'content';
 			}
@@ -1063,6 +1078,39 @@ namespace Nino\Admin {
 				// holds one of its tabs'
 				'own'			=> true,
 			];
+		}
+
+		/**
+		 *	Whether $class is a panel a feature brought - its class file
+		 *	lies below \Nino\Features::dir(), the same test that tells a
+		 *	feature's own class apart from a kernel or app/ one, since both
+		 *	shapes are otherwise the same class-with-static-methods.
+		 *	realpath() on both sides so a symlinked checkout still compares
+		 *	correctly, and a directory that does not (yet) exist - a
+		 *	checkout ships none - simply never matches.
+		 *
+		 *	@param		string		$class				A validated panel class name
+		 *
+		 *	@return 	bool
+		 */
+		private static function _isFeaturePanel( string $class ): bool {
+
+			try {
+				$file = ( new \ReflectionClass( $class ) )->getFileName();
+			} catch( \ReflectionException ) {
+				return false;
+			}
+
+			if( is_string( $file ) === false )
+				return false;
+
+			$file = realpath( $file );
+			$dir 	= realpath( \Nino\Features::dir() );
+
+			if( $file === false || $dir === false )
+				return false;
+
+			return str_starts_with( $file, $dir. DIRECTORY_SEPARATOR );
 		}
 
 		/**

@@ -23,6 +23,11 @@ hooks for features: another mail transport, and sorted, paged element lists.
   feature, matched against key and version and checked to fit this kernel,
   then moved into `features/`
   with the old directory put back if the move fails. Nothing is activated.
+  A successful fetch is kept under `data/catalogue.php`; `cached()` reads it
+  back with no request of its own, null when there is nothing to show - no
+  fetch yet, a file that does not hold what fetch() writes, or a
+  `/nino/catalogue/url` that no longer matches (switching the catalogue off
+  included).
 - **`\Nino\Fetch`** (`_nino/Nino/Fetch/Fetch.php`): the kernel's one http
   client - a GET over https with timeout and byte cap, through curl or the
   stream wrapper, no redirects, certificate verified, user agent `Nino`. A
@@ -31,12 +36,19 @@ hooks for features: another mail transport, and sorted, paged element lists.
 - **Configuration** `/nino/catalogue/url` (Nino's catalogue by default, `''`
   switches it off) and `/nino/catalogue/key` (a PEM public key for a
   catalogue of your own).
-- **Features panel:** a catalogue block with **Load catalogue** - loaded only
-  when pressed, never on its own - listing the newest version of every
-  published feature this kernel can run, with **Install** and **Update**;
-  updating an active feature applies the update in the same step. Where
-  `features/` is not writable, the archive is linked to unpack by hand.
-  Actions `features/catalogue` and `features/install`.
+- **Features panel:** three tabs - Available, Inactive, Active - each
+  labelled with a count. Available is the catalogue: what it offers that is
+  not already current, listing the newest version of every published
+  feature this kernel can run, with **Install** and **Update**; updating an
+  active feature applies the update in the same step, and its offers are
+  always recomputed against the features on disk now, so an install shows up
+  there without a new fetch. An action bar above the tabs holds **Refresh
+  catalogue** - fetched only when pressed, never on its own - and a status
+  line naming when the cache is from. `features/list` answers the cached
+  catalogue alongside the installed features, so Available fills the moment
+  the panel opens with no request of its own; `features/catalogue` refreshes
+  it. Where `features/` is not writable, the archive is linked to unpack by
+  hand. Actions `features/catalogue` and `features/install`.
 - **`/nino/mail/send`** (`\Nino\Mail::TRANSPORT`): a transport callback.
   `Mail::send()` fires it after the per-ip cap and the header cleaning with
   `{ to, subject, body, replyTo, sender, headers, sent }`; a handler that
@@ -57,11 +69,44 @@ hooks for features: another mail transport, and sorted, paged element lists.
   script it adds to the project's bundles with `\Nino\Html::addAsset()` -
   as `/features/<Name>/...` and they are found after a relocation with
   `NINO_FEATURES_DIR` too.
+- **`\Nino\Modules\Maintenance`** (`_nino/Nino/Modules/Maintenance/`): one
+  switch that answers every site page and module endpoint with a 503 for a
+  visitor who is not signed in to the workbench, `Retry-After` and
+  `Cache-Control: no-store` among the headers. Its `/nino/http/response`
+  callback fires at priority 1, before `Modules\Jstext` (5) and
+  `Modules\Cache` (9) - `/_admin` keeps working throughout, and a signed-in
+  account still sees the site as it is. Configuration
+  `/nino/maintenance/status` (bool, default off) and `/nino/maintenance/retry`
+  (seconds, default 3600); the page renders `templates/page-maintenance.tpl`
+  with the site's own header and footer where a project has installed one, a
+  built-in minimal page with the same `/maintenance/title` and
+  `/maintenance/text` texts otherwise. The full-page cache is switched off at
+  runtime, never persisted, for as long as maintenance is on. Listed in
+  `/nino/modules` by the setup wizard whenever its class exists, the same way
+  as `Design` and `Templates`; its System panel **Maintenance** sits next to
+  Config.
+- A fourth workbench navigation group, **Features**, between Structure and
+  System (`\Nino\Admin\Panels::GROUPS`). Every panel a feature brings lands
+  there regardless of what its own `nav()` names - the registry checks
+  whether the panel's class file lies below `\Nino\Features::dir()` and sets
+  the group itself - so an editor granted the Features group sees every
+  active feature's panel and nothing a kernel or `app/` module placed there
+  instead. The group carries no heading while nothing is in it.
 
 ### Changed
 
 - `\Nino\Features::constraintValid()` is public - the catalogue validates
   the `nino` field of an entry with it.
+- The setup wizard no longer offers Navigation, the locale picker and the
+  contact form as a choice: `\Nino\Install\Setup::ALWAYS_MODULES` lists
+  their unit keys, and `apiApply()` applies each one's unit and lists its
+  class in `/nino/modules` on every run, the same way `Design` and
+  `Templates` (`TOOL_MODULES`) already were. The picker (`apiLibrary()`)
+  still offers any other module unit - a project's own below `app/`, or a
+  fork below `_admin/install/library/modules/` - unchanged.
+- A panel naming the `features` group from outside `features/` is refused
+  with the existing "unknown nav group" warning and falls back to `content`,
+  the same as any other invalid group.
 
 ## 1.1.0-beta — 2026-09-07
 

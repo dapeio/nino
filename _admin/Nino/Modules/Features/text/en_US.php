@@ -2,23 +2,22 @@
 // The Features module's own workbench strings, merged into its fills while
 // the module is active (see the panel's text()) - same keys and shape the
 // workbench's own text/<locale>.php has. A %s is filled by the script - the
-// features directory, a version, a list of keys, the catalogue url - or, in a
-// message the panel phrases itself (see its _say()), by the panel: the
-// kernel's reason
+// features directory, a version, a list of keys, a date - or, in a message
+// the panel phrases itself (see its _say()), by the panel: the kernel's
+// reason
 return [
 	'[[/_admin/nav/features]]'								=> 'Features',
 	'[[/_admin/features/label/active]]'				=> 'Active features',
-	'[[/_admin/features/hint/intro]]'					=> 'Every feature installed under %s. Drop a feature directory there and switch it on here; what it needs to know is saved as its settings in config.php, and switching it off keeps all of that for the next time.',
+	'[[/_admin/features/tab/available]]'			=> 'Available',
+	'[[/_admin/features/tab/inactive]]'				=> 'Inactive',
+	'[[/_admin/features/tab/active]]'					=> 'Active',
 	'[[/_admin/features/hint/empty]]'					=> 'No features are installed. A feature is one directory under %s, with a feature.php manifest beside its class.',
+	'[[/_admin/features/hint/active-empty]]'	=> 'No feature is switched on.',
 	'[[/_admin/features/label/version]]'			=> 'Version %s',
 	'[[/_admin/features/label/installed]]'		=> 'installed as %s',
 	'[[/_admin/features/label/requires]]'			=> 'Requires: %s',
 	'[[/_admin/features/label/settings]]'			=> 'Settings',
 	'[[/_admin/features/label/none]]'					=> '– none –',
-	'[[/_admin/features/status/active]]'			=> 'Active',
-	'[[/_admin/features/status/inactive]]'		=> 'Inactive',
-	'[[/_admin/features/status/update]]'			=> 'Update available',
-	'[[/_admin/features/status/incompatible]]'	=> 'Not compatible',
 	'[[/_admin/features/label/activate]]'			=> 'Activate',
 	'[[/_admin/features/label/deactivate]]'		=> 'Deactivate',
 	'[[/_admin/features/label/update]]'				=> 'Update to %s',
@@ -35,16 +34,15 @@ return [
 	'[[/_admin/features/error/activate]]'			=> 'The feature could not be activated.',
 	'[[/_admin/features/error/deactivate]]'		=> 'The feature could not be deactivated.',
 	'[[/_admin/features/error/update]]'				=> 'The feature could not be updated.',
-	'[[/_admin/features/label/catalogue]]'		=> 'Catalogue',
-	'[[/_admin/features/hint/catalogue]]'			=> 'Features can also be installed from the catalogue at %s. It is read only when you ask for it here - the workbench never contacts it on its own - and an archive is only put in place once it is what the signed catalogue promised.',
+	'[[/_admin/features/label/catalogue-refresh]]'	=> 'Refresh catalogue',
+	'[[/_admin/features/label/catalogue-status]]'	=> 'Catalogue as of %s',
+	'[[/_admin/features/label/catalogue-unloaded]]'	=> 'not loaded yet',
 	'[[/_admin/features/hint/catalogue-off]]'	=> 'The catalogue is switched off: /nino/catalogue/url in config.php is empty. A feature is copied into %s by hand.',
-	'[[/_admin/features/label/catalogue-load]]'	=> 'Load catalogue',
+	'[[/_admin/features/hint/available-unloaded]]'	=> 'The catalogue has not been loaded yet. Press Refresh catalogue to see what is available.',
+	'[[/_admin/features/hint/available-empty]]'	=> 'Everything the catalogue offers is already installed, up to date.',
 	'[[/_admin/features/msg/catalogue-loading]]'	=> 'Loading the catalogue …',
-	'[[/_admin/features/label/generated]]'		=> 'Catalogue as of %s',
 	'[[/_admin/features/hint/catalogue-readonly]]'	=> 'The web server cannot write to %s, so nothing is installed from here: download an archive and unpack it there by hand.',
 	'[[/_admin/features/hint/catalogue-empty]]'	=> 'The catalogue lists no features.',
-	'[[/_admin/features/status/available]]'		=> 'Available',
-	'[[/_admin/features/status/installed]]'		=> 'Installed',
 	'[[/_admin/features/label/install]]'			=> 'Install',
 	'[[/_admin/features/label/archive]]'			=> 'Download the archive',
 	'[[/_admin/features/label/released]]'			=> 'released %s',

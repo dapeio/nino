@@ -58,7 +58,7 @@ Behebe fehlgeschlagene Prüfungen, bevor du fortfährst. Ohne ausreichende Schre
 
 ## 2. Setup
 
-Setup legt Sprachen und funktionale Module fest und erzeugt die Basis des Projekts.
+Setup legt Sprachen fest und erzeugt die Basis des Projekts.
 
 ### Sprachen
 
@@ -68,19 +68,21 @@ Beim erneuten Anwenden ersetzt die sichtbare Sprachauswahl den bisherigen Stand.
 
 ### Module
 
-Die Liste bietet jedes Modul an, das eine Installer-Einheit mitliefert: in einem frischen Checkout Navigation, Sprachauswahl und Kontaktformular, dazu jedes Modul, das ein Projekt hinzugefügt hat. Features – etwa Newsletter und Suche aus dem Katalog – werden hier nicht angeboten: Ein Feature wird aus [dapeio/nino-features](https://github.com/dapeio/nino-features) nach `features/` kopiert und nach der Einrichtung im [Panel Features](features.de.md) der Workbench eingeschaltet. Benötigt ein gewähltes Modul ein weiteres Modul, nimmt der Assistent diese Abhängigkeit automatisch in die Auswahl auf. Auch eine verwendete Seitenvorlage kann benötigte Module nachziehen; eine Kontaktseite aktiviert beispielsweise ihre Formular- und Mail-Funktionen.
+Navigation, Sprachauswahl (der Locale Picker) und das Kontaktformular sind keine Wahl mehr: `\Nino\Install\Setup::ALWAYS_MODULES` nennt ihre Einheiten-Schlüssel, und jeder Setup-Durchlauf wendet alle drei Einheiten an und trägt alle drei Klassen in `/nino/modules` ein - genau wie bei einem tatsächlich gewählten Modul. `Design` und `Templates` laufen weiter wie bisher - eingetragen, sobald ihre Klasse existiert (`TOOL_MODULES`), ohne eigene Einheit.
+
+Die verbleibende Liste bietet jedes *andere* Modul an, das eine Installer-Einheit mitliefert: in einem frischen Checkout keines, dazu jedes Modul, das ein Projekt unter `app/` hinzugefügt hat, oder eine eigene Fassung unter `_admin/install/library/modules/`. Features – etwa Newsletter und Suche aus dem Katalog – werden auch hier nicht angeboten: Ein Feature wird aus [dapeio/nino-features](https://github.com/dapeio/nino-features) nach `features/` kopiert und nach der Einrichtung im [Panel Features](features.de.md) der Workbench eingeschaltet. Benötigt ein gewähltes Modul ein weiteres Modul, nimmt der Assistent diese Abhängigkeit automatisch in die Auswahl auf - und findet sie bereits vorhanden, wenn diese Abhängigkeit eines der drei immer aktiven Module ist. Auch eine verwendete Seitenvorlage kann benötigte Module nachziehen; eine Kontaktseite funktioniert zum Beispiel, weil das Modul des Kontaktformulars ohnehin immer da ist.
 
 Setup schreibt:
 
 - verfügbare und native Sprache nach `config.php`;
-- die aktivierten Modulklassen nach `/nino/modules`;
-- die von Basis und Modulen gelieferten Routen nach `/nino/http/routes`;
+- die aktivierten Modulklassen - die immer aktiven drei, die Entwicklerwerkzeuge, deren Klasse existiert, und was sonst gewählt wurde - nach `/nino/modules`;
+- die von Basis und jeder angewandten Einheit gelieferten Routen nach `/nino/http/routes`;
 - Templates nach `templates/`;
 - globale und sprachabhängige Texte nach `text/`;
 - mitgelieferte Element-Typen nach `elements/`;
 - weitere deklarierte Dateien an ihre Projektpfade.
 
-Sprachen, Module und die von Setup verwalteten Routen werden ersetzt. Manuell oder durch andere Bereiche angelegte Routen bleiben erhalten. Bereits kopierte Templates, Texte und Element-Typen löscht ein späteres Abwählen nicht.
+Sprachen, die gewählten *anderen* Module und die von Setup verwalteten Routen werden bei einem späteren erneuten Anwenden ersetzt; die drei immer aktiven Einheiten und die Routen/Templates/Texte, die sie mitbringen, entfernt es dabei nie. Manuell oder durch andere Bereiche angelegte Routen bleiben erhalten. Bereits kopierte Templates, Texte und Element-Typen löscht ein späteres Abwählen nicht.
 
 ## 3. Themes
 

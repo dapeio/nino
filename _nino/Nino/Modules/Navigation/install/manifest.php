@@ -1,8 +1,6 @@
 <?php return [
-	// Checked when the Setup step opens on a project that has decided
-	// nothing yet. Only the opening position - once Setup has applied once,
-	// the operator's own answer is the only one that counts
-	'preset' 		=> true,
+	// One of \Nino\Install\Setup::ALWAYS_MODULES now: applied on every setup
+	// run, never a picker choice
 	'label' 			=> 'Navigation',
 	'moduleClass' => '\\Nino\\Modules\\Navigation',
 	// The menus the setup wizard and the Routes panel offer a checkbox for. Only an editing

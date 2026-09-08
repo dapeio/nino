@@ -1,13 +1,17 @@
 /**
  *	Nino										A compact filesystembased php framework
  *	Dev											"Features" module: every feature installed under
- *													features/, one block each - what it is, whether it is
- *													switched on, what stands in its way, and the settings
- *													its manifest declares, as a form. See Admin/Admin.php
- *													beside it: the entries arrive with their words already
- *													in the interface language and the settings schema
- *													normalized by \Nino\Features, so this file only knows
- *													how to draw each setting type and collect it back.
+ *													features/, sorted into three tabs - Available (what
+ *													the catalogue offers that is not already current, so
+ *													an install or an update), Inactive and Active - a
+ *													shared action bar above them holding the one Refresh
+ *													catalogue button, and below an active feature its
+ *													settings form. See Admin/Admin.php beside it: the
+ *													entries arrive with their words already in the
+ *													interface language and the settings schema normalized
+ *													by \Nino\Features, so this file only knows how to sort
+ *													a feature into its tab, draw each setting type and
+ *													collect it back.
  *
  *													Activating and deactivating end in a reload: the rail
  *													is rendered server-side, so the panel a feature brings
@@ -15,13 +19,15 @@
  *													again. The hash stays on this panel, so the workbench
  *													comes back where it was.
  *
- *													Below the list, in a mount of its own, the catalogue:
- *													read only when its button is pressed - the workbench
- *													never contacts it on its own - and drawn from state, so
- *													reading the list again leaves it as it was. Installing
- *													places a directory and switches nothing on, so it ends
- *													in reading the list and the catalogue again rather
- *													than in a reload.
+ *													features/list answers the catalogue exactly as
+ *													\Nino\Catalogue::cached() last left it on disk, so the
+ *													Available tab fills the moment the panel opens without
+ *													a request of its own - the workbench still never
+ *													contacts the catalogue on its own. Only Refresh
+ *													catalogue posts features/catalogue, which re-fetches
+ *													and answers the same shape; installing reads the list
+ *													again rather than the catalogue, since the offers are
+ *													always recomputed against the features on disk now.
  *
  *	@package								Dape/Nino
  *	@author									David Perchermeier <mail@dape.io>
@@ -39,24 +45,31 @@
 		_pendingMsg : {},
 		_dir 				: '',
 		_features 	: [],
-		// The catalogue url as features/list names it - '' when it is switched off
+		// The catalogue url as features/list names it - '' when it is switched off,
+		// which is when the Available tab offers no Refresh button at all
 		_catalogueUrl : '',
-		// The last features/catalogue answer, once it was asked for - null before,
-		// and null it stays until someone presses the button: see _loadCatalogue()
-		_catalogue 		: null,
-		// What the catalogue block's message line says - a load running, or why
-		// the last one failed - as state, since the block is built fresh each time
+		// Whether the features directory can be written - features/list and
+		// features/catalogue both answer it fresh, live, every time
+		_writable 	: true,
+		// { url, fetched, offers } from features/list's own 'catalogue', or
+		// from a features/catalogue answer once Refresh was pressed; null
+		// before either ever ran
+		_cache 			: null,
+		// What the action bar's status line says while a refresh runs, or why
+		// the last one failed - as state, since the bar is built fresh each time
 		_catalogueMsg : { text : '', error : false, busy : false },
 		// key => message: what an install answered, shown on its offer through
 		// the two renders that follow it - see _install()
 		_offerMsg 		: {},
+		// Which tab is on screen - kept across a re-render so an action does
+		// not jump the panel back to Available
+		_tab 				: 'available',
 
 		/**
-		 *	Load every feature with its state and settings, and render them -
-		 *	and the catalogue block below, from what it knows: the url, and
-		 *	the offers if they were asked for before
+		 *	Load every feature with its state, settings and the cached
+		 *	catalogue, and render the panel from what came back
 		 *
-		 *	@param		{Function}	[then]			Run once the list is back - an install reads the catalogue again after it
+		 *	@param		{Function}	[then]			Run once the list is back
 		 *
 		 *	@return		void
 		 */
@@ -71,10 +84,11 @@
 					return Nino.admin.features._showError( wrap, status, response );
 
 				Nino.admin.features._dir 					= response.dir || '';
+				Nino.admin.features._catalogueUrl	= response.catalogueUrl || '';
+				Nino.admin.features._writable			= response.writable === true;
+				Nino.admin.features._cache 				= response.catalogue || null;
 				Nino.admin.features._features			= response.features || [];
-				Nino.admin.features._catalogueUrl	= response.catalogue || '';
-				Nino.admin.features._render();
-				Nino.admin.features._renderCatalogue();
+				Nino.admin.features._renderPanel();
 				Nino.admin.features._ready = true;
 
 				if( typeof then === 'function' )
@@ -119,35 +133,263 @@
 		},
 
 		/**
-		 *	The intro naming the directory, then one block per feature - or
-		 *	the empty state when the directory holds none
+		 *	The whole panel, from state: the tab strip, the action bar (only
+		 *	while the catalogue is switched on) and the current tab's content
 		 *
 		 *	@return		void
 		 */
-		_render : function() {
+		_renderPanel : function() {
 
 			const wrap = dc.getElementById('features-list');
 			wrap.innerHTML = '';
 
-			const intro = dc.createElement('p');
-			intro.className = 'nino-admin-hint nino-admin-hint-lead';
-			intro.textContent = Nino.content.getText('/_admin/features/hint/intro').replace( '%s', Nino.admin.features._dir );
-			wrap.appendChild( intro );
+			wrap.appendChild( Nino.admin.features._renderTabs() );
 
-			if( Nino.admin.features._features.length === 0 ) {
-				wrap.appendChild( Nino.adminUi.emptyState( Nino.content.getText('/_admin/features/hint/empty').replace( '%s', Nino.admin.features._dir ) ) );
-				return;
-			}
+			if( Nino.admin.features._catalogueUrl !== '' )
+				wrap.appendChild( Nino.admin.features._renderActionBar() );
 
-			Nino.admin.features._features.forEach( function( feature ) {
-				wrap.appendChild( Nino.admin.features._renderFeature( feature ) );
+			Nino.admin.features._renderTabContent( wrap );
+		},
+
+		/**
+		 *	How many features/offers each tab holds, for its label
+		 *
+		 *	@return		{Object}							{ available, inactive, active }
+		 */
+		_counts : function() {
+			return {
+				available	: Nino.admin.features._availableOffers().length,
+				inactive	: Nino.admin.features._features.filter( function( f ) { return f.active === false } ).length,
+				active		: Nino.admin.features._features.filter( function( f ) { return f.active === true } ).length,
+			};
+		},
+
+		/**
+		 *	The cached offers that belong on the Available tab: whatever is
+		 *	not already current - not on disk at all, or on disk in an older
+		 *	version, or one no version of which fits this kernel (shown
+		 *	greyed, with what it asks for, same as before)
+		 *
+		 *	@return		{Array}
+		 */
+		_availableOffers : function() {
+			const cache = Nino.admin.features._cache;
+			return cache === null ? [] : cache.offers.filter( function( o ) { return o.state !== 'current' } );
+		},
+
+		/**
+		 *	The tab strip: three tabs, each labelled with its count, wired
+		 *	through the shared button row so the active one is underlined and
+		 *	a click switches the panel below without reloading anything
+		 *
+		 *	@return		{Element}							<div role="tablist">
+		 */
+		_renderTabs : function() {
+
+			const bar = dc.createElement('div');
+			bar.className = 'nino-admin-tabs nino-admin-tabs--bar admin-panel-tabs';
+			bar.setAttribute( 'role', 'tablist' );
+
+			const counts	= Nino.admin.features._counts();
+
+			// Three literal lookups rather than one built from a key: a fill
+			// that only a concatenated argument ever names is invisible to
+			// the static check every panel script is held to (see the
+			// module's Dev docblock and tests/admin-features-js-smoke.js)
+			const labels = {
+				available	: Nino.content.getText('/_admin/features/tab/available'),
+				inactive	: Nino.content.getText('/_admin/features/tab/inactive'),
+				active		: Nino.content.getText('/_admin/features/tab/active'),
+			};
+			const buttons	= {};
+
+			[ 'available', 'inactive', 'active' ].forEach( function( key ) {
+				const btn = dc.createElement('button');
+				btn.type = 'button';
+				btn.setAttribute( 'role', 'tab' );
+				btn.className = 'nino-admin-tab';
+				btn.textContent = labels[key]+ ' ('+ counts[key]+ ')';
+				bar.appendChild( btn );
+				buttons[key] = btn;
+			} );
+
+			Nino.adminUi.buttonRow( buttons, Nino.admin.features._tab, function( key ) {
+				Nino.admin.features._tab = key;
+				Nino.admin.features._renderPanel();
+			}, 'aria-selected' );
+
+			return bar;
+		},
+
+		/**
+		 *	The action bar above the tabs: Refresh catalogue - absent while
+		 *	the catalogue is switched off, the caller already checked that -
+		 *	and a status line saying when the cache is from, or that it is
+		 *	not loaded yet, or what the last refresh answered
+		 *
+		 *	@return		{Element}							nino-admin-actionbar nino-admin-list-actions
+		 */
+		_renderActionBar : function() {
+
+			const refresh = dc.createElement('button');
+			refresh.type = 'button';
+			refresh.className = 'nino-admin-btn-secondary';
+			refresh.disabled = Nino.admin.features._catalogueMsg.busy === true;
+			refresh.textContent = Nino.content.getText('/_admin/features/label/catalogue-refresh');
+			refresh.addEventListener( 'click', function() { Nino.admin.features._refreshCatalogue() } );
+
+			const status = dc.createElement('p');
+			status.className = 'nino-admin-actionbar-status';
+			status.setAttribute( 'aria-live', 'polite' );
+			status.textContent = Nino.admin.features._statusText();
+			if( Nino.admin.features._catalogueMsg.error === true )
+				status.classList.add('nino-admin-error');
+
+			return Nino.adminUi.listActions( [ refresh, status ] );
+		},
+
+		/**
+		 *	What the action bar's status line reads: a message from the last
+		 *	refresh while there is one, else when the cache is from, else that
+		 *	there is none yet
+		 *
+		 *	@return		{string}
+		 */
+		_statusText : function() {
+
+			if( Nino.admin.features._catalogueMsg.text !== '' )
+				return Nino.admin.features._catalogueMsg.text;
+
+			const cache = Nino.admin.features._cache;
+
+			return cache !== null
+				? Nino.content.getText('/_admin/features/label/catalogue-status').replace( '%s', cache.fetched )
+				: Nino.content.getText('/_admin/features/label/catalogue-unloaded');
+		},
+
+		/**
+		 *	Refresh the catalogue: the one request the workbench ever makes to
+		 *	it, and only from here. What came back becomes the cache every tab
+		 *	reads, so a fresh Available count and offers follow without
+		 *	reading the list again
+		 *
+		 *	@return		void
+		 */
+		_refreshCatalogue : function() {
+
+			Nino.admin.features._catalogueMsg = { text : Nino.content.getText('/_admin/features/msg/catalogue-loading'), error : false, busy : true };
+			Nino.admin.features._renderPanel();
+
+			Nino.admin.features._apiCall( 'catalogue', {}, function( status, response ) {
+
+				if( status !== 200 || response === null ) {
+					Nino.admin.features._catalogueMsg = { text : '('+ status+ ') '+ ( ( response && response.error ) ? response.error : Nino.content.getText('/_admin/features/error/catalogue') ), error : true, busy : false };
+					Nino.admin.features._renderPanel();
+					return;
+				}
+
+				Nino.admin.features._cache 				= { url : response.url, fetched : response.fetched, offers : response.offers };
+				Nino.admin.features._writable			= response.writable === true;
+				Nino.admin.features._catalogueMsg	= { text : '', error : false, busy : false };
+				Nino.admin.features._renderPanel();
 			} );
 		},
 
 		/**
-		 *	One feature: name, version and status, description, requirements,
-		 *	every problem, the buttons its state allows, and - switched on,
-		 *	with settings declared - its settings form
+		 *	The current tab's content, into its own tabpanel: one card per
+		 *	feature or offer, or the empty state that says why there is none
+		 *
+		 *	@param		{Element}	wrap
+		 *
+		 *	@return		void
+		 */
+		_renderTabContent : function( wrap ) {
+
+			const panel = dc.createElement('div');
+			panel.className = 'nino-admin-tabpanel';
+			panel.setAttribute( 'role', 'tabpanel' );
+			wrap.appendChild( panel );
+
+			if( Nino.admin.features._tab === 'inactive' )
+				return Nino.admin.features._fillInstalled( panel, false );
+			if( Nino.admin.features._tab === 'active' )
+				return Nino.admin.features._fillInstalled( panel, true );
+			return Nino.admin.features._fillAvailable( panel );
+		},
+
+		/**
+		 *	The Inactive or Active tab: every installed feature whose 'active'
+		 *	matches, or the shared empty state
+		 *
+		 *	@param		{Element}	panel
+		 *	@param		{boolean}	active
+		 *
+		 *	@return		void
+		 */
+		_fillInstalled : function( panel, active ) {
+
+			const list = Nino.admin.features._features.filter( function( f ) { return f.active === active } );
+
+			if( list.length === 0 ) {
+				panel.appendChild( Nino.adminUi.emptyState( Nino.content.getText( active === true ? '/_admin/features/hint/active-empty' : '/_admin/features/hint/empty' ).replace( '%s', Nino.admin.features._dir ) ) );
+				return;
+			}
+
+			list.forEach( function( feature ) { panel.appendChild( Nino.admin.features._renderFeature( feature ) ) } );
+		},
+
+		/**
+		 *	The Available tab: why there is nothing to show, in order - the
+		 *	catalogue is off, it was never loaded, it lists nothing at all, or
+		 *	everything it lists is already current - else the readonly notice
+		 *	where it applies, then one card per offer
+		 *
+		 *	@param		{Element}	panel
+		 *
+		 *	@return		void
+		 */
+		_fillAvailable : function( panel ) {
+
+			if( Nino.admin.features._catalogueUrl === '' ) {
+				panel.appendChild( Nino.adminUi.emptyState( Nino.content.getText('/_admin/features/hint/catalogue-off').replace( '%s', Nino.admin.features._dir ) ) );
+				return;
+			}
+
+			const cache = Nino.admin.features._cache;
+
+			if( cache === null ) {
+				panel.appendChild( Nino.adminUi.emptyState( Nino.content.getText('/_admin/features/hint/available-unloaded') ) );
+				return;
+			}
+
+			if( cache.offers.length === 0 ) {
+				panel.appendChild( Nino.adminUi.emptyState( Nino.content.getText('/_admin/features/hint/catalogue-empty') ) );
+				return;
+			}
+
+			const wanted = Nino.admin.features._availableOffers();
+
+			if( wanted.length === 0 ) {
+				panel.appendChild( Nino.adminUi.emptyState( Nino.content.getText('/_admin/features/hint/available-empty') ) );
+				return;
+			}
+
+			if( Nino.admin.features._writable === false ) {
+				const readonly = dc.createElement('p');
+				readonly.className = 'nino-admin-error';
+				readonly.textContent = Nino.content.getText('/_admin/features/hint/catalogue-readonly').replace( '%s', Nino.admin.features._dir );
+				panel.appendChild( readonly );
+			}
+
+			wanted.forEach( function( offer ) { panel.appendChild( Nino.admin.features._renderOffer( offer, Nino.admin.features._writable === true ) ) } );
+		},
+
+		/**
+		 *	One feature: name, version and, where it differs, the version on
+		 *	disk, description, requirements, every problem, the buttons its
+		 *	state allows, and - switched on, with settings declared - its
+		 *	settings form. No status badge: which tab it is in already says
+		 *	that, and a problem line names anything a word could not
 		 *
 		 *	@param		{Object}	feature			An entry of features/list
 		 *
@@ -160,8 +402,7 @@
 			card.dataset.feature = feature.key;
 
 			const title = dc.createElement('h3');
-			title.textContent = feature.name+ ' ';
-			title.appendChild( Nino.admin.features._renderStatus( feature ) );
+			title.textContent = feature.name;
 			card.appendChild( title );
 
 			// The manifest's version, and the one this installation recorded
@@ -203,41 +444,6 @@
 				card.appendChild( Nino.admin.features._renderSettings( feature ) );
 
 			return card;
-		},
-
-		/**
-		 *	The status in words - a low-vision reader cannot go by a colour,
-		 *	so the word is the badge and the class only underlines it
-		 *
-		 *	@param		{Object}	feature
-		 *
-		 *	@return		{Element}							<span>
-		 */
-		_renderStatus : function( feature ) {
-
-			const badge = dc.createElement('span');
-			badge.className = 'nino-admin-eyebrow';
-
-			if( feature.problems.length > 0 ) {
-				badge.classList.add('nino-admin-error');
-				badge.dataset.status = 'incompatible';
-				badge.textContent = Nino.content.getText('/_admin/features/status/incompatible');
-			}
-			else if( feature.update === true ) {
-				badge.classList.add('nino-admin-changed');
-				badge.dataset.status = 'update';
-				badge.textContent = Nino.content.getText('/_admin/features/status/update');
-			}
-			else if( feature.active === true ) {
-				badge.dataset.status = 'active';
-				badge.textContent = Nino.content.getText('/_admin/features/status/active');
-			}
-			else {
-				badge.dataset.status = 'inactive';
-				badge.textContent = Nino.content.getText('/_admin/features/status/inactive');
-			}
-
-			return badge;
 		},
 
 		/**
@@ -346,102 +552,14 @@
 		},
 
 		/**
-		 *	The catalogue block, into its own mount below the list: what it
-		 *	is and where it would be read from, the one button that reads it
-		 *	- the workbench never contacts the catalogue on its own - and,
-		 *	once it was read, one card per offer. Built from state, so the
-		 *	list reload that follows an install draws it again as it was
+		 *	One offer: name, the version the catalogue offers beside the one
+		 *	on disk, description, requirements - for one that does not fit,
+		 *	what it asks of the kernel - and the button its state allows, or
+		 *	the archive link where nothing can be placed. Greyed rather than
+		 *	left out where it is incompatible: what it asks for is the useful
+		 *	part
 		 *
-		 *	@return		void
-		 */
-		_renderCatalogue : function() {
-
-			const wrap = dc.getElementById('features-catalogue');
-			if( wrap === null )
-				return;
-			wrap.innerHTML = '';
-
-			const url = Nino.admin.features._catalogueUrl;
-
-			const card = dc.createElement('section');
-			card.className = 'nino-admin-card';
-			card.dataset.catalogue = url === '' ? 'off' : 'on';
-			wrap.appendChild( card );
-
-			const title = dc.createElement('h3');
-			title.textContent = Nino.content.getText('/_admin/features/label/catalogue');
-			card.appendChild( title );
-
-			const hint = dc.createElement('p');
-			hint.className = 'nino-admin-hint';
-			card.appendChild( hint );
-
-			// Switched off in config.php: said, and nothing to press
-			if( url === '' ) {
-				hint.textContent = Nino.content.getText('/_admin/features/hint/catalogue-off').replace( '%s', Nino.admin.features._dir );
-				return;
-			}
-
-			hint.textContent = Nino.content.getText('/_admin/features/hint/catalogue').replace( '%s', url );
-
-			const actions = dc.createElement('div');
-			actions.className = 'admin-features-actions';
-
-			const load = dc.createElement('button');
-			load.type = 'button';
-			load.className = 'nino-admin-btn-secondary';
-			load.disabled = Nino.admin.features._catalogueMsg.busy === true;
-			load.textContent = Nino.content.getText('/_admin/features/label/catalogue-load');
-			load.addEventListener( 'click', function() { Nino.admin.features._loadCatalogue() } );
-			actions.appendChild( load );
-
-			const msg = dc.createElement('p');
-			msg.className = 'nino-admin-hint';
-			msg.setAttribute( 'aria-live', 'polite' );
-			msg.textContent = Nino.admin.features._catalogueMsg.text;
-			if( Nino.admin.features._catalogueMsg.error === true )
-				msg.classList.add('nino-admin-error');
-			actions.appendChild( msg );
-
-			card.appendChild( actions );
-
-			const catalogue = Nino.admin.features._catalogue;
-			if( catalogue === null )
-				return;
-
-			if( catalogue.generated ) {
-				const generated = dc.createElement('p');
-				generated.className = 'nino-admin-hint';
-				generated.textContent = Nino.content.getText('/_admin/features/label/generated').replace( '%s', catalogue.generated );
-				card.appendChild( generated );
-			}
-
-			// Nothing can be placed from here: said once, and every offer
-			// links its archive instead of offering a button
-			if( catalogue.writable === false ) {
-				const readonly = dc.createElement('p');
-				readonly.className = 'nino-admin-error';
-				readonly.textContent = Nino.content.getText('/_admin/features/hint/catalogue-readonly').replace( '%s', Nino.admin.features._dir );
-				card.appendChild( readonly );
-			}
-
-			if( catalogue.offers.length === 0 ) {
-				wrap.appendChild( Nino.adminUi.emptyState( Nino.content.getText('/_admin/features/hint/catalogue-empty') ) );
-				return;
-			}
-
-			catalogue.offers.forEach( function( offer ) {
-				wrap.appendChild( Nino.admin.features._renderOffer( offer, catalogue.writable === true ) );
-			} );
-		},
-
-		/**
-		 *	One offer: name and state, the version the catalogue offers
-		 *	beside the one on disk, description, requirements - for one that
-		 *	does not fit, what it asks of the kernel - and the button its
-		 *	state allows, or the archive link where nothing can be placed
-		 *
-		 *	@param		{Object}	offer				An entry of features/catalogue
+		 *	@param		{Object}	offer				An entry of the cached catalogue
 		 *	@param		{boolean}	writable		Whether the features directory can be written
 		 *
 		 *	@return		{Element}							<section>
@@ -452,14 +570,11 @@
 			card.className = 'nino-admin-card';
 			card.dataset.offer = offer.key;
 
-			// Greyed rather than left out: what it asks for is the useful part
-			if( offer.state === 'incompatible' ) {
+			if( offer.state === 'incompatible' )
 				card.setAttribute( 'aria-disabled', 'true' );
-			}
 
 			const title = dc.createElement('h3');
-			title.textContent = offer.name+ ' ';
-			title.appendChild( Nino.admin.features._renderOfferStatus( offer ) );
+			title.textContent = offer.name;
 			card.appendChild( title );
 
 			// The catalogue's version, the one on disk when that differs -
@@ -509,41 +624,11 @@
 		},
 
 		/**
-		 *	An offer's state in words, the way _renderStatus() says a
-		 *	feature's: available, update available, installed, not compatible
-		 *
-		 *	@param		{Object}	offer
-		 *
-		 *	@return		{Element}							<span>
-		 */
-		_renderOfferStatus : function( offer ) {
-
-			const badge = dc.createElement('span');
-			badge.className = 'nino-admin-eyebrow';
-			badge.dataset.state = offer.state;
-
-			if( offer.state === 'incompatible' ) {
-				badge.classList.add('nino-admin-error');
-				badge.textContent = Nino.content.getText('/_admin/features/status/incompatible');
-			}
-			else if( offer.state === 'upgrade' ) {
-				badge.classList.add('nino-admin-changed');
-				badge.textContent = Nino.content.getText('/_admin/features/status/update');
-			}
-			else if( offer.state === 'current' )
-				badge.textContent = Nino.content.getText('/_admin/features/status/installed');
-			else
-				badge.textContent = Nino.content.getText('/_admin/features/status/available');
-
-			return badge;
-		},
-
-		/**
 		 *	What an offer's state allows: Install while it is not on disk,
 		 *	Update while the disk holds an older version - or, where the web
 		 *	server cannot write the features directory, the archive to
-		 *	download and unpack by hand. Nothing for one that is current or
-		 *	does not fit; the message line reports the install's answer
+		 *	download and unpack by hand. Nothing for one that does not fit;
+		 *	the message line reports the install's answer
 		 *
 		 *	@param		{Object}	offer
 		 *	@param		{boolean}	writable
@@ -587,38 +672,12 @@
 		},
 
 		/**
-		 *	Read the catalogue - the one request the workbench ever makes to
-		 *	it, and only from here. What came back, or why nothing did, is
-		 *	the state the block is drawn from
-		 *
-		 *	@return		void
-		 */
-		_loadCatalogue : function() {
-
-			Nino.admin.features._catalogueMsg = { text : Nino.content.getText('/_admin/features/msg/catalogue-loading'), error : false, busy : true };
-			Nino.admin.features._renderCatalogue();
-
-			Nino.admin.features._apiCall( 'catalogue', {}, function( status, response ) {
-
-				if( status !== 200 || response === null ) {
-					Nino.admin.features._catalogue 		= null;
-					Nino.admin.features._catalogueMsg	= { text : '('+ status+ ') '+ ( ( response && response.error ) ? response.error : Nino.content.getText('/_admin/features/error/catalogue') ), error : true, busy : false };
-				}
-				else {
-					Nino.admin.features._catalogue 		= response;
-					Nino.admin.features._catalogueMsg	= { text : '', error : false, busy : false };
-				}
-
-				Nino.admin.features._renderCatalogue();
-			} );
-		},
-
-		/**
 		 *	Install an offer, or update to it: the kernel downloads and
 		 *	verifies the archive and places the directory, and an active
 		 *	feature has its update applied in the same request. Ends in
-		 *	reading the list again - the feature is in it now, or in its new
-		 *	version - and the catalogue after it, which says so too
+		 *	reading the list again - its cached catalogue's offers are always
+		 *	recomputed against the features on disk now, so the Available tab
+		 *	already shows the new state without a catalogue request of its own
 		 *
 		 *	@param		{Object}	offer
 		 *	@param		{Element}	btn
@@ -643,11 +702,11 @@
 					return;
 				}
 
-				// Kept as state rather than written here: the block is built
-				// again twice below, and the word has to be there both times
+				// Kept as state rather than written here: init() rebuilds this
+				// card from scratch, and the word has to be there once it does
 				Nino.admin.features._offerMsg[offer.key] = Nino.content.getText( response.updated === true ? '/_admin/features/msg/updated' : '/_admin/features/msg/installed' );
 
-				Nino.admin.features.init( Nino.admin.features._loadCatalogue );
+				Nino.admin.features.init();
 			} );
 		},
 

@@ -345,6 +345,46 @@ check( 'read once per request', \Nino\Catalogue::fetch( $appData ) === $catalogu
 echo "\n";
 
 
+// --- Catalogue::cached --------------------------------------------------------
+
+echo "Catalogue::cached - the fetched catalogue kept under data/, no network\n";
+
+$cachePath = \Nino\Filesystem::path( $appData, '/data/catalogue.php' );
+check( 'a successful fetch left the catalogue cached to disk', is_file( $cachePath ) === true );
+
+$stored = include $cachePath;
+check( 'the file holds when it was fetched, the configured url and the parsed document', is_array( $stored ) && array_keys( $stored ) === [ 'fetched', 'url', 'catalogue' ]
+	&& is_int( $stored['fetched'] ) && $stored['fetched'] <= time() && $stored['fetched'] > time() - 30
+	&& $stored['url'] === \Nino\Catalogue::DEFAULT_URL && $stored['catalogue'] === $catalogue );
+
+$requests = [];
+$cached = \Nino\Catalogue::cached( $appData );
+check( 'cached() answers it without any request', $requests === [] && is_array( $cached ) );
+check( 'the same shape fetch() returns, plus fetched', array_keys( $cached ) === [ 'format', 'generated', 'features', 'url', 'fetched' ]
+	&& $cached['url'] === \Nino\Catalogue::DEFAULT_URL && $cached['fetched'] === $stored['fetched'] && count( $cached['features'] ) === 6
+	&& $cached['format'] === $catalogue['format'] && $cached['generated'] === $catalogue['generated'] && $cached['features'] === $catalogue['features'] );
+
+$movedUrl = $appData;
+$movedUrl['/nino/catalogue/url'] = 'https://example.org/own/catalogue.json';
+$requests = [];
+check( 'a changed catalogue url invalidates the cache, and cached() never fetches either', \Nino\Catalogue::cached( $movedUrl ) === null && $requests === [] );
+
+$offCached = $appData;
+$offCached['/nino/catalogue/url'] = '';
+check( 'switching the catalogue off makes it null too - \'\' never matches a url a fetch was ever made under', \Nino\Catalogue::cached( $offCached ) === null );
+
+\Nino\Filesystem::putFileContent( $appData, '/data/catalogue.php', [ 'fetched' => time(), 'url' => \Nino\Catalogue::DEFAULT_URL, 'catalogue' => 'not a parsed catalogue' ] );
+check( 'a broken file (one that does not hold what fetch() writes) makes it null', \Nino\Catalogue::cached( $appData ) === null );
+
+\Nino\Filesystem::putFileContent( $appData, '/data/catalogue.php', [ 'url' => \Nino\Catalogue::DEFAULT_URL, 'catalogue' => $catalogue ] );
+check( 'a file missing \'fetched\' makes it null too', \Nino\Catalogue::cached( $appData ) === null );
+
+// Left as fetch() itself would leave it, for what follows below
+\Nino\Filesystem::putFileContent( $appData, '/data/catalogue.php', [ 'fetched' => $stored['fetched'], 'url' => \Nino\Catalogue::DEFAULT_URL, 'catalogue' => $catalogue ] );
+
+echo "\n";
+
+
 // --- Catalogue::offers -------------------------------------------------------
 
 echo "Catalogue::offers - what fits this kernel, beside what is on disk\n";
@@ -581,10 +621,19 @@ check( 'and neither asked the catalogue for anything', $requests === [] );
 publish( $appData, $remote, $features, null, $privateKey );
 $requests = [];
 [ $status, $body ] = callFeatures( $appData, 'apiCatalogue' );
-check( 'apiCatalogue reads the catalogue - two requests - and answers its url, its stamp, whether features/ is writable, and one offer per key, sorted', $status === 200
-	&& array_keys( $body ) === [ 'url', 'generated', 'writable', 'offers' ] && $body['url'] === \Nino\Catalogue::DEFAULT_URL && $body['generated'] === '2026-09-07T12:00:00Z' && $body['writable'] === true
+check( 'apiCatalogue reads the catalogue - two requests - and answers its url, its stamp, when it was fetched, whether features/ is writable, and one offer per key, sorted', $status === 200
+	&& array_keys( $body ) === [ 'url', 'generated', 'fetched', 'writable', 'offers' ] && $body['url'] === \Nino\Catalogue::DEFAULT_URL && $body['generated'] === '2026-09-07T12:00:00Z' && $body['writable'] === true
+	&& is_string( $body['fetched'] ) && $body['fetched'] !== '' && preg_match( '/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/', $body['fetched'] ) === 1
 	&& array_column( $requests, 'url' ) === [ \Nino\Catalogue::DEFAULT_URL, \Nino\Catalogue::DEFAULT_URL. '.sig' ] && array_column( $body['offers'], 'key' ) === [ 'ancient', 'helper', 'needy', 'sample' ] );
 $offers = array_column( $body['offers'], null, 'key' );
+
+// apiList carries the same catalogue, straight from what apiCatalogue just
+// cached - no further request, and its offers answer the same as apiCatalogue's
+$requests = [];
+[ $listStatus, $listBody ] = callFeatures( $appData, 'apiList' );
+check( 'apiList carries the cached catalogue too - url, fetched and the same offers - with no request of its own', $listStatus === 200 && $requests === []
+	&& is_array( $listBody['catalogue'] ) && array_keys( $listBody['catalogue'] ) === [ 'url', 'fetched', 'offers' ]
+	&& $listBody['catalogue']['url'] === \Nino\Catalogue::DEFAULT_URL && $listBody['catalogue']['fetched'] === $body['fetched'] && $listBody['catalogue']['offers'] === $body['offers'] );
 check( 'every offer has the same keys, the extension list flattened to ext', array_keys( $offers['helper'] ) === [ 'key', 'name', 'description', 'version', 'nino', 'ext', 'requires', 'directory', 'archive', 'size', 'released', 'state', 'fits', 'local', 'active' ] );
 check( 'names and descriptions arrive in the session locale - de_DE, the native language, since none was chosen', $offers['helper']['name'] === 'Helper' && $offers['helper']['description'] === 'Ein helper' && $offers['sample']['description'] === 'Ein sample' );
 check( 'the state travels with each offer: helper current and active, sample current and off, ancient and needy incompatible with what they ask for',

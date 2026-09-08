@@ -46,7 +46,7 @@
 				</div>
 
 				<div id="install-content-setup">
-					<p class="nino-admin-hint nino-admin-hint-lead">Pick locales and modules - assembles routes, templates and text from <code>_admin/install/library</code>. Whatever's checked when you hit "Next" is the whole picture: unchecking something and coming back here replaces the previous selection, it doesn't add to it - though a route/template/text file already written for something you un-pick still has to be removed by hand, see <code>docs/setup.md</code>.</p>
+					<p class="nino-admin-hint nino-admin-hint-lead">Pick the site's locales - the navigation, the contact form and the locale picker are always on, their routes, templates and text come from <code>_admin/install/library</code>. Whatever's checked when you hit "Next" is the whole picture: unchecking something and coming back here replaces the previous selection, it doesn't add to it - though a route/template/text file already written for something you un-pick still has to be removed by hand, see <code>docs/setup.md</code>.</p>
 					<div class="nino-admin-card">
 						<h3>Available Locales</h3>
 						<div id="setup-locales" class="nino-admin-checklist"></div>
@@ -55,7 +55,7 @@
 						<h3>Native Locale</h3>
 						<div id="setup-native-locale"></div>
 					</div>
-					<div class="nino-admin-card">
+					<div class="nino-admin-card install-hidden" id="setup-modules-card">
 						<h3>Modules</h3>
 						<div id="setup-modules" class="nino-admin-checklist"></div>
 					</div>

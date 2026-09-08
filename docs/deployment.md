@@ -227,9 +227,11 @@ Treat a Nino update like a change to the specific website project, not like blin
 
 1. Secure the current production state outside the webroot.
 2. First transfer the change to a development or staging environment.
-3. Keep project-owned PHP classes in `app/` (or `NINO_APP_DIR`) and compare only deliberate kernel changes with the new state. `_nino/` can then be replaced wholesale - Nino's optional modules under `_nino/Nino/Modules/` included, since a project switches them on or off in `/nino/modules` rather than editing them - and so can `_admin/`: the workbench holds no project state - the accounts live in `config.php`, the recovery secret in `private/.auth/pw.php`. A feature is updated on its own: press **Update** in the catalogue block of the workbench's Features panel, or replace its directory under `features/` with the new release by hand and press **Update** in the list. The feature's install unit adds what is new and overwrites nothing the project has, and the feature migrates its own data before the new version is recorded; see [Features](features.md#updating).
+3. Keep project-owned PHP classes in `app/` (or `NINO_APP_DIR`) and compare only deliberate kernel changes with the new state. `_nino/` can then be replaced wholesale - Nino's optional modules under `_nino/Nino/Modules/` included, since a project switches them on or off in `/nino/modules` rather than editing them - and so can `_admin/`: the workbench holds no project state - the accounts live in `config.php`, the recovery secret in `private/.auth/pw.php`. A feature is updated on its own: press **Update** on the Available tab of the workbench's Features panel, or replace its directory under `features/` with the new release by hand and press **Update** on the Active or Inactive tab, wherever it sits. The feature's install unit adds what is new and overwrites nothing the project has, and the feature migrates its own data before the new version is recorded; see [Features](features.md#updating).
 4. Run smoke tests and project-specific acceptance.
 5. Transfer the tested state and keep the previous version for rollback.
+
+For an update that cannot happen invisibly, switch the System panel's Maintenance on beforehand and back off once step 4 has passed on the live state - a signed-in account still sees the site throughout, so the check itself does not need the switch off first.
 
 Nino uses one project layout: private files belong in `private/`, browser-facing
 files in `public/`, project-owned PHP source in `app/`, and installed features

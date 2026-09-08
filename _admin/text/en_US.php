@@ -25,6 +25,7 @@ return [
 	'[[/_admin/label/nav]]'			=> 'Workbench sections',
 	'[[/_admin/nav/group/content]]'		=> 'Content',
 	'[[/_admin/nav/group/structure]]'	=> 'Structure',
+	'[[/_admin/nav/group/features]]'	=> 'Features',
 	'[[/_admin/nav/group/system]]'		=> 'System',
 
 	'[[/_admin/htmleditor/label/strong]]'	=> 'Bold',

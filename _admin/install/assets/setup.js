@@ -63,7 +63,16 @@
 				return { key : code, label : code, active : lib.activeLocales.indexOf( code ) !== -1 };
 			} ), 'locale' );
 
-			Nino.install.setup._renderList( 'setup-modules', Object.keys( lib.modules ).map( function( key ) {
+			// Navigation, the contact form and the locale picker are always on
+			// (see Setup::ALWAYS_MODULES), so the picker only ever offers what a
+			// project or the library brings of its own - and a checkout brings
+			// nothing: the card stays hidden until there is something to pick
+			const moduleKeys = Object.keys( lib.modules );
+			const moduleCard = document.getElementById( 'setup-modules-card' );
+			if( moduleCard !== null )
+				moduleCard.classList.toggle( 'install-hidden', moduleKeys.length === 0 );
+
+			Nino.install.setup._renderList( 'setup-modules', moduleKeys.map( function( key ) {
 				return Object.assign( { key : key }, lib.modules[key] );
 			} ), 'module' );
 

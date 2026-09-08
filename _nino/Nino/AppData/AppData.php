@@ -112,6 +112,17 @@ namespace Nino {
 			// \Nino\Catalogue). Nothing here is fetched on its own
 			'/nino/catalogue/url'	=> \Nino\Catalogue::DEFAULT_URL,
 			'/nino/catalogue/key'	=> '',
+			// Modules\Maintenance's one switch and its Retry-After seconds -
+			// present regardless of whether the module's class is part of a
+			// given delivery, same as every other default here. Appended at
+			// the end rather than beside the cache keys it is modelled on:
+			// phpstan's inferred literal shape of this array is part of
+			// phpstan-baseline.neon's message for a finding lower in this
+			// file, and an insertion nearer the front reflows which keys
+			// that message truncates to, turning an unrelated existing
+			// finding into an apparently new one
+			'/nino/maintenance/status'	=> false,
+			'/nino/maintenance/retry'	=> 3600,
 		];
 
 		public static function prepare( array &$appData ): void {

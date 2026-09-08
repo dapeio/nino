@@ -42,6 +42,11 @@ namespace Nino {
 	 *										An archive is a .tar.gz holding one directory named after
 	 *										the feature's class, exactly what lands below features/.
 	 *
+	 *										A successful fetch() is kept under data/catalogue.php - see
+	 *										cached(), which reads it back without ever making a
+	 *										request. The panel's Available tab fills from that cache on
+	 *										every open; only its own Refresh action calls fetch() again.
+	 *
 	 *	@package					Dape/Nino
 	 *	@author						David Perchermeier <mail@dape.io>
 	 *	@link							https://github.com/dapeio/nino
@@ -73,6 +78,13 @@ PEM;
 		// Downloads and unpacked archives wait here, below the private data
 		// directory, until they are verified - never in features/ itself
 		private const string STAGING = '/data/.features';
+
+		// Where a successfully fetched catalogue is kept between requests -
+		// see fetch() and cached(). Overwritten whole on every fetch, never
+		// merged; a project deletes it like any other cache without losing
+		// anything, and the next fetch() (or open of the panel, once one runs)
+		// writes it fresh
+		private const string CACHE_FILE = '/data/catalogue.php';
 
 		private const string KEY_PATTERN				= '/^[a-z][a-z0-9-]*$/';
 		private const string DIRECTORY_PATTERN	= '/^[A-Z][A-Za-z0-9]*$/';
@@ -141,6 +153,53 @@ PEM;
 
 			$catalogue['url'] = $url;
 			$appData['./nino/catalogue'] = $catalogue;
+
+			// Kept under data/ so the panel can show it - and the Available
+			// tab can fill itself - without a request of its own; see
+			// cached(). Best effort: a write that fails (a read-only data/)
+			// does not undo a fetch that itself succeeded, it only leaves
+			// nothing to show on the next request that does not fetch
+			\Nino\Filesystem::putFileContent( $appData, self::CACHE_FILE, [
+				'fetched'		=> time(),
+				'url'				=> $url,
+				'catalogue'	=> $catalogue,
+			] );
+
+			return $catalogue;
+		}
+
+		/**
+		 *	The catalogue as it was last fetched, read from data/ - never
+		 *	fetched itself, so this is safe to call on every page the panel
+		 *	opens. null when there is nothing to show: no successful fetch
+		 *	yet, a file that does not hold what fetch() writes, or one fetched
+		 *	under a url that is not the configured one any more - which is
+		 *	also what switching the catalogue off looks like, since '' never
+		 *	matches a url a fetch was ever made under
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	array|null							The same shape fetch() returns, plus 'fetched' (unix time); null for nothing cached
+		 */
+		public static function cached( array &$appData ): ?array {
+
+			$stored = \Nino\Filesystem::getFileContent( $appData, self::CACHE_FILE, null );
+
+			if( is_array( $stored ) === false )
+				return null;
+
+			if( is_int( $stored['fetched'] ?? null ) === false || is_string( $stored['url'] ?? null ) === false )
+				return null;
+
+			if( $stored['url'] !== self::url( $appData ) )
+				return null;
+
+			$catalogue = $stored['catalogue'] ?? null;
+
+			if( is_array( $catalogue ) === false || is_array( $catalogue['features'] ?? null ) === false )
+				return null;
+
+			$catalogue['fetched'] = $stored['fetched'];
 
 			return $catalogue;
 		}

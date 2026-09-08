@@ -24,6 +24,18 @@ namespace Nino\Modules\Features {
 	 *												here, once, in the interface language, so the script
 	 *												renders what it gets.
 	 *
+	 *												One pane, one script-built tab strip: Available (what
+	 *												the catalogue offers that is not already current -
+	 *												install or update), Inactive and Active. apiList()
+	 *												answers the installed features and, alongside them,
+	 *												the catalogue as \Nino\Catalogue::cached() last left
+	 *												it on disk - so the Available tab fills without a
+	 *												request the moment the panel opens. Only the panel's
+	 *												own Refresh action (apiCatalogue()) ever fetches; the
+	 *												offers themselves are always recomputed against the
+	 *												features on disk now, so an install since the last
+	 *												fetch is reflected without a new one.
+	 *
 	 *												A secret never travels to the browser. The list says
 	 *												whether one is stored, the form shows an empty
 	 *												password input, and posting it empty keeps the value
@@ -79,10 +91,10 @@ namespace Nino\Modules\Features {
 			return '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-blocks-icon lucide-blocks"><path d="M10 22V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v11a3 3 0 0 0 3 3h15a1 1 0 0 0 1-1v-5a1 1 0 0 0-1-1H10"/><rect x="14" y="2" width="8" height="8" rx="1"/></svg>';
 		}
 
-		// Two mount points: the installed list, and below it the catalogue
-		// block - built separately, so reloading the one leaves the other
+		// One pane: a tab strip and an action bar the script builds, then the
+		// content of whichever tab is current
 		public static function panes(): array {
-			return [ 'features-list', 'features-catalogue' ];
+			return [ 'features-list' ];
 		}
 
 		public static function assets(): array {
@@ -127,10 +139,13 @@ namespace Nino\Modules\Features {
 		}
 
 		/**
-		 *	Every installed feature with its state and its settings form,
-		 *	plus the directory they are read from - and the catalogue url,
-		 *	so the block below the list can say where a load would go before
-		 *	anything is loaded ('' when the catalogue is switched off)
+		 *	Every installed feature with its state and its settings form, the
+		 *	directory they are read from, the configured catalogue url ('' when
+		 *	switched off - the Available tab's own empty state, and the reason
+		 *	the panel offers no Refresh button) and whether the features
+		 *	directory is writable, and the last cached catalogue, if there is
+		 *	one - so the Available tab fills without a request of its own,
+		 *	see \Nino\Catalogue::cached()
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
@@ -149,9 +164,11 @@ namespace Nino\Modules\Features {
 				$features[] = self::_entry( $appData, $feature, $locale );
 
 			\Nino\Http::ok( $request, [
-				'dir' 			=> self::_dir(),
-				'catalogue'	=> \Nino\Catalogue::url( $appData ),
-				'features'	=> $features,
+				'dir'					=> self::_dir(),
+				'catalogueUrl'	=> \Nino\Catalogue::url( $appData ),
+				'writable'		=> \Nino\Catalogue::writable(),
+				'catalogue'		=> self::_cachedCatalogue( $appData, $locale ),
+				'features'		=> $features,
 			] );
 		}
 
@@ -238,11 +255,13 @@ namespace Nino\Modules\Features {
 		}
 
 		/**
-		 *	Read the catalogue - two requests to its url, believed only with
-		 *	the signature (see Catalogue::fetch()) - and answer what it offers
-		 *	this installation, phrased for the browser. Only ever on request:
-		 *	the panel opens without it, and the script posts this when the
-		 *	button is pressed.
+		 *	Refresh the catalogue - two requests to its url, believed only
+		 *	with the signature (see Catalogue::fetch()) - and answer what it
+		 *	offers this installation, phrased for the browser. Only ever on
+		 *	request: the panel opens from \Nino\Catalogue::cached() alone (see
+		 *	apiList()), and the script posts this when Refresh catalogue is
+		 *	pressed. A successful fetch leaves the cache fresh on disk too, so
+		 *	the next apiList() needs no request of its own.
 		 *
 		 *	The two ways the configuration rules it out are said in the
 		 *	interface language; every other reason is the kernel's own English
@@ -276,32 +295,14 @@ namespace Nino\Modules\Features {
 			}
 
 			$locale	= \Nino\Admin\Admin::sessionLocale( $appData );
-			$offers	= [];
-
-			foreach( \Nino\Catalogue::offers( $appData, $catalogue ) as $offer )
-				$offers[] = [
-					'key'					=> $offer['key'],
-					'name'				=> \Nino\Features::localized( $offer['name'], $locale ),
-					'description'	=> \Nino\Features::localized( $offer['description'], $locale ),
-					'version'			=> $offer['version'],
-					'nino'				=> $offer['nino'],
-					'ext'					=> $offer['php']['ext'],
-					'requires'		=> $offer['requires'],
-					'directory'		=> $offer['directory'],
-					'archive'			=> $offer['archive'],
-					'size'				=> $offer['size'],
-					'released'		=> $offer['released'],
-					'state'				=> $offer['state'],
-					'fits'				=> $offer['fits'],
-					'local'				=> $offer['local'],
-					'active'			=> $offer['active'],
-				];
+			$cached	= \Nino\Catalogue::cached( $appData );
 
 			\Nino\Http::ok( $request, [
 				'url'				=> $catalogue['url'],
 				'generated'	=> $catalogue['generated'],
+				'fetched'		=> self::_fetched( $cached['fetched'] ?? time() ),
 				'writable'	=> \Nino\Catalogue::writable(),
-				'offers'		=> $offers,
+				'offers'		=> self::_offers( $appData, $catalogue, $locale ),
 			] );
 		}
 
@@ -420,6 +421,85 @@ namespace Nino\Modules\Features {
 			}
 
 			\Nino\Http::ok( $request, [ 'feature' => self::_entry( $appData, $feature, \Nino\Admin\Admin::sessionLocale( $appData ) ) ] );
+		}
+
+		/**
+		 *	The catalogue as \Nino\Catalogue::cached() last left it on disk,
+		 *	phrased the way apiCatalogue() phrases a fresh one - so the
+		 *	Available tab renders identically whether it filled from the
+		 *	cache on open or from a Refresh just now
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$locale				The interface language
+		 *
+		 *	@return 	array|null							{ url, fetched, offers } or null when nothing is cached
+		 */
+		private static function _cachedCatalogue( array &$appData, string $locale ): ?array {
+
+			$cached = \Nino\Catalogue::cached( $appData );
+
+			if( $cached === null )
+				return null;
+
+			return [
+				'url'			=> $cached['url'],
+				'fetched'	=> self::_fetched( $cached['fetched'] ),
+				'offers'	=> self::_offers( $appData, $cached, $locale ),
+			];
+		}
+
+		/**
+		 *	The offers of a parsed catalogue (Catalogue::fetch()'s or
+		 *	Catalogue::cached()'s - both carry 'features'), phrased for the
+		 *	browser: names and descriptions localized, the extension list
+		 *	flattened to 'ext'. Recomputed against Features::all() every time,
+		 *	so an install or activation since the catalogue was last fetched
+		 *	is reflected without a new request
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		$catalogue		A parsed catalogue
+		 *	@param		string		$locale				The interface language
+		 *
+		 *	@return 	array
+		 */
+		private static function _offers( array &$appData, array $catalogue, string $locale ): array {
+
+			$offers = [];
+
+			foreach( \Nino\Catalogue::offers( $appData, $catalogue ) as $offer )
+				$offers[] = [
+					'key'					=> $offer['key'],
+					'name'				=> \Nino\Features::localized( $offer['name'], $locale ),
+					'description'	=> \Nino\Features::localized( $offer['description'], $locale ),
+					'version'			=> $offer['version'],
+					'nino'				=> $offer['nino'],
+					'ext'					=> $offer['php']['ext'],
+					'requires'		=> $offer['requires'],
+					'directory'		=> $offer['directory'],
+					'archive'			=> $offer['archive'],
+					'size'				=> $offer['size'],
+					'released'		=> $offer['released'],
+					'state'				=> $offer['state'],
+					'fits'				=> $offer['fits'],
+					'local'				=> $offer['local'],
+					'active'			=> $offer['active'],
+				];
+
+			return $offers;
+		}
+
+		/**
+		 *	A unix time as the panel shows it - the "Catalogue as of %s" line,
+		 *	same rule as a backup date: formatted once here, in the interface
+		 *	the browser gets a string to display, not a timestamp to format
+		 *
+		 *	@param		int				$timestamp
+		 *
+		 *	@return 	string
+		 */
+		private static function _fetched( int $timestamp ): string {
+
+			return date( 'Y-m-d H:i', $timestamp );
 		}
 
 		/**

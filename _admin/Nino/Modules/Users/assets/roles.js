@@ -357,7 +357,7 @@
 			// the group name goes in front of each entry, so the search finds
 			// a whole group by typing its name and the list reads in the same
 			// order the navigation does
-			const GROUPS = [ 'content', 'structure', 'system', 'other' ];
+			const GROUPS = [ 'content', 'structure', 'features', 'system', 'other' ];
 
 			const options = [];
 			GROUPS.forEach( function( group ) {
@@ -532,7 +532,7 @@
 
 		/**
 		 *	What a permission group is called: the navigation's own heading for
-		 *	the three the rail has, and a name of its own for the fourth, which
+		 *	the four the rail has, and a name of its own for the fifth, which
 		 *	is not a group of the rail at all but "held by somebody, offered by
 		 *	nothing" (see \Nino\Modules\Users\Admin::permOptions())
 		 *

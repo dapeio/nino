@@ -262,7 +262,7 @@ check( 'the roles tab picks permissions with the shared multi-reference control,
 	/ordered\s*:\s*false/.test( rolesSource ) &&
 	rolesSource.includes( "check.disabled = hasFullAccess" ) === false );
 check( 'it orders them the way the rail is ordered, with the ones no panel offers behind those',
-	rolesSource.includes( "[ 'content', 'structure', 'system', 'other' ]" ) &&
+	rolesSource.includes( "[ 'content', 'structure', 'features', 'system', 'other' ]" ) &&
 	rolesSource.includes( "Nino.content.getText('/_admin/nav/group/'+ group )" ) &&
 	rolesSource.includes( "Nino.content.getText('/_admin/roles/group/other')" ) );
 // Full access IS every permission, so picking single ones beside it would say

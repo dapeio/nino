@@ -1,9 +1,7 @@
 <?php return [
-	// Checked when the Setup step opens on a project that has decided
-	// nothing yet. Only the opening position - once Setup has applied once,
-	// the operator's own answer is the only one that counts
-	'preset' 		=> true,
-	// The key the picker posts back and page units list in requiresModules.
+	// The key page units list in requiresModules - the contact form is one
+	// of \Nino\Install\Setup::ALWAYS_MODULES now, applied on every setup
+	// run rather than picked, so this key is never posted by the picker.
 	// Without one a unit is keyed by its module directory's lowercased name
 	// ("form"); the page library has always said "forms"
 	'key' 				=> 'forms',
