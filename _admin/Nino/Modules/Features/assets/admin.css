@@ -18,22 +18,123 @@
 
 @layer nino.tool {
 
-/*	Activate, Update, Settings, Deactivate on a feature; Install or the
-	archive link on an offer. The script builds them as siblings with no
-	whitespace between them, so without a gap of their own they touch. */
+/*	The head of the list pane: the tab strip and the filter over what the
+	tabs hold. It stays at the top while the cards scroll under it - a
+	catalogue of any size is a long page, and the tab you are on, the counts
+	beside it and the box you are typing into are exactly what you must not
+	lose sight of while looking through it.
+
+	The shared strip is deliberately not sticky (see _admin/assets/style.css)
+	because a panel with tabs drills into a form whose context bar is pinned
+	to the same edge, and the two would sit on top of each other. That cannot
+	happen here: drilling into a feature's settings hides this whole pane, so
+	only ever one of the two is on screen. Hence the rule lives here, scoped
+	to this pane, rather than in the shared stylesheet.
+
+	The bar surface and the bleed to both edges are the ones the context bar
+	uses, so the two read as the same piece of chrome. */
+#features-list .admin-features-head {
+	position: sticky;
+	top: -1rem;
+	z-index: 22;
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: .5rem 1rem;
+	margin: -1rem calc(var(--nino-admin-content-inline) * -1) 1.25rem;
+	padding: .35rem var(--nino-admin-content-inline) 0;
+	border-bottom: 1px solid var(--editor-separator);
+	background: var(--editor-bar-bg);
+	box-shadow: 0 1px 0 rgba(15,23,42,.025);
+	backdrop-filter: blur(18px) saturate(170%);
+	-webkit-backdrop-filter: blur(18px) saturate(170%);
+}
+
+#features-list .nino-admin-list-copy {
+	max-width: 80%;
+}
+
+/*	The strip sits in the head now, so it brings neither its own bleed nor
+	the border the head already draws. */
+#features-list .admin-features-head > .admin-panel-tabs {
+	flex: 1 1 auto;
+	min-width: 0;
+	margin: 0;
+	border-bottom: 0;
+}
+
+/*	The filter takes the rest of the row, and a whole row of its own once
+	the tabs need the width - a search box squeezed to three characters is
+	worse than one on a second line. */
+#features-list .admin-features-head > .nino-admin-table-search {
+	flex: 0 1 16rem;
+	min-width: 9rem;
+	margin: 0 0 .35rem;
+}
+
+/*	A row of the grouped list: what it is on the left, what can be done with
+	it on the right. An active feature is not one of these - it is the shared
+	drill-down row (.admin-type-btn), because everything it offers is on the
+	screen behind its chevron. */
+#features-list .nino-admin-list > li {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: .5rem .75rem;
+	min-height: var(--nino-admin-row-height);
+	padding: .58rem .78rem;
+}
+
+/*	An offer no version of which fits this kernel: readable, and visibly not
+	something to act on - the same treatment the card version had. */
+#features-list .nino-admin-list > li[aria-disabled="true"] {
+	opacity: .6;
+}
+
+/*	A requirement, a reason an activation is refused, what an offer asks of
+	this kernel. The shared list copy ellipsizes one line, which is right for
+	a description and wrong for a reason - these wrap and are read whole. */
+#features-list .admin-features-note {
+	white-space: normal;
+	overflow: visible;
+}
+
+/*	Activate on an inactive feature; Install or the archive link on an offer.
+	The script builds them as siblings with no whitespace between them, so
+	without a gap of their own they touch. */
 #features-list .admin-features-actions {
 	display: flex;
 	flex-wrap: wrap;
 	align-items: center;
+	justify-content: flex-end;
 	gap: .5rem;
 }
 
-/*	The line they report into - "Activating …", or a kernel refusal that is
-	a whole sentence. It takes what is left of the row and wraps onto a row
-	of its own before it squeezes the buttons. */
+/*	The line they report into - "Activating …", or a kernel refusal that is a
+	whole sentence. It takes what is left of the row, and takes a row of its
+	own before it squeezes the button. */
 #features-list .admin-features-actions > p {
-	flex: 1 1 14rem;
+	flex: 1 1 12rem;
 	margin: 0;
+	text-align: right;
+}
+
+/*	Nothing to report, nothing to make room for: an empty line would push
+	every row of a long list that bit taller for no reason. */
+#features-list .admin-features-actions > p:empty {
+	display: none;
+}
+
+/*	The screen behind a feature's chevron: its name and the line under it
+	read as a heading, not as another row. */
+#features-detail h3 {
+	margin: 0 0 .15rem;
+}
+
+#features-detail h3 + .nino-admin-hint {
+	margin-top: 0;
 }
 
 }

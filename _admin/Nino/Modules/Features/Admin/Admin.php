@@ -92,11 +92,11 @@ namespace Nino\Modules\Features {
 			return '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-blocks-icon lucide-blocks"><path d="M10 22V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v11a3 3 0 0 0 3 3h15a1 1 0 0 0 1-1v-5a1 1 0 0 0-1-1H10"/><rect x="14" y="2" width="8" height="8" rx="1"/></svg>';
 		}
 
-		// Two panes, the levels the script steps through: the list - a tab
-		// strip and an action bar it builds, then the content of whichever
-		// tab is current - and one feature's settings
+		// Two panes, the levels the script steps through: the list - a head
+		// with the tab strip and the filter, an action bar, then the rows of
+		// whichever tab is current - and one active feature's own screen
 		public static function panes(): array {
-			return [ 'features-list', 'features-settings' ];
+			return [ 'features-list', 'features-detail' ];
 		}
 
 		public static function assets(): array {
@@ -167,6 +167,8 @@ namespace Nino\Modules\Features {
 
 			foreach( \Nino\Features::all( $appData ) as $feature )
 				$features[] = self::_entry( $appData, $feature, $locale );
+
+			self::_byName( $features );
 
 			\Nino\Http::ok( $request, [
 				'dir'					=> self::_dir(),
@@ -490,7 +492,25 @@ namespace Nino\Modules\Features {
 					'active'			=> $offer['active'],
 				];
 
+			self::_byName( $offers );
+
 			return $offers;
+		}
+
+		/**
+		 *	Sort a list of features or offers by the name a person reads,
+		 *	naturally and case-insensitively - the rule the element lists
+		 *	sort by (see \Nino\Elements::queryElements()). Here rather than
+		 *	in the script: the names were localized here, so this is where
+		 *	the order they read in is known. The kernel sorts by key, which
+		 *	is the identity, not the word on the card
+		 *
+		 *	@param		array 		&$list				(reference) Entries carrying 'name'
+		 *
+		 *	@return 	void
+		 */
+		private static function _byName( array &$list ): void {
+			usort( $list, static fn( array $a, array $b ): int => strnatcasecmp( (string) $a['name'], (string) $b['name'] ) );
 		}
 
 		/**

@@ -410,7 +410,7 @@ $panelActions = [
 ];
 
 check( 'the panel is a system entry between Backups (10) and Config (20), with its two mount points and its permission', \Nino\Modules\Features\Admin::nav() === [ 'features', '/_admin/nav/features', 15, 'system' ]
-	&& \Nino\Modules\Features\Admin::panes() === [ 'features-list', 'features-settings' ] && \Nino\Modules\Features\Admin::perm() === '/_admin/features/manage' );
+	&& \Nino\Modules\Features\Admin::panes() === [ 'features-list', 'features-detail' ] && \Nino\Modules\Features\Admin::perm() === '/_admin/features/manage' );
 check( 'it offers exactly the six actions', array_keys( \Nino\Modules\Features\Admin::actions() ) === [ 'features/list', 'features/activate', 'features/deactivate', 'features/settings', 'features/catalogue', 'features/install' ] );
 check( 'the workbench finds it by reading the directory, nothing registered', in_array( \Nino\Modules\Features\Admin::class, \Nino\Admin\Admin::modules(), true ) === true && isset( \Nino\Admin\Admin::panels( $appData )['features'] ) === true );
 
@@ -435,9 +435,13 @@ foreach( $panelActions as $method => $data )
 \Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );
 
 [ $status, $body ] = callFeatures( $appData, 'apiList' );
-check( 'apiList answers the directory the panel reads from, the catalogue url, whether it is writable, no cached catalogue yet, and every feature, sorted by key', $status === 200 && $body['dir'] === '/tests/fixtures/features'
+// Sorted by the name a person reads, not by the key: in this session's
+// locale the sample feature is "Beispiel-Feature", so it comes first here
+// and would come last if the panel still answered in key order
+check( 'apiList answers the directory the panel reads from, the catalogue url, whether it is writable, no cached catalogue yet, and every feature, sorted by the localized name', $status === 200 && $body['dir'] === '/tests/fixtures/features'
 	&& $body['catalogueUrl'] === \Nino\Catalogue::DEFAULT_URL && $body['writable'] === true && $body['catalogue'] === null
-	&& array_keys( $body ) === [ 'dir', 'catalogueUrl', 'writable', 'catalogue', 'features' ] && array_column( $body['features'], 'key' ) === [ 'helper', 'old', 'sample' ] );
+	&& array_keys( $body ) === [ 'dir', 'catalogueUrl', 'writable', 'catalogue', 'features' ] && array_column( $body['features'], 'key' ) === [ 'sample', 'helper', 'old' ]
+	&& array_column( $body['features'], 'name' ) === [ 'Beispiel-Feature', 'Helper', 'Old' ] );
 $byKey = array_column( $body['features'], null, 'key' );
 check( 'every entry has the same keys', array_keys( $byKey['sample'] ) === [ 'key', 'name', 'description', 'version', 'installed', 'active', 'update', 'requires', 'problems', 'settings' ] );
 check( 'names and descriptions arrive in the session locale - de_DE, the native language, since none was chosen', $byKey['sample']['name'] === 'Beispiel-Feature' && $byKey['sample']['description'] === 'Prüft den ganzen Feature-Vertrag.'

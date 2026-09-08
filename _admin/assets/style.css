@@ -1682,7 +1682,7 @@ a {
 
 :where(.nino-admin) .nino-admin-card {
 	margin-bottom: .75rem;
-	padding: .85rem;
+	padding: 1.2rem;
 	background: var(--editor-bg-grouped);
 }
 
@@ -1699,6 +1699,7 @@ a {
 :where(.nino-admin) .nino-admin-card h3 {
 	margin-bottom: .55rem;
 	font-size: .9rem;
+  margin-top: .25rem;
 }
 
 /* A share-of-total bar: a labelled row over a thin track. Both dashboards draw

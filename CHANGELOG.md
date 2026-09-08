@@ -107,18 +107,30 @@ hooks for features: another mail transport, and sorted, paged element lists.
 - A panel naming the `features` group from outside `features/` is refused
   with the existing "unknown nav group" warning and falls back to `content`,
   the same as any other invalid group.
-- **Features panel:** a feature's settings are no longer a form inside its
-  card. An active feature that declares any carries a **Settings** button,
-  which steps into a screen of its own - the pane `features-settings`, a
-  context bar with the workbench's back link, the form legended with the
-  feature, and Save in the bar pinned to the bottom the way every other
-  form screen has it. The screen survives the reload a save ends in, and
-  falls back to the list when the feature it is for stops being switched
-  on or stops declaring settings. The panel bundles a stylesheet of its
-  own now (`_admin/Nino/Modules/Features/assets/admin.css`) for the one
-  thing it needs beyond the design system: the row of buttons a card and
-  a catalogue offer carry, which the script builds without whitespace
-  between them and which therefore had none.
+- **Features panel:** a list, not a wall of cards. Every feature is one row
+  of the shared grouped list now, so a catalogue of any size stays
+  readable. An **active** feature is the shared drill-down row - name, one
+  line, chevron - and everything it offers is on the screen behind it: its
+  settings, the update waiting for it, and **Deactivate**. The pane is
+  `features-detail`, with the workbench's own back link, the settings in
+  one fieldset, and Deactivate, Update and Save together in the bar pinned
+  to the bottom. The screen survives the reload a save ends in and falls
+  back to the list when the feature it is for is switched off elsewhere.
+  An **inactive** feature and a **catalogue offer** stay rows with their
+  one action - Activate, Install, or the archive link - since there is
+  nothing to step into for either.
+- **Features panel:** a filter beside the tabs, over name, key and
+  description. It narrows every tab at once and the counts narrow with it,
+  so a search says which tab the match is on. Tabs and filter share a head
+  that stays at the top while the rows scroll - scoped to this pane, since
+  the shared tab strip stays deliberately unsticky for panels that drill
+  into a context bar. **Active** is the first tab and the one the panel
+  opens on, and both `features/list` and `features/catalogue` answer
+  sorted by the name a person reads rather than by the key.
+- The Features panel bundles a stylesheet of its own now
+  (`_admin/Nino/Modules/Features/assets/admin.css`): the head, the rows,
+  and the gap in a row's buttons, which the script builds without
+  whitespace between them and which therefore had none.
 
 ## 1.1.0-beta — 2026-09-07
 
