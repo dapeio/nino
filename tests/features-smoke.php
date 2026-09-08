@@ -393,11 +393,13 @@ $panelActions = [
 	'apiActivate' 	=> [ 'key' => 'helper' ],
 	'apiDeactivate'	=> [ 'key' => 'helper' ],
 	'apiSettings' 	=> [ 'key' => 'sample', 'fields' => [] ],
+	'apiCatalogue'	=> [],
+	'apiInstall' 		=> [ 'key' => 'helper', 'version' => '1.0.0' ],
 ];
 
-check( 'the panel is a system entry between Backups (10) and Config (20), with its one mount point and its permission', \Nino\Modules\Features\Admin::nav() === [ 'features', '/_admin/nav/features', 15, 'system' ]
-	&& \Nino\Modules\Features\Admin::panes() === [ 'features-list' ] && \Nino\Modules\Features\Admin::perm() === '/_admin/features/manage' );
-check( 'it offers exactly the four actions', array_keys( \Nino\Modules\Features\Admin::actions() ) === [ 'features/list', 'features/activate', 'features/deactivate', 'features/settings' ] );
+check( 'the panel is a system entry between Backups (10) and Config (20), with its two mount points and its permission', \Nino\Modules\Features\Admin::nav() === [ 'features', '/_admin/nav/features', 15, 'system' ]
+	&& \Nino\Modules\Features\Admin::panes() === [ 'features-list', 'features-catalogue' ] && \Nino\Modules\Features\Admin::perm() === '/_admin/features/manage' );
+check( 'it offers exactly the six actions', array_keys( \Nino\Modules\Features\Admin::actions() ) === [ 'features/list', 'features/activate', 'features/deactivate', 'features/settings', 'features/catalogue', 'features/install' ] );
 check( 'the workbench finds it by reading the directory, nothing registered', in_array( \Nino\Modules\Features\Admin::class, \Nino\Admin\Admin::modules(), true ) === true && isset( \Nino\Admin\Admin::panels( $appData )['features'] ) === true );
 
 // Nobody is signed in: every action is a 401
@@ -421,7 +423,8 @@ foreach( $panelActions as $method => $data )
 \Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );
 
 [ $status, $body ] = callFeatures( $appData, 'apiList' );
-check( 'apiList answers the directory the panel reads from and every feature, sorted by key', $status === 200 && $body['dir'] === '/tests/fixtures/features' && array_column( $body['features'], 'key' ) === [ 'helper', 'old', 'sample' ] );
+check( 'apiList answers the directory the panel reads from, the catalogue url, and every feature, sorted by key', $status === 200 && $body['dir'] === '/tests/fixtures/features' && $body['catalogue'] === \Nino\Catalogue::DEFAULT_URL
+	&& array_keys( $body ) === [ 'dir', 'catalogue', 'features' ] && array_column( $body['features'], 'key' ) === [ 'helper', 'old', 'sample' ] );
 $byKey = array_column( $body['features'], null, 'key' );
 check( 'every entry has the same keys', array_keys( $byKey['sample'] ) === [ 'key', 'name', 'description', 'version', 'installed', 'active', 'update', 'requires', 'problems', 'settings' ] );
 check( 'names and descriptions arrive in the session locale - de_DE, the native language, since none was chosen', $byKey['sample']['name'] === 'Beispiel-Feature' && $byKey['sample']['description'] === 'Prüft den ganzen Feature-Vertrag.'
@@ -481,6 +484,20 @@ check( 'fields has to be an array, the key a known feature', callFeatures( $appD
 	&& callFeatures( $appData, 'apiSettings', [ 'key' => 'nope', 'fields' => [] ] ) === [ 400, [ 'error' => 'unknown feature' ] ]
 	&& callFeatures( $appData, 'apiSettings', [ 'fields' => [] ] ) === [ 400, [ 'error' => 'unknown feature' ] ] );
 check( 'the activity log names the feature, and a read logs nothing', \Nino\Modules\Features\Admin::log( 'features/activate', [ 'key' => 'sample' ] ) === 'Activate feature "sample"'
-	&& \Nino\Modules\Features\Admin::log( 'features/settings', [ 'key' => 'sample' ] ) === 'Edit settings of feature "sample"' && \Nino\Modules\Features\Admin::log( 'features/list', [] ) === '' );
+	&& \Nino\Modules\Features\Admin::log( 'features/settings', [ 'key' => 'sample' ] ) === 'Edit settings of feature "sample"' && \Nino\Modules\Features\Admin::log( 'features/list', [] ) === ''
+	&& \Nino\Modules\Features\Admin::log( 'features/install', [ 'key' => 'sample', 'version' => '1.3.0' ] ) === 'Install feature "sample" 1.3.0' && \Nino\Modules\Features\Admin::log( 'features/catalogue', [] ) === '' );
+
+// The catalogue, switched off: the one catalogue answer that reads no
+// catalogue and installs nothing - this run's features directory is the
+// checkout's fixtures. The panel phrases it itself, in the session locale,
+// reading its words through the project path (Admin::textFills()), which
+// here has to be the checkout's; the rest of the catalogue half is
+// tests/catalogue-smoke.php's, over a features directory of its own
+$off = $appData;
+$off['/nino/catalogue/url']			= '';
+$off['./nino/filesystem/path']	= dirname( __DIR__ );
+$offWords = (array) include dirname( __DIR__ ). '/_admin/Nino/Modules/Features/text/de_DE.php';
+check( 'apiCatalogue with the catalogue switched off is a 400 in the panel\'s own words, in the session locale, and apiList says the same with an empty url',
+	callFeatures( $off, 'apiCatalogue' ) === [ 400, [ 'error' => $offWords['[[/_admin/features/error/catalogue-off]]'] ] ] && callFeatures( $off, 'apiList' )[1]['catalogue'] === '' );
 
 ninoDone( $appData );

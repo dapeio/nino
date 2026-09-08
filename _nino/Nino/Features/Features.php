@@ -204,7 +204,7 @@ namespace Nino {
 				return $fail( '"version" must be major.minor.patch' );
 
 			$nino = (string) ( $raw['nino'] ?? '*' );
-			if( trim( $nino ) === '' || self::_constraintValid( $nino ) === false )
+			if( trim( $nino ) === '' || self::constraintValid( $nino ) === false )
 				return $fail( '"nino" must be a version constraint such as ^1.0' );
 
 			$module = '\\Nino\\Modules\\'. $name;
@@ -1033,7 +1033,7 @@ namespace Nino {
 		 *
 		 *	@return 	bool										Whether every part of it is something satisfies() understands
 		 */
-		private static function _constraintValid( string $constraint ): bool {
+		public static function constraintValid( string $constraint ): bool {
 
 			foreach( explode( '||', $constraint ) as $alternative )
 				foreach( preg_split( '/[\s,]+/', trim( $alternative ) ) ?: [] as $part )

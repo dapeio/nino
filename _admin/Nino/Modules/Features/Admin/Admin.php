@@ -41,6 +41,10 @@ namespace Nino\Modules\Features {
 		// kernel is asked, so a stray value never reaches an error message
 		private const string KEY_PATTERN = '/^[a-z][a-z0-9-]*$/';
 
+		// A version as the catalogue names one - the same shape the kernel
+		// accepts in a manifest (Features::VERSION_PATTERN)
+		private const string VERSION_PATTERN = '/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.]+)?$/';
+
 		public static function perm(): string {
 			return self::MANAGE_PERM;
 		}
@@ -56,6 +60,8 @@ namespace Nino\Modules\Features {
 				'features/activate' 	=> [ self::class, 'apiActivate' ],
 				'features/deactivate'	=> [ self::class, 'apiDeactivate' ],
 				'features/settings' 	=> [ self::class, 'apiSettings' ],
+				'features/catalogue' 	=> [ self::class, 'apiCatalogue' ],
+				'features/install' 		=> [ self::class, 'apiInstall' ],
 			];
 		}
 
@@ -73,8 +79,10 @@ namespace Nino\Modules\Features {
 			return '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-blocks-icon lucide-blocks"><path d="M10 22V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v11a3 3 0 0 0 3 3h15a1 1 0 0 0 1-1v-5a1 1 0 0 0-1-1H10"/><rect x="14" y="2" width="8" height="8" rx="1"/></svg>';
 		}
 
+		// Two mount points: the installed list, and below it the catalogue
+		// block - built separately, so reloading the one leaves the other
 		public static function panes(): array {
-			return [ 'features-list' ];
+			return [ 'features-list', 'features-catalogue' ];
 		}
 
 		public static function assets(): array {
@@ -106,19 +114,23 @@ namespace Nino\Modules\Features {
 
 		public static function log( string $action, array $data ): string {
 
-			$key = is_string( $data['key'] ?? null ) === true ? $data['key'] : '';
+			$key 		 = is_string( $data['key'] ?? null ) === true ? $data['key'] : '';
+			$version = is_string( $data['version'] ?? null ) === true ? $data['version'] : '';
 
 			return match( $action ) {
 				'features/activate' 	=> 'Activate feature "'. $key. '"',
 				'features/deactivate'	=> 'Deactivate feature "'. $key. '"',
 				'features/settings' 	=> 'Edit settings of feature "'. $key. '"',
+				'features/install' 		=> 'Install feature "'. $key. '" '. $version,
 				default 							=> '',
 			};
 		}
 
 		/**
 		 *	Every installed feature with its state and its settings form,
-		 *	plus the directory they are read from
+		 *	plus the directory they are read from - and the catalogue url,
+		 *	so the block below the list can say where a load would go before
+		 *	anything is loaded ('' when the catalogue is switched off)
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
@@ -138,6 +150,7 @@ namespace Nino\Modules\Features {
 
 			\Nino\Http::ok( $request, [
 				'dir' 			=> self::_dir(),
+				'catalogue'	=> \Nino\Catalogue::url( $appData ),
 				'features'	=> $features,
 			] );
 		}
@@ -222,6 +235,139 @@ namespace Nino\Modules\Features {
 			}
 
 			self::_answer( $appData, $request, $key );
+		}
+
+		/**
+		 *	Read the catalogue - two requests to its url, believed only with
+		 *	the signature (see Catalogue::fetch()) - and answer what it offers
+		 *	this installation, phrased for the browser. Only ever on request:
+		 *	the panel opens without it, and the script posts this when the
+		 *	button is pressed.
+		 *
+		 *	The two ways the configuration rules it out are said in the
+		 *	interface language; every other reason is the kernel's own English
+		 *	sentence, behind a phrase of ours
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		&$request			(reference) Current server request
+		 *
+		 *	@return 	void
+		 */
+		public static function apiCatalogue( array &$appData, array &$request ): void {
+
+			if( \Nino\Admin\Admin::guardPerm( $appData, $request, self::MANAGE_PERM ) === false )
+				return;
+
+			if( \Nino\Catalogue::url( $appData ) === '' ) {
+				\Nino\Http::fail( $request, 400, self::_say( $appData, '/_admin/features/error/catalogue-off', 'the catalogue is switched off' ) );
+				return;
+			}
+
+			if( \Nino\Catalogue::key( $appData ) === '' ) {
+				\Nino\Http::fail( $request, 400, self::_say( $appData, '/_admin/features/error/catalogue-key', 'no catalogue key is configured, so no catalogue can be trusted' ) );
+				return;
+			}
+
+			$catalogue = \Nino\Catalogue::fetch( $appData );
+
+			if( is_string( $catalogue ) === true ) {
+				\Nino\Http::fail( $request, 400, self::_say( $appData, '/_admin/features/error/catalogue-reason', $catalogue ) );
+				return;
+			}
+
+			$locale	= \Nino\Admin\Admin::sessionLocale( $appData );
+			$offers	= [];
+
+			foreach( \Nino\Catalogue::offers( $appData, $catalogue ) as $offer )
+				$offers[] = [
+					'key'					=> $offer['key'],
+					'name'				=> \Nino\Features::localized( $offer['name'], $locale ),
+					'description'	=> \Nino\Features::localized( $offer['description'], $locale ),
+					'version'			=> $offer['version'],
+					'nino'				=> $offer['nino'],
+					'ext'					=> $offer['php']['ext'],
+					'requires'		=> $offer['requires'],
+					'directory'		=> $offer['directory'],
+					'archive'			=> $offer['archive'],
+					'size'				=> $offer['size'],
+					'released'		=> $offer['released'],
+					'state'				=> $offer['state'],
+					'fits'				=> $offer['fits'],
+					'local'				=> $offer['local'],
+					'active'			=> $offer['active'],
+				];
+
+			\Nino\Http::ok( $request, [
+				'url'				=> $catalogue['url'],
+				'generated'	=> $catalogue['generated'],
+				'writable'	=> \Nino\Catalogue::writable(),
+				'offers'		=> $offers,
+			] );
+		}
+
+		/**
+		 *	Install one catalogue entry: the kernel downloads, verifies and
+		 *	places the directory (see Catalogue::install()) and activates
+		 *	nothing. A feature that was active before is then activated again,
+		 *	which is how its update is applied (Features::activate()); one
+		 *	that was off, or new, is only put in place and waits in the list
+		 *	for its Activate. Answers the feature's entry as the list would
+		 *	show it now, and whether the update was applied
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		&$request			(reference) Current server request
+		 *
+		 *	@return 	void
+		 */
+		public static function apiInstall( array &$appData, array &$request ): void {
+
+			if( \Nino\Admin\Admin::guardPerm( $appData, $request, self::MANAGE_PERM ) === false )
+				return;
+
+			$data 		= \Nino\Admin\Admin::postData();
+			$key 			= self::_key( $data );
+			$version	= self::_version( $data );
+
+			if( $key === null || $version === null ) {
+				\Nino\Http::fail( $request, 400, 'no feature key and version posted' );
+				return;
+			}
+
+			// Read before the directory changes: whether it is on now decides
+			// what happens after the files are in place
+			$before 		= \Nino\Features::get( $appData, $key );
+			$wasActive	= $before !== null && $before['active'] === true;
+
+			$result = \Nino\Catalogue::install( $appData, $key, $version );
+
+			if( $result !== true ) {
+				\Nino\Http::fail( $request, 400, $result );
+				return;
+			}
+
+			if( $wasActive === true ) {
+
+				$result = \Nino\Features::activate( $appData, $key );
+
+				// The directory is already the new one - the answer has to say
+				// so, since the list will show the update still waiting
+				if( $result !== true ) {
+					\Nino\Http::fail( $request, 400, self::_say( $appData, '/_admin/features/error/update-after-install', $result ) );
+					return;
+				}
+			}
+
+			$feature = \Nino\Features::get( $appData, $key );
+
+			if( $feature === null ) {
+				\Nino\Http::fail( $request, 500, 'feature "'. $key. '" disappeared' );
+				return;
+			}
+
+			\Nino\Http::ok( $request, [
+				'feature'	=> self::_entry( $appData, $feature, \Nino\Admin\Admin::sessionLocale( $appData ) ),
+				'updated'	=> $wasActive,
+			] );
 		}
 
 		/**
@@ -346,6 +492,44 @@ namespace Nino\Modules\Features {
 			$key = $data['key'] ?? null;
 
 			return is_string( $key ) === true && preg_match( self::KEY_PATTERN, $key ) === 1 ? $key : null;
+		}
+
+		/**
+		 *	The posted version, or null when it is not one
+		 *
+		 *	@param		array 		$data					The posted payload
+		 *
+		 *	@return 	string|null
+		 */
+		private static function _version( array $data ): ?string {
+
+			$version = $data['version'] ?? null;
+
+			return is_string( $version ) === true && preg_match( self::VERSION_PATTERN, $version ) === 1 ? $version : null;
+		}
+
+		/**
+		 *	A message this panel phrases itself, in the interface language:
+		 *	the fill's text, with the kernel's reason in its %s where it has
+		 *	one. The panel's words are read the way the shell reads them for
+		 *	the browser (Admin::textFills()); where they cannot be read, the
+		 *	reason alone is the answer, so it is never empty
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$fill					A key of the panel's text files, eg. '/_admin/features/error/catalogue-off'
+		 *	@param		string		$reason				The kernel's own sentence
+		 *
+		 *	@return 	string
+		 */
+		private static function _say( array &$appData, string $fill, string $reason ): string {
+
+			$fills = \Nino\Admin\Admin::textFills( $appData, self::text(), \Nino\Admin\Admin::sessionLocale( $appData ) );
+			$text	 = $fills['[['. $fill. ']]'] ?? '';
+
+			if( is_string( $text ) === false || $text === '' )
+				return $reason;
+
+			return str_replace( '%s', $reason, $text );
 		}
 
 		/**

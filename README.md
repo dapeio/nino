@@ -176,9 +176,10 @@ _nino/           Kernel and frontend core, one class per file under _nino/Nino/,
                  /nino/modules
 app/             Project-owned PHP classes under their own namespace
 features/        The features a project installs, one directory each with a
-                 feature.php manifest, copied in from the catalogue
-                 github.com/dapeio/nino-features and switched on in the
-                 workbench's Features panel - a checkout ships none
+                 feature.php manifest, installed from the signed catalogue of
+                 github.com/dapeio/nino-features in the workbench's Features
+                 panel or copied in by hand, and switched on there - a
+                 checkout ships none
 _admin/          The workbench: the shell alone, recovery.php, its own screens
                  as modules under _admin/Nino/Modules/ (Dashboard, Elements,
                  Text, Images, Logs, Routes, Users, Language, Backups, Config),
@@ -212,6 +213,7 @@ php tests/install-smoke.php
 php tests/design-smoke.php
 php tests/templates-smoke.php
 php tests/features-smoke.php
+php tests/catalogue-smoke.php
 for test in features/*/tests/*-smoke.php; do [ -e "$test" ] && php "$test"; done
 php tests/demo-catalogue-smoke.php
 for test in tests/*-js-smoke.js; do node "$test"; done

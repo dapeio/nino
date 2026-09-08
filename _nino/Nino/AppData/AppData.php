@@ -106,6 +106,12 @@ namespace Nino {
 			// version it activated and the settings it saved (see
 			// \Nino\Features). Empty until the first activation
 			'/nino/features'			=> [],
+			// Where the Features panel loads the catalogue from when asked, and
+			// the key it has to be signed with - '' switches the catalogue off,
+			// the key '' falls back to the one the kernel ships (see
+			// \Nino\Catalogue). Nothing here is fetched on its own
+			'/nino/catalogue/url'	=> \Nino\Catalogue::DEFAULT_URL,
+			'/nino/catalogue/key'	=> '',
 		];
 
 		public static function prepare( array &$appData ): void {

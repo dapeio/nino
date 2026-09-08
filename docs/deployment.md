@@ -89,7 +89,7 @@ A general example configuration cannot reliably guess the paths and PHP-FPM sett
 
 Before initial setup, PHP must be able to create directories and files in the project root. The still missing project paths are created by the wizard or, if needed, by the kernel and are not a manually required prerequisite.
 
-During operation, Nino only needs write permissions for actually changeable content. Depending on usage, this includes `private/config.php`, `private/text/`, `private/elements/`, `private/data/`, `private/.logs/`, `private/.backups/`, `private/assets/`, `public/images/`, and `public/.cache/`. The Templates panel additionally needs `private/templates/`; it can create native text keys, Element Types, and image-slot definitions in the configuration. Applying appearance variants in the Design panel needs `private/templates/`, `private/assets/`, `public/fonts/`, and any other destination declared by a Theme manifest. The appearance catalogue under `_admin/install/library/` itself remains read-only, as does `_admin/.cache/`'s content once built - the workbench writes its bundles there, so that one directory inside the tool folder needs write access. The project root and PHP source can otherwise remain read-only after installation.
+During operation, Nino only needs write permissions for actually changeable content. Depending on usage, this includes `private/config.php`, `private/text/`, `private/elements/`, `private/data/`, `private/.logs/`, `private/.backups/`, `private/assets/`, `public/images/`, and `public/.cache/`. The Templates panel additionally needs `private/templates/`; it can create native text keys, Element Types, and image-slot definitions in the configuration. Applying appearance variants in the Design panel needs `private/templates/`, `private/assets/`, `public/fonts/`, and any other destination declared by a Theme manifest. The appearance catalogue under `_admin/install/library/` itself remains read-only, as does `_admin/.cache/`'s content once built - the workbench writes its bundles there, so that one directory inside the tool folder needs write access. The project root and PHP source can otherwise remain read-only after installation. Installing a feature from the catalogue in the Features panel is the one exception: it writes `features/` and stages the download below `private/data/.features/`. Without write access to `features/` the panel offers the archive for a manual copy instead, so the directory can stay read-only where features are deployed with the project.
 
 Grant these permissions to the user under which PHP is executed. World-writable permissions such as `0777` are not a suitable permanent solution. After deployment, the kernel and other PHP source code should not be generally writable.
 
@@ -136,6 +136,7 @@ Check in `config.php` or via the workbench's Config panel at least the following
 | `/nino/session/force-secure-cookie` | `true` if TLS terminates before PHP | enforces secure session cookies behind an HTTPS proxy |
 | `/nino/admin/backups` | according to operational decision | controls the workbench's daily encrypted backup |
 | `/nino/admin/logs` | according to operational decision | controls the workbench's activity log |
+| `/nino/catalogue/url` | the default, or `''` where nothing is to be installed from the catalogue | where the Features panel loads the feature catalogue from - on request only, never on its own; empty switches the catalogue off |
 
 Error messages should not expose file paths, configuration values, or stack traces in the browser. After switching, check that errors still arrive in a protected log and remain accessible to the operator.
 
@@ -187,6 +188,7 @@ php tests/install-smoke.php
 php tests/design-smoke.php
 php tests/templates-smoke.php
 php tests/features-smoke.php
+php tests/catalogue-smoke.php
 for test in features/*/tests/*-smoke.php; do [ -e "$test" ] || continue; php "$test" || exit 1; done
 php tests/demo-catalogue-smoke.php
 for test in tests/*-js-smoke.js; do node "$test"; done
@@ -225,7 +227,7 @@ Treat a Nino update like a change to the specific website project, not like blin
 
 1. Secure the current production state outside the webroot.
 2. First transfer the change to a development or staging environment.
-3. Keep project-owned PHP classes in `app/` (or `NINO_APP_DIR`) and compare only deliberate kernel changes with the new state. `_nino/` can then be replaced wholesale - Nino's optional modules under `_nino/Nino/Modules/` included, since a project switches them on or off in `/nino/modules` rather than editing them - and so can `_admin/`: the workbench holds no project state - the accounts live in `config.php`, the recovery secret in `private/.auth/pw.php`. A feature is updated on its own: replace its directory under `features/` with the new release and press **Update** in the workbench's Features panel. The feature's install unit adds what is new and overwrites nothing the project has, and the feature migrates its own data before the new version is recorded; see [Features](features.md#updating).
+3. Keep project-owned PHP classes in `app/` (or `NINO_APP_DIR`) and compare only deliberate kernel changes with the new state. `_nino/` can then be replaced wholesale - Nino's optional modules under `_nino/Nino/Modules/` included, since a project switches them on or off in `/nino/modules` rather than editing them - and so can `_admin/`: the workbench holds no project state - the accounts live in `config.php`, the recovery secret in `private/.auth/pw.php`. A feature is updated on its own: press **Update** in the catalogue block of the workbench's Features panel, or replace its directory under `features/` with the new release by hand and press **Update** in the list. The feature's install unit adds what is new and overwrites nothing the project has, and the feature migrates its own data before the new version is recorded; see [Features](features.md#updating).
 4. Run smoke tests and project-specific acceptance.
 5. Transfer the tested state and keep the previous version for rollback.
 

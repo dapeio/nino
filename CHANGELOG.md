@@ -2,6 +2,56 @@
 
 All notable changes to Nino are documented in this file.
 
+## Unreleased
+
+### Added
+
+- **`\Nino\Catalogue`** (`_nino/Nino/Catalogue/Catalogue.php`): fetches the
+  catalogue and its detached signature (ECDSA P-256 over SHA-256, DER,
+  base64), verifies it against the key the kernel ships as `PUBLIC_KEY` or
+  the one under `/nino/catalogue/key`, parses format 1 and refuses a
+  catalogue that is wrong anywhere, answers `offers()` per key (`available`,
+  `upgrade`, `current`, `incompatible`) and `install()`s one version: the
+  catalogue fetched again, the archive downloaded with its size as the cap,
+  sha256 and size checked, unpacked below `data/.features/` with every entry
+  validated (one directory, plain files, nothing outside, bounded), read as a
+  feature, matched against key and version and checked to fit this kernel,
+  then moved into `features/`
+  with the old directory put back if the move fails. Nothing is activated.
+- **`\Nino\Fetch`** (`_nino/Nino/Fetch/Fetch.php`): the kernel's one http
+  client - a GET over https with timeout and byte cap, through curl or the
+  stream wrapper, no redirects, certificate verified, user agent `Nino`. A
+  test stubs it under `./nino/fetch/stub`. Used by the catalogue and nothing
+  else; Nino makes no request unless the Features panel is asked to.
+- **Configuration** `/nino/catalogue/url` (Nino's catalogue by default, `''`
+  switches it off) and `/nino/catalogue/key` (a PEM public key for a
+  catalogue of your own).
+- **Features panel:** a catalogue block with **Load catalogue** - loaded only
+  when pressed, never on its own - listing the newest version of every
+  published feature this kernel can run, with **Install** and **Update**;
+  updating an active feature applies the update in the same step. Where
+  `features/` is not writable, the archive is linked to unpack by hand.
+  Actions `features/catalogue` and `features/install`.
+- **`/nino/mail/send`** (`\Nino\Mail::TRANSPORT`): a transport callback.
+  `Mail::send()` fires it after the per-ip cap and the header cleaning with
+  `{ to, subject, body, replyTo, sender, headers, sent }`; a handler that
+  sets `sent` to `true` or `false` replaces `mail()`, one that leaves it at
+  `null` passes the mail on.
+- **`[elements]`** takes `sort` (`title`, `-date`, `category,-date`: numbers
+  as numbers, everything else natural and case-insensitive, an element
+  without the field last) and `offset`; `offset` and `limit` apply after the
+  callback. `\Nino\Elements::queryElements()` takes the same as a sixth
+  parameter `$options` (`sort`, `offset`, `limit`), and
+  `\Nino\Elements::sortElements()` orders a list on its own.
+- **Tests:** `tests/catalogue-smoke.php` - a keypair generated per run,
+  archives written byte by byte (a hostile one too), the network stubbed;
+  kernel-smoke covers the transport callback and the sorted, paged query.
+
+### Changed
+
+- `\Nino\Features::constraintValid()` is public - the catalogue validates
+  the `nino` field of an entry with it.
+
 ## 1.1.0-beta — 2026-09-07
 
 Features. An installable package is one directory below `features/` with a
@@ -10,6 +60,11 @@ the wizard; Nino's optional modules ship with the kernel again, and `app/`
 is the project's alone. The features themselves are published from the
 catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features) -
 a checkout ships none.
+
+The catalogue. A feature is installed from the Features panel: the panel loads
+a signed `catalogue.json` from getnino.dev on request, offers what fits the
+running kernel, and installs or updates an archive below `features/`. Two
+hooks for features: another mail transport, and sorted, paged element lists.
 
 ### Added
 

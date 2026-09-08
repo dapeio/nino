@@ -46,6 +46,8 @@ The panel's four actions are `features/list`, `features/activate`, `features/dea
 - **Update** is offered for an active feature whose manifest names a different version than the recorded one - after its directory has been replaced with a new release. The update is the same action as activating: the unit adds what is new, and the module gets to migrate its own data before the new version is recorded.
 - **Settings** shows the form the manifest describes and stores it under `/nino/features` in `config.php`. Every setting is validated before any is written; an error names the setting, and nothing is saved.
 
+Below the list stands the **catalogue** block, and with it two more actions, `features/catalogue` and `features/install`, behind which stand `\Nino\Catalogue::fetch()`, `offers()` and `install()`. Nothing is fetched on its own: the block names the catalogue's url and loads it only when you press **Load catalogue**. It then lists, per feature the catalogue publishes, the newest version this Nino can run - **Install** for one that is not in the directory, **Update** for one that is there in an older version, "installed" for one that is current, and greyed out, with what it asks for, one no version of which fits. Installing downloads the archive, checks it against the signed catalogue, and puts the directory in place; an update replaces the directory and, for an active feature, applies the update in the same step. Where `features/` is not writable, the block links the archive instead, to unpack by hand. See [The Catalogue](#the-catalogue).
+
 **Important:** A panel a feature brings appears only with the next load of the workbench after activating, and goes only then after deactivating - the rail is built once per page load from the panel registry. Reload the page. A panel in the Content group offers its permission on the roles tab of the Users panel; the **Editor** role the wizard wrote before the activation does not receive it by itself - grant it there.
 
 ## The Manifest `feature.php`
@@ -199,6 +201,38 @@ What a feature writes under `data/` belongs to the project: the workbench's dail
 
 The setup wizard's Setup step offers no features. It knows the kernel modules that ship a unit - navigation, language selection, contact form - a project's own modules under `app/`, and the units under `_admin/install/library/modules/`; a feature is switched on in the Features panel after setup. Both apply their units through the same method, `\Nino\Features::applyUnit()`: the wizard with overwrite on, because a unit applied again is meant to replace what it copied before there; an activation with it off. That is why the application lives in the kernel and not in the wizard - `_admin/install/` may be deleted after setup, and a feature still has to activate afterwards.
 
+## The Catalogue
+
+A feature that is not copied in by hand comes from a catalogue: a `catalogue.json` published over https beside the archives it lists, and beside it a detached signature `catalogue.json.sig`. Nino's own is `https://getnino.dev/features/catalogue.json`, built and signed by the catalogue repository [dapeio/nino-features](https://github.com/dapeio/nino-features) from the same directories a hand copy comes from. The kernel side is `\Nino\Catalogue` in `_nino/Nino/Catalogue/Catalogue.php` and the kernel's one http client, `\Nino\Fetch`; `tests/catalogue-smoke.php` checks both without a network.
+
+### What the Catalogue Says
+
+Format 1 is one JSON document: `format` (`1`), `generated` (when), and `features`, a list of entries - one per published version:
+
+| Field | Meaning |
+| --- | --- |
+| `key`, `name`, `description`, `version`, `nino`, `php.ext`, `requires` | what the feature's manifest says, see [The Manifest](#the-manifest-featurephp) |
+| `directory` | the directory the archive holds - `Newsletter`, the feature's class name segment |
+| `archive` | the https url of the `.tar.gz` |
+| `sha256`, `size` | the digest and the byte length of exactly that file |
+| `released` | the date |
+
+An archive is a `.tar.gz` holding exactly that one directory - what lands below `features/`, nothing beside it; a feature's `tests/` are not published. A catalogue that is wrong anywhere is refused as a whole: `\Nino\Catalogue::parse()` names the entry and the field.
+
+### Trust
+
+The signature is the trust. It is an ECDSA signature (curve P-256) over SHA-256 of the document's exact bytes, DER-encoded and base64 - what `openssl dgst -sha256 -sign key.pem catalogue.json | base64` writes. The public half of Nino's key ships with the kernel as `\Nino\Catalogue::PUBLIC_KEY`; `/nino/catalogue/key` in `config.php` replaces it with another key, PEM, for a catalogue of your own, and `/nino/catalogue/url` names that catalogue. An empty key verifies nothing, so no catalogue is accepted at all until a key is configured - the kernel's constant is empty until Nino's first key exists. `/nino/catalogue/url` set to `''` switches the catalogue off: the block in the panel says so, and Nino makes no request.
+
+Nothing is believed before the signature holds: the document is fetched, its signature is fetched, and only a document the key signed is parsed. An installation fetches the catalogue again rather than trusting what the panel showed, downloads the archive with the byte cap the entry names, and refuses an archive whose size or SHA-256 differs from the entry. The archive is unpacked below `data/.features/` - never in `features/` itself - after every entry was looked at: one directory named as the entry says, plain files and directories only, no path outside it, bounded in count and size; what came out is read as a feature and has to be the key and the version the catalogue promised, and to fit this kernel as the entry did. Only then is the directory moved into `features/`, replacing what was there; a move that fails half way puts the old directory back. The staging directory is removed either way.
+
+### What Install Does Not Do
+
+Install places files, nothing more. A newly installed feature is switched on in the panel like one copied in by hand, with everything [Activating](#activating) says. An update of an active feature is followed by that activation in one step from the panel, so the unit adds what is new and the module gets to migrate its data - see [Updating](#updating) - but `\Nino\Catalogue::install()` itself activates nothing. Requirements are not resolved by the catalogue either: a feature that `requires` another is installed after it, on its own, and the panel says what is missing at activation.
+
+### Requirements and Privacy
+
+An installation needs the `curl` extension or `allow_url_fopen`, the `openssl` extension, `phar` for the archive, and a writable `features/` directory - where it is not writable, the panel links the archive, to unpack by hand as before. Every request goes over https to the catalogue's host and nowhere else: no redirect is followed, no other scheme fetched, the certificate is verified, the user agent says `Nino` and nothing more - not the version, not the site. Nino makes these requests when someone presses **Load catalogue** or **Install** and at no other time; there is no check for updates in the background, no telemetry, nothing sent. The manual way stays: a directory copied into `features/` is a feature like any other.
+
 ## Writing a Feature
 
 ### Directory Layout
@@ -260,7 +294,7 @@ CI runs `php tests/features-smoke.php` - the contract test against `tests/fixtur
 
 ## Outlook
 
-The features Nino publishes come from the catalogue repository [dapeio/nino-features](https://github.com/dapeio/nino-features) today: one directory per feature below `features/` there, each with its manifest, its tests, a README and a changelog, copied into a project's `features/` by hand and switched on in the panel. Planned is the next step: the Features panel is meant to list the features of the catalogue that match the running Nino version and to install a signed `.tar.gz` archive into `features/`. The manifest is laid out for that - `nino`, `requires` and `version` are what a catalogue needs - but none of it exists today: there is no download and no signature check, and Nino still makes no outbound request. Until then a feature arrives in the directory as a copy.
+The features Nino publishes come from the catalogue repository [dapeio/nino-features](https://github.com/dapeio/nino-features): one directory per feature below `features/` there, each with its manifest, its tests, a README and a changelog - copied into a project's `features/` by hand, or installed from the signed catalogue the repository publishes at getnino.dev, see [The Catalogue](#the-catalogue). What the catalogue does not do yet is resolve requirements on its own: a feature that `requires` another is installed after it, each on its own. And a catalogue of your own is a matter of a url and a key - the format is small enough to publish from a directory of features with the repository's `bin/build.php`.
 
 ## Further Manuals
 

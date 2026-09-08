@@ -88,7 +88,7 @@ Eine allgemeine Beispielkonfiguration kann die Pfade und PHP-FPM-Einstellungen e
 
 Vor der Ersteinrichtung muss PHP in der Projektwurzel Verzeichnisse und Dateien anlegen dürfen. Die noch fehlenden Projektpfade werden vom Assistenten beziehungsweise bei Bedarf vom Kernel erzeugt und sind keine manuell anzulegende Voraussetzung.
 
-Im laufenden Betrieb benötigt Nino Schreibrechte nur für tatsächlich veränderliche Inhalte. Dazu gehören je nach Nutzung `private/config.php`, `private/text/`, `private/elements/`, `private/data/`, `private/.logs/`, `private/.backups/`, `private/assets/`, `public/images/` und `public/.cache/`. Das Templates-Panel benötigt zusätzlich `private/templates/`; es kann native Textschlüssel, Elementtypen und Bildplatz-Definitionen in der Konfiguration anlegen. Das Anwenden von Darstellungsvarianten im Design-Panel benötigt `private/templates/`, `private/assets/`, `public/fonts/` sowie jedes weitere Ziel, das ein Theme-Manifest erklärt. Der Darstellungskatalog unter `_admin/install/library/` selbst bleibt schreibgeschützt; `_admin/.cache/` dagegen braucht Schreibrechte, weil die Workbench ihre Bundles dort baut – das eine Verzeichnis im Werkzeugordner. Projektwurzel und PHP-Quellcode können ansonsten nach der Installation schreibgeschützt bleiben.
+Im laufenden Betrieb benötigt Nino Schreibrechte nur für tatsächlich veränderliche Inhalte. Dazu gehören je nach Nutzung `private/config.php`, `private/text/`, `private/elements/`, `private/data/`, `private/.logs/`, `private/.backups/`, `private/assets/`, `public/images/` und `public/.cache/`. Das Templates-Panel benötigt zusätzlich `private/templates/`; es kann native Textschlüssel, Elementtypen und Bildplatz-Definitionen in der Konfiguration anlegen. Das Anwenden von Darstellungsvarianten im Design-Panel benötigt `private/templates/`, `private/assets/`, `public/fonts/` sowie jedes weitere Ziel, das ein Theme-Manifest erklärt. Der Darstellungskatalog unter `_admin/install/library/` selbst bleibt schreibgeschützt; `_admin/.cache/` dagegen braucht Schreibrechte, weil die Workbench ihre Bundles dort baut – das eine Verzeichnis im Werkzeugordner. Projektwurzel und PHP-Quellcode können ansonsten nach der Installation schreibgeschützt bleiben. Das Installieren eines Features aus dem Katalog im Panel Features ist die eine Ausnahme: Es schreibt `features/` und legt den Download unterhalb von `private/data/.features/` zwischen. Ohne Schreibrecht auf `features/` bietet das Panel stattdessen das Archiv zum Kopieren von Hand an, das Verzeichnis kann also schreibgeschützt bleiben, wo Features mit dem Projekt ausgeliefert werden.
 
 Vergib diese Rechte an den Benutzer, unter dem PHP ausgeführt wird. Weltweit beschreibbare Rechte wie `0777` sind keine geeignete Dauerlösung. Nach dem Deployment sollten Kernel und übriger PHP-Quellcode nicht allgemein beschreibbar sein.
 
@@ -137,6 +137,7 @@ Prüfe in `config.php` beziehungsweise über das Config-Panel der Workbench mind
 | `/nino/session/force-secure-cookie` | `true` bei TLS-Terminierung vor PHP | erzwingt sichere Session-Cookies hinter einem HTTPS-Proxy |
 | `/nino/admin/backups` | nach Betriebsentscheidung | steuert die tägliche verschlüsselte Sicherung der Workbench |
 | `/nino/admin/logs` | nach Betriebsentscheidung | steuert das Aktivitätsprotokoll der Workbench |
+| `/nino/catalogue/url` | der Standard, oder `''`, wo nichts aus dem Katalog installiert werden soll | woher das Panel Features den Feature-Katalog lädt – nur auf Anforderung, nie von selbst; leer schaltet den Katalog ab |
 
 Fehlermeldungen sollten im Browser keine Dateipfade, Konfigurationswerte oder Stacktraces offenlegen. Prüfe nach dem Umschalten, dass Fehler weiterhin in einem geschützten Log ankommen und für den Betreiber erreichbar bleiben.
 
@@ -188,6 +189,7 @@ php tests/install-smoke.php
 php tests/design-smoke.php
 php tests/templates-smoke.php
 php tests/features-smoke.php
+php tests/catalogue-smoke.php
 for test in features/*/tests/*-smoke.php; do [ -e "$test" ] || continue; php "$test" || exit 1; done
 php tests/demo-catalogue-smoke.php
 for test in tests/*-js-smoke.js; do node "$test"; done
@@ -226,7 +228,7 @@ Behandle ein Nino-Update wie eine Änderung am konkreten Webseitenprojekt, nicht
 
 1. Sichere den aktuellen produktiven Stand außerhalb des Webroots.
 2. Übernimm die Änderung zunächst in eine Entwicklungs- oder Staging-Umgebung.
-3. Lege projekteigene PHP-Klassen in `app/` (oder `NINO_APP_DIR`) ab und vergleiche nur bewusste Kernel-Anpassungen mit dem neuen Stand. `_nino/` kann dann vollständig ersetzt werden – Ninos optionale Module unter `_nino/Nino/Modules/` eingeschlossen, denn ein Projekt schaltet sie in `/nino/modules` ein oder aus, statt sie zu bearbeiten –, und `_admin/` ebenso: Die Workbench trägt keinen Projektzustand – die Konten liegen in der `config.php`, das Recovery-Geheimnis in `private/.auth/pw.php`. Ein Feature wird für sich aktualisiert: Ersetze sein Verzeichnis unter `features/` durch die neue Fassung und drücke **Update** im Panel Features der Workbench. Die Install-Einheit des Features ergänzt, was neu ist, und überschreibt nichts, was das Projekt hat, und das Feature migriert seine eigenen Daten, bevor die neue Version aufgezeichnet wird; siehe [Features](features.de.md#aktualisieren).
+3. Lege projekteigene PHP-Klassen in `app/` (oder `NINO_APP_DIR`) ab und vergleiche nur bewusste Kernel-Anpassungen mit dem neuen Stand. `_nino/` kann dann vollständig ersetzt werden – Ninos optionale Module unter `_nino/Nino/Modules/` eingeschlossen, denn ein Projekt schaltet sie in `/nino/modules` ein oder aus, statt sie zu bearbeiten –, und `_admin/` ebenso: Die Workbench trägt keinen Projektzustand – die Konten liegen in der `config.php`, das Recovery-Geheimnis in `private/.auth/pw.php`. Ein Feature wird für sich aktualisiert: Drücke **Update** im Block Katalog des Panels Features der Workbench, oder ersetze sein Verzeichnis unter `features/` von Hand durch die neue Fassung und drücke **Update** in der Liste. Die Install-Einheit des Features ergänzt, was neu ist, und überschreibt nichts, was das Projekt hat, und das Feature migriert seine eigenen Daten, bevor die neue Version aufgezeichnet wird; siehe [Features](features.de.md#aktualisieren).
 4. Führe Smoke-Tests und projektspezifische Abnahme aus.
 5. Übertrage den geprüften Stand und behalte die vorherige Version für ein Rollback.
 

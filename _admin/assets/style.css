@@ -1690,6 +1690,12 @@ a {
 	padding-top:1.85rem;
 }
 
+/* A card that offers nothing - a catalogue feature no version of which
+   fits this kernel - stays readable but steps back */
+:where(.nino-admin) .nino-admin-card[aria-disabled="true"] {
+	opacity: .6;
+}
+
 :where(.nino-admin) .nino-admin-card h3 {
 	margin-bottom: .55rem;
 	font-size: .9rem;

@@ -2,8 +2,9 @@
 // Die eigenen Workbench-Texte des Features-Moduls, in seine Fills gemischt,
 // solange das Modul aktiv ist (siehe text() des Panels) - dieselben
 // Schlüssel und dieselbe Form wie text/<locale>.php der Workbench. Ein %s
-// füllt das Skript: das Features-Verzeichnis, eine Version, eine Liste
-// von Schlüsseln
+// füllt das Skript - das Features-Verzeichnis, eine Version, eine Liste
+// von Schlüsseln, die Katalog-URL - oder, in einer Meldung, die das Panel
+// selbst formuliert (siehe sein _say()), das Panel: den Grund des Kernels
 return [
 	'[[/_admin/nav/features]]'								=> 'Features',
 	'[[/_admin/features/label/active]]'				=> 'Aktive Features',
@@ -34,4 +35,27 @@ return [
 	'[[/_admin/features/error/activate]]'			=> 'Das Feature konnte nicht aktiviert werden.',
 	'[[/_admin/features/error/deactivate]]'		=> 'Das Feature konnte nicht deaktiviert werden.',
 	'[[/_admin/features/error/update]]'				=> 'Das Feature konnte nicht aktualisiert werden.',
+	'[[/_admin/features/label/catalogue]]'		=> 'Katalog',
+	'[[/_admin/features/hint/catalogue]]'			=> 'Features lassen sich auch aus dem Katalog unter %s installieren. Er wird nur gelesen, wenn du es hier anstößt - die Workbench nimmt von sich aus keinen Kontakt auf -, und ein Archiv wird erst abgelegt, wenn es das ist, was der signierte Katalog verspricht.',
+	'[[/_admin/features/hint/catalogue-off]]'	=> 'Der Katalog ist ausgeschaltet: /nino/catalogue/url in der config.php ist leer. Ein Feature wird von Hand nach %s kopiert.',
+	'[[/_admin/features/label/catalogue-load]]'	=> 'Katalog laden',
+	'[[/_admin/features/msg/catalogue-loading]]'	=> 'Katalog wird geladen …',
+	'[[/_admin/features/label/generated]]'		=> 'Katalog vom %s',
+	'[[/_admin/features/hint/catalogue-readonly]]'	=> 'Der Webserver kann nicht nach %s schreiben, also wird von hier aus nichts installiert: lade ein Archiv herunter und entpacke es dort von Hand.',
+	'[[/_admin/features/hint/catalogue-empty]]'	=> 'Der Katalog führt keine Features.',
+	'[[/_admin/features/status/available]]'		=> 'Verfügbar',
+	'[[/_admin/features/status/installed]]'		=> 'Installiert',
+	'[[/_admin/features/label/install]]'			=> 'Installieren',
+	'[[/_admin/features/label/archive]]'			=> 'Archiv herunterladen',
+	'[[/_admin/features/label/released]]'			=> 'veröffentlicht %s',
+	'[[/_admin/features/label/nino]]'					=> 'Benötigt Nino %s',
+	'[[/_admin/features/label/extensions]]'		=> 'Benötigt die PHP-Erweiterungen %s',
+	'[[/_admin/features/msg/installing]]'			=> 'Wird installiert …',
+	'[[/_admin/features/msg/installed]]'			=> 'Installiert.',
+	'[[/_admin/features/error/install]]'			=> 'Das Feature konnte nicht installiert werden.',
+	'[[/_admin/features/error/catalogue]]'		=> 'Der Katalog konnte nicht geladen werden.',
+	'[[/_admin/features/error/catalogue-reason]]'	=> 'Der Katalog konnte nicht geladen werden: %s',
+	'[[/_admin/features/error/catalogue-off]]'	=> 'Der Katalog ist ausgeschaltet: /nino/catalogue/url in der config.php ist leer.',
+	'[[/_admin/features/error/catalogue-key]]'	=> 'Es ist kein Katalog-Schlüssel konfiguriert, also kann keinem Katalog vertraut werden.',
+	'[[/_admin/features/error/update-after-install]]'	=> 'Die neuen Dateien sind an Ort und Stelle, aber das Update konnte nicht angewendet werden: %s',
 ];
