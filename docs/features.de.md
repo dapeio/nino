@@ -85,7 +85,7 @@ return [
 | Schlüssel | Bedeutung |
 |---|---|
 | `key` | der Slug des Features (`/^[a-z][a-z0-9-]*$/`): was `requires` nennt, was `/nino/features` als Schlüssel trägt und was `\Nino\Features::setting()` fragt. Ohne Angabe der kleingeschriebene Verzeichnisname |
-| `name` | ein String oder eine Map `locale => string`; Pflicht |
+| `name` | ein String oder eine Map `locale => string`; Pflicht. Das, was eine Zeile im Features-Panel sagt – der Key steht dort nie –, der Name muss das Feature also von den anderen unterscheiden, die ein Projekt installieren könnte. Der Kernel nimmt, was er bekommt, denn zwei davon können aus zwei Katalogen kommen, über die er nicht bestimmt; zusammengehalten wird das im Katalog, so wie [dapeio/nino-features](https://github.com/dapeio/nino-features) zwei Features mit einem Namen abweist |
 | `description` | ein String oder eine Map `locale => string`; optional |
 | `category` | wofür das Feature da ist, ein Slug – siehe [Kategorien](#kategorien); optional, und das, wonach das Features-Panel gruppiert und filtert |
 | `version` | `major.minor.patch`, optional mit Pre-Release-Suffix (`1.0.0-beta.2`); Pflicht. Was das Panel zeigt und `activate()` aufzeichnet |

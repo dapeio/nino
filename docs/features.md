@@ -85,7 +85,7 @@ return [
 | Key | Meaning |
 |---|---|
 | `key` | the feature's slug (`/^[a-z][a-z0-9-]*$/`): what `requires` names, what `/nino/features` is keyed by and what `\Nino\Features::setting()` asks for. Without one, the lowercased directory name |
-| `name` | a string or a `locale => string` map; required |
+| `name` | a string or a `locale => string` map; required. What a row in the Features panel says - the key is never on screen there - so it has to tell the feature apart from the others a project might install. The kernel takes what it is given, since two of them arrive from two catalogues it has no say over; a catalogue is where that is held together, the way [dapeio/nino-features](https://github.com/dapeio/nino-features) refuses two features sharing a name |
 | `description` | a string or a `locale => string` map; optional |
 | `category` | what the feature is for, one slug - see [Categories](#categories); optional, and what the Features panel groups and filters by |
 | `version` | `major.minor.patch`, optionally with a pre-release suffix (`1.0.0-beta.2`); required. What the panel shows and `activate()` records |
