@@ -507,7 +507,7 @@ Modules are activated in `/nino/modules`. The order of the array is relevant if 
 | `Assets` | `[assets ...]` | bundles, caches, and optionally minifies CSS/JS |
 | `Csrf` | `[csrf]` | renders a hidden token field; core protection itself is always active |
 | `Elements` | `[element ...]`, `[elements ...]` | loads typed content; lists support query, `sort`, `offset`, `limit`, and optional callback |
-| `Form` | `POST://.form` | validates contact forms, uses honeypot and rate limit, sends emails, and logs successful submissions |
+| `Form` | `POST://.form` | owns the one form endpoint and hands every submission to `\Nino\Form` - see [Forms](#forms) below |
 | `Images` | `[image ...]` | creates an escaped `<img>` from an image slot or URI |
 | `Jstext` | `[jstext]` | provides text values as securely encoded JSON with CSP nonce |
 | `Localepicker` | `[localepicker ...]` | switches locale via query and redirect |
@@ -522,6 +522,50 @@ Some details are deliberately defensive:
 - The form limits inputs, protects write operations, and discards old log months.
 - The public signup of the catalogue's Newsletter feature responds independently of whether an address is new or already known. This makes it harder to query foreign addresses.
 - `Jstext` uses JSON hex escaping and adds a random nonce to the Content Security Policy.
+
+### Forms
+
+`Modules\Form` owns the route `POST /.form` and nothing else: what a submission is, what it has to look like, the mail pair it sends and the record it leaves is `\Nino\Form`, and the split is what lets a project have more than one form without a second endpoint answering the same uri.
+
+A project defines its forms under `/nino/form/forms` in `config.php` - beside its routes and its image slots, so they are hand-editable, they travel in every backup, and a form needs no file format of its own. Defining none gives `\Nino\Form::DEFAULT_FORM`, the contact form Nino has always shipped, field for field:
+
+```php
+'/nino/form/forms' => [
+	[
+		'key'						=> 'quote',
+		'name'					=> 'Quote request',
+		'to'						=> 'sales@example.com',	// '' sends to '[[/form/email/owner]]'
+		'subject'				=> '',									// '' uses '[[/form/subject/owner]]'
+		'confirm'				=> true,								// a confirmation to the first address the visitor gave
+		'ownerTemplate'	=> '/templates/mail-owner',
+		'userTemplate'	=> '/templates/mail-user',
+		'fields'				=> [
+			[ 'name' => 'email',	'label' => '[[/form/label/email]]', 'type' => 'email',		'required' => true ],
+			[ 'name' => 'budget',	'label' => 'Budget',								'type' => 'number' ],
+			[ 'name' => 'wishes',	'label' => 'What for?',							'type' => 'textarea' ],
+		],
+	],
+],
+```
+
+A field's `type` is one of `\Nino\Form::TYPES` (`text`, `email`, `tel`, `url`, `number`, `textarea`, `select`; a `select` lists its `options`), its `label` may be a textfill, and its `name` may not be one of `\Nino\Form::RESERVED` - the four keys the endpoint reads off the post itself and the four a record carries beside the values. A definition with no usable field left is dropped rather than half-read: a form nobody can submit is better than one that mails to an address a hand edit mistyped.
+
+Two more keys sit beside them. `/nino/form/retention` is how many months of submissions stay on disk (1 to 60, `\Nino\Form::RETENTION_MONTHS` without one), and `/nino/form/store` set to `false` means the mail goes out and nothing is written at all - a site that answers its inquiries and keeps no copy has less to protect, and the Submissions panel then stays empty because there is nothing to show.
+
+The markup is the project's own: `page-contact.tpl` carries a hand-written `<form class="nino-form">` that the shared script in `Nino.ui.js` drives. A project with several forms writes each one's markup the same way, or installs the catalogue's [Forms feature](https://github.com/dapeio/nino-features/blob/main/features/Forms/README.md), which adds a `[form]` shortcode that renders one from its definition, a builder for the definitions and a set of spam guards.
+
+**Refusing a submission** needs no callback name of its own. A module or feature that wants to turn one away registers on the same route callback ahead of the module - `\Nino\Callbacks::registerCallback( $appData, '/nino/http/response/POST://.form', ..., 1 )` - and leaves a status behind; `\Nino\Form::handle()` sees a status that is not 200 and returns without sending or writing anything. `\Nino\Csrf::init()` does exactly that, which is why the endpoint has no csrf check of its own:
+
+```php
+\Nino\Callbacks::registerCallback( $appData, '/nino/http/response/POST://.form', static function( array &$appData, array &$request ): void {
+
+	if( yourGuardRefuses( $appData ) === true )
+		$request['/nino/http/response']['statusCode'] = 418;
+
+}, 1 );
+```
+
+418 rather than a status of its own for every refusal: the shared `.nino-form` script shows one generic message for anything that is not 200 or 400, so a bot never learns which check it tripped.
 
 ### Elements Search Index
 

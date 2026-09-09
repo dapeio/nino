@@ -158,7 +158,11 @@ A key that does not appear here is either hidden from editing or technical. Crea
 
 ### Submissions
 
-**Submissions** lists the stored entries of the contact form while the Form module is active: date, category, sender and message, expandable, exportable as CSV. It is deliberately read-only. Selecting an address opens your mail client; Nino does not reply on its own.
+**Submissions** lists the stored entries of every form while the Form module is active, most recent first. It knows no field names of its own: a card shows the date, which form the inquiry came from, the address to answer at as a mailto link, and every value the entry carries under the label it was collected under - so a project that defines forms of its own (see [Forms](development.md#forms)) sees their fields here without configuring anything. A value whose field the form has since lost still shows, under its own name: a form that dropped a field must not take the answers with it.
+
+A select narrows to one form and a search box searches the values and their labels, both above the list; the export writes what the two of them left, so an export taken while one form is selected is that form's. A card expands to its full text, and once open offers **Delete** for that one submission - the request a person makes about their own inquiry, and the panel's only write. An entry recorded before submissions carried an id offers none, because there is nothing to address it by that survives a deletion. Selecting an address opens your mail client; Nino does not reply on its own.
+
+How long entries stay and whether they are written at all is `/nino/form/retention` and `/nino/form/store` in `config.php` - the catalogue's Forms feature offers both in its own panel.
 
 ### Newsletter
 

@@ -55,6 +55,18 @@ namespace Nino {
 		// Where a project's forms live. Absent means DEFAULT_FORM
 		public const string FORMS = '/nino/form/forms';
 
+		// How long a submission stays on disk, in months, and whether one is
+		// written at all. Beside the definitions on purpose: a project decides
+		// all three the same way - by hand in config.php, or through the
+		// catalogue's Forms feature, which writes these very keys.
+		//
+		// Storing nothing is a position, not a mistake: a site that answers
+		// its mail and keeps no copy has less to protect, and the panel then
+		// stays empty because there is nothing to show rather than because
+		// something failed
+		public const string RETENTION	= '/nino/form/retention';
+		public const string STORE			= '/nino/form/store';
+
 		// The field types a form may declare. 'textarea' is the only one that
 		// is not an <input type>.
 		//
@@ -109,6 +121,37 @@ namespace Nino {
 					$forms[] = $form;
 
 			return $forms === [] ? [ self::normalize( self::DEFAULT_FORM ) ] : $forms;
+		}
+
+		/**
+		 *	How many months of submissions stay on disk - '/nino/form/retention'
+		 *	where a project sets one, RETENTION_MONTHS otherwise. A value
+		 *	outside 1..60 is a hand edit gone wrong, and falls back to the
+		 *	default rather than deleting a project's history to nothing or
+		 *	keeping it forever
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	int
+		 */
+		public static function retention( array &$appData ): int {
+
+			$months = (int) ( $appData[ self::RETENTION ] ?? self::RETENTION_MONTHS );
+
+			return ( $months >= 1 && $months <= 60 ) ? $months : self::RETENTION_MONTHS;
+		}
+
+		/**
+		 *	Whether a submission is recorded at all. On unless a project says
+		 *	otherwise - what this framework has always done
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	bool
+		 */
+		public static function stores( array &$appData ): bool {
+
+			return ( $appData[ self::STORE ] ?? true ) !== false;
 		}
 
 		/**
@@ -363,7 +406,8 @@ namespace Nino {
 			if( ( $appData['./nino/mail/ratelimited'] ?? false ) === true )
 				return;
 
-			self::record( $appData, $form, $values );
+			if( self::stores( $appData ) === true )
+				self::record( $appData, $form, $values );
 		}
 
 		/**
@@ -535,9 +579,71 @@ namespace Nino {
 		 */
 		public static function prune( array &$appData ): void {
 
-			$cutoff = ( new \DateTime( 'first day of -'. self::RETENTION_MONTHS. ' months' ) )->setTime( 0, 0 );
+			$cutoff = ( new \DateTime( 'first day of -'. self::retention( $appData ). ' months' ) )->setTime( 0, 0 );
 
 			\Nino\RotatingLog::prune( \Nino\Filesystem::path( $appData, '/data' ), 'forms.', 'Y-m', '.php', $cutoff );
+		}
+
+		/**
+		 *	Delete one recorded submission by its id - the one write this
+		 *	engine does on a visitor's behalf rather than a visitor's action.
+		 *	A person asking for their inquiry to be removed is an ordinary
+		 *	request, and a list that cannot answer it is a list that has to
+		 *	be edited by hand on the server
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$id						The entry's id
+		 *
+		 *	@return 	bool										Whether an entry was removed
+		 */
+		public static function remove( array &$appData, string $id ): bool {
+
+			// The id a record() has carried since submissions could belong to
+			// more than one form. An entry written before that has none, and
+			// there is nothing to address it by that stays true across a
+			// deletion - so the panel offers no button on those rather than
+			// offer one that could remove the wrong row
+			if( preg_match( '/^[a-f0-9]{16}$/', $id ) !== 1 )
+				return false;
+
+			$dir		= \Nino\Filesystem::path( $appData, '/data' );
+			$removed	= false;
+
+			foreach( glob( $dir. '/forms.*.php' ) ?: [] as $file ) {
+
+				$name = basename( $file );
+
+				if( preg_match( '/^\d{4}-\d{2}$/', substr( $name, 6, -4 ) ) !== 1 )
+					continue;
+
+				// Read first, write only the one month that holds it: an entry
+				// never moves between files, so this cannot pick the wrong one,
+				// and every other month is left with its mtime intact
+				$holds = false;
+				foreach( \Nino\Filesystem::getFileContent( $appData, '/data/'. $name, [] ) as $entry )
+					if( is_array( $entry ) === true && ( $entry['id'] ?? '' ) === $id )
+						$holds = true;
+
+				if( $holds === false )
+					continue;
+
+				\Nino\Filesystem::mutate( $appData, '/data/'. $name, function( array $entries ) use ( $id, &$removed ): array {
+
+					$kept = [];
+
+					foreach( $entries as $entry )
+						if( is_array( $entry ) === true && ( $entry['id'] ?? '' ) === $id )
+							$removed = true;
+						else
+							$kept[] = $entry;
+
+					return $kept;
+				} );
+
+				return $removed;
+			}
+
+			return false;
 		}
 
 		/**

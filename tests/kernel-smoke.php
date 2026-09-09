@@ -1351,6 +1351,44 @@ check( 'an entry written before there was more than one form reads as the first 
 	return false;
 } )( $appData ) );
 
+// What is kept, and for how long. Both beside the definitions in
+// config.php, so a project decides them the way it decides its forms -
+// and the Forms feature's builder writes these very keys
+check( 'without a setting, the window is the built-in one', \Nino\Form::retention( $appData ) === \Nino\Form::RETENTION_MONTHS && \Nino\Form::stores( $appData ) === true );
+
+$appData[ \Nino\Form::RETENTION ] = 12;
+check( 'a project sets its own window', \Nino\Form::retention( $appData ) === 12 );
+
+$appData[ \Nino\Form::RETENTION ] = 0;
+check( 'a window outside 1..60 is a hand edit gone wrong, and falls back rather than deleting everything', \Nino\Form::retention( $appData ) === \Nino\Form::RETENTION_MONTHS );
+$appData[ \Nino\Form::RETENTION ] = 999;
+check( '...at either end', \Nino\Form::retention( $appData ) === \Nino\Form::RETENTION_MONTHS );
+unset( $appData[ \Nino\Form::RETENTION ] );
+
+$appData[ \Nino\Form::STORE ] = false;
+$storedBefore = count( \Nino\Form::entries( $appData ) );
+$_POST = [ 'name' => 'Jo', 'email' => 'jo@example.com', 'message' => 'Hi', 'location' => '', 'cat' => '' ];
+$noStoreRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Modules\Form::callbackResponse( $appData, $noStoreRequest );
+check( 'with recording off the mail still goes out and nothing is written', $noStoreRequest['/nino/http/response']['statusCode'] === 200
+	&& count( \Nino\Form::entries( $appData ) ) === $storedBefore );
+unset( $appData[ \Nino\Form::STORE ] );
+
+// Removing one entry - the request a person makes about their own inquiry.
+// By id, which is why record() writes one
+$ids = array_values( array_filter( array_column( \Nino\Form::entries( $appData ), 'id' ) ) );
+$removeId = $ids[0];
+$countBefore = count( \Nino\Form::entries( $appData ) );
+
+check( 'an id nothing carries removes nothing, and says so', \Nino\Form::remove( $appData, str_repeat( 'a', 16 ) ) === false
+	&& count( \Nino\Form::entries( $appData ) ) === $countBefore );
+check( 'something that is not an id at all is refused without touching a file', \Nino\Form::remove( $appData, '../../config' ) === false
+	&& \Nino\Form::remove( $appData, '' ) === false && count( \Nino\Form::entries( $appData ) ) === $countBefore );
+check( 'one submission is removed by its id, and the rest of the month stays', \Nino\Form::remove( $appData, $removeId ) === true
+	&& count( \Nino\Form::entries( $appData ) ) === $countBefore - 1
+	&& in_array( $removeId, array_column( \Nino\Form::entries( $appData ), 'id' ), true ) === false );
+check( 'removing it twice is not an error, it is simply not there', \Nino\Form::remove( $appData, $removeId ) === false );
+
 // The seam a spam guard sits at: the same route callback, ahead of the
 // module - what \Nino\Csrf::init() does at priority 1, and why there is no
 // callback name of its own for it

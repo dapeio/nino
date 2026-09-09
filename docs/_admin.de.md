@@ -158,7 +158,11 @@ Ein Schlüssel, der hier nicht erscheint, ist entweder für die Bearbeitung ausg
 
 ### Anfragen
 
-**Anfragen** listet die gespeicherten Einträge des Kontaktformulars, solange das Form-Modul aktiv ist: Datum, Kategorie, Absender und Nachricht, aufklappbar, als CSV exportierbar. Die Ansicht ist bewusst nur lesend. Das Anwählen einer Adresse öffnet dein Mailprogramm; Nino antwortet nicht von sich aus.
+**Anfragen** listet die gespeicherten Einträge aller Formulare, solange das Form-Modul aktiv ist, die jüngste zuerst. Das Panel kennt keine eigenen Feldnamen: Eine Karte zeigt das Datum, aus welchem Formular die Anfrage kam, die Adresse zum Antworten als Mailto-Link und jeden Wert unter dem Label, unter dem er erhoben wurde – ein Projekt mit eigenen Formularen (siehe [Formulare](development.de.md#formulare)) sieht deren Felder hier also ohne jede Konfiguration. Ein Wert, dessen Feld das Formular inzwischen verloren hat, erscheint weiterhin, unter seinem eigenen Namen: Ein Formular, das ein Feld abgelegt hat, darf die Antworten nicht mitnehmen.
+
+Eine Auswahl schränkt auf ein Formular ein, ein Suchfeld durchsucht Werte und Labels, beides über der Liste; der Export schreibt, was die beiden übrig gelassen haben – ein Export bei ausgewähltem Formular ist also der dieses Formulars. Eine Karte klappt zu ihrem vollen Text auf und bietet dann **Löschen** für diese eine Anfrage – die Bitte, die ein Mensch zu seiner eigenen Anfrage äußert, und der einzige Schreibvorgang des Panels. Ein Eintrag aus der Zeit, bevor Anfragen eine ID trugen, bietet keines, weil es nichts gibt, womit er sich über eine Löschung hinweg eindeutig ansprechen ließe. Das Anwählen einer Adresse öffnet dein Mailprogramm; Nino antwortet nicht von sich aus.
+
+Wie lange Einträge bleiben und ob sie überhaupt geschrieben werden, sind `/nino/form/retention` und `/nino/form/store` in der `config.php` – das Forms-Feature aus dem Katalog bietet beides in seinem eigenen Panel an.
 
 ### Newsletter
 

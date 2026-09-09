@@ -1073,6 +1073,13 @@ echo "Submissions (Modules\\Form writes, Modules\\Form\\Editor::apiList reads)\n
 	'[[/form/email/owner]]' 	=> 'owner@example.com',
 	'[[/form/subject/owner]]' => 'New inquiry',
 	'[[/form/subject/user]]' 	=> 'Thanks for reaching out',
+	// The labels the contact form's own install unit writes. A definition
+	// carries the fill, not the word, so the panel is what resolves it -
+	// in the interface language of whoever is looking
+	'[[/form/label/name]]'		=> 'Name',
+	'[[/form/label/email]]'		=> 'E-Mail',
+	'[[/form/label/cat]]'			=> 'Subject',
+	'[[/form/label/message]]'	=> 'Message',
 ], '*' );
 
 $_POST = [ 'name' => 'Jo Client', 'email' => 'jo@example.com', 'message' => 'Hallo!', 'location' => '', 'cat' => 'General' ];
@@ -1083,6 +1090,37 @@ check( 'a valid contact submission succeeds', $formRequest['/nino/http/response'
 [ $status, $body ] = callAdminPost( $appData, 'submissions/list' );
 check( 'submissions/list succeeds', $status === 200 );
 check( 'submissions/list finds the submission just sent', count( $body['entries'] ) === 1 && $body['entries'][0]['email'] === 'jo@example.com' );
+// The panel knows no field names of its own - a project may define any
+// form. What turns a stored 'cat' back into "Subject" is the definition
+// listed beside the entries, with its labels' fills already resolved in
+// the interface language
+check( 'and the forms beside them, each with the fields and labels the panel renders a card from', array_keys( $body['forms'] ) === [ 'contact' ]
+	&& $body['forms']['contact']['name'] === 'Contact'
+	&& array_column( $body['forms']['contact']['fields'], 'name' ) === [ 'name', 'email', 'cat', 'message' ]
+	&& array_column( $body['forms']['contact']['fields'], 'type' ) === [ 'text', 'email', 'text', 'textarea' ]
+	&& array_column( $body['forms']['contact']['fields'], 'label' ) === [ 'Name', 'E-Mail', 'Subject', 'Message' ] );
+
+// Deleting one - the request a person makes about their own inquiry, and
+// the one write this panel does
+[ $status ] = callAdminPost( $appData, 'submissions/delete', [ 'id' => str_repeat( 'f', 16 ) ] );
+check( 'submissions/delete answers 404 for an id nothing carries', $status === 404 );
+
+[ $status ] = callAdminPost( $appData, 'submissions/delete', [ 'id' => [ 'not', 'a', 'string' ] ] );
+check( '...and for something that is not an id at all, without raising anything', $status === 404 );
+
+[ $status, $body ] = callAdminPost( $appData, 'submissions/delete', [ 'id' => $body['entries'][0]['id'] ] );
+check( 'submissions/delete removes the one it names', $status === 200 && $body['deleted'] === true );
+
+[ $status, $body ] = callAdminPost( $appData, 'submissions/list' );
+check( '...and the list is empty afterwards', $status === 200 && $body['entries'] === [] );
+
+check( 'the deletion is what the activity log writes for it', \Nino\Modules\Form\Admin::log( 'submissions/delete', [ 'id' => 'abc' ] ) === 'Delete submission abc'
+	&& \Nino\Modules\Form\Admin::log( 'submissions/list', [] ) === '' );
+
+// Sent again, so what follows sees the same one submission it did before
+$_POST = [ 'name' => 'Jo Client', 'email' => 'jo@example.com', 'message' => 'Hallo!', 'location' => '', 'cat' => 'General' ];
+$formRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Modules\Form::callbackResponse( $appData, $formRequest );
 
 check( 'forms data lives on the private root, not under _editor', is_file( \Nino\Filesystem::path( $appData, '/data/forms.'. date( 'Y-m' ). '.php' ) ) === true && is_dir( \Nino\Filesystem::getPath( $appData ). '/_admin/data' ) === false );
 

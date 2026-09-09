@@ -2,7 +2,7 @@
 
 /**
  *	Nino										A compact filesystembased php framework
- *	Modules\Form					The contact form
+ *	Modules\Form					The form endpoint and its submissions
  *	editor.css							What the module's /_admin panel needs beyond the design
  *													system in _admin/assets/style.css. Joins the editor's own
  *													style bundle while the module is active (see the panel's
@@ -42,6 +42,64 @@
 }
 .submissions-entry-name a {
 	color: var(--editor-text);
+}
+
+/*	Every value the entry carries that is neither the address nor the long
+	text, as label/value pairs. A grid rather than a stacked list: a card
+	holding six short answers is read down one column of labels, and a form
+	may declare any number of them. Below the narrow breakpoint the two
+	columns become one, because a label and a value sharing 9rem is two
+	ellipses. */
+.submissions-entry-fields {
+	display: grid;
+	grid-template-columns: minmax(4rem, max-content) 1fr;
+	gap: .1rem .6rem;
+	margin: 0 0 .3rem;
+	font-size: .82rem;
+}
+.submissions-entry-fields dt {
+	color: var(--editor-text-secondary);
+}
+.submissions-entry-fields dd {
+	margin: 0;
+	overflow-wrap: anywhere;
+}
+
+/*	Collapsed, the card shows the header, the address and the first line of
+	the message; the pairs are part of what opening it reveals, so a list of
+	twenty cards stays one screen. */
+.submissions-entry:not(.expanded) .submissions-entry-fields {
+	display: none;
+}
+
+@media (max-width: 32rem) {
+	.submissions-entry-fields {
+		grid-template-columns: 1fr;
+		gap: 0 0;
+	}
+	.submissions-entry-fields dd {
+		margin-bottom: .25rem;
+	}
+}
+
+/*	The one destructive control on the card, and it only appears once the
+	card is open: a delete button on every collapsed row of a long list is a
+	row of delete buttons to mis-click. */
+.submissions-entry-delete {
+	display: none;
+	margin-top: .5rem;
+}
+.submissions-entry.expanded .submissions-entry-delete {
+	display: inline-block;
+}
+
+/*	The form to narrow to, beside the search box in the shared toolbar. It
+	takes what it needs and never more than its longest option: a select
+	whose text is cut off says nothing about what is selected. */
+.submissions-form {
+	flex: 0 0 auto;
+	width: auto;
+	max-width: 14rem;
 }
 .submissions-entry-message {
 	display: -webkit-box;

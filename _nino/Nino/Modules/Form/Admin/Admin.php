@@ -29,7 +29,10 @@ namespace Nino\Modules\Form {
 		public const string VIEW_PERM = '/_admin/submissions/view';
 
 		public static function actions(): array {
-			return [ 'submissions/list' => [ self::class, 'apiList' ] ];
+			return [
+				'submissions/list' 		=> [ self::class, 'apiList' ],
+				'submissions/delete'	=> [ self::class, 'apiDelete' ],
+			];
 		}
 
 		public static function nav(): array {
@@ -52,13 +55,24 @@ namespace Nino\Modules\Form {
 			return \Nino\Admin\Panels::relative( dirname( __DIR__ ). '/text' );
 		}
 
+		// What the activity log writes for this panel's one destructive
+		// action - the id alone, since the entry it named is gone by the time
+		// anyone reads the line
+		public static function log( string $action, array $data ): string {
+			return match( $action ) {
+				'submissions/delete'	=> 'Delete submission '. (string) ( $data['id'] ?? '' ),
+				default								=> '',
+			};
+		}
+
 		public static function summary( array &$appData ): array {
 			return [ 'value' => self::count( $appData ), 'label' => '/_admin/dashboard/label/submissions' ];
 		}
 
 		/**
 		 *	List every recorded submission within the retention window
-		 *	(see Modules\Form::RETENTION_MONTHS), most recent first
+		 *	(see \Nino\Form::retention()), most recent first, and the forms
+		 *	they belong to
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
@@ -72,10 +86,71 @@ namespace Nino\Modules\Form {
 
 			\Nino\Http::ok( $request, [
 				'entries'	=> array_reverse( \Nino\Form::entries( $appData ) ),
-				// The forms a project defines, so the panel can say which one a
-				// submission belongs to rather than only that one arrived
-				'forms'		=> array_column( \Nino\Form::forms( $appData ), 'name', 'key' ),
+				'forms'		=> self::_forms( $appData ),
 			] );
+		}
+
+		/**
+		 *	Delete one recorded submission.
+		 *
+		 *	Guarded by the panel's own permission rather than a second one:
+		 *	whoever may read these inquiries is whoever answers them, and a
+		 *	person asking for theirs to be removed asks the same someone. A
+		 *	permission of its own would have to be granted to the Editor role
+		 *	by hand on every project that already exists, which is a fair
+		 *	price for a destructive action - but not for one that removes a
+		 *	single row a reader could copy out beforehand
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		&$request			(reference) Current server request
+		 *
+		 *	@return 	void
+		 */
+		public static function apiDelete( array &$appData, array &$request ): void {
+
+			if( \Nino\Admin\Admin::guardPerm( $appData, $request, self::VIEW_PERM ) === false )
+				return;
+
+			$id = \Nino\Admin\Admin::postData()['id'] ?? null;
+
+			if( is_string( $id ) === false || \Nino\Form::remove( $appData, $id ) === false ) {
+				\Nino\Http::fail( $request, 404, 'no such submission' );
+				return;
+			}
+
+			\Nino\Http::ok( $request, [ 'deleted' => true ] );
+		}
+
+		/**
+		 *	The forms a project defines, as the panel needs them: the name a
+		 *	person reads, and every field with the label it was rendered
+		 *	under. A submission carries names, not labels - it is the form
+		 *	definition that turns 'cat' back into "Subject", and the fills in
+		 *	a label are resolved here, where the interface language is known
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	array										key => { name, fields: [ { name, label, type } ] }
+		 */
+		private static function _forms( array &$appData ): array {
+
+			$forms = [];
+
+			foreach( \Nino\Form::forms( $appData ) as $form ) {
+
+				$fields = [];
+
+				foreach( $form['fields'] as $field )
+					$fields[] = [
+						'name'	=> $field['name'],
+						'label'	=> \Nino\Html::renderHtml( $appData, $field['label'] ),
+						'type'	=> $field['type'],
+					];
+
+				$forms[ $form['key'] ] = [ 'name' => $form['name'], 'fields' => $fields ];
+			}
+
+			return $forms;
 		}
 
 		/**

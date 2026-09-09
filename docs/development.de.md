@@ -492,7 +492,7 @@ Module werden in `/nino/modules` aktiviert. Die Reihenfolge des Arrays ist relev
 | `Assets` | `[assets …]` | bündelt, zwischenspeichert und optional minifiziert CSS/JS |
 | `Csrf` | `[csrf]` | rendert ein verstecktes Token-Feld; der Kernschutz selbst ist immer aktiv |
 | `Elements` | `[element …]`, `[elements …]` | lädt typisierte Inhalte; Listen unterstützen Query, `sort`, `offset`, `limit` und optionalen Callback |
-| `Form` | `POST://.form` | validiert Kontaktformulare, nutzt Honeypot und Rate-Limit, versendet Mails und protokolliert erfolgreiche Einsendungen |
+| `Form` | `POST://.form` | besitzt den einen Formular-Endpunkt und reicht jede Einsendung an `\Nino\Form` weiter – siehe [Formulare](#formulare) |
 | `Images` | `[image …]` | erzeugt ein escaped `<img>` aus einem Bildslot oder einer URI |
 | `Jstext` | `[jstext]` | stellt Textwerte als sicher kodiertes JSON mit CSP-Nonce bereit |
 | `Localepicker` | `[localepicker …]` | wechselt Locale über Query und Redirect |
@@ -507,6 +507,50 @@ Einige Details sind absichtlich defensiv gestaltet:
 - Das Formular begrenzt Eingaben, schützt Schreibvorgänge und verwirft alte Protokollmonate.
 - Die öffentliche Anmeldung des Newsletter-Features aus dem Katalog antwortet unabhängig davon gleich, ob eine Adresse neu oder bereits bekannt ist. Das erschwert die Abfrage fremder Adressen.
 - `Jstext` verwendet JSON-Hex-Escaping und ergänzt die Content-Security-Policy um einen zufälligen Nonce.
+
+### Formulare
+
+`Modules\Form` besitzt die Route `POST /.form` und sonst nichts: Was eine Einsendung ist, wie sie aussehen muss, welches Mailpaar sie verschickt und welchen Eintrag sie hinterlässt, ist `\Nino\Form` – und genau diese Trennung erlaubt einem Projekt mehr als ein Formular, ohne dass ein zweiter Endpunkt dieselbe URI beantwortet.
+
+Ein Projekt definiert seine Formulare unter `/nino/form/forms` in der `config.php` – neben seinen Routen und seinen Bildslots, also von Hand editierbar, in jedem Backup enthalten und ohne eigenes Dateiformat. Wer keines definiert, bekommt `\Nino\Form::DEFAULT_FORM`, das Kontaktformular, das Nino immer schon mitgebracht hat, Feld für Feld:
+
+```php
+'/nino/form/forms' => [
+	[
+		'key'						=> 'quote',
+		'name'					=> 'Angebotsanfrage',
+		'to'						=> 'vertrieb@example.com',	// '' schickt an '[[/form/email/owner]]'
+		'subject'				=> '',											// '' nutzt '[[/form/subject/owner]]'
+		'confirm'				=> true,										// Bestätigung an die erste Adresse, die der Besucher angegeben hat
+		'ownerTemplate'	=> '/templates/mail-owner',
+		'userTemplate'	=> '/templates/mail-user',
+		'fields'				=> [
+			[ 'name' => 'email',	'label' => '[[/form/label/email]]', 'type' => 'email',		'required' => true ],
+			[ 'name' => 'budget',	'label' => 'Budget',								'type' => 'number' ],
+			[ 'name' => 'wishes',	'label' => 'Wofür?',								'type' => 'textarea' ],
+		],
+	],
+],
+```
+
+Der `type` eines Feldes ist einer aus `\Nino\Form::TYPES` (`text`, `email`, `tel`, `url`, `number`, `textarea`, `select`; ein `select` führt seine `options` mit), sein `label` darf ein Textfill sein, und sein `name` darf keiner aus `\Nino\Form::RESERVED` sein – die vier Schlüssel, die der Endpunkt selbst aus dem Post liest, und die vier, die ein Eintrag neben den Werten trägt. Eine Definition, von der kein brauchbares Feld übrig bleibt, wird verworfen statt halb gelesen: Ein Formular, das niemand absenden kann, ist besser als eines, das an eine vertippte Adresse schickt.
+
+Zwei weitere Schlüssel stehen daneben. `/nino/form/retention` ist die Zahl der Monate, die Einsendungen auf der Platte bleiben (1 bis 60, ohne Angabe `\Nino\Form::RETENTION_MONTHS`), und `/nino/form/store` auf `false` heißt: Die Mail geht raus und es wird gar nichts geschrieben – eine Seite, die ihre Anfragen beantwortet und keine Kopie behält, hat weniger zu schützen, und das Panel Anfragen bleibt dann leer, weil es nichts zu zeigen gibt.
+
+Das Markup gehört dem Projekt: `page-contact.tpl` trägt ein von Hand geschriebenes `<form class="nino-form">`, das das gemeinsame Skript in `Nino.ui.js` steuert. Ein Projekt mit mehreren Formularen schreibt jedes Markup genauso – oder installiert das [Forms-Feature](https://github.com/dapeio/nino-features/blob/main/features/Forms/README.md) aus dem Katalog, das einen Shortcode `[form]` mitbringt, der eines aus seiner Definition zeichnet, dazu einen Builder für die Definitionen und eine Reihe Spam-Wächter.
+
+**Eine Einsendung abweisen** braucht keinen eigenen Callback-Namen. Ein Modul oder Feature, das eine abweisen will, registriert sich auf demselben Route-Callback vor dem Modul – `\Nino\Callbacks::registerCallback( $appData, '/nino/http/response/POST://.form', ..., 1 )` – und hinterlässt einen Status; `\Nino\Form::handle()` sieht einen Status, der nicht 200 ist, und kehrt zurück, ohne etwas zu verschicken oder zu schreiben. `\Nino\Csrf::init()` macht genau das, und deshalb hat der Endpunkt keine eigene CSRF-Prüfung:
+
+```php
+\Nino\Callbacks::registerCallback( $appData, '/nino/http/response/POST://.form', static function( array &$appData, array &$request ): void {
+
+	if( deinWaechterLehntAb( $appData ) === true )
+		$request['/nino/http/response']['statusCode'] = 418;
+
+}, 1 );
+```
+
+418 statt eines eigenen Status je Ablehnung: Das gemeinsame Skript `.nino-form` zeigt für alles, was nicht 200 oder 400 ist, eine einzige allgemeine Meldung – ein Bot erfährt also nie, an welcher Prüfung er gescheitert ist.
 
 ### Suchindex für Elements
 
