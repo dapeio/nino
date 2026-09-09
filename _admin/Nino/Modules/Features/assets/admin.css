@@ -4,8 +4,9 @@
  *	Nino										A compact filesystembased php framework
  *	Modules\Features				The features installed below features/, and the catalogue
  *	admin.css								What the module's /_admin panel needs beyond the design
- *													system in _admin/assets/style.css: the row of buttons a
- *													feature's card and a catalogue offer carry. Bundled while
+ *													system in _admin/assets/style.css: the pinned head with
+ *													its two filters, the rows of the list, and the row of
+ *													buttons a feature or a catalogue offer carries. Bundled while
  *													the module is there (see the panel's assets()), so the
  *													same layer rules apply - the shell's stylesheet fixes the
  *													layer order, this one only ever adds to nino.tool, scoped
@@ -18,11 +19,11 @@
 
 @layer nino.tool {
 
-/*	The head of the list pane: the tab strip and the filter over what the
-	tabs hold. It stays at the top while the cards scroll under it - a
-	catalogue of any size is a long page, and the tab you are on, the counts
-	beside it and the box you are typing into are exactly what you must not
-	lose sight of while looking through it.
+/*	The head of the list pane: the tab strip and the two filters over what
+	the tabs hold - the search box and the category. It stays at the top
+	while the rows scroll under it - a catalogue of any size is a long page,
+	and the tab you are on, the counts beside it and what you have narrowed
+	to are exactly what you must not lose sight of while looking through it.
 
 	The shared strip is deliberately not sticky (see _admin/assets/style.css)
 	because a panel with tabs drills into a form whose context bar is pinned
@@ -70,6 +71,17 @@
 #features-list .admin-features-head > .nino-admin-table-search {
 	flex: 0 1 16rem;
 	min-width: 9rem;
+	margin: 0 0 .35rem;
+}
+
+/*	The category beside it. It shrinks before the search box does and never
+	past the width of its longest option, because a select whose text is cut
+	off says nothing about what is currently selected - which is the one
+	thing it has to say while a filtered list is being read. */
+#features-list .admin-features-head > .admin-features-category {
+	flex: 0 0 auto;
+	width: auto;
+	max-width: 14rem;
 	margin: 0 0 .35rem;
 }
 

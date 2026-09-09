@@ -235,12 +235,29 @@ check( 'no features list', \Nino\Catalogue::parse( '{"format":1}' ) === 'the cat
 
 $parsed = \Nino\Catalogue::parse( json_encode( [ 'format' => 1, 'generated' => 'now', 'features' => [ $good ] ] ) );
 check( 'a valid document parses to format, generated and the entries', is_array( $parsed ) && $parsed['format'] === 1 && $parsed['generated'] === 'now' && count( $parsed['features'] ) === 1 );
-check( 'an entry is normalized: every key present, in order', array_keys( $parsed['features'][0] ) === [ 'key', 'name', 'description', 'version', 'nino', 'php', 'requires', 'directory', 'archive', 'sha256', 'size', 'released' ] );
+check( 'an entry is normalized: every key present, in order', array_keys( $parsed['features'][0] ) === [ 'key', 'name', 'description', 'category', 'version', 'nino', 'php', 'requires', 'directory', 'archive', 'sha256', 'size', 'released' ] );
 
 $parsed = \Nino\Catalogue::parse( json_encode( [ 'format' => 1, 'features' => [ [ 'key' => 'x', 'name' => 'X', 'version' => '1.0.0', 'directory' => 'X', 'archive' => 'https://c.test/x.tar.gz', 'sha256' => strtoupper( str_repeat( 'ab', 32 ) ), 'size' => 1, 'php' => [ 'ext' => [ 'Mbstring' ] ], 'released' => str_repeat( 'd', 40 ) ] ] ] ) );
 check( 'what is missing gets its default, digests and extensions are lowercased, released is cut', is_array( $parsed )
 	&& $parsed['features'][0]['nino'] === '*' && $parsed['features'][0]['description'] === '' && $parsed['features'][0]['requires'] === []
+	&& $parsed['features'][0]['category'] === ''
 	&& $parsed['features'][0]['sha256'] === str_repeat( 'ab', 32 ) && $parsed['features'][0]['php']['ext'] === [ 'mbstring' ] && strlen( $parsed['features'][0]['released'] ) === 32 );
+
+// The one field a bad value does not cost the catalogue. Everything else here
+// refuses the whole document (see the checks below) because everything else
+// is something the kernel acts on; a category is a heading in a list, and a
+// kernel that refused a signed catalogue over a category it had never heard
+// of would stop reading the catalogue the day a newer one publishes one
+$parsed = \Nino\Catalogue::parse( json_encode( [ 'format' => 1, 'features' => [
+	entry( 'named', '1.0.0', 'a', [ 'category' => 'security' ] ),
+	entry( 'later', '1.0.0', 'b', [ 'category' => 'somethingnewerthanthis' ] ),
+	entry( 'broken', '1.0.0', 'c', [ 'category' => [ 'not', 'a', 'slug' ] ] ),
+] ] ) );
+check( 'a category travels with the entry, one this kernel never heard of included - and one that is not a slug at all is dropped rather than costing the catalogue',
+	is_array( $parsed ) && count( $parsed['features'] ) === 3
+	&& $parsed['features'][0]['category'] === 'security' && $parsed['features'][1]['category'] === 'somethingnewerthanthis' && $parsed['features'][2]['category'] === '' );
+
+$parsed = \Nino\Catalogue::parse( json_encode( [ 'format' => 1, 'features' => [ $good ] ] ) );
 
 $parsed = \Nino\Catalogue::parse( json_encode( [ 'format' => 1, 'features' => [ $good, $good, entry( 'helper', '1.1.0', 'other' ) ] ] ) );
 check( 'the same key and version twice counts once, another version counts', is_array( $parsed ) && count( $parsed['features'] ) === 2 );
@@ -396,7 +413,7 @@ check( 'the highest version this kernel can run is offered, not the highest ther
 check( 'nothing on disk: available', $offers['helper']['state'] === 'available' && $offers['helper']['local'] === null && $offers['helper']['active'] === false && $offers['sample']['state'] === 'available' );
 check( 'a feature no version of which fits is incompatible, shown with its newest version and what it asks for', $offers['ancient']['state'] === 'incompatible' && $offers['ancient']['fits'] === false && $offers['ancient']['nino'] === '^0.9'
 	&& $offers['needy']['state'] === 'incompatible' && $offers['needy']['php']['ext'] === [ 'no_such_extension' ] );
-check( 'the offer is the catalogue entry plus fits, local, active and state', array_keys( $offers['helper'] ) === [ 'key', 'name', 'description', 'version', 'nino', 'php', 'requires', 'directory', 'archive', 'sha256', 'size', 'released', 'fits', 'local', 'active', 'state' ] );
+check( 'the offer is the catalogue entry plus fits, local, active and state', array_keys( $offers['helper'] ) === [ 'key', 'name', 'description', 'category', 'version', 'nino', 'php', 'requires', 'directory', 'archive', 'sha256', 'size', 'released', 'fits', 'local', 'active', 'state' ] );
 
 echo "\n";
 
@@ -634,7 +651,7 @@ $requests = [];
 check( 'apiList carries the cached catalogue too - url, fetched and the same offers - with no request of its own', $listStatus === 200 && $requests === []
 	&& is_array( $listBody['catalogue'] ) && array_keys( $listBody['catalogue'] ) === [ 'url', 'fetched', 'offers' ]
 	&& $listBody['catalogue']['url'] === \Nino\Catalogue::DEFAULT_URL && $listBody['catalogue']['fetched'] === $body['fetched'] && $listBody['catalogue']['offers'] === $body['offers'] );
-check( 'every offer has the same keys, the extension list flattened to ext', array_keys( $offers['helper'] ) === [ 'key', 'name', 'description', 'version', 'nino', 'ext', 'requires', 'directory', 'archive', 'size', 'released', 'state', 'fits', 'local', 'active' ] );
+check( 'every offer has the same keys, the extension list flattened to ext', array_keys( $offers['helper'] ) === [ 'key', 'name', 'description', 'category', 'version', 'nino', 'ext', 'requires', 'directory', 'archive', 'size', 'released', 'state', 'fits', 'local', 'active' ] );
 check( 'names and descriptions arrive in the session locale - de_DE, the native language, since none was chosen', $offers['helper']['name'] === 'Helper' && $offers['helper']['description'] === 'Ein helper' && $offers['sample']['description'] === 'Ein sample' );
 check( 'the state travels with each offer: helper current and active, sample current and off, ancient and needy incompatible with what they ask for',
 	$offers['helper']['state'] === 'current' && $offers['helper']['version'] === '1.1.0' && $offers['helper']['local'] === '1.1.0' && $offers['helper']['active'] === true && $offers['helper']['fits'] === true
@@ -716,7 +733,7 @@ check( 'a feature not on disk is offered as available, its name in the session l
 $requests = [];
 [ $status, $body ] = callFeatures( $appData, 'apiInstall', [ 'key' => 'extra', 'version' => '1.0.0' ] );
 check( 'installing it answers its entry as the list shows it now - on disk, off, nothing recorded - and that no update was applied', $status === 200 && array_keys( $body ) === [ 'feature', 'updated' ] && $body['updated'] === false
-	&& array_keys( $body['feature'] ) === [ 'key', 'name', 'description', 'version', 'installed', 'active', 'update', 'requires', 'problems', 'settings' ]
+	&& array_keys( $body['feature'] ) === [ 'key', 'name', 'description', 'category', 'version', 'installed', 'active', 'update', 'requires', 'problems', 'settings' ]
 	&& $body['feature']['key'] === 'extra' && $body['feature']['name'] === 'Extra' && $body['feature']['version'] === '1.0.0' && $body['feature']['active'] === false && $body['feature']['installed'] === null && $body['feature']['update'] === false && $body['feature']['problems'] === [] );
 check( 'the directory is in place, the archive was fetched once, and nothing was switched on', is_file( NINO_FEATURES_DIR. '/Extra/feature.php' ) && is_file( NINO_FEATURES_DIR. '/Extra/Extra.php' )
 	&& count( array_filter( $requests, static fn( array $r ): bool => $r['url'] === 'https://catalogue.test/features/extra-1.0.0.tar.gz' ) ) === 1

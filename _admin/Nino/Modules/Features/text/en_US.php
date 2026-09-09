@@ -10,6 +10,19 @@ return [
 	'[[/_admin/features/label/active]]'				=> 'Active features',
 	'[[/_admin/features/tab/available]]'			=> 'Available',
 	'[[/_admin/features/label/filter]]'			=> 'Filter by name',
+	'[[/_admin/features/label/category]]'			=> 'Category',
+	'[[/_admin/features/label/category-all]]'	=> 'All categories',
+	// One per \Nino\Features::CATEGORIES, and one for a feature that names
+	// none. A category this workbench has no line for - a feature written for
+	// a later catalogue - is shown as the slug it is, so the filter still
+	// groups it
+	'[[/_admin/features/category/content]]'		=> 'Content',
+	'[[/_admin/features/category/ui]]'				=> 'Interface',
+	'[[/_admin/features/category/communication]]'	=> 'Communication',
+	'[[/_admin/features/category/marketing]]'	=> 'Marketing & Analytics',
+	'[[/_admin/features/category/security]]'	=> 'Security & Privacy',
+	'[[/_admin/features/category/system]]'		=> 'System & Operations',
+	'[[/_admin/features/category/none]]'			=> 'Uncategorized',
 	'[[/_admin/features/hint/nomatch]]'			=> 'Nothing on this tab matches the filter.',
 	'[[/_admin/features/tab/inactive]]'				=> 'Inactive',
 	'[[/_admin/features/tab/active]]'					=> 'Active',

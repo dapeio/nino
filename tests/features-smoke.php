@@ -47,7 +47,7 @@ check( 'every readable manifest is listed, sorted by key', array_keys( $all ) ==
 check( 'a directory whose manifest does not validate is skipped with a warning naming it', isset( $all['broken'] ) === false
 	&& count( array_filter( $warnings, static fn( string $w ): bool => str_contains( $w, '/Broken/feature.php' ) && str_contains( $w, 'version' ) ) ) === 1 );
 check( 'the module class is derived from the directory', $all['sample']['module'] === '\\Nino\\Modules\\Sample' && $all['helper']['module'] === '\\Nino\\Modules\\Helper' );
-check( 'the manifest is normalized: every key present', array_keys( $all['helper'] ) === [ 'key', 'dir', 'module', 'name', 'description', 'version', 'nino', 'php', 'requires', 'data', 'settings', 'active', 'installed', 'update', 'problems' ]
+check( 'the manifest is normalized: every key present', array_keys( $all['helper'] ) === [ 'key', 'dir', 'module', 'name', 'description', 'category', 'version', 'nino', 'php', 'requires', 'data', 'settings', 'active', 'installed', 'update', 'problems' ]
 	&& $all['helper']['nino'] === '*' && $all['helper']['requires'] === [] && $all['helper']['settings'] === [] );
 check( 'nothing is active or recorded on a fresh project', $all['sample']['active'] === false && $all['sample']['installed'] === null && $all['sample']['update'] === false );
 check( 'a compatible feature has no problems', $all['sample']['problems'] === [] && $all['helper']['problems'] === [] );
@@ -111,6 +111,18 @@ check( 'requires lists feature keys, itself left out', manifestFails( $manifestD
 check( 'data paths stay below /data/', manifestFails( $manifestDir, 'BadData', [ 'name' => 'x', 'version' => '1.0.0', 'data' => [ '/config.php' ] ], '"data"' )
 	&& manifestFails( $manifestDir, 'DotData', [ 'name' => 'x', 'version' => '1.0.0', 'data' => [ '/data/../config.php' ] ], '"data"' ) );
 check( 'extensions are names', manifestFails( $manifestDir, 'BadExt', [ 'name' => 'x', 'version' => '1.0.0', 'php' => [ 'ext' => [ 'g d' ] ] ], '"php"' ) );
+
+// The vocabulary is CATEGORIES, the rule is a slug. A feature written for a
+// catalogue this kernel predates is filed under a category this kernel has
+// never heard of, and has to install anyway - so an unknown slug is kept, and
+// only something that is not a slug at all is refused
+check( 'a category is optional and defaults to none', \Nino\Features::manifest( $manifestDir. '/Mini' )['category'] === '' );
+check( 'one of the published categories is kept', \Nino\Features::manifest( writeManifest( $manifestDir, 'Filed', [ 'name' => 'x', 'version' => '1.0.0', 'category' => 'security' ] ) )['category'] === 'security'
+	&& \Nino\Features::CATEGORIES === [ 'content', 'ui', 'communication', 'marketing', 'security', 'system' ] );
+check( 'and so is one this kernel does not publish - a later catalogue files features under names this one cannot know', \Nino\Features::manifest( writeManifest( $manifestDir, 'Later', [ 'name' => 'x', 'version' => '1.0.0', 'category' => 'commerce' ] ) )['category'] === 'commerce'
+	&& ninoWarnings() === [] );
+check( 'a category that is not a slug is refused, and the message names the vocabulary', manifestFails( $manifestDir, 'BadCategory', [ 'name' => 'x', 'version' => '1.0.0', 'category' => 'UI Effects' ], '"category"' )
+	&& manifestFails( $manifestDir, 'ArrayCategory', [ 'name' => 'x', 'version' => '1.0.0', 'category' => [ 'security' ] ], 'security, system' ) );
 check( 'a setting needs a known type', manifestFails( $manifestDir, 'BadType', [ 'name' => 'x', 'version' => '1.0.0', 'settings' => [ 'a' => [ 'type' => 'color' ] ] ], 'unknown type' ) );
 check( 'a setting name is a lowerCamel identifier', manifestFails( $manifestDir, 'BadSetting', [ 'name' => 'x', 'version' => '1.0.0', 'settings' => [ 'api-key' => [ 'type' => 'string' ] ] ], 'setting name' ) );
 check( 'a select needs options', manifestFails( $manifestDir, 'NoOptions', [ 'name' => 'x', 'version' => '1.0.0', 'settings' => [ 'a' => [ 'type' => 'select' ] ] ], '"options"' ) );
@@ -443,9 +455,13 @@ check( 'apiList answers the directory the panel reads from, the catalogue url, w
 	&& array_keys( $body ) === [ 'dir', 'catalogueUrl', 'writable', 'catalogue', 'features' ] && array_column( $body['features'], 'key' ) === [ 'sample', 'helper', 'old' ]
 	&& array_column( $body['features'], 'name' ) === [ 'Beispiel-Feature', 'Helper', 'Old' ] );
 $byKey = array_column( $body['features'], null, 'key' );
-check( 'every entry has the same keys', array_keys( $byKey['sample'] ) === [ 'key', 'name', 'description', 'version', 'installed', 'active', 'update', 'requires', 'problems', 'settings' ] );
+check( 'every entry has the same keys', array_keys( $byKey['sample'] ) === [ 'key', 'name', 'description', 'category', 'version', 'installed', 'active', 'update', 'requires', 'problems', 'settings' ] );
 check( 'names and descriptions arrive in the session locale - de_DE, the native language, since none was chosen', $byKey['sample']['name'] === 'Beispiel-Feature' && $byKey['sample']['description'] === 'Prüft den ganzen Feature-Vertrag.'
 	&& $byKey['helper']['name'] === 'Helper' && $byKey['helper']['description'] === '' );
+// The slug, not a word: the categories are named in the panel's own fills, so
+// the script labels the ones this workbench knows and shows the rest as they
+// are - see tests/admin-features-js-smoke.js
+check( 'the category travels as the slug it is, empty for a feature that names none', $byKey['sample']['category'] === 'content' && $byKey['helper']['category'] === '' );
 check( 'the state travels with each entry', $byKey['sample']['active'] === true && $byKey['sample']['installed'] === '1.2.0' && $byKey['sample']['update'] === false && $byKey['sample']['requires'] === [ 'helper' ]
 	&& $byKey['old']['active'] === false && $byKey['old']['installed'] === null );
 check( 'an incompatible feature lists its problems, a compatible one none', count( $byKey['old']['problems'] ) === 3 && str_contains( $byKey['old']['problems'][0], 'requires Nino ^0.9' ) && $byKey['sample']['problems'] === [] && $byKey['helper']['settings'] === [] );

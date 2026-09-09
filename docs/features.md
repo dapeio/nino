@@ -65,6 +65,7 @@ return [
 		'en_US' => 'A product catalogue with a public JSON endpoint and a workbench panel.',
 		'de_DE' => 'Ein Produktkatalog mit öffentlichem JSON-Endpunkt und einem Panel der Workbench.',
 	],
+	'category'		=> 'content',
 	'version'			=> '1.1.0',
 	'nino'				=> '^1.0',
 	'php'					=> [ 'ext' => [ 'json' ] ],
@@ -85,6 +86,7 @@ return [
 | `key` | the feature's slug (`/^[a-z][a-z0-9-]*$/`): what `requires` names, what `/nino/features` is keyed by and what `\Nino\Features::setting()` asks for. Without one, the lowercased directory name |
 | `name` | a string or a `locale => string` map; required |
 | `description` | a string or a `locale => string` map; optional |
+| `category` | what the feature is for, one slug - see [Categories](#categories); optional, and what the Features panel groups and filters by |
 | `version` | `major.minor.patch`, optionally with a pre-release suffix (`1.0.0-beta.2`); required. What the panel shows and `activate()` records |
 | `nino` | the Nino version the feature was written for, as a constraint; `*` without one |
 | `php` | `[ 'ext' => [ … ] ]`: PHP extensions that must be loaded |
@@ -93,6 +95,24 @@ return [
 | `data` | paths below `/data/` the feature owns - what a backup carries and a restore callback merges; `..` is refused |
 
 A localized value - `name`, `description`, a `label`, a `hint`, an option of a `select` - is read through `\Nino\Features::localized( $value, $locale )`: the locale asked for, else `en_US`, else the first entry, else an empty string.
+
+### Categories
+
+One category per feature, the coarse "what is this for" the Features panel groups by and a catalogue of forty features is browsed by. `\Nino\Features::CATEGORIES` publishes the vocabulary:
+
+| `category` | What belongs there |
+|---|---|
+| `content` | content types, and what makes existing content reachable - posts, a gallery, events, a search |
+| `ui` | how what is already there looks and behaves - effects, a slider, a lightbox, page composition |
+| `communication` | messages from and to visitors - a contact form, a newsletter, comments |
+| `marketing` | being found, and measuring it - sitemaps, social cards, page views |
+| `security` | protecting access, and personal data - a password area, a consent banner, spam defence |
+| `system` | infrastructure a visitor never sees - a mail transport, remote backups, webhooks, imports |
+
+Where a feature could sit in two of them, decide top-down and take the first that fits: does it protect access or touch personal data (`security`), is it about being found or measured (`marketing`), does it exchange messages with people (`communication`), does it bring content or make content reachable (`content`), does it only change how existing things look (`ui`)? What is left is `system`. The question is what the site owner wants, never how the feature is built: an image gallery is `content`, a lightbox over images that are already there is `ui`.
+
+The kernel accepts any slug (`/^[a-z][a-z0-9-]{0,23}$/`), not only these six. A feature written for a catalogue newer than the kernel running it is filed under a category that kernel cannot know, and has to install regardless - so an unknown one is kept and shown as it stands, and the vocabulary is enforced where features are published rather than where they are read. A manifest without a `category` is valid; the panel simply says nothing about one.
+
 
 The class is not declared but derived: `\Nino\Modules\<Directory>`. A `module` entry that names the same class is accepted; one that says anything else is refused. The autoloader serves that one class from `features/<Name>/` and no other, so a manifest promising something else would be wrong.
 

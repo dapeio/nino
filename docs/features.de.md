@@ -65,6 +65,7 @@ return [
 		'en_US' => 'A product catalogue with a public JSON endpoint and a workbench panel.',
 		'de_DE' => 'Ein Produktkatalog mit öffentlichem JSON-Endpunkt und einem Panel der Workbench.',
 	],
+	'category'		=> 'content',
 	'version'			=> '1.1.0',
 	'nino'				=> '^1.0',
 	'php'					=> [ 'ext' => [ 'json' ] ],
@@ -85,6 +86,7 @@ return [
 | `key` | der Slug des Features (`/^[a-z][a-z0-9-]*$/`): was `requires` nennt, was `/nino/features` als Schlüssel trägt und was `\Nino\Features::setting()` fragt. Ohne Angabe der kleingeschriebene Verzeichnisname |
 | `name` | ein String oder eine Map `locale => string`; Pflicht |
 | `description` | ein String oder eine Map `locale => string`; optional |
+| `category` | wofür das Feature da ist, ein Slug – siehe [Kategorien](#kategorien); optional, und das, wonach das Features-Panel gruppiert und filtert |
 | `version` | `major.minor.patch`, optional mit Pre-Release-Suffix (`1.0.0-beta.2`); Pflicht. Was das Panel zeigt und `activate()` aufzeichnet |
 | `nino` | die Nino-Version, für die das Feature geschrieben wurde, als Constraint; ohne Angabe `*` |
 | `php` | `[ 'ext' => [ … ] ]`: PHP-Erweiterungen, die geladen sein müssen |
@@ -93,6 +95,23 @@ return [
 | `data` | Pfade unterhalb von `/data/`, die das Feature besitzt – was ein Backup trägt und ein Restore-Callback zusammenführt; `..` ist verboten |
 
 Ein lokalisierter Wert – `name`, `description`, ein `label`, ein `hint`, eine Option eines `select` – wird über `\Nino\Features::localized( $value, $locale )` gelesen: die gefragte Sprache, sonst `en_US`, sonst der erste Eintrag, sonst ein leerer String.
+
+### Kategorien
+
+Eine Kategorie pro Feature: das grobe „wofür ist das da", nach dem das Features-Panel gruppiert und nach dem ein Katalog von vierzig Features durchsucht wird. `\Nino\Features::CATEGORIES` veröffentlicht das Vokabular:
+
+| `category` | Was dort hingehört |
+|---|---|
+| `content` | Inhaltstypen, und was vorhandene Inhalte zugänglich macht – Beiträge, eine Galerie, Termine, eine Suche |
+| `ui` | wie das Vorhandene aussieht und sich verhält – Effekte, ein Slider, eine Lightbox, Seitenkomposition |
+| `communication` | Nachrichten von und an Besucher – ein Kontaktformular, ein Newsletter, Kommentare |
+| `marketing` | gefunden werden, und es messen – Sitemaps, Social-Cards, Seitenaufrufe |
+| `security` | Zugriff schützen, personenbezogene Daten – ein Passwortbereich, ein Consent-Banner, Spamabwehr |
+| `system` | Infrastruktur, die ein Besucher nie sieht – ein Mailtransport, entfernte Backups, Webhooks, Importe |
+
+Passt ein Feature in zwei davon, wird von oben nach unten entschieden und die erste genommen, die zutrifft: Schützt es Zugriff oder verarbeitet es personenbezogene Daten (`security`)? Geht es um Auffindbarkeit oder Messung (`marketing`)? Tauscht es Nachrichten mit Menschen aus (`communication`)? Bringt es Inhalte – oder macht es vorhandene zugänglich (`content`)? Verändert es nur, wie Vorhandenes aussieht (`ui`)? Was übrig bleibt, ist `system`. Maßgeblich ist, was der Betreiber will, nie wie das Feature gebaut ist: eine Bildergalerie ist `content`, eine Lightbox über bereits vorhandenen Bildern ist `ui`.
+
+Der Kernel akzeptiert jeden Slug (`/^[a-z][a-z0-9-]{0,23}$/`), nicht nur diese sechs. Ein Feature, das für einen neueren Katalog als den laufenden Kernel geschrieben wurde, steht unter einer Kategorie, die dieser Kernel nicht kennen kann, und muss sich trotzdem installieren lassen – eine unbekannte wird also übernommen und so angezeigt, wie sie dasteht, und das Vokabular wird dort durchgesetzt, wo Features veröffentlicht werden, nicht dort, wo sie gelesen werden. Ein Manifest ohne `category` ist gültig; das Panel sagt dann einfach nichts dazu.
 
 Die Klasse wird nicht erklärt, sondern abgeleitet: `\Nino\Modules\<Verzeichnis>`. Ein `module`-Eintrag, der dieselbe Klasse nennt, wird angenommen; einer, der etwas anderes sagt, wird abgelehnt. Denn der Autoloader liefert aus `features/<Name>/` nur diese eine Klasse, und ein Manifest, das etwas anderes verspricht, wäre falsch.
 

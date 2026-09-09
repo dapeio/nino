@@ -10,6 +10,19 @@ return [
 	'[[/_admin/features/label/active]]'				=> 'Aktive Features',
 	'[[/_admin/features/tab/available]]'			=> 'Verfügbar',
 	'[[/_admin/features/label/filter]]'			=> 'Nach Namen filtern',
+	'[[/_admin/features/label/category]]'			=> 'Kategorie',
+	'[[/_admin/features/label/category-all]]'	=> 'Alle Kategorien',
+	// Je eine pro \Nino\Features::CATEGORIES, dazu eine für ein Feature ohne
+	// Angabe. Eine Kategorie, für die diese Workbench keine Zeile hat - ein
+	// Feature aus einem späteren Katalog -, erscheint als der Slug, der sie
+	// ist; der Filter gruppiert sie trotzdem
+	'[[/_admin/features/category/content]]'		=> 'Inhalte',
+	'[[/_admin/features/category/ui]]'				=> 'Darstellung',
+	'[[/_admin/features/category/communication]]'	=> 'Kommunikation',
+	'[[/_admin/features/category/marketing]]'	=> 'Marketing & Analyse',
+	'[[/_admin/features/category/security]]'	=> 'Sicherheit & Datenschutz',
+	'[[/_admin/features/category/system]]'		=> 'System & Betrieb',
+	'[[/_admin/features/category/none]]'			=> 'Ohne Kategorie',
 	'[[/_admin/features/hint/nomatch]]'			=> 'Auf diesem Tab passt nichts zum Filter.',
 	'[[/_admin/features/tab/inactive]]'				=> 'Inaktiv',
 	'[[/_admin/features/tab/active]]'					=> 'Aktiv',

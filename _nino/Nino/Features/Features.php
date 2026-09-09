@@ -53,7 +53,22 @@ namespace Nino {
 		// knows how to validate
 		public const array SETTING_TYPES = [ 'bool', 'int', 'string', 'text', 'email', 'url', 'select', 'secret', 'lines' ];
 
+		// The coarse "what is this for" a feature is filed under, one per
+		// feature: what the Features panel filters by and what a person
+		// browsing a catalogue of forty features navigates by. A vocabulary
+		// rather than free text, or the same idea arrives as four spellings
+		// and the filter stops grouping anything.
+		//
+		// Advisory here on purpose: manifest() takes any slug, not only these
+		// (see CATEGORY_PATTERN). A kernel that predates a category shows the
+		// slug it does not know rather than refusing the feature - so a new
+		// category costs a catalogue release, not a Nino release. What keeps
+		// the vocabulary a vocabulary is the publishing side: the catalogue's
+		// build step only ever publishes these.
+		public const array CATEGORIES = [ 'content', 'ui', 'communication', 'marketing', 'security', 'system' ];
+
 		private const string KEY_PATTERN = '/^[a-z][a-z0-9-]*$/';
+		private const string CATEGORY_PATTERN = '/^[a-z][a-z0-9-]{0,23}$/';
 		private const string SETTING_PATTERN = '/^[a-z][a-zA-Z0-9]*$/';
 		private const string VERSION_PATTERN = '/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.]+)?$/';
 
@@ -199,6 +214,16 @@ namespace Nino {
 			if( isset( $raw['description'] ) === true && self::_localizedValid( $raw['description'] ) === false )
 				return $fail( '"description" must be a string or a locale => string map' );
 
+			// Any slug passes, CATEGORIES is what a feature should use - the
+			// panel labels the ones it knows and shows the rest as they are.
+			// Nothing depends on the value: it groups a list, so an unknown
+			// one costs a heading, not a feature
+			// Read, never cast: an array here would be a warning about string
+			// conversion before it was ever a refusal naming the field
+			$category = $raw['category'] ?? '';
+			if( is_string( $category ) === false || ( $category !== '' && preg_match( self::CATEGORY_PATTERN, $category ) !== 1 ) )
+				return $fail( '"category" must be a slug - one of '. implode( ', ', self::CATEGORIES ) );
+
 			$version = (string) ( $raw['version'] ?? '' );
 			if( preg_match( self::VERSION_PATTERN, $version ) !== 1 )
 				return $fail( '"version" must be major.minor.patch' );
@@ -255,6 +280,7 @@ namespace Nino {
 				'module'			=> $module,
 				'name'				=> $raw['name'],
 				'description'	=> $raw['description'] ?? '',
+				'category'		=> $category,
 				'version'			=> $version,
 				'nino'				=> trim( $nino ),
 				'php'					=> [ 'ext' => $extensions ],

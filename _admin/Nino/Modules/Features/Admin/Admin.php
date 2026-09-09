@@ -93,8 +93,8 @@ namespace Nino\Modules\Features {
 		}
 
 		// Two panes, the levels the script steps through: the list - a head
-		// with the tab strip and the filter, an action bar, then the rows of
-		// whichever tab is current - and one active feature's own screen
+		// with the tab strip and the two filters, an action bar, then the rows
+		// of whichever tab is current - and one active feature's own screen
 		public static function panes(): array {
 			return [ 'features-list', 'features-detail' ];
 		}
@@ -478,6 +478,7 @@ namespace Nino\Modules\Features {
 					'key'					=> $offer['key'],
 					'name'				=> \Nino\Features::localized( $offer['name'], $locale ),
 					'description'	=> \Nino\Features::localized( $offer['description'], $locale ),
+					'category'		=> $offer['category'],
 					'version'			=> $offer['version'],
 					'nino'				=> $offer['nino'],
 					'ext'					=> $offer['php']['ext'],
@@ -575,6 +576,10 @@ namespace Nino\Modules\Features {
 				'key'					=> $feature['key'],
 				'name'				=> \Nino\Features::localized( $feature['name'], $locale ),
 				'description'	=> \Nino\Features::localized( $feature['description'], $locale ),
+				// The slug, not a label: the script has the fills, and the one
+				// category it may meet without a fill - a feature filed under
+				// something this workbench predates - it shows as it stands
+				'category'		=> $feature['category'],
 				'version'			=> $feature['version'],
 				'installed'		=> $feature['installed'],
 				'active'			=> $feature['active'],

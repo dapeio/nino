@@ -6,6 +6,7 @@ return [
 	'key'					=> 'sample',
 	'name'				=> [ 'en_US' => 'Sample feature', 'de_DE' => 'Beispiel-Feature' ],
 	'description'	=> [ 'en_US' => 'Exercises the whole feature contract.', 'de_DE' => 'Prüft den ganzen Feature-Vertrag.' ],
+	'category'		=> 'content',
 	'version'			=> '1.2.0',
 	'nino'				=> '^1.0',
 	'php'					=> [ 'ext' => [ 'json' ] ],

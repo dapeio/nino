@@ -70,6 +70,10 @@
 		// What the filter above the tabs holds - kept across a re-render too,
 		// so switching tabs while searching keeps searching
 		_filter 		: '',
+		// Which category the list is narrowed to, '' for all of them. Kept
+		// across a re-render for the same reason, and dropped by _renderHead()
+		// when the category it names is no longer among the ones on offer
+		_category 	: '',
 		// The key of the feature whose own screen is open, '' while the list
 		// is - as state, so the reload a save ends in comes back to the same
 		// screen rather than dropping to the list
@@ -185,8 +189,13 @@
 
 		/**
 		 *	Whether one feature or offer is what the filter is looking for -
-		 *	its name, its key or its description, case ignored. An empty
-		 *	filter matches everything, which is the state the panel opens in
+		 *	its name, its key, its description or the name of its category,
+		 *	case ignored, and inside the category the select narrows to. Both
+		 *	empty matches everything, which is the state the panel opens in
+		 *
+		 *	The category is searchable as well as selectable on purpose:
+		 *	typing "security" is what someone who has not noticed the select
+		 *	does, and it should find the same rows
 		 *
 		 *	@param		{Object}	entry				A feature of features/list or a cached offer
 		 *
@@ -194,10 +203,64 @@
 		 */
 		_matches : function( entry ) {
 
-			const query = Nino.admin.features._filter.trim().toLowerCase();
+			const query		= Nino.admin.features._filter.trim().toLowerCase();
+			const category	= Nino.admin.features._category;
+
+			if( category !== '' && ( entry.category || '' ) !== category )
+				return false;
 
 			return query === ''
-				|| [ entry.name, entry.key, entry.description ].join( ' ' ).toLowerCase().indexOf( query ) !== -1;
+				|| [ entry.name, entry.key, entry.description, Nino.admin.features._categoryLabel( entry.category ) ]
+					.join( ' ' ).toLowerCase().indexOf( query ) !== -1;
+		},
+
+		/**
+		 *	What a category slug is called here. The workbench's own fills name
+		 *	the ones the kernel publishes (\Nino\Features::CATEGORIES); a slug
+		 *	without a fill - a feature filed under a category newer than this
+		 *	workbench - is its own label, which reads as a slug but groups and
+		 *	filters like any other
+		 *
+		 *	@param		{string}	slug				'' for a feature that names none
+		 *
+		 *	@return		{string}
+		 */
+		_categoryLabel : function( slug ) {
+
+			const key = slug ? String( slug ) : 'none';
+
+			return Nino.content.getText('/_admin/features/category/'+ key ) || key;
+		},
+
+		/**
+		 *	The categories to offer in the select: the ones the features and
+		 *	the offers on screen actually carry, each once, sorted by the name
+		 *	they are shown under.
+		 *
+		 *	Built from the list rather than from a fixed vocabulary, so the
+		 *	select never offers a heading nothing is filed under - and picks up
+		 *	a category this workbench has no name for the moment a catalogue
+		 *	publishes one
+		 *
+		 *	@return		{Array}								[ { value, label }, ... ]
+		 */
+		_categories : function() {
+
+			const seen = {};
+
+			Nino.admin.features._features
+				.concat( Nino.admin.features._availableOffers() )
+				.forEach( function( entry ) { seen[ entry.category || '' ] = true } );
+
+			return Object.keys( seen ).map( function( slug ) {
+				return { value : slug, label : Nino.admin.features._categoryLabel( slug ) };
+			} ).sort( function( a, b ) {
+				// A feature without a category last, whatever it is called:
+				// "no category" is not a category, it is the rest
+				if( a.value === '' ) return 1;
+				if( b.value === '' ) return -1;
+				return a.label.localeCompare( b.label );
+			} );
 		},
 
 		/**
@@ -214,12 +277,12 @@
 		},
 
 		/**
-		 *	The head of the pane: the tab strip and, beside it, the filter
-		 *	over everything the tabs hold. One block, because the two belong
-		 *	together and because it is what stays at the top of a long list -
-		 *	see assets/admin.css. The filter is outside the tablist: a
-		 *	tablist holds tabs, and a search input in it would be read out as
-		 *	one
+		 *	The head of the pane: the tab strip and, beside it, the two filters
+		 *	over everything the tabs hold - the search box and the category.
+		 *	One block, because they belong together and because it is what
+		 *	stays at the top of a long list - see assets/admin.css. Neither
+		 *	filter is inside the tablist: a tablist holds tabs, and a control
+		 *	in it would be read out as one
 		 *
 		 *	@return		{Element}							<div class="admin-features-head">
 		 */
@@ -227,6 +290,14 @@
 
 			const head = dc.createElement('div');
 			head.className = 'admin-features-head';
+
+			// A category that was picked and is now gone - the last feature
+			// carrying it was removed, or a catalogue refresh dropped it - would
+			// otherwise hide every row with no visible reason
+			const categories = Nino.admin.features._categories();
+
+			if( categories.some( function( c ) { return c.value === Nino.admin.features._category } ) === false )
+				Nino.admin.features._category = '';
 
 			head.appendChild( Nino.admin.features._renderTabs() );
 
@@ -254,7 +325,57 @@
 			filter.id = 'features-filter';
 			head.appendChild( filter );
 
+			// Nothing to narrow when everything on screen shares one category -
+			// a select with a single option is a control that cannot be used
+			if( categories.length > 1 )
+				head.appendChild( Nino.admin.features._renderCategoryFilter( categories ) );
+
 			return head;
+		},
+
+		/**
+		 *	The category select: every category on screen, plus the entry that
+		 *	turns the narrowing off. A plain select rather than a row of
+		 *	chips - the head is pinned to the top of the pane, and a second
+		 *	row of controls costs a long list that much of its height on every
+		 *	screen it is read on
+		 *
+		 *	@param		{Array}		categories	What _categories() found
+		 *
+		 *	@return		{Element}							<select>
+		 */
+		_renderCategoryFilter : function( categories ) {
+
+			const select = dc.createElement('select');
+			select.id = 'features-category';
+			select.className = 'nino-admin-input admin-features-category';
+			select.setAttribute( 'aria-label', Nino.content.getText('/_admin/features/label/category') );
+
+			const all = dc.createElement('option');
+			all.value = '';
+			all.textContent = Nino.content.getText('/_admin/features/label/category-all');
+			select.appendChild( all );
+
+			categories.forEach( function( category ) {
+				const option = dc.createElement('option');
+				option.value = category.value;
+				option.textContent = category.label;
+				select.appendChild( option );
+			} );
+
+			select.value = Nino.admin.features._category;
+
+			// Same as the search box: the whole panel is drawn again so the tab
+			// counts follow, and the focus goes back to the control that had it
+			select.addEventListener( 'change', function() {
+				Nino.admin.features._category = select.value;
+				Nino.admin.features._renderPanel();
+				const next = dc.getElementById('features-category');
+				if( next !== null )
+					next.focus();
+			} );
+
+			return select;
 		},
 
 		/**
@@ -523,7 +644,7 @@
 
 			const meta = dc.createElement('div');
 			meta.className = 'admin-type-btn-descr';
-			meta.textContent = Nino.admin.features._meta( feature.version, feature.installed, '', feature.description );
+			meta.textContent = Nino.admin.features._meta( feature.category, feature.version, feature.installed, '', feature.description );
 			copy.appendChild( meta );
 
 			const chev = dc.createElement('span');
@@ -553,7 +674,7 @@
 			const row = dc.createElement('li');
 			row.dataset.feature = feature.key;
 
-			const copy = Nino.admin.features._copy( feature.name, Nino.admin.features._meta( feature.version, feature.installed, '', feature.description ) );
+			const copy = Nino.admin.features._copy( feature.name, Nino.admin.features._meta( feature.category, feature.version, feature.installed, '', feature.description ) );
 
 			if( feature.requires.length > 0 )
 				copy.appendChild( Nino.admin.features._note( Nino.content.getText('/_admin/features/label/requires').replace( '%s', feature.requires.join( ', ' ) ), false ) );
@@ -572,12 +693,19 @@
 		},
 
 		/**
-		 *	The one line under a name: which version this is, the one on disk
-		 *	where that differs - which is what an update is - when the
-		 *	catalogue named a release date, and what the thing is for. Joined
-		 *	rather than stacked: a row is scanned, and the filter above is what
-		 *	finds a description nobody can read to the end of at this width
+		 *	The one line under a name: what the feature is for, which version
+		 *	this is, the one on disk where that differs - which is what an
+		 *	update is - when the catalogue named a release date, and what the
+		 *	thing does. Joined rather than stacked: a row is scanned, and the
+		 *	filters above are what find a description nobody can read to the
+		 *	end of at this width
 		 *
+		 *	The category leads, where there is one: it is the coarsest fact
+		 *	about a row and the one that groups a long list while it is read
+		 *	top to bottom. A feature that names none says nothing rather than
+		 *	"uncategorized" on every line
+		 *
+		 *	@param		{string}	category		'' for a feature that names none
 		 *	@param		{string}	version
 		 *	@param		{string|null}	installed	The version on disk, null when there is none
 		 *	@param		{string}	released		'' when nothing was released
@@ -585,9 +713,10 @@
 		 *
 		 *	@return		{string}
 		 */
-		_meta : function( version, installed, released, description ) {
+		_meta : function( category, version, installed, released, description ) {
 
 			return [
+				category ? Nino.admin.features._categoryLabel( category ) : '',
 				Nino.content.getText('/_admin/features/label/version').replace( '%s', version )
 					+ ( installed !== null && installed !== undefined && installed !== version
 						? ' \u2013 '+ Nino.content.getText('/_admin/features/label/installed').replace( '%s', installed )
@@ -748,7 +877,7 @@
 			if( offer.state === 'incompatible' )
 				row.setAttribute( 'aria-disabled', 'true' );
 
-			const copy = Nino.admin.features._copy( offer.name, Nino.admin.features._meta( offer.version, offer.local, offer.released, offer.description ) );
+			const copy = Nino.admin.features._copy( offer.name, Nino.admin.features._meta( offer.category, offer.version, offer.local, offer.released, offer.description ) );
 
 			if( offer.requires.length > 0 )
 				copy.appendChild( Nino.admin.features._note( Nino.content.getText('/_admin/features/label/requires').replace( '%s', offer.requires.join( ', ' ) ), false ) );
@@ -894,7 +1023,7 @@
 
 			const meta = dc.createElement('p');
 			meta.className = 'nino-admin-hint';
-			meta.textContent = Nino.admin.features._meta( feature.version, feature.installed, '', feature.description );
+			meta.textContent = Nino.admin.features._meta( feature.category, feature.version, feature.installed, '', feature.description );
 			form.appendChild( meta );
 
 			if( feature.requires.length > 0 ) {

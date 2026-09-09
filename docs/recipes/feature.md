@@ -69,6 +69,9 @@ return [
 		'en_US' => 'A product catalogue with a public JSON endpoint and a workbench panel.',
 		'de_DE' => 'Ein Produktkatalog mit öffentlichem JSON-Endpunkt und einem Panel der Workbench.',
 	],
+	// What it is for, one of \Nino\Features::CATEGORIES - what the panel
+	// groups and filters by. See docs/features.md#categories
+	'category'		=> 'content',
 	'version'			=> '1.1.0',
 	'nino'				=> '^1.0',
 	'php'					=> [ 'ext' => [ 'json' ] ],

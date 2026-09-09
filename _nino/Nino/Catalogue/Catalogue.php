@@ -33,11 +33,19 @@ namespace Nino {
 	 *
 	 *										{ "format": 1, "generated": "...", "features": [ {
 	 *											"key": "newsletter", "name": ..., "description": ...,
-	 *											"version": "1.0.0", "nino": "^1.0", "php": { "ext": [] },
+	 *											"category": "communication", "version": "1.0.0",
+	 *											"nino": "^1.0", "php": { "ext": [] },
 	 *											"requires": [], "directory": "Newsletter",
 	 *											"archive": "https://.../newsletter-1.0.0.tar.gz",
 	 *											"sha256": "...", "size": 12345, "released": "2026-09-07"
 	 *										} ] }
+	 *
+	 *										"category" arrived after format 1 was published and did not
+	 *										raise the number: this reader takes only the keys it knows
+	 *										and ignores the rest, so a kernel written before the field
+	 *										existed reads a catalogue carrying it without noticing.
+	 *										Anything later that a kernel would have to understand is
+	 *										what format 2 is for.
 	 *
 	 *										An archive is a .tar.gz holding one directory named after
 	 *										the feature's class, exactly what lands below features/.
@@ -89,6 +97,7 @@ PEM;
 		private const string KEY_PATTERN				= '/^[a-z][a-z0-9-]*$/';
 		private const string DIRECTORY_PATTERN	= '/^[A-Z][A-Za-z0-9]*$/';
 		private const string VERSION_PATTERN		= '/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.]+)?$/';
+		private const string CATEGORY_PATTERN		= '/^[a-z][a-z0-9-]{0,23}$/';
 
 		/**
 		 *	@param		array 		&$appData			(reference) Array with current app data
@@ -543,6 +552,17 @@ PEM;
 			if( isset( $entry['description'] ) === true && self::_localizedValid( $entry['description'] ) === false )
 				return '"description" must be a string or a locale => string map';
 
+			// Dropped rather than refused, which is the one place this reader
+			// deliberately differs from Features::manifest(): a bad entry costs
+			// the whole catalogue (see parse()), and a category is a heading in
+			// a list. A kernel that refused a document over a field it did not
+			// understand would stop reading the catalogue the day a newer one
+			// publishes a category it predates - the field has to be the cheap
+			// kind to get wrong
+			$category = $entry['category'] ?? '';
+			if( is_string( $category ) === false || preg_match( self::CATEGORY_PATTERN, $category ) !== 1 )
+				$category = '';
+
 			$version = (string) ( $entry['version'] ?? '' );
 			if( preg_match( self::VERSION_PATTERN, $version ) !== 1 )
 				return '"version" must be major.minor.patch';
@@ -585,6 +605,7 @@ PEM;
 				'key'					=> $key,
 				'name'				=> $entry['name'],
 				'description'	=> $entry['description'] ?? '',
+				'category'		=> $category,
 				'version'			=> $version,
 				'nino'				=> $nino,
 				'php'					=> [ 'ext' => $extensions ],

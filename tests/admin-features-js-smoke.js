@@ -243,11 +243,13 @@ const panel 	= Nino.admin.features;
 // all), 'fresh' inactive without problems (Activate alone), 'plain' active
 // with an update waiting (Update + Deactivate), 'sample' active with a full
 // settings schema - so Inactive is { old, fresh } and Active is { plain, sample }
+// - and one category each, 'fresh' deliberately without: a project whose
+// features predate the field is the state the panel has to read well too
 const FEATURES = [
-	{ key : 'old', name : 'Old', description : '', version : '3.0.0', installed : null, active : false, update : false, requires : [ 'nowhere' ],
+	{ key : 'old', name : 'Old', description : '', category : 'system', version : '3.0.0', installed : null, active : false, update : false, requires : [ 'nowhere' ],
 		problems : [ 'requires Nino ^0.9, this is 1.0.0', 'requires the php extension "no_such_extension"' ], settings : [] },
-	{ key : 'plain', name : 'Plain', description : 'Nothing to set.', version : '1.0.0', installed : '0.9.0', active : true, update : true, requires : [], problems : [], settings : [] },
-	{ key : 'sample', name : 'Beispiel-Feature', description : 'Prüft den ganzen Feature-Vertrag.', version : '1.2.0', installed : '1.2.0', active : true, update : false, requires : [ 'helper' ], problems : [], settings : [
+	{ key : 'plain', name : 'Plain', description : 'Nothing to set.', category : 'ui', version : '1.0.0', installed : '0.9.0', active : true, update : true, requires : [], problems : [], settings : [] },
+	{ key : 'sample', name : 'Beispiel-Feature', description : 'Prüft den ganzen Feature-Vertrag.', category : 'content', version : '1.2.0', installed : '1.2.0', active : true, update : false, requires : [ 'helper' ], problems : [], settings : [
 		{ name : 'enabled', type : 'bool', label : 'Aktiv', hint : '', required : false, min : null, max : null, maxlength : null, unit : '', options : [], value : true },
 		{ name : 'limit', type : 'int', label : 'Limit', hint : 'Items per page', required : false, min : 1, max : 50, maxlength : null, unit : 'items', options : [], value : 7 },
 		{ name : 'title', type : 'string', label : 'Title', hint : '', required : true, min : null, max : null, maxlength : 40, unit : '', options : [], value : 'Again' },
@@ -258,7 +260,7 @@ const FEATURES = [
 		{ name : 'apiKey', type : 'secret', label : 'API key', hint : '', required : false, min : null, max : null, maxlength : 1000, unit : '', options : [], set : true },
 		{ name : 'hosts', type : 'lines', label : 'Hosts', hint : '', required : false, min : null, max : null, maxlength : null, unit : '', options : [], value : [ 'one', 'two' ] },
 	] },
-	{ key : 'fresh', name : 'Fresh', description : 'Not switched on yet.', version : '0.1.0', installed : null, active : false, update : false, requires : [], problems : [], settings : [] },
+	{ key : 'fresh', name : 'Fresh', description : 'Not switched on yet.', category : '', version : '0.1.0', installed : null, active : false, update : false, requires : [], problems : [], settings : [] },
 ];
 
 /** A features/list answer: the catalogue url, whether features/ is writable, the cache - null unless given - and the installed features, FEATURES unless a list of its own is given (an install adds one the fixture does not carry) */
@@ -271,11 +273,11 @@ function listAnswer( catalogueUrl, writable, cache, features ) {
 // available, 'helper' an upgrade over what is on disk, 'sample' already
 // current - the one state the Available tab excludes
 const OFFERS = [
-	{ key : 'ancient', name : 'Ancient', description : 'Ein ancient', version : '1.0.0', nino : '^0.9', ext : [], requires : [], directory : 'Ancient', archive : 'https://catalogue.test/features/ancient-1.0.0.tar.gz', size : 10, released : '2026-09-07', state : 'incompatible', fits : false, local : null, active : false },
-	{ key : 'extra', name : 'Zusatz', description : 'Ein extra', version : '1.0.0', nino : '^1.0', ext : [], requires : [ 'helper' ], directory : 'Extra', archive : 'https://catalogue.test/features/extra-1.0.0.tar.gz', size : 10, released : '2026-09-07', state : 'available', fits : true, local : null, active : false },
-	{ key : 'helper', name : 'Helper', description : '', version : '1.2.0', nino : '^1.0', ext : [], requires : [], directory : 'Helper', archive : 'https://catalogue.test/features/helper-1.2.0.tar.gz', size : 10, released : '', state : 'upgrade', fits : true, local : '1.1.0', active : true },
-	{ key : 'needy', name : 'Needy', description : 'Ein needy', version : '1.0.0', nino : '^1.0', ext : [ 'no_such_extension', 'other' ], requires : [], directory : 'Needy', archive : 'https://catalogue.test/features/needy-1.0.0.tar.gz', size : 10, released : '2026-09-07', state : 'incompatible', fits : false, local : null, active : false },
-	{ key : 'sample', name : 'Beispiel-Feature', description : 'Ein sample', version : '1.2.0', nino : '^1.0', ext : [], requires : [ 'helper' ], directory : 'Sample', archive : 'https://catalogue.test/features/sample-1.2.0.tar.gz', size : 10, released : '2026-09-07', state : 'current', fits : true, local : '1.2.0', active : true },
+	{ key : 'ancient', name : 'Ancient', description : 'Ein ancient', category : 'content', version : '1.0.0', nino : '^0.9', ext : [], requires : [], directory : 'Ancient', archive : 'https://catalogue.test/features/ancient-1.0.0.tar.gz', size : 10, released : '2026-09-07', state : 'incompatible', fits : false, local : null, active : false },
+	{ key : 'extra', name : 'Zusatz', description : 'Ein extra', category : 'marketing', version : '1.0.0', nino : '^1.0', ext : [], requires : [ 'helper' ], directory : 'Extra', archive : 'https://catalogue.test/features/extra-1.0.0.tar.gz', size : 10, released : '2026-09-07', state : 'available', fits : true, local : null, active : false },
+	{ key : 'helper', name : 'Helper', description : '', category : 'system', version : '1.2.0', nino : '^1.0', ext : [], requires : [], directory : 'Helper', archive : 'https://catalogue.test/features/helper-1.2.0.tar.gz', size : 10, released : '', state : 'upgrade', fits : true, local : '1.1.0', active : true },
+	{ key : 'needy', name : 'Needy', description : 'Ein needy', category : 'security', version : '1.0.0', nino : '^1.0', ext : [ 'no_such_extension', 'other' ], requires : [], directory : 'Needy', archive : 'https://catalogue.test/features/needy-1.0.0.tar.gz', size : 10, released : '2026-09-07', state : 'incompatible', fits : false, local : null, active : false },
+	{ key : 'sample', name : 'Beispiel-Feature', description : 'Ein sample', category : 'content', version : '1.2.0', nino : '^1.0', ext : [], requires : [ 'helper' ], directory : 'Sample', archive : 'https://catalogue.test/features/sample-1.2.0.tar.gz', size : 10, released : '2026-09-07', state : 'current', fits : true, local : '1.2.0', active : true },
 ];
 
 const CACHE = { url : 'https://catalogue.getnino.dev/catalogue.json', fetched : '2026-09-07 12:00', offers : OFFERS };
@@ -343,6 +345,18 @@ check( 'every message the class phrases itself is a fill of the module in both l
 	&& moduleEn['/_admin/features/error/catalogue-reason'].includes( '%s' ) && moduleDe['/_admin/features/error/catalogue-reason'].includes( '%s' )
 	&& moduleEn['/_admin/features/error/update-after-install'].includes( '%s' ) && moduleDe['/_admin/features/error/update-after-install'].includes( '%s' ) );
 check( 'the module\'s two text files declare the same keys', Object.keys( moduleEn ).sort().join(',') === Object.keys( moduleDe ).sort().join(',') && Object.keys( moduleEn ).length > 20 );
+
+// The vocabulary is the kernel's (\Nino\Features::CATEGORIES), the words for
+// it are this panel's. A category shipped without a fill would show as its
+// own slug - which is the fallback for a feature from a later catalogue, not
+// for one this very workbench was released with
+const vocabulary = ( source('_nino/Nino/Features/Features.php').match( /public const array CATEGORIES = \[([^\]]*)\]/ ) || [ '', '' ] )[1]
+	.split(',').map( function( part ) { return part.trim().replace( /^'|'$/g, '' ) } ).filter( Boolean );
+const unnamed = vocabulary.concat( [ 'none' ] ).filter( function( slug ) {
+	return moduleEn['/_admin/features/category/'+ slug ] === undefined || moduleDe['/_admin/features/category/'+ slug ] === undefined;
+} );
+check( 'every category the kernel publishes is named in both interface languages'+ ( unnamed.length ? ' - missing: '+ unnamed.join(', ') : '' ),
+	vocabulary.length === 6 && vocabulary.indexOf( 'security' ) !== -1 && unnamed.length === 0 );
 check( 'the nav label and the dashboard tile are among them, and no value carries a live shortcode', moduleEn['/_admin/nav/features'] !== undefined && moduleEn['/_admin/features/label/active'] !== undefined
 	&& Object.keys( moduleEn ).every( function( key ) { return /[[\]]/.test( moduleEn[key] ) === false && /[[\]]/.test( moduleDe[key] ) === false } ) );
 check( 'the intro hint and the eyebrow badge fills are gone', moduleEn['/_admin/features/hint/intro'] === undefined && moduleEn['/_admin/features/label/catalogue'] === undefined
@@ -377,7 +391,7 @@ check( 'there is no intro line and no eyebrow badge - just the head, the action 
 const head 	 = mount.children[0];
 const strip	 = head.children[0];
 const filter = head.children[1];
-check( 'the head holds the tab strip and the filter, in that order, and the filter is outside the tablist', head.children.length === 2
+check( 'the head holds the tab strip, the filter and the category, in that order, and neither filter is inside the tablist', head.children.length === 3
 	&& hasClass( strip, 'nino-admin-tabs' ) && hasClass( strip, 'nino-admin-tabs--bar' ) && hasClass( strip, 'admin-panel-tabs' ) && strip.attributes.role === 'tablist'
 	&& filter.tagName === 'INPUT' && filter.type === 'search' && filter.id === 'features-filter' );
 check( 'the filter is labelled and placeheld from the text system, and reuses the shared search control', hasClass( filter, 'nino-admin-table-search' )
@@ -409,6 +423,9 @@ check( 'Inactive is the grouped list, one row per feature that is off, in the ba
 check( 'a row is the shared name-over-line copy, and carries no status badge', hasClass( row( mount, 'fresh' ).children[0], 'nino-admin-list-copy' )
 	&& row( mount, 'fresh' ).children[0].children[0].tagName === 'STRONG' && row( mount, 'fresh' ).children[0].children[0].textContent === 'Fresh' );
 check( 'the line under the name says which version this is and what the feature does', meta( row( mount, 'fresh' ) ) === text('/_admin/features/label/version').replace( '%s', '0.1.0' )+ ' · Not switched on yet.' );
+check( 'a feature that names no category writes nothing about one - "uncategorized" on every line of an older project is noise, not information',
+	meta( row( mount, 'fresh' ) ).indexOf( text('/_admin/features/category/none') ) === -1
+	&& meta( row( mount, 'old' ) ) === text('/_admin/features/category/system')+ ' · '+ text('/_admin/features/label/version').replace( '%s', '3.0.0' ) );
 check( 'an inactive feature without problems offers Activate alone', byTag( row( mount, 'fresh' ), 'button' ).map( function( el ) { return el.textContent } ).join('|') === text('/_admin/features/label/activate') && hasClass( byTag( row( mount, 'fresh' ), 'button' )[0], 'nino-admin-btn-primary' ) );
 check( 'one with problems offers nothing, and its requirements and every refusal are read whole rather than ellipsized', byTag( row( mount, 'old' ), 'button' ).length === 0
 	&& notes( row( mount, 'old' ) ).join('|') === text('/_admin/features/label/requires').replace( '%s', 'nowhere' )+ '|'+ FEATURES[0].problems.join('|')
@@ -420,7 +437,7 @@ check( 'an active feature is the shared drill-down row - a button with a chevron
 	&& hasClass( row( mount, 'plain' ), 'admin-type-btn' ) && row( mount, 'plain' ).type === 'button'
 	&& byTag( row( mount, 'plain' ), 'span' ).filter( function( el ) { return hasClass( el, 'admin-view-button-chev' ) } ).length === 1
 	&& findAll( row( mount, 'plain' ), function( el ) { return el.tagName === 'BUTTON' } ).length === 0 );
-check( 'its line names the version and, where an update waits, the one on disk', meta( row( mount, 'plain' ) ) === text('/_admin/features/label/version').replace( '%s', '1.0.0' )+ ' – '+ text('/_admin/features/label/installed').replace( '%s', '0.9.0' )+ ' · Nothing to set.' );
+check( 'its line leads with the category, then names the version and, where an update waits, the one on disk', meta( row( mount, 'plain' ) ) === text('/_admin/features/category/ui')+ ' · '+ text('/_admin/features/label/version').replace( '%s', '1.0.0' )+ ' – '+ text('/_admin/features/label/installed').replace( '%s', '0.9.0' )+ ' · Nothing to set.' );
 
 // --- the filter over everything the tabs hold
 
@@ -457,6 +474,62 @@ fire( filterNow(), 'input' );
 fire( byTag( mount.children[0], 'button' )[0], 'click' );
 check( 'cleared, every card is back', rowKeys( mount, 'feature' ) === 'plain,sample' );
 
+// --- the category beside it
+
+/** The category select as it stands after the last redraw - rebuilt like everything else in the head */
+function categoryNow() {
+	return mount.children[0].children[2];
+}
+
+check( 'the category is a select of its own, labelled from the text system and reusing the shared input control',
+	categoryNow().tagName === 'SELECT' && categoryNow().id === 'features-category'
+	&& hasClass( categoryNow(), 'nino-admin-input' ) && hasClass( categoryNow(), 'admin-features-category' )
+	&& categoryNow().attributes['aria-label'] === text('/_admin/features/label/category') );
+check( 'it offers what is on screen and nothing else: the entry that turns it off first, then one per category by the name it is shown under, the features without one last',
+	byTag( categoryNow(), 'option' ).map( function( o ) { return o.textContent } ).join('|')
+		=== [ text('/_admin/features/label/category-all'), text('/_admin/features/category/content'), text('/_admin/features/category/ui'),
+			text('/_admin/features/category/system'), text('/_admin/features/category/none') ].join('|') );
+check( 'so a category nothing is filed under is not offered - the catalogue is not loaded yet, and its own are not among them',
+	byTag( categoryNow(), 'option' ).map( function( o ) { return o.value } ).join('|') === '|content|ui|system|' );
+
+categoryNow().value = 'content';
+fire( categoryNow(), 'change' );
+const byCategory = byTag( mount.children[0], 'button' );
+check( 'picking one narrows every tab\'s count the way the search box does', byCategory[0].textContent === text('/_admin/features/tab/active')+ ' (1)'
+	&& byCategory[1].textContent === text('/_admin/features/tab/inactive')+ ' (0)' && byCategory[2].textContent === text('/_admin/features/tab/available')+ ' (0)' );
+check( 'and the tab on screen shows what is filed under it', rowKeys( mount, 'feature' ) === 'sample' );
+check( 'the pick survives the redraw it triggers', categoryNow().value === 'content' );
+
+filterNow().value = 'plain';
+fire( filterNow(), 'input' );
+check( 'the two narrow together rather than one replacing the other - Plain is not filed under Content',
+	findAll( mount.children[2], function( el ) { return hasClass( el, 'nino-admin-empty' ) } )[0].textContent === text('/_admin/features/hint/nomatch') );
+
+filterNow().value = '';
+fire( filterNow(), 'input' );
+categoryNow().value = '';
+fire( categoryNow(), 'change' );
+check( 'cleared, every feature is back', rowKeys( mount, 'feature' ) === 'plain,sample' );
+
+filterNow().value = text('/_admin/features/category/ui').toLowerCase();
+fire( filterNow(), 'input' );
+check( 'typing a category name into the search box finds the same rows, for anyone who never noticed the select', rowKeys( mount, 'feature' ) === 'plain' );
+filterNow().value = '';
+fire( filterNow(), 'input' );
+
+// A pick that no longer names anything on screen would hide every row with
+// nothing on the page saying why - so a reload that drops the last feature
+// carrying it drops the pick too
+categoryNow().value = 'ui';
+fire( categoryNow(), 'change' );
+panel.init();
+answer( 200, listAnswer( CACHE.url, true, null, FEATURES.filter( function( f ) { return f.category !== 'ui' } ) ) );
+check( 'a category gone after a reload stops narrowing instead of emptying the list for good', rowKeys( mount, 'feature' ) === 'sample' && categoryNow().value === '' );
+
+panel.init();
+answer( 200, listAnswer( CACHE.url, true, null ) );
+check( 'and the whole list is back with the feature', rowKeys( mount, 'feature' ) === 'plain,sample' );
+
 // --- one feature's own screen (from the Active tab)
 
 const sample = row( mount, 'sample' );
@@ -467,8 +540,8 @@ const asked = requests.length;
 fire( sample, 'click' );
 check( 'stepping into it asks the backend for nothing - features/list already carried the schema', requests.length === asked );
 check( 'the list is stepped out of and the feature\'s pane shown, the way every drill-down level is', mount.classList.contains('admin-hidden') === true && screen.classList.contains('admin-hidden') === false );
-check( 'the screen names the feature and the line the row carried', byTag( screen, 'h3' )[0].textContent === 'Beispiel-Feature'
-	&& byTag( screen, 'p' ).some( function( el ) { return el.textContent === text('/_admin/features/label/version').replace( '%s', '1.2.0' )+ ' · Prüft den ganzen Feature-Vertrag.' } )
+check( 'the screen names the feature and the line the row carried, category and all', byTag( screen, 'h3' )[0].textContent === 'Beispiel-Feature'
+	&& byTag( screen, 'p' ).some( function( el ) { return el.textContent === text('/_admin/features/category/content')+ ' · '+ text('/_admin/features/label/version').replace( '%s', '1.2.0' )+ ' · Prüft den ganzen Feature-Vertrag.' } )
 	&& byTag( screen, 'p' ).some( function( el ) { return el.textContent === text('/_admin/features/label/requires').replace( '%s', 'helper' ) } ) );
 
 const backLink = byTag( screen.children[0], 'a' )[0];
@@ -590,15 +663,17 @@ fire( tabs[2], 'click' );
 const availableTabs = byTag( mount.children[0], 'button' );
 check( 'Available\'s count is the offers that are not already current: ancient, extra, helper, needy - not sample', availableTabs[2].textContent === text('/_admin/features/tab/available')+ ' (4)' );
 check( 'the status line reads the cache\'s own stamp', byTag( mount.children[1], 'p' )[0].textContent === text('/_admin/features/label/catalogue-status').replace( '%s', CACHE.fetched ) );
+check( 'and the category now offers what the catalogue brought as well - it is built from what is on screen, installed or not',
+	byTag( mount.children[0].children[2], 'option' ).map( function( o ) { return o.value } ).join('|') === '|content|ui|marketing|security|system|' );
 
 check( 'the Available tab is one card per offer that is not current, ancient/extra/helper/needy but not sample', rowKeys( mount, 'offer' ) === 'ancient,extra,helper,needy' );
 check( 'an offer is a row of the same grouped list, its name in the shared copy, no status badge', offer( mount, 'extra' ).tagName === 'LI'
 	&& hasClass( offer( mount, 'extra' ).children[0], 'nino-admin-list-copy' ) && offer( mount, 'extra' ).children[0].children[0].textContent === 'Zusatz' );
 check( 'an available offer has Install as the primary action, and one line naming its version, its release date and what it is', byTag( offer( mount, 'extra' ), 'button' ).map( function( el ) { return el.textContent } ).join('|') === text('/_admin/features/label/install') && hasClass( byTag( offer( mount, 'extra' ), 'button' )[0], 'nino-admin-btn-primary' )
-	&& meta( offer( mount, 'extra' ) ) === text('/_admin/features/label/version').replace( '%s', '1.0.0' )+ ' – '+ text('/_admin/features/label/released').replace( '%s', '2026-09-07' )+ ' · Ein extra'
+	&& meta( offer( mount, 'extra' ) ) === text('/_admin/features/category/marketing')+ ' · '+ text('/_admin/features/label/version').replace( '%s', '1.0.0' )+ ' – '+ text('/_admin/features/label/released').replace( '%s', '2026-09-07' )+ ' · Ein extra'
 	&& notes( offer( mount, 'extra' ) ).join('|') === text('/_admin/features/label/requires').replace( '%s', 'helper' ) );
 check( 'an upgrade offers Update to the new version and names the one on disk', byTag( offer( mount, 'helper' ), 'button' ).map( function( el ) { return el.textContent } ).join('|') === text('/_admin/features/label/update').replace( '%s', '1.2.0' )
-	&& meta( offer( mount, 'helper' ) ) === text('/_admin/features/label/version').replace( '%s', '1.2.0' )+ ' – '+ text('/_admin/features/label/installed').replace( '%s', '1.1.0' ) );
+	&& meta( offer( mount, 'helper' ) ) === text('/_admin/features/category/system')+ ' · '+ text('/_admin/features/label/version').replace( '%s', '1.2.0' )+ ' – '+ text('/_admin/features/label/installed').replace( '%s', '1.1.0' ) );
 check( 'an incompatible one is greyed, offers nothing, and says what it asks for: the Nino constraint, and the extensions where it names some', byTag( offer( mount, 'needy' ), 'button' ).length === 0 && offer( mount, 'needy' ).attributes['aria-disabled'] === 'true'
 	&& notes( offer( mount, 'needy' ) ).join('|') === text('/_admin/features/label/nino').replace( '%s', '^1.0' )+ '|'+ text('/_admin/features/label/extensions').replace( '%s', 'no_such_extension, other' )
 	&& notes( offer( mount, 'ancient' ) ).join('|') === text('/_admin/features/label/nino').replace( '%s', '^0.9' )
@@ -708,6 +783,8 @@ fire( byTag( mount.children[0], 'button' )[1], 'click' );
 check( 'Inactive, empty, names the features directory', findAll( mount.children[2], function( el ) { return hasClass( el, 'nino-admin-empty' ) } )[0].textContent === text('/_admin/features/hint/empty').replace( '%s', '/features' ) );
 fire( byTag( mount.children[0], 'button' )[0], 'click' );
 check( 'Active, empty, says no feature is on', findAll( mount.children[2], function( el ) { return hasClass( el, 'nino-admin-empty' ) } )[0].textContent === text('/_admin/features/hint/active-empty') );
+check( 'and with nothing to narrow the category is not drawn at all - a select with one option is a control that cannot be used',
+	mount.children[0].children.length === 2 && byTag( mount.children[0], 'select' ).length === 0 );
 
 panel.init();
 answer( 500, null );
