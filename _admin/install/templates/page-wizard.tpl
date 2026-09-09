@@ -25,7 +25,7 @@
 				     Back/Next controls the wizard's flow, see script.js -->
 				<div id="install-nav-wrap" class="nino-admin-nav">
 					<span id="install-nav-checks" class="active">1. Environment</span>
-					<span id="install-nav-setup">2. Setup</span>
+					<span id="install-nav-setup">2. Language</span>
 					<span id="install-nav-themes">3. Themes</span>
 					<span id="install-nav-header">4. Header</span>
 					<span id="install-nav-footer">5. Footer</span>
@@ -46,7 +46,7 @@
 				</div>
 
 				<div id="install-content-setup">
-					<p class="nino-admin-hint nino-admin-hint-lead">Pick the site's locales - the navigation, the contact form and the locale picker are always on, their routes, templates and text come from <code>_admin/install/library</code>. Whatever's checked when you hit "Next" is the whole picture: unchecking something and coming back here replaces the previous selection, it doesn't add to it - though a route/template/text file already written for something you un-pick still has to be removed by hand, see <code>docs/setup.md</code>.</p>
+					<p class="nino-admin-hint nino-admin-hint-lead">Pick the available languages and Nino's default language. You can change this at any time in _admin/.</p>
 					<div class="nino-admin-card">
 						<h3>Available Locales</h3>
 						<div id="setup-locales" class="nino-admin-checklist"></div>
