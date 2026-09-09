@@ -164,6 +164,15 @@ function offer( root, key ) {
 	return findAll( root, function( el ) { return el.dataset.offer === key } )[0];
 }
 
+/** The line an offer reports into, and the button it carries */
+function offerMessage( root, key ) {
+	return ( byTag( offer( root, key ), 'p' )[0] || { textContent : '' } ).textContent;
+}
+
+function offerButton( root, key ) {
+	return byTag( offer( root, key ), 'button' )[0];
+}
+
 /** Every row's key, in the order they are drawn */
 function rowKeys( root, attr ) {
 	return findAll( root, function( el ) { return typeof el.dataset[attr] === 'string' } ).map( function( el ) { return el.dataset[attr] } ).join(',');
@@ -223,7 +232,12 @@ const sandbox = {
 	},
 	Nino : Nino,
 };
-sandbox.window = { Nino : Nino, location : { hash : '', reload : function() { reloads++ } } };
+let confirmAnswer = true;
+sandbox.window = {
+	Nino : Nino,
+	confirm : function() { return confirmAnswer },
+	location : { hash : '', reload : function() { reloads++ } },
+};
 
 const context = vm.createContext( sandbox );
 vm.runInContext( source('_admin/assets/Nino.admin.js'), context, { filename : 'Nino.admin.js' } );
@@ -294,10 +308,10 @@ check( 'and binds its ready callback', callbacks.length === 1 && callbacks[0] ==
 
 // The backend half of the same contract, read from the class
 const admin = source('_admin/Nino/Modules/Features/Admin/Admin.php');
-check( 'the panel is a system entry with the nav uri the script speaks, two mount points and six actions',
+check( 'the panel is a system entry with the nav uri the script speaks, two mount points and seven actions',
 	admin.includes( "return [ 'features', '/_admin/nav/features', 15, 'system' ];" ) && admin.includes( "return [ 'features-list', 'features-detail' ];" )
 	&& script.includes( "'features-list'" ) && script.includes( "'features-detail'" )
-	&& [ 'features/list', 'features/activate', 'features/deactivate', 'features/settings', 'features/catalogue', 'features/install' ].every( function( action ) { return admin.includes( "'"+ action+ "'" ) } ) );
+	&& [ 'features/list', 'features/activate', 'features/deactivate', 'features/settings', 'features/catalogue', 'features/install', 'features/remove' ].every( function( action ) { return admin.includes( "'"+ action+ "'" ) } ) );
 // The one thing the module's own stylesheet is for: the script builds a
 // card's buttons as siblings with no whitespace between them, so the row
 // carries its gap itself
@@ -312,10 +326,11 @@ check( 'the panel bundles a stylesheet of its own, in the workbench\'s layer, sp
 check( 'the head that carries the tabs and the filter stays at the top of the list pane, scoped to that pane',
 	/#features-list \.admin-features-head \{[^}]*position: sticky;/s.test( moduleCss )
 	&& /\.admin-panel-tabs \{[^}]*position: sticky;/s.test( source('_admin/assets/style.css') ) === false );
-check( 'every action method guards itself with the panel\'s permission', ( admin.match( /guardPerm\( \$appData, \$request, self::MANAGE_PERM \)/g ) || [] ).length === 6 );
-check( 'the script posts those six actions and no other',
+check( 'every action method guards itself with the panel\'s permission', ( admin.match( /guardPerm\( \$appData, \$request, self::MANAGE_PERM \)/g ) || [] ).length === 7 );
+check( 'the script posts those seven actions and no other',
 	script.includes( "action : 'features/'+ endpoint" ) && script.includes( "_apiCall( 'list'" ) && script.includes( "_apiCall( 'settings'" )
-	&& script.includes( "? 'deactivate' : 'activate'" ) && script.includes( "_apiCall( 'catalogue'" ) && script.includes( "_apiCall( 'install'" ) && ( script.match( /_apiCall\( /g ) || [] ).length === 5 );
+	&& script.includes( "? 'deactivate' : 'activate'" ) && script.includes( "_apiCall( 'catalogue'" ) && script.includes( "_apiCall( 'install'" )
+	&& script.includes( "_apiCall( 'remove'" ) && ( script.match( /_apiCall\( /g ) || [] ).length === 6 );
 
 // --- one language, one text system
 
@@ -426,8 +441,11 @@ check( 'the line under the name says which version this is and what the feature 
 check( 'a feature that names no category writes nothing about one - "uncategorized" on every line of an older project is noise, not information',
 	meta( row( mount, 'fresh' ) ).indexOf( text('/_admin/features/category/none') ) === -1
 	&& meta( row( mount, 'old' ) ) === text('/_admin/features/category/system')+ ' · '+ text('/_admin/features/label/version').replace( '%s', '3.0.0' ) );
-check( 'an inactive feature without problems offers Activate alone', byTag( row( mount, 'fresh' ), 'button' ).map( function( el ) { return el.textContent } ).join('|') === text('/_admin/features/label/activate') && hasClass( byTag( row( mount, 'fresh' ), 'button' )[0], 'nino-admin-btn-primary' ) );
-check( 'one with problems offers nothing, and its requirements and every refusal are read whole rather than ellipsized', byTag( row( mount, 'old' ), 'button' ).length === 0
+check( 'an inactive feature without problems offers Remove and Activate', byTag( row( mount, 'fresh' ), 'button' ).map( function( el ) { return el.textContent } ).join('|') === text('/_admin/features/label/remove')+ '|'+ text('/_admin/features/label/activate')
+	&& hasClass( byTag( row( mount, 'fresh' ), 'button' )[0], 'nino-admin-btn-danger' ) && hasClass( byTag( row( mount, 'fresh' ), 'button' )[1], 'nino-admin-btn-primary' ) );
+// A feature that cannot be switched on is exactly the one somebody wants rid
+// of, so Remove is there whether or not Activate is
+check( 'one with problems offers Remove alone, and its requirements and every refusal are read whole rather than ellipsized', byTag( row( mount, 'old' ), 'button' ).map( function( el ) { return el.textContent } ).join('|') === text('/_admin/features/label/remove')
 	&& notes( row( mount, 'old' ) ).join('|') === text('/_admin/features/label/requires').replace( '%s', 'nowhere' )+ '|'+ FEATURES[0].problems.join('|')
 	&& byTag( row( mount, 'old' ), 'small' ).filter( function( el ) { return hasClass( el, 'nino-admin-error' ) } ).map( function( el ) { return el.textContent } ).join('|') === FEATURES[0].problems.join('|') );
 
@@ -622,7 +640,7 @@ answer( 200, listAnswer( CACHE.url, true, null ) );
 // --- switching on and off (from the tab the feature is on)
 
 fire( tabs[1], 'click' );
-const activate = byTag( row( mount, 'fresh' ), 'button' )[0];
+const activate = byTag( row( mount, 'fresh' ), 'button' )[1];
 const freshMsg = byTag( row( mount, 'fresh' ), 'p' ).filter( function( el ) { return el.attributes['aria-live'] === 'polite' } )[0];
 fire( activate, 'click' );
 check( 'Activate posts features/activate with the key', requests[requests.length - 1].action === 'features/activate' && requests[requests.length - 1].payload.key === 'fresh' && activate.disabled === true && freshMsg.textContent === text('/_admin/features/msg/activating') );
@@ -631,6 +649,36 @@ check( 'a refusal shows the kernel\'s reason and reloads nothing', reloads === 0
 fire( activate, 'click' );
 answer( 200, { feature : FEATURES[3] } );
 check( 'success says so, keeps the hash on the panel and reloads the workbench', reloads === 1 && sandbox.window.location.hash === '#features' && freshMsg.textContent === text('/_admin/features/msg/activated')+ ' '+ text('/_admin/features/msg/reload') );
+
+// --- removing the directory, which deactivating deliberately does not do
+
+fire( tabs[1], 'click' );
+const removeBtn = byTag( row( mount, 'old' ), 'button' )[0];
+const oldMsg = byTag( row( mount, 'old' ), 'p' ).filter( function( el ) { return el.attributes['aria-live'] === 'polite' } )[0];
+
+confirmAnswer = false;
+const beforeRemove = requests.length;
+fire( removeBtn, 'click' );
+check( 'declining the confirmation sends nothing and holds no button', requests.length === beforeRemove && removeBtn.disabled === false );
+
+confirmAnswer = true;
+fire( removeBtn, 'click' );
+check( 'Remove posts features/remove with the key alone, holds the button and says so', requests[requests.length - 1].action === 'features/remove'
+	&& JSON.stringify( requests[requests.length - 1].payload ) === '{"key":"old"}'
+	&& removeBtn.disabled === true && oldMsg.textContent === text('/_admin/features/msg/removing') );
+
+answer( 400, { error : 'could not remove /features/Old - the web server may not write there' } );
+check( 'a refusal shows the kernel\'s reason and frees the button', removeBtn.disabled === false
+	&& oldMsg.textContent === 'could not remove /features/Old - the web server may not write there' );
+
+fire( removeBtn, 'click' );
+answer( 200, { removed : 'old' } );
+check( 'a removal reads the whole list again - what it took away may be what another row was waiting for', requests[requests.length - 1].action === 'features/list' );
+answer( 200, listAnswer( CACHE.url, true, null, FEATURES.filter( function( f ) { return f.key !== 'old' } ) ) );
+check( '...and the row is gone with no page reload: no rail entry changes when an inactive feature leaves', rowKeys( mount, 'feature' ) === 'fresh' && reloads === 1 );
+
+panel.init();
+answer( 200, listAnswer( CACHE.url, true, null ) );
 
 // Deactivate and Update live on the feature's own screen now, not in the list
 fire( tabs[0], 'click' );
@@ -695,8 +743,17 @@ check( 'a failed install falls back to its own error line', byTag( offer( mount,
 
 const EXTRA = { key : 'extra', name : 'Extra', description : 'Ein extra', version : '1.0.0', installed : null, active : false, update : false, requires : [ 'helper' ], problems : [], settings : [] };
 const FEATURES_WITH_EXTRA = FEATURES.concat( [ EXTRA ] );
-const requestsBeforeInstall = requests.length;
+// An install that pulled a requirement in with it names it: pressing Install
+// on one feature and getting two is not something to work out from the
+// Inactive tab afterwards
 fire( install, 'click' );
+answer( 200, { feature : EXTRA, updated : false, required : [ 'helper' ] } );
+answer( 200, listAnswer( CACHE.url, true, CACHE, FEATURES_WITH_EXTRA ) );
+fire( byTag( mount.children[0], 'button' )[2], 'click' );
+check( 'an install that brought a requirement along says which one', offerMessage( mount, 'extra' ) === text('/_admin/features/msg/installed-with').replace( '%s', 'helper' ) );
+
+const requestsBeforeInstall = requests.length;
+fire( offerButton( mount, 'extra' ), 'click' );
 answer( 200, { feature : EXTRA, updated : false } );
 check( 'success reads the list again, and only the list - the cached catalogue\'s offers are recomputed there, no catalogue request and no page reload', requests.length === requestsBeforeInstall + 2 && requests[requests.length - 1].action === 'features/list' && reloads === 2 );
 
@@ -710,7 +767,7 @@ answer( 200, listAnswer( CACHE.url, true, Object.assign( {}, CACHE, { offers : i
 check( 'the installed feature now shows on Inactive, off, with Activate - and Available lost it, straight from the cache', byTag( mount.children[0], 'button' )[2].textContent === text('/_admin/features/tab/available')+ ' (3)' );
 
 fire( byTag( mount.children[0], 'button' )[1], 'click' );
-check( 'the just-installed feature is on Inactive now, with Activate', row( mount, 'extra' ) !== undefined && byTag( row( mount, 'extra' ), 'button' ).map( function( el ) { return el.textContent } ).join('|') === text('/_admin/features/label/activate') );
+check( 'the just-installed feature is on Inactive now, with Remove and Activate', row( mount, 'extra' ) !== undefined && byTag( row( mount, 'extra' ), 'button' ).map( function( el ) { return el.textContent } ).join('|') === text('/_admin/features/label/remove')+ '|'+ text('/_admin/features/label/activate') );
 
 fire( byTag( mount.children[0], 'button' )[2], 'click' );
 check( 'and the offer itself is gone from Available - excluded as current, not shown with a disabled button', offer( mount, 'extra' ) === undefined );

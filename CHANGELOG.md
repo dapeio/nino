@@ -92,6 +92,22 @@ and a seam a submission can be refused at.
   refusing the entry: a bad entry costs the whole catalogue, and a category is
   a heading in a list. The catalogue format stayed at 1; its reader takes only
   the keys it knows.
+- **`\Nino\Features::remove()`** and the panel's **Remove**: an inactive
+  feature's directory deleted from the workbench, the one step deactivating
+  deliberately leaves out. What the feature kept stays - its settings, its
+  files under `data/`, whatever its unit copied into the project - so putting
+  the same feature back finds its settings where it left them. Refused for an
+  active feature: its class is listed in `/nino/modules`, and a directory
+  deleted from under the autoloader is a fatal on the next request rather
+  than a message. Action `features/remove`.
+- **`\Nino\Catalogue::install()` resolves requirements.** It works out the
+  whole set first - what the feature `requires`, what those require, and only
+  what the project does not already carry - checks every entry against this
+  kernel, and places them deepest first, so the feature asked for arrives
+  last and can be switched on straight away. A requirement already on disk is
+  left as it is, whatever version it has. One the catalogue cannot serve
+  refuses the whole install, naming it, with nothing placed. The panel's
+  answer names what came along.
 - **`/nino/mail/send`** (`\Nino\Mail::TRANSPORT`): a transport callback.
   `Mail::send()` fires it after the per-ip cap and the header cleaning with
   `{ to, subject, body, replyTo, sender, headers, sent }`; a handler that

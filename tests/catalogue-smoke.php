@@ -732,7 +732,7 @@ check( 'a feature not on disk is offered as available, its name in the session l
 
 $requests = [];
 [ $status, $body ] = callFeatures( $appData, 'apiInstall', [ 'key' => 'extra', 'version' => '1.0.0' ] );
-check( 'installing it answers its entry as the list shows it now - on disk, off, nothing recorded - and that no update was applied', $status === 200 && array_keys( $body ) === [ 'feature', 'updated' ] && $body['updated'] === false
+check( 'installing it answers its entry as the list shows it now - on disk, off, nothing recorded - and that no update was applied', $status === 200 && array_keys( $body ) === [ 'feature', 'updated', 'required' ] && $body['updated'] === false && $body['required'] === []
 	&& array_keys( $body['feature'] ) === [ 'key', 'name', 'description', 'category', 'version', 'installed', 'active', 'update', 'requires', 'problems', 'settings' ]
 	&& $body['feature']['key'] === 'extra' && $body['feature']['name'] === 'Extra' && $body['feature']['version'] === '1.0.0' && $body['feature']['active'] === false && $body['feature']['installed'] === null && $body['feature']['update'] === false && $body['feature']['problems'] === [] );
 check( 'the directory is in place, the archive was fetched once, and nothing was switched on', is_file( NINO_FEATURES_DIR. '/Extra/feature.php' ) && is_file( NINO_FEATURES_DIR. '/Extra/Extra.php' )
@@ -781,6 +781,87 @@ check( 'the directory is the new one, the record stayed at 1.2.0, and the list s
 
 check( 'the activity log names the feature and the version, and a catalogue read logs nothing', \Nino\Modules\Features\Admin::log( 'features/install', [ 'key' => 'helper', 'version' => '1.2.0' ] ) === 'Install feature "helper" 1.2.0'
 	&& \Nino\Modules\Features\Admin::log( 'features/catalogue', [] ) === '' );
+
+echo "\n";
+
+
+// --- Requirements, resolved by the install ---------------------------------
+
+echo "Catalogue::install - a feature brings what it requires\n";
+
+// 'top' requires 'middle', 'middle' requires 'bottom', and none of the three
+// is on disk. One Install has to place all of them, deepest first
+$bottom	= tarGz( featureFiles( 'Bottom', 'bottom', '1.0.0' ) );
+$middle	= tarGz( featureFiles( 'Middle', 'middle', '1.0.0', [ 'feature.php' => '<?php return [ \'key\' => \'middle\', \'name\' => \'Middle\', \'version\' => \'1.0.0\', \'requires\' => [ \'bottom\' ] ];' ] ) );
+$top		= tarGz( featureFiles( 'Top', 'top', '1.0.0', [ 'feature.php' => '<?php return [ \'key\' => \'top\', \'name\' => \'Top\', \'version\' => \'1.0.0\', \'requires\' => [ \'middle\' ] ];' ] ) );
+
+$remote['https://catalogue.test/features/bottom-1.0.0.tar.gz'] = $bottom;
+$remote['https://catalogue.test/features/middle-1.0.0.tar.gz'] = $middle;
+$remote['https://catalogue.test/features/top-1.0.0.tar.gz']		= $top;
+
+$chained = array_merge( $withHelper120, [
+	entry( 'helper', '1.3.0', $helper130 ),
+	entry( 'bottom', '1.0.0', $bottom ),
+	entry( 'middle', '1.0.0', $middle, [ 'requires' => [ 'bottom' ], 'directory' => 'Middle' ] ),
+	entry( 'top', '1.0.0', $top, [ 'requires' => [ 'middle' ], 'directory' => 'Top' ] ),
+] );
+publish( $appData, $remote, $chained, null, $privateKey );
+
+$requests = [];
+[ $status, $body ] = callFeatures( $appData, 'apiInstall', [ 'key' => 'top', 'version' => '1.0.0' ] );
+check( 'one Install places the whole chain, and the answer names what came along', $status === 200 && $body['required'] === [ 'bottom', 'middle' ]
+	&& is_file( NINO_FEATURES_DIR. '/Top/feature.php' ) && is_file( NINO_FEATURES_DIR. '/Middle/feature.php' ) && is_file( NINO_FEATURES_DIR. '/Bottom/feature.php' ) );
+// Deepest first, because the panel activates what it installed and an
+// activation refuses a feature whose requirement is not in the directory
+check( 'deepest first, one archive each', array_values( array_map( static fn( array $r ): string => basename( (string) $r['url'] ), array_filter( $requests, static fn( array $r ): bool => str_ends_with( (string) $r['url'], '.tar.gz' ) ) ) ) === [ 'bottom-1.0.0.tar.gz', 'middle-1.0.0.tar.gz', 'top-1.0.0.tar.gz' ] );
+check( 'and the chain can be switched on in one step, which is what placing it in that order was for', \Nino\Features::activate( $appData, 'top' ) === true
+	&& \Nino\Features::get( $appData, 'top' )['active'] === true && \Nino\Features::get( $appData, 'bottom' )['active'] === true );
+
+// A requirement already on disk is left exactly as it is - an install is not
+// the moment to update something a project chose to keep
+$requests = [];
+$another = tarGz( featureFiles( 'Another', 'another', '1.0.0', [ 'feature.php' => '<?php return [ \'key\' => \'another\', \'name\' => \'Another\', \'version\' => \'1.0.0\', \'requires\' => [ \'bottom\' ] ];' ] ) );
+$remote['https://catalogue.test/features/another-1.0.0.tar.gz'] = $another;
+publish( $appData, $remote, array_merge( $chained, [ entry( 'another', '1.0.0', $another, [ 'requires' => [ 'bottom' ], 'directory' => 'Another' ] ) ] ), null, $privateKey );
+
+[ $status, $body ] = callFeatures( $appData, 'apiInstall', [ 'key' => 'another', 'version' => '1.0.0' ] );
+check( 'a requirement the project already carries is not fetched again', $status === 200 && $body['required'] === []
+	&& count( array_filter( $requests, static fn( array $r ): bool => str_ends_with( (string) $r['url'], '.tar.gz' ) ) ) === 1 );
+
+// A requirement the catalogue cannot serve: refused whole, with nothing
+// placed - half an installation is worse than none
+$orphan = tarGz( featureFiles( 'Orphan', 'orphan', '1.0.0', [ 'feature.php' => '<?php return [ \'key\' => \'orphan\', \'name\' => \'Orphan\', \'version\' => \'1.0.0\', \'requires\' => [ \'nowhere\' ] ];' ] ) );
+$remote['https://catalogue.test/features/orphan-1.0.0.tar.gz'] = $orphan;
+publish( $appData, $remote, array_merge( $chained, [ entry( 'orphan', '1.0.0', $orphan, [ 'requires' => [ 'nowhere' ], 'directory' => 'Orphan' ] ) ] ), null, $privateKey );
+
+$requests = [];
+$result = callFeatures( $appData, 'apiInstall', [ 'key' => 'orphan', 'version' => '1.0.0' ] );
+check( 'a requirement the catalogue does not list refuses the whole install, naming it', $result === [ 400, [ 'error' => 'required feature "nowhere": the catalogue lists no "nowhere" this kernel can run' ] ]
+	&& is_dir( NINO_FEATURES_DIR. '/Orphan' ) === false
+	&& array_filter( $requests, static fn( array $r ): bool => str_ends_with( (string) $r['url'], '.tar.gz' ) ) === [] );
+
+echo "\n";
+
+
+// --- Removing a feature's directory ----------------------------------------
+
+echo "Features::remove - the step deactivating leaves out\n";
+
+check( 'an active feature is refused, and its directory stays', callFeatures( $appData, 'apiRemove', [ 'key' => 'top' ] ) === [ 400, [ 'error' => 'feature "top" is active - switch it off before removing it' ] ]
+	&& is_dir( NINO_FEATURES_DIR. '/Top' ) === true );
+check( 'a key nothing carries is a 400 before the kernel is asked', callFeatures( $appData, 'apiRemove', [ 'key' => 'nowhere' ] ) === [ 400, [ 'error' => 'unknown feature' ] ]
+	&& callFeatures( $appData, 'apiRemove', [ 'key' => '../../etc' ] ) === [ 400, [ 'error' => 'unknown feature' ] ] );
+
+\Nino\Features::deactivate( $appData, 'top' );
+
+[ $status, $body ] = callFeatures( $appData, 'apiRemove', [ 'key' => 'top' ] );
+check( 'an inactive one goes, directory and all', $status === 200 && $body === [ 'removed' => 'top' ]
+	&& is_dir( NINO_FEATURES_DIR. '/Top' ) === false && \Nino\Features::get( $appData, 'top' ) === null );
+// The same rule deactivation follows: what a feature left behind is the
+// project's now, and putting the feature back finds it again
+check( 'what it recorded stays - a removal is not an uninstall', isset( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/features']['top'] ) === true );
+check( 'and the class is not in /nino/modules either way', in_array( '\\Nino\\Modules\\Top', \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/modules'], true ) === false );
+check( 'the activity log names it', \Nino\Modules\Features\Admin::log( 'features/remove', [ 'key' => 'top' ] ) === 'Remove the directory of feature "top"' );
 
 echo "\n";
 

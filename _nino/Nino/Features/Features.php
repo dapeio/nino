@@ -616,6 +616,55 @@ namespace Nino {
 		}
 
 		/**
+		 *	Delete a feature's directory.
+		 *
+		 *	The one thing deactivation deliberately does not do, and the step
+		 *	that was missing: a feature switched off is still a directory a
+		 *	project carries, and until now the only way to be rid of it was a
+		 *	file manager on the server. What it leaves behind is what
+		 *	deactivation leaves behind - the settings recorded under
+		 *	'/nino/features', the files under data/, the templates and texts
+		 *	its unit copied once. That is deliberate on both counts: those are
+		 *	the project's now, and putting the same feature back finds its
+		 *	settings where it left them.
+		 *
+		 *	Refused for an active feature. Its class is listed in
+		 *	'/nino/modules', so removing the directory would leave the
+		 *	autoloader looking for a class that is not there - switch it off
+		 *	first, which is one click and says what it is doing.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$key					The feature's key
+		 *
+		 *	@return 	true|string							true, or why not
+		 */
+		public static function remove( array &$appData, string $key ): true|string {
+
+			$feature = self::get( $appData, $key );
+			if( $feature === null )
+				return 'unknown feature "'. $key. '"';
+
+			if( $feature['active'] === true )
+				return 'feature "'. $key. '" is active - switch it off before removing it';
+
+			// all() only ever reads directories below dir(), so this cannot
+			// currently be anything else. Checked anyway: it is the guard
+			// between a key from a request and a recursive delete
+			$dir = $feature['dir'];
+			if( str_starts_with( $dir, self::dir(). '/' ) === false || str_contains( $dir, '..' ) === true )
+				return 'feature "'. $key. '" does not live below the features directory';
+
+			\Nino\Filesystem::removeDir( $dir );
+
+			if( is_dir( $dir ) === true )
+				return 'could not remove '. $dir. ' - the web server may not write there';
+
+			unset( $appData['./nino/features/all'] );
+
+			return true;
+		}
+
+		/**
 		 *	The unit manifest of an install/ directory - the wizard's units
 		 *	and a feature's install/ share the shape (docs/setup.md, "Library
 		 *	Format")

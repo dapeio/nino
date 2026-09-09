@@ -370,19 +370,112 @@ PEM;
 			if( is_string( $catalogue ) === true )
 				return $catalogue;
 
-			$entry = null;
-			foreach( $catalogue['features'] as $candidate )
-				if( $candidate['key'] === $key && $candidate['version'] === $version )
-					$entry = $candidate;
+			// What this install will place, in the order it has to: the
+			// requirements the project does not have yet, deepest first, then
+			// the feature that was asked for. Worked out whole before a byte
+			// is downloaded, so a requirement the catalogue cannot serve is a
+			// refusal with nothing on disk rather than half an installation
+			$plan = self::_plan( $appData, $catalogue, $key, $version, [] );
 
-			if( $entry === null )
-				return 'the catalogue does not list "'. $key. '" in version '. $version;
-
-			if( self::_fits( $entry ) === false )
-				return '"'. $key. '" '. $version. ' requires Nino '. $entry['nino']. ( $entry['php']['ext'] === [] ? '' : ' and the php extensions '. implode( ', ', $entry['php']['ext'] ) );
+			if( is_string( $plan ) === true )
+				return $plan;
 
 			if( self::writable() === false )
-				return 'the features directory is not writable - download '. $entry['archive']. ' and unpack it there by hand';
+				return 'the features directory is not writable - download '. $plan[ count( $plan ) - 1 ]['archive']. ' and unpack it there by hand';
+
+			// What actually went in, for the panel to name - a runtime key,
+			// never written anywhere
+			$appData['./nino/catalogue/installed'] = [];
+
+			foreach( $plan as $entry ) {
+
+				$result = self::_place( $appData, $entry );
+
+				if( $result !== true )
+					return count( $plan ) === 1
+						? $result
+						: 'required feature "'. $entry['key']. '": '. $result;
+
+				$appData['./nino/catalogue/installed'][] = $entry['key'];
+			}
+
+			return true;
+		}
+
+		/**
+		 *	Everything one install has to place, in order: a feature's
+		 *	requirements before the feature, each one only where the project
+		 *	does not already carry it, and every entry checked against this
+		 *	kernel before anything is fetched.
+		 *
+		 *	A requirement already on disk is left exactly as it is, whatever
+		 *	version it has - an install is not the moment to update something
+		 *	a project chose to keep. What it cannot do it says: a requirement
+		 *	the catalogue does not list is a refusal naming it, because the
+		 *	alternative is placing a feature that cannot be switched on.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		$catalogue		A parsed catalogue
+		 *	@param		string		$key					The feature asked for
+		 *	@param		string		$version			Its version, '' for the newest that fits
+		 *	@param		array 		$chain				Keys already in the plan, against a cycle
+		 *
+		 *	@return 	array|string						The entries to place, or why not
+		 */
+		private static function _plan( array &$appData, array $catalogue, string $key, string $version, array $chain ): array|string {
+
+			$entry = null;
+
+			foreach( $catalogue['features'] as $candidate )
+				if( $candidate['key'] === $key && ( $version === '' ? self::_fits( $candidate ) === true : $candidate['version'] === $version ) )
+					if( $entry === null || version_compare( self::_comparable( $candidate['version'] ), self::_comparable( $entry['version'] ) ) > 0 )
+						$entry = $candidate;
+
+			if( $entry === null )
+				return $version === ''
+					? 'the catalogue lists no "'. $key. '" this kernel can run'
+					: 'the catalogue does not list "'. $key. '" in version '. $version;
+
+			if( self::_fits( $entry ) === false )
+				return '"'. $key. '" '. $entry['version']. ' requires Nino '. $entry['nino']. ( $entry['php']['ext'] === [] ? '' : ' and the php extensions '. implode( ', ', $entry['php']['ext'] ) );
+
+			$chain[]	= $key;
+			$plan			= [];
+
+			foreach( $entry['requires'] as $required ) {
+
+				// Already there, or already in this plan: nothing to do either
+				// way, and the second case is what stops two features that
+				// require each other from planning forever
+				if( in_array( $required, $chain, true ) === true || \Nino\Features::get( $appData, $required ) !== null )
+					continue;
+
+				$sub = self::_plan( $appData, $catalogue, $required, '', $chain );
+
+				if( is_string( $sub ) === true )
+					return 'required feature "'. $required. '": '. $sub;
+
+				foreach( $sub as $subEntry ) {
+					$chain[]	= $subEntry['key'];
+					$plan[]		= $subEntry;
+				}
+			}
+
+			$plan[] = $entry;
+
+			return $plan;
+		}
+
+		/**
+		 *	Download one entry's archive, check it against what the signed
+		 *	catalogue promised, and put the directory in place
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		$entry				One validated catalogue entry
+		 *
+		 *	@return 	true|string
+		 */
+		private static function _place( array &$appData, array $entry ): true|string {
 
 			$archive = \Nino\Fetch::get( $appData, $entry['archive'], [ 'maxBytes' => $entry['size'], 'timeout' => 60 ] );
 			if( $archive['ok'] === false )
@@ -392,7 +485,7 @@ PEM;
 				return 'the archive does not match what the catalogue promised';
 
 			\Nino\Filesystem::forceDir( $appData, self::STAGING );
-			$staging = \Nino\Filesystem::path( $appData, self::STAGING ). '/'. $key. '-'. bin2hex( random_bytes( 6 ) );
+			$staging = \Nino\Filesystem::path( $appData, self::STAGING ). '/'. $entry['key']. '-'. bin2hex( random_bytes( 6 ) );
 			if( @mkdir( $staging, 0755, true ) === false )
 				return 'could not create the staging directory';
 

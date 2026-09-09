@@ -789,6 +789,18 @@
 			msg.className = 'nino-admin-hint';
 			msg.setAttribute( 'aria-live', 'polite' );
 
+			// The one destructive control in the list, and it is only ever on an
+			// inactive row: an active feature's class is listed in
+			// /nino/modules, so its directory is not something to delete from
+			// under the autoloader. Switching it off first is one click and
+			// says what it is doing
+			const remove = dc.createElement('button');
+			remove.type = 'button';
+			remove.className = 'nino-admin-btn-danger';
+			remove.textContent = Nino.content.getText('/_admin/features/label/remove');
+			remove.addEventListener( 'click', function() { Nino.admin.features._remove( feature, remove, msg ) } );
+			actions.appendChild( remove );
+
 			if( feature.problems.length === 0 ) {
 				const activate = dc.createElement('button');
 				activate.type = 'button';
@@ -801,6 +813,41 @@
 			actions.appendChild( msg );
 
 			return actions;
+		},
+
+		/**
+		 *	Delete an inactive feature's directory, after asking. What the
+		 *	feature kept stays - its settings, its files, the templates its
+		 *	unit copied - which is what the confirmation says, because it is
+		 *	the half of the answer nobody expects
+		 *
+		 *	@param		{Object}	feature
+		 *	@param		{Element}	btn
+		 *	@param		{Element}	msg
+		 *
+		 *	@return		void
+		 */
+		_remove : function( feature, btn, msg ) {
+
+			if( wn.confirm( Nino.content.getText('/_admin/features/confirm/remove').replace( '%s', feature.name ) ) === false )
+				return;
+
+			btn.disabled = true;
+			msg.textContent = Nino.content.getText('/_admin/features/msg/removing');
+
+			Nino.admin.features._apiCall( 'remove', { key : feature.key }, function( status, response ) {
+
+				if( status !== 200 || response === null ) {
+					btn.disabled = false;
+					msg.textContent = ( response && response.error ) ? response.error : Nino.content.getText('/_admin/features/error/remove');
+					return;
+				}
+
+				// The whole list again rather than the row taken off screen:
+				// a removed feature may have been what another one required,
+				// and that row now says something different
+				Nino.admin.features.init();
+			} );
 		},
 
 		/**
@@ -971,8 +1018,16 @@
 				}
 
 				// Kept as state rather than written here: init() rebuilds this
-				// row from scratch, and the word has to be there once it does
-				Nino.admin.features._offerMsg[offer.key] = Nino.content.getText('/_admin/features/msg/installed');
+				// row from scratch, and the word has to be there once it does.
+				// A feature that pulled its requirements in with it names them:
+				// pressing Install on one thing and getting three is not
+				// something to find out from the Inactive tab
+				const required = response.required || [];
+
+				Nino.admin.features._offerMsg[offer.key] = required.length === 0
+					? Nino.content.getText('/_admin/features/msg/installed')
+					: Nino.content.getText('/_admin/features/msg/installed-with').replace( '%s', required.join( ', ' ) );
+
 				Nino.admin.features.init();
 			} );
 		},

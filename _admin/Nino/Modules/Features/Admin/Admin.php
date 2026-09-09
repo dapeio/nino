@@ -73,6 +73,7 @@ namespace Nino\Modules\Features {
 				'features/activate' 	=> [ self::class, 'apiActivate' ],
 				'features/deactivate'	=> [ self::class, 'apiDeactivate' ],
 				'features/settings' 	=> [ self::class, 'apiSettings' ],
+				'features/remove'			=> [ self::class, 'apiRemove' ],
 				'features/catalogue' 	=> [ self::class, 'apiCatalogue' ],
 				'features/install' 		=> [ self::class, 'apiInstall' ],
 			];
@@ -138,6 +139,7 @@ namespace Nino\Modules\Features {
 				'features/activate' 	=> 'Activate feature "'. $key. '"',
 				'features/deactivate'	=> 'Deactivate feature "'. $key. '"',
 				'features/settings' 	=> 'Edit settings of feature "'. $key. '"',
+				'features/remove'			=> 'Remove the directory of feature "'. $key. '"',
 				'features/install' 		=> 'Install feature "'. $key. '" '. $version,
 				default 							=> '',
 			};
@@ -212,6 +214,40 @@ namespace Nino\Modules\Features {
 				return;
 
 			self::_switch( $appData, $request, false );
+		}
+
+		/**
+		 *	Delete an inactive feature's directory - the one step deactivating
+		 *	deliberately leaves out, and the one this panel could not do at
+		 *	all. What the feature kept stays: its settings, its files under
+		 *	data/, the templates and texts its unit copied once. Putting the
+		 *	same feature back therefore finds its settings where it left them
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		&$request			(reference) Current server request
+		 *
+		 *	@return 	void
+		 */
+		public static function apiRemove( array &$appData, array &$request ): void {
+
+			if( \Nino\Admin\Admin::guardPerm( $appData, $request, self::MANAGE_PERM ) === false )
+				return;
+
+			$key = self::_key( \Nino\Admin\Admin::postData() );
+
+			if( $key === null || \Nino\Features::get( $appData, $key ) === null ) {
+				\Nino\Http::fail( $request, 400, 'unknown feature' );
+				return;
+			}
+
+			$result = \Nino\Features::remove( $appData, $key );
+
+			if( $result !== true ) {
+				\Nino\Http::fail( $request, 400, $result );
+				return;
+			}
+
+			\Nino\Http::ok( $request, [ 'removed' => $key ] );
 		}
 
 		/**
@@ -372,9 +408,19 @@ namespace Nino\Modules\Features {
 				return;
 			}
 
+			// Everything the install placed, in the order it did - the feature
+			// asked for, and the requirements it pulled in ahead of itself.
+			// The panel names them, because a project that pressed Install on
+			// one feature and got three has to be told which three
+			$installed = array_values( array_filter(
+				(array) ( $appData['./nino/catalogue/installed'] ?? [] ),
+				static fn( string $installedKey ): bool => $installedKey !== $key
+			) );
+
 			\Nino\Http::ok( $request, [
-				'feature'	=> self::_entry( $appData, $feature, \Nino\Admin\Admin::sessionLocale( $appData ) ),
-				'updated'	=> $wasActive,
+				'feature'		=> self::_entry( $appData, $feature, \Nino\Admin\Admin::sessionLocale( $appData ) ),
+				'updated'		=> $wasActive,
+				'required'	=> $installed,
 			] );
 		}
 
