@@ -738,7 +738,13 @@
 							// the values become markup (Form/Newsletter escape on the
 							// way into the mail templates); removing characters here
 							// protected nothing and corrupted ordinary input
-							data[this.fields[i].name] = this.fields[i].value;
+							// A checkbox is the one control whose .value says nothing about
+							// what the visitor did: an unticked box with no value attribute
+							// still reads "on", so posting it unconditionally reported every
+							// box as ticked. What it is worth is whether it is checked
+							data[this.fields[i].name] = ( this.fields[i].type === 'checkbox' )
+								? ( this.fields[i].checked === true ? ( this.fields[i].value || 'on' ) : '' )
+								: this.fields[i].value;
 
 							// Check required
 							if( this.fields[i].required === true && this.fields[i].value.length === 0 )
@@ -871,8 +877,12 @@
 						for( let i = 0, l = this.fields.length; i<l; i++) {
 
 							// Stored as typed - see the .nino-form handler above for why
-							// the character strip that used to sit here was removed
-							data[this.fields[i].name] = this.fields[i].value;
+							// the character strip that used to sit here was removed, and
+							// why a checkbox is asked whether it is checked rather than
+							// what its value reads (a consent box is the likely one here)
+							data[this.fields[i].name] = ( this.fields[i].type === 'checkbox' )
+								? ( this.fields[i].checked === true ? ( this.fields[i].value || 'on' ) : '' )
+								: this.fields[i].value;
 
 							if( this.fields[i].required === true && this.fields[i].value.length === 0 )
 								this.fields[i].classList.add('nino-is-error') || ( error = Nino.content.getText('/newsletter/info/required') );

@@ -43,12 +43,15 @@ function classList( initial ) {
 	};
 }
 
-function field( name, type, value, required ) {
+function field( name, type, value, required, checked ) {
 	return {
 		tagName : type === 'textarea' ? 'TEXTAREA' : 'INPUT',
 		name : name,
 		type : type,
 		value : value,
+		// A real checkbox carries both: .value is what it would submit, .checked
+		// whether it submits at all
+		checked : checked === true,
 		required : required === true,
 		disabled : false,
 		classList : classList(),
@@ -193,6 +196,33 @@ check( 'punctuation in a message survives to the request', sent[0].data.message 
 check( 'the visible field is not rewritten underneath the visitor', forms[0].fieldList[2].value === typedEmail );
 check( 'the csrf field is posted along with the rest', sent[0].data._csrf === 'token-value' );
 check( 'the empty honeypot is posted as empty', sent[0].data.location === '' );
+
+// A checkbox is the one control whose .value says nothing about what the
+// visitor did: an unticked box with no value attribute still reads "on", so
+// posting it unconditionally reported every box as ticked
+const consentOff = field( 'consent', 'checkbox', 'on', false, false );
+const consentOn  = field( 'consent', 'checkbox', 'yes', false, true );
+
+forms[0].fieldList.push( consentOff );
+forms[0].fields = forms[0].fieldList;
+sent.length = 0;
+forms[0].classList.remove('nino-is-success');
+forms[0].submit();
+check( 'an unticked checkbox is posted as empty, not as its value', sent.length === 1 && sent[0].data.consent === '' );
+
+forms[0].fieldList[ forms[0].fieldList.length - 1 ] = consentOn;
+forms[0].fields = forms[0].fieldList;
+sent.length = 0;
+forms[0].classList.remove('nino-is-success');
+forms[0].submit();
+check( 'a ticked one is posted as the value it carries', sent.length === 1 && sent[0].data.consent === 'yes' );
+
+forms[0].fieldList.pop();
+forms[0].fields = forms[0].fieldList;
+sent.length = 0;
+forms[0].classList.remove('nino-is-success');
+forms[0].fill( { name : typedName, email : typedEmail, message : typedMessage } );
+forms[0].submit();
 
 
 // --- Which message a status code produces -------------------------------
