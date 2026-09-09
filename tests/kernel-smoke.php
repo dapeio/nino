@@ -1280,6 +1280,96 @@ $_POST = array_merge( $_POST, [ 'name' => 'Attacker', 'email' => 'attacker@examp
 check( 'a csrf-blocked request is rejected even with otherwise-valid fields', $blockedRequest['/nino/http/response']['statusCode'] === 403 );
 check( 'a csrf-blocked request does not send mail or record a submission', count( \Nino\Filesystem::getFileContent( $appData, '/data/forms.'. date( 'Y-m' ). '.php', [] ) ) === $submissionsBefore );
 
+// A post that is not a flat map of strings. Casting one raised an engine
+// warning Runtime::handleError() treats as fatal - an unauthenticated 500
+// from the one endpoint the whole internet may post to
+unset( $_POST['_csrf'] );
+$arrayRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+$_POST = [ 'name' => [ 'x' ], 'email' => 'jo@example.com', 'message' => 'Hi', 'location' => '' ];
+
+$raised = [];
+set_error_handler( static function( int $no, string $message ) use ( &$raised ): bool { $raised[] = $message; return true; } );
+\Nino\Modules\Form::callbackResponse( $appData, $arrayRequest );
+restore_error_handler();
+
+check( 'a field posted as an array is a 400, and raises nothing the error handler would turn fatal', $arrayRequest['/nino/http/response']['statusCode'] === 400 && $raised === [] );
+
+echo "\n";
+
+
+// --- Form - several forms, and the seam a guard refuses at ------------------
+
+echo "Form - a project's own forms, and refusing a submission ahead of the engine\n";
+
+check( 'with nothing configured, the contact form this framework ships is what is offered', array_column( \Nino\Form::forms( $appData ), 'key' ) === [ 'contact' ]
+	&& array_column( \Nino\Form::forms( $appData )[0]['fields'], 'name' ) === [ 'name', 'email', 'cat', 'message' ] );
+
+$appData[ \Nino\Form::FORMS ] = [
+	\Nino\Form::DEFAULT_FORM,
+	[
+		'key' => 'quote', 'name' => 'Quote', 'to' => 'sales@example.com', 'confirm' => false,
+		'fields' => [
+			[ 'name' => 'email',   'label' => 'Mail',    'type' => 'email',    'required' => true ],
+			[ 'name' => 'budget',  'label' => 'Budget',  'type' => 'number' ],
+			[ 'name' => 'date',    'label' => 'Ignored', 'type' => 'text' ],
+		],
+	],
+	[ 'key' => 'broken', 'fields' => [] ],
+];
+
+check( 'a project defines its forms in config.php, beside its routes', array_column( \Nino\Form::forms( $appData ), 'key' ) === [ 'contact', 'quote' ] );
+check( 'a definition with no usable field is left out rather than half-read', \Nino\Form::form( $appData, 'broken' ) === null );
+check( 'a field named like something a record already carries is dropped', array_column( \Nino\Form::form( $appData, 'quote' )['fields'], 'name' ) === [ 'email', 'budget' ] );
+check( 'an empty key is the first form defined - which is what a page posting no key belongs to', \Nino\Form::form( $appData, '' )['key'] === 'contact' );
+
+$unknownRequest = submitForm( $appData, [ 'form' => 'nowhere', 'name' => 'Jo', 'email' => 'jo@example.com', 'message' => 'Hi' ] );
+check( 'a key no form has is a 404 - a page pointing at a form that was renamed, not spam', $unknownRequest['/nino/http/response']['statusCode'] === 404 );
+
+$_POST = [ 'form' => 'quote', 'email' => 'jo@example.com', 'budget' => 'not-a-number', 'location' => '' ];
+$badTypeRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Modules\Form::callbackResponse( $appData, $badTypeRequest );
+check( 'a value that is not of its field\'s declared type is a 400', $badTypeRequest['/nino/http/response']['statusCode'] === 400 );
+
+$_POST = [ 'form' => 'quote', 'email' => 'jo@example.com', 'budget' => '5000', 'location' => '' ];
+$quoteRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Modules\Form::callbackResponse( $appData, $quoteRequest );
+$quoteEntries = \Nino\Filesystem::getFileContent( $appData, '/data/forms.'. date( 'Y-m' ). '.php', [] );
+$quoteEntry   = end( $quoteEntries );
+check( 'a submission to another form is accepted and recorded under that form', $quoteRequest['/nino/http/response']['statusCode'] === 200
+	&& $quoteEntry['form'] === 'quote' && $quoteEntry['budget'] === '5000' && preg_match( '/^[0-9a-f]{16}$/', $quoteEntry['id'] ) === 1 );
+// An entry from before this framework knew more than one form: no 'form',
+// no 'id', the values flat beside the date and the ip. A project's history
+// has to survive the update untouched
+\Nino\Filesystem::mutate( $appData, '/data/forms.'. date( 'Y-m' ). '.php', static function( array $entries ): array {
+	$entries[] = [ 'date' => '2020-01-01 00:00:00', 'name' => 'Old Entry', 'email' => 'old@example.com', 'message' => 'Hi', 'cat' => '', 'ip' => '127.0.0.1' ];
+	return $entries;
+} );
+check( 'an entry written before there was more than one form reads as the first form\'s, unchanged otherwise', ( static function( array &$appData ): bool {
+	foreach( \Nino\Form::entries( $appData ) as $entry )
+		if( ( $entry['name'] ?? '' ) === 'Old Entry' )
+			return $entry['form'] === 'contact' && $entry['id'] === '' && $entry['email'] === 'old@example.com' && $entry['date'] === '2020-01-01 00:00:00';
+	return false;
+} )( $appData ) );
+
+// The seam a spam guard sits at: the same route callback, ahead of the
+// module - what \Nino\Csrf::init() does at priority 1, and why there is no
+// callback name of its own for it
+$guarded = 0;
+\Nino\Callbacks::registerCallback( $appData, '/nino/http/response/POST://.form', static function( array &$appData, array &$request ) use ( &$guarded ): void {
+	$guarded++;
+	$request['/nino/http/response']['statusCode'] = 418;
+}, 1 );
+
+$before = count( \Nino\Form::entries( $appData ) );
+$_POST = [ 'name' => 'Spam', 'email' => 'spam@example.com', 'message' => 'Buy', 'location' => '' ];
+$refusedRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Callbacks::doCallbacks( $appData, '/nino/http/response/POST://.form', $refusedRequest );
+check( 'a guard registered ahead of the module refuses without a callback name of its own', $guarded === 1
+	&& $refusedRequest['/nino/http/response']['statusCode'] === 418 && count( \Nino\Form::entries( $appData ) ) === $before );
+
+unset( $appData['./nino/callbacks']['/nino/http/response/POST://.form'][1], $appData[ \Nino\Form::FORMS ] );
+\Nino\Callbacks::registerCallback( $appData, '/nino/http/response/POST://.form', [ '\Nino\Modules\Form', 'callbackResponse' ] );
+
 echo "\n";
 
 
@@ -1370,6 +1460,35 @@ $rateState['127.0.0.1'] = [ 'tries' => 5, 'reset' => time() + 3600 ];
 \Nino\Filesystem::putFileContent( $appData, $ratelimitPath, $rateState );
 $seen = [];
 check( 'the per-ip cap applies before any transport', \Nino\Mail::send( $appData, 'to@example.org', 'x', 'y', '' ) === false && $seen === [] && ( $appData['./nino/mail/ratelimited'] ?? false ) === true );
+
+// One action of one visitor, several envelopes: a contact form's owner
+// notification and the confirmation that answers it. Charging each mail
+// separately made a cap of five allow two submissions, and the third was
+// answered "sent" while nothing left the server
+unset( $appData['./nino/callbacks'][ \Nino\Mail::TRANSPORT ], $appData['./nino/mail/ratelimited'] );
+$rateState = \Nino\Filesystem::getFileContent( $appData, $ratelimitPath, [] );
+unset( $rateState['127.0.0.1'] );
+\Nino\Filesystem::putFileContent( $appData, $ratelimitPath, $rateState );
+
+$batched = [];
+\Nino\Callbacks::registerCallback( $appData, \Nino\Mail::TRANSPORT, static function( array &$appData, array &$mail ) use ( &$batched ): void {
+	$batched[] = $mail['to'];
+	$mail['sent'] = true;
+} );
+
+$pair = [
+	[ 'to' => 'owner@example.org',   'subject' => 'a', 'body' => 'x', 'replyTo' => 'jo@example.org' ],
+	[ 'to' => 'jo@example.org',      'subject' => 'b', 'body' => 'y', 'replyTo' => 'owner@example.org' ],
+];
+check( 'sendAll delivers every mail of one action', \Nino\Mail::sendAll( $appData, $pair ) === true && $batched === [ 'owner@example.org', 'jo@example.org' ] );
+check( 'and charges the cap once for the pair, not once per envelope', ( \Nino\Filesystem::getFileContent( $appData, $ratelimitPath, [] )['127.0.0.1']['tries'] ?? 0 ) === 1 );
+
+$batched = [];
+for( $i = 0; $i < 4; $i++ )
+	\Nino\Mail::sendAll( $appData, $pair );
+check( 'so five submissions fit the window of five, and the sixth is refused whole', count( $batched ) === 8
+	&& \Nino\Mail::sendAll( $appData, $pair ) === false && count( $batched ) === 8 && ( $appData['./nino/mail/ratelimited'] ?? false ) === true );
+check( 'an empty batch is not an action and costs nothing', \Nino\Mail::sendAll( $appData, [] ) === true );
 
 unset( $appData['./nino/callbacks'][ \Nino\Mail::TRANSPORT ], $appData['/nino/mail/sender'], $appData['./nino/mail/ratelimited'] );
 

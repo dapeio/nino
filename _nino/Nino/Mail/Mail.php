@@ -47,11 +47,68 @@ namespace Nino {
 				// Flagged rather than just reported through the return value, so
 				// a caller can tell "we refused to send this" apart from "mail()
 				// failed" - Form uses it to not record a submission whose mail
-				// was never attempted (see its callbackResponse())
+				// was never attempted (see \Nino\Form::handle())
 				$appData['./nino/mail/ratelimited'] = true;
 
 				return false;
 			}
+
+			return self::_deliver( $appData, $to, $subject, $body, $replyTo );
+		}
+
+		/**
+		 *	Send several mails that are one action of one visitor - a contact
+		 *	form's owner notification and the confirmation that answers it -
+		 *	for one hit of the per-ip cap.
+		 *
+		 *	Charging each mail separately made the cap count actions that are
+		 *	not the visitor's: with two mails per submission and a cap of five,
+		 *	the third submission in an hour was answered "sent" while nothing
+		 *	left the server. The cap exists to stop a form being used as a
+		 *	relay, and a relay is measured in submissions, not in envelopes.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		$mails				[ { to, subject, body, replyTo }, ... ]
+		 *
+		 *	@return 	bool										Whether every mail was delivered
+		 */
+		public static function sendAll( array &$appData, array $mails ): bool {
+
+			if( $mails === [] )
+				return true;
+
+			if( self::_hit( $appData, \Nino\Http::getClientIp() ) === false ) {
+				$appData['./nino/mail/ratelimited'] = true;
+				return false;
+			}
+
+			$sent = true;
+
+			foreach( $mails as $mail )
+				$sent = self::_deliver( $appData,
+					(string) ( $mail['to'] ?? '' ),
+					(string) ( $mail['subject'] ?? '' ),
+					(string) ( $mail['body'] ?? '' ),
+					(string) ( $mail['replyTo'] ?? '' ) ) && $sent;
+
+			return $sent;
+		}
+
+		/**
+		 *	One mail, past the cap: header cleaning, the From and Reply-To
+		 *	lines, the transport callback, and mail() when no transport took
+		 *	it. Never charges the cap itself - send() and sendAll() decide how
+		 *	many hits a caller's action is worth
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$to
+		 *	@param		string		$subject
+		 *	@param		string		$body
+		 *	@param		string		$replyTo
+		 *
+		 *	@return 	bool
+		 */
+		private static function _deliver( array &$appData, string $to, string $subject, string $body, string $replyTo ): bool {
 
 			// Everything that ends up on a header line gets its CR/LF stripped.
 			// $subject comes from an admin-editable textfill and send() is public
