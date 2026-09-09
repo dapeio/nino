@@ -11,7 +11,8 @@ return [
 	'nino'				=> '^1.0',
 	'php'					=> [ 'ext' => [ 'json' ] ],
 	'requires'		=> [ 'helper' ],
-	'data'				=> [ '/data/sample.php' ],
+	// One file and one directory: a backup has to carry both shapes
+	'data'				=> [ '/data/sample.php', '/data/sample-dir' ],
 	'settings'		=> [
 		'enabled'	=> [ 'type' => 'bool', 'label' => [ 'en_US' => 'Enabled', 'de_DE' => 'Aktiv' ], 'default' => true ],
 		'limit'		=> [ 'type' => 'int', 'label' => 'Limit', 'hint' => 'Items per page', 'min' => 1, 'max' => 50, 'unit' => 'items', 'default' => 10 ],

@@ -106,6 +106,54 @@ namespace Nino {
 			foreach( glob( $data. '/logs.*.php' ) ?: [] as $file )
 				$files[$file] = 'data/'. basename( $file );
 
+			// What an installed feature says it owns under /data/. The manifest
+			// key is documented as "what a backup carries" (see docs/features.md),
+			// and until this read it it was not: the two entries above are
+			// hardcoded literals for the one feature that predates the catalogue,
+			// and anything else - a directory a feature owns, a file a feature
+			// nobody here knows about writes - was simply never in a backup.
+			//
+			// \Nino\Features::all() reads the manifests, which are plain array
+			// files; no feature class is autoloaded on a backup's behalf, which
+			// is the same care the two literals above were written with. A
+			// manifest's paths are validated when it is read (below /data/, no
+			// '..'), so what arrives here needs no second check
+			foreach( \Nino\Features::all( $appData ) as $feature ) {
+
+				if( ( $feature['active'] ?? false ) !== true )
+					continue;
+
+				foreach( (array) ( $feature['data'] ?? [] ) as $owned ) {
+
+					$path = \Nino\Filesystem::path( $appData, $owned );
+
+					if( is_file( $path ) === true ) {
+						$files[$path] = ltrim( $owned, '/' );
+						continue;
+					}
+
+					if( is_dir( $path ) === false )
+						continue;
+
+					$iterator = new \RecursiveIteratorIterator(
+						new \RecursiveDirectoryIterator( $path, \FilesystemIterator::SKIP_DOTS ),
+						\RecursiveIteratorIterator::LEAVES_ONLY,
+						\RecursiveIteratorIterator::CATCH_GET_CHILD
+					);
+
+					foreach( $iterator as $file ) {
+
+						$filePath = $file->getPathname();
+
+						if( $file->isFile() === false || is_link( $filePath ) === true )
+							continue;
+
+						$relative = substr( $filePath, strlen( rtrim( $path, DIRECTORY_SEPARATOR ) ) + 1 );
+						$files[$filePath] = ltrim( $owned, '/' ). '/'. str_replace( DIRECTORY_SEPARATOR, '/', $relative );
+					}
+				}
+			}
+
 			return $files;
 		}
 

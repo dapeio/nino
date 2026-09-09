@@ -259,6 +259,23 @@ check( 'the module boots on the next request and its shortcode reads its setting
 	return ( $appData['./helper/booted'] ?? false ) === true && \Nino\Html::renderHtml( $appData, '[sample]' ) === 'Again';
 } )() );
 check( 'the workbench lists its panel while it is active', isset( \Nino\Admin\Admin::panels( $appData )['sample'] ) === true );
+
+// The manifest key 'data' is documented as "what a backup carries", and until
+// Backup::manifest() read it, it was not: only two hardcoded literals for the
+// one feature that predates the catalogue were ever carried, so a directory a
+// feature owns was silently absent from every backup
+\Nino\Filesystem::putFileContent( $appData, '/data/sample.php', [ 'kept' => true ] );
+\Nino\Filesystem::putFileContent( $appData, '/data/sample-dir/one.php', [ 1 ] );
+\Nino\Filesystem::putFileContent( $appData, '/data/sample-dir/deeper/two.php', [ 2 ] );
+$carried = \Nino\Backup::manifest( $appData );
+check( 'a backup carries the file an active feature\'s manifest declares under data', in_array( 'data/sample.php', $carried, true ) === true );
+check( '...and every file below a directory it declares, at its own relative path', in_array( 'data/sample-dir/one.php', $carried, true ) === true
+	&& in_array( 'data/sample-dir/deeper/two.php', $carried, true ) === true );
+check( 'and carries nothing for a feature that is not switched on', ( static function( array $appData ): bool {
+	\Nino\Features::deactivate( $appData, 'sample' );
+	$carried = \Nino\Backup::manifest( $appData );
+	return in_array( 'data/sample.php', $carried, true ) === false;
+} )( $appData ) );
 check( 'its class file sits below NINO_FEATURES_DIR, so the registry moves it into the features group though its own nav() names content', \Nino\Admin\Admin::panels( $appData )['sample']['group'] === 'features' );
 check( 'the registry sits it in the rail between the structure and the system panels, GROUPS order rather than its own nav()', ( static function() use ( $appData ): bool {
 	$order = array_keys( \Nino\Admin\Admin::panels( $appData ) );
