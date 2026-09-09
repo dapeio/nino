@@ -19,11 +19,12 @@ One login, one navigation, every screen a panel. The panels are grouped by what 
 |---|---|---|
 | **Content** | Dashboard, Elements (Element Types), Text (Text Keys), Images (Image Slots), Submissions, Log | editors and developers |
 | **Structure** | Templates, Design, Routes, Navigations | developers |
+| **Features** | whatever the active features bring | whoever holds the feature panel's own permission |
 | **System** | Users (User roles, Login protection), Language (Translations), Backups, Config, Features | developers – and every account for its own profile under Users |
 
 A screen in brackets is a **tab** of the panel before it: the Elements panel opens on the entries and carries Element Types as its second tab, so the shape of the content sits right beside the content. A tab is a screen of its own – with its own permission, so an editor sees Elements without Element Types, and its own deep link, `#types`.
 
-Submissions and Navigations belong to optional kernel modules and are present while their module is active; Templates and Design are optional kernel modules too, nothing but a panel each, switched on or off in `/nino/modules`. A **feature** - an installable package under `features/`, copied in from the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features) and switched on in the Features panel - brings its panel the same way: the catalogue's Newsletter feature adds a Newsletter panel to the Content group, its Search feature a Search panel to the System group, and a checkout ships neither. The panels above that are in neither list are the workbench's own: `_admin` holds the shell, and every screen in it is a module under `_admin/Nino/Modules/<Name>/`, brought and taken away one directory at a time. A module a project adds, or a feature it installs, can bring a panel of its own the same way; see the [Developer Manual](development.md#panels-of-the-workbench) and [Features](features.md).
+Submissions and Navigations belong to optional kernel modules and are present while their module is active; Templates and Design are optional kernel modules too, nothing but a panel each, switched on or off in `/nino/modules`. A **feature** - an installable package under `features/`, copied in from the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features) and switched on in the Features panel - brings its panel the same way - the catalogue's Newsletter feature adds a Newsletter panel, its Forms feature a Forms panel, its Search feature a Search panel, and a checkout ships none of them; every one of them lands in the rail's own Features group. The panels above that are in neither list are the workbench's own: `_admin` holds the shell, and every screen in it is a module under `_admin/Nino/Modules/<Name>/`, brought and taken away one directory at a time. A module a project adds, or a feature it installs, can bring a panel of its own the same way; see the [Developer Manual](development.md#panels-of-the-workbench) and [Features](features.md).
 
 There is no second tool. `/_editor`, `/_install`, `/_design` and `/_templates` of earlier versions are all here, and a reserved path of theirs is an ordinary page path now.
 
@@ -72,7 +73,7 @@ A permission is one string per panel or tab; `/*` matches every path below it, s
 | Config | `/_admin/config/manage` |
 | Features | `/_admin/features/manage` |
 
-A feature's panel brings its permission along - the catalogue's Newsletter feature `/_admin/newsletter/manage`, its Search feature `/_admin/search/manage` - and the roles tab of the Users panel offers it while the feature is active.
+A feature's panel brings its permission along - the catalogue's Newsletter feature `/_admin/newsletter/manage`, its Forms feature `/_admin/forms/manage`, and so on - and the roles tab of the Users panel offers it while the feature is active.
 
 ### Finer permissions inside a panel
 

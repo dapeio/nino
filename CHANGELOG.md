@@ -4,10 +4,13 @@ All notable changes to Nino are documented in this file.
 
 ## Unreleased
 
-The catalogue. A feature is installed from the Features panel: the panel loads
-a signed `catalogue.json` from getnino.dev on request, offers what fits the
-running kernel, and installs or updates an archive below `features/`. Two
-hooks for features: another mail transport, and sorted, paged element lists.
+The catalogue, and the form engine. A feature is installed from the Features
+panel: the panel loads a signed `catalogue.json` from getnino.dev on request,
+offers what fits the running kernel, and installs or updates an archive below
+`features/`. The contact form becomes an engine a project defines its own
+forms for, with the Submissions panel reading whatever they collect. Three
+hooks for features: another mail transport, sorted and paged element lists,
+and a seam a submission can be refused at.
 
 ### Added
 
@@ -49,6 +52,46 @@ hooks for features: another mail transport, and sorted, paged element lists.
   the panel opens with no request of its own; `features/catalogue` refreshes
   it. Where `features/` is not writable, the archive is linked to unpack by
   hand. Actions `features/catalogue` and `features/install`.
+- **`\Nino\Form`** (`_nino/Nino/Form/Form.php`): the form engine, lifted out
+  of `\Nino\Modules\Form`, which keeps the route `POST /.form` and hands
+  every submission here. A project defines its forms under
+  **`/nino/form/forms`** in `config.php` - beside its routes and its image
+  slots, so they are hand-editable, they travel in every backup, and a form
+  needs no file format of its own; defining none gives `DEFAULT_FORM`, the
+  contact form this framework has always shipped, field for field. A field
+  names one of `TYPES` (`text`, `email`, `tel`, `url`, `number`, `textarea`,
+  `select`) and may not take one of `RESERVED`; a definition with no usable
+  field left is dropped rather than half-read. `forms()`, `form()`,
+  `normalize()`, `posted()`, `validate()`, `handle()`, `send()`, `render()`,
+  `record()`, `prune()`, `remove()` and `entries()` are the api a module or a
+  feature builds on - the catalogue's Forms feature is a second writer of the
+  definitions and a spam guard in front of them, and carries no copy of any
+  of this.
+- **A seam for refusing a submission:** a module or feature registers on the
+  route callback `/nino/http/response/POST://.form` ahead of the module -
+  priority 1, what `\Nino\Csrf::init()` already does - and leaves a status
+  behind; `Form::handle()` returns without sending or writing anything. No
+  callback name of its own, and none needed.
+- **Configuration** `/nino/form/retention` (months a submission stays on
+  disk, 1 to 60, `RETENTION_MONTHS` without one) and `/nino/form/store`
+  (`false` means the mail goes out and nothing is written - a site that
+  answers its inquiries and keeps no copy has less to protect).
+- **`\Nino\Mail::sendAll()`**: several mails that are one action of one
+  visitor - a form's owner notification and the confirmation that answers it -
+  for one hit of the per-ip cap. Charging each separately made the cap count
+  envelopes rather than submissions, so with two mails per submission and a
+  cap of five the third was answered "sent" while nothing left the server.
+- **`category`** in a feature manifest, and **`\Nino\Features::CATEGORIES`**
+  (`content`, `ui`, `communication`, `marketing`, `security`, `system`): what
+  a feature is for, one per feature, what the Features panel groups and
+  filters by. Any slug is accepted, not only the six - a feature written for a
+  catalogue newer than the kernel running it is filed under a category that
+  kernel cannot know and has to install regardless - so the vocabulary is held
+  together where features are published. `\Nino\Catalogue` carries the field
+  through `parse()` and `offers()` and drops one it cannot read rather than
+  refusing the entry: a bad entry costs the whole catalogue, and a category is
+  a heading in a list. The catalogue format stayed at 1; its reader takes only
+  the keys it knows.
 - **`/nino/mail/send`** (`\Nino\Mail::TRANSPORT`): a transport callback.
   `Mail::send()` fires it after the per-ip cap and the header cleaning with
   `{ to, subject, body, replyTo, sender, headers, sent }`; a handler that
@@ -62,7 +105,10 @@ hooks for features: another mail transport, and sorted, paged element lists.
   `\Nino\Elements::sortElements()` orders a list on its own.
 - **Tests:** `tests/catalogue-smoke.php` - a keypair generated per run,
   archives written byte by byte (a hostile one too), the network stubbed;
-  kernel-smoke covers the transport callback and the sorted, paged query.
+  kernel-smoke covers the transport callback, the sorted, paged query, the
+  forms of a project and the seam a guard refuses at;
+  `tests/admin-submissions-js-smoke.js` - the Submissions panel's script,
+  which had none.
 
 - **`\Nino\Filesystem::path()`** resolves `/features/...` against
   `\Nino\Features::dir()`, so a feature names its own files - a stylesheet or
@@ -127,6 +173,33 @@ hooks for features: another mail transport, and sorted, paged element lists.
   into a context bar. **Active** is the first tab and the one the panel
   opens on, and both `features/list` and `features/catalogue` answer
   sorted by the name a person reads rather than by the key.
+- **`\Nino\Modules\Form`** is the route and nothing else now: it registers
+  `POST /.form` and hands the request to `\Nino\Form`. A page written against
+  that endpoint keeps working, and a project that defines no forms gets the
+  contact form it always had.
+- **Submissions panel:** it knew four field names - `name`, `email`, `cat`,
+  `message` - so a project defining a form with a company and a budget got
+  cards showing a date and nothing else. It knows none now: a card shows the
+  date, which form the inquiry came from, the address to answer at, and every
+  value the entry carries under the label it was collected under, taken from
+  the form definition with its fills resolved server-side. A value whose field
+  the form has since lost still shows, under its own name. A select narrows to
+  one form and a search box searches values and labels, both drawn only where
+  there is more than one form; the export writes what they left. A card
+  expands to **Delete** for that one submission - `submissions/delete`, the
+  panel's first write, guarded by its own permission and written to the
+  activity log; an entry recorded before submissions carried an id offers
+  none, because nothing addresses it across a deletion.
+- **Features panel:** a category select beside the search box, built from the
+  categories on screen so it never offers a heading nothing is filed under,
+  and dropped when the category it names is gone. The search box reads the
+  category too, and the category leads the line under a feature's name.
+- **`\Nino\Backup`** carries an active feature's own `data` files and
+  directories, named by its manifest, so a backup taken with a feature
+  switched on restores what the feature kept.
+- **`.nino-form`** posts a checkbox by its checked state rather than by its
+  value. An unticked box with no value attribute still reads `"on"`, so every
+  box was submitted, mailed and recorded as ticked.
 - The Features panel bundles a stylesheet of its own now
   (`_admin/Nino/Modules/Features/assets/admin.css`): the head, the rows,
   and the gap in a row's buttons, which the script builds without

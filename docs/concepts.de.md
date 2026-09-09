@@ -166,7 +166,7 @@ Templates), die ein Projekt in `/nino/modules` ein- oder ausschaltet. Ein
 **Feature** ist ein installierbares Paket: ein Verzeichnis unterhalb von
 `features/` mit einem Manifest `feature.php`, aus dem Katalog
 [dapeio/nino-features](https://github.com/dapeio/nino-features) hineinkopiert
-– Newsletter und Suche liegen dort, ein Checkout bringt keines mit – und im
+– dort wächst die Sammlung, ein Checkout bringt keines mit – und im
 Panel Features der Workbench eingeschaltet, das seine Version aufzeichnet und
 seine Einstellungen anbietet. Ein **Projektmodul** ist der eigene Code des
 Projekts unter `app/`. Siehe
@@ -174,12 +174,13 @@ Projekts unter `app/`. Siehe
 
 ## Die Workbench `/_admin`
 
-Eine Verwaltungsoberfläche mit einer Anmeldung. Sie hat einen eigenen Einstiegspunkt (`_admin/index.php`) und ist kein Frontend-Modul aus `/nino/modules`; jeder Bildschirm darin ist ein Panel, und ein Modul oder ein installiertes Feature kann eines beisteuern – der Newsletter des Katalogs sein Panel unter Inhalt, seine Suche eines unter System:
+Eine Verwaltungsoberfläche mit einer Anmeldung. Sie hat einen eigenen Einstiegspunkt (`_admin/index.php`) und ist kein Frontend-Modul aus `/nino/modules`; jeder Bildschirm darin ist ein Panel, und ein Modul oder ein installiertes Feature kann eines beisteuern, das dann in der eigenen Gruppe Features der Leiste landet:
 
 | Gruppe | Panels | Verantwortung |
 |---|---|---|
 | Inhalt | Dashboard, Elemente (mit Elementtypen), Texte (mit Textschlüsseln), Bilder (mit Bildplätzen), Anfragen, Log | tägliche Pflege von Inhalten, Bildern und Betriebsdaten; die Tabs in Klammern halten die Form dieser Inhalte und gehören dem Entwickler |
 | Struktur | [Templates](templates.de.md), [Design](appearance.de.md), Routen, Navigationen | die Struktur des Projekts: Seitentemplates, Erscheinungsbild, Routen und Menüs |
+| Features | was die aktiven Features mitbringen | eine Gruppe für das Panel jedes installierten Features, gleich welche Gruppe sein eigenes `nav()` nennt; ohne Überschrift, solange nichts darin liegt |
 | System | Nutzer (mit Nutzerrollen und Anmeldeschutz), Sprache (mit Übersetzungen), Backups, Konfiguration, Features | Konten und Rollen, Sprachen und Übersetzungsübergabe, Wiederherstellung, technische Konfiguration, installierte Features |
 
 Ein Konto hält eine Rolle, eine Rolle eine Menge von Berechtigungen, eine je Panel oder Tab; der Assistent schreibt **Editor** (jede Inhalt-Berechtigung) und **Developer** (`/*`), und der Tab Nutzerrollen des Panels Nutzer bearbeitet sie. Ein Panel, das ein Konto nicht verwenden darf, wird nicht gerendert. Die Abgrenzung verläuft damit zwischen vollständigem Entwicklungszugriff und berechtigungsgesteuerter redaktioneller Arbeit – innerhalb eines Werkzeugs. Solange das Projekt noch nicht existiert, liefert dieselbe Route den [Einrichtungsassistenten](setup.de.md); `/_admin/recovery.php` ist der Weg zurück, wenn die Konten selbst kaputt sind. Siehe das [`/_admin`-Handbuch](_admin.de.md).

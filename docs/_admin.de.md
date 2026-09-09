@@ -19,11 +19,12 @@ Ein Login, eine Navigation, jeder Bildschirm ein Panel. Die Panels sind danach g
 |---|---|---|
 | **Inhalt** | Dashboard, Elemente (Elementtypen), Texte (Textschlüssel), Bilder (Bildplätze), Anfragen, Log | Redakteure und Entwickler |
 | **Struktur** | Templates, Design, Routen, Navigationen | Entwickler |
+| **Features** | was die aktiven Features mitbringen | wer die eigene Berechtigung des Feature-Panels hält |
 | **System** | Nutzer (Nutzerrollen, Anmeldeschutz), Sprache (Übersetzungen), Backups, Konfiguration, Features | Entwickler – und jedes Konto für sein eigenes Profil unter Nutzer |
 
 Ein Bildschirm in Klammern ist ein **Tab** des Panels davor: Das Panel Elemente öffnet auf den Einträgen und trägt Elementtypen als zweiten Tab, sodass die Form der Inhalte direkt neben den Inhalten liegt. Ein Tab ist ein eigener Bildschirm – mit eigener Berechtigung, sodass ein Redakteur Elemente ohne Elementtypen sieht, und eigenem tiefen Link, `#types`.
 
-Anfragen und Navigationen gehören zu optionalen Kernel-Modulen und sind vorhanden, solange ihr Modul aktiv ist; Templates und Design sind ebenfalls optionale Kernel-Module, nichts als je ein Panel, in `/nino/modules` ein- oder ausgeschaltet. Ein **Feature** – ein installierbares Paket unter `features/`, aus dem Katalog [dapeio/nino-features](https://github.com/dapeio/nino-features) hineinkopiert und im Panel Features eingeschaltet – bringt sein Panel auf dieselbe Weise mit: Das Newsletter-Feature des Katalogs ergänzt die Gruppe Inhalt um ein Panel Newsletter, sein Search-Feature die Gruppe System um ein Panel Suche, und ein Checkout bringt keines von beiden mit. Die Panels oben, die in keiner der beiden Listen stehen, sind die eigenen der Workbench: `_admin` hält die Hülle, und jede Ansicht darin ist ein Modul unter `_admin/Nino/Modules/<Name>/` – Verzeichnis für Verzeichnis hinzugefügt und wieder entfernt. Ein Modul, das ein Projekt hinzufügt, oder ein Feature, das es installiert, kann auf dieselbe Weise ein eigenes Panel mitbringen; siehe das [Entwickler-Handbuch](development.de.md#panels-der-workbench) und [Features](features.de.md).
+Anfragen und Navigationen gehören zu optionalen Kernel-Modulen und sind vorhanden, solange ihr Modul aktiv ist; Templates und Design sind ebenfalls optionale Kernel-Module, nichts als je ein Panel, in `/nino/modules` ein- oder ausgeschaltet. Ein **Feature** – ein installierbares Paket unter `features/`, aus dem Katalog [dapeio/nino-features](https://github.com/dapeio/nino-features) hineinkopiert und im Panel Features eingeschaltet – bringt sein Panel auf dieselbe Weise mit – das Newsletter-Feature des Katalogs ein Panel Newsletter, sein Forms-Feature ein Panel Formulare, sein Search-Feature ein Panel Suche, und ein Checkout bringt keines davon mit; jedes landet in der eigenen Gruppe Features der Leiste. Die Panels oben, die in keiner der beiden Listen stehen, sind die eigenen der Workbench: `_admin` hält die Hülle, und jede Ansicht darin ist ein Modul unter `_admin/Nino/Modules/<Name>/` – Verzeichnis für Verzeichnis hinzugefügt und wieder entfernt. Ein Modul, das ein Projekt hinzufügt, oder ein Feature, das es installiert, kann auf dieselbe Weise ein eigenes Panel mitbringen; siehe das [Entwickler-Handbuch](development.de.md#panels-der-workbench) und [Features](features.de.md).
 
 Ein zweites Werkzeug gibt es nicht. `/_editor`, `/_install`, `/_design` und `/_templates` früherer Versionen sind alle hier, und ein früher reservierter Pfad ist jetzt ein gewöhnlicher Seitenpfad.
 
@@ -72,7 +73,7 @@ Eine Berechtigung ist eine Zeichenkette pro Panel oder Tab; `/*` deckt jeden Pfa
 | Konfiguration | `/_admin/config/manage` |
 | Features | `/_admin/features/manage` |
 
-Das Panel eines Features bringt seine Berechtigung mit – das Newsletter-Feature des Katalogs `/_admin/newsletter/manage`, sein Search-Feature `/_admin/search/manage` –, und der Tab Nutzerrollen des Panels Nutzer bietet sie an, solange das Feature aktiv ist.
+Das Panel eines Features bringt seine Berechtigung mit – das Newsletter-Feature des Katalogs `/_admin/newsletter/manage`, sein Forms-Feature `/_admin/forms/manage`, und so weiter –, und der Tab Nutzerrollen des Panels Nutzer bietet sie an, solange das Feature aktiv ist.
 
 ### Feinere Rechte innerhalb eines Panels
 
