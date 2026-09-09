@@ -612,6 +612,80 @@ check( 'process() rejects bytes that are not a valid image', \Nino\Images::proce
 check( 'process() rejects an empty target dimension', \Nino\Images::process( $appData, $wideSource, 0, 100, 'elements/demo/item3' ) === false );
 check( 'process() rejects a path-traversal basePath', \Nino\Images::process( $appData, $wideSource, 100, 100, '../escape' ) === false );
 
+echo "\n";
+
+
+// --- Images::fit - the whole picture, in a box -----------------------------
+
+echo "Images::fit / the render callback\n";
+
+$fitFilename = \Nino\Images::fit( $appData, $wideSource, 100, 100, 'gallery/demo/one' );
+check( 'fit() names the box rather than the result, so the path stays predictable per slot', $fitFilename === 'gallery/demo/one.fit100x100.jpg' );
+
+[ $fitWidth, $fitHeight ] = getimagesize( \Nino\Filesystem::path( $appData, '/images/'. ( $fitFilename ?: '' ) ) );
+check( 'the whole 400x200 picture is in the 100x100 box, its own proportions kept - nothing cropped', $fitWidth === 100 && $fitHeight === 50 );
+
+$tallFilename = \Nino\Images::fit( $appData, makeTestImage( 200, 400 ), 100, 100, 'gallery/demo/two' );
+[ $tallWidth, $tallHeight ] = getimagesize( \Nino\Filesystem::path( $appData, '/images/'. ( $tallFilename ?: '' ) ) );
+check( '...whichever edge is the long one', $tallWidth === 50 && $tallHeight === 100 );
+
+$smallFilename = \Nino\Images::fit( $appData, makeTestImage( 40, 30 ), 800, 800, 'gallery/demo/three' );
+[ $smallWidth, $smallHeight ] = getimagesize( \Nino\Filesystem::path( $appData, '/images/'. ( $smallFilename ?: '' ) ) );
+check( 'a source smaller than the box is stored as it is - four times the bytes for the same picture is not an improvement', $smallWidth === 40 && $smallHeight === 30 );
+
+check( 'fit() refuses what process() refuses', \Nino\Images::fit( $appData, 'not an image', 100, 100, 'gallery/demo/four' ) === false
+	&& \Nino\Images::fit( $appData, $wideSource, 0, 100, 'gallery/demo/four' ) === false
+	&& \Nino\Images::fit( $appData, $wideSource, 100, 100, '../escape' ) === false );
+
+// The seam a richer uploader hooks into: past the checks, before the
+// encoding. A handler that renders the image itself says so with a filename
+$rendered = [];
+\Nino\Callbacks::registerCallback( $appData, \Nino\Images::RENDER, static function( array &$appData, array &$image ) use ( &$rendered ): void {
+	$rendered[] = $image['mode']. ' '. $image['width']. 'x'. $image['height']. ' from '. $image['source']['width']. 'x'. $image['source']['height'];
+	$image['filename'] = $image['basePath']. '.handled.webp';
+} );
+
+check( 'a handler renders instead of gd, and gets the mode, the box and the source it was given', \Nino\Images::process( $appData, $wideSource, 64, 64, 'gallery/demo/hooked' ) === 'gallery/demo/hooked.handled.webp'
+	&& \Nino\Images::fit( $appData, $wideSource, 64, 64, 'gallery/demo/hooked' ) === 'gallery/demo/hooked.handled.webp'
+	&& $rendered === [ 'crop 64x64 from 400x200', 'fit 64x64 from 400x200' ] );
+check( '...and nothing was written by the kernel for either', \Nino\Filesystem::fileExists( $appData, '/images/gallery/demo/hooked.64x64.jpg' ) === false
+	&& \Nino\Filesystem::fileExists( $appData, '/images/gallery/demo/hooked.fit64x64.jpg' ) === false );
+
+unset( $appData['./nino/callbacks'][ \Nino\Images::RENDER ] );
+
+\Nino\Callbacks::registerCallback( $appData, \Nino\Images::RENDER, static function( array &$appData, array &$image ): void {
+	$image['filename'] = false;
+} );
+check( 'a handler that refuses the upload refuses it, and gd never runs', \Nino\Images::process( $appData, $wideSource, 64, 64, 'gallery/demo/refused' ) === false
+	&& \Nino\Filesystem::fileExists( $appData, '/images/gallery/demo/refused.64x64.jpg' ) === false );
+
+unset( $appData['./nino/callbacks'][ \Nino\Images::RENDER ] );
+
+// A handler is project code, not a reason to stop checking what comes back
+\Nino\Callbacks::registerCallback( $appData, \Nino\Images::RENDER, static function( array &$appData, array &$image ): void {
+	$image['filename'] = '../../escape.jpg';
+} );
+check( 'a filename that climbs out of the upload directory is not taken - gd renders it after all', \Nino\Images::process( $appData, $wideSource, 64, 64, 'gallery/demo/climb' ) === 'gallery/demo/climb.64x64.jpg' );
+
+unset( $appData['./nino/callbacks'][ \Nino\Images::RENDER ] );
+
+// The checks are ahead of the callback on purpose: what keeps an upload
+// endpoint safe is not something a feature switches off by registering
+$reached = false;
+\Nino\Callbacks::registerCallback( $appData, \Nino\Images::RENDER, static function( array &$appData, array &$image ) use ( &$reached ): void {
+	$reached = true;
+} );
+check( 'a handler never sees bytes that are not a decodable image of a sane size', \Nino\Images::process( $appData, 'not an image', 64, 64, 'gallery/demo/bad' ) === false && $reached === false );
+
+unset( $appData['./nino/callbacks'][ \Nino\Images::RENDER ] );
+
+echo "\n";
+
+
+// --- Images::delete --------------------------------------------------------
+
+echo "Images::delete - never outside its own directory\n";
+
 // delete() must never escape its own upload dir, even given a maliciously crafted filename
 \Nino\Filesystem::putFileContent( $appData, '/canary.txt', 'still here' );
 \Nino\Images::delete( $appData, '../canary.txt' );

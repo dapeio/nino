@@ -108,6 +108,22 @@ and a seam a submission can be refused at.
   left as it is, whatever version it has. One the catalogue cannot serve
   refuses the whole install, naming it, with nothing placed. The panel's
   answer names what came along.
+- **`/nino/images/render`** (`\Nino\Images::RENDER`): a rendering callback,
+  the same shape the mail transport has. `\Nino\Images::process()` and the new
+  `\Nino\Images::fit()` fire it after the checks and before the encoding - the
+  byte cap, the path, the image type and the pixel cap are what keep an upload
+  endpoint safe and are not something a feature switches off by registering -
+  with `mode`, the target box, the deterministic `basePath` and the source's
+  own dimensions. A handler that wrote the file sets `filename`, `false`
+  refuses the upload, `null` passes it on to gd. Where a richer uploader
+  belongs - webp, a srcset, an imagick pipeline - rather than a fork of the
+  two methods.
+- **`\Nino\Images::fit()`**: the whole picture scaled into a box with its own
+  proportions kept, and never scaled up. What `process()` cannot be: it crops
+  to exactly the dimensions asked for, which is right for a slot with a fixed
+  frame and wrong for the large view behind a thumbnail, where cropping is
+  what the viewer opened the image to undo. The box goes into the filename
+  rather than the result, so the name stays deterministic per slot.
 - **`/nino/mail/send`** (`\Nino\Mail::TRANSPORT`): a transport callback.
   `Mail::send()` fires it after the per-ip cap and the header cleaning with
   `{ to, subject, body, replyTo, sender, headers, sent }`; a handler that
