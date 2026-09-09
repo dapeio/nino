@@ -214,6 +214,20 @@ namespace Nino {
 			if( isset( $raw['description'] ) === true && self::_localizedValid( $raw['description'] ) === false )
 				return $fail( '"description" must be a string or a locale => string map' );
 
+			// The prose a manifest may carry beyond its description: how the
+			// feature is used, which the panel puts at the top of its screen.
+			// Capped like a text setting - what does not fit a box in a panel
+			// is a README, and a feature carries one of those already
+			if( isset( $raw['manual'] ) === true ) {
+
+				if( self::_localizedValid( $raw['manual'] ) === false )
+					return $fail( '"manual" must be a string or a locale => string map' );
+
+				foreach( is_array( $raw['manual'] ) === true ? $raw['manual'] : [ $raw['manual'] ] as $text )
+					if( strlen( (string) $text ) > self::MAX_TEXT_LENGTH )
+						return $fail( '"manual" is at most '. self::MAX_TEXT_LENGTH. ' characters - a longer one is a README' );
+			}
+
 			// Any slug passes, CATEGORIES is what a feature should use - the
 			// panel labels the ones it knows and shows the rest as they are.
 			// Nothing depends on the value: it groups a list, so an unknown
@@ -280,6 +294,7 @@ namespace Nino {
 				'module'			=> $module,
 				'name'				=> $raw['name'],
 				'description'	=> $raw['description'] ?? '',
+				'manual'			=> $raw['manual'] ?? '',
 				'category'		=> $category,
 				'version'			=> $version,
 				'nino'				=> trim( $nino ),

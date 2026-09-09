@@ -149,4 +149,48 @@
 	margin-top: 0;
 }
 
+/*	The manual, at the top of the screen behind the chevron: how the feature
+	is used, out of its own manifest. It opens with the screen, because
+	somebody who came here to switch something on wants to know what to do
+	with it - and it closes in one click, because that is true exactly once.
+	Capped rather than complete: a manual that runs past the box scrolls
+	inside it instead of pushing the settings and the buttons off screen. */
+#features-detail .features-manual {
+	margin: 1rem 0 0;
+	padding: .6rem .8rem;
+	border: 1px solid var(--editor-separator);
+	border-radius: var(--editor-radius-sm);
+	background: var(--nino-admin-surface-muted);
+}
+
+#features-detail .features-manual summary {
+	cursor: pointer;
+	font-size: .82rem;
+	font-weight: 650;
+}
+
+#features-detail .features-manual-body {
+	max-height: 14rem;
+	overflow-y: auto;
+	margin-top: .5rem;
+	font-size: .85rem;
+	line-height: 1.55;
+}
+
+#features-detail .features-manual-body p {
+	margin: 0 0 .6rem;
+}
+
+#features-detail .features-manual-body p:last-child {
+	margin-bottom: 0;
+}
+
+#features-detail .features-manual-body code {
+	font-family: var(--nino-admin-mono);
+	font-size: .92em;
+	padding: .08em .3em;
+	border-radius: 4px;
+	background: var(--editor-bg);
+}
+
 }

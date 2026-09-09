@@ -31,6 +31,7 @@ return [
 	'[[/_admin/features/label/version]]'			=> 'Version %s',
 	'[[/_admin/features/label/installed]]'		=> 'installiert als %s',
 	'[[/_admin/features/label/requires]]'			=> 'Benötigt: %s',
+	'[[/_admin/features/label/manual]]'				=> 'So wird es verwendet',
 	'[[/_admin/features/label/settings]]'			=> 'Einstellungen',
 	'[[/_admin/features/label/none]]'					=> '– keine –',
 	'[[/_admin/features/label/activate]]'			=> 'Aktivieren',

@@ -47,7 +47,7 @@ check( 'every readable manifest is listed, sorted by key', array_keys( $all ) ==
 check( 'a directory whose manifest does not validate is skipped with a warning naming it', isset( $all['broken'] ) === false
 	&& count( array_filter( $warnings, static fn( string $w ): bool => str_contains( $w, '/Broken/feature.php' ) && str_contains( $w, 'version' ) ) ) === 1 );
 check( 'the module class is derived from the directory', $all['sample']['module'] === '\\Nino\\Modules\\Sample' && $all['helper']['module'] === '\\Nino\\Modules\\Helper' );
-check( 'the manifest is normalized: every key present', array_keys( $all['helper'] ) === [ 'key', 'dir', 'module', 'name', 'description', 'category', 'version', 'nino', 'php', 'requires', 'data', 'settings', 'active', 'installed', 'update', 'problems' ]
+check( 'the manifest is normalized: every key present', array_keys( $all['helper'] ) === [ 'key', 'dir', 'module', 'name', 'description', 'manual', 'category', 'version', 'nino', 'php', 'requires', 'data', 'settings', 'active', 'installed', 'update', 'problems' ]
 	&& $all['helper']['nino'] === '*' && $all['helper']['requires'] === [] && $all['helper']['settings'] === [] );
 check( 'nothing is active or recorded on a fresh project', $all['sample']['active'] === false && $all['sample']['installed'] === null && $all['sample']['update'] === false );
 check( 'a compatible feature has no problems', $all['sample']['problems'] === [] && $all['helper']['problems'] === [] );
@@ -123,6 +123,16 @@ check( 'and so is one this kernel does not publish - a later catalogue files fea
 	&& ninoWarnings() === [] );
 check( 'a category that is not a slug is refused, and the message names the vocabulary', manifestFails( $manifestDir, 'BadCategory', [ 'name' => 'x', 'version' => '1.0.0', 'category' => 'UI Effects' ], '"category"' )
 	&& manifestFails( $manifestDir, 'ArrayCategory', [ 'name' => 'x', 'version' => '1.0.0', 'category' => [ 'security' ] ], 'security, system' ) );
+// The manual: the prose the panel puts at the top of a feature's screen,
+// localized like the name and the description, and capped so that what does
+// not fit a box in a panel stays a README
+check( 'a manual is optional and defaults to nothing', \Nino\Features::manifest( $manifestDir. '/Mini' )['manual'] === '' );
+check( 'one string is the manual in every language, a map is one per language', \Nino\Features::manifest( writeManifest( $manifestDir, 'Told', [ 'name' => 'x', 'version' => '1.0.0', 'manual' => 'Put `[told]` where it goes.' ] ) )['manual'] === 'Put `[told]` where it goes.'
+	&& \Nino\Features::manifest( writeManifest( $manifestDir, 'Both', [ 'name' => 'x', 'version' => '1.0.0', 'manual' => [ 'en_US' => 'Use it.', 'de_DE' => 'So geht es.' ] ] ) )['manual'] === [ 'en_US' => 'Use it.', 'de_DE' => 'So geht es.' ]
+	&& \Nino\Features::localized( \Nino\Features::manifest( $manifestDir. '/Both' )['manual'], 'de_DE' ) === 'So geht es.' );
+check( 'a manual that is not a string or a map of them is refused', manifestFails( $manifestDir, 'BadManual', [ 'name' => 'x', 'version' => '1.0.0', 'manual' => [ 'en_US' => 5 ] ], '"manual"' ) );
+check( 'and one that would not fit a box in a panel is refused as the README it is', manifestFails( $manifestDir, 'LongManual', [ 'name' => 'x', 'version' => '1.0.0', 'manual' => str_repeat( 'a', 10001 ) ], 'at most 10000 characters' ) );
+
 check( 'a setting needs a known type', manifestFails( $manifestDir, 'BadType', [ 'name' => 'x', 'version' => '1.0.0', 'settings' => [ 'a' => [ 'type' => 'color' ] ] ], 'unknown type' ) );
 check( 'a setting name is a lowerCamel identifier', manifestFails( $manifestDir, 'BadSetting', [ 'name' => 'x', 'version' => '1.0.0', 'settings' => [ 'api-key' => [ 'type' => 'string' ] ] ], 'setting name' ) );
 check( 'a select needs options', manifestFails( $manifestDir, 'NoOptions', [ 'name' => 'x', 'version' => '1.0.0', 'settings' => [ 'a' => [ 'type' => 'select' ] ] ], '"options"' ) );
@@ -472,7 +482,7 @@ check( 'apiList answers the directory the panel reads from, the catalogue url, w
 	&& array_keys( $body ) === [ 'dir', 'catalogueUrl', 'writable', 'catalogue', 'features' ] && array_column( $body['features'], 'key' ) === [ 'sample', 'helper', 'old' ]
 	&& array_column( $body['features'], 'name' ) === [ 'Beispiel-Feature', 'Helper', 'Old' ] );
 $byKey = array_column( $body['features'], null, 'key' );
-check( 'every entry has the same keys', array_keys( $byKey['sample'] ) === [ 'key', 'name', 'description', 'category', 'version', 'installed', 'active', 'update', 'requires', 'problems', 'settings' ] );
+check( 'every entry has the same keys', array_keys( $byKey['sample'] ) === [ 'key', 'name', 'description', 'manual', 'category', 'version', 'installed', 'active', 'update', 'requires', 'problems', 'settings' ] );
 check( 'names and descriptions arrive in the session locale - de_DE, the native language, since none was chosen', $byKey['sample']['name'] === 'Beispiel-Feature' && $byKey['sample']['description'] === 'Prüft den ganzen Feature-Vertrag.'
 	&& $byKey['helper']['name'] === 'Helper' && $byKey['helper']['description'] === '' );
 // The slug, not a word: the categories are named in the panel's own fills, so

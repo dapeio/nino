@@ -733,7 +733,7 @@ check( 'a feature not on disk is offered as available, its name in the session l
 $requests = [];
 [ $status, $body ] = callFeatures( $appData, 'apiInstall', [ 'key' => 'extra', 'version' => '1.0.0' ] );
 check( 'installing it answers its entry as the list shows it now - on disk, off, nothing recorded - and that no update was applied', $status === 200 && array_keys( $body ) === [ 'feature', 'updated', 'required' ] && $body['updated'] === false && $body['required'] === []
-	&& array_keys( $body['feature'] ) === [ 'key', 'name', 'description', 'category', 'version', 'installed', 'active', 'update', 'requires', 'problems', 'settings' ]
+	&& array_keys( $body['feature'] ) === [ 'key', 'name', 'description', 'manual', 'category', 'version', 'installed', 'active', 'update', 'requires', 'problems', 'settings' ]
 	&& $body['feature']['key'] === 'extra' && $body['feature']['name'] === 'Extra' && $body['feature']['version'] === '1.0.0' && $body['feature']['active'] === false && $body['feature']['installed'] === null && $body['feature']['update'] === false && $body['feature']['problems'] === [] );
 check( 'the directory is in place, the archive was fetched once, and nothing was switched on', is_file( NINO_FEATURES_DIR. '/Extra/feature.php' ) && is_file( NINO_FEATURES_DIR. '/Extra/Extra.php' )
 	&& count( array_filter( $requests, static fn( array $r ): bool => $r['url'] === 'https://catalogue.test/features/extra-1.0.0.tar.gz' ) ) === 1

@@ -622,6 +622,7 @@ namespace Nino\Modules\Features {
 				'key'					=> $feature['key'],
 				'name'				=> \Nino\Features::localized( $feature['name'], $locale ),
 				'description'	=> \Nino\Features::localized( $feature['description'], $locale ),
+				'manual'			=> \Nino\Features::localized( $feature['manual'] ?? '', $locale ),
 				// The slug, not a label: the script has the fills, and the one
 				// category it may meet without a fill - a feature filed under
 				// something this workbench predates - it shows as it stands

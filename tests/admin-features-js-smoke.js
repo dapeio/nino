@@ -183,6 +183,11 @@ function meta( el ) {
 	return el === undefined ? '' : ( byTag( el, 'small' )[0] || byTag( el, 'div' ).filter( function( n ) { return hasClass( n, 'admin-type-btn-descr' ) } )[0] || { textContent : '' } ).textContent;
 }
 
+/** The text of a node the script built out of pieces - the stand-in keeps them as children */
+function textOf( el ) {
+	return el === undefined ? '' : ( el.textContent !== '' ? el.textContent : ( el.children || [] ).map( textOf ).join('') );
+}
+
 /** The lines under it that are read whole - a requirement, a refusal, what an offer asks for */
 function notes( el ) {
 	return byTag( el, 'small' ).filter( function( n ) { return hasClass( n, 'admin-features-note' ) } ).map( function( n ) { return n.textContent } );
@@ -263,7 +268,7 @@ const FEATURES = [
 	{ key : 'old', name : 'Old', description : '', category : 'system', version : '3.0.0', installed : null, active : false, update : false, requires : [ 'nowhere' ],
 		problems : [ 'requires Nino ^0.9, this is 1.0.0', 'requires the php extension "no_such_extension"' ], settings : [] },
 	{ key : 'plain', name : 'Plain', description : 'Nothing to set.', category : 'ui', version : '1.0.0', installed : '0.9.0', active : true, update : true, requires : [], problems : [], settings : [] },
-	{ key : 'sample', name : 'Beispiel-Feature', description : 'Prüft den ganzen Feature-Vertrag.', category : 'content', version : '1.2.0', installed : '1.2.0', active : true, update : false, requires : [ 'helper' ], problems : [], settings : [
+	{ key : 'sample', name : 'Beispiel-Feature', description : 'Prüft den ganzen Feature-Vertrag.', manual : 'Setze `data-sample="on"` auf den Container.\nJede Zeile wird nacheinander getippt.\n\nMehr braucht es nicht - <b>kein</b> Markup.\n\nEin Backtick ` allein bleibt Text.', category : 'content', version : '1.2.0', installed : '1.2.0', active : true, update : false, requires : [ 'helper' ], problems : [], settings : [
 		{ name : 'enabled', type : 'bool', label : 'Aktiv', hint : '', required : false, min : null, max : null, maxlength : null, unit : '', options : [], value : true },
 		{ name : 'limit', type : 'int', label : 'Limit', hint : 'Items per page', required : false, min : 1, max : 50, maxlength : null, unit : 'items', options : [], value : 7 },
 		{ name : 'title', type : 'string', label : 'Title', hint : '', required : true, min : null, max : null, maxlength : 40, unit : '', options : [], value : 'Again' },
@@ -573,6 +578,20 @@ check( 'the form is on that screen and nowhere in the list, every setting a cont
 check( 'the settings sit in one fieldset, legended from the text system', byTag( form, 'fieldset' ).length === 1
 	&& byTag( form, 'legend' )[0].textContent === text('/_admin/features/label/settings') );
 
+const manual		 = findAll( screen, function( el ) { return hasClass( el, 'features-manual' ) } )[0];
+const manualBody = findAll( screen, function( el ) { return hasClass( el, 'features-manual-body' ) } )[0];
+const manualP		 = byTag( manualBody, 'p' );
+
+check( 'the manual out of the manifest opens the screen, above the settings, behind a summary that closes it again', manual !== undefined && manual.tagName === 'DETAILS' && manual.open === true
+	&& byTag( manual, 'summary' )[0].textContent === text('/_admin/features/label/manual')
+	&& form.children.indexOf( manual ) < form.children.indexOf( byTag( form, 'fieldset' )[0] ) );
+check( 'a blank line starts a paragraph, a single one is where the manifest wrapped its own line', manualP.length === 3
+	&& textOf( manualP[0] ) === 'Setze data-sample="on" auf den Container. Jede Zeile wird nacheinander getippt.' );
+check( 'a backticked span is a code element and the rest is text - a manifest writes prose, never markup', byTag( manualP[0], 'code' ).map( function( el ) { return el.textContent } ).join('|') === 'data-sample="on"'
+	&& textOf( manualP[1] ) === 'Mehr braucht es nicht - <b>kein</b> Markup.' && byTag( manualP[1], 'b' ).length === 0 );
+check( 'an unclosed backtick is prose, not the rest of the paragraph turned into code', textOf( manualP[2] ) === 'Ein Backtick ` allein bleibt Text.'
+	&& byTag( manualP[2], 'code' ).length === 0 );
+
 const byKey = {};
 controls.forEach( function( el ) { byKey[el.dataset.key] = el } );
 check( 'a bool is the shared switch', byKey.enabled.type === 'checkbox' && byKey.enabled.checked === true && findAll( form, function( el ) { return hasClass( el, 'nino-admin-switch-state' ) } ).length === 1 );
@@ -629,6 +648,7 @@ check( 'a feature that is no longer switched on drops its screen and comes back 
 // Deactivate is, and where an update waiting for it is applied
 fire( row( mount, 'plain' ), 'click' );
 const plainBar = byTag( screen, 'form' )[0].children[ byTag( screen, 'form' )[0].children.length - 1 ];
+check( 'a feature whose manifest carries no manual gets no box for one', findAll( screen, function( el ) { return hasClass( el, 'features-manual' ) } ).length === 0 );
 check( 'an active feature that declares no setting gets the same screen, without a fieldset and without a Save', byTag( screen, 'fieldset' ).length === 0
 	&& byTag( plainBar, 'button' ).map( function( el ) { return el.textContent } ).join('|') === text('/_admin/features/label/deactivate')+ '|'+ text('/_admin/features/label/update').replace( '%s', '1.0.0' )
 	&& byTag( plainBar, 'button' ).every( function( el ) { return el.type === 'button' } ) );

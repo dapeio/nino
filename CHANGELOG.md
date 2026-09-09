@@ -92,6 +92,18 @@ and a seam a submission can be refused at.
   refusing the entry: a bad entry costs the whole catalogue, and a category is
   a heading in a list. The catalogue format stayed at 1; its reader takes only
   the keys it knows.
+- **`manual`** in a feature manifest, and the box the Features panel opens a
+  feature's screen with: the short manual its author wrote - where the
+  shortcode goes, what an attribute does - rather than the README, which is
+  written for somebody reading the source. Localized like `name` and
+  `description`, capped at 10000 characters per language, and rendered as
+  paragraphs on blank lines with `` `backticks` `` as code and no other
+  markup: the text comes out of a manifest, so every piece of it becomes a
+  text node, never html. Open when the screen opens, closed with a click, and
+  scrolling inside its own box rather than pushing the settings down the page.
+  A feature that carries none gets no box. Deliberately not in
+  `catalogue.json`: what a manual answers is asked once the feature is
+  installed, and an offer already carries its description.
 - **`\Nino\Features::remove()`** and the panel's **Remove**: an inactive
   feature's directory deleted from the workbench, the one step deactivating
   deliberately leaves out. What the feature kept stays - its settings, its

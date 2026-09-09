@@ -1042,6 +1042,77 @@
 		 *
 		 *	@return		void
 		 */
+		/**
+		 *	The manual at the top of a feature's screen: what its manifest says
+		 *	about using it, as paragraphs, with `backticked` spans as code. Open,
+		 *	and capped in height by the stylesheet - it is read once and is in the
+		 *	way afterwards, so it collapses. null where the feature carries none
+		 *
+		 *	@param		{object}	feature			As the panel loaded it
+		 *
+		 *	@return		{?Element}
+		 */
+		_renderManual : function( feature ) {
+
+			const text = ( feature.manual || '' ).trim();
+
+			if( text === '' )
+				return null;
+
+			const details = dc.createElement('details');
+			details.className = 'features-manual';
+			details.open = true;
+
+			const summary = dc.createElement('summary');
+			summary.textContent = Nino.content.getText('/_admin/features/label/manual');
+			details.appendChild( summary );
+
+			const body = dc.createElement('div');
+			body.className = 'features-manual-body';
+
+			// A blank line starts a paragraph; a single one is where the manifest
+			// wrapped its own line and means nothing here
+			text.split( /\n[ \t]*\n/ ).forEach( function( block ) {
+
+				const flowed = block.trim().replace( /\s*\n\s*/g, ' ' );
+
+				if( flowed === '' )
+					return;
+
+				const paragraph = dc.createElement('p');
+				const pieces = flowed.split( '`' );
+
+				// Text out of a manifest, so every piece of it goes in as text: the
+				// backtick is the only markup there is, and it makes an element
+				// rather than a string of html. An unclosed one is prose, not
+				// markup - shown as it was written instead of turning the rest of
+				// the paragraph into code
+				if( pieces.length % 2 === 0 )
+					paragraph.textContent = flowed;
+				else
+					pieces.forEach( function( piece, index ) {
+
+						if( piece === '' )
+							return;
+
+						if( index % 2 === 0 ) {
+							paragraph.appendChild( dc.createTextNode( piece ) );
+							return;
+						}
+
+						const code = dc.createElement('code');
+						code.textContent = piece;
+						paragraph.appendChild( code );
+					} );
+
+				body.appendChild( paragraph );
+			} );
+
+			details.appendChild( body );
+
+			return details;
+		},
+
 		_renderDetail : function() {
 
 			const list	= dc.getElementById('features-list');
@@ -1087,6 +1158,11 @@
 				requires.textContent = Nino.content.getText('/_admin/features/label/requires').replace( '%s', feature.requires.join( ', ' ) );
 				form.appendChild( requires );
 			}
+
+			const manual = Nino.admin.features._renderManual( feature );
+
+			if( manual !== null )
+				form.appendChild( manual );
 
 			const settings = feature.settings.length > 0;
 

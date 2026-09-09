@@ -66,6 +66,10 @@ return [
 		'en_US' => 'A product catalogue with a public JSON endpoint and a workbench panel.',
 		'de_DE' => 'Ein Produktkatalog mit öffentlichem JSON-Endpunkt und einem Panel der Workbench.',
 	],
+	'manual'			=> [
+		'en_US' => 'Put `[catalog]` where the list belongs. `limit` and `sort` narrow it.',
+		'de_DE' => 'Setze `[catalog]` dorthin, wo die Liste hin soll. `limit` und `sort` schränken sie ein.',
+	],
 	'category'		=> 'content',
 	'version'			=> '1.1.0',
 	'nino'				=> '^1.0',
@@ -87,6 +91,7 @@ return [
 | `key` | der Slug des Features (`/^[a-z][a-z0-9-]*$/`): was `requires` nennt, was `/nino/features` als Schlüssel trägt und was `\Nino\Features::setting()` fragt. Ohne Angabe der kleingeschriebene Verzeichnisname |
 | `name` | ein String oder eine Map `locale => string`; Pflicht. Das, was eine Zeile im Features-Panel sagt – der Key steht dort nie –, der Name muss das Feature also von den anderen unterscheiden, die ein Projekt installieren könnte. Der Kernel nimmt, was er bekommt, denn zwei davon können aus zwei Katalogen kommen, über die er nicht bestimmt; zusammengehalten wird das im Katalog, so wie [dapeio/nino-features](https://github.com/dapeio/nino-features) zwei Features mit einem Namen abweist |
 | `description` | ein String oder eine Map `locale => string`; optional |
+| `manual` | ein String oder eine Map `locale => string`; optional. Wie das Feature benutzt wird – das Panel setzt es in eine Box oben auf seinen Bildschirm: Absätze an Leerzeilen, `` `Backticks` `` für Code, sonst nichts, höchstens 10000 Zeichen je Sprache. Kein README: was jemand braucht, um einen Shortcode zu setzen oder ein Attribut zu vergeben, nicht was ein Entwickler braucht, um den Quelltext zu lesen |
 | `category` | wofür das Feature da ist, ein Slug – siehe [Kategorien](#kategorien); optional, und das, wonach das Features-Panel gruppiert und filtert |
 | `version` | `major.minor.patch`, optional mit Pre-Release-Suffix (`1.0.0-beta.2`); Pflicht. Was das Panel zeigt und `activate()` aufzeichnet |
 | `nino` | die Nino-Version, für die das Feature geschrieben wurde, als Constraint; ohne Angabe `*` |
