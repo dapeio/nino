@@ -163,16 +163,12 @@
 		return result.length ? result : [ { value : '', label : Nino.content.getText('/_admin/templates/empty/textfills') } ];
 	}
 
-	function panel( number, title, description ) {
-		const result = node( 'section', 'pd-form-section pd-v3-panel' );
-		const heading = node( 'div', 'pd-v3-panel-heading' );
-		const marker = node( 'span', 'pd-v3-number' );
-		const copy = node( 'div', 'pd-v3-panel-copy' );
-		marker.append( node( 'small', '', Nino.content.getText('/_admin/templates/label/step') ), node( 'strong', '', String( number ) ) );
-		copy.append( node( 'h3', '', title ), node( 'p', '', description ) );
-		heading.append( marker, copy );
-		result.appendChild( heading );
-		return result;
+	/*	The two panels of step 2 carry no heading of their own. The first is the
+		only thing on screen when it is, and the second is a strip of area tabs
+		that names every area on it - a numbered "Step 2 · Areas" over them said
+		where you already were, in a dialog whose own stepper says the same. */
+	function panel() {
+		return node( 'section', 'pd-form-section pd-v3-panel' );
 	}
 
 	function sectionLabel( title, description ) {
@@ -393,9 +389,7 @@
 
 	function renderSectionPanel( wrap, draft, item ) {
 		const quick = quickMode();
-		const section = panel( 1, Nino.content.getText('/_admin/templates/label/panel-section'), quick
-			? Nino.content.getText('/_admin/templates/hint/panel-section-quick')
-			: Nino.content.getText('/_admin/templates/hint/panel-section-full') );
+		const section = panel();
 		const grid = node( 'div', 'pd-form-grid' );
 		grid.appendChild( formField( Nino.content.getText('/_admin/templates/label/section-id'), 'id', 'text', draft.id, Nino.content.getText('/_admin/templates/hint/section-id2').replace( '%p', draft.pageId ).replace( '%i', draft.id ), Object.keys( item.layouts ).length < 2 ) );
 		const recommended = recommendedFrame( draft, item );
@@ -473,7 +467,7 @@
 
 	function fixedValueField( propertyDefinition, path, value, wide ) {
 		const control = propertyDefinition.control === 'textarea' ? 'textarea' : ( propertyDefinition.control === 'url' ? 'url' : 'text' );
-		return formField( Nino.content.getText('/_admin/templates/label/property-value').replace( '%s', Nino.adminUi.text( propertyDefinition.label ) ), path, control, value, Nino.content.getText('/_admin/templates/hint/fixed-value'), wide === true );
+		return formField( Nino.content.getText('/_admin/templates/label/property-value'), path, control, value, Nino.content.getText('/_admin/templates/hint/fixed-value'), wide === true );
 	}
 
 	/**
@@ -490,8 +484,8 @@
 		group.appendChild( row );
 	}
 
-	function sourceField( label, areaKey, index, property, options, mode ) {
-		const field = formField( Nino.content.getText('/_admin/templates/label/binding-source').replace( '%s', label ), '', options, mode );
+	function sourceField( areaKey, index, property, options, mode ) {
+		const field = formField( Nino.content.getText('/_admin/templates/label/binding-source'), '', options, mode );
 		const select = field.querySelector('select');
 		select.removeAttribute('data-path');
 		select.dataset.bindingMode = areaKey+ ':'+ index+ ':'+ property;
@@ -513,11 +507,11 @@
 			const mode = bindingSource( component, property );
 			if( area.source === 'elements' ) {
 				const options = [ { value : 'field', label : Nino.content.getText('/_admin/templates/label/collection-field') }, { value : 'textfill', label : Nino.content.getText('/_admin/templates/label/textfill-existing') }, { value : 'fixed', label : Nino.content.getText('/_admin/templates/label/value-fixed') } ];
-				const source = propertyDefinition.fieldType === 'image' ? null : sourceField( Nino.adminUi.text( propertyDefinition.label ), areaKey, index, property, options, mode );
+				const source = propertyDefinition.fieldType === 'image' ? null : sourceField( areaKey, index, property, options, mode );
 				let value;
 				if( mode === 'textfill' ) value = formField( Nino.content.getText('/_admin/templates/label/textfill-key'), path, textfillOptions( current ), current );
 				else if( mode === 'fixed' ) value = fixedValueField( propertyDefinition, path, current );
-				else value = formField( Nino.content.getText('/_admin/templates/label/maps-to').replace( '%s', Nino.adminUi.text( propertyDefinition.label ) ), path, modelOptions( area, areaDraft.source.elementMode === 'existing' ? areaDraft.source.elementType : '', propertyDefinition.fieldType ), current );
+				else value = formField( Nino.content.getText('/_admin/templates/label/maps-to'), path, modelOptions( area, areaDraft.source.elementMode === 'existing' ? areaDraft.source.elementType : '', propertyDefinition.fieldType ), current );
 				bindingRow( group, Nino.adminUi.text( propertyDefinition.label ), source, value );
 				return;
 			}
@@ -526,7 +520,7 @@
 			const sourceOptions = propertyDefinition.kind === 'image'
 				? [ { value : 'new', label : Nino.content.getText('/_admin/templates/label/slot-new2') }, { value : 'image', label : Nino.content.getText('/_admin/templates/label/slot-existing') } ]
 				: [ { value : 'new', label : Nino.content.getText('/_admin/templates/label/value-new') }, { value : 'textfill', label : Nino.content.getText('/_admin/templates/label/textfill-existing') }, { value : 'fixed', label : Nino.content.getText('/_admin/templates/label/value-fixed') } ];
-			const source = sourceField( Nino.adminUi.text( propertyDefinition.label ), areaKey, index, property, sourceOptions, mode );
+			const source = sourceField( areaKey, index, property, sourceOptions, mode );
 			let value = null;
 			if( mode === 'image' ) {
 				value = formField( Nino.content.getText('/_admin/templates/label/image-slot'), path, ( pd.sectionsUI._images || [] ).map( function( image ) { return { value : image.uri, label : image.uri } } ), current );
@@ -541,7 +535,7 @@
 				input.value = Object.prototype.hasOwnProperty.call( pd.composer._textValues, generated ) ? pd.composer._textValues[generated] : propertyDefinition.default;
 				if( input.tagName === 'INPUT' && propertyDefinition.control === 'url' ) asLinkInput( input );
 				input.dataset.textKey = generated; input.placeholder = propertyDefinition.default;
-				value.append( node( 'span', '', Nino.content.getText('/_admin/templates/label/property-value').replace( '%s', Nino.adminUi.text( propertyDefinition.label ) ) ), input );
+				value.append( node( 'span', '', Nino.content.getText('/_admin/templates/label/property-value') ), input );
 				input.addEventListener( 'input', function() { pd.composer._textValues[generated] = input.value; pd.composer._touched.add( generated ) } );
 			}
 			bindingRow( group, Nino.adminUi.text( propertyDefinition.label ), source, value );
@@ -580,9 +574,7 @@
 		const areaKey = pd.areaComposer._areaKey;
 		const area = item.areas[areaKey];
 		const areaDraft = draft.areas[areaKey];
-		const section = panel( 2, Nino.content.getText('/_admin/templates/label/panel-areas'), quick
-			? Nino.content.getText('/_admin/templates/hint/panel-areas-quick')
-			: Nino.content.getText('/_admin/templates/hint/panel-areas-full') );
+		const section = panel();
 		section.classList.add('pd-v3-areas-panel');
 		const workspace = node( 'div', 'pd-v3-area-workspace' );
 		const tabs = node( 'div', 'pd-v3-area-tabs' );
@@ -597,7 +589,9 @@
 			button.setAttribute( 'aria-selected', key === areaKey ? 'true' : 'false' );
 			button.setAttribute( 'aria-controls', 'pd-v3-area-panel-'+ key );
 			button.tabIndex = key === areaKey ? 0 : -1;
-			copy.append( node( 'strong', '', Nino.adminUi.text( item.areas[key].label ) ), node( 'small', '', item.areas[key].source === 'elements' ? Nino.content.getText('/_admin/templates/label/area-collection') : Nino.content.getText('/_admin/templates/label/area-single') ) );
+			// The number and the name, and nothing under them: "Collection" or
+			// "Single" on every tab said what the editor below shows anyway
+			copy.append( node( 'strong', '', Nino.adminUi.text( item.areas[key].label ) ) );
 			button.append( node( 'span', 'pd-v3-area-index', String( index + 1 ) ), copy );
 			button.addEventListener( 'click', function() { pd.composer.captureValues(); pd.areaComposer._areaKey = key; pd.composer.renderSettings() } );
 			tabs.appendChild( button );
@@ -608,11 +602,11 @@
 		editor.setAttribute( 'role', 'tabpanel' );
 		editor.setAttribute( 'aria-labelledby', 'pd-v3-area-tab-'+ areaKey );
 
+		// The tab above it is lit and carries the same name, so the editor
+		// repeats nothing: what is left here is the Design/Data switch, and in
+		// the quick view there is not even that
 		const toolbar = node( 'div', 'pd-v3-area-heading' );
-		const copy = node('div');
-		copy.append( node( 'strong', '', Nino.adminUi.text( area.label ) ), node( 'p', '', Nino.adminUi.text( area.help ) || ( quick ? Nino.content.getText('/_admin/templates/hint/area-quick') : Nino.content.getText('/_admin/templates/hint/area-full') ) ) );
 		if( quick ) {
-			toolbar.appendChild( copy ); editor.appendChild( toolbar );
 			renderQuickArea( editor, draft, item, areaKey, area, areaDraft );
 			workspace.appendChild( editor ); section.appendChild( workspace ); wrap.appendChild( section );
 			return;
@@ -628,7 +622,7 @@
 		} );
 		views.setAttribute( 'role', 'tablist' );
 		views.setAttribute( 'aria-label', Nino.content.getText('/_admin/templates/label/area-editor').replace( '%s', Nino.adminUi.text( area.label ) ) );
-		toolbar.append( copy, views ); editor.appendChild( toolbar );
+		toolbar.appendChild( views ); editor.appendChild( toolbar );
 		if( pd.areaComposer._view === 'data' ) renderData( editor, draft, item, areaKey, area, areaDraft );
 		else renderDesign( editor, draft, item, areaKey, area, areaDraft );
 		workspace.appendChild( editor );
@@ -639,7 +633,6 @@
 	function renderQuickArea( section, draft, item, areaKey, area, areaDraft ) {
 		const body = node( 'div', 'pd-v3-area-body pd-v3-quick' );
 		if( area.source === 'elements' ) renderCollectionSource( body, areaKey, areaDraft );
-		body.appendChild( sectionLabel( Nino.content.getText('/_admin/templates/label/components-data'), Nino.content.getText('/_admin/templates/hint/components-data') ) );
 		const list = node( 'div', 'pd-v3-quick-components' );
 		areaDraft.components.forEach( function( component, index ) {
 			const definition = componentDefinition( item, area, component );

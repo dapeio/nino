@@ -255,6 +255,15 @@ and a seam a submission can be refused at.
   (`_admin/Nino/Modules/Features/assets/admin.css`): the head, the rows,
   and the gap in a row's buttons, which the script builds without
   whitespace between them and which therefore had none.
+- **The section composer says each thing once.** The dialog's heading carried
+  its own name on step 2, where the preset's name is the more useful of the
+  two, and the preset was named again in a card below it with the description
+  that sold it in the library. Both panels of that step had a numbered heading
+  saying where you already were; every area tab carried "Collection" or
+  "Single" under its name; the editor under the lit tab repeated that tab's
+  name and its help; and the quick view labelled its one list. All of it is
+  gone, and five labels lost the property name they repeated twice per row:
+  "Source", "Value", "New textfill", "Data source", "Data field".
 
 ### Fixed
 

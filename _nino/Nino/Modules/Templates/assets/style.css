@@ -65,7 +65,7 @@
 	border-radius: var(--editor-radius-sm);
 	background: var(--editor-bg);
 }
-.pd-page-icon, .pd-inspector-icon, .pd-template-preview-icon, .pd-include-icon, .pd-template-library-icon, .pd-v3-number, .pd-v3-area-index, .pd-v3-component-order, .pd-v3-binding-order {
+.pd-page-icon, .pd-inspector-icon, .pd-template-preview-icon, .pd-include-icon, .pd-template-library-icon, .pd-v3-area-index, .pd-v3-component-order, .pd-v3-binding-order {
 	display: grid;
 	place-items: center;
 	flex: 0 0 auto;
@@ -1316,27 +1316,16 @@
 	border-right: 1px solid var(--editor-separator);
 	background: color-mix(in srgb, var(--editor-bg) 72%, transparent);
 }
+/*	The card that named the picked preset is gone: the dialog's own heading
+	carries the name now, and what a card would have said under it was the
+	description that sold it in the library. What is left is the way back. */
 #pd-selected-preset {
 	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	gap: 1rem;
+	justify-content: flex-end;
 	margin: 0 0 .8rem;
-	padding: .75rem .8rem;
-	border: 1px solid color-mix(in srgb, var(--editor-blue) 24%, var(--editor-border));
-	border-radius: .85rem;
-	background: linear-gradient(135deg, var(--editor-blue-soft), var(--editor-bg-elevated));
 }
-#pd-selected-preset strong, #pd-selected-preset p {
-	display: block;
-}
-#pd-selected-preset strong {
-	font-size: .78rem;
-}
-#pd-selected-preset p {
-	margin: .14rem 0 0;
-	color: var(--editor-text-secondary);
-	font-size: .6rem;
+#pd-selected-preset:empty {
+	display: none;
 }
 #pd-selected-preset button {
 	flex: 0 0 auto;
@@ -1759,37 +1748,6 @@
 	overflow: hidden;
 	padding: 0;
 }
-.pd-v3-panel-heading {
-	display: grid;
-	grid-template-columns: 2.55rem minmax(0, 1fr);
-	gap: .75rem;
-	align-items: center;
-	padding: .8rem .9rem .78rem;
-	border-bottom: 1px solid var(--editor-border);
-	background: linear-gradient(110deg, color-mix(in srgb, var(--editor-blue-soft) 42%, var(--editor-bg-elevated)), var(--editor-bg-elevated) 48%);
-}
-.pd-v3-panel-copy { min-width: 0; }
-.pd-v3-panel-heading h3 { margin: 0; font-size: .82rem; letter-spacing: -.01em; }
-.pd-v3-panel-heading p { max-width: 34rem; margin: .18rem 0 0; color: var(--editor-text-secondary); font-size: .65rem; line-height: 1.42; }
-.pd-v3-number {
-	width: 2.55rem;
-	height: 2.55rem;
-	border: 1px solid color-mix(in srgb, var(--editor-blue) 24%, var(--editor-border));
-	background: var(--editor-blue-soft);
-	color: var(--editor-blue);
-	line-height: 1;
-}
-.pd-v3-number small {
-	font-size: .45rem;
-	font-weight: 750;
-	letter-spacing: .08em;
-	text-transform: uppercase;
-}
-.pd-v3-number strong {
-	margin-top: .16rem;
-	font-size: .9rem;
-	font-weight: 780;
-}
 
 /* Named area composer (manifest v3) ------------------------------------- */
 .pd-v3-panel > .pd-form-grid {
@@ -1856,18 +1814,18 @@
 	min-width: 0;
 	background: var(--editor-bg);
 }
+/*	All that is left over the area editor is its Design/Data switch - the tab
+	above it is lit and carries the name, so the bar holds one control and is
+	sized for one. */
 .pd-v3-area-heading {
 	display: flex;
 	align-items: center;
-	justify-content: space-between;
+	justify-content: flex-end;
 	gap: 1rem;
-	min-height: 4.25rem;
-	padding: .72rem .85rem;
+	padding: .55rem .85rem;
 	border-bottom: 1px solid var(--editor-border);
 	background: var(--editor-bg-elevated);
 }
-.pd-v3-area-heading strong { display: block; font-size: .82rem; }
-.pd-v3-area-heading p { margin: .16rem 0 0; color: var(--editor-text-secondary); font-size: .7rem; line-height: 1.35; }
 .pd-v3-view-tabs {
 	display: inline-flex;
 	flex: 0 0 auto;
@@ -2029,11 +1987,8 @@
 @media (max-width: 48rem) {
 	.pd-v3-component { grid-template-columns: minmax(0, 1fr) auto; }
 	.pd-v3-component-controls { grid-column: 1 / -1; grid-row: 2; }
-	.pd-v3-area-heading { align-items: flex-start; flex-direction: column; }
 }
 @media (max-width: 32rem) {
-	.pd-v3-panel-heading { grid-template-columns: 2.35rem minmax(0, 1fr); padding: .72rem; }
-	.pd-v3-number { width: 2.35rem; height: 2.35rem; }
 	.pd-v3-component { grid-template-columns: minmax(0, 1fr); }
 	.pd-v3-component-controls, .pd-v3-component-actions { grid-column: 1; grid-row: auto; }
 	.pd-v3-component-actions { justify-content: flex-end; }

@@ -200,7 +200,7 @@ check( 'ordered components move without mutating the previous state', movedCompo
 	&& Nino.admin.templates.areaComposer.moveComponent( componentList, 0, -1 ) === componentList );
 check( 'the editor keeps Area-level Design/Data views and independent collection creation', [ "[ 'design', 'data' ]", "'/_admin/templates/label/panel-areas'", 'collection.area', 'image.component' ].every( function( marker ) { return areaComposerSource.includes( marker ) } ) );
 check( 'Add Section uses a reduced combined component/data view while Edit keeps fine tuning', [
-	'function quickMode()', 'function renderQuickArea(', "'/_admin/templates/label/components-data'", "if( !quick ) {",
+	'function quickMode()', 'function renderQuickArea(', 'pd-v3-quick-components', "if( !quick ) {",
 ].every( function( marker ) { return areaComposerSource.includes( marker ) } )
 	&& composerSource.includes( "step === 'library' && pd.composer._context && pd.composer._context.mode === 'replace'" )
 	&& styleSource.includes( '.pd-composer-dialog.is-edit .pd-stepper' ) );
@@ -237,7 +237,7 @@ check( 'composer controls are styled by the tool itself, because its dialogs sit
 	&& /:where\(\.nino-admin\)\s*\.nino-admin-switch\s*\{/.test( ninoAdminCssSource )
 	&& /(^|\n)\.pd-check\s*\{/.test( styleSource ) );
 check( 'the config pane gives steps, Area tabs, components, sources and bindings explicit UI structure', [
-	'pd-v3-panel-copy', 'pd-v3-area-index', 'pd-v3-area-tab-copy', 'pd-v3-component-copy',
+	'pd-v3-panel', 'pd-v3-area-index', 'pd-v3-area-tab-copy', 'pd-v3-component-copy',
 	'pd-v3-section-label', 'pd-v3-source-panel', 'pd-v3-binding-heading', 'pd-v3-generated-value',
 ].every( function( marker ) { return areaComposerSource.includes( marker ) } ) );
 check( 'named-area rules use maintainable component specificity in the normal tool layer', /@layer nino\.tool \{\s*#pd-composer-settings/.test( styleSource )

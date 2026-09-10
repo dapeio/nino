@@ -425,6 +425,7 @@
 			back.classList.toggle( 'pd-hidden', onLibrary || editing );
 			next.classList.toggle( 'pd-hidden', !onLibrary );
 			next.textContent = selectedInclude() ? Nino.content.getText('/_admin/templates/label/next-template') : Nino.content.getText('/_admin/templates/label/next-config');
+			pd.composer.renderComposerHeading();
 			submit.classList.toggle( 'pd-hidden', onLibrary );
 			dc.getElementById('pd-step-library').classList.toggle( 'is-active', onLibrary );
 			dc.getElementById('pd-step-config').classList.toggle( 'is-active', !onLibrary );
@@ -554,22 +555,49 @@
 			pd.composer.requestPreview( true );
 		},
 
+		/**
+		 *	The dialog's own heading says what it is doing while a preset is
+		 *	still being picked, and says which one was picked once step 2 is on
+		 *	screen - where naming the dialog again is the one thing nobody needs
+		 *	and the preset's name is what everything below refers to. The
+		 *	description went with it: it sold the preset in the library, and the
+		 *	preview beside this shows the thing itself.
+		 *
+		 *	@return		void
+		 */
+		renderComposerHeading : function() {
+			const eyebrow = dc.querySelector('.pd-composer-heading .pd-eyebrow');
+			const title = dc.getElementById('pd-composer-title');
+			const preset = selectedPreset();
+			if( !eyebrow || !title )
+				return;
+			if( pd.composer._step === 'config' && preset ) {
+				eyebrow.textContent = Nino.adminUi.text( preset.category )+ ' · '+ presetKind( preset );
+				title.textContent = Nino.adminUi.text( preset.name );
+				return;
+			}
+			eyebrow.textContent = Nino.content.getText('/_admin/templates/label/section-composer');
+			title.textContent = pd.composer._context && pd.composer._context.mode === 'replace'
+				? Nino.content.getText('/_admin/templates/label/composer-edit')
+				: Nino.content.getText('/_admin/templates/label/composer-add');
+		},
+
 		renderSelectedPreset : function() {
 			const wrap = dc.getElementById('pd-selected-preset');
 			const preset = selectedPreset();
 			if( !wrap || !preset )
 				return;
 			wrap.innerHTML = '';
-			const copy = element('div');
-			copy.append( element( 'span', 'pd-eyebrow', Nino.adminUi.text( preset.category )+ ' · '+ presetKind( preset ) ), element( 'strong', '', Nino.adminUi.text( preset.name ) ), element( 'p', '', Nino.adminUi.text( preset.description ) ) );
-			if( pd.composer._context && pd.composer._context.mode === 'replace' ) {
-				wrap.appendChild( copy );
+			pd.composer.renderComposerHeading();
+			// What is left of this block is the way back to the library. In
+			// replace mode there is none - the preset of an existing section is
+			// not something this dialog changes
+			if( pd.composer._context && pd.composer._context.mode === 'replace' )
 				return;
-			}
 			const change = element( 'button', '', Nino.content.getText('/_admin/templates/label/change-preset') );
 			change.type = 'button';
 			change.addEventListener( 'click', function() { pd.composer.setStep('library') } );
-			wrap.append( copy, change );
+			wrap.appendChild( change );
 		},
 
 		renderSettings : function() {
