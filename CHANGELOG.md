@@ -182,6 +182,13 @@ and a seam a submission can be refused at.
   the group itself - so an editor granted the Features group sees every
   active feature's panel and nothing a kernel or `app/` module placed there
   instead. The group carries no heading while nothing is in it.
+- **`assets/style.css`**, the site's own stylesheet, shipped empty by the base
+  unit and last in the css bundle. Four manuals already told a project to put
+  its own rules there and promised the file is never touched - it was the one
+  file in that list that did not exist. Everything else in the bundle is
+  replaced wholesale when its choice is made again (the theme, either frame,
+  the generated token layer), so there was nowhere to put a rule that survives
+  picking another theme.
 
 ### Changed
 

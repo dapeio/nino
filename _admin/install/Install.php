@@ -900,6 +900,13 @@ namespace Nino\Install {
 			'footer' => [ 'template' => '/templates/theme.footer.tpl', 'stylesheet' => '/assets/style.footer.css' ],
 		];
 
+		// The site's own stylesheet, shipped empty by the base unit and last
+		// in the bundle. Everything else in there is replaced wholesale when
+		// its choice is made again - the theme, either frame, the generated
+		// token layer - so a project that wants one rule of its own had
+		// nowhere to put it that survives picking another theme
+		private const string PROJECT_STYLESHEET = '/assets/style.css';
+
 		/**
 		 *	This module's action map, merged into Install::handlePost()'s dispatch
 		 *
@@ -1160,7 +1167,7 @@ namespace Nino\Install {
 			self::_applyFrame( $appData, $kind, $frame );
 
 			$appData['/nino/install/'. $kind] = $frame;
-			$appData['/nino/html/assets'] = self::_bundleFrames( $appData, self::_activeFrameKinds( $appData ) );
+			$appData['/nino/html/assets'] = self::_bundleProject( self::_bundleFrames( $appData, self::_activeFrameKinds( $appData ) ) );
 
 			\Nino\AppData::writeContentData( $appData, [ '/nino/install/'. $kind, '/nino/html/assets' ] );
 
@@ -1558,7 +1565,7 @@ namespace Nino\Install {
 				$applied[$kind] = $frame;
 			}
 
-			$appData['/nino/html/assets'] = self::_bundleFrames( $appData, array_keys( $applied ) );
+			$appData['/nino/html/assets'] = self::_bundleProject( self::_bundleFrames( $appData, array_keys( $applied ) ) );
 
 			$keys = array_merge( [ '/nino/install/theme', '/nino/html/assets' ], array_map( static fn( string $kind ): string => '/nino/install/'. $kind, array_keys( $applied ) ) );
 
@@ -1724,9 +1731,9 @@ namespace Nino\Install {
 				static fn( string $file ): bool => in_array( $file, $wanted, true ) === false
 			) );
 
-			// After the theme stylesheet, or - with no theme in the bundle at
-			// all - after everything, since a frame overriding project css it
-			// has never seen is the worse failure of the two
+			// After the theme stylesheet, and with no theme in the bundle at all
+			// still ahead of the site's own - a frame overriding css a project
+			// wrote itself is the worse failure of the two
 			$position = false;
 			foreach( self::_stylesheets() as $stylesheet ) {
 				$found = array_search( $stylesheet, $files, true );
@@ -1734,7 +1741,12 @@ namespace Nino\Install {
 					$position = $found;
 			}
 
-			array_splice( $files, $position === false ? count( $files ) : $position + 1, 0, $wanted );
+			if( $position === false ) {
+				$own 			= array_search( self::PROJECT_STYLESHEET, $files, true );
+				$position = $own === false ? count( $files ) - 1 : $own - 1;
+			}
+
+			array_splice( $files, $position + 1, 0, $wanted );
 
 			$assets[self::BUNDLE_KEY] = $files;
 
@@ -1758,6 +1770,30 @@ namespace Nino\Install {
 		 *
 		 *	@return 	array
 		 */
+		/**
+		 *	'/nino/html/assets' with the site's own stylesheet last, added if
+		 *	it is not in the bundle yet and left where it is if it is. Last is
+		 *	the whole point: the theme assigns the design tokens to roles and a
+		 *	frame styles its own markup with them, and this is where a project
+		 *	overrules either without editing a file that the next theme, frame
+		 *	or design write would replace under it
+		 *
+		 *	@param		array 		$assets				'/nino/html/assets' as it stands
+		 *
+		 *	@return 	array
+		 */
+		private static function _bundleProject( array $assets ): array {
+
+			$files = array_map( 'strval', $assets[self::BUNDLE_KEY] ?? [] );
+
+			if( in_array( self::PROJECT_STYLESHEET, $files, true ) === false )
+				$files[] = self::PROJECT_STYLESHEET;
+
+			$assets[self::BUNDLE_KEY] = $files;
+
+			return $assets;
+		}
+
 		private static function _bundle( array &$appData, string $stylesheet ): array {
 
 			$assets = $appData['/nino/html/assets'] ?? [];

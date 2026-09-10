@@ -421,8 +421,12 @@ $themeSwitchRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 $configAfterSwitch = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
 
 check( 'switching themes swaps the bundled stylesheet rather than adding a second one', $configAfterSwitch['/nino/html/assets']['/.cache/style.css'] === [
-	'/_nino/Nino.css', '/assets/style.design.css', '/assets/style.custom.css', '/assets/style.theme.'. $themeSwitch. '.css', '/assets/style.header.css', '/assets/style.footer.css',
+	'/_nino/Nino.css', '/assets/style.design.css', '/assets/style.custom.css', '/assets/style.theme.'. $themeSwitch. '.css', '/assets/style.header.css', '/assets/style.footer.css', '/assets/style.css',
 ] );
+// Last, and only once however often a theme or a frame is picked again: this
+// is the one file in the bundle nothing the wizard writes ever replaces
+check( 'the site\'s own stylesheet is last in the bundle, and there is one of it', is_file( $sandbox. '/private/assets/style.css' ) === true
+	&& count( array_keys( $configAfterSwitch['/nino/html/assets']['/.cache/style.css'], '/assets/style.css', true ) ) === 1 );
 check( '...and updates the persisted key with it', $configAfterSwitch['/nino/install/theme'] === $themeSwitch );
 check( 'copies the new theme\'s own fonts too', is_file( $sandbox. '/public/fonts/spectral-regular.woff2' ) === true );
 check( 'a file the previous theme wrote is left behind, not deleted - same additive rule as Setup\'s templates/text', is_file( $sandbox. '/private/assets/style.theme.'. $themeSample. '.css' ) === true );

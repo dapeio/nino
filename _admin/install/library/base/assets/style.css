@@ -1,0 +1,14 @@
+/**
+ *	style.css						This site's own stylesheet - the last thing the css bundle
+ *												loads, so a rule here wins over the design tokens, the
+ *												theme and the header/footer frame alike.
+ *
+ *												It ships empty on purpose. Everything a wizard, a theme
+ *												or a frame writes lives in a file of its own
+ *												(style.theme.<name>.css, style.header.css,
+ *												style.footer.css, and the generated token layer), and
+ *												every one of those is replaced wholesale when that
+ *												choice is made again. This one is never touched, so
+ *												what you put here survives changing the theme, both
+ *												frames and the design.
+ */
