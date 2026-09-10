@@ -13,7 +13,15 @@ namespace Nino\Modules\Templates {
 	final class AreaComposer {
 
 		private const string ID_PATTERN = '/^[a-z][a-z0-9-]*$/';
-		private const string FIELD_PATTERN = '/^[A-Za-z][A-Za-z0-9]*$/';
+		// A field of the collection this area renders. An area that makes its
+		// own Elements type names its fields in the preset's model, in
+		// lowerCamel; an area bound to a type the project already has names
+		// whatever that type calls them, and an Elements type takes any
+		// non-empty key (see the Element Types panel). So this is as wide as
+		// the [[fill]] the binding becomes can carry, rather than as narrow as
+		// the models this repository happens to ship - a type with a field
+		// called header_image was refused, and told it did not exist
+		private const string FIELD_PATTERN = '/^[A-Za-z][A-Za-z0-9_-]*$/';
 		private const string TEXT_KEY_PATTERN = '#^/[A-Za-z0-9][A-Za-z0-9_./-]*$#';
 		private const string IMAGE_KEY_PATTERN = '#^/[a-z0-9][a-z0-9_/-]*$#';
 		private const string TEMPLATE_PATTERN = '#^/templates/[A-Za-z0-9][A-Za-z0-9._-]*$#';
@@ -815,7 +823,13 @@ namespace Nino\Modules\Templates {
 					throw new \InvalidArgumentException( 'component '. $id. ' has an invalid image binding' );
 				return;
 			}
-			if( preg_match( self::FIELD_PATTERN, $value ) !== 1 || ( $strictModel && isset( $model[$value] ) === false ) )
+			// Two different refusals, and saying so matters: with a collection
+			// the project already has there is no model to be unknown to, so
+			// "unknown model field" sent whoever hit it looking for a field
+			// that was there all along
+			if( preg_match( self::FIELD_PATTERN, $value ) !== 1 )
+				throw new \InvalidArgumentException( 'component '. $id. ' binds a field name a section cannot render - a letter first, then letters, digits, - and _' );
+			if( $strictModel && isset( $model[$value] ) === false )
 				throw new \InvalidArgumentException( 'component '. $id. ' maps to an unknown model field' );
 			if( $strictModel && ( $definition['fieldType'] === 'image' ) !== ( $model[$value]['type'] === 'image' ) )
 				throw new \InvalidArgumentException( 'component '. $id. ' has an incompatible model mapping' );

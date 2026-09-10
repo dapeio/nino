@@ -75,6 +75,43 @@
 		parent[last] = value;
 	}
 
+	/**
+ *	A link the section stores as it is: an absolute url, a path of its own site
+ *	or a fragment on the page it sits on. type="url" takes only the first of
+ *	the three, and it does not take it quietly - the browser refuses the whole
+ *	composer form before its submit handler ever runs, so a button pointing at
+ *	#prices could not be saved at all. The field is a text input carrying the
+ *	server's own rule instead (AreaComposer::validLiteral), which says no to a
+ *	foreign scheme, to a protocol-relative //host and to whitespace, and yes to
+ *	everything else.
+ *
+ *	@param		{string}	value
+ *	@return		{boolean}					Whether the server would take it
+ */
+	function linkAccepted( value ) {
+
+		value = String( value ).trim();
+
+		if( value === '' )
+			return true;
+
+		if( /[\u0000-\u0020\u007F]/.test( value ) === true || value.indexOf('//') === 0 )
+			return false;
+
+		const scheme = /^([A-Za-z][A-Za-z0-9+.-]*):/.exec( value );
+
+		return scheme === null || [ 'http', 'https', 'mailto', 'tel' ].indexOf( scheme[1].toLowerCase() ) !== -1;
+	}
+
+	function asLinkInput( input ) {
+		input.type = 'text';
+		input.inputMode = 'url';
+		const mark = function() { input.setCustomValidity( linkAccepted( input.value ) ? '' : Nino.content.getText('/_admin/templates/error/link') ) };
+		input.addEventListener( 'input', mark );
+		mark();
+		return input;
+	}
+
 	function formField( label, path, options, value, help, wide ) {
 		const field = node( 'label', 'pd-form-field'+ ( wide ? ' is-wide' : '' ) );
 		field.appendChild( node( 'span', '', label ) );
@@ -93,8 +130,9 @@
 			} );
 		} else {
 			input = node( options === 'textarea' ? 'textarea' : 'input' );
-			if( input.tagName === 'INPUT' ) input.type = options || 'text';
+			if( input.tagName === 'INPUT' ) input.type = options === 'url' ? 'text' : ( options || 'text' );
 			input.value = value === undefined ? '' : value;
+			if( options === 'url' ) asLinkInput( input );
 		}
 		input.dataset.path = path;
 		field.appendChild( input );
@@ -499,8 +537,9 @@
 			} else if( propertyDefinition.kind !== 'image' ) {
 				value = node( 'label', 'pd-form-field pd-v3-generated-value' );
 				const input = node( propertyDefinition.control === 'textarea' ? 'textarea' : 'input' );
-				if( input.tagName === 'INPUT' ) input.type = propertyDefinition.control === 'url' ? 'url' : 'text';
+				if( input.tagName === 'INPUT' ) input.type = 'text';
 				input.value = Object.prototype.hasOwnProperty.call( pd.composer._textValues, generated ) ? pd.composer._textValues[generated] : propertyDefinition.default;
+				if( input.tagName === 'INPUT' && propertyDefinition.control === 'url' ) asLinkInput( input );
 				input.dataset.textKey = generated; input.placeholder = propertyDefinition.default;
 				value.append( node( 'span', '', Nino.content.getText('/_admin/templates/label/property-value').replace( '%s', Nino.adminUi.text( propertyDefinition.label ) ) ), input );
 				input.addEventListener( 'input', function() { pd.composer._textValues[generated] = input.value; pd.composer._touched.add( generated ) } );
@@ -864,6 +903,7 @@
 		_view : 'design',
 		nextComponentId : nextComponentId,
 		moveComponent : moveComponent,
+		linkAccepted : linkAccepted,
 		areaKeys : areaKeys,
 		reconcileAvailableCollections : function() {
 			const item = preset();

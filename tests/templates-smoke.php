@@ -330,6 +330,28 @@ check( 'maps ordered components to compatible existing model fields', str_contai
 	&& str_contains( $articles['source'], '[[buttonLabel]]' ) );
 check( 'returns each independently creatable collection and the complete recommended schema', isset( $articles['content']['collections'][0]['model']['image'], $articles['content']['collections'][0]['model']['linkLabel'] ) );
 check( 'generated Elements images use Nino image storage under the public content prefix', str_contains( $articles['source'], '[[/nino/public]]/images/[[photo]]' ) && str_contains( $articles['source'], '/uploads/' ) === false );
+// An Elements type takes any non-empty field key, so an area bound to one the
+// project already has meets whatever that project called its fields. The
+// composer only ever took lowerCamel, and refused the rest as "an unknown
+// model field" - with an existing collection there is no model to be unknown
+// to, so whoever hit it went looking for a field that was there all along
+$underscoreInput = $articleInput;
+$underscoreInput['id'] = 'underscore-fields';
+$underscoreInput['areas']['articles']['components'][0]['bindings'] = [ 'src' => 'header_image', 'alt' => 'page-title' ];
+$underscoreInput['areas']['articles']['components'][1]['bindings'] = [ 'text' => 'page-title' ];
+$underscore = \Nino\Modules\Templates\Composer::compose( $underscoreInput );
+check( 'a chosen collection may call its fields header_image or page-title', str_contains( $underscore['source'], '[[header_image]]' )
+	&& str_contains( $underscore['source'], '[[page-title]]' ) );
+
+$spacedInput = $articleInput;
+$spacedInput['id'] = 'spaced-field';
+$spacedInput['areas']['articles']['components'][1]['bindings'] = [ 'text' => 'no name' ];
+$refusal = '';
+try { \Nino\Modules\Templates\Composer::compose( $spacedInput ); }
+catch( \InvalidArgumentException $exception ) { $refusal = $exception->getMessage(); }
+check( 'and a name a fill could not carry is refused for what it is, not as a missing field', str_contains( $refusal, 'cannot render' )
+	&& str_contains( $refusal, 'unknown model field' ) === false );
+
 $missingArticleSources = $articleInput;
 unset( $missingArticleSources['areas']['articles']['components'][1]['bindingSources'] );
 check( 'section metadata must declare every Elements-Area binding source', throwsInvalidArgument( fn() => \Nino\Modules\Templates\Composer::compose( $missingArticleSources ) ) );

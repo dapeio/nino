@@ -268,7 +268,20 @@ and a seam a submission can be refused at.
   back now, rather than every preset having to know the rule exists; a preset
   that is not a bar still opts out where it says so, as the sidebar rail does
   above its own breakpoint.
-
+- **A button's link takes a fragment and a relative path again.** The composer's
+  link field was an `<input type="url">`, and the composer is a real form: a
+  value like `#prices` or `/kontakt` made the browser refuse the submit before
+  the handler ran, so the section could not be saved at all. The field is a
+  text input carrying the server's own rule now
+  (`AreaComposer::validLiteral`), which refuses a foreign scheme, a
+  protocol-relative `//host` and whitespace, and takes everything else.
+- **An area bound to an existing Elements type may use that type's field
+  names.** `AreaComposer`'s field pattern took lowerCamel alone, while an
+  Elements type takes any non-empty key - so a collection with a field called
+  `header_image` was refused, and told it was "an unknown model field". With a
+  collection the project already has there is no model to be unknown to: the
+  pattern is as wide as the `[[fill]]` the binding becomes can carry, and a
+  name outside it is refused for what it is.
 
 ## 1.1.0-beta — 2026-09-07
 

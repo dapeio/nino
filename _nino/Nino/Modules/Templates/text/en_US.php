@@ -367,6 +367,7 @@ return [
 	'[[/_admin/templates/error/displayname-save]]'    	=> 'Enter a safe template name before saving.',
 	'[[/_admin/templates/error/duplicate-id]]'        	=> 'Another section already uses id "%s".',
 	'[[/_admin/templates/error/filename]]'            	=> 'Use a filename such as page-services.tpl.',
+	'[[/_admin/templates/error/link]]'                	=> 'A link may be absolute, relative (/contact) or a fragment (#prices) - a scheme other than http, https, mailto or tel is not allowed, and neither are spaces.',
 	'[[/_admin/templates/error/map-fields]]'          	=> 'Map every field in %s to a compatible Elements field.',
 	'[[/_admin/templates/error/native-prefix]]'       	=> 'Native content: %s',
 	'[[/_admin/templates/error/request]]'             	=> 'Request failed.',

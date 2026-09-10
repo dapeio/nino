@@ -367,6 +367,7 @@ return [
 	'[[/_admin/templates/error/displayname-save]]'    	=> 'Gib vor dem Speichern einen zulässigen Template-Namen ein.',
 	'[[/_admin/templates/error/duplicate-id]]'        	=> 'Ein anderer Abschnitt verwendet die Id „%s“ bereits.',
 	'[[/_admin/templates/error/filename]]'            	=> 'Verwende einen Dateinamen wie page-services.tpl.',
+	'[[/_admin/templates/error/link]]'                	=> 'Ein Link darf absolut, relativ (/kontakt) oder ein Sprungziel (#preise) sein – ein anderes Schema als http, https, mailto oder tel ist nicht erlaubt, Leerzeichen auch nicht.',
 	'[[/_admin/templates/error/map-fields]]'          	=> 'Bilde jedes Feld in %s auf ein passendes Elementfeld ab.',
 	'[[/_admin/templates/error/native-prefix]]'       	=> 'Eigene Inhalte: %s',
 	'[[/_admin/templates/error/request]]'             	=> 'Anfrage fehlgeschlagen.',

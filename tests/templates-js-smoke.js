@@ -182,6 +182,18 @@ check( 'the Area editor loads after the established composer and exposes bounded
 const componentList = [ { id : 'title' }, { id : 'title-2' }, { id : 'image' } ];
 check( 'new component IDs remain stable and unique within an Area', Nino.admin.templates.areaComposer.nextComponentId( componentList, 'title' ) === 'title-3'
 	&& Nino.admin.templates.areaComposer.nextComponentId( componentList, 'button' ) === 'button' );
+// A button's link is stored as it was written, and the composer form is a real
+// form: an <input type="url"> holding #prices makes the browser refuse the
+// submit before the handler runs, so the section could not be saved at all.
+// The field is a text input carrying the server's own rule instead
+const linkAccepted = Nino.admin.templates.areaComposer.linkAccepted;
+check( 'a fragment and a relative link are accepted, which type="url" never allowed', [ '#prices', '/kontakt', 'preise.html', '../oben', '', '  ' ].every( linkAccepted ) );
+check( 'and an absolute one, in the four schemes the server takes', [ 'https://example.com/a', 'http://example.com', 'mailto:a@example.com', 'tel:+4989123' ].every( linkAccepted ) );
+check( 'what the server refuses the field refuses too - a foreign scheme, //host, whitespace', [ 'javascript:alert(1)', 'data:text/html,x', 'ftp://example.com', '//example.com/a', 'https://example.com/a b' ].every( function( value ) { return linkAccepted( value ) === false } ) );
+check( 'and the two link fields are text inputs, so the browser stops enforcing a scheme', areaComposerSource.includes( "input.type = options === 'url' ? 'text' : ( options || 'text' )" )
+	&& /asLinkInput\( input \)/.test( areaComposerSource )
+	&& areaComposerSource.includes( "input.type = 'url'" ) === false );
+
 const movedComponents = Nino.admin.templates.areaComposer.moveComponent( componentList, 2, -1 );
 check( 'ordered components move without mutating the previous state', movedComponents[1].id === 'image'
 	&& componentList[1].id === 'title-2'
