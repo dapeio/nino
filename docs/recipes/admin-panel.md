@@ -21,8 +21,8 @@ Two kinds of panel exist, and the class looks the same for both:
   "Panels, the installer unit and Restore" in the [runtime module
   recipe](runtime-module.md)) and exists exactly while that module is active. Prefer it whenever the
   screen belongs to a module or a feature: it then ships, and is removed, as
-  one directory. `Modules\Form` (Submissions), `Modules\Navigation` and
-  `Modules\Design` are built this way as kernel modules, `Modules\Templates`,
+  one directory. `Modules\Form` (Submissions) and `Modules\Navigation` are
+  built this way as kernel modules, `Modules\Templates`,
   `Modules\Newsletter` and `Modules\Search` as features from the
   catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features),
   copied under `features/` (the [feature recipe](feature.md)).
@@ -90,8 +90,8 @@ request:
   the `features` group.
 - `weight` orders the navigation within the group, lowest first, stable for
   equal weights. Core content panels sit at 0 (Dashboard), 20 (Elements), 30
-  (Text), 40 (Images) and 90 (Logs); structure at 2 (Templates), 5 (Design)
-  and 20 (Routes); system at 2 (Users), 5 (Language), 10 (Backups) and 20
+  (Text), 40 (Images) and 90 (Logs); structure at 20 (Routes); system at
+  2 (Users), 5 (Language), 10 (Backups) and 20
   (Config). A module panel picks the slot it wants: Submissions 60,
   Navigations 25 (after Routes); the catalogue's Newsletter and Search name
   weights of their own too, but land in `features` rather than wherever they
@@ -365,9 +365,8 @@ its fills (`[[/nino/dir]]`, the panel's own text keys) resolve like the
 shell's. The file is a fragment: no `<html>`, no `[csrf]` (the page has one),
 no `<link>` or `<script>` (the panel's `assets()` are bundled). Every id and
 class in it is the panel's own; the components are the design system's.
-`_nino/Nino/Modules/Design` (four editors under a tab strip, `layout()` =
-`'page'`) and the Template Builder feature (`features/Templates` once copied
-in, `layout()` = `'workspace'`) are the references:
+The Template Builder feature (`features/Templates` once copied in,
+`layout()` = `'workspace'`) is the reference:
 
 ```php
 public static function template(): string {

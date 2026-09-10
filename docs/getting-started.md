@@ -7,7 +7,7 @@
 This guide leads you on the shortest path from a fresh checkout to a locally running Nino website. If you instead want to look up every field and writing process of the wizard, read the [Setup Wizard](setup.md) reference; technical backgrounds are explained in the [Concepts](concepts.md).
 
 **Additional Links:**
-[README](../README.md) · [Concepts](concepts.md) · [Developer Manual](development.md) · [Recipes](recipes/README.md) · [Getting Started](getting-started.md) · [Setup Wizard](setup.md) · [`/_admin` Workbench](_admin.md) · [Design Panel](appearance.md) · [Features](features.md) · [Deployment](deployment.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
+[README](../README.md) · [Concepts](concepts.md) · [Developer Manual](development.md) · [Recipes](recipes/README.md) · [Getting Started](getting-started.md) · [Setup Wizard](setup.md) · [`/_admin` Workbench](_admin.md) · [Features](features.md) · [Deployment](deployment.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
 
 **Important:** A fresh checkout contains the kernel, the workbench, the modules, the features and the installation library, but not yet a complete project state. The setup wizard - what `/_admin` shows until it is done - creates and fills the required project directories; only then does the website run.
 
@@ -37,18 +37,14 @@ As long as the wizard is not completed, you can return to earlier steps and reap
 |---|---|
 | [1. Environment](setup.md#1-environment) | Are PHP, extensions, and write permissions ready for use? |
 | [2. Setup](setup.md#2-setup) | Which languages and functional modules does the project require? |
-| [3. Themes](setup.md#3-themes) | Which visual starting point should be copied? |
-| [4. Header](setup.md#4-header) | Which independently previewed header frame should be installed? |
-| [5. Footer](setup.md#5-footer) | Which independently previewed footer frame should be installed? |
-| [6. Design](setup.md#6-design) | Which colours, type scale, spacing, and shaping should the theme use? |
-| [7. Routes](setup.md#7-routes) | Which first pages, public paths, and metadata are created? |
-| [8. Personal Information](setup.md#8-personal-information) | Which central company and website values are available as textfills? |
-| [9. Accounts](setup.md#9-accounts) | Which developer account(s) sign in to the workbench with full access? |
-| [10. Finish](setup.md#10-finish) | Which recovery password opens `/_admin/recovery.php` when the accounts are broken - and locks the wizard? |
+| [3. Routes](setup.md#3-routes) | Which first pages, public paths, and metadata are created? |
+| [4. Personal Information](setup.md#4-personal-information) | Which central company and website values are available as textfills? |
+| [5. Accounts](setup.md#5-accounts) | Which developer account(s) sign in to the workbench with full access? |
+| [6. Finish](setup.md#6-finish) | Which recovery password opens `/_admin/recovery.php` when the accounts are broken - and locks the wizard? |
 
-The wizard automatically resolves dependencies between selected modules and the page templates used. Theme, Header, Footer, and Design are separate consecutive decisions; after completion, the Design panel is where they change.
+The wizard automatically resolves dependencies between selected modules and the page templates used. The look is not among its questions: the base unit delivers one theme, `assets/theme.css`, and the two frame templates it is drawn against - see [The Look](setup.md#the-look).
 
-The accounts of step 9 are developers with full rights. Editor accounts with content permissions only are created later in the workbench's Users panel.
+The accounts of step 5 are developers with full rights. Editor accounts with content permissions only are created later in the workbench's Users panel.
 
 ## Verify the Result
 
@@ -56,16 +52,15 @@ After completion, open:
 
 | Address | Expected Result |
 |---|---|
-| `/` | The configured website is delivered with the selected theme. |
+| `/` | The configured website is delivered, in the theme the base unit brought. |
 | `/_admin` | The root account opens the workbench with every panel: content, structure and system. |
-| `/_admin#design` | The Design panel with Theme, Header, Footer and Design. |
 | `/_admin#templates` | The Templates panel, the section-first Template Builder (Alpha). |
 
 Also check every language and route, the navigation, and used forms. Save a text and an image as a test. In the Templates panel, open a `page-*.tpl`, change nothing at first, and check whether its top-level sections are recognized without warnings.
 
 Newsletter and Search are features, not wizard modules, and a checkout ships none: when the project needs one, copy its directory from the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features) into `features/`, switch it on in the workbench's **Features** panel (System group), then reload the workbench for its panel to appear. See [Features](features.md).
 
-The last step sets the recovery password and locks the wizard. Subsequently, remove `_admin/install/` from production delivery; this also retires the catalogue-backed tabs of the Design panel, while its Design tab keeps working. The correct order and further security checks are described in the [Deployment Manual](deployment.md#the-wizard-after-setup).
+The last step sets the recovery password and locks the wizard. Subsequently, remove `_admin/install/` from production delivery; everything it copied stays where it wrote it. The correct order and further security checks are described in the [Deployment Manual](deployment.md#the-wizard-after-setup).
 
 ## Next Steps
 
@@ -74,6 +69,5 @@ The last step sets the recovery password and locks the wizard. Subsequently, rem
 - [Setup Wizard](setup.md) documents all options and writing processes.
 - [`/_admin` Workbench](_admin.md) guides through every panel, the accounts and the recovery page.
 - The **Template Builder** - page templates composed from whole sections - is a feature from the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features); its [manual](https://github.com/dapeio/nino-features/blob/main/features/Templates/docs/templates.md) is there too.
-- [Design Panel](appearance.md) explains the four appearance editors.
 - [Features](features.md) explains how an installable feature is switched on, configured and updated.
 - [Deployment](deployment.md) guides through web server configuration, security, backups, and go-live.

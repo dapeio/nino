@@ -33,9 +33,8 @@ Kurze Absätze sind langen Einschüben vorzuziehen. Klammern bleiben für echte 
 | `_nino` | Kernel, Module und Frontend-Grundlagen |
 | `/_admin` | die Workbench: eine Verwaltungsoberfläche mit einer Anmeldung für Entwickler und Redakteure; jeder Bildschirm ist ein Panel |
 | Einrichtungsassistent | der Erststart-Modus von `/_admin`, der aus einem frischen Checkout die Projektverzeichnisse und den ersten lauffähigen Stand erzeugt (`_admin/install/`) |
-| Design-Panel | Bearbeitung von Theme, Design, Header und Footer nach der Installation |
-| Templates-Panel | der sectionbasierte Template Builder für Entwickler |
-| Entwickler | richtet Struktur, Design und technische Funktionen ein |
+| Templates-Panel | der sectionbasierte Template-Baukasten für Entwickler, ein Feature aus dem Katalog |
+| Entwickler | richtet Struktur, Aussehen und technische Funktionen ein |
 | Redakteur | pflegt Texte, Elemente und Bilder |
 | Betreiber | verantwortet den laufenden Betrieb; kann zugleich Redakteur sein |
 | Textfill | sprachabhängiger oder globaler Textplatzhalter |

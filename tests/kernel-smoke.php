@@ -2446,9 +2446,13 @@ $routerSource = file_get_contents( __DIR__. '/../router.php' );
 check( 'router.php refuses the private root', str_contains( $routerSource, '#^/private(?:/|$)#' ) === true );
 check( '...before it ever looks for a static file', strpos( $routerSource, '/private' ) < strpos( $routerSource, 'is_file( __DIR__. $uri )' ) );
 
-check( 'the shared appearance library exposes only its deliberate theme previews',
+// The library used to have one deliberately public file, the theme picker's
+// preview image; since 1.2 it has none, and the router says so without an
+// exception to get wrong
+check( 'the installer library is refused whole, with nothing carved out of it',
 	str_contains( $routerSource, '#^/_admin/install/library(?:/|$)#' ) === true
-	&& str_contains( $routerSource, '#^/_admin/install/library/themes/[a-z0-9][a-z0-9-]*/preview\\.svg$#' ) === true );
+	&& str_contains( $routerSource, '/_admin/install/library/themes' ) === false
+	&& str_contains( (string) file_get_contents( __DIR__. '/../_admin/install/library/.htaccess' ), 'FilesMatch' ) === false );
 check( '...and refuses its source before static-file delivery', strpos( $routerSource, '#^/_admin/install/library(?:/|$)#' ) < strpos( $routerSource, 'is_file( __DIR__. $uri )' ) );
 
 /*	A checkout ships no private directory at all - it is one installation's
@@ -2459,8 +2463,8 @@ check( 'a checkout ships no private directory - the wizard creates it', is_dir( 
 check( '...and the deny rule that protects it travels with the installer', str_contains(
 	(string) @file_get_contents( __DIR__. '/../_admin/install/library/base/private/.htaccess' ), 'Require all denied'
 ) === true );
-check( 'the shared appearance library ships the matching Apache protection', str_contains(
-	(string) @file_get_contents( __DIR__. '/../_admin/install/library/.htaccess' ), '^(?!preview\\.svg$)'
+check( 'the installer library ships the matching Apache protection', str_contains(
+	(string) @file_get_contents( __DIR__. '/../_admin/install/library/.htaccess' ), 'Require all denied'
 ) === true );
 
 // Nothing private may sit in the public root of a fresh checkout

@@ -68,9 +68,14 @@ const publicTemplates = filesBelow( LIBRARY ).concat( moduleUnitFiles ).filter( 
 		&& [ 'llms-txt.tpl', 'robots.tpl', 'sitemap-xml.tpl' ].includes( name ) === false;
 } ).sort();
 
+/* The page frames used to be their own library units, one directory per
+ * variant; since 1.2 the base unit delivers the one pair every project gets,
+ * as theme.header.tpl and theme.footer.tpl beside the stylesheet that styles
+ * them. The audit follows them there. */
+const FRAMES = [ 'base/templates/theme.header.tpl', 'base/templates/theme.footer.tpl' ];
+
 check( 'the audit reaches every finished public template kind',
-	publicTemplates.some( function( file ) { return relative( file ).includes('/header/'); } )
-	&& publicTemplates.some( function( file ) { return relative( file ).includes('/footer/'); } )
+	FRAMES.every( function( frame ) { return publicTemplates.some( function( file ) { return relative( file ).endsWith( frame ); } ); } )
 	&& publicTemplates.some( function( file ) { return relative( file ).includes('/pages/'); } )
 	&& publicTemplates.some( function( file ) { return relative( file ).includes('/Modules/') && relative( file ).includes('/install/templates/'); } )
 	&& publicTemplates.some( function( file ) { return relative( file ).includes('/base/templates/'); } )
@@ -211,25 +216,16 @@ publicTemplates.forEach( function( file ) {
 
 check( 'every public nino-* class has an owner'+ ( undefinedClasses.length === 0 ? '' : ' - '+ undefinedClasses.join(', ') ), undefinedClasses.length === 0 );
 
-const orphanedFrameClasses = [];
-[ 'header', 'footer' ].forEach( function( kind ) {
-	fs.readdirSync( path.join( LIBRARY, kind ) ).sort().forEach( function( unit ) {
-		const unitDirectory = path.join( LIBRARY, kind, unit );
-		const stylesheet = path.join( unitDirectory, 'style.css' );
-		const template = path.join( unitDirectory, 'template.tpl' );
-		if( fs.existsSync( stylesheet ) === false || fs.existsSync( template ) === false )
-			return;
-		const css = fs.readFileSync( stylesheet, 'utf8' ).replace( /\/\*[\s\S]*?\*\//g, '' );
-		const markup = fs.readFileSync( template, 'utf8' );
-		const classes = Array.from( css.matchAll( /\.(nino-frame-[a-z0-9-]+)/g ), function( match ) { return match[1]; } );
-		Array.from( new Set( classes ) ).forEach( function( name ) {
-			if( markup.includes( name ) === false )
-				orphanedFrameClasses.push( kind+ '/'+ unit+ ': '+ name );
-		} );
-	} );
-} );
+/* The frame stylesheet and the frame markup are one delivery, so a
+ * .nino-frame-* rule with no element to hit is either a leftover of a frame
+ * that was replaced or a template that lost the class it was styled by. */
+const themeCss = fs.readFileSync( path.join( LIBRARY, 'base/assets/theme.css' ), 'utf8' ).replace( /\/\*[\s\S]*?\*\//g, '' );
+const frameMarkup = FRAMES.map( function( frame ) { return fs.readFileSync( path.join( LIBRARY, frame ), 'utf8' ); } ).join('\n');
+const orphanedFrameClasses = Array.from( new Set(
+	Array.from( themeCss.matchAll( /\.(nino-frame-[a-z0-9-]+)/g ), function( match ) { return match[1]; } )
+) ).filter( function( name ) { return frameMarkup.includes( name ) === false; } );
 
-check( 'frame styles name markup their own unit renders'+ ( orphanedFrameClasses.length === 0 ? '' : ' - '+ orphanedFrameClasses.join(', ') ), orphanedFrameClasses.length === 0 );
+check( 'frame styles name markup the delivered frames render'+ ( orphanedFrameClasses.length === 0 ? '' : ' - '+ orphanedFrameClasses.join(', ') ), orphanedFrameClasses.length === 0 );
 
 const semanticProblems = [];
 publicTemplates.forEach( function( file ) {
@@ -266,13 +262,12 @@ publicTemplates.forEach( function( file ) {
 
 check( 'finished templates keep non-visual HTML semantics'+ ( semanticProblems.length === 0 ? '' : ' - '+ semanticProblems.join('; ') ), semanticProblems.length === 0 );
 
-/* Frame units are installed independently of optional modules. Any textfill
+/* The frames are installed independently of optional modules. Any textfill
  * used by their own accessible labels therefore has to be part of base in
  * every shipped locale, or Html::_renderFills() leaves the raw [[...]] key. */
 const frameAriaLabels = new Set();
 publicTemplates.filter( function( file ) {
-	const name = relative( file );
-	return name.includes('/header/') || name.includes('/footer/');
+	return FRAMES.some( function( frame ) { return relative( file ).endsWith( frame ); } );
 } ).forEach( function( file ) {
 	const source = fs.readFileSync( file, 'utf8' );
 	for( const match of source.matchAll( /\baria-label=["'](\[\[[^"']+\]\])["']/g ) )
@@ -298,9 +293,10 @@ check( 'frame aria-label fills resolve from base without optional modules'
 	frameAriaLabels.size === 2 && missingBaseFrameLabels.length === 0
 );
 
-/* The social list currently renders only on footer v2. Its icons must use the
- * text role of that surface; presentation attributes on a path or svg would
- * override the shared CSS fill and make Console's light footer unreadable. */
+/* The social list is not in the delivered footer, but travels with base for a
+ * footer that includes it (see the base manifest). Its icons must use the text
+ * role of that surface; presentation attributes on a path or svg would
+ * override the shared CSS fill and make a light footer unreadable. */
 const socialMarkup = fs.readFileSync( path.join( LIBRARY, 'base/templates/html-socialmedia.tpl' ), 'utf8' );
 const fixedSocialPaint = Array.from( socialMarkup.matchAll( /\b(?:fill|stroke)=["'](?!none["']|currentColor["'])[^"']+["']/g ), function( match ) {
 	return match[0];

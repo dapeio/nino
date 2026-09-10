@@ -17,10 +17,6 @@ declare(strict_types=1);
 require __DIR__. '/../_nino/Nino.php';
 require __DIR__. '/../_admin/Admin.php';
 require __DIR__. '/../_admin/install/Install.php';
-// The Themes step calls into the Design module when it is there - found
-// through the autoloader like every module, so nothing to load by hand:
-// without it the Design step degrades to "not offered", and the tests below
-// cover the real path because _nino/Nino/Modules/Design is part of this checkout
 
 $failures = 0;
 $checks		= 0;
@@ -223,15 +219,27 @@ check( 'reports back the three always-on units, nothing was picked to add to the
 $configAfterApply = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
 
 check( 'picking only the already-native de_DE does not pull in en_US too', $configAfterApply['/nino/locales/available'] === [ 'de_DE' ] );
+// The look is not a choice any more: the base unit delivers one theme.css and
+// this step puts it in the bundle, with the project's own stylesheet last
+var_export( $configAfterApply['/nino/html/assets'] ); echo "
+";
+check( 'the Setup step seeds the css bundle with the delivered look and the project\'s own', $configAfterApply['/nino/html/assets']['/.cache/style.css'] === [
+	'/_nino/Nino.css', '/assets/theme.css', '/assets/style.css',
+] );
+check( '...and the two files it names are really in the project', is_file( $sandbox. '/private/assets/theme.css' ) === true && is_file( $sandbox. '/private/assets/style.css' ) === true
+	&& is_file( $sandbox. '/private/templates/theme.header.tpl' ) === true && is_file( $sandbox. '/private/templates/theme.footer.tpl' ) === true
+	&& is_file( $sandbox. '/public/fonts/league-spartan.woff2' ) === true );
 check( 'core structural modules are always present', in_array( '\\Nino\\Modules\\Template', $configAfterApply['/nino/modules'], true ) === true );
 check( 'the always-on Form module is present, with nothing picked', in_array( '\\Nino\\Modules\\Form', $configAfterApply['/nino/modules'], true ) === true );
 check( 'the always-on Navigation module is present too', in_array( '\\Nino\\Modules\\Navigation', $configAfterApply['/nino/modules'], true ) === true );
 check( 'and so is the always-on Localepicker module', in_array( '\\Nino\\Modules\\Localepicker', $configAfterApply['/nino/modules'], true ) === true );
-check( 'the developer tools that ship as modules are active from the first config on', in_array( '\\Nino\\Modules\\Design', $configAfterApply['/nino/modules'], true ) === true
-	&& in_array( '\\Nino\\Modules\\Maintenance', $configAfterApply['/nino/modules'], true ) === true
-	// The Template Builder is not among them any more: it is a feature now,
-	// installed from the catalogue, so a fresh config must not carry it
-	&& in_array( '\\Nino\\Modules\\Templates', $configAfterApply['/nino/modules'], true ) === false );
+check( 'the one developer tool that still ships as a module is active from the first config on', in_array( '\\Nino\\Modules\\Maintenance', $configAfterApply['/nino/modules'], true ) === true
+	// Neither of the other two is among them any more: the Template Builder is
+	// a feature installed from the catalogue, and the look is no longer a
+	// choice at all - the base unit delivers one theme.css and nothing reads a
+	// Design module, because there is none
+	&& in_array( '\\Nino\\Modules\\Templates', $configAfterApply['/nino/modules'], true ) === false
+	&& in_array( '\\Nino\\Modules\\Design', $configAfterApply['/nino/modules'], true ) === false );
 check( 'apply writes the two roles a project starts with', array_keys( $configAfterApply['/nino/auth/roles'] ) === [ 'editor', 'developer' ] && $configAfterApply['/nino/auth/roles']['developer'] === [ 'label' => 'Developer', 'perms' => [ '/*' ] ] );
 check( 'the Editor role is every content panel\'s permission - the always-on Form module\'s included - and no structure, system or tab permission', in_array( '/_admin/elements/manage', $configAfterApply['/nino/auth/roles']['editor']['perms'], true ) === true
 	&& in_array( '/_admin/submissions/view', $configAfterApply['/nino/auth/roles']['editor']['perms'], true ) === true
@@ -331,298 +339,6 @@ unset( $appData['/nino/http/routes']['GET://_admin'], $appData['/nino/http/route
 echo "\n";
 
 
-// --- Themes::apiList / apiApply --------------------------------------------
-
-echo "Themes::apiList / apiApply\n";
-
-/*	Read off disk rather than listed here: which looks ship is a decision the
-	library makes, and a list in a test is one more place to forget. What is
-	pinned is the shape of the set - ten of them, and Basis first, because it is
-	the one the others are read against and the picker shows them in this order.	*/
-$themeKeys = array_values( array_filter(
-	scandir( __DIR__. '/../_admin/install/library/themes' ) ?: [],
-	static fn( string $entry ): bool => is_file( __DIR__. '/../_admin/install/library/themes/'. $entry. '/manifest.php' )
-) );
-
-check( 'the catalogue is ten looks with Basis at the head of it', count( $themeKeys ) === 10 && $themeKeys[0] === 'basis' );
-
-/*	Two of them stand in for the rest below: one to apply, one to switch to. Named
-	rather than indexed so the failure says which look broke, and checked against
-	the directory so a renamed one fails here instead of thirty checks later.	*/
-$themeSample = 'midnight';
-$themeSwitch = 'chronicle';
-
-check( 'the looks the checks below work on are in the catalogue', in_array( $themeSample, $themeKeys, true ) === true
-	&& in_array( $themeSwitch, $themeKeys, true ) === true );
-
-// The css bundle starts out exactly as a hand-set-up project's would:
-// the kernel stylesheet plus one of the project's own, neither of them a
-// library theme. Both have to survive every apply below, in place
-$appData['/nino/html/assets'] = [
-	'/.cache/style.css' => [ '/_nino/Nino.css', '/assets/style.custom.css' ],
-	'/.cache/script.js' => [ '/_nino/Nino.js' ],
-];
-\Nino\AppData::writeContentData( $appData, [ '/nino/html/assets' ] );
-
-$themeListRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Install\Themes::apiList( $appData, $themeListRequest );
-$themeListBody = $themeListRequest['/nino/http/response']['body'];
-
-check( 'lists every current theme unit, one per _admin/install/library/themes/<key>', array_keys( $themeListBody['themes'] ) === $themeKeys );
-check( 'each theme carries the label and description its manifest declares', $themeListBody['themes'][$themeSample]['label'] !== '' && $themeListBody['themes'][$themeSample]['description'] !== '' );
-check( 'each theme carries a preview image path, served out of the shared library itself', $themeListBody['themes'][$themeSample]['preview'] === '/_admin/install/library/themes/'. $themeSample. '/preview.svg' );
-check( 'no theme is applied yet - the bundle carries none of the library\'s own stylesheets', $themeListBody['activeTheme'] === null );
-
-$_POST['data'] = json_encode( [ 'theme' => 'does-not-exist' ] );
-$unknownThemeRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Install\Themes::apiApply( $appData, $unknownThemeRequest );
-check( 'rejects an unknown theme with 400', $unknownThemeRequest['/nino/http/response']['statusCode'] === 400 );
-
-// A traversal attempt has to be rejected the same way any other unknown
-// key is - never resolved into a directory outside _admin/install/library/themes
-$_POST['data'] = json_encode( [ 'theme' => '../modules/democontent' ] );
-$traversalThemeRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Install\Themes::apiApply( $appData, $traversalThemeRequest );
-check( 'rejects a theme key trying to escape _admin/install/library/themes', $traversalThemeRequest['/nino/http/response']['statusCode'] === 400 );
-
-$_POST['data'] = json_encode( [ 'theme' => $themeSample ] );
-$themeApplyRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Install\Themes::apiApply( $appData, $themeApplyRequest );
-check( 'apply succeeds', $themeApplyRequest['/nino/http/response']['statusCode'] === 200 );
-check( 'response echoes the applied theme', $themeApplyRequest['/nino/http/response']['body']['theme'] === $themeSample );
-
-$configAfterTheme = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
-
-check( 'copies the theme\'s own stylesheet into /assets', is_file( $sandbox. '/private/assets/style.theme.'. $themeSample. '.css' ) === true );
-check( 'copies the webfonts that stylesheet references, keeping their subdirectories', is_file( $sandbox. '/public/fonts/lato-regular.woff2' ) === true && is_file( $sandbox. '/public/fonts/exo-2.woff2' ) === true );
-check( 'never copies the picker-only preview image into the project', is_file( $sandbox. '/preview.svg' ) === false );
-check( 'persists the picked key at /nino/install/theme', ( $configAfterTheme['/nino/install/theme'] ?? null ) === $themeSample );
-check( 'appends the theme\'s stylesheet to the css bundle', in_array( '/assets/style.theme.'. $themeSample. '.css', $configAfterTheme['/nino/html/assets']['/.cache/style.css'], true ) === true );
-// The generated design layer now sits between the framework stylesheet and
-// everything else, so this is no longer a fixed prefix - what has to hold is
-// that the project's own stylesheet is still there and still ahead of the
-// theme that reads from it
-$bundleAfterTheme = $configAfterTheme['/nino/html/assets']['/.cache/style.css'];
-check( 'leaves the project\'s own stylesheets in the bundle alone, in order', $bundleAfterTheme[0] === '/_nino/Nino.css'
-	&& array_search( '/assets/style.custom.css', $bundleAfterTheme, true ) < array_search( '/assets/style.theme.'. $themeSample. '.css', $bundleAfterTheme, true ) );
-check( 'the generated design layer leads, so a theme and a frame can both read from it', array_search( '/assets/style.design.css', $bundleAfterTheme, true ) === 1
-	&& array_search( '/assets/style.theme.'. $themeSample. '.css', $bundleAfterTheme, true ) > 1
-	&& array_search( '/assets/style.header.css', $bundleAfterTheme, true ) > array_search( '/assets/style.theme.'. $themeSample. '.css', $bundleAfterTheme, true ) );
-check( 'never touches another bundle in the same array', $configAfterTheme['/nino/html/assets']['/.cache/script.js'] === [ '/_nino/Nino.js' ] );
-
-$themeListAfterApply = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Install\Themes::apiList( $appData, $themeListAfterApply );
-check( 'apiList now reports the applied theme, for the picker to pre-select', $themeListAfterApply['/nino/http/response']['body']['activeTheme'] === $themeSample );
-
-// Switching themes replaces the bundled stylesheet at the position the
-// previous one held, rather than adding a second one next to it
-$_POST['data'] = json_encode( [ 'theme' => $themeSwitch ] );
-$themeSwitchRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Install\Themes::apiApply( $appData, $themeSwitchRequest );
-
-$configAfterSwitch = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
-
-check( 'switching themes swaps the bundled stylesheet rather than adding a second one', $configAfterSwitch['/nino/html/assets']['/.cache/style.css'] === [
-	'/_nino/Nino.css', '/assets/style.design.css', '/assets/style.custom.css', '/assets/style.theme.'. $themeSwitch. '.css', '/assets/style.header.css', '/assets/style.footer.css', '/assets/style.css',
-] );
-// Last, and only once however often a theme or a frame is picked again: this
-// is the one file in the bundle nothing the wizard writes ever replaces
-check( 'the site\'s own stylesheet is last in the bundle, and there is one of it', is_file( $sandbox. '/private/assets/style.css' ) === true
-	&& count( array_keys( $configAfterSwitch['/nino/html/assets']['/.cache/style.css'], '/assets/style.css', true ) ) === 1 );
-check( '...and updates the persisted key with it', $configAfterSwitch['/nino/install/theme'] === $themeSwitch );
-check( 'copies the new theme\'s own fonts too', is_file( $sandbox. '/public/fonts/spectral-regular.woff2' ) === true );
-check( 'a file the previous theme wrote is left behind, not deleted - same additive rule as Setup\'s templates/text', is_file( $sandbox. '/private/assets/style.theme.'. $themeSample. '.css' ) === true );
-
-// --- Frames: the site's header/footer as interchangeable units ----------
-
-check( 'the picked frame lands where the base templates include it from', is_file( $sandbox. '/private/templates/theme.header.tpl' ) === true
-	&& is_file( $sandbox. '/private/templates/theme.footer.tpl' ) === true );
-check( '...and its own stylesheet lands in the project, bundled after the theme', is_file( $sandbox. '/private/assets/style.header.css' ) === true
-	&& is_file( $sandbox. '/private/assets/style.footer.css' ) === true );
-check( 'the base html templates call the installed frame rather than carrying the markup', str_contains( (string) file_get_contents( __DIR__. '/../_admin/install/library/base/templates/html-header.tpl' ), '[template /templates/theme.header]' )
-	&& str_contains( (string) file_get_contents( __DIR__. '/../_admin/install/library/base/templates/html-footer.tpl' ), '[template /templates/theme.footer]' )
-	&& str_contains( (string) file_get_contents( __DIR__. '/../_admin/install/library/base/templates/html-header.tpl' ), '<header' ) === false );
-$baseHeaderSource = (string) file_get_contents( __DIR__. '/../_admin/install/library/base/templates/html-header.tpl' );
-check( 'the installed document shell uses current HTML metadata without IE conditionals', str_starts_with( $baseHeaderSource, "<!doctype html>\n<html lang=\"[[/website/lang]]\">" )
-	&& str_contains( $baseHeaderSource, 'X-UA-Compatible' ) === false
-	&& str_contains( $baseHeaderSource, '<!--[if ' ) === false
-	&& str_contains( $baseHeaderSource, 'http-equiv="Content-Type"' ) === false
-	&& str_contains( $baseHeaderSource, '<meta charset="[[/website/charset]]">' ) );
-
-// The indirection is only worth anything if it resolves. 'theme.header' has a
-// dot in it, and both the filesystem layer and the [template] shortcode have
-// path rules of their own - a name they quietly refuse renders as nothing at
-// all, which looks like a styling problem rather than a missing include
-\Nino\Modules\Template::init( $appData );
-$frameRender = \Nino\Html::renderHtml( $appData, (string) file_get_contents( __DIR__. '/../_admin/install/library/base/templates/html-footer.tpl' ) );
-
-check( 'the installed frame really renders through [template /templates/theme.footer]', str_contains( $frameRender, '[template' ) === false
-	&& str_contains( $frameRender, '<footer' ) === true
-	&& str_contains( $frameRender, 'nino-footer-legal' ) === true );
-
-// A frame unit with no style.css of its own still gets an empty file, so the
-// bundle entry never points at something that isn't there
-$emptyStyleFrames = array_filter( glob( __DIR__. '/../_admin/install/library/footer/*/style.css' ) ?: [], static fn( string $file ): bool => filesize( $file ) === 0 );
-check( 'a frame that ships no css of its own is still installable', $emptyStyleFrames === [] || is_file( $sandbox. '/private/assets/style.footer.css' ) === true );
-
-// Header and Footer are their own tabs after Design. Each post changes only
-// that frame; the second one must retain the first and restore canonical
-// header/footer bundle order rather than ordering by whichever was last.
-$configBeforeFrames = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
-
-$_POST['data'] = json_encode( [ 'kind' => 'header', 'frame' => 'v3' ] );
-$headerPickRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Install\Themes::apiFrameApply( $appData, $headerPickRequest );
-
-$_POST['data'] = json_encode( [ 'kind' => 'footer', 'frame' => 'v2' ] );
-$footerPickRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Install\Themes::apiFrameApply( $appData, $footerPickRequest );
-
-$configAfterFrames = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
-
-check( 'each dedicated frame apply succeeds and echoes only its pick', $headerPickRequest['/nino/http/response']['body'] === [ 'kind' => 'header', 'frame' => 'v3' ]
-	&& $footerPickRequest['/nino/http/response']['body'] === [ 'kind' => 'footer', 'frame' => 'v2' ] );
-check( 'each frame overrides the theme\'s declaration and is persisted', ( $configAfterFrames['/nino/install/header'] ?? null ) === 'v3'
-	&& ( $configAfterFrames['/nino/install/footer'] ?? null ) === 'v2' );
-check( '...and the installed template is really that unit\'s', file_get_contents( $sandbox. '/private/templates/theme.header.tpl' ) === file_get_contents( __DIR__. '/../_admin/install/library/header/v3/template.tpl' ) );
-check( 'frame-only applies leave the selected theme and Design untouched', ( $configAfterFrames['/nino/install/theme'] ?? null ) === ( $configBeforeFrames['/nino/install/theme'] ?? null )
-	&& ( $configAfterFrames['/nino/design/settings'] ?? [] ) === ( $configBeforeFrames['/nino/design/settings'] ?? [] ) );
-check( 'applying Footer after Header keeps their canonical bundle order', array_search( '/assets/style.header.css', $configAfterFrames['/nino/html/assets']['/.cache/style.css'], true )
-	< array_search( '/assets/style.footer.css', $configAfterFrames['/nino/html/assets']['/.cache/style.css'], true ) );
-
-// Unlike theme defaults, a choice in a dedicated frame tab is explicit. An
-// invalid key is rejected rather than silently substituting another unit.
-$headerTemplateBeforeBadFrame = (string) file_get_contents( $sandbox. '/private/templates/theme.header.tpl' );
-$_POST['data'] = json_encode( [ 'kind' => 'header', 'frame' => '../../../etc/passwd' ] );
-$badFrameRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Install\Themes::apiFrameApply( $appData, $badFrameRequest );
-
-$_POST['data'] = json_encode( [ 'kind' => 'sidebar', 'frame' => 'v1' ] );
-$badFrameKindRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Install\Themes::apiFrameApply( $appData, $badFrameKindRequest );
-
-$configAfterBadFrame = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
-
-check( 'a frame key that names no unit is rejected without reaching the filesystem', $badFrameRequest['/nino/http/response']['statusCode'] === 400
-	&& file_get_contents( $sandbox. '/private/templates/theme.header.tpl' ) === $headerTemplateBeforeBadFrame
-	&& ( $configAfterBadFrame['/nino/install/header'] ?? null ) === 'v3' );
-check( 'an unknown frame kind is rejected too', $badFrameKindRequest['/nino/http/response']['statusCode'] === 400 );
-check( 'switching frames swaps the bundled stylesheet rather than adding a second one', count( array_keys( $configAfterBadFrame['/nino/html/assets']['/.cache/style.css'], '/assets/style.header.css', true ) ) === 1 );
-
-// --- the frame preview -------------------------------------------------
-//
-// A frame is a version number in a dropdown otherwise. Every check below
-// pins a way the rendering went wrong while it was being built, so none of
-// them can come back quietly.
-
-$framePreview = static function( array &$appData, string $kind, string $frame, array $design = [] ): array {
-	$_POST['data'] = json_encode( [ 'kind' => $kind, 'frame' => $frame, 'theme' => 'basis', 'design' => $design ] );
-	$request = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-	\Nino\Install\Themes::apiFrame( $appData, $request );
-	return [ $request['/nino/http/response']['statusCode'], $request['/nino/http/response']['body'] ];
-};
-
-// The markup half is what the fill and shortcode passes produce; the css half
-// is a stylesheet and has to be looked at separately, since css legitimately
-// contains square brackets and the word "navigation" in a comment
-$splitPreview = static function( string $document ): array {
-	$body = substr( $document, (int) strpos( $document, '</head>' ) );
-	preg_match_all( '/<style>(.*?)<\/style>/s', $document, $styles );
-	return [ $body, implode( "\n", $styles[1] ) ];
-};
-
-[ $headerStatus, $headerBody ] = $framePreview( $appData, 'header', 'v1' );
-[ $headerMarkup, $headerCss ]  = $splitPreview( (string) ( $headerBody['html'] ?? '' ) );
-
-check( 'a frame renders as a complete, inert document', $headerStatus === 200
-	&& str_starts_with( (string) ( $headerBody['html'] ?? '' ), '<!doctype html>' )
-	&& str_contains( (string) $headerBody['html'], '<script' ) === false );
-
-// The framework stylesheet is project-root relative to the installer, not to
-// the shared library. Getting that base wrong produced a preview that rendered
-// every frame unstyled - which reads as a broken frame rather than a broken preview
-check( 'the framework stylesheet is really in the preview, not just meant to be', str_contains( $headerCss, '.nino-grid-row' )
-	&& str_contains( $headerCss, '.nino-scroll-header' )
-	&& strlen( $headerCss ) > 50000 );
-check( '...along with the design tokens and the theme that reads from them', str_contains( $headerCss, '--nino-on-alt:' )
-	&& str_contains( $headerCss, '--color-title: var(--nino-default-link);' ) );
-check( '...and the frame unit\'s own stylesheet, last', str_contains( $headerCss, '.nino-frame-header' )
-	&& strrpos( $headerCss, '.nino-frame-header {' ) > strrpos( $headerCss, '--color-title:' ) );
-
-// The fill stripper used to run over the css too. A stylesheet's square
-// brackets are attribute selectors, and [data-nino-mode="dark"] carries the
-// entire dark half of the palette
-check( 'stripping unresolved fills leaves css attribute selectors intact', substr_count( $headerCss, '[data-nino-mode="dark"]' ) === 1
-	&& str_contains( $headerCss, ':root:not([data-nino-mode="light"])' ) );
-
-// Fills have to be substituted before the shortcode pass: html-header-nav.tpl
-// carries [navigation ... title="[[/company/name]]"], and a shortcode pattern
-// run first ends its arguments at the ']]' inside that fill and leaves the
-// remainder on the page as text
-check( 'the navigation resolves to real markup with items', str_contains( $headerMarkup, 'nino-nav-content' )
-	&& substr_count( $headerMarkup, '<li><a href="#"' ) === 4
-	&& str_contains( $headerMarkup, 'class="nino-is-active"' ) );
-check( '...and no half-parsed shortcode is left on the page', preg_match( '/\]"\]|\[navigation|\[template/', $headerMarkup ) === 0 );
-check( 'nothing unresolved is shown as its own source code', preg_match( '/\[\[/', $headerMarkup ) === 0 );
-
-// The shortcode's own content is a burger's logo. The real module wraps each
-// line in a div ahead of the list, and dropping it loses that logo
-check( 'the navigation keeps the content the shortcode wraps', str_contains( $headerMarkup, 'nino-headernav-logo' ) );
-
-[ , $footerBody ] = $framePreview( $appData, 'footer', 'v3' );
-[ $footerMarkup ] = $splitPreview( (string) ( $footerBody['html'] ?? '' ) );
-
-// '[[/global/adress]]' is the label "Address" and '[[/company/adress]]' is the
-// street. A hand-written fixture map guessed both were the street, and the
-// preview showed the address twice under itself
-check( 'labels and values come from the library\'s own text, not from a guess', str_contains( $footerMarkup, '<strong>Address</strong>' )
-	&& str_contains( $footerMarkup, 'Street 1, 12345 City' )
-	&& str_contains( $footerMarkup, '<strong>Phone</strong>' ) );
-
-// glob() returns de_DE before en_US, so a plain merge previewed an english
-// wizard in german
-check( 'the preview is in the installer\'s own language', str_contains( $footerMarkup, 'Germany' )
-	&& str_contains( $footerMarkup, 'Deutschland' ) === false
-	&& str_contains( $footerMarkup, 'Adresse' ) === false );
-
-// Not copied into the project yet, and a srcdoc iframe has an opaque origin
-// that could not fetch them - so a rule per font would be a console error per
-// font and the frame would render in the browser's serif default
-check( 'webfonts are dropped and a real family stack takes their place', str_contains( (string) $footerBody['html'], '@font-face' ) === false
-	&& str_contains( (string) $footerBody['html'], '--fontfamily-text:system-ui' ) );
-
-// The design being previewed drives the preview, not what is stored
-[ , $redPreview ]  = $framePreview( $appData, 'footer', 'v1', [ 'primary' => '#c81e2d' ] );
-[ , $bluePreview ] = $framePreview( $appData, 'footer', 'v1', [ 'primary' => '#1e63c8' ] );
-
-check( 'the preview is rendered with the design being chosen, not the stored one', $redPreview['html'] !== $bluePreview['html'] );
-
-[ $unknownKindStatus ] = $framePreview( $appData, 'sidebar', 'v1' );
-[ , $unknownFrameBody ] = $framePreview( $appData, 'header', '../../../etc/passwd' );
-
-check( 'an unknown frame kind is refused', $unknownKindStatus === 400 );
-// Compared against the fallback's own output rather than searched for a
-// marker: 'root:' looked like a good one until it matched ':root:not(' in
-// every stylesheet the preview embeds
-check( 'previewing a frame key that names no unit falls back instead of reading the filesystem', ( $unknownFrameBody['frame'] ?? '' ) === 'v1'
-	&& $unknownFrameBody['html'] === $headerBody['html'] );
-
-// Every shipped unit has to render - a frame that previews as an empty box is
-// indistinguishable from one that is broken
-$framePreviewFailures = [];
-foreach( [ 'header', 'footer' ] as $kind )
-	foreach( glob( __DIR__. '/../_admin/install/library/'. $kind. '/*/template.tpl' ) ?: [] as $unit ) {
-
-		$key = basename( dirname( $unit ) );
-		[ $status, $body ] = $framePreview( $appData, $kind, $key );
-		[ $markup ] 			 = $splitPreview( (string) ( $body['html'] ?? '' ) );
-
-		if( $status !== 200 || preg_match( '/\[\[|\[template|\]"\]/', $markup ) === 1 || strlen( strip_tags( $markup ) ) < 40 )
-			$framePreviewFailures[] = $kind. '/'. $key;
-	}
-
-check( 'every shipped frame previews'. ( $framePreviewFailures === [] ? '' : ' - '. implode( ', ', $framePreviewFailures ) ), $framePreviewFailures === [] );
-
 // --- a header that scrolls away really goes ---------------------------------
 
 // max-height is the weakest of the four ways a box keeps its height:
@@ -630,489 +346,46 @@ check( 'every shipped frame previews'. ( $framePreviewFailures === [] ? '' : ' -
 // for, and a border is drawn whatever the box does. Every header preset uses
 // at least one of them to give its bar a height, so the collapsed state has
 // to take all of them back - the rule that only said max-height: 0 left five
-// of six bars sitting on screen while the page scrolled under them
+// of the wizard's six header presets sitting on screen while the page
+// scrolled under them
 $collapsed = '';
 
 if( preg_match( '/body\.nino-scroll-down\s+\.nino-scroll-header\s*\{([^}]*)\}/', (string) file_get_contents( __DIR__. '/../_nino/Nino.css' ), $match ) === 1 )
 	$collapsed = $match[1];
 
-check( 'the collapsed header takes back every way a preset gave its bar a height', $collapsed !== ''
+check( 'the collapsed header takes back every way a frame can give its bar a height', $collapsed !== ''
 	&& preg_match( '/max-height:\s*0/', $collapsed ) === 1 && preg_match( '/min-height:\s*0/', $collapsed ) === 1
 	&& preg_match( '/padding-top:\s*0/', $collapsed ) === 1 && preg_match( '/padding-bottom:\s*0/', $collapsed ) === 1
 	&& preg_match( '/border-top-width:\s*0/', $collapsed ) === 1 && preg_match( '/border-bottom-width:\s*0/', $collapsed ) === 1 );
 
-// And a preset must not reach for the one thing that rule cannot take back.
-// A plain height on the bar would survive all of it - so no preset has one,
-// and this is where the next one finds that out
-$fixedHeight = [];
+// And the delivered header must not reach for the one thing that rule cannot
+// take back. A plain height on the bar would survive all of it - so the frame
+// the base unit ships does not have one, and this is where a replacement that
+// does finds that out
+$fixedHeight 	= [];
+$frameMarkup 	= (string) file_get_contents( __DIR__. '/../_admin/install/library/base/templates/theme.header.tpl' );
+$frameStyle 	= (string) file_get_contents( __DIR__. '/../_admin/install/library/base/assets/theme.css' );
 
-foreach( glob( __DIR__. '/../_admin/install/library/header/*', GLOB_ONLYDIR ) ?: [] as $preset ) {
-
-	$template = (string) file_get_contents( $preset. '/template.tpl' );
-	$style		= (string) file_get_contents( $preset. '/style.css' );
-
-	if( preg_match( '/class="([^"]*nino-scroll-header[^"]*)"/', $template, $match ) !== 1 )
-		continue;
-
+if( preg_match( '/class="([^"]*nino-scroll-header[^"]*)"/', $frameMarkup, $match ) === 1 )
 	foreach( preg_split( '/\s+/', trim( $match[1] ) ) ?: [] as $class ) {
 
-		// A preset that is not a bar says so for itself: the sidebar rail hands
+		// A frame that is not a bar says so for itself: a sidebar rail hands
 		// max-height back above its own breakpoint, and from there its height is
 		// the layout's business rather than this rule's
-		if( preg_match( '/body\.nino-scroll-down[^{}]*\.'. preg_quote( $class, '/' ). '\s*\{[^}]*max-height:\s*none/', $style ) === 1 )
+		if( preg_match( '/body\.nino-scroll-down[^{}]*\.'. preg_quote( $class, '/' ). '\s*\{[^}]*max-height:\s*none/', $frameStyle ) === 1 )
 			continue;
 
 		// Every block whose selector ends on one of the bar's own classes
-		if( preg_match_all( '/([^{}]*\.'. preg_quote( $class, '/' ). ')\s*\{([^}]*)\}/', $style, $blocks, PREG_SET_ORDER ) === 0 )
+		if( preg_match_all( '/([^{}]*\.'. preg_quote( $class, '/' ). ')\s*\{([^}]*)\}/', $frameStyle, $blocks, PREG_SET_ORDER ) === 0 )
 			continue;
 
 		foreach( $blocks as $found )
 			if( preg_match( '/(?<![a-z-])height:\s*(?!auto)/', $found[2] ) === 1 )
-				$fixedHeight[] = basename( $preset ). ' ('. $class. ')';
-	}
-}
-
-check( 'and no preset gives its bar a height the collapsed state cannot take back'. ( $fixedHeight === [] ? '' : ' - '. implode( ', ', array_unique( $fixedHeight ) ) ), $fixedHeight === [] );
-
-echo "\n";
-
-
-// --- Design: the generated token layer ---------------------------------
-
-$_POST['data'] = json_encode( [ 'theme' => 'basis' ] );
-$designDefaultRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Install\Themes::apiApply( $appData, $designDefaultRequest );
-$configAfterDesign = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
-
-check( 'a theme\'s declared design defaults are what a plain "pick and Next" applies', ( $configAfterDesign['/nino/design/settings']['primary'] ?? null ) === '#4faae8' );
-check( 'the generated stylesheet is written and carries the tokens a theme reads from', is_file( $sandbox. '/private/assets/style.design.css' ) === true
-	&& str_contains( (string) file_get_contents( $sandbox. '/private/assets/style.design.css' ), '--nino-on-alt:' ) === true );
-
-// The Design step reads what the Themes step just installed rather than being
-// handed it - one source for the current design, not two that can disagree
-$designReadRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Install\Themes::apiDesignRead( $appData, $designReadRequest );
-$designReadBody = $designReadRequest['/nino/http/response']['body'];
-
-check( 'the Design step opens on what the picked theme declared', ( $designReadBody['settings']['primary'] ?? '' ) === '#4faae8'
-	&& ( $designReadBody['settings']['shaping'] ?? '' ) === 2
-	&& ( $designReadBody['settings']['spacing'] ?? '' ) === 2 );
-// Every control this step draws comes out of that vocabulary, so it has to
-// carry a full description of each knob rather than a list of values - and the
-// panels to sort them into, or ten knobs arrive as one column
-check( '...and is handed the vocabulary its controls render from', count( $designReadBody['choices']['contrast']['steps'] ?? [] ) === 3
-	&& ( $designReadBody['choices']['volume']['note'] ?? '' ) !== ''
-	&& ( $designReadBody['choices']['harmony']['label'] ?? '' ) !== ''
-	&& ( $designReadBody['choices']['measure']['default'] ?? 0 ) === 2
-	&& ( $designReadBody['groups'] ?? [] ) !== [] );
-/*	The step borrows the example from /_design rather than building one: what
-	a set of settings looks like is Design's question, and a second answer in
-	the installer is a second one to keep in step. A complete document, because
-	it is delivered into a sandboxed iframe.	*/
-check( '...and the page those settings produce, built by /_design', str_starts_with( (string) ( $designReadBody['example'] ?? '' ), '<!doctype html>' )
-	&& str_contains( (string) ( $designReadBody['example'] ?? '' ), '--nino-on-alt:' )
-	&& str_contains( (string) ( $designReadBody['example'] ?? '' ), 'nino-alert--warning' ) );
-
-$_POST['data'] = json_encode( [ 'design' => [ 'primary' => '#c81e2d', 'secondary' => '#0f766e', 'harmony' => 1, 'temperature' => 1, 'saturation' => 1, 'contrast' => 3, 'depth' => 3, 'scale' => 1, 'volume' => 1, 'spacing' => 1, 'shaping' => 1, 'measure' => 1 ] ] );
-$designApplyRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Install\Themes::apiDesignApply( $appData, $designApplyRequest );
-$configAfterPick = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
-
-check( 'the operator\'s design beats the theme\'s defaults and is persisted whole', ( $configAfterPick['/nino/design/settings'] ?? [] ) === [
-	'primary' => '#c81e2d', 'secondary' => '#0f766e', 'harmony' => 1, 'temperature' => 1,
-	'saturation' => 1, 'contrast' => 3, 'depth' => 3, 'scale' => 1,
-	'volume' => 1, 'spacing' => 1, 'shaping' => 1, 'measure' => 1,
-] );
-// Scale and Measure reach the stylesheet as their own tokens rather than as
-// numbers a theme has to restate
-check( '...and the root size and the layout ceiling with it', str_contains( (string) file_get_contents( $sandbox. '/private/assets/style.design.css' ), '--nino-base-size: 14px;' )
-	&& str_contains( (string) file_get_contents( $sandbox. '/private/assets/style.design.css' ), '--nino-measure: 88rem;' ) );
-check( '...and the size raster it produced is in the stylesheet', str_contains( (string) file_get_contents( $sandbox. '/private/assets/style.design.css' ), '--nino-space-1: 0.375rem;' ) );
-check( '...and regenerating never leaves a second design entry in the bundle', count( array_keys( $configAfterPick['/nino/html/assets']['/.cache/style.css'], '/assets/style.design.css', true ) ) === 1 );
-
-$_POST['data'] = json_encode( [ 'kind' => 'header', 'frame' => 'v2' ] );
-$frameAfterDesignRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Install\Themes::apiFrameApply( $appData, $frameAfterDesignRequest );
-$configAfterFrameOnDesign = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
-
-check( 'a frame applied after Design preserves the operator\'s full Design settings', $frameAfterDesignRequest['/nino/http/response']['statusCode'] === 200
-	&& ( $configAfterFrameOnDesign['/nino/design/settings'] ?? [] ) === ( $configAfterPick['/nino/design/settings'] ?? [] ) );
-
-$previewRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-$_POST['data']  = json_encode( [ 'design' => [ 'primary' => '#4faae8', 'volume' => 3 ] ] );
-\Nino\Install\Themes::apiPreview( $appData, $previewRequest );
-$previewBody = $previewRequest['/nino/http/response']['body'];
-
-// The example is a whole page rather than a palette, so what it has to carry
-// is the generated stylesheet for the settings just posted - not the ones on
-// disk, which are what the operator is trying to change
-$previewLight = (string) ( $previewBody['example'] ?? '' );
-check( 'the picker can ask what a setting produces without storing it', str_starts_with( $previewLight, '<!doctype html>' )
-	&& str_contains( $previewLight, '--nino-brand: #4faae8;' )
-	&& str_contains( $previewLight, 'data-nino-mode="light"' ) );
-
-/*	...inside the frames this project will actually have. Before the Header and
-	Footer steps have run there is nothing installed to read, so the theme's own
-	declaration decides - a theme names the pair it was drawn against, and a
-	Design judged inside somebody else's bar is a Design judged wrong. On a look
-	built around a vertical rail it was not a detail but the whole layout.	*/
-check( '...inside the project\'s own header and footer, not a bar invented for the preview', str_contains( $previewLight, 'nino-frame-header' )
-	&& str_contains( $previewLight, '<footer' )
-	&& str_contains( $previewLight, 'nino-nav-content' ) );
-// A srcdoc frame fetches nothing, so whatever the example points at travels
-// with it - and the fills a request would have resolved are resolved here too
-check( '...with the pictures carried into it and no fill left showing', str_contains( $previewLight, 'src="data:image/' )
-	&& str_contains( $previewLight, '[[' ) === false );
-
-// The previewed mode travels beside the settings, never inside them: a
-// sandboxed iframe has an opaque origin, so nothing in the browser can stamp
-// the attribute the generated stylesheet keys its dark block on
-$darkRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-$_POST['mode'] = 'dark';
-\Nino\Install\Themes::apiPreview( $appData, $darkRequest );
-$previewDark = (string) ( $darkRequest['/nino/http/response']['body']['example'] ?? '' );
-unset( $_POST['mode'] );
-
-check( '...in either mode, with the picked brand surviving both', str_contains( $previewDark, 'data-nino-mode="dark"' )
-	&& str_contains( $previewDark, '--nino-brand: #4faae8;' )
-	&& $previewDark !== $previewLight );
-check( '...including the size raster, so both halves of the step preview the same way', ( $previewBody['raster']['text'][6] ?? '' ) !== ''
-	&& ( $previewBody['raster']['space'][1] ?? '' ) !== ''
-	&& $previewBody['settings']['volume'] === 3 );
-check( 'previewing stores nothing', ( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/design/settings']['volume'] ?? '' ) === 1 );
-
-$listWithFrames = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Install\Themes::apiList( $appData, $listWithFrames );
-$listBody = $listWithFrames['/nino/http/response']['body'];
-
-check( 'the picker is handed the frames and each theme\'s own defaults', isset( $listBody['frames']['header'], $listBody['frames']['footer'] )
-	&& $listBody['frames']['header'] !== []
-	&& ( $listBody['themes']['basis']['design']['primary'] ?? '' ) === '#4faae8'
-	&& ( $listBody['themes']['basis']['design']['shaping'] ?? '' ) === 2
-	&& ( $listBody['themes']['basis']['header'] ?? '' ) === 'v1' );
-
-// A theme is a mapping layer: a literal colour in a role is a pair /_design
-// never measured, and a literal size is a value the raster cannot move. Check
-// the complete current catalogue rather than blessing one representative.
-$renderedPairs = [
-	[ '--color-background', 					'--color-text' ],
-	[ '--color-background', 					'--color-title' ],
-	[ '--color-background', 					'--color-subtitle' ],
-	[ '--color-section-default-bg', 	'--color-section-default-text' ],
-	[ '--color-section-alt-bg', 			'--color-section-alt-text' ],
-	[ '--color-section-tint-bg', 		'--color-section-tint-text' ],
-	[ '--color-section-dark-bg', 			'--color-section-dark-text' ],
-	[ '--color-section-black-bg', 		'--color-section-black-text' ],
-	[ '--color-primary', 							'--color-primary-text' ],
-	// The second brand colour makes the same promise as the first: filled
-	// with, written on, and solved until the text on it clears the target
-	[ '--color-brand-alt', 						'--color-brand-alt-text' ],
-	[ '--color-footer-bg-main', 			'--color-footer-text-main' ],
-	[ '--color-footer-bg-legal', 			'--color-footer-text-legal' ],
-	[ '--color-code-bg', 							'--color-code-text' ],
-	// The brand as ink, per ground: --color-primary is solved against its own
-	// ink and says nothing about what it does written on a page surface, so
-	// every surface a section can paint carries the accent solved for it
-	[ '--color-section-default-bg', 	'--color-accent-default' ],
-	[ '--color-section-alt-bg', 			'--color-accent-alt' ],
-	[ '--color-section-tint-bg', 		'--color-accent-tint' ],
-	[ '--color-section-dark-bg', 			'--color-accent-dark' ],
-	[ '--color-section-black-bg', 		'--color-accent-black' ],
-	// ...and a status surface carries its own ink rather than the brand's
-	[ '--color-error', 								'--color-error-text' ],
-	[ '--color-success', 							'--color-success-text' ],
-	[ '--color-warning', 							'--color-warning-text' ],
-];
-
-/*	The focus ring is not a text pair - SC 1.4.11 asks 3:1 of it, not 4.5 -
-	but it is the same cross-surface trap: a ring solved against the page and
-	carried onto a dark section is unreadable there, which is exactly what
-	--color-accent was split per ground to avoid. So it is measured the same
-	way, against its own ground, at the UI target.	*/
-$renderedUiPairs = [
-	[ '--color-section-default-bg', 	'--color-focus-default' ],
-	[ '--color-section-alt-bg', 			'--color-focus-alt' ],
-	[ '--color-section-tint-bg', 		'--color-focus-tint' ],
-	[ '--color-section-dark-bg', 			'--color-focus-dark' ],
-	[ '--color-section-black-bg', 		'--color-focus-black' ],
-];
-
-$relativeLuminance = static function( string $hex ): float {
-	$channels = [];
-	foreach( [ 0, 2, 4 ] as $offset ) {
-		$value = hexdec( substr( ltrim( $hex, '#' ), $offset, 2 ) ) / 255;
-		$channels[] = $value <= 0.04045 ? $value / 12.92 : pow( ( $value + 0.055 ) / 1.055, 2.4 );
-	}
-	return 0.2126 * $channels[0] + 0.7152 * $channels[1] + 0.0722 * $channels[2];
-};
-$contrastRatio = static function( string $back, string $front ) use ( $relativeLuminance ): float {
-	$a = $relativeLuminance( $back );
-	$b = $relativeLuminance( $front );
-	return ( max( $a, $b ) + 0.05 ) / ( min( $a, $b ) + 0.05 );
-};
-$tokenValues = static function( array $settings, string $mode ): array {
-	$values = [];
-	foreach( \Nino\Modules\Design\Tokens::palette( $settings, $mode ) as $surface => $surfaceValues ) {
-		$values['--nino-'. $surface] 								= $surfaceValues['bg'];
-		$values['--nino-on-'. $surface] 						= $surfaceValues['on'];
-		$values['--nino-on-'. $surface. '-muted'] 	= $surfaceValues['on-muted'];
-		$values['--nino-'. $surface. '-link'] 			= $surfaceValues['link'];
-		$values['--nino-'. $surface. '-border'] 		= $surfaceValues['border'];
-		$values['--nino-'. $surface. '-focus'] 			= $surfaceValues['focus'];
-		$values['--nino-'. $surface. '-disabled'] 	= $surfaceValues['disabled'];
-	}
-	return $values;
-};
-
-$composite = static function( string $hex, string $ground, float $alpha ): string {
-	$out = '';
-	foreach( [ 0, 2, 4 ] as $offset ) {
-		$front = hexdec( substr( ltrim( $hex, '#' ), $offset, 2 ) );
-		$back  = hexdec( substr( ltrim( $ground, '#' ), $offset, 2 ) );
-		$out .= sprintf( '%02x', (int) round( $front * $alpha + $back * ( 1 - $alpha ) ) );
-	}
-	return '#'. $out;
-};
-// The generated floor, read back out of the stylesheet the way a browser would
-// resolve var(--nino-scrim) - one value in the bare :root, one in both dark
-// blocks
-$generatedScrim = static function( array $settings ): array {
-	$blocks = preg_split( '/@media \(prefers-color-scheme: dark\)/', \Nino\Modules\Design\Tokens::css( $settings ) );
-	$out = [];
-	foreach( [ 'light' => 0, 'dark' => 1 ] as $mode => $block ) {
-		preg_match( '/--nino-scrim: rgb\((\d+) (\d+) (\d+) \/ (\d+)%\)/', $blocks[$block], $found );
-		$out[$mode] = [
-			'colour'	=> sprintf( '#%02x%02x%02x', (int) ( $found[1] ?? 0 ), (int) ( $found[2] ?? 0 ), (int) ( $found[3] ?? 0 ) ),
-			'alpha'		=> (int) ( $found[4] ?? 0 ) / 100,
-		];
-	}
-	return $out;
-};
-
-$manifestFailures = [];
-$colourFailures 	= [];
-$sizeFailures 		= [];
-$unreadable 			= [];
-$measuredPairs 		= 0;
-$measuredUiPairs 	= 0;
-$measuredScrims 	= 0;
-
-foreach( $themeKeys as $themeKey ) {
-
-	$themeDir = __DIR__. '/../_admin/install/library/themes/'. $themeKey;
-	$manifest = include $themeDir. '/manifest.php';
-
-	if( is_array( $manifest ) === false ) {
-		$manifestFailures[] = $themeKey. ': manifest does not return an array';
-		continue;
+				$fixedHeight[] = $class;
 	}
 
-	$design = is_array( $manifest['design'] ?? null ) ? $manifest['design'] : [];
-	if( $design === [] || \Nino\Modules\Design\Tokens::normalize( $design ) !== $design )
-		$manifestFailures[] = $themeKey. ': design is incomplete or not normalized';
-
-	foreach( [ 'header', 'footer' ] as $kind )
-		if( in_array( (string) ( $manifest[$kind] ?? '' ), $themeListBody['frames'][$kind] ?? [], true ) === false )
-			$manifestFailures[] = $themeKey. ': unknown '. $kind. ' '. (string) ( $manifest[$kind] ?? '' );
-
-	$stylesheet = (string) ( $manifest['stylesheet'] ?? '' );
-	$cssPath 	= $themeDir. $stylesheet;
-	$themeCss 	= is_file( $cssPath ) === true ? (string) file_get_contents( $cssPath ) : '';
-
-	if( $themeCss === '' ) {
-		$manifestFailures[] = $themeKey. ': stylesheet is missing';
-		continue;
-	}
-
-	preg_match_all( '/^\s*(--color-[a-z0-9-]+)\s*:\s*([^;]+);/mi', $themeCss, $roles, PREG_SET_ORDER );
-	$literalRoles = array_values( array_filter( $roles, static fn( array $role ): bool => str_contains( $role[2], 'var(--nino-' ) === false
-		|| preg_match( '/#[0-9a-f]{3,8}\b|\brgba?\s*\(/i', $role[2] ) === 1 ) );
-
-	// 47 since the brand became four roles and the tint ground joined the four
-	// neutral ones: the second brand colour as a surface and its ink, the tint
-	// ground and its ink, and the accent and focus values solved for it
-	if( count( $roles ) !== 47 || $literalRoles !== [] )
-		$colourFailures[] = $themeKey. ': '. count( $roles ). ' roles, '. count( $literalRoles ). ' literal/unmapped';
-
-	// The root size and the layout ceiling are raster values now, so a theme
-	// assigns them like every other size instead of writing a number
-	preg_match_all( '/^\s*(--(?:text|space)-[1-6]|--radius(?:-small|-large)?|--line-height|--base-size|--grid-max-width)\s*:\s*([^;]+);/mi', $themeCss, $sizeRoles, PREG_SET_ORDER );
-	$literalSizes = array_values( array_filter( $sizeRoles, static fn( array $role ): bool => str_contains( $role[2], 'var(--nino-' ) === false ) );
-
-	if( count( $sizeRoles ) !== 18 || $literalSizes !== [] )
-		$sizeFailures[] = $themeKey. ': '. count( $sizeRoles ). ' roles, '. count( $literalSizes ). ' literal/unmapped';
-
-	preg_match_all( '/^\s*(--color-[a-z0-9-]+)\s*:\s*var\(\s*(--nino-[a-z0-9-]+)\s*\)\s*;/mi', $themeCss, $assignments, PREG_SET_ORDER );
-	$roleToken = [];
-	foreach( $assignments as $assignment )
-		$roleToken[$assignment[1]] = $assignment[2];
-
-	$settings 		= \Nino\Modules\Design\Tokens::normalize( $design );
-	$scrimValues	= $generatedScrim( $settings );
-
-	foreach( [ 'light', 'dark' ] as $mode ) {
-
-		$values = $tokenValues( $settings, $mode );
-
-		foreach( $renderedPairs as [ $backRole, $frontRole ] ) {
-
-			$backToken 	= $roleToken[$backRole] ?? '';
-			$frontToken 	= $roleToken[$frontRole] ?? '';
-			$back 			= $values[$backToken] ?? null;
-			$front 			= $values[$frontToken] ?? null;
-
-			if( $back === null || $front === null ) {
-				$unreadable[] = $themeKey. '/'. $mode. ' '. $frontRole. ': not mapped to a generated token';
-				continue;
-			}
-
-			$measuredPairs++;
-			$ratio 	= $contrastRatio( $back, $front );
-			// WCAG AA is the floor at every position; the knob only ever asks
-			// for more. Muted text is text, so it gets the same floor
-			$target = [ 1 => 4.5, 2 => 4.5, 3 => 7.0 ][$settings['contrast']];
-
-			if( $ratio < $target - 0.02 )
-				$unreadable[] = sprintf( '%s/%s %s: %s on %s = %.2f:1, needs %.1f', $themeKey, $mode, $frontRole, $front, $back, $ratio, $target );
-		}
-
-		foreach( $renderedUiPairs as [ $backRole, $frontRole ] ) {
-
-			$back 	= $values[$roleToken[$backRole] ?? ''] ?? null;
-			$front	= $values[$roleToken[$frontRole] ?? ''] ?? null;
-
-			if( $back === null || $front === null ) {
-				$unreadable[] = $themeKey. '/'. $mode. ' '. $frontRole. ': not mapped to a generated token';
-				continue;
-			}
-
-			$measuredUiPairs++;
-			$ratio = $contrastRatio( $back, $front );
-
-			// SC 1.4.11, and the one value no knob is allowed to soften
-			if( $ratio < 2.98 )
-				$unreadable[] = sprintf( '%s/%s %s: %s on %s = %.2f:1, needs 3.0', $themeKey, $mode, $frontRole, $front, $back, $ratio );
-		}
-
-		/*	The scrim is the one role that is not a pair: what sits under it is
-			a photograph nobody has seen. /_design publishes a solved floor, and
-			a look may darken it for mood - Poster all but blacks the picture
-			out, Gallery shows as much of it as the promise allows - so the
-			value is measured rather than trusted, against the worst picture it
-			could be handed and with the ink at the weakest the framework paints
-			it (.nino-section-subtitle carries opacity .8).	*/
-		$scrimValue = '';
-		if( preg_match( '/--color-background-dim\s*:\s*([^;]+);/i', $themeCss, $scrimRole ) === 1 )
-			$scrimValue = trim( $scrimRole[1] );
-
-		$scrimInk = $values[$roleToken['--color-section-black-text'] ?? ''] ?? null;
-		$scrimBase = null;
-		$scrimAlpha = null;
-
-		if( $scrimValue === 'var(--nino-scrim)' ) {
-			$scrimBase	= $scrimValues[$mode]['colour'];
-			$scrimAlpha	= $scrimValues[$mode]['alpha'];
-		} elseif( preg_match( '/^color-mix\( *in srgb, *var\( *(--nino-[a-z0-9-]+) *\) *(\d+)%, *transparent *\)$/i', $scrimValue, $scrimMix ) === 1 ) {
-			$scrimBase	= $values[$scrimMix[1]] ?? null;
-			$scrimAlpha	= (int) $scrimMix[2] / 100;
-		}
-
-		if( $scrimBase === null || $scrimInk === null ) {
-			$unreadable[] = $themeKey. '/'. $mode. ' --color-background-dim: '. ( $scrimValue === '' ? 'not set' : $scrimValue. ' is not a scrim this can resolve' );
-		} else {
-
-			$measuredScrims++;
-			$scrimGround = $composite( $scrimBase, '#ffffff', $scrimAlpha );
-			$scrimRatio  = $contrastRatio( $scrimGround, $composite( $scrimInk, $scrimGround, 0.8 ) );
-			$target      = [ 1 => 4.5, 2 => 4.5, 3 => 7.0 ][$settings['contrast']];
-
-			if( $scrimRatio < $target - 0.02 )
-				$unreadable[] = sprintf( '%s/%s --color-background-dim: %.2f:1 over a white photograph, needs %.1f', $themeKey, $mode, $scrimRatio, $target );
-		}
-	}
-}
-
-/*	Every step's message sits in the action bar, beside the button that acts on
-	it. They used to sit at the foot of their own pane, which on the taller steps
-	is a scroll away from Next - so a step said "Applying …" or named what went
-	wrong somewhere the operator was not looking.
-
-	Each keeps the id its module writes to, so nothing else moved; which one is
-	on screen is the same pane class the panes themselves are shown by, and every
-	one of them needs that rule or its step goes quiet.	*/
-$wizard = (string) file_get_contents( __DIR__. '/../_admin/install/templates/page-wizard.tpl' );
-$wizardCss = (string) file_get_contents( __DIR__. '/../_admin/install/assets/style.css' );
-
-preg_match_all( '/<p id="([a-z-]+-msg)" class="install-step-msg"/', $wizard, $stepMessages );
-$strayMessages = [];
-
-foreach( $stepMessages[1] as $id )
-	if( str_contains( $wizardCss, '#'. $id ) === false )
-		$strayMessages[] = $id. ': no rule shows it';
-
-// ...and none left behind in a pane, which would be a second place a step
-// could write to and only one of them visible
-preg_match_all( '/<p id="([a-z-]+-msg)"(?![^>]*install-step-msg)/', $wizard, $orphans );
-
-foreach( $orphans[1] as $id )
-	if( $id !== 'install-actions-msg' )
-		$strayMessages[] = $id. ': still in its pane';
-
-check( 'every step\'s message is in the action bar and shown with its step'. ( $strayMessages === [] ? '' : ' - '. implode( ' | ', $strayMessages ) ),
-	$strayMessages === [] && count( $stepMessages[1] ) === 9 );
-
-check( 'all eight manifests declare a complete Design and available frames'. ( $manifestFailures === [] ? '' : ' - '. implode( ' | ', $manifestFailures ) ), $manifestFailures === [] );
-
-/*	The catalogue is meant to span the system rather than cluster in the middle
-	of it: ten looks that all sit at the framework default would leave the
-	operator to discover every position for themselves, and a position no
-	shipped look uses is a position nobody has ever looked at. Every knob, every
-	position, at least once - which is also how a knob that produces something
-	unusable at one end gets found before a project does.	*/
-$catalogueDesigns = [];
-foreach( $themeKeys as $themeKey ) {
-	$manifest = include __DIR__. '/../_admin/install/library/themes/'. $themeKey. '/manifest.php';
-	$catalogueDesigns[$themeKey] = \Nino\Modules\Design\Tokens::normalize( (array) ( $manifest['design'] ?? [] ) );
-}
-
-$unvisited = [];
-foreach( \Nino\Modules\Design\Tokens::choices() as $knob => $meta )
-	for( $position = $meta['min']; $position <= $meta['max']; $position++ )
-		if( in_array( $position, array_column( $catalogueDesigns, $knob ), true ) === false )
-			$unvisited[] = $knob. ' '. $meta['steps'][$position - $meta['min']];
-
-check( 'every position of every setting is shipped by at least one theme'. ( $unvisited === [] ? '' : ' - never used: '. implode( ', ', $unvisited ) ), $unvisited === [] );
-// ...and no two looks are the same look. Ten themes that differ only in their
-// stylesheets would be ten themes the Design pane cannot tell apart
-$catalogueRows = array_map( static fn( array $design ): string => json_encode( $design ), $catalogueDesigns );
-check( 'no two themes start from the same Design'. ( count( array_unique( $catalogueRows ) ) === count( $catalogueRows ) ? '' : ' - '. implode( ', ', array_keys( array_diff_key( $catalogueRows, array_unique( $catalogueRows ) ) ) ) ),
-	count( array_unique( $catalogueRows ) ) === count( $catalogueRows ) );
-check( 'every theme in the catalogue assigns every colour role to generated tokens'. ( $colourFailures === [] ? '' : ' - '. implode( ' | ', $colourFailures ) ), $colourFailures === [] );
-check( 'every theme in the catalogue assigns every size role to the generated raster'. ( $sizeFailures === [] ? '' : ' - '. implode( ' | ', $sizeFailures ) ), $sizeFailures === [] );
-check( 'every rendered pair in every theme meets its declared target in both modes'. ( $unreadable === [] ? '' : ' - '. implode( ' | ', $unreadable ) ),
-	$unreadable === [] && $measuredPairs === count( $themeKeys ) * count( $renderedPairs ) * 2
-	&& $measuredUiPairs === count( $themeKeys ) * count( $renderedUiPairs ) * 2
-	&& $measuredScrims === count( $themeKeys ) * 2 );
-
-// Nino.css still uses --color-primary both as a background (paired with
-// --color-primary-text) and as ink on the page ground. All catalogue themes
-// map it to the safe brand surface; pin its weakest second use until the
-// framework splits the role.
-$basisManifest = include __DIR__. '/../_admin/install/library/themes/basis/manifest.php';
-$basisSettings = \Nino\Modules\Design\Tokens::normalize( $basisManifest['design'] );
-$darkValues 	= $tokenValues( $basisSettings, 'dark' );
-$primaryAsInk = $contrastRatio( $darkValues['--nino-default'], $darkValues['--nino-brand-safe'] );
-
-check( 'the known --color-primary dual-use stays within a step of readable (Nino.css role split pending)', $primaryAsInk >= 4.0
-	&& $contrastRatio( $darkValues['--nino-default'], $darkValues['--nino-default-link'] ) >= 4.5 );
-
-// The persisted key is the source of truth. The generated CSS bundle is an
-// output artifact and must not silently select a theme when the key is absent.
-unset( $appData['/nino/install/theme'] );
-$themeListWithoutSelection = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Install\Themes::apiList( $appData, $themeListWithoutSelection );
-check( 'does not infer an active theme from the CSS bundle when the persisted key is absent', $themeListWithoutSelection['/nino/http/response']['body']['activeTheme'] === null );
-$appData['/nino/install/theme'] = 'basis';
+check( 'the header markup carries the class that rule acts on', preg_match( '/class="[^"]*nino-scroll-header/', $frameMarkup ) === 1 );
+check( 'and the delivered frame gives its bar no height the collapsed state cannot take back'. ( $fixedHeight === [] ? '' : ' - '. implode( ', ', array_unique( $fixedHeight ) ) ), $fixedHeight === [] );
 
 echo "\n";
 
@@ -1791,32 +1064,30 @@ check( 'the always-on module list carries no unit the wizard offers', array_inte
 	\Nino\AppData::DEFAULTS['/nino/modules']
 ) === [] );
 
-// Every theme unit has to be self-contained: its own manifest, the
-// stylesheet that manifest names, and every webfont that stylesheet
-// @font-faces - nothing else in the library ships fonts anymore, so a
-// missing one is a font that silently never loads
-foreach( scandir( $realRoot. '/_admin/install/library/themes' ) ?: [] as $themeEntry ) {
+/*	The look is one file the base unit delivers, so that file has to be
+	self-contained: the fonts it @font-faces are copied by the same unit, and
+	the two frame templates it styles are copied by it too. Nothing looks for
+	a theme unit any more - a missing font here is a font that silently never
+	loads, and a missing template a header or footer that silently is not
+	there (\Nino\Template resolves an absent include to '').	*/
+$baseUnit 	= $realRoot. '/_admin/install/library/base';
+$baseFiles 	= (array) ( ( include $baseUnit. '/manifest.php' )['files'] ?? [] );
+$themeCss 	= (string) file_get_contents( $baseUnit. '/assets/theme.css' );
 
-	if( $themeEntry === '.' || $themeEntry === '..' )
-		continue;
+check( 'the base unit ships the one stylesheet the css bundle names, and copies the directory it is in', is_file( $baseUnit. '/assets/theme.css' ) === true
+	&& in_array( 'assets', $baseFiles, true ) === true );
 
-	$themeDir 			= $realRoot. '/_admin/install/library/themes/'. $themeEntry;
-	$themeManifest 	= include $themeDir. '/manifest.php';
-	$themeCss 			= (string) ( $themeManifest['stylesheet'] ?? '' );
+preg_match_all( '#url\(["\']?\[\[/nino/public\]\](/fonts/[^)"\']+)#', $themeCss, $themeFonts );
+check( 'and every webfont it @font-faces', count( $themeFonts[1] ) > 0
+	&& array_values( array_filter( array_unique( $themeFonts[1] ), fn( string $font ): bool => is_file( $baseUnit. $font ) === false ) ) === [] );
+check( '...and names fonts among the files it copies, so they reach the project at all', in_array( 'fonts', $baseFiles, true ) === true );
 
-	check( "the \"$themeEntry\" theme ships the stylesheet its manifest names", $themeCss !== '' && is_file( $themeDir. '/'. $themeCss ) === true );
-	check( "the \"$themeEntry\" theme ships a preview image and a description for the picker", is_file( $themeDir. '/'. ( $themeManifest['preview'] ?? '' ) ) === true && ( $themeManifest['description'] ?? '' ) !== '' );
-
-	preg_match_all( '#url\(["\']?(/fonts/[^)"\']+)#', (string) file_get_contents( $themeDir. '/'. $themeCss ), $themeFonts );
-
-	$missingFonts = array_values( array_filter( array_unique( $themeFonts[1] ), fn( string $font ): bool => is_file( $themeDir. $font ) === false ) );
-	check( "the \"$themeEntry\" theme ships every webfont its stylesheet references", $missingFonts === [] );
-}
-
-// Basis is the one look the catalogue is read against, so it is the one a
-// fresh install has to be able to fall back on
-check( 'the reference look is in the library and names a stylesheet it ships', is_file( $realRoot. '/_admin/install/library/themes/basis/manifest.php' ) === true
-	&& is_file( $realRoot. '/_admin/install/library/themes/basis/'. ( include $realRoot. '/_admin/install/library/themes/basis/manifest.php' )['stylesheet'] ) === true );
+// The stylesheet and the markup it styles are one delivery: theme.css names
+// .nino-frame-header and .nino-footer-nav, and nothing else writes either
+// template into a project
+foreach( [ 'theme.header.tpl', 'theme.footer.tpl' ] as $frame )
+	check( "the base unit ships $frame and lists it among its templates", is_file( $baseUnit. '/templates/'. $frame ) === true
+		&& in_array( $frame, (array) ( ( include $baseUnit. '/manifest.php' )['templates'] ?? [] ), true ) === true );
 
 echo "\n";
 

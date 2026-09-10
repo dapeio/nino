@@ -1,9 +1,8 @@
-# The installer's library is server-side source. Only the deliberately public
-# picker image may be delivered directly; PHP manifests, page and frame
-# templates, stylesheets and bundled font sources are read by /_install and,
-# while the installer is still deployed, by /_design.
-<FilesMatch "^(?!preview\.svg$)">
-	Require all denied
-</FilesMatch>
+# The installer's library is server-side source, all of it: PHP manifests, page
+# templates, stylesheets and bundled font sources, read by the wizard and
+# copied into the project by it. Nothing in here is ever served directly.
+# Up to Nino 1.1 there was one exception - the theme picker's preview images,
+# which went with the themes when the wizard stopped asking about the look.
+Require all denied
 
 Options -Indexes

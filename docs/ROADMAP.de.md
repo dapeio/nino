@@ -26,8 +26,7 @@ Die Dokumentation richtet sich primär an selbstständige Webentwickler und klei
 | `deployment.de.md` | `deployment.md` | Webserver, Go-live, Sicherheit, Backups und Updates | veröffentlicht |
 | `setup.de.md` | `setup.md` | der Einrichtungsassistent: notwendige Ersteinrichtung und Library-Format | veröffentlicht |
 | `_admin.de.md` | `_admin.md` | die Workbench: jedes Panel, Konten, Rollen und Recovery | veröffentlicht |
-| `appearance.de.md` | `appearance.md` | das Design-Panel: Theme, Design, Header und Footer | veröffentlicht (Alpha) |
-| `templates.de.md` | `templates.md` | das Templates-Panel: sectionbasierte Komposition von Seitentemplates | veröffentlicht (Alpha) |
+| – | – | das Design-Panel und der Template-Baukasten sind seit 1.2 nicht mehr Teil von Nino: `appearance.de.md`/`appearance.md` liegt archiviert in [`design-library/docs/`](https://github.com/dapeio/nino-features/tree/main/design-library/docs), `templates.de.md`/`templates.md` beim Feature in [`features/Templates/docs/`](https://github.com/dapeio/nino-features/tree/main/features/Templates/docs) | ausgelagert |
 | `features.de.md` | `features.md` | Features: das Panel, das Manifest `feature.php`, das Settings-Schema, Aktivierung, Update und Deaktivierung, die Tests eines Features | veröffentlicht |
 | – | `recipes/*.md` | die sieben Erweiterungsrezepte: Panel, Laufzeitmodul, Installer-Paket, Section-Preset, Templates und Seiten-Units, Elementtypen, Feature | veröffentlicht, nur Englisch |
 
@@ -35,7 +34,7 @@ Die Dokumentation richtet sich primär an selbstständige Webentwickler und klei
 
 1. Deutsche und englische README einschließlich Screenshots gemeinsam pflegen.
 2. Das Design-Handbuch aus dem WIP-Status bis zu einem vollständigen Arbeitsweg ausbauen.
-3. Das Workbench-Handbuch und die vier Referenzen (Assistent, Design-Panel, Templates-Panel, Features) bei Verhaltensänderungen paarweise aktualisieren.
+3. Das Workbench-Handbuch und die beiden Referenzen (Assistent, Features) bei Verhaltensänderungen paarweise aktualisieren.
 4. Technische Beispiele, Versionsangaben und Sicherheitsanforderungen regelmäßig mit dem Repository abgleichen.
 5. Inhalte und Navigation für die spätere Dokumentationswebseite beziehungsweise das Wiki ableiten.
 

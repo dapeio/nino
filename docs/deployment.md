@@ -7,7 +7,7 @@
 This manual guides a fully developed Nino website into production. If you instead want to set up a fresh project, start with [Getting Started](getting-started.md); technical extensions are covered in the [Developer Manual](development.md).
 
 **Additional Links:**
-[README](../README.md) · [Concepts](concepts.md) · [Developer Manual](development.md) · [Recipes](recipes/README.md) · [Getting Started](getting-started.md) · [Setup Wizard](setup.md) · [`/_admin` Workbench](_admin.md) · [Design Panel](appearance.md) · [Features](features.md) · [Deployment](deployment.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
+[README](../README.md) · [Concepts](concepts.md) · [Developer Manual](development.md) · [Recipes](recipes/README.md) · [Getting Started](getting-started.md) · [Setup Wizard](setup.md) · [`/_admin` Workbench](_admin.md) · [Features](features.md) · [Deployment](deployment.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
 
 ## Target System Requirements
 
@@ -68,7 +68,7 @@ Transfer the same behavior explicitly to the server configuration:
 - deny access to dotfiles and dot directories;
 - **deny `private/` entirely** — it is never requested by a browser, only read by PHP;
 - **deny `app/` and `features/` entirely** — the project's own classes and the installed features are server-side source, never requested by a browser; each ships its own `.htaccess` for Apache;
-- deny direct access to `_admin/install/library/` except `_admin/install/library/themes/<key>/preview.svg` — the remaining files are server-side appearance source; the same goes for the section presets under `features/Templates/library/`, where a project that installed the Template Builder keeps them;
+- **deny `_admin/install/library/` entirely** — it is what the wizard copies a project out of, server-side source with nothing public in it; the same goes for the section presets under `features/Templates/library/`, where a project that installed the Template Builder keeps them;
 - disable directory listing;
 - forward the HTTP `Authorization` header to PHP. With nginx/PHP-FPM this normally requires `fastcgi_param HTTP_AUTHORIZATION $http_authorization;` in the PHP location;
 - do not deliver PHP source and data files as text.
@@ -89,7 +89,7 @@ A general example configuration cannot reliably guess the paths and PHP-FPM sett
 
 Before initial setup, PHP must be able to create directories and files in the project root. The still missing project paths are created by the wizard or, if needed, by the kernel and are not a manually required prerequisite.
 
-During operation, Nino only needs write permissions for actually changeable content. Depending on usage, this includes `private/config.php`, `private/text/`, `private/elements/`, `private/data/`, `private/.logs/`, `private/.backups/`, `private/assets/`, `public/images/`, and `public/.cache/`. The Templates panel additionally needs `private/templates/`; it can create native text keys, Element Types, and image-slot definitions in the configuration. Applying appearance variants in the Design panel needs `private/templates/`, `private/assets/`, `public/fonts/`, and any other destination declared by a Theme manifest. The appearance catalogue under `_admin/install/library/` itself remains read-only, as does `_admin/.cache/`'s content once built - the workbench writes its bundles there, so that one directory inside the tool folder needs write access. The project root and PHP source can otherwise remain read-only after installation. Installing a feature from the catalogue in the Features panel is the one exception: it writes `features/` and stages the download below `private/data/.features/`. Without write access to `features/` the panel offers the archive for a manual copy instead, so the directory can stay read-only where features are deployed with the project.
+During operation, Nino only needs write permissions for actually changeable content. Depending on usage, this includes `private/config.php`, `private/text/`, `private/elements/`, `private/data/`, `private/.logs/`, `private/.backups/`, `private/assets/`, `public/images/`, and `public/.cache/`. The Templates panel additionally needs `private/templates/`; it can create native text keys, Element Types, and image-slot definitions in the configuration. The installer library under `_admin/install/library/` itself remains read-only, as does `_admin/.cache/`'s content once built - the workbench writes its bundles there, so that one directory inside the tool folder needs write access. The project root and PHP source can otherwise remain read-only after installation. Installing a feature from the catalogue in the Features panel is the one exception: it writes `features/` and stages the download below `private/data/.features/`. Without write access to `features/` the panel offers the archive for a manual copy instead, so the directory can stay read-only where features are deployed with the project.
 
 Grant these permissions to the user under which PHP is executed. World-writable permissions such as `0777` are not a suitable permanent solution. After deployment, the kernel and other PHP source code should not be generally writable.
 
@@ -151,13 +151,13 @@ Grant editor permissions as narrowly as practically possible; the accounts the w
 
 HTTPS protects not only login data but also session cookies and all editorially transmitted content. Permanently redirect HTTP requests to HTTPS and only test login via the final public address.
 
-Additional web server protection for `/_admin` - such as IP allowances or HTTP authentication - can form a useful second barrier under suitable operating conditions. It does not replace the accounts. The Design panel ships as an optional kernel module and can be taken out of a production delivery by removing `\Nino\Modules\Design` from `/nino/modules`; the Template Builder is a feature, so its whole directory can go from `features/` - which is the point of it being one; the workbench itself stays, because the editors work in it.
+Additional web server protection for `/_admin` - such as IP allowances or HTTP authentication - can form a useful second barrier under suitable operating conditions. It does not replace the accounts. The Template Builder is a feature, so its whole directory can go from `features/` - which is the point of it being one; the workbench itself stays, because the editors work in it.
 
 ## The Wizard After Setup
 
 Complete the wizard fully. The last step sets the recovery password and locks the wizard. Then remove the `_admin/install/` directory from production delivery.
 
-That takes the appearance catalogue under `_admin/install/library/` with it. This is deliberate: the catalogue is setup material, not a runtime feature. An applied theme or frame already lives in the project as files under `assets/` and `templates/`, editable by hand and through the Templates panel. Inside the Design panel the Design tab keeps working unchanged — it generates the palette and the raster rather than copying files — while the three catalogue-backed tabs have nothing left to list and say so. Keep the locked `_admin/install/` deployed if you want Theme, Header, and Footer to stay switchable.
+That takes the installer library under `_admin/install/library/` with it. This is deliberate: the library is setup material, not a runtime feature. Everything it copied already lives in the project - the theme as `assets/theme.css`, the two frames as `templates/theme.header.tpl` and `templates/theme.footer.tpl` - editable by hand and, for the frames, through the Templates panel. Nothing at runtime reads the library.
 
 The order is essential:
 
@@ -185,12 +185,9 @@ php tests/kernel-smoke.php
 php tests/admin-smoke.php
 php tests/admin-system-smoke.php
 php tests/install-smoke.php
-php tests/design-smoke.php
-php tests/templates-smoke.php
 php tests/features-smoke.php
 php tests/catalogue-smoke.php
 for test in features/*/tests/*-smoke.php; do [ -e "$test" ] || continue; php "$test" || exit 1; done
-php tests/demo-catalogue-smoke.php
 for test in tests/*-js-smoke.js; do node "$test"; done
 php tests/concurrency-smoke.php
 ```
@@ -203,7 +200,6 @@ The smoke tests do not replace project-specific acceptance testing. Additionally
 - forms including validation, sending, and error messages;
 - login, logout, and the permissions of an editor account in `/_admin`;
 - a developer account's access to the Structure and System panels;
-- all four tabs of the Design panel, including one frame preview, if the module is delivered;
 - access and unchanged round-trip in the Template Builder, where the feature is installed;
 - writing and reloading editorial content;
 - behavior behind CDN, proxy, or cache, if used.
@@ -216,7 +212,7 @@ A successful call to the homepage does not yet prove that sensitive files are pr
 - `config.php` and PHP data files;
 - hidden log and backup directories;
 - internal files from `_admin/`, `app/` and `features/` that are not intended as public assets - the panel templates, the section presets and a feature's install unit among them;
-- files below `_admin/install/library/` other than `_admin/install/library/themes/*/preview.svg`;
+- any file below `_admin/install/library/`;
 - `_admin/install/`, after it has been removed.
 
 The expected response may be `403` or `404` depending on the server. The decisive factor is that neither content nor directory list is delivered.
@@ -254,9 +250,8 @@ Nino is in the beta phase. Security fixes appear on `main`; there is currently n
 - [ ] The setup wizard was able to create the project directories from the writable project root itself — a checkout ships neither `private/` nor `public/`, so the first step of the wizard is where that is confirmed.
 - [ ] Write permissions are limited to the required paths after setup.
 - [ ] The setup wizard was fully completed and `_admin/install/` subsequently removed from production.
-- [ ] If `_admin/install/` is deployed to keep Theme/Header/Footer switchable, it is locked and only its catalogue's Theme previews are directly accessible.
 - [ ] Developer and editor accounts are tested, and the recovery password is stored safely.
-- [ ] The Design module is either switched off in `/nino/modules` or consciously kept as Alpha, the Template Builder either removed from `features/` or consciously kept, and only developer accounts reach either.
+- [ ] The Template Builder is either removed from `features/` or consciously kept, and only developer accounts reach it.
 - [ ] Editor accounts only have the necessary permissions.
 - [ ] HTTPS and secure session cookies work at the final address.
 - [ ] Error display is disabled and error logging is checked.
@@ -270,5 +265,4 @@ Nino is in the beta phase. Security fixes appear on `main`; there is currently n
 - [Getting Started](getting-started.md) describes the necessary initial setup.
 - [`/_admin` Workbench](_admin.md) explains every panel, the accounts, backups and the recovery page.
 - The **Template Builder** - page templates composed from whole sections - is a feature from the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features); its [manual](https://github.com/dapeio/nino-features/blob/main/features/Templates/docs/templates.md) is there too.
-- [Design Panel](appearance.md) describes the four appearance editors.
 - [Concepts](concepts.md) explains the technical structure behind the deployed project.

@@ -47,8 +47,9 @@ namespace Nino\Admin {
 		public const string DIR = __DIR__;
 		public const string ROOT = __DIR__. '/..';
 
-		// The appearance catalogue the wizard ships - themes, header and
-		// footer units - read by the Design panel after setup as well
+		// The library the wizard copies a project out of - the base unit, the
+		// units without a runtime class of their own, and the page units. Read
+		// by the wizard alone; nothing after setup looks here
 		public const string LIBRARY = __DIR__. '/install/library';
 
 		/**

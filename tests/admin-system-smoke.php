@@ -2314,7 +2314,7 @@ check( 'a pane with tabs carries the shared tab bar, its own screen first, and a
 // pane spelled differently on the two sides is a panel whose tab opens on
 // nothing, with no error anywhere (the bundler skips a missing file)
 $shipped = $appData;
-$shipped['/nino/modules'] = array_merge( \Nino\AppData::DEFAULTS['/nino/modules'], [ '\\Nino\\Modules\\Form', '\\Nino\\Modules\\Navigation', '\\Nino\\Modules\\Design', '\\Nino\\Modules\\Maintenance' ] );
+$shipped['/nino/modules'] = array_merge( \Nino\AppData::DEFAULTS['/nino/modules'], [ '\\Nino\\Modules\\Form', '\\Nino\\Modules\\Navigation', '\\Nino\\Modules\\Maintenance' ] );
 $missingAssets = [];
 $missingPanes = [];
 foreach( \Nino\Admin\Admin::allPanels( $shipped ) as $uri => $panel ) {
@@ -2487,7 +2487,7 @@ foreach( [ 'en_US', 'de_DE', 'fr_FR' ] as $locale ) {
 	// The registry has to actually contain the app panels, or this whole check
 	// silently proves nothing about the files it was written for
 	if( $locale === 'en_US' )
-		check( 'the render check covers the runtime modules\' panels too', isset( \Nino\Admin\Admin::allPanels( $render )['design'] ) === true && isset( \Nino\Admin\Admin::allPanels( $render )['maintenance'] ) === true );
+		check( 'the render check covers the runtime modules\' panels too', isset( \Nino\Admin\Admin::allPanels( $render )['maintenance'] ) === true && isset( \Nino\Admin\Admin::allPanels( $render )['submissions'] ) === true );
 
 	preg_match_all( '/\[\[([^\]\[]+)\]\]/', \Nino\Html::renderHtml( $render, $markup ), $left );
 

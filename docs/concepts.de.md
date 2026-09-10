@@ -7,7 +7,7 @@
 Dieses Handbuch erklärt die Architektur von Nino und das Zusammenspiel von Konfiguration, Daten, Templates und Modulen. Falls du stattdessen direkt eine Webseite einrichten möchtest, beginne mit [Erste Schritte](getting-started.de.md); konkrete APIs und Implementierungsdetails stehen im [Entwickler-Handbuch](development.de.md).
 
 **Weitere Links:**
-[README](../README.de.md) · [Grundkonzepte](concepts.de.md) · [Entwickler-Handbuch](development.de.md) · [Rezepte](recipes/README.md) · [Erste Schritte](getting-started.de.md) · [Einrichtungsassistent](setup.de.md) · [`/_admin`-Workbench](_admin.de.md) · [Design-Panel](appearance.de.md) · [Features](features.de.md) · [Deployment](deployment.de.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
+[README](../README.de.md) · [Grundkonzepte](concepts.de.md) · [Entwickler-Handbuch](development.de.md) · [Rezepte](recipes/README.md) · [Erste Schritte](getting-started.de.md) · [Einrichtungsassistent](setup.de.md) · [`/_admin`-Workbench](_admin.de.md) · [Features](features.de.md) · [Deployment](deployment.de.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
 
 ## Kernsäulen
 Nino organisiert eine Webseite mit nur wenigen, aber klar getrennten Bausteinen:
@@ -161,7 +161,7 @@ ersetzt werden und es entsteht kein zweites Hook- oder Plugin-System.
 
 Ein Modul erreicht ein Projekt in einer von drei Formen. Ein **Kernel-Modul**
 wird in `_nino/Nino/Modules/` mitgeliefert – die immer aktiven und die
-optionalen (Formular, Navigation, Sprachauswahl, das Panel Design), die ein Projekt in `/nino/modules` ein- oder ausschaltet. Ein
+optionalen (Formular, Navigation, Sprachauswahl, der Wartungsschalter), die ein Projekt in `/nino/modules` ein- oder ausschaltet. Ein
 **Feature** ist ein installierbares Paket: ein Verzeichnis unterhalb von
 `features/` mit einem Manifest `feature.php`, aus dem Katalog
 [dapeio/nino-features](https://github.com/dapeio/nino-features) hineinkopiert
@@ -178,7 +178,7 @@ Eine Verwaltungsoberfläche mit einer Anmeldung. Sie hat einen eigenen Einstiegs
 | Gruppe | Panels | Verantwortung |
 |---|---|---|
 | Inhalt | Dashboard, Elemente (mit Elementtypen), Texte (mit Textschlüsseln), Bilder (mit Bildplätzen), Anfragen, Log | tägliche Pflege von Inhalten, Bildern und Betriebsdaten; die Tabs in Klammern halten die Form dieser Inhalte und gehören dem Entwickler |
-| Struktur | [Design](appearance.de.md), Routen, Navigationen | die Struktur des Projekts: Erscheinungsbild, Routen und Menüs |
+| Struktur | Routen, Navigationen | die Struktur des Projekts: seine Routen und Menüs |
 | Features | was die aktiven Features mitbringen | eine Gruppe für das Panel jedes installierten Features, gleich welche Gruppe sein eigenes `nav()` nennt; ohne Überschrift, solange nichts darin liegt |
 | System | Nutzer (mit Nutzerrollen und Anmeldeschutz), Sprache (mit Übersetzungen), Backups, Konfiguration, Features | Konten und Rollen, Sprachen und Übersetzungsübergabe, Wiederherstellung, technische Konfiguration, installierte Features |
 
@@ -196,13 +196,12 @@ Ein Konto hält eine Rolle, eine Rolle eine Menge von Berechtigungen, eine je Pa
 | dynamische Liste ausgeben | Element-Abfrage oder Shortcode mit Callback |
 | technische Funktion ergänzen | projektspezifisches Modul |
 | paketierte Funktion ergänzen – ein Newsletter, eine Suche | ein Feature aus dem Katalog [dapeio/nino-features](https://github.com/dapeio/nino-features), nach `features/` kopiert und im Panel Features eingeschaltet |
-| Theme, Design, Header oder Footer ändern | das Design-Panel; Stylesheets für projektspezifische Übersteuerungen jenseits des Katalogs |
+| das Aussehen ändern | `assets/theme.css` und `assets/style.css` im Projekt; der Katalog, den der Assistent früher angeboten hat, ist für das Design-Feature geparkt |
 
 ## Wie es weitergeht
 
 - [Erste Schritte](getting-started.de.md) führt durch die notwendige Ersteinrichtung.
 - [`/_admin`-Workbench](_admin.de.md) erklärt jedes Panel, die Rollen und die Recovery-Seite.
 - Der **Template-Baukasten** – Seitentemplates aus ganzen Abschnitten – ist ein Feature aus dem Katalog [dapeio/nino-features](https://github.com/dapeio/nino-features); sein [Handbuch](https://github.com/dapeio/nino-features/blob/main/features/Templates/docs/templates.de.md) liegt dort ebenfalls.
-- [Design-Panel](appearance.de.md) erklärt die vier Erscheinungsbild-Editoren.
 - [Features](features.de.md) erklärt installierbare Features und ihr Manifest.
 - [Deployment](deployment.de.md) beschreibt den Weg von der lokalen Webseite in den sicheren Betrieb.

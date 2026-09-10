@@ -4,10 +4,10 @@
 
 **Last updated:** September 7, 2026 · **Nino version:** 1.0.0-beta
 
-This manual explains the decisions and writing processes of the ten steps of the setup wizard - the first-run mode of the [`/_admin` workbench](_admin.md). If you instead want to take the shortest path from checkout to a configured website, start with [Getting Started](getting-started.md); the later production operation is covered in [Deployment](deployment.md).
+This manual explains the decisions and writing processes of the six steps of the setup wizard - the first-run mode of the [`/_admin` workbench](_admin.md). If you instead want to take the shortest path from checkout to a configured website, start with [Getting Started](getting-started.md); the later production operation is covered in [Deployment](deployment.md).
 
 **Additional Links:**
-[README](../README.md) · [Concepts](concepts.md) · [Developer Manual](development.md) · [Recipes](recipes/README.md) · [Getting Started](getting-started.md) · [Setup Wizard](setup.md) · [`/_admin` Workbench](_admin.md) · [Design Panel](appearance.md) · [Features](features.md) · [Deployment](deployment.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
+[README](../README.md) · [Concepts](concepts.md) · [Developer Manual](development.md) · [Recipes](recipes/README.md) · [Getting Started](getting-started.md) · [Setup Wizard](setup.md) · [`/_admin` Workbench](_admin.md) · [Features](features.md) · [Deployment](deployment.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
 
 **Important:** The wizard creates the first functional project state from a fresh Nino checkout. It is necessary: before its execution, the actual project directories such as `templates/`, `text/`, `elements/`, and `images/` do not yet exist.
 
@@ -17,9 +17,7 @@ Until its last step has been completed, `/_admin` answers with the wizard instea
 
 - checks PHP and write permissions;
 - sets languages and modules;
-- creates the project directories from its library;
-- applies a theme;
-- sets the Design, Header, and Footer independently;
+- creates the project directories from its library, the site's look among them;
 - sets up the first web pages;
 - records central website information;
 - creates the first developer accounts of the workbench;
@@ -39,7 +37,7 @@ Three different rules apply:
 |---|---|
 | Languages, modules, generated routes, and page list | the visible selection replaces the previously managed state by the assistant |
 | Templates, texts, and element types | are supplemented or updated but not automatically deleted |
-| Theme and frame files | files with the same name are overwritten; additional files from a previous theme remain |
+| The look - `assets/theme.css` and the two frame templates | files with the same name are overwritten |
 
 This distinction protects your own changes. Deselecting a module may remove its configuration; automatically deleting a template file that has been edited in the meantime would not be safe.
 
@@ -67,14 +65,14 @@ When reapplying, the visible language selection replaces the previous state. The
 
 ### Modules
 
-Navigation, language selection (the locale picker) and the contact form are no longer a choice: `\Nino\Install\Setup::ALWAYS_MODULES` names their unit keys, and every Setup run applies all three units and lists all three classes in `/nino/modules`, exactly as it would for a module actually picked. `Design` and `Templates` are handled the same way they always were - listed whenever their class exists (`TOOL_MODULES`), no unit to apply.
+Navigation, language selection (the locale picker) and the contact form are no longer a choice: `\Nino\Install\Setup::ALWAYS_MODULES` names their unit keys, and every Setup run applies all three units and lists all three classes in `/nino/modules`, exactly as it would for a module actually picked. A developer tool that ships as a module is handled the same way it always was - listed whenever its class exists (`TOOL_MODULES`), no unit to apply. `Maintenance` is the one Nino still ships.
 
 The list that remains offers every *other* module that ships an installer unit: nothing, in a fresh checkout, plus any module a project has added below `app/`, or a fork below `_admin/install/library/modules/`. Features - the catalogue's Newsletter and Search, for instance - are not offered here either: a feature is copied into `features/` from [dapeio/nino-features](https://github.com/dapeio/nino-features) and switched on in the workbench's [Features panel](features.md) after setup. If a selected module requires another module, the assistant automatically includes this dependency in the selection - and finds it already present when that dependency happens to be one of the three always-on ones. A used page template can also pull in required modules; a contact page, for example, works because the contact form's own module is always there.
 
 Setup writes:
 
 - available and native language to `config.php`;
-- the activated module classes - the always-on three, the developer tools whose class exists, and whatever else was picked - to `/nino/modules`;
+- the activated module classes - the always-on three, any developer tool whose class exists, and whatever else was picked - to `/nino/modules`;
 - the routes provided by the base and every applied module to `/nino/http/routes`;
 - templates to `templates/`;
 - global and language-dependent texts to `text/`;
@@ -83,73 +81,31 @@ Setup writes:
 
 Languages, the picked *other* modules, and the routes managed by Setup are replaced on a later reapply; the three always-on units and the routes/templates/text they bring are never removed by it. Manually or by other areas created routes remain preserved. Templates, texts, and element types that have already been copied are not deleted by later deselection.
 
-## 3. Themes
+### The Look
 
-A theme is a complete visual starting point under `library/themes/<key>`. It can include stylesheets, fonts, images, and other assets. The preview in the selection grid belongs to the shared appearance catalogue and is not copied into the project.
+Not a choice, and not a step: the base unit delivers one theme, and every project starts from it. Three files, copied like any other unit file:
 
-Exactly one theme is active. When applying:
+| File | What it is |
+|---|---|
+| `assets/theme.css` | the whole look in one stylesheet: the design tokens, the roles they are assigned to, the three webfaces, and the css for both frames below |
+| `templates/theme.header.tpl` | the site's `<header>`, included by `html-header.tpl` through `[template /templates/theme.header]` |
+| `templates/theme.footer.tpl` | the site's `<footer>`, included the same way |
 
-1. the wizard copies the files specified in the manifest into the project;
-2. replaces the previous theme stylesheet in the asset bundle `/.cache/style.css`;
-3. saves the selected theme key under `/nino/install/theme`;
-4. installs the manifest's Design, Header, and Footer defaults as the complete baseline for the following steps.
-
-The position of the stylesheet in the bundle is preserved as much as possible so that the CSS cascade does not change unintentionally. Own additional bundle entries are not removed.
-
-**Important:** Theme files with the same name are overwritten. Files that only the previous theme brought remain. Therefore, secure your own changes via Git before switching or reapplying the theme. After completion, the wizard locks itself; the workbench's [Design panel](appearance.md) provides the same Theme catalogue for later changes.
-
-## 4. Header
-
-The site's `<header>` is an interchangeable unit under `library/header/<key>`, made from a `template.tpl` plus the `style.css` for the markup that template brings. The theme preselects the header it was drawn against; this separate step overrides only that choice, while the Design values are still the ones the theme declared.
-
-Applying copies the unit to `templates/theme.header.tpl` and `assets/style.header.css`, persists its key under `/nino/install/header`, and keeps the frame stylesheets directly after the theme in the CSS bundle. It does not recopy the theme or reset Design.
-
-The taller preview iframe renders the real template against the framework, the picked theme, that theme's declared Design values, and the frame's own stylesheet. Stepping back here after Design has been settled previews against the settled values instead, so what the frame is shown on always matches what the next Next writes. A version number says nothing about a layout, and unlike a theme a frame has no preview image to open. The preview stands in for what a project does not have yet: a placeholder mark where the logo goes, sample navigation items, and the library's own text for everything else. It is a sandboxed document of its own because a frame stylesheet uses broad selectors that must not land on the installer.
-
-The base page templates include the installed copy through `[template /templates/theme.header]` rather than carrying the markup themselves, so the header can later be changed by replacing the same two project files.
-
-## 5. Footer
-
-The Footer step follows the same unit contract independently under `library/footer/<key>`. Applying writes `templates/theme.footer.tpl` and `assets/style.footer.css`, persists `/nino/install/footer`, and leaves Theme, Design, and the selected Header untouched.
-
-Its taller preview uses the same Design and theme context as the Header preview. Applying Footer after Header preserves the canonical bundle order: theme, header stylesheet, footer stylesheet.
-
-The base page templates include it through `[template /templates/theme.footer]`.
-
-## 6. Design
-
-Its own step, and the last of the three that decide the look, because the theme grid already fills a pane and everything here has to be looked at while it is being changed. Both frames are in place by now, so the specimen is drawn on the page the project will actually have.
-
-The values the theme reads from. The Design module generates the `--nino-*` tokens and a theme stylesheet assigns them to roles rather than writing literals.
-
-**Colour** - a primary, an optional secondary, a Contrast step and a Colors step. Every background is generated together with the text colour that belongs on it, measured against the WCAG contrast formula, so a brand colour cannot produce unreadable text. The chips under the controls show the real pairs, not just the backgrounds.
-
-**Size** - Volume (how far the type scale fans out), Spacing (gaps and line height) and Shaping (corner radii). The specimen below them is drawn at the sizes they generate; a list of rem values would be quicker to read and tell you nothing. Every setting's default reproduces `Nino.css`'s own scale, so a project that changes nothing here is not moved.
-
-See the [Design panel](appearance.md) reference for the token names both halves publish.
-
-A theme's manifest declares the design it was drawn with, so picking a theme and walking through to here produces the look its preview promised. The swatch strip under the controls shows the real pairs, not just the backgrounds.
-
-This step is optional: a delivery that ships without the Design module (`_nino/Nino/Modules/Design/`) installs exactly as before, with the Design block absent.
+The page templates include the two frames rather than carrying their markup, so either can be rewritten without touching the page frame around it. A missing include resolves to an empty string, which is why the base unit lists both files: a delivery that forgot one would ship a site with no header, silently.
 
 The order in the css bundle is the whole contract, and each layer owns one slot in it:
 
 ```
 _nino/Nino.css              framework defaults
-assets/style.design.css     Design - the generated values
-assets/style.theme.*.css    the theme - which value goes in which role
-assets/style.header.css     the frames - styling for the markup they brought
-assets/style.footer.css
-assets/style.css            the project's own overrides
+assets/theme.css            the look - tokens, roles, fonts, both frames
+assets/style.css            the project's own, shipped empty
 ```
 
-The bundle order is fixed and independent of the order the steps run in: Design is settled last, but its stylesheet stays the layer the theme reads from.
+Setup seeds `/nino/html/assets`' bundle with the two project entries if they are not in it yet, and appends rather than replaces - whatever a project added itself keeps its place. `assets/style.css` is written once, empty, and never touched again, so a rule put there overrules everything above it.
 
-The Design panel stays available after the installation, so a project can be recolored without reinstalling. See the [Design panel](appearance.md) reference.
+Up to Nino 1.1 the wizard asked four questions here - a theme from a catalogue of ten, a header and a footer from thirteen frames, and the design values compiled out of them. It does not any more. The catalogue is parked in [`design-library/`](https://github.com/dapeio/nino-features/tree/main/design-library) of the feature repository, waiting for the **Design** feature, which will compile its own stylesheet over the delivered one.
 
-Theme and both frame catalogues sit beside the base, module, and page units below `_admin/install/library/`. The Design panel reads them for as long as the wizard is deployed; they are setup material, copied into the project when applied and never read at runtime.
-
-## 7. Routes
+## 3. Routes
 
 This step creates the public page structure. The list can be supplemented, edited, deleted, and sorted. With "Continue", the entire visible list is applied as the new state.
 
@@ -175,7 +131,7 @@ A route on the **Blank** template gets its own copy of that template, named afte
 
 The reserved path `/_admin` cannot be used as a public page.
 
-## 8. Personal Information
+## 4. Personal Information
 
 This step records central company and website values as textfills. The values are stored globally and can be edited later in the workbench's Text panel.
 
@@ -191,7 +147,7 @@ The following keys are typically created:
 
 These textfills are used in templates, meta tags, and possibly in the footer or contact forms.
 
-## 9. Accounts
+## 5. Accounts
 
 This step creates the root account of the workbench: the **Developer** role, full access over `/*`, the account you sign in to `/_admin` with. Submit again for a second one, then continue. Editor accounts with fewer rights are created later, in the workbench's **Users** panel, from the **Editor** role - both roles are written by the Setup step and edited on the Users panel's roles tab.
 
@@ -202,7 +158,7 @@ Provide:
 
 Both can be changed later under **Users**. The accounts live in `config.php` under `/nino/auth/user`.
 
-## 10. Finish
+## 6. Finish
 
 The last step sets the **recovery password** and locks the wizard. It is not a login: `/_admin/recovery.php` asks for it when the accounts themselves are what is broken - to restore a backup or to reset a password - and nothing in the workbench ever asks for it (see [Recovery](_admin.md#recovery)).
 
@@ -216,13 +172,13 @@ If completion fails, check the write permissions of the `private/` directory. Af
 
 ## Verify the Result and Remove the Wizard
 
-After completion, open the frontend and the workbench. Check at least the start page, every configured language, the login to `/_admin` with the root account, the four tabs of the Design panel, a `page-*.tpl` opened in the Templates panel, and the selected theme assets.
+After completion, open the frontend and the workbench. Check at least the start page, every configured language, the login to `/_admin` with the root account, and that the header, the footer and the webfonts the theme declares are all there.
 
-The wizard is intended only for initial setup. Remove `_admin/install/` from the production delivery - it takes the appearance catalogue with it, and the Design panel says so - or keep it deployed, locked, to keep Theme, Header and Footer switchable. See [Deployment](deployment.md#the-wizard-after-setup).
+The wizard is intended only for initial setup. Remove `_admin/install/` from the production delivery: nothing outside it reads its library, and what it already copied stays where it was written. See [Deployment](deployment.md#the-wizard-after-setup).
 
 ## Library Format
 
-Nino separates one-time installer source from the appearance catalogue that remains editable afterwards:
+Everything the wizard copies from is one-time installer source, in one of four shapes:
 
 | Path | Purpose |
 |---|---|
@@ -230,28 +186,14 @@ Nino separates one-time installer source from the appearance catalogue that rema
 | `_nino/Nino/Modules/<Module>/install/`, `app/…/<Module>/install/` | a module's own unit: the selectable functional addition, beside the class it activates |
 | `_admin/install/library/modules/<key>/` | a selectable unit without a runtime class of its own |
 | `_admin/install/library/pages/<key>/` | starting point for one concrete page |
-| `_admin/install/library/themes/<key>/` | visual baseline shared by the wizard and the Design panel |
-| `_admin/install/library/header/<key>/`, `_admin/install/library/footer/<key>/` | interchangeable frame shared by both |
 
-Everything below `_admin/install/` is removed together with the wizard after completion; a module's `install/` directory stays with its module, and only the wizard reads it. The catalogue is setup material, not a runtime plugin system.
+Everything below `_admin/install/` is removed together with the wizard after completion; a module's `install/` directory stays with its module, and only the wizard reads it. The library is setup material, not a runtime plugin system.
 
 Module units are found, not listed: the wizard scans `_nino/Nino/Modules/*/install/` - Nino's own optional modules - and then the whole application directory (`app/`, or `NINO_APP_DIR`) up to four levels deep, plus `_admin/install/library/modules/`. A unit's key - what the picker posts and what `requiresModules` names - is the manifest's `key` or, without one, the module directory's lowercased name; it must be a slug and unique, and the first unit to claim a key keeps it, so Nino's own modules keep theirs.
 
 Not scanned: `features/`. A feature carries an `install/` unit of the same shape, but `\Nino\Features::activate()` applies it when the feature is switched on in the workbench - through the same `applyUnit()` the wizard uses, with overwrite on here and add-only there, so that the unit application survives the removal of `_admin/install/`. See [Features](features.md).
 
-The Design module and the Template Builder have no unit to pick: the Setup step lists them in `/nino/modules` whenever their class exists, so both panels are in the workbench from the first `config.php` on.
-
-A theme's `manifest.php` lists the files to be copied plus what the look was drawn against:
-
-| Key | Meaning |
-|---|---|
-| `label`, `description`, `preview` | picker only; the preview image is served from the library and never copied |
-| `stylesheet` | where the copied stylesheet ends up, and what gets bundled |
-| `files` | which of the unit's directories are copied into the project |
-| `header`, `footer` | the frame units this theme was drawn against |
-| `design` | the Design settings it was drawn with: `primary`, `secondary`, `contrast`, `colors`, `volume`, `spacing`, `shaping` |
-
-A frame unit has no manifest - a `template.tpl` and an optional `style.css` are everything it has to declare. Theme units and the installer-specific base/module/page units use manifests for their copying and configuration contracts.
+A developer tool that ships as a module has no unit to pick: the Setup step lists it in `/nino/modules` whenever its class exists, so its panel is in the workbench from the first `config.php` on.
 
 ## What the Wizard Deliberately Does Not Do
 
@@ -264,5 +206,4 @@ It also does not create `images/`, `templates/`, `text/`, or `elements/` before 
 - [Getting Started](getting-started.md) guides through the necessary initial setup.
 - [`/_admin` Workbench](_admin.md) explains the panels, the accounts and the recovery page.
 - The **Template Builder** - page templates composed from whole sections - is a feature from the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features); its [manual](https://github.com/dapeio/nino-features/blob/main/features/Templates/docs/templates.md) is there too.
-- [Design Panel](appearance.md) explains the four appearance editors.
 - [Deployment](deployment.md) describes web server configuration, security, and go-live.

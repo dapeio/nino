@@ -25,15 +25,11 @@
 				     Back/Next controls the wizard's flow, see script.js -->
 				<div id="install-nav-wrap" class="nino-admin-nav">
 					<span id="install-nav-checks" class="active">1. Environment</span>
-					<span id="install-nav-setup">2. Language</span>
-					<span id="install-nav-themes">3. Themes</span>
-					<span id="install-nav-header">4. Header</span>
-					<span id="install-nav-footer">5. Footer</span>
-					<span id="install-nav-design">6. Design</span>
-					<span id="install-nav-webpages">7. Routes</span>
-					<span id="install-nav-personalinfos">8. Personal Infos</span>
-					<span id="install-nav-accounts">9. Accounts</span>
-					<span id="install-nav-finish">10. Finish</span>
+					<span id="install-nav-setup">2. Languages</span>
+					<span id="install-nav-webpages">3. Routes</span>
+					<span id="install-nav-personalinfos">4. Personal Infos</span>
+					<span id="install-nav-accounts">5. Accounts</span>
+					<span id="install-nav-finish">6. Finish</span>
 				</div>
 			</aside>
 
@@ -61,112 +57,6 @@
 					</div>
 				</div>
 
-				<div id="install-content-themes">
-					<p class="nino-admin-hint nino-admin-hint-lead">Pick the site's look - one complete theme from <code>library/themes</code>. Applying copies whatever its manifest lists (its stylesheet, the webfonts that stylesheet uses, any images it ships) into the project and points <code>config.php</code>'s css bundle at it. Click a tile's preview to enlarge it. Exactly one theme is active at a time: picking a different one later overwrites its files rather than adding to them.</p>
-					<div id="themes-grid"></div>
-				</div>
-
-				<div id="install-content-header">
-					<p class="nino-admin-hint nino-admin-hint-lead">Pick the site's <code>&lt;header&gt;</code>. The theme chooses the version it was drawn against; this separate step lets you replace it before the Design values are settled against it. The base page templates include the installed copy through <code>&#91;template /templates/theme.header&#93;</code>.</p>
-					<p id="themes-frame-header-unavailable" class="nino-admin-hint install-hidden">This delivery ships no header variants. Press "Next" to continue.</p>
-					<!-- A version number says nothing about what a frame looks
-					     like, so themes/frame renders the real template into an
-					     isolated document rather than splicing its broad CSS into
-					     the installer page. -->
-					<div id="themes-frame-header-panel" class="install-theme-panel install-hidden">
-						<div class="install-frame-pick">
-							<label class="install-theme-field">
-								<span>Header variant</span>
-								<select id="themes-frame-header" class="nino-admin-input"></select>
-							</label>
-							<div class="install-frame-stage">
-								<iframe id="themes-frame-header-preview" class="install-frame-view" title="Header preview" sandbox="" loading="lazy"></iframe>
-							</div>
-						</div>
-					</div>
-				</div>
-
-				<div id="install-content-footer">
-					<p class="nino-admin-hint nino-admin-hint-lead">Pick the site's <code>&lt;footer&gt;</code>. It is installed independently from the Header, on the theme chosen in the preceding step. The base page templates include the installed copy through <code>&#91;template /templates/theme.footer&#93;</code>.</p>
-					<p id="themes-frame-footer-unavailable" class="nino-admin-hint install-hidden">This delivery ships no footer variants. Press "Next" to continue.</p>
-					<div id="themes-frame-footer-panel" class="install-theme-panel install-hidden">
-						<div class="install-frame-pick">
-							<label class="install-theme-field">
-								<span>Footer variant</span>
-								<select id="themes-frame-footer" class="nino-admin-input"></select>
-							</label>
-							<div class="install-frame-stage">
-								<iframe id="themes-frame-footer-preview" class="install-frame-view" title="Footer preview" sandbox="" loading="lazy"></iframe>
-							</div>
-						</div>
-					</div>
-				</div>
-
-				<div id="install-content-design">
-					<p id="design-unavailable" class="nino-admin-hint install-hidden">This delivery ships without the Design module, so there is nothing to generate here - the theme's own stylesheet decides the colours instead. Press "Next" to continue.</p>
-
-					<!--	Same split as the Design panel: every setting visible at once on
-								the left, one page on the right showing what all of them
-								together produce. The example itself is built by the Design module -
-								see Install.php's apiDesignRead.	-->
-					<div id="design-controls" class="install-design-split">
-
-						<div class="install-design-controls">
-							<div class="nino-admin-tabs" role="tablist" aria-label="Design settings">
-								<button type="button" role="tab" id="themes-design-tab-colour" class="nino-admin-tab is-active" aria-selected="true" aria-controls="themes-design-panel-colour">Colour</button>
-								<button type="button" role="tab" id="themes-design-tab-raster" class="nino-admin-tab" aria-selected="false" aria-controls="themes-design-panel-raster">Raster</button>
-							</div>
-
-							<div class="nino-admin-tabpanel install-design-panel" role="tabpanel" id="themes-design-panel-colour" aria-labelledby="themes-design-tab-colour">
-								<div id="themes-design-colours">
-									<label class="install-theme-field" id="themes-design-primary-field">
-										<span>Primary</span>
-										<span class="install-theme-color">
-											<input type="color" id="themes-design-primary" class="install-theme-swatch">
-											<input type="text" id="themes-design-primary-hex" class="nino-admin-input" inputmode="text" spellcheck="false" autocomplete="off" maxlength="7">
-										</span>
-									</label>
-									<label class="install-theme-field" id="themes-design-secondary-field">
-										<span>Secondary</span>
-										<span class="install-theme-color">
-											<input type="color" id="themes-design-secondary" class="install-theme-swatch">
-											<input type="text" id="themes-design-secondary-hex" class="nino-admin-input" inputmode="text" spellcheck="false" autocomplete="off" maxlength="7" placeholder="auto">
-										</span>
-										<small>overrides Harmony</small>
-									</label>
-								</div>
-								<div id="themes-design-knobs-colour"></div>
-							</div>
-
-							<div class="nino-admin-tabpanel install-design-panel" role="tabpanel" id="themes-design-panel-raster" aria-labelledby="themes-design-tab-raster" hidden>
-								<div id="themes-design-knobs-raster"></div>
-							</div>
-						</div>
-
-						<div class="install-design-stage">
-							<div class="install-design-modes" role="group" aria-label="Preview mode">
-								<button type="button" id="themes-design-mode-light" class="install-design-mode is-active" aria-pressed="true">Light</button>
-								<button type="button" id="themes-design-mode-dark" class="install-design-mode" aria-pressed="false">Dark</button>
-								<button type="button" id="design-reset" class="nino-admin-btn-secondary" hidden>Back to the theme&rsquo;s values</button>
-							</div>
-							<!--	The frame renders at a desktop's layout width and is
-										scaled into this box - see Nino.adminUi.scaleFrame().
-										Without it the panel is narrower than the narrowest
-										content ceiling Width offers, and all three settings
-										for it look the same	-->
-							<div class="install-design-port" id="themes-design-example-port">
-								<iframe id="themes-design-example" class="install-design-view" title="Live preview of the current design" sandbox="" loading="lazy"></iframe>
-							</div>
-						</div>
-					</div>
-
-					<!--	Nothing here is written until Next, so the position to
-								offer a way back to is the one the theme handed over -
-								see design.js's _reset. Shown only while the two differ. -->
-					<div class="install-design-footer">
-					</div>
-				</div>
-
 				<div id="install-content-webpages">
 					<p class="nino-admin-hint nino-admin-hint-lead">Build the project's actual routes: click a row to open it, or "New Route" to add one - an Element URI (a stable identifier, eg. <code>/home</code>), the real Http URI it's reachable at (eg. <code>/</code>), a starting template from <code>_admin/install/library/pages</code>, and each active locale's name/title/description - name is also what shows up in the main menu, if the Navigation module (step 2) is active and its "Show in main navigation" box is checked. Click ↑/↓ to reorder, "Next" batch-generates routes/templates/text/blacklist from the list below.</p>
 					<div id="webpages-list"></div>
@@ -174,7 +64,7 @@
 				</div>
 
 				<div id="install-content-personalinfos">
-					<p class="nino-admin-hint nino-admin-hint-lead">Fill in the site's company/website info (contact details, author, hosting) - the handful of keys that are always there no matter what steps 2/3 picked. Everything else is fine as the library's generic default; edit it in the Text panel (or Text Keys for technical keys) afterward if it isn't.</p>
+					<p class="nino-admin-hint nino-admin-hint-lead">Fill in the site's company/website info (contact details, author, hosting) - the handful of keys that are always there no matter what step 2 picked. Everything else is fine as the library's generic default; edit it in the Text panel (or Text Keys for technical keys) afterward if it isn't.</p>
 					<div id="personalinfos-list"></div>
 				</div>
 
@@ -238,10 +128,6 @@
 				<div id="install-actions-status" class="nino-admin-actionbar-status">
 					<p id="install-actions-msg"></p>
 					<p id="setup-msg" class="install-step-msg" role="status" aria-live="polite"></p>
-					<p id="themes-msg" class="install-step-msg" role="status" aria-live="polite"></p>
-					<p id="design-msg" class="install-step-msg" role="status" aria-live="polite"></p>
-					<p id="header-msg" class="install-step-msg" role="status" aria-live="polite"></p>
-					<p id="footer-msg" class="install-step-msg" role="status" aria-live="polite"></p>
 					<p id="webpages-msg" class="install-step-msg" role="status" aria-live="polite"></p>
 					<p id="personalinfos-msg" class="install-step-msg" role="status" aria-live="polite"></p>
 					<p id="accounts-add-msg" class="install-step-msg" role="status" aria-live="polite"></p>
@@ -252,19 +138,11 @@
 			</div>
 		</div>
 
-		<!-- Theme preview lightbox - a single, reused overlay filled by
-		     themes.js rather than one per tile, see its _openLightbox() -->
-		<div id="themes-lightbox" class="install-hidden">
-			<img id="themes-lightbox-image" src="" alt="">
-			<p id="themes-lightbox-caption"></p>
-		</div>
 		<script src="[[/nino/dir]]/_nino/Nino.js"></script>
 		<script src="[[/nino/dir]]/_admin/assets/Nino.admin.js"></script>
 		<script src="[[/nino/dir]]/_admin/install/assets/script.js"></script>
 		<script src="[[/nino/dir]]/_admin/install/assets/checks.js"></script>
 		<script src="[[/nino/dir]]/_admin/install/assets/setup.js"></script>
-		<script src="[[/nino/dir]]/_admin/install/assets/themes.js"></script>
-		<script src="[[/nino/dir]]/_admin/install/assets/design.js"></script>
 		<script src="[[/nino/dir]]/_admin/install/assets/webpages.js"></script>
 		<script src="[[/nino/dir]]/_admin/install/assets/personalinfos.js"></script>
 		<script src="[[/nino/dir]]/_admin/install/assets/accounts.js"></script>

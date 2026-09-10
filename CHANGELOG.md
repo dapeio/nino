@@ -12,6 +12,12 @@ forms for, with the Submissions panel reading whatever they collect. Three
 hooks for features: another mail transport, sorted and paged element lists,
 and a seam a submission can be refused at.
 
+And the kernel gets smaller by two. The Template Builder is a feature of that
+catalogue now, and the Design panel is gone altogether: a project starts from
+one fixed look the setup wizard delivers, and the wizard is six steps instead
+of ten. Both are the same bet - what a project may not want should be
+something it can add, or leave out, one directory at a time.
+
 ### Added
 
 - **`\Nino\Catalogue`** (`_nino/Nino/Catalogue/Catalogue.php`): fetches the
@@ -189,7 +195,16 @@ and a seam a submission can be refused at.
   replaced wholesale when its choice is made again (the theme, either frame,
   the generated token layer), so there was nowhere to put a rule that survives
   picking another theme.
-
+- **`assets/theme.css`**, the site's whole look in one stylesheet, delivered by
+  the base install unit beside the two frame templates it is drawn against
+  (`templates/theme.header.tpl`, `templates/theme.footer.tpl`). Four layers
+  concatenated in the order the cascade needs them: the compiled design tokens,
+  the theme that assigns each one a role, the header frame's rules and the
+  footer frame's. It is what the old wizard produced when you pressed Next four
+  times and took the defaults - `basis`, byte for byte - and it is now a file
+  edited by hand rather than a file a panel rewrites. Setup seeds the bundle
+  with it and with `assets/style.css`, appending only what is not there yet, so
+  a project that has added entries of its own keeps them where it put them.
 ### Changed
 
 - `\Nino\Features::constraintValid()` is public - the catalogue validates
@@ -316,8 +331,48 @@ and a seam a submission can be refused at.
   purpose, so a shipped module can never be shadowed - and the feature would
   look installed and do nothing. `^1.2` in its manifest is what refuses that and
   says why.
+- **Design leaves the core - the whole of it, panel and catalogue.** The site's
+  look is no longer something Nino asks about or keeps editable: every project
+  starts from one fixed theme (see `assets/theme.css` under Added), and the
+  **Design** feature - not written yet - is what will replace it, with a
+  catalogue per part of a page rather than one whole-page theme. Removed here:
 
+  - `_nino/Nino/Modules/Design/` - the module, its panel, the token palette
+    solver, the appearance catalogue reader and the live preview: 11 files,
+    4,449 lines. `\Nino\Modules\Design` is out of
+    `\Nino\Install\Setup::TOOL_MODULES`, so a fresh install no longer lists
+    it in `/nino/modules`.
+  - `\Nino\Install\Themes` in `_admin/install/Install.php` - 1,142 lines, the
+    class behind the wizard's Theme, Header and Footer steps. Install.php
+    goes from 3,507 lines to 2,391.
+  - **Four of the wizard's ten steps.** Themes, Header, Footer and Design are
+    gone from the rail, the template, `STEPS` and `_commitStep`, together with
+    `assets/themes.js` and `assets/design.js` (1,145 lines) and their ~340
+    lines of stylesheet. The wizard is six steps: Environment, Setup, Routes,
+    Personal Infos, Accounts, Finish.
+  - `_admin/install/library/{themes,header,footer}/` - ten themes, six headers
+    and seven footers, 85 files and 3,824 lines. **Parked, not deleted:** they
+    sit in
+    [`design-library/`](https://github.com/dapeio/nino-features/tree/main/design-library)
+    of [dapeio/nino-features](https://github.com/dapeio/nino-features), outside
+    `features/`, so `bin/build.php` and `bin/check.sh` never see them - not a
+    feature, never published, source material for the one that is coming. The
+    two Design manuals (`docs/appearance.md`, `docs/appearance.de.md`, 378
+    lines) and the panel's three screenshots went with them, archived under
+    `design-library/docs/` for the token contract they document.
+  - `tests/design-smoke.php`, `design-js-smoke.js`,
+    `install-design-js-smoke.js` and `install-themes-js-smoke.js` - 2,404
+    lines, ~350 checks. What is still Nino's is asserted where it belongs:
+    `tests/install-smoke.php` holds the base unit to the stylesheet, the
+    webfonts and both frame templates it has to deliver, and to a header the
+    collapsed state can really take back;
+    `tests/install-script-js-smoke.js` holds the wizard to its six steps and
+    to leaving nothing of the other four behind.
 
+  Nothing under `_admin/install/library/` is publicly served any more - the
+  theme picker's `preview.svg` was its one deliberate exception - so
+  `router.php` and both `.htaccess` rules deny the tree whole, with no carve-out
+  to get wrong.
 ## 1.1.0-beta — 2026-09-07
 
 Features. An installable package is one directory below `features/` with a

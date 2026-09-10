@@ -6,11 +6,11 @@
  *													unit the installer finds, see Setup::units() - and a
  *													native locale among the ones picked, and assemble them
  *													into the real project (routes, templates, text). See
- *													_admin/install/Install.php's Setup class. Themes (see
- *													themes.js) and pages (see webpages.js) have their own
- *													steps - this one only ever touches base + the picked
- *													module units. Driven by the shared Back/Next bar
- *													(script.js) rather than its own save button - apply() is
+ *													_admin/install/Install.php's Setup class. Pages have
+ *													their own step (see webpages.js) - this one only ever
+ *													touches base + the picked module units. Driven by the
+ *													shared Back/Next bar (script.js) rather than its own
+ *													save button - apply() is
  *													exposed for Next to call, not wired to a button here.
  *
  *	@package								Dape/Nino

@@ -67,14 +67,13 @@ vm.runInContext(
 
 const install = sandbox.Nino.install;
 
-/*	Frames before Design, because that is the direction the dependency runs: the
-	Design step previews a whole page inside the project's own header and footer,
-	so the frame decides its layout - a rail down the side is a different page
-	from a bar across the top. The frame steps only preview the frame itself,
-	whose structure the Design does not touch. Themes::apiApply() writes them in
-	this order for the same reason.	*/
+/*	The wizard installs a site, it does not style one. Since 1.2 the look is
+	the fixed theme base delivers - assets/theme.css, written by the base unit
+	along with the header and footer templates it is drawn against - so the four
+	steps that used to pick a theme, a header, a footer and a palette are gone
+	from the wizard, and the Design feature is where that choice comes back. */
 const stepKeys = install.STEPS.map( function( step ) { return step.key; } );
-check( 'Header and Footer are separate steps, and both come before Design', stepKeys.join(',') === 'checks,setup,themes,header,footer,design,webpages,personalinfos,accounts,finish' );
+check( 'the wizard is the six steps that install a site', stepKeys.join(',') === 'checks,setup,webpages,personalinfos,accounts,finish' );
 
 // The rail is read top to bottom, so it has to number the steps in the order
 // they actually run
@@ -82,23 +81,26 @@ const wizardNav = fs.readFileSync( path.join( __dirname, '../_admin/install/temp
 check( '...and the rail numbers them in that order', stepKeys.every( function( key, index ) {
 	return new RegExp( 'id="install-nav-'+ key+ '"[^>]*>'+ ( index + 1 )+ '\\.' ).test( wizardNav );
 } ) );
+check( '...and numbers nothing beyond them', ( wizardNav.match( /<span id="install-nav-/g ) || [] ).length === stepKeys.length );
 
-let frameCommit = [];
-install.header = { apply : function( callback ) { frameCommit.push('header'); callback( true ); } };
-install.footer = { apply : function( callback ) { frameCommit.push('footer'); callback( true ); } };
-install._commitStep( 'header', function() {} );
-install._commitStep( 'footer', function() {} );
-check( 'Next dispatches each new frame step to its own apply action', frameCommit.join(',') === 'header,footer' );
-
+/*	A step is a nav span, a content pane, a script tag and a _commitStep branch.
+	Removing one means removing all four: a leftover pane is dead markup the
+	pane-class switcher can never show, and a leftover branch dispatches to a
+	module the page no longer loads. */
 const wizardTemplate = fs.readFileSync( path.join( __dirname, '../_admin/install/templates/page-wizard.tpl' ), 'utf8' );
-check( 'the wizard template carries matching nav and content pairs for both tabs', wizardTemplate.includes('id="install-nav-header"')
-	&& wizardTemplate.includes('id="install-content-header"')
-	&& wizardTemplate.includes('id="install-nav-footer"')
-	&& wizardTemplate.includes('id="install-content-footer"')
-	&& wizardTemplate.includes('id="themes-frames"') === false );
-
-const installStyle = fs.readFileSync( path.join( __dirname, '../_admin/install/assets/style.css' ), 'utf8' );
-check( 'the isolated frame previews use the taller viewport', installStyle.includes('--frame-height: 36rem;') );
+const wizardScript 	= fs.readFileSync( path.join( __dirname, '../_admin/install/assets/script.js' ), 'utf8' );
+const installStyle 	= fs.readFileSync( path.join( __dirname, '../_admin/install/assets/style.css' ), 'utf8' );
+check( 'every step the rail names has its content pane', stepKeys.every( function( key ) {
+	return wizardTemplate.includes( 'id="install-content-'+ key+ '"' );
+} ) );
+check( '...and the four appearance steps left nothing of themselves behind', [ 'themes', 'header', 'footer', 'design' ].every( function( key ) {
+	return wizardTemplate.includes( 'install-nav-'+ key ) === false
+		&& wizardTemplate.includes( 'install-content-'+ key ) === false
+		&& wizardTemplate.includes( 'assets/'+ key+ '.js' ) === false
+		&& wizardScript.includes( "'"+ key+ "'" ) === false
+		&& installStyle.includes( 'show-'+ key ) === false;
+} ) );
+check( '...and neither did the theme lightbox', wizardTemplate.includes('themes-lightbox') === false && installStyle.includes('themes-lightbox') === false );
 
 install._setBusy( true );
 check( 'a pending commit disables both shared navigation buttons', elements['install-back'].disabled === true && elements['install-next'].disabled === true );

@@ -1177,9 +1177,9 @@ a {
 }
 
 /* --bar: a row of natural-width tabs above a pane, the way a panel with
-   several screens switches between them (see Panels::panesHtml()) and the
-   Design panel switches its four editors - a labelled underline on one rule,
-   not a row of filled buttons splitting the width between them */
+   several screens switches between them (see Panels::panesHtml()) - a
+   labelled underline on one rule, not a row of filled buttons splitting the
+   width between them */
 :where(.nino-admin) .nino-admin-tabs--bar {
 	gap: .25rem;
 	margin: 0 0 1.25rem;

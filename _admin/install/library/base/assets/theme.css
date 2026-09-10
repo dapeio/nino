@@ -1,0 +1,713 @@
+/*	Nino						A compact filesystembased php framework
+ *	theme.css				The look every Nino project starts from. Copied into the
+ *									project by the base install unit, first of the two
+ *									stylesheets in the css bundle - the project's own
+ *									assets/style.css comes after it and overrules it.
+ *
+ *									Four layers, in this order, and the order is the point:
+ *
+ *									  1. the design tokens - the whole --nino-* palette and
+ *									     raster, compiled once and frozen here
+ *									  2. the theme - which token goes in which role, plus the
+ *									     three webfaces (see the base manifest's `fonts`)
+ *									  3. the header frame - the css for theme.header.tpl
+ *									  4. the footer frame - the css for theme.footer.tpl
+ *
+ *									Up to Nino 1.1 the wizard asked four questions and wrote
+ *									this file from the answers. It does not any more: this is
+ *									one fixed look, edited by hand or replaced wholesale. The
+ *									Design feature is what compiles a stylesheet of its own
+ *									over it - the ten themes and thirteen frames that used to
+ *									be the wizard's choices are parked with it, see
+ *									https://github.com/dapeio/nino-features/tree/main/design-library
+ *
+ *	@package				Dape/Nino
+ *	@author					David Perchermeier <mail@dape.io>
+ *	@link						https://github.com/dapeio/nino
+ */
+
+/* ---- 1. the design tokens ---- */
+:root {
+	color-scheme: light dark;
+	--nino-default: #ffffff;
+	--nino-on-default: #0b0e10;
+	--nino-on-default-muted: #757778;
+	--nino-default-link: #387cab;
+	--nino-default-border: #949596;
+	--nino-default-focus: #469cd7;
+	--nino-default-hover: #f0f0f0;
+	--nino-default-active: #e0e0e0;
+	--nino-default-disabled: #aeaeaf;
+	--nino-default-shadow: rgb(15 23 42 / 12%);
+	--nino-alt: #eef4fa;
+	--nino-on-alt: #0b0e10;
+	--nino-on-alt-muted: #6e6f71;
+	--nino-alt-link: #3075a4;
+	--nino-alt-border: #8c8d8e;
+	--nino-alt-focus: #3c94cd;
+	--nino-alt-hover: #dfe5eb;
+	--nino-alt-active: #cfd5db;
+	--nino-alt-disabled: #a5a6a7;
+	--nino-alt-shadow: rgb(15 23 42 / 12%);
+	--nino-tint: #e3f3ff;
+	--nino-on-tint: #0b0e10;
+	--nino-on-tint-muted: #666f77;
+	--nino-tint-link: #2e73a2;
+	--nino-tint-border: #868c91;
+	--nino-tint-focus: #3b92cc;
+	--nino-tint-hover: #d4e4f0;
+	--nino-tint-active: #c4d4e0;
+	--nino-tint-disabled: #9fa4a9;
+	--nino-tint-shadow: rgb(15 23 42 / 12%);
+	--nino-dark: #2a2f32;
+	--nino-on-dark: #fcfcfc;
+	--nino-on-dark-muted: #939597;
+	--nino-dark-link: #589ccc;
+	--nino-dark-border: #757777;
+	--nino-dark-focus: #207db5;
+	--nino-dark-hover: #383d40;
+	--nino-dark-active: #484d50;
+	--nino-dark-disabled: #616262;
+	--nino-dark-shadow: rgb(15 23 42 / 12%);
+	--nino-black: #0e1216;
+	--nino-on-black: #fcfcfc;
+	--nino-on-black-muted: #7b7c7e;
+	--nino-black-link: #3d82b1;
+	--nino-black-border: #5f6161;
+	--nino-black-focus: #00669a;
+	--nino-black-hover: #1a1f23;
+	--nino-black-active: #292d32;
+	--nino-black-disabled: #4c4d4d;
+	--nino-black-shadow: rgb(15 23 42 / 12%);
+	--nino-brand: #4faae8;
+	--nino-on-brand: #0b0e10;
+	--nino-on-brand-muted: #273b4b;
+	--nino-brand-link: #003d5f;
+	--nino-brand-border: #475560;
+	--nino-brand-focus: #005887;
+	--nino-brand-hover: #409cd9;
+	--nino-brand-active: #2d8cc9;
+	--nino-brand-disabled: #5e6972;
+	--nino-brand-shadow: rgb(15 23 42 / 12%);
+	--nino-brand-safe: #147bb7;
+	--nino-on-brand-safe: #fcfcfc;
+	--nino-on-brand-safe-muted: #fcfcfc;
+	--nino-brand-safe-link: #f9fdff;
+	--nino-brand-safe-border: #c2d3df;
+	--nino-brand-safe-focus: #a1d7ff;
+	--nino-brand-safe-hover: #2d8cc9;
+	--nino-brand-safe-active: #439fdd;
+	--nino-brand-safe-disabled: #a9b5be;
+	--nino-brand-safe-shadow: rgb(15 23 42 / 12%);
+	--nino-accent: #4faae8;
+	--nino-on-accent: #0b0e10;
+	--nino-on-accent-muted: #273b4b;
+	--nino-accent-link: #003d5f;
+	--nino-accent-border: #475560;
+	--nino-accent-focus: #005887;
+	--nino-accent-hover: #409cd9;
+	--nino-accent-active: #2d8cc9;
+	--nino-accent-disabled: #5e6972;
+	--nino-accent-shadow: rgb(15 23 42 / 12%);
+	--nino-accent-safe: #147bb7;
+	--nino-on-accent-safe: #fcfcfc;
+	--nino-on-accent-safe-muted: #fcfcfc;
+	--nino-accent-safe-link: #f9fdff;
+	--nino-accent-safe-border: #c2d3df;
+	--nino-accent-safe-focus: #a1d7ff;
+	--nino-accent-safe-hover: #2d8cc9;
+	--nino-accent-safe-active: #439fdd;
+	--nino-accent-safe-disabled: #a9b5be;
+	--nino-accent-safe-shadow: rgb(15 23 42 / 12%);
+	--nino-success: #438061;
+	--nino-on-success: #fcfcfc;
+	--nino-on-success-muted: #eefff5;
+	--nino-success-link: #eefff5;
+	--nino-success-border: #c7d2cb;
+	--nino-success-focus: #7ee3b0;
+	--nino-success-hover: #549171;
+	--nino-success-active: #66a383;
+	--nino-success-disabled: #acb4af;
+	--nino-success-shadow: rgb(15 23 42 / 12%);
+	--nino-warning: #986d00;
+	--nino-on-warning: #fcfcfc;
+	--nino-on-warning-muted: #fffbf4;
+	--nino-warning-link: #fffbf4;
+	--nino-warning-border: #d9cfbd;
+	--nino-warning-focus: #fcc863;
+	--nino-warning-hover: #a97d21;
+	--nino-warning-active: #bc9038;
+	--nino-warning-disabled: #b9b2a5;
+	--nino-warning-shadow: rgb(15 23 42 / 12%);
+	--nino-danger: #cf4438;
+	--nino-on-danger: #fcfcfc;
+	--nino-on-danger-muted: #fffbfa;
+	--nino-danger-link: #fffbfa;
+	--nino-danger-border: #e8cac5;
+	--nino-danger-focus: #ffc2b8;
+	--nino-danger-hover: #e35648;
+	--nino-danger-active: #f86a5b;
+	--nino-danger-disabled: #c4aeaa;
+	--nino-danger-shadow: rgb(15 23 42 / 12%);
+	--nino-scrim: rgb(14 18 22 / 67%);
+	--nino-base-size: 16px;
+	--nino-line-height: 1.5;
+	--nino-measure: 120rem;
+	--nino-text-1: 1rem;
+	--nino-text-2: 1.125rem;
+	--nino-text-3: 1.25rem;
+	--nino-text-4: 1.5rem;
+	--nino-text-5: 1.8rem;
+	--nino-text-6: 2.5rem;
+	--nino-space-1: 0.5rem;
+	--nino-space-2: 1rem;
+	--nino-space-3: 2rem;
+	--nino-space-4: 3rem;
+	--nino-space-5: 5rem;
+	--nino-space-6: 8rem;
+	--nino-radius-1: 0.1rem;
+	--nino-radius-2: 0.2rem;
+	--nino-radius-3: 0.4rem;
+	--nino-radius-full: 999rem;
+}
+
+@media (min-width: 768px) {
+	:root {
+		--nino-base-size: 18px;
+		--nino-text-4: 1.6rem;
+		--nino-text-5: 2rem;
+		--nino-text-6: 3rem;
+	}
+}
+
+@media (prefers-color-scheme: dark) {
+	:root:not([data-nino-mode="light"]) {
+		--nino-default: #101418;
+		--nino-on-default: #fcfcfc;
+		--nino-on-default-muted: #7c7e7f;
+		--nino-default-link: #3f83b3;
+		--nino-default-border: #606262;
+		--nino-default-focus: #00679b;
+		--nino-default-hover: #1c2125;
+		--nino-default-active: #2b2f34;
+		--nino-default-disabled: #4d4e4e;
+		--nino-default-shadow: rgb(0 0 0 / 55%);
+		--nino-alt: #1a1f22;
+		--nino-on-alt: #fcfcfc;
+		--nino-on-alt-muted: #848587;
+		--nino-alt-link: #478cbb;
+		--nino-alt-border: #676969;
+		--nino-alt-focus: #046fa6;
+		--nino-alt-hover: #272c2f;
+		--nino-alt-active: #363c3f;
+		--nino-alt-disabled: #545555;
+		--nino-alt-shadow: rgb(0 0 0 / 55%);
+		--nino-tint: #04253b;
+		--nino-on-tint: #fcfcfc;
+		--nino-on-tint-muted: #818b92;
+		--nino-tint-link: #4c90bf;
+		--nino-tint-border: #676d72;
+		--nino-tint-focus: #0d72aa;
+		--nino-tint-hover: #13334a;
+		--nino-tint-active: #23435b;
+		--nino-tint-disabled: #54595c;
+		--nino-tint-shadow: rgb(0 0 0 / 55%);
+		--nino-dark: #2a2f32;
+		--nino-on-dark: #fcfcfc;
+		--nino-on-dark-muted: #939597;
+		--nino-dark-link: #589ccc;
+		--nino-dark-border: #757777;
+		--nino-dark-focus: #207db5;
+		--nino-dark-hover: #383d40;
+		--nino-dark-active: #484d50;
+		--nino-dark-disabled: #616262;
+		--nino-dark-shadow: rgb(0 0 0 / 55%);
+		--nino-black: #05080b;
+		--nino-on-black: #fcfcfc;
+		--nino-on-black-muted: #767879;
+		--nino-black-link: #397eac;
+		--nino-black-border: #5b5d5d;
+		--nino-black-focus: #006294;
+		--nino-black-hover: #0f1417;
+		--nino-black-active: #1d2225;
+		--nino-black-disabled: #484949;
+		--nino-black-shadow: rgb(0 0 0 / 55%);
+		--nino-brand: #4faae8;
+		--nino-on-brand: #0b0e10;
+		--nino-on-brand-muted: #273b4b;
+		--nino-brand-link: #003d5f;
+		--nino-brand-border: #475560;
+		--nino-brand-focus: #005887;
+		--nino-brand-hover: #409cd9;
+		--nino-brand-active: #2d8cc9;
+		--nino-brand-disabled: #5e6972;
+		--nino-brand-shadow: rgb(0 0 0 / 55%);
+		--nino-brand-safe: #1d81bc;
+		--nino-on-brand-safe: #0b0e10;
+		--nino-on-brand-safe-muted: #00101d;
+		--nino-brand-safe-link: #00101e;
+		--nino-brand-safe-border: #26333d;
+		--nino-brand-safe-focus: #003554;
+		--nino-brand-safe-hover: #0073ad;
+		--nino-brand-safe-active: #006498;
+		--nino-brand-safe-disabled: #3d474f;
+		--nino-brand-safe-shadow: rgb(0 0 0 / 55%);
+		--nino-accent: #4faae8;
+		--nino-on-accent: #0b0e10;
+		--nino-on-accent-muted: #273b4b;
+		--nino-accent-link: #003d5f;
+		--nino-accent-border: #475560;
+		--nino-accent-focus: #005887;
+		--nino-accent-hover: #409cd9;
+		--nino-accent-active: #2d8cc9;
+		--nino-accent-disabled: #5e6972;
+		--nino-accent-shadow: rgb(0 0 0 / 55%);
+		--nino-accent-safe: #1d81bc;
+		--nino-on-accent-safe: #0b0e10;
+		--nino-on-accent-safe-muted: #00101d;
+		--nino-accent-safe-link: #00101e;
+		--nino-accent-safe-border: #26333d;
+		--nino-accent-safe-focus: #003554;
+		--nino-accent-safe-hover: #0073ad;
+		--nino-accent-safe-active: #006498;
+		--nino-accent-safe-disabled: #3d474f;
+		--nino-accent-safe-shadow: rgb(0 0 0 / 55%);
+		--nino-success: #488666;
+		--nino-on-success: #0b0e0c;
+		--nino-on-success-muted: #04100a;
+		--nino-success-link: #001107;
+		--nino-success-border: #2a332e;
+		--nino-success-focus: #003923;
+		--nino-success-hover: #3a7959;
+		--nino-success-active: #2b6a4c;
+		--nino-success-disabled: #404743;
+		--nino-success-shadow: rgb(0 0 0 / 55%);
+		--nino-warning: #b38100;
+		--nino-on-warning: #0f0d0a;
+		--nino-on-warning-muted: #2d220b;
+		--nino-warning-link: #312000;
+		--nino-warning-border: #473e30;
+		--nino-warning-focus: #553b00;
+		--nino-warning-hover: #a27400;
+		--nino-warning-active: #906700;
+		--nino-warning-disabled: #595347;
+		--nino-warning-shadow: rgb(0 0 0 / 55%);
+		--nino-danger: #d54a3d;
+		--nino-on-danger: #100c0c;
+		--nino-on-danger-muted: #210403;
+		--nino-danger-link: #260000;
+		--nino-danger-border: #432b28;
+		--nino-danger-focus: #6a0001;
+		--nino-danger-hover: #c53b2f;
+		--nino-danger-active: #b42820;
+		--nino-danger-disabled: #54413f;
+		--nino-danger-shadow: rgb(0 0 0 / 55%);
+		--nino-scrim: rgb(5 8 11 / 64%);
+	}
+}
+
+:root[data-nino-mode="dark"] {
+	--nino-default: #101418;
+	--nino-on-default: #fcfcfc;
+	--nino-on-default-muted: #7c7e7f;
+	--nino-default-link: #3f83b3;
+	--nino-default-border: #606262;
+	--nino-default-focus: #00679b;
+	--nino-default-hover: #1c2125;
+	--nino-default-active: #2b2f34;
+	--nino-default-disabled: #4d4e4e;
+	--nino-default-shadow: rgb(0 0 0 / 55%);
+	--nino-alt: #1a1f22;
+	--nino-on-alt: #fcfcfc;
+	--nino-on-alt-muted: #848587;
+	--nino-alt-link: #478cbb;
+	--nino-alt-border: #676969;
+	--nino-alt-focus: #046fa6;
+	--nino-alt-hover: #272c2f;
+	--nino-alt-active: #363c3f;
+	--nino-alt-disabled: #545555;
+	--nino-alt-shadow: rgb(0 0 0 / 55%);
+	--nino-tint: #04253b;
+	--nino-on-tint: #fcfcfc;
+	--nino-on-tint-muted: #818b92;
+	--nino-tint-link: #4c90bf;
+	--nino-tint-border: #676d72;
+	--nino-tint-focus: #0d72aa;
+	--nino-tint-hover: #13334a;
+	--nino-tint-active: #23435b;
+	--nino-tint-disabled: #54595c;
+	--nino-tint-shadow: rgb(0 0 0 / 55%);
+	--nino-dark: #2a2f32;
+	--nino-on-dark: #fcfcfc;
+	--nino-on-dark-muted: #939597;
+	--nino-dark-link: #589ccc;
+	--nino-dark-border: #757777;
+	--nino-dark-focus: #207db5;
+	--nino-dark-hover: #383d40;
+	--nino-dark-active: #484d50;
+	--nino-dark-disabled: #616262;
+	--nino-dark-shadow: rgb(0 0 0 / 55%);
+	--nino-black: #05080b;
+	--nino-on-black: #fcfcfc;
+	--nino-on-black-muted: #767879;
+	--nino-black-link: #397eac;
+	--nino-black-border: #5b5d5d;
+	--nino-black-focus: #006294;
+	--nino-black-hover: #0f1417;
+	--nino-black-active: #1d2225;
+	--nino-black-disabled: #484949;
+	--nino-black-shadow: rgb(0 0 0 / 55%);
+	--nino-brand: #4faae8;
+	--nino-on-brand: #0b0e10;
+	--nino-on-brand-muted: #273b4b;
+	--nino-brand-link: #003d5f;
+	--nino-brand-border: #475560;
+	--nino-brand-focus: #005887;
+	--nino-brand-hover: #409cd9;
+	--nino-brand-active: #2d8cc9;
+	--nino-brand-disabled: #5e6972;
+	--nino-brand-shadow: rgb(0 0 0 / 55%);
+	--nino-brand-safe: #1d81bc;
+	--nino-on-brand-safe: #0b0e10;
+	--nino-on-brand-safe-muted: #00101d;
+	--nino-brand-safe-link: #00101e;
+	--nino-brand-safe-border: #26333d;
+	--nino-brand-safe-focus: #003554;
+	--nino-brand-safe-hover: #0073ad;
+	--nino-brand-safe-active: #006498;
+	--nino-brand-safe-disabled: #3d474f;
+	--nino-brand-safe-shadow: rgb(0 0 0 / 55%);
+	--nino-accent: #4faae8;
+	--nino-on-accent: #0b0e10;
+	--nino-on-accent-muted: #273b4b;
+	--nino-accent-link: #003d5f;
+	--nino-accent-border: #475560;
+	--nino-accent-focus: #005887;
+	--nino-accent-hover: #409cd9;
+	--nino-accent-active: #2d8cc9;
+	--nino-accent-disabled: #5e6972;
+	--nino-accent-shadow: rgb(0 0 0 / 55%);
+	--nino-accent-safe: #1d81bc;
+	--nino-on-accent-safe: #0b0e10;
+	--nino-on-accent-safe-muted: #00101d;
+	--nino-accent-safe-link: #00101e;
+	--nino-accent-safe-border: #26333d;
+	--nino-accent-safe-focus: #003554;
+	--nino-accent-safe-hover: #0073ad;
+	--nino-accent-safe-active: #006498;
+	--nino-accent-safe-disabled: #3d474f;
+	--nino-accent-safe-shadow: rgb(0 0 0 / 55%);
+	--nino-success: #488666;
+	--nino-on-success: #0b0e0c;
+	--nino-on-success-muted: #04100a;
+	--nino-success-link: #001107;
+	--nino-success-border: #2a332e;
+	--nino-success-focus: #003923;
+	--nino-success-hover: #3a7959;
+	--nino-success-active: #2b6a4c;
+	--nino-success-disabled: #404743;
+	--nino-success-shadow: rgb(0 0 0 / 55%);
+	--nino-warning: #b38100;
+	--nino-on-warning: #0f0d0a;
+	--nino-on-warning-muted: #2d220b;
+	--nino-warning-link: #312000;
+	--nino-warning-border: #473e30;
+	--nino-warning-focus: #553b00;
+	--nino-warning-hover: #a27400;
+	--nino-warning-active: #906700;
+	--nino-warning-disabled: #595347;
+	--nino-warning-shadow: rgb(0 0 0 / 55%);
+	--nino-danger: #d54a3d;
+	--nino-on-danger: #100c0c;
+	--nino-on-danger-muted: #210403;
+	--nino-danger-link: #260000;
+	--nino-danger-border: #432b28;
+	--nino-danger-focus: #6a0001;
+	--nino-danger-hover: #c53b2f;
+	--nino-danger-active: #b42820;
+	--nino-danger-disabled: #54413f;
+	--nino-danger-shadow: rgb(0 0 0 / 55%);
+	--nino-scrim: rgb(5 8 11 / 64%);
+}
+
+/* ---- 2. the theme - which token goes in which role ---- */
+@font-face {
+	font-family: 'Text';
+	font-style: normal;
+	font-weight: normal;
+	font-display: swap;
+	src: local('Text Regular'), url('[[/nino/public]]/fonts/source-sans-3-regular.woff2') format('woff2');
+}
+@font-face {
+	font-family: 'Text';
+	font-style: normal;
+	font-weight: bold;
+	font-display: swap;
+	src: local('Text Bold'), url('[[/nino/public]]/fonts/source-sans-3-bold.woff2') format('woff2');
+}
+@font-face {
+	font-family: 'Title';
+	font-style: normal;
+	font-weight: bold;
+	font-display: swap;
+	src: local('Title Bold'), url('[[/nino/public]]/fonts/league-spartan.woff2') format('woff2');
+}
+
+/*	Basis.
+
+	The neutral starting point - a plain white page, one blue accent, and
+	every size straight off the framework scale. The look to pick when the
+	content should do the talking.
+
+	Colours here are assignments, never values. /_design generates the --nino-*
+	tokens this file reads (assets/style.design.css, loaded immediately before
+	it) and measures every background/text pair it publishes; what this unit
+	decides is which surface each role sits on. Recolouring the site is
+	therefore a /_design save and nothing below has to change.
+
+	Three rules follow. Never write a literal colour into a role - a hex here
+	is a pair /_design cannot vouch for. Never pair across surfaces, because
+	--color-section-alt-text belongs to --nino-on-alt and to nothing else. And
+	never put text on --nino-brand or --nino-accent: those are the two brand
+	colours exactly as they were picked, so they are the surfaces with no
+	contrast promise attached - --nino-brand-safe and --nino-accent-safe are the
+	same two colours made safe, and those are what carry ink.	*/
+:root {
+
+	/* Brand. Four roles from two questions - is it the first brand colour or the
+	   second, and is it the one that was picked or the one text survives on.
+	   --color-secondary is the primary exactly as it was picked and is only ever
+	   shown; --color-primary is that same colour with its lightness solved until
+	   the text on it clears the contrast target, and is what every button and
+	   filled surface uses. --color-brand-alt is the second colour playing the
+	   same part as --color-primary: filled with, written on, and safe.
+
+	   The palette used to publish one safe surface for whichever of the two
+	   colours had been settled on, so setting a Secondary quietly moved every
+	   button onto it and left no contrast-safe brand anywhere. Naming both is
+	   what lets a look use two colours instead of choosing between them. */
+	--color-primary: var(--nino-brand-safe);
+	--color-primary-text: var(--nino-on-brand-safe);
+	--color-secondary: var(--nino-brand);
+	--color-brand-alt: var(--nino-accent-safe);
+	--color-brand-alt-text: var(--nino-on-accent-safe);
+
+	/* ...and the brand as ink, which is a third value again: --color-primary
+	   is solved so text survives *on* it, and says nothing about what it does
+	   written on a page surface. Every ground gets the one /_design solved for
+	   it, so a price, a stat, an outline button or an info alert clears the
+	   text target wherever it lands */
+	--color-accent-default: var(--nino-default-link);
+	--color-accent-alt: var(--nino-alt-link);
+	--color-accent-tint: var(--nino-tint-link);
+	--color-accent-dark: var(--nino-dark-link);
+	--color-accent-black: var(--nino-black-link);
+
+
+	/* ...and the focus ring, which is the same role again with a different
+	   target: 3:1 rather than 4.5, per WCAG 2.2 SC 1.4.11. Each ground takes
+	   the ring solved for the surface it actually paints - the line above it
+	   names that surface, and a ring solved against a different one is the
+	   cross-surface pairing this whole split exists to prevent */
+	--color-focus-default: var(--nino-default-focus);
+	--color-focus-alt: var(--nino-alt-focus);
+	--color-focus-tint: var(--nino-tint-focus);
+	--color-focus-dark: var(--nino-dark-focus);
+	--color-focus-black: var(--nino-black-focus);
+
+	/* The one role that is meant to fail the text target - see Nino.css.
+	   Solved against the page ground, which is where a form sits */
+	--color-disabled: var(--nino-default-disabled);
+
+	/* Page ground */
+	--color-background: var(--nino-default);
+	--color-text: var(--nino-on-default);
+	--color-title: var(--nino-default-link);
+	--color-subtitle: var(--nino-on-default-muted);
+	--color-border: var(--nino-default-border);
+	--color-header-bg: var(--nino-default);
+
+	/* The scrim over a cover image. /_design solves it against the worst
+	   photograph it could be asked to cover - a white one - so this is the
+	   lightest scrim that still carries the ink on top of it, and the most
+	   of the picture a look can show. A theme may darken it for mood; it
+	   must not lighten it. */
+	--color-background-dim: var(--nino-scrim);
+
+	/* Footer bands */
+	--color-footer-bg-main: var(--nino-black);
+	--color-footer-text-main: var(--nino-on-black-muted);
+	--color-footer-bg-legal: var(--nino-black);
+	--color-footer-text-legal: var(--nino-on-black-muted);
+	--color-footer-text: var(--nino-on-black-muted);
+
+	/* Sections - the four grounds a page alternates between */
+	--color-section-default-bg: var(--nino-default);
+	--color-section-default-text: var(--nino-on-default);
+	--color-section-alt-bg: var(--nino-alt);
+	--color-section-alt-text: var(--nino-on-alt);
+	/*	The fifth ground: the page with the brand in it rather than a near-grey
+		step away from it. Quiet enough to read a whole section on, coloured
+		enough to read as chosen. */
+	--color-section-tint-bg: var(--nino-tint);
+	--color-section-tint-text: var(--nino-on-tint);
+	--color-section-dark-bg: var(--nino-dark);
+	--color-section-dark-text: var(--nino-on-dark);
+	--color-section-black-bg: var(--nino-black);
+	--color-section-black-text: var(--nino-on-black);
+
+	/* Code */
+	--color-code-bg: var(--nino-black);
+	--color-code-text: var(--nino-on-black);
+	--color-code-border: var(--nino-black-border);
+
+	/* Status - each one is a surface with its own ink, never the brand's */
+	--color-error: var(--nino-danger);
+	--color-error-text: var(--nino-on-danger);
+	--color-success: var(--nino-success);
+	--color-success-text: var(--nino-on-success);
+	--color-warning: var(--nino-warning);
+	--color-warning-text: var(--nino-on-warning);
+
+	/* Typefaces are the one thing a theme cannot be handed: a webfont is a
+	   file this unit ships, not a value anything can generate */
+	--fontfamily-text: 'Text', system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+	--fontfamily-title: 'Title', system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+	--fontfamily-subtitle: 'Text', system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+	--fontsize-small: .75em;
+	--fontsize-big: 1.25em;
+	--fontsize-btn: 1rem;
+
+	/* Sizes are assignments too. The raster comes from /_design's Volume,
+	   Spacing and Shaping steps - this unit declares 'default/default/default' in
+	   its manifest, which is what a hand-tuned block here used to spell out one
+	   number at a time. The wide-screen half of the type scale is the raster's
+	   own media query; there is nothing to repeat for it here */
+	--base-size: var(--nino-base-size);
+	--line-height: var(--nino-line-height);
+
+	--text-1: var(--nino-text-1);
+	--text-2: var(--nino-text-2);
+	--text-3: var(--nino-text-3);
+	--text-4: var(--nino-text-4);
+	--text-5: var(--nino-text-5);
+	--text-6: var(--nino-text-6);
+
+	--space-1: var(--nino-space-1);
+	--space-2: var(--nino-space-2);
+	--space-3: var(--nino-space-3);
+	--space-4: var(--nino-space-4);
+	--space-5: var(--nino-space-5);
+	--space-6: var(--nino-space-6);
+
+	--radius: var(--nino-radius-2);
+	--radius-small: var(--nino-radius-1);
+	--radius-large: var(--nino-radius-3);
+
+	/*	The reference unit. Every size below is the framework's own value,
+	reached through the raster rather than restated - with the manifest's
+	default knobs this stylesheet reproduces Nino.css exactly, which is the
+	guarantee the whole design layer rests on: switching it on must not move
+	a project that has not asked for anything.	*/
+	--article-img-max-width: 12vw;
+	--article-img-max-height: 20vh;
+	--grid-max-width: var(--nino-measure);
+}
+
+
+/*	Everything below styles the two frame templates the base unit delivers
+	beside this file - theme.header.tpl and theme.footer.tpl. Replacing a
+	frame means replacing its template and this section together: neither
+	half is any use without the other.	*/
+
+/* ---- 3. the header frame ---- */
+.nino-frame-header {
+	border-bottom: 1px solid var(--color-border);
+}
+
+.nino-frame-header .nino-scroll-header {
+	min-height: 5rem;
+	opacity: 1;
+	background-color: var(--color-background);
+	display:flex;
+}
+
+body.nino-scroll-atf .nino-frame-header .nino-scroll-header {
+	background-color: var(--color-background);
+}
+
+.nino-frame-header .nino-logo {
+	width: clamp(7.5rem, 10vw, 10rem);
+	height: auto;
+	min-width: 0;
+	min-height: 0;
+	margin: 0;
+	background-image: none;
+}
+
+.nino-frame-header .nino-frame-header-nav {
+	margin-left: auto;
+}
+
+.nino-frame-header .nino-nav-burger > label > svg {
+	fill: var(--color-title);
+}
+
+
+body main {
+	padding-top: clamp(5rem, var(--space-6), 8rem);
+}
+
+body main:has(> .nino-cover:first-child),
+body main:has(> .nino-parallex:first-child) {
+	padding-top: 0;
+}
+
+@media (min-width: 768px) {
+	.nino-frame-header .nino-nav-content li a {
+		position: relative;
+		padding: .5rem 0;
+		font-size: .9rem;
+		letter-spacing: .04em;
+	}
+
+	.nino-frame-header .nino-nav-content li a::after {
+		content: "";
+		position: absolute;
+		left: 0;
+		bottom: 0;
+		width: 100%;
+		height: 2px;
+		background-color: var(--color-secondary);
+		transform: scaleX(0);
+		transform-origin: right;
+		transition: transform .2s ease;
+	}
+
+	.nino-frame-header .nino-nav-content li a:hover::after,
+	.nino-frame-header .nino-nav-content li a:focus::after,
+	.nino-frame-header .nino-nav-content li a.nino-is-active::after {
+		transform: scaleX(1);
+		transform-origin: left;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.nino-frame-header .nino-nav-content li a::after {
+		transition: none;
+	}
+}
+
+/* ---- 4. the footer frame ---- */
+.nino-footer-nav .nino-footer-title {
+	display:none;
+}
+.nino-footer-nav {
+	display:flex;
+	gap:var(--space-3);
+	align-items: center;
+}
+.nino-footer-copyright {
+	display:flex;
+	align-items: center;
+}

@@ -1339,7 +1339,7 @@
 	<div class="nino-grid-row nino-grid-row--wide">
 		<div class="nino-grid-100 nino-mb-2">
 			<h3 class="nino-section-title nino-text-left" id="abstaende-title">Spacing</h3>
-			<p class="nino-section-subtitle nino-text-left">Seven levels per direction, derived from the Design panel's grid: 0 resets, 1 through 6 follow the spacing scale.</p>
+			<p class="nino-section-subtitle nino-text-left">Seven levels per direction, derived from the theme's grid: 0 resets, 1 through 6 follow the spacing scale.</p>
 		</div>
 		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left nino-mb-3"><span class="nino-badge nino-badge--pill">.nino-m-0 … -6</span> <span class="nino-badge nino-badge--pill">.nino-mt-*</span> <span class="nino-badge nino-badge--pill">.nino-mr-*</span> <span class="nino-badge nino-badge--pill">.nino-mb-*</span> <span class="nino-badge nino-badge--pill">.nino-ml-*</span> <span class="nino-badge nino-badge--pill">.nino-p-*</span> <span class="nino-badge nino-badge--pill">.nino-pt-*</span> <span class="nino-badge nino-badge--pill">.nino-pr-*</span> <span class="nino-badge nino-badge--pill">.nino-pb-*</span> <span class="nino-badge nino-badge--pill">.nino-pl-*</span> <span class="nino-badge nino-badge--pill">.nino-mx-auto</span></div>
 		<div class="nino-grid-100 nino-mb-3">

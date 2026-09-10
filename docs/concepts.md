@@ -7,7 +7,7 @@
 This manual explains the architecture of Nino and the interaction of configuration, data, templates, and modules. If you instead want to set up a website directly, start with [Getting Started](getting-started.md); concrete APIs and implementation details are in the [Developer Manual](development.md).
 
 **Additional Links:**
-[README](../README.md) · [Concepts](concepts.md) · [Developer Manual](development.md) · [Recipes](recipes/README.md) · [Getting Started](getting-started.md) · [Setup Wizard](setup.md) · [`/_admin` Workbench](_admin.md) · [Design Panel](appearance.md) · [Features](features.md) · [Deployment](deployment.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
+[README](../README.md) · [Concepts](concepts.md) · [Developer Manual](development.md) · [Recipes](recipes/README.md) · [Getting Started](getting-started.md) · [Setup Wizard](setup.md) · [`/_admin` Workbench](_admin.md) · [Features](features.md) · [Deployment](deployment.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
 
 ## Core Pillars
 
@@ -162,7 +162,7 @@ no second hook or plugin system is introduced.
 
 A module reaches a project in one of three shapes. A **kernel module** ships in
 `_nino/Nino/Modules/` - the always-on ones and the optional ones (form,
-navigation, language selection, the Design panel) a project
+navigation, language selection, the maintenance switch) a project
 switches on or off in `/nino/modules`. A **feature** is an installable package:
 one directory below `features/` with a `feature.php` manifest, copied in from
 the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features) -
@@ -178,7 +178,7 @@ One management interface with one login. It has its own entry point (`_admin/ind
 | Group | Panels | Responsibility |
 |---|---|---|
 | Content | Dashboard, Elements (with Element Types), Text (with Text Keys), Images (with Image Slots), Submissions, Log | daily maintenance of content, images and operational data; the tabs in brackets hold the shape of that content and are the developer's |
-| Structure | [Design](appearance.md), Routes, Navigations | the project's structure: the appearance, routes and menus |
+| Structure | Routes, Navigations | the project's structure: its routes and menus |
 | Features | whatever the active features bring | one group for every installed feature's panel, whatever group its own `nav()` names; no heading while nothing is in it |
 | System | Users (with User roles and Login protection), Language (with Translations), Backups, Config, Features | accounts and roles, languages and the translation hand-off, restore, technical configuration, installed features |
 
@@ -196,13 +196,12 @@ An account holds a role, a role a set of permissions, one per panel or tab; the 
 | Output dynamic list | element query or shortcode with callback |
 | Add technical function | project-specific module |
 | Add a packaged function - a newsletter, a search | a feature from the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features), copied into `features/` and switched on in the Features panel |
-| Change Theme, Design, Header, or Footer | the Design panel; stylesheets for project-specific overrides beyond the catalogue |
+| Change the look | `assets/theme.css` and `assets/style.css` in the project; the catalogue the wizard used to offer is parked for the Design feature |
 
 ## Next Steps
 
 - [Getting Started](getting-started.md) guides through the necessary initial setup.
 - [`/_admin` Workbench](_admin.md) explains every panel, the roles and the recovery page.
 - The **Template Builder** - page templates composed from whole sections - is a feature from the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features); its [manual](https://github.com/dapeio/nino-features/blob/main/features/Templates/docs/templates.md) is there too.
-- [Design Panel](appearance.md) explains the four appearance editors.
 - [Features](features.md) explains installable features and their manifest.
 - [Deployment](deployment.md) describes the path from the local website to secure operation.

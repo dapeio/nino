@@ -33,8 +33,8 @@ namespace Nino\Modules\Config {
 	 *												Navigations panel, and '/nino/html/assets'
 	 *												is a build concern - its order is load-bearing for the css
 	 *												cascade, which a json textarea shows nobody, so it stays a
-	 *												deliberate config.php edit (or the Design panel's Theme
-	 *												step) rather than a field that looks safe to change.
+	 *												deliberate config.php edit rather than a field that
+	 *												looks safe to change.
 	 *
 	 *												'/nino/html/images' and '/nino/auth/user' were never part of
 	 *												this either, for the same reason: both get their own richer

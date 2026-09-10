@@ -4,10 +4,10 @@
 
 **Stand:** 7. September 2026 · **Nino-Version:** 1.0.0-beta
 
-Dieses Handbuch erklärt die eine Verwaltungsoberfläche eines Nino-Projekts: `/_admin`, die Workbench. Entwickler richten das Projekt hier ein und bauen Struktur und Erscheinungsbild; Redakteure pflegen hier die Inhalte. Was ein Konto sieht, bestimmen seine Rechte. Der Assistent, der aus einem frischen Checkout ein Projekt macht, ist der Erststart-Modus der Workbench und hat eine eigene Referenz, den [Einrichtungsassistenten](setup.de.md); das Panel [Design](appearance.de.md) ebenfalls, und der [Template-Baukasten](https://github.com/dapeio/nino-features/blob/main/features/Templates/docs/templates.de.md) auch – der allerdings ist ein Feature aus dem Katalog und nicht Teil von Nino.
+Dieses Handbuch erklärt die eine Verwaltungsoberfläche eines Nino-Projekts: `/_admin`, die Workbench. Entwickler richten das Projekt hier ein und bauen Struktur und Erscheinungsbild; Redakteure pflegen hier die Inhalte. Was ein Konto sieht, bestimmen seine Rechte. Der Assistent, der aus einem frischen Checkout ein Projekt macht, ist der Erststart-Modus der Workbench und hat eine eigene Referenz, den [Einrichtungsassistenten](setup.de.md); der [Template-Baukasten](https://github.com/dapeio/nino-features/blob/main/features/Templates/docs/templates.de.md) ebenfalls – der allerdings ist ein Feature aus dem Katalog und nicht Teil von Nino.
 
 **Weitere Links:**
-[README](../README.de.md) · [Grundkonzepte](concepts.de.md) · [Entwickler-Handbuch](development.de.md) · [Rezepte](recipes/README.md) · [Erste Schritte](getting-started.de.md) · [Einrichtungsassistent](setup.de.md) · [`/_admin`-Workbench](_admin.de.md) · [Design-Panel](appearance.de.md) · [Features](features.de.md) · [Deployment](deployment.de.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
+[README](../README.de.md) · [Grundkonzepte](concepts.de.md) · [Entwickler-Handbuch](development.de.md) · [Rezepte](recipes/README.md) · [Erste Schritte](getting-started.de.md) · [Einrichtungsassistent](setup.de.md) · [`/_admin`-Workbench](_admin.de.md) · [Features](features.de.md) · [Deployment](deployment.de.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
 
 **Sicherheitshinweis:** Jedes Panel schreibt unmittelbar in Konfiguration und Projektdateien. Ein Entwicklerkonto kann Routing, Datenmodelle, Templates und die sichtbare Webseite verändern, ein Redaktionskonto die Inhalte. Arbeite mit einem aktuellen Git-Stand oder einer anderen verlässlichen Sicherung, ausschließlich über HTTPS, und gib jedem Konto genau die Rolle, die es braucht.
 
@@ -18,15 +18,15 @@ Ein Login, eine Navigation, jeder Bildschirm ein Panel. Die Panels sind danach g
 | Gruppe | Panels | Wer |
 |---|---|---|
 | **Inhalt** | Dashboard, Elemente (Elementtypen), Texte (Textschlüssel), Bilder (Bildplätze), Anfragen, Log | Redakteure und Entwickler |
-| **Struktur** | Design, Routen, Navigationen | Entwickler |
+| **Struktur** | Routen, Navigationen | Entwickler |
 | **Features** | was die aktiven Features mitbringen | wer die eigene Berechtigung des Feature-Panels hält |
 | **System** | Nutzer (Nutzerrollen, Anmeldeschutz), Sprache (Übersetzungen), Backups, Konfiguration, Features | Entwickler – und jedes Konto für sein eigenes Profil unter Nutzer |
 
 Ein Bildschirm in Klammern ist ein **Tab** des Panels davor: Das Panel Elemente öffnet auf den Einträgen und trägt Elementtypen als zweiten Tab, sodass die Form der Inhalte direkt neben den Inhalten liegt. Ein Tab ist ein eigener Bildschirm – mit eigener Berechtigung, sodass ein Redakteur Elemente ohne Elementtypen sieht, und eigenem tiefen Link, `#types`.
 
-Anfragen und Navigationen gehören zu optionalen Kernel-Modulen und sind vorhanden, solange ihr Modul aktiv ist; Templates und Design sind ebenfalls optionale Kernel-Module, nichts als je ein Panel, in `/nino/modules` ein- oder ausgeschaltet. Ein **Feature** – ein installierbares Paket unter `features/`, aus dem Katalog [dapeio/nino-features](https://github.com/dapeio/nino-features) hineinkopiert und im Panel Features eingeschaltet – bringt sein Panel auf dieselbe Weise mit – das Newsletter-Feature des Katalogs ein Panel Newsletter, sein Forms-Feature ein Panel Formulare, sein Search-Feature ein Panel Suche, und ein Checkout bringt keines davon mit; jedes landet in der eigenen Gruppe Features der Leiste. Die Panels oben, die in keiner der beiden Listen stehen, sind die eigenen der Workbench: `_admin` hält die Hülle, und jede Ansicht darin ist ein Modul unter `_admin/Nino/Modules/<Name>/` – Verzeichnis für Verzeichnis hinzugefügt und wieder entfernt. Ein Modul, das ein Projekt hinzufügt, oder ein Feature, das es installiert, kann auf dieselbe Weise ein eigenes Panel mitbringen; siehe das [Entwickler-Handbuch](development.de.md#panels-der-workbench) und [Features](features.de.md).
+Anfragen und Navigationen gehören zu optionalen Kernel-Modulen und sind vorhanden, solange ihr Modul aktiv ist, in `/nino/modules` ein- oder ausgeschaltet. Ein **Feature** – ein installierbares Paket unter `features/`, aus dem Katalog [dapeio/nino-features](https://github.com/dapeio/nino-features) hineinkopiert und im Panel Features eingeschaltet – bringt sein Panel auf dieselbe Weise mit – das Newsletter-Feature des Katalogs ein Panel Newsletter, sein Forms-Feature ein Panel Formulare, sein Template-Baukasten ein Panel Templates, und ein Checkout bringt keines davon mit; jedes landet in der eigenen Gruppe Features der Leiste. Die Panels oben, die in keiner der beiden Listen stehen, sind die eigenen der Workbench: `_admin` hält die Hülle, und jede Ansicht darin ist ein Modul unter `_admin/Nino/Modules/<Name>/` – Verzeichnis für Verzeichnis hinzugefügt und wieder entfernt. Ein Modul, das ein Projekt hinzufügt, oder ein Feature, das es installiert, kann auf dieselbe Weise ein eigenes Panel mitbringen; siehe das [Entwickler-Handbuch](development.de.md#panels-der-workbench) und [Features](features.de.md).
 
-Ein zweites Werkzeug gibt es nicht. `/_editor`, `/_install`, `/_design` und `/_templates` früherer Versionen sind alle hier, und ein früher reservierter Pfad ist jetzt ein gewöhnlicher Seitenpfad.
+Ein zweites Werkzeug gibt es nicht. `/_editor`, `/_install`, `/_design` und `/_templates` früherer Versionen sind fort: Was von ihnen geblieben ist, ist ein Panel hier oder – beim Template-Baukasten – ein Feature aus dem Katalog, und ein früher reservierter Pfad ist jetzt ein gewöhnlicher Seitenpfad.
 
 Alle Panel-Namen folgen der Oberflächensprache des Kontos. Dieses Handbuch nennt die deutschen Bezeichnungen.
 
@@ -34,7 +34,7 @@ Alle Panel-Namen folgen der Oberflächensprache des Kontos. Dieses Handbuch nenn
 
 Ein frischer Checkout hat noch kein Projekt. Bis der letzte Schritt des Assistenten abgeschlossen ist, zeigt `/_admin` statt der Anmeldung den Assistenten: zehn Schritte von der Umgebungsprüfung bis zu den Konten und dem Recovery-Passwort. Die Referenz [Einrichtungsassistent](setup.de.md) erklärt jeden Schritt und was er schreibt.
 
-Der Assistent liegt in `_admin/install/`. Sobald er sich selbst ausgesperrt hat, kann dieses Verzeichnis aus einer Produktivauslieferung entfernt werden; das Design-Panel verliert dann seinen Katalog für Theme, Header und Footer und sagt das auch, sonst ändert sich nichts. Behalte es ausgeliefert, wenn diese drei umschaltbar bleiben sollen.
+Der Assistent liegt in `_admin/install/`. Sobald er sich selbst ausgesperrt hat, kann dieses Verzeichnis aus einer Produktivauslieferung entfernt werden: Nichts außerhalb liest seine Library, und alles, was er kopiert hat, bleibt dort liegen, wo er es geschrieben hat.
 
 ## Anmeldung, Konten und Rollen
 
@@ -60,8 +60,7 @@ Eine Berechtigung ist eine Zeichenkette pro Panel oder Tab; `/*` deckt jeden Pfa
 | Bildplätze (Tab von Bilder) | `/_admin/slots/manage` |
 | Anfragen | `/_admin/submissions/view` |
 | Log | `/_admin/logs/view` |
-| Templates | `/_admin/templates/manage` |
-| Design | `/_admin/design/manage` |
+| Templates (das Feature Template-Baukasten) | `/_admin/templates/manage` |
 | Routen | `/_admin/routes/manage` |
 | Navigationen | `/_admin/navs/manage` |
 | Nutzer (eigenes Profil) | keine – jedes Konto |
@@ -118,9 +117,9 @@ Die Leiste links trägt Marke, Konto, Zahnrad und Navigation; die Fläche rechts
 - **Gruppen.** Die Navigation ist in Inhalt, Struktur, Features und System mit je einer Überschrift unterteilt; eine Gruppe ohne Inhalt - Features, in einem Projekt ohne aktiviertes Feature - trägt gar keine Überschrift. Ein Konto, das nur eine Gruppe sieht, bekommt eine schlichte Liste.
 - **Tabs.** Ein Panel mit mehreren Bildschirmen trägt eine Tab-Leiste am Kopf seiner Fläche – Elemente und Elementtypen, Nutzer, Nutzerrollen und Anmeldeschutz – und kommt auf dem Tab zurück, auf dem du es verlassen hast. Jeder Tab ist ein eigener Bildschirm: seine Berechtigung, sein tiefer Link (`#roles`), sein Zustand.
 - **Einklappen.** Der kleine Doppelpfeil neben der Marke klappt die Leiste zu einer Spalte aus Symbolen zusammen. Ein Panel, das die ganze Breite braucht – der Template Builder – klappt sie von sich aus ein und nimmt der Fläche die Lesebreiten-Grenze; klappst du sie von Hand wieder auf, bleibt sie auf jedem Panel offen, bis du sie wieder einklappst. Die Wahl liegt im Browser, nicht auf dem Server.
-- **Tiefe Links.** Die Adresszeile folgt dir: `#elements/team/ada` ist das Element, das du gerade bearbeitest, `#design/header` der Header-Editor. Ein Neuladen oder ein Lesezeichen öffnet genau diesen Stand, und der Zurück-Knopf des Browsers geht ihn zurück.
+- **Tiefe Links.** Die Adresszeile folgt dir: `#elements/team/ada` ist das Element, das du gerade bearbeitest, `#types` der Tab Elementtypen. Ein Neuladen oder ein Lesezeichen öffnet genau diesen Stand, und der Zurück-Knopf des Browsers geht ihn zurück.
 - **Zahnrad.** Oberflächensprache und helles oder dunkles Farbschema. Die Sprache bestimmt auch die Inhaltssprache, mit der die Formulare unter Texte und Elemente öffnen.
-- **Panelwechsel** setzt kein Panel zurück: Der Template Builder behält sein ungespeichertes Dokument, ein Elementformular seine ungespeicherten Werte, bis du speicherst oder die Seite verlässt. Das Verlassen mit ungespeicherten Änderungen im Templates- oder Design-Panel fragt vorher nach.
+- **Panelwechsel** setzt kein Panel zurück: Der Template Builder behält sein ungespeichertes Dokument, ein Elementformular seine ungespeicherten Werte, bis du speicherst oder die Seite verlässt. Das Verlassen des Templates-Panels mit ungespeicherten Änderungen fragt vorher nach.
 
 Welches Panel auch offen ist – Speichern schreibt die Projektdateien sofort. Es gibt keinen Entwurfszustand und keinen eigenen Veröffentlichen-Schritt; prüfe danach das Frontend und jede betroffene Sprache.
 
@@ -180,12 +179,6 @@ Wie lange Einträge bleiben und ob sie überhaupt geschrieben werden, sind `/nin
 Das Panel **Templates** ist der Template Builder: Er setzt die `page-*.tpl`-Dateien des Projekts aus vollständigen Sections zusammen – eine durchsuchbare Bibliothek von Section-Presets, wiederverwendbare `[template]`-Sections, Header und Footer der Seite und eine native Schnellbefüllung der Texte, die eine Section mitbringt. Es ist ein Workspace-Panel: Die Leiste klappt ein, und Templateliste, Section-Canvas und Inspektor stehen nebeneinander.
 
 Alles, was es kann, seine Regeln zur Quelltextsicherheit und der Manifest-Vertrag der Preset-Bibliothek stehen im [Handbuch](https://github.com/dapeio/nino-features/blob/main/features/Templates/docs/templates.de.md) des Template-Baukastens. Das Panel gehört zum Template-Baukasten-Feature aus dem Katalog [dapeio/nino-features](https://github.com/dapeio/nino-features) und ist da, solange das Feature nach `features/` kopiert und im Panel Features eingeschaltet ist.
-
-### Design
-
-Das Panel **Design** hält die vier Erscheinungsbild-Entscheidungen der Seite nach dem Assistenten bearbeitbar: **Theme** installiert eine vollständige visuelle Grundlage, **Header** und **Footer** ersetzen je einen Rahmen, **Design** erzeugt Farbpalette und Größenraster aus einer Handvoll Einstellungen und schreibt `assets/style.design.css`. Die vier sind Tabs im Panel; der Aktionsknopf am Fuß wechselt mit dem aktiven Tab.
-
-Theme, Header und Footer lesen den Katalog des Assistenten unter `_admin/install/library/` und sagen es, wenn er entfernt wurde; Design erzeugt statt zu kopieren und funktioniert in jedem Fall. Die Einstellungen, der Token-Vertrag und die Bundle-Reihenfolge stehen in der Referenz [Design-Panel](appearance.de.md). Das Panel ist das optionale Kernel-Modul `_nino/Nino/Modules/Design/`; in `/nino/modules` abgeschaltet, verlässt es die Workbench.
 
 ### Elementtypen
 
@@ -359,9 +352,9 @@ Die Ausgabe ist die vollständige Datei; schreibe sie nach `private/.auth/pw.php
 
 ## Empfohlener Arbeitsablauf
 
-1. Führe den Assistenten aus, dann lösche `_admin/install/` aus der Produktivauslieferung oder behalte es gesperrt für den Erscheinungsbild-Katalog.
+1. Führe den Assistenten aus, dann lösche `_admin/install/` aus der Produktivauslieferung.
 2. Baue die Struktur unter **Elementtypen** (ein Tab von Elemente), **Textschlüssel** (Texte), **Bildplätze** (Bilder), **Routen** und **Navigationen**.
-3. Setze die Seiten unter **Templates** zusammen, lege das Erscheinungsbild unter **Design** fest und prüfe das Ergebnis im Browser.
+3. Setze die Seiten unter **Templates** zusammen, passe `assets/theme.css` an, wo das ausgelieferte Aussehen nicht das gewünschte ist, und prüfe das Ergebnis im Browser.
 4. Fülle die Inhalte unter **Elemente**, **Texte** und **Bilder**; übergib eine Sprache unter **Sprache › Übersetzungen**.
 5. Prüfe Dashboard und die beiden Scans auf fehlende Definitionen.
 6. Lege die Redaktionskonten unter **Nutzer** mit der Rolle Editor an – lege auf dem Tab **Nutzerrollen** eine Rolle an, wo die beiden nicht reichen – und prüfe, was sie sehen.
@@ -377,7 +370,6 @@ Die Ausgabe ist die vollständige Datei; schreibe sie nach `private/.auth/pw.php
 | Speichern schlägt fehl | Schreibrechte der betroffenen Datei oder des Verzeichnisses. |
 | Template fehlt unter **Routen** | Angeboten werden nur vorhandene Dateien `templates/page-*.tpl`. |
 | Eine Seite lässt sich unter **Templates** nicht speichern | Nach einer externen Änderung neu laden, eindeutige Section-Ids und unpaarige `<section>`-Tags prüfen; siehe das [Handbuch](https://github.com/dapeio/nino-features/blob/main/features/Templates/docs/templates.de.md) des Template-Baukastens. |
-| **Design** meldet, keine Varianten seien verfügbar | `_admin/install/library/` wurde entfernt; der Tab Design funktioniert weiter. |
 | Texte oder Bilder fehlen in einem Scan | Dynamische Schlüssel und Bilder sind statisch nicht erkennbar. |
 | Die Backup-Liste ist leer | Sicherungen sind ausgeschaltet, oder heute gab es noch keine angemeldete Anfrage. |
 | Die Suche liefert keine Elemente | Das Search-Feature des Katalogs in `features/` und im Panel Features eingeschaltet, `/nino/elements/index` in der `config.php`, dann **Suchindex erstellen**. |
@@ -388,6 +380,5 @@ Die Ausgabe ist die vollständige Datei; schreibe sie nach `private/.auth/pw.php
 
 - [Einrichtungsassistent](setup.de.md) dokumentiert die zehn Erststart-Schritte und das Library-Format.
 - Der **Template-Baukasten** – Seitentemplates aus ganzen Abschnitten – ist ein Feature aus dem Katalog [dapeio/nino-features](https://github.com/dapeio/nino-features); sein [Handbuch](https://github.com/dapeio/nino-features/blob/main/features/Templates/docs/templates.de.md) liegt dort ebenfalls.
-- [Design-Panel](appearance.de.md) erklärt die vier Erscheinungsbild-Editoren und den Token-Vertrag.
 - [Entwickler-Handbuch](development.de.md) beschreibt APIs, Module, Panels und die direkte Arbeit an Projektdateien.
 - [Deployment](deployment.de.md) behandelt Webserver, Sicherheit, Sicherungen und Go-Live.

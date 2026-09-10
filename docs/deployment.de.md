@@ -7,7 +7,7 @@
 Dieses Handbuch führt eine fertig entwickelte Nino-Webseite in den produktiven Betrieb. Falls du stattdessen ein frisches Projekt einrichten möchtest, beginne mit [Erste Schritte](getting-started.de.md); technische Erweiterungen behandelt das [Entwickler-Handbuch](development.de.md).
 
 **Weitere Links:**
-[README](../README.de.md) · [Grundkonzepte](concepts.de.md) · [Entwickler-Handbuch](development.de.md) · [Rezepte](recipes/README.md) · [Erste Schritte](getting-started.de.md) · [Einrichtungsassistent](setup.de.md) · [`/_admin`-Workbench](_admin.de.md) · [Design-Panel](appearance.de.md) · [Features](features.de.md) · [Deployment](deployment.de.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
+[README](../README.de.md) · [Grundkonzepte](concepts.de.md) · [Entwickler-Handbuch](development.de.md) · [Rezepte](recipes/README.md) · [Erste Schritte](getting-started.de.md) · [Einrichtungsassistent](setup.de.md) · [`/_admin`-Workbench](_admin.de.md) · [Features](features.de.md) · [Deployment](deployment.de.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
 
 ## Voraussetzungen des Zielsystems
 Nino benötigt weder Datenbankserver noch Composer-Installation auf dem Zielsystem. Das vereinfacht zwar das Deployment, macht die Dateien des Projekts aber umso wichtiger: Konfiguration und redaktionelle Daten liegen direkt im Dateisystem und müssen beim Übertragen, Sichern und Berechtigen vollständig berücksichtigt werden.
@@ -67,7 +67,7 @@ Prüfe in der Hosting-Konfiguration zusätzlich, wie nicht vorhandene Pfade an `
 - Zugriffe auf Dotfiles und Dot-Verzeichnisse verweigern;
 - **`private/` vollständig sperren** – es wird nie von einem Browser angefragt, sondern nur von PHP gelesen;
 - **`app/` und `features/` vollständig sperren** – die eigenen Klassen des Projekts und die installierten Features sind serverseitiger Quelltext, den nie ein Browser anfragt; beide bringen für Apache eine eigene `.htaccess` mit;
-- direkte Zugriffe auf `_admin/install/library/` bis auf `_admin/install/library/themes/<key>/preview.svg` sperren – die übrigen Dateien sind serverseitige Darstellungsquellen; dasselbe gilt für die Section-Presets unter `features/Templates/library/`, wo ein Projekt sie liegen hat, das den Template-Baukasten installiert hat;
+- **`_admin/install/library/` vollständig sperren** – es ist das, woraus der Assistent ein Projekt kopiert, serverseitige Quelle ohne irgendetwas Öffentliches darin; dasselbe gilt für die Section-Presets unter `features/Templates/library/`, wo ein Projekt sie liegen hat, das den Template-Baukasten installiert hat;
 - Verzeichnisauflistung deaktivieren;
 - den HTTP-Header `Authorization` an PHP weitergeben. Bei nginx/PHP-FPM ist dafür normalerweise `fastcgi_param HTTP_AUTHORIZATION $http_authorization;` in der PHP-Location erforderlich;
 - PHP-Quell- und Datendateien nicht als Text ausliefern.
@@ -88,7 +88,7 @@ Eine allgemeine Beispielkonfiguration kann die Pfade und PHP-FPM-Einstellungen e
 
 Vor der Ersteinrichtung muss PHP in der Projektwurzel Verzeichnisse und Dateien anlegen dürfen. Die noch fehlenden Projektpfade werden vom Assistenten beziehungsweise bei Bedarf vom Kernel erzeugt und sind keine manuell anzulegende Voraussetzung.
 
-Im laufenden Betrieb benötigt Nino Schreibrechte nur für tatsächlich veränderliche Inhalte. Dazu gehören je nach Nutzung `private/config.php`, `private/text/`, `private/elements/`, `private/data/`, `private/.logs/`, `private/.backups/`, `private/assets/`, `public/images/` und `public/.cache/`. Das Templates-Panel benötigt zusätzlich `private/templates/`; es kann native Textschlüssel, Elementtypen und Bildplatz-Definitionen in der Konfiguration anlegen. Das Anwenden von Darstellungsvarianten im Design-Panel benötigt `private/templates/`, `private/assets/`, `public/fonts/` sowie jedes weitere Ziel, das ein Theme-Manifest erklärt. Der Darstellungskatalog unter `_admin/install/library/` selbst bleibt schreibgeschützt; `_admin/.cache/` dagegen braucht Schreibrechte, weil die Workbench ihre Bundles dort baut – das eine Verzeichnis im Werkzeugordner. Projektwurzel und PHP-Quellcode können ansonsten nach der Installation schreibgeschützt bleiben. Das Installieren eines Features aus dem Katalog im Panel Features ist die eine Ausnahme: Es schreibt `features/` und legt den Download unterhalb von `private/data/.features/` zwischen. Ohne Schreibrecht auf `features/` bietet das Panel stattdessen das Archiv zum Kopieren von Hand an, das Verzeichnis kann also schreibgeschützt bleiben, wo Features mit dem Projekt ausgeliefert werden.
+Im laufenden Betrieb benötigt Nino Schreibrechte nur für tatsächlich veränderliche Inhalte. Dazu gehören je nach Nutzung `private/config.php`, `private/text/`, `private/elements/`, `private/data/`, `private/.logs/`, `private/.backups/`, `private/assets/`, `public/images/` und `public/.cache/`. Das Templates-Panel benötigt zusätzlich `private/templates/`; es kann native Textschlüssel, Elementtypen und Bildplatz-Definitionen in der Konfiguration anlegen. Die Installer-Library unter `_admin/install/library/` selbst bleibt schreibgeschützt; `_admin/.cache/` dagegen braucht Schreibrechte, weil die Workbench ihre Bundles dort baut – das eine Verzeichnis im Werkzeugordner. Projektwurzel und PHP-Quellcode können ansonsten nach der Installation schreibgeschützt bleiben. Das Installieren eines Features aus dem Katalog im Panel Features ist die eine Ausnahme: Es schreibt `features/` und legt den Download unterhalb von `private/data/.features/` zwischen. Ohne Schreibrecht auf `features/` bietet das Panel stattdessen das Archiv zum Kopieren von Hand an, das Verzeichnis kann also schreibgeschützt bleiben, wo Features mit dem Projekt ausgeliefert werden.
 
 Vergib diese Rechte an den Benutzer, unter dem PHP ausgeführt wird. Weltweit beschreibbare Rechte wie `0777` sind keine geeignete Dauerlösung. Nach dem Deployment sollten Kernel und übriger PHP-Quellcode nicht allgemein beschreibbar sein.
 
@@ -152,13 +152,13 @@ Vergib Redaktionsrechte so eng wie praktisch möglich; die Konten, die der Assis
 
 HTTPS schützt nicht nur Anmeldedaten, sondern auch Sitzungs-Cookies und alle redaktionell übertragenen Inhalte. Leite HTTP-Anfragen dauerhaft auf HTTPS um und teste die Anmeldung nur über die endgültige öffentliche Adresse.
 
-Zusätzlicher Webserver-Schutz für `/_admin` – etwa IP-Freigaben oder HTTP-Authentifizierung – kann bei passenden Betriebsbedingungen eine sinnvolle zweite Barriere bilden. Er ersetzt die Konten nicht. Das Panel Design wird als optionales Kernel-Modul ausgeliefert und lässt sich aus einer Produktivauslieferung herausnehmen, indem `\Nino\Modules\Design` aus `/nino/modules` entfernt wird; der Template-Baukasten ist ein Feature, sein ganzes Verzeichnis kann also aus `features/` verschwinden – genau dafür ist er eines; die Workbench selbst bleibt, weil die Redaktion darin arbeitet.
+Zusätzlicher Webserver-Schutz für `/_admin` – etwa IP-Freigaben oder HTTP-Authentifizierung – kann bei passenden Betriebsbedingungen eine sinnvolle zweite Barriere bilden. Er ersetzt die Konten nicht. Der Template-Baukasten ist ein Feature, sein ganzes Verzeichnis kann also aus `features/` verschwinden – genau dafür ist er eines; die Workbench selbst bleibt, weil die Redaktion darin arbeitet.
 
 ## Der Assistent nach der Einrichtung
 
 Schließe den Assistenten vollständig ab. Der letzte Schritt setzt das Recovery-Passwort und sperrt den Assistenten. Entferne anschließend das Verzeichnis `_admin/install/` aus der produktiven Auslieferung.
 
-Damit verschwindet auch der Darstellungskatalog unter `_admin/install/library/`. Das ist beabsichtigt: Der Katalog ist Einrichtungsmaterial, kein Laufzeitfeature. Angewendete Themes und Frames liegen längst als Projektdateien in `assets/` und `templates/` und bleiben von Hand sowie über das Templates-Panel bearbeitbar. Im Design-Panel arbeitet der Tab Design unverändert weiter — er erzeugt die Palette und das Raster, statt Dateien zu kopieren; die drei katalogbasierten Tabs haben danach nichts mehr aufzulisten und sagen das auch. Wer Theme, Header und Footer dauerhaft umschaltbar halten will, liefert das gesperrte `_admin/install/` bewusst mit aus.
+Damit verschwindet auch die Installer-Library unter `_admin/install/library/`. Das ist beabsichtigt: Die Library ist Einrichtungsmaterial, kein Laufzeitfeature. Alles, was sie kopiert hat, liegt längst im Projekt – das Theme als `assets/theme.css`, die beiden Frames als `templates/theme.header.tpl` und `templates/theme.footer.tpl` – und bleibt von Hand und, für die Frames, über das Templates-Panel bearbeitbar. Zur Laufzeit liest niemand die Library.
 
 Die Reihenfolge ist wesentlich:
 
@@ -186,12 +186,9 @@ php tests/kernel-smoke.php
 php tests/admin-smoke.php
 php tests/admin-system-smoke.php
 php tests/install-smoke.php
-php tests/design-smoke.php
-php tests/templates-smoke.php
 php tests/features-smoke.php
 php tests/catalogue-smoke.php
 for test in features/*/tests/*-smoke.php; do [ -e "$test" ] || continue; php "$test" || exit 1; done
-php tests/demo-catalogue-smoke.php
 for test in tests/*-js-smoke.js; do node "$test"; done
 php tests/concurrency-smoke.php
 ```
@@ -204,7 +201,6 @@ Die Smoke-Tests ersetzen keinen projektspezifischen Abnahmetest. Prüfe zusätzl
 - Formulare einschließlich Validierung, Versand und Fehlermeldungen;
 - Anmeldung, Abmeldung und die Rechte eines Redaktionskontos in `/_admin`;
 - den Zugang eines Entwicklerkontos zu den Panels von Struktur und System;
-- alle vier Tabs des Design-Panels einschließlich einer Frame-Vorschau, sofern das Modul ausgeliefert wird;
 - Zugriff und unveränderten Round-Trip im Template-Baukasten, sofern das Feature installiert ist;
 - Schreiben und erneutes Laden eines redaktionellen Inhalts;
 - Verhalten hinter CDN, Proxy oder Cache, sofern eingesetzt.
@@ -217,7 +213,7 @@ Ein erfolgreicher Aufruf der Startseite belegt noch nicht, dass sensible Dateien
 - `config.php` und PHP-Datendateien;
 - versteckte Log- und Backup-Verzeichnisse;
 - interne Dateien aus `_admin/`, `app/` und `features/`, die nicht als öffentliche Assets vorgesehen sind – die Panel-Templates, die Section-Presets und die Install-Einheit eines Features darunter;
-- Dateien unter `_admin/install/library/` mit Ausnahme von `_admin/install/library/themes/*/preview.svg`;
+- jede Datei unter `_admin/install/library/`;
 - `_admin/install/`, nachdem es entfernt wurde.
 
 Die erwartete Antwort kann je nach Server `403` oder `404` sein. Entscheidend ist, dass weder Inhalt noch Verzeichnisliste ausgeliefert werden.
@@ -257,9 +253,8 @@ Nino befindet sich in der Beta-Phase. Sicherheitskorrekturen erscheinen auf `mai
 - [ ] Der Einrichtungsassistent konnte die Projektverzeichnisse aus der beschreibbaren Projektwurzel selbst erzeugen — ein Checkout liefert weder `private/` noch `public/` mit, der erste Schritt des Assistenten prüft genau das.
 - [ ] Schreibrechte sind nach der Einrichtung auf die benötigten Pfade begrenzt.
 - [ ] Der Einrichtungsassistent wurde vollständig abgeschlossen und `_admin/install/` anschließend produktiv entfernt.
-- [ ] Wird `_admin/install/` mitgeliefert, um Theme/Header/Footer umschaltbar zu halten, ist es gesperrt und von seinem Katalog sind nur die Theme-Vorschauen direkt erreichbar.
 - [ ] Entwickler- und Redaktionskonten sind getestet, und das Recovery-Passwort ist sicher verwahrt.
-- [ ] Das Modul Design ist entweder in `/nino/modules` abgeschaltet oder bewusst als Alpha behalten, der Template-Baukasten entweder aus `features/` entfernt oder bewusst behalten, und nur Entwicklerkonten erreichen beides.
+- [ ] Der Template-Baukasten ist entweder aus `features/` entfernt oder bewusst behalten, und nur Entwicklerkonten erreichen ihn.
 - [ ] Editor-Nutzer haben nur die benötigten Berechtigungen.
 - [ ] HTTPS und sichere Session-Cookies funktionieren an der endgültigen Adresse.
 - [ ] Fehleranzeige ist deaktiviert und Fehlerprotokollierung geprüft.
@@ -273,5 +268,4 @@ Nino befindet sich in der Beta-Phase. Sicherheitskorrekturen erscheinen auf `mai
 - [Erste Schritte](getting-started.de.md) beschreibt die notwendige Ersteinrichtung.
 - [`/_admin`-Workbench](_admin.de.md) erklärt jedes Panel, die Konten, Sicherungen und die Recovery-Seite.
 - Der **Template-Baukasten** – Seitentemplates aus ganzen Abschnitten – ist ein Feature aus dem Katalog [dapeio/nino-features](https://github.com/dapeio/nino-features); sein [Handbuch](https://github.com/dapeio/nino-features/blob/main/features/Templates/docs/templates.de.md) liegt dort ebenfalls.
-- [Design-Panel](appearance.de.md) beschreibt die vier Erscheinungsbild-Editoren.
 - [Grundkonzepte](concepts.de.md) erklärt die technische Struktur hinter dem deployten Projekt.

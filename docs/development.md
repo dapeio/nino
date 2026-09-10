@@ -7,7 +7,7 @@
 This manual describes the technical work with Nino — from the entry point through routing and rendering to custom modules, persistent data, and tests. If you instead want to first learn about the architecture or set up a fresh project, read the [Concepts](concepts.md) or [Getting Started](getting-started.md).
 
 **Additional Links:**
-[README](../README.md) · [Concepts](concepts.md) · [Developer Manual](development.md) · [Recipes](recipes/README.md) · [Getting Started](getting-started.md) · [Setup Wizard](setup.md) · [`/_admin` Workbench](_admin.md) · [Design Panel](appearance.md) · [Features](features.md) · [Deployment](deployment.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
+[README](../README.md) · [Concepts](concepts.md) · [Developer Manual](development.md) · [Recipes](recipes/README.md) · [Getting Started](getting-started.md) · [Setup Wizard](setup.md) · [`/_admin` Workbench](_admin.md) · [Features](features.md) · [Deployment](deployment.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
 
 **Developer Profile:** For simple websites, solid knowledge of HTML, CSS, and JavaScript as well as PHP basics is sufficient. Templates consist of HTML+, i.e., HTML with textfills and shortcodes. Only custom application logic, external interfaces, or new modules require deeper PHP knowledge. A finished project can then be largely maintained in the workbench, `/_admin`.
 
@@ -515,7 +515,7 @@ Modules are activated in `/nino/modules`. The order of the array is relevant if 
 | `Navigation` | `[navigation ...]` | renders navigations from a compact line syntax |
 | `Template` | `[template /path/name]` | loads the raw content of a `.tpl` file; the common render pipeline processes it further |
 
-Every module in the table ships in `_nino/Nino/Modules/`, beside the always-on kernel modules. `Form` and `Navigation` bring their workbench panels along (Submissions, Navigations), `Design`, `Templates` and `Maintenance` are nothing but a panel each: every one is present exactly while its module is active. `Form`, `Navigation` and `Localepicker` are no longer a setup wizard choice - the wizard applies each one's `install/` unit and lists its class in `/nino/modules` on every run (`\Nino\Install\Setup::ALWAYS_MODULES`), the same way `Design`, `Templates` and `Maintenance` are listed whenever their class exists. A project may still switch any of the six off by hand in `/nino/modules`, and `_nino/` stays replaceable wholesale. Everything beyond the table is a **feature** - an installable package under `features/<Name>/` with a `feature.php` manifest, switched on in the workbench's Features panel, bringing its panel the same way. A checkout ships none: they come from the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features) - `Newsletter` (double opt-in, confirmation and unsubscribe under `/.newsletter`) and `Search` (a locale-aware fuzzy index over Element fields) among them - copied into `features/` or installed from the Features panel. See [Features](features.md), [Panels of the Workbench](#panels-of-the-workbench) and [Directory and Autoloading](#directory-and-autoloading) below.
+Every module in the table ships in `_nino/Nino/Modules/`, beside the always-on kernel modules. `Form` and `Navigation` bring their workbench panels along (Submissions, Navigations), `Maintenance` is nothing but a switch: every one is present exactly while its module is active. `Form`, `Navigation` and `Localepicker` are no longer a setup wizard choice - the wizard applies each one's `install/` unit and lists its class in `/nino/modules` on every run (`\Nino\Install\Setup::ALWAYS_MODULES`), the same way `Maintenance` is listed whenever its class exists. A project may still switch any of the four off by hand in `/nino/modules`, and `_nino/` stays replaceable wholesale. Everything beyond the table is a **feature** - an installable package under `features/<Name>/` with a `feature.php` manifest, switched on in the workbench's Features panel, bringing its panel the same way. A checkout ships none: they come from the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features) - `Newsletter` (double opt-in, confirmation and unsubscribe under `/.newsletter`) and `Search` (a locale-aware fuzzy index over Element fields) among them - copied into `features/` or installed from the Features panel. See [Features](features.md), [Panels of the Workbench](#panels-of-the-workbench) and [Directory and Autoloading](#directory-and-autoloading) below.
 
 Some details are deliberately defensive:
 
@@ -607,7 +607,7 @@ The `Nino\` namespace is kernel-owned and cannot be shadowed from the project
 application root - with one deliberate opening: `Nino\Modules\*` is a merged
 view over four roots rather than one directory. The runtime modules Nino ships
 live in `_nino/` - the always-on ones and the optional ones a project switches
-on or off in `/nino/modules` (`Form`, `Navigation`, `Localepicker`, `Design`,
+on or off in `/nino/modules` (`Form`, `Navigation`, `Localepicker`,
 `Maintenance`); the workbench's own screens in `_admin/Nino/Modules/`
 (`Dashboard`, `Elements`, `Text`, `Images`, `Logs`, `Routes`, `Users`,
 `Language`, `Backups`, `Config`, `Features`); the features a project installs
@@ -748,7 +748,7 @@ public static function assets(): array {
 }
 ```
 
-Every action method guards itself with `\Nino\Admin\Admin::guardPerm( $appData, $request, self::MANAGE_PERM )`, which answers `401` without an account and `403` without the permission. The workbench's own modules are merged first, and a uri or action name one of them already owns is never handed to a runtime module. The shipped modules are the reference: `features/Search/Admin/Admin.php` is the smallest complete panel, `_nino/Nino/Modules/Form/Admin/Admin.php` one with fills and a Dashboard tile, `_nino/Nino/Modules/Design/Admin/Admin.php` one with its own template, and the catalogue's `features/Templates/Admin/Admin.php` a workspace. The [panel recipe](recipes/admin-panel.md) of the AI guide walks through a complete panel including its frontend.
+Every action method guards itself with `\Nino\Admin\Admin::guardPerm( $appData, $request, self::MANAGE_PERM )`, which answers `401` without an account and `403` without the permission. The workbench's own modules are merged first, and a uri or action name one of them already owns is never handed to a runtime module. The shipped modules are the reference: `features/Search/Admin/Admin.php` is the smallest complete panel, `_nino/Nino/Modules/Form/Admin/Admin.php` one with fills and a Dashboard tile, and the catalogue's `features/Templates/Admin/Admin.php` one with its own template and a workspace layout. The [panel recipe](recipes/admin-panel.md) of the AI guide walks through a complete panel including its frontend.
 
 A module that keeps its own files under `data/` registers `'/nino/admin/restore'` in `init()`; the Backups panel calls it with the staged backup and the live data directory, and the module merges what is its own (`Newsletter::callbackRestore()` in the catalogue's Newsletter feature). Finally, an `install/` directory beside the class file - `manifest.php`, `templates/`, `text/` - makes a kernel or project module selectable in the setup wizard; see the [Library Format](setup.md#library-format). A feature carries the same unit, and `\Nino\Features::activate()` applies it - without overwriting anything the project has - when the feature is switched on in the Features panel; the manifest, the settings and the lifecycle are in [Features](features.md).
 
@@ -777,7 +777,7 @@ $request = \Nino\request( $appData, $_SERVER );
 \Nino\output( $appData, $request );
 ```
 
-`init( true )` boots without a `config.php`, because until the setup wizard has run there is none. `Admin::init()` then decides what the route serves: the wizard (`_admin/install/Install.php`) while `Admin::isInstalled()` says no, the login and the panels afterwards. The wizard is not a module from `/nino/modules`; the panels that ship as modules - Design, Templates and Maintenance - are, and come through `adminPanels()` like any other.
+`init( true )` boots without a `config.php`, because until the setup wizard has run there is none. `Admin::init()` then decides what the route serves: the wizard (`_admin/install/Install.php`) while `Admin::isInstalled()` says no, the login and the panels afterwards. The wizard is not a module from `/nino/modules`; a panel that ships as a module is, and comes through `adminPanels()` like any other.
 
 `_admin/recovery.php` is the third entry point, booting the same way: it verifies the recovery secret (`\Nino\Admin\Recovery`) and offers a restore and a password reset, nothing else.
 
@@ -864,10 +864,7 @@ Nino uses standalone smoke tests without PHPUnit. Each test creates an isolated 
 | `tests/admin-smoke.php` | the workbench shell and its content panels: the text blacklist and html sanitizer, element and image operations |
 | `tests/admin-system-smoke.php` | the structure and system panels: the session gate, accounts, roles and permissions, element types, backups and recovery, the activity log, and a render of every panel in every interface language |
 | `tests/install-smoke.php` | Installation steps, generated structure, and self-lock |
-| `tests/design-smoke.php` | generated Design values and authenticated Theme/Header/Footer operations |
-| `tests/templates-smoke.php` | section composition, template includes, lossless page frames, content quick fill, and save conflicts |
-| `tests/demo-catalogue-smoke.php` | the demo catalogue page shows every section preset in every layout and every `nino-*` class |
-| `tests/*-js-smoke.js` | browser-like logic of management interfaces and template builder |
+| `tests/*-js-smoke.js` | browser-like logic of the management interfaces |
 | `tests/concurrency-smoke.php` | parallel and atomic write operations |
 
 Locally, they are executed individually:
@@ -877,12 +874,9 @@ php tests/kernel-smoke.php
 php tests/admin-smoke.php
 php tests/admin-system-smoke.php
 php tests/install-smoke.php
-php tests/design-smoke.php
-php tests/templates-smoke.php
 php tests/features-smoke.php
 php tests/catalogue-smoke.php
 for test in features/*/tests/*-smoke.php; do [ -e "$test" ] || continue; php "$test" || exit 1; done
-php tests/demo-catalogue-smoke.php
 for test in tests/*-js-smoke.js; do node "$test"; done
 php tests/concurrency-smoke.php
 ```
@@ -978,7 +972,6 @@ module reacts to what the workbench does without owning a panel there.
 - [Setup Wizard](setup.md) documents all installation steps and writing rules.
 - [`/_admin` Workbench](_admin.md) describes every panel, the roles and the recovery page.
 - The **Template Builder** - page templates composed from whole sections - is a feature from the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features); its [manual](https://github.com/dapeio/nino-features/blob/main/features/Templates/docs/templates.md) is there too.
-- [Design Panel](appearance.md) explains the four appearance editors and the token contract.
 - [Features](features.md) explains installable features: the manifest, the settings, activation, updates and a feature's tests.
 - [Deployment](deployment.md) describes web servers, security, and go-live.
 - [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) explains how to handle security reports.

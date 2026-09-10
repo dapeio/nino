@@ -24,12 +24,11 @@ if( preg_match( '#^/private(?:/|$)#', $uri ) === 1 ) {
     return true;
 }
 
-// The installer's library is source for the setup wizard's steps and for the Design panel's
-// catalogue dialogs, not a second public asset tree. Theme picker images are
-// its one intentional public file; mirror _admin/install/library/.htaccess here
-// because PHP's development server ignores Apache configuration entirely.
-if( preg_match( '#^/_admin/install/library(?:/|$)#', $uri ) === 1
-	&& preg_match( '#^/_admin/install/library/themes/[a-z0-9][a-z0-9-]*/preview\.svg$#', $uri ) !== 1 ) {
+// The installer's library is what the setup wizard copies a project out of,
+// not a second public asset tree - and since 1.2 there is nothing public in
+// it at all. Mirror _admin/install/library/.htaccess here because PHP's
+// development server ignores Apache configuration entirely.
+if( preg_match( '#^/_admin/install/library(?:/|$)#', $uri ) === 1 ) {
 	http_response_code( 404 );
 	return true;
 }

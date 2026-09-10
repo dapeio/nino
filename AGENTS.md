@@ -77,7 +77,7 @@ Do not use “page”, “template”, “module”, and “admin module” inte
 | Add behavior to public requests or a new shortcode | Runtime module |
 | Make a kernel or project module selectable and copyable during the setup wizard | Installer module package |
 | Package an installable feature - a module with a manifest, settings and a version, switched on in the workbench after setup | Feature - `features/<Name>/` with `feature.php`, see the [feature recipe](docs/recipes/feature.md) |
-| Add an insertable visual building block to the Templates panel | Section preset |
+| Add an insertable visual building block to the Templates panel | Section preset - in the Template Builder feature of the catalogue, not here |
 | Add a complete starting page to the installation library | Page library unit |
 | Add reusable HTML+ included by other templates | Reusable `.tpl` template |
 | Map a public HTTP URL to output | Route |
@@ -116,7 +116,7 @@ Important source directories:
 | `_nino/Nino/<Class>/<Class>.php` | The kernel classes and public core APIs: AppData, Auth, Callbacks, Catalogue, Csrf, Features, Fetch, Filesystem, Backup, RotatingLog, Elements, Html, Http, Images, Locales, Text, Mail, Modules, Runtime |
 | `_nino/Nino/Catalogue/Catalogue.php`, `_nino/Nino/Fetch/Fetch.php` | The feature catalogue: `Fetch` is the kernel's one http client (https only, no redirects, a byte cap, stubbed in tests through `./nino/fetch/stub`); `Catalogue` fetches `catalogue.json` and its detached ECDSA signature, verifies it against `PUBLIC_KEY` or `/nino/catalogue/key`, parses format 1, answers `offers()` per key, and `install()`s an archive: re-fetched catalogue, sha256 and size, staging below `data/.features/`, every entry validated, manifest matched, directory replaced. Nothing is fetched unless the Features panel asks. Contract test `tests/catalogue-smoke.php`, no network |
 | `_nino/Nino/Features/Features.php` | The feature contract: discovery below `features/`, manifest validation, version constraints, settings, `activate()`, `deactivate()`, and `applyUnit()` - the unit application the wizard shares (overwrite on there, add-only for a feature). Contract test `tests/features-smoke.php` against `tests/fixtures/features/` |
-| `_nino/Nino/Modules/<Name>/<Name>.php` | Kernel runtime modules: the always-on ones every project needs (Assets, Cache, Csrf, Elements, Images, Jstext, Template) and the optional ones a project switches on or off in `/nino/modules` (`Form`, `Navigation`, `Localepicker`, `Design`, `Maintenance`). Replaced wholesale with `_nino/` |
+| `_nino/Nino/Modules/<Name>/<Name>.php` | Kernel runtime modules: the always-on ones every project needs (Assets, Cache, Csrf, Elements, Images, Jstext, Template) and the optional ones a project switches on or off in `/nino/modules` (`Form`, `Navigation`, `Localepicker`, `Maintenance`). Replaced wholesale with `_nino/` |
 | `_nino/Nino/Modules/<Name>/Admin/Admin.php`, `assets/`, `text/`, `templates/`, `install/` | A kernel module's own workbench panel class with its scripts, stylesheets, fills and (for a template panel) its markup, and its installer unit - everything the module brings, in one directory |
 | `features/<Name>/` | An installed feature: `feature.php` (the manifest - key, name, version, the `nino` constraint, `requires`, `settings`, `data`), `<Name>.php` (the class `\Nino\Modules\<Name>`, derived from the directory), `Admin/Admin.php` (its panel), `install/` (the unit `\Nino\Features::activate()` applies add-only), `text/`, `assets/`, `tests/<key>-smoke.php`. A checkout ships none: the published ones - `Newsletter`, `Search` - come from the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features) and are copied in. Denied by `features/.htaccess` and `router.php`; relocated by `NINO_FEATURES_DIR` |
 | `app/<Namespace>/<Class>/<Class>.php` | Project-owned PHP classes and runtime modules; defaults to this root unless `NINO_APP_DIR` is defined before loading the kernel |
@@ -130,10 +130,8 @@ Important source directories:
 | `_admin/recovery.php`, `templates/page-recovery.tpl`, `assets/recovery.js` | The recovery page: restore a backup, reset a password, with the recovery secret |
 | `_admin/install/Install.php` | The setup wizard - the workbench's first-run mode, served by the same route while `Admin::isInstalled()` says no; deletable after setup |
 | `_admin/install/library/base/`, `modules/`, `pages/<slug>/` | The wizard's library: always-applied base, units without a runtime class, installable page units |
-| `_admin/install/library/themes/<slug>/` | Appearance themes: manifest, preview, and installable assets. Setup material read by the wizard and, while the directory is deployed, by the Design panel; applying one copies it into the project |
-| `_admin/install/library/header/<slug>/`, `footer/<slug>/` | Interchangeable page frames: a `template.tpl` plus an optional `style.css`, no manifest. Installed as `templates/theme.header.tpl` / `theme.footer.tpl`, which the base html templates include |
-| `_nino/Nino/Modules/Design/Design.php`, `Admin/`, `Appearance/`, `Tokens/`, `Preview/` | The Design module: the settings and the generated stylesheet's place in the bundle (module class), the panel, the catalogue units, the token palette solver, the live preview the wizard borrows |
-| `_nino/Nino/Modules/Design/templates/preview-example.tpl` | The page both pickers preview against. Framework classes only - `Design\Preview` wraps it in a document with the generated tokens and serves it to a sandboxed iframe |
+| `_admin/install/library/base/assets/theme.css`, `base/templates/theme.header.tpl`, `theme.footer.tpl` | The one look every project starts from, delivered by the base unit: the compiled design tokens, the roles they are assigned to, the three webfaces and the css for both frames, plus the two frame templates `html-header.tpl` includes through `[template /templates/theme.header]`. Edited by hand; there is no generator behind it any more |
+| the appearance catalogue | Not here since 1.2: the ten themes, six headers and seven footers the wizard used to offer, and the Design panel that kept them editable, are parked in [`design-library/`](https://github.com/dapeio/nino-features/tree/main/design-library) of [dapeio/nino-features](https://github.com/dapeio/nino-features) - not a feature, never published, waiting for the **Design** feature. Its archived manual carries the token contract |
 | the Template Builder | Not here since 1.2: extracted into the feature [`features/Templates`](https://github.com/dapeio/nino-features/blob/main/features/Templates/README.md) of the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features), with its section preset library, its two tests and its manual. A project that installed it carries it below `features/`, where the autoloader serves `\Nino\Modules\Templates` from - the kernel root resolves first, so a Nino that still shipped the module would shadow it, which is why the feature names `^1.2` |
 | `public/` | The project's public half — everything a browser loads directly: `images/`, `favicon/`, `fonts/`, and the generated `.cache/` bundles. Reached through `Filesystem::path()` on disk and `Filesystem::url()` (or the `[[/nino/public]]` fill) for urls. Never build a public url by hand from `[[/nino/dir]]`. `assets/` is *not* here — the bundle sources are private, see below |
 | project root | `index.php`, `router.php`, `_nino/`, `_admin/`, `app/` and `features/`. `Filesystem::getPath()`. The workbench serves its own js/css from here, so a tool file's url uses the plain project dir, not the public prefix |
@@ -344,7 +342,7 @@ other's complete stylesheets for a handful of classes; copy the class you need
 into the panel that needs it, or promote it to the design system - never
 restate the shell. Every rule of a panel stylesheet is loaded on every screen
 of the workbench, so scope every one of them to the panel's own root
-(`#pd-app .pd-canvas`, `#theme-page-wrap .theme-tile`) - a bare `body {}` or
+(`#pd-app .pd-canvas`, `#features-list .admin-features-head`) - a bare `body {}` or
 `code {}` in a panel file lands on the whole workbench.
 
 ### The five rules
@@ -423,13 +421,12 @@ or in that markup, and `tests/admin-system-smoke.php` twice over: statically on
 a key a panel's scripts or markup ask for that either language lacks, and end to
 end - it renders the whole workbench in both interface languages and fails on any
 `[[fill]]` that came out the other side unresolved, which is the only version a
-key its regexes do not recognise cannot slip past. A schema two surfaces share - the Design
-knobs, which the setup wizard renders as well and which reaches no fills -
-keeps its English as the fallback, and the panel looks for a fill of its own
-first (`design.js`'s `_knobText()`). The recovery page and the setup wizard are English by design, as
-is the section library's own preset content (a manifest's `name`, `description`,
-`category` and area labels) - the panel renders all of it through
-`Nino.adminUi.text()`, so a manifest may use fill keys instead.
+key its regexes do not recognise cannot slip past. A schema two surfaces share keeps its English as the
+fallback, and the panel looks for a fill of its own first. The recovery page
+and the setup wizard are English by design, as is the section library's own
+preset content (a manifest's `name`, `description`, `category` and area
+labels) - the panel renders all of it through `Nino.adminUi.text()`, so a
+manifest may use fill keys instead.
 
 ### The shared data table
 
@@ -669,9 +666,7 @@ temporary project and must not rely on a previously installed working tree.
 | Structure/system panels, registry contract, recovery | `tests/admin-system-smoke.php` |
 | Workbench frontend | relevant `tests/admin-*-js-smoke.js` |
 | Setup wizard behavior/library | `tests/install-smoke.php` and relevant install JS test |
-| Design module/panel | `tests/design-smoke.php` and `tests/design-js-smoke.js`, plus `tests/install-smoke.php` when the wizard's application changes |
-| Section preset/Template Builder PHP | `tests/templates-smoke.php` |
-| Template Builder browser behavior | `tests/templates-js-smoke.js` |
+| The delivered look - `theme.css`, the two frame templates | `tests/install-smoke.php` and `tests/install-library-templates-js-smoke.js` |
 | The feature contract (`\Nino\Features`, the wizard's unit application) | `tests/features-smoke.php` |
 | The catalogue (`\Nino\Catalogue`, `\Nino\Fetch`, the panel's catalogue and install actions) | `tests/catalogue-smoke.php` - a keypair, signed catalogues and archives built in the test, the network stubbed |
 | A feature (a new one, or one of the catalogue's such as Newsletter or Search) | its own `features/<Name>/tests/<key>-smoke.php`, plus `tests/features-smoke.php`; CI's `features` job runs the catalogue's features against every push |
@@ -686,12 +681,9 @@ php tests/kernel-smoke.php
 php tests/admin-smoke.php
 php tests/admin-system-smoke.php
 php tests/install-smoke.php
-php tests/design-smoke.php
-php tests/templates-smoke.php
 php tests/features-smoke.php
 php tests/catalogue-smoke.php
 for test in features/*/tests/*-smoke.php; do [ -e "$test" ] || continue; php "$test" || exit 1; done
-php tests/demo-catalogue-smoke.php
 for test in tests/*-js-smoke.js; do node "$test"; done
 php tests/concurrency-smoke.php
 ```
@@ -862,14 +854,14 @@ Read these before designing a new implementation:
 | Workbench shell, registry, recovery | `_admin/Admin.php` |
 | Workbench panel backend patterns | `_admin/Nino/Modules/Elements/Admin/Admin.php`, `Routes/Admin/Admin.php`, `Users/Admin/Admin.php` |
 | Panel list/form JS | `_admin/Nino/Modules/Elements/assets/types.js` and `admin.js`, `_admin/Nino/Modules/Routes/assets/admin.js`; the shell `_admin/assets/script.js` |
-| Panel contract | `\Nino\Admin\Panels` in `_admin/Admin.php`; smallest panel `tests/fixtures/features/Sample/Admin/Admin.php` (the catalogue's `features/Search/Admin/Admin.php` is the smallest published one); fills and a tile `_nino/Nino/Modules/Form/Admin/Admin.php`; own template `_nino/Nino/Modules/Design/Admin/Admin.php`; workspace `features/Templates/Admin/Admin.php` in the catalogue |
+| Panel contract | `\Nino\Admin\Panels` in `_admin/Admin.php`; smallest panel `tests/fixtures/features/Sample/Admin/Admin.php` (the catalogue's `features/Search/Admin/Admin.php` is the smallest published one); fills and a tile `_nino/Nino/Modules/Form/Admin/Admin.php`; own template and workspace layout `features/Templates/Admin/Admin.php` in the catalogue |
 | Ordered Admin relationships | `\Nino\Modules\Navigation\Admin` and `_nino/Nino/Modules/Navigation/assets/admin.js` |
 | Shared Admin UI | the `nino.system` half of `_admin/assets/style.css` and `_admin/assets/Nino.admin.js` |
 | Installer package shape | `_nino/Nino/Modules/*/install/manifest.php`; a feature's `features/*/install/manifest.php` has the same shape |
 | Setup wizard semantics | `_admin/install/Install.php` and `tests/install-smoke.php` |
 | Generic Section presets | `features/Templates/library/*/manifest.php` in the catalogue |
 | Section preset with several layouts | `features/Templates/library/feature-split/` in the catalogue |
-| Composer/parser contracts | `features/Templates/Composer/Composer.php`, `SectionDocument/SectionDocument.php`, `AreaComposer/AreaComposer.php` in the catalogue and `tests/templates-smoke.php` |
+| Composer/parser contracts | `features/Templates/Composer/Composer.php`, `SectionDocument/SectionDocument.php`, `AreaComposer/AreaComposer.php` in the catalogue, with its own `tests/templates-smoke.php` |
 | Basic page unit | `_admin/install/library/pages/home/` |
 | Module-dependent page | `_admin/install/library/pages/contact/` |
 | Locale-structural page | `_admin/install/library/pages/legal/` |

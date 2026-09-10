@@ -56,10 +56,9 @@ CGIPassAuth On
 # Its mirror, public/, is the opposite: everything in there is meant to be
 # served, and nothing else in this project root is - index.php and the tool
 # folders aside, a request that resolves to a real file outside public/ is
-# almost always a mistake. The installer's appearance catalogue is the one
-# place inside a tool folder with a deliberately public file in it, so
-# _admin/install/library/.htaccess denies everything there except the theme
-# picker images.
+# almost always a mistake. _admin/install/library/.htaccess denies its whole
+# tree for the same reason: it is what the wizard copies from, not a second
+# public asset tree.
 
 # Don't let a directory with no index.php list its contents - a plain
 # defence-in-depth default now that nothing relies on an unguessable

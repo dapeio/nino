@@ -36,7 +36,7 @@ The lookup roots are deliberately different:
   shadow a kernel class from its application root.
 - `Nino\Modules\*` is the one opening: a merged view over four roots, looked
   for in this order - `_nino/` (every module Nino ships: the always-on ones
-  and the optional `Form`, `Navigation`, `Localepicker`, `Design`
+  and the optional `Form`, `Navigation`, `Localepicker`
   a project switches on or off in `/nino/modules`), `_admin/` (the workbench's
   own screens), `features/` (the installed features, one directory each with
   a `feature.php` manifest - the catalogue's `Newsletter` and `Search` arrive
@@ -352,10 +352,10 @@ tools and the installer:
   order and only while the module is active, so the screens come and go with
   the module.
 - `install/manifest.php` beside the class makes a kernel or project module
-  selectable in the setup wizard (the [installer package recipe](installer-package.md)). No wizard file lists it. A module that is a
-  panel and nothing else - Design, Templates - has no unit: the wizard's
-  Setup step lists `Install\Setup::TOOL_MODULES` in `/nino/modules` whenever
-  their class exists. A feature carries the same unit and
+  selectable in the setup wizard (the [installer package recipe](installer-package.md)). No wizard file lists it. A module with nothing
+  to copy - `Maintenance`, which is a switch and a template - has no unit:
+  the wizard's Setup step lists `Install\Setup::TOOL_MODULES` in
+  `/nino/modules` whenever its class exists. A feature carries the same unit and
   `\Nino\Features::activate()` applies it, add-only, when the feature is
   switched on in the workbench - the [feature recipe](feature.md).
 - `'/nino/admin/restore'` (args `dataDir`, `staging`) is the callback a module

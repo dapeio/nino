@@ -20,11 +20,18 @@
 	'templates' => [
 		'html-header.tpl',
 		'html-footer.tpl',
-		// Not included by the base templates themselves, but by the frames
-		// that can replace them: footer/v2 renders it through
-		// [template /templates/html-socialmedia]. Without it here nothing
-		// ever copies the file into the project and that include silently
-		// resolves to an empty string
+		// The site's header and footer markup. html-header.tpl includes them as
+		// [template /templates/theme.header] rather than carrying them inline,
+		// so a project can rewrite either file without touching the page frame
+		// around it - and a missing include resolves to an empty string, which
+		// is exactly the silent no-header a delivery must never ship
+		'theme.header.tpl',
+		'theme.footer.tpl',
+		// Not included by theme.footer.tpl itself, but by a footer that
+		// replaces it: [template /templates/html-socialmedia]. It travels
+		// with the base unit so that include resolves in any project -
+		// without the file, it silently resolves to an empty string, and a
+		// footer bringing its own copy is a footer a project cannot swap
 		'html-socialmedia.tpl',
 		'robots.tpl',
 		'sitemap-xml.tpl',
@@ -45,6 +52,10 @@
 	'files' => [
 		'private',
 		'assets',
+		// The three webfaces theme.css declares. They came with the theme unit
+		// while a theme was something the wizard asked about; the look is
+		// fixed now, so they come with everything else that is
+		'fonts',
 		'images',
 		'favicon'
 	],

@@ -41,7 +41,7 @@ The included design system, with its base components and modules, provides a qui
 
 ![Textfill overview in the Nino workbench](docs/assets/screenshots/_admin1.webp)
 
-One management interface with one login. Developers set the project up and build its structure and appearance here; editors maintain its content here. Every screen is a panel, grouped into **Content** (elements, texts, images, submissions, log), **Structure** (templates, design, routes, navigations), **Features** (an installed feature's own panel, whatever group it names) and **System** (users and roles, languages and translations, backups, config, features); the shape of the content – element types, text keys, image slots – sits on tabs beside it. An account holds a role, a role one permission per panel or tab; the wizard writes Editor and Developer, and a panel an account may not use is not rendered.
+One management interface with one login. Developers set the project up and build its structure and appearance here; editors maintain its content here. Every screen is a panel, grouped into **Content** (elements, texts, images, submissions, log), **Structure** (routes, navigations), **Features** (an installed feature's own panel, whatever group it names) and **System** (users and roles, languages and translations, backups, config, features); the shape of the content – element types, text keys, image slots – sits on tabs beside it. An account holds a role, a role one permission per panel or tab; the wizard writes Editor and Developer, and a panel an account may not use is not rendered.
 
 The workbench provides full access for development, diagnostics and corrections, and a narrow, permission-controlled surface for daily editorial work. All changes can alternatively be made directly in the file system. `/_admin/recovery.php` is the way back in when the accounts themselves are broken.
 
@@ -58,7 +58,7 @@ The workbench provides full access for development, diagnostics and corrections,
        width="49%">
 </a>
 
-Every fresh checkout is configured through the wizard, which is what `/_admin` shows until it is done. It checks the environment, guides you through languages, theme, header, footer and design, copies the required assets, creates initial pages and basic information, creates the first developer accounts and sets the recovery password. Afterwards it locks itself out, and `_admin/install/` can be removed from a production delivery.
+Every fresh checkout is configured through the wizard, which is what `/_admin` shows until it is done. It checks the environment, guides you through languages and modules, copies the theme the base unit delivers along with the required assets, creates initial pages and basic information, creates the first developer accounts and sets the recovery password. Afterwards it locks itself out, and `_admin/install/` can be removed from a production delivery.
 
 #### The Template Builder — a feature, Alpha
 
@@ -84,37 +84,13 @@ The Template Builder preserves ordinary HTML+ source. Standalone template shortc
 
 > **Status: Alpha.** Preset manifests and generated `.tpl` markup are readable and extensible, but the library and composition workflow may still evolve. The panel belongs to the Template Builder feature from the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features) and is there while that feature is copied into `features/` and switched on in the Features panel.
 
-#### The Design panel — optional, Alpha
-
-<a href="docs/assets/screenshots/_design1.webp" target="_blank">
-  <img src="docs/assets/screenshots/_design1.webp"
-       alt="Theme catalogue in the Nino Design panel"
-       width="31%">
-</a>
-<a href="docs/assets/screenshots/_design2.webp" target="_blank">
-  <img src="docs/assets/screenshots/_design2.webp"
-       alt="Footer frame preview in the Nino Design panel"
-       width="31%">
-</a>
-<a href="docs/assets/screenshots/_design3.webp" target="_blank">
-  <img src="docs/assets/screenshots/_design3.webp"
-       alt="Colour settings and live page preview in the Nino Design panel"
-       width="31%">
-</a>
-
-The Design panel turns the site's visual foundation into a focused set of controlled choices. Developers can select a curated Theme, switch Header and Footer frames independently, and refine the shared colour palette and layout raster while previewing the complete website.
-
-It keeps presentation separate from content and template structure. Themes and frames are installed as ordinary CSS and `.tpl` files, while custom settings are written to the project's shared design layer. Changes can be previewed, reverted, and applied without rewriting page templates, and the resulting source remains available for precise manual refinement.
-
-> **Status: Alpha.** The appearance catalogue and editing workflow may still evolve. The panel is the optional kernel module `_nino/Nino/Modules/Design/`; a project switches it off in `/nino/modules`.
-
 ## What Nino includes
 
 * multilingual routing, texts, and content
 * a dedicated template system with shortcodes and a clear separation of HTML and PHP
 * one workbench for developers and editors, with roles, recovery and an optional section-first Template Builder for `.tpl` files (Alpha)
 * a file-based content model for textfills and recurring elements
-* themes, asset bundling, and frontend base components
+* one fixed theme, asset bundling, and frontend base components
 * forms, navigation, language selection, and image processing
 * installable features with a manifest, settings and versioned updates, switched on in the workbench - a newsletter and a search among those the [dapeio/nino-features](https://github.com/dapeio/nino-features) catalogue provides
 * users, granular permissions, login protection, and activity logs
@@ -171,9 +147,8 @@ router.php       Built-in server routing, for local development
 
 _nino/           Kernel and frontend core, one class per file under _nino/Nino/,
                  with every module Nino ships under _nino/Nino/Modules/: the
-                 ones every project needs and the optional Form, Navigation,
-                 Localepicker, Design and Templates, switched on or off in
-                 /nino/modules
+                 ones every project needs and the optional Form, Navigation
+                 and Localepicker, switched on or off in /nino/modules
 app/             Project-owned PHP classes under their own namespace
 features/        The features a project installs, one directory each with a
                  feature.php manifest, installed from the signed catalogue of
@@ -196,7 +171,7 @@ private/         Never served, only read by PHP - created by the wizard
 
 public/          Everything a browser loads directly - created by the wizard
   images/          Uploaded images
-  fonts/           Webfonts the active theme ships
+  fonts/           Webfonts the theme declares
   favicon/         The generated favicon set
   .cache/          The css and js bundles, built from private/assets/
 ```
@@ -210,12 +185,9 @@ php tests/kernel-smoke.php
 php tests/admin-smoke.php
 php tests/admin-system-smoke.php
 php tests/install-smoke.php
-php tests/design-smoke.php
-php tests/templates-smoke.php
 php tests/features-smoke.php
 php tests/catalogue-smoke.php
 for test in features/*/tests/*-smoke.php; do [ -e "$test" ] && php "$test"; done
-php tests/demo-catalogue-smoke.php
 for test in tests/*-js-smoke.js; do node "$test"; done
 php tests/concurrency-smoke.php
 ```
@@ -246,7 +218,6 @@ Nino deliberately keeps its architecture small: a central `$appData` array carri
 * **[Setup Wizard](docs/setup.md):** steps, writing rules, and library format
 * **[`/_admin` Workbench](docs/_admin.md):** every panel, accounts, roles, configuration, backups and recovery
 * **[Template Builder](https://github.com/dapeio/nino-features/blob/main/features/Templates/docs/templates.md):** composing page templates from complete HTML and template sections - a feature from the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features)
-* **[Design Panel](docs/appearance.md):** post-install Theme, Design, Header, and Footer editing
 * **[Features](docs/features.md):** installable packages - the manifest, the settings, activation and updates
 * **[Feature catalogue](https://github.com/dapeio/nino-features):** the features Nino publishes - newsletter and search among them - installed by copying a directory into `features/`
 * **[Deployment](docs/deployment.md):** web server, security, backups, and go-live
@@ -262,7 +233,6 @@ Nino as a whole is currently in the **Beta phase**. Individual optional tools ha
 | --- | --- |
 | Kernel, frontend, workbench and existing project foundation | Beta |
 | Template Builder (a feature from the [catalogue](https://github.com/dapeio/nino-features)) | Alpha |
-| Design panel | Alpha |
 
 Security fixes land directly on `main`; there is no separate LTS version yet.
 

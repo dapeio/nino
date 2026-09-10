@@ -4,10 +4,10 @@
 
 **Last updated:** September 7, 2026 · **Nino version:** 1.0.0-beta
 
-This manual explains the one management interface of a Nino project: `/_admin`, the workbench. Developers set the project up, build its structure and appearance here; editors maintain its content here. What an account sees is what its permissions allow. The wizard that turns a fresh checkout into a project is the workbench's first-run mode and has its own reference, the [Setup Wizard](setup.md); the [Design](appearance.md) panel has one as well, and so does the [Template Builder](https://github.com/dapeio/nino-features/blob/main/features/Templates/docs/templates.md), which is a feature from the catalogue rather than part of Nino.
+This manual explains the one management interface of a Nino project: `/_admin`, the workbench. Developers set the project up, build its structure and appearance here; editors maintain its content here. What an account sees is what its permissions allow. The wizard that turns a fresh checkout into a project is the workbench's first-run mode and has its own reference, the [Setup Wizard](setup.md); so does the [Template Builder](https://github.com/dapeio/nino-features/blob/main/features/Templates/docs/templates.md), which is a feature from the catalogue rather than part of Nino.
 
 **Additional Links:**
-[README](../README.md) · [Concepts](concepts.md) · [Developer Manual](development.md) · [Recipes](recipes/README.md) · [Getting Started](getting-started.md) · [Setup Wizard](setup.md) · [`/_admin` Workbench](_admin.md) · [Design Panel](appearance.md) · [Features](features.md) · [Deployment](deployment.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
+[README](../README.md) · [Concepts](concepts.md) · [Developer Manual](development.md) · [Recipes](recipes/README.md) · [Getting Started](getting-started.md) · [Setup Wizard](setup.md) · [`/_admin` Workbench](_admin.md) · [Features](features.md) · [Deployment](deployment.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
 
 **Security Note:** Every panel writes directly to configuration and project files. A developer account can change routing, data models, templates and the visible website; an editor account can change content. Work from a current Git state or another reliable backup, use HTTPS only, and give every account exactly the role it needs.
 
@@ -18,15 +18,15 @@ One login, one navigation, every screen a panel. The panels are grouped by what 
 | Group | Panels | Who |
 |---|---|---|
 | **Content** | Dashboard, Elements (Element Types), Text (Text Keys), Images (Image Slots), Submissions, Log | editors and developers |
-| **Structure** | Design, Routes, Navigations | developers |
+| **Structure** | Routes, Navigations | developers |
 | **Features** | whatever the active features bring | whoever holds the feature panel's own permission |
 | **System** | Users (User roles, Login protection), Language (Translations), Backups, Config, Features | developers – and every account for its own profile under Users |
 
 A screen in brackets is a **tab** of the panel before it: the Elements panel opens on the entries and carries Element Types as its second tab, so the shape of the content sits right beside the content. A tab is a screen of its own – with its own permission, so an editor sees Elements without Element Types, and its own deep link, `#types`.
 
-Submissions and Navigations belong to optional kernel modules and are present while their module is active; Templates and Design are optional kernel modules too, nothing but a panel each, switched on or off in `/nino/modules`. A **feature** - an installable package under `features/`, copied in from the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features) and switched on in the Features panel - brings its panel the same way - the catalogue's Newsletter feature adds a Newsletter panel, its Forms feature a Forms panel, its Search feature a Search panel, and a checkout ships none of them; every one of them lands in the rail's own Features group. The panels above that are in neither list are the workbench's own: `_admin` holds the shell, and every screen in it is a module under `_admin/Nino/Modules/<Name>/`, brought and taken away one directory at a time. A module a project adds, or a feature it installs, can bring a panel of its own the same way; see the [Developer Manual](development.md#panels-of-the-workbench) and [Features](features.md).
+Submissions and Navigations belong to optional kernel modules and are present while their module is active, switched on or off in `/nino/modules`. A **feature** - an installable package under `features/`, copied in from the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features) and switched on in the Features panel - brings its panel the same way - the catalogue's Newsletter feature adds a Newsletter panel, its Forms feature a Forms panel, its Template Builder a Templates panel, and a checkout ships none of them; every one of them lands in the rail's own Features group. The panels above that are in neither list are the workbench's own: `_admin` holds the shell, and every screen in it is a module under `_admin/Nino/Modules/<Name>/`, brought and taken away one directory at a time. A module a project adds, or a feature it installs, can bring a panel of its own the same way; see the [Developer Manual](development.md#panels-of-the-workbench) and [Features](features.md).
 
-There is no second tool. `/_editor`, `/_install`, `/_design` and `/_templates` of earlier versions are all here, and a reserved path of theirs is an ordinary page path now.
+There is no second tool. `/_editor`, `/_install`, `/_design` and `/_templates` of earlier versions are gone: what survived of them is a panel here or, for the Template Builder, a feature from the catalogue, and a reserved path of theirs is an ordinary page path now.
 
 Every panel label follows the interface language of the account. This manual names the English labels.
 
@@ -34,7 +34,7 @@ Every panel label follows the interface language of the account. This manual nam
 
 A fresh checkout has no project yet. Until the wizard's last step is completed, `/_admin` shows the wizard instead of the login: ten steps from the environment check to the accounts and the recovery password. The [Setup Wizard](setup.md) reference explains every step and what it writes.
 
-The wizard lives in `_admin/install/`. Once it has locked itself out, that directory can be removed from a production delivery; the Design panel then loses its Theme, Header and Footer catalogue and says so, and nothing else changes. Keep it deployed if those three are to stay switchable.
+The wizard lives in `_admin/install/`. Once it has locked itself out, that directory can be removed from a production delivery: nothing outside it reads its library, and everything it copied stays where it wrote it.
 
 ## Login, Accounts and Roles
 
@@ -60,8 +60,7 @@ A permission is one string per panel or tab; `/*` matches every path below it, s
 | Image Slots (tab of Images) | `/_admin/slots/manage` |
 | Submissions | `/_admin/submissions/view` |
 | Log | `/_admin/logs/view` |
-| Templates | `/_admin/templates/manage` |
-| Design | `/_admin/design/manage` |
+| Templates (the Template Builder feature) | `/_admin/templates/manage` |
 | Routes | `/_admin/routes/manage` |
 | Navigations | `/_admin/navs/manage` |
 | Users (own profile) | none – every account |
@@ -118,9 +117,9 @@ The rail on the left carries the brand, your account, the settings gear and the 
 - **Groups.** The navigation is divided into Content, Structure, Features and System with a heading each; a group with nothing in it - Features, on a project with none switched on - carries no heading at all. An account that sees one group alone gets a plain list.
 - **Tabs.** A panel with several screens carries a tab bar at the top of its pane – Elements and Element Types, Users, User roles and Login protection – and comes back on the tab you left it on. Every tab is a screen of its own: its permission, its deep link (`#roles`), its state.
 - **Fold.** The small chevron beside the brand folds the rail to a column of icons. A panel that needs the whole width – the Template Builder – folds it on its own and takes the reading-width ceiling off the pane; open it again by hand and it stays open, on every panel, until you fold it again. The choice is kept in the browser, not on the server.
-- **Deep links.** The address bar follows you: `#elements/team/ada` is the element you are editing, `#design/header` the Header editor. A reload or a bookmark opens exactly that state, and the browser's back button steps through it.
+- **Deep links.** The address bar follows you: `#elements/team/ada` is the element you are editing, `#types` the Element Types tab. A reload or a bookmark opens exactly that state, and the browser's back button steps through it.
 - **Settings gear.** Interface language and light or dark colour scheme. The language also selects the content locale the Text and Elements forms open with.
-- **Switching panels** never resets a panel: the Template Builder keeps its unsaved document, an element form its unsaved values, until you save or leave the page. Leaving with unsaved changes in the Templates or Design panel asks first.
+- **Switching panels** never resets a panel: the Template Builder keeps its unsaved document, an element form its unsaved values, until you save or leave the page. Leaving the Templates panel with unsaved changes asks first.
 
 Whatever panel is open, saving writes the project files immediately. There is no draft state and no separate publish step; check the frontend and every affected language afterwards.
 
@@ -180,12 +179,6 @@ How long entries stay and whether they are written at all is `/nino/form/retenti
 The **Templates** panel is the Template Builder: it composes the project's `page-*.tpl` files from complete sections – a searchable library of section presets, reusable `[template]` sections, the page's header and footer, and a native quick fill of the text a section brings. It is a workspace panel: the rail folds, and the template list, the section canvas and the inspector sit side by side.
 
 Everything it can do, its source safety rules and the preset library's manifest contract are in the Template Builder's [manual](https://github.com/dapeio/nino-features/blob/main/features/Templates/docs/templates.md). The panel belongs to the Template Builder feature from the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features) and is there while that feature is copied into `features/` and switched on in the Features panel.
-
-### Design
-
-The **Design** panel keeps the site's four appearance decisions editable after the wizard: **Theme** installs a complete visual baseline, **Header** and **Footer** replace one frame each, **Design** generates the colour palette and the size raster from a handful of settings and writes `assets/style.design.css`. The four are tabs inside the panel; the action button at the foot changes with the active tab.
-
-Theme, Header and Footer read the wizard's catalogue under `_admin/install/library/` and say so when it has been removed; Design generates rather than copies and keeps working either way. The settings, the token contract and the bundle order are in the [Design Panel](appearance.md) reference. The panel is the optional kernel module `_nino/Nino/Modules/Design/`; switched off in `/nino/modules`, it leaves the workbench.
 
 ### Element Types
 
@@ -359,9 +352,9 @@ The output is the complete file; write it to `private/.auth/pw.php`. Do this in 
 
 ## Recommended Workflow
 
-1. Run the wizard, then delete `_admin/install/` from the production delivery or keep it locked for the appearance catalogue.
+1. Run the wizard, then delete `_admin/install/` from the production delivery.
 2. Build the structure under **Element Types** (a tab of Elements), **Text Keys** (Text), **Image Slots** (Images), **Routes** and **Navigations**.
-3. Compose the pages under **Templates**, settle the look under **Design**, and check the result in the browser.
+3. Compose the pages under **Templates**, adjust `assets/theme.css` where the delivered look is not the one you want, and check the result in the browser.
 4. Fill the content under **Elements**, **Text** and **Images**; hand a language over under **Language › Translations**.
 5. Check the Dashboard and the two scans for missing definitions.
 6. Create the editor accounts under **Users** with the Editor role – add a role on the **User roles** tab where the two are not enough – and test what they see.
@@ -377,7 +370,6 @@ The output is the complete file; write it to `private/.auth/pw.php`. Do this in 
 | Saving fails | Write permissions of the affected file or directory. |
 | Template missing in **Routes** | Only existing `templates/page-*.tpl` files are offered. |
 | A page cannot be saved in **Templates** | Reload after an external edit, check unique section ids and unmatched `<section>` tags; see the Template Builder's [manual](https://github.com/dapeio/nino-features/blob/main/features/Templates/docs/templates.md). |
-| **Design** says no variants are available | `_admin/install/library/` was removed; the Design tab keeps working. |
 | Texts or images missing in a scan | Dynamic keys and images are not statically recognizable. |
 | Backup list is empty | Backups are switched off, or no authenticated request has happened today. |
 | Search returns no elements | The catalogue's Search feature in `features/` and switched on in the Features panel, `/nino/elements/index` in `config.php`, then **Create searchindex**. |
@@ -388,6 +380,5 @@ The output is the complete file; write it to `private/.auth/pw.php`. Do this in 
 
 - [Setup Wizard](setup.md) documents the ten first-run steps and the library format.
 - The **Template Builder** - page templates composed from whole sections - is a feature from the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features); its [manual](https://github.com/dapeio/nino-features/blob/main/features/Templates/docs/templates.md) is there too.
-- [Design Panel](appearance.md) explains the four appearance editors and the token contract.
 - [Developer Manual](development.md) describes APIs, modules, panels and direct work on project files.
 - [Deployment](deployment.md) covers web server, security, backups and go-live.

@@ -11,14 +11,10 @@
  *													<span id="install-nav-<key>"> + <div id="install-content-<key>">
  *													pair wired up in STEPS below - adding one is: one new pair in
  *													the page-wizard.tpl template, one entry in STEPS, and the
- *													step module (one file may serve related steps, as themes.js
- *													does for Themes, Header and Footer).
+ *													step module in assets/<key>.js.
  *
  *													"Next" both commits the current step's data (if it has any -
- *													Setup applies its picker, Themes applies the picked theme
- *													and defaults, Design writes the generated stylesheet,
- *													Header/Footer apply their individual frame,
- *													Webpages applies its page list,
+ *													Setup applies its picker, Webpages applies its page list,
  *													PersonalInfos saves its fields, Admin just checks an
  *													account exists) and advances, replacing what used to be
  *													each step's own save button. A step with nothing to commit
@@ -37,10 +33,6 @@
 		STEPS : [
 			{ key : 'checks', 				paneClass : 'show-checks' 				},
 			{ key : 'setup', 					paneClass : 'show-setup' 				},
-			{ key : 'themes', 				paneClass : 'show-themes' 				},
-			{ key : 'header', 				paneClass : 'show-header' 				},
-			{ key : 'footer', 				paneClass : 'show-footer' 				},
-			{ key : 'design', 				paneClass : 'show-design' 				},
 			{ key : 'webpages', 			paneClass : 'show-webpages' 			},
 			{ key : 'personalinfos', paneClass : 'show-personalinfos' },
 			{ key : 'accounts', 			paneClass : 'show-accounts' 		},
@@ -166,18 +158,6 @@
 			if( key === 'setup' && Nino.install.setup !== undefined )
 				return Nino.install.setup.apply( function( ok ) { callback( ok ) } );
 
-			if( key === 'themes' && Nino.install.themes !== undefined )
-				return Nino.install.themes.apply( function( ok ) { callback( ok ) } );
-
-			if( key === 'design' && Nino.install.design !== undefined )
-				return Nino.install.design.apply( function( ok ) { callback( ok ) } );
-
-			if( key === 'header' && Nino.install.header !== undefined )
-				return Nino.install.header.apply( function( ok ) { callback( ok ) } );
-
-			if( key === 'footer' && Nino.install.footer !== undefined )
-				return Nino.install.footer.apply( function( ok ) { callback( ok ) } );
-
 			if( key === 'webpages' && Nino.install.webpages !== undefined )
 				return Nino.install.webpages.apply( function( ok ) { callback( ok ) } );
 
@@ -201,8 +181,7 @@
 		 */
 		/**
 		 *	`fields` are sent beside the payload rather than inside it, for the
-		 *	things a step needs the server to know but must never store - the
-		 *	Design step's previewed mode is the one that exists
+		 *	things a step needs the server to know but must never store
 		 */
 		apiCall : function( action, payload, callback, fields ) {
 

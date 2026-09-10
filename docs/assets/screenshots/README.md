@@ -1,6 +1,6 @@
 # Screenshot-Briefing
 
-Die englische und die deutsche Root-README zeigen Nino in sechs Bereichen. Die Dateien werden unter diesem Verzeichnis abgelegt und relativ als `docs/assets/screenshots/<datei>.webp` eingebunden.
+Die englische und die deutsche Root-README zeigen Nino in fünf Bereichen. Die Dateien werden unter diesem Verzeichnis abgelegt und relativ als `docs/assets/screenshots/<datei>.webp` eingebunden.
 
 | Bereich | Dateien | Inhalt und Aussage |
 |---|---|---|
@@ -9,9 +9,10 @@ Die englische und die deutsche Root-README zeigen Nino in sechs Bereichen. Die D
 | Admin | `_admin1.webp` | Textfill-Übersicht; technische Kontrolle für Entwickler |
 | Editor | `_editor1.webp`, `_editor2.webp` | Elementbearbeitung und Bildplatzverwaltung; einfache tägliche Pflege für Redakteure |
 | Templates | `_templates1.webp`, `_templates2.webp`, `_templates3.webp` | Section-Canvas, Preset-Library und Live-Vorschau; visuelle Template-Komposition bei lesbarem Quelltext |
-| Design | `_design1.webp`, `_design2.webp`, `_design3.webp` | Theme, Footer-Frame und Farbeinstellungen; kontrollierte Gestaltung mit vollständiger Vorschau |
 
 Weitere Screenshots wie `admin-elements.webp`, `admin-text.webp`, `editor-elements.webp` und `editor-text.webp` bleiben in den jeweiligen Referenzhandbüchern eingebunden.
+
+Die drei Design-Panel-Screenshots liegen seit 1.2 nicht mehr hier: Sie sind mit dem Panel und seinem Katalog nach [`design-library/docs/assets/`](https://github.com/dapeio/nino-features/tree/main/design-library/docs/assets) in dapeio/nino-features gewandert und im dort archivierten Handbuch eingebunden.
 
 ## Empfohlene Aufbereitung
 
