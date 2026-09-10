@@ -541,7 +541,7 @@ main:has(> .nino-atf--fullscreen:first-child) {
 	overflow: hidden;
 	max-height: 200px;
 	opacity: .6;
-	transition: max-height .4s, opacity .4s;
+	transition: max-height .4s, padding-top .4s, padding-bottom .4s, border-top-width .4s, border-bottom-width .4s, opacity .4s;
 	background-color:var(--color-header-bg);
 }
 body.nino-scroll-atf .nino-scroll-header {
@@ -551,8 +551,23 @@ body.nino-scroll-atf .nino-scroll-header {
 .nino-scroll-header:hover {
 	opacity: 1;
 }
+/* Collapsed means gone. A header preset gives its bar a height with
+   min-height, with vertical padding and with a border, and none of the three
+   yields to max-height: min-height wins over it outright, padding is never
+   squeezed below what it asks for, and a border is drawn whatever the box
+   does. So the collapsed state takes all of them back here, rather than every
+   preset having to know that this rule exists - which is what went wrong:
+   five presets, five bars that stayed on screen.
+
+   A preset that is not a bar opts out where it says so - the sidebar rail
+   sets max-height: none for itself above its own breakpoint. */
 body.nino-scroll-down .nino-scroll-header {
 	max-height: 0;
+	min-height: 0;
+	padding-top: 0;
+	padding-bottom: 0;
+	border-top-width: 0;
+	border-bottom-width: 0;
 }
 
 

@@ -617,6 +617,60 @@ foreach( [ 'header', 'footer' ] as $kind )
 
 check( 'every shipped frame previews'. ( $framePreviewFailures === [] ? '' : ' - '. implode( ', ', $framePreviewFailures ) ), $framePreviewFailures === [] );
 
+// --- a header that scrolls away really goes ---------------------------------
+
+// max-height is the weakest of the four ways a box keeps its height:
+// min-height beats it outright, padding is never squeezed below what it asks
+// for, and a border is drawn whatever the box does. Every header preset uses
+// at least one of them to give its bar a height, so the collapsed state has
+// to take all of them back - the rule that only said max-height: 0 left five
+// of six bars sitting on screen while the page scrolled under them
+$collapsed = '';
+
+if( preg_match( '/body\.nino-scroll-down\s+\.nino-scroll-header\s*\{([^}]*)\}/', (string) file_get_contents( __DIR__. '/../_nino/Nino.css' ), $match ) === 1 )
+	$collapsed = $match[1];
+
+check( 'the collapsed header takes back every way a preset gave its bar a height', $collapsed !== ''
+	&& preg_match( '/max-height:\s*0/', $collapsed ) === 1 && preg_match( '/min-height:\s*0/', $collapsed ) === 1
+	&& preg_match( '/padding-top:\s*0/', $collapsed ) === 1 && preg_match( '/padding-bottom:\s*0/', $collapsed ) === 1
+	&& preg_match( '/border-top-width:\s*0/', $collapsed ) === 1 && preg_match( '/border-bottom-width:\s*0/', $collapsed ) === 1 );
+
+// And a preset must not reach for the one thing that rule cannot take back.
+// A plain height on the bar would survive all of it - so no preset has one,
+// and this is where the next one finds that out
+$fixedHeight = [];
+
+foreach( glob( __DIR__. '/../_admin/install/library/header/*', GLOB_ONLYDIR ) ?: [] as $preset ) {
+
+	$template = (string) file_get_contents( $preset. '/template.tpl' );
+	$style		= (string) file_get_contents( $preset. '/style.css' );
+
+	if( preg_match( '/class="([^"]*nino-scroll-header[^"]*)"/', $template, $match ) !== 1 )
+		continue;
+
+	foreach( preg_split( '/\s+/', trim( $match[1] ) ) ?: [] as $class ) {
+
+		// A preset that is not a bar says so for itself: the sidebar rail hands
+		// max-height back above its own breakpoint, and from there its height is
+		// the layout's business rather than this rule's
+		if( preg_match( '/body\.nino-scroll-down[^{}]*\.'. preg_quote( $class, '/' ). '\s*\{[^}]*max-height:\s*none/', $style ) === 1 )
+			continue;
+
+		// Every block whose selector ends on one of the bar's own classes
+		if( preg_match_all( '/([^{}]*\.'. preg_quote( $class, '/' ). ')\s*\{([^}]*)\}/', $style, $blocks, PREG_SET_ORDER ) === 0 )
+			continue;
+
+		foreach( $blocks as $found )
+			if( preg_match( '/(?<![a-z-])height:\s*(?!auto)/', $found[2] ) === 1 )
+				$fixedHeight[] = basename( $preset ). ' ('. $class. ')';
+	}
+}
+
+check( 'and no preset gives its bar a height the collapsed state cannot take back'. ( $fixedHeight === [] ? '' : ' - '. implode( ', ', array_unique( $fixedHeight ) ) ), $fixedHeight === [] );
+
+echo "\n";
+
+
 // --- Design: the generated token layer ---------------------------------
 
 $_POST['data'] = json_encode( [ 'theme' => 'basis' ] );

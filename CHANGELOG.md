@@ -249,6 +249,20 @@ and a seam a submission can be refused at.
   and the gap in a row's buttons, which the script builds without
   whitespace between them and which therefore had none.
 
+### Fixed
+
+- **A header that scrolls away really goes.** `body.nino-scroll-down
+  .nino-scroll-header` set `max-height: 0` and nothing else, and max-height is
+  the weakest of the four ways a box keeps its height: min-height beats it
+  outright, padding is never squeezed below what it asks for, and a border is
+  drawn whatever the box does. Every one of the six shipped header presets uses
+  at least one of them, so five of six stayed on screen while the page scrolled
+  under them and the sixth left its border. The collapsed state takes all four
+  back now, rather than every preset having to know the rule exists; a preset
+  that is not a bar still opts out where it says so, as the sidebar rail does
+  above its own breakpoint.
+
+
 ## 1.1.0-beta — 2026-09-07
 
 Features. An installable package is one directory below `features/` with a
