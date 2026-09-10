@@ -543,7 +543,6 @@ check( 'Footer is an independent pane and applies only its own frame', nodes['th
 const template = fs.readFileSync( path.join( __dirname, '../_nino/Nino/Modules/Design/templates/panel.tpl' ), 'utf8' );
 const css = fs.readFileSync( path.join( __dirname, '../_nino/Nino/Modules/Design/assets/style.css' ), 'utf8' );
 const adminTemplate = fs.readFileSync( path.join( __dirname, '../_admin/templates/page-index.tpl' ), 'utf8' );
-const templatesTemplate = fs.readFileSync( path.join( __dirname, '../_nino/Nino/Modules/Templates/templates/panel.tpl' ), 'utf8' );
 
 check( 'template navigation and content contain one matching pair per dialog', [ 'theme', 'design', 'header', 'footer' ].every( function( tab ) {
 	return template.indexOf('id="theme-nav-'+ tab+ '"') !== -1 && template.indexOf('id="theme-content-'+ tab+ '"') !== -1;
@@ -553,11 +552,9 @@ check( 'one shared action bar changes responsibility with the active dialog - it
 	&& source.indexOf("design \t: '/_admin/design/label/save-design'") !== -1
 	&& template.indexOf('class="nino-admin-btn-primary" id="theme-action-save">[[/_admin/design/label/apply-theme]]</button>') !== -1
 	&& sandbox.Nino.content.getText('/_admin/design/label/save-design') === 'Save Design' );
-check( 'the two module panels are fragments the workbench renders into its pane, with no chrome of their own',
+check( 'the module panel is a fragment the workbench renders into its pane, with no chrome of its own',
 	template.includes('<html') === false
 	&& template.includes('nino-admin-rail') === false
-	&& templatesTemplate.includes('<html') === false
-	&& templatesTemplate.includes('nino-admin-rail') === false
 	&& adminTemplate.includes('[[/_admin/panes]]')
 	&& adminTemplate.includes('admin-tools') === false );
 check( 'the four editors are a tab strip inside the pane - the shell\'s own tab bar, not a second rail', template.includes('class="nino-admin-tabs nino-admin-tabs--bar theme-tabs" role="tablist"')

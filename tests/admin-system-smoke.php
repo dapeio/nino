@@ -2314,7 +2314,7 @@ check( 'a pane with tabs carries the shared tab bar, its own screen first, and a
 // pane spelled differently on the two sides is a panel whose tab opens on
 // nothing, with no error anywhere (the bundler skips a missing file)
 $shipped = $appData;
-$shipped['/nino/modules'] = array_merge( \Nino\AppData::DEFAULTS['/nino/modules'], [ '\\Nino\\Modules\\Form', '\\Nino\\Modules\\Navigation', '\\Nino\\Modules\\Design', '\\Nino\\Modules\\Templates', '\\Nino\\Modules\\Maintenance' ] );
+$shipped['/nino/modules'] = array_merge( \Nino\AppData::DEFAULTS['/nino/modules'], [ '\\Nino\\Modules\\Form', '\\Nino\\Modules\\Navigation', '\\Nino\\Modules\\Design', '\\Nino\\Modules\\Maintenance' ] );
 $missingAssets = [];
 $missingPanes = [];
 foreach( \Nino\Admin\Admin::allPanels( $shipped ) as $uri => $panel ) {
@@ -2487,7 +2487,7 @@ foreach( [ 'en_US', 'de_DE', 'fr_FR' ] as $locale ) {
 	// The registry has to actually contain the app panels, or this whole check
 	// silently proves nothing about the files it was written for
 	if( $locale === 'en_US' )
-		check( 'the render check covers the runtime modules\' panels too', isset( \Nino\Admin\Admin::allPanels( $render )['templates'] ) === true && isset( \Nino\Admin\Admin::allPanels( $render )['design'] ) === true );
+		check( 'the render check covers the runtime modules\' panels too', isset( \Nino\Admin\Admin::allPanels( $render )['design'] ) === true && isset( \Nino\Admin\Admin::allPanels( $render )['maintenance'] ) === true );
 
 	preg_match_all( '/\[\[([^\]\[]+)\]\]/', \Nino\Html::renderHtml( $render, $markup ), $left );
 
@@ -2853,10 +2853,6 @@ check( '...the whole value stays on the one line, attributed to who wrote it', c
 // is how the whole Templates panel logged nothing. So: the handler of every
 // one of these actions is the class asked, and it answers
 $described = [
-	[ \Nino\Modules\Templates\Documents::class,		'documents/save',			[ 'name' => 'page-x' ],						'page-x' ],
-	[ \Nino\Modules\Templates\Documents::class,		'documents/delete',		[ 'name' => 'page-x' ],						'page-x' ],
-	[ \Nino\Modules\Templates\Content::class,			'content/type-create',	[ 'uri' => '/cards' ],							'/cards' ],
-	[ \Nino\Modules\Templates\Content::class,			'content/image-create',	[ 'uri' => '/page-x/hero/background' ],	'/page-x/hero/background' ],
 	[ \Nino\Modules\Routes\Admin::class,						'routes/save',				[ 'httpUri' => '/x' ],							'/x' ],
 	[ \Nino\Modules\Routes\Admin::class,						'routes/delete',			[ 'httpUri' => '/x' ],							'/x' ],
 	[ \Nino\Modules\Config\Admin::class,						'config/save',				[ 'fields' => [ '/nino/cache/ttl' => 1 ] ],	'/nino/cache/ttl' ],

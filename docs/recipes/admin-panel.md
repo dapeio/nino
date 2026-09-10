@@ -1,7 +1,7 @@
 # Recipe: Add a panel to the workbench
 
 **Additional Links:**
-[Agent guide](../../AGENTS.md) · [All recipes](README.md) · [Developer Manual](../development.md) · [Concepts](../concepts.md) · [`/_admin` Workbench](../_admin.md) · [Setup Wizard](../setup.md) · [Templates Panel](../templates.md) · [Features](../features.md)
+[Agent guide](../../AGENTS.md) · [All recipes](README.md) · [Developer Manual](../development.md) · [Concepts](../concepts.md) · [`/_admin` Workbench](../_admin.md) · [Setup Wizard](../setup.md) · [Features](../features.md)
 
 One of the seven extension recipes of the [Nino agent guide](../../AGENTS.md). Its
 rules - the required workflow, the core runtime model, the conventions and the
@@ -21,9 +21,9 @@ Two kinds of panel exist, and the class looks the same for both:
   "Panels, the installer unit and Restore" in the [runtime module
   recipe](runtime-module.md)) and exists exactly while that module is active. Prefer it whenever the
   screen belongs to a module or a feature: it then ships, and is removed, as
-  one directory. `Modules\Form` (Submissions), `Modules\Navigation`,
-  `Modules\Design` and `Modules\Templates` are built this way as kernel
-  modules, `Modules\Newsletter` and `Modules\Search` as features from the
+  one directory. `Modules\Form` (Submissions), `Modules\Navigation` and
+  `Modules\Design` are built this way as kernel modules, `Modules\Templates`,
+  `Modules\Newsletter` and `Modules\Search` as features from the
   catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features),
   copied under `features/` (the [feature recipe](feature.md)).
 - A **workbench panel** is a module under `_admin/Nino/Modules/<Name>/`, the
@@ -366,8 +366,8 @@ shell's. The file is a fragment: no `<html>`, no `[csrf]` (the page has one),
 no `<link>` or `<script>` (the panel's `assets()` are bundled). Every id and
 class in it is the panel's own; the components are the design system's.
 `_nino/Nino/Modules/Design` (four editors under a tab strip, `layout()` =
-`'page'`) and `_nino/Nino/Modules/Templates` (the Template Builder, `layout()` =
-`'workspace'`) are the shipped references:
+`'page'`) and the Template Builder feature (`features/Templates` once copied
+in, `layout()` = `'workspace'`) are the references:
 
 ```php
 public static function template(): string {

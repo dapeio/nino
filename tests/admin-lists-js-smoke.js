@@ -58,7 +58,7 @@ function moduleScripts( root, modules ) {
 }
 // The optional kernel modules that bring a panel, and every feature the
 // checkout carries - the directory is the list, as for the workbench's own
-const KERNEL_MODULES = [ 'Form', 'Navigation', 'Design', 'Templates' ];
+const KERNEL_MODULES = [ 'Form', 'Navigation', 'Design' ];
 const FEATURES = fs.readdirSync( path.join( __dirname, '../features' ), { withFileTypes : true } ).filter( e => e.isDirectory() ).map( e => e.name ).sort();
 const APP_MODULES = KERNEL_MODULES.concat( FEATURES );
 
@@ -350,13 +350,6 @@ panelMarkup.forEach( function( file ) {
 } );
 check( 'no panel writes a sentence of its own into its markup'+ ( hardcodedMarkup.length ? ' - '+ hardcodedMarkup.slice( 0, 5 ).join( ', ' ) : '' ), hardcodedMarkup.length === 0 );
 
-// The Template Builder is the panel this was written for: 3400 lines that used
-// to carry every word in the source, and now carry none
-[ 'script.js', 'sections.js', 'composer.js', 'area-composer.js' ].forEach( function( file ) {
-	const source = fs.readFileSync( path.join( __dirname, '../_nino/Nino/Modules/Templates/assets/', file ), 'utf8' );
-	check( 'the Template Builder\'s '+ file+ ' speaks through the text system', source.includes( "Nino.content.getText('/_admin/templates/" ) );
-} );
-
 check( 'destructive Admin controls all use the shared danger treatment',
 	[ [ 'Elements', 'types.js' ], [ 'Users', 'admin.js' ], [ 'Users', 'roles.js' ], [ 'Backups', 'admin.js' ] ]
 		.every( e => adminAsset( e[0], e[1] ).includes("className = 'nino-admin-btn-danger'") ) );
@@ -414,7 +407,6 @@ check( 'the shared design system owns the rail fold and the workspace layout, so
 const TOOL_ROOTS = {
 	'_admin/assets/style.css'                        : '#admin-page-wrap',
 	'_admin/install/assets/style.css'                  : '#install-page-wrap',
-	'_nino/Nino/Modules/Templates/assets/style.css'    : '#pd-app',
 	'_nino/Nino/Modules/Design/assets/style.css'       : '#theme-page-wrap',
 };
 
@@ -472,7 +464,7 @@ const TOOL_TEMPLATES = {
 // A module panel's template is a fragment the workbench renders into its
 // pane: it links nothing, its files join the workbench's bundles (see the
 // panel's assets())
-[ '_nino/Nino/Modules/Templates/templates/panel.tpl', '_nino/Nino/Modules/Design/templates/panel.tpl' ].forEach( function( file ) {
+[ '_nino/Nino/Modules/Design/templates/panel.tpl' ].forEach( function( file ) {
 	const markup = read( file );
 	check( file+ ' is a fragment with no head, no stylesheet link and no script of its own',
 		markup.includes('<html') === false && markup.includes('<link') === false && markup.includes('<script') === false );

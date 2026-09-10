@@ -7,7 +7,7 @@
 Dieses Handbuch führt eine fertig entwickelte Nino-Webseite in den produktiven Betrieb. Falls du stattdessen ein frisches Projekt einrichten möchtest, beginne mit [Erste Schritte](getting-started.de.md); technische Erweiterungen behandelt das [Entwickler-Handbuch](development.de.md).
 
 **Weitere Links:**
-[README](../README.de.md) · [Grundkonzepte](concepts.de.md) · [Entwickler-Handbuch](development.de.md) · [Rezepte](recipes/README.md) · [Erste Schritte](getting-started.de.md) · [Einrichtungsassistent](setup.de.md) · [`/_admin`-Workbench](_admin.de.md) · [Templates-Panel](templates.de.md) · [Design-Panel](appearance.de.md) · [Features](features.de.md) · [Deployment](deployment.de.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
+[README](../README.de.md) · [Grundkonzepte](concepts.de.md) · [Entwickler-Handbuch](development.de.md) · [Rezepte](recipes/README.md) · [Erste Schritte](getting-started.de.md) · [Einrichtungsassistent](setup.de.md) · [`/_admin`-Workbench](_admin.de.md) · [Design-Panel](appearance.de.md) · [Features](features.de.md) · [Deployment](deployment.de.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
 
 ## Voraussetzungen des Zielsystems
 Nino benötigt weder Datenbankserver noch Composer-Installation auf dem Zielsystem. Das vereinfacht zwar das Deployment, macht die Dateien des Projekts aber umso wichtiger: Konfiguration und redaktionelle Daten liegen direkt im Dateisystem und müssen beim Übertragen, Sichern und Berechtigen vollständig berücksichtigt werden.
@@ -67,7 +67,7 @@ Prüfe in der Hosting-Konfiguration zusätzlich, wie nicht vorhandene Pfade an `
 - Zugriffe auf Dotfiles und Dot-Verzeichnisse verweigern;
 - **`private/` vollständig sperren** – es wird nie von einem Browser angefragt, sondern nur von PHP gelesen;
 - **`app/` und `features/` vollständig sperren** – die eigenen Klassen des Projekts und die installierten Features sind serverseitiger Quelltext, den nie ein Browser anfragt; beide bringen für Apache eine eigene `.htaccess` mit;
-- direkte Zugriffe auf `_admin/install/library/` bis auf `_admin/install/library/themes/<key>/preview.svg` sperren – die übrigen Dateien sind serverseitige Darstellungsquellen; dasselbe gilt für die Section-Presets unter `_nino/Nino/Modules/Templates/library/`;
+- direkte Zugriffe auf `_admin/install/library/` bis auf `_admin/install/library/themes/<key>/preview.svg` sperren – die übrigen Dateien sind serverseitige Darstellungsquellen; dasselbe gilt für die Section-Presets unter `features/Templates/library/`, wo ein Projekt sie liegen hat, das den Template-Baukasten installiert hat;
 - Verzeichnisauflistung deaktivieren;
 - den HTTP-Header `Authorization` an PHP weitergeben. Bei nginx/PHP-FPM ist dafür normalerweise `fastcgi_param HTTP_AUTHORIZATION $http_authorization;` in der PHP-Location erforderlich;
 - PHP-Quell- und Datendateien nicht als Text ausliefern.
@@ -152,7 +152,7 @@ Vergib Redaktionsrechte so eng wie praktisch möglich; die Konten, die der Assis
 
 HTTPS schützt nicht nur Anmeldedaten, sondern auch Sitzungs-Cookies und alle redaktionell übertragenen Inhalte. Leite HTTP-Anfragen dauerhaft auf HTTPS um und teste die Anmeldung nur über die endgültige öffentliche Adresse.
 
-Zusätzlicher Webserver-Schutz für `/_admin` – etwa IP-Freigaben oder HTTP-Authentifizierung – kann bei passenden Betriebsbedingungen eine sinnvolle zweite Barriere bilden. Er ersetzt die Konten nicht. Die beiden Entwickler-Panels, die als optionale Kernel-Module ausgeliefert werden, Templates und Design, lassen sich aus einer Produktivauslieferung herausnehmen, indem `\Nino\Modules\Templates` und `\Nino\Modules\Design` aus `/nino/modules` entfernt werden; die Workbench selbst bleibt, weil die Redaktion darin arbeitet.
+Zusätzlicher Webserver-Schutz für `/_admin` – etwa IP-Freigaben oder HTTP-Authentifizierung – kann bei passenden Betriebsbedingungen eine sinnvolle zweite Barriere bilden. Er ersetzt die Konten nicht. Das Panel Design wird als optionales Kernel-Modul ausgeliefert und lässt sich aus einer Produktivauslieferung herausnehmen, indem `\Nino\Modules\Design` aus `/nino/modules` entfernt wird; der Template-Baukasten ist ein Feature, sein ganzes Verzeichnis kann also aus `features/` verschwinden – genau dafür ist er eines; die Workbench selbst bleibt, weil die Redaktion darin arbeitet.
 
 ## Der Assistent nach der Einrichtung
 
@@ -205,7 +205,7 @@ Die Smoke-Tests ersetzen keinen projektspezifischen Abnahmetest. Prüfe zusätzl
 - Anmeldung, Abmeldung und die Rechte eines Redaktionskontos in `/_admin`;
 - den Zugang eines Entwicklerkontos zu den Panels von Struktur und System;
 - alle vier Tabs des Design-Panels einschließlich einer Frame-Vorschau, sofern das Modul ausgeliefert wird;
-- Zugriff und unveränderten Round-Trip im Templates-Panel, sofern das Modul ausgeliefert wird;
+- Zugriff und unveränderten Round-Trip im Template-Baukasten, sofern das Feature installiert ist;
 - Schreiben und erneutes Laden eines redaktionellen Inhalts;
 - Verhalten hinter CDN, Proxy oder Cache, sofern eingesetzt.
 
@@ -259,7 +259,7 @@ Nino befindet sich in der Beta-Phase. Sicherheitskorrekturen erscheinen auf `mai
 - [ ] Der Einrichtungsassistent wurde vollständig abgeschlossen und `_admin/install/` anschließend produktiv entfernt.
 - [ ] Wird `_admin/install/` mitgeliefert, um Theme/Header/Footer umschaltbar zu halten, ist es gesperrt und von seinem Katalog sind nur die Theme-Vorschauen direkt erreichbar.
 - [ ] Entwickler- und Redaktionskonten sind getestet, und das Recovery-Passwort ist sicher verwahrt.
-- [ ] Die Module Design und Templates sind entweder in `/nino/modules` abgeschaltet oder bewusst als Alpha behalten, und nur Entwicklerkonten erreichen sie.
+- [ ] Das Modul Design ist entweder in `/nino/modules` abgeschaltet oder bewusst als Alpha behalten, der Template-Baukasten entweder aus `features/` entfernt oder bewusst behalten, und nur Entwicklerkonten erreichen beides.
 - [ ] Editor-Nutzer haben nur die benötigten Berechtigungen.
 - [ ] HTTPS und sichere Session-Cookies funktionieren an der endgültigen Adresse.
 - [ ] Fehleranzeige ist deaktiviert und Fehlerprotokollierung geprüft.
@@ -272,6 +272,6 @@ Nino befindet sich in der Beta-Phase. Sicherheitskorrekturen erscheinen auf `mai
 
 - [Erste Schritte](getting-started.de.md) beschreibt die notwendige Ersteinrichtung.
 - [`/_admin`-Workbench](_admin.de.md) erklärt jedes Panel, die Konten, Sicherungen und die Recovery-Seite.
-- [Templates-Panel](templates.de.md) beschreibt den optionalen Template-Builder im Alpha-Status.
+- Der **Template-Baukasten** – Seitentemplates aus ganzen Abschnitten – ist ein Feature aus dem Katalog [dapeio/nino-features](https://github.com/dapeio/nino-features); sein [Handbuch](https://github.com/dapeio/nino-features/blob/main/features/Templates/docs/templates.de.md) liegt dort ebenfalls.
 - [Design-Panel](appearance.de.md) beschreibt die vier Erscheinungsbild-Editoren.
 - [Grundkonzepte](concepts.de.md) erklärt die technische Struktur hinter dem deployten Projekt.

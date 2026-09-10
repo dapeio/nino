@@ -60,7 +60,7 @@ Die Workbench bietet vollständigen Zugriff für Entwicklung, Diagnose und Korre
 
 Jeder frische Checkout wird über den Assistenten eingerichtet – das, was `/_admin` zeigt, bis er abgeschlossen ist. Er prüft die Umgebung, führt durch Sprachen, Theme, Header, Footer und Design, übernimmt die benötigten Assets, legt erste Seiten und Basisinformationen an, erstellt die ersten Entwicklerkonten und setzt das Recovery-Passwort. Danach sperrt er sich selbst aus, und `_admin/install/` kann aus einer Produktivauslieferung entfernt werden.
 
-#### Das Templates-Panel – optional, Alpha
+#### Der Template-Baukasten – ein Feature, Alpha
 
 <a href="docs/assets/screenshots/_templates1.webp" target="_blank">
   <img src="docs/assets/screenshots/_templates1.webp"
@@ -82,7 +82,7 @@ Der Template Builder macht aus `page-*.tpl`-Dateien eine übersichtliche Abfolge
 
 Der Template Builder bewahrt normales HTML+. Alleinstehende Template-Shortcodes lassen sich direkt über **Add section** wählen und bleiben verschiebbare Canvas-Bausteine; Header und Footer sind gewöhnliche `[template]`-Shortcodes, werden aber sicher über feste Template Settings verwaltet. Anzeigename und VPA-Standard stehen als inerte Metadaten am Dateianfang. Sonstiger Quelltext bleibt gesperrt und bytegenau erhalten. Für codebasierte Sections gibt es einen bewussten HTML+-Escape-Hatch.
 
-> **Status: Alpha.** Preset-Manifeste und erzeugtes `.tpl`-Markup bleiben lesbar und erweiterbar; Library und Arbeitsablauf können sich noch weiterentwickeln. Das Panel ist das optionale Kernel-Modul `_nino/Nino/Modules/Templates/`; ein Projekt schaltet es in `/nino/modules` ab.
+> **Status: Alpha.** Preset-Manifeste und erzeugtes `.tpl`-Markup bleiben lesbar und erweiterbar; Library und Arbeitsablauf können sich noch weiterentwickeln. Das Panel gehört zum Template-Baukasten-Feature aus dem Katalog [dapeio/nino-features](https://github.com/dapeio/nino-features) und ist da, solange das Feature nach `features/` kopiert und im Panel Features eingeschaltet ist.
 
 #### Das Design-Panel – optional, Alpha
 
@@ -246,7 +246,7 @@ Nino hält seine Architektur bewusst klein: Ein zentrales `$appData`-Array träg
 * **[Erste Schritte](docs/getting-started.de.md):** vom Checkout zur eingerichteten Webseite
 * **[Einrichtungsassistent](docs/setup.de.md):** Schritte, Schreibregeln und Library-Format
 * **[`/_admin`-Workbench](docs/_admin.de.md):** jedes Panel, Konten, Rollen, Konfiguration, Backups und Recovery
-* **[Templates-Panel](docs/templates.de.md):** Seitentemplates aus vollständigen HTML- und Template-Sections zusammensetzen
+* **[Template-Baukasten](https://github.com/dapeio/nino-features/blob/main/features/Templates/docs/templates.de.md):** Seitentemplates aus vollständigen HTML- und Template-Sections zusammensetzen – ein Feature aus dem Katalog [dapeio/nino-features](https://github.com/dapeio/nino-features)
 * **[Design-Panel](docs/appearance.de.md):** Theme, Design, Header und Footer nach der Installation bearbeiten
 * **[Features](docs/features.de.md):** installierbare Pakete – Manifest, Einstellungen, Aktivierung und Updates
 * **[Feature-Katalog](https://github.com/dapeio/nino-features):** die Features, die Nino veröffentlicht – Newsletter und Suche darunter –, installiert durch Kopieren eines Verzeichnisses nach `features/`
@@ -262,7 +262,7 @@ Nino befindet sich als Gesamtprojekt derzeit in der **Beta-Phase**. Einzelne opt
 | Bereich                                          | Status                                    |
 | ------------------------------------------------ | ----------------------------------------- |
 | Kernel, Frontend, Workbench und bestehende Projektgrundlage | Beta                           |
-| Templates-Panel (Template Builder)               | Alpha                                     |
+| Template-Baukasten (Feature aus dem [Katalog](https://github.com/dapeio/nino-features)) | Alpha                                     |
 | Design-Panel                                     | Alpha                                     |
 
 Sicherheitskorrekturen landen direkt auf `main`; eine separate LTS-Version gibt es noch nicht.

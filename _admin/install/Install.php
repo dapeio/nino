@@ -387,7 +387,7 @@ namespace Nino\Install {
 		// unit the wizard would apply (see the module's own docblock), so
 		// there is nothing for a picker checkbox to control - only whether
 		// its class is part of this delivery
-		public const array TOOL_MODULES = [ '\\Nino\\Modules\\Design', '\\Nino\\Modules\\Templates', '\\Nino\\Modules\\Maintenance' ];
+		public const array TOOL_MODULES = [ '\\Nino\\Modules\\Design', '\\Nino\\Modules\\Maintenance' ];
 
 		// Unit keys (see units()) that used to be a picker choice and are now
 		// applied on every apply, exactly like a module a project actually

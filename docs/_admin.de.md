@@ -4,10 +4,10 @@
 
 **Stand:** 7. September 2026 · **Nino-Version:** 1.0.0-beta
 
-Dieses Handbuch erklärt die eine Verwaltungsoberfläche eines Nino-Projekts: `/_admin`, die Workbench. Entwickler richten das Projekt hier ein und bauen Struktur und Erscheinungsbild; Redakteure pflegen hier die Inhalte. Was ein Konto sieht, bestimmen seine Rechte. Der Assistent, der aus einem frischen Checkout ein Projekt macht, ist der Erststart-Modus der Workbench und hat eine eigene Referenz, den [Einrichtungsassistenten](setup.de.md); die beiden großen Entwickler-Panels ebenfalls: [Templates](templates.de.md) und [Design](appearance.de.md).
+Dieses Handbuch erklärt die eine Verwaltungsoberfläche eines Nino-Projekts: `/_admin`, die Workbench. Entwickler richten das Projekt hier ein und bauen Struktur und Erscheinungsbild; Redakteure pflegen hier die Inhalte. Was ein Konto sieht, bestimmen seine Rechte. Der Assistent, der aus einem frischen Checkout ein Projekt macht, ist der Erststart-Modus der Workbench und hat eine eigene Referenz, den [Einrichtungsassistenten](setup.de.md); das Panel [Design](appearance.de.md) ebenfalls, und der [Template-Baukasten](https://github.com/dapeio/nino-features/blob/main/features/Templates/docs/templates.de.md) auch – der allerdings ist ein Feature aus dem Katalog und nicht Teil von Nino.
 
 **Weitere Links:**
-[README](../README.de.md) · [Grundkonzepte](concepts.de.md) · [Entwickler-Handbuch](development.de.md) · [Rezepte](recipes/README.md) · [Erste Schritte](getting-started.de.md) · [Einrichtungsassistent](setup.de.md) · [`/_admin`-Workbench](_admin.de.md) · [Templates-Panel](templates.de.md) · [Design-Panel](appearance.de.md) · [Features](features.de.md) · [Deployment](deployment.de.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
+[README](../README.de.md) · [Grundkonzepte](concepts.de.md) · [Entwickler-Handbuch](development.de.md) · [Rezepte](recipes/README.md) · [Erste Schritte](getting-started.de.md) · [Einrichtungsassistent](setup.de.md) · [`/_admin`-Workbench](_admin.de.md) · [Design-Panel](appearance.de.md) · [Features](features.de.md) · [Deployment](deployment.de.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
 
 **Sicherheitshinweis:** Jedes Panel schreibt unmittelbar in Konfiguration und Projektdateien. Ein Entwicklerkonto kann Routing, Datenmodelle, Templates und die sichtbare Webseite verändern, ein Redaktionskonto die Inhalte. Arbeite mit einem aktuellen Git-Stand oder einer anderen verlässlichen Sicherung, ausschließlich über HTTPS, und gib jedem Konto genau die Rolle, die es braucht.
 
@@ -18,7 +18,7 @@ Ein Login, eine Navigation, jeder Bildschirm ein Panel. Die Panels sind danach g
 | Gruppe | Panels | Wer |
 |---|---|---|
 | **Inhalt** | Dashboard, Elemente (Elementtypen), Texte (Textschlüssel), Bilder (Bildplätze), Anfragen, Log | Redakteure und Entwickler |
-| **Struktur** | Templates, Design, Routen, Navigationen | Entwickler |
+| **Struktur** | Design, Routen, Navigationen | Entwickler |
 | **Features** | was die aktiven Features mitbringen | wer die eigene Berechtigung des Feature-Panels hält |
 | **System** | Nutzer (Nutzerrollen, Anmeldeschutz), Sprache (Übersetzungen), Backups, Konfiguration, Features | Entwickler – und jedes Konto für sein eigenes Profil unter Nutzer |
 
@@ -179,7 +179,7 @@ Wie lange Einträge bleiben und ob sie überhaupt geschrieben werden, sind `/nin
 
 Das Panel **Templates** ist der Template Builder: Er setzt die `page-*.tpl`-Dateien des Projekts aus vollständigen Sections zusammen – eine durchsuchbare Bibliothek von Section-Presets, wiederverwendbare `[template]`-Sections, Header und Footer der Seite und eine native Schnellbefüllung der Texte, die eine Section mitbringt. Es ist ein Workspace-Panel: Die Leiste klappt ein, und Templateliste, Section-Canvas und Inspektor stehen nebeneinander.
 
-Alles, was es kann, seine Regeln zur Quelltextsicherheit und der Manifest-Vertrag der Preset-Bibliothek stehen in der Referenz [Templates-Panel](templates.de.md). Das Panel ist das optionale Kernel-Modul `_nino/Nino/Modules/Templates/`; in `/nino/modules` abgeschaltet, verlässt es die Workbench.
+Alles, was es kann, seine Regeln zur Quelltextsicherheit und der Manifest-Vertrag der Preset-Bibliothek stehen im [Handbuch](https://github.com/dapeio/nino-features/blob/main/features/Templates/docs/templates.de.md) des Template-Baukastens. Das Panel gehört zum Template-Baukasten-Feature aus dem Katalog [dapeio/nino-features](https://github.com/dapeio/nino-features) und ist da, solange das Feature nach `features/` kopiert und im Panel Features eingeschaltet ist.
 
 ### Design
 
@@ -376,7 +376,7 @@ Die Ausgabe ist die vollständige Datei; schreibe sie nach `private/.auth/pw.php
 | Ein Panel oder ein Tab fehlt | Dem Konto fehlt die Berechtigung, oder sein Modul ist nicht aktiv. |
 | Speichern schlägt fehl | Schreibrechte der betroffenen Datei oder des Verzeichnisses. |
 | Template fehlt unter **Routen** | Angeboten werden nur vorhandene Dateien `templates/page-*.tpl`. |
-| Eine Seite lässt sich unter **Templates** nicht speichern | Nach einer externen Änderung neu laden, eindeutige Section-Ids und unpaarige `<section>`-Tags prüfen; siehe [Templates-Panel](templates.de.md). |
+| Eine Seite lässt sich unter **Templates** nicht speichern | Nach einer externen Änderung neu laden, eindeutige Section-Ids und unpaarige `<section>`-Tags prüfen; siehe das [Handbuch](https://github.com/dapeio/nino-features/blob/main/features/Templates/docs/templates.de.md) des Template-Baukastens. |
 | **Design** meldet, keine Varianten seien verfügbar | `_admin/install/library/` wurde entfernt; der Tab Design funktioniert weiter. |
 | Texte oder Bilder fehlen in einem Scan | Dynamische Schlüssel und Bilder sind statisch nicht erkennbar. |
 | Die Backup-Liste ist leer | Sicherungen sind ausgeschaltet, oder heute gab es noch keine angemeldete Anfrage. |
@@ -387,7 +387,7 @@ Die Ausgabe ist die vollständige Datei; schreibe sie nach `private/.auth/pw.php
 ## Wie es weitergeht
 
 - [Einrichtungsassistent](setup.de.md) dokumentiert die zehn Erststart-Schritte und das Library-Format.
-- [Templates-Panel](templates.de.md) erklärt den Template Builder und den Vertrag der Section-Presets.
+- Der **Template-Baukasten** – Seitentemplates aus ganzen Abschnitten – ist ein Feature aus dem Katalog [dapeio/nino-features](https://github.com/dapeio/nino-features); sein [Handbuch](https://github.com/dapeio/nino-features/blob/main/features/Templates/docs/templates.de.md) liegt dort ebenfalls.
 - [Design-Panel](appearance.de.md) erklärt die vier Erscheinungsbild-Editoren und den Token-Vertrag.
 - [Entwickler-Handbuch](development.de.md) beschreibt APIs, Module, Panels und die direkte Arbeit an Projektdateien.
 - [Deployment](deployment.de.md) behandelt Webserver, Sicherheit, Sicherungen und Go-Live.

@@ -4,10 +4,10 @@
 
 **Stand:** 7. September 2026 · **Nino-Version:** 1.0.0-beta
 
-Diese Anleitung erklärt die vier Darstellungseditoren des Panels **Design** der Workbench: Theme, Design, Header und Footer. Der strukturelle Seitenaufbau ist in der Referenz [Templates-Panel](templates.de.md) beschrieben, alles Weitere zur Workbench im [`/_admin`-Handbuch](_admin.de.md).
+Diese Anleitung erklärt die vier Darstellungseditoren des Panels **Design** der Workbench: Theme, Design, Header und Footer. Der strukturelle Seitenaufbau gehört zum [Template-Baukasten](https://github.com/dapeio/nino-features/blob/main/features/Templates/docs/templates.de.md), einem Feature aus dem Katalog, alles Weitere zur Workbench im [`/_admin`-Handbuch](_admin.de.md).
 
 **Weiterführende Links:**
-[README](../README.de.md) · [Grundkonzepte](concepts.de.md) · [Entwickler-Handbuch](development.de.md) · [Rezepte](recipes/README.md) · [Erste Schritte](getting-started.de.md) · [Einrichtungsassistent](setup.de.md) · [`/_admin`-Workbench](_admin.de.md) · [Templates-Panel](templates.de.md) · [Design-Panel](appearance.de.md) · [Features](features.de.md) · [Deployment](deployment.de.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
+[README](../README.de.md) · [Grundkonzepte](concepts.de.md) · [Entwickler-Handbuch](development.de.md) · [Rezepte](recipes/README.md) · [Erste Schritte](getting-started.de.md) · [Einrichtungsassistent](setup.de.md) · [`/_admin`-Workbench](_admin.de.md) · [Design-Panel](appearance.de.md) · [Features](features.de.md) · [Deployment](deployment.de.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
 
 **Sicherheit:** Das Panel ist Teil von `/_admin` und verlangt bei jeder Aktion `/_admin/design/manage` – eine Entwicklerberechtigung, nie eine der Redaktion. Es ist das Design-Modul, ein optionales Kernel-Modul (`_nino/Nino/Modules/Design/`), das die Workbench verlässt, wenn es in `/nino/modules` abgeschaltet wird. Das Panel benennt seine Einstellungen in der Oberflächensprache (`_nino/Nino/Modules/Design/text/<locale>.php`); das Schema, aus dem sie stammen, bleibt englisch, weil der Einrichtungsassistent dieselben Einstellungen rendert und kein eigenes Textsystem hat – eine dort ergänzte Einstellung erscheint also in beiden, in den Worten des Schemas, bis ein Fill sie benennt.
 
@@ -184,6 +184,6 @@ Alle zehn mitgelieferten Themes — Basis, Bureau, Chronicle, Console, Gallery, 
 
 ## Nächste Schritte
 
-- [Templates-Panel](templates.de.md) baut Seiten aus Abschnitten, die diese Flächen nutzen.
+- Der **Template-Baukasten** – Seitentemplates aus ganzen Abschnitten – ist ein Feature aus dem Katalog [dapeio/nino-features](https://github.com/dapeio/nino-features); sein [Handbuch](https://github.com/dapeio/nino-features/blob/main/features/Templates/docs/templates.de.md) liegt dort ebenfalls.
 - [`/_admin`-Workbench](_admin.de.md) beschreibt den Rest der Workbench, zu der dieses Panel gehört.
 - [Entwickler-Handbuch](development.de.md) dokumentiert den Token-Vertrag für Stylesheet-Autoren.

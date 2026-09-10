@@ -7,7 +7,7 @@
 Dieses Handbuch beschreibt die technische Arbeit mit Nino – vom Einstiegspunkt über Routing und Rendering bis zu eigenen Modulen, dauerhaften Daten und Tests. Falls du stattdessen zuerst die Architektur kennenlernen oder ein frisches Projekt einrichten möchtest, lies die [Grundkonzepte](concepts.de.md) beziehungsweise [Erste Schritte](getting-started.de.md).
 
 **Weitere Links:**
-[README](../README.de.md) · [Grundkonzepte](concepts.de.md) · [Entwickler-Handbuch](development.de.md) · [Rezepte](recipes/README.md) · [Erste Schritte](getting-started.de.md) · [Einrichtungsassistent](setup.de.md) · [`/_admin`-Workbench](_admin.de.md) · [Templates-Panel](templates.de.md) · [Design-Panel](appearance.de.md) · [Features](features.de.md) · [Deployment](deployment.de.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
+[README](../README.de.md) · [Grundkonzepte](concepts.de.md) · [Entwickler-Handbuch](development.de.md) · [Rezepte](recipes/README.md) · [Erste Schritte](getting-started.de.md) · [Einrichtungsassistent](setup.de.md) · [`/_admin`-Workbench](_admin.de.md) · [Design-Panel](appearance.de.md) · [Features](features.de.md) · [Deployment](deployment.de.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
 
 **Entwicklerprofil:** Für einfache Webseiten reichen solide Kenntnisse in HTML, CSS und JavaScript sowie PHP-Grundlagen. Templates bestehen aus HTML+, also HTML mit Textfills und Shortcodes. Erst eigene Anwendungslogik, externe Schnittstellen oder neue Module verlangen tieferes PHP-Wissen. Ein fertiges Projekt kann anschließend weitgehend in der Workbench `/_admin` gepflegt werden.
 
@@ -594,7 +594,7 @@ Projekts nicht überschrieben werden – mit einer bewussten Öffnung:
 über vier Roots. Die Laufzeitmodule, die Nino mitbringt, liegen in `_nino/` –
 die immer aktiven und die optionalen, die ein Projekt in `/nino/modules` ein-
 oder ausschaltet (`Form`, `Navigation`, `Localepicker`, `Design`,
-`Templates`, `Maintenance`); die eigenen Ansichten der Workbench in `_admin/Nino/Modules/`
+`Maintenance`); die eigenen Ansichten der Workbench in `_admin/Nino/Modules/`
 (`Dashboard`, `Elements`, `Text`, `Images`, `Logs`, `Routes`, `Users`,
 `Language`, `Backups`, `Config`, `Features`); die Features, die ein Projekt
 unter `features/` (oder `NINO_FEATURES_DIR`) installiert, je ein Verzeichnis
@@ -738,7 +738,7 @@ public static function assets(): array {
 }
 ```
 
-Jede Aktionsmethode schützt sich selbst mit `\Nino\Admin\Admin::guardPerm( $appData, $request, self::MANAGE_PERM )`, das ohne Konto mit `401` und ohne Berechtigung mit `403` antwortet. Die Panels der Workbench selbst werden zuerst zusammengeführt; eine URI oder ein Aktionsname, den ein solches Panel bereits besitzt, geht nie an ein Modul. Die mitgelieferten Module sind die Referenz: `features/Search/Admin/Admin.php` ist das kleinste vollständige Panel, `_nino/Nino/Modules/Form/Admin/Admin.php` eines mit Textfills und Dashboard-Kachel, `_nino/Nino/Modules/Design/Admin/Admin.php` eines mit eigenem Template, `_nino/Nino/Modules/Templates/Admin/Admin.php` ein Workspace. Das [Panel-Rezept](recipes/admin-panel.md) des KI-Leitfadens führt durch ein vollständiges Panel samt Frontend.
+Jede Aktionsmethode schützt sich selbst mit `\Nino\Admin\Admin::guardPerm( $appData, $request, self::MANAGE_PERM )`, das ohne Konto mit `401` und ohne Berechtigung mit `403` antwortet. Die Panels der Workbench selbst werden zuerst zusammengeführt; eine URI oder ein Aktionsname, den ein solches Panel bereits besitzt, geht nie an ein Modul. Die mitgelieferten Module sind die Referenz: `features/Search/Admin/Admin.php` ist das kleinste vollständige Panel, `_nino/Nino/Modules/Form/Admin/Admin.php` eines mit Textfills und Dashboard-Kachel, `_nino/Nino/Modules/Design/Admin/Admin.php` eines mit eigenem Template, und `features/Templates/Admin/Admin.php` aus dem Katalog ein Workspace. Das [Panel-Rezept](recipes/admin-panel.md) des KI-Leitfadens führt durch ein vollständiges Panel samt Frontend.
 
 Ein Modul, das eigene Dateien unter `data/` führt, registriert in `init()` den Callback `'/nino/admin/restore'`; das Panel Backups ruft ihn mit dem entpackten Backup und dem aktiven Datenverzeichnis auf, und das Modul führt zusammen, was ihm gehört (`Newsletter::callbackRestore()` im Newsletter-Feature des Katalogs). Ein Verzeichnis `install/` neben der Klassendatei – `manifest.php`, `templates/`, `text/` – macht ein Kernel- oder Projektmodul schließlich im Einrichtungsassistenten wählbar; siehe das [Library-Format](setup.de.md#library-format). Ein Feature trägt dieselbe Einheit, und `\Nino\Features::activate()` wendet sie an – ohne etwas zu überschreiben, das das Projekt hat –, wenn das Feature im Panel Features eingeschaltet wird; Manifest, Einstellungen und Lebenszyklus stehen unter [Features](features.de.md).
 
@@ -956,7 +956,7 @@ besitzen.
 - [Erste Schritte](getting-started.de.md) führt vom Checkout zum eingerichteten Projekt.
 - [Einrichtungsassistent](setup.de.md) dokumentiert alle Installationsschritte und Schreibregeln.
 - [`/_admin`-Workbench](_admin.de.md) beschreibt jedes Panel, die Rollen und die Recovery-Seite.
-- [Templates-Panel](templates.de.md) erklärt den strukturellen Template-Builder im Alpha-Status.
+- Der **Template-Baukasten** – Seitentemplates aus ganzen Abschnitten – ist ein Feature aus dem Katalog [dapeio/nino-features](https://github.com/dapeio/nino-features); sein [Handbuch](https://github.com/dapeio/nino-features/blob/main/features/Templates/docs/templates.de.md) liegt dort ebenfalls.
 - [Design-Panel](appearance.de.md) erklärt die vier Erscheinungsbild-Editoren und den Token-Vertrag.
 - [Features](features.de.md) erklärt installierbare Features: Manifest, Einstellungen, Aktivierung, Updates und die Tests eines Features.
 - [Deployment](deployment.de.md) beschreibt Webserver, Sicherheit und Go-live.

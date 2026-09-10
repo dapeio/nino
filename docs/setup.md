@@ -7,7 +7,7 @@
 This manual explains the decisions and writing processes of the ten steps of the setup wizard - the first-run mode of the [`/_admin` workbench](_admin.md). If you instead want to take the shortest path from checkout to a configured website, start with [Getting Started](getting-started.md); the later production operation is covered in [Deployment](deployment.md).
 
 **Additional Links:**
-[README](../README.md) · [Concepts](concepts.md) · [Developer Manual](development.md) · [Recipes](recipes/README.md) · [Getting Started](getting-started.md) · [Setup Wizard](setup.md) · [`/_admin` Workbench](_admin.md) · [Templates Panel](templates.md) · [Design Panel](appearance.md) · [Features](features.md) · [Deployment](deployment.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
+[README](../README.md) · [Concepts](concepts.md) · [Developer Manual](development.md) · [Recipes](recipes/README.md) · [Getting Started](getting-started.md) · [Setup Wizard](setup.md) · [`/_admin` Workbench](_admin.md) · [Design Panel](appearance.md) · [Features](features.md) · [Deployment](deployment.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
 
 **Important:** The wizard creates the first functional project state from a fresh Nino checkout. It is necessary: before its execution, the actual project directories such as `templates/`, `text/`, `elements/`, and `images/` do not yet exist.
 
@@ -263,6 +263,6 @@ It also does not create `images/`, `templates/`, `text/`, or `elements/` before 
 
 - [Getting Started](getting-started.md) guides through the necessary initial setup.
 - [`/_admin` Workbench](_admin.md) explains the panels, the accounts and the recovery page.
-- [Templates Panel](templates.md) describes the Template Builder in Alpha status.
+- The **Template Builder** - page templates composed from whole sections - is a feature from the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features); its [manual](https://github.com/dapeio/nino-features/blob/main/features/Templates/docs/templates.md) is there too.
 - [Design Panel](appearance.md) explains the four appearance editors.
 - [Deployment](deployment.md) describes web server configuration, security, and go-live.

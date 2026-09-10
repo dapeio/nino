@@ -4,10 +4,10 @@
 
 **Last updated:** September 7, 2026 · **Nino version:** 1.0.0-beta
 
-This manual explains the one management interface of a Nino project: `/_admin`, the workbench. Developers set the project up, build its structure and appearance here; editors maintain its content here. What an account sees is what its permissions allow. The wizard that turns a fresh checkout into a project is the workbench's first-run mode and has its own reference, the [Setup Wizard](setup.md); the two large developer panels have theirs as well: [Templates](templates.md) and [Design](appearance.md).
+This manual explains the one management interface of a Nino project: `/_admin`, the workbench. Developers set the project up, build its structure and appearance here; editors maintain its content here. What an account sees is what its permissions allow. The wizard that turns a fresh checkout into a project is the workbench's first-run mode and has its own reference, the [Setup Wizard](setup.md); the [Design](appearance.md) panel has one as well, and so does the [Template Builder](https://github.com/dapeio/nino-features/blob/main/features/Templates/docs/templates.md), which is a feature from the catalogue rather than part of Nino.
 
 **Additional Links:**
-[README](../README.md) · [Concepts](concepts.md) · [Developer Manual](development.md) · [Recipes](recipes/README.md) · [Getting Started](getting-started.md) · [Setup Wizard](setup.md) · [`/_admin` Workbench](_admin.md) · [Templates Panel](templates.md) · [Design Panel](appearance.md) · [Features](features.md) · [Deployment](deployment.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
+[README](../README.md) · [Concepts](concepts.md) · [Developer Manual](development.md) · [Recipes](recipes/README.md) · [Getting Started](getting-started.md) · [Setup Wizard](setup.md) · [`/_admin` Workbench](_admin.md) · [Design Panel](appearance.md) · [Features](features.md) · [Deployment](deployment.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
 
 **Security Note:** Every panel writes directly to configuration and project files. A developer account can change routing, data models, templates and the visible website; an editor account can change content. Work from a current Git state or another reliable backup, use HTTPS only, and give every account exactly the role it needs.
 
@@ -18,7 +18,7 @@ One login, one navigation, every screen a panel. The panels are grouped by what 
 | Group | Panels | Who |
 |---|---|---|
 | **Content** | Dashboard, Elements (Element Types), Text (Text Keys), Images (Image Slots), Submissions, Log | editors and developers |
-| **Structure** | Templates, Design, Routes, Navigations | developers |
+| **Structure** | Design, Routes, Navigations | developers |
 | **Features** | whatever the active features bring | whoever holds the feature panel's own permission |
 | **System** | Users (User roles, Login protection), Language (Translations), Backups, Config, Features | developers – and every account for its own profile under Users |
 
@@ -179,7 +179,7 @@ How long entries stay and whether they are written at all is `/nino/form/retenti
 
 The **Templates** panel is the Template Builder: it composes the project's `page-*.tpl` files from complete sections – a searchable library of section presets, reusable `[template]` sections, the page's header and footer, and a native quick fill of the text a section brings. It is a workspace panel: the rail folds, and the template list, the section canvas and the inspector sit side by side.
 
-Everything it can do, its source safety rules and the preset library's manifest contract are in the [Templates Panel](templates.md) reference. The panel is the optional kernel module `_nino/Nino/Modules/Templates/`; switched off in `/nino/modules`, it leaves the workbench.
+Everything it can do, its source safety rules and the preset library's manifest contract are in the Template Builder's [manual](https://github.com/dapeio/nino-features/blob/main/features/Templates/docs/templates.md). The panel belongs to the Template Builder feature from the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features) and is there while that feature is copied into `features/` and switched on in the Features panel.
 
 ### Design
 
@@ -376,7 +376,7 @@ The output is the complete file; write it to `private/.auth/pw.php`. Do this in 
 | A panel or a tab is missing | The account lacks its permission, or its module is not active. |
 | Saving fails | Write permissions of the affected file or directory. |
 | Template missing in **Routes** | Only existing `templates/page-*.tpl` files are offered. |
-| A page cannot be saved in **Templates** | Reload after an external edit, check unique section ids and unmatched `<section>` tags; see [Templates Panel](templates.md). |
+| A page cannot be saved in **Templates** | Reload after an external edit, check unique section ids and unmatched `<section>` tags; see the Template Builder's [manual](https://github.com/dapeio/nino-features/blob/main/features/Templates/docs/templates.md). |
 | **Design** says no variants are available | `_admin/install/library/` was removed; the Design tab keeps working. |
 | Texts or images missing in a scan | Dynamic keys and images are not statically recognizable. |
 | Backup list is empty | Backups are switched off, or no authenticated request has happened today. |
@@ -387,7 +387,7 @@ The output is the complete file; write it to `private/.auth/pw.php`. Do this in 
 ## Next Steps
 
 - [Setup Wizard](setup.md) documents the ten first-run steps and the library format.
-- [Templates Panel](templates.md) explains the Template Builder and the section preset contract.
+- The **Template Builder** - page templates composed from whole sections - is a feature from the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features); its [manual](https://github.com/dapeio/nino-features/blob/main/features/Templates/docs/templates.md) is there too.
 - [Design Panel](appearance.md) explains the four appearance editors and the token contract.
 - [Developer Manual](development.md) describes APIs, modules, panels and direct work on project files.
 - [Deployment](deployment.md) covers web server, security, backups and go-live.

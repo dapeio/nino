@@ -7,7 +7,7 @@
 This guide leads you on the shortest path from a fresh checkout to a locally running Nino website. If you instead want to look up every field and writing process of the wizard, read the [Setup Wizard](setup.md) reference; technical backgrounds are explained in the [Concepts](concepts.md).
 
 **Additional Links:**
-[README](../README.md) · [Concepts](concepts.md) · [Developer Manual](development.md) · [Recipes](recipes/README.md) · [Getting Started](getting-started.md) · [Setup Wizard](setup.md) · [`/_admin` Workbench](_admin.md) · [Templates Panel](templates.md) · [Design Panel](appearance.md) · [Features](features.md) · [Deployment](deployment.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
+[README](../README.md) · [Concepts](concepts.md) · [Developer Manual](development.md) · [Recipes](recipes/README.md) · [Getting Started](getting-started.md) · [Setup Wizard](setup.md) · [`/_admin` Workbench](_admin.md) · [Design Panel](appearance.md) · [Features](features.md) · [Deployment](deployment.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
 
 **Important:** A fresh checkout contains the kernel, the workbench, the modules, the features and the installation library, but not yet a complete project state. The setup wizard - what `/_admin` shows until it is done - creates and fills the required project directories; only then does the website run.
 
@@ -73,7 +73,7 @@ The last step sets the recovery password and locks the wizard. Subsequently, rem
 - [Developer Manual](development.md) deepens kernel, APIs, callbacks, and custom modules.
 - [Setup Wizard](setup.md) documents all options and writing processes.
 - [`/_admin` Workbench](_admin.md) guides through every panel, the accounts and the recovery page.
-- [Templates Panel](templates.md) explains the section-first Template Builder in Alpha status.
+- The **Template Builder** - page templates composed from whole sections - is a feature from the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features); its [manual](https://github.com/dapeio/nino-features/blob/main/features/Templates/docs/templates.md) is there too.
 - [Design Panel](appearance.md) explains the four appearance editors.
 - [Features](features.md) explains how an installable feature is switched on, configured and updated.
 - [Deployment](deployment.md) guides through web server configuration, security, backups, and go-live.

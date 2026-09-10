@@ -1,7 +1,7 @@
 # Recipe: Add a runtime module
 
 **Additional Links:**
-[Agent guide](../../AGENTS.md) · [All recipes](README.md) · [Developer Manual](../development.md) · [Concepts](../concepts.md) · [`/_admin` Workbench](../_admin.md) · [Setup Wizard](../setup.md) · [Templates Panel](../templates.md) · [Features](../features.md)
+[Agent guide](../../AGENTS.md) · [All recipes](README.md) · [Developer Manual](../development.md) · [Concepts](../concepts.md) · [`/_admin` Workbench](../_admin.md) · [Setup Wizard](../setup.md) · [Features](../features.md)
 
 One of the seven extension recipes of the [Nino agent guide](../../AGENTS.md). Its
 rules - the required workflow, the core runtime model, the conventions and the
@@ -36,7 +36,7 @@ The lookup roots are deliberately different:
   shadow a kernel class from its application root.
 - `Nino\Modules\*` is the one opening: a merged view over four roots, looked
   for in this order - `_nino/` (every module Nino ships: the always-on ones
-  and the optional `Form`, `Navigation`, `Localepicker`, `Design`, `Templates`
+  and the optional `Form`, `Navigation`, `Localepicker`, `Design`
   a project switches on or off in `/nino/modules`), `_admin/` (the workbench's
   own screens), `features/` (the installed features, one directory each with
   a `feature.php` manifest - the catalogue's `Newsletter` and `Search` arrive

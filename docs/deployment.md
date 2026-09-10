@@ -7,7 +7,7 @@
 This manual guides a fully developed Nino website into production. If you instead want to set up a fresh project, start with [Getting Started](getting-started.md); technical extensions are covered in the [Developer Manual](development.md).
 
 **Additional Links:**
-[README](../README.md) · [Concepts](concepts.md) · [Developer Manual](development.md) · [Recipes](recipes/README.md) · [Getting Started](getting-started.md) · [Setup Wizard](setup.md) · [`/_admin` Workbench](_admin.md) · [Templates Panel](templates.md) · [Design Panel](appearance.md) · [Features](features.md) · [Deployment](deployment.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
+[README](../README.md) · [Concepts](concepts.md) · [Developer Manual](development.md) · [Recipes](recipes/README.md) · [Getting Started](getting-started.md) · [Setup Wizard](setup.md) · [`/_admin` Workbench](_admin.md) · [Design Panel](appearance.md) · [Features](features.md) · [Deployment](deployment.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
 
 ## Target System Requirements
 
@@ -68,7 +68,7 @@ Transfer the same behavior explicitly to the server configuration:
 - deny access to dotfiles and dot directories;
 - **deny `private/` entirely** — it is never requested by a browser, only read by PHP;
 - **deny `app/` and `features/` entirely** — the project's own classes and the installed features are server-side source, never requested by a browser; each ships its own `.htaccess` for Apache;
-- deny direct access to `_admin/install/library/` except `_admin/install/library/themes/<key>/preview.svg` — the remaining files are server-side appearance source; the same goes for the section presets under `_nino/Nino/Modules/Templates/library/`;
+- deny direct access to `_admin/install/library/` except `_admin/install/library/themes/<key>/preview.svg` — the remaining files are server-side appearance source; the same goes for the section presets under `features/Templates/library/`, where a project that installed the Template Builder keeps them;
 - disable directory listing;
 - forward the HTTP `Authorization` header to PHP. With nginx/PHP-FPM this normally requires `fastcgi_param HTTP_AUTHORIZATION $http_authorization;` in the PHP location;
 - do not deliver PHP source and data files as text.
@@ -151,7 +151,7 @@ Grant editor permissions as narrowly as practically possible; the accounts the w
 
 HTTPS protects not only login data but also session cookies and all editorially transmitted content. Permanently redirect HTTP requests to HTTPS and only test login via the final public address.
 
-Additional web server protection for `/_admin` - such as IP allowances or HTTP authentication - can form a useful second barrier under suitable operating conditions. It does not replace the accounts. The two developer panels that ship as optional kernel modules, Templates and Design, can be taken out of a production delivery by removing `\Nino\Modules\Templates` and `\Nino\Modules\Design` from `/nino/modules`; the workbench itself stays, because the editors work in it.
+Additional web server protection for `/_admin` - such as IP allowances or HTTP authentication - can form a useful second barrier under suitable operating conditions. It does not replace the accounts. The Design panel ships as an optional kernel module and can be taken out of a production delivery by removing `\Nino\Modules\Design` from `/nino/modules`; the Template Builder is a feature, so its whole directory can go from `features/` - which is the point of it being one; the workbench itself stays, because the editors work in it.
 
 ## The Wizard After Setup
 
@@ -204,7 +204,7 @@ The smoke tests do not replace project-specific acceptance testing. Additionally
 - login, logout, and the permissions of an editor account in `/_admin`;
 - a developer account's access to the Structure and System panels;
 - all four tabs of the Design panel, including one frame preview, if the module is delivered;
-- access and unchanged round-trip in the Templates panel, if the module is delivered;
+- access and unchanged round-trip in the Template Builder, where the feature is installed;
 - writing and reloading editorial content;
 - behavior behind CDN, proxy, or cache, if used.
 
@@ -256,7 +256,7 @@ Nino is in the beta phase. Security fixes appear on `main`; there is currently n
 - [ ] The setup wizard was fully completed and `_admin/install/` subsequently removed from production.
 - [ ] If `_admin/install/` is deployed to keep Theme/Header/Footer switchable, it is locked and only its catalogue's Theme previews are directly accessible.
 - [ ] Developer and editor accounts are tested, and the recovery password is stored safely.
-- [ ] The Design and Templates modules are either switched off in `/nino/modules` or consciously kept as Alpha, and only developer accounts reach them.
+- [ ] The Design module is either switched off in `/nino/modules` or consciously kept as Alpha, the Template Builder either removed from `features/` or consciously kept, and only developer accounts reach either.
 - [ ] Editor accounts only have the necessary permissions.
 - [ ] HTTPS and secure session cookies work at the final address.
 - [ ] Error display is disabled and error logging is checked.
@@ -269,6 +269,6 @@ Nino is in the beta phase. Security fixes appear on `main`; there is currently n
 
 - [Getting Started](getting-started.md) describes the necessary initial setup.
 - [`/_admin` Workbench](_admin.md) explains every panel, the accounts, backups and the recovery page.
-- [Templates Panel](templates.md) describes the optional template builder in Alpha status.
+- The **Template Builder** - page templates composed from whole sections - is a feature from the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features); its [manual](https://github.com/dapeio/nino-features/blob/main/features/Templates/docs/templates.md) is there too.
 - [Design Panel](appearance.md) describes the four appearance editors.
 - [Concepts](concepts.md) explains the technical structure behind the deployed project.

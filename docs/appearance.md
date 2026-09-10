@@ -4,10 +4,10 @@
 
 **Last updated:** September 7, 2026 · **Nino version:** 1.0.0-beta
 
-This manual explains the four appearance editors of the workbench's **Design** panel: Theme, Design, Header, and Footer. Structural page composition is described in the [Templates panel](templates.md) reference; everything else about the workbench in the [`/_admin` manual](_admin.md).
+This manual explains the four appearance editors of the workbench's **Design** panel: Theme, Design, Header, and Footer. Structural page composition belongs to the [Template Builder](https://github.com/dapeio/nino-features/blob/main/features/Templates/docs/templates.md), a feature from the catalogue; everything else about the workbench in the [`/_admin` manual](_admin.md).
 
 **Additional Links:**
-[README](../README.md) · [Concepts](concepts.md) · [Developer Manual](development.md) · [Recipes](recipes/README.md) · [Getting Started](getting-started.md) · [Setup Wizard](setup.md) · [`/_admin` Workbench](_admin.md) · [Templates Panel](templates.md) · [Design Panel](appearance.md) · [Features](features.md) · [Deployment](deployment.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
+[README](../README.md) · [Concepts](concepts.md) · [Developer Manual](development.md) · [Recipes](recipes/README.md) · [Getting Started](getting-started.md) · [Setup Wizard](setup.md) · [`/_admin` Workbench](_admin.md) · [Design Panel](appearance.md) · [Features](features.md) · [Deployment](deployment.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
 
 **Security:** The panel is part of `/_admin` and asks for `/_admin/design/manage` on every action - a developer's permission, never an editor's. It is the Design module, an optional kernel module (`_nino/Nino/Modules/Design/`) that leaves the workbench when it is switched off in `/nino/modules`. The panel names its settings in the interface language (`_nino/Nino/Modules/Design/text/<locale>.php`); the schema they come from stays English, because the setup wizard renders the same settings and has no text system of its own – so a setting added there appears in both, in the schema's words, until a fill names it.
 
@@ -184,6 +184,6 @@ All ten supplied themes — Basis, Bureau, Chronicle, Console, Gallery, Market, 
 
 ## Next Steps
 
-- [Templates Panel](templates.md) composes pages from sections that use these surfaces.
+- The **Template Builder** - page templates composed from whole sections - is a feature from the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features); its [manual](https://github.com/dapeio/nino-features/blob/main/features/Templates/docs/templates.md) is there too.
 - [`/_admin` Workbench](_admin.md) covers the rest of the workbench this panel is part of.
 - [Developer Manual](development.md) documents the token contract for stylesheet authors.

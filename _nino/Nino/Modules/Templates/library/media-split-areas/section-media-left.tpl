@@ -1,2 +1,0 @@
-[[area:media]]
-[[area:content]]

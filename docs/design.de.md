@@ -6,7 +6,7 @@
 
 > **Hinweis:** Dieses Handbuch wird aktuell überarbeitet. Bitte nutze bis zur Fertigstellung die Informationen aus:
 > - **[Entwickler-Handbuch](development.de.md)** (für Backend-Integration)
-> - **[Templates-Panel](templates.de.md)** (für Template-Struktur)
+> - **[Template-Baukasten](https://github.com/dapeio/nino-features/blob/main/features/Templates/docs/templates.de.md)** (ein Feature aus dem Katalog, für Template-Struktur)
 > - **[Haupt-Repository `dapeio/nino`](https://github.com/dapeio/nino)** (für aktuelle Frontend-Konventionen)
 
 ## Geplante Inhalte

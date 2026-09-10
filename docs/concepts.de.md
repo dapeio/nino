@@ -7,7 +7,7 @@
 Dieses Handbuch erklärt die Architektur von Nino und das Zusammenspiel von Konfiguration, Daten, Templates und Modulen. Falls du stattdessen direkt eine Webseite einrichten möchtest, beginne mit [Erste Schritte](getting-started.de.md); konkrete APIs und Implementierungsdetails stehen im [Entwickler-Handbuch](development.de.md).
 
 **Weitere Links:**
-[README](../README.de.md) · [Grundkonzepte](concepts.de.md) · [Entwickler-Handbuch](development.de.md) · [Rezepte](recipes/README.md) · [Erste Schritte](getting-started.de.md) · [Einrichtungsassistent](setup.de.md) · [`/_admin`-Workbench](_admin.de.md) · [Templates-Panel](templates.de.md) · [Design-Panel](appearance.de.md) · [Features](features.de.md) · [Deployment](deployment.de.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
+[README](../README.de.md) · [Grundkonzepte](concepts.de.md) · [Entwickler-Handbuch](development.de.md) · [Rezepte](recipes/README.md) · [Erste Schritte](getting-started.de.md) · [Einrichtungsassistent](setup.de.md) · [`/_admin`-Workbench](_admin.de.md) · [Design-Panel](appearance.de.md) · [Features](features.de.md) · [Deployment](deployment.de.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
 
 ## Kernsäulen
 Nino organisiert eine Webseite mit nur wenigen, aber klar getrennten Bausteinen:
@@ -133,7 +133,7 @@ Die geladene `.tpl`-Datei kann neben HTML auch wieder Shortcodes und Textfills e
 
 So können mehrere Template-Dateien zu einer komplexen HTML-Struktur zusammengesetzt werden.
 
-Seitentemplates lassen sich über das optionale [Templates-Panel](templates.de.md) der Workbench aus vollständigen HTML- und `[template]`-Sections zusammensetzen. Er speichert normales, lesbares `.tpl`-Markup und ersetzt nicht die Prüfung der fertigen Webseite im Browser; tiefergehende Strukturarbeit bleibt über HTML+ oder Code möglich.
+Seitentemplates lassen sich über den Template-Baukasten aus vollständigen HTML- und `[template]`-Sections zusammensetzen. Er ist ein Feature aus dem Katalog [dapeio/nino-features](https://github.com/dapeio/nino-features); sein [Handbuch](https://github.com/dapeio/nino-features/blob/main/features/Templates/docs/templates.de.md) liegt dort ebenfalls. Er speichert normales, lesbares `.tpl`-Markup und ersetzt nicht die Prüfung der fertigen Webseite im Browser; tiefergehende Strukturarbeit bleibt über HTML+ oder Code möglich.
 
 Nino verarbeitet einen HTML-String bei jedem Rendering-Durchlauf in einer festen Reihenfolge:
 
@@ -161,8 +161,7 @@ ersetzt werden und es entsteht kein zweites Hook- oder Plugin-System.
 
 Ein Modul erreicht ein Projekt in einer von drei Formen. Ein **Kernel-Modul**
 wird in `_nino/Nino/Modules/` mitgeliefert – die immer aktiven und die
-optionalen (Formular, Navigation, Sprachauswahl, die Panels Design und
-Templates), die ein Projekt in `/nino/modules` ein- oder ausschaltet. Ein
+optionalen (Formular, Navigation, Sprachauswahl, das Panel Design), die ein Projekt in `/nino/modules` ein- oder ausschaltet. Ein
 **Feature** ist ein installierbares Paket: ein Verzeichnis unterhalb von
 `features/` mit einem Manifest `feature.php`, aus dem Katalog
 [dapeio/nino-features](https://github.com/dapeio/nino-features) hineinkopiert
@@ -179,7 +178,7 @@ Eine Verwaltungsoberfläche mit einer Anmeldung. Sie hat einen eigenen Einstiegs
 | Gruppe | Panels | Verantwortung |
 |---|---|---|
 | Inhalt | Dashboard, Elemente (mit Elementtypen), Texte (mit Textschlüsseln), Bilder (mit Bildplätzen), Anfragen, Log | tägliche Pflege von Inhalten, Bildern und Betriebsdaten; die Tabs in Klammern halten die Form dieser Inhalte und gehören dem Entwickler |
-| Struktur | [Templates](templates.de.md), [Design](appearance.de.md), Routen, Navigationen | die Struktur des Projekts: Seitentemplates, Erscheinungsbild, Routen und Menüs |
+| Struktur | [Design](appearance.de.md), Routen, Navigationen | die Struktur des Projekts: Erscheinungsbild, Routen und Menüs |
 | Features | was die aktiven Features mitbringen | eine Gruppe für das Panel jedes installierten Features, gleich welche Gruppe sein eigenes `nav()` nennt; ohne Überschrift, solange nichts darin liegt |
 | System | Nutzer (mit Nutzerrollen und Anmeldeschutz), Sprache (mit Übersetzungen), Backups, Konfiguration, Features | Konten und Rollen, Sprachen und Übersetzungsübergabe, Wiederherstellung, technische Konfiguration, installierte Features |
 
@@ -191,7 +190,7 @@ Ein Konto hält eine Rolle, eine Rolle eine Menge von Berechtigungen, eine je Pa
 |---|---|
 | Seitentitel ändern | Textfill in `text/` oder im Panel Texte |
 | neues Teammitglied ergänzen | Element im Panel Elemente |
-| Seite aus vollständigen Sections zusammensetzen | das Templates-Panel (Alpha) |
+| Seite aus vollständigen Sections zusammensetzen | der [Template-Baukasten](https://github.com/dapeio/nino-features/blob/main/features/Templates/docs/templates.de.md), ein Feature aus dem Katalog (Alpha) |
 | tiefergehende HTML-Struktur ändern | HTML+-Escape-Hatch oder `.tpl`-Datei in `templates/` |
 | neue öffentliche URL anlegen | Route in `config.php` beziehungsweise im Panel Routes |
 | dynamische Liste ausgeben | Element-Abfrage oder Shortcode mit Callback |
@@ -203,7 +202,7 @@ Ein Konto hält eine Rolle, eine Rolle eine Menge von Berechtigungen, eine je Pa
 
 - [Erste Schritte](getting-started.de.md) führt durch die notwendige Ersteinrichtung.
 - [`/_admin`-Workbench](_admin.de.md) erklärt jedes Panel, die Rollen und die Recovery-Seite.
-- [Templates-Panel](templates.de.md) erklärt den strukturellen Template-Builder im Alpha-Status.
+- Der **Template-Baukasten** – Seitentemplates aus ganzen Abschnitten – ist ein Feature aus dem Katalog [dapeio/nino-features](https://github.com/dapeio/nino-features); sein [Handbuch](https://github.com/dapeio/nino-features/blob/main/features/Templates/docs/templates.de.md) liegt dort ebenfalls.
 - [Design-Panel](appearance.de.md) erklärt die vier Erscheinungsbild-Editoren.
 - [Features](features.de.md) erklärt installierbare Features und ihr Manifest.
 - [Deployment](deployment.de.md) beschreibt den Weg von der lokalen Webseite in den sicheren Betrieb.

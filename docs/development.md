@@ -7,7 +7,7 @@
 This manual describes the technical work with Nino — from the entry point through routing and rendering to custom modules, persistent data, and tests. If you instead want to first learn about the architecture or set up a fresh project, read the [Concepts](concepts.md) or [Getting Started](getting-started.md).
 
 **Additional Links:**
-[README](../README.md) · [Concepts](concepts.md) · [Developer Manual](development.md) · [Recipes](recipes/README.md) · [Getting Started](getting-started.md) · [Setup Wizard](setup.md) · [`/_admin` Workbench](_admin.md) · [Templates Panel](templates.md) · [Design Panel](appearance.md) · [Features](features.md) · [Deployment](deployment.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
+[README](../README.md) · [Concepts](concepts.md) · [Developer Manual](development.md) · [Recipes](recipes/README.md) · [Getting Started](getting-started.md) · [Setup Wizard](setup.md) · [`/_admin` Workbench](_admin.md) · [Design Panel](appearance.md) · [Features](features.md) · [Deployment](deployment.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
 
 **Developer Profile:** For simple websites, solid knowledge of HTML, CSS, and JavaScript as well as PHP basics is sufficient. Templates consist of HTML+, i.e., HTML with textfills and shortcodes. Only custom application logic, external interfaces, or new modules require deeper PHP knowledge. A finished project can then be largely maintained in the workbench, `/_admin`.
 
@@ -608,7 +608,7 @@ application root - with one deliberate opening: `Nino\Modules\*` is a merged
 view over four roots rather than one directory. The runtime modules Nino ships
 live in `_nino/` - the always-on ones and the optional ones a project switches
 on or off in `/nino/modules` (`Form`, `Navigation`, `Localepicker`, `Design`,
-`Templates`, `Maintenance`); the workbench's own screens in `_admin/Nino/Modules/`
+`Maintenance`); the workbench's own screens in `_admin/Nino/Modules/`
 (`Dashboard`, `Elements`, `Text`, `Images`, `Logs`, `Routes`, `Users`,
 `Language`, `Backups`, `Config`, `Features`); the features a project installs
 below `features/` (or `NINO_FEATURES_DIR`), one directory each with a
@@ -748,7 +748,7 @@ public static function assets(): array {
 }
 ```
 
-Every action method guards itself with `\Nino\Admin\Admin::guardPerm( $appData, $request, self::MANAGE_PERM )`, which answers `401` without an account and `403` without the permission. The workbench's own modules are merged first, and a uri or action name one of them already owns is never handed to a runtime module. The shipped modules are the reference: `features/Search/Admin/Admin.php` is the smallest complete panel, `_nino/Nino/Modules/Form/Admin/Admin.php` one with fills and a Dashboard tile, `_nino/Nino/Modules/Design/Admin/Admin.php` one with its own template, `_nino/Nino/Modules/Templates/Admin/Admin.php` a workspace. The [panel recipe](recipes/admin-panel.md) of the AI guide walks through a complete panel including its frontend.
+Every action method guards itself with `\Nino\Admin\Admin::guardPerm( $appData, $request, self::MANAGE_PERM )`, which answers `401` without an account and `403` without the permission. The workbench's own modules are merged first, and a uri or action name one of them already owns is never handed to a runtime module. The shipped modules are the reference: `features/Search/Admin/Admin.php` is the smallest complete panel, `_nino/Nino/Modules/Form/Admin/Admin.php` one with fills and a Dashboard tile, `_nino/Nino/Modules/Design/Admin/Admin.php` one with its own template, and the catalogue's `features/Templates/Admin/Admin.php` a workspace. The [panel recipe](recipes/admin-panel.md) of the AI guide walks through a complete panel including its frontend.
 
 A module that keeps its own files under `data/` registers `'/nino/admin/restore'` in `init()`; the Backups panel calls it with the staged backup and the live data directory, and the module merges what is its own (`Newsletter::callbackRestore()` in the catalogue's Newsletter feature). Finally, an `install/` directory beside the class file - `manifest.php`, `templates/`, `text/` - makes a kernel or project module selectable in the setup wizard; see the [Library Format](setup.md#library-format). A feature carries the same unit, and `\Nino\Features::activate()` applies it - without overwriting anything the project has - when the feature is switched on in the Features panel; the manifest, the settings and the lifecycle are in [Features](features.md).
 
@@ -977,7 +977,7 @@ module reacts to what the workbench does without owning a panel there.
 - [Getting Started](getting-started.md) guides from checkout to configured project.
 - [Setup Wizard](setup.md) documents all installation steps and writing rules.
 - [`/_admin` Workbench](_admin.md) describes every panel, the roles and the recovery page.
-- [Templates Panel](templates.md) explains the structural template builder in Alpha status.
+- The **Template Builder** - page templates composed from whole sections - is a feature from the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features); its [manual](https://github.com/dapeio/nino-features/blob/main/features/Templates/docs/templates.md) is there too.
 - [Design Panel](appearance.md) explains the four appearance editors and the token contract.
 - [Features](features.md) explains installable features: the manifest, the settings, activation, updates and a feature's tests.
 - [Deployment](deployment.md) describes web servers, security, and go-live.

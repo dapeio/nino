@@ -1,7 +1,7 @@
 # Recipe: Package a feature
 
 **Additional Links:**
-[Agent guide](../../AGENTS.md) · [All recipes](README.md) · [Developer Manual](../development.md) · [Concepts](../concepts.md) · [`/_admin` Workbench](../_admin.md) · [Setup Wizard](../setup.md) · [Templates Panel](../templates.md) · [Features](../features.md)
+[Agent guide](../../AGENTS.md) · [All recipes](README.md) · [Developer Manual](../development.md) · [Concepts](../concepts.md) · [`/_admin` Workbench](../_admin.md) · [Setup Wizard](../setup.md) · [Features](../features.md)
 
 One of the seven extension recipes of the [Nino agent guide](../../AGENTS.md). Its
 rules - the required workflow, the core runtime model, the conventions and the

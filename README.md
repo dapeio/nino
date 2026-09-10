@@ -60,7 +60,7 @@ The workbench provides full access for development, diagnostics and corrections,
 
 Every fresh checkout is configured through the wizard, which is what `/_admin` shows until it is done. It checks the environment, guides you through languages, theme, header, footer and design, copies the required assets, creates initial pages and basic information, creates the first developer accounts and sets the recovery password. Afterwards it locks itself out, and `_admin/install/` can be removed from a production delivery.
 
-#### The Templates panel — optional, Alpha
+#### The Template Builder — a feature, Alpha
 
 <a href="docs/assets/screenshots/_templates1.webp" target="_blank">
   <img src="docs/assets/screenshots/_templates1.webp"
@@ -82,7 +82,7 @@ The Template Builder turns `page-*.tpl` files into a focused sequence of complet
 
 The Template Builder preserves ordinary HTML+ source. Standalone template shortcodes can be chosen directly through **Add section** and remain movable canvas items, while the page header and footer are ordinary `[template]` shortcodes managed safely through fixed Template Settings. A display name and VPA default live as inert metadata at the start of the file. Unrelated source remains locked and byte-identical. A deliberate HTML+ escape hatch is available for code-authored sections.
 
-> **Status: Alpha.** Preset manifests and generated `.tpl` markup are readable and extensible, but the library and composition workflow may still evolve. The panel is the optional kernel module `_nino/Nino/Modules/Templates/`; a project switches it off in `/nino/modules`.
+> **Status: Alpha.** Preset manifests and generated `.tpl` markup are readable and extensible, but the library and composition workflow may still evolve. The panel belongs to the Template Builder feature from the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features) and is there while that feature is copied into `features/` and switched on in the Features panel.
 
 #### The Design panel — optional, Alpha
 
@@ -245,7 +245,7 @@ Nino deliberately keeps its architecture small: a central `$appData` array carri
 * **[Getting Started](docs/getting-started.md):** from checkout to a configured website
 * **[Setup Wizard](docs/setup.md):** steps, writing rules, and library format
 * **[`/_admin` Workbench](docs/_admin.md):** every panel, accounts, roles, configuration, backups and recovery
-* **[Templates Panel](docs/templates.md):** composing page templates from complete HTML and template sections
+* **[Template Builder](https://github.com/dapeio/nino-features/blob/main/features/Templates/docs/templates.md):** composing page templates from complete HTML and template sections - a feature from the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features)
 * **[Design Panel](docs/appearance.md):** post-install Theme, Design, Header, and Footer editing
 * **[Features](docs/features.md):** installable packages - the manifest, the settings, activation and updates
 * **[Feature catalogue](https://github.com/dapeio/nino-features):** the features Nino publishes - newsletter and search among them - installed by copying a directory into `features/`
@@ -261,7 +261,7 @@ Nino as a whole is currently in the **Beta phase**. Individual optional tools ha
 | Area | Status |
 | --- | --- |
 | Kernel, frontend, workbench and existing project foundation | Beta |
-| Templates panel (Template Builder) | Alpha |
+| Template Builder (a feature from the [catalogue](https://github.com/dapeio/nino-features)) | Alpha |
 | Design panel | Alpha |
 
 Security fixes land directly on `main`; there is no separate LTS version yet.

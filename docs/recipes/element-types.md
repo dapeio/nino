@@ -1,7 +1,7 @@
 # Recipe: Define Element types for repeated content
 
 **Additional Links:**
-[Agent guide](../../AGENTS.md) · [All recipes](README.md) · [Developer Manual](../development.md) · [Concepts](../concepts.md) · [`/_admin` Workbench](../_admin.md) · [Setup Wizard](../setup.md) · [Templates Panel](../templates.md) · [Features](../features.md)
+[Agent guide](../../AGENTS.md) · [All recipes](README.md) · [Developer Manual](../development.md) · [Concepts](../concepts.md) · [`/_admin` Workbench](../_admin.md) · [Setup Wizard](../setup.md) · [Features](../features.md)
 
 One of the seven extension recipes of the [Nino agent guide](../../AGENTS.md). Its
 rules - the required workflow, the core runtime model, the conventions and the
@@ -268,7 +268,7 @@ Elements Area is actually bound to - the auto-generated
 `<page>-<section>-<area>` of a new Area as readily as a type picked under Edit
 Section → Data, so the pair stays correct on the very first insert and after
 any later rebind. The token names a declared Elements Area of the same preset;
-anything else is refused at manifest load. `_nino/Nino/Modules/Templates/library/
+anything else is refused at manifest load. `features/Templates/library/
 filterable-grid/` is a complete worked example: a static block (§10.3a) pairs
 `[elementvalues]` with an Elements Area whose `item.data` stamps each card
 with its own field value per §10.3.

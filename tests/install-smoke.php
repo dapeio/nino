@@ -228,8 +228,10 @@ check( 'the always-on Form module is present, with nothing picked', in_array( '\
 check( 'the always-on Navigation module is present too', in_array( '\\Nino\\Modules\\Navigation', $configAfterApply['/nino/modules'], true ) === true );
 check( 'and so is the always-on Localepicker module', in_array( '\\Nino\\Modules\\Localepicker', $configAfterApply['/nino/modules'], true ) === true );
 check( 'the developer tools that ship as modules are active from the first config on', in_array( '\\Nino\\Modules\\Design', $configAfterApply['/nino/modules'], true ) === true
-	&& in_array( '\\Nino\\Modules\\Templates', $configAfterApply['/nino/modules'], true ) === true
-	&& in_array( '\\Nino\\Modules\\Maintenance', $configAfterApply['/nino/modules'], true ) === true );
+	&& in_array( '\\Nino\\Modules\\Maintenance', $configAfterApply['/nino/modules'], true ) === true
+	// The Template Builder is not among them any more: it is a feature now,
+	// installed from the catalogue, so a fresh config must not carry it
+	&& in_array( '\\Nino\\Modules\\Templates', $configAfterApply['/nino/modules'], true ) === false );
 check( 'apply writes the two roles a project starts with', array_keys( $configAfterApply['/nino/auth/roles'] ) === [ 'editor', 'developer' ] && $configAfterApply['/nino/auth/roles']['developer'] === [ 'label' => 'Developer', 'perms' => [ '/*' ] ] );
 check( 'the Editor role is every content panel\'s permission - the always-on Form module\'s included - and no structure, system or tab permission', in_array( '/_admin/elements/manage', $configAfterApply['/nino/auth/roles']['editor']['perms'], true ) === true
 	&& in_array( '/_admin/submissions/view', $configAfterApply['/nino/auth/roles']['editor']['perms'], true ) === true

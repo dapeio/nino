@@ -7,7 +7,7 @@
 Dieses Handbuch erklärt, was ein Feature ist, wie ein Betreiber es im Panel **Features** der Workbench einschaltet, und was ein Entwickler liefern muss, damit ein Verzeichnis eines wird: das Manifest, das Settings-Schema, den Lebenszyklus und die Tests. Der Kernel-Vertrag dahinter ist `\Nino\Features` in `_nino/Nino/Features/Features.php`; `tests/features-smoke.php` prüft ihn gegen die Fixtures unter `tests/fixtures/features/`. Wer ein eigenes Feature Schritt für Schritt bauen will, folgt dem [Feature-Rezept](recipes/feature.md).
 
 **Weitere Links:**
-[README](../README.de.md) · [Grundkonzepte](concepts.de.md) · [Entwickler-Handbuch](development.de.md) · [Rezepte](recipes/README.md) · [Erste Schritte](getting-started.de.md) · [Einrichtungsassistent](setup.de.md) · [`/_admin`-Workbench](_admin.de.md) · [Templates-Panel](templates.de.md) · [Design-Panel](appearance.de.md) · [Features](features.de.md) · [Deployment](deployment.de.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
+[README](../README.de.md) · [Grundkonzepte](concepts.de.md) · [Entwickler-Handbuch](development.de.md) · [Rezepte](recipes/README.md) · [Erste Schritte](getting-started.de.md) · [Einrichtungsassistent](setup.de.md) · [`/_admin`-Workbench](_admin.de.md) · [Design-Panel](appearance.de.md) · [Features](features.de.md) · [Deployment](deployment.de.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
 
 ## Was ein Feature ist
 
@@ -17,7 +17,7 @@ Drei Arten von Modulen gibt es in einem Nino-Projekt, und der Unterschied ist, w
 
 | Art | Ort | Wer schaltet es ein |
 |---|---|---|
-| **Kernel-Modul** | `_nino/Nino/Modules/<Name>/` – die immer aktiven (`Assets`, `Cache`, `Csrf`, `Elements`, `Images`, `Jstext`, `Template`) und die optionalen (`Form`, `Navigation`, `Localepicker`, `Design`, `Templates`, `Maintenance`) | der Einrichtungsassistent, oder von Hand in `/nino/modules` |
+| **Kernel-Modul** | `_nino/Nino/Modules/<Name>/` – die immer aktiven (`Assets`, `Cache`, `Csrf`, `Elements`, `Images`, `Jstext`, `Template`) und die optionalen (`Form`, `Navigation`, `Localepicker`, `Design`, `Maintenance`) | der Einrichtungsassistent, oder von Hand in `/nino/modules` |
 | **Feature** | `features/<Name>/`, ein Verzeichnis je Feature, mit `feature.php` | das Panel Features |
 | **Projektmodul** | `app/<Vendor>/…` unter einem eigenen Namespace | von Hand in `/nino/modules` |
 

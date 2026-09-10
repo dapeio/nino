@@ -292,6 +292,32 @@ and a seam a submission can be refused at.
   pattern is as wide as the `[[fill]]` the binding becomes can carry, and a
   name outside it is refused for what it is.
 
+### Removed
+
+- **The Template Builder leaves the kernel.**
+  `_nino/Nino/Modules/Templates/` - 70 files, 10,917 lines, a third of everything
+  under `_nino/` - is now the `templates` feature of the catalogue
+  [dapeio/nino-features](https://github.com/dapeio/nino-features), installed from
+  the Features panel like any other. The code is unchanged: the autoloader
+  resolves `features/Templates/AreaComposer/AreaComposer.php` as
+  `\Nino\Modules\Templates\AreaComposer` without a line of renaming, because
+  below `features/` the `Nino/Modules` prefix is the directory itself. The class
+  came out of `\Nino\Install\Setup::TOOL_MODULES`, so a fresh install no longer
+  lists it in `/nino/modules`, and `docs/templates.md`, its German half and the
+  two recipes travel with it.
+
+  Its panel now sits in the workbench's **Features** group rather than under
+  **Structure** - every feature's panel does, so that granting that one group
+  stays a bounded grant. Nothing changes for permissions: the panel was in
+  `structure` before, which the Editor role never carried either.
+
+  **`\Nino\VERSION` is `1.2.0-beta` for this.** A kernel that still ships the
+  module serves its own copy - the autoloader resolves `_nino/` first, on
+  purpose, so a shipped module can never be shadowed - and the feature would
+  look installed and do nothing. `^1.2` in its manifest is what refuses that and
+  says why.
+
+
 ## 1.1.0-beta — 2026-09-07
 
 Features. An installable package is one directory below `features/` with a

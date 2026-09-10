@@ -7,7 +7,7 @@
 Dieses Handbuch erklärt die Entscheidungen und Schreibvorgänge der zehn Schritte des Einrichtungsassistenten – des Erststart-Modus der [`/_admin`-Workbench](_admin.de.md). Falls du stattdessen auf dem kürzesten Weg vom Checkout zur eingerichteten Webseite gelangen möchtest, beginne mit [Erste Schritte](getting-started.de.md); den späteren produktiven Betrieb behandelt [Deployment](deployment.de.md).
 
 **Weitere Links:**
-[README](../README.de.md) · [Grundkonzepte](concepts.de.md) · [Entwickler-Handbuch](development.de.md) · [Rezepte](recipes/README.md) · [Erste Schritte](getting-started.de.md) · [Einrichtungsassistent](setup.de.md) · [`/_admin`-Workbench](_admin.de.md) · [Templates-Panel](templates.de.md) · [Design-Panel](appearance.de.md) · [Features](features.de.md) · [Deployment](deployment.de.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
+[README](../README.de.md) · [Grundkonzepte](concepts.de.md) · [Entwickler-Handbuch](development.de.md) · [Rezepte](recipes/README.md) · [Erste Schritte](getting-started.de.md) · [Einrichtungsassistent](setup.de.md) · [`/_admin`-Workbench](_admin.de.md) · [Design-Panel](appearance.de.md) · [Features](features.de.md) · [Deployment](deployment.de.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
 
 **Wichtig:** Der Assistent erzeugt aus einem frischen Nino-Checkout den ersten lauffähigen Projektstand. Er ist notwendig: Vor seiner Ausführung existieren die eigentlichen Projektverzeichnisse wie `templates/`, `text/`, `elements/` und `images/` noch nicht.
 
@@ -280,6 +280,6 @@ Diese Grenze ist beabsichtigt: Der Assistent automatisiert wiederkehrende techni
 - [Erste Schritte](getting-started.de.md) beschreibt den vollständigen Erfolgsweg.
 - [Grundkonzepte](concepts.de.md) erklärt Datenfluss, Routing und Rendering.
 - [`/_admin`-Workbench](_admin.de.md) erklärt die Panels, die Konten und die Recovery-Seite.
-- [Templates-Panel](templates.de.md) beschreibt den Template Builder im Alpha-Status.
+- Der **Template-Baukasten** – Seitentemplates aus ganzen Abschnitten – ist ein Feature aus dem Katalog [dapeio/nino-features](https://github.com/dapeio/nino-features); sein [Handbuch](https://github.com/dapeio/nino-features/blob/main/features/Templates/docs/templates.de.md) liegt dort ebenfalls.
 - [Design-Panel](appearance.de.md) erklärt die vier Erscheinungsbild-Editoren.
 - [Deployment](deployment.de.md) führt durch Sicherheit, Tests und Go-live.
