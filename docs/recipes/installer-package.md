@@ -118,7 +118,7 @@ frontend.
 'requiresModules' => [ 'forms', 'navigation' ],
 ```
 
-The Setup step resolves module requirements transitively. A requirement no
+`\Nino\Install\Setup` resolves module requirements transitively. A requirement no
 unit answers to is skipped with a warning, never applied. Keep the dependency
 graph small and acyclic even though the resolver terminates cycles. A cycle
 usually indicates mixed responsibilities.
@@ -248,7 +248,7 @@ Use manifest routes when Setup owns the persisted route choice. Never put an
 ordinary visitor page into a module unit merely because it uses the module; use
 a page unit.
 
-The Setup step:
+The wizard's second step:
 
 - replaces the selected locale and optional-module sets;
 - always retains the structural core modules;

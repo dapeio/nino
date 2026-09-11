@@ -4,6 +4,20 @@ All notable changes to Nino are documented in this file.
 
 ## Unreleased
 
+### Changed
+
+- **The wizard's second step is called "Languages".** It asks about locales, and
+  the module picker beside them stays hidden until a project module with an
+  install unit is found - nothing in a fresh checkout - so the step is named for
+  the half that is always there. The rail label changed with 1.2.0-beta; the
+  manuals had not followed, which left `docs/getting-started.md` pointing at
+  `setup.md#2-setup`, an anchor that no longer existed. Heading, anchors and
+  both Getting Started tables now match, in English and German, and
+  `tests/install-script-js-smoke.js` holds the manual to the rail's numbering
+  and refuses a step link that resolves to nothing. The step *key* is still
+  `setup`, and so are `Setup::units()`, the `setup/apply` action and
+  `\Nino\Install\Setup` - only the label is the narrower name, and the docs say
+  which is which.
 
 ## 1.2.0-beta — 2026-09-11
 

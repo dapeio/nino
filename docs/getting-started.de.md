@@ -36,7 +36,7 @@ Solange der Assistent nicht abgeschlossen ist, kannst du zu früheren Schritten 
 | Schritt | Entscheidung |
 |---|---|
 | [1. Umgebung](setup.de.md#1-umgebung) | Sind PHP, Erweiterungen und Schreibrechte einsatzbereit? |
-| [2. Setup](setup.de.md#2-setup) | Welche Sprachen und funktionalen Module benötigt das Projekt? |
+| [2. Sprachen](setup.de.md#2-sprachen) | Welche Sprachen und funktionalen Module benötigt das Projekt? |
 | [3. Routes](setup.de.md#3-routes) | Welche ersten Seiten, öffentlichen Pfade und Metadaten werden angelegt? |
 | [4. Persönliche Angaben](setup.de.md#4-persönliche-angaben) | Welche zentralen Unternehmens- und Webseitenwerte stehen als Textfills bereit? |
 | [5. Accounts](setup.de.md#5-accounts) | Welche Entwicklerkonten melden sich mit Vollzugriff an der Workbench an? |

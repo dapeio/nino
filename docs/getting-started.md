@@ -36,7 +36,7 @@ As long as the wizard is not completed, you can return to earlier steps and reap
 | Step | Decision |
 |---|---|
 | [1. Environment](setup.md#1-environment) | Are PHP, extensions, and write permissions ready for use? |
-| [2. Setup](setup.md#2-setup) | Which languages and functional modules does the project require? |
+| [2. Languages](setup.md#2-languages) | Which languages and functional modules does the project require? |
 | [3. Routes](setup.md#3-routes) | Which first pages, public paths, and metadata are created? |
 | [4. Personal Information](setup.md#4-personal-information) | Which central company and website values are available as textfills? |
 | [5. Accounts](setup.md#5-accounts) | Which developer account(s) sign in to the workbench with full access? |

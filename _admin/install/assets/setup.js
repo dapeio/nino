@@ -2,16 +2,22 @@
 
 /**
  *	Nino										A compact filesystembased php framework
- *	Install									Step 2: pick available locales/modules - every module
- *													unit the installer finds, see Setup::units() - and a
- *													native locale among the ones picked, and assemble them
- *													into the real project (routes, templates, text). See
- *													_admin/install/Install.php's Setup class. Pages have
- *													their own step (see webpages.js) - this one only ever
- *													touches base + the picked module units. Driven by the
- *													shared Back/Next bar (script.js) rather than its own
- *													save button - apply() is
- *													exposed for Next to call, not wired to a button here.
+ *	Install									Step 2, "Languages": pick the available locales and a
+ *													native locale among them, and assemble the project from
+ *													them (routes, templates, text). The step key stays
+ *													`setup` - so do Setup::units(), the `setup/apply`
+ *													action and Install.php's Setup class; only the label
+ *													the rail shows is the narrower name.
+ *
+ *													It also carries the module picker, hidden until a
+ *													project module with an install unit is found (see
+ *													#setup-modules-card) - nothing in a fresh checkout,
+ *													which is why the step is named for the half that is
+ *													always there. Pages have their own step (see
+ *													webpages.js); this one only ever touches base + the
+ *													picked module units. Driven by the shared Back/Next bar
+ *													(script.js) rather than its own save button - apply()
+ *													is exposed for Next to call, not wired to a button.
  *
  *	@package								Dape/Nino
  *	@author									David Perchermeier <mail@dape.io>

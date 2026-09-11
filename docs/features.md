@@ -225,7 +225,7 @@ What a feature writes under `data/` belongs to the project: the workbench's dail
 
 ### The Wizard and the Units
 
-The setup wizard's Setup step offers no features. It knows the kernel modules that ship a unit - navigation, language selection, contact form - a project's own modules under `app/`, and the units under `_admin/install/library/modules/`; a feature is switched on in the Features panel after setup. Both apply their units through the same method, `\Nino\Features::applyUnit()`: the wizard with overwrite on, because a unit applied again is meant to replace what it copied before there; an activation with it off. That is why the application lives in the kernel and not in the wizard - `_admin/install/` may be deleted after setup, and a feature still has to activate afterwards.
+The setup wizard's second step offers no features. It knows the kernel modules that ship a unit - navigation, language selection, contact form - a project's own modules under `app/`, and the units under `_admin/install/library/modules/`; a feature is switched on in the Features panel after setup. Both apply their units through the same method, `\Nino\Features::applyUnit()`: the wizard with overwrite on, because a unit applied again is meant to replace what it copied before there; an activation with it off. That is why the application lives in the kernel and not in the wizard - `_admin/install/` may be deleted after setup, and a feature still has to activate afterwards.
 
 ## The Catalogue
 

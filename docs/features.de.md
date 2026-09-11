@@ -224,7 +224,7 @@ Was ein Feature unter `data/` schreibt, gehört dem Projekt: Das tägliche Backu
 
 ### Der Assistent und die Einheiten
 
-Der Setup-Schritt des Einrichtungsassistenten bietet keine Features an. Er kennt die Kernel-Module mit einer Einheit – Navigation, Sprachauswahl, Kontaktformular –, die eigenen Module des Projekts unter `app/` und die Einheiten unter `_admin/install/library/modules/`; ein Feature wird nach der Einrichtung im Panel Features eingeschaltet. Beide wenden ihre Einheiten über dieselbe Methode an, `\Nino\Features::applyUnit()`: der Assistent mit Überschreiben, weil eine erneut angewendete Einheit dort ersetzen soll, was sie zuvor kopiert hat; eine Aktivierung ohne. Deshalb liegt die Anwendung im Kernel und nicht im Assistenten – `_admin/install/` darf nach der Einrichtung gelöscht werden, und ein Feature muss sich danach noch aktivieren lassen.
+Der zweite Schritt des Einrichtungsassistenten bietet keine Features an. Er kennt die Kernel-Module mit einer Einheit – Navigation, Sprachauswahl, Kontaktformular –, die eigenen Module des Projekts unter `app/` und die Einheiten unter `_admin/install/library/modules/`; ein Feature wird nach der Einrichtung im Panel Features eingeschaltet. Beide wenden ihre Einheiten über dieselbe Methode an, `\Nino\Features::applyUnit()`: der Assistent mit Überschreiben, weil eine erneut angewendete Einheit dort ersetzen soll, was sie zuvor kopiert hat; eine Aktivierung ohne. Deshalb liegt die Anwendung im Kernel und nicht im Assistenten – `_admin/install/` darf nach der Einrichtung gelöscht werden, und ein Feature muss sich danach noch aktivieren lassen.
 
 ## Der Katalog
 

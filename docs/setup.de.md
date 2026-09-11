@@ -54,11 +54,9 @@ Noch nicht vorhandene Projektverzeichnisse sind erwartbar. Entscheidend ist, das
 
 Behebe fehlgeschlagene Prüfungen, bevor du fortfährst. Ohne ausreichende Schreibrechte kann der Assistent weder Konfiguration noch Inhalte zuverlässig erzeugen.
 
-## 2. Setup
+## 2. Sprachen
 
-Setup legt Sprachen fest und erzeugt die Basis des Projekts.
-
-### Sprachen
+Der Schritt ist nach dem benannt, wonach er fragt - und er ist zugleich der, in dem der Assistent die Base-Einheit und die immer aktiven Einheiten anwendet, legt also nebenbei die Grundlage des Projekts an.
 
 **Available Locales** bestimmt die verfügbaren Sprachen. **Native Locale** ist die Standardsprache und muss Teil dieser Auswahl sein. Sie dient technisch als Rückfall, solange für einen Besucher noch keine Sprache feststeht, und bildet inhaltlich die „Muttersprache“ der Webseite.
 
@@ -70,7 +68,7 @@ Navigation, Sprachauswahl (der Locale Picker) und das Kontaktformular sind keine
 
 Die verbleibende Liste bietet jedes *andere* Modul an, das eine Installer-Einheit mitliefert: in einem frischen Checkout keines, dazu jedes Modul, das ein Projekt unter `app/` hinzugefügt hat, oder eine eigene Fassung unter `_admin/install/library/modules/`. Features – etwa Newsletter und Suche aus dem Katalog – werden auch hier nicht angeboten: Ein Feature wird aus [dapeio/nino-features](https://github.com/dapeio/nino-features) nach `features/` kopiert und nach der Einrichtung im [Panel Features](features.de.md) der Workbench eingeschaltet. Benötigt ein gewähltes Modul ein weiteres Modul, nimmt der Assistent diese Abhängigkeit automatisch in die Auswahl auf - und findet sie bereits vorhanden, wenn diese Abhängigkeit eines der drei immer aktiven Module ist. Auch eine verwendete Seitenvorlage kann benötigte Module nachziehen; eine Kontaktseite funktioniert zum Beispiel, weil das Modul des Kontaktformulars ohnehin immer da ist.
 
-Setup schreibt:
+Der Schritt schreibt:
 
 - verfügbare und native Sprache nach `config.php`;
 - die aktivierten Modulklassen - die immer aktiven drei, jedes Entwicklerwerkzeug, dessen Klasse existiert, und was sonst gewählt wurde - nach `/nino/modules`;
@@ -80,7 +78,7 @@ Setup schreibt:
 - mitgelieferte Element-Typen nach `elements/`;
 - weitere deklarierte Dateien an ihre Projektpfade.
 
-Sprachen, die gewählten *anderen* Module und die von Setup verwalteten Routen werden bei einem späteren erneuten Anwenden ersetzt; die drei immer aktiven Einheiten und die Routen/Templates/Texte, die sie mitbringen, entfernt es dabei nie. Manuell oder durch andere Bereiche angelegte Routen bleiben erhalten. Bereits kopierte Templates, Texte und Element-Typen löscht ein späteres Abwählen nicht.
+Sprachen, die gewählten *anderen* Module und die von diesem Schritt verwalteten Routen werden bei einem späteren erneuten Anwenden ersetzt; die drei immer aktiven Einheiten und die Routen/Templates/Texte, die sie mitbringen, entfernt es dabei nie. Manuell oder durch andere Bereiche angelegte Routen bleiben erhalten. Bereits kopierte Templates, Texte und Element-Typen löscht ein späteres Abwählen nicht.
 
 ### Das Aussehen
 
@@ -203,7 +201,7 @@ Modul-Einheiten werden gefunden, nicht aufgelistet: Der Assistent durchsucht `_n
 
 Nicht durchsucht wird `features/`. Ein Feature trägt eine `install/`-Einheit derselben Form, aber `\Nino\Features::activate()` wendet sie an, wenn das Feature in der Workbench eingeschaltet wird – über dasselbe `applyUnit()`, das der Assistent verwendet, hier mit Überschreiben, dort nur ergänzend, damit die Anwendung der Einheit das Entfernen von `_admin/install/` überlebt. Siehe [Features](features.de.md).
 
-Ein Entwicklerwerkzeug, das als Modul ausgeliefert wird, hat keine Einheit zum Auswählen: Der Setup-Schritt trägt es in `/nino/modules` ein, sobald seine Klasse existiert, sodass sein Panel von der ersten `config.php` an in der Workbench ist.
+Ein Entwicklerwerkzeug, das als Modul ausgeliefert wird, hat keine Einheit zum Auswählen: `\Nino\Install\Setup` trägt es in `/nino/modules` ein, sobald seine Klasse existiert, sodass sein Panel von der ersten `config.php` an in der Workbench ist.
 
 Die Basis-, Modul- und Seiteneinheiten besitzen je eine `manifest.php`. Das Manifest beschreibt, was angezeigt, kopiert und konfiguriert wird. Je nach Einheit enthält es beispielsweise:
 
