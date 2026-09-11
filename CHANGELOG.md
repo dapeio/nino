@@ -4,6 +4,34 @@ All notable changes to Nino are documented in this file.
 
 ## Unreleased
 
+### Fixed
+
+- **The `/_admin` login was refused on Apache with PHP as CGI or FastCGI**, for
+  credentials that were correct. The workbench sends its pair as an HTTP Basic
+  `Authorization` header, and Apache hands a CGI/FastCGI script no such header
+  unless `CGIPassAuth` is on - a directive that needs 2.4.13 and does not cover
+  every php-cgi wrapper. The documented fallback for those hosts is a
+  `RewriteRule` copying the header into an environment variable, but Apache
+  prefixes a variable set during an internal redirect with `REDIRECT_` (once per
+  redirect), and `\Nino\Http` only ever looked at `HTTP_AUTHORIZATION`. So the
+  workaround written for exactly those hosts did not work on them:
+  `PHP_AUTH_USER`, `HTTP_AUTHORIZATION` and `REDIRECT_HTTP_AUTHORIZATION` all
+  empty under SAPI `cgi-fcgi` is what it looked like. The credential pair is now
+  read from whichever member of that `REDIRECT_…` family arrives. A client
+  cannot reach it: a request header lands as `HTTP_<NAME>`, so the one name that
+  could be tried arrives as `HTTP_REDIRECT_HTTP_AUTHORIZATION` and matches
+  nothing.
+- The shipped `.htaccess` now carries that `RewriteRule` beside `CGIPassAuth
+  On`, so a host that needs it has it without editing anything, and it is
+  harmless where `CGIPassAuth` already worked - it writes the value the header
+  already has.
+- `.htaccess` also sets `SetEnv NINO_HTACCESS 1`. Whether the file is applied at
+  all is the question behind every "the login does not work" *and* every "why is
+  `private/` being served", and `AllowOverride` can switch it off silently - a
+  rule that is not applied looks exactly like a rule that is. The deployment
+  checklist asks for the variable, and `docs/deployment.md` has the probe that
+  reads it along with the three places the credentials can fail to arrive.
+
 ### Changed
 
 - **The wizard's second step is called "Languages".** It asks about locales, and

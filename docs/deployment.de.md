@@ -51,7 +51,35 @@ Die mitgelieferte `.htaccess` setzt diese grundlegenden Regeln, sofern der Serve
 
 - Dateien mit einem führenden Punkt werden nicht direkt ausgeliefert.
 - Verzeichnisse ohne Indexdatei zeigen keine Dateiliste.
-- Der HTTP-Header `Authorization` erreicht PHP, damit der Login unter `/_admin` seine Basic-Zugangsdaten lesen kann. Apache verbirgt diesen Header normalerweise vor CGI-/FastCGI-Skripten; ist die mitgelieferte Datei nicht aktiv, setze `CGIPassAuth On` in der entsprechenden Server- oder Virtual-Host-Konfiguration. Die Direktive setzt Apache 2.4.13 oder neuer voraus - eine ältere Version beantwortet jede Anfrage mit einem 500, weil sie sie nicht kennt; dort gehört die Zeile entfernt und der Header über die Serverkonfiguration durchgereicht.
+- Der HTTP-Header `Authorization` erreicht PHP, damit der Login unter `/_admin` seine Basic-Zugangsdaten lesen kann. Apache verbirgt diesen Header normalerweise vor CGI-/FastCGI-Skripten. Dagegen stehen zwei Regeln in der Datei: `CGIPassAuth On` und – für die Fälle, in denen das nicht reicht – eine `RewriteRule`, die den Header in eine Umgebungsvariable kopiert. Die Direktive setzt Apache 2.4.13 oder neuer voraus; eine ältere Version beantwortet jede Anfrage mit einem 500, weil sie sie nicht kennt – dort gehört genau diese eine Zeile entfernt, die Rewrite-Regel trägt den Rest.
+- `SetEnv NINO_HTACCESS 1` – daran erkennst Du, ob überhaupt etwas davon angewendet wird.
+
+#### Der Login weist ab, obwohl das Passwort stimmt
+
+Das Symptom ist immer dasselbe: `/_admin` antwortet mit `401` auf korrekte Zugangsdaten. Die Ursache ist, dass das Zugangspaar nie bei PHP angekommen ist. Diese Probe sagt, an welcher der drei Stellen es fehlt:
+
+```php
+<?php
+// Neben index.php legen, mit `curl -u test:geheim https://…/probe.php` aufrufen
+// und danach wieder löschen.
+header( 'Content-Type: text/plain' );
+echo 'SAPI:                        ', PHP_SAPI, "\n";
+echo 'NINO_HTACCESS:               ', var_export( $_SERVER['NINO_HTACCESS'] ?? null, true ), "\n";
+echo 'PHP_AUTH_USER:               ', var_export( $_SERVER['PHP_AUTH_USER'] ?? null, true ), "\n";
+echo 'HTTP_AUTHORIZATION:          ', var_export( $_SERVER['HTTP_AUTHORIZATION'] ?? null, true ), "\n";
+echo 'REDIRECT_HTTP_AUTHORIZATION: ', var_export( $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? null, true ), "\n";
+```
+
+So liest man sie:
+
+| | |
+| --- | --- |
+| `NINO_HTACCESS` ist `NULL` | Die `.htaccess` wird gar nicht angewendet – `AllowOverride` ist für dieses Verzeichnis aus. Das zuerst reparieren: Dieselbe Datei hält Dotfiles, `.git/` und den ganzen `private/`-Baum vom Ausliefern ab, das ist also eine Frage von Datenabfluss, bevor es eine Frage des Logins ist |
+| `PHP_AUTH_USER` ist gesetzt | Nichts zu tun – das ist `mod_php`, der Login funktioniert |
+| `HTTP_AUTHORIZATION` ist gesetzt | `CGIPassAuth` hat seine Arbeit getan, der Login funktioniert |
+| `REDIRECT_HTTP_AUTHORIZATION` ist gesetzt | Die Rewrite-Regel hat gegriffen, und `\Nino\Http` liest diese Variable – der Login funktioniert |
+| alle drei sind `NULL`, SAPI ist `cgi` oder `cgi-fcgi` | Keine der beiden Regeln hat das Skript erreicht. Entweder wird die `.htaccess` nicht angewendet (siehe erste Zeile), oder `mod_rewrite` ist aus, oder der Hoster startet PHP über einen Wrapper, der den Header verwirft, bevor Apaches eigene Regeln greifen – dann beim Hoster `Authorization` durchreichen lassen oder `CGIPassAuth On` in den vhost setzen |
+
 
 Eine separate Schutzregel liegt in `private/.htaccess` und sperrt dieses Verzeichnis vollständig. Sie ist die wichtigste: In `private/` liegen `config.php`, die Templates sowie die Texte und Elemente, aus denen sie rendern, die Daten deiner Besucher und die Stylesheet- und Skriptquellen, aus denen das Asset-Bundle gebaut wird. Ohne sie liefert ein Aufruf von `private/templates/page-home.tpl` den Template-Quelltext im Klartext aus.
 
@@ -247,6 +275,7 @@ Nino befindet sich in der Beta-Phase. Sicherheitskorrekturen erscheinen auf `mai
 - [ ] PHP-Version und Erweiterungen entsprechen den Anforderungen.
 - [ ] Öffentliche Routen werden korrekt an Nino übergeben.
 - [ ] Dotfiles, Dot-Verzeichnisse und PHP-Datendateien sind nicht direkt erreichbar.
+- [ ] Bei Apache: Die `.htaccess` wird tatsächlich angewendet — `$_SERVER['NINO_HTACCESS']` ist `1`. Alles darunter, was auf `.htaccess` beruht, ist sonst nichts wert.
 - [ ] `app/` und `features/` werden nicht ausgeliefert — beide tragen eine eigene `.htaccess`; prüfe es mit einer Anfrage nach einer Datei eines installierten Features, z. B. `/features/Newsletter/install/templates/mail-header.tpl`, sobald das Newsletter-Feature des Katalogs an Ort und Stelle ist – ein Checkout bringt kein Feature mit, also muss eines da sein, nach dem sich fragen lässt.
 - [ ] `private/` wird nicht ausgeliefert — die eigene `.htaccess` sperrt das Verzeichnis, und jede PHP-Datei darin trägt einen 403-Stub; prüfe, ob beides auf deinem Webserver greift, oder verlege das Verzeichnis mit `NINO_PRIVATE_DIR` aus dem Webroot. Die Templates und die Asset-Quellen sind kein PHP und haben nur die Serverregel.
 - [ ] Verzeichnisauflistung ist deaktiviert.

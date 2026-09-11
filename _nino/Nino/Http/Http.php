@@ -253,8 +253,11 @@ namespace Nino {
 		// FastCGI commonly expose only HTTP_AUTHORIZATION after the web server
 		// has been configured to pass it through. Prefer PHP's parsed values for
 		// backwards compatibility, then decode one strict Basic credential pair
-		// from the already normalized request header. A password may contain a
-		// colon, so split only at the first one.
+		// from the already normalized request header - or, where the header did
+		// not survive the hop into the script at all, from the environment
+		// variable the documented Apache fallback copies it into (see
+		// _getRawAuthorization()). A password may contain a colon, so split only
+		// at the first one.
 		private static function _getBasicAuthCredentials( array $rawServer, array $header ): array {
 
 			if( array_key_exists( 'PHP_AUTH_USER', $rawServer ) === true || array_key_exists( 'PHP_AUTH_PW', $rawServer ) === true )
@@ -264,7 +267,11 @@ namespace Nino {
 				];
 
 			$authorization = $header['Authorization'] ?? '';
-			if( is_string( $authorization ) === false || preg_match( '/^Basic[ \t]+([A-Za-z0-9+\/]+={0,2})$/iD', trim( $authorization ), $matches ) !== 1 )
+
+			if( is_string( $authorization ) === false || $authorization === '' )
+				$authorization = self::_getRawAuthorization( $rawServer );
+
+			if( preg_match( '/^Basic[ \t]+([A-Za-z0-9+\/]+={0,2})$/iD', trim( $authorization ), $matches ) !== 1 )
 				return [ 'user' => '', 'pw' => '' ];
 
 			$decoded = base64_decode( $matches[1], true );
@@ -274,6 +281,38 @@ namespace Nino {
 			[ $user, $pw ] = explode( ':', $decoded, 2 );
 
 			return [ 'user' => $user, 'pw' => $pw ];
+		}
+
+		/*	The Authorization header as an environment variable, for the servers
+			that hand a script no header at all.
+
+			Apache strips Authorization from CGI and FastCGI requests unless
+			CGIPassAuth is on, and that directive needs 2.4.13 - on an older one
+			(and on a php-cgi wrapper it does not cover) the .htaccess falls back
+			to copying the header into an environment variable:
+
+			  RewriteCond %{HTTP:Authorization} .
+			  RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+
+			A variable set during an internal redirect reaches the script with a
+			REDIRECT_ prefix, and each further redirect adds another one - so the
+			name is not one value to look up but a small family, and which member
+			arrives is the server's business rather than the project's. Nothing a
+			client sends can land here: a request header becomes HTTP_<NAME>, so
+			a header literally called "Redirect-Http-Authorization" arrives as
+			HTTP_REDIRECT_HTTP_AUTHORIZATION and does not match.
+
+			@param		array 		$rawServer		$_SERVER as request() received it
+
+			@return 	string									'' when no variant carries anything */
+		private static function _getRawAuthorization( array $rawServer ): string {
+
+			foreach( $rawServer as $key => $value )
+				if( is_string( $key ) === true && is_string( $value ) === true && $value !== ''
+					&& preg_match( '/^(?:REDIRECT_)+HTTP_AUTHORIZATION$/', $key ) === 1 )
+					return $value;
+
+			return '';
 		}
 
 		// Build the request-side header array from $_SERVER (passed in as

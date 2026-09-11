@@ -52,7 +52,35 @@ The included `.htaccess` sets these baseline rules, provided the server allows `
 
 - Files with a leading dot are not delivered directly.
 - Directories without an index file do not show a file list.
-- The HTTP `Authorization` header reaches PHP so that the `/_admin` login can read its Basic credentials. Apache normally hides this header from CGI/FastCGI scripts; if the included file is not active, set `CGIPassAuth On` in the corresponding server or virtual-host configuration. The directive needs Apache 2.4.13 or newer - an older one answers every request with a 500 because it does not know it, so remove the line there and pass the header through the server configuration instead.
+- The HTTP `Authorization` header reaches PHP so that the `/_admin` login can read its Basic credentials. Apache normally hides this header from CGI/FastCGI scripts. Two rules cover that, and the file ships both: `CGIPassAuth On`, and - for where that is not enough - a `RewriteRule` that copies the header into an environment variable. The directive needs Apache 2.4.13 or newer; an older one answers every request with a 500 because it does not know it, so remove that one line there and rely on the rewrite.
+- `SetEnv NINO_HTACCESS 1`, which is how you find out whether any of the above is applied at all.
+
+#### The login form is refused and the password is right
+
+The symptom is always the same: `/_admin` answers `401` for credentials that are correct. The cause is that the credential pair never reached PHP. This probe says which of the three places it did not arrive in:
+
+```php
+<?php
+// Drop next to index.php, call it as `curl -u test:secret https://…/probe.php`,
+// and delete it again afterwards.
+header( 'Content-Type: text/plain' );
+echo 'SAPI:                        ', PHP_SAPI, "\n";
+echo 'NINO_HTACCESS:               ', var_export( $_SERVER['NINO_HTACCESS'] ?? null, true ), "\n";
+echo 'PHP_AUTH_USER:               ', var_export( $_SERVER['PHP_AUTH_USER'] ?? null, true ), "\n";
+echo 'HTTP_AUTHORIZATION:          ', var_export( $_SERVER['HTTP_AUTHORIZATION'] ?? null, true ), "\n";
+echo 'REDIRECT_HTTP_AUTHORIZATION: ', var_export( $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? null, true ), "\n";
+```
+
+Read it like this:
+
+| | |
+| --- | --- |
+| `NINO_HTACCESS` is `NULL` | the `.htaccess` is not applied at all - `AllowOverride` is off for this directory. Fix that first: the same file is what keeps dotfiles, `.git/` and the whole `private/` tree from being served, so this is a disclosure question before it is a login question |
+| `PHP_AUTH_USER` is set | nothing to do - this is `mod_php`, and the login works |
+| `HTTP_AUTHORIZATION` is set | `CGIPassAuth` did its job; the login works |
+| `REDIRECT_HTTP_AUTHORIZATION` is set | the rewrite fallback did its job, and `\Nino\Http` reads that variable - the login works |
+| all three are `NULL`, SAPI is `cgi` or `cgi-fcgi` | neither rule reached the script. Either the `.htaccess` is not applied (see the first row), or `mod_rewrite` is off, or the host runs PHP through a wrapper that drops the header before Apache's own rules apply - ask the host to pass `Authorization` through, or set `CGIPassAuth On` in the vhost |
+
 
 A separate protection rule lives in `private/.htaccess` and denies that directory outright. It is the one that matters most: `private/` holds `config.php`, the templates, the text and elements they render from, the data your visitors produce, and the stylesheet and script sources the asset bundle is built out of. Without it, a request for `private/templates/page-home.tpl` returns the template source as plain text.
 
@@ -244,6 +272,7 @@ Nino is in the beta phase. Security fixes appear on `main`; there is currently n
 - [ ] PHP version and extensions meet the requirements.
 - [ ] Public routes are correctly forwarded to Nino.
 - [ ] Dotfiles, dot directories, and PHP data files are not directly accessible.
+- [ ] On Apache: the `.htaccess` is actually applied — `$_SERVER['NINO_HTACCESS']` is `1`. Everything below that relies on `.htaccess` is worth nothing if it is not.
 - [ ] `app/` and `features/` are not served — each carries its own `.htaccess`; verify with a request for a file of an installed feature, e.g. `/features/Newsletter/install/templates/mail-header.tpl` once the catalogue's Newsletter feature is in place - a checkout ships no feature, so there has to be one to ask for.
 - [ ] `private/` is not served — its own `.htaccess` denies it, and each PHP file inside carries a 403 stub; verify both apply on your webserver, or move the directory out of the webroot with `NINO_PRIVATE_DIR`. The templates and the asset sources are not PHP and have only the server rule.
 - [ ] Directory listing is disabled.

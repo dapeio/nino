@@ -1753,6 +1753,37 @@ check( 'a malformed Basic header produces no partial credentials',
 	( $malformedBasicRequest['/nino/http/request']['user'] ?? '' ) === ''
 	&& ( $malformedBasicRequest['/nino/http/request']['pw'] ?? '' ) === '' );
 
+/*	Where Apache hands a cgi/cgi-fcgi script no Authorization header at all -
+	an Apache older than CGIPassAuth (2.4.13), or a php-cgi wrapper the
+	directive does not cover - the .htaccess copies it into an environment
+	variable instead, and Apache prefixes a variable set during an internal
+	redirect with REDIRECT_, once per redirect. The login used to see nothing
+	on exactly the hosts the documented fallback was written for */
+$redirectedBasicRequest = fakeRequest( $appData, '/.nino/auth/login', 'POST', [ 'REDIRECT_HTTP_AUTHORIZATION' => $basicHeader ] );
+check( 'Basic credentials survive the REDIRECT_ prefix Apache\'s rewrite fallback produces',
+	( $redirectedBasicRequest['/nino/http/request']['user'] ?? '' ) === 'editor@example.com'
+	&& ( $redirectedBasicRequest['/nino/http/request']['pw'] ?? '' ) === 'secret:with-colons' );
+
+$nestedBasicRequest = fakeRequest( $appData, '/.nino/auth/login', 'POST', [ 'REDIRECT_REDIRECT_HTTP_AUTHORIZATION' => $basicHeader ] );
+check( '...and the second prefix a nested redirect adds',
+	( $nestedBasicRequest['/nino/http/request']['user'] ?? '' ) === 'editor@example.com' );
+
+// A request header lands in $_SERVER as HTTP_<NAME>, so the one name a client
+// could try reads as HTTP_REDIRECT_HTTP_AUTHORIZATION and matches nothing
+$forgedBasicRequest = fakeRequest( $appData, '/.nino/auth/login', 'POST', [ 'HTTP_REDIRECT_HTTP_AUTHORIZATION' => $basicHeader ] );
+check( 'a client cannot reach that path with a header of its own',
+	( $forgedBasicRequest['/nino/http/request']['user'] ?? '' ) === ''
+	&& ( $forgedBasicRequest['/nino/http/request']['pw'] ?? '' ) === '' );
+
+$emptyRedirectRequest = fakeRequest( $appData, '/.nino/auth/login', 'POST', [ 'REDIRECT_HTTP_AUTHORIZATION' => '' ] );
+check( 'an empty variant is skipped rather than read as a credential',
+	( $emptyRedirectRequest['/nino/http/request']['user'] ?? '' ) === '' );
+
+check( 'the shipped .htaccess carries both halves of the Apache workaround, and says whether it is applied',
+	str_contains( $htaccess = (string) @file_get_contents( __DIR__. '/../.htaccess' ), 'CGIPassAuth On' ) === true
+	&& str_contains( $htaccess, 'E=HTTP_AUTHORIZATION:%{HTTP:Authorization}' ) === true
+	&& str_contains( $htaccess, 'SetEnv NINO_HTACCESS 1' ) === true );
+
 $appData['./nino/jstext/nonce'] = base64_encode( random_bytes( 16 ) );
 \Nino\Modules\Jstext::callbackResponse( $appData, $homeRequest );
 $jstextCsp = $homeRequest['/nino/http/response']['header']['Content-Security-Policy'];

@@ -11,6 +11,27 @@
 # header through the server configuration instead (see docs/deployment.md).
 CGIPassAuth On
 
+# ...and the fallback for where that is not enough: an Apache older than
+# 2.4.13, or a php-cgi wrapper CGIPassAuth does not cover (SAPI "cgi-fcgi"
+# with all three of PHP_AUTH_USER, HTTP_AUTHORIZATION and
+# REDIRECT_HTTP_AUTHORIZATION empty is what that looks like). The header is
+# copied into an environment variable instead, which does survive the hop.
+# Apache prefixes a variable set during an internal redirect with REDIRECT_,
+# once per redirect - \Nino\Http reads whichever member of that family
+# arrives. Harmless where CGIPassAuth already worked: it writes the same value
+# the header already carries.
+<IfModule mod_rewrite.c>
+	RewriteEngine On
+	RewriteCond %{HTTP:Authorization} .
+	RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+</IfModule>
+
+# Whether this file is read at all - the question behind every "the login does
+# not work" and every "why is private/ being served". AllowOverride can switch
+# the whole file off silently, and a rule that is not applied looks exactly
+# like a rule that is. docs/deployment.md's checklist asks for this variable.
+SetEnv NINO_HTACCESS 1
+
 # Never serve a dotfile directly - matches the filename only (not the
 # containing directory, so _editor/.cache/script.js is unaffected).
 # private/.auth/ and private/.logs/ are dotdirs whose files inside
