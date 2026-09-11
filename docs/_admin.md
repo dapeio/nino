@@ -2,7 +2,7 @@
 
 **Language:** English · [Deutsch](_admin.de.md)
 
-**Last updated:** September 7, 2026 · **Nino version:** 1.0.0-beta
+**Last updated:** September 11, 2026 · **Nino version:** 1.2.0-beta
 
 This manual explains the one management interface of a Nino project: `/_admin`, the workbench. Developers set the project up, build its structure and appearance here; editors maintain its content here. What an account sees is what its permissions allow. The wizard that turns a fresh checkout into a project is the workbench's first-run mode and has its own reference, the [Setup Wizard](setup.md); so does the [Template Builder](https://github.com/dapeio/nino-features/blob/main/features/Templates/docs/templates.md), which is a feature from the catalogue rather than part of Nino.
 

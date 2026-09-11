@@ -2,7 +2,7 @@
 
 **Language:** English · [Deutsch](getting-started.de.md)
 
-**Last updated:** September 7, 2026 · **Nino version:** 1.0.0-beta
+**Last updated:** September 11, 2026 · **Nino version:** 1.2.0-beta
 
 This guide leads you on the shortest path from a fresh checkout to a locally running Nino website. If you instead want to look up every field and writing process of the wizard, read the [Setup Wizard](setup.md) reference; technical backgrounds are explained in the [Concepts](concepts.md).
 

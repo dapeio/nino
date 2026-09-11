@@ -2,7 +2,7 @@
 
 **Sprache:** [English](setup.md) · Deutsch
 
-**Stand:** 7. September 2026 · **Nino-Version:** 1.0.0-beta
+**Stand:** 11. September 2026 · **Nino-Version:** 1.2.0-beta
 
 Dieses Handbuch erklärt die Entscheidungen und Schreibvorgänge der sechs Schritte des Einrichtungsassistenten – des Erststart-Modus der [`/_admin`-Workbench](_admin.de.md). Falls du stattdessen auf dem kürzesten Weg vom Checkout zur eingerichteten Webseite gelangen möchtest, beginne mit [Erste Schritte](getting-started.de.md); den späteren produktiven Betrieb behandelt [Deployment](deployment.de.md).
 

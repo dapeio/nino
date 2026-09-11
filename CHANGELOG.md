@@ -4,6 +4,9 @@ All notable changes to Nino are documented in this file.
 
 ## Unreleased
 
+
+## 1.2.0-beta — 2026-09-11
+
 The catalogue, and the form engine. A feature is installed from the Features
 panel: the panel loads a signed `catalogue.json` from getnino.dev on request,
 offers what fits the running kernel, and installs or updates an archive below
@@ -393,6 +396,7 @@ something it can add, or leave out, one directory at a time.
   theme picker's `preview.svg` was its one deliberate exception - so
   `router.php` and both `.htaccess` rules deny the tree whole, with no carve-out
   to get wrong.
+  
 ## 1.1.0-beta — 2026-09-07
 
 Features. An installable package is one directory below `features/` with a

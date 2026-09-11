@@ -2,7 +2,7 @@
 
 **Language:** English · [Deutsch](setup.de.md)
 
-**Last updated:** September 7, 2026 · **Nino version:** 1.0.0-beta
+**Last updated:** September 11, 2026 · **Nino version:** 1.2.0-beta
 
 This manual explains the decisions and writing processes of the six steps of the setup wizard - the first-run mode of the [`/_admin` workbench](_admin.md). If you instead want to take the shortest path from checkout to a configured website, start with [Getting Started](getting-started.md); the later production operation is covered in [Deployment](deployment.md).
 

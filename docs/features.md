@@ -2,7 +2,7 @@
 
 **Language:** English · [Deutsch](features.de.md)
 
-**Last updated:** September 7, 2026 · **Nino version:** 1.0.0-beta
+**Last updated:** September 11, 2026 · **Nino version:** 1.2.0-beta
 
 This manual explains what a feature is, how an operator switches one on in the workbench's **Features** panel, and what a developer has to deliver for a directory to be one: the manifest, the settings schema, the lifecycle and the tests. The kernel contract behind it is `\Nino\Features` in `_nino/Nino/Features/Features.php`; `tests/features-smoke.php` checks it against the fixtures under `tests/fixtures/features/`. To build a feature of your own step by step, follow the [feature recipe](recipes/feature.md).
 
