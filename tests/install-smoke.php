@@ -1082,6 +1082,21 @@ check( 'and every webfont it @font-faces', count( $themeFonts[1] ) > 0
 	&& array_values( array_filter( array_unique( $themeFonts[1] ), fn( string $font ): bool => is_file( $baseUnit. $font ) === false ) ) === [] );
 check( '...and names fonts among the files it copies, so they reach the project at all', in_array( 'fonts', $baseFiles, true ) === true );
 
+/*	The root size is a percentage of the visitor's browser default, in both
+	files that set it - a px length here silently overrules someone who raised
+	their default to 20px, and that is the one setting a visitor changes
+	because they need it rather than because they prefer it. theme.css matters
+	as much as Nino.css: it assigns --base-size from its own token, so a px
+	there wins over a correct kernel.	*/
+$rootSizes = [];
+foreach( [ '/../_nino/Nino.css' => '--base-size', '/../_admin/install/library/base/assets/theme.css' => '--nino-base-size' ] as $file => $token )
+	if( preg_match_all( '/'. preg_quote( $token, '/' ). ':\s*([^;]+);/', (string) file_get_contents( __DIR__. $file ), $found ) > 0 )
+		foreach( $found[1] as $value )
+			$rootSizes[] = $file. ': '. trim( $value );
+
+check( 'both files set the root size, and neither as a length'. ( $rootSizes === [] ? ' - none found' : '' ), count( $rootSizes ) === 4
+	&& array_filter( $rootSizes, static fn( string $entry ): bool => str_ends_with( $entry, '%' ) === false ) === [] );
+
 // The stylesheet and the markup it styles are one delivery: theme.css names
 // .nino-frame-header and .nino-footer-nav, and nothing else writes either
 // template into a project

@@ -23,7 +23,9 @@
  *			the @media block right below :root) - mobile-first fluid type, not
  *			a fixed size scaled down for small screens. A project overriding
  *			these needs to repeat the same @media step in its own stylesheet,
- *			same as assets/style.theme01.css does.
+ *			same as assets/theme.css does. --base-size is a percentage of the
+ *			visitor's own browser default rather than a fixed px, so an override
+ *			has to stay a percentage too.
  *
  *
  ****************************************************************************************************/
@@ -146,7 +148,15 @@
 	--fontfamily-text: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
 	--fontfamily-title: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
 	--fontfamily-code: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-	--base-size: 16px;
+	/*	Relative, not 16px: a font-size on html resolves against the browser's
+		own default, so 100% is whatever the visitor set it to. A length here
+		would silently overrule someone who raised their default to 20px, which
+		is the one setting a visitor changes precisely because they need it.
+		112.5% below is 18px for a default of 16, and 22.5px for a default of
+		20 - the step stays proportional either way. Anything deriving a length
+		from this has to go through --text-* / --space-*, never through
+		calc() on this value: a percentage is not a length.	*/
+	--base-size: 100%;
 	--line-height: 1.5;
 	--fontsize-small: .75em;
 	--fontsize-big: 1.25em;
@@ -178,7 +188,7 @@
 }
 @media (min-width: 768px){
   :root{
-		--base-size: 18px;
+		--base-size: 112.5%;
     --text-4: 1.6rem;
     --text-5: 2rem;
     --text-6: 3rem;

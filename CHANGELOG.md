@@ -306,7 +306,17 @@ something it can add, or leave out, one directory at a time.
   collection the project already has there is no model to be unknown to: the
   pattern is as wide as the `[[fill]]` the binding becomes can carry, and a
   name outside it is refused for what it is.
-
+- **The root size overruled the visitor's own browser setting.** `--base-size`
+  was `16px`, stepping to `18px` above 768px, and `html { font-size }` took it
+  literally - so someone who had raised their browser's default to 20px because
+  they need it got 16 anyway. It is `100%` / `112.5%` now: the same sizes for a
+  default of 16, proportional for anyone else. Both files that set it changed,
+  and the second one is the one that mattered: the base unit's `theme.css`
+  assigns `--base-size` from its own `--nino-base-size`, so a correct kernel
+  alone would have been overruled in every real install. `tests/install-smoke.php`
+  holds both to a percentage. Measured in Chromium: at a 16px default the
+  computed root size is 18px before and after; at a 20px default it was 18px and
+  is now 22.5px.
 ### Removed
 
 - **The Template Builder leaves the kernel.**

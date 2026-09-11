@@ -150,7 +150,10 @@
 	--nino-danger-disabled: #c4aeaa;
 	--nino-danger-shadow: rgb(15 23 42 / 12%);
 	--nino-scrim: rgb(14 18 22 / 67%);
-	--nino-base-size: 16px;
+	/* A percentage of the visitor's browser default, never a px length - see
+	   --base-size in Nino.css. A generated replacement for this file has to
+	   keep it relative. */
+	--nino-base-size: 100%;
 	--nino-line-height: 1.5;
 	--nino-measure: 120rem;
 	--nino-text-1: 1rem;
@@ -173,7 +176,7 @@
 
 @media (min-width: 768px) {
 	:root {
-		--nino-base-size: 18px;
+		--nino-base-size: 112.5%;
 		--nino-text-4: 1.6rem;
 		--nino-text-5: 2rem;
 		--nino-text-6: 3rem;
