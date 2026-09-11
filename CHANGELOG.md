@@ -317,6 +317,16 @@ something it can add, or leave out, one directory at a time.
   holds both to a percentage. Measured in Chromium: at a 16px default the
   computed root size is 18px before and after; at a 20px default it was 18px and
   is now 22.5px.
+- **A deactivated feature's data was in no backup.** `\Nino\Backup::manifest()`
+  skipped a feature that was not switched on, its `data` files with it. But
+  deactivating is documented as removing the class from `/nino/modules` *and
+  nothing else* - settings and data stay, switching it back on finds everything
+  as it was. A backup taken meanwhile did not carry that data, and a restore from
+  it left `config.php` recording an installed version whose data was gone: the
+  one state deactivation exists to make impossible. Ownership now ends when the
+  directory does, not when the switch goes off - a feature that was really
+  removed drops out of `\Nino\Features::all()` and stops being carried. The
+  catalogue's Newsletter had the same hole.
 ### Removed
 
 - **The Template Builder leaves the kernel.**

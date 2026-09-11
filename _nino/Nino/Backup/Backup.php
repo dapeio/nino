@@ -120,9 +120,15 @@ namespace Nino {
 			// '..'), so what arrives here needs no second check
 			foreach( \Nino\Features::all( $appData ) as $feature ) {
 
-				if( ( $feature['active'] ?? false ) !== true )
-					continue;
-
+				/*	Present, not active. Deactivating a feature is documented as
+					removing its class from '/nino/modules' and nothing else -
+					settings, data and copied files stay, and switching it back on
+					finds everything as it was. A backup that ran while it was off
+					did not have its data, so a restore from that backup broke the
+					promise: config.php still recorded the installed version, the
+					data behind it was gone. Ownership ends when the directory
+					does, not when the switch goes off - a feature that was really
+					removed drops out of all() and stops being carried here.	*/
 				foreach( (array) ( $feature['data'] ?? [] ) as $owned ) {
 
 					$path = \Nino\Filesystem::path( $appData, $owned );

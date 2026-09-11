@@ -281,10 +281,15 @@ $carried = \Nino\Backup::manifest( $appData );
 check( 'a backup carries the file an active feature\'s manifest declares under data', in_array( 'data/sample.php', $carried, true ) === true );
 check( '...and every file below a directory it declares, at its own relative path', in_array( 'data/sample-dir/one.php', $carried, true ) === true
 	&& in_array( 'data/sample-dir/deeper/two.php', $carried, true ) === true );
-check( 'and carries nothing for a feature that is not switched on', ( static function( array $appData ): bool {
+// Present, not active: deactivation keeps data by contract, so a backup taken
+// while the feature is off has to keep it too. It did not, and a restore from
+// such a backup left config.php recording an installed version whose data was
+// gone - the one state deactivation exists to make impossible
+check( '...and carries them just the same while the feature is switched off, because deactivating keeps its data', ( static function( array $appData ): bool {
 	\Nino\Features::deactivate( $appData, 'sample' );
 	$carried = \Nino\Backup::manifest( $appData );
-	return in_array( 'data/sample.php', $carried, true ) === false;
+	return in_array( 'data/sample.php', $carried, true ) === true
+		&& in_array( 'data/sample-dir/deeper/two.php', $carried, true ) === true;
 } )( $appData ) );
 check( 'its class file sits below NINO_FEATURES_DIR, so the registry moves it into the features group though its own nav() names content', \Nino\Admin\Admin::panels( $appData )['sample']['group'] === 'features' );
 check( 'the registry sits it in the rail between the structure and the system panels, GROUPS order rather than its own nav()', ( static function() use ( $appData ): bool {
