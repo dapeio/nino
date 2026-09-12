@@ -2360,6 +2360,186 @@ check( 'an engine-raised warning (not one of our own E_USER_* calls) still termi
 echo "\n";
 
 
+// --- Runtime::handleShutdown() - the fatals the error handler never sees ---
+
+echo "Runtime::handleShutdown() - a fatal php never hands the handler still reaches the log\n";
+
+/*	Regression: everything Nino offers for diagnosis hung off
+	set_error_handler(), and php never calls that for the levels it raises
+	and stops on. An exhausted memory limit, an expired max_execution_time
+	and a compile-time fatal produced a bare 500 with an empty log and no
+	effect from /nino/error/display - the failures that most need explaining
+	were the ones that explained themselves least.
+
+	Narrower than it sounds, and the reason these cases are the ones tested:
+	on php 8.4 a parse error in a lazily autoloaded class and a call to a
+	missing function are a ParseError and an Error, thrown objects
+	handleException() has always caught. What is left is what is below.	*/
+$shutdownBootstrap = static function( bool $log, bool $display, int $history = 0 ): string {
+	return '
+		$sandbox = sys_get_temp_dir(). "/nino-handleshutdown-". bin2hex( random_bytes( 4 ) );
+		mkdir( $sandbox. "/private", 0755, true );
+		$history = '. var_export( $history, true ). ';
+		if( $history > 0 ) {
+			mkdir( $sandbox. "/private/data", 0755, true );
+			$seed = [];
+			for( $i = 0; $i < $history; $i++ )
+				$seed[] = [ "type" => E_WARNING, "message" => "an earlier warning, number ". $i. ", ". str_repeat( "y", 300 ), "file" => "/templates/page.tpl", "line" => $i, "date" => "2026-09-01 12:00:00" ];
+			file_put_contents( $sandbox. "/private/data/logs.". date( "Y-m" ). ".php", "<?php return ". var_export( $seed, true ). ";" );
+		}
+		$appData = [ "./nino/uid" => $sandbox ];
+		\Nino\AppData::prepare( $appData );
+		$appData["./nino/filesystem/path"] = $sandbox;
+		$appData["./nino/filesystem/configpath"] = $sandbox. "/private";
+		$appData["./nino/filesystem/contentpath"] = $sandbox. "/private";
+		$appData["./nino/filesystem/privatepath"] = $sandbox. "/private";
+		$appData["./nino/filesystem/publicpath"] = $sandbox. "/public";
+		$appData["/nino/error/log"] = '. var_export( $log, true ). ';
+		$appData["/nino/error/display"] = '. var_export( $display, true ). ';
+		\Nino\Runtime::init( $appData );
+		// Announced after init(), not before it: output sent first means
+		// headers_sent(), session_start() raises a plain E_WARNING about that,
+		// and the handler ends the child on it long before its own fatal
+		echo "sandbox:". $sandbox. "\n";
+	';
+};
+
+/**
+ *	Read back the month's log the child process wrote, and take its sandbox
+ *	with it - the child announces the directory before it dies, which is the
+ *	only way the parent can know where a randomly named sandbox went.
+ *
+ *	@param		array			$run			runIsolated() result
+ *
+ *	@return		array<int, array<string, mixed>>		The entries, or [] for no log at all
+ */
+function shutdownLogEntries( array $run ): array {
+
+	if( preg_match( '/^sandbox:(.+)$/m', $run['stdout'], $match ) !== 1 )
+		return [];
+
+	$sandbox	= rtrim( $match[1] );
+	$logs		= glob( $sandbox. '/private/data/logs.*.php' ) ?: [];
+	$entries	= $logs === [] ? [] : ( include $logs[0] );
+
+	\Nino\Filesystem::removeDir( $sandbox );
+
+	return is_array( $entries ) === true ? $entries : [];
+}
+
+/*	The memory case, which is the one that does not work by simply asking
+	error_get_last(): nothing is freed before a shutdown function runs, so
+	_recordError() has to fit reading this month's log back in, appending
+	to it and writing it out again into whatever the dying request left
+	below the limit. What that is comes down to the block php just refused
+	- it asked for one it could not have, and that much is still unused -
+	which has nothing to do with what the write costs. handleShutdown()'s
+	ini_set() is what decides whether either of these lands at all.	*/
+$memoryFatal = runIsolated( $shutdownBootstrap( true, false ). '
+	ini_set( "memory_limit", (string) ( memory_get_usage( true ) + 4 * 1024 * 1024 ) );
+	$eat = [];
+	while( true )
+		$eat[] = str_repeat( "x", 1024 );
+' );
+$memoryEntries = shutdownLogEntries( $memoryFatal );
+
+check( 'an exhausted memory limit is written to the log', count( $memoryEntries ) === 1
+	&& ( $memoryEntries[0]['type'] ?? null ) === E_ERROR
+	&& str_contains( (string) ( $memoryEntries[0]['message'] ?? '' ), 'Allowed memory size' ) === true );
+check( '...with the file and line it died on, and the date it happened', ( $memoryEntries[0]['line'] ?? null ) > 0
+	&& ( $memoryEntries[0]['file'] ?? '' ) !== ''
+	&& ( $memoryEntries[0]['date'] ?? '' ) !== '' );
+
+/*	The same failure against a log that has been collecting all month, which
+	is the ordinary case and the one with no doubt left in it: what the entry
+	costs is the size of that file, read back in and written out again, while
+	what the request left behind is the size of the block that did not fit.
+	Measured, a fatal refused 132 KiB of hash table against a 600 KiB log
+	wrote nothing at all - and left the month's log intact, so not even a
+	damaged file said that an entry had gone missing.	*/
+$memoryWithHistory = runIsolated( $shutdownBootstrap( true, false, 1200 ). '
+	ini_set( "memory_limit", (string) ( memory_get_usage( true ) + 4 * 1024 * 1024 ) );
+	$eat = [];
+	while( true )
+		$eat[] = str_repeat( "x", 1024 );
+' );
+$historyEntries	= shutdownLogEntries( $memoryWithHistory );
+$historyLast	= $historyEntries === [] ? [] : end( $historyEntries );
+
+check( '...and appended to a log that has been collecting all month, which costs more room than the request left', count( $historyEntries ) === 1201
+	&& ( $historyLast['type'] ?? null ) === E_ERROR
+	&& str_contains( (string) ( $historyLast['message'] ?? '' ), 'Allowed memory size' ) === true );
+
+// A compile-time fatal - the other kind php raises and stops on, and the one
+// an autoloader can still walk into on a single route
+$compileFatal = runIsolated( $shutdownBootstrap( true, false ). '
+	eval( "class TwiceDeclared {}" );
+	eval( "class TwiceDeclared {}" );
+' );
+$compileEntries = shutdownLogEntries( $compileFatal );
+
+check( 'a compile-time fatal (a redeclared class) is written to the log', count( $compileEntries ) === 1
+	&& ( $compileEntries[0]['type'] ?? null ) === E_COMPILE_ERROR );
+
+// One entry per fatal, whatever is registered to report it: handleError()
+// ends a fatal request with an exit(), and an exit() runs shutdown
+// functions too, so both handlers are reached by the same failure. The
+// outcome is what is pinned here - $_reported is what guarantees it, but
+// not the only reason it holds today (see the property's own note)
+$handledFatal = runIsolated( $shutdownBootstrap( true, false ). '
+	trigger_error( "a real failure", E_USER_ERROR );
+' );
+$handledEntries = shutdownLogEntries( $handledFatal );
+
+check( 'a fatal the error handler does see is logged once, not once per handler', count( $handledEntries ) === 1
+	&& ( $handledEntries[0]['type'] ?? null ) === E_USER_ERROR );
+
+// The same outcome where two handlers really are registered: a second
+// Runtime::init() in one process adds a second handleShutdown(), and both
+// are called with the same error_get_last() to read. $_reported is what
+// makes one of them the reporter; without it the write the first one does
+// happens to overwrite what the second would have found, which is luck
+// rather than a rule
+$twiceInitialised = runIsolated( $shutdownBootstrap( true, false ). '
+	\Nino\Runtime::init( $appData );
+	eval( "class TwiceDeclared {}" );
+	eval( "class TwiceDeclared {}" );
+' );
+check( '...and once per fatal, not once per registered shutdown function', count( shutdownLogEntries( $twiceInitialised ) ) === 1 );
+
+// The switch still governs: a shutdown that reports is one the site asked for
+$memoryUnlogged = runIsolated( $shutdownBootstrap( false, false ). '
+	ini_set( "memory_limit", (string) ( memory_get_usage( true ) + 4 * 1024 * 1024 ) );
+	$eat = [];
+	while( true )
+		$eat[] = str_repeat( "x", 1024 );
+' );
+check( '...and nothing is logged when /nino/error/log is off', shutdownLogEntries( $memoryUnlogged ) === [] );
+
+// And /nino/error/display reaches the fatals it never reached before. No
+// backtrace with it: the stack this died on is gone by the time a shutdown
+// function runs, and error_get_last() is all php kept
+$memoryShown = runIsolated( $shutdownBootstrap( true, true ). '
+	ini_set( "memory_limit", (string) ( memory_get_usage( true ) + 4 * 1024 * 1024 ) );
+	$eat = [];
+	while( true )
+		$eat[] = str_repeat( "x", 1024 );
+' );
+check( 'a display-on install is shown the fatal instead of a bare 500', str_contains( $memoryShown['stdout'], 'Allowed memory size' ) === true
+	&& count( shutdownLogEntries( $memoryShown ) ) === 1 );
+
+// The quiet half: a request that ends normally must leave no trace at all,
+// whatever warnings error_get_last() still holds from the way there
+$noFatal = runIsolated( $shutdownBootstrap( true, false ). '
+	@file_get_contents( $sandbox. "/definitely-not-there" );
+	echo "done\n";
+' );
+check( 'a request that ends cleanly writes no entry, even after a suppressed warning', str_contains( $noFatal['stdout'], 'done' ) === true
+	&& shutdownLogEntries( $noFatal ) === [] );
+
+echo "\n";
+
+
 // --- Filesystem's own I/O calls stay non-fatal under the real handler -----
 
 echo "Filesystem - a real fopen()/mkdir()/unlink() failure returns false, doesn't 500\n";

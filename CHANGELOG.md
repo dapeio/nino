@@ -125,6 +125,42 @@ All notable changes to Nino are documented in this file.
 
 ### Fixed
 
+- **A fatal PHP never hands the error handler was a bare 500 with an empty
+  log.** `set_error_handler()` is not called for the levels the engine raises
+  and stops on, and everything Nino offers for diagnosis hung off that handler.
+  An exhausted memory limit, an expired `max_execution_time` or a compile-time
+  fatal such as a redeclared class produced a `500` with nothing in
+  `private/data/logs.<YYYY-MM>.php` and no effect from `/nino/error/display`:
+  the failures that most need explaining were the ones that explained
+  themselves least, and the deployment manual's promise that the reason for a
+  bare `500` is in that log did not hold for them.
+
+  `Runtime::handleShutdown()`, registered by `Runtime::init()`, reads
+  `error_get_last()` and reports it through the same two config keys
+  `handleError()` reads. No backtrace with it - the stack the request died on
+  is gone by the time a shutdown function runs, and `error_get_last()` is
+  everything PHP kept of it.
+
+  What this does and does not reach is worth knowing before reaching for it. On
+  the PHP 8.4 Nino requires, a parse error in a lazily autoloaded class and a
+  call to a function that is not there are a `ParseError` and an `Error` -
+  thrown objects `handleException()` has always caught and logged, and they
+  were never the silent case. What was silent is the engine's own fatals. A
+  failure before `Runtime::init()` has run, PHP failing on `Nino.php` itself,
+  stays the webserver's to report and is the one case the log still cannot
+  show.
+
+  Reporting an exhausted memory limit takes memory, which is the one thing that
+  request has none of: nothing is freed before a shutdown function runs, so
+  what is left to write with is the size of the block PHP just refused, while
+  what the entry costs is the size of the month's log, read back in and written
+  out again. Measured, a fatal refused 132 KiB of hash table against a 600 KiB
+  log wrote nothing at all, and left the log undamaged, so not even a broken
+  file showed that an entry had gone missing. The handler raises the limit by
+  8 MiB before it reports that one - a figure rather than no limit at all,
+  because a request that has just proven it will take whatever it is given must
+  not be handed the machine on its way out.
+
 - **The front controller forwarded to a relative target, and on some hosts that
   is an internal redirect loop.** `RewriteRule . index.php [L]` reads like the
   portable choice - Apache resolves a relative substitution against the

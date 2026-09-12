@@ -30,8 +30,45 @@ namespace Nino {
 		// AppData::init(), Filesystem::init()).
 		private const array NON_FATAL_LEVELS = [ E_USER_NOTICE, E_USER_WARNING, E_USER_DEPRECATED ];
 
+		// The levels php raises and stops on. set_error_handler() is never
+		// called for any of them, so until handleShutdown() below existed they
+		// produced a bare 500 with nothing in the log and nothing on the page,
+		// whatever /nino/error/log and /nino/error/display said.
+		//
+		// What is left in this set is narrower than the list looks, and worth
+		// knowing before reaching for it: on the php 8.4 Nino requires, a parse
+		// error in a lazily autoloaded class and a call to a function that is
+		// not there are a ParseError and an Error - thrown objects
+		// handleException() has always caught, and they leave error_get_last()
+		// empty. What no handler ever sees is an exhausted memory limit, an
+		// expired max_execution_time (both E_ERROR) and a compile-time fatal
+		// such as a redeclared class (E_COMPILE_ERROR). E_PARSE and E_CORE_ERROR
+		// are in the set for completeness rather than for reach: an engine that
+		// fails to start, or fails on the entry file itself, does so before the
+		// line below that registers this handler.
+		private const array SHUTDOWN_LEVELS = [ E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR ];
+
+		// Headroom handleShutdown() grants itself to report an exhausted memory
+		// limit - enough to read this month's log back in, append an entry and
+		// write it out again. A figure rather than no limit at all ('-1'): a
+		// request that has just proven it will take whatever it is given must
+		// not be handed the machine on its way out
+		private const int SHUTDOWN_MEMORY_RESERVE = 8 * 1024 * 1024;
+
 		private static
 			$_currentInstance = [];
+
+		// Set once a fatal has been reported, by whichever handler reached it
+		// first: handleError() ends a fatal request with exit(), and an exit()
+		// runs shutdown functions as well, while a second Runtime::init() in one
+		// process registers a second handleShutdown().
+		//
+		// Neither writes the same fatal twice without this, but for reasons
+		// that are accidents rather than decisions: every level handleError()
+		// is called for is outside SHUTDOWN_LEVELS, and a second
+		// handleShutdown() finds error_get_last() already overwritten by the
+		// log write the first one did. This is that same outcome, on purpose
+		private static bool $_reported = false;
 
 		public static function init( array &$appData ): void {
 
@@ -41,6 +78,7 @@ namespace Nino {
 			// Set errorhandler
 			set_error_handler( [ self::class, 'handleError' ] );
 			set_exception_handler( [ self::class, 'handleException' ] );
+			register_shutdown_function( [ self::class, 'handleShutdown' ] );
 
 			// Start session
 			if( session_status() !== PHP_SESSION_ACTIVE ) {
@@ -120,6 +158,16 @@ namespace Nino {
 			// only the user levels above are survivable
 			$fatal = is_object( $args[0] ) === true || in_array( $args[0], self::NON_FATAL_LEVELS, true ) === false;
 
+			// Every way out of here for a fatal ends in an exit(), and an exit()
+			// runs handleShutdown() - which must not then report the same failure
+			// a second time. Set where $fatal is decided rather than next to the
+			// exit()s: there are two of them, and the display branch below reaches
+			// its own first. Not set for a non-fatal level, which returns into the
+			// script - a flag left standing there would swallow the report of a
+			// real fatal later in the same request
+			if( $fatal === true )
+				self::$_reported = true;
+
 			// Check, if error/log and error/display are configured yet
 			$configured = self::$_currentInstance !== null && isset( self::$_currentInstance['/nino/error/log'] ) === true && isset( self::$_currentInstance['/nino/error/display'] ) === true;
 
@@ -164,6 +212,86 @@ namespace Nino {
 			// inside the error handler would re-enter this very method
 			header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.1' ). ' 500 Internal Server Error', true, 500 );
 			exit;
+		}
+
+		/**
+		 *	The other half of handleError(): the failures php never hands it.
+		 *
+		 *	An exhausted memory limit, an expired max_execution_time, a compile-
+		 *	time fatal such as a redeclared class - the engine raises those and
+		 *	stops, and set_error_handler() is not called at all. Everything the
+		 *	framework offers for diagnosis hung off that handler, so the failure
+		 *	that most needs explaining was the one that explained itself least:
+		 *	a bare 500, an empty log, and /nino/error/display with no effect on
+		 *	it. error_get_last() still holds what died, and a shutdown function
+		 *	is the last point at which anything can be done with it.
+		 *
+		 *	Registered by init(), which is the earliest point Nino has one to
+		 *	register at: a failure before that - php failing on Nino.php itself -
+		 *	stays the webserver's to report, and is the one case this cannot show.
+		 *
+		 *	@return		void
+		 */
+		public static function handleShutdown(): void {
+
+			// handleError() already reported this one and ended the request -
+			// its exit() runs shutdown functions too
+			if( self::$_reported === true )
+				return;
+
+			$last = error_get_last();
+
+			if( $last === null || in_array( $last['type'], self::SHUTDOWN_LEVELS, true ) === false )
+				return;
+
+			self::$_reported = true;
+
+			// An exhausted limit is still exhausted in here: nothing is freed
+			// before shutdown functions run, so _recordError() has to fit its work
+			// into what the dying request happened to leave. That amount is the
+			// size of the allocation php just refused - it asked for a block it
+			// could not have, and that much is still unused below the limit -
+			// which has nothing to do with what writing the entry costs: reading
+			// this month's log back in, appending to it and writing it out again.
+			// Measured against a log a month into its life, that is the difference
+			// between an entry and silence, and silence is what the request that
+			// most needs explaining then leaves behind. Raising the limit for what
+			// is left of a request that is over anyway costs nothing; the
+			// alternative - a reserve buffer allocated in init() and freed here -
+			// makes every healthy request carry it
+			if( str_contains( $last['message'], 'Allowed memory size' ) === true )
+				ini_set( 'memory_limit', (string) ( memory_get_usage( true ) + self::SHUTDOWN_MEMORY_RESERVE ) );
+
+			$errorArray = [
+				'type'		=> $last['type'],
+				'message'	=> $last['message'],
+				'file'		=> $last['file'],
+				'line'		=> $last['line'],
+			];
+
+			// Same rule as handleError(): both choices have to be known, or this
+			// is a boot-time failure that a production install never opted into
+			$configured = self::$_currentInstance !== null
+				&& isset( self::$_currentInstance['/nino/error/log'] ) === true
+				&& isset( self::$_currentInstance['/nino/error/display'] ) === true;
+
+			if( $configured === true && self::$_currentInstance['/nino/error/log'] === true )
+				self::_recordError( self::$_currentInstance, $errorArray );
+
+			// A fatal that reached the engine may still have sent nothing, in
+			// which case the status is ours to set. Where output already went
+			// out, php has set it already
+			if( headers_sent() === false )
+				header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.1' ). ' 500 Internal Server Error', true, 500 );
+
+			// No backtrace here, unlike handleError(): the stack this died on is
+			// gone by the time a shutdown function runs, and error_get_last() is
+			// everything php kept of it
+			if( $configured === true && self::$_currentInstance['/nino/error/display'] === true ) {
+				echo '<pre>';
+				var_dump( $errorArray );
+				echo '</pre>';
+			}
 		}
 
 		// Append one error entry to this month's /data/logs.<Y-m>.php -
