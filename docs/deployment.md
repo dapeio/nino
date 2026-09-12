@@ -101,6 +101,8 @@ curl -sSI https://…/ | grep -i 'content-security-policy\|content-type'
 
 `DirectoryIndex index.php` is the fix and the shipped `.htaccess` carries it. If adding it changes nothing, the file is not being applied at all - check that first with the probe above, because the same file is what keeps `private/` from being delivered.
 
+**nginx answers the same `403` for the same reason**, and `.htaccess` is never read there at all. So if the probe above says `NINO_HTACCESS` is `NULL` on a host that shows this symptom, the first question is not `AllowOverride` but whether this is Apache: `curl -sSI https://…/` names the server, and `$_SERVER['SERVER_SOFTWARE']` does too. On nginx a directory with no `index` match is a `403` because `autoindex` is off by default, and nothing in the project's own files can change that - the whole configuration is the server's, and the next section is the one that applies.
+
 ### Nginx and Other Web Servers
 
 Transfer the same behavior explicitly to the server configuration:
@@ -116,17 +118,48 @@ Transfer the same behavior explicitly to the server configuration:
 - forward the HTTP `Authorization` header to PHP. With nginx/PHP-FPM this normally requires `fastcgi_param HTTP_AUTHORIZATION $http_authorization;` in the PHP location;
 - do not deliver PHP source and data files as text.
 
-For nginx each of the three denied trees is one block:
+For nginx that is one `server` block. Only the PHP-FPM socket is yours to fill in - everything else is the same on every host:
 
 ```nginx
-location ^~ /private/  { deny all; return 404; }
-location ^~ /app/      { deny all; return 404; }
-location ^~ /features/ { deny all; return 404; }
+# What answers "/" - and "/_admin/", a directory with an index.php of its own.
+# Without it nginx has no index to serve, autoindex is off by default, and "/"
+# answers 403 while /index.php answers normally.
+index index.php;
+
+# Denied before routed: ^~ short-circuits the regex locations below, so
+# nothing under these four trees is ever handed to PHP.
+location ^~ /private/                { deny all; return 404; }
+location ^~ /app/                    { deny all; return 404; }
+location ^~ /features/               { deny all; return 404; }
+location ^~ /_admin/install/library/ { deny all; return 404; }
+
+# Dotfiles and dot directories, with .cache/ (the generated bundles), .demo/
+# (the demo images) and .well-known/ as the exceptions. Only for paths that
+# resolve on disk: /.form and /.newsletter are routes rather than files and
+# have to keep falling through - the same line router.php draws.
+location ~ /\.(?!cache/|demo/|well-known/) {
+	if ( -e $request_filename ) { return 403; }
+	try_files $uri $uri/ /index.php$is_args$args;
+}
+
+# An existing file is delivered; everything else is a route and belongs to Nino.
+location / {
+	try_files $uri $uri/ /index.php$is_args$args;
+}
+
+location ~ \.php$ {
+	try_files     $uri =404;
+	include       fastcgi_params;
+	fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+	# The workbench login sends its credentials as an HTTP Basic header
+	fastcgi_param HTTP_AUTHORIZATION $http_authorization;
+	fastcgi_pass  unix:/run/php/php8.4-fpm.sock;   # yours
+}
 ```
 
-Or avoid the question for `private/` by moving the directory out of the webroot with `NINO_PRIVATE_DIR`; `NINO_APP_DIR` and `NINO_FEATURES_DIR` do the same for the other two.
+Or avoid the question for `private/` by moving the directory out of the webroot with `NINO_PRIVATE_DIR`; `NINO_APP_DIR` and `NINO_FEATURES_DIR` do the same for the other two - then each of those three blocks protects a directory that is not there any more, which is the stronger arrangement.
 
-A general example configuration cannot reliably guess the paths and PHP-FPM settings of a specific hosting. Therefore, after setup, check both desired routes and deliberately forbidden direct accesses.
+The paths and PHP-FPM settings of a specific hosting cannot be guessed reliably, and a panel-generated configuration usually already has a PHP location of its own to merge this into rather than to paste beside. So after setup, check both the routes you want and the direct accesses you do not: the section [Test Forbidden Direct Access](#test-forbidden-direct-access) is that list.
 
 ## Write Permissions
 

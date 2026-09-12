@@ -25,6 +25,19 @@ All notable changes to Nino are documented in this file.
   always the server's. The 404 on `/index.php` is the project working
   correctly; `/index.php` is not a route.
 
+- **`docs/deployment.md`'s nginx section documented the denials as
+  configuration and the routing as prose.** Which is the half that makes the
+  site answer at all: nginx returns the same `403` on `/` for the same reason
+  Apache does, `autoindex` being off by default, and there `.htaccess` is never
+  read - so the identical symptom has an entirely different cause and nothing in
+  the project can fix it. Both manuals now carry the complete `server` block,
+  with the PHP-FPM socket as the only line left to fill in: `index index.php`,
+  `try_files` to `index.php`, the PHP location with `HTTP_AUTHORIZATION`, and
+  the dotfile rule written the way `router.php` writes it - denying only paths
+  that resolve on disk, so `/.form` and `/.newsletter` keep falling through as
+  the routes they are. The fourth denied tree, `_admin/install/library/`, was in
+  the bullet list and missing from the blocks; it is in them now.
+
 - **The `/_admin` login was refused on Apache with PHP as CGI or FastCGI**, for
   credentials that were correct. The workbench sends its pair as an HTTP Basic
   `Authorization` header, and Apache hands a CGI/FastCGI script no such header

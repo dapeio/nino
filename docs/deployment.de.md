@@ -100,6 +100,8 @@ curl -sSI https://…/ | grep -i 'content-security-policy\|content-type'
 
 `DirectoryIndex index.php` ist die Lösung, und die mitgelieferte `.htaccess` trägt sie. Ändert das nichts, wird die Datei gar nicht angewendet – prüfe das zuerst mit der Sonde oben, denn dieselbe Datei ist es, die `private/` vor der Auslieferung bewahrt.
 
+**nginx antwortet mit demselben `403` aus demselben Grund**, und dort wird eine `.htaccess` überhaupt nie gelesen. Sagt die Sonde oben also `NULL` auf einem Host, der dieses Symptom zeigt, ist die erste Frage nicht `AllowOverride`, sondern ob das hier überhaupt Apache ist: `curl -sSI https://…/` nennt den Server, und `$_SERVER['SERVER_SOFTWARE']` tut es ebenso. Bei nginx ist ein Verzeichnis ohne `index`-Treffer ein `403`, weil `autoindex` standardmäßig aus ist – und daran kann keine Datei im Projekt etwas ändern. Die ganze Konfiguration gehört dort dem Server, und der nächste Abschnitt ist der zuständige.
+
 ### Nginx und andere Webserver
 
 Übertrage dasselbe Verhalten ausdrücklich in die Serverkonfiguration:
@@ -115,17 +117,50 @@ curl -sSI https://…/ | grep -i 'content-security-policy\|content-type'
 - den HTTP-Header `Authorization` an PHP weitergeben. Bei nginx/PHP-FPM ist dafür normalerweise `fastcgi_param HTTP_AUTHORIZATION $http_authorization;` in der PHP-Location erforderlich;
 - PHP-Quell- und Datendateien nicht als Text ausliefern.
 
-Für nginx ist jeder der drei gesperrten Bäume ein einzelner Block:
+Für nginx ist das ein `server`-Block. Auszufüllen ist nur der PHP-FPM-Socket – alles andere ist auf jedem Host dasselbe:
 
 ```nginx
-location ^~ /private/  { deny all; return 404; }
-location ^~ /app/      { deny all; return 404; }
-location ^~ /features/ { deny all; return 404; }
+# Was "/" beantwortet – und "/_admin/", ein Verzeichnis mit eigener index.php.
+# Ohne diese Zeile hat nginx keinen Index auszuliefern, autoindex ist
+# standardmäßig aus, und "/" antwortet mit 403, während /index.php normal
+# antwortet.
+index index.php;
+
+# Gesperrt, bevor geroutet wird: ^~ schaltet die Regex-Locations darunter ab,
+# also wird unter diesen vier Bäumen nie etwas an PHP übergeben.
+location ^~ /private/                { deny all; return 404; }
+location ^~ /app/                    { deny all; return 404; }
+location ^~ /features/               { deny all; return 404; }
+location ^~ /_admin/install/library/ { deny all; return 404; }
+
+# Dotfiles und Dot-Verzeichnisse, mit .cache/ (die erzeugten Bundles), .demo/
+# (die Demobilder) und .well-known/ als Ausnahmen. Nur für Pfade, die auf der
+# Platte existieren: /.form und /.newsletter sind Routen und keine Dateien und
+# müssen weiterhin durchfallen – dieselbe Linie, die router.php zieht.
+location ~ /\.(?!cache/|demo/|well-known/) {
+	if ( -e $request_filename ) { return 403; }
+	try_files $uri $uri/ /index.php$is_args$args;
+}
+
+# Eine vorhandene Datei wird ausgeliefert; alles andere ist eine Route und
+# gehört Nino.
+location / {
+	try_files $uri $uri/ /index.php$is_args$args;
+}
+
+location ~ \.php$ {
+	try_files     $uri =404;
+	include       fastcgi_params;
+	fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+	# Der Login der Workbench schickt seine Zugangsdaten als HTTP-Basic-Header
+	fastcgi_param HTTP_AUTHORIZATION $http_authorization;
+	fastcgi_pass  unix:/run/php/php8.4-fpm.sock;   # deiner
+}
 ```
 
-Oder du umgehst die Frage für `private/`, indem du das Verzeichnis mit `NINO_PRIVATE_DIR` aus dem Webroot verlegst; `NINO_APP_DIR` und `NINO_FEATURES_DIR` tun dasselbe für die beiden anderen.
+Oder du umgehst die Frage für `private/`, indem du das Verzeichnis mit `NINO_PRIVATE_DIR` aus dem Webroot verlegst; `NINO_APP_DIR` und `NINO_FEATURES_DIR` tun dasselbe für die beiden anderen – dann schützt jeder dieser drei Blöcke ein Verzeichnis, das gar nicht mehr da ist, und das ist die stärkere Anordnung.
 
-Eine allgemeine Beispielkonfiguration kann die Pfade und PHP-FPM-Einstellungen eines konkreten Hostings nicht zuverlässig erraten. Prüfe deshalb nach dem Einrichten sowohl gewünschte Routen als auch bewusst verbotene Direktzugriffe.
+Die Pfade und PHP-FPM-Einstellungen eines konkreten Hostings lassen sich nicht zuverlässig erraten, und eine vom Panel erzeugte Konfiguration hat meist schon eine eigene PHP-Location, in die das hier hineingehört statt danebengesetzt zu werden. Prüfe deshalb nach dem Einrichten sowohl die Routen, die du willst, als auch die Direktzugriffe, die du nicht willst: der Abschnitt [Verbotene Direktzugriffe testen](#verbotene-direktzugriffe-testen) ist diese Liste.
 
 ## Schreibrechte
 
