@@ -49,6 +49,7 @@ Das ist ein Entwicklungsserver, keine Produktionskonfiguration.
 
 Die mitgelieferte `.htaccess` setzt diese grundlegenden Regeln, sofern der Server `AllowOverride` für das Projekt zulässt:
 
+- Anfragen, die weder auf eine Datei noch auf ein Verzeichnis zeigen, werden an `index.php` weitergereicht, und `DirectoryIndex index.php` ist das, was `/` und `/_admin/` beantwortet. Ohne das Erste ist jede Adresse außer der Startseite der 404 des Servers; ohne das Zweite findet `/` auf einem Host, dessen PHP-Konfiguration nichts zu Apaches Liste hinzufügt, keine Indexdatei, fällt auf die Verzeichnisliste durch und wird von der Regel darunter abgewiesen. `DirectoryIndex` gehört zur `AllowOverride`-Klasse `Indexes`, eine mehr als der Rest der Datei braucht – ein Server, der die anderen erlaubt und diese nicht, beantwortet jede Anfrage mit einem 500; dort gehört die Zeile entfernt und die Direktive in den vhost.
 - Dateien mit einem führenden Punkt werden nicht direkt ausgeliefert.
 - Verzeichnisse ohne Indexdatei zeigen keine Dateiliste.
 - Der HTTP-Header `Authorization` erreicht PHP, damit der Login unter `/_admin` seine Basic-Zugangsdaten lesen kann. Apache verbirgt diesen Header normalerweise vor CGI-/FastCGI-Skripten. Dagegen stehen zwei Regeln in der Datei: `CGIPassAuth On` und – für die Fälle, in denen das nicht reicht – eine `RewriteRule`, die den Header in eine Umgebungsvariable kopiert. Die Direktive setzt Apache 2.4.13 oder neuer voraus; eine ältere Version beantwortet jede Anfrage mit einem 500, weil sie sie nicht kennt – dort gehört genau diese eine Zeile entfernt, die Rewrite-Regel trägt den Rest.
@@ -84,6 +85,20 @@ So liest man sie:
 Eine separate Schutzregel liegt in `private/.htaccess` und sperrt dieses Verzeichnis vollständig. Sie ist die wichtigste: In `private/` liegen `config.php`, die Templates sowie die Texte und Elemente, aus denen sie rendern, die Daten deiner Besucher und die Stylesheet- und Skriptquellen, aus denen das Asset-Bundle gebaut wird. Ohne sie liefert ein Aufruf von `private/templates/page-home.tpl` den Template-Quelltext im Klartext aus.
 
 Prüfe in der Hosting-Konfiguration zusätzlich, wie nicht vorhandene Pfade an `index.php` übergeben werden. Eine `.htaccess`, die vom Server ignoriert wird, entfaltet keinerlei Schutzwirkung – und bei `private/` ist das keine Härtungsfrage, sondern eine Offenlegung. Wenn du dich auf `.htaccess` nicht verlassen kannst, richte stattdessen `NINO_PRIVATE_DIR` in der `index.php` auf ein Verzeichnis außerhalb des Webroots; dann braucht es gar keine Serverregel.
+
+#### Die Startseite wird abgewiesen, `/index.php` antwortet
+
+`/` liefert einen `403`, `/index.php` liefert Ninos `404`-Seite. Keines von beidem ist Nino, das etwas verweigert – zusammen sagen sie genau, wo die Anfrage stehen bleibt.
+
+`/index.php` ist keine registrierte Route, also beantwortet das Projekt sie mit seiner eigenen 404-Seite – und das ist der Beleg dafür, dass PHP läuft und das Projekt bootet. Der `403` hat PHP nie erreicht: Apache hat im Verzeichnis eine Indexdatei gesucht, keine gefunden und statt einer Verzeichnisliste abgewiesen.
+
+Nino beantwortet keinen `GET` mit einem `403`. Der CSRF-Schutz lässt die sicheren Methoden in Ruhe, und eine Adresse, die es nicht kennt, ist ein `404`. Ein `403` auf eine normale Seitenanfrage ist deshalb der des Servers und nicht der des Projekts – ein Blick auf die Header entscheidet das: jede Antwort von Nino trägt eine `Content-Security-Policy`, eine Apache-Fehlerseite trägt keine:
+
+```bash
+curl -sSI https://…/ | grep -i 'content-security-policy\|content-type'
+```
+
+`DirectoryIndex index.php` ist die Lösung, und die mitgelieferte `.htaccess` trägt sie. Ändert das nichts, wird die Datei gar nicht angewendet – prüfe das zuerst mit der Sonde oben, denn dieselbe Datei ist es, die `private/` vor der Auslieferung bewahrt.
 
 ### Nginx und andere Webserver
 

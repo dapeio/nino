@@ -50,6 +50,7 @@ This is a development server, not a production configuration.
 
 The included `.htaccess` sets these baseline rules, provided the server allows `AllowOverride` for the project:
 
+- Requests that resolve to neither a file nor a directory are forwarded to `index.php`, and `DirectoryIndex index.php` is what answers `/` and `/_admin/`. Without the first, every address but the homepage is the server's own 404; without the second, `/` finds no index file on a host whose PHP configuration does not add one to Apache's list, falls through to the directory listing, and is refused by the rule below. `DirectoryIndex` needs `AllowOverride Indexes`, one class more than the rest of the file - a server that grants the others but not that one answers every request with a 500, so remove that line there and set the directive in the vhost.
 - Files with a leading dot are not delivered directly.
 - Directories without an index file do not show a file list.
 - The HTTP `Authorization` header reaches PHP so that the `/_admin` login can read its Basic credentials. Apache normally hides this header from CGI/FastCGI scripts. Two rules cover that, and the file ships both: `CGIPassAuth On`, and - for where that is not enough - a `RewriteRule` that copies the header into an environment variable. The directive needs Apache 2.4.13 or newer; an older one answers every request with a 500 because it does not know it, so remove that one line there and rely on the rewrite.
@@ -85,6 +86,20 @@ Read it like this:
 A separate protection rule lives in `private/.htaccess` and denies that directory outright. It is the one that matters most: `private/` holds `config.php`, the templates, the text and elements they render from, the data your visitors produce, and the stylesheet and script sources the asset bundle is built out of. Without it, a request for `private/templates/page-home.tpl` returns the template source as plain text.
 
 Additionally, check in the hosting configuration how non-existent paths are passed to `index.php`. An `.htaccess` ignored by the server has no protective effect — and for `private/` that is not a hardening detail but a disclosure. If you cannot rely on `.htaccess`, point `NINO_PRIVATE_DIR` in `index.php` at a directory outside the webroot instead; then no server rule is needed at all.
+
+#### The homepage is refused while `/index.php` answers
+
+`/` returns `403` and `/index.php` returns Nino's `404` page. Neither is Nino refusing anything, and together they say exactly where the request stops.
+
+`/index.php` is not a registered route, so the project answers it with its own 404 page - which is the proof that PHP runs and the project boots. The `403` never reached PHP at all: Apache looked for an index file in the directory, found none, and refused to list the directory instead.
+
+Nino answers no `GET` with a `403`. The CSRF guard leaves the safe methods alone, and an address it does not know is a `404`. A `403` on a plain page request is therefore the server's, not the project's, and one look at the headers settles it - every Nino response carries a `Content-Security-Policy`, an Apache error page carries none:
+
+```bash
+curl -sSI https://…/ | grep -i 'content-security-policy\|content-type'
+```
+
+`DirectoryIndex index.php` is the fix and the shipped `.htaccess` carries it. If adding it changes nothing, the file is not being applied at all - check that first with the probe above, because the same file is what keeps `private/` from being delivered.
 
 ### Nginx and Other Web Servers
 

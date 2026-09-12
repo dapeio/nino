@@ -6,6 +6,25 @@ All notable changes to Nino are documented in this file.
 
 ### Fixed
 
+- **On Apache, a fresh install answered `403` on `/` and Nino's 404 page on
+  every other address.** The project shipped no routing at all: no
+  `DirectoryIndex`, so `/` found no index file on any host whose PHP
+  configuration does not add `index.php` to Apache's list, fell through to the
+  directory listing and was refused by the `Options -Indexes` two lines above
+  it - and no front controller, so `/imprint` was the server's own 404 rather
+  than the project's page. `docs/deployment.md` called the forwarding the
+  server's job and gave the nginx equivalent only, which is a fair sentence
+  where a configuration has to be written anyway and no help at all where the
+  `.htaccess` *is* the configuration. Both rules now ship in it, and the Apache
+  section documents them, including the `AllowOverride Indexes` that
+  `DirectoryIndex` needs.
+
+  The symptom is worth naming because it reads like a refusal and is not one:
+  Nino answers no `GET` with a `403` - the CSRF guard leaves the safe methods
+  alone and an unknown address is a `404` - so a `403` on a page request is
+  always the server's. The 404 on `/index.php` is the project working
+  correctly; `/index.php` is not a route.
+
 - **The `/_admin` login was refused on Apache with PHP as CGI or FastCGI**, for
   credentials that were correct. The workbench sends its pair as an HTTP Basic
   `Authorization` header, and Apache hands a CGI/FastCGI script no such header

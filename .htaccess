@@ -85,3 +85,41 @@ SetEnv NINO_HTACCESS 1
 # defence-in-depth default now that nothing relies on an unguessable
 # directory name any more
 Options -Indexes
+
+# What answers "/" - and "/_admin/", which is a real directory with an
+# index.php of its own. Apache's own default list is index.html; the entry for
+# index.php comes from the php module's configuration, and a host that runs PHP
+# through FPM without it has none. There "/" finds no index file, falls through
+# to the directory listing, and is refused by the Options line above: a
+# homepage that answers 403 while /index.php answers at all. That is a server
+# default rather than anything about the project, so name it here instead of
+# inheriting it.
+#
+# DirectoryIndex belongs to AllowOverride's "Indexes" class, one more than the
+# "Options" and "FileInfo" this file already needs. A server that allows those
+# two but not that one answers every request with a 500 - remove this line
+# there and set it in the vhost, the same way CGIPassAuth is handled above.
+DirectoryIndex index.php
+
+# The front controller. Everything that is not a real file or directory is a
+# website route and belongs to index.php - /imprint, /blog/a-post, /.form. The
+# forwarding is the server's job, which is a true sentence for nginx, where a
+# configuration has to be written anyway; on Apache there is nothing else to
+# write, the project is dropped into a webroot and this file is the whole
+# configuration. So the rule belongs in it.
+#
+# Written relative (index.php, not /index.php) so a subdirectory install needs
+# no RewriteBase: Apache resolves it against the directory this file sits in.
+#
+# Real files and directories are excluded and keep being served by the server
+# itself - public/ assets, _admin/ with its own index.php, and
+# /_admin/recovery.php. What is denied stays denied: the [F] rule above matches
+# only paths that do resolve on disk and is terminal, and private/.htaccess
+# answers for its own tree either way. This is the same line router.php draws
+# for the development server.
+<IfModule mod_rewrite.c>
+	RewriteEngine On
+	RewriteCond %{REQUEST_FILENAME} !-f
+	RewriteCond %{REQUEST_FILENAME} !-d
+	RewriteRule . index.php [L]
+</IfModule>

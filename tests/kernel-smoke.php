@@ -1784,6 +1784,22 @@ check( 'the shipped .htaccess carries both halves of the Apache workaround, and 
 	&& str_contains( $htaccess, 'E=HTTP_AUTHORIZATION:%{HTTP:Authorization}' ) === true
 	&& str_contains( $htaccess, 'SetEnv NINO_HTACCESS 1' ) === true );
 
+/*	The two rules that make a fresh install answer at all on Apache. Without
+	the first, "/" finds no index file on a host whose php configuration does
+	not add one to Apache's list, falls through to the directory listing and is
+	refused by the Options line - a homepage that 403s while /index.php answers
+	with the project's own 404 page. Without the second, every other address is
+	the server's 404 rather than a route. Both are the line router.php already
+	draws for the development server */
+check( 'the shipped .htaccess names the index file that answers "/"',
+	str_contains( $htaccess, 'DirectoryIndex index.php' ) === true );
+check( '...and forwards everything that is neither file nor directory to it',
+	str_contains( $htaccess, 'RewriteCond %{REQUEST_FILENAME} !-f' ) === true
+	&& str_contains( $htaccess, 'RewriteCond %{REQUEST_FILENAME} !-d' ) === true
+	&& str_contains( $htaccess, 'RewriteRule . index.php [L]' ) === true );
+check( '...relative, so a subdirectory install needs no RewriteBase',
+	str_contains( $htaccess, 'RewriteRule . /index.php' ) === false );
+
 $appData['./nino/jstext/nonce'] = base64_encode( random_bytes( 16 ) );
 \Nino\Modules\Jstext::callbackResponse( $appData, $homeRequest );
 $jstextCsp = $homeRequest['/nino/http/response']['header']['Content-Security-Policy'];
