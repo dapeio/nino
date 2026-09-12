@@ -61,9 +61,20 @@
 				// Login
 				el.formMsg.className = 'pending';
 				el.formMsg.innerHTML = Nino.content.getText('/_admin/login/msg/pending');
-				Nino.auth.login( el.inputUser.value, el.inputPw.value, '/_admin', function(){
+				Nino.auth.login( el.inputUser.value, el.inputPw.value, '/_admin', function( xhr ){
 					el.formMsg.classList.add('error');
-					el.formMsg.innerHTML = Nino.content.getText('/_admin/login/error/wrong');
+
+					/*	401 is the only answer that means the pair was read and
+							refused - that is the one this form may call a wrong
+							password. Everything else never got that far: a 403 from
+							the csrf guard or from a server that blocks dot-uris, a 404
+							where nothing forwards an unmatched address to index.php, a
+							500 from php. Telling the person to check their input in
+							those cases sends the only one who can fix it looking in the
+							wrong place, which is a morning lost to a server setting */
+					el.formMsg.innerHTML = xhr.status === 401
+						? Nino.content.getText('/_admin/login/error/wrong')
+						: Nino.content.getText('/_admin/login/error/endpoint').replace( '%s', String( xhr.status ) );
 				} );
 			} );
 

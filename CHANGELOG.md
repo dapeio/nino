@@ -6,6 +6,62 @@ All notable changes to Nino are documented in this file.
 
 ### Fixed
 
+- **The front controller forwarded to a relative target, and on some hosts that
+  is an internal redirect loop.** `RewriteRule . index.php [L]` reads like the
+  portable choice - Apache resolves a relative substitution against the
+  directory the file sits in - but the per-directory prefix `mod_rewrite`
+  strips is not always the one it puts back. Where it is not, the substitution
+  resolves to nothing, Apache retries, and gives up after ten internal
+  redirects with a `500`. The target is now the absolute `/index.php`, measured
+  on an IONOS host where that one character was the whole difference. The cost
+  is the one line a subdirectory install edits (`/shop/index.php`); no form is
+  both absolute and location-independent, `RewriteBase` included, so the file
+  takes the one that works everywhere and names the edit.
+
+  The shape this leaves behind is distinctive and was worth writing down: `/`
+  and `/_admin/` answer normally, because `mod_dir` resolves those two through
+  `DirectoryIndex` without a rewrite ever running, and every other address - an
+  existing page and a nonsense one alike - is a `500`. No PHP error log and no
+  effect from `/nino/error/display`, because PHP is never reached.
+
+  `RewriteRule ^index\.php$ - [L]` now also stands ahead of the catch-all. It
+  closes the second way into the same loop: where `%{REQUEST_FILENAME}` is not
+  the mapped filesystem path in per-directory context, `!-f` stays true for
+  `index.php` itself and the catch-all fires on its own result.
+
+  Both manuals gained the section for it, including the error-log line that
+  confirms it (*Request exceeded the limit of 10 internal redirects*) and
+  `FallbackResource /index.php` for a host where `mod_rewrite` misbehaves
+  beyond this - it does the same job without `mod_rewrite` and cannot loop by
+  construction. And the header that says whether a `500` is even PHP's: every
+  Nino response carries a `Content-Security-Policy`, an Apache error page
+  carries none.
+
+- **The workbench login blamed the password for failures that never looked at
+  it.** `_admin/assets/login.js` showed *Check your input or contact the
+  administrator* for any answer that was not a `200`, so a `403` from a host
+  that refuses a uri with a dot segment, a `404` from a server with no
+  forwarding to `index.php`, and a `500` from PHP all read as wrong
+  credentials - and the one person who can fix any of them goes looking at the
+  account instead of at the server. `401` is the only answer that means the
+  pair was read and refused. Everything else now says the endpoint answered,
+  and names the status.
+
+  The endpoint is `POST /.nino/auth/login`, a dot uri like `/.form` and
+  `/.newsletter` - and a dot path is exactly what a shared host blocks by
+  default, which is worth knowing before the password is doubted.
+  `docs/deployment.md` gained the table that reads the four statuses, and the
+  one request that tells Nino's own CSRF `403` apart from the server's: a `403`
+  carrying a `Content-Security-Policy` header reached the kernel, one without it
+  never did. It also finally names where a bare `500` explains itself -
+  `private/data/logs.<YYYY-MM>.php`, which is the only place it does once
+  `/nino/error/display` is off.
+
+  `tests/admin-login-js-smoke.js` is new and drives the form's own branch;
+  `tests/admin-smoke.php` additionally holds the shell's two locales to the same
+  key set, since a key present in one and missing from the other renders as an
+  empty string - a login form with a blank line where the reason should be.
+
 - **On Apache, a fresh install answered `403` on `/` and Nino's 404 page on
   every other address.** The project shipped no routing at all: no
   `DirectoryIndex`, so `/` found no index file on any host whose PHP

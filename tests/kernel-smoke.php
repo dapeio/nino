@@ -1796,9 +1796,31 @@ check( 'the shipped .htaccess names the index file that answers "/"',
 check( '...and forwards everything that is neither file nor directory to it',
 	str_contains( $htaccess, 'RewriteCond %{REQUEST_FILENAME} !-f' ) === true
 	&& str_contains( $htaccess, 'RewriteCond %{REQUEST_FILENAME} !-d' ) === true
-	&& str_contains( $htaccess, 'RewriteRule . index.php [L]' ) === true );
-check( '...relative, so a subdirectory install needs no RewriteBase',
-	str_contains( $htaccess, 'RewriteRule . /index.php' ) === false );
+	&& str_contains( $htaccess, 'RewriteRule . /index.php [L]' ) === true );
+
+/*	...to an absolute url path, which is the whole of it. The relative form
+	reads like the portable one - Apache resolves it against the directory the
+	file sits in - and on some hosts the per-directory prefix it strips is not
+	the one it puts back: the substitution resolves to nothing, Apache retries,
+	and every address that needs forwarding 500s at ten internal redirects.
+	Measured on an IONOS host, where this one character was the difference
+	between a site and a stack of 500s. A subdirectory install edits the line
+	(/shop/index.php); there is no form that is both absolute and
+	location-independent, so the file takes the one that works everywhere	*/
+check( '...as an absolute url path, not a relative one',
+	str_contains( $htaccess, 'RewriteRule . index.php' ) === false );
+
+/*	...and the stop in front of it. mod_rewrite runs per-directory before the
+	url is mapped, and where %{REQUEST_FILENAME} is not the mapped path there,
+	!-f stays true for index.php itself: the catch-all rewrites its own result
+	until Apache gives up at ten internal redirects with a 500. The symptom is
+	that "/" and "/_admin/" answer (mod_dir resolves those without a rewrite)
+	and every other address 500s. The guard has to come first to be one */
+$guard		= strpos( $htaccess, 'RewriteRule ^index\.php$ - [L]' );
+$catchAll	= strpos( $htaccess, 'RewriteRule . /index.php [L]' );
+
+check( 'the front controller cannot rewrite its own result into a loop', $guard !== false );
+check( '...because that stop stands ahead of the catch-all', $guard !== false && $catchAll !== false && $guard < $catchAll );
 
 $appData['./nino/jstext/nonce'] = base64_encode( random_bytes( 16 ) );
 \Nino\Modules\Jstext::callbackResponse( $appData, $homeRequest );

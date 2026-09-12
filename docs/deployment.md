@@ -56,9 +56,48 @@ The included `.htaccess` sets these baseline rules, provided the server allows `
 - The HTTP `Authorization` header reaches PHP so that the `/_admin` login can read its Basic credentials. Apache normally hides this header from CGI/FastCGI scripts. Two rules cover that, and the file ships both: `CGIPassAuth On`, and - for where that is not enough - a `RewriteRule` that copies the header into an environment variable. The directive needs Apache 2.4.13 or newer; an older one answers every request with a 500 because it does not know it, so remove that one line there and rely on the rewrite.
 - `SetEnv NINO_HTACCESS 1`, which is how you find out whether any of the above is applied at all.
 
+#### Every address but `/` and `/_admin/` answers 500
+
+The two that work are the two that need no forwarding: the webroot and `_admin/` are real directories, and `mod_dir` answers them through `DirectoryIndex`. Everything else goes through the rewrite - so a `500` rather than a `404` means the forwarding is running and failing, not that it is missing.
+
+It is an internal redirect loop, and the host's error log says so in as many words: *Request exceeded the limit of 10 internal redirects*. Two things cause it, and the first is one character.
+
+**The rewrite target has to be an absolute URL path** - `RewriteRule . /index.php [L]`, not `RewriteRule . index.php [L]`. The relative form looks like the portable one, since Apache is meant to resolve it against the directory the file sits in, and on some hosts the per-directory prefix `mod_rewrite` strips is not the one it puts back. The substitution then resolves to nothing, Apache retries, and every address that needs forwarding answers `500` while `/` and `/_admin/` keep working. Measured on an IONOS host; the shipped file has the absolute form.
+
+A project served from a subdirectory edits that one line - `/shop/index.php`. No form is both absolute and location-independent, `RewriteBase` included, so the file takes the one that works everywhere and names the edit.
+
+**And the catch-all must not be able to fire on its own result.** `mod_rewrite` runs per-directory *before* the URL is fully mapped, and where `%{REQUEST_FILENAME}` does not hold the mapped filesystem path there, `!-f` stays true for `index.php` itself. `RewriteRule ^index\.php$ - [L]` ahead of the catch-all ends the second pass whatever that variable says; the shipped file carries it too. An `.htaccess` written before these lines existed has neither - add both.
+
+Where `mod_rewrite` misbehaves beyond that, `FallbackResource` does the same job without it and cannot loop by construction:
+
+```apache
+FallbackResource /index.php
+```
+
+It takes an absolute URL path, so a subdirectory install writes `/subdir/index.php`. Apache 2.2.16 and newer. Use one or the other, not both.
+
+A `500` that survives both never reached the rewrite or never left PHP, and one header tells you which: every Nino response carries a `Content-Security-Policy`, an Apache error page carries none. Without it, read the host's error log; with it, `private/data/logs.<YYYY-MM>.php`.
+
 #### The login form is refused and the password is right
 
-The symptom is always the same: `/_admin` answers `401` for credentials that are correct. The cause is that the credential pair never reached PHP. This probe says which of the three places it did not arrive in:
+The login form names the status it received, and that status is the first thing to read - only one of the four is about the password:
+
+| | |
+| --- | --- |
+| `401` | the pair was read and refused. Either it is wrong, or - the case this section is about - it never arrived and PHP saw none |
+| `403` | the request did not get through. Either Nino's CSRF guard refused it, or the server refuses the address: the endpoint is `POST /.nino/auth/login`, and a host that blocks every path with a dot segment blocks it along with `/.form` and `/.newsletter` |
+| `404` | nothing forwards an unmatched address to `index.php` - see [Webroot and Routing](#webroot-and-routing) |
+| `500` | PHP died on the request. The reason is in `private/data/logs.<YYYY-MM>.php` as long as `/nino/error/log` is on, which is the default |
+
+One request tells the two `403`s apart, and it needs no account:
+
+```bash
+curl -sS -i -X POST https://…/.nino/auth/login | head -20
+```
+
+A `403` carrying a `Content-Security-Policy` header is Nino's own CSRF guard - the request reached the kernel. A `403` without one never did, and the address is being refused before PHP: the dot segment is the usual reason.
+
+The `401` is the rest of this section. The symptom is always the same: `/_admin` answers `401` for credentials that are correct. The cause is that the credential pair never reached PHP. This probe says which of the three places it did not arrive in:
 
 ```php
 <?php
@@ -215,6 +254,8 @@ Check in `config.php` or via the workbench's Config panel at least the following
 | `/nino/catalogue/url` | the default, or `''` where nothing is to be installed from the catalogue | where the Features panel loads the feature catalogue from - on request only, never on its own; empty switches the catalogue off |
 
 Error messages should not expose file paths, configuration values, or stack traces in the browser. After switching, check that errors still arrive in a protected log and remain accessible to the operator.
+
+That log is `private/data/logs.<YYYY-MM>.php`, one file per month, with entries older than three months dropped. The workbench's Logs panel reads it - and when the workbench is the thing that is broken, so does any file manager. It is where the reason for a bare `500` is, which on a production host is the only place it is: `/nino/error/display` is off, so the browser gets nothing but the status.
 
 ## Secure the Workbench
 

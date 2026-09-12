@@ -55,9 +55,48 @@ Die mitgelieferte `.htaccess` setzt diese grundlegenden Regeln, sofern der Serve
 - Der HTTP-Header `Authorization` erreicht PHP, damit der Login unter `/_admin` seine Basic-Zugangsdaten lesen kann. Apache verbirgt diesen Header normalerweise vor CGI-/FastCGI-Skripten. Dagegen stehen zwei Regeln in der Datei: `CGIPassAuth On` und – für die Fälle, in denen das nicht reicht – eine `RewriteRule`, die den Header in eine Umgebungsvariable kopiert. Die Direktive setzt Apache 2.4.13 oder neuer voraus; eine ältere Version beantwortet jede Anfrage mit einem 500, weil sie sie nicht kennt – dort gehört genau diese eine Zeile entfernt, die Rewrite-Regel trägt den Rest.
 - `SetEnv NINO_HTACCESS 1` – daran erkennst Du, ob überhaupt etwas davon angewendet wird.
 
+#### Alles außer `/` und `/_admin/` antwortet mit 500
+
+Die beiden, die funktionieren, sind genau die beiden, die keine Weiterleitung brauchen: der Webroot und `_admin/` sind echte Verzeichnisse, und `mod_dir` beantwortet sie über `DirectoryIndex`. Alles andere läuft über die Rewrite-Regel – ein `500` statt eines `404` heißt also, dass die Weiterleitung läuft und scheitert, nicht dass sie fehlt.
+
+Es ist eine Schleife interner Weiterleitungen, und das Fehlerlog des Hosters sagt es wörtlich: *Request exceeded the limit of 10 internal redirects*. Zwei Dinge verursachen sie, und das erste ist ein einziges Zeichen.
+
+**Das Ziel der Rewrite-Regel muss ein absoluter URL-Pfad sein** – `RewriteRule . /index.php [L]`, nicht `RewriteRule . index.php [L]`. Die relative Form sieht nach der portablen aus, denn Apache soll sie gegen das Verzeichnis auflösen, in dem die Datei liegt – und auf manchen Hosts ist das Verzeichnispräfix, das `mod_rewrite` abschneidet, nicht dasselbe, das es wieder voranstellt. Dann zeigt die Ersetzung ins Leere, Apache versucht es erneut, und jede Adresse, die eine Weiterleitung braucht, antwortet mit `500`, während `/` und `/_admin/` weiter funktionieren. Auf einem IONOS-Host gemessen; die mitgelieferte Datei trägt die absolute Form.
+
+Ein Projekt, das aus einem Unterverzeichnis ausgeliefert wird, ändert genau diese eine Zeile – `/shop/index.php`. Keine Form ist zugleich absolut und ortsunabhängig, `RewriteBase` eingeschlossen; die Datei nimmt also die, die überall funktioniert, und benennt die Änderung.
+
+**Und die Auffangregel darf nicht auf ihr eigenes Ergebnis greifen können.** `mod_rewrite` läuft pro Verzeichnis, *bevor* die URL vollständig aufgelöst ist, und wo `%{REQUEST_FILENAME}` dort nicht den aufgelösten Dateisystempfad enthält, bleibt `!-f` auch für `index.php` selbst wahr. `RewriteRule ^index\.php$ - [L]` vor der Auffangregel beendet den zweiten Durchlauf, egal was die Variable sagt; die mitgelieferte Datei trägt auch das. Eine `.htaccess`, die vor diesen Zeilen entstanden ist, hat keine von beiden – dann ergänze beide.
+
+Wo `mod_rewrite` darüber hinaus nicht mitspielt, erledigt `FallbackResource` dasselbe ohne es und kann bauartbedingt nicht schleifen:
+
+```apache
+FallbackResource /index.php
+```
+
+Es braucht einen absoluten URL-Pfad, eine Unterverzeichnis-Installation schreibt also `/unterverzeichnis/index.php`. Ab Apache 2.2.16. Entweder das eine oder das andere, nicht beides.
+
+Ein `500`, der beides überlebt, hat die Rewrite-Regel nie erreicht oder PHP nie verlassen – und ein Header sagt, was von beidem: jede Antwort von Nino trägt eine `Content-Security-Policy`, eine Apache-Fehlerseite trägt keine. Ohne sie gehört das Fehlerlog des Hosters gelesen, mit ihr `private/data/logs.<YYYY-MM>.php`.
+
 #### Der Login weist ab, obwohl das Passwort stimmt
 
-Das Symptom ist immer dasselbe: `/_admin` antwortet mit `401` auf korrekte Zugangsdaten. Die Ursache ist, dass das Zugangspaar nie bei PHP angekommen ist. Diese Probe sagt, an welcher der drei Stellen es fehlt:
+Das Login-Formular nennt den Status, den es bekommen hat, und dieser Status ist das Erste, was zu lesen ist – nur einer der vier handelt vom Passwort:
+
+| | |
+| --- | --- |
+| `401` | das Paar wurde gelesen und abgewiesen. Entweder ist es falsch – oder es ist, der Fall dieses Abschnitts, nie angekommen und PHP hat gar keines gesehen |
+| `403` | die Anfrage ist nicht durchgekommen. Entweder hat Ninos CSRF-Schutz sie abgewiesen, oder der Server weist die Adresse ab: der Endpunkt ist `POST /.nino/auth/login`, und ein Host, der jeden Pfad mit einem Punkt-Segment sperrt, sperrt ihn zusammen mit `/.form` und `/.newsletter` |
+| `404` | nichts reicht eine nicht getroffene Adresse an `index.php` weiter – siehe [Webroot und Routing](#webroot-und-routing) |
+| `500` | PHP ist an der Anfrage gestorben. Der Grund steht in `private/data/logs.<YYYY-MM>.php`, solange `/nino/error/log` an ist, und das ist die Voreinstellung |
+
+Eine einzige Anfrage unterscheidet die beiden `403`, und sie braucht kein Konto:
+
+```bash
+curl -sS -i -X POST https://…/.nino/auth/login | head -20
+```
+
+Ein `403` mit einem `Content-Security-Policy`-Header ist Ninos eigener CSRF-Schutz – die Anfrage hat den Kernel erreicht. Ein `403` ohne einen solchen Header hat ihn nie erreicht, und die Adresse wird vor PHP abgewiesen: das Punkt-Segment ist der übliche Grund.
+
+Der `401` ist der Rest dieses Abschnitts. Das Symptom ist immer dasselbe: `/_admin` antwortet mit `401` auf korrekte Zugangsdaten. Die Ursache ist, dass das Zugangspaar nie bei PHP angekommen ist. Diese Probe sagt, an welcher der drei Stellen es fehlt:
 
 ```php
 <?php
@@ -218,6 +257,8 @@ Prüfe in `config.php` beziehungsweise über das Config-Panel der Workbench mind
 | `/nino/catalogue/url` | der Standard, oder `''`, wo nichts aus dem Katalog installiert werden soll | woher das Panel Features den Feature-Katalog lädt – nur auf Anforderung, nie von selbst; leer schaltet den Katalog ab |
 
 Fehlermeldungen sollten im Browser keine Dateipfade, Konfigurationswerte oder Stacktraces offenlegen. Prüfe nach dem Umschalten, dass Fehler weiterhin in einem geschützten Log ankommen und für den Betreiber erreichbar bleiben.
+
+Dieses Log ist `private/data/logs.<YYYY-MM>.php`, eine Datei pro Monat, Einträge älter als drei Monate fallen heraus. Das Logs-Panel der Workbench liest es – und wenn die Workbench selbst das Kaputte ist, tut es jeder Dateimanager. Dort steht der Grund für einen nackten `500`, und auf einem Produktivsystem ist das der einzige Ort: `/nino/error/display` ist aus, der Browser bekommt also nichts als den Status.
 
 ## Die Workbench absichern
 

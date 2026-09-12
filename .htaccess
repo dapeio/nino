@@ -108,8 +108,20 @@ DirectoryIndex index.php
 # write, the project is dropped into a webroot and this file is the whole
 # configuration. So the rule belongs in it.
 #
-# Written relative (index.php, not /index.php) so a subdirectory install needs
-# no RewriteBase: Apache resolves it against the directory this file sits in.
+# The target is written as an absolute url path, /index.php. A relative one
+# (index.php) reads like the portable choice - Apache is supposed to resolve it
+# against the directory this file sits in - and on some hosts it is not: the
+# per-directory prefix mod_rewrite strips is not always the one it puts back,
+# the substitution then resolves to something that does not exist, and Apache
+# retries until it gives up at ten internal redirects with a 500. Measured on
+# an IONOS host, where the single character was the whole difference between
+# every address 500ing and the site working.
+#
+# The cost is the one line a subdirectory install has to edit: a project served
+# from /shop/ writes /shop/index.php here. There is no form that is both
+# absolute and location-independent - RewriteBase has the same problem from the
+# other side - so this file takes the form that works everywhere and names the
+# edit instead of taking the one that is silent and sometimes wrong.
 #
 # Real files and directories are excluded and keep being served by the server
 # itself - public/ assets, _admin/ with its own index.php, and
@@ -119,7 +131,22 @@ DirectoryIndex index.php
 # for the development server.
 <IfModule mod_rewrite.c>
 	RewriteEngine On
+
+	# The stop that makes the rule below safe where %{REQUEST_FILENAME} is not
+	# the mapped filesystem path. mod_rewrite runs per-directory before the url
+	# is fully mapped, and on some shared hosts the variable does not hold a
+	# path the -f test can find there. !-f then stays true for index.php
+	# itself, the catch-all fires again on its own result, and Apache gives up
+	# after ten internal redirects with a 500 - on every address that needs
+	# forwarding, while "/" and "/_admin/" keep answering because mod_dir
+	# resolves those without a rewrite. That shape - only the two directories
+	# work, everything else 500s - is this loop, and the host's error log says
+	# "Request exceeded the limit of 10 internal redirects". This line ends the
+	# second pass whatever the variable says; see docs/deployment.md for
+	# FallbackResource, which does the same job without mod_rewrite at all.
+	RewriteRule ^index\.php$ - [L]
+
 	RewriteCond %{REQUEST_FILENAME} !-f
 	RewriteCond %{REQUEST_FILENAME} !-d
-	RewriteRule . index.php [L]
+	RewriteRule . /index.php [L]
 </IfModule>

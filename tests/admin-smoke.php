@@ -1194,6 +1194,39 @@ check( 'dashboard/summary requires an authed admin session too', $status === 401
 echo "\n";
 
 
+// --- The shell's own text ---------------------------------------------------
+
+/*	Every key the workbench shell renders exists in both shipped locales. A key
+	present in one and missing from the other renders as an empty string rather
+	than as an error - a login form with a blank message where the reason should
+	be is exactly the failure that is hardest to report */
+$shellText = [];
+foreach( [ 'de_DE', 'en_US' ] as $locale )
+	$shellText[$locale] = (array) require __DIR__. '/../_admin/text/'. $locale. '.php';
+
+$missingDe = array_diff_key( $shellText['en_US'], $shellText['de_DE'] );
+$missingEn = array_diff_key( $shellText['de_DE'], $shellText['en_US'] );
+
+if( $missingDe !== [] || $missingEn !== [] )
+	echo '        missing in de_DE: ', implode( ', ', array_keys( $missingDe ) ), ' | missing in en_US: ', implode( ', ', array_keys( $missingEn ) ), "\n";
+
+check( 'the shell\'s two locales carry the same keys', $missingDe === [] && $missingEn === [] );
+check( 'no key is left with an empty value', array_filter( $shellText['de_DE'], fn( $v ) => trim( (string) $v ) === '' ) === []
+	&& array_filter( $shellText['en_US'], fn( $v ) => trim( (string) $v ) === '' ) === [] );
+
+/*	The login form tells a refused pair apart from an endpoint that never got to
+	read one - see _admin/assets/login.js and tests/admin-login-js-smoke.js. The
+	second message carries the status code, so it needs its placeholder */
+foreach( [ 'de_DE', 'en_US' ] as $locale ) {
+	check( $locale. ' carries the endpoint message the login falls back to',
+		isset( $shellText[$locale]['[[/_admin/login/error/endpoint]]'] ) === true );
+	check( '...with the place the status code goes',
+		str_contains( (string) ( $shellText[$locale]['[[/_admin/login/error/endpoint]]'] ?? '' ), '%s' ) === true );
+}
+
+echo "\n";
+
+
 // --- Cleanup ---------------------------------------------------------------
 
 \Nino\Filesystem::removeDir( $sandbox );
