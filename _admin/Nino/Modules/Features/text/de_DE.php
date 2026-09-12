@@ -31,18 +31,20 @@ return [
 	'[[/_admin/features/label/version]]'			=> 'Version %s',
 	'[[/_admin/features/label/installed]]'		=> 'installiert als %s',
 	'[[/_admin/features/label/requires]]'			=> 'Benötigt: %s',
-	'[[/_admin/features/label/manual]]'				=> 'So wird es verwendet',
+	/*	Die beiden Tabs im Screen eines Features: was es ist, und was sich
+		daran einstellen lässt. Ein Feature, das sich nirgends beschreibt oder
+		keine Einstellung mitbringt, hat nur die eine Seite - ohne Leiste	*/
+	'[[/_admin/features/tab/about]]'					=> 'Beschreibung',
+	'[[/_admin/features/tab/settings]]'			=> 'Einstellungen',
 
 	/*	Die Abschnitte des Handbuchs, in der Reihenfolge, in der das Panel sie
 		zeichnet. Immer dieselben, auch die leeren: „keine Callbacks" ist eine
 		Antwort, und wer die Frage nicht findet, muss in den Quelltext schauen,
 		um zu erfahren, dass die Antwort nichts war	*/
-	'[[/_admin/features/manual/description]]'	=> 'Beschreibung',
 	'[[/_admin/features/manual/shortcodes]]'	=> 'Shortcodes',
 	'[[/_admin/features/manual/markup]]'				=> 'Markup',
 	'[[/_admin/features/manual/routes]]'			=> 'Routen',
 	'[[/_admin/features/manual/panel]]'				=> 'Admin-Panel',
-	'[[/_admin/features/manual/settings]]'		=> 'Einstellungen',
 	'[[/_admin/features/manual/callbacks]]'		=> 'Callbacks',
 	'[[/_admin/features/manual/install]]'			=> 'Installiert',
 	'[[/_admin/features/manual/none]]'				=> '– keine –',

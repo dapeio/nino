@@ -8,7 +8,8 @@
  *										is always empty, and that one Save collects every
  *										setting of its feature by data-key - on the screen of
  *										its own the Settings button steps into and the back
- *										link leaves - and the three tabs
+ *										link leaves, over the two tabs that screen is split
+ *										into (Description, Settings) - and the three tabs
  *										(Available, Inactive, Active) with their counts, the
  *										action bar's Refresh catalogue button and status line,
  *										that the Available tab fills from what features/list
@@ -563,8 +564,8 @@ const asked = requests.length;
 fire( sample, 'click' );
 check( 'stepping into it asks the backend for nothing - features/list already carried the schema', requests.length === asked );
 check( 'the list is stepped out of and the feature\'s pane shown, the way every drill-down level is', mount.classList.contains('admin-hidden') === true && screen.classList.contains('admin-hidden') === false );
-check( 'the screen names the feature and the line the row carried, category and all', byTag( screen, 'h3' )[0].textContent === 'Beispiel-Feature'
-	&& byTag( screen, 'p' ).some( function( el ) { return el.textContent === text('/_admin/features/category/content')+ ' · '+ text('/_admin/features/label/version').replace( '%s', '1.2.0' )+ ' · Prüft den ganzen Feature-Vertrag.' } )
+check( 'the screen names the feature, and the line under it is identity alone - what it does is a sentence, and a sentence is not appended to a line that gets scanned', byTag( screen, 'h3' )[0].textContent === 'Beispiel-Feature'
+	&& byTag( screen, 'p' ).some( function( el ) { return el.textContent === text('/_admin/features/category/content')+ ' · '+ text('/_admin/features/label/version').replace( '%s', '1.2.0' ) } )
 	&& byTag( screen, 'p' ).some( function( el ) { return el.textContent === text('/_admin/features/label/requires').replace( '%s', 'helper' ) } ) );
 
 const backLink = byTag( screen.children[0], 'a' )[0];
@@ -575,16 +576,46 @@ const form 	 = byTag( screen, 'form' )[0];
 const controls = form ? form.querySelectorAll('[data-key]') : [];
 check( 'the form is on that screen and nowhere in the list, every setting a control carrying its name in schema order', form !== undefined && byTag( mount, 'form' ).length === 0
 	&& controls.map( function( el ) { return el.dataset.key } ).join(',') === 'enabled,limit,title,notes,contact,site,mode,apiKey,hosts' );
-check( 'the settings sit in one fieldset, legended from the text system', byTag( form, 'fieldset' ).length === 1
-	&& byTag( form, 'legend' )[0].textContent === text('/_admin/features/label/settings') );
+check( 'the settings sit in one fieldset', byTag( form, 'fieldset' ).length === 1 );
 
-const manual		 = findAll( screen, function( el ) { return hasClass( el, 'features-manual' ) } )[0];
-const manualBody = findAll( screen, function( el ) { return hasClass( el, 'features-manual-body' ) } )[0];
+/*	Two tabs over one form: what the feature is, and what can be set on it.
+	Both panes are built and one of them is hidden - not one pane rebuilt per
+	switch - so a setting typed into and then left to go and read what it does
+	comes back with what was typed in it	*/
+const tabBar 		= findAll( screen, function( el ) { return hasClass( el, 'features-detail-tabs' ) } )[0];
+const detailTabs	= tabBar === undefined ? [] : byTag( tabBar, 'button' );
+const aboutPane	= findAll( screen, function( el ) { return hasClass( el, 'features-about' ) } )[0];
+const settingsPane = byTag( form, 'fieldset' )[0];
+
+check( 'the screen is two tabs, Description first, each a tab of the shared strip', tabBar !== undefined && tabBar.attributes.role === 'tablist'
+	&& detailTabs.map( function( el ) { return el.textContent } ).join('|') === text('/_admin/features/tab/about')+ '|'+ text('/_admin/features/tab/settings')
+	&& detailTabs.every( function( el ) { return el.attributes.role === 'tab' && el.type === 'button' } ) );
+check( 'they sit above both panes, in the form, so the one Save below belongs to them', form.children.indexOf( tabBar ) < form.children.indexOf( aboutPane )
+	&& form.children.indexOf( aboutPane ) < form.children.indexOf( settingsPane ) );
+check( 'a screen opens on what the feature is: the description pane shown, the settings pane hidden rather than unmounted', aboutPane.hidden === false && settingsPane.hidden === true
+	&& detailTabs[0].attributes['aria-selected'] === 'true' && detailTabs[1].attributes['aria-selected'] === 'false' );
+check( 'each tab points at its pane and each pane back at its tab, so a reader who cannot see the strip is told what names the group', detailTabs[0].attributes['aria-controls'] === aboutPane.id
+	&& detailTabs[1].attributes['aria-controls'] === settingsPane.id && aboutPane.attributes['aria-labelledby'] === detailTabs[0].id
+	&& settingsPane.attributes['aria-labelledby'] === detailTabs[1].id && aboutPane.id !== '' && settingsPane.id !== '' );
+check( '...and the group has no legend of its own: the tab is its name, and the same word twice is one of them drifting', byTag( settingsPane, 'legend' ).length === 0 );
+check( 'the description leads the pane it is under, with the manual below it', byTag( aboutPane, 'p' )[0].textContent === 'Prüft den ganzen Feature-Vertrag.'
+	&& hasClass( byTag( aboutPane, 'p' )[0], 'features-about-lead' ) );
+
+fire( detailTabs[1], 'click' );
+check( 'switching brings the settings forward and takes the description back', aboutPane.hidden === true && settingsPane.hidden === false
+	&& detailTabs[1].attributes['aria-selected'] === 'true' && detailTabs[0].attributes['aria-selected'] === 'false' );
+check( '...without rebuilding either of them - the controls are the same elements, with what was typed still in them', byTag( screen, 'form' )[0] === form
+	&& findAll( screen, function( el ) { return hasClass( el, 'features-about' ) } )[0] === aboutPane );
+
+fire( detailTabs[0], 'click' );
+check( 'and back again', aboutPane.hidden === false && settingsPane.hidden === true );
+
+const manualBody = findAll( aboutPane, function( el ) { return hasClass( el, 'features-manual-body' ) } )[0];
 const manualP		 = byTag( manualBody, 'p' );
 
-check( 'the manual out of the manifest opens the screen, above the settings, behind a summary that closes it again', manual !== undefined && manual.tagName === 'DETAILS' && manual.open === true
-	&& byTag( manual, 'summary' )[0].textContent === text('/_admin/features/label/manual')
-	&& form.children.indexOf( manual ) < form.children.indexOf( byTag( form, 'fieldset' )[0] ) );
+check( 'the manual out of the manifest is under the description, in that pane, in no box of its own', manualBody !== undefined
+	&& findAll( screen, function( el ) { return el.tagName === 'DETAILS' } ).length === 0
+	&& aboutPane.children.indexOf( manualBody ) === 1 );
 check( 'a blank line starts a paragraph, a single one is where the manifest wrapped its own line', manualP.length === 3
 	&& textOf( manualP[0] ) === 'Setze data-sample="on" auf den Container. Jede Zeile wird nacheinander getippt.' );
 check( 'a backticked span is a code element and the rest is text - a manifest writes prose, never markup', byTag( manualP[0], 'code' ).map( function( el ) { return el.textContent } ).join('|') === 'data-sample="on"'
@@ -596,8 +627,7 @@ check( 'an unclosed backtick is prose, not the rest of the paragraph turned into
 	feature adds, each a handle and one line. Drawn from the object the panel
 	is handed, which is the same path the screen takes - what changes is only
 	what the server put in 'manual' */
-const carded = panel._renderManual( {
-	description	: 'Drawn two lines above this block, never in it.',
+const cardedBody = panel._renderManual( {
 	manualSections : [ 'shortcodes', 'markup', 'routes', 'panel', 'callbacks', 'install' ],
 	manual : {
 		shortcodes	: [ { handle : '[carded]', text : 'Draws the card.' } ],
@@ -607,36 +637,38 @@ const carded = panel._renderManual( {
 		callbacks		: [],
 		install			: [],
 	},
-	settings : [ { key : 'x', label : 'Ex', hint : 'Drawn as the form below, never in here.' } ],
 } );
 
-const cardedBody = findAll( carded, function( el ) { return hasClass( el, 'features-manual-body' ) } )[0];
 const cardedH6	 = byTag( cardedBody, 'h6' );
-const cardedP		 = byTag( cardedBody, 'p' );
+const cardedDl	 = byTag( cardedBody, 'dl' );
+const cardedDt	 = byTag( cardedBody, 'dt' );
+const cardedDd	 = byTag( cardedBody, 'dd' );
 
 check( 'a sectioned manual is one heading per section, always the same six, always in the same order',
 	cardedH6.map( function( el ) { return el.textContent } ).join('|')
 	=== [ 'shortcodes', 'markup', 'routes', 'panel', 'callbacks', 'install' ].map( function( name ) { return text('/_admin/features/manual/'+ name) } ).join('|') );
-check( 'an entry is its handle as code and one line beside it', byTag( cardedP[0], 'code' )[0].textContent === '[carded]'
-	&& textOf( cardedP[0] ) === '[carded]Draws the card.' );
-check( 'an entry with no handle is that line alone', byTag( cardedP[1], 'code' ).length === 0
-	&& textOf( cardedP[1] ) === 'A line that stands on its own.' );
+/*	One list per section, not one per entry: a handle and what it does is a
+	description list, and one list is what puts every handle of a section in
+	one column. A grid per entry sizes its first column to its own handle -
+	which is not a column	*/
+check( 'a section with entries is one description list, one term and one line per entry', cardedDl.length === 2
+	&& cardedDt.length === 2 && cardedDd.length === 2 && byTag( cardedDl[0], 'dt' ).length === 1 );
+check( 'an entry is its handle as code, and what it does beside it', byTag( cardedDt[0], 'code' )[0].textContent === '[carded]'
+	&& cardedDd[0].textContent === 'Draws the card.' );
+check( 'an entry with no handle keeps the column the other lines are in, its term empty', byTag( cardedDt[1], 'code' ).length === 0
+	&& textOf( cardedDt[1] ) === '' && cardedDd[1].textContent === 'A line that stands on its own.' );
 
 /*	Four sections with nothing in them, each saying so. "No callbacks" is an
 	answer, and a reader who does not find the question has to go and read the
 	source to learn that the answer was nothing	*/
-const none = cardedP.filter( function( el ) { return hasClass( el, 'features-manual-none' ) } );
+const none = byTag( cardedBody, 'p' ).filter( function( el ) { return hasClass( el, 'features-manual-none' ) } );
 
-check( 'an empty section says there is nothing rather than being left out', none.length === 4
+check( 'an empty section says there is nothing rather than being left out, with no list at all', none.length === 4
 	&& none.every( function( el ) { return el.textContent === text('/_admin/features/manual/none') } ) );
 
-/*	Neither the description nor a setting is in here. Both are already on the
-	screen - the description above this block, the settings as the form below -
-	and the same words twice is the second place they drift from	*/
-check( 'the description and the settings stay out of it', textOf( cardedBody ).indexOf( 'two lines above' ) === -1
-	&& textOf( cardedBody ).indexOf( 'the form below' ) === -1 );
-check( '...and a feature with neither manual nor sections gets no block at all',
-	panel._renderManual( { description : 'Something.', manual : '' } ) === null );
+check( 'a feature with neither manual nor sections gets no manual at all, and one that says nothing about itself either gets no pane - which is the one screen with no tab strip over it',
+	panel._renderManual( { manual : '' } ) === null && panel._renderAbout( { description : '', manual : '' } ) === null
+	&& byTag( panel._renderAbout( { description : 'Just the sentence.', manual : '' } ), 'p' ).length === 1 );
 
 const byKey = {};
 controls.forEach( function( el ) { byKey[el.dataset.key] = el } );
@@ -659,6 +691,14 @@ check( 'the bar the workbench pins to the bottom holds everything the feature ca
 	&& byTag( bar, 'button' ).map( function( el ) { return el.textContent } ).join('|') === text('/_admin/features/label/deactivate')+ '|'+ text('/_admin/common/label/save')
 	&& save.type === 'submit' && hasClass( off, 'nino-admin-btn-danger' ) && off.type === 'button' );
 
+/*	One bar under both tabs, so Save can be pressed from the description. A
+	hidden control is not focusable and the browser cannot report a failed
+	constraint on one - the form would simply never submit - so the settings
+	come forward on the click, before the form is asked to submit at all	*/
+fire( save, 'click' );
+check( 'Save pressed from the description brings the settings forward first, rather than submitting over a pane nothing can be reported on', settingsPane.hidden === false
+	&& aboutPane.hidden === true && detailTabs[1].attributes['aria-selected'] === 'true' );
+
 fire( form, 'submit' );
 const posted = requests[requests.length - 1];
 check( 'saving posts features/settings with the feature\'s key and every field collected by data-key', posted.action === 'features/settings' && posted.payload.key === 'sample'
@@ -678,6 +718,8 @@ answer( 200, listAnswer( CACHE.url, true, null ) );
 check( 'the reload comes back to the feature\'s screen rather than dropping to the list', screen.classList.contains('admin-hidden') === false && mount.classList.contains('admin-hidden') === true );
 const rebuilt = byTag( screen, 'form' )[0];
 check( '...on the rebuilt form, where the confirmation survives the re-render', rebuilt !== form && byTag( rebuilt, 'p' ).some( function( el ) { return el.textContent === text('/_admin/common/msg/saved') } ) );
+check( '...and on the tab it was saved from: a save is not a reason to be put back at the beginning of a screen', byTag( findAll( screen, function( el ) { return hasClass( el, 'features-detail-tabs' ) } )[0], 'button' )[1].attributes['aria-selected'] === 'true'
+	&& findAll( screen, function( el ) { return hasClass( el, 'features-about' ) } )[0].hidden === true );
 
 fire( byTag( screen.children[0], 'a' )[0], 'click' );
 check( 'the back link returns to the list on the tab it was left on, and empties the pane behind it', mount.classList.contains('admin-hidden') === false && screen.classList.contains('admin-hidden') === true
@@ -686,6 +728,7 @@ check( 'the back link returns to the list on the tab it was left on, and empties
 // A feature switched off somewhere else - another tab, another account -
 // must not leave a screen standing for something that is no longer on
 fire( row( mount, 'sample' ), 'click' );
+check( 'stepping into a feature opens on what it is, whatever tab the screen before it was left on - a save keeps its tab, a fresh drill-in starts at the beginning', findAll( screen, function( el ) { return hasClass( el, 'features-about' ) } )[0].hidden === false );
 panel.init();
 answer( 200, listAnswer( CACHE.url, true, null, FEATURES.map( function( f ) { return f.key === 'sample' ? Object.assign( {}, f, { active : false, settings : [] } ) : f } ) ) );
 check( 'a feature that is no longer switched on drops its screen and comes back to the list', mount.classList.contains('admin-hidden') === false && screen.classList.contains('admin-hidden') === true && screen.children.length === 0 );
@@ -694,7 +737,10 @@ check( 'a feature that is no longer switched on drops its screen and comes back 
 // Deactivate is, and where an update waiting for it is applied
 fire( row( mount, 'plain' ), 'click' );
 const plainBar = byTag( screen, 'form' )[0].children[ byTag( screen, 'form' )[0].children.length - 1 ];
-check( 'a feature whose manifest carries no manual gets no box for one', findAll( screen, function( el ) { return hasClass( el, 'features-manual' ) } ).length === 0 );
+check( 'a feature whose manifest carries no manual gets no manual, only the sentence it describes itself with', findAll( screen, function( el ) { return hasClass( el, 'features-manual-body' ) } ).length === 0
+	&& byTag( findAll( screen, function( el ) { return hasClass( el, 'features-about' ) } )[0], 'p' ).map( function( el ) { return el.textContent } ).join('|') === 'Nothing to set.' );
+check( '...and with one pane there is no strip over it, and nothing hidden behind a tab that is not there', findAll( screen, function( el ) { return hasClass( el, 'features-detail-tabs' ) } ).length === 0
+	&& findAll( screen, function( el ) { return hasClass( el, 'features-detail-pane' ) } ).every( function( el ) { return el.hidden === false } ) );
 check( 'an active feature that declares no setting gets the same screen, without a fieldset and without a Save', byTag( screen, 'fieldset' ).length === 0
 	&& byTag( plainBar, 'button' ).map( function( el ) { return el.textContent } ).join('|') === text('/_admin/features/label/deactivate')+ '|'+ text('/_admin/features/label/update').replace( '%s', '1.0.0' )
 	&& byTag( plainBar, 'button' ).every( function( el ) { return el.type === 'button' } ) );

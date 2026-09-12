@@ -6,6 +6,33 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **A feature's own screen in the Features panel is two tabs: Description and
+  Settings.** Description is the sentence the manifest describes the feature
+  with - it used to be the tail of the line under the heading, where a sentence
+  appended to a line that gets scanned is a sentence nobody reads - and under it
+  the manual. Settings is the form. The line under the heading is identity only
+  now: category and version.
+
+  A feature that declares no setting, or describes itself nowhere, has the one
+  pane it has and no strip over it: a tab bar with one tab on it is chrome
+  around a pane that was going to be shown anyway.
+
+  Both panes are built and one of them is hidden, rather than one pane built per
+  switch - a setting typed into and then left to go and read what it does comes
+  back with what was typed in it. Hidden is still inside the form, so the one
+  Save below both collects the whole schema whichever tab is on; pressed from
+  the Description it brings the settings forward first, because a hidden control
+  is not focusable and the browser cannot report a failed constraint on one. A
+  save comes back to the tab it was saved from; stepping into a feature opens on
+  what it is.
+
+  The manual loses the box it sat in, its summary and its 32rem scroll cap: the
+  tab is what gets it out of the way, so it is as long as it is. And a section
+  with entries is one list rather than a row of two-column lines, which is what
+  actually puts every handle of a section in one column - a grid per entry sizes
+  its first column to its own handle, and a column that starts somewhere else on
+  every line is not a column.
+
 - **A feature's manual is a reference card now, not prose.** One section per
   kind of thing a feature can add - `shortcodes`, `markup`, `routes`, `panel`,
   `callbacks`, `install` - and one line per entry, with the handle somebody
@@ -28,12 +55,11 @@ All notable changes to Nino are documented in this file.
   answer, and a reader who does not find the question has to go and read the
   source to learn that the answer was nothing.
 
-  Three things deliberately have no section. The **description** is already
-  printed two lines above the box and the **settings** are the form below it,
-  with the labels and hints the manifest declares - writing either again is
-  writing it differently. And the **PHP a feature exposes** is a README
-  question: this box is what an operator opens to find out what arrived on their
-  site.
+  Three things deliberately have no section. The **description** is the first
+  line of the same tab and the **settings** are the other one, with the labels
+  and hints the manifest declares - writing either again is writing it
+  differently. And the **PHP a feature exposes** is a README question: this tab
+  is what an operator opens to find out what arrived on their site.
 
   `markup` is the one section that is not something Nino registers - an
   attribute, a class a script looks for, a `<script type="text/plain">`. Several
@@ -83,6 +109,19 @@ All notable changes to Nino are documented in this file.
   the layer and not specificity arithmetic), the utilities still centre a
   title, the focus ring is still drawn, and the header still collapses from
   90px to 0 on scroll.
+
+- **The wizard's second step is called "Languages".** It asks about locales, and
+  the module picker beside them stays hidden until a project module with an
+  install unit is found - nothing in a fresh checkout - so the step is named for
+  the half that is always there. The rail label changed with 1.2.0-beta; the
+  manuals had not followed, which left `docs/getting-started.md` pointing at
+  `setup.md#2-setup`, an anchor that no longer existed. Heading, anchors and
+  both Getting Started tables now match, in English and German, and
+  `tests/install-script-js-smoke.js` holds the manual to the rail's numbering
+  and refuses a step link that resolves to nothing. The step *key* is still
+  `setup`, and so are `Setup::units()`, the `setup/apply` action and
+  `\Nino\Install\Setup` - only the label is the narrower name, and the docs say
+  which is which.
 
 ### Fixed
 
@@ -199,21 +238,6 @@ All notable changes to Nino are documented in this file.
   rule that is not applied looks exactly like a rule that is. The deployment
   checklist asks for the variable, and `docs/deployment.md` has the probe that
   reads it along with the three places the credentials can fail to arrive.
-
-### Changed
-
-- **The wizard's second step is called "Languages".** It asks about locales, and
-  the module picker beside them stays hidden until a project module with an
-  install unit is found - nothing in a fresh checkout - so the step is named for
-  the half that is always there. The rail label changed with 1.2.0-beta; the
-  manuals had not followed, which left `docs/getting-started.md` pointing at
-  `setup.md#2-setup`, an anchor that no longer existed. Heading, anchors and
-  both Getting Started tables now match, in English and German, and
-  `tests/install-script-js-smoke.js` holds the manual to the rail's numbering
-  and refuses a step link that resolves to nothing. The step *key* is still
-  `setup`, and so are `Setup::units()`, the `setup/apply` action and
-  `\Nino\Install\Setup` - only the label is the narrower name, and the docs say
-  which is which.
 
 ## 1.2.0-beta — 2026-09-11
 

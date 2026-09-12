@@ -45,7 +45,7 @@ Die sieben Aktionen des Panels sind `features/list`, `features/activate`, `featu
 - **Deaktivieren** trägt die Klasse wieder aus – und sonst nichts. Einstellungen, Daten und kopierte Templates bleiben, ein erneutes Einschalten findet alles vor, wie es war. Ein Feature, das ein anderes aktives Feature unter `requires` nennt, hält dieses fest: Das benötigte Feature lässt sich nicht deaktivieren, solange das andere aktiv ist.
 - **Entfernen** löscht das Verzeichnis eines inaktiven Features – der eine Schritt, den das Deaktivieren bewusst auslässt. Was das Feature behalten hat, bleibt: seine Einstellungen unter `/nino/features`, seine Dateien unter `data/`, alles, was seine Einheit ins Projekt kopiert hat – wer dasselbe Feature zurückholt, findet seine Einstellungen also wieder. Für ein aktives Feature wird es abgewiesen: Seine Klasse steht in `/nino/modules`, und ein Verzeichnis, das unter dem Autoloader weggelöscht wird, ist beim nächsten Request ein Fatal und keine Meldung.
 - **Update** bietet das Panel für ein aktives Feature an, dessen Manifest eine andere Version nennt als die aufgezeichnete – nach dem Ersetzen des Verzeichnisses durch eine neue Fassung. Die Aktualisierung ist dieselbe Aktion wie das Aktivieren: Die Einheit ergänzt, was neu ist, und das Modul darf seine eigenen Daten migrieren, bevor die neue Version aufgezeichnet wird.
-- **Einstellungen** stehen auf dem Bildschirm, in den die Zeile eines aktiven Features einsteigt – zusammen mit seinem Update, wo eines wartet, und mit **Deaktivieren**. Das Formular ist das, was das Manifest beschreibt, und Speichern legt es unter `/nino/features` in der `config.php` ab. Jede Einstellung wird geprüft, bevor eine geschrieben wird; ein Fehler nennt die Einstellung, und nichts wird gespeichert.
+- **Einstellungen** stehen auf dem Bildschirm, in den die Zeile eines aktiven Features einsteigt – zusammen mit seinem Update, wo eines wartet, und mit **Deaktivieren**. Dieser Bildschirm hat zwei Tabs: **Beschreibung** – der Satz, mit dem das Manifest das Feature beschreibt, und darunter [das Handbuch](#das-handbuch) – und **Einstellungen**, das Formular aus dem Manifest. Ein Feature, das keine Einstellung mitbringt oder sich nirgends beschreibt, hat nur die eine Seite, ohne Leiste darüber. Beide Seiten werden gebaut, eine ist verborgen: eine Einstellung, in die getippt und die dann verlassen wurde, um nachzulesen, was sie tut, kommt mit dem zurück, was darin stand – und das eine Speichern darunter sammelt das ganze Schema ein, gleich welcher Tab offen ist; aus der Beschreibung gedrückt holt es zuerst die Einstellungen nach vorn. Speichern legt das Formular unter `/nino/features` in der `config.php` ab. Jede Einstellung wird geprüft, bevor eine geschrieben wird; ein Fehler nennt die Einstellung, und nichts wird gespeichert.
 
 Der Tab **Verfügbar** ist der Katalog: was er anbietet und diese Installation noch nicht aktuell hat. Über den Tabs schickt der Knopf **Katalog aktualisieren** der Aktionsleiste `features/catalogue`, hinter dem `\Nino\Catalogue::fetch()` und `offers()` stehen (`features/install` steht hinter `install()`), und eine Statuszeile nennt, wann der Katalog zuletzt gelesen wurde, oder dass er noch nicht gelesen wurde. Nichts wird von selbst geladen: `features/list` antwortet mit dem, was `\Nino\Catalogue::cached()` zuletzt unter `data/catalogue.php` hinterlassen hat, sodass Verfügbar sich beim Öffnen des Panels sofort füllt, ohne eine eigene Anfrage; nur Aktualisieren ruft `fetch()` erneut auf. Geladen, bietet Verfügbar **Installieren** für ein Feature, das nicht im Verzeichnis liegt, **Update** für eines, das dort in einer älteren Version liegt, und graut, mit dem, was es verlangt, eines aus, von dem keine Version passt – eines, das schon aktuell ist, erscheint hier gar nicht erst. Das Installieren lädt das Archiv, prüft es gegen den signierten Katalog und legt das Verzeichnis an; eine Aktualisierung ersetzt das Verzeichnis und wendet bei einem aktiven Feature das Update im selben Schritt an. Die Angebote selbst werden immer gegen die Features abgeglichen, die gerade auf der Platte liegen, also zeigt sich eine Installation auf Verfügbar auch ohne ein neues Laden. Wo `features/` nicht beschreibbar ist, verlinkt der Tab stattdessen das Archiv, zum Entpacken von Hand. Siehe [Der Katalog](#der-katalog).
 
@@ -106,7 +106,7 @@ return [
 | `key` | der Slug des Features (`/^[a-z][a-z0-9-]*$/`): was `requires` nennt, was `/nino/features` als Schlüssel trägt und was `\Nino\Features::setting()` fragt. Ohne Angabe der kleingeschriebene Verzeichnisname |
 | `name` | ein String oder eine Map `locale => string`; Pflicht. Das, was eine Zeile im Features-Panel sagt – der Key steht dort nie –, der Name muss das Feature also von den anderen unterscheiden, die ein Projekt installieren könnte. Der Kernel nimmt, was er bekommt, denn zwei davon können aus zwei Katalogen kommen, über die er nicht bestimmt; zusammengehalten wird das im Katalog, so wie [dapeio/nino-features](https://github.com/dapeio/nino-features) zwei Features mit einem Namen abweist |
 | `description` | ein String oder eine Map `locale => string`; optional |
-| `manual` | eine Map `section => handle => zeile`; optional. Was das Feature hinzufügt – das Panel setzt es in eine Box oben auf seinen Bildschirm, siehe [Das Handbuch](#das-handbuch). Ein String oder eine Map `locale => string` davon ist die ältere Prosaform: wird weiterhin gelesen, ist aber nicht mehr die, die man schreibt |
+| `manual` | eine Map `section => handle => zeile`; optional. Was das Feature hinzufügt – das Panel zeichnet es auf dem Tab **Beschreibung** seines Bildschirms, siehe [Das Handbuch](#das-handbuch). Ein String oder eine Map `locale => string` davon ist die ältere Prosaform: wird weiterhin gelesen, ist aber nicht mehr die, die man schreibt |
 | `category` | wofür das Feature da ist, ein Slug – siehe [Kategorien](#kategorien); optional, und das, wonach das Features-Panel gruppiert und filtert |
 | `version` | `major.minor.patch`, optional mit Pre-Release-Suffix (`1.0.0-beta.2`); Pflicht. Was das Panel zeigt und `activate()` aufzeichnet |
 | `nino` | die Nino-Version, für die das Feature geschrieben wurde, als Constraint; ohne Angabe `*` |
@@ -119,11 +119,12 @@ Ein lokalisierter Wert – `name`, `description`, ein `label`, ein `hint`, eine 
 
 ### Das Handbuch
 
-Die Box, mit der das Features-Panel den Bildschirm eines Features eröffnet.
-Keine Prosa: was ein Entwickler damit macht, ist *etwas nachschlagen* – welcher
-Shortcode, welche Route, wie das Panel heißt – und dass jedes Feature dieselben
-Fragen in derselben Reihenfolge beantwortet, ist mehr wert, als wenn eines davon
-sie besonders gut beantwortet.
+Der Tab **Beschreibung** auf dem Bildschirm eines Features im Features-Panel,
+unter dem Satz, mit dem das Manifest es beschreibt. Keine Prosa: was ein
+Entwickler damit macht, ist *etwas nachschlagen* – welcher Shortcode, welche
+Route, wie das Panel heißt – und dass jedes Feature dieselben Fragen in
+derselben Reihenfolge beantwortet, ist mehr wert, als wenn eines davon sie
+besonders gut beantwortet.
 
 Ein Eintrag ist ein **Griff** und eine **Zeile**. Der Griff ist das, was jemand
 tippt, und wird nie übersetzt; die Zeile ist ein String oder eine Map
@@ -143,7 +144,9 @@ tippt, und wird nie übersetzt; die Zeile ist ein String oder eine Map
 Die Abschnitte sind `\Nino\Features::MANUAL_SECTIONS`, und das Panel zeichnet
 jeden davon – **auch die leeren**: „keine Callbacks" ist eine Antwort, und wer
 die Frage nicht findet, muss in den Quelltext schauen, um zu erfahren, dass die
-Antwort nichts war.
+Antwort nichts war. Ein Abschnitt mit Einträgen ist eine Liste: jeder Griff darin
+steht in einer Spalte und jede Zeile daneben in einer zweiten – halte eine Zeile
+also so kurz, dass sie eine bleibt.
 
 | Abschnitt | Was dort hingehört |
 |---|---|
@@ -156,12 +159,13 @@ Antwort nichts war.
 
 Drei Dinge haben bewusst keinen Abschnitt.
 
-Die **Beschreibung** steht bereits zwei Zeilen über der Box, und die
-**Einstellungen** sind das Formular darunter, mit den Labels und Hinweisen aus
-dem Manifest. Beides noch einmal zu schreiben heißt, es anders zu schreiben.
+Die **Beschreibung** ist die `description` aus dem Manifest und steht als erste
+Zeile desselben Tabs, und die **Einstellungen** sind der andere Tab, mit den
+Labels und Hinweisen aus dem Manifest. Beides noch einmal zu schreiben heißt, es
+anders zu schreiben.
 
-Das **PHP, das ein Feature anderem Code anbietet**, ist eine README-Frage. Diese
-Box öffnet ein Betreiber, um zu erfahren, was auf seiner Seite angekommen ist;
+Das **PHP, das ein Feature anderem Code anbietet**, ist eine README-Frage. Diesen
+Tab öffnet ein Betreiber, um zu erfahren, was auf seiner Seite angekommen ist;
 `Modules\Search::getElements()` dazwischen macht beides schwerer zu lesen.
 
 Ein Eintrag, der als einfacher Listeneintrag geschrieben ist, hat keinen Griff

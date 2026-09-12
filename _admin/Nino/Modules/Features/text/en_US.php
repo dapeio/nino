@@ -31,18 +31,20 @@ return [
 	'[[/_admin/features/label/version]]'			=> 'Version %s',
 	'[[/_admin/features/label/installed]]'		=> 'installed as %s',
 	'[[/_admin/features/label/requires]]'			=> 'Requires: %s',
-	'[[/_admin/features/label/manual]]'				=> 'How to use it',
+	/*	The two tabs of a feature's own screen: what it is, and what can be
+		set on it. A feature that describes itself nowhere, or declares no
+		setting, has the one pane it has and no strip over it	*/
+	'[[/_admin/features/tab/about]]'					=> 'Description',
+	'[[/_admin/features/tab/settings]]'			=> 'Settings',
 
 	/*	The manual's sections, in the order the panel draws them. Always the
 		same ones, the empty included: "no callbacks" is an answer, and a reader
 		who does not find the question has to go and read the source to learn
 		that the answer was nothing	*/
-	'[[/_admin/features/manual/description]]'	=> 'Description',
 	'[[/_admin/features/manual/shortcodes]]'	=> 'Shortcodes',
 	'[[/_admin/features/manual/markup]]'				=> 'Markup',
 	'[[/_admin/features/manual/routes]]'			=> 'Routes',
 	'[[/_admin/features/manual/panel]]'				=> 'Admin panel',
-	'[[/_admin/features/manual/settings]]'		=> 'Settings',
 	'[[/_admin/features/manual/callbacks]]'		=> 'Callbacks',
 	'[[/_admin/features/manual/install]]'			=> 'Installs',
 	'[[/_admin/features/manual/none]]'				=> '- none -',

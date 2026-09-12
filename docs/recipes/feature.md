@@ -69,11 +69,12 @@ return [
 		'en_US' => 'A product catalogue with a public JSON endpoint and a workbench panel.',
 		'de_DE' => 'Ein Produktkatalog mit öffentlichem JSON-Endpunkt und einem Panel der Workbench.',
 	],
-	/*	The card the panel opens the feature's screen with: one section per kind
-		of thing a feature adds, each a handle and one line. Always the same
-		sections, always in the same order, the empty ones included - what a
-		developer does with this is look something up. See
-		docs/features.md#the-manual; the README is the other one	*/
+	/*	The Description tab of the feature's screen in the panel, under the
+		sentence above: one section per kind of thing a feature adds, each a
+		handle and one line. Always the same sections, always in the same order,
+		the empty ones included - what a developer does with this is look
+		something up. See docs/features.md#the-manual; the README is the other
+		one	*/
 	'manual'			=> [
 		'shortcodes'	=> [
 			'[catalog]' => [ 'en_US' => 'The list. `limit` and `sort` narrow it.', 'de_DE' => 'Die Liste. `limit` und `sort` schränken sie ein.' ],

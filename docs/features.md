@@ -45,7 +45,7 @@ The panel's seven actions are `features/list`, `features/activate`, `features/de
 - **Deactivate** removes the class from the list - and nothing else. Settings, data and copied templates stay, and switching the feature back on finds everything as it was. A feature another active feature requires cannot be deactivated.
 - **Remove** deletes an inactive feature's directory, which is the one step deactivating deliberately leaves out. What the feature kept stays - its settings under `/nino/features`, its files under `data/`, whatever its unit copied into the project - so putting the same feature back finds its settings where it left them. It is refused for an active feature: the class is listed in `/nino/modules`, and a directory deleted from under the autoloader is a fatal on the next request rather than a message.
 - **Update** is offered for an active feature whose manifest names a different version than the recorded one - after its directory has been replaced with a new release. The update is the same action as activating: the unit adds what is new, and the module gets to migrate its own data before the new version is recorded.
-- **Settings** are on the screen an active feature's row steps into - together with its update, where one waits, and with **Deactivate**. The form is the one the manifest describes, and saving stores it under `/nino/features` in `config.php`. Every setting is validated before any is written; an error names the setting, and nothing is saved.
+- **Settings** are on the screen an active feature's row steps into - together with its update, where one waits, and with **Deactivate**. That screen is two tabs: **Description**, which is the sentence the manifest describes the feature with and under it [the manual](#the-manual), and **Settings**, the form the manifest describes. A feature that declares no setting, or describes itself nowhere, has the one pane it has and no strip over it. Both panes are built, one hidden, so a setting typed into and then left to go and read what it does comes back with what was typed in it - and the one Save below both collects the whole schema whichever tab is on; pressed from the Description it brings the settings forward first. Saving stores the form under `/nino/features` in `config.php`. Every setting is validated before any is written; an error names the setting, and nothing is saved.
 
 The **Available** tab is the catalogue: what it offers that this installation does not already have current. Above the tabs, an action bar's **Refresh catalogue** button posts `features/catalogue`, behind which stand `\Nino\Catalogue::fetch()` and `offers()` (`features/install` stands behind `install()`), and a status line names when the catalogue was last read, or that it has not been read yet. Nothing is fetched on its own: `features/list` answers whatever `\Nino\Catalogue::cached()` last left under `data/catalogue.php`, so Available fills the moment the panel opens without a request of its own; only Refresh calls `fetch()` again. Loaded, Available offers **Install** for a feature not in the directory, **Update** for one there in an older version, and greys out, with what it asks for, one no version of which fits - a feature already current does not appear here at all. Installing downloads the archive, checks it against the signed catalogue, and puts the directory in place; an update replaces the directory and, for an active feature, applies the update in the same step. The offers themselves are always recomputed against the features on disk now, so an install is reflected on Available without a new fetch either. Where `features/` is not writable, the tab links the archive instead, to unpack by hand. See [The Catalogue](#the-catalogue).
 
@@ -106,7 +106,7 @@ return [
 | `key` | the feature's slug (`/^[a-z][a-z0-9-]*$/`): what `requires` names, what `/nino/features` is keyed by and what `\Nino\Features::setting()` asks for. Without one, the lowercased directory name |
 | `name` | a string or a `locale => string` map; required. What a row in the Features panel says - the key is never on screen there - so it has to tell the feature apart from the others a project might install. The kernel takes what it is given, since two of them arrive from two catalogues it has no say over; a catalogue is where that is held together, the way [dapeio/nino-features](https://github.com/dapeio/nino-features) refuses two features sharing a name |
 | `description` | a string or a `locale => string` map; optional |
-| `manual` | a `section => handle => line` map; optional. What the feature adds, which the panel puts in a box at the top of its screen - see [The manual](#the-manual). A string, or a `locale => string` map of them, is the older prose form: still read, no longer the one to write |
+| `manual` | a `section => handle => line` map; optional. What the feature adds, which the panel draws on the **Description** tab of its screen - see [The manual](#the-manual). A string, or a `locale => string` map of them, is the older prose form: still read, no longer the one to write |
 | `category` | what the feature is for, one slug - see [Categories](#categories); optional, and what the Features panel groups and filters by |
 | `version` | `major.minor.patch`, optionally with a pre-release suffix (`1.0.0-beta.2`); required. What the panel shows and `activate()` records |
 | `nino` | the Nino version the feature was written for, as a constraint; `*` without one |
@@ -119,10 +119,11 @@ A localized value - `name`, `description`, a `label`, a `hint`, an option of a `
 
 ### The Manual
 
-The box the Features panel opens a feature's screen with. Not prose: what a
-developer does with it is *look something up* — which shortcode, which route,
-what the panel is called — and every feature answering the same questions in the
-same order is worth more than any one of them answering them well.
+The **Description** tab of a feature's screen in the Features panel, under the
+sentence the manifest describes it with. Not prose: what a developer does with it
+is *look something up* — which shortcode, which route, what the panel is called —
+and every feature answering the same questions in the same order is worth more
+than any one of them answering them well.
 
 One entry is a **handle** and one **line**. The handle is what somebody types and
 is never translated; the line is a string, or a `locale => string` map of them,
@@ -142,7 +143,9 @@ exactly like a `name` or a `description`.
 The sections are `\Nino\Features::MANUAL_SECTIONS`, and the panel draws every one
 of them **including the ones left empty** — "no callbacks" is an answer, and a
 reader who does not find the question has to go and read the source to learn that
-the answer was nothing.
+the answer was nothing. A section with entries is one list, so every handle in it
+stands in one column and every line beside it in another; keep a line to what
+fits on one.
 
 | Section | What belongs there |
 |---|---|
@@ -155,11 +158,11 @@ the answer was nothing.
 
 Three things deliberately have no section.
 
-The **description** is already printed two lines above the box, and the
-**settings** are the form below it, with the labels and hints the manifest
-declares. Writing either again is writing it differently.
+The **description** is the manifest's own `description`, printed as the first
+line of the same tab, and the **settings** are the other tab, with the labels and
+hints the manifest declares. Writing either again is writing it differently.
 
-The **PHP a feature exposes to other code** is a README question. This box is
+The **PHP a feature exposes to other code** is a README question. This tab is
 what an operator opens to find out what arrived on their site; mixing
 `Modules\Search::getElements()` into it makes both harder to scan.
 

@@ -5,9 +5,17 @@
  *													the catalogue offers that is not already current, so
  *													an install or an update), Inactive and Active - a
  *													shared action bar above them holding the one Refresh
- *													catalogue button. An active feature's settings are a
- *													screen of their own, behind its Settings button and
- *													left again through the back link. See Admin/Admin.php
+ *													catalogue button. An active feature has a screen of
+ *													its own, behind its chevron and left again through the
+ *													back link, split into two tabs: Description - the
+ *													sentence its manifest describes itself with, and under
+ *													it the manual, every kind of thing a feature can add
+ *													answered in the same order by every feature - and
+ *													Settings. Both panes are built and one is hidden, so
+ *													a setting typed into and then left to go and read what
+ *													it does comes back with what was typed in it, and the
+ *													one Save below both collects the whole schema whichever
+ *													tab is on. See Admin/Admin.php
  *													beside it: the entries arrive with their words already
  *													in the interface language and the settings schema
  *													normalized by \Nino\Features, so this file only knows
@@ -78,6 +86,18 @@
 		// is - as state, so the reload a save ends in comes back to the same
 		// screen rather than dropping to the list
 		_openFeature : '',
+		// Which of the two tabs of a feature's own screen is on. Kept across
+		// the re-render a save ends in, and reset to the first one when a
+		// different feature is opened. 'about' is where a screen opens:
+		// somebody who already knows the feature is one click from its
+		// settings, somebody who does not needs the sentence first
+		_detailTab : 'about',
+		// The panes of the screen that is open, key -> element, and the shared
+		// button row's paint function - so Save can bring the settings forward
+		// before the browser validates a control the other tab is covering.
+		// Empty while the list is on, or while a screen has only one pane
+		_detailPanes : {},
+		_detailSelect : null,
 
 		/**
 		 *	Load every feature with its state, settings and the cached
@@ -1033,24 +1053,54 @@
 		},
 
 		/**
-		 *	The second level, and which of the two is on screen: everything
-		 *	one active feature has - what it is, its settings where it declares
-		 *	any, the update waiting for it where one is, and switching it off -
-		 *	while the feature _openFeature names is still installed and still
-		 *	on. Else the list, which is where a feature that was switched off
-		 *	somewhere else ends up rather than on a screen about nothing
+		 *	The description tab of a feature's screen: the sentence its manifest
+		 *	describes itself with, and under it the manual - every kind of thing
+		 *	a feature can add, answered in the same order by every feature.
 		 *
-		 *	@return		void
-		 */
-		/**
-		 *	The manual at the top of a feature's screen: what its manifest says
-		 *	about using it, as paragraphs, with `backticked` spans as code. Open,
-		 *	and capped in height by the stylesheet - it is read once and is in the
-		 *	way afterwards, so it collapses. null where the feature carries none
+		 *	null where the manifest carries neither, which is the one case a
+		 *	screen has no description pane and therefore no tab strip either
 		 *
 		 *	@param		{object}	feature			As the panel loaded it
 		 *
-		 *	@return		{?Element}
+		 *	@return		{?Element}						<div class="features-about">
+		 */
+		_renderAbout : function( feature ) {
+
+			const about = dc.createElement('div');
+			about.className = 'features-about';
+
+			const description = typeof feature.description === 'string' ? feature.description.trim() : '';
+
+			// It used to be the tail of the meta line above, after the category
+			// and the version. Which is a line that gets scanned - and a sentence
+			// appended to a line that gets scanned is a sentence nobody reads
+			if( description !== '' ) {
+				const lead = dc.createElement('p');
+				lead.className = 'features-about-lead';
+				lead.textContent = description;
+				about.appendChild( lead );
+			}
+
+			const manual = Nino.admin.features._renderManual( feature );
+
+			if( manual !== null )
+				about.appendChild( manual );
+
+			return about.children.length === 0 ? null : about;
+		},
+
+		/**
+		 *	The manual: what a feature's manifest says about using it - either
+		 *	as the sections every manifest answers, or, for a catalogue written
+		 *	before those existed, as paragraphs with `backticked` spans as code.
+		 *	null where the feature carries none
+		 *
+		 *	No box of its own and no cap on its height: the tab it is drawn
+		 *	under is what gets it out of the way, so it is as long as it is
+		 *
+		 *	@param		{object}	feature			As the panel loaded it
+		 *
+		 *	@return		{?Element}						<div class="features-manual-body">
 		 */
 		_renderManual : function( feature ) {
 
@@ -1061,14 +1111,6 @@
 			if( sections === null && prose === '' )
 				return null;
 
-			const details = dc.createElement('details');
-			details.className = 'features-manual';
-			details.open = true;
-
-			const summary = dc.createElement('summary');
-			summary.textContent = Nino.content.getText('/_admin/features/label/manual');
-			details.appendChild( summary );
-
 			const body = dc.createElement('div');
 			body.className = 'features-manual-body';
 
@@ -1076,8 +1118,7 @@
 				// The older prose form. Still drawn, so a catalogue written
 				// before the sections existed reads as it always did
 				Nino.admin.features._manualProse( body, prose );
-				details.appendChild( body );
-				return details;
+				return body;
 			}
 
 			/*	One shape for every feature, in one order, so the thing a
@@ -1087,18 +1128,14 @@
 				question has to go and read the source to learn that the answer
 				was nothing.
 
-				What is *not* in here: the description and the settings. Both are
-				already on this screen - the description two lines above, the
-				settings as the form below with their own labels and hints - and
-				the same words twice, sixty pixels apart, is the second place
-				they drift from	*/
+				What is *not* in here: the settings. They are the other tab, with
+				their own labels and their own hints, and the same words twice is
+				the second place they drift from	*/
 			( feature.manualSections || [] ).forEach( function( name ) {
 				Nino.admin.features._manualSection( body, name, sections[name] || [] );
 			} );
 
-			details.appendChild( body );
-
-			return details;
+			return body;
 		},
 
 		/**
@@ -1126,27 +1163,37 @@
 				return;
 			}
 
-			entries.forEach( function( entry ) {
+			/*	A handle and what it does is a description list, and one list for
+				the whole section is what puts every handle of it in one column and
+				every line in another. One grid per entry - which is what a row of
+				<p> is - aligns each entry with itself and with nothing else, which
+				is not a column and is no faster to read than prose	*/
+			const list = dc.createElement('dl');
+			list.className = 'features-manual-section';
 
-				const line = dc.createElement('p');
+			entries.forEach( function( entry ) {
 
 				// Everything here came out of a manifest, so everything goes in
 				// as text - the handle is an element rather than a string of
 				// html, and there is no markup to get wrong
+				const term = dc.createElement('dt');
+
 				if( entry.handle ) {
 					const code = dc.createElement('code');
 					code.textContent = entry.handle;
-					line.appendChild( code );
+					term.appendChild( code );
 				}
 
-				if( entry.text ) {
-					const said = dc.createElement('span');
-					said.textContent = entry.text;
-					line.appendChild( said );
-				}
+				// A line with no handle of its own - one that says something about
+				// the whole section - keeps the column the other lines are in
+				const said = dc.createElement('dd');
+				said.textContent = entry.text || '';
 
-				body.appendChild( line );
+				list.appendChild( term );
+				list.appendChild( said );
 			} );
+
+			body.appendChild( list );
 		},
 
 		/**
@@ -1198,6 +1245,16 @@
 			} );
 		},
 
+		/**
+		 *	The second level, and which of the two is on screen: everything
+		 *	one active feature has - what it is, its settings where it declares
+		 *	any, the update waiting for it where one is, and switching it off -
+		 *	while the feature _openFeature names is still installed and still
+		 *	on. Else the list, which is where a feature that was switched off
+		 *	somewhere else ends up rather than on a screen about nothing
+		 *
+		 *	@return		void
+		 */
 		_renderDetail : function() {
 
 			const list	= dc.getElementById('features-list');
@@ -1207,6 +1264,8 @@
 			} )[0];
 
 			wrap.innerHTML = '';
+			Nino.admin.features._detailPanes = {};
+			Nino.admin.features._detailSelect = null;
 
 			if( feature === undefined ) {
 				Nino.admin.features._openFeature = '';
@@ -1232,11 +1291,17 @@
 			title.textContent = feature.name;
 			form.appendChild( title );
 
+			// Identity only: what kind of thing this is, and which version of it
+			// is installed. The description used to be the tail of this line and
+			// is the first paragraph of the Description tab now - the line under
+			// a heading is scanned, and a sentence appended to it is not read
 			const meta = dc.createElement('p');
 			meta.className = 'nino-admin-hint';
-			meta.textContent = Nino.admin.features._meta( feature.category, feature.version, feature.installed, '', feature.description );
+			meta.textContent = Nino.admin.features._meta( feature.category, feature.version, feature.installed, '', '' );
 			form.appendChild( meta );
 
+			// Above the tabs, not in one: what this feature needs in order to run
+			// at all is not something to go looking for behind a tab
 			if( feature.requires.length > 0 ) {
 				const requires = dc.createElement('p');
 				requires.className = 'nino-admin-hint';
@@ -1244,15 +1309,53 @@
 				form.appendChild( requires );
 			}
 
-			const manual = Nino.admin.features._renderManual( feature );
+			const about		= Nino.admin.features._renderAbout( feature );
+			const settings	= feature.settings.length > 0;
+			const panes		= {};
 
-			if( manual !== null )
-				form.appendChild( manual );
-
-			const settings = feature.settings.length > 0;
+			/*	Both panes built and one of them hidden, rather than one pane built
+				per switch: a setting typed into, and then left to go and read what
+				it does, would come back empty. Hidden is also still inside the
+				form, so the one Save below collects the whole schema whichever tab
+				is on - see _collect()	*/
+			if( about !== null )
+				panes.about = about;
 
 			if( settings === true )
-				form.appendChild( Nino.admin.features._renderSettings( feature ) );
+				panes.settings = Nino.admin.features._renderSettings( feature, about === null );
+
+			Nino.admin.features._detailPanes = panes;
+
+			// A strip with one tab on it is chrome around a pane that was going to
+			// be shown anyway. A feature with no settings, or none that describes
+			// itself, gets the one thing it has
+			const tabbed = panes.about !== undefined && panes.settings !== undefined;
+
+			// The screen was left on Settings, and an update has since taken them
+			// away
+			if( panes[Nino.admin.features._detailTab] === undefined )
+				Nino.admin.features._detailTab = 'about';
+
+			if( tabbed === true )
+				form.appendChild( Nino.admin.features._renderDetailTabs() );
+
+			Object.keys( panes ).forEach( function( key ) {
+
+				const pane = panes[key];
+				pane.classList.add('features-detail-pane');
+
+				// A pane is only a tabpanel where there is a strip to switch it:
+				// the shared class is what hides the one that is not on
+				if( tabbed === true ) {
+					pane.classList.add('nino-admin-tabpanel');
+					pane.id = 'features-pane-'+ key;
+					pane.setAttribute( 'role', 'tabpanel' );
+					pane.setAttribute( 'aria-labelledby', 'features-tab-'+ key );
+					pane.hidden = key !== Nino.admin.features._detailTab;
+				}
+
+				form.appendChild( pane );
+			} );
 
 			const actions = dc.createElement('div');
 			actions.className = 'nino-admin-actionbar';
@@ -1280,6 +1383,16 @@
 				save = dc.createElement('button');
 				save.type = 'submit';
 				save.textContent = Nino.content.getText('/_admin/common/label/save');
+				/*	One bar under both tabs, so Save can be pressed from the
+					description. A hidden control is not focusable and the browser
+					cannot report a failed constraint on one - "an invalid form
+					control is not focusable", and the form never submits. So the
+					settings come forward first: this runs on the click, before the
+					form is asked to submit at all	*/
+				save.addEventListener( 'click', function() {
+					if( Nino.admin.features._detailTab !== 'settings' )
+						Nino.admin.features._showDetailTab('settings');
+				} );
 				actions.appendChild( save );
 			}
 
@@ -1309,6 +1422,75 @@
 		},
 
 		/**
+		 *	The two tabs of a feature's screen: what it is, and what can be set
+		 *	on it. Drawn only where there are both - see _renderDetail(), which
+		 *	built the panes this switches between and holds them in _detailPanes
+		 *
+		 *	@return		{Element}						<div role="tablist">
+		 */
+		_renderDetailTabs : function() {
+
+			const bar = dc.createElement('div');
+			bar.className = 'nino-admin-tabs nino-admin-tabs--bar features-detail-tabs';
+			bar.setAttribute( 'role', 'tablist' );
+
+			// Two literal lookups rather than one built from the key, for the
+			// reason _renderTabs() spells its three out: a fill that only a
+			// concatenated argument ever names is invisible to the static check
+			// every panel script is held to
+			const labels = {
+				about		: Nino.content.getText('/_admin/features/tab/about'),
+				settings	: Nino.content.getText('/_admin/features/tab/settings'),
+			};
+			const buttons = {};
+
+			[ 'about', 'settings' ].forEach( function( key ) {
+				const btn = dc.createElement('button');
+				btn.type = 'button';
+				btn.id = 'features-tab-'+ key;
+				btn.className = 'nino-admin-tab';
+				btn.setAttribute( 'role', 'tab' );
+				btn.setAttribute( 'aria-controls', 'features-pane-'+ key );
+				btn.textContent = labels[key];
+				bar.appendChild( btn );
+				buttons[key] = btn;
+			} );
+
+			Nino.admin.features._detailSelect = Nino.adminUi.buttonRow( buttons, Nino.admin.features._detailTab, function( key ) {
+				Nino.admin.features._showDetailTab( key );
+			}, 'aria-selected' );
+
+			return bar;
+		},
+
+		/**
+		 *	Bring one of the two panes forward. Called by the strip, and by Save
+		 *	when it is pressed from the other tab
+		 *
+		 *	@param		{string}	key					'about' or 'settings'
+		 *
+		 *	@return		void
+		 */
+		_showDetailTab : function( key ) {
+
+			const panes = Nino.admin.features._detailPanes;
+
+			if( panes[key] === undefined )
+				return;
+
+			Nino.admin.features._detailTab = key;
+
+			Object.keys( panes ).forEach( function( name ) {
+				panes[name].hidden = name !== key;
+			} );
+
+			// Painting a row that is already painted costs nothing, and this is
+			// also how the strip follows a switch it did not make itself
+			if( Nino.admin.features._detailSelect !== null )
+				Nino.admin.features._detailSelect( key );
+		},
+
+		/**
 		 *	Step into one active feature's own screen
 		 *
 		 *	@param		{Object}	feature
@@ -1317,6 +1499,9 @@
 		 */
 		_showDetail : function( feature ) {
 			Nino.admin.features._openFeature = feature.key;
+			// A different feature is a different screen: the tab the last one was
+			// left on says nothing about this one, so it opens on what it is
+			Nino.admin.features._detailTab = 'about';
 			Nino.admin.features._renderDetail();
 		},
 
@@ -1333,20 +1518,27 @@
 
 		/**
 		 *	The settings of one feature, every declared setting by its type -
-		 *	the fieldset of the screen's one form, whose Save sits in the bar
-		 *	the workbench pins to the bottom
+		 *	the settings tab of the screen's one form, whose Save sits in the
+		 *	bar the workbench pins to the bottom
 		 *
 		 *	@param		{Object}	feature
+		 *	@param		{boolean}	named				Whether the group names itself. It does
+		 *															not under a tab - the tab is the name, and
+		 *															the pane says so with aria-labelledby. It
+		 *															does on a screen with no tabs, which is a
+		 *															feature that describes itself nowhere
 		 *
 		 *	@return		{Element}							<fieldset>
 		 */
-		_renderSettings : function( feature ) {
+		_renderSettings : function( feature, named ) {
 
 			const fieldset = dc.createElement('fieldset');
 
-			const legend = dc.createElement('legend');
-			legend.textContent = Nino.content.getText('/_admin/features/label/settings');
-			fieldset.appendChild( legend );
+			if( named === true ) {
+				const legend = dc.createElement('legend');
+				legend.textContent = Nino.content.getText('/_admin/features/label/settings');
+				fieldset.appendChild( legend );
+			}
 
 			feature.settings.forEach( function( field ) {
 				fieldset.appendChild( Nino.admin.features._renderField( field ) );
