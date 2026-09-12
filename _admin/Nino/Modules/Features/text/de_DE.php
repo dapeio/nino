@@ -32,6 +32,20 @@ return [
 	'[[/_admin/features/label/installed]]'		=> 'installiert als %s',
 	'[[/_admin/features/label/requires]]'			=> 'Benötigt: %s',
 	'[[/_admin/features/label/manual]]'				=> 'So wird es verwendet',
+
+	/*	Die Abschnitte des Handbuchs, in der Reihenfolge, in der das Panel sie
+		zeichnet. Immer dieselben, auch die leeren: „keine Callbacks" ist eine
+		Antwort, und wer die Frage nicht findet, muss in den Quelltext schauen,
+		um zu erfahren, dass die Antwort nichts war	*/
+	'[[/_admin/features/manual/description]]'	=> 'Beschreibung',
+	'[[/_admin/features/manual/shortcodes]]'	=> 'Shortcodes',
+	'[[/_admin/features/manual/markup]]'				=> 'Markup',
+	'[[/_admin/features/manual/routes]]'			=> 'Routen',
+	'[[/_admin/features/manual/panel]]'				=> 'Admin-Panel',
+	'[[/_admin/features/manual/settings]]'		=> 'Einstellungen',
+	'[[/_admin/features/manual/callbacks]]'		=> 'Callbacks',
+	'[[/_admin/features/manual/install]]'			=> 'Installiert',
+	'[[/_admin/features/manual/none]]'				=> '– keine –',
 	'[[/_admin/features/label/settings]]'			=> 'Einstellungen',
 	'[[/_admin/features/label/none]]'					=> '– keine –',
 	'[[/_admin/features/label/activate]]'			=> 'Aktivieren',

@@ -4,6 +4,86 @@ All notable changes to Nino are documented in this file.
 
 ## Unreleased
 
+### Changed
+
+- **A feature's manual is a reference card now, not prose.** One section per
+  kind of thing a feature can add - `shortcodes`, `markup`, `routes`, `panel`,
+  `callbacks`, `install` - and one line per entry, with the handle somebody
+  types beside it:
+
+  ```php
+  'manual' => [
+      'shortcodes'  => [ '[catalog]' => [ 'en_US' => 'The list.', 'de_DE' => 'Die Liste.' ] ],
+      'markup'      => [ 'data-catalog' => 'On a container the script should fill.' ],
+      'routes'      => [ '/api/catalog' => 'The public JSON endpoint.' ],
+      'panel'       => [], 'callbacks' => [], 'install' => [],
+  ],
+  ```
+
+  What a developer does with a feature's manual is *look something up* in it -
+  which shortcode, which route, what the panel is called - and prose makes that
+  a read rather than a glance. Every feature answering the same questions in the
+  same order is worth more than any one of them answering them well. The panel
+  draws every section including the ones left empty: "no callbacks" is an
+  answer, and a reader who does not find the question has to go and read the
+  source to learn that the answer was nothing.
+
+  Three things deliberately have no section. The **description** is already
+  printed two lines above the box and the **settings** are the form below it,
+  with the labels and hints the manifest declares - writing either again is
+  writing it differently. And the **PHP a feature exposes** is a README
+  question: this box is what an operator opens to find out what arrived on their
+  site.
+
+  `markup` is the one section that is not something Nino registers - an
+  attribute, a class a script looks for, a `<script type="text/plain">`. Several
+  features add nothing else, and without it their manual would be empty while
+  they are the ones with the most to say.
+
+  The older prose form is still read, so a catalogue written before this keeps
+  working; it is no longer the one to write. `docs/features.md` has the
+  reference, the recipe's manifest example follows it, and
+  `tests/features-smoke.php` holds every feature in a checkout to the sectioned
+  shape - a schema half a catalogue follows is not a schema.
+
+- **`_nino/Nino.css` puts its own design decisions in one cascade layer,
+  `@layer nino.base`.** An unlayered rule beats a layered one whatever its
+  specificity, so every stylesheet outside that file - `assets/theme.css`, a
+  project's `assets/style.css`, a feature's own - now overrides Nino's
+  defaults by existing rather than by out-specifying them.
+
+  The measurement that prompted it, against the classes a Design part set may
+  write (single class, no nesting, which is how the sets are authored):
+
+  ```
+  section  80 rules, 27 reachable (33%)     atf      59 rules, 23 (38%)
+  article  40 rules, 24 reachable (60%)     buttons  25 rules, 19 (76%)
+  ```
+
+  Two thirds of what Nino set for a section could not be reached at all:
+  `.nino-section-title {}` loses to `.nino-text-center > .nino-section-title`
+  by one class, and the way out was `!important` or doubled selectors in every
+  set. Doing this before the part sets are written is much cheaper than after -
+  a set authored against the old cascade would have to be revisited.
+
+- Four things stay **outside** the layer on purpose, each marked where it sits:
+  the scroll-driven header (a header preset's stylesheet is unlayered, so a
+  layered collapse rule would lose to every preset and no bar would ever
+  collapse again), the focus ring (an accessibility floor, not a look - WCAG
+  2.2 SC 2.4.7), the back-to-top button, and sections 08 *Javascript Elements*
+  and 09 *Utilities* wholesale. `tests/kernel-smoke.php` walks the file and
+  holds each of them to that side, because a rule that slid into the layer
+  later would not break anything visibly - it would only stop winning.
+
+- **No project has to migrate anything.** Nothing outside `Nino.css` changed;
+  among themselves and against those four, the unlayered stylesheets compete on
+  specificity exactly as before. Verified in a browser against the Design
+  preview: a set's single-class rule now beats Nino's two-class rule, the same
+  selector injected unlayered beats the set again (so the difference really is
+  the layer and not specificity arithmetic), the utilities still centre a
+  title, the focus ring is still drawn, and the header still collapses from
+  90px to 0 on scroll.
+
 ### Fixed
 
 - **The front controller forwarded to a relative target, and on some hosts that

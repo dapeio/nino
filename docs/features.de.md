@@ -66,9 +66,24 @@ return [
 		'en_US' => 'A product catalogue with a public JSON endpoint and a workbench panel.',
 		'de_DE' => 'Ein Produktkatalog mit öffentlichem JSON-Endpunkt und einem Panel der Workbench.',
 	],
+	// Ein Abschnitt je Art von Sache, die ein Feature hinzufügt, jeder Eintrag
+	// ein Griff und eine Zeile dazu. Immer dieselben Abschnitte, in derselben
+	// Reihenfolge, die leeren eingeschlossen – siehe „Das Handbuch" unten
 	'manual'			=> [
-		'en_US' => 'Put `[catalog]` where the list belongs. `limit` and `sort` narrow it.',
-		'de_DE' => 'Setze `[catalog]` dorthin, wo die Liste hin soll. `limit` und `sort` schränken sie ein.',
+		'shortcodes' => [
+			'[catalog]' => [ 'en_US' => 'The list. `limit` and `sort` narrow it.', 'de_DE' => 'Die Liste. `limit` und `sort` schränken sie ein.' ],
+		],
+		'markup'		=> [],
+		'routes'		=> [
+			'/api/catalog' => 'Der öffentliche JSON-Endpunkt, solange „Public API" an ist.',
+		],
+		'panel'			=> [
+			'Catalog' => [ 'en_US' => 'The products themselves.', 'de_DE' => 'Die Produkte selbst.' ],
+		],
+		'callbacks'	=> [],
+		'install'		=> [
+			'templates/page-catalog.tpl' => 'Die Listenseite.',
+		],
 	],
 	'category'		=> 'content',
 	'version'			=> '1.1.0',
@@ -91,7 +106,7 @@ return [
 | `key` | der Slug des Features (`/^[a-z][a-z0-9-]*$/`): was `requires` nennt, was `/nino/features` als Schlüssel trägt und was `\Nino\Features::setting()` fragt. Ohne Angabe der kleingeschriebene Verzeichnisname |
 | `name` | ein String oder eine Map `locale => string`; Pflicht. Das, was eine Zeile im Features-Panel sagt – der Key steht dort nie –, der Name muss das Feature also von den anderen unterscheiden, die ein Projekt installieren könnte. Der Kernel nimmt, was er bekommt, denn zwei davon können aus zwei Katalogen kommen, über die er nicht bestimmt; zusammengehalten wird das im Katalog, so wie [dapeio/nino-features](https://github.com/dapeio/nino-features) zwei Features mit einem Namen abweist |
 | `description` | ein String oder eine Map `locale => string`; optional |
-| `manual` | ein String oder eine Map `locale => string`; optional. Wie das Feature benutzt wird – das Panel setzt es in eine Box oben auf seinen Bildschirm: Absätze an Leerzeilen, `` `Backticks` `` für Code, sonst nichts, höchstens 10000 Zeichen je Sprache. Kein README: was jemand braucht, um einen Shortcode zu setzen oder ein Attribut zu vergeben, nicht was ein Entwickler braucht, um den Quelltext zu lesen |
+| `manual` | eine Map `section => handle => zeile`; optional. Was das Feature hinzufügt – das Panel setzt es in eine Box oben auf seinen Bildschirm, siehe [Das Handbuch](#das-handbuch). Ein String oder eine Map `locale => string` davon ist die ältere Prosaform: wird weiterhin gelesen, ist aber nicht mehr die, die man schreibt |
 | `category` | wofür das Feature da ist, ein Slug – siehe [Kategorien](#kategorien); optional, und das, wonach das Features-Panel gruppiert und filtert |
 | `version` | `major.minor.patch`, optional mit Pre-Release-Suffix (`1.0.0-beta.2`); Pflicht. Was das Panel zeigt und `activate()` aufzeichnet |
 | `nino` | die Nino-Version, für die das Feature geschrieben wurde, als Constraint; ohne Angabe `*` |
@@ -101,6 +116,69 @@ return [
 | `data` | Pfade unterhalb von `/data/`, die das Feature besitzt – was ein Backup trägt und ein Restore-Callback zusammenführt; `..` ist verboten |
 
 Ein lokalisierter Wert – `name`, `description`, ein `label`, ein `hint`, eine Option eines `select` – wird über `\Nino\Features::localized( $value, $locale )` gelesen: die gefragte Sprache, sonst `en_US`, sonst der erste Eintrag, sonst ein leerer String.
+
+### Das Handbuch
+
+Die Box, mit der das Features-Panel den Bildschirm eines Features eröffnet.
+Keine Prosa: was ein Entwickler damit macht, ist *etwas nachschlagen* – welcher
+Shortcode, welche Route, wie das Panel heißt – und dass jedes Feature dieselben
+Fragen in derselben Reihenfolge beantwortet, ist mehr wert, als wenn eines davon
+sie besonders gut beantwortet.
+
+Ein Eintrag ist ein **Griff** und eine **Zeile**. Der Griff ist das, was jemand
+tippt, und wird nie übersetzt; die Zeile ist ein String oder eine Map
+`locale => string`, genau wie ein `name` oder eine `description`.
+
+```php
+'manual' => [
+	'shortcodes'	=> [ '[catalog limit="6"]' => [ 'en_US' => 'The list, at most six.', 'de_DE' => 'Die Liste, höchstens sechs.' ] ],
+	'markup'		=> [ 'data-catalog' => 'An einem Container, den das Skript füllen soll.' ],
+	'routes'		=> [ '/api/catalog' => 'Der öffentliche JSON-Endpunkt.' ],
+	'panel'			=> [ 'Catalog' => 'Die Produkte selbst.' ],
+	'callbacks'		=> [ '/nino/elements/committed' => 'Frischt die Liste auf, wenn ein Element gespeichert wird.' ],
+	'install'		=> [ 'templates/page-catalog.tpl' => 'Die Listenseite.' ],
+],
+```
+
+Die Abschnitte sind `\Nino\Features::MANUAL_SECTIONS`, und das Panel zeichnet
+jeden davon – **auch die leeren**: „keine Callbacks" ist eine Antwort, und wer
+die Frage nicht findet, muss in den Quelltext schauen, um zu erfahren, dass die
+Antwort nichts war.
+
+| Abschnitt | Was dort hingehört |
+|---|---|
+| `shortcodes` | was eine Seite zwischen Klammern schreibt, eine Zeile je Form, die es zu nennen lohnt |
+| `markup` | was ein Template schreibt und kein Shortcode ist: ein Attribut, eine Klasse, nach der ein Skript sucht, ein `<script type="text/plain">`. Manche Features fügen nichts anderes hinzu |
+| `routes` | die Adressen, die das Feature beantwortet |
+| `panel` | die Workbench-Bildschirme, die es mitbringt, unter dem Namen aus der Navigation |
+| `callbacks` | wo es sich einhängt, unter dem Callback-Schlüssel |
+| `install` | was die Aktivierung ins Projekt legt – ein Template, ein Elementtyp, die Worte, die sie einmischt |
+
+Drei Dinge haben bewusst keinen Abschnitt.
+
+Die **Beschreibung** steht bereits zwei Zeilen über der Box, und die
+**Einstellungen** sind das Formular darunter, mit den Labels und Hinweisen aus
+dem Manifest. Beides noch einmal zu schreiben heißt, es anders zu schreiben.
+
+Das **PHP, das ein Feature anderem Code anbietet**, ist eine README-Frage. Diese
+Box öffnet ein Betreiber, um zu erfahren, was auf seiner Seite angekommen ist;
+`Modules\Search::getElements()` dazwischen macht beides schwerer zu lesen.
+
+Ein Eintrag, der als einfacher Listeneintrag geschrieben ist, hat keinen Griff
+und ist eine Zeile, die für sich steht – für den Fall, dass das Zusagende ein
+Satz ist und kein Schnipsel:
+
+```php
+'markup' => [ 'Das Feature bringt kein Formular mit: setze die Section aus dem Panel Templates.' ],
+```
+
+Ein Griff ist höchstens 120 Zeichen lang, eine Zeile höchstens 1000, ein
+Abschnitt hat höchstens 40 Einträge. Alles Längere ist ein README, und eines
+davon bringt ein Feature ohnehin mit.
+
+Die ältere Form – ein String oder eine Map `locale => string` davon – wird
+weiterhin gelesen, ein Katalog aus der Zeit vor den Abschnitten funktioniert
+also weiter. Sie ist nicht die, die man schreibt.
 
 ### Kategorien
 

@@ -133,6 +133,72 @@ check( 'one string is the manual in every language, a map is one per language', 
 check( 'a manual that is not a string or a map of them is refused', manifestFails( $manifestDir, 'BadManual', [ 'name' => 'x', 'version' => '1.0.0', 'manual' => [ 'en_US' => 5 ] ], '"manual"' ) );
 check( 'and one that would not fit a box in a panel is refused as the README it is', manifestFails( $manifestDir, 'LongManual', [ 'name' => 'x', 'version' => '1.0.0', 'manual' => str_repeat( 'a', 10001 ) ], 'at most 10000 characters' ) );
 
+/*	...and the shape a manual is written in now: a section per kind of thing a
+	feature adds, each a handle and one line about it. Prose reads well and is
+	the wrong thing here - what a developer does with a feature's manual is
+	look something up in it, and every feature answering the same questions in
+	the same order is worth more than any one of them answering them well	*/
+$sectioned = \Nino\Features::manifest( writeManifest( $manifestDir, 'Carded', [ 'name' => 'x', 'version' => '1.0.0', 'manual' => [
+	'shortcodes'	=> [ '[carded]' => [ 'en_US' => 'Draws the card.', 'de_DE' => 'Zeichnet die Karte.' ] ],
+	'markup'			=> [ 'data-carded' => 'On anything that should carry one.' ],
+	'routes'			=> [],
+	'panel'				=> [],
+	'callbacks'		=> [],
+	'install'			=> [ 'templates/page-carded.tpl' => 'The page it renders.' ],
+] ] ) );
+
+check( 'a sectioned manual is read as one', is_array( $sectioned['manual'] ) === true
+	&& isset( $sectioned['manual']['shortcodes']['[carded]'] ) === true );
+
+$cards = \Nino\Features::manualSections( $sectioned['manual'], 'de_DE' );
+
+check( 'it resolves into one locale, in the order the panel draws them', array_keys( (array) $cards ) === \Nino\Features::MANUAL_SECTIONS );
+check( '...with the handle kept and only the line translated', ( $cards['shortcodes'][0] ?? [] ) === [ 'handle' => '[carded]', 'text' => 'Zeichnet die Karte.' ] );
+check( '...a line written as one string being that line in every language', ( $cards['markup'][0]['text'] ?? '' ) === 'On anything that should carry one.' );
+check( 'an empty section stays, so the panel can say there is nothing', $cards['routes'] === [] && $cards['panel'] === [] );
+
+/*	An entry written as a plain list item has an integer key and no handle -
+	a line that stands on its own, which is what a section like 'markup'
+	sometimes needs	*/
+$bare = \Nino\Features::manifest( writeManifest( $manifestDir, 'Bare', [ 'name' => 'x', 'version' => '1.0.0', 'manual' => [
+	'markup' => [ 'The feature ships no form - place the section from the Templates panel.' ],
+] ] ) );
+
+check( 'an entry with no handle is a line of its own', ( \Nino\Features::manualSections( $bare['manual'], 'en_US' )['markup'][0] ?? [] )
+	=== [ 'handle' => '', 'text' => 'The feature ships no form - place the section from the Templates panel.' ] );
+
+check( 'a section that is not one is refused, and named', manifestFails( $manifestDir, 'BadSection', [ 'name' => 'x', 'version' => '1.0.0',
+	'manual' => [ 'shortcode' => [ '[x]' => 'y' ] ] ], 'not "shortcode"' ) );
+check( 'a line that is not a string or a map of them is refused', manifestFails( $manifestDir, 'BadLine', [ 'name' => 'x', 'version' => '1.0.0',
+	'manual' => [ 'shortcodes' => [ '[x]' => 5 ] ] ], 'the line must be a string' ) );
+check( 'a paragraph where a line belongs is refused', manifestFails( $manifestDir, 'LongLine', [ 'name' => 'x', 'version' => '1.0.0',
+	'manual' => [ 'shortcodes' => [ '[x]' => str_repeat( 'a', 1001 ) ] ] ], 'one line, not a paragraph' ) );
+check( 'a handle nobody could type is refused', manifestFails( $manifestDir, 'LongHandle', [ 'name' => 'x', 'version' => '1.0.0',
+	'manual' => [ 'shortcodes' => [ str_repeat( 'a', 121 ) => 'y' ] ] ], 'a handle is' ) );
+
+// The prose form still reads, so a catalogue written before the sections
+// existed keeps working - it is the panel that draws whichever it got
+check( 'the older prose form is still a manual', \Nino\Features::manualSections( 'Put `[told]` where it goes.', 'en_US' ) === null
+	&& \Nino\Features::manualSections( [ 'en_US' => 'Use it.' ], 'en_US' ) === null );
+
+/*	Every shipped feature carries the sectioned shape. A schema half a
+	catalogue follows is not a schema, and this is the check that keeps it
+	from becoming one	*/
+$prose = [];
+
+foreach( (array) glob( __DIR__. '/../features/*', GLOB_ONLYDIR ) as $dir ) {
+
+	$feature = \Nino\Features::manifest( $dir );
+
+	if( $feature !== null && ( $feature['manual'] ?? '' ) !== '' && \Nino\Features::manualSections( $feature['manual'], 'en_US' ) === null )
+		$prose[] = basename( $dir );
+}
+
+if( $prose !== [] )
+	echo '        still prose: ', implode( ', ', $prose ), "\n";
+
+check( 'every feature in this checkout writes its manual in sections', $prose === [] );
+
 check( 'a setting needs a known type', manifestFails( $manifestDir, 'BadType', [ 'name' => 'x', 'version' => '1.0.0', 'settings' => [ 'a' => [ 'type' => 'color' ] ] ], 'unknown type' ) );
 check( 'a setting name is a lowerCamel identifier', manifestFails( $manifestDir, 'BadSetting', [ 'name' => 'x', 'version' => '1.0.0', 'settings' => [ 'api-key' => [ 'type' => 'string' ] ] ], 'setting name' ) );
 check( 'a select needs options', manifestFails( $manifestDir, 'NoOptions', [ 'name' => 'x', 'version' => '1.0.0', 'settings' => [ 'a' => [ 'type' => 'select' ] ] ], '"options"' ) );
@@ -487,7 +553,7 @@ check( 'apiList answers the directory the panel reads from, the catalogue url, w
 	&& array_keys( $body ) === [ 'dir', 'catalogueUrl', 'writable', 'catalogue', 'features' ] && array_column( $body['features'], 'key' ) === [ 'sample', 'helper', 'old' ]
 	&& array_column( $body['features'], 'name' ) === [ 'Beispiel-Feature', 'Helper', 'Old' ] );
 $byKey = array_column( $body['features'], null, 'key' );
-check( 'every entry has the same keys', array_keys( $byKey['sample'] ) === [ 'key', 'name', 'description', 'manual', 'category', 'version', 'installed', 'active', 'update', 'requires', 'problems', 'settings' ] );
+check( 'every entry has the same keys', array_keys( $byKey['sample'] ) === [ 'key', 'name', 'description', 'manual', 'manualSections', 'category', 'version', 'installed', 'active', 'update', 'requires', 'problems', 'settings' ] );
 check( 'names and descriptions arrive in the session locale - de_DE, the native language, since none was chosen', $byKey['sample']['name'] === 'Beispiel-Feature' && $byKey['sample']['description'] === 'Prüft den ganzen Feature-Vertrag.'
 	&& $byKey['helper']['name'] === 'Helper' && $byKey['helper']['description'] === '' );
 // The slug, not a word: the categories are named in the panel's own fills, so

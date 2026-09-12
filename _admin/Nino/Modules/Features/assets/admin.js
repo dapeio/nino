@@ -1054,9 +1054,11 @@
 		 */
 		_renderManual : function( feature ) {
 
-			const text = ( feature.manual || '' ).trim();
+			const manual = feature.manual;
+			const prose  = typeof manual === 'string' ? manual.trim() : '';
+			const sections = ( manual !== null && typeof manual === 'object' ) ? manual : null;
 
-			if( text === '' )
+			if( sections === null && prose === '' )
 				return null;
 
 			const details = dc.createElement('details');
@@ -1069,6 +1071,93 @@
 
 			const body = dc.createElement('div');
 			body.className = 'features-manual-body';
+
+			if( sections === null ) {
+				// The older prose form. Still drawn, so a catalogue written
+				// before the sections existed reads as it always did
+				Nino.admin.features._manualProse( body, prose );
+				details.appendChild( body );
+				return details;
+			}
+
+			/*	One shape for every feature, in one order, so the thing a
+				developer does with this - look something up - is a glance rather
+				than a read. Every section is drawn, the empty ones included: "no
+				callbacks" is an answer, and a reader who does not find the
+				question has to go and read the source to learn that the answer
+				was nothing.
+
+				What is *not* in here: the description and the settings. Both are
+				already on this screen - the description two lines above, the
+				settings as the form below with their own labels and hints - and
+				the same words twice, sixty pixels apart, is the second place
+				they drift from	*/
+			( feature.manualSections || [] ).forEach( function( name ) {
+				Nino.admin.features._manualSection( body, name, sections[name] || [] );
+			} );
+
+			details.appendChild( body );
+
+			return details;
+		},
+
+		/**
+		 *	One section: its heading, then a line per entry - the handle as
+		 *	code, what it does beside it. An empty one says so rather than
+		 *	being left out
+		 *
+		 *	@param		{Element}	body
+		 *	@param		{string}	name				A section of \Nino\Features::MANUAL_SECTIONS
+		 *	@param		{Array}		entries			{ handle, text }, handle optional
+		 *
+		 *	@return		void
+		 */
+		_manualSection : function( body, name, entries ) {
+
+			const heading = dc.createElement('h6');
+			heading.textContent = Nino.content.getText('/_admin/features/manual/'+ name);
+			body.appendChild( heading );
+
+			if( entries.length === 0 ) {
+				const none = dc.createElement('p');
+				none.className = 'features-manual-none';
+				none.textContent = Nino.content.getText('/_admin/features/manual/none');
+				body.appendChild( none );
+				return;
+			}
+
+			entries.forEach( function( entry ) {
+
+				const line = dc.createElement('p');
+
+				// Everything here came out of a manifest, so everything goes in
+				// as text - the handle is an element rather than a string of
+				// html, and there is no markup to get wrong
+				if( entry.handle ) {
+					const code = dc.createElement('code');
+					code.textContent = entry.handle;
+					line.appendChild( code );
+				}
+
+				if( entry.text ) {
+					const said = dc.createElement('span');
+					said.textContent = entry.text;
+					line.appendChild( said );
+				}
+
+				body.appendChild( line );
+			} );
+		},
+
+		/**
+		 *	The older prose manual: paragraphs, with `backticked` spans as code
+		 *
+		 *	@param		{Element}	body
+		 *	@param		{string}	text
+		 *
+		 *	@return		void
+		 */
+		_manualProse : function( body, text ) {
 
 			// A blank line starts a paragraph; a single one is where the manifest
 			// wrapped its own line and means nothing here
@@ -1107,10 +1196,6 @@
 
 				body.appendChild( paragraph );
 			} );
-
-			details.appendChild( body );
-
-			return details;
 		},
 
 		_renderDetail : function() {

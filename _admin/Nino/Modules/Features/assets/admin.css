@@ -170,7 +170,11 @@
 }
 
 #features-detail .features-manual-body {
-	max-height: 14rem;
+	/*	Room for a whole reference rather than a peek at one: with sections
+		this is a thing to look something up in, and a scroll box that shows
+		three of seven headings hides exactly what somebody came for. Still
+		bounded, and the <details> around it is how it gets out of the way */
+	max-height: 32rem;
 	overflow-y: auto;
 	margin-top: .5rem;
 	font-size: .85rem;
@@ -191,6 +195,51 @@
 	padding: .08em .3em;
 	border-radius: 4px;
 	background: var(--editor-bg);
+}
+
+/*	A sectioned manual: a heading per section, then a line per entry - the
+	handle as code, what it does beside it. Every feature answering the same
+	questions in the same order is what makes this a thing to glance at rather
+	than a thing to read, and the look has to hold that up: the headings small
+	and quiet, the handles aligned, the lines tight */
+#features-detail .features-manual-body h6 {
+	margin: .9rem 0 .3rem;
+	color: var(--editor-text-secondary);
+	font-size: .72rem;
+	font-weight: 600;
+	letter-spacing: .02em;
+	text-transform: uppercase;
+}
+#features-detail .features-manual-body h6:first-child {
+	margin-top: 0;
+}
+
+/*	Handle and line as two columns rather than a run of inline text: a column
+	of handles is a column you can run your eye down, which is the whole reason
+	the sections exist. It collapses to one column where there is no room -
+	below that width the alignment buys nothing and costs the line */
+#features-detail .features-manual-body p:has(> code:first-child) {
+	display: grid;
+	grid-template-columns: minmax(0, auto) minmax(0, 1fr);
+	gap: .1rem .6rem;
+	align-items: baseline;
+	margin: 0 0 .25rem;
+}
+#features-detail .features-manual-body p > code:first-child {
+	justify-self: start;
+}
+
+/* A section with nothing in it says so, and says it quietly */
+#features-detail .features-manual-body .features-manual-none {
+	display: block;
+	color: var(--editor-text-secondary);
+	font-style: italic;
+}
+
+@media (max-width: 700px) {
+	#features-detail .features-manual-body p:has(> code:first-child) {
+		grid-template-columns: minmax(0, 1fr);
+	}
 }
 
 }

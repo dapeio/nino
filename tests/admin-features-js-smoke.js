@@ -592,6 +592,52 @@ check( 'a backticked span is a code element and the rest is text - a manifest wr
 check( 'an unclosed backtick is prose, not the rest of the paragraph turned into code', textOf( manualP[2] ) === 'Ein Backtick ` allein bleibt Text.'
 	&& byTag( manualP[2], 'code' ).length === 0 );
 
+/*	...and the shape a manual is written in now: a section per kind of thing a
+	feature adds, each a handle and one line. Drawn from the object the panel
+	is handed, which is the same path the screen takes - what changes is only
+	what the server put in 'manual' */
+const carded = panel._renderManual( {
+	description	: 'Drawn two lines above this block, never in it.',
+	manualSections : [ 'shortcodes', 'markup', 'routes', 'panel', 'callbacks', 'install' ],
+	manual : {
+		shortcodes	: [ { handle : '[carded]', text : 'Draws the card.' } ],
+		markup			: [ { handle : '', text : 'A line that stands on its own.' } ],
+		routes			: [],
+		panel				: [],
+		callbacks		: [],
+		install			: [],
+	},
+	settings : [ { key : 'x', label : 'Ex', hint : 'Drawn as the form below, never in here.' } ],
+} );
+
+const cardedBody = findAll( carded, function( el ) { return hasClass( el, 'features-manual-body' ) } )[0];
+const cardedH6	 = byTag( cardedBody, 'h6' );
+const cardedP		 = byTag( cardedBody, 'p' );
+
+check( 'a sectioned manual is one heading per section, always the same six, always in the same order',
+	cardedH6.map( function( el ) { return el.textContent } ).join('|')
+	=== [ 'shortcodes', 'markup', 'routes', 'panel', 'callbacks', 'install' ].map( function( name ) { return text('/_admin/features/manual/'+ name) } ).join('|') );
+check( 'an entry is its handle as code and one line beside it', byTag( cardedP[0], 'code' )[0].textContent === '[carded]'
+	&& textOf( cardedP[0] ) === '[carded]Draws the card.' );
+check( 'an entry with no handle is that line alone', byTag( cardedP[1], 'code' ).length === 0
+	&& textOf( cardedP[1] ) === 'A line that stands on its own.' );
+
+/*	Four sections with nothing in them, each saying so. "No callbacks" is an
+	answer, and a reader who does not find the question has to go and read the
+	source to learn that the answer was nothing	*/
+const none = cardedP.filter( function( el ) { return hasClass( el, 'features-manual-none' ) } );
+
+check( 'an empty section says there is nothing rather than being left out', none.length === 4
+	&& none.every( function( el ) { return el.textContent === text('/_admin/features/manual/none') } ) );
+
+/*	Neither the description nor a setting is in here. Both are already on the
+	screen - the description above this block, the settings as the form below -
+	and the same words twice is the second place they drift from	*/
+check( 'the description and the settings stay out of it', textOf( cardedBody ).indexOf( 'two lines above' ) === -1
+	&& textOf( cardedBody ).indexOf( 'the form below' ) === -1 );
+check( '...and a feature with neither manual nor sections gets no block at all',
+	panel._renderManual( { description : 'Something.', manual : '' } ) === null );
+
 const byKey = {};
 controls.forEach( function( el ) { byKey[el.dataset.key] = el } );
 check( 'a bool is the shared switch', byKey.enabled.type === 'checkbox' && byKey.enabled.checked === true && findAll( form, function( el ) { return hasClass( el, 'nino-admin-switch-state' ) } ).length === 1 );

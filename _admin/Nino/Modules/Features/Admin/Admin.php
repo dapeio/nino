@@ -622,7 +622,15 @@ namespace Nino\Modules\Features {
 				'key'					=> $feature['key'],
 				'name'				=> \Nino\Features::localized( $feature['name'], $locale ),
 				'description'	=> \Nino\Features::localized( $feature['description'], $locale ),
-				'manual'			=> \Nino\Features::localized( $feature['manual'] ?? '', $locale ),
+				/*	Either shape, as it was written: a sectioned manual arrives as
+					an object of sections, the older prose one as a string, and the
+					script draws whichever it got. One field rather than two,
+					because a feature has one manual	*/
+				'manual'			=> \Nino\Features::manualSections( $feature['manual'] ?? '', $locale )
+										?? \Nino\Features::localized( $feature['manual'] ?? '', $locale ),
+				// ...and the vocabulary to draw it with, so the script carries no
+				// copy of a list that lives in php
+				'manualSections'	=> \Nino\Features::MANUAL_SECTIONS,
 				// The slug, not a label: the script has the fills, and the one
 				// category it may meet without a fill - a feature filed under
 				// something this workbench predates - it shows as it stands

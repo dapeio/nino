@@ -53,6 +53,40 @@ namespace Nino {
 		// knows how to validate
 		public const array SETTING_TYPES = [ 'bool', 'int', 'string', 'text', 'email', 'url', 'select', 'secret', 'lines' ];
 
+		/*	The sections a manual is written in, in the order the panel draws
+			them. A fixed vocabulary rather than free prose, because the thing a
+			developer does with a feature's manual is *look something up* in it -
+			which shortcode, which route, what the panel is called - and prose
+			makes that a read rather than a glance. Every feature answering the
+			same questions in the same order is worth more than any one of them
+			answering them well.
+
+			Two of the sections the panel draws are not in here, because a
+			feature already declares them and writing them twice is writing them
+			differently: the description comes from 'description', and the
+			settings from 'settings' with their own labels and hints.
+
+			An empty section is drawn all the same, saying so. "No callbacks" is
+			an answer, and a reader who does not find the question has to go and
+			check the source to learn that the answer was nothing.
+
+			'markup' is the one that is not a thing Nino registers: it is what a
+			feature asks a template to write - data-lightbox, a class a script
+			looks for, a <script type="text/plain">. Several features add nothing
+			but that, and without the section their manual would be empty while
+			they are the ones with the most to say.
+
+			What is deliberately not a section: the php a feature exposes to
+			other code. This is the card an operator opens to find out what
+			arrived on their site; Modules\Search::getElements() is a README
+			question, and mixing the two makes both harder to scan.	*/
+		public const array MANUAL_SECTIONS = [ 'shortcodes', 'markup', 'routes', 'panel', 'callbacks', 'install' ];
+
+		// One manual entry is a handle and a line about it - not a paragraph,
+		// and not a name so long it stops being a handle
+		private const int MANUAL_ENTRIES = 40;
+		private const int MANUAL_HANDLE_LENGTH = 120;
+
 		// The coarse "what is this for" a feature is filed under, one per
 		// feature: what the Features panel filters by and what a person
 		// browsing a catalogue of forty features navigates by. A vocabulary
@@ -218,10 +252,53 @@ namespace Nino {
 			// feature is used, which the panel puts at the top of its screen.
 			// Capped like a text setting - what does not fit a box in a panel
 			// is a README, and a feature carries one of those already
-			if( isset( $raw['manual'] ) === true ) {
+			if( isset( $raw['manual'] ) === true && self::_manualSectioned( $raw['manual'] ) === true ) {
 
+				/*	The sectioned form: section => handle => one line, localized
+					the way a name or a description is. The handle - a shortcode,
+					a route, the panel's name - is written once and is not
+					translated, because it is what a developer types	*/
+				foreach( $raw['manual'] as $section => $entries ) {
+
+					if( in_array( $section, self::MANUAL_SECTIONS, true ) === false )
+						return $fail( '"manual" knows the sections '. implode( ', ', self::MANUAL_SECTIONS ). ' - not "'. (string) $section. '"' );
+
+					if( is_array( $entries ) === false )
+						return $fail( '"manual" section "'. $section. '" must be a handle => text map' );
+
+					if( count( $entries ) > self::MANUAL_ENTRIES )
+						return $fail( '"manual" section "'. $section. '" is at most '. self::MANUAL_ENTRIES. ' entries - a longer one is a README' );
+
+					foreach( $entries as $handle => $text ) {
+
+						/*	A handle, or none: an entry written as a plain list item
+							has an integer key and is a line with nothing to put in
+							front of it - which is what a section like 'markup'
+							sometimes needs, where the thing to say is a sentence and
+							not a snippet.
+
+							No is_string() beside the is_int(): an array key is one or
+							the other, so the negative already says which	*/
+						if( is_int( $handle ) === false && ( trim( $handle ) === '' || strlen( $handle ) > self::MANUAL_HANDLE_LENGTH ) )
+							return $fail( '"manual" section "'. $section. '": a handle is a non-empty string of at most '. self::MANUAL_HANDLE_LENGTH. ' characters, or none at all' );
+
+						if( self::_localizedValid( $text ) === false )
+							return $fail( '"manual" section "'. $section. '", "'. $handle. '": the line must be a string or a locale => string map' );
+
+						foreach( is_array( $text ) === true ? $text : [ $text ] as $line )
+							if( strlen( (string) $line ) > self::MAX_STRING_LENGTH )
+								return $fail( '"manual" section "'. $section. '", "'. $handle. '" is at most '. self::MAX_STRING_LENGTH. ' characters - one line, not a paragraph' );
+					}
+				}
+			}
+			else if( isset( $raw['manual'] ) === true ) {
+
+				/*	...and the prose form, which is what a manual was before it
+					had sections. Still read, so a catalogue written against the
+					older shape keeps working - but the sectioned one is what to
+					write: see docs/features.md	*/
 				if( self::_localizedValid( $raw['manual'] ) === false )
-					return $fail( '"manual" must be a string or a locale => string map' );
+					return $fail( '"manual" must be a section => handle => text map, or a string' );
 
 				foreach( is_array( $raw['manual'] ) === true ? $raw['manual'] : [ $raw['manual'] ] as $text )
 					if( strlen( (string) $text ) > self::MAX_TEXT_LENGTH )
@@ -1103,6 +1180,79 @@ namespace Nino {
 		 *
 		 *	@return 	bool										Whether it is a non-empty string or a non-empty locale => string map
 		 */
+		/**
+		 *	A sectioned manual, resolved into one locale and ready to draw:
+		 *	every section MANUAL_SECTIONS names, in that order, each a list of
+		 *	{ handle, text }.
+		 *
+		 *	Every section is returned, including the empty ones, because "no
+		 *	callbacks" is an answer and a reader who does not find the question
+		 *	has to go and read the source to learn that the answer was nothing.
+		 *
+		 *	@param		mixed			$manual				A manifest's 'manual'
+		 *	@param		string		$locale				The interface locale to resolve into
+		 *
+		 *	@return 	array|null							null for the older prose form
+		 */
+		public static function manualSections( mixed $manual, string $locale ): ?array {
+
+			if( self::_manualSectioned( $manual ) === false )
+				return null;
+
+			$out = [];
+
+			foreach( self::MANUAL_SECTIONS as $section ) {
+
+				$out[$section] = [];
+
+				foreach( (array) ( $manual[$section] ?? [] ) as $handle => $text )
+					$out[$section][] = [
+						/*	The handle is what a developer types, so it is not
+							translated - only the line beside it is. An entry written
+							as a plain list item has an integer key and no handle:
+							a line that stands on its own	*/
+						'handle'	=> is_int( $handle ) === true ? '' : (string) $handle,
+						'text'		=> self::localized( $text, $locale ),
+					];
+			}
+
+			return $out;
+		}
+
+		/**
+		 *	Which of the two shapes a manual is written in.
+		 *
+		 *	A sectioned manual is section => handle => line, so its values are
+		 *	arrays; the older prose form is a string or a locale => string map,
+		 *	whose values are strings. That is the whole test, and it is enough:
+		 *	no locale is called "shortcodes" and no section is called "en_US".
+		 *
+		 *	A section spelled wrong therefore still reads as sectioned, which is
+		 *	what lets the validation name it - falling back to "must be a
+		 *	string" for a typo'd section would be the least useful thing this
+		 *	could say.
+		 *
+		 *	@param		mixed			$value				A manifest's 'manual'
+		 *
+		 *	@return 	bool
+		 */
+		private static function _manualSectioned( mixed $value ): bool {
+
+			if( is_array( $value ) === false )
+				return false;
+
+			// An empty one is a feature saying it adds nothing, which is a
+			// thing worth being able to say
+			if( $value === [] )
+				return true;
+
+			foreach( $value as $entries )
+				if( is_array( $entries ) === false )
+					return false;
+
+			return true;
+		}
+
 		private static function _localizedValid( mixed $value ): bool {
 
 			if( is_string( $value ) === true )

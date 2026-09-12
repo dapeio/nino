@@ -69,12 +69,20 @@ return [
 		'en_US' => 'A product catalogue with a public JSON endpoint and a workbench panel.',
 		'de_DE' => 'Ein Produktkatalog mit öffentlichem JSON-Endpunkt und einem Panel der Workbench.',
 	],
-	// The short manual the panel opens the feature's screen with: where the
-	// shortcode goes, what an attribute does. Paragraphs on blank lines,
-	// `backticks` for code, and nothing else - the README is the other one
+	/*	The card the panel opens the feature's screen with: one section per kind
+		of thing a feature adds, each a handle and one line. Always the same
+		sections, always in the same order, the empty ones included - what a
+		developer does with this is look something up. See
+		docs/features.md#the-manual; the README is the other one	*/
 	'manual'			=> [
-		'en_US' => 'Put `[catalog]` where the list belongs. `limit` and `sort` narrow it.',
-		'de_DE' => 'Setze `[catalog]` dorthin, wo die Liste hin soll. `limit` und `sort` schränken sie ein.',
+		'shortcodes'	=> [
+			'[catalog]' => [ 'en_US' => 'The list. `limit` and `sort` narrow it.', 'de_DE' => 'Die Liste. `limit` und `sort` schränken sie ein.' ],
+		],
+		'markup'			=> [],
+		'routes'			=> [ '/api/catalog' => 'The public JSON endpoint, while "Public API" is on.' ],
+		'panel'				=> [ 'Catalog' => 'The products themselves.' ],
+		'callbacks'		=> [],
+		'install'			=> [ 'templates/page-catalog.tpl' => 'The list page.' ],
 	],
 	// What it is for, one of \Nino\Features::CATEGORIES - what the panel
 	// groups and filters by. See docs/features.md#categories

@@ -66,9 +66,24 @@ return [
 		'en_US' => 'A product catalogue with a public JSON endpoint and a workbench panel.',
 		'de_DE' => 'Ein Produktkatalog mit öffentlichem JSON-Endpunkt und einem Panel der Workbench.',
 	],
+	// One section per kind of thing a feature adds, each a handle and one line
+	// about it. Always the same sections, in the same order, the empty ones
+	// included - see "The manual" below
 	'manual'			=> [
-		'en_US' => 'Put `[catalog]` where the list belongs. `limit` and `sort` narrow it.',
-		'de_DE' => 'Setze `[catalog]` dorthin, wo die Liste hin soll. `limit` und `sort` schränken sie ein.',
+		'shortcodes' => [
+			'[catalog]' => [ 'en_US' => 'The list. `limit` and `sort` narrow it.', 'de_DE' => 'Die Liste. `limit` und `sort` schränken sie ein.' ],
+		],
+		'markup'		=> [],
+		'routes'		=> [
+			'/api/catalog' => 'The public JSON endpoint, while "Public API" is on.',
+		],
+		'panel'			=> [
+			'Catalog' => [ 'en_US' => 'The products themselves.', 'de_DE' => 'Die Produkte selbst.' ],
+		],
+		'callbacks'	=> [],
+		'install'		=> [
+			'templates/page-catalog.tpl' => 'The list page.',
+		],
 	],
 	'category'		=> 'content',
 	'version'			=> '1.1.0',
@@ -91,7 +106,7 @@ return [
 | `key` | the feature's slug (`/^[a-z][a-z0-9-]*$/`): what `requires` names, what `/nino/features` is keyed by and what `\Nino\Features::setting()` asks for. Without one, the lowercased directory name |
 | `name` | a string or a `locale => string` map; required. What a row in the Features panel says - the key is never on screen there - so it has to tell the feature apart from the others a project might install. The kernel takes what it is given, since two of them arrive from two catalogues it has no say over; a catalogue is where that is held together, the way [dapeio/nino-features](https://github.com/dapeio/nino-features) refuses two features sharing a name |
 | `description` | a string or a `locale => string` map; optional |
-| `manual` | a string or a `locale => string` map; optional. How the feature is used, which the panel puts in a box at the top of its screen - paragraphs on blank lines, `` `backticks` `` for code, nothing else, and at most 10000 characters per language. Not a README: what a person needs to place a shortcode or set an attribute, not what a developer needs to read the source |
+| `manual` | a `section => handle => line` map; optional. What the feature adds, which the panel puts in a box at the top of its screen - see [The manual](#the-manual). A string, or a `locale => string` map of them, is the older prose form: still read, no longer the one to write |
 | `category` | what the feature is for, one slug - see [Categories](#categories); optional, and what the Features panel groups and filters by |
 | `version` | `major.minor.patch`, optionally with a pre-release suffix (`1.0.0-beta.2`); required. What the panel shows and `activate()` records |
 | `nino` | the Nino version the feature was written for, as a constraint; `*` without one |
@@ -101,6 +116,67 @@ return [
 | `data` | paths below `/data/` the feature owns - what a backup carries and a restore callback merges; `..` is refused |
 
 A localized value - `name`, `description`, a `label`, a `hint`, an option of a `select` - is read through `\Nino\Features::localized( $value, $locale )`: the locale asked for, else `en_US`, else the first entry, else an empty string.
+
+### The Manual
+
+The box the Features panel opens a feature's screen with. Not prose: what a
+developer does with it is *look something up* — which shortcode, which route,
+what the panel is called — and every feature answering the same questions in the
+same order is worth more than any one of them answering them well.
+
+One entry is a **handle** and one **line**. The handle is what somebody types and
+is never translated; the line is a string, or a `locale => string` map of them,
+exactly like a `name` or a `description`.
+
+```php
+'manual' => [
+	'shortcodes'	=> [ '[catalog limit="6"]' => [ 'en_US' => 'The list, at most six.', 'de_DE' => 'Die Liste, höchstens sechs.' ] ],
+	'markup'		=> [ 'data-catalog' => 'On a container the script should fill.' ],
+	'routes'		=> [ '/api/catalog' => 'The public JSON endpoint.' ],
+	'panel'			=> [ 'Catalog' => 'The products themselves.' ],
+	'callbacks'		=> [ '/nino/elements/committed' => 'Refreshes the list when an element is saved.' ],
+	'install'		=> [ 'templates/page-catalog.tpl' => 'The list page.' ],
+],
+```
+
+The sections are `\Nino\Features::MANUAL_SECTIONS`, and the panel draws every one
+of them **including the ones left empty** — "no callbacks" is an answer, and a
+reader who does not find the question has to go and read the source to learn that
+the answer was nothing.
+
+| Section | What belongs there |
+|---|---|
+| `shortcodes` | what a page writes between brackets, one line per form worth naming |
+| `markup` | what a template writes that is not a shortcode: an attribute, a class a script looks for, a `<script type="text/plain">`. Several features add nothing else |
+| `routes` | the addresses the feature answers |
+| `panel` | the workbench screens it brings, by the name in the rail |
+| `callbacks` | what it hooks into, by the callback key |
+| `install` | what activation puts in the project — a template, an element type, the words it merges |
+
+Three things deliberately have no section.
+
+The **description** is already printed two lines above the box, and the
+**settings** are the form below it, with the labels and hints the manifest
+declares. Writing either again is writing it differently.
+
+The **PHP a feature exposes to other code** is a README question. This box is
+what an operator opens to find out what arrived on their site; mixing
+`Modules\Search::getElements()` into it makes both harder to scan.
+
+An entry written as a plain list item has no handle and is a line that stands on
+its own — for the case where the thing to say is a sentence rather than a
+snippet:
+
+```php
+'markup' => [ 'The feature ships no form: place the section from the Templates panel.' ],
+```
+
+A handle is at most 120 characters, a line at most 1000, a section at most 40
+entries. Anything longer is a README, and a feature carries one of those already.
+
+The older form — a string, or a `locale => string` map of one — is still read, so
+a catalogue written before the sections existed keeps working. It is not the one
+to write.
 
 ### Categories
 

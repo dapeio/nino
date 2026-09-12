@@ -32,6 +32,20 @@ return [
 	'[[/_admin/features/label/installed]]'		=> 'installed as %s',
 	'[[/_admin/features/label/requires]]'			=> 'Requires: %s',
 	'[[/_admin/features/label/manual]]'				=> 'How to use it',
+
+	/*	The manual's sections, in the order the panel draws them. Always the
+		same ones, the empty included: "no callbacks" is an answer, and a reader
+		who does not find the question has to go and read the source to learn
+		that the answer was nothing	*/
+	'[[/_admin/features/manual/description]]'	=> 'Description',
+	'[[/_admin/features/manual/shortcodes]]'	=> 'Shortcodes',
+	'[[/_admin/features/manual/markup]]'				=> 'Markup',
+	'[[/_admin/features/manual/routes]]'			=> 'Routes',
+	'[[/_admin/features/manual/panel]]'				=> 'Admin panel',
+	'[[/_admin/features/manual/settings]]'		=> 'Settings',
+	'[[/_admin/features/manual/callbacks]]'		=> 'Callbacks',
+	'[[/_admin/features/manual/install]]'			=> 'Installs',
+	'[[/_admin/features/manual/none]]'				=> '- none -',
 	'[[/_admin/features/label/settings]]'			=> 'Settings',
 	'[[/_admin/features/label/none]]'					=> '– none –',
 	'[[/_admin/features/label/activate]]'			=> 'Activate',
