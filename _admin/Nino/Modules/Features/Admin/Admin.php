@@ -351,12 +351,10 @@ namespace Nino\Modules\Features {
 
 		/**
 		 *	Install one catalogue entry: the kernel downloads, verifies and
-		 *	places the directory (see Catalogue::install()) and activates
-		 *	nothing. A feature that was active before is then activated again,
-		 *	which is how its update is applied (Features::activate()); one
-		 *	that was off, or new, is only put in place and waits in the list
-		 *	for its Activate. Answers the feature's entry as the list would
-		 *	show it now, and whether the update was applied
+		 *	places the directory (see Catalogue::install()), and this switches
+		 *	the feature on unless the project has said otherwise. Answers the
+		 *	feature's entry as the list would show it now, whether an update was
+		 *	applied and whether it was switched on
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
@@ -381,6 +379,7 @@ namespace Nino\Modules\Features {
 			// what happens after the files are in place
 			$before 		= \Nino\Features::get( $appData, $key );
 			$wasActive	= $before !== null && $before['active'] === true;
+			$isNew			= $before === null;
 
 			$result = \Nino\Catalogue::install( $appData, $key, $version );
 
@@ -389,14 +388,32 @@ namespace Nino\Modules\Features {
 				return;
 			}
 
-			if( $wasActive === true ) {
+			/*	Switched on, unless the project has already said otherwise. Three
+				cases, and only the last is a decision this must not make:
+
+				  - it was active: activating again is how the update is applied,
+				    which is one step for both in the kernel (Features::activate());
+				  - it was not in the directory at all: pressing Install is a
+				    project saying it wants the feature, and leaving it in the
+				    Inactive tab made that take two presses for the one intention;
+				  - it is there and switched off: somebody switched it off. A newer
+				    version of it is not them changing their mind, so it stays off
+				    and keeps its Activate.
+
+				What it requires comes with it either way - activate() walks the
+				requirements itself, so a feature that pulled two others in with it
+				is switched on together with them	*/
+			if( $wasActive === true || $isNew === true ) {
 
 				$result = \Nino\Features::activate( $appData, $key );
 
-				// The directory is already the new one - the answer has to say
-				// so, since the list will show the update still waiting
+				// The directory is already the new one, and that is the half a
+				// failure here must still report: the list would otherwise show a
+				// feature waiting with no word on why it is not on
 				if( $result !== true ) {
-					\Nino\Http::fail( $request, 400, self::_say( $appData, '/_admin/features/error/update-after-install', $result ) );
+					\Nino\Http::fail( $request, 400, self::_say( $appData, $wasActive === true
+						? '/_admin/features/error/update-after-install'
+						: '/_admin/features/error/activate-after-install', $result ) );
 					return;
 				}
 			}
@@ -420,6 +437,7 @@ namespace Nino\Modules\Features {
 			\Nino\Http::ok( $request, [
 				'feature'		=> self::_entry( $appData, $feature, \Nino\Admin\Admin::sessionLocale( $appData ) ),
 				'updated'		=> $wasActive,
+				'activated'	=> $isNew,
 				'required'	=> $installed,
 			] );
 		}

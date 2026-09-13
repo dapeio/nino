@@ -56,6 +56,8 @@ return [
 	'[[/_admin/features/msg/removing]]'				=> 'Removing …',
 	'[[/_admin/features/error/remove]]'				=> 'The directory could not be removed.',
 	'[[/_admin/features/msg/installed-with]]'	=> 'Installed, together with what it requires: %s.',
+	'[[/_admin/features/msg/installed-active]]'	=> 'Installed and switched on.',
+	'[[/_admin/features/msg/installed-active-with]]'	=> 'Installed and switched on, together with what it requires: %s.',
 	'[[/_admin/features/label/deactivate]]'		=> 'Deactivate',
 	'[[/_admin/features/label/update]]'				=> 'Update to %s',
 	'[[/_admin/features/hint/secret-set]]'		=> 'A value is stored. Leave the field empty to keep it, or type a new one to replace it.',
@@ -93,4 +95,5 @@ return [
 	'[[/_admin/features/error/catalogue-off]]'	=> 'The catalogue is switched off: /nino/catalogue/url in config.php is empty.',
 	'[[/_admin/features/error/catalogue-key]]'	=> 'No catalogue key is configured, so no catalogue can be trusted.',
 	'[[/_admin/features/error/update-after-install]]'	=> 'The new files are in place, but the update could not be applied: %s',
+	'[[/_admin/features/error/activate-after-install]]'	=> 'The feature is in place, but it could not be switched on: %s',
 ];

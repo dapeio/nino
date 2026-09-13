@@ -56,6 +56,8 @@ return [
 	'[[/_admin/features/msg/removing]]'				=> 'Wird entfernt …',
 	'[[/_admin/features/error/remove]]'				=> 'Das Verzeichnis konnte nicht entfernt werden.',
 	'[[/_admin/features/msg/installed-with]]'	=> 'Installiert, zusammen mit dem, was es benötigt: %s.',
+	'[[/_admin/features/msg/installed-active]]'	=> 'Installiert und eingeschaltet.',
+	'[[/_admin/features/msg/installed-active-with]]'	=> 'Installiert und eingeschaltet, zusammen mit dem, was es benötigt: %s.',
 	'[[/_admin/features/label/deactivate]]'		=> 'Deaktivieren',
 	'[[/_admin/features/label/update]]'				=> 'Auf %s aktualisieren',
 	'[[/_admin/features/hint/secret-set]]'		=> 'Ein Wert ist gespeichert. Lass das Feld leer, um ihn zu behalten, oder gib einen neuen ein, um ihn zu ersetzen.',
@@ -93,4 +95,5 @@ return [
 	'[[/_admin/features/error/catalogue-off]]'	=> 'Der Katalog ist ausgeschaltet: /nino/catalogue/url in der config.php ist leer.',
 	'[[/_admin/features/error/catalogue-key]]'	=> 'Es ist kein Katalog-Schlüssel konfiguriert, also kann keinem Katalog vertraut werden.',
 	'[[/_admin/features/error/update-after-install]]'	=> 'Die neuen Dateien sind an Ort und Stelle, aber das Update konnte nicht angewendet werden: %s',
+	'[[/_admin/features/error/activate-after-install]]'	=> 'Das Feature ist an Ort und Stelle, konnte aber nicht eingeschaltet werden: %s',
 ];

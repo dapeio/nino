@@ -6,6 +6,31 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **Install switches the feature on.** Pressing Install on a feature the
+  project does not have placed the directory and left it sitting in the
+  Inactive tab, waiting for an Activate - one intention, two presses, and a
+  tab to find the feature on in between. `features/install` now follows the
+  install with the activation, and what a feature requires comes with it,
+  since `\Nino\Features::activate()` walks its requirements itself.
+
+  Two of the three cases were already this: an active feature is activated
+  again, which is how an update is applied. The third stays as it was, and is
+  the reason the cases are told apart at all - a feature that is on disk and
+  switched off stays off. Somebody switched it off, and a newer version of it
+  is not them changing their mind; its Activate stays in the row.
+
+  The answer says which happened - `updated`, `activated`, or neither - and
+  the panel's word follows it, because somebody told "Installed." goes looking
+  for the Activate that is no longer there. Where the files are placed but the
+  activation fails, which only an activation can find out (a manifest
+  requiring something the directory does not have), the panel answers a 400
+  saying both halves rather than leaving a feature in the list for no stated
+  reason.
+
+  `\Nino\Catalogue::install()` itself is unchanged and still activates
+  nothing: placing files and switching on are two steps, and only the panel
+  knows whether the second one was asked for.
+
 - **A feature's own screen in the Features panel is two tabs: Description and
   Settings.** Description is the sentence the manifest describes the feature
   with - it used to be the tail of the line under the heading, where a sentence

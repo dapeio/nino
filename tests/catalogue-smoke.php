@@ -721,7 +721,7 @@ rename( NINO_FEATURES_DIR. '.away', NINO_FEATURES_DIR );
 unset( $appData['./nino/features/all'] );
 check( 'without a writable features directory the kernel\'s refusal, naming the archive for the manual way, passes through', $result === [ 400, [ 'error' => 'the features directory is not writable - download https://catalogue.test/features/sample-3.0.0.tar.gz and unpack it there by hand' ] ] );
 
-// A feature that is not on disk yet: placed, and nothing more
+// A feature that is not on disk yet: placed, and switched on with it
 $extra100 = tarGz( featureFiles( 'Extra', 'extra', '1.0.0' ) );
 $remote['https://catalogue.test/features/extra-1.0.0.tar.gz'] = $extra100;
 $withExtra = array_merge( $features, [ entry( 'extra', '1.0.0', $extra100, [ 'name' => [ 'en_US' => 'Extra', 'de_DE' => 'Zusatz' ] ] ) ] );
@@ -732,15 +732,54 @@ check( 'a feature not on disk is offered as available, its name in the session l
 
 $requests = [];
 [ $status, $body ] = callFeatures( $appData, 'apiInstall', [ 'key' => 'extra', 'version' => '1.0.0' ] );
-check( 'installing it answers its entry as the list shows it now - on disk, off, nothing recorded - and that no update was applied', $status === 200 && array_keys( $body ) === [ 'feature', 'updated', 'required' ] && $body['updated'] === false && $body['required'] === []
+/*	Install means install: a feature the project did not have is switched on
+	in the same request, and the answer says which of the two happened to it -
+	'updated' for one that was already running, 'activated' for one that was
+	not there at all. Leaving it in the Inactive tab made one intention take
+	two presses.	*/
+check( 'installing a feature the project did not have answers its entry as the list shows it now - on disk, on, recorded', $status === 200 && array_keys( $body ) === [ 'feature', 'updated', 'activated', 'required' ] && $body['updated'] === false && $body['activated'] === true && $body['required'] === []
 	&& array_keys( $body['feature'] ) === [ 'key', 'name', 'description', 'manual', 'manualSections', 'category', 'version', 'installed', 'active', 'update', 'requires', 'problems', 'settings' ]
-	&& $body['feature']['key'] === 'extra' && $body['feature']['name'] === 'Extra' && $body['feature']['version'] === '1.0.0' && $body['feature']['active'] === false && $body['feature']['installed'] === null && $body['feature']['update'] === false && $body['feature']['problems'] === [] );
-check( 'the directory is in place, the archive was fetched once, and nothing was switched on', is_file( NINO_FEATURES_DIR. '/Extra/feature.php' ) && is_file( NINO_FEATURES_DIR. '/Extra/Extra.php' )
+	&& $body['feature']['key'] === 'extra' && $body['feature']['name'] === 'Extra' && $body['feature']['version'] === '1.0.0' && $body['feature']['active'] === true && $body['feature']['installed'] === '1.0.0' && $body['feature']['update'] === false && $body['feature']['problems'] === [] );
+check( 'the directory is in place, the archive was fetched once, and the class is in the module list', is_file( NINO_FEATURES_DIR. '/Extra/feature.php' ) && is_file( NINO_FEATURES_DIR. '/Extra/Extra.php' )
 	&& count( array_filter( $requests, static fn( array $r ): bool => $r['url'] === 'https://catalogue.test/features/extra-1.0.0.tar.gz' ) ) === 1
-	&& \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/modules'] === [ '\\Nino\\Modules\\Helper' ] && isset( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/features']['extra'] ) === false );
+	&& in_array( '\\Nino\\Modules\\Extra', \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/modules'], true ) === true
+	&& ( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/features']['extra']['version'] ?? '' ) === '1.0.0' );
 
 [ $status, $body ] = callFeatures( $appData, 'apiCatalogue' );
-check( 'and the catalogue now says installed', $status === 200 && array_column( $body['offers'], 'state', 'key' )['extra'] === 'current' && array_column( $body['offers'], 'local', 'key' )['extra'] === '1.0.0' && array_column( $body['offers'], 'active', 'key' )['extra'] === false );
+check( 'and the catalogue now says installed, and running', $status === 200 && array_column( $body['offers'], 'state', 'key' )['extra'] === 'current' && array_column( $body['offers'], 'local', 'key' )['extra'] === '1.0.0' && array_column( $body['offers'], 'active', 'key' )['extra'] === true );
+
+/*	...and the one case it does not switch on: a feature the project has
+	deliberately switched off. A newer version of it is not somebody changing
+	their mind about that, so it is placed and left alone, with its Activate
+	where it was.	*/
+check( 'it can be switched off again', callFeatures( $appData, 'apiDeactivate', [ 'key' => 'extra' ] )[0] === 200
+	&& \Nino\Features::get( $appData, 'extra' )['active'] === false );
+
+$extra110 = tarGz( featureFiles( 'Extra', 'extra', '1.1.0' ) );
+$remote['https://catalogue.test/features/extra-1.1.0.tar.gz'] = $extra110;
+publish( $appData, $remote, array_merge( $withExtra, [ entry( 'extra', '1.1.0', $extra110, [ 'name' => [ 'en_US' => 'Extra', 'de_DE' => 'Zusatz' ] ] ) ] ), null, $privateKey );
+
+[ $status, $body ] = callFeatures( $appData, 'apiInstall', [ 'key' => 'extra', 'version' => '1.1.0' ] );
+check( 'a newer version of a feature somebody switched off is placed and left off', $status === 200
+	&& $body['updated'] === false && $body['activated'] === false
+	&& $body['feature']['version'] === '1.1.0' && $body['feature']['active'] === false );
+check( '...and its class is out of the module list, where deactivating put it', in_array( '\\Nino\\Modules\\Extra', \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/modules'], true ) === false );
+
+/*	A feature the archive can place but the activation cannot switch on - its
+	manifest requires something that is not in the directory, which only an
+	activation knows. The files are in place either way, and the answer has to
+	say both halves or the list shows a feature sitting there for no stated
+	reason	*/
+$lonely = tarGz( featureFiles( 'Lonely', 'lonely', '1.0.0', [ 'feature.php' => '<?php return [ \'key\' => \'lonely\', \'name\' => \'Lonely\', \'version\' => \'1.0.0\', \'requires\' => [ \'nowhere\' ] ];' ] ) );
+$remote['https://catalogue.test/features/lonely-1.0.0.tar.gz'] = $lonely;
+publish( $appData, $remote, array_merge( $withExtra, [ entry( 'lonely', '1.0.0', $lonely ) ] ), null, $privateKey );
+
+[ $status, $body ] = callFeatures( $appData, 'apiInstall', [ 'key' => 'lonely', 'version' => '1.0.0' ] );
+check( 'a new feature that cannot be switched on is a 400 saying it is in place, in the panel\'s own words', $status === 400
+	&& str_starts_with( $body['error'], panelWord( 'de_DE', '/_admin/features/error/activate-after-install', 'feature "lonely" cannot be activated: ' ) ) && str_contains( $body['error'], '"nowhere"' ) );
+check( '...and the directory really is there, with nothing recorded and nothing in the module list', is_file( NINO_FEATURES_DIR. '/Lonely/feature.php' )
+	&& isset( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/features']['lonely'] ) === false
+	&& in_array( '\\Nino\\Modules\\Lonely', \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/modules'], true ) === false );
 
 // An active feature: the new version replaces the directory and, since it
 // is active, its update is applied in the same request - the record moves
@@ -755,10 +794,10 @@ check( 'the offer for an active feature on disk in an older version says upgrade
 check( 'before: on disk as 1.1.0, recorded as 1.0.0, an update waiting', \Nino\Features::get( $appData, 'helper' )['version'] === '1.1.0' && \Nino\Features::get( $appData, 'helper' )['installed'] === '1.0.0' && \Nino\Features::get( $appData, 'helper' )['update'] === true );
 
 [ $status, $body ] = callFeatures( $appData, 'apiInstall', [ 'key' => 'helper', 'version' => '1.2.0' ] );
-check( 'updating an active feature places the new version and applies the update: the entry is 1.2.0, recorded as 1.2.0, no update waiting, still active', $status === 200 && $body['updated'] === true
+check( 'updating an active feature places the new version and applies the update: the entry is 1.2.0, recorded as 1.2.0, no update waiting, still active', $status === 200 && $body['updated'] === true && $body['activated'] === false
 	&& $body['feature']['version'] === '1.2.0' && $body['feature']['installed'] === '1.2.0' && $body['feature']['update'] === false && $body['feature']['active'] === true && $body['feature']['problems'] === [] );
 check( 'config.php records the version, and the files are the new ones', \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/features']['helper']['version'] === '1.2.0'
-	&& \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/modules'] === [ '\\Nino\\Modules\\Helper' ]
+	&& in_array( '\\Nino\\Modules\\Helper', \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/modules'], true ) === true
 	&& str_contains( (string) file_get_contents( NINO_FEATURES_DIR. '/Helper/feature.php' ), '1.2.0' ) && stagingClean( $staging ) === true );
 
 [ $status, $body ] = callFeatures( $appData, 'apiCatalogue' );

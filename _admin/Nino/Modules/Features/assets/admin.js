@@ -1044,9 +1044,15 @@
 				// something to find out from the Inactive tab
 				const required = response.required || [];
 
+				/*	Installing a feature that was not in the directory switches it on -
+					see apiInstall() for the one case it does not - and the word has to
+					say so, or the next thing somebody does is look for the Activate
+					that is no longer there */
+				const word = response.activated === true ? 'installed-active' : 'installed';
+
 				Nino.admin.features._offerMsg[offer.key] = required.length === 0
-					? Nino.content.getText('/_admin/features/msg/installed')
-					: Nino.content.getText('/_admin/features/msg/installed-with').replace( '%s', required.join( ', ' ) );
+					? Nino.content.getText('/_admin/features/msg/'+ word )
+					: Nino.content.getText('/_admin/features/msg/'+ word+ '-with').replace( '%s', required.join( ', ' ) );
 
 				Nino.admin.features.init();
 			} );

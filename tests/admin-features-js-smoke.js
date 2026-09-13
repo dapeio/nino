@@ -354,9 +354,13 @@ check( 'the three tab labels and the reload hint are among them', [ 'available',
 check( 'no eyebrow status word is asked for any more - the tab and the version line carry that now', keys.indexOf( '/_admin/features/status/active' ) === -1 && keys.indexOf( '/_admin/features/status/incompatible' ) === -1 );
 
 // The words the class phrases itself - a catalogue refusal, an update that
-// did not apply - are fills too, read server-side in the interface language
+// did not apply, a feature that would not switch on - are fills too, read
+// server-side in the interface language. Every message literal in the class,
+// not only the ones written directly into a _say() call: the key an install
+// reports with is chosen between two of them, and a scan anchored on the call
+// stopped seeing either the moment it was
 const phrased = [];
-const phrasedRe = /_say\( \$appData, '(\/_admin\/[^']+)'/g;
+const phrasedRe = /'(\/_admin\/features\/(?:error|msg|label)\/[^']+)'/g;
 while( ( match = phrasedRe.exec( admin ) ) )
 	if( phrased.indexOf( match[1] ) === -1 )
 		phrased.push( match[1] );
@@ -364,7 +368,8 @@ const unphrased = phrased.filter( function( key ) { return moduleEn[key] === und
 check( 'every message the class phrases itself is a fill of the module in both languages'+ ( unphrased.length ? ' - missing: '+ unphrased.join(', ') : '' ), phrased.length >= 4 && unphrased.length === 0
 	&& phrased.indexOf( '/_admin/features/error/catalogue-off' ) !== -1 && phrased.indexOf( '/_admin/features/error/catalogue-key' ) !== -1
 	&& moduleEn['/_admin/features/error/catalogue-reason'].includes( '%s' ) && moduleDe['/_admin/features/error/catalogue-reason'].includes( '%s' )
-	&& moduleEn['/_admin/features/error/update-after-install'].includes( '%s' ) && moduleDe['/_admin/features/error/update-after-install'].includes( '%s' ) );
+	&& moduleEn['/_admin/features/error/update-after-install'].includes( '%s' ) && moduleDe['/_admin/features/error/update-after-install'].includes( '%s' )
+	&& moduleEn['/_admin/features/error/activate-after-install'].includes( '%s' ) && moduleDe['/_admin/features/error/activate-after-install'].includes( '%s' ) );
 check( 'the module\'s two text files declare the same keys', Object.keys( moduleEn ).sort().join(',') === Object.keys( moduleDe ).sort().join(',') && Object.keys( moduleEn ).length > 20 );
 
 // The vocabulary is the kernel's (\Nino\Features::CATEGORIES), the words for
@@ -863,6 +868,29 @@ answer( 200, { feature : EXTRA, updated : false, required : [ 'helper' ] } );
 answer( 200, listAnswer( CACHE.url, true, CACHE, FEATURES_WITH_EXTRA ) );
 fire( byTag( mount.children[0], 'button' )[2], 'click' );
 check( 'an install that brought a requirement along says which one', offerMessage( mount, 'extra' ) === text('/_admin/features/msg/installed-with').replace( '%s', 'helper' ) );
+
+/*	And what it says when the install switched the feature on, which is what
+	installing a feature the project did not have does now: somebody told
+	"Installed." goes looking for the Activate that is not there any more	*/
+fire( offerButton( mount, 'extra' ), 'click' );
+answer( 200, { feature : EXTRA, updated : false, activated : true, required : [] } );
+answer( 200, listAnswer( CACHE.url, true, CACHE, FEATURES_WITH_EXTRA ) );
+fire( byTag( mount.children[0], 'button' )[2], 'click' );
+check( 'an install that switched the feature on says that, not only that it installed', offerMessage( mount, 'extra' ) === text('/_admin/features/msg/installed-active') );
+
+fire( offerButton( mount, 'extra' ), 'click' );
+answer( 200, { feature : EXTRA, updated : false, activated : true, required : [ 'helper' ] } );
+answer( 200, listAnswer( CACHE.url, true, CACHE, FEATURES_WITH_EXTRA ) );
+fire( byTag( mount.children[0], 'button' )[2], 'click' );
+check( '...and names what came with it in the same line', offerMessage( mount, 'extra' ) === text('/_admin/features/msg/installed-active-with').replace( '%s', 'helper' ) );
+
+// An update to a feature that is already running answers no 'activated' at
+// all, and the word stays the one it was
+fire( offerButton( mount, 'extra' ), 'click' );
+answer( 200, { feature : EXTRA, updated : true, activated : false, required : [] } );
+answer( 200, listAnswer( CACHE.url, true, CACHE, FEATURES_WITH_EXTRA ) );
+fire( byTag( mount.children[0], 'button' )[2], 'click' );
+check( 'an update says only that it installed - nothing was switched on', offerMessage( mount, 'extra' ) === text('/_admin/features/msg/installed') );
 
 const requestsBeforeInstall = requests.length;
 fire( offerButton( mount, 'extra' ), 'click' );
