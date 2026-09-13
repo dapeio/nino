@@ -302,6 +302,45 @@ events; `/nino/*` is reserved for Nino.
 - Catch failures only when the caller can recover safely; do not hide bugs.
 - Do not call internal `_method()` APIs across class boundaries.
 
+### Markup belongs in a template
+
+PHP decides **what** is shown; a template decides **what it looks like**. A page,
+a panel screen, a preview, a mail body, a fragment a shortcode returns - the
+markup lives in a `.tpl`, is read through `\Nino\Filesystem`, and is filled with
+`str_replace()` over `[[token]]` placeholders (a template rendered as HTML+ by
+the kernel uses the fill and shortcode engine instead). A project's templates are
+`templates/*.tpl`; a module's or a feature's own are `templates/` beside its
+class - `_nino/Nino/Modules/<Name>/templates/`, `features/<Name>/templates/`,
+read as `/features/<Name>/templates/<name>.tpl`.
+
+This is not a style preference. It is what lets somebody change how a thing looks
+without reading the class that decides when it appears, and what keeps a diff
+about behaviour separate from a diff about design.
+
+Three shapes MAY carry markup in PHP, and nothing else:
+
+1. **A one-line fragment with `[[tokens]]`, declared once as a named property**
+   at the top of the class - never built inside a method. `\Nino\Modules\Navigation::$html`
+   (`'<li><a href="[[uri]]"[[attributes]]>[[title]]</a></li>'`) and
+   `Modules\Assets`'s `$_template` are the shape to copy; being a property is
+   the point, because it is then one place to read and a project can replace it.
+2. **An icon**, which is geometry rather than a view - and what the panel
+   contract asks a panel class for as a string (`Admin::icon()`).
+3. **A last-resort fallback** for the case where no template can be read at all -
+   `Modules\Maintenance`'s built-in page is the one instance, and it says so
+   where it stands.
+
+Two things that look like exceptions and are not: a **document format** built
+from data (`sitemap.xml`, `robots.txt`, an RSS feed) is a serialisation rather
+than a view, and a **builder whose product is markup** (the Template Builder
+feature composes `.tpl` source) is writing its output, not rendering itself.
+Both MUST say so where the markup is.
+
+A template is output: what is in it is sent to whoever asked for the page. Do not
+explain the file inside it - put that in the class that fills it. A panel's own
+template (`templates/panel.tpl`) is the exception, since only a logged-in
+workbench user is ever sent it.
+
 ### JavaScript
 
 - There is no module bundler or transpiler.
