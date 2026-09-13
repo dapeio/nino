@@ -31,6 +31,24 @@ All notable changes to Nino are documented in this file.
   nothing: placing files and switching on are two steps, and only the panel
   knows whether the second one was asked for.
 
+  And because it switches a feature on, it now ends the way Activate and
+  Deactivate already did: by building the workbench again, with the address
+  kept on this panel. The rail, a feature's assets and its words are all
+  rendered before the browser is given the page, so a feature switched on
+  inside a page built before it existed is a feature with no panel, no styles
+  and its fills showing as `[[...]]`. Updating a running feature reloads too -
+  applying the update is a re-activation, and what the page holds is the
+  version from before it. An install that switched nothing on, which is the
+  one case that leaves the shell alone, still just reads the list again.
+
+  What the install did is said in a dialog now, instead of being written onto
+  the offer's row. That line could never be read: the offers are recomputed
+  against what is on disk on every list, so an installed offer is `current`
+  and the Available tab leaves it out - the row the message was written to was
+  gone before it rendered. The dialog is what restoring a backup already uses,
+  for the same reason, and it is also what makes the reload safe to do
+  underneath it.
+
 - **A feature's own screen in the Features panel is two tabs: Description and
   Settings.** Description is the sentence the manifest describes the feature
   with - it used to be the tail of the line under the heading, where a sentence

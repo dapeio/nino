@@ -239,8 +239,12 @@ const sandbox = {
 	Nino : Nino,
 };
 let confirmAnswer = true;
+// What an install said before it reloaded, in order - the dialog is where an
+// install's word goes, because the offer it was pressed on is gone afterwards
+const alerts = [];
 sandbox.window = {
 	Nino : Nino,
+	alert : function( said ) { alerts.push( said ) },
 	confirm : function() { return confirmAnswer },
 	location : { hash : '', reload : function() { reloads++ } },
 };
@@ -860,42 +864,50 @@ check( 'a failed install falls back to its own error line', byTag( offer( mount,
 
 const EXTRA = { key : 'extra', name : 'Extra', description : 'Ein extra', version : '1.0.0', installed : null, active : false, update : false, requires : [ 'helper' ], problems : [], settings : [] };
 const FEATURES_WITH_EXTRA = FEATURES.concat( [ EXTRA ] );
+
+/*	What an install says, and where. Not on the offer's own row: an offer that
+	is installed is not an offer any more, and the list that follows leaves it
+	out - which the end of this section checks. So the word goes in a dialog,
+	the way restoring a backup says its word, and the row underneath it is free
+	to disappear	*/
+
 // An install that pulled a requirement in with it names it: pressing Install
 // on one feature and getting two is not something to work out from the
 // Inactive tab afterwards
+const reloadsBeforeInstall = reloads;
 fire( install, 'click' );
 answer( 200, { feature : EXTRA, updated : false, required : [ 'helper' ] } );
 answer( 200, listAnswer( CACHE.url, true, CACHE, FEATURES_WITH_EXTRA ) );
-fire( byTag( mount.children[0], 'button' )[2], 'click' );
-check( 'an install that brought a requirement along says which one', offerMessage( mount, 'extra' ) === text('/_admin/features/msg/installed-with').replace( '%s', 'helper' ) );
+check( 'an install that brought a requirement along says which one', alerts[alerts.length - 1] === text('/_admin/features/msg/installed-with').replace( '%s', 'helper' ) );
+check( '...and, having switched nothing on, reads the list again rather than building the workbench anew', reloads === reloadsBeforeInstall && requests[requests.length - 1].action === 'features/list' );
 
 /*	And what it says when the install switched the feature on, which is what
 	installing a feature the project did not have does now: somebody told
 	"Installed." goes looking for the Activate that is not there any more	*/
-fire( offerButton( mount, 'extra' ), 'click' );
-answer( 200, { feature : EXTRA, updated : false, activated : true, required : [] } );
-answer( 200, listAnswer( CACHE.url, true, CACHE, FEATURES_WITH_EXTRA ) );
 fire( byTag( mount.children[0], 'button' )[2], 'click' );
-check( 'an install that switched the feature on says that, not only that it installed', offerMessage( mount, 'extra' ) === text('/_admin/features/msg/installed-active') );
+fire( offerButton( mount, 'extra' ), 'click' );
+const requestsBeforeActivating = requests.length;
+answer( 200, { feature : EXTRA, updated : false, activated : true, required : [] } );
+check( 'an install that switched the feature on says that, not only that it installed', alerts[alerts.length - 1] === text('/_admin/features/msg/installed-active') );
+check( '...and builds the whole workbench again, because a feature that is on brings a panel, assets and words the page was built without', reloads === reloadsBeforeInstall + 1 && sandbox.window.location.hash === '#features' && requests.length === requestsBeforeActivating );
 
 fire( offerButton( mount, 'extra' ), 'click' );
 answer( 200, { feature : EXTRA, updated : false, activated : true, required : [ 'helper' ] } );
-answer( 200, listAnswer( CACHE.url, true, CACHE, FEATURES_WITH_EXTRA ) );
-fire( byTag( mount.children[0], 'button' )[2], 'click' );
-check( '...and names what came with it in the same line', offerMessage( mount, 'extra' ) === text('/_admin/features/msg/installed-active-with').replace( '%s', 'helper' ) );
+check( '...and names what came with it in the same line', alerts[alerts.length - 1] === text('/_admin/features/msg/installed-active-with').replace( '%s', 'helper' ) && reloads === reloadsBeforeInstall + 2 );
 
 // An update to a feature that is already running answers no 'activated' at
-// all, and the word stays the one it was
+// all - it was on before and is on now - and the word stays the one it was.
+// It reloads all the same: applying the update is a re-activation, and what
+// the page holds is the version that was there before it
 fire( offerButton( mount, 'extra' ), 'click' );
 answer( 200, { feature : EXTRA, updated : true, activated : false, required : [] } );
-answer( 200, listAnswer( CACHE.url, true, CACHE, FEATURES_WITH_EXTRA ) );
-fire( byTag( mount.children[0], 'button' )[2], 'click' );
-check( 'an update says only that it installed - nothing was switched on', offerMessage( mount, 'extra' ) === text('/_admin/features/msg/installed') );
+check( 'an update says only that it installed - nothing was switched on', alerts[alerts.length - 1] === text('/_admin/features/msg/installed') );
+check( '...and reloads too: the running feature was re-activated, and the page is the version before it', reloads === reloadsBeforeInstall + 3 );
 
 const requestsBeforeInstall = requests.length;
 fire( offerButton( mount, 'extra' ), 'click' );
 answer( 200, { feature : EXTRA, updated : false } );
-check( 'success reads the list again, and only the list - the cached catalogue\'s offers are recomputed there, no catalogue request and no page reload', requests.length === requestsBeforeInstall + 2 && requests[requests.length - 1].action === 'features/list' && reloads === 2 );
+check( 'success reads the list again, and only the list - the cached catalogue\'s offers are recomputed there, no catalogue request and no page reload', requests.length === requestsBeforeInstall + 2 && requests[requests.length - 1].action === 'features/list' && reloads === reloadsBeforeInstall + 3 );
 
 // The list answers a catalogue whose offers already reflect the install:
 // extra now current - features/list itself would only carry this once the
@@ -918,6 +930,11 @@ const helperBtn = byTag( offer( mount, 'helper' ), 'button' )[0];
 fire( helperBtn, 'click' );
 check( 'Update posts features/install with the offered version', requests[requests.length - 1].action === 'features/install' && requests[requests.length - 1].payload.key === 'helper' && requests[requests.length - 1].payload.version === '1.2.0' );
 answer( 200, { feature : FEATURES[1], updated : true } );
+check( '...and updating a feature that is running reloads the workbench: applying the update re-activates it, and the page is the version before it', reloads === reloadsBeforeInstall + 4 );
+
+// Which is why the readonly panel below is opened rather than read out of
+// that answer: an update ends in a reload, so there is no list read to answer
+panel.init();
 answer( 200, listAnswer( CACHE.url, false, Object.assign( {}, CACHE, { offers : installedOffers } ) ) );
 check( 'without a writable directory the tab says so, naming it, and every remaining offer links its archive instead of a button', byTag( mount.children[2], 'p' ).some( function( el ) { return hasClass( el, 'nino-admin-error' ) && el.textContent === text('/_admin/features/hint/catalogue-readonly').replace( '%s', '/features' ) } )
 	&& byTag( offer( mount, 'ancient' ), 'button' ).length === 0 && byTag( offer( mount, 'needy' ), 'button' ).length === 0

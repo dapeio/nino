@@ -22,11 +22,16 @@
  *													how to sort a feature into its tab, draw each setting
  *													type and collect it back.
  *
- *													Activating and deactivating end in a reload: the rail
+ *													Everything that switches a feature on or off ends in a
+ *													reload: activating, deactivating, and installing, which
+ *													switches on what the project did not have yet. The rail
  *													is rendered server-side, so the panel a feature brings
  *													- or takes away - is only there once the page is built
- *													again. The hash stays on this panel, so the workbench
- *													comes back where it was.
+ *													again, and so are its assets and its words. The hash
+ *													stays on this panel, so the workbench comes back where
+ *													it was. An install says what it did in a dialog first:
+ *													the offer it was pressed on is not an offer afterwards,
+ *													so there is no row left to write it on.
  *
  *													features/list answers the catalogue exactly as
  *													\Nino\Catalogue::cached() last left it on disk, so the
@@ -34,9 +39,10 @@
  *													a request of its own - the workbench still never
  *													contacts the catalogue on its own. Only Refresh
  *													catalogue posts features/catalogue, which re-fetches
- *													and answers the same shape; installing reads the list
- *													again rather than the catalogue, since the offers are
- *													always recomputed against the features on disk now.
+ *													and answers the same shape; an install that switched
+ *													nothing on reads the list again rather than the
+ *													catalogue, since the offers are always recomputed
+ *													against the features on disk now.
  *
  *	@package								Dape/Nino
  *	@author									David Perchermeier <mail@dape.io>
@@ -67,9 +73,6 @@
 		// What the action bar's status line says while a refresh runs, or why
 		// the last one failed - as state, since the bar is built fresh each time
 		_catalogueMsg : { text : '', error : false, busy : false },
-		// key => message: what an install answered, shown on its offer through
-		// the two renders that follow it - see _install()
-		_offerMsg 		: {},
 		// Which tab is on screen - kept across a re-render so an action does
 		// not jump the panel back to the first one. Active is where a panel
 		// opens: what this installation is running is the answer to the
@@ -1003,21 +1006,19 @@
 				actions.appendChild( archive );
 			}
 
-			if( Nino.admin.features._offerMsg[offer.key] )
-				msg.textContent = Nino.admin.features._offerMsg[offer.key];
-
 			actions.appendChild( msg );
 
 			return actions;
 		},
 
 		/**
-		 *	Install or update one offer, then read the list again - the offers
-		 *	are recomputed against what is on disk now, so the catalogue itself
-		 *	is not fetched a second time
+		 *	Install or update one offer, say what it did, and then either read
+		 *	the list again or build the whole workbench again - the offers are
+		 *	recomputed against what is on disk now, so the catalogue itself is
+		 *	not fetched a second time either way
 		 *
 		 *	@param		{Object}	offer
-				*	@param		{Element}	btn
+		 *	@param		{Element}	btn
 		 *	@param		{Element}	msg
 		 *
 		 *	@return		void
@@ -1037,22 +1038,38 @@
 					return;
 				}
 
-				// Kept as state rather than written here: init() rebuilds this
-				// row from scratch, and the word has to be there once it does.
-				// A feature that pulled its requirements in with it names them:
-				// pressing Install on one thing and getting three is not
-				// something to find out from the Inactive tab
-				const required = response.required || [];
-
 				/*	Installing a feature that was not in the directory switches it on -
 					see apiInstall() for the one case it does not - and the word has to
 					say so, or the next thing somebody does is look for the Activate
-					that is no longer there */
-				const word = response.activated === true ? 'installed-active' : 'installed';
+					that is no longer there. A feature that pulled its requirements in
+					with it names them too: pressing Install on one thing and getting
+					three is not something to find out afterwards	*/
+				const required = response.required || [];
+				const word 		= response.activated === true ? 'installed-active' : 'installed';
 
-				Nino.admin.features._offerMsg[offer.key] = required.length === 0
+				const said = required.length === 0
 					? Nino.content.getText('/_admin/features/msg/'+ word )
 					: Nino.content.getText('/_admin/features/msg/'+ word+ '-with').replace( '%s', required.join( ', ' ) );
+
+				/*	Said in a dialog rather than written onto the row it was pressed
+					on, because that row is gone by the time anybody could read it:
+					an offer that is installed is no longer an offer, and the list
+					that follows leaves it out (see _offers()). A dialog is also what
+					restoring a backup uses, for the same reason - it is the last
+					word on an action whose screen does not survive it	*/
+				wn.alert( said );
+
+				/*	Switched on - by this install, or by the re-activation that
+					applying an update to a running feature is - and the page this was
+					pressed in was built before any of that: the feature's panel, its
+					assets and its words are only there once the shell is built again.
+					The hash keeps the workbench on this panel, exactly as _switch()
+					does when the same thing happens from the Inactive tab	*/
+				if( response.activated === true || response.updated === true ) {
+					wn.location.hash = '#features';
+					wn.location.reload();
+					return;
+				}
 
 				Nino.admin.features.init();
 			} );
