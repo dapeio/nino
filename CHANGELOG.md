@@ -188,6 +188,31 @@ All notable changes to Nino are documented in this file.
   with a 403 naming it. The address stays changeable, since a rename grants
   nothing, and an account editing itself has proven its current password.
 
+- **A page name containing a colon rewrote the link's markup.** A menu line
+  is `<uri>:<title>`, and the parser split it on every colon - so the second
+  colon of an ordinary page name ("Angebot: Sommer") ended the title and
+  opened the third field, which is written into the `<a>` tag as attributes.
+  A name typed in the Text panel decided what the markup said. A generated
+  line is split once now, and the page's name is escaped on the way into the
+  page, the way an editor's words are everywhere else. A hand-written line in
+  the shortcode's own body is the template author's and keeps all three
+  fields, verbatim.
+
+- **The wizard's Accounts step never showed what it had to say.** Its message
+  element is shown by the pane class of its step, and the stylesheet named
+  `show-admin` while the shell sets `show-accounts` - so every message that
+  step writes, "mail already in use" included, was written into an element
+  with `display: none`. The test that now stands over it compares the two
+  lists rather than the one spelling.
+
+- **A page of your own could take a library page's template file.** A page on
+  the Blank template is written to `templates/page-<its own uri>.tpl`, so one
+  called `/home` lands on `templates/page-home.tpl` - the file the library's
+  home page owns, with a route body identical to that page's. The wizard then
+  read it back as the home page and, on the next apply, wrote the library's
+  home page over whatever had been built in it. Such a name is refused where
+  it is typed, naming the library page that has it.
+
 - **The burger navigation could not be opened with a keyboard.** The control
   behind the label is a checkbox, and the stylesheet gave it `display: none` -
   a control that is not rendered is not focusable either. So on every narrow

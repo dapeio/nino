@@ -358,6 +358,24 @@ check( 'the collapsed header takes back every way a frame can give its bar a hei
 	&& preg_match( '/padding-top:\s*0/', $collapsed ) === 1 && preg_match( '/padding-bottom:\s*0/', $collapsed ) === 1
 	&& preg_match( '/border-top-width:\s*0/', $collapsed ) === 1 && preg_match( '/border-bottom-width:\s*0/', $collapsed ) === 1 );
 
+// One step's message is shown by the same pane class the panes themselves are
+// shown by - so a class the shell never sets means that step's messages are
+// never seen. The Accounts step keyed on 'show-admin' while the shell sets
+// 'show-accounts', so everything it had to say, "mail already in use"
+// included, was written into an element with display:none
+$wizardCss	= (string) file_get_contents( __DIR__. '/../_admin/install/assets/style.css' );
+$wizardJs		= (string) file_get_contents( __DIR__. '/../_admin/install/assets/script.js' );
+
+preg_match_all( '/paneClass\s*:\s*\x27([a-z-]+)\x27/', $wizardJs, $paneMatches );
+preg_match_all( '/#install-page-wrap\.(show-[a-z-]+) #[a-z-]+-msg/', $wizardCss, $msgMatches );
+
+$stepClasses	= $paneMatches[1];
+$msgClasses		= array_values( array_unique( $msgMatches[1] ) );
+$orphans			= array_values( array_diff( $msgClasses, $stepClasses ) );
+
+check( 'the wizard has a pane class per step', count( $stepClasses ) === 6 && in_array( 'show-accounts', $stepClasses, true ) === true );
+check( 'every step message is shown by a class the shell actually sets'. ( $orphans === [] ? '' : ' - orphaned: '. implode( ', ', $orphans ) ), $orphans === [] );
+
 // The burger menu is a checkbox behind a label, and the checkbox used to be
 // display:none - which is not rendered, and what is not rendered cannot be
 // focused: the whole navigation of every narrow viewport could be opened with
@@ -627,6 +645,32 @@ $perRouteList = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Install\Webpages::apiList( $appData, $perRouteList );
 $teamEntry = array_values( array_filter( $perRouteList['/nino/http/response']['body']['webpages'], fn( array $e ): bool => $e['httpUri'] === '/team' ) )[0] ?? [];
 check( 'a per-route page reads back as owning its template rather than as the library unit', ( $teamEntry['libraryKey'] ?? null ) === '' && ( $teamEntry['body'] ?? null ) === '[template /templates/page-team]' );
+
+// A page of your own whose Element-URI is the name of a library unit: its own
+// copy would be written to templates/page-home.tpl, which is the file the
+// home unit owns - and its body would be the home unit's body to the byte, so
+// the wizard read the page back as that unit and the next apply wrote the
+// library's home page over whatever had been built in it. Refused where it is
+// typed, naming the page of the library that has the name
+$_POST['data'] = json_encode( [ 'webpages' => [
+	[ 'uri' => '/home', 'httpUri' => '/eigene-startseite', 'libraryKey' => 'blank', 'text' => [] ],
+] ] );
+$collisionRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Install\Webpages::apiApply( $appData, $collisionRequest );
+check( 'a page of your own cannot take a library page\'s template name', $collisionRequest['/nino/http/response']['statusCode'] === 409
+	&& str_contains( (string) ( $collisionRequest['/nino/http/response']['body']['error'] ?? '' ), '"home"' ) === true );
+check( '...and nothing of it was written', \Nino\Filesystem::fileExists( $appData, '/templates/page-home.tpl' ) === false
+	|| trim( (string) \Nino\Filesystem::getFileContent( $appData, '/templates/page-home.tpl', '' ) ) !== '' );
+
+// A name no unit owns is one more page of your own, as before
+$_POST['data'] = json_encode( [ 'webpages' => [
+	[ 'uri' => '/team', 'httpUri' => '/team', 'libraryKey' => 'blank', 'text' => [] ],
+	[ 'uri' => '/startseite', 'httpUri' => '/eigene-startseite', 'libraryKey' => 'blank', 'text' => [] ],
+] ] );
+$ownNameRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Install\Webpages::apiApply( $appData, $ownNameRequest );
+check( 'a name no library page owns is a page of your own like any other', $ownNameRequest['/nino/http/response']['statusCode'] === 200
+	&& \Nino\Filesystem::fileExists( $appData, '/templates/page-startseite.tpl' ) === true );
 
 // Navigation: always active now (see ALWAYS_MODULES above). Membership is
 // posted explicitly per entry and stored on its route.

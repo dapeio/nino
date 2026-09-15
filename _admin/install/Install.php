@@ -1287,6 +1287,38 @@ namespace Nino\Install {
 		 *
 		 *	@return 	string									Unit key, or '' if no unit declares this body
 		 */
+		/**
+		 *	Which library unit ships a template of this name, if any - so a page
+		 *	that would write its own copy under that name can be refused before
+		 *	the two start writing over each other (see apiApply())
+		 *
+		 *	@param		string		$file					A template file name, 'page-home.tpl' style
+		 *
+		 *	@return 	string									Unit key, or ''
+		 */
+		private static function _unitOwningTemplate( string $file ): string {
+
+			if( $file === '' )
+				return '';
+
+			foreach( scandir( self::LIBRARY. '/pages' ) ?: [] as $entry ) {
+
+				if( $entry === '.' || $entry === '..' )
+					continue;
+
+				$manifest = self::_readManifest( self::LIBRARY. '/pages/'. $entry );
+
+				if( $manifest === null || ( $manifest['templatePerRoute'] ?? false ) === true )
+					continue;
+
+				foreach( ( $manifest['templates'] ?? [] ) as $template )
+					if( (string) $template === $file )
+						return $entry;
+			}
+
+			return '';
+		}
+
 		private static function _unitFromBody( string $body ): string {
 
 			if( $body === '' )
@@ -1400,6 +1432,29 @@ namespace Nino\Install {
 
 				if( $libraryKey === '' && $body === '' ) {
 					\Nino\Http::fail( $request, 400, 'page must name a libraryKey or body' );
+					return;
+				}
+
+				// A unit that hands every route its own copy names that copy
+				// after the page (see _perRouteTemplate()), so a page of your
+				// own called '/home' would be written to templates/page-home.tpl
+				// - which is the home unit's own file, and whose body is the
+				// home unit's body to the byte. Both halves of the wizard go
+				// wrong then: the page reads back as the home unit (a page is
+				// identified by its body, see _unitFromBody()), and applying the
+				// home unit anywhere writes the library's home page over what
+				// was built in it. Refused where it is typed, with the name that
+				// is taken
+				$unitManifest	= $libraryKey === '' ? [] : ( self::_readManifest( self::LIBRARY. '/pages/'. $libraryKey ) ?? [] );
+				$collision		= '';
+
+				if( ( $unitManifest['templatePerRoute'] ?? false ) === true ) {
+					$ownCopy 		= self::_perRouteTemplate( [ 'uri' => $uri ], $unitManifest );
+					$collision	= $ownCopy === null ? '' : self::_unitOwningTemplate( $ownCopy['file'] );
+				}
+
+				if( $collision !== '' ) {
+					\Nino\Http::fail( $request, 409, 'a page of your own cannot be called "'. $uri. '": the page template it would write is the one the "'. $collision. '" page of the library owns' );
 					return;
 				}
 

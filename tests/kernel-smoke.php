@@ -2081,6 +2081,34 @@ check( 'a menu written entirely by hand still works, with no nav argument at all
 check( 'an empty shortcode renders nothing', \Nino\Modules\Navigation::doShortcode( $appData, [] ) === '' );
 check( 'an unknown menu key renders nothing', \Nino\Modules\Navigation::doShortcode( $appData, [ 'nav' => 'nope' ] ) === '' );
 
+// A page's name is editor content, and a line is '<uri>:<title>'. Splitting
+// on every ':' made the second colon of a perfectly ordinary name ("Angebot:
+// Sommer") end the title and open the third field, which is written into the
+// <a> tag as attributes - a name typed in the Text panel deciding what the
+// markup says
+\Nino\Html::addFills( $appData, [ '/webpage/top/name' => 'Angebot: Sommer" onmouseover="alert(1)' ], 'en_US' );
+$navColon = \Nino\Modules\Navigation::doShortcode( $appData, [ 'nav' => 'main' ] );
+check( 'a colon in a page name stays part of the name', str_contains( $navColon, 'Angebot: Sommer' ) === true );
+check( '...and none of it reaches the tag', str_contains( $navColon, '" onmouseover="' ) === false
+	&& str_contains( $navColon, '&quot; onmouseover=&quot;' ) === true );
+
+// ...and the name itself is text, not markup - the same rule every other
+// place an editor's words reach a page follows
+\Nino\Html::addFills( $appData, [ '/webpage/top/name' => '<script>alert(1)</script>' ], 'en_US' );
+$navMarkup = \Nino\Modules\Navigation::doShortcode( $appData, [ 'nav' => 'main' ] );
+check( 'markup in a page name is drawn as text', str_contains( $navMarkup, '&lt;script&gt;' ) === true
+	&& str_contains( $navMarkup, '<script>alert(1)' ) === false );
+
+// A hand-written line is the page author's own - three fields, the third of
+// them attributes for the tag, and written as typed. That is what it has
+// always been, and what a template that uses it keeps
+$navAttributes = \Nino\Modules\Navigation::doShortcode( $appData, [ 'content' => '/a:A: target="_blank"' ] );
+check( 'a hand-written line still carries its attributes in the third field', str_contains( $navAttributes, '>A<' ) === true
+	&& str_contains( $navAttributes, 'target="_blank"' ) === true );
+check( '...and its markup is still the author\'s own', str_contains( \Nino\Modules\Navigation::doShortcode( $appData, [ 'content' => '/a:<b>A</b>' ] ), '<b>A</b>' ) === true );
+
+\Nino\Html::addFills( $appData, [ '/webpage/top/name' => 'Top' ], 'en_US' );
+
 $appData['/nino/http/routes'] = $routesBeforeNav;
 
 // Http::output() itself exit()s, so the header-finalizing part it delegates

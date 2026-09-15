@@ -82,15 +82,28 @@ namespace Nino\Modules {
 			// Render list elements
 			$lis	= '';
 
-			$lines = ( $nav !== '' ) ? self::routeLines( $appData, (string) $nav ) : [];
+			/*	Two sources, and they are not read the same way. A generated line
+				carries a page's name, which is editor content: everything after
+				the first ':' is that name, colons and all, and it is escaped on
+				the way into the page. A hand-written line is the template
+				author's own, so it keeps the third field it has always had -
+				attributes for the tag - and keeps being written verbatim	*/
+			$lines = [];
+
+			foreach( ( $nav !== '' ) ? self::routeLines( $appData, (string) $nav ) : [] as $line )
+				$lines[] = [ 'line' => $line, 'authored' => false ];
 
 			if( $content !== '' )
-				$lines = array_merge( $lines, explode( PHP_EOL, $content ) );
+				foreach( explode( PHP_EOL, $content ) as $line )
+					$lines[] = [ 'line' => $line, 'authored' => true ];
 
 			if( count( $lines ) === 0 )
 				return '';
 
-			foreach( $lines as $line ) {
+			foreach( $lines as $entry ) {
+
+				$line 		= $entry['line'];
+				$authored	= $entry['authored'];
 
 				// Blank, not just empty: with the list coming from the routes,
 				// what stands between the tags is usually nothing but the
@@ -104,13 +117,26 @@ namespace Nino\Modules {
 					continue;
 				}
 
-				$element		= explode( ':', $line );
+				// A generated line is split once: a page called "Angebot: Sommer"
+				// used to end at the second colon, and the rest of its own name
+				// was written into the <a> tag as attributes - a name typed in
+				// the Text panel deciding what the markup says
+				$element		= explode( ':', $line, $authored === true ? 3 : 2 );
 				$uri				= \Nino\Http::getRequest( $appData )['/nino/http/request']['uri'] ?? '/';
 				$attributes = $element[2] ?? '';
 				$element[0]	= trim( $element[0] );
+				$title			= $element[1] ?? '';
+
+				// And a page's name is text: a '<' an editor typed is a '<' on
+				// the page, the same rule every other place their words reach one
+				// follows. A hand-written line stays what its author wrote
+				if( $authored === false ) {
+					$title			= htmlspecialchars( $title, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8' );
+					$element[0]	= htmlspecialchars( $element[0], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8' );
+				}
 
 				$attributes	.= ( $uri === $element[0] ) ? ' class="nino-is-active"' : '';
-				$lis				.= str_replace( [ '[[uri]]', '[[attributes]]', '[[title]]' ], [ $element[0]	, $attributes, $element[1] ], self::$html['li'] );
+				$lis				.= str_replace( [ '[[uri]]', '[[attributes]]', '[[title]]' ], [ $element[0]	, $attributes, $title ], self::$html['li'] );
 			}
 			$html .= str_replace( '[[content]]', $lis, self::$html['ul'] );
 

@@ -201,7 +201,7 @@
 #install-page-wrap.show-setup #setup-msg,
 #install-page-wrap.show-webpages #webpages-msg,
 #install-page-wrap.show-personalinfos #personalinfos-msg,
-#install-page-wrap.show-admin #accounts-add-msg,
+#install-page-wrap.show-accounts #accounts-add-msg,
 #install-page-wrap.show-finish #finish-msg {
 	display: block;
 }
