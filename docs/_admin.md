@@ -257,7 +257,7 @@ Every account can change its own email address and password under **Users**; a c
 An account with `/_admin/users/manage` also sees the other accounts and can:
 
 - **create** one, with an address, a password of at least eight characters and a role;
-- change its address or password and end its sessions;
+- change its address, end its sessions, and set a new password – the password only on an account that holds no permission your own does not: whoever sets a password can sign in with it;
 - give it **another role**, or none – never your own: log out and ask another manager;
 - **delete** it. Your own account and the last account with full access – its own or its role's – cannot be deleted, and the last full access cannot be handed away through a role change either.
 

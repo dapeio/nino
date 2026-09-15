@@ -367,6 +367,22 @@ namespace Nino\Modules\Users {
 				}
 			}
 
+			// Whoever sets a password signs in with it - so a manager may set
+			// one only on an account no wider than their own, the same bound as
+			// handing out a role (see Roles::notHeld()). The address stays
+			// changeable: a rename grants nothing. An account editing itself
+			// has proven its current password above
+			if( $isSelf === false && $pw !== '' ) {
+
+				$target		= \Nino\Auth::getUser( $appData, $username );
+				$missing	= ( $target !== false ) ? Roles::notHeld( $appData, \Nino\Auth::permissions( $appData, $target ) ) : '';
+
+				if( $missing !== '' ) {
+					\Nino\Http::fail( $request, 403, 'cannot set the password of an account holding a permission your own account does not: '. $missing );
+					return;
+				}
+			}
+
 			$result = \Nino\Auth::updateUser( $appData, $username, $newUsername, $pw );
 
 			if( $result === false ) {

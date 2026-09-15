@@ -168,6 +168,26 @@ All notable changes to Nino are documented in this file.
 
 ### Fixed
 
+- **A burst of parallel guesses was never locked out.** Every request of the
+  burst passed the login's cooldown check before the first of them filled the
+  bucket, and the failed attempts registered after that treated the lock they
+  found as a fresh first try: the account was open again the moment the
+  `maxtries`'th attempt had closed it, with the counter back at one.
+  `/nino/auth/maxtries` held for guesses made one after the other and not for
+  guesses made at once - the case a lockout is for. A registration that finds
+  a running lock now leaves it alone; the other buckets of the same attempt,
+  the client's ip among them, are still counted.
+
+- **A manager could set the password of a wider account.** Handing out a role
+  is bounded by holding it: an account that may manage users cannot create or
+  promote an account into a permission its own lacks, since the account it
+  creates is the one it signs in as next. The password field of an existing
+  account had no such bound - the same manager could give a developer account
+  a password of their choosing and sign in as that. `users/save` now refuses a
+  password on an account holding a permission the manager's own does not,
+  with a 403 naming it. The address stays changeable, since a rename grants
+  nothing, and an account editing itself has proven its current password.
+
 - **A fatal PHP never hands the error handler was a bare 500 with an empty
   log.** `set_error_handler()` is not called for the levels the engine raises
   and stops on, and everything Nino offers for diagnosis hung off that handler.

@@ -702,6 +702,29 @@ check( 'a manager can rename another user without knowing their password', $stat
 [ $status ] = callUsers( $appData, 'apiSave', [ 'username' => 'plain3@example.com', 'mail' => 'manager@example.com' ] );
 check( 'renaming to a mail already in use is rejected', $status === 400 );
 
+// Whoever sets a password signs in with it - so a manager may set one only
+// on an account no wider than their own, the same bound as handing out a
+// role (see Roles::notHeld()). A rename grants nothing and stays open
+\Nino\Auth::insertUser( $appData, 'wide@example.com', 'wide password', [ '/*' ] );
+\Nino\Auth::insertUser( $appData, 'narrow@example.com', 'narrow password', [ \Nino\Modules\Text\Admin::MANAGE_PERM ] );
+\Nino\Auth::insertUser( $appData, 'usersonly@example.com', 'users only password', [ \Nino\Modules\Users\Admin::MANAGE_PERM, \Nino\Modules\Text\Admin::MANAGE_PERM ] );
+\Nino\Auth::loginUser( $appData, 'usersonly@example.com', 'users only password' );
+
+[ $status ] = callUsers( $appData, 'apiSave', [ 'username' => 'wide@example.com', 'mail' => 'wide@example.com', 'pw' => 'a password of my choosing' ] );
+check( 'a manager cannot set the password of an account holding a permission their own does not', $status === 403 );
+check( '...and that account\'s stored password is untouched', password_verify( 'wide password', \Nino\Auth::getUser( $appData, 'wide@example.com' )['pw'] ) === true );
+
+[ $status, $body ] = callUsers( $appData, 'apiSave', [ 'username' => 'wide@example.com', 'mail' => 'wide2@example.com' ] );
+check( 'renaming that account stays open - a new address grants nothing', $status === 200 && $body['mail'] === 'wide2@example.com' );
+
+[ $status ] = callUsers( $appData, 'apiSave', [ 'username' => 'narrow@example.com', 'mail' => 'narrow@example.com', 'pw' => 'a password of my choosing' ] );
+check( 'a manager can set the password of an account no wider than their own', $status === 200 && password_verify( 'a password of my choosing', \Nino\Auth::getUser( $appData, 'narrow@example.com' )['pw'] ) === true );
+
+\Nino\Auth::deleteUser( $appData, 'wide2@example.com' );
+\Nino\Auth::deleteUser( $appData, 'narrow@example.com' );
+\Nino\Auth::deleteUser( $appData, 'usersonly@example.com' );
+\Nino\Auth::loginUser( $appData, 'manager@example.com', 'manager password' );
+
 $appData['/nino/auth/user']['plain3@example.com']['sessions'] = [ '127.0.0.1' => time(), '10.0.0.1' => time() ];
 [ $status, $body ] = callUsers( $appData, 'apiLogoutAll', [ 'username' => 'plain3@example.com' ] );
 check( 'a manager can log out another user everywhere', $status === 200 && $body['ok'] === true && $body['loggedOutSelf'] === false );

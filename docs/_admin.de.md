@@ -257,7 +257,7 @@ Jedes Konto kann unter **Nutzer** die eigene E-Mail-Adresse und das eigene Passw
 Ein Konto mit `/_admin/users/manage` sieht außerdem die anderen Konten und kann:
 
 - eines **anlegen**, mit Adresse, einem Passwort aus mindestens acht Zeichen und einer Rolle;
-- Adresse oder Passwort ändern und seine Sitzungen beenden;
+- Adresse ändern, seine Sitzungen beenden und ein neues Passwort setzen – das Passwort nur bei einem Konto, das kein Recht hält, das dem eigenen fehlt: Wer ein Passwort setzt, kann sich damit anmelden;
 - ihm eine **andere Rolle** geben, oder keine – nie dem eigenen Konto: abmelden und einen anderen Verwalter bitten;
 - es **löschen**. Das eigene Konto und das letzte Konto mit Vollzugriff – eigenem oder dem seiner Rolle – lassen sich nicht löschen, und der letzte Vollzugriff lässt sich auch nicht über einen Rollenwechsel abgeben.
 

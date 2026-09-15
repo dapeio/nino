@@ -202,12 +202,15 @@ namespace Nino\Modules\Users {
 		 *	The first of these permissions the signed-in account does not
 		 *	hold itself, or '' when it holds every one. Granting is bounded by
 		 *	holding: a role may not be given a permission its author lacks
-		 *	(apiSave()), and an account may not be handed a role wider than
-		 *	the one handing it out (\Nino\Modules\Users\Admin::apiCreate(),
-		 *	apiSetRole()). Without both, an account that may manage users
-		 *	writes a full-access role, creates an account holding it with a
-		 *	password of its choosing, and signs in as that - and "manage
-		 *	users" would silently mean "everything". Checked with the same
+		 *	(apiSave()), an account may not be handed a role wider than the
+		 *	one handing it out (\Nino\Modules\Users\Admin::apiCreate(),
+		 *	apiSetRole()), and a password may not be set on an account wider
+		 *	than the one setting it (\Nino\Modules\Users\Admin::apiSave()).
+		 *	Without all three, an account that may manage users writes a
+		 *	full-access role, creates an account holding it with a password
+		 *	of its choosing - or gives one to an account that already holds
+		 *	it - and signs in as that: "manage users" would silently mean
+		 *	"everything". Checked with the same
 		 *	\Nino\Auth::checkPermission() every action uses, so '/*' alone
 		 *	covers '/*', and a blanket covers what is under it.
 		 *

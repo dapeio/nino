@@ -660,10 +660,18 @@ namespace Nino {
 
 					$tries = (int) ( $state[$key] ?? 0 );
 
-					if( $tries >= 0 )
-						$tries++;
-					else
-						$tries = 1;
+					// A negative value that survived the sweep above is a lock
+					// still running - written by a parallel request between this
+					// request's cooldown check in loginUser() and this write,
+					// since loginUser() never registers against a bucket it found
+					// locked. It stays a lock. Counting it as a fresh first try
+					// reopened the account the moment the maxtries'th attempt had
+					// closed it, so a burst of parallel guesses - the case the
+					// lockout exists for - was never locked out at all
+					if( $tries < 0 )
+						continue;
+
+					$tries++;
 
 					// Check max tries - see IP_TRIES_FACTOR for why the ip bucket
 					// gets a much longer leash than a single account does

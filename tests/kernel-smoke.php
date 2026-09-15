@@ -897,6 +897,23 @@ check( 'loginUser rotates an outdated password hash', $newHash !== $oldHash && p
 \Nino\Auth::loginUser( $appData, 'test@example.com', 'wrong' );
 check( 'loginUser locks out after maxtries failed attempts', \Nino\Auth::loginUser( $appData, 'test@example.com', 'correct horse battery staple' ) === false );
 
+// A burst of parallel guesses has every request pass loginUser()'s cooldown
+// check before the first of them locks the bucket, so the registrations
+// after that one arrive at a bucket that is already locked. They used to
+// count the lock as a fresh first try, which reopened the account the moment
+// the maxtries'th attempt had closed it - a lockout that held for guesses
+// made one after the other and never for the ones made at once. loginUser()
+// itself never registers against a bucket it found locked, so the late
+// registration is exercised directly (invokeArgs() with a reference - see
+// the Mail::_hit section below for why)
+$register			= new ReflectionMethod( '\Nino\Auth', '_registerFailedAttemp' );
+$triesBefore	= \Nino\Filesystem::getFileContent( $appData, '/data/auth-tries.php', [] );
+$register->invokeArgs( null, [ &$appData, [ 'ip:127.0.0.1', 'test@example.com' ] ] );
+$triesAfter		= \Nino\Filesystem::getFileContent( $appData, '/data/auth-tries.php', [] );
+check( 'a failed attempt registered against a bucket a parallel request has just locked leaves the lock as it is', $triesBefore['test@example.com'] < 0 && $triesAfter['test@example.com'] === $triesBefore['test@example.com'] );
+check( '...and still counts the other buckets of the same attempt', $triesAfter['ip:127.0.0.1'] === $triesBefore['ip:127.0.0.1'] + 1 );
+check( '...so the account stays locked', \Nino\Auth::loginUser( $appData, 'test@example.com', 'correct horse battery staple' ) === false );
+
 check( 'deleteUser removes the user', \Nino\Auth::deleteUser( $appData, 'test@example.com' ) === true );
 check( 'getUser no longer finds the deleted user', \Nino\Auth::getUser( $appData, 'test@example.com' ) === false );
 
