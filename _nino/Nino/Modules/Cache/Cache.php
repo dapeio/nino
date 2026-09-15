@@ -100,13 +100,45 @@ namespace Nino\Modules {
 		 */
 		public static function callbackResponse( array &$appData, array &$request ): void {
 
+			if( self::_prepare( $appData, $request ) === false )
+				return;
+
+			// Ends the request here: no route callbacks, no fills, no render.
+			// That is the entire point of the module, and _servable() has
+			// already established there is nothing registered that this would
+			// silently skip
+			\Nino\Http::output( $appData, $request );
+		}
+
+		/**
+		 *	Decide whether this request is answered from the cache and, if so,
+		 *	shape $request into that answer - body, header, and the locale the
+		 *	page was rendered in. Split out from callbackResponse() so the
+		 *	decision is testable without the exit that follows it in
+		 *	production, the same split Modules\Maintenance makes
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		&$request			(reference) Current request
+		 *
+		 *	@return 	bool										Whether a stored page was applied
+		 */
+		public static function _prepare( array &$appData, array &$request ): bool {
+
 			if( self::_servable( $appData, $request ) === false )
-				return;
+				return false;
 
-			$entry = \Nino\Filesystem::getFileContent( $appData, self::DIR. '/'. self::_key( $request ). '.php', false );
+			$path		= self::DIR. '/'. self::_key( $request ). '.php';
+			$entry	= \Nino\Filesystem::getFileContent( $appData, $path, false );
 
-			if( is_array( $entry ) === false || is_string( $entry['body'] ?? null ) === false || ( $entry['expires'] ?? 0 ) < time() )
-				return;
+			if( is_array( $entry ) === false || is_string( $entry['body'] ?? null ) === false )
+				return false;
+
+			// An entry past its lifetime goes now rather than being read and
+			// rejected on every request until something drops the whole cache
+			if( ( $entry['expires'] ?? 0 ) < time() ) {
+				@unlink( \Nino\Filesystem::path( $appData, $path ) );
+				return false;
+			}
 
 			// The route's own locale, which \Nino\request() applies through
 			// Locales::response() right after this callback round - which
@@ -118,11 +150,7 @@ namespace Nino\Modules {
 			$request['/nino/http/response']['body'] 									= self::_stamp( $appData, $entry['body'], false );
 			$request['/nino/http/response']['header']['X-Nino-Cache']	= 'hit';
 
-			// Ends the request here: no route callbacks, no fills, no render.
-			// That is the entire point of the module, and _servable() has
-			// already established there is nothing registered that this would
-			// silently skip
-			\Nino\Http::output( $appData, $request );
+			return true;
 		}
 
 		/**
@@ -215,15 +243,7 @@ namespace Nino\Modules {
 			if( self::_cacheable( $appData, $request ) === false )
 				return false;
 
-			if( (int) ( $request['/nino/http/response']['statusCode'] ?? 0 ) !== 200 )
-				return false;
-
-			// A project's own module may hang a handler off one specific route
-			// (the shape Modules\Form and Modules\Newsletter use for their
-			// endpoints). Answering from here would never call it.
-			$routeCallback = '/nino/http/response/'. $request['/nino/http/request']['method']. ':/'. ( $request['/nino/http/response']['uri'] ?? '' );
-
-			return isset( $appData['./nino/callbacks'][$routeCallback] ) === false;
+			return (int) ( $request['/nino/http/response']['statusCode'] ?? 0 ) === 200;
 		}
 
 		/**
@@ -257,11 +277,32 @@ namespace Nino\Modules {
 			if( \Nino\Auth::getCurrentUser( $appData ) !== false )
 				return false;
 
-			$uri = (string) ( $request['/nino/http/request']['uri'] ?? '' );
+			$uri 		= (string) ( $request['/nino/http/request']['uri'] ?? '' );
+			$method	= (string) ( $request['/nino/http/request']['method'] ?? '' );
 
 			// The tools and the module endpoints, always, whatever the
 			// blacklist happens to say
 			if( $uri === '' || self::_isTool( $uri ) === true || str_starts_with( $uri, '/.' ) === true )
+				return false;
+
+			// A project's own module may hang a handler off one specific route
+			// (the shape Modules\Form and Modules\Newsletter use for their
+			// endpoints, and the catalogue's Posts feature for its pages).
+			// Answering from here would never call it - so such a page is not
+			// stored either: those entries could only ever be written, never
+			// read, and the page was told it was a miss for nothing
+			if( isset( $appData['./nino/callbacks'][ '/nino/http/response/'. $method. ':/'. ( $request['/nino/http/response']['uri'] ?? '' ) ] ) === true )
+				return false;
+
+			// A wildcard route ('GET://blog/*') answers an unbounded set of
+			// addresses, and the key is the address as asked for - so every
+			// made-up one under it became an entry of its own, with a lock
+			// side-car beside it, and an anonymous client could grow
+			// private/data/ as fast as it could send requests. The wildcard's
+			// own address is a route of its own and stays cacheable; what it
+			// covers is answered live
+			if( isset( $appData['/nino/http/routes'][ $method. ':/'. $uri ] ) === false
+				&& \Nino\Http::requestRoute( $appData, $uri, $method ) !== null )
 				return false;
 
 			return self::_blacklisted( (array) ( $appData['/nino/cache/blacklist'] ?? [] ), $uri ) === false;
@@ -353,7 +394,20 @@ namespace Nino\Modules {
 		 */
 		public static function _invalidate( array &$appData ): void {
 
-			\Nino\Filesystem::removeDir( \Nino\Filesystem::path( $appData, self::DIR ) );
+			$dir = \Nino\Filesystem::path( $appData, self::DIR );
+
+			// The lock side-car every write creates belongs to the entry (see
+			// Filesystem::lockFile), and nothing else ever removes one - so
+			// /data/.locks kept an empty file per page ever cached, for good.
+			// Unlinking a file another request holds the lock on is safe: that
+			// request keeps its handle, and a write it had already begun is one
+			// this invalidation could not have caught either way
+			$locks = \Nino\Filesystem::path( $appData, '/data' ). '/.locks';
+
+			foreach( glob( $dir. '/*.php' ) ?: [] as $entry )
+				@unlink( $locks. '/'. sha1( self::DIR. '/'. basename( $entry ) ). '.lock' );
+
+			\Nino\Filesystem::removeDir( $dir );
 		}
 	}
 

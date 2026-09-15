@@ -2842,8 +2842,9 @@ echo "\n";
 echo "Modules\\Cache - full-page cache for anonymous GET\n";
 
 // A request as Http::request() leaves it, plus the response fields the two
-// callbacks read. Http::output() exits, so serving is never driven directly
-// here - _servable()/_cacheable() and the store side are what these cover.
+// callbacks read. Http::output() exits, so the hit itself is driven through
+// _prepare(), the decide-and-shape half callbackResponse() calls before it -
+// the same split Modules\Maintenance uses for the same reason
 function cacheRequest( string $uri, string $method = 'GET', array $response = [] ): array {
 	return [
 		'/nino/http/request' => [
@@ -3021,6 +3022,82 @@ $named = cacheRequest( '/home' );
 \Nino\Modules\Cache::callbackOutput( $appData, $named );
 check( 'two request uris resolving to one page stay two entries', cacheEntryCount( $appData ) === 2 );
 
+// --- what a wildcard route and a route handler mean for the store ---------
+
+// A wildcard route ('GET://blog/*') answers an unbounded set of uris, and
+// the key is the uri as asked for - so every made-up address under it used
+// to become an entry of its own, and a lock file beside it. An anonymous
+// client could grow private/data/ as fast as it could send requests
+\Nino\Modules\Cache::_invalidate( $appData );
+$appData['/nino/http/routes']['GET://blog/*'] = [ 'uri' => '/blog', 'body' => '[template /templates/page-blog]' ];
+$wildcard = cacheRequest( '/blog/anything-at-all' );
+$wildcard['/nino/http/response']['uri'] = '/blog';
+\Nino\Modules\Cache::callbackOutput( $appData, $wildcard );
+check( 'a page answered through a wildcard route is never stored - its uris are the client\'s to invent', cacheEntryCount( $appData ) === 0 );
+check( '...and it is not told it was a miss either', isset( $wildcard['/nino/http/response']['header']['X-Nino-Cache'] ) === false );
+
+$exact = cacheRequest( '/blog' );
+\Nino\Modules\Cache::callbackOutput( $appData, $exact );
+check( 'the wildcard\'s own address, which is a route of its own, still is', cacheEntryCount( $appData ) === 1 );
+unset( $appData['/nino/http/routes']['GET://blog/*'] );
+
+// A route with a handler of its own (the shape Modules\Form and the Posts
+// feature use) is never answered from the cache - and so must never be
+// stored: those entries could only ever be written, never read
+\Nino\Modules\Cache::_invalidate( $appData );
+$appData['/nino/http/routes']['GET://post'] = [ 'uri' => '/post' ];
+\Nino\Callbacks::registerCallback( $appData, '/nino/http/response/GET://post', static function( array &$appData, array &$request ): void {} );
+$handled = cacheRequest( '/post' );
+\Nino\Modules\Cache::callbackOutput( $appData, $handled );
+check( 'a page whose route has a handler of its own is not stored - it could never be served', cacheEntryCount( $appData ) === 0 );
+check( '...and is not marked as a miss', isset( $handled['/nino/http/response']['header']['X-Nino-Cache'] ) === false );
+unset( $appData['./nino/callbacks']['/nino/http/response/GET://post'], $appData['/nino/http/routes']['GET://post'] );
+
+// --- the hit ---------------------------------------------------------------
+
+\Nino\Modules\Cache::_invalidate( $appData );
+$appData['/nino/http/routes']['GET://home'] = [ 'uri' => '/home' ];
+$appData['./nino/jstext/nonce'] = 'a-render-time-nonce';
+$rendered = cacheRequest( '/home', 'GET', [ 'body' => '<html data-csrf="'. \Nino\Csrf::getToken( $appData ). '" data-nonce="a-render-time-nonce">cached</html>' ] );
+\Nino\Modules\Cache::callbackOutput( $appData, $rendered );
+$storedEntry = \Nino\Filesystem::getFileContent( $appData, '/data/cache/'. sha1( '/home|de_DE' ). '.php', [] );
+check( 'the two per-request values are stored as markers, not as this request\'s own', str_contains( $storedEntry['body'] ?? '', \Nino\Csrf::getToken( $appData ) ) === false
+	&& str_contains( $storedEntry['body'] ?? '', 'a-render-time-nonce' ) === false );
+
+// The next visitor: another session, so another token and another nonce
+\Nino\Csrf::rotateToken( $appData );
+$appData['./nino/jstext/nonce'] = 'the-next-requests-nonce';
+$appData['./nino/locales/current'] = 'en_US';
+$hit = cacheRequest( '/home', 'GET', [ 'body' => '' ] );
+check( 'a stored page is served', \Nino\Modules\Cache::_prepare( $appData, $hit ) === true );
+check( '...carrying this request\'s token and nonce, with no marker left in it', str_contains( $hit['/nino/http/response']['body'], 'data-csrf="'. \Nino\Csrf::getToken( $appData ). '"' ) === true
+	&& str_contains( $hit['/nino/http/response']['body'], 'data-nonce="the-next-requests-nonce"' ) === true
+	&& str_contains( $hit['/nino/http/response']['body'], '@@nino-cache' ) === false );
+check( '...and saying so in the header', ( $hit['/nino/http/response']['header']['X-Nino-Cache'] ?? '' ) === 'hit' );
+check( '...with the locale the page was rendered in applied to the session', \Nino\Locales::getCurrentLocale( $appData ) === 'de_DE' );
+
+// An entry past its lifetime is not served - and goes, rather than sitting
+// there being read and rejected on every request until the next invalidation
+$expiredPath = \Nino\Filesystem::path( $appData, '/data/cache/'. sha1( '/home|de_DE' ). '.php' );
+$expiredEntry = \Nino\Filesystem::getFileContent( $appData, '/data/cache/'. sha1( '/home|de_DE' ). '.php', [] );
+$expiredEntry['expires'] = time() - 1;
+\Nino\Filesystem::putFileContent( $appData, '/data/cache/'. sha1( '/home|de_DE' ). '.php', $expiredEntry );
+$stale = cacheRequest( '/home', 'GET', [ 'body' => '' ] );
+check( 'an entry past its lifetime is not served', \Nino\Modules\Cache::_prepare( $appData, $stale ) === false );
+check( '...and is dropped rather than read again on every request', is_file( $expiredPath ) === false );
+
+// The lock side-car every write creates (see Filesystem::lockFile) belongs
+// to the entry, so dropping the cache drops it too - otherwise /data/.locks
+// kept one empty file per page ever cached, for good
+\Nino\Modules\Cache::_invalidate( $appData );
+$locked = cacheRequest( '/home' );
+\Nino\Modules\Cache::callbackOutput( $appData, $locked );
+$lockPath = \Nino\Filesystem::path( $appData, '/data' ). '/.locks/'. sha1( '/data/cache/'. sha1( '/home|de_DE' ). '.php' ). '.lock';
+check( 'a stored page has a lock side-car', is_file( $lockPath ) === true );
+\Nino\Modules\Cache::_invalidate( $appData );
+check( '...and dropping the cache takes it with it', is_file( $lockPath ) === false );
+
+unset( $appData['/nino/http/routes']['GET://home'], $appData['./nino/jstext/nonce'] );
 \Nino\Modules\Cache::_invalidate( $appData );
 $appData['/nino/cache/status'] = false;
 

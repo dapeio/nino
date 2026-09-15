@@ -188,6 +188,30 @@ All notable changes to Nino are documented in this file.
   with a 403 naming it. The address stays changeable, since a rename grants
   nothing, and an account editing itself has proven its current password.
 
+- **Any visitor could grow the page cache without bound.** A cache entry is
+  keyed by the address as asked for, and a wildcard route (`GET://blog/*`)
+  answers an unbounded set of them - so every made-up address under one became
+  a page-sized entry plus an empty lock file beside it, as fast as an
+  anonymous client could send requests. What a wildcard route covers is
+  answered live now; the wildcard's own address is a route of its own and is
+  still cached.
+
+- **Pages that could never be served were stored anyway.** A page whose route
+  has a handler of its own is never answered from the cache, since that would
+  skip the handler - but only the serving side knew it. The storing side wrote
+  an entry on every anonymous view and told the response it was a `miss`:
+  entries that could only ever be written, never read. The rule holds on both
+  sides now.
+
+- **An expired entry was read and rejected on every request** until something
+  dropped the whole cache. It is deleted the first time it is found stale.
+
+- **Dropping the cache left a lock file per page behind.** Every write creates
+  a lock side-car under `private/data/.locks/`, and nothing ever removed one -
+  so a directory of empty files grew with every page ever cached and stayed
+  after the cache itself was gone. Invalidation takes the side-cars of the
+  entries it drops with it.
+
 - **Installing from the catalogue failed on a private root reached through a
   symlink.** `PharData` names every entry of an archive by the archive's
   canonical path, symlinks resolved, while the unpacking cut that prefix by

@@ -313,7 +313,7 @@ A module that keeps files of its own under `data/` merges them during a restore 
 
 The login throttle is the Users panel's **Login protection** tab, the languages are the **Language** panel. Routes, navigations and the asset bundles are not edited here either: the first two have their panels, the bundle order is load-bearing for the CSS cascade and stays a deliberate file edit.
 
-**The page cache.** With **Cache rendered pages** on, `Modules\Cache` stores a finished page and serves it again without rendering. Never cached: anything but a plain `GET` with a `200`, anything with query vars, any uri under `/_` or `/.`, and every request of a signed-in visitor. **Never cache these** adds your own exclusions; a trailing `/*` covers a subtree. The `[csrf]` token and the `[jstext]` nonce are re-stamped per response. Any save in the workbench drops the whole cache; responses carry `X-Nino-Cache: hit` or `miss`.
+**The page cache.** With **Cache rendered pages** on, `Modules\Cache` stores a finished page and serves it again without rendering. Never cached: anything but a plain `GET` with a `200`, anything with query vars, any uri under `/_` or `/.`, every request of a signed-in visitor, any page whose route has a handler of its own (a module endpoint, the catalogue's Posts pages), and anything a wildcard route answers - there the addresses are the visitor's to invent, and one page per invented address is disk a stranger decides the size of. **Never cache these** adds your own exclusions; a trailing `/*` covers a subtree. The `[csrf]` token and the `[jstext]` nonce are re-stamped per response. Any save in the workbench drops the whole cache; responses carry `X-Nino-Cache: hit` or `miss`.
 
 In production, `/nino/error/display` must be off.
 
