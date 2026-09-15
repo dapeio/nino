@@ -149,7 +149,7 @@ PEM;
 			if( $json['ok'] === false )
 				return 'the catalogue could not be fetched: '. $json['error'];
 
-			$signature = \Nino\Fetch::get( $appData, $url. '.sig', [ 'maxBytes' => 4096 ] );
+			$signature = \Nino\Fetch::get( $appData, self::_signatureUrl( $url ), [ 'maxBytes' => 4096 ] );
 			if( $signature['ok'] === false )
 				return 'the catalogue signature could not be fetched: '. $signature['error'];
 
@@ -246,6 +246,28 @@ PEM;
 		 *
 		 *	@return 	array|string						{ format, generated, features: [ entry, ... ] } or why not
 		 */
+		/**
+		 *	The address of a catalogue's signature: '.sig' on the end of the
+		 *	path, not on the end of the url.
+		 *
+		 *	Appended to the whole thing, a catalogue behind a token -
+		 *	'https://host/catalogue.json?token=abc', which url() accepts,
+		 *	since Fetch::isHttpsUrl() has no opinion on a query string -
+		 *	was fetched as '...?token=abc.sig'. That is a 404, reported as
+		 *	"the catalogue signature could not be fetched", with nothing
+		 *	saying the shape of the url was the cause.
+		 *
+		 *	@param		string		$url					The catalogue's own url
+		 *
+		 *	@return 	string
+		 */
+		private static function _signatureUrl( string $url ): string {
+
+			$pathLength = strcspn( $url, '?#' );
+
+			return substr( $url, 0, $pathLength ). '.sig'. substr( $url, $pathLength );
+		}
+
 		public static function parse( string $json ): array|string {
 
 			$document = json_decode( $json, true );

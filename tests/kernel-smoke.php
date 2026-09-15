@@ -1450,6 +1450,28 @@ $goodLoginRequest = [
 check( 'callbackLoginResponse succeeds end-to-end with a Basic header and valid token', $goodLoginRequest['/nino/http/response']['statusCode'] === 200 );
 check( 'and actually logs the user in', ( \Nino\Auth::getCurrentUser( $appData )['mail'] ?? null ) === $csrfUser );
 
+/*	...and a refused attempt while that session is still live. The answer
+	used to be decided by getCurrentUser(), which answers for the session as
+	a whole: loginUser() leaves a resumed session alone when it refuses, so a
+	wrong password posted from such a tab was answered 200/true while the
+	attempt itself was counted as failed. \Nino.js takes any 200 for a login
+	and redirects, so that tab walked into the workbench as the identity it
+	already had	*/
+$_POST['_csrf'] = \Nino\Csrf::getToken( $appData );
+$wrongWhileLoggedIn = [
+	'REQUEST_METHOD' 			=> 'POST',
+	'REQUEST_URI' 				=> '/.nino/auth/login',
+	'REMOTE_ADDR' 				=> '127.0.0.1',
+	'HTTP_AUTHORIZATION'	=> 'Basic '. base64_encode( 'nobody@example.com:WRONG' ),
+];
+\Nino\Http::request( $appData, $wrongWhileLoggedIn );
+\Nino\Csrf::callbackResponse( $appData, $wrongWhileLoggedIn );
+\Nino\Auth::callbackLoginResponse( $appData, $wrongWhileLoggedIn );
+
+check( 'a refused login answers 401 even while another session is live', $wrongWhileLoggedIn['/nino/http/response']['statusCode'] === 401
+	&& $wrongWhileLoggedIn['/nino/http/response']['body'] === false );
+check( '...and the session that was live is still the one that is', ( \Nino\Auth::getCurrentUser( $appData )['mail'] ?? null ) === $csrfUser );
+
 \Nino\Auth::logoutUser( $appData );
 \Nino\Auth::deleteUser( $appData, $csrfUser );
 unset( $_POST['_csrf'] );
@@ -2207,6 +2229,19 @@ $appData['./nino/jstext/nonce'] = base64_encode( random_bytes( 16 ) );
 \Nino\Modules\Jstext::callbackResponse( $appData, $homeRequest );
 $jstextCsp = $homeRequest['/nino/http/response']['header']['Content-Security-Policy'];
 check( 'Jstext appends its script-src to the csp', str_contains( $jstextCsp, "script-src 'self' 'nonce-" ) === true );
+
+/*	The nonce reaches the page twice - raw in the script tag, and json
+	encoded in the block beside it - and json_encode() escapes a '/' as
+	'\\/'. A base64 nonce carries one about a third of the time, and
+	Modules\Cache::_stamp() re-stamped the raw one only, so a stored page
+	kept the render-time nonce in its json for as long as the entry lived.
+	Hex carries no character json touches	*/
+$freshNonceData = $appData;
+unset( $freshNonceData['./nino/jstext/nonce'] );
+\Nino\Modules\Jstext::init( $freshNonceData );
+$freshNonce = (string) ( $freshNonceData['./nino/jstext/nonce'] ?? '' );
+check( 'the jstext nonce is 16 bytes of hex', preg_match( '/^[0-9a-f]{32}$/', $freshNonce ) === 1 );
+check( '...so json_encode leaves it exactly as the page carries it', json_encode( $freshNonce ) === '"'. $freshNonce. '"' );
 check( 'Jstext keeps the default-src while doing so', str_contains( $jstextCsp, "default-src 'self'" ) === true );
 check( 'the composed csp does not start with a stray separator', str_starts_with( $jstextCsp, ';' ) === false );
 
@@ -3148,6 +3183,32 @@ $refused = [
 
 \Nino\Filesystem::forceDir( $appData, '/data/../../escape-dir' );
 restore_error_handler();
+
+/*	A nul byte is the same rule with a sharper edge. Every i/o call in the
+	class carries an @ so a failure comes back as false - but @ does not
+	suppress an exception, and mkdir()/fopen()/rename()/glob() throw a
+	ValueError for a path containing one. So where a '..' answered false, a
+	nul was an uncaught 500, for any caller whose own allowlist let one
+	through	*/
+$nulWarnings = [];
+set_error_handler( static function( int $no, string $message ) use ( &$nulWarnings ): bool { $nulWarnings[] = $message; return true; } );
+
+$nulRefused = [
+	'path'				=> \Nino\Filesystem::path( $pathAppData, "/text/de_DE\0.php" ),
+	'url'					=> \Nino\Filesystem::url( $pathAppData, "/images/x\0.png" ),
+	'fileExists'	=> \Nino\Filesystem::fileExists( $appData, "/text/de_DE\0.php" ),
+	'lockFile'		=> \Nino\Filesystem::lockFile( $appData, "/data/x\0.lock" ),
+	'read'				=> \Nino\Filesystem::getFileContent( $appData, "/text/de_DE\0.php", 'the default' ),
+	'write'				=> \Nino\Filesystem::putFileContent( $appData, "/data/nul\0.php", [ 'x' ] ),
+	'mutate'			=> \Nino\Filesystem::mutate( $appData, "/data/nul\0.php", static fn( array $state ): array => [ 'x' ] ),
+];
+
+\Nino\Filesystem::forceDir( $appData, "/data/nul\0dir" );
+restore_error_handler();
+
+check( 'a nul byte is refused at every door too, rather than thrown out of', $nulRefused === [
+	'path' => '', 'url' => '', 'fileExists' => false, 'lockFile' => false, 'read' => 'the default', 'write' => false, 'mutate' => false,
+] );
 
 check( 'every door of the filesystem refuses a traversal, not just the two that read and write content', $refused === [
 	'path' => '', 'url' => '', 'fileExists' => false, 'lockFile' => false, 'read' => 'the default', 'write' => false, 'mutate' => false,

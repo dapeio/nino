@@ -253,6 +253,23 @@ namespace Nino {
 			if( $configured === true && self::$_currentInstance['/nino/error/log'] === true )
 				self::_recordError( self::$_currentInstance, $errorArray );
 
+			// The status the failure earned, before anything is printed. The
+			// display branch below echoes its dump and exit()s, so the
+			// header() that used to sit at the end of this method never ran
+			// on a development install: an exception or an E_USER_ERROR with
+			// '/nino/error/display' on answered 200 with a stack trace in the
+			// body, where this method's own docblock and docs/development.md
+			// both promise 500 - and a uptime check, a devtools filter or a
+			// fetch() that keys on the status read that as success. Measured
+			// with php -S: display on answered 200, display off 500, for the
+			// same throw.
+			//
+			// headers_sent() for the same reason handleShutdown() checks it: a
+			// fatal can land after the response has gone out, and a header()
+			// then raises a warning that would re-enter this very method
+			if( $fatal === true && headers_sent() === false )
+				header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.1' ). ' 500 Internal Server Error', true, 500 );
+
 			// Display error - only when the site explicitly asked for it, and
 			// only once that choice is actually known. An error raised inside
 			// the boot sequence itself, before AppData::init() has read
@@ -285,10 +302,7 @@ namespace Nino {
 			if( $fatal === false )
 				return true;
 
-			// Break current cycle - SERVER_PROTOCOL is absent on cli (and can be
-			// absent behind an odd sapi), and an undefined-key warning raised
-			// inside the error handler would re-enter this very method
-			header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.1' ). ' 500 Internal Server Error', true, 500 );
+			// Break current cycle - the status went out above, on both paths
 			exit;
 		}
 

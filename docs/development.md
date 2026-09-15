@@ -303,7 +303,7 @@ The method reads the current file state again, only takes over the specified key
 - Read accesses are cached based on modification time and file size.
 - Write operations first create a temporary file in the target directory and then replace the target via `rename()`.
 - Locks are sidecar files under `/data/.locks`; their name is derived from the target path.
-- Paths with `..` are rejected as an additional protective layer - by every door of `Filesystem`, not only by the two that read and write content: `path()` and `url()` answer `''`, `fileExists()`, `lockFile()`, `putFileContent()` and `mutate()` answer `false`, `getFileContent()` answers its default, and `forceDir()` creates nothing. Each of them says so in the log, so a call site that forgot to validate its own input is findable.
+- Paths with `..` or a nul byte are rejected as an additional protective layer - by every door of `Filesystem`, not only by the two that read and write content: `path()` and `url()` answer `''`, `fileExists()`, `lockFile()`, `putFileContent()` and `mutate()` answer `false`, `getFileContent()` answers its default, and `forceDir()` creates nothing. Each of them says so in the log, so a call site that forgot to validate its own input is findable. The nul byte is the half that is not merely a second layer: PHP's own `mkdir()`, `fopen()`, `rename()` and `glob()` throw a `ValueError` for one, which the `@` in front of them does not suppress, so without this rule a nul byte where a `..` would have answered `false` was an uncaught 500.
 
 For a simple, complete replacement, `putFileContent()` is sufficient:
 

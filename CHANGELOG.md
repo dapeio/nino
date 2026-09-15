@@ -188,6 +188,58 @@ All notable changes to Nino are documented in this file.
   with a 403 naming it. The address stays changeable, since a rename grants
   nothing, and an account editing itself has proven its current password.
 
+- **A development install answered 200 for a crash.** With
+  `/nino/error/display` on, the handler echoed its dump and `exit`ed - and the
+  `header()` that sets the 500 sat after that branch, so it never ran. An
+  uncaught exception and an `E_USER_ERROR` both answered `200 OK` with a stack
+  trace in the body, where this method's own docblock and `docs/development.md`
+  promise 500. Measured with `php -S`: display on answered 200, display off 500,
+  for the same throw; both answer 500 now. A crash that reports success is
+  worth more than the dump it prints: an uptime check, a devtools filter and
+  every `fetch()` that keys on the status believed it.
+
+- **Wrong credentials were answered `200` while another session was live.** The
+  login endpoint decided success by asking who is signed in, not by the result
+  of the attempt - and `loginUser()` leaves a resumed session untouched when it
+  refuses. So a wrong password posted from a tab whose session still held
+  somebody was answered `200`/`true` while the attempt itself was counted as a
+  failed one. `Nino.js` takes any 200 for a login and redirects, so that tab
+  walked into the workbench as the identity it already had. The endpoint reads
+  the attempt's own result now; the documented 401 is what a refusal gets.
+
+- **A nul byte in a path was a 500 where a `..` was a `false`.** Every I/O call
+  in `\Nino\Filesystem` carries an `@` so a failure comes back as `false` and
+  the caller's own "could not be written" message is reachable - but `@` does
+  not suppress an exception, and `mkdir()`, `fopen()`, `rename()` and `glob()`
+  all throw a `ValueError` for a path containing one. Any caller whose own
+  allowlist let a nul through (a pattern without the `D` modifier is enough)
+  got an uncaught 500 instead of its own refusal. Both rules now live in one
+  place that all seven doors ask, so the sentence in `docs/development.md` is
+  true of the whole class rather than of the two that read and write content.
+
+- **A version constraint with an empty alternative was satisfied by every
+  kernel.** `'^9.0 ||'` - a trailing, doubled or lone `||` - split into an
+  alternative with no parts, and an alternative with no parts held: the check
+  that keeps a feature off a kernel it was not written for waved every kernel
+  through, in the Features panel and in the catalogue alike. Such a constraint
+  is refused when a manifest declares it, and an alternative now has to earn
+  its "holds" from a part that held.
+
+- **A catalogue behind a token could never verify.** The signature's address
+  was built by appending `.sig` to the whole url, so
+  `https://host/catalogue.json?token=abc` was fetched as `...?token=abc.sig` -
+  a 404, reported as "the catalogue signature could not be fetched" with
+  nothing saying the shape of the url was the cause. `.sig` goes on the path
+  now, and the query and fragment stay where they were.
+
+- **A third of cached pages kept a dead nonce in their script data.** The
+  `[jstext]` nonce reaches a page twice - raw in the script tag, and
+  JSON-encoded in the block beside it - and `json_encode()` escapes a `/` as
+  `\/`. A base64 nonce carries one about a third of the time, and the page
+  cache re-stamped the raw form only, so a stored page kept the render-time
+  nonce in its JSON for as long as the entry lived. The nonce is hex now: 16
+  bytes either way, and no character JSON touches.
+
 - **A request that posted an array where a string belonged was a 500.** Four
   of them in the workbench and the wizard, all reachable by typing `[]` into a
   field name: `?locale[]=x` on `/_admin` raised "Array to string conversion" -

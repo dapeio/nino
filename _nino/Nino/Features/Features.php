@@ -443,7 +443,13 @@ namespace Nino {
 
 			foreach( explode( '||', $constraint ) as $alternative ) {
 
-				$holds = true;
+				// $holds starts false and is earned by a part that held. It
+				// used to start true, so an alternative with no parts at all -
+				// what '^9.0 ||' splits into - was satisfied by every version
+				// there is: a feature written for a Nino nobody has yet
+				// installed on 1.x without a word. constraintValid() refuses
+				// that shape now too, so this is the second of two doors
+				$holds = false;
 				foreach( preg_split( '/[\s,]+/', trim( $alternative ) ) ?: [] as $part ) {
 					if( $part === '' )
 						continue;
@@ -451,6 +457,7 @@ namespace Nino {
 						$holds = false;
 						break;
 					}
+					$holds = true;
 				}
 
 				if( $holds === true )
@@ -1321,10 +1328,20 @@ namespace Nino {
 		 */
 		public static function constraintValid( string $constraint ): bool {
 
-			foreach( explode( '||', $constraint ) as $alternative )
+			foreach( explode( '||', $constraint ) as $alternative ) {
+
+				// An alternative that says nothing is not an alternative. A
+				// trailing, doubled or lone '||' produced one, and satisfies()
+				// read it as "holds for everything" - the constraint that is
+				// meant to keep a feature off a kernel it was not written for
+				// waved every kernel through
+				if( trim( $alternative ) === '' )
+					return false;
+
 				foreach( preg_split( '/[\s,]+/', trim( $alternative ) ) ?: [] as $part )
 					if( $part !== '' && $part !== '*' && preg_match( '/^(?:\^|~|>=|<=|>|<|!=|=)?\d+(?:\.\d+){0,2}(?:-[0-9A-Za-z.]+)?$/', $part ) !== 1 )
 						return false;
+			}
 
 			return true;
 		}

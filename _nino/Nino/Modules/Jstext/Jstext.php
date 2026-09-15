@@ -52,7 +52,15 @@ namespace Nino\Modules {
 		 */
 		public static function init( array &$appData ): void {
 
-			$appData['./nino/jstext/nonce'] = base64_encode(random_bytes(16));
+			// Hex, not base64: the nonce goes into the page twice - raw in the
+			// script tag, and json_encoded in the block beside it - and
+			// json_encode() escapes a '/' as '\/'. About a third of base64
+			// nonces carry one, and \Nino\Modules\Cache::_stamp() then
+			// re-stamped only the raw one, leaving the render-time nonce
+			// standing in a stored page's json for as long as the entry lived.
+			// 16 bytes either way; a nonce is a base64-value token, and hex is
+			// a subset of that alphabet
+			$appData['./nino/jstext/nonce'] = bin2hex( random_bytes( 16 ) );
 
 			\Nino\Html::addShortcode( $appData, 'jstext', [ self::class, 'doShortcode' ] );
 

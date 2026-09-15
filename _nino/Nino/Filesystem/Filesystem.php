@@ -35,11 +35,12 @@ namespace Nino {
 
 		public static function getFileContent( array &$appData, string $filename, mixed $default = false ): mixed {
 
-			// Every call site is expected to already validate $filename against its
-			// own whitelist (element type/uri, locale, image slot, ...) - this ".."
-			// rejection is defense-in-depth only, so a call site that forgets to
-			// validate its input can't turn into a path-traversal read.
-			if( str_contains( $filename, '..' ) === true )
+			// Every call site is expected to already validate $filename against
+			// its own whitelist (element type/uri, locale, image slot, ...) -
+			// this rejection is defense-in-depth only, so a call site that
+			// forgets to validate its input can't turn into a path-traversal
+			// read. See _unusablePath() for the two things it refuses
+			if( self::_unusablePath( $filename ) === true )
 				return $default;
 
 			if( self::_prepareFileCache( $appData, $filename ) === false )
@@ -81,8 +82,10 @@ namespace Nino {
 
 		public static function putFileContent( array &$appData, string $filename, mixed $content, bool $nolock = false, bool $append = false ): bool {
 
-			// See getFileContent() - same defense-in-depth ".." rejection, on the write side
-			if( str_contains( $filename, '..' ) === true )
+			// See getFileContent() - same defense-in-depth rejection, on the
+			// write side, where a nul byte is the half that is not theoretical:
+			// @fopen() throws a ValueError for one rather than answering false
+			if( self::_unusablePath( $filename ) === true )
 				return false;
 
 			self::_prepareFileCache( $appData, $filename );
@@ -235,7 +238,7 @@ namespace Nino {
 			// answer as "may I proceed". The rule itself, not
 			// _prepareFileCache()'s answer: that one says whether the file is
 			// there, and a first write locks a file that is not there yet
-			if( str_contains( $filename, '..' ) === true )
+			if( self::_unusablePath( $filename ) === true )
 				return false;
 
 			self::_prepareFileCache( $appData, $filename );
@@ -427,8 +430,8 @@ namespace Nino {
 			// _prepareFileCache()). A path nobody may read is a path nobody may
 			// build either, and answering '' rather than a resolved traversal
 			// is what makes a call site that forgot to validate fail visibly
-			if( str_contains( $filename, '..' ) === true ) {
-				trigger_error( 'Filesystem::path(): refusing a path containing "..": \''. $filename. '\'', E_USER_WARNING );
+			if( self::_unusablePath( $filename ) === true ) {
+				trigger_error( 'Filesystem::path(): refusing an unusable path: \''. addcslashes( $filename, "\0" ). '\'', E_USER_WARNING );
 				return '';
 			}
 
@@ -438,8 +441,8 @@ namespace Nino {
 		public static function forceDir( array &$appData, string $dirpath ): void {
 
 			// See path()
-			if( str_contains( $dirpath, '..' ) === true ) {
-				trigger_error( 'Filesystem::forceDir(): refusing a path containing "..": \''. $dirpath. '\'', E_USER_WARNING );
+			if( self::_unusablePath( $dirpath ) === true ) {
+				trigger_error( 'Filesystem::forceDir(): refusing an unusable path: \''. addcslashes( $dirpath, "\0" ). '\'', E_USER_WARNING );
 				return;
 			}
 
@@ -505,8 +508,8 @@ namespace Nino {
 
 			// See path() - a url is built from the same virtual path, and a
 			// traversal in one is a link out of the project's own tree
-			if( str_contains( $filename, '..' ) === true ) {
-				trigger_error( 'Filesystem::url(): refusing a path containing "..": \''. $filename. '\'', E_USER_WARNING );
+			if( self::_unusablePath( $filename ) === true ) {
+				trigger_error( 'Filesystem::url(): refusing an unusable path: \''. addcslashes( $filename, "\0" ). '\'', E_USER_WARNING );
 				return '';
 			}
 
@@ -632,9 +635,38 @@ namespace Nino {
 		// docs/development.md), and a layer that only two of its doors have is
 		// not one. Every call site is still expected to validate its own input
 		// against its own whitelist - this is what catches the one that forgot
+		/**
+		 *	A virtual path this class refuses to touch, whatever the caller
+		 *	meant by it.
+		 *
+		 *	Two rules, in one place because they belong to every entry point
+		 *	rather than to one of them - docs/development.md says as much, and
+		 *	it used to be true of the readers and writers only.
+		 *
+		 *	'..' is the traversal guard: every call site is expected to
+		 *	validate its own input, so this is defense-in-depth.
+		 *
+		 *	A nul byte is not defense in depth. Every i/o call in this class
+		 *	carries an @ so that a failure comes back as false and the
+		 *	caller's own "could not be written" message is reachable - but @
+		 *	does not suppress an exception, and mkdir(), fopen(), rename() and
+		 *	glob() all throw a ValueError for a path containing one. So a nul
+		 *	where a '..' would have answered false was an uncaught ValueError,
+		 *	ie. a 500, for any caller whose own allowlist let one through (a
+		 *	pattern without the D modifier is enough).
+		 *
+		 *	@param		string		$filename			A virtual path, as a caller passes it
+		 *
+		 *	@return 	bool
+		 */
+		private static function _unusablePath( string $filename ): bool {
+
+			return str_contains( $filename, '..' ) === true || str_contains( $filename, "\0" ) === true;
+		}
+
 		private static function _prepareFileCache( array &$appData, string $filename ): bool {
 
-			if( str_contains( $filename, '..' ) === true )
+			if( self::_unusablePath( $filename ) === true )
 				return false;
 
 			// 'fstat' is the mtime/size fingerprint getFileContent() decides

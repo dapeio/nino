@@ -86,12 +86,20 @@ namespace Nino {
 			if( ( $request['./nino/csrf/blocked'] ?? false ) === true )
 				return;
 
-			self::loginUser( $appData, $request['/nino/http/request']['user'],  $request['/nino/http/request']['pw'] );
+			// The attempt's own result, not who is signed in afterwards.
+			// getCurrentUser() answers for the session as a whole, and
+			// loginUser() leaves a resumed session untouched when it refuses:
+			// a wrong password posted from a tab whose session still holds
+			// somebody was answered 200/true, while the attempt was counted
+			// as failed. \Nino.js takes any 200 for a login and redirects, so
+			// that tab walked into the workbench as the identity it already
+			// had - with a status the documented contract says is 401
+			$user = self::loginUser( $appData, $request['/nino/http/request']['user'],  $request['/nino/http/request']['pw'] );
 
 			$request['/nino/http/response']['statusCode']	= 401;
 			$request['/nino/http/response']['body']				= false;
 
-			if( self::getCurrentUser( $appData ) === false )
+			if( $user === false )
 				return;
 
 			$request['/nino/http/response']['statusCode']	= 200;

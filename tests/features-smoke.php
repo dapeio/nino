@@ -260,9 +260,22 @@ foreach( [
 	[ '1.0.0', '1.0.0-beta', true ], [ '1.0.0', '1.0.1', false ], [ '1', '1.7.2', true ], [ '1.7', '1.7.2', true ], [ '1.7', '1.8.0', false ],
 	[ '2.0 || ^1.0', '1.0.0', true ], [ '2.0 || ^1.0', '3.0.0', false ], [ '*', '9.9.9', true ],
 	[ '^1.0', 'nope', false ],
+	// An alternative that says nothing used to hold for everything: the
+	// parts loop skipped its one empty part and left $holds at the true it
+	// started on, so a feature written for a Nino nobody has installed on
+	// 1.x without a word
+	[ '^9.0 ||', '1.2.0', false ], [ '||', '1.2.0', false ], [ '^9.0 || || ^8.0', '1.2.0', false ],
 ] as [ $constraint, $version, $expected ] )
 	check( str_pad( $constraint, 12 ). ' '. str_pad( $version, 11 ). ' -> '. ( $expected ? 'yes' : 'no' ), \Nino\Features::satisfies( $constraint, $version ) === $expected );
 check( 'the default version is the running kernel', \Nino\Features::satisfies( '^'. explode( '.', \Nino\VERSION )[0] ) === true );
+
+// ...and the same shape is refused where a manifest declares it, so it never
+// reaches satisfies() from a feature directory at all
+check( 'an alternative with nothing in it is not a constraint', \Nino\Features::constraintValid( '^9.0 ||' ) === false
+	&& \Nino\Features::constraintValid( '||' ) === false
+	&& \Nino\Features::constraintValid( '' ) === false
+	&& \Nino\Features::constraintValid( '2.0 || ^1.0' ) === true );
+check( 'a manifest declaring one is refused', manifestFails( $manifestDir, 'EmptyAlt', [ 'name' => 'x', 'version' => '1.0.0', 'nino' => '^9.0 ||' ], '"nino"' ) );
 
 echo "\n";
 

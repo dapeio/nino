@@ -356,6 +356,7 @@ check( 'a signed, valid catalogue is fetched with two requests: the document and
 	&& array_column( $requests, 'url' ) === [ \Nino\Catalogue::DEFAULT_URL, \Nino\Catalogue::DEFAULT_URL. '.sig' ] );
 check( 'the signature is read with a small cap, the document with a larger one', $requests[0]['options']['maxBytes'] === 1024 * 1024 && $requests[1]['options']['maxBytes'] === 4096 );
 check( 'the catalogue carries its url and every entry', $catalogue['url'] === \Nino\Catalogue::DEFAULT_URL && count( $catalogue['features'] ) === 6 );
+
 $requests = [];
 check( 'read once per request', \Nino\Catalogue::fetch( $appData ) === $catalogue && $requests === [] );
 
@@ -380,6 +381,26 @@ check( 'cached() answers it without any request', $requests === [] && is_array( 
 check( 'the same shape fetch() returns, plus fetched', array_keys( $cached ) === [ 'format', 'generated', 'features', 'url', 'fetched' ]
 	&& $cached['url'] === \Nino\Catalogue::DEFAULT_URL && $cached['fetched'] === $stored['fetched'] && count( $cached['features'] ) === 6
 	&& $cached['format'] === $catalogue['format'] && $cached['generated'] === $catalogue['generated'] && $cached['features'] === $catalogue['features'] );
+
+/*	A private catalogue behind a token: url() takes it (isHttpsUrl() has no
+	opinion on a query string), and the signature belongs beside the
+	document - '.sig' on the path, not on the end of the url. Appended to
+	the whole thing it asked for '...?token=abc.sig', a 404 reported as "the
+	signature could not be fetched" with nothing saying the url shape was
+	the cause	*/
+$tokenUrl = 'https://catalogue.example.org/private/catalogue.json?token=abc#part';
+$tokenData = $appData;
+$tokenData['/nino/catalogue/url'] = $tokenUrl;
+unset( $tokenData['./nino/catalogue'] );
+$remote[ $tokenUrl ] = $json;
+$remote[ 'https://catalogue.example.org/private/catalogue.json.sig?token=abc#part' ] = sign( $json, $privateKey );
+$requests = [];
+check( 'a catalogue behind a query string fetches its signature from the path beside it', is_array( \Nino\Catalogue::fetch( $tokenData ) )
+	&& array_column( $requests, 'url' ) === [ $tokenUrl, 'https://catalogue.example.org/private/catalogue.json.sig?token=abc#part' ] );
+
+// ...and the cache on disk goes back to the one the checks above read
+unset( $appData['./nino/catalogue'] );
+\Nino\Catalogue::fetch( $appData );
 
 $movedUrl = $appData;
 $movedUrl['/nino/catalogue/url'] = 'https://example.org/own/catalogue.json';
