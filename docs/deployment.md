@@ -249,9 +249,12 @@ Check in `config.php` or via the workbench's Config panel at least the following
 | `/nino/error/display` | `false` | suppresses technical error details in the browser |
 | `/nino/error/log` | `true` | writes errors for later diagnosis to the log |
 | `/nino/session/force-secure-cookie` | `true` if TLS terminates before PHP | enforces secure session cookies behind an HTTPS proxy |
+| `/nino/http/proxies` | the proxy's addresses where one sits in front of the site, otherwise empty | decides which address a visitor is counted as, and with it every per-ip limit |
 | `/nino/admin/backups` | according to operational decision | controls the workbench's daily encrypted backup |
 | `/nino/admin/logs` | according to operational decision | controls the workbench's activity log |
 | `/nino/catalogue/url` | the default, or `''` where nothing is to be installed from the catalogue | where the Features panel loads the feature catalogue from - on request only, never on its own; empty switches the catalogue off |
+
+**Behind a reverse proxy** (Cloudflare, a load balancer, an ingress) both proxy keys belong together: `/nino/session/force-secure-cookie` because PHP itself sees no HTTPS, and `/nino/http/proxies` because otherwise `REMOTE_ADDR` is the proxy for every single visitor. Without the second, the site counts all of them as one client - the login cooldown, the per-ip mail cap and a form's rate limit then apply to the whole internet at once. The mail cap does it silently, since a rate-limit refusal is not surfaced as an error; the cooldown does it loudly, and a stranger can trigger it on purpose with wrong logins against account names that need not exist. List the addresses or CIDR ranges of the proxies you operate or pay for, one per line in the Config panel; the visitor is then the rightmost `X-Forwarded-For` hop that is not one of them. Leave the key empty where no proxy is in front of the site: the header is one any client can write, and an entry that is not actually a proxy is what makes it believable.
 
 Error messages should not expose file paths, configuration values, or stack traces in the browser. After switching, check that errors still arrive in a protected log and remain accessible to the operator.
 

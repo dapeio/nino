@@ -98,7 +98,7 @@ Was eine Rolle nicht darf, wird ihr nicht angeboten: Ein Feld, das sie nicht än
 
 Ein Panel, für das dem Konto die Berechtigung fehlt, wird gar nicht erst gerendert, und seine Aktionen antworten in jedem Fall mit `403`; eine Fläche zeigt nur die Tabs, die das Konto hält. Ein fehlender Menüpunkt oder Tab ist deshalb meist beabsichtigt und kein Darstellungsfehler.
 
-Nach fünf Fehlversuchen ist ein Konto eine Stunde gesperrt – beide Zahlen sind der Tab **Anmeldeschutz** des Panels Nutzer; derselbe Zähler läuft je Adresse, sodass auch das Raten über Konten hinweg gedrosselt ist. Konten und Rollen liegen in der `config.php`, die Zähler der Anmeldedrossel unter `private/.auth/`.
+Nach fünf Fehlversuchen ist ein Konto eine Stunde gesperrt – beide Zahlen sind der Tab **Anmeldeschutz** des Panels Nutzer; derselbe Zähler läuft je Adresse, sodass auch das Raten über Konten hinweg gedrosselt ist – hinter einem Reverse Proxy ist diese Adresse für alle der Proxy, solange **Reverse Proxies vor dieser Website** ihn nicht nennt, und dann sperrt das Raten eines Fremden die ganze Seite aus. Konten und Rollen liegen in der `config.php`, die Zähler der Anmeldedrossel unter `private/.auth/`.
 
 Für den Betrieb:
 
@@ -305,6 +305,7 @@ Ein Modul, das eigene Dateien unter `data/` hält, führt sie bei einer Wiederhe
 | Fehler und Diagnose | Fehler in ein Log schreiben | `/nino/error/log` | Schalter |
 | Fehler und Diagnose | Fehler im Frontend anzeigen | `/nino/error/display` | Schalter |
 | Fehler und Diagnose | Session-Cookie immer als secure setzen | `/nino/session/force-secure-cookie` | Schalter |
+| Fehler und Diagnose | Reverse Proxies vor dieser Website | `/nino/http/proxies` | eine Adresse oder ein CIDR-Bereich je Zeile |
 | Workbench | Tägliche verschlüsselte Sicherung | `/nino/admin/backups` | Schalter |
 | Workbench | Aktivitätsprotokoll führen | `/nino/admin/logs` | Schalter |
 | Seiten-Cache | Gerenderte Seiten cachen | `/nino/cache/status` | Schalter |
@@ -314,6 +315,8 @@ Ein Modul, das eigene Dateien unter `data/` hält, führt sie bei einer Wiederhe
 Die Anmeldedrossel ist der Tab **Anmeldeschutz** des Panels Nutzer, die Sprachen sind das Panel **Sprache**. Routen, Navigationen und die Asset-Bundles werden hier ebenfalls nicht bearbeitet: Die ersten beiden haben ihre Panels, die Bundle-Reihenfolge trägt die CSS-Kaskade und bleibt eine bewusste Dateibearbeitung.
 
 **Der Seiten-Cache.** Mit **Gerenderte Seiten cachen** speichert `Modules\Cache` eine fertige Seite und liefert sie ohne Rendern erneut aus. Nie gecacht: alles außer einem schlichten `GET` mit `200`, alles mit Query-Variablen, jede Uri unter `/_` oder `/.`, jede Anfrage eines angemeldeten Besuchers, jede Seite, deren Route einen eigenen Handler hat (ein Modul-Endpunkt, die Seiten des Posts-Features), und alles, was eine Wildcard-Route beantwortet – dort erfindet der Besucher die Adressen, und eine Seite je erfundener Adresse ist Plattenplatz, dessen Größe ein Fremder bestimmt. **Nie cachen** ergänzt eigene Ausnahmen; ein abschließendes `/*` deckt einen Teilbaum ab. Das `[csrf]`-Token und die `[jstext]`-Nonce werden je Antwort neu gestempelt. Jedes Speichern in der Workbench leert den gesamten Cache; Antworten tragen `X-Nino-Cache: hit` oder `miss`.
+
+**Als wer ein Besucher zählt.** Jede Regel je IP – die Anmeldedrossel, die Sendegrenze für Mail, das Rate-Limit eines Formulars, die Adresse, unter der eine Session steht – zählt die Adresse, mit der PHP spricht. Hinter einem Reverse Proxy ist das der Proxy, für jeden Besucher gleichermaßen, alle teilen sich also einen Eimer. **Reverse Proxies vor dieser Website** beendet das: Steht die Adresse des Proxys (oder sein CIDR-Bereich) in der Liste, wird der Besucher stattdessen aus `X-Forwarded-For` gelesen. Tragen Sie dort nur Proxies ein, die Sie betreiben oder bezahlen – den Header kann jeder Client schreiben, und erst ein Eintrag, der kein Proxy ist, macht eine gefälschte Adresse glaubwürdig. Leer ist der sichere Wert und die Vorgabe. Eine Zeile, die weder Adresse noch CIDR-Bereich ist, wird zurückgewiesen statt gespeichert, denn sie träfe nichts, während das Formular aussieht, als wäre etwas eingestellt.
 
 In Produktion muss `/nino/error/display` aus sein.
 
@@ -365,7 +368,7 @@ Die Ausgabe ist die vollständige Datei; schreibe sie nach `private/.auth/pw.php
 
 | Problem | Prüfen |
 |---|---|
-| Anmeldung nach mehreren Versuchen gesperrt | Die Sperrdauer abwarten (eine Stunde als Standard, siehe **Nutzer › Anmeldeschutz**); die Sperre gilt je Konto und je Adresse. |
+| Anmeldung nach mehreren Versuchen gesperrt | Die Sperrdauer abwarten (eine Stunde als Standard, siehe **Nutzer › Anmeldeschutz**); die Sperre gilt je Konto und je Adresse. Hinter einem Reverse Proxy **Konfiguration › Reverse Proxies vor dieser Website** setzen, sonst teilen sich alle Besucher eine Adresse und eine Sperre. |
 | Ein Panel oder ein Tab fehlt | Dem Konto fehlt die Berechtigung, oder sein Modul ist nicht aktiv. |
 | Speichern schlägt fehl | Schreibrechte der betroffenen Datei oder des Verzeichnisses. |
 | Template fehlt unter **Routen** | Angeboten werden nur vorhandene Dateien `templates/page-*.tpl`. |

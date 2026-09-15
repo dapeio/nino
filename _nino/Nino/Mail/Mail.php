@@ -42,7 +42,7 @@ namespace Nino {
 		// client ip has hit the send cap for this window
 		public static function send( array &$appData, string $to, string $subject, string $body, string $replyTo ): bool {
 
-			if( self::_hit( $appData, \Nino\Http::getClientIp() ) === false ) {
+			if( self::_hit( $appData, \Nino\Http::getClientIp( $appData ) ) === false ) {
 
 				// Flagged rather than just reported through the return value, so
 				// a caller can tell "we refused to send this" apart from "mail()
@@ -77,7 +77,7 @@ namespace Nino {
 			if( $mails === [] )
 				return true;
 
-			if( self::_hit( $appData, \Nino\Http::getClientIp() ) === false ) {
+			if( self::_hit( $appData, \Nino\Http::getClientIp( $appData ) ) === false ) {
 				$appData['./nino/mail/ratelimited'] = true;
 				return false;
 			}

@@ -1986,6 +1986,103 @@ check( '...which is what Nino.css\'s own data: uri needs', str_contains(
 	(string) @file_get_contents( __DIR__. '/../_nino/Nino.css' ), 'url("data:image/svg+xml'
 ) === false || str_contains( $seededCsp, 'data:' ) === true );
 
+/*	Http::getClientIp() - who the visitor is behind a reverse proxy.
+
+	REMOTE_ADDR is the proxy's own address for every single visitor there, so
+	every per-ip rule in the site (Mail's send cap, the login cooldown, a
+	session's ip pinning) counts the internet as one client. X-Forwarded-For
+	carries the visitor - and is a request header anyone can write, so it is
+	read only where the peer is a proxy this site was told about	*/
+$proxyServer = [ $_SERVER['REMOTE_ADDR'] ?? '', $_SERVER['HTTP_X_FORWARDED_FOR'] ?? null ];
+
+$_SERVER['REMOTE_ADDR'] 					= '203.0.113.9';
+$_SERVER['HTTP_X_FORWARDED_FOR'] 	= '198.51.100.7';
+
+$noProxyAppData = $appData;
+$noProxyAppData['/nino/http/proxies'] = [];
+check( 'with no proxy configured a forwarded address is ignored', \Nino\Http::getClientIp( $noProxyAppData ) === '203.0.113.9' );
+check( '...and for a caller that passes no appData at all', \Nino\Http::getClientIp() === '203.0.113.9' );
+
+$proxyAppData = $appData;
+$proxyAppData['/nino/http/proxies'] = [ '203.0.113.9' ];
+check( 'a forwarded address is read where the peer is a configured proxy', \Nino\Http::getClientIp( $proxyAppData ) === '198.51.100.7' );
+
+// What the rest of the request sees - the ip field is where every consumer
+// reads it from
+$proxiedRequest = fakeRequest( $proxyAppData, '/' );
+check( 'the resolved address is what the request carries', ( $proxiedRequest['/nino/http/request']['ip'] ?? '' ) === '198.51.100.7' );
+
+// Only the rightmost hop was written by our own proxy. Everything left of it
+// is whatever the client sent, because a forwarding proxy appends rather than
+// verifies - a client that writes its own chain cannot pick its address
+$_SERVER['HTTP_X_FORWARDED_FOR'] = '10.9.9.9, 198.51.100.7';
+check( 'the rightmost hop wins over the ones a client put in front of it', \Nino\Http::getClientIp( $proxyAppData ) === '198.51.100.7' );
+
+// Several of our own proxies in a row: the walk stops at the first address
+// none of them is
+$proxyAppData['/nino/http/proxies'] = [ '203.0.113.9', '10.0.0.0/8' ];
+$_SERVER['HTTP_X_FORWARDED_FOR'] = '198.51.100.7, 10.0.0.5, 10.0.0.6';
+check( 'a chain of trusted proxies is walked back to the client', \Nino\Http::getClientIp( $proxyAppData ) === '198.51.100.7' );
+
+// A cidr range is its first bits, not its text: the neighbouring network is
+// not in 10.0.0.0/8 however similar it reads
+$_SERVER['HTTP_X_FORWARDED_FOR'] = '198.51.100.7, 11.0.0.5';
+check( 'an address outside the configured range is the client itself', \Nino\Http::getClientIp( $proxyAppData ) === '11.0.0.5' );
+
+// ...and a prefix that ends inside a byte is honoured to the bit
+$proxyAppData['/nino/http/proxies'] = [ '203.0.113.0/26' ];
+$_SERVER['HTTP_X_FORWARDED_FOR'] = '198.51.100.7';
+check( 'a peer inside a part-byte cidr range is trusted', \Nino\Http::getClientIp( $proxyAppData ) === '198.51.100.7' );
+$_SERVER['REMOTE_ADDR'] = '203.0.113.70';
+check( '...and one past its end is not', \Nino\Http::getClientIp( $proxyAppData ) === '203.0.113.70' );
+
+// A v6 range never matches a v4 address, and the other way round: the packed
+// forms differ in length before a single bit is compared
+$proxyAppData['/nino/http/proxies'] = [ '2001:db8::/32' ];
+$_SERVER['REMOTE_ADDR'] = '203.0.113.9';
+check( 'a v4 peer is not trusted by a v6 range', \Nino\Http::getClientIp( $proxyAppData ) === '203.0.113.9' );
+
+// The same v6 address written two ways is one address, so the list is
+// compared packed rather than as text
+$proxyAppData['/nino/http/proxies'] = [ '2001:0db8:0000:0000:0000:0000:0000:0009' ];
+$_SERVER['REMOTE_ADDR'] = '2001:db8::9';
+check( 'a v6 peer is recognized whatever notation the list uses', \Nino\Http::getClientIp( $proxyAppData ) === '198.51.100.7' );
+
+// A port some proxies append, and the spacing the header is written with
+$proxyAppData['/nino/http/proxies'] = [ '203.0.113.9', '10.0.0.0/8' ];
+$_SERVER['REMOTE_ADDR'] = '203.0.113.9';
+$_SERVER['HTTP_X_FORWARDED_FOR'] = '  198.51.100.7:53238 ,10.0.0.5';
+check( 'a port on a forwarded address is dropped', \Nino\Http::getClientIp( $proxyAppData ) === '198.51.100.7' );
+
+$_SERVER['HTTP_X_FORWARDED_FOR'] = '[2001:db8::7]:53238, 10.0.0.5';
+check( '...including the bracketed v6 form a port needs', \Nino\Http::getClientIp( $proxyAppData ) === '2001:db8::7' );
+
+// Anything that is not an address is dropped rather than returned: a hop
+// cannot smuggle in a host name, a range, or a rate-limit key of its choosing
+$_SERVER['HTTP_X_FORWARDED_FOR'] = 'not-an-ip, 10.0.0.5';
+check( 'a hop that is not an ip address is skipped', \Nino\Http::getClientIp( $proxyAppData ) === '10.0.0.5' );
+
+$_SERVER['HTTP_X_FORWARDED_FOR'] = '';
+check( 'an empty header leaves the peer as the client', \Nino\Http::getClientIp( $proxyAppData ) === '203.0.113.9' );
+
+// The list is what decides, not the header: an unlisted peer is the client
+// even where the header looks exactly as a proxy would have written it
+$_SERVER['REMOTE_ADDR'] = '192.0.2.50';
+$_SERVER['HTTP_X_FORWARDED_FOR'] = '198.51.100.7';
+check( 'a peer that is no listed proxy is the client, header or not', \Nino\Http::getClientIp( $proxyAppData ) === '192.0.2.50' );
+
+// A typo in the list matches nothing rather than everything - the failure
+// mode of trusting a header is worse than the one of ignoring it
+$proxyAppData['/nino/http/proxies'] = [ 'cloudflare', '', '10.0.0.0/999', 42 ];
+$_SERVER['REMOTE_ADDR'] = '203.0.113.9';
+check( 'an unusable list entry trusts nothing', \Nino\Http::getClientIp( $proxyAppData ) === '203.0.113.9' );
+
+[ $_SERVER['REMOTE_ADDR'], $forwardedBefore ] = $proxyServer;
+if( $forwardedBefore === null )
+	unset( $_SERVER['HTTP_X_FORWARDED_FOR'] );
+else
+	$_SERVER['HTTP_X_FORWARDED_FOR'] = $forwardedBefore;
+
 $basicHeader = 'Basic '. base64_encode( 'editor@example.com:secret:with-colons' );
 $basicRequest = fakeRequest( $appData, '/.nino/auth/login', 'POST', [ 'HTTP_AUTHORIZATION' => $basicHeader ] );
 check( 'Http::request keeps a CGI/FastCGI Authorization header', ( $basicRequest['/nino/http/request']['header']['Authorization'] ?? '' ) === $basicHeader );

@@ -810,10 +810,26 @@ Nino startet Sessions im Strict Mode. Session-Cookies sind `HttpOnly`, verwenden
 Die Authentifizierung schützt zusätzlich durch:
 
 - einen Dummy-Passworthash gegen messbare Unterschiede bei unbekannten Nutzern,
-- Fehlversuchsgrenzen pro Konto und IP,
+- Fehlversuchsgrenzen pro Konto und IP – die IP ist die, die `\Nino\Http::getClientIp()` auflöst; hinter einem Reverse Proxy muss also `/nino/http/proxies` gesetzt sein, sonst teilt sich das ganze Internet einen Eimer,
 - automatisches Rehashing veralteter Passworthashes,
 - zufällige Session-Tokens mit begrenzter Laufzeit,
 - und die Möglichkeit, alle Sessions eines Nutzers zu widerrufen.
+
+### Die Adresse des Besuchers
+
+`\Nino\Http::getClientIp( $appData )` beantwortet, von wem eine Anfrage kommt. Das ist die TCP-Gegenstelle (`REMOTE_ADDR`) – außer sie ist selbst ein Reverse Proxy, der unter `/nino/http/proxies` steht; dann ist es der rechteste `X-Forwarded-For`-Sprung, der nicht selbst einer dieser Proxies ist.
+
+Der Schlüssel ist wichtig, weil jede Regel je IP genau diesen einen Wert liest: der IP-Eimer der Anmeldedrossel, die Sendegrenze von `\Nino\Mail`, das Rate-Limit eines Formulars und die Adresse, unter der eine Session in der Workbench steht. (Eine Session ist nicht an eine Adresse gebunden – ihr Token ist der Schlüssel, unter dem sie liegt.) Hinter einem Proxy ohne gesetzten Schlüssel ist `REMOTE_ADDR` für jeden einzelnen Besucher der Proxy, alle teilen sich also einen Eimer – fünf Formularabsendungen von irgendwem halten dann die Mail jedes Besuchers für den Rest des Fensters auf.
+
+```php
+'/nino/http/proxies' => [
+    '198.51.100.7',       // ein Proxy
+    '10.0.0.0/8',         // oder ein ganzer Bereich
+    '2001:db8::/32',      // v4 und v6, exakt oder CIDR
+],
+```
+
+Leer, und das ist die Vorgabe, heißt „kein Proxy“: `X-Forwarded-For` wird vollständig ignoriert. Tragen Sie nur Proxies ein, die Sie tatsächlich betreiben oder bezahlen – den Header kann jeder Client schreiben, und eine Adresse in dieser Liste, die kein Proxy ist, verschenkt genau diese Fälschung. Alles links des rechtesten nicht vertrauten Sprungs wird nie gelesen, denn ein weiterleitender Proxy hängt an den Header an, statt zu prüfen, was schon darin steht. Das Panel Konfiguration bearbeitet dieselbe Liste und weist eine Zeile zurück, die weder Adresse noch CIDR-Bereich ist.
 
 ### Response-Header
 

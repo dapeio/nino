@@ -5,7 +5,7 @@
 return [
 	'[[/_admin/nav/config]]'						=> 'Konfiguration',
 	'[[/_admin/config/group/diagnostics]]'	=> 'Fehler und Diagnose',
-	'[[/_admin/config/intro/diagnostics]]'	=> 'Was passiert, wenn PHP einen Fehler meldet, und wie das Session-Cookie gesetzt wird.',
+	'[[/_admin/config/intro/diagnostics]]'	=> 'Was passiert, wenn PHP einen Fehler meldet, wie das Session-Cookie gesetzt wird und als welche Adresse ein Besucher zählt.',
 	'[[/_admin/config/group/editor]]'		=> 'Workbench',
 	'[[/_admin/config/intro/editor]]'		=> 'Hintergrundarbeit, die /_admin von selbst erledigt. Beide waren vor 0.12.0-beta in jedem Projekt stillschweigend an – siehe Changelog.',
 	'[[/_admin/config/group/cache]]'		=> 'Seiten-Cache',
@@ -16,6 +16,8 @@ return [
 	'[[/_admin/config/hint/errordisplay]]'	=> 'Nur für die Entwicklung. Eine Live-Seite muss das aus lassen – die Ausgabe enthält Dateipfade und einen Stacktrace.',
 	'[[/_admin/config/label/securecookie]]'	=> 'Session-Cookie immer als secure setzen',
 	'[[/_admin/config/hint/securecookie]]'	=> 'Hinter einem TLS-terminierenden Proxy einschalten, wo PHP selbst kein HTTPS sieht und das Flag sonst weglassen würde.',
+	'[[/_admin/config/label/proxies]]'	=> 'Reverse Proxies vor dieser Website',
+	'[[/_admin/config/hint/proxies]]'	=> 'Eine Adresse oder ein CIDR-Bereich je Zeile, und nur Proxies, die Sie selbst betreiben oder bezahlen. Leer gelassen ist der Besucher, mit wem PHP spricht – hinter einem Proxy also der Proxy, womit jede Grenze je IP alle Besucher als einen zählt. Ausgefüllt wird der Besucher aus X-Forwarded-For gelesen, das jeder setzen kann: Eine Adresse in dieser Liste, die kein Proxy ist, verschenkt genau diese Fälschung.',
 	'[[/_admin/config/label/backups]]'	=> 'Tägliche verschlüsselte Sicherung',
 	'[[/_admin/config/hint/backups]]'		=> 'Läuft einmal täglich bei der ersten Anfrage nach Mitternacht und behält vierzehn Tage. Wiederherstellen unter Backups.',
 	'[[/_admin/config/label/logs]]'			=> 'Aktivitätsprotokoll führen',

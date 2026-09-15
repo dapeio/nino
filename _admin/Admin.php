@@ -849,7 +849,7 @@ namespace Nino\Admin {
 			return match( $field['type'] ) {
 				'int' 		=> $key. ': expected a whole number between '. ( $field['min'] ?? PHP_INT_MIN ). ' and '. ( $field['max'] ?? PHP_INT_MAX ),
 				'bool' 		=> $key. ': expected true or false',
-				'lines' 	=> $key. ': expected one entry per line',
+				'lines' 	=> $key. ': expected one entry per line'. ( ( $field['entry'] ?? '' ) === 'ip' ? ', each an ip address or a cidr range' : '' ),
 				default 	=> $key. ': invalid value',
 			};
 		}

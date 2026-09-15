@@ -98,7 +98,7 @@ What a role may not do, it is not offered: a field it may not change is shown re
 
 A panel an account lacks the permission for is not rendered at all, and its actions answer `403` regardless; a pane shows only the tabs the account holds. A missing menu item or tab is therefore usually intentional, not a display error.
 
-After five failed attempts, an account is locked for an hour – both numbers are the **Login protection** tab of the Users panel; the same counter runs per address, so guessing across accounts is throttled too. Accounts and roles live in `config.php`, the login throttle's counters under `private/.auth/`.
+After five failed attempts, an account is locked for an hour – both numbers are the **Login protection** tab of the Users panel; the same counter runs per address, so guessing across accounts is throttled too - behind a reverse proxy that address is the proxy for everybody unless **Reverse proxies in front of this site** names it, and then one stranger's wrong guesses lock the whole site out. Accounts and roles live in `config.php`, the login throttle's counters under `private/.auth/`.
 
 For operation:
 
@@ -305,6 +305,7 @@ A module that keeps files of its own under `data/` merges them during a restore 
 | Errors and diagnostics | Write errors to a log | `/nino/error/log` | switch |
 | Errors and diagnostics | Show errors in the frontend | `/nino/error/display` | switch |
 | Errors and diagnostics | Always set the session cookie as secure | `/nino/session/force-secure-cookie` | switch |
+| Errors and diagnostics | Reverse proxies in front of this site | `/nino/http/proxies` | one address or cidr range per line |
 | Workbench | Daily encrypted backup | `/nino/admin/backups` | switch |
 | Workbench | Record an activity log | `/nino/admin/logs` | switch |
 | Page cache | Cache rendered pages | `/nino/cache/status` | switch |
@@ -314,6 +315,8 @@ A module that keeps files of its own under `data/` merges them during a restore 
 The login throttle is the Users panel's **Login protection** tab, the languages are the **Language** panel. Routes, navigations and the asset bundles are not edited here either: the first two have their panels, the bundle order is load-bearing for the CSS cascade and stays a deliberate file edit.
 
 **The page cache.** With **Cache rendered pages** on, `Modules\Cache` stores a finished page and serves it again without rendering. Never cached: anything but a plain `GET` with a `200`, anything with query vars, any uri under `/_` or `/.`, every request of a signed-in visitor, any page whose route has a handler of its own (a module endpoint, the catalogue's Posts pages), and anything a wildcard route answers - there the addresses are the visitor's to invent, and one page per invented address is disk a stranger decides the size of. **Never cache these** adds your own exclusions; a trailing `/*` covers a subtree. The `[csrf]` token and the `[jstext]` nonce are re-stamped per response. Any save in the workbench drops the whole cache; responses carry `X-Nino-Cache: hit` or `miss`.
+
+**Who a visitor is.** Every per-ip rule in the site - the login cooldown, the mail send cap, a form's rate limit, the address a session is listed under - counts the address PHP is talking to. Behind a reverse proxy that address is the proxy, for every visitor alike, so all of them share one bucket. **Reverse proxies in front of this site** ends that: with the proxy's address (or CIDR range) in the list, the visitor is read from `X-Forwarded-For` instead. Only put proxies in there that you operate or pay for - the header is one any client can write, and an entry that is not a proxy is what makes a forged address believable. Empty is the safe value and the default. A line that is neither an address nor a CIDR range is refused rather than stored, because it would match nothing while the form reads as configured.
 
 In production, `/nino/error/display` must be off.
 
@@ -365,7 +368,7 @@ The output is the complete file; write it to `private/.auth/pw.php`. Do this in 
 
 | Problem | Check |
 |---|---|
-| Login locked after several attempts | Wait out the lockout duration (an hour by default, see **Users › Login protection**); the lock is per account and per address. |
+| Login locked after several attempts | Wait out the lockout duration (an hour by default, see **Users › Login protection**); the lock is per account and per address. Behind a reverse proxy, set **Config › Reverse proxies in front of this site**, or every visitor shares one address and one lock. |
 | A panel or a tab is missing | The account lacks its permission, or its module is not active. |
 | Saving fails | Write permissions of the affected file or directory. |
 | Template missing in **Routes** | Only existing `templates/page-*.tpl` files are offered. |

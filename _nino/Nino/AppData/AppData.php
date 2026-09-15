@@ -100,6 +100,11 @@ namespace Nino {
 		    'footer',
 			],
 			'/nino/http/routes'		=> [],
+			// Which peer addresses are a reverse proxy in front of this site,
+			// written as exact addresses or cidr ranges. Empty is "no proxy":
+			// the tcp peer is the visitor and X-Forwarded-For is ignored
+			// entirely (see \Nino\Http::getClientIp())
+			'/nino/http/proxies'	=> [],
 			'/nino/auth/user'			=> [],
 			'/nino/auth/roles'		=> [],
 			// What the Features panel records per installed feature: the

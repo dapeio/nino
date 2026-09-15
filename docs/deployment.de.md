@@ -252,9 +252,12 @@ Prüfe in `config.php` beziehungsweise über das Config-Panel der Workbench mind
 | `/nino/error/display` | `false` | unterdrückt technische Fehlerdetails im Browser |
 | `/nino/error/log` | `true` | schreibt Fehler für die spätere Diagnose ins Log |
 | `/nino/session/force-secure-cookie` | `true` bei TLS-Terminierung vor PHP | erzwingt sichere Session-Cookies hinter einem HTTPS-Proxy |
+| `/nino/http/proxies` | die Adressen des Proxys, wo einer vor der Seite steht, sonst leer | bestimmt, als welche Adresse ein Besucher zählt – und damit jede Grenze je IP |
 | `/nino/admin/backups` | nach Betriebsentscheidung | steuert die tägliche verschlüsselte Sicherung der Workbench |
 | `/nino/admin/logs` | nach Betriebsentscheidung | steuert das Aktivitätsprotokoll der Workbench |
 | `/nino/catalogue/url` | der Standard, oder `''`, wo nichts aus dem Katalog installiert werden soll | woher das Panel Features den Feature-Katalog lädt – nur auf Anforderung, nie von selbst; leer schaltet den Katalog ab |
+
+**Hinter einem Reverse Proxy** (Cloudflare, ein Load Balancer, ein Ingress) gehören beide Proxy-Schlüssel zusammen: `/nino/session/force-secure-cookie`, weil PHP selbst kein HTTPS sieht, und `/nino/http/proxies`, weil `REMOTE_ADDR` sonst für jeden einzelnen Besucher der Proxy ist. Ohne den zweiten zählt die Seite sie alle als einen Client – die Anmeldedrossel, die Sendegrenze je IP und das Rate-Limit eines Formulars gelten dann für das ganze Internet auf einmal. Die Sendegrenze tut es stumm, denn eine Ablehnung wegen Rate-Limit wird nicht als Fehler gemeldet; die Anmeldedrossel tut es laut, und ein Fremder kann sie absichtlich auslösen, mit falschen Anmeldungen an Kontonamen, die es gar nicht geben muss. Tragen Sie die Adressen oder CIDR-Bereiche der Proxies ein, die Sie betreiben oder bezahlen, eine je Zeile im Panel Konfiguration; der Besucher ist dann der rechteste `X-Forwarded-For`-Sprung, der keiner davon ist. Lassen Sie den Schlüssel leer, wo kein Proxy vor der Seite steht: Den Header kann jeder Client schreiben, und erst ein Eintrag, der kein Proxy ist, macht ihn glaubwürdig.
 
 Fehlermeldungen sollten im Browser keine Dateipfade, Konfigurationswerte oder Stacktraces offenlegen. Prüfe nach dem Umschalten, dass Fehler weiterhin in einem geschützten Log ankommen und für den Betreiber erreichbar bleiben.
 

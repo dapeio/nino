@@ -188,6 +188,36 @@ All notable changes to Nino are documented in this file.
   with a 403 naming it. The address stays changeable, since a rename grants
   nothing, and an account editing itself has proven its current password.
 
+- **Behind a reverse proxy, every visitor was the same visitor.** The client
+  address is the TCP peer, and behind Cloudflare, a load balancer or an
+  ingress that peer is the proxy - the same address for everybody. Every
+  per-ip rule in the site reads that one value, so they all counted the
+  internet as one client: the login cooldown's ip bucket, `\Nino\Mail`'s send
+  cap, a form's rate limit and the address a session is listed under. The
+  cooldown was the sharper end - fifty wrong logins against account names
+  that need not exist put the one address every visitor shares into cooldown,
+  and every admin's correct password was refused for the hour. The mail cap was
+  the one that bit first and quietest - five contact-form submissions from
+  anyone locked out every visitor's mail, newsletter confirmations included,
+  for the rest of the window, and a rate-limit refusal is not surfaced as an
+  error.
+
+  `/nino/http/proxies` names the proxies in front of the site, as exact
+  addresses or CIDR ranges, and the Config panel's **Reverse proxies in front
+  of this site** edits the same list. Where the peer is one of them, the
+  visitor is the rightmost `X-Forwarded-For` hop that is not itself a listed
+  proxy; everything left of it is never read, because a forwarding proxy
+  appends to that header rather than checking what is already in it.
+
+  The list is what makes the header believable, which is why the key exists
+  at all rather than the header simply being trusted: `X-Forwarded-For` is an
+  ordinary request header any client can write, and read unconditionally it
+  would have handed the cooldown bucket, the log's ip field and the session
+  list's address to whoever asked. Empty is the default and keeps the previous behaviour
+  exactly - the header ignored, the peer the answer. A line that is neither an
+  address nor a CIDR range is refused on save rather than stored, because it
+  would match nothing while the form reads as configured.
+
 - **A slider could not be operated with a keyboard.** Its previous and next
   controls were `<div>`s with a click listener and its dots were bare `<li>`s
   with one - reachable with a pointer and with nothing else: no tab stop, no

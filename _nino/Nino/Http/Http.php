@@ -60,7 +60,7 @@ namespace Nino {
 				'body'					=> file_get_contents( 'php://input' ),
 				'user'					=> $auth['user'],
 				'pw'						=> $auth['pw'],
-				'ip'						=> self::getClientIp(),
+				'ip'						=> self::getClientIp( $appData ),
 			];
 			// Seed the response header with the default security headers, so a
 			// callback that extends one of them (eg. Jstext appending its
@@ -225,28 +225,166 @@ namespace Nino {
 			return $cleanUri;
 		}
 
-		// Return current client ip address. Only the actual TCP peer address
-		// (REMOTE_ADDR) is trusted - Client-Ip/X-Forwarded-For are ordinary
-		// request headers any client can set to an arbitrary value, and Nino
-		// has no trusted-proxy configuration to verify them against. Trusting
-		// them here would let a session's ip-pinning check (see Auth) and the
-		// activity log's ip field both be spoofed by the request itself.
-		//
-		// Behind a reverse proxy (Cloudflare, a load balancer, ...) this is
-		// necessarily the proxy's own address for every single visitor, not
-		// theirs - REMOTE_ADDR simply has no other value to be. Mail::_hit()'s
-		// per-ip send cap is the one place that currently matters: it becomes
-		// a per-site cap instead, and five contact-form submissions from
-		// anyone lock out every visitor's mail (newsletter confirmations
-		// included) for the rest of the window, silently, since a rate-limit
-		// refusal is not surfaced as an error. A trusted-proxy allowlist
-		// (only trust X-Forwarded-For's rightmost hop when REMOTE_ADDR itself
-		// is a known proxy) would fix this properly but isn't implemented -
-		// this comment exists so that gap gets found in the source, not at
-		// the mail server, if it ever bites.
-		public static function getClientIp(): string {
+		// The one header a forwarded client address is read from. Client-Ip
+		// and the rest are not: every proxy that forwards an address writes
+		// this one, and a second spelling would be a second thing the
+		// allowlist below has to stay in sync with
+		private const string FORWARDED_FOR = 'HTTP_X_FORWARDED_FOR';
 
-			return $_SERVER['REMOTE_ADDR'] ?? '';
+		// Return current client ip address.
+		//
+		// The TCP peer address (REMOTE_ADDR) is the answer, unless that peer
+		// is itself a proxy this site was configured to trust:
+		// X-Forwarded-For is an ordinary request header any client can set to
+		// an arbitrary value, so a forwarded address is worth exactly as much
+		// as the hop that wrote it. Read unconditionally it would let the
+		// login cooldown's ip bucket (see Auth::loginUser()), the activity
+		// log's ip field and the address a session is listed under all be
+		// set by the request itself. A session is not pinned to an address -
+		// its token is the key it lives under, and the ip beside it is the
+		// display value the workbench's session list shows.
+		//
+		// Behind a reverse proxy (Cloudflare, a load balancer, ...) the peer
+		// address is the proxy's own for every single visitor, though, and
+		// then every per-ip rule in the site collapses into one bucket:
+		// Mail::_hit()'s send cap becomes a per-site cap, where five
+		// contact-form submissions from anyone lock out every visitor's mail
+		// (newsletter confirmations included) for the rest of the window -
+		// silently, since a rate-limit refusal is not surfaced as an error.
+		// Auth's ip bucket becomes one too, and it is the larger of the two:
+		// maxtries * IP_TRIES_FACTOR wrong logins against account names that
+		// need not exist put that one address in cooldown, and every admin's
+		// correct password is refused for as long as it lasts.
+		//
+		// So the peer has to be named: '/nino/http/proxies' lists the proxies
+		// in front of this site, as exact addresses or cidr ranges. Where the
+		// peer is one of them, the client is the rightmost X-Forwarded-For
+		// hop that is not itself a listed proxy - everything left of it is
+		// whatever the client sent (a forwarding proxy appends, it does not
+		// verify) and is never read. An empty list, which is the default,
+		// keeps the plain behaviour: the header is ignored and the peer is
+		// the client. So does calling this without $appData, for the few
+		// callers that have none.
+		public static function getClientIp( array $appData = [] ): string {
+
+			$remote 	= $_SERVER['REMOTE_ADDR'] ?? '';
+			$proxies	= $appData['/nino/http/proxies'] ?? [];
+
+			if( is_array( $proxies ) === false || $proxies === []
+				|| self::_isTrustedProxy( $remote, $proxies ) === false )
+				return $remote;
+
+			$hops = [];
+			foreach( explode( ',', (string) ( $_SERVER[ self::FORWARDED_FOR ] ?? '' ) ) as $hop )
+				if( ( $hop = self::_cleanIp( $hop ) ) !== '' )
+					$hops[] = $hop;
+
+			if( $hops === [] )
+				return $remote;
+
+			// Right to left: the rightmost hop is the one our own proxy
+			// wrote, the one before it what the proxy before that wrote. The
+			// walk stops at the first address no trusted hop vouches for
+			for( $i = count( $hops ) - 1; $i >= 0; $i-- )
+				if( self::_isTrustedProxy( $hops[$i], $proxies ) === false )
+					return $hops[$i];
+
+			// Every hop is a trusted proxy of ours, so the visitor is one of
+			// them and the leftmost entry is as close to them as the chain
+			// gets
+			return $hops[0];
+		}
+
+		// One X-Forwarded-For entry down to a bare address: the spacing the
+		// header is written with goes, a port some proxies append goes
+		// ('198.51.100.7:53238', '[2001:db8::7]:53238'), and what is left has
+		// to be an ip address - so a hop cannot smuggle in a hostname, a cidr
+		// range or a rate-limit key of its own choosing
+		private static function _cleanIp( string $raw ): string {
+
+			$ip = trim( $raw );
+
+			if( str_starts_with( $ip, '[' ) === true ) {
+
+				// [v6]:port - the brackets are there to keep the port apart
+				// from the address' own colons
+				$end	= strpos( $ip, ']' );
+				$ip 	= ( $end !== false ) ? substr( $ip, 1, $end - 1 ) : substr( $ip, 1 );
+			}
+			// A single colon is a v4 address with a port; several are a v6
+			// address, which carries no port without the brackets above
+			else if( substr_count( $ip, ':' ) === 1 )
+				$ip = explode( ':', $ip )[0];
+
+			return ( filter_var( $ip, FILTER_VALIDATE_IP ) !== false ) ? $ip : '';
+		}
+
+		// Is this address one of the configured proxies? An entry is an exact
+		// address or a cidr range ('10.0.0.0/8', '2001:db8::/32'); anything
+		// else in the list matches nothing rather than everything, because
+		// the failure mode of a typo here is trusting a header
+		private static function _isTrustedProxy( string $ip, array $proxies ): bool {
+
+			if( $ip === '' )
+				return false;
+
+			foreach( $proxies as $proxy )
+				if( is_string( $proxy ) === true && self::_ipInRange( $ip, trim( $proxy ) ) === true )
+					return true;
+
+			return false;
+		}
+
+		// Compare packed addresses rather than text: inet_pton() turns both
+		// sides into the same bytes whatever notation they were written in
+		// ('::1' and '0:0:0:0:0:0:0:1' are one address, '10.0.0.1' has one
+		// spelling but a v4-mapped v6 peer does not), and a cidr range is
+		// then its first bits. v4 and v6 never match each other, since their
+		// packed forms differ in length.
+		private static function _ipInRange( string $ip, string $range ): bool {
+
+			if( $range === '' )
+				return false;
+
+			$bits = null;
+
+			if( str_contains( $range, '/' ) === true ) {
+
+				[ $range, $prefix ] = explode( '/', $range, 2 );
+
+				if( ctype_digit( $prefix ) === false )
+					return false;
+
+				$bits = (int) $prefix;
+			}
+
+			$packedIp 		= @inet_pton( $ip );
+			$packedRange	= @inet_pton( $range );
+
+			if( $packedIp === false || $packedRange === false
+				|| strlen( $packedIp ) !== strlen( $packedRange ) )
+				return false;
+
+			if( $bits === null )
+				return $packedIp === $packedRange;
+
+			if( $bits > strlen( $packedRange ) * 8 )
+				return false;
+
+			$bytes 	= intdiv( $bits, 8 );
+			$rest 	= $bits % 8;
+
+			if( $bytes > 0 && strncmp( $packedIp, $packedRange, $bytes ) !== 0 )
+				return false;
+
+			if( $rest === 0 )
+				return true;
+
+			// The byte the prefix ends inside of: compare only its leading
+			// $rest bits
+			$mask = ( 0xff << ( 8 - $rest ) ) & 0xff;
+
+			return ( ord( $packedIp[$bytes] ) & $mask ) === ( ord( $packedRange[$bytes] ) & $mask );
 		}
 
 		// PHP_AUTH_USER/PHP_AUTH_PW are populated by some SAPIs, while CGI and

@@ -582,7 +582,7 @@ namespace Nino {
 				foreach( $values as $name => $value )
 					$entry[$name] = htmlspecialchars( (string) $value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8' );
 
-				$entry['ip'] = \Nino\Http::getClientIp();
+				$entry['ip'] = \Nino\Http::getClientIp( $appData );
 
 				\Nino\Filesystem::mutate( $appData, '/data/forms.'. date( 'Y-m' ). '.php', function( array $entries ) use ( $entry ): array {
 					$entries[] = $entry;

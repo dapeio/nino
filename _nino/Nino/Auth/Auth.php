@@ -115,7 +115,7 @@ namespace Nino {
 			// Check user data - no client ip (cli, eg. the smoke tests) means no
 			// ip bucket rather than one shared '' bucket everything falls into
 			$user		= self::getUser( $appData, $username );
-			$ip			= \Nino\Http::getClientIp();
+			$ip			= \Nino\Http::getClientIp( $appData );
 			$ipKeys	= ( $ip !== '' ) ? [ self::IP_KEY_PREFIX. $ip ] : [];
 
 			// Check cooldown - the ip bucket is checked regardless of whether
@@ -238,7 +238,7 @@ namespace Nino {
 
 			// Every login mints a new token, so there is never an "already have
 			// a session for this key" case to skip the write for
-			$user['sessions'][$token] = [ 'time' => $now, 'ip' => \Nino\Http::getClientIp() ];
+			$user['sessions'][$token] = [ 'time' => $now, 'ip' => \Nino\Http::getClientIp( $appData ) ];
 			$appData['/nino/auth/user'][$user['mail']] = $user;
 			\Nino\AppData::writeContentData( $appData, [ '/nino/auth/user' ] );
 

@@ -709,12 +709,12 @@ function callDev( array &$appData, string $class, string $method, array $data = 
 [ $status, $body ] = callDev( $appData, \Nino\Modules\Config\Admin::class, 'apiList' );
 check( 'apiList succeeds', $status === 200 );
 check( 'apiList returns the field schema in render order', array_column( $body['fields'], 'key' ) === [
-	'/nino/error/log', '/nino/error/display', '/nino/session/force-secure-cookie',
+	'/nino/error/log', '/nino/error/display', '/nino/session/force-secure-cookie', '/nino/http/proxies',
 	'/nino/admin/backups', '/nino/admin/logs',
 	'/nino/cache/status', '/nino/cache/ttl', '/nino/cache/blacklist',
 ] );
 check( 'every field carries the type its editor renders from', array_column( $body['fields'], 'type' ) === [
-	'bool', 'bool', 'bool', 'bool', 'bool', 'bool', 'int', 'lines',
+	'bool', 'bool', 'bool', 'lines', 'bool', 'bool', 'bool', 'int', 'lines',
 ] );
 check( 'apiList returns the group headings', array_keys( $body['groups'] ) === [ 'diagnostics', 'editor', 'cache' ] );
 check( 'every field belongs to a declared group', array_diff( array_unique( array_column( $body['fields'], 'group' ) ), array_keys( $body['groups'] ) ) === [] );
@@ -842,6 +842,22 @@ check( 'apiSave rejects an int above its maximum', $status === 400 );
 
 [ $status ] = callDev( $appData, \Nino\Modules\Config\Admin::class, 'apiSave', [ 'fields' => [ '/nino/error/log' => 'yes please' ] ] );
 check( 'apiSave rejects a bool that is neither', $status === 400 );
+
+/*	The proxy list decides which address every per-ip rule in the site counts
+	a visitor as, so a line that is not an address at all is refused rather
+	than stored: it would match nothing while the form reads as configured */
+[ $status ] = callDev( $appData, \Nino\Modules\Config\Admin::class, 'apiSave', [ 'fields' => [ '/nino/http/proxies' => "198.51.100.7\n10.0.0.0/8\n2001:db8::/32" ] ] );
+check( 'apiSave takes addresses and cidr ranges as the proxy list', $status === 200 && $appData['/nino/http/proxies'] === [ '198.51.100.7', '10.0.0.0/8', '2001:db8::/32' ] );
+check( '...and writes them to config.php', \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/proxies'] === [ '198.51.100.7', '10.0.0.0/8', '2001:db8::/32' ] );
+
+[ $status ] = callDev( $appData, \Nino\Modules\Config\Admin::class, 'apiSave', [ 'fields' => [ '/nino/http/proxies' => 'cloudflare' ] ] );
+check( 'apiSave refuses a proxy entry that is no address', $status === 400 && $appData['/nino/http/proxies'] === [ '198.51.100.7', '10.0.0.0/8', '2001:db8::/32' ] );
+
+[ $status ] = callDev( $appData, \Nino\Modules\Config\Admin::class, 'apiSave', [ 'fields' => [ '/nino/http/proxies' => '10.0.0.0/64' ] ] );
+check( '...and a cidr prefix the address it belongs to cannot have', $status === 400 );
+
+[ $status ] = callDev( $appData, \Nino\Modules\Config\Admin::class, 'apiSave', [ 'fields' => [ '/nino/http/proxies' => '' ] ] );
+check( 'an emptied proxy list saves as the empty list that trusts nothing', $status === 200 && $appData['/nino/http/proxies'] === [] );
 
 // Nothing is written until every field validates, so one bad value cannot leave
 // half a form saved

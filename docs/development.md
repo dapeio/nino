@@ -826,10 +826,26 @@ Nino starts sessions in strict mode. Session cookies are `HttpOnly`, use `SameSi
 Authentication is additionally protected by:
 
 - a dummy password hash against measurable differences with unknown users,
-- failure limits per account and IP,
+- failure limits per account and IP - the IP being the one `\Nino\Http::getClientIp()` resolves, so a site behind a reverse proxy needs `/nino/http/proxies` set or the whole internet shares one bucket,
 - automatic rehashing of outdated password hashes,
 - random session tokens with limited runtime,
 - and the ability to revoke all sessions of a user.
+
+### The Visitor's Address
+
+`\Nino\Http::getClientIp( $appData )` answers who the request is from. That is the TCP peer (`REMOTE_ADDR`) - unless the peer is a reverse proxy listed under `/nino/http/proxies`, in which case it is the rightmost `X-Forwarded-For` hop that is not itself one of those proxies.
+
+The key matters because every per-IP rule in the site reads this one value: the login cooldown's IP bucket, `\Nino\Mail`'s send cap, a form's rate limit, and the address a session is listed under in the workbench. (A session is not pinned to an address - its token is the key it lives under.) Behind a proxy without the key set, `REMOTE_ADDR` is the proxy for every single visitor, so all of them share one bucket - five contact-form submissions from anyone then hold up every visitor's mail for the rest of the window.
+
+```php
+'/nino/http/proxies' => [
+    '198.51.100.7',       // one proxy
+    '10.0.0.0/8',         // or a whole range
+    '2001:db8::/32',      // v4 and v6, exact or cidr
+],
+```
+
+Empty, which is the default, means "no proxy": `X-Forwarded-For` is ignored entirely. Fill it in only with proxies you actually operate or pay for - the header is one any client can write, and an address in this list that is not a proxy hands out exactly that spoof. Everything left of the rightmost untrusted hop is never read, because a forwarding proxy appends to the header rather than verifying what is already in it. The Config panel edits the same list and refuses a line that is neither an address nor a CIDR range.
 
 ### Response Headers
 

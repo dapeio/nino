@@ -83,6 +83,17 @@ namespace Nino\Modules\Config {
 				'label'	=> '/_admin/config/label/securecookie',
 				'hint' 	=> '/_admin/config/hint/securecookie',
 			],
+			// The list \Nino\Http::getClientIp() checks the peer address
+			// against before it reads a forwarded one. Empty is the safe
+			// value and the default; a wrong entry here trusts a header, so
+			// the hint says what belongs in it
+			'/nino/http/proxies' => [
+				'type' 	=> 'lines',
+				'entry'	=> 'ip',
+				'group'	=> 'diagnostics',
+				'label'	=> '/_admin/config/label/proxies',
+				'hint' 	=> '/_admin/config/hint/proxies',
+			],
 			// Both flags are read by the workbench (\Nino\Modules\Backups::maybeRun(), \Nino\Modules\Logs\Admin::record()),
 			// which is also where the keys are named after.
 			'/nino/admin/backups' => [
@@ -327,7 +338,7 @@ namespace Nino\Modules\Config {
 
 				'int' => \Nino\Admin\Admin::cleanInt( $value, $field ),
 
-				'lines' => self::_cleanLines( $value ),
+				'lines' => self::_cleanLines( $value, $field['entry'] ?? '' ),
 
 				default => null,
 			};
@@ -339,10 +350,11 @@ namespace Nino\Modules\Config {
 		 *	after editing and none of them mean anything to a consumer.
 		 *
 		 *	@param		mixed			$value				As posted - a list, or the raw textarea string
+		 *	@param		string		$entry				What one line has to be, '' for anything
 		 *
 		 *	@return 	array|null							The cleaned list, or null if it is not a list of strings
 		 */
-		private static function _cleanLines( mixed $value ): ?array {
+		private static function _cleanLines( mixed $value, string $entry = '' ): ?array {
 
 			if( is_string( $value ) === true )
 				$value = preg_split( '/\r\n|\r|\n/', $value );
@@ -358,11 +370,52 @@ namespace Nino\Modules\Config {
 
 				$line = trim( $line );
 
-				if( $line !== '' && in_array( $line, $lines, true ) === false )
+				if( $line === '' )
+					continue;
+
+				if( $entry === 'ip' && self::_isIpEntry( $line ) === false )
+					return null;
+
+				if( in_array( $line, $lines, true ) === false )
 					$lines[] = $line;
 			}
 
 			return $lines;
+		}
+
+		/**
+		 *	One line of an 'ip' list: an address, or an address with a cidr
+		 *	prefix.
+		 *
+		 *	Refused rather than kept, because an entry that is neither matches
+		 *	nothing - and a list whose typo silently matches nothing sits in
+		 *	the form looking configured while the site still counts every
+		 *	visitor as the proxy (see \Nino\Http::getClientIp(), which is what
+		 *	reads this list).
+		 *
+		 *	@param		string		$line					One cleaned line
+		 *
+		 *	@return 	bool
+		 */
+		private static function _isIpEntry( string $line ): bool {
+
+			$parts	= explode( '/', $line, 2 );
+			$ip 		= filter_var( $parts[0], FILTER_VALIDATE_IP );
+
+			if( $ip === false )
+				return false;
+
+			if( isset( $parts[1] ) === false )
+				return true;
+
+			if( ctype_digit( $parts[1] ) === false )
+				return false;
+
+			// A v6 prefix goes to 128, a v4 one to 32 - beyond that the range
+			// is not a range but a typo
+			$max = ( filter_var( $ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6 ) !== false ) ? 128 : 32;
+
+			return (int) $parts[1] <= $max;
 		}
 	}
 }

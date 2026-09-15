@@ -5,7 +5,7 @@
 return [
 	'[[/_admin/nav/config]]'						=> 'Config',
 	'[[/_admin/config/group/diagnostics]]'	=> 'Errors and diagnostics',
-	'[[/_admin/config/intro/diagnostics]]'	=> 'What happens when php raises an error, and how the session cookie is issued.',
+	'[[/_admin/config/intro/diagnostics]]'	=> 'What happens when php raises an error, how the session cookie is issued, and which address a visitor is counted as.',
 	'[[/_admin/config/group/editor]]'		=> 'Editor features',
 	'[[/_admin/config/intro/editor]]'		=> 'Background work /_admin does on its own. Both were silently on in every project before 0.12.0-beta – see the changelog.',
 	'[[/_admin/config/group/cache]]'		=> 'Page cache',
@@ -16,6 +16,8 @@ return [
 	'[[/_admin/config/hint/errordisplay]]'	=> 'Development only. A live site must leave this off – the dump includes file paths and a stack trace.',
 	'[[/_admin/config/label/securecookie]]'	=> 'Always set the session cookie as secure',
 	'[[/_admin/config/hint/securecookie]]'	=> 'Turn on behind a tls-terminating proxy, where php sees no HTTPS of its own and would otherwise leave the flag off.',
+	'[[/_admin/config/label/proxies]]'	=> 'Reverse proxies in front of this site',
+	'[[/_admin/config/hint/proxies]]'	=> 'One address or cidr range per line, and only proxies you operate or pay for. Left empty, a visitor is whoever php is talking to – which behind a proxy is the proxy, so every per-ip limit on the site counts all visitors as one. Filled in, the visitor is read from X-Forwarded-For, which anyone can set: an address in this list that is not actually a proxy hands out that spoof.',
 	'[[/_admin/config/label/backups]]'	=> 'Daily encrypted backup',
 	'[[/_admin/config/hint/backups]]'		=> 'Runs once a day on the first request after midnight and keeps fourteen days. Restore them under Backups.',
 	'[[/_admin/config/label/logs]]'			=> 'Record an audit trail',
