@@ -294,7 +294,7 @@ Die Methode liest den aktuellen Dateistand erneut, übernimmt nur die angegebene
 - Lesezugriffe werden anhand von Änderungszeit und Dateigröße gecacht.
 - Schreibvorgänge erzeugen zunächst eine temporäre Datei im Zielverzeichnis und ersetzen das Ziel anschließend per `rename()`.
 - Sperren liegen als Sidecar-Dateien unter `/data/.locks`; ihr Name wird aus dem Zielpfad abgeleitet.
-- Pfade mit `..` werden als zusätzliche Schutzschicht abgewiesen.
+- Pfade mit `..` werden als zusätzliche Schutzschicht abgewiesen – von jeder Tür von `Filesystem`, nicht nur von den beiden, die Inhalte lesen und schreiben: `path()` und `url()` antworten mit `''`, `fileExists()`, `lockFile()`, `putFileContent()` und `mutate()` mit `false`, `getFileContent()` mit seinem Vorgabewert, und `forceDir()` legt nichts an. Jede von ihnen protokolliert das, damit eine Aufrufstelle, die ihre Eingabe nicht geprüft hat, auffindbar ist.
 
 Für eine einfache, vollständige Ersetzung genügt `putFileContent()`:
 

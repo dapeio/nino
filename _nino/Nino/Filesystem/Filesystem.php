@@ -229,6 +229,15 @@ namespace Nino {
 		// that happens. The lock file is only ever created, never replaced.
 		public static function lockFile( array &$appData, string $filename ): bool {
 
+			// The lock's own file name is a sha1, so a traversal could not have
+			// escaped through it - but a caller that may not read or write this
+			// path may not hold a lock on it either, and mutate() reads the
+			// answer as "may I proceed". The rule itself, not
+			// _prepareFileCache()'s answer: that one says whether the file is
+			// there, and a first write locks a file that is not there yet
+			if( str_contains( $filename, '..' ) === true )
+				return false;
+
 			self::_prepareFileCache( $appData, $filename );
 
 			// Already holding it (eg. lockFile() followed by a putFileContent()
@@ -413,10 +422,26 @@ namespace Nino {
 		 *	@return 	string									Absolute path, existing or not
 		 */
 		public static function path( array &$appData, string $filename ): string {
+
+			// Same rejection as every reader and writer (see
+			// _prepareFileCache()). A path nobody may read is a path nobody may
+			// build either, and answering '' rather than a resolved traversal
+			// is what makes a call site that forgot to validate fail visibly
+			if( str_contains( $filename, '..' ) === true ) {
+				trigger_error( 'Filesystem::path(): refusing a path containing "..": \''. $filename. '\'', E_USER_WARNING );
+				return '';
+			}
+
 			return self::_resolvePath( $appData, $filename );
 		}
 
 		public static function forceDir( array &$appData, string $dirpath ): void {
+
+			// See path()
+			if( str_contains( $dirpath, '..' ) === true ) {
+				trigger_error( 'Filesystem::forceDir(): refusing a path containing "..": \''. $dirpath. '\'', E_USER_WARNING );
+				return;
+			}
 
 			$dirpath = self::_resolvePath( $appData, $dirpath );
 
@@ -477,6 +502,13 @@ namespace Nino {
 		 *	@return 	string
 		 */
 		public static function url( array &$appData, string $filename ): string {
+
+			// See path() - a url is built from the same virtual path, and a
+			// traversal in one is a link out of the project's own tree
+			if( str_contains( $filename, '..' ) === true ) {
+				trigger_error( 'Filesystem::url(): refusing a path containing "..": \''. $filename. '\'', E_USER_WARNING );
+				return '';
+			}
 
 			$filename = '/'. ltrim( $filename, '/' );
 
@@ -594,7 +626,16 @@ namespace Nino {
 		}
 
 
+		// The ".." rejection getFileContent()/putFileContent() have always made,
+		// in the one place every reader, writer and locker passes through: it
+		// is documented as a protective layer under the whole class (see
+		// docs/development.md), and a layer that only two of its doors have is
+		// not one. Every call site is still expected to validate its own input
+		// against its own whitelist - this is what catches the one that forgot
 		private static function _prepareFileCache( array &$appData, string $filename ): bool {
+
+			if( str_contains( $filename, '..' ) === true )
+				return false;
 
 			// 'fstat' is the mtime/size fingerprint getFileContent() decides
 			// staleness by; lock handles deliberately live outside this slot,

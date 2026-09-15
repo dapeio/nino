@@ -1002,6 +1002,27 @@ check( '...and drops the account\'s bucket from auth-tries.php', isset( \Nino\Fi
 check( '...so two more typos later do not add up to a lockout', is_array( \Nino\Auth::loginUser( $appData, 'counter@example.com', 'correct horse battery staple' ) ) === true );
 \Nino\Auth::deleteUser( $appData, 'counter@example.com' );
 
+// An account written by hand. The class says so itself: status, sessions and
+// perms are a developer-only, direct-json task - so a record that is a hash
+// and a permission list and nothing else is a thing a project has, and
+// reading a key that is not there is a warning this framework treats as
+// fatal: a 500 on the login form rather than a refusal
+$appData['/nino/auth/user']['handwritten@example.com'] = [ 'pw' => password_hash( 'correct horse battery staple', PASSWORD_DEFAULT ), 'perms' => [ '/*' ] ];
+$handWarnings = [];
+set_error_handler( static function( int $no, string $message ) use ( &$handWarnings ): bool { $handWarnings[] = $message; return true; } );
+$handLogin = \Nino\Auth::loginUser( $appData, 'handwritten@example.com', 'correct horse battery staple' );
+restore_error_handler();
+check( 'a hand-written account without a status is refused, not raised at', $handLogin === false && $handWarnings === [] );
+
+$appData['/nino/auth/user']['handwritten@example.com']['status'] = 2;
+$handWarnings = [];
+set_error_handler( static function( int $no, string $message ) use ( &$handWarnings ): bool { $handWarnings[] = $message; return true; } );
+$handEnabled = \Nino\Auth::loginUser( $appData, 'handwritten@example.com', 'correct horse battery staple' );
+restore_error_handler();
+check( '...and one with a status but no sessions list logs in', is_array( $handEnabled ) === true && $handWarnings === [] );
+check( '...with the session it just opened', count( \Nino\Auth::getUser( $appData, 'handwritten@example.com' )['sessions'] ) === 1 );
+\Nino\Auth::deleteUser( $appData, 'handwritten@example.com' );
+
 // Disabling an account must end the sessions it already holds. _resumeSession()
 // checked only that the token was listed and unexpired, so a disabled account
 // stayed fully authorised in every browser holding one - for up to SESSION_TTL
@@ -2977,6 +2998,35 @@ foreach( \Nino\Filesystem::PRIVATE_DIRS as $private )
 	check( "$private resolves against the private root", \Nino\Filesystem::path( $pathAppData, $private ) === '/srv/site/private'. $private );
 
 check( 'a path under a private directory follows it', \Nino\Filesystem::path( $pathAppData, '/text/de_DE.php' ) === '/srv/site/private/text/de_DE.php' );
+
+/*	The '..' rejection is documented as a layer under this whole class, and
+	only the two content calls made it: every other door - the one that says
+	whether a file is there, the one that builds a path for somebody else to
+	read, the one that creates a directory, the one that takes a lock, the one
+	that builds a url - resolved a traversal and handed it on. Every call site
+	is still expected to validate its own input; this is what catches the one
+	that forgot	*/
+$traversalWarnings = [];
+set_error_handler( static function( int $no, string $message ) use ( &$traversalWarnings ): bool { $traversalWarnings[] = $message; return true; } );
+
+$refused = [
+	'path'				=> \Nino\Filesystem::path( $pathAppData, '/text/../../etc/passwd' ),
+	'url'					=> \Nino\Filesystem::url( $pathAppData, '/images/../../etc/passwd' ),
+	'fileExists'	=> \Nino\Filesystem::fileExists( $appData, '/text/../../etc/passwd' ),
+	'lockFile'		=> \Nino\Filesystem::lockFile( $appData, '/data/../../escape.lock' ),
+	'read'				=> \Nino\Filesystem::getFileContent( $appData, '/text/../../etc/passwd', 'the default' ),
+	'write'				=> \Nino\Filesystem::putFileContent( $appData, '/data/../../escape.php', [ 'x' ] ),
+	'mutate'			=> \Nino\Filesystem::mutate( $appData, '/data/../../escape.php', static fn( array $state ): array => [ 'x' ] ),
+];
+
+\Nino\Filesystem::forceDir( $appData, '/data/../../escape-dir' );
+restore_error_handler();
+
+check( 'every door of the filesystem refuses a traversal, not just the two that read and write content', $refused === [
+	'path' => '', 'url' => '', 'fileExists' => false, 'lockFile' => false, 'read' => 'the default', 'write' => false, 'mutate' => false,
+] );
+check( '...and says so, so a call site that forgot to validate is findable', count( $traversalWarnings ) >= 3 );
+check( '...and the directory it refused does not exist', is_dir( dirname( $sandbox, 2 ). '/escape-dir' ) === false );
 check( 'a directory merely starting with a private name does not', \Nino\Filesystem::path( $pathAppData, '/textures/x.png' ) === '/srv/site/textures/x.png' );
 check( 'everything under /private follows the private root', \Nino\Filesystem::path( $pathAppData, '/private/.auth/pw.php' ) === '/srv/site/private/.auth/pw.php' );
 check( 'the old /content prefix is not a private-path alias', \Nino\Filesystem::path( $pathAppData, '/content/.auth/pw.php' ) === '/srv/site/content/.auth/pw.php' );

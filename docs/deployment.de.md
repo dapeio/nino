@@ -211,7 +211,7 @@ Vergib diese Rechte an den Benutzer, unter dem PHP ausgeführt wird. Weltweit be
 
 ## Konfiguration und Application-Quellcode außerhalb des Webroots
 
-Standardmäßig liegt der vollständige private Verzeichnisbaum einschließlich `config.php` in `private/`. `NINO_PRIVATE_DIR` verschiebt diesen vollständigen Baum in ein existierendes, beschreibbares Verzeichnis außerhalb des Webroots. Mit `NINO_CONFIG_DIR` kann zusätzlich nur `config.php` auf ein anderes existierendes, beschreibbares Verzeichnis zeigen.
+Standardmäßig liegt der vollständige private Verzeichnisbaum einschließlich `config.php` in `private/`. `NINO_PRIVATE_DIR` verschiebt diesen vollständigen Baum in ein existierendes, beschreibbares Verzeichnis außerhalb des Webroots. Mit `NINO_CONFIG_DIR` kann zusätzlich nur `config.php` auf ein anderes existierendes, beschreibbares Verzeichnis zeigen. `NINO_CONTENT_DIR`, der Name von `NINO_PRIVATE_DIR` vor 1.1, wird beim Start mit einem Hinweis auf den Nachfolger abgelehnt statt ignoriert – eine Installation, die noch den alten Namen setzt, ließe den privaten Baum sonst dort liegen, wo er ist, und sähe dabei aus, als wäre er verschoben.
 
 ```php
 define('NINO_PRIVATE_DIR', '/pfad/ausserhalb/des/webroots/nino-private');

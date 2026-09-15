@@ -188,6 +188,27 @@ All notable changes to Nino are documented in this file.
   with a 403 naming it. The address stays changeable, since a rename grants
   nothing, and an account editing itself has proven its current password.
 
+- **The `..` rejection was a layer with two doors.** The development manual
+  promises that `Filesystem` refuses a path containing `..` as an additional
+  protective layer, and only `getFileContent()` and `putFileContent()` made
+  the check - `fileExists()`, `path()`, `url()`, `forceDir()`, `lockFile()`
+  and `mutate()` resolved a traversal and handed it on. Every door refuses it
+  now, and says so in the log.
+
+- **A hand-written account could 500 the login form.** This framework's own
+  account class says that status, sessions and permissions are a
+  developer-only, direct-JSON task - and then read both keys as if they were
+  always there, so a record written by hand as a hash and a permission list
+  raised a warning the runtime treats as fatal. `\Nino\Auth::getUser()` fills
+  both in, once, for every caller.
+
+- **`NINO_CONTENT_DIR` was ignored in silence.** The constant was renamed to
+  `NINO_PRIVATE_DIR` in 1.1, and AGENTS.md still named the old one - so a
+  deployment written against it left the password hashes, the sessions and
+  the data under the document root while the operator believed the private
+  tree had been moved out of it. The retired name now fails at boot with a
+  message naming its successor.
+
 - **A pasted closing tag cut the rest of a value off.** The HTML sanitizer
   parsed a value inside a `<div>` of its own, so the first unbalanced
   `</div>` - which is what pasting from a web page looks like - closed that

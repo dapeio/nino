@@ -210,7 +210,7 @@ Grant these permissions to the user under which PHP is executed. World-writable 
 
 ## Configuration and Application Source Outside the Webroot
 
-By default, the complete private tree including `config.php` lives in `private/`. `NINO_PRIVATE_DIR` moves that complete tree to an existing, writable directory outside the webroot. `NINO_CONFIG_DIR` can additionally point only `config.php` at a different existing, writable directory.
+By default, the complete private tree including `config.php` lives in `private/`. `NINO_PRIVATE_DIR` moves that complete tree to an existing, writable directory outside the webroot. `NINO_CONFIG_DIR` can additionally point only `config.php` at a different existing, writable directory. `NINO_CONTENT_DIR`, the name `NINO_PRIVATE_DIR` had before 1.1, is refused at boot with a message naming its successor rather than ignored — a deployment written against the old name would otherwise leave the private tree where it is while looking as though it had been moved.
 
 ```php
 define('NINO_PRIVATE_DIR', '/path/outside/the/webroot/nino-private');

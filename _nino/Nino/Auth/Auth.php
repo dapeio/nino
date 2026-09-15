@@ -139,8 +139,14 @@ namespace Nino {
 			// nat with it - after maxtries * IP_TRIES_FACTOR clicks. Those
 			// attempts also can't teach an attacker anything; the account is
 			// locked either way.
-			$cooling	= ( $user !== false && $user['status'] === 2 && self::_inCooldown( $appData, $username ) === true );
-			$usable		= ( $user !== false && $user['status'] === 2 && $cooling === false );
+			// '?? 0', the way _resumeSession() reads it: status, sessions and
+			// perms are a developer-only, direct-json task by this class's own
+			// account, so a record written by hand can plainly be a hash and a
+			// permission list and nothing else - and reading a key that is not
+			// there raises a warning this framework treats as fatal, ie. a 500
+			// on the login form rather than a refusal
+			$cooling	= ( $user !== false && ( $user['status'] ?? 0 ) === 2 && self::_inCooldown( $appData, $username ) === true );
+			$usable		= ( $user !== false && ( $user['status'] ?? 0 ) === 2 && $cooling === false );
 
 			// Exactly one password_verify() on every path. DUMMY_HASH is a
 			// bcrypt hash of a value nobody holds, at the cost PASSWORD_DEFAULT
@@ -281,7 +287,19 @@ namespace Nino {
 			if( isset( $appData['/nino/auth/user'][$username] ) === false )
 				return false;
 
-			return $appData['/nino/auth/user'][$username] + [ 'mail' => $username ] ;
+			$user = $appData['/nino/auth/user'][$username] + [ 'mail' => $username ];
+
+			// The two keys every caller reads without asking whether they are
+			// there. Status, sessions and perms are a developer-only,
+			// direct-json task by this class's own account, so a record written
+			// by hand can plainly be a hash and a permission list and nothing
+			// else - and reading a key that is not there raises a warning this
+			// framework treats as fatal, ie. a 500 on the login form rather
+			// than a refusal. Filled in on the way out, once, for everybody
+			$user['status']		= is_int( $user['status'] ?? null ) === true ? $user['status'] : 0;
+			$user['sessions']	= is_array( $user['sessions'] ?? null ) === true ? $user['sessions'] : [];
+
+			return $user;
 		}
 
 

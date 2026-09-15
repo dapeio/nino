@@ -35,6 +35,14 @@ namespace Nino {
 		if( defined( 'NINO_CONFIG_DIR' ) === true && ( is_string( NINO_CONFIG_DIR ) === false || NINO_CONFIG_DIR === '' || is_dir( NINO_CONFIG_DIR ) === false || is_writable( NINO_CONFIG_DIR ) === false ) )
 			trigger_error( 'NINO_CONFIG_DIR must point to an existing, writable directory.', E_USER_ERROR );
 
+		// The name this had before 1.1, and the one thing worse than not
+		// honouring it is not saying so: a deployment written against it meant
+		// to move the private tree out of the webroot, and silently ignoring
+		// the constant leaves the password hashes, the sessions and the data
+		// under the document root while the operator believes otherwise
+		if( defined( 'NINO_CONTENT_DIR' ) === true )
+			trigger_error( 'NINO_CONTENT_DIR is not read any more - the private tree is moved with NINO_PRIVATE_DIR.', E_USER_ERROR );
+
 		// Everything this project *is*, as opposed to the code that runs it:
 		// configuration, templates, content and management state all live in
 		// private/. NINO_PRIVATE_DIR may deliberately move that complete tree

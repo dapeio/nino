@@ -303,7 +303,7 @@ The method reads the current file state again, only takes over the specified key
 - Read accesses are cached based on modification time and file size.
 - Write operations first create a temporary file in the target directory and then replace the target via `rename()`.
 - Locks are sidecar files under `/data/.locks`; their name is derived from the target path.
-- Paths with `..` are rejected as an additional protective layer.
+- Paths with `..` are rejected as an additional protective layer - by every door of `Filesystem`, not only by the two that read and write content: `path()` and `url()` answer `''`, `fileExists()`, `lockFile()`, `putFileContent()` and `mutate()` answer `false`, `getFileContent()` answers its default, and `forceDir()` creates nothing. Each of them says so in the log, so a call site that forgot to validate its own input is findable.
 
 For a simple, complete replacement, `putFileContent()` is sufficient:
 
