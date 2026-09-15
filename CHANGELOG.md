@@ -188,6 +188,37 @@ All notable changes to Nino are documented in this file.
   with a 403 naming it. The address stays changeable, since a rename grants
   nothing, and an account editing itself has proven its current password.
 
+- **A pasted closing tag cut the rest of a value off.** The HTML sanitizer
+  parsed a value inside a `<div>` of its own, so the first unbalanced
+  `</div>` - which is what pasting from a web page looks like - closed that
+  wrapper, and everything after it was read as standing outside the value and
+  dropped, silently, on save. The wrapper is a tag no HTML has.
+
+- **One value that is not a string closed three panels.** `\Nino\Text::entries()`
+  measured every stored value with `strlen()`, so an `int` a developer had
+  written into a text file - a year, a count - raised a `TypeError` under
+  `strict_types`, and the Text, Text Keys and Language panels all answered
+  `500` until somebody found the line. A scalar reads as the text it stands
+  for; a value that is no text at all is left out.
+
+- **`alt=""` was not an empty alt.** The shortcode argument parser judged
+  "was there a value?" by the value itself, so `alt=""` - which is how a
+  decorative picture is written, and how AGENTS.md writes one - arrived as a
+  positional argument and the picture kept the image slot's label as its alt
+  text. So did `name="name"`, any value that happens to equal its own name.
+
+- **A type whose element names are long and not ASCII emptied the Elements
+  panel.** The line under a type names its elements and was cut at 150 bytes,
+  which can land inside a multibyte character - and `json_encode()` answers a
+  string that is not valid UTF-8 with `false`, so the panel's whole reply came
+  back empty. The cut lands on a character boundary, and the type prefix is
+  stripped only where it is a prefix.
+
+- **A select could not offer numbers.** PHP stores a numeric string array key
+  as an `int`, so a feature declaring `'12' => 'Twelve'` as a select option
+  had its whole manifest refused - the feature vanished from the Features
+  panel with a message contradicting what its author had written.
+
 - **A login finishing late wrote its stale copy of every account back.** Every
   write to the accounts persists the whole key from the copy its own request
   booted with, and only the sessions were merged with what the file had

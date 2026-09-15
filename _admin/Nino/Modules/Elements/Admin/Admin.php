@@ -712,12 +712,17 @@ namespace Nino\Modules\Elements {
 			$elements = \Nino\Elements::queryElements( $appData, '/'. $type, [], '*', [] );
 			$info = '('. count( $elements ). ') ';
 
+			// The prefix only, not every occurrence: a type called 'news' would
+			// otherwise lose the word from the middle of an element's own name
 			foreach( $elements as $elData )
-				$info .= str_replace( '/'.$type, '', $elData['.uri'] ). ', ';
+				$info .= substr( (string) $elData['.uri'], strlen( '/'. $type ) ). ', ';
 
-			$info = ( strlen( $info ) > 150 ) ? substr( $info, 0, 150 ).' ..' : $info;
-
-			return (string) $info;
+			// mb_strimwidth, not substr: an element name may hold any character
+			// the kernel api accepts, so a cut counted in bytes could land
+			// inside a multibyte one - and json_encode() answers a string that
+			// is not valid utf-8 with false, which is this whole panel coming
+			// back empty
+			return mb_strimwidth( $info, 0, 153, ' ..', 'UTF-8' );
 		}
 
 		/**

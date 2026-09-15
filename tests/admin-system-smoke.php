@@ -1316,6 +1316,31 @@ check( 'apiCreate creates the html-flagged fixture key', $status === 200 );
 ] ] );
 check( 'apiSaveBatch sanitizes html and preserves inline code', $body['results']['/company/note']['value'] === '<strong>Wichtig</strong><em>auch</em><code>x()</code>' );
 
+// An unbalanced closing tag is what pasting from a web page looks like, and
+// the sanitizer parsed the value inside a <div> of its own - so the first
+// stray </div> closed that wrapper and everything after it was read as
+// standing outside the value and dropped, silently, on save
+check( 'a stray closing div does not cut the rest of the value off',
+	\Nino\Html::sanitizeHtml( 'pasted <strong>one</strong></div> and the rest' ) === 'pasted <strong>one</strong> and the rest' );
+check( '...wherever it stands', \Nino\Html::sanitizeHtml( 'a</div>b <em>c</em>' ) === 'ab <em>c</em>' );
+check( 'a balanced block still contributes its text', \Nino\Html::sanitizeHtml( 'before <div>inside</div> after' ) === 'before inside after' );
+
+// A value a developer wrote as something other than a string - an int year,
+// a list - used to reach strlen() under strict_types, which is a TypeError,
+// which the error handler answers with a 500: the Text panel, the Keys panel
+// and the Language panel all stopped opening until somebody found the line
+\Nino\Filesystem::putFileContent( $appData, '/text/global.php', \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] ) + [
+	'[[/company/founded]]'	=> 2024,
+	'[[/company/list]]'			=> [ 'a', 'b' ],
+] );
+unset( $appData['./nino/filesystem/cache'] );
+
+$oddEntries = \Nino\Text::entries( $appData, true );
+$oddKeys		= array_column( $oddEntries, 'key' );
+check( 'a text value that is not a string does not stop the panel opening', in_array( '/company/founded', $oddKeys, true ) === true );
+check( '...and a number is shown as the text it stands for', ( $oddEntries[ array_search( '/company/founded', $oddKeys, true ) ]['values']['*'] ?? null ) === '2024' );
+check( '...while a value that is no text at all is left out rather than rendered as one', in_array( '/company/list', $oddKeys, true ) === false );
+
 // A plain-text value is substituted raw by Html::_renderFills(), attribute
 // values included ('<a href="[[/company/facebook]]">'), so a stored quote is
 // an attribute break-out that strip_tags() never sees. Entities render as the
@@ -1957,6 +1982,25 @@ check( 'apiTypes carries each type\'s model along', ( $body['types'][array_searc
 // is configured at the time it runs
 check( 'apiTypes reports the currently available locales', $body['locales'] === \Nino\Locales::getAvailableLocales( $appData ) );
 check( 'apiTypes seeds the locale select with the native locale', $body['selectedLocale'] === 'de_DE' );
+
+// The line under a type names its elements and is cut at 150 bytes. An
+// element uri may hold any character the kernel api accepts, so the cut could
+// land inside a multibyte one - and json_encode() answers a string that is
+// not valid utf-8 with false, which is the whole panel coming back empty
+\Nino\Filesystem::putFileContent( $appData, '/elements/langtype.php', [
+	'title'	=> 'Umlaute',
+	'model'	=> [ 'title' => [ 'type' => 'string', 'locale' => true ] ],
+	'*'			=> [ '*' => [] ],
+] );
+// Placed so the cut lands inside the 'ü': '(1) ' and the leading '/' are
+// five bytes, so byte 150 of the line is byte 145 of the name
+\Nino\Elements::insertElement( $appData, '/langtype/'. str_repeat( 'a', 144 ). 'über-uns', [ 'title' => 'Ü' ], 'de_DE' );
+
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Elements\Admin::class, 'apiTypes' );
+$langRow = $body['types'][ array_search( 'langtype', array_column( $body['types'], 'type' ), true ) ] ?? [];
+check( 'a type whose element names are long and not ascii still answers', $status === 200 && ( $langRow['descr'] ?? '' ) !== '' );
+check( '...with a line that is text, so the panel\'s answer can be encoded at all', mb_check_encoding( (string) ( $langRow['descr'] ?? '' ), 'UTF-8' ) === true
+	&& json_encode( $body ) !== false );
 
 [ $status ] = callDev( $appData, \Nino\Modules\Elements\Admin::class, 'apiList', [ 'type' => 'nope' ] );
 check( 'apiList 404s for an unknown type', $status === 404 );

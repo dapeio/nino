@@ -1067,8 +1067,16 @@ namespace Nino {
 					return 'setting "'. $name. '": a select needs "options"';
 				$clean['options'] = [];
 				foreach( $options as $value => $label ) {
-					if( is_string( $value ) === false || $value === '' || self::_localizedValid( $label ) === false )
+
+					// (string), not is_string(): php stores a numeric string key
+					// as an int, so a select whose values are numbers - a page
+					// size, a column count - had its whole manifest refused with
+					// a message that contradicted what its author had written
+					$value = (string) $value;
+
+					if( $value === '' || self::_localizedValid( $label ) === false )
 						return 'setting "'. $name. '": "options" must map a value to a label';
+
 					$clean['options'][$value] = $label;
 				}
 			}

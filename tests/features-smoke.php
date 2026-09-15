@@ -202,6 +202,24 @@ check( 'every feature in this checkout writes its manual in sections', $prose ==
 check( 'a setting needs a known type', manifestFails( $manifestDir, 'BadType', [ 'name' => 'x', 'version' => '1.0.0', 'settings' => [ 'a' => [ 'type' => 'color' ] ] ], 'unknown type' ) );
 check( 'a setting name is a lowerCamel identifier', manifestFails( $manifestDir, 'BadSetting', [ 'name' => 'x', 'version' => '1.0.0', 'settings' => [ 'api-key' => [ 'type' => 'string' ] ] ], 'setting name' ) );
 check( 'a select needs options', manifestFails( $manifestDir, 'NoOptions', [ 'name' => 'x', 'version' => '1.0.0', 'settings' => [ 'a' => [ 'type' => 'select' ] ] ], '"options"' ) );
+
+// A select whose values are numbers - a page size, a column count - is
+// written '12' => '12' like every other option. Php stores a numeric string
+// key as an int, so the check for a string key refused the whole manifest
+// and the feature vanished from the panel with a message that contradicted
+// what its author had written
+$numericOptions = \Nino\Features::manifest( writeManifest( $manifestDir, 'NumericOptions', [
+	'name' => 'x', 'version' => '1.0.0',
+	'settings' => [ 'pageSize' => [ 'type' => 'select', 'options' => [ '12' => 'Zwölf', '24' => 'Vierundzwanzig' ], 'default' => '12' ] ],
+] ) );
+// The keys come back as ints, because that is what php makes of a numeric
+// string key and no amount of casting changes it - what matters is that the
+// manifest is read at all and the values are the ones the author wrote
+check( 'a select may offer numbers as its values', is_array( $numericOptions ) === true && ninoWarnings() === []
+	&& array_map( 'strval', array_keys( $numericOptions['settings']['pageSize']['options'] ?? [] ) ) === [ '12', '24' ] );
+check( '...and one of them as its default', ( $numericOptions['settings']['pageSize']['default'] ?? null ) === '12' );
+check( 'an option value that is nothing at all is still refused', manifestFails( $manifestDir, 'EmptyOption',
+	[ 'name' => 'x', 'version' => '1.0.0', 'settings' => [ 'a' => [ 'type' => 'select', 'options' => [ '' => 'Nichts' ] ] ] ], '"options"' ) );
 check( 'an int bound is an int, and min stays below max', manifestFails( $manifestDir, 'BadMin', [ 'name' => 'x', 'version' => '1.0.0', 'settings' => [ 'a' => [ 'type' => 'int', 'min' => '1' ] ] ], '"min"' )
 	&& manifestFails( $manifestDir, 'Crossed', [ 'name' => 'x', 'version' => '1.0.0', 'settings' => [ 'a' => [ 'type' => 'int', 'min' => 5, 'max' => 1 ] ] ], 'above' ) );
 check( 'a pattern is a valid regular expression', manifestFails( $manifestDir, 'BadPattern', [ 'name' => 'x', 'version' => '1.0.0', 'settings' => [ 'a' => [ 'type' => 'string', 'pattern' => '/[' ] ] ], '"pattern"' ) );

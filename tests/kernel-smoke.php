@@ -768,6 +768,28 @@ check( '[image] shortcode renders an <img> tag under the public prefix', str_con
 check( '[image] shortcode renders nothing for a slot with no file uploaded yet', \Nino\Html::renderHtml( $appData, '[image logo]' ) === '' );
 check( '[image] shortcode renders nothing for an unknown slot', \Nino\Html::renderHtml( $appData, '[image nope]' ) === '' );
 
+// What a shortcode is handed. An empty value used to read as no value at all,
+// so alt="" - the way a decorative picture is written, and the way AGENTS.md
+// writes one - arrived as the positional argument 'alt' and the picture kept
+// the slot's label as its alt text. A value that happens to equal its own
+// name went the same way
+$probeArgs = null;
+\Nino\Html::addShortcode( $appData, 'argprobe', static function( array &$appData, array $args ) use ( &$probeArgs ): string {
+	$probeArgs = $args;
+	return '';
+} );
+
+\Nino\Html::renderHtml( $appData, '[argprobe /uri alt="" title="A title" name="name" bare]' );
+check( 'an empty argument value is a value, not a name', array_key_exists( 'alt', $probeArgs ?? [] ) === true && ( $probeArgs['alt'] ?? null ) === '' );
+check( '...a value that reads like its own name is one too', ( $probeArgs['name'] ?? null ) === 'name' );
+check( '...and the ordinary two shapes are unchanged', ( $probeArgs['title'] ?? null ) === 'A title'
+	&& in_array( '/uri', $probeArgs ?? [], true ) === true && in_array( 'bare', $probeArgs ?? [], true ) === true );
+
+// The picture this is really about
+check( 'a decorative picture is written with an empty alt and keeps it', str_contains( \Nino\Html::renderHtml( $appData, '[image hero alt=""]' ), 'alt=""' ) === true );
+
+unset( $appData['./nino/html/shortcodes']['argprobe'], $appData['./nino/callbacks']['/nino/html/shortcode/argprobe'] );
+
 echo "\n";
 
 

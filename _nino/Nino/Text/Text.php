@@ -64,12 +64,29 @@ namespace Nino {
 				$longest 	= 0;
 				$html 		= false;
 
-				foreach( $values as $value ) {
+				// A value a developer wrote as something other than a string - an
+				// int year, a list - used to reach strlen(), which under
+				// strict_types is a TypeError, which the error handler answers
+				// with a 500: every panel that reads the text stopped opening
+				// until somebody found the line. A scalar reads as the text it
+				// stands for; anything else is not text and is left out
+				foreach( $values as $locale => $value ) {
+
 					if( $value === null )
 						continue;
-					$longest 	= max( $longest, strlen( $value ) );
-					$html 		= $html || \Nino\Html::containsHtml( $value );
+
+					if( is_scalar( $value ) === false ) {
+						unset( $values[$locale] );
+						continue;
+					}
+
+					$values[$locale]	= (string) $value;
+					$longest 					= max( $longest, strlen( $values[$locale] ) );
+					$html 						= $html || \Nino\Html::containsHtml( $values[$locale] );
 				}
+
+				if( $values === [] )
+					continue;
 
 				$entries[] = [
 					'key' 				=> $key,

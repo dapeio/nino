@@ -203,18 +203,26 @@ namespace Nino {
 			// Split shortcode arguments
 			$args = [];
 			if( isset( $pregArgs[2] ) === true && $pregArgs[2] !== '' ) {
-				preg_match_all( '/\ ([^\ \=]*)(?:\=[\"]([^\"]*)[\"])?/i', ' '.$pregArgs[2].' ', $attr );
+				// The assignment is a group of its own, so "was there a value?"
+				// is answerable: judged by the value alone, alt="" read as no
+				// value at all and arrived as the positional argument 'alt' -
+				// which is how a decorative picture is written, and how
+				// AGENTS.md writes one. A value that happens to equal its own
+				// name (name="name") went the same way
+				preg_match_all( '/\ ([^\ \=]*)(\=[\"]([^\"]*)[\"])?/i', ' '.$pregArgs[2].' ', $attr );
 
 				foreach( $attr[1] AS $id => $key ) {
 
-					$value = ( $attr[2][$id] !== '' ) ? str_replace( '\'', '"', $attr[2][$id] ) : $attr[1][$id];
+					if( $attr[2][$id] !== '' ) {
+						$args[$key] = str_replace( '\'', '"', $attr[3][$id] );
+						continue;
+					}
 
-					if( $value === $key )
-						$args[] 		= substr( $value, 0 );
-					else
-						$args[$key] = $value;
+					$args[] = $key;
 				}
 
+				// The trailing space this was given adds one empty positional
+				// match at the end, which is not an argument
 				array_pop( $args );
 			}
 
@@ -266,11 +274,15 @@ namespace Nino {
 
 			$doc = new \DOMDocument();
 
+			// Wrapped in a tag no html has, not in a <div>: an unbalanced
+			// '</div>' is what pasting from a web page looks like, and it closed
+			// the wrapper - so everything after it was read as standing outside
+			// the value and dropped, silently, on save
 			libxml_use_internal_errors( true );
-			$doc->loadHTML( '<?xml encoding="utf-8"?><div>'. $html. '</div>', LIBXML_NOERROR | LIBXML_NOWARNING | LIBXML_HTML_NODEFDTD | LIBXML_HTML_NOIMPLIED );
+			$doc->loadHTML( '<?xml encoding="utf-8"?><nino-sanitize>'. $html. '</nino-sanitize>', LIBXML_NOERROR | LIBXML_NOWARNING | LIBXML_HTML_NODEFDTD | LIBXML_HTML_NOIMPLIED );
 			libxml_clear_errors();
 
-			$wrap = $doc->getElementsByTagName( 'div' )->item( 0 );
+			$wrap = $doc->getElementsByTagName( 'nino-sanitize' )->item( 0 );
 
 			return $wrap === null ? '' : self::_sanitizeChildren( $wrap, false );
 		}
