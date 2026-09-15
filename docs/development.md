@@ -522,6 +522,7 @@ Some details are deliberately defensive:
 - The form limits inputs, protects write operations, and discards old log months.
 - The public signup of the catalogue's Newsletter feature responds independently of whether an address is new or already known. This makes it harder to query foreign addresses.
 - `Jstext` uses JSON hex escaping and adds a random nonce to the Content Security Policy.
+- `Jstext` carries only the text keys that were published to it, not every fill the site has. Shipped are `/form/info/` and `/newsletter/info/`, which are what the public scripts read; the workbench publishes `/_admin/`. A project whose own script reads another key names its prefix under `/nino/http/routes`' neighbour `/nino/jstext/keys` in `config.php`, a module or feature calls `\Nino\Modules\Jstext::publish( $appData, [ '/mine/info/' ] )` in its `init()`. **A published key is public**: it stands in the source of every page that renders the block. Before this, `/form/email/owner` - the mailbox a contact form delivers to - was in the source of every page.
 
 ### Forms
 

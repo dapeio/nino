@@ -1941,6 +1941,52 @@ check( 'Jstext appends its script-src to the csp', str_contains( $jstextCsp, "sc
 check( 'Jstext keeps the default-src while doing so', str_contains( $jstextCsp, "default-src 'self'" ) === true );
 check( 'the composed csp does not start with a stray separator', str_starts_with( $jstextCsp, ';' ) === false );
 
+// The header is composed before anything can end the request: Modules\
+// Maintenance answers from priority 1 and ends the request there, so a
+// maintenance page - which renders the site's own footer, and with it
+// [jstext] - used to ship an inline script the policy then refused, because
+// the policy naming its nonce was added at priority 5 and never ran
+$jstextProbe = [];
+\Nino\Modules\Jstext::init( $jstextProbe );
+$jstextPrios = [];
+foreach( ( $jstextProbe['./nino/callbacks']['/nino/http/response'] ?? [] ) as $prio => $callbacks )
+	foreach( $callbacks as $callback )
+		if( is_array( $callback ) === true && str_ends_with( (string) ( $callback[0] ?? '' ), 'Modules\\Jstext' ) === true )
+			$jstextPrios[] = $prio;
+check( 'the csp is composed ahead of everything that can end a request', $jstextPrios !== [] && max( $jstextPrios ) < 1 );
+
+// What the inline block carries. It used to be every fill the site has -
+// including '/form/email/owner', the mailbox a contact form delivers to, and
+// every address and legal line a project keeps in its text files - on every
+// public page, while the scripts reading it only ever ask for two groups
+\Nino\Html::addFills( $appData, [
+	'[[/form/info/success]]'	=> 'Danke!',
+	'[[/form/email/owner]]'		=> 'post@example.com',
+	'[[/company/street]]' 		=> 'Musterweg 1',
+], '*' );
+/** The block's own table, read back the way the browser reads it */
+function jstextTable( array &$appData ): array {
+	$block = \Nino\Modules\Jstext::doShortcode( $appData, [] );
+	preg_match( '/NinoJstext=(.*);<\/script>/', $block, $found );
+	return json_decode( $found[1] ?? '[]', true ) ?? [];
+}
+
+$jstextTable = jstextTable( $appData );
+check( 'the inline block carries the words the shipped scripts ask for', ( $jstextTable['/form/info/success'] ?? null ) === 'Danke!' );
+check( '...and not the mailbox a form delivers to, nor the rest of the site\'s text', isset( $jstextTable['/form/email/owner'] ) === false
+	&& isset( $jstextTable['/company/street'] ) === false );
+
+// A project or a feature whose own script reads a fill says so
+$appData[ \Nino\Modules\Jstext::KEYS ] = [ '/company/' ];
+$jstextConfigured = jstextTable( $appData );
+check( 'a project may publish a group of its own', ( $jstextConfigured['/company/street'] ?? null ) === 'Musterweg 1'
+	&& isset( $jstextConfigured['/form/email/owner'] ) === false );
+unset( $appData[ \Nino\Modules\Jstext::KEYS ] );
+
+\Nino\Modules\Jstext::publish( $appData, [ '/form/email/' ] );
+check( '...and a module registers one for the request it is serving', isset( jstextTable( $appData )['/form/email/owner'] ) === true );
+unset( $appData['./nino/jstext/keys'] );
+
 // The last-resort 404 fallback, ie. a project without its own /404 route.
 // Written as '.uri' it merged a stray key in and left the response uri on the
 // unmatched request path, so every [[/webpage[[/nino/http/response/uri]]/...]]

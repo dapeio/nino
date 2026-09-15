@@ -507,6 +507,7 @@ Einige Details sind absichtlich defensiv gestaltet:
 - Das Formular begrenzt Eingaben, schützt Schreibvorgänge und verwirft alte Protokollmonate.
 - Die öffentliche Anmeldung des Newsletter-Features aus dem Katalog antwortet unabhängig davon gleich, ob eine Adresse neu oder bereits bekannt ist. Das erschwert die Abfrage fremder Adressen.
 - `Jstext` verwendet JSON-Hex-Escaping und ergänzt die Content-Security-Policy um einen zufälligen Nonce.
+- `Jstext` trägt nur die Textschlüssel, die dafür veröffentlicht wurden, nicht jeden Fill der Seite. Mitgeliefert sind `/form/info/` und `/newsletter/info/` – was die öffentlichen Skripte lesen –, die Workbench veröffentlicht `/_admin/`. Wer ein eigenes Skript hat, das einen anderen Schlüssel liest, nennt dessen Präfix in `config.php` unter `/nino/jstext/keys`; ein Modul oder Feature ruft `\Nino\Modules\Jstext::publish( $appData, [ '/mein/info/' ] )` in seinem `init()`. **Ein veröffentlichter Schlüssel ist öffentlich**: Er steht im Quelltext jeder Seite, die den Block rendert. Vorher stand dort `/form/email/owner` – das Postfach, an das ein Kontaktformular zustellt – auf jeder Seite.
 
 ### Formulare
 

@@ -188,6 +188,42 @@ All notable changes to Nino are documented in this file.
   with a 403 naming it. The address stays changeable, since a rename grants
   nothing, and an account editing itself has proven its current password.
 
+- **Every page carried the site's whole text, the form's mailbox included.**
+  The `[jstext]` block serialised every fill the site has into an inline
+  script - the legal copy, the addresses, and `/form/email/owner`, which is
+  the mailbox a contact form delivers to - while the scripts reading it only
+  ever ask for two groups. It carries what was published to it now:
+  `/form/info/` and `/newsletter/info/` as shipped, `/_admin/` where the
+  workbench serves itself, whatever `/nino/jstext/keys` adds in `config.php`,
+  and whatever a module or feature registers with
+  `\Nino\Modules\Jstext::publish()`. A published key is public, and the
+  development manual says so.
+
+- **The maintenance page shipped a script its own policy refused.**
+  `Modules\Maintenance` answers from the response callback at priority 1 and
+  ends the request there, while the policy naming the inline script's nonce
+  was composed at priority 5 - so a maintenance page, which renders the
+  site's own footer and with it `[jstext]`, carried a script the browser then
+  blocked. The policy is composed at priority 0, ahead of everything that can
+  end a request.
+
+- **An editor's language name could put a script into the workbench.** The
+  language switcher took the name of each language from a text fill and
+  wrote it into the shell's markup as it stood. That key is editable in the
+  Text panel, so an account holding only the Text permission could put markup
+  into the page every other account is served, its own session included. The
+  name is escaped for the text it is, brackets included, the way a navigation
+  label already was.
+
+- **The rich-text editor ran what a stored value carried.** A field the model
+  released for html was assigned to the editor's `innerHTML` when a record was
+  opened. The save path sanitises, but a record written by hand, by an import,
+  or by a module that writes elements without the panel does not pass through
+  it - so opening such a record ran whatever it held, with the editor's own
+  session. Measured in Chromium: an `onerror` handler in a stored value ran.
+  The value is parsed inertly and rebuilt as the five tags the editor knows,
+  with a link keeping only an href the same rule the server applies accepts.
+
 - **A page name containing a colon rewrote the link's markup.** A menu line
   is `<uri>:<title>`, and the parser split it on every colon - so the second
   colon of an ordinary page name ("Angebot: Sommer") ended the title and

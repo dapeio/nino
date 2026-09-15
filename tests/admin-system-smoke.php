@@ -2482,6 +2482,22 @@ foreach( [ 'en_US', 'de_DE', 'fr_FR' ] as $locale ) {
 		$noNames['/nino/locales/available'] = [ 'de_DE', 'en_US', 'fr_FR' ];
 		$picker = \Nino\Html::renderHtml( $noNames, \Nino\Html::renderTextfill( $noNames, '/_admin/localepicker' ) );
 		check( 'the language switcher never renders an option with no name', str_contains( $picker, '></option>' ) === false && substr_count( $picker, '<option' ) === 3 );
+
+		// The name of a language is a text fill, which is editor content: the
+		// Text panel writes it, and it went into the shell's markup as it
+		// stood. An account holding only the Text permission could put a
+		// script into the page every other account is served, its own session
+		// included
+		// Built here rather than read back from the fill the shell stored at
+		// boot: that one was composed before this test wrote the name
+		$named = $noNames;
+		\Nino\Html::addFills( $named, [ '[[/nino/locales/locale/fr_FR]]' => '<img src=x onerror="alert(1)"> [[/nino/auth/user]]' ], '*' );
+		$pickerMethod = new ReflectionMethod( '\Nino\Admin\Admin', '_localePickerHtml' );
+		$pickerMethod->setAccessible( true );
+		$namedPicker = \Nino\Html::renderHtml( $named, (string) $pickerMethod->invokeArgs( null, [ &$named, 'en_US' ] ) );
+		check( 'a language name is drawn as text, markup and fill syntax and all', str_contains( $namedPicker, '<img src=x' ) === false
+			&& str_contains( $namedPicker, '&lt;img src=x' ) === true
+			&& str_contains( $namedPicker, '&#91;&#91;/nino/auth/user&#93;&#93;' ) === true );
 	}
 
 	// The registry has to actually contain the app panels, or this whole check

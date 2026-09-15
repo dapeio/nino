@@ -22,6 +22,90 @@
 
 	const TAGS = [ 'strong', 'em', 'span', 'code', 'a' ];
 
+	/**
+	 *	An href this editor keeps - the same rule \Nino\Html::_safeHref()
+	 *	applies on the way in: a fragment, a path that is not protocol-relative,
+	 *	or one of the four schemes. Everything else, 'javascript:' first among
+	 *	them, is dropped
+	 *
+	 *	@param		{string}		href
+	 *
+	 *	@return		{string|null}
+	 */
+	function safeHref( href ) {
+
+		href = String( href || '' ).trim();
+
+		if( href === '' )
+			return null;
+
+		if( href[0] === '#' )
+			return href;
+
+		if( href[0] === '/' && href[1] !== '/' && href[1] !== '\\' )
+			return href;
+
+		return /^(https?|mailto|tel):/i.test( href ) ? href : null;
+	}
+
+	/**
+	 *	A stored value, rebuilt as the five tags this editor knows and nothing
+	 *	else.
+	 *
+	 *	The value arrives from an element or a text file, which AGENTS.md lists
+	 *	as untrusted: the save path sanitises, but a record written by hand, by
+	 *	an import or by a module that writes elements without the panel does not
+	 *	go through it - and assigning such a string to innerHTML ran whatever it
+	 *	carried, with the editor's own session. Parsed inertly (no scripts run,
+	 *	no images load) and rebuilt node by node instead
+	 *
+	 *	@param		{Element}		into					The contenteditable, emptied first
+	 *	@param		{string}		value					The stored html
+	 *
+	 *	@return		void
+	 */
+	function load( into, value ) {
+
+		into.textContent = '';
+
+		const parsed = new DOMParser().parseFromString( '<body>'+ String( value || '' ), 'text/html' );
+
+		( function walk( from, to ) {
+
+			for( let node = from.firstChild; node !== null; node = node.nextSibling ) {
+
+				if( node.nodeType === 3 ) {
+					to.appendChild( dc.createTextNode( node.nodeValue ) );
+					continue;
+				}
+
+				if( node.nodeType !== 1 )
+					continue;
+
+				const tag = node.tagName.toLowerCase();
+
+				// A tag this editor does not know keeps its text and loses
+				// itself - the same thing the server's sanitizer does with one
+				if( TAGS.indexOf( tag ) === -1 ) {
+					walk( node, to );
+					continue;
+				}
+
+				const el = dc.createElement( tag );
+
+				if( tag === 'a' ) {
+					const href = safeHref( node.getAttribute('href') );
+					if( href !== null )
+						el.setAttribute( 'href', href );
+				}
+
+				walk( node, el );
+				to.appendChild( el );
+			}
+
+		} )( parsed.body, into );
+	}
+
 	Nino.admin.htmlEditor = {
 
 		/**
@@ -51,7 +135,7 @@
 			content.setAttribute( 'aria-label', Nino.content.getText('/_admin/htmleditor/label/content') );
 			content.setAttribute( 'tabindex', '0' );
 			content.spellcheck = true;
-			content.innerHTML = value || '';
+			load( content, value );
 
 			const linkbar = dc.createElement('div');
 			linkbar.className = 'nino-admin-richtext-linkbar';
@@ -342,7 +426,7 @@
 				},
 
 				setValue : function( html ) {
-					content.innerHTML = html || '';
+					load( content, html );
 					updateCounter();
 				},
 

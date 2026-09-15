@@ -154,6 +154,13 @@ namespace Nino\Admin {
 
 			\Nino\Html::addFills( $appData, [ '[[/_admin/localepicker]]' => self::_localePickerHtml( $appData, $currentLocale ) ], '*' );
 
+			// The workbench's own scripts read their words out of the inline
+			// [jstext] block, so the shell says which those are - the block
+			// carries what is published to it and nothing else (see
+			// \Nino\Modules\Jstext::publish())
+			if( class_exists( '\\Nino\\Modules\\Jstext' ) === true )
+				\Nino\Modules\Jstext::publish( $appData, [ '/_admin/' ] );
+
 			\Nino\Callbacks::registerCallback( $appData, '/nino/http/response/GET://_admin', 	[ self::class, 'handleGet' ] );
 			\Nino\Callbacks::registerCallback( $appData, '/nino/http/response/POST://_admin', [ self::class, 'handlePost' ] );
 		}
@@ -728,8 +735,18 @@ namespace Nino\Admin {
 				// a language switcher with nothing readable in it
 				$label = \Nino\Html::renderTextfill( $appData, '/nino/locales/locale/'. $locale );
 
+				// The name is editor content - the Text panel writes that key -
+				// and this markup is built before the fill and shortcode pass
+				// runs over the shell, so a '[' in it would be read as syntax
+				// afterwards. Escaped for the text it is, brackets included, the
+				// same two steps Panels::label() takes for a nav label. Not
+				// label() itself: that reads a leading '/' as a fill key, and a
+				// language may well be named one
+				$safeLabel = str_replace( [ '[', ']' ], [ '&#91;', '&#93;' ],
+					htmlspecialchars( $label !== '' ? $label : $locale, ENT_QUOTES | ENT_SUBSTITUTE | ENT_HTML5, 'UTF-8' ) );
+
 				$options .= '<option value="?locale='. $locale. '"'. ( $locale === $currentLocale ? ' selected' : '' ). '>'.
-					( $label !== '' ? $label : $locale ). '</option>';
+					$safeLabel. '</option>';
 			}
 
 			return '<select id="admin-localepicker">'. $options. '</select>';
