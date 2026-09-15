@@ -419,10 +419,21 @@
 		 *	@return		void
 		 */
 		_setFormPending : function( pending ) {
-			const form = dc.getElementById('text-edit-form');
+			// '#text-form', not '#text-edit-form': the locale select and the
+			// back link are appended to the toolbar beside the form, so the
+			// narrower query never reached them. Changing the locale while a
+			// save was in flight built fresh, enabled fields for the other
+			// locale and sent the queued request from the older snapshot - the
+			// screen said "saved" over a field whose text was not persisted,
+			// and the back link destroyed the editors mid-save
+			const form = dc.getElementById('text-form');
 			if( form === null )
 				return;
 			form.querySelectorAll('input, textarea, select, button').forEach( function( el ) { el.disabled = pending } );
+			form.querySelectorAll('a').forEach( function( el ) {
+				el.setAttribute( 'aria-disabled', pending ? 'true' : 'false' );
+				el.style.pointerEvents = pending ? 'none' : '';
+			} );
 			form.querySelectorAll('[contenteditable]').forEach( function( el ) {
 				el.contentEditable = pending ? 'false' : 'true';
 				el.setAttribute( 'aria-disabled', pending ? 'true' : 'false' );

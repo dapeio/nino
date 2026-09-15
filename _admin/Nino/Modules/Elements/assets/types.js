@@ -180,8 +180,18 @@
 			}
 
 			Nino.admin.elementTypes._apiCall( 'get', { uri : uri }, function( status, response ) {
-				if( status !== 200 || response === null )
-					return Nino.admin.elementTypes._showError( dc.getElementById('types-form'), status, response );
+
+				// Shown as well as written - the pane this error goes into is
+				// the one the list is covering, so without the _showForm() the
+				// list stayed on screen and clicking a type that no longer
+				// parses (or one an account just lost the permission for) did
+				// nothing visible at all. Same rule as the Elements panel next
+				// door, which its own suite enforces
+				if( status !== 200 || response === null ) {
+					Nino.admin.elementTypes._showError( dc.getElementById('types-form'), status, response );
+					Nino.admin.elementTypes._showForm();
+					return;
+				}
 
 				Nino.admin.elementTypes._isNew 			= false;
 				Nino.admin.elementTypes._currentUri = response.uri;

@@ -188,6 +188,51 @@ All notable changes to Nino are documented in this file.
   with a 403 naming it. The address stays changeable, since a rename grants
   nothing, and an account editing itself has proven its current password.
 
+- **The workbench lost what was typed when you looked something up.** The
+  shell documents that switching panels never resets anything - "jumping back
+  and forth is always exactly where you left it" - but four panels answered
+  its `showCurrent()` by re-running `init()`: Config, Language, the Users
+  panel's Login protection tab and Features. A ticked switch, a typed number,
+  a half-entered locale code, a feature's settings field: the answer came
+  back, the pane was emptied and rebuilt from the server's values, and the
+  edit was gone without a word. They now build once and stay; the actions that
+  change state re-fetch on their own, the way the Elements panel has always
+  done it. Features also fired two list requests on a page opened at
+  `#features`, because the shell's ready binding runs before the panel's own.
+
+- **The Features filter moved the caret to the end on every keystroke.** The
+  panel is drawn again per keystroke and the focus put back by hand - at the
+  end of the value, so an edit in the middle of a word ("newsletter", Home,
+  "s") sent the next character to the end instead, and a Backspace after a
+  mid-string click deleted the last character rather than the one before the
+  click. The selection is carried across the redraw now.
+
+- **A CSV export dropped every column the first row did not have.** The
+  Submissions panel deliberately lists several forms in one view, and the
+  header row was `Object.keys( rows[0] )`: with a quote-request entry first,
+  every contact-form-only field of the rows below it was missing from the
+  file, and one entry recorded before ids existed took `id` and `form` down
+  with it for everything after. The columns are the union of every row's keys
+  now, in the order they first appear.
+
+- **Three smaller ways the workbench said nothing.** An element's heading kept
+  the old language's title when the locale select was switched, because the
+  lookup that updates it asked for an id the heading never carried. Clicking
+  an element type whose file no longer parses did nothing visible at all: the
+  error was written into the pane the list was covering. And a replacement
+  image kept showing the old picture, because the stored name is deterministic
+  per slot, so the browser answered the unchanged url from its own cache while
+  the panel said "saved".
+
+- **A locale switch mid-save was still possible in the Text panel.** The guard
+  that disables the form while a save is in flight queried `#text-edit-form`,
+  and the locale select and the back link are appended to the toolbar beside
+  it - so neither was ever disabled. Changing the locale while the first of
+  two queued requests was out built fresh fields for the other locale and sent
+  the second request from the older snapshot: the screen said "saved" over a
+  field whose text was not persisted. The guard queries the whole `#text-form`
+  wrapper now.
+
 - **A development install answered 200 for a crash.** With
   `/nino/error/display` on, the handler echoed its dump and `exit`ed - and the
   `header()` that sets the 500 sat after that branch, so it never ran. An

@@ -58,11 +58,24 @@
 				Nino.admin.language._fields 	= response.fields;
 				Nino.admin.language._locales	= response.locales;
 				Nino.admin.language._render();
+				Nino.admin.language._ready = true;
 			} );
 		},
 
+		/*	The shell calls this every time its panel is shown again, and the
+			contract it documents is that switching panels never resets
+			anything: "jumping back and forth is always exactly where you left
+			it". Re-running init() broke that promise on the one screen where
+			it costs the most - a form. A ticked switch, a typed number, a
+			locale code half entered: the answer came back, the wrap was
+			emptied and rebuilt from the server's values, and the edit was gone
+			without a word. Nothing to do once the form is up: the shell
+			un-hides the pane, the pane is where it was left. The actions that
+			change state (save above all) re-fetch on their own	*/
 		showCurrent : function() {
-			Nino.admin.language.init();
+
+			if( Nino.admin.language._ready === false )
+				Nino.admin.language.init();
 		},
 
 		/**

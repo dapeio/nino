@@ -64,5 +64,27 @@ check( 'a formula marker hidden behind whitespace is neutralized too', editor.cs
 check( 'a regular value is unchanged', editor.csvCell('hello') === 'hello' );
 check( 'CSV quoting still applies after neutralization', editor.csvCell('=1,2') === '"\'=1,2"' );
 
+/*	The export's columns are the union of every row's keys, in the order
+	they first appear - not the first row's alone. The Submissions panel
+	deliberately lists several forms in one view ("All forms"), so the first
+	entry's fields are not the file's columns: every field the other forms
+	carry and it does not was dropped from the file without a word, and one
+	entry recorded before ids existed took 'id' and 'form' down with it for
+	every row below	*/
+let exported = '';
+sandbox.Blob = function( parts ) { exported = parts.join('') };
+sandbox.URL = { createObjectURL : function() { return 'blob:x' }, revokeObjectURL : function() {} };
+sandbox.document.createElement = function() { return { click : function() {}, remove : function() {} } };
+sandbox.document.body = { appendChild : function() {} };
+
+editor.exportCsv( 'submissions.csv', [
+	{ id : '1', form : 'contact', name : 'Ada' },
+	{ id : '2', form : 'quote', company : 'Acme' },
+	{ note : 'written before ids existed' },
+] );
+
+check( 'a csv export carries every row\'s columns, not the first row\'s',
+	exported === '\uFEFFid,form,name,company,note\r\n1,contact,Ada,,\r\n2,quote,,Acme,\r\n,,,,written before ids existed' );
+
 console.log( '\n'+ checks+ ' checks, '+ failures+ ' failed' );
 process.exitCode = failures === 0 ? 0 : 1;

@@ -456,10 +456,10 @@
 		 *	objects - shared by the Form and Newsletter modules' panels (see
 		 *	their assets/editor.js), no server endpoint needed since both panels
 		 *	already have the full entries array loaded for their list view.
-		 *	Column order follows the first row's own key order
+		 *	Column order follows the order the keys first appear in
 		 *
 		 *	@param		{string}	filename			Download filename (eg. "newsletter.csv")
-		 *	@param		{Array}		rows					Array of plain objects, same shape for every row
+		 *	@param		{Array}		rows					Array of plain objects; rows may differ in shape
 		 *
 		 *	@return		void
 		 */
@@ -468,7 +468,20 @@
 			if( rows.length === 0 )
 				return;
 
-			const headers = Object.keys( rows[0] );
+			// The union of every row's keys, in the order they first appear,
+			// not the first row's alone. The Submissions panel deliberately
+			// lists several forms in one view ("All forms"), so the first
+			// entry's fields are not the file's columns: every field the other
+			// forms carry and it does not was dropped from the export without
+			// a word, and one entry recorded before ids existed - no 'id', no
+			// 'form' - took those two columns down for every row below it
+			const headers = [];
+			rows.forEach( function( row ) {
+				Object.keys( row ).forEach( function( key ) {
+					if( headers.indexOf( key ) === -1 )
+						headers.push( key );
+				} );
+			} );
 			const lines = [ headers.map( Nino.admin.csvCell ).join(',') ].concat(
 				rows.map( function( row ) { return headers.map( function( key ) { return Nino.admin.csvCell( row[key] ) } ).join(',') } )
 			);

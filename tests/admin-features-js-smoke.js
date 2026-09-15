@@ -122,6 +122,15 @@ function element( tag ) {
 		querySelectorAll : function( selector ) {
 			return selector === '[data-key]' ? findAll( el, function( node ) { return typeof node.dataset.key === 'string' } ) : [];
 		},
+		// Enough of a text field for the filter: what a browser gives an
+		// <input> so that a re-render can put the caret back where it was
+		focus : function() { focused = el },
+		selectionStart : 0,
+		selectionEnd : 0,
+		setSelectionRange : function( start, end ) {
+			el.selectionStart = start;
+			el.selectionEnd 	= end;
+		},
 	};
 	el.classList = classList( el );
 	Object.defineProperty( el, 'innerHTML', {
@@ -232,12 +241,23 @@ const sandbox = {
 	document : {
 		createElement : element,
 		createTextNode : textNode,
-		getElementById : function( id ) { return id === 'features-list' ? mount : ( id === 'features-detail' ? screen : null ) },
+		getElementById : function( id ) {
+			if( id === 'features-list' )
+				return mount;
+			if( id === 'features-detail' )
+				return screen;
+			// Anything else is looked up where a browser would look: in the
+			// tree the panel just drew. The filter's own re-focus reads it
+			return findAll( mount, function( node ) { return node.id === id } )[0]
+				?? findAll( screen, function( node ) { return node.id === id } )[0]
+				?? null;
+		},
 		documentElement : null,
 		body : null,
 	},
 	Nino : Nino,
 };
+let focused = null;
 let confirmAnswer = true;
 // What an install said before it reloaded, in order - the dialog is where an
 // install's word goes, because the offer it was pressed on is gone afterwards
@@ -486,6 +506,21 @@ check( 'a filter narrows every tab\'s count to what matches, so the counts say w
 	&& narrowed[1].textContent === text('/_admin/features/tab/inactive')+ ' (0)' && narrowed[2].textContent === text('/_admin/features/tab/available')+ ' (0)' );
 check( 'and the tab on screen shows the match alone', rowKeys( mount, 'feature' ) === 'sample' );
 check( 'the filter survives the redraw it triggers, with what was typed', filterNow().value === 'beispiel' );
+
+/*	...and so does the caret. The panel is drawn again per keystroke and the
+	focus put back by hand, which used to mean "at the end of the value": an
+	edit in the middle of a word sent the next character to the end instead,
+	and a Backspace after a click mid-string deleted the last character
+	rather than the one before the click	*/
+const editing = filterNow();
+editing.value = 'beispieX';
+editing.setSelectionRange( 7, 7 );
+fire( editing, 'input' );
+check( 'the caret comes back where it was, not at the end of what was typed', filterNow().selectionStart === 7 && filterNow().selectionEnd === 7 );
+check( '...and the focus is on the filter that replaced it', focused === filterNow() );
+
+filterNow().value = 'beispiel';
+fire( filterNow(), 'input' );
 
 filterNow().value = 'NOTHING TO SET';
 fire( filterNow(), 'input' );
@@ -989,9 +1024,20 @@ check( 'switching tabs and back leaves the refreshed cache in place - the tab ba
 
 // --- nothing installed at all, and a failed load
 
+/*	showCurrent() does not re-fetch. The shell calls it on every panel
+	switch, and the contract script.js documents is that switching never
+	resets anything - "jumping back and forth is always exactly where you
+	left it". Re-running init() there rebuilt the settings form from the
+	server's values, so a typed setting was gone the moment somebody looked
+	something up in another panel. init() is what reloads, and the actions
+	that change state (save, remove, install) call it themselves	*/
+const beforeShowCurrent = requests.length;
 panel.showCurrent();
+check( 'showCurrent leaves the panel as it is rather than re-fetching', requests.length === beforeShowCurrent );
+
+panel.init();
 answer( 200, { dir : '/features', catalogueUrl : CACHE.url, writable : true, catalogue : null, features : [] } );
-check( 'showCurrent reloads, and Inactive\'s empty state names the directory - Active empty too, both counted 0', requests[requests.length - 1].action === 'features/list'
+check( 'init reloads, and Inactive\'s empty state names the directory - Active empty too, both counted 0', requests[requests.length - 1].action === 'features/list'
 	&& byTag( mount.children[0], 'button' )[0].textContent === text('/_admin/features/tab/active')+ ' (0)' && byTag( mount.children[0], 'button' )[1].textContent === text('/_admin/features/tab/inactive')+ ' (0)' );
 fire( byTag( mount.children[0], 'button' )[1], 'click' );
 check( 'Inactive, empty, names the features directory', findAll( mount.children[2], function( el ) { return hasClass( el, 'nino-admin-empty' ) } )[0].textContent === text('/_admin/features/hint/empty').replace( '%s', '/features' ) );

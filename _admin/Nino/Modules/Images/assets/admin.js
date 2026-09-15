@@ -348,7 +348,15 @@
 				}
 
 				slot.url = response.url;
-				preview.src = response.url;
+
+				// The stored name is deterministic per slot, so replacing a
+				// picture answers the url the browser already has in its cache
+				// - and public/images/ is served statically, with no
+				// Cache-Control of its own. The panel said "saved" while the
+				// preview still showed the old picture until a hard reload.
+				// The stamp is on the <img> only; the url the panel keeps and
+				// the page later renders stays the clean one
+				preview.src = response.url + ( response.url.indexOf('?') === -1 ? '?' : '&' ) + 't=' + Date.now();
 				preview.hidden = false;
 				msg.textContent = Nino.content.getText('/_admin/images/msg/saved');
 			}, { file : file } );

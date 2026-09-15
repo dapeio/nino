@@ -56,6 +56,9 @@
 	Nino.admin.features = {
 
 		_ready 			: false,
+
+		// A list request is in flight - see init()
+		_loading		: false,
 		// key => message: survives the re-render a successful save triggers - see _save()
 		_pendingMsg : {},
 		_dir 				: '',
@@ -116,7 +119,18 @@
 			if( wrap === null )
 				return;
 
+			// One list request per page load. The shell's onReady is bound
+			// before this file's own (script.js loads first), so both fired
+			// init() on a page opened with #features in the hash - two
+			// requests, and the second one rebuilding the panel the first had
+			// just built
+			if( Nino.admin.features._loading === true )
+				return;
+			Nino.admin.features._loading = true;
+
 			Nino.admin.features._apiCall( 'list', {}, function( status, response ) {
+
+				Nino.admin.features._loading = false;
 				// Back to the list first: an error written into a pane a settings
 				// screen is covering would not be read
 				if( status !== 200 || response === null ) {
@@ -137,8 +151,20 @@
 			} );
 		},
 
+		/*	The shell calls this every time its panel is shown again, and the
+			contract it documents is that switching panels never resets
+			anything: "jumping back and forth is always exactly where you left
+			it". Re-running init() broke that promise on the one screen where
+			it costs the most - a form. A ticked switch, a typed number, a
+			locale code half entered: the answer came back, the wrap was
+			emptied and rebuilt from the server's values, and the edit was gone
+			without a word. Nothing to do once the form is up: the shell
+			un-hides the pane, the pane is where it was left. The actions that
+			change state (save above all) re-fetch on their own	*/
 		showCurrent : function() {
-			Nino.admin.features.init();
+
+			if( Nino.admin.features._ready === false )
+				Nino.admin.features.init();
 		},
 
 		/**
@@ -333,15 +359,28 @@
 
 			// The whole panel is drawn again per keystroke, so the counts on the
 			// tabs follow along - and the focus put back where it was, since the
-			// element that had it is gone by then
+			// element that had it is gone by then.
+			//
+			// Where it was, including the caret: it used to be put at the end
+			// of the value, so typing into the middle of a word ("newsletter",
+			// Home, "s") sent the next character to the end instead, and a
+			// Backspace after clicking mid-string deleted the last character
+			// rather than the one before the click
 			filter.addEventListener( 'input', function() {
+				const start	= filter.selectionStart;
+				const end		= filter.selectionEnd;
+
 				Nino.admin.features._filter = filter.value;
 				Nino.admin.features._renderPanel();
+
 				const next = dc.getElementById('features-filter');
 				if( next !== null ) {
 					next.focus();
 					if( typeof next.setSelectionRange === 'function' )
-						next.setSelectionRange( next.value.length, next.value.length );
+						next.setSelectionRange(
+							typeof start === 'number' ? start : next.value.length,
+							typeof end === 'number' ? end : next.value.length
+						);
 				}
 			} );
 

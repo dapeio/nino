@@ -1397,7 +1397,13 @@
 				// actual identifier (eg. used in links) - kept in sync with the locale
 				// select by _renderLocaleFields()
 
+				// The id is what _renderLocaleFields() looks the heading up by.
+				// Without it that lookup answered null and skipped the update
+				// in silence, so switching the locale select left the English
+				// title standing over the German fields - the one thing the
+				// comment above promises does not happen
 				const title = dc.createElement('div');
+				title.id = 'elements-form-heading';
 				title.className = 'main-title--withuri';
 				title.textContent = Nino.admin.elements._headingText( Nino.admin.elements._localeValues[Nino.admin.elements._selectedLocale] );
 				wrap.appendChild( title );
