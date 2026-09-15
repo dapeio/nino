@@ -509,7 +509,7 @@ a {
 	transition: background-color .15s ease, border-color .15s ease, color .15s ease, box-shadow .15s ease, opacity .12s ease;
 }
 
-:where(.nino-admin) button:hover:not(:disabled) {
+:where(.nino-admin) button:hover:not(:disabled):not(.is-active) {
 	background: var(--editor-blue-soft);
 }
 
@@ -1143,29 +1143,38 @@ a {
      <div class="nino-admin-tabpanel" role="tabpanel">…</div> */
 :where(.nino-admin) .nino-admin-tabs {
 	display: flex;
-	gap: .15rem;
 	margin: 0 0 .9rem;
+	box-shadow: inset 0 0 0 1px var(--editor-border), var(--editor-shadow-sm);
+	border: 1px solid var(--editor-border);
+	border-radius:var(--editor-radius-sm);
+	overflow:hidden;
 }
 
 :where(.nino-admin) .nino-admin-tab {
 	flex: 1 1 auto;
 	padding: .5rem .3rem;
 	border: 0;
+	box-shadow: none;
+	border-radius:0;
 	/* The indicator is a border on the tab itself, sitting on top of the
 	   row's own - so the active tab breaks the line rather than adding a
 	   second one under it */
 	margin-bottom: -1px;
-	background: none;
+	background: var(--editor-bg-elevated);
 	color: var(--editor-text-secondary);
 	font-size: .8rem;
 	font-weight: 600;
 	cursor: pointer;
+	border-right: 1px solid var(--editor-border);
 }
 
-:where(.nino-admin) .nino-admin-tab:hover {
+:where(.nino-admin) .nino-admin-tab:hover:not(.is-active) {
 	color: var(--editor-text);
+	background: var(--editor-bg-elevated) !important;
 }
-
+:where(.nino-admin) .nino-admin-tab:last-child {
+	border-right:none;
+}
 :where(.nino-admin) .nino-admin-tab.is-active {
 	background-color: var(--editor-blue);
 	color: var(--nino-admin-active-text);
@@ -1670,14 +1679,6 @@ a {
 :where(.nino-admin) .nino-admin-tile-label {
 	color: var(--editor-text-secondary);
 	font-size: .76rem;
-}
-
-:where(.nino-admin) .nino-admin-tile--newsletter {
-	border-top-color: var(--editor-green);
-}
-
-:where(.nino-admin) .nino-admin-tile--logs {
-	border-top-color: var(--editor-orange);
 }
 
 :where(.nino-admin) .nino-admin-card {
