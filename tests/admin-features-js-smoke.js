@@ -174,11 +174,10 @@ function offer( root, key ) {
 	return findAll( root, function( el ) { return el.dataset.offer === key } )[0];
 }
 
-/** The line an offer reports into, and the button it carries */
-function offerMessage( root, key ) {
-	return ( byTag( offer( root, key ), 'p' )[0] || { textContent : '' } ).textContent;
-}
-
+/** The button an offer carries - its message goes into the dialog now, not
+    onto the row: the offers are recomputed against what is on disk on every
+    list, so an installed offer is 'current' and the Available tab leaves it
+    out, ie. the row a message was written onto was gone before it rendered */
 function offerButton( root, key ) {
 	return byTag( offer( root, key ), 'button' )[0];
 }
