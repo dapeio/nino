@@ -788,7 +788,7 @@ $request = \Nino\request( $appData, $_SERVER );
 
 ## Error Handling and Logs
 
-`Runtime` registers a common handler for PHP errors and exceptions. Deliberately triggered notices, warnings, and deprecation messages can be logged without ending the request. Exceptions, engine errors, and `E_USER_ERROR` lead to a `500` response.
+`Runtime` registers a common handler for PHP errors and exceptions. Deliberately triggered notices, warnings, and deprecation messages can be logged without ending the request, and so can a deprecation the engine raises - it says a future PHP will do something differently, not that this request went wrong. Exceptions, every other engine error, and `E_USER_ERROR` lead to a `500` response. A month's log keeps its newest 1000 entries: the file is one array, rewritten whole on every entry, so a template raising a notice per view would otherwise grow it with the traffic.
 
 The behavior is controlled in `config.php`:
 

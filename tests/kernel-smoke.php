@@ -2543,6 +2543,49 @@ $engineWarning = runIsolated( $bootstrap. '
 ' );
 check( 'an engine-raised warning (not one of our own E_USER_* calls) still terminates the request', trim( $engineWarning['stdout'] ) === 'before' );
 
+// The one engine level that is not a bug in the code it is raised for: a
+// deprecation says a future php will do this differently, not that this
+// request is wrong. It used to stop the request like any other engine
+// level, so a php minor upgrade took a site down - intermittently, since a
+// compile-time deprecation only fires on the run that recompiles the file
+$engineDeprecated = runIsolated( $bootstrap. '
+	echo "before\n";
+	trigger_error( "as the engine raises one", E_USER_DEPRECATED );
+	@\Nino\Runtime::handleError( E_DEPRECATED, "a deprecation the engine raised", __FILE__, __LINE__ );
+	echo "after\n";
+' );
+check( 'an engine-raised deprecation is recorded and the request carries on', trim( $engineDeprecated['stdout'] ) === "before\nafter" );
+
+echo "\n";
+
+
+// A month's log is one file, rewritten whole on every entry. A template with
+// a broken shortcode raises one notice per view, so the file grew with the
+// traffic - and every entry rewrote all of it under an exclusive lock, until
+// the request that had to read a megabyte of php to add a line was the thing
+// taking the site down
+$logSandbox = $sandbox. '/logcap';
+@mkdir( $logSandbox. '/data', 0777, true );
+$logApp = [ './nino/uid' => 'logcap' ];
+\Nino\AppData::prepare( $logApp );
+$logApp['./nino/filesystem/path'] = $logSandbox;
+$logApp['./nino/filesystem/contentpath'] = $logSandbox;
+$logApp['./nino/filesystem/configpath'] = $logSandbox;
+$logApp['./nino/filesystem/privatepath'] = $logSandbox;
+$logApp['/nino/error/log'] = true;
+$logApp['/nino/error/display'] = false;
+
+$record = new ReflectionMethod( '\Nino\Runtime', '_recordError' );
+$record->setAccessible( true );
+
+for( $i = 1; $i <= \Nino\Runtime::MAX_LOG_ENTRIES + 20; $i++ )
+	$record->invokeArgs( null, [ &$logApp, [ 'type' => E_USER_NOTICE, 'message' => 'entry '. $i, 'file' => 'x.php', 'line' => $i ] ] );
+
+$logged = \Nino\Filesystem::getFileContent( $logApp, '/data/logs.'. date( 'Y-m' ). '.php', [] );
+check( 'a month\'s log stops growing at its cap', count( $logged ) === \Nino\Runtime::MAX_LOG_ENTRIES );
+check( '...keeping the newest entries, which are the ones being read', ( end( $logged )['message'] ?? '' ) === 'entry '. ( \Nino\Runtime::MAX_LOG_ENTRIES + 20 )
+	&& ( $logged[0]['message'] ?? '' ) === 'entry 21' );
+
 echo "\n";
 
 
@@ -2652,7 +2695,9 @@ $memoryWithHistory = runIsolated( $shutdownBootstrap( true, false, 1200 ). '
 $historyEntries	= shutdownLogEntries( $memoryWithHistory );
 $historyLast	= $historyEntries === [] ? [] : end( $historyEntries );
 
-check( '...and appended to a log that has been collecting all month, which costs more room than the request left', count( $historyEntries ) === 1201
+// A file seeded over the cap comes back under it on the next write (see
+// MAX_LOG_ENTRIES), and the entry this run had to leave is the last one
+check( '...and appended to a log that has been collecting all month, which costs more room than the request left', count( $historyEntries ) === \Nino\Runtime::MAX_LOG_ENTRIES
 	&& ( $historyLast['type'] ?? null ) === E_ERROR
 	&& str_contains( (string) ( $historyLast['message'] ?? '' ), 'Allowed memory size' ) === true );
 

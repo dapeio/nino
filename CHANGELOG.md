@@ -188,6 +188,21 @@ All notable changes to Nino are documented in this file.
   with a 403 naming it. The address stays changeable, since a rename grants
   nothing, and an account editing itself has proven its current password.
 
+- **A PHP deprecation took the site down.** Every level the engine raises was
+  fatal, deprecations among them - so a PHP minor upgrade could answer `500`
+  where nothing was wrong, and intermittently at that: a compile-time
+  deprecation fires only on the run that recompiles the file, once per opcache
+  lifetime. A deprecation says a future PHP will do something differently, not
+  that this request went wrong. It is recorded like every other non-fatal
+  level and the request carries on. Every other engine level still stops.
+
+- **A month's error log grew without bound.** The log is one array per month,
+  rewritten whole on every entry under an exclusive lock, and only whole
+  months were ever dropped - so a template raising a notice per view grew the
+  file with the traffic until the request that had to read all of it to add a
+  line was itself what took the site down. A month keeps its newest 1000
+  entries.
+
 - **Every page carried the site's whole text, the form's mailbox included.**
   The `[jstext]` block serialised every fill the site has into an inline
   script - the legal copy, the addresses, and `/form/email/owner`, which is

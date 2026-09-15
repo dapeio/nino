@@ -28,7 +28,22 @@ namespace Nino {
 		// those hides exactly what it exists to surface. Anything that really
 		// must stop the request says so explicitly with E_USER_ERROR (see
 		// AppData::init(), Filesystem::init()).
-		private const array NON_FATAL_LEVELS = [ E_USER_NOTICE, E_USER_WARNING, E_USER_DEPRECATED ];
+		// E_DEPRECATED is the one engine level in here, and the reason is that
+		// it is not a statement about this request: it says a future php will
+		// do something differently, not that anything went wrong now. Stopping
+		// on it meant a php minor upgrade took a site down - intermittently at
+		// that, since a compile-time deprecation only fires on the run that
+		// recompiles the file, ie. once per opcache lifetime. It is recorded
+		// like every other non-fatal level, which is what makes it visible.
+		private const array NON_FATAL_LEVELS = [ E_USER_NOTICE, E_USER_WARNING, E_USER_DEPRECATED, E_DEPRECATED ];
+
+		// How many entries one month's log keeps. The file is one array,
+		// rewritten whole on every entry under an exclusive lock, so a
+		// template with a broken shortcode - one notice per view - grew it
+		// with the traffic until the request that had to read all of it to
+		// add a line was itself what took the site down. The newest are kept:
+		// they are the ones somebody is reading
+		public const int MAX_LOG_ENTRIES = 1000;
 
 		// The levels php raises and stops on. set_error_handler() is never
 		// called for any of them, so until handleShutdown() below existed they
@@ -309,8 +324,15 @@ namespace Nino {
 				$path = '/data/logs.'. date( 'Y-m' ). '.php';
 
 				\Nino\Filesystem::mutate( $appData, $path, function( array $entries ) use ( $entry ): array {
+
 					$entries[] = $entry + [ 'date' => date( 'Y-m-d H:i:s' ) ];
-					return $entries;
+
+					// See MAX_LOG_ENTRIES - array_slice() rather than a check,
+					// so a file that is already over the cap (written before
+					// there was one, or by hand) comes back under it too
+					return count( $entries ) > self::MAX_LOG_ENTRIES
+						? array_values( array_slice( $entries, 0 - self::MAX_LOG_ENTRIES ) )
+						: $entries;
 				} );
 
 				self::_pruneLogs( \Nino\Filesystem::path( $appData, '/data' ) );

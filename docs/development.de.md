@@ -774,7 +774,7 @@ $request = \Nino\request( $appData, $_SERVER );
 
 ## Fehlerbehandlung und Protokolle
 
-`Runtime` registriert einen gemeinsamen Handler für PHP-Fehler und Exceptions. Bewusst ausgelöste Hinweise, Warnungen und Deprecation-Meldungen können protokolliert werden, ohne den Request zu beenden. Exceptions, Engine-Fehler und `E_USER_ERROR` führen zu einer `500`-Antwort.
+`Runtime` registriert einen gemeinsamen Handler für PHP-Fehler und Exceptions. Bewusst ausgelöste Hinweise, Warnungen und Deprecation-Meldungen können protokolliert werden, ohne den Request zu beenden – ebenso eine Deprecation, die die Engine auslöst: Sie sagt, dass ein künftiges PHP etwas anders machen wird, nicht dass an diesem Request etwas falsch ist. Exceptions, alle übrigen Engine-Fehler und `E_USER_ERROR` führen zu einer `500`-Antwort. Das Protokoll eines Monats behält seine neuesten 1000 Einträge: Die Datei ist ein Array, das bei jedem Eintrag vollständig neu geschrieben wird – eine Vorlage, die pro Aufruf einen Hinweis auslöst, ließe sie sonst mit dem Verkehr mitwachsen.
 
 Das Verhalten wird in `config.php` gesteuert:
 
