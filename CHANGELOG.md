@@ -188,6 +188,30 @@ All notable changes to Nino are documented in this file.
   with a 403 naming it. The address stays changeable, since a rename grants
   nothing, and an account editing itself has proven its current password.
 
+- **A type URI with a trailing slash found nothing.** `queryElements()` looked
+  the type file up with a trimmed copy of the URI but built every hit by
+  gluing the URI as given to the element's name - so `/articles/` asked for
+  `/articles//slug` and came back empty, and `articles` came back with that
+  spelling in every hit's `.uri`. The URI is normalised once, where the query
+  starts.
+
+- **A query could not find an element whose boolean is off.** A stored `false`
+  became the empty string on the way into the comparison, so `live=0` matched
+  nothing at all while `live=1` worked. A boolean compares as `1` or `0`.
+
+- **A type URI read back as an element.** The type files and the elements read
+  out of them shared one cache, both keyed by URI - so once a type had been
+  read, asking for the type's own URI as if it were an element handed back
+  that type's whole locale bucket, every element in it, as one element. They
+  are two caches now, dropped together as before.
+
+- **Two requests inserting the same element merged into one.**
+  `insertElement()` asks whether the element is there before it takes the lock
+  the write holds, so both requests passed that look and the second one's
+  fields landed in the first one's element. The look happens where the write
+  does now; the one before it stays, since it is what makes the ordinary
+  refusal cheap.
+
 - **A PHP deprecation took the site down.** Every level the engine raises was
   fatal, deprecations among them - so a PHP minor upgrade could answer `500`
   where nothing was wrong, and intermittently at that: a compile-time

@@ -260,6 +260,54 @@ check( 'queryElements( locale: * ) finds elements that only exist under a locale
 check( 'queryElements( locale: * ) with a query matches across every locale, not just "*"\'s (empty) data', count( \Nino\Elements::queryElements( $appData, '/wildcardtest', [ 'title' => 'One' ], '*', [] ) ) === 1 );
 check( 'queryElements( locale: de_DE ) is unaffected - still only searches that one locale', count( \Nino\Elements::queryElements( $appData, '/wildcardtest', [ 'title' => 'One' ], 'de_DE', [] ) ) === 0 );
 
+// A type uri is written with or without its slashes wherever one is accepted
+// (getElementFile() trims its own), but the hits were built by gluing the uri
+// as given to the element's name - so '/wildcardtest/' asked for
+// '/wildcardtest//a' and found nothing at all
+$slashSpellings = [];
+foreach( [ '/wildcardtest', '/wildcardtest/', 'wildcardtest', 'wildcardtest/' ] as $spelling )
+	$slashSpellings[$spelling] = array_column( \Nino\Elements::queryElements( $appData, $spelling, [], 'de_DE', [] ), '.uri' );
+check( 'a type uri is the same type however its slashes are written', $slashSpellings === array_fill_keys(
+	[ '/wildcardtest', '/wildcardtest/', 'wildcardtest', 'wildcardtest/' ], [ '/wildcardtest/a', '/wildcardtest/b' ] ) );
+
+// A boolean is stored as one, and '(string) false' is '' - so a query for the
+// off state matched nothing, whatever it was written as, while the on state
+// worked. The two spellings a query can use for a boolean are 1/0
+\Nino\Filesystem::putFileContent( $appData, '/elements/flagtest.php', [
+	'title' 	=> 'Flag Test',
+	'model' 	=> [ 'live' => [ 'type' => 'boolean' ] ],
+	'*' 			=> [ '*' => [], 'on' => [ 'live' => true ], 'off' => [ 'live' => false ] ],
+] );
+check( 'a query finds the elements whose boolean is off', array_column( \Nino\Elements::queryElements( $appData, '/flagtest', [ 'live' => '0' ], '*', [] ), '.uri' ) === [ '/flagtest/off' ] );
+check( '...as well as the ones whose boolean is on', array_column( \Nino\Elements::queryElements( $appData, '/flagtest', [ 'live' => '1' ], '*', [] ), '.uri' ) === [ '/flagtest/on' ] );
+
+// The type file and the elements read out of it shared one cache map, keyed
+// by uri - so once a type had been read, asking for the type uri as if it
+// were an element handed back that type's whole locale bucket, every element
+// in it, as one element
+\Nino\Elements::queryElements( $appData, '/wildcardtest', [], 'de_DE', [] );
+check( 'a type uri is not an element, however often the type has been read', \Nino\Elements::getElement( $appData, '/wildcardtest', 'de_DE' ) === false );
+
+// The existence check for an insert stood outside the lock the write takes,
+// so two requests inserting the same uri both passed it and the second one
+// merged its fields into the first one's element. Checked where the write
+// happens now, which is the only place it can be checked
+\Nino\Elements::insertElementType( $appData, '/racetest', [ 'title' => [ 'type' => 'string' ] ] );
+\Nino\Elements::insertElement( $appData, '/racetest/one', [ 'title' => 'First' ], '*' );
+// insertElement()'s own look happens before the lock, so the interleaving is
+// what it cannot see: the write itself is driven directly here, which is
+// exactly the state the second request arrives in
+$writeElement = new ReflectionMethod( '\Nino\Elements', '_writeElementData' );
+$writeElement->setAccessible( true );
+
+$raceWarnings = [];
+set_error_handler( static function( int $no, string $message ) use ( &$raceWarnings ): bool { $raceWarnings[] = $message; return true; } );
+$secondInsert = $writeElement->invokeArgs( null, [ &$appData, '/racetest/one', [ 'title' => 'Second' ], '*', false ] );
+restore_error_handler();
+check( 'inserting an element that is already there is refused where the write happens, not only before it', $secondInsert === false
+	&& str_contains( implode( ' ', $raceWarnings ), 'already exists' ) === true );
+check( '...and leaves the one that is there as it was', ( \Nino\Elements::getElement( $appData, '/racetest/one', '*' )['title'] ?? null ) === 'First' );
+
 // --- Elements::queryElementValues() - distinct values of one model key ---
 
 \Nino\Elements::insertElementType( $appData, '/valuetest', [

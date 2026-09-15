@@ -23,7 +23,7 @@ namespace Nino {
 			// Add element type / element to cache
 			self::_cacheElement( $appData, $uri, $locale );
 
-			return $appData['./nino/elements/cache'][ $uri ][ $locale ] ?? $return;
+			return $appData['./nino/elements/cache']['elements'][ $uri ][ $locale ] ?? $return;
 		}
 
 		// The elements of a type that match a query - and, through $options,
@@ -37,7 +37,15 @@ namespace Nino {
 				$locale = \Nino\Locales::getCurrentLocale( $appData );
 
 			// Get element type data from file
+			// Normalised once, here: getElementFile() trims its own copy, so a
+			// type uri written with a trailing slash found its file - and the
+			// hits below were then built by gluing the uri as given to the
+			// element's name, which asked for '/type//element' and found
+			// nothing at all. A uri written without the leading slash came back
+			// with that spelling in every hit's '.uri'
+			$typeUri	= '/'. trim( $typeUri, '/' );
 			$typeData = \Nino\Elements::getElementFile( $appData, $typeUri );
+
 			if( $typeData === false )
 				return $return;
 
@@ -167,7 +175,10 @@ namespace Nino {
 			if( is_scalar( $value ) === false )
 				return false;
 
-			$value = (string) $value;
+			// '1' and '0', not '1' and '': a boolean is stored as one, and
+			// (string) false is the empty string - so a query for the off state
+			// matched nothing at all while the on state worked
+			$value = is_bool( $value ) ? ( $value === true ? '1' : '0' ) : (string) $value;
 
 			if( $value === $kValClean )
 				return true;
@@ -364,13 +375,16 @@ namespace Nino {
 			$typeUri = '/'. trim( $typeUri, '/' );
 			$typeFile = self::_typeFile( $typeUri );
 
-			// Check filecache
-			$appData['./nino/elements/cache'][$typeUri] = \Nino\Filesystem::getFileContent( $appData, $typeFile, false );
+			// Check filecache. Under its own key, not beside the elements: both
+			// were keyed by uri in the same map, so once a type had been read,
+			// asking for the type uri as if it were an element handed back that
+			// type's whole locale bucket - every element in it, as one element
+			$appData['./nino/elements/cache']['files'][$typeUri] = \Nino\Filesystem::getFileContent( $appData, $typeFile, false );
 
-			if( $appData['./nino/elements/cache'][$typeUri] === false )
+			if( $appData['./nino/elements/cache']['files'][$typeUri] === false )
 				trigger_error( 'Invalid element php file \''. $typeFile. '\'' );
 
-			return $appData['./nino/elements/cache'][$typeUri];
+			return $appData['./nino/elements/cache']['files'][$typeUri];
 		}
 
 		// Insert an element type
@@ -687,6 +701,27 @@ namespace Nino {
 				$oldElementUri = self::getElementUriFromUri( $uri );
 				$renameBuckets = [];
 
+				// An insert asks whether the element is there. insertElement()
+				// asks too, but before the lock this mutation holds - so two
+				// requests inserting the same uri both passed that look and the
+				// second one merged its fields into the first one's element. A
+				// uri the autoincrement branch above has just allocated is new
+				// by construction and skips this. Same look the rename below
+				// makes, for the same reason
+				if( $update === false && $writtenUri === $uri ) {
+					foreach( $typeData as $bucketName => $bucketData ) {
+
+						if( $bucketName === 'model' || is_array( $bucketData ) === false )
+							continue;
+
+						if( array_key_exists( $elementUri, $bucketData ) === true ) {
+							trigger_error( 'Element \''. $data['.uri']. '\' already exists.' );
+							$outcome = 'error';
+							return null;
+						}
+					}
+				}
+
 				if( $uri !== $data['.uri'] ) {
 					foreach( $typeData as $bucketName => $bucketData ) {
 						if( $bucketName === 'model' || is_array( $bucketData ) === false )
@@ -767,15 +802,17 @@ namespace Nino {
 						return null;
 					}
 
-					// Whitelist
-					if( isset( $field['whitelist'] ) === true && in_array( $data[$key], $field['whitelist'] ) === false ) {
+					// Whitelist. Strictly: php 8 no longer reads 'abc' == 0 as
+					// true, so the classic bypass is gone, but a list is a list of
+					// values and '1' is not 1
+					if( isset( $field['whitelist'] ) === true && in_array( $data[$key], (array) $field['whitelist'], true ) === false ) {
 						trigger_error( 'Element value \''. $key. '\' is not whitelisted.' );
 						$outcome = 'error';
 						return null;
 					}
 
-					// Blacklist
-					if( isset( $field['blacklist'] ) === true && in_array( $data[$key], $field['blacklist'] ) === true ) {
+					// Blacklist - strictly, see the whitelist above
+					if( isset( $field['blacklist'] ) === true && in_array( $data[$key], (array) $field['blacklist'], true ) === true ) {
 						trigger_error( 'Element value \''. $key. '\' is blacklisted.' );
 						$outcome = 'error';
 						return null;
@@ -920,7 +957,7 @@ namespace Nino {
 			$typeUri		= self::getElementTypeFromUri( $uri );
 			$elementUri	= self::getElementUriFromUri( $uri );
 
-			if( $locale !== '*' && isset( $appData['./nino/elements/cache'][$uri][$locale] ) === true )
+			if( $locale !== '*' && isset( $appData['./nino/elements/cache']['elements'][$uri][$locale] ) === true )
 				return;
 
 			// Get element type data from file
@@ -952,8 +989,8 @@ namespace Nino {
 
 
 			// Combine data
-			$appData['./nino/elements/cache'][$uri] = $appData['./nino/elements/cache'][$uri] ?? [];
-			$appData['./nino/elements/cache'][$uri][$locale] = $localeData + $globalData + $localeDefaults + $globalDefaults + $defaults;
+			$appData['./nino/elements/cache']['elements'][$uri] = $appData['./nino/elements/cache']['elements'][$uri] ?? [];
+			$appData['./nino/elements/cache']['elements'][$uri][$locale] = $localeData + $globalData + $localeDefaults + $globalDefaults + $defaults;
 		}
 
 	}
