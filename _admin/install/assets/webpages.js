@@ -43,6 +43,10 @@
 		_locales 				: [],
 		_navs 					: [],
 		_entries 				: [],
+
+		// The list as the server last answered with it, json-encoded - what
+		// _dirty() compares against. null until the first load
+		_loaded 				: null,
 		_currentIndex 	: null,
 		_current 			: null,
 		_isNew 					: false,
@@ -65,11 +69,37 @@
 				Nino.install.webpages._templates 	= response.templates;
 				Nino.install.webpages._locales 		= response.locales;
 				Nino.install.webpages._navs 			= response.navs;
-				Nino.install.webpages._entries 		= response.webpages;
+
+				/*	The routes are the operator's, and until Next posts them
+					they live nowhere but here. setup.apply() marks this step
+					stale whenever the Languages step was applied, so pressing
+					Back to change a locale and Next again used to replace the
+					whole list with the server's - every route added or edited
+					since, gone without a message, on the very gesture this step
+					goes out of its way to keep an open form alive for. The
+					templates, locales and navs above are what Back may actually
+					have changed and are always taken; the list is taken only
+					where nothing was edited since it was fetched	*/
+				if( Nino.install.webpages._dirty() === false ) {
+					Nino.install.webpages._entries	= response.webpages;
+					Nino.install.webpages._loaded 	= JSON.stringify( response.webpages );
+				}
+
 				Nino.install.webpages._renderList();
 				Nino.install.webpages._showList();
 				Nino.install.webpages._ready = true;
 			} );
+		},
+
+		/**
+		 *	Whether this step carries route edits the server has not seen
+		 *
+		 *	@return		{boolean}
+		 */
+		_dirty : function() {
+
+			return Nino.install.webpages._loaded !== null
+				&& JSON.stringify( Nino.install.webpages._entries ) !== Nino.install.webpages._loaded;
 		},
 
 		showCurrent : function() {
@@ -700,6 +730,12 @@
 				}
 
 				msg.textContent = 'Applied '+ response.webpages.length+ ' route(s).';
+
+				// Posted, so the server's list and this one are the same again -
+				// its own answer, so a route it normalized reads here as it is
+				// stored, and the next load may take what it sends (see init())
+				Nino.install.webpages._entries	= response.webpages;
+				Nino.install.webpages._loaded 	= JSON.stringify( response.webpages );
 
 				// Setup may since have added/removed a module the
 				// requiresModules pull-in also touches - reload on next visit

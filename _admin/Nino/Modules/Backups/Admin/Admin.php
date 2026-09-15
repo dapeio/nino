@@ -38,6 +38,9 @@ namespace Nino\Modules\Backups {
 			return self::MANAGE_PERM;
 		}
 
+		// How many safety snapshots a project keeps - see _pruneSnapshots()
+		private const int SNAPSHOT_KEEP = 3;
+
 		private const string STUB_PREFIX = "<?php http_response_code(403); exit; return '";
 		private const string STUB_SUFFIX = "';\n";
 
@@ -166,22 +169,42 @@ namespace Nino\Modules\Backups {
 		 *
 		 *	@return 	array										[ "Y-m-d", ... ]
 		 */
+		// What an archive's id may look like: a dated backup, or the
+		// safety snapshot a restore writes before it overwrites anything.
+		// The snapshot used to match nothing here - not in this list, not in
+		// apiRestore(), not in recovery.php - so "a wrong pick can itself be
+		// undone", which the docblock, the panel's confirm text and both
+		// manuals all promise, was true of a file only ssh could reach
+		public const string ID_PATTERN = '/^(?:\d{4}-\d{2}-\d{2}|pre-restore-\d{4}-\d{2}-\d{2}-\d{6})$/';
+
 		public static function dates( array &$appData ): array {
 
-			$dates = [];
+			$dates 			= [];
+			$snapshots	= [];
 
 			// Every location, not just the current one: an archive written
 			// before the directory moved is still a restorable archive
 			foreach( self::_backupDirs( $appData ) as $dir )
-				foreach( glob( $dir. '/*.php' ) ?: [] as $file )
-					if( preg_match( '/^\d{4}-\d{2}-\d{2}$/', basename( $file, '.php' ) ) === 1 )
-						$dates[] = basename( $file, '.php' );
+				foreach( glob( $dir. '/*.php' ) ?: [] as $file ) {
 
-			$dates = array_values( array_unique( $dates ) );
+					$id = basename( $file, '.php' );
+
+					if( preg_match( '/^\d{4}-\d{2}-\d{2}$/', $id ) === 1 )
+						$dates[] = $id;
+					else if( preg_match( self::ID_PATTERN, $id ) === 1 )
+						$snapshots[] = $id;
+				}
+
+			$dates 			= array_values( array_unique( $dates ) );
+			$snapshots	= array_values( array_unique( $snapshots ) );
 
 			rsort( $dates );
+			rsort( $snapshots );
 
-			return $dates;
+			// The dated backups first, the snapshots after them: a snapshot is
+			// the way back out of a restore, not one of the daily copies
+			// somebody picks from
+			return array_merge( $dates, $snapshots );
 		}
 
 		public static function log( string $action, array $data ): string {
@@ -224,7 +247,7 @@ namespace Nino\Modules\Backups {
 
 			$date = (string) ( \Nino\Admin\Admin::postData()['date'] ?? '' );
 
-			if( preg_match( '/^\d{4}-\d{2}-\d{2}$/', $date ) !== 1 ) {
+			if( preg_match( self::ID_PATTERN, $date ) !== 1 ) {
 				\Nino\Http::fail( $request, 400, 'invalid date' );
 				return;
 			}
@@ -391,6 +414,37 @@ namespace Nino\Modules\Backups {
 			$cipher = openssl_encrypt( $gz, 'aes-256-gcm', $key, OPENSSL_RAW_DATA, $iv, $tag );
 
 			file_put_contents( $dir. '/pre-restore-'. date( 'Y-m-d-His' ). '.php', self::STUB_PREFIX. base64_encode( $iv. $tag. $cipher ). self::STUB_SUFFIX );
+
+			self::_pruneSnapshots( $dir );
+		}
+
+		/**
+		 *	Keep the newest SNAPSHOT_KEEP safety snapshots and drop the rest.
+		 *
+		 *	Backups::_prune() deliberately walks past these - they are not
+		 *	dated backups and must not be swept up with them - which left
+		 *	every restore a project ever did as a full encrypted copy on disk,
+		 *	for good. Their own bound rather than the daily retention in days:
+		 *	what makes a snapshot worth keeping is that it is recent in
+		 *	restores, not in days, and a project that restores twice a year
+		 *	would lose its way back out after two weeks of nothing happening.
+		 *
+		 *	@param		string		$dir					Absolute path to the backup directory
+		 *
+		 *	@return 	void
+		 */
+		private static function _pruneSnapshots( string $dir ): void {
+
+			$snapshots = glob( $dir. '/pre-restore-*.php' ) ?: [];
+
+			if( count( $snapshots ) <= self::SNAPSHOT_KEEP )
+				return;
+
+			// The name carries the timestamp, so sorting it sorts them by age
+			rsort( $snapshots );
+
+			foreach( array_slice( $snapshots, self::SNAPSHOT_KEEP ) as $file )
+				@unlink( $file );
 		}
 	}
 }

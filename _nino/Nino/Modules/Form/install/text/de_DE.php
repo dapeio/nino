@@ -5,6 +5,7 @@
 	'[[/form/info/welcome]]' => 'Haben Sie Fragen oder möchten Sie ein Angebot anfragen? Nutzen Sie das Formular, um mit uns in Kontakt zu treten.',
 	'[[/form/info/required]]' => 'Bitte füllen Sie alle Pflichtfelder aus.',
 	'[[/form/info/email]]' => 'Bitte geben Sie eine gültige E-Mail-Adresse ein.',
+	'[[/form/info/invalid]]' => 'Bitte prüfen Sie das markierte Feld.',
 	'[[/form/info/error]]' => 'Ihre Nachricht konnte nicht versendet werden. Bitte probieren Sie es später noch einmal.',
 	'[[/form/info/success]]' => 'Vielen Dank – Ihre Nachricht wurde versandt.',
 	'[[/form/label/cat]]' => 'Grund',

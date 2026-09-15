@@ -552,6 +552,38 @@ check( 'the wrecked user record is back after restore', isset( $afterRestore['/n
 $backupDir = $sandbox. '/private/.backups';
 check( 'a pre-restore safety snapshot of the (corrupted) state was made first', count( glob( $backupDir. '/pre-restore-*.php' ) ?: [] ) === 1 );
 
+/*	...and that snapshot is a way back out, which is what the panel's confirm
+	text and both manuals promise. It used to match nothing: not the list,
+	not apiRestore(), not recovery.php - so "a wrong pick can itself be
+	undone" was true of a file only ssh could reach. It is also the one
+	archive nothing ever pruned, so every restore a project did stayed on
+	disk as a full encrypted copy, for good	*/
+$snapshotId = basename( ( glob( $backupDir. '/pre-restore-*.php' ) ?: [] )[0], '.php' );
+check( 'the snapshot is offered, after the dated backups rather than among them', in_array( $snapshotId, \Nino\Modules\Backups\Admin::dates( $appData ), true ) === true
+	&& array_key_last( \Nino\Modules\Backups\Admin::dates( $appData ) ) === array_search( $snapshotId, \Nino\Modules\Backups\Admin::dates( $appData ), true ) );
+
+$_POST['data'] = json_encode( [ 'date' => $snapshotId ] );
+$undoRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Modules\Backups\Admin::apiRestore( $appData, $undoRequest );
+check( 'restoring it undoes the restore', ( $undoRequest['/nino/http/response']['body']['ok'] ?? false ) === true
+	&& isset( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/auth/user']['admin@example.com'] ) === false );
+
+// Undoing wrote one of its own, so there are two now - and the bound is what
+// keeps that from growing with every restore the project ever does
+for( $i = 0; $i < 4; $i++ ) {
+	touch( $backupDir. '/pre-restore-2020-01-0'. $i. '-120000.php' );
+}
+$_POST['data'] = json_encode( [ 'date' => $snapshotId ] );
+$boundRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Modules\Backups\Admin::apiRestore( $appData, $boundRequest );
+check( 'a restore keeps the newest three snapshots and drops the rest', count( glob( $backupDir. '/pre-restore-*.php' ) ?: [] ) === 3 );
+
+// Back to the state the checks below read
+$_POST['data'] = json_encode( [ 'date' => $dates[0] ] );
+$backRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Modules\Backups\Admin::apiRestore( $appData, $backRequest );
+
+
 // config.php is the one file every request reads at boot, and a restore
 // replaces it. Written in place, a request booting mid-write read a
 // half-written file - an include of a truncated var_export either fatals or

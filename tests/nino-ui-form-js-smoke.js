@@ -147,6 +147,7 @@ sandbox.Nino = {
 			'/form/info/error'    : 'Your message could not be sent. Please try again later.',
 			'/form/info/email'    : 'Please enter a valid email address.',
 			'/form/info/required' : 'Please fill in every required field.',
+			'/form/info/invalid'  : 'Please check the highlighted field.',
 		},
 		getText : function( key ) { return sandbox.Nino.content.text[key] || '' },
 	},
@@ -239,6 +240,30 @@ check( 'a 400 answers the form it belongs to', forms[1].msg.textContent === 'Ple
 check( '...and not the other one still in flight', forms[0].msg.textContent === '' );
 check( 'a 400 names the field instead of asking the visitor to try later', forms[1].msg.textContent !== 'Your message could not be sent. Please try again later.' );
 check( 'a rejected form stays editable', forms[1].btn.disabled === false && forms[1].fieldList.every( function( f ) { return f.disabled === false } ) );
+
+/*	...unless the form carries a field the client never checked.
+	Form::TYPES has url, number and select in it too, and validate()
+	refuses all three - so a 400 there is not necessarily the address, and
+	saying it is sends the visitor to look at the one field that was fine	*/
+forms[1].fieldList.push( field( 'website', 'url', 'my site', false, false ) );
+forms[1].fields = forms[1].fieldList;
+forms[1].classList.remove('nino-is-error');
+forms[1].msg.textContent = '';
+forms[1].submit();
+respond( sent.length - 1, 400 );
+check( 'a 400 on a form with a url field asks the visitor to check the field, not their address', forms[1].msg.textContent === 'Please check the highlighted field.' );
+
+// The browser's own verdict is what the client refuses on, so a stand-in
+// without one submits and lets the server answer - which is what just
+// happened above
+forms[1].fieldList[ forms[1].fieldList.length - 1 ].validity = { typeMismatch : true, badInput : false };
+forms[1].fields = forms[1].fieldList;
+forms[1].classList.remove('nino-is-error');
+forms[1].msg.textContent = '';
+const beforeTyped = sent.length;
+forms[1].submit();
+check( 'a url the browser calls invalid is refused before the request', sent.length === beforeTyped
+	&& forms[1].msg.textContent === 'Please check the highlighted field.' );
 check( '...and can be submitted again', forms[1].classList.contains('success') === false );
 
 respond( 0, 200 );

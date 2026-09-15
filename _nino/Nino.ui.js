@@ -780,17 +780,24 @@
 						this.form.classList.add( ok === true ? 'nino-is-success' : 'nino-is-error' );
 
 						// A 400 is Form.php repeating the field validation this form
-						// already ran, ie. an address the regex below accepted and
-						// FILTER_VALIDATE_EMAIL did not - so it gets the field-level
-						// message instead of "please try again later", which sends the
-						// visitor away to wait out a problem only they can fix. Every
-						// other non-200 stays generic on purpose: naming the csrf 403
-						// or the honeypot's 418 tells a spam bot which check it tripped.
-						// textContent, not innerHTML - these are editor-editable
-						// textfills, and Modules\Jstext json-encodes them precisely so
-						// they cannot become markup on the way in
+						// already ran - so it gets a field-level message instead of
+						// "please try again later", which sends the visitor away to
+						// wait out a problem only they can fix. Which message depends
+						// on what the form holds: Form::TYPES has url, number and
+						// select in it as well, so a 400 on a form carrying one of
+						// those is not necessarily the address, and saying so anyway
+						// sent the visitor to look at the one field that was fine.
+						// Every other non-200 stays generic on purpose: naming the
+						// csrf 403 or the honeypot's 418 tells a spam bot which check
+						// it tripped. textContent, not innerHTML - these are
+						// editor-editable textfills, and Modules\Jstext json-encodes
+						// them precisely so they cannot become markup on the way in
+						const typed = Array.prototype.some.call( this.form.fields, function( field ) {
+							return field.type === 'url' || field.type === 'number' || field.tagName === 'SELECT';
+						} );
+
 						this.form.msg.textContent = ( xhr.status === 400 )
-							? Nino.content.getText('/form/info/email')
+							? Nino.content.getText( typed === true ? '/form/info/invalid' : '/form/info/email' )
 							: Nino.content.getText('/form/info/'+ ( ok === true ? 'success' : 'error' ));
 
 						// Only a delivered message locks the form down. Disabling every
@@ -858,6 +865,20 @@
 							// helps nobody
 							if( error === false && this.fields[i].type === 'email' && ( /^[a-zA-Z0-9.!#$%&'*+\/=?^_`{|}~-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*\.[a-zA-Z]{2,}$/.test(this.fields[i].value) === false ) )
 								this.fields[i].classList.add('nino-is-error') || ( error = Nino.content.getText('/form/info/email') );
+
+							// A url and a number are validated by Form::validate() too
+							// (FILTER_VALIDATE_URL, is_numeric), and the client checked
+							// neither - so the server's 400 came back for a field this
+							// form had passed, and the visitor was told their email
+							// address was wrong while it was fine. The browser's own
+							// verdict rather than a second regex here: it is the rule
+							// the visitor already sees in the field, so the two cannot
+							// disagree. Absent (a non-browser client, a test stand-in)
+							// it checks nothing and the server still answers
+							if( error === false && ( this.fields[i].type === 'url' || this.fields[i].type === 'number' )
+								&& this.fields[i].value.length > 0 && typeof this.fields[i].validity === 'object' && this.fields[i].validity !== null
+								&& ( this.fields[i].validity.typeMismatch === true || this.fields[i].validity.badInput === true ) )
+								this.fields[i].classList.add('nino-is-error') || ( error = Nino.content.getText('/form/info/invalid') );
 						}
 						// Catch error
 						if( error !== false )

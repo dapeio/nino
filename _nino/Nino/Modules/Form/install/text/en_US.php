@@ -5,6 +5,7 @@
 	'[[/form/info/welcome]]' => 'Do you have questions or would like to request a quote? Use the form to get in touch with us.',
 	'[[/form/info/required]]' => 'Please fill in all required fields.',
 	'[[/form/info/email]]' => 'Please enter a valid email address.',
+	'[[/form/info/invalid]]' => 'Please check the highlighted field.',
 	'[[/form/info/error]]' => 'Your message could not be sent. Please try again later.',
 	'[[/form/info/success]]' => 'Thank you – your message has been sent.',
 	'[[/form/label/cat]]' => 'Reason',

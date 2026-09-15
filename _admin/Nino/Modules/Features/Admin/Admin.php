@@ -411,6 +411,18 @@ namespace Nino\Modules\Features {
 				// failure here must still report: the list would otherwise show a
 				// feature waiting with no word on why it is not on
 				if( $result !== true ) {
+
+					// ...and the log has to carry that half too. The shell
+					// records an action only where it answered 200 (see
+					// \Nino\Admin\Admin::handlePost()), so the placement -
+					// files written into the project, by somebody, at a time -
+					// went unrecorded whenever the activation behind it failed.
+					// An audit trail that drops what happened because what
+					// followed it did not is not one
+					$actor = \Nino\Auth::getCurrentUser( $appData );
+					if( $actor !== false )
+						\Nino\Admin\Admin::record( $appData, $actor['mail'], self::log( 'features/install', [ 'key' => $key, 'version' => $version ] ). ' (not activated: '. $result. ')' );
+
 					\Nino\Http::fail( $request, 400, self::_say( $appData, $wasActive === true
 						? '/_admin/features/error/update-after-install'
 						: '/_admin/features/error/activate-after-install', $result ) );

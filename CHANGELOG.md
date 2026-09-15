@@ -188,6 +188,65 @@ All notable changes to Nino are documented in this file.
   with a 403 naming it. The address stays changeable, since a rename grants
   nothing, and an account editing itself has proven its current password.
 
+- **A feature whose directory sits outside the project had no panel at all.**
+  `Panels::relative()` answers a project-relative path for everything a panel
+  says about its own files, and knew one root: the project. A project that
+  points `NINO_FEATURES_DIR` somewhere else - which `index.php` documents, and
+  which `\Nino\Filesystem` addresses through the virtual `/features` prefix
+  either way - got `''` back for the exact line the manuals tell a feature
+  panel to write, and `''` was dropped in silence. The pane was a blank mount
+  point, every label a raw fill key, and nothing in the log said why. The
+  features directory is the second root that function answers for now, and an
+  asset path that is not a project path is named in the log rather than
+  dropped.
+
+- **The safety snapshot of a restore could not be restored.** Before
+  overwriting the project, a restore writes an encrypted copy of the current
+  state - "so a wrong choice is itself undoable", which the panel's confirm
+  text and both manuals repeat. It was named `pre-restore-<timestamp>`, and
+  the list, `backups/restore` and `recovery.php` all accepted `YYYY-MM-DD` and
+  nothing else: the way back out existed on disk and was reachable by ssh. It
+  is offered now, after the dated backups rather than among them, and works
+  through recovery.php too. It is also the one archive nothing ever pruned -
+  every restore a project did stayed as a full encrypted copy, for good. The
+  newest three are kept, counted in restores rather than in days, because what
+  makes a snapshot worth keeping is that it is recent in restores.
+
+- **An install that placed files but failed to activate left no log line.**
+  The shell records an action only where it answered 200, and this one answers
+  400 on purpose - the directory is already the new one, and saying so is the
+  half a failure still has to report. So the placement, which is files written
+  into the project by somebody at a time, went unrecorded whenever the
+  activation behind it failed. It is recorded with the reason the activation
+  gave.
+
+- **The wizard dropped unapplied routes on Back and forward.** The Routes step
+  keeps its list in the browser until Next posts it, and applying the
+  Languages step marks it stale - so pressing Back to change a locale and Next
+  again replaced the whole list with the server's, and every route added or
+  edited since was gone without a message, on the very gesture the step goes
+  out of its way to keep an open form alive for. It takes the templates,
+  locales and navigations from the answer (which is what Back may have
+  changed) and keeps its own list whenever it carries edits.
+
+- **The slider's controls were drawn over the bottom of every slide.** The
+  40px the stylesheet reserves for them is `padding-bottom`, and the page sets
+  `box-sizing: border-box` for everything - so the height `Nino.ui.js` measures
+  and writes onto the slider had that padding taken out of it again, and the
+  absolutely positioned track ran into the band the controls sit in. Measured
+  in Chromium: the controls overlapped the track by 25px, and by 0 after. The
+  slider sizes its own box as content now, which is what the padding was
+  written for.
+
+- **A rejected form told the visitor their email address was wrong when it was
+  not.** `\Nino\Form::TYPES` has `url`, `number` and `select` in it, and the
+  server refuses all three - the client checked neither, so a url typed as "my
+  site" came back as a 400 and the form said "please enter a valid email
+  address" over an address that was fine. A url and a number are checked
+  client-side now, by the browser's own verdict rather than a second regex of
+  ours, and a 400 on a form that carries one of those types asks the visitor
+  to check the marked field instead: the new fill `/form/info/invalid`.
+
 - **The workbench lost what was typed when you looked something up.** The
   shell documents that switching panels never resets anything - "jumping back
   and forth is always exactly where you left it" - but four panels answered

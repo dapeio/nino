@@ -1041,12 +1041,32 @@ namespace Nino\Admin {
 			// warning is the only thing that says why
 			$assets = [];
 			if( method_exists( $class, 'assets' ) === true )
-				foreach( (array) $class::assets() as $asset )
-					if( is_string( $asset ) === true && preg_match( '#^/[A-Za-z0-9_./-]+\.(js|css)$#', $asset ) === 1 && str_contains( $asset, '..' ) === false ) {
-						if( is_file( Admin::ROOT. $asset ) === false )
-							trigger_error( 'Panel '. $class. ' names an asset that does not exist: '. $asset, E_USER_WARNING );
-						$assets[] = $asset;
+				foreach( (array) $class::assets() as $asset ) {
+
+					// Named rather than dropped in silence: a panel whose
+					// asset path does not take the documented shape - the ''
+					// Panels::relative() answers for a path it cannot place,
+					// above all - used to disappear here without a word, and
+					// an empty pane with no line in the log is the hardest
+					// kind of nothing to chase
+					if( is_string( $asset ) === false || preg_match( '#^/[A-Za-z0-9_./-]+\.(js|css)$#', $asset ) !== 1 || str_contains( $asset, '..' ) === true ) {
+						trigger_error( 'Panel '. $class. ' names an asset that is not a project path: \''. ( is_string( $asset ) === true ? $asset : gettype( $asset ) ). '\'', E_USER_WARNING );
+						continue;
 					}
+
+					// The features directory may sit outside the project (see
+					// Panels::relative()), so an asset below it is checked
+					// where Filesystem resolves it rather than under the
+					// project root
+					$onDisk = str_starts_with( $asset, \Nino\Filesystem::FEATURES_DIR. '/' ) === true
+						? \Nino\Features::dir(). substr( $asset, strlen( \Nino\Filesystem::FEATURES_DIR ) )
+						: Admin::ROOT. $asset;
+
+					if( is_file( $onDisk ) === false )
+						trigger_error( 'Panel '. $class. ' names an asset that does not exist: '. $asset, E_USER_WARNING );
+
+					$assets[] = $asset;
+				}
 
 			$panes = [ $uri. '-list' ];
 			if( method_exists( $class, 'panes' ) === true )
@@ -1202,11 +1222,25 @@ namespace Nino\Admin {
 		 *
 		 *	  Panels::relative( dirname( __DIR__ ). '/assets/admin.js' )
 		 *
-		 *	@param		string		$absolute			An absolute path inside the project
+		 *	The features directory is the second root this answers for. A
+		 *	project may point NINO_FEATURES_DIR outside the project root -
+		 *	index.php documents that, and Filesystem addresses everything
+		 *	under it by the virtual '/features' prefix either way. A feature
+		 *	panel writing the exact line the manuals tell it to write got ''
+		 *	back there, and '' is dropped: its assets never reached the page
+		 *	and its text() was never read, so the pane was a blank mount point
+		 *	and every label a raw fill key, with nothing in the log saying why.
 		 *
-		 *	@return 	string										'' when the path is not inside the project
+		 *	@param		string		$absolute			An absolute path inside the project, or below the features directory
+		 *
+		 *	@return 	string										'' when the path is inside neither
 		 */
 		public static function relative( string $absolute ): string {
+
+			$features = realpath( \Nino\Features::dir() );
+
+			if( $features !== false && str_starts_with( $absolute, $features. '/' ) === true )
+				return \Nino\Filesystem::FEATURES_DIR. str_replace( '\\', '/', substr( $absolute, strlen( $features ) ) );
 
 			$root = dirname( __DIR__ );
 
@@ -1441,7 +1475,11 @@ namespace Nino\Admin {
 
 				case 'recovery/restore':
 					$date = (string) ( $data['date'] ?? '' );
-					if( preg_match( '/^\d{4}-\d{2}-\d{2}$/', $date ) !== 1 ) {
+					// The same shapes the panel offers, snapshots included (see
+					// \Nino\Modules\Backups\Admin::ID_PATTERN): recovery.php is
+					// the door that is open when nothing else is, so the way
+					// back out of a wrong restore has to fit through it too
+					if( preg_match( \Nino\Modules\Backups\Admin::ID_PATTERN, $date ) !== 1 ) {
 						\Nino\Http::fail( $request, 400, 'invalid date' );
 						return;
 					}

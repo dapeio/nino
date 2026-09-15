@@ -2360,9 +2360,16 @@ header .nino-headernav-logo {
 }
 
 /* Contentslider */
+/*	content-box against the page's own border-box: Nino.ui.js measures the
+	track and writes that height onto the slider, and under border-box the
+	padding below is taken out of it - the absolutely positioned track then
+	ran into the band the controls sit in, and .nino-slider-controls was
+	drawn over the last 40px of every slide. The padding is room for the
+	controls, which is what it says, and now what it is	*/
 .nino-slider {
 	position: relative;
 	overflow: hidden;
+	box-sizing: content-box;
 	padding-bottom: 40px; /* room for .nino-slider-controls */
 }
 .nino-slider ul {
