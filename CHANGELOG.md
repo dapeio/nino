@@ -188,6 +188,40 @@ All notable changes to Nino are documented in this file.
   with a 403 naming it. The address stays changeable, since a rename grants
   nothing, and an account editing itself has proven its current password.
 
+- **Installing from the catalogue failed on a private root reached through a
+  symlink.** `PharData` names every entry of an archive by the archive's
+  canonical path, symlinks resolved, while the unpacking cut that prefix by
+  the length of the path it had been given. With `private/` behind a symlink
+  - a hosting home directory, a bind mount, macOS's `/var` - every entry path
+  came out wrong and every install was refused with a message blaming the
+  archive. The prefix is the archive's own path now.
+
+- **An archive with a file where the feature directory should be threw out
+  of the install.** The look before the extraction accepted a top-level file
+  of the directory's name, and the look after it opened that file as a
+  directory: an uncaught exception instead of a refusal, and the staging
+  directory below `private/data/` left behind. Such an archive is refused by
+  name, and everything the extraction is checked for happens inside the same
+  guard as the extraction itself.
+
+- **An update activated from the off state skipped the upgrade hook.**
+  Deactivating a feature keeps its recorded version on purpose, and
+  installing a newer version leaves a switched-off feature off - so the path
+  an update of an inactive feature takes is deactivate, install, activate.
+  `\Nino\Features::activate()` ran `upgrade()` only for a feature that was
+  already on: on exactly that path the record jumped to the new version with
+  the migration never run, and no later activation could run it either, the
+  old version being gone from the record. The record decides now, not the
+  active flag; a first activation still runs no hook.
+
+- **A replaced feature directory could be read back from opcache as the old
+  one.** A catalogue install swaps a directory for another at the same paths,
+  and opcache looks at a file's timestamp every couple of seconds at most -
+  not at all where `validate_timestamps` is off. The request that placed the
+  new version could compile the old manifest and class from the new paths.
+  Every php file of the directory is dropped from opcache before the swap and
+  after it, and before a feature directory is removed.
+
 - **A submission's text could reach the owner as nothing.** A posted value
   was cut at its byte cap with `substr()`, which leaves half of a multibyte
   character behind when the cut lands inside one, and the mail body and the

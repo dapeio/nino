@@ -538,6 +538,13 @@ PEM;
 			$target		= \Nino\Features::dir(). '/'. $entry['directory'];
 			$previous	= $staging. '/previous';
 
+			// opcache forgets what it compiled from these paths - before the
+			// swap for the files that are there, after it for the ones that
+			// take their place. Without this the same request (or, with
+			// validate_timestamps off, every request) read the old manifest
+			// and the old class back from the new directory
+			\Nino\Features::invalidateOpcache( $target );
+
 			if( is_dir( $target ) === true && @rename( $target, $previous ) === false )
 				return 'could not move the installed feature aside';
 
@@ -546,6 +553,8 @@ PEM;
 					@rename( $previous, $target );
 				return 'could not move the feature into place';
 			}
+
+			\Nino\Features::invalidateOpcache( $target );
 
 			// The registry read before this request saw the directory as it
 			// was - the next reader sees the new one
@@ -571,15 +580,32 @@ PEM;
 			try {
 				$phar = new \PharData( $archivePath );
 
+				// The archive's own path, not the one it was opened by: PharData
+				// names every entry by the canonical path, symlinks resolved, so
+				// a private root reached through one (a hosting home directory,
+				// a bind mount, macOS's /var) put the cut below anywhere but at
+				// the entry - and every install was a refusal blaming the archive
+				$prefix		= 'phar://'. $phar->getPath(). '/';
 				$entries	= 0;
 				$bytes		= 0;
 
 				foreach( new \RecursiveIteratorIterator( $phar, \RecursiveIteratorIterator::SELF_FIRST ) as $file ) {
 
-					$path = substr( (string) $file->getPathname(), strlen( 'phar://'. $archivePath. '/' ) );
+					$pathname = (string) $file->getPathname();
+
+					if( str_starts_with( $pathname, $prefix ) === false )
+						return 'the archive holds an entry outside itself';
+
+					$path = substr( $pathname, strlen( $prefix ) );
 
 					if( $path !== $directory && str_starts_with( $path, $directory. '/' ) === false )
 						return 'the archive holds "'. $path. '" outside "'. $directory. '/"';
+
+					// A file of the directory's name is not the directory - it
+					// passed here and was opened as one after the extraction,
+					// an exception out of install()
+					if( $path === $directory && $file->isDir() === false )
+						return 'the archive holds "'. $path. '" as a file, not a directory';
 
 					foreach( explode( '/', $path ) as $segment )
 						if( $segment === '' || $segment === '.' || $segment === '..' || str_contains( $segment, '\\' ) === true )
@@ -605,20 +631,26 @@ PEM;
 					return 'could not create the unpacking directory';
 
 				$phar->extractTo( $into, null, true );
+
+				// PharData drops what it will not name - a "../" it silently
+				// strips, a symlink it writes as an empty file - so what came
+				// out is looked at once more: exactly the one directory, no
+				// links. Inside the try like the look before it: whatever the
+				// extraction left that cannot be walked is a refusal, not an
+				// exception out of install()
+				if( ( scandir( $into ) ?: [] ) !== [ '.', '..', $directory ] )
+					return 'the archive unpacked to more than the directory "'. $directory. '"';
+
+				if( is_dir( $into. '/'. $directory ) === false )
+					return 'the archive unpacked to "'. $directory. '", which is not a directory';
+
+				foreach( new \RecursiveIteratorIterator( new \RecursiveDirectoryIterator( $into. '/'. $directory, \FilesystemIterator::SKIP_DOTS ), \RecursiveIteratorIterator::SELF_FIRST ) as $file )
+					if( $file->isLink() === true || ( $file->isFile() === false && $file->isDir() === false ) )
+						return 'the archive unpacked to "'. substr( (string) $file->getPathname(), strlen( $into ) + 1 ). '", which is neither a file nor a directory';
 			}
 			catch( \Throwable $e ) {
 				return 'the archive could not be read: '. $e->getMessage();
 			}
-
-			// PharData drops what it will not name - a "../" it silently
-			// strips, a symlink it writes as an empty file - so what came out
-			// is looked at once more: exactly the one directory, no links
-			if( ( scandir( $into ) ?: [] ) !== [ '.', '..', $directory ] )
-				return 'the archive unpacked to more than the directory "'. $directory. '"';
-
-			foreach( new \RecursiveIteratorIterator( new \RecursiveDirectoryIterator( $into. '/'. $directory, \FilesystemIterator::SKIP_DOTS ), \RecursiveIteratorIterator::SELF_FIRST ) as $file )
-				if( $file->isLink() === true || ( $file->isFile() === false && $file->isDir() === false ) )
-					return 'the archive unpacked to "'. substr( (string) $file->getPathname(), strlen( $into ) + 1 ). '", which is neither a file nor a directory';
 
 			return true;
 		}

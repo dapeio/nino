@@ -627,9 +627,16 @@ namespace Nino {
 			$class 			= $feature['module'];
 			$wasActive	= $feature['active'];
 
-			if( $wasActive === true && $feature['installed'] !== $feature['version'] && method_exists( $class, 'upgrade' ) === true )
+			// The record, not the active flag, says whether this is an update:
+			// deactivate() keeps the recorded version on purpose, and a newer
+			// directory placed while the feature was off (the panel's install
+			// leaves a switched-off feature off) reaches the hook on the
+			// activation that follows. Running it only for a feature already
+			// on skipped the migration on exactly that path - and recorded the
+			// new version, so no later activation could run it either
+			if( $feature['installed'] !== null && $feature['installed'] !== $feature['version'] && method_exists( $class, 'upgrade' ) === true )
 				if( $class::upgrade( $appData, (string) $feature['installed'] ) === false )
-					return 'feature "'. $key. '" refused to upgrade from '. ( $feature['installed'] ?? 'an unrecorded version' );
+					return 'feature "'. $key. '" refused to upgrade from '. $feature['installed'];
 
 			$modules = array_values( (array) ( $appData['/nino/modules'] ?? [] ) );
 			if( $wasActive === false )
@@ -746,6 +753,7 @@ namespace Nino {
 			if( str_starts_with( $dir, self::dir(). '/' ) === false || str_contains( $dir, '..' ) === true )
 				return 'feature "'. $key. '" does not live below the features directory';
 
+			self::invalidateOpcache( $dir );
 			\Nino\Filesystem::removeDir( $dir );
 
 			if( is_dir( $dir ) === true )
@@ -754,6 +762,28 @@ namespace Nino {
 			unset( $appData['./nino/features/all'] );
 
 			return true;
+		}
+
+		/**
+		 *	Drop every php file below a directory from opcache - around a
+		 *	directory being swapped for another at the same paths (a catalogue
+		 *	install or update), and before one is deleted. opcache looks at a
+		 *	file's timestamp every couple of seconds at most, and not at all
+		 *	where validate_timestamps is off; \Nino\Filesystem does the same
+		 *	for the one file it writes
+		 *
+		 *	@param		string		$dir					Absolute directory
+		 *
+		 *	@return 	void
+		 */
+		public static function invalidateOpcache( string $dir ): void {
+
+			if( function_exists( 'opcache_invalidate' ) === false || is_dir( $dir ) === false )
+				return;
+
+			foreach( new \RecursiveIteratorIterator( new \RecursiveDirectoryIterator( $dir, \FilesystemIterator::SKIP_DOTS ) ) as $file )
+				if( $file->isFile() === true && strtolower( $file->getExtension() ) === 'php' )
+					opcache_invalidate( $file->getPathname(), true );
 		}
 
 		/**

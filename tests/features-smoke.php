@@ -399,6 +399,21 @@ $appData['/nino/features']['sample']['version'] = '1.2.0';
 \Nino\AppData::writeContentData( $appData, [ '/nino/features' ] );
 unset( $appData['./nino/features/all'] );
 
+// The same update arriving while the feature is off. deactivate() keeps
+// the recorded version on purpose, and a newer directory placed in the
+// meantime leaves a switched-off feature off (the panel's install does).
+// activate() used to run the hook only for a feature already on - so on
+// exactly this path the record jumped to the new version with the
+// migration never run, and no later activation could run it either, the
+// old version being gone from the record
+check( '(switched off for the next check)', \Nino\Features::deactivate( $appData, 'sample' ) === true );
+$appData['/nino/features']['sample']['version'] = '0.5.0';
+\Nino\AppData::writeContentData( $appData, [ '/nino/features' ] );
+unset( $appData['./nino/features/all'], $appData['./sample/upgraded-from'] );
+$fromOff = \Nino\Features::activate( $appData, 'sample' );
+check( 'activating a switched-off feature whose directory is newer than its record runs the upgrade hook too', $fromOff === true && ( $appData['./sample/upgraded-from'] ?? null ) === '0.5.0'
+	&& \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/features']['sample']['version'] === '1.2.0' && \Nino\Features::get( $appData, 'sample' )['active'] === true );
+
 echo "\n";
 
 

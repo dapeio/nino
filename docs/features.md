@@ -290,7 +290,7 @@ A feature is updated by replacing its directory with the new release and activat
 public static function upgrade( array &$appData, string $fromVersion ): bool
 ```
 
-`activate()` calls it when the feature is active, the recorded version differs from the manifest's and the class has the method - with the recorded version as `$fromVersion`, after the unit has been applied and before the new version is recorded. The module migrates its own data in there. Returning `false` refuses the update, and the recorded version stays the old one. A class without `upgrade()` is updated without a migration.
+`activate()` calls it when a version is recorded that differs from the manifest's and the class has the method - whether the feature is on or was switched off and its directory replaced in the meantime - with the recorded version as `$fromVersion`, after the unit has been applied and before the new version is recorded. The module migrates its own data in there. Returning `false` refuses the update, and the recorded version stays the old one. A class without `upgrade()` is updated without a migration.
 
 ### Deactivating
 

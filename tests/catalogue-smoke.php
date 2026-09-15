@@ -532,6 +532,33 @@ if( $result === true ) {
 	check( '(restoring 1.1.0)', \Nino\Catalogue::install( $appData, 'helper', '1.1.0' ) === true );
 }
 
+// An archive whose one top-level entry is a file of the feature's name: the
+// look before the extraction accepted it (a file may be named like the
+// directory), and the look after it opened the file as a directory - an
+// exception out of install(), and the staging directory left behind
+$bytes = tarGz( [ 'Helper' => '<?php' ] );
+try { $result = tryInstall( $appData, $remote, $features, $privateKey, entry( 'helper', '1.2.0', $bytes ), $bytes ); }
+catch( \Throwable $e ) { $result = 'threw '. get_class( $e ); }
+check( 'an archive holding a file where the feature directory should be is refused, not thrown at', $result === 'the archive holds "Helper" as a file, not a directory' && stagingClean( $staging ) === true );
+
+// PharData names every entry by the archive's canonical path, symlinks
+// resolved, while _unpack() cut the prefix by the length of the path it
+// had been given. A private root reached through a symlink - a hosting
+// home directory, a bind mount, macOS's /var -> /private/var - made every
+// entry path garbage, and every install a refusal blaming the archive
+$linkedPrivate = $sandbox. '/private-link';
+symlink( 'private', $linkedPrivate );
+$realPaths = [];
+foreach( [ 'configpath', 'contentpath', 'privatepath' ] as $pathKey ) {
+	$realPaths[$pathKey] = $appData['./nino/filesystem/'. $pathKey];
+	$appData['./nino/filesystem/'. $pathKey] = $linkedPrivate;
+}
+$result = \Nino\Catalogue::install( $appData, 'helper', '1.1.0' );
+check( 'an install through a symlinked private root succeeds - the entries are cut by the archive\'s own path', $result === true && stagingClean( $staging ) === true && str_contains( (string) file_get_contents( NINO_FEATURES_DIR. '/Helper/feature.php' ), '1.1.0' ) === true );
+foreach( $realPaths as $pathKey => $realPath )
+	$appData['./nino/filesystem/'. $pathKey] = $realPath;
+unlink( $linkedPrivate );
+
 $bytes = tarGz( featureFiles( 'Helper', 'other', '1.2.0' ) );
 $result = tryInstall( $appData, $remote, $features, $privateKey, entry( 'helper', '1.2.0', $bytes ), $bytes );
 check( 'an archive holding another feature than promised', $result === 'the archive holds "other" 1.2.0, the catalogue promised "helper" 1.2.0' );

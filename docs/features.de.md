@@ -292,7 +292,7 @@ Ein Feature wird aktualisiert, indem sein Verzeichnis durch die neue Fassung ers
 public static function upgrade( array &$appData, string $fromVersion ): bool
 ```
 
-`activate()` ruft ihn, wenn das Feature aktiv ist, die aufgezeichnete Version eine andere ist als die des Manifests und die Klasse die Methode hat – mit der aufgezeichneten Version als `$fromVersion`, nachdem die Einheit angewendet wurde und bevor die neue Version aufgezeichnet wird. Das Modul migriert darin seine eigenen Daten. Gibt es `false` zurück, wird die Aktualisierung abgewiesen, und die aufgezeichnete Version bleibt die alte. Eine Klasse ohne `upgrade()` wird ohne Migration aktualisiert.
+`activate()` ruft ihn, wenn eine Version aufgezeichnet ist, die eine andere ist als die des Manifests, und die Klasse die Methode hat – ob das Feature an ist oder abgeschaltet war und sein Verzeichnis inzwischen ersetzt wurde – mit der aufgezeichneten Version als `$fromVersion`, nachdem die Einheit angewendet wurde und bevor die neue Version aufgezeichnet wird. Das Modul migriert darin seine eigenen Daten. Gibt es `false` zurück, wird die Aktualisierung abgewiesen, und die aufgezeichnete Version bleibt die alte. Eine Klasse ohne `upgrade()` wird ohne Migration aktualisiert.
 
 ### Deaktivieren
 
