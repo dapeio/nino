@@ -864,6 +864,29 @@ $adminBadRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Modules\Routes\Admin::apiSave( $appData, $adminBadRequest );
 check( 'a genuinely unknown template is still rejected', $adminBadRequest['/nino/http/response']['statusCode'] === 400 );
 
+// Saving, deleting and moving a route all read the routes, decide against
+// what they find and write the whole key back - so two editors saving two
+// different pages at the same moment each wrote their own full copy, and the
+// second one dropped the first one's page. writeContentData() locks for its
+// own write, which is after the decision; these hold the lock across both
+$routesSource = (string) file_get_contents( __DIR__. '/../_admin/Nino/Modules/Routes/Admin/Admin.php' );
+$unlocked = [];
+
+foreach( [ 'apiSave', 'apiDelete', 'apiMove' ] as $action ) {
+
+	$body = substr( $routesSource, strpos( $routesSource, 'public static function '. $action. '(' ) ?: 0 );
+	$body = substr( $body, 0, strpos( $body, "\n\t\t}" ) ?: strlen( $body ) );
+
+	$lockAt		= strpos( $body, "lockFile( \$appData, '/config.php' )" );
+	$readAt		= strpos( $body, "getFileContent( \$appData, '/config.php'" );
+	$unlockAt	= strpos( $body, "unlockFile( \$appData, '/config.php' )" );
+
+	if( $lockAt === false || $readAt === false || $unlockAt === false || $lockAt > $readAt || $unlockAt < $readAt || str_contains( $body, '} finally {' ) === false )
+		$unlocked[] = $action;
+}
+
+check( 'every route write decides and writes under one lock'. ( $unlocked === [] ? '' : ' - unlocked: '. implode( ', ', $unlocked ) ), $unlocked === [] );
+
 \Nino\Auth::logoutUser( $appData );
 \Nino\Auth::deleteUser( $appData, 'dev@example.com' );
 

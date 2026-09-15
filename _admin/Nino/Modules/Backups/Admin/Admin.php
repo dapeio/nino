@@ -289,8 +289,29 @@ namespace Nino\Modules\Backups {
 			// separately from the rest of the archive.
 			$stagedConfig = $staging. '/config.php';
 
+			// config.php is the one file every request reads at boot. Written in
+			// place, a request booting mid-write read a half-written file - an
+			// include of a truncated var_export either fatals or returns
+			// something that is not an array, and AppData::init() answers that
+			// with "config.php exists but did not return an array" for everybody
+			// until the write finished. Renamed over it instead, under the same
+			// lock every other writer of that file takes, so a reader sees the
+			// old file or the new one and nothing in between
 			if( is_file( $stagedConfig ) === true ) {
-				file_put_contents( $configPath. '/config.php', file_get_contents( $stagedConfig ) );
+
+				if( \Nino\Filesystem::lockFile( $appData, '/config.php' ) === false )
+					return [ 500, 'could not lock config.php for the restore' ];
+
+				$target	= $configPath. '/config.php';
+				$temp		= $target. '.'. bin2hex( random_bytes( 6 ) ). '.tmp';
+
+				if( @copy( $stagedConfig, $temp ) === false || @rename( $temp, $target ) === false ) {
+					@unlink( $temp );
+					\Nino\Filesystem::unlockFile( $appData, '/config.php' );
+					return [ 500, 'could not write config.php' ];
+				}
+
+				\Nino\Filesystem::unlockFile( $appData, '/config.php' );
 				unlink( $stagedConfig );
 			}
 

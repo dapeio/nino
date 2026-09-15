@@ -188,6 +188,31 @@ All notable changes to Nino are documented in this file.
   with a 403 naming it. The address stays changeable, since a rename grants
   nothing, and an account editing itself has proven its current password.
 
+- **A login finishing late wrote its stale copy of every account back.** Every
+  write to the accounts persists the whole key from the copy its own request
+  booted with, and only the sessions were merged with what the file had
+  meanwhile become. So a login that started before an administrator's change
+  and finished after it wrote its boot-time copy of every record over that
+  change, and an account created in between disappeared. The records are
+  merged too now: what a request changed is written as that request left it,
+  what it never touched is taken from the file, an account created while it
+  ran is kept, and one it deleted stays deleted.
+
+- **A restore replaced `config.php` in place.** It is the one file every
+  request reads at boot, and it was written with a plain
+  `file_put_contents()` - so a request booting mid-write read a truncated
+  file, which either fatals or comes back as something that is not an array,
+  and every visitor was told the configuration is broken until the write
+  finished. It is written beside the file and renamed over it, under the same
+  lock every other writer of that file takes.
+
+- **Two editors saving two pages at once kept one of them.** Saving, deleting
+  and moving a route each read the routes, decide against what they find and
+  write the whole key back - and only the write was under a lock, which is
+  after the decision. So the second save wrote its own full copy over the
+  first one's page. All three hold the lock across the read, the decision and
+  the write.
+
 - **A type URI with a trailing slash found nothing.** `queryElements()` looked
   the type file up with a trimmed copy of the URI but built every hit by
   gluing the URI as given to the element's name - so `/articles/` asked for

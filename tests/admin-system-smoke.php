@@ -552,6 +552,27 @@ check( 'the wrecked user record is back after restore', isset( $afterRestore['/n
 $backupDir = $sandbox. '/private/.backups';
 check( 'a pre-restore safety snapshot of the (corrupted) state was made first', count( glob( $backupDir. '/pre-restore-*.php' ) ?: [] ) === 1 );
 
+// config.php is the one file every request reads at boot, and a restore
+// replaces it. Written in place, a request booting mid-write read a
+// half-written file - an include of a truncated var_export either fatals or
+// returns something that is not an array, and AppData::init() answers that
+// with "config.php exists but did not return an array" for everybody until
+// the write finished. Written beside it and renamed over it, a reader sees
+// one file or the other
+$restoreSource	= (string) file_get_contents( __DIR__. '/../_admin/Nino/Modules/Backups/Admin/Admin.php' );
+$restoreBody		= substr( $restoreSource, strpos( $restoreSource, 'public static function restore(' ) ?: 0 );
+$restoreBody		= substr( $restoreBody, 0, strpos( $restoreBody, "\n\t\t}" ) ?: strlen( $restoreBody ) );
+
+check( 'a restore replaces config.php atomically, not in place', str_contains( $restoreBody, 'file_put_contents( $configPath' ) === false
+	&& str_contains( $restoreBody, 'rename(' ) === true );
+check( '...under the same lock every other writer of that file takes', str_contains( $restoreBody, "lockFile( \$appData, '/config.php' )" ) === true );
+
+// And the restored file is the one a reader gets afterwards - the check
+// above is about how it is written, this one that it was
+check( 'the restored config.php is a readable array', is_array( ( static function() use ( $appData ): mixed {
+	return include \Nino\Filesystem::getConfigPath( $appData ). '/config.php';
+} )() ) === true );
+
 $_POST['data'] = json_encode( [ 'date' => '2020-01-01' ] );
 $unknownDateRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Modules\Backups\Admin::apiRestore( $appData, $unknownDateRequest );

@@ -411,149 +411,166 @@ namespace Nino\Modules\Routes {
 			if( \Nino\Admin\Admin::guardPerm( $appData, $request, self::MANAGE_PERM ) === false )
 				return;
 
-			$data 						= \Nino\Admin\Admin::postData();
-			$originalHttpUri 	= (string) ( $data['originalHttpUri'] ?? '' );
-
-			$uri 			= self::_normalizeUri( (string) ( $data['uri'] ?? '' ) );
-			$httpUri 	= self::_normalizeUri( (string) ( $data['httpUri'] ?? '' ) );
-			$template = (string) ( $data['template'] ?? '' );
-
-			if( $uri === null ) {
-				\Nino\Http::fail( $request, 400, 'invalid uri: "'. ( (string) ( $data['uri'] ?? '' ) ). '"' );
+			// Read, checked and written under one lock: all three of these read
+			// the routes, decide against what they find and write the whole key
+			// back, so two editors saving two different pages at the same moment
+			// each wrote their own full copy and the second one dropped the
+			// first one's page. writeContentData() locks for its own write only,
+			// which is too late to help here - the decision is what has to be
+			// under the lock. Re-locking inside is a no-op (see lockFile())
+			if( \Nino\Filesystem::lockFile( $appData, '/config.php' ) === false ) {
+				\Nino\Http::fail( $request, 500, 'could not lock config.php for writing' );
 				return;
 			}
 
-			if( $httpUri === null ) {
-				\Nino\Http::fail( $request, 400, 'invalid http uri: "'. ( (string) ( $data['httpUri'] ?? '' ) ). '"' );
-				return;
-			}
+			try {
 
-			if( in_array( $httpUri, self::RESERVED_HTTP_URIS, true ) === true ) {
-				\Nino\Http::fail( $request, 409, 'reserved http uri: "'. $httpUri. '"' );
-				return;
-			}
+				$data 						= \Nino\Admin\Admin::postData();
+				$originalHttpUri 	= (string) ( $data['originalHttpUri'] ?? '' );
 
+				$uri 			= self::_normalizeUri( (string) ( $data['uri'] ?? '' ) );
+				$httpUri 	= self::_normalizeUri( (string) ( $data['httpUri'] ?? '' ) );
+				$template = (string) ( $data['template'] ?? '' );
 
-			$statusCode = (int) ( $data['statusCode'] ?? 200 );
-			if( $statusCode < 100 || $statusCode > 599 )
-				$statusCode = 200;
-
-			$locales = \Nino\Locales::getAvailableLocales( $appData );
-
-			$text = [];
-			foreach( $locales as $locale ) {
-				$row = (array) ( $data['text'][$locale] ?? [] );
-				$text[$locale] = [
-					'name' 				=> self::_orDefault( $row['name'] 				?? '', self::DEFAULT_TEXT['name'] ),
-					'title' 			=> self::_orDefault( $row['title'] 			?? '', self::DEFAULT_TEXT['title'] ),
-					'description' => self::_orDefault( $row['description'] ?? '', self::DEFAULT_TEXT['description'] ),
-				];
-			}
-
-			$config = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
-			$routes = $config['/nino/http/routes'] ?? [];
-			$navKeys = self::navKeys( $appData );
-			$pages 	= self::pages( $appData, $routes, $locales, $navKeys );
-
-			$selfIndex = null;
-
-			foreach( $pages as $index => $existing ) {
-
-				if( $originalHttpUri !== '' && ( $existing['httpUri'] ?? null ) === $originalHttpUri ) {
-					$selfIndex = $index;
-					continue;
-				}
-
-				if( ( $existing['uri'] ?? null ) === $uri ) {
-					\Nino\Http::fail( $request, 400, 'duplicate uri: "'. $uri. '"' );
+				if( $uri === null ) {
+					\Nino\Http::fail( $request, 400, 'invalid uri: "'. ( (string) ( $data['uri'] ?? '' ) ). '"' );
 					return;
 				}
 
-				if( ( $existing['httpUri'] ?? null ) === $httpUri ) {
-					\Nino\Http::fail( $request, 400, 'duplicate http uri: "'. $httpUri. '"' );
+				if( $httpUri === null ) {
+					\Nino\Http::fail( $request, 400, 'invalid http uri: "'. ( (string) ( $data['httpUri'] ?? '' ) ). '"' );
 					return;
 				}
+
+				if( in_array( $httpUri, self::RESERVED_HTTP_URIS, true ) === true ) {
+					\Nino\Http::fail( $request, 409, 'reserved http uri: "'. $httpUri. '"' );
+					return;
+				}
+
+
+				$statusCode = (int) ( $data['statusCode'] ?? 200 );
+				if( $statusCode < 100 || $statusCode > 599 )
+					$statusCode = 200;
+
+				$locales = \Nino\Locales::getAvailableLocales( $appData );
+
+				$text = [];
+				foreach( $locales as $locale ) {
+					$row = (array) ( $data['text'][$locale] ?? [] );
+					$text[$locale] = [
+						'name' 				=> self::_orDefault( $row['name'] 				?? '', self::DEFAULT_TEXT['name'] ),
+						'title' 			=> self::_orDefault( $row['title'] 			?? '', self::DEFAULT_TEXT['title'] ),
+						'description' => self::_orDefault( $row['description'] ?? '', self::DEFAULT_TEXT['description'] ),
+					];
+				}
+
+				$config = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
+				$routes = $config['/nino/http/routes'] ?? [];
+				$navKeys = self::navKeys( $appData );
+				$pages 	= self::pages( $appData, $routes, $locales, $navKeys );
+
+				$selfIndex = null;
+
+				foreach( $pages as $index => $existing ) {
+
+					if( $originalHttpUri !== '' && ( $existing['httpUri'] ?? null ) === $originalHttpUri ) {
+						$selfIndex = $index;
+						continue;
+					}
+
+					if( ( $existing['uri'] ?? null ) === $uri ) {
+						\Nino\Http::fail( $request, 400, 'duplicate uri: "'. $uri. '"' );
+						return;
+					}
+
+					if( ( $existing['httpUri'] ?? null ) === $httpUri ) {
+						\Nino\Http::fail( $request, 400, 'duplicate http uri: "'. $httpUri. '"' );
+						return;
+					}
+				}
+
+				$routeKey 			= self::_routeKey( $httpUri );
+				$previousRouteKey = $selfIndex !== null ? self::_routeKey( (string) $pages[$selfIndex]['httpUri'] ) : null;
+
+				// Every route counts here, not just the page ones: a page may
+				// never take a uri robots.txt, a module or a developer already
+				// answers on
+				if( isset( $routes[$routeKey] ) === true && $routeKey !== $previousRouteKey ) {
+					\Nino\Http::fail( $request, 409, 'http uri already belongs to another route: "'. $httpUri. '"' );
+					return;
+				}
+
+				$previous = $selfIndex !== null ? $pages[$selfIndex] : [];
+
+				$body = '[template /templates/'. $template. ']';
+
+				// A route body the wizard's library shipped can be more than a
+				// plain template reference - its "legal" unit picks the template
+				// file per locale via [[/nino/http/response/locale]] - and the
+				// template <select> has no way to spell that. Keep the body such
+				// an entry already carries instead of flattening it into
+				// whichever single option happened to be preselected
+				if( isset( $previous['body'] ) === true && self::_templateFromBody( (string) $previous['body'] ) === null ) {
+					$body 		= (string) $previous['body'];
+					// ...and with it the template field, which for such an entry
+					// names nothing: the disabled <select> still posts whichever
+					// option the browser preselected, and storing that would
+					// leave the list claiming a template this page never uses
+					$template = (string) ( $previous['template'] ?? '' );
+				}
+
+				// Checked here rather than up front: an entry whose body the
+				// <select> can't spell keeps the template field it already had
+				// (empty, for the wizard's locale-resolving "legal" unit), and
+				// posts an empty value from its own disabled option - neither of
+				// which names a real file, and neither of which is an error
+				if( $body === '[template /templates/'. $template. ']' && in_array( $template, self::_templates( $appData ), true ) === false ) {
+					\Nino\Http::fail( $request, 400, 'unknown template: "'. $template. '"' );
+					return;
+				}
+
+				// Menu membership lives on the route and nowhere else - that is
+				// what Modules\Navigation::routeLines() reads, and the only copy
+				// that renders
+				$navs = self::entryNavs( $data, $navKeys );
+
+				$routeData = [ 'uri' => $uri, 'body' => $body ];
+				if( $statusCode !== 200 )
+					$routeData['statusCode'] = $statusCode;
+
+				// A priority someone tuned on this route is not this save's to
+				// reset - only the set of keys is rewritten (see the shortcode's
+				// own routeLines() for what the value means). A membership this
+				// save adds starts behind everything already in that menu
+				$prios = $routes[$previousRouteKey ?? $routeKey]['navs'] ?? [];
+				foreach( $navs as $navKey )
+					$routeData['navs'][$navKey] = (int) ( $prios[$navKey] ?? self::_nextPrio( $routes, $navKey ) );
+
+				$routes = self::_putRoute( $routes, $previousRouteKey, $routeKey, $routeData );
+
+				$appData['/nino/http/routes'] = $routes;
+
+				\Nino\AppData::writeContentData( $appData, [ '/nino/http/routes' ] );
+
+				foreach( $locales as $locale )
+					self::_mergeText( $appData, '/text/'. $locale. '.php', [
+						'[[/webpage'. $uri. '/name]]' 				=> $text[$locale]['name'],
+						'[[/webpage'. $uri. '/title]]' 			=> $text[$locale]['title'],
+						'[[/webpage'. $uri. '/description]]' => $text[$locale]['description'],
+					] );
+
+				// The page's reachable path as a fill, so a template can link to
+				// it by name - [[/webpage/site-home/uri]] - rather than repeating
+				// a path this form can change. Global, because an entry has one
+				// Http-URI for every locale, and blacklisted like every other
+				// technical value: /_admin's Text panel edits wording, not routes
+				self::_mergeText( $appData, '/text/global.php', [ '[[/webpage'. $uri. '/uri]]' => $httpUri ] );
+				\Nino\Text::setBlacklisted( $appData, '/webpage'. $uri. '/uri', true );
+
+				\Nino\Http::ok( $request, [ 'pages' => self::pages( $appData, $routes, $locales, $navKeys ) ] );
+			} finally {
+				\Nino\Filesystem::unlockFile( $appData, '/config.php' );
 			}
-
-			$routeKey 			= self::_routeKey( $httpUri );
-			$previousRouteKey = $selfIndex !== null ? self::_routeKey( (string) $pages[$selfIndex]['httpUri'] ) : null;
-
-			// Every route counts here, not just the page ones: a page may
-			// never take a uri robots.txt, a module or a developer already
-			// answers on
-			if( isset( $routes[$routeKey] ) === true && $routeKey !== $previousRouteKey ) {
-				\Nino\Http::fail( $request, 409, 'http uri already belongs to another route: "'. $httpUri. '"' );
-				return;
-			}
-
-			$previous = $selfIndex !== null ? $pages[$selfIndex] : [];
-
-			$body = '[template /templates/'. $template. ']';
-
-			// A route body the wizard's library shipped can be more than a
-			// plain template reference - its "legal" unit picks the template
-			// file per locale via [[/nino/http/response/locale]] - and the
-			// template <select> has no way to spell that. Keep the body such
-			// an entry already carries instead of flattening it into
-			// whichever single option happened to be preselected
-			if( isset( $previous['body'] ) === true && self::_templateFromBody( (string) $previous['body'] ) === null ) {
-				$body 		= (string) $previous['body'];
-				// ...and with it the template field, which for such an entry
-				// names nothing: the disabled <select> still posts whichever
-				// option the browser preselected, and storing that would
-				// leave the list claiming a template this page never uses
-				$template = (string) ( $previous['template'] ?? '' );
-			}
-
-			// Checked here rather than up front: an entry whose body the
-			// <select> can't spell keeps the template field it already had
-			// (empty, for the wizard's locale-resolving "legal" unit), and
-			// posts an empty value from its own disabled option - neither of
-			// which names a real file, and neither of which is an error
-			if( $body === '[template /templates/'. $template. ']' && in_array( $template, self::_templates( $appData ), true ) === false ) {
-				\Nino\Http::fail( $request, 400, 'unknown template: "'. $template. '"' );
-				return;
-			}
-
-			// Menu membership lives on the route and nowhere else - that is
-			// what Modules\Navigation::routeLines() reads, and the only copy
-			// that renders
-			$navs = self::entryNavs( $data, $navKeys );
-
-			$routeData = [ 'uri' => $uri, 'body' => $body ];
-			if( $statusCode !== 200 )
-				$routeData['statusCode'] = $statusCode;
-
-			// A priority someone tuned on this route is not this save's to
-			// reset - only the set of keys is rewritten (see the shortcode's
-			// own routeLines() for what the value means). A membership this
-			// save adds starts behind everything already in that menu
-			$prios = $routes[$previousRouteKey ?? $routeKey]['navs'] ?? [];
-			foreach( $navs as $navKey )
-				$routeData['navs'][$navKey] = (int) ( $prios[$navKey] ?? self::_nextPrio( $routes, $navKey ) );
-
-			$routes = self::_putRoute( $routes, $previousRouteKey, $routeKey, $routeData );
-
-			$appData['/nino/http/routes'] = $routes;
-
-			\Nino\AppData::writeContentData( $appData, [ '/nino/http/routes' ] );
-
-			foreach( $locales as $locale )
-				self::_mergeText( $appData, '/text/'. $locale. '.php', [
-					'[[/webpage'. $uri. '/name]]' 				=> $text[$locale]['name'],
-					'[[/webpage'. $uri. '/title]]' 			=> $text[$locale]['title'],
-					'[[/webpage'. $uri. '/description]]' => $text[$locale]['description'],
-				] );
-
-			// The page's reachable path as a fill, so a template can link to
-			// it by name - [[/webpage/site-home/uri]] - rather than repeating
-			// a path this form can change. Global, because an entry has one
-			// Http-URI for every locale, and blacklisted like every other
-			// technical value: /_admin's Text panel edits wording, not routes
-			self::_mergeText( $appData, '/text/global.php', [ '[[/webpage'. $uri. '/uri]]' => $httpUri ] );
-			\Nino\Text::setBlacklisted( $appData, '/webpage'. $uri. '/uri', true );
-
-			\Nino\Http::ok( $request, [ 'pages' => self::pages( $appData, $routes, $locales, $navKeys ) ] );
 		}
 
 		/**
@@ -625,25 +642,42 @@ namespace Nino\Modules\Routes {
 			if( \Nino\Admin\Admin::guardPerm( $appData, $request, self::MANAGE_PERM ) === false )
 				return;
 
-			$httpUri 	= (string) ( \Nino\Admin\Admin::postData()['httpUri'] ?? '' );
-			$routes 	= \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes'] ?? [];
-			$routeKey = self::_routeKey( $httpUri );
-
-			// Only ever a page route: this module lists nothing else, so
-			// anything else under that key is a module's or a developer's and
-			// not this button's to delete
-			if( isset( $routes[$routeKey] ) === false || self::isPageRoute( $routeKey, $routes[$routeKey] ) === false ) {
-				\Nino\Http::fail( $request, 404, 'unknown page' );
+			// Read, checked and written under one lock: all three of these read
+			// the routes, decide against what they find and write the whole key
+			// back, so two editors saving two different pages at the same moment
+			// each wrote their own full copy and the second one dropped the
+			// first one's page. writeContentData() locks for its own write only,
+			// which is too late to help here - the decision is what has to be
+			// under the lock. Re-locking inside is a no-op (see lockFile())
+			if( \Nino\Filesystem::lockFile( $appData, '/config.php' ) === false ) {
+				\Nino\Http::fail( $request, 500, 'could not lock config.php for writing' );
 				return;
 			}
 
-			unset( $routes[$routeKey] );
+			try {
 
-			$appData['/nino/http/routes'] = $routes;
+				$httpUri 	= (string) ( \Nino\Admin\Admin::postData()['httpUri'] ?? '' );
+				$routes 	= \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes'] ?? [];
+				$routeKey = self::_routeKey( $httpUri );
 
-			\Nino\AppData::writeContentData( $appData, [ '/nino/http/routes' ] );
+				// Only ever a page route: this module lists nothing else, so
+				// anything else under that key is a module's or a developer's and
+				// not this button's to delete
+				if( isset( $routes[$routeKey] ) === false || self::isPageRoute( $routeKey, $routes[$routeKey] ) === false ) {
+					\Nino\Http::fail( $request, 404, 'unknown page' );
+					return;
+				}
 
-			\Nino\Http::ok( $request, [ 'pages' => self::pages( $appData, $routes, \Nino\Locales::getAvailableLocales( $appData ), self::navKeys( $appData ) ) ] );
+				unset( $routes[$routeKey] );
+
+				$appData['/nino/http/routes'] = $routes;
+
+				\Nino\AppData::writeContentData( $appData, [ '/nino/http/routes' ] );
+
+				\Nino\Http::ok( $request, [ 'pages' => self::pages( $appData, $routes, \Nino\Locales::getAvailableLocales( $appData ), self::navKeys( $appData ) ) ] );
+			} finally {
+				\Nino\Filesystem::unlockFile( $appData, '/config.php' );
+			}
 		}
 
 		/**
@@ -669,52 +703,69 @@ namespace Nino\Modules\Routes {
 			if( \Nino\Admin\Admin::guardPerm( $appData, $request, self::MANAGE_PERM ) === false )
 				return;
 
-			$data 			= \Nino\Admin\Admin::postData();
-			$httpUri 		= (string) ( $data['httpUri'] ?? '' );
-			$direction 	= (string) ( $data['direction'] ?? '' );
-
-			if( in_array( $direction, [ 'up', 'down' ], true ) === false ) {
-				\Nino\Http::fail( $request, 400, 'direction must be "up" or "down"' );
+			// Read, checked and written under one lock: all three of these read
+			// the routes, decide against what they find and write the whole key
+			// back, so two editors saving two different pages at the same moment
+			// each wrote their own full copy and the second one dropped the
+			// first one's page. writeContentData() locks for its own write only,
+			// which is too late to help here - the decision is what has to be
+			// under the lock. Re-locking inside is a no-op (see lockFile())
+			if( \Nino\Filesystem::lockFile( $appData, '/config.php' ) === false ) {
+				\Nino\Http::fail( $request, 500, 'could not lock config.php for writing' );
 				return;
 			}
 
-			$routes 	= \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes'] ?? [];
-			$pageKeys = array_keys( array_filter( $routes, fn( array $r, string $k ): bool => self::isPageRoute( $k, $r ), ARRAY_FILTER_USE_BOTH ) );
+			try {
 
-			$index = array_search( self::_routeKey( $httpUri ), $pageKeys, true );
+				$data 			= \Nino\Admin\Admin::postData();
+				$httpUri 		= (string) ( $data['httpUri'] ?? '' );
+				$direction 	= (string) ( $data['direction'] ?? '' );
 
-			if( $index === false ) {
-				\Nino\Http::fail( $request, 404, 'unknown page' );
-				return;
-			}
-
-			$swapWith = $direction === 'up' ? $index - 1 : $index + 1;
-
-			if( $swapWith < 0 || $swapWith >= count( $pageKeys ) ) {
-				\Nino\Http::fail( $request, 400, 'already at the '. ( $direction === 'up' ? 'top' : 'bottom' ) );
-				return;
-			}
-
-			[ $pageKeys[$index], $pageKeys[$swapWith] ] = [ $pageKeys[$swapWith], $pageKeys[$index] ];
-
-			// Refill the slots the page routes occupy, in the swapped order -
-			// every other route stays exactly where it was
-			$ordered 	= [];
-			$next 		= 0;
-
-			foreach( $routes as $routeKey => $route )
-				if( self::isPageRoute( $routeKey, $route ) === true ) {
-					$ordered[ $pageKeys[$next] ] = $routes[ $pageKeys[$next] ];
-					$next++;
-				} else {
-					$ordered[$routeKey] = $route;
+				if( in_array( $direction, [ 'up', 'down' ], true ) === false ) {
+					\Nino\Http::fail( $request, 400, 'direction must be "up" or "down"' );
+					return;
 				}
 
-			$appData['/nino/http/routes'] = $ordered;
+				$routes 	= \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes'] ?? [];
+				$pageKeys = array_keys( array_filter( $routes, fn( array $r, string $k ): bool => self::isPageRoute( $k, $r ), ARRAY_FILTER_USE_BOTH ) );
 
-			\Nino\AppData::writeContentData( $appData, [ '/nino/http/routes' ] );
+				$index = array_search( self::_routeKey( $httpUri ), $pageKeys, true );
 
-			\Nino\Http::ok( $request, [ 'pages' => self::pages( $appData, $ordered, \Nino\Locales::getAvailableLocales( $appData ), self::navKeys( $appData ) ) ] );
+				if( $index === false ) {
+					\Nino\Http::fail( $request, 404, 'unknown page' );
+					return;
+				}
+
+				$swapWith = $direction === 'up' ? $index - 1 : $index + 1;
+
+				if( $swapWith < 0 || $swapWith >= count( $pageKeys ) ) {
+					\Nino\Http::fail( $request, 400, 'already at the '. ( $direction === 'up' ? 'top' : 'bottom' ) );
+					return;
+				}
+
+				[ $pageKeys[$index], $pageKeys[$swapWith] ] = [ $pageKeys[$swapWith], $pageKeys[$index] ];
+
+				// Refill the slots the page routes occupy, in the swapped order -
+				// every other route stays exactly where it was
+				$ordered 	= [];
+				$next 		= 0;
+
+				foreach( $routes as $routeKey => $route )
+					if( self::isPageRoute( $routeKey, $route ) === true ) {
+						$ordered[ $pageKeys[$next] ] = $routes[ $pageKeys[$next] ];
+						$next++;
+					} else {
+						$ordered[$routeKey] = $route;
+					}
+
+				$appData['/nino/http/routes'] = $ordered;
+
+				\Nino\AppData::writeContentData( $appData, [ '/nino/http/routes' ] );
+
+				\Nino\Http::ok( $request, [ 'pages' => self::pages( $appData, $ordered, \Nino\Locales::getAvailableLocales( $appData ), self::navKeys( $appData ) ) ] );
+			} finally {
+				\Nino\Filesystem::unlockFile( $appData, '/config.php' );
+			}
 		}
 
 		/**

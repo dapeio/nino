@@ -1240,6 +1240,57 @@ $sneaky['/nino/auth/user'][$sessionUser]['sessions']['tokenD'] = [ 'time' => tim
 \Nino\Auth::updateUser( $pwChange, $sessionUser, $sessionUser, 'a brand new password' );
 check( 'a password change ends a session opened while it was running', $sessions() === [] );
 
+/*	Only the sessions were merged, so everything else about an account was
+	whatever the writing request had copied at boot: a login finishing after
+	an administrator's change wrote its own stale copy of every record back
+	over that change, and an account created in between vanished. The records
+	are merged now too - this request's where it changed one, the file's
+	where it did not	*/
+$accounts = function() use ( $sandbox ): array {
+	$onDisk = include $sandbox. '/private/config.php';
+	return $onDisk['/nino/auth/user'] ?? [];
+};
+
+\Nino\Auth::insertUser( $appData, 'bystander@example.com', 'correct horse battery staple' );
+
+// The slow request: booted, and about to write a session of its own
+$slowLogin = $buildAppData();
+$slowLogin['./nino/auth/baseline'] = $slowLogin['/nino/auth/user'] ?? [];
+
+// Meanwhile: an administrator changes one account and creates another
+$admin = $buildAppData();
+$admin['./nino/auth/baseline'] = $admin['/nino/auth/user'] ?? [];
+$admin['/nino/auth/user']['bystander@example.com']['marker'] = 'CHANGED_BY_THE_ADMIN';
+$admin['/nino/auth/user']['brandnew@example.com'] = [ 'pw' => 'x', 'status' => 2, 'perms' => [], 'sessions' => [] ];
+\Nino\AppData::writeContentData( $admin, [ '/nino/auth/user' ] );
+
+$slowLogin['/nino/auth/user'][$sessionUser]['sessions']['tokenSlow'] = [ 'time' => time(), 'ip' => '10.0.0.5' ];
+\Nino\AppData::writeContentData( $slowLogin, [ '/nino/auth/user' ] );
+
+check( 'a login finishing later keeps its own session', isset( $sessions()['tokenSlow'] ) === true );
+check( '...and does not write its stale copy over an account it never touched', ( $accounts()['bystander@example.com']['marker'] ?? null ) === 'CHANGED_BY_THE_ADMIN' );
+check( '...nor drop an account created while it was running', isset( $accounts()['brandnew@example.com'] ) === true );
+
+// The other direction: what this request did change is this request's
+$changer = $buildAppData();
+$changer['./nino/auth/baseline'] = $changer['/nino/auth/user'] ?? [];
+$other = $buildAppData();
+$other['./nino/auth/baseline'] = $other['/nino/auth/user'] ?? [];
+
+$other['/nino/auth/user']['bystander@example.com']['marker'] = 'AND_AGAIN';
+\Nino\AppData::writeContentData( $other, [ '/nino/auth/user' ] );
+
+$changer['/nino/auth/user']['bystander@example.com']['marker'] = 'CHANGED_HERE';
+\Nino\AppData::writeContentData( $changer, [ '/nino/auth/user' ] );
+check( 'a record this request did change is written as this request left it', ( $accounts()['bystander@example.com']['marker'] ?? null ) === 'CHANGED_HERE' );
+
+// ...and a deletion is a change like any other: the account stays gone
+$deleter = $buildAppData();
+$deleter['./nino/auth/baseline'] = $deleter['/nino/auth/user'] ?? [];
+unset( $deleter['/nino/auth/user']['brandnew@example.com'] );
+\Nino\AppData::writeContentData( $deleter, [ '/nino/auth/user' ] );
+check( 'a deleted account is not carried back in from the file', isset( $accounts()['brandnew@example.com'] ) === false );
+
 // Regression: mutate()'s return value used to be silently discarded here -
 // a failed config.php write (disk full, permission denied, ...) had no
 // observable effect anywhere. Forced via a configpath whose base is a

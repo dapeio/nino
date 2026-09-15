@@ -267,40 +267,85 @@ namespace Nino {
 			return $written !== false;
 		}
 
-		// Three-way merge for '/nino/auth/user' sessions - two parallel
-		// logins both write the whole key from their own stale copy, so
-		// re-reading alone isn't enough; whoever writes second would
-		// otherwise drop the other's session.
-		// $baseline = sessions at boot, $onDisk = current file, $inMemory =
-		// this request's own decision. A token on disk but missing from both
-		// baseline and memory is someone else's parallel login and is kept;
-		// one that was in baseline but is gone from memory was deliberately
-		// removed and stays removed.
-		// Only sessions are merged, never the rest of a user's record.
-		// $revoked (mail => true) overrides the "keep what we never saw"
-		// rule for a request that means to end every session - a password
-		// change or "log out everywhere" (Auth::updateUser()/
-		// logoutAllSessions()) must not resurrect a token a parallel login
-		// created in the meantime.
+		// Three-way merge for '/nino/auth/user' - every Auth write persists the
+		// whole key from the copy its own request booted with, so re-reading
+		// alone isn't enough: whoever writes second would otherwise drop
+		// whatever the other one did.
+		//
+		// $baseline = the accounts at boot, $onDisk = the current file,
+		// $inMemory = this request's own decision. What a request changed is
+		// what differs from its baseline, so:
+		//
+		// - an account only on disk was created while this request ran and is
+		//   kept;
+		// - an account in the baseline and gone from memory was deleted here
+		//   and stays deleted;
+		// - a record this request changed is written as this request left it;
+		// - a record it did not touch is taken from the file, not from the
+		//   stale copy - which is what used to write a login's boot-time copy
+		//   of every account over an administrator's change.
+		//
+		// Sessions are merged on top of whichever record won: a token on disk
+		// but missing from both baseline and memory is someone else's parallel
+		// login and is kept; one that was in the baseline and is gone from
+		// memory was deliberately removed and stays removed. $revoked
+		// (mail => true) overrides the "keep what we never saw" rule for a
+		// request that means to end every session - a password change or
+		// "log out everywhere" (Auth::updateUser()/logoutAllSessions()) must
+		// not resurrect a token a parallel login created in the meantime.
 		private static function _mergeAuthUsers( array $baseline, array $onDisk, array $inMemory, array $revoked = [] ): array {
+
+			$merged = [];
+
+			// Everything the file has, minus what this request deleted
+			foreach( $onDisk as $mail => $user )
+				if( isset( $baseline[$mail] ) === false || isset( $inMemory[$mail] ) === true )
+					$merged[$mail] = $user;
 
 			foreach( $inMemory as $mail => $user ) {
 
-				if( is_array( $user['sessions'] ?? null ) === false || is_array( $onDisk[$mail]['sessions'] ?? null ) === false )
+				$base		= $baseline[$mail] ?? null;
+				$disk		= $onDisk[$mail] ?? null;
+				$changed	= $base === null || self::_sessionless( $user ) !== self::_sessionless( $base );
+
+				// This request's record where it changed one (a deletion on disk
+				// included: it meant to write this), the file's where it did not
+				$record = ( $changed === true || $disk === null ) ? $user : $disk;
+
+				if( $changed === false && $disk === null )
 					continue;
 
-				// Nothing to carry over for a user this request revoked
-				if( ( $revoked[$mail] ?? false ) === true )
-					continue;
+				$sessions = is_array( $user['sessions'] ?? null ) === true ? $user['sessions'] : ( $record['sessions'] ?? null );
 
-				$baseSessions = $baseline[$mail]['sessions'] ?? [];
+				if( is_array( $sessions ) === true && ( $revoked[$mail] ?? false ) !== true && is_array( $disk['sessions'] ?? null ) === true ) {
 
-				foreach( $onDisk[$mail]['sessions'] as $token => $session )
-					if( isset( $baseSessions[$token] ) === false && isset( $user['sessions'][$token] ) === false )
-						$inMemory[$mail]['sessions'][$token] = $session;
+					$baseSessions = $baseline[$mail]['sessions'] ?? [];
+
+					foreach( $disk['sessions'] as $token => $session )
+						if( isset( $baseSessions[$token] ) === false && isset( $sessions[$token] ) === false )
+							$sessions[$token] = $session;
+				}
+
+				if( is_array( $record ) === true && is_array( $sessions ) === true )
+					$record['sessions'] = $sessions;
+
+				$merged[$mail] = $record;
 			}
 
-			return $inMemory;
+			return $merged;
+		}
+
+		// One account record without its sessions - what "did this request
+		// change this account?" is decided on, since the sessions are merged
+		// separately either way
+		private static function _sessionless( mixed $user ): mixed {
+
+			if( is_array( $user ) === false )
+				return $user;
+
+			unset( $user['sessions'] );
+
+			return $user;
 		}
 	}
 }
