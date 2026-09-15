@@ -188,6 +188,54 @@ All notable changes to Nino are documented in this file.
   with a 403 naming it. The address stays changeable, since a rename grants
   nothing, and an account editing itself has proven its current password.
 
+- **The burger navigation could not be opened with a keyboard.** The control
+  behind the label is a checkbox, and the stylesheet gave it `display: none` -
+  a control that is not rendered is not focusable either. So on every narrow
+  viewport the site's whole navigation could be opened with a pointer and by
+  nothing else, which also takes out everything that drives a keyboard.
+  Measured in Chromium: the checkbox was not a tab stop at all, and is now.
+  It is hidden rather than removed, and the icon carries the focus ring the
+  control has nothing left to show one with.
+
+- **Nothing said what a visitor who asked for less motion gets.** The
+  parallax has honoured `prefers-reduced-motion` since it was written; the
+  arrow that bounces at the foot of a hero, the bouncing helper class, the
+  spinner, the viewport animations and the smooth scroll to an anchor did
+  not. They stop, arrive without arriving, and jump, for a visitor whose
+  system asks them to. A viewport animation becomes plainly visible rather
+  than merely un-animated, so an element whose script never ran is not left
+  invisible.
+
+- **A query variable could take the page's scripts down with it.** `Nino.http
+  .readQueryVars()` handed every value straight to `decodeURIComponent()`,
+  which answers a stray `%` with a `URIError` - and a query variable is
+  whatever somebody put in the address. A key without a value read the
+  literal string `undefined`, an empty query produced a variable named `''`,
+  and a value carrying its own `=` was cut at it. Text that is not valid
+  percent-encoding is now the text itself, which is what the address bar
+  shows anyway.
+
+- **The resize and scroll throttle throttled nothing.** Both listeners set
+  their gate, asked for an animation frame and cleared the gate again in the
+  same breath - so every event of a burst got a frame of its own, and a
+  scroll was one callback round per event rather than one per frame. The gate
+  is cleared inside the frame now. A resize callback was also handed whatever
+  the last scroll event had left behind, which on a page nobody had scrolled
+  was `false`.
+
+- **One throwing scroll callback stopped every scroll behaviour on the page.**
+  `Nino.ui`'s scroll gate was cleared after the callbacks had run, so a
+  callback that threw left it shut for good: the scrolled-header class never
+  came back, the parallax froze, and anything a project or a feature had
+  registered stopped with it. The gate is cleared in a `finally`. The one
+  callback in this file that could throw - the parallax offset on a box with
+  no picture in it - no longer does.
+
+- **A slider without slides threw out of the whole UI setup.** A `.nino-slider`
+  with no `<ul>` yet, or one with nothing in it, made the setup read the slide
+  at the start position and throw - so every tab strip, form and filter
+  further down the page stayed unwired. Such a slider is left alone.
+
 - **Any visitor could grow the page cache without bound.** A cache entry is
   keyed by the address as asked for, and a wildcard route (`GET://blog/*`)
   answers an unbounded set of them - so every made-up address under one became

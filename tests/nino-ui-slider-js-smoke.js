@@ -156,5 +156,34 @@ delete slider.attributes['data-slider-pos'];
 ui.onReady();
 check( 'a slider without data-slider-pos starts on the middle slide', slider.pos === 1 );
 
+// A slider is markup a project writes by hand, so it can be markup that is
+// not finished: a <ul> with nothing in it yet, or no <ul> at all. Reading the
+// slide at the start position threw a TypeError out of onReady(), and
+// everything onReady() had not wired yet - every tab strip, form and filter
+// after it on the page - stayed unwired
+const emptyStage = element('UL');
+emptyStage.getElementsByTagName = function() { return [] };
+emptyStage.getBoundingClientRect = function() { return { height : 0 } };
+
+const emptySlider = element('DIV');
+emptySlider.attributes = {};
+emptySlider.getAttribute = function( name ) { return this.attributes[name] ?? null };
+emptySlider.getBoundingClientRect = function() { return { width : 320 } };
+emptySlider.getElementsByTagName = function( tagName ) { return tagName === 'ul' ? [ emptyStage ] : [] };
+
+const noStage = element('DIV');
+noStage.attributes = {};
+noStage.getAttribute = function( name ) { return this.attributes[name] ?? null };
+noStage.getBoundingClientRect = function() { return { width : 320 } };
+noStage.getElementsByTagName = function() { return [] };
+
+document.querySelectorAll = function( selector ) { return selector === '.nino-slider' ? [ emptySlider, noStage, slider ] : [] };
+
+let readyThrew = null;
+try { ui.onReady(); } catch( error ) { readyThrew = error.constructor.name+ ': '+ error.message }
+check( 'a slider with no slides in it is left alone rather than throwing out of onReady', readyThrew === null );
+check( '...and one with no list at all too', readyThrew === null && noStage.classList.contains('nino-is-ready') === false );
+check( '...while the finished slider beside them is still wired', slider.pos === 1 );
+
 console.log( '\n'+ checks+ ' checks, '+ failures+ ' failed' );
 process.exitCode = failures === 0 ? 0 : 1;

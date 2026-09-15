@@ -217,9 +217,19 @@
 					if( Nino.events._calls['resize'] !== false )
 						return;
 
+					// The flag is cleared inside the frame, not beside it: cleared
+					// here it was false again before the browser had drawn
+					// anything, so every event of a burst asked for a frame of its
+					// own and the throttle throttled nothing. And a resize
+					// callback is handed the resize event - it used to be handed
+					// whatever the last scroll had left behind, which on a page
+					// that had not been scrolled was false
 					Nino.events._calls['resize'] = e;
-					window.requestAnimationFrame( () => { Nino.events._events['resize'].forEach( cb => { cb.call(cb,Nino.events._calls['scroll']) } ) } );
-					Nino.events._calls['resize'] = false;
+					window.requestAnimationFrame( () => {
+						const event = Nino.events._calls['resize'];
+						Nino.events._calls['resize'] = false;
+						Nino.events._events['resize'].forEach( cb => { cb.call(cb,event) } );
+					} );
 				} );
 
 				// onScroll
@@ -228,9 +238,13 @@
 					if( Nino.events._calls['scroll'] !== false )
 						return;
 
+					// Cleared inside the frame - see the resize listener above
 					Nino.events._calls['scroll'] = e;
-					window.requestAnimationFrame( () => { Nino.events._events['scroll'].forEach( cb => { cb.call(cb,Nino.events._calls['scroll']) } ) } );
-					Nino.events._calls['scroll'] = false;
+					window.requestAnimationFrame( () => {
+						const event = Nino.events._calls['scroll'];
+						Nino.events._calls['scroll'] = false;
+						Nino.events._events['scroll'].forEach( cb => { cb.call(cb,event) } );
+					} );
 				} );
 			},
 		},
@@ -255,17 +269,47 @@
 			 *	@return		{Array}										Parsed query vars
 			 */
 			readQueryVars : function( ) {
-				let
-					result = [],
-					tmp = [],
-					a = location.search.substr(1).split("&"),
-					l = a.length;
-				for( let i = 0; i < l; i++ ) {
-						tmp = a[i].split("=");
-						result[tmp[0]] = decodeURIComponent(tmp[1]);
+
+				const result = {};
+				const pairs = location.search.replace( /^\?/, '' ).split( '&' );
+
+				for( let i = 0; i < pairs.length; i++ ) {
+
+					// An empty query is one empty pair, which used to become a
+					// variable named '' holding the string 'undefined'
+					if( pairs[i] === '' )
+						continue;
+
+					const at = pairs[i].indexOf( '=' );
+
+					// Split on the first '=' only: a value may carry its own
+					const rawKey		= at === -1 ? pairs[i] : pairs[i].slice( 0, at );
+					const rawValue	= at === -1 ? '' : pairs[i].slice( at + 1 );
+
+					result[ Nino.http.decodeQueryPart( rawKey ) ] = Nino.http.decodeQueryPart( rawValue );
 				}
 
 				return result;
+			},
+
+			/**
+			 *	One key or value of a query string, decoded. Whatever somebody
+			 *	put in the address ends up here, and decodeURIComponent() answers
+			 *	a stray '%' with a URIError - which took out whatever was reading
+			 *	the address. Text that is not valid percent-encoding is the text
+			 *	itself, which is what the visitor sees in the address bar anyway
+			 *
+			 *	@param		{string}		part					A raw key or value
+			 *
+			 *	@return		{string}									The decoded part, or the raw one
+			 */
+			decodeQueryPart : function( part ) {
+
+				try {
+					return decodeURIComponent( part.replace( /\+/g, ' ' ) );
+				} catch( error ) {
+					return part;
+				}
 			},
 
 			/**

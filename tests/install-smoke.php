@@ -358,6 +358,44 @@ check( 'the collapsed header takes back every way a frame can give its bar a hei
 	&& preg_match( '/padding-top:\s*0/', $collapsed ) === 1 && preg_match( '/padding-bottom:\s*0/', $collapsed ) === 1
 	&& preg_match( '/border-top-width:\s*0/', $collapsed ) === 1 && preg_match( '/border-bottom-width:\s*0/', $collapsed ) === 1 );
 
+// The burger menu is a checkbox behind a label, and the checkbox used to be
+// display:none - which is not rendered, and what is not rendered cannot be
+// focused: the whole navigation of every narrow viewport could be opened with
+// a pointer and by nothing else. Hidden, not removed, and the icon carries
+// the focus ring the control has nothing left to show one with
+$ninoCss = (string) file_get_contents( __DIR__. '/../_nino/Nino.css' );
+$burger  = '';
+
+// Without the comments: this file explains itself, and one of the sentences
+// in that block is about the display:none it no longer has
+if( preg_match( '/\.nino-nav-burger input\[type="checkbox"\]\s*\{([^}]*)\}/', $ninoCss, $match ) === 1 )
+	$burger = (string) preg_replace( '#/\*.*?\*/#s', '', $match[1] );
+
+check( 'the burger control is hidden without being taken out of the tab order', $burger !== ''
+	&& preg_match( '/display:\s*none/', $burger ) !== 1
+	&& preg_match( '/opacity:\s*0/', $burger ) === 1 );
+check( '...and something shows when it has the focus', str_contains( $ninoCss, '.nino-nav-burger input[type="checkbox"]:focus-visible' ) === true );
+
+// A visitor who asked their system for less motion. The parallax has said so
+// since it was written; everything else that moves on its own had not
+$reducedMotion = '';
+
+if( preg_match( '/@media \(prefers-reduced-motion: reduce\) \{(.*?)\n\}/s', $ninoCss, $match ) === 1 )
+	$reducedMotion = $match[1];
+
+check( 'what runs forever on its own stops for a visitor who asked for less motion', $reducedMotion !== ''
+	&& str_contains( $reducedMotion, '.nino-atf-arrowdown' ) === true
+	&& str_contains( $reducedMotion, '.nino-fx-vertical-bounce' ) === true
+	&& str_contains( $reducedMotion, 'animation: none' ) === true );
+check( '...a viewport animation is simply there rather than arriving', str_contains( $reducedMotion, '.nino-vpa' ) === true
+	&& str_contains( $reducedMotion, 'opacity: 1' ) === true );
+check( '...and a jump to an anchor is a jump, not a ride', str_contains( $reducedMotion, 'scroll-behavior: auto' ) === true );
+
+// The attribute the scripts set beside their classes, said again in the
+// stylesheet: an author display rule beats the browser's own [hidden]
+check( 'the stylesheet keeps what the scripts hide hidden', str_contains( $ninoCss, '.nino-tabs-panel[hidden]' ) === true
+	&& str_contains( $ninoCss, '.nino-filter-item[hidden]' ) === true );
+
 // And the delivered header must not reach for the one thing that rule cannot
 // take back. A plain height on the bar would survive all of it - so the frame
 // the base unit ships does not have one, and this is where a replacement that

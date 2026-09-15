@@ -213,6 +213,15 @@
 				 */
 				const parallexScroll = function( wh, ww, st, sl ) {
 					for( let i=0, l=e.parallex.length; i<l; i++ ) {
+
+						// A box a project wrote without a picture in it yet, or with
+						// the picture in a wrapper: querySelector('img') found
+						// nothing, and reading .style off that threw on every frame
+						// of every scroll - which, before the gate below was made to
+						// survive a throw, stopped every scroll behaviour on the page
+						if( e.parallex[i].img === null || e.parallex[i].img === undefined )
+							continue;
+
 						let br = e.parallex[i].getBoundingClientRect();
 						if( br.top < wh && br.bottom > 0 )
 							e.parallex[i].img.style.top = 0 - ( wh / 8 ) - ( br.top / 1.1 ) + 'px';
@@ -522,7 +531,20 @@
 
 					slider				= e.slider[i];
 					slider.stage	= slider.getElementsByTagName('ul')[0];
+
+					// A slider is markup a project writes by hand, so it can be
+					// markup that is not finished: no list in it yet, or a list
+					// with nothing in it. Reading the slide at the start position
+					// threw out of onReady(), and everything onReady() had not
+					// wired yet - every tab strip, form and filter further down the
+					// page - stayed unwired
+					if( slider.stage === undefined )
+						continue;
+
 					slider.lis 		= slider.stage.getElementsByTagName('li');
+
+					if( slider.lis.length === 0 )
+						continue;
 					// Not `parseInt(...) ?? fallback`: a missing or unparsable
 					// attribute makes parseInt() answer NaN, and NaN is not nullish,
 					// so that fallback never ran - a slider without data-slider-pos
@@ -1186,9 +1208,19 @@
 				return;
 
 			wn.requestAnimationFrame( () => {
-				const [ wH, wW, st, sl ] = Nino.ui._metrics();
-				Nino.ui._onScroll.forEach( (cb) => { cb( wH, wW, st, sl ) } );
-				Nino.ui._onScrollTicking = false;
+
+				// try/finally, because the callbacks are a project's own and a
+				// feature's as much as this file's: one that throws used to leave
+				// the gate shut, and a shut gate is every scroll behaviour on the
+				// page stopping for good - a scrolled-header class that never
+				// comes back, a parallax that freezes, a table of contents that
+				// stops following the reader
+				try {
+					const [ wH, wW, st, sl ] = Nino.ui._metrics();
+					Nino.ui._onScroll.forEach( (cb) => { cb( wH, wW, st, sl ) } );
+				} finally {
+					Nino.ui._onScrollTicking = false;
+				}
 			});
 
 			Nino.ui._onScrollTicking = true;

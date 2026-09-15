@@ -2011,7 +2011,24 @@ body.nino-scroll-btf .nino-back-to-top {
 	align-items: center;
 }
 .nino-nav-burger input[type="checkbox"] {
-	display: none;
+	/* Not display:none: a control that is not rendered is not focusable
+	   either, so the menu could be opened with a pointer and by nothing else -
+	   the whole navigation was out of reach for a keyboard, and for anything
+	   driving one. Out of sight, still there */
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	margin: 0;
+	padding: 0;
+	opacity: 0;
+	pointer-events: none;
+}
+/* ...and the icon says when the control behind it has the focus, since the
+   control itself has nothing left to show it with. The checkbox sits inside
+   the label, ahead of the icon (see Modules\Navigation's nav-burger markup) */
+.nino-nav-burger input[type="checkbox"]:focus-visible ~ svg {
+	outline: 2px solid var(--color-accent);
+	outline-offset: 2px;
 }
 .nino-nav-burger svg {
 	width: 32px;
@@ -2554,6 +2571,15 @@ header .nino-headernav-logo {
 	opacity: 1;
 	transform: translateY(0);
 }
+/* The attribute the script sets beside the class, said again here: hidden is
+   display:none out of the browser's own stylesheet, and any author rule that
+   gives one of these elements a display - the rule above, or a project's own
+   stylesheet loaded after this one - beats it */
+.nino-tabs-panel[hidden],
+.nino-filter-item[hidden] {
+	display: none;
+}
+
 /* Fades the panel in on switch - degrades gracefully (instant show) in
    browsers without @starting-style/allow-discrete support */
 @starting-style {
@@ -2838,6 +2864,38 @@ header .nino-headernav-logo {
 	clip: rect(0, 0, 0, 0);
 	white-space: nowrap;
 	border: 0;
+}
+
+/* A visitor who asked their system for less motion. The parallax has said
+   this since it was written (see .nino-parallex above); this is the rest of
+   the file saying it too: everything that moves on its own stops, everything
+   that moves on the way in simply arrives, and a jump to an anchor is a jump
+   rather than a ride. Not a blanket "animation: none" on everything - that
+   also kills the ones a visitor asked for by pressing something */
+@media (prefers-reduced-motion: reduce) {
+
+	html {
+		scroll-behavior: auto;
+	}
+
+	/* The three that run forever without anybody doing anything */
+	.nino-atf-arrowdown,
+	.nino-fx-vertical-bounce,
+	.nino-preloader::after {
+		animation: none;
+	}
+
+	/* A viewport animation is a fade and a rise on the way in - here the
+	   element is simply there. Visible rather than merely un-animated: with
+	   the transition gone but the hidden state kept, an element whose script
+	   never ran would stay invisible for good */
+	.nino-vpa,
+	.nino-vpa--visible-once.nino-vpa--repeat {
+		opacity: 1;
+		transform: none;
+		filter: none;
+		transition: none;
+	}
 }
 
 .nino-hidden-s { display: none !important; }
