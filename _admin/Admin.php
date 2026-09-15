@@ -129,7 +129,12 @@ namespace Nino\Admin {
 			// switch uses, this needs no guard() at all: GET /_admin is
 			// already reachable without a session, so there's nothing to
 			// loosen. Persists to the same ./admin/locale session key.
-			$queryLocale = (string) ( $_GET['locale'] ?? '' );
+			// is_string(), not a cast: '?locale[]=x' is a query anybody can
+			// send, and casting the array it parses to raises "Array to
+			// string conversion" - a level the runtime treats as fatal, ie.
+			// a 500 on the workbench's own address plus a log line per hit
+			// (see \Nino\Form::posted(), which reads a post the same way)
+			$queryLocale = is_string( $_GET['locale'] ?? null ) === true ? $_GET['locale'] : '';
 			if( $queryLocale !== '' && \Nino\Locales::verifyLocale( $appData, $queryLocale ) === true )
 				\Nino\Runtime::setSessionValue( $appData, './admin/locale', $queryLocale );
 
@@ -422,7 +427,10 @@ namespace Nino\Admin {
 				return;
 
 			$actions = self::actions( $appData );
-			$action	 = $_POST['action'] ?? '';
+			// A non-string action is no action. Left as posted, the isset()
+			// below is "Illegal offset type in isset" for 'action[]=x' - a
+			// TypeError, so a 500 where the answer is the 404 two lines down
+			$action	 = is_string( $_POST['action'] ?? null ) === true ? $_POST['action'] : '';
 
 			if( isset( $actions[$action] ) === false ) {
 				\Nino\Http::fail( $request, 404, 'unknown action' );
@@ -765,7 +773,9 @@ namespace Nino\Admin {
 			if( self::guard( $appData, $request ) === false )
 				return;
 
-			$locale = (string) ( self::postData()['locale'] ?? '' );
+			$locale = self::postData()['locale'] ?? '';
+			if( is_string( $locale ) === false )
+				$locale = '';
 
 			if( \Nino\Locales::verifyLocale( $appData, $locale ) === false ) {
 				\Nino\Http::fail( $request, 400, 'unknown locale' );
@@ -781,7 +791,11 @@ namespace Nino\Admin {
 		 *	@return 	array
 		 */
 		public static function postData(): array {
-			$data = json_decode( $_POST['data'] ?? '', true );
+			// json_decode() takes a string, and 'data[]=x' posts an array:
+			// unguarded that is a TypeError, ie. a 500 - and one reachable
+			// before any authentication, since recovery.php reads its
+			// password through here
+			$data = json_decode( is_string( $_POST['data'] ?? null ) === true ? $_POST['data'] : '', true );
 			return is_array( $data ) ? $data : [];
 		}
 

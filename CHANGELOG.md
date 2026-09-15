@@ -188,6 +188,25 @@ All notable changes to Nino are documented in this file.
   with a 403 naming it. The address stays changeable, since a rename grants
   nothing, and an account editing itself has proven its current password.
 
+- **A request that posted an array where a string belonged was a 500.** Four
+  of them in the workbench and the wizard, all reachable by typing `[]` into a
+  field name: `?locale[]=x` on `/_admin` raised "Array to string conversion" -
+  a level the runtime treats as fatal - with a log line per hit;
+  `action[]=x` reached `isset( $actions[$action] )`, which is an "Illegal
+  offset type" TypeError, where the answer is the 404 two lines further down;
+  `data[]=x` reached `json_decode()`, which takes a string, and that path is
+  open before any authentication, since `recovery.php` reads its password
+  through `postData()`; and the wizard's own dispatcher had the same
+  `action[]=x`. All four read their value as a string or not at all now, and
+  answer the way they always meant to.
+
+  `\Nino\Features::manifest()` had the same shape in a different place: `key`,
+  `version`, `nino` and `module` were cast before they were checked, so a
+  manifest with an array in one of those fields took the request down one line
+  before the reader could say what was wrong with it. A manifest is a PHP file
+  somebody put in `features/`; refusing it with a sentence is the whole job of
+  that function.
+
 - **Every visitor got a session file and a cookie, whether or not they had a
   session.** `Runtime::init()` started the PHP session on every request, for
   every anonymous page view and every crawler hit alike. Two things followed

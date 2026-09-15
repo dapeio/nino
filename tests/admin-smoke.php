@@ -211,6 +211,49 @@ check( 'the panel\'s perm() is assignable to a role, under its nav label and in 
 check( 'a tab\'s perm() is assignable on its own, under its nav fill', in_array( [ 'perm' => \Nino\Modules\Elements\Types::MANAGE_PERM, 'label' => '/_admin/nav/types', 'group' => 'structure', 'offered' => true ], $permOptions, true ) === true );
 check( 'the users manage perm stays assignable too, once - the Roles tab shares it', count( array_filter( $permOptions, fn( array $option ): bool => $option['perm'] === \Nino\Modules\Users\Admin::MANAGE_PERM ) ) === 1 );
 
+/*	Nothing says a request carries strings. Every one of these used to be
+	a 500: 'action[]=x' is an "Illegal offset type in isset" in the
+	dispatcher, 'data[]=x' a TypeError in json_decode(), and '?locale[]=x'
+	an "Array to string conversion" - a level the runtime treats as fatal
+	(see \Nino\Runtime::NON_FATAL_LEVELS). Two of them are reachable
+	without signing in, and postData() is what recovery.php reads its
+	password through.
+
+	This file's own handler swallows every warning (see the top), so the
+	one these three would raise is recorded here instead - only that one:
+	the dummy panels of this suite raise plenty of their own on the way	*/
+$arrayWarnings = [];
+set_error_handler( function( int $level, string $message ) use ( &$arrayWarnings ): bool {
+	$arrayWarnings[] = $message;
+	return true;
+} );
+
+$request = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+$_POST['action'] = [ 'dummy/list' ];
+$_POST['data'] = json_encode( [] );
+\Nino\Admin\Admin::handlePost( $withModule, $request );
+check( 'an array-shaped action is answered as unknown, not raised at', $request['/nino/http/response']['statusCode'] === 404 );
+
+$request = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+$_POST['action'] = 'dummy/list';
+$_POST['data'] = [ 'x' ];
+\Nino\Admin\Admin::handlePost( $withModule, $request );
+check( 'an array-shaped data field reads as no data, not as a 500', $request['/nino/http/response']['statusCode'] === 200 );
+check( '...and postData() answers the empty array it promises', \Nino\Admin\Admin::postData() === [] );
+
+$_POST['data'] = json_encode( [] );
+
+$arrayLocaleGet = [ '/nino/http/response' => [ 'statusCode' => 200, 'body' => '[template /_admin/templates/page-index]' ] ];
+$_GET['locale'] = [ 'de_DE' ];
+\Nino\Admin\Admin::handleGet( $withModule, $arrayLocaleGet );
+unset( $_GET['locale'] );
+
+check( 'an array-shaped ?locale is ignored rather than cast', $arrayLocaleGet['/nino/http/response']['statusCode'] === 200 );
+check( 'none of the three raised an "Array to string conversion" on the way',
+	array_filter( $arrayWarnings, fn( string $message ): bool => str_contains( $message, 'Array to string conversion' ) ) === [] );
+
+restore_error_handler();
+
 $getRequest = [ '/nino/http/response' => [ 'statusCode' => 200, 'body' => '[template /_admin/templates/page-index]' ] ];
 \Nino\Admin\Admin::handleGet( $withModule, $getRequest );
 check( 'the module panel is visible to an account holding its perm', isset( \Nino\Admin\Admin::visiblePanels( $withModule )['dummy'] ) === true );

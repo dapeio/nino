@@ -106,6 +106,18 @@ check( 'a pre-release suffix is a version too', \Nino\Features::manifest( writeM
 check( 'a constraint has to be one satisfies() reads', manifestFails( $manifestDir, 'BadNino', [ 'name' => 'x', 'version' => '1.0.0', 'nino' => 'latest' ], '"nino"' ) );
 check( 'a module entry may only name the class the directory serves', manifestFails( $manifestDir, 'WrongModule', [ 'name' => 'x', 'version' => '1.0.0', 'module' => '\\Acme\\Other' ], '"module"' )
 	&& is_array( \Nino\Features::manifest( writeManifest( $manifestDir, 'RightModule', [ 'name' => 'x', 'version' => '1.0.0', 'module' => 'Nino\\Modules\\RightModule' ] ) ) ) );
+/*	Nothing says a manifest's fields are strings - it is a php file
+	somebody put in features/. A (string) cast of an array raises "Array to
+	string conversion", a level \Nino\Runtime treats as fatal, so the
+	reader whose whole job is refusing a bad manifest with a sentence took
+	the request down one line before saying what was wrong. manifestFails()
+	asserts exactly one warning, which is what makes these fail otherwise	*/
+check( 'a field that is an array is refused like any other wrong value, and raises nothing on the way',
+	manifestFails( $manifestDir, 'ArrayKey', [ 'key' => [ 'x' ], 'name' => 'x', 'version' => '1.0.0' ], '"key"' )
+	&& manifestFails( $manifestDir, 'ArrayVersion', [ 'name' => 'x', 'version' => [ '1.0.0' ] ], '"version"' )
+	&& manifestFails( $manifestDir, 'ArrayNino', [ 'name' => 'x', 'version' => '1.0.0', 'nino' => [ '^1.0' ] ], '"nino"' )
+	&& manifestFails( $manifestDir, 'ArrayModule', [ 'name' => 'x', 'version' => '1.0.0', 'module' => [ 'x' ] ], '"module"' ) );
+
 check( 'requires lists feature keys, itself left out', manifestFails( $manifestDir, 'BadReq', [ 'name' => 'x', 'version' => '1.0.0', 'requires' => [ 'Not Slug' ] ], '"requires"' )
 	&& \Nino\Features::manifest( writeManifest( $manifestDir, 'SelfReq', [ 'name' => 'x', 'version' => '1.0.0', 'requires' => [ 'selfreq', 'a', 'a', 'b' ] ] ) )['requires'] === [ 'a', 'b' ] );
 check( 'data paths stay below /data/', manifestFails( $manifestDir, 'BadData', [ 'name' => 'x', 'version' => '1.0.0', 'data' => [ '/config.php' ] ], '"data"' )

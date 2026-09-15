@@ -141,6 +141,14 @@ $unknownRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Install\Install::handlePost( $appData, $unknownRequest );
 check( 'an unknown action is rejected with 404', $unknownRequest['/nino/http/response']['statusCode'] === 404 );
 
+// 'action[]=x' is an "Illegal offset type in isset" in the dispatcher, ie. a
+// 500 on the wizard's address where the answer is the 404 above
+$_POST['action'] = [ 'checks/run' ];
+$arrayActionRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Install\Install::handlePost( $appData, $arrayActionRequest );
+check( 'an array-shaped action is rejected the same way, not thrown on', $arrayActionRequest['/nino/http/response']['statusCode'] === 404 );
+$_POST['action'] = 'checks/run';
+
 echo "\n";
 
 

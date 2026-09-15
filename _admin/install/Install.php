@@ -116,7 +116,10 @@ namespace Nino\Install {
 			if( self::guard( $appData, $request ) === false )
 				return;
 
-			$action = $_POST['action'] ?? '';
+			// Same reading as the workbench's own dispatcher: a non-string
+			// action is no action, rather than an "Illegal offset type in
+			// isset" (a 500) where the 404 below is the answer
+			$action = is_string( $_POST['action'] ?? null ) === true ? $_POST['action'] : '';
 
 			$actions = [];
 			foreach( self::MODULES as $module )

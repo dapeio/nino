@@ -238,8 +238,16 @@ namespace Nino {
 			if( is_array( $raw ) === false )
 				return $fail( 'must return an array' );
 
-			$key = (string) ( $raw['key'] ?? strtolower( $name ) );
-			if( preg_match( self::KEY_PATTERN, $key ) !== 1 )
+			// is_string() before the pattern, here and for the three fields
+			// below: a manifest is a php file somebody put in features/, so
+			// nothing says its fields are strings. A (string) cast of an
+			// array raises "Array to string conversion", which the runtime
+			// treats as fatal (see Runtime::NON_FATAL_LEVELS) - the reader
+			// that exists to refuse a bad manifest with a sentence took the
+			// site down with a 500 instead, one line before saying what was
+			// wrong
+			$key = $raw['key'] ?? strtolower( $name );
+			if( is_string( $key ) === false || preg_match( self::KEY_PATTERN, $key ) !== 1 )
 				return $fail( '"key" must be a slug' );
 
 			if( self::_localizedValid( $raw['name'] ?? '' ) === false )
@@ -315,16 +323,16 @@ namespace Nino {
 			if( is_string( $category ) === false || ( $category !== '' && preg_match( self::CATEGORY_PATTERN, $category ) !== 1 ) )
 				return $fail( '"category" must be a slug - one of '. implode( ', ', self::CATEGORIES ) );
 
-			$version = (string) ( $raw['version'] ?? '' );
-			if( preg_match( self::VERSION_PATTERN, $version ) !== 1 )
+			$version = $raw['version'] ?? '';
+			if( is_string( $version ) === false || preg_match( self::VERSION_PATTERN, $version ) !== 1 )
 				return $fail( '"version" must be major.minor.patch' );
 
-			$nino = (string) ( $raw['nino'] ?? '*' );
-			if( trim( $nino ) === '' || self::constraintValid( $nino ) === false )
+			$nino = $raw['nino'] ?? '*';
+			if( is_string( $nino ) === false || trim( $nino ) === '' || self::constraintValid( $nino ) === false )
 				return $fail( '"nino" must be a version constraint such as ^1.0' );
 
 			$module = '\\Nino\\Modules\\'. $name;
-			if( isset( $raw['module'] ) === true && '\\'. ltrim( (string) $raw['module'], '\\' ) !== $module )
+			if( isset( $raw['module'] ) === true && ( is_string( $raw['module'] ) === false || '\\'. ltrim( $raw['module'], '\\' ) !== $module ) )
 				return $fail( '"module" can only be '. $module. ' - the class the autoloader serves from this directory' );
 
 			if( is_file( $dir. '/'. $name. '.php' ) === false )
