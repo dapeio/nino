@@ -35,12 +35,14 @@ function classList() {
 }
 
 function element( tagName ) {
-	return {
+	const el = {
 		tagName 	: tagName,
 		children 	: [],
+		attributes	: {},
 		classList 	: classList(),
 		listeners 	: {},
 		style 		: {},
+		textContent : '',
 		addEventListener : function( type, callback, options ) {
 			this.listeners[type] = { callback : callback, options : options };
 		},
@@ -48,7 +50,14 @@ function element( tagName ) {
 			this.children.push( child );
 			return child;
 		},
+		setAttribute : function( name, value ) { this.attributes[name] = String( value ) },
+		getAttribute : function( name ) { return this.attributes[name] ?? null },
 	};
+
+	// What the slider's dots read back through (see sliderMove())
+	Object.defineProperty( el, 'firstChild', { get : function() { return el.children[0] ?? null } } );
+
+	return el;
 }
 
 const slides = [ element('LI'), element('LI'), element('LI') ];
@@ -146,6 +155,29 @@ touch( 'touchmove', 170, 103 );
 touch( 'touchstart', 160, 100, 2 );
 check( 'a second finger releases horizontal dragging', slider.classList.contains('nino-is-touch') === false );
 check( 'a multi-touch move remains available to native pinch zoom', touch( 'touchmove', 150, 100, 2 ) === false );
+
+// The controls a visitor operates. They were DIVs and bare LIs with a click
+// listener: reachable with a pointer and with nothing else - no tab stop, no
+// Enter, no Space, and a screen reader announcing '‹'
+const controls = slider.children.filter( function( c ) { return c.className === 'nino-slider-controls' } )[0];
+const prev = controls.children[0];
+const dotList = controls.children[1];
+const next = controls.children[2];
+
+check( 'the previous and next controls are real buttons', prev.tagName === 'BUTTON' && next.tagName === 'BUTTON'
+	&& prev.type === 'button' && next.type === 'button' );
+check( '...with a name a screen reader can read out, not just an arrow', ( prev.attributes['aria-label'] ?? '' ) !== ''
+	&& ( next.attributes['aria-label'] ?? '' ) !== '' && prev.textContent === '‹' );
+check( 'every dot is a button too', dotList.children.length === 3
+	&& dotList.children.every( function( li ) { return ( li.children[0] ?? {} ).tagName === 'BUTTON' } ) );
+check( '...each one saying which slide it goes to', ( dotList.children[1].children[0].attributes['aria-label'] ?? '' ).includes( '2' ) );
+const dotState = dotList.children.map( function( li ) { return li.children[0].attributes['aria-current'] } );
+check( '...and exactly the one showing says that it is', dotState.filter( function( v ) { return v === 'true' } ).length === 1
+	&& dotState[ slider.pos ] === 'true' );
+
+// The page's own language decides the word, where the project has none of
+// its own
+check( 'the words follow the language the page declares', ( prev.attributes['aria-label'] ?? '' ) === 'Previous' );
 
 // A slider that names no start position falls back to the middle slide.
 // parseInt() answers NaN for the missing attribute, and NaN is not nullish,

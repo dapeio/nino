@@ -13,6 +13,11 @@
 	'[[/global/phone]]' => 'Phone',
 	'[[/global/email]]' => 'Email',
 
+	// Slider - the words its controls carry for a screen reader
+	'[[/slider/label/prev]]' => 'Previous',
+	'[[/slider/label/next]]' => 'Next',
+	'[[/slider/label/slide]]' => 'Go to slide %s',
+
 	// Cookie banner
 	'[[/cookiebanner/info/text]]' => 'This website uses cookies to give you the best possible experience.',
 	'[[/cookiebanner/label/legal]]' => 'Learn more',

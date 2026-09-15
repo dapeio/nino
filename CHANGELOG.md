@@ -188,6 +188,17 @@ All notable changes to Nino are documented in this file.
   with a 403 naming it. The address stays changeable, since a rename grants
   nothing, and an account editing itself has proven its current password.
 
+- **A slider could not be operated with a keyboard.** Its previous and next
+  controls were `<div>`s with a click listener and its dots were bare `<li>`s
+  with one - reachable with a pointer and with nothing else: no tab stop, no
+  Enter, no Space, and a screen reader announcing `‹`. All of them are real
+  buttons now, each with a name, and the dot showing says that it is.
+  Measured in Chromium: the controls were not tab stops at all, and are now.
+  The words come from `/slider/label/prev`, `/slider/label/next` and
+  `/slider/label/slide` - shipped in both languages, overridable per slider
+  with `data-slider-label-*`, and falling back to the language the page
+  declares. The classes the stylesheet paints are unchanged.
+
 - **The `..` rejection was a layer with two doors.** The development manual
   promises that `Filesystem` refuses a path containing `..` as an additional
   protective layer, and only `getFileContent()` and `putFileContent()` made

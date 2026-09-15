@@ -41,7 +41,7 @@ namespace Nino\Modules {
 			is public - it is in the source of every page that renders the block	*/
 		public const string KEYS = '/nino/jstext/keys';
 
-		private const array DEFAULT_KEYS = [ '/form/info/', '/newsletter/info/' ];
+		private const array DEFAULT_KEYS = [ '/form/info/', '/newsletter/info/', '/slider/label/' ];
 
 		/**
 		 *	Module initiating

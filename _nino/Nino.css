@@ -2397,11 +2397,18 @@ header .nino-headernav-logo {
 	align-items: center;
 	gap: var(--space-1);
 }
+/* A real <button> since it has to be operable with a keyboard - so it also
+   has to stop looking like the browser's own */
 .nino-slider-button {
 	cursor: pointer;
 	font-size: 1.8rem;
 	line-height: 1rem;
 	padding: 2px 8px 8px 8px;
+	appearance: none;
+	background: none;
+	border: 0;
+	color: inherit;
+	font-family: inherit;
 }
 /* Specificity note: .nino-slider ul (above) matches this too since it's
    still a <ul> descendant of .nino-slider - needs the extra .nino-slider-controls
@@ -2426,6 +2433,19 @@ header .nino-headernav-logo {
 }
 .nino-slider-points li.nino-is-active {
 	background-color: var(--color-secondary);
+}
+/* The dot is the <li> the rules above paint; the button inside it is what a
+   visitor presses, and it covers the dot exactly */
+.nino-slider-point {
+	display: block;
+	width: 100%;
+	height: 100%;
+	padding: 0;
+	appearance: none;
+	background: none;
+	border: 0;
+	border-radius: 50%;
+	cursor: pointer;
 }
 
 /* Viewport animations (vpa) - default is a subtle fade+rise. --zoom/--zoom-

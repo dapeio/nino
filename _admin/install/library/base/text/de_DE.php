@@ -13,6 +13,11 @@
   '[[/website/footer/title/followus]]' => 'Social Media',
 	'[[/website/footer/title/getintouch]]' => 'Hier sind wir',
 
+	// Slider - die Wörter, die seine Bedienelemente für einen Screenreader tragen
+	'[[/slider/label/prev]]' => 'Zurück',
+	'[[/slider/label/next]]' => 'Weiter',
+	'[[/slider/label/slide]]' => 'Zu Bild %s',
+
 	// Cookie-Banner
 	'[[/cookiebanner/info/text]]' => 'Diese Website verwendet Cookies, um Ihnen die bestmögliche Erfahrung zu bieten.',
 	'[[/cookiebanner/label/legal]]' => 'Mehr erfahren',

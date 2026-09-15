@@ -499,6 +499,10 @@
 						wrap.lis[wrap.pos].classList.add('nino-is-active');
 						wrap.ips?.[wrap.pos]?.classList.add('nino-is-active');
 
+						// Which dot is the one showing, said rather than only drawn
+						for( let ip = 0, lp = ( wrap.ips ?? [] ).length; ip < lp; ip++ )
+							wrap.ips[ip].firstChild?.setAttribute?.( 'aria-current', ip === wrap.pos ? 'true' : 'false' );
+
 						sliderResize();
 					},
 
@@ -511,6 +515,64 @@
 					 *
 					 *	@return		void
 					 */
+					/**
+					 *	One control of a slider: a real button, with the face it had
+					 *	as a DIV and a name a screen reader can read out
+					 *
+					 *	@param		{string}		className		The classes the stylesheet paints
+					 *	@param		{string}		face				What is drawn in it, '' for a dot
+					 *	@param		{string}		label				Its accessible name
+					 *	@param		{Function}	onClick
+					 *
+					 *	@return		{Element}
+					 */
+					sliderButton = function( className, face, label, onClick ) {
+
+						const button = document.createElement('BUTTON');
+
+						button.type = 'button';
+						button.className = className;
+
+						if( face !== '' )
+							button.textContent = face;
+
+						button.setAttribute( 'aria-label', label );
+						button.addEventListener( 'click', onClick );
+
+						return button;
+					},
+
+					/**
+					 *	What a slider control is called: the project's own text where
+					 *	it has one (published to [jstext] under '/slider/label/'),
+					 *	else the language the page declares, else English
+					 *
+					 *	@param		{Element}		wrap					The slider
+					 *	@param		{string}		which					'prev', 'next' or 'slide'
+					 *
+					 *	@return		{string}
+					 */
+					sliderLabel = function( wrap, which ) {
+
+						// Nino.content may not be there at all: this file is also
+						// loaded on its own (see the tests), and a project may ship
+						// the ui script without the text block
+						const own = wrap.getAttribute( 'data-slider-label-'+ which )
+							|| ( Nino.content?.getText?.( '/slider/label/'+ which ) ?? '' );
+
+						if( own !== '' )
+							return own;
+
+						const fallback = {
+							de : { prev : 'Zurück', next : 'Weiter', slide : 'Zu Bild %s' },
+							en : { prev : 'Previous', next : 'Next', slide : 'Go to slide %s' },
+						};
+
+						const language = ( dE.getAttribute?.( 'lang' ) || dE.lang || 'en' ).slice( 0, 2 ).toLowerCase();
+
+						return ( fallback[language] ?? fallback.en )[which];
+					},
+
 					sliderClick = function( wrap, dir ) {
 
 						let
@@ -566,10 +628,16 @@
 					slider.controls.className = 'nino-slider-controls';
 					slider.appendChild( slider.controls );
 
-					slider.prevButton = document.createElement('DIV');
-					slider.prevButton.className = 'nino-slider-button prev';
-					slider.prevButton.innerHTML = '‹';
-					slider.prevButton.addEventListener( 'click', function(){ sliderClick( slider, -1 ) } );
+					/*	Real buttons, not DIVs and bare LIs with a click listener on
+						them: those are reachable with a pointer and with nothing
+						else - no tab stop, no Enter, no Space, and a screen reader
+						announcing '‹'. The classes stay what they were, so a
+						project's own stylesheet keeps working.
+
+						The word each one says: the project's own text where it has
+						one, else the language the page declares, else English. A
+						label is not optional on a control whose face is an arrow	*/
+					slider.prevButton = sliderButton( 'nino-slider-button prev', '‹', sliderLabel( slider, 'prev' ), function(){ sliderClick( slider, -1 ) } );
 					slider.controls.appendChild( slider.prevButton );
 
 					slider.pWrap = document.createElement('UL');
@@ -577,15 +645,22 @@
 					slider.controls.appendChild( slider.pWrap );
 					slider.ips = [];
 					for( let ip=0, lp=slider.lis.length; ip<lp; ip++ ) {
+
 						slider.ips[ip] = document.createElement('LI');
-						slider.ips[ip].addEventListener( 'click', function(){ sliderMove( slider, ip ) } );
+
+						// The button inside the dot, so the dot keeps being the
+						// element the stylesheet paints
+						const dot = sliderButton( 'nino-slider-point', '', sliderLabel( slider, 'slide' ).replace( '%s', String( ip + 1 ) ), ( function( to ) {
+							return function(){ sliderMove( slider, to ) };
+						} )( ip ) );
+
+						dot.setAttribute( 'aria-current', ip === slider.pos ? 'true' : 'false' );
+
+						slider.ips[ip].appendChild( dot );
 						slider.pWrap.appendChild( slider.ips[ip] );
 					}
 
-					slider.nextButton = document.createElement('DIV');
-					slider.nextButton.className = 'nino-slider-button next';
-					slider.nextButton.innerHTML = '›';
-					slider.nextButton.addEventListener( 'click', function(){ sliderClick( slider, 1 ) } );
+					slider.nextButton = sliderButton( 'nino-slider-button next', '›', sliderLabel( slider, 'next' ), function(){ sliderClick( slider, 1 ) } );
 					slider.controls.appendChild( slider.nextButton );
 
 					// Touch swipe support
