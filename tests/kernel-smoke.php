@@ -1416,6 +1416,17 @@ check( 'an empty key is the first form defined - which is what a page posting no
 $unknownRequest = submitForm( $appData, [ 'form' => 'nowhere', 'name' => 'Jo', 'email' => 'jo@example.com', 'message' => 'Hi' ] );
 check( 'a key no form has is a 404 - a page pointing at a form that was renamed, not spam', $unknownRequest['/nino/http/response']['statusCode'] === 404 );
 
+// handle() used to pre-filter the key against the slug shape and collapse a
+// miss to '' - the first form - so a page posting 'Quote' was validated
+// against, mailed to and recorded under the contact form instead of 404'd
+$shapedKeyRequest = submitForm( $appData, [ 'form' => 'Quote', 'name' => 'Jo', 'email' => 'jo@example.com', 'message' => 'Hi' ] );
+check( '...whatever shape the key has - a miss is never routed to the first form', $shapedKeyRequest['/nino/http/response']['statusCode'] === 404 );
+
+// posted() reads keys of at most 64 characters; a definition allowing a
+// longer name described a field that could never be submitted
+$longNames = \Nino\Form::normalize( [ 'key' => 'long', 'fields' => [ [ 'name' => str_repeat( 'n', 65 ) ], [ 'name' => str_repeat( 'n', 64 ) ] ] ] );
+check( 'a field name is bounded at definition time to what posted() reads', array_column( $longNames['fields'] ?? [], 'name' ) === [ str_repeat( 'n', 64 ) ] );
+
 $_POST = [ 'form' => 'quote', 'email' => 'jo@example.com', 'budget' => 'not-a-number', 'location' => '' ];
 $badTypeRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Modules\Form::callbackResponse( $appData, $badTypeRequest );
@@ -1456,14 +1467,91 @@ $appData[ \Nino\Form::RETENTION ] = 999;
 check( '...at either end', \Nino\Form::retention( $appData ) === \Nino\Form::RETENTION_MONTHS );
 unset( $appData[ \Nino\Form::RETENTION ] );
 
+// A transport takes the mail here: with recording off, a mail that did not
+// go out is a 500 (see below), so "goes out" has to mean it
+$taken = 0;
+\Nino\Callbacks::registerCallback( $appData, \Nino\Mail::TRANSPORT, static function( array &$appData, array &$mail ) use ( &$taken ): void {
+	$taken++;
+	$mail['sent'] = true;
+} );
 $appData[ \Nino\Form::STORE ] = false;
 $storedBefore = count( \Nino\Form::entries( $appData ) );
 $_POST = [ 'name' => 'Jo', 'email' => 'jo@example.com', 'message' => 'Hi', 'location' => '', 'cat' => '' ];
 $noStoreRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Modules\Form::callbackResponse( $appData, $noStoreRequest );
 check( 'with recording off the mail still goes out and nothing is written', $noStoreRequest['/nino/http/response']['statusCode'] === 200
-	&& count( \Nino\Form::entries( $appData ) ) === $storedBefore );
-unset( $appData[ \Nino\Form::STORE ] );
+	&& $taken === 2 && count( \Nino\Form::entries( $appData ) ) === $storedBefore );
+unset( $appData[ \Nino\Form::STORE ], $appData['./nino/callbacks'][ \Nino\Mail::TRANSPORT ] );
+
+// What a submission's text survives. posted() cut a value at
+// MAX_FIELD_LENGTH with substr(), so a multibyte character at the cut lost
+// half its bytes - and render() and record() escaped without
+// ENT_SUBSTITUTE, which answers invalid utf-8 with '' rather than a
+// replacement character: the message went out and was stored as nothing,
+// and the visitor saw ok. A transport takes the mails here, so their bodies
+// can be read instead of handed to mail()
+$mailed = [];
+\Nino\Callbacks::registerCallback( $appData, \Nino\Mail::TRANSPORT, static function( array &$appData, array &$mail ) use ( &$mailed ): void {
+	$mailed[] = $mail;
+	$mail['sent'] = true;
+} );
+\Nino\Filesystem::putFileContent( $appData, '/templates/mail-test.tpl', '<p>[[message]]</p>[[fields]]' );
+\Nino\Modules\Template::init( $appData );
+// The submissions above have used up part of Mail's per-ip cap - a fresh
+// window for the ones below, whose mails have to go out
+\Nino\Filesystem::putFileContent( $appData, '/data/ratelimit.php', [] );
+$formsBefore = $appData[ \Nino\Form::FORMS ];
+$appData[ \Nino\Form::FORMS ] = [ [ 'ownerTemplate' => '/templates/mail-test', 'userTemplate' => '/templates/mail-test' ] + \Nino\Form::DEFAULT_FORM ];
+$formsFile = '/data/forms.'. date( 'Y-m' ). '.php';
+
+$almostAll = str_repeat( 'a', \Nino\Form::MAX_FIELD_LENGTH - 1 );
+$longRequest	= submitForm( $appData, [ 'name' => 'Jo', 'email' => 'jo@example.com', 'message' => $almostAll. 'ä und hier geht es weiter' ] );
+$formEntries	= \Nino\Filesystem::getFileContent( $appData, $formsFile, [] );
+$longEntry		= end( $formEntries );
+check( 'a value is cut at MAX_FIELD_LENGTH on a character boundary - the character at the cut goes, the message stays', $longRequest['/nino/http/response']['statusCode'] === 200 && $longEntry['message'] === $almostAll && str_contains( $mailed[0]['body'] ?? '', '<p>'. $almostAll. '</p>' ) === true );
+
+$mailed = [];
+$latinRequest	= submitForm( $appData, [ 'name' => "Ren\xE9", 'email' => 'jo@example.com', 'message' => "caf\xE9 au lait" ] );
+$formEntries	= \Nino\Filesystem::getFileContent( $appData, $formsFile, [] );
+$latinEntry		= end( $formEntries );
+check( 'a byte that is not utf-8 becomes the replacement character, in the record and in the mail, rather than blanking the value', $latinRequest['/nino/http/response']['statusCode'] === 200 && $latinEntry['name'] === "Ren\u{FFFD}" && $latinEntry['message'] === "caf\u{FFFD} au lait" && str_contains( $mailed[0]['body'] ?? '', "<p>caf\u{FFFD} au lait</p>" ) === true );
+
+// render() promises a submitted value is never read as a placeholder. It
+// filled with str_replace() over arrays, pair by pair over the whole
+// string - so the [[fields]] table, inserted first, had the [[date]] and
+// [[email]] inside a visitor's message rewritten by the pairs after it
+$mailed = [];
+$placeholderRequest = submitForm( $appData, [ 'name' => 'Jo', 'email' => 'jo@example.com', 'message' => 'see [[date]] and [[email]]' ] );
+check( 'a submitted value is never read as a placeholder - in the [[fields]] table included', $placeholderRequest['/nino/http/response']['statusCode'] === 200 && substr_count( $mailed[0]['body'] ?? '', 'see [[date]] and [[email]]' ) === 2 );
+
+// A submission the per-ip cap refused was answered ok: 200 and {status: ok}
+// were set before the flag was looked at, nothing had gone out and nothing
+// was recorded, and the visitor waited for a reply to a message nobody
+// received. Over budget is a 429 - the same generic message on the page,
+// and the visitor knows to try again later. The cap is Mail's, 5 per hour
+$mailed = [];
+$countBefore = count( \Nino\Filesystem::getFileContent( $appData, $formsFile, [] ) );
+\Nino\Filesystem::putFileContent( $appData, '/data/ratelimit.php', [ '127.0.0.1' => [ 'tries' => 5, 'reset' => time() + 3600 ] ] );
+$cappedRequest = submitForm( $appData, [ 'name' => 'Jo', 'email' => 'jo@example.com', 'message' => 'Hi' ] );
+check( 'a submission the per-ip mail cap refuses is a 429, not ok - and neither mailed nor recorded', $cappedRequest['/nino/http/response']['statusCode'] === 429
+	&& isset( $cappedRequest['/nino/http/response']['body'] ) === false && $mailed === [] && count( \Nino\Filesystem::getFileContent( $appData, $formsFile, [] ) ) === $countBefore );
+\Nino\Filesystem::putFileContent( $appData, '/data/ratelimit.php', [] );
+unset( $appData['./nino/mail/ratelimited'] );
+
+// A mail that did not go out: with a copy kept the inquiry is in the panel,
+// so the visitor is told ok; with none kept nothing has it, and ok would be
+// a lie - a 500, which is what a mail server that did not take a mail is
+unset( $appData['./nino/callbacks'][ \Nino\Mail::TRANSPORT ] );
+\Nino\Callbacks::registerCallback( $appData, \Nino\Mail::TRANSPORT, static function( array &$appData, array &$mail ): void { $mail['sent'] = false; } );
+$countBefore = count( \Nino\Filesystem::getFileContent( $appData, $formsFile, [] ) );
+$keptRequest = submitForm( $appData, [ 'name' => 'Jo', 'email' => 'jo@example.com', 'message' => 'Hi' ] );
+check( 'a mail that did not go out still records where a copy is kept, and the visitor is told ok', $keptRequest['/nino/http/response']['statusCode'] === 200 && count( \Nino\Filesystem::getFileContent( $appData, $formsFile, [] ) ) === $countBefore + 1 );
+$appData[ \Nino\Form::STORE ] = false;
+$lostRequest = submitForm( $appData, [ 'name' => 'Jo', 'email' => 'jo@example.com', 'message' => 'Hi' ] );
+check( '...and with none kept it is a 500 - nothing has the inquiry', $lostRequest['/nino/http/response']['statusCode'] === 500 && isset( $lostRequest['/nino/http/response']['body'] ) === false );
+unset( $appData[ \Nino\Form::STORE ], $appData['./nino/callbacks'][ \Nino\Mail::TRANSPORT ], $appData['./nino/html/shortcodes']['template'], $appData['./nino/callbacks']['/nino/html/shortcode/template'] );
+$appData[ \Nino\Form::FORMS ] = $formsBefore;
+@unlink( \Nino\Filesystem::path( $appData, '/templates/mail-test.tpl' ) );
 
 // Removing one entry - the request a person makes about their own inquiry.
 // By id, which is why record() writes one
@@ -1569,6 +1657,13 @@ check( 'to, body, replyTo and the sender arrive as given', $taken[0]['to'] === '
 check( 'the headers are what mail() would get', str_contains( $taken[0]['headers'], 'Content-Type: text/html; charset=UTF-8' ) && str_contains( $taken[0]['headers'], "\r\nFrom: noreply@example.org" ) && str_contains( $taken[0]['headers'], "\r\nReply-To: reply@example.org" ) );
 check( 'a display-name address is reduced to the address before the transport sees it', \Nino\Mail::send( $appData, 'Max Mustermann <max@example.org>', 'x', 'y', '' ) === true && $taken[1]['to'] === 'max@example.org' && $taken[1]['replyTo'] === '' );
 check( 'an invalid address is refused before any transport', \Nino\Mail::send( $appData, 'not an address', 'x', 'y', '' ) === false && count( $taken ) === 2 );
+
+// mail() refuses a nul byte in any of its arguments with a ValueError -
+// which nothing caught, so a message with one (a form field can carry it)
+// was a 500 rather than the false send() promises. Dropped with the CR/LF,
+// before any transport sees the mail
+check( 'a nul byte is dropped from the body and every header value, never thrown at', \Nino\Mail::send( $appData, 'to@example.org', "Sub\0ject", "Hello\0world", "re\0ply@example.org" ) === true
+	&& $taken[2]['body'] === 'Helloworld' && $taken[2]['subject'] === 'Subject' && $taken[2]['replyTo'] === 'reply@example.org' );
 
 // A first transport that leaves sent alone passes the mail on; the one
 // after it decides

@@ -188,6 +188,53 @@ All notable changes to Nino are documented in this file.
   with a 403 naming it. The address stays changeable, since a rename grants
   nothing, and an account editing itself has proven its current password.
 
+- **A submission's text could reach the owner as nothing.** A posted value
+  was cut at its byte cap with `substr()`, which leaves half of a multibyte
+  character behind when the cut lands inside one, and the mail body and the
+  stored record were escaped without `ENT_SUBSTITUTE` - so `htmlspecialchars()`
+  answered the whole value with an empty string. A message of a thousand
+  bytes with an umlaut at the cut, or a client posting Latin-1, went out and
+  was recorded as nothing while the visitor saw ok. The cut lands on a
+  character boundary now, and a byte that is not UTF-8 becomes the
+  replacement character, the way AGENTS.md has always asked for.
+
+- **A submission the mail cap refused was answered ok.** The endpoint set
+  `200` and `{status: ok}` before it looked at the flag `\Nino\Mail` raises
+  when the per-ip cap refuses a send - nothing had gone out, nothing was
+  recorded, and the visitor waited for a reply to a message nobody received.
+  Over budget is a `429` now, which the shared `.nino-form` script shows as
+  the generic message. With `/nino/form/store` off, a mail no transport took
+  is a `500` for the same reason: nothing has the inquiry. Where a copy is
+  kept, the submission still records and the visitor is still told ok, since
+  the inquiry is in the Submissions panel.
+
+- **A nul byte in a mail was a 500.** PHP's `mail()` refuses a nul byte in
+  any of its arguments with a `ValueError`, which nothing caught - so a form
+  field carrying one turned into a bare 500 instead of the `false`
+  `\Nino\Mail::send()` promises. The byte is dropped with the CR/LF, from the
+  body as well, before any transport sees the mail; and an argument `mail()`
+  refuses outright is still answered with `false`.
+
+- **A form key nothing has could land on the first form.** The endpoint
+  checked the posted key against the slug shape and collapsed a miss to `''`,
+  which is the first form - so a page posting `Quote` for a form defined as
+  `quote` was validated against, mailed to and recorded under the contact
+  form. The key goes to the lookup as posted, and a miss is the `404` the
+  docs promised.
+
+- **A form field name longer than 64 characters could never be submitted.**
+  `\Nino\Form::normalize()` accepted names of any length while the endpoint
+  reads posted keys of at most 64 characters; the field rendered, the browser
+  posted it, and the value was dropped on arrival. The bound is the same on
+  both sides now, so the Forms feature's builder refuses such a name where it
+  is typed.
+
+- **A placeholder inside a submitted value was filled.** The mail body was
+  filled pair by pair over the whole string, so `[[date]]` or `[[email]]`
+  inside a visitor's message, once inside the `[[fields]]` table, was
+  rewritten by the pairs after it - contrary to what the docblock promised.
+  The placeholders are filled in one pass now.
+
 - **A fatal PHP never hands the error handler was a bare 500 with an empty
   log.** `set_error_handler()` is not called for the levels the engine raises
   and stops on, and everything Nino offers for diagnosis hung off that handler.

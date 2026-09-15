@@ -70,10 +70,10 @@ namespace Nino {
 		// The field types a form may declare. 'textarea' is the only one that
 		// is not an <input type>.
 		//
-		// No 'checkbox': the shared .nino-form script posts each field's
-		// .value unconditionally (see _nino/Nino.ui.js), and an unticked
-		// checkbox's value is still the string "on" - a box nobody ticked
-		// would be mailed and recorded as ticked
+		// No 'checkbox' yet. The shared .nino-form script posts a ticked box
+		// as its value and an unticked one as '' (see _nino/Nino.ui.js), so
+		// nothing stands in the way of one; it is simply not declared here
+		// until a form needs it
 		public const array TYPES = [ 'text', 'email', 'tel', 'url', 'number', 'textarea', 'select' ];
 
 		// Names a field may not take: the four the endpoint reads off the
@@ -207,8 +207,10 @@ namespace Nino {
 
 				// A field name becomes a posted key, a column of an export and
 				// a placeholder in the mail - so it is an identifier, not a
-				// label, and never one of the names something else owns
-				if( preg_match( '/^[a-zA-Z][a-zA-Z0-9_-]*$/', $name ) !== 1 || in_array( $name, self::RESERVED, true ) === true )
+				// label, and never one of the names something else owns. At
+				// most 64 characters, the same bound posted() reads keys with:
+				// a longer name described a field that could never be submitted
+				if( preg_match( '/^[a-zA-Z][a-zA-Z0-9_-]{0,63}$/', $name ) !== 1 || in_array( $name, self::RESERVED, true ) === true )
 					continue;
 
 				if( in_array( $name, $seen, true ) === true )
@@ -268,7 +270,10 @@ namespace Nino {
 		}
 
 		/**
-		 *	Every posted value, once - name-checked, trimmed and capped. A
+		 *	Every posted value, once - name-checked, trimmed and capped. The
+		 *	cap is in bytes and lands on a character boundary: a cut through
+		 *	the middle of a multibyte character left invalid utf-8, which the
+		 *	escaping on the way out answered with nothing at all. A
 		 *	value that is not a string is not taken: casting one (name[]=x)
 		 *	raises an engine warning this framework treats as fatal, ie. an
 		 *	unauthenticated 500 from a malformed post. Reading the whole post
@@ -284,7 +289,7 @@ namespace Nino {
 			foreach( $_POST as $key => $value )
 				if( is_string( $key ) === true && is_string( $value ) === true
 					&& preg_match( '/^[a-zA-Z_][a-zA-Z0-9_-]{0,63}$/', $key ) === 1 )
-					$posted[$key] = substr( trim( $value ), 0, self::MAX_FIELD_LENGTH );
+					$posted[$key] = mb_strcut( trim( $value ), 0, self::MAX_FIELD_LENGTH, 'UTF-8' );
 
 			return $posted;
 		}
@@ -367,11 +372,13 @@ namespace Nino {
 				return;
 
 			$posted	= self::posted();
-			$key		= (string) ( $posted['form'] ?? '' );
-			$form		= self::form( $appData, preg_match( '/^[a-z][a-z0-9-]*$/', $key ) === 1 ? $key : '' );
+			$form		= self::form( $appData, (string) ( $posted['form'] ?? '' ) );
 
 			// A key no form has: a page pointing at a form that was renamed,
-			// which the visitor can do nothing about and which is not spam
+			// which the visitor can do nothing about and which is not spam.
+			// The key goes to form() as posted - a shape check ahead of it
+			// used to collapse a miss to '', which is the first form, so a
+			// page posting 'Quote' was mailed and recorded as the contact form
 			if( $form === null ) {
 				$request['/nino/http/response']['statusCode'] = 404;
 				return;
@@ -393,21 +400,34 @@ namespace Nino {
 				return;
 			}
 
-			self::send( $appData, $form, $values );
+			$sent = self::send( $appData, $form, $values );
+
+			// A submission whose mail the cap refused is not recorded - one
+			// entry per request regardless would turn a throttled flood into
+			// unthrottled disk growth from an unauthenticated endpoint - and
+			// not answered ok either, which it used to be: nothing had gone
+			// out and nothing was kept, and the visitor waited for a reply to
+			// a message nobody received. A 429, which the shared .nino-form
+			// script shows as the generic message, so the visitor tries later
+			if( ( $appData['./nino/mail/ratelimited'] ?? false ) === true ) {
+				$request['/nino/http/response']['statusCode'] = 429;
+				return;
+			}
+
+			// A mail that did not go out still records - the inquiry did
+			// happen, it is in the panel, and losing it would be worse - and
+			// the visitor is told ok. Where the project keeps no copy nothing
+			// has the inquiry, and ok would be a lie: a 500, the same generic
+			// message on the page
+			if( self::stores( $appData ) === true )
+				self::record( $appData, $form, $values );
+			elseif( $sent === false ) {
+				$request['/nino/http/response']['statusCode'] = 500;
+				return;
+			}
 
 			$request['/nino/http/response']['statusCode']	= 200;
 			$request['/nino/http/response']['body']				= [ 'status' => 'ok' ];
-
-			// A submission whose mail the cap refused is not recorded: one
-			// entry per request regardless would turn a throttled flood into
-			// unthrottled disk growth from an unauthenticated endpoint. A
-			// mail() that simply failed still records - there the inquiry did
-			// happen and losing it would be worse
-			if( ( $appData['./nino/mail/ratelimited'] ?? false ) === true )
-				return;
-
-			if( self::stores( $appData ) === true )
-				self::record( $appData, $form, $values );
 		}
 
 		/**
@@ -422,9 +442,11 @@ namespace Nino {
 		 *	@param		array 		$form					One normalized form
 		 *	@param		array 		$values				name => value
 		 *
-		 *	@return 	void
+		 *	@return 	bool										Whether every mail went out - false for
+		 *																	one the cap refused (see handle()) as
+		 *																	much as for one no transport took
 		 */
-		public static function send( array &$appData, array $form, array $values ): void {
+		public static function send( array &$appData, array $form, array $values ): bool {
 
 			// [[/nino/dir]] and [[/nino/public]] are ordinary fills by the time
 			// this runs - \Nino\request() registers them before
@@ -455,13 +477,16 @@ namespace Nino {
 					'replyTo'	=> $owner,
 				];
 
-			\Nino\Mail::sendAll( $appData, $mails );
+			return \Nino\Mail::sendAll( $appData, $mails );
 		}
 
 		/**
 		 *	One mail body: the template rendered, then the placeholders
 		 *	replaced in the result - that order, so a submitted value can
-		 *	never be read as a fill, a shortcode or a template include.
+		 *	never be read as a fill, a shortcode or a template include - and
+		 *	replaced in one pass (strtr(), not str_replace() pair by pair),
+		 *	so a placeholder inside a submitted value is never read as one
+		 *	either, not even inside the [[fields]] table.
 		 *	[[fields]] is the whole submission as a table, which is what a
 		 *	template for a form with fields nobody knew in advance needs;
 		 *	[[name]], [[email]], [[message]] and [[subject]] are filled where
@@ -477,7 +502,11 @@ namespace Nino {
 		 */
 		public static function render( array &$appData, array $form, array $values, string $template ): string {
 
-			$safe = static fn( string $value ): string => htmlspecialchars( $value, ENT_QUOTES, 'UTF-8' );
+			// ENT_SUBSTITUTE: a byte that is not utf-8 - a client posting
+			// latin-1 - becomes the replacement character. Without it
+			// htmlspecialchars() answers the whole value with '', and the
+			// inquiry reached the owner as nothing
+			$safe = static fn( string $value ): string => htmlspecialchars( $value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8' );
 			$rows = '';
 
 			foreach( $form['fields'] as $field )
@@ -494,9 +523,7 @@ namespace Nino {
 				'[[message]]'	=> nl2br( $safe( (string) ( $values['message'] ?? '' ) ) ),
 			];
 
-			$html = \Nino\Html::renderHtml( $appData, '[template '. $template. ']' );
-
-			return str_replace( array_keys( $fills ), array_values( $fills ), $html );
+			return strtr( \Nino\Html::renderHtml( $appData, '[template '. $template. ']' ), $fills );
 		}
 
 		/**
@@ -551,8 +578,9 @@ namespace Nino {
 					'form'	=> $form['key'],
 				];
 
+				// ENT_SUBSTITUTE for the same reason as in render()
 				foreach( $values as $name => $value )
-					$entry[$name] = htmlspecialchars( (string) $value, ENT_QUOTES, 'UTF-8' );
+					$entry[$name] = htmlspecialchars( (string) $value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8' );
 
 				$entry['ip'] = \Nino\Http::getClientIp();
 

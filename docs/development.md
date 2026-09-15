@@ -548,7 +548,7 @@ A project defines its forms under `/nino/form/forms` in `config.php` - beside it
 ],
 ```
 
-A field's `type` is one of `\Nino\Form::TYPES` (`text`, `email`, `tel`, `url`, `number`, `textarea`, `select`; a `select` lists its `options`), its `label` may be a textfill, and its `name` may not be one of `\Nino\Form::RESERVED` - the four keys the endpoint reads off the post itself and the four a record carries beside the values. A definition with no usable field left is dropped rather than half-read: a form nobody can submit is better than one that mails to an address a hand edit mistyped.
+A field's `type` is one of `\Nino\Form::TYPES` (`text`, `email`, `tel`, `url`, `number`, `textarea`, `select`; a `select` lists its `options`), its `label` may be a textfill, and its `name` is an identifier of at most 64 characters (a letter, then letters, digits, `_` or `-`) that is not one of `\Nino\Form::RESERVED` - the four keys the endpoint reads off the post itself and the four a record carries beside the values. A definition with no usable field left is dropped rather than half-read: a form nobody can submit is better than one that mails to an address a hand edit mistyped.
 
 Two more keys sit beside them. `/nino/form/retention` is how many months of submissions stay on disk (1 to 60, `\Nino\Form::RETENTION_MONTHS` without one), and `/nino/form/store` set to `false` means the mail goes out and nothing is written at all - a site that answers its inquiries and keeps no copy has less to protect, and the Submissions panel then stays empty because there is nothing to show.
 
@@ -566,6 +566,8 @@ The markup is the project's own: `page-contact.tpl` carries a hand-written `<for
 ```
 
 418 rather than a status of its own for every refusal: the shared `.nino-form` script shows one generic message for anything that is not 200 or 400, so a bot never learns which check it tripped.
+
+The endpoint's own answers follow the same rule. A submission the per-ip mail cap refuses is a `429`, neither mailed nor recorded - the visitor sees the generic message and tries again later, and a throttled flood does not become unthrottled disk growth. A submission whose mail no transport took is recorded and answered `200` where the project keeps a copy, since the inquiry is in the Submissions panel; where `/nino/form/store` is `false` nothing has it, and the answer is a `500`.
 
 ### Elements Search Index
 

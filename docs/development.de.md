@@ -533,7 +533,7 @@ Ein Projekt definiert seine Formulare unter `/nino/form/forms` in der `config.ph
 ],
 ```
 
-Der `type` eines Feldes ist einer aus `\Nino\Form::TYPES` (`text`, `email`, `tel`, `url`, `number`, `textarea`, `select`; ein `select` führt seine `options` mit), sein `label` darf ein Textfill sein, und sein `name` darf keiner aus `\Nino\Form::RESERVED` sein – die vier Schlüssel, die der Endpunkt selbst aus dem Post liest, und die vier, die ein Eintrag neben den Werten trägt. Eine Definition, von der kein brauchbares Feld übrig bleibt, wird verworfen statt halb gelesen: Ein Formular, das niemand absenden kann, ist besser als eines, das an eine vertippte Adresse schickt.
+Der `type` eines Feldes ist einer aus `\Nino\Form::TYPES` (`text`, `email`, `tel`, `url`, `number`, `textarea`, `select`; ein `select` führt seine `options` mit), sein `label` darf ein Textfill sein, und sein `name` ist eine Kennung aus höchstens 64 Zeichen (ein Buchstabe, dann Buchstaben, Ziffern, `_` oder `-`), die keiner aus `\Nino\Form::RESERVED` ist – die vier Schlüssel, die der Endpunkt selbst aus dem Post liest, und die vier, die ein Eintrag neben den Werten trägt. Eine Definition, von der kein brauchbares Feld übrig bleibt, wird verworfen statt halb gelesen: Ein Formular, das niemand absenden kann, ist besser als eines, das an eine vertippte Adresse schickt.
 
 Zwei weitere Schlüssel stehen daneben. `/nino/form/retention` ist die Zahl der Monate, die Einsendungen auf der Platte bleiben (1 bis 60, ohne Angabe `\Nino\Form::RETENTION_MONTHS`), und `/nino/form/store` auf `false` heißt: Die Mail geht raus und es wird gar nichts geschrieben – eine Seite, die ihre Anfragen beantwortet und keine Kopie behält, hat weniger zu schützen, und das Panel Anfragen bleibt dann leer, weil es nichts zu zeigen gibt.
 
@@ -551,6 +551,8 @@ Das Markup gehört dem Projekt: `page-contact.tpl` trägt ein von Hand geschrieb
 ```
 
 418 statt eines eigenen Status je Ablehnung: Das gemeinsame Skript `.nino-form` zeigt für alles, was nicht 200 oder 400 ist, eine einzige allgemeine Meldung – ein Bot erfährt also nie, an welcher Prüfung er gescheitert ist.
+
+Die eigenen Antworten des Endpunkts folgen derselben Regel. Eine Einsendung, die die Mail-Drossel je IP abweist, ist ein `429`, weder verschickt noch gespeichert – der Besucher sieht die allgemeine Meldung und versucht es später noch einmal, und eine gedrosselte Flut wird nicht zu ungedrosseltem Plattenwachstum. Eine Einsendung, deren Mail kein Transport genommen hat, wird gespeichert und mit `200` beantwortet, wo das Projekt eine Kopie behält, denn die Anfrage steht im Panel Einsendungen; steht `/nino/form/store` auf `false`, hat sie niemand, und die Antwort ist ein `500`.
 
 ### Suchindex für Elements
 

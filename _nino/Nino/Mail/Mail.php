@@ -118,6 +118,13 @@ namespace Nino {
 			$subject	= self::_headerValue( $subject );
 			$replyTo	= self::_headerValue( $replyTo );
 
+			// A nul byte goes too, from the body as well: mail() refuses one in
+			// any argument with a ValueError rather than failing to send, and
+			// a form field can carry one - that was a 500 for the visitor
+			// instead of the false this class promises. Before the transport
+			// callback, so no transport has to know either
+			$body = str_replace( "\0", '', $body );
+
 			// _headerValue() only strips CR/LF - mail()'s $to also accepts a
 			// plain comma-separated list with no newline involved at all, so
 			// an admin-editable field this comes from (Form's owner notify
@@ -173,16 +180,23 @@ namespace Nino {
 
 			// -f only for an address that validated - the parameter goes to the
 			// sendmail command line, so it must never carry anything unchecked
-			return ( $sender !== '' )
-				? mail( $to, $subject, $body, $headers, '-f'. $sender )
-				: mail( $to, $subject, $body, $headers );
+			try {
+				return ( $sender !== '' )
+					? mail( $to, $subject, $body, $headers, '-f'. $sender )
+					: mail( $to, $subject, $body, $headers );
+			} catch( \ValueError ) {
+				// An argument mail() refuses outright, which the strips above
+				// did not know about: still a mail that did not go out, which
+				// is what false has always meant here
+				return false;
+			}
 		}
 
 		// A single header value with anything that could start a new header
-		// line removed
+		// line removed - and the nul byte mail() refuses (see _deliver())
 		private static function _headerValue( string $value ): string {
 
-			return trim( str_replace( [ "\r", "\n" ], '', $value ) );
+			return trim( str_replace( [ "\r", "\n", "\0" ], '', $value ) );
 		}
 
 		// The address to send as: '/nino/mail/sender' from config.php if set,
