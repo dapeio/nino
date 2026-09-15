@@ -823,6 +823,8 @@ creates the hidden form field. However, the actual protection belongs to the ker
 
 Nino starts sessions in strict mode. Session cookies are `HttpOnly`, use `SameSite=Lax`, and are set via HTTPS as `Secure`. Behind a TLS-terminating proxy, the Secure flag can be enforced with `/nino/session/force-secure-cookie`. A successful login renews the session ID and the CSRF token.
 
+A session is started when something writes to it, not on every request: minting a CSRF token (so: rendering a form, or checking a post), signing in, and a visitor picking a language. A page that does none of those answers with no session, no `PHPSESSID` cookie and no session file - which matters both for the disk a crawler fills and for what a cookie banner has to declare. `\Nino\Runtime::startSession()` is the call that starts one; every write goes through it, and it answers `false` on the CLI, where there is no session to start.
+
 Authentication is additionally protected by:
 
 - a dummy password hash against measurable differences with unknown users,
@@ -854,7 +856,10 @@ Each response starts with central security headers, including:
 - `Strict-Transport-Security`,
 - `Content-Security-Policy`,
 - `X-Frame-Options: SAMEORIGIN`,
-- `X-Content-Type-Options: nosniff`.
+- `X-Content-Type-Options: nosniff`,
+- `Cache-Control: no-store`.
+
+The last one is Nino's own answer to whether a response may be stored. PHP used to give it, as a side effect of the session that was started on every request; now that a request without session state starts none, the header is declared in `\Nino\Http` instead - a project that wants its public pages cached by browsers and proxies changes that one value, and accepts that a visitor sees a page one render behind an edit for as long as it says.
 
 Project code may specifically extend these headers. It should not generally replace or weaken them just to get a messy inline integration working.
 

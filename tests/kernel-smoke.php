@@ -1968,6 +1968,28 @@ check( 'Locales::init ignores a malformed non-string locale stored in the sessio
 // and stored there it would outlive a later change of the native locale
 check( 'resolving the default does not persist it as a visitor locale', \Nino\Runtime::getSessionValue( $nativeAppData, './nino/locales/current' ) === null );
 
+/*	Runtime's session, which is started on demand rather than on every
+	request: an anonymous GET of a page that renders no form and signs
+	nobody in used to leave a session file and a PHPSESSID cookie behind
+	for a session that never held one value. Measured with php -S against
+	this kernel: a plain page answers with neither, the same page with a
+	[csrf] in it answers with both, and a visitor who has one keeps the one
+	they have. The suites build their appData without Runtime::init() (see
+	harness.php), so there is nothing to start here and $_SESSION stays the
+	ordinary array it is on the cli - which is what these assert	*/
+check( 'startSession reports no session where init() never ran', \Nino\Runtime::startSession( $appData ) === false );
+
+\Nino\Runtime::setSessionValue( $appData, './nino/test/value', 'stored' );
+check( '...and a session value is still written and read back', \Nino\Runtime::getSessionValue( $appData, './nino/test/value' ) === 'stored' );
+
+\Nino\Runtime::unsetSessionValue( $appData, './nino/test/value' );
+check( '...and unset again', \Nino\Runtime::getSessionValue( $appData, './nino/test/value', 'gone' ) === 'gone' );
+
+// Reading never starts one either: a value nobody wrote is the default,
+// not an empty session brought into being by asking for it
+check( 'reading an unwritten key answers the default', \Nino\Runtime::getSessionValue( $appData, './nino/test/never-written', 'default' ) === 'default'
+	&& session_status() !== PHP_SESSION_ACTIVE );
+
 function fakeRequest( array &$appData, string $uri, string $method = 'GET', array $server = [] ): array {
 	$request = array_merge( [ 'REQUEST_METHOD' => $method, 'REQUEST_URI' => $uri, 'REMOTE_ADDR' => '127.0.0.1' ], $server );
 	\Nino\Http::request( $appData, $request );
@@ -1977,6 +1999,14 @@ function fakeRequest( array &$appData, string $uri, string $method = 'GET', arra
 $homeRequest = fakeRequest( $appData, '/' );
 $seededCsp = $homeRequest['/nino/http/response']['header']['Content-Security-Policy'] ?? '';
 check( 'the response header is seeded with the default csp', str_contains( $seededCsp, "default-src 'self'" ) === true );
+
+/*	Whether a response may be stored is Nino's answer now. It used to be
+	php's: the session was started on every request, and its cache limiter
+	put Expires/Pragma/Cache-Control on every response as a side effect.
+	A request that writes no session value starts none any more, so the
+	same answer has to come from here or it would depend on whether the
+	page happened to render a form	*/
+check( 'the response header carries an explicit no-store', ( $homeRequest['/nino/http/response']['header']['Cache-Control'] ?? '' ) === 'no-store' );
 
 // img-src '*' covers network schemes only, so a data: uri needs spelling out.
 // Nino.css uses one for .nino-atf-arrowdown, ie. the framework's own default

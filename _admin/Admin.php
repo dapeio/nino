@@ -1391,8 +1391,11 @@ namespace Nino\Admin {
 					return;
 				}
 
-				// Same fixation defence as a login through Auth
-				session_regenerate_id( true );
+				// Same fixation defence as a login through Auth, and the same
+				// reason for going through startSession() first: the session
+				// this rotates may not have been started yet
+				if( \Nino\Runtime::startSession( $appData ) === true )
+					session_regenerate_id( true );
 				\Nino\Csrf::rotateToken( $appData );
 				\Nino\Runtime::setSessionValue( $appData, self::SESSION_KEY, true );
 				\Nino\Http::ok( $request );

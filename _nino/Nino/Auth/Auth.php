@@ -182,9 +182,11 @@ namespace Nino {
 			self::_clearTries( $appData, array_merge( $ipKeys, [ $username ] ) );
 
 			// Rotate the session id + csrf token now that the session's identity
-			// is changing (session-fixation defense) - the status guard keeps
-			// cli callers (tests) without an active session working
-			if( session_status() === PHP_SESSION_ACTIVE )
+			// is changing (session-fixation defense). startSession() rather
+			// than a status check: a login is one of the writes that starts
+			// the session (see Runtime::startSession()), and it returns false
+			// for cli callers (tests), which have no session to rotate
+			if( \Nino\Runtime::startSession( $appData ) === true )
 				session_regenerate_id( true );
 			\Nino\Csrf::rotateToken( $appData );
 

@@ -35,6 +35,18 @@ namespace Nino {
 					'Content-Security-Policy' 		=> 'default-src \'self\'; img-src * data:; style-src \'self\' \'unsafe-inline\'; frame-ancestors \'self\'; base-uri \'self\'; form-action \'self\'',
 					'X-Frame-Options' 						=> 'SAMEORIGIN',
 					'X-Content-Type-Options'			=> 'nosniff',
+					// Nino's own answer to whether a response may be stored,
+					// rather than php's: the session used to be started on
+					// every request, and its cache limiter put four no-store
+					// headers on every response as a side effect of that.
+					// Now that a request without session state starts no
+					// session (see Runtime::startSession()), the same answer
+					// has to be given here or it would depend on whether a
+					// page happened to render a form. A project that wants
+					// its public pages cached by browsers and proxies
+					// changes this one value - what a visitor sees is one
+					// render behind an edit for as long as it says.
+					'Cache-Control'								=> 'no-store',
 				],
 				'body'				=> '',
 				'uri'					=> '',

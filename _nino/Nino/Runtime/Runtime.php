@@ -85,6 +85,15 @@ namespace Nino {
 		// log write the first one did. This is that same outcome, on purpose
 		private static bool $_reported = false;
 
+		// Whether init() ran, ie. whether there is a php session for
+		// startSession() to start at all, and the cookie params it starts it
+		// with. The smoke tests build their appData without init() on purpose
+		// (see tests/harness.php): there $_SESSION stays the ordinary array
+		// it is on the cli, and starting a real session under a test run
+		// would write session files for nothing
+		private static bool $_sessionReady = false;
+		private static array $_sessionCookieParams = [];
+
 		public static function init( array &$appData ): void {
 
 			// Set current instance
@@ -95,34 +104,88 @@ namespace Nino {
 			set_exception_handler( [ self::class, 'handleException' ] );
 			register_shutdown_function( [ self::class, 'handleShutdown' ] );
 
-			// Start session
-			if( session_status() !== PHP_SESSION_ACTIVE ) {
+			// Prepare the session, and start one only where there already is
+			// one. Starting it here regardless meant a session file per
+			// anonymous hit - every visitor, every crawler - and a
+			// Set-Cookie: PHPSESSID on the first request of each, for a
+			// session that in the great majority of them never held a single
+			// value: the kernel writes to it when a csrf token is minted (ie.
+			// when a form is rendered or a post is checked), when somebody
+			// signs in, and when a visitor picks a language. A page that does
+			// none of those now answers with no session, no cookie and no
+			// session file.
+			self::$_sessionReady 				= true;
+			self::$_sessionCookieParams	= [
+				'lifetime'	=> 0,
+				'path'			=> '/',
+				'secure'		=> ( $appData['/nino/session/force-secure-cookie'] ?? false ) === true || ( ( $_SERVER['HTTPS'] ?? '' ) !== '' && ( $_SERVER['HTTPS'] ?? '' ) !== 'off' ),
+				'httponly'	=> true,
+				'samesite'	=> 'Lax',
+			];
 
-				// Without strict mode php happily adopts any session id a client
-				// sends, so an attacker can plant one before login and keep using
-				// it afterwards. loginUser()'s session_regenerate_id() covers the
-				// post-login half of that, but not the pre-login state living in
-				// the same session - the csrf token above all.
-				ini_set( 'session.use_strict_mode', '1' );
+			// A visitor carrying the cookie has a session whether or not this
+			// request writes to it - Auth reads its token to resume a login,
+			// and a deferred start would be a second cookie for the same
+			// visitor
+			if( isset( $_COOKIE[ session_name() ] ) === true )
+				self::startSession( $appData );
+		}
 
-				session_set_cookie_params( [
-					'lifetime'	=> 0,
-					'path'			=> '/',
-					'secure'		=> ( $appData['/nino/session/force-secure-cookie'] ?? false ) === true || ( ( $_SERVER['HTTPS'] ?? '' ) !== '' && ( $_SERVER['HTTPS'] ?? '' ) !== 'off' ),
-					'httponly'	=> true,
-					'samesite'	=> 'Lax',
-				] );
-				session_start();
-			}
-			if( isset( $_SESSION[$appData['./nino/uid']] ) === false )
-				$_SESSION[$appData['./nino/uid']] = [];
+		/**
+		 *	Start the php session, unless one is running already.
+		 *
+		 *	Every session write goes through here, so that a request which
+		 *	never writes one never starts one (see init()). Returns whether
+		 *	there is an active session afterwards - false on the cli, where
+		 *	init() has not run and $_SESSION is an ordinary array, and false
+		 *	once the response has gone out, since a session cookie cannot be
+		 *	sent after the headers.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	bool
+		 */
+		public static function startSession( array &$appData ): bool {
+
+			if( session_status() === PHP_SESSION_ACTIVE )
+				return true;
+
+			if( self::$_sessionReady === false || headers_sent() === true )
+				return false;
+
+			// Without strict mode php happily adopts any session id a client
+			// sends, so an attacker can plant one before login and keep using
+			// it afterwards. loginUser()'s session_regenerate_id() covers the
+			// post-login half of that, but not the pre-login state living in
+			// the same session - the csrf token above all.
+			ini_set( 'session.use_strict_mode', '1' );
+
+			// php's own cache limiter sends four no-store headers with every
+			// session it starts. Whether a response may be cached is Http's
+			// answer (see Http::$_defaultResponse), not a side effect of
+			// having a session, and left at the default those headers would
+			// now appear on exactly the responses that happen to start one
+			session_cache_limiter( '' );
+
+			session_set_cookie_params( self::$_sessionCookieParams );
+
+			if( session_start() === false )
+				return false;
+
+			$_SESSION[$appData['./nino/uid']] = $_SESSION[$appData['./nino/uid']] ?? [];
+
+			return true;
 		}
 
 		public static function getSessionValue( array &$appData, string $key, mixed $return = null ): mixed {
+			// Reading never starts a session: a session that was not started
+			// by now holds nothing this request could read anyway - init()
+			// starts the one a visitor arrives with
 			return $_SESSION[$appData['./nino/uid']][$key] ?? $return;
 		}
 
 		public static function setSessionValue( array &$appData, string $key, mixed $value ): void {
+			self::startSession( $appData );
 			$_SESSION[$appData['./nino/uid']] = $_SESSION[$appData['./nino/uid']] ?? [];
 			$_SESSION[$appData['./nino/uid']][$key] = $value;
 		}

@@ -188,6 +188,34 @@ All notable changes to Nino are documented in this file.
   with a 403 naming it. The address stays changeable, since a rename grants
   nothing, and an account editing itself has proven its current password.
 
+- **Every visitor got a session file and a cookie, whether or not they had a
+  session.** `Runtime::init()` started the PHP session on every request, for
+  every anonymous page view and every crawler hit alike. Two things followed
+  from that: a file under `session.save_path` per first request, kept until
+  PHP's garbage collection gets to it, and a `Set-Cookie: PHPSESSID` on a
+  session that in the great majority of those requests never held a single
+  value - which is also a cookie a banner has to declare.
+
+  The session is started when something writes to it now: a CSRF token being
+  minted (rendering a form, or checking a post), a login, a visitor picking a
+  language. A visitor who arrives with the cookie still gets their session
+  started up front, because Auth reads its token to resume a login.
+  `\Nino\Runtime::startSession()` is the one call that starts one; every write
+  goes through it, and it answers `false` where there is nothing to start.
+
+  Measured with `php -S` against a two-page project: before, a plain page
+  answered `Set-Cookie: PHPSESSID`, `Expires: Thu, 19 Nov 1981`,
+  `Cache-Control: no-store, no-cache, must-revalidate`, `Pragma: no-cache`
+  and one session file per request; after, it answers with none of them, the
+  same page with a `[csrf]` in it answers with the cookie and one file, and a
+  visitor who has a session keeps the one they have.
+
+  Those four cache headers were PHP's, sent by the session's cache limiter.
+  Whether a response may be stored is not a side effect of having a session,
+  so `\Nino\Http`'s default response header now says it: `Cache-Control:
+  no-store`, the same answer as before for every page. A project that wants
+  its public pages cached by browsers and proxies changes that one value.
+
 - **Behind a reverse proxy, every visitor was the same visitor.** The client
   address is the TCP peer, and behind Cloudflare, a load balancer or an
   ingress that peer is the proxy - the same address for everybody. Every

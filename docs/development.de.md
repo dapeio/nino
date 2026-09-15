@@ -807,6 +807,8 @@ erzeugt das versteckte Formularfeld. Der eigentliche Schutz gehört jedoch zum K
 
 Nino startet Sessions im Strict Mode. Session-Cookies sind `HttpOnly`, verwenden `SameSite=Lax` und werden über HTTPS als `Secure` gesetzt. Hinter einem TLS-terminierenden Proxy lässt sich das Secure-Flag mit `/nino/session/force-secure-cookie` erzwingen. Ein erfolgreicher Login erneuert die Session-ID und den CSRF-Token.
 
+Eine Session wird gestartet, wenn etwas in sie schreibt, nicht bei jeder Anfrage: beim Erzeugen eines CSRF-Tokens (also beim Rendern eines Formulars oder beim Prüfen eines Posts), beim Anmelden und wenn ein Besucher eine Sprache wählt. Eine Seite, die nichts davon tut, antwortet ohne Session, ohne `PHPSESSID`-Cookie und ohne Sessiondatei – was sowohl für den Plattenplatz zählt, den ein Crawler füllt, als auch dafür, was ein Cookie-Banner erklären muss. `\Nino\Runtime::startSession()` ist der Aufruf, der eine startet; jeder Schreibzugriff geht durch ihn, und auf der CLI, wo es nichts zu starten gibt, antwortet er `false`.
+
 Die Authentifizierung schützt zusätzlich durch:
 
 - einen Dummy-Passworthash gegen messbare Unterschiede bei unbekannten Nutzern,
@@ -838,7 +840,10 @@ Jede Response startet mit zentralen Sicherheitsheadern, darunter:
 - `Strict-Transport-Security`,
 - `Content-Security-Policy`,
 - `X-Frame-Options: SAMEORIGIN`,
-- `X-Content-Type-Options: nosniff`.
+- `X-Content-Type-Options: nosniff`,
+- `Cache-Control: no-store`.
+
+Der letzte ist Ninos eigene Antwort darauf, ob eine Response gespeichert werden darf. Sie kam bisher von PHP, als Nebenwirkung der Session, die bei jeder Anfrage gestartet wurde; da eine Anfrage ohne Session-Inhalt nun keine mehr startet, steht der Header in `\Nino\Http`. Ein Projekt, das seine öffentlichen Seiten von Browsern und Proxies cachen lassen will, ändert diesen einen Wert – und nimmt in Kauf, dass ein Besucher eine Seite so lange einen Render hinter einer Änderung sieht, wie er es sagt.
 
 Projektcode darf diese Header gezielt erweitern. Er sollte sie nicht pauschal ersetzen oder abschwächen, nur um eine unsaubere Inline-Integration zum Laufen zu bringen.
 
