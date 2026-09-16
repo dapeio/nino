@@ -98,7 +98,7 @@ namespace Nino\Modules {
 		private static function _escapeFieldValue( mixed $value, bool $isHtml ): string {
 		    $safe = $isHtml === true
 		        ? \Nino\Html::sanitizeHtml( strval( $value ) )
-		        : htmlspecialchars( strval( $value ), ENT_QUOTES, 'UTF-8' );
+		        : htmlspecialchars( strval( $value ), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8' );
 		    return str_replace( '[', '&#91;', $safe );
 		}
 

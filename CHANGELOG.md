@@ -292,6 +292,30 @@ All notable changes to Nino are documented in this file.
   field whose text was not persisted. The guard queries the whole `#text-form`
   wrapper now.
 
+- **One byte that was not UTF-8 deleted the value it was in.** Eight escapes in
+  the kernel and the workbench spelled their flags out as `ENT_QUOTES` or
+  `ENT_NOQUOTES` - and spelling them out drops php's own default, which has
+  carried `ENT_SUBSTITUTE` since 8.1. Without it `htmlspecialchars()` answers
+  invalid UTF-8 with `''`: one Latin-1 byte anywhere in an element field, a
+  maintenance notice, an image `alt` or a link target - out of an import, a
+  feed, a paste - and the whole value rendered as nothing. Silently: no
+  warning, no log line, and the page looked merely empty.
+
+  `AGENTS.md` has required `ENT_QUOTES | ENT_SUBSTITUTE` all along, so this was
+  drift from a written rule rather than a missing one, and it had already bitten
+  twice before - `\Nino\Form` stored and mailed a submission as nothing, and
+  that was fixed where it was found rather than as a class. All eight now carry
+  the flag, `\Nino\Html::sanitizeHtml()`'s serializer among them, which is the
+  road every rich field takes. `tests/kernel-smoke.php` greps both trees for the
+  pattern, so the ninth is a failing test rather than a report.
+
+- **A preview kept every `ResizeObserver` it ever made.** `scaleFrame()` created
+  one per call and disconnected none, so a caller that re-fits the same box left
+  the previous observer attached and still firing. Design rebuilds the scaler on
+  every width change and every preview it loads: after n of them, one drag of the
+  window edge ran the fit arithmetic n times, and nothing ever took one away. The
+  port carries its observer now, and a second call replaces the first.
+
 - **The login form called a server's `403` and its own the same thing.** Both
   said "the login endpoint answered 403 - that is a server configuration",
   which is right for one of them and sends the other looking in the wrong

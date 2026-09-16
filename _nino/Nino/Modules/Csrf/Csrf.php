@@ -45,7 +45,7 @@ namespace Nino\Modules {
 		 *	@return 	string									Hidden input html
 		 */
 		public static function doShortcode( array &$appData, array $args ): string {
-			return '<input type="hidden" name="_csrf" value="'. htmlspecialchars( \Nino\Csrf::getToken( $appData ), ENT_QUOTES, 'UTF-8' ). '">';
+			return '<input type="hidden" name="_csrf" value="'. htmlspecialchars( \Nino\Csrf::getToken( $appData ), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8' ). '">';
 		}
 	}
 

@@ -273,7 +273,11 @@ HTML+ is processed as textfills, then shortcodes, then final render callbacks.
 Escape at the output context:
 
 - HTML text/attribute: `htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE,
-  'UTF-8')`.
+  'UTF-8')`. `ENT_SUBSTITUTE` is not optional: spelling the flags out drops
+  php's own default, and without it one byte that is not valid UTF-8 answers
+  `''` and takes the whole value with it - silently, with no warning and no log
+  line. The same holds for `ENT_NOQUOTES` on text content. `tests/kernel-smoke.php`
+  greps for it.
 - Rich element text: declare `'html' => true` in its model and rely on
   `\Nino\Html::sanitizeHtml()` when accepting it.
 - Browser DOM: insert untrusted text with `textContent`, not `innerHTML`.

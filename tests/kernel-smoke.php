@@ -887,6 +887,27 @@ check( '[elements] takes sort, offset and limit; ids count from 0 after the cut'
 check( '[elements] with a callback: sorted before it, offset and limit after it',
 	\Nino\Html::renderHtml( $appData, '[elements /sorttest sort="-weight" callback="sorttest-drop-first" offset="1" limit="1"][[title]];[/elements]' ) === 'item 9;' );
 
+// One byte that is not utf-8 - out of an import, a feed, a paste from a
+// latin-1 source - used to take the whole value with it: htmlspecialchars()
+// answers invalid input with '' unless ENT_SUBSTITUTE is among the flags, and
+// spelling the flags out drops php's own default. The field rendered as
+// nothing, silently, with no warning and no log line. \Nino\Form had the same
+// defect (see the submission tests further down); this is the render side
+\Nino\Filesystem::putFileContent( $appData, '/elements/badbytes.php', [
+	'title'	=> 'Bad Bytes',
+	'model'	=> [ 'title' => [ 'type' => 'string' ], 'note' => [ 'type' => 'string' ] ],
+	'*'			=> [ 'one' => [ 'title' => "Cafe\xE9 Munchen", 'note' => 'plain' ] ],
+] );
+$badByteRender = \Nino\Html::renderHtml( $appData, '[elements /badbytes][[title]]|[[note]];[/elements]' );
+check( 'an element value with one invalid utf-8 byte still renders, replacement character and all', str_contains( $badByteRender, 'Munchen' )
+	&& str_contains( $badByteRender, '|plain;' )
+	&& $badByteRender !== '|plain;' );
+// The rich branch takes the other road - sanitizeHtml(), whose serializer
+// escapes every text node - and had the same hole one level down
+check( '...and so does a rich field, whose text nodes go through the sanitizer instead', str_contains(
+	\Nino\Html::sanitizeHtml( "<p>Cafe\xE9 Munchen</p>" ), 'Munchen'
+) === true );
+
 echo "\n";
 
 
@@ -3292,6 +3313,43 @@ check( 'a subdirectory install carries into both', [
 	\Nino\Filesystem::url( $pathAppData, '/images/hero.jpg' ),
 	\Nino\Filesystem::url( $pathAppData, '/_admin/assets/script.js' ),
 ] === [ '/subdir/public/images/hero.jpg', '/subdir/_admin/assets/script.js' ] );
+
+echo "\n";
+
+
+// --- Escaping never answers bad input with nothing ------------------------
+
+echo "htmlspecialchars() keeps what it cannot encode\n";
+
+/*	htmlspecialchars() returns '' for input that is not valid utf-8, unless
+	ENT_SUBSTITUTE is among its flags - and php's own default carries it only
+	as long as no flags are given at all. Every call here spells them out, so
+	every call has to spell out that one too. It has bitten twice: \Nino\Form
+	stored and mailed a submission as nothing, and the Elements module rendered
+	a field as nothing. A grep is the only thing that stops the third.	*/
+$escapeSources = [];
+$escapeWalk = static function( string $dir ) use ( &$escapeWalk, &$escapeSources ): void {
+	foreach( (array) glob( $dir. '/*' ) as $path ) {
+		if( is_dir( $path ) === true )
+			$escapeWalk( $path );
+		elseif( str_ends_with( (string) $path, '.php' ) === true )
+			$escapeSources[] = (string) $path;
+	}
+};
+$escapeWalk( __DIR__. '/../_nino' );
+$escapeWalk( __DIR__. '/../_admin' );
+$escapeOffenders = [];
+foreach( $escapeSources as $escapeFile ) {
+	foreach( explode( "\n", (string) file_get_contents( $escapeFile ) ) as $escapeNo => $escapeLine ) {
+		if( str_contains( $escapeLine, 'htmlspecialchars(' ) === false || str_contains( $escapeLine, 'ENT_' ) === false )
+			continue;
+		if( str_contains( $escapeLine, 'ENT_SUBSTITUTE' ) === true )
+			continue;
+		$escapeOffenders[] = substr( (string) realpath( $escapeFile ), strlen( (string) realpath( __DIR__. '/..' ) ) + 1 ). ':'. ( $escapeNo + 1 );
+	}
+}
+check( 'no escape in the kernel or the workbench drops ENT_SUBSTITUTE'. ( $escapeOffenders === [] ? '' : ' - '. implode( ' | ', $escapeOffenders ) ), $escapeOffenders === [] );
+check( '...and the rule has something to find: the sources were actually read', count( $escapeSources ) > 40 );
 
 echo "\n";
 

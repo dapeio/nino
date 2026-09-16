@@ -55,7 +55,7 @@ namespace Nino\Modules {
 			$url = \Nino\Images::getUrl( $appData, $slot['filename'] );
 			$alt = (string) ( $args['alt'] ?? ( $slot['label'] ?? '' ) );
 
-			return '<img src="'. htmlspecialchars( $url, ENT_QUOTES, 'UTF-8' ). '" width="'. (int) ( $slot['width'] ?? 0 ). '" height="'. (int) ( $slot['height'] ?? 0 ). '" alt="'. htmlspecialchars( $alt, ENT_QUOTES, 'UTF-8' ). '">';
+			return '<img src="'. htmlspecialchars( $url, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8' ). '" width="'. (int) ( $slot['width'] ?? 0 ). '" height="'. (int) ( $slot['height'] ?? 0 ). '" alt="'. htmlspecialchars( $alt, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8' ). '">';
 		}
 	}
 

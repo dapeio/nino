@@ -169,11 +169,23 @@
 
 			fit();
 
-			// The panel resizes with the window, with the rail, and with the tab
-			// the operator is on - watching the box is the only one of those the
-			// caller does not have to remember to report
-			if( typeof wn.ResizeObserver === 'function' )
-				new wn.ResizeObserver( fit ).observe( port );
+			/*	The panel resizes with the window, with the rail, and with the tab
+				the operator is on - watching the box is the only one of those the
+				caller does not have to remember to report.
+
+				One observer per port, not one per call. A caller re-fits the same
+				box whenever the thing inside it changes - Design rebuilds the
+				scaler on every width change and every preview it loads - and each
+				of those used to leave the previous observer attached and firing.
+				After n calls one drag of the window edge ran fit() n times, and
+				nothing ever took one away. The port carries its observer, so a
+				second call replaces the first rather than joining it.	*/
+			if( typeof wn.ResizeObserver === 'function' ) {
+				if( port._ninoScaleObserver )
+					port._ninoScaleObserver.disconnect();
+				port._ninoScaleObserver = new wn.ResizeObserver( fit );
+				port._ninoScaleObserver.observe( port );
+			}
 
 			return fit;
 		},

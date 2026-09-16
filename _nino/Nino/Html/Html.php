@@ -297,8 +297,10 @@ namespace Nino {
 			foreach( iterator_to_array( $node->childNodes ) as $child ) {
 
 				if( $child->nodeType === XML_TEXT_NODE ) {
-					// ENT_NOQUOTES: this is text content, not an attribute value - quotes need no escaping here
-					$out .= htmlspecialchars( $child->textContent, ENT_NOQUOTES, 'UTF-8' );
+					// ENT_NOQUOTES: this is text content, not an attribute value - quotes need no escaping here.
+					// ENT_SUBSTITUTE because spelling the flags out drops php's own: without it one byte that
+					// is not utf-8 anywhere in the node answers '' and takes the whole text with it
+					$out .= htmlspecialchars( $child->textContent, ENT_NOQUOTES | ENT_SUBSTITUTE, 'UTF-8' );
 					continue;
 				}
 
@@ -316,7 +318,7 @@ namespace Nino {
 
 				if( $tag === 'a' ) {
 					$href = self::_safeHref( $child->getAttribute( 'href' ) );
-					$out .= ( $href === null ) ? $inner : '<a href="'. htmlspecialchars( $href, ENT_QUOTES, 'UTF-8' ). '">'. $inner. '</a>';
+					$out .= ( $href === null ) ? $inner : '<a href="'. htmlspecialchars( $href, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8' ). '">'. $inner. '</a>';
 					continue;
 				}
 

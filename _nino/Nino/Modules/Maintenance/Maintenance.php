@@ -233,8 +233,8 @@ namespace Nino\Modules {
 
 			return sprintf(
 				self::FALLBACK_BODY,
-				htmlspecialchars( $title, ENT_QUOTES, 'UTF-8' ),
-				nl2br( htmlspecialchars( $text, ENT_QUOTES, 'UTF-8' ) )
+				htmlspecialchars( $title, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8' ),
+				nl2br( htmlspecialchars( $text, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8' ) )
 			);
 		}
 	}
