@@ -2225,6 +2225,32 @@ $catchAll	= strpos( $htaccess, 'RewriteRule . /index.php [L]' );
 check( 'the front controller cannot rewrite its own result into a loop', $guard !== false );
 check( '...because that stop stands ahead of the catch-all', $guard !== false && $catchAll !== false && $guard < $catchAll );
 
+/*	A dot uri is a route here, not a file: /.nino/auth/login is the workbench
+	login, /.form the contact form, /.newsletter and /.protected belong to
+	features. All three deployments say the same sentence - deny a dot path
+	only where it resolves to something on disk - and only one of them said
+	it in a way Apache reads: the shipped .htaccess denied the pattern
+	outright, and Apache stops its directory walk at the first component that
+	does not exist and tests <FilesMatch> against that one. '/.nino/auth/login'
+	therefore matched as '.nino'. Measured against Apache 2.4.58: every one of
+	those routes answered 403 before php saw the request, while
+	/gibt-es-nicht-12345 reached index.php - which is what made it look like a
+	host problem rather than this file	*/
+$denyStart = strpos( $htaccess, '<FilesMatch "^\\.">' );
+$existsIf  = strpos( $htaccess, '<If "-f %{REQUEST_FILENAME} || -d %{REQUEST_FILENAME}">' );
+
+check( 'the .htaccess denies a dotfile only where one exists, so a dot route still reaches the front controller',
+	$existsIf !== false && $denyStart !== false && $existsIf < $denyStart
+	&& strpos( $htaccess, '</If>', $denyStart ) !== false );
+
+// The other two halves of the same sentence, so a change to one of the three
+// stands out as the odd one
+$router = (string) @file_get_contents( __DIR__. '/../router.php' );
+$deploy = (string) @file_get_contents( __DIR__. '/../docs/deployment.md' );
+
+check( '...and the development server draws the same line', str_contains( $router, 'is_file( __DIR__. $uri ) === true' ) === true );
+check( '...and so does the nginx recipe', str_contains( $deploy, 'if ( -e $request_filename ) { return 403; }' ) === true );
+
 $appData['./nino/jstext/nonce'] = base64_encode( random_bytes( 16 ) );
 \Nino\Modules\Jstext::callbackResponse( $appData, $homeRequest );
 $jstextCsp = $homeRequest['/nino/http/response']['header']['Content-Security-Policy'];

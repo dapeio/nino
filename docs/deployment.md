@@ -85,7 +85,7 @@ The login form names the status it received, and that status is the first thing 
 | | |
 | --- | --- |
 | `401` | the pair was read and refused. Either it is wrong, or - the case this section is about - it never arrived and PHP saw none |
-| `403` | the request did not get through. Either Nino's CSRF guard refused it, or the server refuses the address: the endpoint is `POST /.nino/auth/login`, and a host that blocks every path with a dot segment blocks it along with `/.form` and `/.newsletter` |
+| `403` | the request did not get through. Either Nino's CSRF guard refused it, or the address is refused before PHP: the endpoint is `POST /.nino/auth/login`, and anything that blocks a path with a dot segment blocks it along with `/.form`, `/.newsletter` and `/.protected`. Up to 1.2.0-beta the shipped `.htaccess` was that anything - see the note below the probe |
 | `404` | nothing forwards an unmatched address to `index.php` - see [Webroot and Routing](#webroot-and-routing) |
 | `500` | PHP died on the request. The reason is in `private/data/logs.<YYYY-MM>.php` as long as `/nino/error/log` is on, which is the default |
 
@@ -96,6 +96,8 @@ curl -sS -i -X POST https://…/.nino/auth/login | head -20
 ```
 
 A `403` carrying a `Content-Security-Policy` header is Nino's own CSRF guard - the request reached the kernel. A `403` without one never did, and the address is being refused before PHP: the dot segment is the usual reason.
+
+**On a checkout older than this fix, that reason is the shipped `.htaccess` itself.** Its dotfile deny was written as a bare `<FilesMatch "^\.">`, and Apache stops its directory walk at the first component that does not exist and tests that one: `/.nino/auth/login` was denied as `.nino`, `/.form` as `.form`. Both answered `403` before PHP saw them, on every Apache install the file applies to, while every ordinary address reached `index.php` normally - which is exactly what makes it look like a host rule. The deny is conditioned on the path resolving on disk now, the same line `router.php` and the nginx block below already drew. Replacing the `.htaccess` is the whole fix; nothing in the project or the host has to change.
 
 The `401` is the rest of this section. The symptom is always the same: `/_admin` answers `401` for credentials that are correct. The cause is that the credential pair never reached PHP. This probe says which of the three places it did not arrive in:
 

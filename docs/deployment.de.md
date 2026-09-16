@@ -84,7 +84,7 @@ Das Login-Formular nennt den Status, den es bekommen hat, und dieser Status ist 
 | | |
 | --- | --- |
 | `401` | das Paar wurde gelesen und abgewiesen. Entweder ist es falsch – oder es ist, der Fall dieses Abschnitts, nie angekommen und PHP hat gar keines gesehen |
-| `403` | die Anfrage ist nicht durchgekommen. Entweder hat Ninos CSRF-Schutz sie abgewiesen, oder der Server weist die Adresse ab: der Endpunkt ist `POST /.nino/auth/login`, und ein Host, der jeden Pfad mit einem Punkt-Segment sperrt, sperrt ihn zusammen mit `/.form` und `/.newsletter` |
+| `403` | die Anfrage ist nicht durchgekommen. Entweder hat Ninos CSRF-Schutz sie abgewiesen, oder die Adresse wird vor PHP abgewiesen: der Endpunkt ist `POST /.nino/auth/login`, und was einen Pfad mit Punkt-Segment sperrt, sperrt ihn zusammen mit `/.form`, `/.newsletter` und `/.protected`. Bis 1.2.0-beta war dieses „was" die mitgelieferte `.htaccess` selbst – siehe den Hinweis unter der Sonde |
 | `404` | nichts reicht eine nicht getroffene Adresse an `index.php` weiter – siehe [Webroot und Routing](#webroot-und-routing) |
 | `500` | PHP ist an der Anfrage gestorben. Der Grund steht in `private/data/logs.<YYYY-MM>.php`, solange `/nino/error/log` an ist, und das ist die Voreinstellung |
 
@@ -95,6 +95,8 @@ curl -sS -i -X POST https://…/.nino/auth/login | head -20
 ```
 
 Ein `403` mit einem `Content-Security-Policy`-Header ist Ninos eigener CSRF-Schutz – die Anfrage hat den Kernel erreicht. Ein `403` ohne einen solchen Header hat ihn nie erreicht, und die Adresse wird vor PHP abgewiesen: das Punkt-Segment ist der übliche Grund.
+
+**In einem Checkout vor dieser Korrektur ist dieser Grund die mitgelieferte `.htaccess` selbst.** Ihre Dotfile-Sperre stand als nacktes `<FilesMatch "^\.">` darin, und Apache bricht den Verzeichnisdurchlauf bei der ersten nicht vorhandenen Komponente ab und prüft genau diese: `/.nino/auth/login` wurde als `.nino` gesperrt, `/.form` als `.form`. Beide antworteten mit `403`, bevor PHP sie sah – auf jeder Apache-Installation, für die die Datei gilt –, während jede gewöhnliche Adresse normal bei `index.php` ankam. Genau das lässt es wie eine Regel des Hosts aussehen. Die Sperre ist jetzt daran gebunden, dass der Pfad auf der Platte existiert, dieselbe Linie, die `router.php` und der nginx-Block weiter unten längst ziehen. Die `.htaccess` austauschen ist die ganze Korrektur; weder am Projekt noch am Host muss etwas geändert werden.
 
 Der `401` ist der Rest dieses Abschnitts. Das Symptom ist immer dasselbe: `/_admin` antwortet mit `401` auf korrekte Zugangsdaten. Die Ursache ist, dass das Zugangspaar nie bei PHP angekommen ist. Diese Probe sagt, an welcher der drei Stellen es fehlt:
 

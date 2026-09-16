@@ -292,6 +292,31 @@ All notable changes to Nino are documented in this file.
   field whose text was not persisted. The guard queries the whole `#text-form`
   wrapper now.
 
+- **On Apache, every address Nino owns under a dot answered `403`.** The
+  shipped `.htaccess` denies dotfiles so that `.env`, `.git/config` or an
+  editor backup can never be served. It did so with a bare `<FilesMatch
+  "^\.">`, and Apache stops its directory walk at the first component that
+  does not exist and tests `<FilesMatch>` against that one - so
+  `/.nino/auth/login` was denied as `.nino` and `/.form` as `.form`, before
+  PHP saw either. That is the workbench login, the contact form, the
+  newsletter and the protected area, on every Apache install this file
+  applies to, while every ordinary address reached `index.php` normally -
+  which is what made it look like a rule of the host rather than the
+  project's own file.
+
+  The deny is conditioned on the path resolving to something on disk now,
+  which is the line `router.php` and the nginx recipe in
+  `docs/deployment.md` both already drew: a dot path that is a file stays
+  denied, a dot path that is a route reaches the front controller.
+
+  Measured against Apache 2.4.58 with the shipped file, before and after:
+  `/.nino/auth/login`, `/.form`, `/.newsletter`, `/.protected` and
+  `/.demo-catalogue` went from `403` to reaching `index.php`; `/.gitignore`
+  and `/.git/config` stayed `403`; `/.cache/style.css` and `/.demo/…` are
+  served as before. `<If>` needs no override class the file did not already
+  need - `CGIPassAuth` above requires `AuthConfig`, and without that the
+  file 500s there long before reaching this.
+
 - **A development install answered 200 for a crash.** With
   `/nino/error/display` on, the handler echoed its dump and `exit`ed - and the
   `header()` that sets the 500 sat after that branch, so it never ran. An

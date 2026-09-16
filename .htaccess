@@ -39,9 +39,30 @@ SetEnv NINO_HTACCESS 1
 # is denied by private/.htaccess, with self-exiting .php stubs as an additional
 # safeguard (see docs/development.md's "Outputs and Uploads", and the
 # go-live checklist in docs/deployment.md).
-<FilesMatch "^\.">
-	Require all denied
-</FilesMatch>
+#
+# Conditioned on the request resolving to something on disk, which is the line
+# router.php and the nginx recipe in docs/deployment.md both already draw.
+# Without that condition this denied Nino's own dot *routes* as well - and a
+# route is not a file at all. Measured against Apache 2.4.58 with this file:
+# POST /.nino/auth/login answered 403 before php ever saw it, and so did
+# /.form, /.newsletter, /.protected and /.demo-catalogue. That is the
+# workbench login, the contact form, the newsletter and the protected area,
+# on every Apache install this file applies to.
+#
+# The error log names the mechanism: "client denied by server configuration:
+# <docroot>/.nino". Apache stops the directory walk at the first component
+# that does not exist and tests <FilesMatch> against that one, so '.nino'
+# matched the pattern although the request was for '/.nino/auth/login'.
+#
+# <If> asks for no override class this file did not already need: CGIPassAuth
+# above needs AuthConfig, and with that granted the expression is accepted -
+# measured with AllowOverride "FileInfo Options Indexes AuthConfig Limit",
+# where removing AuthConfig 500s on CGIPassAuth long before reaching this.
+<If "-f %{REQUEST_FILENAME} || -d %{REQUEST_FILENAME}">
+	<FilesMatch "^\.">
+		Require all denied
+	</FilesMatch>
+</If>
 
 # ...and the contents of a dot *directory*, which the rule above cannot see:
 # it matches filenames, so a checkout's .git/config reads as a plain "config"
