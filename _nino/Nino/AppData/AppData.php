@@ -105,6 +105,13 @@ namespace Nino {
 			// the tcp peer is the visitor and X-Forwarded-For is ignored
 			// entirely (see \Nino\Http::getClientIp())
 			'/nino/http/proxies'	=> [],
+			// webp for every derived image, where this gd can write one.
+			// Smaller than both formats it replaces, at the same quality:
+			// lossless where the alternative was png and lossy where it was
+			// jpeg (see \Nino\Images::_render()). False keeps png and jpeg -
+			// for a project that has to serve a client older than webp, or a
+			// pipeline downstream that expects those two names
+			'/nino/images/webp'		=> true,
 			'/nino/auth/user'			=> [],
 			'/nino/auth/roles'		=> [],
 			// What the Features panel records per installed feature: the

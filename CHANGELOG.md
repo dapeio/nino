@@ -292,6 +292,32 @@ All notable changes to Nino are documented in this file.
   field whose text was not persisted. The guard queries the whole `#text-form`
   wrapper now.
 
+- **Every derived image is a webp now.** webp is not a third option beside png
+  and jpeg - it is a better container for both answers the encoder was already
+  giving. So the branch stays exactly as it was, and only what it writes
+  changes: lossless where png would have been, lossy where jpeg would have
+  been. Measured on this gd, 1600x1000:
+
+  | | png | jpeg | webp |
+  | --- | --- | --- | --- |
+  | a photograph | 2930 KB | 199 KB | **151 KB** lossy |
+  | line art | 24 KB | 242 KB | **1 KB** lossless |
+
+  Not lossy for both: on line art that is 67 KB here, larger than png and soft
+  into the bargain, which is the whole reason the branch exists. Lossless also
+  carries the alpha channel, so nothing is given up on the png side either.
+
+  A gd that cannot write webp keeps png and jpeg, as does a project that sets
+  `'/nino/images/webp' => false` - for a client older than webp, or a pipeline
+  downstream that expects those two names. The shipped `.htaccess` declares
+  `image/webp` for a host whose own `mime.types` predates it; php's development
+  server answers the type by itself, and nginx has carried it since 1.11.
+
+  A side effect worth having: a re-upload that used to change the output format
+  changed the filename with it, and the panel had to delete the orphan. Both
+  branches write `.webp` now, so a replacement overwrites in place and there is
+  no orphan to miss.
+
 - **Every webp upload was stored as a png, twelve times its size.** The output
   format was chosen from the source type: png, gif and webp all *can* carry
   transparency, so all three were answered with png. For png and gif that guess

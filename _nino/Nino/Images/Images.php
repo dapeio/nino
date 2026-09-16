@@ -242,8 +242,30 @@ namespace Nino {
 			imagecopyresampled( $canvas, $source, 0, 0, $cropX, $cropY, $targetWidth, $targetHeight, $cropWidth, $cropHeight );
 			imagedestroy( $source );
 
+			/*	webp replaces both formats rather than the decision between them.
+				The branch above stays exactly as it was - it is a good guess at
+				the content, and webp is simply a better container for either
+				answer. Measured on this gd, 1600x1000:
+
+				  a photograph    png 2930 KB | jpeg  199 KB | webp lossy     151 KB
+				  line art        png   24 KB | jpeg  242 KB | webp lossless    1 KB
+
+				So lossless where png would have been - no quality lost at all,
+				and the alpha channel comes with it - and lossy where jpeg would
+				have been. Not lossy for both: on line art it is 67 KB here, worse
+				than png and soft into the bargain, which is the whole reason that
+				branch exists.
+
+				A gd without webp, or a project that switched it off, writes the
+				two formats it always did.	*/
+			$webp = ( $appData['/nino/images/webp'] ?? true ) === true
+				&& function_exists( 'imagewebp' ) === true
+				&& ( imagetypes() & IMG_WEBP ) !== 0;
+
 			ob_start();
-			if( $keepAlpha === true ) {
+			if( $webp === true ) {
+				imagewebp( $canvas, null, $keepAlpha === true ? IMG_WEBP_LOSSLESS : 82 );
+			} elseif( $keepAlpha === true ) {
 				imagepng( $canvas, null, 8 );
 			} else {
 				// Progressive encoding (renders a low-res pass immediately, then
@@ -264,7 +286,7 @@ namespace Nino {
 			// predictable from the slot alone and every re-upload orphans a file
 			$suffix = $mode === 'fit' ? ( '.fit'. $width. 'x'. $height ) : ( '.'. $width. 'x'. $height );
 
-			$filename = $basePath. $suffix. ( $keepAlpha ? '.png' : '.jpg' );
+			$filename = $basePath. $suffix. ( $webp === true ? '.webp' : ( $keepAlpha ? '.png' : '.jpg' ) );
 
 			if( \Nino\Filesystem::putFileContent( $appData, self::UPLOAD_DIR. '/'. $filename, $encoded ) === false )
 				return false;

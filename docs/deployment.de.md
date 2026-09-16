@@ -159,7 +159,8 @@ curl -sSI https://…/ | grep -i 'content-security-policy\|content-type'
 - **`_admin/install/library/` vollständig sperren** – es ist das, woraus der Assistent ein Projekt kopiert, serverseitige Quelle ohne irgendetwas Öffentliches darin; dasselbe gilt für die Section-Presets unter `features/Templates/library/`, wo ein Projekt sie liegen hat, das den Template-Baukasten installiert hat;
 - Verzeichnisauflistung deaktivieren;
 - den HTTP-Header `Authorization` an PHP weitergeben. Bei nginx/PHP-FPM ist dafür normalerweise `fastcgi_param HTTP_AUTHORIZATION $http_authorization;` in der PHP-Location erforderlich;
-- PHP-Quell- und Datendateien nicht als Text ausliefern.
+- PHP-Quell- und Datendateien nicht als Text ausliefern;
+- `.webp` als `image/webp` ausliefern – der Kernel schreibt jedes abgeleitete Bild als eines, wo GD das kann, und nginx führt den Typ seit 1.11 in seiner eigenen `mime.types`.
 
 Für nginx ist das ein `server`-Block. Auszufüllen ist nur der PHP-FPM-Socket – alles andere ist auf jedem Host dasselbe:
 

@@ -483,6 +483,14 @@ echo "\n";
 
 echo "Elements::apiUploadImage\n";
 
+/*	Both upload sections below run with '/nino/images/webp' off. The panel
+	logic under test is the part that deletes the previous file when a re-upload
+	lands under a different name, and that only ever happens on the png/jpeg
+	fallback - with webp on, both branches write .webp and a replacement
+	overwrites in place. The one webp case each section needs is checked
+	explicitly at its end	*/
+$appData['/nino/images/webp'] = false;
+
 /**
  *	Write a small solid-color image to a real temp file and populate $_FILES['file']
  *	as if it had actually been uploaded - apiUploadImage() reads it via
@@ -557,6 +565,18 @@ check( 'a same-format replacement overwrites the same deterministic path, not a 
 [ $status3, $body3 ] = callUploadImage( $appData, [ 'type' => 'imagedemo', 'uri' => 'item1', 'locale' => 'de_DE', 'key' => 'photo' ], true );
 check( 'switching output format succeeds and yields a differently-named file', $status3 === 200 && ( $body3['filename'] ?? null ) === 'elements/imagedemo/item1.40x40.png' );
 check( 'the old .jpg is deleted once the new .png is committed (no orphan across a format change)', is_file( $uploadPath ) === false );
+
+/*	With webp on there is no format change left to orphan anything: the branch
+	that used to pick between png and jpeg now picks between two webp encodings
+	under one name, so a replacement always overwrites in place	*/
+if( function_exists( 'imagewebp' ) === true && ( imagetypes() & IMG_WEBP ) !== 0 ) {
+	$appData['/nino/images/webp'] = true;
+	[ $statusWebp, $bodyWebp ] = callUploadImage( $appData, [ 'type' => 'imagedemo', 'uri' => 'item1', 'locale' => 'de_DE', 'key' => 'photo' ] );
+	check( 'with webp on the upload is a webp', $statusWebp === 200 && ( $bodyWebp['filename'] ?? null ) === 'elements/imagedemo/item1.40x40.webp' );
+	[ $statusWebp2, $bodyWebp2 ] = callUploadImage( $appData, [ 'type' => 'imagedemo', 'uri' => 'item1', 'locale' => 'de_DE', 'key' => 'photo' ], true );
+	check( '...and a source that would have changed the format keeps the same name, so nothing is orphaned', $statusWebp2 === 200 && ( $bodyWebp2['filename'] ?? null ) === ( $bodyWebp['filename'] ?? '' ) );
+	$appData['/nino/images/webp'] = false;
+}
 
 // process() overwrites the deterministic path before updateElement() gets a
 // chance to run its veto callback. A rejected same-format update must restore

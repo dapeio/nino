@@ -160,7 +160,8 @@ Transfer the same behavior explicitly to the server configuration:
 - **deny `_admin/install/library/` entirely** — it is what the wizard copies a project out of, server-side source with nothing public in it; the same goes for the section presets under `features/Templates/library/`, where a project that installed the Template Builder keeps them;
 - disable directory listing;
 - forward the HTTP `Authorization` header to PHP. With nginx/PHP-FPM this normally requires `fastcgi_param HTTP_AUTHORIZATION $http_authorization;` in the PHP location;
-- do not deliver PHP source and data files as text.
+- do not deliver PHP source and data files as text;
+- serve `.webp` as `image/webp` - the kernel writes every derived image as one wherever gd can, and nginx has carried the type in its own `mime.types` since 1.11.
 
 For nginx that is one `server` block. Only the PHP-FPM socket is yours to fill in - everything else is the same on every host:
 

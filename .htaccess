@@ -26,6 +26,14 @@ CGIPassAuth On
 	RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
 </IfModule>
 
+# Every derived image is a webp where the server's gd can write one (see
+# \Nino\Images and '/nino/images/webp'), so the type has to be named. Every
+# mime.types of the last decade carries it and this line then changes nothing;
+# an older host without it would hand the file back as a download instead of
+# drawing it. Needs no override class this file does not already need -
+# AllowOverride FileInfo is what the RewriteRule above runs under.
+AddType image/webp .webp
+
 # Whether this file is read at all - the question behind every "the login does
 # not work" and every "why is private/ being served". AllowOverride can switch
 # the whole file off silently, and a rule that is not applied looks exactly

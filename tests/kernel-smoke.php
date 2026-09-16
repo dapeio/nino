@@ -598,6 +598,13 @@ echo "\n";
 
 echo "Images::process / delete\n";
 
+/*	Everything down to the webp-output block runs with '/nino/images/webp'
+	off, so the png/jpeg fallback - what a gd without webp writes, and what a
+	project that switched it off gets - keeps being exercised in full. The
+	alpha reader is what picks between those two, so it is visible here rather
+	than hidden behind one container that fits both	*/
+$appData['/nino/images/webp'] = false;
+
 /**
  *	Build raw jpeg/png bytes for a solid-color test image
  *
@@ -704,6 +711,38 @@ if( function_exists( 'imagewebp' ) === true && ( imagetypes() & IMG_WEBP ) !== 0
 	check( '...and bytes that are no longer a decodable image are refused outright', $webpTruncated === false );
 } else {
 	check( 'this php has no webp support, so the container reader is not exercised here', true );
+}
+
+/*	And with it on, which is the default: webp replaces both formats rather
+	than the decision between them. The branch stays, the container changes -
+	lossless where png would have been (no quality lost, alpha carried along),
+	lossy where jpeg would have been. The written file says which: a lossless
+	webp is a 'VP8L' chunk, a lossy one 'VP8 ' or 'VP8X'	*/
+if( function_exists( 'imagewebp' ) === true && ( imagetypes() & IMG_WEBP ) !== 0 ) {
+
+	$appData['/nino/images/webp'] = true;
+	$webpChunkOf = static function( string $filename ) use ( &$appData ): string {
+		return substr( (string) @file_get_contents( \Nino\Filesystem::path( $appData, '/images/'. $filename ) ), 12, 4 );
+	};
+
+	$outPhoto = \Nino\Images::process( $appData, $wideSource, 100, 100, 'elements/demo/out-photo' );
+	check( 'with webp on, a source that would have been jpeg is written as webp', $outPhoto === 'elements/demo/out-photo.100x100.webp' );
+	check( '...lossy, the way jpeg was', in_array( $webpChunkOf( (string) $outPhoto ), [ 'VP8 ', 'VP8X' ], true ) === true );
+	\Nino\Images::delete( $appData, (string) $outPhoto );
+
+	$outArt = \Nino\Images::process( $appData, makeTestImage( 100, 100, true ), 50, 50, 'elements/demo/out-art' );
+	check( '...and one that would have been png is webp too', $outArt === 'elements/demo/out-art.50x50.webp' );
+	check( '...lossless, so the edges png was chosen for stay sharp and the alpha channel survives', $webpChunkOf( (string) $outArt ) === 'VP8L' );
+	\Nino\Images::delete( $appData, (string) $outArt );
+
+	$appData['/nino/images/webp'] = false;
+	$outOff = \Nino\Images::process( $appData, $wideSource, 100, 100, 'elements/demo/out-off' );
+	check( '...and switching it off in config.php brings jpeg back, name and all', $outOff === 'elements/demo/out-off.100x100.jpg' );
+	\Nino\Images::delete( $appData, (string) $outOff );
+
+} else {
+	check( 'this php writes no webp, so the kernel keeps png and jpeg by itself', \Nino\Images::process( $appData, $wideSource, 100, 100, 'elements/demo/out-none' ) === 'elements/demo/out-none.100x100.jpg' );
+	\Nino\Images::delete( $appData, 'elements/demo/out-none.100x100.jpg' );
 }
 
 check( 'process() rejects bytes that are not a valid image', \Nino\Images::process( $appData, 'not an image', 100, 100, 'elements/demo/item3' ) === false );
@@ -2267,6 +2306,14 @@ check( 'the shipped .htaccess carries both halves of the Apache workaround, and 
 	draws for the development server */
 check( 'the shipped .htaccess names the index file that answers "/"',
 	str_contains( $htaccess, 'DirectoryIndex index.php' ) === true );
+
+/*	\Nino\Images writes a webp wherever gd can, so the file has to say what
+	that is: every mime.types of the last decade carries the type and the line
+	then changes nothing, but an older host without it hands the image back as
+	a download. Php's own development server needs no help here - it answers
+	image/webp by itself, which is why router.php carries no counterpart	*/
+check( '...and declares the type of the images the kernel writes',
+	str_contains( $htaccess, 'AddType image/webp .webp' ) === true );
 check( '...and forwards everything that is neither file nor directory to it',
 	str_contains( $htaccess, 'RewriteCond %{REQUEST_FILENAME} !-f' ) === true
 	&& str_contains( $htaccess, 'RewriteCond %{REQUEST_FILENAME} !-d' ) === true
