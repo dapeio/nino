@@ -53,7 +53,7 @@ Die mitgelieferte `.htaccess` setzt diese grundlegenden Regeln, sofern der Serve
 - Dateien mit einem führenden Punkt werden nicht direkt ausgeliefert.
 - Verzeichnisse ohne Indexdatei zeigen keine Dateiliste.
 - Der HTTP-Header `Authorization` erreicht PHP, damit der Login unter `/_admin` seine Basic-Zugangsdaten lesen kann. Apache verbirgt diesen Header normalerweise vor CGI-/FastCGI-Skripten. Dagegen stehen zwei Regeln in der Datei: `CGIPassAuth On` und – für die Fälle, in denen das nicht reicht – eine `RewriteRule`, die den Header in eine Umgebungsvariable kopiert. Die Direktive setzt Apache 2.4.13 oder neuer voraus; eine ältere Version beantwortet jede Anfrage mit einem 500, weil sie sie nicht kennt – dort gehört genau diese eine Zeile entfernt, die Rewrite-Regel trägt den Rest.
-- `SetEnv NINO_HTACCESS 1` – daran erkennst Du, ob überhaupt etwas davon angewendet wird.
+- `SetEnv NINO_HTACCESS 1`. Eine `1` in `$_SERVER` beweist, dass die Datei angewendet wird. Ihr Fehlen beweist nichts: Manche FastCGI-Aufbauten und PHP-Wrapper reichen `SetEnv` nie an das Skript durch und lassen die Variable leer, obwohl jede Regel oben greift. Die Sonde weiter unten klärt diese Richtung von außen.
 
 #### Alles außer `/` und `/_admin/` antwortet mit 500
 
@@ -96,6 +96,8 @@ curl -sS -i -X POST https://…/.nino/auth/login | head -20
 
 Ein `403` mit einem `Content-Security-Policy`-Header ist Ninos eigener CSRF-Schutz – die Anfrage hat den Kernel erreicht. Ein `403` ohne einen solchen Header hat ihn nie erreicht, und die Adresse wird vor PHP abgewiesen: das Punkt-Segment ist der übliche Grund.
 
+Das Login-Formular liest denselben Header und sagt, welcher von beiden es war – wer davorsitzt, wird also entweder zum Neuladen aufgefordert oder erfährt, dass es eine Servereinstellung ist. Das `curl` oben bestätigt das von außen, es ist nicht der Weg, es herauszufinden.
+
 **In einem Checkout vor dieser Korrektur ist dieser Grund die mitgelieferte `.htaccess` selbst.** Ihre Dotfile-Sperre stand als nacktes `<FilesMatch "^\.">` darin, und Apache bricht den Verzeichnisdurchlauf bei der ersten nicht vorhandenen Komponente ab und prüft genau diese: `/.nino/auth/login` wurde als `.nino` gesperrt, `/.form` als `.form`. Beide antworteten mit `403`, bevor PHP sie sah – auf jeder Apache-Installation, für die die Datei gilt –, während jede gewöhnliche Adresse normal bei `index.php` ankam. Genau das lässt es wie eine Regel des Hosts aussehen. Die Sperre ist jetzt daran gebunden, dass der Pfad auf der Platte existiert, dieselbe Linie, die `router.php` und der nginx-Block weiter unten längst ziehen. Die `.htaccess` austauschen ist die ganze Korrektur; weder am Projekt noch am Host muss etwas geändert werden.
 
 Der `401` ist der Rest dieses Abschnitts. Das Symptom ist immer dasselbe: `/_admin` antwortet mit `401` auf korrekte Zugangsdaten. Die Ursache ist, dass das Zugangspaar nie bei PHP angekommen ist. Diese Probe sagt, an welcher der drei Stellen es fehlt:
@@ -116,11 +118,12 @@ So liest man sie:
 
 | | |
 | --- | --- |
-| `NINO_HTACCESS` ist `NULL` | Die `.htaccess` wird gar nicht angewendet – `AllowOverride` ist für dieses Verzeichnis aus. Das zuerst reparieren: Dieselbe Datei hält Dotfiles, `.git/` und den ganzen `private/`-Baum vom Ausliefern ab, das ist also eine Frage von Datenabfluss, bevor es eine Frage des Logins ist |
+| `NINO_HTACCESS` ist `1` | Die `.htaccess` wird angewendet. Der Rest dieser Tabelle betrifft dann nur noch den Header |
+| `NINO_HTACCESS` ist `NULL` | Unentschieden, nicht negativ. Ein FastCGI-Aufbau oder ein PHP-Wrapper, der `SetEnv` verwirft, lässt die Variable leer, obwohl jede Regel der Datei greift – also von außen klären, mit einer Adresse, die es sicher nicht gibt: `curl -sSI https://…/gibt-es-garantiert-nicht-12345`. Ninos eigene 404-Seite trägt einen `Content-Security-Policy`-Header, Apaches eigene trägt keinen: Mit Policy hat die Weiterleitung gegriffen und die Datei gilt. Ohne Policy gilt sie nicht, und `AllowOverride` ist das Erste, was zu reparieren ist – dieselbe Datei hält Dotfiles, `.git/` und den ganzen `private/`-Baum vom Ausliefern ab, das ist also eine Frage von Datenabfluss, bevor es eine Frage des Logins ist |
 | `PHP_AUTH_USER` ist gesetzt | Nichts zu tun – das ist `mod_php`, der Login funktioniert |
 | `HTTP_AUTHORIZATION` ist gesetzt | `CGIPassAuth` hat seine Arbeit getan, der Login funktioniert |
 | `REDIRECT_HTTP_AUTHORIZATION` ist gesetzt | Die Rewrite-Regel hat gegriffen, und `\Nino\Http` liest diese Variable – der Login funktioniert |
-| alle drei sind `NULL`, SAPI ist `cgi` oder `cgi-fcgi` | Keine der beiden Regeln hat das Skript erreicht. Entweder wird die `.htaccess` nicht angewendet (siehe erste Zeile), oder `mod_rewrite` ist aus, oder der Hoster startet PHP über einen Wrapper, der den Header verwirft, bevor Apaches eigene Regeln greifen – dann beim Hoster `Authorization` durchreichen lassen oder `CGIPassAuth On` in den vhost setzen |
+| alle drei sind `NULL`, SAPI ist `cgi` oder `cgi-fcgi` | Keine der beiden Regeln hat das Skript erreicht. Entweder wird die `.htaccess` nicht angewendet (das klären die beiden Zeilen darüber), oder `mod_rewrite` ist aus, oder der Hoster startet PHP über einen Wrapper, der den Header verwirft, bevor Apaches eigene Regeln greifen – dann beim Hoster `Authorization` durchreichen lassen oder `CGIPassAuth On` in den vhost setzen |
 
 
 Eine separate Schutzregel liegt in `private/.htaccess` und sperrt dieses Verzeichnis vollständig. Sie ist die wichtigste: In `private/` liegen `config.php`, die Templates sowie die Texte und Elemente, aus denen sie rendern, die Daten deiner Besucher und die Stylesheet- und Skriptquellen, aus denen das Asset-Bundle gebaut wird. Ohne sie liefert ein Aufruf von `private/templates/page-home.tpl` den Template-Quelltext im Klartext aus.
@@ -371,7 +374,7 @@ Nino befindet sich in der Beta-Phase. Sicherheitskorrekturen erscheinen auf `mai
 - [ ] PHP-Version und Erweiterungen entsprechen den Anforderungen.
 - [ ] Öffentliche Routen werden korrekt an Nino übergeben.
 - [ ] Dotfiles, Dot-Verzeichnisse und PHP-Datendateien sind nicht direkt erreichbar.
-- [ ] Bei Apache: Die `.htaccess` wird tatsächlich angewendet — `$_SERVER['NINO_HTACCESS']` ist `1`. Alles darunter, was auf `.htaccess` beruht, ist sonst nichts wert.
+- [ ] Bei Apache: Die `.htaccess` wird tatsächlich angewendet — `$_SERVER['NINO_HTACCESS']` ist `1`, oder, auf einem Host, der `SetEnv` verwirft, antwortet eine nicht vorhandene Adresse mit Ninos eigener 404-Seite statt mit der des Servers. Alles darunter, was auf `.htaccess` beruht, ist sonst nichts wert.
 - [ ] `app/` und `features/` werden nicht ausgeliefert — beide tragen eine eigene `.htaccess`; prüfe es mit einer Anfrage nach einer Datei eines installierten Features, z. B. `/features/Newsletter/install/templates/mail-header.tpl`, sobald das Newsletter-Feature des Katalogs an Ort und Stelle ist – ein Checkout bringt kein Feature mit, also muss eines da sein, nach dem sich fragen lässt.
 - [ ] `private/` wird nicht ausgeliefert — die eigene `.htaccess` sperrt das Verzeichnis, und jede PHP-Datei darin trägt einen 403-Stub; prüfe, ob beides auf deinem Webserver greift, oder verlege das Verzeichnis mit `NINO_PRIVATE_DIR` aus dem Webroot. Die Templates und die Asset-Quellen sind kein PHP und haben nur die Serverregel.
 - [ ] Verzeichnisauflistung ist deaktiviert.

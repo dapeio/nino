@@ -15,6 +15,7 @@ return [
 	'[[/_admin/login/error/pw]]'		=> 'Passwort muss angegeben werden.',
 	'[[/_admin/login/error/wrong]]'	=> 'Prüfen Sie Ihre Eingabe oder verständigen Sie den Administrator.',
 	'[[/_admin/login/error/endpoint]]'=> 'Der Login-Endpunkt hat mit %s geantwortet - die Zugangsdaten wurden gar nicht geprüft. Das ist eine Serverkonfiguration, kein falsches Passwort.',
+	'[[/_admin/login/error/csrf]]'	=> 'Diese Seite ist zu lange offen, ihr Sitzungs-Token gilt nicht mehr. Laden Sie die Seite neu und melden Sie sich erneut an.',
 	'[[/_admin/login/msg/welcome]]'	=> 'Geben Sie Ihre E-Mail und Ihr Passwort an:',
 	'[[/_admin/login/msg/pending]]'	=> 'Eingabe wird geprüft.',
 

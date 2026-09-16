@@ -41,13 +41,16 @@ const textKey		= function( key ) {
 
 const WRONG			= textKey('/_admin/login/error/wrong');
 const ENDPOINT	= textKey('/_admin/login/error/endpoint');
+const CSRF			= textKey('/_admin/login/error/csrf');
 
 check( 'en_US carries the wrong-credentials message', typeof WRONG === 'string' && WRONG !== '' );
 check( 'en_US carries the endpoint message', typeof ENDPOINT === 'string' && ENDPOINT !== '' );
 check( '...and the endpoint message has a place for the status code', ENDPOINT !== null && ENDPOINT.indexOf('%s') !== -1 );
+check( 'en_US carries the stale-token message, and it asks for a reload rather than a status code', typeof CSRF === 'string' && CSRF !== '' && CSRF.indexOf('%s') === -1 );
 
 const de = fs.readFileSync( path.join( __dirname, '../_admin/text/de_DE.php' ), 'utf8' );
 check( 'de_DE carries it too', de.indexOf('[[/_admin/login/error/endpoint]]') !== -1 && de.indexOf('%s') !== -1 );
+check( '...and the stale-token message as well', de.indexOf('[[/_admin/login/error/csrf]]') !== -1 );
 
 // The form's dom, reduced to the five ids login.js reaches for
 function field() {
@@ -105,6 +108,7 @@ const sandbox = {
 		'/_admin/login/error/pw'			: 'Password is required.',
 		'/_admin/login/error/wrong'		: WRONG,
 		'/_admin/login/error/endpoint': ENDPOINT,
+		'/_admin/login/error/csrf'		: CSRF,
 		'/_admin/login/msg/pending'		: 'Checking.',
 	},
 };
@@ -124,10 +128,17 @@ check( 'it wired the form up', typeof el['form-login'].handler === 'function' );
 // The request itself is stubbed at Nino.http.sendRequest, so what is under
 // test is the branch login.js takes on the answer - not the xhr
 let sentTo = '';
-function attempt( status ) {
+function attempt( status, policy ) {
 	sandbox.Nino.http.sendRequest = function( uri, method, callback ) {
 		sentTo = uri;
-		callback( { status : status } );
+		callback( {
+			status : status,
+			// Same-origin, so the form may read the response headers - which is
+			// how it tells the kernel's own answer from the server's
+			getResponseHeader : function( name ) {
+				return name === 'Content-Security-Policy' && policy ? policy : null;
+			},
+		} );
 	};
 	el['form-message'].innerHTML = '';
 	el['form-login'].handler( { preventDefault : function() {} } );
@@ -147,6 +158,17 @@ check( '...and it is sent to the login endpoint', sentTo === '/.nino/auth/login'
 } );
 
 check( 'the status is put into the sentence rather than appended to it', attempt( 404 ) === ENDPOINT.replace( '%s', '404' ) );
+
+/*	The two 403s are not the same morning. Every answer the kernel composes
+	carries a Content-Security-Policy and a server's own error page carries
+	none, so the header says whether the request reached php at all: with one,
+	the csrf guard refused a stale token and a reload is the whole fix; without
+	one, the address never got there and no reload will help	*/
+check( 'a 403 the kernel composed is the csrf guard, and asks for a reload', attempt( 403, "default-src 'self'" ) === CSRF );
+check( '...while a 403 without the kernel\'s own header is the server refusing the address', attempt( 403 ) === ENDPOINT.replace( '%s', '403' ) );
+check( '...and the header alone never excuses another status', attempt( 404, "default-src 'self'" ) === ENDPOINT.replace( '%s', '404' )
+	&& attempt( 500, "default-src 'self'" ) === ENDPOINT.replace( '%s', '500' ) );
+check( '...nor turns a 401 into anything but a wrong password', attempt( 401, "default-src 'self'" ) === WRONG );
 
 
 // The two field guards in front of all of that are unchanged

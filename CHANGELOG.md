@@ -292,6 +292,29 @@ All notable changes to Nino are documented in this file.
   field whose text was not persisted. The guard queries the whole `#text-form`
   wrapper now.
 
+- **The login form called a server's `403` and its own the same thing.** Both
+  said "the login endpoint answered 403 - that is a server configuration",
+  which is right for one of them and sends the other looking in the wrong
+  place: a token that went stale while the page sat open is fixed by
+  reloading it, not by a hoster ticket. Every answer the kernel composes
+  carries a `Content-Security-Policy` (it is in `\Nino\Http`'s default
+  response header set) and a server's own error page carries none, and a
+  same-origin xhr may read that header - so the form reads it and says which
+  of the two it got. `docs/deployment.md` already told an operator to make
+  that distinction with `curl`; the form makes it before anyone has to.
+
+- **The deployment manual read a missing `NINO_HTACCESS` as proof.** The
+  variable is set by the shipped `.htaccess`, and the manual read its absence
+  as "the file is not applied at all - `AllowOverride` is off". That is one
+  of two causes: some FastCGI setups and PHP wrappers never pass `SetEnv`
+  through to the script and leave the variable empty while every rule in the
+  file is in force. Read the old way, a host like that sends an operator to
+  fix an `AllowOverride` that was never wrong. A `1` still proves the file
+  applies; its absence decides nothing, and the manual now names the test
+  that does - an address that certainly does not exist answers with Nino's
+  own 404 page, policy header and all, exactly when the forwarding rule
+  applies. Both manuals and the go-live checklist.
+
 - **On Apache, every address Nino owns under a dot answered `403`.** The
   shipped `.htaccess` denies dotfiles so that `.env`, `.git/config` or an
   editor backup can never be served. It did so with a bare `<FilesMatch

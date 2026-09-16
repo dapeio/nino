@@ -71,10 +71,24 @@
 							where nothing forwards an unmatched address to index.php, a
 							500 from php. Telling the person to check their input in
 							those cases sends the only one who can fix it looking in the
-							wrong place, which is a morning lost to a server setting */
+							wrong place, which is a morning lost to a server setting.
+
+							The two 403s are worth telling apart, because they are not
+							the same morning. Every answer the kernel composes carries a
+							Content-Security-Policy (it is in Http's default response
+							header set), a server's own error page carries none, and a
+							same-origin xhr may read that header. With one, the request
+							reached php and the csrf guard refused the token - stale
+							after the login page sat open, and a reload is the whole
+							fix. Without one, the address never reached php, and nothing
+							the person types will change that */
+					const fromKernel = typeof xhr.getResponseHeader === 'function'
+						&& xhr.getResponseHeader('Content-Security-Policy') !== null;
 					el.formMsg.innerHTML = xhr.status === 401
 						? Nino.content.getText('/_admin/login/error/wrong')
-						: Nino.content.getText('/_admin/login/error/endpoint').replace( '%s', String( xhr.status ) );
+						: ( xhr.status === 403 && fromKernel
+							? Nino.content.getText('/_admin/login/error/csrf')
+							: Nino.content.getText('/_admin/login/error/endpoint').replace( '%s', String( xhr.status ) ) );
 				} );
 			} );
 
