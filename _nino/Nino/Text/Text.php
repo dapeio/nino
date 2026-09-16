@@ -217,7 +217,7 @@ namespace Nino {
 			$value = substr( $value, 0, self::HARD_MAXLENGTH );
 
 			if( $html === true )
-				return \Nino\Html::sanitizeHtml( $value );
+				return self::_neutralizeShortcodes( \Nino\Html::sanitizeHtml( $value ) );
 
 			// strip_tags() answers "no markup of its own", which is the whole
 			// requirement as long as a fill lands in text content. It does not
@@ -233,7 +233,45 @@ namespace Nino {
 			// value re-saved from the editor would gain a round of escaping on
 			// every pass. Neither entity below contains a quote, so this stays
 			// idempotent.
-			return str_replace( [ '"', "'" ], [ '&quot;', '&#039;' ], strip_tags( $value ) );
+			return self::_neutralizeShortcodes( str_replace( [ '"', "'" ], [ '&quot;', '&#039;' ], strip_tags( $value ) ) );
+		}
+
+		/**
+		 *	A stored value may name another fill. It may not carry a shortcode.
+		 *
+		 *	\Nino\Html renders fills first and shortcodes after them, over the
+		 *	finished document - so whatever a value carries is read again as
+		 *	markup of the page. A fill naming another fill is deliberate and the
+		 *	shipped texts use it (see _renderFills()'s own loop), but a
+		 *	shortcode is not a word: '[template /templates/mail-owner]' stored
+		 *	in a heading puts a private template - its copy, the owner's address
+		 *	- on a public page, and '[elements /type]' empties a collection onto
+		 *	one. The Text panel is an editor's, and an editor edits words; what
+		 *	a page includes is a developer's decision.
+		 *
+		 *	So '[[/a/fill/key]]' survives and every other bracket becomes an
+		 *	entity, which renders as itself and carries no meaning on the next
+		 *	pass. Neither entity contains a bracket, so re-saving a value that
+		 *	went through here changes nothing - the same idempotence the quotes
+		 *	above rely on. AGENTS.md, "Rendering and escaping rules", is the
+		 *	standing rule; \Nino\Modules\Elements and the Search and
+		 *	ProtectedArea features already neutralize theirs.
+		 *
+		 *	@param		string		$value
+		 *
+		 *	@return 	string
+		 */
+		private static function _neutralizeShortcodes( string $value ): string {
+
+			return (string) preg_replace_callback(
+				'#\[\[/[a-zA-Z0-9/_.-]*\]\]|[\[\]]#',
+				static fn( array $match ): string => match( $match[0] ) {
+					'['			=> '&#91;',
+					']'			=> '&#93;',
+					default	=> $match[0],
+				},
+				$value
+			);
 		}
 	}
 }

@@ -292,6 +292,28 @@ All notable changes to Nino are documented in this file.
   field whose text was not persisted. The guard queries the whole `#text-form`
   wrapper now.
 
+- **An editor could put a private template on a public page.** `\Nino\Html`
+  renders fills first and shortcodes after them, over the finished document,
+  so whatever a stored textfill carries is read again as markup of that page.
+  `\Nino\Text::sanitizeValue()` stripped tags and encoded quotes but left
+  brackets alone - so `[template /templates/mail-owner]`, typed into a heading
+  in the Text panel, rendered that template to every visitor: its copy, and
+  the owner address the mail templates carry. `[elements /type]` emptied a
+  collection onto the page the same way.
+
+  The Text panel is an editor's - `/_admin/text/manage` is the permission the
+  shipped Editor role holds - and an editor edits words. What a page includes
+  is a developer's decision, so a stored value may name another fill, which is
+  deliberate and the renderer resolves it, and every other bracket is now an
+  entity. Both branches, plain and rich. Neither entity contains a bracket, so
+  a value re-saved through the panel is unchanged, the way the quotes beside
+  them already were.
+
+  `AGENTS.md` has stated the rule all along - "if untrusted content can
+  contain `[`, it can otherwise become a new fill or shortcode on the next
+  rendering pass" - and `\Nino\Modules\Elements`, Search and ProtectedArea
+  each neutralize their own. This was the one input that did not.
+
 - **Every derived image is a webp now.** webp is not a third option beside png
   and jpeg - it is a better container for both answers the encoder was already
   giving. So the branch stays exactly as it was, and only what it writes

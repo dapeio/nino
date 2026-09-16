@@ -394,6 +394,32 @@ $result = saveText( $appData, [
 
 check( 'a non-html key has all tags stripped, not sanitized-and-kept', ( $result['value'] ?? '' ) === 'Acme Corp x' );
 
+/*	A word is a word. \Nino\Html renders fills first and shortcodes after them,
+	over the finished document, so whatever a stored value carries is read
+	again as markup of the page: '[template /templates/mail-owner]' typed into
+	a heading put a private template - its copy, the owner's address - onto a
+	public page, and the Text panel is an editor's. Naming another fill stays
+	allowed; it is deliberate and the renderer resolves it	*/
+$result = saveText( $appData, [
+	'key'			=> '/home/plain',
+	'locale'	=> 'de_DE',
+	'value'		=> 'Lies [template /templates/mail-owner] und [elements /people] - siehe [[/company/name]]',
+] );
+check( 'a shortcode typed into a textfill is stored as an entity, not as a shortcode', ( $result['value'] ?? '' ) === 'Lies &#91;template /templates/mail-owner&#93; und &#91;elements /people&#93; - siehe [[/company/name]]' );
+check( '...so rendering the page shows the words instead of running them', str_contains(
+	\Nino\Html::renderHtml( $appData, '[[/home/plain]]' ), '[template /templates/mail-owner]'
+) === false );
+$result = saveText( $appData, [ 'key' => '/home/plain', 'locale' => 'de_DE', 'value' => (string) ( $result['value'] ?? '' ) ] );
+check( '...and saving that value again changes nothing - the entities carry no bracket', ( $result['value'] ?? '' ) === 'Lies &#91;template /templates/mail-owner&#93; und &#91;elements /people&#93; - siehe [[/company/name]]' );
+
+$result = saveText( $appData, [
+	'key'			=> '/home/h2',
+	'locale'	=> 'de_DE',
+	'value'		=> '<strong>Fett</strong> und [template /templates/mail-owner]',
+] );
+check( 'a rich field is held to the same line, after its own sanitizer ran', str_contains( (string) ( $result['value'] ?? '' ), '&#91;template' ) === true
+	&& str_contains( (string) ( $result['value'] ?? '' ), '<strong>Fett</strong>' ) === true );
+
 $result = saveText( $appData, [ 'key' => '/company/name', 'locale' => '*', 'value' => 'New Co' ] );
 check( 'saving a global key succeeds', $result['ok'] === true );
 $storedGlobal = \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] );
