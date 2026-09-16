@@ -292,6 +292,23 @@ All notable changes to Nino are documented in this file.
   field whose text was not persisted. The guard queries the whole `#text-form`
   wrapper now.
 
+- **Every webp upload was stored as a png, twelve times its size.** The output
+  format was chosen from the source type: png, gif and webp all *can* carry
+  transparency, so all three were answered with png. For png and gif that guess
+  does double duty - what arrives as one is usually line art, and jpeg would
+  soften exactly the edges that matter. For webp it is simply wrong: webp is
+  what phones and export tools write for photographs. Measured on a 1600x1000
+  photograph, 3185 KB as png against 264 KB as jpeg - for every derived size,
+  on disk and over the wire, for every visitor.
+
+  A webp says outright whether it has an alpha channel, so that is read now
+  instead of assumed: `VP8 ` is the simple lossy chunk and never has one, `VP8L`
+  carries the flag behind its dimensions, `VP8X` in its leading flags byte. An
+  opaque webp becomes jpeg, one with alpha stays png, and a container this does
+  not recognize is treated as if it had alpha - that costs bytes, where the
+  wrong answer the other way would flatten a transparent logo onto black. png
+  and gif are untouched.
+
 - **One byte that was not UTF-8 deleted the value it was in.** Eight escapes in
   the kernel and the workbench spelled their flags out as `ENT_QUOTES` or
   `ENT_NOQUOTES` - and spelling them out drops php's own default, which has

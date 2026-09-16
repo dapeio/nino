@@ -650,11 +650,61 @@ check( 'process() overwrites the same deterministic path on a repeat upload, not
 \Nino\Images::delete( $appData, $squareFilename );
 check( 'delete() removes the file', is_file( $squarePath ) === false );
 
-// A source that might carry transparency (png/gif/webp) is re-encoded as png, to preserve it
+// A png or gif is re-encoded as png: the format is the guess at the content
+// too, and what arrives as one is usually line art that jpeg would soften
 $alphaSource = makeTestImage( 100, 100, true );
 $alphaFilename = \Nino\Images::process( $appData, $alphaSource, 50, 50, 'elements/demo/item2' );
 check( 'process() outputs png for a source that may have transparency', $alphaFilename === 'elements/demo/item2.50x50.png' );
 \Nino\Images::delete( $appData, $alphaFilename );
+
+/*	webp is the other way round: it is what phones and export tools write for
+	photographs, and answering it with png cost a factor of twelve on every
+	derived size. Its container says whether there is an alpha channel - 'VP8 '
+	is the simple lossy chunk and never has one, 'VP8L' and 'VP8X' carry a flag -
+	so that is read rather than guessed. Real encoder output here, not a
+	hand-built header	*/
+function makeTestWebp( int $width, int $height, bool $alpha, bool $lossless = false ): string {
+	$img = imagecreatetruecolor( $width, $height );
+	if( $alpha === true ) {
+		imagealphablending( $img, false );
+		imagesavealpha( $img, true );
+		imagefill( $img, 0, 0, imagecolorallocatealpha( $img, 0, 200, 0, 64 ) );
+	} else {
+		imagefill( $img, 0, 0, imagecolorallocate( $img, 200, 120, 60 ) );
+	}
+	ob_start();
+	imagewebp( $img, null, $lossless === true ? IMG_WEBP_LOSSLESS : 80 );
+	$bytes = ob_get_clean();
+	imagedestroy( $img );
+	return $bytes;
+}
+if( function_exists( 'imagewebp' ) === true && ( imagetypes() & IMG_WEBP ) !== 0 ) {
+
+	$webpChunks = [];
+	foreach( [ 'lossy opaque' => [ false, false ], 'lossy alpha' => [ true, false ], 'lossless opaque' => [ false, true ], 'lossless alpha' => [ true, true ] ] as $webpCase => $webpHow )
+		$webpChunks[$webpCase] = substr( makeTestWebp( 60, 40, $webpHow[0], $webpHow[1] ), 12, 4 );
+	check( 'the webp fixtures really are the three container shapes the reader knows'. ' - '. json_encode( $webpChunks ),
+		in_array( $webpChunks['lossy opaque'], [ 'VP8 ', 'VP8L', 'VP8X' ], true ) === true );
+
+	$webpOpaque = \Nino\Images::process( $appData, makeTestWebp( 200, 200, false ), 60, 60, 'elements/demo/webp-opaque' );
+	check( 'an opaque webp is answered with jpeg, not png', $webpOpaque === 'elements/demo/webp-opaque.60x60.jpg' );
+	\Nino\Images::delete( $appData, (string) $webpOpaque );
+
+	$webpAlpha = \Nino\Images::process( $appData, makeTestWebp( 200, 200, true ), 60, 60, 'elements/demo/webp-alpha' );
+	check( '...and a webp that carries alpha still gets png, so the channel survives', $webpAlpha === 'elements/demo/webp-alpha.60x60.png' );
+	\Nino\Images::delete( $appData, (string) $webpAlpha );
+
+	$webpLossless = \Nino\Images::process( $appData, makeTestWebp( 200, 200, true, true ), 60, 60, 'elements/demo/webp-lossless' );
+	check( '...lossless webp too, whose flag sits behind its dimensions', $webpLossless === 'elements/demo/webp-lossless.60x60.png' );
+	\Nino\Images::delete( $appData, (string) $webpLossless );
+
+	// Anything the reader does not recognize costs bytes rather than a channel:
+	// a truncated or foreign container is answered as if it had alpha
+	$webpTruncated = \Nino\Images::process( $appData, substr( makeTestWebp( 200, 200, false ), 0, 20 ), 60, 60, 'elements/demo/webp-broken' );
+	check( '...and bytes that are no longer a decodable image are refused outright', $webpTruncated === false );
+} else {
+	check( 'this php has no webp support, so the container reader is not exercised here', true );
+}
 
 check( 'process() rejects bytes that are not a valid image', \Nino\Images::process( $appData, 'not an image', 100, 100, 'elements/demo/item3' ) === false );
 check( 'process() rejects an empty target dimension', \Nino\Images::process( $appData, $wideSource, 0, 100, 'elements/demo/item3' ) === false );

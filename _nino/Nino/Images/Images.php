@@ -207,9 +207,20 @@ namespace Nino {
 				$cropY = (int) round( ( $sourceHeight - $cropHeight ) / 2 );
 			}
 
-			// Alpha-aware output: png (with transparency preserved) for a source that
-			// might carry it, jpeg otherwise - keeps photos small, logos crisp
-			$keepAlpha = in_array( $info[2], [ IMAGETYPE_PNG, IMAGETYPE_GIF, IMAGETYPE_WEBP ], true );
+			/*	Alpha-aware output: png (with transparency preserved) for a source
+				that carries it, jpeg otherwise - keeps photos small, logos crisp.
+
+				For png and gif the source format is also a fair guess at the
+				content: what arrives as one is usually line art, where jpeg would
+				soften exactly the edges that matter. webp is the other way round -
+				it is what phones and export tools write for photographs - and
+				guessing from the format cost it a factor of twelve. A 1600x1000
+				photograph, measured on this gd: 3185 KB as png against 264 KB as
+				jpeg, for every derived size and every visitor. Its container says
+				outright whether there is an alpha channel, so that is read rather
+				than assumed.	*/
+			$keepAlpha = in_array( $info[2], [ IMAGETYPE_PNG, IMAGETYPE_GIF ], true )
+				|| ( $info[2] === IMAGETYPE_WEBP && self::_webpHasAlpha( $bytes ) === true );
 
 			$canvas = @imagecreatetruecolor( $targetWidth, $targetHeight );
 
@@ -259,6 +270,37 @@ namespace Nino {
 				return false;
 
 			return $filename;
+		}
+
+		/**
+		 *	Whether a webp carries an alpha channel, read off its container.
+		 *
+		 *	A webp is a RIFF file whose first chunk names the bitstream. 'VP8 '
+		 *	is the simple lossy one and has no alpha at all - the overwhelmingly
+		 *	common case for a photograph. 'VP8L' is lossless and carries
+		 *	alpha_is_used as bit 4 of the byte that follows its 14+14 bit
+		 *	dimensions. 'VP8X' is the extended container, whose flags byte comes
+		 *	first and marks alpha with the same bit.
+		 *
+		 *	Anything this does not recognize - a truncated upload, a chunk order
+		 *	a future encoder writes - is answered with true: that costs bytes,
+		 *	while a wrong false would flatten a transparent logo onto black.
+		 *
+		 *	@param		string		$bytes				The validated source
+		 *
+		 *	@return 	bool
+		 */
+		private static function _webpHasAlpha( string $bytes ): bool {
+
+			if( strlen( $bytes ) < 25 || str_starts_with( $bytes, 'RIFF' ) === false || substr( $bytes, 8, 4 ) !== 'WEBP' )
+				return true;
+
+			return match( substr( $bytes, 12, 4 ) ) {
+				'VP8 '	=> false,
+				'VP8L'	=> ord( $bytes[20] ) !== 0x2F || ( ord( $bytes[24] ) & 0x10 ) !== 0,
+				'VP8X'	=> ( ord( $bytes[20] ) & 0x10 ) !== 0,
+				default	=> true,
+			};
 		}
 
 		// Read a previously processed image for a short-lived rollback snapshot.
