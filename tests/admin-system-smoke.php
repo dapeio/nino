@@ -62,7 +62,6 @@ $appData['./nino/filesystem/path']	= $sandbox;
 // Mirrors \Nino\init()'s fixed private/public split.
 $appData['./nino/filesystem/configpath']	= $sandbox. '/private';
 $appData['./nino/filesystem/contentpath']	= $sandbox. '/private';
-$appData['./nino/filesystem/privatepath'] = $sandbox. '/private';
 $appData['./nino/filesystem/publicpath'] 	= $sandbox. '/public';
 $appData['/nino/dir']		= '';
 $appData['/nino/locales/native']		= 'de_DE';
@@ -540,7 +539,6 @@ $appData = [ "./nino/uid" => '. var_export( $sandbox, true ). ' ];
 $appData["./nino/filesystem/path"]				= '. var_export( $sandbox, true ). ';
 $appData["./nino/filesystem/configpath"]	= '. var_export( $sandbox. '/private', true ). ';
 $appData["./nino/filesystem/contentpath"] = '. var_export( $sandbox. '/private', true ). ';
-$appData["./nino/filesystem/privatepath"] = '. var_export( $sandbox. '/private', true ). ';
 $appData["./nino/filesystem/publicpath"]	= '. var_export( $sandbox. '/public', true ). ';
 $appData["/nino/dir"] = "";
 \Nino\AppData::init( $appData );
@@ -676,7 +674,6 @@ $outAppData = [ './nino/uid' => $outSandbox ];
 $outAppData['./nino/filesystem/path']			= $outSandbox;
 $outAppData['./nino/filesystem/configpath']	= $outConfigDir; // simulates NINO_CONFIG_DIR
 $outAppData['./nino/filesystem/contentpath']	= $outSandbox. '/private';
-$outAppData['./nino/filesystem/privatepath']	= $outSandbox. '/private';
 $outAppData['./nino/filesystem/publicpath']	= $outSandbox. '/public';
 $outAppData['/nino/dir']										= '';
 $outAppData['/nino/locales/native']				= 'de_DE';

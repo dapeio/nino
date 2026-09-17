@@ -16,8 +16,19 @@ namespace Nino {
 
 		public static function registerCallback( array &$appData, string $name, mixed $callback, int $prio = 5 ): void {
 
-			if( is_callable( $callback ) === false )
+			/*	Said out loud rather than dropped in silence. A hook is a string
+				and a callable, and both are easy to get slightly wrong - a
+				method renamed and one registration left behind, a typo in
+				'callbackRespones'. The registration then did nothing, the hook
+				never fired, and there was no line anywhere saying why: the
+				symptom is a feature that quietly does not work.
+				E_USER_WARNING is the kernel's "record this and carry on"
+				channel (see \Nino\Runtime::NON_FATAL_LEVELS), so the request
+				still finishes - a bad callback must not take the page down	*/
+			if( is_callable( $callback ) === false ) {
+				trigger_error( 'Nino: the callback registered for \''. $name. '\' is not callable and was not registered.', E_USER_WARNING );
 				return;
+			}
 
 			$appData['./nino/callbacks'][$name] = $appData['./nino/callbacks'][$name] ?? [[],[],[],[],[],[],[],[],[],[]];
 

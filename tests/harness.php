@@ -74,7 +74,6 @@ function ninoSandbox( string $name ): array {
 	$appData['./nino/filesystem/path']				= $sandbox;
 	$appData['./nino/filesystem/configpath']	= $sandbox. '/private';
 	$appData['./nino/filesystem/contentpath']	= $sandbox. '/private';
-	$appData['./nino/filesystem/privatepath']	= $sandbox. '/private';
 	$appData['./nino/filesystem/publicpath']	= $sandbox. '/public';
 	$appData['./nino/locales/current']				= 'de_DE';
 	$appData['/nino/locales/native']					= 'de_DE';

@@ -212,11 +212,10 @@
 
 				select.value = Nino.admin.submissions._form;
 				select.addEventListener( 'change', function() {
+					// Same as the search below: which form is picked is a filter
+					// over the cards that are already there
 					Nino.admin.submissions._form = select.value;
-					Nino.admin.submissions._renderList();
-					const next = dc.getElementById('submissions-form');
-					if( next !== null )
-						next.focus();
+					Nino.admin.submissions._applyFilter();
 				} );
 
 				head.appendChild( select );
@@ -230,17 +229,17 @@
 			search.placeholder = Nino.content.getText('/_admin/submissions/label/search');
 			search.setAttribute( 'aria-label', Nino.content.getText('/_admin/submissions/label/search') );
 
-			// The list is drawn again per keystroke, and the focus put back
-			// where it was - the element that had it is gone by then
+			/*	The cards are already in the document, so a keystroke only
+				decides which of them are shown - it does not draw the list
+				again. It used to: every card rebuilt, every value decoded
+				again, and then a scrollHeight/clientHeight read per card to
+				find the ones that overflow, which forces a layout each time.
+				That also took the focus with it, which is why this listener
+				used to put it back afterwards. Nothing is replaced now, so
+				nothing loses it	*/
 			search.addEventListener( 'input', function() {
 				Nino.admin.submissions._filter = search.value;
-				Nino.admin.submissions._renderList();
-				const next = dc.getElementById('submissions-search');
-				if( next !== null ) {
-					next.focus();
-					if( typeof next.setSelectionRange === 'function' )
-						next.setSelectionRange( next.value.length, next.value.length );
-				}
+				Nino.admin.submissions._applyFilter();
 			} );
 
 			head.appendChild( search );
@@ -259,11 +258,11 @@
 			const wrap = dc.getElementById('submissions-list');
 			wrap.innerHTML = '';
 
-			const all 	= Nino.admin.submissions._entries;
-			const shown	= all.filter( Nino.admin.submissions._matches );
+			const all = Nino.admin.submissions._entries;
 
 			// Nothing recorded at all, and nothing matching - two different
-			// things, and the second one must not read as the first
+			// things, and the second one must not read as the first. This is
+			// the first: no cards to draw and no filters to offer over them
 			if( all.length === 0 ) {
 				wrap.appendChild( Nino.adminUi.emptyState( Nino.content.getText('/_admin/submissions/empty') ) );
 				return;
@@ -271,10 +270,12 @@
 
 			wrap.appendChild( Nino.admin.submissions._renderHead() );
 
-			if( shown.length === 0 ) {
-				wrap.appendChild( Nino.adminUi.emptyState( Nino.content.getText('/_admin/submissions/nomatch') ) );
-				return;
-			}
+			// ...and the second, kept in the document and shown by
+			// _applyFilter() when the filters let nothing through
+			const nomatch = Nino.adminUi.emptyState( Nino.content.getText('/_admin/submissions/nomatch') );
+			nomatch.id = 'submissions-nomatch';
+			nomatch.classList.add('admin-hidden');
+			wrap.appendChild( nomatch );
 
 			const exportBtn = dc.createElement('button');
 			exportBtn.type = 'button';
@@ -282,30 +283,81 @@
 			exportBtn.classList.add('nino-admin-btn-primary');
 			exportBtn.textContent = Nino.content.getText('/_admin/submissions/label/export');
 			// What is on screen, not what is on disk: an export taken while a
-			// form is selected is the export of that form
+			// form is selected is the export of that form. Read at the moment
+			// of the click, since the filters move without the list being
+			// drawn again
 			exportBtn.addEventListener( 'click', function() {
-				Nino.admin.exportCsv( Nino.content.getText('/_admin/submissions/label/filename'), shown );
+				Nino.admin.exportCsv( Nino.content.getText('/_admin/submissions/label/filename'), Nino.admin.submissions._entries.filter( Nino.admin.submissions._matches ) );
 			} );
 
+			/*	Every recorded submission gets its card, once. Which of them
+				are on screen is a class, not a redraw - see _applyFilter()	*/
 			const ul = dc.createElement('ul');
 			ul.id = 'submissions-entries';
 			ul.className = 'nino-admin-list nino-admin-list-dense';
 
-			shown.forEach( function( entry ) {
+			all.forEach( function( entry ) {
 				ul.appendChild( Nino.admin.submissions._renderEntry( entry ) );
 			} );
 
 			wrap.appendChild( ul );
-			wrap.appendChild( Nino.adminUi.listActions( [ exportBtn ] ) );
+
+			const actions = Nino.adminUi.listActions( [ exportBtn ] );
+			actions.id = 'submissions-actions';
+			wrap.appendChild( actions );
 
 			// Only show the "expand" hint on cards whose long value actually
 			// overflows its collapsed (line-clamped) height - can only be
-			// measured once the card is in the document
+			// measured once the card is in the document, and now measured only
+			// once per card rather than once per keystroke
 			ul.querySelectorAll('.submissions-entry').forEach( function( li ) {
 				const message = li.querySelector('.submissions-entry-message');
 				if( message !== null && message.scrollHeight > message.clientHeight + 1 )
 					li.classList.add('has-overflow');
 			} );
+
+			Nino.admin.submissions._applyFilter();
+		},
+
+		/**
+		 *	Show the cards the two filters let through and hide the rest -
+		 *	the whole of what a keystroke in the search field does. The cards
+		 *	themselves are built once, by _renderList()
+		 *
+		 *	@return		void
+		 */
+		_applyFilter : function() {
+
+			const ul = dc.getElementById('submissions-entries');
+
+			if( ul === null )
+				return;
+
+			const all = Nino.admin.submissions._entries;
+			let shown = 0;
+
+			Array.prototype.forEach.call( ul.children, function( li, index ) {
+
+				const on = Nino.admin.submissions._matches( all[index] );
+
+				li.classList.toggle( 'admin-hidden', on === false );
+
+				if( on === true )
+					shown++;
+			} );
+
+			// The "nothing matches" line, the list and the export row are the
+			// three things that differ between "some" and "none"
+			const nomatch = dc.getElementById('submissions-nomatch');
+			const actions = dc.getElementById('submissions-actions');
+
+			if( nomatch !== null )
+				nomatch.classList.toggle( 'admin-hidden', shown > 0 );
+
+			ul.classList.toggle( 'admin-hidden', shown === 0 );
+
+			if( actions !== null )
+				actions.classList.toggle( 'admin-hidden', shown === 0 );
 		},
 
 		/**

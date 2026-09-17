@@ -591,7 +591,7 @@ check( 'an archive holding a file where the feature directory should be is refus
 $linkedPrivate = $sandbox. '/private-link';
 symlink( 'private', $linkedPrivate );
 $realPaths = [];
-foreach( [ 'configpath', 'contentpath', 'privatepath' ] as $pathKey ) {
+foreach( [ 'configpath', 'contentpath' ] as $pathKey ) {
 	$realPaths[$pathKey] = $appData['./nino/filesystem/'. $pathKey];
 	$appData['./nino/filesystem/'. $pathKey] = $linkedPrivate;
 }

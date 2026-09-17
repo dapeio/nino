@@ -72,12 +72,15 @@ namespace Nino {
 			// private root unless the site's index.php defines
 			// NINO_CONFIG_DIR before requiring this file.
 			'./nino/filesystem/configpath'	=> $config,
-			'./nino/filesystem/contentpath'	=> $private,
 			// Where the private half of a project lives - config.php, the
-			// templates, the text/elements they render from, and the data
-			// visitors produce (see Filesystem::PRIVATE_DIRS). Never served
-			// by a webserver
-			'./nino/filesystem/privatepath'	=> $private,
+			// templates, the text and elements they render from, and the data
+			// visitors produce (see Filesystem::PRIVATE_DIRS). Never served by
+			// a webserver. One key, although the resolution reaches it two
+			// ways: through the '/private/...' prefix (Filesystem::CONTENT_DIR)
+			// and through the PRIVATE_DIRS themselves. Two keys were two
+			// places for one directory to be named, and one of them could move
+			// without the other
+			'./nino/filesystem/contentpath'	=> $private,
 			// ...and where the half that *is* served lives (see
 			// Filesystem::PUBLIC_DIRS)
 			'./nino/filesystem/publicpath'	=> $public,

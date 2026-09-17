@@ -82,7 +82,6 @@ $appData['./nino/filesystem/path']			= $sandbox;
 // Mirrors \Nino\init()'s fixed private/public split.
 $appData['./nino/filesystem/configpath']	= $sandbox. '/private';
 $appData['./nino/filesystem/contentpath']	= $sandbox. '/private';
-$appData['./nino/filesystem/privatepath'] = $sandbox. '/private';
 $appData['./nino/filesystem/publicpath'] 	= $sandbox. '/public';
 $appData['/nino/dir']				= '';
 $appData['/nino/locales/native']				= 'de_DE';
@@ -117,7 +116,7 @@ $notADirectory = $sandbox. '/not-a-private-directory';
 file_put_contents( $notADirectory, 'x' );
 $typeWriteFailure = $appData;
 $typeWriteFailure['./nino/filesystem/cache'] = [];
-$typeWriteFailure['./nino/filesystem/privatepath'] = $notADirectory;
+$typeWriteFailure['./nino/filesystem/contentpath'] = $notADirectory;
 check( 'insertElementType reports a failed type-file write', \Nino\Elements::insertElementType( $typeWriteFailure, '/cannot-write', $model ) === false );
 unlink( $notADirectory );
 
@@ -1397,6 +1396,24 @@ check( 'a [class, method] static callback ran', ( $callbackResult['static'] ?? f
 check( 'a plain function-name callback ran', ( $callbackResult['function'] ?? false ) === true );
 check( 'a closure callback ran', ( $callbackResult['closure'] ?? false ) === true );
 
+/*	...and a callback that is not one says so. A hook is a string and a
+	callable, and both are easy to get slightly wrong - a method renamed and one
+	registration left behind, a typo in 'callbackRespones'. The registration
+	returned in silence, the hook never fired, and nothing anywhere said why:
+	the symptom is a feature that quietly does not work	*/
+$badCallbackWarnings = [];
+set_error_handler( static function( int $no, string $message ) use ( &$badCallbackWarnings ): bool { $badCallbackWarnings[] = $message; return true; } );
+\Nino\Callbacks::registerCallback( $appData, 'test/callbackshapes', [ KernelSmokeCallbackTarget::class, 'methodThatIsNotThere' ] );
+restore_error_handler();
+
+check( 'a callback that is not callable is refused with a warning naming the hook', count( $badCallbackWarnings ) === 1
+	&& str_contains( $badCallbackWarnings[0], "test/callbackshapes" ) === true
+	&& str_contains( $badCallbackWarnings[0], 'not callable' ) === true );
+
+$afterBad = [ 'start' => true ];
+\Nino\Callbacks::doCallbacks( $appData, 'test/callbackshapes', $afterBad );
+check( '...and is not registered, so firing the hook still works', ( $afterBad['closure'] ?? false ) === true && count( $callbackTarget->seen ) === 2 );
+
 echo "\n";
 
 
@@ -1413,7 +1430,6 @@ $buildAppData = function() use ( $sandbox ) {
 	$fresh['./nino/filesystem/path'] 				= $sandbox;
 	$fresh['./nino/filesystem/configpath'] 	= $sandbox. '/private';
 	$fresh['./nino/filesystem/contentpath'] = $sandbox. '/private';
-	$fresh['./nino/filesystem/privatepath'] = $sandbox. '/private';
 	$fresh['./nino/filesystem/publicpath'] 	= $sandbox. '/public';
 	\Nino\AppData::init( $fresh );
 	return $fresh;
@@ -2756,6 +2772,32 @@ check( 'Location (on the request-side whitelist too) still survives', array_key_
 
 check( 'a bare [assets] shortcode without argument renders nothing instead of erroring', \Nino\Modules\Assets::doShortcode( $appData, [] ) === '' );
 
+/*	The bundle keeps one address on disk and changes the one in the page: a
+	regenerated bundle used to be served at the url a browser was already
+	holding a copy of, so the page asked for /public/.cache/style.css and got
+	the stylesheet from before the change. The way out was a hard reload nobody
+	knows to do	*/
+\Nino\Filesystem::putFileContent( $appData, '/assets/probe.custom.css', 'body{color:red}' );
+\Nino\Html::addAsset( $appData, '/.cache/probe.css', '/assets/probe.custom.css' );
+
+$bundleTag		= \Nino\Modules\Assets::doShortcode( $appData, [ 0 => '/.cache/probe.css' ] );
+$bundleFirst	= ( preg_match( '/href="([^"]+)"/', $bundleTag, $bundleMatch ) === 1 ) ? $bundleMatch[1] : '';
+
+check( 'the bundle is linked under its own url with a version on it', str_starts_with( $bundleFirst, \Nino\Filesystem::url( $appData, '/.cache/probe.css' ). '?v=' ) === true );
+check( '...and the file on disk keeps the one name, so nothing piles up beside it', is_file( \Nino\Filesystem::path( $appData, '/.cache/probe.css' ) ) === true );
+
+// Rendering it again changes nothing, because nothing changed
+check( 'an unchanged bundle keeps its url, so the copy a browser holds stays good', \Nino\Modules\Assets::doShortcode( $appData, [ 0 => '/.cache/probe.css' ] ) === $bundleTag );
+
+// ...and a changed source moves it, which is the whole point
+sleep( 1 );
+\Nino\Filesystem::putFileContent( $appData, '/assets/probe.custom.css', 'body{color:blue}' );
+unset( $appData['./nino/filesystem/cache']['/assets/probe.custom.css'] );
+
+$bundleSecond = ( preg_match( '/href="([^"]+)"/', \Nino\Modules\Assets::doShortcode( $appData, [ 0 => '/.cache/probe.css' ] ), $bundleMatch ) === 1 ) ? $bundleMatch[1] : '';
+check( 'a rebuilt bundle is linked under a different url', $bundleSecond !== '' && $bundleSecond !== $bundleFirst );
+check( '...at the same path, differing in the version alone', explode( '?', $bundleSecond )[0] === explode( '?', $bundleFirst )[0] );
+
 echo "\n";
 
 
@@ -3070,7 +3112,6 @@ $partial = [ './nino/uid' => $partialRoot ];
 $partial['./nino/filesystem/path'] 				= $partialRoot;
 $partial['./nino/filesystem/configpath'] 	= $partialRoot. '/private';
 $partial['./nino/filesystem/contentpath'] = $partialRoot. '/private';
-$partial['./nino/filesystem/privatepath'] = $partialRoot. '/private';
 $partial['./nino/filesystem/publicpath'] 	= $partialRoot. '/public';
 \Nino\AppData::init( $partial );
 
@@ -3150,7 +3191,6 @@ $logApp = [ './nino/uid' => 'logcap' ];
 $logApp['./nino/filesystem/path'] = $logSandbox;
 $logApp['./nino/filesystem/contentpath'] = $logSandbox;
 $logApp['./nino/filesystem/configpath'] = $logSandbox;
-$logApp['./nino/filesystem/privatepath'] = $logSandbox;
 $logApp['/nino/error/log'] = true;
 $logApp['/nino/error/display'] = false;
 
@@ -3200,7 +3240,6 @@ $shutdownBootstrap = static function( bool $log, bool $display, int $history = 0
 		$appData["./nino/filesystem/path"] = $sandbox;
 		$appData["./nino/filesystem/configpath"] = $sandbox. "/private";
 		$appData["./nino/filesystem/contentpath"] = $sandbox. "/private";
-		$appData["./nino/filesystem/privatepath"] = $sandbox. "/private";
 		$appData["./nino/filesystem/publicpath"] = $sandbox. "/public";
 		$appData["/nino/error/log"] = '. var_export( $log, true ). ';
 		$appData["/nino/error/display"] = '. var_export( $display, true ). ';
@@ -3415,7 +3454,6 @@ $pathAppData = $appData;
 $pathAppData['./nino/filesystem/path'] 				= '/srv/site';
 $pathAppData['./nino/filesystem/configpath'] 	= '/srv/site/private';
 $pathAppData['./nino/filesystem/contentpath'] = '/srv/site/private';
-$pathAppData['./nino/filesystem/privatepath'] = '/srv/site/private';
 $pathAppData['./nino/filesystem/publicpath'] 	= '/srv/site/public';
 
 foreach( [ '/images/hero.jpg', '/fonts/text.woff2', '/.cache/script.js' ] as $public )
@@ -3496,7 +3534,7 @@ check( 'the old /content prefix is not a private-path alias', \Nino\Filesystem::
 check( 'the typo /privat prefix is not a private-path alias', \Nino\Filesystem::path( $pathAppData, '/privat/.auth/pw.php' ) === '/srv/site/privat/.auth/pw.php' );
 
 // Moving the private root moves every private path with it, and nothing else
-$pathAppData['./nino/filesystem/privatepath'] = '/var/nino-private';
+$pathAppData['./nino/filesystem/contentpath'] = '/var/nino-private';
 
 check( 'config.php keeps following its own configpath, not the private root', \Nino\Filesystem::path( $pathAppData, '/config.php' ) === '/srv/site/private/config.php' );
 check( 'a moved private root takes the templates with it', \Nino\Filesystem::path( $pathAppData, '/templates/page-home.tpl' ) === '/var/nino-private/templates/page-home.tpl' );
@@ -3506,6 +3544,17 @@ check( '...and text, elements and data', [
 	\Nino\Filesystem::path( $pathAppData, '/data' ),
 ] === [ '/var/nino-private/text', '/var/nino-private/elements', '/var/nino-private/data' ] );
 check( '...and the asset sources, which are private content like the rest', \Nino\Filesystem::path( $pathAppData, '/assets/style.design.css' ) === '/var/nino-private/assets/style.design.css' );
+/*	...and what is addressed through the '/private' prefix rather than as one
+	of the PRIVATE_DIRS. Those were two keys resolved as two roots, so moving
+	the private root moved the templates, the text and the data and left
+	everything under the prefix - the recovery secret, the backups, the logs -
+	where it had been. Nothing did move them apart in practice, because
+	\Nino\init() wrote both from one value; there is one key now	*/
+check( '...and everything addressed through the /private prefix, which used to stay behind', [
+	\Nino\Filesystem::path( $pathAppData, '/private/.auth/pw.php' ),
+	\Nino\Filesystem::path( $pathAppData, '/private/data/forms.php' ),
+] === [ '/var/nino-private/.auth/pw.php', '/var/nino-private/data/forms.php' ] );
+check( 'the two names for it answer the same directory', \Nino\Filesystem::getPrivatePath( $pathAppData ) === \Nino\Filesystem::getContentPath( $pathAppData ) );
 check( 'but leaves the public ones where the webserver reaches them', \Nino\Filesystem::path( $pathAppData, '/images/hero.jpg' ) === '/srv/site/public/images/hero.jpg' );
 
 // config.php keeps its own, older override - it wins over the private root

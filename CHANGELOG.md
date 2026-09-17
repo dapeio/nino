@@ -188,6 +188,42 @@ All notable changes to Nino are documented in this file.
 
 ### Fixed
 
+- **A regenerated asset bundle kept the url a browser was still holding.**
+  `/public/.cache/style.css` is the same address before and after a rebuild,
+  so a visitor with the old copy cached kept being served it, and the way out
+  was a hard reload nobody knows to do. The url carries the bundle's own hash
+  now - the one `_createCachefile()` already writes into its first line - as a
+  query, so the file on disk keeps its single name and nothing piles up beside
+  it.
+
+- **A callback that was not callable was dropped in silence.**
+  `registerCallback()` returned without a word, so a hook registered with a
+  renamed method or a typo simply never fired and nothing anywhere said why.
+  It raises an `E_USER_WARNING` naming the hook now - the kernel's "record
+  this and carry on" channel, so a bad registration still cannot take the page
+  down.
+
+- **The private root was one directory stored under two keys.**
+  `./nino/filesystem/contentpath` resolved everything addressed through the
+  `/private/...` prefix and `./nino/filesystem/privatepath` everything
+  addressed as one of the `PRIVATE_DIRS` - the same directory, reached two
+  ways, with two places for it to be named. Nothing ever set them apart,
+  because `\Nino\init()` wrote both from one value; had anything moved one,
+  the templates would have followed and the recovery secret, the backups and
+  the logs would have stayed behind. One key now, and `getPrivatePath()`
+  answers what `getContentPath()` answers.
+
+- **Filtering the submissions list rebuilt it on every keystroke.** Every card
+  built again, every value decoded again, and then a
+  `scrollHeight`/`clientHeight` read per card to find the ones that overflow -
+  which forces a layout each time. The cards are built once now and the two
+  filters toggle a class, which also means the search field no longer loses
+  the focus it had to be given back.
+
+- **The shipped header template passed an argument nothing reads.**
+  `[navigation nav="main" burger title="..."]` - the navigation shortcode
+  reads `content`, `callback`, `id`, `class` and `nav`, never `title`.
+
 - **A settings list of 20 000 lines cost 883 ms to refuse.** The `lines`
   validator de-duplicated with an `in_array()` over the list built so far - a
   walk of that list per posted line - and looked at `MAX_LINES` only once the

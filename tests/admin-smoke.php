@@ -62,7 +62,6 @@ $appData['./nino/filesystem/path']			= $sandbox;
 // Mirrors \Nino\init()'s fixed private/public split.
 $appData['./nino/filesystem/configpath']	= $sandbox. '/private';
 $appData['./nino/filesystem/contentpath']	= $sandbox. '/private';
-$appData['./nino/filesystem/privatepath'] = $sandbox. '/private';
 $appData['./nino/filesystem/publicpath'] 	= $sandbox. '/public';
 $appData['/nino/dir']				= '';
 $appData['/nino/locales/native']				= 'de_DE';

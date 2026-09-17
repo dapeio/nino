@@ -359,8 +359,14 @@ namespace Nino {
 			)
 				return rtrim( $appData['./nino/filesystem/contentpath']. substr( $filename, strlen( self::CONTENT_DIR ) ), '/' );
 
-			if( self::_isIn( self::PRIVATE_DIRS, $filename ) === true && ( $appData['./nino/filesystem/privatepath'] ?? '' ) !== '' )
-				return rtrim( $appData['./nino/filesystem/privatepath']. $filename, '/' );
+			// The same root as the branch above, and deliberately the same key:
+			// '/private/data/x' and '/data/x' are one file addressed two ways
+			// (that is what CONTENT_DIR's indirection is for), so two keys were
+			// two places for one answer to be given differently. Moving the
+			// private root used to move the PRIVATE_DIRS and leave everything
+			// addressed through the '/private' prefix behind
+			if( self::_isIn( self::PRIVATE_DIRS, $filename ) === true && ( $appData['./nino/filesystem/contentpath'] ?? '' ) !== '' )
+				return rtrim( $appData['./nino/filesystem/contentpath']. $filename, '/' );
 
 			// The installed features, wherever NINO_FEATURES_DIR put them - so
 			// a feature names its own files as '/features/<Name>/...', for an
@@ -448,10 +454,13 @@ namespace Nino {
 		}
 
 		// The project's *private* root - config.php, templates, text,
-		// elements, data and the asset sources (see PRIVATE_DIRS)
+		// elements, data and the asset sources (see PRIVATE_DIRS). The same
+		// directory getContentPath() answers with, under the name the
+		// PRIVATE_DIRS half of the resolution uses: there is one private root,
+		// and it is stored once
 		public static function getPrivatePath( array &$appData ): string {
 
-			return $appData['./nino/filesystem/privatepath'];
+			return self::getContentPath( $appData );
 
 		}
 

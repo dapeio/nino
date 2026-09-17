@@ -112,10 +112,20 @@ namespace Nino\Modules {
 			// Fill template
 			$content	= \Nino\Callbacks::doCallbacks( $appData, '/nino/shortcodes/assets/output/'. $pathinfo['extension'], self::$_template[$pathinfo['extension']] );
 
+			/*	The url carries the bundle's own hash - the sha1
+				_createCachefile() writes into its first line, read back here
+				after any rebuild above. Without it a regenerated bundle keeps
+				the address a browser may still be holding a copy of: the page
+				asks for /public/.cache/style.css, gets the stylesheet from
+				before the change, and the way out is a hard reload nobody knows
+				to do. As a query rather than a name, so the file on disk stays
+				the one file, nothing piles up and no rewrite rule is needed	*/
+			$version = self::_readHashLine( $appData, $targetFile );
+
 			return str_replace( [
 				'[[filename]]',
 			], [
-				\Nino\Filesystem::url( $appData, $targetFile ),
+				\Nino\Filesystem::url( $appData, $targetFile ). ( $version !== '' ? '?v='. substr( $version, 0, 12 ) : '' ),
 			], $content );
 		}
 

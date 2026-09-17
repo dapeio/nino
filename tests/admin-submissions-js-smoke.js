@@ -142,9 +142,12 @@ function hasClass( el, name ) {
 	return String( el.className ).split(' ').indexOf( name ) !== -1 || el.classList.contains( name );
 }
 
-/** Every card on screen, by the entry id it carries */
+/*	Every card on screen, by the entry id it carries. Every recorded
+	submission has a card and keeps it - which of them are on screen is a
+	class the two filters toggle, not a redraw (see _applyFilter()), so "on
+	screen" is "not hidden" rather than "present"	*/
 function cards() {
-	return findAll( mount, function( el ) { return hasClass( el, 'submissions-entry' ) } );
+	return findAll( mount, function( el ) { return hasClass( el, 'submissions-entry' ) && hasClass( el, 'admin-hidden' ) === false } );
 }
 
 function cardIds() {
@@ -404,6 +407,35 @@ check( 'every fill the script asks for exists in both interface languages'+ ( mi
 check( 'the module\'s two text files declare the same keys', Object.keys( moduleEn ).sort().join(',') === Object.keys( moduleDe ).sort().join(',') );
 check( 'no value is written into the page as markup - a stored value is escaped, and this is what keeps it that way',
 	/innerHTML\s*=\s*[^']/.test( script.replace( /innerHTML\s*=\s*''/g, '' ) ) === false );
+
+/*	A keystroke in the search field used to draw the whole list again: every
+	card rebuilt and every value decoded, then a scrollHeight/clientHeight read
+	per card to find the ones that overflow - which forces a layout each time.
+	Counted here by wrapping the card builder: filtering must not call it	*/
+panel.init();
+answer( 200, { entries : ENTRIES, forms : FORMS } );
+
+const builder = sandbox.Nino.admin.submissions._renderEntry;
+let built = 0;
+sandbox.Nino.admin.submissions._renderEntry = function( entry ) { built++; return builder( entry ) };
+
+sandbox.Nino.admin.submissions._renderList();
+const builtOnce = built;
+built = 0;
+
+formNow().value = '';
+fire( formNow(), 'change' );
+searchNow().value = 'a';
+fire( searchNow(), 'input' );
+searchNow().value = 'ad';
+fire( searchNow(), 'input' );
+searchNow().value = 'add';
+fire( searchNow(), 'input' );
+
+check( 'drawing the list builds one card per recorded submission', builtOnce > 0 && builtOnce === sandbox.Nino.admin.submissions._entries.length );
+check( '...and three keystrokes and a form switch build none of them again', built === 0 );
+
+sandbox.Nino.admin.submissions._renderEntry = builder;
 
 console.log( '\n'+ checks+ ' checks, '+ failures+ ' failed' );
 process.exitCode = failures === 0 ? 0 : 1;
