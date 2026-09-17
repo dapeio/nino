@@ -2505,6 +2505,25 @@ check( 'a URL parse failure produces an empty query array', $queryParser->invoke
 check( 'requestRoute rejects an empty URI without entering its parent walk', \Nino\Http::requestRoute( $appData, '', 'GET' ) === null );
 check( 'requestRoute rejects a relative URI without entering its parent walk', \Nino\Http::requestRoute( $appData, 'relative/path', 'GET' ) === null );
 
+/*	The signed-in account's mail address, the one fill \Nino\request()
+	registers that carries something a person typed. It is built here through
+	that call rather than by hand, and read back through the markup the
+	workbench's rail actually uses	*/
+$hostileMail = '"<script>alert(1)</script>[x]"@example.com';
+check( 'php calls an address carrying a script element and a bracket valid, so the FILTER_VALIDATE_EMAIL every account panel runs stores one', filter_var( $hostileMail, FILTER_VALIDATE_EMAIL ) !== false );
+
+\Nino\Auth::insertUser( $appData, $hostileMail, 'correct horse battery staple' );
+\Nino\Auth::loginUser( $appData, $hostileMail, 'correct horse battery staple' );
+\Nino\request( $appData, [ 'REQUEST_METHOD' => 'GET', 'REQUEST_URI' => '/', 'REMOTE_ADDR' => '127.0.0.1' ] );
+
+$railSpan = \Nino\Html::renderHtml( $appData, '<span id="admin-user-email">[[/nino/auth/user]]</span>' );
+check( 'the address reaches the page as the text it is, never as markup', str_contains( $railSpan, '<script' ) === false && str_contains( $railSpan, '&lt;script&gt;' ) === true );
+check( '...brackets neutralized as well, so the shortcode pass over the finished document cannot read one as syntax', str_contains( $railSpan, '[x]' ) === false && str_contains( $railSpan, '&#91;x&#93;' ) === true );
+check( 'and the shell draws the address through exactly that fill', str_contains( (string) @file_get_contents( dirname( __DIR__ ). '/_admin/templates/page-index.tpl' ), '<span id="admin-user-email">[[/nino/auth/user]]</span>' ) === true );
+
+\Nino\Auth::logoutUser( $appData );
+\Nino\Auth::deleteUser( $appData, $hostileMail );
+
 echo "\n";
 
 

@@ -111,6 +111,33 @@ check( 'the 6th attempt is locked out (429), not just rejected as wrong', \Nino\
 check( 'the lockout applies regardless of the secret tried next', \Nino\Admin\Recovery::verify( $appData, 'the real password' ) === 429 );
 // Reset the lockout state for the rest of the file - a fresh cooldown window shouldn't leak into later checks
 \Nino\Filesystem::putFileContent( $appData, \Nino\Filesystem::CONTENT_DIR. '/.auth/lockout.json', [ 'tries' => 0, 'until' => 0 ] );
+
+// How long an answer takes is itself an answer. An installation whose
+// secret file went missing must not reject faster than one that has a
+// secret to reject against - see Recovery::DECOY_HASH
+$attempt = static function() use ( &$appData ): float {
+	// A fresh window each time, so neither measurement is cut short by the cooldown
+	\Nino\Filesystem::putFileContent( $appData, \Nino\Filesystem::CONTENT_DIR. '/.auth/lockout.json', [ 'tries' => 0, 'until' => 0 ] );
+	$start = hrtime( true );
+	\Nino\Admin\Recovery::verify( $appData, 'definitely-the-wrong-password' );
+	return ( hrtime( true ) - $start ) / 1e6;
+};
+
+$withSecret = $attempt();
+@unlink( \Nino\Admin\Recovery::path( $appData ) );
+$withoutSecret = $attempt();
+
+// The constant is private, so read it out of the source: a php that moves
+// PASSWORD_DEFAULT on must fail a check here rather than quietly leave the
+// decoy cheaper than the hashes set() writes
+preg_match( '#DECOY_HASH = \'([^\']+)\'#', (string) @file_get_contents( __DIR__. '/../_admin/Admin.php' ), $decoy );
+check( 'the decoy hash is of the kind and cost this php hashes with', isset( $decoy[1] ) === true && password_needs_rehash( $decoy[1], PASSWORD_DEFAULT ) === false );
+check( 'losing the secret file leaves no stored hash', \Nino\Admin\Recovery::hash( $appData ) === null );
+check( 'so nothing authenticates, least of all against the decoy', \Nino\Admin\Recovery::verify( $appData, 'definitely-the-wrong-password' ) === 401 );
+check( 'and that rejection costs what one against a real hash costs ('. round( $withoutSecret ). ' ms vs '. round( $withSecret ). ' ms)', $withoutSecret > $withSecret / 4 );
+
+check( 'the secret can be stored again for the rest of the file', \Nino\Admin\Recovery::set( $appData, 'the real password' ) === true );
+\Nino\Filesystem::putFileContent( $appData, \Nino\Filesystem::CONTENT_DIR. '/.auth/lockout.json', [ 'tries' => 0, 'until' => 0 ] );
 $noMarker = $appData;
 unset( $noMarker['/nino/install/completed'] );
 check( 'the secret alone counts as installed - losing the marker must not reopen the wizard', \Nino\Admin\Admin::isInstalled( $noMarker ) === true );

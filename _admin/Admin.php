@@ -1354,6 +1354,25 @@ namespace Nino\Admin {
 		// writes it; hash() reads it
 		public const string PASSWORD_PATH = '/.auth/pw.php';
 
+		/*	A hash nothing ever verifies against, for an installation that has
+			none of its own.
+
+			password_verify() is where the time goes - bcrypt at this php's
+			default cost is around 220 ms here - and '$hash !== null &&
+			password_verify(...)' short-circuits, so an installation without a
+			recovery password answered instantly while one with it took a fifth
+			of a second. That difference is readable over any network by an
+			unauthenticated caller, and the docblock on verify() has claimed
+			since it was written that it is not there.
+
+			Pinned rather than computed, because generating one costs the same
+			as the verify it is there to imitate. Its plaintext is 32 random
+			bytes nobody kept. tests/admin-system-smoke.php compares its algorithm
+			and cost against what password_hash() produces on the php running
+			the tests, so a php that moves the default fails a check instead of
+			quietly reopening the gap.	*/
+		private const string DECOY_HASH = '$2y$12$chyCv/lOYBJvmL3beXveSOsJpcvIbrxZC6uJZw02M5hUz89c3/bAW';
+
 		// The attempt counter, next to the credential it guards. A virtual
 		// path (see \Nino\Filesystem::CONTENT_DIR), so it goes through
 		// mutate() and keeps its lock - two concurrent wrong attempts must
@@ -1601,7 +1620,10 @@ namespace Nino\Admin {
 					return null;
 				}
 
-				$verified = $hash !== null && password_verify( $password, $hash );
+				// Always a verify, with or without a hash of its own to verify
+				// against - see DECOY_HASH. The null check comes after it and so
+				// cannot be skipped: nothing authenticates against the decoy
+				$verified = password_verify( $password, $hash ?? self::DECOY_HASH ) === true && $hash !== null;
 
 				if( $verified === true )
 					return [ 'tries' => 0, 'until' => 0 ];

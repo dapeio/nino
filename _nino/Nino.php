@@ -130,12 +130,27 @@ namespace Nino {
 		\Nino\Locales::response( $appData, $request );
 
 		$currentUser = \Nino\Auth::getCurrentUser( $appData );
+
+		// The signed-in account's mail address, and the only fill below that
+		// carries something a person typed - the other four are cleanUri()
+		// output, which keeps nothing outside [a-zA-Z0-9:/.~_-%]. An address
+		// may hold a quoted local part, so '"<script>alert(1)</script>"@example.com'
+		// passes the FILTER_VALIDATE_EMAIL every panel that writes one checks
+		// against, and drawn as it stood it was a script in the shell of
+		// every account served that page.
+		// Brackets neutralized as well as escaped, the two steps
+		// Admin\Panels::label() takes: a fill is substituted before the
+		// shortcode pass runs over the finished document, so a '[' left
+		// standing in one would be read as syntax afterwards
+		$userMail = str_replace( [ '[', ']' ], [ '&#91;', '&#93;' ],
+			htmlspecialchars( ( $currentUser !== false ) ? (string) $currentUser['mail'] : '', ENT_QUOTES | ENT_SUBSTITUTE | ENT_HTML5, 'UTF-8' ) );
+
 		\Nino\Html::addFills( $appData, [
 			'[[/nino/http/request/uri]]'			=> $request['/nino/http/request']['uri'],
 			'[[/nino/http/response/uri]]'		=> $request['/nino/http/response']['uri'],
 			'[[/nino/http/response/uri/clean]]'		=> str_replace( '/', '_', $request['/nino/http/response']['uri'] ),
 			'[[/nino/http/response/locale]]'	=> $request['/nino/http/response']['locale'],
-			'[[/nino/auth/user]]'						=> ( ( $currentUser !== false ) ? $currentUser['mail'] : '' ),
+			'[[/nino/auth/user]]'						=> $userMail,
 		], '*' );
 
 		\Nino\Html::response( $appData, $request );

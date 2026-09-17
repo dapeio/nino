@@ -168,6 +168,35 @@ All notable changes to Nino are documented in this file.
 
 ### Fixed
 
+- **The recovery form said whether a secret exists by how fast it refused.**
+  `Recovery::verify()` checks a posted secret against the stored hash, and
+  `$hash !== null && password_verify(...)` never reached the verify on an
+  installation that has none - one whose password file went missing, or one
+  the wizard never got as far as writing. The verify is where the time goes:
+  bcrypt at php's default cost is around a fifth of a second here, so one
+  installation refused in half a millisecond and the other in two hundred,
+  and which of the two states an installation is in is then readable off a
+  single unauthenticated request over any network. The docblock has claimed
+  since it was written that it is not. It is not now: an installation with no
+  hash verifies against a pinned decoy, and the null check that decides the
+  answer comes after the verify, where it cannot be skipped. Nothing
+  authenticates against the decoy, and the tests compare its algorithm and
+  cost against what `password_hash()` produces on the php running them, so a
+  php that moves `PASSWORD_DEFAULT` on fails a check rather than quietly
+  leaving the decoy cheaper than a real hash.
+
+- **The signed-in address went into the workbench's rail as markup.** The
+  `[[/nino/auth/user]]` fill carried the account's mail address exactly as
+  stored, and `filter_var()`'s `FILTER_VALIDATE_EMAIL` - the check every panel
+  that writes an address runs - accepts a quoted local part, so
+  `"<script>alert(1)</script>"@example.com` is an address they take. Drawn
+  into `page-index.tpl` as it stood, it was a script in the shell of every
+  account that loads the page, put there by anyone who may create or rename
+  one. The fill is escaped where it is registered now, with its brackets
+  neutralized along with it: a fill is substituted before the shortcode pass
+  runs over the finished document, so a `[` left standing in one would be
+  read as syntax afterwards.
+
 - **A burst of parallel guesses was never locked out.** Every request of the
   burst passed the login's cooldown check before the first of them filled the
   bucket, and the failed attempts registered after that treated the lock they
