@@ -82,9 +82,10 @@
 				// about to be cached here are the ones it just declared stale
 				if( requestId !== Nino.admin.elements._typesRequest )
 					return;
-				Nino.admin.elements._loading = false;
-				if( status !== 200 || response === null )
+				if( status !== 200 || response === null ) {
+					Nino.admin.elements._loading = false;
 					return Nino.admin.elements._showError( dc.getElementById('elements-types'), status, response );
+				}
 				Nino.admin.elements._locales = response.locales;
 				Nino.admin.sessionLocale.init( response.selectedLocale );
 				Nino.admin.elements._renderTypes( response.types );
@@ -95,6 +96,13 @@
 				// to the plain type list if there was nothing to restore
 				if( Nino.admin.elements._restoreFromHash( response.types ) === false )
 					Nino.admin.elements._showTypes();
+
+				// Cleared last, after the show above and not before it.
+				// _refreshTypes() reads this flag as "a types request is already
+				// in flight" and stands down; cleared first, both halves of that
+				// guard were false by the time _showTypes() reached it, and the
+				// list this callback had just rendered was fetched a second time
+				Nino.admin.elements._loading = false;
 			} );
 		},
 

@@ -313,5 +313,67 @@ check( 'every error path shows the pane it writes into', errorPaths === 3
 	&& /_showError\( dc\.getElementById\('elements-list'\)[\s\S]{0,120}_showList\(\)/.test( source )
 	&& /_showError\( dc\.getElementById\('elements-form'\)[\s\S]{0,120}_showFormView\(\)/.test( source ) );
 
+/*	Opening the panel asks the server for the type list once. It asked twice:
+	_refreshTypes() stands down while a types request is in flight ("refetching
+	there would just repeat the request it is already inside of", says its own
+	comment), and init()'s callback cleared both halves of that guard - _loading
+	and _ready - before calling _showTypes(), which is what reaches
+	_refreshTypes(). So the list the callback had just rendered was fetched
+	again, on every single load of the panel.
+
+	Its own context, and a document with the three drill-down elements in it:
+	the sandbox above is deliberately DOM-free, and init() returns at its first
+	getElementById()	*/
+function countTypesRequests() {
+
+	const classes = () => { const held = {}; return { add : k => held[k] = true, remove : k => delete held[k], contains : k => held[k] === true } };
+	const el = () => ( { classList : classes(), dataset : {}, style : {}, innerHTML : '', textContent : '',
+		appendChild(){}, addEventListener(){}, setAttribute(){}, removeAttribute(){}, querySelectorAll : () => [] } );
+	const nodes = { 'elements-types' : el(), 'elements-list' : el(), 'elements-form' : el() };
+	const asked = [];
+
+	const box = {
+		console : console,
+		document : { getElementById : id => nodes[id] || null, createElement : el, querySelectorAll : () => [], documentElement : el(), body : el() },
+	};
+	box.window = box;
+	box.Nino = {
+		editor : {},
+		events : { bindCallback(){} },
+		// Answered straight away: what matters here is the order init()'s own
+		// callback does things in, not that a real request takes a moment
+		http : { sendRequest : ( uri, method, callback, data ) => {
+			asked.push( data.action );
+			callback( { status : 200, responseJSON : { types : [], locales : [ 'de_DE' ], selectedLocale : 'de_DE' } } );
+		} },
+		content : { getText : key => key },
+		admin : { router : { set(){} }, sessionLocale : { init(){} } },
+		adminUi : { text : value => value, emptyState : el, listActions : el },
+	};
+
+	const box_context = vm.createContext( box );
+	vm.runInContext( fs.readFileSync( path.join( __dirname, '../_admin/assets/Nino.admin.js' ), 'utf8' ), box_context, { filename : 'Nino.admin.js' } );
+	vm.runInContext( source, box_context, { filename : 'elements.js' } );
+
+	const module = box.Nino.admin.elements;
+	// Rendering is not what is being counted, and _restoreFromHash() would
+	// drill into a level this context has no markup for
+	module._renderTypes = function(){};
+	module._restoreFromHash = function(){ return false };
+
+	module.showCurrent();
+	const opening = asked.slice();
+	asked.length = 0;
+	module.showCurrent();
+
+	return { opening : opening, returning : asked.slice() };
+}
+
+const typesRequests = countTypesRequests();
+check( 'opening the panel asks for the type list once, not twice', JSON.stringify( typesRequests.opening ) === '["elements/types"]' );
+// _refreshTypes()'s actual job: the count beside a type is content, so coming
+// back to the overview after adding an element has to re-read it
+check( '...and coming back to the overview re-reads it, which is what that second request was for', JSON.stringify( typesRequests.returning ) === '["elements/types"]' );
+
 console.log( '\n'+ checks+ ' checks, '+ failures+ ' failed' );
 process.exitCode = failures === 0 ? 0 : 1;

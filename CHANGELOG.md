@@ -188,6 +188,32 @@ All notable changes to Nino are documented in this file.
 
 ### Fixed
 
+- **The workbench asked the server for the same thing twice.** Three separate
+  repetitions, each measured before and after.
+
+  The panel registry is a glob over the module directories, a `ReflectionClass`
+  per panel class and a `nav()`/`actions()` call each - and one `GET /_admin`
+  built it **four times over**: for the asset bundles, for the text fills, for
+  the rail and for the panes. Every panel action built it once more. It is
+  built once per request now, keyed by what it is built from, so a feature
+  switched on through the Features panel - which adds a module and its panel
+  inside the request that switched it on - still gets a fresh one.
+  `Admin::modules()` reads its directory once per process for the same reason.
+
+  Opening the Elements panel fetched `elements/types` **twice**.
+  `_refreshTypes()` stands down while a types request is in flight, and
+  `init()`'s callback cleared both halves of that guard - `_loading` and
+  `_ready` - before calling `_showTypes()`, which is what reaches it. So the
+  list the callback had just rendered was fetched again. `_loading` is cleared
+  last now.
+
+  The Config pane is in the page on every workbench load, hidden, and its
+  script bound `init()` to `ready`: `config/list` was fetched for a screen
+  nobody had opened, and when the workbench did land on Config the shell's
+  `show()` called `showCurrent()` while that first request was still in
+  flight, so the form was fetched twice. `showCurrent()` is the one entry
+  point now, which is the contract `script.js` documents.
+
 - **Seven comments in the kernel and the workbench were written in German.**
   A docblock that names the screen it belongs to tends to name it in the
   language the screenshot was taken in - "Elemente nach Typ", "Letzte

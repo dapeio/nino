@@ -331,6 +331,12 @@
 		},
 	};
 
-	Nino.events.bindCallback( 'ready', Nino.admin.config.init );
+	/*	Not bound to 'ready'. The pane is in the page on every workbench load,
+		hidden, so an init() there fetched config/list for a screen nobody had
+		opened - and when the workbench did land on Config, the shell's show()
+		called showCurrent() while that first request was still in flight, whose
+		_ready was therefore still false, and the form was fetched twice.
+		showCurrent() is the one entry point: the shell calls it when the panel
+		is shown, which is when the form is wanted	*/
 
 })(window, document, document.documentElement, document.body);

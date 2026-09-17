@@ -327,6 +327,16 @@ namespace Nino\Admin {
 		 */
 		public static function modules(): array {
 
+			// Read once per process, not once per caller: self::MODULES is a
+			// fixed directory inside the tool, and nothing installs into it at
+			// runtime - a feature's panel arrives through adminPanels() (see
+			// collect()), not by appearing here. panels() asks four times in a
+			// single GET, and each asking was a glob
+			static $cached = null;
+
+			if( $cached !== null )
+				return $cached;
+
 			$classes = [];
 
 			foreach( glob( self::MODULES. '/*/Admin/Admin.php' ) ?: [] as $file ) {
@@ -338,6 +348,8 @@ namespace Nino\Admin {
 				if( preg_match( '/^[A-Z][A-Za-z0-9]*$/', $name ) === 1 )
 					$classes[] = 'Nino\\Modules\\'. $name. '\\Admin';
 			}
+
+			$cached = $classes;
 
 			return $classes;
 		}
@@ -1002,6 +1014,25 @@ namespace Nino\Admin {
 		 */
 		public static function collect( array &$appData, array $core, string $method ): array {
 
+			/*	One registry per request. Building it costs a glob over the
+				module directories, a ReflectionClass per panel to tell a
+				feature's from the tool's own, and a nav()/actions() call each -
+				and a single GET of the workbench asked for it four times over:
+				once for the asset bundles, once for the text fills, once for
+				the rail and once for the panes. Every panel action asked once
+				more.
+
+				Keyed by what it is built from rather than simply stored: a
+				feature switched on through the Features panel adds a module,
+				and its panel, inside the very request that switched it on -
+				which is why that panel rebuilds the workbench before answering.
+				A changed module list is a different key and therefore a fresh
+				registry; only the newest is kept, so this never grows	*/
+			$cacheKey = md5( $method. "\0". implode( "\0", $core ). "\0". implode( "\0", array_map( 'strval', (array) ( $appData['/nino/modules'] ?? [] ) ) ) );
+
+			if( isset( $appData['./_admin/panels'][$cacheKey] ) === true )
+				return $appData['./_admin/panels'][$cacheKey];
+
 			$panels = [];
 			$taken	= [];
 
@@ -1041,6 +1072,8 @@ namespace Nino\Admin {
 			// of equal weight keep their registration order
 			$order = array_flip( self::GROUPS );
 			uasort( $panels, static fn( array $a, array $b ): int => [ $order[$a['group']], $a['weight'] ] <=> [ $order[$b['group']], $b['weight'] ] );
+
+			$appData['./_admin/panels'] = [ $cacheKey => $panels ];
 
 			return $panels;
 		}

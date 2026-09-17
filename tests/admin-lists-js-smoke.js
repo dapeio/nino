@@ -123,6 +123,16 @@ check( 'Config uses only the shared pinned action bar for its single Save', conf
 check( 'Config carries no search-index action any more', configSource.includes( 'searchindex' ) === false );
 check( 'Config no longer edits routes, navigations or asset bundles', [ '/nino/http/routes', '/nino/html/navs', '/nino/html/assets' ].every( function( key ) { return configSource.includes( key ) === false } ) );
 check( 'Config renders no raw json textarea any more', configSource.includes( 'config-form-value' ) === false );
+
+/*	The Config pane is in the page on every workbench load, hidden. Bound to
+	'ready', its init() therefore fetched config/list for a screen nobody had
+	opened - and when the workbench did land on Config, the shell's show()
+	called showCurrent() while that first request was still in flight, whose
+	_ready was still false, so the form was fetched twice. showCurrent() is the
+	one entry point now, which is the contract script.js documents: a panel
+	loads when it is shown	*/
+check( 'Config does not fetch its form on every workbench load', /bindCallback\(\s*'ready'/.test( configSource ) === false );
+check( '...and showCurrent() is what loads it, so the panel still fills when shown', /showCurrent\s*:\s*function[\s\S]{0,160}config\.init\(\)/.test( configSource ) === true );
 // The login throttle and the languages left Config for screens of their own:
 // the Users panel's login-protection tab and the Language panel. Both render
 // their numbers and switches with the shared components

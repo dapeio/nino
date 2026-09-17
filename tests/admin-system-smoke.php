@@ -2388,7 +2388,14 @@ class AdminSmokeShadowPanel {
 
 /** The runtime module contributing both, answering adminPanels() */
 class AdminSmokeDummyModule {
-	public static function adminPanels( array &$appData ): array { return [ 'AdminSmokeDummyPanel', 'AdminSmokeShadowPanel' ]; }
+	/** Once per registry build - the counter the caching check below reads */
+	public static int $asked = 0;
+	public static function adminPanels( array &$appData ): array { self::$asked++; return [ 'AdminSmokeDummyPanel', 'AdminSmokeShadowPanel' ]; }
+}
+
+/** A module that brings no panel at all - a second entry in the module list, and nothing else */
+class AdminSmokeSilentModule {
+	public static function adminPanels( array &$appData ): array { return []; }
 }
 
 /** A panel naming a script that is not on disk - the registry has to say so */
@@ -2432,6 +2439,36 @@ check( 'every label is a fill - structure and system panels the same as the cont
 check( 'the three groups actually on screen get their headings, in the GROUPS order - features carries no heading while nothing sits in it', preg_match( '/nav-group" data-group="content".*data-group="structure".*data-group="system"/s', $navHtml ) === 1
 	&& str_contains( $navHtml, 'data-group="features"' ) === false );
 check( 'GROUPS lists all four, features between structure and system', \Nino\Admin\Panels::GROUPS === [ 'content', 'structure', 'features', 'system' ] );
+
+/*	The registry is built once per request and reused. Building it is a glob
+	over the module directories, a ReflectionClass per panel class to tell a
+	feature's from the tool's own, and a nav()/actions() call each - and a
+	single GET of the workbench asked for it four times over: the asset
+	bundles, the text fills, the rail and the panes. Every panel action asked
+	once more	*/
+// A fresh request: $withModule has been through panels() above, and the
+// registry it built is in it (see Panels::collect()'s own cache)
+$cachedRegistry = $withModule;
+unset( $cachedRegistry['./_admin/panels'] );
+AdminSmokeDummyModule::$asked = 0;
+\Nino\Admin\Admin::panels( $cachedRegistry );
+\Nino\Admin\Admin::allPanels( $cachedRegistry );
+\Nino\Admin\Admin::visiblePanels( $cachedRegistry );
+\Nino\Admin\Admin::actions( $cachedRegistry );
+check( 'four askings of the registry build it once', AdminSmokeDummyModule::$asked === 1 );
+
+/*	...and a module list that changed is a different registry rather than the
+	stale one. The Features panel switches a feature on and builds the
+	workbench again inside the same request - that is the whole reason it does
+	so - and the panel the feature brought has to be in what comes back	*/
+$cachedRegistry['/nino/modules'] = array_merge( $cachedRegistry['/nino/modules'], [ 'AdminSmokeSilentModule' ] );
+$rebuilt = \Nino\Admin\Admin::panels( $cachedRegistry );
+check( '...and a module switched on inside the request gets a fresh one', AdminSmokeDummyModule::$asked === 2 && isset( $rebuilt['dummy'] ) === true );
+check( 'which is then reused in its turn', ( static function() use ( $cachedRegistry ): bool {
+	$again = $cachedRegistry;
+	\Nino\Admin\Admin::panels( $again );
+	return AdminSmokeDummyModule::$asked === 2;
+} )() );
 
 check( 'a panel naming the features group from outside features/ is refused and falls back to content, with a warning', ( static function() use ( $withModule ): bool {
 	$withFeatureNamer = $withModule;
