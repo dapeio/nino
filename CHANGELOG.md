@@ -188,6 +188,33 @@ All notable changes to Nino are documented in this file.
 
 ### Fixed
 
+- **Three things the kernel did over again on every page.** Each measured
+  before and after.
+
+  `Html::_renderFills()` replaces fills until nothing changes, because a
+  fill's value may name another fill. Proving the pass just made was the
+  final one meant a whole further `str_replace()` over the document - which
+  walks it once per fill key, so a project with a few hundred fills paid that
+  many scans to discover nothing had been left. A document with no `[[` in it
+  cannot have anything left, and that is one scan for two characters. On a
+  16 KB page: 0.55 → 0.32 ms with 50 fills, 1.86 → 0.94 with 200, 4.16 → 2.10
+  with 500. The comparison still decides every other case.
+
+  An element read with the `'*'` locale could not hit the read cache at all -
+  the early return excluded `'*'` outright - so every one of them went back to
+  the type file, walked its locale buckets to find which one holds the element
+  and rebuilt the merged array. On a page rendering a collection that is once
+  per element per render. What a `'*'` read resolves to is remembered beside
+  the element now: one pass over 500 elements went from 1.68 ms to 0.22.
+
+  `Elements::deleteElement()` rewrote the whole type file and fired
+  `/nino/elements/committed` even when it had removed nothing - a second
+  delete of the same element, a locale that never held it. So a module
+  keeping derived data was told about a deletion that had not happened, and
+  every cached read of that type file elsewhere was invalidated by the new
+  mtime. It is still an idempotent success, which is the contract the suite
+  pins; what is gone is the work.
+
 - **Two copies that had drifted apart.** A catalogue entry is a published
   feature manifest, so `\Nino\Catalogue`'s reader and
   `\Nino\Features::manifest()` have to agree about the fields they both read.

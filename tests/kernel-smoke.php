@@ -384,6 +384,60 @@ check( 'deleteElement leaves the other locale fully intact', ( \Nino\Elements::g
 // ...and once the last locale holding it goes, the '*' shell entry goes too
 \Nino\Elements::deleteElement( $appData, '/testtype/item1', 'en_US' );
 check( 'deleteElement removes the element (no leftover "*" shell entry)', \Nino\Elements::getElement( $appData, '/testtype/item1', 'en_US' ) === false );
+
+/*	Deleting it again is still a success - "already gone" is what was asked
+	for - and now it is a success that does nothing. It used to unset nothing,
+	write the whole type file back regardless (a temp file, a rename, an
+	opcache invalidation and a new mtime that invalidates every cached read of
+	that file elsewhere), and then fire '/nino/elements/committed' with
+	operation 'delete' - so a module keeping derived data was told about a
+	deletion that had not happened	*/
+$committed = [];
+\Nino\Callbacks::registerCallback( $appData, '/nino/elements/committed', static function( array &$appData, array &$change ) use ( &$committed ): void { $committed[] = $change['operation']. ' '. $change['uri']; } );
+
+/*	Judged by the inode, not by the mtime or the bytes: a rewrite that puts
+	the same content back is invisible in both (mtime has one-second
+	resolution), while \Nino\Filesystem::_writeFile() replaces the file by
+	rename()ing a temp file over it - which is a different inode every time	*/
+$typeFilePath = \Nino\Filesystem::path( $appData, '/elements/testtype.php' );
+clearstatcache( true, $typeFilePath );
+$beforeDelete = (int) @fileinode( $typeFilePath );
+
+$emptyDelete = \Nino\Elements::deleteElement( $appData, '/testtype/item1', 'en_US' );
+clearstatcache( true, $typeFilePath );
+
+check( 'deleting an element that is already gone still reports success', $emptyDelete === true );
+check( '...without rewriting the type file', $beforeDelete > 0 && (int) @fileinode( $typeFilePath ) === $beforeDelete );
+check( '...and without announcing a deletion that did not happen', $committed === [] );
+
+// ...while a delete that does remove something still announces it
+\Nino\Elements::insertElement( $appData, '/testtype/gone', [ 'title' => 'Here for a moment' ], 'de_DE' );
+$committed = [];
+check( 'a delete that removes something is announced as before', \Nino\Elements::deleteElement( $appData, '/testtype/gone', '*' ) === true && $committed === [ 'delete /testtype/gone' ] );
+
+/*	A '*' read resolves to whichever locale actually holds the element, and
+	that resolution is remembered: the read cache could not be hit by a '*'
+	read at all, so every one of them went back to the type file, walked its
+	locale buckets again and rebuilt the merged array. On a page rendering a
+	collection that is once per element per render.
+
+	The resolution is only ever written by a read that asked with '*'. Writing
+	it for a named-locale read too - which is how this was first written - made
+	the next '*' read answer with whichever locale happened to have been read
+	last, and the workbench's own apiList then labelled an element with its
+	English title on a German site	*/
+\Nino\Elements::insertElement( $appData, '/testtype/both', [ 'title' => 'Beide' ], 'de_DE' );
+\Nino\Elements::insertElement( $appData, '/testtype/both', [ 'title' => 'Both' ], 'en_US' );
+
+check( 'a star read finds the first locale that holds the element', ( \Nino\Elements::getElement( $appData, '/testtype/both', '*' )['title'] ?? null ) === 'Beide' );
+check( '...and remembers what it resolved to, so the next one does not walk the file again', ( $appData['./nino/elements/cache']['resolved']['/testtype/both'] ?? null ) === 'de_DE' );
+
+\Nino\Elements::getElement( $appData, '/testtype/both', 'en_US' );
+check( 'a read of a named locale does not overwrite that resolution', ( $appData['./nino/elements/cache']['resolved']['/testtype/both'] ?? null ) === 'de_DE' );
+check( '...so a later star read still answers with the first locale, not the last one read', ( \Nino\Elements::getElement( $appData, '/testtype/both', '*' )['title'] ?? null ) === 'Beide' );
+
+\Nino\Elements::deleteElement( $appData, '/testtype/both', '*' );
+check( 'a write drops the remembered resolution with the rest of the cache', isset( $appData['./nino/elements/cache']['resolved'] ) === false );
 check( 'the element is gone from every other locale as well', \Nino\Elements::getElement( $appData, '/testtype/item1', '*' ) === false );
 
 // Regression: 'date'/'datetime' model fields hold a plain string value (php has no
@@ -986,6 +1040,29 @@ check( '[elements] takes sort, offset and limit; ids count from 0 after the cut'
 } );
 check( '[elements] with a callback: sorted before it, offset and limit after it',
 	\Nino\Html::renderHtml( $appData, '[elements /sorttest sort="-weight" callback="sorttest-drop-first" offset="1" limit="1"][[title]];[/elements]' ) === 'item 9;' );
+
+/*	Fills are replaced until nothing changes, because a fill's value may name
+	another fill (a mail subject carrying [[/website/url]], say). Proving that
+	the pass just made was the final one meant running a whole further
+	str_replace() over the document, once per fill key - so a project with a
+	few hundred fills paid that many scans of the page to discover that nothing
+	had been left. A document with no '[[' in it any more cannot have anything
+	left, and that is one scan for two characters. The comparison still decides
+	every other case	*/
+\Nino\Html::addFills( $appData, [
+	'[[/chain/outer]]'	=> 'outer sees [[/chain/middle]]',
+	'[[/chain/middle]]'	=> 'middle sees [[/chain/inner]]',
+	'[[/chain/inner]]'	=> 'the inner one',
+], '*' );
+check( 'a fill whose value names another fill still resolves all the way down', \Nino\Html::renderHtml( $appData, '<p>[[/chain/outer]]</p>' ) === '<p>outer sees middle sees the inner one</p>' );
+
+// The cap that stops a value referencing itself - the Text panel can write one
+\Nino\Html::addFills( $appData, [ '[[/chain/loop]]' => 'round [[/chain/loop]]' ], '*' );
+check( 'a fill that names itself stops at the pass cap instead of running forever', str_starts_with( \Nino\Html::renderHtml( $appData, '[[/chain/loop]]' ), 'round round round' ) === true );
+
+// A key nothing answers is left standing, and is exactly the case where the
+// early exit must not fire - the document still holds '[[' after the pass
+check( 'an unresolved key survives the render as itself', \Nino\Html::renderHtml( $appData, '<p>[[/chain/nobody]]</p>' ) === '<p>[[/chain/nobody]]</p>' );
 
 // One byte that is not utf-8 - out of an import, a feed, a paste from a
 // latin-1 source - used to take the whole value with it: htmlspecialchars()

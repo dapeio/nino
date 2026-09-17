@@ -181,10 +181,26 @@ namespace Nino {
 			// itself (possible via the Text panel, not just the
 			// developer-authored defaults).
 			for( $pass = 0; $pass < 10; $pass++ ) {
+
 				$rendered = str_replace( $fillKeys, $fillValues, $html );
+
 				if( $rendered === $html )
 					break;
+
 				$html = $rendered;
+
+				// Nothing left that could match, so the pass that would prove
+				// it is not run. str_replace() with an array of needles walks
+				// the document once per needle - a project with a few hundred
+				// fills therefore paid that many scans purely to discover that
+				// the first pass had been the final one. This is one scan for
+				// two characters.
+				// The comparison above still decides the rest: a value that
+				// carries a fill of its own leaves '[[' standing, and a
+				// same-count swap - which is why the loop compares the string
+				// rather than counting - is caught by it as before
+				if( substr_count( $html, '[[' ) === 0 )
+					break;
 			}
 
 			return $html;

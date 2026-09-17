@@ -306,6 +306,9 @@ namespace Nino {
 				if( is_array( $typeData ) === false )
 					return null;
 
+				// Kept to compare against below - see the 'nothing' outcome
+				$before = $typeData;
+
 				// Unset locale data
 				unset( $typeData[$locale][$elementUri] );
 				if( empty( $typeData[$locale] ) === true )
@@ -328,6 +331,20 @@ namespace Nino {
 				if( $lastEntry === true )
 					unset( $typeData['*'][$elementUri] );
 
+				/*	Nothing came out, so nothing goes back in. A delete of an
+					element that is not there - the second delete of the same
+					one, a locale that never held it - unset nothing, and the
+					type file was written whole regardless: a temp file, a
+					rename, an opcache invalidation, and a new mtime that
+					invalidates every cached read of that file elsewhere. Then
+					'/nino/elements/committed' fired with operation 'delete', so
+					a module keeping derived data was told about a deletion that
+					had not happened	*/
+				if( $typeData === $before ) {
+					$outcome = 'nothing';
+					return null;
+				}
+
 				unset( $appData['./nino/elements/cache'] );
 
 				// Run callback
@@ -342,6 +359,15 @@ namespace Nino {
 
 			if( $outcome === 'notfound' )
 				return ! trigger_error( 'Element type \''. $typeUri. '\' does not exist.' );
+
+			/*	Still a success, and deliberately so: "already gone" is what
+				was asked for, and admin-system-smoke.php pins that contract
+				("deleting an already-deleted element is an idempotent no-op,
+				not an error"). What is gone is the work - no rewrite of the
+				type file, and no '/nino/elements/committed' for a deletion that
+				did not happen	*/
+			if( $outcome === 'nothing' )
+				return true;
 
 			if( $outcome === 'veto' )
 				return null;
@@ -957,7 +983,21 @@ namespace Nino {
 			$typeUri		= self::getElementTypeFromUri( $uri );
 			$elementUri	= self::getElementUriFromUri( $uri );
 
-			if( $locale !== '*' && isset( $appData['./nino/elements/cache']['elements'][$uri][$locale] ) === true )
+			/*	A '*' read resolves to whichever locale actually holds this
+				element, and that resolution is remembered beside it. The check
+				below excluded '*' outright, so a '*' read could never hit the
+				cache: every one of them went back to the type file (a stat per
+				read, see getElementFile()), walked its locale buckets again and
+				rebuilt the merged array - on a page that renders a collection,
+				once per element per render. Dropped with the rest of this cache
+				whenever anything is written (see deleteElement() and
+				_writeElementData())	*/
+			$wanted = $locale;
+
+			if( $locale === '*' && isset( $appData['./nino/elements/cache']['resolved'][$uri] ) === true )
+				$locale = (string) $appData['./nino/elements/cache']['resolved'][$uri];
+
+			if( isset( $appData['./nino/elements/cache']['elements'][$uri][$locale] ) === true )
 				return;
 
 			// Get element type data from file
@@ -991,6 +1031,15 @@ namespace Nino {
 			// Combine data
 			$appData['./nino/elements/cache']['elements'][$uri] = $appData['./nino/elements/cache']['elements'][$uri] ?? [];
 			$appData['./nino/elements/cache']['elements'][$uri][$locale] = $localeData + $globalData + $localeDefaults + $globalDefaults + $defaults;
+
+			// What a '*' read resolves to, for the next one - '*' itself where
+			// the element is global-only, which is an answer like any other.
+			// Only for a read that asked with '*': a read of a named locale
+			// answers "this locale", not "the one a '*' read would find", and
+			// storing that as the resolution made the next '*' read answer
+			// with whichever locale happened to have been read last
+			if( $wanted === '*' )
+				$appData['./nino/elements/cache']['resolved'][$uri] = $locale;
 		}
 
 	}
