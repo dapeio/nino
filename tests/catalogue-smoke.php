@@ -243,6 +243,27 @@ check( 'what is missing gets its default, digests and extensions are lowercased,
 	&& $parsed['features'][0]['category'] === ''
 	&& $parsed['features'][0]['sha256'] === str_repeat( 'ab', 32 ) && $parsed['features'][0]['php']['ext'] === [ 'mbstring' ] && strlen( $parsed['features'][0]['released'] ) === 32 );
 
+/*	A catalogue entry is a published manifest, so this reader and
+	Features::manifest() have to agree about the fields they both read.
+	"requires" had drifted: the manifest side drops a self-reference and a
+	duplicate, this side kept both, and the panel then showed a feature
+	requiring itself and the same requirement twice. The install walk survived
+	it - _plan() chains what it has already planned - so the list is what a
+	reader of it sees	*/
+$selfNeedy = \Nino\Catalogue::parse( json_encode( [ 'format' => 1, 'features' => [ [ 'key' => 'x', 'name' => 'X', 'version' => '1.0.0', 'directory' => 'X',
+	'archive' => 'https://c.test/x.tar.gz', 'sha256' => str_repeat( 'ab', 32 ), 'size' => 1, 'requires' => [ 'x', 'helper', 'helper', 'other' ] ] ] ] ) );
+check( 'a requirement on itself, and a requirement listed twice, are both dropped - the same two steps Features::manifest() takes', is_array( $selfNeedy )
+	&& $selfNeedy['features'][0]['requires'] === [ 'helper', 'other' ] );
+
+// And the vocabulary itself is one definition rather than two. These three
+// were private copies here, identical to the manifest reader's, which is one
+// spelling too many of "what a feature key is"
+$catalogueClass = new ReflectionClass( '\Nino\Catalogue' );
+check( 'a key, a version and a category are \Nino\Features\' vocabulary, not a second copy of it', array_filter( [ 'KEY_PATTERN', 'VERSION_PATTERN', 'CATEGORY_PATTERN' ],
+	static fn( string $name ): bool => $catalogueClass->getReflectionConstant( $name ) !== false ) === [] );
+check( '...and so is what counts as a usable name or description', method_exists( '\Nino\Features', 'localizedValid' ) === true
+	&& $catalogueClass->hasMethod( '_localizedValid' ) === false );
+
 // The one field a bad value does not cost the catalogue. Everything else here
 // refuses the whole document (see the checks below) because everything else
 // is something the kernel acts on; a category is a heading in a list, and a

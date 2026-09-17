@@ -2520,6 +2520,20 @@ $arrayPickerRequest = fakeRequest( $appData, '/legal?/_nino/localepicker/current
 \Nino\Modules\Localepicker::callbackResponse( $appData, $arrayPickerRequest );
 check( 'the localepicker also ignores an array-shaped locale query', \Nino\Locales::getCurrentLocale( $appData ) === 'en_US' && $arrayPickerRequest['/nino/http/response']['statusCode'] === 201 );
 
+/*	The two switches are one method under two keys now. Modules\Localepicker's
+	callback used to be a verbatim copy of the kernel's - every line and every
+	comment, differing in the query key alone - which is two places to fix
+	whenever one of them turns out to be wrong	*/
+\Nino\Locales::setCurrentLocale( $appData, 'en_US' );
+$ownKeyRequest = fakeRequest( $appData, '/legal?/_project/language=de_DE' );
+\Nino\Http::response( $appData, $ownKeyRequest );
+\Nino\Locales::switchFromQuery( $appData, $ownKeyRequest, '/_project/language' );
+check( 'the locale switch is one method taking the query key, so a project can answer under its own', $ownKeyRequest['/nino/http/response']['statusCode'] === 302
+	&& ( $ownKeyRequest['/nino/http/response']['header']['Location'] ?? '' ) === '/rechtliches'
+	&& \Nino\Locales::getCurrentLocale( $appData ) === 'de_DE' );
+check( '...and the module carries no copy of it any more', str_contains( (string) file_get_contents( dirname( __DIR__ ). '/_nino/Nino/Modules/Localepicker/Localepicker.php' ), 'findRouteUri' ) === false );
+\Nino\Locales::setCurrentLocale( $appData, 'en_US' );
+
 $queryParser = new ReflectionMethod( '\Nino\Http', '_getRequestQueryVarsPart' );
 $queryParser->setAccessible( true );
 check( 'a URL parse failure produces an empty query array', $queryParser->invoke( null, 'http://[' ) === [] );

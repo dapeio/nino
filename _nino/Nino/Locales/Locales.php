@@ -67,9 +67,32 @@ namespace Nino {
 		// redirect back to the current uri in the new locale
 		public static function callbackResponse( array &$appData, array &$request ): void {
 
+			self::switchFromQuery( $appData, $request, '/_nino/locales/current' );
+		}
+
+		/**
+		 *	Apply the locale a query string asked for, and send the visitor to
+		 *	that locale's own address for the page they are on.
+		 *
+		 *	The key is a parameter because there are two switches, not one:
+		 *	this kernel class answers '?/_nino/locales/current=de_DE', and the
+		 *	optional Localepicker module answers its own
+		 *	'?/_nino/localepicker/current=de_DE' beside it. That module used to
+		 *	carry a verbatim copy of this method under the second key - every
+		 *	comment and every line - which is two places to fix whenever one of
+		 *	them turns out to be wrong.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		&$request			(reference) Current server request
+		 *	@param		string		$queryKey			The query variable that carries the wanted locale
+		 *
+		 *	@return 	void
+		 */
+		public static function switchFromQuery( array &$appData, array &$request, string $queryKey ): void {
+
 			// Catch locale change. parse_str() legitimately creates arrays for a
 			// query such as current[]=de_DE; only scalar locale ids are valid.
-			$requestedLocale = $request['/nino/http/request']['query']['/_nino/locales/current'] ?? null;
+			$requestedLocale = $request['/nino/http/request']['query'][$queryKey] ?? null;
 			if( is_string( $requestedLocale ) === false )
 				return;
 

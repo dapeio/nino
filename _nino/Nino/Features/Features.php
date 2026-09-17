@@ -101,10 +101,17 @@ namespace Nino {
 		// build step only ever publishes these.
 		public const array CATEGORIES = [ 'content', 'ui', 'communication', 'marketing', 'security', 'system' ];
 
-		private const string KEY_PATTERN = '/^[a-z][a-z0-9-]*$/';
-		private const string CATEGORY_PATTERN = '/^[a-z][a-z0-9-]{0,23}$/';
+		/*	What a feature key, a category and a version look like. Public
+			because they are not this class's private business: \Nino\Catalogue
+			reads the same three fields out of a published catalogue entry, and
+			kept its own copies of all three. Two spellings of "what a feature
+			key is" is one spelling too many - the catalogue is the publishing
+			side of exactly these manifests	*/
+		public const string KEY_PATTERN = '/^[a-z][a-z0-9-]*$/';
+		public const string CATEGORY_PATTERN = '/^[a-z][a-z0-9-]{0,23}$/';
+		public const string VERSION_PATTERN = '/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.]+)?$/';
+
 		private const string SETTING_PATTERN = '/^[a-z][a-zA-Z0-9]*$/';
-		private const string VERSION_PATTERN = '/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.]+)?$/';
 
 		private const int MAX_STRING_LENGTH = 1000;
 		private const int MAX_TEXT_LENGTH = 10000;
@@ -250,10 +257,10 @@ namespace Nino {
 			if( is_string( $key ) === false || preg_match( self::KEY_PATTERN, $key ) !== 1 )
 				return $fail( '"key" must be a slug' );
 
-			if( self::_localizedValid( $raw['name'] ?? '' ) === false )
+			if( self::localizedValid( $raw['name'] ?? '' ) === false )
 				return $fail( '"name" must be a string or a locale => string map' );
 
-			if( isset( $raw['description'] ) === true && self::_localizedValid( $raw['description'] ) === false )
+			if( isset( $raw['description'] ) === true && self::localizedValid( $raw['description'] ) === false )
 				return $fail( '"description" must be a string or a locale => string map' );
 
 			// The prose a manifest may carry beyond its description: how the
@@ -290,7 +297,7 @@ namespace Nino {
 						if( is_int( $handle ) === false && ( trim( $handle ) === '' || strlen( $handle ) > self::MANUAL_HANDLE_LENGTH ) )
 							return $fail( '"manual" section "'. $section. '": a handle is a non-empty string of at most '. self::MANUAL_HANDLE_LENGTH. ' characters, or none at all' );
 
-						if( self::_localizedValid( $text ) === false )
+						if( self::localizedValid( $text ) === false )
 							return $fail( '"manual" section "'. $section. '", "'. $handle. '": the line must be a string or a locale => string map' );
 
 						foreach( is_array( $text ) === true ? $text : [ $text ] as $line )
@@ -305,7 +312,7 @@ namespace Nino {
 					had sections. Still read, so a catalogue written against the
 					older shape keeps working - but the sectioned one is what to
 					write: see docs/features.md	*/
-				if( self::_localizedValid( $raw['manual'] ) === false )
+				if( self::localizedValid( $raw['manual'] ) === false )
 					return $fail( '"manual" must be a section => handle => text map, or a string' );
 
 				foreach( is_array( $raw['manual'] ) === true ? $raw['manual'] : [ $raw['manual'] ] as $text )
@@ -1036,10 +1043,10 @@ namespace Nino {
 			if( in_array( $type, self::SETTING_TYPES, true ) === false )
 				return 'setting "'. $name. '" has an unknown type "'. $type. '"';
 
-			if( isset( $schema['label'] ) === true && self::_localizedValid( $schema['label'] ) === false )
+			if( isset( $schema['label'] ) === true && self::localizedValid( $schema['label'] ) === false )
 				return 'setting "'. $name. '": "label" must be a string or a locale => string map';
 
-			if( isset( $schema['hint'] ) === true && self::_localizedValid( $schema['hint'] ) === false )
+			if( isset( $schema['hint'] ) === true && self::localizedValid( $schema['hint'] ) === false )
 				return 'setting "'. $name. '": "hint" must be a string or a locale => string map';
 
 			$clean = [
@@ -1089,7 +1096,7 @@ namespace Nino {
 					// a message that contradicted what its author had written
 					$value = (string) $value;
 
-					if( $value === '' || self::_localizedValid( $label ) === false )
+					if( $value === '' || self::localizedValid( $label ) === false )
 						return 'setting "'. $name. '": "options" must map a value to a label';
 
 					$clean['options'][$value] = $label;
@@ -1306,7 +1313,19 @@ namespace Nino {
 			return true;
 		}
 
-		private static function _localizedValid( mixed $value ): bool {
+		/**
+		 *	Whether a name or description is usable: a non-empty string, or a
+		 *	non-empty locale => string map with nothing empty in it.
+		 *
+		 *	Public for the same reason the patterns above are - \Nino\Catalogue
+		 *	validates the same two fields of the same manifests once they are
+		 *	published, and carried a line-for-line copy of this
+		 *
+		 *	@param		mixed			$value
+		 *
+		 *	@return 	bool
+		 */
+		public static function localizedValid( mixed $value ): bool {
 
 			if( is_string( $value ) === true )
 				return trim( $value ) !== '';

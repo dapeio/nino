@@ -42,38 +42,19 @@ namespace Nino\Modules {
 		}
 
 		/**
-		 *	Prepare a http request
+		 *	The same locale switch the kernel answers, under this module's own
+		 *	query key - see \Nino\Locales::switchFromQuery(), which this is the
+		 *	second caller of. It used to be a verbatim copy of that method,
+		 *	comments and all, differing in the key alone
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		array			$request			Current request
+		 *	@param		array			&$request			Current request
 		 *
 		 *	@return 	void
 		 */
 		public static function callbackResponse( array &$appData, array &$request ): void {
 
-			$requestedLocale = $request['/nino/http/request']['query']['/_nino/localepicker/current'] ?? null;
-			if( is_string( $requestedLocale ) === false )
-				return;
-
-			$locale = \Nino\Locales::setCurrentLocale( $appData, $requestedLocale );
-
-			// Keep the response's own 'locale' in sync with the switch just
-			// made - \Nino\request() calls Locales::response() right after
-			// Http::response()'s callbacks run, and that method reverts the
-			// current locale straight back if it doesn't match this field.
-			// Left at whatever Http::request() seeded it with (the locale
-			// *before* this switch), that's exactly what would happen: the
-			// switch above would never survive past this same request
-			$request['/nino/http/response']['locale'] = $locale;
-
-			$newUri = \Nino\Http::findRouteUri( $appData, $request['/nino/http/response']['uri'], $locale );
-
-			// Redirect via the response array - a direct header() call would be
-			// overwritten by Http::output()'s own http_response_code() pass
-			if( $newUri !== null ) {
-				$request['/nino/http/response']['statusCode'] 					= 302;
-				$request['/nino/http/response']['header']['Location']	= str_replace( $request['/nino/http/request']['method']. ':/', '', $newUri );
-			}
+			\Nino\Locales::switchFromQuery( $appData, $request, '/_nino/localepicker/current' );
 		}
 
 		/**

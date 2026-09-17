@@ -94,10 +94,14 @@ PEM;
 		// writes it fresh
 		private const string CACHE_FILE = '/data/catalogue.php';
 
-		private const string KEY_PATTERN				= '/^[a-z][a-z0-9-]*$/';
-		private const string DIRECTORY_PATTERN	= '/^[A-Z][A-Za-z0-9]*$/';
-		private const string VERSION_PATTERN		= '/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.]+)?$/';
-		private const string CATEGORY_PATTERN		= '/^[a-z][a-z0-9-]{0,23}$/';
+		/*	A key, a version and a category are \Nino\Features' vocabulary, not
+			this class's: a catalogue entry is a published manifest, so the two
+			readers have to agree on what those three fields look like or a
+			feature is installable and unreadable, or the other way round. They
+			were copies here. The directory name is this reader's own - a
+			manifest never carries one, since a manifest is already inside the
+			directory it describes	*/
+		private const string DIRECTORY_PATTERN = '/^[A-Z][A-Za-z0-9]*$/';
 
 		/**
 		 *	@param		array 		&$appData			(reference) Array with current app data
@@ -690,13 +694,13 @@ PEM;
 				return 'must be an object';
 
 			$key = (string) ( $entry['key'] ?? '' );
-			if( preg_match( self::KEY_PATTERN, $key ) !== 1 )
+			if( preg_match( \Nino\Features::KEY_PATTERN, $key ) !== 1 )
 				return '"key" must be a slug';
 
-			if( self::_localizedValid( $entry['name'] ?? '' ) === false )
+			if( \Nino\Features::localizedValid( $entry['name'] ?? '' ) === false )
 				return '"name" must be a string or a locale => string map';
 
-			if( isset( $entry['description'] ) === true && self::_localizedValid( $entry['description'] ) === false )
+			if( isset( $entry['description'] ) === true && \Nino\Features::localizedValid( $entry['description'] ) === false )
 				return '"description" must be a string or a locale => string map';
 
 			// Dropped rather than refused, which is the one place this reader
@@ -707,11 +711,11 @@ PEM;
 			// publishes a category it predates - the field has to be the cheap
 			// kind to get wrong
 			$category = $entry['category'] ?? '';
-			if( is_string( $category ) === false || preg_match( self::CATEGORY_PATTERN, $category ) !== 1 )
+			if( is_string( $category ) === false || preg_match( \Nino\Features::CATEGORY_PATTERN, $category ) !== 1 )
 				$category = '';
 
 			$version = (string) ( $entry['version'] ?? '' );
-			if( preg_match( self::VERSION_PATTERN, $version ) !== 1 )
+			if( preg_match( \Nino\Features::VERSION_PATTERN, $version ) !== 1 )
 				return '"version" must be major.minor.patch';
 
 			$nino = trim( (string) ( $entry['nino'] ?? '*' ) );
@@ -725,11 +729,18 @@ PEM;
 				$extensions[] = strtolower( $ext );
 			}
 
+			// Self-excluded and de-duplicated, the same two steps
+			// Features::manifest() takes over the identical field: a feature
+			// that lists itself, or lists the same key twice, is the panel
+			// showing a requirement on itself and a requirement twice. The
+			// install walk survived both (see _plan(), which chains what it
+			// has already planned), so this is what a reader of the list sees
 			$requires = [];
 			foreach( (array) ( $entry['requires'] ?? [] ) as $req ) {
-				if( is_string( $req ) === false || preg_match( self::KEY_PATTERN, $req ) !== 1 )
+				if( is_string( $req ) === false || preg_match( \Nino\Features::KEY_PATTERN, $req ) !== 1 )
 					return '"requires" must list feature keys';
-				$requires[] = $req;
+				if( $req !== $key && in_array( $req, $requires, true ) === false )
+					$requires[] = $req;
 			}
 
 			$directory = (string) ( $entry['directory'] ?? '' );
@@ -790,26 +801,6 @@ PEM;
 		private static function _comparable( string $version ): string {
 
 			return preg_replace( '/-.*$/', '', $version ) ?? $version;
-		}
-
-		/**
-		 *	@param		mixed			$value
-		 *
-		 *	@return 	bool
-		 */
-		private static function _localizedValid( mixed $value ): bool {
-
-			if( is_string( $value ) === true )
-				return trim( $value ) !== '';
-
-			if( is_array( $value ) === false || $value === [] )
-				return false;
-
-			foreach( $value as $locale => $string )
-				if( is_string( $locale ) === false || is_string( $string ) === false || trim( $string ) === '' )
-					return false;
-
-			return true;
 		}
 	}
 }

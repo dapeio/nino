@@ -188,6 +188,26 @@ All notable changes to Nino are documented in this file.
 
 ### Fixed
 
+- **Two copies that had drifted apart.** A catalogue entry is a published
+  feature manifest, so `\Nino\Catalogue`'s reader and
+  `\Nino\Features::manifest()` have to agree about the fields they both read.
+  They did not: the manifest side drops a `requires` entry naming the feature
+  itself and de-duplicates the rest, the catalogue side kept both, so the
+  Features panel could show a feature requiring itself and the same
+  requirement listed twice. (The install walk survived it - `_plan()` chains
+  what it has already planned - so it was the list a reader sees, not the
+  install.) The catalogue side takes the same two steps now, and the three
+  patterns it had copied - what a key, a version and a category look like -
+  and the line-for-line copy of `localizedValid()` are gone: those are
+  `\Nino\Features`' vocabulary, and two spellings of "what a feature key is"
+  is one too many.
+
+  `\Nino\Modules\Localepicker::callbackResponse()` was a verbatim copy of
+  `\Nino\Locales::callbackResponse()` - every line and every comment,
+  differing in the query key alone, which is two places to fix whenever one of
+  them turns out to be wrong. The kernel's is `switchFromQuery()` now, taking
+  the key as a parameter, and the module is the second caller of it.
+
 - **The workbench asked the server for the same thing twice.** Three separate
   repetitions, each measured before and after.
 
