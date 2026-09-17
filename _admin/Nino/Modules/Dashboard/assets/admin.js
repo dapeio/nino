@@ -158,7 +158,7 @@
 		},
 
 		/**
-		 *	"Elemente nach Typ": one meter bar per type, width relative to
+		 *	"Elements by type": one meter bar per type, width relative to
 		 *	whichever type has the most entries, clicking a row jumps to
 		 *	that type in the Elements panel
 		 *
@@ -225,7 +225,7 @@
 		},
 
 		/**
-		 *	"Letzte Aktivität": the handful of most recent log lines
+		 *	"Recent activity": the handful of most recent log lines
 		 *	(server already limits + orders them), same list markup as
 		 *	logs.js's own full list
 		 *

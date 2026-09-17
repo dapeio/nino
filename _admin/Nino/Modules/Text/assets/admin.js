@@ -123,7 +123,7 @@
 
 		/**
 		 *	Drill-down navigation: category list -> category form. The main
-		 *	System/Texte/Elemente bar stays visible throughout.
+		 *	System/Text/Elements bar stays visible throughout.
 		 *
 		 *	@return		void
 		 */

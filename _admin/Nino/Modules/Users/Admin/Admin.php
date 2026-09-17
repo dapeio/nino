@@ -394,7 +394,7 @@ namespace Nino\Modules\Users {
 		}
 
 		/**
-		 *	Log a user out of every session ("überall abmelden")
+		 *	Log a user out of every session ("Log out everywhere")
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request

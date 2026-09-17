@@ -2532,7 +2532,7 @@ header .nino-headernav-logo {
 .nino-vpa--blur-medium { --vpa-f-hidden: blur(12px); --vpa-f-visible: blur(0); }
 .nino-vpa--blur-hard { --vpa-f-hidden: blur(24px); --vpa-f-visible: blur(0); }
 
-/* --flip-*: a playful 3D tilt-down into place - the most "auffällig" of the
+/* --flip-*: a playful 3D tilt-down into place - the loudest of the
    set, best used sparingly (one hero/callout, not a whole repeated grid) */
 .nino-vpa--flip-soft { --vpa-t-hidden: perspective(800px) rotateX(-20deg); --vpa-t-visible: perspective(800px) rotateX(0deg); --vpa-origin: top center; }
 .nino-vpa--flip-medium { --vpa-t-hidden: perspective(800px) rotateX(-40deg); --vpa-t-visible: perspective(800px) rotateX(0deg); --vpa-origin: top center; }

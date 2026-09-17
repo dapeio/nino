@@ -168,6 +168,18 @@ All notable changes to Nino are documented in this file.
 
 ### Fixed
 
+- **Seven comments in the kernel and the workbench were written in German.**
+  A docblock that names the screen it belongs to tends to name it in the
+  language the screenshot was taken in - "Elemente nach Typ", "Letzte
+  Aktivität", "überall abmelden", and three drill-down docblocks naming the
+  panel bar as `System/Texte/Elemente`. Each reads fine to whoever wrote it
+  and not at all to the next person. They say what the English interface says
+  now, and `tests/kernel-smoke.php` reads every comment in `_nino/` and
+  `_admin/` and names the ones that are German - by an umlaut *and* by a word
+  list, because "Elemente nach Typ" has no umlaut in it and an umlaut alone
+  would flag `Nino.ui.js`'s `de` locale table, which is the point of that
+  table.
+
 - **Two module stylesheets wrote rules over the whole workbench.** A panel's
   `admin.css` is bundled into the same page as every other panel's, so a
   selector that starts at a bare class is not that panel's rule - it is the

@@ -259,8 +259,8 @@
 
 		/**
 		 *	Drill-down navigation: types -> list -> form, each level hiding its
-		 *	parent (the main System/Texte/Elemente bar stays visible throughout,
-		 *	so only the local "‹ Zurück" links in the list/form need to move
+		 *	parent (the main System/Text/Elements bar stays visible throughout,
+		 *	so only the local "‹ Back" links in the list/form need to move
 		 *	back up one level, not the whole page)
 		 *
 		 *	@return		void

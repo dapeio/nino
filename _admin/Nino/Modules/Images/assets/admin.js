@@ -120,8 +120,8 @@
 		},
 
 		/**
-		 *	Drill-down navigation: list -> form. The main Elemente/Texte/Bilder/
-		 *	Nutzer bar stays visible throughout.
+		 *	Drill-down navigation: list -> form. The main Elements/Text/Images/
+		 *	Users bar stays visible throughout.
 		 *
 		 *	@return		void
 		 */

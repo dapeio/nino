@@ -3470,6 +3470,70 @@ check( '...and the rule has something to find: the sources were actually read', 
 echo "\n";
 
 
+// --- One language in the source -------------------------------------------
+
+echo "Comments in the kernel and the workbench are written in one language\n";
+
+/*	The project is written in English - code, comments and docblocks alike -
+	and German belongs in the two places that are about German: a locale's
+	text file and a *.de.md manual. What kept turning up instead was a
+	docblock naming the screen it belongs to in the language the screenshot
+	was taken in ("Elemente nach Typ", "ueberall abmelden"), which reads fine
+	to whoever wrote it and not at all to the next person.
+
+	Comment lines only, and by two marks together: an umlaut, and a word list
+	of german function words that are not also english ones. Neither alone is
+	enough - "Elemente nach Typ" carries no umlaut, and an umlaut on its own
+	would flag \Nino.ui.js's 'de' locale table, which is the point of that
+	table. Words that are german and english both ("die", "man", "war",
+	"hat", "fast", "also") are deliberately not in the list; the whole source
+	tree is checked against it below, so a false positive is visible here
+	rather than in somebody's next patch.	*/
+$languageWords = 'nach|nicht|wird|werden|oder|aber|wenn|damit|durch|zwischen|schon|noch|immer|eine|einen|einem|einer|kein|keine|jede|jeden|jedes|dieser|diese|dieses|welche|und|sich|auch|sind|nur|beim|zum|zur|vom|der|das|des|dem|ist|sein|Datei|Zeile|Seite|Elemente|Typ|sowie|bereits|etwa|zwar';
+$languageSources = [];
+$languageWalk = static function( string $dir ) use ( &$languageWalk, &$languageSources ): void {
+	foreach( (array) glob( $dir. '/*' ) as $path ) {
+		$path = (string) $path;
+		// A locale's own text lives under text/, a shipped library page is a
+		// project's content rather than this project's source
+		if( str_contains( $path, '/text' ) === true || str_contains( $path, '/install/library' ) === true || str_contains( $path, 'de_DE' ) === true )
+			continue;
+		if( is_dir( $path ) === true )
+			$languageWalk( $path );
+		elseif( preg_match( '/\\.(php|js|css)$/', $path ) === 1 )
+			$languageSources[] = $path;
+	}
+};
+$languageWalk( __DIR__. '/../_nino' );
+$languageWalk( __DIR__. '/../_admin' );
+
+$languageOffenders = [];
+foreach( $languageSources as $languageFile ) {
+	foreach( explode( "\n", (string) file_get_contents( $languageFile ) ) as $languageNo => $languageLine ) {
+
+		$opening	= ltrim( $languageLine, " \t" );
+		$trailing	= strpos( $languageLine, '//' );
+
+		// The comment half of the line, and only that: a trailing '// ...' is
+		// one (the '//' of a url is not), and everything left of it is code,
+		// where a variable named $der is nobody's german
+		if( $opening !== '' && ( $opening[0] === '*' || str_starts_with( $opening, '//' ) || str_starts_with( $opening, '/*' ) ) )
+			$languageComment = $languageLine;
+		elseif( $trailing !== false && $trailing > 0 && $languageLine[$trailing - 1] !== ':' )
+			$languageComment = substr( $languageLine, $trailing );
+		else
+			continue;
+
+		if( preg_match( '/[\x{00e4}\x{00f6}\x{00fc}\x{00df}\x{00c4}\x{00d6}\x{00dc}]|\b('. $languageWords. ')\b/u', $languageComment ) === 1 )
+			$languageOffenders[] = substr( (string) realpath( $languageFile ), strlen( (string) realpath( __DIR__. '/..' ) ) + 1 ). ':'. ( $languageNo + 1 );
+	}
+}
+check( 'no comment in the kernel or the workbench is written in german'. ( $languageOffenders === [] ? '' : ' - '. implode( ' | ', $languageOffenders ) ), $languageOffenders === [] );
+check( '...and the rule has something to find: the sources were actually read', count( $languageSources ) > 60 );
+
+echo "\n";
+
+
 // --- The private root is never reachable over http -----------------------
 
 echo "router.php - the private root is never served\n";
