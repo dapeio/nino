@@ -325,6 +325,27 @@ check( 'a secret posted empty keeps the current one, posted null clears it', $v(
 	&& $v( [ 'apiKey' => null ], [ 'apiKey' => 'old' ] )['values']['apiKey'] === '' && $v( [ 'apiKey' => 'new' ], [ 'apiKey' => 'old' ] )['values']['apiKey'] === 'new' );
 check( 'lines come as a textarea or a list, trimmed and unique', $v( [ 'hosts' => " a.example \n\n b.example \n a.example " ] )['values']['hosts'] === [ 'a.example', 'b.example' ]
 	&& $v( [ 'hosts' => [ 'x', 'y' ] ] )['values']['hosts'] === [ 'x', 'y' ] && $v( [ 'hosts' => [ 'x', 3 ] ] )['errors']['hosts'] === 'must be a list of strings' );
+
+/*	A list longer than the cap is refused - and refused without having been
+	de-duplicated first. The de-duplication was an in_array() over the list
+	built so far, so it walked that list once per posted line, and the cap was
+	only looked at once the whole post had been through it. Measured on the
+	method: 1 000 lines took 2.6 ms, 5 000 took 61 ms, and 20 000 took 883 ms
+	of cpu for an answer that was "too long" either way.
+
+	The bound below is generous on purpose - twenty thousand lines now take
+	about 0.04 ms, and 883 ms is what it has to stay clear of	*/
+$manyLines = [];
+for( $i = 0; $i < 20000; $i++ )
+	$manyLines[] = 'line number '. $i;
+
+$manyStart	= hrtime( true );
+$manyResult	= $v( [ 'hosts' => $manyLines ] );
+$manyMs			= ( hrtime( true ) - $manyStart ) / 1e6;
+
+check( 'a list longer than the cap is refused', ( $manyResult['errors']['hosts'] ?? '' ) === 'must be at most 200 lines' );
+check( '...as soon as it is too long, not after the whole post has been walked and de-duplicated ('. round( $manyMs, 2 ). ' ms)', $manyMs < 100 );
+check( 'and a list at the cap is still accepted whole', count( $v( [ 'hosts' => array_slice( $manyLines, 0, 200 ) ] )['values']['hosts'] ?? [] ) === 200 );
 check( 'a setting the form did not send keeps its current value, and a stray key is ignored', $v( [ 'limit' => 3, 'stray' => 1 ], [ 'title' => 'Kept', 'stray' => 2 ] )['values'] === [ 'limit' => 3, 'title' => 'Kept' ] );
 check( 'every setting is checked before any is accepted', count( $v( [ 'limit' => 'x', 'title' => '', 'mode' => 'z' ] )['errors'] ) === 3 );
 
@@ -414,6 +435,37 @@ check( 'the Roles tab offers the panel\'s permission under the features group, t
 
 $again = \Nino\Features::activate( $appData, 'sample' );
 check( 'activating again is harmless: nothing changes', $again === true && \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/modules'] === $stored['/nino/modules'] && isset( $appData['./sample/upgraded-from'] ) === false );
+
+/*	...and "nothing changes" now means nothing is done either. Activating
+	sample re-applied helper's whole unit every time - every file copied or
+	skipped, every text key walked, config.php written - although helper was
+	already on and already at the version its own directory carries, which is a
+	state an activation has nothing left to do anything about.
+
+	Observable because helper's unit carries a config default: take it away and
+	only something that really applies that unit puts it back	*/
+unset( $appData['/helper/config'] );
+\Nino\AppData::writeContentData( $appData, [ '/helper/config' ] );
+check( 'the default helper\'s unit brings is out of the way', isset( $appData['/helper/config'] ) === false );
+
+check( 'activating sample does not re-apply the unit of a requirement that is already on and current', \Nino\Features::activate( $appData, 'sample' ) === true
+	&& isset( $appData['/helper/config'] ) === false );
+
+check( '...while activating helper itself applies it, as it always did', \Nino\Features::activate( $appData, 'helper' ) === true
+	&& ( $appData['/helper/config'] ?? null ) === 'unit-default' );
+
+/*	A requirement whose record is older than its directory is an update, and
+	that one must not be skipped: the activation of anything requiring it is
+	exactly where the update gets carried through	*/
+$olderRecord = $appData[ \Nino\Features::STATE_KEY ];
+$olderRecord['helper']['version'] = '0.0.9';
+$appData[ \Nino\Features::STATE_KEY ] = $olderRecord;
+unset( $appData['/helper/config'], $appData['./nino/features/all'] );
+\Nino\AppData::writeContentData( $appData, [ \Nino\Features::STATE_KEY, '/helper/config' ] );
+
+check( 'a requirement whose record is older than its directory is activated, not skipped', \Nino\Features::activate( $appData, 'sample' ) === true
+	&& ( $appData['/helper/config'] ?? null ) === 'unit-default'
+	&& ( $appData[ \Nino\Features::STATE_KEY ]['helper']['version'] ?? null ) === '0.1.0' );
 
 echo "\n";
 

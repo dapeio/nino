@@ -188,6 +188,35 @@ All notable changes to Nino are documented in this file.
 
 ### Fixed
 
+- **A settings list of 20 000 lines cost 883 ms to refuse.** The `lines`
+  validator de-duplicated with an `in_array()` over the list built so far - a
+  walk of that list per posted line - and looked at `MAX_LINES` only once the
+  whole post had been through it. So an oversized list was paid for in full
+  before being told it was too long: 2.6 ms at 1 000 lines, 61 ms at 5 000,
+  883 ms at 20 000. The seen lines are keys now and the cap is checked as each
+  line is kept, which is the same threshold reached earlier: 0.04 ms at
+  20 000. It is an authenticated endpoint, but a second of cpu per request is
+  a second of cpu per request.
+
+- **The wizard re-read its whole page library once per page.**
+  `Webpages::pages()` asks `_unitFromBody()` for every route it lists, and
+  that scans the library: a `scandir`, a manifest `include` per unit, and a
+  text fragment `include` per unit per locale. Seven units and two locales is
+  21 includes, and a project with twenty pages paid for that twenty times over
+  to render the page list once. Read once per locale set now - the library is
+  inside the tool and nothing writes to it at runtime. Per `pages()` call:
+  0.72 → 0.08 ms at four pages, 6.95 → 0.91 at forty.
+
+- **Activating a feature re-applied its requirements' units every time.**
+  Every file copied or skipped, every text key walked, `config.php` written -
+  once per requirement, on every activation of anything that requires it,
+  even when that requirement was already on and already at the version its own
+  directory carries. A requirement in that state is skipped now; one whose
+  record is older than its directory is an update and still runs, and one with
+  problems is still refused rather than quietly passed over. And `applyUnit()`
+  wrote `config.php` once per config default a unit brought instead of once
+  for all of them.
+
 - **Three things the kernel did over again on every page.** Each measured
   before and after.
 

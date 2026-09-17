@@ -628,6 +628,26 @@ namespace Nino {
 			$chain[] = $key;
 
 			foreach( $feature['requires'] as $required ) {
+
+				/*	A requirement that is already on, at the version its own
+					directory carries and with nothing wrong with it, has nothing
+					left for an activation to do: the unit only ever adds what the
+					project does not have, the module is already listed, and the
+					recorded version is already this one. What it did cost was a
+					full unit pass - every file copied or skipped, every text key
+					walked, config.php written - once per requirement, on every
+					activation of anything that requires it.
+
+					'installed' rather than 'active' alone, because a newer
+					directory placed while the feature was off is an update and
+					that has to run; and 'problems' because a requirement that
+					has become unrunnable must still be refused here, loudly,
+					rather than quietly skipped	*/
+				$have = self::get( $appData, $required );
+
+				if( $have !== null && $have['active'] === true && $have['problems'] === [] && $have['installed'] === $have['version'] )
+					continue;
+
 				$result = self::activate( $appData, $required, $chain );
 				if( $result !== true )
 					return 'required feature "'. $required. '": '. $result;
@@ -893,14 +913,24 @@ namespace Nino {
 			foreach( ( $manifest['blacklist'] ?? [] ) as $key )
 				$blacklist[] = $key;
 
-			// A unit's own config defaults - only filled in where the project
-			// has nothing yet, never overwritten: re-applying a unit must not
-			// reset a value the developer has edited since
+			/*	A unit's own config defaults - only filled in where the project
+				has nothing yet, never overwritten: re-applying a unit must not
+				reset a value the developer has edited since.
+
+				Collected and written once. writeContentData() takes a list of
+				keys and rewrites the whole of config.php for it, so writing
+				inside the loop meant one full rewrite per default a unit
+				brought: the base unit alone carries a dozen	*/
+			$configKeys = [];
+
 			foreach( ( $manifest['config'] ?? [] ) as $configKey => $configValue )
 				if( isset( $appData[$configKey] ) === false ) {
 					$appData[$configKey] = $configValue;
-					\Nino\AppData::writeContentData( $appData, [ $configKey ] );
+					$configKeys[] = $configKey;
 				}
+
+			if( $configKeys !== [] )
+				\Nino\AppData::writeContentData( $appData, $configKeys );
 
 			$globalFragment = $unitDir. '/text/global.php';
 			if( is_file( $globalFragment ) === true )
@@ -1197,18 +1227,34 @@ namespace Nino {
 						$value = preg_split( '/\r\n|\r|\n/', $value ) ?: [];
 					if( is_array( $value ) === false )
 						return [ false, 'must be a list' ];
+					/*	Seen as keys rather than in_array() over the list built so
+						far, which walked it once per line - and the length was
+						checked only after the whole post had been walked and
+						de-duplicated, so an oversized one was paid for in full
+						before being refused. The cap is checked as each line is
+						kept now, which is the same threshold reached earlier	*/
 					$lines = [];
+					$seen		= [];
+
 					foreach( $value as $line ) {
+
 						if( is_string( $line ) === false )
 							return [ false, 'must be a list of strings' ];
+
 						$line = trim( $line );
+
 						if( strlen( $line ) > self::MAX_STRING_LENGTH )
 							return [ false, 'a line must be at most '. self::MAX_STRING_LENGTH. ' characters' ];
-						if( $line !== '' && in_array( $line, $lines, true ) === false )
-							$lines[] = $line;
+
+						if( $line === '' || isset( $seen[$line] ) === true )
+							continue;
+
+						$seen[$line]	= true;
+						$lines[]			= $line;
+
+						if( count( $lines ) > self::MAX_LINES )
+							return [ false, 'must be at most '. self::MAX_LINES. ' lines' ];
 					}
-					if( count( $lines ) > self::MAX_LINES )
-						return [ false, 'must be at most '. self::MAX_LINES. ' lines' ];
 					if( $lines === [] && $required === true )
 						return [ false, 'is required' ];
 					return [ true, $lines ];

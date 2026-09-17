@@ -1023,6 +1023,21 @@ namespace Nino\Install {
 		 */
 		private static function _templates( array $locales = [] ): array {
 
+			/*	Read once per locale set, not once per caller. The library is
+				inside the tool and nothing writes to it at runtime, while
+				pages() asks _unitFromBody(), which asks this - once per page
+				route it lists. Each reading is a scandir plus a manifest
+				include per unit plus, through _suggestions(), a text fragment
+				include per unit per locale: seven units and two locales is 21
+				includes, and a project with twenty pages paid for that twenty
+				times over to render the wizard's page list once	*/
+			static $cached = [];
+
+			$cacheKey = implode( "\0", $locales );
+
+			if( isset( $cached[$cacheKey] ) === true )
+				return $cached[$cacheKey];
+
 			$units = [];
 
 			foreach( scandir( self::LIBRARY. '/pages' ) ?: [] as $entry ) {
@@ -1041,6 +1056,8 @@ namespace Nino\Install {
 			}
 
 			ksort( $units );
+
+			$cached[$cacheKey] = $units;
 
 			return $units;
 		}
