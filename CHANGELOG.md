@@ -168,6 +168,16 @@ All notable changes to Nino are documented in this file.
 
 ### Fixed
 
+- **Two module stylesheets wrote rules over the whole workbench.** A panel's
+  `admin.css` is bundled into the same page as every other panel's, so a
+  selector that starts at a bare class is not that panel's rule - it is the
+  workbench's. `.admin-form-actions` in the accounts panel and
+  `.admin-dashboard-more` in the dashboard's were exactly that, while both
+  files' own docblocks promised every selector starts at one of the panel's
+  ids. Both start at one now, and the suite reads the selectors out of every
+  module stylesheet and names the ones that do not, so the promise is checked
+  rather than repeated.
+
 - **The recovery form said whether a secret exists by how fast it refused.**
   `Recovery::verify()` checks a posted secret against the stored hash, and
   `$hash !== null && password_verify(...)` never reached the verify on an
@@ -1077,6 +1087,29 @@ All notable changes to Nino are documented in this file.
   rule that is not applied looks exactly like a rule that is. The deployment
   checklist asks for the variable, and `docs/deployment.md` has the probe that
   reads it along with the three places the credentials can fail to arrive.
+
+### Removed
+
+- **`putFileContent()`'s append mode, and `_appendFile()` with it.** Nobody
+  passed the flag - 92 call sites in the kernel, the workbench, the features and
+  the suites, and not one of them a fifth argument. It could not usefully have
+  been passed either: this class serialises a `.php` file as
+  `<?php return ...;` and a `.json` file through `json_encode()`, so appending
+  to either produced a file that no longer parses, and the two formats are what
+  it stores. Logs are not the exception that justified it - they are dated
+  `.php` arrays written whole through `mutate()`, and `\Nino\RotatingLog` only
+  ever sweeps them. What is left is one path with one behaviour, and three
+  branches fewer around the cache bookkeeping that the append case needed.
+
+- **Dead phone-layout rules in the accounts panel's stylesheet.** A
+  `@media (max-width: 38rem)` block placed a list row's `<a>` and `<button>`
+  into a two-column grid. There is no button - `_renderList()` gives each row
+  exactly one child, the `<a>`, and the panel's Add button lives outside the
+  list in the shared action bar - and there is no grid either: the shared
+  `.nino-admin-list > li` is a plain block, so the `grid-template-columns` the
+  block set on it was ignored, and with it every `grid-column` under it. Three
+  rules, none of which a browser ever applied.
+
 
 ## 1.2.0-beta — 2026-09-11
 

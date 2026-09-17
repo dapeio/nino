@@ -80,7 +80,7 @@ namespace Nino {
 			return $appData['./nino/filesystem/cache'][$filename]['content'];
 		}
 
-		public static function putFileContent( array &$appData, string $filename, mixed $content, bool $nolock = false, bool $append = false ): bool {
+		public static function putFileContent( array &$appData, string $filename, mixed $content, bool $nolock = false ): bool {
 
 			// See getFileContent() - same defense-in-depth rejection, on the
 			// write side, where a nul byte is the half that is not theoretical:
@@ -113,9 +113,7 @@ namespace Nino {
 			if( substr( $filename, -4 ) === '.php' )
 				$content = '<?php return '. var_export( $content, true ). ';';
 
-			$success = ( $append === true )
-				? self::_appendFile( $path, (string) $content )
-				: self::_writeFile( $path, (string) $content );
+			$success = self::_writeFile( $path, (string) $content );
 
 			// Released either way, including for $nolock === true: the write is
 			// the end of the caller's read-modify-write sequence (lockFile() ->
@@ -125,20 +123,16 @@ namespace Nino {
 			// in one request, or simply the next write of the same file.
 			self::unlockFile( $appData, $filename );
 
-			// A failed atomic replace leaves the old file in place; a failed
-			// append may have written a short prefix. In either case, discard the
-			// slot so the next read reflects disk rather than the attempted value.
+			// A failed atomic replace leaves the old file in place, so discard
+			// the slot: the next read must reflect disk rather than the value
+			// this call attempted to write.
 			if( $success === false ) {
 				unset( $appData['./nino/filesystem/cache'][$filename] );
 				return false;
 			}
 
-			// Update cache only after persistence. For an append the complete new
-			// value is unknown here, so force the next read back to disk.
-			if( $append === true )
-				$appData['./nino/filesystem/cache'][$filename]['fstat'] = [];
-			else
-				$appData['./nino/filesystem/cache'][$filename]['content'] = $cacheContent;
+			// Update cache only after persistence
+			$appData['./nino/filesystem/cache'][$filename]['content'] = $cacheContent;
 
 			// Reset opcache
 			if( function_exists( 'opcache_invalidate' ) === true && is_file( $path ) === true )
@@ -149,7 +143,7 @@ namespace Nino {
 			clearstatcache( true, $path );
 			$stat = @stat( $path );
 
-			if( $append === false && $stat !== false )
+			if( $stat !== false )
 				$appData['./nino/filesystem/cache'][$filename]['fstat'] = [ 'mtime' => $stat['mtime'], 'size' => $stat['size'] ];
 
 			return true;
@@ -203,26 +197,6 @@ namespace Nino {
 			}
 
 			return true;
-		}
-
-		// Append to a file. Kept separate from _writeFile(): appending is by
-		// definition an in-place operation, there is nothing to swap in.
-		private static function _appendFile( string $path, string $content ): bool {
-
-			// See _writeFile()'s identical @ - same reasoning, same handler
-			$handle = @fopen( $path, 'a' );
-
-			if( $handle === false )
-				return false;
-
-			// No ftruncate() here - it used to run unconditionally, so an
-			// "append" emptied the file and wrote the chunk on its own
-			$written = @fwrite( $handle, $content );
-			$flushed = @fflush( $handle );
-
-			fclose( $handle );
-
-			return $written !== false && $written === strlen( $content ) && $flushed === true;
 		}
 
 		// Lock a file for a read-modify-write sequence. The lock lives on a

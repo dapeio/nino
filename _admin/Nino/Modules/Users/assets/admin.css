@@ -5,11 +5,13 @@
  *	Modules\Users			Accounts, roles and login protection
  *	admin.css								What the module's /_admin panel needs beyond the design
  *													system in _admin/assets/style.css: the in-flow button row
- *													of the role form, and what the account list turns into on
- *													a phone. Bundled while the module is there (see the
- *													panel's assets()), so the same layer rules apply - the
- *													shell's stylesheet fixes the layer order, this one only
- *													ever adds to nino.tool, scoped to the panel's own ids.
+ *													of the role form, and the hand-typed permission field
+ *													under the picker. Bundled while the module is there (see
+ *													the panel's assets()), so the same layer rules apply -
+ *													the shell's stylesheet fixes the layer order, this one
+ *													only ever adds to nino.tool, and every selector in it
+ *													starts at one of the panel's own ids (asserted by
+ *													tests/admin-lists-js-smoke.js).
  *
  *	@package								Dape/Nino
  *	@author									David Perchermeier <mail@dape.io>
@@ -23,7 +25,7 @@
 /*	An in-flow row of form buttons, for a form that has no pinned bottom bar of
  *	its own (the role form inside a user's screen). A form that owns the
  *	screen uses the shared pinned action bar instead. */
-.admin-form-actions {
+#users-role-form .admin-form-actions {
 	display: flex;
 	flex-wrap: wrap;
 	align-items: center;
@@ -49,25 +51,6 @@
 	width: auto;
 	font-family: var(--nino-admin-mono);
 	font-size: .78rem;
-}
-
-@media (max-width: 38rem) {
-
-	#users-list > .nino-admin-list > li {
-		grid-template-columns: minmax(0, 1fr) auto;
-	}
-
-	#users-list > .nino-admin-list > li > a {
-		grid-column: 1;
-		grid-row: 2;
-		justify-self: start;
-	}
-
-	#users-list > .nino-admin-list > li > button {
-		grid-column: 2;
-		grid-row: 2;
-	}
-
 }
 
 }

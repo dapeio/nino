@@ -41,7 +41,10 @@
 	padding-bottom: .4rem;
 	border-bottom: 1px solid var(--editor-separator);
 }
-.admin-dashboard-more {
+
+/* The "all of them" link under the activity list, appended as its next
+   sibling - see _activitySection() in admin.js */
+#admin-dashboard-activity + .admin-dashboard-more {
 	display: inline-block;
 	margin-top: .5rem;
 	font-size: .8rem;

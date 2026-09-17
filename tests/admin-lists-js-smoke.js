@@ -223,6 +223,50 @@ check( 'every module stylesheet opens with the shared layer order and adds only 
 check( 'and the shell\'s own stylesheet is balanced too, so a module\'s rules land in the layer they say',
 	css.split('{').length === css.split('}').length );
 
+/*	...and every selector in one starts at an id of the panel's own. Every
+	module stylesheet is bundled into the same page as every other module's,
+	so a bare class in one is a rule over the whole workbench - and the class
+	that prompted this, .admin-form-actions, sat in Users' sheet while a test
+	elsewhere in this file asserts no other panel uses the name. The file
+	docblocks have promised the scoping all along; nothing checked it	*/
+function unscopedSelectors( styleSheet ) {
+
+	const out		= [];
+	const body	= styleSheet.replace( /\/\*[\s\S]*?\*\//g, '' );
+	const rules	= /([^{}]+)\{/g;
+	let match;
+
+	while( ( match = rules.exec( body ) ) !== null ) {
+
+		const selector = match[1].trim();
+
+		// An at-rule's own prelude (@layer, @media) is not a selector - its
+		// block's contents are matched on the next pass round
+		if( selector === '' || selector.startsWith('@') === true )
+			continue;
+
+		// Split on the commas that separate selectors, not on the ones inside
+		// an :is()/:not()/:where() list
+		let depth = 0, part = '';
+		const parts = [];
+		for( const ch of selector ) {
+			if( ch === '(' ) depth++;
+			else if( ch === ')' ) depth--;
+			if( ch === ',' && depth === 0 ) { parts.push( part ); part = ''; continue; }
+			part += ch;
+		}
+		parts.push( part );
+
+		parts.map( p => p.trim() ).filter( p => p !== '' && p.startsWith('#') === false ).forEach( p => out.push( p ) );
+	}
+
+	return out;
+}
+
+const strayRules = moduleStyles.map( m => [ m, unscopedSelectors( adminAsset( m, 'admin.css' ) ) ] ).filter( e => e[1].length > 0 );
+check( 'every selector a module stylesheet adds starts at one of the panel\'s own ids'+ ( strayRules.length === 0 ? '' : ' - '+ strayRules.map( e => e[0]+ ': '+ e[1].join(', ') ).join('; ') ),
+	moduleStyles.length > 0 && strayRules.length === 0 );
+
 // One way to say "nothing here yet". A hint paragraph in one panel, a bare
 // <p> in the next and a table's own empty row in a third is what the screens
 // used to do; the component is the design system's, so every list screen and
