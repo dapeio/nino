@@ -661,10 +661,12 @@ namespace Nino {
 				// would for a named element.
 				$autoincrement = self::readAutoincrement( $typeData );
 
+				$allocated = false;
 				if( $update === false && $autoincrement !== null && self::getElementUriFromUri( $uri ) === '' ) {
 					$number 										= max( $autoincrement, self::autoincrementSeed( $typeData ) );
 					$uri 												= $typeUri. '/'. self::autoincrementUri( $number );
 					$writtenUri 								= $uri;
+					$allocated 									= true;
 					$typeData['autoincrement'] 	= $number + 1;
 				}
 
@@ -734,7 +736,7 @@ namespace Nino {
 				// uri the autoincrement branch above has just allocated is new
 				// by construction and skips this. Same look the rename below
 				// makes, for the same reason
-				if( $update === false && $writtenUri === $uri ) {
+				if( $update === false && $allocated === false ) {
 					foreach( $typeData as $bucketName => $bucketData ) {
 
 						if( $bucketName === 'model' || is_array( $bucketData ) === false )

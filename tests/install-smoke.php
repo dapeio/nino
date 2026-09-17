@@ -666,8 +666,9 @@ $collisionRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Install\Webpages::apiApply( $appData, $collisionRequest );
 check( 'a page of your own cannot take a library page\'s template name', $collisionRequest['/nino/http/response']['statusCode'] === 409
 	&& str_contains( (string) ( $collisionRequest['/nino/http/response']['body']['error'] ?? '' ), '"home"' ) === true );
-check( '...and nothing of it was written', \Nino\Filesystem::fileExists( $appData, '/templates/page-home.tpl' ) === false
-	|| trim( (string) \Nino\Filesystem::getFileContent( $appData, '/templates/page-home.tpl', '' ) ) !== '' );
+$configAfterCollision = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
+check( '...and nothing of it was written - no route for it, and the library page\'s template as it was', isset( $configAfterCollision['/nino/http/routes']['GET://eigene-startseite'] ) === false
+	&& trim( (string) \Nino\Filesystem::getFileContent( $appData, '/templates/page-home.tpl', '' ) ) !== '' );
 
 // A name no unit owns is one more page of your own, as before
 $_POST['data'] = json_encode( [ 'webpages' => [

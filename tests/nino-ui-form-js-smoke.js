@@ -147,7 +147,7 @@ sandbox.Nino = {
 			'/form/info/error'    : 'Your message could not be sent. Please try again later.',
 			'/form/info/email'    : 'Please enter a valid email address.',
 			'/form/info/required' : 'Please fill in every required field.',
-			'/form/info/invalid'  : 'Please check the highlighted field.',
+			'/form/info/invalid'  : 'Please check your entries.',
 		},
 		getText : function( key ) { return sandbox.Nino.content.text[key] || '' },
 	},
@@ -251,7 +251,18 @@ forms[1].classList.remove('nino-is-error');
 forms[1].msg.textContent = '';
 forms[1].submit();
 respond( sent.length - 1, 400 );
-check( 'a 400 on a form with a url field asks the visitor to check the field, not their address', forms[1].msg.textContent === 'Please check the highlighted field.' );
+check( 'a 400 on a form with a url field asks the visitor to check their entries, not their address', forms[1].msg.textContent === 'Please check your entries.' );
+
+// A site installed before that fill existed has no '/form/info/invalid',
+// and getText() answers '' for a key it does not have - the address text
+// is the fallback then, as it was before, rather than an empty line
+delete sandbox.Nino.content.text['/form/info/invalid'];
+forms[1].classList.remove('nino-is-error');
+forms[1].msg.textContent = '';
+forms[1].submit();
+respond( sent.length - 1, 400 );
+check( '...and a site without that fill is told about the address rather than nothing', forms[1].msg.textContent === 'Please enter a valid email address.' );
+sandbox.Nino.content.text['/form/info/invalid'] = 'Please check your entries.';
 
 // The browser's own verdict is what the client refuses on, so a stand-in
 // without one submits and lets the server answer - which is what just
@@ -263,7 +274,7 @@ forms[1].msg.textContent = '';
 const beforeTyped = sent.length;
 forms[1].submit();
 check( 'a url the browser calls invalid is refused before the request', sent.length === beforeTyped
-	&& forms[1].msg.textContent === 'Please check the highlighted field.' );
+	&& forms[1].msg.textContent === 'Please check your entries.' );
 check( '...and can be submitted again', forms[1].classList.contains('success') === false );
 
 respond( 0, 200 );

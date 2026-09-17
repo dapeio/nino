@@ -161,14 +161,6 @@ namespace Nino\Modules\Backups {
 			return openssl_decrypt( $cipher, 'aes-256-gcm', $key, OPENSSL_RAW_DATA, $iv, $tag );
 		}
 
-		/**
-		 *	Available backup dates, most recent first - shared by
-		 *	apiList() and \Nino\Modules\Dashboard\Admin::apiSummary()
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *
-		 *	@return 	array										[ "Y-m-d", ... ]
-		 */
 		// What an archive's id may look like: a dated backup, or the
 		// safety snapshot a restore writes before it overwrites anything.
 		// The snapshot used to match nothing here - not in this list, not in
@@ -177,6 +169,14 @@ namespace Nino\Modules\Backups {
 		// manuals all promise, was true of a file only ssh could reach
 		public const string ID_PATTERN = '/^(?:\d{4}-\d{2}-\d{2}|pre-restore-\d{4}-\d{2}-\d{2}-\d{6})$/';
 
+		/**
+		 *	Available backup dates, most recent first - shared by
+		 *	apiList() and \Nino\Modules\Dashboard\Admin::apiSummary()
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	array										[ "Y-m-d" | "pre-restore-Y-m-d-His", ... ]
+		 */
 		public static function dates( array &$appData ): array {
 
 			$dates 			= [];

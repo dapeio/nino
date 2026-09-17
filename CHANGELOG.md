@@ -6,6 +6,12 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **A model's whitelist and blacklist compare strictly.** A list is a list of
+  values, and `'1'` is not `1`: a value is refused unless the list holds it in
+  the field's own type. A model whose list was spelled in another type than
+  its field - `[ '1', '2' ]` under an integer - accepted those values before
+  and refuses them now; spell the list in the field's type.
+
 - **The shell's markup is properties now, not strings four methods build.**
   `AGENTS.md` allows exactly one shape for markup in PHP - a fragment with
   `[[tokens]]`, declared once as a named property - and gives the reason:
@@ -187,6 +193,24 @@ All notable changes to Nino are documented in this file.
   which is which.
 
 ### Fixed
+
+- **The Language panel did not load.** Its `showCurrent()` builds the form
+  once, gated on a `_ready` flag the first answer sets - and the flag was
+  never declared, so the gate compared `undefined` and the panel built zero
+  times rather than once. Declared now, and a check holds every panel that
+  gates on the flag to declaring it.
+
+- **A bracket in a page name was filled in the menu.** `[navigation]` escaped
+  a generated entry's name as text but left its `[` alone, and what a
+  shortcode returns is rendered again - fills and shortcodes included - so a
+  name carrying `[[/some/fill]]` was expanded in every menu that lists the
+  page. The brackets are entities on the way out now, as they are everywhere
+  else an editor's words reach a page.
+
+- **A hidden tab panel or filter item could show.** `.nino-tabs-panel` and
+  `.nino-filter-item` carry a `display` of their own, and an author rule
+  beats the browser's `[hidden] { display: none }`. The stylesheet says it
+  for both.
 
 - **A regenerated asset bundle kept the url a browser was still holding.**
   `/public/.cache/style.css` is the same address before and after a rebuild,
@@ -454,7 +478,9 @@ All notable changes to Nino are documented in this file.
   address" over an address that was fine. A url and a number are checked
   client-side now, by the browser's own verdict rather than a second regex of
   ours, and a 400 on a form that carries one of those types asks the visitor
-  to check the marked field instead: the new fill `/form/info/invalid`.
+  to check their entries instead: the new fill `/form/info/invalid`. A site
+  installed before this has no such fill; until it adds one in the Text panel,
+  that 400 shows the address text as before rather than nothing.
 
 - **The workbench lost what was typed when you looked something up.** The
   shell documents that switching panels never resets anything - "jumping back
@@ -783,7 +809,9 @@ All notable changes to Nino are documented in this file.
   protective layer, and only `getFileContent()` and `putFileContent()` made
   the check - `fileExists()`, `path()`, `url()`, `forceDir()`, `lockFile()`
   and `mutate()` resolved a traversal and handed it on. Every door refuses it
-  now, and says so in the log.
+  now; `path()`, `url()` and `forceDir()` say so in the log, the reads, the
+  writes, the existence check and the lock refuse as quietly as they would a
+  missing file.
 
 - **A hand-written account could 500 the login form.** This framework's own
   account class says that status, sessions and permissions are a
@@ -980,7 +1008,9 @@ All notable changes to Nino are documented in this file.
   literal string `undefined`, an empty query produced a variable named `''`,
   and a value carrying its own `=` was cut at it. Text that is not valid
   percent-encoding is now the text itself, which is what the address bar
-  shows anyway.
+  shows anyway. A `+` in a value is a space now, as
+  `application/x-www-form-urlencoded` and php's own `$_GET` read it; it used
+  to stay a `+`.
 
 - **The resize and scroll throttle throttled nothing.** Both listeners set
   their gate, asked for an animation frame and cleared the gate again in the
@@ -1099,8 +1129,8 @@ All notable changes to Nino are documented in this file.
   `\Nino\Form::normalize()` accepted names of any length while the endpoint
   reads posted keys of at most 64 characters; the field rendered, the browser
   posted it, and the value was dropped on arrival. The bound is the same on
-  both sides now, so the Forms feature's builder refuses such a name where it
-  is typed.
+  both sides now: `normalize()` leaves such a field out, so a definition
+  cannot carry one the endpoint would drop.
 
 - **A placeholder inside a submitted value was filled.** The mail body was
   filled pair by pair over the whole string, so `[[date]]` or `[[email]]`

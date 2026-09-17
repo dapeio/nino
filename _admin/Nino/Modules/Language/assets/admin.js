@@ -29,6 +29,9 @@
 
 		// Survives the re-render a successful save triggers - see _save()
 		_pendingMsg : '',
+		// Set once the first answer has rendered the form; showCurrent() builds
+		// nothing while it is set - see there
+		_ready 		: false,
 		_intro 		: '',
 		_fields 	: [],
 		// The locale inventory as apiList() reported it, plus whatever has been

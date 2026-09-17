@@ -133,6 +133,11 @@ namespace Nino\Modules {
 				if( $authored === false ) {
 					$title			= htmlspecialchars( $title, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8' );
 					$element[0]	= htmlspecialchars( $element[0], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8' );
+					// ...and what a shortcode returns is rendered again, fills and
+					// shortcodes included, so a '[' is an entity on the way out - the
+					// same swap every other place an editor's words reach a page makes
+					$title			= str_replace( [ '[', ']' ], [ '&#91;', '&#93;' ], $title );
+					$element[0]	= str_replace( [ '[', ']' ], [ '&#91;', '&#93;' ], $element[0] );
 				}
 
 				$attributes	.= ( $uri === $element[0] ) ? ' class="nino-is-active"' : '';

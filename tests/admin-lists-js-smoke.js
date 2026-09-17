@@ -8,6 +8,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const vm = require('vm');
 
 let checks = 0;
 let failures = 0;
@@ -159,6 +160,36 @@ check( 'Language creates the text file through the backend rather than client-si
 check( 'Language does not switch a freshly created skeleton on', /entry\.active\s*=\s*true/.test( addLocaleSource ) === false );
 check( 'Language still re-activates an already translated language directly', addLocaleSource.includes( 'existing.active = true' ) );
 check( 'Language says what the Add button writes before it is pressed', languageSource.includes( "adderHint.textContent = Nino.content.getText('/_admin/language/hint/add')" ) && adminModuleText( 'Language', 'en_US' ).includes( 'Creates text/<locale>.php' ) );
+
+/*	The shell shows a panel by calling its showCurrent(), and a panel that
+	builds once gates init() there on `_ready === false`. Language got the
+	gate without the flag it reads: `_ready` was set on the first answer and
+	never declared, so `undefined === false` was false and the panel built
+	zero times rather than once. The gate is the panel's own code; so is the
+	declaration - and one is nothing without the other	*/
+const gatedPanels = fs.readdirSync( path.join( __dirname, '../_admin/Nino/Modules' ) )
+	.filter( function( m ) { return fs.existsSync( path.join( __dirname, '../_admin/Nino/Modules', m, 'assets', 'admin.js' ) ) } )
+	.map( function( m ) { return [ m, adminAsset( m, 'admin.js' ) ] } )
+	.filter( function( e ) { return /\._ready === false/.test( e[1] ) } );
+const undeclaredGates = gatedPanels.filter( function( e ) { return /_ready\s*:\s*false/.test( e[1] ) === false } ).map( function( e ) { return e[0] } );
+check( 'every panel that gates init() on _ready declares it'+ ( undeclaredGates.length > 0 ? ' - undeclared in '+ undeclaredGates.join(', ') : '' ), gatedPanels.length >= 3 && undeclaredGates.length === 0 );
+
+// ...and the one that lost its form to that: shown, it asks for its list
+const languageSandbox = {
+	console 	: console,
+	document 	: { getElementById : function() { return {} }, documentElement : {}, body : {} },
+	Nino 		: { events : { bindCallback : function() {} }, http : { sendRequest : function() {} } },
+};
+languageSandbox.window = languageSandbox;
+vm.runInContext( languageSource, vm.createContext( languageSandbox ), { filename : 'language.js' } );
+const languagePanel = languageSandbox.Nino.admin.language;
+let languageLists = 0;
+languagePanel._apiCall = function( endpoint ) { if( endpoint === 'list' ) languageLists++ };
+languagePanel.showCurrent();
+check( 'Language fetches its form when its panel is first shown', languageLists === 1 );
+languagePanel._ready = true;
+languagePanel.showCurrent();
+check( '...and not again once the answer has rendered it', languageLists === 1 );
 
 const textSource = adminAsset( 'Text', 'keys.js' );
 const categoryStart = textSource.indexOf('_renderCategoryList : function()');

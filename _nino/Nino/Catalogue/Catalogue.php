@@ -242,15 +242,6 @@ PEM;
 		}
 
 		/**
-		 *	Validate and normalize a catalogue document. Anything that is not
-		 *	what format 1 says is refused as a whole: a catalogue that is half
-		 *	right is not offered half way.
-		 *
-		 *	@param		string		$json
-		 *
-		 *	@return 	array|string						{ format, generated, features: [ entry, ... ] } or why not
-		 */
-		/**
 		 *	The address of a catalogue's signature: '.sig' on the end of the
 		 *	path, not on the end of the url.
 		 *
@@ -272,6 +263,15 @@ PEM;
 			return substr( $url, 0, $pathLength ). '.sig'. substr( $url, $pathLength );
 		}
 
+		/**
+		 *	Validate and normalize a catalogue document. Anything that is not
+		 *	what format 1 says is refused as a whole: a catalogue that is half
+		 *	right is not offered half way.
+		 *
+		 *	@param		string		$json
+		 *
+		 *	@return 	array|string						{ format, generated, features: [ entry, ... ] } or why not
+		 */
 		public static function parse( string $json ): array|string {
 
 			$document = json_decode( $json, true );

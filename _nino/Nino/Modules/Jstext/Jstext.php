@@ -31,9 +31,9 @@ namespace Nino\Modules {
 		/*	Which text keys the inline block carries. It used to carry every
 			fill the site has, on every page that renders [jstext] - the legal
 			copy, the addresses, and '/form/email/owner', which is the mailbox a
-			contact form delivers to. The scripts reading it ask for two groups
-			(see Nino.ui.js's .nino-form and .nino-newsletter handlers), so those
-			two are what it carries.
+			contact form delivers to. The scripts reading it ask for three groups
+			(see Nino.ui.js's .nino-form, .nino-newsletter and .nino-slider
+			handlers), so those three are what it carries.
 
 			A project whose own script reads another fill names its prefix under
 			'/nino/jstext/keys' in config.php; a module or a feature serving a
@@ -91,7 +91,7 @@ namespace Nino\Modules {
 		}
 
 		/**
-		 *	Every prefix the inline block carries: the two the shipped scripts
+		 *	Every prefix the inline block carries: the three the shipped scripts
 		 *	read, what config.php adds, and what this request registered
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data

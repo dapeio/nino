@@ -405,9 +405,12 @@ $result = saveText( $appData, [
 	'value'		=> 'Lies [template /templates/mail-owner] und [elements /people] - siehe [[/company/name]]',
 ] );
 check( 'a shortcode typed into a textfill is stored as an entity, not as a shortcode', ( $result['value'] ?? '' ) === 'Lies &#91;template /templates/mail-owner&#93; und &#91;elements /people&#93; - siehe [[/company/name]]' );
-check( '...so rendering the page shows the words instead of running them', str_contains(
-	\Nino\Html::renderHtml( $appData, '[[/home/plain]]' ), '[template /templates/mail-owner]'
-) === false );
+// The saved value, registered the way a page's fills are - the render pass
+// runs shortcodes over what a fill puts in, so a stored entity has to stay one
+\Nino\Html::addFills( $appData, [ '/home/plain' => (string) ( $result['value'] ?? '' ) ], '*' );
+$renderedPlain = \Nino\Html::renderHtml( $appData, '[[/home/plain]]' );
+check( '...so rendering the page shows the words instead of running them', str_contains( $renderedPlain, '&#91;template /templates/mail-owner&#93;' ) === true
+	&& str_contains( $renderedPlain, '[template /templates/mail-owner]' ) === false );
 $result = saveText( $appData, [ 'key' => '/home/plain', 'locale' => 'de_DE', 'value' => (string) ( $result['value'] ?? '' ) ] );
 check( '...and saving that value again changes nothing - the entities carry no bracket', ( $result['value'] ?? '' ) === 'Lies &#91;template /templates/mail-owner&#93; und &#91;elements /people&#93; - siehe [[/company/name]]' );
 

@@ -264,9 +264,9 @@
 			},
 
 			/**
-			 *	Parse the current location's query string into a key/value array
+			 *	Parse the current location's query string into a key/value object
 			 *
-			 *	@return		{Array}										Parsed query vars
+			 *	@return		{Object}										Parsed query vars
 			 */
 			readQueryVars : function( ) {
 

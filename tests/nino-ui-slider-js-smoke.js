@@ -214,7 +214,7 @@ document.querySelectorAll = function( selector ) { return selector === '.nino-sl
 let readyThrew = null;
 try { ui.onReady(); } catch( error ) { readyThrew = error.constructor.name+ ': '+ error.message }
 check( 'a slider with no slides in it is left alone rather than throwing out of onReady', readyThrew === null );
-check( '...and one with no list at all too', readyThrew === null && noStage.classList.contains('nino-is-ready') === false );
+check( '...and one with no list at all too - nothing appended, nothing wired', readyThrew === null && noStage.children.length === 0 && noStage.pos === undefined );
 check( '...while the finished slider beside them is still wired', slider.pos === 1 );
 
 console.log( '\n'+ checks+ ' checks, '+ failures+ ' failed' );

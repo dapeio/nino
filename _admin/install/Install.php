@@ -1293,21 +1293,6 @@ namespace Nino\Install {
 		}
 
 		/**
-		 *	Which library unit a route body came from, or '' for a body no
-		 *	unit declares (hand-written, or a page pointed at a template
-		 *	that was never part of the library).
-		 *
-		 *	Every unit's manifest route declares a distinct body, so the
-		 *	body identifies the unit on its own - which is why the binding
-		 *	does not have to be persisted anywhere. It only decides which
-		 *	unit's files a *new* page installs (see apiApply()); an existing
-		 *	page is just a route with a template
-		 *
-		 *	@param		string		$body
-		 *
-		 *	@return 	string									Unit key, or '' if no unit declares this body
-		 */
-		/**
 		 *	Which library unit ships a template of this name, if any - so a page
 		 *	that would write its own copy under that name can be refused before
 		 *	the two start writing over each other (see apiApply())
@@ -1339,6 +1324,21 @@ namespace Nino\Install {
 			return '';
 		}
 
+		/**
+		 *	Which library unit a route body came from, or '' for a body no
+		 *	unit declares (hand-written, or a page pointed at a template
+		 *	that was never part of the library).
+		 *
+		 *	Every unit's manifest route declares a distinct body, so the
+		 *	body identifies the unit on its own - which is why the binding
+		 *	does not have to be persisted anywhere. It only decides which
+		 *	unit's files a *new* page installs (see apiApply()); an existing
+		 *	page is just a route with a template
+		 *
+		 *	@param		string		$body
+		 *
+		 *	@return 	string									Unit key, or '' if no unit declares this body
+		 */
 		private static function _unitFromBody( string $body ): string {
 
 			if( $body === '' )

@@ -507,15 +507,6 @@
 					},
 
 					/**
-					 *	Advance a slider by one step (wrapping around the ends,
-					 *	respecting offsetLeft/offsetRight) and re-render it
-					 *
-					 *	@param		{Element}	wrap						Slider wrap element
-					 *	@param		{number}	dir							Direction to move, 1 or -1
-					 *
-					 *	@return		void
-					 */
-					/**
 					 *	One control of a slider: a real button, with the face it had
 					 *	as a DIV and a name a screen reader can read out
 					 *
@@ -573,6 +564,15 @@
 						return ( fallback[language] ?? fallback.en )[which];
 					},
 
+					/**
+					 *	Advance a slider by one step (wrapping around the ends,
+					 *	respecting offsetLeft/offsetRight) and re-render it
+					 *
+					 *	@param		{Element}	wrap						Slider wrap element
+					 *	@param		{number}	dir							Direction to move, 1 or -1
+					 *
+					 *	@return		void
+					 */
 					sliderClick = function( wrap, dir ) {
 
 						let
@@ -787,6 +787,10 @@
 						// select in it as well, so a 400 on a form carrying one of
 						// those is not necessarily the address, and saying so anyway
 						// sent the visitor to look at the one field that was fine.
+						// The server names no field on a 400, so the text asks for the
+						// entries, not a highlighted one. A site installed before that
+						// fill existed has none, and getText() answers '' for it - the
+						// address text stays the fallback rather than an empty line.
 						// Every other non-200 stays generic on purpose: naming the
 						// csrf 403 or the honeypot's 418 tells a spam bot which check
 						// it tripped. textContent, not innerHTML - these are
@@ -797,7 +801,7 @@
 						} );
 
 						this.form.msg.textContent = ( xhr.status === 400 )
-							? Nino.content.getText( typed === true ? '/form/info/invalid' : '/form/info/email' )
+							? ( ( typed === true ? Nino.content.getText('/form/info/invalid') : '' ) || Nino.content.getText('/form/info/email') )
 							: Nino.content.getText('/form/info/'+ ( ok === true ? 'success' : 'error' ));
 
 						// Only a delivered message locks the form down. Disabling every

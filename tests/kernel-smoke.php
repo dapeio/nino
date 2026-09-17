@@ -743,8 +743,10 @@ if( function_exists( 'imagewebp' ) === true && ( imagetypes() & IMG_WEBP ) !== 0
 	$webpChunks = [];
 	foreach( [ 'lossy opaque' => [ false, false ], 'lossy alpha' => [ true, false ], 'lossless opaque' => [ false, true ], 'lossless alpha' => [ true, true ] ] as $webpCase => $webpHow )
 		$webpChunks[$webpCase] = substr( makeTestWebp( 60, 40, $webpHow[0], $webpHow[1] ), 12, 4 );
-	check( 'the webp fixtures really are the three container shapes the reader knows'. ' - '. json_encode( $webpChunks ),
-		in_array( $webpChunks['lossy opaque'], [ 'VP8 ', 'VP8L', 'VP8X' ], true ) === true );
+	check( 'the webp fixtures really are the three container shapes the reader knows - '. json_encode( $webpChunks ),
+	( $webpChunks['lossy opaque'] ?? '' ) === 'VP8 ' && ( $webpChunks['lossy alpha'] ?? '' ) === 'VP8X'
+	&& in_array( $webpChunks['lossless opaque'] ?? '', [ 'VP8L', 'VP8X' ], true ) === true
+	&& in_array( $webpChunks['lossless alpha'] ?? '', [ 'VP8L', 'VP8X' ], true ) === true );
 
 	$webpOpaque = \Nino\Images::process( $appData, makeTestWebp( 200, 200, false ), 60, 60, 'elements/demo/webp-opaque' );
 	check( 'an opaque webp is answered with jpeg, not png', $webpOpaque === 'elements/demo/webp-opaque.60x60.jpg' );
@@ -2265,8 +2267,8 @@ check( '...which is what Nino.css\'s own data: uri needs', str_contains(
 /*	Http::getClientIp() - who the visitor is behind a reverse proxy.
 
 	REMOTE_ADDR is the proxy's own address for every single visitor there, so
-	every per-ip rule in the site (Mail's send cap, the login cooldown, a
-	session's ip pinning) counts the internet as one client. X-Forwarded-For
+	every per-ip rule in the site (Mail's send cap, the login cooldown - a
+	session is not pinned to an address) counts the internet as one client. X-Forwarded-For
 	carries the visitor - and is a request header anyone can write, so it is
 	read only where the peer is a proxy this site was told about	*/
 $proxyServer = [ $_SERVER['REMOTE_ADDR'] ?? '', $_SERVER['HTTP_X_FORWARDED_FOR'] ?? null ];
@@ -2740,6 +2742,15 @@ $navMarkup = \Nino\Modules\Navigation::doShortcode( $appData, [ 'nav' => 'main' 
 check( 'markup in a page name is drawn as text', str_contains( $navMarkup, '&lt;script&gt;' ) === true
 	&& str_contains( $navMarkup, '<script>alert(1)' ) === false );
 
+// ...and a shortcode's result is rendered again, fills and shortcodes
+// included, so a '[' in a name has to be an entity by the time it leaves
+// here - the pass that follows would otherwise fill it
+\Nino\Html::addFills( $appData, [ '/webpage/top/name' => 'Angebot [[/webpage/home/name]] [navigation nav="main"]' ], 'en_US' );
+$navBracket = \Nino\Modules\Navigation::doShortcode( $appData, [ 'nav' => 'main' ] );
+check( 'a bracket in a page name is an entity, so the render pass after the shortcode cannot fill it',
+	str_contains( $navBracket, 'Angebot &#91;&#91;/webpage/home/name&#93;&#93; &#91;navigation nav=&quot;main&quot;&#93;' ) === true
+	&& str_contains( $navBracket, '[[/webpage/home/name]]' ) === false );
+
 // A hand-written line is the page author's own - three fields, the third of
 // them attributes for the tag, and written as typed. That is what it has
 // always been, and what a template that uses it keeps
@@ -3171,7 +3182,11 @@ check( 'an engine-raised warning (not one of our own E_USER_* calls) still termi
 $engineDeprecated = runIsolated( $bootstrap. '
 	echo "before\n";
 	trigger_error( "as the engine raises one", E_USER_DEPRECATED );
-	@\Nino\Runtime::handleError( E_DEPRECATED, "a deprecation the engine raised", __FILE__, __LINE__ );
+	// Not under @, and with every level reported: the handler bails out on a
+	// level error_reporting() masks before it decides anything, so a masked
+	// call would pass here whatever the handler did with a deprecation
+	error_reporting( E_ALL );
+	\Nino\Runtime::handleError( E_DEPRECATED, "a deprecation the engine raised", __FILE__, __LINE__ );
 	echo "after\n";
 ' );
 check( 'an engine-raised deprecation is recorded and the request carries on', trim( $engineDeprecated['stdout'] ) === "before\nafter" );
