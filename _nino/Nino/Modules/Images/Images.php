@@ -23,6 +23,17 @@ namespace Nino\Modules {
 
 	class Images {
 
+		/*	The one fragment this module renders, declared once rather than
+			built inside doShortcode(). Being a property is the point: a
+			project that wants loading="lazy" or a different attribute order
+			replaces it without touching the class - see AGENTS.md, "Markup
+			belongs in a template", and \Nino\Modules\Navigation::$html for
+			the shape	*/
+		public static
+			$html = [
+				'img' => '<img src="[[src]]" width="[[width]]" height="[[height]]" alt="[[alt]]">',
+			];
+
 		/**
 		 *	Module initiating
 		 *
@@ -55,7 +66,16 @@ namespace Nino\Modules {
 			$url = \Nino\Images::getUrl( $appData, $slot['filename'] );
 			$alt = (string) ( $args['alt'] ?? ( $slot['label'] ?? '' ) );
 
-			return '<img src="'. htmlspecialchars( $url, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8' ). '" width="'. (int) ( $slot['width'] ?? 0 ). '" height="'. (int) ( $slot['height'] ?? 0 ). '" alt="'. htmlspecialchars( $alt, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8' ). '">';
+			return str_replace(
+				[ '[[src]]', '[[width]]', '[[height]]', '[[alt]]' ],
+				[
+					htmlspecialchars( $url, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8' ),
+					(string) (int) ( $slot['width'] ?? 0 ),
+					(string) (int) ( $slot['height'] ?? 0 ),
+					htmlspecialchars( $alt, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8' ),
+				],
+				self::$html['img']
+			);
 		}
 	}
 

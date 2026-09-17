@@ -52,6 +52,19 @@ namespace Nino\Admin {
 		// by the wizard alone; nothing after setup looks here
 		public const string LIBRARY = __DIR__. '/install/library';
 
+		/*	The language switcher, the one fragment this class renders itself -
+			declared once rather than concatenated inside _localePickerHtml().
+			Being a property is the point: a project that wants a different
+			control replaces the entry rather than the method. Every other
+			piece of the shell is a fragment of \Nino\Admin\Panels::$html or
+			a line of _admin/templates/ - see AGENTS.md, "Markup belongs in a
+			template"	*/
+		public static
+			$html = [
+				'localepicker'	=> '<select id="admin-localepicker">[[content]]</select>',
+				'locale-option'	=> '<option value="?locale=[[locale]]"[[selected]]>[[label]]</option>',
+			];
+
 		/**
 		 *	Bootstrap the admin area: register routes, assets, textfills and
 		 *	the response callbacks for every admin route
@@ -753,11 +766,14 @@ namespace Nino\Admin {
 				$safeLabel = str_replace( [ '[', ']' ], [ '&#91;', '&#93;' ],
 					htmlspecialchars( $label !== '' ? $label : $locale, ENT_QUOTES | ENT_SUBSTITUTE | ENT_HTML5, 'UTF-8' ) );
 
-				$options .= '<option value="?locale='. $locale. '"'. ( $locale === $currentLocale ? ' selected' : '' ). '>'.
-					$safeLabel. '</option>';
+				$options .= str_replace(
+					[ '[[locale]]', '[[selected]]', '[[label]]' ],
+					[ $locale, ( $locale === $currentLocale ? ' selected' : '' ), $safeLabel ],
+					self::$html['locale-option']
+				);
 			}
 
-			return '<select id="admin-localepicker">'. $options. '</select>';
+			return str_replace( '[[content]]', $options, self::$html['localepicker'] );
 		}
 
 		/**
@@ -938,6 +954,33 @@ namespace Nino\Admin {
 
 		// The navigation's groups, in the order they are rendered
 		public const array GROUPS = [ 'content', 'structure', 'features', 'system' ];
+
+		/*	Every fragment the shell is assembled from, declared once instead
+			of concatenated inside navHtml() and panesHtml(). Being properties
+			is the point: the rail, the pane wrapper and the tab strip are then
+			one place to read, and a project that wants a different class or an
+			extra attribute on them replaces the entry rather than the method -
+			see AGENTS.md, "Markup belongs in a template", and
+			\Nino\Modules\Navigation::$html for the shape.
+
+			The ids are the convention the tool has always had (admin-nav-<uri>,
+			admin-content-<uri>, admin-tab-<uri>) and data-panel/data-tab are
+			what script.js reads, so an entry that drops one drops the shell's
+			own wiring with it	*/
+		public static
+			$html = [
+				'nav-group'		=> '<span class="nino-admin-nav-group" data-group="[[group]]">[[label]]</span>',
+				'nav-link'		=> '<a href="#" id="admin-nav-[[uri]]" data-panel="[[uri]]" data-layout="[[layout]]"><span class="nino-admin-nav-icon" aria-hidden="true">[[icon]]</span><span class="nino-admin-nav-label">[[label]]</span></a>',
+				// The letter that stands in for a panel with no icon of its own
+				'nav-initial'	=> '<b>[[initial]]</b>',
+				'pane'				=> '<div id="admin-content-[[uri]]" data-panel="[[uri]]" data-layout="[[layout]]" hidden>[[content]]</div>',
+				'tab-bar'			=> '<div class="nino-admin-tabs nino-admin-tabs--bar admin-panel-tabs" role="tablist">[[content]]</div>',
+				'tab-button'	=> '<button type="button" role="tab" class="nino-admin-tab" data-tab="[[uri]]" aria-selected="false">[[label]]</button>',
+				'tab-pane'		=> '<div id="admin-tab-[[uri]]" data-tab="[[uri]]" hidden>[[content]]</div>',
+				// A panel without a template of its own renders mount points
+				// its script fills - see panes() in the panel contract
+				'mount'				=> '<div id="[[id]]"></div>',
+			];
 
 		/**
 		 *	Build one tool's registry: its own panels first, then every
@@ -1188,12 +1231,22 @@ namespace Nino\Admin {
 
 				if( count( $groups ) > 1 && $panel['group'] !== $open ) {
 					$open = $panel['group'];
-					$html .= '<span class="nino-admin-nav-group" data-group="'. $open. '">[[/_admin/nav/group/'. $open. ']]</span>';
+					$html .= str_replace(
+						[ '[[group]]', '[[label]]' ],
+						[ $open, '[[/_admin/nav/group/'. $open. ']]' ],
+						self::$html['nav-group']
+					);
 				}
 
-				$html .= '<a href="#" id="admin-nav-'. $panel['uri']. '" data-panel="'. $panel['uri']. '" data-layout="'. $panel['layout']. '">'
-					. '<span class="nino-admin-nav-icon" aria-hidden="true">'. ( $panel['icon'] !== '' ? $panel['icon'] : '<b>'. self::initial( $panel['label'] ). '</b>' ). '</span>'
-					. '<span class="nino-admin-nav-label">'. self::label( $panel['label'] ). '</span></a>';
+				$icon = ( $panel['icon'] !== '' )
+					? $panel['icon']
+					: str_replace( '[[initial]]', self::initial( $panel['label'] ), self::$html['nav-initial'] );
+
+				$html .= str_replace(
+					[ '[[uri]]', '[[layout]]', '[[icon]]', '[[label]]' ],
+					[ $panel['uri'], $panel['layout'], $icon, self::label( $panel['label'] ) ],
+					self::$html['nav-link']
+				);
 			}
 
 			return $html;
@@ -1270,26 +1323,40 @@ namespace Nino\Admin {
 
 			foreach( $panels as $panel ) {
 
-				$html .= '<div id="admin-content-'. $panel['uri']. '" data-panel="'. $panel['uri']. '" data-layout="'. $panel['layout']. '" hidden>';
+				$content = '';
 
-				if( $panel['tabs'] === [] ) {
-					$html .= self::_paneContent( $panel ). '</div>';
-					continue;
-				}
+				if( $panel['tabs'] === [] )
+					$content = self::_paneContent( $panel );
+				else {
 
-				$tabs = ( $panel['own'] === true ? [ $panel['uri'] => $panel ] : [] ) + $panel['tabs'];
+					$tabs = ( $panel['own'] === true ? [ $panel['uri'] => $panel ] : [] ) + $panel['tabs'];
 
-				if( count( $tabs ) > 1 ) {
-					$html .= '<div class="nino-admin-tabs nino-admin-tabs--bar admin-panel-tabs" role="tablist">';
+					// One tab is no strip: an account holding a single tab's
+					// permission gets that pane and nothing to switch with
+					if( count( $tabs ) > 1 ) {
+						$buttons = '';
+						foreach( $tabs as $tab )
+							$buttons .= str_replace(
+								[ '[[uri]]', '[[label]]' ],
+								[ $tab['uri'], self::label( $tab['tab'] ) ],
+								self::$html['tab-button']
+							);
+						$content .= str_replace( '[[content]]', $buttons, self::$html['tab-bar'] );
+					}
+
 					foreach( $tabs as $tab )
-						$html .= '<button type="button" role="tab" class="nino-admin-tab" data-tab="'. $tab['uri']. '" aria-selected="false">'. self::label( $tab['tab'] ). '</button>';
-					$html .= '</div>';
+						$content .= str_replace(
+							[ '[[uri]]', '[[content]]' ],
+							[ $tab['uri'], self::_paneContent( $tab ) ],
+							self::$html['tab-pane']
+						);
 				}
 
-				foreach( $tabs as $tab )
-					$html .= '<div id="admin-tab-'. $tab['uri']. '" data-tab="'. $tab['uri']. '" hidden>'. self::_paneContent( $tab ). '</div>';
-
-				$html .= '</div>';
+				$html .= str_replace(
+					[ '[[uri]]', '[[layout]]', '[[content]]' ],
+					[ $panel['uri'], $panel['layout'], $content ],
+					self::$html['pane']
+				);
 			}
 
 			return $html;
@@ -1309,7 +1376,7 @@ namespace Nino\Admin {
 
 			$html = '';
 			foreach( $panel['panes'] as $pane )
-				$html .= '<div id="'. $pane. '"></div>';
+				$html .= str_replace( '[[id]]', $pane, self::$html['mount'] );
 
 			return $html;
 		}

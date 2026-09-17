@@ -6,6 +6,26 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **The shell's markup is properties now, not strings four methods build.**
+  `AGENTS.md` allows exactly one shape for markup in PHP - a fragment with
+  `[[tokens]]`, declared once as a named property - and gives the reason:
+  being a property is what lets somebody change how a thing looks without
+  reading the class that decides when it appears. The rail, the pane wrapper,
+  the tab strip, the mount points and the language switcher were concatenated
+  inside `navHtml()`, `panesHtml()`, `_paneContent()` and
+  `_localePickerHtml()` instead, and so were the `[csrf]` hidden input and the
+  `[image]` `<img>` - the latter already copied once as "the existing
+  pattern". They are `\Nino\Admin\Panels::$html`,
+  `\Nino\Admin\Admin::$html`, `\Nino\Modules\Csrf::$html` and
+  `\Nino\Modules\Images::$html`, the same shape
+  `\Nino\Modules\Navigation::$html` has always had.
+
+  Nothing about the rendered page changes - the suites compare the shell byte
+  for byte and did not move. What is new is that the seam is tested as a seam:
+  each of the four is replaced in a test and what comes back has to follow it,
+  so "a project can replace this" is a check rather than a sentence in
+  `AGENTS.md`.
+
 - **Install switches the feature on.** Pressing Install on a feature the
   project does not have placed the directory and left it sitting in the
   Inactive tab, waiting for an Activate - one intention, two presses, and a

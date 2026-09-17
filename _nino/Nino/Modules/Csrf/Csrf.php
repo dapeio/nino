@@ -25,6 +25,17 @@ namespace Nino\Modules {
 
 	class Csrf {
 
+		/*	The one fragment this module renders, declared once rather than
+			built inside doShortcode(). Being a property is the point: it is
+			then one place to read, and a project that needs a different field
+			name or an extra attribute replaces it without touching the class -
+			see AGENTS.md, "Markup belongs in a template", and
+			\Nino\Modules\Navigation::$html for the shape	*/
+		public static
+			$html = [
+				'input' => '<input type="hidden" name="_csrf" value="[[token]]">',
+			];
+
 		/**
 		 *	Module initiating
 		 *
@@ -45,7 +56,12 @@ namespace Nino\Modules {
 		 *	@return 	string									Hidden input html
 		 */
 		public static function doShortcode( array &$appData, array $args ): string {
-			return '<input type="hidden" name="_csrf" value="'. htmlspecialchars( \Nino\Csrf::getToken( $appData ), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8' ). '">';
+
+			return str_replace(
+				'[[token]]',
+				htmlspecialchars( \Nino\Csrf::getToken( $appData ), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8' ),
+				self::$html['input']
+			);
 		}
 	}
 

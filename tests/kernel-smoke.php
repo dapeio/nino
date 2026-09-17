@@ -877,6 +877,17 @@ check( '...and the ordinary two shapes are unchanged', ( $probeArgs['title'] ?? 
 // The picture this is really about
 check( 'a decorative picture is written with an empty alt and keeps it', str_contains( \Nino\Html::renderHtml( $appData, '[image hero alt=""]' ), 'alt=""' ) === true );
 
+/*	The <img> is a named property, not a string the method builds - which is
+	what makes it one place to read and something a project can replace. Proven
+	by replacing it: a project that wants loading="lazy" on every picture sets
+	the entry, and the shortcode renders through it	*/
+$shippedImg = \Nino\Modules\Images::$html['img'];
+\Nino\Modules\Images::$html['img'] = '<img loading="lazy" src="[[src]]" alt="[[alt]]" data-size="[[width]]x[[height]]">';
+$replacedImg = \Nino\Html::renderHtml( $appData, '[image hero]' );
+\Nino\Modules\Images::$html['img'] = $shippedImg;
+check( 'the <img> fragment is the property, so replacing it replaces what the shortcode renders', $replacedImg === '<img loading="lazy" src="/public/images/hero.1600x600.jpg" alt="Hero" data-size="1600x600">' );
+check( '...and putting the shipped one back renders the shipped markup again', str_starts_with( \Nino\Html::renderHtml( $appData, '[image hero]' ), '<img src="/public/images/hero.1600x600.jpg"' ) === true );
+
 unset( $appData['./nino/html/shortcodes']['argprobe'], $appData['./nino/callbacks']['/nino/html/shortcode/argprobe'] );
 
 echo "\n";
@@ -1506,6 +1517,16 @@ $fakeRequest = [ '/nino/http/request' => [ 'method' => 'POST' ], '/nino/http/res
 check( 'callbackResponse accepts the current token', $fakeRequest['/nino/http/response']['statusCode'] === 200 );
 
 check( 'Modules\Csrf::doShortcode renders a hidden input with the current token, reading the kernel token', str_contains( \Nino\Modules\Csrf::doShortcode( $appData, [] ), 'value="'. $token2. '"' ) === true );
+
+// Same as the [image] fragment above: the hidden input is a property, so a
+// project that needs a different field name sets the entry rather than
+// patching the module
+$shippedCsrf = \Nino\Modules\Csrf::$html['input'];
+\Nino\Modules\Csrf::$html['input'] = '<input type="hidden" name="authenticity_token" value="[[token]]">';
+$replacedCsrf = \Nino\Modules\Csrf::doShortcode( $appData, [] );
+\Nino\Modules\Csrf::$html['input'] = $shippedCsrf;
+check( 'the hidden input is the property, so replacing it replaces what the shortcode renders', $replacedCsrf === '<input type="hidden" name="authenticity_token" value="'. $token2. '">' );
+check( '...and the shipped fragment names the field the kernel checks', str_contains( \Nino\Modules\Csrf::doShortcode( $appData, [] ), 'name="_csrf"' ) === true );
 
 // Regression: Auth::callbackLoginResponse()/callbackLogoutResponse() used
 // to hard-refuse (trigger_error(E_USER_ERROR)) unless the Csrf module was

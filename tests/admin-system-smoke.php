@@ -2449,6 +2449,37 @@ check( 'every pane carries the mount points its script renders into', str_contai
 check( 'a panel without panes() gets the conventional <uri>-list mount', str_contains( $panesHtml, '<div id="admin-content-dummy" data-panel="dummy" data-layout="page" hidden><div id="dummy-list"></div></div>' ) === true );
 check( 'a pane with tabs carries the shared tab bar, its own screen first, and a tab pane per tab', str_contains( $panesHtml, '<div id="admin-content-language" data-panel="language" data-layout="page" hidden><div class="nino-admin-tabs nino-admin-tabs--bar admin-panel-tabs" role="tablist"><button type="button" role="tab" class="nino-admin-tab" data-tab="language" aria-selected="false">[[/_admin/nav/languages]]</button><button type="button" role="tab" class="nino-admin-tab" data-tab="translations" aria-selected="false">[[/_admin/nav/translations]]</button></div><div id="admin-tab-language" data-tab="language" hidden><div id="language-form"></div></div><div id="admin-tab-translations" data-tab="translations" hidden><div id="translations-content"></div></div></div>' ) === true );
 
+
+/*	Every piece of that markup is an entry of Panels::$html, not a string the
+	method builds - which is what lets somebody change how the rail looks
+	without reading the class that decides what is in it (AGENTS.md, "Markup
+	belongs in a template"). Proven by replacing an entry: what comes back has
+	to follow it	*/
+$shippedLink = \Nino\Admin\Panels::$html['nav-link'];
+\Nino\Admin\Panels::$html['nav-link'] = '<a class="own-rail" href="#[[uri]]" data-panel="[[uri]]">[[label]]</a>';
+$replacedNav = \Nino\Admin\Panels::navHtml( $registry );
+\Nino\Admin\Panels::$html['nav-link'] = $shippedLink;
+check( 'the rail is rendered through the property, so a replaced link fragment is what comes back', str_contains( $replacedNav, '<a class="own-rail" href="#navs" data-panel="navs">[[/_admin/nav/navs]]</a>' ) === true
+	&& str_contains( $replacedNav, 'nino-admin-nav-icon' ) === false );
+check( '...and the shipped fragment is back afterwards', str_contains( \Nino\Admin\Panels::navHtml( $registry ), '<span class="nino-admin-nav-label">[[/_admin/nav/navs]]</span></a>' ) === true );
+
+$shippedMount = \Nino\Admin\Panels::$html['mount'];
+\Nino\Admin\Panels::$html['mount'] = '<section id="[[id]]" class="own-mount"></section>';
+$replacedPanes = \Nino\Admin\Panels::panesHtml( $registry );
+\Nino\Admin\Panels::$html['mount'] = $shippedMount;
+check( 'the mount points are rendered through theirs too', str_contains( $replacedPanes, '<section id="dummy-list" class="own-mount"></section>' ) === true );
+
+// The language switcher is Admin's own fragment rather than Panels', since
+// it is the one piece of the shell that class still renders itself
+$shippedOption = \Nino\Admin\Admin::$html['locale-option'];
+\Nino\Admin\Admin::$html['locale-option'] = '<option value="[[locale]]"[[selected]]>[[label]] ([[locale]])</option>';
+$pickerFragment = new ReflectionMethod( '\Nino\Admin\Admin', '_localePickerHtml' );
+$pickerFragment->setAccessible( true );
+$replacedPicker = (string) $pickerFragment->invokeArgs( null, [ &$appData, 'en_US' ] );
+\Nino\Admin\Admin::$html['locale-option'] = $shippedOption;
+check( 'and so is the language switcher', str_contains( $replacedPicker, '<option value="en_US" selected>' ) === true
+	&& str_contains( $replacedPicker, '(en_US)</option>' ) === true );
+
 // Every file a shipped panel names has to be there, and every mount id it
 // answers has to be one its script renders into - a renamed script or a
 // pane spelled differently on the two sides is a panel whose tab opens on
