@@ -1144,8 +1144,6 @@ a {
 :where(.nino-admin) .nino-admin-tabs {
 	display: flex;
 	margin: 0 0 .9rem;
-	box-shadow: inset 0 0 0 1px var(--editor-border), var(--editor-shadow-sm);
-	border: 1px solid var(--editor-border);
 	border-radius:var(--editor-radius-sm);
 	overflow:hidden;
 }
