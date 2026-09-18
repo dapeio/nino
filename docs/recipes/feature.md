@@ -89,7 +89,7 @@ return [
 	// groups and filters by. See docs/features.md#categories
 	'category'		=> 'content',
 	'version'			=> '1.1.0',
-	'nino'				=> '^1.0',
+	'nino'				=> '^1.3',
 	'php'					=> [ 'ext' => [ 'json' ] ],
 	'requires'		=> [],
 	// The files under data/ this feature owns - what a backup carries

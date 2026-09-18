@@ -2,7 +2,7 @@
 
 **Sprache:** [English](features.md) · Deutsch
 
-**Stand:** 11. September 2026 · **Nino-Version:** 1.2.0-beta
+**Stand:** 18. September 2026 · **Nino-Version:** 1.3.0-beta
 
 Dieses Handbuch erklärt, was ein Feature ist, wie ein Betreiber es im Panel **Features** der Workbench einschaltet, und was ein Entwickler liefern muss, damit ein Verzeichnis eines wird: das Manifest, das Settings-Schema, den Lebenszyklus und die Tests. Der Kernel-Vertrag dahinter ist `\Nino\Features` in `_nino/Nino/Features/Features.php`; `tests/features-smoke.php` prüft ihn gegen die Fixtures unter `tests/fixtures/features/`. Wer ein eigenes Feature Schritt für Schritt bauen will, folgt dem [Feature-Rezept](recipes/feature.md).
 
@@ -87,7 +87,7 @@ return [
 	],
 	'category'		=> 'content',
 	'version'			=> '1.1.0',
-	'nino'				=> '^1.0',
+	'nino'				=> '^1.3',
 	'php'					=> [ 'ext' => [ 'json' ] ],
 	'requires'		=> [],
 	// The files under data/ this feature owns - what a backup carries

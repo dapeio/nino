@@ -6,6 +6,17 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **`\Nino\VERSION` is `1.3.0-beta`.** The published `v1.2.0-beta` tag and
+  this tree both called themselves `1.2.0-beta` while the feature contract
+  moved on underneath: `Features::manifest()` learned to read a sectioned
+  `manual` map after the tag, so the tagged kernel refuses every one of the
+  24 published manifests - measured, all 24 - while every constraint they
+  carried (`^1.0`, `^1.1`, `^1.2`) is satisfied by it. Two different
+  contracts under one version number cannot be told apart by a constraint,
+  which is the whole mechanism a constraint exists for. The catalogue's
+  manifests move to `^1.3` in the same change, so a kernel that cannot read
+  a manifest is refused before the archive is fetched rather than after.
+
 - **`Features::applyUnit()` hands back a unit's config defaults instead of
   writing them.** It takes a fourth accumulator, `&$config`, beside
   `&$routes` and `&$blacklist`, and the caller persists them. config.php
@@ -320,25 +331,19 @@ All notable changes to Nino are documented in this file.
   hand. The callback takes `mixed` and normalises, the way `AGENTS.md` asks
   of a `mutate()` callback.
 
-- **`features/.htaccess` was deleted, and could not simply be put back.** The
-  file is tracked and has been since the features directory arrived; `8c85f4b`
-  removed it. `.gitignore` excluded `/features/` as a directory, which does not
-  affect a file already in the index but does prevent one from being added
-  again - git stops at an excluded directory and never reads what is inside, so
-  no rule written below it can match. The deletion was therefore one-way.
-
-  What it cost: CI has been red on main ever since. `phpstan.neon` lists
-  `features` under `paths`, so the static analysis step fails with `Path
-  .../features does not exist` - and it runs before the tests, so ESLint and
-  every smoke test were skipped rather than run. `tests/features-smoke.php`
-  asserts the file's presence and its deny rule, and two JS suites read the
-  directory before their first check, so on a fresh clone they crash with
-  ENOENT. On a server the tree was served rather than denied, since the root
-  `.htaccess` forwards only what does not resolve on disk and a feature's files
-  do resolve.
-
-  The file is restored byte for byte from `8c85f4b^`, and the exclusion now
-  names the directory's contents so the rule can always be added back.
+- **A checkout carried no `features/` and no deny rule for it.** `.gitignore`
+  excluded the directory rather than its contents, and an exclusion of a
+  directory cannot be undone from below - git stops there and never reads
+  what is inside - so `features/.htaccess` had never been shippable, however
+  the rule was written. What the manuals, `AGENTS.md` and
+  `tests/features-smoke.php` all say a checkout ships, no clone had. On a
+  server that meant the tree was served rather than denied, since the root
+  `.htaccess` forwards only what does not resolve on disk and a feature's
+  files do resolve; `Catalogue::install()` creates the directory on the way
+  in, and a directory made that way carries no rule. The exclusion names the
+  contents now, the rule is in the repository, and the three suites a clone
+  could not pass - `features-smoke.php` and the two that read the directory
+  before their first check - pass.
 
 - **The Language panel did not load.** Its `showCurrent()` builds the form
   once, gated on a `_ready` flag the first answer sets - and the flag was
