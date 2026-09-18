@@ -662,9 +662,10 @@ namespace Nino {
 			$routes 		= is_array( $stored['/nino/http/routes'] ?? null ) ? $stored['/nino/http/routes'] : \Nino\AppData::DEFAULTS['/nino/http/routes'];
 			$routesBefore	= $routes;
 			$blacklist	= [];
+			$config			= [];
 
 			if( is_dir( $feature['dir']. '/install' ) === true )
-				self::applyUnit( $appData, $feature['dir']. '/install', \Nino\Locales::getAvailableLocales( $appData ), $routes, $blacklist, false );
+				self::applyUnit( $appData, $feature['dir']. '/install', \Nino\Locales::getAvailableLocales( $appData ), $routes, $blacklist, $config, false );
 
 			$class 			= $feature['module'];
 			$wasActive	= $feature['active'];
@@ -680,34 +681,91 @@ namespace Nino {
 				if( $class::upgrade( $appData, (string) $feature['installed'] ) === false )
 					return 'feature "'. $key. '" refused to upgrade from '. $feature['installed'];
 
-			$modules = array_values( (array) ( $appData['/nino/modules'] ?? [] ) );
-			if( $wasActive === false )
-				$modules[] = $class;
-			$appData['/nino/modules'] = array_values( array_unique( $modules ) );
+			/*	What this activation adds, rather than what config.php held when
+				the snapshot above was taken. Everything between that read and
+				this point can have written the file: applyUnit() merges text
+				files, and the upgrade hook is a feature's own code, which
+				docs/features.md invites to migrate config.php with the kernel's
+				own mutate(). Persisting the snapshot reverted whatever they did -
+				a hook's migration silently undone by the activation that called
+				it, in one process, no second request needed.
 
-			$state = is_array( $appData[ self::STATE_KEY ] ?? null ) ? $appData[ self::STATE_KEY ] : [];
-			$state[$key] = [
-				'version'		=> $feature['version'],
-				'settings'	=> is_array( $state[$key]['settings'] ?? null ) ? $state[$key]['settings'] : [],
-			];
-			$appData[ self::STATE_KEY ] = $state;
-
-			$keys = [ '/nino/modules', self::STATE_KEY ];
+				So the three keys are written as the differences they are, against
+				the file as it stands at lock time. isset() rather than
+				array_key_exists() on the routes, because that is the test
+				applyUnit() itself applied against the snapshot	*/
+			$added = [];
+			foreach( $routes as $routeKey => $route )
+				if( ( $routesBefore[$routeKey] ?? null ) !== $route )
+					$added[$routeKey] = $route;
 
 			$live = (array) ( $appData['/nino/http/routes'] ?? [] );
-			if( $routes !== $routesBefore ) {
-				$appData['/nino/http/routes'] = $routes;
-				$keys[] = '/nino/http/routes';
+			$version = $feature['version'];
+
+			/*	E_USER_ERROR, the level writeContentData() raises for the same
+				thing: a config.php write that is dropped rather than made has
+				to be loud, because what is lost is a route, a module list or a
+				version record. The refusal below it is for a handler that
+				decides to carry on - the same shape AppData and Elements use,
+				and the same phpstan-baseline entry	*/
+			if( \Nino\Filesystem::lockFile( $appData, '/config.php' ) === false ) {
+				trigger_error( 'Features::activate(): could not lock config.php for writing.', E_USER_ERROR );
+				return 'could not write config.php';
 			}
 
-			$written = \Nino\AppData::writeContentData( $appData, $keys );
+			$written = \Nino\Filesystem::mutate( $appData, '/config.php', static function( array $content ) use ( $class, $key, $version, $added, $config ): array {
+
+				// Whether the class is in the file, not whether this request
+				// thought the feature was on: the two can differ, and what an
+				// activation means is that the class is listed afterwards
+				$modules = array_values( (array) ( $content['/nino/modules'] ?? [] ) );
+				if( in_array( $class, $modules, true ) === false )
+					$modules[] = $class;
+				$content['/nino/modules'] = array_values( array_unique( $modules ) );
+
+				$state = is_array( $content[ self::STATE_KEY ] ?? null ) ? $content[ self::STATE_KEY ] : [];
+				$state[$key] = [
+					'version'		=> $version,
+					'settings'	=> is_array( $state[$key]['settings'] ?? null ) ? $state[$key]['settings'] : [],
+				];
+				$content[ self::STATE_KEY ] = $state;
+
+				if( $added !== [] ) {
+
+					$stored = is_array( $content['/nino/http/routes'] ?? null ) ? $content['/nino/http/routes'] : \Nino\AppData::DEFAULTS['/nino/http/routes'];
+
+					foreach( $added as $routeKey => $route )
+						if( isset( $stored[$routeKey] ) === false )
+							$stored[$routeKey] = $route;
+
+					$content['/nino/http/routes'] = $stored;
+				}
+
+				// The unit's own defaults, still only where the file has nothing:
+				// applyUnit() decided that against $appData, and the file is what
+				// it has to hold against
+				foreach( $config as $configKey => $configValue )
+					if( isset( $content[$configKey] ) === false )
+						$content[$configKey] = $configValue;
+
+				return $content;
+			} );
 
 			// The live routes back, with the unit's new ones added: this
 			// request goes on with everything it booted with
 			$appData['/nino/http/routes'] = $live + $routes;
 
-			if( $written === false )
+			if( $written === false ) {
+				trigger_error( 'Features::activate(): failed to write config.php.', E_USER_ERROR );
 				return 'could not write config.php';
+			}
+
+			// What was written, read back into this request: the file is the
+			// decision now, not the copy this request booted with
+			$persisted = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
+			$persisted = is_array( $persisted ) ? $persisted : [];
+			$appData['/nino/modules'] = array_values( (array) ( $persisted['/nino/modules'] ?? [] ) );
+			$appData[ self::STATE_KEY ] = is_array( $persisted[ self::STATE_KEY ] ?? null ) ? $persisted[ self::STATE_KEY ] : [];
 
 			if( $blacklist !== [] )
 				\Nino\Filesystem::mutate( $appData, '/text/blacklist.php', function( mixed $list ) use ( $blacklist ): array {
@@ -867,9 +925,14 @@ namespace Nino {
 		 *	Apply one unit's manifest.php: merge its routes into $routes
 		 *	(skipping any locale-gated route whose locale is not available),
 		 *	copy its files, templates and element types (same locale gating),
-		 *	collect its blacklist entries, fill in its config defaults where
-		 *	the project has nothing yet, and merge its text/global.php and
+		 *	collect its blacklist entries and its config defaults for keys the
+		 *	project has nothing for yet, and merge its text/global.php and
 		 *	text/<locale>.php fragments into the real /text files.
+		 *
+		 *	The config defaults are collected, not written. This method used to
+		 *	write them itself, and config.php cannot be both written here and
+		 *	decided by the caller under one lock - which is what activate() needs
+		 *	in order not to commit a snapshot it read before this ran.
 		 *
 		 *	With $overwrite the unit wins, which is what the wizard wants: a
 		 *	re-applied unit replaces what it copied before. Without it the
@@ -882,11 +945,12 @@ namespace Nino {
 		 *	@param		array 		$locales			The locales to apply for
 		 *	@param		array 		&$routes			(reference) Routes accumulator - the persisted routes, never the live ones
 		 *	@param		array 		&$blacklist		(reference) Collected blacklist keys, appended to
+		 *	@param		array 		&$config			(reference) Collected config defaults, key => value, for the caller to write
 		 *	@param		bool			$overwrite		Whether the unit replaces what the project has
 		 *
 		 *	@return 	void
 		 */
-		public static function applyUnit( array &$appData, string $unitDir, array $locales, array &$routes, array &$blacklist, bool $overwrite = true ): void {
+		public static function applyUnit( array &$appData, string $unitDir, array $locales, array &$routes, array &$blacklist, array &$config, bool $overwrite = true ): void {
 
 			$unitDir	= rtrim( $unitDir, '/' );
 			$manifest	= self::readUnitManifest( $unitDir ) ?? [];
@@ -931,20 +995,18 @@ namespace Nino {
 				has nothing yet, never overwritten: re-applying a unit must not
 				reset a value the developer has edited since.
 
-				Collected and written once. writeContentData() takes a list of
-				keys and rewrites the whole of config.php for it, so writing
-				inside the loop meant one full rewrite per default a unit
-				brought: the base unit alone carries a dozen	*/
-			$configKeys = [];
-
+				Handed to the caller rather than written here. Writing them was
+				one full rewrite of config.php per unit at best, and it made the
+				file impossible to decide under a lock: putFileContent() releases
+				the lock at the end of every write, so a caller holding one lost
+				it here. activate() now writes every key it decides, these
+				included, in one locked read-modify-write at the end. $appData
+				still gets the value, because the rest of this request reads it	*/
 			foreach( ( $manifest['config'] ?? [] ) as $configKey => $configValue )
 				if( isset( $appData[$configKey] ) === false ) {
 					$appData[$configKey] = $configValue;
-					$configKeys[] = $configKey;
+					$config[$configKey] = $configValue;
 				}
-
-			if( $configKeys !== [] )
-				\Nino\AppData::writeContentData( $appData, $configKeys );
 
 			$globalFragment = $unitDir. '/text/global.php';
 			if( is_file( $globalFragment ) === true )

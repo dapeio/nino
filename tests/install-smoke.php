@@ -273,7 +273,7 @@ check( 'copies base\'s deny rule into the private root it just filled', is_file(
 $applyUnitSource = (string) file_get_contents( __DIR__. '/../_nino/Nino/Features/Features.php' );
 $applyUnitBody 	= substr( $applyUnitSource, strpos( $applyUnitSource, 'public static function applyUnit(' ) );
 $applyUnitBody 	= substr( $applyUnitBody, 0, strpos( $applyUnitBody, "\n\t\t}" ) );
-check( 'the wizard\'s Setup applies a unit through the kernel, with overwrite on', str_contains( (string) file_get_contents( __DIR__. '/../_admin/install/Install.php' ), '\\Nino\\Features::applyUnit( $appData, $unitDir, $locales, $routes, $blacklist, true )' ) === true );
+check( 'the wizard\'s Setup applies a unit through the kernel, with overwrite on', str_contains( (string) file_get_contents( __DIR__. '/../_admin/install/Install.php' ), '\\Nino\\Features::applyUnit( $appData, $unitDir, $locales, $routes, $blacklist, $config, true )' ) === true );
 
 check( '...before any template can create that directory unprotected', strpos( $applyUnitBody, "\$manifest['files']" ) < strpos( $applyUnitBody, "forceDir( \$appData, '/templates' )" ) );
 

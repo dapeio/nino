@@ -6,6 +6,15 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **`Features::applyUnit()` hands back a unit's config defaults instead of
+  writing them.** It takes a fourth accumulator, `&$config`, beside
+  `&$routes` and `&$blacklist`, and the caller persists them. config.php
+  cannot be both written inside this method and decided by the caller under
+  one lock, and the caller is the one that needs it (see the activation fix
+  below). For the wizard's Setup step it is also one full rewrite of
+  config.php fewer per unit that brings any default: they go with the keys
+  that step writes anyway.
+
 - **Two docblocks that documented nothing.** A method renamed or moved away
   from its docblock leaves the block behind, and the next member's own block
   lands directly under it - php takes the second, and the first rots where it
@@ -213,6 +222,21 @@ All notable changes to Nino are documented in this file.
   which is which.
 
 ### Fixed
+
+- **An activation reverted what its own upgrade hook had written.**
+  `activate()` read the stored routes, then applied the unit and called the
+  feature's `upgrade()` hook, and then persisted the copy it had read at the
+  start. `docs/features.md` invites that hook to migrate the project's own
+  config, with the kernel's own `mutate()` - and the activation that called
+  it silently undid the migration. It took no second request: one process,
+  one activation, the hook's work gone, as long as the unit had a route of
+  its own to add (without one the key was not written at all, which is why
+  this went unseen). The same copy was persisted for `/nino/modules` and
+  `/nino/features`, whose window was the whole request rather than a few
+  lines, so a parallel change to either was lost as well. All three keys are
+  now written as the differences they are, against config.php as it stands
+  at lock time, in one locked read-modify-write; the module list is decided
+  by what the file holds rather than by what this request believed.
 
 - **Removing a symlinked feature blamed the file permissions.** A feature
   reached through a symlink - a checkout linked into `features/`, which is

@@ -73,6 +73,12 @@ parameters:
 			path: _nino/Nino/Filesystem/Filesystem.php
 
 		-
+			message: '#^Unreachable statement \- code above always terminates\.$#'
+			identifier: deadCode.unreachable
+			count: 2
+			path: _nino/Nino/Features/Features.php
+
+		-
 			message: '#^Call to an undefined method DOMNode\:\:getAttribute\(\)\.$#'
 			identifier: method.notFound
 			count: 1

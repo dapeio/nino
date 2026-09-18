@@ -521,6 +521,32 @@ $fromOff = \Nino\Features::activate( $appData, 'sample' );
 check( 'activating a switched-off feature whose directory is newer than its record runs the upgrade hook too', $fromOff === true && ( $appData['./sample/upgraded-from'] ?? null ) === '0.5.0'
 	&& \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/features']['sample']['version'] === '1.2.0' && \Nino\Features::get( $appData, 'sample' )['active'] === true );
 
+/*	And what the hook writes to config.php is still there afterwards.
+	activate() read the routes before applyUnit() and before the hook, and
+	persisted that copy - so a hook doing an ordinary migration with the
+	kernel's own mutate() had its work reverted by the activation that called
+	it, in one process, with no second request involved. It needed the unit to
+	have a route to add for the write to happen at all, which is why one of
+	the unit's own is taken back out first.	*/
+$appData['./sample/migrate-routes'] = true;
+$appData['/nino/features']['sample']['version'] = '0.5.0';
+
+$strippedRoutes = (array) \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes'];
+unset( $strippedRoutes['GET://sample-de'] );
+$appData['/nino/http/routes'] = $strippedRoutes;
+
+\Nino\AppData::writeContentData( $appData, [ '/nino/features', '/nino/http/routes' ] );
+unset( $appData['./nino/features/all'] );
+
+$migrated			= \Nino\Features::activate( $appData, 'sample' );
+$routesAfter	= (array) \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes'];
+
+check( 'what the upgrade hook wrote to config.php survives the activation that called it', $migrated === true && isset( $routesAfter['GET://sample-migrated'] ) === true );
+check( '...and the unit\'s own route arrives in the same write', isset( $routesAfter['GET://sample-de'] ) === true );
+check( '...and the project\'s own route is untouched by either', ( $routesAfter['GET://sample']['body'] ?? null ) === 'the project\'s own' );
+
+unset( $appData['./sample/migrate-routes'] );
+
 echo "\n";
 
 
@@ -572,20 +598,21 @@ file_put_contents( \Nino\Filesystem::path( $appData, '/images/u.txt' ), 'project
 
 $routes = [ 'GET://u' => [ 'uri' => '/project-u' ] ];
 $blacklist = [];
-\Nino\Features::applyUnit( $appData, $unitDir, [ 'de_DE' ], $routes, $blacklist, false );
+$unitConfig = [];
+\Nino\Features::applyUnit( $appData, $unitDir, [ 'de_DE' ], $routes, $blacklist, $unitConfig, false );
 check( 'add-only: an existing route, template, file and text key stay, what is missing arrives', $routes['GET://u']['uri'] === '/project-u'
 	&& file_get_contents( \Nino\Filesystem::path( $appData, '/templates/page-u.tpl' ) ) === 'project' && file_get_contents( \Nino\Filesystem::path( $appData, '/templates/page-u.de_DE.tpl' ) ) === 'unit de'
 	&& file_get_contents( \Nino\Filesystem::path( $appData, '/images/u.txt' ) ) === 'project image' && \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] )['[[/u/g]]'] === 'project' && $blacklist === [ '/u/x' ] );
 check( 'a locale-gated template for a locale not asked for is never copied', is_file( \Nino\Filesystem::path( $appData, '/templates/page-u.fr_FR.tpl' ) ) === false );
 
-\Nino\Features::applyUnit( $appData, $unitDir, [ 'de_DE' ], $routes, $blacklist, true );
+\Nino\Features::applyUnit( $appData, $unitDir, [ 'de_DE' ], $routes, $blacklist, $unitConfig, true );
 check( 'overwrite: the unit replaces all of it', $routes['GET://u']['uri'] === '/u'
 	&& file_get_contents( \Nino\Filesystem::path( $appData, '/templates/page-u.tpl' ) ) === 'unit' && file_get_contents( \Nino\Filesystem::path( $appData, '/images/u.txt' ) ) === 'unit image'
 	&& \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] )['[[/u/g]]'] === 'unit' && $blacklist === [ '/u/x', '/u/x' ] );
 check( 'a unit without a manifest applies nothing', ( static function() use ( $appData, $sandbox ): bool {
-	$r = [ 'a' => 1 ]; $b = [];
-	\Nino\Features::applyUnit( $appData, $sandbox. '/no-unit', [ 'de_DE' ], $r, $b );
-	return $r === [ 'a' => 1 ] && $b === [] && \Nino\Features::readUnitManifest( $sandbox. '/no-unit' ) === null;
+	$r = [ 'a' => 1 ]; $b = []; $c = [];
+	\Nino\Features::applyUnit( $appData, $sandbox. '/no-unit', [ 'de_DE' ], $r, $b, $c );
+	return $r === [ 'a' => 1 ] && $b === [] && $c === [] && \Nino\Features::readUnitManifest( $sandbox. '/no-unit' ) === null;
 } )() );
 
 echo "\n";

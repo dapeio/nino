@@ -760,14 +760,18 @@ namespace Nino\Install {
 				unset( $routes[$routeKey] );
 
 			$blacklist = [];
+			$config = [];
 
-			self::_applyUnit( $appData, self::LIBRARY. '/base', $locales, $routes, $blacklist );
+			self::_applyUnit( $appData, self::LIBRARY. '/base', $locales, $routes, $blacklist, $config );
 			foreach( $modules as $key )
-				self::_applyUnit( $appData, $units[$key], $locales, $routes, $blacklist );
+				self::_applyUnit( $appData, $units[$key], $locales, $routes, $blacklist, $config );
 
 			$appData['/nino/http/routes'] = $routes;
 
-			\Nino\AppData::writeContentData( $appData, [ '/nino/locales/available', '/nino/locales/native', '/nino/modules', '/nino/auth/roles', '/nino/http/routes', '/nino/html/assets' ] );
+			// The units' config defaults go with the keys this step writes
+			// anyway - applyUnit() collects them now instead of writing one
+			// full config.php rewrite per unit that brings any
+			\Nino\AppData::writeContentData( $appData, array_merge( [ '/nino/locales/available', '/nino/locales/native', '/nino/modules', '/nino/auth/roles', '/nino/http/routes', '/nino/html/assets' ], array_keys( $config ) ) );
 
 			if( count( $blacklist ) > 0 )
 				\Nino\Filesystem::mutate( $appData, '/text/blacklist.php', function( array $list ) use ( $blacklist ): array {
@@ -840,12 +844,15 @@ namespace Nino\Install {
 		 *	@param		array 		&$routes			(reference) Routes accumulator - starts from what's on
 		 *																	disk (see apiApply()), never from $appData directly
 		 *	@param		array 		&$blacklist		(reference) Collected blacklist keys, appended to
+		 *	@param		array 		&$config			(reference) Collected config defaults - applyUnit() hands
+		 *																	them back rather than writing them, so apiApply()
+		 *																	persists them with the keys it writes anyway
 		 *
 		 *	@return 	void
 		 */
-		private static function _applyUnit( array &$appData, string $unitDir, array $locales, array &$routes, array &$blacklist ): void {
+		private static function _applyUnit( array &$appData, string $unitDir, array $locales, array &$routes, array &$blacklist, array &$config ): void {
 
-			\Nino\Features::applyUnit( $appData, $unitDir, $locales, $routes, $blacklist, true );
+			\Nino\Features::applyUnit( $appData, $unitDir, $locales, $routes, $blacklist, $config, true );
 		}
 	}
 
