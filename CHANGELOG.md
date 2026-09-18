@@ -4,6 +4,8 @@ All notable changes to Nino are documented in this file.
 
 ## Unreleased
 
+## 1.3.0-beta — 2026-09-18
+
 ### Changed
 
 - **`\Nino\VERSION` is `1.3.0-beta`.** The published `v1.2.0-beta` tag and
