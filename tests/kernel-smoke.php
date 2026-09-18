@@ -1372,6 +1372,43 @@ check( 'deleteElement releases the type file lock after a callback veto', probeL
 echo "\n";
 
 
+// --- Filesystem::mutate - the lock comes off however the callback leaves ------------------------------
+
+echo "Filesystem::mutate releases its lock when what runs under it throws\n";
+
+// mutate() releases on both of its own exits - a callback answering null,
+// and the write at the end. A throwable had no exit at all: it walked past
+// every unlockFile() there is, and lockFile() keeps the handle outside the
+// cache slot on purpose, so nothing else dropped it either. The file then
+// stayed locked against every other process for the rest of the request.
+// Two ways in: the callback itself, and the include of a .php file that no
+// longer parses - which throws from inside the same lock, one line earlier
+$thrown = null;
+try {
+	\Nino\Filesystem::mutate( $appData, '/data/throwing.php', static function( mixed $state ): array {
+		throw new \RuntimeException( 'the callback gave up' );
+	} );
+}
+catch( \Throwable $e ) {
+	$thrown = $e;
+}
+check( 'a callback\'s throwable carries on out of mutate unchanged', $thrown instanceof \RuntimeException && $thrown->getMessage() === 'the callback gave up' );
+check( 'and the lock it walked out of is released', probeLockFree( $sandbox, '/data/throwing.php' ) === true );
+
+file_put_contents( \Nino\Filesystem::path( $appData, '/data/unparseable.php' ), '<?php return [ ' );
+$parseError = null;
+try {
+	\Nino\Filesystem::mutate( $appData, '/data/unparseable.php', static fn( mixed $state ): array => [ 'x' ] );
+}
+catch( \Throwable $e ) {
+	$parseError = $e;
+}
+check( 'a .php file that no longer parses throws from inside the lock', $parseError instanceof \ParseError );
+check( 'and that lock is released as well', probeLockFree( $sandbox, '/data/unparseable.php' ) === true );
+
+echo "\n";
+
+
 // --- Callbacks::doCallbacks - every callable shape registerCallback() accepts ---------------------------
 
 echo "Callbacks::doCallbacks runs every registered callable shape\n";

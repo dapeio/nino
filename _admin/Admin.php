@@ -1713,7 +1713,18 @@ namespace Nino\Admin {
 			$lockedOut 	= false;
 			$verified 	= false;
 
-			\Nino\Filesystem::mutate( $appData, self::LOCKOUT_PATH, function( array $state ) use ( $password, $hash, &$lockedOut, &$verified ): ?array {
+			\Nino\Filesystem::mutate( $appData, self::LOCKOUT_PATH, function( mixed $state ) use ( $password, $hash, &$lockedOut, &$verified ): ?array {
+
+				// mutate() hands over what the file holds, and $default only covers
+				// a file that is not there: an empty, truncated or unreadable
+				// lockout.json decodes to null, and a file that is an array without
+				// the counter in it reads a key that is not there. Under `array
+				// $state` the first was a TypeError and the second a warning, both
+				// fatal - a 500 on the one door a locked-out administrator has left,
+				// until somebody repairs the file by hand. This line is what
+				// AGENTS.md asks of a mutate() callback, and what the kernel's own
+				// do; the counter starts over, which is what $default means
+				$state = ( is_array( $state ) === true ? $state : [] ) + [ 'tries' => 0, 'until' => 0 ];
 
 				if( (int) $state['until'] > time() ) {
 					$lockedOut = true;

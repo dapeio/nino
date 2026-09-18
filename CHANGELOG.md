@@ -194,6 +194,28 @@ All notable changes to Nino are documented in this file.
 
 ### Fixed
 
+- **A callback that threw kept the file locked for the rest of the request.**
+  `Filesystem::mutate()` released its lock on both of its own exits - a
+  callback answering `null`, and the write at the end - and a throwable had
+  no exit at all: it walked past every `unlockFile()` there is, and the
+  handle is held outside the cache slot on purpose, so nothing else dropped
+  it either. A data file that is not the array a callback's signature asks
+  for, or one that no longer parses, therefore left an exclusive lock on it
+  that nothing released until the request ended, while every other process
+  wanting that file waited. Two callers already swallow such a throwable and
+  render the page anyway (`Form::record()`, the error log), so the request
+  did survive to hold it. The lock now comes off whichever way the callback
+  leaves, and the throwable carries on unchanged.
+
+- **A damaged lockout counter shut the recovery door.** `Recovery::verify()`
+  typed its `mutate()` callback `array $state`, but `$default` answers only
+  for a file that is not there - a file that is there answers with what it
+  holds, and an empty, truncated or unreadable `lockout.json` decodes to
+  `null`. That was a TypeError, so the one entry point left to somebody
+  locked out of the workbench answered 500 until the file was repaired by
+  hand. The callback takes `mixed` and normalises, the way `AGENTS.md` asks
+  of a `mutate()` callback.
+
 - **`features/.htaccess` was deleted, and could not simply be put back.** The
   file is tracked and has been since the features directory arrived; `8c85f4b`
   removed it. `.gitignore` excluded `/features/` as a directory, which does not

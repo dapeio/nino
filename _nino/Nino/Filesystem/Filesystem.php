@@ -274,7 +274,8 @@ namespace Nino {
 		// the lock exists to exclude. $fn is fn(mixed $state, array
 		// &$appData): mixed, returning either the new state to write or
 		// null to abort - which still releases the lock, so a caller with
-		// an early exit doesn't need its own unlockFile() call.
+		// an early exit doesn't need its own unlockFile() call. A callback
+		// that throws releases it too, and the throwable carries on.
 		public static function mutate( array &$appData, string $path, callable $fn, mixed $default = [] ): bool {
 
 			if( self::lockFile( $appData, $path ) === false )
@@ -282,8 +283,24 @@ namespace Nino {
 
 			$appData['./nino/filesystem/cache'][$path]['fstat'] = [];
 
-			$state 	= self::getFileContent( $appData, $path, $default );
-			$new 		= $fn( $state, $appData );
+			// The lock has to come off however this leaves, not only on the two
+			// ways out below. A callback that throws - a data file that is not
+			// the array its signature asks for, a random_bytes() that ran out -
+			// and an include of a .php file that no longer parses both walk out
+			// of here past every unlockFile() there is, and the handle is held
+			// deliberately outside the cache slot, so nothing else drops it
+			// either: the file stays locked against every other process for the
+			// rest of a request that has no reason left to hold it. Rethrown
+			// unchanged - whether the failure is fatal is the caller's decision,
+			// the lock is not
+			try {
+				$state 	= self::getFileContent( $appData, $path, $default );
+				$new 		= $fn( $state, $appData );
+			}
+			catch( \Throwable $e ) {
+				self::unlockFile( $appData, $path );
+				throw $e;
+			}
 
 			if( $new === null ) {
 				self::unlockFile( $appData, $path );

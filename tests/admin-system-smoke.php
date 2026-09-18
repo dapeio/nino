@@ -111,6 +111,25 @@ check( 'the lockout applies regardless of the secret tried next', \Nino\Admin\Re
 // Reset the lockout state for the rest of the file - a fresh cooldown window shouldn't leak into later checks
 \Nino\Filesystem::putFileContent( $appData, \Nino\Filesystem::CONTENT_DIR. '/.auth/lockout.json', [ 'tries' => 0, 'until' => 0 ] );
 
+// A counter file that is not the counter. getFileContent()'s $default
+// answers for a file that is not there; a file that IS there answers with
+// what it holds, and an empty, truncated or unreadable .json decodes to
+// null. Under a callback typed `array $state` that was a TypeError, ie. a
+// 500 on the one door left to somebody who is locked out of the workbench,
+// until the file was repaired by hand. Nothing here can produce such a file
+// - _writeFile() renames a temp file into place - but a partial deploy, a
+// hand edit or a uid mismatch on the read can
+$lockoutFile = \Nino\Filesystem::path( $appData, \Nino\Filesystem::CONTENT_DIR. '/.auth/lockout.json' );
+foreach( [ 'an empty' => '', 'a truncated' => '{ "tries": ', 'a non-array' => '7' ] as $what => $bytes ) {
+
+	file_put_contents( $lockoutFile, $bytes );
+	clearstatcache( true, $lockoutFile );
+	unset( $appData['./nino/filesystem/cache'][ \Nino\Filesystem::CONTENT_DIR. '/.auth/lockout.json' ] );
+
+	check( $what. ' lockout.json still lets recovery answer, rather than 500ing the door shut', \Nino\Admin\Recovery::verify( $appData, 'the real password' ) === 200 );
+}
+\Nino\Filesystem::putFileContent( $appData, \Nino\Filesystem::CONTENT_DIR. '/.auth/lockout.json', [ 'tries' => 0, 'until' => 0 ] );
+
 // How long an answer takes is itself an answer. An installation whose
 // secret file went missing must not reject faster than one that has a
 // secret to reject against - see Recovery::DECOY_HASH
