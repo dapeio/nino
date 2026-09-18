@@ -194,6 +194,26 @@ All notable changes to Nino are documented in this file.
 
 ### Fixed
 
+- **`features/.htaccess` was deleted, and could not simply be put back.** The
+  file is tracked and has been since the features directory arrived; `8c85f4b`
+  removed it. `.gitignore` excluded `/features/` as a directory, which does not
+  affect a file already in the index but does prevent one from being added
+  again - git stops at an excluded directory and never reads what is inside, so
+  no rule written below it can match. The deletion was therefore one-way.
+
+  What it cost: CI has been red on main ever since. `phpstan.neon` lists
+  `features` under `paths`, so the static analysis step fails with `Path
+  .../features does not exist` - and it runs before the tests, so ESLint and
+  every smoke test were skipped rather than run. `tests/features-smoke.php`
+  asserts the file's presence and its deny rule, and two JS suites read the
+  directory before their first check, so on a fresh clone they crash with
+  ENOENT. On a server the tree was served rather than denied, since the root
+  `.htaccess` forwards only what does not resolve on disk and a feature's files
+  do resolve.
+
+  The file is restored byte for byte from `8c85f4b^`, and the exclusion now
+  names the directory's contents so the rule can always be added back.
+
 - **The Language panel did not load.** Its `showCurrent()` builds the form
   once, gated on a `_ready` flag the first answer sets - and the flag was
   never declared, so the gate compared `undefined` and the panel built zero

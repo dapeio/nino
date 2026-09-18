@@ -13,7 +13,15 @@
 # or runtime content (uploaded images), never repository content
 /public/
 
-/features/
+# The installed features - catalogue content, one directory per feature,
+# never repository content (see \Nino\Features and docs/features.md). Its
+# deny rule is the exception: that file is this repository's and a checkout
+# has to carry it, so the exclusion names the contents rather than the
+# directory. As a directory exclusion this was one `git rm` away from
+# being unrecoverable - git stops at an excluded directory and never reads
+# what is inside, so a deleted deny rule could not be added back
+/features/*
+!/features/.htaccess
 
 .DS_Store
 Thumbs.db
