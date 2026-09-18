@@ -312,6 +312,18 @@ check( 'a form posts strings and gets the real types back', $v( [ 'enabled' => '
 check( 'a bool takes only its own spellings', $v( [ 'enabled' => 'yes' ] )['errors'] === [ 'enabled' => 'must be true or false' ] && $v( [ 'enabled' => 1 ] )['values']['enabled'] === true );
 check( 'an int is a whole number within its bounds', $v( [ 'limit' => '5.5' ] )['errors']['limit'] === 'must be a whole number'
 	&& $v( [ 'limit' => 0 ] )['errors']['limit'] === 'must be at least 1' && $v( [ 'limit' => '51' ] )['errors']['limit'] === 'must be at most 50' );
+// (int) saturates rather than failing, so a digit string wider than an int
+// became PHP_INT_MAX and was stored as if that was what had been asked for.
+// A setting without a 'max' kept it; 'limit' has one, so it was refused -
+// but named a bound the value had never been anywhere near. An unbounded
+// field is the one that showed it, so this asks both
+$wide = static fn( string $n ): array => \Nino\Features::validateSettings( [ 'n' => [ 'type' => 'int' ] ], [ 'n' => $n ] );
+check( 'a digit string wider than an int is refused, not saturated', $wide( '99999999999999999999999' )['errors'] === [ 'n' => 'must be a whole number' ]
+	&& $wide( (string) PHP_INT_MAX. '0' )['errors'] === [ 'n' => 'must be a whole number' ] );
+check( '...at the boundary exactly, either way', $wide( (string) PHP_INT_MAX )['values'] === [ 'n' => PHP_INT_MAX ] && $wide( (string) PHP_INT_MIN )['values'] === [ 'n' => PHP_INT_MIN ]
+	&& $wide( '9223372036854775808' )['errors'] !== [] && $wide( '-9223372036854775809' )['errors'] !== [] );
+check( '...and leading zeros and a signed zero still pass', $wide( '007' )['values'] === [ 'n' => 7 ] && $wide( '-0' )['values'] === [ 'n' => 0 ] );
+
 check( 'a string is trimmed, capped and, when required, not empty', $v( [ 'title' => '  Hi  ' ] )['values']['title'] === 'Hi'
 	&& $v( [ 'title' => str_repeat( 'x', 41 ) ] )['errors']['title'] === 'must be at most 40 characters' && $v( [ 'title' => ' ' ] )['errors']['title'] === 'is required' );
 check( 'a pattern is enforced, an empty optional value passes it by', $v( [ 'slug' => 'my-slug' ] )['values']['slug'] === 'my-slug'

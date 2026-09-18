@@ -3683,6 +3683,48 @@ check( '...and the rule has something to find: the sources were actually read', 
 echo "\n";
 
 
+// --- Every docblock documents something ------------------------------------
+
+echo "No docblock in the kernel or the workbench documents another docblock\n";
+
+/*	A method renamed or moved away from its docblock leaves the block behind,
+	and the next member's own block then lands directly under it. Php takes the
+	second one and every reader follows - Reflection, an editor, the person
+	looking for the rule - so the first documents nothing and rots where it
+	stands, describing a method that may no longer exist. Two T_DOC_COMMENTs
+	with no declaration between them is the whole test.	*/
+$docOffenders = [];
+foreach( $escapeSources as $docFile ) {
+
+	$docPrevious = null;
+
+	foreach( token_get_all( (string) file_get_contents( $docFile ) ) as $docToken ) {
+
+		if( is_array( $docToken ) === false ) {
+			$docPrevious = null;
+			continue;
+		}
+
+		if( $docToken[0] === T_WHITESPACE || $docToken[0] === T_COMMENT )
+			continue;
+
+		if( $docToken[0] === T_DOC_COMMENT ) {
+
+			if( $docPrevious !== null )
+				$docOffenders[] = substr( (string) realpath( $docFile ), strlen( (string) realpath( __DIR__. '/..' ) ) + 1 ). ':'. $docPrevious;
+
+			$docPrevious = $docToken[2];
+			continue;
+		}
+
+		$docPrevious = null;
+	}
+}
+check( 'no docblock documents another docblock'. ( $docOffenders === [] ? '' : ' - '. implode( ' | ', $docOffenders ) ), $docOffenders === [] );
+
+echo "\n";
+
+
 // --- One language in the source -------------------------------------------
 
 echo "Comments in the kernel and the workbench are written in one language\n";

@@ -6,6 +6,16 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **Two docblocks that documented nothing.** A method renamed or moved away
+  from its docblock leaves the block behind, and the next member's own block
+  lands directly under it - php takes the second, and the first rots where it
+  stands describing something that may no longer exist. `Features` carried
+  one for a method that has since been renamed and rewritten, which is gone;
+  `install/Install.php` carried one for `_perRouteTemplate()`, which had no
+  docblock of its own, and it is back above that method. A rule in
+  `kernel-smoke.php` holds the whole tree to it: no docblock directly
+  follows another.
+
 - **The catalogue's shipped key is described as what it is.** The comment
   above `Catalogue::PUBLIC_KEY`, `key()`'s `@return`, the class docblock and
   both manuals still said the constant was empty until Nino's first key
@@ -203,6 +213,23 @@ All notable changes to Nino are documented in this file.
   which is which.
 
 ### Fixed
+
+- **Removing a symlinked feature blamed the file permissions.** A feature
+  reached through a symlink - a checkout linked into `features/`, which is
+  how one is developed - was not removed at all: `Filesystem::removeDir()`
+  will not follow a link, which is right, but it did not remove the link
+  either, and the `is_dir()` check after it followed the link and still said
+  yes. So the operator was told the web server may not write there, which
+  was neither the reason nor anything they could act on. A linked-in feature
+  now goes by dropping the link, and what the link points at is left alone.
+
+- **A number too wide for an int was stored as `PHP_INT_MAX`.** A setting's
+  `int` accepted any run of digits and cast it, and PHP's cast saturates
+  rather than failing. A setting without a `max` kept that value; one with a
+  `max` did refuse it, but named a bound the value had never been near. The
+  digits are held against what the cast made of them now, so
+  `9223372036854775807` still passes and one more digit does not; `007` and
+  `-0` are unaffected.
 
 - **A refusal on the feature that was asked for was announced as a
   requirement's.** The install loop labelled a failure by the plan's size

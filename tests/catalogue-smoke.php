@@ -1009,6 +1009,27 @@ check( 'what it recorded stays - a removal is not an uninstall', isset( \Nino\Fi
 check( 'and the class is not in /nino/modules either way', in_array( '\\Nino\\Modules\\Top', \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/modules'], true ) === false );
 check( 'the activity log names it', \Nino\Modules\Features\Admin::log( 'features/remove', [ 'key' => 'top' ] ) === 'Remove the directory of feature "top"' );
 
+// A feature reached through a symlink - a checkout linked into features/,
+// which is how one is developed - goes by dropping the link, and what the
+// link points at is not this project's to delete. removeDir() will not
+// follow a link, which is right, and it did not remove the link either: the
+// feature stayed, is_dir() followed the link and still said yes, and the
+// answer blamed the file permissions for it. The Linked.php beside the
+// manifest is load-bearing - manifest() refuses a feature whose class file
+// is missing, and without it this would fail as an unknown feature
+$linked = sys_get_temp_dir(). '/nino-linked-feature-'. uniqid();
+mkdir( $linked, 0755, true );
+file_put_contents( $linked. '/feature.php', '<?php return [ \'key\' => \'linked\', \'name\' => \'Linked\', \'version\' => \'1.0.0\' ];' );
+file_put_contents( $linked. '/Linked.php', '<?php namespace Nino\Modules { class Linked { public const string VERSION = \'1.0.0\'; } }' );
+symlink( $linked, NINO_FEATURES_DIR. '/Linked' );
+unset( $appData['./nino/features/all'] );
+
+[ $status, $body ] = callFeatures( $appData, 'apiRemove', [ 'key' => 'linked' ] );
+check( 'a symlinked feature goes by its link, and what the link points at stays', $status === 200 && $body === [ 'removed' => 'linked' ]
+	&& is_link( NINO_FEATURES_DIR. '/Linked' ) === false && is_dir( $linked ) === true );
+
+\Nino\Filesystem::removeDir( $linked );
+
 echo "\n";
 
 ninoDone( $appData );

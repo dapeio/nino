@@ -796,7 +796,21 @@ namespace Nino {
 				return 'feature "'. $key. '" does not live below the features directory';
 
 			self::invalidateOpcache( $dir );
-			\Nino\Filesystem::removeDir( $dir );
+
+			// A feature reached through a symlink - a checkout linked into
+			// features/ during development, or a deployment that assembles the
+			// directory out of links - goes by dropping the link, never by
+			// deleting what it points at. removeDir() refuses to follow a link
+			// at all, which is right, but it declined to remove the link either:
+			// the feature stayed where it was, is_dir() followed the link and
+			// still said yes, and the operator was told the web server may not
+			// write there - which was not the reason, and not a thing they could
+			// do anything about. Dropping the link leaves the checkout on the
+			// other side of it alone
+			if( is_link( $dir ) === true )
+				@unlink( $dir );
+			else
+				\Nino\Filesystem::removeDir( $dir );
 
 			if( is_dir( $dir ) === true )
 				return 'could not remove '. $dir. ' - the web server may not write there';
@@ -1173,8 +1187,23 @@ namespace Nino {
 					return [ false, 'must be true or false' ];
 
 				case 'int':
-					if( is_string( $value ) === true && preg_match( '/^-?\d+$/', trim( $value ) ) === 1 )
-						$value = (int) trim( $value );
+					if( is_string( $value ) === true && preg_match( '/^-?\d+$/', trim( $value ) ) === 1 ) {
+
+						/*	(int) saturates instead of failing, so a digit string wider
+							than an int - a pasted id, a run of nines - arrived here as
+							PHP_INT_MAX, or PHP_INT_MIN with a sign, and was stored as
+							if that was what had been asked for. A setting without a
+							'max' kept it; one with a 'max' did refuse it, but named a
+							bound the value had never been near. The digits are held
+							against what the cast made of them, sign and leading zeros
+							off both sides first, so '007' and '-0' still pass	*/
+						$digits	= trim( $value );
+						$value	= (int) $digits;
+						$size		= ltrim( ltrim( $digits, '-' ), '0' );
+
+						if( $size !== '' && $size !== ltrim( (string) $value, '-' ) )
+							return [ false, 'must be a whole number' ];
+					}
 					if( is_int( $value ) === false )
 						return [ false, 'must be a whole number' ];
 					if( isset( $schema['min'] ) === true && $value < $schema['min'] )
@@ -1281,11 +1310,6 @@ namespace Nino {
 			};
 		}
 
-		/**
-		 *	@param		mixed			$value
-		 *
-		 *	@return 	bool										Whether it is a non-empty string or a non-empty locale => string map
-		 */
 		/**
 		 *	A sectioned manual, resolved into one locale and ready to draw:
 		 *	every section MANUAL_SECTIONS names, in that order, each a list of

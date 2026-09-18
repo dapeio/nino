@@ -1613,26 +1613,6 @@ namespace Nino\Install {
 		}
 
 		/**
-		 *	Where a 'templatePerRoute' unit's template lands for one entry,
-		 *	and which of the unit's own files it is copied from.
-		 *
-		 *	Named after the entry's Element URI rather than its Http URI: the
-		 *	Element URI is the stable identifier (the Http one is free to
-		 *	change, and '/' has no name at all), and page-&lt;uri&gt;.tpl is the
-		 *	shape /_admin's template picker globs for. A nested uri flattens
-		 *	to one segment - that picker lists templates/page-*.tpl and never
-		 *	looks into subdirectories.
-		 *
-		 *	Falls back to the unit's own single template when the uri yields
-		 *	nothing usable, so a strange entry still gets a working page
-		 *	rather than a route pointing at a file that was never written.
-		 *
-		 *	@param		array 		$entry				One webpages-list entry
-		 *	@param		array 		$manifest			The unit's manifest
-		 *
-		 *	@return 	array|null							{ file, source }, or null without a template to copy
-		 */
-		/**
 		 *	The route body a 'templatePerRoute' unit produces for one entry,
 		 *	or null for a unit that shares one template. Both apiApply() (which
 		 *	persists the list) and _applyWebpage() (which writes the route)
@@ -1656,6 +1636,26 @@ namespace Nino\Install {
 			return $template === null ? null : '[template /templates/'. pathinfo( $template['file'], PATHINFO_FILENAME ). ']';
 		}
 
+		/**
+		 *	Where a 'templatePerRoute' unit's template lands for one entry,
+		 *	and which of the unit's own files it is copied from.
+		 *
+		 *	Named after the entry's Element URI rather than its Http URI: the
+		 *	Element URI is the stable identifier (the Http one is free to
+		 *	change, and '/' has no name at all), and page-&lt;uri&gt;.tpl is the
+		 *	shape /_admin's template picker globs for. A nested uri flattens
+		 *	to one segment - that picker lists templates/page-*.tpl and never
+		 *	looks into subdirectories.
+		 *
+		 *	Falls back to the unit's own single template when the uri yields
+		 *	nothing usable, so a strange entry still gets a working page
+		 *	rather than a route pointing at a file that was never written.
+		 *
+		 *	@param		array 		$entry				One webpages-list entry
+		 *	@param		array 		$manifest			The unit's manifest
+		 *
+		 *	@return 	array|null							{ file, source }, or null without a template to copy
+		 */
 		private static function _perRouteTemplate( array $entry, array $manifest ): ?array {
 
 			$source = (string) ( array_values( $manifest['templates'] ?? [] )[0] ?? '' );
