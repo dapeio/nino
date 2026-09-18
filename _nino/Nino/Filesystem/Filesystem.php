@@ -217,16 +217,19 @@ namespace Nino {
 
 			self::_prepareFileCache( $appData, $filename );
 
+			// Not the caller's spelling - see _canonicalPath()
+			$lockKey = self::_canonicalPath( $appData, $filename );
+
 			// Already holding it (eg. lockFile() followed by a putFileContent()
 			// that takes its own lock) - flock() is per handle, so re-locking
 			// the same handle is a no-op rather than a deadlock, but there is
 			// no point in opening a second one
-			if( is_resource( $appData['./nino/filesystem/locks'][$filename] ?? null ) === true )
+			if( is_resource( $appData['./nino/filesystem/locks'][$lockKey] ?? null ) === true )
 				return true;
 
 			self::forceDir( $appData, '/data/.locks' );
 
-			$lockPath	= self::path( $appData, '/data' ). '/.locks/'. sha1( $filename ). '.lock';
+			$lockPath	= self::path( $appData, '/data' ). '/.locks/'. sha1( $lockKey ). '.lock';
 			// See _writeFile()'s @fopen() - same reasoning: without it, a
 			// permission/quota failure here 500s before "could not be
 			// locked for writing" (mutate(), writeContentData(), Elements)
@@ -247,14 +250,17 @@ namespace Nino {
 			// take the only reference to this resource with it, closing the
 			// handle and releasing the lock while the caller still believes it
 			// holds one. Locks live in their own map for that reason.
-			$appData['./nino/filesystem/locks'][$filename] = $handle;
+			$appData['./nino/filesystem/locks'][$lockKey] = $handle;
 
 			return true;
 		}
 
 		public static function unlockFile( array &$appData, string $filename ): bool {
 
-			$handle = $appData['./nino/filesystem/locks'][$filename] ?? null;
+			// The key lockFile() stored it under, not what this caller happened
+			// to spell - see _canonicalPath()
+			$lockKey	= self::_canonicalPath( $appData, $filename );
+			$handle 	= $appData['./nino/filesystem/locks'][$lockKey] ?? null;
 
 			if( is_resource( $handle ) === false )
 				return false;
@@ -262,7 +268,7 @@ namespace Nino {
 			flock( $handle, LOCK_UN );
 			fclose( $handle );
 
-			unset( $appData['./nino/filesystem/locks'][$filename] );
+			unset( $appData['./nino/filesystem/locks'][$lockKey] );
 
 			return true;
 		}
@@ -395,6 +401,48 @@ namespace Nino {
 				return rtrim( $appData['./nino/filesystem/publicpath']. $filename, '/' );
 
 			return rtrim( $appData['./nino/filesystem/path']. $filename, '/' );
+		}
+
+		/**
+		 *	The one name a file is locked under, whatever spelling a caller
+		 *	reached it by. _resolvePath() answers one path for several virtual
+		 *	ones on purpose - a missing or repeated separator is nothing, and
+		 *	'/private/data/x.php' is the same file as '/data/x.php' (that is what
+		 *	CONTENT_DIR's indirection is for, and the comment there says so). The
+		 *	spelling used to reach the sidecar name unchanged, so two call sites
+		 *	naming one file differently took two locks and serialized against
+		 *	nothing at all.
+		 *
+		 *	Still a *virtual* path, deliberately rather than the resolved one: the
+		 *	sidecar is sha1() of this, and Modules\Cache::_invalidate() rebuilds
+		 *	that name from the virtual path it knows. Hashing the absolute answer
+		 *	would rename every lock on disk and silently stop that cleanup. A path
+		 *	that is already canonical - which is every one in the tree - hashes
+		 *	exactly as it did before.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$filename			A virtual path, as a caller passes it
+		 *
+		 *	@return 	string									Eg. '/data/x.php'
+		 */
+		private static function _canonicalPath( array &$appData, string $filename ): string {
+
+			$filename = (string) preg_replace( '#/+#', '/', '/'. $filename );
+
+			if( str_starts_with( $filename, self::CONTENT_DIR. '/' ) === false )
+				return $filename;
+
+			$stripped = substr( $filename, strlen( self::CONTENT_DIR ) );
+
+			// Asked of _resolvePath() rather than of PRIVATE_DIRS, so the two
+			// spellings are only folded together where they really are one file.
+			// '/private/config.php' is not '/config.php' wherever configpath
+			// points somewhere else, and '/private/.auth/pw.php' has no
+			// prefix-less spelling at all - '/.auth/pw.php' is under the project
+			// root, a different file
+			return ( self::_resolvePath( $appData, $stripped ) === self::_resolvePath( $appData, $filename ) )
+				? $stripped
+				: $filename;
 		}
 
 		// Whether a virtual path belongs to one of these directories - the

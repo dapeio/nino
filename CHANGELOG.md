@@ -223,6 +223,21 @@ All notable changes to Nino are documented in this file.
 
 ### Fixed
 
+- **Two spellings of one file took two locks.** `_resolvePath()` answers one
+  path for several virtual ones by design - a missing or repeated separator
+  is nothing, and `/private/data/x.php` is the same file as `/data/x.php`,
+  which is what `CONTENT_DIR`'s indirection is for. The lock was keyed on
+  the caller's spelling instead, the sidecar being `sha1()` of it, so one
+  file had as many locks as it had spellings and two call sites naming it
+  differently serialized against nothing: measured at 61 of 120 concurrent
+  updates surviving, against 120 of 120 with one spelling. The lock key is
+  canonical now, folded only where the two spellings really do resolve to
+  one file - so `/private/config.php` and `/config.php` stay apart wherever
+  `NINO_CONFIG_DIR` points elsewhere, and `/private/.auth/` keeps its own
+  key. It stays a *virtual* path, so every already-canonical name hashes to
+  the sidecar it always did and `Modules\Cache`'s own cleanup still finds
+  its lock file.
+
 - **An activation reverted what its own upgrade hook had written.**
   `activate()` read the stored routes, then applied the unit and called the
   feature's `upgrade()` hook, and then persisted the copy it had read at the

@@ -88,6 +88,32 @@ function runElementWorker( string $sandbox, string $prefix ): void {
 }
 
 /**
+ *	One aliasing worker: ROUNDS times, boot fresh and append one entry to
+ *	the file, reached by the spelling this worker was given. Both spellings
+ *	resolve to the same file - that is what CONTENT_DIR's indirection is
+ *	for - so if the lock is keyed on the spelling rather than on the file,
+ *	the two workers hold two different locks and serialize against nothing.
+ *
+ *	@param		string		$sandbox			Sandbox path
+ *	@param		string		$spelling			Virtual path this worker addresses the file by
+ *
+ *	@return		void
+ */
+function runAliasWorker( string $sandbox, string $spelling ): void {
+
+	for( $round = 0; $round < ROUNDS; $round++ ) {
+
+		$appData = bootAppData( $sandbox );
+
+		\Nino\Filesystem::mutate( $appData, $spelling, static function( mixed $rows ) use ( $round ): array {
+			$rows = is_array( $rows ) ? $rows : [];
+			$rows[] = $round;
+			return $rows;
+		} );
+	}
+}
+
+/**
  *	Run the editor's lazy daily backup from a separately-booted request.
  *	Two of these starting against a config without backup keys used to each
  *	generate a different directory/key pair.
@@ -140,6 +166,11 @@ if( ( $argv[1] ?? '' ) === 'element-worker' ) {
 
 if( ( $argv[1] ?? '' ) === 'backup-worker' ) {
 	runBackupWorker( $argv[2] );
+	exit( 0 );
+}
+
+if( ( $argv[1] ?? '' ) === 'alias-worker' ) {
+	runAliasWorker( $argv[2], $argv[3] );
 	exit( 0 );
 }
 
@@ -252,6 +283,34 @@ if( is_file( $today ) === true ) {
 	check( 'the surviving config key decrypts the concurrently-created backup', false );
 }
 
+echo "\n";
+
+
+// --- One file reached by two spellings ----------------------------------------------------------
+
+echo "Filesystem::mutate serializes a file reached by two spellings\n";
+
+/*	_resolvePath() answers one path for several virtual ones on purpose:
+	'/private/data/x.php' and '/data/x.php' are one file addressed two ways,
+	and its own comment says so. The lock was keyed on the caller's spelling
+	instead - the sidecar name is sha1() of it - so one file had as many
+	locks as it had spellings, and two call sites naming it differently
+	serialized against nothing. Two processes, one file, one spelling each.	*/
+$aliasSandbox = sys_get_temp_dir(). '/nino-concurrency-alias-'. bin2hex( random_bytes( 6 ) );
+mkdir( $aliasSandbox. '/private/data', 0755, true );
+file_put_contents( $aliasSandbox. '/private/config.php', '<?php return '. var_export( [ '/nino/modules' => [] ], true ). ';' );
+file_put_contents( $aliasSandbox. '/private/data/rows.php', '<?php return [];' );
+
+runParallel( 'alias-worker', $aliasSandbox, [ '/data/rows.php', '/private/data/rows.php' ] );
+
+$aliasRows = include $aliasSandbox. '/private/data/rows.php';
+$aliasRows = is_array( $aliasRows ) ? $aliasRows : [];
+
+check( 'both spellings reached the one file', is_file( $aliasSandbox. '/private/data/rows.php' ) === true && count( glob( $aliasSandbox. '/private/data/*.php' ) ?: [] ) === 1 );
+check( 'and neither run overwrote the other: every entry of both is there', count( $aliasRows ) === 2 * ROUNDS );
+check( 'one sidecar lock, not two', count( glob( $aliasSandbox. '/private/data/.locks/*.lock' ) ?: [] ) === 1 );
+
+\Nino\Filesystem::removeDir( $aliasSandbox );
 \Nino\Filesystem::removeDir( $sandbox );
 
 echo "\n", $checks, ' checks, ', $failures, " failed\n";
