@@ -25,8 +25,8 @@ namespace Nino {
 	 *
 	 *										Trust is the signature. The public half of the key ships
 	 *										with the kernel (PUBLIC_KEY) and '/nino/catalogue/key'
-	 *										replaces it for a catalogue of your own; an empty key
-	 *										accepts no catalogue at all. Every archive url the
+	 *										replaces it for a catalogue of your own; an empty one
+	 *										falls back to the kernel's. Every archive url the
 	 *										catalogue names is fetched over https and nothing else.
 	 *
 	 *										What a catalogue says (format 1):
@@ -66,15 +66,15 @@ namespace Nino {
 		public const string DEFAULT_URL = 'https://catalogue.getnino.dev/catalogue.json';
 
 		// The public half of the key Nino's catalogue is signed with, PEM.
-		// Empty until the first key exists - and an empty key verifies nothing,
-		// so until then no catalogue is accepted. '/nino/catalogue/key' names
-		// another key for a catalogue of your own
-public const string PUBLIC_KEY = <<<'PEM'
------BEGIN PUBLIC KEY-----
-MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE84ucNcgOiSyR6iujeBqNtxpoFEBg
-tRm6k5xjrlISP9l8GO5qX54XWFpzt18fsm8bDfH5+HEoJRgyI8ogDogNvQ==
------END PUBLIC KEY-----
-PEM;
+		// An empty '/nino/catalogue/key' falls back to this one, so an
+		// installation always has a key to verify against; the setting names
+		// another for a catalogue of your own
+		public const string PUBLIC_KEY = <<<'PEM'
+		-----BEGIN PUBLIC KEY-----
+		MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE84ucNcgOiSyR6iujeBqNtxpoFEBg
+		tRm6k5xjrlISP9l8GO5qX54XWFpzt18fsm8bDfH5+HEoJRgyI8ogDogNvQ==
+		-----END PUBLIC KEY-----
+		PEM;
 
 		public const int FORMAT = 1;
 
@@ -118,7 +118,7 @@ PEM;
 		/**
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *
-		 *	@return 	string									The PEM public key the catalogue has to be signed with, '' for none
+		 *	@return 	string									The PEM public key the catalogue has to be signed with - the kernel's own unless '/nino/catalogue/key' names one
 		 */
 		public static function key( array &$appData ): string {
 
@@ -417,8 +417,15 @@ PEM;
 
 				$result = self::_place( $appData, $entry );
 
+				// Which entry failed, not how many there are. _plan() appends the
+				// feature that was asked for last and every missing requirement
+				// before it, so a plan of one is the requested feature alone - but
+				// as soon as one requirement had to come along, the size told
+				// nothing about which entry the loop is on, and a refusal for the
+				// feature the project pressed Install on was announced as a
+				// required feature of itself
 				if( $result !== true )
-					return count( $plan ) === 1
+					return $entry['key'] === $key
 						? $result
 						: 'required feature "'. $entry['key']. '": '. $result;
 
@@ -515,9 +522,15 @@ PEM;
 			if( @mkdir( $staging, 0755, true ) === false )
 				return 'could not create the staging directory';
 
-			$result = self::_unpackAndPlace( $appData, $archive['body'], $entry, $staging );
-
-			\Nino\Filesystem::removeDir( $staging );
+			try {
+				$result = self::_unpackAndPlace( $appData, $archive['body'], $entry, $staging );
+			}
+			// However that came back. A staging directory left standing is a copy
+			// of the archive below data/ that nothing else ever removes, and the
+			// name carries random_bytes(), so every retry leaves another one
+			finally {
+				\Nino\Filesystem::removeDir( $staging );
+			}
 
 			return $result;
 		}
@@ -546,8 +559,21 @@ PEM;
 			// the same key, the same version - and a valid one. manifest()
 			// warns on its own for an invalid one; here that is a refusal
 			set_error_handler( static fn(): bool => true );
-			$manifest = \Nino\Features::manifest( $source );
-			restore_error_handler();
+			try {
+				$manifest = \Nino\Features::manifest( $source );
+			}
+			// A manifest is php the archive brought, and php that does not parse
+			// throws where an invalid one returns null. Without this the throw
+			// left past restore_error_handler(), so the swallow-everything
+			// closure above stayed on the stack for the rest of the process -
+			// and install() raised instead of refusing, which is a 500 in the
+			// panel rather than the sentence below
+			catch( \Throwable ) {
+				$manifest = null;
+			}
+			finally {
+				restore_error_handler();
+			}
 
 			if( $manifest === null )
 				return 'the archive does not hold a valid feature';
@@ -637,8 +663,22 @@ PEM;
 						if( $segment === '' || $segment === '.' || $segment === '..' || str_contains( $segment, '\\' ) === true )
 							return 'the archive holds an unsafe path "'. $path. '"';
 
-					if( $file->isLink() === true || ( $file->isFile() === false && $file->isDir() === false ) )
-						return 'the archive holds "'. $path. '", which is neither a file nor a directory';
+					// A link is neither, and isLink() never says so here: PharData
+					// names a tar's link entries as plain files of no size, and a stat
+					// through the phar wrapper answers for the entry rather than for
+					// the link - so both halves of an isLink()/isFile() test are false
+					// for every entry a tar can hold, and this guard never fired. The
+					// wrapper does know: it will not open one as a file. So that is
+					// the question to ask it
+					if( $file->isDir() === false ) {
+
+						$handle = @fopen( $pathname, 'rb' );
+
+						if( $handle === false )
+							return 'the archive holds "'. $path. '", which is neither a file nor a directory';
+
+						fclose( $handle );
+					}
 
 					$entries++;
 					$bytes += $file->isFile() === true ? (int) $file->getSize() : 0;
@@ -659,9 +699,10 @@ PEM;
 				$phar->extractTo( $into, null, true );
 
 				// PharData drops what it will not name - a "../" it silently
-				// strips, a symlink it writes as an empty file - so what came
-				// out is looked at once more: exactly the one directory, no
-				// links. Inside the try like the look before it: whatever the
+				// strips - so what came out is looked at once more: exactly the
+				// one directory, no links. A link entry no longer reaches this,
+				// the look above refuses it; here isLink() does work, because
+				// this walks the extracted tree on disk rather than the archive. Inside the try like the look before it: whatever the
 				// extraction left that cannot be walked is a refusal, not an
 				// exception out of install()
 				if( ( scandir( $into ) ?: [] ) !== [ '.', '..', $directory ] )

@@ -6,6 +6,16 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **The catalogue's shipped key is described as what it is.** The comment
+  above `Catalogue::PUBLIC_KEY`, `key()`'s `@return`, the class docblock and
+  both manuals still said the constant was empty until Nino's first key
+  existed, and that no catalogue is accepted until one is configured. The
+  constant holds a key, and an empty `/nino/catalogue/key` falls back to it -
+  so a stock installation does verify, against the kernel's own. The
+  "no key" refusals in `Catalogue::fetch()` and the Features panel stay:
+  they are the fork and key-rotation case, which is what the suite's own
+  comment says they are for.
+
 - **A model's whitelist and blacklist compare strictly.** A list is a list of
   values, and `'1'` is not `1`: a value is refused unless the list holds it in
   the field's own type. A model whose list was spelled in another type than
@@ -193,6 +203,34 @@ All notable changes to Nino are documented in this file.
   which is which.
 
 ### Fixed
+
+- **A refusal on the feature that was asked for was announced as a
+  requirement's.** The install loop labelled a failure by the plan's size
+  rather than by which entry it was on, and the plan carries every missing
+  requirement ahead of the feature the project pressed Install on. So as
+  soon as one requirement came along, a refusal for the feature itself read
+  `required feature "<its own key>": ...` in the panel. It is labelled by
+  identity now.
+
+- **An archive whose manifest does not parse raised instead of refusing.**
+  A manifest is php the archive brought, and php that does not parse throws
+  where an invalid one returns null - out past the `restore_error_handler()`
+  below the read, so the closure that silences a bad manifest stayed on the
+  handler stack for the rest of the process, and out past the cleanup, so a
+  copy of the archive was left below `data/` for good, one more on every
+  retry. The panel got a 500 rather than the refusal. Both are now what they
+  promised: the read is caught and answers the ordinary refusal, and the
+  staging directory goes in a `finally`.
+
+- **A link entry in an archive was installed as an empty file.** The look
+  before the extraction asked `isLink()`, which `PharData` answers `false`
+  to for every entry a tar can hold - it names link entries as plain files
+  of no size - so that guard never fired once, and the look after the
+  extraction found a plain file rather than a link to object to. The result
+  was inert, but `docs/features.md` promises "plain files and directories
+  only" and the archive still got as far as being unpacked. The wrapper is
+  asked whether it will open the entry instead, which is the question it can
+  answer. A hard link entry still passes; it opens.
 
 - **A callback that threw kept the file locked for the rest of the request.**
   `Filesystem::mutate()` released its lock on both of its own exits - a

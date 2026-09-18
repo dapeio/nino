@@ -195,7 +195,7 @@ $config['/nino/catalogue/url'] = [ 'https://example.org/' ];
 check( 'so does anything that is not a string', \Nino\Catalogue::url( $config ) === '' );
 
 $config['/nino/catalogue/key'] = '';
-check( 'without a configured key the kernel\'s own is used - and it is empty until a key exists', \Nino\Catalogue::key( $config ) === \Nino\Catalogue::PUBLIC_KEY );
+check( 'without a configured key the kernel\'s own is used', \Nino\Catalogue::key( $config ) === \Nino\Catalogue::PUBLIC_KEY );
 $config['/nino/catalogue/key'] = "  ". $publicKey. "\n\n";
 check( 'a configured key is used, trimmed', \Nino\Catalogue::key( $config ) === trim( $publicKey ) );
 
@@ -568,11 +568,15 @@ check( 'an archive with a path that climbs out of it', $result === 'the archive 
 
 $bytes = tarGz( featureFiles( 'Helper', 'helper', '1.2.0' ) + [ 'Helper/link.php' => [ 'link' => '/etc/passwd' ] ] );
 $result = tryInstall( $appData, $remote, $features, $privateKey, entry( 'helper', '1.2.0', $bytes ), $bytes );
-check( 'an archive with a symlink is refused or the link is disarmed - nothing links out of features/', ( $result === true && is_link( NINO_FEATURES_DIR. '/Helper/link.php' ) === false ) || ( $result !== true && file_exists( NINO_FEATURES_DIR. '/Helper/link.php' ) === false ) );
-if( $result === true ) {
-	// Put 1.1.0 back for the checks below
-	check( '(restoring 1.1.0)', \Nino\Catalogue::install( $appData, 'helper', '1.1.0' ) === true );
-}
+// Refused, not disarmed. The look before the extraction used to ask
+// isLink(), which PharData answers false to for every entry a tar can
+// hold - so the guard never fired, the link came out as a 0-byte plain
+// file, and the look after the extraction found no link to object to
+// either. Inert, but not what docs/features.md promises ("plain files and
+// directories only"), and the archive got as far as being unpacked
+check( 'an archive with a symlink is refused, before anything is unpacked', $result === 'the archive holds "Helper/link.php", which is neither a file nor a directory' );
+check( 'nothing of it reaches features/, and the staging directory is gone', file_exists( NINO_FEATURES_DIR. '/Helper/link.php' ) === false && stagingClean( $staging ) === true );
+check( 'the version that was installed before it is untouched', str_contains( (string) file_get_contents( NINO_FEATURES_DIR. '/Helper/feature.php' ), '1.1.0' ) === true );
 
 // An archive whose one top-level entry is a file of the feature's name: the
 // look before the extraction accepted it (a file may be named like the
@@ -612,6 +616,22 @@ check( 'an archive holding another version than promised', $result === 'the arch
 $bytes = tarGz( [ 'Helper/' => null, 'Helper/feature.php' => '<?php return "nope";' ] );
 $result = tryInstall( $appData, $remote, $features, $privateKey, entry( 'helper', '1.2.0', $bytes ), $bytes );
 check( 'an archive whose manifest does not validate', $result === 'the archive does not hold a valid feature' && ninoWarnings() === [] );
+
+// A manifest is php the archive brought, and php that does not parse throws
+// where an invalid one returns null. The throw left out of the include
+// inside manifest() - past the restore_error_handler() below the read, so
+// the closure that silences a bad manifest stayed on the handler stack for
+// the rest of the process, and past the removeDir() that clears the staging
+// directory, so a copy of the archive was left below data/ for good. In the
+// panel it was a 500 rather than the refusal the comment there promises.
+// The trigger_error() is what pins the handler half: the harness records
+// warnings, so an empty list means the swallowing closure is still on top
+$bytes = tarGz( [ 'Helper/' => null, 'Helper/feature.php' => '<?php return [ \'key\' => \'helper\',' ] );
+try { $result = tryInstall( $appData, $remote, $features, $privateKey, entry( 'helper', '1.2.0', $bytes ), $bytes ); }
+catch( \Throwable $e ) { $result = 'threw '. get_class( $e ); }
+trigger_error( 'the handler is back', E_USER_WARNING );
+check( 'an archive whose manifest does not parse is refused, not thrown at', $result === 'the archive does not hold a valid feature' );
+check( 'and it leaves no staging directory and no error handler of its own behind', stagingClean( $staging ) === true && ninoWarnings() === [ 'the handler is back' ] );
 
 $bytes = tarGz( featureFiles( 'Helper', 'helper', '1.2.0', [ 'feature.php' => '<?php return [ \'key\' => \'helper\', \'name\' => \'Helper\', \'version\' => \'1.2.0\', \'nino\' => \'^9.0\', \'php\' => [ \'ext\' => [ \'no_such_extension\' ] ] ];' ] ) );
 $result = tryInstall( $appData, $remote, $features, $privateKey, entry( 'helper', '1.2.0', $bytes ), $bytes );
@@ -947,6 +967,24 @@ $result = callFeatures( $appData, 'apiInstall', [ 'key' => 'orphan', 'version' =
 check( 'a requirement the catalogue does not list refuses the whole install, naming it', $result === [ 400, [ 'error' => 'required feature "nowhere": the catalogue lists no "nowhere" this kernel can run' ] ]
 	&& is_dir( NINO_FEATURES_DIR. '/Orphan' ) === false
 	&& array_filter( $requests, static fn( array $r ): bool => str_ends_with( (string) $r['url'], '.tar.gz' ) ) === [] );
+
+// ...and a refusal on the feature that was asked for is not a requirement's
+// refusal. _plan() puts the missing requirements first and the feature the
+// project pressed Install on last, and the loop used to label by the plan's
+// SIZE: with one requirement along, every refusal in it - the last entry's
+// included - was announced as a required feature, naming the feature the
+// project asked for as a requirement of itself
+$sidekick		= tarGz( featureFiles( 'Sidekick', 'sidekick', '1.0.0' ) );
+$brokentop	= tarGz( featureFiles( 'Brokentop', 'brokentop', '1.0.0', [ 'feature.php' => '<?php return [ \'key\' => \'brokentop\', \'name\' => \'Brokentop\', \'version\' => \'1.0.0\', \'requires\' => [ \'sidekick\' ] ];' ] ) );
+$remote['https://catalogue.test/features/sidekick-1.0.0.tar.gz']		= $sidekick;
+$remote['https://catalogue.test/features/brokentop-1.0.0.tar.gz']	= $brokentop;
+publish( $appData, $remote, array_merge( $chained, [
+	entry( 'sidekick', '1.0.0', $sidekick ),
+	entry( 'brokentop', '1.0.0', $brokentop. 'tampered', [ 'requires' => [ 'sidekick' ], 'directory' => 'Brokentop' ] ),
+] ), null, $privateKey );
+
+check( 'a refusal on the feature asked for is its own, not a required feature\'s', \Nino\Catalogue::install( $appData, 'brokentop', '1.0.0' ) === 'the archive does not match what the catalogue promised'
+	&& is_dir( NINO_FEATURES_DIR. '/Brokentop' ) === false );
 
 echo "\n";
 
