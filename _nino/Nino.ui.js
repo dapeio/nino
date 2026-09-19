@@ -831,7 +831,7 @@
 							return;
 
 						// Loop through inputs
-						let error = false, data = {};
+						let error = false, data = {}, radioGroups = {};
 						for( let i = 0, l = this.fields.length; i<l; i++) {
 
 							// Stored as typed. This used to strip [<>'";(){}[\]\|] from
@@ -846,13 +846,45 @@
 							// the values become markup (Form/Newsletter escape on the
 							// way into the mail templates); removing characters here
 							// protected nothing and corrupted ordinary input
-							// A checkbox is the one control whose .value says nothing about
-							// what the visitor did: an unticked box with no value attribute
-							// still reads "on", so posting it unconditionally reported every
-							// box as ticked. What it is worth is whether it is checked
-							data[this.fields[i].name] = ( this.fields[i].type === 'checkbox' )
-								? ( this.fields[i].checked === true ? ( this.fields[i].value || 'on' ) : '' )
-								: this.fields[i].value;
+							// A checkbox and a radio are the two controls whose .value says
+							// nothing about what the visitor did: an unticked box with no
+							// value attribute still reads "on", so posting it
+							// unconditionally reported every box as ticked. What either is
+							// worth is whether it is checked
+							if( this.fields[i].type === 'checkbox' )
+								data[this.fields[i].name] = this.fields[i].checked === true ? ( this.fields[i].value || 'on' ) : '';
+
+							else if( this.fields[i].type === 'radio' ) {
+
+								/*	A group of radios shares one name, and this loop writes
+									data[name] once per member - so the last member won
+									whichever one was ticked, and a visitor who picked the
+									first option had the last one submitted, stored and
+									mailed. Only the ticked member carries an answer, and an
+									unticked one must not overwrite it whatever order they
+									sit in.
+
+									The group is also required or not as a group, which no
+									single member's .value can say - it is never empty, so
+									the required check below never fired for one, and a
+									question nobody answered went through as answered.
+									Collected here and asked after the loop, where the group
+									is complete	*/
+								if( this.fields[i].checked === true )
+									data[this.fields[i].name] = this.fields[i].value;
+								else if( data[this.fields[i].name] === undefined )
+									data[this.fields[i].name] = '';
+
+								if( this.fields[i].required === true )
+									radioGroups[this.fields[i].name] = true;
+
+								// None of the checks below is a radio's: required is the
+								// group's, and an email, url or number is never one
+								continue;
+							}
+
+							else
+								data[this.fields[i].name] = this.fields[i].value;
 
 							// Check required
 							if( this.fields[i].required === true && this.fields[i].value.length === 0 )
@@ -884,6 +916,20 @@
 								&& ( this.fields[i].validity.typeMismatch === true || this.fields[i].validity.badInput === true ) )
 								this.fields[i].classList.add('nino-is-error') || ( error = Nino.content.getText('/form/info/invalid') );
 						}
+
+						// A required radio group, asked of the group rather than of any one
+						// of its members - see the radio case above. Every member is
+						// marked, because the answer that is missing is the group's
+						if( error === false )
+							for( const name in radioGroups )
+								if( data[name] === '' ) {
+									error = Nino.content.getText('/form/info/required');
+									for( let i = 0, l = this.fields.length; i<l; i++)
+										if( this.fields[i].type === 'radio' && this.fields[i].name === name )
+											this.fields[i].classList.add('nino-is-error');
+									break;
+								}
+
 						// Catch error
 						if( error !== false )
 							return this.msg.textContent = error;
@@ -995,16 +1041,33 @@
 						if( this.classList.contains('nino-is-success') === true || this.classList.contains('nino-is-existing') === true )
 							return;
 
-						let error = false, data = {};
+						let error = false, data = {}, radioGroups = {};
 						for( let i = 0, l = this.fields.length; i<l; i++) {
 
 							// Stored as typed - see the .nino-form handler above for why
-							// the character strip that used to sit here was removed, and
-							// why a checkbox is asked whether it is checked rather than
-							// what its value reads (a consent box is the likely one here)
-							data[this.fields[i].name] = ( this.fields[i].type === 'checkbox' )
-								? ( this.fields[i].checked === true ? ( this.fields[i].value || 'on' ) : '' )
-								: this.fields[i].value;
+							// the character strip that used to sit here was removed, why a
+							// checkbox is asked whether it is checked rather than what its
+							// value reads (a consent box is the likely one here), and why a
+							// radio group is one answer rather than one per member (here
+							// that is a "how often" choice)
+							if( this.fields[i].type === 'checkbox' )
+								data[this.fields[i].name] = this.fields[i].checked === true ? ( this.fields[i].value || 'on' ) : '';
+
+							else if( this.fields[i].type === 'radio' ) {
+
+								if( this.fields[i].checked === true )
+									data[this.fields[i].name] = this.fields[i].value;
+								else if( data[this.fields[i].name] === undefined )
+									data[this.fields[i].name] = '';
+
+								if( this.fields[i].required === true )
+									radioGroups[this.fields[i].name] = true;
+
+								continue;
+							}
+
+							else
+								data[this.fields[i].name] = this.fields[i].value;
 
 							if( this.fields[i].required === true && this.fields[i].value.length === 0 )
 								this.fields[i].classList.add('nino-is-error') || ( error = Nino.content.getText('/newsletter/info/required') );
@@ -1013,6 +1076,18 @@
 							if( error === false && this.fields[i].type === 'email' && ( /^[a-zA-Z0-9.!#$%&'*+\/=?^_`{|}~-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*\.[a-zA-Z]{2,}$/.test(this.fields[i].value) === false ) )
 								this.fields[i].classList.add('nino-is-error') || ( error = Nino.content.getText('/newsletter/info/email') );
 						}
+
+						// The group's answer, not any member's - see the .nino-form handler
+						if( error === false )
+							for( const name in radioGroups )
+								if( data[name] === '' ) {
+									error = Nino.content.getText('/newsletter/info/required');
+									for( let i = 0, l = this.fields.length; i<l; i++)
+										if( this.fields[i].type === 'radio' && this.fields[i].name === name )
+											this.fields[i].classList.add('nino-is-error');
+									break;
+								}
+
 						if( error !== false )
 							return this.msg.textContent = error;
 

@@ -70,10 +70,12 @@ namespace Nino {
 		// The field types a form may declare. 'textarea' is the only one that
 		// is not an <input type>.
 		//
-		// No 'checkbox' yet. The shared .nino-form script posts a ticked box
-		// as its value and an unticked one as '' (see _nino/Nino.ui.js), so
-		// nothing stands in the way of one; it is simply not declared here
-		// until a form needs it
+		// No 'checkbox' and no 'radio' yet. The shared .nino-form script posts a
+		// ticked box as its value and an unticked one as '', and a radio group
+		// as the answer of whichever member is ticked (see _nino/Nino.ui.js), so
+		// nothing stands in the way of either; they are simply not declared here
+		// until a form needs them. A hand-written form in a template may use
+		// both today - the script drives whatever markup the project wrote
 		public const array TYPES = [ 'text', 'email', 'tel', 'url', 'number', 'textarea', 'select' ];
 
 		// Names a field may not take: the four the endpoint reads off the

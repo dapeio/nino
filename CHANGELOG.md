@@ -18,6 +18,25 @@ All notable changes to Nino are documented in this file.
   business, in that repository. Nothing about the kernel moved - what a panel
   from a feature *is*, and how the Features panel handles it, is still here.
 
+
+### Fixed
+
+- **A radio group was submitted as its last member, whichever one the visitor
+  ticked.** The shared `.nino-form` script collects a form by walking every
+  `input`, `textarea` and `select` and writing `data[name]` for each - and a
+  radio group shares one name, so the last member overwrote the answer. Someone
+  picking the first of three options had the third submitted, stored and mailed.
+  A required group was worse: a radio's `.value` is never empty, so the required
+  check never fired for one, and a question nobody answered went through as
+  answered. Both handlers had it - the contact form and the newsletter signup.
+  Only the ticked member now carries the answer, an unticked one never
+  overwrites it, and a required group is asked of the group.
+
+  Neither `Form::TYPES` nor the Forms feature declares `radio`, so a form built
+  through either could not produce one. A hand-written `<form class="nino-form">`
+  in a template could and can - which is what `docs/development.md` describes as
+  the ordinary way to write one.
+
 ## 1.3.0-beta — 2026-09-18
 
 ### Changed

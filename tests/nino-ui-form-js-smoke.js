@@ -220,8 +220,61 @@ check( 'a ticked one is posted as the value it carries', sent.length === 1 && se
 
 forms[0].fieldList.pop();
 forms[0].fields = forms[0].fieldList;
+
+// A radio is the other control whose .value says nothing about what the
+// visitor did, and unlike a checkbox a group of them shares one name. The
+// loop writes data[name] once per member, so without a case of its own the
+// last member won whichever one was ticked - a visitor picking the first
+// option had the last one submitted, stored and mailed. And .value is never
+// empty on a radio, so a required group nobody answered passed the required
+// check and reached the server as an answer it had not been given
+const planSmall = field( 'plan', 'radio', 'small', true, false );
+const planLarge = field( 'plan', 'radio', 'large', true, true );
+const planHuge  = field( 'plan', 'radio', 'huge',  true, false );
+
+forms[0].fieldList.push( planSmall, planLarge, planHuge );
+forms[0].fields = forms[0].fieldList;
 sent.length = 0;
 forms[0].classList.remove('nino-is-success');
+forms[0].submit();
+check( 'the ticked radio is posted, not the last one of its group', sent.length === 1 && sent[0].data.plan === 'large' );
+
+// The ticked one first this time: order must not decide the answer either way
+forms[0].fieldList[ forms[0].fieldList.length - 3 ] = field( 'plan', 'radio', 'small', true, true );
+forms[0].fieldList[ forms[0].fieldList.length - 2 ] = field( 'plan', 'radio', 'large', true, false );
+forms[0].fields = forms[0].fieldList;
+sent.length = 0;
+forms[0].classList.remove('nino-is-success');
+forms[0].submit();
+check( '...and a group whose first member is the ticked one posts that one', sent.length === 1 && sent[0].data.plan === 'small' );
+
+// Nobody answered a required group: it is the group that is empty, not any
+// one member, and .value tells nothing about it
+forms[0].fieldList[ forms[0].fieldList.length - 3 ] = field( 'plan', 'radio', 'small', true, false );
+forms[0].fields = forms[0].fieldList;
+sent.length = 0;
+forms[0].classList.remove('nino-is-success');
+forms[0].submit();
+check( 'a required radio group nobody answered is refused rather than sent', sent.length === 0 && forms[0].msg.textContent === 'Please fill in every required field.' );
+
+// An optional group nobody answered is empty, and that is an answer
+forms[0].fieldList[ forms[0].fieldList.length - 3 ] = field( 'plan', 'radio', 'small', false, false );
+forms[0].fieldList[ forms[0].fieldList.length - 2 ] = field( 'plan', 'radio', 'large', false, false );
+forms[0].fieldList[ forms[0].fieldList.length - 1 ] = field( 'plan', 'radio', 'huge',  false, false );
+forms[0].fields = forms[0].fieldList;
+sent.length = 0;
+forms[0].classList.remove('nino-is-success');
+forms[0].msg.textContent = '';
+forms[0].submit();
+check( '...while an optional one nobody answered is posted as empty', sent.length === 1 && sent[0].data.plan === '' );
+
+forms[0].fieldList.pop();
+forms[0].fieldList.pop();
+forms[0].fieldList.pop();
+forms[0].fields = forms[0].fieldList;
+sent.length = 0;
+forms[0].classList.remove('nino-is-success');
+forms[0].msg.textContent = '';
 forms[0].fill( { name : typedName, email : typedEmail, message : typedMessage } );
 forms[0].submit();
 
