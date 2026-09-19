@@ -176,9 +176,7 @@ How long entries stay and whether they are written at all is `/nino/form/retenti
 
 ### Templates
 
-The **Templates** panel is the Template Builder: it composes the project's `page-*.tpl` files from complete sections – a searchable library of section presets, reusable `[template]` sections, the page's header and footer, and a native quick fill of the text a section brings. It is a workspace panel: the rail folds, and the template list, the section canvas and the inspector sit side by side.
-
-Everything it can do, its source safety rules and the preset library's manifest contract are in the Template Builder's [manual](https://github.com/dapeio/nino-features/blob/main/features/Templates/docs/templates.md). The panel belongs to the Template Builder feature from the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features) and is there while that feature is copied into `features/` and switched on in the Features panel.
+**Templates** belongs to the Template Builder feature from the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features) and is there while that feature is copied into `features/` and switched on in the Features panel. It is a workspace panel: the rail folds, and its three columns sit side by side. The feature's own [manual](https://github.com/dapeio/nino-features/blob/main/features/Templates/docs/templates.md) documents the panel - what it composes, its source safety rules and the preset library's manifest contract.
 
 ### Element Types
 

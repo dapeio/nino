@@ -176,9 +176,7 @@ Wie lange Einträge bleiben und ob sie überhaupt geschrieben werden, sind `/nin
 
 ### Templates
 
-Das Panel **Templates** ist der Template Builder: Er setzt die `page-*.tpl`-Dateien des Projekts aus vollständigen Sections zusammen – eine durchsuchbare Bibliothek von Section-Presets, wiederverwendbare `[template]`-Sections, Header und Footer der Seite und eine native Schnellbefüllung der Texte, die eine Section mitbringt. Es ist ein Workspace-Panel: Die Leiste klappt ein, und Templateliste, Section-Canvas und Inspektor stehen nebeneinander.
-
-Alles, was es kann, seine Regeln zur Quelltextsicherheit und der Manifest-Vertrag der Preset-Bibliothek stehen im [Handbuch](https://github.com/dapeio/nino-features/blob/main/features/Templates/docs/templates.de.md) des Template-Baukastens. Das Panel gehört zum Template-Baukasten-Feature aus dem Katalog [dapeio/nino-features](https://github.com/dapeio/nino-features) und ist da, solange das Feature nach `features/` kopiert und im Panel Features eingeschaltet ist.
+**Templates** gehört zum Template-Baukasten-Feature aus dem Katalog [dapeio/nino-features](https://github.com/dapeio/nino-features) und ist da, solange das Feature nach `features/` kopiert und im Panel Features eingeschaltet ist. Es ist ein Workspace-Panel: Die Leiste klappt ein, und seine drei Spalten stehen nebeneinander. Das [Handbuch](https://github.com/dapeio/nino-features/blob/main/features/Templates/docs/templates.de.md) des Features dokumentiert das Panel – was es zusammensetzt, seine Regeln zur Quelltextsicherheit und den Manifest-Vertrag der Preset-Bibliothek.
 
 ### Elementtypen
 

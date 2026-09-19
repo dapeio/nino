@@ -4,6 +4,20 @@ All notable changes to Nino are documented in this file.
 
 ## Unreleased
 
+### Changed
+
+- **The workbench manual stops describing a feature it does not own.** The
+  Templates section spelled out what the Template Builder composes - the preset
+  library, the reusable sections, the quick fill - and then linked the feature's
+  own manual for the same thing. Two places to keep in step, in two
+  repositories, and the manual here is the one nobody would think to update.
+  It now says what the Newsletter and Search sections already said: which
+  feature the panel belongs to, that it is a workspace panel, and that the
+  feature's own manual documents it. `AGENTS.md` likewise stated which kernels
+  the Template Builder declares itself for; which those are is its manifest's
+  business, in that repository. Nothing about the kernel moved - what a panel
+  from a feature *is*, and how the Features panel handles it, is still here.
+
 ## 1.3.0-beta — 2026-09-18
 
 ### Changed
