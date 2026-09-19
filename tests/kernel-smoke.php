@@ -2281,6 +2281,22 @@ function fakeRequest( array &$appData, string $uri, string $method = 'GET', arra
 	return $request;
 }
 
+/**
+ *	The uri request() resolves for one server array, or the class name of
+ *	whatever it threw instead. Every case below used to throw, and a suite
+ *	that dies on the throw reports no failed check at all - it reports
+ *	nothing
+ */
+function resolvedUri( array &$appData, array $server ): string {
+	try {
+		$request = $server;
+		\Nino\Http::request( $appData, $request );
+		return (string) ( $request['/nino/http/request']['uri'] ?? '' );
+	} catch( \Throwable $e ) {
+		return get_class( $e );
+	}
+}
+
 $homeRequest = fakeRequest( $appData, '/' );
 $seededCsp = $homeRequest['/nino/http/response']['header']['Content-Security-Policy'] ?? '';
 check( 'the response header is seeded with the default csp', str_contains( $seededCsp, "default-src 'self'" ) === true );
@@ -2300,6 +2316,33 @@ check( 'the default csp allows data: images', str_contains( $seededCsp, 'img-src
 check( '...which is what Nino.css\'s own data: uri needs', str_contains(
 	(string) @file_get_contents( __DIR__. '/../_nino/Nino.css' ), 'url("data:image/svg+xml'
 ) === false || str_contains( $seededCsp, 'data:' ) === true );
+
+/*	A request that names neither a method nor a uri, and a uri that is
+	nothing but the markers a path is cut at. Neither REQUEST_METHOD nor
+	REQUEST_URI is guaranteed by the cgi environment - php-cgi under IIS
+	composes no REQUEST_URI at all - and reading a key that is not there is
+	an undefined-key warning, which is fatal in Nino. What followed was
+	worse: cleanUri() cut the path with strtok(), which answers false for a
+	string holding nothing but delimiters, so '' and '#' were a TypeError
+	thrown inside request() before anything could answer. Measured against
+	this kernel: all three ended in a TypeError, and '#frag' answered with
+	'frag' - the fragment standing in for the path, because strtok() skips
+	leading delimiters too	*/
+check( 'a request naming no method and no uri is answered rather than thrown on', resolvedUri( $appData, [] ) === '/' );
+$nameless = [];
+try { \Nino\Http::request( $appData, $nameless ); } catch( \Throwable $e ) {}
+check( '...with no method, which is what matches no route', ( $nameless['/nino/http/request']['method'] ?? 'unset' ) === '' );
+
+check( 'an empty REQUEST_URI is the home uri', resolvedUri( $appData, [ 'REQUEST_METHOD' => 'GET', 'REQUEST_URI' => '' ] ) === '/' );
+check( '...and so is one that is only a fragment marker', resolvedUri( $appData, [ 'REQUEST_METHOD' => 'GET', 'REQUEST_URI' => '#' ] ) === '/' );
+check( 'a uri starting with a fragment marker does not route to the fragment', resolvedUri( $appData, [ 'REQUEST_METHOD' => 'GET', 'REQUEST_URI' => '#frag' ] ) === '/' );
+check( '...nor one starting with a query marker to the query', resolvedUri( $appData, [ 'REQUEST_METHOD' => 'GET', 'REQUEST_URI' => '?a=b' ] ) === '/' );
+
+// The cut itself is unchanged: the path is what precedes the first '?' or '#'
+check( 'the path is still everything before the query and the fragment', fakeRequest( $appData, '/a/b?x=1#f' )['/nino/http/request']['uri'] === '/a/b' );
+check( '...whichever of the two comes first', fakeRequest( $appData, '/a/b#f?x=1' )['/nino/http/request']['uri'] === '/a/b' );
+check( '...and the query is still read off the raw uri', ( fakeRequest( $appData, '/a/b?x=1' )['/nino/http/request']['query']['x'] ?? '' ) === '1' );
+check( '...and a trailing slash is still dropped', fakeRequest( $appData, '/a/b/' )['/nino/http/request']['uri'] === '/a/b' );
 
 /*	Http::getClientIp() - who the visitor is behind a reverse proxy.
 
@@ -2815,6 +2858,47 @@ check( 'a response header outside the request-side whitelist (Set-Cookie) is not
 $downloadRequest = [ '/nino/http/response' => [ 'statusCode' => 200, 'header' => [ 'Content-Disposition' => 'attachment; filename="export.json"' ], 'body' => '' ] ];
 $finalizeResponse->invokeArgs( null, [ &$downloadRequest ] );
 check( 'another whitelist-only-on-the-request-side header (Content-Disposition) survives too', ( $downloadRequest['/nino/http/response']['header']['Content-Disposition'] ?? null ) === 'attachment; filename="export.json"' );
+
+/*	A body json_encode() refuses. false went into the body and echoed as the
+	empty string: an empty 200 carrying a json content-type, which every
+	_apiCall in _admin reads as a success with nothing in it - a blank panel
+	and no message anywhere. The reachable cause is a single malformed utf-8
+	byte, which the activity log's own test in admin-system-smoke.php drives
+	end to end; that one is substituted now rather than refused	*/
+$badUtf8Request = [ '/nino/http/response' => [ 'statusCode' => 200, 'header' => [], 'body' => [ 'files' => [ "Gru\xdfe.jpg" ] ] ] ];
+$finalizeResponse->invokeArgs( null, [ &$badUtf8Request ] );
+$badUtf8Body = json_decode( (string) $badUtf8Request['/nino/http/response']['body'], true );
+check( 'a malformed utf-8 byte no longer costs the whole response', is_array( $badUtf8Body ) === true );
+check( '...the byte is substituted and the rest of the value arrives', ( $badUtf8Body['files'][0] ?? '' ) === "Gru\u{FFFD}e.jpg" );
+check( '...and the status stays the one the handler set', $badUtf8Request['/nino/http/response']['statusCode'] === 200 );
+
+// What cannot be substituted - Inf/NaN, a resource, a recursion. This suite
+// silences trigger_error() wholesale (see the handler at the top), so the one
+// warning worth reading is captured around the call
+$recordedWarnings = [];
+set_error_handler( static function( int $level, string $message ) use ( &$recordedWarnings ): bool { $recordedWarnings[] = $message; return true; } );
+
+$unencodableRequest = [ '/nino/http/response' => [ 'statusCode' => 200, 'header' => [], 'body' => [ 'n' => INF ] ] ];
+$finalizeResponse->invokeArgs( null, [ &$unencodableRequest ] );
+
+// A handler that already failed named its own status: a 403 is a 403 whatever
+// became of its body
+$failedBodyRequest = [ '/nino/http/response' => [ 'statusCode' => 403, 'header' => [], 'body' => [ 'n' => NAN ] ] ];
+$finalizeResponse->invokeArgs( null, [ &$failedBodyRequest ] );
+
+restore_error_handler();
+
+$unencodableBody = json_decode( (string) $unencodableRequest['/nino/http/response']['body'], true );
+check( 'a body that cannot be encoded at all is not answered as a 200', $unencodableRequest['/nino/http/response']['statusCode'] === 500 );
+check( '...it says why, where the panel that asked will print it', str_contains( $unencodableBody['error'] ?? '', 'could not be encoded' ) === true );
+check( '...and the kernel recorded it as well', count( array_filter( $recordedWarnings, static fn( string $w ): bool => str_contains( $w, 'could not be json-encoded' ) === true ) ) === 2 );
+check( 'an unencodable body behind a 4xx keeps that status', $failedBodyRequest['/nino/http/response']['statusCode'] === 403 );
+
+// A string body is not json and is never touched
+$htmlRequest = [ '/nino/http/response' => [ 'statusCode' => 200, 'header' => [], 'body' => '<html>page</html>' ] ];
+$finalizeResponse->invokeArgs( null, [ &$htmlRequest ] );
+check( 'a string body passes through unencoded and untyped', $htmlRequest['/nino/http/response']['body'] === '<html>page</html>'
+	&& isset( $htmlRequest['/nino/http/response']['header']['Content-Type'] ) === false );
 
 check( 'Location (on the request-side whitelist too) still survives', array_key_exists( 'Location', \Nino\Http::filterHeaderFields( [ 'Location' => '/rechtliches' ] ) ) === true );
 

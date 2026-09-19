@@ -58,16 +58,28 @@ namespace Nino {
 			$header 			= self::_filterRequestHeaderFields( $request );
 			$auth 				= self::_getBasicAuthCredentials( $request, $header );
 
-			// Add request/response values
+			/*	Add request/response values.
+
+				REQUEST_METHOD and REQUEST_URI are read with a default rather
+				than assumed present: neither is guaranteed by the cgi
+				environment, and php-cgi under IIS is the known sapi that
+				composes no REQUEST_URI at all. Read unguarded that is an
+				undefined-key warning, and an engine warning is fatal in Nino
+				(see Runtime::NON_FATAL_LEVELS) - so the site did not answer
+				such a request wrongly, it failed to answer it at all, with
+				nothing in the response to say why. A method nothing named
+				matches no route and a uri nothing named is '/', which is what
+				cleanUri() already answers for a uri that cleans away to
+				nothing	*/
 			$request['/nino/http/request'] = [
-				'method'				=> self::_cleanRawMethod( $request['REQUEST_METHOD'] ),
+				'method'				=> self::_cleanRawMethod( $request['REQUEST_METHOD'] ?? '' ),
 				// The method as it came in, before HEAD is folded into GET for
 				// routing - output() needs it to send a HEAD response without a
 				// body, and it keeps that fold from being invisible to anything
 				// else that cares
-				'rawMethod'			=> self::_cleanRawMethod( $request['REQUEST_METHOD'], [], false ),
-				'uri'						=> self::cleanUri( $request['REQUEST_URI'] ),
-				'query'					=> self::_getRequestQueryVarsPart( $request['REQUEST_URI'] ),
+				'rawMethod'			=> self::_cleanRawMethod( $request['REQUEST_METHOD'] ?? '', [], false ),
+				'uri'						=> self::cleanUri( $request['REQUEST_URI'] ?? '' ),
+				'query'					=> self::_getRequestQueryVarsPart( $request['REQUEST_URI'] ?? '' ),
 				'header'				=> $header,
 				'body'					=> file_get_contents( 'php://input' ),
 				'user'					=> $auth['user'],
@@ -157,7 +169,45 @@ namespace Nino {
 
 			// Catch json output
 			if( is_string( $request['/nino/http/response']['body'] ) === false ) {
-				$request['/nino/http/response']['body'] = json_encode( $request['/nino/http/response']['body'], JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT );
+
+				/*	JSON_INVALID_UTF8_SUBSTITUTE, because json_encode() answers
+					false for one malformed byte anywhere in the body and the
+					whole response was lost for it. This is a framework whose
+					content is files people edit with their own editors, and a
+					value a panel posts is bytes like any other: one latin-1
+					filename in a listing, one such byte in a logged element
+					name, and the panel that shows it answered an empty 200
+					from then on - until somebody went into the file by hand,
+					which nothing told them to do. U+FFFD in place of the byte
+					is what a browser would show for it anyway	*/
+				$encoded = json_encode(
+					$request['/nino/http/response']['body'],
+					JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT | JSON_INVALID_UTF8_SUBSTITUTE
+				);
+
+				/*	What is left cannot be substituted - Inf/NaN, a resource, a
+					recursion - and false was written into the body and echoed
+					as the empty string: an empty 200 carrying a json
+					content-type, which every caller in _admin reads as a
+					success with nothing in it, renders as a blank panel and
+					says nothing about. A body that cannot be encoded is a
+					failure to answer, so it is answered as one, with the
+					reason in it. Not a status the response gave itself: a
+					handler that failed with a 403 failed with a 403, whatever
+					became of its body	*/
+				if( $encoded === false ) {
+
+					$reason = json_last_error_msg();
+
+					trigger_error( 'Http: the response body could not be json-encoded ('. $reason. ') and was answered as a failure', E_USER_WARNING );
+
+					if( ( $request['/nino/http/response']['statusCode'] ?? 200 ) < 400 )
+						$request['/nino/http/response']['statusCode'] = 500;
+
+					$encoded = (string) json_encode( [ 'error' => 'The response could not be encoded: '. $reason ], JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT );
+				}
+
+				$request['/nino/http/response']['body'] = $encoded;
 				$request['/nino/http/response']['header']['Content-Type'] = 'application/json; charset=utf-8';
 			}
 
@@ -225,10 +275,21 @@ namespace Nino {
 		// Return clean uri
 		static private function cleanUri( string $rawUri ): string {
 
-			// Clean uri
-			$cleanUri = strtok( $rawUri, '#' );
-			$cleanUri = strtok( $cleanUri, '?' );
-			$cleanUri = preg_replace( '/[^a-zA-Z0-9:\/\.~_\-%]/', '', $cleanUri );
+			/*	The path is what comes before the first '?' or '#'. strtok()
+				was the wrong primitive for that twice over: it skips leading
+				delimiters, so '#fragment' came back as 'fragment' - the
+				fragment standing in for the path - and it answers false for a
+				string that holds nothing but delimiters, so '' and '#' reached
+				the second call as false. That is a TypeError under
+				strict_types, thrown inside request() before anything could
+				answer at all, and an empty REQUEST_URI is not hypothetical
+				(see the note in request()).
+
+				strcspn() is the cut that was meant: the length of the leading
+				run containing neither character, for every input including
+				the empty one	*/
+			$cleanUri = substr( $rawUri, 0, strcspn( $rawUri, '?#' ) );
+			$cleanUri = (string) preg_replace( '/[^a-zA-Z0-9:\/\.~_\-%]/', '', $cleanUri );
 			$cleanUri = rtrim( $cleanUri, '/' );
 
 			if( $cleanUri === '' )

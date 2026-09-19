@@ -21,6 +21,30 @@ All notable changes to Nino are documented in this file.
 
 ### Fixed
 
+- **A response body `json_encode()` refused was answered as an empty 200.** It
+  returns `false` for a body it cannot encode, `false` went into the response
+  body, and `echo false` sends nothing - so the answer was a 200 carrying a json
+  content-type and no body. Every `_apiCall` in the workbench reads that as a
+  success with nothing in it: a blank panel, no message, and nothing in the log.
+  One byte of malformed utf-8 anywhere in the body was enough, and a recorded
+  log line is built from what a panel posted, so one such byte in an element
+  name blanked the activity log for good. Malformed utf-8 is now substituted
+  (`U+FFFD`, what a browser would show for it anyway) instead of costing the
+  whole response; what cannot be substituted - `Inf`/`NaN`, a resource, a
+  recursion - is answered as the failure it is, with the reason in the body and
+  a line in the error log. A status a handler already set to a failure is kept.
+
+- **A request that named no uri was not answered at all.** `REQUEST_URI` is not
+  guaranteed by the cgi environment - `php-cgi` under IIS composes none - and
+  reading the absent key is an undefined-key warning, which is fatal in Nino.
+  An empty one got further and fared no better: `cleanUri()` cut the path with
+  two `strtok()` calls, and `strtok()` answers `false` for a string of nothing
+  but delimiters, so `''` and `'#'` raised a TypeError inside `Http::request()`
+  before anything could answer. `strtok()` also skips leading delimiters, so
+  `'#frag'` resolved to `'frag'` - the fragment standing in for the path. The
+  cut is `strcspn()` now, which is total, and both keys are read with a
+  default: an unnamed method matches no route, an unnamed uri is `/`.
+
 - **`Nino.http.sendRequest()` never mapped a network failure to a status code.**
   It documented 500 for a failed request, 408 for a timeout and 499 for an
   abort, and set them by assigning to `xhr.status` - which is a getter on

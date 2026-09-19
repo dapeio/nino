@@ -3088,6 +3088,29 @@ $lines = \Nino\Modules\Logs\Admin::recentLines( $appData, 500 );
 check( 'a line break in a recorded value writes no second line', count( $lines ) === $before + 1 );
 check( '...the whole value stays on the one line, attributed to who wrote it', count( array_filter( $lines, static fn( $l ): bool => str_starts_with( is_array( $l ) ? implode( ' ', $l ) : (string) $l, date( 'Y-m-d H:i' ). '  root@example.com' ) ) ) === 0 );
 
+/*	...and one byte that is not valid utf-8, which is the reachable half of
+	Http::_finalizeResponse()'s encoding contract (see kernel-smoke.php). A
+	recorded line is built from what a panel posted (Admin::_logAction()),
+	and a post is bytes: one latin-1 byte in an element name went into the
+	log, json_encode() then refused the whole logs/list body, and false
+	written into the body echoed as the empty string. The panel read that
+	empty 200 as a success with nothing in it, showed a blank list, and said
+	nothing - for every later opening too, until somebody edited the file by
+	hand. _oneLine() strips control characters, not malformed utf-8	*/
+\Nino\Modules\Logs\Admin::record( $appData, 'editor@example.com', "Saved element \"Gru\xdfe\"" );
+
+$finalizeLogResponse = new ReflectionMethod( '\Nino\Http', '_finalizeResponse' );
+$finalizeLogResponse->setAccessible( true );
+
+$logListRequest = [ '/nino/http/response' => [ 'statusCode' => 200, 'header' => [], 'body' => '' ] ];
+\Nino\Modules\Logs\Admin::apiList( $appData, $logListRequest );
+check( 'logs/list answers with the lines', is_array( $logListRequest['/nino/http/response']['body']['lines'] ?? null ) === true );
+
+$finalizeLogResponse->invokeArgs( null, [ &$logListRequest ] );
+$logListBody = json_decode( (string) $logListRequest['/nino/http/response']['body'], true );
+check( 'one malformed byte in a logged value does not blank the whole panel', is_array( $logListBody ) === true && $logListRequest['/nino/http/response']['statusCode'] === 200 );
+check( '...and every other line is still there to read', count( array_filter( $logListBody['lines'] ?? [], static fn( $l ): bool => str_contains( is_array( $l ) ? implode( ' ', $l ) : (string) $l, 'Delete Element Type /deletable' ) === true ) ) === 1 );
+
 // The shell asks the class that ran an action for its line (see
 // Admin::_logAction()): a line on any other class is one nobody reads, which
 // is how the whole Templates panel logged nothing. So: the handler of every
