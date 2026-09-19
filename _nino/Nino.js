@@ -319,6 +319,9 @@
 			 *	to `data` automatically unless already set. The parsed json
 			 *	body (or the raw text, if it isn't json) is passed back on
 			 *	xhr.responseJSON, since the native xhr.response is read-only.
+			 *	xhr.status is the status the server sent, or 500 / 408 / 499
+			 *	for a request that failed / timed out / was aborted - the
+			 *	browser reports 0 for all three, which no caller can act on.
 			 *
 			 *	@param		{string}		uri						Target uri
 			 *	@param		{string}		method				Http method
@@ -342,23 +345,45 @@
 					 */
 					responseFn = function(e) {
 
-					  const xhrCopy = xhr;
-					  // xhr.response is a read-only accessor (assigning to it is a silent no-op),
-					  // so the parsed body goes on a separate .responseJSON property instead
-					  try { xhrCopy.responseJSON = JSON.parse( xhrCopy.responseText ); } catch (e) { xhrCopy.responseJSON = xhrCopy.responseText; }
+						// xhr.response is a read-only accessor (assigning to it is a silent
+						// no-op), so the parsed body goes on a separate .responseJSON property
+						try { xhr.responseJSON = JSON.parse( xhr.responseText ); } catch( error ) { xhr.responseJSON = xhr.responseText; }
 
-					  if( e.type === 'error' ) xhrCopy.status = 500;
-					  if( e.type === 'timeout' ) xhrCopy.status = 408;
-					  if( e.type === 'abort' ) xhrCopy.status = 499;
+						/*	A request that never reached a server carries no status - the
+							browser reports 0 for all three failures alike - and every caller
+							reads xhr.status to decide what to say, the panels in _admin/ by
+							printing the number at the person ("the login endpoint answered
+							%s"). So this mapping is the whole difference between a caller that
+							can tell a dead connection from an abandoned request and one that
+							cannot tell either from anything.
 
-					  callback.call( callback, xhrCopy );
+							status is read-only for the same reason response is - a getter on
+							XMLHttpRequest.prototype with no setter - so assigning to it, which
+							is what this used to do, was the very no-op the comment above warns
+							about: the mapping never happened and 0 was what came back. An own
+							property on the instance shadows the prototype's getter, which is
+							the one way to put a value where every caller already reads.
+
+							Nothing sets xhr.timeout, so the browser does not raise the timeout
+							event on its own today. The branch stays anyway: dropping the
+							handler would leave a timed-out request with no callback at all,
+							and a form stuck in .nino-is-pending for good */
+						let mapped = 0;
+						if( e.type === 'error' )		mapped = 500;
+						if( e.type === 'timeout' )	mapped = 408;
+						if( e.type === 'abort' )		mapped = 499;
+
+						if( mapped !== 0 )
+							Object.defineProperty( xhr, 'status', { value : mapped, writable : true, enumerable : true, configurable : true } );
+
+						callback.call( callback, xhr );
 					};
 
 				xhr.open( method, uri, true );
 				xhr.onload				= responseFn;
-			  xhr.onerror 			= responseFn;
-			  xhr.ontimeout 		= responseFn;
-			  xhr.onabort 			= responseFn;
+				xhr.onerror				= responseFn;
+				xhr.ontimeout			= responseFn;
+				xhr.onabort				= responseFn;
 
 				// Data
 				data = ( data && typeof data === 'object' ) ? data : {};

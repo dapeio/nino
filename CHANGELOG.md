@@ -21,6 +21,17 @@ All notable changes to Nino are documented in this file.
 
 ### Fixed
 
+- **`Nino.http.sendRequest()` never mapped a network failure to a status code.**
+  It documented 500 for a failed request, 408 for a timeout and 499 for an
+  abort, and set them by assigning to `xhr.status` - which is a getter on
+  `XMLHttpRequest.prototype` with no setter, so the assignment was a silent
+  no-op. The comment two lines above it says precisely that about
+  `xhr.response`. What every caller got instead was the browser's 0, the same
+  for all three, and the panels that print the number printed it: "the login
+  endpoint answered 0 - the credentials were never checked." The three codes are
+  now defined as an own property on the instance, which shadows the accessor; a
+  served answer keeps the status php sent it.
+
 - **A radio group was submitted as its last member, whichever one the visitor
   ticked.** The shared `.nino-form` script collects a form by walking every
   `input`, `textarea` and `select` and writing `data[name]` for each - and a
