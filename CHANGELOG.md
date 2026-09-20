@@ -4,6 +4,17 @@ All notable changes to Nino are documented in this file.
 
 ## Unreleased
 
+### Added
+
+- **Tests:** the csrf guard's other four paths, none of which was measured.
+  `tests/kernel-smoke.php` now drives which methods are checked (PUT, DELETE
+  and PATCH as much as POST, and a method the kernel does not recognize), the
+  `X-CSRF-Token` header, the token in a json body - `$_POST` is empty for one
+  of those - and the per-route `'csrf' => false` opt-out, including the one
+  thing it must not do: a POST to an address no route is registered for must
+  not inherit the 404 page's opt-out, which would wave through every POST to
+  every unregistered uri on the site.
+
 ### Changed
 
 - **The workbench manual stops describing a feature it does not own.** The

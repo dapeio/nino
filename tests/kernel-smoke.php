@@ -1660,6 +1660,124 @@ $replacedCsrf = \Nino\Modules\Csrf::doShortcode( $appData, [] );
 check( 'the hidden input is the property, so replacing it replaces what the shortcode renders', $replacedCsrf === '<input type="hidden" name="authenticity_token" value="'. $token2. '">' );
 check( '...and the shipped fragment names the field the kernel checks', str_contains( \Nino\Modules\Csrf::doShortcode( $appData, [] ), 'name="_csrf"' ) === true );
 
+
+/*	Everything above drives one path: a POST carrying the token in
+	$_POST['_csrf']. The guard has four more, every one of them written for a
+	failure that had already happened once, and none of them measured:
+
+	- which methods are checked. It used to be POST alone, so a route
+	  registered for PUT, DELETE or PATCH was unprotected, and a method the
+	  kernel does not recognize ('') stays on the checked side deliberately.
+	- the X-CSRF-Token header.
+	- the token in a json body - $_POST is empty for a json request, so the
+	  field alone 403s every json POST whatever token it carries.
+	- the per-route opt-out, and the one thing it must not do: a POST to an
+	  address no route is registered for resolves to the /404 route, and a
+	  'csrf' => false there would wave through every POST to every
+	  unregistered uri site-wide.
+
+	One helper, because each of these is the same call with one thing
+	different	*/
+function csrfCheck( array &$appData, string $method, string $uri = '/api/thing', array $post = [], array $header = [], string $body = '' ): array {
+	$_POST = $post;
+	$request = [
+		'/nino/http/request'	=> [ 'method' => $method, 'uri' => $uri, 'header' => $header, 'body' => $body ],
+		'/nino/http/response'	=> [ 'statusCode' => 200 ],
+	];
+	\Nino\Csrf::callbackResponse( $appData, $request );
+	return $request;
+}
+
+/** Whether one such request was let through */
+function csrfPassed( array $request ): bool {
+	return $request['/nino/http/response']['statusCode'] === 200 && ( $request['./nino/csrf/blocked'] ?? false ) === false;
+}
+
+$csrfRoutesBefore = $appData['/nino/http/routes'] ?? null;
+$appData['/nino/http/routes'] = [
+	'POST://api/thing'	=> [ 'uri' => '/api/thing' ],
+	'POST://webhook'		=> [ 'uri' => '/webhook', 'csrf' => false ],
+	'POST://hooks/*'		=> [ 'uri' => '/hooks', 'csrf' => false ],
+	'POST://plain'			=> [ 'uri' => '/plain', 'csrf' => false ],
+	// The trap: a 404 page is GET-only and may reasonably say it needs no token
+	'GET://404'					=> [ 'uri' => '/404', 'csrf' => false ],
+];
+
+// A safe method carries no token and needs none
+check( 'GET, HEAD and OPTIONS pass without a token', csrfPassed( csrfCheck( $appData, 'GET' ) ) === true
+	&& csrfPassed( csrfCheck( $appData, 'HEAD' ) ) === true && csrfPassed( csrfCheck( $appData, 'OPTIONS' ) ) === true );
+
+// Every method that writes is checked, not POST alone
+check( 'POST, PUT, DELETE and PATCH without a token are all refused', csrfPassed( csrfCheck( $appData, 'POST' ) ) === false
+	&& csrfPassed( csrfCheck( $appData, 'PUT' ) ) === false
+	&& csrfPassed( csrfCheck( $appData, 'DELETE' ) ) === false
+	&& csrfPassed( csrfCheck( $appData, 'PATCH' ) ) === false );
+check( '...and all four pass with the current token', csrfPassed( csrfCheck( $appData, 'POST', '/api/thing', [ '_csrf' => $token2 ] ) ) === true
+	&& csrfPassed( csrfCheck( $appData, 'PUT', '/api/thing', [ '_csrf' => $token2 ] ) ) === true
+	&& csrfPassed( csrfCheck( $appData, 'DELETE', '/api/thing', [ '_csrf' => $token2 ] ) ) === true
+	&& csrfPassed( csrfCheck( $appData, 'PATCH', '/api/thing', [ '_csrf' => $token2 ] ) ) === true );
+
+// A method the kernel does not recognize is '' by the time this runs, and it
+// has no business writing anything either
+check( 'a method the kernel does not recognize is on the checked side', csrfPassed( csrfCheck( $appData, '' ) ) === false );
+
+// The header, which is the only source a cross-site form cannot set
+check( 'the token is taken from X-CSRF-Token', csrfPassed( csrfCheck( $appData, 'POST', '/api/thing', [], [ 'X-CSRF-Token' => $token2 ] ) ) === true );
+check( '...and a wrong one there is refused like any other', csrfPassed( csrfCheck( $appData, 'POST', '/api/thing', [], [ 'X-CSRF-Token' => 'nope' ] ) ) === false );
+
+// The json body: $_POST is empty for one of these, so without this path every
+// json POST was a 403 whatever token it carried
+check( 'the token is taken from a json body', csrfPassed( csrfCheck( $appData, 'POST', '/api/thing', [], [], (string) json_encode( [ '_csrf' => $token2 ] ) ) ) === true );
+check( '...and a wrong one there is refused', csrfPassed( csrfCheck( $appData, 'POST', '/api/thing', [], [], (string) json_encode( [ '_csrf' => 'nope' ] ) ) ) === false );
+check( '...and a body that is no json at all is not a token', csrfPassed( csrfCheck( $appData, 'POST', '/api/thing', [], [], 'not json' ) ) === false );
+
+// Anything a client can send that is not a string is not a token. '_csrf[]=x'
+// parses to an array, and json carries types of its own
+check( 'a _csrf field that is an array is no token', csrfPassed( csrfCheck( $appData, 'POST', '/api/thing', [ '_csrf' => [ $token2 ] ] ) ) === false );
+check( '...nor is a json _csrf that is an array', csrfPassed( csrfCheck( $appData, 'POST', '/api/thing', [], [], (string) json_encode( [ '_csrf' => [ $token2 ] ] ) ) ) === false );
+check( '...nor a json body that is a list rather than an object', csrfPassed( csrfCheck( $appData, 'POST', '/api/thing', [], [], (string) json_encode( [ $token2 ] ) ) ) === false );
+
+// ...and an empty field falls through to the next source rather than counting
+// as an answer, while a wrong one is the answer
+check( 'an empty _csrf field falls through to the header', csrfPassed( csrfCheck( $appData, 'POST', '/api/thing', [ '_csrf' => '' ], [ 'X-CSRF-Token' => $token2 ] ) ) === true );
+check( '...and a wrong one does not', csrfPassed( csrfCheck( $appData, 'POST', '/api/thing', [ '_csrf' => 'nope' ], [ 'X-CSRF-Token' => $token2 ] ) ) === false );
+
+// hash_equals(), so neither end of the token is enough
+check( 'a prefix of the token is refused', csrfPassed( csrfCheck( $appData, 'POST', '/api/thing', [ '_csrf' => substr( $token2, 0, 20 ) ] ) ) === false );
+check( '...and so is the token with anything appended', csrfPassed( csrfCheck( $appData, 'POST', '/api/thing', [ '_csrf' => $token2. 'x' ] ) ) === false );
+
+// The per-route opt-out a public endpoint needs
+check( "a route's own 'csrf' => false lets it through", csrfPassed( csrfCheck( $appData, 'POST', '/webhook' ) ) === true );
+check( '...for the method it is registered for, and no other', csrfPassed( csrfCheck( $appData, 'PUT', '/webhook' ) ) === false );
+
+/*	And the thing it must not do. A POST to an address no route is registered
+	for is looked up here on its own uri and method, which correctly finds
+	nothing - not the /404 route Http::response() has already merged into the
+	response array, looked up with method GET. Reading that merged value
+	instead would let one 'csrf' => false on the 404 page wave through every
+	POST to every unregistered uri on the site	*/
+check( 'a POST to an unregistered uri does not inherit the 404 page\'s opt-out', csrfPassed( csrfCheck( $appData, 'POST', '/nowhere' ) ) === false );
+
+// A wildcard route opts out what it declares: its children, not itself, and
+// a plain parent route opts out nothing but itself
+check( 'a wildcard opt-out covers the children it declares', csrfPassed( csrfCheck( $appData, 'POST', '/hooks/stripe' ) ) === true
+	&& csrfPassed( csrfCheck( $appData, 'POST', '/hooks/stripe/v2' ) ) === true );
+check( '...and not the address it is written under', csrfPassed( csrfCheck( $appData, 'POST', '/hooks' ) ) === false );
+check( 'a plain route\'s opt-out reaches no child of it', csrfPassed( csrfCheck( $appData, 'POST', '/plain/child' ) ) === false );
+
+// What a refusal leaves behind: the status, the flag every later callback has
+// to read for itself, and a body that is not a handler's own
+$csrfRefused = csrfCheck( $appData, 'POST', '/api/thing' );
+check( 'a refusal is a 403 with the blocked flag and no body', $csrfRefused['/nino/http/response']['statusCode'] === 403
+	&& ( $csrfRefused['./nino/csrf/blocked'] ?? false ) === true
+	&& $csrfRefused['/nino/http/response']['body'] === false );
+
+$_POST = [];
+if( $csrfRoutesBefore === null )
+	unset( $appData['/nino/http/routes'] );
+else
+	$appData['/nino/http/routes'] = $csrfRoutesBefore;
+
 // Regression: Auth::callbackLoginResponse()/callbackLogoutResponse() used
 // to hard-refuse (trigger_error(E_USER_ERROR)) unless the Csrf module was
 // listed in '/nino/modules' - protection is now the required \Nino\Csrf
