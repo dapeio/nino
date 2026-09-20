@@ -107,7 +107,7 @@
 	</div>
 </section>
 
-<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-fullscreen-image-cover" data-demo-preset="fullscreen-image" data-demo-layout="cover">
+<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-fullscreen-image-cover" data-demo-preset="hero-fullscreen-image" data-demo-layout="cover">
 	<div class="nino-grid-row nino-grid-row--wide">
 		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left">
 			<span class="nino-badge nino-badge--primary">fullscreen-image</span> <span class="nino-badge nino-badge--pill">Layout: cover — static cover image</span> <span class="nino-badge nino-badge--pill">Surface: cover</span> <span class="nino-badge nino-badge--pill">Overlay: dim</span> <span class="nino-badge nino-badge--pill">Height: 100</span>
@@ -123,7 +123,7 @@
 	</div>
 </section>
 
-<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-fullscreen-image-parallax" data-demo-preset="fullscreen-image" data-demo-layout="parallax">
+<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-fullscreen-image-parallax" data-demo-preset="hero-fullscreen-image" data-demo-layout="parallax">
 	<div class="nino-grid-row nino-grid-row--wide">
 		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left">
 			<span class="nino-badge nino-badge--primary">fullscreen-image</span> <span class="nino-badge nino-badge--pill">Layout: parallax — scrolling image</span> <span class="nino-badge nino-badge--pill">Surface: cover</span> <span class="nino-badge nino-badge--pill">Overlay: dim</span> <span class="nino-badge nino-badge--pill">Height: 100</span>
@@ -241,7 +241,7 @@
 	</div>
 </section>
 
-<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-filterable-grid-default" data-demo-preset="filterable-grid" data-demo-layout="default">
+<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-filterable-grid-default" data-demo-preset="articles-filterable-grid" data-demo-layout="default">
 	<div class="nino-grid-row nino-grid-row--wide">
 		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left">
 			<span class="nino-badge nino-badge--primary">filterable-grid</span> <span class="nino-badge nino-badge--pill">Layout: default</span> <span class="nino-badge nino-badge--pill">Filter from “category” field</span> <span class="nino-badge nino-badge--pill">Surface: alt</span>
@@ -284,7 +284,7 @@
 	</div>
 </section>
 
-<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-content-section-default" data-demo-preset="content-section" data-demo-layout="default">
+<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-content-section-default" data-demo-preset="static-content" data-demo-layout="default">
 	<div class="nino-grid-row nino-grid-row--wide">
 		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left">
 			<span class="nino-badge nino-badge--primary">content-section</span> <span class="nino-badge nino-badge--pill">Layout: default</span> <span class="nino-badge nino-badge--pill">Surface: default</span>
@@ -299,7 +299,7 @@
 	</div>
 </section>
 
-<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-feature-split-media-right" data-demo-preset="feature-split" data-demo-layout="media-right">
+<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-feature-split-media-right" data-demo-preset="image-list-split" data-demo-layout="media-right">
 	<div class="nino-grid-row nino-grid-row--wide">
 		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left">
 			<span class="nino-badge nino-badge--primary">feature-split</span> <span class="nino-badge nino-badge--pill">Layout: media-right — image on the right</span> <span class="nino-badge nino-badge--pill">List from Elements</span> <span class="nino-badge nino-badge--pill">Surface: alt</span>
@@ -318,7 +318,7 @@
 	</div>
 </section>
 
-<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-feature-split-media-left" data-demo-preset="feature-split" data-demo-layout="media-left">
+<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-feature-split-media-left" data-demo-preset="image-list-split" data-demo-layout="media-left">
 	<div class="nino-grid-row nino-grid-row--wide">
 		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left">
 			<span class="nino-badge nino-badge--primary">feature-split</span> <span class="nino-badge nino-badge--pill">Layout: media-left — image on the left</span> <span class="nino-badge nino-badge--pill">List from Elements</span> <span class="nino-badge nino-badge--pill">Surface: alt</span>
@@ -337,7 +337,7 @@
 	</div>
 </section>
 
-<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-media-split-areas-media-left" data-demo-preset="media-split-areas" data-demo-layout="media-left">
+<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-media-split-areas-media-left" data-demo-preset="image-content-split" data-demo-layout="media-left">
 	<div class="nino-grid-row nino-grid-row--wide">
 		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left">
 			<span class="nino-badge nino-badge--primary">media-split-areas</span> <span class="nino-badge nino-badge--pill">Layout: media-left — image on the left</span> <span class="nino-badge nino-badge--pill">Image from an image slot</span> <span class="nino-badge nino-badge--pill">Container: wide</span>
@@ -351,7 +351,7 @@
 	</div>
 </section>
 
-<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-media-split-areas-media-right" data-demo-preset="media-split-areas" data-demo-layout="media-right">
+<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-media-split-areas-media-right" data-demo-preset="image-content-split" data-demo-layout="media-right">
 	<div class="nino-grid-row nino-grid-row--wide">
 		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left">
 			<span class="nino-badge nino-badge--primary">media-split-areas</span> <span class="nino-badge nino-badge--pill">Layout: media-right — image on the right</span> <span class="nino-badge nino-badge--pill">Image from an image slot</span> <span class="nino-badge nino-badge--pill">Container: wide</span>
@@ -365,7 +365,7 @@
 	</div>
 </section>
 
-<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-logo-bar-row" data-demo-preset="logo-bar" data-demo-layout="row">
+<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-logo-bar-row" data-demo-preset="items-logos" data-demo-layout="row">
 	<div class="nino-grid-row nino-grid-row--wide">
 		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left">
 			<span class="nino-badge nino-badge--primary">logo-bar</span> <span class="nino-badge nino-badge--pill">Layout: row — heading above the row</span> <span class="nino-badge nino-badge--pill">Logos from Elements</span> <span class="nino-badge nino-badge--pill">Padding: small</span>
@@ -383,7 +383,7 @@
 	</div>
 </section>
 
-<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-logo-bar-aside" data-demo-preset="logo-bar" data-demo-layout="aside">
+<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-logo-bar-aside" data-demo-preset="items-logos" data-demo-layout="aside">
 	<div class="nino-grid-row nino-grid-row--wide">
 		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left">
 			<span class="nino-badge nino-badge--primary">logo-bar</span> <span class="nino-badge nino-badge--pill">Layout: aside — heading beside the row</span> <span class="nino-badge nino-badge--pill">Logos from Elements</span> <span class="nino-badge nino-badge--pill">Padding: small</span>
@@ -403,7 +403,7 @@
 	</div>
 </section>
 
-<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-pricing-plans-equal" data-demo-preset="pricing-plans" data-demo-layout="equal">
+<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-pricing-plans-equal" data-demo-preset="items-pricing" data-demo-layout="equal">
 	<div class="nino-grid-row nino-grid-row--wide">
 		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left">
 			<span class="nino-badge nino-badge--primary">pricing-plans</span> <span class="nino-badge nino-badge--pill">Layout: equal — equally sized cards</span> <span class="nino-badge nino-badge--pill">Cards from Elements</span> <span class="nino-badge nino-badge--pill">Surface: alt</span>
@@ -421,7 +421,7 @@
 	</div>
 </section>
 
-<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-pricing-plans-feature-middle" data-demo-preset="pricing-plans" data-demo-layout="feature-middle">
+<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-pricing-plans-feature-middle" data-demo-preset="items-pricing" data-demo-layout="feature-middle">
 	<div class="nino-grid-row nino-grid-row--wide">
 		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left">
 			<span class="nino-badge nino-badge--primary">pricing-plans</span> <span class="nino-badge nino-badge--pill">Layout: feature-middle — middle card highlighted</span> <span class="nino-badge nino-badge--pill">Cards from Elements</span> <span class="nino-badge nino-badge--pill">Surface: alt</span>
@@ -439,7 +439,7 @@
 	</div>
 </section>
 
-<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-pricing-plans-four" data-demo-preset="pricing-plans" data-demo-layout="four">
+<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-pricing-plans-four" data-demo-preset="items-pricing" data-demo-layout="four">
 	<div class="nino-grid-row nino-grid-row--wide">
 		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left">
 			<span class="nino-badge nino-badge--primary">pricing-plans</span> <span class="nino-badge nino-badge--pill">Layout: four — four equal cards</span> <span class="nino-badge nino-badge--pill">Cards from Elements</span> <span class="nino-badge nino-badge--pill">Surface: alt</span>
@@ -457,7 +457,7 @@
 	</div>
 </section>
 
-<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-pricing-plans-four-feature-first" data-demo-preset="pricing-plans" data-demo-layout="four-feature-first">
+<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-pricing-plans-four-feature-first" data-demo-preset="items-pricing" data-demo-layout="four-feature-first">
 	<div class="nino-grid-row nino-grid-row--wide">
 		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left">
 			<span class="nino-badge nino-badge--primary">pricing-plans</span> <span class="nino-badge nino-badge--pill">Layout: four-feature-first — one wide card at the top</span> <span class="nino-badge nino-badge--pill">Cards from Elements</span> <span class="nino-badge nino-badge--pill">Surface: alt</span>
@@ -475,7 +475,7 @@
 	</div>
 </section>
 
-<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-pricing-plans-four-feature-last" data-demo-preset="pricing-plans" data-demo-layout="four-feature-last">
+<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-pricing-plans-four-feature-last" data-demo-preset="items-pricing" data-demo-layout="four-feature-last">
 	<div class="nino-grid-row nino-grid-row--wide">
 		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left">
 			<span class="nino-badge nino-badge--primary">pricing-plans</span> <span class="nino-badge nino-badge--pill">Layout: four-feature-last — one wide card at the bottom</span> <span class="nino-badge nino-badge--pill">Cards from Elements</span> <span class="nino-badge nino-badge--pill">Surface: alt</span>
@@ -493,7 +493,7 @@
 	</div>
 </section>
 
-<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-process-timeline-timeline" data-demo-preset="process-timeline" data-demo-layout="timeline">
+<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-process-timeline-timeline" data-demo-preset="items-timeline" data-demo-layout="timeline">
 	<div class="nino-grid-row nino-grid-row--wide">
 		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left">
 			<span class="nino-badge nino-badge--primary">process-timeline</span> <span class="nino-badge nino-badge--pill">Layout: timeline — connected steps</span> <span class="nino-badge nino-badge--pill">Steps from Elements</span>
@@ -511,7 +511,7 @@
 	</div>
 </section>
 
-<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-process-timeline-stacked" data-demo-preset="process-timeline" data-demo-layout="stacked">
+<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-process-timeline-stacked" data-demo-preset="items-timeline" data-demo-layout="stacked">
 	<div class="nino-grid-row nino-grid-row--wide">
 		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left">
 			<span class="nino-badge nino-badge--primary">process-timeline</span> <span class="nino-badge nino-badge--pill">Layout: stacked — stacked vertically</span> <span class="nino-badge nino-badge--pill">Steps from Elements</span>
@@ -538,7 +538,7 @@
 	</div>
 </section>
 
-<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-cta-banner-centered" data-demo-preset="cta-banner" data-demo-layout="centered">
+<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-cta-banner-centered" data-demo-preset="hero-cta" data-demo-layout="centered">
 	<div class="nino-grid-row nino-grid-row--wide">
 		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left">
 			<span class="nino-badge nino-badge--primary">cta-banner</span> <span class="nino-badge nino-badge--pill">Layout: centered — actions below the statement</span> <span class="nino-badge nino-badge--pill">Surface: dark</span>
@@ -552,7 +552,7 @@
 	</div>
 </section>
 
-<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-cta-banner-split" data-demo-preset="cta-banner" data-demo-layout="split">
+<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-cta-banner-split" data-demo-preset="hero-cta" data-demo-layout="split">
 	<div class="nino-grid-row nino-grid-row--wide">
 		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left">
 			<span class="nino-badge nino-badge--primary">cta-banner</span> <span class="nino-badge nino-badge--pill">Layout: split — actions alongside</span> <span class="nino-badge nino-badge--pill">Surface: dark</span>
@@ -579,7 +579,7 @@
 	</div>
 </section>
 
-<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-contact-form-split" data-demo-preset="contact-form" data-demo-layout="split">
+<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-contact-form-split" data-demo-preset="form-contact" data-demo-layout="split">
 	<div class="nino-grid-row nino-grid-row--wide">
 		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left">
 			<span class="nino-badge nino-badge--primary">contact-form</span> <span class="nino-badge nino-badge--pill">Layout: split — contact details beside the form</span> <span class="nino-badge nino-badge--pill">POST /.form</span> <span class="nino-badge nino-badge--pill">Honeypot + CSRF</span>
@@ -620,7 +620,7 @@
 	</div>
 </section>
 
-<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-contact-form-centered" data-demo-preset="contact-form" data-demo-layout="centered">
+<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-contact-form-centered" data-demo-preset="form-contact" data-demo-layout="centered">
 	<div class="nino-grid-row nino-grid-row--wide">
 		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left">
 			<span class="nino-badge nino-badge--primary">contact-form</span> <span class="nino-badge nino-badge--pill">Layout: centered — form only</span> <span class="nino-badge nino-badge--pill">POST /.form</span> <span class="nino-badge nino-badge--pill">Honeypot + CSRF</span>
@@ -653,7 +653,7 @@
 	</div>
 </section>
 
-<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-newsletter-form-centered" data-demo-preset="newsletter-form" data-demo-layout="centered">
+<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-newsletter-form-centered" data-demo-preset="form-newsletter" data-demo-layout="centered">
 	<div class="nino-grid-row nino-grid-row--wide">
 		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left">
 			<span class="nino-badge nino-badge--primary">newsletter-form</span> <span class="nino-badge nino-badge--pill">Layout: centered — form below the text</span> <span class="nino-badge nino-badge--pill">POST /.newsletter</span> <span class="nino-badge nino-badge--pill">Double-Opt-in</span> <span class="nino-badge nino-badge--pill">Surface: dark</span>
@@ -676,7 +676,7 @@
 	</div>
 </section>
 
-<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-newsletter-form-split" data-demo-preset="newsletter-form" data-demo-layout="split">
+<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-newsletter-form-split" data-demo-preset="form-newsletter" data-demo-layout="split">
 	<div class="nino-grid-row nino-grid-row--wide">
 		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left">
 			<span class="nino-badge nino-badge--primary">newsletter-form</span> <span class="nino-badge nino-badge--pill">Layout: split — text beside the form</span> <span class="nino-badge nino-badge--pill">POST /.newsletter</span> <span class="nino-badge nino-badge--pill">Double-Opt-in</span> <span class="nino-badge nino-badge--pill">Surface: dark</span>
@@ -710,7 +710,7 @@
 	</div>
 </section>
 
-<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-static-list-check-demo" data-demo-preset="static-list" data-demo-layout="check-demo">
+<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-static-list-check-demo" data-demo-preset="items-list" data-demo-layout="check-demo">
 	<div class="nino-grid-row nino-grid-row--wide">
 		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left">
 			<span class="nino-badge nino-badge--primary">static-list</span> <span class="nino-badge nino-badge--pill">Layout: check-demo — checklist with sample rows</span> <span class="nino-badge nino-badge--pill">List in markup</span>
@@ -730,7 +730,7 @@
 	</div>
 </section>
 
-<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-static-list-check-elements" data-demo-preset="static-list" data-demo-layout="check-elements">
+<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-static-list-check-elements" data-demo-preset="items-list" data-demo-layout="check-elements">
 	<div class="nino-grid-row nino-grid-row--wide">
 		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left">
 			<span class="nino-badge nino-badge--primary">static-list</span> <span class="nino-badge nino-badge--pill">Layout: check-elements — checklist from Elements</span> <span class="nino-badge nino-badge--pill">Beispieldaten statt &#91;elements&#93;</span>
@@ -754,7 +754,7 @@
 	</div>
 </section>
 
-<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-static-list-numbered-demo" data-demo-preset="static-list" data-demo-layout="numbered-demo">
+<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-static-list-numbered-demo" data-demo-preset="items-list" data-demo-layout="numbered-demo">
 	<div class="nino-grid-row nino-grid-row--wide">
 		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left">
 			<span class="nino-badge nino-badge--primary">static-list</span> <span class="nino-badge nino-badge--pill">Layout: numbered-demo — numbered sample rows</span> <span class="nino-badge nino-badge--pill">List in markup</span>
@@ -774,7 +774,7 @@
 	</div>
 </section>
 
-<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-static-list-numbered-elements" data-demo-preset="static-list" data-demo-layout="numbered-elements">
+<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-static-list-numbered-elements" data-demo-preset="items-list" data-demo-layout="numbered-elements">
 	<div class="nino-grid-row nino-grid-row--wide">
 		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left">
 			<span class="nino-badge nino-badge--primary">static-list</span> <span class="nino-badge nino-badge--pill">Layout: numbered-elements — numbered, from Elements</span> <span class="nino-badge nino-badge--pill">Beispieldaten statt &#91;elements&#93;</span>
@@ -798,7 +798,7 @@
 	</div>
 </section>
 
-<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-static-table-default-demo" data-demo-preset="static-table" data-demo-layout="default-demo">
+<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-static-table-default-demo" data-demo-preset="items-table" data-demo-layout="default-demo">
 	<div class="nino-grid-row nino-grid-row--wide">
 		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left">
 			<span class="nino-badge nino-badge--primary">static-table</span> <span class="nino-badge nino-badge--pill">Layout: default-demo — plain table</span> <span class="nino-badge nino-badge--pill">Rows in markup</span>
@@ -823,7 +823,7 @@
 	</div>
 </section>
 
-<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-static-table-striped-demo" data-demo-preset="static-table" data-demo-layout="striped-demo">
+<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-static-table-striped-demo" data-demo-preset="items-table" data-demo-layout="striped-demo">
 	<div class="nino-grid-row nino-grid-row--wide">
 		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left">
 			<span class="nino-badge nino-badge--primary">static-table</span> <span class="nino-badge nino-badge--pill">Layout: striped-demo — striped</span> <span class="nino-badge nino-badge--pill">Rows in markup</span>
@@ -848,7 +848,7 @@
 	</div>
 </section>
 
-<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-static-table-striped-elements" data-demo-preset="static-table" data-demo-layout="striped-elements">
+<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-static-table-striped-elements" data-demo-preset="items-table" data-demo-layout="striped-elements">
 	<div class="nino-grid-row nino-grid-row--wide">
 		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left">
 			<span class="nino-badge nino-badge--primary">static-table</span> <span class="nino-badge nino-badge--pill">Layout: striped-elements — striped, from Elements</span> <span class="nino-badge nino-badge--pill">Beispieldaten statt &#91;elements&#93;</span>
@@ -879,7 +879,7 @@
 	</div>
 </section>
 
-<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-static-table-default-elements" data-demo-preset="static-table" data-demo-layout="default-elements">
+<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-static-table-default-elements" data-demo-preset="items-table" data-demo-layout="default-elements">
 	<div class="nino-grid-row nino-grid-row--wide">
 		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left">
 			<span class="nino-badge nino-badge--primary">static-table</span> <span class="nino-badge nino-badge--pill">Layout: default-elements — plain, from Elements</span> <span class="nino-badge nino-badge--pill">Beispieldaten statt &#91;elements&#93;</span>
@@ -910,7 +910,7 @@
 	</div>
 </section>
 
-<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-static-accordion-demo" data-demo-preset="static-accordion" data-demo-layout="demo">
+<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-static-accordion-demo" data-demo-preset="items-accordion" data-demo-layout="demo">
 	<div class="nino-grid-row nino-grid-row--wide">
 		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left">
 			<span class="nino-badge nino-badge--primary">static-accordion</span> <span class="nino-badge nino-badge--pill">Layout: demo — three sample questions</span> <span class="nino-badge nino-badge--pill">details/summary, no JavaScript</span>
@@ -937,7 +937,7 @@
 	</div>
 </section>
 
-<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-static-accordion-elements" data-demo-preset="static-accordion" data-demo-layout="elements">
+<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-static-accordion-elements" data-demo-preset="items-accordion" data-demo-layout="elements">
 	<div class="nino-grid-row nino-grid-row--wide">
 		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left">
 			<span class="nino-badge nino-badge--primary">static-accordion</span> <span class="nino-badge nino-badge--pill">Layout: elements — questions from Elements</span> <span class="nino-badge nino-badge--pill">Beispieldaten statt &#91;elements&#93;</span>
@@ -1049,7 +1049,7 @@
 	</div>
 </section>
 
-<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-frame-flaeche-default" data-demo-preset="content-section" data-demo-layout="default">
+<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-frame-flaeche-default" data-demo-preset="static-content" data-demo-layout="default">
 	<div class="nino-grid-row nino-grid-row--wide">
 		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left">
 			<span class="nino-badge nino-badge--primary">content-section</span> <span class="nino-badge nino-badge--pill">Layout: default</span> <span class="nino-badge nino-badge--pill">Surface: default</span>
@@ -1063,7 +1063,7 @@
 	</div>
 </section>
 
-<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-frame-flaeche-alt" data-demo-preset="content-section" data-demo-layout="default">
+<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-frame-flaeche-alt" data-demo-preset="static-content" data-demo-layout="default">
 	<div class="nino-grid-row nino-grid-row--wide">
 		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left">
 			<span class="nino-badge nino-badge--primary">content-section</span> <span class="nino-badge nino-badge--pill">Layout: default</span> <span class="nino-badge nino-badge--pill">Surface: alt</span>
@@ -1077,7 +1077,7 @@
 	</div>
 </section>
 
-<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-frame-flaeche-primary" data-demo-preset="content-section" data-demo-layout="default">
+<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-frame-flaeche-primary" data-demo-preset="static-content" data-demo-layout="default">
 	<div class="nino-grid-row nino-grid-row--wide">
 		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left">
 			<span class="nino-badge nino-badge--primary">content-section</span> <span class="nino-badge nino-badge--pill">Layout: default</span> <span class="nino-badge nino-badge--pill">Surface: primary</span>
@@ -1091,7 +1091,7 @@
 	</div>
 </section>
 
-<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-frame-flaeche-dark" data-demo-preset="content-section" data-demo-layout="default">
+<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-frame-flaeche-dark" data-demo-preset="static-content" data-demo-layout="default">
 	<div class="nino-grid-row nino-grid-row--wide">
 		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left">
 			<span class="nino-badge nino-badge--primary">content-section</span> <span class="nino-badge nino-badge--pill">Layout: default</span> <span class="nino-badge nino-badge--pill">Surface: dark</span>
@@ -1105,7 +1105,7 @@
 	</div>
 </section>
 
-<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-frame-flaeche-black" data-demo-preset="content-section" data-demo-layout="default">
+<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-frame-flaeche-black" data-demo-preset="static-content" data-demo-layout="default">
 	<div class="nino-grid-row nino-grid-row--wide">
 		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left">
 			<span class="nino-badge nino-badge--primary">content-section</span> <span class="nino-badge nino-badge--pill">Layout: default</span> <span class="nino-badge nino-badge--pill">Surface: black</span>
@@ -1119,7 +1119,7 @@
 	</div>
 </section>
 
-<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-frame-breite-narrow" data-demo-preset="content-section" data-demo-layout="default">
+<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-frame-breite-narrow" data-demo-preset="static-content" data-demo-layout="default">
 	<div class="nino-grid-row nino-grid-row--wide">
 		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left">
 			<span class="nino-badge nino-badge--primary">content-section</span> <span class="nino-badge nino-badge--pill">Layout: default</span> <span class="nino-badge nino-badge--pill">Container: narrow</span>
@@ -1133,7 +1133,7 @@
 	</div>
 </section>
 
-<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-frame-breite-default" data-demo-preset="content-section" data-demo-layout="default">
+<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-frame-breite-default" data-demo-preset="static-content" data-demo-layout="default">
 	<div class="nino-grid-row nino-grid-row--wide">
 		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left">
 			<span class="nino-badge nino-badge--primary">content-section</span> <span class="nino-badge nino-badge--pill">Layout: default</span> <span class="nino-badge nino-badge--pill">Container: default</span>
@@ -1147,7 +1147,7 @@
 	</div>
 </section>
 
-<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-frame-breite-wide" data-demo-preset="content-section" data-demo-layout="default">
+<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-frame-breite-wide" data-demo-preset="static-content" data-demo-layout="default">
 	<div class="nino-grid-row nino-grid-row--wide">
 		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left">
 			<span class="nino-badge nino-badge--primary">content-section</span> <span class="nino-badge nino-badge--pill">Layout: default</span> <span class="nino-badge nino-badge--pill">Container: wide</span>
@@ -1161,7 +1161,7 @@
 	</div>
 </section>
 
-<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-frame-polster-none" data-demo-preset="content-section" data-demo-layout="default">
+<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-frame-polster-none" data-demo-preset="static-content" data-demo-layout="default">
 	<div class="nino-grid-row nino-grid-row--wide">
 		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left">
 			<span class="nino-badge nino-badge--primary">content-section</span> <span class="nino-badge nino-badge--pill">Layout: default</span> <span class="nino-badge nino-badge--pill">Padding: none</span>
@@ -1175,7 +1175,7 @@
 	</div>
 </section>
 
-<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-frame-polster-small" data-demo-preset="content-section" data-demo-layout="default">
+<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-frame-polster-small" data-demo-preset="static-content" data-demo-layout="default">
 	<div class="nino-grid-row nino-grid-row--wide">
 		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left">
 			<span class="nino-badge nino-badge--primary">content-section</span> <span class="nino-badge nino-badge--pill">Layout: default</span> <span class="nino-badge nino-badge--pill">Padding: small</span>
@@ -1189,7 +1189,7 @@
 	</div>
 </section>
 
-<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-frame-polster-default" data-demo-preset="content-section" data-demo-layout="default">
+<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-frame-polster-default" data-demo-preset="static-content" data-demo-layout="default">
 	<div class="nino-grid-row nino-grid-row--wide">
 		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left">
 			<span class="nino-badge nino-badge--primary">content-section</span> <span class="nino-badge nino-badge--pill">Layout: default</span> <span class="nino-badge nino-badge--pill">Padding: default</span>
@@ -1203,7 +1203,7 @@
 	</div>
 </section>
 
-<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-frame-polster-big" data-demo-preset="content-section" data-demo-layout="default">
+<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-frame-polster-big" data-demo-preset="static-content" data-demo-layout="default">
 	<div class="nino-grid-row nino-grid-row--wide">
 		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left">
 			<span class="nino-badge nino-badge--primary">content-section</span> <span class="nino-badge nino-badge--pill">Layout: default</span> <span class="nino-badge nino-badge--pill">Padding: big</span>
@@ -1217,7 +1217,7 @@
 	</div>
 </section>
 
-<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-frame-hoehe-50" data-demo-preset="content-section" data-demo-layout="default">
+<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-frame-hoehe-50" data-demo-preset="static-content" data-demo-layout="default">
 	<div class="nino-grid-row nino-grid-row--wide">
 		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left">
 			<span class="nino-badge nino-badge--primary">content-section</span> <span class="nino-badge nino-badge--pill">Layout: default</span> <span class="nino-badge nino-badge--pill">Height: 50</span> <span class="nino-badge nino-badge--pill">Alignment: top</span>
@@ -1233,7 +1233,7 @@
 	</div>
 </section>
 
-<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-frame-hoehe-75" data-demo-preset="content-section" data-demo-layout="default">
+<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-frame-hoehe-75" data-demo-preset="static-content" data-demo-layout="default">
 	<div class="nino-grid-row nino-grid-row--wide">
 		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left">
 			<span class="nino-badge nino-badge--primary">content-section</span> <span class="nino-badge nino-badge--pill">Layout: default</span> <span class="nino-badge nino-badge--pill">Height: 75</span> <span class="nino-badge nino-badge--pill">Alignment: middle</span>
@@ -1249,7 +1249,7 @@
 	</div>
 </section>
 
-<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-frame-hoehe-100" data-demo-preset="content-section" data-demo-layout="default">
+<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-frame-hoehe-100" data-demo-preset="static-content" data-demo-layout="default">
 	<div class="nino-grid-row nino-grid-row--wide">
 		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left">
 			<span class="nino-badge nino-badge--primary">content-section</span> <span class="nino-badge nino-badge--pill">Layout: default</span> <span class="nino-badge nino-badge--pill">Height: 100</span> <span class="nino-badge nino-badge--pill">Alignment: bottom</span>

@@ -17,6 +17,17 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **The shipped pages name the section presets the Template Builder has now.**
+  The feature renamed them so a key names the group an editor looks in, and
+  three files here named the old ones: the demo catalogue's template, in 48
+  `data-demo-preset` attributes, and the `<!-- nino:section -->` markers in
+  `page-home.tpl` and `page-contact.tpl`. A marker whose preset the library
+  does not know is not a library section any more - the panel leaves it on the
+  page and will not edit it - so without this a fresh install's two most
+  visible pages carried a section the builder no longer recognised. Only the
+  `preset` value changed; the section ids beside it are what the generated
+  textfill keys are built from and stay as they are.
+
 - **The workbench manual stops describing a feature it does not own.** The
   Templates section spelled out what the Template Builder composes - the preset
   library, the reusable sections, the quick fill - and then linked the feature's
