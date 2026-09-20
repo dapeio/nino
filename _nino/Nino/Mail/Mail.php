@@ -143,6 +143,8 @@ namespace Nino {
 			if( filter_var( $to, FILTER_VALIDATE_EMAIL ) === false )
 				return false;
 
+			$replyTo = self::_replyToValue( $replyTo );
+
 			// Without a From: the mail goes out as the webserver user
 			// (www-data@some-host), which is the single most reliable way to end
 			// up in a spam folder. The envelope sender (-f) matters just as
@@ -197,6 +199,54 @@ namespace Nino {
 		private static function _headerValue( string $value ): string {
 
 			return trim( str_replace( [ "\r", "\n", "\0" ], '', $value ) );
+		}
+
+		/**
+		 *	A Reply-To header value, or '' where what was given is not one.
+		 *
+		 *	Every other address on a header line here is checked: $to with
+		 *	FILTER_VALIDATE_EMAIL, and refusing the mail outright, and
+		 *	_getSender() the same for From, which it drops rather than "passing
+		 *	something unchecked to sendmail" - its own words. The reply address
+		 *	had neither, and it comes from the same place those two do: an
+		 *	admin-editable textfill, read through renderHtml(). A fill a project
+		 *	never installed renders as its own literal, so
+		 *	'[[/form/email/owner]]' went out as the Reply-To header verbatim -
+		 *	and so did whatever else somebody had typed into the Text panel.
+		 *	That fill is the Form module's install unit's, and the module is one
+		 *	the wizard offers rather than one every project has, so a project
+		 *	running the Newsletter feature without the contact form sent every
+		 *	confirmation mail with a header naming a fill instead of a mailbox.
+		 *
+		 *	Dropped rather than refused: the recipient and the body are fine,
+		 *	and a confirmation nobody receives because the owner mistyped a
+		 *	textfill is worse than one nobody can reply to. Recorded once per
+		 *	mail through the kernel's "record this and carry on" channel, since
+		 *	nothing else would ever tell the operator why replies stopped
+		 *	arriving.
+		 *
+		 *	The display-name form stays whole. 'Max Mustermann
+		 *	<max@example.com>' is a valid value for this header, unlike mail()'s
+		 *	own $to, and it is a plausible thing for a site owner to have
+		 *	typed; only its address part has to hold up.
+		 *
+		 *	@param		string		$replyTo			Already through _headerValue()
+		 *
+		 *	@return 	string
+		 */
+		private static function _replyToValue( string $replyTo ): string {
+
+			if( $replyTo === '' )
+				return '';
+
+			$address = ( preg_match( '/<([^<>]+)>$/', $replyTo, $addressMatch ) === 1 ) ? trim( $addressMatch[1] ) : $replyTo;
+
+			if( filter_var( $address, FILTER_VALIDATE_EMAIL ) !== false )
+				return $replyTo;
+
+			trigger_error( 'Mail: \''. $replyTo. '\' is no reply address - the mail went out without a Reply-To header.', E_USER_WARNING );
+
+			return '';
 		}
 
 		// The address to send as: '/nino/mail/sender' from config.php if set,

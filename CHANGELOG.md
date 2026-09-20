@@ -32,6 +32,21 @@ All notable changes to Nino are documented in this file.
 
 ### Fixed
 
+- **A reply address nothing had checked went out as the `Reply-To` header.**
+  Every other address `\Nino\Mail` puts on a header line is validated - `$to`
+  with `FILTER_VALIDATE_EMAIL`, refusing the mail, and `_getSender()` the same
+  for `From`, which it drops rather than "passing something unchecked to
+  sendmail". The reply address had neither, and it comes from where those two
+  do: an admin-editable textfill read through `renderHtml()`. A fill a project
+  never installed renders as its own literal, so `[[/form/email/owner]]` was
+  sent as the header verbatim - and that fill belongs to the Form module's
+  install unit, which the wizard offers rather than always installs, so a
+  project running the Newsletter feature without the contact form did that on
+  every confirmation mail. It is dropped now, with a line in the error log
+  naming the value; the mail still goes out, because the recipient and the
+  body were never the problem. A real address is untouched, the display-name
+  form included - valid for this header, unlike `mail()`'s own `$to`.
+
 - **Sending a contact form pinned a locale the visitor never chose in their
   session.** The owner's notification goes out in the site's native locale
   whatever language the form was filled in, and `Form::send()` made that switch

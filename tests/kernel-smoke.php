@@ -2285,6 +2285,71 @@ check( 'an invalid address is refused before any transport', \Nino\Mail::send( $
 check( 'a nul byte is dropped from the body and every header value, never thrown at', \Nino\Mail::send( $appData, 'to@example.org', "Sub\0ject", "Hello\0world", "re\0ply@example.org" ) === true
 	&& $taken[2]['body'] === 'Helloworld' && $taken[2]['subject'] === 'Subject' && $taken[2]['replyTo'] === 'reply@example.org' );
 
+/*	The reply address was the one thing on a header line here that nothing
+	checked. $to is validated and refuses the mail; _getSender() validates
+	From and drops it rather than "passing something unchecked to sendmail".
+	The reply address had neither, and it comes from where those two do: an
+	admin-editable textfill read through renderHtml(). A fill the project
+	never installed renders as its own literal, so '[[/form/email/owner]]'
+	went out as the Reply-To header verbatim. That fill belongs to the Form
+	module's install unit and the wizard offers that module rather than
+	installing it always, so a project running the Newsletter feature without
+	the contact form sent every confirmation mail with a header naming a fill.
+
+	It is dropped, not refused: the recipient and the body are fine, and a
+	confirmation nobody receives is worse than one nobody can reply to. This
+	suite silences trigger_error() wholesale, so the line it records is
+	captured around the calls	*/
+// Six more mails than this block budgeted for - a fresh window, the same way
+// the block above opened one
+$rateState = \Nino\Filesystem::getFileContent( $appData, $ratelimitPath, [] );
+unset( $rateState['127.0.0.1'] );
+\Nino\Filesystem::putFileContent( $appData, $ratelimitPath, $rateState );
+unset( $appData['./nino/mail/ratelimited'] );
+
+$replyWarnings = [];
+set_error_handler( static function( int $level, string $message ) use ( &$replyWarnings ): bool { $replyWarnings[] = $message; return true; } );
+
+$replySent = [];
+foreach( [ '[[/form/email/owner]]', 'ask us anything', 'a@example.org, b@example.org', '<script>alert(1)</script>' ] as $notAnAddress )
+	$replySent[$notAnAddress] = \Nino\Mail::send( $appData, 'to@example.org', 'x', 'y', $notAnAddress );
+
+// Six sends, and the per-ip cap is five an hour - a fresh window between the
+// two groups, or the last of them never reaches a transport at all
+$rateState = \Nino\Filesystem::getFileContent( $appData, $ratelimitPath, [] );
+unset( $rateState['127.0.0.1'] );
+\Nino\Filesystem::putFileContent( $appData, $ratelimitPath, $rateState );
+unset( $appData['./nino/mail/ratelimited'] );
+
+$replyKept = [];
+foreach( [ 'reply@example.org', 'Max Mustermann <max@example.org>' ] as $isAnAddress )
+	$replyKept[$isAnAddress] = \Nino\Mail::send( $appData, 'to@example.org', 'x', 'y', $isAnAddress );
+
+restore_error_handler();
+
+$replyHeaders = array_map( static fn( array $mail ): string => (string) $mail['replyTo'], array_slice( $taken, 3 ) );
+
+check( 'an unresolved textfill does not go out as the Reply-To header', ( $replyHeaders[0] ?? null ) === '' );
+check( '...nor does anything else that is not an address', ( $replyHeaders[1] ?? null ) === '' && ( $replyHeaders[2] ?? null ) === '' && ( $replyHeaders[3] ?? null ) === '' );
+check( '...and the mail still goes out - the recipient and the body were never the problem', array_values( $replySent ) === [ true, true, true, true ] );
+check( '...with no Reply-To line on it at all', str_contains( $taken[3]['headers'] ?? '', 'Reply-To:' ) === false );
+check( '...and one recorded line per mail, naming the value, or nothing tells the operator why replies stopped',
+	count( array_filter( $replyWarnings, static fn( string $w ): bool => str_contains( $w, 'is no reply address' ) === true ) ) === 4
+	&& count( array_filter( $replyWarnings, static fn( string $w ): bool => str_contains( $w, '[[/form/email/owner]]' ) === true ) ) === 1 );
+
+// A real address is untouched, and so is the display-name form - valid for
+// this header, unlike mail()'s own $to, and what a site owner types
+check( 'a plain reply address is untouched', ( $replyHeaders[4] ?? null ) === 'reply@example.org' && ( $replyKept['reply@example.org'] ?? false ) === true );
+check( '...and a display-name address keeps its name, because only the address part has to hold up',
+	( $replyHeaders[5] ?? null ) === 'Max Mustermann <max@example.org>'
+	&& str_contains( $taken[8]['headers'] ?? '', "\r\nReply-To: Max Mustermann <max@example.org>" ) === true );
+
+// ...and back to the budget the rest of this block was written against
+$rateState = \Nino\Filesystem::getFileContent( $appData, $ratelimitPath, [] );
+unset( $rateState['127.0.0.1'] );
+\Nino\Filesystem::putFileContent( $appData, $ratelimitPath, $rateState );
+unset( $appData['./nino/mail/ratelimited'] );
+
 // A first transport that leaves sent alone passes the mail on; the one
 // after it decides
 unset( $appData['./nino/callbacks'][ \Nino\Mail::TRANSPORT ] );
