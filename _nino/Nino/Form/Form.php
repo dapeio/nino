@@ -457,8 +457,19 @@ namespace Nino {
 			$owner = $form['to'] !== '' ? $form['to'] : \Nino\Html::renderHtml( $appData, '[[/form/email/owner]]' );
 			$reply = self::_firstEmail( $form, $values );
 
+			/*	useLocale(), not setCurrentLocale(): the owner's mail goes out
+				in the site's native locale, and that is this render's business
+				and nobody's choice. setCurrentLocale() writes what it is given
+				into the visitor's session, so both of these did - and the one
+				below wrote whatever getCurrentLocale() answered, which for a
+				visitor who never picked a locale is the project's default.
+				Sending one inquiry pinned that default in their session, which
+				Locales::init() then reads back and lets win over the project's
+				own: change the native locale afterwards and the visitor who
+				once wrote in keeps getting the old one. init()'s own comment
+				states the rule this broke	*/
 			$visitorLocale = \Nino\Locales::getCurrentLocale( $appData );
-			\Nino\Locales::setCurrentLocale( $appData, \Nino\Locales::getNativeLocale( $appData ) );
+			\Nino\Locales::useLocale( $appData, \Nino\Locales::getNativeLocale( $appData ) );
 
 			$mails = [ [
 				'to'			=> $owner,
@@ -469,7 +480,7 @@ namespace Nino {
 				'replyTo'	=> $reply !== '' ? $reply : $owner,
 			] ];
 
-			\Nino\Locales::setCurrentLocale( $appData, $visitorLocale );
+			\Nino\Locales::useLocale( $appData, $visitorLocale );
 
 			if( $form['confirm'] === true && $reply !== '' )
 				$mails[] = [

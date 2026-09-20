@@ -1976,6 +1976,81 @@ check( 'a mail that did not go out still records where a copy is kept, and the v
 $appData[ \Nino\Form::STORE ] = false;
 $lostRequest = submitForm( $appData, [ 'name' => 'Jo', 'email' => 'jo@example.com', 'message' => 'Hi' ] );
 check( '...and with none kept it is a 500 - nothing has the inquiry', $lostRequest['/nino/http/response']['statusCode'] === 500 && isset( $lostRequest['/nino/http/response']['body'] ) === false );
+/*	The owner's notification goes out in the site's native locale whatever
+	language the visitor wrote in, and that switch was made with
+	setCurrentLocale() - which writes what it is given into the visitor's
+	session. So did the switch back, and what it wrote was whatever
+	getCurrentLocale() answered: for a visitor who never picked a locale,
+	that is the project's default, which Locales::init() takes care never to
+	persist. Its comment says why - "a default nobody chose has no business
+	being written into the visitor's session, where it would then outlive a
+	later change of the project's native locale" - and sending one inquiry
+	was the one thing that wrote it there anyway.
+
+	A fill of its own per locale, because the block above registered
+	[[/form/subject/owner]] for '*': a fill that answers the same in either
+	locale says nothing about which one a mail was rendered in	*/
+unset( $appData['./nino/callbacks'][ \Nino\Mail::TRANSPORT ] );
+$localeMails = [];
+\Nino\Callbacks::registerCallback( $appData, \Nino\Mail::TRANSPORT, static function( array &$appData, array &$mail ) use ( &$localeMails ): void {
+	$localeMails[] = $mail;
+	$mail['sent'] = true;
+} );
+\Nino\Html::addFills( $appData, [ '[[/test/locale/probe]]' => 'deutsch' ], 'de_DE' );
+\Nino\Html::addFills( $appData, [ '[[/test/locale/probe]]' => 'english' ], 'en_US' );
+$appData[ \Nino\Form::FORMS ] = [ [ 'subject' => '[[/test/locale/probe]]', 'ownerTemplate' => '/templates/mail-test', 'userTemplate' => '/templates/mail-test' ] + \Nino\Form::DEFAULT_FORM ];
+\Nino\Filesystem::putFileContent( $appData, '/data/ratelimit.php', [] );
+
+// A visitor who has chosen nothing, on a page that declares no locale of its
+// own: the current locale is the project default (de_DE here), and their
+// session holds no locale at all
+\Nino\Runtime::unsetSessionValue( $appData, './nino/locales/current' );
+\Nino\Locales::useLocale( $appData, \Nino\Locales::getNativeLocale( $appData ) );
+
+$defaultRequest = submitForm( $appData, [ 'name' => 'Jo', 'email' => 'jo@example.com', 'message' => 'Hi' ] );
+check( 'the inquiry is answered as before', $defaultRequest['/nino/http/response']['statusCode'] === 200 );
+check( 'sending one writes no locale into the visitor session', \Nino\Runtime::getSessionValue( $appData, './nino/locales/current', 'unwritten' ) === 'unwritten' );
+
+/*	Which is what makes that write more than untidy: init() reads the session
+	value back and lets it win over the project's own native locale. With the
+	default pinned there, a project that changes its native locale afterwards
+	never reaches the visitor who once wrote in - for as long as their session
+	lives. A copy of the sandbox, so the same session is read by a kernel
+	that boots with a different native locale	*/
+$changedProject = $appData;
+$changedProject['/nino/locales/native'] = 'en_US';
+\Nino\Locales::init( $changedProject );
+check( '...so a later change of the project native locale still reaches them', \Nino\Locales::getCurrentLocale( $changedProject ) === 'en_US' );
+
+// The mail is unchanged by all this: the owner's still renders in the native
+// locale while the visitor keeps reading the site in theirs
+$localeMails = [];
+\Nino\Locales::useLocale( $appData, 'en_US' );
+$visitorRequest = submitForm( $appData, [ 'name' => 'Jo', 'email' => 'jo@example.com', 'message' => 'Hi' ] );
+check( 'the owner mail still goes out in the native locale', $visitorRequest['/nino/http/response']['statusCode'] === 200 && ( $localeMails[0]['subject'] ?? '' ) === 'deutsch' );
+check( '...and the visitor is still reading the site in their own', \Nino\Locales::getCurrentLocale( $appData ) === 'en_US' );
+
+// A locale the visitor did choose is theirs, and a submission leaves it be
+\Nino\Locales::setCurrentLocale( $appData, 'en_US' );
+$localeMails = [];
+$chosenRequest = submitForm( $appData, [ 'name' => 'Jo', 'email' => 'jo@example.com', 'message' => 'Hi' ] );
+check( 'a locale the visitor did choose survives a submission unchanged', $chosenRequest['/nino/http/response']['statusCode'] === 200
+	&& \Nino\Runtime::getSessionValue( $appData, './nino/locales/current', '' ) === 'en_US' );
+check( '...and the owner mail is still the native one', ( $localeMails[0]['subject'] ?? '' ) === 'deutsch' );
+
+// The two switches, side by side: one is a choice and is remembered, the
+// other is this request's business and is not
+\Nino\Locales::setCurrentLocale( $appData, 'de_DE' );
+check( 'setCurrentLocale persists a choice', \Nino\Runtime::getSessionValue( $appData, './nino/locales/current', '' ) === 'de_DE' );
+\Nino\Locales::useLocale( $appData, 'en_US' );
+check( '...and useLocale switches the request without touching the session', \Nino\Locales::getCurrentLocale( $appData ) === 'en_US'
+	&& \Nino\Runtime::getSessionValue( $appData, './nino/locales/current', '' ) === 'de_DE' );
+check( '...and neither takes a locale this project does not have', \Nino\Locales::useLocale( $appData, 'fr_FR' ) === 'en_US'
+	&& \Nino\Locales::setCurrentLocale( $appData, 'fr_FR' ) === 'en_US' );
+
+\Nino\Runtime::unsetSessionValue( $appData, './nino/locales/current' );
+\Nino\Locales::useLocale( $appData, 'de_DE' );
+
 unset( $appData[ \Nino\Form::STORE ], $appData['./nino/callbacks'][ \Nino\Mail::TRANSPORT ], $appData['./nino/html/shortcodes']['template'], $appData['./nino/callbacks']['/nino/html/shortcode/template'] );
 $appData[ \Nino\Form::FORMS ] = $formsBefore;
 @unlink( \Nino\Filesystem::path( $appData, '/templates/mail-test.tpl' ) );

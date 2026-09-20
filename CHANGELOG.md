@@ -21,6 +21,20 @@ All notable changes to Nino are documented in this file.
 
 ### Fixed
 
+- **Sending a contact form pinned a locale the visitor never chose in their
+  session.** The owner's notification goes out in the site's native locale
+  whatever language the form was filled in, and `Form::send()` made that switch
+  - and the switch back - with `Locales::setCurrentLocale()`, which writes what
+  it is given into the visitor's session. What the switch back wrote was
+  whatever `getCurrentLocale()` answered, and for a visitor who has chosen
+  nothing that is the project's default. `Locales::init()` takes care never to
+  persist that default, and says why: it would outlive a later change of the
+  project's native locale. One inquiry wrote it there anyway, and from then on
+  `init()` read it back and let it win - so a project that changed its native
+  locale never reached the visitor who had once written in. The switch is
+  `Locales::useLocale()` now, new beside `setCurrentLocale()`: the same
+  verify-and-apply, for the render this request is doing, remembering nothing.
+
 - **A response body `json_encode()` refused was answered as an empty 200.** It
   returns `false` for a body it cannot encode, `false` went into the response
   body, and `echo false` sends nothing - so the answer was a 200 carrying a json

@@ -33,7 +33,11 @@ namespace Nino {
 			// Assigned directly rather than through setCurrentLocale(): a
 			// default nobody chose has no business being written into the
 			// visitor's session, where it would then outlive a later change of
-			// the project's native locale.
+			// the project's native locale. useLocale() below is that same
+			// intent under a name, for the callers that have one to reach for;
+			// this assignment stands before the fallback it would use means
+			// anything - './nino/locales/current' is still AppData's
+			// hardcoded placeholder at this point, not a locale.
 			$available 	= $appData['/nino/locales/available'] ?? [];
 			$default 		= (string) ( $appData['/nino/locales/native'] ?? '' );
 
@@ -154,15 +158,59 @@ namespace Nino {
 			return in_array( $locale, \Nino\Locales::getAvailableLocales( $appData ) );
 		}
 
+		/**
+		 *	Switch the locale for the rest of this request and remember the
+		 *	choice in the visitor's session, so the next request starts in it.
+		 *
+		 *	For a choice. init()'s own comment says why: a locale nobody
+		 *	picked has no business in the session, where it outlives the
+		 *	reason it was written. A switch that is nobody's choice - a mail
+		 *	rendered in the site's native locale while the visitor's own
+		 *	stays theirs - is useLocale() below.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$locale				The wanted locale id
+		 *
+		 *	@return 	string									The locale now current - the wanted one,
+		 *																	or the one before it where that is not available
+		 */
 		public static function setCurrentLocale( array &$appData, string $locale ): string {
 
-			// Verify, if requested locale is available
-			$appData['./nino/locales/current'] = ( \Nino\Locales::verifyLocale( $appData, $locale ) === true ) ? $locale : \Nino\Locales::getCurrentLocale( $appData );
-			$locale = $appData['./nino/locales/current'];
+			$locale = \Nino\Locales::useLocale( $appData, $locale );
 
 			\Nino\Runtime::setSessionValue( $appData, './nino/locales/current', $locale );
 
 			return $locale;
+		}
+
+		/**
+		 *	Switch the locale for the rest of this request without
+		 *	remembering it - what a render in a locale the visitor did not
+		 *	choose needs, and nothing else.
+		 *
+		 *	\Nino\Form::send() is the caller: the owner's notification goes
+		 *	out in the site's native locale whatever language the visitor
+		 *	filled the form in. Written through setCurrentLocale(), that
+		 *	switch and the switch back both landed in the visitor's session -
+		 *	and the one back wrote whatever getCurrentLocale() had answered,
+		 *	which for a visitor who never chose anything is the project's
+		 *	default. One contact form, and a default nobody picked was pinned
+		 *	in their session for as long as it lives: change the project's
+		 *	native locale afterwards and they still get the old one, because
+		 *	init() reads that session value back and lets it win.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$locale				The wanted locale id
+		 *
+		 *	@return 	string									The locale now current - the wanted one,
+		 *																	or the one before it where that is not available
+		 */
+		public static function useLocale( array &$appData, string $locale ): string {
+
+			// Verify, if requested locale is available
+			$appData['./nino/locales/current'] = ( \Nino\Locales::verifyLocale( $appData, $locale ) === true ) ? $locale : \Nino\Locales::getCurrentLocale( $appData );
+
+			return $appData['./nino/locales/current'];
 		}
 	}
 }
