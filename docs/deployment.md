@@ -266,6 +266,16 @@ Error messages should not expose file paths, configuration values, or stack trac
 
 That log is `private/data/logs.<YYYY-MM>.php`, one file per month, with entries older than three months dropped. The workbench's Logs panel reads it - and when the workbench is the thing that is broken, so does any file manager. It is where the reason for a bare `500` is, which on a production host is the only place it is: `/nino/error/display` is off, so the browser gets nothing but the status.
 
+**The address mails go out as** is the textfill `/form/email/owner`, which the base unit ships as `[[/company/email]]` - so by default every mail this site sends carries the mailbox the project already named, in the `From` header and as the envelope sender. Change it in the Text panel where replies should reach somewhere else; the company address stays what it is.
+
+That address has to be one the sending host may send for. SPF and DMARC are checked against the envelope sender, so a mailbox on a domain this server does not send for is what turns a delivered mail into a rejected or a filtered one - and nothing on the site reports that, because the refusal happens at the receiving end. Where the two differ, `/nino/mail/sender` in `config.php` is the envelope sender and `/form/email/owner` stays the mailbox replies reach:
+
+```php
+'/nino/mail/sender' => 'no-reply@your-host.example',
+```
+
+Left unset, both are the textfill. Set to something that is not an address, it is ignored and the fill answers again; where neither is one, the mail goes out with no `From` at all, which is the most reliable way there is to land in a spam folder.
+
 ## Secure the Workbench
 
 Before go-live, the accounts must work and have strong passwords:

@@ -1,5 +1,7 @@
 <?php return [
-	'[[/form/email/owner]]' => 'contact@example.com',
+	/*	'[[/form/email/owner]]' is the base unit's now. Every mail the kernel
+		sends reads it, not only this module's, and a module a project may
+		decline is the wrong place for a value the framework depends on	*/
 	'[[/mail/style/color/primary]]' => '#4faae8',
 	'[[/mail/style/color/text]]' => '#333333',
 	'[[/mail/style/color/background]]' => '#ffffff',

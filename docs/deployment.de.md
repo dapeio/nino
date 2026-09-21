@@ -269,6 +269,16 @@ Fehlermeldungen sollten im Browser keine Dateipfade, Konfigurationswerte oder St
 
 Dieses Log ist `private/data/logs.<YYYY-MM>.php`, eine Datei pro Monat, Einträge älter als drei Monate fallen heraus. Das Logs-Panel der Workbench liest es – und wenn die Workbench selbst das Kaputte ist, tut es jeder Dateimanager. Dort steht der Grund für einen nackten `500`, und auf einem Produktivsystem ist das der einzige Ort: `/nino/error/display` ist aus, der Browser bekommt also nichts als den Status.
 
+**Die Adresse, unter der Mails hinausgehen,** ist der Textfill `/form/email/owner`, den das Basis-Unit als `[[/company/email]]` mitbringt – standardmäßig trägt also jede Mail dieser Seite das Postfach, das das Projekt ohnehin genannt hat, im `From`-Header und als Envelope-Sender. Ändern Sie ihn im Panel Texte, wenn Antworten woanders ankommen sollen; die Firmenadresse bleibt, was sie ist.
+
+Diese Adresse muss eine sein, für die der sendende Host senden darf. SPF und DMARC werden gegen den Envelope-Sender geprüft, ein Postfach auf einer Domain, für die dieser Server nicht sendet, macht also aus einer zugestellten Mail eine abgelehnte oder gefilterte – und nichts auf der Seite meldet das, weil die Ablehnung auf der Empfängerseite passiert. Wo die beiden auseinandergehen, ist `/nino/mail/sender` in `config.php` der Envelope-Sender und `/form/email/owner` bleibt das Postfach, das Antworten erreicht:
+
+```php
+'/nino/mail/sender' => 'no-reply@ihr-host.example',
+```
+
+Ungesetzt sind beide der Textfill. Steht dort etwas, das keine Adresse ist, wird es übergangen und der Fill antwortet wieder; ist keines von beiden eine, geht die Mail ganz ohne `From` hinaus – der zuverlässigste Weg in einen Spam-Ordner, den es gibt.
+
 ## Die Workbench absichern
 
 Vor dem Go-live müssen die Konten funktionieren und starke Passwörter haben:

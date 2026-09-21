@@ -17,6 +17,20 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **The mailbox every mail is sent from moved to the base install unit, as a
+  fill.** `\Nino\Mail::_getSender()` reads `[[/form/email/owner]]` for the
+  `From` header and the envelope sender of every mail the framework sends, and
+  that fill shipped with the **Form module's** install unit - which the wizard
+  offers rather than installs. A project that did not pick that module had
+  neither header, and a mail without a `From` goes out as the webserver user,
+  which is the most reliable way there is to land in a spam folder. It is the
+  base unit's now, so every project has it, and its value is
+  `[[/company/email]]` rather than a placeholder address: by default the
+  mailbox the project already named, changed in one place when replies should
+  reach another. `/nino/mail/sender` still wins where the envelope sender has
+  to differ from it for SPF, and `docs/deployment.md` now says so - it was in
+  no document at all before, only in the two lines of `Mail.php` that read it.
+
 - **The shipped pages name the section presets the Template Builder has now.**
   The feature renamed them so a key names the group an editor looks in, and
   three files here named the old ones: the demo catalogue's template, in 48

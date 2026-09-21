@@ -2339,6 +2339,57 @@ check( '...and one recorded line per mail, naming the value, or nothing tells th
 
 // A real address is untouched, and so is the display-name form - valid for
 // this header, unlike mail()'s own $to, and what a site owner types
+/*	Where the From header and the envelope sender come from, which is one
+	textfill for every mail this framework sends. It is shipped as
+	'[[/company/email]]' rather than as an address, so the normal case is the
+	mailbox the project already named - one answer, in one place - and an
+	operator who needs another one overwrites the key without touching the
+	company address. A chained fill, and this is the check that it resolves:
+	a value nobody resolves is a From header reading '[[/company/email]]'	*/
+$senderBefore = $appData['/nino/mail/sender'] ?? null;
+unset( $appData['/nino/mail/sender'] );
+\Nino\Html::addFills( $appData, [ '[[/company/email]]' => 'hallo@example.com', '[[/form/email/owner]]' => '[[/company/email]]' ], '*' );
+
+$rateState = \Nino\Filesystem::getFileContent( $appData, $ratelimitPath, [] );
+unset( $rateState['127.0.0.1'] );
+\Nino\Filesystem::putFileContent( $appData, $ratelimitPath, $rateState );
+unset( $appData['./nino/mail/ratelimited'] );
+
+$chained = [];
+$chainedTransport = static function( array &$appData, array &$mail ) use ( &$chained ): void { $chained[] = $mail; $mail['sent'] = true; };
+$transportBefore = $appData['./nino/callbacks'][ \Nino\Mail::TRANSPORT ] ?? null;
+unset( $appData['./nino/callbacks'][ \Nino\Mail::TRANSPORT ] );
+\Nino\Callbacks::registerCallback( $appData, \Nino\Mail::TRANSPORT, $chainedTransport );
+
+\Nino\Mail::send( $appData, 'to@example.org', 'x', 'y', '' );
+check( 'the sender is the company address the owner fill points at', ( $chained[0]['sender'] ?? null ) === 'hallo@example.com' );
+check( '...and reaches the From header as an address, not as the fill it was written as', str_contains( $chained[0]['headers'] ?? '', "\r\nFrom: hallo@example.com" ) === true );
+
+// An operator who needs a different mailbox overwrites the one key
+\Nino\Html::addFills( $appData, [ '[[/form/email/owner]]' => 'kontakt@example.org' ], '*' );
+$chained = [];
+\Nino\Mail::send( $appData, 'to@example.org', 'x', 'y', '' );
+check( 'overwriting that one key changes the sender and nothing else', ( $chained[0]['sender'] ?? null ) === 'kontakt@example.org'
+	&& \Nino\Html::renderHtml( $appData, '[[/company/email]]' ) === 'hallo@example.com' );
+
+/*	...and '/nino/mail/sender' still wins over both, because the envelope
+	sender has to be an address the sending host may send for (spf/dmarc),
+	which is not necessarily the mailbox replies should reach	*/
+$appData['/nino/mail/sender'] = 'no-reply@example.net';
+$chained = [];
+\Nino\Mail::send( $appData, 'to@example.org', 'x', 'y', '' );
+check( 'config.php\'s own sender still wins over the fill', ( $chained[0]['sender'] ?? null ) === 'no-reply@example.net' );
+
+unset( $appData['/nino/mail/sender'], $appData['./nino/callbacks'][ \Nino\Mail::TRANSPORT ] );
+if( $senderBefore !== null )
+	$appData['/nino/mail/sender'] = $senderBefore;
+if( $transportBefore !== null )
+	$appData['./nino/callbacks'][ \Nino\Mail::TRANSPORT ] = $transportBefore;
+$rateState = \Nino\Filesystem::getFileContent( $appData, $ratelimitPath, [] );
+unset( $rateState['127.0.0.1'] );
+\Nino\Filesystem::putFileContent( $appData, $ratelimitPath, $rateState );
+unset( $appData['./nino/mail/ratelimited'] );
+
 check( 'a plain reply address is untouched', ( $replyHeaders[4] ?? null ) === 'reply@example.org' && ( $replyKept['reply@example.org'] ?? false ) === true );
 check( '...and a display-name address keeps its name, because only the address part has to hold up',
 	( $replyHeaders[5] ?? null ) === 'Max Mustermann <max@example.org>'

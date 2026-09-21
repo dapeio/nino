@@ -1190,6 +1190,28 @@ $themeCss 	= (string) file_get_contents( $baseUnit. '/assets/theme.css' );
 check( 'the base unit ships the one stylesheet the css bundle names, and copies the directory it is in', is_file( $baseUnit. '/assets/theme.css' ) === true
 	&& in_array( 'assets', $baseFiles, true ) === true );
 
+/*	And the mailbox every mail this framework sends is addressed from.
+	\Nino\Mail::_getSender() reads '[[/form/email/owner]]' for the From header
+	and the envelope sender of every one of them, and that fill used to ship
+	with the Form module's own install unit - which the wizard offers rather
+	than installs (see Install::units()). A project that did not pick that
+	module had neither header, and a mail without a From goes out as the
+	webserver user, which _getSender()'s own comment calls the most reliable
+	way there is to land in a spam folder	*/
+$baseGlobal = (array) ( include $baseUnit. '/text/global.php' );
+$formGlobal = (array) ( include $realRoot. '/_nino/Nino/Modules/Form/install/text/global.php' );
+
+check( 'the base unit ships the mailbox every mail is sent from', isset( $baseGlobal['[[/form/email/owner]]'] ) === true );
+check( '...and it is the only unit that does, so no unit order decides its value', isset( $formGlobal['[[/form/email/owner]]'] ) === false );
+
+/*	As a fill rather than an address: the normal case is the one the project
+	already gave, so there is one answer in one place and changing it changes
+	both. An operator who needs a different one overwrites this key and the
+	company address stays what it is	*/
+check( '...with the company address as its value', $baseGlobal['[[/form/email/owner]]'] === '[[/company/email]]' );
+check( '...which the same unit ships, or it would resolve to nothing', isset( $baseGlobal['[[/company/email]]'] ) === true
+	&& str_contains( (string) $baseGlobal['[[/company/email]]'], '[[' ) === false );
+
 preg_match_all( '#url\(["\']?\[\[/nino/public\]\](/fonts/[^)"\']+)#', $themeCss, $themeFonts );
 check( 'and every webfont it @font-faces', count( $themeFonts[1] ) > 0
 	&& array_values( array_filter( array_unique( $themeFonts[1] ), fn( string $font ): bool => is_file( $baseUnit. $font ) === false ) ) === [] );
