@@ -559,6 +559,54 @@ Object.keys( TOOL_TEMPLATES ).forEach( function( tool ) {
 	} );
 } );
 
+/*	A tag carries one attribute of any given name, and the html parser enforces
+	that by keeping the first and dropping every repeat as a parse error - in
+	silence. Three <svg> of the shell's theme toggle opened with
+	class="admin-theme-toggle-*" and carried a second class="lucide ..." at the
+	other end of the tag; measured in headless Chromium, they reached the dom
+	with ten attributes rather than eleven and not one lucide class between
+	them. Nothing reads those classes today, which is why it could sit there
+	unnoticed - written the other way round, the same mistake takes the whole
+	theme toggle off the screen. So the sweep is over every template rather
+	than over that one file.	*/
+const templateFiles = [];
+( function collect( dir ) {
+	fs.readdirSync( path.join( cssRoot, dir ), { withFileTypes : true } ).forEach( function( entry ) {
+		const relative = dir === '' ? entry.name : dir+ '/'+ entry.name;
+		if( entry.isDirectory() === true ) {
+			// data/ is generated, .git/ and node_modules/ are not ours
+			if( [ '.git', 'data', 'node_modules' ].indexOf( entry.name ) === -1 )
+				collect( relative );
+			return;
+		}
+		if( entry.name.endsWith('.tpl') )
+			templateFiles.push( relative );
+	} );
+} )( '' );
+
+const repeatedAttributes = [];
+templateFiles.forEach( function( file ) {
+	read( file ).split('\n').forEach( function( line, index ) {
+		const tags = /<[a-zA-Z][-\w:]*((?:\s+[-\w:]+(?:\s*=\s*(?:"[^"]*"|'[^']*'))?)*)\s*\/?>/g;
+		let tag;
+		while( ( tag = tags.exec( line ) ) !== null ) {
+			const names = [];
+			const attributes = /([-\w:]+)(?:\s*=\s*(?:"[^"]*"|'[^']*'))?/g;
+			let attribute;
+			while( ( attribute = attributes.exec( tag[1] ) ) !== null )
+				names.push( attribute[1].toLowerCase() );
+			names.forEach( function( name, at ) {
+				if( names.indexOf( name ) !== at )
+					repeatedAttributes.push( file+ ':'+ ( index + 1 )+ ' @'+ name );
+			} );
+		}
+	} );
+} );
+
+check( 'every template was found and read', templateFiles.length > 10 && templateFiles.indexOf('_admin/templates/page-index.tpl') !== -1 );
+check( 'no element in any template carries the same attribute twice'
+	+ ( repeatedAttributes.length ? ' - '+ repeatedAttributes.slice( 0, 5 ).join(', ') : '' ), repeatedAttributes.length === 0 );
+
 const editorHeader = read('_admin/templates/html-header.tpl');
 check( 'the Editor document shell uses current HTML without IE conditionals', /^<!doctype html>\s*<html lang="\[\[\/website\/lang\]\]">/.test( editorHeader )
 	&& editorHeader.includes('X-UA-Compatible') === false

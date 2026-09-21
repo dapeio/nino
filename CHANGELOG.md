@@ -57,6 +57,23 @@ All notable changes to Nino are documented in this file.
 
 ### Fixed
 
+- **Three icons of the shell carried two `class` attributes each.** The theme
+  toggle's sun, moon and system `<svg>` in `page-index.tpl` opened with
+  `class="admin-theme-toggle-*"` and carried a second
+  `class="lucide lucide-…"` at the other end of the same tag. A tag holds one
+  attribute of any given name: the html parser keeps the first and drops every
+  repeat as a parse error, without saying so. Measured in headless Chromium
+  against the shipped markup - the three elements reached the dom with ten
+  attributes rather than eleven, and `#admin-theme-toggle .lucide` matched
+  nothing at all. Nothing reads the lucide classes today, which is why this
+  could sit there unnoticed; written in the other order it is the whole theme
+  toggle going blank, since `admin-theme-toggle-system`, `-dark` and `-light`
+  are what the stylesheet switches the three icons on. The two attributes are
+  now one, in the place every other icon of the file keeps it, and the
+  measurement finds all three lucide classes back. `tests/admin-lists-js-smoke.js`
+  sweeps every `.tpl` in the checkout for a tag carrying the same attribute
+  twice rather than only this file.
+
 - **The login form never took back what it had marked.** `login.js` outlines
   the field it refuses - the login screen is the one place with no per-field
   error text, only "that pair was wrong" - and it added that outline without
