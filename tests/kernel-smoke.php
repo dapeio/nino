@@ -1625,6 +1625,53 @@ check( 'writeContentData() surfaces a failed config.php write via trigger_error(
 echo "\n";
 
 
+// --- AppData::writeContentData - a key the request does not carry -------------
+
+echo "AppData::writeContentData - a key the request does not carry\n";
+
+/*	Regression: the loop persisted '$appData[$key] ?? null' for every key it
+	was handed, so a caller naming one its own appData never carried stored an
+	explicit null - and a stored null is not an absent key. AppData::init()
+	merges config.php *over* DEFAULTS key by key, so that null shadowed the
+	framework default on every later boot, for the life of the file	*/
+$absentKey = $buildAppData();
+unset( $absentKey['/nino/cache/ttl'] );
+\Nino\AppData::writeContentData( $absentKey, [ '/nino/cache/ttl' ] );
+
+$absentOnDisk = include $sandbox. '/private/config.php';
+check( 'a key the request does not carry is not persisted as null', array_key_exists( '/nino/cache/ttl', $absentOnDisk ) === false );
+check( '...so the next boot still reads the framework default', ( $buildAppData()['/nino/cache/ttl'] ?? null ) === \Nino\AppData::DEFAULTS['/nino/cache/ttl'] );
+
+// The other half of the same rule: naming a key that is gone from the
+// request is how a value is taken back out of config.php - absent in
+// memory, absent in the file
+$storedTtl = $buildAppData();
+$storedTtl['/nino/cache/ttl'] = 60;
+\Nino\AppData::writeContentData( $storedTtl, [ '/nino/cache/ttl' ] );
+$withTtl = include $sandbox. '/private/config.php';
+
+$droppedTtl = $buildAppData();
+unset( $droppedTtl['/nino/cache/ttl'] );
+\Nino\AppData::writeContentData( $droppedTtl, [ '/nino/cache/ttl' ] );
+$withoutTtl = include $sandbox. '/private/config.php';
+
+check( 'a value the request dropped is removed from the file rather than nulled', ( $withTtl['/nino/cache/ttl'] ?? null ) === 60
+	&& array_key_exists( '/nino/cache/ttl', $withoutTtl ) === false );
+
+// The accounts are deliberately not in that rule - '/nino/auth/user' is
+// merged three ways, where a record missing from this request's copy is a
+// deletion the merge decides about rather than an absence
+$accountsBefore	= ( include $sandbox. '/private/config.php' )['/nino/auth/user'] ?? [];
+$noAccounts			= $buildAppData();
+unset( $noAccounts['/nino/auth/user'] );
+\Nino\AppData::writeContentData( $noAccounts, [ '/nino/auth/user' ] );
+$accountsAfter = ( include $sandbox. '/private/config.php' )['/nino/auth/user'] ?? null;
+
+check( 'the accounts key is still written by its own merge, not removed', $accountsBefore !== [] && is_array( $accountsAfter ) === true );
+
+echo "\n";
+
+
 // --- Csrf ------------------------------------------------------------
 
 echo "Csrf::getToken / rotateToken / callbackResponse (kernel, required) / Modules\\Csrf::doShortcode (optional)\n";

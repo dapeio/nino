@@ -57,6 +57,22 @@ All notable changes to Nino are documented in this file.
 
 ### Fixed
 
+- **A key a request did not carry was persisted as null, and a stored null is
+  not an absent key.** `AppData::writeContentData()` wrote `$appData[$key] ??
+  null` for every key it was handed, so a caller naming one its own appData
+  never carried - or one it deliberately unset - stored an explicit null in
+  config.php. `AppData::init()` merges that file *over* `AppData::DEFAULTS` key
+  by key, where a key the file does not carry leaves the framework default
+  standing and a key carrying null overwrites it. One such write, and
+  `/nino/cache/ttl` was null on every later boot for the life of the file
+  instead of the 3600 the project never decided against - with nothing in the
+  file, the panel or the log to say where the value had gone. A named key the
+  request does not carry is taken back out of config.php now: absent in memory,
+  absent on disk, which is what unsetting one before naming it already meant.
+  The accounts remain the exception they were - a record missing from a
+  request's own `/nino/auth/user` is a deletion its three-way merge has to
+  decide about, not an absence.
+
 - **A feature's manifest could pull the transients into every backup.**
   `\Nino\Backup`'s docblock calls `auth-tries.php` and `ratelimit.php`
   transient throttling counters rather than data, and they were kept out by

@@ -256,6 +256,9 @@ namespace Nino {
 		// Returns whether the write happened - under Nino's own error handler the
 		// E_USER_ERROR above already ended the request, so the false only ever
 		// reaches a caller running with a handler that continues (the tests).
+		//
+		// A named key the given appData does not carry is taken out of
+		// config.php rather than written into it - see the loop below.
 		public static function writeContentData( array &$appData, array $keys ): bool {
 
 			if( \Nino\Filesystem::lockFile( $appData, '/config.php' ) === false ) {
@@ -265,10 +268,34 @@ namespace Nino {
 
 			$written = \Nino\Filesystem::mutate( $appData, '/config.php', function( array $content, array &$appData ) use ( $keys ): array {
 
-				foreach( $keys as $key )
+				foreach( $keys as $key ) {
+
+					/*	A key this request does not carry is nothing to persist,
+						and writing it out as null was not the same thing: init()
+						merges config.php *over* DEFAULTS key by key, so a stored
+						null overwrites the framework default where a key the file
+						does not carry at all leaves it standing. One caller naming
+						a key it never assigned was enough to make '/nino/cache/ttl'
+						null on every later boot for the life of the file, instead
+						of the 3600 the project never decided against.
+
+						Taken back out of the file instead: absent in memory, absent
+						on disk, which is also what a caller that unsets a key before
+						naming it here already meant by it.
+
+						The accounts are the one exception and stay below - a record
+						missing from this request's copy of '/nino/auth/user' is a
+						deletion the three-way merge has to decide about, not an
+						absence.	*/
+					if( $key !== '/nino/auth/user' && array_key_exists( $key, $appData ) === false ) {
+						unset( $content[$key] );
+						continue;
+					}
+
 					$content[$key] = ( $key === '/nino/auth/user' )
 						? self::_mergeAuthUsers( $appData['./nino/auth/baseline'] ?? [], $content[$key] ?? [], $appData[$key] ?? [], $appData['./nino/auth/revoked'] ?? [] )
 						: ( $appData[$key] ?? null );
+				}
 
 				return $content;
 			} );
