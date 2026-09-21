@@ -625,6 +625,13 @@ $corrupted['/nino/auth/user'] = [];
 \Nino\Filesystem::putFileContent( $appData, '/config.php', $corrupted );
 check( 'the simulated corruption actually wiped the user record', \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/auth/user'] === [] );
 
+// What a restore leaves in the system's temp directory: tempnam() creates the
+// file it names, and both the restore and its safety snapshot went on to work
+// on that name plus a suffix - the file tempnam() made was never removed, two
+// per restore, for the life of the server
+$tempFiles	= static fn(): int => count( glob( sys_get_temp_dir(). '/ninorestore*' ) ?: [] ) + count( glob( sys_get_temp_dir(). '/ninosnapshot*' ) ?: [] );
+$tempBefore	= $tempFiles();
+
 $_POST['data'] = json_encode( [ 'date' => $dates[0] ] );
 $restoreRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Modules\Backups\Admin::apiRestore( $appData, $restoreRequest );
@@ -662,6 +669,38 @@ $boundRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Modules\Backups\Admin::apiRestore( $appData, $boundRequest );
 check( 'a restore keeps the newest three snapshots and drops the rest', count( glob( $backupDir. '/pre-restore-*.php' ) ?: [] ) === 3 );
 
+check( 'three restores left nothing behind in the temp directory - neither their own file nor the snapshot\'s', $tempFiles() === $tempBefore );
+
+/*	An archive that decrypts but is not one: a backup file somebody truncated
+	or replaced, encrypted with the project's own key so that it passes the
+	one check before unpacking. PharData threw out of restore(), which the
+	panel answered as a 500 with nothing said - and the staging directory and
+	the archive it had written stayed in the temp directory as well. Through
+	a try/catch so the old answer is a failed check rather than the end of
+	this suite	*/
+$backupKey = base64_decode( substr( (string) file_get_contents( $sandbox. '/private/.auth/backup-key.php' ), strlen( "<?php http_response_code(403); exit; return '" ), -strlen( "';\n" ) ), true );
+$garbageIv = random_bytes( 12 ); $garbageTag = '';
+$garbage	 = openssl_encrypt( 'this is not a tar.gz', 'aes-256-gcm', (string) $backupKey, OPENSSL_RAW_DATA, $garbageIv, $garbageTag );
+file_put_contents( $backupDir. '/2020-01-01.php', "<?php http_response_code(403); exit; return '". base64_encode( $garbageIv. $garbageTag. $garbage ). "';\n" );
+
+$_POST['data'] = json_encode( [ 'date' => '2020-01-01' ] );
+$garbageRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+$garbageOutcome = ( static function() use ( &$appData, &$garbageRequest ): string {
+	try {
+		\Nino\Modules\Backups\Admin::apiRestore( $appData, $garbageRequest );
+		return 'answered';
+	}
+	catch( \Throwable $e ) {
+		return $e::class;
+	}
+} )();
+
+check( 'a backup that is not an archive is answered, not thrown', $garbageOutcome === 'answered' && $garbageRequest['/nino/http/response']['statusCode'] === 500
+	&& str_contains( (string) ( $garbageRequest['/nino/http/response']['body']['error'] ?? '' ), 'could not be unpacked' ) === true );
+check( '...and leaves nothing behind either - the staging directory included', $tempFiles() === $tempBefore );
+
+unlink( $backupDir. '/2020-01-01.php' );
+
 // Back to the state the checks below read
 $_POST['data'] = json_encode( [ 'date' => $dates[0] ] );
 $backRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
@@ -675,8 +714,9 @@ $backRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 // with "config.php exists but did not return an array" for everybody until
 // the write finished. Written beside it and renamed over it, a reader sees
 // one file or the other
+// The half of restore() that writes: everything from the unpacking on
 $restoreSource	= (string) file_get_contents( __DIR__. '/../_admin/Nino/Modules/Backups/Admin/Admin.php' );
-$restoreBody		= substr( $restoreSource, strpos( $restoreSource, 'public static function restore(' ) ?: 0 );
+$restoreBody		= substr( $restoreSource, strpos( $restoreSource, 'private static function _restoreFrom(' ) ?: 0 );
 $restoreBody		= substr( $restoreBody, 0, strpos( $restoreBody, "\n\t\t}" ) ?: strlen( $restoreBody ) );
 
 check( 'a restore replaces config.php atomically, not in place', str_contains( $restoreBody, 'file_put_contents( $configPath' ) === false

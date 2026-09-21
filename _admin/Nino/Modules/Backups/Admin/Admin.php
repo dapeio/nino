@@ -293,16 +293,74 @@ namespace Nino\Modules\Backups {
 				return [ 500, 'decryption failed' ];
 			}
 
-			self::_safetySnapshot( $appData, $dir, $key );
+			// The way back out, before anything is touched - and a snapshot
+			// that cannot be made is a restore that does not start
+			try {
+				self::_safetySnapshot( $appData, $dir, $key );
+			}
+			catch( \RuntimeException $e ) {
+				return [ 500, 'the safety snapshot could not be made: '. $e->getMessage() ];
+			}
 
-			$configPath	= \Nino\Filesystem::getConfigPath( $appData );
-			$tmpGz 			= tempnam( sys_get_temp_dir(), 'ninorestore' ). '.tar.gz';
-			$staging		= sys_get_temp_dir(). '/ninorestore-'. bin2hex( random_bytes( 8 ) );
+			/*	tempnam() creates the file it names, and the archive was written
+				beside it under that name plus '.tar.gz' - so the file tempnam()
+				made stayed behind, one per restore, for the life of the server
+				(885 of them in this container's temp directory from the test
+				runs alone, the snapshot's included). And nothing below was
+				checked or caught: an archive PharData could not read threw out
+				of here, past the staging directory and the archive it had
+				written, both left standing as well, and the panel answered a
+				500 with nothing said. Everything this makes is removed on every
+				way out now, and what fails answers a sentence	*/
+			$tmpBase = tempnam( sys_get_temp_dir(), 'ninorestore' );
+			if( $tmpBase === false )
+				return [ 500, 'the temporary restore file could not be created' ];
 
-			file_put_contents( $tmpGz, $gz );
-			mkdir( $staging, 0755, true );
-			( new \PharData( $tmpGz ) )->extractTo( $staging, null, true );
-			unlink( $tmpGz );
+			$tmpGz 		= $tmpBase. '.tar.gz';
+			$staging	= sys_get_temp_dir(). '/ninorestore-'. bin2hex( random_bytes( 8 ) );
+
+			try {
+				return self::_restoreFrom( $appData, $gz, $tmpGz, $staging );
+			}
+			finally {
+				@unlink( $tmpBase );
+				@unlink( $tmpGz );
+				if( is_dir( $staging ) === true )
+					\Nino\Filesystem::removeDir( $staging );
+			}
+		}
+
+		/**
+		 *	Unpack the decrypted archive into the staging directory and copy
+		 *	it over the project - restore()'s own second half, with the temp
+		 *	files it works on removed by restore() whichever way this leaves
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$gz						The decrypted .tar.gz bytes
+		 *	@param		string		$tmpGz				Where to write them for PharData
+		 *	@param		string		$staging			Where to unpack them, not existing yet
+		 *
+		 *	@return 	true|array							true, or [ http status, message ]
+		 */
+		private static function _restoreFrom( array &$appData, string $gz, string $tmpGz, string $staging ): true|array {
+
+			if( @file_put_contents( $tmpGz, $gz ) !== strlen( $gz ) )
+				return [ 500, 'the backup could not be written for unpacking' ];
+
+			if( @mkdir( $staging, 0755, true ) === false )
+				return [ 500, 'the restore staging directory could not be created' ];
+
+			// PharData throws for an archive it cannot read - a file somebody
+			// truncated or replaced that still decrypts - and a throw here was
+			// a 500 the panel could not explain
+			try {
+				( new \PharData( $tmpGz ) )->extractTo( $staging, null, true );
+			}
+			catch( \Throwable $e ) {
+				return [ 500, 'the backup could not be unpacked: '. $e->getMessage() ];
+			}
+
+			$configPath = \Nino\Filesystem::getConfigPath( $appData );
 
 			// config.php belongs under configPath, not root - see
 			// \Nino\Filesystem::getConfigPath()'s docblock. Extracting it straight
@@ -363,8 +421,6 @@ namespace Nino\Modules\Backups {
 					@copy( $entry, $target );
 			}
 
-			\Nino\Filesystem::removeDir( $staging );
-
 			// extractTo()/copyDir() write straight to disk, bypassing Filesystem's own
 			// cache tracking entirely - drop it so any getFileContent() call
 			// later in this same request (or a request landing in the same
@@ -396,24 +452,60 @@ namespace Nino\Modules\Backups {
 		 */
 		private static function _safetySnapshot( array &$appData, string $dir, string $key ): void {
 
-			$tmpTar = tempnam( sys_get_temp_dir(), 'ninosnapshot' ). '.tar';
-			$phar 	= new \PharData( $tmpTar );
+			/*	The shape Backups::_create() has, which this had drifted from:
+				the file tempnam() makes was never removed - one per restore,
+				for the life of the server - and a file the manifest names but
+				that cannot be read was false into addFromString(), a TypeError
+				out of the panel with the temp files left behind. Everything
+				this makes is removed on every way out, and what cannot be read
+				or written throws, which restore() answers as a refusal before
+				it touches anything	*/
+			$tmpBase = tempnam( sys_get_temp_dir(), 'ninosnapshot' );
+			if( $tmpBase === false )
+				throw new \RuntimeException( 'the temporary snapshot file could not be created' );
 
-			foreach( \Nino\Backup::manifest( $appData ) as $absolute => $archiveName )
-				$phar->addFromString( $archiveName, file_get_contents( $absolute ) );
+			$tmpTar = $tmpBase. '.tar';
+			@unlink( $tmpBase );
 
-			$phar->compress( \Phar::GZ );
-			unset( $phar );
-			unlink( $tmpTar );
+			try {
+				$phar = new \PharData( $tmpTar );
 
-			$gz = file_get_contents( $tmpTar. '.gz' );
-			unlink( $tmpTar. '.gz' );
+				foreach( \Nino\Backup::manifest( $appData ) as $absolute => $archiveName ) {
+					$bytes = @file_get_contents( $absolute );
+					if( $bytes === false )
+						throw new \RuntimeException( 'a file could not be read: '. $archiveName );
+					$phar->addFromString( $archiveName, $bytes );
+				}
 
-			$iv 		= random_bytes( 12 );
-			$tag 		= '';
-			$cipher = openssl_encrypt( $gz, 'aes-256-gcm', $key, OPENSSL_RAW_DATA, $iv, $tag );
+				$phar->compress( \Phar::GZ );
+				unset( $phar );
 
-			file_put_contents( $dir. '/pre-restore-'. date( 'Y-m-d-His' ). '.php', self::STUB_PREFIX. base64_encode( $iv. $tag. $cipher ). self::STUB_SUFFIX );
+				$gz = @file_get_contents( $tmpTar. '.gz' );
+				if( $gz === false )
+					throw new \RuntimeException( 'the compressed snapshot could not be read' );
+
+				$iv 		= random_bytes( 12 );
+				$tag 		= '';
+				$cipher = openssl_encrypt( $gz, 'aes-256-gcm', $key, OPENSSL_RAW_DATA, $iv, $tag );
+				if( $cipher === false )
+					throw new \RuntimeException( 'the snapshot could not be encrypted' );
+
+				$snapshot	= $dir. '/pre-restore-'. date( 'Y-m-d-His' ). '.php';
+				$stub			= self::STUB_PREFIX. base64_encode( $iv. $tag. $cipher ). self::STUB_SUFFIX;
+				$temp			= $snapshot. '.'. bin2hex( random_bytes( 6 ) ). '.tmp';
+
+				// Renamed into place like a backup itself: a snapshot the list
+				// offers is a whole one or none
+				if( @file_put_contents( $temp, $stub ) !== strlen( $stub ) || @rename( $temp, $snapshot ) === false ) {
+					@unlink( $temp );
+					throw new \RuntimeException( 'the snapshot could not be written' );
+				}
+			}
+			finally {
+				@unlink( $tmpBase );
+				@unlink( $tmpTar );
+				@unlink( $tmpTar. '.gz' );
+			}
 
 			self::_pruneSnapshots( $dir );
 		}

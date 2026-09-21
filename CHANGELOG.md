@@ -57,6 +57,20 @@ All notable changes to Nino are documented in this file.
 
 ### Fixed
 
+- **A restore left two files behind in the temp directory every time, and
+  threw on a backup it could not unpack.** `tempnam()` creates the file it
+  names, and both the restore and the safety snapshot it takes first went on
+  to work on that name plus a suffix - the file `tempnam()` made was never
+  removed: two per restore, for the life of the server. And nothing on the
+  way was checked or caught. A backup that decrypts but is not an archive - a
+  file somebody truncated or replaced - made `PharData` throw out of the
+  panel: a 500 with nothing said, and the archive and the staging directory
+  it had written left standing as well. The snapshot had drifted from
+  `Backups::_create()` in the same way, and a file the manifest names but
+  that cannot be read was a TypeError instead of a sentence. Both remove
+  everything they make on every way out now; what fails answers with a reason,
+  and a snapshot that cannot be made is a restore that does not start.
+
 - **A unit file that could not be written was an activation that reported
   success.** `Features::copyFile()` wrote a unit's template with an unchecked
   `file_put_contents()`, and `applyUnit()` answered nothing to `activate()`
