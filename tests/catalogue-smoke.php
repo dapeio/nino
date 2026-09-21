@@ -176,6 +176,104 @@ check( 'timeout and byte cap are clamped', end( $requests )['options'] === [ 'ti
 $answer = \Nino\Fetch::get( $appData, 'https://catalogue.test/missing' );
 check( 'a missing answer comes back as not ok with the error, never as a body', $answer['ok'] === false && $answer['status'] === 404 && $answer['body'] === '' && $answer['error'] === 'http 404' );
 
+/*	The other client: where the curl extension is not there, Fetch falls back
+	to php's own stream wrapper - and that half had no answer for a server that
+	sends its headers, part of a body and then goes quiet. fread() reports a
+	used-up read timeout by answering false, the loop took that for the end of
+	the body, and the truncated answer came back as ok with status 200: a
+	catalogue that is half a json document, an archive that is half an archive,
+	both described as complete. The curl half reports the same stall as a
+	failed transfer (curl_exec() answers false), with no body and the reason in
+	'error', which is the shape this one answers in now.
+
+	Driven against a local socket server rather than a stub: a read timeout is
+	the socket's own behaviour and nothing above it can stand in for it. The
+	server is given as a script because it has to stall in a process of its
+	own while this one reads	*/
+$stallServer = $sandbox. '/stall-server.php';
+file_put_contents( $stallServer, <<<'PHP'
+<?php
+declare(strict_types=1);
+// One connection, answered as argv[1] says: 'stall' sends headers and half a
+// body and then goes quiet past any timeout, 'complete' answers in full
+$server = stream_socket_server( 'tcp://127.0.0.1:0', $errno, $errstr );
+if( $server === false )
+	exit( 1 );
+
+echo stream_socket_get_name( $server, false ), "\n";
+
+$client = stream_socket_accept( $server, 10 );
+if( $client === false )
+	exit( 1 );
+
+stream_set_timeout( $client, 5 );
+while( ( $line = fgets( $client, 8192 ) ) !== false )
+	if( trim( $line ) === '' )
+		break;
+
+if( ( $argv[1] ?? '' ) === 'stall' ) {
+	fwrite( $client, "HTTP/1.1 200 OK\r\nContent-Length: 100\r\n\r\nHALF-A-BODY" );
+	sleep( 20 );
+	exit( 0 );
+}
+
+fwrite( $client, "HTTP/1.1 200 OK\r\nContent-Length: 12\r\n\r\nWHOLE-ANSWER" );
+fclose( $client );
+PHP );
+
+/**
+ *	Start the server above and answer the address it is listening on
+ *
+ *	@param		string		$mode					'stall' or 'complete'
+ *	@param		mixed			&$process			(reference) The handle, for proc_terminate()
+ *
+ *	@return 	string									'127.0.0.1:<port>', or '' where it did not start
+ */
+function stallServer( string $script, string $mode, mixed &$process ): string {
+
+	$pipes		= [];
+	$process	= proc_open( [ PHP_BINARY, $script, $mode ], [ 1 => [ 'pipe', 'w' ], 2 => [ 'pipe', 'w' ] ], $pipes );
+
+	if( is_resource( $process ) === false )
+		return '';
+
+	$address = trim( (string) fgets( $pipes[1] ) );
+
+	fclose( $pipes[1] );
+	fclose( $pipes[2] );
+
+	return $address;
+}
+
+$streamClient = new ReflectionMethod( '\Nino\Fetch', '_stream' );
+$streamClient->setAccessible( true );
+
+$stalledProcess	= null;
+$stalledAddress	= stallServer( $stallServer, 'stall', $stalledProcess );
+$stalled				= ( $stalledAddress !== '' ) ? (array) $streamClient->invoke( null, 'http://'. $stalledAddress. '/', 1, \Nino\Fetch::DEFAULT_MAX_BYTES ) : [];
+
+if( is_resource( $stalledProcess ) === true ) {
+	proc_terminate( $stalledProcess );
+	proc_close( $stalledProcess );
+}
+
+check( 'an answer that stops arriving mid-body is not ok', ( $stalled['ok'] ?? null ) === false );
+check( '...and carries the reason instead of the half it did read', ( $stalled['body'] ?? 'unset' ) === ''
+	&& str_contains( (string) ( $stalled['error'] ?? '' ), 'timed out' ) === true );
+check( '...while still reporting the status the server did send', ( $stalled['status'] ?? null ) === 200 );
+
+$completeProcess	= null;
+$completeAddress	= stallServer( $stallServer, 'complete', $completeProcess );
+$complete					= ( $completeAddress !== '' ) ? (array) $streamClient->invoke( null, 'http://'. $completeAddress. '/', 5, \Nino\Fetch::DEFAULT_MAX_BYTES ) : [];
+
+if( is_resource( $completeProcess ) === true ) {
+	proc_terminate( $completeProcess );
+	proc_close( $completeProcess );
+}
+
+check( 'an answer that does arrive is still ok, with the body', ( $complete['ok'] ?? null ) === true
+	&& ( $complete['body'] ?? '' ) === 'WHOLE-ANSWER' && ( $complete['error'] ?? 'x' ) === '' );
+
 echo "\n";
 
 

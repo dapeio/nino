@@ -187,22 +187,46 @@ namespace Nino {
 				if( preg_match( '#^HTTP/\S+\s+(\d{3})#', (string) $line, $m ) === 1 )
 					$status = (int) $m[1];
 
-			$body		= '';
-			$tooBig	= false;
+			$body			= '';
+			$tooBig		= false;
+			$unread		= false;
 			while( feof( $stream ) === false ) {
 				$chunk = fread( $stream, 65536 );
-				if( $chunk === false )
+				/*	Not the end of the body: fread() answers false for a read
+					that failed, and a used-up read timeout is how it fails
+					here. Taken for an end, a server that sent its headers,
+					part of a body and then went quiet came back as ok with
+					status 200 and half an answer - a catalogue that is half a
+					json document, an archive that is half an archive, both
+					described as complete. The curl half reports the same stall
+					as a failed transfer, and so does this one now.	*/
+				if( $chunk === false ) {
+					$unread = true;
 					break;
+				}
 				if( strlen( $body ) + strlen( $chunk ) > $maxBytes ) {
 					$tooBig = true;
 					break;
 				}
 				$body .= $chunk;
 			}
+
+			// Read before fclose(): 'timed_out' is the stream's own record of
+			// why the read above gave up, and it is gone with the handle
+			$timedOut = stream_get_meta_data( $stream )['timed_out'] === true;
+
 			fclose( $stream );
 
 			if( $tooBig === true )
 				return self::_answer( false, $status, '', 'the answer exceeds '. $maxBytes. ' bytes' );
+
+			// No body on a failure, same as the curl half: what arrived is a
+			// fragment, and a caller that is handed a fragment has no way of
+			// knowing it is one
+			if( $unread === true )
+				return self::_answer( false, $status, '', $timedOut === true
+					? 'the answer timed out after '. $timeout. ' seconds'
+					: 'the answer could not be read to the end' );
 
 			if( $status !== 200 )
 				return self::_answer( false, $status, '', 'http '. $status );

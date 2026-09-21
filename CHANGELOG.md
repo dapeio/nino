@@ -57,6 +57,20 @@ All notable changes to Nino are documented in this file.
 
 ### Fixed
 
+- **Half an answer came back as a whole one where curl is not installed.**
+  `\Nino\Fetch` falls back to php's own stream wrapper when the curl extension
+  is missing, and that half had no answer for a server that sends its headers,
+  part of a body and then goes quiet. `fread()` reports a used-up read timeout
+  by answering `false`; the read loop took that for the end of the body, and
+  the truncated answer was returned as `ok` with status 200 - a catalogue that
+  is half a json document, an archive that is half an archive, both described
+  as complete, with the signature check left to be the only thing that noticed.
+  Measured against a local socket server that stalls mid-body: `ok: true`,
+  `status: 200`, `body: "PARTIAL-BODY"` after the timeout had passed. A read
+  that failed is a failed transfer now - no body, the reason in `error`, and
+  the timeout named where the stream recorded one - which is the shape the curl
+  half has always answered a stall in.
+
 - **A log sweep could delete nothing at all, and say nothing about it.**
   `RotatingLog::prune()` - the one sweep behind the error log, the form
   submissions, the activity log and the backup retention - built a glob pattern
