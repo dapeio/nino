@@ -158,7 +158,14 @@
 
 					const max = {};
 					for( let i=0, l=e.autoheight.length; i<l; i++ ) {
-						if( ( e.autoheight[i].getAttribute('data-autoheight-mobile') ?? '' ) !== '' && Nino.client.isMobile === true )
+
+						// The opt-out has to reach the assignment below as well.
+						// Leaving out only the measurement still handed the element
+						// its group's height a moment later - and 'undefinedpx',
+						// which the browser drops, where it was the only element of
+						// its group and that group therefore never got a maximum
+						e.autoheight[i].skip = ( e.autoheight[i].getAttribute('data-autoheight-mobile') ?? '' ) !== '' && Nino.client.isMobile === true;
+						if( e.autoheight[i].skip === true )
 							continue;
 
 						e.autoheight[i].style.height = 'auto';
@@ -166,7 +173,8 @@
 					}
 
 					for( let i=0, l=e.autoheight.length; i<l; i++ )
-						e.autoheight[i].style.height = max[e.autoheight[i].grp] + 'px';
+						if( e.autoheight[i].skip === false )
+							e.autoheight[i].style.height = max[e.autoheight[i].grp] + 'px';
 				} );
 			}
 

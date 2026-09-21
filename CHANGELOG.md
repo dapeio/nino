@@ -57,6 +57,24 @@ All notable changes to Nino are documented in this file.
 
 ### Fixed
 
+- **The mobile opt-out of the row equalizer left a height on the element
+  anyway.** `.nino-autoheight` equalizes every element sharing a
+  `data-autoheight-group`, and `data-autoheight-mobile` is how a single one of
+  them says not to on a phone - a card whose text is long enough that a forced
+  row height turns it into a clipped block. The opt-out was read in the
+  measuring loop alone: the element was kept out of its group's maximum, and
+  the second loop, which carried no condition at all, then wrote that maximum
+  onto it a moment later. The one element that asked to keep its own height
+  was the one element given a height nothing had measured for it. Alone in a
+  group it came off worse still: that group was never measured, so it was
+  handed `undefinedpx` - an invalid declaration the browser drops, which is
+  why the simple case looked correct and only the row the attribute was
+  written for misbehaved. The opt-out is now decided once per element per
+  resize and holds for the assignment as much as for the measurement. New
+  suite `tests/nino-ui-autoheight-js-smoke.js` drives a row of three cards
+  with the middle one opted out, and a fourth alone in its own group, on a
+  mobile client and then on a desktop one.
+
 - **The public stylesheet's two main font stacks were one family name nobody
   has.** `--fontfamily-text` and `--fontfamily-title` in `_nino/Nino.css`
   wrapped the entire stack in single quotes, and a quoted value in
