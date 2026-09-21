@@ -162,11 +162,46 @@ namespace Nino\Modules {
 		 */
 		public static function callbackResponse( array &$appData, array &$request ): void {
 
-			// Append to the seeded default policy (see Http::request()) - never
-			// start from an empty string, that would drop default-src & co
-			$csp = trim( $request['/nino/http/response']['header']['Content-Security-Policy'] ?? '', '; ' );
+			/*	Into the policy's own script-src where it has one, and only
+				appended where it has none. Appending unconditionally wrote the
+				directive a second time, and a repeated directive is not a merge:
+				the first occurrence is the one a browser enforces and every
+				later one is ignored. So a route declaring a script-src of its
+				own - which routes may, that is what a route's 'header' is for
+				(see Http::response()) - left the nonce in a directive nothing
+				read, the inline jstext block was refused as an unlisted inline
+				script, and Nino.content.getText() answered '' for every key on
+				that page. Silently: the page renders, the policy is honoured,
+				and only the words are missing.
 
-			$request['/nino/http/response']['header']['Content-Security-Policy'] = ( $csp === '' ? '' : $csp. '; ' ). "script-src 'self' 'nonce-". $appData['./nino/jstext/nonce'] ."'";
+				'none' is left as it is. It is the one value that means the
+				project decided against inline scripts, this block is one, and a
+				nonce beside it would not merge with that decision but overturn
+				it - 'none' is ignored the moment anything stands next to it. A
+				page that wants jstext does not say 'none'	*/
+			$policy = trim( $request['/nino/http/response']['header']['Content-Security-Policy'] ?? '', '; ' );
+			$nonce  = "'nonce-". $appData['./nino/jstext/nonce']. "'";
+
+			$directives = array_values( array_filter( array_map( 'trim', explode( ';', $policy ) ) ) );
+			$merged = false;
+
+			foreach( $directives as $index => $directive ) {
+
+				if( preg_match( '/^script-src(?:\s|$)/i', $directive ) !== 1 )
+					continue;
+
+				$merged = true;
+
+				if( preg_match( "/(?:^|\s)'none'(?:\s|$)/i", $directive ) !== 1 )
+					$directives[$index] = $directive. ' '. $nonce;
+
+				break;
+			}
+
+			if( $merged === false )
+				$directives[] = "script-src 'self' ". $nonce;
+
+			$request['/nino/http/response']['header']['Content-Security-Policy'] = implode( '; ', $directives );
 		}
 	}
 

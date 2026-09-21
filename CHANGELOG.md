@@ -57,6 +57,21 @@ All notable changes to Nino are documented in this file.
 
 ### Fixed
 
+- **A route with a `script-src` of its own left the jstext nonce in a
+  directive nothing reads.** `Modules\Jstext` appended `script-src 'self'
+  'nonce-…'` to the policy unconditionally, and a repeated directive is not a
+  merge: the first occurrence is the one a browser enforces and every later one
+  is ignored. A route may declare header fields of its own - that is what a
+  route's `header` is for - so a project that hardened the policy on one route
+  got its own `script-src` enforced, the nonce ignored, the inline jstext block
+  refused as an unlisted inline script, and `Nino.content.getText()` answering
+  `''` for every key on that page. Silently: the page renders and the policy is
+  honoured, only the words are missing. The nonce now goes into the policy's own
+  `script-src` where it has one, and the directive is appended only where it
+  has none. A `script-src` of `'none'` is left alone - that value is a decision
+  against inline scripts, and a nonce beside it would overturn it rather than
+  merge with it.
+
 - **A reply address nothing had checked went out as the `Reply-To` header.**
   Every other address `\Nino\Mail` puts on a header line is validated - `$to`
   with `FILTER_VALIDATE_EMAIL`, refusing the mail, and `_getSender()` the same

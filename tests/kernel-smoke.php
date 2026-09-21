@@ -2878,6 +2878,35 @@ $appData['./nino/jstext/nonce'] = base64_encode( random_bytes( 16 ) );
 \Nino\Modules\Jstext::callbackResponse( $appData, $homeRequest );
 $jstextCsp = $homeRequest['/nino/http/response']['header']['Content-Security-Policy'];
 check( 'Jstext appends its script-src to the csp', str_contains( $jstextCsp, "script-src 'self' 'nonce-" ) === true );
+check( '...once, and only where the policy has none of its own', substr_count( $jstextCsp, 'script-src' ) === 1 );
+
+/*	A route may declare header fields of its own - that is what a route's
+	'header' is for, and Http::response() merges them into the seeded policy
+	before these callbacks run. A route that declares a script-src used to get
+	a second one appended, and a repeated directive is not a merge: the first
+	occurrence is the one a browser enforces and every later one is ignored.
+	So the nonce sat in a directive nothing read, the inline jstext block was
+	refused as an unlisted inline script, and Nino.content.getText() answered
+	'' for every key on that page - silently, because the page renders and the
+	policy is honoured, only the words are missing	*/
+$ownPolicyRequest = [ '/nino/http/response' => [ 'header' => [ 'Content-Security-Policy' => "default-src 'self'; script-src 'self' https://cdn.example" ] ] ];
+\Nino\Modules\Jstext::callbackResponse( $appData, $ownPolicyRequest );
+$ownPolicy = $ownPolicyRequest['/nino/http/response']['header']['Content-Security-Policy'];
+check( 'a route with a script-src of its own gets the nonce in that one', substr_count( $ownPolicy, 'script-src' ) === 1
+	&& str_contains( $ownPolicy, "script-src 'self' https://cdn.example 'nonce-" ) === true );
+check( '...and keeps the rest of what it declared', str_starts_with( $ownPolicy, "default-src 'self'; " ) === true );
+
+// 'none' is the one value that means the project decided against inline
+// scripts. A nonce beside it would not merge with that decision but overturn
+// it - 'none' is ignored the moment anything stands next to it
+$noneRequest = [ '/nino/http/response' => [ 'header' => [ 'Content-Security-Policy' => "default-src 'self'; script-src 'none'" ] ] ];
+\Nino\Modules\Jstext::callbackResponse( $appData, $noneRequest );
+check( "a script-src of 'none' is left as it is", $noneRequest['/nino/http/response']['header']['Content-Security-Policy'] === "default-src 'self'; script-src 'none'" );
+
+// ...and an empty policy is still the one case that must not start from ''
+$emptyRequest = [ '/nino/http/response' => [ 'header' => [ 'Content-Security-Policy' => '' ] ] ];
+\Nino\Modules\Jstext::callbackResponse( $appData, $emptyRequest );
+check( 'an empty policy gets the directive and no stray separator', $emptyRequest['/nino/http/response']['header']['Content-Security-Policy'] === "script-src 'self' 'nonce-". $appData['./nino/jstext/nonce']. "'" );
 
 /*	The nonce reaches the page twice - raw in the script tag, and json
 	encoded in the block beside it - and json_encode() escapes a '/' as
