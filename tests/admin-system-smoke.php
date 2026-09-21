@@ -2042,6 +2042,43 @@ check( 'a missing navigation registry exposes no implicit menu', \Nino\Modules\N
 $appData['/nino/html/navs'] = [];
 check( 'an empty navigation registry stays empty', \Nino\Modules\Navigation\Admin::registry( $appData ) === [] );
 
+/*	What "named" has to mean: the menu renders the name through the fill
+	engine, and that merges the locale-independent global.php under the file
+	of the locale the visitor is on. A name written once in global.php, and a
+	name written only in a language that is not the native one, are both names
+	the menu puts on the page - and the panel read the native locale's file
+	alone, so it called them missing and refused to offer the route.	*/
+\Nino\Filesystem::mutate( $appData, '/config.php', function( array $config ): array {
+	$config['/nino/http/routes']['GET://shared']	= [ 'uri' => '/shared', 'body' => '[template /templates/page-shared]' ];
+	$config['/nino/http/routes']['GET://jobs'] 		= [ 'uri' => '/jobs', 'body' => '[template /templates/page-jobs]' ];
+	$config['/nino/http/routes']['GET://press'] 	= [ 'uri' => '/press', 'body' => '[template /templates/page-press]' ];
+	return $config;
+} );
+\Nino\Filesystem::putFileContent( $appData, '/text/global.php', array_merge(
+	\Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] ),
+	[ '[[/webpage/shared/name]]' => 'Shared', '[[/webpage/press/name]]' => 'Press' ]
+) );
+\Nino\Filesystem::putFileContent( $appData, '/text/en_US.php', array_merge(
+	\Nino\Filesystem::getFileContent( $appData, '/text/en_US.php', [] ),
+	[ '[[/webpage/jobs/name]]' => 'Jobs' ]
+) );
+\Nino\Filesystem::putFileContent( $appData, '/text/de_DE.php', array_merge(
+	\Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] ),
+	[ '[[/webpage/press/name]]' => 'Presse' ]
+) );
+
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Navigation\Admin::class, 'apiList' );
+$byUri = array_column( $body['routes'], null, 'httpUri' );
+
+check( 'apiList succeeds after the three unnamed-looking routes joined', $status === 200 );
+check( 'a name written once in global.php for every language is a name', ( $byUri['/shared']['named'] ?? null ) === true
+	&& ( $byUri['/shared']['label'] ?? null ) === 'Shared' );
+check( 'a name only a non-native locale carries is a name too - that menu renders it', ( $byUri['/jobs']['named'] ?? null ) === true
+	&& ( $byUri['/jobs']['label'] ?? null ) === 'Jobs' );
+check( 'the locale file still beats global.php for the label, as the fill engine does', ( $byUri['/press']['label'] ?? null ) === 'Presse' );
+check( '...and a route no language named at all is still reported unnamed', ( $byUri['/robots.txt']['named'] ?? null ) === false
+	&& ( $byUri['/robots.txt']['label'] ?? null ) === '/robots.txt' );
+
 \Nino\Auth::logoutUser( $appData );
 [ $status ] = callDev( $appData, \Nino\Modules\Navigation\Admin::class, 'apiList' );
 check( 'Navigations actions require an authed _admin session too', $status === 401 );

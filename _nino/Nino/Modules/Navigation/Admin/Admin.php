@@ -550,7 +550,7 @@ namespace Nino\Modules\Navigation {
 		 *	module manages - a menu entry is only ever "a path with a name",
 		 *	and a route a module or a developer owns is as good a target as
 		 *	any. 'named' reports whether the /webpage&lt;uri&gt;/name key the menu
-		 *	renders from exists at all: a route without one is skipped by
+		 *	renders from resolves at all: a route without one is skipped by
 		 *	\Nino\Modules\Navigation::routeLines(), so offering it silently
 		 *	would be offering an entry that never shows up
 		 *
@@ -561,7 +561,26 @@ namespace Nino\Modules\Navigation {
 		 */
 		private static function _labels( array &$appData, array $routes ): array {
 
-			$text 	= \Nino\Filesystem::getFileContent( $appData, '/text/'. \Nino\Locales::getNativeLocale( $appData ). '.php', [] );
+			/*	The menu resolves the name through the fill engine, and that
+				merges the locale-independent global.php under the file of the
+				locale the visitor is on - see \Nino\Html::getFills(). Reading
+				the native locale's file alone therefore reported two kinds of
+				named route as unnamed: one named once in global.php for every
+				language, and one named only in a language that is not the
+				native one. Both render in the menu; only the panel refused to
+				offer them. This dialog has no locale picker - a menu has
+				nothing per-locale about it - so a route counts as named when
+				any locale the project offers has a name for it, and the label
+				is the native locale's wording wherever there is one.	*/
+			$textDir 	= (string) ( $appData['/nino/locales/textfiles'] ?? '/text' );
+			$global 	= \Nino\Filesystem::getFileContent( $appData, $textDir. '/global.php', [] );
+			$texts 		= [];
+
+			// Native first, so its wording wins the label where more than one
+			// language named the same page
+			foreach( array_unique( array_merge( [ \Nino\Locales::getNativeLocale( $appData ) ], \Nino\Locales::getAvailableLocales( $appData ) ) ) as $locale )
+				$texts[] = array_merge( $global, \Nino\Filesystem::getFileContent( $appData, $textDir. '/'. $locale. '.php', [] ) );
+
 			$labels = [];
 
 			foreach( $routes as $routeKey => $route ) {
@@ -571,7 +590,11 @@ namespace Nino\Modules\Navigation {
 
 				$httpUri 	= substr( $routeKey, strlen( 'GET:/' ) );
 				$uri 			= (string) ( $route['uri'] ?? $httpUri );
-				$name 		= (string) ( $text['[[/webpage'. $uri. '/name]]'] ?? '' );
+				$name 		= '';
+
+				foreach( $texts as $fills )
+					if( ( $name = (string) ( $fills['[[/webpage'. $uri. '/name]]'] ?? '' ) ) !== '' )
+						break;
 
 				$labels[$routeKey] = [
 					'httpUri' => $httpUri,

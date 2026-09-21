@@ -57,6 +57,24 @@ All notable changes to Nino are documented in this file.
 
 ### Fixed
 
+- **The Navigations panel called a page unnamed that the menu names.** A menu
+  entry is "a path with a name", so the panel reports per route whether the
+  `/webpage<uri>/name` key exists - a route without one is skipped by
+  `Modules\Navigation::routeLines()`, and offering it would be offering an
+  entry that never appears. The menu resolves that name through the fill
+  engine, which merges the locale-independent `global.php` under the file of
+  the locale the visitor is on; the panel read `text/<native locale>.php` and
+  nothing else. So a name written once in `global.php` for every language, and
+  a name written in a language that is not the native one, were both names the
+  menu puts on the page and the panel refused to offer: the entry could not be
+  added at all, and where it already stood it was listed as "(unnamed)". The
+  panel now resolves a route's name the way `Html::getFills()` does - global
+  under each locale the project offers, the native one first so its wording
+  stays the label - and reads the configured text directory rather than a
+  hard-coded `/text`. `tests/admin-system-smoke.php` adds three routes named
+  only in `global.php`, only in `en_US.php`, and in both `global.php` and the
+  native file, and checks the reported name and flag for each.
+
 - **The mobile opt-out of the row equalizer left a height on the element
   anyway.** `.nino-autoheight` equalizes every element sharing a
   `data-autoheight-group`, and `data-autoheight-mobile` is how a single one of
