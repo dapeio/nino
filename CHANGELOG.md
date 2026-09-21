@@ -57,6 +57,16 @@ All notable changes to Nino are documented in this file.
 
 ### Fixed
 
+- **A `.json` file that does not decode was answered as `null`, not as the
+  default.** `Filesystem::getFileContent()` answers `$default` for a path it
+  refuses, a file it cannot prepare and one that is not there - and cached
+  what `json_decode()` gave it for one that is: `null` for an empty file, a
+  truncated one, one holding anything but json. That `null` went out as the
+  file's content, into `mutate()` too, whose callback is typed for the array
+  it was promised as the default - a TypeError out of a read-modify-write, for
+  a data file a crash or a full disk left half written. Such a file answers
+  the default now, the same as one that is not there, and `mutate()` starts
+  its callback from the default it was given.
 - **Converting a text key to global threw away the only translation it had.**
   `Keys::apiSave()` documents the migration it performs: per-locale to global
   "keeps the native locale's value (falling back to the first non-empty one)".

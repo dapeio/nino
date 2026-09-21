@@ -299,7 +299,7 @@ The method reads the current file state again, only takes over the specified key
 `Filesystem` encapsulates path resolution, serialization, cache, locks, and atomic write operations:
 
 - `.php` files are saved as `<?php return ...;` and read via `include`.
-- `.json` files are JSON-encoded and decoded.
+- `.json` files are JSON-encoded and decoded; one that does not decode answers the default, like a file that is not there.
 - Read accesses are cached based on modification time and file size.
 - Write operations first create a temporary file in the target directory and then replace the target via `rename()`.
 - Locks are sidecar files under `/data/.locks`; their name is derived from the target path.

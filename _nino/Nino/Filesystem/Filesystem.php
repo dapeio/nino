@@ -77,7 +77,20 @@ namespace Nino {
 					$appData['./nino/filesystem/cache'][$filename]['content'] = json_decode( $appData['./nino/filesystem/cache'][$filename]['content'], true );
 			}
 
-			return $appData['./nino/filesystem/cache'][$filename]['content'];
+			$content = $appData['./nino/filesystem/cache'][$filename]['content'];
+
+			/*	A .json that did not decode is not content. json_decode() answers
+				null for an empty file, a truncated one and one holding anything
+				but json, and that null went out as the file's content - where
+				$default is what a file that cannot be read answers three times
+				above, and what mutate() promises its callback: one typed for
+				the array it had been given as the default met a TypeError
+				instead. Kept in the slot as it is, so the fingerprint above
+				still spares the re-read, and answered here as what it means.	*/
+			if( $content === null && substr( $filename, -5 ) === '.json' )
+				return $default;
+
+			return $content;
 		}
 
 		public static function putFileContent( array &$appData, string $filename, mixed $content, bool $nolock = false ): bool {

@@ -290,7 +290,7 @@ Die Methode liest den aktuellen Dateistand erneut, übernimmt nur die angegebene
 `Filesystem` kapselt Pfadauflösung, Serialisierung, Cache, Sperren und atomare Schreibvorgänge:
 
 - `.php`-Dateien werden als `<?php return …;` gespeichert und per `include` gelesen.
-- `.json`-Dateien werden JSON-kodiert und -dekodiert.
+- `.json`-Dateien werden JSON-kodiert und -dekodiert; eine, die sich nicht dekodieren lässt, antwortet mit dem Standardwert – wie eine Datei, die es nicht gibt.
 - Lesezugriffe werden anhand von Änderungszeit und Dateigröße gecacht.
 - Schreibvorgänge erzeugen zunächst eine temporäre Datei im Zielverzeichnis und ersetzen das Ziel anschließend per `rename()`.
 - Sperren liegen als Sidecar-Dateien unter `/data/.locks`; ihr Name wird aus dem Zielpfad abgeleitet.

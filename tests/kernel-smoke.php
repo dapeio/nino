@@ -1134,6 +1134,31 @@ unset( $recursiveJson );
 check( 'a rejected write leaves the previous bytes on disk', json_decode( (string) file_get_contents( \Nino\Filesystem::path( $appData, '/data/cache-state.json' ) ), true ) === [ 'state' => 'old' ] );
 check( 'a rejected write leaves the in-request read cache on the persisted value', \Nino\Filesystem::getFileContent( $appData, '/data/cache-state.json', [] ) === [ 'state' => 'old' ] );
 
+/*	And a .json that does not decode: an empty file, a truncated one, one
+	holding anything but json. json_decode() answers null for all of them, and
+	that null was cached and handed back as the file's content - where
+	$default is what every other file that cannot be read answers, and what
+	mutate() promises its callback: one typed for the array it was given as
+	the default met a TypeError instead	*/
+file_put_contents( \Nino\Filesystem::path( $appData, '/data/broken.json' ), '{ "state": ' );
+check( 'a .json that does not decode answers the default, like a file that is not there', \Nino\Filesystem::getFileContent( $appData, '/data/broken.json', [ 'fresh' => true ] ) === [ 'fresh' => true ] );
+
+file_put_contents( \Nino\Filesystem::path( $appData, '/data/empty.json' ), '' );
+check( '...and so does an empty one', \Nino\Filesystem::getFileContent( $appData, '/data/empty.json', [ 'fresh' => true ] ) === [ 'fresh' => true ] );
+
+// Through a try/catch so the old answer is reported as a failed check rather
+// than ending the suite: the callback is typed for an array, and null is not one
+$mutatedBroken = ( static function() use ( &$appData ): string {
+	try {
+		return \Nino\Filesystem::mutate( $appData, '/data/broken.json', static fn( array $state ): array => $state + [ 'added' => true ], [ 'seed' => 1 ] ) === true ? 'written' : 'refused';
+	}
+	catch( \Throwable $e ) {
+		return $e::class;
+	}
+} )();
+check( 'mutate() starts its callback from the default it was given rather than from null', $mutatedBroken === 'written'
+	&& \Nino\Filesystem::getFileContent( $appData, '/data/broken.json', [] ) === [ 'seed' => 1, 'added' => true ] );
+
 echo "\n";
 
 
