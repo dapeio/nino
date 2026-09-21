@@ -612,6 +612,15 @@ namespace Nino {
 			// was - the next reader sees the new one
 			unset( $appData['./nino/features/all'] );
 
+			/*	Whether the class this directory serves is already in memory - a
+				running feature's is, loaded at boot - decides whether the update
+				can be applied in this request at all: Features::activate() asks
+				method_exists() for the upgrade hook, and that answers for the
+				class in memory, the previous version's. Noted here, where the
+				replacement happens, and read by activate(), which defers	*/
+			if( class_exists( $manifest['module'], false ) === true )
+				$appData['./nino/features/replaced'][ $manifest['key'] ] = true;
+
 			return true;
 		}
 

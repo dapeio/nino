@@ -57,6 +57,24 @@ All notable changes to Nino are documented in this file.
 
 ### Fixed
 
+- **A catalogue update of a running feature never ran the new version's
+  upgrade hook.** The Features panel placed the new directory and activated
+  again in the same request, and `Features::activate()` asks `method_exists()`
+  for the hook - which answers for the class in memory, loaded at boot from
+  the previous version. The hook the new version brought was never called,
+  the new version was recorded all the same, and with the record saying
+  current nothing ever called it later: every data migration a feature ships
+  was skipped on exactly the update path the panel offers. Measured with a
+  1.2.0 whose `upgrade()` writes a marker over a running 1.1.0 - no marker,
+  version recorded. `\Nino\Catalogue::install()` notes now when it replaces
+  the directory of a class that is already loaded, `activate()` refuses to
+  apply such an update in that request and says why, and the panel answers
+  that the update is pending and activates again in a request of its own -
+  the same call **Update** in the Active tab makes, words and reload included
+  - so one press is still one press, and the hook runs in a request that
+  loads the new class. The text that wrapped a refusal of the same-request
+  activation is gone with that activation.
+
 - **A day's log file that could not be written took the action being logged
   down with it.** `Modules\Logs\Admin::record()` rewrote the day's file in
   place with an unchecked `file_put_contents()`. A target that could not be

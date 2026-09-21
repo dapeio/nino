@@ -391,7 +391,6 @@ const unphrased = phrased.filter( function( key ) { return moduleEn[key] === und
 check( 'every message the class phrases itself is a fill of the module in both languages'+ ( unphrased.length ? ' - missing: '+ unphrased.join(', ') : '' ), phrased.length >= 4 && unphrased.length === 0
 	&& phrased.indexOf( '/_admin/features/error/catalogue-off' ) !== -1 && phrased.indexOf( '/_admin/features/error/catalogue-key' ) !== -1
 	&& moduleEn['/_admin/features/error/catalogue-reason'].includes( '%s' ) && moduleDe['/_admin/features/error/catalogue-reason'].includes( '%s' )
-	&& moduleEn['/_admin/features/error/update-after-install'].includes( '%s' ) && moduleDe['/_admin/features/error/update-after-install'].includes( '%s' )
 	&& moduleEn['/_admin/features/error/activate-after-install'].includes( '%s' ) && moduleDe['/_admin/features/error/activate-after-install'].includes( '%s' ) );
 check( 'the module\'s two text files declare the same keys', Object.keys( moduleEn ).sort().join(',') === Object.keys( moduleDe ).sort().join(',') && Object.keys( moduleEn ).length > 20 );
 
@@ -929,14 +928,25 @@ fire( offerButton( mount, 'extra' ), 'click' );
 answer( 200, { feature : EXTRA, updated : false, activated : true, required : [ 'helper' ] } );
 check( '...and names what came with it in the same line', alerts[alerts.length - 1] === text('/_admin/features/msg/installed-active-with').replace( '%s', 'helper' ) && reloads === reloadsBeforeInstall + 2 );
 
-// An update to a feature that is already running answers no 'activated' at
-// all - it was on before and is on now - and the word stays the one it was.
-// It reloads all the same: applying the update is a re-activation, and what
-// the page holds is the version that was there before it
+/*	An update to a feature that is already running: the files are in place,
+	and the answer says the update is pending - the request that placed them
+	booted with the previous version's class, so the hook the new version
+	brought can only run in a request of its own. The panel makes that request
+	itself: the same activate that Update in the Active tab posts, with its
+	words and its reload. The row is read afresh each time - the list was
+	built again in between	*/
+const extraLine = function() { return byTag( offer( mount, 'extra' ), 'p' ).filter( function( el ) { return el.attributes['aria-live'] === 'polite' } )[0] };
 fire( offerButton( mount, 'extra' ), 'click' );
-answer( 200, { feature : EXTRA, updated : true, activated : false, required : [] } );
-check( 'an update says only that it installed - nothing was switched on', alerts[alerts.length - 1] === text('/_admin/features/msg/installed') );
-check( '...and reloads too: the running feature was re-activated, and the page is the version before it', reloads === reloadsBeforeInstall + 3 );
+answer( 200, { feature : EXTRA, activated : false, pending : true, required : [] } );
+check( 'a pending update posts features/activate next, on its own, and says so', requests[requests.length - 1].action === 'features/activate' && requests[requests.length - 1].payload.key === 'extra' && extraLine().textContent === text('/_admin/features/msg/updating') );
+answer( 400, { error : 'feature "extra" refused to upgrade from 1.0.0' } );
+check( 'a refused update shows the kernel\'s reason, frees the button and reloads nothing', reloads === reloadsBeforeInstall + 2 && hasClass( extraLine(), 'nino-admin-error' )
+	&& extraLine().textContent === '(400) feature "extra" refused to upgrade from 1.0.0' && offerButton( mount, 'extra' ).disabled === false );
+
+fire( offerButton( mount, 'extra' ), 'click' );
+answer( 200, { feature : EXTRA, activated : false, pending : true, required : [] } );
+answer( 200, { feature : EXTRA } );
+check( 'an applied update says so and reloads: the page is the version before it', extraLine().textContent === text('/_admin/features/msg/updated')+ ' '+ text('/_admin/features/msg/reload') && reloads === reloadsBeforeInstall + 3 );
 
 const requestsBeforeInstall = requests.length;
 fire( offerButton( mount, 'extra' ), 'click' );
@@ -963,8 +973,9 @@ check( 'and the offer itself is gone from Available - excluded as current, not s
 const helperBtn = byTag( offer( mount, 'helper' ), 'button' )[0];
 fire( helperBtn, 'click' );
 check( 'Update posts features/install with the offered version', requests[requests.length - 1].action === 'features/install' && requests[requests.length - 1].payload.key === 'helper' && requests[requests.length - 1].payload.version === '1.2.0' );
-answer( 200, { feature : FEATURES[1], updated : true } );
-check( '...and updating a feature that is running reloads the workbench: applying the update re-activates it, and the page is the version before it', reloads === reloadsBeforeInstall + 4 );
+answer( 200, { feature : FEATURES[1], pending : true } );
+answer( 200, { feature : FEATURES[1] } );
+check( '...and updating a feature that is running activates it again in a request of its own, then reloads the workbench: the page is the version before the update', reloads === reloadsBeforeInstall + 4 );
 
 // Which is why the readonly panel below is opened rather than read out of
 // that answer: an update ends in a reload, so there is no list read to answer

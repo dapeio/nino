@@ -1077,6 +1077,17 @@
 					return;
 				}
 
+				/*	A running feature: the files are in place, and the update is
+					applied by activating again - in a request of its own, because
+					this one booted with the previous version's class, and the hook
+					the new version brought cannot run in it (see apiInstall()). That
+					is the call Update in the Active tab makes, reload and all: the
+					page holds the version before the update	*/
+				if( response.pending === true ) {
+					Nino.admin.features._switch( { key : offer.key }, 'update', btn, msg );
+					return;
+				}
+
 				/*	Installing a feature that was not in the directory switches it on -
 					see apiInstall() for the one case it does not - and the word has to
 					say so, or the next thing somebody does is look for the Activate
@@ -1098,13 +1109,12 @@
 					word on an action whose screen does not survive it	*/
 				wn.alert( said );
 
-				/*	Switched on - by this install, or by the re-activation that
-					applying an update to a running feature is - and the page this was
-					pressed in was built before any of that: the feature's panel, its
-					assets and its words are only there once the shell is built again.
-					The hash keeps the workbench on this panel, exactly as _switch()
-					does when the same thing happens from the Inactive tab	*/
-				if( response.activated === true || response.updated === true ) {
+				/*	Switched on by this install, and the page this was pressed in
+					was built before that: the feature's panel, its assets and its
+					words are only there once the shell is built again. The hash
+					keeps the workbench on this panel, exactly as _switch() does
+					when the same thing happens from the Inactive tab	*/
+				if( response.activated === true ) {
 					wn.location.hash = '#features';
 					wn.location.reload();
 					return;

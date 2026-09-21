@@ -554,6 +554,18 @@ $appData['/nino/features']['sample']['version'] = '0.0.1';
 unset( $appData['./nino/features/all'] );
 $refused = \Nino\Features::activate( $appData, 'sample' );
 check( 'a refused upgrade leaves the record as it was', $refused === 'feature "sample" refused to upgrade from 0.0.1' && \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/features']['sample']['version'] === '0.0.1' );
+
+/*	And an update the request cannot apply at all: the directory was replaced
+	while the class was already loaded - Catalogue::install() notes that under
+	'./nino/features/replaced' - so the class in memory is the previous
+	version's, and the hook activate() would call is the old one. Measured on
+	the panel's update of a running feature: the new version was recorded with
+	its upgrade() never called, and never to be called	*/
+$appData['./nino/features/replaced']['sample'] = true;
+$deferred = \Nino\Features::activate( $appData, 'sample' );
+check( 'an update of a feature whose previous class is loaded is deferred to a new request, the record untouched', $deferred === 'feature "sample" was replaced in this request while its previous version is loaded - the update is applied by activating it in a new request'
+	&& \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/features']['sample']['version'] === '0.0.1' );
+unset( $appData['./nino/features/replaced'] );
 $appData['/nino/features']['sample']['version'] = '1.2.0';
 \Nino\AppData::writeContentData( $appData, [ '/nino/features' ] );
 unset( $appData['./nino/features/all'] );

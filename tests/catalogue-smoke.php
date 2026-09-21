@@ -921,10 +921,11 @@ $requests = [];
 [ $status, $body ] = callFeatures( $appData, 'apiInstall', [ 'key' => 'extra', 'version' => '1.0.0' ] );
 /*	Install means install: a feature the project did not have is switched on
 	in the same request, and the answer says which of the two happened to it -
-	'updated' for one that was already running, 'activated' for one that was
+	'pending' for one that was already running - its update is applied by the
+	request the panel makes next - 'activated' for one that was
 	not there at all. Leaving it in the Inactive tab made one intention take
 	two presses.	*/
-check( 'installing a feature the project did not have answers its entry as the list shows it now - on disk, on, recorded', $status === 200 && array_keys( $body ) === [ 'feature', 'updated', 'activated', 'required' ] && $body['updated'] === false && $body['activated'] === true && $body['required'] === []
+check( 'installing a feature the project did not have answers its entry as the list shows it now - on disk, on, recorded', $status === 200 && array_keys( $body ) === [ 'feature', 'activated', 'pending', 'required' ] && $body['pending'] === false && $body['activated'] === true && $body['required'] === []
 	&& array_keys( $body['feature'] ) === [ 'key', 'name', 'description', 'manual', 'manualSections', 'category', 'version', 'installed', 'active', 'update', 'requires', 'problems', 'settings' ]
 	&& $body['feature']['key'] === 'extra' && $body['feature']['name'] === 'Extra' && $body['feature']['version'] === '1.0.0' && $body['feature']['active'] === true && $body['feature']['installed'] === '1.0.0' && $body['feature']['update'] === false && $body['feature']['problems'] === [] );
 check( 'the directory is in place, the archive was fetched once, and the class is in the module list', is_file( NINO_FEATURES_DIR. '/Extra/feature.php' ) && is_file( NINO_FEATURES_DIR. '/Extra/Extra.php' )
@@ -948,7 +949,7 @@ publish( $appData, $remote, array_merge( $withExtra, [ entry( 'extra', '1.1.0', 
 
 [ $status, $body ] = callFeatures( $appData, 'apiInstall', [ 'key' => 'extra', 'version' => '1.1.0' ] );
 check( 'a newer version of a feature somebody switched off is placed and left off', $status === 200
-	&& $body['updated'] === false && $body['activated'] === false
+	&& $body['pending'] === false && $body['activated'] === false
 	&& $body['feature']['version'] === '1.1.0' && $body['feature']['active'] === false );
 check( '...and its class is out of the module list, where deactivating put it', in_array( '\\Nino\\Modules\\Extra', \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/modules'], true ) === false );
 
@@ -968,9 +969,13 @@ check( '...and the directory really is there, with nothing recorded and nothing 
 	&& isset( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/features']['lonely'] ) === false
 	&& in_array( '\\Nino\\Modules\\Lonely', \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/modules'], true ) === false );
 
-// An active feature: the new version replaces the directory and, since it
-// is active, its update is applied in the same request - the record moves
-$helper120 = tarGz( featureFiles( 'Helper', 'helper', '1.2.0' ) );
+// An active feature: the new version replaces the directory, and the update
+// is applied by activating again - in a request of its own, not this one.
+// This request booted with the previous version's class, and the hook the
+// new version brought can only run in a request that loads the new class.
+// The 1.2.0 class brings one, and writes where it ran from
+$upgradeMarker = $sandbox. '/upgrade-ran.txt';
+$helper120 = tarGz( featureFiles( 'Helper', 'helper', '1.2.0', [ 'Helper.php' => '<?php namespace Nino\\Modules { class Helper { public static function upgrade( array &$appData, string $from ): bool { file_put_contents( '. var_export( $upgradeMarker, true ). ', $from ); return true; } } }' ] ) );
 $remote['https://catalogue.test/features/helper-1.2.0.tar.gz'] = $helper120;
 $withHelper120 = array_merge( $withExtra, [ entry( 'helper', '1.2.0', $helper120 ) ] );
 publish( $appData, $remote, $withHelper120, null, $privateKey );
@@ -980,12 +985,51 @@ check( 'the offer for an active feature on disk in an older version says upgrade
 	&& array_column( $body['offers'], 'local', 'key' )['helper'] === '1.1.0' && array_column( $body['offers'], 'version', 'key' )['helper'] === '1.2.0' && array_column( $body['offers'], 'active', 'key' )['helper'] === true );
 check( 'before: on disk as 1.1.0, recorded as 1.0.0, an update waiting', \Nino\Features::get( $appData, 'helper' )['version'] === '1.1.0' && \Nino\Features::get( $appData, 'helper' )['installed'] === '1.0.0' && \Nino\Features::get( $appData, 'helper' )['update'] === true );
 
+/*	Measured before this was the rule: apiInstall() activated again in the
+	same request, method_exists() answered for the class already in memory -
+	the 1.1.0 one, which has no upgrade() - and 1.2.0 was recorded with its
+	hook never called, and never to be called, since the record now said it
+	was current. The class in memory stays the old one for the rest of this
+	process; that is the condition itself, not an artefact of the test	*/
 [ $status, $body ] = callFeatures( $appData, 'apiInstall', [ 'key' => 'helper', 'version' => '1.2.0' ] );
-check( 'updating an active feature places the new version and applies the update: the entry is 1.2.0, recorded as 1.2.0, no update waiting, still active', $status === 200 && $body['updated'] === true && $body['activated'] === false
-	&& $body['feature']['version'] === '1.2.0' && $body['feature']['installed'] === '1.2.0' && $body['feature']['update'] === false && $body['feature']['active'] === true && $body['feature']['problems'] === [] );
-check( 'config.php records the version, and the files are the new ones', \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/features']['helper']['version'] === '1.2.0'
-	&& in_array( '\\Nino\\Modules\\Helper', \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/modules'], true ) === true
+check( 'updating an active feature places the new version and answers that the update is pending: on disk 1.2.0, still recorded 1.0.0, update waiting, still active', $status === 200 && array_keys( $body ) === [ 'feature', 'activated', 'pending', 'required' ] && $body['pending'] === true && $body['activated'] === false
+	&& $body['feature']['version'] === '1.2.0' && $body['feature']['installed'] === '1.0.0' && $body['feature']['update'] === true && $body['feature']['active'] === true && $body['feature']['problems'] === [] );
+check( 'the files are the new ones, the class still in the module list', in_array( '\\Nino\\Modules\\Helper', \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/modules'], true ) === true
 	&& str_contains( (string) file_get_contents( NINO_FEATURES_DIR. '/Helper/feature.php' ), '1.2.0' ) && stagingClean( $staging ) === true );
+check( '...and nothing called the new version\'s hook in this request - the class in memory is the one without it', is_file( $upgradeMarker ) === false && method_exists( '\\Nino\\Modules\\Helper', 'upgrade' ) === false );
+
+// The kernel refuses to apply it here, whoever asks: the version it would
+// record is one whose hook it cannot call
+check( 'activate() in the same request refuses to apply the update and says why', \Nino\Features::activate( $appData, 'helper' ) === 'feature "helper" was replaced in this request while its previous version is loaded - the update is applied by activating it in a new request'
+	&& \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/features']['helper']['version'] === '1.0.0' );
+
+// The request the panel makes next, as the fresh process it is: the new class
+// is the one that loads, and its hook runs from the recorded version
+$applyDriver = $sandbox. '/apply-update.php';
+file_put_contents( $applyDriver, '<?php
+declare(strict_types=1);
+define( "NINO_FEATURES_DIR", '. var_export( NINO_FEATURES_DIR, true ). ' );
+require '. var_export( __DIR__. '/harness.php', true ). ';
+$appData = [ "./nino/uid" => '. var_export( $sandbox, true ). ' ];
+\Nino\AppData::prepare( $appData );
+$appData["./nino/filesystem/path"]				= '. var_export( $sandbox, true ). ';
+$appData["./nino/filesystem/configpath"]	= '. var_export( $sandbox. '/private', true ). ';
+$appData["./nino/filesystem/contentpath"] = '. var_export( $sandbox. '/private', true ). ';
+$appData["./nino/filesystem/publicpath"]	= '. var_export( $sandbox. '/public', true ). ';
+$appData["/nino/dir"] = "";
+\Nino\AppData::init( $appData );
+echo json_encode( [ "result" => \Nino\Features::activate( $appData, "helper" ), "hook" => method_exists( "\\\\Nino\\\\Modules\\\\Helper", "upgrade" ) ] );
+' );
+$applied = json_decode( (string) shell_exec( PHP_BINARY. ' '. escapeshellarg( $applyDriver ). ' 2>/dev/null' ), true ) ?? [];
+
+// What that request wrote, read back into this one: config.php afresh - a
+// same-second rewrite of the same size is invisible to the cache's
+// fingerprint - and the registry with it
+unset( $appData['./nino/filesystem/cache']['/config.php'], $appData['./nino/features/all'] );
+$appData['/nino/features'] = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/features'];
+
+check( 'a new request loads the new class and applies the update: the hook ran, from the recorded version', ( $applied['result'] ?? null ) === true && ( $applied['hook'] ?? false ) === true && is_file( $upgradeMarker ) === true && file_get_contents( $upgradeMarker ) === '1.0.0' );
+check( 'config.php records the version now, no update waiting', $appData['/nino/features']['helper']['version'] === '1.2.0' && \Nino\Features::get( $appData, 'helper' )['installed'] === '1.2.0' && \Nino\Features::get( $appData, 'helper' )['update'] === false );
 
 [ $status, $body ] = callFeatures( $appData, 'apiCatalogue' );
 check( 'the offer says current now', $status === 200 && array_column( $body['offers'], 'state', 'key' )['helper'] === 'current' && array_column( $body['offers'], 'local', 'key' )['helper'] === '1.2.0' );
@@ -993,14 +1037,19 @@ check( 'the offer says current now', $status === 200 && array_column( $body['off
 // An update whose new version cannot be activated here: the files are
 // placed - the archive fits this kernel, but its manifest now requires a
 // feature that is not in the directory, which only an activation can
-// know - and the answer says both, in the panel's words
+// know - and it is the activation the panel makes next that says so
 $helper130 = tarGz( featureFiles( 'Helper', 'helper', '1.3.0', [ 'feature.php' => '<?php return [ \'key\' => \'helper\', \'name\' => \'Helper\', \'version\' => \'1.3.0\', \'requires\' => [ \'nowhere\' ] ];' ] ) );
 $remote['https://catalogue.test/features/helper-1.3.0.tar.gz'] = $helper130;
 publish( $appData, $remote, array_merge( $withHelper120, [ entry( 'helper', '1.3.0', $helper130 ) ] ), null, $privateKey );
 
 [ $status, $body ] = callFeatures( $appData, 'apiInstall', [ 'key' => 'helper', 'version' => '1.3.0' ] );
-check( 'an update the kernel refuses to apply is a 400 saying the new files are in place, with the kernel\'s reason', $status === 400
-	&& str_starts_with( $body['error'], panelWord( 'de_DE', '/_admin/features/error/update-after-install', 'feature "helper" cannot be activated: ' ) ) && str_contains( $body['error'], '"nowhere"' ) );
+check( 'an update the kernel will refuse is placed and answered as pending all the same - what an activation knows, the placement cannot', $status === 200 && $body['pending'] === true
+	&& $body['feature']['version'] === '1.3.0' && $body['feature']['installed'] === '1.2.0' && $body['feature']['problems'] !== [] );
+
+// The request the panel makes next carries no note of what this one replaced
+unset( $appData['./nino/features/replaced'] );
+[ $status, $body ] = callFeatures( $appData, 'apiActivate', [ 'key' => 'helper' ] );
+check( 'the activation the panel makes next is a 400 with the kernel\'s reason', $status === 400 && str_contains( $body['error'], 'cannot be activated' ) && str_contains( $body['error'], '"nowhere"' ) );
 check( 'the directory is the new one, the record stayed at 1.2.0, and the list shows the problem', str_contains( (string) file_get_contents( NINO_FEATURES_DIR. '/Helper/feature.php' ), '1.3.0' )
 	&& \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/features']['helper']['version'] === '1.2.0'
 	&& \Nino\Features::get( $appData, 'helper' )['version'] === '1.3.0' && \Nino\Features::get( $appData, 'helper' )['update'] === true && \Nino\Features::get( $appData, 'helper' )['problems'] !== [] );

@@ -659,6 +659,18 @@ namespace Nino {
 					return 'required feature "'. $required. '": '. $result;
 			}
 
+			/*	Replaced in this request while its class was already loaded -
+				Catalogue::install() notes that - so the class in memory is the
+				previous version's: method_exists() below answers for it, and
+				the hook the new version brought cannot run here. Once the new
+				version is recorded nothing runs it later either. Measured on
+				the panel's update of a running feature: the new version was
+				recorded with its upgrade() never called, and never to be
+				called. Refused as the deferral it is, before anything is
+				touched; the panel activates again in a request of its own	*/
+			if( isset( $appData['./nino/features/replaced'][$key] ) === true && $feature['installed'] !== null && $feature['installed'] !== $feature['version'] )
+				return 'feature "'. $key. '" was replaced in this request while its previous version is loaded - the update is applied by activating it in a new request';
+
 			// The persisted routes, never the live ones - the live array
 			// carries this request's own runtime routes (the workbench's, the
 			// active modules' self-registered endpoints), which must not be

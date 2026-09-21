@@ -94,6 +94,5 @@ return [
 	'[[/_admin/features/error/catalogue-reason]]'	=> 'The catalogue could not be loaded: %s',
 	'[[/_admin/features/error/catalogue-off]]'	=> 'The catalogue is switched off: /nino/catalogue/url in config.php is empty.',
 	'[[/_admin/features/error/catalogue-key]]'	=> 'No catalogue key is configured, so no catalogue can be trusted.',
-	'[[/_admin/features/error/update-after-install]]'	=> 'The new files are in place, but the update could not be applied: %s',
 	'[[/_admin/features/error/activate-after-install]]'	=> 'The feature is in place, but it could not be switched on: %s',
 ];

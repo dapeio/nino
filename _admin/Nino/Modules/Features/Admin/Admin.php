@@ -392,7 +392,12 @@ namespace Nino\Modules\Features {
 				cases, and only the last is a decision this must not make:
 
 				  - it was active: activating again is how the update is applied,
-				    which is one step for both in the kernel (Features::activate());
+				    which is one step for both in the kernel (Features::activate())
+				    - but not in this request. This one booted with the previous
+				    version's class, and the hook the new version brought can only
+				    run in a request that loads the new one; activate() refuses
+				    here (see there). So the answer says the update is pending,
+				    and the panel activates again in a request of its own;
 				  - it was not in the directory at all: pressing Install is a
 				    project saying it wants the feature, and leaving it in the
 				    Inactive tab made that take two presses for the one intention;
@@ -403,7 +408,7 @@ namespace Nino\Modules\Features {
 				What it requires comes with it either way - activate() walks the
 				requirements itself, so a feature that pulled two others in with it
 				is switched on together with them	*/
-			if( $wasActive === true || $isNew === true ) {
+			if( $isNew === true ) {
 
 				$result = \Nino\Features::activate( $appData, $key );
 
@@ -423,9 +428,7 @@ namespace Nino\Modules\Features {
 					if( $actor !== false )
 						\Nino\Admin\Admin::record( $appData, $actor['mail'], self::log( 'features/install', [ 'key' => $key, 'version' => $version ] ). ' (not activated: '. $result. ')' );
 
-					\Nino\Http::fail( $request, 400, self::_say( $appData, $wasActive === true
-						? '/_admin/features/error/update-after-install'
-						: '/_admin/features/error/activate-after-install', $result ) );
+					\Nino\Http::fail( $request, 400, self::_say( $appData, '/_admin/features/error/activate-after-install', $result ) );
 					return;
 				}
 			}
@@ -448,8 +451,8 @@ namespace Nino\Modules\Features {
 
 			\Nino\Http::ok( $request, [
 				'feature'		=> self::_entry( $appData, $feature, \Nino\Admin\Admin::sessionLocale( $appData ) ),
-				'updated'		=> $wasActive,
 				'activated'	=> $isNew,
+				'pending'		=> $wasActive,
 				'required'	=> $installed,
 			] );
 		}
