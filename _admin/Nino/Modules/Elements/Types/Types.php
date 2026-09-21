@@ -245,7 +245,19 @@ namespace Nino\Modules\Elements {
 				// author gets told, instead of the field silently vanishing
 				if( $data['type'] === 'element' ) {
 
-					$field['elementType'] = trim( (string) ( $data['elementType'] ?? '' ) );
+					/*	Stored without its slashes, because that is the spelling
+						everything downstream reads: \Nino\Elements builds the
+						prefix a reference has to start with as
+						'/'. trim( elementType, '/' ). '/', referencedBy() below
+						compares the same way, and both element forms build an
+						option value as '/'+ elementType+ '/'+ uri - which is
+						'//pages/x' for a type written as '/pages'. A model
+						written by hand with the leading slash therefore ran
+						perfectly well and could not be saved from this panel at
+						all: the dangling-reference check compared it against the
+						bare type uris on disk and refused every save, including
+						one that only changed the title.	*/
+					$field['elementType'] = trim( trim( (string) ( $data['elementType'] ?? '' ) ), '/' );
 
 					// The type editor asks whether the reference is a list and
 					// where it stops as two controls; the model carries one int.
@@ -317,7 +329,11 @@ namespace Nino\Modules\Elements {
 				if( ( $field['type'] ?? '' ) !== 'element' )
 					continue;
 
-				$referenced = (string) ( $field['elementType'] ?? '' );
+				// Normalised here too rather than trusting the caller to have
+				// been through cleanModel(): this is the method that decides
+				// whether a model is refusable, and it answers for the spelling
+				// the kernel accepts, not for one particular spelling of it
+				$referenced = trim( trim( (string) ( $field['elementType'] ?? '' ) ), '/' );
 
 				if( $referenced === '' )
 					return 'field "'. $key. '" is an element reference without a type to point at';

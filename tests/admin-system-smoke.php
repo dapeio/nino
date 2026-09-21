@@ -415,6 +415,46 @@ $strayMultiRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 check( 'a cap on a field that is not a reference is dropped',
 	isset( \Nino\Filesystem::getFileContent( $appData, '/elements/refholder.php', false )['model']['headline']['multiple'] ) === false );
 
+/*	A hand-written type file may spell the referenced type with the leading
+	slash the rest of the framework accepts: \Nino\Elements builds its
+	reference prefix as '/'. trim( elementType, '/' ). '/', and
+	Types::referencedBy() compares the same way, so '/brandnewtype' is a
+	working model that the kernel reads and the site renders. The panel
+	compared the raw value against the bare type uris on disk, so it refused
+	every save of that type - including one that changed nothing but the
+	title - and named the type it had just been given as unknown.	*/
+$_POST['data'] = json_encode( [ 'uri' => 'refholder', 'title' => 'Ref Holder', 'model' => [
+	'author' 	=> [ 'type' => 'element', 'elementType' => '/brandnewtype' ],
+	'editor' 	=> [ 'type' => 'element', 'elementType' => 'brandnewtype/' ],
+] ] );
+$slashRefRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Modules\Elements\Types::apiSave( $appData, $slashRefRequest );
+check( 'a reference spelled with the slashes the kernel accepts is accepted here too', $slashRefRequest['/nino/http/response']['statusCode'] === 200 );
+
+$slashSaved = \Nino\Filesystem::getFileContent( $appData, '/elements/refholder.php', false );
+check( '...and is stored in the one spelling everything downstream reads',
+	( $slashSaved['model']['author']['elementType'] ?? null ) === 'brandnewtype'
+	&& ( $slashSaved['model']['editor']['elementType'] ?? null ) === 'brandnewtype' );
+check( '...so the type knows it is referenced, which is what stops it being deleted',
+	\Nino\Modules\Elements\Types::referencedBy( $appData, 'brandnewtype' ) === [ 'refholder.author', 'refholder.editor' ] );
+
+// A slash is not a type either: '/' trimmed to nothing is the same "no type
+// to point at" an empty value is, and still refused
+$_POST['data'] = json_encode( [ 'uri' => 'refholder', 'title' => 'Ref Holder', 'model' => [
+	'author' => [ 'type' => 'element', 'elementType' => '/' ],
+] ] );
+$slashOnlyRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Modules\Elements\Types::apiSave( $appData, $slashOnlyRequest );
+check( 'a reference of nothing but a slash is still no reference', $slashOnlyRequest['/nino/http/response']['statusCode'] === 400 );
+
+// ...and the slashes do not smuggle an unknown type past the check
+$_POST['data'] = json_encode( [ 'uri' => 'refholder', 'title' => 'Ref Holder', 'model' => [
+	'author' => [ 'type' => 'element', 'elementType' => '/nonexistenttype/' ],
+] ] );
+$slashUnknownRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Modules\Elements\Types::apiSave( $appData, $slashUnknownRequest );
+check( 'an unknown type is unknown however it is spelled', $slashUnknownRequest['/nino/http/response']['statusCode'] === 400 );
+
 check( '"element" is offered as a field type by apiList', in_array( 'element', \Nino\Modules\Elements\Types::FIELD_TYPES, true ) === true );
 
 echo "\n";

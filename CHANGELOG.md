@@ -57,6 +57,25 @@ All notable changes to Nino are documented in this file.
 
 ### Fixed
 
+- **A type that referenced another one with a leading slash could not be saved
+  at all.** An element field names the type it may point at, and everything
+  that reads that name normalises it: `\Nino\Elements` builds the prefix a
+  reference has to start with as `'/'. trim( elementType, '/' ). '/'`, and the
+  panel's own `referencedBy()` compares the same way. So a type file written
+  by hand with `'elementType' => '/pages'` is a working model - the kernel
+  validates against it, the site renders it - and only the panel's
+  dangling-reference check compared the raw value against the bare type uris
+  on disk. It answered 400 with "references the unknown element type
+  \"/pages\"" for the type it had just been handed, on every save of that
+  file, including one that changed nothing but the title, and the type editor
+  drew the field as "reference missing" beside it. The name is normalised
+  where it enters the model now, so what is stored is the spelling the kernel,
+  `referencedBy()` and both element forms already read - the option value the
+  forms build was `//pages/x` otherwise - and the check normalises too rather
+  than trusting its caller. A slash on its own is still no reference, and an
+  unknown type is still unknown however it is spelled.
+  `tests/admin-system-smoke.php` covers all four.
+
 - **A restore that failed took the list of backups with it.** The Backups
   panel is the screen somebody opens when the site is already broken, and a
   refused restore emptied it: `_confirmRestore()` reported through
