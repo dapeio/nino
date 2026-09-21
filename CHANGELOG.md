@@ -28,6 +28,31 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **Nine comments and a manual line described code that is not there any
+  more.** `\Nino\Modules\Backups` still promised archives under a one-time
+  random directory name and a key copy inside `_admin/`, where `dirs()` and
+  `_bootstrap()` write `private/.backups` and `private/.auth/backup-key.php`.
+  The Elements panel called element type creation a developer-only task "not
+  exposed here", although the Types tab of its own pane creates, saves and
+  deletes one, and it pointed at an `assets/elements.js` that is
+  `assets/admin.js` - with the Save button named in German on the way past.
+  `\Nino\Backup::manifest()` credited two classes and a method that exist
+  nowhere and said it carries the activity log, which is written to
+  `private/.logs/` and is in no archive. `\Nino\Form::entries()` was
+  documented as "within the retention window" although it returns every month
+  file on disk: pruning happens on a new submission, so a form nobody submits
+  to keeps everything. The merge in `\Nino\Elements::_writeElementData()` was
+  said to build the element that comes back, while it only feeds the uri-change
+  notification, out of values read before the lock. The setup wizard's
+  stylesheet named two hide utilities and a script that no longer exist and
+  spoke of "all four tools". Both workbench manuals and `AGENTS.md` put the
+  login throttle's counters under `private/.auth/`, where `\Nino\Auth` writes
+  `private/data/auth-tries.php`. And the restore check in
+  `tests/admin-system-smoke.php` was labelled after a class that has no name in
+  the repository any more. Every one of them now says what the code does; two
+  wizard rules nothing references - `.install-admin-row` and
+  `.install-next-step--admin` - went with them, and no behaviour changed.
+
 - **The mailbox every mail is sent from moved to the base install unit, as a
   fill.** `\Nino\Mail::_getSender()` reads `[[/form/email/owner]]` for the
   `From` header and the envelope sender of every mail the framework sends, and

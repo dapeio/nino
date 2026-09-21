@@ -688,10 +688,19 @@ namespace Nino {
 		}
 
 		/**
-		 *	Every recorded submission within the retention window, oldest
-		 *	first (as stored). An entry from before there was more than one
-		 *	form is read as the first form's, so nothing a project already
-		 *	has disappears from a panel that filters by form
+		 *	Every recorded submission on disk, oldest first (as stored):
+		 *	every /data/forms.<Y-m>.php there is, with no cutoff of its own.
+		 *
+		 *	The retention window is not this method's - prune() enforces it,
+		 *	and record() is the only thing here that calls it. A month past
+		 *	the window therefore keeps showing up here until the next
+		 *	submission sweeps it, and on a form nobody submits to any more it
+		 *	keeps showing up for good. A caller that has to honour the window
+		 *	either prunes first or filters on the entry's own 'date'.
+		 *
+		 *	An entry from before there was more than one form is read as the
+		 *	first form's, so nothing a project already has disappears from a
+		 *	panel that filters by form
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *

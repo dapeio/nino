@@ -98,7 +98,7 @@ What a role may not do, it is not offered: a field it may not change is shown re
 
 A panel an account lacks the permission for is not rendered at all, and its actions answer `403` regardless; a pane shows only the tabs the account holds. A missing menu item or tab is therefore usually intentional, not a display error.
 
-After five failed attempts, an account is locked for an hour – both numbers are the **Login protection** tab of the Users panel; the same counter runs per address, so guessing across accounts is throttled too - behind a reverse proxy that address is the proxy for everybody unless **Reverse proxies in front of this site** names it, and then one stranger's wrong guesses lock the whole site out. Accounts and roles live in `config.php`, the login throttle's counters under `private/.auth/`.
+After five failed attempts, an account is locked for an hour – both numbers are the **Login protection** tab of the Users panel; the same counter runs per address, so guessing across accounts is throttled too - behind a reverse proxy that address is the proxy for everybody unless **Reverse proxies in front of this site** names it, and then one stranger's wrong guesses lock the whole site out. Accounts and roles live in `config.php`, the login throttle's counters in `private/data/auth-tries.php` – not in `config.php`, so a run of wrong guesses does not rewrite that file on every attempt.
 
 For operation:
 

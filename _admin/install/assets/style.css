@@ -23,8 +23,10 @@
 
 @layer nino.tool {
 
-/*	Force-hide an element regardless of its own display rules - the wizard's
- *	own copy of the utility every tool here keeps (.editor-hidden, .pd-hidden) */
+/*	Force-hide an element regardless of its own display rules - the wizard's own
+ *	name for what the workbench keeps as .admin-hidden and the design system as
+ *	.nino-admin-hidden for its own components (see _admin/assets/style.css). One
+ *	per prefix, so what this file's markup is hidden by is this file's to change */
 .install-hidden {
 	display: none !important;
 }
@@ -164,13 +166,11 @@
 
 /* -------------------------------------------------------------- Admins step */
 
-/*	#personalinfos-form-global/-locale and #accounts-add-form are plain
- *	<fieldset>/.nino-admin-card surfaces with .nino-admin-field rows, styled
- *	entirely by the design system - see personalinfos.js and admin.js */
-
-.install-admin-row {
-	font: .8rem/1.4 var(--nino-admin-mono);
-}
+/*	This step has no local rules left. #personalinfos-form-global/-locale and
+ *	#accounts-add-form are plain <fieldset>/.nino-admin-card surfaces with
+ *	.nino-admin-field rows, styled entirely by the design system - see
+ *	personalinfos.js and accounts.js. The heading stays so the rule this step
+ *	does one day need has an obvious place to go. */
 
 /* --------------------------------------------------------- Step messages */
 
@@ -224,7 +224,8 @@
 /*
    Tool-local components and overrides (see _admin/assets/style.css).
    Ids are fine here - this file only ever loads inside the setup wizard - but they
-   stay out of the shared design system, which has to work for all four tools.
+   stay out of the shared design system, which has to work for every admin surface:
+   the workbench and its panels, this wizard, and the recovery page.
 */
 
 /* The finish screen replaces the wizard chrome rather than sitting inside it */
@@ -284,10 +285,6 @@
 		var(--editor-bg-grouped);
 	box-shadow: var(--editor-shadow-sm);
 	color: var(--editor-text);
-}
-#install-page-wrap .install-next-step--admin {
-	--install-next-accent: var(--editor-orange);
-	--install-next-soft: color-mix(in srgb, var(--editor-orange) 11%, transparent);
 }
 #install-page-wrap .install-next-step--editor {
 	--install-next-accent: var(--editor-green);

@@ -52,22 +52,28 @@ namespace Nino {
 		// Absolute path -> archive name, for every file the admin panel
 		// writes to at runtime: config.php, the text files, every element
 		// type/image, and the /data/ content a project actually accumulates
-		// (newsletter subscribers, form submissions, the error/activity
-		// log). Deliberately not developer code (_nino/, templates,
-		// _admin/ itself, ...) - that's already versioned in git and would
-		// just bloat every backup. Also deliberately not auth-tries.php or
-		// ratelimit.php - both are transient throttling counters, not data
-		// a restore should bring back.
+		// (newsletter subscribers, form submissions, the php error log
+		// logs.<month>.php, and what an installed feature's manifest declares
+		// it owns below /data/). Deliberately not developer code (_nino/,
+		// templates, _admin/ itself, ...) - that's already versioned in git
+		// and would just bloat every backup. Also deliberately not
+		// auth-tries.php or ratelimit.php - both are transient throttling
+		// counters, not data a restore should bring back. The workbench's
+		// activity log is not in an archive either: it is written to
+		// private/.logs/<day>.php (see \Nino\Modules\Logs\Admin),
+		// which is none of the four directories this walks.
 		//
-		// Shared by Admin\Backup::_create() and Dev\Restore::_safetySnapshot(),
-		// which both need the exact same manifest for the exact same reason -
-		// kept here rather than in either since Restore deliberately doesn't
-		// depend on _admin/Nino/Modules/Backups/Backups.php (see that class' own docblock).
+		// Shared by \Nino\Modules\Backups::_create() and
+		// \Nino\Modules\Backups\Admin::_safetySnapshot(), which both need the
+		// exact same manifest for the exact same reason - kept here in the
+		// kernel rather than in either of them, since the panel that restores
+		// an archive has to work where no other class is loadable (see that
+		// panel's own docblock and its _backupDirs()).
 		public static function manifest( array &$appData ): array {
 
 			// Defensive: a caller right after writing config.php
-			// (Admin\Backup::_bootstrap()) needs the is_file() checks below to
-			// see that write rather than a cached pre-write stat
+			// (\Nino\Modules\Backups::_bootstrap()) needs the is_file() checks
+			// below to see that write rather than a cached pre-write stat
 			clearstatcache();
 
 			// Every path here is resolved rather than concatenated onto one

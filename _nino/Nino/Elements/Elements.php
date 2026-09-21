@@ -710,9 +710,21 @@ namespace Nino {
 				// the requested locale below - uploading an English image could
 				// therefore copy German title/description values into English.
 				//
-				// Merge the requested locale only for the returned complete element,
-				// but write/validate just the keys the caller (or a field callback)
-				// supplied. An insert still validates every required model field.
+				// $writeKeys is taken before the merge, and the loop below skips
+				// every key that is not in it, so an update still writes and
+				// validates only what the caller (or a field callback) supplied.
+				// An insert has no merge and still validates every required model
+				// field.
+				//
+				// What the merge is for is the one reader of $data that wants the
+				// element whole rather than the changed keys: the uri-change
+				// notification further down, which is handed a copy of $data. It
+				// is not what comes back to the caller - that is a fresh
+				// getElement() after the mutation. And getElement() here reads the
+				// element cache, which this mutation only drops at its end, so the
+				// filled-in values are the ones from before the lock was taken:
+				// good enough to tell a listener which element moved, not a source
+				// to write from.
 				$writeKeys = array_fill_keys( array_keys( $data ), true );
 				if( $update === true ) {
 					$existing = \Nino\Elements::getElement( $appData, $uri, $locale, [] );

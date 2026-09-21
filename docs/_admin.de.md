@@ -98,7 +98,7 @@ Was eine Rolle nicht darf, wird ihr nicht angeboten: Ein Feld, das sie nicht än
 
 Ein Panel, für das dem Konto die Berechtigung fehlt, wird gar nicht erst gerendert, und seine Aktionen antworten in jedem Fall mit `403`; eine Fläche zeigt nur die Tabs, die das Konto hält. Ein fehlender Menüpunkt oder Tab ist deshalb meist beabsichtigt und kein Darstellungsfehler.
 
-Nach fünf Fehlversuchen ist ein Konto eine Stunde gesperrt – beide Zahlen sind der Tab **Anmeldeschutz** des Panels Nutzer; derselbe Zähler läuft je Adresse, sodass auch das Raten über Konten hinweg gedrosselt ist – hinter einem Reverse Proxy ist diese Adresse für alle der Proxy, solange **Reverse Proxies vor dieser Website** ihn nicht nennt, und dann sperrt das Raten eines Fremden die ganze Seite aus. Konten und Rollen liegen in der `config.php`, die Zähler der Anmeldedrossel unter `private/.auth/`.
+Nach fünf Fehlversuchen ist ein Konto eine Stunde gesperrt – beide Zahlen sind der Tab **Anmeldeschutz** des Panels Nutzer; derselbe Zähler läuft je Adresse, sodass auch das Raten über Konten hinweg gedrosselt ist – hinter einem Reverse Proxy ist diese Adresse für alle der Proxy, solange **Reverse Proxies vor dieser Website** ihn nicht nennt, und dann sperrt das Raten eines Fremden die ganze Seite aus. Konten und Rollen liegen in der `config.php`, die Zähler der Anmeldedrossel in `private/data/auth-tries.php` – nicht in der `config.php`, damit eine Folge von Fehlversuchen diese Datei nicht bei jedem Versuch neu schreibt.
 
 Für den Betrieb:
 

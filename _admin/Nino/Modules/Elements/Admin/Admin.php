@@ -15,9 +15,12 @@ namespace Nino\Modules\Elements {
 	 *	Modules						The workbench's own screens
 	 *	Elements					Elements editor: fills the response for the /_admin/elements/*
 	 *											routes registered by \Nino\Admin\Admin::init() - list types, list/get/save/
-	 *											delete elements within a type. Element *type* creation stays a
-	 *											developer-only task (\Nino\Elements::insertElementType), not
-	 *											exposed here.
+	 *											delete elements within a type. A type itself - its title and its
+	 *											model - is the Types tab of this same pane (see tabs() and
+	 *											\Nino\Modules\Elements\Types), which creates, saves and deletes
+	 *											one behind a permission of its own: the shape is a developer's
+	 *											business, the entries made of it are not, and they are two
+	 *											screens rather than two tools.
 	 *
 	 *	@package					Dape/Nino
 	 *	@author						David Perchermeier <mail@dape.io>
@@ -69,7 +72,7 @@ namespace Nino\Modules\Elements {
 		}
 
 		// Drill-down: types -> element list -> edit form, each level hiding
-		// its parent (see assets/elements.js)
+		// its parent (see assets/admin.js)
 		public static function panes(): array {
 			return [ 'elements-types', 'elements-list', 'elements-form' ];
 		}
@@ -316,7 +319,7 @@ namespace Nino\Modules\Elements {
 		/**
 		 *	Upload, process and store a new image for one "image"-typed model
 		 *	field of an already-saved element. Committed immediately (not tied
-		 *	to the form's "Speichern" button, unlike every other field). Stored
+		 *	to the form's Save button, unlike every other field). Stored
 		 *	at a deterministic path (elements/<type>/<uri>, disambiguated with
 		 *	the key/locale only where a real collision is possible), so a
 		 *	replace overwrites in place - the rare leftover (the output format

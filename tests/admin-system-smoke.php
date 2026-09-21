@@ -582,11 +582,22 @@ unlink( $sandbox. '/private/.auth/backup-key.php' );
 \Nino\Admin\Admin::guard( $appData, $guardOk );
 check( 'Backup::maybeRun re-creates a missing key copy on an already-bootstrapped install', is_file( $sandbox. '/private/.auth/backup-key.php' ) === true );
 
-// Restore has to work with /_admin deleted - that is the whole point of it
-// reading Backup's output rather than calling into it, and this file loads
-// Editor.php for its own fixtures, so only a subprocess can prove it. A
-// plain \Nino\Modules\Backups:: reference in Restore would pass every check
-// above and still 500 on the one install that actually needs restoring
+// Restore has to find the archives on an installation that is nothing but a
+// kernel and the workbench shell - a broken one is what reaches for it, and by
+// this line the test process is the opposite of that: a sandbox full of
+// fixtures, accounts, panels and an appData every check above has written to.
+// Only a subprocess can say what a bare boot sees. The driver below requires
+// \Nino.php and _admin/Admin.php and nothing else, and asks the panel for its
+// list: what it answers, it found on disk under private/, not in anything this
+// file put there. That is why the panel keeps its own copy of the archive
+// directory and the key path instead of reaching for \Nino\Modules\Backups'
+// private constants (see its _backupDirs() and _key()).
+//
+// 'editorLoaded' is what is left of the check this driver was written for, when
+// Backup was \Nino\Editor\Backup in a tool of its own: the class has no name in
+// this repository any more, so class_exists() on it answers false whatever the
+// driver does. What the assertion still catches is a driver that did not answer
+// at all - a boot that died leaves no key to read, and the check fails.
 $standaloneDriver = $sandbox. '/restore-standalone.php';
 file_put_contents( $standaloneDriver, '<?php
 declare(strict_types=1);
@@ -609,7 +620,7 @@ echo json_encode( [
 
 $standalone = json_decode( (string) shell_exec( 'php '. escapeshellarg( $standaloneDriver ). ' 2>/dev/null' ), true ) ?? [];
 
-check( 'Restore runs without _admin/Admin.php loaded at all', ( $standalone['editorLoaded'] ?? true ) === false );
+check( 'the standalone driver boots on the kernel and the shell alone, with none of this file\'s fixtures', ( $standalone['editorLoaded'] ?? true ) === false );
 check( '...and still finds the archives from there', in_array( date( 'Y-m-d' ), $standalone['dates'] ?? [], true ) === true );
 
 $listRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];

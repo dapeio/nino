@@ -25,10 +25,16 @@ namespace Nino\Modules {
 	 *											every Nino deployment needs - a site with no workbench has
 	 *											nothing to back up in the first place.
 	 *
-	 *											Three independent layers, none of which need any
-	 *											webserver configuration:
-	 *											- stored under a one-time random directory name, never
-	 *											  linked anywhere, so it can't be crawled/guessed
+	 *											Three independent layers, the last two of which hold even
+	 *											where the private half is served after all:
+	 *											- kept below the private directory, at private/.backups
+	 *											  (see dirs()) - project data rather than a tool folder, so
+	 *											  an update replaces _admin/ without taking the archives
+	 *											  with it, and nothing under private/ is served to begin
+	 *											  with. The one-time random directory name this class used
+	 *											  to generate went with that move: it bought an unguessable
+	 *											  name inside the webroot, and there is no longer a name
+	 *											  inside the webroot to guess
 	 *											- .php extension with a self-terminating stub - a direct
 	 *											  request hits exit() before the real (encrypted) data
 	 *											  ever gets output
@@ -53,7 +59,7 @@ namespace Nino\Modules {
 	 *											entirely - there's no point where the tokenizer re-scans
 	 *											for tags inside a string literal.
 	 *
-	 *											Restore lives in _admin, not here - see _admin/Admin.php. This
+	 *											Restore is the panel beside this file, Admin/Admin.php - this
 	 *											class only ever creates, never reads/decrypts, backups.
 	 *
 	 *	@package					Dape/Nino
@@ -189,21 +195,24 @@ namespace Nino\Modules {
 		}
 
 		/**
-		 *	Generate the random backup directory name and encryption key on
-		 *	first use - a project that never opens the workbench never gets these
-		 *	config.php keys at all.
+		 *	Generate the encryption key on first use - a project that never
+		 *	opens the workbench never gets that config.php key at all. The
+		 *	random directory name this used to generate beside it is gone:
+		 *	the archives sit at a fixed place below the private directory
+		 *	now and need no unguessable name of their own (see dirs()).
 		 *
-		 *	The key also gets an independent copy written into _admin/ (behind
-		 *	the same .php exit-stub as a backup itself, since it's just as
-		 *	sensitive) - _admin/Admin.php's Restore module reads *that* copy,
-		 *	deliberately not this one, so restoring never depends on
-		 *	config.php's data being intact. This copy is reconciled on every
-		 *	call independent of whether dir/key already existed, since an
-		 *	install that had Backup running before Restore/_admin's key file
-		 *	existed would otherwise never get one (the dir/key generation
-		 *	itself only ever runs once). Skipped if _admin/ isn't present
-		 *	(already removed after initial setup, or never deployed) - fine,
-		 *	restoring isn't possible without it either way.
+		 *	The key also gets an independent copy, written to
+		 *	private/.auth/backup-key.php (behind the same .php exit-stub as
+		 *	a backup itself, since it's just as sensitive) - the Backups
+		 *	panel beside this file reads *that* copy, deliberately not this
+		 *	one, so restoring never depends on config.php's data being
+		 *	intact. The copy is reconciled on every call, independent of
+		 *	whether the key already existed, since an install that had
+		 *	backups running before the copy existed - or one whose copy was
+		 *	deleted since - would otherwise never get one: the generation
+		 *	above only ever runs once. It goes beside the recovery secret
+		 *	rather than into a tool folder, so it survives an update that
+		 *	replaces _admin/ and is there whenever a restore is.
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *
@@ -249,7 +258,7 @@ namespace Nino\Modules {
 			if( $changed === true && $written === false )
 				throw new \RuntimeException( 'backup configuration could not be written' );
 
-			// Independent of the above: an install that already had a dir/key
+			// Independent of the above: an install that already had a key
 			// before this copy existed (or whose copy was lost/deleted since)
 			// never gets one otherwise, since the block above only ran once,
 			// on first-ever bootstrap
