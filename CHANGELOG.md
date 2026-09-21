@@ -57,6 +57,29 @@ All notable changes to Nino are documented in this file.
 
 ### Fixed
 
+- **An image slot could be saved that no upload was able to fill, and deleting
+  one threw the file away before the record.** Two things in the Image Slots
+  tab. A slot's width and height are the exact canvas `\Nino\Images::process()`
+  renders onto, and they had no upper bound at all: measured on this gd with
+  php's default 128M, `apiCreate` took a 20000x20000 slot with a 200 and the
+  upload meant to fill it then came back as "invalid or oversized image" -
+  blaming the photograph for a size nobody could satisfy, on every attempt,
+  for as long as the slot stood. Both `apiCreate` and `apiSave` now refuse a
+  size above `\Nino\Images::MAX_SOURCE_PIXELS` with a 400 and a reason the
+  panel already shows; the constant became public for it, because it is not
+  only a gate on the way in - the kernel's own comment says the target buffer
+  is the same allocation - and the largest square that budget allows
+  (4472x4472, 20 megapixels) still saves and still fills. Second, `apiDelete`
+  deleted the slot's uploaded file and only then wrote the slot list.
+  Measured with config.php's sidecar lock made impossible to open, which is
+  what a read-only or full disk comes to: the old code answered 200, the file
+  was gone, the slot was still in config.php pointing at it - a public page
+  with a broken `<img>` and nothing left in the panel to re-upload over - and
+  the retry 404'd, because the only copy that had lost the slot was the one
+  in memory. The record is written first now, a write that fails puts the
+  slot back and answers 500, and the file is deleted only once the removal is
+  on disk. Nine checks in `tests/admin-system-smoke.php` around both.
+
 - **Three icons of the shell carried two `class` attributes each.** The theme
   toggle's sun, moon and system `<svg>` in `page-index.tpl` opened with
   `class="admin-theme-toggle-*"` and carried a second

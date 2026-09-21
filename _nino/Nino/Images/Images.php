@@ -53,7 +53,13 @@ namespace Nino {
 		// ~160MB, ie. the guard would let through exactly the upload that OOMs
 		// on the cheap shared hosting this is built for. Larger camera sources
 		// (including a 24MP 6000x4000 image) are deliberately rejected.
-		private const int MAX_SOURCE_PIXELS 		= 20 * 1000 * 1000;
+		//
+		// Public because it is not only a gate on the way in: the target canvas
+		// _render() allocates below is the same kind of buffer, so this is also
+		// the largest picture this server can be asked to produce. A panel that
+		// lets somebody configure a slot size has to be able to read it, or it
+		// accepts a size no upload can ever fill
+		public const int MAX_SOURCE_PIXELS 		= 20 * 1000 * 1000;
 		private const string UPLOAD_DIR 				= '/images';
 
 		// Validate, center-crop and resize raw uploaded image bytes to exactly

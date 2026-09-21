@@ -97,6 +97,28 @@ namespace Nino\Modules\Images {
 			return preg_match( '#^/[a-z][a-z0-9_-]*(/[a-z][a-z0-9_-]*)*$#', $uri ) === 1;
 		}
 
+		/**
+		 *	Whether a slot of this size is one an upload could ever fill.
+		 *
+		 *	A slot's width and height are the exact canvas \Nino\Images::process()
+		 *	renders onto, and the kernel caps the picture it is prepared to hold
+		 *	in memory at \Nino\Images::MAX_SOURCE_PIXELS - the target buffer is
+		 *	the same kind of allocation as the source one that constant guards.
+		 *	Above it the slot is saved and then cannot be filled: every upload
+		 *	comes back as "invalid or oversized image", which sends the person
+		 *	looking at their photograph rather than at the size they typed. Total
+		 *	pixels rather than either edge, for the same reason the kernel counts
+		 *	them that way.
+		 *
+		 *	@param		int				$width
+		 *	@param		int				$height
+		 *
+		 *	@return 	bool
+		 */
+		private static function fitsUploadLimit( int $width, int $height ): bool {
+			return $width * $height <= \Nino\Images::MAX_SOURCE_PIXELS;
+		}
+
 		public static function log( string $action, array $data ): string {
 			return match( $action ) {
 				'slots/create'	=> 'Add Image Slot '. ( $data['uri'] ?? '' ),
@@ -164,6 +186,11 @@ namespace Nino\Modules\Images {
 				return;
 			}
 
+			if( self::fitsUploadLimit( $width, $height ) === false ) {
+				\Nino\Http::fail( $request, 400, 'target size is larger than an upload can produce' );
+				return;
+			}
+
 			$appData['/nino/html/images'][$uri]['label'] 	= $label;
 			$appData['/nino/html/images'][$uri]['width'] 	= $width;
 			$appData['/nino/html/images'][$uri]['height'] = $height;
@@ -194,6 +221,11 @@ namespace Nino\Modules\Images {
 
 			if( self::isValidUri( $uri ) === false || $label === '' ) {
 				\Nino\Http::fail( $request, 400, 'invalid uri or missing label' );
+				return;
+			}
+
+			if( self::fitsUploadLimit( $width, $height ) === false ) {
+				\Nino\Http::fail( $request, 400, 'target size is larger than an upload can produce' );
 				return;
 			}
 
@@ -237,12 +269,25 @@ namespace Nino\Modules\Images {
 				return;
 			}
 
-			if( ( $slot['filename'] ?? null ) !== null )
-				\Nino\Images::delete( $appData, $slot['filename'] );
-
 			unset( $appData['/nino/html/images'][$uri] );
 
-			\Nino\AppData::writeContentData( $appData, [ '/nino/html/images' ] );
+			/*	The record goes first and the file second, because the two
+				failures are not the same size. A write that does not happen - a
+				config.php that cannot be locked, a disk with nothing left on it -
+				used to leave the slot standing in config.php with its image
+				already deleted: a public page rendering a broken <img>, and a
+				panel with nothing left to re-upload over, since the slot still
+				believes it has a file. The other way round the worst case is a
+				file nobody references any more, and the Images panel's own scan
+				already lists those.	*/
+			if( \Nino\AppData::writeContentData( $appData, [ '/nino/html/images' ] ) === false ) {
+				$appData['/nino/html/images'][$uri] = $slot;
+				\Nino\Http::fail( $request, 500, 'could not save the slot list' );
+				return;
+			}
+
+			if( ( $slot['filename'] ?? null ) !== null )
+				\Nino\Images::delete( $appData, $slot['filename'] );
 
 			\Nino\Http::ok( $request );
 		}

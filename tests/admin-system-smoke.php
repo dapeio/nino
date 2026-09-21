@@ -1306,6 +1306,29 @@ check( 'apiCreate rejects an invalid uri', $status === 400 );
 [ $status ] = callDev( $appData, \Nino\Modules\Images\Slots::class, 'apiCreate', [ 'uri' => '/home/hero', 'label' => 'x', 'width' => '10', 'height' => '10' ] );
 check( 'apiCreate rejects a uri that already exists', $status === 409 );
 
+/*	A slot's width and height are the exact canvas \Nino\Images::process()
+	renders onto, and the kernel holds no more than MAX_SOURCE_PIXELS of one
+	picture in memory. Saved above that the slot cannot be filled by anything:
+	measured against the old panel, apiCreate took 20000x20000 with a 200 and
+	the upload meant to fill it came back "invalid or oversized image" - which
+	sends the person looking at their photograph instead of at the size they
+	typed.	*/
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Images\Slots::class, 'apiCreate', [ 'uri' => '/home/wall', 'label' => 'Wall', 'width' => '20000', 'height' => '20000' ] );
+check( 'apiCreate refuses a slot no upload could ever fill, with a reason', $status === 400 && ( $body['error'] ?? '' ) !== '' );
+check( '...and stores nothing of it', isset( $appData['/nino/html/images']['/home/wall'] ) === false );
+
+// The cap is the kernel's own budget, so the largest slot it can still
+// render has to go through - one pixel more is where it stops
+$edge = (int) floor( sqrt( \Nino\Images::MAX_SOURCE_PIXELS ) );
+[ $status ] = callDev( $appData, \Nino\Modules\Images\Slots::class, 'apiCreate', [ 'uri' => '/home/large', 'label' => 'Large', 'width' => (string) $edge, 'height' => (string) $edge ] );
+check( 'the largest slot the kernel can still render is accepted', $status === 200 && ( $appData['/nino/html/images']['/home/large']['width'] ?? 0 ) === $edge );
+
+[ $status ] = callDev( $appData, \Nino\Modules\Images\Slots::class, 'apiSave', [ 'uri' => '/home/large', 'label' => 'Large', 'width' => (string) \Nino\Images::MAX_SOURCE_PIXELS, 'height' => '2' ] );
+check( 'apiSave refuses to grow an existing slot past the same budget', $status === 400 );
+check( '...and leaves the size it had', ( $appData['/nino/html/images']['/home/large']['width'] ?? 0 ) === $edge );
+
+callDev( $appData, \Nino\Modules\Images\Slots::class, 'apiDelete', [ 'uri' => '/home/large' ] );
+
 [ $status, $body ] = callDev( $appData, \Nino\Modules\Images\Slots::class, 'apiList' );
 check( 'apiList succeeds', $status === 200 );
 check( 'apiList finds the new slot', in_array( '/home/hero', array_column( $body['slots'], 'uri' ), true ) === true );
@@ -1324,11 +1347,45 @@ check( 'apiSave 404s for an unknown slot', $status === 404 );
 [ $status ] = callDev( $appData, \Nino\Modules\Images\Slots::class, 'apiDelete', [ 'uri' => '/does/not/exist' ] );
 check( 'apiDelete 404s for an unknown slot', $status === 404 );
 
+/*	Deleting a slot deletes its uploaded file with it, and the order of those
+	two is the whole of it. The file used to go first: a write that does not
+	happen - a config.php that cannot be locked, a disk with nothing left -
+	then left the slot standing in config.php pointing at a file that is gone,
+	the public page rendering a broken <img>, and the panel with nothing to
+	re-upload over. Measured against the old code with the sidecar lock of
+	config.php made impossible to open: apiDelete answered 200, the file was
+	gone, the slot was still in config.php, and the retry 404'd because the
+	only copy that had lost it was the one in memory.	*/
+\Nino\Filesystem::putFileContent( $appData, '/images/home/hero.800x400.jpg', 'stand-in for the uploaded bytes' );
+$heroFile = \Nino\Filesystem::path( $appData, '/images' ). '/home/hero.800x400.jpg';
+check( 'the slot has a file to lose', is_file( $heroFile ) === true
+	&& $appData['/nino/html/images']['/home/hero']['filename'] === 'elements/home/hero.800x400.jpg' );
+$appData['/nino/html/images']['/home/hero']['filename'] = 'home/hero.800x400.jpg';
+callDev( $appData, \Nino\Modules\Images\Slots::class, 'apiSave', [ 'uri' => '/home/hero', 'label' => 'Hero neu 2', 'width' => '800', 'height' => '400' ] );
+
+// A directory where config.php's sidecar lock file goes: lockFile() cannot
+// open it, so writeContentData() refuses to write - the same answer a
+// read-only or full disk gives, without needing either
+$configLock = $sandbox. '/private/data/.locks/'. sha1( '/config.php' ). '.lock';
+unset( $appData['./nino/filesystem/locks'] );
+@unlink( $configLock );
+@mkdir( $configLock );
+
+[ $status ] = callDev( $appData, \Nino\Modules\Images\Slots::class, 'apiDelete', [ 'uri' => '/home/hero' ] );
+check( 'a delete that could not be persisted says so rather than reporting success', $status === 500 );
+check( '...and leaves the uploaded file exactly where it was', is_file( $heroFile ) === true );
+check( '...and leaves the slot itself, so the delete can simply be repeated', isset( $appData['/nino/html/images']['/home/hero'] ) === true
+	&& isset( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/html/images']['/home/hero'] ) === true );
+
+@rmdir( $configLock );
+unset( $appData['./nino/filesystem/locks'], $appData['./nino/filesystem/cache'] );
+
 [ $status ] = callDev( $appData, \Nino\Modules\Images\Slots::class, 'apiDelete', [ 'uri' => '/home/hero' ] );
 check( 'apiDelete succeeds', $status === 200 );
 check( 'the slot is gone from appData', isset( $appData['/nino/html/images']['/home/hero'] ) === false );
 $imagesAfterDelete = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/html/images'] ?? [];
 check( 'the slot is gone from config.php too', isset( $imagesAfterDelete['/home/hero'] ) === false );
+check( '...and now that the record is persisted, the file went with it', is_file( $heroFile ) === false );
 
 echo "\n";
 
