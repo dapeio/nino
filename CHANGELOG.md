@@ -57,6 +57,21 @@ All notable changes to Nino are documented in this file.
 
 ### Fixed
 
+- **A unit file that could not be written was an activation that reported
+  success.** `Features::copyFile()` wrote a unit's template with an unchecked
+  `file_put_contents()`, and `applyUnit()` answered nothing to `activate()`
+  either way. A target that could not be written - a directory in its place, a
+  permission, a full disk - raised php's own warning, which the framework's
+  handler ends the request on: a 500 with half the unit copied. Under a handler
+  that carries on, a project's own or a test suite's, the activation went on to
+  list the class and record the version: a success, with the template missing
+  and nothing to say so. Every copy and every text merge is checked now, and
+  `applyUnit()` names the first file it could not copy, so the activation is
+  refused with that sentence before anything is listed or recorded, and raises
+  nothing on the way. The wizard applies its units through the same method and
+  still reads no answer from it - a fresh install writes into directories it
+  has just created - and that is its own step to take.
+
 - **A `.json` file that does not decode was answered as `null`, not as the
   default.** `Filesystem::getFileContent()` answers `$default` for a path it
   refuses, a file it cannot prepare and one that is not there - and cached

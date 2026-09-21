@@ -670,8 +670,13 @@ namespace Nino {
 			$blacklist	= [];
 			$config			= [];
 
-			if( is_dir( $feature['dir']. '/install' ) === true )
-				self::applyUnit( $appData, $feature['dir']. '/install', \Nino\Locales::getAvailableLocales( $appData ), $routes, $blacklist, $config, false );
+			// A unit file that could not be copied is a refusal, before
+			// anything is listed or recorded - see applyUnit()
+			if( is_dir( $feature['dir']. '/install' ) === true ) {
+				$applied = self::applyUnit( $appData, $feature['dir']. '/install', \Nino\Locales::getAvailableLocales( $appData ), $routes, $blacklist, $config, false );
+				if( $applied !== true )
+					return 'feature "'. $key. '" could not be activated: '. $applied;
+			}
 
 			$class 			= $feature['module'];
 			$wasActive	= $feature['active'];
@@ -954,9 +959,11 @@ namespace Nino {
 		 *	@param		array 		&$config			(reference) Collected config defaults, key => value, for the caller to write
 		 *	@param		bool			$overwrite		Whether the unit replaces what the project has
 		 *
-		 *	@return 	void
+		 *	@return 	true|string							true, or the first file the unit could not
+		 *																	copy or write - named the way the project
+		 *																	sees it, eg. '/templates/page-x.tpl'
 		 */
-		public static function applyUnit( array &$appData, string $unitDir, array $locales, array &$routes, array &$blacklist, array &$config, bool $overwrite = true ): void {
+		public static function applyUnit( array &$appData, string $unitDir, array $locales, array &$routes, array &$blacklist, array &$config, bool $overwrite = true ): true|string {
 
 			$unitDir	= rtrim( $unitDir, '/' );
 			$manifest	= self::readUnitManifest( $unitDir ) ?? [];
@@ -976,22 +983,31 @@ namespace Nino {
 				it a few statements later - a window, however short, in which a
 				failed request could leave the directory readable with a
 				project's templates already in it.	*/
+			/*	Every copy below is checked, and the first one that failed is the
+				answer. Unchecked, a target that could not be written was either
+				php's own warning - which the framework's handler ends the
+				request on, a 500 with half the unit copied - or, under a handler
+				that carries on, nothing at all: the caller listed the class and
+				recorded the version over a template that was never written	*/
 			foreach( ( $manifest['files'] ?? [] ) as $file )
-				self::copyTree( $unitDir. '/'. $file, \Nino\Filesystem::path( $appData, '/'. $file ), $overwrite );
+				if( self::copyTree( $unitDir. '/'. $file, \Nino\Filesystem::path( $appData, '/'. $file ), $overwrite ) === false )
+					return 'could not copy /'. $file;
 
 			if( count( $manifest['templates'] ?? [] ) > 0 ) {
 				\Nino\Filesystem::forceDir( $appData, '/templates' );
 				foreach( $manifest['templates'] as $locale => $file ) {
 					if( is_string( $locale ) === true && in_array( $locale, $locales, true ) === false )
 						continue;
-					self::copyFile( $unitDir. '/templates/'. $file, \Nino\Filesystem::path( $appData, '/templates/'. $file ), $overwrite );
+					if( self::copyFile( $unitDir. '/templates/'. $file, \Nino\Filesystem::path( $appData, '/templates/'. $file ), $overwrite ) === false )
+						return 'could not copy /templates/'. $file;
 				}
 			}
 
 			if( count( $manifest['elementTypes'] ?? [] ) > 0 ) {
 				\Nino\Filesystem::forceDir( $appData, '/elements' );
 				foreach( $manifest['elementTypes'] as $file )
-					self::copyFile( $unitDir. '/'. $file, \Nino\Filesystem::path( $appData, '/elements/'. $file ), $overwrite );
+					if( self::copyFile( $unitDir. '/'. $file, \Nino\Filesystem::path( $appData, '/elements/'. $file ), $overwrite ) === false )
+						return 'could not copy /elements/'. $file;
 			}
 
 			foreach( ( $manifest['blacklist'] ?? [] ) as $key )
@@ -1015,14 +1031,16 @@ namespace Nino {
 				}
 
 			$globalFragment = $unitDir. '/text/global.php';
-			if( is_file( $globalFragment ) === true )
-				self::mergeText( $appData, '/text/global.php', (array) include $globalFragment, $overwrite );
+			if( is_file( $globalFragment ) === true && self::mergeText( $appData, '/text/global.php', (array) include $globalFragment, $overwrite ) === false )
+				return 'could not write /text/global.php';
 
 			foreach( $locales as $locale ) {
 				$localeFragment = $unitDir. '/text/'. $locale. '.php';
-				if( is_file( $localeFragment ) === true )
-					self::mergeText( $appData, '/text/'. $locale. '.php', (array) include $localeFragment, $overwrite );
+				if( is_file( $localeFragment ) === true && self::mergeText( $appData, '/text/'. $locale. '.php', (array) include $localeFragment, $overwrite ) === false )
+					return 'could not write /text/'. $locale. '.php';
 			}
+
+			return true;
 		}
 
 		/**
@@ -1034,11 +1052,11 @@ namespace Nino {
 		 *	@param		array 		$fragment			Bracket-key => value pairs to merge in
 		 *	@param		bool			$overwrite
 		 *
-		 *	@return 	void
+		 *	@return 	bool										Whether the file was written
 		 */
-		public static function mergeText( array &$appData, string $path, array $fragment, bool $overwrite = true ): void {
+		public static function mergeText( array &$appData, string $path, array $fragment, bool $overwrite = true ): bool {
 
-			\Nino\Filesystem::mutate( $appData, $path, function( mixed $content ) use ( $fragment, $overwrite ): array {
+			return \Nino\Filesystem::mutate( $appData, $path, function( mixed $content ) use ( $fragment, $overwrite ): array {
 				$content = is_array( $content ) ? $content : [];
 				return $overwrite === true ? array_merge( $content, $fragment ) : $content + $fragment;
 			} );
@@ -1055,16 +1073,19 @@ namespace Nino {
 		 *	@param		string		$to
 		 *	@param		bool			$overwrite		Whether an existing $to is replaced
 		 *
-		 *	@return 	void
+		 *	@return 	bool										Whether $to holds the unit's file now - a
+		 *																	source that cannot be read or a target that
+		 *																	cannot be written is false, and the caller
+		 *																	says which file it was
 		 */
-		public static function copyFile( string $from, string $to, bool $overwrite = true ): void {
+		public static function copyFile( string $from, string $to, bool $overwrite = true ): bool {
 
 			if( $overwrite === false && is_file( $to ) === true )
-				return;
+				return true;
 
 			$content = @file_get_contents( $from );
 			if( $content === false )
-				return;
+				return false;
 
 			if( is_file( $to ) === true )
 				@unlink( $to );
@@ -1072,7 +1093,14 @@ namespace Nino {
 			if( is_dir( dirname( $to ) ) === false )
 				@mkdir( dirname( $to ), 0755, true );
 
-			file_put_contents( $to, $content );
+			/*	Checked, and silenced: a target that cannot be written - a
+				directory in its place, a permission, a full disk - raised php's
+				own warning here, which the framework's handler ends the request
+				on, and answered nothing to the caller either way. So an
+				activation was a 500 with half a unit copied or, under a handler
+				that carries on, a success with a template missing. The false is
+				the answer now, and applyUnit() names the file	*/
+			return @file_put_contents( $to, $content ) === strlen( $content );
 		}
 
 		/**
@@ -1084,29 +1112,31 @@ namespace Nino {
 		 *	@param		string		$to
 		 *	@param		bool			$overwrite
 		 *
-		 *	@return 	void
+		 *	@return 	bool										Whether everything below $from is in place -
+		 *																	a source the unit names but does not carry,
+		 *																	or one file that could not be copied, is false
 		 */
-		public static function copyTree( string $from, string $to, bool $overwrite = true ): void {
+		public static function copyTree( string $from, string $to, bool $overwrite = true ): bool {
 
-			if( is_file( $from ) === true ) {
-				self::copyFile( $from, $to, $overwrite );
-				return;
-			}
+			if( is_file( $from ) === true )
+				return self::copyFile( $from, $to, $overwrite );
 
 			if( is_dir( $from ) === false )
-				return;
+				return false;
 
-			if( $overwrite === true ) {
-				\Nino\Filesystem::copyDir( $from, $to );
-				return;
-			}
+			if( $overwrite === true )
+				return \Nino\Filesystem::copyDir( $from, $to );
 
-			if( is_dir( $to ) === false )
-				@mkdir( $to, 0755, true );
+			if( is_dir( $to ) === false && @mkdir( $to, 0755, true ) === false && is_dir( $to ) === false )
+				return false;
+
+			$copied = true;
 
 			foreach( scandir( $from ) ?: [] as $entry )
-				if( $entry !== '.' && $entry !== '..' )
-					self::copyTree( $from. '/'. $entry, $to. '/'. $entry, false );
+				if( $entry !== '.' && $entry !== '..' && self::copyTree( $from. '/'. $entry, $to. '/'. $entry, false ) === false )
+					$copied = false;
+
+			return $copied;
 		}
 
 		/**

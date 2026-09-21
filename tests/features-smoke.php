@@ -623,6 +623,40 @@ check( 'reactivation finds the settings as they were', \Nino\Features::activate(
 echo "\n";
 
 
+// --- A unit file that cannot be copied ----------------------------------------
+
+echo "Features::activate - a unit file that cannot be copied is a refusal\n";
+
+/*	copyFile() wrote a unit's template with an unchecked file_put_contents(),
+	and applyUnit() answered nothing to activate() either way. A target that
+	could not be written raised php's own warning - fatal under the framework's
+	handler, a 500 with half the unit copied - and under a handler that carries
+	on (a project's own, this suite's) the activation went on to list the class
+	and record the version: a success with the template missing. The target
+	here is a directory where the template has to go, which is what a
+	permission or a full disk does, provoked without either	*/
+$blockedAppData = ninoSandbox( 'features-blocked' );
+$blockedAppData['/nino/http/routes'] = [ 'GET://' => [ 'uri' => '/home', 'body' => '' ] ];
+\Nino\AppData::writeContentData( $blockedAppData, [ '/nino/modules', '/nino/locales/available', '/nino/locales/native', '/nino/http/routes' ] );
+\Nino\Filesystem::forceDir( $blockedAppData, '/templates/page-sample.tpl' );
+ninoWarnings();
+
+$blocked			= \Nino\Features::activate( $blockedAppData, 'sample' );
+$blockedStored	= \Nino\Filesystem::getFileContent( $blockedAppData, '/config.php', [] );
+
+check( 'a unit file that cannot be copied refuses the activation, naming the file', $blocked === 'feature "sample" could not be activated: could not copy /templates/page-sample.tpl' );
+check( '...and nothing is listed or recorded for it', in_array( '\\Nino\\Modules\\Sample', (array) ( $blockedStored['/nino/modules'] ?? [] ), true ) === false
+	&& isset( $blockedStored['/nino/features']['sample'] ) === false );
+// The rescan of the fixture directory warns about Broken as always; what
+// must not be among the warnings is php's own, which the handler this
+// framework runs under ends the request on
+check( '...and no engine warning is raised on the way', array_filter( ninoWarnings(), static fn( string $w ): bool => str_contains( $w, 'file_put_contents' ) ) === [] );
+
+\Nino\Filesystem::removeDir( ninoSandboxDir( $blockedAppData ) );
+
+echo "\n";
+
+
 // --- The unit application both callers share ----------------------------------
 
 echo "Features::applyUnit - overwrite for the wizard, add-only for a feature\n";
