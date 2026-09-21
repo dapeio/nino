@@ -2547,6 +2547,53 @@ check( 'an old daily file past the cutoff is deleted', is_file( $oldDaily ) === 
 check( 'a fresh daily file is kept', is_file( $freshDaily ) === true );
 check( 'a same-directory file whose name does not parse as a date is left alone, not deleted', is_file( $unparseable ) === true );
 
+/*	Regression: the sweep globbed '<dir>/<prefix>*<suffix>', and a directory is
+	a path rather than a pattern. One project installed below a directory
+	called "site[2]" - or any name carrying '[', ']', '*' or '?' - had the
+	brackets read as a character class, so the pattern described a path that
+	does not exist, glob() answered nothing and the sweep pruned nothing at
+	all, for the life of that installation and without a word about it	*/
+$bracketDir 	= $rotDir. '/site[2]';
+mkdir( $bracketDir, 0777, true );
+$bracketOld 	= $bracketDir. '/logs.2020-01.php';
+$bracketFresh	= $bracketDir. '/logs.'. date( 'Y-m' ). '.php';
+file_put_contents( $bracketOld, '<?php return [];' );
+file_put_contents( $bracketFresh, '<?php return [];' );
+
+\Nino\RotatingLog::prune( $bracketDir, 'logs.', 'Y-m', '.php', $monthlyCutoff );
+
+check( 'a directory whose name carries glob metacharacters is swept like any other', is_file( $bracketOld ) === false );
+check( '...and the fresh bucket in it is still kept', is_file( $bracketFresh ) === true );
+
+/*	And a $dateFormat the sweep was never taught. 'Y-m' and 'Y-m-d' were the
+	only two it understood - the date was always parsed as a full 'Y-m-d' - so
+	every other format a caller might name parsed as nothing, matched nothing
+	and deleted nothing, in the same silence	*/
+$compactOld 	= $rotDir. '/report.20200101.txt';
+$compactFresh	= $rotDir. '/report.'. date( 'Ymd' ). '.txt';
+file_put_contents( $compactOld, 'x' );
+file_put_contents( $compactFresh, 'x' );
+
+\Nino\RotatingLog::prune( $rotDir, 'report.', 'Ymd', '.txt', $dailyCutoff );
+
+check( 'a date format the kernel does not use itself deletes what it names', is_file( $compactOld ) === false );
+check( '...and keeps what is inside the cutoff', is_file( $compactFresh ) === true );
+
+// The anchoring the two kernel formats depend on, pinned where today's date
+// cannot reach it: a bucket named for a month is the first of that month,
+// never today's day-of-month in it - which would drift the boundary from day
+// to day and roll a bucket into the next month entirely (parsing "...-02" on
+// the 31st)
+$anchorInside		= $rotDir. '/anchor.2020-01.php';
+$anchorOutside	= $rotDir. '/anchor.2020-02.php';
+file_put_contents( $anchorInside, 'x' );
+file_put_contents( $anchorOutside, 'x' );
+
+\Nino\RotatingLog::prune( $rotDir, 'anchor.', 'Y-m', '.php', new \DateTime( '2020-01-15 00:00:00' ) );
+
+check( 'a monthly bucket is judged by the first of its month', is_file( $anchorInside ) === false );
+check( '...and one whose month starts after the cutoff is kept', is_file( $anchorOutside ) === true );
+
 echo "\n";
 
 

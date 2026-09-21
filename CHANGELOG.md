@@ -57,6 +57,24 @@ All notable changes to Nino are documented in this file.
 
 ### Fixed
 
+- **A log sweep could delete nothing at all, and say nothing about it.**
+  `RotatingLog::prune()` - the one sweep behind the error log, the form
+  submissions, the activity log and the backup retention - built a glob pattern
+  out of the directory it was given, and a directory is a path rather than a
+  pattern: a project installed below a name carrying `[`, `]`, `*` or `?`
+  ("site[2]") had those characters read as syntax, so the pattern described a
+  path that does not exist and every sweep found nothing, for the life of that
+  installation. The directory is read with `scandir()` now and the prefix and
+  suffix are matched as the literal strings they are. The second half was the
+  same silence from the other end: the date was always parsed as a full
+  `Y-m-d` with a monthly `Y-m` padded out to the first of the month, so the two
+  formats the kernel itself passes were the only two that worked - any other
+  one a caller named parsed as nothing, matched nothing and deleted nothing.
+  The caller's own format is the contract now, parsed behind a `!` so that a
+  field the format does not set is the epoch's rather than today's - which is
+  what kept a monthly bucket anchored to the first of its month, and is now
+  what keeps every other format anchored too.
+
 - **A textfill at the hard length limit could be stored with half a
   character.** `Text::sanitizeValue()` cut an over-long value with `substr()`,
   and the limit it cuts at is a byte count - what the file on disk has to stay
