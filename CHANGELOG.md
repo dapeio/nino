@@ -28,6 +28,17 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **The envelope sender is a textfill, not a `config.php` key.**
+  `\Nino\Mail::_getSender()` read `/nino/mail/sender` from `config.php` ahead
+  of the `[[/form/email/owner]]` fill, so the two halves of one setting lived
+  in two places: the address mails go out as in the Text panel, the address
+  the host sends them as in a file. It is `[[/mail/sender]]` now, shipped
+  empty by the base unit beside the owner address - empty means the same as
+  that address, which is the normal case - and set in the Text panel like it.
+  A value that is no address falls back to the owner address with a line in
+  the log - the old key silently cost every mail its `From` for that.
+  `/nino/mail/sender` is not read any more; `docs/deployment.md` says so.
+
 - **Nine comments and a manual line described code that is not there any
   more.** `\Nino\Modules\Backups` still promised archives under a one-time
   random directory name and a key copy inside `_admin/`, where `dirs()` and

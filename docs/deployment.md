@@ -268,13 +268,9 @@ That log is `private/data/logs.<YYYY-MM>.php`, one file per month, with entries 
 
 **The address mails go out as** is the textfill `/form/email/owner`, which the base unit ships as `[[/company/email]]` - so by default every mail this site sends carries the mailbox the project already named, in the `From` header and as the envelope sender. Change it in the Text panel where replies should reach somewhere else; the company address stays what it is.
 
-That address has to be one the sending host may send for. SPF and DMARC are checked against the envelope sender, so a mailbox on a domain this server does not send for is what turns a delivered mail into a rejected or a filtered one - and nothing on the site reports that, because the refusal happens at the receiving end. Where the two differ, `/nino/mail/sender` in `config.php` is the envelope sender and `/form/email/owner` stays the mailbox replies reach:
+That address has to be one the sending host may send for. SPF and DMARC are checked against the envelope sender, so a mailbox on a domain this server does not send for is what turns a delivered mail into a rejected or a filtered one - and nothing on the site reports that, because the refusal happens at the receiving end. Where the two differ, the textfill `/mail/sender` - shipped empty by the base unit, set in the Text panel like the other one - is the envelope sender, and `/form/email/owner` stays the mailbox replies reach.
 
-```php
-'/nino/mail/sender' => 'no-reply@your-host.example',
-```
-
-Left unset, both are the textfill. Set to something that is not an address, it is ignored and the fill answers again; where neither is one, the mail goes out with no `From` at all, which is the most reliable way there is to land in a spam folder.
+Left empty, both are the owner address. Set to something that is not an address, the owner address answers instead and the log says so; where neither is one, the mail goes out with no `From` at all, which is the most reliable way there is to land in a spam folder.
 
 ## Secure the Workbench
 

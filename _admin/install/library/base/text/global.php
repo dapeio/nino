@@ -18,9 +18,17 @@
 		both. An operator who needs a different one - a no-reply, a mailbox on
 		another domain - overwrites this key in the Text panel and the company
 		address stays what it is. Where the sending host may not send for the
-		address at all (spf/dmarc), '/nino/mail/sender' in config.php is the
-		envelope sender and this stays the mailbox replies reach	*/
+		address at all (spf/dmarc), [[/mail/sender]] below is the envelope
+		sender and this stays the mailbox replies reach	*/
 	'[[/form/email/owner]]' => '[[/company/email]]',
+
+	/*	The envelope sender, where it has to differ from the address above:
+		SPF and DMARC are checked against it, so it has to be one the sending
+		host may send for. Empty means "the same as the address above", which
+		is the normal case; set in the Text panel like the rest, and a value
+		that is no address falls back to the address above, with a line in
+		the log	*/
+	'[[/mail/sender]]' => '',
 	'[[/company/instagram]]' => 'https://www.instagram.com/your-company',
 	'[[/company/facebook]]' => 'https://www.faceboook.com/your-company',
 	'[[/company/youtube]]' => 'https://www.youtube.com/your-company',

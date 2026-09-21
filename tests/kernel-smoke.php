@@ -2393,7 +2393,9 @@ unset( $rateState['127.0.0.1'] );
 \Nino\Filesystem::putFileContent( $appData, $ratelimitPath, $rateState );
 unset( $appData['./nino/mail/ratelimited'] );
 
-$appData['/nino/mail/sender'] = 'noreply@example.org';
+// The envelope sender is a global textfill, like the owner address it
+// falls back to - one place, the Text panel, for both
+\Nino\Html::addFills( $appData, [ '[[/mail/sender]]' => 'noreply@example.org' ], '*' );
 
 $taken = [];
 \Nino\Callbacks::registerCallback( $appData, \Nino\Mail::TRANSPORT, static function( array &$appData, array &$mail ) use ( &$taken ): void {
@@ -2477,9 +2479,7 @@ check( '...and one recorded line per mail, naming the value, or nothing tells th
 	operator who needs another one overwrites the key without touching the
 	company address. A chained fill, and this is the check that it resolves:
 	a value nobody resolves is a From header reading '[[/company/email]]'	*/
-$senderBefore = $appData['/nino/mail/sender'] ?? null;
-unset( $appData['/nino/mail/sender'] );
-\Nino\Html::addFills( $appData, [ '[[/company/email]]' => 'hallo@example.com', '[[/form/email/owner]]' => '[[/company/email]]' ], '*' );
+\Nino\Html::addFills( $appData, [ '[[/company/email]]' => 'hallo@example.com', '[[/form/email/owner]]' => '[[/company/email]]', '[[/mail/sender]]' => '' ], '*' );
 
 $rateState = \Nino\Filesystem::getFileContent( $appData, $ratelimitPath, [] );
 unset( $rateState['127.0.0.1'] );
@@ -2503,17 +2503,29 @@ $chained = [];
 check( 'overwriting that one key changes the sender and nothing else', ( $chained[0]['sender'] ?? null ) === 'kontakt@example.org'
 	&& \Nino\Html::renderHtml( $appData, '[[/company/email]]' ) === 'hallo@example.com' );
 
-/*	...and '/nino/mail/sender' still wins over both, because the envelope
-	sender has to be an address the sending host may send for (spf/dmarc),
-	which is not necessarily the mailbox replies should reach	*/
-$appData['/nino/mail/sender'] = 'no-reply@example.net';
+/*	...and '[[/mail/sender]]' wins over both where it is set, because the
+	envelope sender has to be an address the sending host may send for
+	(spf/dmarc), which is not necessarily the mailbox replies should reach.
+	A textfill like the owner address, not a config.php key: the operator
+	sets both in the Text panel, and an empty one means "the same"	*/
+\Nino\Html::addFills( $appData, [ '[[/mail/sender]]' => 'no-reply@example.net' ], '*' );
 $chained = [];
 \Nino\Mail::send( $appData, 'to@example.org', 'x', 'y', '' );
-check( 'config.php\'s own sender still wins over the fill', ( $chained[0]['sender'] ?? null ) === 'no-reply@example.net' );
+check( 'the sender fill wins over the owner fill', ( $chained[0]['sender'] ?? null ) === 'no-reply@example.net'
+	&& str_contains( $chained[0]['headers'] ?? '', "\r\nFrom: no-reply@example.net" ) === true );
 
-unset( $appData['/nino/mail/sender'], $appData['./nino/callbacks'][ \Nino\Mail::TRANSPORT ] );
-if( $senderBefore !== null )
-	$appData['/nino/mail/sender'] = $senderBefore;
+// ...and one that is not an address falls back to the owner rather than
+// costing every mail its From - a typo in the Text panel is one log line
+\Nino\Html::addFills( $appData, [ '[[/mail/sender]]' => 'not an address' ], '*' );
+$chained = []; $senderWarnings = [];
+set_error_handler( static function( int $no, string $message ) use ( &$senderWarnings ): bool { if( ( error_reporting() & $no ) !== 0 ) $senderWarnings[] = $message; return true; } );
+\Nino\Mail::send( $appData, 'to@example.org', 'x', 'y', '' );
+restore_error_handler();
+check( 'a sender fill that is no address falls back to the owner, and says so', ( $chained[0]['sender'] ?? null ) === 'kontakt@example.org'
+	&& count( array_filter( $senderWarnings, static fn( string $w ): bool => str_contains( $w, 'no sender address' ) ) ) === 1 );
+
+\Nino\Html::addFills( $appData, [ '[[/mail/sender]]' => '' ], '*' );
+unset( $appData['./nino/callbacks'][ \Nino\Mail::TRANSPORT ] );
 if( $transportBefore !== null )
 	$appData['./nino/callbacks'][ \Nino\Mail::TRANSPORT ] = $transportBefore;
 $rateState = \Nino\Filesystem::getFileContent( $appData, $ratelimitPath, [] );
@@ -2581,7 +2593,8 @@ check( 'so five submissions fit the window of five, and the sixth is refused who
 	&& \Nino\Mail::sendAll( $appData, $pair ) === false && count( $batched ) === 8 && ( $appData['./nino/mail/ratelimited'] ?? false ) === true );
 check( 'an empty batch is not an action and costs nothing', \Nino\Mail::sendAll( $appData, [] ) === true );
 
-unset( $appData['./nino/callbacks'][ \Nino\Mail::TRANSPORT ], $appData['/nino/mail/sender'], $appData['./nino/mail/ratelimited'] );
+unset( $appData['./nino/callbacks'][ \Nino\Mail::TRANSPORT ], $appData['./nino/mail/ratelimited'] );
+\Nino\Html::addFills( $appData, [ '[[/mail/sender]]' => '' ], '*' );
 
 echo "\n";
 

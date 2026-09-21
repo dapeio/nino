@@ -249,19 +249,29 @@ namespace Nino {
 			return '';
 		}
 
-		// The address to send as: '/nino/mail/sender' from config.php if set,
-		// otherwise the site owner's address from the Text values. Configurable
-		// because the envelope sender has to be an address the sending host is
-		// allowed to send for (spf/dmarc), which is not necessarily the mailbox
-		// replies should go to. Returns '' if neither is a valid address, in
-		// which case send() simply omits From:/-f rather than passing something
-		// unchecked to sendmail.
+		// The address to send as: the '[[/mail/sender]]' textfill where it is
+		// set, otherwise the site owner's address from the same Text values.
+		// Two fills rather than a config.php key and a fill, because both are
+		// the operator's to set and the Text panel is where they set the
+		// other one. Separate because the envelope sender has to be an address
+		// the sending host is allowed to send for (spf/dmarc), which is not
+		// necessarily the mailbox replies should go to. A sender fill that is
+		// no address - a typo in the Text panel, an unresolved fill rendering
+		// as its own name - falls back to the owner address rather than
+		// costing every mail its From, and says so in the log. Returns '' if
+		// neither is a valid address, in which case send() simply omits
+		// From:/-f rather than passing something unchecked to sendmail.
 		private static function _getSender( array &$appData ): string {
 
-			$sender = self::_headerValue( (string) ( $appData['/nino/mail/sender'] ?? '' ) );
+			$sender = self::_headerValue( \Nino\Html::renderHtml( $appData, '[[/mail/sender]]' ) );
 
-			if( $sender === '' )
+			if( filter_var( $sender, FILTER_VALIDATE_EMAIL ) === false ) {
+
+				if( $sender !== '' )
+					trigger_error( 'Mail: \''. $sender. '\' is no sender address - the mail went out as the owner address.', E_USER_WARNING );
+
 				$sender = self::_headerValue( \Nino\Html::renderHtml( $appData, '[[/form/email/owner]]' ) );
+			}
 
 			return ( filter_var( $sender, FILTER_VALIDATE_EMAIL ) !== false ) ? $sender : '';
 		}

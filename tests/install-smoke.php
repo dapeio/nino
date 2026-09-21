@@ -1242,6 +1242,9 @@ check( '...and it is the only unit that does, so no unit order decides its value
 	both. An operator who needs a different one overwrites this key and the
 	company address stays what it is	*/
 check( '...with the company address as its value', $baseGlobal['[[/form/email/owner]]'] === '[[/company/email]]' );
+// The envelope sender beside it, empty: "the same as the owner address"
+// until an operator whose host may not send for that address sets it
+check( 'the base unit ships the envelope sender fill, empty, beside the owner address', array_key_exists( '[[/mail/sender]]', $baseGlobal ) === true && $baseGlobal['[[/mail/sender]]'] === '' );
 check( '...which the same unit ships, or it would resolve to nothing', isset( $baseGlobal['[[/company/email]]'] ) === true
 	&& str_contains( (string) $baseGlobal['[[/company/email]]'], '[[' ) === false );
 
