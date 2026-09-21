@@ -57,6 +57,19 @@ All notable changes to Nino are documented in this file.
 
 ### Fixed
 
+- **A day's log file that could not be written took the action being logged
+  down with it.** `Modules\Logs\Admin::record()` rewrote the day's file in
+  place with an unchecked `file_put_contents()`. A target that could not be
+  written - a directory in its place, a permission, a full disk - raised php's
+  own warning, which the framework's handler ends the request on: the element
+  was saved, the route was moved, and the request answered a 500 from its
+  log line. Listing the log died on the same file, and a reader who arrived
+  during a write found it truncated. The line is written beside the file and
+  renamed over it now, through the writer the recovery hash already used and
+  which the shell offers as `Admin::writeFileAtomic()` - and a write that
+  fails is what the log says it is, with the lock it took released whichever
+  way the write went. A file that cannot be read holds no lines.
+
 - **A restore left two files behind in the temp directory every time, and
   threw on a backup it could not unpack.** `tempnam()` creates the file it
   names, and both the restore and the safety snapshot it takes first went on

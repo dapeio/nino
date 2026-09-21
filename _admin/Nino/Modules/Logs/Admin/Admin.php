@@ -109,17 +109,32 @@ namespace Nino\Modules\Logs {
 				if( \Nino\Filesystem::lockFile( $appData, $relPath ) === false )
 					return;
 
-				$lines 	 = is_file( $path ) === true ? self::_readLines( $path ) : [];
-				// One entry is one line, whatever was posted: a template name or
-				// a type uri reaches the message verbatim, and a line break in it
-				// would write a second line - dated, attributed to any account,
-				// saying anything. An audit log that can be told what to say is
-				// not one
-				$lines[] = date( 'Y-m-d H:i' ). '  '. self::_oneLine( $actor ). '  '. self::_oneLine( $message );
+				/*	Released whichever way the write goes: a throw between the
+					lock and the unlock left the handle held for the rest of the
+					request. And written beside the file and renamed over it,
+					through the shell's writer, rather than in place with
+					file_put_contents(): that left a reader a truncated file for
+					the duration of the write, and a target that could not be
+					written - a directory in its place, a permission, a full
+					disk - raised php's own warning, which the framework's
+					handler ends the request on. The action being logged died
+					in its log line; now the line is what is lost, and the
+					catch below says so	*/
+				try {
+					$lines 	 = is_file( $path ) === true ? self::_readLines( $path ) : [];
+					// One entry is one line, whatever was posted: a template name or
+					// a type uri reaches the message verbatim, and a line break in it
+					// would write a second line - dated, attributed to any account,
+					// saying anything. An audit log that can be told what to say is
+					// not one
+					$lines[] = date( 'Y-m-d H:i' ). '  '. self::_oneLine( $actor ). '  '. self::_oneLine( $message );
 
-				file_put_contents( $path, self::STUB_PREFIX. base64_encode( implode( "\n", $lines ) ). self::STUB_SUFFIX );
-
-				\Nino\Filesystem::unlockFile( $appData, $relPath );
+					if( \Nino\Admin\Admin::writeFileAtomic( $path, self::STUB_PREFIX. base64_encode( implode( "\n", $lines ) ). self::STUB_SUFFIX ) === false )
+						throw new \RuntimeException( 'the day\'s file could not be written: '. basename( $path ) );
+				}
+				finally {
+					\Nino\Filesystem::unlockFile( $appData, $relPath );
+				}
 
 				foreach( self::_logDirs( $appData ) as $logDir )
 					self::_prune( $logDir );
@@ -217,8 +232,15 @@ namespace Nino\Modules\Logs {
 		 */
 		private static function _readLines( string $path ): array {
 
-			$raw 			= file_get_contents( $path );
-			$decoded 	= base64_decode( substr( $raw, strlen( self::STUB_PREFIX ), -strlen( self::STUB_SUFFIX ) ) );
+			// Silenced: a day's file that cannot be read - a directory standing
+			// in its place - raised php's own warning here, and every listing
+			// of the log died on it. What cannot be read holds no lines
+			$raw = @file_get_contents( $path );
+
+			if( is_string( $raw ) === false )
+				return [];
+
+			$decoded = base64_decode( substr( $raw, strlen( self::STUB_PREFIX ), -strlen( self::STUB_SUFFIX ) ) );
 
 			return $decoded === '' ? [] : explode( "\n", $decoded );
 		}

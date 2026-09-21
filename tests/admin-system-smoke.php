@@ -3327,6 +3327,48 @@ $logListBody = json_decode( (string) $logListRequest['/nino/http/response']['bod
 check( 'one malformed byte in a logged value does not blank the whole panel', is_array( $logListBody ) === true && $logListRequest['/nino/http/response']['statusCode'] === 200 );
 check( '...and every other line is still there to read', count( array_filter( $logListBody['lines'] ?? [], static fn( $l ): bool => str_contains( is_array( $l ) ? implode( ' ', $l ) : (string) $l, 'Delete Element Type /deletable' ) === true ) ) === 1 );
 
+/*	The write itself, where the day's file cannot be written: a directory
+	standing in its place here, which is what a permission or a full disk
+	does, provoked without either. Reading it and writing it both raised php's
+	own warning, which the framework's handler ends the request on - so the
+	action being logged died in its log line, and a panel listing the log died
+	on the same file. And the lock taken for the write was released only on
+	the way that succeeds	*/
+$logsDir		= (string) ( new ReflectionClassConstant( '\Nino\Modules\Logs\Admin', 'LOGS_DIR' ) )->getValue();
+$todayLog		= $logsDir. '/'. date( 'Y-m-d' ). '.php';
+$todayPath	= \Nino\Filesystem::path( $appData, $todayLog );
+$todayAside	= $todayPath. '.aside';
+
+if( is_file( $todayPath ) === true )
+	rename( $todayPath, $todayAside );
+mkdir( $todayPath, 0755, true );
+
+$logWarnings = [];
+// What the code silenced with @ is not a warning anyone sees - the framework's
+// handler reads error_reporting() the same way
+set_error_handler( static function( int $no, string $message ) use ( &$logWarnings ): bool {
+	if( ( error_reporting() & $no ) !== 0 )
+		$logWarnings[] = $message;
+	return true;
+} );
+\Nino\Modules\Logs\Admin::record( $appData, 'editor@example.com', 'Blocked write' );
+$blockedList = \Nino\Modules\Logs\Admin::recentLines( $appData, 5 );
+restore_error_handler();
+
+check( 'a day\'s file that cannot be written or read raises no engine warning - the action being logged goes on', array_filter( $logWarnings, static fn( string $w ): bool => str_contains( $w, 'file_put_contents' ) || str_contains( $w, 'file_get_contents' ) ) === [] );
+check( '...the failure is reported through the framework\'s own channel instead', count( array_filter( $logWarnings, static fn( string $w ): bool => str_starts_with( $w, 'Activity log write failed' ) ) ) === 1 );
+// A guard rather than a regression: without a throw the old code released
+// the lock too - what it did not do was release it past one
+check( '...with the lock released whichever way the write went', \Nino\Filesystem::unlockFile( $appData, $todayLog ) === false );
+check( '...and the listing past that file still answers', is_array( $blockedList ) === true );
+
+rmdir( $todayPath );
+if( is_file( $todayAside ) === true )
+	rename( $todayAside, $todayPath );
+
+\Nino\Modules\Logs\Admin::record( $appData, 'editor@example.com', 'After the block' );
+check( 'the next line is written once the file can be again', str_contains( implode( "\n", \Nino\Modules\Logs\Admin::recentLines( $appData, 5 ) ), 'After the block' ) === true );
+
 // The shell asks the class that ran an action for its line (see
 // Admin::_logAction()): a line on any other class is one nobody reads, which
 // is how the whole Templates panel logged nothing. So: the handler of every
