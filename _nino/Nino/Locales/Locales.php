@@ -47,13 +47,27 @@ namespace Nino {
 			if( $default !== '' )
 				$appData['./nino/locales/current'] = $default;
 
-			// A locale the visitor picked themselves still wins over that
-			// default - setCurrentLocale() verifies it and falls back to the
-			// value just set if it isn't available anymore
+			/*	A locale the visitor picked themselves still wins over that
+				default - useLocale() verifies it and falls back to the value
+				just set if it isn't available anymore.
+
+				useLocale() rather than setCurrentLocale(), for the same reason
+				the assignment above is a direct one. Where the stored locale is
+				one the project has since dropped, the fallback is the default
+				just resolved, and setCurrentLocale() wrote that default back
+				into the visitor's session - a locale nobody chose, pinned there
+				by init() itself, in exactly the place the comment above says it
+				must never be. From then on this same line read it back and let
+				it win, so a project that changed its native locale never
+				reached that visitor again.
+
+				What they did choose is left in the session untouched: it is not
+				honoured while the project does not have that locale, and it is
+				theirs again if it comes back.	*/
 			$currentLocale = \Nino\Runtime::getSessionValue( $appData, './nino/locales/current' );
 
 			if( is_string( $currentLocale ) === true )
-				\Nino\Locales::setCurrentLocale( $appData, $currentLocale );
+				\Nino\Locales::useLocale( $appData, $currentLocale );
 
 			// Registered rather than called directly out of \Nino\request(): a
 			// route can declare its own 'statusCode' (eg. GET://_admin), and

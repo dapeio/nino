@@ -2656,6 +2656,40 @@ check( 'Locales::init ignores a malformed non-string locale stored in the sessio
 // and stored there it would outlive a later change of the native locale
 check( 'resolving the default does not persist it as a visitor locale', \Nino\Runtime::getSessionValue( $nativeAppData, './nino/locales/current' ) === null );
 
+/*	...and neither must the fallback a stale session locale lands on. A
+	visitor who once picked a locale the project has since dropped had
+	setCurrentLocale() called with it: useLocale() inside it answered the
+	project's default, and setCurrentLocale() then wrote that default into
+	their session - the one thing the comment above it forbids, done by
+	init() itself. From then on init() read it back and let it win, so a
+	project that changed its native locale never reached that visitor again	*/
+$staleSessionAppData = [ './nino/uid' => $sandbox. '-stale-locale-session' ];
+\Nino\AppData::prepare( $staleSessionAppData );
+$staleSessionAppData['./nino/filesystem/path']	= $sandbox;
+$staleSessionAppData['/nino/locales/native']			= 'en_US';
+$staleSessionAppData['/nino/locales/available']	= [ 'en_US', 'de_DE' ];
+\Nino\Runtime::setSessionValue( $staleSessionAppData, './nino/locales/current', 'fr_FR' );
+\Nino\Locales::init( $staleSessionAppData );
+
+check( 'a session locale the project no longer has falls back for this request', \Nino\Locales::getCurrentLocale( $staleSessionAppData ) === 'en_US' );
+// Left as it was rather than corrected: it is not honoured while the
+// project does not have that locale, and it is the visitor's own again if
+// it comes back. What must not be in there is a default nobody chose
+check( '...without the fallback being written into the visitor\'s session', \Nino\Runtime::getSessionValue( $staleSessionAppData, './nino/locales/current' ) === 'fr_FR' );
+
+// And the ordinary case is untouched: a stored locale the project still has
+// is what the request runs in, and stays where it is
+$chosenSessionAppData = [ './nino/uid' => $sandbox. '-chosen-locale-session' ];
+\Nino\AppData::prepare( $chosenSessionAppData );
+$chosenSessionAppData['./nino/filesystem/path']		= $sandbox;
+$chosenSessionAppData['/nino/locales/native']			= 'en_US';
+$chosenSessionAppData['/nino/locales/available']	= [ 'en_US', 'de_DE' ];
+\Nino\Runtime::setSessionValue( $chosenSessionAppData, './nino/locales/current', 'de_DE' );
+\Nino\Locales::init( $chosenSessionAppData );
+
+check( 'a session locale the project does have still wins over the native default', \Nino\Locales::getCurrentLocale( $chosenSessionAppData ) === 'de_DE'
+	&& \Nino\Runtime::getSessionValue( $chosenSessionAppData, './nino/locales/current' ) === 'de_DE' );
+
 /*	Runtime's session, which is started on demand rather than on every
 	request: an anonymous GET of a page that renders no form and signs
 	nobody in used to leave a session file and a PHPSESSID cookie behind

@@ -57,6 +57,20 @@ All notable changes to Nino are documented in this file.
 
 ### Fixed
 
+- **A locale a project dropped pinned its default in the visitor's session.**
+  `Locales::init()` takes care never to write the default it resolves into the
+  session, and says why: a locale nobody chose would outlive a later change of
+  the project's native locale. It then handed the locale it found in the
+  session to `setCurrentLocale()` - which writes what it is given - and for a
+  visitor whose stored locale the project no longer offers, what it was given
+  was that very default. `init()` broke its own rule, in the two lines below
+  the comment stating it: the next boot read the default back out of the
+  session and let it win, so a project that changed its native locale never
+  reached the visitor who had once picked a language it has since dropped. The
+  stale locale falls back through `useLocale()` now - applied for this request,
+  remembered nowhere - and what the visitor actually chose is left in their
+  session untouched, so it is theirs again if the project offers it again.
+
 - **Half an answer came back as a whole one where curl is not installed.**
   `\Nino\Fetch` falls back to php's own stream wrapper when the curl extension
   is missing, and that half had no answer for a server that sends its headers,
