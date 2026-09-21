@@ -57,6 +57,20 @@ All notable changes to Nino are documented in this file.
 
 ### Fixed
 
+- **A textfill at the hard length limit could be stored with half a
+  character.** `Text::sanitizeValue()` cut an over-long value with `substr()`,
+  and the limit it cuts at is a byte count - what the file on disk has to stay
+  under. A byte offset lands inside a multibyte character as readily as between
+  two, so a value that reached 20000 bytes in the middle of one was written
+  into `/text/<locale>.php` ending on half of it: a text file that is not UTF-8
+  any more. Nothing refused it - every reader substitutes U+FFFD for that byte
+  instead (the panel's own json, `htmlspecialchars()` with `ENT_SUBSTITUTE` on
+  the page, an export), so the word came back from the editor broken and saving
+  it again wrote the replacement character in for good. The cut is
+  `mb_strcut()` now, which backs off to the last character boundary: the same
+  byte limit, at most one character less of it, and a value that is still UTF-8
+  whether it ends on an umlaut or an emoji.
+
 - **A session php refused to start was a 500 nothing could explain.**
   `Runtime::init()` starts the session a visitor already carries, and it has
   to: a session cookie's flags are fixed at `session_start()` time and cannot

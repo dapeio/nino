@@ -427,6 +427,36 @@ check( 'saving a global key succeeds', $result['ok'] === true );
 $storedGlobal = \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] );
 check( 'a global key is written to global.php, not a locale file', ( $storedGlobal['[[/company/name]]'] ?? '' ) === 'New Co' );
 
+/*	The hard limit is a byte count - what the file on disk has to stay under -
+	and the cut used to be substr()'s, which lands inside a multibyte character
+	as readily as between two. Measured with 19999 ascii bytes and one 'ä'
+	across the boundary: the stored value ended on a lone 0xC3, ie. a text file
+	that is not utf-8 any more, and every reader of it substitutes U+FFFD for
+	that byte - the panel's own json, htmlspecialchars() on the page, an export
+	- so the word came back broken and saving it again made the replacement
+	permanent	*/
+$hardLimit 	= (int) ( new ReflectionClassConstant( '\Nino\Text', 'HARD_MAXLENGTH' ) )->getValue();
+$acrossTheCut	= str_repeat( 'a', $hardLimit - 1 ). 'ä'. str_repeat( 'b', 50 );
+
+$result = saveText( $appData, [ 'key' => '/home/long', 'locale' => 'de_DE', 'value' => $acrossTheCut ] );
+
+check( 'an over-long value is still cut down to the hard byte limit', strlen( (string) ( $result['value'] ?? '' ) ) <= $hardLimit );
+check( '...at a character boundary, so the value stays utf-8', mb_check_encoding( (string) ( $result['value'] ?? '' ), 'UTF-8' ) === true
+	&& str_ends_with( (string) ( $result['value'] ?? '' ), 'a' ) === true );
+
+$stored = \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] );
+check( '...and so does the text file it was written into', mb_check_encoding( (string) ( $stored['[[/home/long]]'] ?? '' ), 'UTF-8' ) === true
+	&& json_encode( $stored ) !== false );
+
+// The same boundary with a four-byte character, which has three ways to be
+// split rather than one
+$emojiCut = saveText( $appData, [ 'key' => '/home/long', 'locale' => 'de_DE', 'value' => str_repeat( 'a', $hardLimit - 2 ). "\u{1F600}" ] );
+check( 'a four-byte character across the limit is dropped whole, not halved', mb_check_encoding( (string) ( $emojiCut['value'] ?? '' ), 'UTF-8' ) === true );
+
+// ...and nothing that fits is touched, multibyte or not
+$underTheCut = saveText( $appData, [ 'key' => '/home/long', 'locale' => 'de_DE', 'value' => 'Grüße, Welt' ] );
+check( 'a value under the limit is not cut at all', ( $underTheCut['value'] ?? '' ) === 'Grüße, Welt' );
+
 echo "\n";
 
 

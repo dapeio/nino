@@ -214,7 +214,19 @@ namespace Nino {
 		// itself enforces.
 		public static function sanitizeValue( string $value, bool $html ): string {
 
-			$value = substr( $value, 0, self::HARD_MAXLENGTH );
+			/*	mb_strcut() rather than substr(): the limit is a byte count -
+				what the file on disk has to stay under - but a cut at a byte
+				offset lands inside a multibyte character as readily as between
+				two, and half a character is a text file that is not utf-8 any
+				more. Measured with 19999 ascii bytes and one 'ä' across the
+				boundary: the stored value ended on a lone 0xC3, and every
+				reader of it answers U+FFFD for that byte - the panel's json,
+				htmlspecialchars() with ENT_SUBSTITUTE on the page, an export -
+				so the word came back broken and saving it again wrote the
+				replacement character in for good. mb_strcut() backs off to the
+				last character boundary instead: the same byte limit, at most
+				one character less of it, and always utf-8.	*/
+			$value = mb_strcut( $value, 0, self::HARD_MAXLENGTH, 'UTF-8' );
 
 			if( $html === true )
 				return self::_neutralizeShortcodes( \Nino\Html::sanitizeHtml( $value ) );
