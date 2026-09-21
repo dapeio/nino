@@ -57,6 +57,24 @@ All notable changes to Nino are documented in this file.
 
 ### Fixed
 
+- **A required field could be saved empty in every language but the one on
+  screen.** One click on Save in the Elements panel writes every translation
+  that was edited - that is what `_saveLocales()` is for, and it has been that
+  way since the editor stopped losing edits made before a locale switch. The
+  required-field check in front of it never moved with that: it read the dom,
+  and the dom only ever holds the visible locale. So leaving a required field
+  empty in one language, switching to another, filling it in there and saving
+  wrote both - the form said "saved", and the element carried a required field
+  with nothing in it, in a language nobody was looking at. The check now
+  covers every locale the save is about to write: the visible one from its own
+  controls as before, the others from the values that are actually going to be
+  submitted, and a translation that is not on screen is named in the message
+  (`title (de_DE)`) so the person knows where to go. A translation nobody
+  edited is not checked, because it is not written either. The one case the
+  stored values cannot show is a blank number field in another locale, which
+  was already 0 by the time it was stored; the new helper says so where it
+  stands. Five checks in `tests/admin-elements-js-smoke.js`.
+
 - **A type that referenced another one with a leading slash could not be saved
   at all.** An element field names the type it may point at, and everything
   that reads that name normalises it: `\Nino\Elements` builds the prefix a

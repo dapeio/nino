@@ -1108,9 +1108,48 @@
 		},
 
 		/**
-		 *	Labels of every currently-visible required field that's empty -
-		 *	global fields always, locale fields only for the selected locale
-		 *	(the only one actually being submitted).
+		 *	Whether a required field is empty in a translation that is not on
+		 *	screen - the same question _isFieldEmpty() answers, asked of the
+		 *	stored value instead of the dom, because the only locale with
+		 *	controls to read is the visible one.
+		 *
+		 *	The one case it cannot see is a blank number field: _readField()
+		 *	turned that into 0 when the locale was stored, and 0 is a number.
+		 *	For the visible locale _isFieldEmpty() still reads the raw input,
+		 *	and for a locale that came from the server the value is whatever
+		 *	was actually written.
+		 *
+		 *	@param		{Object}	field					Model field definition ({ type, html, required, ... })
+		 *	@param		{*}				value					The stored value for one locale
+		 *
+		 *	@return		{boolean}
+		 */
+		_isStoredValueEmpty : function( field, value ) {
+
+			if( field.type === 'boolean' )
+				return false;
+
+			if( field.type === 'array' || Nino.adminUi.isMultiElement( field ) === true )
+				return Array.isArray( value ) === false || value.length === 0;
+
+			if( field.type === 'string' && field.html === true )
+				return String( value ?? '' ).replace(/<[^>]+>/g, '').trim() === '';
+
+			return value === null || value === undefined || String( value ).trim() === '';
+		},
+
+		/**
+		 *	Labels of every required field that's empty in anything this save
+		 *	is about to write - the global fields, and every locale
+		 *	_saveLocales() queues rather than only the one on screen.
+		 *
+		 *	The visible locale used to be the whole check while every edited
+		 *	translation was submitted: leave a required field empty in one
+		 *	language, switch to another and fill it in there, and the save went
+		 *	through and wrote the empty one - the form saying "saved", the
+		 *	element carrying a required field with nothing in it, and no way
+		 *	for the person to know which language it happened in. A translation
+		 *	that is not on screen is named in the message it is missing from.
 		 *
 		 *	An image field is never among them, even if its model says
 		 *	required: its file is uploaded separately, only once the element
@@ -1124,13 +1163,33 @@
 		 */
 		_missingRequiredFields : function() {
 
-			const keys = Nino.admin.elements._globalKeys.concat( Nino.admin.elements._localeKeys );
+			const required = function( keys ) {
+				return keys
+					.filter( function( key ) { return Nino.admin.elements._currentModel[key].type !== 'image' } )
+					.filter( function( key ) { return ( Nino.admin.elements._currentModel[key].required ?? false ) === true } );
+			};
 
-			return keys
-				.filter( function( key ) { return Nino.admin.elements._currentModel[key].type !== 'image' } )
-				.filter( function( key ) { return ( Nino.admin.elements._currentModel[key].required ?? false ) === true } )
+			const missing = required( Nino.admin.elements._globalKeys )
 				.filter( function( key ) { return Nino.admin.elements._isFieldEmpty( key, Nino.admin.elements._currentModel[key] ) } )
 				.map( function( key ) { return Nino.admin.elements._fieldLabel( key ) } );
+
+			Nino.admin.elements._saveLocales().forEach( function( locale ) {
+
+				const visible = locale === Nino.admin.elements._selectedLocale;
+				const stored 	= Nino.admin.elements._localeValues[locale] ?? {};
+
+				required( Nino.admin.elements._localeKeys )
+					.filter( function( key ) {
+						return visible === true
+							? Nino.admin.elements._isFieldEmpty( key, Nino.admin.elements._currentModel[key] )
+							: Nino.admin.elements._isStoredValueEmpty( Nino.admin.elements._currentModel[key], stored[key] );
+					} )
+					.forEach( function( key ) {
+						missing.push( Nino.admin.elements._fieldLabel( key )+ ( visible === true ? '' : ' ('+ locale+ ')' ) );
+					} );
+			} );
+
+			return missing;
 		},
 
 		/**

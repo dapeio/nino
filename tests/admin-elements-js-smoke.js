@@ -105,6 +105,76 @@ elements._currentModel	= {
 check( 'a required image field is never reported as missing', elements._missingRequiredFields().indexOf( 'photo' ) === -1 );
 check( '...while an empty required field of any other type still is', JSON.stringify( elements._missingRequiredFields() ) === JSON.stringify( [ 'title' ] ) );
 
+/*	One click on Save writes every translation that was edited (see
+	_saveLocales() above), and the required check read the dom - which only
+	ever holds the locale on screen. So a required field left empty in one
+	language, filled in in another and saved from there, went through: the
+	form said "saved" and the element carried a required field with nothing
+	in it, in a language nobody was looking at.
+
+	The dom below is what _isFieldEmpty() reads: the controls of the visible
+	locale, and nothing else. Every other translation lives in _localeValues,
+	which is exactly what is submitted for it.	*/
+const visibleFields = {};
+sandbox.CSS = { escape : function( value ) { return String( value ) } };
+sandbox.document.getElementById = function( id ) {
+	return id !== 'elements-form' ? null : {
+		querySelector : function( selector ) {
+			// ':checked' resolves a radio group, which none of these are
+			if( selector.endsWith(':checked') === true )
+				return null;
+			const match = selector.match( /\[data-field="([^"]+)"\]/ );
+			const key = match === null ? '' : match[1];
+			return visibleFields[key] ?? null;
+		},
+	};
+};
+
+elements._globalKeys 			= [];
+elements._localeKeys 			= [ 'title', 'tags' ];
+elements._currentModel		= {
+	title : { type : 'string', required : true },
+	tags 	: { type : 'array', required : true },
+};
+elements._selectedLocale 	= 'en_US';
+elements._dirtyLocales 		= [ 'de_DE', 'en_US' ];
+elements._localeValues 		= {
+	de_DE : { title : '', tags : [ 'x' ] },
+	en_US : { title : 'Cleaning', tags : [ 'x' ] },
+};
+visibleFields.title = { value : 'Cleaning', dataset : { type : 'string' } };
+visibleFields.tags 	= { value : '["x"]', dataset : { type : 'array' } };
+
+check( 'a required field left empty in another edited translation holds the save back',
+	JSON.stringify( elements._missingRequiredFields() ) === JSON.stringify( [ 'title (de_DE)' ] ) );
+
+elements._localeValues.de_DE.tags = [];
+check( '...and a required list is empty the same way a required text is',
+	JSON.stringify( elements._missingRequiredFields() ) === JSON.stringify( [ 'title (de_DE)', 'tags (de_DE)' ] ) );
+
+elements._localeValues.de_DE = { title : 'Reinigung', tags : [ 'y' ] };
+check( 'a translation that has everything it needs does not hold anything back',
+	JSON.stringify( elements._missingRequiredFields() ) === JSON.stringify( [] ) );
+
+// A translation nobody edited is not submitted, so it is not this save's
+// business either - an element may perfectly well have a language it has no
+// text for yet
+elements._dirtyLocales = [ 'en_US' ];
+elements._localeValues.fr_FR = { title : '', tags : [] };
+check( 'an untouched translation is not checked, because it is not written',
+	JSON.stringify( elements._missingRequiredFields() ) === JSON.stringify( [] ) );
+
+// The locale on screen is still read from its controls, and still named
+// without a language nobody needs to be told about
+elements._dirtyLocales = [ 'en_US' ];
+visibleFields.title.value = '   ';
+check( 'the visible locale is still read from the form itself',
+	JSON.stringify( elements._missingRequiredFields() ) === JSON.stringify( [ 'title' ] ) );
+
+sandbox.document.getElementById = function() { return null };
+elements._localeValues = {};
+elements._dirtyLocales = [];
+
 // --- _loadReferenceOptions(): what an element field's select is built from --
 //
 // The choices come from the referenced type's own element list, fetched
