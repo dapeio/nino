@@ -2,7 +2,7 @@
 
 All notable changes to Nino are documented in this file.
 
-## Unreleased
+## 1.3.0 — 2026-09-21
 
 ### Added
 
