@@ -123,7 +123,7 @@ Modules::callModules( $appData, 'init' );
 The order is part of the runtime contract:
 
 - `AppData::prepare()` sets up the internal runtime areas of `$appData`.
-- `AppData::prepareSession()` provides the session configuration before PHP starts the session.
+- `AppData::prepareSession()` provides the session configuration - and the two `/nino/error/` switches, so a failure in this window can still be logged - before PHP starts the session.
 - `Runtime::init()` sets up PHP error handling and starts or takes over the session.
 - `Filesystem::init()` determines the project and configuration path and initializes the file cache.
 - `AppData::init()` loads `config.php` into `$appData`.
@@ -823,7 +823,7 @@ creates the hidden form field. However, the actual protection belongs to the ker
 
 Nino starts sessions in strict mode. Session cookies are `HttpOnly`, use `SameSite=Lax`, and are set via HTTPS as `Secure`. Behind a TLS-terminating proxy, the Secure flag can be enforced with `/nino/session/force-secure-cookie`. A successful login renews the session ID and the CSRF token.
 
-A session is started when something writes to it, not on every request: minting a CSRF token (so: rendering a form, or checking a post), signing in, and a visitor picking a language. A page that does none of those answers with no session, no `PHPSESSID` cookie and no session file - which matters both for the disk a crawler fills and for what a cookie banner has to declare. `\Nino\Runtime::startSession()` is the call that starts one; every write goes through it, and it answers `false` on the CLI, where there is no session to start.
+A session is started when something writes to it, not on every request: minting a CSRF token (so: rendering a form, or checking a post), signing in, and a visitor picking a language. A page that does none of those answers with no session, no `PHPSESSID` cookie and no session file - which matters both for the disk a crawler fills and for what a cookie banner has to declare. `\Nino\Runtime::startSession()` is the call that starts one; every write goes through it, and it answers `false` on the CLI, where there is no session to start. It answers `false` as well where PHP refuses to start one at all - an unusable `session.save_path`, say: the reason PHP gave goes into the error log and the request is answered without a session, rather than becoming a 500 nothing explains.
 
 Authentication is additionally protected by:
 

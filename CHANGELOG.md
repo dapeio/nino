@@ -57,6 +57,28 @@ All notable changes to Nino are documented in this file.
 
 ### Fixed
 
+- **A session php refused to start was a 500 nothing could explain.**
+  `Runtime::init()` starts the session a visitor already carries, and it has
+  to: a session cookie's flags are fixed at `session_start()` time and cannot
+  be retrofitted afterwards. That puts the start before `AppData::init()` has
+  read config.php - so when php raised its own warning about an unusable
+  `session.save_path`, an engine-raised level is fatal here, and
+  `handleError()` knew neither `/nino/error/log` nor `/nino/error/display` yet:
+  every request carrying a session cookie ended in a bare 500 with nothing on
+  the page, nothing on stderr and nothing in the log, and `startSession()`'s
+  own documented `return false` was unreachable code. The failure is silenced
+  and re-raised through the framework's own non-fatal channel now, with the
+  reason php gave, and `AppData::prepareSession()` carries the two error
+  switches into that window beside the session keys it already read - from the
+  project's file where it has an opinion, from `AppData::DEFAULTS` where it has
+  none. A site whose session storage is broken answers its pages and says so in
+  the log instead of going dark. Nothing is loosened by carrying on: a csrf
+  token that cannot be stored never matches the one a form sends back, so that
+  check fails closed. A project that has no config.php yet is left exactly as
+  it was - seeding an error switch there would create the private directory
+  before the wizard puts its deny rule into it, and an unfinished install must
+  keep saying nothing at all.
+
 - **A key a request did not carry was persisted as null, and a stored null is
   not an absent key.** `AppData::writeContentData()` wrote `$appData[$key] ??
   null` for every key it was handed, so a caller naming one its own appData

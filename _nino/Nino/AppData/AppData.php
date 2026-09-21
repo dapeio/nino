@@ -152,11 +152,22 @@ namespace Nino {
 		// fell back to false - so the option existed but could never take
 		// effect, on exactly the tls-terminating-proxy setup it was built
 		// for (no $_SERVER['HTTPS'], secure flag never set).
-		// Deliberately narrow: only these keys, no merge of anything else -
-		// init() below stays the single place the config is actually loaded.
+		// Deliberately narrow: those keys and the two error switches below,
+		// no merge of anything else - init() below stays the single place the
+		// config is actually loaded.
 		// A missing/unreadable config.php is not diagnosed here either; that
 		// is init()'s job and its error message is the better one.
 		public static function prepareSession( array &$appData ): void {
+
+			/*	Nothing is prepared for a project that does not exist yet. The
+				two error keys below give a boot-time failure somewhere to be
+				written down, and writing one creates the private directory -
+				before the wizard has put the deny rule its base unit carries
+				into it. An unfinished install keeps answering the way it did:
+				a bare 500 that says nothing to whoever stumbled onto it (see
+				init()).	*/
+			if( \Nino\Filesystem::fileExists( $appData, '/config.php' ) === false )
+				return;
 
 			$staticAppData = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
 
@@ -166,6 +177,22 @@ namespace Nino {
 			foreach( $staticAppData as $key => $value )
 				if( is_string( $key ) === true && str_starts_with( $key, '/nino/session/' ) === true )
 					$appData[$key] = $value;
+
+			/*	And the two switches Runtime::handleError() consults before it
+				records anything at all. The session is started in this same
+				window, and a session_start() that fails there used to reach a
+				handler that knew neither of them: it logged nothing, displayed
+				nothing and ended the request on a bare 500 - the one failure
+				of the boot that most needed explaining was the one that
+				explained itself least.
+
+				Seeded from the project's own file where it has an opinion and
+				from DEFAULTS where it has none, which is what init() would
+				arrive at a few lines further down anyway - so this window
+				answers the same as the rest of the request rather than
+				differently.	*/
+			$appData['/nino/error/log']			= $staticAppData['/nino/error/log']		?? self::DEFAULTS['/nino/error/log'];
+			$appData['/nino/error/display']	= $staticAppData['/nino/error/display']	?? self::DEFAULTS['/nino/error/display'];
 		}
 
 		/**

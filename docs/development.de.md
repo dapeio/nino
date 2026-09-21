@@ -120,7 +120,7 @@ Modules::callModules( $appData, 'init' );
 Die Reihenfolge ist Teil des Laufzeitvertrags:
 
 - `AppData::prepare()` legt die internen Laufzeitbereiche von `$appData` an.
-- `AppData::prepareSession()` stellt die Session-Konfiguration bereit, bevor PHP die Session startet.
+- `AppData::prepareSession()` stellt die Session-Konfiguration bereit – und die beiden `/nino/error/`-Schalter, damit ein Fehler in diesem Fenster protokolliert werden kann –, bevor PHP die Session startet.
 - `Runtime::init()` richtet die PHP-Fehlerbehandlung ein und startet beziehungsweise übernimmt die Session.
 - `Filesystem::init()` bestimmt Projekt- und Konfigurationspfad und initialisiert den Datei-Cache.
 - `AppData::init()` lädt `config.php` in `$appData`.
@@ -807,7 +807,7 @@ erzeugt das versteckte Formularfeld. Der eigentliche Schutz gehört jedoch zum K
 
 Nino startet Sessions im Strict Mode. Session-Cookies sind `HttpOnly`, verwenden `SameSite=Lax` und werden über HTTPS als `Secure` gesetzt. Hinter einem TLS-terminierenden Proxy lässt sich das Secure-Flag mit `/nino/session/force-secure-cookie` erzwingen. Ein erfolgreicher Login erneuert die Session-ID und den CSRF-Token.
 
-Eine Session wird gestartet, wenn etwas in sie schreibt, nicht bei jeder Anfrage: beim Erzeugen eines CSRF-Tokens (also beim Rendern eines Formulars oder beim Prüfen eines Posts), beim Anmelden und wenn ein Besucher eine Sprache wählt. Eine Seite, die nichts davon tut, antwortet ohne Session, ohne `PHPSESSID`-Cookie und ohne Sessiondatei – was sowohl für den Plattenplatz zählt, den ein Crawler füllt, als auch dafür, was ein Cookie-Banner erklären muss. `\Nino\Runtime::startSession()` ist der Aufruf, der eine startet; jeder Schreibzugriff geht durch ihn, und auf der CLI, wo es nichts zu starten gibt, antwortet er `false`.
+Eine Session wird gestartet, wenn etwas in sie schreibt, nicht bei jeder Anfrage: beim Erzeugen eines CSRF-Tokens (also beim Rendern eines Formulars oder beim Prüfen eines Posts), beim Anmelden und wenn ein Besucher eine Sprache wählt. Eine Seite, die nichts davon tut, antwortet ohne Session, ohne `PHPSESSID`-Cookie und ohne Sessiondatei – was sowohl für den Plattenplatz zählt, den ein Crawler füllt, als auch dafür, was ein Cookie-Banner erklären muss. `\Nino\Runtime::startSession()` ist der Aufruf, der eine startet; jeder Schreibzugriff geht durch ihn, und auf der CLI, wo es nichts zu starten gibt, antwortet er `false`. `false` antwortet er auch, wenn PHP eine Session gar nicht starten kann – etwa bei einem unbrauchbaren `session.save_path`: Der Grund, den PHP genannt hat, landet im Fehlerprotokoll, und die Anfrage wird ohne Session beantwortet, statt zu einem 500 zu werden, den nichts erklärt.
 
 Die Authentifizierung schützt zusätzlich durch:
 

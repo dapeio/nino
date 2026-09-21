@@ -169,8 +169,34 @@ namespace Nino {
 
 			session_set_cookie_params( self::$_sessionCookieParams );
 
-			if( session_start() === false )
+			/*	php raises a warning of its own before session_start() answers
+				false, and an engine-raised level is fatal in here (see
+				NON_FATAL_LEVELS) - so an unusable session.save_path ended the
+				request on a bare 500 and the 'return false' below, the answer
+				this method documents, was unreachable. Silenced and reported
+				through the framework's own "record this and carry on" channel
+				instead: the reason is in the log and the request answers
+				without a session, the same as one that never had one.
+
+				Carrying on loosens nothing. A csrf token that cannot be stored
+				never matches the one a form sends back, so the check fails
+				closed, and a login that cannot be remembered is not a login -
+				what is lost is the session, not the guard on it.	*/
+			if( @session_start() === false ) {
+
+				// php's own message names the storage module and the path it
+				// failed on, which is the entire diagnosis - repeated here
+				// rather than restated, since a session handler of a project's
+				// own may fail for a reason only it knows
+				$last		= error_get_last();
+				$reason	= ( is_array( $last ) === true && str_contains( $last['message'], 'session_start()' ) === true )
+					? $last['message']
+					: 'session_start() answered false';
+
+				trigger_error( 'Runtime::startSession(): '. $reason, E_USER_WARNING );
+
 				return false;
+			}
 
 			$_SESSION[$appData['./nino/uid']] = $_SESSION[$appData['./nino/uid']] ?? [];
 

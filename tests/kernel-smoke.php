@@ -3700,6 +3700,64 @@ check( 'an engine-raised deprecation is recorded and the request carries on', tr
 echo "\n";
 
 
+// --- Runtime::startSession() - a session php refuses to start ----------------
+
+echo "Runtime::startSession() - a session that cannot start says so\n";
+
+/*	Regression: Runtime::init() starts the session a visitor already carries,
+	and it runs before AppData::init() has read config.php - the cookie flags
+	are fixed at session_start() time and cannot be retrofitted afterwards.
+	php raises a warning of its own when session_start() fails, an engine level
+	is fatal in here, and handleError() knew neither '/nino/error/log' nor
+	'/nino/error/display' that early: an unusable session.save_path was a bare
+	500 with nothing on the page, nothing on stderr and nothing in the log, on
+	every request that carried a session cookie	*/
+$sessionFailRoot = $sandbox. '/session-fail';
+mkdir( $sessionFailRoot, 0777, true );
+file_put_contents( $sessionFailRoot. '/config.php', '<?php return '. var_export( [ '/nino/modules' => [] ], true ). ';' );
+
+// No output before \Nino\init() in any of these: on the cli headers_sent()
+// is true the moment anything has been echoed, and startSession() answers
+// false for that before it reaches php at all
+$sessionFail = runIsolated(
+	'$appData = \Nino\init();
+	echo json_encode( [ "status" => session_status(), "csrf" => strlen( \Nino\Csrf::getToken( $appData ) ) ] );',
+	'define( "NINO_PRIVATE_DIR", '. var_export( $sessionFailRoot, true ). ' );
+	ini_set( "session.save_path", "/definitely/not/a/nino-session-directory" );
+	$_COOKIE[ session_name() ] = "0123456789abcdef0123456789abcdef";'
+);
+
+$sessionFailData	= json_decode( $sessionFail['stdout'], true );
+$sessionFailLog		= glob( $sessionFailRoot. '/data/logs.*.php' ) ?: [];
+$sessionFailEntries	= ( $sessionFailLog !== [] ) ? (array) ( include $sessionFailLog[0] ) : [];
+$sessionFailReasons	= implode( "\n", array_map( static fn( mixed $entry ): string => is_array( $entry ) === true ? (string) ( $entry['message'] ?? '' ) : '', $sessionFailEntries ) );
+
+check( 'a session php refuses to start does not end the request', is_array( $sessionFailData ) === true && $sessionFail['exitCode'] === 0 );
+check( '...and the request carries on without one, which fails a csrf check rather than passing it', ( $sessionFailData['status'] ?? null ) === PHP_SESSION_NONE
+	&& ( $sessionFailData['csrf'] ?? 0 ) === 64 );
+check( '...and the reason php gave is in the log, where a bare 500 left nothing at all', str_contains( $sessionFailReasons, 'startSession' ) === true
+	&& str_contains( $sessionFailReasons, 'session_start()' ) === true );
+
+// The other side of it: a session that can start still starts, cookie
+// flags and all - the silencing above must not swallow the normal path
+$sessionOkRoot = $sandbox. '/session-ok';
+mkdir( $sessionOkRoot. '/sessions', 0777, true );
+file_put_contents( $sessionOkRoot. '/config.php', '<?php return '. var_export( [ '/nino/modules' => [] ], true ). ';' );
+
+$sessionOk = runIsolated(
+	'$appData = \Nino\init();
+	echo json_encode( [ "status" => session_status() ] );',
+	'define( "NINO_PRIVATE_DIR", '. var_export( $sessionOkRoot, true ). ' );
+	ini_set( "session.save_path", '. var_export( $sessionOkRoot. '/sessions', true ). ' );
+	$_COOKIE[ session_name() ] = "0123456789abcdef0123456789abcdef";'
+);
+
+check( 'a session that can start is started as it always was', ( json_decode( $sessionOk['stdout'], true )['status'] ?? null ) === PHP_SESSION_ACTIVE );
+check( '...and that boot logs nothing', glob( $sessionOkRoot. '/data/logs.*.php' ) === [] );
+
+echo "\n";
+
+
 // A month's log is one file, rewritten whole on every entry. A template with
 // a broken shortcode raises one notice per view, so the file grew with the
 // traffic - and every entry rewrote all of it under an exclusive lock, until
