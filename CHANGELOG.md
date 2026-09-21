@@ -57,6 +57,25 @@ All notable changes to Nino are documented in this file.
 
 ### Fixed
 
+- **The public stylesheet's two main font stacks were one family name nobody
+  has.** `--fontfamily-text` and `--fontfamily-title` in `_nino/Nino.css`
+  wrapped the entire stack in single quotes, and a quoted value in
+  `font-family` is one family name rather than a list: the browser looked for
+  a face literally called `-apple-system, BlinkMacSystemFont, "Segoe UI",
+  Roboto, sans-serif`, found none, and never reached the `sans-serif` at the
+  end because that keyword sat inside the string too. Measured in headless
+  Chromium against the file itself - a canvas set to the computed value drew
+  the same string at 349.22px, to the pixel what a family name invented for
+  the test drew, where the stack unquoted drew it at 380.21px. So every page
+  the framework styles without a theme, and every page before its webfont
+  arrives, fell back to the browser's standard serif instead of the system
+  sans the file asks for. The quotes are gone from both. `--fontfamily-code`
+  beside them was never quoted, and the three stacks of the base unit's
+  `theme.css` quote only the webface they ship, which is the shape both files
+  now have. `tests/install-smoke.php` reads every `--fontfamily-*`
+  declaration of both files and checks that none is one quoted name and that
+  each ends in a bare generic family.
+
 - **A locale a project dropped pinned its default in the visitor's session.**
   `Locales::init()` takes care never to write the default it resolves into the
   session, and says why: a locale nobody chose would outlive a later change of

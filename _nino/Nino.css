@@ -145,8 +145,16 @@
 		clearly not offered. */
 	--color-disabled: var(--color-subtitle);
 
-	--fontfamily-text: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
-	--fontfamily-title: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+	/*	A font stack is a comma separated list of family names, and quoting one
+		is how a single name that needs it - 'Segoe UI' - is spelled. Quoting
+		the whole list instead spells one family literally called
+		`-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`,
+		which no system has: the browser finds nothing, never reaches the
+		generic keyword at the end because that keyword is inside the string
+		too, and falls back to its own standard font. theme.css quotes the
+		webface it ships and leaves the fallbacks bare, which is the shape.	*/
+	--fontfamily-text: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+	--fontfamily-title: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 	--fontfamily-code: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 	/*	Relative, not 16px: a font-size on html resolves against the browser's
 		own default, so 100% is whatever the visitor set it to. A length here

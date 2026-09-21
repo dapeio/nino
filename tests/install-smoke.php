@@ -1232,6 +1232,38 @@ foreach( [ '/../_nino/Nino.css' => '--base-size', '/../_admin/install/library/ba
 check( 'both files set the root size, and neither as a length'. ( $rootSizes === [] ? ' - none found' : '' ), count( $rootSizes ) === 4
 	&& array_filter( $rootSizes, static fn( string $entry ): bool => str_ends_with( $entry, '%' ) === false ) === [] );
 
+/*	A font stack is a comma separated list of family names, and the quotes in
+	it belong to the single name that needs them - "Segoe UI". A value quoted
+	as a whole is one family whose name happens to contain commas: no system
+	has it, and the generic keyword that should have caught the fall sits
+	inside the string rather than after it, so the browser ends up on its own
+	standard font instead of the sans the stack asked for. Measured in
+	headless Chromium against the quoted value: a canvas set to it measured
+	the same text at the same width as a family name invented for the test,
+	and 8% narrower than the same stack unquoted.	*/
+$fontStacks		= 0;
+$quotedWhole	= [];
+$withoutBackup	= [];
+
+foreach( [ '/../_nino/Nino.css', '/../_admin/install/library/base/assets/theme.css' ] as $file )
+	if( preg_match_all( '/--fontfamily-[a-z]+:\s*([^;]+);/', (string) file_get_contents( __DIR__. $file ), $found ) > 0 )
+		foreach( $found[1] as $value ) {
+
+			$stack = trim( $value );
+			$fontStacks++;
+
+			if( preg_match( '/^(?:\'[^\']*\'|"[^"]*")$/', $stack ) === 1 )
+				$quotedWhole[] = $file. ': '. $stack;
+
+			// The last entry is the one the browser is guaranteed to have, so
+			// it has to reach it as a keyword and not as part of a name
+			if( preg_match( '/,\s*(?:sans-serif|serif|monospace|system-ui|cursive|fantasy)$/', $stack ) !== 1 )
+				$withoutBackup[] = $file. ': '. $stack;
+		}
+
+check( 'every font stack of both files is a list of names and not one quoted name'. ( $quotedWhole === [] ? '' : ' - '. implode( ', ', $quotedWhole ) ), $fontStacks === 6 && $quotedWhole === [] );
+check( '...and every one of them ends in a bare generic family'. ( $withoutBackup === [] ? '' : ' - '. implode( ', ', $withoutBackup ) ), $withoutBackup === [] );
+
 // The stylesheet and the markup it styles are one delivery: theme.css names
 // .nino-frame-header and .nino-footer-nav, and nothing else writes either
 // template into a project
