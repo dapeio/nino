@@ -57,6 +57,22 @@ All notable changes to Nino are documented in this file.
 
 ### Fixed
 
+- **A restore that failed took the list of backups with it.** The Backups
+  panel is the screen somebody opens when the site is already broken, and a
+  refused restore emptied it: `_confirmRestore()` reported through
+  `_showError()`, which clears `#backups-list` and puts one paragraph there
+  instead. But a restore the server did not carry out overwrote nothing -
+  every date on that list is still exactly as valid as it was a second
+  earlier, and the buttons that were just taken away are the way to try the
+  next one. Only a page reload brought them back, on the one screen where a
+  person is least likely to trust a reload. The list now keeps its rows and a
+  refused restore writes into a polite live region below them, which is where
+  every other panel of the workbench puts a failure it survived;
+  `_showError()` stays for the list that could not be loaded, which has
+  nothing to keep. The panel had no js test at all - `tests/admin-backups-js-smoke.js`
+  is a new one, twelve checks over the list, both failure paths and the
+  successful restore, six of which the old file failed.
+
 - **An image slot could be saved that no upload was able to fill, and deleting
   one threw the file away before the record.** Two things in the Image Slots
   tab. A slot's width and height are the exact canvas `\Nino\Images::process()`

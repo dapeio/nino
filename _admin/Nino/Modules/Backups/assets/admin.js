@@ -67,7 +67,8 @@
 		},
 
 		/**
-		 *	Show a failed request's status/error
+		 *	Show a failed request's status/error in place of the list - for the
+		 *	load that failed, where there is no list to keep in the first place
 		 *
 		 *	@param		{number}		status
 		 *	@param		{*}					response
@@ -81,6 +82,35 @@
 			p.className = 'nino-admin-error';
 			p.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : Nino.content.getText('/_admin/common/error/load') );
 			wrap.appendChild( p );
+		},
+
+		/**
+		 *	Report a failure that leaves the list standing, in the line below
+		 *	it.
+		 *
+		 *	A refused restore is exactly that: nothing was overwritten, and
+		 *	every date on the list is still a date worth trying. It used to go
+		 *	through _showError() above, which empties the list - so the one
+		 *	screen the framework offers for getting a broken site back replaced
+		 *	its backups with a sentence, and only a page reload brought them
+		 *	back.
+		 *
+		 *	@param		{number}		status
+		 *	@param		{*}					response
+		 *
+		 *	@return		void
+		 */
+		_showRestoreError : function( status, response ) {
+
+			const message = dc.getElementById('backups-message');
+
+			// No list rendered means no line under it either, and then the
+			// error has to go somewhere rather than nowhere
+			if( message === null )
+				return Nino.admin.backups._showError( status, response );
+
+			message.className = 'nino-admin-error';
+			message.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : Nino.content.getText('/_admin/common/error/request') );
 		},
 
 		/**
@@ -124,6 +154,13 @@
 			} );
 
 			wrap.appendChild( ul );
+
+			// The line a refused restore reports into, beside the list rather
+			// than in place of it
+			const message = dc.createElement('p');
+			message.id = 'backups-message';
+			message.setAttribute( 'aria-live', 'polite' );
+			wrap.appendChild( message );
 		},
 
 		/**
@@ -140,9 +177,14 @@
 			if( wn.confirm( Nino.content.getText('/_admin/backups/confirm/restore').replace( '%s', date ) ) === false )
 				return;
 
+			// Whatever a previous attempt left there is about that attempt
+			const message = dc.getElementById('backups-message');
+			if( message !== null )
+				message.textContent = '';
+
 			Nino.admin.backups._apiCall( 'restore', { date : date }, function( status, response ) {
 				if( status !== 200 || response === null || response.ok !== true )
-					return Nino.admin.backups._showError( status, response );
+					return Nino.admin.backups._showRestoreError( status, response );
 
 				wn.alert( Nino.content.getText('/_admin/backups/msg/restored').replace( '%s', date ) );
 				wn.location.reload();
