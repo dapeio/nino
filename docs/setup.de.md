@@ -78,7 +78,7 @@ Der Schritt schreibt:
 - mitgelieferte Element-Typen nach `elements/`;
 - weitere deklarierte Dateien an ihre Projektpfade.
 
-Sprachen, die gewählten *anderen* Module und die von diesem Schritt verwalteten Routen werden bei einem späteren erneuten Anwenden ersetzt; die drei immer aktiven Einheiten und die Routen/Templates/Texte, die sie mitbringen, entfernt es dabei nie. Manuell oder durch andere Bereiche angelegte Routen bleiben erhalten. Bereits kopierte Templates, Texte und Element-Typen löscht ein späteres Abwählen nicht.
+Eine Datei, die eine Einheit nicht kopieren kann – ein Ziel, das sich nicht schreiben lässt –, beendet den Schritt mit einem 500, der die Datei nennt, und in die `config.php` wird für diesen Lauf nichts geschrieben; sobald das Ziel schreibbar ist, nimmt ein erneutes Anwenden alles wieder auf. Sprachen, die gewählten *anderen* Module und die von diesem Schritt verwalteten Routen werden bei einem späteren erneuten Anwenden ersetzt; die drei immer aktiven Einheiten und die Routen/Templates/Texte, die sie mitbringen, entfernt es dabei nie. Manuell oder durch andere Bereiche angelegte Routen bleiben erhalten. Bereits kopierte Templates, Texte und Element-Typen löscht ein späteres Abwählen nicht.
 
 ### Das Aussehen
 

@@ -77,7 +77,7 @@ The step writes:
 - provided element types to `elements/`;
 - other declared files to their project paths.
 
-Languages, the picked *other* modules, and the routes this step manages are replaced on a later reapply; the three always-on units and the routes/templates/text they bring are never removed by it. Manually or by other areas created routes remain preserved. Templates, texts, and element types that have already been copied are not deleted by later deselection.
+A file a unit cannot copy - a target that is not writable - ends the step with a 500 naming the file, and nothing is written to `config.php` for that run; once the target is writable, applying again picks up whole. Languages, the picked *other* modules, and the routes this step manages are replaced on a later reapply; the three always-on units and the routes/templates/text they bring are never removed by it. Manually or by other areas created routes remain preserved. Templates, texts, and element types that have already been copied are not deleted by later deselection.
 
 ### The Look
 

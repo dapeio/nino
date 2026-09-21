@@ -68,6 +68,15 @@ All notable changes to Nino are documented in this file.
 
 ### Fixed
 
+- **The wizard's Setup step reported success over a unit file it could not
+  copy.** `\Nino\Features::applyUnit()` answers the first file it could not
+  copy, and the wizard read no answer from it: the step went on to write
+  locales, modules and routes into `config.php` and answered 200, with a
+  template missing and nothing to say so. The first such file ends the step
+  now, with a 500 naming it and nothing written for that run; what was
+  copied before it stays, and applying again once the target is writable
+  picks up whole, the way every reapply of this step does.
+
 - **A catalogue update of a running feature never ran the new version's
   upgrade hook.** The Features panel placed the new directory and activated
   again in the same request, and `Features::activate()` asks `method_exists()`

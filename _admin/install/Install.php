@@ -762,9 +762,26 @@ namespace Nino\Install {
 			$blacklist = [];
 			$config = [];
 
-			self::_applyUnit( $appData, self::LIBRARY. '/base', $locales, $routes, $blacklist, $config );
-			foreach( $modules as $key )
-				self::_applyUnit( $appData, $units[$key], $locales, $routes, $blacklist, $config );
+			/*	Read, and the first file a unit could not copy ends the step
+				before config.php is written: applyUnit() answers that file, and
+				a step that read no answer went on to persist locales, modules
+				and routes over a project missing a template, and reported
+				success. What was copied before the failure stays - the units
+				overwrite here, so applying again once the target is writable
+				picks up whole	*/
+			$applied = self::_applyUnit( $appData, self::LIBRARY. '/base', $locales, $routes, $blacklist, $config );
+			if( $applied !== true ) {
+				\Nino\Http::fail( $request, 500, 'the base unit could not be applied: '. $applied );
+				return;
+			}
+
+			foreach( $modules as $key ) {
+				$applied = self::_applyUnit( $appData, $units[$key], $locales, $routes, $blacklist, $config );
+				if( $applied !== true ) {
+					\Nino\Http::fail( $request, 500, 'the unit "'. $key. '" could not be applied: '. $applied );
+					return;
+				}
+			}
 
 			$appData['/nino/http/routes'] = $routes;
 
@@ -848,11 +865,11 @@ namespace Nino\Install {
 		 *																	them back rather than writing them, so apiApply()
 		 *																	persists them with the keys it writes anyway
 		 *
-		 *	@return 	void
+		 *	@return 	true|string							true, or the first file the unit could not copy
 		 */
-		private static function _applyUnit( array &$appData, string $unitDir, array $locales, array &$routes, array &$blacklist, array &$config ): void {
+		private static function _applyUnit( array &$appData, string $unitDir, array $locales, array &$routes, array &$blacklist, array &$config ): true|string {
 
-			\Nino\Features::applyUnit( $appData, $unitDir, $locales, $routes, $blacklist, $config, true );
+			return \Nino\Features::applyUnit( $appData, $unitDir, $locales, $routes, $blacklist, $config, true );
 		}
 	}
 

@@ -338,6 +338,39 @@ $staleNativeRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Install\Setup::apiApply( $appData, $staleNativeRequest );
 check( 'a posted native locale outside the picked set is ignored, falling back to the (only) picked locale', \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/locales/native'] === 'en_US' );
 
+/*	A unit file the step cannot copy. \Nino\Features::applyUnit() answers the
+	first file it could not copy, and the wizard read no answer from it: the
+	step went on to write config.php and answer 200, with a template missing
+	and nothing to say so. A directory standing where the template goes is
+	what a permission or a full disk does, provoked without either. The
+	warning check is a guard - copyFile() is silenced already - kept so the
+	refusal stays the whole outcome	*/
+$blockedTemplate = $sandbox. '/private/templates/theme.header.tpl';
+unlink( $blockedTemplate );
+mkdir( $blockedTemplate, 0755, true );
+$configBeforeBlocked	= \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
+$blockedWarnings			= [];
+set_error_handler( static function( int $no, string $message ) use ( &$blockedWarnings ): bool {
+	if( ( error_reporting() & $no ) !== 0 )
+		$blockedWarnings[] = $message;
+	return true;
+} );
+$_POST['data'] = json_encode( [ 'locales' => [ 'de_DE', 'en_US' ], 'modules' => [] ] );
+$blockedRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Install\Setup::apiApply( $appData, $blockedRequest );
+restore_error_handler();
+rmdir( $blockedTemplate );
+
+check( 'a unit file the step cannot copy is a 500 naming the file', $blockedRequest['/nino/http/response']['statusCode'] === 500
+	&& str_contains( (string) ( $blockedRequest['/nino/http/response']['body']['error'] ?? '' ), '/templates/theme.header.tpl' ) === true );
+check( '...nothing was written to config.php for that apply', \Nino\Filesystem::getFileContent( $appData, '/config.php', [] ) === $configBeforeBlocked );
+check( '...and no engine warning was raised on the way', array_filter( $blockedWarnings, static fn( string $w ): bool => str_contains( $w, 'file_put_contents' ) ) === [] );
+
+// What the refused apply changed in memory, back to what the file says -
+// a real request ends with the refusal, this one goes on
+$appData['/nino/locales/available']	= $configBeforeBlocked['/nino/locales/available'];
+$appData['/nino/locales/native']		= $configBeforeBlocked['/nino/locales/native'];
+
 // Drop the simulated runtime-only routes again - nothing below this point
 // exercises routes, but leaving them in $appData would misrepresent what
 // a fresh request actually looks like for any test added here later
