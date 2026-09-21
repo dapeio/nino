@@ -45,6 +45,18 @@
 			// Catch login
 			dc.getElementById('form-login').addEventListener( 'submit', function(e){
 				e.preventDefault();
+
+				/*	Every attempt starts from a clean slate. The outline marks the
+						field that is empty now, and nothing took it off again: submit
+						with no email, fill the email in, submit again, and the email
+						field still carried the red outline while the password field
+						got one of its own - two fields marked, one of them correct.
+						The message class is reset here for the same reason, so the
+						answer below finds nothing of the previous attempt left on it */
+				el.inputUser.classList.remove('error');
+				el.inputPw.classList.remove('error');
+				el.formMsg.className = '';
+
 				if(el.inputUser.value.length === 0) {
 					el.inputUser.classList.add('error')
 					el.formMsg.innerHTML = Nino.content.getText('/_admin/login/error/user');
@@ -62,7 +74,11 @@
 				el.formMsg.className = 'pending';
 				el.formMsg.innerHTML = Nino.content.getText('/_admin/login/msg/pending');
 				Nino.auth.login( el.inputUser.value, el.inputPw.value, '/_admin', function( xhr ){
-					el.formMsg.classList.add('error');
+
+					// Replaced rather than added: the request is over, so 'pending'
+					// has to go with it - added on top it left the message carrying
+					// both states, and both stylesheet rules, at the same time
+					el.formMsg.className = 'error';
 
 					/*	401 is the only answer that means the pair was read and
 							refused - that is the one this form may call a wrong

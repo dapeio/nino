@@ -52,14 +52,37 @@ const de = fs.readFileSync( path.join( __dirname, '../_admin/text/de_DE.php' ), 
 check( 'de_DE carries it too', de.indexOf('[[/_admin/login/error/endpoint]]') !== -1 && de.indexOf('%s') !== -1 );
 check( '...and the stale-token message as well', de.indexOf('[[/_admin/login/error/csrf]]') !== -1 );
 
-// The form's dom, reduced to the five ids login.js reaches for
+// The form's dom, reduced to the five ids login.js reaches for. The class
+// list is a real one, because what the form leaves on a field between two
+// attempts is half of what this test is about
 function field() {
-	return {
-		value : '', innerHTML : '', className : '',
-		classList : { add : function() {}, remove : function() {} },
+
+	const classes = [];
+	const node = {
+		value : '', innerHTML : '',
+		classList : {
+			add : function( name ) { if( classes.indexOf( name ) === -1 ) classes.push( name ) },
+			remove : function( name ) {
+				const at = classes.indexOf( name );
+				if( at !== -1 ) classes.splice( at, 1 );
+			},
+			contains : function( name ) { return classes.indexOf( name ) !== -1 },
+		},
 		focus : function() {},
 		addEventListener : function( type, fn ) { this.handler = fn },
 	};
+
+	// className and classList are two views of one list in a browser, and
+	// login.js writes through both of them
+	Object.defineProperty( node, 'className', {
+		get : function() { return classes.join(' ') },
+		set : function( value ) {
+			classes.length = 0;
+			String( value ).split(/\s+/).forEach( function( name ) { if( name !== '' ) classes.push( name ) } );
+		},
+	} );
+
+	return node;
 }
 
 const el = {
@@ -174,9 +197,29 @@ check( '...nor turns a 401 into anything but a wrong password', attempt( 401, "d
 // The two field guards in front of all of that are unchanged
 el['input-user'].value = '';
 check( 'an empty email is still caught before any request', attempt( 401 ) === sandbox.NinoJstext['/_admin/login/error/user'] );
+check( '...and the empty field is the one marked', el['input-user'].classList.contains('error') === true
+	&& el['input-pw'].classList.contains('error') === false );
 el['input-user'].value = 'editor@example.com';
 el['input-pw'].value = '';
 check( 'an empty password too', attempt( 401 ) === sandbox.NinoJstext['/_admin/login/error/pw'] );
+
+/*	The mark belongs to the attempt, not to the form: the email that was empty
+	a moment ago has been filled in, so nothing may still point at it	*/
+check( 'the field that was filled in loses the outline it was given', el['input-user'].classList.contains('error') === false );
+check( '...and the one that is empty now has it instead', el['input-pw'].classList.contains('error') === true );
+
+// Both filled in again: a submit that reaches the server leaves neither
+// field marked, and the message says only that the request is running
+el['input-pw'].value = 'correct horse battery staple';
+sandbox.Nino.http.sendRequest = function() {};
+el['form-login'].handler( { preventDefault : function() {} } );
+check( 'a submit that gets past the guards clears both outlines', el['input-user'].classList.contains('error') === false
+	&& el['input-pw'].classList.contains('error') === false );
+check( '...and says the request is pending, and nothing else', el['form-message'].className === 'pending' );
+
+// ...and once the answer is in, the request is over with it
+attempt( 401 );
+check( 'the answer replaces the pending state rather than joining it', el['form-message'].className === 'error' );
 
 console.log( '\n'+ checks+ ' checks, '+ failures+ ' failed' );
 process.exit( failures === 0 ? 0 : 1 );

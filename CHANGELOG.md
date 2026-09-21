@@ -57,6 +57,22 @@ All notable changes to Nino are documented in this file.
 
 ### Fixed
 
+- **The login form never took back what it had marked.** `login.js` outlines
+  the field it refuses - the login screen is the one place with no per-field
+  error text, only "that pair was wrong" - and it added that outline without
+  ever removing it. Submit with no email, fill the email in, submit again:
+  the email field still carried the red outline while the password field got
+  one of its own, so the form pointed at two fields and one of them was
+  correct. The message under the fields had the same problem from the other
+  end: it is set to `pending` for the duration of the request, and the answer
+  *added* `error` to it, so a refused login ended up carrying both classes and
+  both rules of the stylesheet - the blue "checking" state and the red one at
+  once, for as long as the page stayed open. Each attempt now clears both
+  outlines and the message class before it validates anything, and the answer
+  replaces the pending class rather than joining it.
+  `tests/admin-login-js-smoke.js` grew a real class list in its dom stub and
+  six checks around it, three of which the old file failed.
+
 - **The Navigations panel called a page unnamed that the menu names.** A menu
   entry is "a path with a name", so the panel reports per route whether the
   `/webpage<uri>/name` key exists - a route without one is skipped by
