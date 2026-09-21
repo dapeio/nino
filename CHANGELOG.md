@@ -6,6 +6,17 @@ All notable changes to Nino are documented in this file.
 
 ### Added
 
+- **Tests:** the ip bucket of the login throttle, whose rules nothing
+  asserted. Every login in `tests/kernel-smoke.php` comes from 127.0.0.1, so
+  the bucket was live in every test and read by none: that an ip in cooldown
+  is refused before the password is looked at and without the account's
+  bucket moving, that a guess against an account that does not exist counts
+  against the ip, that the ip trips at `maxtries` times its factor and not
+  at `maxtries`, that a successful login clears the ip bucket as well as the
+  account's, that an account already in cooldown feeds no bucket, and that
+  a caller without a client ip gets no ip bucket rather than a shared empty
+  one. Each check was proven by breaking its rule in `Auth.php`.
+
 - **Tests:** the csrf guard's other four paths, none of which was measured.
   `tests/kernel-smoke.php` now drives which methods are checked (PUT, DELETE
   and PATCH as much as POST, and a method the kernel does not recognize), the

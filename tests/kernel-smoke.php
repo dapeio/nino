@@ -1226,6 +1226,65 @@ check( '...and drops the account\'s bucket from auth-tries.php', isset( \Nino\Fi
 check( '...so two more typos later do not add up to a lockout', is_array( \Nino\Auth::loginUser( $appData, 'counter@example.com', 'correct horse battery staple' ) ) === true );
 \Nino\Auth::deleteUser( $appData, 'counter@example.com' );
 
+/*	The ip bucket's own rules, none of which had an assertion: every login in
+	this suite comes from 127.0.0.1, so the bucket was live in all of them and
+	read by none of them. Each rule below was proven by breaking it in Auth.php
+	and watching its check fail. The buckets are seeded through the file the
+	way a burst of requests would have left them, rather than by thirty
+	bcrypt rounds	*/
+$triesFile	= '/data/auth-tries.php';
+$ipFactor		= (int) ( new ReflectionClassConstant( '\Nino\Auth', 'IP_TRIES_FACTOR' ) )->getValue();
+$seedTries	= static function( array $seed ) use ( &$appData, $triesFile ): void {
+	\Nino\Filesystem::mutate( $appData, $triesFile, static function( array $state ) use ( $seed ): array {
+		foreach( $seed as $key => $value )
+			if( $value === null )
+				unset( $state[$key] );
+			else
+				$state[$key] = $value;
+		return $state;
+	} );
+};
+$readTries	= static fn( string $key ): ?int => \Nino\Filesystem::getFileContent( $appData, $triesFile, [] )[$key] ?? null;
+
+\Nino\Auth::insertUser( $appData, 'bucket@example.com', 'correct horse battery staple' );
+
+// An ip in cooldown is refused before anything else is looked at - the
+// right password included - and the refusal moves no account bucket
+$seedTries( [ 'ip:127.0.0.1' => 0 - time() - 3600, 'bucket@example.com' => null ] );
+check( 'an ip in cooldown is refused with the right password too', \Nino\Auth::loginUser( $appData, 'bucket@example.com', 'correct horse battery staple' ) === false );
+check( '...and that refusal does not count against the account', $readTries( 'bucket@example.com' ) === null );
+
+// The ip bucket counts guesses against accounts that do not exist - that is
+// what it is for - and trips at maxtries times the factor, never at
+// maxtries: a shared exit ip is not one person mistyping
+$seedTries( [ 'ip:127.0.0.1' => $appData['/nino/auth/maxtries'] - 1 ] );
+\Nino\Auth::loginUser( $appData, 'nobody@example.com', 'wrong' );
+check( 'a guess against an account that does not exist counts against the ip', $readTries( 'ip:127.0.0.1' ) === $appData['/nino/auth/maxtries'] );
+check( '...and at maxtries the ip is not locked', is_array( \Nino\Auth::loginUser( $appData, 'bucket@example.com', 'correct horse battery staple' ) ) === true );
+check( 'a successful login clears the ip bucket along with the account\'s', $readTries( 'ip:127.0.0.1' ) === null );
+
+$seedTries( [ 'ip:127.0.0.1' => $appData['/nino/auth/maxtries'] * $ipFactor - 1 ] );
+\Nino\Auth::loginUser( $appData, 'nobody@example.com', 'wrong' );
+check( 'at maxtries times the factor the ip is locked, and the right password no longer helps', $readTries( 'ip:127.0.0.1' ) < 0 && \Nino\Auth::loginUser( $appData, 'bucket@example.com', 'correct horse battery staple' ) === false );
+
+// An account already in cooldown feeds no bucket: its owner retrying their
+// own locked login must not take their whole ip out with it
+$seedTries( [ 'ip:127.0.0.1' => null, 'bucket@example.com' => 0 - time() - 3600 ] );
+\Nino\Auth::loginUser( $appData, 'bucket@example.com', 'wrong' );
+check( 'a guess against an account in cooldown moves no bucket, the ip\'s included', $readTries( 'ip:127.0.0.1' ) === null && $readTries( 'bucket@example.com' ) < 0 );
+
+// No client ip - the cli, a test - means no ip bucket, rather than one
+// shared empty bucket every such caller falls into
+$seedTries( [ 'ip:127.0.0.1' => null, 'ip:' => null, 'bucket@example.com' => null ] );
+$_SERVER['REMOTE_ADDR'] = '';
+\Nino\Auth::loginUser( $appData, 'bucket@example.com', 'wrong' );
+$_SERVER['REMOTE_ADDR'] = '127.0.0.1';
+check( 'without a client ip there is no ip bucket at all', array_filter( array_keys( \Nino\Filesystem::getFileContent( $appData, $triesFile, [] ) ), static fn( string $key ): bool => str_starts_with( $key, 'ip:' ) ) === []
+	&& $readTries( 'bucket@example.com' ) === 1 );
+
+$seedTries( [ 'bucket@example.com' => null ] );
+\Nino\Auth::deleteUser( $appData, 'bucket@example.com' );
+
 // An account written by hand. The class says so itself: status, sessions and
 // perms are a developer-only, direct-json task - so a record that is a hash
 // and a permission list and nothing else is a thing a project has, and
