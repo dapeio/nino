@@ -57,6 +57,24 @@ All notable changes to Nino are documented in this file.
 
 ### Fixed
 
+- **Converting a text key to global threw away the only translation it had.**
+  `Keys::apiSave()` documents the migration it performs: per-locale to global
+  "keeps the native locale's value (falling back to the first non-empty one)".
+  `_convertShape()` read that native value with `??`, which steps aside for a
+  null and for nothing else - and a locale file that carries the key with an
+  empty string is not null, as the comment two lines below it already
+  explained about the other half of the same expression. So the fallback ran
+  only for a native locale that had never heard of the key at all. For the
+  ordinary case - a key written per-locale, translated into one language,
+  still blank in the project's own - the empty native value won, the key
+  became a global empty string, and the translation that existed was deleted
+  along with the locale files' copies. Measured in
+  `tests/admin-system-smoke.php`: a key empty in `de_DE` and filled in `en_US`
+  converted to `''`, where the docblock says `en_US`. Empty is now treated as
+  nothing to keep, so the documented fallback runs; a native locale that does
+  have a value still wins over every other one, and a key that is empty in
+  every language still becomes an empty global key rather than no key.
+
 - **A reorder the server refused left no trace anywhere.** The ↑/↓ buttons of
   the Routes list reorder the persisted routes, and because equal menu
   priorities follow route order, that list is also what orders every

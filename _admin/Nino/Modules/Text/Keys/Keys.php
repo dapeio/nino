@@ -505,12 +505,23 @@ namespace Nino\Modules\Text {
 
 			if( $toGlobal === true ) {
 
+				/*	Empty is nothing to keep, not the thing to keep. '??' only
+					steps aside for a null, and a locale file that carries this
+					key with an empty string is not null (see below) - so a key
+					nobody has written in the project's own language yet, which
+					is what every fresh translation looks like until somebody
+					gets to it, converted to global as '' and threw away the one
+					language that did have text. The fallback the docblock of
+					apiSave() promises never ran for it.	*/
+				$native = \Nino\Locales::getNativeLocale( $appData );
+				$value 	= $entry['values'][$native] ?? '';
+
 				// A locale missing this key entirely is null (see
 				// \Nino\Text::entries()), not '' - both are excluded here, so
 				// "the first non-empty value" doesn't pick a locale that never
 				// had one
-				$native = \Nino\Locales::getNativeLocale( $appData );
-				$value 	= $entry['values'][$native] ?? ( array_values( array_filter( $entry['values'], fn( $v ) => $v !== null && $v !== '' ) )[0] ?? '' );
+				if( $value === '' )
+					$value = array_values( array_filter( $entry['values'], fn( $v ) => $v !== null && $v !== '' ) )[0] ?? '';
 
 				foreach( $locales as $locale )
 					\Nino\Filesystem::mutate( $appData, '/text/'. $locale. '.php', function( array $localeData ) use ( $bracketKey ): array {

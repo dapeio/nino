@@ -1477,6 +1477,48 @@ check( 'converting back to per-locale migrates the value into every locale', $de
 check( 'converting back to per-locale removes it from global.php', isset( $globalAfter2['[[/home/welcome/subtitle]]'] ) === false );
 check( 'the key is now blacklisted', in_array( '/home/welcome/subtitle', $blacklist, true ) === true );
 
+/*	Per-locale -> global keeps the native locale's value and, says apiSave()'s
+	docblock, falls back to the first non-empty one. '??' only steps aside for
+	a null, and a locale file carrying the key with an empty string is not
+	null (see \Nino\Text::entries()) - so a key nobody has written in the
+	project's own language yet, which is what a fresh translation looks like
+	until somebody gets to it, converted to global as '' and took the one
+	language that did have text with it.	*/
+callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiCreate', [ 'key' => '/home/welcome/claim', 'global' => false, 'value' => '' ] );
+callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSaveBatch', [ 'items' => [
+	[ 'key' => '/home/welcome/claim', 'locale' => 'en_US', 'value' => 'Nothing but the truth' ],
+] ] );
+
+$claimLocales = \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] );
+check( 'the native locale carries the key with an empty value, which is not the same as not carrying it',
+	array_key_exists( '[[/home/welcome/claim]]', $claimLocales ) === true && $claimLocales['[[/home/welcome/claim]]'] === '' );
+
+[ $status ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', [ 'key' => '/home/welcome/claim', 'global' => true, 'blacklisted' => false ] );
+check( 'an empty native value falls back to the first locale that has one, as the docblock says', $status === 200
+	&& ( \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] )['[[/home/welcome/claim]]'] ?? null ) === 'Nothing but the truth' );
+
+callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', [ 'key' => '/home/welcome/claim', 'global' => false, 'blacklisted' => false ] );
+callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSaveBatch', [ 'items' => [
+	[ 'key' => '/home/welcome/claim', 'locale' => 'de_DE', 'value' => 'Nichts als die Wahrheit' ],
+] ] );
+callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', [ 'key' => '/home/welcome/claim', 'global' => true, 'blacklisted' => false ] );
+check( '...while a native locale that does have a value still wins over every other one',
+	( \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] )['[[/home/welcome/claim]]'] ?? null ) === 'Nichts als die Wahrheit' );
+
+// Empty in every language is the one case where '' really is the value: the
+// key still exists, and converting it must not invent text for it
+callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', [ 'key' => '/home/welcome/claim', 'global' => false, 'blacklisted' => false ] );
+callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSaveBatch', [ 'items' => array_map(
+	static fn( string $locale ): array => [ 'key' => '/home/welcome/claim', 'locale' => $locale, 'value' => '' ],
+	\Nino\Locales::getAvailableLocales( $appData )
+) ] );
+callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', [ 'key' => '/home/welcome/claim', 'global' => true, 'blacklisted' => false ] );
+$claimEmpty = \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] );
+check( 'a key that is empty everywhere converts to an empty global value, not to no key at all',
+	array_key_exists( '[[/home/welcome/claim]]', $claimEmpty ) === true && $claimEmpty['[[/home/welcome/claim]]'] === '' );
+
+callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiDelete', [ 'key' => '/home/welcome/claim' ] );
+
 [ $status ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', [ 'key' => '/does/not/exist', 'global' => true, 'blacklisted' => false ] );
 check( 'apiSave 404s for an unknown key', $status === 404 );
 
