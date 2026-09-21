@@ -2,7 +2,7 @@
 
 **Sprache:** [English](deployment.md) · Deutsch
 
-**Stand:** 18. September 2026 · **Nino-Version:** 1.3.0-beta
+**Stand:** 21. September 2026 · **Nino-Version:** 1.3.0
 
 Dieses Handbuch führt eine fertig entwickelte Nino-Webseite in den produktiven Betrieb. Falls du stattdessen ein frisches Projekt einrichten möchtest, beginne mit [Erste Schritte](getting-started.de.md); technische Erweiterungen behandelt das [Entwickler-Handbuch](development.de.md).
 

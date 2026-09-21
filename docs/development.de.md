@@ -2,7 +2,7 @@
 
 **Sprache:** [English](development.md) · Deutsch
 
-**Stand:** 18. September 2026 · **Nino-Version:** 1.3.0-beta
+**Stand:** 21. September 2026 · **Nino-Version:** 1.3.0
 
 Dieses Handbuch beschreibt die technische Arbeit mit Nino – vom Einstiegspunkt über Routing und Rendering bis zu eigenen Modulen, dauerhaften Daten und Tests. Falls du stattdessen zuerst die Architektur kennenlernen oder ein frisches Projekt einrichten möchtest, lies die [Grundkonzepte](concepts.de.md) beziehungsweise [Erste Schritte](getting-started.de.md).
 

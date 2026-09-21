@@ -2,7 +2,7 @@
 
 **Sprache:** [English](_admin.md) · Deutsch
 
-**Stand:** 18. September 2026 · **Nino-Version:** 1.3.0-beta
+**Stand:** 21. September 2026 · **Nino-Version:** 1.3.0
 
 Dieses Handbuch erklärt die eine Verwaltungsoberfläche eines Nino-Projekts: `/_admin`, die Workbench. Entwickler richten das Projekt hier ein und bauen Struktur und Erscheinungsbild; Redakteure pflegen hier die Inhalte. Was ein Konto sieht, bestimmen seine Rechte. Der Assistent, der aus einem frischen Checkout ein Projekt macht, ist der Erststart-Modus der Workbench und hat eine eigene Referenz, den [Einrichtungsassistenten](setup.de.md); der [Template-Baukasten](https://github.com/dapeio/nino-features/blob/main/features/Templates/docs/templates.de.md) ebenfalls – der allerdings ist ein Feature aus dem Katalog und nicht Teil von Nino.
 
