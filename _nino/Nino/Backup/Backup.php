@@ -14,6 +14,41 @@ namespace Nino {
 	// admin-panel archive) - not a filesystem primitive, so not in Filesystem
 	class Backup {
 
+		/*	What a backup never carries, whatever else asks for it.
+
+			auth-tries.php and ratelimit.php are named in the docblock below as
+			transient throttling counters rather than data, and they were left
+			out by simply not listing them - which held for as long as the list
+			was literals. It stopped holding when a feature's manifest became a
+			source of paths: one that names a directory gets its whole tree
+			walked, and a manifest naming '/data/' itself - which the validator
+			took, since it does start with '/data/' - put every one of these in
+			every backup, and a restore then wrote them back. Restored
+			auth-tries.php re-locks accounts somebody already waited out;
+			restored .locks plants lock files for requests that ended weeks ago.
+
+			So the promise is kept where it is made rather than by what the list
+			happens not to mention. A leading dot with it: '/data/.locks' is the
+			only one today, and everything hidden under /data/ is this
+			framework's own bookkeeping rather than a project's content	*/
+		private const array NEVER = [ 'auth-tries.php', 'ratelimit.php', 'catalogue.php' ];
+
+		/**
+		 *	Whether a path below /data/ is one a backup must not carry
+		 *
+		 *	@param		string		$relative			eg. 'stats/2026-09.php'
+		 *
+		 *	@return 	bool
+		 */
+		private static function _transient( string $relative ): bool {
+
+			foreach( explode( '/', $relative ) as $segment )
+				if( str_starts_with( $segment, '.' ) === true )
+					return true;
+
+			return in_array( $relative, self::NEVER, true );
+		}
+
 		// Absolute path -> archive name, for every file the admin panel
 		// writes to at runtime: config.php, the text files, every element
 		// type/image, and the /data/ content a project actually accumulates
@@ -131,10 +166,18 @@ namespace Nino {
 					removed drops out of all() and stops being carried here.	*/
 				foreach( (array) ( $feature['data'] ?? [] ) as $owned ) {
 
-					$path = \Nino\Filesystem::path( $appData, $owned );
+					// Trimmed before it becomes an archive name: a manifest naming
+					// '/data/stats/' produced 'data//stats/...' entries, one slash
+					// per trailing one somebody wrote
+					$owned	= '/'. trim( (string) $owned, '/' );
+					$name		= ltrim( $owned, '/' );
+					$path 	= \Nino\Filesystem::path( $appData, $owned );
+
+					if( $owned === '/data' || self::_transient( substr( $name, 5 ) ) === true )
+						continue;
 
 					if( is_file( $path ) === true ) {
-						$files[$path] = ltrim( $owned, '/' );
+						$files[$path] = $name;
 						continue;
 					}
 
@@ -154,8 +197,12 @@ namespace Nino {
 						if( $file->isFile() === false || is_link( $filePath ) === true )
 							continue;
 
-						$relative = substr( $filePath, strlen( rtrim( $path, DIRECTORY_SEPARATOR ) ) + 1 );
-						$files[$filePath] = ltrim( $owned, '/' ). '/'. str_replace( DIRECTORY_SEPARATOR, '/', $relative );
+						$relative = str_replace( DIRECTORY_SEPARATOR, '/', substr( $filePath, strlen( rtrim( $path, DIRECTORY_SEPARATOR ) ) + 1 ) );
+
+						if( self::_transient( substr( $name, 5 ). '/'. $relative ) === true )
+							continue;
+
+						$files[$filePath] = $name. '/'. $relative;
 					}
 				}
 			}

@@ -122,6 +122,13 @@ check( 'requires lists feature keys, itself left out', manifestFails( $manifestD
 	&& \Nino\Features::manifest( writeManifest( $manifestDir, 'SelfReq', [ 'name' => 'x', 'version' => '1.0.0', 'requires' => [ 'selfreq', 'a', 'a', 'b' ] ] ) )['requires'] === [ 'a', 'b' ] );
 check( 'data paths stay below /data/', manifestFails( $manifestDir, 'BadData', [ 'name' => 'x', 'version' => '1.0.0', 'data' => [ '/config.php' ] ], '"data"' )
 	&& manifestFails( $manifestDir, 'DotData', [ 'name' => 'x', 'version' => '1.0.0', 'data' => [ '/data/../config.php' ] ], '"data"' ) );
+/*	...and something has to follow it. '/data/' does start with '/data/' and is
+	not a path below it - it is the directory itself, and a manifest naming it
+	claimed every file this framework keeps there: the throttling counters, the
+	catalogue cache, the lock directory. All of them then travelled in every
+	backup, and a restore wrote them back	*/
+check( '...and the data directory itself is not a path below itself', manifestFails( $manifestDir, 'RootData', [ 'name' => 'x', 'version' => '1.0.0', 'data' => [ '/data/' ] ], '"data"' )
+	&& manifestFails( $manifestDir, 'RootData2', [ 'name' => 'x', 'version' => '1.0.0', 'data' => [ '/data//' ] ], '"data"' ) );
 check( 'extensions are names', manifestFails( $manifestDir, 'BadExt', [ 'name' => 'x', 'version' => '1.0.0', 'php' => [ 'ext' => [ 'g d' ] ] ], '"php"' ) );
 
 // The vocabulary is CATEGORIES, the rule is a slug. A feature written for a
@@ -433,6 +440,51 @@ check( '...and carries them just the same while the feature is switched off, bec
 	return in_array( 'data/sample.php', $carried, true ) === true
 		&& in_array( 'data/sample-dir/deeper/two.php', $carried, true ) === true;
 } )( $appData ) );
+/*	And what a backup never carries, whatever asks for it. Backup's own
+	docblock calls auth-tries.php and ratelimit.php transient throttling
+	counters rather than data, and they were left out by not being listed -
+	which held while the list was literals and stopped holding the moment a
+	manifest became a source of paths. A restore is what makes it matter:
+	restored auth-tries.php re-locks an account somebody already waited out,
+	and restored .locks plants lock files for requests that ended weeks ago.
+
+	Driven with a feature claiming the directory itself, which is what the
+	validator above now refuses - so this is the second answer to the same
+	question, and the one that does not depend on a manifest being well-formed	*/
+\Nino\Filesystem::putFileContent( $appData, '/data/auth-tries.php', [ 'x' => 1 ] );
+\Nino\Filesystem::putFileContent( $appData, '/data/ratelimit.php', [ 'x' => 1 ] );
+\Nino\Filesystem::putFileContent( $appData, '/data/catalogue.php', [ 'x' => 1 ] );
+\Nino\Filesystem::forceDir( $appData, '/data/.locks' );
+file_put_contents( \Nino\Filesystem::path( $appData, '/data/.locks' ). '/probe.lock', '' );
+
+$greedyAppData = $appData;
+$greedyAppData['./nino/features/all'] = [ 'greedy' => [
+	'key' => 'greedy', 'dir' => \Nino\Features::dir(). '/Greedy', 'data' => [ '/data/' ],
+	'active' => false, 'problems' => [], 'version' => '1.0.0', 'installed' => null, 'module' => '',
+] ];
+/*	Compared with the slashes collapsed: the old walk spelled these
+	'data//auth-tries.php', one slash per trailing one in the claim, so a plain
+	in_array() would have passed against it for the spelling rather than for
+	the file not being there	*/
+$greedy = array_map( static fn( string $name ): string => (string) preg_replace( '#/+#', '/', $name ), \Nino\Backup::manifest( $greedyAppData ) );
+
+check( 'a backup carries no throttling counter, whatever a manifest claims', in_array( 'data/auth-tries.php', $greedy, true ) === false
+	&& in_array( 'data/ratelimit.php', $greedy, true ) === false );
+check( '...nor the catalogue cache, which is fetched again when it is wanted', in_array( 'data/catalogue.php', $greedy, true ) === false );
+check( '...nor anything hidden, so a restore plants no lock files', array_values( array_filter( $greedy, static fn( string $name ): bool => str_contains( $name, '/.' ) === true ) ) === [] );
+check( '...and no entry has a doubled slash from a trailing one somebody wrote', array_values( array_filter( \Nino\Backup::manifest( $greedyAppData ), static fn( string $name ): bool => str_contains( $name, '//' ) === true ) ) === [] );
+
+// ...while what a feature really owns is still carried, which is the half
+// this must not break
+$ownedAppData = $appData;
+$ownedAppData['./nino/features/all'] = [ 'tidy' => [
+	'key' => 'tidy', 'dir' => \Nino\Features::dir(). '/Tidy', 'data' => [ '/data/sample-dir/' ],
+	'active' => false, 'problems' => [], 'version' => '1.0.0', 'installed' => null, 'module' => '',
+] ];
+$owned = \Nino\Backup::manifest( $ownedAppData );
+check( 'a directory a feature declares is still carried, trailing slash and all', in_array( 'data/sample-dir/one.php', $owned, true ) === true
+	&& in_array( 'data/sample-dir/deeper/two.php', $owned, true ) === true );
+
 check( 'its class file sits below NINO_FEATURES_DIR, so the registry moves it into the features group though its own nav() names content', \Nino\Admin\Admin::panels( $appData )['sample']['group'] === 'features' );
 check( 'the registry sits it in the rail between the structure and the system panels, GROUPS order rather than its own nav()', ( static function() use ( $appData ): bool {
 	$order = array_keys( \Nino\Admin\Admin::panels( $appData ) );

@@ -362,7 +362,13 @@ namespace Nino {
 
 			$data = [];
 			foreach( (array) ( $raw['data'] ?? [] ) as $file ) {
-				if( is_string( $file ) === false || str_starts_with( $file, '/data/' ) === false || str_contains( $file, '..' ) === true )
+				/*	Something has to follow it: '/data/' does start with '/data/'
+					and is not a path below it - it is the directory itself, and a
+					manifest naming it claimed every file this framework keeps
+					there, the transient ones included (see \Nino\Backup::NEVER,
+					which no longer takes a manifest's word for that either)	*/
+				if( is_string( $file ) === false || str_starts_with( $file, '/data/' ) === false
+					|| trim( substr( $file, 6 ), '/' ) === '' || str_contains( $file, '..' ) === true )
 					return $fail( '"data" must list paths below /data/' );
 				$data[] = $file;
 			}

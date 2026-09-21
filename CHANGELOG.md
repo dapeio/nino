@@ -57,6 +57,21 @@ All notable changes to Nino are documented in this file.
 
 ### Fixed
 
+- **A feature's manifest could pull the transients into every backup.**
+  `\Nino\Backup`'s docblock calls `auth-tries.php` and `ratelimit.php`
+  transient throttling counters rather than data, and they were kept out by
+  not being listed - which held while the list was literals and stopped
+  holding when a manifest became a source of paths. `'/data/'` passes
+  `str_starts_with( $file, '/data/' )`, so a manifest naming the directory
+  itself had its whole tree walked: both counters, the catalogue cache and
+  the lock directory, in every backup, and written back by a restore.
+  Restored `auth-tries.php` re-locks an account somebody already waited out;
+  restored `.locks` plants lock files for requests that ended weeks ago. The
+  manifest validator refuses the data root now, and `Backup` keeps the promise
+  where it makes it rather than by what its list happens not to mention -
+  those three names and anything hidden are never carried, whatever asks. A
+  trailing slash in a claim no longer doubles in the archive name either.
+
 - **A route with a `script-src` of its own left the jstext nonce in a
   directive nothing reads.** `Modules\Jstext` appended `script-src 'self'
   'nonce-…'` to the policy unconditionally, and a repeated directive is not a
