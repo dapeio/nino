@@ -28,6 +28,18 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **Tests:** eight checks that copied shipped content - the two locales the
+  library ships, the three always-on units, the two roles, the two menus
+  (three times over), what the contact page requires, the four fields of the
+  contact form - read the source they mirrored now: the base unit's text files, `Setup::ALWAYS_MODULES`
+  and `units()`, `Roles::defaults()`, the Navigation unit's manifest, each
+  page template's manifest, `Form::DEFAULT_FORM` with `TYPES` and `RESERVED`.
+  What they pin is the invariant each meant (a listed locale has a file, an
+  always-on key has a unit, a default lands, a listing answers its manifest, a
+  shipped field survives validation and is typed from the vocabulary), so a
+  content change edits one place and a drift between two still fails. Each
+  was proven by breaking the code beside it.
+
 - **The envelope sender is a textfill, not a `config.php` key.**
   `\Nino\Mail::_getSender()` read `/nino/mail/sender` from `config.php` ahead
   of the `[[/form/email/owner]]` fill, so the two halves of one setting lived

@@ -182,7 +182,17 @@ $libraryRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Install\Setup::apiLibrary( $appData, $libraryRequest );
 $libraryBody = $libraryRequest['/nino/http/response']['body'];
 
-check( 'lists the two locales the library ships translations for', $libraryBody['locales'] === [ 'de_DE', 'en_US' ] );
+/*	The locales the library lists are the ones it ships translations for -
+	read off the base unit's text files rather than written down here a
+	second time, so a locale added to the unit is listed without a second
+	edit, and one listed without a file is what this catches	*/
+$shippedLocales = array_values( array_filter(
+	array_map( static fn( string $file ): string => basename( $file, '.php' ), glob( __DIR__. '/../_admin/install/library/base/text/*.php' ) ?: [] ),
+	static fn( string $locale ): bool => preg_match( '/^[a-z]{2}_[A-Z]{2}$/', $locale ) === 1
+) );
+$listedLocales = $libraryBody['locales'];
+sort( $shippedLocales ); sort( $listedLocales );
+check( 'lists exactly the locales the library ships translations for', $listedLocales === $shippedLocales && count( $shippedLocales ) > 0 );
 check( 'reports the config\'s current native locale as already active', $libraryBody['activeLocales'] === [ 'de_DE' ] );
 check( 'reports the config\'s current native locale itself, for the Native Locale dropdown to pre-select', $libraryBody['nativeLocale'] === 'de_DE' );
 check( 'lists no module unit at all: forms/navigation/localepicker are no longer a choice, and a fresh checkout ships no other unit - pages have their own step now (Webpages), not listed here', $libraryBody['modules'] === [] );
@@ -221,7 +231,11 @@ $applyRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 $applyBody = $applyRequest['/nino/http/response']['body'];
 
 check( 'apply succeeds', $applyRequest['/nino/http/response']['statusCode'] === 200 );
-check( 'reports back the three always-on units, nothing was picked to add to them', $applyBody['modules'] === [ 'forms', 'navigation', 'localepicker' ] );
+// Every always-on unit, and nothing else since nothing was picked - and
+// every key the constant names has a unit to apply, or apply() would drop
+// it on the floor without a word
+check( 'reports back every always-on unit and nothing else, and each of them has a unit', $applyBody['modules'] === \Nino\Install\Setup::ALWAYS_MODULES
+	&& array_diff( \Nino\Install\Setup::ALWAYS_MODULES, array_keys( \Nino\Install\Setup::units() ) ) === [] );
 
 $configAfterApply = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
 
@@ -247,7 +261,11 @@ check( 'the one developer tool that still ships as a module is active from the f
 	// Design module, because there is none
 	&& in_array( '\\Nino\\Modules\\Templates', $configAfterApply['/nino/modules'], true ) === false
 	&& in_array( '\\Nino\\Modules\\Design', $configAfterApply['/nino/modules'], true ) === false );
-check( 'apply writes the two roles a project starts with', array_keys( $configAfterApply['/nino/auth/roles'] ) === [ 'editor', 'developer' ] && $configAfterApply['/nino/auth/roles']['developer'] === [ 'label' => 'Developer', 'perms' => [ '/*' ] ] );
+// The roles a project starts with are the Users module's defaults, whatever
+// they are called - what this pins is that apply writes all of them and that
+// the developer role is the one that may do everything
+check( 'apply writes every role the Users module starts a project with, the developer one with everything', array_keys( $configAfterApply['/nino/auth/roles'] ) === array_keys( \Nino\Modules\Users\Roles::defaults( $appData ) )
+	&& in_array( '/*', $configAfterApply['/nino/auth/roles']['developer']['perms'] ?? [], true ) === true );
 check( 'the Editor role is every content panel\'s permission - the always-on Form module\'s included - and no structure, system or tab permission', in_array( '/_admin/elements/manage', $configAfterApply['/nino/auth/roles']['editor']['perms'], true ) === true
 	&& in_array( '/_admin/submissions/view', $configAfterApply['/nino/auth/roles']['editor']['perms'], true ) === true
 	&& in_array( '/_admin/types/manage', $configAfterApply['/nino/auth/roles']['editor']['perms'], true ) === false
@@ -289,7 +307,12 @@ check( '"forms"\'s own blacklist entries (its mail design tokens) landed too', i
 $deAfterApply = \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] );
 check( 'merges the picked locale\'s text fragments (base + forms)', ( $deAfterApply['[[/form/title]]'] ?? null ) !== null );
 check( '...and "localepicker"\'s, always-on now too', ( $deAfterApply['[[/nino/locales/title]]'] ?? null ) === 'Wählen Sie Ihre Sprache' );
-check( 'the navigation menus config default lands even though nothing picked navigation', $configAfterApply['/nino/html/navs'] === [ 'main', 'footer' ] );
+// The menus are whatever the Navigation unit's manifest declares as the
+// config default - read from there, so the unit can change its menus without
+// a second edit here; what this pins is that the default lands at all
+$navigationDefaults = (array) ( ( include __DIR__. '/../_nino/Nino/Modules/Navigation/install/manifest.php' )['config'] ?? [] );
+check( 'the navigation unit\'s config default lands even though nothing picked navigation', isset( $navigationDefaults['/nino/html/navs'] ) === true
+	&& $configAfterApply['/nino/html/navs'] === $navigationDefaults['/nino/html/navs'] );
 check( 'never writes a fragment for a locale that was not picked', \Nino\Filesystem::fileExists( $appData, '/text/en_US.php' ) === false );
 
 $libraryAfterApply = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
@@ -500,7 +523,11 @@ $wpLibraryRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 $wpLibraryBody = $wpLibraryRequest['/nino/http/response']['body'];
 
 check( 'lists every page template, one per _admin/install/library/pages/<key>', in_array( 'home', array_keys( $wpLibraryBody['templates'] ), true ) === true && in_array( 'blank', array_keys( $wpLibraryBody['templates'] ), true ) === true && in_array( 'contact', array_keys( $wpLibraryBody['templates'] ), true ) === true );
-check( '"contact" declares it requires "forms"', $wpLibraryBody['templates']['contact']['requiresModules'] === [ 'forms' ] );
+// What a page template requires is its manifest's business - every listed
+// template has to answer with exactly what its manifest declares
+$pagesLibrary = __DIR__. '/../_admin/install/library/pages';
+check( 'every page template lists exactly the modules its manifest requires', count( $wpLibraryBody['templates'] ) > 0
+	&& array_filter( $wpLibraryBody['templates'], static fn( array $t, string $key ): bool => $t['requiresModules'] !== (array) ( ( include $pagesLibrary. '/'. $key. '/manifest.php' )['requiresModules'] ?? [] ), ARRAY_FILTER_USE_BOTH ) === [] );
 /*	A project that has written no page yet opens on the starter site the
 	library declares - the pages a site is normally built from, already
 	filled in. A proposal in a list nothing has been written from yet, not a
@@ -524,7 +551,7 @@ check( '...its own per-locale wording rather than the generic fallback', ( $wpLi
 // The one field no form offers and apiApply() takes straight off the entry
 check( '...and the status code its manifest route declares', ( array_values( array_filter( $wpLibraryBody['webpages'],
 	static fn( array $e ): bool => $e['libraryKey'] === '404' ) )[0]['statusCode'] ?? null ) === 404 );
-check( 'navigations are offered - Navigation is always active now, not something that had to be picked', $wpLibraryBody['navs'] === [ 'main', 'footer' ] );
+check( 'navigations are offered - the menus the config holds, since Navigation is always active', $wpLibraryBody['navs'] === $navigationDefaults['/nino/html/navs'] );
 // ...so a preset page proposes whatever menus its own manifest route
 // suggests, intersected with what the project actually registers - home/
 // contact suggest both, legal only footer, 404 none
@@ -736,7 +763,7 @@ $enAfterNav = \Nino\Filesystem::getFileContent( $appData, '/text/en_US.php', [] 
 // /webpage<uri>/name keys the entries already carry
 $routesAfterNav = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes'];
 
-check( 'the Navigation module registers the menus the editors offer', \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/html/navs'] === [ 'main', 'footer' ] );
+check( 'the Navigation module registers the menus the editors offer', \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/html/navs'] === $navigationDefaults['/nino/html/navs'] );
 check( 'an entry explicitly assigned to main joins that menu at its own position in the list', ( $routesAfterNav['GET://']['navs'] ?? null ) === [ 'main' => 1 ] );
 check( '...and so does the second one, one position further down', ( $routesAfterNav['GET://kontakt']['navs'] ?? null ) === [ 'main' => 2 ] );
 check( 'an entry that is in no menu carries no membership at all', isset( $routesAfterNav['GET://impressum']['navs'] ) === false );

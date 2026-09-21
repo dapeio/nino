@@ -2068,8 +2068,18 @@ echo "\n";
 
 echo "Form - a project's own forms, and refusing a submission ahead of the engine\n";
 
-check( 'with nothing configured, the contact form this framework ships is what is offered', array_column( \Nino\Form::forms( $appData ), 'key' ) === [ 'contact' ]
-	&& array_column( \Nino\Form::forms( $appData )[0]['fields'], 'name' ) === [ 'name', 'email', 'cat', 'message' ] );
+/*	The shipped form is DEFAULT_FORM, read from there rather than copied
+	here: what these pin is that it is offered whole - normalize() drops a
+	field it does not accept without a word - and that its fields are typed
+	from the vocabulary and named uniquely outside the reserved names, which
+	normalize() would silently repair (an unknown type becomes text) rather
+	than refuse	*/
+$shippedForms = \Nino\Form::forms( $appData );
+check( 'with nothing configured, the form this framework ships is what is offered, whole', count( $shippedForms ) === 1 && $shippedForms[0]['key'] === \Nino\Form::DEFAULT_FORM['key']
+	&& array_column( $shippedForms[0]['fields'], 'name' ) === array_column( \Nino\Form::DEFAULT_FORM['fields'], 'name' ) );
+check( '...its fields typed from the vocabulary, named uniquely and outside the reserved names', array_diff( array_column( \Nino\Form::DEFAULT_FORM['fields'], 'type' ), \Nino\Form::TYPES ) === []
+	&& count( array_unique( array_column( \Nino\Form::DEFAULT_FORM['fields'], 'name' ) ) ) === count( \Nino\Form::DEFAULT_FORM['fields'] )
+	&& array_intersect( array_column( \Nino\Form::DEFAULT_FORM['fields'], 'name' ), \Nino\Form::RESERVED ) === [] );
 
 $appData[ \Nino\Form::FORMS ] = [
 	\Nino\Form::DEFAULT_FORM,
