@@ -176,6 +176,14 @@
 			} );
 			wrap.appendChild( ul );
 
+			// The line a refused move reports into. Beside the list rather than
+			// in place of it: the rows are still every route there is, and they
+			// carry the arrows the next attempt is made with
+			const msg = dc.createElement('p');
+			msg.id = 'routes-list-msg';
+			msg.setAttribute( 'aria-live', 'polite' );
+			wrap.appendChild( msg );
+
 			const addBtn = dc.createElement('button');
 			addBtn.type = 'button';
 			addBtn.className = 'nino-admin-btn-primary';
@@ -209,11 +217,53 @@
 		 */
 		_move : function( httpUri, direction ) {
 			Nino.admin.routes._apiCall( 'move', { httpUri : httpUri, direction : direction }, function( status, response ) {
-				if( status !== 200 || response === null )
+
+				/*	A move the server refused used to end right here, without a
+					word: the row stayed where it was, nothing said why, and the
+					arrow read as a button that does nothing. Whatever the reason -
+					a route somebody else has deleted since this list was drawn, a
+					config.php that could not be written - the order on screen is a
+					guess from that moment on, so it is read back from the server
+					and the reason is put under the list.	*/
+				if( status !== 200 || response === null ) {
+
+					Nino.admin.routes._apiCall( 'list', {}, function( listStatus, listResponse ) {
+
+						if( listStatus === 200 && listResponse !== null ) {
+							Nino.admin.routes._pages = listResponse.pages;
+							Nino.admin.routes._renderList();
+						}
+
+						// After the re-render, because that builds the line anew
+						Nino.admin.routes._showMoveError( status, response );
+					} );
 					return;
+				}
+
 				Nino.admin.routes._pages = response.pages;
 				Nino.admin.routes._renderList();
 			} );
+		},
+
+		/**
+		 *	Report a move the server refused, in the line below the list
+		 *
+		 *	@param		{number}		status
+		 *	@param		{*}					response
+		 *
+		 *	@return		void
+		 */
+		_showMoveError : function( status, response ) {
+
+			const msg = dc.getElementById('routes-list-msg');
+
+			// No list rendered means no line under it, and then the error has to
+			// go somewhere rather than nowhere
+			if( msg === null )
+				return Nino.admin.routes._showError( dc.getElementById('routes-list'), status, response );
+
+			msg.className = 'nino-admin-error';
+			msg.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : Nino.content.getText('/_admin/common/error/save') );
 		},
 
 		/**

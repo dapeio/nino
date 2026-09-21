@@ -57,6 +57,23 @@ All notable changes to Nino are documented in this file.
 
 ### Fixed
 
+- **A reorder the server refused left no trace anywhere.** The ↑/↓ buttons of
+  the Routes list reorder the persisted routes, and because equal menu
+  priorities follow route order, that list is also what orders every
+  navigation those pages stand in. `_move()` answered anything but a 200 with
+  a bare `return`: the row did not move, nothing appeared, no message, no
+  status - the arrow simply read as a button that does nothing, however often
+  it was pressed. And whatever the refusal was - a route somebody else deleted
+  since the list was drawn, a config.php that could not be written - the order
+  on screen stopped being the order on disk at that moment, with nothing to
+  say so. A refused move now reads the list back from the server, redraws it,
+  and puts the status and the server's own reason in a polite live region
+  below the list, where the rows and their arrows stay standing; if the reload
+  fails too, the reason for the move is still shown. The panel had no js test -
+  `tests/admin-routes-js-smoke.js` is a new one, twelve checks over the list,
+  an accepted move, two refused ones and a reload that fails as well, six of
+  which the old file failed.
+
 - **A required field could be saved empty in every language but the one on
   screen.** One click on Save in the Elements panel writes every translation
   that was edited - that is what `_saveLocales()` is for, and it has been that
