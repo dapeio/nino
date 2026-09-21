@@ -1141,14 +1141,14 @@ a {
                aria-controls="…">Raster</button>
      </div>
      <div class="nino-admin-tabpanel" role="tabpanel">…</div> */
-:where(.nino-admin) .nino-admin-tabs {
+:where(.nino-admin) .nino-admin-tabs:not(.admin-panel-tabs) {
 	display: flex;
 	margin: 0 0 .9rem;
 	border-radius:var(--editor-radius-sm);
 	overflow:hidden;
 }
 
-:where(.nino-admin) .nino-admin-tab {
+:where(.nino-admin) .nino-admin-tabs:not(.admin-panel-tabs) .nino-admin-tab {
 	flex: 1 1 auto;
 	padding: .5rem .3rem;
 	border: 0;
@@ -1187,7 +1187,7 @@ a {
    several screens switches between them (see Panels::panesHtml()) - a
    labelled underline on one rule, not a row of filled buttons splitting the
    width between them */
-:where(.nino-admin) .nino-admin-tabs--bar {
+:where(.nino-admin) .nino-admin-tabs--bar:not(.admin-panel-tabs) {
 	gap: .25rem;
 	margin: 0 0 1.25rem;
 	border-bottom: 1px solid var(--editor-separator);
@@ -1195,10 +1195,11 @@ a {
 
 :where(.nino-admin) .nino-admin-tabs--bar .nino-admin-tab {
 	flex: 0 0 auto;
-	padding: .55rem .85rem;
+	padding: .55rem 1.25rem;
 	border-bottom: 2px solid transparent;
 	border-radius: 0;
 	box-shadow: none;
+	color: var(--editor-text-secondary);
 }
 
 :where(.nino-admin) .nino-admin-tabs--bar .nino-admin-tab.is-active {
@@ -2247,7 +2248,7 @@ a {
  *	context bar, with its back link, takes over. */
 #admin-content-wrap > [data-panel] > .admin-panel-tabs {
 	margin: -1rem calc(var(--nino-admin-content-inline) * -1) 1.25rem;
-	padding: 0 var(--nino-admin-content-inline);
+	padding: 1rem var(--nino-admin-content-inline);
 	min-height: 52px;
 	background: var(--editor-bar-bg);
 	box-shadow: 0 1px 0 rgba(15,23,42,.025);
