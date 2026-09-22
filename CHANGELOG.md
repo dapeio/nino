@@ -6,6 +6,13 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **Docs:** the design manual's plan put the design tokens in
+  `text/global.php`, where that file holds `/company/*`, `/website/*`
+  and the two mail fills and nothing else. The tokens are the `--nino-*`
+  custom properties of `assets/theme.css`, compiled into the first of its
+  four layers; they stopped being textfills when the wizard stopped
+  asking about the look. Both language versions.
+
 - **Docs:** the wizard reference named seven Personal Infos keys, and
   four of them do not exist. `/company/address`, `/website/name`,
   `/website/description` and `/website/keywords` are in no text file the

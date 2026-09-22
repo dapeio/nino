@@ -14,7 +14,7 @@
 | Section | Status | Description |
 |---|---|---|
 | **Frontend Architecture** | Planned | Structure of the CSS framework, naming conventions, grid system |
-| **Design Tokens** | Planned | Colors, spacing, typography (in `text/global.php`) |
+| **Design Tokens** | Planned | Colors, spacing, typography (the `--nino-*` properties in `assets/theme.css`) |
 | **Template Work** | Planned | Practical guide for `page-*.tpl` and `section-*.tpl` |
 | **Shortcodes & Components** | Planned | Integration of Nino core components (e.g., navigation, locale picker) |
 | **Custom Frontend Elements** | Planned | Development of individual blocks and shortcodes |
