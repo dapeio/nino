@@ -17,9 +17,9 @@
  *									this file from the answers. It does not any more: this is
  *									one fixed look, edited by hand or replaced wholesale. The
  *									Design feature is what compiles a stylesheet of its own
- *									over it - the ten themes and thirteen frames that used to
- *									be the wizard's choices are parked with it, see
- *									https://github.com/dapeio/nino-features/tree/main/design-library
+ *									over it. The whole-page themes the wizard used to offer
+ *									are gone: a project composes its look from the part sets,
+ *									and a presets field that combines them may come later.
  *
  *	@package				Dape/Nino
  *	@author					David Perchermeier <mail@dape.io>

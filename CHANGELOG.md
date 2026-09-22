@@ -6,6 +6,14 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **Docs:** the base unit's `theme.css` header no longer points at the
+  catalogue's `design-library/`, a directory the catalogue dropped on
+  purpose: the whole-page themes the wizard used to offer are gone, a
+  project composes its look from the Design feature's part sets, and a
+  presets field that combines them may come later. The Design feature's
+  `library/base.css` carries this header byte for byte and follows in its
+  own patch.
+
 - **Docs:** the feature directory in `docs/features.md`, its German twin and
   `docs/recipes/feature.md` shows `templates/`, the directory the catalogue's
   AGENTS.md asks every feature that draws anything to keep its markup in;
