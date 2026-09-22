@@ -6,6 +6,17 @@ All notable changes to Nino are documented in this file.
 
 ### Added
 
+- **Tests:** the csrf guard's header path was measured against a header
+  array the test wrote itself. `\Nino\Csrf::_extractToken()` documents
+  that it reads `X-CSRF-Token` off the already normalized request header,
+  "the one every other header read in the kernel already goes through" -
+  and `\Nino\Http::filterHeaderFields()` keeps an allowlist that drops a
+  name missing from it in silence. Taking `'X-CSRF-Token'` out of that
+  list left all seven suites green while the documented path was dead for
+  every real client. `tests/kernel-smoke.php` now sends the header the way
+  a client does, as `HTTP_X_CSRF_TOKEN` through `\Nino\Http::request()`,
+  and holds that it arrives and is compared rather than trusted.
+
 - **Tests:** `Accounts::usableUsers()` documents two ways an entry under
   `/nino/auth/user` is an array key rather than an account - it is
   disabled, or it carries no password - and only the first was measured.

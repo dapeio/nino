@@ -1856,6 +1856,34 @@ check( 'a method the kernel does not recognize is on the checked side', csrfPass
 check( 'the token is taken from X-CSRF-Token', csrfPassed( csrfCheck( $appData, 'POST', '/api/thing', [], [ 'X-CSRF-Token' => $token2 ] ) ) === true );
 check( '...and a wrong one there is refused like any other', csrfPassed( csrfCheck( $appData, 'POST', '/api/thing', [], [ 'X-CSRF-Token' => 'nope' ] ) ) === false );
 
+/*	_extractToken() reads that header off the already normalized request
+	header rather than $_SERVER, and says so: it is "the one every other
+	header read in the kernel already goes through". Every check above hands
+	callbackResponse() a header array built by hand, so all of them stay
+	green whether or not the kernel actually carries the header that far -
+	Http::filterHeaderFields() keeps an allowlist, and a name missing from it
+	is dropped in silence, which would leave the whole documented path dead
+	with nothing to say so. Driven from $_SERVER through Http::request(), the
+	way a real request arrives	*/
+function csrfCheckRaw( array &$appData, string $header ): array {
+
+	$_POST = [];
+	$request = [
+		'REQUEST_METHOD'		=> 'POST',
+		'REQUEST_URI'				=> '/api/thing',
+		'REMOTE_ADDR'				=> '127.0.0.1',
+		'HTTP_X_CSRF_TOKEN'	=> $header,
+	];
+
+	\Nino\Http::request( $appData, $request );
+	\Nino\Csrf::callbackResponse( $appData, $request );
+
+	return $request;
+}
+
+check( 'a client\'s X-CSRF-Token header survives normalization and reaches the guard', csrfPassed( csrfCheckRaw( $appData, $token2 ) ) === true );
+check( '...and a wrong one sent that way is refused, so the header is read rather than trusted', csrfPassed( csrfCheckRaw( $appData, 'nope' ) ) === false );
+
 // The json body: $_POST is empty for one of these, so without this path every
 // json POST was a 403 whatever token it carried
 check( 'the token is taken from a json body', csrfPassed( csrfCheck( $appData, 'POST', '/api/thing', [], [], (string) json_encode( [ '_csrf' => $token2 ] ) ) ) === true );
