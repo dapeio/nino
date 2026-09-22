@@ -19,7 +19,7 @@ Nino organizes a website with only a few but clearly separated components:
 - `data/` contains the operational data of the running system;
 - PHP modules extend the process via callbacks.
 
-The following paths describe the configured project state; before completing the setup wizard, they do not yet exist.
+The following paths describe the configured project state; before completing the setup wizard, they do not yet exist. A project has two halves: everything a webserver must never deliver lives in `private/`, everything a browser loads directly in `public/`. The short forms used below and throughout the code - `/text`, `/data`, `/images` - are the virtual paths Nino resolves into one of the two; `NINO_PRIVATE_DIR` moves the private half out of the webroot altogether.
 
 The architecture follows four fundamental decisions:
 
@@ -97,13 +97,14 @@ Nino separates persistent data by its task:
 
 | Location in the configured project | Content |
 |---|---|
-| `config.php` | routes, modules, languages, users, and technical options |
-| `text/global.php` | language-independent textfills |
-| `text/<locale>.php` | textfills of one language |
-| `elements/*.php` | type models and entries of recurring content |
-| `templates/*.tpl` | HTML structure for pages, components, and emails |
-| `images/` and `assets/` | editorial images and static frontend files |
-| `data/` | form submissions, newsletter data, and other operational data written during operation |
+| `private/config.php` | routes, modules, languages, users, and technical options |
+| `private/text/global.php` | language-independent textfills |
+| `private/text/<locale>.php` | textfills of one language |
+| `private/elements/*.php` | type models and entries of recurring content |
+| `private/templates/*.tpl` | HTML structure for pages, components, and emails |
+| `private/assets/` | the stylesheet and script sources an asset bundle is built from - read by PHP, never served |
+| `private/data/` | form submissions, newsletter data, and other operational data written during operation |
+| `public/images/` | editorial images; `public/fonts/`, `public/favicon/` and the generated `public/.cache/` bundles beside them |
 
 A page title thus belongs in `text/`, a route in `config.php`, news posts, a portfolio, or team members in `elements/`, and the visible HTML structure in `templates/`.
 

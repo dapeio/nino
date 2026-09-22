@@ -18,7 +18,7 @@ Nino organisiert eine Webseite mit nur wenigen, aber klar getrennten Bausteinen:
 - `data/` enthält die Bewegungsdaten des laufenden Betriebs;
 - PHP-Module ergänzen den Ablauf über Callbacks.
 
-Die folgenden Pfade beschreiben den eingerichteten Projektstand; vor dem Abschluss des Einrichtungsassistenten existieren sie noch nicht.
+Die folgenden Pfade beschreiben den eingerichteten Projektstand; vor dem Abschluss des Einrichtungsassistenten existieren sie noch nicht. Ein Projekt hat zwei Hälften: Alles, was ein Webserver niemals ausliefern darf, liegt in `private/`, alles, was ein Browser direkt lädt, in `public/`. Die Kurzformen unten und im Code – `/text`, `/data`, `/images` – sind die virtuellen Pfade, die Nino in eine der beiden Hälften auflöst; `NINO_PRIVATE_DIR` verschiebt die private Hälfte ganz aus dem Webroot.
 
 Die Architektur folgt vier Grundentscheidungen:
 
@@ -96,13 +96,14 @@ Nino trennt persistente Daten nach ihrer Aufgabe:
 
 | Ort im eingerichteten Projekt | Inhalt |
 |---|---|
-| `config.php` | Routen, Module, Sprachen, Nutzer und technische Optionen |
-| `text/global.php` | sprachunabhängige Textfills |
-| `text/<locale>.php` | Textfills einer Sprache |
-| `elements/*.php` | Typmodelle und Einträge wiederkehrender Inhalte |
-| `templates/*.tpl` | HTML-Struktur für Seiten, Komponenten und E-Mails |
-| `images/` und `assets/` | redaktionelle Bilder und statische Frontend-Dateien |
-| `data/` | Formulareingänge, Newsletter-Daten und weitere Bewegungsdaten, die während des Betriebs geschrieben werden |
+| `private/config.php` | Routen, Module, Sprachen, Nutzer und technische Optionen |
+| `private/text/global.php` | sprachunabhängige Textfills |
+| `private/text/<locale>.php` | Textfills einer Sprache |
+| `private/elements/*.php` | Typmodelle und Einträge wiederkehrender Inhalte |
+| `private/templates/*.tpl` | HTML-Struktur für Seiten, Komponenten und E-Mails |
+| `private/assets/` | die Stylesheet- und Skriptquellen, aus denen ein Asset-Bundle gebaut wird – von PHP gelesen, nie ausgeliefert |
+| `private/data/` | Formulareingänge, Newsletter-Daten und weitere Bewegungsdaten, die während des Betriebs geschrieben werden |
+| `public/images/` | redaktionelle Bilder; daneben `public/fonts/`, `public/favicon/` und die generierten Bundles in `public/.cache/` |
 
 Ein Seitentitel gehört damit in `text/`, eine Route in `config.php`, Newsbeiträge, ein Portfolio oder Teammitglieder in `elements/` und die sichtbare HTML-Struktur in `templates/`.
 

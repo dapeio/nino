@@ -19,6 +19,15 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **Docs:** the Concepts manual and its German twin still laid a project
+  out the way it was before the `private/` and `public/` split. "Location
+  in the configured project" named `config.php`, `text/`, `elements/`,
+  `templates/` and `data/` at the project root, and put `images/` and
+  `assets/` in one row - where `images/` is served and `assets/` holds the
+  sources of a bundle and must never be. The table names both halves now,
+  and the sentence above it says the short forms used in the code are the
+  virtual paths `\Nino\Filesystem` resolves into one of them.
+
 - **Docs:** five things the developer manual and its German twin said
   about a kernel that has moved on. The boot order left out
   `Html::init()`, which stands between `Csrf::init()` and `Auth::init()`
