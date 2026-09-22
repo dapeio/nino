@@ -42,9 +42,14 @@ namespace Nino\Modules {
 	 *
 	 *											What is never cached, regardless of configuration: any
 	 *											method but GET, anything with query vars, any uri under
-	 *											/_ (the tools) or /. (module endpoints), any response
-	 *											that is not a plain 200, and every request from a logged
-	 *											in user.
+	 *											/_admin (the workbench - see TOOL_PREFIXES) or /. (module
+	 *											endpoints), any response that is not a plain 200, every
+	 *											request from a logged in user, every page whose own route
+	 *											has a response callback registered for it, since
+	 *											answering from here would never call it, and everything a
+	 *											wildcard route answers, where the addresses are the
+	 *											visitor's to invent and one entry per invented one is
+	 *											disk a stranger decides the size of.
 	 *
 	 *	@package						Dape/Nino
 	 *	@author							David Perchermeier <mail@dape.io>

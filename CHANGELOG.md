@@ -19,6 +19,17 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **Docs:** `\Nino\Modules\Cache`'s own docblock listed what the page
+  cache never stores, and the list was both wider and shorter than the
+  code. Wider: it kept "any uri under /_", where `TOOL_PREFIXES` holds
+  `/_admin` alone, so a project's own `/_something` is cacheable.
+  Shorter: `_cacheable()` also refuses a page whose own route has a
+  response callback registered for it - answering from the cache would
+  never call it - and everything a wildcard route answers, which is the
+  rule that keeps an anonymous client from growing `private/data/` one
+  entry per invented address. The `_admin` manual described both
+  already; the class now does too.
+
 - **Docs:** `\Nino\Modules\Maintenance` said it is listed in
   `/nino/modules` "the same way Design and Templates are". Both moved to
   the catalogue and left `\Nino\Install\Setup::TOOL_MODULES` holding this
