@@ -30,6 +30,12 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **Docs:** the Config panel's script sent the reader to a `language.js` and
+  a `pages.js` for the settings that moved out of its form. The languages
+  are the Language panel's own `admin.js`, the routes the Routes panel's;
+  neither file name exists. Its `nav()` answered "[ uri, label ]" into "the
+  dashboard's tab bar" as well.
+
 - **Docs:** three comments of the Backups panel named a `Restore` class in
   `_admin/Admin.php`. That class has no name in the repository any more -
   `apiRestore()` and `_safetySnapshot()` are `\Nino\Modules\Backups\Admin`'s,

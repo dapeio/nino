@@ -13,12 +13,13 @@
  *
  *													The login throttle and the site's languages used to
  *													be groups of this form and now sit next to what they
- *													are about: lockout.js under Users, and language.js.
+ *													are about: lockout.js under Users, and the Language
+ *													panel's own admin.js.
  *
  *													Routes, navigations and asset bundles used to be
  *													editable here as raw json and no longer are - the
- *													first two have real editors of their own (pages.js
- *													and the Navigation module's own panel) and a
+ *													first two have real editors of their own (the Routes
+ *													panel and the Navigation module's own) and a
  *													second, unvalidated way to write the same data is
  *													a way to corrupt it.
  *
