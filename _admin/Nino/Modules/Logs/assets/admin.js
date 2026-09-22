@@ -5,9 +5,10 @@
  *	Modules									Optional modules
  *	Nino										Framework
  *	admin.js									Admin "Log" panel: read-only view of the activity log
- *													Admin.php's Logs class writes to (logins, element/text/
- *													user/image changes) - see _admin/Editor.php's Logs class
- *													docblock. Nothing here writes anything, it only lists.
+ *													the panel class beside it writes (logins, element/text/
+ *													user/image changes) - see Admin/Admin.php's record() and
+ *													its class docblock. Nothing here writes anything, it
+ *													only lists.
  *
  *	@package								Dape/Nino
  *	@author									David Perchermeier <mail@dape.io>

@@ -30,6 +30,11 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **Docs:** the Log panel's script named an `Admin.php`'s "Logs class" and
+  an `_admin/Editor.php` for the half that writes the lines it lists. Both
+  are `\Nino\Modules\Logs\Admin::record()`, in the `Admin/Admin.php` beside
+  it.
+
 - **Docs:** five comments of the Dashboard panel named files, classes and
   rules that are not there: an `_admin/Editor.php` holding a `Dashboard`
   class, a `logs.js` for what is the Log panel's `assets/admin.js`,
