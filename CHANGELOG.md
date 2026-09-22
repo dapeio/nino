@@ -6,6 +6,14 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **Docs:** the installer recipe listed `active` among the unit keys the
+  installer supports, and nothing reads it. `Setup::apiLibrary()` computes
+  an `active` flag for the picker out of `moduleClass` and `preset`, which
+  is where the name comes from; no manifest in the tree carries the key,
+  and neither `apiApply()` nor `Features::applyUnit()` looks for one. The
+  row is gone, two paragraphs below the recipe's own warning not to add a
+  manifest key and assume the installer uses it.
+
 - **Docs:** the style guide's rule for naming project paths spelled them
   `templates/`, `text/`, `elements/` and `images/` - the layout before
   the `private/`/`public/` split, and the spelling it asks every manual

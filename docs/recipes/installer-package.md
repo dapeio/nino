@@ -104,7 +104,6 @@ Supported unit keys in the current installer:
 | `elementTypes` | Unit-root files copied into project `elements/` |
 | `blacklist` | Text keys merged into `text/blacklist.php` |
 | `config` | Top-level defaults written only when absent |
-| `active` | Special always-active picker state; do not use for normal choices |
 
 Do not add decorative manifest keys and assume the installer uses them. If new
 metadata is required, implement and test its consumer in `Install.php` and the
