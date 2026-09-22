@@ -2,14 +2,14 @@
 
 /**
  *	Nino										A compact filesystembased php framework
- *	Dev											"Pages" module: create/edit/delete the site's actual page
+ *	Dev											"Routes" panel: create/edit/delete the site's actual page
  *													routes without hand-editing /nino/http/routes as raw json
  *													(Config still covers everything this doesn't). The
  *													template select only ever offers a templates/page-*.tpl
- *													file that already exists on disk - see _admin/Admin.php's
- *													Routes class docblock for the Element URI/Http URI
- *													split every entry carries. List + drill-down-form shape
- *													follows images.js closely; the list's own ↑/↓ buttons
+ *													file that already exists on disk - see the panel's own
+ *													Admin/Admin.php class docblock for the Element URI/Http
+ *													URI split every entry carries. List + drill-down-form
+ *													shape follows slots.js closely; the list's own ↑/↓ buttons
  *													reorder the routes with it, which is what orders every
  *													menu those pages appear in (see \Nino\Modules\Navigation).
  *
@@ -118,7 +118,7 @@
 		 *	Render the page list, plus a "New page" action below it. Each
 		 *	row's ↑/↓ buttons reorder the persisted list and the routes with
 		 *	it - equal menu priorities follow route order, so this is what
-		 *	orders the menus (see Routes.php's Routes::apiMove())
+		 *	orders the menus (see Admin.php's apiMove())
 		 *
 		 *	@return		void
 		 */
@@ -194,7 +194,7 @@
 
 		/**
 		 *	The on-disk template a route body names, when it names exactly
-		 *	one - mirrors Routes.php's Routes::_templateFromBody(), which is
+		 *	one - mirrors Admin.php's _templateFromBody(), which is
 		 *	what actually decides whether a save may rewrite the body
 		 *
 		 *	@param		{string}	body
@@ -208,7 +208,7 @@
 
 		/**
 		 *	Swap one page with its neighbor and re-render - see Admin.php's
-		 *	Routes::apiMove()
+		 *	apiMove()
 		 *
 		 *	@param		{string}	httpUri
 		 *	@param		{string}	direction			'up' | 'down'
@@ -399,7 +399,7 @@
 			// A route body that isn't a plain template reference can't be
 			// spelled by this select - the setup wizard's "legal" unit resolves its
 			// file per locale via [[/nino/http/response/locale]]. Saving
-			// keeps that body either way (see Routes.php's Routes::apiSave),
+			// keeps that body either way (see Admin.php's apiSave()),
 			// so the select is disabled rather than left looking as if it
 			// still decided anything
 			if( entry.body !== undefined && entry.body !== '' && Nino.admin.routes._templateFromBody( entry.body ) === null ) {

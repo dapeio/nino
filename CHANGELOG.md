@@ -30,6 +30,17 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **Docs:** the Routes panel was still the "Pages" module of a `Routes.php`
+  in seven comments. There is no `Routes.php` and no `Routes` class: the
+  panel is `\Nino\Modules\Routes\Admin` in `Admin/Admin.php`, which is where
+  `apiMove()`, `apiSave()` and `_templateFromBody()` are read. Its class
+  docblock also explained its independence with "the same standalone-folder
+  reasoning every other class in this file follows", of which there is none
+  left - one panel is one directory now - its `nav()` still answered
+  "[ uri, label ]" into "the dashboard's tab bar" rather than
+  "[ uri, label, weight, group ]" into the rail, and its list shape follows
+  the Image Slots tab's `slots.js`, not an `images.js`.
+
 - **Docs:** five comments of the Text panel and its Text Keys tab named
   files and methods from the tool's two-file days: an `_admin/assets/text.js`
   and a `text.js` where the panel's script is `assets/admin.js` and the tab's

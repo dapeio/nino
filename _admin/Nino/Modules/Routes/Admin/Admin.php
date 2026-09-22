@@ -12,13 +12,13 @@ namespace Nino\Modules\Routes {
 
 	/**
 	 *	Nino							A compact filesystembased php framework
-	 *	Dev								"Pages" module: create/edit/delete the site's actual page
+	 *	Routes						The Routes panel: create/edit/delete the site's actual page
 	 *												routes without hand-editing /nino/http/routes as raw json
 	 *												(Config still covers everything this doesn't, see its own
 	 *												docblock). A friendlier continuation of the wizard's
 	 *												Webpages step (see _admin/install/Install.php's Webpages class -
-	 *												not depended on here, same standalone-folder reasoning
-	 *												every other class in this file follows) for once the wizard
+	 *												not depended on here, the same standalone-module reasoning
+	 *												every panel under _admin/Nino/Modules/ follows) for once the wizard
 	 *												has been deleted: template selection is restricted to
 	 *												whichever templates/page-*.tpl files already exist on
 	 *												disk - no copying, no library units, just wiring an
@@ -89,9 +89,10 @@ namespace Nino\Modules\Routes {
 		}
 
 		/**
-		 *	Nav entry for this module, rendered into the dashboard's tab bar
+		 *	Nav entry for this module - a structure panel, at the weight the
+		 *	rail orders it by within that group
 		 *
-		 *	@return 	array										[ uri, label ]
+		 *	@return 	array										[ uri, label, weight, group ]
 		 */
 		public static function nav(): array {
 			return [ 'routes', '/_admin/nav/routes', 20, 'structure' ];
