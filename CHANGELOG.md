@@ -30,6 +30,13 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **Docs:** five comments of the Text panel and its Text Keys tab named
+  files and methods from the tool's two-file days: an `_admin/assets/text.js`
+  and a `text.js` where the panel's script is `assets/admin.js` and the tab's
+  `assets/keys.js`, a `Dev\Text` class for what is `\Nino\Modules\Text\Keys`,
+  and a `Text::_entries()` for `\Nino\Text::entries()`, which is what the
+  entries in that parameter come from.
+
 - **Docs:** nineteen comments of the Elements panel named a class, a file or
   a method that is somewhere else. `AUTOINCREMENT_PAD`, `_writeElementData()`,
   `insertElement()` and `updateElement()` are `\Nino\Elements`', not the

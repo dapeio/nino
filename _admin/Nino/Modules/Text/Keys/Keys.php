@@ -381,8 +381,9 @@ namespace Nino\Modules\Text {
 			// collision check below already treats it as - but it has to
 			// return before the mutate further down, whose "write the new
 			// key, unset the old one" pair collapses into a plain delete
-			// when both brackets are the same string. _admin/assets/text.js
-			// guards this in the ui; the endpoint has to guard it too, or a
+			// when both brackets are the same string. This tab's own
+			// assets/keys.js guards it in the ui (see _renameKey()); the
+			// endpoint has to guard it too, or a
 			// direct post drops the value from every locale file and still
 			// answers 200
 			if( $newKey === $key ) {

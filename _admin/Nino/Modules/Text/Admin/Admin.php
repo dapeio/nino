@@ -96,7 +96,7 @@ namespace Nino\Modules\Text {
 		/**
 		 *	The category a batch of text/savebatch items belongs to - the
 		 *	first non-empty path segment of a key (eg. "home" for
-		 *	"/home/welcome/h2"), same grouping text.js itself uses to
+		 *	"/home/welcome/h2"), same grouping assets/admin.js itself uses to
 		 *	present keys as one category's worth of fields per form.
 		 *	A batch is always one category's fields saved together, so
 		 *	the first item's key is representative of the whole request

@@ -9,7 +9,7 @@
  *													the Text panel, also shows blacklisted keys and lets each key's
  *													key/global/per-locale shape/blacklist status be changed or
  *													the key deleted entirely, all inline (the "set" half - see
- *													Dev\Text's class docblock) - and a "New text key"
+ *													the Keys class docblock) - and a "New text key"
  *													action to create one. Full CRUD, deliberately not just a
  *													copy of the Text panel's values-only editor - during active
  *													development that's one less reason to switch tabs.
@@ -121,7 +121,7 @@
 		/**
 		 *	Group key entries by the first path segment (eg. "/home/welcome/h2" -> "home")
 		 *
-		 *	@param		{Array}		entries				List of key entries (see Text::_entries())
+		 *	@param		{Array}		entries				List of key entries (see \Nino\Text::entries())
 		 *
 		 *	@return		{Object}									group name -> entries[]
 		 */
@@ -765,7 +765,7 @@
 
 		/**
 		 *	Open the "missing keys found in templates" scan results form -
-		 *	see Dev\Text::apiScan()
+		 *	see Keys::apiScan()
 		 *
 		 *	@return		void
 		 */
