@@ -15,7 +15,7 @@ This guide leads you on the shortest path from a fresh checkout to a locally run
 
 For local setup, PHP 8.4 or newer, the PHP extensions checked by Nino, and write permissions in the project root are required. Git is necessary if the project is checked out directly from the repository.
 
-The first installation step checks the version, extensions, and write permissions. Missing directories such as `templates/`, `text/`, `elements/`, or `images/` are expected at this point—PHP must only be able to create them.
+The first installation step checks the version, extensions, and write permissions. It looks at three paths: the project root, `private/` and `public/`. A checkout ships neither of the last two, so both are expected to be missing at this point—PHP must only be able to create them.
 
 > **Security:** Perform the setup locally or in another protected environment. Until completion, the wizard has no access protection, and no account exists yet.
 
@@ -29,7 +29,7 @@ php -S 127.0.0.1:8000 router.php
 
 Then open <http://127.0.0.1:8000/_admin>. `router.php` maps the local routing; for production, a dedicated web server configuration is required.
 
-## The Ten Steps
+## The Six Steps
 
 As long as the wizard is not completed, you can return to earlier steps and reapply settings. What is replaced, added, or preserved in the process is described in the [Setup Wizard](setup.md#navigation-and-saving) reference.
 
@@ -54,9 +54,9 @@ After completion, open:
 |---|---|
 | `/` | The configured website is delivered, in the theme the base unit brought. |
 | `/_admin` | The root account opens the workbench with every panel: content, structure and system. |
-| `/_admin#templates` | The Templates panel, the section-first Template Builder (Alpha). |
+| `/_admin#templates` | Only where the Template Builder is installed: the Templates panel, the section-first builder (Alpha). A fresh checkout ships no feature, so this panel is not there yet. |
 
-Also check every language and route, the navigation, and used forms. Save a text and an image as a test. In the Templates panel, open a `page-*.tpl`, change nothing at first, and check whether its top-level sections are recognized without warnings.
+Also check every language and route, the navigation, and used forms. Save a text and an image as a test. Where the Template Builder is installed, open a `page-*.tpl` in the Templates panel, change nothing at first, and check whether its top-level sections are recognized without warnings.
 
 Newsletter and Search are features, not wizard modules, and a checkout ships none: when the project needs one, copy its directory from the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features) into `features/`, switch it on in the workbench's **Features** panel (System group), then reload the workbench for its panel to appear. See [Features](features.md).
 

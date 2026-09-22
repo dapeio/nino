@@ -6,6 +6,17 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **Docs:** "Getting Started" and its German twin promised ten wizard
+  steps over a table of six - `Install::MODULES` has six modules and the
+  rail draws six. The environment chapter named `templates/`, `text/`,
+  `elements/` and `images/` as the directories a checkout is missing,
+  from before the `private/`/`public/` split: `Checks::DIRECTORIES`
+  looks at the project root, `private` and `public`, and the four named
+  are inside the first two. And "Verify the Result" sent the reader to
+  the Templates panel right after a first install, three lines above the
+  paragraph saying a checkout ships no feature - that panel belongs to
+  the Template Builder, so both mentions say where it is there.
+
 - **Docs:** the project structure in both READMEs listed ten of the
   workbench's eleven screens. `_admin/Nino/Modules/` carries a
   `Features/` directory beside the ten named, and the panel it holds is

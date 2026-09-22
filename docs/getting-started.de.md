@@ -15,7 +15,7 @@ Dieses Handbuch führt auf dem kürzesten Weg von einem frischen Checkout zu ein
 
 Für die lokale Einrichtung werden PHP 8.4 oder neuer, die von Nino geprüften PHP-Erweiterungen und Schreibrechte in der Projektwurzel benötigt. Git ist erforderlich, wenn das Projekt direkt aus dem Repository ausgecheckt wird.
 
-Der erste Installationsschritt prüft Version, Erweiterungen und Schreibrechte. Fehlende Verzeichnisse wie `templates/`, `text/`, `elements/` oder `images/` sind zu diesem Zeitpunkt erwartbar – PHP muss sie lediglich anlegen dürfen.
+Der erste Installationsschritt prüft Version, Erweiterungen und Schreibrechte. Er sieht sich drei Pfade an: die Projektwurzel, `private/` und `public/`. Ein Checkout bringt die beiden letzten nicht mit, sie fehlen zu diesem Zeitpunkt also erwartungsgemäß – PHP muss sie lediglich anlegen dürfen.
 
 > **Sicherheit:** Führe die Einrichtung lokal oder in einer anderweitig geschützten Umgebung aus. Bis zum Abschluss besitzt der Assistent keinen Zugangsschutz, und es existiert noch kein Konto.
 
@@ -29,7 +29,7 @@ php -S 127.0.0.1:8000 router.php
 
 Öffne anschließend <http://127.0.0.1:8000/_admin>. `router.php` bildet das lokale Routing ab; für den Produktivbetrieb ist eine eigene Webserver-Konfiguration erforderlich.
 
-## Die zehn Schritte
+## Die sechs Schritte
 
 Solange der Assistent nicht abgeschlossen ist, kannst du zu früheren Schritten zurückkehren und Einstellungen erneut anwenden. Was dabei ersetzt, ergänzt oder erhalten wird, beschreibt die Referenz [Einrichtungsassistent](setup.de.md#navigation-und-speichern).
 
@@ -54,9 +54,9 @@ Die Konten aus Schritt 5 sind Entwickler mit vollen Rechten. Redaktionskonten mi
 |---|---|
 | `/` | Die eingerichtete Webseite wird mit dem ausgelieferten Theme dargestellt. |
 | `/_admin` | Das Root-Konto öffnet die Workbench mit jedem Panel: Inhalt, Struktur und System. |
-| `/_admin#templates` | Das Templates-Panel, der sectionbasierte Template Builder (Alpha). |
+| `/_admin#templates` | Nur dort, wo der Template-Baukasten installiert ist: das Templates-Panel, der sectionbasierte Baukasten (Alpha). Ein frischer Checkout bringt kein Feature mit, dieses Panel gibt es also noch nicht. |
 
-Prüfe außerdem jede Sprache und Route, die Navigation sowie verwendete Formulare. Speichere testweise einen Text und ein Bild. Öffne im Templates-Panel ein `page-*.tpl`, ändere zunächst nichts und prüfe, ob seine obersten Sections ohne Warnung erkannt werden.
+Prüfe außerdem jede Sprache und Route, die Navigation sowie verwendete Formulare. Speichere testweise einen Text und ein Bild. Öffne dort, wo der Template-Baukasten installiert ist, im Templates-Panel ein `page-*.tpl`, ändere zunächst nichts und prüfe, ob seine obersten Sections ohne Warnung erkannt werden.
 
 Newsletter und Suche sind Features, keine Module des Assistenten, und ein Checkout bringt keines mit: Kopiere das Verzeichnis eines Features aus dem Katalog [dapeio/nino-features](https://github.com/dapeio/nino-features) nach `features/`, wenn das Projekt es braucht, schalte es im Panel **Features** der Workbench (Gruppe System) ein und lade die Workbench danach neu, damit sein Panel erscheint. Siehe [Features](features.de.md).
 
