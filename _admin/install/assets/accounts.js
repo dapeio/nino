@@ -2,9 +2,9 @@
 
 /**
  *	Nino										A compact filesystembased php framework
- *	Install									Step 9: create the first _admin account(s). See
+ *	Install									Step 5: create the first _admin account(s). See
  *													_admin/install/Install.php's Accounts class. "Create admin" stays
- *													its own repeatable action (unlike Setup/Content, more than
+ *													its own repeatable action (unlike every step before it, more than
  *													one submit here is the normal case) - only the
  *													precondition for the shared Next button (at least one
  *													account exists) is exposed, as checkCanAdvance()

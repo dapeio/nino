@@ -2,23 +2,24 @@
 
 /**
  *	Nino										A compact filesystembased php framework
- *	Install									Step 7: the project's actual pages - a free-form, ordered
+ *	Install									Step 3: the project's actual pages - a free-form, ordered
  *													list of { uri, httpUri, libraryKey, navs, text } entries
  *													built here, rather than a fixed checkbox per
  *													_admin/install/library/pages/&lt;key&gt; unit (that picker is
  *													Setup's - see setup.js). "uri" (Element-URI) is a stable
  *													identifier, "httpUri" is the real browser path - see
  *													Install.php's Webpages::_routeKeys() docblock for why
- *													both exist. List + drill-down-form shape, same as _admin's
- *													Pages module (see pages.js) - the two are meant to feel
- *													like the same tool, since they do the same job. "New
+ *													both exist. List + drill-down-form shape, same as the
+ *													workbench's Routes panel (see its assets/admin.js) - the
+ *													two are meant to feel like the same tool, since they do
+ *													the same job. "New
  *													Route" opens an entry prefilled from the picked
  *													template's own suggested uris and per-locale wording
  *													(see _suggest(), fed by Install.php's Webpages::
  *													_suggestions()) - a field left blank still falls back to
  *													that class's generic placeholder on "Next"; the list's
  *													own ↑/↓ buttons reorder in place. Everything here is
- *													purely client-side - unlike _admin's Pages module, nothing
+ *													purely client-side - unlike the Routes panel, nothing
  *													persists until "Next" posts the whole list at once (see
  *													apply()), so Save/Delete only ever edit _entries in
  *													memory. Driven by the shared Back/Next bar (script.js)
@@ -219,7 +220,7 @@
 
 		/**
 		 *	How one entry is named in the list and the template select. An
-		 *	entry /_admin's Pages module created carries no library unit at
+		 *	entry the workbench's Routes panel created carries no library unit at
 		 *	all, just the template it already sits on - reported as-is
 		 *	rather than blank
 		 *
@@ -260,8 +261,8 @@
 
 		/**
 		 *	Open the editor for an existing entry, or a blank (uri-suggested)
-		 *	one for a new route - mirrors _admin's Pages module (see pages.js's
-		 *	_openForm()), except nothing here is written to disk until "Next"
+		 *	one for a new route - mirrors the workbench's Routes panel (see its
+		 *	own _openForm()), except nothing here is written to disk until "Next"
 		 *	applies the whole list, so every way out of this form folds the
 		 *	entry into _entries rather than discarding it. A new entry starts
 		 *	from the picked template's
@@ -442,7 +443,7 @@
 			const templateSelect = dc.createElement('select');
 			templateSelect.id = 'webpages-form-template';
 
-			// An entry /_admin's Pages module created has no library unit to
+			// An entry the workbench's Routes panel created has no library unit to
 			// select - it gets its own, non-library option so the select can
 			// still represent it, and re-applying leaves it on whatever
 			// template it already sits on

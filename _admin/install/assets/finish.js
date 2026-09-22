@@ -2,7 +2,7 @@
 
 /**
  *	Nino										A compact filesystembased php framework
- *	Install									Step 10, the last one: set the real /_admin password. Success
+ *	Install									Step 6, the last one: set the recovery password. Success
  *													here is what locks the wizard back out for good - see
  *													_admin/install/Install.php's Finish class.
  *

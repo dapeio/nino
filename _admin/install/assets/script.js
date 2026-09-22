@@ -3,7 +3,7 @@
 /**
  *	Nino										A compact filesystembased php framework
  *	Install									Setup wizard frontend: a strictly linear Back/Next flow
- *													through the registered steps (the top nav is a progress
+ *													through the registered steps (the rail is a progress
  *													display only, not a jump-menu - see page-wizard.tpl), plus
  *													the shared api-call/error helpers every step's own
  *													assets/<step>.js builds on (see checks.js for the shape a
@@ -15,7 +15,7 @@
  *
  *													"Next" both commits the current step's data (if it has any -
  *													Setup applies its picker, Webpages applies its page list,
- *													PersonalInfos saves its fields, Admin just checks an
+ *													PersonalInfos saves its fields, Accounts just checks an
  *													account exists) and advances, replacing what used to be
  *													each step's own save button. A step with nothing to commit
  *													(Checks) just advances.

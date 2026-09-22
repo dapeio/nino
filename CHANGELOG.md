@@ -6,6 +6,19 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **Docs:** the wizard's own step scripts counted the same steps the php
+  classes did - `webpages.js` "Step 7", `personalinfos.js` "Step 8",
+  `accounts.js` "Step 9", `finish.js` "Step 10" - and `finish.js` called
+  what that step sets "the real /_admin password" rather than the
+  recovery password. Six comments sent the reader to `_admin`'s "Pages
+  module" and its `pages.js`, which is the Routes panel and its
+  `assets/admin.js`, and two in `personalinfos.js` to
+  `_admin/assets/text.js`, which has been the Text panel's own
+  `assets/admin.js` since the panel scripts were named alike.
+  `script.js` called the Accounts step "Admin" and the wizard's side rail
+  "the top nav", and `style.css` named `Nino.install.selectStep()`, a
+  method that is `showStep()`.
+
 - **Docs:** the setup wizard's own classes counted steps the wizard does
   not have. `Webpages` called itself "Step 7", `PersonalInfos` "Step 8",
   `Accounts` "Step 9" and `Finish` "Step 10", where `Install::MODULES`

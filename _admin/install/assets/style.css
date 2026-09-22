@@ -53,7 +53,7 @@
 	min-width: 0;
 }
 /*	Only one step's content pane is visible at a time - #install-page-wrap's
- *	class (set by Nino.install.selectStep(), see script.js) picks which */
+ *	class (set by Nino.install.showStep(), see script.js) picks which */
 #install-content-wrap > div {
 	display: none;
 }
@@ -164,9 +164,9 @@
 	grid-column: 2 / -1;
 }
 
-/* -------------------------------------------------------------- Admins step */
+/* ------------------------------------------ Personal Infos and Accounts */
 
-/*	This step has no local rules left. #personalinfos-form-global/-locale and
+/*	Neither step has a local rule left. #personalinfos-form-global/-locale and
  *	#accounts-add-form are plain <fieldset>/.nino-admin-card surfaces with
  *	.nino-admin-field rows, styled entirely by the design system - see
  *	personalinfos.js and accounts.js. The heading stays so the rule this step

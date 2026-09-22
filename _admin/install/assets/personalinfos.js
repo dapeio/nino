@@ -2,15 +2,16 @@
 
 /**
  *	Nino										A compact filesystembased php framework
- *	Install									Step 8: bulk-fill the /company/* and /website/* text keys
+ *	Install									Step 4: bulk-fill the /company/* and /website/* text keys
  *													every project has (global.php + per-locale
  *													text/<locale>.php) in one form instead of clicking through
  *													_admin's Text panel one key at a time - each with a
  *													friendly label instead of its raw key, see
  *													_admin/install/Install.php's PersonalInfos class. Same shape as
- *													_admin/assets/text.js's category form: every global key on
- *													top in one fieldset, every locale-scoped key below behind
- *													a locale <select>, in-memory _localeValues preserving
+ *													the Text panel's own assets/admin.js and its category
+ *													form: every global key on top in one fieldset, every
+ *													locale-scoped key below behind a locale <select>,
+ *													in-memory _localeValues preserving
  *													unsaved edits across a locale switch. Driven by the shared
  *													Back/Next bar (script.js) rather than its own save button -
  *													save() is exposed for Next to call, not wired to a button
@@ -173,7 +174,7 @@
 		/**
 		 *	Render the whole form: every global key in one fieldset, every
 		 *	locale-scoped key below behind a locale <select> - same shape as
-		 *	_admin/assets/text.js's _renderGroupForm()
+		 *	the Text panel's own _renderGroupForm() (its assets/admin.js)
 		 *
 		 *	@return		void
 		 */
