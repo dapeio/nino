@@ -6,6 +6,17 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **Docs:** the base unit's own files named a wizard and a set of
+  stylesheets that are gone. `assets/style.css` said the look lives in
+  `style.theme.<name>.css`, `style.header.css`, `style.footer.css` and a
+  generated token layer - four files nothing in the tree writes, since
+  the delivered look is the one `assets/theme.css` the unit copies. And
+  two templates sent the reader to `/_install`, an address the wizard
+  has not answered on since it became the workbench's first-run mode:
+  `llms-txt.tpl` to "/_install's Setup step" for a list of pages, which
+  the Routes step builds, and `html-header.tpl` to "/_install's own
+  PersonalInfos step" for the address field.
+
 - **Docs:** the wizard's own step scripts counted the same steps the php
   classes did - `webpages.js` "Step 7", `personalinfos.js` "Step 8",
   `accounts.js` "Step 9", `finish.js` "Step 10" - and `finish.js` called

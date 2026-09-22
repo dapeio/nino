@@ -40,9 +40,9 @@
 			     rather than "[[...]]" inside the quotes: a textfill is
 			     inserted verbatim, and /company/adress is multi-line by
 			     design (a postal address, offered as a <textarea> in
-			     /_install's own PersonalInfos step), so a raw newline used to
-			     land inside a json string and this whole block failed to
-			     parse on every page. [json ...] emits the complete string
+			     the setup wizard's own Personal Infos step), so a raw newline
+			     used to land inside a json string and this whole block failed
+			     to parse on every page. [json ...] emits the complete string
 			     literal, quotes included - see Html::doJsonShortcode() -->
 			<script type="application/ld+json">
 			{

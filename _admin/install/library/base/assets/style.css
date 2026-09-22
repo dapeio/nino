@@ -3,12 +3,11 @@
  *												loads, so a rule here wins over the design tokens, the
  *												theme and the header/footer frame alike.
  *
- *												It ships empty on purpose. Everything a wizard, a theme
- *												or a frame writes lives in a file of its own
- *												(style.theme.<name>.css, style.header.css,
- *												style.footer.css, and the generated token layer), and
- *												every one of those is replaced wholesale when that
- *												choice is made again. This one is never touched, so
- *												what you put here survives changing the theme, both
- *												frames and the design.
+ *												It ships empty on purpose. The delivered look is one
+ *												file of its own, assets/theme.css - the design tokens,
+ *												the roles they are assigned to, the webfaces and the
+ *												css for both frames, all four in that order - and it
+ *												is replaced wholesale whenever the look is delivered
+ *												again, as the Design feature will. This one is never
+ *												touched, so what you put here survives that.
  */
