@@ -19,6 +19,13 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **Docs:** `\Nino\Mail`'s class comment still said a rate-limited burst
+  "just becomes silently-missing mail". It has not since the cap grew a
+  flag of its own: `send()` and `sendAll()` set
+  `'./nino/mail/ratelimited'`, and `\Nino\Form::handle()` answers such a
+  submission 429 and records nothing - the line 30 lines below it in the
+  same file already said so. The class comment says it too now.
+
 - **Docs:** `\Nino\Modules\Cache`'s own docblock listed what the page
   cache never stores, and the list was both wider and shorter than the
   code. Wider: it kept "any uri under /_", where `TOOL_PREFIXES` holds

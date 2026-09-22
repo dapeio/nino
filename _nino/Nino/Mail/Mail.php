@@ -12,10 +12,12 @@ namespace Nino {
 
 	// Mail - thin wrapper around mail(): centralizes Content-Type/Reply-To
 	// headers (one place for a project-wide change) and a shared per-ip
-	// send cap (5/hour, /data/ratelimit.php) - over budget, send() just
-	// returns false, the same outcome as any other mail() failure, which
-	// Form/Newsletter already treat as non-fatal, so a rate-limited burst
-	// just becomes silently-missing mail
+	// send cap (5/hour, /data/ratelimit.php) - over budget, send() and
+	// sendAll() return false and leave './nino/mail/ratelimited' behind,
+	// which is what tells a caller "we refused to send this" apart from a
+	// mail() that failed: \Nino\Form::handle() reads the flag and answers
+	// 429 without recording the submission, where a mail no transport took
+	// is recorded and answered ok
 	//
 	// mail() is the default transport, not the only one: a module or a
 	// feature that delivers another way (smtp, an api) registers a
