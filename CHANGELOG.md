@@ -30,6 +30,13 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **Docs:** five comments of the Dashboard panel named files, classes and
+  rules that are not there: an `_admin/Editor.php` holding a `Dashboard`
+  class, a `logs.js` for what is the Log panel's `assets/admin.js`,
+  `\Nino\Panels` for the registry, which is `\Nino\Admin\Panels`, and a
+  stylesheet header promising "two dashboard tiles" in a file that holds the
+  panel's two lists and the "show all" link under them.
+
 - **Docs:** the Config panel's script sent the reader to a `language.js` and
   a `pages.js` for the settings that moved out of its form. The languages
   are the Language panel's own `admin.js`, the routes the Routes panel's;

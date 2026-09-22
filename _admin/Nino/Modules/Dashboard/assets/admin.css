@@ -4,13 +4,13 @@
  *	Nino										A compact filesystembased php framework
  *	Modules\Dashboard		The overview, one number per panel
  *	admin.css								What the module's /_admin panel needs beyond the design
- *													system in _admin/assets/style.css: the two cards the panel
+ *													system in _admin/assets/style.css: the two lists the panel
  *													draws itself - elements by type, recent activity - and the
- *													two dashboard tiles the design system has no reason to
- *													know about. Bundled while the module is there (see the
- *													panel's assets()), so the same layer rules apply - the
- *													shell's stylesheet fixes the layer order, this one only
- *													ever adds to nino.tool, scoped to the panel's own ids.
+ *													"show all" link under the second of them. Bundled while
+ *													the module is there (see the panel's assets()), so the
+ *													same layer rules apply - the shell's stylesheet fixes the
+ *													layer order, this one only ever adds to nino.tool, scoped
+ *													to the panel's own ids.
  *
  *	@package								Dape/Nino
  *	@author									David Perchermeier <mail@dape.io>

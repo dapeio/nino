@@ -4,7 +4,7 @@
  *	Nino										Framework
  *	admin.js    						Admin "Dashboard" panel - the landing tab: a handful
  *													of read-only numbers already available from the other
- *													panels (see _admin/Editor.php's Dashboard class), pulled
+ *													panels (see Admin/Admin.php beside it), pulled
  *													into one overview. Doesn't write anything, and the tiles
  *													are just #hash links into the panel they summarize -
  *													Nino.admin.onReady()'s own hashchange listener does the
@@ -23,7 +23,7 @@
 
 		/**
 		 *	Load the summary and render it. Same "always re-fetch" shape as
-		 *	logs.js - there's no drill-down state to preserve,
+		 *	the Log panel's admin.js - there's no drill-down state to preserve,
 		 *	and re-fetching on every tab switch keeps the numbers current
 		 *
 		 *	@return		void
@@ -227,7 +227,7 @@
 		/**
 		 *	"Recent activity": the handful of most recent log lines
 		 *	(server already limits + orders them), same list markup as
-		 *	logs.js's own full list
+		 *	the Log panel's own full list
 		 *
 		 *	@param		{string[]}	lines
 		 *

@@ -17,7 +17,7 @@ namespace Nino\Modules\Dashboard {
 	 *											already available from the other panels (element
 	 *											counts, the last backup, recent activity, and one
 	 *											tile per panel that reports a number through its
-	 *											summary() - see \Nino\Panels), pulled together into
+	 *											summary() - see \Nino\Admin\Panels), pulled together into
 	 *											one overview instead of having to open each tab in
 	 *											turn. Doesn't add any storage of its own
 	 *
