@@ -82,8 +82,10 @@ namespace Nino\Install {
 		}
 
 		/**
-		 *	Fill the GET /_admin response: the wizard if the project is still
-		 *	on the shipped default _admin hash, else a locked-out notice
+		 *	Fill the GET /_admin response: the wizard while the project has
+		 *	never finished the setup, else a locked-out notice -
+		 *	Admin::isInstalled() answers that from '/nino/install/completed'
+		 *	and the stored recovery secret
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
@@ -137,10 +139,12 @@ namespace Nino\Install {
 		}
 
 		/**
-		 *	Require the project to still be on the shipped default _admin hash -
+		 *	Require the project to be one that has never finished the wizard -
+		 *	Admin::isInstalled() again, the same gate handleGet() reads -
 		 *	shared by every module action, checked once per request rather
 		 *	than per action
 		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
 		 *
 		 *	@return 	bool										If the request may proceed
@@ -300,9 +304,10 @@ namespace Nino\Install {
 				$parent = dirname( $path );
 				$exists = is_dir( $path );
 
-				// A not-yet-created directory (data/, .cache/) is fine as long as
-				// its parent can create it on first write - only an
-				// already-existing one has to be writable itself
+				// A not-yet-created directory - private/ and public/, neither of
+				// which a checkout carries - is fine as long as its parent can
+				// create it on first write - only an already-existing one has to
+				// be writable itself
 				$writable = $exists ? is_writable( $path ) : is_writable( $parent );
 
 				$result[( $rel === '' ) ? '.' : $rel] = [
@@ -800,11 +805,11 @@ namespace Nino\Install {
 
 		/**
 		 *	Auto-select whatever a picked module declares via
-		 *	requiresModules (eg. "forms"/"newsletter" -> "mail"),
-		 *	transitively - a fixed-point loop rather than plain recursion
-		 *	since two modules could (in principle) require each other, and
-		 *	the module count is small enough that this never runs more than
-		 *	a couple of iterations
+		 *	requiresModules - other units' keys, the same slugs a page unit
+		 *	names (eg. "forms") - transitively: a fixed-point loop rather
+		 *	than plain recursion, since two modules could (in principle)
+		 *	require each other, and the module count is small enough that
+		 *	this never runs more than a couple of iterations
 		 *
 		 *	@param		array 		$modules			Picked module keys
 		 *	@param		array 		$units				units(): key => unit directory
@@ -875,7 +880,7 @@ namespace Nino\Install {
 
 	/**
 	 *	Nino							A compact filesystembased php framework
-	 *	Install						Step 7: build the project's actual pages - a free-form,
+	 *	Install						Step 3: build the project's actual pages - a free-form,
 	 *												ordered list of { uri, httpUri, libraryKey, navs, text }
 	 *												entries a developer adds/reorders/removes here, rather
 	 *												than a fixed checkbox per _admin/install/library/pages/&lt;key&gt;
@@ -900,8 +905,9 @@ namespace Nino\Install {
 	 *												Nothing of this is persisted as a list of its own: the
 	 *												routes are the pages (see isPageRoute()/pages()), the
 	 *												/webpage&lt;uri&gt;/* text keys are their wording, and the
-	 *												route's 'navs' its menu membership. /_admin/Admin.php's
-	 *												The Routes panel reads and writes exactly the same routes (its
+	 *												route's 'navs' its menu membership. The workbench's own
+	 *												Routes panel - _admin/Nino/Modules/Routes/Admin/Admin.php -
+	 *												reads and writes exactly the same routes (its
 	 *												own standalone copy of this shape/logic, restricted to
 	 *												templates already on disk rather than library units) for
 	 *												once this folder has been deleted - see its own docblock
@@ -1052,7 +1058,7 @@ namespace Nino\Install {
 				pages() asks _unitFromBody(), which asks this - once per page
 				route it lists. Each reading is a scandir plus a manifest
 				include per unit plus, through _suggestions(), a text fragment
-				include per unit per locale: seven units and two locales is 21
+				include per unit per locale: eight units and two locales is 24
 				includes, and a project with twenty pages paid for that twenty
 				times over to render the wizard's page list once	*/
 			static $cached = [];
@@ -1579,12 +1585,12 @@ namespace Nino\Install {
 			$routes = $foreignRoutes;
 
 			// Auto-pull whatever module a used template requires (eg.
-			// "contact" -> forms+mail), same reasoning as Setup's own
+			// "contact" -> "forms"), same reasoning as Setup's own
 			// module-requirement resolving, just sourced from templates
 			// instead of a picked module's own requiresModules. Not just
 			// flipping the moduleClass on: a required module not already
-			// active (eg. "mail" was never checked in Setup because
-			// nothing needed it until this apply) still needs its own
+			// active - one nothing needed until this apply, so nobody
+			// checked it in Setup - still needs its own
 			// templates/text actually copied - see _applyModule() - the
 			// same way Setup::_applyUnit() would have, had it been picked
 			// there instead
@@ -1768,7 +1774,7 @@ namespace Nino\Install {
 
 			$libraryKey = self::_libraryKey( $entry );
 
-			// No library unit behind it (an entry /_admin's Pages module
+			// No library unit behind it (an entry the workbench's Routes panel
 			// created): it still owns exactly one route, keyed the same way -
 			// returning nothing here would leave that route behind on the
 			// next apply, since apiApply() strips the previous list's keys
@@ -1954,7 +1960,7 @@ namespace Nino\Install {
 
 			} elseif( $routeKey !== null && (string) ( $entry['body'] ?? '' ) !== '' ) {
 
-				// An entry /_admin's Pages module created: there is no unit to
+				// An entry the workbench's Routes panel created: there is no unit to
 				// copy anything from - its template already exists on disk -
 				// so the route it owns is simply put back as it stands
 				$route = [ 'uri' => $entry['uri'], 'body' => (string) $entry['body'] ];
@@ -2178,7 +2184,7 @@ namespace Nino\Install {
 
 	/**
 	 *	Nino							A compact filesystembased php framework
-	 *	Install						Step 8: bulk-fill the handful of "Personal Infos" keys every
+	 *	Install						Step 4: bulk-fill the handful of "Personal Infos" keys every
 	 *												project has regardless of what Setup/Webpages picked -
 	 *												/company/* and /website/* (company/contact details,
 	 *												the site's author/hosting info), each with a friendly
@@ -2315,7 +2321,7 @@ namespace Nino\Install {
 
 	/**
 	 *	Nino							A compact filesystembased php framework
-	 *	Accounts					Step 9: create the first workbench account(s), the same way
+	 *	Accounts					Step 5: create the first workbench account(s), the same way
 	 *												\Nino\Modules\Users\Admin bootstraps them from inside _admin - duplicated
 	 *												rather than depended on, since the wizard is meant to work even
 	 *												before a developer has decided whether to keep _admin around
@@ -2423,9 +2429,9 @@ namespace Nino\Install {
 
 	/**
 	 *	Nino							A compact filesystembased php framework
-	 *	Install						Step 10 - the wizard's last step: set the real _admin password.
+	 *	Install						Step 6 - the wizard's last step: set the recovery password.
 	 *												Writes it under the private directory rather than into any
-	 *												tool folder (see Install::setDevPassword()), and is the one
+	 *												tool folder (see Install::setRecoverySecret()), and is the one
 	 *												action whose success is itself what locks the wizard back out -
 	 *												Admin::isInstalled() goes true the moment this returns
 	 *

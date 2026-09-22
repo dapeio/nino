@@ -6,6 +6,24 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **Docs:** the setup wizard's own classes counted steps the wizard does
+  not have. `Webpages` called itself "Step 7", `PersonalInfos` "Step 8",
+  `Accounts` "Step 9" and `Finish` "Step 10", where `Install::MODULES`
+  lists six modules and `page-wizard.tpl` draws six numbered entries in
+  the rail. `Finish` also sent the reader to `Install::setDevPassword()`,
+  a method that is `setRecoverySecret()`, and called what that step sets
+  "the real _admin password" - it is the recovery password, which no
+  login ever asks for. Two docblocks still gated the wizard on "the
+  shipped default _admin hash", where `Admin::isInstalled()` reads
+  `/nino/install/completed` and the stored recovery secret; `guard()`
+  documented one of its two parameters. Two comments sent the reader to
+  `/_admin`'s "Pages module", which is the Routes panel under
+  `_admin/Nino/Modules/Routes/`; three named a "mail" unit no module in
+  the tree ships; one named `data/` and `.cache/` as the directories the
+  first step judges by their parent, where `Checks::DIRECTORIES` holds
+  the project root, `private` and `public`; and the page library's
+  include count said seven units where `library/pages/` holds eight.
+
 - **Docs:** the base unit's `theme.css` header no longer points at the
   catalogue's `design-library/`, a directory the catalogue dropped on
   purpose: the whole-page themes the wizard used to offer are gone, a
