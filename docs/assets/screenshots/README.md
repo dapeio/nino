@@ -1,16 +1,16 @@
 # Screenshot-Briefing
 
-Die englische und die deutsche Root-README zeigen Nino in fünf Bereichen. Die Dateien werden unter diesem Verzeichnis abgelegt und relativ als `docs/assets/screenshots/<datei>.webp` eingebunden.
+Die englische und die deutsche Root-README zeigen Nino derzeit in vier Bereichen; der fünfte, Editor, ist noch offen. Die Dateien werden unter diesem Verzeichnis abgelegt und relativ als `docs/assets/screenshots/<datei>.webp` eingebunden.
 
 | Bereich | Dateien | Inhalt und Aussage |
 |---|---|---|
 | Frontend | `frontend.webp` | vollständig eingerichtete Nino-Webseite; individuelles Ergebnis statt fest vorgegebenem CMS-Layout |
 | Install | `_install1.webp`, `_install2.webp` | Routenkonfiguration und Abschlussansicht; geführte, notwendige Ersteinrichtung |
 | Admin | `_admin1.webp` | Textfill-Übersicht; technische Kontrolle für Entwickler |
-| Editor | `_editor1.webp`, `_editor2.webp` | Elementbearbeitung und Bildplatzverwaltung; einfache tägliche Pflege für Redakteure |
+| Editor | `_editor1.webp`, `_editor2.webp` – noch nicht aufgenommen | Elementbearbeitung und Bildplatzverwaltung; einfache tägliche Pflege für Redakteure |
 | Templates | `_templates1.webp`, `_templates2.webp`, `_templates3.webp` | Section-Canvas, Preset-Library und Live-Vorschau; visuelle Template-Komposition bei lesbarem Quelltext |
 
-Weitere Screenshots wie `admin-elements.webp`, `admin-text.webp`, `editor-elements.webp` und `editor-text.webp` bleiben in den jeweiligen Referenzhandbüchern eingebunden.
+Ältere Dateien wie `admin.webp`, `admin-elements.webp`, `admin-text.webp`, `editor.webp`, `editor-elements.webp`, `editor-text.webp`, `install.webp` und `templates.webp` liegen weiterhin hier, sind aber in keinem Handbuch eingebunden.
 
 Die drei Design-Panel-Screenshots liegen seit 1.2 nicht mehr hier: Sie sind mit dem Panel und seinem Katalog nach [`design-library/docs/assets/`](https://github.com/dapeio/nino-features/tree/main/design-library/docs/assets) in dapeio/nino-features gewandert und im dort archivierten Handbuch eingebunden.
 

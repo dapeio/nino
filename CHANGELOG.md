@@ -6,6 +6,15 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **Docs:** the screenshot briefing counted five areas in the two
+  READMEs, which embed four - frontend, workbench, wizard, Template
+  Builder. The fifth, Editor, names `_editor1.webp` and `_editor2.webp`,
+  two files this directory does not hold; the row says so rather than
+  reading as a description of what is there. The sentence below it said
+  four further screenshots stay embedded in the reference manuals, and
+  no manual embeds any of the eight files that are here beside the seven
+  in use.
+
 - **Docs:** the design manual's plan put the design tokens in
   `text/global.php`, where that file holds `/company/*`, `/website/*`
   and the two mail fills and nothing else. The tokens are the `--nino-*`
