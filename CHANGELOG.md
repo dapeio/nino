@@ -51,8 +51,9 @@ All notable changes to Nino are documented in this file.
   `:not(.admin-panel-tabs)` - a workbench class inside the `nino.system`
   layer, which `tests/admin-lists-js-smoke.js` holds to `nino-admin-*`
   classes alone. The strip carries `nino-admin-tabs--panel` now, the three
-  exceptions name that, and the tool-layer rules on `.admin-panel-tabs` are
-  as they were.
+  exceptions name that, the tool-layer rules on `.admin-panel-tabs` are as
+  they were, and the two suites that read the fragment as a string -
+  `admin-smoke.php` and `admin-system-smoke.php` - name the modifier.
 
 - **The demo catalogue page posted its newsletter forms from the domain
   root.** Both newsletter sections of `.demo-catalogue.tpl` wrote
