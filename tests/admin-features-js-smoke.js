@@ -426,7 +426,10 @@ check( 'the script writes no sentence of its own into the dom'+ ( hardcoded.leng
 // --- opening the panel: no cache yet
 
 panel.init();
-check( 'init loads features/list through the shell\'s one endpoint', requests.length === 1 && requests[0].action === 'features/list' && requests[0].uri === '/_admin/' && requests[0].method === 'POST' );
+// The endpoint is written from the project's root: the bundle Modules\Assets
+// builds substitutes the fill, so a site served from a directory posts to
+// its own workbench and not beside it
+check( 'init loads features/list through the shell\'s one endpoint, written from the project root', requests.length === 1 && requests[0].action === 'features/list' && requests[0].uri === '[[/nino/dir]]/_admin/' && requests[0].method === 'POST' );
 
 answer( 200, listAnswer( CACHE.url, true, null ) );
 check( 'opening the panel fetches nothing but the list - no catalogue request follows on its own', requests.length === 1 );

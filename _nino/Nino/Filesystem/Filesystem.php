@@ -630,6 +630,52 @@ namespace Nino {
 
 		}
 
+		/**
+		 *	The directory the project is served from, read off the entry
+		 *	script: the part of its url that is not its path inside the
+		 *	project. '/shop/_admin/index.php' for a file that is
+		 *	'/_admin/index.php' under the project root is a site at '/shop';
+		 *	'/index.php' for '/index.php' is one at the root. Nothing else can
+		 *	know this before config.php exists - and the wizard that writes
+		 *	config.php runs from a subdirectory too, posting to an endpoint
+		 *	that has to carry it. \Nino\request() asks only when config.php
+		 *	left '/nino/dir' empty, so a project behind a proxy that rewrites
+		 *	its path keeps naming the directory itself.
+		 *
+		 *	'' where the pair does not describe a file under this project -
+		 *	the cli, a server that composes no SCRIPT_NAME, a router script
+		 *	outside the tree - which is what a root install answers too.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		$server				The server array of this request ($_SERVER)
+		 *
+		 *	@return 	string									Eg. '', '/shop'
+		 */
+		public static function deriveDir( array &$appData, array $server ): string {
+
+			$scriptName = (string) ( $server['SCRIPT_NAME'] ?? '' );
+			$scriptFile = (string) ( $server['SCRIPT_FILENAME'] ?? '' );
+
+			if( $scriptName === '' || $scriptFile === '' )
+				return '';
+
+			$script	= realpath( $scriptFile );
+			$root		= realpath( self::getPath( $appData ) );
+
+			if( $script === false || $root === false || str_starts_with( $script, $root. DIRECTORY_SEPARATOR ) === false )
+				return '';
+
+			// The script's path inside the project, in url form
+			$inside = str_replace( DIRECTORY_SEPARATOR, '/', substr( $script, strlen( $root ) ) );
+
+			if( $scriptName === $inside )
+				return '';
+
+			return str_ends_with( $scriptName, $inside ) === true
+				? substr( $scriptName, 0, -strlen( $inside ) )
+				: '';
+		}
+
 		public static function copyDir( string $source, string $dest ): bool {
 
 			// @ throughout - see forceDir()'s identical reasoning: none of

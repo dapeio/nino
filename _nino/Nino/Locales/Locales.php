@@ -128,10 +128,13 @@ namespace Nino {
 			$newUri = \Nino\Http::findRouteUri( $appData, $request['/nino/http/response']['uri'], $locale );
 
 			// Redirect via the response array - a direct header() call would be
-			// overwritten by Http::output()'s own http_response_code() pass
+			// overwritten by Http::output()'s own http_response_code() pass.
+			// The route key is project-relative, the address a browser is sent
+			// to is not: a site served from a directory puts it in front, or
+			// the switch lands beside the site (see Http::_projectUri())
 			if( $newUri !== null ) {
 				$request['/nino/http/response']['statusCode'] 					= 302;
-				$request['/nino/http/response']['header']['Location']	= str_replace( $request['/nino/http/request']['method']. ':/', '', $newUri );
+				$request['/nino/http/response']['header']['Location']	= rtrim( \Nino\Filesystem::getDir( $appData ), '/' ). str_replace( $request['/nino/http/request']['method']. ':/', '', $newUri );
 			}
 		}
 

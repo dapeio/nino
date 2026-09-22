@@ -78,7 +78,7 @@ namespace Nino {
 				// body, and it keeps that fold from being invisible to anything
 				// else that cares
 				'rawMethod'			=> self::_cleanRawMethod( $request['REQUEST_METHOD'] ?? '', [], false ),
-				'uri'						=> self::cleanUri( $request['REQUEST_URI'] ?? '' ),
+				'uri'						=> self::_projectUri( $appData, self::cleanUri( $request['REQUEST_URI'] ?? '' ) ),
 				'query'					=> self::_getRequestQueryVarsPart( $request['REQUEST_URI'] ?? '' ),
 				'header'				=> $header,
 				'body'					=> file_get_contents( 'php://input' ),
@@ -273,6 +273,39 @@ namespace Nino {
 		}
 
 		// Return clean uri
+		/**
+		 *	The request path as the routes know it: without the directory the
+		 *	project is served from. Routes are keyed project-relative
+		 *	('GET://about'), and every address the kernel writes - a form's
+		 *	action, a menu entry, the workbench's own endpoint - puts
+		 *	[[/nino/dir]] in front of such a key. What comes back from the
+		 *	browser therefore carries the directory, and a site at
+		 *	example.com/shop/ answered every one of its own addresses with the
+		 *	404 page: '/shop/about' was looked up as it stood, and no route
+		 *	is keyed that way. Only the leading segment that is the directory
+		 *	comes off - '/shopping' on a site at '/shop' is left alone - and
+		 *	the directory on its own is the site's root.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$uri					A cleaned request path (see cleanUri())
+		 *
+		 *	@return 	string
+		 */
+		static private function _projectUri( array &$appData, string $uri ): string {
+
+			$dir = rtrim( (string) ( $appData['/nino/dir'] ?? '' ), '/' );
+
+			if( $dir === '' )
+				return $uri;
+
+			if( $uri === $dir )
+				return '/';
+
+			return str_starts_with( $uri, $dir. '/' ) === true
+				? substr( $uri, strlen( $dir ) )
+				: $uri;
+		}
+
 		static private function cleanUri( string $rawUri ): string {
 
 			/*	The path is what comes before the first '?' or '#'. strtok()

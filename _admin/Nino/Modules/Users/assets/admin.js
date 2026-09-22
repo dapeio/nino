@@ -99,7 +99,7 @@
 		 *	@return		void
 		 */
 		_apiCall : function( endpoint, payload, callback ) {
-			Nino.http.sendRequest( '/_admin/', 'POST', function( xhr ) {
+			Nino.http.sendRequest( '[[/nino/dir]]/_admin/', 'POST', function( xhr ) {
 				callback( xhr.status, xhr.responseJSON );
 			}, { action : 'users/'+ endpoint, data : JSON.stringify( payload ) } );
 		},
@@ -635,7 +635,7 @@
 
 				// Logging out yourself invalidates the current session - reload straight to the login form
 				if( response.loggedOutSelf === true ) {
-					wn.location.replace( '/_admin' );
+					wn.location.replace( '[[/nino/dir]]/_admin' );
 					return;
 				}
 

@@ -12,7 +12,7 @@
 	</head>
 	<body>
 		[csrf]
-		<div id="install-page-wrap" class="nino-admin nino-admin-shell nino-admin-shell--rail show-checks">
+		<div id="install-page-wrap" class="nino-admin nino-admin-shell nino-admin-shell--rail show-checks" data-dir="[[/nino/dir]]">
 			<aside id="install-shell-rail" class="nino-admin-rail" aria-label="Installation progress">
 				<div id="install-bar-wrap" class="nino-admin-rail-head">
 					<div id="install-bar-title">

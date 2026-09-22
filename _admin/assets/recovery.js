@@ -21,7 +21,7 @@
 		 *	@return		void
 		 */
 		_apiCall : function( endpoint, payload, callback ) {
-			Nino.http.sendRequest( '/_admin/recovery.php', 'POST', function( xhr ) {
+			Nino.http.sendRequest( Nino.dir+ '/_admin/recovery.php', 'POST', function( xhr ) {
 				callback( xhr.status, xhr.responseJSON );
 			}, { action : 'recovery/'+ endpoint, data : JSON.stringify( payload ) } );
 		},

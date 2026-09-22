@@ -198,5 +198,45 @@ check( 'a json body comes back parsed', parsed !== null && typeof parsed === 'ob
 check( 'a body that is not json comes back as its text', answer( 'load', 502, '<html>Bad Gateway</html>' ).responseJSON === '<html>Bad Gateway</html>' );
 check( 'an empty body comes back empty, not as a thrown parse error', answer( 'error', 0, '' ).responseJSON === '' );
 
+// --- Nino.dir: the directory the project is served from ---------------------
+//
+// Bundled, the file carries what Modules\Assets wrote into it; loaded as it
+// is on disk (the wizard, the recovery page), the literal survives and the
+// page's data-dir says where the project is. The auth endpoints go under it
+// either way - a site at /sub used to post its login to /.nino/auth/login,
+// beside itself
+
+XMLHttpRequestStub.prototype.open = function( method, uri ) { this.method = method; this.uri = uri };
+
+/**
+ *	Boot one Nino.js source on a page that carries data-dir (or none, for null)
+ */
+function bootWith( source, dataDir ) {
+	const box = Object.assign( {}, sandbox );
+	box.document = Object.assign( {}, document, {
+		querySelector : function( selector ) { return ( selector === '[data-dir]' && dataDir !== null ) ? { dataset : { dir : dataDir } } : null },
+	} );
+	box.window = box;
+	box.self = box;
+	vm.runInContext( source, vm.createContext( box ), { filename : 'Nino.js' } );
+	return box;
+}
+
+const rawSource = fs.readFileSync( path.join( __dirname, '../_nino/Nino.js' ), 'utf8' );
+
+check( 'the source carries the fill the bundle substitutes', rawSource.includes( "'[[/nino/dir]]'" ) );
+check( 'loaded as it is on a page at the root, the directory is empty', bootWith( rawSource, null ).Nino.dir === '' );
+check( 'loaded as it is on a page that carries data-dir, the directory is what it carries', bootWith( rawSource, '/sub' ).Nino.dir === '/sub' );
+check( 'bundled, the directory written in is read as it stands', bootWith( rawSource.replaceAll( '[[/nino/dir]]', '/shop' ), '/other' ).Nino.dir === '/shop' );
+check( '...and an empty one is the root, whatever the page carries', bootWith( rawSource.replaceAll( '[[/nino/dir]]', '' ), '/other' ).Nino.dir === '' );
+
+const subBox = bootWith( rawSource, '/sub' );
+sent.length = 0;
+subBox.Nino.auth.login( 'editor@example.com', 'secret', '/sub/_admin' );
+check( 'a login posts to the endpoint under the directory', sent.length === 1 && sent[0].uri === '/sub/.nino/auth/login' );
+sent.length = 0;
+subBox.Nino.auth.logout( '/sub' );
+check( '...and so does a logout', sent.length === 1 && sent[0].uri === '/sub/.nino/auth/logout' );
+
 console.log( '\n'+ checks+ ' checks, '+ failures+ ' failed' );
 process.exit( failures === 0 ? 0 : 1 );

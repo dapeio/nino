@@ -45,6 +45,23 @@ All notable changes to Nino are documented in this file.
 
 ### Fixed
 
+- **A site served from a subdirectory answered its own addresses with the
+  404 page.** Every address the kernel writes carried `[[/nino/dir]]`, and
+  the router looked the request path up as it came in, so `/shop/about`
+  found no route keyed `GET://about`; the workbench's panels, its login and
+  logout, the recovery page and the install wizard posted to `/_admin/` and
+  `/.nino/auth/…` from the domain root, a locale switch redirected there,
+  and a menu entry linked there - twenty-eight places. `Http::request()`
+  reads the request path without the directory; `\Nino\request()` derives
+  the directory from the entry script's own address where `config.php`
+  does not name it (`Filesystem::deriveDir()`), which is what lets the
+  wizard run from there at all; `Nino.js` carries it as `Nino.dir` for the
+  two pages that load it unbundled and the bundled scripts write the fill;
+  the redirect and the menu put it in front. `kernel-smoke.php` holds the
+  router, the redirect, the menu, the derivation, and that no shipped script
+  or template names an address from the domain root; `nino-auth-js-smoke.js`
+  holds `Nino.dir` and the endpoints under it.
+
 - **The panel tab strip's exception was spelled with a class outside the
   design system's namespace.** `Fixed(/admin): tabs styling` kept the
   generic tab rules off the pane's own strip with

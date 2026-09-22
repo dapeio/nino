@@ -100,6 +100,12 @@ namespace Nino\Modules {
 			if( count( $lines ) === 0 )
 				return '';
 
+			// A generated entry names its page the way the routes do, from the
+			// project's root; the page is reached under the directory the
+			// project is served from. A hand-written line that already names
+			// somewhere else (a full url, a fragment) is written as it stands
+			$dir = rtrim( \Nino\Filesystem::getDir( $appData ), '/' );
+
 			foreach( $lines as $entry ) {
 
 				$line 		= $entry['line'];
@@ -141,7 +147,8 @@ namespace Nino\Modules {
 				}
 
 				$attributes	.= ( $uri === $element[0] ) ? ' class="nino-is-active"' : '';
-				$lis				.= str_replace( [ '[[uri]]', '[[attributes]]', '[[title]]' ], [ $element[0]	, $attributes, $title ], self::$html['li'] );
+				$href				= ( str_starts_with( $element[0], '/' ) === true && str_starts_with( $element[0], '//' ) === false ) ? $dir. $element[0] : $element[0];
+				$lis				.= str_replace( [ '[[uri]]', '[[attributes]]', '[[title]]' ], [ $href, $attributes, $title ], self::$html['li'] );
 			}
 			$html .= str_replace( '[[content]]', $lis, self::$html['ul'] );
 

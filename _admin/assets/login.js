@@ -73,7 +73,7 @@
 				// Login
 				el.formMsg.className = 'pending';
 				el.formMsg.innerHTML = Nino.content.getText('/_admin/login/msg/pending');
-				Nino.auth.login( el.inputUser.value, el.inputPw.value, '/_admin', function( xhr ){
+				Nino.auth.login( el.inputUser.value, el.inputPw.value, '[[/nino/dir]]/_admin', function( xhr ){
 
 					// Replaced rather than added: the request is over, so 'pending'
 					// has to go with it - added on top it left the message carrying

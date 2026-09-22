@@ -24,6 +24,28 @@
 
 	wn.Nino = {
 
+		/**
+		 *	The directory the project is served from ('' at the domain root,
+		 *	'/shop' for a site at example.com/shop/) - the prefix every address
+		 *	this script and the ones written against it send a request to.
+		 *
+		 *	Modules\Assets writes the value into the literal below when it
+		 *	bundles this file, the same substitution Nino.ui.js's form and
+		 *	newsletter endpoints rely on. Two pages load the file as it is on
+		 *	disk instead - the install wizard and the recovery page, which have
+		 *	to work before or without a bundle - and there the literal survives
+		 *	unreplaced; those pages carry the directory as data-dir on their
+		 *	wrapper, and reading it from there is what keeps them inside the
+		 *	project too. A page with neither is at the root, which is what ''
+		 *	always meant.
+		 */
+		dir : ( function() {
+			const bundled = '[[/nino/dir]]';
+			if( bundled.charAt( 0 ) !== '[' )
+				return bundled;
+			const carrier = dc.querySelector( '[data-dir]' );
+			return ( carrier !== null && typeof carrier.dataset !== 'undefined' ) ? ( carrier.dataset.dir || '' ) : '';
+		} )(),
 
 		auth : {
 
@@ -40,7 +62,7 @@
 			login : function( user, pw, redirect, onError ) {
 				onError = ( typeof onError === 'function' ) ? onError : function(){};
 				Nino.http.sendRequest(
-					'/.nino/auth/login',
+					Nino.dir+ '/.nino/auth/login',
 					'POST',
 					function( xhr ) { if( xhr.status !== 200 ) return onError( xhr ); wn.location.replace( redirect ) },
 					{},
@@ -57,7 +79,7 @@
 			 */
 			logout : function( redirect ) {
 				Nino.http.sendRequest(
-					'/.nino/auth/logout',
+					Nino.dir+ '/.nino/auth/logout',
 					'POST',
 					function(){ window.location.replace( redirect ) }
 				);

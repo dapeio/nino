@@ -98,7 +98,7 @@
 		 *	@return		void
 		 */
 		_apiCall : function( endpoint, payload, callback ) {
-			Nino.http.sendRequest( '/_admin/', 'POST', function( xhr ) {
+			Nino.http.sendRequest( '[[/nino/dir]]/_admin/', 'POST', function( xhr ) {
 				callback( xhr.status, xhr.responseJSON );
 			}, { action : 'roles/'+ endpoint, data : JSON.stringify( payload ) } );
 		},

@@ -191,7 +191,7 @@
 				data[key] = fields[key];
 			} );
 
-			Nino.http.sendRequest( '/_admin/', 'POST', function( xhr ) {
+			Nino.http.sendRequest( Nino.dir+ '/_admin/', 'POST', function( xhr ) {
 				callback( xhr.status, xhr.responseJSON );
 			}, data );
 		},

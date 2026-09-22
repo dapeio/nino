@@ -4373,6 +4373,109 @@ check( 'a subdirectory install carries into both', [
 echo "\n";
 
 
+// --- A project served from a subdirectory ---------------------------------
+
+echo "A subdirectory install - the router reads past the directory, every address the kernel writes carries it\n";
+
+/*	Routes are keyed from the project's root ('GET://about'), and every
+	address a page writes puts [[/nino/dir]] in front of one. The request
+	path was looked up as it came in, though, so a site at example.com/shop/
+	answered every one of its own addresses with the 404 page. Measured
+	before the router read past the directory: with '/nino/dir' = '/sub',
+	'/sub/page' answered 404 and '/page' 200	*/
+$subAppData = $appData;
+$subAppData['/nino/dir'] = '/sub';
+$subAppData['/nino/http/routes'] = [
+	'GET://'				=> [ 'uri' => '/home', 'body' => 'home' ],
+	'GET://page'		=> [ 'uri' => '/page', 'body' => 'page', 'locale' => 'de_DE' ],
+	'GET://en/page'	=> [ 'uri' => '/page', 'body' => 'page', 'locale' => 'en_US', 'navs' => [ 'main' => 5 ] ],
+];
+$subAppData['./nino/http/requests'] = [];
+
+$subRequest = fakeRequest( $subAppData, '/sub/page' );
+\Nino\Http::response( $subAppData, $subRequest );
+check( 'the request path is read without the directory, and the route is found', $subRequest['/nino/http/request']['uri'] === '/page' && $subRequest['/nino/http/response']['uri'] === '/page' && $subRequest['/nino/http/response']['statusCode'] === 200 );
+check( 'the directory alone is the root', fakeRequest( $subAppData, '/sub' )['/nino/http/request']['uri'] === '/' );
+check( '...with a trailing slash too', fakeRequest( $subAppData, '/sub/' )['/nino/http/request']['uri'] === '/' );
+check( 'a path that merely begins with the same letters is left as it is', fakeRequest( $subAppData, '/subway' )['/nino/http/request']['uri'] === '/subway' );
+check( 'the query part is read as before', fakeRequest( $subAppData, '/sub/page?x=1' )['/nino/http/request']['query'] === [ 'x' => '1' ] );
+check( 'a root install reads the path as it came', fakeRequest( $appData, '/page' )['/nino/http/request']['uri'] === '/page' );
+
+// The route key a locale switch redirects to is project-relative too, and
+// the browser is sent to the address, not the key
+$switchRequest = fakeRequest( $subAppData, '/sub/page?lang=en_US' );
+\Nino\Locales::switchFromQuery( $subAppData, $switchRequest, 'lang' );
+check( 'a locale switch redirects under the directory', ( $switchRequest['/nino/http/response']['header']['Location'] ?? '' ) === '/sub/en/page' && $switchRequest['/nino/http/response']['statusCode'] === 302 );
+
+// A menu entry names its page the way the routes do - and links to where
+// the page is; what a hand-written line names elsewhere stays as written.
+// The entry for the requested page is the active one, compared before the
+// directory goes in front
+$subAppData['./nino/http/requests'] = [];
+fakeRequest( $subAppData, '/sub/page' );
+$subMenu = \Nino\Modules\Navigation::doShortcode( $subAppData, [ 'content' => "/page:Page\n/other:Other\n//example.com/x:Elsewhere\n#top:Top" ] );
+check( 'a menu entry links under the directory', str_contains( $subMenu, 'href="/sub/page"' ) === true && str_contains( $subMenu, 'href="/sub/other"' ) === true );
+check( '...and the requested page is still the active entry', preg_match( '/href="\/sub\/page" class="nino-is-active"/', $subMenu ) === 1 );
+check( '...while a protocol-relative url and a fragment are written as they stand', str_contains( $subMenu, 'href="//example.com/x"' ) === true && str_contains( $subMenu, 'href="#top"' ) === true );
+\Nino\Html::addFills( $subAppData, [ '/webpage/page/name' => 'Page' ], 'en_US' );
+\Nino\Locales::setCurrentLocale( $subAppData, 'en_US' );
+check( 'a generated entry links under the directory too', str_contains( \Nino\Modules\Navigation::doShortcode( $subAppData, [ 'nav' => 'main' ] ), 'href="/sub/en/page"' ) === true );
+
+/*	Where the directory comes from. config.php may name it; before config.php
+	exists the wizard runs from that directory already and posts to an
+	endpoint under it, so the entry script's own address is read: the part
+	of SCRIPT_NAME that is not the script's path inside the project	*/
+if( is_dir( $sandbox. '/_admin' ) === false )
+	mkdir( $sandbox. '/_admin', 0777, true );
+file_put_contents( $sandbox. '/_admin/index.php', '' );
+file_put_contents( $sandbox. '/index.php', '' );
+$entry = function( string $name, string $file ): array { return [ 'SCRIPT_NAME' => $name, 'SCRIPT_FILENAME' => $file ]; };
+
+check( "the directory is what stands before the entry script's path inside the project", \Nino\Filesystem::deriveDir( $appData, $entry( '/shop/_admin/index.php', $sandbox. '/_admin/index.php' ) ) === '/shop' );
+check( "...for the site's own index.php too", \Nino\Filesystem::deriveDir( $appData, $entry( '/shop/index.php', $sandbox. '/index.php' ) ) === '/shop' );
+check( '...and two levels deep', \Nino\Filesystem::deriveDir( $appData, $entry( '/sites/shop/index.php', $sandbox. '/index.php' ) ) === '/sites/shop' );
+check( 'a root install answers the empty directory', \Nino\Filesystem::deriveDir( $appData, $entry( '/_admin/index.php', $sandbox. '/_admin/index.php' ) ) === '' );
+check( 'a script outside the project answers nothing', \Nino\Filesystem::deriveDir( $appData, $entry( '/shop/index.php', __FILE__ ) ) === '' );
+check( 'a name that does not end in the script\'s path answers nothing', \Nino\Filesystem::deriveDir( $appData, $entry( '/shop/other.php', $sandbox. '/index.php' ) ) === '' );
+check( 'a request without the pair answers nothing', \Nino\Filesystem::deriveDir( $appData, [] ) === '' );
+
+$seedAppData = $subAppData;
+$seedAppData['/nino/dir'] = '';
+$seedRequest = \Nino\request( $seedAppData, [ 'REQUEST_METHOD' => 'GET', 'REQUEST_URI' => '/shop/page', 'REMOTE_ADDR' => '127.0.0.1', 'SCRIPT_NAME' => '/shop/index.php', 'SCRIPT_FILENAME' => $sandbox. '/index.php' ] );
+check( 'a request seeds the directory config.php left empty, and is routed under it', $seedAppData['/nino/dir'] === '/shop' && $seedRequest['/nino/http/response']['uri'] === '/page' && $seedRequest['/nino/http/response']['statusCode'] === 200 );
+$namedAppData = $subAppData;
+$namedAppData['/nino/dir'] = '/named';
+\Nino\request( $namedAppData, [ 'REQUEST_METHOD' => 'GET', 'REQUEST_URI' => '/named/page', 'REMOTE_ADDR' => '127.0.0.1', 'SCRIPT_NAME' => '/shop/index.php', 'SCRIPT_FILENAME' => $sandbox. '/index.php' ] );
+check( 'a directory config.php names is kept over the derived one', $namedAppData['/nino/dir'] === '/named' );
+
+/*	And the other half: nothing the kernel ships sends a browser to an address
+	from the domain root. A bundled script writes the [[/nino/dir]] fill
+	Modules\Assets substitutes, the two scripts a page loads as they are on
+	disk (recovery.js, the wizard's) read Nino.dir, and a template writes
+	the fill. The workbench's panels, its login, its logout, the recovery
+	page and the wizard all posted to '/_admin/' or '/.nino/auth/...' as it
+	stood - twenty-eight places, none of which a site at /shop reached	*/
+$kernelRoot = dirname( __DIR__ );
+$rootAbsoluteRequests = [];
+foreach( array_merge( glob( $kernelRoot. '/_nino/*.js' ), glob( $kernelRoot. '/_admin/assets/*.js' ), glob( $kernelRoot. '/_admin/install/assets/*.js' ), glob( $kernelRoot. '/_admin/Nino/Modules/*/assets/*.js' ), glob( $kernelRoot. '/_nino/Nino/Modules/*/assets/*.js' ) ) as $shippedScript ) {
+	$shippedSource = (string) file_get_contents( $shippedScript );
+	// Over the whole file, not line by line: a call may put its first
+	// argument on the next line, and Nino.js's own two did
+	preg_match_all( '/\b(?:sendRequest|logout|replace|assign)\(\s*\'\/(?!\/)|\blogin\(\s*[^;]*?,\s*\'\/[^\']*\'\s*,\s*function/', $shippedSource, $rootAbsoluteHits, PREG_OFFSET_CAPTURE );
+	foreach( $rootAbsoluteHits[0] as $hit )
+		$rootAbsoluteRequests[] = substr( $shippedScript, strlen( $kernelRoot ) + 1 ). ':'. ( substr_count( $shippedSource, "\n", 0, $hit[1] ) + 1 );
+}
+check( 'no shipped script sends a request to, or a browser to, an address from the domain root'. ( $rootAbsoluteRequests === [] ? '' : ' - '. implode( ', ', $rootAbsoluteRequests ) ), $rootAbsoluteRequests === [] );
+
+$rootAbsoluteTemplates = [];
+foreach( array_merge( glob( $kernelRoot. '/_admin/templates/*.tpl' ), glob( $kernelRoot. '/_admin/install/templates/*.tpl' ) ) as $shippedTemplate )
+	if( preg_match( '/\b(?:action|href|src)="\/(?!\/)/', (string) file_get_contents( $shippedTemplate ) ) === 1 )
+		$rootAbsoluteTemplates[] = substr( $shippedTemplate, strlen( $kernelRoot ) + 1 );
+check( 'no template the kernel ships writes an address from the domain root'. ( $rootAbsoluteTemplates === [] ? '' : ' - '. implode( ', ', $rootAbsoluteTemplates ) ), $rootAbsoluteTemplates === [] );
+
+echo "\n";
+
+
 // --- Escaping never answers bad input with nothing ------------------------
 
 echo "htmlspecialchars() keeps what it cannot encode\n";

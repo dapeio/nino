@@ -110,6 +110,14 @@ namespace Nino {
 
 	function request( array &$appData, array $request ): array {
 
+		// A project served from a subdirectory: config.php may name it, and
+		// where it does not, the entry script's own address does (see
+		// Filesystem::deriveDir()). Before Http::request(), which strips the
+		// directory off the request path, and before the fills below, which
+		// put it in front of every address a page writes
+		if( (string) ( $appData['/nino/dir'] ?? '' ) === '' )
+			$appData['/nino/dir'] = \Nino\Filesystem::deriveDir( $appData, $request );
+
 		\Nino\Http::request( $appData, $request );
 
 		// Before Http::response(), because these three answer to $appData
