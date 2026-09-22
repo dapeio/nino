@@ -712,27 +712,94 @@ check( '...and leaves nothing behind either - the staging directory included', $
 
 unlink( $backupDir. '/2020-01-01.php' );
 
+/*	config.php is the one file every request reads at boot, and a restore
+	replaces it. Written in place, a request booting mid-write read a
+	half-written file - an include of a truncated var_export either fatals or
+	returns something that is not an array, and AppData::init() answers that
+	with "config.php exists but did not return an array" for everybody until
+	the write finished. Written beside it and renamed over it, under the lock
+	every other writer of that file takes, a reader sees one file or the
+	other. Three things, each measured on the files rather than read off the
+	source: the file that stands there afterwards is another file (a new
+	inode, nothing temporary left beside it), the file does not change while
+	somebody else holds the lock, and the module callback below runs with
+	the extracted backup in hand	*/
+$restoreSeen = [];
+\Nino\Callbacks::registerCallback( $appData, '/nino/admin/restore', static function( array &$appData, array &$args ) use ( &$restoreSeen ): void {
+	// The first restore is the one under test; the lock experiment below
+	// runs the write step once more, with an archive of one file
+	if( $restoreSeen !== [] )
+		return;
+	$staging = (string) ( $args['staging'] ?? '' );
+	$restoreSeen = [
+		'dataDir'		=> $args['dataDir'] ?? null,
+		'staged'		=> $staging !== '' && is_dir( $staging ) ? count( glob( $staging. '/*' ) ?: [] ) : 0,
+	];
+} );
+
+$configFile		= \Nino\Filesystem::getConfigPath( $appData ). '/config.php';
+$inodeBefore	= fileinode( $configFile );
+
 // Back to the state the checks below read
 $_POST['data'] = json_encode( [ 'date' => $dates[0] ] );
 $backRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Modules\Backups\Admin::apiRestore( $appData, $backRequest );
+clearstatcache();
 
+check( 'a restore replaces config.php with another file rather than writing into it, and leaves nothing temporary beside it',
+	( $backRequest['/nino/http/response']['body']['ok'] ?? false ) === true
+	&& fileinode( $configFile ) !== $inodeBefore
+	&& glob( $configFile. '.*.tmp' ) === [] );
 
-// config.php is the one file every request reads at boot, and a restore
-// replaces it. Written in place, a request booting mid-write read a
-// half-written file - an include of a truncated var_export either fatals or
-// returns something that is not an array, and AppData::init() answers that
-// with "config.php exists but did not return an array" for everybody until
-// the write finished. Written beside it and renamed over it, a reader sees
-// one file or the other
-// The half of restore() that writes: everything from the unpacking on
-$restoreSource	= (string) file_get_contents( __DIR__. '/../_admin/Nino/Modules/Backups/Admin/Admin.php' );
-$restoreBody		= substr( $restoreSource, strpos( $restoreSource, 'private static function _restoreFrom(' ) ?: 0 );
-$restoreBody		= substr( $restoreBody, 0, strpos( $restoreBody, "\n\t\t}" ) ?: strlen( $restoreBody ) );
+/*	The lock. Held from a child process, because flock() is per handle and a
+	lock this process already holds is re-entered rather than waited for (see
+	Filesystem::lockFile()); the child watches config.php's inode for the
+	second and a half it holds the lock and says afterwards whether the file
+	changed under it. Driven at the write step itself - _restoreFrom(), with
+	an archive of one file - because the safety snapshot a whole restore
+	takes first waits for the same lock on its own account, and would hide a
+	write step that does not. The lock file's name is what lockFile()
+	derives it from	*/
+$lockKey		= (string) ( new ReflectionMethod( '\Nino\Filesystem', '_canonicalPath' ) )->invokeArgs( null, [ &$appData, '/config.php' ] );
+$lockPath		= \Nino\Filesystem::path( $appData, '/data' ). '/.locks/'. sha1( $lockKey ). '.lock';
+\Nino\Filesystem::lockFile( $appData, '/config.php' );
+\Nino\Filesystem::unlockFile( $appData, '/config.php' );
 
-check( 'a restore replaces config.php atomically, not in place', str_contains( $restoreBody, 'file_put_contents( $configPath' ) === false
-	&& str_contains( $restoreBody, 'rename(' ) === true );
-check( '...under the same lock every other writer of that file takes', str_contains( $restoreBody, "lockFile( \$appData, '/config.php' )" ) === true );
+$configBefore	= \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
+$configMarked	= $configBefore + [ '/nino/restore/marker' => 'written after the lock was released' ];
+$archiveBase	= sys_get_temp_dir(). '/ninotest-lock-'. bin2hex( random_bytes( 6 ) );
+$archive			= new PharData( $archiveBase. '.tar' );
+$archive->addFromString( 'config.php', "<?php\nreturn ". var_export( $configMarked, true ). ";\n" );
+$archive->compress( Phar::GZ );
+unset( $archive );
+$gz = (string) file_get_contents( $archiveBase. '.tar.gz' );
+@unlink( $archiveBase. '.tar' );
+@unlink( $archiveBase. '.tar.gz' );
+
+$watcher = 'set_error_handler( function() { return true; } ); $lock = fopen( $argv[1], "c" ); flock( $lock, LOCK_EX ); $was = fileinode( $argv[2] ); $changed = false; echo "held\n";'
+	. ' for( $i = 0; $i < 75; $i++ ) { usleep( 20000 ); clearstatcache( true, $argv[2] ); if( fileinode( $argv[2] ) !== $was ) $changed = true; }'
+	. ' flock( $lock, LOCK_UN ); echo $changed === true ? "changed\n" : "unchanged\n";';
+$holder = proc_open( [ PHP_BINARY, '-r', $watcher, $lockPath, $configFile ], [ 1 => [ 'pipe', 'w' ] ], $holderPipes );
+$held		= is_resource( $holder ) === true && trim( (string) fgets( $holderPipes[1] ) ) === 'held';
+
+$tmpBase	= (string) tempnam( sys_get_temp_dir(), 'ninotest' );
+$tmpGz		= $tmpBase. '.tar.gz';
+$staging	= sys_get_temp_dir(). '/ninotest-staging-'. bin2hex( random_bytes( 6 ) );
+$written	= ( new ReflectionMethod( '\Nino\Modules\Backups\Admin', '_restoreFrom' ) )->invokeArgs( null, [ &$appData, $gz, $tmpGz, $staging ] );
+$underLock = is_resource( $holder ) === true ? trim( (string) stream_get_contents( $holderPipes[1] ) ) : '';
+if( is_resource( $holder ) === true ) { fclose( $holderPipes[1] ); proc_close( $holder ); }
+@unlink( $tmpBase );
+@unlink( $tmpGz );
+if( is_dir( $staging ) === true )
+	\Nino\Filesystem::removeDir( $staging );
+clearstatcache();
+
+check( '...and under the lock every other writer of that file takes: while another process holds it the file does not change, and once the lock is gone the restored file is what stands there',
+	$held === true && $written === true && $underLock === 'unchanged'
+	&& ( ( include $configFile )['/nino/restore/marker'] ?? null ) === 'written after the lock was released' );
+
+// The marker was the experiment's, not the project's
+\Nino\Filesystem::putFileContent( $appData, '/config.php', $configBefore );
 
 // And the restored file is the one a reader gets afterwards - the check
 // above is about how it is written, this one that it was
@@ -761,9 +828,12 @@ echo "Restore - a module merges its own data files through /nino/admin/restore\n
 // keeps files under data/ registers '/nino/admin/restore' in its init() and
 // merges its own (the Newsletter feature in dapeio/nino-features is the
 // reference, tested in its own suite), so a project without the module has
-// nothing to merge and Restore has nothing to know
-$restoreSource = file_get_contents( __DIR__. '/../_admin/Nino/Modules/Backups/Admin/Admin.php' );
-check( 'Restore fires the module callback instead of naming any module', str_contains( $restoreSource, "'/nino/admin/restore'" ) === true && str_contains( $restoreSource, 'newsletter' ) === false );
+// nothing to merge and Restore has nothing to know. What it hands every
+// callback is the live data directory and the directory the backup was
+// extracted to - the one registered before the restore above saw both
+check( 'Restore hands the module callback the live data directory and the extracted backup',
+	( $restoreSeen['dataDir'] ?? null ) === \Nino\Filesystem::path( $appData, '/data' )
+	&& ( $restoreSeen['staged'] ?? 0 ) > 0 );
 
 echo "\n";
 

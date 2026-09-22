@@ -2,6 +2,20 @@
 
 All notable changes to Nino are documented in this file.
 
+## Unreleased
+
+### Changed
+
+- **Tests:** three checks in `tests/admin-system-smoke.php` read the source
+  of the restore for `rename(`, `lockFile( $appData, '/config.php' )` and
+  `'/nino/admin/restore'`, so a refactor that spelled any of them differently
+  turned them red while a restore that dropped the behaviour behind a
+  different spelling would not. They measure the restore now: `config.php`
+  is another file afterwards, with nothing temporary beside it; it does not
+  change while another process holds its lock, watched from that process at
+  the write step itself; and the module callback is handed the live data
+  directory and the extracted backup.
+
 ## 1.3.0 — 2026-09-21
 
 ### Added
