@@ -21,13 +21,13 @@
 	wn.Nino.admin = {
 
 		/**
-		 *	Minimal url-hash "router": lets a panel (Elements/Text/Users) persist
-		 *	which drill-down level it's on into the hash, so a refresh restores
-		 *	the exact view instead of resetting to the panel's top level. Uses
+		 *	Minimal url-hash "router": lets a panel persist which drill-down
+		 *	level it's on into the hash, so a refresh restores the exact view
+		 *	instead of resetting to the panel's top level. Uses
 		 *	history.replaceState (not location.hash=) so it never scroll-jumps
 		 *	and never fires its own hashchange event.
 		 *
-		 *	All three panels' init() run unconditionally on page load and each
+		 *	Every panel's init() runs unconditionally on page load and each
 		 *	ends by calling its own "show my current state" function - which is
 		 *	also what set() is called from. Without a guard, whichever panel's
 		 *	background load finishes last would stomp the hash with its own
@@ -454,7 +454,7 @@
 		/**
 		 *	Trigger a client-side CSV download from an array of plain, flat
 		 *	objects - shared by the Form and Newsletter modules' panels (see
-		 *	their assets/editor.js), no server endpoint needed since both panels
+		 *	their assets/admin.js), no server endpoint needed since both panels
 		 *	already have the full entries array loaded for their list view.
 		 *	Column order follows the order the keys first appear in
 		 *
@@ -516,8 +516,8 @@
 		},
 
 		/**
-		 *	Wire up the admin dashboard: logout button and the nav switches
-		 *	between the user/text/elements panels
+		 *	Wire up the workbench shell: logout button, and the nav that
+		 *	switches between the panels the registry rendered
 		 *
 		 *	@return		void
 		 */

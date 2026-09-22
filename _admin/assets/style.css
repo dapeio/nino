@@ -107,7 +107,8 @@
  *              .nino-admin-elementlist-note
  *   Boolean    .nino-admin-switch  .nino-admin-switch-track
  *              .nino-admin-switch-copy  .nino-admin-switch-state
- *   Tabs       .nino-admin-tabs  .nino-admin-tabs--bar  .nino-admin-tab
+ *   Tabs       .nino-admin-tabs  .nino-admin-tabs--bar
+ *              .nino-admin-tabs--panel  .nino-admin-tab
  *              .nino-admin-tabpanel
  *   Controls   .nino-admin-locale-select
  *              .nino-admin-locale-select--corner

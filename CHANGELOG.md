@@ -30,6 +30,22 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **Docs:** ten comments in `_admin/assets/` described an older workbench.
+  The hash router named "Elements/Text/Users" and "all three panels", where
+  six panels persist their drill-down level in it; `exportCsv()` sent the
+  reader to the Form and Newsletter panels' `assets/editor.js`, which is
+  `assets/admin.js`; `onReady()` still wired up "the user/text/elements
+  panels" rather than whatever the registry rendered; the table model's
+  `FIELD_TYPES` lives in `Types.php`, not in `Admin.php`; three docblocks of
+  the design system explained their "owns no strings" rule with a `/_admin`
+  that is English and a localized tool beside it, from the days of two
+  tools; `numberField()` named two of its three callers; and
+  `setStateClass()` counted three shells where the workbench's and the
+  wizard's are the two that call it. The stylesheet's vocabulary index
+  gained `.nino-admin-tabs--panel`, the modifier the panel tab strip has
+  carried since it stopped taking its exception from a class outside the
+  design system.
+
 - **Docs:** five docblocks of `_admin/Admin.php` described a shape the file
   does not have. The panel contract was "two required and six optional
   static methods" above a list of ten of them; `Admin::panels()` answered a

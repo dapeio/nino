@@ -369,9 +369,9 @@
 		 *	alone is the one signal a low-vision reader loses, so the words
 		 *	are part of the component rather than a caller's decision.
 		 *
-		 *	Owns no strings, same rule as table(): /_admin is English and
-		 *	the workbench translates, so both the label and the two state words
-		 *	come from the caller.
+		 *	Owns no strings, same rule as table(): every word the workbench
+		 *	shows is a fill, so both the label and the two state words come
+		 *	from the caller.
 		 *
 		 *	@param	{Object}	options		{ key, checked, label, hint, on, off }
 		 *
@@ -423,8 +423,9 @@
 		 *	and the unit come from the caller. A duration in seconds is
 		 *	unreadable as a number - 3600 says nothing, "1 h" does - so a
 		 *	field whose unit is seconds gets a reading aid, recomputed on
-		 *	input so the two never disagree. The Config panel and the Users
-		 *	panel's login-protection tab render their settings with it.
+		 *	input so the two never disagree. The Config panel, the Users
+		 *	panel's login-protection tab and a feature's settings in the
+		 *	Features panel render their numbers with it.
 		 *
 		 *	@param	{Object}	options		{ key, value, min, max, unit, label, hint }
 		 *
@@ -785,7 +786,7 @@
 
 			// Field types that fit in a cell. 'image' and 'array' do not,
 			// and a 'string' carrying html:true is markup, not text - see
-			// Admin.php's FIELD_TYPES and its 'html' flag
+			// Types.php's FIELD_TYPES and its 'html' flag
 			DISPLAYABLE : [ 'string', 'integer', 'double', 'boolean', 'date', 'datetime', 'element' ],
 
 			/**
@@ -805,8 +806,8 @@
 			/**
 			 *	One cell's text. Deliberately language-neutral: a boolean is
 			 *	a glyph rather than "yes"/"no", so the same component reads
-			 *	correctly in an English-only panel and in a localized one
-			 *	without either passing a translation for it.
+			 *	correctly in both interface languages without a caller
+			 *	passing a translation for it.
 			 *
 			 *	@param		{*}				value
 			 *	@param		{string}	type			Model field type
@@ -978,11 +979,12 @@
 		 *	A sortable, searchable, paged data table.
 		 *
 		 *	Owns no strings. Every word it can show comes from `labels`, so
-		 *	the same component reads correctly in _admin (English-only, field
-		 *	labelled by its raw model key) and in a localized panel (through
-		 *	Nino.content). Everything that can be a number or a glyph - the
-		 *	pager arrows, the row range, a boolean cell - is one, so the
-		 *	caller only has to supply two actual sentences.
+		 *	the same component reads correctly where a field is labelled by
+		 *	its raw model key (the type editor) and where every label is a
+		 *	fill (the element form, through Nino.content). Everything that can
+		 *	be a number or a glyph - the pager arrows, the row range, a
+		 *	boolean cell - is one, so the caller only has to supply two
+		 *	actual sentences.
 		 *
 		 *	The whole set is passed in and paged here rather than fetched a
 		 *	page at a time: an element type is one file that is read whole
@@ -1225,10 +1227,10 @@
 		 *	The shell element carries two unrelated things at once: the
 		 *	design system's own classes (.nino-admin, .nino-admin-shell -
 		 *	which every layout rule in _admin/assets/style.css hangs off) and
-		 *	the "which panel is open" state each tool switches on. Assigning
-		 *	className outright is the obvious way to do the second and
-		 *	silently destroys the first, so all three shells go through here
-		 *	instead.
+		 *	the "which panel is open" state the shell script switches on.
+		 *	Assigning className outright is the obvious way to do the second
+		 *	and silently destroys the first, so both shells - the workbench's
+		 *	and the setup wizard's - go through here instead.
 		 *
 		 *	@param		{Element}	shell					The tool's own page wrapper
 		 *	@param		{string}	stateClass		Eg. "show-elements"
