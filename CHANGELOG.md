@@ -6,6 +6,13 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **Docs:** the feature directory in `docs/features.md`, its German twin and
+  `docs/recipes/feature.md` shows `templates/`, the directory the catalogue's
+  AGENTS.md asks every feature that draws anything to keep its markup in;
+  and the element recipe's image address is `[[/nino/public]]/images/…`,
+  the fill the base unit's own templates use, where it read `[[/nino/dir]]`
+  - the project directory, which is not where a public file is served from.
+
 - **Docs:** README, SECURITY.md and the two deployment manuals no longer
   call Nino a beta. 1.3.0 is a release, and the five sentences that said
   otherwise were written before there was one; what they said beside it -

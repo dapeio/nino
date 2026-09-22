@@ -361,6 +361,7 @@ features/Catalog/
 ├── Admin/Admin.php          das Panel \Nino\Modules\Catalog\Admin, von adminPanels() beantwortet
 ├── assets/admin.js          das Skript des Panels
 ├── text/<locale>.php        die Textfills des Panels, solange das Feature aktiv ist
+├── templates/               das Markup, das die Laufzeitklasse rendert, gelesen über \Nino\Filesystem
 ├── install/                 die Einheit, die activate() anwendet
 │   ├── manifest.php
 │   ├── templates/

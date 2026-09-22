@@ -359,6 +359,7 @@ features/Catalog/
 ├── Admin/Admin.php          the panel \Nino\Modules\Catalog\Admin, answered by adminPanels()
 ├── assets/admin.js          the panel's script
 ├── text/<locale>.php        the panel's fills, while the feature is active
+├── templates/               the markup the runtime class renders, read through \Nino\Filesystem
 ├── install/                 the unit activate() applies
 │   ├── manifest.php
 │   ├── templates/

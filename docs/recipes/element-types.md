@@ -202,7 +202,7 @@ lowercase hyphenated IDs.
 <article id="service-[[.id]]" class="nino-article">
 	<img
 		class="nino-article-img"
-		src="[[/nino/dir]]/images/[[image]]"
+		src="[[/nino/public]]/images/[[image]]"
 		alt="[[title]]"
 	>
 	<div class="nino-article-content">

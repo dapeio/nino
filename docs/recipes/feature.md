@@ -35,6 +35,7 @@ features/Catalog/
 ├── text/
 │   ├── en_US.php            the panel's fills, merged while the feature is active
 │   └── de_DE.php
+├── templates/catalog.tpl    the markup the runtime class renders - php decides what is shown, a template what it looks like
 ├── install/                 the unit activate() applies, add-only (4.)
 │   ├── manifest.php
 │   ├── templates/section-catalog.tpl
