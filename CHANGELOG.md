@@ -6,6 +6,12 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **Docs:** README, SECURITY.md and the two deployment manuals no longer
+  call Nino a beta. 1.3.0 is a release, and the five sentences that said
+  otherwise were written before there was one; what they said beside it -
+  the latest release is the supported one, fixes land on `main`, there is no
+  LTS line - stands as it was.
+
 - **Docs:** thirteen comments in the Elements, Users, Images and Text panels
   sent the reader to `elements.js`, a file that has been `admin.js` since the
   panel scripts were named alike, and one docblock in `Elements/Types/Types.php` named

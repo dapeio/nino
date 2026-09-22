@@ -369,7 +369,7 @@ can replace the project application root and `NINO_FEATURES_DIR` the features
 root. A non-`Nino\` class resolves against the app root and nowhere else -
 `_nino/` holds the kernel and nothing of the project's own.
 
-Nino is in the beta phase. Security fixes appear on `main`; there is currently no separate LTS line. Therefore, plan updates as active project maintenance and check `SECURITY.md` and the changelog before an update.
+Security fixes appear on `main`; there is currently no separate LTS line. Therefore, plan updates as active project maintenance and check `SECURITY.md` and the changelog before an update.
 
 ## Go-Live Checklist
 

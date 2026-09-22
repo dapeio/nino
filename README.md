@@ -227,11 +227,11 @@ Nino deliberately keeps its architecture small: a central `$appData` array carri
 
 ## Status and Security
 
-Nino as a whole is currently in the **Beta phase**. Individual optional tools have their own, lower maturity level:
+Nino's kernel, frontend, workbench and project foundation are **released** - 1.3.0 is the first release. Individual optional tools have their own, lower maturity level:
 
 | Area | Status |
 | --- | --- |
-| Kernel, frontend, workbench and existing project foundation | Beta |
+| Kernel, frontend, workbench and existing project foundation | Released |
 | Template Builder (a feature from the [catalogue](https://github.com/dapeio/nino-features)) | Alpha |
 
 Security fixes land directly on `main`; there is no separate LTS version yet.

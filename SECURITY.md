@@ -11,7 +11,7 @@ code paths. We aim to acknowledge reports within a few days.
 
 ## Supported Versions
 
-Nino is currently in beta. Only the latest release is supported - see the
+Only the latest release is supported - see the
 [releases page](https://github.com/dapeio/nino/releases) for the current
 version. Security fixes land on the `main` branch; there is no separate LTS
 branch at this stage.

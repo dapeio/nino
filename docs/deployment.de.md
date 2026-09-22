@@ -374,7 +374,7 @@ Verzeichnisstrukturen werden während eines Requests nicht migriert.
 im App-Root aufgelöst und nirgends sonst – `_nino/` hält den Kernel und nichts
 Projekteigenes.
 
-Nino befindet sich in der Beta-Phase. Sicherheitskorrekturen erscheinen auf `main`; eine getrennte LTS-Linie gibt es derzeit nicht. Plane Updates deshalb als aktive Projektpflege ein und prüfe `SECURITY.md` sowie den Changelog vor einer Aktualisierung.
+Sicherheitskorrekturen erscheinen auf `main`; eine getrennte LTS-Linie gibt es derzeit nicht. Plane Updates deshalb als aktive Projektpflege ein und prüfe `SECURITY.md` sowie den Changelog vor einer Aktualisierung.
 
 ## Go-live-Checkliste
 
