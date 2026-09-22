@@ -19,6 +19,13 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **Docs:** `\Nino\Modules\Maintenance` said it is listed in
+  `/nino/modules` "the same way Design and Templates are". Both moved to
+  the catalogue and left `\Nino\Install\Setup::TOOL_MODULES` holding this
+  one class, so the comparison named two modules a checkout does not have.
+  The docblock says what that list holds now, and why this module is its
+  one entry.
+
 - **Docs:** seven kernel comments sent the reader somewhere there is
   nothing. `\Nino\Backup::manifest()` named `Backup::maybeRun()`, a method
   of `\Nino\Modules\Backups`; `\Nino\RotatingLog` credited its two

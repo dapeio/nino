@@ -17,8 +17,9 @@ namespace Nino\Modules {
 	 *	Maintenance					One switch that answers every public page with a 503
 	 *											instead of rendering it - a kernel module, not a feature,
 	 *											because it changes what every request answers rather than
-	 *											adding one. Listed in /nino/modules the same way Design and
-	 *											Templates are (see \Nino\Install\Setup::TOOL_MODULES): the
+	 *											adding one. The one entry of
+	 *											\Nino\Install\Setup::TOOL_MODULES - Design and Templates stood
+	 *											beside it there until both became catalogue features: the
 	 *											wizard adds its class whenever the class exists, there is no
 	 *											picker checkbox for it and no install/ unit the wizard
 	 *											applies - see install/ beside this file for why that
