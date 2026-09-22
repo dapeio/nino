@@ -42,7 +42,7 @@ Kurze Absätze sind langen Einschüben vorzuziehen. Klammern bleiben für echte 
 | Shortcode | Verbindung zwischen Template und dynamischer Logik |
 | Template | HTML-basierte `.tpl`-Datei ohne PHP-Logik |
 
-Pfade wie `templates/`, `text/`, `elements/` und `images/` bezeichnen immer den eingerichteten Projektstand. Sie existieren in einem frischen Checkout noch nicht, sondern werden vom Einrichtungsassistenten erzeugt und befüllt.
+Pfade wie `private/templates/`, `private/text/`, `private/elements/` und `public/images/` bezeichnen immer den eingerichteten Projektstand. Ein frischer Checkout bringt weder `private/` noch `public/` mit; beide werden vom Einrichtungsassistenten erzeugt und befüllt.
 
 `Admin` allein wird vermieden, weil es sowohl eine Rolle als auch den technischen Bereich `/_admin` meinen kann. Pfade und Nino-Begriffe stehen in Codeformat.
 

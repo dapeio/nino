@@ -6,6 +6,13 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **Docs:** the style guide's rule for naming project paths spelled them
+  `templates/`, `text/`, `elements/` and `images/` - the layout before
+  the `private/`/`public/` split, and the spelling it asks every manual
+  to use. They are `private/templates/`, `private/text/`,
+  `private/elements/` and `public/images/`, and what a checkout is
+  missing is the two directories above them.
+
 - **Docs:** the screenshot briefing counted five areas in the two
   READMEs, which embed four - frontend, workbench, wizard, Template
   Builder. The fifth, Editor, names `_editor1.webp` and `_editor2.webp`,
