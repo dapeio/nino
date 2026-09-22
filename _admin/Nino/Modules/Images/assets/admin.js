@@ -139,7 +139,7 @@
 
 		/**
 		 *	Group slots by the uri's first path segment (eg. "home/hero" -> "home"),
-		 *	same convention as Text::_groupEntries()
+		 *	same convention as the Text panel's _groupEntries()
 		 *
 		 *	@param		{Array}		slots					[ { uri, label, width, height, url }, ... ]
 		 *

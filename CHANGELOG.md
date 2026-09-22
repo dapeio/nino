@@ -30,6 +30,13 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **Docs:** the Image Slots tab's script described itself as the "Images"
+  module and carried a half-replaced sentence from the rename ("what the
+  Images panel Images panel edits", "types.js/the Elements panel Elements"),
+  and it named a `Dev\Images` class for the scan its own `Slots::apiScan()`
+  answers. The Images panel's grouping comment named the same `Dev`-era
+  `Text` class for a function that is the Text panel's `_groupEntries()`.
+
 - **Docs:** the Log panel's script named an `Admin.php`'s "Logs class" and
   an `_admin/Editor.php` for the half that writes the lines it lists. Both
   are `\Nino\Modules\Logs\Admin::record()`, in the `Admin/Admin.php` beside

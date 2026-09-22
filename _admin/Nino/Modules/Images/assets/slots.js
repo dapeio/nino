@@ -2,11 +2,11 @@
 
 /**
  *	Nino										A compact filesystembased php framework
- *	Dev											"Images" module: create/edit image slot definitions
- *													(label/width/height) - the "set" half of what the Images panel
- *													Images panel edits ("values" half: which file currently
- *													fills a slot). Same split as types.js/the Elements panel
- *													Elements. Never touches a slot's filename.
+ *	Dev											"Image Slots" tab of the Images panel: create/edit image
+ *													slot definitions (label/width/height) - the "set" half of
+ *													what the Images panel edits ("values" half: which file
+ *													currently fills a slot). Same split as types.js and the
+ *													Elements panel. Never touches a slot's filename.
  *
  *	@package								Dape/Nino
  *	@author									David Perchermeier <mail@dape.io>
@@ -342,7 +342,7 @@
 
 		/**
 		 *	Open the "hardcoded <img> tags found in templates, not backed by
-		 *	any slot" scan results form - see Dev\Images::apiScan()
+		 *	any slot" scan results form - see Slots::apiScan()
 		 *
 		 *	@return		void
 		 */
