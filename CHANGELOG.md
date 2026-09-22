@@ -30,6 +30,18 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **Docs:** five docblocks of `_admin/Admin.php` described a shape the file
+  does not have. The panel contract was "two required and six optional
+  static methods" above a list of ten of them; `Admin::panels()` answered a
+  registry entry of nine keys where `Panels::_entry()` builds seven more -
+  `tab`, `template`, `layout`, `icon`, `tabs`, `parent` and `own` - and now
+  points at `collect()`, which is where the shape is written out;
+  `Recovery::handlePost()` dispatches five actions, not "four ... the other
+  three need it open", since `recovery/reset` is the fifth; `Recovery::set()`
+  named recovery.php as a second caller, which offers no way to change the
+  secret at all; and the encryption key the recovery hash compares itself to
+  is `\Nino\Modules\Backups\Admin::_key()`, not a `Backup::_key()`.
+
 - **Docs:** `Modules\Elements::_escapeFieldValue()`'s docblock described
   one of its two parameters and one of its two branches. The method gained
   `$isHtml` when rich element fields did, and takes

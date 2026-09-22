@@ -366,7 +366,7 @@ namespace Nino\Admin {
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *
-		 *	@return 	array										[ uri => { class, uri, label, weight, group, perm, panes, assets, text } ]
+		 *	@return 	array										[ uri => entry ], see Panels::collect()
 		 */
 		public static function panels( array &$appData ): array {
 
@@ -963,7 +963,7 @@ namespace Nino\Admin {
 	 *											hand-written template. The PHP half of assets/Nino.admin.js
 	 *											and style.css.
 	 *
-	 *	A panel							is a class with two required and six optional static
+	 *	A panel							is a class with two required and a handful of optional static
 	 *											methods - no interface, no base class, same as a runtime
 	 *											module is a class with init():
 	 *
@@ -1588,8 +1588,8 @@ namespace Nino\Admin {
 		}
 
 		/**
-		 *	Dispatch recovery.php's four actions: login opens the gate, the
-		 *	other three need it open. Same one-route/$_POST['action'] shape as
+		 *	Dispatch recovery.php's five actions: login opens the gate, the
+		 *	other four need it open. Same one-route/$_POST['action'] shape as
 		 *	Admin::handlePost(), deliberately without the panel registry -
 		 *	this runs when config.php may be the very thing that is broken
 		 *
@@ -1812,8 +1812,10 @@ namespace Nino\Admin {
 		}
 
 		/**
-		 *	Hash a new secret and store it - the wizard's last step, and
-		 *	recovery.php itself when the secret is changed
+		 *	Hash a new secret and store it - the wizard's last step (see
+		 *	\Nino\Install\Install::setRecoverySecret()), and nothing else:
+		 *	recovery.php offers no way to change the secret, so a new one
+		 *	afterwards is the file written by hand (see docs/_admin.md)
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		string		$password			The plaintext secret
@@ -1832,10 +1834,10 @@ namespace Nino\Admin {
 		 *	Canonically PASSWORD_PATH, under the private directory - never
 		 *	config.php: a Restore rewrites config.php, and a credential that
 		 *	authorises restoring must not be part of what gets restored (the
-		 *	same reasoning Backup already applies to the encryption key, see
-		 *	Backup::_key()). It is also outside every tool folder, so
-		 *	replacing _admin/ on an update no longer takes the
-		 *	password with it.
+		 *	same reasoning the Backups module already applies to the
+		 *	encryption key, see \Nino\Modules\Backups\Admin::_key()). It is
+		 *	also outside every tool folder, so replacing _admin/ on an update
+		 *	no longer takes the password with it.
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *
