@@ -19,6 +19,15 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **Docs:** the runtime-module recipe pointed at recipes by number - "(7.)",
+  "(9.)", "(recipe 7)" - the way `feature.md` points at its own numbered
+  sections. This recipe has no numbered sections, and recipe 7 of the guide
+  is "Package a feature", not the panel recipe it meant. All three name the
+  recipe they mean, the way the same file already does two paragraphs
+  further down. Its autoload list also left `Maintenance` out of the
+  optional modules a project switches on or off in `/nino/modules`, which
+  it names itself a page later.
+
 - **Docs:** the Concepts manual and its German twin still laid a project
   out the way it was before the `private/` and `public/` split. "Location
   in the configured project" named `config.php`, `text/`, `elements/`,

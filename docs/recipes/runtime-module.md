@@ -36,7 +36,7 @@ The lookup roots are deliberately different:
   shadow a kernel class from its application root.
 - `Nino\Modules\*` is the one opening: a merged view over four roots, looked
   for in this order - `_nino/` (every module Nino ships: the always-on ones
-  and the optional `Form`, `Navigation`, `Localepicker`
+  and the optional `Form`, `Navigation`, `Localepicker` and `Maintenance`
   a project switches on or off in `/nino/modules`), `_admin/` (the workbench's
   own screens), `features/` (the installed features, one directory each with
   a `feature.php` manifest - the catalogue's `Newsletter` and `Search` arrive
@@ -74,11 +74,11 @@ Everything a module brings lives in its directory, below the class file:
 ```text
 app/Project/Catalog/Catalog/
 ├── Catalog.php            the runtime module, class Project\Catalog\Catalog
-├── Admin/Admin.php        optional workbench panel, answered by adminPanels() (7.)
+├── Admin/Admin.php        optional workbench panel, answered by adminPanels() (the panel recipe)
 ├── assets/                the panel's own .js/.css
 ├── text/<locale>.php      the panel's fills
 ├── templates/panel.tpl    the panel's markup, when it answers template() (see the panel recipe)
-└── install/               optional installer unit, found by Setup::units() (9.)
+└── install/               optional installer unit, found by Setup::units() (the installer recipe)
 ```
 
 ## Minimal complete module
@@ -347,8 +347,8 @@ A module is one directory: add it and everything appears, remove it and
 everything is gone. Three optional hooks make that true for the management
 tools and the installer:
 
-- `adminPanels( array &$appData ): array` returns panel class names (recipe
-  7). The kernel asks through `\Nino\Modules::collect()`, in `/nino/modules`
+- `adminPanels( array &$appData ): array` returns panel class names (the
+  [panel recipe](admin-panel.md)). The kernel asks through `\Nino\Modules::collect()`, in `/nino/modules`
   order and only while the module is active, so the screens come and go with
   the module.
 - `install/manifest.php` beside the class makes a kernel or project module
