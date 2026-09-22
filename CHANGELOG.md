@@ -30,6 +30,13 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **Docs:** three comments of the Backups panel named a `Restore` class in
+  `_admin/Admin.php`. That class has no name in the repository any more -
+  `apiRestore()` and `_safetySnapshot()` are `\Nino\Modules\Backups\Admin`'s,
+  in `Admin/Admin.php` beside the engine - and the panel's script still
+  called itself the "Restore" module. Its `nav()` answered "[ uri, label ]"
+  into "the dashboard's tab bar" as well.
+
 - **Docs:** the Routes panel was still the "Pages" module of a `Routes.php`
   in seven comments. There is no `Routes.php` and no `Routes` class: the
   panel is `\Nino\Modules\Routes\Admin` in `Admin/Admin.php`, which is where

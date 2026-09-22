@@ -369,8 +369,8 @@ namespace Nino\Modules {
 
 		/**
 		 *	Delete dated backups older than RETENTION_DAYS. Only ever touches
-		 *	files whose name is exactly a plain "Y-m-d.php" date - _admin's
-		 *	Restore::_safetySnapshot() also writes into this same directory
+		 *	files whose name is exactly a plain "Y-m-d.php" date - the panel's
+		 *	own Admin::_safetySnapshot() also writes into this same directory
 		 *	(differently named, "pre-restore-<timestamp>.php") and must never
 		 *	be swept up here
 		 *

@@ -2,7 +2,7 @@
 
 /**
  *	Nino										A compact filesystembased php framework
- *	Dev											"Restore" module: lists the encrypted daily
+ *	Dev											"Backups" panel: lists the encrypted daily
  *													backups the Backup engine (Backups.php beside it) creates, and
  *													restores one on request. A native confirm() before the
  *													actual restore call is deliberate - this overwrites the
@@ -166,7 +166,7 @@
 		/**
 		 *	Confirm, then restore the given backup date. A safety snapshot of
 		 *	the current state is taken server-side before anything is
-		 *	overwritten (see Restore::apiRestore() in _admin/Admin.php)
+		 *	overwritten (see apiRestore() in Admin/Admin.php beside it)
 		 *
 		 *	@param		{string}		date
 		 *
