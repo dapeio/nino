@@ -19,6 +19,13 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **Docs:** `\Nino\Images::getSlots()` said image slots "can't be added or
+  removed from the admin, only the file each currently points to changes".
+  The Image Slots tab of the Images panel has created, edited and deleted
+  one since it exists - `\Nino\Modules\Images\Slots`, with its own
+  `slots/create` and `slots/delete` actions. The comment names the split
+  the two panes really make, the same one Element Types and Elements have.
+
 - **Docs:** `\Nino\Mail`'s class comment still said a rate-limited burst
   "just becomes silently-missing mail". It has not since the cap grew a
   flag of its own: `send()` and `sendAll()` set

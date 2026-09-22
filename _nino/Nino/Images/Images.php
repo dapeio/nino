@@ -374,9 +374,11 @@ namespace Nino {
 			return \Nino\Filesystem::url( $appData, self::UPLOAD_DIR. '/'. $filename );
 		}
 
-		// Every developer-fixed image slot ("/nino/html/images" in config.php) -
-		// unlike an Element's "image" field, slots themselves can't be added or
-		// removed from the admin, only the file each currently points to changes
+		// Every developer-fixed image slot ("/nino/html/images" in config.php).
+		// The set and the values are two panes, the same split Element Types and
+		// Elements have: the Image Slots tab creates a slot, edits its label and
+		// its target size and deletes it (see \Nino\Modules\Images\Slots), and
+		// the Images panel only changes which file each one points at
 		public static function getSlots( array &$appData ): array {
 			return $appData['/nino/html/images'] ?? [];
 		}
