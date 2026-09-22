@@ -159,8 +159,8 @@ features/        Die Features, die ein Projekt installiert, je ein Verzeichnis
 _admin/          Die Workbench: nur die Shell, recovery.php, ihre eigenen
                  Ansichten als Module unter _admin/Nino/Modules/ (Dashboard,
                  Elements, Text, Images, Logs, Routes, Users, Language,
-                 Backups, Config) und der Einrichtungsassistent mit seiner
-                 Bibliothek unter _admin/install/
+                 Backups, Features, Config) und der Einrichtungsassistent mit
+                 seiner Bibliothek unter _admin/install/
 docs/            Dokumentation, mit den Erweiterungsrezepten unter docs/recipes/
 
 private/         Wird nie ausgeliefert, nur von PHP gelesen - vom Assistenten angelegt

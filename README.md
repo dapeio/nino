@@ -157,8 +157,9 @@ features/        The features a project installs, one directory each with a
                  checkout ships none
 _admin/          The workbench: the shell alone, recovery.php, its own screens
                  as modules under _admin/Nino/Modules/ (Dashboard, Elements,
-                 Text, Images, Logs, Routes, Users, Language, Backups, Config),
-                 and the setup wizard with its library under _admin/install/
+                 Text, Images, Logs, Routes, Users, Language, Backups,
+                 Features, Config), and the setup wizard with its library
+                 under _admin/install/
 docs/            Documentation, with the extension recipes under docs/recipes/
 
 private/         Never served, only read by PHP - created by the wizard

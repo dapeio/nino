@@ -6,6 +6,14 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **Docs:** the project structure in both READMEs listed ten of the
+  workbench's eleven screens. `_admin/Nino/Modules/` carries a
+  `Features/` directory beside the ten named, and the panel it holds is
+  the one the same README sends a reader to for installing a feature -
+  so the one screen a project needs before it has any others was the one
+  the tree did not show. It stands between Backups and Config now, where
+  its `nav()` weight puts it in the rail.
+
 - **Docs:** the base unit's own files named a wizard and a set of
   stylesheets that are gone. `assets/style.css` said the look lives in
   `style.theme.<name>.css`, `style.header.css`, `style.footer.css` and a
