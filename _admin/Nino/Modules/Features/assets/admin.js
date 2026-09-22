@@ -451,7 +451,7 @@
 		_renderTabs : function() {
 
 			const bar = dc.createElement('div');
-			bar.className = 'nino-admin-tabs nino-admin-tabs--bar admin-panel-tabs';
+			bar.className = 'nino-admin-tabs nino-admin-tabs--bar nino-admin-tabs--panel admin-panel-tabs';
 			bar.setAttribute( 'role', 'tablist' );
 
 			const counts	= Nino.admin.features._counts();

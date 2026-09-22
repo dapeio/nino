@@ -1043,7 +1043,7 @@ namespace Nino\Admin {
 				// The letter that stands in for a panel with no icon of its own
 				'nav-initial'	=> '<b>[[initial]]</b>',
 				'pane'				=> '<div id="admin-content-[[uri]]" data-panel="[[uri]]" data-layout="[[layout]]" hidden>[[content]]</div>',
-				'tab-bar'			=> '<div class="nino-admin-tabs nino-admin-tabs--bar admin-panel-tabs" role="tablist">[[content]]</div>',
+				'tab-bar'			=> '<div class="nino-admin-tabs nino-admin-tabs--bar nino-admin-tabs--panel admin-panel-tabs" role="tablist">[[content]]</div>',
 				'tab-button'	=> '<button type="button" role="tab" class="nino-admin-tab" data-tab="[[uri]]" aria-selected="false">[[label]]</button>',
 				'tab-pane'		=> '<div id="admin-tab-[[uri]]" data-tab="[[uri]]" hidden>[[content]]</div>',
 				// A panel without a template of its own renders mount points

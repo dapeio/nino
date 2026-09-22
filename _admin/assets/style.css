@@ -1141,14 +1141,14 @@ a {
                aria-controls="…">Raster</button>
      </div>
      <div class="nino-admin-tabpanel" role="tabpanel">…</div> */
-:where(.nino-admin) .nino-admin-tabs:not(.admin-panel-tabs) {
+:where(.nino-admin) .nino-admin-tabs:not(.nino-admin-tabs--panel) {
 	display: flex;
 	margin: 0 0 .9rem;
 	border-radius:var(--editor-radius-sm);
 	overflow:hidden;
 }
 
-:where(.nino-admin) .nino-admin-tabs:not(.admin-panel-tabs) .nino-admin-tab {
+:where(.nino-admin) .nino-admin-tabs:not(.nino-admin-tabs--panel) .nino-admin-tab {
 	flex: 1 1 auto;
 	padding: .5rem .3rem;
 	border: 0;
@@ -1187,7 +1187,7 @@ a {
    several screens switches between them (see Panels::panesHtml()) - a
    labelled underline on one rule, not a row of filled buttons splitting the
    width between them */
-:where(.nino-admin) .nino-admin-tabs--bar:not(.admin-panel-tabs) {
+:where(.nino-admin) .nino-admin-tabs--bar:not(.nino-admin-tabs--panel) {
 	gap: .25rem;
 	margin: 0 0 1.25rem;
 	border-bottom: 1px solid var(--editor-separator);

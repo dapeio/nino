@@ -45,6 +45,15 @@ All notable changes to Nino are documented in this file.
 
 ### Fixed
 
+- **The panel tab strip's exception was spelled with a class outside the
+  design system's namespace.** `Fixed(/admin): tabs styling` kept the
+  generic tab rules off the pane's own strip with
+  `:not(.admin-panel-tabs)` - a workbench class inside the `nino.system`
+  layer, which `tests/admin-lists-js-smoke.js` holds to `nino-admin-*`
+  classes alone. The strip carries `nino-admin-tabs--panel` now, the three
+  exceptions name that, and the tool-layer rules on `.admin-panel-tabs` are
+  as they were.
+
 - **The demo catalogue page posted its newsletter forms from the domain
   root.** Both newsletter sections of `.demo-catalogue.tpl` wrote
   `action="/.newsletter"` - the line the Templates feature's preset wrote
