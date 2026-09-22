@@ -91,7 +91,14 @@ namespace Nino\Modules {
 		 *	being interpreted when the surrounding content is re-rendered by
 		 *	Html::_doShortcode() right after this callback returns.
 		 *
+		 *	A field the model released with 'html' => true goes through
+		 *	Html::sanitizeHtml() instead of htmlspecialchars(): it keeps the
+		 *	whitelisted inline tags and drops everything else, which is what
+		 *	makes such a field rich text rather than markup an editor may write
+		 *	freely. The bracket swap is made on either answer.
+		 *
 		 *	@param		mixed			$value				Raw scalar field value
+		 *	@param		bool			$isHtml				Whether the field's model says 'html' => true
 		 *
 		 *	@return 	string									Safe-to-substitute value
 		 */

@@ -30,6 +30,13 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **Docs:** `Modules\Elements::_escapeFieldValue()`'s docblock described
+  one of its two parameters and one of its two branches. The method gained
+  `$isHtml` when rich element fields did, and takes
+  `\Nino\Html::sanitizeHtml()` for one - which is what the whole
+  `'html' => true` model flag is - while the docblock still read as though
+  every value went through `htmlspecialchars()`. Both are documented now.
+
 - **Docs:** two more comments named the wrong writer. `\Nino\Runtime`
   compared its own log file to "Modules\Form's forms.<Y-m>.php", which
   `\Nino\Form::record()` writes - `Modules\Form` owns the route and
