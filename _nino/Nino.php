@@ -189,7 +189,7 @@ namespace Nino {
 	// _nino/Nino/<Class>/<Class>.php and are autoloaded on first use by
 	// the spl_autoload_register() call at the bottom of this file, from
 	// the same <namespace-as-path>/<basename>.php layout every module
-	// follows. Nothing here needs to be required by hand: init() below
+	// follows. Nothing here needs to be required by hand: init() above
 	// touches AppData first, and the loader resolves every class after it
 	// the moment it is first named.
 

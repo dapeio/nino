@@ -794,7 +794,8 @@ namespace Nino {
 					// attach the upload to, so a required image would reject the
 					// very insert that has to happen first - making the element
 					// impossible to create at all. Neither tool writes the flag onto
-					// an image field (see _admin/Admin.php's cleanModel()); this
+					// an image field (see the Element Types tab's own cleanModel(),
+					// _admin/Nino/Modules/Elements/Types/Types.php); this
 					// keeps a hand-edited model that does out of that dead end. A
 					// caller that does pass an image filename is unaffected either way
 					if( isset( $field['required'] ) === true && $field['required'] === true && $field['type'] !== 'image' ) {
@@ -945,7 +946,7 @@ namespace Nino {
 
 				// Run callback - lets a module react to (or veto, by returning
 				// false) a save, same veto-capable shape as deleteElement()'s
-				// own '/nino/elements/delete<typeUri>' callback below
+				// own '/nino/elements/delete<typeUri>' callback above
 				$callbackName = '/nino/elements'. $typeUri. ( $update === true ? '/update' : '/insert' );
 				if( \Nino\Callbacks::doCallbacks( $appData, $callbackName, $typeData ) === false ) {
 					$outcome = 'veto';

@@ -11,8 +11,9 @@ declare(strict_types=1);
 namespace Nino {
 
 	// RotatingLog - one prune() for every "delete dated files older than a
-	// cutoff" sweep (Runtime's error log, Form's submissions, Admin\Logs,
-	// Admin\Backup's retention), which each used to carry their own copy
+	// cutoff" sweep (Runtime's error log, Form's submissions, the activity
+	// log of Modules\Logs\Admin, the archive retention of Modules\Backups),
+	// which each used to carry their own copy
 	class RotatingLog {
 
 		// Delete files in $dir named "<prefix><date><suffix>" whose date is

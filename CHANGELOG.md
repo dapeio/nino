@@ -19,6 +19,20 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **Docs:** seven kernel comments sent the reader somewhere there is
+  nothing. `\Nino\Backup::manifest()` named `Backup::maybeRun()`, a method
+  of `\Nino\Modules\Backups`; `\Nino\RotatingLog` credited its two
+  workbench callers as `Admin\Logs` and `Admin\Backup`, which are
+  `\Nino\Modules\Logs\Admin` and `\Nino\Modules\Backups`;
+  `\Nino\Form::prune()` named the first of those the same way;
+  `\Nino\Text` put the two editors it was split out of in
+  "Admin.php/Admin.php", where one of them is `Text/Keys/Keys.php`;
+  `\Nino\Elements` pointed at a `cleanModel()` in `_admin/Admin.php`,
+  which is the Element Types tab's, and called `deleteElement()` - the
+  method above it - the one below; and `_nino/Nino.php` said the same of
+  `init()`. Every one of them now names what is there, and no behaviour
+  changed.
+
 - **Docs:** the agent guide's repository map left one kernel class out
   and its test matrix excluded the wrong directory. Section 4 lists
   nineteen classes under `_nino/Nino/<Class>/<Class>.php` and

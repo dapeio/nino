@@ -611,8 +611,9 @@ namespace Nino {
 
 		/**
 		 *	Delete monthly files older than the retention window - a longer
-		 *	window than the admin activity log (see Admin\Logs): these are
-		 *	real business inquiries, not just an operational safety net
+		 *	window than the admin activity log (see \Nino\Modules\Logs\Admin):
+		 *	these are real business inquiries, not just an operational safety
+		 *	net
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *

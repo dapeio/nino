@@ -15,7 +15,8 @@ namespace Nino {
 	// every /text/{locale}.php, batches a save into one lock/read/write per
 	// file. Only holds what was byte-for-byte identical between the two
 	// UIs - blacklist filtering, PERM- vs session-gated saves, shape
-	// conversion stay in Admin.php/Admin.php.
+	// conversion stay in the panels' own files, Text/Admin/Admin.php and
+	// Text/Keys/Keys.php.
 	class Text {
 
 		private const int MIN_MAXLENGTH 		= 150;

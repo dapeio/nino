@@ -132,12 +132,13 @@ namespace Nino {
 			// where the live copy is itself what's being recovered from.
 			// '/data/newsletter-removed.php' as a plain literal, deliberately
 			// not \Nino\Modules\Newsletter::REMOVED_PATH: this runs
-			// unconditionally on every backup (see Backup::maybeRun()), and
-			// a class constant read autoloads the class just as
-			// unconditionally - a project that deleted this optional
-			// module's file (never used its public signup routes) would get
-			// a fatal "Class not found" on every single backup, admin
-			// requests included, for a project that touched nothing
+			// unconditionally on every backup (see
+			// \Nino\Modules\Backups::maybeRun()), and a class constant read
+			// autoloads the class just as unconditionally - a project that
+			// deleted this optional module's file (never used its public
+			// signup routes) would get a fatal "Class not found" on every
+			// single backup, admin requests included, for a project that
+			// touched nothing
 			if( is_file( $data. '/newsletter-removed.php' ) === true )
 				$files[$data. '/newsletter-removed.php'] = 'data/newsletter-removed.php';
 
