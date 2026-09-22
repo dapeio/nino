@@ -19,6 +19,22 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **Docs:** five things the developer manual and its German twin said
+  about a kernel that has moved on. The boot order left out
+  `Html::init()`, which stands between `Csrf::init()` and `Auth::init()`
+  and registers the one shortcode the kernel owns itself. The assets
+  chapter said the bundle replaces "only" `[[/nino/dir]]`, where
+  `Modules\Assets::_createCachefile()` replaces `[[/nino/public]]` beside
+  it - without which the base unit's `theme.css` would ship the literal in
+  its three `@font-face` urls. The module table had no `Cache` row at all,
+  although the module is one of the seven always-on ones, and its
+  `Elements` row named two of that module's three shortcodes.
+  "Important Kernel APIs" had no `Form` row, although `\Nino\Form` is
+  where the form engine has lived since `Modules\Form` became the route
+  and nothing else. And the panel reference called
+  `features/Search/Admin/Admin.php` a shipped module: a checkout ships no
+  feature, so the smallest complete panel in it is the Sample fixture.
+
 - **Docs:** `Nino.css` still spoke of "the Design module" in three places
   and offered `assets/style.theme01.css` as the example of a project's own
   stylesheet. Design is a catalogue feature - every other file here says

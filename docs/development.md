@@ -116,6 +116,7 @@ Filesystem::init( $appData );
 AppData::init( $appData );
 Locales::init( $appData );
 Csrf::init( $appData );
+Html::init( $appData );
 Auth::init( $appData );
 Modules::callModules( $appData, 'init' );
 ```
@@ -127,7 +128,7 @@ The order is part of the runtime contract:
 - `Runtime::init()` sets up PHP error handling and starts or takes over the session.
 - `Filesystem::init()` determines the project and configuration path and initializes the file cache.
 - `AppData::init()` loads `config.php` into `$appData`.
-- `Locales`, `Csrf`, and `Auth` determine language, CSRF state, and current user.
+- `Locales`, `Csrf`, and `Auth` determine language, CSRF state, and current user; `Html::init()` between them registers the one shortcode the kernel owns itself, `[json]`, which the base templates use in their schema.org block whatever modules a project has.
 - Only then does `Modules::callModules()` initialize the modules registered under `/nino/modules`.
 
 Thus, a module can rely on the core functions and the loaded configuration. Conversely, the basic initialization must not depend on an optional module.
@@ -447,7 +448,7 @@ The respective target names are then included as shortcodes:
 
 Only if the target name ends with `.min` is it additionally minified. The cache considers path, size, and modification time of the source files.
 
-Assets deliberately **do not** go through the full HTML+ engine. Only the secure directory path `[[/nino/dir]]` is replaced. This prevents editorial textfills or shortcodes from inadvertently generating executable CSS or JavaScript code.
+Assets deliberately **do not** go through the full HTML+ engine. Only the two secure directory fills are replaced: `[[/nino/dir]]` and `[[/nino/public]]`. This prevents editorial textfills or shortcodes from inadvertently generating executable CSS or JavaScript code. Both are needed - `Nino.ui.js` falls back to `[[/nino/dir]]/.form` for a form that carries no action of its own, and the base unit's `theme.css` addresses its three webfonts through `[[/nino/public]]`.
 
 ### Final HTML Callbacks
 
@@ -485,6 +486,7 @@ The following overview is a working reference, not a complete listing of every i
 | `Elements` | Load individual elements, query, create, modify, and delete types and elements |
 | `Features` | Discover the features below `features/`, read and validate their manifests, answer and save their settings, activate and deactivate them, and apply an install unit - the wizard's too |
 | `Fetch` | The kernel's one http client: a GET over https with a timeout and a byte cap, used by the catalogue and by nothing else |
+| `Form` | The form engine behind `POST /.form`: which forms a project defines, what a submission has to look like, the mail pair it sends and the record it leaves |
 | `Html` | Register fills and shortcodes, render HTML+, and sanitize allowed inline HTML |
 | `Http` | Normalize requests, resolve routes, create and output responses |
 | `Images` | Process uploads, manage variants, and generate URLs |
@@ -505,8 +507,9 @@ Modules are activated in `/nino/modules`. The order of the array is relevant if 
 | Module | Integration | Key Features |
 | --- | --- | --- |
 | `Assets` | `[assets ...]` | bundles, caches, and optionally minifies CSS/JS |
+| `Cache` | `/nino/http/response`, priority 9; `/nino/http/output` | while `/nino/cache/status` is on, answers an anonymous `GET` from a stored copy and stores every finished page it may; a write through `/_admin` drops the lot |
 | `Csrf` | `[csrf]` | renders a hidden token field; core protection itself is always active |
-| `Elements` | `[element ...]`, `[elements ...]` | loads typed content; lists support query, `sort`, `offset`, `limit`, and optional callback |
+| `Elements` | `[element ...]`, `[elements ...]`, `[elementvalues ...]` | loads typed content; lists support query, `sort`, `offset`, `limit`, and optional callback, and `[elementvalues]` loops the distinct values of one field |
 | `Form` | `POST://.form` | owns the one form endpoint and hands every submission to `\Nino\Form` - see [Forms](#forms) below |
 | `Images` | `[image ...]` | creates an escaped `<img>` from an image slot or URI |
 | `Jstext` | `[jstext]` | provides text values as securely encoded JSON with CSP nonce |
@@ -515,7 +518,7 @@ Modules are activated in `/nino/modules`. The order of the array is relevant if 
 | `Navigation` | `[navigation ...]` | renders navigations from a compact line syntax |
 | `Template` | `[template /path/name]` | loads the raw content of a `.tpl` file; the common render pipeline processes it further |
 
-Every module in the table ships in `_nino/Nino/Modules/`, beside the always-on kernel modules. `Form` and `Navigation` bring their workbench panels along (Submissions, Navigations), `Maintenance` is nothing but a switch: every one is present exactly while its module is active. `Form`, `Navigation` and `Localepicker` are no longer a setup wizard choice - the wizard applies each one's `install/` unit and lists its class in `/nino/modules` on every run (`\Nino\Install\Setup::ALWAYS_MODULES`), the same way `Maintenance` is listed whenever its class exists. A project may still switch any of the four off by hand in `/nino/modules`, and `_nino/` stays replaceable wholesale. Everything beyond the table is a **feature** - an installable package under `features/<Name>/` with a `feature.php` manifest, switched on in the workbench's Features panel, bringing its panel the same way. A checkout ships none: they come from the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features) - `Newsletter` (double opt-in, confirmation and unsubscribe under `/.newsletter`) and `Search` (a locale-aware fuzzy index over Element fields) among them - copied into `features/` or installed from the Features panel. See [Features](features.md), [Panels of the Workbench](#panels-of-the-workbench) and [Directory and Autoloading](#directory-and-autoloading) below.
+Every module in the table ships in `_nino/Nino/Modules/`: the always-on `Assets`, `Cache`, `Csrf`, `Elements`, `Images`, `Jstext` and `Template`, and the four a project may switch off. `Form` and `Navigation` bring their workbench panels along (Submissions, Navigations), `Maintenance` is nothing but a switch: every one is present exactly while its module is active. `Form`, `Navigation` and `Localepicker` are no longer a setup wizard choice - the wizard applies each one's `install/` unit and lists its class in `/nino/modules` on every run (`\Nino\Install\Setup::ALWAYS_MODULES`), the same way `Maintenance` is listed whenever its class exists. A project may still switch any of the four off by hand in `/nino/modules`, and `_nino/` stays replaceable wholesale. Everything beyond the table is a **feature** - an installable package under `features/<Name>/` with a `feature.php` manifest, switched on in the workbench's Features panel, bringing its panel the same way. A checkout ships none: they come from the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features) - `Newsletter` (double opt-in, confirmation and unsubscribe under `/.newsletter`) and `Search` (a locale-aware fuzzy index over Element fields) among them - copied into `features/` or installed from the Features panel. See [Features](features.md), [Panels of the Workbench](#panels-of-the-workbench) and [Directory and Autoloading](#directory-and-autoloading) below.
 
 Some details are deliberately defensive:
 
@@ -751,7 +754,7 @@ public static function assets(): array {
 }
 ```
 
-Every action method guards itself with `\Nino\Admin\Admin::guardPerm( $appData, $request, self::MANAGE_PERM )`, which answers `401` without an account and `403` without the permission. The workbench's own modules are merged first, and a uri or action name one of them already owns is never handed to a runtime module. The shipped modules are the reference: `features/Search/Admin/Admin.php` is the smallest complete panel, `_nino/Nino/Modules/Form/Admin/Admin.php` one with fills and a Dashboard tile, and the catalogue's `features/Templates/Admin/Admin.php` one with its own template and a workspace layout. The [panel recipe](recipes/admin-panel.md) of the AI guide walks through a complete panel including its frontend.
+Every action method guards itself with `\Nino\Admin\Admin::guardPerm( $appData, $request, self::MANAGE_PERM )`, which answers `401` without an account and `403` without the permission. The workbench's own modules are merged first, and a uri or action name one of them already owns is never handed to a runtime module. The shipped modules are the reference: `_nino/Nino/Modules/Form/Admin/Admin.php` is one with fills and a Dashboard tile, and the smallest complete panel in the checkout is the fixture `tests/fixtures/features/Sample/Admin/Admin.php` - in the catalogue, `features/Search/Admin/Admin.php` is the smallest published one and `features/Templates/Admin/Admin.php` one with its own template and a workspace layout. The [panel recipe](recipes/admin-panel.md) of the AI guide walks through a complete panel including its frontend.
 
 A module that keeps its own files under `data/` registers `'/nino/admin/restore'` in `init()`; the Backups panel calls it with the staged backup and the live data directory, and the module merges what is its own (`Newsletter::callbackRestore()` in the catalogue's Newsletter feature). Finally, an `install/` directory beside the class file - `manifest.php`, `templates/`, `text/` - makes a kernel or project module selectable in the setup wizard; see the [Library Format](setup.md#library-format). A feature carries the same unit, and `\Nino\Features::activate()` applies it - without overwriting anything the project has - when the feature is switched on in the Features panel; the manifest, the settings and the lifecycle are in [Features](features.md).
 
