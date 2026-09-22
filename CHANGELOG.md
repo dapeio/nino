@@ -4,6 +4,19 @@ All notable changes to Nino are documented in this file.
 
 ## Unreleased
 
+### Added
+
+- **Tests:** `Accounts::usableUsers()` documents two ways an entry under
+  `/nino/auth/user` is an array key rather than an account - it is
+  disabled, or it carries no password - and only the first was measured.
+  The shipped placeholder the existing check uses has `status => 0` and
+  a real hash, so an enabled entry with `pw => ''` would have satisfied
+  the wizard's "at least one admin" precondition and let `Finish` lock
+  the installer over a project nobody can sign in to. One check in
+  `tests/install-smoke.php` holds both halves now, through the list and
+  through the precondition; dropping the password half of the condition
+  in `usableUsers()` turns it red.
+
 ### Changed
 
 - **Docs:** the agent guide's repository map left one kernel class out

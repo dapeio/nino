@@ -1027,6 +1027,16 @@ $finishWithoutAdminRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] 
 \Nino\Install\Finish::apiComplete( $appData, $finishWithoutAdminRequest );
 check( 'refuses to lock the installer before an active _editor account exists', $finishWithoutAdminRequest['/nino/http/response']['statusCode'] === 409 );
 
+/*	The other half of usableUsers()' rule. The placeholder above is disabled;
+	an entry that is enabled but carries no password is an array key rather
+	than an account, and must not satisfy the same "at least one admin"
+	precondition merely because the key exists	*/
+$appData['/nino/auth/user']['no-password@example.com'] = [ 'pw' => '', 'status' => 2, 'sessions' => [], 'perms' => [ '/*' ] ];
+$finishWithoutPasswordRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Install\Finish::apiComplete( $appData, $finishWithoutPasswordRequest );
+check( '...nor an enabled entry that carries no password', \Nino\Install\Accounts::usableUsers( $appData ) === [] && $finishWithoutPasswordRequest['/nino/http/response']['statusCode'] === 409 );
+unset( $appData['/nino/auth/user']['no-password@example.com'] );
+
 $_POST['data'] = json_encode( [ 'mail' => 'not-an-email', 'pw' => 'a-long-enough-password' ] );
 $invalidMailRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Install\Accounts::apiCreate( $appData, $invalidMailRequest );
