@@ -6,6 +6,12 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **Docs:** thirteen comments in the Elements, Users, Images and Text panels
+  sent the reader to `elements.js`, a file that has been `admin.js` since the
+  panel scripts were named alike, and one docblock in `Elements/Types/Types.php` named
+  `\Nino\Modules\Elements\Admin::insertElementType()`, a method that lives in
+  `\Nino\Elements`. Every one names the file and the class that exist.
+
 - **Tests:** three checks in `tests/admin-system-smoke.php` read the source
   of the restore for `rename(`, `lockFile( $appData, '/config.php' )` and
   `'/nino/admin/restore'`, so a refactor that spelled any of them differently

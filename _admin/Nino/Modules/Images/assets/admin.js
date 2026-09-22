@@ -86,7 +86,7 @@
 		},
 
 		/**
-		 *	Call an images/* admin action - see elements.js for why /_admin/
+		 *	Call an images/* admin action - see Elements' admin.js for why /_admin/
 		 *	(trailing slash) and why extra multipart fields (eg. a File) just work
 		 *
 		 *	@param		{string}		endpoint			Action name (eg. "list", becomes "images/list")

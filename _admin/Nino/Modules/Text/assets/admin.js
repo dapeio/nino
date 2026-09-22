@@ -90,7 +90,7 @@
 		},
 
 		/**
-		 *	Call a text/* admin action - see elements.js for why /_admin/ (trailing slash)
+		 *	Call a text/* admin action - see Elements' admin.js for why /_admin/ (trailing slash)
 		 *
 		 *	@param		{string}		endpoint			Action name (eg. "savebatch", becomes "text/savebatch")
 		 *	@param		{Object}		payload				Request payload, sent json-encoded as "data"
@@ -246,7 +246,7 @@
 
 		/**
 		 *	Render one key as a labeled field, nino-admin-richtext or textarea+counter
-		 *	depending on the entry, matching elements.js's field styling
+		 *	depending on the entry, matching Elements' admin.js's field styling
 		 *
 		 *	@param		{Object}	entry					Key entry
 		 *	@param		{*}				value					Current value

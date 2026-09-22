@@ -191,7 +191,7 @@ namespace Nino\Modules\Elements {
 
 		/**
 		 *	Validate a posted model definition, dropping anything malformed -
-		 *	same rules as \Nino\Modules\Elements\Admin::insertElementType(), plus width/height for
+		 *	same rules as \Nino\Elements::insertElementType(), plus width/height for
 		 *	image fields, maxlength for string fields, the referenced type for
 		 *	element fields, a fixed unit suffix for every type but boolean/
 		 *	image/element, and a plain string list for options
@@ -224,7 +224,7 @@ namespace Nino\Modules\Elements {
 
 				// Never on an image, whatever was posted: its file is uploaded
 				// separately, once the element already exists and has a uri to
-				// attach it to (see assets/elements.js's image branch), so a
+				// attach it to (see assets/admin.js's image branch), so a
 				// required image could not be satisfied by the very save that
 				// creates the element - the type would be impossible to add an
 				// element to at all. The frontend stops offering the checkbox
@@ -271,7 +271,7 @@ namespace Nino\Modules\Elements {
 						$field['multiple'] = max( 0, (int) ( $data['multipleMax'] ?? 0 ) );
 				}
 
-				// Only rendered for a string field (elements.js's maxlength+counter and
+				// Only rendered for a string field (admin.js's maxlength+counter and
 				// html-editor branches) - 0/absent falls back to DEFAULT_MAXLENGTH client-side
 				if( $data['type'] === 'string' ) {
 					$maxlength = (int) ( $data['maxlength'] ?? 0 );
@@ -280,7 +280,7 @@ namespace Nino\Modules\Elements {
 				}
 
 				// A fixed unit/label shown next to the input (eg. a "price" field's
-				// "€") - elements.js applies it to every type except boolean,
+				// "€") - admin.js applies it to every type except boolean,
 				// image and element, none of which render an input a unit could
 				// sit next to
 				if( in_array( $data['type'], [ 'boolean', 'image', 'element' ], true ) === false ) {
@@ -291,7 +291,7 @@ namespace Nino\Modules\Elements {
 
 				// Never on an element reference: its choices are the referenced
 				// type's elements, and a second fixed list next to them would
-				// be two selects fighting over the same value (elements.js
+				// be two selects fighting over the same value (admin.js
 				// renders the options list ahead of the type's own branches)
 				if( $data['type'] !== 'element' && is_array( $data['options'] ?? null ) === true && count( $data['options'] ) > 0 )
 					$field['options'] = array_values( array_map( 'strval', $data['options'] ) );
@@ -313,7 +313,7 @@ namespace Nino\Modules\Elements {
 		 *	the author has no way of telling that from "this type simply has
 		 *	no elements yet". A type deleted *later* is a different case and
 		 *	stays tolerated - the forms show the dangling value rather than
-		 *	discard it (see assets/elements.js's element branch).
+		 *	discard it (see assets/admin.js's element branch).
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		$model				Model as returned by cleanModel()

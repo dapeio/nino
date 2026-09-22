@@ -90,7 +90,7 @@
 		},
 
 		/**
-		 *	Call a users/* admin action - see elements.js for why /_admin/ (trailing slash)
+		 *	Call a users/* admin action - see Elements' admin.js for why /_admin/ (trailing slash)
 		 *
 		 *	@param		{string}		endpoint			Action name (eg. "save", becomes "users/save")
 		 *	@param		{Object}		payload				Request payload, sent json-encoded as "data"

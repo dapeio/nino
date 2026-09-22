@@ -257,7 +257,7 @@
 				optionsWrap.appendChild( localeLabel );
 
 				// Never offered for an image: its file is uploaded separately,
-				// after the element already exists (see elements.js's image
+				// after the element already exists (see admin.js's image
 				// branch - a new element has no uri to attach an upload to yet),
 				// so a required image could never be filled in on the very save
 				// that would have to satisfy it. The element would simply be
@@ -473,7 +473,7 @@
 		 *	Order matters beyond this list: _buildModel() walks _fields in
 		 *	order, json_decode and Admin.php's cleanModel() both keep that
 		 *	order on the way into the type file, and each element form renders
-		 *	its fields in the model's own key order (see elements.js's
+		 *	its fields in the model's own key order (see admin.js's
 		 *	_globalKeys/_localeKeys) - so this is how the editing form for
 		 *	every element of this type gets arranged
 		 *
@@ -831,13 +831,13 @@
 
 		/**
 		 *	Tell the Elements module next door that the schema it renders its
-		 *	forms from has just changed (see elements.js's invalidate()).
+		 *	forms from has just changed (see admin.js's invalidate()).
 		 *
 		 *	That module reads every type's model exactly once per page load,
 		 *	so without this a field added, renamed or removed here only
 		 *	showed up over there after a full page reload. Called through its
 		 *	own public entry point rather than by touching its state, and
-		 *	guarded so this module still works on its own if elements.js is
+		 *	guarded so this module still works on its own if admin.js is
 		 *	not deployed alongside it
 		 *
 		 *	@return		void
