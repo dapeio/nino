@@ -19,6 +19,13 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **Docs:** `Nino.css` still spoke of "the Design module" in three places
+  and offered `assets/style.theme01.css` as the example of a project's own
+  stylesheet. Design is a catalogue feature - every other file here says
+  so - and a project's stylesheets are `assets/theme.css` and the
+  `assets/style.css` the base unit ships empty after it; `style.theme01.css`
+  is a name from the wizard's whole-page themes, which are gone.
+
 - **Docs:** `\Nino\Images::getSlots()` said image slots "can't be added or
   removed from the admin, only the file each currently points to changes".
   The Image Slots tab of the Images panel has created, edited and deleted
