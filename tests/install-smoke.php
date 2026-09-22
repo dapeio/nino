@@ -1327,6 +1327,20 @@ foreach( [ '/../_nino/Nino.css', '/../_admin/install/library/base/assets/theme.c
 check( 'every font stack of both files is a list of names and not one quoted name'. ( $quotedWhole === [] ? '' : ' - '. implode( ', ', $quotedWhole ) ), $fontStacks > 0 && $quotedWhole === [] );
 check( '...and every one of them ends in a bare generic family'. ( $withoutBackup === [] ? '' : ' - '. implode( ', ', $withoutBackup ) ), $withoutBackup === [] );
 
+/*	An address a shipped template writes is the project's, and a site may sit
+	in a subdirectory: a form that posts to "/.newsletter" posts beside a site
+	at /shop. [[/nino/dir]] is what the library's own templates put in front
+	of every address - page-contact.tpl's action, theme.header.tpl's links -
+	and the demo catalogue page, assembled from the Templates feature's
+	presets, was the one template that did not	*/
+$rootAbsoluteTemplates = [];
+$libraryTemplates = new RecursiveIteratorIterator( new RecursiveDirectoryIterator( __DIR__. '/../_admin/install/library', FilesystemIterator::SKIP_DOTS ) );
+foreach( $libraryTemplates as $libraryTemplate )
+	if( str_ends_with( $libraryTemplate->getFilename(), '.tpl' ) === true && preg_match( '/\b(?:action|href)="\//', (string) file_get_contents( $libraryTemplate->getPathname() ) ) === 1 )
+		$rootAbsoluteTemplates[] = substr( $libraryTemplate->getPathname(), strlen( __DIR__. '/../_admin/install/library/' ) );
+sort( $rootAbsoluteTemplates );
+check( 'no template of the install library writes an address from the domain root - a site in a subdirectory posts and links within itself'. ( $rootAbsoluteTemplates === [] ? '' : ' - '. implode( ', ', $rootAbsoluteTemplates ) ), $rootAbsoluteTemplates === [] );
+
 // The stylesheet and the markup it styles are one delivery: theme.css names
 // .nino-frame-header and .nino-footer-nav, and nothing else writes either
 // template into a project

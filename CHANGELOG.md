@@ -37,6 +37,16 @@ All notable changes to Nino are documented in this file.
 
 ### Fixed
 
+- **The demo catalogue page posted its newsletter forms from the domain
+  root.** Both newsletter sections of `.demo-catalogue.tpl` wrote
+  `action="/.newsletter"` - the line the Templates feature's preset wrote
+  until its own fix - and an action in the markup wins over the one
+  `Nino.ui.js` builds with the project directory in front, so a site at
+  `/shop` posted beside itself. They write `[[/nino/dir]]/.newsletter` now,
+  like every other address the install library writes, and
+  `tests/install-smoke.php` holds that no template of the library writes an
+  `action` or `href` from the domain root.
+
 - **`--fontfamily-subtitle` was read by `Nino.css` and declared only by the
   base unit's `theme.css`.** `.nino-atf-subtitle` and `.nino-section-subtitle`
   read it, so on a page without that theme - or with an older copy of it -

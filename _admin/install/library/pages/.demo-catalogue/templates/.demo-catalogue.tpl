@@ -664,7 +664,7 @@
 	<div class="nino-grid-row">
 		<div class="nino-grid-100 nino-mb-3 nino-text-center"><h2 class="nino-section-title" id="newsletter-centered-title">Workshop newsletter</h2><p class="nino-section-subtitle">Four times a year, a look at what is currently being made.</p></div>
 		<div class="nino-grid-100 nino-grid-m-66 nino-mx-auto">
-			<form class="nino-form nino-newsletter-form nino-form--inline" action="/.newsletter">
+			<form class="nino-form nino-newsletter-form nino-form--inline" action="[[/nino/dir]]/.newsletter">
 				[csrf]
 				<input type="text" name="location" value="" tabindex="-1" autocomplete="off" aria-hidden="true" class="nino-form-trap">
 				<label for="newsletter-centered-email" class="nino-sr-only">[[/newsletter/label/email]]</label>
@@ -689,7 +689,7 @@
 			<div class="nino-grid-100 nino-mb-3 nino-text-left"><h2 class="nino-section-title" id="newsletter-split-title">Workshop newsletter</h2><p class="nino-section-subtitle">Four times a year, a look at what is currently being made.</p></div>
 		</div>
 		<div class="nino-grid-100 nino-grid-m-50 nino-p-2">
-			<form class="nino-form nino-newsletter-form nino-form--inline" action="/.newsletter">
+			<form class="nino-form nino-newsletter-form nino-form--inline" action="[[/nino/dir]]/.newsletter">
 				[csrf]
 				<input type="text" name="location" value="" tabindex="-1" autocomplete="off" aria-hidden="true" class="nino-form-trap">
 				<label for="newsletter-split-email" class="nino-sr-only">[[/newsletter/label/email]]</label>
