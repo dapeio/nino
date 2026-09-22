@@ -19,6 +19,14 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **Docs:** `AGENTS.md`'s source references sent an agent looking for an
+  element file to
+  `_admin/install/library/pages/.demo-elements/demo-services.php`. There is
+  no such page unit and no such file - the install library's only hidden
+  unit is `.demo-catalogue`, which ships templates and images and no
+  elements. The row names the complete type file in the element recipe,
+  and says where the suites build theirs.
+
 - **Docs:** the runtime-module recipe pointed at recipes by number - "(7.)",
   "(9.)", "(recipe 7)" - the way `feature.md` points at its own numbered
   sections. This recipe has no numbered sections, and recipe 7 of the guide

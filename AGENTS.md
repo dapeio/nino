@@ -908,7 +908,7 @@ Read these before designing a new implementation:
 | Basic page unit | `_admin/install/library/pages/home/` |
 | Module-dependent page | `_admin/install/library/pages/contact/` |
 | Locale-structural page | `_admin/install/library/pages/legal/` |
-| Element file example | `_admin/install/library/pages/.demo-elements/demo-services.php` |
+| Element file example | the complete type file in [docs/recipes/element-types.md](docs/recipes/element-types.md); the checkout ships no element type of its own, and the suites build theirs in `tests/kernel-smoke.php` and `tests/admin-smoke.php` |
 
 Human behavior changes normally require matching updates in both English and
 German manuals. This AI guide and its recipes under `docs/recipes/` stay in
