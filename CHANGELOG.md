@@ -30,6 +30,14 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **Docs:** two more comments named the wrong writer. `\Nino\Runtime`
+  compared its own log file to "Modules\Form's forms.<Y-m>.php", which
+  `\Nino\Form::record()` writes - `Modules\Form` owns the route and
+  nothing else since the engine moved. And `\Nino\Modules\Jstext` sent
+  the reader to `Nino.ui.js`'s ".nino-newsletter" handler for one of its
+  three shipped key prefixes; the class is `.nino-newsletter-form`, which
+  is what the handler selects and what the shipped markup carries.
+
 - **Docs:** `AGENTS.md`'s source references sent an agent looking for an
   element file to
   `_admin/install/library/pages/.demo-elements/demo-services.php`. There is

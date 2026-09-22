@@ -32,7 +32,7 @@ namespace Nino\Modules {
 			fill the site has, on every page that renders [jstext] - the legal
 			copy, the addresses, and '/form/email/owner', which is the mailbox a
 			contact form delivers to. The scripts reading it ask for three groups
-			(see Nino.ui.js's .nino-form, .nino-newsletter and .nino-slider
+			(see Nino.ui.js's .nino-form, .nino-newsletter-form and .nino-slider
 			handlers), so those three are what it carries.
 
 			A project whose own script reads another fill names its prefix under

@@ -415,9 +415,9 @@ namespace Nino {
 		// Append one error entry to this month's /data/logs.<Y-m>.php -
 		// a plain, readable array file (Filesystem::getFileContent()/
 		// putFileContent()'s native .php handling), same idea as
-		// Modules\Form's forms.<Y-m>.php. The fixed, predictable filename is
-		// safe because the complete /data tree lives under private/ and is
-		// never served by the webserver.
+		// \Nino\Form::record()'s forms.<Y-m>.php. The fixed, predictable
+		// filename is safe because the complete /data tree lives under
+		// private/ and is never served by the webserver.
 		// Never thrown - a logging failure inside the error handler
 		// itself must not recurse into another error
 		private static function _recordError( array &$appData, array $entry ): void {
