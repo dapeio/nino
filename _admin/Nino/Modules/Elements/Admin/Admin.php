@@ -13,14 +13,14 @@ namespace Nino\Modules\Elements {
 	/**
 	 *	Nino							A compact filesystembased php framework
 	 *	Modules						The workbench's own screens
-	 *	Elements					Elements editor: fills the response for the /_admin/elements/*
-	 *											routes registered by \Nino\Admin\Admin::init() - list types, list/get/save/
-	 *											delete elements within a type. A type itself - its title and its
-	 *											model - is the Types tab of this same pane (see tabs() and
-	 *											\Nino\Modules\Elements\Types), which creates, saves and deletes
-	 *											one behind a permission of its own: the shape is a developer's
-	 *											business, the entries made of it are not, and they are two
-	 *											screens rather than two tools.
+	 *	Elements					Elements editor: fills the POST /_admin response for its own
+	 *											elements/* actions (see \Nino\Admin\Admin::handlePost()) - list
+	 *											types, list/get/save/delete elements within a type. A type itself -
+	 *											its title and its model - is the Types tab of this same pane (see
+	 *											tabs() and \Nino\Modules\Elements\Types), which creates, saves and
+	 *											deletes one behind a permission of its own: the shape is a
+	 *											developer's business, the entries made of it are not, and they are
+	 *											two screens rather than two tools.
 	 *
 	 *	@package					Dape/Nino
 	 *	@author						David Perchermeier <mail@dape.io>
@@ -124,7 +124,7 @@ namespace Nino\Modules\Elements {
 			foreach( self::types( $appData ) as $type ) {
 				$typeData = self::typeData( $appData, $type );
 				$next 		= \Nino\Elements::readAutoincrement( $typeData );
-				// A numbered type (set up in /_admin, see Admin::AUTOINCREMENT_PAD)
+				// A numbered type (set up in /_admin, see \Nino\Elements::AUTOINCREMENT_PAD)
 				// has no uri to ask for - the form shows the number the next
 				// element would get instead of a text field
 				$types[] = [
@@ -380,7 +380,7 @@ namespace Nino\Modules\Elements {
 			}
 
 			// The value to overwrite, per the field's own scope (matches how
-			// Admin::_writeElementData() itself routes a save for this key)
+			// \Nino\Elements::_writeElementData() itself routes a save for this key)
 			$oldElement 	= \Nino\Elements::getElement( $appData, $elementUri, $isLocaleField ? $locale : '*' );
 			$oldFilename 	= is_array( $oldElement ) ? ( $oldElement[$key] ?? null ) : null;
 			$oldBytes 		= is_string( $oldFilename ) && $oldFilename !== '' ? \Nino\Images::read( $appData, $oldFilename ) : false;
@@ -522,7 +522,7 @@ namespace Nino\Modules\Elements {
 
 			// A numbered type assigns the uri, so an insert into one arrives
 			// without one and the kernel allocates it under the type file's lock
-			// (see Admin::AUTOINCREMENT_PAD). An update always names its
+			// (see \Nino\Elements::AUTOINCREMENT_PAD). An update always names its
 			// element - by then it has a uri like any other.
 			$numbered = $isNew === true && $uri === ''
 				&& in_array( $type, self::types( $appData ), true ) === true
@@ -560,7 +560,7 @@ namespace Nino\Modules\Elements {
 					$fields[$key] = \Nino\Html::sanitizeHtml( $value );
 
 			// Required-field enforcement lives in the kernel itself
-			// (Admin::insertElement()/updateElement()) - $errorMsg below
+			// (\Nino\Elements::insertElement()/updateElement()) - $errorMsg below
 			// already captures its "Missing required element key '...'" message
 			$errorMsg = null;
 			set_error_handler( function( int $errno, string $errstr ) use ( &$errorMsg ): bool { $errorMsg = $errstr; return true; } );

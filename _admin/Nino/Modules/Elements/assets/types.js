@@ -261,7 +261,7 @@
 				// branch - a new element has no uri to attach an upload to yet),
 				// so a required image could never be filled in on the very save
 				// that would have to satisfy it. The element would simply be
-				// impossible to create. Admin.php's _cleanModel() drops the flag
+				// impossible to create. Types.php's cleanModel() drops the flag
 				// on save too, so a type file that carries one from before loses
 				// it the next time it is saved here
 				if( type !== 'image' ) {
@@ -316,7 +316,7 @@
 				// Which type this reference may point at. Part of the field, not
 				// of the value: it is what both element forms build their select
 				// of elements from, so a reference without one has nothing to
-				// offer (Admin.php's _unknownReferencedType() rejects the save).
+				// offer (Types.php's _unknownReferencedType() rejects the save).
 				// A brand-new type is not in this list yet - it has no file on
 				// disk to reference - so a self-reference is added by reopening
 				// the type once it exists
@@ -421,7 +421,7 @@
 			const actions = dc.createElement('div');
 			actions.className = 'admin-field-actions';
 
-			// Same ↑/↓ pair the Pages list uses (see pages.js's _move()) - a
+			// Same ↑/↓ pair the Routes list uses (see its admin.js's _move()) - a
 			// field's position in the model is the order both element forms
 			// render it in, so this is a real editing control, not just a way
 			// to tidy up this list
@@ -471,7 +471,7 @@
 		 *	Swap a field row with its neighbour and re-render.
 		 *
 		 *	Order matters beyond this list: _buildModel() walks _fields in
-		 *	order, json_decode and Admin.php's cleanModel() both keep that
+		 *	order, json_decode and Types.php's cleanModel() both keep that
 		 *	order on the way into the type file, and each element form renders
 		 *	its fields in the model's own key order (see admin.js's
 		 *	_globalKeys/_localeKeys) - so this is how the editing form for
@@ -539,7 +539,7 @@
 					// Absent on every row but an element reference
 					elementType : ( row.querySelector('.admin-field-element-type')?.value ) ?? '',
 					// Whether that reference holds a list, and its ceiling. Sent
-					// as the two controls collect them; Admin.php's cleanModel()
+					// as the two controls collect them; Types.php's cleanModel()
 					// is what folds them into the model's single 'multiple' int
 					multiple 		: ( row.querySelector('.admin-field-multiple')?.checked ) ?? false,
 					multipleMax : row.querySelector('.admin-field-multiple-max')?.value,
@@ -809,7 +809,7 @@
 				// Every key _storeFields() reads back off a row belongs here.
 				// maxlength and suffix were offered by the field editor and
 				// collected by _storeFields(), but never made it into the
-				// payload - the server has always accepted both (see Admin.php's
+				// payload - the server has always accepted both (see Types.php's
 				// cleanModel()), so setting either simply did nothing
 				model[field.key] = {
 					type 				: field.type,

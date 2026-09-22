@@ -30,6 +30,22 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **Docs:** nineteen comments of the Elements panel named a class, a file or
+  a method that is somewhere else. `AUTOINCREMENT_PAD`, `_writeElementData()`,
+  `insertElement()` and `updateElement()` are `\Nino\Elements`', not the
+  panel's own `Admin`'s; `process()` is `\Nino\Images`'; `apiSave()` and
+  `_convertShape()`, the text-key migration the type editor copies, are
+  `\Nino\Modules\Text\Keys`'; `cleanModel()` and `_unknownReferencedType()`
+  live in `Types.php`, not in `Admin.php`; the Types tab's script is
+  `assets/types.js`, not `assets/elementtypes.js`; `typeDescr()` is read from
+  `Admin.php`, not from an `Editor.php`; the reorder pair the type editor
+  copies is the Routes list's `admin.js`, not a `pages.js`; the panel answers
+  `elements/*` actions of the one POST /_admin route rather than "the
+  /_admin/elements/* routes"; and its script still called element types
+  "developer-only, not exposed here" although the Types tab of its own pane
+  creates, saves and deletes one - the same sentence `## 1.3.0` corrected in
+  the panel class.
+
 - **Docs:** ten comments in `_admin/assets/` described an older workbench.
   The hash router named "Elements/Text/Users" and "all three panels", where
   six panels persist their drill-down level in it; `exportCsv()` sent the

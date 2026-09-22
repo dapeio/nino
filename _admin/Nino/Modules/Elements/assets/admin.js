@@ -5,8 +5,9 @@
  *	Modules									Optional modules
  *	Nino										Framework
  *	admin.js   							Admin "Elements" panel: browse types, list/create/edit/delete
- *													the elements within a type. Element *types* themselves are
- *													developer-only (\Nino\Elements::insertElementType), not exposed here.
+ *													the elements within a type. An element *type* itself - its
+ *													title and its model - is the Types tab of this same pane
+ *													(see assets/types.js), behind a permission of its own.
  *
  *	@package								Dape/Nino
  *	@author									David Perchermeier <mail@dape.io>
@@ -284,7 +285,7 @@
 		/**
 		 *	Re-read the type list behind the overview. What it shows per type is
 		 *	content, not schema - the element count and the uris underneath it
-		 *	(see Editor.php's typeDescr()) - and the list is rendered once, by
+		 *	(see Admin.php's typeDescr()) - and the list is rendered once, by
 		 *	init(). Creating or deleting an element and going back to the
 		 *	overview therefore left the count it had on page load: "(0)" next to
 		 *	a type that visibly has an element in it.

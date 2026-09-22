@@ -88,7 +88,7 @@ namespace Nino\Modules\Elements {
 		/**
 		 *	A type uri is always a single flat filename segment (elements/<type>.php,
 		 *	no nesting) - reject anything else outright, same defensive spirit as
-		 *	\Nino\Modules\Images\Admin::process()'s basePath check, before it ever reaches a filesystem call
+		 *	\Nino\Images::process()'s basePath check, before it ever reaches a filesystem call
 		 *
 		 *	@param		string		$typeUri
 		 *
@@ -228,7 +228,7 @@ namespace Nino\Modules\Elements {
 				// required image could not be satisfied by the very save that
 				// creates the element - the type would be impossible to add an
 				// element to at all. The frontend stops offering the checkbox
-				// for image fields (see assets/elementtypes.js), and this drops
+				// for image fields (see assets/types.js), and this drops
 				// it from a hand-written or older model on the next save
 				if( $data['type'] !== 'image' && ( $data['required'] ?? false ) === true )
 					$field['required'] = true;
@@ -350,7 +350,7 @@ namespace Nino\Modules\Elements {
 		 *	bucket (the type's actual content) are read back and written
 		 *	right along with them - untouched, EXCEPT for a field whose
 		 *	locale/global shape just changed, whose stored value(s) are
-		 *	migrated via _migrateFieldShape() the same way \Nino\Modules\Text\Admin::apiSave()
+		 *	migrated via _migrateFieldShape() the same way \Nino\Modules\Text\Keys::apiSave()
 		 *	already migrates a text key's value(s) on the same kind of
 		 *	change. Without that, a field switched to global keeps its old
 		 *	per-locale value(s) sitting in the locale buckets - and since
@@ -457,7 +457,7 @@ namespace Nino\Modules\Elements {
 		 *	type, between the '*' bucket and every locale bucket - called
 		 *	from apiSave() when that field's model 'locale' flag just
 		 *	changed. Same migrate-don't-discard reasoning as
-		 *	\Nino\Modules\Text\Admin::_convertShape(): global -> per-locale copies the current
+		 *	\Nino\Modules\Text\Keys::_convertShape(): global -> per-locale copies the current
 		 *	'*' value into every locale; per-locale -> global keeps the
 		 *	native locale's value (falling back to the first non-empty one)
 		 *	and removes the now-stale per-locale copies so they can't keep
@@ -563,12 +563,12 @@ namespace Nino\Modules\Elements {
 			];
 
 			// A type created numbered starts at the first number - there is
-			// nothing yet to seed past (see \Nino\Modules\Elements\Admin::AUTOINCREMENT_PAD)
+			// nothing yet to seed past (see \Nino\Elements::AUTOINCREMENT_PAD)
 			if( ( $data['autoincrement'] ?? false ) === true )
 				$typeData['autoincrement'] = 1;
 
 			// Checked, same as apiSave() does: answering 200 on a failed write
-			// leaves the frontend believing the type exists (elementtypes.js
+			// leaves the frontend believing the type exists (types.js
 			// clears _isNew and adopts the uri), so its next Save posts
 			// against a file that was never created and comes back 404
 			if( \Nino\Filesystem::putFileContent( $appData, '/elements/'. $typeUri. '.php', $typeData ) === false ) {
