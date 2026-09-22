@@ -16,6 +16,19 @@ All notable changes to Nino are documented in this file.
   the write step itself; and the module callback is handed the live data
   directory and the extracted backup.
 
+### Fixed
+
+- **`--fontfamily-subtitle` was read by `Nino.css` and declared only by the
+  base unit's `theme.css`.** `.nino-atf-subtitle` and `.nino-section-subtitle`
+  read it, so on a page without that theme - or with an older copy of it -
+  both fell back to whatever face the parent had. Declared beside
+  `--fontfamily-text` and `--fontfamily-title` now, with the text face's
+  stack, as theme.css maps it; and `tests/kernel-smoke.php` holds that every
+  custom property `Nino.css` reads without a fallback is one it declares.
+  `tests/install-smoke.php` counted the font stacks of both files - six -
+  and would have counted the new one as a failure; it holds "at least one,
+  none quoted as a whole" now, which is what it was there for.
+
 ## 1.3.0 — 2026-09-21
 
 ### Added

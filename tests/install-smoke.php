@@ -1324,7 +1324,7 @@ foreach( [ '/../_nino/Nino.css', '/../_admin/install/library/base/assets/theme.c
 				$withoutBackup[] = $file. ': '. $stack;
 		}
 
-check( 'every font stack of both files is a list of names and not one quoted name'. ( $quotedWhole === [] ? '' : ' - '. implode( ', ', $quotedWhole ) ), $fontStacks === 6 && $quotedWhole === [] );
+check( 'every font stack of both files is a list of names and not one quoted name'. ( $quotedWhole === [] ? '' : ' - '. implode( ', ', $quotedWhole ) ), $fontStacks > 0 && $quotedWhole === [] );
 check( '...and every one of them ends in a bare generic family'. ( $withoutBackup === [] ? '' : ' - '. implode( ', ', $withoutBackup ) ), $withoutBackup === [] );
 
 // The stylesheet and the markup it styles are one delivery: theme.css names

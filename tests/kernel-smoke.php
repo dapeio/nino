@@ -2854,6 +2854,18 @@ check( 'the response header is seeded with the default csp', str_contains( $seed
 check( 'the response header carries an explicit no-store', ( $homeRequest['/nino/http/response']['header']['Cache-Control'] ?? '' ) === 'no-store' );
 
 // img-src '*' covers network schemes only, so a data: uri needs spelling out.
+/*	Every custom property Nino.css reads without a fallback is one it declares
+	itself. The base unit's theme.css declares the same names again for a
+	project, but a page without that theme - or with an older copy of it -
+	gets the browser's initial value where a name is missing, which for a
+	font-family is whatever the parent had; --fontfamily-subtitle was that
+	name, read by two rules and declared by theme.css alone	*/
+$ninoCss = (string) @file_get_contents( __DIR__. '/../_nino/Nino.css' );
+preg_match_all( '/var\(\s*(--[a-zA-Z0-9-]+)\s*\)/', $ninoCss, $consumedProperties );
+preg_match_all( '/(--[a-zA-Z0-9-]+)\s*:/', $ninoCss, $declaredProperties );
+$undeclaredProperties = array_values( array_diff( array_unique( $consumedProperties[1] ), $declaredProperties[1] ) );
+check( 'every custom property Nino.css reads without a fallback is declared in Nino.css itself'. ( $undeclaredProperties === [] ? '' : ' - missing: '. implode( ', ', $undeclaredProperties ) ), $undeclaredProperties === [] );
+
 // Nino.css uses one for .nino-atf-arrowdown, ie. the framework's own default
 // policy used to block the framework's own icon
 check( 'the default csp allows data: images', str_contains( $seededCsp, 'img-src * data:' ) === true );

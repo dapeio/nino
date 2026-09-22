@@ -155,6 +155,7 @@
 		webface it ships and leaves the fallbacks bare, which is the shape.	*/
 	--fontfamily-text: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 	--fontfamily-title: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+	--fontfamily-subtitle: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 	--fontfamily-code: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 	/*	Relative, not 16px: a font-size on html resolves against the browser's
 		own default, so 100% is whatever the visitor set it to. A length here
