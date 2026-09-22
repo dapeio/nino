@@ -6,6 +6,16 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **Docs:** the agent guide's repository map left one kernel class out
+  and its test matrix excluded the wrong directory. Section 4 lists
+  nineteen classes under `_nino/Nino/<Class>/<Class>.php` and
+  `_nino/Nino/Form/Form.php` - the form engine behind `POST /.form` - is
+  not among them, so the one class a form question leads to was the one
+  the map did not name. Section 10's syntax checks skip `./data/*`, a
+  path that has been `private/data/` since the split and is in no
+  checkout anyway; `.github/workflows/ci.yml` skips `./.git/*`, and the
+  two commands are the same command now.
+
 - **Docs:** the installer recipe listed `active` among the unit keys the
   installer supports, and nothing reads it. `Setup::apiLibrary()` computes
   an `active` flag for the picker out of `moduleClass` and `preset`, which

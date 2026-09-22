@@ -113,7 +113,7 @@ Important source directories:
 | Path | Ownership |
 | --- | --- |
 | `_nino/Nino.php` | Boot: `\Nino\init()`, `request()`, `output()` and the autoloader. `Nino\*` resolves below `_nino/` alone, every other namespace below `app/` (or `NINO_APP_DIR`) alone; `Nino\Modules\*` is a merged view over four roots in this order: `_nino/`, `_admin/`, `features/` (or `NINO_FEATURES_DIR`, where the `Nino/Modules/` prefix is the directory itself), `app/` |
-| `_nino/Nino/<Class>/<Class>.php` | The kernel classes and public core APIs: AppData, Auth, Callbacks, Catalogue, Csrf, Features, Fetch, Filesystem, Backup, RotatingLog, Elements, Html, Http, Images, Locales, Text, Mail, Modules, Runtime |
+| `_nino/Nino/<Class>/<Class>.php` | The kernel classes and public core APIs: AppData, Auth, Callbacks, Catalogue, Csrf, Features, Fetch, Filesystem, Backup, RotatingLog, Elements, Form, Html, Http, Images, Locales, Text, Mail, Modules, Runtime |
 | `_nino/Nino/Catalogue/Catalogue.php`, `_nino/Nino/Fetch/Fetch.php` | The feature catalogue: `Fetch` is the kernel's one http client (https only, no redirects, a byte cap, stubbed in tests through `./nino/fetch/stub`); `Catalogue` fetches `catalogue.json` and its detached ECDSA signature, verifies it against `PUBLIC_KEY` or `/nino/catalogue/key`, parses format 1, answers `offers()` per key, and `install()`s an archive: re-fetched catalogue, sha256 and size, staging below `data/.features/`, every entry validated, manifest matched, directory replaced. Nothing is fetched unless the Features panel asks. Contract test `tests/catalogue-smoke.php`, no network |
 | `_nino/Nino/Features/Features.php` | The feature contract: discovery below `features/`, manifest validation, version constraints, settings, `activate()`, `deactivate()`, and `applyUnit()` - the unit application the wizard shares (overwrite on there, add-only for a feature). Contract test `tests/features-smoke.php` against `tests/fixtures/features/` |
 | `_nino/Nino/Modules/<Name>/<Name>.php` | Kernel runtime modules: the always-on ones every project needs (Assets, Cache, Csrf, Elements, Images, Jstext, Template) and the optional ones a project switches on or off in `/nino/modules` (`Form`, `Navigation`, `Localepicker`, `Maintenance`). Replaced wholesale with `_nino/` |
@@ -734,9 +734,9 @@ php tests/concurrency-smoke.php
 Syntax and diff checks:
 
 ```bash
-find . -name '*.php' -not -path './data/*' -print0 \
+find . -name '*.php' -not -path './.git/*' -print0 \
 	| xargs -0 -n1 php -l
-find . -name '*.js' -not -path './data/*' -print0 \
+find . -name '*.js' -not -path './.git/*' -print0 \
 	| xargs -0 -n1 node --check
 phpstan analyse
 npx eslint .
