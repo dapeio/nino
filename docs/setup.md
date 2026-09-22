@@ -9,7 +9,7 @@ This manual explains the decisions and writing processes of the six steps of the
 **Additional Links:**
 [README](../README.md) · [Concepts](concepts.md) · [Developer Manual](development.md) · [Recipes](recipes/README.md) · [Getting Started](getting-started.md) · [Setup Wizard](setup.md) · [`/_admin` Workbench](_admin.md) · [Features](features.md) · [Deployment](deployment.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
 
-**Important:** The wizard creates the first functional project state from a fresh Nino checkout. It is necessary: before its execution, the actual project directories such as `templates/`, `text/`, `elements/`, and `images/` do not yet exist.
+**Important:** The wizard creates the first functional project state from a fresh Nino checkout. It is necessary: before its execution a checkout carries neither `private/` nor `public/`, so none of the project directories inside them - `private/templates/`, `private/text/`, `private/elements/`, `public/images/` - exists yet.
 
 ## When the Wizard Runs
 
@@ -131,19 +131,20 @@ The reserved path `/_admin` cannot be used as a public page.
 
 ## 4. Personal Information
 
-This step records central company and website values as textfills. The values are stored globally and can be edited later in the workbench's Text panel.
+This step records central company and website values as textfills. It edits nothing else: of the keys the base unit ships, only those under `/company/*` and `/website/*`, and of those only the ones that are not on the blacklist. All of them can be edited later in the workbench's Text panel.
 
-The following keys are typically created:
+Language-independent, in the order the form shows them:
 
 - `/company/name`
-- `/company/address`
 - `/company/email`
 - `/company/phone`
-- `/website/name`
-- `/website/description`
-- `/website/keywords`
+- `/company/adress`
+- `/website/author`
+- `/website/host`
 
-These textfills are used in templates, meta tags, and possibly in the footer or contact forms.
+`/company/country` and `/company/description` are stored per language, so step through every active language and save its values. A `/company/*` or `/website/*` key a library fork adds is offered too, appended after these.
+
+These textfills are used in templates, meta tags, and possibly in the footer or contact forms. The technical ones the base unit blacklists - `/website/url`, `/website/charset`, `/website/lang` - are deliberately left out here and are edited on the workbench's Text Keys tab afterwards.
 
 ## 5. Accounts
 
@@ -197,7 +198,7 @@ A developer tool that ships as a module has no unit to pick: `\Nino\Install\Setu
 
 The wizard creates the first working project state, but it does not replace project-specific development. Templates, content models, callbacks, integrations, detailed design, and production configuration remain part of the implementation.
 
-It also does not create `images/`, `templates/`, `text/`, or `elements/` before setup begins. These directories and their initial content are generated from the selected installation library during the process.
+It also does not create `private/` or `public/`, nor any of the project directories inside them, before setup begins. These directories and their initial content are generated from the selected installation library during the process.
 
 ## Next Steps
 

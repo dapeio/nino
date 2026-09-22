@@ -6,6 +6,22 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **Docs:** the wizard reference named seven Personal Infos keys, and
+  four of them do not exist. `/company/address`, `/website/name`,
+  `/website/description` and `/website/keywords` are in no text file the
+  base unit ships; the key is `/company/adress`, the description is
+  `/company/description`, and the two the step actually adds to the
+  other three - `/website/author` and `/website/host` - were not listed
+  at all. It also called the values global, where `/company/country` and
+  `/company/description` are per locale. The list is now the eight keys
+  `personalinfos.js`'s `ORDER` names, in that order, with the blacklisted
+  technical ones said to be left out. Both language versions, and the
+  German twin's Library-Format list, also promised a manifest a
+  "Beschreibung" and a "Vorschaubild": no manifest in the tree carries
+  either, only `label`. And the sentences naming `templates/`, `text/`,
+  `elements/` and `images/` as what a checkout is missing name
+  `private/` and `public/` now, which is where those four live.
+
 - **Docs:** "Getting Started" and its German twin promised ten wizard
   steps over a table of six - `Install::MODULES` has six modules and the
   rail draws six. The environment chapter named `templates/`, `text/`,

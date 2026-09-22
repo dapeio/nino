@@ -9,7 +9,7 @@ Dieses Handbuch erklärt die Entscheidungen und Schreibvorgänge der sechs Schri
 **Weitere Links:**
 [README](../README.de.md) · [Grundkonzepte](concepts.de.md) · [Entwickler-Handbuch](development.de.md) · [Rezepte](recipes/README.md) · [Erste Schritte](getting-started.de.md) · [Einrichtungsassistent](setup.de.md) · [`/_admin`-Workbench](_admin.de.md) · [Features](features.de.md) · [Deployment](deployment.de.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
 
-**Wichtig:** Der Assistent erzeugt aus einem frischen Nino-Checkout den ersten lauffähigen Projektstand. Er ist notwendig: Vor seiner Ausführung existieren die eigentlichen Projektverzeichnisse wie `templates/`, `text/`, `elements/` und `images/` noch nicht.
+**Wichtig:** Der Assistent erzeugt aus einem frischen Nino-Checkout den ersten lauffähigen Projektstand. Er ist notwendig: Vor seiner Ausführung bringt ein Checkout weder `private/` noch `public/` mit, und damit auch keines der Projektverzeichnisse darin – `private/templates/`, `private/text/`, `private/elements/`, `public/images/`.
 
 ## Wann der Assistent läuft
 
@@ -205,7 +205,7 @@ Ein Entwicklerwerkzeug, das als Modul ausgeliefert wird, hat keine Einheit zum A
 
 Die Basis-, Modul- und Seiteneinheiten besitzen je eine `manifest.php`. Das Manifest beschreibt, was angezeigt, kopiert und konfiguriert wird. Je nach Einheit enthält es beispielsweise:
 
-- Titel, Beschreibung und Vorschaubild;
+- Titel (`label`);
 - benötigte Module;
 - Routen und Statuscodes;
 - Template- und Element-Dateien;
