@@ -634,6 +634,9 @@
 					const active = btn.dataset.tab === current;
 					btn.classList.toggle( 'is-active', active );
 					btn.setAttribute( 'aria-selected', active ? 'true' : 'false' );
+					// One tab stop per strip, the tab that is open - see
+					// Nino.adminUi.tabKeys(), which moves it from the arrows
+					btn.tabIndex = active ? 0 : -1;
 				} );
 
 				show( current );
@@ -670,8 +673,31 @@
 			Object.keys( panels ).forEach( function( panel ) {
 				panels[panel][0].addEventListener( 'click', function(ev){ ev.preventDefault(); selectTab( panel ) } );
 			} );
-			dc.querySelectorAll('#admin-content-wrap > [data-panel] > .admin-panel-tabs > button[data-tab]').forEach( function( btn ) {
-				btn.addEventListener( 'click', function() { selectTab( btn.closest('[data-panel]').dataset.panel, btn.dataset.tab ) } );
+			dc.querySelectorAll('#admin-content-wrap > [data-panel] > .admin-panel-tabs').forEach( function( strip ) {
+
+				const owner 	= strip.closest('[data-panel]').dataset.panel;
+				const buttons	= Array.from( strip.querySelectorAll(':scope > button[data-tab]') );
+
+				buttons.forEach( function( btn, at ) {
+
+					btn.addEventListener( 'click', function() { selectTab( owner, btn.dataset.tab ) } );
+
+					/*	A strip nobody has opened yet still has to say which of its
+						tabs is the one on screen. The panes are rendered with every
+						button aria-selected="false" (see Panels::$html) and only the
+						panel the shell opens on ever went through selectTab(), so
+						every other strip announced a tablist with no selected tab and
+						handed out one tab stop per tab. The first one is what
+						selectTab() will open when the panel is reached, so the strip
+						says so from the start	*/
+					btn.classList.toggle( 'is-active', at === 0 );
+					btn.setAttribute( 'aria-selected', at === 0 ? 'true' : 'false' );
+					btn.tabIndex = at === 0 ? 0 : -1;
+				} );
+
+				// The arrows, Home and End, from the design system - the strip is
+				// announced as a tablist, so it answers to the keys one answers to
+				Nino.adminUi.tabKeys( buttons, function( at ) { selectTab( owner, buttons[at].dataset.tab ) } );
 			} );
 
 			// Restore the panel from a refresh/deep link, and react to manual hash

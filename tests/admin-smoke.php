@@ -179,7 +179,7 @@ check( 'the shadow panel never reaches the nav', str_contains( $navHtml, 'Shadow
 $panesHtml = \Nino\Admin\Admin::panesHtml( $withModule );
 check( 'every pane starts hidden, names its layout and carries its mount points', str_contains( $panesHtml, '<div id="admin-content-dummy" data-panel="dummy" data-layout="page" hidden><div id="dummy-list"></div><div id="dummy-form"></div></div>' ) === true );
 check( 'the dashboard pane has no mount point of its own', str_contains( $panesHtml, '<div id="admin-content-dashboard" data-panel="dashboard" data-layout="page" hidden></div>' ) === true );
-check( 'a pane with tabs holds the strip and one tab pane per tab, its own screen first', str_contains( $panesHtml, '<div id="admin-content-elements" data-panel="elements" data-layout="page" hidden><div class="nino-admin-tabs nino-admin-tabs--bar nino-admin-tabs--panel admin-panel-tabs" role="tablist"><button type="button" role="tab" class="nino-admin-tab" data-tab="elements" aria-selected="false">[[/_admin/nav/elements]]</button><button type="button" role="tab" class="nino-admin-tab" data-tab="types" aria-selected="false">[[/_admin/nav/types]]</button></div><div id="admin-tab-elements" data-tab="elements" hidden><div id="elements-types"></div><div id="elements-list"></div><div id="elements-form"></div></div><div id="admin-tab-types" data-tab="types" hidden><div id="types-list"></div><div id="types-form"></div></div></div>' ) === true );
+check( 'a pane with tabs holds the strip and one tab pane per tab, its own screen first', str_contains( $panesHtml, '<div id="admin-content-elements" data-panel="elements" data-layout="page" hidden><div class="nino-admin-tabs nino-admin-tabs--bar nino-admin-tabs--panel admin-panel-tabs" role="tablist"><button type="button" role="tab" id="admin-tabbutton-elements" class="nino-admin-tab" data-tab="elements" aria-controls="admin-tab-elements" aria-selected="false">[[/_admin/nav/elements]]</button><button type="button" role="tab" id="admin-tabbutton-types" class="nino-admin-tab" data-tab="types" aria-controls="admin-tab-types" aria-selected="false">[[/_admin/nav/types]]</button></div><div id="admin-tab-elements" role="tabpanel" aria-labelledby="admin-tabbutton-elements" data-tab="elements" hidden><div id="elements-types"></div><div id="elements-list"></div><div id="elements-form"></div></div><div id="admin-tab-types" role="tabpanel" aria-labelledby="admin-tabbutton-types" data-tab="types" hidden><div id="types-list"></div><div id="types-form"></div></div></div>' ) === true );
 
 $allActions = \Nino\Admin\Admin::actions( $withModule );
 check( 'the module\'s action is dispatchable', ( $allActions['dummy/list'] ?? null ) === [ 'EditorSmokeDummyPanel', 'apiList' ] );
@@ -994,6 +994,22 @@ $getRequest = [ '/nino/http/response' => [ 'statusCode' => 200, 'body' => '[temp
 $visiblePanels = array_keys( \Nino\Admin\Admin::visiblePanels( $appData ) );
 check( 'a full-access account gets every panel in its navigation, content first, then structure, then system', $visiblePanels === [ 'dashboard', 'elements', 'text', 'images', 'submissions', 'logs', 'routes', 'users', 'language', 'backups', 'features', 'config' ] );
 check( '...with every tab on its pane', array_keys( \Nino\Admin\Admin::visiblePanels( $appData )['users']['tabs'] ) === [ 'roles', 'lockout' ] && substr_count( \Nino\Html::renderTextfill( $appData, '/_admin/panes' ), 'admin-panel-tabs' ) === 5 );
+/*	Every tab the shell renders is announced as a tab of a tablist, so every
+	one of them has to name the pane it opens and every pane has to be the
+	tabpanel that names it back. Counted rather than spot-checked: a strip
+	where one button carries the pair and the next does not is exactly the
+	shape a fragment edited by hand takes	*/
+$renderedPanes = \Nino\Html::renderTextfill( $appData, '/_admin/panes' );
+check( 'every rendered tab names the pane it opens, and every pane is the tabpanel that names it back',
+	substr_count( $renderedPanes, 'role="tab"' ) > 0
+	&& substr_count( $renderedPanes, 'role="tab"' ) === substr_count( $renderedPanes, 'aria-controls="admin-tab-' )
+	&& substr_count( $renderedPanes, 'role="tabpanel"' ) === substr_count( $renderedPanes, 'aria-labelledby="admin-tabbutton-' )
+	&& substr_count( $renderedPanes, 'role="tabpanel"' ) === substr_count( $renderedPanes, 'id="admin-tab-' ) );
+$firstTab = \Nino\Admin\Admin::visiblePanels( $appData )['users']['uri'];
+check( '...and the two ids a tab and its pane point at are really each other\'s',
+	str_contains( $renderedPanes, 'id="admin-tabbutton-roles" class="nino-admin-tab" data-tab="roles" aria-controls="admin-tab-roles"' ) === true
+	&& str_contains( $renderedPanes, 'id="admin-tab-roles" role="tabpanel" aria-labelledby="admin-tabbutton-roles"' ) === true
+	&& $firstTab === 'users' );
 check( 'the rendered nav then carries the three group headings', substr_count( \Nino\Html::renderTextfill( $appData, '/_admin/nav' ), 'nino-admin-nav-group' ) === 3 );
 
 echo "\n";

@@ -1035,7 +1035,14 @@ namespace Nino\Admin {
 			The ids are the convention the tool has always had (admin-nav-<uri>,
 			admin-content-<uri>, admin-tab-<uri>) and data-panel/data-tab are
 			what script.js reads, so an entry that drops one drops the shell's
-			own wiring with it	*/
+			own wiring with it.
+
+			A tab and the pane it opens name each other: the strip is a
+			`role="tablist"` and its buttons are tabs, so a screen reader is
+			told a tab controls something - and without aria-controls it has
+			nothing to say what, and the pane itself was an anonymous div
+			rather than the tabpanel the pattern promises. The button's own id
+			(admin-tabbutton-<uri>) exists for the pane to point back at	*/
 		public static
 			$html = [
 				'nav-group'		=> '<span class="nino-admin-nav-group" data-group="[[group]]">[[label]]</span>',
@@ -1044,8 +1051,12 @@ namespace Nino\Admin {
 				'nav-initial'	=> '<b>[[initial]]</b>',
 				'pane'				=> '<div id="admin-content-[[uri]]" data-panel="[[uri]]" data-layout="[[layout]]" hidden>[[content]]</div>',
 				'tab-bar'			=> '<div class="nino-admin-tabs nino-admin-tabs--bar nino-admin-tabs--panel admin-panel-tabs" role="tablist">[[content]]</div>',
-				'tab-button'	=> '<button type="button" role="tab" class="nino-admin-tab" data-tab="[[uri]]" aria-selected="false">[[label]]</button>',
-				'tab-pane'		=> '<div id="admin-tab-[[uri]]" data-tab="[[uri]]" hidden>[[content]]</div>',
+				'tab-button'	=> '<button type="button" role="tab" id="admin-tabbutton-[[uri]]" class="nino-admin-tab" data-tab="[[uri]]" aria-controls="admin-tab-[[uri]]" aria-selected="false">[[label]]</button>',
+				'tab-pane'		=> '<div id="admin-tab-[[uri]]" role="tabpanel" aria-labelledby="admin-tabbutton-[[uri]]" data-tab="[[uri]]" hidden>[[content]]</div>',
+				// The same pane where there is no strip above it: one tab is no
+				// strip (see panesHtml()), so there is no tab to be the panel of
+				// and no button for aria-labelledby to point at
+				'tab-pane-lone'	=> '<div id="admin-tab-[[uri]]" data-tab="[[uri]]" hidden>[[content]]</div>',
 				// A panel without a template of its own renders mount points
 				// its script fills - see panes() in the panel contract
 				'mount'				=> '<div id="[[id]]"></div>',
@@ -1434,11 +1445,13 @@ namespace Nino\Admin {
 						$content .= str_replace( '[[content]]', $buttons, self::$html['tab-bar'] );
 					}
 
+					$paneHtml = count( $tabs ) > 1 ? self::$html['tab-pane'] : self::$html['tab-pane-lone'];
+
 					foreach( $tabs as $tab )
 						$content .= str_replace(
 							[ '[[uri]]', '[[content]]' ],
 							[ $tab['uri'], self::_paneContent( $tab ) ],
-							self::$html['tab-pane']
+							$paneHtml
 						);
 				}
 

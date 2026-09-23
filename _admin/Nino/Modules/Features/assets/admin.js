@@ -470,7 +470,12 @@
 			[ 'active', 'inactive', 'available' ].forEach( function( key ) {
 				const btn = dc.createElement('button');
 				btn.type = 'button';
+				btn.id = 'features-tabbutton-'+ key;
 				btn.setAttribute( 'role', 'tab' );
+				// The one panel below the strip, which the three tabs share -
+				// a tab that controls nothing is a tab a screen reader can say
+				// nothing about, see _renderTabContent()
+				btn.setAttribute( 'aria-controls', 'features-tabpanel' );
 				btn.className = 'nino-admin-tab';
 				btn.textContent = labels[key]+ ' ('+ counts[key]+ ')';
 				bar.appendChild( btn );
@@ -571,7 +576,12 @@
 
 			const panel = dc.createElement('div');
 			panel.className = 'nino-admin-tabpanel';
+			panel.id = 'features-tabpanel';
 			panel.setAttribute( 'role', 'tabpanel' );
+			// The three tabs draw into this one panel rather than into three,
+			// so the panel names whichever of them is open - and each of them
+			// names the panel (see _renderTabs())
+			panel.setAttribute( 'aria-labelledby', 'features-tabbutton-'+ Nino.admin.features._tab );
 			wrap.appendChild( panel );
 
 			if( Nino.admin.features._tab === 'inactive' )

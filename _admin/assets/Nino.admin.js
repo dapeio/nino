@@ -213,39 +213,108 @@
 		buttonRow : function( buttons, active, onSelect, flag ) {
 
 			const attribute = flag || 'aria-pressed';
+			const keys 			= Object.keys( buttons ).filter( function( key ) {
+				return buttons[key] !== null && typeof buttons[key] !== 'undefined';
+			} );
 
 			const paint = function( key ) {
-				Object.keys( buttons ).forEach( function( candidate ) {
+				keys.forEach( function( candidate ) {
 
 					const button = buttons[candidate];
-
-					if( button === null || typeof button === 'undefined' )
-						return;
-
-					const on = candidate === key;
+					const on 		= candidate === key;
 
 					button.classList.toggle( 'is-active', on );
 					button.setAttribute( attribute, on === true ? 'true' : 'false' );
+
+					/*	A tab strip is one tab stop, not one per tab: the pattern
+						reaches a strip with Tab and walks it with the arrows, and a
+						row that leaves every tab tabbable makes the operator press
+						Tab once per tab to get past a strip they did not want. The
+						switch does not do this - aria-pressed buttons are ordinary
+						buttons and each is its own stop	*/
+					if( attribute === 'aria-selected' )
+						button.tabIndex = on === true ? 0 : -1;
 				} );
 			};
 
-			Object.keys( buttons ).forEach( function( key ) {
-
-				const button = buttons[key];
-
-				if( button === null || typeof button === 'undefined' )
-					return;
-
-				button.addEventListener( 'click', function() {
+			keys.forEach( function( key ) {
+				buttons[key].addEventListener( 'click', function() {
 					paint( key );
 					if( typeof onSelect === 'function' )
 						onSelect( key );
 				} );
 			} );
 
+			// Only a tablist gets the arrows; a row of aria-pressed switches is
+			// a row of ordinary buttons and the browser already walks it
+			if( attribute === 'aria-selected' )
+				Nino.adminUi.tabKeys( keys.map( function( key ) { return buttons[key] } ), function( at ) {
+					paint( keys[at] );
+					if( typeof onSelect === 'function' )
+						onSelect( keys[at] );
+				} );
+
 			paint( active );
 
 			return paint;
+		},
+
+		/**
+		 *	The keyboard half of a tab strip: Left/Right walk it, Home and End
+		 *	jump to its ends, and exactly one tab is in the page's tab order at
+		 *	a time.
+		 *
+		 *	Here rather than in each strip because the workbench has three of
+		 *	them - the pane strip the shell renders (see \Nino\Admin\Panels::$html),
+		 *	and the Features panel's two - and every one of them was a row of
+		 *	buttons a pointer could operate and an arrow key could not. A tab
+		 *	is announced as a tab, so it is offered the keys a tab answers to;
+		 *	`Nino.ui.js` gives the public site's tabs the same four.
+		 *
+		 *	@param	{Array}			tabs			The strip's buttons, in the order they are drawn
+		 *	@param	{Function}	onMove		Called with the index the operator moved to
+		 *
+		 *	@return	{Function}						roving( index ), for pointing the one tab stop
+		 *													from outside
+		 */
+		tabKeys : function( tabs, onMove ) {
+
+			const strip = ( tabs || [] ).filter( function( tab ) {
+				return tab !== null && typeof tab !== 'undefined';
+			} );
+
+			const roving = function( index ) {
+				strip.forEach( function( tab, at ) { tab.tabIndex = ( at === index ) ? 0 : -1 } );
+			};
+
+			strip.forEach( function( tab, at ) {
+
+				tab.addEventListener( 'keydown', function( ev ) {
+
+					if( [ 'ArrowLeft', 'ArrowRight', 'Home', 'End' ].indexOf( ev.key ) === -1 )
+						return;
+
+					// The arrows scroll the page otherwise, which is the one thing
+					// the operator did not ask for by pressing them on a tab
+					ev.preventDefault();
+
+					let next = at;
+					if( ev.key === 'ArrowLeft' )	next = ( at - 1 + strip.length ) % strip.length;
+					if( ev.key === 'ArrowRight' )	next = ( at + 1 ) % strip.length;
+					if( ev.key === 'Home' )				next = 0;
+					if( ev.key === 'End' )				next = strip.length - 1;
+
+					roving( next );
+
+					if( typeof strip[next].focus === 'function' )
+						strip[next].focus();
+
+					if( typeof onMove === 'function' )
+						onMove( next );
+				} );
+			} );
+
+			return roving;
 		},
 
 		/**

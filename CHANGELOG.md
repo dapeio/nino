@@ -431,6 +431,30 @@ All notable changes to Nino are documented in this file.
 
 ### Fixed
 
+- **A tab strip of the workbench could be operated with a pointer and not
+  with the arrow keys.** All three of them - the strip the shell renders over
+  a pane's tabs (`\Nino\Admin\Panels::$html`) and the Features panel's two -
+  are `role="tablist"` rows of `role="tab"` buttons, which tells a screen
+  reader user that Left, Right, Home and End move along the strip. None of
+  them listened for a key: the strip was walked with Tab, one stop per tab,
+  and the keys the announcement promised did nothing. The panes were not
+  panels either - a tab named nothing with `aria-controls`, and the div it
+  opened was an anonymous div rather than the `role="tabpanel"` the pattern
+  says it is - and every strip but the one the shell happened to open
+  reported a tablist with no tab selected at all, because only the opened
+  panel ever went through `selectTab()`. `Nino.adminUi.tabKeys()` is the
+  keyboard half, in the design system rather than three times over:
+  Left/Right wrap, Home and End jump to the ends, and exactly one tab is in
+  the page's tab order at a time. `Nino.adminUi.buttonRow()` uses it for
+  every row it is given the `aria-selected` flag for, the shell's own strip
+  calls it directly and paints every strip's first tab on wire-up, and the
+  shell's fragments name the pane each tab opens - a lone tab pane, where one
+  tab is no strip, stays a plain div with no tab to be the panel of.
+  `tests/admin-lists-js-smoke.js` drives the helper and the row through
+  ArrowRight, End and the wrap-around (nine checks, all nine red before),
+  and `tests/admin-smoke.php` counts the tab/panel pairs in the rendered
+  panes (two checks, both red before).
+
 - **A site served from a subdirectory answered its own addresses with the
   404 page.** Every address the kernel writes carried `[[/nino/dir]]`, and
   the router looked the request path up as it came in, so `/shop/about`

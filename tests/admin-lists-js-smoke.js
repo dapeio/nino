@@ -117,6 +117,73 @@ check( 'the switch is a shared component, not a copy per tool',
 check( 'a switch states its condition in words, not by knob position alone',
 	adminUiSource.includes( "'nino-admin-switch-state'" ) );
 check( 'Config renders booleans with that shared switch', configSource.includes('Nino.adminUi.switchField(') );
+
+/*	A tab strip is announced as a tablist, and a tablist is walked with the
+	arrows rather than with Tab - the pattern's own keyboard contract, and the
+	one half all three of the workbench's strips were missing: the pane strip
+	the shell renders and the Features panel's two were reachable with a
+	pointer and with Enter, and Left/Right/Home/End did nothing at all. It
+	lives in the design system because there are three of them, which is
+	exactly how one ends up without it.
+
+	Driven here rather than read: what this is about is which tab ends up
+	focused and which one is left in the page's tab order	*/
+function tabStub() {
+	const node = {
+		tabIndex : 0, focused : false, attributes : {}, listeners : {},
+		classList : { toggle : function() {} },
+		setAttribute : function( name, value ) { this.attributes[name] = String( value ) },
+		getAttribute : function( name ) { return this.attributes[name] ?? null },
+		addEventListener : function( name, fn ) { this.listeners[name] = fn },
+		focus : function() { this.focused = true },
+	};
+	return node;
+}
+
+const tabSandbox = {
+	console 	: console,
+	document 	: { createElement : function() { return tabStub() }, documentElement : {}, body : {} },
+	Nino 			: { content : { getText : function() { return '' } } },
+};
+tabSandbox.window = tabSandbox;
+vm.runInContext( adminUiSource, vm.createContext( tabSandbox ), { filename : 'Nino.admin.js' } );
+const adminUi = tabSandbox.Nino.adminUi;
+
+check( 'the design system owns the tab strip\'s keyboard half', typeof adminUi.tabKeys === 'function' );
+
+const strip = [ tabStub(), tabStub(), tabStub() ];
+const moved = [];
+adminUi.tabKeys( strip, function( at ) { moved.push( at ) } );
+
+let stripPrevented = false;
+strip[0].listeners.keydown.call( strip[0], { key : 'ArrowRight', preventDefault : function() { stripPrevented = true } } );
+check( 'an arrow on a tab moves the strip rather than the page', stripPrevented === true && moved[0] === 1 && strip[1].focused === true );
+check( '...and takes the one tab stop with it', strip[1].tabIndex === 0 && strip[0].tabIndex === -1 && strip[2].tabIndex === -1 );
+
+strip[1].listeners.keydown.call( strip[1], { key : 'End', preventDefault : function() {} } );
+check( 'End jumps to the last tab', moved[1] === 2 && strip[2].focused === true && strip[2].tabIndex === 0 );
+strip[2].listeners.keydown.call( strip[2], { key : 'ArrowRight', preventDefault : function() {} } );
+check( '...and the strip wraps rather than stopping at its end', moved[2] === 0 && strip[0].tabIndex === 0 );
+
+// The row component is what the Features panel builds its two strips with,
+// so a row flagged as a tablist has to come out of it with the same contract
+const rowButtons = { a : tabStub(), b : tabStub() };
+const rowPicked = [];
+adminUi.buttonRow( rowButtons, 'a', function( key ) { rowPicked.push( key ) }, 'aria-selected' );
+check( 'a button row flagged as a tablist is one tab stop, on the selected tab', rowButtons.a.tabIndex === 0 && rowButtons.b.tabIndex === -1 );
+rowButtons.a.listeners.keydown.call( rowButtons.a, { key : 'ArrowRight', preventDefault : function() {} } );
+check( '...and the arrows pick the next tab, not just focus it', rowPicked[0] === 'b' && rowButtons.b.attributes['aria-selected'] === 'true' && rowButtons.b.tabIndex === 0 );
+
+// A switch is not a tablist: aria-pressed buttons are ordinary buttons and
+// each of them is its own tab stop
+const switchButtons = { on : tabStub(), off : tabStub() };
+adminUi.buttonRow( switchButtons, 'on', function() {} );
+check( 'a row of pressed-state buttons keeps every button in the tab order', switchButtons.on.tabIndex === 0 && switchButtons.off.tabIndex === 0
+	&& switchButtons.on.listeners.keydown === undefined );
+
+// The shell's own strip is server-rendered markup, not a button row - it
+// reaches for the same keys rather than growing a second copy of them
+check( 'the shell wires its pane strips through that shared helper', asset('script.js').includes( 'Nino.adminUi.tabKeys( buttons,' ) );
 check( 'Config relies on fieldset\'s own shared surface instead of applying card padding twice', configSource.includes( "fieldset.className = 'nino-admin-card'" ) === false );
 check( 'Config uses only the shared pinned action bar for its single Save', configSource.includes( "'nino-admin-actionbar'" ) && configSource.includes( 'admin-form-actions' ) === false );
 // The search-index rebuild is the Search feature's own panel (dapeio/
