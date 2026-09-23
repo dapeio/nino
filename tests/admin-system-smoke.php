@@ -2734,6 +2734,19 @@ class AdminSmokeFeatureNamerModule {
 	public static function adminPanels( array &$appData ): array { return [ 'AdminSmokeFeatureNamerPanel' ]; }
 }
 
+/** A panel whose icon() answers whatever the icon check below hands it */
+class AdminSmokeIconPanel {
+	public static string $icon = '';
+	public static function actions(): array { return [ 'iconpanel/list' => [ self::class, 'apiList' ] ]; }
+	public static function nav(): array { return [ 'iconpanel', 'Icon panel', 58 ]; }
+	public static function icon(): string { return self::$icon; }
+	public static function apiList( array &$appData, array &$request ): void { \Nino\Http::ok( $request ); }
+}
+
+class AdminSmokeIconModule {
+	public static function adminPanels( array &$appData ): array { return [ 'AdminSmokeIconPanel' ]; }
+}
+
 $withModule = $appData;
 $withModule['/nino/modules'] = [ 'AdminSmokeDummyModule', '\\Nino\\Modules\\Navigation' ];
 
@@ -3042,6 +3055,29 @@ check( 'a panel naming a file that is not there is reported, and the file stays 
 	restore_error_handler();
 	return in_array( '/app/Ghost/assets/ghost.js', $registry['ghost']['assets'] ?? [], true ) === true
 		&& count( array_filter( $warnings, static fn( string $m ): bool => str_contains( $m, '/app/Ghost/assets/ghost.js' ) ) ) === 1;
+} )() );
+
+/*	An icon is the one piece of markup a panel class hands the shell itself
+	(see Panels::_entry()), and trusted code is still held to one shape: an
+	inline svg and nothing that runs. A panel that answers anything else keeps
+	its place in the rail and falls back to the label's initial, which is what
+	a panel without an icon gets - so nothing a class returns here can end up
+	in the rail as a handler or a script	*/
+check( 'an icon a panel answers reaches the rail only as an inline svg with nothing that runs', ( static function() use ( $appData ): bool {
+
+	$plain = '<svg viewBox="0 0 24 24"><path d="M4 4h16"/></svg>';
+	$icons = [];
+
+	foreach( [ $plain, '<img src="x" onerror="alert(1)">', '<svg viewBox="0 0 24 24" onload="alert(1)"><path d="M4 4h16"/></svg>', '<svg viewBox="0 0 24 24"><script>alert(1)</script></svg>' ] as $markup ) {
+		AdminSmokeIconPanel::$icon = $markup;
+		$withIcon = $appData;
+		$withIcon['/nino/modules'] = [ 'AdminSmokeIconModule' ];
+		$icons[$markup] = (string) ( \Nino\Admin\Admin::panels( $withIcon )['iconpanel']['icon'] ?? '' );
+	}
+
+	// The harmless one survives, so this cannot pass by refusing everything
+	return $icons[$plain] === $plain
+		&& array_filter( $icons, static fn( string $icon ): bool => $icon !== '' && ( str_starts_with( $icon, '<svg' ) === false || preg_match( '/<script|\son[a-z]+\s*=/i', $icon ) === 1 ) ) === [];
 } )() );
 
 $getRequest = [ '/nino/http/response' => [ 'statusCode' => 200, 'body' => '[template /_admin/templates/page-index]' ] ];

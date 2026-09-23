@@ -6,6 +6,16 @@ All notable changes to Nino are documented in this file.
 
 ### Added
 
+- **Tests:** the shape a panel's `icon()` is held to, which nothing
+  measured. `Panels::_entry()` documents it as "an inline svg and nothing
+  that runs" and drops anything else, so the rail falls back to the label's
+  initial - what a panel without an icon gets. `tests/admin-system-smoke.php`
+  hands one panel four icons in turn and holds that every one that reaches
+  the rail is an inline svg with no `<script>` and no `on...=` handler, and
+  that the harmless one is not dropped, so the check cannot pass by refusing
+  everything. Proven by replacing the guard's condition with `false`: 680
+  checks, 1 failed.
+
 - **Tests:** the csrf guard's header path was measured against a header
   array the test wrote itself. `\Nino\Csrf::_extractToken()` documents
   that it reads `X-CSRF-Token` off the already normalized request header,
