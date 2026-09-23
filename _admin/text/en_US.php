@@ -25,6 +25,7 @@ return [
 
 	'[[/_admin/label/rail]]'			=> 'Workbench navigation',
 	'[[/_admin/label/nav]]'			=> 'Workbench sections',
+	'[[/_admin/label/language]]'	=> 'Interface language',
 	'[[/_admin/nav/group/content]]'		=> 'Content',
 	'[[/_admin/nav/group/structure]]'	=> 'Structure',
 	'[[/_admin/nav/group/features]]'	=> 'Features',
@@ -58,6 +59,11 @@ return [
 	'[[/_admin/common/label/global]]'		=> 'Global',
 	'[[/_admin/common/label/on]]'				=> 'on',
 	'[[/_admin/common/label/off]]'			=> 'off',
+	// The names behind the shared table's three glyph controls - see
+	// Nino.adminUi.table(), which has no word of its own for them
+	'[[/_admin/common/label/prevpage]]'	=> 'Previous page',
+	'[[/_admin/common/label/nextpage]]'	=> 'Next page',
+	'[[/_admin/common/label/perpage]]'	=> 'Rows per page',
 	'[[/_admin/common/msg/saving]]'			=> 'Saving …',
 	'[[/_admin/common/msg/saved]]'			=> 'Saved.',
 	'[[/_admin/common/msg/deleting]]'		=> 'Deleting …',

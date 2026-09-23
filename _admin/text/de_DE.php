@@ -26,6 +26,7 @@ return [
 
 	'[[/_admin/label/rail]]'			=> 'Navigation der Workbench',
 	'[[/_admin/label/nav]]'			=> 'Bereiche der Workbench',
+	'[[/_admin/label/language]]'	=> 'Sprache der Oberfläche',
 	'[[/_admin/nav/group/content]]'		=> 'Inhalt',
 	'[[/_admin/nav/group/structure]]'	=> 'Struktur',
 	'[[/_admin/nav/group/features]]'	=> 'Features',
@@ -59,6 +60,11 @@ return [
 	'[[/_admin/common/label/global]]'		=> 'Global',
 	'[[/_admin/common/label/on]]'				=> 'an',
 	'[[/_admin/common/label/off]]'			=> 'aus',
+	// Die Namen hinter den drei Glyphen-Bedienelementen der geteilten
+	// Tabelle - siehe Nino.adminUi.table(), die dafür kein eigenes Wort hat
+	'[[/_admin/common/label/prevpage]]'	=> 'Vorherige Seite',
+	'[[/_admin/common/label/nextpage]]'	=> 'Nächste Seite',
+	'[[/_admin/common/label/perpage]]'	=> 'Zeilen pro Seite',
 	'[[/_admin/common/msg/saving]]'			=> 'Wird gespeichert …',
 	'[[/_admin/common/msg/saved]]'			=> 'Gespeichert.',
 	'[[/_admin/common/msg/deleting]]'		=> 'Wird gelöscht …',

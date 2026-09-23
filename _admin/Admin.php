@@ -61,7 +61,12 @@ namespace Nino\Admin {
 			template"	*/
 		public static
 			$html = [
-				'localepicker'	=> '<select id="admin-localepicker">[[content]]</select>',
+				// aria-label rather than a <label>: the switcher sits in the
+				// rail's settings popover and on the login card, neither of
+				// which has room for a visible word beside it - and a select
+				// with no name at all is announced as "combo box", which says
+				// nothing about what changing it does
+				'localepicker'	=> '<select id="admin-localepicker" aria-label="[[/_admin/label/language]]">[[content]]</select>',
 				'locale-option'	=> '<option value="?locale=[[locale]]"[[selected]]>[[label]]</option>',
 			];
 

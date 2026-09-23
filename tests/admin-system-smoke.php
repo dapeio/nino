@@ -3016,6 +3016,15 @@ foreach( [ 'en_US', 'de_DE', 'fr_FR' ] as $locale ) {
 		$noNames['/nino/locales/available'] = [ 'de_DE', 'en_US', 'fr_FR' ];
 		$picker = \Nino\Html::renderHtml( $noNames, \Nino\Html::renderTextfill( $noNames, '/_admin/localepicker' ) );
 		check( 'the language switcher never renders an option with no name', str_contains( $picker, '></option>' ) === false && substr_count( $picker, '<option' ) === 3 );
+		/*	And the switcher itself is called something. It stands alone in the
+			rail's settings popover and on the login card, with no visible word
+			beside it, so without a name of its own it is announced as "combo
+			box" - a control whose whole purpose is invisible to whoever cannot
+			see the flag of options inside it	*/
+		check( '...and the switcher itself carries a name, resolved in the interface language',
+			str_contains( \Nino\Admin\Admin::$html['localepicker'], 'aria-label="[[/_admin/label/language]]"' ) === true
+			&& preg_match( '/aria-label="\[\[/', $picker ) === 0
+			&& preg_match( '/<select id="admin-localepicker" aria-label="[^"\[]+"/', $picker ) === 1 );
 
 		// The name of a language is a text fill, which is editor content: the
 		// Text panel writes it, and it went into the shell's markup as it

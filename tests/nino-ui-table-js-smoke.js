@@ -151,5 +151,87 @@ check( 'an empty set still has a page 1, and reports a range of zero',
 
 check( 'page size 0 cannot divide by zero', model.pageCount( 10, 0 ) >= 1 );
 
+// --- the renderer's own controls ------------------------------------------
+
+/*	The model half is what the rest of this file is about; these four are the
+	renderer's, and the reason they are here is that three of them are drawn
+	as glyphs. A button whose face is '‹' is announced as "button ‹", a select
+	of bare numbers as "combo box", and the search box's placeholder is gone
+	the moment somebody types in it - so the table had four controls and one
+	name between them. The component owns no strings, so the names come from
+	the caller where there is a word and from the workbench's shared fills
+	where there is not.
+
+	A recording element, rather than the no-op stub the model checks share:
+	what is under test is exactly which attributes the renderer sets	*/
+function recorder( tag ) {
+	const el = {
+		tagName : String( tag ).toUpperCase(), className : '', textContent : '', value : '',
+		type : '', placeholder : '', disabled : false, selected : false, tabIndex : 0,
+		dataset : {}, style : {}, attributes : {}, children : [], listeners : {},
+		appendChild : function( child ) { el.children.push( child ); return child },
+		setAttribute : function( name, value ) { el.attributes[name] = String( value ) },
+		getAttribute : function( name ) { return el.attributes[name] ?? null },
+		addEventListener : function( name, fn ) { el.listeners[name] = fn },
+		classList : { add : noop, remove : noop, toggle : noop, contains : () => false },
+		querySelectorAll : function( selector ) {
+			const want = String( selector ).toUpperCase();
+			const found = [];
+			( function walk( node ) {
+				( node.children || [] ).forEach( function( child ) {
+					if( child.tagName === want ) found.push( child );
+					walk( child );
+				} );
+			} )( el );
+			return found;
+		},
+	};
+	Object.defineProperty( el, 'innerHTML', { get : () => '', set : function() { el.children.length = 0 } } );
+	return el;
+}
+
+function descendants( root ) {
+	const found = [];
+	( function walk( node ) {
+		( node.children || [] ).forEach( function( child ) { found.push( child ); walk( child ) } );
+	} )( root );
+	return found;
+}
+
+ctx.document.createElement = recorder;
+ctx.Nino.content = { getText : function( key ) { return 'fill:'+ key } };
+
+const mount = recorder('div');
+ctx.Nino.adminUi.table( {
+	mount 	: mount,
+	columns	: [ { key : 'uri', label : 'Uri', type : 'string' } ],
+	rows 		: [ { uri : '/a' }, { uri : '/b' } ],
+	labels 	: { search : 'Search rows', empty : 'Nothing here', noMatch : 'No match' },
+} );
+
+const drawn 		= descendants( mount );
+const searchBox	= drawn.filter( el => el.type === 'search' )[0];
+const steps 		= drawn.filter( el => el.className === 'nino-admin-table-step' );
+const sizeSelect= drawn.filter( el => el.className === 'nino-admin-table-size' )[0];
+
+check( 'the table drew its toolbar, its pager and its size select', searchBox !== undefined && steps.length === 2 && sizeSelect !== undefined );
+check( 'the search box is named, not only hinted at', searchBox.getAttribute('aria-label') === 'Search rows' );
+check( 'both pager arrows carry a name rather than only a glyph',
+	steps[0].getAttribute('aria-label') === 'fill:/_admin/common/label/prevpage'
+	&& steps[1].getAttribute('aria-label') === 'fill:/_admin/common/label/nextpage'
+	&& steps[0].textContent === '\u2039' && steps[1].textContent === '\u203a' );
+check( '...and so does the rows-per-page select', sizeSelect.getAttribute('aria-label') === 'fill:/_admin/common/label/perpage' );
+
+// A caller with a word of its own is still the one that decides
+const named = recorder('div');
+ctx.Nino.adminUi.table( {
+	mount 	: named,
+	columns	: [ { key : 'uri', label : 'Uri', type : 'string' } ],
+	rows 		: [ { uri : '/a' } ],
+	labels 	: { search : 'Search', empty : '', noMatch : '', prev : 'Zurück', next : 'Weiter', pageSize : 'Zeilen' },
+} );
+const namedSteps = descendants( named ).filter( el => el.className === 'nino-admin-table-step' );
+check( 'a caller\'s own words win over the shared fills', namedSteps[0].getAttribute('aria-label') === 'Zurück' && namedSteps[1].getAttribute('aria-label') === 'Weiter' );
+
 console.log( '\n'+ checks+ ' checks, '+ failures+ ' failed' );
 process.exit( failures === 0 ? 0 : 1 );

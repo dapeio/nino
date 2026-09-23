@@ -170,6 +170,14 @@ check( '...typed as an element reference, marked as a list', store( empty ).data
 check( 'an untouched control already holds valid json', stored( empty ).length === 0 );
 check( 'nothing chosen says so rather than showing a blank box', chosenRows( empty )[0].textContent === 'Nothing chosen' );
 
+/*	The field's name is a <span> above a <div>, so it labels nothing: the
+	search box inside it had a placeholder and no name at all, and a
+	placeholder is not one - it is gone on the first keystroke and never
+	reaches the accessibility tree. The word the caller gives for the box is
+	the box's name as well as its placeholder	*/
+const emptySearch = byClass( empty, 'nino-admin-elementlist-search' )[0];
+check( 'the search box is called something, not just hinted at', emptySearch.attributes['aria-label'] === 'Search' && emptySearch.placeholder === 'Search' );
+
 const seeded = build( { value : [ '/tag/css', '/tag/php' ] } );
 check( 'a stored value is offered in the order it was stored', JSON.stringify( stored( seeded ) ) === '["/tag/css","/tag/php"]' );
 check( '...and each row is named by its label, not its uri', chosenRows( seeded )[0].children[0].textContent === 'CSS' );

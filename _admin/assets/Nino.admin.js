@@ -670,6 +670,11 @@
 			search.type = 'search';
 			search.className = 'nino-admin-input nino-admin-elementlist-search';
 			search.placeholder = text.search || '';
+			// The field's own name belongs to the chosen list, not to the box
+			// below it - a <div> field, so the <span> above labels nothing at
+			// all - and a placeholder is not a name: it is gone the moment
+			// somebody types, and never reaches the accessibility tree as one
+			search.setAttribute( 'aria-label', text.search || '' );
 			field.appendChild( search );
 
 			const results = dc.createElement('ul');
@@ -1055,6 +1060,14 @@
 		 *	boolean cell - is one, so the caller only has to supply two
 		 *	actual sentences.
 		 *
+		 *	What is drawn as a glyph still has to be *called* something: a
+		 *	button whose face is '‹' is announced as "button ‹" and the search
+		 *	box's placeholder is gone the moment somebody types in it. Those
+		 *	three names come from `labels` where the caller has a word, and
+		 *	from the workbench's shared fills where it has not - the same rule
+		 *	switchField()'s on/off pair follows, and the reason the caller
+		 *	still does not have to know them.
+		 *
 		 *	The whole set is passed in and paged here rather than fetched a
 		 *	page at a time: an element type is one file that is read whole
 		 *	on every request (see Nino\Elements::queryElements), so a page
@@ -1071,7 +1084,11 @@
 		 *																					plain value, so behaviour does not depend on how
 		 *																					a cell happens to be drawn.
 		 *	@param		{Array}			options.rows					The complete set
-		 *	@param		{Object}		options.labels				{ search, empty, noMatch }
+		 *	@param		{Object}		options.labels				{ search, empty, noMatch } - and optionally
+		 *																					{ prev, next, pageSize }, the three names the
+		 *																					pager's glyphs carry; each falls back to
+		 *																					/_admin/common/label/prevpage, -/nextpage and
+		 *																					-/perpage
 		 *	@param		{number}		[options.pageSize]		Initial rows per page (default 50)
 		 *	@param		{Array}			[options.pageSizes]		Offered sizes (default [50,100,150])
 		 *	@param		{Function}	[options.onRowClick]	Called with the row object
@@ -1096,6 +1113,16 @@
 
 			const model = Nino.adminUi.tableModel;
 
+			/*	The three names the pager's glyphs carry: the caller's word where
+				it has one, the workbench's shared fill where it has not, English
+				where neither is there - the rule switchField()'s on/off pair
+				follows. Three literal lookups rather than one built from a key:
+				a fill that only a concatenated argument ever names is invisible
+				to the static check every workbench script is held to	*/
+			const prevLabel	= labels.prev 		?? ( Nino.content.getText('/_admin/common/label/prevpage') || 'Previous page' );
+			const nextLabel	= labels.next 		?? ( Nino.content.getText('/_admin/common/label/nextpage') || 'Next page' );
+			const sizeLabel	= labels.pageSize	?? ( Nino.content.getText('/_admin/common/label/perpage') || 'Rows per page' );
+
 			mount.innerHTML = '';
 			mount.classList.add('nino-admin-table-wrap');
 
@@ -1107,6 +1134,11 @@
 			search.type = 'search';
 			search.className = 'nino-admin-table-search';
 			search.placeholder = labels.search || '';
+			// A placeholder is not a name: it disappears on the first keystroke
+			// and never reaches the accessibility tree as one. The toolbar has
+			// no room for a visible label, so the box carries the same word the
+			// placeholder shows
+			search.setAttribute( 'aria-label', labels.search || '' );
 			search.addEventListener( 'input', function() { query = search.value; page = 1; draw() } );
 			toolbar.appendChild( search );
 			mount.appendChild( toolbar );
@@ -1165,6 +1197,7 @@
 
 			const sizeSelect = dc.createElement('select');
 			sizeSelect.className = 'nino-admin-table-size';
+			sizeSelect.setAttribute( 'aria-label', sizeLabel );
 			pageSizes.forEach( function( size ) {
 				const option = dc.createElement('option');
 				option.value = String( size );
@@ -1178,16 +1211,23 @@
 				draw();
 			} );
 
+			/*	The two arrows are glyphs, and a glyph is not a name: a screen
+				reader announced the pager as "button ‹" and "button ›". The
+				component owns no strings, so the word comes from the caller
+				where there is one and from the shared fills where there is
+				not - the rule switchField()'s on/off pair already follows	*/
 			const prev = dc.createElement('button');
 			prev.type = 'button';
 			prev.className = 'nino-admin-table-step';
 			prev.textContent = '\u2039';
+			prev.setAttribute( 'aria-label', prevLabel );
 			prev.addEventListener( 'click', function() { page--; draw() } );
 
 			const next = dc.createElement('button');
 			next.type = 'button';
 			next.className = 'nino-admin-table-step';
 			next.textContent = '\u203a';
+			next.setAttribute( 'aria-label', nextLabel );
 			next.addEventListener( 'click', function() { page++; draw() } );
 
 			pager.appendChild( sizeSelect );

@@ -431,6 +431,27 @@ All notable changes to Nino are documented in this file.
 
 ### Fixed
 
+- **Six controls of the workbench had no name a screen reader could read
+  out.** The language switcher is a bare `<select>` standing on the login
+  card and in the rail's settings popover with no visible word beside it, so
+  it was announced as "combo box" and nothing else. The shared data table's
+  four controls fared no better: its search box carried a placeholder, which
+  is not a name - it is gone on the first keystroke and never reaches the
+  accessibility tree - its two pager arrows were announced as "button ‹" and
+  "button ›", and its rows-per-page select as a combo box of numbers. The
+  multi-reference control's search box had the same placeholder-only
+  problem, under a `<span>` that labels nothing because the field around it
+  is a `<div>`. The switcher names itself from a new
+  `/_admin/label/language` fill; the table and the element list name their
+  boxes with the word the caller already gives them, and the table's three
+  glyph controls fall back to three new `/_admin/common/label/` fills the
+  way `switchField()`'s on/off pair already does, so no caller has to know
+  them. `tests/nino-ui-table-js-smoke.js` drives the renderer through a
+  recording element and holds all four names (four checks, all red before),
+  `tests/nino-ui-elementlist-js-smoke.js` the fifth (one, red), and
+  `tests/admin-system-smoke.php` the switcher's, rendered rather than read,
+  so an unresolved fill would fail it too (one, red).
+
 - **Three screens wrote their answer into a paragraph nobody was told to
   watch.** The login form's verdict, the recovery page's "Checking …" and
   the wizard's "Please fix the error above before continuing" are written
