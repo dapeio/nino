@@ -159,6 +159,8 @@
 				upBtn.type = 'button';
 				upBtn.textContent = '↑';
 				upBtn.title = Nino.content.getText('/_admin/routes/label/moveup');
+				// title is a hover hint, not a name - see Nino.adminUi.elementList()
+				upBtn.setAttribute( 'aria-label', Nino.content.getText('/_admin/routes/label/moveup') );
 				upBtn.disabled = index === 0;
 				upBtn.addEventListener( 'click', function() { Nino.admin.routes._move( entry.httpUri, 'up' ) } );
 				moveWrap.appendChild( upBtn );
@@ -167,6 +169,7 @@
 				downBtn.type = 'button';
 				downBtn.textContent = '↓';
 				downBtn.title = Nino.content.getText('/_admin/routes/label/movedown');
+				downBtn.setAttribute( 'aria-label', Nino.content.getText('/_admin/routes/label/movedown') );
 				downBtn.disabled = index === Nino.admin.routes._pages.length - 1;
 				downBtn.addEventListener( 'click', function() { Nino.admin.routes._move( entry.httpUri, 'down' ) } );
 				moveWrap.appendChild( downBtn );

@@ -185,6 +185,10 @@
 				const up = dc.createElement('button');
 				up.type = 'button';
 				up.title = 'Move up';
+				// title is a hover hint, not a name: it is the weakest source the
+				// accessibility tree accepts and reaches neither a touch screen
+				// nor a keyboard. A button whose face is an arrow says what it is
+				up.setAttribute( 'aria-label', 'Move up' );
 				up.textContent = '↑';
 				up.disabled = index === 0;
 				up.addEventListener( 'click', function() { Nino.install.webpages._move( index, 'up' ) } );
@@ -193,6 +197,7 @@
 				const down = dc.createElement('button');
 				down.type = 'button';
 				down.title = 'Move down';
+				down.setAttribute( 'aria-label', 'Move down' );
 				down.textContent = '↓';
 				down.disabled = index === Nino.install.webpages._entries.length - 1;
 				down.addEventListener( 'click', function() { Nino.install.webpages._move( index, 'down' ) } );

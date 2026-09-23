@@ -431,6 +431,22 @@ All notable changes to Nino are documented in this file.
 
 ### Fixed
 
+- **Nine reorder and remove buttons were called nothing but a hover hint.**
+  The ↑/↓ pair in the Routes list, in the Element Types field list, in the
+  Navigations entry list and in the wizard's Routes list, and the × beside
+  the last of them, have an arrow or a cross for a face and carried the word
+  for it in `title` alone. `title` is the weakest source the accessibility
+  tree accepts, it is shown on hover and on nothing else - not on a touch
+  screen, not to a keyboard - and a project's stylesheet cannot make it
+  visible. `Nino.adminUi.elementList()`'s own button sets both, and these
+  five hand-rolled copies of the same row set one; all nine set
+  `aria-label` beside the title now, from the fill the title already uses.
+  `tests/admin-lists-js-smoke.js` reads every `dc.createElement('button')`
+  in every shipped workbench script, per variable, and requires a name
+  wherever a glyph was written on one - so a Delete whose face is a whole
+  word and whose title is a hint is left alone (one check, red before,
+  naming all nine).
+
 - **A refused contact form said so three ways, and a screen reader was
   handed none of them.** `Nino.ui.js` refuses a submit on the client - a
   required field left empty, an address that is not one - and answered with

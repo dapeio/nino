@@ -774,6 +774,41 @@ check( 'the design system has a heading that is there for whoever is not looking
 	pointer rule asks for (WCAG 2.2 SC 2.5.8)	*/
 check( 'the design system gives a text-shaped action a hit area rather than a line height',
 	/:where\(\.nino-admin\) \.nino-admin-linkbutton \{[^}]*min-height: 1\.5rem;/s.test( shared ) );
+
+/*	A button whose face is a glyph has to be called something, and `title` is
+	not that something: it is the weakest source the accessibility tree
+	accepts, it is shown on hover and on nothing else - not on a touch screen,
+	not to a keyboard - and a project's own stylesheet cannot make it visible.
+	Nino.adminUi.elementList()'s button() sets both; the five ↑/↓/× pairs the
+	panels and the wizard hand-rolled set only the title. Read per variable,
+	so what is checked is the button a glyph was written on and not, say, the
+	hint on a disabled Delete whose face is a whole word	*/
+const glyphOnly = [];
+[ [ '_admin/assets', fs.readdirSync( path.join( cssRoot, '_admin/assets' ) ) ],
+  [ '_admin/install/assets', fs.readdirSync( path.join( cssRoot, '_admin/install/assets' ) ) ] ]
+	.flatMap( function( entry ) { return entry[1].filter( f => f.endsWith('.js') ).map( f => entry[0]+ '/'+ f ) } )
+	.concat( ADMIN_MODULES.flatMap( function( m ) {
+		const dir = path.join( cssRoot, '_admin/Nino/Modules', m, 'assets' );
+		return fs.existsSync( dir ) ? fs.readdirSync( dir ).filter( f => f.endsWith('.js') ).map( f => '_admin/Nino/Modules/'+ m+ '/assets/'+ f ) : [];
+	} ) )
+	.concat( [ 'Form', 'Navigation' ].flatMap( function( m ) {
+		const dir = path.join( cssRoot, '_nino/Nino/Modules', m, 'assets' );
+		return fs.existsSync( dir ) ? fs.readdirSync( dir ).filter( f => f.endsWith('.js') ).map( f => '_nino/Nino/Modules/'+ m+ '/assets/'+ f ) : [];
+	} ) )
+	.forEach( function( file ) {
+		const source = read( file );
+		const buttons = new Set();
+		for( const m of source.matchAll( /(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*dc\.createElement\('button'\)/g ) )
+			buttons.add( m[1] );
+		buttons.forEach( function( name ) {
+			const glyph = new RegExp( '\\b'+ name+ "\\.textContent = '[^A-Za-z0-9\\s]'" ).test( source );
+			const named = new RegExp( '\\b'+ name+ "\\.setAttribute\\(\\s*'aria-label'" ).test( source );
+			if( glyph === true && named === false )
+				glyphOnly.push( file+ ' '+ name );
+		} );
+	} );
+check( 'a button whose face is a glyph carries a name, not only a hover hint'
+	+ ( glyphOnly.length ? ' - '+ glyphOnly.join(', ') : '' ), glyphOnly.length === 0 );
 check( 'every message paragraph a template ships is announced when a script fills it'
 	+ ( mutedMessages.length ? ' - '+ mutedMessages.join(', ') : '' ), mutedMessages.length === 0 );
 check( 'no element in any template carries the same attribute twice'

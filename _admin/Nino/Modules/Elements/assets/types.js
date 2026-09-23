@@ -431,6 +431,9 @@
 			const up = dc.createElement('button');
 			up.type = 'button';
 			up.title = Nino.content.getText('/_admin/common/label/moveup');
+			// title is a hover hint, not a name - see the same pair in the Routes
+			// and Navigations lists, and Nino.adminUi.elementList()'s button()
+			up.setAttribute( 'aria-label', Nino.content.getText('/_admin/common/label/moveup') );
 			up.textContent = '↑';
 			up.disabled = index === 0;
 			up.addEventListener( 'click', function() { Nino.admin.elementTypes._move( index, 'up' ) } );
@@ -439,6 +442,7 @@
 			const down = dc.createElement('button');
 			down.type = 'button';
 			down.title = Nino.content.getText('/_admin/common/label/movedown');
+			down.setAttribute( 'aria-label', Nino.content.getText('/_admin/common/label/movedown') );
 			down.textContent = '↓';
 			down.disabled = index === Nino.admin.elementTypes._fields.length - 1;
 			down.addEventListener( 'click', function() { Nino.admin.elementTypes._move( index, 'down' ) } );
