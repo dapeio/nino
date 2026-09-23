@@ -596,25 +596,47 @@
 			label.textContent = locale;
 			row.appendChild( label );
 
-			const name = dc.createElement('input');
+			/**
+			 *	One of the row's three boxes.
+			 *
+			 *	The row is a grid of a locale code and three controls, with no
+			 *	room for a visible label over each of them - so all three carried
+			 *	a placeholder and nothing else. A placeholder is not a name: it
+			 *	is gone the moment somebody types, and it never reaches the
+			 *	accessibility tree as one, which left a step with four locales on
+			 *	it offering twelve boxes a screen reader could only call "edit
+			 *	text". The name carries the locale too, because "Name" said four
+			 *	times over says nothing about which language it is the name in
+			 *
+			 *	@param		{string}	tag					'input' or 'textarea'
+			 *	@param		{string}	field				Its data-field
+			 *	@param		{string}	name				What it is called
+			 *	@param		{string}	placeholder
+			 *
+			 *	@return		{Element}
+			 */
+			const box = function( tag, field, name, placeholder ) {
+
+				const el = dc.createElement( tag );
+
+				el.placeholder = placeholder;
+				el.dataset.field = field;
+				el.value = values[field] || '';
+				el.setAttribute( 'aria-label', name+ ' ('+ locale+ ')' );
+
+				return el;
+			};
+
+			const name = box( 'input', 'name', 'Name', 'Name e.g. "Home"' );
 			name.type = 'text';
-			name.placeholder = 'Name e.g. "Home"';
-			name.dataset.field = 'name';
-			name.value = values.name || '';
 			row.appendChild( name );
 
-			const title = dc.createElement('input');
+			const title = box( 'input', 'title', 'HTML Title', 'HTML Title e.g. "Welcome"' );
 			title.type = 'text';
-			title.placeholder = 'HTML Title e.g. "Welcome"';
-			title.dataset.field = 'title';
-			title.value = values.title || '';
 			row.appendChild( title );
 
-			const description = dc.createElement('textarea');
+			const description = box( 'textarea', 'description', 'HTML Description', 'HTML Description, etc.' );
 			description.rows = 2;
-			description.placeholder = 'HTML Description, etc.';
-			description.dataset.field = 'description';
-			description.value = values.description || '';
 			row.appendChild( description );
 
 			return row;

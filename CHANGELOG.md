@@ -431,6 +431,20 @@ All notable changes to Nino are documented in this file.
 
 ### Fixed
 
+- **The wizard's Routes step offered three boxes per language that a screen
+  reader could only call "edit text".** A route's per-locale row is a grid of
+  the locale code and three controls - the menu name, the HTML title and the
+  description - and none of them had a label: all three carried a
+  placeholder, which is not a name, because it is gone the moment somebody
+  types in the box and never reaches the accessibility tree as one. A
+  project set up in four languages therefore had twelve unnamed boxes on one
+  screen, in one row each, with nothing but their order to tell them apart.
+  Each box now names itself, and names its locale with it - "Name (de_DE)" -
+  since "Name" four times over says nothing about which language it is the
+  name in; the placeholder stays as the example it always was.
+  `tests/install-script-js-smoke.js` gained a recording element and builds a
+  row through the step's own `_localeRow()` (three checks, one red before).
+
 - **The workbench had no heading of any level, and the wizard's ran h3, h3,
   h3, h1.** Measured in headless Chromium on the rendered shell: `h1
   count=0`, and no `h2` or `h3` either, so a screen reader asked to list the

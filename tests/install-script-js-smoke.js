@@ -61,12 +61,28 @@ const elements = {
 	elements['install-nav-'+ key] = navSpan();
 } );
 
+// A recording element, for the parts of a step that build their own dom
+function recorder( tag ) {
+	const el = {
+		tagName : String( tag ).toUpperCase(), className : '', textContent : '', value : '',
+		type : '', placeholder : '', rows : 0,
+		dataset : {}, attributes : {}, children : [], listeners : {},
+		classList : classList(),
+		appendChild : function( child ) { el.children.push( child ); return child },
+		setAttribute : function( name, value ) { el.attributes[name] = String( value ) },
+		getAttribute : function( name ) { return el.attributes[name] ?? null },
+		addEventListener : function( name, fn ) { el.listeners[name] = fn },
+	};
+	return el;
+}
+
 const sandbox = {
 	console : console,
 	document : {
 		documentElement : null,
 		body : null,
 		getElementById : function( id ) { return elements[id] ?? null },
+		createElement : recorder,
 	},
 };
 sandbox.window = sandbox;
@@ -197,6 +213,21 @@ sandbox.Nino.install.apiCall = function( action, payload, callback ) {
 };
 webpages.apply( function( ok ) { callbackResult = ok } );
 check( 'a preserved open form is included before the page list is posted', apiCalls === 1 && callbackResult === true );
+
+/*	A route's per-locale row is a grid of a locale code and three boxes, with
+	no room for a label over each of them - so all three carried a placeholder
+	and nothing else. A placeholder is not a name: it is gone on the first
+	keystroke and never reaches the accessibility tree as one, so a step with
+	four locales on it offered twelve boxes a screen reader could only call
+	"edit text". The locale is part of each name, because "Name" four times
+	over says nothing about which language it is the name in	*/
+const localeRow = webpages._localeRow( 'de_DE', { name : 'Start' } );
+const boxes = localeRow.children.filter( function( child ) { return child.tagName === 'INPUT' || child.tagName === 'TEXTAREA' } );
+check( 'a locale row draws its three boxes', boxes.length === 3 && boxes.map( function( b ) { return b.dataset.field } ).join(',') === 'name,title,description' );
+check( '...each of them named, and named for its locale', boxes.every( function( b ) { return ( b.getAttribute('aria-label') || '' ).endsWith(' (de_DE)') } )
+	&& boxes[0].getAttribute('aria-label') === 'Name (de_DE)' );
+check( '...with the placeholder still there as the hint it always was, and the value untouched',
+	boxes[0].placeholder === 'Name e.g. "Home"' && boxes[0].value === 'Start' && boxes[1].value === '' );
 
 console.log( '\n'+ checks+ ' checks, '+ failures+ ' failed' );
 process.exitCode = failures === 0 ? 0 : 1;
