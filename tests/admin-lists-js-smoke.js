@@ -671,6 +671,42 @@ templateFiles.forEach( function( file ) {
 } );
 
 check( 'every template was found and read', templateFiles.length > 10 && templateFiles.indexOf('_admin/templates/page-index.tpl') !== -1 );
+
+/*	A message a script writes after an action is only a message if somebody is
+	told it changed. The workbench's own pages carry one paragraph per screen
+	that a script fills - the login form's answer, the recovery page's
+	"Checking …", the wizard's "Please fix the error above" - and three of
+	those were plain paragraphs: the text appeared, and a screen reader said
+	nothing at all, because nothing had asked it to watch.
+
+	The list is taken from the scripts rather than written here: every id
+	ending in msg or message that a shipped script reaches for is a paragraph
+	something writes into, so the next screen to grow one is held to the same
+	rule without this test being edited. A paragraph no script names (the two
+	locked pages' one sentence) is static text and needs nothing	*/
+const writtenMessageIds = new Set();
+[ '_admin/assets', '_admin/install/assets' ].forEach( function( dir ) {
+	fs.readdirSync( path.join( cssRoot, dir ) ).filter( f => f.endsWith('.js') ).forEach( function( file ) {
+		const source = read( dir+ '/'+ file );
+		const lookups = /getElementById\(\s*'([-\w]*(?:msg|message))'\s*\)/g;
+		let found;
+		while( ( found = lookups.exec( source ) ) !== null )
+			writtenMessageIds.add( found[1] );
+	} );
+} );
+
+const mutedMessages = [];
+templateFiles.forEach( function( file ) {
+	const markup = read( file );
+	const tags = /<[a-zA-Z][-\w:]*\s+[^>]*id="([-\w]+)"[^>]*>/g;
+	let tag;
+	while( ( tag = tags.exec( markup ) ) !== null )
+		if( writtenMessageIds.has( tag[1] ) === true && /role="(status|alert)"/.test( tag[0] ) === false )
+			mutedMessages.push( file+ ' #'+ tag[1] );
+} );
+check( 'the sweep found the message paragraphs to hold', writtenMessageIds.has('form-message') && writtenMessageIds.has('install-actions-msg') && writtenMessageIds.size >= 5 );
+check( 'every message paragraph a template ships is announced when a script fills it'
+	+ ( mutedMessages.length ? ' - '+ mutedMessages.join(', ') : '' ), mutedMessages.length === 0 );
 check( 'no element in any template carries the same attribute twice'
 	+ ( repeatedAttributes.length ? ' - '+ repeatedAttributes.slice( 0, 5 ).join(', ') : '' ), repeatedAttributes.length === 0 );
 

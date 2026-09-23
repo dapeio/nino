@@ -60,6 +60,10 @@ function field() {
 	const classes = [];
 	const node = {
 		value : '', innerHTML : '',
+		// A refused field says so twice: the outline the stylesheet paints and
+		// the aria-invalid a screen reader reads out, so the stub carries
+		// attributes as well as classes
+		attributes : {},
 		classList : {
 			add : function( name ) { if( classes.indexOf( name ) === -1 ) classes.push( name ) },
 			remove : function( name ) {
@@ -68,6 +72,9 @@ function field() {
 			},
 			contains : function( name ) { return classes.indexOf( name ) !== -1 },
 		},
+		setAttribute : function( name, value ) { this.attributes[name] = String( value ) },
+		removeAttribute : function( name ) { delete this.attributes[name] },
+		getAttribute : function( name ) { return this.attributes[name] ?? null },
 		focus : function() {},
 		addEventListener : function( type, fn ) { this.handler = fn },
 	};
@@ -207,6 +214,19 @@ check( 'an empty password too', attempt( 401 ) === sandbox.NinoJstext['/_admin/l
 	a moment ago has been filled in, so nothing may still point at it	*/
 check( 'the field that was filled in loses the outline it was given', el['input-user'].classList.contains('error') === false );
 check( '...and the one that is empty now has it instead', el['input-pw'].classList.contains('error') === true );
+
+/*	The outline is a colour, and a colour is the one thing a screen reader is
+	never told and a colour-blind operator may not see. The mark is also a
+	word - aria-invalid on the field the form refused - and it comes off with
+	the outline, or the next attempt points at a field that is fine now	*/
+check( 'the refused field is marked in words, not only with a colour', el['input-pw'].getAttribute('aria-invalid') === 'true' );
+check( '...and the field that was filled in carries no mark at all', el['input-user'].getAttribute('aria-invalid') === null );
+
+/*	The sentence that says why is written into #form-message, which the login
+	template declares as a live region - without that, every message this file
+	writes after a submit is a message a screen reader never hears	*/
+const loginTemplate = fs.readFileSync( path.join( __dirname, '../_admin/templates/page-login.tpl' ), 'utf8' );
+check( 'the message the form writes into is announced when it changes', /<p id="form-message"[^>]*role="status"[^>]*aria-live="polite"/.test( loginTemplate ) );
 
 // Both filled in again: a submit that reaches the server leaves neither
 // field marked, and the message says only that the request is running

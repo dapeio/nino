@@ -126,7 +126,7 @@
 							install/assets/style.css. install-actions-msg is the wizard's
 							own and is always there.	-->
 				<div id="install-actions-status" class="nino-admin-actionbar-status">
-					<p id="install-actions-msg"></p>
+					<p id="install-actions-msg" role="status" aria-live="polite"></p>
 					<p id="setup-msg" class="install-step-msg" role="status" aria-live="polite"></p>
 					<p id="webpages-msg" class="install-step-msg" role="status" aria-live="polite"></p>
 					<p id="personalinfos-msg" class="install-step-msg" role="status" aria-live="polite"></p>

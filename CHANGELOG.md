@@ -431,6 +431,25 @@ All notable changes to Nino are documented in this file.
 
 ### Fixed
 
+- **Three screens wrote their answer into a paragraph nobody was told to
+  watch.** The login form's verdict, the recovery page's "Checking …" and
+  the wizard's "Please fix the error above before continuing" are written
+  into a paragraph by a script after a submit, and the three paragraphs were
+  plain `<p>` elements: the sentence appeared on the screen and a screen
+  reader said nothing, so an operator who cannot see it pressed Log in and
+  got silence. All three are `role="status" aria-live="polite"` now, the way
+  the wizard's five per-step messages and the recovery page's other two
+  already were. The login form also marked the field it refused with a red
+  outline and nothing else - a colour, which is the one signal that reaches
+  neither a screen reader nor a colour-blind operator - and sets
+  `aria-invalid` beside it, taken back with the outline on the next attempt.
+  `tests/admin-lists-js-smoke.js` collects every `msg`/`message` id a
+  shipped `_admin` script writes into and holds each one's paragraph to a
+  live region, so the next screen to grow one is held to it too (one check,
+  red before, naming all three); `tests/admin-login-js-smoke.js` grew
+  attributes in its dom stub and three checks around the mark and the
+  region (two red before).
+
 - **A tab strip of the workbench could be operated with a pointer and not
   with the arrow keys.** All three of them - the strip the shell renders over
   a pane's tabs (`\Nino\Admin\Panels::$html`) and the Features panel's two -

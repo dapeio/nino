@@ -42,6 +42,35 @@
 				submit		: dc.getElementById('submit'),
 			};
 
+			/**
+			 *	Mark a field as refused, or take the mark back.
+			 *
+			 *	The red outline is what the form says it with, and a red outline
+			 *	is the one signal a screen reader is never given and a
+			 *	colour-blind operator may not see either. aria-invalid is the
+			 *	same sentence in words; the message under the fields - a
+			 *	role="status" in the template - is the rest of it, so the field
+			 *	says it was refused and the message says why. Removed rather than
+			 *	set to "false", because the attribute is the mark and a field
+			 *	nobody refused carries no mark at all
+			 *
+			 *	@param		{Element}	field
+			 *	@param		{boolean}	invalid
+			 *
+			 *	@return		void
+			 */
+			const mark = function( field, invalid ) {
+
+				if( invalid === true ) {
+					field.classList.add('error');
+					field.setAttribute( 'aria-invalid', 'true' );
+					return;
+				}
+
+				field.classList.remove('error');
+				field.removeAttribute('aria-invalid');
+			};
+
 			// Catch login
 			dc.getElementById('form-login').addEventListener( 'submit', function(e){
 				e.preventDefault();
@@ -53,18 +82,18 @@
 						got one of its own - two fields marked, one of them correct.
 						The message class is reset here for the same reason, so the
 						answer below finds nothing of the previous attempt left on it */
-				el.inputUser.classList.remove('error');
-				el.inputPw.classList.remove('error');
+				mark( el.inputUser, false );
+				mark( el.inputPw, false );
 				el.formMsg.className = '';
 
 				if(el.inputUser.value.length === 0) {
-					el.inputUser.classList.add('error')
+					mark( el.inputUser, true );
 					el.formMsg.innerHTML = Nino.content.getText('/_admin/login/error/user');
 					el.inputUser.focus();
 					return;
 				}
 				if(el.inputPw.value.length === 0) {
-					el.inputPw.classList.add('error')
+					mark( el.inputPw, true );
 					el.formMsg.innerHTML = Nino.content.getText('/_admin/login/error/pw');
 					el.inputPw.focus();
 					return;
