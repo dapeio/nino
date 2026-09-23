@@ -1245,8 +1245,19 @@
 				page = view.page;
 
 				headRow.querySelectorAll('th').forEach( function( th ) {
-					th.classList.toggle( 'is-sorted', th.dataset.key === sortKey );
-					th.classList.toggle( 'is-desc', th.dataset.key === sortKey && sortDir < 0 );
+
+					const sorted = th.dataset.key === sortKey;
+
+					th.classList.toggle( 'is-sorted', sorted );
+					th.classList.toggle( 'is-desc', sorted && sortDir < 0 );
+
+					/*	Which column the table is ordered by, said rather than only
+						drawn: the ↑/↓ above is a ::after on the sorted header, and a
+						generated glyph is one of the two things a screen reader is
+						never handed - the other being the colour it is drawn in. A
+						header that is not the sorted one says "none", which is what
+						tells the reader the column can be sorted at all	*/
+					th.setAttribute( 'aria-sort', sorted === false ? 'none' : ( sortDir < 0 ? 'descending' : 'ascending' ) );
 				} );
 
 				tbody.innerHTML = '';

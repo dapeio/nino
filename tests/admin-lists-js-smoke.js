@@ -314,6 +314,25 @@ check( 'a pane\'s tab strip carries the workbench bar surface, full width and fl
 check( 'the workbench stylesheet is one file: the design system first, its own rules after', css.indexOf('@layer nino.system {') > 0 && css.indexOf('@layer nino.system {') < css.indexOf('@layer nino.tool {') && fs.existsSync( path.join( __dirname, '../_admin/assets/Nino.admin.css' ) ) === false );
 check( 'shared rows expose a right-facing drill-down arrow', sharedCss.includes('.nino-admin-list li > a::after') && sharedCss.includes('content: "›"') );
 check( 'shared rows retain a keyboard focus treatment', sharedCss.includes('.nino-admin-list li > a:focus-visible') );
+
+/*	Taking the browser's ring off a control is only allowed where something
+	of equal visibility replaces it (WCAG 2.2 SC 2.4.7 and 1.4.11). Two of the
+	design system's three `outline: none` rules put an inset box-shadow back;
+	the third, on a clickable table row, replaced it with the same tint the
+	row already uses for hover - 1.15:1 against the card in the light scheme,
+	1.26:1 in the dark one, where the rule asks for 3:1 - so a keyboard could
+	walk the rows and could not see which one it was on. The sweep is over
+	every rule that removes an outline, since the next one to do it is the
+	next one to forget	*/
+const unringed = [];
+sharedCss.replace( /([^{}]+)\{([^}]*)\}/g, function( rule, selector, body ) {
+	if( /outline:\s*(none|0)/.test( body ) === true && /box-shadow:\s*(?!none)/.test( body ) === false )
+		unringed.push( selector.trim().split('\n').pop().trim() );
+	return rule;
+} );
+check( 'no shared rule takes a focus ring off without putting one back'+ ( unringed.length ? ' - '+ unringed.join(' | ') : '' ), unringed.length === 0 );
+check( 'a clickable table row draws its own ring, inside the row the scroller would clip',
+	/:where\(\.nino-admin\) \.nino-admin-table tbody tr:focus-visible \{[^}]*outline: 2px solid var\(--editor-blue\);[^}]*outline-offset: -2px;/s.test( sharedCss ) );
 check( 'Dashboard list rows are plain block links the tile grid does not restyle', adminAsset( 'Dashboard', 'admin.css' ).includes('#admin-dashboard-elements a') );
 
 // A panel's own rules travel with it, in a stylesheet of the same shape every

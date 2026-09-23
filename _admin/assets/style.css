@@ -1606,7 +1606,19 @@ a {
 
 :where(.nino-admin) .nino-admin-table tbody tr:is(:hover, :focus-visible) {
 	background: var(--editor-blue-soft);
-	outline: none;
+}
+
+/*	A clickable row is a tab stop (see Nino.adminUi.table()), and the row it
+	shared its answer with the pointer: the tint above, which measures 1.15:1
+	against the card in the light scheme and 1.26:1 in the dark one, where the
+	focus rule asks for 3:1 (WCAG 2.2 SC 1.4.11) - and the browser's own ring
+	was taken off with `outline: none` on top of that. So a keyboard could
+	walk the rows and could not see which one it was on. The ring is drawn
+	inside the row rather than around it, because a table row's outline is
+	clipped by the scroller the table sits in. */
+:where(.nino-admin) .nino-admin-table tbody tr:focus-visible {
+	outline: 2px solid var(--editor-blue);
+	outline-offset: -2px;
 }
 
 /* Numbers line up on their last digit, uris read as identifiers.

@@ -233,5 +233,28 @@ ctx.Nino.adminUi.table( {
 const namedSteps = descendants( named ).filter( el => el.className === 'nino-admin-table-step' );
 check( 'a caller\'s own words win over the shared fills', namedSteps[0].getAttribute('aria-label') === 'Zurück' && namedSteps[1].getAttribute('aria-label') === 'Weiter' );
 
+/*	Which column the table is ordered by was drawn and not said: a ::after
+	glyph on the sorted header, plus a class. A generated glyph is exactly
+	what a screen reader is not handed, so the header says it in the attribute
+	the pattern has for it - and an unsorted header saying "none" is what
+	tells the reader the column can be sorted at all	*/
+const sortable = recorder('div');
+ctx.Nino.adminUi.table( {
+	mount 	: sortable,
+	columns	: [ { key : 'uri', label : 'Uri', type : 'string' }, { key : 'n', label : 'N', type : 'integer' } ],
+	rows 		: [ { uri : '/b', n : 2 }, { uri : '/a', n : 1 } ],
+	labels 	: { search : 'Search', empty : '', noMatch : '' },
+} );
+const headers = descendants( sortable ).filter( el => el.tagName === 'TH' );
+check( 'an unsorted table says every column may be sorted', headers.length === 2 && headers.every( th => th.getAttribute('aria-sort') === 'none' ) );
+
+const sortButtons = descendants( sortable ).filter( el => el.className === 'nino-admin-table-sort' );
+sortButtons[1].listeners.click();
+check( 'the column the table is ordered by says so, and in which direction', headers[1].getAttribute('aria-sort') === 'ascending' && headers[0].getAttribute('aria-sort') === 'none' );
+sortButtons[1].listeners.click();
+check( '...and says it again the other way round on a second press', headers[1].getAttribute('aria-sort') === 'descending' );
+sortButtons[0].listeners.click();
+check( '...and the column that lost the sort goes back to none', headers[1].getAttribute('aria-sort') === 'none' && headers[0].getAttribute('aria-sort') === 'ascending' );
+
 console.log( '\n'+ checks+ ' checks, '+ failures+ ' failed' );
 process.exit( failures === 0 ? 0 : 1 );

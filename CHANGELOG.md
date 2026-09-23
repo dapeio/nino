@@ -431,6 +431,23 @@ All notable changes to Nino are documented in this file.
 
 ### Fixed
 
+- **A keyboard could walk the shared table's rows and not see which one it
+  was on, and never heard which column it was sorted by.** A clickable row
+  in `Nino.adminUi.table()` is a tab stop, and the stylesheet answered focus
+  with the same tint it answers hover with - and took the browser's own ring
+  off on top of it. Computed from the design tokens, that tint is 1.15:1
+  against the card in the light scheme and 1.26:1 in the dark one, where the
+  focus rule asks for 3:1 (WCAG 2.2 SC 1.4.11). The row draws a real 2px ring
+  now, inset so the table's own scroller cannot clip it. The sort state had
+  the matching problem from the other side: which column the table is ordered
+  by, and in which direction, was a `::after` glyph and a class - both of
+  them things a screen reader is handed nothing of - so every header now
+  carries `aria-sort`, "none" included, which is also what says the column
+  can be sorted at all. `tests/admin-lists-js-smoke.js` sweeps the design
+  system for a rule that removes an outline without putting one back (two
+  checks, both red before) and `tests/nino-ui-table-js-smoke.js` presses the
+  sort buttons and reads the attribute back (four checks, all red before).
+
 - **"Log out" and "Close recovery" were links to nowhere, and too small to
   hit.** Both were `<a href="#">` with a click handler: announced to a screen
   reader as links, activated by Enter and not by Space the way every other
