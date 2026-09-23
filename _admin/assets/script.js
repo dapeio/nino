@@ -99,6 +99,27 @@
 				if( wn.location.hash !== hash )
 					wn.history.replaceState( null, '', hash );
 			},
+
+			/**
+			 *	The shell's own write, after a panel or a tab was opened: its
+			 *	name and nothing behind it, unless the hash already names it.
+			 *
+			 *	A panel that keeps drill-down state writes the hash itself, with
+			 *	the parts that state needs (see set() and Elements' showCurrent()).
+			 *	The others never wrote it at all, so the address kept naming
+			 *	whatever panel had last written - open Images, then Routes, and
+			 *	the bar still said #images, and a reload went back to Images.
+			 *	Asked after the panel's own showCurrent() ran, so a panel that
+			 *	wrote a deeper address keeps it: this only fills the silence
+			 *
+			 *	@param		{string}	name					A panel or one of its tabs
+			 *
+			 *	@return		void
+			 */
+			settle : function( name ) {
+				if( Nino.admin.router.current().panel !== name )
+					Nino.admin.router.set( name, [] );
+			},
 		},
 
 		/**
@@ -639,6 +660,7 @@
 
 				if( tabPanes.length === 0 ) {
 					show( panel );
+					Nino.admin.router.settle( panel );
 					return;
 				}
 
@@ -657,6 +679,7 @@
 				} );
 
 				show( current );
+				Nino.admin.router.settle( current );
 			}
 
 			/**

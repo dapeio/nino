@@ -1230,8 +1230,16 @@ a {
 	padding: .55rem 1.25rem;
 	border-bottom: 2px solid transparent;
 	border-radius: 0;
+	/* A tab is a word on the rule, not a button on the page: the surface
+	   every button carries came through on a page-coloured background as a
+	   white box around each inactive tab, which the head's white bar hid */
+	background: none;
 	box-shadow: none;
 	color: var(--editor-text-secondary);
+}
+:where(.nino-admin) .nino-admin-tabs--bar .nino-admin-tab:hover:not(.is-active) {
+	background: none !important;
+	color: var(--editor-text);
 }
 
 :where(.nino-admin) .nino-admin-tabs--bar .nino-admin-tab.is-active {

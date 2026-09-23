@@ -446,6 +446,17 @@ All notable changes to Nino are documented in this file.
 
 ### Fixed
 
+- **A panel opened from the rail did not write its name into the address.**
+  Only the panels that keep drill-down state - Dashboard, Elements, Text,
+  Images, Users and its Roles tab - wrote the url hash, through
+  `router.set()` with the parts that state needs. The nineteen others never
+  wrote it, so the bar kept naming whatever panel had last written: open
+  Images, then Routes, and it still said `#images`, and a reload went back
+  to Images. `selectTab()` settles the hash after every switch - the panel's
+  or the open tab's bare name, unless the panel's own script already wrote
+  a deeper one - and `tests/admin-script-js-smoke.js` reads the address
+  back after a rail click, a tab click and an arrow key.
+
 - **A `--bar` tab strip anywhere but the panel head drew as the segmented
   one.** The design system has two strips: the segmented row of equal boxes
   with the open tab filled, and `--bar`, natural widths under one rule with

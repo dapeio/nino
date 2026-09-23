@@ -157,12 +157,16 @@ const shellNodes = {
 	'admin-user-logout' : node( 'admin-user-logout', {} ),
 	'admin-content-dashboard' : dashboardPane,
 	'admin-content-users' : usersPane,
+	'admin-tab-roles' : rolesPane,
+	'admin-tab-lockout' : lockoutPane,
 };
 
 const shell = {
 	console : console,
 	location : { hash : '#users' },
-	history : { replaceState : function() {} },
+	// What the router writes is what the bar shows - the stub keeps the two
+	// in step the way a browser does, so the checks below can read it back
+	history : { replaceState : function( state, title, url ) { shell.location.hash = url } },
 	addEventListener : function() {},
 	document : {
 		documentElement : null, body : null,
@@ -192,12 +196,22 @@ check( '...and no other link claims to be the current page', railLinks.dashboard
 railLinks.dashboard.listeners.click( { preventDefault : function() {} } );
 check( 'the mark moves with the panel', railLinks.dashboard.getAttribute('aria-current') === 'page' && railLinks.users.getAttribute('aria-current') === null );
 
+/*	And the address moves with it. A panel that keeps drill-down state writes
+	the hash itself; the others never wrote it, so the bar kept naming the
+	last panel that did - open Images, then Routes, and it still said #images,
+	and a reload went back to Images. The shell writes the bare name after
+	every switch the panel's own script did not settle	*/
+check( 'a panel opened from the rail writes its name into the address', shell.location.hash === '#dashboard' );
+railLinks.users.listeners.click( { preventDefault : function() {} } );
+check( '...and a pane with tabs writes the tab that is open', shell.location.hash === '#roles' );
+
 check( 'a pane strip starts with exactly one tab selected and one tab stop', rolesTab.getAttribute('aria-selected') === 'true'
 	&& lockoutTab.getAttribute('aria-selected') === 'false' && rolesTab.tabIndex === 0 && lockoutTab.tabIndex === -1 );
 
 rolesTab.listeners.keydown( { key : 'ArrowRight', preventDefault : function() {} } );
 check( 'an arrow key opens the next tab of a pane strip', lockoutTab.getAttribute('aria-selected') === 'true'
 	&& lockoutPane.hidden === false && rolesPane.hidden === true && lockoutTab.focused === true );
+check( '...and the address names the tab now open', shell.location.hash === '#lockout' );
 
 console.log( '\n'+ checks+ ' checks, '+ failures+ ' failed' );
 process.exitCode = failures === 0 ? 0 : 1;
