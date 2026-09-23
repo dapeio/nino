@@ -123,8 +123,7 @@
 					dc.getElementById('recovery-reset-pw').value = '';
 				} );
 			} );
-			dc.getElementById('recovery-logout').addEventListener( 'click', function( ev ) {
-				ev.preventDefault();
+			dc.getElementById('recovery-logout').addEventListener( 'click', function() {
 				Nino.recovery._apiCall( 'logout', {}, function() { wn.location.reload() } );
 			} );
 		},

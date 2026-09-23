@@ -431,6 +431,25 @@ All notable changes to Nino are documented in this file.
 
 ### Fixed
 
+- **"Log out" and "Close recovery" were links to nowhere, and too small to
+  hit.** Both were `<a href="#">` with a click handler: announced to a screen
+  reader as links, activated by Enter and not by Space the way every other
+  action in the workbench is, and - being real links to the page one is
+  already on - a middle-click or "open in new tab" on either reloaded the
+  screen instead of doing anything. Measured in headless Chromium on the
+  rendered shell, "Log out" was also 44x19 css px, under the 24x24 the
+  pointer rule asks for (WCAG 2.2 SC 2.5.8). Both are `<button type="button">`
+  now, and the design system grew `.nino-admin-linkbutton` for the shape they
+  need - an action that reads as a line of text - which takes the button
+  surface back off and puts a 1.5rem floor under the hit area - and the shared
+  hover rule names it as its one exception, since that rule weighs more than
+  the new class's own and would otherwise tint a button that has no surface;
+  the two handlers dropped the `preventDefault()` they no longer have anything
+  to prevent. The same measurement now reports no focusable element of the shell
+  under 24px in either direction. `tests/admin-lists-js-smoke.js` sweeps the
+  tool's own templates for `href="#"` - the shape the mistake always takes -
+  and holds the new class to its floor (two checks, both red before).
+
 - **Six controls of the workbench had no name a screen reader could read
   out.** The language switcher is a bare `<select>` standing on the login
   card and in the rail's settings popover with no visible word beside it, so

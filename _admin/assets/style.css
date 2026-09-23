@@ -77,7 +77,7 @@
  *   Type       .nino-admin-hint  .nino-admin-hint-lead  .nino-admin-eyebrow
  *              .nino-admin-error  .nino-admin-empty
  *   Controls   .nino-admin-btn-primary  .nino-admin-btn-secondary
- *              .nino-admin-btn-danger
+ *              .nino-admin-btn-danger  .nino-admin-linkbutton
  *   Surfaces   .nino-admin-card  .nino-admin-tiles  .nino-admin-tile
  *              .nino-admin-tile-value .nino-admin-tile-label
  *              .nino-admin-meter-row  .nino-admin-meter-label
@@ -342,6 +342,28 @@ a {
 	color: var(--editor-red);
 }
 
+/* An action that belongs in a line of text: the rail's "Log out", the
+   recovery page's "Close recovery". Both used to be <a href="#"> - announced
+   as links, offered to Enter and not to Space, and pointing at nothing - so
+   they are buttons now, and this is what takes the button surface back off
+   them. The 24px floor is the target size the pointer rule asks for (WCAG
+   2.2 SC 2.5.8): "Log out" is one line of .82rem text, which is 19px tall on
+   its own. */
+:where(.nino-admin) .nino-admin-linkbutton {
+	min-height: 1.5rem;
+	padding: 0;
+	border-radius: 0;
+	background: none;
+	font-size: inherit;
+	font-weight: inherit;
+	box-shadow: none;
+}
+
+:where(.nino-admin) .nino-admin-linkbutton:hover:not(:disabled) {
+	background: none;
+	text-decoration: underline;
+}
+
 /* The fold is a desktop control (see the sidebar block below): on a phone
    the rail is a top bar and has nothing to fold. */
 :where(.nino-admin) .nino-admin-rail-toggle {
@@ -510,7 +532,10 @@ a {
 	transition: background-color .15s ease, border-color .15s ease, color .15s ease, box-shadow .15s ease, opacity .12s ease;
 }
 
-:where(.nino-admin) button:hover:not(:disabled):not(.is-active) {
+/* Not the link-shaped one: it has no surface to tint, and this rule weighs
+   more than its own (three classes and an element against three classes), so
+   naming the exception here is the only place it can be made */
+:where(.nino-admin) button:hover:not(:disabled):not(.is-active):not(.nino-admin-linkbutton) {
 	background: var(--editor-blue-soft);
 }
 

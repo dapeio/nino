@@ -705,6 +705,32 @@ templateFiles.forEach( function( file ) {
 			mutedMessages.push( file+ ' #'+ tag[1] );
 } );
 check( 'the sweep found the message paragraphs to hold', writtenMessageIds.has('form-message') && writtenMessageIds.has('install-actions-msg') && writtenMessageIds.size >= 5 );
+
+/*	An action is a button and a place is a link (AGENTS.md, "Templates"). The
+	rail's "Log out" and the recovery page's "Close recovery" were written as
+	<a href="#">: announced as links to whoever cannot see them, offered to
+	Enter and not to Space, and pointing at the page they are already on - so
+	a middle-click or a "open in new tab" reloaded the workbench instead of
+	logging out. href="#" is what that mistake always looks like, so the
+	sweep is for that rather than for the two ids.
+
+	Over the tool's own screens, not over the section library: a preset's
+	"Learn more" is an href="#" on purpose - it is where the project puts its
+	own address, and nothing is wired to it	*/
+const fakeLinks = [];
+templateFiles.filter( function( file ) {
+	return file.startsWith('_admin/templates/') || file.startsWith('_admin/install/templates/');
+} ).forEach( function( file ) {
+	if( ( read( file ).match( /<a\s[^>]*href="#"/g ) || [] ).length > 0 )
+		fakeLinks.push( file );
+} );
+check( 'no template writes an action as a link to nowhere'+ ( fakeLinks.length ? ' - '+ fakeLinks.join(', ') : '' ), fakeLinks.length === 0 );
+
+/*	...and a button that reads as a line of text still has to be big enough to
+	hit: "Log out" is one line of .82rem type, 19px tall, under the 24px the
+	pointer rule asks for (WCAG 2.2 SC 2.5.8)	*/
+check( 'the design system gives a text-shaped action a hit area rather than a line height',
+	/:where\(\.nino-admin\) \.nino-admin-linkbutton \{[^}]*min-height: 1\.5rem;/s.test( shared ) );
 check( 'every message paragraph a template ships is announced when a script fills it'
 	+ ( mutedMessages.length ? ' - '+ mutedMessages.join(', ') : '' ), mutedMessages.length === 0 );
 check( 'no element in any template carries the same attribute twice'

@@ -42,7 +42,7 @@
 						<button type="submit">Set password</button>
 					</form>
 				</section>
-				<p class="nino-admin-hint"><a href="[[/nino/dir]]/_admin/">Back to /_admin</a> · <a href="#" id="recovery-logout">Close recovery</a></p>
+				<p class="nino-admin-hint"><a href="[[/nino/dir]]/_admin/">Back to /_admin</a> · <button type="button" id="recovery-logout" class="nino-admin-linkbutton">Close recovery</button></p>
 			</div>
 		</div>
 		<script src="[[/nino/dir]]/_nino/Nino.js"></script>

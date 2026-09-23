@@ -669,7 +669,7 @@
 
 			// Bind events - the rail itself always stays visible, local
 			// "‹ Back" links inside each panel handle drilling back up a level
-			el.userLogout.addEventListener( 'click', function(ev){ ev.preventDefault(); Nino.auth.logout( '[[/nino/dir]]/_admin' ) } );
+			el.userLogout.addEventListener( 'click', function(){ Nino.auth.logout( '[[/nino/dir]]/_admin' ) } );
 			Object.keys( panels ).forEach( function( panel ) {
 				panels[panel][0].addEventListener( 'click', function(ev){ ev.preventDefault(); selectTab( panel ) } );
 			} );
