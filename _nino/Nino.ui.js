@@ -51,6 +51,63 @@
 		},
 
 		/**
+		 *	Mark a form field as refused, or take the mark back.
+		 *
+		 *	The class is what the stylesheet paints, and a colour is the one
+		 *	signal a screen reader is never handed and a colour-blind visitor
+		 *	may not see. aria-invalid is the same thing in words. The mark also
+		 *	has to come off: neither submit handler ever removed it, so a
+		 *	visitor who corrected the address they were sent back for submitted
+		 *	again with the corrected field still outlined - and, once this
+		 *	attribute exists, still announced as invalid.
+		 *
+		 *	@param		{Element}	field
+		 *	@param		{boolean}	invalid
+		 *
+		 *	@return		void
+		 */
+		_markField : function( field, invalid ) {
+
+			if( invalid === true ) {
+				field.classList.add('nino-is-error');
+				field.setAttribute?.( 'aria-invalid', 'true' );
+				return;
+			}
+
+			field.classList.remove('nino-is-error');
+			field.removeAttribute?.( 'aria-invalid' );
+		},
+
+		/**
+		 *	Make the paragraph a form writes its answer into a live region.
+		 *
+		 *	Both handlers write the validation error and the server's verdict
+		 *	into the form's first <p>, and that paragraph is a project's own
+		 *	markup - the shipped contact template's, a template a project wrote
+		 *	itself, a preset the Template Builder composed. None of them can be
+		 *	asked to remember the attribute, so the component that writes into
+		 *	it is what puts it there. Left alone where the markup already says
+		 *	something, so a form that wants role="alert" keeps it
+		 *
+		 *	@param		{Element}	[msg]
+		 *
+		 *	@return		void
+		 */
+		_liveMessage : function( msg ) {
+
+			if( msg === null || typeof msg === 'undefined' || typeof msg.setAttribute !== 'function' )
+				return;
+
+			const role = typeof msg.getAttribute === 'function' ? msg.getAttribute('role') : null;
+
+			if( role !== null && role !== '' )
+				return;
+
+			msg.setAttribute( 'role', 'status' );
+			msg.setAttribute( 'aria-live', 'polite' );
+		},
+
+		/**
 		 *	Width available to a cover inside its actual containing block.
 		 *	Cover height is intentionally viewport-relative, but its width must
 		 *	respect layouts that reserve part of that viewport for a side rail.
@@ -838,8 +895,17 @@
 						if( this.classList.contains('nino-is-success') === true )
 							return;
 
+						/*	Every attempt starts from a clean slate. The mark belongs to
+							the attempt, not to the form: nothing ever took it off, so a
+							visitor sent back for their address and told to correct it
+							submitted again with the corrected field still outlined -
+							and, now that the outline has a word beside it, still
+							announced as invalid	*/
+						for( let i = 0, l = this.fields.length; i<l; i++ )
+							Nino.ui._markField( this.fields[i], false );
+
 						// Loop through inputs
-						let error = false, data = {}, radioGroups = {};
+						let error = false, data = {}, radioGroups = {}, firstRefused = null;
 						for( let i = 0, l = this.fields.length; i<l; i++) {
 
 							// Stored as typed. This used to strip [<>'";(){}[\]\|] from
@@ -895,8 +961,11 @@
 								data[this.fields[i].name] = this.fields[i].value;
 
 							// Check required
-							if( this.fields[i].required === true && this.fields[i].value.length === 0 )
-								this.fields[i].classList.add('nino-is-error') || ( error = Nino.content.getText('/form/info/required') );
+							if( this.fields[i].required === true && this.fields[i].value.length === 0 ) {
+								Nino.ui._markField( this.fields[i], true );
+								firstRefused = firstRefused ?? this.fields[i];
+								error = Nino.content.getText('/form/info/required');
+							}
 
 							// Check email. The local part uses the character set the html
 							// spec allows for input[type=email] (and php's
@@ -907,8 +976,11 @@
 							// dot-plus-tld tail is kept - it is stricter than the spec,
 							// deliberately, because a contact form typo'd to "@localhost"
 							// helps nobody
-							if( error === false && this.fields[i].type === 'email' && ( /^[a-zA-Z0-9.!#$%&'*+\/=?^_`{|}~-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*\.[a-zA-Z]{2,}$/.test(this.fields[i].value) === false ) )
-								this.fields[i].classList.add('nino-is-error') || ( error = Nino.content.getText('/form/info/email') );
+							if( error === false && this.fields[i].type === 'email' && ( /^[a-zA-Z0-9.!#$%&'*+\/=?^_`{|}~-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*\.[a-zA-Z]{2,}$/.test(this.fields[i].value) === false ) ) {
+								Nino.ui._markField( this.fields[i], true );
+								firstRefused = firstRefused ?? this.fields[i];
+								error = Nino.content.getText('/form/info/email');
+							}
 
 							// A url and a number are validated by Form::validate() too
 							// (FILTER_VALIDATE_URL, is_numeric), and the client checked
@@ -921,8 +993,11 @@
 							// it checks nothing and the server still answers
 							if( error === false && ( this.fields[i].type === 'url' || this.fields[i].type === 'number' )
 								&& this.fields[i].value.length > 0 && typeof this.fields[i].validity === 'object' && this.fields[i].validity !== null
-								&& ( this.fields[i].validity.typeMismatch === true || this.fields[i].validity.badInput === true ) )
-								this.fields[i].classList.add('nino-is-error') || ( error = Nino.content.getText('/form/info/invalid') );
+								&& ( this.fields[i].validity.typeMismatch === true || this.fields[i].validity.badInput === true ) ) {
+								Nino.ui._markField( this.fields[i], true );
+								firstRefused = firstRefused ?? this.fields[i];
+								error = Nino.content.getText('/form/info/invalid');
+							}
 						}
 
 						// A required radio group, asked of the group rather than of any one
@@ -933,14 +1008,25 @@
 								if( data[name] === '' ) {
 									error = Nino.content.getText('/form/info/required');
 									for( let i = 0, l = this.fields.length; i<l; i++)
-										if( this.fields[i].type === 'radio' && this.fields[i].name === name )
-											this.fields[i].classList.add('nino-is-error');
+										if( this.fields[i].type === 'radio' && this.fields[i].name === name ) {
+											Nino.ui._markField( this.fields[i], true );
+											firstRefused = firstRefused ?? this.fields[i];
+										}
 									break;
 								}
 
 						// Catch error
-						if( error !== false )
-							return this.msg.textContent = error;
+						if( error !== false ) {
+							this.msg.textContent = error;
+							/*	The message says what is wrong; the caret says where. A
+								long form refused for its last field left the visitor at
+								the submit button with a sentence above the fold they
+								could not see, and no way to the field but hunting for
+								it - the one who most needs it being the one who cannot
+								see the outline either	*/
+							firstRefused?.focus?.();
+							return error;
+						}
 
 						// One handler bound to this form, not a property written onto
 						// the shared function object: `const uniqueResponse =
@@ -973,6 +1059,10 @@
 					e.form[i].fields	= e.form[i].querySelectorAll('input, textarea, select');
 					e.form[i].msg 		= e.form[i].querySelectorAll('p')[0];
 					e.form[i].btn 		= e.form[i].querySelectorAll('button')[0];
+
+					// Both the validation error and the server's verdict are
+					// written into that paragraph, and it is a project's own markup
+					ui._liveMessage( e.form[i].msg );
 
 					for( let ieI = 0, ieL = e.form[i].fields.length; ieI<ieL; ieI++ ) {
 
@@ -1049,7 +1139,11 @@
 						if( this.classList.contains('nino-is-success') === true || this.classList.contains('nino-is-existing') === true )
 							return;
 
-						let error = false, data = {}, radioGroups = {};
+						// The mark belongs to the attempt - see the .nino-form handler
+						for( let i = 0, l = this.fields.length; i<l; i++ )
+							Nino.ui._markField( this.fields[i], false );
+
+						let error = false, data = {}, radioGroups = {}, firstRefused = null;
 						for( let i = 0, l = this.fields.length; i<l; i++) {
 
 							// Stored as typed - see the .nino-form handler above for why
@@ -1077,12 +1171,18 @@
 							else
 								data[this.fields[i].name] = this.fields[i].value;
 
-							if( this.fields[i].required === true && this.fields[i].value.length === 0 )
-								this.fields[i].classList.add('nino-is-error') || ( error = Nino.content.getText('/newsletter/info/required') );
+							if( this.fields[i].required === true && this.fields[i].value.length === 0 ) {
+								Nino.ui._markField( this.fields[i], true );
+								firstRefused = firstRefused ?? this.fields[i];
+								error = Nino.content.getText('/newsletter/info/required');
+							}
 
 							// Same character set as the .nino-form check above
-							if( error === false && this.fields[i].type === 'email' && ( /^[a-zA-Z0-9.!#$%&'*+\/=?^_`{|}~-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*\.[a-zA-Z]{2,}$/.test(this.fields[i].value) === false ) )
-								this.fields[i].classList.add('nino-is-error') || ( error = Nino.content.getText('/newsletter/info/email') );
+							if( error === false && this.fields[i].type === 'email' && ( /^[a-zA-Z0-9.!#$%&'*+\/=?^_`{|}~-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*\.[a-zA-Z]{2,}$/.test(this.fields[i].value) === false ) ) {
+								Nino.ui._markField( this.fields[i], true );
+								firstRefused = firstRefused ?? this.fields[i];
+								error = Nino.content.getText('/newsletter/info/email');
+							}
 						}
 
 						// The group's answer, not any member's - see the .nino-form handler
@@ -1091,13 +1191,19 @@
 								if( data[name] === '' ) {
 									error = Nino.content.getText('/newsletter/info/required');
 									for( let i = 0, l = this.fields.length; i<l; i++)
-										if( this.fields[i].type === 'radio' && this.fields[i].name === name )
-											this.fields[i].classList.add('nino-is-error');
+										if( this.fields[i].type === 'radio' && this.fields[i].name === name ) {
+											Nino.ui._markField( this.fields[i], true );
+											firstRefused = firstRefused ?? this.fields[i];
+										}
 									break;
 								}
 
-						if( error !== false )
-							return this.msg.textContent = error;
+						if( error !== false ) {
+							this.msg.textContent = error;
+							// The caret goes where the message points - see .nino-form
+							firstRefused?.focus?.();
+							return error;
+						}
 
 						// Bound per submit - see the .nino-form handler above
 						const boundResponse = newsletterResponse.bind( { form : this } );
@@ -1111,6 +1217,9 @@
 					e.newsletterForm[i].fields	= e.newsletterForm[i].querySelectorAll('input, textarea, select');
 					e.newsletterForm[i].msg 		= e.newsletterForm[i].querySelectorAll('p')[0];
 					e.newsletterForm[i].btn 		= e.newsletterForm[i].querySelectorAll('button')[0];
+
+					// Same paragraph, same reason - see the .nino-form loop above
+					ui._liveMessage( e.newsletterForm[i].msg );
 
 					e.newsletterForm[i].addEventListener( 'submit', newsletterSubmit );
 				}
@@ -1285,6 +1394,12 @@
 
 			const el = dc.createElement('div');
 			el.className = 'nino-toast' + ( type ? ' nino-toast--' + type : '' );
+			// A toast is a sentence that appears without anybody looking for it
+			// and is gone four seconds later. Without a live role it is a
+			// sentence only whoever was watching that corner of the screen ever
+			// gets; polite rather than assertive, since nothing here interrupts
+			el.setAttribute( 'role', 'status' );
+			el.setAttribute( 'aria-live', 'polite' );
 			el.textContent = message;
 			container.appendChild( el );
 

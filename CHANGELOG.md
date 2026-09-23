@@ -431,6 +431,25 @@ All notable changes to Nino are documented in this file.
 
 ### Fixed
 
+- **A refused contact form said so three ways, and a screen reader was
+  handed none of them.** `Nino.ui.js` refuses a submit on the client - a
+  required field left empty, an address that is not one - and answered with
+  a red outline on the field, a sentence in a paragraph nothing had been
+  asked to watch, and the caret left wherever it was: on a long form refused
+  for its last field, that is the submit button, with the explanation above
+  the fold. It also never took the outline off again, exactly as the
+  workbench login form used to not, so a visitor who corrected the address
+  submitted with the corrected field still marked. The message paragraph is
+  declared `role="status"` by the handler that writes into it - it is a
+  project's own markup, so the component that fills it is the only place
+  that can - a refused field carries `aria-invalid` beside the class and
+  loses both on the next attempt, and the caret goes to the first field the
+  form refused. `Nino.ui.toast()`, a sentence that appears unasked and is
+  gone four seconds later, is a live region for the same reason.
+  `tests/nino-ui-form-js-smoke.js` grew attributes and a focus flag in its
+  field stub and drives a refusal, a correction and a toast (nine checks,
+  six red before).
+
 - **The wizard's Routes step offered three boxes per language that a screen
   reader could only call "edit text".** A route's per-locale row is a grid of
   the locale code and three controls - the menu name, the HTML title and the

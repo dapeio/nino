@@ -55,6 +55,14 @@ function field( name, type, value, required, checked ) {
 		required : required === true,
 		disabled : false,
 		classList : classList(),
+		// A refused field says so twice - the outline the stylesheet paints and
+		// the word a screen reader reads - and the caret goes to the first one
+		attributes : {},
+		focused : false,
+		setAttribute : function( key, value ) { this.attributes[key] = String( value ) },
+		removeAttribute : function( key ) { delete this.attributes[key] },
+		getAttribute : function( key ) { return this.attributes[key] ?? null },
+		focus : function() { this.focused = true },
 		parentNode : { classList : classList() },
 		listeners : {},
 		addEventListener : function( event, callback ) { this.listeners[event] = callback },
@@ -70,7 +78,11 @@ function form() {
 		field( 'message', 'textarea', '', true ),
 		field( 'location', 'text', '', false ),
 	];
-	const msg = { textContent : '', innerHTML : '' };
+	const msg = {
+		textContent : '', innerHTML : '', attributes : {},
+		setAttribute : function( key, value ) { this.attributes[key] = String( value ) },
+		getAttribute : function( key ) { return this.attributes[key] ?? null },
+	};
 	const btn = { disabled : false };
 
 	return {
@@ -353,6 +365,63 @@ check( 'messages are written as text, not html', forms[0].msg.innerHTML === '' &
 check( 'the default endpoint remains relative to the rendered project root', source.includes( "'[[/nino/dir]]/.form'" ) );
 check( 'no form handler writes a textfill through innerHTML', /msg\.innerHTML\s*=/.test( source ) === false );
 check( 'no form handler strips characters out of a field value', /value\.replace\(\s*\/\[<>/.test( source.replace( /\s/g, '' ) ) === false && source.includes( "value.replace( /[<>'\";(){}[\\]\\\\|]/g, '' )" ) === false );
+
+
+// --- What a refused form tells whoever cannot see it --------------------
+
+/*	The handler refuses on the client too - a required field left empty, an
+	address that is not one - and it said so in three ways a screen reader is
+	handed none of: a red outline on the field, a sentence in a paragraph
+	nothing was watching, and the caret left wherever it was. It also never
+	took the outline off again, so a corrected field stayed marked through
+	every later attempt	*/
+const refused = form();
+forms.push( refused );
+sandbox.Nino.ui.onReady();
+
+check( 'the paragraph a form answers in is announced when it changes', refused.msg.getAttribute('role') === 'status' && refused.msg.getAttribute('aria-live') === 'polite' );
+
+const beforeRefusal = sent.length;
+refused.fill( { name : '', email : 'someone@example.com', message : 'Hello.' } );
+refused.submit();
+const nameField = refused.fieldList[1];
+const mailField = refused.fieldList[2];
+
+check( 'an empty required field is refused before the request', sent.length === beforeRefusal && refused.msg.textContent === 'Please fill in every required field.' );
+check( '...and the field says so in words as well as in colour', nameField.classList.contains('nino-is-error') === true && nameField.getAttribute('aria-invalid') === 'true' );
+check( '...and no field that was fine is marked', mailField.getAttribute('aria-invalid') === null && mailField.classList.contains('nino-is-error') === false );
+check( '...and the caret is put where the message points', nameField.focused === true );
+
+// The mark belongs to the attempt: filling the field in and submitting again
+// must leave nothing of the last one pointing at it
+refused.fill( { name : 'Someone', email : 'nope' } );
+mailField.focused = false;
+refused.submit();
+check( 'a field that was corrected loses its mark', nameField.classList.contains('nino-is-error') === false && nameField.getAttribute('aria-invalid') === null );
+check( '...and the one that is wrong now carries it instead', mailField.getAttribute('aria-invalid') === 'true' && mailField.focused === true );
+
+
+// --- A toast nobody was told about --------------------------------------
+
+/*	A toast is a sentence that appears without anybody looking for it and is
+	gone four seconds later, which is precisely the case a live region exists
+	for	*/
+const toasts = [];
+sandbox.document.createElement = function() {
+	const el = { className : '', textContent : '', attributes : {}, children : [],
+		classList : classList(), style : {},
+		setAttribute : function( key, value ) { this.attributes[key] = String( value ) },
+		getAttribute : function( key ) { return this.attributes[key] ?? null },
+		appendChild : function( child ) { this.children.push( child ) },
+		remove : function() {} };
+	toasts.push( el );
+	return el;
+};
+sandbox.document.querySelector = function() { return null };
+sandbox.document.body.appendChild = function() {};
+sandbox.Nino.ui.toast( 'Saved.', 'success' );
+const toast = toasts[toasts.length - 1];
+check( 'a toast is announced rather than only drawn', toast.textContent === 'Saved.' && toast.getAttribute('role') === 'status' && toast.getAttribute('aria-live') === 'polite' );
 
 console.log( '\n'+ checks+ ' checks, '+ failures+ ' failed' );
 process.exitCode = failures === 0 ? 0 : 1;
