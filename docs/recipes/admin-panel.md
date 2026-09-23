@@ -32,7 +32,7 @@ Two kinds of panel exist, and the class looks the same for both:
   `Admin::modules()` finds it by reading the directory, so there is no list to
   add it to. Use it only for a screen every project has regardless of its
   modules - Dashboard, Elements, Text, Images, Logs, Routes, Users, Language,
-  Backups and Config are built this way.
+  Backups, Features and Config are built this way.
 
 Which accounts see a panel is its `perm()` and nothing else: a content panel
 (editors and developers) declares one under the `content` group, a developer
@@ -91,11 +91,11 @@ request:
 - `weight` orders the navigation within the group, lowest first, stable for
   equal weights. Core content panels sit at 0 (Dashboard), 20 (Elements), 30
   (Text), 40 (Images) and 90 (Logs); structure at 20 (Routes); system at
-  2 (Users), 5 (Language), 10 (Backups) and 20
+  2 (Users), 5 (Language), 10 (Backups), 15 (Features) and 20
   (Config). A module panel picks the slot it wants: Submissions 60,
-  Navigations 25 (after Routes); the catalogue's Newsletter and Search name
-  weights of their own too, but land in `features` rather than wherever they
-  name, since both ship below `features/`.
+  Navigations 25 (after Routes), Maintenance 18; the catalogue's Newsletter
+  and Search name weights of their own too, but land in `features` rather
+  than wherever they name, since both ship below `features/`.
 
 `tabs()` rules:
 
@@ -114,7 +114,9 @@ request:
   shapes), User roles (sharing `/_admin/users/manage`) and Login protection
   (`/_admin/lockout/manage`) under Users, Translations under Language. The
   strip is the design system's `.nino-admin-tabs--bar`, the same the Design
-  panel renders for its four editors.
+  panel renders for its four editors; the registry adds
+  `.nino-admin-tabs--panel` to a pane's own strip, which is what keeps the
+  generic tab rules off it.
 
 A dispatched action announces itself on `/nino/admin/action`
 (`{ action, panel, status, user, data }`) once it has answered - the one place a
@@ -509,7 +511,7 @@ shape:
 
 			const add = dc.createElement('button');
 			add.type = 'button';
-			add.className = 'nino-btn nino-btn--primary';
+			add.className = 'nino-admin-btn-primary';
 			add.textContent = 'New note';
 			add.addEventListener( 'click', function() {
 				Nino.admin.catalog._renderForm( null );
@@ -576,7 +578,7 @@ shape:
 			message.setAttribute( 'aria-live', 'polite' );
 
 			save.type = 'submit';
-			save.className = 'nino-btn nino-btn--primary';
+			save.className = 'nino-admin-btn-primary';
 			save.textContent = 'Save';
 
 			actions.className = 'nino-admin-actionbar';

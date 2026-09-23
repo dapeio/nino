@@ -30,6 +30,15 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **Docs:** the panel recipe listed ten of the eleven workbench panels -
+  Features was missing, from the list and from the system weights - left
+  Maintenance out of the module panels' weights, described a pane's tab
+  strip without the `.nino-admin-tabs--panel` the registry adds to it, and
+  built its skeleton's buttons with `nino-btn nino-btn--primary`, the public
+  site's button class, which no workbench stylesheet declares. The skeleton
+  uses `.nino-admin-btn-primary` now, which is what the table above it names
+  and what every shipped panel uses.
+
 - **Docs:** four things in `docs/_admin.md` and its German twin were not
   what the tool does. The Maintenance panel - a kernel module's panel like
   Submissions and Navigations, with its own `/_admin/maintenance/manage` -
