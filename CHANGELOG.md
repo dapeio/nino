@@ -40,6 +40,32 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **Admin:** every panel but the Dashboard opens with the same head. The
+  panes used to open however their panel began: a tab strip and nothing
+  else where the registry had tabs, the first row of a list where it had
+  none, a title the panel's own script drew where a feature thought of one -
+  Design's, Search's, Mailer's - and the Features panel's own strip in a row
+  of its own; twenty-three screens and no two of them telling where you are
+  the same way. `Panels::panesHtml()` now renders one row into every pane
+  from `Panels::$html`, like the rest of the shell: the panel's label as the
+  `<h2>` of the screen, the same label the rail shows through the same
+  escape, the registry's tab strip beside it, an actions slot at the end.
+  The workbench's bar surface, edge to edge, so the screens read as one
+  tool. The shell script looks for a strip in the head and nowhere else. A
+  panel whose tabs are its own puts its strip beside the name through
+  `Nino.adminUi.panelHead( mount ).tabs( strip )` - the Features panel does,
+  its row keeps the filter and the category - and one with buttons over its
+  screen appends them to the slot; `head()` in the panel contract, `false`,
+  drops the row, which the Dashboard answers because the tiles have no
+  single subject. A workspace pane has no padding for the head to bleed
+  through, and the rule that says so has to stand in the workbench layer:
+  a later layer wins whatever the selector. `tests/admin-smoke.php`,
+  `tests/admin-system-smoke.php`, `tests/admin-script-js-smoke.js`,
+  `tests/admin-lists-js-smoke.js` and `tests/admin-features-js-smoke.js`
+  hold the head, the exception, the fragment, the helper and the layer;
+  against the kernel before this change: 3, 6, 3 failed and two suites
+  that die on the strip they do not find.
+
 - **Admin:** the white surfaces stand off the page. The light scheme's
   page colour moves a shade further from white (`#edf0f5` where it was
   `#f5f7fb`), the border every card and field draws goes from 13% to 19%

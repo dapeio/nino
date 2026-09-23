@@ -44,6 +44,14 @@ namespace Nino\Modules\Dashboard {
 			return [];
 		}
 
+		// The one pane without the head that names it (see
+		// \Nino\Admin\Panels::panesHtml()): the overview is the tiles, and
+		// a row saying "Dashboard" over them would be a title over a screen
+		// that has no single subject
+		public static function head(): bool {
+			return false;
+		}
+
 		public static function assets(): array {
 			return [
 				\Nino\Admin\Panels::relative( dirname( __DIR__ ). '/assets/admin.js' ),

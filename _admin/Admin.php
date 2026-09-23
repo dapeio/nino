@@ -1047,14 +1047,24 @@ namespace Nino\Admin {
 			told a tab controls something - and without aria-controls it has
 			nothing to say what, and the pane itself was an anonymous div
 			rather than the tabpanel the pattern promises. The button's own id
-			(admin-tabbutton-<uri>) exists for the pane to point back at	*/
+			(admin-tabbutton-<uri>) exists for the pane to point back at.
+
+			Every pane but one opens with its head: one row across the
+			workbench, the panel's name as the h2 of the screen, the tab strip
+			beside it where the registry has tabs, and a slot at its end for
+			the buttons a panel keeps over its screen (see panesHtml() and
+			Nino.adminUi.panelHead(), through which a panel's script puts a
+			strip or a button of its own there). A panel answering head()
+			false - the Dashboard - opens on its screen alone	*/
 		public static
 			$html = [
 				'nav-group'		=> '<span class="nino-admin-nav-group" data-group="[[group]]">[[label]]</span>',
 				'nav-link'		=> '<a href="#" id="admin-nav-[[uri]]" data-panel="[[uri]]" data-layout="[[layout]]"><span class="nino-admin-nav-icon" aria-hidden="true">[[icon]]</span><span class="nino-admin-nav-label">[[label]]</span></a>',
 				// The letter that stands in for a panel with no icon of its own
 				'nav-initial'	=> '<b>[[initial]]</b>',
-				'pane'				=> '<div id="admin-content-[[uri]]" data-panel="[[uri]]" data-layout="[[layout]]" hidden>[[content]]</div>',
+				'pane'				=> '<div id="admin-content-[[uri]]" data-panel="[[uri]]" data-layout="[[layout]]" hidden>[[head]][[content]]</div>',
+				'head'				=> '<div class="admin-panel-head">[[title]][[tabs]]<div class="admin-panel-actions"></div></div>',
+				'head-title'	=> '<h2 class="admin-panel-title">[[label]]</h2>',
 				'tab-bar'			=> '<div class="nino-admin-tabs nino-admin-tabs--bar nino-admin-tabs--panel admin-panel-tabs" role="tablist">[[content]]</div>',
 				'tab-button'	=> '<button type="button" role="tab" id="admin-tabbutton-[[uri]]" class="nino-admin-tab" data-tab="[[uri]]" aria-controls="admin-tab-[[uri]]" aria-selected="false">[[label]]</button>',
 				'tab-pane'		=> '<div id="admin-tab-[[uri]]" role="tabpanel" aria-labelledby="admin-tabbutton-[[uri]]" data-tab="[[uri]]" hidden>[[content]]</div>',
@@ -1233,6 +1243,11 @@ namespace Nino\Admin {
 			if( in_array( $layout, [ 'page', 'workspace' ], true ) === false )
 				$layout = 'page';
 
+			// Whether the pane opens with the head that names it (see
+			// panesHtml()). Every panel unless it says otherwise: a screen
+			// that is its own overview, the Dashboard, is the one that does
+			$head = method_exists( $class, 'head' ) === true ? (bool) $class::head() : true;
+
 			// An icon is markup a panel class ships - trusted code, but
 			// held to one shape: an inline svg and nothing that runs
 			$icon = method_exists( $class, 'icon' ) === true ? trim( (string) $class::icon() ) : '';
@@ -1269,6 +1284,7 @@ namespace Nino\Admin {
 				'panes'		=> $panes,
 				'template'=> $template,
 				'layout'	=> $layout,
+				'head'		=> $head,
 				'icon'		=> $icon,
 				'assets'	=> $assets,
 				'text'		=> method_exists( $class, 'text' ) === true ? (string) $class::text() : '',
@@ -1411,13 +1427,16 @@ namespace Nino\Admin {
 
 		/**
 		 *	The content panes, one per panel - the other half of navHtml().
-		 *	A pane holds the mount points the panel's own script renders
-		 *	into, or its template included whole. A panel with tabs (see
-		 *	collect()) holds a strip of tab buttons and one tab pane per
-		 *	tab, its own screen first; the strip is only rendered when there
-		 *	is more than one tab to choose from. Every pane and tab pane
-		 *	starts hidden; the shell script shows the selected ones and
-		 *	reads a panel's layout off data-layout
+		 *	A pane opens with its head - the panel's name, and beside it the
+		 *	strip of tab buttons where the panel has tabs (see collect()) -
+		 *	and holds the mount points the panel's own script renders into,
+		 *	or its template included whole; a panel with tabs holds one tab
+		 *	pane per tab, its own screen first. The strip is only rendered
+		 *	when there is more than one tab to choose from, the head's title
+		 *	only for a panel that has not answered head() false - and a
+		 *	panel that has, but has tabs, keeps the head for its strip.
+		 *	Every pane and tab pane starts hidden; the shell script shows the
+		 *	selected ones and reads a panel's layout off data-layout
 		 *
 		 *	@param		array 		$panels				A registry, see collect() - already filtered to what the account may see
 		 *
@@ -1429,7 +1448,8 @@ namespace Nino\Admin {
 
 			foreach( $panels as $panel ) {
 
-				$content = '';
+				$content	= '';
+				$strip		= '';
 
 				if( $panel['tabs'] === [] )
 					$content = self::_paneContent( $panel );
@@ -1447,7 +1467,7 @@ namespace Nino\Admin {
 								[ $tab['uri'], self::label( $tab['tab'] ) ],
 								self::$html['tab-button']
 							);
-						$content .= str_replace( '[[content]]', $buttons, self::$html['tab-bar'] );
+						$strip = str_replace( '[[content]]', $buttons, self::$html['tab-bar'] );
 					}
 
 					$paneHtml = count( $tabs ) > 1 ? self::$html['tab-pane'] : self::$html['tab-pane-lone'];
@@ -1460,9 +1480,16 @@ namespace Nino\Admin {
 						);
 				}
 
+				// The head: the name, the strip beside it, the actions slot.
+				// A panel without a name of its own still gets the row when
+				// there is a strip to hold - the shell script looks for a
+				// strip in the head and nowhere else
+				$title	= $panel['head'] === true ? str_replace( '[[label]]', self::label( $panel['label'] ), self::$html['head-title'] ) : '';
+				$head		= $title === '' && $strip === '' ? '' : str_replace( [ '[[title]]', '[[tabs]]' ], [ $title, $strip ], self::$html['head'] );
+
 				$html .= str_replace(
-					[ '[[uri]]', '[[layout]]', '[[content]]' ],
-					[ $panel['uri'], $panel['layout'], $content ],
+					[ '[[uri]]', '[[layout]]', '[[head]]', '[[content]]' ],
+					[ $panel['uri'], $panel['layout'], $head, $content ],
 					self::$html['pane']
 				);
 			}

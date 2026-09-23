@@ -2316,25 +2316,77 @@ a {
 	display: none !important;
 }
 
-/*	The strip a pane with tabs carries (see Panels::panesHtml()): the design
- *	system's --bar tabs, given the workbench's own bar surface. It reads as
- *	the same piece of chrome the context bar is - the pane's own bar rather
- *	than a row of buttons floating in the content - so it takes the bar
- *	background, bleeds through the pane's inline padding to both edges and
- *	closes flush against the top of the pane.
+/*	The head every pane but the Dashboard opens with (see Panels::panesHtml()):
+ *	the panel's name, the tab strip beside it where the panel has tabs, and
+ *	the buttons a panel keeps over its screen at the end of the row. One row
+ *	across the workbench, so the screens read as one tool: the name says
+ *	where you are, the strip - the design system's --bar tabs - what else is
+ *	here. It reads as the same piece of chrome the context bar is, the pane's
+ *	own bar rather than a title floating in the content: the bar surface,
+ *	bled through the pane's inline padding to both edges and closed flush
+ *	against the top of the pane, a hairline under it.
  *
- *	Not sticky, unlike .nino-admin-contextbar: a panel with tabs drills into
- *	forms that bring a context bar of their own, and two bars pinned to the
- *	same edge would sit on top of each other. The tabs scroll away and the
- *	context bar, with its back link, takes over. */
-#admin-content-wrap > [data-panel] > .admin-panel-tabs {
-	margin: -1rem calc(var(--nino-admin-content-inline) * -1) 1.25rem;
-	padding: 1rem var(--nino-admin-content-inline);
+ *	Not sticky, unlike .nino-admin-contextbar: a panel drills into forms that
+ *	bring a context bar of their own, and two bars pinned to the same edge
+ *	would sit on top of each other. The head scrolls away and the context
+ *	bar, with its back link, takes over. */
+#admin-content-wrap > [data-panel] > .admin-panel-head {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0 1.5rem;
 	min-height: 52px;
+	margin: -1rem calc(var(--nino-admin-content-inline) * -1) 1.25rem;
+	padding: .35rem var(--nino-admin-content-inline) 0;
+	border-bottom: 1px solid var(--editor-separator);
 	background: var(--editor-bar-bg);
 	box-shadow: 0 1px 0 rgba(15,23,42,.025);
 	backdrop-filter: blur(18px) saturate(170%);
 	-webkit-backdrop-filter: blur(18px) saturate(170%);
+}
+/*	The name: the one heading size the workbench has for a screen, and no
+ *	margin of its own - the row's padding is the spacing, so a panel with a
+ *	strip and one without sit at the same height */
+#admin-content-wrap > [data-panel] > .admin-panel-head > .admin-panel-title {
+	margin: 0;
+	padding-bottom: .35rem;
+	font-size: 1.8rem;
+	line-height: 1.2;
+}
+/*	The strip lays itself out in the head and brings neither its own bleed
+ *	nor a rule of its own: it stands on the head's hairline, so the open
+ *	tab's underline is drawn on that line rather than a step above it */
+#admin-content-wrap > [data-panel] > .admin-panel-head > .admin-panel-tabs {
+	display: flex;
+	flex: 1 1 auto;
+	gap: .25rem;
+	min-width: 0;
+	margin: 0;
+	padding: 0;
+	border-bottom: 0;
+	align-self: flex-end;
+}
+#admin-content-wrap > [data-panel] > .admin-panel-head > .admin-panel-actions {
+	display: flex;
+	flex: 0 0 auto;
+	align-items: center;
+	gap: .5rem;
+	margin-left: auto;
+	padding-bottom: .35rem;
+}
+#admin-content-wrap > [data-panel] > .admin-panel-head > .admin-panel-actions:empty {
+	display: none;
+}
+/*	A workspace pane (see layout() in the panel contract, and the rule in the
+ *	design system above) has no padding for the head to bleed through: the
+ *	row takes the whole width as it is, and the panel's own regions start
+ *	right under it. In this layer rather than beside the workspace rule,
+ *	because a later layer wins whatever the selector - the bleed above would
+ *	otherwise stand however specific the exception was */
+@media (min-width: 64rem) {
+	#admin-page-wrap.nino-admin-shell--workspace #admin-content-wrap > [data-panel] > .admin-panel-head {
+		margin: 0;
+	}
 }
 
 /* --------------------------------------------------------------- Rail head */

@@ -54,6 +54,7 @@ request:
 | `panes()` | no | mount ids rendered inside the pane, default `[ '<uri>-list' ]` |
 | `template()` | no | instead of mount points: a `.tpl` rendered whole into the pane through the `[template]` shortcode - project-relative, no extension, no `..` |
 | `layout()` | no | `'page'` (default: a column of content at reading width) or `'workspace'` (the whole pane, the rail folded to its icons) |
+| `head()` | no | `false` opens the pane on its screen alone, without the head that names the panel (the Dashboard); every other panel gets one, see below |
 | `icon()` | no | an inline `<svg>` for the rail; without one the folded rail shows the label's initial. Held to that one shape: nothing that runs |
 | `tabs()` | no | further panel classes shown as tabs of this panel's pane, see below |
 | `tab()` | no | what the tab strip calls this panel's own screen, when its nav label will not do (Language: `'Languages'`) |
@@ -117,6 +118,23 @@ request:
   panel renders for its four editors; the registry adds
   `.nino-admin-tabs--panel` to a pane's own strip, which is what keeps the
   generic tab rules off it.
+
+The head: every pane but the Dashboard's opens with one row, rendered from
+`Panels::$html` like the rest of the shell - the panel's label as the `<h2>`
+of the screen (`.admin-panel-title`, the same label the rail shows, through
+the same escape), the tab strip beside it where the registry has tabs, and
+an empty `.admin-panel-actions` slot at its end. It is the workbench's bar
+surface, edge to edge, so the screens read as one tool: the name says where
+you are, the strip what else is here. A panel does not draw a title of its
+own, then. A panel whose tabs are its own rather than the registry's - the
+Features panel's Active/Inactive/Available, a feature switching between two
+editors - puts its strip beside the name through
+`Nino.adminUi.panelHead( mount ).tabs( strip )`, which replaces the strip
+before it so a screen drawn again does not stack two; a panel that keeps
+buttons over its screen appends them to `.actions`. `panelHead()` answers
+`null` where there is no head, so a script rendered somewhere other than its
+pane keeps its strip where it drew it. `head()` returning `false` drops the
+row; the Dashboard does that, because its screen has no single subject.
 
 A dispatched action announces itself on `/nino/admin/action`
 (`{ action, panel, status, user, data }`) once it has answered - the one place a

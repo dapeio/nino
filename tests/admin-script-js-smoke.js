@@ -120,16 +120,42 @@ function node( id, attributes ) {
 		addEventListener : function( name, fn ) { el.listeners[name] = fn },
 		focus : function() { el.focused = true },
 		closest : function() { return el.parent === null ? null : ( el.parent.dataset.panel !== undefined ? el.parent : el.parent.closest() ) },
+		// A child by one class, the way the head's parts are reached
+		querySelector : function( selector ) {
+			return el.children.find( function( c ) { return c.classList.contains( selector.replace( ':scope > .', '' ) ) } ) || null;
+		},
 		querySelectorAll : function( selector ) {
 			if( selector === ':scope > div[data-tab]' )
 				return el.children.filter( function( c ) { return c.dataset.tab !== undefined && c.isStrip !== true } );
 			if( selector === ':scope > button[data-tab]' )
 				return el.children.filter( function( c ) { return c.dataset.tab !== undefined } );
-			if( selector === ':scope > .admin-panel-tabs > button[data-tab]' )
-				return el.children.filter( function( c ) { return c.isStrip === true } ).flatMap( function( strip ) { return strip.children } );
+			if( selector === ':scope > .admin-panel-head > .admin-panel-tabs > button[data-tab]' )
+				return el.children.filter( function( c ) { return c.classList.contains('admin-panel-head') } )
+					.flatMap( function( h ) { return h.children.filter( function( c ) { return c.classList.contains('admin-panel-tabs') } ) } )
+					.flatMap( function( strip ) { return strip.children } );
 			return [];
 		},
+		// Enough of a live tree for a strip to be put into a head and taken out again
+		insertAdjacentElement : function( where, other ) {
+			const at = el.parent.children.indexOf( el );
+			el.parent.children.splice( where === 'afterend' ? at + 1 : at, 0, other );
+			other.parent = el.parent;
+			return other;
+		},
+		insertBefore : function( other, reference ) {
+			const at = reference ? el.children.indexOf( reference ) : el.children.length;
+			el.children.splice( at, 0, other );
+			other.parent = el;
+			return other;
+		},
+		remove : function() {
+			if( el.parent === null ) return;
+			const at = el.parent.children.indexOf( el );
+			if( at !== -1 ) el.parent.children.splice( at, 1 );
+			el.parent = null;
+		},
 	};
+	Object.defineProperty( el, 'firstChild', { get : function() { return el.children[0] || null } } );
 	return el;
 }
 
@@ -140,15 +166,29 @@ const rolesTab = node( 'admin-tabbutton-roles', { tab : 'roles' } );
 const lockoutTab = node( 'admin-tabbutton-lockout', { tab : 'lockout' } );
 const strip = node( '', {} );
 strip.isStrip = true;
+strip.classList.add('admin-panel-tabs');
 strip.children = [ rolesTab, lockoutTab ];
 rolesTab.parent = strip;
 lockoutTab.parent = strip;
 
+// The head the shell renders over the pane (see Panels::panesHtml()): the
+// name, the strip beside it, the actions slot
+const head = node( '', {} );
+head.classList.add('admin-panel-head');
+const title = node( '', {} );
+title.classList.add('admin-panel-title');
+const actions = node( '', {} );
+actions.classList.add('admin-panel-actions');
+head.children = [ title, strip, actions ];
+title.parent = head;
+strip.parent = head;
+actions.parent = head;
+
 const rolesPane = node( 'admin-tab-roles', { tab : 'roles' } );
 const lockoutPane = node( 'admin-tab-lockout', { tab : 'lockout' } );
 const usersPane = node( 'admin-content-users', { panel : 'users', layout : 'page' } );
-usersPane.children = [ strip, rolesPane, lockoutPane ];
-strip.parent = usersPane;
+usersPane.children = [ head, rolesPane, lockoutPane ];
+head.parent = usersPane;
 
 const dashboardPane = node( 'admin-content-dashboard', { panel : 'dashboard', layout : 'page' } );
 const pageWrap = node( 'admin-page-wrap', {} );
@@ -177,7 +217,7 @@ const shell = {
 				return [ railLinks.dashboard, railLinks.users ];
 			if( selector === '#admin-content-wrap > [data-panel]' )
 				return [ dashboardPane, usersPane ];
-			if( selector === '#admin-content-wrap > [data-panel] > .admin-panel-tabs' )
+			if( selector === '#admin-content-wrap > [data-panel] > .admin-panel-head > .admin-panel-tabs' )
 				return [ strip ];
 			return [];
 		},
@@ -212,6 +252,22 @@ rolesTab.listeners.keydown( { key : 'ArrowRight', preventDefault : function() {}
 check( 'an arrow key opens the next tab of a pane strip', lockoutTab.getAttribute('aria-selected') === 'true'
 	&& lockoutPane.hidden === false && rolesPane.hidden === true && lockoutTab.focused === true );
 check( '...and the address names the tab now open', shell.location.hash === '#lockout' );
+
+/*	The head over every pane but the Dashboard, reached from inside the pane.
+	A panel with tabs of its own - Features, a feature's editors - puts its
+	strip beside the name through it, so the workbench has one row rather
+	than a title and a strip per panel; drawn again, the strip replaces the
+	one before it rather than stacking	*/
+const ui = shell.Nino.adminUi;
+check( 'there is no head to reach from outside a pane', ui.panelHead( node( 'loose', {} ) ) === null && ui.panelHead( null ) === null );
+const reached = ui.panelHead( rolesTab );
+check( 'from inside a pane the head is the row over it, with the name and the actions slot', reached !== null && reached.element === head && reached.title === title && reached.actions === actions );
+const own = node( 'own-strip', {} );
+const ownAgain = node( 'own-strip-again', {} );
+reached.tabs( own );
+check( 'a strip of the panel\'s own goes in after the name and takes the class the head lays a strip out by', head.children[1] === own && own.classList.contains('admin-panel-tabs') && head.children.indexOf( strip ) === -1 && head.children.length === 3 );
+reached.tabs( ownAgain );
+check( '...and a strip drawn again replaces the one before it rather than stacking', head.children.indexOf( own ) === -1 && head.children[1] === ownAgain && head.children.length === 3 );
 
 console.log( '\n'+ checks+ ' checks, '+ failures+ ' failed' );
 process.exitCode = failures === 0 ? 0 : 1;

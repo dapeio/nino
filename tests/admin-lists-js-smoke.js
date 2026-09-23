@@ -307,10 +307,21 @@ check( 'the list action bar wraps, so a long action label cannot be pushed off a
 check( 'the rail\'s icon buttons share one box, independent of the icon inside them',
 	/#admin-nav-ui-toggle, #admin-theme-toggle \{[^}]*width: 2rem;[^}]*height: 2rem;/s.test( workbenchCss ) &&
 	/#admin-theme-toggle \.admin-theme-toggle-system \{\s*display:block;/s.test( workbenchCss ) );
-// The pane's tab strip is the pane's own bar, not a row of buttons in the
-// content: the context bar's surface, edge to edge, closing at the top
-check( 'a pane\'s tab strip carries the workbench bar surface, full width and flush to the top',
-	/#admin-content-wrap > \[data-panel\] > \.admin-panel-tabs \{[^}]*margin: -1rem calc\(var\(--nino-admin-content-inline\) \* -1\)[^}]*background: var\(--editor-bar-bg\);/s.test( workbenchCss ) );
+// The pane's head is the pane's own bar, not a title floating in the
+// content: the context bar's surface, edge to edge, closing at the top. The
+// name brings no margin of its own, so the row's padding is the one spacing
+// and a pane with a strip sits at the height of one without; the strip
+// brings no rule of its own, so the open tab's underline is drawn on the
+// head's hairline rather than a step above it; and in a workspace, where
+// the pane has no padding to bleed through, the head does not bleed - a
+// rule that has to stand in the workbench layer, since a later layer wins
+// whatever the selector
+check( 'a pane\'s head carries the workbench bar surface, full width and flush to the top',
+	/#admin-content-wrap > \[data-panel\] > \.admin-panel-head \{[^}]*margin: -1rem calc\(var\(--nino-admin-content-inline\) \* -1\)[^}]*background: var\(--editor-bar-bg\);/s.test( workbenchCss ) );
+check( '...its name brings no margin of its own, and its strip no rule of its own',
+	/> \.admin-panel-head > \.admin-panel-title \{[^}]*margin: 0;/s.test( workbenchCss ) && /> \.admin-panel-head > \.admin-panel-tabs \{[^}]*border-bottom: 0;/s.test( workbenchCss ) );
+check( '...and in a workspace the head does not bleed, said in the layer that can say it',
+	/#admin-page-wrap\.nino-admin-shell--workspace #admin-content-wrap > \[data-panel\] > \.admin-panel-head \{\s*margin: 0;/s.test( workbenchCss ) && sharedCss.includes('.admin-panel-head') === false );
 check( 'the workbench stylesheet is one file: the design system first, its own rules after', css.indexOf('@layer nino.system {') > 0 && css.indexOf('@layer nino.system {') < css.indexOf('@layer nino.tool {') && fs.existsSync( path.join( __dirname, '../_admin/assets/Nino.admin.css' ) ) === false );
 check( 'shared rows expose a right-facing drill-down arrow', sharedCss.includes('.nino-admin-list li > a::after') && sharedCss.includes('content: "›"') );
 check( 'shared rows retain a keyboard focus treatment', sharedCss.includes('.nino-admin-list li > a:focus-visible') );

@@ -739,6 +739,7 @@ The workbench's own screens are the same thing in a different root: `_admin` hol
 | `panes()` | mount ids rendered inside the pane, default `[ '<uri>-list' ]` |
 | `template()` | instead of mount points: a `.tpl` rendered whole into the pane, project-relative and without the extension - for a panel that lays out its own regions |
 | `layout()` | `'page'` (default: a column of content at reading width) or `'workspace'` (the whole width, the rail folded to its icons) |
+| `head()` | `false` opens the pane on its screen alone; every other panel opens with the head that names it - the label as the screen's `<h2>`, the tab strip beside it, a slot for the panel's own buttons - so a panel draws no title of its own. The Dashboard is the one shipped panel without; a panel with tabs of its own puts them there through `Nino.adminUi.panelHead()` |
 | `icon()` | an inline `<svg>` for the rail; a panel without one shows its label's initial when the rail is folded |
 | `tabs()` | further panel classes shown as tabs of this panel's pane - each a complete panel with its own `perm()`, script and hash prefix, ordered in the strip by its `nav()` weight; `tab()` names this panel's own tab when the nav label will not do. The workbench's own modules do this: Element Types under Elements, Text Keys under Text, Image Slots under Images, User roles and Login protection under Users, Translations under Language |
 | `assets()` | project-relative `.js`/`.css` files, bundled into `/_admin/.cache/` after the workbench's own |

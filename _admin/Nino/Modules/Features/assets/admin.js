@@ -326,12 +326,15 @@
 		},
 
 		/**
-		 *	The head of the pane: the tab strip and, beside it, the two filters
-		 *	over everything the tabs hold - the search box and the category.
-		 *	One block, because they belong together and because it is what
-		 *	stays at the top of a long list - see assets/admin.css. Neither
-		 *	filter is inside the tablist: a tablist holds tabs, and a control
-		 *	in it would be read out as one
+		 *	The head of the list: the two filters over everything the tabs
+		 *	hold - the search box and the category - in a row that stays at
+		 *	the top of a long list (see assets/admin.css). The tab strip
+		 *	itself goes into the pane's head beside the panel's name, the row
+		 *	the shell renders over every panel (Nino.adminUi.panelHead()),
+		 *	and only where there is none - the script rendered somewhere
+		 *	other than its pane - opens this row instead. Neither filter is
+		 *	inside the tablist: a tablist holds tabs, and a control in it
+		 *	would be read out as one
 		 *
 		 *	@return		{Element}							<div class="admin-features-head">
 		 */
@@ -348,7 +351,13 @@
 			if( categories.some( function( c ) { return c.value === Nino.admin.features._category } ) === false )
 				Nino.admin.features._category = '';
 
-			head.appendChild( Nino.admin.features._renderTabs() );
+			const strip			= Nino.admin.features._renderTabs();
+			const paneHead	= Nino.adminUi.panelHead( dc.getElementById('features-list') );
+
+			if( paneHead === null )
+				head.appendChild( strip );
+			else
+				paneHead.tabs( strip );
 
 			const filter = dc.createElement('input');
 			filter.type = 'search';

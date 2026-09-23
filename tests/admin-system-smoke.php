@@ -187,7 +187,7 @@ check( 'a tab the account lacks the permission for is left off its pane', \Nino\
 \Nino\Auth::loginUser( $appData, 'typesonly@example.com', 'correct horse battery staple' );
 $typesOnly = \Nino\Admin\Admin::visiblePanels( $appData );
 check( 'an account holding only a tab\'s permission gets the pane without the panel\'s own screen', isset( $typesOnly['elements'] ) === true && $typesOnly['elements']['own'] === false && array_keys( $typesOnly['elements']['tabs'] ) === [ 'types' ] );
-check( '...rendered as the tab pane alone', str_contains( \Nino\Admin\Admin::panesHtml( $appData ), '<div id="admin-content-elements" data-panel="elements" data-layout="page" hidden><div id="admin-tab-types" data-tab="types" hidden><div id="types-list"></div><div id="types-form"></div></div></div>' ) === true );
+check( '...rendered as the tab pane alone under the panel\'s own head - one tab is no strip, but the name stays', str_contains( \Nino\Admin\Admin::panesHtml( $appData ), '<div id="admin-content-elements" data-panel="elements" data-layout="page" hidden><div class="admin-panel-head"><h2 class="admin-panel-title">[[/_admin/nav/elements]]</h2><div class="admin-panel-actions"></div></div><div id="admin-tab-types" data-tab="types" hidden><div id="types-list"></div><div id="types-form"></div></div></div>' ) === true );
 \Nino\Auth::deleteUser( $appData, 'typesonly@example.com' );
 
 \Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );
@@ -2734,6 +2734,18 @@ class AdminSmokeFeatureNamerModule {
 	public static function adminPanels( array &$appData ): array { return [ 'AdminSmokeFeatureNamerPanel' ]; }
 }
 
+/** A panel answering head() false: its pane opens on its screen, with no row naming it - what the Dashboard does */
+class AdminSmokeHeadlessPanel {
+	public static function actions(): array { return [ 'headless/list' => [ self::class, 'apiList' ] ]; }
+	public static function nav(): array { return [ 'headless', 'Headless', 59 ]; }
+	public static function head(): bool { return false; }
+	public static function apiList( array &$appData, array &$request ): void { \Nino\Http::ok( $request ); }
+}
+
+class AdminSmokeHeadlessModule {
+	public static function adminPanels( array &$appData ): array { return [ 'AdminSmokeHeadlessPanel' ]; }
+}
+
 /** A panel whose icon() answers whatever the icon check below hands it */
 class AdminSmokeIconPanel {
 	public static string $icon = '';
@@ -2807,10 +2819,24 @@ check( 'a panel naming the features group from outside features/ is refused and 
 		&& count( array_filter( $warnings, static fn( string $m ): bool => str_contains( $m, 'AdminSmokeFeatureNamerPanel' ) && str_contains( $m, 'features' ) ) ) === 1;
 } )() );
 
+/*	The head is the default and the Dashboard the exception, not the other
+	way round: a panel that says nothing opens with the row that names it,
+	one that answers head() false opens on its screen alone - and the
+	registry carries the answer, so the rail and the panes read one value	*/
+check( 'a panel answering head() false opens on its screen alone; one that says nothing gets the head, the Dashboard is the one shipped panel without', ( static function() use ( $withModule ): bool {
+	$withHeadless = $withModule;
+	$withHeadless['/nino/modules'] = array_merge( $withHeadless['/nino/modules'], [ 'AdminSmokeHeadlessModule' ] );
+	$registry = \Nino\Admin\Admin::panels( $withHeadless );
+	$html = \Nino\Admin\Panels::panesHtml( $registry );
+	return ( $registry['headless']['head'] ?? null ) === false && ( $registry['dummy']['head'] ?? null ) === true && ( $registry['dashboard']['head'] ?? null ) === false
+		&& str_contains( $html, '<div id="admin-content-headless" data-panel="headless" data-layout="page" hidden><div id="headless-list"></div></div>' ) === true
+		&& str_contains( $html, 'admin-content-headless' ) === true && substr_count( $html, 'admin-panel-head' ) === count( $registry ) - 2;
+} )() );
+
 $panesHtml = \Nino\Admin\Panels::panesHtml( $registry );
-check( 'every pane carries the mount points its script renders into', str_contains( $panesHtml, '<div id="admin-content-navs" data-panel="navs" data-layout="page" hidden><div id="navs-list"></div><div id="navs-form"></div></div>' ) === true );
-check( 'a panel without panes() gets the conventional <uri>-list mount', str_contains( $panesHtml, '<div id="admin-content-dummy" data-panel="dummy" data-layout="page" hidden><div id="dummy-list"></div></div>' ) === true );
-check( 'a pane with tabs carries the shared tab bar, its own screen first, and a tab pane per tab', str_contains( $panesHtml, '<div id="admin-content-language" data-panel="language" data-layout="page" hidden><div class="nino-admin-tabs nino-admin-tabs--bar nino-admin-tabs--panel admin-panel-tabs" role="tablist"><button type="button" role="tab" id="admin-tabbutton-language" class="nino-admin-tab" data-tab="language" aria-controls="admin-tab-language" aria-selected="false">[[/_admin/nav/languages]]</button><button type="button" role="tab" id="admin-tabbutton-translations" class="nino-admin-tab" data-tab="translations" aria-controls="admin-tab-translations" aria-selected="false">[[/_admin/nav/translations]]</button></div><div id="admin-tab-language" role="tabpanel" aria-labelledby="admin-tabbutton-language" data-tab="language" hidden><div id="language-form"></div></div><div id="admin-tab-translations" role="tabpanel" aria-labelledby="admin-tabbutton-translations" data-tab="translations" hidden><div id="translations-content"></div></div></div>' ) === true );
+check( 'every pane carries the mount points its script renders into, under the head that names the panel', str_contains( $panesHtml, '<div id="admin-content-navs" data-panel="navs" data-layout="page" hidden><div class="admin-panel-head"><h2 class="admin-panel-title">[[/_admin/nav/navs]]</h2><div class="admin-panel-actions"></div></div><div id="navs-list"></div><div id="navs-form"></div></div>' ) === true );
+check( 'a panel without panes() gets the conventional <uri>-list mount', str_contains( $panesHtml, '<div id="admin-content-dummy" data-panel="dummy" data-layout="page" hidden><div class="admin-panel-head"><h2 class="admin-panel-title">Dummy</h2><div class="admin-panel-actions"></div></div><div id="dummy-list"></div></div>' ) === true );
+check( 'a pane with tabs carries the shared tab bar in its head, beside the name, its own screen first, and a tab pane per tab', str_contains( $panesHtml, '<div id="admin-content-language" data-panel="language" data-layout="page" hidden><div class="admin-panel-head"><h2 class="admin-panel-title">[[/_admin/nav/language]]</h2><div class="nino-admin-tabs nino-admin-tabs--bar nino-admin-tabs--panel admin-panel-tabs" role="tablist"><button type="button" role="tab" id="admin-tabbutton-language" class="nino-admin-tab" data-tab="language" aria-controls="admin-tab-language" aria-selected="false">[[/_admin/nav/languages]]</button><button type="button" role="tab" id="admin-tabbutton-translations" class="nino-admin-tab" data-tab="translations" aria-controls="admin-tab-translations" aria-selected="false">[[/_admin/nav/translations]]</button></div><div class="admin-panel-actions"></div></div><div id="admin-tab-language" role="tabpanel" aria-labelledby="admin-tabbutton-language" data-tab="language" hidden><div id="language-form"></div></div><div id="admin-tab-translations" role="tabpanel" aria-labelledby="admin-tabbutton-translations" data-tab="translations" hidden><div id="translations-content"></div></div></div>' ) === true );
 
 
 /*	Every piece of that markup is an entry of Panels::$html, not a string the
@@ -2831,6 +2857,13 @@ $shippedMount = \Nino\Admin\Panels::$html['mount'];
 $replacedPanes = \Nino\Admin\Panels::panesHtml( $registry );
 \Nino\Admin\Panels::$html['mount'] = $shippedMount;
 check( 'the mount points are rendered through theirs too', str_contains( $replacedPanes, '<section id="dummy-list" class="own-mount"></section>' ) === true );
+
+$shippedTitle = \Nino\Admin\Panels::$html['head-title'];
+\Nino\Admin\Panels::$html['head-title'] = '<p class="own-title">[[label]]</p>';
+$replacedHeads = \Nino\Admin\Panels::panesHtml( $registry );
+\Nino\Admin\Panels::$html['head-title'] = $shippedTitle;
+check( 'and the name in a pane\'s head through its own fragment', str_contains( $replacedHeads, '<div class="admin-panel-head"><p class="own-title">Dummy</p><div class="admin-panel-actions"></div></div><div id="dummy-list">' ) === true
+	&& str_contains( \Nino\Admin\Panels::panesHtml( $registry ), '<h2 class="admin-panel-title">Dummy</h2>' ) === true );
 
 // The language switcher is Admin's own fragment rather than Panels', since
 // it is the one piece of the shell that class still renders itself

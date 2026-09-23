@@ -669,7 +669,7 @@
 				lastTab[panel] = current;
 
 				tabPanes.forEach( function( p ) { p.hidden = p.dataset.tab !== current } );
-				pane.querySelectorAll(':scope > .admin-panel-tabs > button[data-tab]').forEach( function( btn ) {
+				pane.querySelectorAll(':scope > .admin-panel-head > .admin-panel-tabs > button[data-tab]').forEach( function( btn ) {
 					const active = btn.dataset.tab === current;
 					btn.classList.toggle( 'is-active', active );
 					btn.setAttribute( 'aria-selected', active ? 'true' : 'false' );
@@ -713,7 +713,10 @@
 			Object.keys( panels ).forEach( function( panel ) {
 				panels[panel][0].addEventListener( 'click', function(ev){ ev.preventDefault(); selectTab( panel ) } );
 			} );
-			dc.querySelectorAll('#admin-content-wrap > [data-panel] > .admin-panel-tabs').forEach( function( strip ) {
+			// The strip stands in the pane's head, beside the panel's name
+			// (see Panels::panesHtml()) - a strip a panel's own script puts
+			// there later (Nino.adminUi.panelHead()) drives itself
+			dc.querySelectorAll('#admin-content-wrap > [data-panel] > .admin-panel-head > .admin-panel-tabs').forEach( function( strip ) {
 
 				const owner 	= strip.closest('[data-panel]').dataset.panel;
 				const buttons	= Array.from( strip.querySelectorAll(':scope > button[data-tab]') );

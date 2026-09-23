@@ -106,7 +106,15 @@ function element( tag ) {
 		attributes : {},
 		children : [],
 		listeners : {},
-		appendChild : function( child ) { el.children.push( child ); return child },
+		parent : null,
+		appendChild : function( child ) { el.children.push( child ); child.parent = el; return child },
+		// Enough of a live tree for the strip to be put into the pane's head
+		// (Nino.adminUi.panelHead()) and drawn again there
+		closest : function() { let at = el.parent; while( at !== null && at.dataset.panel === undefined ) at = at.parent; return at },
+		querySelector : function( selector ) { return el.children.find( function( c ) { return hasClass( c, selector.replace( ':scope > .', '' ) ) } ) || null },
+		insertAdjacentElement : function( where, other ) { const at = el.parent.children.indexOf( el ); el.parent.children.splice( at + 1, 0, other ); other.parent = el.parent; return other },
+		insertBefore : function( other, reference ) { el.children.splice( reference ? el.children.indexOf( reference ) : el.children.length, 0, other ); other.parent = el; return other },
+		remove : function() { if( el.parent === null ) return; el.parent.children.splice( el.parent.children.indexOf( el ), 1 ); el.parent = null },
 		// A data-* attribute is a dataset entry, as in a browser - the shared
 		// select writes its key with setAttribute(), the panel reads dataset
 		setAttribute : function( name, value ) {
@@ -220,6 +228,22 @@ mount.id = 'features-list';
 // The panel's second pane: the screen an active feature's row drills into
 const screen = element('div');
 screen.id = 'features-detail';
+// The pane the shell renders both into, with the head that names the panel
+// over them (see Panels::panesHtml()) - where the strip goes
+const pane = element('div');
+pane.setAttribute( 'data-panel', 'features' );
+const paneHead = element('div');
+paneHead.className = 'admin-panel-head';
+const paneTitle = element('h2');
+paneTitle.className = 'admin-panel-title';
+paneTitle.textContent = 'Features';
+const paneActions = element('div');
+paneActions.className = 'admin-panel-actions';
+paneHead.appendChild( paneTitle );
+paneHead.appendChild( paneActions );
+pane.appendChild( paneHead );
+pane.appendChild( mount );
+pane.appendChild( screen );
 
 const callbacks = [];
 const requests = [];
@@ -437,14 +461,15 @@ check( 'there is no intro line and no eyebrow badge - just the head, the action 
 	&& hasClass( mount.children[0], 'admin-features-head' )
 	&& findAll( mount, function( el ) { return hasClass( el, 'nino-admin-hint-lead' ) } ).length === 0 && findAll( mount, function( el ) { return hasClass( el, 'nino-admin-eyebrow' ) } ).length === 0 );
 
-// --- the head: the tab strip and the filter beside it
+// --- the head: the tab strip beside the panel's name, the filter in the module's own row
 
 const head 	 = mount.children[0];
-const strip	 = head.children[0];
-const filter = head.children[1];
-check( 'the head holds the tab strip, the filter and the category, in that order, and neither filter is inside the tablist', head.children.length === 3
+const strip	 = paneHead.children[1];
+const filter = head.children[0];
+check( 'the strip stands in the pane\'s head beside the name, and the module\'s own row holds the filter and the category - neither inside the tablist', paneHead.children.length === 3
+	&& paneHead.children[0] === paneTitle && paneHead.children[2] === paneActions
 	&& hasClass( strip, 'nino-admin-tabs' ) && hasClass( strip, 'nino-admin-tabs--bar' ) && hasClass( strip, 'admin-panel-tabs' ) && strip.attributes.role === 'tablist'
-	&& filter.tagName === 'INPUT' && filter.type === 'search' && filter.id === 'features-filter' );
+	&& head.children.length === 2 && filter.tagName === 'INPUT' && filter.type === 'search' && filter.id === 'features-filter' );
 check( 'the filter is labelled and placeheld from the text system, and reuses the shared search control', hasClass( filter, 'nino-admin-table-search' )
 	&& filter.placeholder === text('/_admin/features/label/filter') && filter.attributes['aria-label'] === text('/_admin/features/label/filter') );
 
@@ -497,12 +522,12 @@ check( 'its line leads with the category, then names the version and, where an u
 
 /** The filter as it stands after the last redraw - the panel builds a new one every time */
 function filterNow() {
-	return mount.children[0].children[1];
+	return mount.children[0].children[0];
 }
 
 filterNow().value = 'beispiel';
 fire( filterNow(), 'input' );
-const narrowed = byTag( mount.children[0], 'button' );
+const narrowed = byTag( paneHead.children[1], 'button' );
 check( 'a filter narrows every tab\'s count to what matches, so the counts say where the match is', narrowed[0].textContent === text('/_admin/features/tab/active')+ ' (1)'
 	&& narrowed[1].textContent === text('/_admin/features/tab/inactive')+ ' (0)' && narrowed[2].textContent === text('/_admin/features/tab/available')+ ' (0)' );
 check( 'and the tab on screen shows the match alone', rowKeys( mount, 'feature' ) === 'sample' );
@@ -529,7 +554,7 @@ check( 'it reads the description too, and ignores case', rowKeys( mount, 'featur
 
 filterNow().value = 'fre';
 fire( filterNow(), 'input' );
-fire( byTag( mount.children[0], 'button' )[1], 'click' );
+fire( byTag( paneHead.children[1], 'button' )[1], 'click' );
 check( 'switching tabs keeps the filter, and it reads the key as well as the name', rowKeys( mount, 'feature' ) === 'fresh'
 	&& filterNow().value === 'fre' );
 
@@ -540,14 +565,14 @@ check( 'a filter that matches nothing says so - not the tab\'s own empty state, 
 
 filterNow().value = '';
 fire( filterNow(), 'input' );
-fire( byTag( mount.children[0], 'button' )[0], 'click' );
+fire( byTag( paneHead.children[1], 'button' )[0], 'click' );
 check( 'cleared, every card is back', rowKeys( mount, 'feature' ) === 'plain,sample' );
 
 // --- the category beside it
 
 /** The category select as it stands after the last redraw - rebuilt like everything else in the head */
 function categoryNow() {
-	return mount.children[0].children[2];
+	return mount.children[0].children[1];
 }
 
 check( 'the category is a select of its own, labelled from the text system and reusing the shared input control',
@@ -563,7 +588,7 @@ check( 'so a category nothing is filed under is not offered - the catalogue is n
 
 categoryNow().value = 'content';
 fire( categoryNow(), 'change' );
-const byCategory = byTag( mount.children[0], 'button' );
+const byCategory = byTag( paneHead.children[1], 'button' );
 check( 'picking one narrows every tab\'s count the way the search box does', byCategory[0].textContent === text('/_admin/features/tab/active')+ ' (1)'
 	&& byCategory[1].textContent === text('/_admin/features/tab/inactive')+ ' (0)' && byCategory[2].textContent === text('/_admin/features/tab/available')+ ' (0)' );
 check( 'and the tab on screen shows what is filed under it', rowKeys( mount, 'feature' ) === 'sample' );
@@ -865,11 +890,11 @@ check( 'a cached catalogue fills the Available tab straight from features/list -
 // whichever tab is current) - switch back to look at the freshly cached one
 fire( tabs[2], 'click' );
 
-const availableTabs = byTag( mount.children[0], 'button' );
+const availableTabs = byTag( paneHead.children[1], 'button' );
 check( 'Available\'s count is the offers that are not already current: ancient, extra, helper, needy - not sample', availableTabs[2].textContent === text('/_admin/features/tab/available')+ ' (4)' );
 check( 'the status line reads the cache\'s own stamp', byTag( mount.children[1], 'p' )[0].textContent === text('/_admin/features/label/catalogue-status').replace( '%s', CACHE.fetched ) );
 check( 'and the category now offers what the catalogue brought as well - it is built from what is on screen, installed or not',
-	byTag( mount.children[0].children[2], 'option' ).map( function( o ) { return o.value } ).join('|') === '|content|ui|marketing|security|system|' );
+	byTag( mount.children[0].children[1], 'option' ).map( function( o ) { return o.value } ).join('|') === '|content|ui|marketing|security|system|' );
 
 check( 'the Available tab is one card per offer that is not current, ancient/extra/helper/needy but not sample', rowKeys( mount, 'offer' ) === 'ancient,extra,helper,needy' );
 check( 'an offer is a row of the same grouped list, its name in the shared copy, no status badge', offer( mount, 'extra' ).tagName === 'LI'
@@ -920,7 +945,7 @@ check( '...and, having switched nothing on, reads the list again rather than bui
 /*	And what it says when the install switched the feature on, which is what
 	installing a feature the project did not have does now: somebody told
 	"Installed." goes looking for the Activate that is not there any more	*/
-fire( byTag( mount.children[0], 'button' )[2], 'click' );
+fire( byTag( paneHead.children[1], 'button' )[2], 'click' );
 fire( offerButton( mount, 'extra' ), 'click' );
 const requestsBeforeActivating = requests.length;
 answer( 200, { feature : EXTRA, updated : false, activated : true, required : [] } );
@@ -963,12 +988,12 @@ check( 'success reads the list again, and only the list - the cached catalogue\'
 const installedOffers = JSON.parse( JSON.stringify( OFFERS ) );
 installedOffers[1] = Object.assign( {}, installedOffers[1], { state : 'current', local : '1.0.0' } );
 answer( 200, listAnswer( CACHE.url, true, Object.assign( {}, CACHE, { offers : installedOffers } ), FEATURES_WITH_EXTRA ) );
-check( 'the installed feature now shows on Inactive, off, with Activate - and Available lost it, straight from the cache', byTag( mount.children[0], 'button' )[2].textContent === text('/_admin/features/tab/available')+ ' (3)' );
+check( 'the installed feature now shows on Inactive, off, with Activate - and Available lost it, straight from the cache', byTag( paneHead.children[1], 'button' )[2].textContent === text('/_admin/features/tab/available')+ ' (3)' );
 
-fire( byTag( mount.children[0], 'button' )[1], 'click' );
+fire( byTag( paneHead.children[1], 'button' )[1], 'click' );
 check( 'the just-installed feature is on Inactive now, with Remove and Activate', row( mount, 'extra' ) !== undefined && byTag( row( mount, 'extra' ), 'button' ).map( function( el ) { return el.textContent } ).join('|') === text('/_admin/features/label/remove')+ '|'+ text('/_admin/features/label/activate') );
 
-fire( byTag( mount.children[0], 'button' )[2], 'click' );
+fire( byTag( paneHead.children[1], 'button' )[2], 'click' );
 check( 'and the offer itself is gone from Available - excluded as current, not shown with a disabled button', offer( mount, 'extra' ) === undefined );
 
 // --- a directory the web server cannot write
@@ -998,7 +1023,7 @@ panel.init();
 const allCurrent = OFFERS.map( function( o ) { return Object.assign( {}, o, { state : 'current' } ) } );
 answer( 200, listAnswer( CACHE.url, true, Object.assign( {}, CACHE, { offers : allCurrent } ) ) );
 check( 'a cache whose offers are all already current says everything is up to date, count 0', findAll( mount.children[2], function( el ) { return hasClass( el, 'nino-admin-empty' ) } )[0].textContent === text('/_admin/features/hint/available-empty')
-	&& byTag( mount.children[0], 'button' )[2].textContent === text('/_admin/features/tab/available')+ ' (0)' );
+	&& byTag( paneHead.children[1], 'button' )[2].textContent === text('/_admin/features/tab/available')+ ' (0)' );
 
 panel.showCurrent();
 answer( 200, listAnswer( '', true, null ) );
@@ -1031,9 +1056,10 @@ fire( byTag( mount.children[1], 'button' )[0], 'click' );
 answer( 200, catalogueAnswer( true, OFFERS, '2026-09-08 09:00' ) );
 check( 'a successful refresh clears the error, frees the button and the status now names when it was fetched', hasClass( byTag( mount.children[1], 'p' )[0], 'nino-admin-error' ) === false && byTag( mount.children[1], 'button' )[0].disabled === false
 	&& byTag( mount.children[1], 'p' )[0].textContent === text('/_admin/features/label/catalogue-status').replace( '%s', '2026-09-08 09:00' ) );
-check( 'the Available tab now shows the refreshed offers, count 4', byTag( mount.children[0], 'button' )[2].textContent === text('/_admin/features/tab/available')+ ' (4)'
+check( 'the Available tab now shows the refreshed offers, count 4', byTag( paneHead.children[1], 'button' )[2].textContent === text('/_admin/features/tab/available')+ ' (4)'
 	&& rowKeys( mount, 'offer' ) === 'ancient,extra,helper,needy' );
-check( 'switching tabs and back leaves the refreshed cache in place - the tab bar rebuild does not lose state', ( fire( byTag( mount.children[0], 'button' )[0], 'click' ), fire( byTag( mount.children[0], 'button' )[2], 'click' ), rowKeys( mount, 'offer' ).split(',').filter( Boolean ).length === 4 ) );
+check( 'switching tabs and back leaves the refreshed cache in place - the tab bar rebuild does not lose state', ( fire( byTag( paneHead.children[1], 'button' )[0], 'click' ), fire( byTag( paneHead.children[1], 'button' )[2], 'click' ), rowKeys( mount, 'offer' ).split(',').filter( Boolean ).length === 4 ) );
+check( '...and every redraw put one strip into the head, in the place after the name, rather than stacking them', paneHead.children.length === 3 && hasClass( paneHead.children[1], 'admin-panel-tabs' ) && paneHead.children[0] === paneTitle );
 
 // --- nothing installed at all, and a failed load
 
@@ -1051,13 +1077,13 @@ check( 'showCurrent leaves the panel as it is rather than re-fetching', requests
 panel.init();
 answer( 200, { dir : '/features', catalogueUrl : CACHE.url, writable : true, catalogue : null, features : [] } );
 check( 'init reloads, and Inactive\'s empty state names the directory - Active empty too, both counted 0', requests[requests.length - 1].action === 'features/list'
-	&& byTag( mount.children[0], 'button' )[0].textContent === text('/_admin/features/tab/active')+ ' (0)' && byTag( mount.children[0], 'button' )[1].textContent === text('/_admin/features/tab/inactive')+ ' (0)' );
-fire( byTag( mount.children[0], 'button' )[1], 'click' );
+	&& byTag( paneHead.children[1], 'button' )[0].textContent === text('/_admin/features/tab/active')+ ' (0)' && byTag( paneHead.children[1], 'button' )[1].textContent === text('/_admin/features/tab/inactive')+ ' (0)' );
+fire( byTag( paneHead.children[1], 'button' )[1], 'click' );
 check( 'Inactive, empty, names the features directory', findAll( mount.children[2], function( el ) { return hasClass( el, 'nino-admin-empty' ) } )[0].textContent === text('/_admin/features/hint/empty').replace( '%s', '/features' ) );
-fire( byTag( mount.children[0], 'button' )[0], 'click' );
+fire( byTag( paneHead.children[1], 'button' )[0], 'click' );
 check( 'Active, empty, says no feature is on', findAll( mount.children[2], function( el ) { return hasClass( el, 'nino-admin-empty' ) } )[0].textContent === text('/_admin/features/hint/active-empty') );
 check( 'and with nothing to narrow the category is not drawn at all - a select with one option is a control that cannot be used',
-	mount.children[0].children.length === 2 && byTag( mount.children[0], 'select' ).length === 0 );
+	mount.children[0].children.length === 1 && byTag( mount.children[0], 'select' ).length === 0 );
 
 panel.init();
 answer( 500, null );

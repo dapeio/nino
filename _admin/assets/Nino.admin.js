@@ -68,6 +68,51 @@
 		},
 
 		/**
+		 *	The head of the pane an element stands in: the row the shell
+		 *	renders over every panel but the Dashboard (see
+		 *	\Nino\Admin\Panels::$html) - the panel's name, the registry's tab
+		 *	strip beside it, a slot for actions at its end. A panel with tabs
+		 *	of its own puts its strip there through tabs(), which takes the
+		 *	place after the name and replaces whatever strip stood there, so
+		 *	a screen drawn again does not stack two; a panel with buttons
+		 *	over its screen appends them to actions. One row across the
+		 *	workbench, then, rather than a title and a strip per panel.
+		 *
+		 *	null where there is no head - the Dashboard, or a script rendered
+		 *	somewhere other than a pane - so a panel keeps its strip where it
+		 *	drew it
+		 *
+		 *	@param		{Element}		el						Any element inside the pane - the mount, usually
+		 *
+		 *	@return		{Object|null}						{ element, title, actions, tabs( strip ) }
+		 */
+		panelHead : function( el ) {
+			const pane = el && typeof el.closest === 'function' ? el.closest('[data-panel]') : null;
+			const head = pane ? pane.querySelector(':scope > .admin-panel-head') : null;
+			if( !head )
+				return null;
+			return {
+				element	: head,
+				title		: head.querySelector(':scope > .admin-panel-title'),
+				actions	: head.querySelector(':scope > .admin-panel-actions'),
+				tabs		: function( strip ) {
+					const before = head.querySelector(':scope > .admin-panel-tabs');
+					if( before !== null && before !== strip )
+						before.remove();
+					// The class the head lays a strip out by, whatever the
+					// panel called its own
+					strip.classList.add('admin-panel-tabs');
+					const title = head.querySelector(':scope > .admin-panel-title');
+					if( title !== null )
+						title.insertAdjacentElement( 'afterend', strip );
+					else
+						head.insertBefore( strip, head.firstChild );
+					return strip;
+				},
+			};
+		},
+
+		/**
 		 *	The one way a panel says "nothing here yet": a list without entries,
 		 *	a table without rows, a scan that found nothing. Owns no strings -
 		 *	the caller says what is missing, in the interface language

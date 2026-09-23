@@ -19,11 +19,14 @@
 
 @layer nino.tool {
 
-/*	The head of the list pane: the tab strip and the two filters over what
-	the tabs hold - the search box and the category. It stays at the top
-	while the rows scroll under it - a catalogue of any size is a long page,
-	and the tab you are on, the counts beside it and what you have narrowed
-	to are exactly what you must not lose sight of while looking through it.
+/*	The head of the list: the two filters over what the tabs hold - the
+	search box and the category; the tab strip stands in the pane's own head
+	beside the panel's name (see _admin/assets/style.css), and only comes
+	here where there is none. The row stays at the top while the rows scroll
+	under it - a catalogue of any size is a long page, and what you have
+	narrowed to is exactly what you must not lose sight of while looking
+	through it. It closes against the pane's head above it, the gap that
+	head leaves under itself taken back, so the two read as one bar.
 
 	The shared strip is deliberately not sticky (see _admin/assets/style.css)
 	because a panel with tabs drills into a form whose context bar is pinned
@@ -41,10 +44,10 @@
 	display: flex;
 	flex-wrap: wrap;
 	align-items: center;
-	justify-content: space-between;
+	justify-content: flex-end;
 	gap: .5rem 1rem;
-	margin: -1rem calc(var(--nino-admin-content-inline) * -1) 1.25rem;
-	padding: .35rem var(--nino-admin-content-inline) 0;
+	margin: -1.25rem calc(var(--nino-admin-content-inline) * -1) 1.25rem;
+	padding: .5rem var(--nino-admin-content-inline);
 	border-bottom: 1px solid var(--editor-separator);
 	background: var(--editor-bar-bg);
 	box-shadow: 0 1px 0 rgba(15,23,42,.025);
@@ -56,8 +59,8 @@
 	max-width: 80%;
 }
 
-/*	The strip sits in the head now, so it brings neither its own bleed nor
-	the border the head already draws. */
+/*	The strip, where the pane has no head to hold it: it brings neither its
+	own bleed nor the border the row already draws. */
 #features-list .admin-features-head > .admin-panel-tabs {
 	flex: 1 1 auto;
 	min-width: 0;
