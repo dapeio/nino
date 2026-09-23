@@ -491,9 +491,9 @@ shape:
 			const wrap = dc.getElementById('catalog-list');
 			wrap.innerHTML = '';
 
-			const heading = dc.createElement('h2');
-			heading.textContent = 'Catalog';
-			wrap.appendChild( heading );
+			// No heading of its own: the pane's head names the panel (see
+			// "The head" above), and a title drawn here would say it twice.
+			// The form a level below opens with one, under its context bar
 
 			const list = dc.createElement('ul');
 			list.className = 'nino-admin-list';

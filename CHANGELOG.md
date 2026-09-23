@@ -40,6 +40,14 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **Docs:** the panel recipe's skeleton still drew a heading over its list -
+  the one thing the pane's head does for every panel since the entry below,
+  so a panel written from the skeleton would have said its name twice. The
+  list screen draws none now and a comment says why; the form a level
+  below keeps its own, under its context bar, like every form in the
+  workbench. Found by the pass that took the catalogue's panels to the
+  head.
+
 - **Admin:** every panel but the Dashboard opens with the same head. The
   panes used to open however their panel began: a tab strip and nothing
   else where the registry had tabs, the first row of a list where it had
