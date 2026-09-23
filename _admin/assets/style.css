@@ -129,21 +129,24 @@
 	--editor-green: #16a34a;
 	--editor-green-soft: rgba(22,163,74,.1);
 	--editor-orange: #d97706;
-	--editor-bg: #f5f7fb;
+	/* A shade further from white than it was (#f5f7fb): the cards, the rail
+	   and the bars are white, and on a page this close to white they had
+	   almost no edge - the border between them measured 1.3:1 */
+	--editor-bg: #edf0f5;
 	--editor-bg-elevated: #fff;
 	--editor-bg-grouped: #fff;
 	--editor-text: #172033;
 	--editor-text-secondary: #687386;
-	--editor-separator: rgba(15,23,42,.09);
-	--editor-border: rgba(15,23,42,.13);
+	--editor-separator: rgba(15,23,42,.11);
+	--editor-border: rgba(15,23,42,.19);
 	--editor-bar-bg: rgba(255,255,255,.9);
 	--editor-sidebar-bg: #fff;
 	--editor-focus: 0 0 0 3px rgba(37,99,235,.2);
 	--editor-radius: 10px;
 	--editor-radius-sm: 7px;
 	--editor-gap: .75rem;
-	--editor-shadow: 0 1px 2px rgba(15,23,42,.05), 0 8px 24px rgba(15,23,42,.055);
-	--editor-shadow-sm: 0 1px 2px rgba(15,23,42,.045), 0 3px 10px rgba(15,23,42,.035);
+	--editor-shadow: 0 1px 2px rgba(15,23,42,.06), 0 8px 24px rgba(15,23,42,.07);
+	--editor-shadow-sm: 0 1px 2px rgba(15,23,42,.055), 0 3px 10px rgba(15,23,42,.05);
 
 	--nino-admin-mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
 	--nino-admin-sidebar-width: 15rem;

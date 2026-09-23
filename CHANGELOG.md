@@ -40,6 +40,14 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **Admin:** the white surfaces stand off the page. The light scheme's
+  page colour moves a shade further from white (`#edf0f5` where it was
+  `#f5f7fb`), the border every card and field draws goes from 13% to 19%
+  ink and the separator from 9% to 11%, and the two shadows gain a little
+  depth - the cards, the rail and the bars are white, and on a page that
+  close to white their edge measured 1.3:1, which is where "the white
+  areas need more contrast" came from. The dark scheme is as it was.
+
 - **Docs:** what three passes left between their areas. Three comments in
   `\Nino\Auth` and the Users panel's docblock said sessions and
   permissions are "a developer-only, direct-json task", from before the
