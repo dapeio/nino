@@ -40,6 +40,21 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **Docs:** what three passes left between their areas. Three comments in
+  `\Nino\Auth` and the Users panel's docblock said sessions and
+  permissions are "a developer-only, direct-json task", from before the
+  panel could assign a role (`Auth::setRole()`) and end every session of
+  an account (`Auth::logoutAllSessions()`, `users/logoutall`); status and
+  a permission held beside a role still are, and the sentences say which.
+  The Navigation panel's script sent the reader to `pages.js` and
+  `elementtypes.js`, the Form panel's called itself `editor.js` and its
+  neighbour `logs.js` - the Routes panel's `admin.js`, the Elements panel's
+  `types.js`, `admin.js` and the Log panel's `admin.js`. And
+  `tests/install-smoke.php` named `setDevPassword()` three times, a method
+  that is `setRecoverySecret()`, and "a Design module, because there is
+  none" where the Design feature is a catalogue feature the Features panel
+  installs.
+
 - **Docs:** AGENTS.md's "Two traps" in section 6a has held three of them
   since restating a shared component in a panel was added to the list.
 

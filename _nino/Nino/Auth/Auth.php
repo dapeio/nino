@@ -147,10 +147,12 @@ namespace Nino {
 			// nat with it - after maxtries * IP_TRIES_FACTOR clicks. Those
 			// attempts also can't teach an attacker anything; the account is
 			// locked either way.
-			// '?? 0', the way _resumeSession() reads it: status, sessions and
-			// perms are a developer-only, direct-json task by this class's own
-			// account, so a record written by hand can plainly be a hash and a
-			// permission list and nothing else - and reading a key that is not
+			// '?? 0', the way _resumeSession() reads it: status, and any
+			// permission held beside a role, are a developer-only, direct-json
+			// task by this class's own account (the Users panel assigns a role
+			// and ends sessions, and writes nothing else), so a record written
+			// by hand can plainly be a hash and a permission list and nothing
+			// else - and reading a key that is not
 			// there raises a warning this framework treats as fatal, ie. a 500
 			// on the login form rather than a refusal
 			$cooling	= ( $user !== false && ( $user['status'] ?? 0 ) === 2 && self::_inCooldown( $appData, $username ) === true );
@@ -300,10 +302,12 @@ namespace Nino {
 			$user = $appData['/nino/auth/user'][$username] + [ 'mail' => $username ];
 
 			// The two keys every caller reads without asking whether they are
-			// there. Status, sessions and perms are a developer-only,
-			// direct-json task by this class's own account, so a record written
-			// by hand can plainly be a hash and a permission list and nothing
-			// else - and reading a key that is not there raises a warning this
+			// there. Status, and any permission held beside a role, are a
+			// developer-only, direct-json task by this class's own account
+			// (the Users panel assigns a role and ends sessions, and writes
+			// nothing else), so a record written by hand can plainly be a hash
+			// and a permission list and nothing else - and reading a key that
+			// is not there raises a warning this
 			// framework treats as fatal, ie. a 500 on the login form rather
 			// than a refusal. Filled in on the way out, once, for everybody
 			$user['status']		= is_int( $user['status'] ?? null ) === true ? $user['status'] : 0;
@@ -427,8 +431,10 @@ namespace Nino {
 		}
 
 
-		// Update a user's mail and/or password. Perms/sessions/status are
-		// left untouched - those stay a developer-only, direct-json task.
+		// Update a user's mail and/or password. Role, perms, sessions and
+		// status are left untouched: setRole() and logoutAllSessions() are
+		// the panel's way to the first and the third, the other two stay a
+		// developer-only, direct-json task.
 		// A tries counter (see TRIES_PATH) follows a mail change so an
 		// in-progress cooldown survives a rename.
 		public static function updateUser( array &$appData, string $username, string $newUsername, string $pw = '' ): array|false {

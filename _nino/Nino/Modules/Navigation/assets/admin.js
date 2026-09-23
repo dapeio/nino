@@ -9,7 +9,7 @@
  *													Routes module's per-page checkboxes can't give, since
  *													there a page only ever sees its own membership.
  *
- *													List + drill-down shape follows pages.js closely; the
+ *													List + drill-down shape follows the Routes panel's admin.js closely; the
  *													detail level's ↑/↓ buttons reorder one menu, and every
  *													action re-renders from the response rather than patching
  *													a local copy (see Modules\Navigation\Admin,
@@ -418,7 +418,7 @@
 			// A plain button, not an .nino-admin-btn-primary: that class is the
 			// full-width primary a *list* level carries (see _renderList()),
 			// and this one sits inside a form under a Save button it must not
-			// compete with - same shape elementtypes.js's "Add field" has
+			// compete with - same shape the Elements panel's types.js "Add field" has
 			const addBtn = dc.createElement('button');
 			addBtn.type = 'button';
 			addBtn.textContent = Nino.content.getText('/_admin/navs/label/addbtn');

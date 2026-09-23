@@ -7,7 +7,7 @@ declare(strict_types=1);
  *												(_install/Install.php). Runs against an isolated sandbox
  *												directory, never touches the real project data - in
  *												particular, it never rewrites the real _admin/Admin.php (see the
- *												Finish section below): setDevPassword() only takes a
+ *												Finish section below): setRecoverySecret() only takes a
  *												sandboxed path here, exactly so this file is safe to run
  *												against a real checkout.
  *
@@ -257,8 +257,9 @@ check( 'and so is the always-on Localepicker module', in_array( '\\Nino\\Modules
 check( 'the one developer tool that still ships as a module is active from the first config on', in_array( '\\Nino\\Modules\\Maintenance', $configAfterApply['/nino/modules'], true ) === true
 	// Neither of the other two is among them any more: the Template Builder is
 	// a feature installed from the catalogue, and the look is no longer a
-	// choice at all - the base unit delivers one theme.css and nothing reads a
-	// Design module, because there is none
+	// choice at all - the base unit delivers one theme.css, and the Design
+	// feature that composes a look is a catalogue feature the Features panel
+	// installs, not a module this config could list
 	&& in_array( '\\Nino\\Modules\\Templates', $configAfterApply['/nino/modules'], true ) === false
 	&& in_array( '\\Nino\\Modules\\Design', $configAfterApply['/nino/modules'], true ) === false );
 // The roles a project starts with are the Users module's defaults, whatever
@@ -1076,7 +1077,7 @@ $shortFinishRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Install\Finish::apiComplete( $appData, $shortFinishRequest );
 check( 'rejects a too-short _admin password with 400', $shortFinishRequest['/nino/http/response']['statusCode'] === 400 );
 
-// setDevPassword() no longer rewrites php source: it stores the hash under
+// setRecoverySecret() no longer rewrites php source: it stores the hash under
 // the private directory, outside every tool folder and outside config.php.
 // _admin/Admin.php therefore stays byte-identical, which is what makes it
 // replaceable on an update (see Install::setRecoverySecret()'s docblock)
@@ -1126,7 +1127,7 @@ check( 'a truncated password file reads as no password at all', \Nino\Admin\Reco
 unlink( $pwPath );
 
 check( 'writePasswordHash() refuses an empty hash rather than storing one nothing can match', \Nino\Admin\Recovery::writeHash( $appData, '' ) === false );
-check( 'setDevPassword() can write the file again afterwards', \Nino\Install\Install::setRecoverySecret( $appData, 'another dev password' ) === true );
+check( 'setRecoverySecret() can write the file again afterwards', \Nino\Install\Install::setRecoverySecret( $appData, 'another dev password' ) === true );
 check( '...and the new password is the one that verifies', password_verify( 'another dev password', (string) \Nino\Admin\Recovery::hash( $appData ) ) === true );
 
 check( 'the private directory carries its own deny rule', is_file( $sandbox. '/private/.htaccess' ) === true );

@@ -18,9 +18,10 @@ namespace Nino\Modules\Users {
 	 *											'/_admin/users/manage' permission - anyone's, plus (manage-only,
 	 *											no self-service) which role an account holds. What a role
 	 *											grants is the Roles tab of this same pane (see Roles), the
-	 *											login throttle the Lockout tab. Sessions/tries/status, and
-	 *											the permissions an account may hold beside its role, stay a
-	 *											developer-only, direct-json task
+	 *											login throttle the Lockout tab. Every session an account
+	 *											holds is ended from here too (users/logoutall). Tries,
+	 *											status, and the permissions an account may hold beside its
+	 *											role, stay a developer-only, direct-json task
 	 *
 	 *	@package					Dape/Nino
 	 *	@author						David Perchermeier <mail@dape.io>

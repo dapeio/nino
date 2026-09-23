@@ -4,7 +4,7 @@
  *	Nino										A compact filesystembased php framework
  *	Modules									Optional modules
  *	Nino										Framework
- *	editor.js								The Form module's /_admin panel, "Submissions": every
+ *	admin.js								The Form module's /_admin panel, "Submissions": every
  *													submission \Nino\Form records (in addition to the mail
  *													itself) - see Modules\Form\Admin beside this file.
  *													Ships with the module: it is in the editor bundle
@@ -41,7 +41,7 @@
 
 		/**
 		 *	Load the recorded submissions and render them. Same "always
-		 *	re-fetch" shape as logs.js - there's no drill-down state to
+		 *	re-fetch" shape as the Log panel's admin.js - there's no drill-down state to
 		 *	preserve, and re-fetching on every tab switch keeps the list
 		 *	current with whatever arrived since it was last open
 		 *
