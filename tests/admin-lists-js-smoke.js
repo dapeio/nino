@@ -745,6 +745,30 @@ templateFiles.filter( function( file ) {
 } );
 check( 'no template writes an action as a link to nowhere'+ ( fakeLinks.length ? ' - '+ fakeLinks.join(', ') : '' ), fakeLinks.length === 0 );
 
+/*	Every screen the tool puts in front of somebody has exactly one <h1>, and
+	the levels below it are a ladder without a rung missing. Measured in
+	headless Chromium, the workbench shell had no heading of any level at all
+	and the wizard ran h3, h3, h3, h1 - so a screen reader asked to list the
+	page's headings answered with nothing, or with the wrong shape. The shell
+	and the wizard carry a .nino-admin-sr-only <h1>, because neither has a
+	place a visible one would belong	*/
+const headingShapes = [];
+[ '_admin/templates/page-index.tpl', '_admin/templates/page-locked.tpl',
+  '_admin/install/templates/page-wizard.tpl', '_admin/install/templates/page-locked.tpl' ].forEach( function( file ) {
+	// Comments stripped first - the <h1> a comment explains is not one
+	const markup = read( file ).replace( /<!--[\s\S]*?-->/g, '' );
+	const levels = ( markup.match( /<h[1-6][\s>]/g ) || [] ).map( function( tag ) { return Number( tag[2] ) } );
+	const ones 	= levels.filter( function( level ) { return level === 1 } ).length;
+	const gap 	= levels.some( function( level, at ) { return at > 0 && level > levels[at-1] + 1 } );
+	// The first heading is the page's own, and it is an h1: the wizard used to
+	// run h3, h3, h3 and then reach h1 on its last screen
+	if( ones !== 1 || gap === true || levels[0] !== 1 )
+		headingShapes.push( file+ ' ['+ levels.join(',')+ ']' );
+} );
+check( 'every screen of the tool has one <h1> and no missing level under it'+ ( headingShapes.length ? ' - '+ headingShapes.join(', ') : '' ), headingShapes.length === 0 );
+check( 'the design system has a heading that is there for whoever is not looking at the screen',
+	/:where\(\.nino-admin\) \.nino-admin-sr-only \{[^}]*clip-path: inset\(50%\);/s.test( shared ) );
+
 /*	...and a button that reads as a line of text still has to be big enough to
 	hit: "Log out" is one line of .82rem type, 19px tall, under the 24px the
 	pointer rule asks for (WCAG 2.2 SC 2.5.8)	*/

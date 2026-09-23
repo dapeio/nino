@@ -75,7 +75,7 @@
  *              .nino-admin-auth-brand  .nino-admin-auth-title
  *   Brand      .nino-admin-brand-mark  .nino-admin-brand-copy
  *   Type       .nino-admin-hint  .nino-admin-hint-lead  .nino-admin-eyebrow
- *              .nino-admin-error  .nino-admin-empty
+ *              .nino-admin-error  .nino-admin-empty  .nino-admin-sr-only
  *   Controls   .nino-admin-btn-primary  .nino-admin-btn-secondary
  *              .nino-admin-btn-danger  .nino-admin-linkbutton
  *   Surfaces   .nino-admin-card  .nino-admin-tiles  .nino-admin-tile
@@ -1508,6 +1508,29 @@ a {
    for the case where the values themselves are what you came to read.
    Rendered by Nino.adminUi.table(), which owns none of the wording. */
 
+/*	A heading, a name or an instruction that is there for whoever is not
+	looking at the screen. Every surface of the workbench needs one somewhere:
+	the shell's <h1> names an application whose own chrome already says what
+	it is, and the wizard's names a page whose steps carry no visible title at
+	all - but a page without an <h1> is a page a screen reader cannot be
+	asked to summarise, and a heading drawn where the design has no room for
+	one is a heading nobody wanted.
+
+	clip-path rather than display:none or visibility:hidden, which both take
+	the text out of the accessibility tree as well - which is the one thing
+	this must not do. */
+:where(.nino-admin) .nino-admin-sr-only {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	margin: -1px;
+	padding: 0;
+	overflow: hidden;
+	clip-path: inset(50%);
+	border: 0;
+	white-space: nowrap;
+}
+
 /* The hide state the shared components switch. It lives here, next to the
    component that uses it, rather than in a tool's own stylesheet: /_admin
    has a local .admin-hidden of its own, and a shared
@@ -1734,7 +1757,10 @@ a {
 	opacity: .6;
 }
 
-:where(.nino-admin) .nino-admin-card h3 {
+/*	h2 as well as h3: a panel's own screens sit under the shell's one <h1>,
+	so a card's title is the page's second level, not its third - the levels
+	a screen reader reads out have to be a ladder without a rung missing */
+:where(.nino-admin) .nino-admin-card :is(h2, h3) {
 	margin-bottom: .55rem;
 	font-size: .9rem;
   margin-top: .25rem;

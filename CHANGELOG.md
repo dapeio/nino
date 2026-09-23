@@ -431,6 +431,26 @@ All notable changes to Nino are documented in this file.
 
 ### Fixed
 
+- **The workbench had no heading of any level, and the wizard's ran h3, h3,
+  h3, h1.** Measured in headless Chromium on the rendered shell: `h1
+  count=0`, and no `h2` or `h3` either, so a screen reader asked to list the
+  page's headings - the usual way of finding out what a page is - answered
+  with nothing at all. The two locked pages had none either, and the
+  wizard's one `<h1>` was on its last screen, under three `<h3>`. The shell
+  and the wizard now open with an `<h1>` the design system's new
+  `.nino-admin-sr-only` keeps off the glass, because neither has a place a
+  visible one would belong: the shell's panels open with their own screen
+  and the wizard's steps with a lead paragraph. The two locked pages promote
+  the sentence they already show, and the levels below are a ladder - the
+  wizard's three cards and its finish screen are `h2`, the environment
+  groups `checks.js` draws are `h2`, and a panel's own headings (the
+  dashboard's two cards, a feature's screen, the translations screen, which
+  was a second `<h1>`) are the `h2` they always were one level below. The
+  shared card rule takes both levels. `tests/admin-lists-js-smoke.js` reads
+  the heading levels out of each of the four screens and holds them to one
+  `h1` first and no missing rung (two checks, both red before, naming all
+  four files).
+
 - **Neither the rail nor the wizard's progress said which one of them you
   were on.** The workbench marks the open panel by putting an `active` class
   on its rail link, and the setup wizard marks the step it is on the same way

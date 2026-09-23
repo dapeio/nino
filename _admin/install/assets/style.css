@@ -67,7 +67,7 @@
 	display: block;
 	margin: 0 0 1rem;
 }
-.install-check-group h3 {
+.install-check-group h2 {
 	margin: 0 0 .35rem;
 	color: var(--editor-text-secondary);
 }

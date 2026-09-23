@@ -171,7 +171,7 @@
 			const section = dc.createElement('div');
 			section.className = 'nino-admin-card';
 
-			const title = dc.createElement('h3');
+			const title = dc.createElement('h2');
 			title.textContent = Nino.content.getText('/_admin/dashboard/label/elements');
 			section.appendChild( title );
 
@@ -238,7 +238,7 @@
 			const section = dc.createElement('div');
 			section.className = 'nino-admin-card';
 
-			const title = dc.createElement('h3');
+			const title = dc.createElement('h2');
 			title.textContent = Nino.content.getText('/_admin/dashboard/label/activity');
 			section.appendChild( title );
 

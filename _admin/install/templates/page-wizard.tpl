@@ -35,6 +35,13 @@
 
 			<main id="install-content-wrap" class="nino-admin-pane">
 
+				<!-- The page's heading. A step opens with its lead paragraph
+				     rather than with a title, and the rail beside it already
+				     says which step that is, so there is nowhere a visible <h1>
+				     would belong - and a page without one is a page a screen
+				     reader has no way of summarising -->
+				<h1 class="nino-admin-sr-only">Set up Nino</h1>
+
 				<div id="install-content-checks">
 					<p class="nino-admin-hint nino-admin-hint-lead">PHP version, extensions and file/folder permissions Nino needs to run.</p>
 					<div id="checks-results"></div>
@@ -44,15 +51,15 @@
 				<div id="install-content-setup">
 					<p class="nino-admin-hint nino-admin-hint-lead">Pick the available languages and Nino's default language. You can change this at any time in _admin/.</p>
 					<div class="nino-admin-card">
-						<h3>Available Locales</h3>
+						<h2>Available Locales</h2>
 						<div id="setup-locales" class="nino-admin-checklist"></div>
 					</div>
 					<div class="nino-admin-card">
-						<h3>Native Locale</h3>
+						<h2>Native Locale</h2>
 						<div id="setup-native-locale"></div>
 					</div>
 					<div class="nino-admin-card install-hidden" id="setup-modules-card">
-						<h3>Modules</h3>
+						<h2>Modules</h2>
 						<div id="setup-modules" class="nino-admin-checklist"></div>
 					</div>
 				</div>
@@ -90,7 +97,7 @@
 							<span class="install-finish-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
 							<div>
 								<span class="nino-admin-eyebrow install-finish-eyebrow">Ready to go</span>
-								<h1>Installation complete</h1>
+								<h2>Installation complete</h2>
 								<p>Choose where you would like to continue.</p>
 							</div>
 						</div>

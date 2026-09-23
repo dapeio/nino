@@ -39,6 +39,12 @@
 				</nav>
 			</aside>
 			<main id="admin-content-wrap" class="nino-admin-pane">
+				<!-- The page's heading. The shell names itself in the rail and
+				     in the browser tab, and every panel opens with its own
+				     screen rather than with a title, so there is nowhere a
+				     visible <h1> would belong - and a page without one is a
+				     page a screen reader has no way of summarising -->
+				<h1 class="nino-admin-sr-only">[[/_admin/label/title]]</h1>
 				[[/_admin/panes]]
 			</main>
 			[jstext]

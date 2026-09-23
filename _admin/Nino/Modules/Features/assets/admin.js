@@ -1369,7 +1369,7 @@
 			const form = dc.createElement('form');
 			form.dataset.feature = feature.key;
 
-			const title = dc.createElement('h3');
+			const title = dc.createElement('h2');
 			title.textContent = feature.name;
 			form.appendChild( title );
 

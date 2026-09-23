@@ -59,7 +59,7 @@
 	text-transform: uppercase;
 }
 
-#admin-page-wrap .admin-translations-intro h1 {
+#admin-page-wrap .admin-translations-intro h2 {
 	margin: 0 0 .4rem;
 	font-size: clamp(1.35rem, 3vw, 1.65rem);
 	letter-spacing: -.035em;

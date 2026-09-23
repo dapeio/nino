@@ -85,7 +85,9 @@
 			const kicker = dc.createElement('span');
 			kicker.textContent = Nino.content.getText('/_admin/translations/label/workflow');
 			intro.appendChild( kicker );
-			const title = dc.createElement('h1');
+			// h2, not h1: the page's one heading is the shell's (see
+			// page-index.tpl) and a panel's own screen opens a level below it
+			const title = dc.createElement('h2');
 			title.textContent = Nino.content.getText('/_admin/translations/label/title');
 			intro.appendChild( title );
 			// The native locale sits emphasised inside the sentence, wherever

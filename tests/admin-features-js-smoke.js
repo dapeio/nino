@@ -609,7 +609,7 @@ const asked = requests.length;
 fire( sample, 'click' );
 check( 'stepping into it asks the backend for nothing - features/list already carried the schema', requests.length === asked );
 check( 'the list is stepped out of and the feature\'s pane shown, the way every drill-down level is', mount.classList.contains('admin-hidden') === true && screen.classList.contains('admin-hidden') === false );
-check( 'the screen names the feature, and the line under it is identity alone - what it does is a sentence, and a sentence is not appended to a line that gets scanned', byTag( screen, 'h3' )[0].textContent === 'Beispiel-Feature'
+check( 'the screen names the feature, and the line under it is identity alone - what it does is a sentence, and a sentence is not appended to a line that gets scanned', byTag( screen, 'h2' )[0].textContent === 'Beispiel-Feature'
 	&& byTag( screen, 'p' ).some( function( el ) { return el.textContent === text('/_admin/features/category/content')+ ' · '+ text('/_admin/features/label/version').replace( '%s', '1.2.0' ) } )
 	&& byTag( screen, 'p' ).some( function( el ) { return el.textContent === text('/_admin/features/label/requires').replace( '%s', 'helper' ) } ) );
 

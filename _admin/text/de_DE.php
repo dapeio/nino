@@ -27,6 +27,7 @@ return [
 	'[[/_admin/label/rail]]'			=> 'Navigation der Workbench',
 	'[[/_admin/label/nav]]'			=> 'Bereiche der Workbench',
 	'[[/_admin/label/language]]'	=> 'Sprache der Oberfläche',
+	'[[/_admin/label/title]]'		=> 'Nino Workbench',
 	'[[/_admin/nav/group/content]]'		=> 'Inhalt',
 	'[[/_admin/nav/group/structure]]'	=> 'Struktur',
 	'[[/_admin/nav/group/features]]'	=> 'Features',

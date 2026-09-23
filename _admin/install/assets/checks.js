@@ -80,10 +80,12 @@
 			const group = dc.createElement('section');
 			group.className = 'install-check-group';
 
-			const h3 = dc.createElement('h3');
-			h3.className = 'nino-admin-eyebrow';
-			h3.textContent = title;
-			group.appendChild( h3 );
+			// h2: the wizard's one <h1> is the page's (see page-wizard.tpl) and
+			// a group of checks is a section of the step under it
+			const heading = dc.createElement('h2');
+			heading.className = 'nino-admin-eyebrow';
+			heading.textContent = title;
+			group.appendChild( heading );
 
 			// Diagnostics are read, never opened - the shared grouped list's
 			// dense variant supplies the surface and the row separators

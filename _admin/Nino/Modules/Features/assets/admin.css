@@ -141,11 +141,11 @@
 
 /*	The screen behind a feature's chevron: its name and the line under it
 	read as a heading, not as another row. */
-#features-detail h3 {
+#features-detail h2 {
 	margin: 0 0 .15rem;
 }
 
-#features-detail h3 + .nino-admin-hint {
+#features-detail h2 + .nino-admin-hint {
 	margin-top: 0;
 }
 
