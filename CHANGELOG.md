@@ -40,6 +40,15 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **Admin:** the demo catalogue marks its static-block specimens by the
+  presets' new names. The catalogue's `.demo-catalogue.tpl` carries one
+  `data-demo-preset`/`data-demo-layout` mark per specimen so the Template
+  Builder's `demo-catalogue-smoke.php` can hold that every preset and every
+  layout of the library is shown; the feature renamed `items-list`,
+  `items-table` and `items-accordion` to `static-list`, `static-table` and
+  `static-accordion`, and the ten marks that named them follow. Marks only:
+  the sections themselves are what they were.
+
 - **Docs:** the panel recipe's skeleton still drew a heading over its list -
   the one thing the pane's head does for every panel since the entry below,
   so a panel written from the skeleton would have said its name twice. The

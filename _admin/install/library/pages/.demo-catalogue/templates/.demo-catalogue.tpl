@@ -710,7 +710,7 @@
 	</div>
 </section>
 
-<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-static-list-check-demo" data-demo-preset="items-list" data-demo-layout="check-demo">
+<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-static-list-check-demo" data-demo-preset="static-list" data-demo-layout="check-demo">
 	<div class="nino-grid-row nino-grid-row--wide">
 		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left">
 			<span class="nino-badge nino-badge--primary">static-list</span> <span class="nino-badge nino-badge--pill">Layout: check-demo — checklist with sample rows</span> <span class="nino-badge nino-badge--pill">List in markup</span>
@@ -730,7 +730,7 @@
 	</div>
 </section>
 
-<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-static-list-check-elements" data-demo-preset="items-list" data-demo-layout="check-elements">
+<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-static-list-check-elements" data-demo-preset="static-list" data-demo-layout="check-elements">
 	<div class="nino-grid-row nino-grid-row--wide">
 		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left">
 			<span class="nino-badge nino-badge--primary">static-list</span> <span class="nino-badge nino-badge--pill">Layout: check-elements — checklist from Elements</span> <span class="nino-badge nino-badge--pill">Beispieldaten statt &#91;elements&#93;</span>
@@ -754,7 +754,7 @@
 	</div>
 </section>
 
-<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-static-list-numbered-demo" data-demo-preset="items-list" data-demo-layout="numbered-demo">
+<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-static-list-numbered-demo" data-demo-preset="static-list" data-demo-layout="numbered-demo">
 	<div class="nino-grid-row nino-grid-row--wide">
 		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left">
 			<span class="nino-badge nino-badge--primary">static-list</span> <span class="nino-badge nino-badge--pill">Layout: numbered-demo — numbered sample rows</span> <span class="nino-badge nino-badge--pill">List in markup</span>
@@ -774,7 +774,7 @@
 	</div>
 </section>
 
-<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-static-list-numbered-elements" data-demo-preset="items-list" data-demo-layout="numbered-elements">
+<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-static-list-numbered-elements" data-demo-preset="static-list" data-demo-layout="numbered-elements">
 	<div class="nino-grid-row nino-grid-row--wide">
 		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left">
 			<span class="nino-badge nino-badge--primary">static-list</span> <span class="nino-badge nino-badge--pill">Layout: numbered-elements — numbered, from Elements</span> <span class="nino-badge nino-badge--pill">Beispieldaten statt &#91;elements&#93;</span>
@@ -798,7 +798,7 @@
 	</div>
 </section>
 
-<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-static-table-default-demo" data-demo-preset="items-table" data-demo-layout="default-demo">
+<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-static-table-default-demo" data-demo-preset="static-table" data-demo-layout="default-demo">
 	<div class="nino-grid-row nino-grid-row--wide">
 		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left">
 			<span class="nino-badge nino-badge--primary">static-table</span> <span class="nino-badge nino-badge--pill">Layout: default-demo — plain table</span> <span class="nino-badge nino-badge--pill">Rows in markup</span>
@@ -823,7 +823,7 @@
 	</div>
 </section>
 
-<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-static-table-striped-demo" data-demo-preset="items-table" data-demo-layout="striped-demo">
+<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-static-table-striped-demo" data-demo-preset="static-table" data-demo-layout="striped-demo">
 	<div class="nino-grid-row nino-grid-row--wide">
 		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left">
 			<span class="nino-badge nino-badge--primary">static-table</span> <span class="nino-badge nino-badge--pill">Layout: striped-demo — striped</span> <span class="nino-badge nino-badge--pill">Rows in markup</span>
@@ -848,7 +848,7 @@
 	</div>
 </section>
 
-<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-static-table-striped-elements" data-demo-preset="items-table" data-demo-layout="striped-elements">
+<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-static-table-striped-elements" data-demo-preset="static-table" data-demo-layout="striped-elements">
 	<div class="nino-grid-row nino-grid-row--wide">
 		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left">
 			<span class="nino-badge nino-badge--primary">static-table</span> <span class="nino-badge nino-badge--pill">Layout: striped-elements — striped, from Elements</span> <span class="nino-badge nino-badge--pill">Beispieldaten statt &#91;elements&#93;</span>
@@ -879,7 +879,7 @@
 	</div>
 </section>
 
-<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-static-table-default-elements" data-demo-preset="items-table" data-demo-layout="default-elements">
+<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-static-table-default-elements" data-demo-preset="static-table" data-demo-layout="default-elements">
 	<div class="nino-grid-row nino-grid-row--wide">
 		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left">
 			<span class="nino-badge nino-badge--primary">static-table</span> <span class="nino-badge nino-badge--pill">Layout: default-elements — plain, from Elements</span> <span class="nino-badge nino-badge--pill">Beispieldaten statt &#91;elements&#93;</span>
@@ -910,7 +910,7 @@
 	</div>
 </section>
 
-<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-static-accordion-demo" data-demo-preset="items-accordion" data-demo-layout="demo">
+<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-static-accordion-demo" data-demo-preset="static-accordion" data-demo-layout="demo">
 	<div class="nino-grid-row nino-grid-row--wide">
 		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left">
 			<span class="nino-badge nino-badge--primary">static-accordion</span> <span class="nino-badge nino-badge--pill">Layout: demo — three sample questions</span> <span class="nino-badge nino-badge--pill">details/summary, no JavaScript</span>
@@ -937,7 +937,7 @@
 	</div>
 </section>
 
-<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-static-accordion-elements" data-demo-preset="items-accordion" data-demo-layout="elements">
+<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-static-accordion-elements" data-demo-preset="static-accordion" data-demo-layout="elements">
 	<div class="nino-grid-row nino-grid-row--wide">
 		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left">
 			<span class="nino-badge nino-badge--primary">static-accordion</span> <span class="nino-badge nino-badge--pill">Layout: elements — questions from Elements</span> <span class="nino-badge nino-badge--pill">Beispieldaten statt &#91;elements&#93;</span>
