@@ -446,6 +446,17 @@ All notable changes to Nino are documented in this file.
 
 ### Fixed
 
+- **A `--bar` tab strip anywhere but the panel head drew as the segmented
+  one.** The design system has two strips: the segmented row of equal boxes
+  with the open tab filled, and `--bar`, natural widths under one rule with
+  an underline. The segmented rules excluded only the head's `--panel` strip,
+  and a `:not()` weighs as much as the class it names - so they outweighed
+  every `--bar` rule by one class, and a `--bar` strip inside a panel
+  (Redirects', Design's, the Features panel's detail) drew as equal boxes
+  with the underline's colours on top: three panels, three tab designs. The
+  segmented rules exclude `--bar` too, the `--bar` strip lays itself out,
+  and `tests/admin-lists-js-smoke.js` holds both.
+
 - **`tests/` was served.** `app/`, `features/` and the wizard's library each
   carry a `Require all denied` and a rule in `router.php`; the suites did
   not, so over http `tests/kernel-smoke.php` booted the kernel against a

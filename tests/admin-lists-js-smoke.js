@@ -335,6 +335,25 @@ check( 'a clickable table row draws its own ring, inside the row the scroller wo
 	/:where\(\.nino-admin\) \.nino-admin-table tbody tr:focus-visible \{[^}]*outline: 2px solid var\(--editor-blue\);[^}]*outline-offset: -2px;/s.test( sharedCss ) );
 check( 'Dashboard list rows are plain block links the tile grid does not restyle', adminAsset( 'Dashboard', 'admin.css' ).includes('#admin-dashboard-elements a') );
 
+/*	Two tab strips, one class each: the segmented one (equal boxes, the open
+	tab filled) and --bar (natural widths, an underline). A :not() weighs as
+	much as the class it names, so a segmented rule that excludes only the
+	head's --panel strip outweighs every --bar rule with one class fewer, and
+	a --bar strip outside the head drew as boxes with an underline's colours -
+	which is how three panels came to have three tab designs. Every segmented
+	rule excludes --bar as well, and the --bar strip lays itself out, since
+	the segmented container no longer does it for it	*/
+const segmentedRulesReachingBar = [];
+sharedCss.replace( /([^{}]+)\{([^}]*)\}/g, function( rule, selector, body ) {
+	selector.trim().split('\n').pop().split(',').forEach( function( one ) {
+		if( one.includes('.nino-admin-tabs:not(.nino-admin-tabs--panel)') && one.includes(':not(.nino-admin-tabs--bar)') === false )
+			segmentedRulesReachingBar.push( one.trim() );
+	} );
+	return rule;
+} );
+check( 'no segmented-strip rule reaches a --bar strip'+ ( segmentedRulesReachingBar.length ? ' - '+ segmentedRulesReachingBar.join(' | ') : '' ), segmentedRulesReachingBar.length === 0 );
+check( '...and the --bar strip lays itself out', /\.nino-admin-tabs--bar:not\(\.nino-admin-tabs--panel\) \{[^}]*display: flex;/s.test( sharedCss ) );
+
 // A panel's own rules travel with it, in a stylesheet of the same shape every
 // module's has: the layer order first (it is idempotent, and the file may be
 // bundled before the shell's one day), then everything inside nino.tool. An

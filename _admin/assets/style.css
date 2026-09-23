@@ -1167,14 +1167,19 @@ a {
                aria-controls="…">Raster</button>
      </div>
      <div class="nino-admin-tabpanel" role="tabpanel">…</div> */
-:where(.nino-admin) .nino-admin-tabs:not(.nino-admin-tabs--panel) {
+:where(.nino-admin) .nino-admin-tabs:not(.nino-admin-tabs--panel):not(.nino-admin-tabs--bar) {
 	display: flex;
 	margin: 0 0 .9rem;
 	border-radius:var(--editor-radius-sm);
 	overflow:hidden;
 }
 
-:where(.nino-admin) .nino-admin-tabs:not(.nino-admin-tabs--panel) .nino-admin-tab {
+/* The segmented strip's tabs, and only those: a :not() weighs as much as the
+   class it names, so without the second one this rule outweighed every --bar
+   rule below it (three classes against two) and a --bar strip anywhere but
+   the head - Redirects', Design's, the Features panel's detail - drew as a row
+   of equal boxes with the underline's colours on top: half of each */
+:where(.nino-admin) .nino-admin-tabs:not(.nino-admin-tabs--panel):not(.nino-admin-tabs--bar) .nino-admin-tab {
 	flex: 1 1 auto;
 	padding: .5rem .3rem;
 	border: 0;
@@ -1214,6 +1219,7 @@ a {
    labelled underline on one rule, not a row of filled buttons splitting the
    width between them */
 :where(.nino-admin) .nino-admin-tabs--bar:not(.nino-admin-tabs--panel) {
+	display: flex;
 	gap: .25rem;
 	margin: 0 0 1.25rem;
 	border-bottom: 1px solid var(--editor-separator);
