@@ -30,6 +30,19 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **Docs:** four things in `docs/_admin.md` and its German twin were not
+  what the tool does. The Maintenance panel - a kernel module's panel like
+  Submissions and Navigations, with its own `/_admin/maintenance/manage` -
+  was missing from the group table, from the permission table and from the
+  sentence that lists the optional kernel modules, although the manual
+  documents the panel itself further down; the dashboard's tile list left
+  out the active features and the maintenance tile; the wizard has six
+  steps, not ten (`Nino.install.STEPS`, and `docs/setup.md` says six); and
+  the recovery password could be set with `php _admin/Admin.php <password>`,
+  which prints nothing at all - that file declares classes and has no cli
+  entry of any kind. The manual writes the stub `Recovery::hash()` reads
+  instead.
+
 - **Docs:** the roles picker's docblock put a role's permissions in "three
   group boxes". It groups by the rail's four nav groups plus the "other" box
   for what no panel offers, as `_groupName()` two screens below already

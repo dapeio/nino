@@ -20,11 +20,11 @@ One login, one navigation, every screen a panel. The panels are grouped by what 
 | **Content** | Dashboard, Elements (Element Types), Text (Text Keys), Images (Image Slots), Submissions, Log | editors and developers |
 | **Structure** | Routes, Navigations | developers |
 | **Features** | whatever the active features bring | whoever holds the feature panel's own permission |
-| **System** | Users (User roles, Login protection), Language (Translations), Backups, Config, Features | developers – and every account for its own profile under Users |
+| **System** | Users (User roles, Login protection), Language (Translations), Backups, Config, Features, Maintenance | developers – and every account for its own profile under Users |
 
 A screen in brackets is a **tab** of the panel before it: the Elements panel opens on the entries and carries Element Types as its second tab, so the shape of the content sits right beside the content. A tab is a screen of its own – with its own permission, so an editor sees Elements without Element Types, and its own deep link, `#types`.
 
-Submissions and Navigations belong to optional kernel modules and are present while their module is active, switched on or off in `/nino/modules`. A **feature** - an installable package under `features/`, copied in from the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features) and switched on in the Features panel - brings its panel the same way - the catalogue's Newsletter feature adds a Newsletter panel, its Forms feature a Forms panel, its Template Builder a Templates panel, and a checkout ships none of them; every one of them lands in the rail's own Features group. The panels above that are in neither list are the workbench's own: `_admin` holds the shell, and every screen in it is a module under `_admin/Nino/Modules/<Name>/`, brought and taken away one directory at a time. A module a project adds, or a feature it installs, can bring a panel of its own the same way; see the [Developer Manual](development.md#panels-of-the-workbench) and [Features](features.md).
+Submissions, Navigations and Maintenance belong to optional kernel modules and are present while their module is active, switched on or off in `/nino/modules`. A **feature** - an installable package under `features/`, copied in from the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features) and switched on in the Features panel - brings its panel the same way - the catalogue's Newsletter feature adds a Newsletter panel, its Forms feature a Forms panel, its Template Builder a Templates panel, and a checkout ships none of them; every one of them lands in the rail's own Features group. The panels above that are in neither list are the workbench's own: `_admin` holds the shell, and every screen in it is a module under `_admin/Nino/Modules/<Name>/`, brought and taken away one directory at a time. A module a project adds, or a feature it installs, can bring a panel of its own the same way; see the [Developer Manual](development.md#panels-of-the-workbench) and [Features](features.md).
 
 There is no second tool. `/_editor`, `/_install`, `/_design` and `/_templates` of earlier versions are gone: what survived of them is a panel here or, for the Template Builder, a feature from the catalogue, and a reserved path of theirs is an ordinary page path now.
 
@@ -32,7 +32,7 @@ Every panel label follows the interface language of the account. This manual nam
 
 ## First Run: the Setup Wizard
 
-A fresh checkout has no project yet. Until the wizard's last step is completed, `/_admin` shows the wizard instead of the login: ten steps from the environment check to the accounts and the recovery password. The [Setup Wizard](setup.md) reference explains every step and what it writes.
+A fresh checkout has no project yet. Until the wizard's last step is completed, `/_admin` shows the wizard instead of the login: six steps from the environment check to the accounts and the recovery password. The [Setup Wizard](setup.md) reference explains every step and what it writes.
 
 The wizard lives in `_admin/install/`. Once it has locked itself out, that directory can be removed from a production delivery: nothing outside it reads its library, and everything it copied stays where it wrote it.
 
@@ -71,6 +71,7 @@ A permission is one string per panel or tab; `/*` matches every path below it, s
 | Backups | `/_admin/backups/manage` |
 | Config | `/_admin/config/manage` |
 | Features | `/_admin/features/manage` |
+| Maintenance | `/_admin/maintenance/manage` |
 
 A feature's panel brings its permission along - the catalogue's Newsletter feature `/_admin/newsletter/manage`, its Forms feature `/_admin/forms/manage`, and so on - and the roles tab of the Users panel offers it while the feature is active.
 
@@ -127,7 +128,7 @@ Whatever panel is open, saving writes the project files immediately. There is no
 
 ### Dashboard
 
-The **Dashboard** is the first panel and summarizes what the account may see: a tile per panel that has something to count – elements by type, submissions, users, element types, routes, text keys and image slots still missing, and whatever a feature's panel counts, subscribers for the catalogue's Newsletter – plus the date of the latest backup and the most recent log entries. Every tile leads to the panel it counts for when clicked; the dashboard itself changes nothing.
+The **Dashboard** is the first panel and summarizes what the account may see: a tile per panel that has something to count – elements by type, submissions, users, element types, routes, text keys and image slots still missing, active features, and whatever a feature's panel counts, subscribers for the catalogue's Newsletter – plus the date of the latest backup, the most recent log entries and, while the site is switched off, that maintenance is on. Every tile leads to the panel it counts for when clicked; the dashboard itself changes nothing.
 
 ### Elements
 
@@ -343,13 +344,13 @@ A panel a feature brings appears with the next load of the workbench after activ
 - **Restore a backup**, from the list of dates, after snapshotting the current state;
 - **Reset an account**: an existing address gets the new password and is logged out everywhere; an address without an account becomes one with full access.
 
-Five wrong attempts lock it for an hour. The secret's hash lives in `private/.auth/pw.php` – outside `config.php`, so a restore cannot roll it back, and outside every tool directory, so an update cannot take it along. To set a new one outside the wizard:
+Five wrong attempts lock it for an hour. The secret's hash lives in `private/.auth/pw.php` – outside `config.php`, so a restore cannot roll it back, and outside every tool directory, so an update cannot take it along. Nothing in the workbench writes that file except the wizard's last step, so a new secret is written by hand - it is a php stub that refuses to be served, with the hash inside it:
 
 ```bash
-php _admin/Admin.php <password>
+php -r 'echo "<?php http_response_code(403); exit; return \x27", password_hash( $argv[1], PASSWORD_DEFAULT ), "\x27;\n";' -- '<password>' > private/.auth/pw.php
 ```
 
-The output is the complete file; write it to `private/.auth/pw.php`. Do this in a protected local environment only – a password on a command line may be visible in the shell history or the process list.
+Do this in a protected local environment only – a password on a command line may be visible in the shell history or the process list.
 
 ## Recommended Workflow
 
@@ -379,7 +380,7 @@ The output is the complete file; write it to `private/.auth/pw.php`. Do this in 
 
 ## Next Steps
 
-- [Setup Wizard](setup.md) documents the ten first-run steps and the library format.
+- [Setup Wizard](setup.md) documents the six first-run steps and the library format.
 - The **Template Builder** - page templates composed from whole sections - is a feature from the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features); its [manual](https://github.com/dapeio/nino-features/blob/main/features/Templates/docs/templates.md) is there too.
 - [Developer Manual](development.md) describes APIs, modules, panels and direct work on project files.
 - [Deployment](deployment.md) covers web server, security, backups and go-live.

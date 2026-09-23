@@ -20,11 +20,11 @@ Ein Login, eine Navigation, jeder Bildschirm ein Panel. Die Panels sind danach g
 | **Inhalt** | Dashboard, Elemente (Elementtypen), Texte (Textschlüssel), Bilder (Bildplätze), Anfragen, Log | Redakteure und Entwickler |
 | **Struktur** | Routen, Navigationen | Entwickler |
 | **Features** | was die aktiven Features mitbringen | wer die eigene Berechtigung des Feature-Panels hält |
-| **System** | Nutzer (Nutzerrollen, Anmeldeschutz), Sprache (Übersetzungen), Backups, Konfiguration, Features | Entwickler – und jedes Konto für sein eigenes Profil unter Nutzer |
+| **System** | Nutzer (Nutzerrollen, Anmeldeschutz), Sprache (Übersetzungen), Backups, Konfiguration, Features, Wartung | Entwickler – und jedes Konto für sein eigenes Profil unter Nutzer |
 
 Ein Bildschirm in Klammern ist ein **Tab** des Panels davor: Das Panel Elemente öffnet auf den Einträgen und trägt Elementtypen als zweiten Tab, sodass die Form der Inhalte direkt neben den Inhalten liegt. Ein Tab ist ein eigener Bildschirm – mit eigener Berechtigung, sodass ein Redakteur Elemente ohne Elementtypen sieht, und eigenem tiefen Link, `#types`.
 
-Anfragen und Navigationen gehören zu optionalen Kernel-Modulen und sind vorhanden, solange ihr Modul aktiv ist, in `/nino/modules` ein- oder ausgeschaltet. Ein **Feature** – ein installierbares Paket unter `features/`, aus dem Katalog [dapeio/nino-features](https://github.com/dapeio/nino-features) hineinkopiert und im Panel Features eingeschaltet – bringt sein Panel auf dieselbe Weise mit – das Newsletter-Feature des Katalogs ein Panel Newsletter, sein Forms-Feature ein Panel Formulare, sein Template-Baukasten ein Panel Templates, und ein Checkout bringt keines davon mit; jedes landet in der eigenen Gruppe Features der Leiste. Die Panels oben, die in keiner der beiden Listen stehen, sind die eigenen der Workbench: `_admin` hält die Hülle, und jede Ansicht darin ist ein Modul unter `_admin/Nino/Modules/<Name>/` – Verzeichnis für Verzeichnis hinzugefügt und wieder entfernt. Ein Modul, das ein Projekt hinzufügt, oder ein Feature, das es installiert, kann auf dieselbe Weise ein eigenes Panel mitbringen; siehe das [Entwickler-Handbuch](development.de.md#panels-der-workbench) und [Features](features.de.md).
+Anfragen, Navigationen und Wartung gehören zu optionalen Kernel-Modulen und sind vorhanden, solange ihr Modul aktiv ist, in `/nino/modules` ein- oder ausgeschaltet. Ein **Feature** – ein installierbares Paket unter `features/`, aus dem Katalog [dapeio/nino-features](https://github.com/dapeio/nino-features) hineinkopiert und im Panel Features eingeschaltet – bringt sein Panel auf dieselbe Weise mit – das Newsletter-Feature des Katalogs ein Panel Newsletter, sein Forms-Feature ein Panel Formulare, sein Template-Baukasten ein Panel Templates, und ein Checkout bringt keines davon mit; jedes landet in der eigenen Gruppe Features der Leiste. Die Panels oben, die in keiner der beiden Listen stehen, sind die eigenen der Workbench: `_admin` hält die Hülle, und jede Ansicht darin ist ein Modul unter `_admin/Nino/Modules/<Name>/` – Verzeichnis für Verzeichnis hinzugefügt und wieder entfernt. Ein Modul, das ein Projekt hinzufügt, oder ein Feature, das es installiert, kann auf dieselbe Weise ein eigenes Panel mitbringen; siehe das [Entwickler-Handbuch](development.de.md#panels-der-workbench) und [Features](features.de.md).
 
 Ein zweites Werkzeug gibt es nicht. `/_editor`, `/_install`, `/_design` und `/_templates` früherer Versionen sind fort: Was von ihnen geblieben ist, ist ein Panel hier oder – beim Template-Baukasten – ein Feature aus dem Katalog, und ein früher reservierter Pfad ist jetzt ein gewöhnlicher Seitenpfad.
 
@@ -32,7 +32,7 @@ Alle Panel-Namen folgen der Oberflächensprache des Kontos. Dieses Handbuch nenn
 
 ## Erststart: der Einrichtungsassistent
 
-Ein frischer Checkout hat noch kein Projekt. Bis der letzte Schritt des Assistenten abgeschlossen ist, zeigt `/_admin` statt der Anmeldung den Assistenten: zehn Schritte von der Umgebungsprüfung bis zu den Konten und dem Recovery-Passwort. Die Referenz [Einrichtungsassistent](setup.de.md) erklärt jeden Schritt und was er schreibt.
+Ein frischer Checkout hat noch kein Projekt. Bis der letzte Schritt des Assistenten abgeschlossen ist, zeigt `/_admin` statt der Anmeldung den Assistenten: sechs Schritte von der Umgebungsprüfung bis zu den Konten und dem Recovery-Passwort. Die Referenz [Einrichtungsassistent](setup.de.md) erklärt jeden Schritt und was er schreibt.
 
 Der Assistent liegt in `_admin/install/`. Sobald er sich selbst ausgesperrt hat, kann dieses Verzeichnis aus einer Produktivauslieferung entfernt werden: Nichts außerhalb liest seine Library, und alles, was er kopiert hat, bleibt dort liegen, wo er es geschrieben hat.
 
@@ -71,6 +71,7 @@ Eine Berechtigung ist eine Zeichenkette pro Panel oder Tab; `/*` deckt jeden Pfa
 | Backups | `/_admin/backups/manage` |
 | Konfiguration | `/_admin/config/manage` |
 | Features | `/_admin/features/manage` |
+| Wartung | `/_admin/maintenance/manage` |
 
 Das Panel eines Features bringt seine Berechtigung mit – das Newsletter-Feature des Katalogs `/_admin/newsletter/manage`, sein Forms-Feature `/_admin/forms/manage`, und so weiter –, und der Tab Nutzerrollen des Panels Nutzer bietet sie an, solange das Feature aktiv ist.
 
@@ -127,7 +128,7 @@ Welches Panel auch offen ist – Speichern schreibt die Projektdateien sofort. E
 
 ### Dashboard
 
-Das **Dashboard** ist das erste Panel und fasst zusammen, was das Konto sehen darf: eine Kachel je Panel, das etwas zu zählen hat – Elemente je Typ, Anfragen, Nutzer, Elementtypen, Routen, noch fehlende Textschlüssel und Bildplätze, und was das Panel eines Features zählt, beim Newsletter des Katalogs die Abonnenten – dazu das Datum der letzten Sicherung und die jüngsten Log-Einträge. Jede Kachel führt beim Klick zu dem Panel, für das sie zählt; das Dashboard selbst ändert nichts.
+Das **Dashboard** ist das erste Panel und fasst zusammen, was das Konto sehen darf: eine Kachel je Panel, das etwas zu zählen hat – Elemente je Typ, Anfragen, Nutzer, Elementtypen, Routen, noch fehlende Textschlüssel und Bildplätze, aktive Features, und was das Panel eines Features zählt, beim Newsletter des Katalogs die Abonnenten – dazu das Datum der letzten Sicherung, die jüngsten Log-Einträge und, solange die Website abgeschaltet ist, dass die Wartung an ist. Jede Kachel führt beim Klick zu dem Panel, für das sie zählt; das Dashboard selbst ändert nichts.
 
 ### Elemente
 
@@ -343,13 +344,13 @@ Ein Panel, das ein Feature mitbringt, erscheint mit dem nächsten Laden der Work
 - **Eine Sicherung wiederherstellen**, aus der Liste der Daten, nach einer Sicherung des aktuellen Stands;
 - **Ein Konto zurücksetzen**: Eine vorhandene Adresse bekommt das neue Passwort und wird überall abgemeldet; eine Adresse ohne Konto wird eines mit Vollzugriff.
 
-Fünf Fehlversuche sperren die Seite eine Stunde. Der Hash des Geheimnisses liegt in `private/.auth/pw.php` – außerhalb der `config.php`, damit eine Wiederherstellung ihn nicht zurückrollen kann, und außerhalb jedes Werkzeugverzeichnisses, damit ein Update ihn nicht mitnimmt. Ein neues außerhalb des Assistenten setzen:
+Fünf Fehlversuche sperren die Seite eine Stunde. Der Hash des Geheimnisses liegt in `private/.auth/pw.php` – außerhalb der `config.php`, damit eine Wiederherstellung ihn nicht zurückrollen kann, und außerhalb jedes Werkzeugverzeichnisses, damit ein Update ihn nicht mitnimmt. Außer dem letzten Schritt des Assistenten schreibt nichts in der Workbench diese Datei, ein neues Geheimnis wird also von Hand geschrieben – sie ist ein PHP-Stub, der sich nicht ausliefern lässt, mit dem Hash darin:
 
 ```bash
-php _admin/Admin.php <passwort>
+php -r 'echo "<?php http_response_code(403); exit; return \x27", password_hash( $argv[1], PASSWORD_DEFAULT ), "\x27;\n";' -- '<passwort>' > private/.auth/pw.php
 ```
 
-Die Ausgabe ist die vollständige Datei; schreibe sie nach `private/.auth/pw.php`. Tu das nur in einer geschützten lokalen Umgebung – ein Passwort auf der Kommandozeile kann im Shell-Verlauf oder in der Prozessliste sichtbar werden.
+Tu das nur in einer geschützten lokalen Umgebung – ein Passwort auf der Kommandozeile kann im Shell-Verlauf oder in der Prozessliste sichtbar werden.
 
 ## Empfohlener Arbeitsablauf
 
@@ -379,7 +380,7 @@ Die Ausgabe ist die vollständige Datei; schreibe sie nach `private/.auth/pw.php
 
 ## Wie es weitergeht
 
-- [Einrichtungsassistent](setup.de.md) dokumentiert die zehn Erststart-Schritte und das Library-Format.
+- [Einrichtungsassistent](setup.de.md) dokumentiert die sechs Erststart-Schritte und das Library-Format.
 - Der **Template-Baukasten** – Seitentemplates aus ganzen Abschnitten – ist ein Feature aus dem Katalog [dapeio/nino-features](https://github.com/dapeio/nino-features); sein [Handbuch](https://github.com/dapeio/nino-features/blob/main/features/Templates/docs/templates.de.md) liegt dort ebenfalls.
 - [Entwickler-Handbuch](development.de.md) beschreibt APIs, Module, Panels und die direkte Arbeit an Projektdateien.
 - [Deployment](deployment.de.md) behandelt Webserver, Sicherheit, Sicherungen und Go-Live.
