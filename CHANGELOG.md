@@ -30,6 +30,9 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **Docs:** AGENTS.md's "Two traps" in section 6a has held three of them
+  since restating a shared component in a panel was added to the list.
+
 - **Docs:** the panel recipe listed ten of the eleven workbench panels -
   Features was missing, from the list and from the system weights - left
   Maintenance out of the module panels' weights, described a pane's tab

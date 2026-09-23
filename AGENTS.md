@@ -499,7 +499,7 @@ The pure half (`Nino.adminUi.tableModel`) is filtering, sorting, paging and cell
 formatting as plain functions — extend and test there, not in the renderer.
 `tests/nino-ui-table-js-smoke.js` covers it.
 
-### Two traps
+### Three traps
 
 - **Never assign `className` on an element that carries a design-system class.**
   The shells carry `.nino-admin` plus their `show-<panel>` state, so switching
