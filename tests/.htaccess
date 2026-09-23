@@ -1,0 +1,9 @@
+# The suites are run from a shell, never from a browser: nothing in here is a
+# page or an asset. Reachable over http, tests/kernel-smoke.php would boot the
+# kernel against a sandbox and run its seven hundred checks for whoever asked -
+# seconds of cpu and a temp directory per request, and the sandbox path
+# printed back. Denied the way app/ and features/ are; router.php mirrors it
+# for php's development server.
+Require all denied
+
+Options -Indexes

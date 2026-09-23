@@ -155,7 +155,7 @@ curl -sSI https://…/ | grep -i 'content-security-policy\|content-type'
 - `/_admin` an `_admin/index.php` routen und `/_admin/recovery.php` seiner eigenen Datei überlassen;
 - Zugriffe auf Dotfiles und Dot-Verzeichnisse verweigern;
 - **`private/` vollständig sperren** – es wird nie von einem Browser angefragt, sondern nur von PHP gelesen;
-- **`app/` und `features/` vollständig sperren** – die eigenen Klassen des Projekts und die installierten Features sind serverseitiger Quelltext, den nie ein Browser anfragt; beide bringen für Apache eine eigene `.htaccess` mit;
+- **`app/`, `features/` und `tests/` vollständig sperren** – die eigenen Klassen des Projekts und die installierten Features sind serverseitiger Quelltext, den nie ein Browser anfragt, und die Test-Suiten laufen aus der Shell; alle drei bringen für Apache eine eigene `.htaccess` mit;
 - **`_admin/install/library/` vollständig sperren** – es ist das, woraus der Assistent ein Projekt kopiert, serverseitige Quelle ohne irgendetwas Öffentliches darin; dasselbe gilt für die Section-Presets unter `features/Templates/library/`, wo ein Projekt sie liegen hat, das den Template-Baukasten installiert hat;
 - Verzeichnisauflistung deaktivieren;
 - den HTTP-Header `Authorization` an PHP weitergeben. Bei nginx/PHP-FPM ist dafür normalerweise `fastcgi_param HTTP_AUTHORIZATION $http_authorization;` in der PHP-Location erforderlich;
@@ -176,6 +176,7 @@ index index.php;
 location ^~ /private/                { deny all; return 404; }
 location ^~ /app/                    { deny all; return 404; }
 location ^~ /features/               { deny all; return 404; }
+location ^~ /tests/                  { deny all; return 404; }
 location ^~ /_admin/install/library/ { deny all; return 404; }
 
 # Dotfiles und Dot-Verzeichnisse, mit .cache/ (die erzeugten Bundles), .demo/
@@ -346,7 +347,7 @@ Ein erfolgreicher Aufruf der Startseite belegt noch nicht, dass sensible Dateien
 - Dotfiles und Dot-Verzeichnisse;
 - `config.php` und PHP-Datendateien;
 - versteckte Log- und Backup-Verzeichnisse;
-- interne Dateien aus `_admin/`, `app/` und `features/`, die nicht als öffentliche Assets vorgesehen sind – die Panel-Templates, die Section-Presets und die Install-Einheit eines Features darunter;
+- interne Dateien aus `_admin/`, `app/`, `features/` und `tests/`, die nicht als öffentliche Assets vorgesehen sind – die Panel-Templates, die Section-Presets und die Install-Einheit eines Features darunter;
 - jede Datei unter `_admin/install/library/`;
 - `_admin/install/`, nachdem es entfernt wurde.
 
@@ -382,7 +383,7 @@ Sicherheitskorrekturen erscheinen auf `main`; eine getrennte LTS-Linie gibt es d
 - [ ] Öffentliche Routen werden korrekt an Nino übergeben.
 - [ ] Dotfiles, Dot-Verzeichnisse und PHP-Datendateien sind nicht direkt erreichbar.
 - [ ] Bei Apache: Die `.htaccess` wird tatsächlich angewendet — `$_SERVER['NINO_HTACCESS']` ist `1`, oder, auf einem Host, der `SetEnv` verwirft, antwortet eine nicht vorhandene Adresse mit Ninos eigener 404-Seite statt mit der des Servers. Alles darunter, was auf `.htaccess` beruht, ist sonst nichts wert.
-- [ ] `app/` und `features/` werden nicht ausgeliefert — beide tragen eine eigene `.htaccess`; prüfe es mit einer Anfrage nach einer Datei eines installierten Features, z. B. `/features/Newsletter/install/templates/mail-header.tpl`, sobald das Newsletter-Feature des Katalogs an Ort und Stelle ist – ein Checkout bringt kein Feature mit, also muss eines da sein, nach dem sich fragen lässt.
+- [ ] `app/`, `features/` und `tests/` werden nicht ausgeliefert — alle drei tragen eine eigene `.htaccess`; `/tests/kernel-smoke.php` muss `403` oder `404` antworten, nie eine Liste von Checks; prüfe es mit einer Anfrage nach einer Datei eines installierten Features, z. B. `/features/Newsletter/install/templates/mail-header.tpl`, sobald das Newsletter-Feature des Katalogs an Ort und Stelle ist – ein Checkout bringt kein Feature mit, also muss eines da sein, nach dem sich fragen lässt.
 - [ ] `private/` wird nicht ausgeliefert — die eigene `.htaccess` sperrt das Verzeichnis, und jede PHP-Datei darin trägt einen 403-Stub; prüfe, ob beides auf deinem Webserver greift, oder verlege das Verzeichnis mit `NINO_PRIVATE_DIR` aus dem Webroot. Die Templates und die Asset-Quellen sind kein PHP und haben nur die Serverregel.
 - [ ] Verzeichnisauflistung ist deaktiviert.
 - [ ] Der Einrichtungsassistent konnte die Projektverzeichnisse aus der beschreibbaren Projektwurzel selbst erzeugen — ein Checkout liefert weder `private/` noch `public/` mit, der erste Schritt des Assistenten prüft genau das.

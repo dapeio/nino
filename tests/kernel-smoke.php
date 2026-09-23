@@ -3111,6 +3111,25 @@ check( '...and forwards everything that is neither file nor directory to it',
 check( '...as an absolute url path, not a relative one',
 	str_contains( $htaccess, 'RewriteRule . index.php' ) === false );
 
+/*	Four directories a checkout ships hold nothing a browser ever asks for:
+	the project's classes, the installed features, the wizard's library and
+	the suites. Each is denied twice - its own .htaccess for Apache, a rule
+	in router.php for php's development server, which applies no .htaccess
+	at all. tests/ had neither: over http, kernel-smoke.php booted the kernel
+	against a sandbox and ran every check for whoever asked, seconds of cpu
+	and a temp directory per request, the sandbox path printed back. Held as
+	a pair: a directory denied on one server and open on the other is the
+	shape the next omission takes	*/
+$undenied = [];
+$router 	= (string) file_get_contents( __DIR__. '/../router.php' );
+foreach( [ 'app', 'features', 'tests', '_admin/install/library' ] as $shippedSource ) {
+	if( str_contains( (string) @file_get_contents( __DIR__. '/../'. $shippedSource. '/.htaccess' ), 'Require all denied' ) === false )
+		$undenied[] = $shippedSource. '/.htaccess';
+	if( str_contains( $router, "'#^/". $shippedSource. "(?:/|$)#'" ) === false )
+		$undenied[] = $shippedSource. ' in router.php';
+}
+check( 'every shipped directory a browser never needs is denied for Apache and for the development server alike'. ( $undenied === [] ? '' : ' - '. implode( ', ', $undenied ) ), $undenied === [] );
+
 /*	...and the stop in front of it. mod_rewrite runs per-directory before the
 	url is mapped, and where %{REQUEST_FILENAME} is not the mapped path there,
 	!-f stays true for index.php itself: the catch-all rewrites its own result

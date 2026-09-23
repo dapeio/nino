@@ -446,6 +446,15 @@ All notable changes to Nino are documented in this file.
 
 ### Fixed
 
+- **`tests/` was served.** `app/`, `features/` and the wizard's library each
+  carry a `Require all denied` and a rule in `router.php`; the suites did
+  not, so over http `tests/kernel-smoke.php` booted the kernel against a
+  sandbox and ran every check for whoever asked - seconds of cpu and a temp
+  directory per request, the sandbox path printed back. `tests/.htaccess`
+  and a `router.php` rule deny it the same way, the deployment manual's
+  nginx block, its checklist and its direct-access list name the directory,
+  and `tests/kernel-smoke.php` holds all four directories to the pair.
+
 - **The base unit's robots.txt fenced two addresses that stopped existing
   with the split, and its demo page ended a sentence in German.**
   `robots.tpl` disallowed `/.cache/` and `/data/`: the first is

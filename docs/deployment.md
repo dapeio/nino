@@ -156,7 +156,7 @@ Transfer the same behavior explicitly to the server configuration:
 - route `/_admin` to `_admin/index.php` and leave `/_admin/recovery.php` to its own file;
 - deny access to dotfiles and dot directories;
 - **deny `private/` entirely** — it is never requested by a browser, only read by PHP;
-- **deny `app/` and `features/` entirely** — the project's own classes and the installed features are server-side source, never requested by a browser; each ships its own `.htaccess` for Apache;
+- **deny `app/`, `features/` and `tests/` entirely** — the project's own classes and the installed features are server-side source, never requested by a browser, and the suites are run from a shell; each ships its own `.htaccess` for Apache;
 - **deny `_admin/install/library/` entirely** — it is what the wizard copies a project out of, server-side source with nothing public in it; the same goes for the section presets under `features/Templates/library/`, where a project that installed the Template Builder keeps them;
 - disable directory listing;
 - forward the HTTP `Authorization` header to PHP. With nginx/PHP-FPM this normally requires `fastcgi_param HTTP_AUTHORIZATION $http_authorization;` in the PHP location;
@@ -176,6 +176,7 @@ index index.php;
 location ^~ /private/                { deny all; return 404; }
 location ^~ /app/                    { deny all; return 404; }
 location ^~ /features/               { deny all; return 404; }
+location ^~ /tests/                  { deny all; return 404; }
 location ^~ /_admin/install/library/ { deny all; return 404; }
 
 # Dotfiles and dot directories, with .cache/ (the generated bundles), .demo/
@@ -343,7 +344,7 @@ A successful call to the homepage does not yet prove that sensitive files are pr
 - dotfiles and dot directories;
 - `config.php` and PHP data files;
 - hidden log and backup directories;
-- internal files from `_admin/`, `app/` and `features/` that are not intended as public assets - the panel templates, the section presets and a feature's install unit among them;
+- internal files from `_admin/`, `app/`, `features/` and `tests/` that are not intended as public assets - the panel templates, the section presets and a feature's install unit among them;
 - any file below `_admin/install/library/`;
 - `_admin/install/`, after it has been removed.
 
@@ -377,7 +378,7 @@ Security fixes appear on `main`; there is currently no separate LTS line. Theref
 - [ ] Public routes are correctly forwarded to Nino.
 - [ ] Dotfiles, dot directories, and PHP data files are not directly accessible.
 - [ ] On Apache: the `.htaccess` is actually applied — `$_SERVER['NINO_HTACCESS']` is `1`, or, on a host that drops `SetEnv`, an address that does not exist answers with Nino's own 404 rather than the server's. Everything below that relies on `.htaccess` is worth nothing if it is not.
-- [ ] `app/` and `features/` are not served — each carries its own `.htaccess`; verify with a request for a file of an installed feature, e.g. `/features/Newsletter/install/templates/mail-header.tpl` once the catalogue's Newsletter feature is in place - a checkout ships no feature, so there has to be one to ask for.
+- [ ] `app/`, `features/` and `tests/` are not served — each carries its own `.htaccess`; `/tests/kernel-smoke.php` must answer `403` or `404`, never a list of checks; verify with a request for a file of an installed feature, e.g. `/features/Newsletter/install/templates/mail-header.tpl` once the catalogue's Newsletter feature is in place - a checkout ships no feature, so there has to be one to ask for.
 - [ ] `private/` is not served — its own `.htaccess` denies it, and each PHP file inside carries a 403 stub; verify both apply on your webserver, or move the directory out of the webroot with `NINO_PRIVATE_DIR`. The templates and the asset sources are not PHP and have only the server rule.
 - [ ] Directory listing is disabled.
 - [ ] The setup wizard was able to create the project directories from the writable project root itself — a checkout ships neither `private/` nor `public/`, so the first step of the wizard is where that is confirmed.

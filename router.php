@@ -42,6 +42,14 @@ if( preg_match( '#^/app(?:/|$)#', $uri ) === 1 ) {
 	return true;
 }
 
+// The suites are run from a shell, never from a browser - reachable over http,
+// tests/kernel-smoke.php would run its seven hundred checks for whoever asked.
+// Mirrors tests/.htaccess
+if( preg_match( '#^/tests(?:/|$)#', $uri ) === 1 ) {
+	http_response_code( 404 );
+	return true;
+}
+
 // The installed features are source as well - a feature's runtime class,
 // its panel and its install unit (see \Nino\Features). Mirrors
 // features/.htaccess
