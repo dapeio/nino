@@ -1,8 +1,6 @@
 User-agent: *
 Allow: /
 Disallow: /_admin/
-Disallow: /.cache/
-Disallow: /data/
 
 # AI assistants/crawlers - allowed by default so this site can be found and
 # cited via AI search/chat products. Flip any "Allow: /" below to

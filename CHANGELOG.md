@@ -431,6 +431,19 @@ All notable changes to Nino are documented in this file.
 
 ### Fixed
 
+- **The base unit's robots.txt fenced two addresses that stopped existing
+  with the split, and its demo page ended a sentence in German.**
+  `robots.tpl` disallowed `/.cache/` and `/data/`: the first is
+  `/public/.cache/` since `public/` gathered the served half
+  (`Filesystem::PUBLIC_DIRS`), the second lives under `private/` and is not
+  served at all. Both lines are gone; the bundle cache is not fenced in
+  their place, since the stylesheets and scripts in it are what a crawler
+  renders the page with. And `demo-catalogue-include.tpl` closed its one
+  English sentence with "eingesetzt", a remainder of a translation that
+  stood on every delivered demo page. `tests/install-smoke.php` holds the
+  first as a rule: every path the file disallows begins with a directory
+  that exists under the webroot.
+
 - **A visitor who asked their system for less motion got it from four rules
   and from nothing else.** `Nino.css` declares twenty-seven transitions and
   three endless animations; its `prefers-reduced-motion` block stopped the

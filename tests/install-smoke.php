@@ -1351,6 +1351,21 @@ foreach( $libraryTemplates as $libraryTemplate )
 sort( $rootAbsoluteTemplates );
 check( 'no template of the install library writes an address from the domain root - a site in a subdirectory posts and links within itself'. ( $rootAbsoluteTemplates === [] ? '' : ' - '. implode( ', ', $rootAbsoluteTemplates ) ), $rootAbsoluteTemplates === [] );
 
+/*	robots.txt is delivered content, and a Disallow line names a path a
+	crawler could otherwise reach. Two of the three the base unit named,
+	nothing could reach any more: /data/ moved under private/ with the split
+	(Filesystem::PRIVATE_DIRS) and is not served at all, and /.cache/ is
+	/public/.cache/ now (PUBLIC_DIRS, getPublicDir()) - so the file fenced two
+	dead addresses. Not that the bundle cache wants fencing: the stylesheets
+	and scripts in it are what a crawler renders the page with. Held as a rule
+	rather than as the list: every path the file disallows begins with a
+	directory that exists under the webroot after the split - a tool folder,
+	the public half, the kernel - or is the root itself	*/
+$robotsTemplate = (string) file_get_contents( __DIR__. '/../_admin/install/library/base/templates/robots.tpl' );
+preg_match_all( '/^Disallow:\s*(\S+)/m', $robotsTemplate, $disallowed );
+$deadDisallows = array_filter( $disallowed[1], static fn( string $path ): bool => $path !== '/' && preg_match( '#^/(?:_admin|_nino|public)/#', $path ) !== 1 );
+check( "every path the base unit's robots.txt disallows exists under the webroot after the split". ( $deadDisallows === [] ? '' : ' - '. implode( ', ', $deadDisallows ) ), $disallowed[1] !== [] && $deadDisallows === [] );
+
 // The stylesheet and the markup it styles are one delivery: theme.css names
 // .nino-frame-header and .nino-footer-nav, and nothing else writes either
 // template into a project
