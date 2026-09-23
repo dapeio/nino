@@ -30,6 +30,11 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **Docs:** the roles picker's docblock put a role's permissions in "three
+  group boxes". It groups by the rail's four nav groups plus the "other" box
+  for what no panel offers, as `_groupName()` two screens below already
+  says - so it names no number now.
+
 - **Docs:** the Image Slots tab's script described itself as the "Images"
   module and carried a half-replaced sentence from the rename ("what the
   Images panel Images panel edits", "types.js/the Elements panel Elements"),

@@ -318,7 +318,7 @@
 		 *	A checkbox per permission was the first shape and does not survive
 		 *	the number: the list is one entry per panel and tab of every active
 		 *	module, it grows with every module a project adds, and a role
-		 *	typically holds a handful of them scattered through three group
+		 *	typically holds a handful of them scattered through its group
 		 *	boxes. The picker shows what the role HAS as a short list and makes
 		 *	finding the next one a search rather than a scan. Unordered
 		 *	(ordered: false): a permission set has no first and no last.
