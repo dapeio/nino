@@ -86,5 +86,118 @@ editor.exportCsv( 'submissions.csv', [
 check( 'a csv export carries every row\'s columns, not the first row\'s',
 	exported === '\uFEFFid,form,name,company,note\r\n1,contact,Ada,,\r\n2,quote,,Acme,\r\n,,,,written before ids existed' );
 
+/*	The rail and its panes, driven for real. Which panel is open was a class
+	the stylesheet paints and nothing else, so the navigation read as a run of
+	links with nothing to tell them apart; and every pane strip but the one
+	the shell happened to open reported a tablist with no selected tab and one
+	tab stop per tab.
+
+	A second context rather than more of the one above: onReady() wants a dom,
+	and the router checks up there want one that answers nothing	*/
+function node( id, attributes ) {
+	const classes = new Set();
+	const el = {
+		id : id || '', hidden : false, tabIndex : 0, focused : false,
+		dataset : Object.assign( {}, attributes || {} ),
+		attributes : {}, listeners : {}, children : [], parent : null,
+		classList : {
+			add : function( name ) { classes.add( name ) },
+			remove : function( name ) { classes.delete( name ) },
+			contains : function( name ) { return classes.has( name ) },
+			toggle : function( name, force ) {
+				if( force === true ) classes.add( name );
+				else if( force === false ) classes.delete( name );
+				else if( classes.has( name ) ) classes.delete( name );
+				else classes.add( name );
+				return classes.has( name );
+			},
+			forEach : function( fn ) { Array.from( classes ).forEach( fn ) },
+			[Symbol.iterator] : function() { return classes[Symbol.iterator]() },
+		},
+		setAttribute : function( name, value ) { el.attributes[name] = String( value ) },
+		removeAttribute : function( name ) { delete el.attributes[name] },
+		getAttribute : function( name ) { return el.attributes[name] ?? null },
+		addEventListener : function( name, fn ) { el.listeners[name] = fn },
+		focus : function() { el.focused = true },
+		closest : function() { return el.parent === null ? null : ( el.parent.dataset.panel !== undefined ? el.parent : el.parent.closest() ) },
+		querySelectorAll : function( selector ) {
+			if( selector === ':scope > div[data-tab]' )
+				return el.children.filter( function( c ) { return c.dataset.tab !== undefined && c.isStrip !== true } );
+			if( selector === ':scope > button[data-tab]' )
+				return el.children.filter( function( c ) { return c.dataset.tab !== undefined } );
+			if( selector === ':scope > .admin-panel-tabs > button[data-tab]' )
+				return el.children.filter( function( c ) { return c.isStrip === true } ).flatMap( function( strip ) { return strip.children } );
+			return [];
+		},
+	};
+	return el;
+}
+
+const railLinks = { dashboard : node( 'admin-nav-dashboard', { panel : 'dashboard', layout : 'page' } ),
+                    users 		: node( 'admin-nav-users', { panel : 'users', layout : 'page' } ) };
+
+const rolesTab = node( 'admin-tabbutton-roles', { tab : 'roles' } );
+const lockoutTab = node( 'admin-tabbutton-lockout', { tab : 'lockout' } );
+const strip = node( '', {} );
+strip.isStrip = true;
+strip.children = [ rolesTab, lockoutTab ];
+rolesTab.parent = strip;
+lockoutTab.parent = strip;
+
+const rolesPane = node( 'admin-tab-roles', { tab : 'roles' } );
+const lockoutPane = node( 'admin-tab-lockout', { tab : 'lockout' } );
+const usersPane = node( 'admin-content-users', { panel : 'users', layout : 'page' } );
+usersPane.children = [ strip, rolesPane, lockoutPane ];
+strip.parent = usersPane;
+
+const dashboardPane = node( 'admin-content-dashboard', { panel : 'dashboard', layout : 'page' } );
+const pageWrap = node( 'admin-page-wrap', {} );
+const shellNodes = {
+	'admin-page-wrap' : pageWrap,
+	'admin-user-logout' : node( 'admin-user-logout', {} ),
+	'admin-content-dashboard' : dashboardPane,
+	'admin-content-users' : usersPane,
+};
+
+const shell = {
+	console : console,
+	location : { hash : '#users' },
+	history : { replaceState : function() {} },
+	addEventListener : function() {},
+	document : {
+		documentElement : null, body : null,
+		getElementById : function( id ) { return shellNodes[id] ?? null },
+		addEventListener : function() {},
+		querySelectorAll : function( selector ) {
+			if( selector === '#admin-nav-wrap a[data-panel]' )
+				return [ railLinks.dashboard, railLinks.users ];
+			if( selector === '#admin-content-wrap > [data-panel]' )
+				return [ dashboardPane, usersPane ];
+			if( selector === '#admin-content-wrap > [data-panel] > .admin-panel-tabs' )
+				return [ strip ];
+			return [];
+		},
+	},
+};
+shell.window = shell;
+shell.Nino = { events : { bindCallback : function() {} } };
+
+const shellContext = vm.createContext( shell );
+vm.runInContext( fs.readFileSync( path.join( __dirname, '../_admin/assets/Nino.admin.js' ), 'utf8' ), shellContext, { filename : 'Nino.admin.js' } );
+vm.runInContext( fs.readFileSync( path.join( __dirname, '../_admin/assets/script.js' ), 'utf8' ), shellContext, { filename : 'script.js' } );
+shell.Nino.admin.onReady();
+
+check( 'the rail says which panel is open rather than only painting it', railLinks.users.getAttribute('aria-current') === 'page' );
+check( '...and no other link claims to be the current page', railLinks.dashboard.getAttribute('aria-current') === null );
+railLinks.dashboard.listeners.click( { preventDefault : function() {} } );
+check( 'the mark moves with the panel', railLinks.dashboard.getAttribute('aria-current') === 'page' && railLinks.users.getAttribute('aria-current') === null );
+
+check( 'a pane strip starts with exactly one tab selected and one tab stop', rolesTab.getAttribute('aria-selected') === 'true'
+	&& lockoutTab.getAttribute('aria-selected') === 'false' && rolesTab.tabIndex === 0 && lockoutTab.tabIndex === -1 );
+
+rolesTab.listeners.keydown( { key : 'ArrowRight', preventDefault : function() {} } );
+check( 'an arrow key opens the next tab of a pane strip', lockoutTab.getAttribute('aria-selected') === 'true'
+	&& lockoutPane.hidden === false && rolesPane.hidden === true && lockoutTab.focused === true );
+
 console.log( '\n'+ checks+ ' checks, '+ failures+ ' failed' );
 process.exitCode = failures === 0 ? 0 : 1;

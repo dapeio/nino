@@ -607,7 +607,24 @@
 				const target = panels[panel];
 				if( target === undefined )
 					return;
-				links.forEach( function( t ) { t.classList.toggle( 'active', t === target[0] ) } );
+				/*	Which panel is open, said as well as drawn: the rail marked it
+					with a class the stylesheet paints and nothing else, so a screen
+					reader read the navigation as twelve links with nothing to tell
+					them apart. aria-current is removed rather than set to "false"
+					on the others - "false" is a value the attribute has, and it
+					reads as "this one is not the current page", which is not
+					something eleven links need to say	*/
+				links.forEach( function( t ) {
+
+					const open = t === target[0];
+
+					t.classList.toggle( 'active', open );
+
+					if( open === true )
+						t.setAttribute( 'aria-current', 'page' );
+					else
+						t.removeAttribute( 'aria-current' );
+				} );
 				// The panes start hidden (see Panels::panesHtml()); showing one
 				// is a plain attribute flip, so no stylesheet has to know the
 				// panel names either

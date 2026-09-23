@@ -40,12 +40,26 @@ function classList() {
 	};
 }
 
+// A rail span carries what step the wizard is on twice over: the class the
+// stylesheet paints, and the attribute a screen reader reads
+function navSpan() {
+	const node = { classList : classList(), attributes : {} };
+	node.setAttribute = function( name, value ) { node.attributes[name] = String( value ) };
+	node.removeAttribute = function( name ) { delete node.attributes[name] };
+	node.getAttribute = function( name ) { return node.attributes[name] ?? null };
+	return node;
+}
+
 const elements = {
 	'install-back' : { disabled : false, classList : classList() },
 	'install-next' : { disabled : false, classList : classList() },
 	'install-actions-msg' : { textContent : '' },
 	'webpages-msg' : { textContent : '' },
+	'install-page-wrap' : { classList : classList() },
 };
+[ 'checks', 'setup', 'webpages', 'personalinfos', 'accounts', 'finish' ].forEach( function( key ) {
+	elements['install-nav-'+ key] = navSpan();
+} );
 
 const sandbox = {
 	console : console,
@@ -56,7 +70,11 @@ const sandbox = {
 	},
 };
 sandbox.window = sandbox;
-sandbox.Nino = { events : { bindCallback : function() {} } };
+sandbox.Nino = {
+	events 	: { bindCallback : function() {} },
+	// showStep() swaps the pane class through the shared primitive
+	adminUi	: { setStateClass : function() {} },
+};
 
 const context = vm.createContext( sandbox );
 vm.runInContext(
@@ -82,6 +100,20 @@ check( '...and the rail numbers them in that order', stepKeys.every( function( k
 	return new RegExp( 'id="install-nav-'+ key+ '"[^>]*>'+ ( index + 1 )+ '\\.' ).test( wizardNav );
 } ) );
 check( '...and numbers nothing beyond them', ( wizardNav.match( /<span id="install-nav-/g ) || [] ).length === stepKeys.length );
+
+/*	The rail is a progress display, and the progress was shown by the colour
+	of one of six words and nothing else - so an operator who cannot see that
+	colour has no way of reading which of the six steps the wizard is on.
+	Driven rather than read: what matters is that the mark moves with the
+	step and that it never sits on two of them at once	*/
+const navOf = function( key ) { return elements['install-nav-'+ key] };
+install.showStep( 0 );
+check( 'the wizard says which step it is on, not only paints it', navOf('checks').getAttribute('aria-current') === 'step' );
+check( '...and no other step claims to be the current one', stepKeys.slice( 1 ).every( function( key ) { return navOf( key ).getAttribute('aria-current') === null } ) );
+install.showStep( 2 );
+check( 'the mark moves with the step', navOf('webpages').getAttribute('aria-current') === 'step' && navOf('checks').getAttribute('aria-current') === null );
+check( '...and the class the stylesheet paints moves with it', navOf('webpages').classList.contains('active') === true && navOf('checks').classList.contains('active') === false );
+install.showStep( 0 );
 
 /*	A step is a nav span, a content pane, a script tag and a _commitStep branch.
 	Removing one means removing all four: a leftover pane is dead markup the

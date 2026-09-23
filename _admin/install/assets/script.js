@@ -84,10 +84,26 @@
 			// shared layout with them the first time a tab was clicked
 			Nino.adminUi.setStateClass( dc.getElementById('install-page-wrap'), step.paneClass );
 
+			/*	Which step the wizard is on, said as well as drawn. The rail is a
+				progress display (see page-wizard.tpl), and progress shown only by
+				the colour of one of six words is progress an operator who cannot
+				see it has no way of reading. aria-current="step" is the attribute
+				for exactly this, and it is removed from the other five rather
+				than set to "false" - five steps saying "not this one" is five
+				things to listen past	*/
 			Nino.install.STEPS.forEach( function( s, i ) {
+
 				const nav = dc.getElementById('install-nav-'+ s.key);
-				if( nav !== null )
-					nav.classList.toggle( 'active', i === index );
+
+				if( nav === null )
+					return;
+
+				nav.classList.toggle( 'active', i === index );
+
+				if( i === index )
+					nav.setAttribute( 'aria-current', 'step' );
+				else
+					nav.removeAttribute( 'aria-current' );
 			} );
 
 			dc.getElementById('install-back').classList.toggle( 'install-hidden', index === 0 );

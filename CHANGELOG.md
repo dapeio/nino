@@ -431,6 +431,22 @@ All notable changes to Nino are documented in this file.
 
 ### Fixed
 
+- **Neither the rail nor the wizard's progress said which one of them you
+  were on.** The workbench marks the open panel by putting an `active` class
+  on its rail link, and the setup wizard marks the step it is on the same way
+  on one of six words - a colour and nothing else, so a screen reader read
+  the navigation as up to twelve links with nothing to tell them apart and
+  the wizard's progress display as six pieces of static text. Measured on the
+  rendered shell in headless Chromium, the page carried no `aria-current` at
+  all. Both set it now - `page` on the open panel, `step` on the current
+  wizard step - and remove it from the others rather than writing "false" on
+  them, which is a value that reads as "not this one" on every link that is
+  not the answer. `tests/admin-script-js-smoke.js` gained a rail and a pane
+  of its own and drives `onReady()` against it (five checks, three red
+  before - two of them also the first real drive of the pane strip's arrow
+  keys), and `tests/install-script-js-smoke.js` moves the wizard between
+  steps and reads the mark back (four checks, two red before).
+
 - **A keyboard could walk the shared table's rows and not see which one it
   was on, and never heard which column it was sorted by.** A clickable row
   in `Nino.adminUi.table()` is a tab stop, and the stylesheet answered focus
