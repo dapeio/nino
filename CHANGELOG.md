@@ -431,6 +431,29 @@ All notable changes to Nino are documented in this file.
 
 ### Fixed
 
+- **A visitor who asked their system for less motion got it from four rules
+  and from nothing else.** `Nino.css` declares twenty-seven transitions and
+  three endless animations; its `prefers-reduced-motion` block stopped the
+  three animations and one transition, so the slider still slid its 600ms,
+  the burger menu unrolled, the cookie banner rose, the toast faded in, the
+  preloader faded out over a full second and every button and field
+  crossfaded its colours. The block clamps every animation and transition to
+  .01ms now - a state change still happens, it simply arrives instead of
+  travelling, which is what keeps the ones a visitor asked for by pressing
+  something - and the three that run on their own are still stopped outright
+  after it. `Nino.ui.js` was worse: `scrollIntoView` and `scrollTo` take the
+  behaviour as an option, and an option wins over whatever the stylesheet
+  says, so the hash link, the down arrow and "back to top" all rode smoothly
+  however the system was set; and `onReady()` wrote `scroll-behavior: smooth`
+  onto `<html>` as an inline style, which is the one declaration a stylesheet
+  cannot overrule without `!important`, putting the ride back for every
+  anchor on the page. All four ask `Nino.ui._reducedMotion()` now, asked
+  fresh each time because the setting can change while the page is open.
+  `tests/nino-ui-scroll-js-smoke.js` answers the media query both ways and
+  reads the behaviour and the inline style back, and holds the stylesheet's
+  block to the clamp (seven checks; against the old sources the file aborts
+  at the first of them, and with only the stylesheet reverted two are red).
+
 - **Nine reorder and remove buttons were called nothing but a hover hint.**
   The ↑/↓ pair in the Routes list, in the Element Types field list, in the
   Navigations entry list and in the wizard's Routes list, and the × beside

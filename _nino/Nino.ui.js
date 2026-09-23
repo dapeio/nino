@@ -51,6 +51,36 @@
 		},
 
 		/**
+		 *	Whether the visitor asked their system for less motion.
+		 *
+		 *	The stylesheet answers this question in css (see Nino.css's
+		 *	prefers-reduced-motion block), and every scroll this file starts
+		 *	has to answer it in javascript instead - because a scroll asked for
+		 *	with `behavior: 'smooth'` is a scroll whose option wins over
+		 *	whatever the stylesheet says. Asked fresh each time rather than read
+		 *	once at boot: the setting can change while the page is open, on
+		 *	every system that offers it beside a light/dark switch.
+		 *
+		 *	@return		{boolean}								false where the browser cannot be asked
+		 */
+		_reducedMotion : function() {
+
+			if( typeof wn.matchMedia !== 'function' )
+				return false;
+
+			return wn.matchMedia('(prefers-reduced-motion: reduce)').matches === true;
+		},
+
+		/**
+		 *	The scroll behaviour to ask for: a ride, or simply being there
+		 *
+		 *	@return		{string}								'smooth' or 'auto'
+		 */
+		_scrollBehavior : function() {
+			return Nino.ui._reducedMotion() === true ? 'auto' : 'smooth';
+		},
+
+		/**
 		 *	Mark a form field as refused, or take the mark back.
 		 *
 		 *	The class is what the stylesheet paints, and a colour is the one
@@ -173,9 +203,16 @@
 			bd.classList.add( Nino.client.isMobile ? 'client-mobile' : 'client-desktop' );
 
 			/*
-			 *	Catch hashchange smooth scroll
+			 *	Catch hashchange smooth scroll.
+			 *
+			 *	Written as an inline style, which is the one declaration
+			 *	Nino.css's prefers-reduced-motion block cannot overrule without
+			 *	!important - so the visitor is asked here as well: one who wants
+			 *	less motion got a smooth ride to every anchor on the page
+			 *	regardless, because this line put it back.
 			 */
-			dE.style.scrollBehavior = "smooth";
+			if( ui._reducedMotion() === false )
+				dE.style.scrollBehavior = "smooth";
 
 			/**
 			 *	Smooth-scroll to the element referenced by the current url hash
@@ -191,7 +228,9 @@
 				if( typeof ev !== 'undefined' && typeof ev.preventDefault !== 'undefined' )
 					ev.preventDefault();
 
-				el.scrollIntoView({ behavior: 'smooth' });
+				// The option wins over the stylesheet, so the preference is asked
+				// here rather than left to the css - see _scrollBehavior()
+				el.scrollIntoView({ behavior: ui._scrollBehavior() });
 			};
 			wn.addEventListener( 'hashchange', fnHashchange );
 
@@ -492,7 +531,7 @@
 			 *	body.nino-scroll-atf/-btf classes above, JS just handles the click
 			 */
 			for( let i=0, l=e.backToTop.length; i<l; i++ )
-				e.backToTop[i].addEventListener( 'click', function() { wn.scrollTo( { top: 0, behavior: 'smooth' } ) } );
+				e.backToTop[i].addEventListener( 'click', function() { wn.scrollTo( { top: 0, behavior: ui._scrollBehavior() } ) } );
 
 
 			/*
@@ -507,7 +546,7 @@
 						return;
 					const target = dc.querySelector( this.dataset.arrowTarget );
 					if( target !== null )
-						target.scrollIntoView({ behavior: 'smooth' });
+						target.scrollIntoView({ behavior: ui._scrollBehavior() });
 				} );
 
 

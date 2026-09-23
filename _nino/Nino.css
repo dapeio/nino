@@ -2907,19 +2907,42 @@ header .nino-headernav-logo {
    this since it was written (see .nino-parallex above); this is the rest of
    the file saying it too: everything that moves on its own stops, everything
    that moves on the way in simply arrives, and a jump to an anchor is a jump
-   rather than a ride. Not a blanket "animation: none" on everything - that
-   also kills the ones a visitor asked for by pressing something */
+   rather than a ride.
+
+   This used to be the three named animations and one transition below, and
+   nothing else - so the other twenty-five transitions this file declares kept
+   their full travel: the slider slid its 600ms, the burger menu unrolled, the
+   cookie banner rose, the toast faded in, the preloader faded out over a
+   second, every button and field crossfaded its colours. The clamp below is
+   what says it once, for everything, rather than one rule per component that
+   the next component forgets.
+
+   A duration of .01ms, not `animation: none`: a state change still happens,
+   it simply arrives instead of travelling - which is what keeps the ones a
+   visitor asked for by pressing something. The three that run forever without
+   anybody doing anything are the exception and are still stopped outright,
+   after the clamp and with !important, or the clamp would restart them at one
+   hundredth of a millisecond each. */
 @media (prefers-reduced-motion: reduce) {
 
 	html {
-		scroll-behavior: auto;
+		scroll-behavior: auto !important;
+	}
+
+	*,
+	*::before,
+	*::after {
+		animation-duration: .01ms !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: .01ms !important;
+		scroll-behavior: auto !important;
 	}
 
 	/* The three that run forever without anybody doing anything */
 	.nino-atf-arrowdown,
 	.nino-fx-vertical-bounce,
 	.nino-preloader::after {
-		animation: none;
+		animation: none !important;
 	}
 
 	/* A viewport animation is a fade and a rise on the way in - here the
