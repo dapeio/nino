@@ -120,6 +120,40 @@ namespace Nino {
 			return $hits;
 		}
 
+		// The element before or after one, in the order its type lists them:
+		// the type file's own order, which is what the Elements panel's list
+		// and an [elements] block without sort show - or in an order and a
+		// subset of the caller's choosing, $options['sort'] as sortElements()
+		// reads it and $options['query'] as queryElements() takes it. The
+		// neighbour comes resolved for $locale like getElement(), and the
+		// list walked is what queryElements() lists for that locale. $return
+		// past either end, for a uri that is not in that list, and for one
+		// that is no element uri at all. A page that links "previous" and
+		// "next" walks the same list its visitor came from
+		static public function prevElement( array &$appData, string $elementUri, string $locale = '', mixed $return = false, array $options = [] ): mixed {
+			return self::_neighbourElement( $appData, $elementUri, -1, $locale, $return, $options );
+		}
+
+		static public function nextElement( array &$appData, string $elementUri, string $locale = '', mixed $return = false, array $options = [] ): mixed {
+			return self::_neighbourElement( $appData, $elementUri, 1, $locale, $return, $options );
+		}
+
+		static private function _neighbourElement( array &$appData, string $elementUri, int $step, string $locale, mixed $return, array $options ): mixed {
+
+			// The spelling every hit carries in '.uri' (see queryElements()), so
+			// a uri written without its slashes still finds its place. A uri
+			// without a type separator is no element uri: answered here rather
+			// than left to getElementTypeFromUri(), which would raise a notice
+			$elementUri = '/'. trim( $elementUri, '/' );
+			if( strpos( substr( $elementUri, 1 ), '/' ) === false )
+				return $return;
+
+			$hits = self::queryElements( $appData, self::getElementTypeFromUri( $elementUri ), (array) ( $options['query'] ?? [] ), $locale, [], [ 'sort' => (string) ( $options['sort'] ?? '' ) ] );
+			$at 	= array_search( $elementUri, array_column( $hits, '.uri' ), true );
+
+			return $at === false ? $return : ( $hits[$at + $step] ?? $return );
+		}
+
 		// Order a list of elements by one or more fields: 'title' ascending,
 		// '-date' descending, 'category,-date' by the first and, where that
 		// is equal, the second. Two numbers compare as numbers, anything else

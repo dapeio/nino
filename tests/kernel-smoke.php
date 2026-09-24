@@ -280,6 +280,35 @@ check( 'a type uri is the same type however its slashes are written', $slashSpel
 check( 'a query finds the elements whose boolean is off', array_column( \Nino\Elements::queryElements( $appData, '/flagtest', [ 'live' => '0' ], '*', [] ), '.uri' ) === [ '/flagtest/off' ] );
 check( '...as well as the ones whose boolean is on', array_column( \Nino\Elements::queryElements( $appData, '/flagtest', [ 'live' => '1' ], '*', [] ), '.uri' ) === [ '/flagtest/on' ] );
 
+// The element before and after one, in the order the type lists them - the
+// type file's order, which is what the panel's list and an [elements] block
+// without sort show - or in the caller's sort and subset. Past either end,
+// off the list and for a uri that is no element: $return
+check( 'Elements::prevElement() and nextElement() exist', method_exists( '\Nino\Elements', 'prevElement' ) === true && method_exists( '\Nino\Elements', 'nextElement' ) === true );
+if( method_exists( '\Nino\Elements', 'prevElement' ) === true ) {
+	\Nino\Filesystem::putFileContent( $appData, '/elements/walktest.php', [
+		'title' 	=> 'Walk Test',
+		'model' 	=> [ 'title' => [ 'type' => 'string', 'locale' => true ], 'date' => [ 'type' => 'string' ], 'live' => [ 'type' => 'boolean' ] ],
+		'*' 			=> [ '*' => [], 'a' => [ 'date' => '2026-03-01', 'live' => true ], 'b' => [ 'date' => '2026-01-01', 'live' => false ], 'c' => [ 'date' => '2026-02-01', 'live' => true ] ],
+		'de_DE' 	=> [ 'a' => [ 'title' => 'A' ], 'b' => [ 'title' => 'B' ], 'c' => [ 'title' => 'C' ] ],
+		// d exists in one translation only, with no global entry
+		'en_US' 	=> [ 'a' => [ 'title' => 'A en' ], 'b' => [ 'title' => 'B en' ], 'c' => [ 'title' => 'C en' ], 'd' => [ 'title' => 'D en' ] ],
+	] );
+	$walk = function( string $method, string $uri, string $locale = 'de_DE', array $options = [] ) use ( &$appData ) {
+		$hit = \Nino\Elements::$method( $appData, $uri, $locale, false, $options );
+		return is_array( $hit ) === true ? ( $hit['.uri'] ?? '?' ) : $hit;
+	};
+	check( 'nextElement() is the element after, in the type file\'s order', $walk( 'nextElement', '/walktest/a' ) === '/walktest/b' && $walk( 'nextElement', '/walktest/b' ) === '/walktest/c' );
+	check( 'prevElement() is the element before', $walk( 'prevElement', '/walktest/b' ) === '/walktest/a' && $walk( 'prevElement', '/walktest/c' ) === '/walktest/b' );
+	check( 'past either end there is nothing', $walk( 'prevElement', '/walktest/a' ) === false && $walk( 'nextElement', '/walktest/c' ) === false );
+	check( 'the neighbour comes resolved for the locale asked', ( \Nino\Elements::nextElement( $appData, '/walktest/a', 'de_DE' )['title'] ?? null ) === 'B' && ( \Nino\Elements::nextElement( $appData, '/walktest/a', 'en_US' )['title'] ?? null ) === 'B en' );
+	check( 'the list walked is the locale\'s: an element one translation alone holds is its last neighbour there, and absent elsewhere', $walk( 'nextElement', '/walktest/c', 'en_US' ) === '/walktest/d' && $walk( 'nextElement', '/walktest/c', 'de_DE' ) === false && $walk( 'nextElement', '/walktest/c', '*' ) === '/walktest/d' );
+	check( 'sort under $options walks the sorted list', $walk( 'nextElement', '/walktest/b', 'de_DE', [ 'sort' => 'date' ] ) === '/walktest/c' && $walk( 'prevElement', '/walktest/a', 'de_DE', [ 'sort' => 'date' ] ) === '/walktest/c' && $walk( 'nextElement', '/walktest/a', 'de_DE', [ 'sort' => '-date' ] ) === '/walktest/c' );
+	check( 'query under $options walks the subset, and an element outside it has no place in it', $walk( 'nextElement', '/walktest/a', 'de_DE', [ 'query' => [ 'live' => '1' ] ] ) === '/walktest/c' && $walk( 'prevElement', '/walktest/b', 'de_DE', [ 'query' => [ 'live' => '1' ] ] ) === false );
+	check( 'a uri is the same element however its slashes are written', $walk( 'nextElement', 'walktest/a/' ) === '/walktest/b' );
+	check( 'an unknown element, an unknown type and a uri without a type separator answer $return, quietly', $walk( 'nextElement', '/walktest/zzz' ) === false && $walk( 'nextElement', '/nosuchtype/a' ) === false && $walk( 'nextElement', '/walktest' ) === false && \Nino\Elements::nextElement( $appData, '/walktest/c', 'de_DE', 'none' ) === 'none' );
+}
+
 // The type file and the elements read out of it shared one cache map, keyed
 // by uri - so once a type had been read, asking for the type uri as if it
 // were an element handed back that type's whole locale bucket, every element

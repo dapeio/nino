@@ -6,6 +6,19 @@ All notable changes to Nino are documented in this file.
 
 ### Added
 
+- **Elements:** `\Nino\Elements::prevElement( $appData, $elementUri, $locale,
+  $return, $options )` and `nextElement()`, the element before and after
+  one in the order its type lists them - the type file's own order, which
+  is what the Elements panel and an `[elements]` block without `sort`
+  show - or in the caller's `sort` and `query` under `$options`, resolved
+  for `$locale` like `getElement()`, and `$return` past either end, for a
+  uri outside that list and for one that is no element uri. A detail
+  page's "previous" and "next" walk the list its visitor came from.
+  `tests/kernel-smoke.php` holds the order, both ends, the locale the
+  neighbour is resolved for and the list it is taken from, `sort`, `query`,
+  a uri's slash spellings and the quiet answers (773 → 783 checks, 1 red
+  before: the methods did not exist, so the rest of the block is skipped).
+
 - **Elements:** the element form steps through its type's entries.
   **‹ Previous element** and **Next element ›** sit at the right of the
   form's context bar, in the order of the list and disabled at either
