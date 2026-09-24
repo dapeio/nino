@@ -47,6 +47,10 @@
 		// through. Refilled with every list the server sends (see
 		// _renderList()), dropped with the type
 		_elements				: [],
+		// The translation the list's cells show - the workbench's content
+		// locale at the time the list was read, so a form that switched it
+		// can tell the list needs reading again (see _renderForm()'s back link)
+		_listLocale			: '',
 		_htmlEditors		: {},
 		// Referenced type uri -> [ { uri, label } ], the choices an element
 		// field's select offers. Refilled on every form open rather than
@@ -521,7 +525,7 @@
 
 			dc.querySelectorAll('.admin-type-btn').forEach( function( btn ) { btn.classList.toggle( 'active', btn.dataset.type === type ) } );
 
-			Nino.admin.elements._apiCall( 'list', { type : type }, function( status, response ) {
+			Nino.admin.elements._apiCall( 'list', { type : type, locale : Nino.admin.sessionLocale.current ?? '' }, function( status, response ) {
 				if( requestId !== Nino.admin.elements._listRequest || type !== Nino.admin.elements._currentType )
 					return;
 				// Shown as well as written: this runs while the type picker is the
@@ -532,7 +536,7 @@
 					Nino.admin.elements._showList();
 					return;
 				}
-				Nino.admin.elements._renderList( response.elements );
+				Nino.admin.elements._renderList( response.elements, response.columns ?? [] );
 				Nino.admin.elements._showList();
 
 				const pendingUri = Nino.admin.elements._pendingUri;
@@ -543,15 +547,37 @@
 		},
 
 		/**
-		 *	Render the element list for the current type, plus an "add new" button
-		 *
-		 *	@param		{Array}		elements			[ { uri, label }, ... ]
+		 *	Read the current type's list again - after a save, or when the
+		 *	workbench's content locale moved on since the list was read - and
+		 *	draw it, leaving whatever is on screen alone if the answer is late
 		 *
 		 *	@return		void
 		 */
-		_renderList : function( elements ) {
+		_refreshList : function() {
+			const type = Nino.admin.elements._currentType;
+			Nino.admin.elements._apiCall( 'list', { type : type, locale : Nino.admin.sessionLocale.current ?? '' }, function( status, response ) {
+				if( status === 200 && response !== null && type === Nino.admin.elements._currentType )
+					Nino.admin.elements._renderList( response.elements, response.columns ?? [] );
+			} );
+		},
+
+		/**
+		 *	Render the element list for the current type, plus an "add new"
+		 *	button: a table of the fields a cell can show - one row per element,
+		 *	its uri first, the cells the translation the workbench is set to -
+		 *	or, for a type none of whose fields fits a cell, the plain list of
+		 *	labels
+		 *
+		 *	@param		{Array}		elements			[ { uri, label, values }, ... ]
+		 *	@param		{Array}		columns				Field keys a cell can show, in model order (the server's displayableColumns())
+		 *
+		 *	@return		void
+		 */
+		_renderList : function( elements, columns ) {
 
 			Nino.admin.elements._elements = elements;
+			Nino.admin.elements._listLocale = Nino.admin.sessionLocale.current ?? '';
+			columns = Array.isArray( columns ) ? columns : [];
 
 			// The list is re-read after every save, so a form open on one of
 			// these follows the fresh order - a just created element included
@@ -586,6 +612,30 @@
 				hint.className = 'nino-admin-empty';
 				hint.textContent = Nino.content.getText('/_admin/elements/label/reference-empty');
 				wrap.appendChild( hint );
+			} else if( columns.length > 0 ) {
+				// The shared data table: search, type-aware sort and pages over
+				// the whole set (see Nino.adminUi.table()). The uri is the row's
+				// identity and its first column, under a key no model field can
+				// carry - '.uri' is what the kernel itself calls it - so a field
+				// named "uri" stays a field. A row is a link into the form, as
+				// the plain list's entries are
+				const mount = dc.createElement('div');
+				mount.id = 'elements-table';
+				wrap.appendChild( mount );
+				Nino.adminUi.table( {
+					mount 		: mount,
+					rowKey 		: '.uri',
+					columns 	: [ { key : '.uri', label : Nino.content.getText('/_admin/elements/label/uri'), type : 'string' } ].concat( columns.map( function( key ) {
+						return { key : key, label : Nino.admin.elements._fieldLabel( key ), type : ( ( Nino.admin.elements._currentModel || {} )[key] || {} ).type || 'string' };
+					} ) ),
+					rows 			: elements.map( function( element ) { return Object.assign( { '.uri' : element.uri }, element.values || {} ) } ),
+					labels 		: {
+						search 	: Nino.content.getText('/_admin/elements/label/reference-search'),
+						empty 	: Nino.content.getText('/_admin/elements/label/reference-empty'),
+						noMatch : Nino.content.getText('/_admin/elements/label/reference-no-matches'),
+					},
+					onRowClick : function( row ) { Nino.admin.elements._openForm( row['.uri'] ) },
+				} );
 			} else {
 				const ul = dc.createElement('ul');
 				ul.className = 'nino-admin-list';
@@ -1483,6 +1533,10 @@
 					return;
 				Nino.admin.elements._destroyHtmlEditors();
 				Nino.admin.elements._showList();
+				// The form's locale switch moves the workbench's content locale;
+				// the list's cells show one translation, so they follow
+				if( Nino.admin.elements._listLocale !== ( Nino.admin.sessionLocale.current ?? '' ) )
+					Nino.admin.elements._refreshList();
 			} );
 			const toolbar = Nino.admin.formToolbar( backLink );
 			wrap.appendChild( toolbar );
@@ -1842,11 +1896,7 @@
 					Nino.admin.elements._saving = false;
 					Nino.admin.elements._setFormPending( false );
 
-					const savedType = Nino.admin.elements._currentType;
-					Nino.admin.elements._apiCall( 'list', { type : savedType }, function( listStatus, listResponse ) {
-						if( listStatus === 200 && listResponse !== null && savedType === Nino.admin.elements._currentType )
-							Nino.admin.elements._renderList( listResponse.elements );
-					} );
+					Nino.admin.elements._refreshList();
 				} );
 			}
 

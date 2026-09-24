@@ -504,6 +504,43 @@ check( 'a new element uri outside the documented slug syntax is rejected', $requ
 echo "\n";
 
 
+// --- Elements::apiList: the table view -------------------------------------
+
+echo "Elements::apiList - the table view's columns and one translation's values\n";
+
+// The list answers the fields a table cell can show, in model order - not an
+// image, not a rich-text string - and every element's values for the
+// translation asked. An element that has no data in that translation yet is
+// still listed, with its translated cells empty: the table is where an editor
+// finds what is left to translate, so it cannot be the place it vanishes from
+\Nino\Elements::insertElementType( $appData, '/demotable', [
+	'title' 	=> [ 'type' => 'string', 'locale' => true ],
+	'body' 		=> [ 'type' => 'string', 'locale' => true, 'html' => true ],
+	'price' 	=> [ 'type' => 'double' ],
+	'photo' 	=> [ 'type' => 'image', 'width' => 10, 'height' => 10 ],
+] );
+$request = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+$_POST['data'] = json_encode( [ 'type' => 'demotable', 'uri' => 'one', 'locale' => 'de_DE', 'isNew' => true, 'fields' => [ 'title' => 'Eins', 'body' => '<p>x</p>', 'price' => 9.5 ] ] );
+\Nino\Modules\Elements\Admin::apiSave( $appData, $request );
+check( 'the table\'s element is saved in one translation', $request['/nino/http/response']['statusCode'] === 200 );
+
+$request = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+$_POST['data'] = json_encode( [ 'type' => 'demotable', 'locale' => 'de_DE' ] );
+\Nino\Modules\Elements\Admin::apiList( $appData, $request );
+$listed = $request['/nino/http/response']['body'] ?? [];
+check( 'apiList names the columns a cell can show, in model order', ( $listed['columns'] ?? null ) === [ 'title', 'price' ] );
+check( 'apiList answers the translation asked, global fields included', ( $listed['elements'][0]['values'] ?? null ) === [ 'title' => 'Eins', 'price' => 9.5 ] );
+
+$request = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+$_POST['data'] = json_encode( [ 'type' => 'demotable', 'locale' => 'en_US' ] );
+\Nino\Modules\Elements\Admin::apiList( $appData, $request );
+$listed = $request['/nino/http/response']['body'] ?? [];
+check( 'a translation the element does not have yet still lists it', count( $listed['elements'] ?? [] ) === 1 && ( $listed['elements'][0]['uri'] ?? '' ) === 'one' );
+check( '...with its translated cell empty and the global one filled', ( $listed['elements'][0]['values'] ?? null ) === [ 'title' => null, 'price' => 9.5 ] );
+
+echo "\n";
+
+
 // --- Elements::apiSave: required fields ---------------------------------------
 
 echo "Elements::apiSave - required fields\n";

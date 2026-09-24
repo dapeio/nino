@@ -559,6 +559,8 @@ if( typeof elements._renderNav === 'function' ) {
 	const listNode = dom.make('div');
 	sandbox.document.getElementById = id => ( { 'elements-form' : formNode, 'elements-list' : listNode } )[id] ?? null;
 	sandbox.Nino.adminUi.listActions = () => dom.make('div');
+	// The list notes the workbench's content locale, which the shell owns
+	sandbox.Nino.admin.sessionLocale = { current : 'de_DE', set(){}, init(){} };
 	elements._renderList( [ { uri : 'cy', label : 'Cy' }, { uri : 'dee', label : 'Dee' } ] );
 	const refreshed = formNode.querySelectorAll('.admin-element-nav button');
 	check( 'a fresh list re-points the open form\'s buttons', refreshed.length === 2 && refreshed[0].disabled === true && refreshed[1].dataset.uri === 'dee' );
@@ -569,6 +571,50 @@ if( typeof elements._renderNav === 'function' ) {
 	check( 'a save in flight disables both', refreshed.every( b => b.disabled === true ) );
 	elements._setFormPending( false );
 	check( '...and afterwards the one at the end stays disabled, the other comes back', refreshed[0].disabled === true && refreshed[1].disabled === false );
+}
+
+
+
+// --- the list is a table ---------------------------------------------------
+//
+// elements/list answers the fields a cell can show (columns) and every
+// element's values for one translation; the panel draws the shared table
+// from it: the uri first, under a key no model field can carry, then one
+// column per field, and a row opens the form. A type none of whose fields
+// fits a cell keeps the plain list of labels.
+
+{
+	const listNode = dom.make('div');
+	sandbox.document.getElementById = id => id === 'elements-list' ? listNode : null;
+	sandbox.Nino.adminUi.listActions = () => dom.make('div');
+	sandbox.Nino.admin.formToolbar = backLink => dom.make('div');
+	const opened = [];
+	elements._openForm = function( uri ) { opened.push( uri ) };
+	elements._currentType = 'services';
+	elements._currentTypeTitle = 'Services';
+	elements._currentModel = { title : { type : 'string', locale : true }, body : { type : 'string', html : true }, price : { type : 'double' }, uri : { type : 'string' } };
+	elements._rights = {};
+
+	elements._renderList( [
+		{ uri : 'ada', label : 'Ada', values : { title : 'Ada', price : 9.5, uri : 'a field called uri' } },
+		{ uri : 'bob', label : 'Bob', values : { title : null, price : 3, uri : '' } },
+	], [ 'title', 'price', 'uri' ] );
+
+	const table = dom.find( listNode, n => n.tagName === 'table' )[0];
+	const heads = table ? dom.find( table, n => n.tagName === 'th' ).map( th => th.dataset.key ) : [];
+	check( 'the list is the shared table, the uri first and then the columns the server named', table !== undefined && table.className === 'nino-admin-table' && heads.join() === '.uri,title,price,uri' );
+	const rows = table ? dom.find( table, n => n.tagName === 'tr' && n.parentNode.tagName === 'tbody' ) : [];
+	const cells = rows.map( tr => dom.find( tr, n => n.tagName === 'td' ).map( td => td.textContent ) );
+	check( 'one row per element, the cells its values - a field called uri stays a field', JSON.stringify( cells ) === '[["ada","Ada","9.5","a field called uri"],["bob","","3",""]]' );
+	check( 'the plain list is not drawn beside it', dom.find( listNode, n => n.tagName === 'ul' ).length === 0 );
+	if( rows[1] !== undefined )
+		rows[1].listeners.click();
+	check( 'a row opens its element', JSON.stringify( opened ) === '["bob"]' );
+	check( 'the list remembers the translation it shows', elements._listLocale === 'de_DE' );
+
+	// No column: the plain list
+	elements._renderList( [ { uri : 'ada', label : 'Ada', values : {} } ], [] );
+	check( 'a type with no field a cell can show keeps the plain list', dom.find( listNode, n => n.tagName === 'table' ).length === 0 && dom.find( listNode, n => n.tagName === 'ul' ).length === 1 );
 }
 
 console.log( '\n'+ checks+ ' checks, '+ failures+ ' failed' );

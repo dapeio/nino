@@ -136,8 +136,8 @@ The **Dashboard** is the first panel and summarizes what the account may see: a 
 
 Elements are recurring structured content – team members, services, references – whose fields a developer defines on the **Element Types** tab of this panel. Editors and developers maintain the entries in the same panel; the tab is the developer's.
 
-1. Choose a type.
-2. Open an entry or select **New element**. A type that numbers its elements states the uri it is about to create; every other type asks for a slug of lowercase letters, digits, hyphens and underscores.
+1. Choose a type. Its entries are a table: one column per field a cell can show (not images, lists or rich text), the uri first, the cells in the translation the workbench is set to – empty where an entry has none yet. Search, sort by a column, page.
+2. Open an entry (its row) or select **New element**. A type that numbers its elements states the uri it is about to create; every other type asks for a slug of lowercase letters, digits, hyphens and underscores.
 3. Fill the global fields once and the translated fields per language – the language switch is inside the form, and unsaved values survive the switch.
 4. **Save**. An image field becomes available only after a new element has been saved once; Nino then processes the upload to the dimensions the type declares.
 

@@ -136,8 +136,8 @@ Das **Dashboard** ist das erste Panel und fasst zusammen, was das Konto sehen da
 
 Elemente sind wiederkehrende strukturierte Inhalte – Teammitglieder, Leistungen, Referenzen –, deren Felder ein Entwickler auf dem Tab **Elementtypen** dieses Panels festlegt. Redakteure und Entwickler pflegen die Einträge im selben Panel; der Tab gehört dem Entwickler.
 
-1. Wähle einen Typ.
-2. Öffne einen Eintrag oder wähle **Neues Element**. Ein Typ, der seine Elemente nummeriert, nennt die Uri, die er gleich anlegt; jeder andere fragt nach einem Slug aus Kleinbuchstaben, Ziffern, Binde- und Unterstrichen.
+1. Wähle einen Typ. Seine Einträge sind eine Tabelle: eine Spalte je Feld, das in eine Zelle passt (keine Bilder, Listen oder Rich Text), die Uri zuerst, die Zellen in der Übersetzung, auf die die Werkbank steht – leer, wo ein Eintrag noch keine hat. Suchen, nach einer Spalte sortieren, blättern.
+2. Öffne einen Eintrag (seine Zeile) oder wähle **Neues Element**. Ein Typ, der seine Elemente nummeriert, nennt die Uri, die er gleich anlegt; jeder andere fragt nach einem Slug aus Kleinbuchstaben, Ziffern, Binde- und Unterstrichen.
 3. Fülle die globalen Felder einmal und die übersetzten je Sprache – der Sprachumschalter sitzt im Formular, ungespeicherte Werte überstehen den Wechsel.
 4. **Speichern**. Ein Bildfeld wird erst verfügbar, nachdem ein neues Element einmal gespeichert wurde; Nino verarbeitet den Upload dann auf die Maße, die der Typ vorgibt.
 

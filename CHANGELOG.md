@@ -66,6 +66,22 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **Elements:** a type's entries are a table, not a list of titles. One
+  column per field a cell can show - `elements/list` has answered those
+  `columns` and every element's `values` for one translation since
+  1.0.0-beta, and nothing drew them - the uri first, the cells in the
+  translation the workbench is set to and empty where an entry has none
+  yet, with the shared table's search, type-aware sort and pages. A row
+  opens the form; a type none of whose fields fits a cell keeps the plain
+  list. The form's locale switch moves the workbench's content locale, so
+  the back link reads the list again when it did. `tests/admin-smoke.php`
+  pins the answer the table reads (the columns in model order, the
+  translation asked, an entry without that translation still listed with
+  its cell empty: 242 → 247 checks; proven by mutation, see the patch),
+  `tests/admin-elements-js-smoke.js` that the panel draws the table from
+  it, the uri under `.uri`, a row into the form, and the plain list where
+  there is no column (81 → 87, 5 red before).
+
 - **Admin:** the demo catalogue marks its static-block specimens by the
   presets' new names. The catalogue's `.demo-catalogue.tpl` carries one
   `data-demo-preset`/`data-demo-layout` mark per specimen so the Template
