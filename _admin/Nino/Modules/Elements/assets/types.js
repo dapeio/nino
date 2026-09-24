@@ -207,11 +207,11 @@
 
 		/**
 		 *	Render one field's row: key, type, and whichever options apply to
-		 *	that type (locale/html/required always; maxlength for string;
+		 *	that type (locale/html/required always; maxlength and inputsize for string;
 		 *	width+height for image; the referenced type for element; suffix for
 		 *	everything but boolean/image/element; options for a fixed value list)
 		 *
-		 *	@param		{Object}	field					{ key, type, locale, html, required, maxlength, width, height, elementType, suffix, options }
+		 *	@param		{Object}	field					{ key, type, locale, html, required, maxlength, inputsize, width, height, elementType, suffix, options }
 		 *	@param		{number}	index					Index into _fields, for the remove button
 		 *
 		 *	@return		{Element}
@@ -304,6 +304,16 @@
 					maxlengthInput.placeholder = Nino.content.getText('/_admin/types/placeholder/maxlength');
 					maxlengthInput.value = field.maxlength ?? '';
 					optionsWrap.appendChild( maxlengthInput );
+
+					// Rows the field's input opens with - a hint for the form, not
+					// a limit on the value (see Types.php's cleanModel())
+					const inputsizeInput = dc.createElement('input');
+					inputsizeInput.type = 'number';
+					inputsizeInput.min = '1';
+					inputsizeInput.className = 'admin-field-inputsize';
+					inputsizeInput.placeholder = Nino.content.getText('/_admin/types/placeholder/inputsize');
+					inputsizeInput.value = field.inputsize ?? '';
+					optionsWrap.appendChild( inputsizeInput );
 
 					const optionsInput = dc.createElement('input');
 					optionsInput.type = 'text';
@@ -537,6 +547,7 @@
 					required 	: ( row.querySelector('.admin-field-required')?.checked ) ?? false,
 					html 			: ( row.querySelector('.admin-field-html')?.checked ) ?? false,
 					maxlength : row.querySelector('.admin-field-maxlength')?.value,
+					inputsize : row.querySelector('.admin-field-inputsize')?.value,
 					width 		: row.querySelector('.admin-field-width')?.value,
 					height 		: row.querySelector('.admin-field-height')?.value,
 					suffix 		: ( row.querySelector('.admin-field-suffix')?.value ) ?? '',
@@ -821,6 +832,7 @@
 					required 		: field.required,
 					html 				: field.html,
 					maxlength 	: field.maxlength,
+					inputsize 	: field.inputsize,
 					width 			: field.width,
 					height 			: field.height,
 					suffix 			: field.suffix,

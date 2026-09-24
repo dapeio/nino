@@ -114,10 +114,11 @@
 		 *	@param		{Element}		container			Element to render the editor into (cleared first)
 		 *	@param		{string}		value					Initial html value
 		 *	@param		{number}		maxlength			Max visible (textContent) character count
+		 *	@param		{number}		rows					Minimum height in lines of text, 0 for the stylesheet's default
 		 *
 		 *	@return		{Object}									{ getValue(), setValue( html ), destroy() }
 		 */
-		create : function( container, value, maxlength ) {
+		create : function( container, value, maxlength, rows ) {
 
 			container.innerHTML = '';
 			container.classList.add('nino-admin-richtext');
@@ -135,6 +136,11 @@
 			content.setAttribute( 'aria-label', Nino.content.getText('/_admin/htmleditor/label/content') );
 			content.setAttribute( 'tabindex', '0' );
 			content.spellcheck = true;
+			// A field whose model asks for a height (an element type's
+			// inputsize) hands the number over; the stylesheet turns it into
+			// a height, so the line metrics and the padding stay its business
+			if( ( rows ?? 0 ) > 0 )
+				content.style.setProperty( '--nino-admin-richtext-rows', String( rows ) );
 			load( content, value );
 
 			const linkbar = dc.createElement('div');

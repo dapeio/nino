@@ -445,5 +445,131 @@ check( 'opening the panel asks for the type list once, not twice', JSON.stringif
 // back to the overview after adding an element has to re-read it
 check( '...and coming back to the overview re-reads it, which is what that second request was for', JSON.stringify( typesRequests.returning ) === '["elements/types"]' );
 
+// --- inputsize: a model field's rows reach its input ----------------------
+//
+// A string field may say how many rows its input opens with. The textarea
+// takes it as its rows; a rich-text field hands it to the html editor, which
+// sizes its area from it. Nothing else changes: a size is a hint for the
+// form, not a limit on the value.
+//
+// A dom of plain objects that records what was appended, so a rendered
+// control can be found again - the sandbox above has none
+
+function domTree() {
+	const classes = () => { const held = {}; return { add : k => held[k] = true, remove : k => delete held[k], toggle : ( k, on ) => { if( on ) held[k] = true; else delete held[k] }, contains : k => held[k] === true } };
+	const make = tag => ( { tagName : tag, children : [], parentNode : null, listeners : {}, classList : classes(), dataset : {}, style : {}, attrs : {},
+		appendChild( c ) { c.parentNode = this; this.children.push( c ); return c },
+		replaceWith( c ) { const at = this.parentNode.children.indexOf( this ); c.parentNode = this.parentNode; this.parentNode.children.splice( at, 1, c ) },
+		addEventListener( type, fn ) { this.listeners[type] = fn }, setAttribute( k, v ) { this.attrs[k] = v }, removeAttribute(){}, closest : () => null,
+		querySelectorAll( selector ) { return find( this, byTag( selector ) ) }, querySelector( selector ) { return find( this, byTag( selector ) )[0] ?? null },
+		get innerHTML() { return '' }, set innerHTML( v ) { this.children = [] } } );
+	const byTag = selector => {
+		if( selector === '.admin-element-nav button' )
+			return n => n.tagName === 'button' && n.parentNode !== null && n.parentNode.className === 'admin-element-nav';
+		if( selector === '.admin-element-nav' )
+			return n => n.className === 'admin-element-nav';
+		const tags = selector.split(',').map( s => s.trim() ).filter( s => /^[a-z]+$/.test( s ) );
+		return n => tags.indexOf( n.tagName ) !== -1;
+	};
+	const find = ( node, test, out = [] ) => { ( node.children || [] ).forEach( c => { if( test( c ) ) out.push( c ); find( c, test, out ) } ); return out };
+	return { make, find };
+}
+
+const dom = domTree();
+sandbox.document.createElement = dom.make;
+let editorRows = null;
+sandbox.Nino.admin.htmlEditor = { create : function( mount, value, maxlength, rows ) { editorRows = rows; return { getValue : () => value, setValue(){}, destroy(){} } } };
+elements._currentType = 'services';
+elements._rights = {};
+elements._htmlEditors = {};
+
+const sized = dom.find( elements._renderFieldControl( 'body', { type : 'string', inputsize : 8 }, 'text' ), n => n.tagName === 'textarea' );
+check( 'a string field opens with the rows its model asks for', sized.length === 1 && sized[0].rows === 8 );
+const unsized = dom.find( elements._renderFieldControl( 'body', { type : 'string' }, '' ), n => n.tagName === 'textarea' );
+check( '...and without one the textarea keeps the stylesheet\'s height', unsized.length === 1 && unsized[0].rows === undefined );
+elements._renderFieldControl( 'body', { type : 'string', html : true, inputsize : 6 }, '' );
+check( 'a rich-text field hands its rows to the html editor', editorRows === 6 );
+elements._renderFieldControl( 'body', { type : 'string', html : true }, '' );
+check( '...and 0 without one', editorRows === 0 );
+
+
+// --- previous/next: the form steps through the list's order ---------------
+//
+// The list the server sends is the order; the open element's neighbours are
+// the entries before and after it. The form renders one button each into its
+// context bar, disabled at either end, and a save in flight disables both
+// without handing the unreachable one back afterwards.
+
+check( 'the form knows its neighbours', typeof elements._neighbours === 'function' && typeof elements._renderNav === 'function' );
+
+if( typeof elements._renderNav === 'function' ) {
+
+	elements._elements = [ { uri : 'ada', label : 'Ada' }, { uri : 'bob', label : 'Bob' }, { uri : 'cy', label : 'Cy' } ];
+	elements._isNew = false;
+	elements._currentUri = 'bob';
+	check( 'the middle element has both neighbours, in the list\'s order', JSON.stringify( elements._neighbours() ) === '{"prev":"ada","next":"cy"}' );
+	elements._currentUri = 'ada';
+	check( 'the first has no previous', JSON.stringify( elements._neighbours() ) === '{"prev":null,"next":"bob"}' );
+	elements._currentUri = 'cy';
+	check( 'the last has no next', JSON.stringify( elements._neighbours() ) === '{"prev":"bob","next":null}' );
+	elements._currentUri = 'zed';
+	check( 'an element the list does not hold has none', JSON.stringify( elements._neighbours() ) === '{"prev":null,"next":null}' );
+	elements._currentUri = 'bob';
+	elements._isNew = true;
+	check( '...nor has a new element', JSON.stringify( elements._neighbours() ) === '{"prev":null,"next":null}' );
+	elements._isNew = false;
+
+	const opened = [];
+	elements._openForm = function( uri ) { opened.push( uri ) };
+	const nav = elements._renderNav();
+	const buttons = dom.find( nav, n => n.tagName === 'button' );
+	check( 'the form gets a previous and a next button', nav.className === 'admin-element-nav' && buttons.map( b => b.dataset.nav ).join() === 'prev,next' );
+	check( '...each pointing at its neighbour', buttons[0].dataset.uri === 'ada' && buttons[1].dataset.uri === 'cy' && buttons.every( b => b.disabled === false ) );
+	elements._currentUri = 'cy';
+	const atEnd = dom.find( elements._renderNav(), n => n.tagName === 'button' );
+	check( 'at the end, next is disabled and points nowhere', atEnd[1].disabled === true && atEnd[1].dataset.uri === '' && atEnd[0].disabled === false );
+	buttons[1].listeners.click();
+	atEnd[1].listeners.click();
+	check( 'clicking next opens that element, and a button at the end opens nothing', JSON.stringify( opened ) === '["cy"]' );
+
+	// Into the form's context bar, after the back link (and the locale
+	// switch, when the type has one) - the shell's toolbar stands in
+	const formNode = dom.make('div');
+	sandbox.document.getElementById = id => id === 'elements-form' ? formNode : null;
+	sandbox.Nino.admin.formToolbar = backLink => { const bar = dom.make('div'); bar.className = 'nino-admin-contextbar'; bar.appendChild( backLink ); return bar };
+	elements._numbered = {};
+	elements._raw = {};
+	elements._globalKeys = [];
+	elements._localeKeys = [];
+	elements._currentTypeTitle = 'Services';
+	elements._currentUri = 'bob';
+	elements._renderForm();
+	const bar = formNode.children.find( n => n.className === 'nino-admin-contextbar' );
+	check( 'the form renders them into its context bar, at its end', bar !== undefined && bar.children.length === 2 && bar.children[1].className === 'admin-element-nav' );
+	elements._isNew = true;
+	elements._renderForm();
+	const barNew = formNode.children.find( n => n.className === 'nino-admin-contextbar' );
+	check( 'a new element, which the list does not hold yet, gets none', barNew !== undefined && barNew.children.length === 1 );
+	elements._isNew = false;
+
+	// The list comes back after every save; a form open on one of its
+	// elements takes the fresh order without being rendered again
+	elements._currentUri = 'cy';
+	elements._renderForm();
+	const listNode = dom.make('div');
+	sandbox.document.getElementById = id => ( { 'elements-form' : formNode, 'elements-list' : listNode } )[id] ?? null;
+	sandbox.Nino.adminUi.listActions = () => dom.make('div');
+	elements._renderList( [ { uri : 'cy', label : 'Cy' }, { uri : 'dee', label : 'Dee' } ] );
+	const refreshed = formNode.querySelectorAll('.admin-element-nav button');
+	check( 'a fresh list re-points the open form\'s buttons', refreshed.length === 2 && refreshed[0].disabled === true && refreshed[1].dataset.uri === 'dee' );
+
+	// A save in flight disables both; afterwards only the reachable one
+	// comes back
+	elements._setFormPending( true );
+	check( 'a save in flight disables both', refreshed.every( b => b.disabled === true ) );
+	elements._setFormPending( false );
+	check( '...and afterwards the one at the end stays disabled, the other comes back', refreshed[0].disabled === true && refreshed[1].disabled === false );
+}
+
 console.log( '\n'+ checks+ ' checks, '+ failures+ ' failed' );
 process.exitCode = failures === 0 ? 0 : 1;

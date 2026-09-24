@@ -192,7 +192,7 @@ namespace Nino\Modules\Elements {
 		/**
 		 *	Validate a posted model definition, dropping anything malformed -
 		 *	same rules as \Nino\Elements::insertElementType(), plus width/height for
-		 *	image fields, maxlength for string fields, the referenced type for
+		 *	image fields, maxlength and inputsize for string fields, the referenced type for
 		 *	element fields, a fixed unit suffix for every type but boolean/
 		 *	image/element, and a plain string list for options
 		 *
@@ -277,6 +277,15 @@ namespace Nino\Modules\Elements {
 					$maxlength = (int) ( $data['maxlength'] ?? 0 );
 					if( $maxlength > 0 )
 						$field['maxlength'] = $maxlength;
+
+					// How many rows the field's input opens with: the textarea's
+					// rows, or the rich-text area's minimum height in lines (see
+					// admin.js and html-editor.js). A size is a hint for the form,
+					// never a limit on the value, so 0/absent leaves the input at
+					// the stylesheet's default height
+					$inputsize = (int) ( $data['inputsize'] ?? 0 );
+					if( $inputsize > 0 )
+						$field['inputsize'] = $inputsize;
 				}
 
 				// A fixed unit/label shown next to the input (eg. a "price" field's

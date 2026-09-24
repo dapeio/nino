@@ -31,6 +31,8 @@ return [
 	'[[/_admin/elements/msg/duplicated]]'	=> 'Eine Kopie der Werte, noch kein Element – vergib eine Uri und speichere.',
 	'[[/_admin/elements/label/back]]'			=> 'Zurück zu',
 	'[[/_admin/elements/label/backtypes]]'	=> 'Zurück zur Übersicht',
+	'[[/_admin/elements/label/prev]]'			=> '‹ Vorheriges Element',
+	'[[/_admin/elements/label/next]]'			=> 'Nächstes Element ›',
 	'[[/_admin/elements/msg/pending]]'			=> 'Wird gespeichert …',
 	'[[/_admin/elements/msg/saved]]'				=> 'Gespeichert.',
 	'[[/_admin/elements/error/uri]]'				=> 'Uri muss angegeben werden.',
@@ -83,6 +85,7 @@ return [
 	'[[/_admin/types/label/uri]]'				=> 'Uri (elements/<uri>.php) – nur Kleinbuchstaben, Ziffern, - und _',
 	'[[/_admin/types/placeholder/suffix]]'	=> 'Einheit/Suffix (optional, z. B. €)',
 	'[[/_admin/types/placeholder/maxlength]]'	=> 'Max. Zeichen (Standard 2000)',
+	'[[/_admin/types/placeholder/inputsize]]'	=> 'Zeilen des Eingabefelds (optional)',
 	'[[/_admin/types/placeholder/max]]'	=> 'Max. Elemente (0 = unbegrenzt)',
 	'[[/_admin/elements/empty]]'					=> 'Noch keine Element-Typen angelegt.',
 ];

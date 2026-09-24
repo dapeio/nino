@@ -145,6 +145,8 @@ A field that references other elements is a select or, where the type allows sev
 
 **Raw storage**, at the foot of the form, shows the buckets the entry is stored in: `*` for the global fields and one per language. It is read-only and meant for diagnosis and migrations.
 
+**‹ Previous element** and **Next element ›**, at the right of the form's context bar, step through the type's entries in the order of the list without returning to it. Like the back link, they do not save.
+
 **Duplicate** takes every value of the open entry into a new element – all languages, all fields, except the uri and the images, which belong to the entry they were uploaded for. Nothing is written yet: give the copy a uri and save it.
 
 **Delete** removes the entry in every language, and the images only its image fields used. Only a backup brings it back.
@@ -202,7 +204,7 @@ Element types describe recurring content. Each type is a file under `elements/`;
 | `image` | an image with fixed target dimensions |
 | `element` | a reference to an element of another type |
 
-Depending on the type, a field is *per translation* or global, required or optional, rich text, limited to fixed values, given dimensions, a unit or suffix. An `element` field names the type it references and may hold several elements, ordered, with **Max. elements** as its ceiling (`0` for none); the kernel enforces that ceiling on save. A deleted target stays as *missing* rather than being dropped, and references are not part of a Translations export.
+Depending on the type, a field is *per translation* or global, required or optional, rich text, limited to fixed values, given dimensions, a unit or suffix, or a number of rows its input opens with. An `element` field names the type it references and may hold several elements, ordered, with **Max. elements** as its ceiling (`0` for none); the kernel enforces that ceiling on save. A deleted target stays as *missing* rather than being dropped, and references are not part of a Translations export.
 
 Switching a field between global and per translation migrates the existing values; check the result in every language. Saving a type does not delete existing entries, but a removed field disappears from the form.
 

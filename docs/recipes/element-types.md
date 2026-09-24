@@ -29,6 +29,7 @@ Common model properties:
 | `required` | non-image | Reject missing value on insert |
 | `html` | string | Allow sanitized rich inline HTML |
 | `maxlength` | string | Editing limit/hint |
+| `inputsize` | string | Rows the editing area opens with: the textarea's rows, or the rich-text area's minimum height in lines. A hint for the form, not a limit on the value |
 | `suffix` | non-boolean, non-image, non-element | Fixed UI unit such as `€` or `%` |
 | `options` | supported controls, never element | Fixed choices presented by the editing UI |
 | `width`, `height` | image | Required generated image dimensions |
@@ -137,6 +138,7 @@ return [
 			'locale' => true,
 			'html' => true,
 			'maxlength' => 2000,
+			'inputsize' => 8,
 		],
 		'linkLabel' => [
 			'type' => 'string',

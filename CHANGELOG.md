@@ -6,6 +6,32 @@ All notable changes to Nino are documented in this file.
 
 ### Added
 
+- **Elements:** the element form steps through its type's entries.
+  **‹ Previous element** and **Next element ›** sit at the right of the
+  form's context bar, in the order of the list and disabled at either
+  end, and follow the list the server sends back after every save - so a
+  just created element has its neighbours without a detour over the
+  list. Like the back link, they do not save. `tests/admin-elements-js-smoke.js`
+  holds the neighbours of the first, a middle, the last, an unknown and a
+  new element, the buttons' targets and clicks, that the form renders them
+  into its context bar and a new element's form does not, that a fresh
+  list re-points them, and that a save in flight disables both and hands
+  only the reachable one back: 62 → 81 checks, 4 red without the change
+  (the nav block is skipped where the module has none).
+
+- **Element Types:** `inputsize` on a string field, the number of rows its
+  input opens with - the textarea's rows, or the rich-text area's minimum
+  height in lines (`--nino-admin-richtext-rows`, turned into a height by
+  the stylesheet, with the plain `3rem` kept for a browser without `lh`).
+  The field editor offers it next to maxlength, `Types::cleanModel()` keeps
+  it for string fields only, and it is a hint for the form rather than a
+  limit on the value. `tests/admin-system-smoke.php` holds that a posted
+  size survives on a string field and is dropped on a double (683 → 685
+  checks, 1 red before); `tests/admin-elementtypes-js-smoke.js` that the
+  editor forwards it (32 → 33, 1 red); `tests/admin-elements-js-smoke.js`
+  that the textarea takes it as rows and the html editor as its height
+  (part of the count above).
+
 - **Tests:** the shape a panel's `icon()` is held to, which nothing
   measured. `Panels::_entry()` documents it as "an inline svg and nothing
   that runs" and drops anything else, so the rail falls back to the label's

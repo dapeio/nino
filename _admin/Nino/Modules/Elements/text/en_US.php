@@ -31,6 +31,8 @@ return [
 	'[[/_admin/elements/msg/duplicated]]'	=> 'A copy of the values, not yet an element - give it a uri and save.',
 	'[[/_admin/elements/label/back]]'			=> 'Back to',
 	'[[/_admin/elements/label/backtypes]]'	=> 'Back to overview',
+	'[[/_admin/elements/label/prev]]'			=> '‹ Previous element',
+	'[[/_admin/elements/label/next]]'			=> 'Next element ›',
 	'[[/_admin/elements/msg/pending]]'			=> 'Saving …',
 	'[[/_admin/elements/msg/saved]]'				=> 'Saved.',
 	'[[/_admin/elements/error/uri]]'				=> 'Uri is required.',
@@ -83,6 +85,7 @@ return [
 	'[[/_admin/types/label/uri]]'				=> 'Uri (elements/<uri>.php) – lowercase letters, digits, - and _ only',
 	'[[/_admin/types/placeholder/suffix]]'	=> 'Unit/suffix (optional, eg. €)',
 	'[[/_admin/types/placeholder/maxlength]]'	=> 'Max. characters (default 2000)',
+	'[[/_admin/types/placeholder/inputsize]]'	=> 'Rows of the input (optional)',
 	'[[/_admin/types/placeholder/max]]'	=> 'Max. elements (0 = unlimited)',
 	'[[/_admin/elements/empty]]'					=> 'No element types yet.',
 ];

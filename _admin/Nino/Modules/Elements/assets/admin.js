@@ -42,6 +42,11 @@
 		_localeValues		: {},
 		_selectedLocale	: null,
 		_dirtyLocales		: [],
+		// The open type's elements as the list last showed them, [ { uri,
+		// label } ] in the list's order - what the form's previous/next step
+		// through. Refilled with every list the server sends (see
+		// _renderList()), dropped with the type
+		_elements				: [],
 		_htmlEditors		: {},
 		// Referenced type uri -> [ { uri, label } ], the choices an element
 		// field's select offers. Refilled on every form open rather than
@@ -181,6 +186,7 @@
 			Nino.admin.elements._localeValues			= {};
 			Nino.admin.elements._raw							= {};
 			Nino.admin.elements._dirtyLocales			= [];
+			Nino.admin.elements._elements					= [];
 			Nino.admin.elements._referenceOptions	= {};
 			Nino.admin.elements._pendingUri				= undefined;
 
@@ -443,6 +449,59 @@
 			return Nino.admin.elements._numbered[Nino.admin.elements._currentType] || '00001';
 		},
 
+		/**
+		 *	The elements before and after the open one, in the list's order:
+		 *	null at either end, both null for a new element or for one the
+		 *	list does not hold (yet)
+		 *
+		 *	@return		{Object}								{ prev, next } - uris or null
+		 */
+		_neighbours : function() {
+			const none = { prev : null, next : null };
+			if( Nino.admin.elements._isNew === true || Nino.admin.elements._currentUri === null )
+				return none;
+			const uris = Nino.admin.elements._elements.map( function( element ) { return element.uri } );
+			const at = uris.indexOf( Nino.admin.elements._currentUri );
+			if( at === -1 )
+				return none;
+			return { prev : uris[at - 1] ?? null, next : uris[at + 1] ?? null };
+		},
+
+		/**
+		 *	Previous/next for the form's context bar: one button each, stepping
+		 *	through the type's elements as the list orders them without going
+		 *	back to it, disabled at either end. Like the back link, stepping
+		 *	away does not save - that is what the save button is for
+		 *
+		 *	@return		{Element}
+		 */
+		_renderNav : function() {
+
+			const neighbours = Nino.admin.elements._neighbours();
+			const nav = dc.createElement('div');
+			nav.className = 'admin-element-nav';
+
+			[ [ 'prev', neighbours.prev ], [ 'next', neighbours.next ] ].forEach( function( pair ) {
+				const btn = dc.createElement('button');
+				btn.type = 'button';
+				btn.className = 'nino-admin-btn-secondary';
+				btn.dataset.nav = pair[0];
+				// Empty when there is nothing to step to - what _setFormPending()
+				// reads to keep the button disabled once a save is over
+				btn.dataset.uri = pair[1] ?? '';
+				btn.disabled = ( pair[1] === null );
+				btn.textContent = Nino.content.getText( '/_admin/elements/label/'+ pair[0] );
+				btn.addEventListener( 'click', function() {
+					if( btn.dataset.uri === '' )
+						return;
+					Nino.admin.elements._openForm( btn.dataset.uri );
+				} );
+				nav.appendChild( btn );
+			} );
+
+			return nav;
+		},
+
 		_selectType : function( type, model, title ) {
 
 			if( Nino.admin.elements._saving === true )
@@ -453,6 +512,7 @@
 			Nino.admin.elements._currentType 			= type;
 			Nino.admin.elements._currentTypeTitle	= title;
 			Nino.admin.elements._currentModel			= model;
+			Nino.admin.elements._elements					= [];
 			Nino.admin.elements._globalKeys		= Object.keys( model ).filter( function( key ) { return ( model[key].locale ?? false ) !== true } );
 			Nino.admin.elements._localeKeys		= Object.keys( model ).filter( function( key ) { return ( model[key].locale ?? false ) === true } );
 
@@ -490,6 +550,15 @@
 		 *	@return		void
 		 */
 		_renderList : function( elements ) {
+
+			Nino.admin.elements._elements = elements;
+
+			// The list is re-read after every save, so a form open on one of
+			// these follows the fresh order - a just created element included
+			const form = dc.getElementById('elements-form');
+			const nav = form === null ? null : form.querySelector('.admin-element-nav');
+			if( nav !== null && nav !== undefined )
+				nav.replaceWith( Nino.admin.elements._renderNav() );
 
 			const wrap = dc.getElementById('elements-list');
 			wrap.innerHTML = '';
@@ -718,7 +787,7 @@
 				label.appendChild( span );
 				const mount = dc.createElement('div');
 				label.appendChild( mount );
-				Nino.admin.elements._htmlEditors[key] = Nino.admin.htmlEditor.create( mount, value ?? '', field.maxlength ?? Nino.admin.elements.DEFAULT_MAXLENGTH );
+				Nino.admin.elements._htmlEditors[key] = Nino.admin.htmlEditor.create( mount, value ?? '', field.maxlength ?? Nino.admin.elements.DEFAULT_MAXLENGTH, field.inputsize ?? 0 );
 				return label;
 			}
 
@@ -984,6 +1053,11 @@
 			// count in the same row, plus the matching maxlength
 			const maxlength = field.maxlength ?? Nino.admin.elements.DEFAULT_MAXLENGTH;
 			input.maxLength = maxlength;
+
+			// The model may say how many rows the field opens with; the author
+			// can still drag it taller (the stylesheet leaves resize on)
+			if( ( field.inputsize ?? 0 ) > 0 )
+				input.rows = field.inputsize;
 
 			const header = dc.createElement('div');
 			header.className = 'nino-admin-field-header';
@@ -1330,6 +1404,11 @@
 			wrap.querySelectorAll('input, textarea, select, button').forEach( function( el ) {
 				el.disabled = pending || el.closest('.admin-field-readonly') !== null;
 			} );
+			// The previous/next buttons sit in the same pane: the one at an end
+			// stays disabled after the save, like the read-only fields do
+			wrap.querySelectorAll('.admin-element-nav button').forEach( function( btn ) {
+				btn.disabled = pending || btn.dataset.uri === '';
+			} );
 			wrap.querySelectorAll('[contenteditable]').forEach( function( el ) {
 				const locked = pending || el.closest('.admin-field-readonly') !== null;
 				el.contentEditable = locked ? 'false' : 'true';
@@ -1539,6 +1618,12 @@
 
 				form.appendChild( localeWrap );
 			}
+
+			// Stepping through the type's elements from the form itself, at the
+			// bar's right end after the locale switch. A new element is not in
+			// the list yet, so there is nothing to step from
+			if( Nino.admin.elements._isNew === false )
+				toolbar.appendChild( Nino.admin.elements._renderNav() );
 
 			// What is actually on disk, folded away - a manager's view
 			const raw = Nino.admin.elements._renderRaw();

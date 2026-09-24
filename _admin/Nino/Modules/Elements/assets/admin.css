@@ -4,8 +4,9 @@
  *	Nino										A compact filesystembased php framework
  *	Modules\Elements		Element data and the types behind it
  *	admin.css								What the module's /_admin panel needs beyond the design
- *													system in _admin/assets/style.css: the raw-data drawer of
- *													an element, and the field editor of the Element Types tab.
+ *													system in _admin/assets/style.css: the raw-data drawer and
+ *													the previous/next of an element's form, and the field
+ *													editor of the Element Types tab.
  *													Bundled while the module is there (see the panel's
  *													assets()), so the same layer rules apply - the shell's
  *													stylesheet fixes the layer order, this one only ever adds
@@ -50,6 +51,40 @@
 	background: var(--nino-admin-surface-muted);
 	font: .76rem/1.5 var(--nino-admin-mono);
 	white-space: pre;
+}
+
+/* ---------------------------------------------- Element form: prev/next */
+
+/* Both at the bar's right end: the locale switch takes the remaining room,
+   so the two buttons follow it - with or without a switch to follow */
+#elements-form .nino-admin-contextbar > .nino-admin-contextbar-select {
+	margin-left: auto;
+}
+
+#elements-form .admin-element-nav {
+	display: flex;
+	flex: 0 1 auto;
+	min-width: 0;
+	gap: .35rem;
+}
+
+/* A label that does not fit is cut, not overflowing the bar */
+#elements-form .admin-element-nav button {
+	flex: 0 1 auto;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+/* On a phone the two buttons take a row of their own, still at the right */
+@media (max-width: 63.999rem) {
+	#elements-form .nino-admin-contextbar {
+		flex-wrap: wrap;
+	}
+	#elements-form .admin-element-nav {
+		margin-left: auto;
+	}
 }
 
 /* ---------------------------------------------------- Element type form */

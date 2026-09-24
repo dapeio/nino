@@ -1331,7 +1331,11 @@ a {
 }
 
 :where(.nino-admin) .nino-admin-richtext-content {
+	/* --nino-admin-richtext-rows is a minimum in lines, set per field by
+	   html-editor.js; the padding added is this rule's own. The plain
+	   3rem stays for a browser without lh */
 	min-height: 3rem;
+	min-height: max(3rem, calc(var(--nino-admin-richtext-rows, 0) * 1lh + 1.1rem));
 	padding: .55rem .65rem;
 	border: 1px solid var(--editor-border);
 	border-radius: var(--editor-radius-sm);

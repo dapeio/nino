@@ -145,6 +145,8 @@ Ein Feld, das auf andere Elemente verweist, ist eine Auswahlliste oder, wo der T
 
 **Rohdaten**, am Fuß des Formulars, zeigt die Buckets, in denen der Eintrag liegt: `*` für die globalen Felder und einer je Sprache. Die Ansicht ist nur lesend und für Diagnose und Migrationen gedacht.
 
+**‹ Vorheriges Element** und **Nächstes Element ›**, rechts in der Kontextleiste des Formulars, gehen die Einträge des Typs in der Reihenfolge der Liste durch, ohne zu ihr zurückzukehren. Wie der Zurück-Link speichern sie nicht.
+
 **Duplizieren** übernimmt alle Werte des offenen Eintrags in ein neues Element – alle Sprachen, alle Felder, außer der Uri und den Bildern, die zu dem Eintrag gehören, für den sie hochgeladen wurden. Geschrieben ist noch nichts: Gib der Kopie eine Uri und speichere sie.
 
 **Löschen** entfernt den Eintrag in jeder Sprache und die Bilder, die nur seine Bildfelder nutzten. Nur eine Sicherung bringt ihn zurück.
@@ -202,7 +204,7 @@ Elementtypen beschreiben wiederkehrende Inhalte. Jeder Typ ist eine Datei unter 
 | `image` | ein Bild mit festen Zielmaßen |
 | `element` | ein Verweis auf ein Element eines anderen Typs |
 
-Je nach Typ ist ein Feld *pro Übersetzung* oder global, Pflicht oder optional, Rich Text, auf feste Werte beschränkt, mit Maßen, Einheit oder Suffix versehen. Ein `element`-Feld nennt den Typ, auf den es verweist, und darf mehrere Elemente halten, geordnet, mit **Max. Elemente** als Obergrenze (`0` für keine); der Kernel setzt diese Grenze beim Speichern durch. Ein gelöschtes Ziel bleibt als *fehlend* stehen, und Verweise sind nicht Teil eines Übersetzungs-Exports.
+Je nach Typ ist ein Feld *pro Übersetzung* oder global, Pflicht oder optional, Rich Text, auf feste Werte beschränkt, mit Maßen, Einheit oder Suffix versehen oder mit einer Zeilenzahl, mit der sein Eingabefeld öffnet. Ein `element`-Feld nennt den Typ, auf den es verweist, und darf mehrere Elemente halten, geordnet, mit **Max. Elemente** als Obergrenze (`0` für keine); der Kernel setzt diese Grenze beim Speichern durch. Ein gelöschtes Ziel bleibt als *fehlend* stehen, und Verweise sind nicht Teil eines Übersetzungs-Exports.
 
 Der Wechsel eines Felds zwischen global und pro Übersetzung migriert die vorhandenen Werte; prüfe das Ergebnis in jeder Sprache. Das Speichern eines Typs löscht keine Einträge, ein entferntes Feld verschwindet aber aus dem Formular.
 

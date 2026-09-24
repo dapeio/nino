@@ -67,6 +67,7 @@ function fakeRow( field ) {
 		'.admin-field-required' 			: field.type === 'image' ? null : { checked : field.required === true },
 		'.admin-field-html' 					: field.type === 'string' ? { checked : field.html === true } : null,
 		'.admin-field-maxlength' 			: field.type === 'string' ? { value : field.maxlength ?? '' } : null,
+		'.admin-field-inputsize' 			: field.type === 'string' ? { value : field.inputsize ?? '' } : null,
 		'.admin-field-select-options' : field.type === 'string' ? { value : ( field.options ?? [] ).join(', ') } : null,
 		'.admin-field-width' 					: field.type === 'image' ? { value : field.width ?? '' } : null,
 		'.admin-field-height' 				: field.type === 'image' ? { value : field.height ?? '' } : null,
@@ -136,7 +137,7 @@ check( 'an image row, which renders no "required" checkbox, reads back as not re
 // dropped in between. maxlength and suffix were exactly that.
 
 elementTypes._fields = [
-	{ key : 'title', 	type : 'string', 	locale : true, required : true, html : true, maxlength : '80', suffix : '', elementType : '', options : [ 'a', 'b' ] },
+	{ key : 'title', 	type : 'string', 	locale : true, required : true, html : true, maxlength : '80', inputsize : '8', suffix : '', elementType : '', options : [ 'a', 'b' ] },
 	{ key : 'photo', 	type : 'image', 	width : '800', height : '600' },
 	{ key : 'price', 	type : 'double', 	suffix : '\u20ac' },
 	{ key : 'author', type : 'element', 	elementType : 'people' },
@@ -148,6 +149,7 @@ const built = elementTypes._buildModel();
 
 check( 'a field without a key never reaches the payload', Object.keys( built ).join() === 'title,photo,price,author' );
 check( '_buildModel carries a string field\'s maxlength', built.title.maxlength === '80' );
+check( '_buildModel carries a string field\'s inputsize', built.title.inputsize === '8' );
 check( '_buildModel carries a suffix', built.price.suffix === '\u20ac' );
 check( '_buildModel carries an element field\'s referenced type', built.author.elementType === 'people' );
 check( '_buildModel carries the image dimensions', built.photo.width === '800' && built.photo.height === '600' );

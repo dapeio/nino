@@ -235,9 +235,9 @@ $_POST['data'] = json_encode( [
 	'uri' 		=> 'testtype',
 	'title' 	=> 'Test Type Renamed',
 	'model' 	=> [
-		'name' 		=> [ 'type' => 'string', 'locale' => true, 'required' => true, 'maxlength' => 80 ],
+		'name' 		=> [ 'type' => 'string', 'locale' => true, 'required' => true, 'maxlength' => 80, 'inputsize' => 8 ],
 		'photo' 	=> [ 'type' => 'image', 'width' => 40, 'height' => 40, 'suffix' => 'ignored on image', 'required' => true ],
-		'price' 	=> [ 'type' => 'double', 'suffix' => '€' ],
+		'price' 	=> [ 'type' => 'double', 'suffix' => '€', 'inputsize' => 5 ],
 		'active' 	=> [ 'type' => 'boolean', 'suffix' => 'ignored on boolean' ],
 		'bogus' 	=> [ 'type' => 'not-a-real-type' ],
 	],
@@ -250,6 +250,10 @@ $afterSave = \Nino\Filesystem::getFileContent( $appData, '/elements/testtype.php
 check( 'apiSave updates the title', $afterSave['title'] === 'Test Type Renamed' );
 check( 'apiSave keeps the valid field', ( $afterSave['model']['name']['required'] ?? null ) === true );
 check( 'apiSave sets a string field\'s maxlength', ( $afterSave['model']['name']['maxlength'] ?? null ) === 80 );
+// The rows a field's input opens with belong to a string field, plain or
+// rich text - the only ones rendered as a text area
+check( 'apiSave sets a string field\'s inputsize', ( $afterSave['model']['name']['inputsize'] ?? null ) === 8 );
+check( 'apiSave drops inputsize on a non-string field', isset( $afterSave['model']['price']['inputsize'] ) === false );
 check( 'apiSave adds the new field', ( $afterSave['model']['photo']['width'] ?? null ) === 40 );
 check( 'apiSave drops suffix on an image field', isset( $afterSave['model']['photo']['suffix'] ) === false );
 // An image's file is uploaded only after the element exists, so a required
