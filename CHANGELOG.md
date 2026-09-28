@@ -552,6 +552,13 @@ All notable changes to Nino are documented in this file.
 
 ### Fixed
 
+- **Images:** a failed slot upload showed its message as ordinary secondary
+  text. The panel set the modifier `error`, which no rule styles; the design
+  system's is `is-error`, the one the Elements image field uses.
+  `tests/admin-lists-js-smoke.js` now holds that every modifier a workbench
+  script puts beside `.nino-admin-field-image-msg` is a rule in style.css
+  (136 → 138 checks, 1 red before).
+
 - **Install:** the wizard answered a POST whose `data` field was an array
   (`data[]=x`) with a 500, and it has no authentication until it finishes.
   `Install::postData()` was a copy of `Admin::postData()` from before the

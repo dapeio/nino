@@ -961,5 +961,20 @@ const undefinedKeys = [ ...usedKeys ].filter( k => [ 'en_US', 'de_DE' ].some( lo
 check( 'every fill key the workbench asks for is defined in English and in German'+ ( undefinedKeys.length ? ' - missing: '+ undefinedKeys.join(', ') : '' ), undefinedKeys.length === 0 );
 check( 'the checks above saw the whole vocabulary', usedKeys.size > 200 );
 
+console.log('\nOne stylesheet');
+
+// A message beside an image control says what went wrong in the colour the
+// design system gives an error - if the script asks for the modifier the
+// stylesheet actually knows. A misspelt one shows the failure as ordinary
+// secondary text, which is how a failed slot upload in the Images panel
+// looked. So every modifier any workbench script puts beside
+// .nino-admin-field-image-msg has to be a rule in style.css
+const stylesheet = asset( 'style.css' );
+const imageMsgModifiers = new Set();
+localizedScripts.forEach( e => { for( const m of e[1].matchAll( /nino-admin-field-image-msg ([a-z-]+)/g ) ) imageMsgModifiers.add( m[1] ) } );
+const unknownModifiers = Array.from( imageMsgModifiers ).filter( mod => stylesheet.includes( '.nino-admin-field-image-msg.'+ mod ) === false );
+check( 'every modifier a script puts beside the image message is one the stylesheet styles'+ ( unknownModifiers.length ? ' - unknown: '+ unknownModifiers.join(', ') : '' ), unknownModifiers.length === 0 );
+check( '...and the check saw the modifier both image controls use', imageMsgModifiers.has('is-error') );
+
 console.log( '\n'+ checks+ ' checks, '+ failures+ ' failed' );
 process.exitCode = failures === 0 ? 0 : 1;

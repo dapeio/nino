@@ -342,7 +342,7 @@
 				fileInput.value = '';
 
 				if( status !== 200 || response === null ) {
-					msg.className = 'nino-admin-field-image-msg error';
+					msg.className = 'nino-admin-field-image-msg is-error';
 					msg.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : Nino.content.getText('/_admin/images/error/save') );
 					return;
 				}
