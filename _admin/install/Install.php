@@ -405,7 +405,7 @@ namespace Nino\Install {
 		// applied on every apply, exactly like a module a project actually
 		// picked - Navigation, the locale picker and the contact form. Not a
 		// class list like CORE_MODULES/TOOL_MODULES: a unit key still has to
-		// go through the normal _applyUnit()/moduleClass path in apiApply(),
+		// go through the normal applyUnit()/moduleClass path in apiApply(),
 		// so its routes/templates/text land the same way they always did
 		public const array ALWAYS_MODULES = [ 'forms', 'navigation', 'localepicker' ];
 
@@ -459,7 +459,7 @@ namespace Nino\Install {
 				if( in_array( $key, self::ALWAYS_MODULES, true ) === true )
 					continue;
 
-				$manifest = self::_readManifest( $unitDir ) ?? [];
+				$manifest = \Nino\Features::readUnitManifest( $unitDir ) ?? [];
 				$modules[$key] = [
 					'label' 					=> (string) ( $manifest['label'] ?? $key ),
 					'requiresModules' => $manifest['requiresModules'] ?? [],
@@ -600,16 +600,6 @@ namespace Nino\Install {
 		}
 
 		/**
-		 *	@param		string		$unitDir
-		 *
-		 *	@return 	array|null							Null if $unitDir has no manifest.php
-		 */
-		private static function _readManifest( string $unitDir ): ?array {
-
-			return \Nino\Features::readUnitManifest( $unitDir );
-		}
-
-		/**
 		 *	Every route key base or any module could ever contribute,
 		 *	picked or not. apiApply() strips all of these out of the
 		 *	persisted routes before re-adding only the currently picked
@@ -621,10 +611,10 @@ namespace Nino\Install {
 		 */
 		private static function _libraryRouteKeys(): array {
 
-			$keys = array_keys( self::_readManifest( self::LIBRARY. '/base' )['routes'] ?? [] );
+			$keys = array_keys( \Nino\Features::readUnitManifest( self::LIBRARY. '/base' )['routes'] ?? [] );
 
 			foreach( self::units() as $unitDir )
-				$keys = array_merge( $keys, array_keys( ( self::_readManifest( $unitDir ) ?? [] )['routes'] ?? [] ) );
+				$keys = array_merge( $keys, array_keys( ( \Nino\Features::readUnitManifest( $unitDir ) ?? [] )['routes'] ?? [] ) );
 
 			return array_values( array_unique( $keys ) );
 		}
@@ -678,7 +668,7 @@ namespace Nino\Install {
 			// Navigation, the locale picker and the contact form are no
 			// longer posted - they are unconditionally part of the applied
 			// set, ahead of whatever else was actually picked, so their
-			// units go through the exact same _applyUnit()/moduleClass path
+			// units go through the exact same applyUnit()/moduleClass path
 			// below as any other module a project chose
 			$modules 	= array_values( array_unique( array_merge(
 				array_intersect( self::ALWAYS_MODULES, array_keys( $units ) ),
@@ -708,7 +698,7 @@ namespace Nino\Install {
 
 			$moduleClasses = self::CORE_MODULES;
 			foreach( $modules as $key ) {
-				$manifest = self::_readManifest( $units[$key] );
+				$manifest = \Nino\Features::readUnitManifest( $units[$key] );
 				if( isset( $manifest['moduleClass'] ) === true )
 					$moduleClasses[] = $manifest['moduleClass'];
 			}
@@ -777,14 +767,14 @@ namespace Nino\Install {
 				success. What was copied before the failure stays - the units
 				overwrite here, so applying again once the target is writable
 				picks up whole	*/
-			$applied = self::_applyUnit( $appData, self::LIBRARY. '/base', $locales, $routes, $blacklist, $config );
+			$applied = \Nino\Features::applyUnit( $appData, self::LIBRARY. '/base', $locales, $routes, $blacklist, $config, true );
 			if( $applied !== true ) {
 				\Nino\Http::fail( $request, 500, 'the base unit could not be applied: '. $applied );
 				return;
 			}
 
 			foreach( $modules as $key ) {
-				$applied = self::_applyUnit( $appData, $units[$key], $locales, $routes, $blacklist, $config );
+				$applied = \Nino\Features::applyUnit( $appData, $units[$key], $locales, $routes, $blacklist, $config, true );
 				if( $applied !== true ) {
 					\Nino\Http::fail( $request, 500, 'the unit "'. $key. '" could not be applied: '. $applied );
 					return;
@@ -830,7 +820,7 @@ namespace Nino\Install {
 
 				foreach( $modules as $moduleKey ) {
 
-					$manifest = self::_readManifest( $units[$moduleKey] ) ?? [];
+					$manifest = \Nino\Features::readUnitManifest( $units[$moduleKey] ) ?? [];
 
 					foreach( ( $manifest['requiresModules'] ?? [] ) as $req ) {
 
@@ -855,30 +845,6 @@ namespace Nino\Install {
 			return $modules;
 		}
 
-		/**
-		 *	Apply one unit's manifest.php - routes, files, templates, element
-		 *	types, blacklist, config defaults and text fragments. The work is
-		 *	the kernel's, \Nino\Features::applyUnit(), because a feature
-		 *	activation applies its install/ unit the same way after setup,
-		 *	when this directory may already be gone. The wizard applies with
-		 *	overwrite on: a re-applied unit replaces what it copied before.
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		string		$unitDir			Absolute path to the unit (base or modules/<key>)
-		 *	@param		array 		$locales			Picked locales
-		 *	@param		array 		&$routes			(reference) Routes accumulator - starts from what's on
-		 *																	disk (see apiApply()), never from $appData directly
-		 *	@param		array 		&$blacklist		(reference) Collected blacklist keys, appended to
-		 *	@param		array 		&$config			(reference) Collected config defaults - applyUnit() hands
-		 *																	them back rather than writing them, so apiApply()
-		 *																	persists them with the keys it writes anyway
-		 *
-		 *	@return 	true|string							true, or the first file the unit could not copy
-		 */
-		private static function _applyUnit( array &$appData, string $unitDir, array $locales, array &$routes, array &$blacklist, array &$config ): true|string {
-
-			return \Nino\Features::applyUnit( $appData, $unitDir, $locales, $routes, $blacklist, $config, true );
-		}
 	}
 
 	/**
@@ -1078,7 +1044,7 @@ namespace Nino\Install {
 				if( $entry === '.' || $entry === '..' )
 					continue;
 
-				$manifest = self::_readManifest( self::LIBRARY. '/pages/'. $entry );
+				$manifest = \Nino\Features::readUnitManifest( self::LIBRARY. '/pages/'. $entry );
 				if( $manifest === null )
 					continue;
 
@@ -1145,7 +1111,7 @@ namespace Nino\Install {
 					$uri = (string) ( $fragment[$prefix. 'uri]]'] ?? '' );
 			}
 
-			$manifestRoute = array_values( ( self::_readManifest( self::LIBRARY. '/pages/'. $libraryKey ) ?? [] )['routes'] ?? [] )[0] ?? [];
+			$manifestRoute = array_values( ( \Nino\Features::readUnitManifest( self::LIBRARY. '/pages/'. $libraryKey ) ?? [] )['routes'] ?? [] )[0] ?? [];
 
 			return [
 				'uri' 	=> $uri,
@@ -1282,7 +1248,7 @@ namespace Nino\Install {
 				if( $entry === '.' || $entry === '..' )
 					continue;
 
-				$manifest = self::_readManifest( self::LIBRARY. '/pages/'. $entry );
+				$manifest = \Nino\Features::readUnitManifest( self::LIBRARY. '/pages/'. $entry );
 
 				if( $manifest === null || isset( $manifest['preset'] ) === false )
 					continue;
@@ -1300,7 +1266,7 @@ namespace Nino\Install {
 			foreach( array_keys( $units ) as $key ) {
 
 				$suggested 		= self::_suggestions( (string) $key, $locales );
-				$manifestRoute = array_values( ( self::_readManifest( self::LIBRARY. '/pages/'. $key ) ?? [] )['routes'] ?? [] )[0] ?? [];
+				$manifestRoute = array_values( ( \Nino\Features::readUnitManifest( self::LIBRARY. '/pages/'. $key ) ?? [] )['routes'] ?? [] )[0] ?? [];
 				$body 				= (string) ( $suggested['body'] ?? '' );
 
 				/*	The Element-URI is the unit's own name, the same one the
@@ -1344,7 +1310,7 @@ namespace Nino\Install {
 				if( $entry === '.' || $entry === '..' )
 					continue;
 
-				$manifest = self::_readManifest( self::LIBRARY. '/pages/'. $entry );
+				$manifest = \Nino\Features::readUnitManifest( self::LIBRARY. '/pages/'. $entry );
 
 				if( $manifest === null || ( $manifest['templatePerRoute'] ?? false ) === true )
 					continue;
@@ -1382,18 +1348,6 @@ namespace Nino\Install {
 					return (string) $key;
 
 			return '';
-		}
-
-		/**
-		 *	@param		string		$unitDir
-		 *
-		 *	@return 	array|null							Null if $unitDir has no manifest.php
-		 */
-		private static function _readManifest( string $unitDir ): ?array {
-
-			$path = $unitDir. '/manifest.php';
-
-			return is_file( $path ) ? include $path : null;
 		}
 
 		/**
@@ -1498,7 +1452,7 @@ namespace Nino\Install {
 				// home unit anywhere writes the library's home page over what
 				// was built in it. Refused where it is typed, with the name that
 				// is taken
-				$unitManifest	= $libraryKey === '' ? [] : ( self::_readManifest( self::LIBRARY. '/pages/'. $libraryKey ) ?? [] );
+				$unitManifest	= $libraryKey === '' ? [] : ( \Nino\Features::readUnitManifest( self::LIBRARY. '/pages/'. $libraryKey ) ?? [] );
 				$collision		= '';
 
 				if( ( $unitManifest['templatePerRoute'] ?? false ) === true ) {
@@ -1595,11 +1549,11 @@ namespace Nino\Install {
 			// active - one nothing needed until this apply, so nobody
 			// checked it in Setup - still needs its own
 			// templates/text actually copied - see _applyModule() - the
-			// same way Setup::_applyUnit() would have, had it been picked
+			// same way \Nino\Features::applyUnit() would have, had it been picked
 			// there instead
 			$requiredModuleKeys = [];
 			foreach( array_unique( array_filter( array_column( $webpages, 'libraryKey' ) ) ) as $templateKey ) {
-				$manifest = self::_readManifest( self::LIBRARY. '/pages/'. $templateKey ) ?? [];
+				$manifest = \Nino\Features::readUnitManifest( self::LIBRARY. '/pages/'. $templateKey ) ?? [];
 				foreach( ( $manifest['requiresModules'] ?? [] ) as $moduleKey )
 					$requiredModuleKeys[$moduleKey] = true;
 			}
@@ -1614,30 +1568,54 @@ namespace Nino\Install {
 
 			$moduleClasses = $appData['/nino/modules'] ?? [];
 			foreach( $units as $unitDir ) {
-				$moduleManifest = self::_readManifest( $unitDir ) ?? [];
+				$moduleManifest = \Nino\Features::readUnitManifest( $unitDir ) ?? [];
 				if( isset( $moduleManifest['moduleClass'] ) === true && in_array( $moduleManifest['moduleClass'], $moduleClasses, true ) === false )
 					$moduleClasses[] = $moduleManifest['moduleClass'];
 			}
 			$appData['/nino/modules'] = array_values( array_unique( $moduleClasses ) );
 
-			$blacklist = [];
+			$blacklist 	= [];
+			$config 		= [];
 
-			foreach( $units as $unitDir )
-				self::_applyModule( $appData, $unitDir, $locales, $blacklist );
+			/*	Every copy and every text merge below is checked, and the first
+				that failed ends the step with the file's name, before the
+				routes are written - the way Setup's step answers. The copies
+				were unchecked here, so a template that could not be written
+				left a step that reported success over a route rendering a
+				file that was not there	*/
+			foreach( $units as $unitKey => $unitDir ) {
+				$applied = self::_applyModule( $appData, $unitDir, $locales, $blacklist, $config );
+				if( $applied !== true ) {
+					\Nino\Http::fail( $request, 500, 'the unit "'. $unitKey. '" could not be applied: '. $applied );
+					return;
+				}
+			}
 
-			foreach( $webpages as $entry )
-				self::_applyWebpage( $appData, $entry, $locales, $routes, $blacklist );
+			foreach( $webpages as $entry ) {
+				$applied = self::_applyWebpage( $appData, $entry, $locales, $routes, $blacklist );
+				if( $applied !== true ) {
+					\Nino\Http::fail( $request, 500, 'the page "'. $entry['uri']. '" could not be applied: '. $applied );
+					return;
+				}
+			}
 
 			$appData['/nino/http/routes'] = $routes;
 
-			\Nino\AppData::writeContentData( $appData, [ '/nino/modules', '/nino/http/routes' ] );
+			// A required unit's config defaults go with the keys this step
+			// writes anyway, one write - not one full config.php rewrite per
+			// key, which is what \Nino\Features::applyUnit() stopped doing
+			\Nino\AppData::writeContentData( $appData, array_merge( [ '/nino/modules', '/nino/http/routes' ], array_keys( $config ) ) );
 
 			if( count( $blacklist ) > 0 )
 				\Nino\Filesystem::mutate( $appData, '/text/blacklist.php', function( array $list ) use ( $blacklist ): array {
 					return array_values( array_unique( array_merge( $list, $blacklist ) ) );
 				} );
 
-			self::_applyLegalLink( $appData, $webpages, $locales );
+			$applied = self::_applyLegalLink( $appData, $webpages, $locales );
+			if( $applied !== true ) {
+				\Nino\Http::fail( $request, 500, 'the legal page could not be linked: '. $applied );
+				return;
+			}
 
 			// Derived back off the routes just written, not the working copy
 			// above: what the frontend holds after an apply is then exactly
@@ -1659,7 +1637,7 @@ namespace Nino\Install {
 		 */
 		private static function _perRouteBody( array $entry, string $libraryKey ): ?string {
 
-			$manifest = self::_readManifest( self::LIBRARY. '/pages/'. $libraryKey ) ?? [];
+			$manifest = \Nino\Features::readUnitManifest( self::LIBRARY. '/pages/'. $libraryKey ) ?? [];
 
 			if( ( $manifest['templatePerRoute'] ?? false ) !== true )
 				return null;
@@ -1783,7 +1761,7 @@ namespace Nino\Install {
 			// next apply, since apiApply() strips the previous list's keys
 			// through this very method
 			if( $libraryKey !== null ) {
-				$manifest = self::_readManifest( self::LIBRARY. '/pages/'. $libraryKey );
+				$manifest = \Nino\Features::readUnitManifest( self::LIBRARY. '/pages/'. $libraryKey );
 				if( $manifest === null || count( $manifest['routes'] ?? [] ) === 0 )
 					return [];
 			}
@@ -1820,7 +1798,7 @@ namespace Nino\Install {
 		 */
 		private static function _unitRoute( string $libraryKey, array $locales ): ?array {
 
-			$manifest = self::_readManifest( self::LIBRARY. '/pages/'. $libraryKey ) ?? [];
+			$manifest = \Nino\Features::readUnitManifest( self::LIBRARY. '/pages/'. $libraryKey ) ?? [];
 			$route 		= array_values( $manifest['routes'] ?? [] )[0] ?? null;
 
 			if( $route === null )
@@ -1856,7 +1834,7 @@ namespace Nino\Install {
 		 *	to $entry['uri'] (the stable Element-URI, used for meta/fills -
 		 *	see _routeKeys()'s docblock for why these differ), skipped if
 		 *	it's gated to a locale that isn't picked (same as
-		 *	Setup::_applyUnit() does); copy its template/
+		 *	\Nino\Features::applyUnit() does); copy its template/
 		 *	element-type files, collect its blacklist entries, merge its
 		 *	deeper text/global.php + text/&lt;locale&gt;.php content (any
 		 *	/webpage/&lt;name&gt;/* meta the manifest still ships is filtered
@@ -1874,9 +1852,9 @@ namespace Nino\Install {
 		 *																	disk (see apiApply()), never from $appData directly
 		 *	@param		array 		&$blacklist		(reference) Collected blacklist keys, appended to
 		 *
-		 *	@return 	void
+		 *	@return 	true|string							true, or the first file that could not be copied or written
 		 */
-		private static function _applyWebpage( array &$appData, array $entry, array $locales, array &$routes, array &$blacklist ): void {
+		private static function _applyWebpage( array &$appData, array $entry, array $locales, array &$routes, array &$blacklist ): true|string {
 
 			$routeKey 	= self::_routeKeys( $entry )[0] ?? null;
 			$libraryKey = self::_libraryKey( $entry );
@@ -1884,7 +1862,7 @@ namespace Nino\Install {
 			if( $libraryKey !== null ) {
 
 				$unitDir 	= self::LIBRARY. '/pages/'. $libraryKey;
-				$manifest = self::_readManifest( $unitDir ) ?? [];
+				$manifest = \Nino\Features::readUnitManifest( $unitDir ) ?? [];
 				$route 		= self::_unitRoute( $libraryKey, $locales );
 
 				// A unit declaring 'templatePerRoute' hands every route its own
@@ -1922,43 +1900,44 @@ namespace Nino\Install {
 					// has been built in it since
 					\Nino\Filesystem::forceDir( $appData, '/templates' );
 					$target = \Nino\Filesystem::path( $appData, '/templates/'. $perRoute['file'] );
-					if( is_file( $target ) === false )
-						self::_copyFile( $unitDir. '/templates/'. $perRoute['source'], $target );
+					if( is_file( $target ) === false && \Nino\Features::copyFile( $unitDir. '/templates/'. $perRoute['source'], $target ) === false )
+						return 'could not copy /templates/'. $perRoute['file'];
 
 				} elseif( count( $manifest['templates'] ?? [] ) > 0 ) {
 					\Nino\Filesystem::forceDir( $appData, '/templates' );
 					foreach( $manifest['templates'] as $locale => $file ) {
 						if( is_string( $locale ) === true && in_array( $locale, $locales, true ) === false )
 							continue;
-						self::_copyFile( $unitDir. '/templates/'. $file, \Nino\Filesystem::path( $appData, '/templates/'. $file ) );
+						if( \Nino\Features::copyFile( $unitDir. '/templates/'. $file, \Nino\Filesystem::path( $appData, '/templates/'. $file ) ) === false )
+							return 'could not copy /templates/'. $file;
 					}
 				}
 
-				if( count( $manifest['files'] ?? [] ) > 0 ) {
-					foreach( $manifest['files'] as $file )
-						if( is_dir( $unitDir. '/'. $file ) === true )
-							\Nino\Filesystem::copyDir( $unitDir. '/'. $file, \Nino\Filesystem::path( $appData, '/'. $file ) );
-						else if( is_file( $unitDir. '/'. $file ) === true )
-							self::_copyFile( $unitDir. '/'. $file, \Nino\Filesystem::path( $appData, '/'. $file ) );
-				}
+				// A file or a whole directory, as the unit ships it - and one
+				// the manifest names but the unit does not carry is a failure
+				// now rather than silently skipped, as it is for a Setup unit
+				foreach( ( $manifest['files'] ?? [] ) as $file )
+					if( \Nino\Features::copyTree( $unitDir. '/'. $file, \Nino\Filesystem::path( $appData, '/'. $file ) ) === false )
+						return 'could not copy /'. $file;
 
 				if( count( $manifest['elementTypes'] ?? [] ) > 0 ) {
 					\Nino\Filesystem::forceDir( $appData, '/elements' );
 					foreach( $manifest['elementTypes'] as $file )
-						self::_copyFile( $unitDir. '/'. $file, \Nino\Filesystem::path( $appData, '/elements/'. $file ) );
+						if( \Nino\Features::copyFile( $unitDir. '/'. $file, \Nino\Filesystem::path( $appData, '/elements/'. $file ) ) === false )
+							return 'could not copy /elements/'. $file;
 				}
 
 				foreach( ( $manifest['blacklist'] ?? [] ) as $key )
 					$blacklist[] = $key;
 
 				$globalFragment = $unitDir. '/text/global.php';
-				if( is_file( $globalFragment ) === true )
-					self::_mergeText( $appData, '/text/global.php', self::_withoutWebpageMeta( include $globalFragment ) );
+				if( is_file( $globalFragment ) === true && \Nino\Features::mergeText( $appData, '/text/global.php', self::_withoutWebpageMeta( (array) include $globalFragment ) ) === false )
+					return 'could not write /text/global.php';
 
 				foreach( $locales as $locale ) {
 					$localeFragment = $unitDir. '/text/'. $locale. '.php';
-					if( is_file( $localeFragment ) === true )
-						self::_mergeText( $appData, '/text/'. $locale. '.php', self::_withoutWebpageMeta( include $localeFragment ) );
+					if( is_file( $localeFragment ) === true && \Nino\Features::mergeText( $appData, '/text/'. $locale. '.php', self::_withoutWebpageMeta( (array) include $localeFragment ) ) === false )
+						return 'could not write /text/'. $locale. '.php';
 				}
 
 			} elseif( $routeKey !== null && (string) ( $entry['body'] ?? '' ) !== '' ) {
@@ -1998,9 +1977,10 @@ namespace Nino\Install {
 			// the same reason /website/url is - a technical value, not
 			// wording anybody edits in /_admin's Text panel
 			if( $routeKey !== null ) {
-				self::_mergeText( $appData, '/text/global.php', [
+				if( \Nino\Features::mergeText( $appData, '/text/global.php', [
 					'[[/webpage'. $entry['uri']. '/uri]]' => (string) ( $entry['httpUri'] ?? '' ),
-				] );
+				] ) === false )
+					return 'could not write /text/global.php';
 				$blacklist[] = '/webpage'. $entry['uri']. '/uri';
 			}
 
@@ -2011,12 +1991,15 @@ namespace Nino\Install {
 
 				$meta = $entry['text'][$locale] ?? self::DEFAULT_TEXT;
 
-				self::_mergeText( $appData, '/text/'. $locale. '.php', [
+				if( \Nino\Features::mergeText( $appData, '/text/'. $locale. '.php', [
 					'[[/webpage'. $entry['uri']. '/name]]' 				=> $meta['name'],
 					'[[/webpage'. $entry['uri']. '/title]]' 				=> $meta['title'],
 					'[[/webpage'. $entry['uri']. '/description]]' => $meta['description'],
-				] );
+				] ) === false )
+					return 'could not write /text/'. $locale. '.php';
 			}
+
+			return true;
 		}
 
 		/**
@@ -2035,32 +2018,35 @@ namespace Nino\Install {
 		}
 
 		/**
-		 *	Apply a required module's own templates/blacklist/text - same
-		 *	shape as Setup::_applyUnit(), duplicated rather than shared for
-		 *	the usual reason every class in this file duplicates a small
-		 *	helper instead of reaching into a sibling's internals. Routes
-		 *	are deliberately not handled here: no module in the library
-		 *	currently declares any (they self-register at boot instead, or
-		 *	have none), and a module a template requires has no uri of its
-		 *	own to generate one for anyway
+		 *	Apply a required module's own templates/blacklist/config/text -
+		 *	the subset of what \Nino\Features::applyUnit() does for a picked
+		 *	unit, on the same helpers. Routes are deliberately not handled
+		 *	here: no module in the library currently declares any (they
+		 *	self-register at boot instead, or have none), and a module a
+		 *	template requires has no uri of its own to generate one for
+		 *	anyway; nor are its files and element types, see
+		 *	docs/recipes/installer-package.md
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		string		$unitDir			Absolute path to the module unit (modules/<key>)
 		 *	@param		array 		$locales			Picked locales
 		 *	@param		array 		&$blacklist		(reference) Collected blacklist keys, appended to
+		 *	@param		array 		&$config			(reference) Collected config defaults, for apiApply() to
+		 *																	persist with the keys it writes anyway
 		 *
-		 *	@return 	void
+		 *	@return 	true|string							true, or the first file that could not be copied or written
 		 */
-		private static function _applyModule( array &$appData, string $unitDir, array $locales, array &$blacklist ): void {
+		private static function _applyModule( array &$appData, string $unitDir, array $locales, array &$blacklist, array &$config ): true|string {
 
-			$manifest = self::_readManifest( $unitDir ) ?? [];
+			$manifest = \Nino\Features::readUnitManifest( $unitDir ) ?? [];
 
 			if( count( $manifest['templates'] ?? [] ) > 0 ) {
 				\Nino\Filesystem::forceDir( $appData, '/templates' );
 				foreach( $manifest['templates'] as $locale => $file ) {
 					if( is_string( $locale ) === true && in_array( $locale, $locales, true ) === false )
 						continue;
-					self::_copyFile( $unitDir. '/templates/'. $file, \Nino\Filesystem::path( $appData, '/templates/'. $file ) );
+					if( \Nino\Features::copyFile( $unitDir. '/templates/'. $file, \Nino\Filesystem::path( $appData, '/templates/'. $file ) ) === false )
+						return 'could not copy /templates/'. $file;
 				}
 			}
 
@@ -2073,18 +2059,20 @@ namespace Nino\Install {
 			foreach( ( $manifest['config'] ?? [] ) as $configKey => $configValue )
 				if( isset( $appData[$configKey] ) === false ) {
 					$appData[$configKey] = $configValue;
-					\Nino\AppData::writeContentData( $appData, [ $configKey ] );
+					$config[$configKey] = $configValue;
 				}
 
 			$globalFragment = $unitDir. '/text/global.php';
-			if( is_file( $globalFragment ) === true )
-				self::_mergeText( $appData, '/text/global.php', include $globalFragment );
+			if( is_file( $globalFragment ) === true && \Nino\Features::mergeText( $appData, '/text/global.php', (array) include $globalFragment ) === false )
+				return 'could not write /text/global.php';
 
 			foreach( $locales as $locale ) {
 				$localeFragment = $unitDir. '/text/'. $locale. '.php';
-				if( is_file( $localeFragment ) === true )
-					self::_mergeText( $appData, '/text/'. $locale. '.php', include $localeFragment );
+				if( is_file( $localeFragment ) === true && \Nino\Features::mergeText( $appData, '/text/'. $locale. '.php', (array) include $localeFragment ) === false )
+					return 'could not write /text/'. $locale. '.php';
 			}
+
+			return true;
 		}
 
 		/**
@@ -2103,86 +2091,32 @@ namespace Nino\Install {
 		 *	@param		array 		$webpages			The just-applied, current webpages list
 		 *	@param		array 		$locales			Picked locales
 		 *
-		 *	@return 	void
+		 *	@return 	true|string							true, or the first text file that could not be written
 		 */
-		private static function _applyLegalLink( array &$appData, array $webpages, array $locales ): void {
+		private static function _applyLegalLink( array &$appData, array $webpages, array $locales ): true|string {
 
 			$legalEntry = null;
 			foreach( $webpages as $entry )
 				if( self::_libraryKey( $entry ) === 'legal' ) { $legalEntry = $entry; break; }
 
 			if( $legalEntry === null )
-				return;
+				return true;
 
-			self::_mergeText( $appData, '/text/global.php', [ '[[/website/legal/uri]]' => $legalEntry['httpUri'] ] );
+			// Fully derived content that has to track its source on every
+			// apply: merged with the fragment winning, which is what
+			// \Nino\Features::mergeText() does
+			if( \Nino\Features::mergeText( $appData, '/text/global.php', [ '[[/website/legal/uri]]' => $legalEntry['httpUri'] ] ) === false )
+				return 'could not write /text/global.php';
 
 			foreach( $locales as $locale ) {
 				$name = $legalEntry['text'][$locale]['name'] ?? self::DEFAULT_TEXT['name'];
-				self::_setText( $appData, '/text/'. $locale. '.php', '[[/website/legal/name]]', $name );
+				if( \Nino\Features::mergeText( $appData, '/text/'. $locale. '.php', [ '[[/website/legal/name]]' => $name ] ) === false )
+					return 'could not write /text/'. $locale. '.php';
 			}
+
+			return true;
 		}
 
-		/**
-		 *	Merge a text fragment's keys into a /text/*.php file - later
-		 *	units win a key collision
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		string		$path					Filesystem-relative path, eg. '/text/de_DE.php'
-		 *	@param		array 		$fragment			Bracket-key => value pairs to merge in
-		 *
-		 *	@return 	void
-		 */
-		private static function _mergeText( array &$appData, string $path, array $fragment ): void {
-			\Nino\Filesystem::mutate( $appData, $path, function( array $content ) use ( $fragment ): array {
-				return array_merge( $content, $fragment );
-			} );
-		}
-
-		/**
-		 *	Set (overwrite) a single text key - unlike _mergeText(), used
-		 *	only for fully-derived content that has to track its source on
-		 *	every apply() rather than merge on top of a possibly-stale
-		 *	previous value (see _applyLegalLink())
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		string		$path					Filesystem-relative path, eg. '/text/de_DE.php'
-		 *	@param		string		$bracketKey		Eg. '[[/website/legal/name]]'
-		 *	@param		string		$value
-		 *
-		 *	@return 	void
-		 */
-		private static function _setText( array &$appData, string $path, string $bracketKey, string $value ): void {
-			\Nino\Filesystem::mutate( $appData, $path, function( array $content ) use ( $bracketKey, $value ): array {
-				$content[$bracketKey] = $value;
-				return $content;
-			} );
-		}
-
-		/**
-		 *	Copy one library file into the project - see
-		 *	Setup::_copyFile()'s docblock, duplicated here for the same
-		 *	reason every class in this file duplicates a small helper
-		 *	instead of reaching into a sibling's internals
-		 *
-		 *	@param		string		$from
-		 *	@param		string		$to
-		 *
-		 *	@return 	void
-		 */
-		private static function _copyFile( string $from, string $to ): void {
-
-			$content = @file_get_contents( $from );
-			if( $content === false )
-				return;
-
-			if( is_file( $to ) === true )
-				@unlink( $to );
-
-			if( is_dir( dirname( $to ) ) === false )
-				@mkdir( dirname( $to ), 0755, true );
-
-			file_put_contents( $to, $content );
-		}
 	}
 
 	/**

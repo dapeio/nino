@@ -552,6 +552,21 @@ All notable changes to Nino are documented in this file.
 
 ### Fixed
 
+- **Install:** the Routes step reported success over a template it could
+  not write. It kept its own copies of the unit helpers that Setup handed
+  to `\Nino\Features` in 1.1 - a manifest reader, a file copy that
+  swallowed a failed write, a text merge - and one config.php rewrite per
+  default of a required module. It reads, copies and merges through
+  `\Nino\Features::readUnitManifest()`, `copyFile()`, `copyTree()` and
+  `mergeText()` now, every copy checked: the first that fails ends the
+  step with a 500 naming the file, before any route is written, the way
+  Setup's step answers. A file a page unit's manifest names but does not
+  carry fails the step too, as it does for a Setup unit. Setup's one-line
+  wrappers around the kernel's helpers are gone as well.
+  `tests/install-smoke.php` puts a directory where contact's template has
+  to go and holds that the apply fails, names the file and writes no route
+  (268 → 270 checks, 2 red before).
+
 - **Translations:** an import could fail a whole element over one field.
   The import pre-checks every translated value so that a malformed one is
   skipped on its own, and that pre-check was a copy of the kernel's rules

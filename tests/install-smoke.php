@@ -298,7 +298,8 @@ check( 'copies base\'s deny rule into the private root it just filled', is_file(
 $applyUnitSource = (string) file_get_contents( __DIR__. '/../_nino/Nino/Features/Features.php' );
 $applyUnitBody 	= substr( $applyUnitSource, strpos( $applyUnitSource, 'public static function applyUnit(' ) );
 $applyUnitBody 	= substr( $applyUnitBody, 0, strpos( $applyUnitBody, "\n\t\t}" ) );
-check( 'the wizard\'s Setup applies a unit through the kernel, with overwrite on', str_contains( (string) file_get_contents( __DIR__. '/../_admin/install/Install.php' ), '\\Nino\\Features::applyUnit( $appData, $unitDir, $locales, $routes, $blacklist, $config, true )' ) === true );
+preg_match_all( '/\\\\Nino\\\\Features::applyUnit\( [^;]*?\)/', (string) file_get_contents( __DIR__. '/../_admin/install/Install.php' ), $applyUnitCalls );
+check( 'the wizard\'s Setup applies its units through the kernel, every call with overwrite on', count( $applyUnitCalls[0] ) >= 2 && array_filter( $applyUnitCalls[0], fn( string $call ): bool => str_ends_with( $call, ', true )' ) === false ) === [] );
 
 check( '...before any template can create that directory unprotected', strpos( $applyUnitBody, "\$manifest['files']" ) < strpos( $applyUnitBody, "forceDir( \$appData, '/templates' )" ) );
 
@@ -637,6 +638,18 @@ $_POST['data'] = json_encode( [ 'webpages' => [
 		'de_DE' => [ 'name' => 'Kontakt' ],
 	] ],
 ] ] );
+/*	A copy the step cannot make is the step's failure, not a success over a
+	route that renders a file that is not there. The Routes step kept its own
+	copy of the unit helpers, and that copy swallowed a failed write - here a
+	directory stands where contact's template has to go, so the write fails
+	the way a permission or a full disk would	*/
+mkdir( $sandbox. '/private/templates/page-contact.tpl', 0755, true );
+$blockedApplyRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Install\Webpages::apiApply( $appData, $blockedApplyRequest );
+check( 'a template the step cannot write fails the apply and names the file', $blockedApplyRequest['/nino/http/response']['statusCode'] === 500 && str_contains( (string) ( $blockedApplyRequest['/nino/http/response']['body']['error'] ?? '' ), '/templates/page-contact.tpl' ) === true );
+check( '...before any route is written', isset( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes']['GET://kontakt'] ) === false );
+rmdir( $sandbox. '/private/templates/page-contact.tpl' );
+
 $wpApplyRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Install\Webpages::apiApply( $appData, $wpApplyRequest );
 check( 'apply succeeds', $wpApplyRequest['/nino/http/response']['statusCode'] === 200 );
