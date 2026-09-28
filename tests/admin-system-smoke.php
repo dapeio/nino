@@ -264,6 +264,10 @@ check( 'apiList finds the sandbox type', count( $types ) === 1 && $types[0]['uri
 check( 'apiList reports the real title', $types[0]['title'] === 'Test Type' );
 check( 'apiList reports the real field count', $types[0]['fieldCount'] === 1 );
 check( 'apiList exposes the allowed field types', in_array( 'image', $listRequest['/nino/http/response']['body']['fieldTypes'] ?? [], true ) === true );
+// The one place the rule lives: the editor offers a unit for the types the
+// server names, and the server keeps a unit for those alone
+$suffixTypes = $listRequest['/nino/http/response']['body']['suffixTypes'] ?? null;
+check( 'apiList names the types a unit applies to: every field type that renders an input a unit can sit next to', $suffixTypes === array_values( array_diff( \Nino\Modules\Elements\Types::FIELD_TYPES, [ 'boolean', 'image', 'element' ] ) ) );
 
 $_POST['data'] = json_encode( [ 'uri' => 'testtype' ] );
 $getRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
@@ -293,6 +297,7 @@ $_POST['data'] = json_encode( [
 		'photo' 	=> [ 'type' => 'image', 'width' => 40, 'height' => 40, 'suffix' => 'ignored on image', 'required' => true ],
 		'price' 	=> [ 'type' => 'double', 'suffix' => '€', 'inputsize' => 5 ],
 		'active' 	=> [ 'type' => 'boolean', 'suffix' => 'ignored on boolean' ],
+		'ref' 		=> [ 'type' => 'element', 'elementType' => 'testtype', 'suffix' => 'ignored on element' ],
 		'bogus' 	=> [ 'type' => 'not-a-real-type' ],
 	],
 ] );
@@ -316,6 +321,7 @@ check( 'apiSave drops suffix on an image field', isset( $afterSave['model']['pho
 check( 'apiSave drops "required" on an image field', isset( $afterSave['model']['photo']['required'] ) === false );
 check( 'apiSave sets a suffix on a non-boolean/image field', $afterSave['model']['price']['suffix'] === '€' );
 check( 'apiSave drops suffix on a boolean field', isset( $afterSave['model']['active']['suffix'] ) === false );
+check( 'apiSave drops suffix on an element field, which renders a select and no input', ( $afterSave['model']['ref']['elementType'] ?? null ) === 'testtype' && isset( $afterSave['model']['ref']['suffix'] ) === false );
 check( 'apiSave silently drops a field with an unknown type', isset( $afterSave['model']['bogus'] ) === false );
 check( 'apiSave never touches the "*" bucket', $afterSave['*'] === [ '*' => [] ] );
 check( 'apiSave never touches real locale content', ( $afterSave['de_DE']['item1']['name'] ?? null ) === 'Hallo' );
@@ -323,7 +329,7 @@ check( 'apiSave never touches real locale content', ( $afterSave['de_DE']['item1
 // The order fields are posted in is the order they are written in, and the
 // order every element form then renders them in - that is exactly what the
 // editor's new ↑/↓ buttons change (see assets/elementtypes.js's _move())
-check( 'apiSave keeps the posted field order', array_keys( $afterSave['model'] ) === [ 'name', 'photo', 'price', 'active' ] );
+check( 'apiSave keeps the posted field order', array_keys( $afterSave['model'] ) === [ 'name', 'photo', 'price', 'active', 'ref' ] );
 
 $_POST['data'] = json_encode( [
 	'uri' 		=> 'testtype',

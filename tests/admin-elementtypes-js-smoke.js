@@ -269,5 +269,37 @@ check( 'the danger zone is not rendered while creating a new type',
 	/_isNew === false \)\s*\n\s*form\.appendChild\( Nino\.admin\.elementTypes\._renderDangerZone\(\) \);/.test( typesSource ) );
 
 
+// --- the unit input is offered for the types the server names --------------
+//
+// Which field types take a unit is the server's rule (Types.php's
+// SUFFIX_TYPES): it keeps a suffix for those alone and hands the list to the
+// editor beside the field types. The editor used to state the rule itself,
+// one type short, and offered a unit on an element reference that the save
+// then dropped in silence. So the input follows the list, and nothing else.
+// A recording dom of plain objects, since the sandbox above has none
+
+{
+	const make = tag => ( { tagName : tag, children : [], className : '', dataset : {}, classList : { add(){}, remove(){}, toggle(){} },
+		appendChild( c ) { this.children.push( c ); return c }, addEventListener(){}, setAttribute(){},
+		// a select answers with its selected option, as the real one does
+		get value() { if( tag !== 'select' ) return this._value; const chosen = this.children.find( o => o.selected === true ) || this.children[0]; return chosen ? chosen.value : '' },
+		set value( v ) { this._value = v },
+		get innerHTML() { return '' }, set innerHTML( v ) { this.children = [] } } );
+	const find = ( node, test, out = [] ) => { ( node.children || [] ).forEach( c => { if( test( c ) ) out.push( c ); find( c, test, out ) } ); return out };
+	sandbox.document.createElement = make;
+	sandbox.document.createTextNode = text => ( { nodeType : 3, textContent : text, children : [] } );
+	sandbox.Nino.content = { getText : key => key };
+	elementTypes._fields = [ { key : 'a', type : 'double' } ];
+	elementTypes._types = [];
+	elementTypes._currentUri = null;
+	elementTypes._fieldTypes = [ 'string', 'integer', 'double', 'boolean', 'array', 'date', 'datetime', 'image', 'element' ];
+	elementTypes._suffixTypes = [ 'string', 'integer', 'double', 'array', 'date', 'datetime' ];
+	const unitInputs = field => find( elementTypes._renderFieldRow( field, 0 ), n => n.className === 'admin-field-suffix' ).length;
+	check( 'a row of a type the server names offers the unit input', unitInputs( { key : 'price', type : 'double' } ) === 1 && unitInputs( { key : 'title', type : 'string' } ) === 1 );
+	check( '...and a row of a type it does not name - an element reference, an image, a boolean - does not', unitInputs( { key : 'ref', type : 'element', elementType : 'people' } ) === 0 && unitInputs( { key : 'photo', type : 'image' } ) === 0 && unitInputs( { key : 'live', type : 'boolean' } ) === 0 );
+	elementTypes._suffixTypes = [];
+	check( 'before the server has answered, no row offers one', unitInputs( { key : 'price', type : 'double' } ) === 0 );
+}
+
 console.log( '\n'+ checks+ ' checks, '+ failures+ ' failed' );
 process.exitCode = failures === 0 ? 0 : 1;

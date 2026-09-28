@@ -552,6 +552,18 @@ All notable changes to Nino are documented in this file.
 
 ### Fixed
 
+- **Element Types:** the type editor offered a unit/suffix input on an
+  element-reference field, and the save dropped what was typed in silence:
+  three places stated which types take a unit, and the editor's code was
+  one type short. The rule lives once now, in `Types::SUFFIX_TYPES` (the
+  types that render an input a unit can sit next to); `cleanModel()`
+  keeps a suffix for those alone, `elements/types list` answers the list
+  as `suffixTypes`, and the editor offers the input for that list and
+  nothing else. `tests/admin-system-smoke.php` pins the answer and the
+  dropped suffix on a reference (686 → 688 checks, 1 red before);
+  `tests/admin-elementtypes-js-smoke.js` renders rows of every kind and
+  holds which get the input (33 → 36, 2 red before).
+
 - **Install:** the base unit's web manifest pointed its 192 and 512 px
   icons at `/favicon/…`, the place the set lived before the public/
   split, so both fell through to index.php - and in a subdirectory site

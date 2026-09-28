@@ -34,6 +34,14 @@ namespace Nino\Modules\Elements {
 
 		public const array FIELD_TYPES = [ 'string', 'integer', 'double', 'boolean', 'array', 'date', 'datetime', 'image', 'element' ];
 
+		// The field types a fixed unit or suffix applies to: every type that
+		// renders an input a unit can sit next to. Not boolean (a "Ja"/"Nein"
+		// choice has nothing to append), not image (its own preview and
+		// upload area), not element (a select of elements). Stated here once:
+		// cleanModel() keeps a suffix for these types only, apiList() hands
+		// the list to the type editor, which offers the input for them only
+		public const array SUFFIX_TYPES = [ 'string', 'integer', 'double', 'array', 'date', 'datetime' ];
+
 		/**
 		 *	This module's action map, merged into \Nino\Admin\Admin::handlePost()'s dispatch
 		 *
@@ -139,7 +147,7 @@ namespace Nino\Modules\Elements {
 			if( \Nino\Admin\Admin::guardPerm( $appData, $request, self::MANAGE_PERM ) === false )
 				return;
 
-			\Nino\Http::ok( $request, [ 'types' => self::summaries( $appData ), 'fieldTypes' => self::FIELD_TYPES ] );
+			\Nino\Http::ok( $request, [ 'types' => self::summaries( $appData ), 'fieldTypes' => self::FIELD_TYPES, 'suffixTypes' => self::SUFFIX_TYPES ] );
 		}
 
 		/**
@@ -289,10 +297,9 @@ namespace Nino\Modules\Elements {
 				}
 
 				// A fixed unit/label shown next to the input (eg. a "price" field's
-				// "€") - admin.js applies it to every type except boolean,
-				// image and element, none of which render an input a unit could
-				// sit next to
-				if( in_array( $data['type'], [ 'boolean', 'image', 'element' ], true ) === false ) {
+				// "€") - for the types that render an input a unit can sit next
+				// to, see SUFFIX_TYPES
+				if( in_array( $data['type'], self::SUFFIX_TYPES, true ) === true ) {
 					$suffix = trim( (string) ( $data['suffix'] ?? '' ) );
 					if( $suffix !== '' )
 						$field['suffix'] = $suffix;

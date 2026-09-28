@@ -23,6 +23,10 @@
 
 		_types 					: [],
 		_fieldTypes 		: [],
+		// The field types a unit/suffix applies to, as the server states them
+		// (Types.php's SUFFIX_TYPES): the rule lives there, the editor only
+		// asks. Empty until the list has answered
+		_suffixTypes 		: [],
 		_currentUri 		: null,
 		_isNew 					: false,
 		_fields 				: [],
@@ -49,6 +53,7 @@
 
 				Nino.admin.elementTypes._types 			= response.types;
 				Nino.admin.elementTypes._fieldTypes = response.fieldTypes;
+				Nino.admin.elementTypes._suffixTypes = response.suffixTypes ?? [];
 				Nino.admin.elementTypes._renderList();
 				Nino.admin.elementTypes._showList();
 				Nino.admin.elementTypes._ready = true;
@@ -209,7 +214,7 @@
 		 *	Render one field's row: key, type, and whichever options apply to
 		 *	that type (locale/html/required always; maxlength and inputsize for string;
 		 *	width+height for image; the referenced type for element; suffix for
-		 *	everything but boolean/image/element; options for a fixed value list)
+		 *	the types the server names, see _suffixTypes; options for a fixed value list)
 		 *
 		 *	@param		{Object}	field					{ key, type, locale, html, required, maxlength, inputsize, width, height, elementType, suffix, options }
 		 *	@param		{number}	index					Index into _fields, for the remove button
@@ -275,10 +280,13 @@
 					optionsWrap.appendChild( requiredLabel );
 				}
 
-				// Shown next to the value everywhere except boolean (a "Ja"/"Nein"
-				// choice has nothing to append) and image (its own preview/upload
-				// area, not an input a suffix could sit next to)
-				if( type !== 'boolean' && type !== 'image' ) {
+				// Offered for the types the server keeps a suffix for - the ones
+				// that render an input a unit can sit next to, which is neither
+				// a boolean's "Ja"/"Nein" choice, nor an image's upload area, nor
+				// an element reference's select. The editor used to state that
+				// rule itself, one type short, and offered a unit on a reference
+				// that the save then dropped in silence
+				if( Nino.admin.elementTypes._suffixTypes.indexOf( type ) !== -1 ) {
 					const suffixInput = dc.createElement('input');
 					suffixInput.type = 'text';
 					suffixInput.className = 'admin-field-suffix';
