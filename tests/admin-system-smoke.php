@@ -1839,6 +1839,11 @@ file_put_contents( $sandbox. '/private/templates/scan-fixture.tpl', '<p>[[/page-
 // [[/webpage[[/nino/http/response/uri]]/title]]) - only the inner, always-
 // registered kernel fill should ever be visible to a static regex scan
 file_put_contents( $sandbox. '/private/templates/scan-fixture-2.tpl', '<title>[[/webpage[[/nino/http/response/uri]]/title]]</title><img src="[[/nino/public]]/images/example.jpg">' );
+// Every fill the kernel registers at runtime, as the kernel names them - the
+// scan used to keep its own copy of that list, and the copy was one short:
+// a template with the clean uri made the Dashboard report a missing key
+$runtimeFillKeys = method_exists( '\\Nino\\Html', 'runtimeFillKeys' ) === true ? \Nino\Html::runtimeFillKeys( $appData ) : [];
+file_put_contents( $sandbox. '/private/templates/scan-fixture-3.tpl', '<body class="p-[[/nino/http/response/uri/clean]]">'. implode( ' ', array_map( fn( string $key ): string => '[['. $key. ']]', $runtimeFillKeys ) ). '</body>' );
 
 // /company/name is genuinely defined (unlike /page-scan-test/heading) - proves
 // a real key is correctly excluded, not just absent from the fixture by accident
@@ -1855,9 +1860,13 @@ check( 'an undefined key found twice in the same file is only reported once', co
 check( 'an already-defined key is not reported', in_array( '/company/name', $missingKeys, true ) === false );
 check( 'the kernel-injected /nino/http/response/uri fill is never reported, despite appearing inside a nested [[...]] construct', in_array( '/nino/http/response/uri', $missingKeys, true ) === false );
 check( 'the kernel-injected /nino/public fill is never reported as missing', in_array( '/nino/public', $missingKeys, true ) === false );
+check( 'the clean uri the kernel fills at runtime is never reported as missing', in_array( '/nino/http/response/uri/clean', $missingKeys, true ) === false );
+$reportedRuntimeFills = array_values( array_intersect( $runtimeFillKeys, $missingKeys ) );
+check( 'no fill the kernel names as one it registers at runtime is reported - the scan reads that list, it keeps no copy'. ( $reportedRuntimeFills === [] ? '' : ' - reported: '. implode( ', ', $reportedRuntimeFills ) ), count( $runtimeFillKeys ) >= 8 && $reportedRuntimeFills === [] );
 
 unlink( $sandbox. '/private/templates/scan-fixture.tpl' );
 unlink( $sandbox. '/private/templates/scan-fixture-2.tpl' );
+unlink( $sandbox. '/private/templates/scan-fixture-3.tpl' );
 
 // --- apiScanApply: the three answers a scanned key can get -----------------
 //

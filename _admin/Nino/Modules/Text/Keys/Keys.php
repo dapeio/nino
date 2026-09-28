@@ -553,22 +553,6 @@ namespace Nino\Modules\Text {
 		}
 
 		/**
-		 *	A handful of fills the kernel itself injects at request time
-		 *	(Nino::request()'s Html::addFills() call) - never stored in any
-		 *	/text/*.php file, so apiScan() below would otherwise flag them as
-		 *	"missing" forever. Only the innermost, non-nested [[...]] a
-		 *	static regex scan can even see (eg. the [[/nino/http/response/
-		 *	uri]] inside html-header.tpl's [[/webpage[[/nino/http/response/
-		 *	uri]]/title]]) - the outer, dynamically-constructed key itself
-		 *	isn't something a scan of the raw template source can resolve at
-		 *	all, since its final shape depends on which page is rendering
-		 */
-		private const array KERNEL_FILLS = [
-			'/nino/http/request/uri', '/nino/http/response/uri', '/nino/http/response/locale',
-			'/nino/auth/user', '/nino/dir', '/nino/public', '/date/year',
-		];
-
-		/**
 		 *	Scan every public-site template (templates/*.tpl - not the workbench's
 		 *	or _admin's own, those are separate text systems entirely) for
 		 *	[[/key]] placeholders that aren't yet defined for any locale -
@@ -688,7 +672,17 @@ namespace Nino\Modules\Text {
 			$known = [];
 			foreach( \Nino\Text::entries( $appData ) as $entry )
 				$known[$entry['key']] = true;
-			foreach( self::KERNEL_FILLS as $key )
+			// The fills the kernel injects at request time (see
+			// \Nino\Html::bootFills() and requestFills()) are never stored in
+			// any /text/*.php file, so the scan would flag them as missing
+			// forever. Read from the kernel, which states them once: a copy
+			// kept here fell one behind and reported the clean uri. Only the
+			// innermost, non-nested [[...]] a static regex scan can even see
+			// (the [[/nino/http/response/uri]] inside html-header.tpl's
+			// [[/webpage[[/nino/http/response/uri]]/title]]) - the outer,
+			// dynamically built key is not something a scan of the raw source
+			// can resolve, since its final shape depends on the page rendering
+			foreach( \Nino\Html::runtimeFillKeys( $appData ) as $key )
 				$known[$key] = true;
 			// A retired key is usually in the blacklist and in no text file at
 			// all (apiScanApply() writes no value for it), so without this it

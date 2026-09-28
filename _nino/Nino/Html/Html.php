@@ -121,6 +121,38 @@ namespace Nino {
 				$appData['./nino/html/fills'][$locale]['[['. trim( $fillKey, '[[]]' ). ']]'] = $fillValue;
 		}
 
+		// The fills the kernel registers at runtime rather than reading from a
+		// text file, stated once, here: bootFills() at the start of every
+		// request, before the response round (the mail templates Modules\Form
+		// and Newsletter render in that window need /nino/public), and
+		// requestFills() once the response is known - by \Nino\request(),
+		// and again by Modules\Maintenance, whose page wears the site's
+		// header. runtimeFillKeys() is the same list by name, for whoever has
+		// to know which placeholders never get a text value: the Text panel's
+		// scan for missing keys used to keep its own copy of it, one short
+		public static function bootFills( array &$appData ): array {
+			return [
+				'[[/nino/dir]]'					=> \Nino\Filesystem::getDir( $appData ),
+				'[[/nino/public]]'			=> \Nino\Filesystem::getPublicDir( $appData ),
+				'[[/date/year]]'				=> date('Y'),
+			];
+		}
+
+		public static function requestFills( array $request, string $userMail ): array {
+			$responseUri = (string) ( $request['/nino/http/response']['uri'] ?? '' );
+			return [
+				'[[/nino/http/request/uri]]'				=> (string) ( $request['/nino/http/request']['uri'] ?? '' ),
+				'[[/nino/http/response/uri]]'				=> $responseUri,
+				'[[/nino/http/response/uri/clean]]'	=> str_replace( '/', '_', $responseUri ),
+				'[[/nino/http/response/locale]]'		=> (string) ( $request['/nino/http/response']['locale'] ?? '' ),
+				'[[/nino/auth/user]]'								=> $userMail,
+			];
+		}
+
+		public static function runtimeFillKeys( array &$appData ): array {
+			return array_map( static fn( string $fill ): string => trim( $fill, '[]' ), array_keys( self::bootFills( $appData ) + self::requestFills( [], '' ) ) );
+		}
+
 		public static function getAssets( array &$appData, string $library ): array {
 			return $appData['/nino/html/assets'][$library] ?? [];
 		}

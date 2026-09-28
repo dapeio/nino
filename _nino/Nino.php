@@ -128,11 +128,7 @@ namespace Nino {
 		// it would reach them as the literal '[[/nino/public]]' inside the
 		// mail's logo url. Everything that genuinely needs the request stays
 		// in the second call below
-		\Nino\Html::addFills( $appData, [
-			'[[/nino/dir]]'										=> \Nino\Filesystem::getDir( $appData ),
-			'[[/nino/public]]'								=> \Nino\Filesystem::getPublicDir( $appData ),
-			'[[/date/year]]'									=> date('Y'),
-		], '*' );
+		\Nino\Html::addFills( $appData, \Nino\Html::bootFills( $appData ), '*' );
 
 		\Nino\Http::response( $appData, $request );
 
@@ -156,13 +152,7 @@ namespace Nino {
 		$userMail = str_replace( [ '[', ']' ], [ '&#91;', '&#93;' ],
 			htmlspecialchars( ( $currentUser !== false ) ? (string) $currentUser['mail'] : '', ENT_QUOTES | ENT_SUBSTITUTE | ENT_HTML5, 'UTF-8' ) );
 
-		\Nino\Html::addFills( $appData, [
-			'[[/nino/http/request/uri]]'			=> $request['/nino/http/request']['uri'],
-			'[[/nino/http/response/uri]]'		=> $request['/nino/http/response']['uri'],
-			'[[/nino/http/response/uri/clean]]'		=> str_replace( '/', '_', $request['/nino/http/response']['uri'] ),
-			'[[/nino/http/response/locale]]'	=> $request['/nino/http/response']['locale'],
-			'[[/nino/auth/user]]'						=> $userMail,
-		], '*' );
+		\Nino\Html::addFills( $appData, \Nino\Html::requestFills( $request, $userMail ), '*' );
 
 		\Nino\Html::response( $appData, $request );
 

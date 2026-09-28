@@ -3387,6 +3387,13 @@ check( 'php calls an address carrying a script element and a bracket valid, so t
 \Nino\Auth::loginUser( $appData, $hostileMail, 'correct horse battery staple' );
 \Nino\request( $appData, [ 'REQUEST_METHOD' => 'GET', 'REQUEST_URI' => '/', 'REMOTE_ADDR' => '127.0.0.1' ] );
 
+// The fills a request registers are the ones the kernel names as its runtime
+// fills, and the names are what the Text panel's scan reads - so a fill
+// added to one and not the other cannot happen: both are the same two lists
+$registeredFills = array_keys( $appData['./nino/html/fills']['*'] ?? [] );
+$namedFills = method_exists( '\\Nino\\Html', 'runtimeFillKeys' ) === true ? array_map( fn( string $key ): string => '[['. $key. ']]', \Nino\Html::runtimeFillKeys( $appData ) ) : [];
+check( 'every fill the kernel names as a runtime fill is registered by a request, the clean uri included', $namedFills !== [] && in_array( '[[/nino/http/response/uri/clean]]', $namedFills, true ) === true && array_diff( $namedFills, $registeredFills ) === [] );
+
 $railSpan = \Nino\Html::renderHtml( $appData, '<span id="admin-user-email">[[/nino/auth/user]]</span>' );
 check( 'the address reaches the page as the text it is, never as markup', str_contains( $railSpan, '<script' ) === false && str_contains( $railSpan, '&lt;script&gt;' ) === true );
 check( '...brackets neutralized as well, so the shortcode pass over the finished document cannot read one as syntax', str_contains( $railSpan, '[x]' ) === false && str_contains( $railSpan, '&#91;x&#93;' ) === true );

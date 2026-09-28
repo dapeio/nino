@@ -174,14 +174,9 @@ namespace Nino\Modules {
 
 			// The same is true of the request fills \Nino\request() adds after
 			// its response round - a project's own page-maintenance.tpl wears
-			// the site's header, and that header names them
-			\Nino\Html::addFills( $appData, [
-				'[[/nino/http/request/uri]]'				=> (string) ( $request['/nino/http/request']['uri'] ?? '' ),
-				'[[/nino/http/response/uri]]'				=> (string) ( $request['/nino/http/response']['uri'] ?? '' ),
-				'[[/nino/http/response/uri/clean]]'	=> str_replace( '/', '_', (string) ( $request['/nino/http/response']['uri'] ?? '' ) ),
-				'[[/nino/http/response/locale]]'		=> (string) ( $request['/nino/http/response']['locale'] ?? '' ),
-				'[[/nino/auth/user]]'								=> '',
-			], '*' );
+			// the site's header, and that header names them. The same fills,
+			// from the same place, with nobody signed in
+			\Nino\Html::addFills( $appData, \Nino\Html::requestFills( $request, '' ), '*' );
 
 			$request['/nino/http/response']['statusCode'] = 503;
 			$request['/nino/http/response']['header']['Retry-After'] = (string) self::retry( $appData );

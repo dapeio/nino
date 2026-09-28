@@ -552,6 +552,18 @@ All notable changes to Nino are documented in this file.
 
 ### Fixed
 
+- **Text:** the scan for missing keys, and the Dashboard tile that counts
+  them, reported `[[/nino/http/response/uri/clean]]` - a fill the kernel
+  makes at request time - as a key no text file answers. The scan kept its
+  own copy of the kernel's runtime fills (`Keys::KERNEL_FILLS`), one
+  short. The kernel states them once now: `\Nino\Html::bootFills()` and
+  `requestFills()` are what `\Nino\request()` and Maintenance register
+  (Maintenance's own copy of the five request fills is gone), and
+  `runtimeFillKeys()` is the list by name, which the scan reads.
+  `tests/admin-system-smoke.php` scans a template carrying every one of
+  them (688 → 690 checks, 2 red before), `tests/kernel-smoke.php` holds
+  that a request registers every fill the kernel names (783 → 784, 1 red).
+
 - **Element Types:** the type editor offered a unit/suffix input on an
   element-reference field, and the save dropped what was typed in silence:
   three places stated which types take a unit, and the editor's code was
