@@ -14,6 +14,43 @@ declare(strict_types=1);
  *	Usage: php tests/admin-system-smoke.php
  */
 
+// Run as a child of itself (see "Recovery::handlePost without a Backups
+// module" below): a kernel whose autoloader refuses the Backups panel, which
+// is the only way to be without that class once this suite has loaded it.
+// Prints the status the restore answered, or the error it threw
+if( ( $argv[1] ?? '' ) === 'restore-without-backups' ) {
+	// Not the harness: it declares check(), and so does this file
+	require __DIR__. '/../_nino/Nino.php';
+	require __DIR__. '/../_admin/Admin.php';
+	$childSandbox = sys_get_temp_dir(). '/nino-recovery-child-'. uniqid();
+	mkdir( $childSandbox, 0755, true );
+	$appData = [ './nino/uid' => $childSandbox ];
+	\Nino\AppData::prepare( $appData );
+	$appData['./nino/filesystem/path']				= $childSandbox;
+	$appData['./nino/filesystem/configpath']	= $childSandbox. '/private';
+	$appData['./nino/filesystem/contentpath']	= $childSandbox. '/private';
+	$appData['./nino/filesystem/publicpath']	= $childSandbox. '/public';
+	foreach( spl_autoload_functions() as $loader ) {
+		spl_autoload_unregister( $loader );
+		spl_autoload_register( function( string $class ) use ( $loader ): void {
+			if( $class !== 'Nino\\Modules\\Backups\\Admin' )
+				$loader( $class );
+		} );
+	}
+	\Nino\Runtime::setSessionValue( $appData, \Nino\Admin\Recovery::SESSION_KEY, true );
+	$_POST['action'] = 'recovery/restore';
+	$_POST['data'] 	= json_encode( [ 'date' => 'not-a-date' ] );
+	$request = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+	try {
+		\Nino\Admin\Recovery::handlePost( $appData, $request );
+		echo $request['/nino/http/response']['statusCode'];
+	} catch( \Throwable $e ) {
+		echo get_class( $e ). ': '. $e->getMessage();
+	}
+	\Nino\Filesystem::removeDir( $childSandbox );
+	exit;
+}
+
 require __DIR__. '/../_nino/Nino.php';
 require __DIR__. '/../_admin/Admin.php';
 
@@ -195,6 +232,23 @@ $allowedRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Admin\Admin::handlePost( $appData, $allowedRequest );
 check( 'and 200 for full access', $allowedRequest['/nino/http/response']['statusCode'] === 200 );
 \Nino\Auth::deleteUser( $appData, 'editor@example.com' );
+
+echo "\n";
+
+
+// --- Recovery::handlePost without a Backups module -------------------
+
+echo "Recovery::handlePost without a Backups module\n";
+
+// A delivery may drop the Backups module; the recovery page then offers the
+// password reset alone and a restore is answered 501 (see the 'recovery/list'
+// case). The date check read \Nino\Modules\Backups\Admin::ID_PATTERN before
+// the class_exists() guard, so without the module the constant read threw
+// first: a 500 behind the one door that is open when nothing else is.
+// Measured in a child process whose autoloader refuses that class (see the
+// top of this file)
+$childAnswer = trim( (string) shell_exec( escapeshellarg( PHP_BINARY ). ' '. escapeshellarg( __FILE__ ). ' restore-without-backups 2>&1' ) );
+check( 'a delivery without the Backups module answers recovery/restore with 501, not a 500'. ( $childAnswer !== '501' ? ' - child said: '. substr( $childAnswer, 0, 120 ) : '' ), $childAnswer === '501' );
 
 echo "\n";
 

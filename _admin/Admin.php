@@ -1696,16 +1696,19 @@ namespace Nino\Admin {
 
 				case 'recovery/restore':
 					$date = (string) ( $data['date'] ?? '' );
+					// Asked first: the date check below reads a constant of the
+					// module, and a delivery without it has to be told 501 here
+					// rather than fall over that read
+					if( class_exists( '\\Nino\\Modules\\Backups\\Admin' ) === false ) {
+						\Nino\Http::fail( $request, 501, 'no backups module' );
+						return;
+					}
 					// The same shapes the panel offers, snapshots included (see
 					// \Nino\Modules\Backups\Admin::ID_PATTERN): recovery.php is
 					// the door that is open when nothing else is, so the way
 					// back out of a wrong restore has to fit through it too
 					if( preg_match( \Nino\Modules\Backups\Admin::ID_PATTERN, $date ) !== 1 ) {
 						\Nino\Http::fail( $request, 400, 'invalid date' );
-						return;
-					}
-					if( class_exists( '\\Nino\\Modules\\Backups\\Admin' ) === false ) {
-						\Nino\Http::fail( $request, 501, 'no backups module' );
 						return;
 					}
 					$result = \Nino\Modules\Backups\Admin::restore( $appData, $date );

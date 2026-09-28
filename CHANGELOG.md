@@ -552,6 +552,14 @@ All notable changes to Nino are documented in this file.
 
 ### Fixed
 
+- **Recovery:** a delivery without the Backups module answered a restore
+  through recovery.php with a 500 instead of the documented 501. The date
+  check read `\Nino\Modules\Backups\Admin::ID_PATTERN` before the
+  `class_exists()` guard, so the guard could never answer. It comes first
+  now. `tests/admin-system-smoke.php` measures it in a child process whose
+  autoloader refuses that one class (685 → 686 checks, 1 red before: the
+  child threw "Class not found").
+
 - **Images:** a failed slot upload showed its message as ordinary secondary
   text. The panel set the modifier `error`, which no rule styles; the design
   system's is `is-error`, the one the Elements image field uses.
