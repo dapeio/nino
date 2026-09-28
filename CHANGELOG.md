@@ -552,6 +552,13 @@ All notable changes to Nino are documented in this file.
 
 ### Fixed
 
+- **Install:** the wizard answered a POST whose `data` field was an array
+  (`data[]=x`) with a 500, and it has no authentication until it finishes.
+  `Install::postData()` was a copy of `Admin::postData()` from before the
+  guard 92bc3fb gave that one; it reads through `Admin::postData()` now.
+  `tests/install-smoke.php` posts the array: 265 → 266 checks, 1 red
+  before (a TypeError).
+
 - **A panel opened from the rail did not write its name into the address.**
   Only the panels that keep drill-down state - Dashboard, Elements, Text,
   Images, Users and its Roles tab - wrote the url hash, through

@@ -163,14 +163,17 @@ namespace Nino\Install {
 		}
 
 		/**
-		 *	Decode the json-encoded "data" POST field every module action reads
-		 *	its payload from - same shape as Admin::postData()
+		 *	The json-encoded "data" POST field every wizard action reads its
+		 *	payload from - the workbench's own read, not a copy of it. A copy
+		 *	is what this was, and it missed the guard Admin::postData() got
+		 *	when 'data[]=x' (an array where a string belongs) turned out to be
+		 *	a TypeError: a 500 that the wizard, which has no authentication
+		 *	until it finishes, answered to anyone
 		 *
 		 *	@return 	array
 		 */
 		public static function postData(): array {
-			$data = json_decode( $_POST['data'] ?? '', true );
-			return is_array( $data ) ? $data : [];
+			return \Nino\Admin\Admin::postData();
 		}
 
 		/**

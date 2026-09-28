@@ -115,6 +115,12 @@ $_POST['data'] = json_encode( [ 'foo' => 'bar' ] );
 check( 'postData() decodes the json payload', \Nino\Install\Install::postData() === [ 'foo' => 'bar' ] );
 $_POST['data'] = 'not json';
 check( 'postData() falls back to an empty array on invalid json', \Nino\Install\Install::postData() === [] );
+// 'data[]=x' posts an array, and json_decode() takes a string: unguarded that
+// is a TypeError, a 500 the wizard answered before any authentication.
+// Admin::postData() has carried the guard since 92bc3fb; this read is that one
+$_POST['data'] = [ 'x' ];
+try { $arrayPayload = \Nino\Install\Install::postData(); } catch( \TypeError $e ) { $arrayPayload = 'TypeError'; }
+check( 'postData() answers an array payload with an empty one, not a TypeError', $arrayPayload === [] );
 
 $appData['/nino/http/routes']['GET://_admin'] = [ 'uri' => '/_admin', 'body' => 'stale persisted page' ];
 \Nino\Install\Install::init( $appData );
