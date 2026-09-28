@@ -1358,6 +1358,24 @@ foreach( $libraryTemplates as $libraryTemplate )
 sort( $rootAbsoluteTemplates );
 check( 'no template of the install library writes an address from the domain root - a site in a subdirectory posts and links within itself'. ( $rootAbsoluteTemplates === [] ? '' : ' - '. implode( ', ', $rootAbsoluteTemplates ) ), $rootAbsoluteTemplates === [] );
 
+/*	The web manifest is copied into public/favicon/ as it is - json, not a
+	template, so the check above never saw it, and its icons pointed from the
+	domain root at the place the set lived before the public/ split. A src
+	the browser resolves against the manifest's own address is right wherever
+	the site sits. And every icon the base unit ships is one the page can
+	reach: named by the header template or by the manifest - favicon.ico
+	was neither, and a browser probes it at the root, not under public/	*/
+$manifest = json_decode( (string) file_get_contents( $baseUnit. '/favicon/site.webmanifest' ), true );
+$manifestIcons = array_map( static fn( array $icon ): string => (string) ( $icon['src'] ?? '' ), (array) ( $manifest['icons'] ?? [] ) );
+$rootAbsoluteIcons = array_filter( $manifestIcons, static fn( string $src ): bool => $src === '' || preg_match( '#^(?:/|[a-z]+:)#i', $src ) === 1 );
+check( "the base unit's web manifest names its icons relative to itself, not from the domain root". ( $rootAbsoluteIcons === [] ? '' : ' - '. implode( ', ', $rootAbsoluteIcons ) ), count( $manifestIcons ) >= 2 && $rootAbsoluteIcons === [] );
+$headerTemplate = (string) file_get_contents( $baseUnit. '/templates/html-header.tpl' );
+$unreachableIcons = [];
+foreach( scandir( $baseUnit. '/favicon' ) as $iconFile )
+	if( $iconFile !== '.' && $iconFile !== '..' && $iconFile !== 'site.webmanifest' && str_contains( $headerTemplate, '/favicon/'. $iconFile ) === false && in_array( $iconFile, $manifestIcons, true ) === false )
+		$unreachableIcons[] = $iconFile;
+check( 'every icon the base unit ships is named by its header template or its manifest'. ( $unreachableIcons === [] ? '' : ' - unreachable: '. implode( ', ', $unreachableIcons ) ), $unreachableIcons === [] );
+
 /*	robots.txt is delivered content, and a Disallow line names a path a
 	crawler could otherwise reach. Two of the three the base unit named,
 	nothing could reach any more: /data/ moved under private/ with the split

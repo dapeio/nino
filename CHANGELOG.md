@@ -552,6 +552,21 @@ All notable changes to Nino are documented in this file.
 
 ### Fixed
 
+- **Install:** the base unit's web manifest pointed its 192 and 512 px
+  icons at `/favicon/…`, the place the set lived before the public/
+  split, so both fell through to index.php - and in a subdirectory site
+  every install did. The two `src` values are manifest-relative now
+  (`favicon-192x192.png`), which resolves under `public/favicon/`
+  wherever the site sits, and the shipped `favicon.ico`, which nothing
+  linked, is the header template's first icon link. An existing project
+  keeps its copy: drop the `/favicon/` prefix of both `src` values in
+  `public/favicon/site.webmanifest`, and add
+  `<link rel="icon" href="[[/nino/public]]/favicon/favicon.ico" sizes="any">`
+  to its header template if it wants the .ico. `tests/install-smoke.php`
+  holds that the manifest names its icons relative to itself and that
+  every shipped icon is reachable through the header or the manifest
+  (266 → 268 checks, 2 red before).
+
 - **Recovery:** a delivery without the Backups module answered a restore
   through recovery.php with a 500 instead of the documented 501. The date
   check read `\Nino\Modules\Backups\Admin::ID_PATTERN` before the

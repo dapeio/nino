@@ -22,6 +22,7 @@
 			<meta name="twitter:description" content="[[/webpage[[/nino/http/response/uri]]/description]]">
 			<meta name="twitter:image" content="https://[[/website/url]][[/nino/public]]/images/logo.png">
 
+			<link rel="icon" href="[[/nino/public]]/favicon/favicon.ico" sizes="any">
 			<link rel="apple-touch-icon" sizes="180x180" href="[[/nino/public]]/favicon/apple-touch-icon.png">
 			<link rel="icon" type="image/png" sizes="32x32" href="[[/nino/public]]/favicon/favicon-32x32.png">
 			<link rel="icon" type="image/png" sizes="16x16" href="[[/nino/public]]/favicon/favicon-16x16.png">
