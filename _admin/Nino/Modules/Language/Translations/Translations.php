@@ -346,16 +346,19 @@ namespace Nino\Modules\Language {
 
 		/**
 		 *	Reject one malformed field without making the kernel reject all
-		 *	valid sibling fields in that element's partial update.
+		 *	valid sibling fields in that element's partial update. What the
+		 *	kernel would refuse is the kernel's to say
+		 *	(\Nino\Elements::valueError()): this used to be a copy of its
+		 *	rules, and the copy compared loosely where the kernel compares
+		 *	strictly, so a value it let through ('1' against a whitelist of
+		 *	'01') failed the whole element. What stays here is the import's
+		 *	own two rules: a required field is not emptied, and a value outside
+		 *	a fixed options list is not imported - the choice the form would
+		 *	not offer
 		 */
 		private static function _validElementValue( mixed $value, array $field ): bool {
 
-			$type = (string) ( $field['type'] ?? '' );
-			$expected = in_array( $type, [ 'date', 'datetime', 'image', 'element' ], true ) ? 'string' : $type;
-
-			if( $type === 'double' && is_int( $value ) === true ) {
-				// The kernel accepts and coerces whole-number JSON values too.
-			} else if( gettype( $value ) !== $expected )
+			if( \Nino\Elements::valueError( $field, $value ) !== null )
 				return false;
 
 			if( ( $field['required'] ?? false ) === true ) {
@@ -365,13 +368,7 @@ namespace Nino\Modules\Language {
 					return false;
 			}
 
-			if( isset( $field['whitelist'] ) === true && in_array( $value, $field['whitelist'] ) === false )
-				return false;
-
 			if( is_array( $field['options'] ?? null ) === true && $field['options'] !== [] && in_array( $value, $field['options'], true ) === false )
-				return false;
-
-			if( isset( $field['blacklist'] ) === true && in_array( $value, $field['blacklist'] ) === true )
 				return false;
 
 			return true;

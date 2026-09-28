@@ -32,7 +32,9 @@ namespace Nino\Modules\Elements {
 			return self::MANAGE_PERM;
 		}
 
-		public const array FIELD_TYPES = [ 'string', 'integer', 'double', 'boolean', 'array', 'date', 'datetime', 'image', 'element' ];
+		// The kernel's list, under the name the panel and its script have
+		// always read it by: sent as fieldTypes with every type list
+		public const array FIELD_TYPES = \Nino\Elements::FIELD_TYPES;
 
 		// The field types a fixed unit or suffix applies to: every type that
 		// renders an input a unit can sit next to. Not boolean (a "Ja"/"Nein"

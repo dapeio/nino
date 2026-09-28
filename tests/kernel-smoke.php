@@ -309,6 +309,30 @@ if( method_exists( '\Nino\Elements', 'prevElement' ) === true ) {
 	check( 'an unknown element, an unknown type and a uri without a type separator answer $return, quietly', $walk( 'nextElement', '/walktest/zzz' ) === false && $walk( 'nextElement', '/nosuchtype/a' ) === false && $walk( 'nextElement', '/walktest' ) === false && \Nino\Elements::nextElement( $appData, '/walktest/c', 'de_DE', 'none' ) === 'none' );
 }
 
+// What a write refuses is one check, valueError(), and whoever validates
+// ahead of a write asks it - the Translations import kept a copy that
+// compared loosely, so '1' passed its whitelist of '01' and the kernel then
+// refused the whole element. Strict lists, the (array) cast a hand-written
+// model relies on, a whole number for a double, and a reference's rules
+check( 'Elements::valueError() exists, and the kernel names its field types once', method_exists( '\\Nino\\Elements', 'valueError' ) === true && defined( '\\Nino\\Elements::FIELD_TYPES' ) === true );
+if( method_exists( '\\Nino\\Elements', 'valueError' ) === true ) {
+	$refuses = fn( array $field, mixed $value ): bool => \Nino\Elements::valueError( $field, $value ) !== null;
+	check( 'a whitelist is a list of values: \'1\' is not \'01\', and \'01\' is', $refuses( [ 'type' => 'string', 'whitelist' => [ '01' ] ], '1' ) === true && $refuses( [ 'type' => 'string', 'whitelist' => [ '01' ] ], '01' ) === false );
+	check( 'a list written as one value is that one value', $refuses( [ 'type' => 'string', 'whitelist' => '01' ], '01' ) === false && $refuses( [ 'type' => 'string', 'blacklist' => 'x' ], 'x' ) === true );
+	check( 'a blacklist refuses strictly too', $refuses( [ 'type' => 'integer', 'blacklist' => [ 1 ] ], 1 ) === true && $refuses( [ 'type' => 'integer', 'blacklist' => [ '1' ] ], 1 ) === false );
+	check( 'the type is checked as the write checks it: a whole number is a double, a fraction is no integer', $refuses( [ 'type' => 'double' ], 5 ) === false && $refuses( [ 'type' => 'integer' ], 5.5 ) === true && $refuses( [ 'type' => 'date' ], '2026-01-01' ) === false );
+	check( 'a reference may only point into its type, and an empty one is no reference', $refuses( [ 'type' => 'element', 'elementType' => 'tags' ], '/tags/a' ) === false && $refuses( [ 'type' => 'element', 'elementType' => 'tags' ], '/people/a' ) === true && $refuses( [ 'type' => 'element', 'elementType' => 'tags' ], '' ) === false );
+	check( 'a list reference refuses a foreign uri, a duplicate and one entry too many', $refuses( [ 'type' => 'element', 'elementType' => 'tags', 'multiple' => 2 ], [ '/tags/a', '/tags/b' ] ) === false && $refuses( [ 'type' => 'element', 'elementType' => 'tags', 'multiple' => 2 ], [ '/tags/a', '/people/b' ] ) === true && $refuses( [ 'type' => 'element', 'elementType' => 'tags', 'multiple' => 2 ], [ '/tags/a', '/tags/a' ] ) === true && $refuses( [ 'type' => 'element', 'elementType' => 'tags', 'multiple' => 2 ], [ '/tags/a', '/tags/b', '/tags/c' ] ) === true );
+	check( 'the answer names what the write would say', str_contains( (string) \Nino\Elements::valueError( [ 'type' => 'string', 'whitelist' => [ '01' ] ], '1', 'code', '/t/x' ), 'not whitelisted' ) === true );
+	// The one list of field types: a model keeps every type in it and nothing else
+	$everyType = [];
+	foreach( \Nino\Elements::FIELD_TYPES as $fieldType )
+		$everyType[ 'f_'. $fieldType ] = $fieldType === 'element' ? [ 'type' => 'element', 'elementType' => 'tags' ] : [ 'type' => $fieldType ];
+	$everyType['f_video'] = [ 'type' => 'video' ];
+	\Nino\Elements::insertElementType( $appData, '/typelisttest', $everyType );
+	check( 'a model keeps every field type the kernel names, and drops one it does not', array_keys( \Nino\Elements::getElementModel( $appData, '/typelisttest' ) ) === array_map( fn( string $t ): string => 'f_'. $t, \Nino\Elements::FIELD_TYPES ) );
+}
+
 // The type file and the elements read out of it shared one cache map, keyed
 // by uri - so once a type had been read, asking for the type uri as if it
 // were an element handed back that type's whole locale bucket, every element

@@ -264,6 +264,7 @@ check( 'apiList finds the sandbox type', count( $types ) === 1 && $types[0]['uri
 check( 'apiList reports the real title', $types[0]['title'] === 'Test Type' );
 check( 'apiList reports the real field count', $types[0]['fieldCount'] === 1 );
 check( 'apiList exposes the allowed field types', in_array( 'image', $listRequest['/nino/http/response']['body']['fieldTypes'] ?? [], true ) === true );
+check( '...and they are the kernel\'s own list, stated once', defined( '\\Nino\\Elements::FIELD_TYPES' ) === true && \Nino\Modules\Elements\Types::FIELD_TYPES === \Nino\Elements::FIELD_TYPES && ( $listRequest['/nino/http/response']['body']['fieldTypes'] ?? null ) === \Nino\Elements::FIELD_TYPES );
 // The one place the rule lives: the editor offers a unit for the types the
 // server names, and the server keeps a unit for those alone
 $suffixTypes = $listRequest['/nino/http/response']['body']['suffixTypes'] ?? null;
@@ -2645,6 +2646,9 @@ echo "\nTranslations - native Text + Elements JSON round-trip\n";
 		'views' 			=> [ 'type' => 'integer' ],
 		'image' 			=> [ 'type' => 'image', 'locale' => true ],
 		'related' 		=> [ 'type' => 'element', 'elementType' => 'brandnewtype', 'locale' => true ],
+		// A whitelisted translatable field: what the import lets through has
+		// to be what the kernel takes, or one bad value fails the whole element
+		'code' 				=> [ 'type' => 'string', 'locale' => true, 'whitelist' => [ '01', '02' ] ],
 	],
 	'*' => [
 		'*' => [],
@@ -2657,6 +2661,7 @@ echo "\nTranslations - native Text + Elements JSON round-trip\n";
 			'features' => [ 'Schnell', 'Klein' ],
 			'image' => 'native.webp',
 			'related' => '/brandnewtype/de',
+			'code' => '01',
 		],
 	],
 	'en_US' => [
@@ -2666,6 +2671,7 @@ echo "\nTranslations - native Text + Elements JSON round-trip\n";
 			'features' => [ 'Old' ],
 			'image' => 'english.webp',
 			'related' => '/brandnewtype/en',
+			'code' => '01',
 		],
 	],
 ] );
@@ -2709,6 +2715,9 @@ $translation['elements'] = [
 			'views' => 99,
 			'image' => 'hacked.webp',
 			'related' => '/brandnewtype/hacked',
+			// '1' == '01' loosely, and the kernel compares strictly: a
+			// pre-check that let it through made the whole element fail
+			'code' => '1',
 			'unknown' => 'HACKED',
 		],
 		'ghost' => [ 'title' => 'HACKED' ],
@@ -2722,7 +2731,7 @@ $translation['elements'] = [
 ] );
 check( 'apiImport succeeds for a configured target locale', $status === 200 && $result['targetLocale'] === 'en_US' );
 check( 'apiImport reports Text values and rejected keys separately', $result['text'] === [ 'imported' => 2, 'skipped' => 3 ] );
-check( 'apiImport reports Element fields and rejected paths separately', $result['elements'] === [ 'imported' => 3, 'skipped' => 6 ] );
+check( 'apiImport reports Element fields and rejected paths separately', $result['elements'] === [ 'imported' => 3, 'skipped' => 7 ] );
 
 $translatedText = \Nino\Filesystem::getFileContent( $appData, '/text/en_US.php', [] );
 $nativeText = \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] );
@@ -2734,6 +2743,7 @@ check( 'Element import sanitizes plain, HTML and nested array strings', $transla
 check( 'Element import cannot overwrite global or image fields', $translatedElements['*']['item']['views'] === 7 && $translatedElements['en_US']['item']['image'] === 'english.webp' );
 check( '...nor an element reference, which is a choice rather than a translation', $translatedElements['en_US']['item']['related'] === '/brandnewtype/en' );
 check( 'Element import leaves the native bucket untouched', $translatedElements['de_DE']['item']['title'] === 'Projekt' );
+check( 'a value the kernel would refuse is skipped on its own, and its siblings are imported', $translatedElements['en_US']['item']['code'] === '01' && $translatedElements['en_US']['item']['title'] === 'Project' );
 
 $badTranslation = $translation;
 $badTranslation['version'] = 99;

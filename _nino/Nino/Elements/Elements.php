@@ -14,6 +14,12 @@ namespace Nino {
 	class Elements {
 
 		// Get an element from file
+		// The field types a model may declare: the one list the kernel accepts
+		// in insertElementType() and the type editor offers - its
+		// \Nino\Modules\Elements\Types::FIELD_TYPES is this list. In the
+		// order the editor's type select shows them
+		public const array FIELD_TYPES = [ 'string', 'integer', 'double', 'boolean', 'array', 'date', 'datetime', 'image', 'element' ];
+
 		static public function getElement( array &$appData, string $uri, string $locale = '', mixed $return = false ): mixed {
 
 			// Verify locale
@@ -472,7 +478,7 @@ namespace Nino {
 			// Fill model
 			foreach( $model AS $key => $data ) {
 
-				if( isset( $data['type'] ) === false || in_array( $data['type'], [ 'string', 'integer', 'array', 'boolean', 'double', 'date', 'datetime', 'image', 'element' ] ) === false )
+				if( isset( $data['type'] ) === false || in_array( $data['type'], self::FIELD_TYPES, true ) === false )
 					continue;
 
 				// An 'element' field is a reference to another element, and the
@@ -632,6 +638,75 @@ namespace Nino {
 		 */
 		static public function isMultiElement( array $field ): bool {
 			return ( $field['type'] ?? '' ) === 'element' && is_int( $field['multiple'] ?? null ) === true;
+		}
+
+		// Why a write would refuse a value for a field - the message it
+		// triggers - or null when it takes it. The write's own check
+		// (_writeElementData() below), offered to whoever validates ahead of a
+		// write: the Translations import rejects one malformed field this way
+		// rather than have the write reject the whole element's partial
+		// update, and it used to keep a copy of these rules, which had
+		// drifted - a loose compare where this one is strict, no (array) cast
+		// of the lists, no list reference. The type, then the whitelist and
+		// the blacklist strictly (php 8 no longer reads 'abc' == 0 as true, so
+		// the classic bypass is gone, but a list is a list of values and '1'
+		// is not 1), then an element reference: it stores the referenced
+		// element's full uri ('/type/slug', what getElement() takes) and may
+		// only point into the type its field declares - checked as a plain
+		// string against the model, deliberately not against the referenced
+		// file, which a write reads under a lock on this type's file alone,
+		// and a reference whose target is deleted later stays readable either
+		// way (both element forms show it as missing rather than dropping
+		// it). An empty value is "no reference"; 'required' is what makes one
+		// mandatory. A list reference holds exactly the uris a single one
+		// holds, so each entry answers the same question; the same element
+		// twice is one choice stored twice, which nothing reading the list
+		// could tell apart and the up/down controls would move as two
+		// identical rows; and the cap is checked here rather than left to the
+		// form that drew the list, since an api caller is every bit as able
+		// to post one entry too many. A whole number for a double is taken
+		// as the write takes it. Not here: 'required' and a model default,
+		// which concern the write and its bucket rather than the value
+		public static function valueError( array $field, mixed $value, string $key = '', string $uri = '' ): ?string {
+
+			$type = (string) ( $field['type'] ?? '' );
+
+			if( $type === 'double' && is_int( $value ) === true )
+				$value = (float) $value;
+
+			if( gettype( $value ) !== self::_expectedGettype( $field ) )
+				return 'Wrong var type \''. $key. '\' in \''. $uri. '\'. \''. $type. '\' required, \''. gettype( $value ). '\' given.';
+
+			if( isset( $field['whitelist'] ) === true && in_array( $value, (array) $field['whitelist'], true ) === false )
+				return 'Element value \''. $key. '\' is not whitelisted.';
+
+			if( isset( $field['blacklist'] ) === true && in_array( $value, (array) $field['blacklist'], true ) === true )
+				return 'Element value \''. $key. '\' is blacklisted.';
+
+			if( $type !== 'element' )
+				return null;
+
+			$referencePrefix = '/'. trim( (string) ( $field['elementType'] ?? '' ), '/' ). '/';
+
+			if( self::isMultiElement( $field ) === false )
+				return ( $value !== '' && str_starts_with( $value, $referencePrefix ) === false )
+					? 'Element reference \''. $key. '\' in \''. $uri. '\' must point into \''. ( $field['elementType'] ?? '' ). '\', got \''. $value. '\'.'
+					: null;
+
+			$seen = [];
+			foreach( $value as $reference ) {
+				if( is_string( $reference ) === false || $reference === '' || str_starts_with( $reference, $referencePrefix ) === false )
+					return 'Element reference \''. $key. '\' in \''. $uri. '\' must point into \''. ( $field['elementType'] ?? '' ). '\', got \''. ( is_string( $reference ) === true ? $reference : gettype( $reference ) ). '\'.';
+				if( isset( $seen[$reference] ) === true )
+					return 'Element reference \''. $key. '\' in \''. $uri. '\' lists \''. $reference. '\' twice.';
+				$seen[$reference] = true;
+			}
+
+			$limit = (int) $field['multiple'];
+			if( $limit > 0 && count( $value ) > $limit )
+				return 'Element reference \''. $key. '\' in \''. $uri. '\' holds '. count( $value ). ' entries, at most '. $limit. ' allowed.';
+
+			return null;
 		}
 
 		// The PHP gettype() a model field's declared type is expected to hold
@@ -871,91 +946,22 @@ namespace Nino {
 						continue;
 					}
 
-					if( gettype( $data[$key] ) !== self::_expectedGettype( $field ) ) {
-						trigger_error( 'Wrong var type \''. $key. '\' in \''. $uri. '\'. \''. $field['type']. '\' required, \''. gettype( $data[$key] ). '\' given.' );
+					// The type, the lists and a reference's rules - one check, see
+					// valueError(), which the Translations import asks ahead of
+					// its writes
+					$valueError = self::valueError( $field, $data[$key], $key, $uri );
+					if( $valueError !== null ) {
+						trigger_error( $valueError );
 						$outcome = 'error';
 						return null;
 					}
 
-					// Whitelist. Strictly: php 8 no longer reads 'abc' == 0 as
-					// true, so the classic bypass is gone, but a list is a list of
-					// values and '1' is not 1
-					if( isset( $field['whitelist'] ) === true && in_array( $data[$key], (array) $field['whitelist'], true ) === false ) {
-						trigger_error( 'Element value \''. $key. '\' is not whitelisted.' );
-						$outcome = 'error';
-						return null;
-					}
-
-					// Blacklist - strictly, see the whitelist above
-					if( isset( $field['blacklist'] ) === true && in_array( $data[$key], (array) $field['blacklist'], true ) === true ) {
-						trigger_error( 'Element value \''. $key. '\' is blacklisted.' );
-						$outcome = 'error';
-						return null;
-					}
-
-					// An element reference stores the referenced element's full uri
-					// ('/type/slug' - what getElement() takes), and may only point
-					// into the type its field declares. Checked as a plain string
-					// against the model, deliberately not against the referenced
-					// file: this runs inside a lock on *this* type's file, and a
-					// reference whose target is deleted later stays readable either
-					// way (both element forms show it as missing rather than
-					// dropping it). An empty value is "no reference" - 'required'
-					// above is what makes one mandatory
-					if( $field['type'] === 'element' ) {
-
-						$referencePrefix = '/'. trim( (string) ( $field['elementType'] ?? '' ), '/' ). '/';
-
-						// A list reference holds exactly the uris a single one
-						// holds, so each entry answers the same question. The cap
-						// is checked here rather than left to the form that drew
-						// the list: an api caller is every bit as able to post one
-						// entry too many, and a model that promises "at most three"
-						// is not a hint the ui happens to render
-						if( self::isMultiElement( $field ) === true ) {
-
-							$limit = (int) $field['multiple'];
-							$seen 	= [];
-
-							foreach( $data[$key] as $reference ) {
-
-								if( is_string( $reference ) === false || $reference === '' || str_starts_with( $reference, $referencePrefix ) === false ) {
-									trigger_error( 'Element reference \''. $key. '\' in \''. $uri. '\' must point into \''. ( $field['elementType'] ?? '' ). '\', got \''. ( is_string( $reference ) === true ? $reference : gettype( $reference ) ). '\'.' );
-									$outcome = 'error';
-									return null;
-								}
-
-								// The list is an ordered set. The same element twice
-								// is one choice stored twice - nothing reading it
-								// could tell the copies apart, and the up/down
-								// controls would move two identical rows
-								if( isset( $seen[$reference] ) === true ) {
-									trigger_error( 'Element reference \''. $key. '\' in \''. $uri. '\' lists \''. $reference. '\' twice.' );
-									$outcome = 'error';
-									return null;
-								}
-
-								$seen[$reference] = true;
-							}
-
-							if( $limit > 0 && count( $data[$key] ) > $limit ) {
-								trigger_error( 'Element reference \''. $key. '\' in \''. $uri. '\' holds '. count( $data[$key] ). ' entries, at most '. $limit. ' allowed.' );
-								$outcome = 'error';
-								return null;
-							}
-
-							// Stored as a list, never as the gapped or string-keyed
-							// array a partial removal client-side or a json object
-							// can arrive as - a template iterating it would other-
-							// wise see the keys rather than the order
-							$data[$key] = array_values( $data[$key] );
-
-						} else if( $data[$key] !== '' && str_starts_with( $data[$key], $referencePrefix ) === false ) {
-							trigger_error( 'Element reference \''. $key. '\' in \''. $uri. '\' must point into \''. ( $field['elementType'] ?? '' ). '\', got \''. $data[$key]. '\'.' );
-							$outcome = 'error';
-							return null;
-						}
-					}
+					// A list reference is stored as a list, never as the gapped or
+					// string-keyed array a partial removal client-side or a json
+					// object can arrive as - a template iterating it would
+					// otherwise see the keys rather than the order
+					if( $field['type'] === 'element' && self::isMultiElement( $field ) === true )
+						$data[$key] = array_values( $data[$key] );
 
 					// Set value
 					$typeData[$targetArray][$elementUri] = $typeData[$targetArray][$elementUri] ?? [];

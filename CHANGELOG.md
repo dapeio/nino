@@ -552,6 +552,24 @@ All notable changes to Nino are documented in this file.
 
 ### Fixed
 
+- **Translations:** an import could fail a whole element over one field.
+  The import pre-checks every translated value so that a malformed one is
+  skipped on its own, and that pre-check was a copy of the kernel's rules
+  that had drifted: it compared a whitelist loosely where the kernel
+  compares strictly, so `'1'` passed a whitelist of `'01'` and the kernel
+  then refused the element's partial update, siblings included. The
+  kernel states its rules once now: `\Nino\Elements::FIELD_TYPES` is the
+  list of field types a model may declare (the type editor's
+  `Types::FIELD_TYPES` is that list), and `\Nino\Elements::valueError(
+  $field, $value )` says what a write would refuse - the type, the lists
+  strictly, a reference's prefix, duplicates and cap - which the write
+  itself and the import both ask. `tests/kernel-smoke.php` holds the
+  check's answers and that a model keeps exactly the named types (784 →
+  793 checks, 1 red before); `tests/admin-system-smoke.php` imports a
+  whitelisted `'1'` beside a valid title and holds that only the one is
+  skipped (690 → 692, 4 red before - two of them existing checks: with the
+  loose pre-check the title beside the bad value was not written).
+
 - **Text:** the scan for missing keys, and the Dashboard tile that counts
   them, reported `[[/nino/http/response/uri/clean]]` - a fill the kernel
   makes at request time - as a key no text file answers. The scan kept its
