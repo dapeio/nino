@@ -4,6 +4,8 @@ All notable changes to Nino are documented in this file.
 
 ## Unreleased
 
+## v1.3.2 - 2026-10-01
+
 ### Added
 
 - **Docs:** `THIRD-PARTY-NOTICES.md`, the notice for the one piece of
