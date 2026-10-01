@@ -998,7 +998,7 @@ echo "PersonalInfos::apiList / apiSaveBatch\n";
 	return $config;
 } );
 $appData['/nino/locales/available'] = [ 'de_DE', 'en_US' ];
-\Nino\Filesystem::putFileContent( $appData, '/text/global.php', [ '[[/company/name]]' => 'Acme Inc', '[[/website/author]]' => 'Acme Inc' ] );
+\Nino\Filesystem::putFileContent( $appData, '/text/global.php', [ '[[/company/name]]' => 'Acme Inc', '[[/website/author]]' => 'Acme Inc', '[[/company/instagram]]' => 'https://www.instagram.com/acme' ] );
 \Nino\Filesystem::putFileContent( $appData, '/text/de_DE.php', [ '[[/company/country]]' => 'Deutschland', '[[/website/lang]]' => 'de', '[[/home/headline]]' => 'Willkommen', '[[/webpage/kontakt/name]]' => 'Kontakt' ] );
 \Nino\Filesystem::putFileContent( $appData, '/text/en_US.php', [ '[[/company/country]]' => 'Germany', '[[/website/lang]]' => 'en', '[[/home/headline]]' => 'Welcome', '[[/webpage/kontakt/name]]' => 'Contact' ] );
 \Nino\Filesystem::putFileContent( $appData, '/text/blacklist.php', [ '/website/lang' ] );
@@ -1015,6 +1015,11 @@ check( 'a /website/* key is listed', array_search( '/company/country', $personal
 check( 'a blacklisted key is left out even though it\'s a /website/* key', array_search( '/website/lang', $personalInfosKeys, true ) === false );
 check( 'a key outside /company/* and /website/* is left out', array_search( '/home/headline', $personalInfosKeys, true ) === false );
 check( 'a webpage\'s own meta key is left out too, despite existing in text/*.php', array_search( '/webpage/kontakt/name', $personalInfosKeys, true ) === false );
+// The links to a site's profiles elsewhere are the catalogue's Social links
+// feature - an element type the editors keep - and the base unit ships none
+// of the four /company/<network> keys it had, so the step asks for none of
+// them, not even where a project's text still holds one
+check( 'a social network\'s address is not asked for: the base unit ships no such key', array_search( '/company/instagram', $personalInfosKeys, true ) === false );
 
 $personalInfosLabels = array_column( $personalInfosEntries, 'label', 'key' );
 check( 'derives a friendly label by capitalizing each path segment', $personalInfosLabels['/company/name'] === 'Company Name' );

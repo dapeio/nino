@@ -147,6 +147,8 @@ Language-independent, in the order the form shows them:
 
 These textfills are used in templates, meta tags, and possibly in the footer or contact forms. `/website/url` is the site's address without the protocol - `www.example.com` -: the base unit's templates put it behind `https://` for the canonical link, the Open Graph and Twitter tags, the JSON-LD block, `sitemap.xml` and `robots.txt`, and the Form module's mails name it, so set it before the site goes live. The technical ones the base unit blacklists - `/website/charset`, `/website/lang` - are deliberately left out here and are edited on the workbench's Text Keys tab afterwards.
 
+The links to the site's profiles elsewhere - Instagram, YouTube and the like - are not asked for here: they are the catalogue feature [Social links](https://github.com/dapeio/nino-features/blob/main/features/Social/README.md), an element type the editors keep under Elements once it is switched on.
+
 ## 5. Accounts
 
 This step creates the root account of the workbench: the **Developer** role, full access over `/*`, the account you sign in to `/_admin` with. Submit again for a second one, then continue. Editor accounts with fewer rights are created later, in the workbench's **Users** panel, from the **Editor** role - both roles are written by the Setup step and edited on the Users panel's roles tab.

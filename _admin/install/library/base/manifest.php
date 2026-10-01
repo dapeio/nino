@@ -27,12 +27,6 @@
 		// is exactly the silent no-header a delivery must never ship
 		'theme.header.tpl',
 		'theme.footer.tpl',
-		// Not included by theme.footer.tpl itself, but by a footer that
-		// replaces it: [template /templates/html-socialmedia]. It travels
-		// with the base unit so that include resolves in any project -
-		// without the file, it silently resolves to an empty string, and a
-		// footer bringing its own copy is a footer a project cannot swap
-		'html-socialmedia.tpl',
 		'robots.tpl',
 		'sitemap-xml.tpl',
 		'llms-txt.tpl',

@@ -928,6 +928,25 @@ All notable changes to Nino are documented in this file.
   or template names an address from the domain root; `nino-auth-js-smoke.js`
   holds `Nino.dir` and the endpoints under it.
 
+### Removed
+
+- **The social media links left the base unit for the catalogue.** The keys
+  `/company/instagram`, `/company/facebook`, `/company/youtube` and
+  `/company/telegram`, which the Personal Information step asked for, the
+  heading `/website/footer/title/followus`, the template `html-socialmedia.tpl`
+  that drew them - four brand icons of unknown origin, every link opening a
+  new tab - and the `.nino-socialmedia` rules in `Nino.css`. Four networks
+  fixed as text keys were the wrong shape for a list a site keeps: the
+  catalogue's feature Social links is an element type the editors keep under
+  Elements, with icons from Lucide, every address checked before it becomes a
+  link, and `[social]`, `[social-link]` and `[social-icon]` to draw it. The
+  Design feature's frames include that feature's template instead. The demo
+  catalogue's "Social and partners" is "Partners", with the logo bar alone;
+  `install-library-templates-js-smoke.js` lost its check of the icons' paint
+  (9 → 8 checks); `install-smoke.php` holds that the Personal Information step
+  asks for no network's address (270 → 271); and the setup manual and its
+  German twin say where the links went.
+
 ## 1.3.1 — 2026-09-22
 
 ### Changed

@@ -65,7 +65,7 @@
 				<a href="#ablauf" class="nino-btn nino-btn--outline nino-btn--small">Features and process</a>
 				<a href="#kennzahlen" class="nino-btn nino-btn--outline nino-btn--small">Metrics</a>
 				<a href="#navigation" class="nino-btn nino-btn--outline nino-btn--small">In-content navigation</a>
-				<a href="#social" class="nino-btn nino-btn--outline nino-btn--small">Social and partners</a>
+				<a href="#partner" class="nino-btn nino-btn--outline nino-btn--small">Partners</a>
 				<a href="#profil" class="nino-btn nino-btn--outline nino-btn--small">Profile, contact, quote</a>
 				<a href="#video" class="nino-btn nino-btn--outline nino-btn--small">Video</a>
 				<a href="#tabs" class="nino-btn nino-btn--outline nino-btn--small">Tabs and filters</a>
@@ -1773,21 +1773,14 @@
 	</div>
 </section>
 
-<section class="nino-section nino-mt-0 nino-mb-0" id="social" aria-labelledby="social-title">
+<section class="nino-section nino-mt-0 nino-mb-0" id="partner" aria-labelledby="partner-title">
 	<div class="nino-grid-row nino-grid-row--wide">
 		<div class="nino-grid-100 nino-mb-2">
-			<h3 class="nino-section-title nino-text-left" id="social-title">Social and partners</h3>
-			<p class="nino-section-subtitle nino-text-left">The icon row usually appears in the footer, while the logo bar sits in the page content.</p>
+			<h3 class="nino-section-title nino-text-left" id="partner-title">Partners</h3>
+			<p class="nino-section-subtitle nino-text-left">A logo bar for the page content.</p>
 		</div>
-		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left nino-mb-3"><span class="nino-badge nino-badge--pill">.nino-socialmedia</span> <span class="nino-badge nino-badge--pill">.nino-logos</span> <span class="nino-badge nino-badge--pill">.nino-logos-item</span></div>
-		<div class="nino-grid-100 nino-grid-m-33 nino-mb-3">
-			<ul class="nino-socialmedia nino-mb-3">
-				<li><a href="#social" aria-label="Mastodon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20m0 3a7 7 0 1 1 0 14 7 7 0 0 1 0-14"></path></svg></a></li>
-				<li><a href="#social" aria-label="RSS"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20m0 3a7 7 0 1 1 0 14 7 7 0 0 1 0-14"></path></svg></a></li>
-				<li><a href="#social" aria-label="E-Mail"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20m0 3a7 7 0 1 1 0 14 7 7 0 0 1 0-14"></path></svg></a></li>
-			</ul>
-		</div>
-		<div class="nino-grid-100 nino-grid-m-66">
+		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left nino-mb-3"><span class="nino-badge nino-badge--pill">.nino-logos</span> <span class="nino-badge nino-badge--pill">.nino-logos-item</span></div>
+		<div class="nino-grid-100">
 			<div class="nino-logos">
 				<span class="nino-logos-item">Nordlicht</span>
 				<span class="nino-logos-item">Werkhaus</span>

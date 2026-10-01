@@ -148,6 +148,8 @@ Sprachunabhängig sind beispielsweise:
 
 Land und Beschreibung werden je Sprache gespeichert. Wechsle deshalb jede aktive Sprache durch und speichere deren Werte.
 
+Links zu den Profilen der Website anderswo – Instagram, YouTube und Co. – fragt der Schritt nicht ab: Sie sind das Katalog-Feature [Social-Media-Links](https://github.com/dapeio/nino-features/blob/main/features/Social/README.md), ein Elementtyp, den die Redaktion unter Elemente pflegt, sobald es eingeschaltet ist.
+
 Der Schritt zeigt bewusst nicht alle Textfills des Projekts. Technische Schlüssel, Design-Tokens und tiefere Seiten- oder Modulinhalte werden später in der Workbench gepflegt – unter Texte und Textschlüssel.
 
 ## 5. Accounts

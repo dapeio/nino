@@ -988,7 +988,6 @@ body.nino-scroll-down .nino-scroll-header {
  *			.nino-pricing-row, .nino-pricing-item(--featured), .nino-pricing-title, .nino-pricing-price
  *			.nino-accordion, .nino-accordion-trigger, .nino-accordion-panel
  *			.nino-pagination
- *			.nino-socialmedia
  *			.nino-logos, .nino-logos-item
  *			.nino-gallery, .nino-gallery-item(--wide, --tall)
  *			.nino-feature-list, .nino-feature-item
@@ -1661,27 +1660,6 @@ body.nino-scroll-btf .nino-back-to-top {
 	color: var(--color-primary-text);
 }
 
-
-/* Social Media */
-.nino-socialmedia {
-	display: flex;
-	flex-wrap: wrap;
-	align-items: center;
-	justify-content: flex-start;
-	gap: var(--space-1);
-}
-.nino-socialmedia > li {
-	opacity: .7;
-	transition: opacity .2s ease;
-}
-.nino-socialmedia > li:hover {
-	opacity:1;
-}
-.nino-socialmedia > li > a > svg {
-	width:24px;
-	height:24px;
-	fill: var(--color-footer-text-main);
-}
 
 /* Logo/Partner strip - text placeholders standing in for real logo
    images (SVG/PNG), grayscale-to-color on hover */

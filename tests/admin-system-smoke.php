@@ -1758,9 +1758,10 @@ check( '...and a number is shown as the text it stands for', ( $oddEntries[ arra
 check( '...while a value that is no text at all is left out rather than rendered as one', in_array( '/company/list', $oddKeys, true ) === false );
 
 // A plain-text value is substituted raw by Html::_renderFills(), attribute
-// values included ('<a href="[[/company/facebook]]">'), so a stored quote is
-// an attribute break-out that strip_tags() never sees. Entities render as the
-// character itself in both contexts, and re-encode to themselves on a re-save
+// values included ('<meta name="author" content="[[/website/author]]">'), so
+// a stored quote is an attribute break-out that strip_tags() never sees.
+// Entities render as the character itself in both contexts, and re-encode to
+// themselves on a re-save
 [ $status, $body ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSaveBatch', [ 'items' => [
 	[ 'key' => '/company/tagline', 'locale' => '*', 'value' => 'x" onmouseover="alert(1)' ],
 ] ] );

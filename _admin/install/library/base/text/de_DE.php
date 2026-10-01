@@ -10,7 +10,6 @@
 	'[[/global/phone]]' => 'Telefon',
 	'[[/global/email]]' => 'E-Mail',
 	
-  '[[/website/footer/title/followus]]' => 'Social Media',
 	'[[/website/footer/title/getintouch]]' => 'Hier sind wir',
 
 	// Slider - die Wörter, die seine Bedienelemente für einen Screenreader tragen

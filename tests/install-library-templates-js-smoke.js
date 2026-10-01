@@ -293,24 +293,5 @@ check( 'frame aria-label fills resolve from base without optional modules'
 	frameAriaLabels.size === 2 && missingBaseFrameLabels.length === 0
 );
 
-/* The social list is not in the delivered footer, but travels with base for a
- * footer that includes it (see the base manifest). Its icons must use the text
- * role of that surface; presentation attributes on a path or svg would
- * override the shared CSS fill and make a light footer unreadable. */
-const socialMarkup = fs.readFileSync( path.join( LIBRARY, 'base/templates/html-socialmedia.tpl' ), 'utf8' );
-const fixedSocialPaint = Array.from( socialMarkup.matchAll( /\b(?:fill|stroke)=["'](?!none["']|currentColor["'])[^"']+["']/g ), function( match ) {
-	return match[0];
-} );
-const publicCss = fs.readFileSync( path.join( ROOT, '_nino/Nino.css' ), 'utf8' );
-const socialRule = publicCss.match( /\.nino-socialmedia\s*>\s*li\s*>\s*a\s*>\s*svg\s*\{([^}]*)\}/ );
-const usesFooterTextRole = socialRule !== null
-	&& /\bfill\s*:\s*var\(\s*--color-footer-text-main\s*\)\s*;?/.test( socialRule[1] )
-	&& /--color-primary-text/.test( socialRule[1] ) === false;
-
-check( 'social icons inherit the footer text role without fixed SVG paint'
-	+ ( fixedSocialPaint.length === 0 ? '' : ' - '+ fixedSocialPaint.join(', ') ),
-	fixedSocialPaint.length === 0 && usesFooterTextRole
-);
-
 console.log( '\n'+ checks+ ' checks, '+ failures+ ' failed' );
 process.exitCode = failures === 0 ? 0 : 1;

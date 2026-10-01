@@ -6,7 +6,6 @@
 	
 	'[[/website/header/title/navigation]]' => 'Main navigation',
 	'[[/website/footer/title/navigation]]' => 'Navigation',
-  '[[/website/footer/title/followus]]' => 'Follow us',
 	'[[/website/footer/title/getintouch]]' => 'Here we are',
 
 	'[[/global/adress]]' => 'Address',

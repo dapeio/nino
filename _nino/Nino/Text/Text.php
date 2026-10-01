@@ -237,11 +237,12 @@ namespace Nino {
 			// survive an attribute though, and Html::_renderFills() is a blind
 			// str_replace over the finished document: the shipped templates put
 			// plain-text fills inside href/src/alt/content/title (eg.
-			// '<a href="[[/company/facebook]]">' in html-socialmedia.tpl), where
-			// a stored value of  x" onmouseover="...  closes the attribute and
-			// opens an event handler that fires for every visitor. The quotes go
-			// in as entities, which render as themselves in text and as
-			// themselves in an attribute, so nothing on screen changes.
+			// '<meta name="author" content="[[/website/author]]">' in
+			// html-header.tpl), where a stored value of  x" onmouseover="...
+			// closes the attribute and opens an event handler that fires for
+			// every visitor. The quotes go in as entities, which render as
+			// themselves in text and as themselves in an attribute, so nothing
+			// on screen changes.
 			// Deliberately not htmlspecialchars(): that also encodes '&', and a
 			// value re-saved from the editor would gain a round of escaping on
 			// every pass. Neither entity below contains a quote, so this stays

@@ -29,10 +29,6 @@
 		that is no address falls back to the address above, with a line in
 		the log	*/
 	'[[/mail/sender]]' => '',
-	'[[/company/instagram]]' => 'https://www.instagram.com/your-company',
-	'[[/company/facebook]]' => 'https://www.faceboook.com/your-company',
-	'[[/company/youtube]]' => 'https://www.youtube.com/your-company',
-	'[[/company/telegram]]' => 'https://t.me/your-company',
 
 	'[[/website/url]]' => 'www.example.com',
 	'[[/website/charset]]' => 'UTF-8',
