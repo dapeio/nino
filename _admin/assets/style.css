@@ -538,10 +538,9 @@ a {
 /* Not the link-shaped one: it has no surface to tint, and this rule weighs
    more than its own (three classes and an element against three classes), so
    naming the exception here is the only place it can be made */
-:where(.nino-admin) button:hover:not(:disabled):not(.is-active):not(.nino-admin-linkbutton) {
+:where(.nino-admin) button:hover:not(:disabled):not(.is-active):not(.nino-admin-linkbutton):not(.nino-admin-btn-primary) {
 	background: var(--editor-blue-soft);
 }
-
 :where(.nino-admin) button:active {
 	transform: none;
 }

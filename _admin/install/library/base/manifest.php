@@ -40,7 +40,6 @@
 	'blacklist' => [
 		'/website/lang',
 		'/website/charset',
-		'/website/url',
 	],
 	/*	Copied wherever this project keeps that kind of file, so each entry
 		follows \Nino\Filesystem::path() rather than a literal directory.

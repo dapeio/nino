@@ -41,7 +41,7 @@
 		// renders, just appended after these in whatever order apiList()
 		// returned (alphabetical, see \Nino\Text::entries())
 		ORDER : [
-			'/company/name', '/company/email', '/company/phone', '/company/adress',
+			'/website/url', '/company/name', '/company/email', '/company/phone', '/company/adress',
 			'/website/author', '/website/host',
 			'/company/country', '/company/description',
 		],

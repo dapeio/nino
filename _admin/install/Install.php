@@ -1974,7 +1974,7 @@ namespace Nino\Install {
 			// hard-coding a path that this step can change on the next apply.
 			// Global rather than per-locale: an entry carries exactly one
 			// Http-URI for every locale (see _suggestions()). Blacklisted for
-			// the same reason /website/url is - a technical value, not
+			// the same reason /website/charset is - a technical value, not
 			// wording anybody edits in /_admin's Text panel
 			if( $routeKey !== null ) {
 				if( \Nino\Features::mergeText( $appData, '/text/global.php', [
@@ -2152,6 +2152,8 @@ namespace Nino\Install {
 
 		// Only these two prefixes are in scope - see this class's docblock
 		private const array KEY_PREFIXES = [ '/company/', '/website/' ];
+		// Blacklisted text keys
+		private const array KEY_BLACKLIST = [ '/website/charset', '/website/lang' ];
 
 		/**
 		 *	This module's action map, merged into Install::handlePost()'s dispatch
@@ -2181,8 +2183,8 @@ namespace Nino\Install {
 			$keys = self::_keys();
 
 			$entries = array_values( array_filter(
-				\Nino\Text::entries( $appData, false ),
-				fn( array $entry ): bool => isset( $keys[$entry['key']] )
+				\Nino\Text::entries( $appData, true ),
+				fn( array $entry ): bool => ( isset( $keys[$entry['key']] ) && ! in_array( $entry['key'], self::KEY_BLACKLIST ) )
 			) );
 
 			foreach( $entries as &$entry )
@@ -2252,7 +2254,7 @@ namespace Nino\Install {
 			$data 	= \Nino\Install\Install::postData();
 			$items 	= is_array( $data['items'] ?? null ) ? $data['items'] : [];
 
-			\Nino\Http::ok( $request, [ 'results' => \Nino\Text::saveBatch( $appData, $items, false ) ] );
+			\Nino\Http::ok( $request, [ 'results' => \Nino\Text::saveBatch( $appData, $items, true ) ] );
 		}
 	}
 
