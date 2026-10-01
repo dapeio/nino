@@ -713,6 +713,7 @@ temporary project and must not rely on a previously installed working tree.
 | The feature contract (`\Nino\Features`, the wizard's unit application) | `tests/features-smoke.php` |
 | The catalogue (`\Nino\Catalogue`, `\Nino\Fetch`, the panel's catalogue and install actions) | `tests/catalogue-smoke.php` - a keypair, signed catalogues and archives built in the test, the network stubbed |
 | A feature (a new one, or one of the catalogue's such as Newsletter or Search) | its own `features/<Name>/tests/<key>-smoke.php`, plus `tests/features-smoke.php`; CI's `features` job runs the catalogue's features against every push |
+| Anything a catalogue feature reads from the kernel - the demo catalogue page and its `data-demo-preset` marks, `Nino.css`, the base unit's templates and keys, the feature contract | the catalogue's own checks against this checkout, before the push: `NINO_ROOT=$PWD ../nino-features/bin/check.sh`, with [dapeio/nino-features](https://github.com/dapeio/nino-features) cloned beside it. CI's `features` job runs the same tests after the push - a key renamed on one side alone turns it red, so a rename that spans both repositories is pushed to the catalogue first and to Nino right after, and the push that changes Nino's side finds the catalogue renamed already |
 | Shared public UI slider/tabs | corresponding `tests/nino-ui-*-js-smoke.js` |
 | Shared management UI/CSS structure | owner tests plus `tests/admin-lists-js-smoke.js` |
 | Multi-element reference control | `tests/nino-ui-elementlist-js-smoke.js` plus both element forms' own tests |

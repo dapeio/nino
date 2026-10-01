@@ -6,6 +6,13 @@ All notable changes to Nino are documented in this file.
 
 ### Added
 
+- **Docs:** `THIRD-PARTY-NOTICES.md`, the notice for the one piece of
+  third-party work Nino ships. The workbench's pages, the install wizard and
+  every panel's `icon()` draw Lucide's icons, which are ISC-licensed, and
+  the ones Lucide took over from Feather are MIT-licensed as well; both
+  licenses ask for their notice in every copy, and no file carried it. Both
+  READMEs name the file under their license.
+
 - **Elements:** `\Nino\Elements::prevElement( $appData, $elementUri, $locale,
   $return, $options )` and `nextElement()`, the element before and after
   one in the order its type lists them - the type file's own order, which
@@ -78,6 +85,40 @@ All notable changes to Nino are documented in this file.
   in `usableUsers()` turns it red.
 
 ### Changed
+
+- **Install:** the Personal Information step asks for the website's
+  address. `/website/url` - the domain without the protocol, which the base
+  unit's templates put behind `https://` for the canonical link, the Open
+  Graph and Twitter tags, the JSON-LD block, `sitemap.xml` and `robots.txt` -
+  is off the base unit's blacklist: the step shows it first, and the Text
+  panel lists it with the other `/website/*` keys. The two keys the step
+  still leaves out, `/website/charset` and `/website/lang`, are the step's
+  own `KEY_BLACKLIST`. The setup manual and its German twin list the address
+  with the keys the step shows and say what it feeds; they still counted it
+  among the technical keys left out.
+
+- **Docs:** AGENTS.md's test matrix names the check a change needs that a
+  catalogue feature reads - the demo catalogue page and its
+  `data-demo-preset` marks, `Nino.css`, the base unit's templates and keys,
+  the feature contract: the catalogue's own `bin/check.sh` against this
+  checkout, before the push. CI's `features` job runs the same tests, but
+  after it, and that is where the marks the demo catalogue gave the list, the
+  table and the accordion met them: `static-*` on this side, `items-*` in the
+  Templates feature still, three red checks in `demo-catalogue-smoke.php`.
+
+- **CI:** a checkout without `app/.htaccess` or `features/.htaccess` is told
+  so first. Each is the one file its directory holds, git keeps no empty
+  directory, and PHPStan - `phpstan.neon` analyses both directories - ended
+  the job with "Path … does not exist" before `tests/kernel-smoke.php`, which
+  holds the four denied directories to their `.htaccess`, got to name the
+  file - a run in September ended that way, and `features/.htaccess` went
+  missing once more on 22 September. A step before PHPStan names the missing
+  file now.
+
+- **Tests:** `tests/admin-system-smoke.php` reads the tab bar with the
+  `nino-admin-tabs--panel` modifier the panel's strip carries since 1.3.1, as
+  `tests/admin-smoke.php` did in 1.3.1 already. The tag's own CI run failed
+  on that one check.
 
 - **Elements:** a type's entries are a table, not a list of titles. One
   column per field a cell can show - `elements/list` has answered those
@@ -513,44 +554,16 @@ All notable changes to Nino are documented in this file.
   the project root, `private` and `public`; and the page library's
   include count said seven units where `library/pages/` holds eight.
 
-- **Docs:** the base unit's `theme.css` header no longer points at the
-  catalogue's `design-library/`, a directory the catalogue dropped on
-  purpose: the whole-page themes the wizard used to offer are gone, a
-  project composes its look from the Design feature's part sets, and a
-  presets field that combines them may come later. The Design feature's
-  `library/base.css` carries this header byte for byte and follows in its
-  own patch.
-
-- **Docs:** the feature directory in `docs/features.md`, its German twin and
-  `docs/recipes/feature.md` shows `templates/`, the directory the catalogue's
-  AGENTS.md asks every feature that draws anything to keep its markup in;
-  and the element recipe's image address is `[[/nino/public]]/images/…`,
-  the fill the base unit's own templates use, where it read `[[/nino/dir]]`
-  - the project directory, which is not where a public file is served from.
-
-- **Docs:** README, SECURITY.md and the two deployment manuals no longer
-  call Nino a beta. 1.3.0 is a release, and the five sentences that said
-  otherwise were written before there was one; what they said beside it -
-  the latest release is the supported one, fixes land on `main`, there is no
-  LTS line - stands as it was.
-
-- **Docs:** thirteen comments in the Elements, Users, Images and Text panels
-  sent the reader to `elements.js`, a file that has been `admin.js` since the
-  panel scripts were named alike, and one docblock in `Elements/Types/Types.php` named
-  `\Nino\Modules\Elements\Admin::insertElementType()`, a method that lives in
-  `\Nino\Elements`. Every one names the file and the class that exist.
-
-- **Tests:** three checks in `tests/admin-system-smoke.php` read the source
-  of the restore for `rename(`, `lockFile( $appData, '/config.php' )` and
-  `'/nino/admin/restore'`, so a refactor that spelled any of them differently
-  turned them red while a restore that dropped the behaviour behind a
-  different spelling would not. They measure the restore now: `config.php`
-  is another file afterwards, with nothing temporary beside it; it does not
-  change while another process holds its lock, watched from that process at
-  the write step itself; and the module callback is handed the live data
-  directory and the extracted backup.
-
 ### Fixed
+
+- **1.3.1 called itself 1.3.0.** The release was tagged without the commit
+  that names it: `\Nino\VERSION` - what a feature's `nino` constraint is
+  checked against - stayed `'1.3.0'`, the manuals' headers too, and the
+  changelog kept 1.3.1's entries under Unreleased. `\Nino\VERSION` is
+  `'1.3.1'`, the headers say 1.3.1 of 22 September, and the entries the tag
+  carried have their own section below. The tag itself still reports 1.3.0.
+  The German README called Nino a beta as well, a sentence the English one
+  had dropped in 1.3.1; it says released now.
 
 - **Install:** the Routes step reported success over a template it could
   not write. It kept its own copies of the unit helpers that Setup handed
@@ -915,15 +928,57 @@ All notable changes to Nino are documented in this file.
   or template names an address from the domain root; `nino-auth-js-smoke.js`
   holds `Nino.dir` and the endpoints under it.
 
+## 1.3.1 — 2026-09-22
+
+### Changed
+
+- **Docs:** the base unit's `theme.css` header no longer points at the
+  catalogue's `design-library/`, a directory the catalogue dropped on
+  purpose: the whole-page themes the wizard used to offer are gone, a
+  project composes its look from the Design feature's part sets, and a
+  presets field that combines them may come later. The Design feature's
+  `library/base.css` carries this header byte for byte and follows in its
+  own patch.
+
+- **Docs:** the feature directory in `docs/features.md`, its German twin and
+  `docs/recipes/feature.md` shows `templates/`, the directory the catalogue's
+  AGENTS.md asks every feature that draws anything to keep its markup in;
+  and the element recipe's image address is `[[/nino/public]]/images/…`,
+  the fill the base unit's own templates use, where it read `[[/nino/dir]]`
+  - the project directory, which is not where a public file is served from.
+
+- **Docs:** README, SECURITY.md and the two deployment manuals no longer
+  call Nino a beta. 1.3.0 is a release, and the five sentences that said
+  otherwise were written before there was one; what they said beside it -
+  the latest release is the supported one, fixes land on `main`, there is no
+  LTS line - stands as it was.
+
+- **Docs:** thirteen comments in the Elements, Users, Images and Text panels
+  sent the reader to `elements.js`, a file that has been `admin.js` since the
+  panel scripts were named alike, and one docblock in `Elements/Types/Types.php` named
+  `\Nino\Modules\Elements\Admin::insertElementType()`, a method that lives in
+  `\Nino\Elements`. Every one names the file and the class that exist.
+
+- **Tests:** three checks in `tests/admin-system-smoke.php` read the source
+  of the restore for `rename(`, `lockFile( $appData, '/config.php' )` and
+  `'/nino/admin/restore'`, so a refactor that spelled any of them differently
+  turned them red while a restore that dropped the behaviour behind a
+  different spelling would not. They measure the restore now: `config.php`
+  is another file afterwards, with nothing temporary beside it; it does not
+  change while another process holds its lock, watched from that process at
+  the write step itself; and the module callback is handed the live data
+  directory and the extracted backup.
+
+### Fixed
+
 - **The panel tab strip's exception was spelled with a class outside the
   design system's namespace.** `Fixed(/admin): tabs styling` kept the
   generic tab rules off the pane's own strip with
   `:not(.admin-panel-tabs)` - a workbench class inside the `nino.system`
   layer, which `tests/admin-lists-js-smoke.js` holds to `nino-admin-*`
   classes alone. The strip carries `nino-admin-tabs--panel` now, the three
-  exceptions name that, the tool-layer rules on `.admin-panel-tabs` are as
-  they were, and the two suites that read the fragment as a string -
-  `admin-smoke.php` and `admin-system-smoke.php` - name the modifier.
+  exceptions name that, and the tool-layer rules on `.admin-panel-tabs` are
+  as they were.
 
 - **The demo catalogue page posted its newsletter forms from the domain
   root.** Both newsletter sections of `.demo-catalogue.tpl` wrote

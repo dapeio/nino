@@ -2,7 +2,7 @@
 
 **Sprache:** [English](setup.md) · Deutsch
 
-**Stand:** 21. September 2026 · **Nino-Version:** 1.3.0
+**Stand:** 22. September 2026 · **Nino-Version:** 1.3.1
 
 Dieses Handbuch erklärt die Entscheidungen und Schreibvorgänge der sechs Schritte des Einrichtungsassistenten – des Erststart-Modus der [`/_admin`-Workbench](_admin.de.md). Falls du stattdessen auf dem kürzesten Weg vom Checkout zur eingerichteten Webseite gelangen möchtest, beginne mit [Erste Schritte](getting-started.de.md); den späteren produktiven Betrieb behandelt [Deployment](deployment.de.md).
 
@@ -140,6 +140,7 @@ Beim erneuten Anwenden ersetzt die Liste nur die Routen, die aus ihrem vorherige
 
 Sprachunabhängig sind beispielsweise:
 
+- Adresse der Website (`/website/url`) – die Domain ohne Protokoll, etwa `www.example.com`. Die Templates der Basis-Einheit setzen sie hinter `https://` für Canonical-Link, Open-Graph- und Twitter-Tags, JSON-LD, `sitemap.xml` und `robots.txt`, die Mails des Form-Moduls nennen sie; sie gehört also vor dem Livegang gesetzt;
 - Unternehmensname;
 - E-Mail-Adresse und Telefonnummer;
 - Anschrift;

@@ -229,11 +229,11 @@ Nino hält seine Architektur bewusst klein: Ein zentrales `$appData`-Array träg
 
 ## Status und Sicherheit
 
-Nino befindet sich als Gesamtprojekt derzeit in der **Beta-Phase**. Einzelne optionale Werkzeuge besitzen einen eigenen, niedrigeren Reifegrad:
+Kernel, Frontend, Workbench und Projektgrundlage von Nino sind **veröffentlicht** – 1.3.0 ist das erste Release. Einzelne optionale Werkzeuge besitzen einen eigenen, niedrigeren Reifegrad:
 
 | Bereich                                          | Status                                    |
 | ------------------------------------------------ | ----------------------------------------- |
-| Kernel, Frontend, Workbench und bestehende Projektgrundlage | Beta                           |
+| Kernel, Frontend, Workbench und bestehende Projektgrundlage | Veröffentlicht                 |
 | Template-Baukasten (Feature aus dem [Katalog](https://github.com/dapeio/nino-features)) | Alpha                                     |
 
 Sicherheitskorrekturen landen direkt auf `main`; eine separate LTS-Version gibt es noch nicht.
@@ -242,4 +242,6 @@ Sicherheitsprobleme sollten nicht als öffentliches Issue gemeldet werden. Konta
 
 ## Lizenz
 
-[MIT](https://github.com/dapeio/nino/blob/main/LICENSE)
+[MIT](https://github.com/dapeio/nino/blob/main/LICENSE). Die Icons der Workbench stammen von
+[Lucide](https://lucide.dev) (ISC, die aus Feather übernommenen zusätzlich MIT); ihre Lizenzhinweise stehen in
+[THIRD-PARTY-NOTICES.md](https://github.com/dapeio/nino/blob/main/THIRD-PARTY-NOTICES.md).

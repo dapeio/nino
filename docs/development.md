@@ -2,7 +2,7 @@
 
 **Language:** English · [Deutsch](development.de.md)
 
-**Last updated:** September 21, 2026 · **Nino version:** 1.3.0
+**Last updated:** September 22, 2026 · **Nino version:** 1.3.1
 
 This manual describes the technical work with Nino — from the entry point through routing and rendering to custom modules, persistent data, and tests. If you instead want to first learn about the architecture or set up a fresh project, read the [Concepts](concepts.md) or [Getting Started](getting-started.md).
 

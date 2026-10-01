@@ -35,6 +35,13 @@ jobs:
       - name: Lint all JS files
         run: find . -name "*.js" -not -path "./.git/*" -print0 | xargs -0 -n1 node --check
 
+      # app/ and features/ hold nothing but their .htaccess in a checkout, and
+      # git keeps no empty directory: without the file there is no directory,
+      # and PHPStan - phpstan.neon analyses both - stops with "Path ... does
+      # not exist" before kernel-smoke.php gets to name what is missing
+      - name: Check the directories a checkout ships
+        run: for dir in app features; do [ -f "$dir/.htaccess" ] || { echo "::error file=$dir/.htaccess::$dir/.htaccess is missing - it is what keeps $dir/ in a checkout and what denies it to a browser"; exit 1; }; done
+
       # Static analysis - phpstan.neon holds level and paths, the baseline
       # next to it the findings that were open when the check arrived, so
       # only something new fails here

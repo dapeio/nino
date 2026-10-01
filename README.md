@@ -241,4 +241,6 @@ Security issues should not be reported as public issues. Contact details and the
 
 ## License
 
-[MIT](https://github.com/dapeio/nino/blob/main/LICENSE)
+[MIT](https://github.com/dapeio/nino/blob/main/LICENSE). The icons of the workbench come from
+[Lucide](https://lucide.dev) (ISC, the ones taken over from Feather also MIT); their notices are in
+[THIRD-PARTY-NOTICES.md](https://github.com/dapeio/nino/blob/main/THIRD-PARTY-NOTICES.md).

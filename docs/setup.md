@@ -2,7 +2,7 @@
 
 **Language:** English · [Deutsch](setup.de.md)
 
-**Last updated:** September 21, 2026 · **Nino version:** 1.3.0
+**Last updated:** September 22, 2026 · **Nino version:** 1.3.1
 
 This manual explains the decisions and writing processes of the six steps of the setup wizard - the first-run mode of the [`/_admin` workbench](_admin.md). If you instead want to take the shortest path from checkout to a configured website, start with [Getting Started](getting-started.md); the later production operation is covered in [Deployment](deployment.md).
 
@@ -135,6 +135,7 @@ This step records central company and website values as textfills. It edits noth
 
 Language-independent, in the order the form shows them:
 
+- `/website/url`
 - `/company/name`
 - `/company/email`
 - `/company/phone`
@@ -144,7 +145,7 @@ Language-independent, in the order the form shows them:
 
 `/company/country` and `/company/description` are stored per language, so step through every active language and save its values. A `/company/*` or `/website/*` key a library fork adds is offered too, appended after these.
 
-These textfills are used in templates, meta tags, and possibly in the footer or contact forms. The technical ones the base unit blacklists - `/website/url`, `/website/charset`, `/website/lang` - are deliberately left out here and are edited on the workbench's Text Keys tab afterwards.
+These textfills are used in templates, meta tags, and possibly in the footer or contact forms. `/website/url` is the site's address without the protocol - `www.example.com` -: the base unit's templates put it behind `https://` for the canonical link, the Open Graph and Twitter tags, the JSON-LD block, `sitemap.xml` and `robots.txt`, and the Form module's mails name it, so set it before the site goes live. The technical ones the base unit blacklists - `/website/charset`, `/website/lang` - are deliberately left out here and are edited on the workbench's Text Keys tab afterwards.
 
 ## 5. Accounts
 
