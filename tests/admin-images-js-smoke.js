@@ -310,6 +310,9 @@ vm.runInContext( imagesSource, shellContext, { filename : 'admin.js' } );
 
 const shellPanel = shellNino.admin.images;
 shellPanel._locales = [ 'de_DE', 'en_US' ];
+const grouped = shellPanel._groupSlots( [ '/template/page-home/hero/image', '/template/page-home/about/image', '/template/frame-header/logo/image', '/logo', '/home/hero', '/constructor/x' ].map( uri => ( { uri : uri } ) ) );
+check( 'slots are grouped as the Text panel groups keys: /template/<category> for a key of the grammar, the first segment for any other',
+	Object.keys( grouped ).join() === 'template/page-home,template/frame-header,logo,home,constructor' && grouped['template/page-home'].length === 2 && grouped['template/frame-header'].length === 1 );
 shellPanel._groups = { 'page-home' : [ slot() ] };
 const shellAnswer = function( status, body ) { shellRequests[shellRequests.length - 1].callback( { status : status, responseJSON : body } ) };
 const registered = registry._entries.images;

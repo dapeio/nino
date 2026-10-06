@@ -735,6 +735,70 @@ All notable changes to Nino are documented in this file.
   code, no old key family left in any shipped file, and `category()` and
   `isGrammarKey()` over a table of cases. CI runs it in `lint-and-test`.
 
+- **Workbench, Text:** texts are found by search. The Text panel and the Keys
+  tab open with a search field above the list: every word must occur in the
+  key, the text or the name shown for it, accents and case do not matter, and
+  a word that starts with `/` looks at the key only. A hit shows the name, the
+  place it belongs to and the match marked in the text, and opens the form on
+  that field. At most 50 hits show, then *Show more*. The language code next
+  to a hit switches the language the panel works in, *Empty in <language>*
+  lists what is still missing in it, and the Keys tab has the chip *Hidden
+  only*. A row opens by `#text/<key>` and `#keys/<key>` as well as by its row.
+  New module `Nino.admin.textKeys` (`textkeys.js`) holds the model both panels
+  share (rows, blocks, sections, fields, the search) without touching the DOM
+  apart from the search bar and the hit; `Nino.adminUi.describeKey()`,
+  `slugLabel()` and `humanize()` name a key by the vocabulary.
+
+- **Workbench, Text:** the list is grouped the way an editor thinks. *Pages*
+  come first in the order of the saved routes, a sub-page behind its page - the
+  legal page and the demo catalogue, which have no template of their own to
+  name, with a row each - then the block *General*: the project (company,
+  website, mail), the common words, the building blocks sorted by name, the
+  modules, the features, the system's own (languages, page details without a
+  page) and the other keys. A page's form carries its details - name, title
+  and description, the system keys `/_nino/webpage<uri>/*`; the path is not
+  shown - in a section of its own above the template's texts, and both are
+  saved in one request. The log line names every
+  group the request touched (`Edit Text /template/page-home, /_nino/webpage/home`).
+  The form shows each field with its German or English name from the
+  vocabulary, a subtitle for what it is, an *All languages* badge for a global
+  key and the key itself as small text; the sections' preview shows the first
+  filled text.
+
+- **Workbench, vocabulary:** 133 words `/_admin/common/word/<slug>` in both
+  languages (*Name*, *Titel*, *Beschreibung*, *Preis*, ...). A key's last
+  segments are looked up here: a word is itself, `<word>-<number>` is
+  "<word> <number>", `<left>-<word>` is "<left> · <word>", and what the
+  vocabulary does not know is humanized (`opening-hours` is *Opening hours*).
+  The Elements field labels, the Images slot groups and the wizard's personal
+  information fields use it, so the editor reads the same word in every place.
+
+- **Workbench, Text Keys:** a key is created segment by segment. The form asks
+  for the namespace, the category, the part and the name in four fields, shows
+  the key it makes and checks every segment while it is typed against
+  `[a-z0-9]+(-[a-z0-9]+)*`; the category offers the ones the project has. The
+  namespace choice starts with `/project`, *Unlock* adds `/template`,
+  `/feature` and `/module`, and `/_nino` and `/_admin` are never offered.
+  Renaming a key uses the same form with the segments filled in, and a key of
+  the system or the workbench has no *Rename*. A global value and the first
+  value are asked only when a key is created.
+
+- **Workbench, Elements:** the key of a field is picked from a list of 17 words
+  (`name`, `title`, `description`, `price`, ...), with *Own key …* to
+  type another one.
+
+- **`tests/admin-text-js-smoke.js`** (83 -> 244 checks) holds the model, the
+  search, the sections, the form, the page details and the locale switch on a
+  fake DOM; `tests/admin-router-js-smoke.js` (50 -> 60) the hash links of both
+  panels; `tests/admin-elements-js-smoke.js` (226 -> 230) and
+  `tests/admin-elementtypes-js-smoke.js` (77 -> 85) the labels and the key
+  picker; `tests/admin-smoke.php` (409 -> 424) the order, pages, templates and
+  features `keys` answers and the log line; `tests/admin-system-smoke.php`
+  (1011 -> 1023) the categories of the Keys list and that both languages carry
+  the same vocabulary; `tests/admin-images-js-smoke.js` (49 -> 50) the
+  grouping of slots; `tests/install-smoke.php` (307 -> 309) the wizard's
+  labels.
+
 ### Changed
 
 - **Workbench:** what the panels print for a failure. A failure with a code is
@@ -1135,6 +1199,29 @@ All notable changes to Nino are documented in this file.
   declare `nino ^1.4`; a feature that only reads its own keys is not
   concerned.
 
+- **Workbench, Text:** `keys` answers four more members: `order` (a key to its
+  place in the files, for the order the editor expects), `pages` (the saved
+  routes that are pages, `null` without the Routes panel, for the page rows),
+  `templates` (a category to its template file and the
+  `<!-- nino:template-name -->` of it) and `features`.
+  The keys of the workbench itself (`/_admin/...`) are not listed in the Text
+  panel any more, they are Nino's words and not the project's. `keys/list`
+  answers `selectedLocale` and `categories`. The log line of a save names its
+  groups, not only the first key.
+
+- **Workbench, Elements:** a field is labelled by its fill, then by the
+  vocabulary word of its key, then by the key itself with a capital
+  (`Price_default`); the sixteen demo labels the Elements unit carried
+  (`/_admin/elements/field/<type>/<name>`) are gone, the vocabulary says them.
+  The hints of an image and its alternative text name the field they are linked
+  to by the same label: its fill, then the word, then the key with a capital.
+
+- **Workbench, Images:** slots are grouped by namespace and category of their
+  key, so the same word names them as in the Text panel.
+
+- **Setup wizard:** the personal information fields are labelled from the
+  English vocabulary, `Website › URL` instead of `Website › Url`.
+
 ### Fixed
 
 - **Workbench, Elements:** a required field is marked and a refused save says
@@ -1376,6 +1463,14 @@ All notable changes to Nino are documented in this file.
   text files of the `blank` and `legal` units, which held nothing else,
   `Webpages::_withoutWebpageMeta()`, `PersonalInfos::KEY_BLACKLIST` and
   `Keys::isValidKey()`.
+
+- **Workbench, Text Keys:** the one-line key field of the new-key form and the
+  inline rename, `Keys._renameKey`; the form with its segments does both.
+  `Text._groupEntries`, `_preview` and `_groupDescr` are gone with the list
+  they built.
+
+- **Workbench, Elements:** the sixteen demo labels `/_admin/elements/field/*`
+  mentioned above.
 
 ## v1.3.2 - 2026-10-01
 

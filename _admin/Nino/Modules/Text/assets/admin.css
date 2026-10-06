@@ -4,13 +4,14 @@
  *	Nino										A compact filesystembased php framework
  *	Modules\Text			The text fills and their keys
  *	admin.css								What the module's /_admin panel needs beyond the design
- *													system in _admin/assets/style.css: the Text Keys tab - its
- *													schema rows and its key input - and the wide two-column
- *													form the text screen becomes on a desktop. Bundled while
- *													the module is there (see the panel's assets()), so the
- *													same layer rules apply - the shell's stylesheet fixes the
- *													layer order, this one only ever adds to nino.tool, scoped
- *													to the panel's own ids.
+ *													system in _admin/assets/style.css: the search and the
+ *													hits of the Text panel and its Keys tab, the sections of
+ *													a form, the Keys tab's schema rows and segment inputs,
+ *													and the wide two-column form the text screen becomes on
+ *													a desktop. Bundled while the module is there (see the
+ *													panel's assets()), so the same layer rules apply - the
+ *													shell's stylesheet fixes the layer order, this one only
+ *													ever adds to nino.tool, scoped to the panel's own ids.
  *
  *	@package								Dape/Nino
  *	@author									David Perchermeier <mail@dape.io>
@@ -126,6 +127,226 @@
 #admin-content-text .admin-text-readonly:empty::before {
 	content: "—";
 	opacity: .55;
+}
+
+/* ------------------------------------------- Finding a text: the list */
+
+/* The search, the language the list is shown in and the filter for the keys
+   with no text in it - on one line where there is room, wrapping where not */
+#text-list .admin-text-search,
+#keys-list .admin-text-search {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: .5rem;
+	margin: 0 0 .5rem;
+}
+
+#text-list .admin-text-search-input,
+#keys-list .admin-text-search-input {
+	flex: 1 1 16rem;
+	min-width: 0;
+}
+
+#text-list .admin-text-search .nino-admin-locale-select,
+#keys-list .admin-text-search .nino-admin-locale-select {
+	flex: 0 0 auto;
+	width: auto;
+}
+
+/* A filter that is on or off, said by aria-pressed and by its look both */
+#text-list .admin-text-chip,
+#keys-list .admin-text-chip {
+	flex: 0 0 auto;
+	min-height: 30px;
+	padding: .25rem .75rem;
+	border-radius: 999px;
+	background: transparent;
+	color: var(--editor-text-secondary);
+	font-size: .76rem;
+	font-weight: 600;
+}
+
+#text-list .admin-text-chip[aria-pressed="true"],
+#keys-list .admin-text-chip[aria-pressed="true"] {
+	background: var(--editor-blue-soft);
+	box-shadow: inset 0 0 0 1px var(--editor-blue);
+	color: var(--editor-text);
+}
+
+#text-list .admin-text-block > h2,
+#keys-list .admin-text-block > h2 {
+	margin: 1.4rem 0 .5rem;
+	color: var(--editor-text-secondary);
+	font-size: .72rem;
+	font-weight: 750;
+	letter-spacing: .065em;
+	text-transform: uppercase;
+}
+
+#text-list .admin-text-block > h3,
+#keys-list .admin-text-block > h3 {
+	margin: 1rem 0 .4rem;
+	color: var(--editor-text-secondary);
+	font-size: .78rem;
+	font-weight: 650;
+}
+
+#text-list .admin-text-block > h2:first-child,
+#keys-list .admin-text-block > h2:first-child {
+	margin-top: .6rem;
+}
+
+/* A page below another, in the list and nowhere else: its data stay as they are */
+#text-list .nino-admin-list-buttons > .admin-type-btn.is-sub {
+	padding-left: 1.9rem;
+}
+
+/* A hit: the main button opens the row at the field, the language code beside
+   it is a button of its own and does nothing else than switch the language */
+#text-list .admin-text-hits,
+#keys-list .admin-text-hits {
+	margin-bottom: .6rem;
+}
+
+#text-list .admin-text-hit,
+#keys-list .admin-text-hit {
+	display: flex;
+	align-items: stretch;
+	border-bottom: 1px solid var(--editor-separator);
+}
+
+#text-list .admin-text-hit:last-child,
+#keys-list .admin-text-hit:last-child {
+	border-bottom: 0;
+}
+
+#text-list .admin-text-hit-open,
+#keys-list .admin-text-hit-open {
+	display: grid;
+	flex: 1 1 auto;
+	gap: .1rem;
+	min-width: 0;
+	min-height: 54px;
+	padding: .62rem .78rem;
+	border-radius: 0;
+	background: transparent;
+	box-shadow: none;
+	color: var(--editor-text);
+	font-size: .84rem;
+	text-align: left;
+}
+
+#text-list .admin-text-hit-open:hover,
+#keys-list .admin-text-hit-open:hover {
+	background: var(--editor-blue-soft);
+}
+
+#text-list .admin-text-hit-snippet,
+#keys-list .admin-text-hit-snippet {
+	color: var(--editor-text-secondary);
+	font-size: .78rem;
+	font-weight: 400;
+	line-height: 1.4;
+	overflow-wrap: anywhere;
+}
+
+#text-list .admin-text-hit-key,
+#keys-list .admin-text-hit-key {
+	color: var(--editor-text-secondary);
+	font: 400 .7rem/1.4 var(--nino-admin-mono);
+	overflow-wrap: anywhere;
+}
+
+#text-list .admin-text-hit-lang,
+#keys-list .admin-text-hit-lang {
+	flex: 0 0 auto;
+	align-self: center;
+	min-height: 26px;
+	margin: 0 .78rem 0 0;
+	padding: .1rem .5rem;
+	font-size: .7rem;
+}
+
+#text-list mark,
+#keys-list mark {
+	padding: 0 .1em;
+	border-radius: 2px;
+	background: var(--editor-blue-soft);
+	box-shadow: inset 0 -2px 0 var(--editor-blue);
+	color: inherit;
+}
+
+/* ------------------------------------------- Reading a row: its sections */
+
+/* What the legend says besides the name of the section: the route of a page
+   and the beginning of its first text. Not in capitals like the name */
+#text-form .admin-text-section-route,
+#text-form .admin-text-section-preview {
+	margin-left: .6rem;
+	font-size: .72rem;
+	font-weight: 400;
+	letter-spacing: 0;
+	text-transform: none;
+}
+
+#text-form .admin-text-section-route {
+	font-family: var(--nino-admin-mono);
+}
+
+#text-form .admin-text-section-preview {
+	color: var(--editor-text-secondary);
+}
+
+/* A field that is the same in every language says so, beside its name */
+#text-form .admin-text-badge,
+#keys-form .admin-text-badge {
+	flex: 0 0 auto;
+	padding: .05rem .5rem;
+	border-radius: 999px;
+	background: var(--editor-blue-soft);
+	color: var(--editor-text-secondary);
+	font-size: .68rem;
+	font-weight: 600;
+	white-space: nowrap;
+}
+
+/* The key the field is, small, and the counter of what was typed - the
+   description of the field, not part of its name */
+#text-form .admin-text-meta,
+#keys-form .admin-text-meta {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: .75rem;
+	margin-top: .22rem;
+	min-width: 0;
+}
+
+#text-form .admin-text-meta code,
+#keys-form .admin-text-meta code {
+	min-width: 0;
+	color: var(--editor-text-secondary);
+	font: 400 .7rem/1.4 var(--nino-admin-mono);
+	overflow-wrap: anywhere;
+}
+
+/* The name a key is read by, in the Keys tab, over the text it names */
+#keys-form .admin-text-subtitle {
+	display: block;
+	margin: 0 0 .25rem;
+	color: var(--editor-text-secondary);
+	font-size: .74rem;
+	font-weight: 600;
+}
+
+/* The field a hit or a link led to, marked until the row is left. A
+   mark that stays and does not move, so there is nothing to switch off for
+   those who ask for less motion */
+#text-form .admin-text-field.is-found,
+#keys-form .admin-text-field.is-found {
+	background: var(--editor-blue-soft);
+	box-shadow: -3px 0 0 var(--editor-blue);
 }
 
 }

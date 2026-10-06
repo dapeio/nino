@@ -1449,18 +1449,27 @@
 		},
 
 		/**
-		 *	Resolve a model field's admin-facing label: an optional per-type/per-
-		 *	field translation from the admin's own text system (same locale the
-		 *	admin dashboard itself is currently displayed in), falling back to
-		 *	the raw model key if no translation exists for it
+		 *	Resolve a model field's admin-facing label, in this order: a fill of
+		 *	the type's own for the field (/_admin/elements/field/<type>/<key>,
+		 *	which a feature or a project may bring), else the word of the
+		 *	vocabulary the key is (/_admin/common/word/<key>: "title" is "Titel"),
+		 *	else the key itself with a capital first letter - "price_default"
+		 *	is "Price_default"
 		 *
 		 *	@param		{string}	key						Field key (eg. "title")
 		 *
 		 *	@return		{string}
 		 */
 		_fieldLabel : function( key ) {
+
 			const translated = Nino.content.getText('/_admin/elements/field/'+ Nino.admin.elements._currentType+ '/'+ key);
-			return translated !== '' ? translated : key;
+
+			if( translated !== '' )
+				return translated;
+
+			const word = Nino.content.getText('/_admin/common/word/'+ key);
+
+			return word !== '' ? word : key.charAt(0).toUpperCase()+ key.slice(1);
 		},
 
 		/**

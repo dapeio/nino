@@ -62,7 +62,7 @@ const elementTypes = sandbox.Nino.admin.elementTypes;
 function fakeRow( field ) {
 	const controls = {
 		'.admin-field-key' 						: { value : field.key },
-		'select' 											: { value : field.type },
+		'.admin-field-type' 					: { value : field.type },
 		'.admin-field-locale' 				: { checked : field.locale === true },
 		'.admin-field-required' 			: field.type === 'image' ? null : { checked : field.required === true },
 		'.admin-field-html' 					: field.type === 'string' ? { checked : field.html === true } : null,
@@ -471,7 +471,8 @@ check( 'the danger zone is not rendered while creating a new type',
 
 {
 	const make = tag => ( { tagName : tag, children : [], className : '', dataset : {}, classList : { add(){}, remove(){}, toggle(){} },
-		appendChild( c ) { this.children.push( c ); return c }, addEventListener(){}, setAttribute(){},
+		appendChild( c ) { this.children.push( c ); return c }, addEventListener( type, fn ) { ( this.listeners[type] = this.listeners[type] ?? [] ).push( fn ) }, setAttribute(){},
+		listeners : {}, fire( type ) { ( this.listeners[type] ?? [] ).forEach( fn => fn( { type : type } ) ) }, dispatchEvent( ev ) { this.fire( ev.type ) }, focus() { this.focused = true },
 		// a select answers with its selected option, as the real one does
 		get value() { if( tag !== 'select' ) return this._value; const chosen = this.children.find( o => o.selected === true ) || this.children[0]; return chosen ? chosen.value : '' },
 		set value( v ) { this._value = v },
@@ -490,6 +491,32 @@ check( 'the danger zone is not rendered while creating a new type',
 	check( '...and a row of a type it does not name - an element reference, an image, a boolean - does not', unitInputs( { key : 'ref', type : 'element', elementType : 'people' } ) === 0 && unitInputs( { key : 'photo', type : 'image' } ) === 0 && unitInputs( { key : 'live', type : 'boolean' } ) === 0 );
 	elementTypes._suffixTypes = [];
 	check( 'before the server has answered, no row offers one', unitInputs( { key : 'price', type : 'double' } ) === 0 );
+
+	// The key of a field: a choice among the words fields most often are - the
+	// vocabulary's, in the language of the interface, the slug as the value - and
+	// an own key, which shows the text field it always was. The text field stays
+	// what is read back and saved
+	const WORDS = [ 'title', 'subtitle', 'text', 'description', 'image', 'alt', 'caption', 'link', 'label', 'name', 'email', 'phone', 'address', 'date', 'author', 'price', 'icon' ];
+	const choice = field => find( elementTypes._renderFieldRow( field, 0 ), n => n.className === 'admin-field-key-select' )[0];
+	const keyField = field => find( elementTypes._renderFieldRow( field, 0 ), n => n.className === 'admin-field-key' )[0];
+	check( 'the choice offers the 17 words of the vocabulary that name a field, and "own key"', JSON.stringify( elementTypes.KEY_WORDS ) === JSON.stringify( WORDS )
+		&& choice( { key : 'a', type : 'string' } ).children.map( o => o.value ).join() === WORDS.concat( [ '' ] ).join() );
+	check( '...each named by its word', choice( { key : 'a', type : 'string' } ).children.slice( 0, 17 ).every( o => o.textContent === '/_admin/common/word/'+ o.value ) );
+	check( '...and a key that is one of them is chosen, its text field hidden', choice( { key : 'title', type : 'string' } ).value === 'title' && keyField( { key : 'title', type : 'string' } ).hidden === true );
+	check( 'any other key shows "own key" with its text field filled', choice( { key : 'price_default', type : 'double' } ).value === '' && keyField( { key : 'price_default', type : 'double' } ).hidden === false && keyField( { key : 'price_default', type : 'double' } ).value === 'price_default' );
+	check( 'a field that is new starts as an own key with an empty text field', choice( { type : 'string' } ).value === '' && keyField( { type : 'string' } ).hidden === false && keyField( { type : 'string' } ).value === '' );
+	// the choice at work: a word fills the text field and hides it, "own key" shows it again
+	sandbox.Event = function( type ) { this.type = type };
+	const row = elementTypes._renderFieldRow( { key : 'price_default', type : 'double' }, 0 );
+	const select = find( row, n => n.className === 'admin-field-key-select' )[0];
+	const input = find( row, n => n.className === 'admin-field-key' )[0];
+	select.children.forEach( o => { o.selected = ( o.value === 'author' ) } );
+	select.fire('change');
+	check( 'picking a word puts it into the text field, which is what is saved, and hides the field', input.value === 'author' && input.hidden === true );
+	select.children.forEach( o => { o.selected = ( o.value === '' ) } );
+	select.fire('change');
+	check( '...and "own key" shows the field again, with the word still in it, and puts the cursor there', input.hidden === false && input.value === 'author' && input.focused === true );
+	check( '_storeFields() reads the type from its own select, not from the first select of the row', typesSource.includes( "row.querySelector('.admin-field-type').value" ) && typesSource.includes( "row.querySelector('select').value" ) === false );
 }
 
 

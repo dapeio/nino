@@ -366,6 +366,90 @@ check( 'Text::apiKeys exposes the session-remembered locale, defaulting to nativ
 echo "\n";
 
 
+// --- Text::apiKeys - what the form needs to arrange the keys -------------------
+
+echo "Text::apiKeys - the order a template reads the keys in, the pages, the names of the templates\n";
+
+$templatesDir = $sandbox. '/private/templates';
+mkdir( $templatesDir, 0777, true );
+file_put_contents( $templatesDir. '/page-home.tpl', "<!-- nino:template-name Start -->\n<h1>[[/template/page-home/welcome/title]]</h1>\n<p>[[/template/page-home/intro/text]]</p>\n<i>[[/project/company/general/name]]</i> [[/template/page-home/[[dynamic]]/x]] [[/template/common/label/name]] [[/template/common/label/email]]" );
+file_put_contents( $templatesDir. '/page-legal.de_DE.tpl', '<p>[[/project/company/general/name]]</p>' );
+file_put_contents( $templatesDir. '/.demo-catalogue.tpl', '<p>[[/project/company/general/name]]</p>' );
+file_put_contents( $templatesDir. '/page-more.tpl', '<p>[[/feature/shop/cart/title]] [[/feature/shop/cart/text]] [[/feature/shop/own/note]] [[/module/form/info/success]] [[/module/form/info/error]]</p>' );
+// A feature that reads some of its own keys in its own template, the rest in the project's
+$featureDir = $sandbox. '/shop-feature';
+mkdir( $featureDir. '/templates', 0777, true );
+file_put_contents( $featureDir. '/templates/shop-cart.tpl', '<p>[[/feature/shop/cart/text]] [[/feature/shop/cart/title]]</p>' );
+$appData['./nino/features/all'] = [ 'shop' => [ 'key' => 'shop', 'dir' => $featureDir, 'name' => [ 'en_US' => 'Shop', 'de_DE' => 'Laden' ] ] ];
+file_put_contents( $templatesDir. '/page-Foo.tpl', '<p>[[/template/page-Foo/a/b]]</p>' );
+file_put_contents( $templatesDir. '/frame-header.tpl', '<nav>[[/template/frame-header/navigation/label]]</nav>' );
+$configFile = $sandbox. '/private/config.php';
+$configBefore = is_file( $configFile ) === true ? file_get_contents( $configFile ) : null;
+file_put_contents( $configFile, '<?php return [ \'/nino/http/routes\' => [
+	\'GET://home\' => [ \'uri\' => \'/home\', \'body\' => \'[template /templates/page-home]\' ],
+	\'GET://legal\' => [ \'uri\' => \'/legal\', \'body\' => \'[template /templates/page-legal.[[/nino/http/response/locale]]]\' ],
+	\'GET://robots.txt\' => [ \'uri\' => \'/robots.txt\', \'body\' => \'[template /templates/robots]\' ],
+	\'GET://.demo-catalogue\' => [ \'uri\' => \'/.demo-catalogue\', \'body\' => \'[template /templates/.demo-catalogue]\' ],
+] ];' );
+\Nino\Filesystem::mutate( $appData, '/text/de_DE.php', fn( array $texts ): array => $texts + [
+	'[[/template/page-home/welcome/title]]' => 'Willkommen', '[[/template/page-home/intro/text]]' => 'Los geht\'s', '[[/_nino/webpage/home/name]]' => 'Start', '[[/_admin/elements/field/x/y]]' => 'Hidden by being the workbench\'s',
+	'[[/template/common/label/name]]' => 'Name', '[[/template/common/label/email]]' => 'E-Mail',
+	'[[/feature/shop/cart/title]]' => 'Warenkorb', '[[/feature/shop/cart/text]]' => 'Dein Warenkorb', '[[/feature/shop/own/note]]' => 'Hinweis',
+	'[[/module/form/info/success]]' => 'Gesendet', '[[/module/form/info/error]]' => 'Fehler',
+] );
+
+$request = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Modules\Text\Admin::apiKeys( $appData, $request );
+$body = $request['/nino/http/response']['body'];
+$keysBody = array_column( $body['keys'], 'key' );
+
+check( 'the words of the workbench are no text of the site: /_admin keys are not listed', in_array( '/_admin/elements/field/x/y', $keysBody, true ) === false && in_array( '/template/page-home/welcome/title', $keysBody, true ) === true );
+check( 'order says where a template first reads a key - the title of the home page before its text, as the template has them',
+	isset( $body['order']['/template/page-home/welcome/title'], $body['order']['/template/page-home/intro/text'] ) === true && $body['order']['/template/page-home/welcome/title'] < $body['order']['/template/page-home/intro/text'] );
+check( '...a key no template reads literally has none', isset( $body['order']['/_nino/webpage/home/name'] ) === false );
+check( '...a project key is looked up in the project\'s templates, in the order of their file names: the third file here, after frame-header.tpl and page-Foo.tpl', ( $body['order']['/project/company/general/name'] ?? 0 ) >= 20000000 && ( $body['order']['/project/company/general/name'] ?? 0 ) < 30000000 );
+check( '/template/common is read by every template, so it has a position though no file is named common',
+	isset( $body['order']['/template/common/label/name'], $body['order']['/template/common/label/email'] ) === true && $body['order']['/template/common/label/name'] < $body['order']['/template/common/label/email'] );
+check( 'pages are the stored routes that are pages, with the template, its category and the name it gives itself',
+	array_column( $body['pages'], 'uri' ) === [ '/home', '/legal', '/.demo-catalogue' ] && $body['pages'][0] === [ 'uri' => '/home', 'httpUri' => '/home', 'template' => 'page-home', 'category' => 'page-home', 'templateName' => 'Start' ] );
+check( '...the legal page, which picks its file by language, has no template to name and no category', $body['pages'][1]['template'] === '' && $body['pages'][1]['category'] === null && $body['pages'][1]['templateName'] === null );
+check( '...the demo catalogue, a route to a template that is no page-* and has no category, is a page too, with neither: its details are its own, not the system\'s',
+	$body['pages'][2] === [ 'uri' => '/.demo-catalogue', 'httpUri' => '/.demo-catalogue', 'template' => '.demo-catalogue', 'category' => null, 'templateName' => null ] && in_array( '/robots.txt', array_column( $body['pages'], 'uri' ), true ) === false );
+check( 'templates are the files directly in templates/ whose name is a category - with the name a template gives itself, null where it gives none',
+	$body['templates']['page-home'] === [ 'file' => 'page-home.tpl', 'name' => 'Start' ] && $body['templates']['frame-header'] === [ 'file' => 'frame-header.tpl', 'name' => null ] && isset( $body['templates']['page-Foo'] ) === false && isset( $body['templates']['page-legal.de_DE'] ) === false );
+check( 'a feature key is looked up in the templates of the feature first, then in the project\'s: what the feature reads itself comes first, in its order - the text of the cart before its title - and a key only the project\'s template reads after it',
+	( $body['order']['/feature/shop/cart/text'] ?? 99999999 ) < 10000000 && $body['order']['/feature/shop/cart/text'] < $body['order']['/feature/shop/cart/title'] && ( $body['order']['/feature/shop/own/note'] ?? 0 ) >= 10000000 );
+check( '...and a module key, which no template of the module reads here, in the project\'s, in the order they are read', isset( $body['order']['/module/form/info/success'], $body['order']['/module/form/info/error'] ) === true && $body['order']['/module/form/info/success'] < $body['order']['/module/form/info/error'] );
+check( 'features says each installed feature\'s name, by its key, in the language of the workbench', $body['features'] === [ 'shop' => 'Laden' ] );
+
+// What the log says of a batch: every group it touches, once, in the order the batch names them
+check( 'the log names every group of a batch - a page\'s texts and its details together, a language\'s name, the project, a key somebody made up',
+	\Nino\Modules\Text\Admin::log( 'text/savebatch', [ 'items' => [
+		[ 'key' => '/template/page-home/welcome/title' ], [ 'key' => '/_nino/webpage/home/title' ], [ 'key' => '/template/page-home/intro/text' ], [ 'key' => '/_nino/webpage/about/team/name' ],
+		[ 'key' => '/project/company/general/name' ], [ 'key' => '/_nino/locale/de_DE/name' ], [ 'key' => '/home/plain' ], [ 'key' => '' ],
+	] ] ) === 'Edit Text /template/page-home, /_nino/webpage/home, /_nino/webpage/about/team, /project/company, /_nino/locale, /home, /-' );
+check( '...and nothing for another action', \Nino\Modules\Text\Admin::log( 'text/keys', [] ) === '' );
+
+foreach( [ 'page-home', 'page-legal.de_DE', 'page-Foo', 'frame-header', '.demo-catalogue', 'page-more' ] as $file )
+	unlink( $templatesDir. '/'. $file. '.tpl' );
+unlink( $featureDir. '/templates/shop-cart.tpl' );
+rmdir( $featureDir. '/templates' );
+rmdir( $featureDir );
+unset( $appData['./nino/features/all'] );
+rmdir( $templatesDir );
+if( $configBefore === null )
+	unlink( $configFile );
+else
+	file_put_contents( $configFile, $configBefore );
+\Nino\Filesystem::mutate( $appData, '/text/de_DE.php', function( array $texts ): array {
+	foreach( [ '[[/template/page-home/welcome/title]]', '[[/template/page-home/intro/text]]', '[[/_nino/webpage/home/name]]', '[[/_admin/elements/field/x/y]]', '[[/template/common/label/name]]', '[[/template/common/label/email]]', '[[/feature/shop/cart/title]]', '[[/feature/shop/cart/text]]', '[[/feature/shop/own/note]]', '[[/module/form/info/success]]', '[[/module/form/info/error]]' ] as $key )
+		unset( $texts[$key] );
+	return $texts;
+} );
+
+echo "\n";
+
+
 // --- Text::untranslatedCounts ------------------------------------------------
 
 echo "Text::untranslatedCounts - what the Dashboard says is not translated yet\n";
@@ -1856,6 +1940,14 @@ check( 'text/savebatch via handlePost succeeds', $status === 200 );
 $linesAfterText = readTodayLogLines( $appData, $sandbox );
 check( 'text/savebatch is recorded with the key\'s category, not the locale', count( $linesAfterText ) === count( $linesAfterDelete ) + 1 && str_ends_with( end( $linesAfterText ), 'Edit Text /home' ) === true );
 
+// A page's form saves its template's texts and its route's details in one request: the line names both groups
+[ $status ] = callAdminPost( $appData, 'text/savebatch', [ 'items' => [
+	[ 'key' => '/home/plain', 'locale' => 'de_DE', 'value' => 'Noch ein Text' ],
+	[ 'key' => '/_nino/webpage/home/title', 'locale' => 'de_DE', 'value' => 'Startseite' ],
+] ] );
+$linesAfterPage = readTodayLogLines( $appData, $sandbox );
+check( 'a batch over two namespaces is recorded with both groups', $status === 200 && count( $linesAfterPage ) === count( $linesAfterText ) + 1 && str_ends_with( end( $linesAfterPage ), 'Edit Text /home, /_nino/webpage/home' ) === true );
+
 // --- Login hook: Admin::guard()/handleGet() log "Login" the first time a
 // newly-authenticated session touches _editor - not a direct Auth hook, since
 // the real login POST (/.nino/auth/login) isn't guaranteed to be routed
@@ -1866,7 +1958,7 @@ unset( $appData['./nino/auth/current'] );
 
 [ $status ] = callAdminPost( $appData, 'elements/list', [ 'type' => 'logtestdemo' ] );
 check( 'a logged-out request is rejected', $status === 401 );
-check( 'a logged-out request adds no log entry', count( readTodayLogLines( $appData, $sandbox ) ) === count( $linesAfterText ) );
+check( 'a logged-out request adds no log entry', count( readTodayLogLines( $appData, $sandbox ) ) === count( $linesAfterPage ) );
 
 \Nino\Auth::loginUser( $appData, 'manager@example.com', 'manager password' );
 
@@ -1874,7 +1966,7 @@ check( 'a logged-out request adds no log entry', count( readTodayLogLines( $appD
 check( 'the first request after a fresh login still succeeds', $status === 200 );
 
 $linesAfterLogin = readTodayLogLines( $appData, $sandbox );
-check( 'a fresh login is recorded exactly once', count( $linesAfterLogin ) === count( $linesAfterText ) + 1 );
+check( 'a fresh login is recorded exactly once', count( $linesAfterLogin ) === count( $linesAfterPage ) + 1 );
 check( 'the login line names the newly-authenticated user', str_ends_with( end( $linesAfterLogin ), '  Login' ) === true && str_contains( end( $linesAfterLogin ), 'manager@example.com' ) === true );
 
 callAdminPost( $appData, 'elements/list', [ 'type' => 'logtestdemo' ] );

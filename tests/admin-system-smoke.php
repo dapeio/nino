@@ -2235,6 +2235,29 @@ $subtitleEntry = null;
 foreach( $body['keys'] as $entry ) if( $entry['key'] === '/template/page-home/welcome/subtitle' ) $subtitleEntry = $entry;
 check( 'apiList finds the new per-locale key, not blacklisted by default', $subtitleEntry !== null && $subtitleEntry['global'] === false && $subtitleEntry['blacklisted'] === false );
 
+// What the form that creates or renames a key offers to choose from, per namespace
+$templatesDir = $sandbox. '/private/templates';
+$madeTemplatesDir = is_dir( $templatesDir ) === false && mkdir( $templatesDir, 0777, true );
+foreach( [ 'page-extra', 'frame-header', 'page-Foo', 'page-legal.de_DE' ] as $categoryFile )
+	file_put_contents( $templatesDir. '/'. $categoryFile. '.tpl', '' );
+callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiCreate', [ 'key' => '/project/shop/list/title', 'global' => false, 'value' => 'Shop' ] );
+$appData['./nino/features/all'] = [ 'sample' => [ 'key' => 'sample', 'dir' => $sandbox. '/sample-feature', 'name' => 'Sample' ], 'shop' => [ 'key' => 'shop', 'dir' => $sandbox. '/shop-feature', 'name' => 'Shop' ] ];
+[ , $listBody ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiList' );
+unset( $appData['./nino/features/all'] );
+check( 'apiList names the language of the session, which the tab opens in', ( $listBody['selectedLocale'] ?? '' ) === \Nino\Admin\Admin::sessionLocale( $appData ) );
+check( 'apiList offers /template the templates directly in templates/ whose name is a category, and "common" first',
+	array_slice( $listBody['categories']['template'] ?? [], 0, 1 ) === [ 'common' ] && array_intersect( [ 'frame-header', 'page-extra' ], $listBody['categories']['template'] ?? [] ) === [ 'frame-header', 'page-extra' ] );
+check( '...none whose name is no word of a key', in_array( 'page-Foo', $listBody['categories']['template'] ?? [], true ) === false && in_array( 'page-legal.de_DE', $listBody['categories']['template'] ?? [], true ) === false );
+check( '/module is the kernel\'s modules, by their directory in lower case', in_array( 'form', $listBody['categories']['module'] ?? [], true ) === true && in_array( 'maintenance', $listBody['categories']['module'] ?? [], true ) === true
+	&& in_array( 'Form', $listBody['categories']['module'] ?? [], true ) === false && in_array( 'modules.php', $listBody['categories']['module'] ?? [], true ) === false );
+check( '/project is company, website and mail, then the categories keys already use', array_slice( $listBody['categories']['project'] ?? [], 0, 3 ) === [ 'company', 'website', 'mail' ] && in_array( 'shop', $listBody['categories']['project'] ?? [], true ) === true );
+check( '/feature is the features that are installed, by their key', ( $listBody['categories']['feature'] ?? null ) === [ 'sample', 'shop' ] );
+callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiDelete', [ 'key' => '/project/shop/list/title' ] );
+foreach( [ 'page-extra', 'frame-header', 'page-Foo', 'page-legal.de_DE' ] as $categoryFile )
+	unlink( $templatesDir. '/'. $categoryFile. '.tpl' );
+if( $madeTemplatesDir === true )
+	rmdir( $templatesDir );
+
 [ $status ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', [ 'key' => '/template/page-home/welcome/subtitle', 'global' => true, 'blacklisted' => false ] );
 check( 'apiSave converts a per-locale key to global', $status === 200 );
 
@@ -2568,6 +2591,61 @@ check( 'both are cleaned up again', $meta() === [] );
 
 echo "\n";
 
+
+// --- The vocabulary: the words that name a part of a key -----------------------------
+
+echo "Text - the closed vocabulary of the words /_admin/common/word/*\n";
+
+$wordFills = [];
+foreach( [ 'en_US', 'de_DE' ] as $vocabLocale ) {
+	$wordFills[$vocabLocale] = [];
+	foreach( include __DIR__. '/../_admin/text/'. $vocabLocale. '.php' as $bracketKey => $wordText )
+		if( str_starts_with( $bracketKey, '[[/_admin/common/word/' ) === true )
+			$wordFills[$vocabLocale][substr( $bracketKey, strlen( '[[/_admin/common/word/' ), -2 )] = $wordText;
+}
+$words = array_keys( $wordFills['en_US'] );
+check( 'the vocabulary is 133 words, the same in English and in German, each with a text', count( $words ) === 133 && array_keys( $wordFills['de_DE'] ) === $words
+	&& array_filter( array_merge( $wordFills['en_US'], $wordFills['de_DE'] ), static fn( string $text ): bool => trim( $text ) === '' ) === [] );
+check( 'a word is a slug: lower-case words joined by hyphens, one for each slug, in the alphabet', array_filter( $words, static fn( string $slug ): bool => preg_match( '/^[a-z0-9]+(?:-[a-z0-9]+)*$/', $slug ) !== 1 ) === [] && $words === array_values( array_unique( $words ) ) && $words === ( static function( array $sorted ): array { sort( $sorted ); return $sorted; } )( $words ) );
+check( 'no word is an alias of another: no two slugs share a text in a language', count( array_unique( $wordFills['en_US'] ) ) === count( $words ) && count( array_unique( $wordFills['de_DE'] ) ) === count( $words ) );
+$keyWords = [ 'title', 'subtitle', 'text', 'description', 'image', 'alt', 'caption', 'link', 'label', 'name', 'email', 'phone', 'address', 'date', 'author', 'price', 'icon' ];
+check( 'the 17 words the Element Type editor offers as the key of a field are in the vocabulary', array_diff( $keyWords, $words ) === [] && preg_match( "/KEY_WORDS\s*:\s*\[ '". implode( "', '", $keyWords ). "' \]/", (string) file_get_contents( __DIR__. '/../_admin/Nino/Modules/Elements/assets/types.js' ) ) === 1 );
+check( 'a word names no key and is no key: no fill, no slash in any of them', array_filter( array_merge( $wordFills['en_US'], $wordFills['de_DE'] ), static fn( string $text ): bool => preg_match( '/\[\[|\//', $text ) === 1 ) === [] );
+
+// Every segment of every key the kernel ships is a word, or falls apart into words: a part, a name, the entry of a list,
+// a category that names a group. Excepted are the categories of the page templates with a route - the row of a page is
+// named after its route - the keys of a feature, whose row is named in its manifest, and the two parts of an image slot a
+// page's template shares with its text keys
+$slugCovered = static function( string $slug ) use ( $words, &$slugCovered ): bool {
+	if( in_array( $slug, $words, true ) === true )
+		return true;
+	if( preg_match( '/^(.+)-\d+$/', $slug, $numbered ) === 1 )
+		return $slugCovered( $numbered[1] );
+	for( $dash = strpos( $slug, '-' ); $dash !== false; $dash = strpos( $slug, '-', $dash + 1 ) )
+		if( $dash > 0 && in_array( substr( $slug, $dash + 1 ), $words, true ) === true && in_array( substr( $slug, 0, $dash ), $words, true ) === true )
+			return true;
+	return false;
+};
+$shippedKeys = [];
+foreach( array_merge( glob( dirname( __DIR__ ). '/_admin/install/library/*/text/*.php' ) ?: [], glob( dirname( __DIR__ ). '/_admin/install/library/pages/*/text/*.php' ) ?: [], glob( dirname( __DIR__ ). '/_admin/install/library/pages/.*/text/*.php' ) ?: [], glob( dirname( __DIR__ ). '/_nino/Nino/Modules/*/install/text/*.php' ) ?: [] ) as $fragment )
+	foreach( array_keys( (array) include $fragment ) as $bracketKey )
+		$shippedKeys[trim( $bracketKey, '[]' )] = true;
+$uncovered = [];
+$counted = 0;
+foreach( array_keys( $shippedKeys ) as $shippedKey ) {
+	if( preg_match( '#^/(template|project|feature|module)/([^/]+)/([^/]+)/([^/]+)$#', $shippedKey, $segments ) !== 1 )
+		continue;
+	$counted++;
+	foreach( [ 'category' => $segments[2], 'part' => $segments[3], 'name' => $segments[4] ] as $role => $slug ) {
+		if( $role === 'category' && ( $segments[1] === 'feature' || ( $segments[1] === 'template' && str_starts_with( $slug, 'page-' ) === true ) ) )
+			continue;
+		if( in_array( $slug, [ 'contact-form', 'fullscreen-image' ], true ) === true )
+			continue;
+		if( $slugCovered( $slug ) === false )
+			$uncovered[$role. ' '. $slug] = $shippedKey;
+	}
+}
+check( 'every part, name and group of the '. $counted. ' keys the kernel ships is a word of the vocabulary or falls apart into words'. ( $uncovered === [] ? '' : ' - '. implode( '; ', array_slice( array_keys( $uncovered ), 0, 8 ) ) ), $uncovered === [] && $counted > 50 );
 
 // --- Text::apiScan / Images::apiScan: template scanners ---------------------
 

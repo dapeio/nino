@@ -298,6 +298,113 @@
 		},
 
 		/**
+		 *	What a text key is made of, read from its form alone - the one
+		 *	function the Text panel, its Keys tab and the Images panel share.
+		 *	A key is one of
+		 *
+		 *	  - a key of the grammar, /<namespace>/<category>/<part>/<name>:
+		 *	    { kind : 'grammar', namespace, category, part, name }, with
+		 *	    { list, id } added when the part has a hyphen - 'category-necessary'
+		 *	    is the list 'category' and the entry 'necessary'. Whether the part
+		 *	    really is a list is the vocabulary's call (see slugLabel())
+		 *	  - the details of a page the system writes after its Element-URI,
+		 *	    /_nino/webpage<uri>/<field>: { kind : 'webpage', uri, field }, the
+		 *	    uri read from the right, since it may hold slashes and dots
+		 *	  - the name of a language, /_nino/locale/<code>/name: { kind : 'locale', code }
+		 *	  - anything else - a key a project made up, one of the workbench:
+		 *	    { kind : 'free' }
+		 *
+		 *	@param		{string}	key
+		 *
+		 *	@return		{Object}
+		 */
+		describeKey : function( key ) {
+
+			key = String( key ?? '' );
+
+			// The one pattern written out of a string, which the guard of the key forms (tests/keys-smoke.php) reads
+			// without taking an escaped slash for the start of an old family
+			let match = new RegExp( '^/_nino/webpage(/.+)/(name|title|description|uri)$' ).exec( key );
+			if( match !== null )
+				return { kind : 'webpage', uri : match[1], field : match[2] };
+
+			match = /^\/_nino\/locale\/([^\/]+)\/name$/.exec( key );
+			if( match !== null )
+				return { kind : 'locale', code : match[1] };
+
+			match = /^\/(template|project|feature|module)\/([a-z0-9]+(?:-[a-z0-9]+)*)\/([a-z0-9]+(?:-[a-z0-9]+)*)\/([a-z0-9]+(?:-[a-z0-9]+)*)$/.exec( key );
+			if( match === null )
+				return { kind : 'free' };
+
+			const described = { kind : 'grammar', namespace : match[1], category : match[2], part : match[3], name : match[4] };
+			const dash = match[3].indexOf('-');
+
+			if( dash > 0 ) {
+				described.list = match[3].slice( 0, dash );
+				described.id = match[3].slice( dash + 1 );
+			}
+
+			return described;
+		},
+
+		/**
+		 *	A slug the way a person reads it when no word of the vocabulary
+		 *	names it: the first letter in capitals, hyphens and underscores as
+		 *	spaces
+		 *
+		 *	@param		{string}	slug
+		 *
+		 *	@return		{string}
+		 */
+		humanize : function( slug ) {
+			slug = String( slug ?? '' ).replace( /[-_]+/g, ' ' ).trim();
+			return slug.charAt(0).toUpperCase() + slug.slice(1);
+		},
+
+		/**
+		 *	The name of one segment of a text key, in the language of the
+		 *	interface: a word of the closed vocabulary (/_admin/common/word/<slug>,
+		 *	one per slug, no aliases), put together from words where the slug
+		 *	is a compound, humanized where it is not. In this order:
+		 *
+		 *	  1. the slug is a word: 'intro' is "Einleitung"
+		 *	  2. it is <word>-<number>: 'item-3' is "Eintrag 3"
+		 *	  3. it is split at every hyphen from the left, and where what is
+		 *	     right of the hyphen is a word, the two read "<left> · <word>" -
+		 *	     the left part looked up as well, humanized if it is no word:
+		 *	     'unit-day' is "Einheit · Tag", 'cta-label' "Cta · Beschriftung",
+		 *	     'hero-image-alt' "Hero image · Alternativtext"
+		 *	  4. otherwise it is humanized: 'tagline' is "Tagline"
+		 *
+		 *	@param		{string}	slug
+		 *
+		 *	@return		{string}
+		 */
+		slugLabel : function( slug ) {
+
+			slug = String( slug ?? '' );
+
+			const word = function( candidate ) { return Nino.content.getText( '/_admin/common/word/'+ candidate ) };
+
+			if( word( slug ) !== '' )
+				return word( slug );
+
+			const numbered = /^(.+)-(\d+)$/.exec( slug );
+			if( numbered !== null )
+				return Nino.adminUi.slugLabel( numbered[1] )+ ' '+ numbered[2];
+
+			for( let dash = slug.indexOf('-'); dash !== -1; dash = slug.indexOf( '-', dash + 1 ) ) {
+				const right = word( slug.slice( dash + 1 ) );
+				if( dash > 0 && right !== '' ) {
+					const left = slug.slice( 0, dash );
+					return ( word( left ) || Nino.adminUi.humanize( left ) )+ ' · '+ right;
+				}
+			}
+
+			return Nino.adminUi.humanize( slug );
+		},
+
+		/**
 		 *	Show a frame at a layout width it does not have room for, scaled to
 		 *	the room it does have.
 		 *

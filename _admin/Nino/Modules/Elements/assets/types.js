@@ -23,6 +23,11 @@
 
 	Nino.admin.elementTypes = {
 
+		// The keys a field is offered as, before an own one: the words of the
+		// vocabulary fields most often are (/_admin/common/word/<key>, the ones
+		// the Elements form names by it too)
+		KEY_WORDS 			: [ 'title', 'subtitle', 'text', 'description', 'image', 'alt', 'caption', 'link', 'label', 'name', 'email', 'phone', 'address', 'date', 'author', 'price', 'icon' ],
+
 		_types 					: [],
 		_fieldTypes 		: [],
 		// The field types a unit/suffix applies to, as the server states them
@@ -245,12 +250,50 @@
 			const row = dc.createElement('fieldset');
 			row.className = 'admin-field-row';
 
+			// The key of a field is one of the words fields most often are -
+			// "Titel", "Bild", "Preis" - or one of the type's own. The choice puts
+			// the word into the text field, which is what is read back and saved
+			// and is shown only for an own key, with the checks it always had
+			const keySelect = dc.createElement('select');
+			keySelect.className = 'admin-field-key-select';
+			keySelect.setAttribute( 'aria-label', Nino.content.getText('/_admin/types/label/fieldname') );
+			Nino.admin.elementTypes.KEY_WORDS.forEach( function( word ) {
+				const opt = dc.createElement('option');
+				opt.value = word;
+				opt.textContent = Nino.content.getText('/_admin/common/word/'+ word) || word;
+				opt.selected = ( word === field.key );
+				keySelect.appendChild( opt );
+			} );
+			const ownOpt = dc.createElement('option');
+			ownOpt.value = '';
+			ownOpt.textContent = Nino.content.getText('/_admin/types/label/ownkey');
+			ownOpt.selected = ( Nino.admin.elementTypes.KEY_WORDS.indexOf( field.key ?? '' ) === -1 );
+			keySelect.appendChild( ownOpt );
+			row.appendChild( keySelect );
+
 			const keyInput = dc.createElement('input');
 			keyInput.type = 'text';
 			keyInput.placeholder = Nino.content.getText('/_admin/types/label/fieldname');
+			keyInput.setAttribute( 'aria-label', Nino.content.getText('/_admin/types/label/ownkey') );
 			keyInput.value = field.key ?? '';
 			keyInput.className = 'admin-field-key';
+			keyInput.hidden = ( Nino.admin.elementTypes.KEY_WORDS.indexOf( field.key ?? '' ) !== -1 );
 			row.appendChild( keyInput );
+
+			keySelect.addEventListener( 'change', function() {
+
+				const word = keySelect.value;
+				keyInput.hidden = ( word !== '' );
+
+				if( word !== '' )
+					keyInput.value = word;
+				else
+					keyInput.focus();
+
+				// What the field is called changed, whichever way: the hint that says
+				// it is renamed follows it (see below)
+				keyInput.dispatchEvent( new wn.Event( 'input' ) );
+			} );
 
 			// A field that is saved keeps the name it was saved under on the row, so
 			// a rename can be told from a new field however the rows are moved or
@@ -274,6 +317,7 @@
 			}
 
 			const typeSelect = dc.createElement('select');
+			typeSelect.className = 'admin-field-type';
 			Nino.admin.elementTypes._fieldTypes.forEach( function( t ) {
 				const opt = dc.createElement('option');
 				opt.value = t;
@@ -668,7 +712,7 @@
 					key 			: row.querySelector('.admin-field-key').value,
 					// Undefined on a field that is not saved yet - see _renames()
 					originalKey : row.dataset.originalKey,
-					type 			: row.querySelector('select').value,
+					type 			: row.querySelector('.admin-field-type').value,
 					locale 		: row.querySelector('.admin-field-locale').checked,
 					// Absent on an image row, which is never offered the checkbox
 					// (see _renderFieldRow()) - false, not "keep whatever was there"

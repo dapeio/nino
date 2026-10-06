@@ -83,7 +83,9 @@ const editorElements = source('_admin/Nino/Modules/Elements/assets/admin.js');
 const adminElements = source('_admin/Nino/Modules/Elements/assets/admin.js');
 check( 'toolbar and server sanitizer both whitelist code', htmlEditor.includes("'span', 'code', 'a'") && kernel.includes("'span', 'code', 'a'") );
 check( 'the editable surface explicitly restores drag selection', editorCss.includes('.nino-admin-richtext-content *') && editorCss.includes('-webkit-user-select: text') && editorCss.includes('user-select: text') );
-check( 'rich text is not nested inside an interactive label', editorText.includes("dc.createElement( entry.html === true ? 'div' : 'label' )") && editorElements.includes("dc.createElement( isHtml ? 'div' : 'label' )") && adminElements.includes("dc.createElement( isHtml ? 'div' : 'label' )") );
+// The Text panel names a field by pointing at its name (aria-labelledby) and not by wrapping it in a <label>:
+// a label would take the key and the counter into the name, and nest the editable surface in it
+check( 'rich text is not nested inside an interactive label', editorText.includes("createElement('label')") === false && editorText.includes( "wrap.setAttribute( 'aria-labelledby', nameSpan.id )" ) && editorElements.includes("dc.createElement( isHtml ? 'div' : 'label' )") && adminElements.includes("dc.createElement( isHtml ? 'div' : 'label' )") );
 check( 'code receives a readable monospace treatment', editorCss.includes('.nino-admin-richtext-content code') && editorCss.includes('ui-monospace') );
 
 console.log( '\n'+ checks+ ' checks, '+ failures+ ' failed' );

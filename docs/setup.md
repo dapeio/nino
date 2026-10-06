@@ -150,7 +150,7 @@ The reserved path `/_admin` cannot be used as a public page.
 
 ## 4. Personal Information
 
-This step records central company and website values as textfills. It edits nothing else: of the keys the base unit ships, only those under `/project/company/` and `/project/website/general/` - the technical `/project/website/html/` values and the look of the mails are outside both - each labelled by its category and its name ("Company › Address", "Website › Url"), in English like the whole wizard. All of them can be edited later in the workbench's Text panel.
+This step records central company and website values as textfills. It edits nothing else: of the keys the base unit ships, only those under `/project/company/` and `/project/website/general/` - the technical `/project/website/html/` values and the look of the mails are outside both - each labelled by its category and its name ("Company › Address", "Website › URL"), in English like the whole wizard. All of them can be edited later in the workbench's Text panel.
 
 Language-independent, in the order the form shows them:
 

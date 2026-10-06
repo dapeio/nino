@@ -196,17 +196,20 @@
 		},
 
 		/**
-		 *	Group slots by the uri's first path segment (eg. "home/hero" -> "home"),
-		 *	same convention as the Text panel's _groupEntries()
+		 *	Group slots as the Text panel groups keys - by what Nino.adminUi.describeKey()
+		 *	makes of the uri: /<namespace>/<category> for a slot that follows the
+		 *	grammar of a text key (a template's, "template/page-home"), the first
+		 *	path segment for any other ("logo")
 		 *
 		 *	@param		{Array}		slots					[ { uri, label, width, height, url, alt, usage }, ... ]
 		 *
 		 *	@return		{Object}									group name -> slots[]
 		 */
 		_groupSlots : function( slots ) {
-			const groups = {};
+			const groups = Object.create( null );
 			slots.forEach( function( slot ) {
-				const group = slot.uri.split('/').filter( Boolean )[0] || '-';
+				const described = Nino.adminUi.describeKey( slot.uri );
+				const group = described.kind === 'grammar' ? described.namespace+ '/'+ described.category : ( slot.uri.split('/').filter( Boolean )[0] || '-' );
 				groups[group] = groups[group] || [];
 				groups[group].push( slot );
 			} );

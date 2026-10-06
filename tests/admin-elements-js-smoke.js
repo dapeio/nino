@@ -1028,7 +1028,7 @@ function fakeDom() {
 		'/_admin/elements/label/uri' : 'Uri', '/_admin/elements/msg/duplicated' : 'COPY',
 		'/_admin/common/msg/dirty' : 'Unsaved changes', '/_admin/common/msg/savedat' : 'Saved at %s.', '/_admin/common/msg/saving' : 'Saving',
 	};
-	sandbox.Nino.content = { getText : key => texts[key] ?? ( key.indexOf('/field/') !== -1 ? '' : key ) };
+	sandbox.Nino.content = { getText : key => texts[key] ?? ( key.indexOf('/field/') !== -1 || key.indexOf('/common/word/') !== -1 ? '' : key ) };
 	sandbox.Nino.admin.formToolbar = backLink => { const bar = d.make('div'); bar.className = 'nino-admin-contextbar'; bar.appendChild( backLink ); return bar };
 	const localeSwitches = [];
 	sandbox.Nino.admin.sessionLocale = { current : 'en_US', set : locale => localeSwitches.push( locale ), init(){} };
@@ -1069,8 +1069,8 @@ function fakeDom() {
 	texts['/_admin/elements/hint/alt'] = 'ALT OF %s';
 	texts['/_admin/elements/label/image-remove'] = 'Remove image';
 	const hintsOf = el => el.querySelectorAll('.nino-admin-field-hint').map( h => h.textContent );
-	check( 'the image field of a model with an alt link names the field it is written in', hintsOf( elements._renderField( 'photo', elements._currentModel.photo, 'a.jpg' ) ).join() === 'ALT IN caption' );
-	check( '...and the linked field names the image it is the alt text of', hintsOf( elements._renderField( 'caption', elements._currentModel.caption, 'x' ) ).join() === 'ALT OF photo' );
+	check( 'the image field of a model with an alt link names the field it is written in', hintsOf( elements._renderField( 'photo', elements._currentModel.photo, 'a.jpg' ) ).join() === 'ALT IN Caption' );
+	check( '...and the linked field names the image it is the alt text of', hintsOf( elements._renderField( 'caption', elements._currentModel.caption, 'x' ) ).join() === 'ALT OF Photo' );
 	check( 'an image without the link, and a field nobody links to, carry no such hint', hintsOf( elements._renderField( 'plain', elements._currentModel.plain, '' ) ).length === 0
 		&& hintsOf( elements._renderField( 'other', { type : 'string' }, 'x' ) ).length === 0 );
 	const withImage = elements._renderField( 'photo', elements._currentModel.photo, 'a.jpg' );
@@ -1501,6 +1501,29 @@ check( 'the sentences are not alerts - the status line says it once, in its own 
 	vm.runInContext( source, vm.createContext( box ), { filename : 'elements.js' } );
 	check( 'the Elements form registers with the shell under its name, with the three words the shell asks it',
 		registered.length === 1 && registered[0][0] === 'elements' && [ 'isDirty', 'save', 'discard' ].every( k => typeof registered[0][1][k] === 'function' ) );
+}
+
+// --- the name of a field: a fill, a word, the key -----------------------------------
+//
+// A field is named by the fill of its type (/_admin/elements/field/<type>/<key>,
+// which Social brings), else by the word of the vocabulary its key is, else by
+// the key with a capital first letter - the key as written, so "price_default"
+// stays "Price_default" where the Text panel would say "Price default". The
+// labels the shipped demo types used to carry are gone: they were a table of
+// names, and covered the labels a project gave a type of the same name
+
+{
+	const words = { '/_admin/common/word/title' : 'Titel', '/_admin/common/word/price' : 'Preis', '/_admin/elements/field/social/title' : 'Netzwerk' };
+	sandbox.Nino.content = { getText : key => words[key] ?? '' };
+	elements._currentType = 'social';
+	check( 'the fill of the type comes first', elements._fieldLabel( 'title' ) === 'Netzwerk' );
+	elements._currentType = 'services';
+	check( '...then the word of the vocabulary', elements._fieldLabel( 'title' ) === 'Titel' && elements._fieldLabel( 'price' ) === 'Preis' );
+	check( '...then the key with a capital first letter, as written', elements._fieldLabel( 'price_default' ) === 'Price_default' && elements._fieldLabel( 'tasks' ) === 'Tasks' );
+	check( 'the demo labels of the shipped types are gone from both languages', [ 'en_US', 'de_DE' ].every( locale => {
+		const fills = fs.readFileSync( path.join( __dirname, '../_admin/Nino/Modules/Elements/text/'+ locale+ '.php' ), 'utf8' );
+		return /\[\[\/_admin\/elements\/field\//.test( fills ) === false && fills.includes( '[[/_admin/types/label/ownkey]]' );
+	} ) );
 }
 
 console.log( '\n'+ checks+ ' checks, '+ failures+ ' failed' );

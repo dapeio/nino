@@ -1128,7 +1128,7 @@ echo "PersonalInfos::apiList / apiSaveBatch\n";
 	return $config;
 } );
 $appData['/nino/locales/available'] = [ 'de_DE', 'en_US' ];
-\Nino\Filesystem::putFileContent( $appData, '/text/global.php', [ '[[/project/company/general/name]]' => 'Acme Inc', '[[/project/company/contact/address]]' => 'Street 1', '[[/project/website/general/author]]' => 'Acme Inc', '[[/project/company/social/instagram]]' => 'https://www.instagram.com/acme' ] );
+\Nino\Filesystem::putFileContent( $appData, '/text/global.php', [ '[[/project/company/general/name]]' => 'Acme Inc', '[[/project/company/contact/address]]' => 'Street 1', '[[/project/website/general/author]]' => 'Acme Inc', '[[/project/website/general/url]]' => 'www.acme.test', '[[/project/website/general/host]]' => 'Acme Hosting', '[[/project/company/social/instagram]]' => 'https://www.instagram.com/acme' ] );
 \Nino\Filesystem::putFileContent( $appData, '/text/de_DE.php', [ '[[/project/company/contact/country]]' => 'Deutschland', '[[/project/website/html/lang]]' => 'de', '[[/template/page-home/welcome/headline]]' => 'Willkommen', '[[/_nino/webpage/kontakt/name]]' => 'Kontakt' ] );
 \Nino\Filesystem::putFileContent( $appData, '/text/en_US.php', [ '[[/project/company/contact/country]]' => 'Germany', '[[/project/website/html/lang]]' => 'en', '[[/template/page-home/welcome/headline]]' => 'Welcome', '[[/_nino/webpage/kontakt/name]]' => 'Contact' ] );
 \Nino\Filesystem::putFileContent( $appData, '/text/blacklist.php', [ '/project/website/html/lang' ] );
@@ -1154,9 +1154,14 @@ check( 'a webpage\'s own meta key is left out too, despite existing in text/*.ph
 check( 'a social network\'s address is not asked for: the base unit ships no such key', array_search( '/project/company/social/instagram', $personalInfosKeys, true ) === false );
 
 $personalInfosLabels = array_column( $personalInfosEntries, 'label', 'key' );
-check( 'derives a friendly label from the category and the name, capitalized', $personalInfosLabels['/project/company/general/name'] === 'Company › Name' );
+check( 'derives a friendly label from the category and the name, each as the English vocabulary of the workbench says it', $personalInfosLabels['/project/company/general/name'] === 'Company › Name' );
 check( '...also for a key of the website', $personalInfosLabels['/project/website/general/author'] === 'Website › Author' );
 check( '...and an address, spelled right', $personalInfosLabels['/project/company/contact/address'] === 'Company › Address' );
+check( '...the words of the vocabulary as they are written there, not capitalized by rule: an address is a "URL", hosting is "Hosting"', $personalInfosLabels['/project/website/general/url'] === 'Website › URL' && $personalInfosLabels['/project/website/general/host'] === 'Website › Hosting' );
+check( 'every label of the step is made of words of the vocabulary', array_filter( $personalInfosLabels, static function( string $label ): bool {
+	$english = include __DIR__. '/../_admin/text/en_US.php';
+	return count( array_filter( explode( ' › ', $label ), static fn( string $word ): bool => in_array( $word, $english, true ) === false ) ) > 0;
+} ) === [] );
 
 $saveBatchRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 $_POST['data'] = json_encode( [ 'items' => [

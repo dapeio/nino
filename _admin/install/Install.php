@@ -2204,6 +2204,11 @@ namespace Nino\Install {
 		// internals
 		private const string BASE_TEXT_DIR = __DIR__. '/library/base/text';
 
+		// The workbench's own English words, which hold the vocabulary of a key's
+		// segments (/_admin/common/word/<slug>). The wizard publishes no [jstext],
+		// so it reads the file itself
+		private const string WORDS_FILE = __DIR__. '/../text/en_US.php';
+
 		// Only these two prefixes are in scope - see this class's docblock.
 		// The technical /project/website/html/* values and the mails' look
 		// are outside both
@@ -2283,10 +2288,10 @@ namespace Nino\Install {
 
 		/**
 		 *	'/project/company/contact/address' -> 'Company › Address',
-		 *	'/project/website/general/author' -> 'Website › Author' - the
-		 *	category and the name, each capitalized with its hyphens as spaces,
-		 *	no hardcoded per-key lookup table to keep in sync with the
-		 *	library's own key names. English like the whole wizard
+		 *	'/project/website/general/url' -> 'Website › URL' - the category and
+		 *	the name, each as the vocabulary of the workbench says it in English
+		 *	(see _word()), no hardcoded per-key lookup table to keep in sync with
+		 *	the library's own key names. English like the whole wizard
 		 *
 		 *	@param		string		$key
 		 *
@@ -2295,9 +2300,26 @@ namespace Nino\Install {
 		private static function _label( string $key ): string {
 
 			$segments = explode( '/', trim( $key, '/' ) );
-			$humanize = static fn( string $segment ): string => ucfirst( str_replace( '-', ' ', $segment ) );
 
-			return $humanize( $segments[1] ?? '' ). ' › '. $humanize( $segments[3] ?? '' );
+			return self::_word( $segments[1] ?? '' ). ' › '. self::_word( $segments[3] ?? '' );
+		}
+
+		/**
+		 *	One segment of a key as the English vocabulary of the workbench names
+		 *	it: 'company' is "Company", 'url' is "URL". A slug the vocabulary has
+		 *	no word for is capitalized with its hyphens as spaces
+		 *
+		 *	@param		string		$slug
+		 *
+		 *	@return 	string
+		 */
+		private static function _word( string $slug ): string {
+
+			static $words = null;
+
+			$words ??= is_file( self::WORDS_FILE ) === true ? (array) ( include self::WORDS_FILE ) : [];
+
+			return (string) ( $words['[[/_admin/common/word/'. $slug. ']]'] ?? ucfirst( str_replace( '-', ' ', $slug ) ) );
 		}
 
 		/**

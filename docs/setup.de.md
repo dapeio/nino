@@ -158,7 +158,7 @@ Beim erneuten Anwenden ersetzt die Liste nur die Routen, die aus ihrem vorherige
 
 ## 4. Persönliche Angaben
 
-„Personal Infos“ bündelt zentrale Textwerte, die unabhängig von der Modulauswahl benötigt werden. Der Schritt bearbeitet ausschließlich die vorgesehenen Schlüssel unter `/project/company/` und `/project/website/general/` – die technischen Werte unter `/project/website/html/` und die Gestaltung der Mails liegen außerhalb beider. Jedes Feld heißt nach seiner Kategorie und seinem Namen („Company › Address“, „Website › Url“), englisch wie der ganze Assistent.
+„Personal Infos“ bündelt zentrale Textwerte, die unabhängig von der Modulauswahl benötigt werden. Der Schritt bearbeitet ausschließlich die vorgesehenen Schlüssel unter `/project/company/` und `/project/website/general/` – die technischen Werte unter `/project/website/html/` und die Gestaltung der Mails liegen außerhalb beider. Jedes Feld heißt nach seiner Kategorie und seinem Namen („Company › Address“, „Website › URL“), englisch wie der ganze Assistent.
 
 Sprachunabhängig sind beispielsweise:
 

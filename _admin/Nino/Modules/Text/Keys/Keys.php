@@ -111,6 +111,7 @@ namespace Nino\Modules\Text {
 
 		public static function assets(): array {
 			return [
+				\Nino\Admin\Panels::relative( dirname( __DIR__ ). '/assets/textkeys.js' ),
 				\Nino\Admin\Panels::relative( dirname( __DIR__ ). '/assets/keys.js' ),
 				'/_admin/assets/html-editor.js',
 			];
@@ -125,7 +126,15 @@ namespace Nino\Modules\Text {
 		/**
 		 *	List every known text key, blacklisted or not (unlike the Text panel's
 		 *	own panel, this is exactly where you'd come to un-blacklist one)
-		 *	- see \Nino\Text::entries()
+		 *	- see \Nino\Text::entries() - and what the form that creates or
+		 *	renames a key offers to choose from, 'categories': per namespace the
+		 *	categories a key can go in -
+		 *
+		 *	  - template	the templates directly in templates/ whose name is a
+		 *								category (see \Nino\Modules\Template::category()), and common
+		 *	  - feature		the keys of the installed features
+		 *	  - module		the kernel modules, by their directory in lower case
+		 *	  - project		company, website and mail, and the ones keys already use
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
@@ -143,7 +152,56 @@ namespace Nino\Modules\Text {
 			\Nino\Http::ok( $request, [
 				'keys' 		=> $keys,
 				'locales' => \Nino\Locales::getAvailableLocales( $appData ),
+				'selectedLocale' => \Nino\Admin\Admin::sessionLocale( $appData ),
+				'categories' => self::_categories( $appData, $keys ),
 			] );
+		}
+
+		/**
+		 *	The categories a key can be created in, per namespace - see apiList()
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		$keys					The known keys, in \Nino\Text::entries()' shape
+		 *
+		 *	@return 	array										[ 'template' => [ ... ], 'feature' => [ ... ], 'module' => [ ... ], 'project' => [ ... ] ]
+		 */
+		private static function _categories( array &$appData, array $keys ): array {
+
+			$template = [];
+			foreach( glob( \Nino\Filesystem::path( $appData, '/templates' ). '/*.tpl' ) ?: [] as $file ) {
+				$category = \Nino\Modules\Template::category( basename( $file ) );
+				if( $category !== null && $category !== 'common' )
+					$template[] = $category;
+			}
+
+			// The kernel this workbench runs from - not the project's directory, which is
+			// wherever the data are
+			$module = [];
+			foreach( glob( dirname( __DIR__, 5 ). '/_nino/Nino/Modules/*', GLOB_ONLYDIR ) ?: [] as $dir )
+				$module[] = strtolower( basename( $dir ) );
+
+			$shipped = [ 'company', 'website', 'mail' ];
+			$project = [];
+			foreach( $keys as $entry )
+				if( preg_match( '#^/project/([a-z0-9]+(?:-[a-z0-9]+)*)/#', $entry['key'], $match ) === 1 && in_array( $match[1], $shipped, true ) === false )
+					$project[] = $match[1];
+
+			$template = array_unique( $template );
+			$module 	= array_unique( $module );
+			$project 	= array_unique( $project );
+			$feature 	= array_map( 'strval', array_keys( \Nino\Features::all( $appData ) ) );
+
+			sort( $template );
+			sort( $module );
+			sort( $project );
+			sort( $feature );
+
+			return [
+				'template' => array_merge( [ 'common' ], $template ),
+				'feature' 	=> $feature,
+				'module' 	=> $module,
+				'project' 	=> array_merge( $shipped, $project ),
+			];
 		}
 
 		/**
