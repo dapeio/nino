@@ -1841,6 +1841,8 @@ namespace Nino\Admin {
 		// The session flag recovery.php sets once the secret was verified
 		public const string SESSION_KEY = './nino/admin/recovery';
 
+		// The shortest password the workbench accepts, for every account and for
+		// this secret - the wizard and the Users panel read it from here
 		public const int MIN_PW_LENGTH = 8;
 
 		/**

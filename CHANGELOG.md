@@ -13,6 +13,12 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **Workbench, setup wizard:** one minimum password length,
+  `\Nino\Admin\Recovery::MIN_PW_LENGTH` (still 8). The Users panel and the
+  wizard's Accounts and Finish steps read it instead of keeping private
+  copies, and `tests/install-smoke.php` holds every form's `minlength`, the
+  panel scripts' `minLength` and the labels in both languages to it.
+
 - **Workbench:** the login page's bundle no longer carries
   `_admin/assets/Nino.admin.js`, the kit the panels are built with -
   `login.js` uses none of it. The page loads about 2,500 fewer lines.

@@ -36,7 +36,6 @@ namespace Nino\Modules\Users {
 	class Admin {
 
 		public const string MANAGE_PERM = '/_admin/users/manage';
-		private const int MIN_PW_LENGTH = 8;
 
 		public static function actions(): array {
 			return [
@@ -380,8 +379,8 @@ namespace Nino\Modules\Users {
 				return;
 			}
 
-			if( strlen( $pw ) < self::MIN_PW_LENGTH ) {
-				\Nino\Http::fail( $request, 400, 'password must be at least '. self::MIN_PW_LENGTH. ' characters', 'users_password_short', [ self::MIN_PW_LENGTH ], 'pw' );
+			if( strlen( $pw ) < \Nino\Admin\Recovery::MIN_PW_LENGTH ) {
+				\Nino\Http::fail( $request, 400, 'password must be at least '. \Nino\Admin\Recovery::MIN_PW_LENGTH. ' characters', 'users_password_short', [ \Nino\Admin\Recovery::MIN_PW_LENGTH ], 'pw' );
 				return;
 			}
 
@@ -494,8 +493,8 @@ namespace Nino\Modules\Users {
 				return;
 			}
 
-			if( $pw !== '' && strlen( $pw ) < self::MIN_PW_LENGTH ) {
-				\Nino\Http::fail( $request, 400, 'password must be at least '. self::MIN_PW_LENGTH. ' characters', 'users_password_short', [ self::MIN_PW_LENGTH ], 'pw' );
+			if( $pw !== '' && strlen( $pw ) < \Nino\Admin\Recovery::MIN_PW_LENGTH ) {
+				\Nino\Http::fail( $request, 400, 'password must be at least '. \Nino\Admin\Recovery::MIN_PW_LENGTH. ' characters', 'users_password_short', [ \Nino\Admin\Recovery::MIN_PW_LENGTH ], 'pw' );
 				return;
 			}
 

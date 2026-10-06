@@ -2338,18 +2338,18 @@ namespace Nino\Install {
 
 	/**
 	 *	Nino							A compact filesystembased php framework
-	 *	Accounts					Step 5: create the first workbench account(s), the same way
-	 *												\Nino\Modules\Users\Admin bootstraps them from inside _admin - duplicated
-	 *												rather than depended on, since the wizard is meant to work even
-	 *												before a developer has decided whether to keep _admin around
+	 *	Accounts					Step 5: create the first workbench account(s) through
+	 *												\Nino\Auth, the way \Nino\Modules\Users\Admin creates them - repeated
+	 *												here rather than called, since the Users module can be
+	 *												deleted on its own. The password rule is
+	 *												\Nino\Admin\Recovery::MIN_PW_LENGTH, the one every password
+	 *												of the workbench follows
 	 *
 	 *	@package					Dape/Nino
 	 *	@author						David Perchermeier <mail@dape.io>
 	 *	@link							https://github.com/dapeio/nino
 	 */
 	class Accounts {
-
-		private const int MIN_PW_LENGTH = 8;
 
 		/**
 		 *	This module's action map, merged into Install::handlePost()'s dispatch
@@ -2417,8 +2417,8 @@ namespace Nino\Install {
 				return;
 			}
 
-			if( strlen( $pw ) < self::MIN_PW_LENGTH ) {
-				\Nino\Http::fail( $request, 400, 'password must be at least '. self::MIN_PW_LENGTH. ' characters' );
+			if( strlen( $pw ) < \Nino\Admin\Recovery::MIN_PW_LENGTH ) {
+				\Nino\Http::fail( $request, 400, 'password must be at least '. \Nino\Admin\Recovery::MIN_PW_LENGTH. ' characters' );
 				return;
 			}
 
@@ -2449,8 +2449,6 @@ namespace Nino\Install {
 	 *	@link							https://github.com/dapeio/nino
 	 */
 	class Finish {
-
-		private const int MIN_PW_LENGTH = 8;
 
 		/**
 		 *	This module's action map, merged into Install::handlePost()'s dispatch
@@ -2485,8 +2483,8 @@ namespace Nino\Install {
 				return;
 			}
 
-			if( strlen( $pw ) < self::MIN_PW_LENGTH ) {
-				\Nino\Http::fail( $request, 400, 'password must be at least '. self::MIN_PW_LENGTH. ' characters' );
+			if( strlen( $pw ) < \Nino\Admin\Recovery::MIN_PW_LENGTH ) {
+				\Nino\Http::fail( $request, 400, 'password must be at least '. \Nino\Admin\Recovery::MIN_PW_LENGTH. ' characters' );
 				return;
 			}
 

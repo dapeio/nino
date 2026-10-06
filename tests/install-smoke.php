@@ -1330,6 +1330,28 @@ check( '...and both password labels name that number', preg_match( '/<span>Passw
 	&& preg_match( '/<span>New recovery password \(at least '. $minPw. ' characters\)<\/span>/', $wizardTemplate ) === 1 );
 check( 'the Accounts step asks for the password twice', str_contains( $wizardTemplate, 'for="accounts-add-pw2"' ) === true );
 
+/*	One minimum for every password the workbench and the wizard set:
+	Recovery::MIN_PW_LENGTH. No class keeps a copy of its own, and every form,
+	script and label that tells a person the rule names that number	*/
+$minPwDeclared = 0;
+foreach( new RecursiveIteratorIterator( new RecursiveDirectoryIterator( __DIR__. '/../_admin', FilesystemIterator::SKIP_DOTS ) ) as $phpFile )
+	if( $phpFile->getExtension() === 'php' )
+		$minPwDeclared += preg_match_all( '/const\s+int\s+MIN_PW_LENGTH\b/', (string) file_get_contents( $phpFile->getPathname() ) );
+$minPwShown = [];
+foreach( [
+	'templates/page-recovery.tpl' 						=> '/(?:minlength="|at least )(\d+)/',
+	'install/templates/page-wizard.tpl' 				=> '/(?:minlength="|at least )(\d+)/',
+	'Nino/Modules/Users/assets/admin.js' 			=> '/minLength = (\d+)/',
+	'Nino/Modules/Users/assets/recoverypw.js' 	=> '/minLength = (\d+)/',
+	'Nino/Modules/Users/text/en_US.php' 				=> '/at least (\d+) characters/',
+	'Nino/Modules/Users/text/de_DE.php' 				=> '/mindestens (\d+) Zeichen/',
+] as $minPwFile => $minPwPattern ) {
+	preg_match_all( $minPwPattern, (string) file_get_contents( __DIR__. '/../_admin/'. $minPwFile ), $minPwMatch );
+	$minPwShown[$minPwFile] = array_values( array_unique( array_map( 'intval', $minPwMatch[1] ) ) );
+}
+check( 'one minimum password length, Recovery::MIN_PW_LENGTH, declared once and named by every form, script and label', $minPwDeclared === 1
+	&& array_filter( $minPwShown, static fn( array $numbers ): bool => $numbers !== [ \Nino\Admin\Recovery::MIN_PW_LENGTH ] ) === [] );
+
 $_POST['data'] = json_encode( [ 'mail' => 'boundary@example.com', 'pw' => str_repeat( 'x', max( 0, $minPw - 1 ) ) ] );
 $belowRuleRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Install\Accounts::apiCreate( $appData, $belowRuleRequest );
