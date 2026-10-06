@@ -19,7 +19,9 @@ namespace Nino\Modules {
 	 *	Backups						Encrypted daily snapshot of everything the admin panel can
 	 *											write to at runtime - triggered once per authenticated
 	 *											admin request per day (see \Nino\Admin\Admin::guard()), not a cron
-	 *											job, so it needs no server-level scheduling at all. Lives
+	 *											job, so it needs no server-level scheduling at all. The
+	 *											panel's "Back up now" adds an archive of its own on top
+	 *											of that one (see now()). Lives
 	 *											here rather than in the kernel (_nino/) since
 	 *											it's a workbench operational concern, not something
 	 *											every Nino deployment needs - a site with no workbench has
@@ -69,6 +71,10 @@ namespace Nino\Modules {
 	class Backups {
 
 		private const int RETENTION_DAYS = 14;
+
+		// How many of the archives somebody asked for (see now()) are kept,
+		// the newest ones: the daily ones are bounded by their days alone
+		private const int MANUAL_KEEP = 10;
 		private const string LOCK_PATH = '/_admin/backup-daily';
 
 		// Under the private directory, not in this tool's own folder: archives
@@ -195,6 +201,51 @@ namespace Nino\Modules {
 		}
 
 		/**
+		 *	Write one archive now, on request - the Backups panel's "Back up
+		 *	now". An archive of its own, named by date and time, beside the
+		 *	daily one and never in place of it: today's Y-m-d.php is the state
+		 *	before the day's work (see maybeRun()), and a click at five in the
+		 *	afternoon must not replace it. Kept like the daily ones - the same
+		 *	days - and at most MANUAL_KEEP of them.
+		 *
+		 *	Without the daily lock: the name is to the second, so two clicks in
+		 *	the same second make the same archive - the second write replaces
+		 *	the first, atomically, and both answer with that id. That lock is
+		 *	taken by every request of the workbench
+		 *	(see maybeRun()) - holding it for the seconds an archive takes
+		 *	would stop all of them. _bootstrap() serialises itself under
+		 *	config.php's lock. The activity log line is the panel's (see
+		 *	Admin::log()), not written here
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	string|array						The new archive's id ("Y-m-d-His"), or [ http status, message ]
+		 */
+		public static function now( array &$appData ): string|array {
+
+			if( ( $appData['/nino/admin/backups'] ?? true ) === false )
+				return [ 409, 'backups are switched off' ];
+
+			try {
+
+				self::_bootstrap( $appData );
+
+				\Nino\Filesystem::forceDir( $appData, self::BACKUPS_DIR );
+
+				$dir 	= self::dirs( $appData )[0];
+				$id 	= date( 'Y-m-d-His' );
+
+				self::_create( $appData, $dir, $dir. '/'. $id. '.php' );
+				self::_prune( $dir );
+
+				return $id;
+
+			} catch( \RuntimeException | \PharException $e ) {
+				return [ 500, $e->getMessage() ];
+			}
+		}
+
+		/**
 		 *	Generate the encryption key on first use - a project that never
 		 *	opens the workbench never gets that config.php key at all. The
 		 *	random directory name this used to generate beside it is gone:
@@ -288,7 +339,7 @@ namespace Nino\Modules {
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		string		$dir					Absolute path to the backup directory
-		 *	@param		string		$path					Absolute path of today's backup file
+		 *	@param		string		$path					Absolute path of the backup file to write: today's, or the timed archive's
 		 *
 		 *	@return 	void
 		 */
@@ -368,11 +419,12 @@ namespace Nino\Modules {
 		}
 
 		/**
-		 *	Delete dated backups older than RETENTION_DAYS. Only ever touches
-		 *	files whose name is exactly a plain "Y-m-d.php" date - the panel's
-		 *	own Admin::_safetySnapshot() also writes into this same directory
-		 *	(differently named, "pre-restore-<timestamp>.php") and must never
-		 *	be swept up here
+		 *	Delete dated backups older than RETENTION_DAYS, and the archives
+		 *	of now() beyond the newest MANUAL_KEEP. Only ever touches files
+		 *	whose name is exactly a plain "Y-m-d.php" date or a "Y-m-d-His.php"
+		 *	one - the panel's own Admin::_safetySnapshot() also writes into
+		 *	this same directory (differently named,
+		 *	"pre-restore-<timestamp>.php") and must never be swept up here
 		 *
 		 *	@param		string		$dir					Absolute path to the backup directory
 		 *
@@ -383,6 +435,19 @@ namespace Nino\Modules {
 			$cutoff = ( new \DateTime( '-'. self::RETENTION_DAYS. ' days' ) )->setTime( 0, 0 );
 
 			\Nino\RotatingLog::prune( $dir, '', 'Y-m-d', '.php', $cutoff );
+			\Nino\RotatingLog::prune( $dir, '', 'Y-m-d-His', '.php', $cutoff );
+
+			// Read, not globbed (see RotatingLog::prune()); the name carries
+			// the time, so sorting it sorts by age
+			$manual = [];
+			foreach( @scandir( $dir ) ?: [] as $name )
+				if( preg_match( '/^\d{4}-\d{2}-\d{2}-\d{6}\.php$/', $name ) === 1 )
+					$manual[] = $name;
+
+			rsort( $manual );
+
+			foreach( array_slice( $manual, self::MANUAL_KEEP ) as $name )
+				@unlink( $dir. '/'. $name );
 		}
 	}
 }

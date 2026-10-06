@@ -1,8 +1,9 @@
 /**
  *	Nino										A compact filesystembased php framework
  *	recovery.js							The break-glass page (_admin/recovery.php): one secret, then
- *													a list of backups to restore and a form to give an account
- *													a password. Plain tags and literal text on purpose - this
+ *													a list of backups to restore, a form to give an account
+ *													a password and one to create an account with full access.
+ *													Plain tags and literal text on purpose - this
  *													has to work when the project's own text and bundles do not.
  *
  *	@package								Dape/Nino
@@ -57,8 +58,9 @@
 		},
 		/**
 		 *	The tools: load the backup dates and known accounts, wire the
-		 *	restore buttons and the reset form. Shown by the server only once
-		 *	the secret was verified (see page-recovery.tpl's [[...]] gate)
+		 *	restore buttons and the two account forms. Shown by the server
+		 *	only once the secret was verified (see page-recovery.tpl's
+		 *	[[...]] gate)
 		 *
 		 *	@return		void
 		 */
@@ -68,6 +70,62 @@
 				return;
 			dc.getElementById('recovery-login').classList.add('admin-hidden');
 			tools.classList.remove('admin-hidden');
+			Nino.recovery._load();
+			const reset = dc.getElementById('recovery-reset');
+			const resetMsg = dc.getElementById('recovery-reset-msg');
+			reset.addEventListener( 'submit', function( ev ) {
+				ev.preventDefault();
+				const mail = dc.getElementById('recovery-reset-mail').value;
+				if( mail === '' )
+					return;
+				resetMsg.textContent = 'Saving …';
+				Nino.recovery._apiCall( 'reset', { mail : mail, pw : dc.getElementById('recovery-reset-pw').value }, function( status, response ) {
+					if( status !== 200 ) {
+						resetMsg.textContent = Nino.recovery._error( status, response, 'Could not set the password.' );
+						return;
+					}
+					resetMsg.textContent = 'Password set, every session of this account logged out.';
+					dc.getElementById('recovery-reset-pw').value = '';
+				} );
+			} );
+			const create = dc.getElementById('recovery-create');
+			const createMsg = dc.getElementById('recovery-create-msg');
+			create.addEventListener( 'submit', function( ev ) {
+				ev.preventDefault();
+				const mail = dc.getElementById('recovery-create-mail').value.trim();
+				const pw = dc.getElementById('recovery-create-pw').value;
+				if( pw !== dc.getElementById('recovery-create-repeat').value ) {
+					createMsg.textContent = 'The passwords do not match.';
+					return;
+				}
+				// The one action here that cannot be taken back from this page,
+				// so it is asked about - and the server wants the answer as well
+				if( wn.confirm( 'Create an account with FULL access for '+ mail+ '?' ) === false )
+					return;
+				createMsg.textContent = 'Saving …';
+				Nino.recovery._apiCall( 'create', { mail : mail, pw : pw, confirm : true }, function( status, response ) {
+					if( status !== 200 ) {
+						createMsg.textContent = Nino.recovery._error( status, response, 'Could not create the account.' );
+						return;
+					}
+					createMsg.textContent = 'Account created with full access.';
+					dc.getElementById('recovery-create-pw').value = '';
+					dc.getElementById('recovery-create-repeat').value = '';
+					// So the new account is there to pick under "Set a password"
+					Nino.recovery._load();
+				} );
+			} );
+			dc.getElementById('recovery-logout').addEventListener( 'click', function() {
+				Nino.recovery._apiCall( 'logout', {}, function() { wn.location.reload() } );
+			} );
+		},
+		/**
+		 *	Ask for the backup dates and the accounts, and draw both: the
+		 *	restore buttons and the accounts a password can be set for
+		 *
+		 *	@return		void
+		 */
+		_load : function() {
 			const list = dc.getElementById('recovery-dates');
 			const restoreMsg = dc.getElementById('recovery-restore-msg');
 			Nino.recovery._apiCall( 'list', {}, function( status, response ) {
@@ -101,30 +159,23 @@
 					li.appendChild( btn );
 					list.appendChild( li );
 				} );
-				const users = dc.getElementById('recovery-users');
-				users.innerHTML = '';
-				( response.users || [] ).forEach( function( mail ) {
+				const select = dc.getElementById('recovery-reset-mail');
+				const users = response.users || [];
+				select.innerHTML = '';
+				// Nobody to pick: the select says so and there is nothing to submit
+				if( users.length === 0 ) {
+					const none = dc.createElement('option');
+					none.value = '';
+					none.textContent = 'No accounts';
+					select.appendChild( none );
+				}
+				users.forEach( function( mail ) {
 					const option = dc.createElement('option');
 					option.value = mail;
-					users.appendChild( option );
+					option.textContent = mail;
+					select.appendChild( option );
 				} );
-			} );
-			const reset = dc.getElementById('recovery-reset');
-			const resetMsg = dc.getElementById('recovery-reset-msg');
-			reset.addEventListener( 'submit', function( ev ) {
-				ev.preventDefault();
-				resetMsg.textContent = 'Saving …';
-				Nino.recovery._apiCall( 'reset', { mail : dc.getElementById('recovery-reset-mail').value.trim(), pw : dc.getElementById('recovery-reset-pw').value }, function( status, response ) {
-					if( status !== 200 ) {
-						resetMsg.textContent = Nino.recovery._error( status, response, 'Could not set the password.' );
-						return;
-					}
-					resetMsg.textContent = response.created === true ? 'Account created with full access.' : 'Password set, every session of this account logged out.';
-					dc.getElementById('recovery-reset-pw').value = '';
-				} );
-			} );
-			dc.getElementById('recovery-logout').addEventListener( 'click', function() {
-				Nino.recovery._apiCall( 'logout', {}, function() { wn.location.reload() } );
+				dc.getElementById('recovery-reset-submit').disabled = users.length === 0;
 			} );
 		},
 	};

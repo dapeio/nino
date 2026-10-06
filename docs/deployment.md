@@ -278,7 +278,7 @@ Left empty, both are the owner address. Set to something that is not an address,
 Before go-live, the accounts must work and have strong passwords:
 
 - `/_admin` is the one management interface - developers and editors sign in with their own accounts. A **Developer** account holds `/*`, an **Editor** account the Content permissions only; the [`/_admin` manual](_admin.md#login-accounts-and-roles) lists every permission.
-- `/_admin/recovery.php` asks for the recovery password set in the wizard's last step and offers a restore and a password reset. Keep that password where the developer accounts' passwords are not.
+- `/_admin/recovery.php` asks for the recovery password set in the wizard's last step and offers a restore, setting the password of an account and creating one with full access. The Recovery password tab of Users changes it. Keep that password where the developer accounts' passwords are not.
 
 Grant editor permissions as narrowly as practically possible; the accounts the wizard creates are developers, and additional accounts usually do not need that scope. Keep the number of developer accounts small.
 
@@ -303,7 +303,7 @@ An incomplete installation does not become valid by deleting its wizard.
 
 ## Backups and Restoration
 
-With activated backups, the workbench automatically creates an encrypted backup on the first authenticated request of the day. The daily backups rotate over 14 days and are stored under `private/.backups/`; the archives are encrypted with AES-256-GCM, the key lives under `private/.auth/`.
+With activated backups, the workbench automatically creates an encrypted backup on the first authenticated request of the day. The daily backups rotate over 14 days and are stored under `private/.backups/`; **Back up now** in the Backups panel adds an archive of its own, named by date and time, that is kept for the same 14 days (at most the newest ten); the archives are encrypted with AES-256-GCM, the key lives under `private/.auth/`.
 
 Restoration is done in the Backups panel, or - when no account works any more - on `/_admin/recovery.php`. Before restoring, Nino creates an additional backup of the current state so that an accidentally incorrect restoration does not immediately destroy the previous state.
 

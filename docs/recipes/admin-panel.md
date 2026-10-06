@@ -113,8 +113,9 @@ request:
   (`Admin::visiblePanels()`, `'own' => false`). A tab has no tabs of its own.
 - The workbench's own modules use it: Element Types under Elements, Text Keys under Text,
   Image Slots under Images (each a structure permission beside the content it
-  shapes), User roles (sharing `/_admin/users/manage`) and Login protection
-  (`/_admin/lockout/manage`) under Users, Translations under Language. The
+  shapes), User roles (sharing `/_admin/users/manage`), Login protection
+  (`/_admin/lockout/manage`) and Recovery password (`/_admin/recoverypw/manage`)
+  under Users, Translations under Language. The
   strip is the design system's `.nino-admin-tabs--bar`, the same the Design
   panel renders for its four editors; the registry adds
   `.nino-admin-tabs--panel` to a pane's own strip, which is what keeps the
@@ -142,7 +143,11 @@ A dispatched action announces itself on `/nino/admin/action`
 module reacts to what the workbench does without owning the panel the action
 belongs to. Notification only: the response is already written, so refusing
 stays `guardPerm()`'s job, and *what changed* is the kernel's own events
-(`/nino/elements/committed`, `/nino/auth/user/*`). The activity log is not a
+(`/nino/elements/committed`, `/nino/auth/user/*`). `data` is the posted
+payload with its top-level `pw`, `current` and `currentPassword` blanked. A
+secret posted under any other key is not: a feature's `secret` setting arrives
+in `features/settings` as `data.fields.<name>`, in plain text, so a listener
+treats `data` as sensitive. The activity log is not a
 listener on it but a direct call, deliberately - an audit line that can be lost
 by not registering a callback is not an audit line.
 

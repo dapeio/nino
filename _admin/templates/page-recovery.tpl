@@ -33,13 +33,23 @@
 				</section>
 				<section>
 					<form id="recovery-reset">
-						<h2>Reset an account</h2>
-						<p class="nino-admin-hint">An existing account gets the new password and is logged out everywhere. An address that has no account yet becomes one with full access.</p>
-						<label class="nino-admin-field" for="recovery-reset-mail"><span>Email</span><input id="recovery-reset-mail" type="email" list="recovery-users" autocomplete="off" required></label>
-						<datalist id="recovery-users"></datalist>
+						<h2>Set a password</h2>
+						<p class="nino-admin-hint">The account gets the new password, is logged out everywhere, and is unlocked and activated if it was locked or deactivated.</p>
+						<label class="nino-admin-field" for="recovery-reset-mail"><span>Account</span><select id="recovery-reset-mail" required></select></label>
 						<label class="nino-admin-field" for="recovery-reset-pw"><span>New password (at least 8 characters)</span><input id="recovery-reset-pw" type="password" autocomplete="new-password" minlength="8" required></label>
 						<p id="recovery-reset-msg" role="status" aria-live="polite"></p>
-						<button type="submit">Set password</button>
+						<button type="submit" id="recovery-reset-submit">Set password</button>
+					</form>
+				</section>
+				<section>
+					<form id="recovery-create">
+						<h2>Create a full-access account</h2>
+						<p class="nino-admin-hint">For when no account is left to log in with. The new account can do everything, and this cannot be undone from here.</p>
+						<label class="nino-admin-field" for="recovery-create-mail"><span>Email</span><input id="recovery-create-mail" type="email" autocomplete="off" required></label>
+						<label class="nino-admin-field" for="recovery-create-pw"><span>Password (at least 8 characters)</span><input id="recovery-create-pw" type="password" autocomplete="new-password" minlength="8" required></label>
+						<label class="nino-admin-field" for="recovery-create-repeat"><span>Repeat the password</span><input id="recovery-create-repeat" type="password" autocomplete="new-password" minlength="8" required></label>
+						<p id="recovery-create-msg" role="status" aria-live="polite"></p>
+						<button type="submit">Create account</button>
 					</form>
 				</section>
 				<p class="nino-admin-hint"><a href="[[/nino/dir]]/_admin/">Back to /_admin</a> · <button type="button" id="recovery-logout" class="nino-admin-linkbutton">Close recovery</button></p>

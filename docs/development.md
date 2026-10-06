@@ -741,7 +741,7 @@ The workbench's own screens are the same thing in a different root: `_admin` hol
 | `layout()` | `'page'` (default: a column of content at reading width) or `'workspace'` (the whole width, the rail folded to its icons) |
 | `head()` | `false` opens the pane on its screen alone; every other panel opens with the head that names it - the label as the screen's `<h2>`, the tab strip beside it, a slot for the panel's own buttons - so a panel draws no title of its own. The Dashboard is the one shipped panel without; a panel with tabs of its own puts them there through `Nino.adminUi.panelHead()` |
 | `icon()` | an inline `<svg>` for the rail; a panel without one shows its label's initial when the rail is folded |
-| `tabs()` | further panel classes shown as tabs of this panel's pane - each a complete panel with its own `perm()`, script and hash prefix, ordered in the strip by its `nav()` weight; `tab()` names this panel's own tab when the nav label will not do. The workbench's own modules do this: Element Types under Elements, Text Keys under Text, Image Slots under Images, User roles and Login protection under Users, Translations under Language |
+| `tabs()` | further panel classes shown as tabs of this panel's pane - each a complete panel with its own `perm()`, script and hash prefix, ordered in the strip by its `nav()` weight; `tab()` names this panel's own tab when the nav label will not do. The workbench's own modules do this: Element Types under Elements, Text Keys under Text, Image Slots under Images, User roles, Login protection and Recovery password under Users, Translations under Language |
 | `assets()` | project-relative `.js`/`.css` files, bundled into `/_admin/.cache/` after the workbench's own |
 | `text()` | a directory of `<locale>.php` fill files, merged into the workbench's own |
 | `summary( &$appData )` | a Dashboard tile `[ 'value' => ..., 'label' => ... ]` |
@@ -787,7 +787,7 @@ $request = \Nino\request( $appData, $_SERVER );
 
 `init( true )` boots without a `config.php`, because until the setup wizard has run there is none. `Admin::init()` then decides what the route serves: the wizard (`_admin/install/Install.php`) while `Admin::isInstalled()` says no, the login and the panels afterwards. The wizard is not a module from `/nino/modules`; a panel that ships as a module is, and comes through `adminPanels()` like any other.
 
-`_admin/recovery.php` is the third entry point, booting the same way: it verifies the recovery secret (`\Nino\Admin\Recovery`) and offers a restore and a password reset, nothing else.
+`_admin/recovery.php` is the third entry point, booting the same way: it verifies the recovery secret (`\Nino\Admin\Recovery`) and offers a restore, setting the password of an account that exists and creating one with full access, nothing else. The workbench itself asks for the secret in one place, the Recovery password tab of Users (`Recovery::change()`).
 
 ---
 
@@ -957,7 +957,7 @@ The following table lists the most important hooks used by the kernel and integr
 | `/nino/mail/send` | `{ to, subject, body, replyTo, sender, headers, sent }` | deliver a mail another way than `mail()`: a transport that took it sets `sent` to `true` or `false`, and `mail()` is skipped; `sent` left at `null` passes the mail on |
 | `/nino/images/render` | `{ mode, bytes, width, height, basePath, source: { width, height, type, orientation }, filename }` | render an uploaded image another way than gd: a handler that wrote the file sets `filename` to the path below `/images/`, `false` refuses the upload, `null` passes it on |
 | `/nino/admin/restore` | `{ dataDir, staging }` | `/_admin` restores a backup: a module merges its own `data/` files from the staged copy into the live directory |
-| `/nino/admin/action` | `{ action, panel, status, user, data }` | a `/_admin` panel action has run and answered - notification only, and fired for a failed action too. Says who did what in the workbench; *what changed* is the kernel's own events above |
+| `/nino/admin/action` | `{ action, panel, status, user, data }` | a `/_admin` panel action has run and answered - notification only, and fired for a failed action too. Says who did what in the workbench; *what changed* is the kernel's own events above. `data` is the posted payload with its top-level `pw`, `current` and `currentPassword` blanked - a listener sees that a password was sent, never which. A secret under another key (a feature's `secret` setting in `features/settings`) is not blanked |
 
 `/nino/mail/send` and `/nino/images/render` are the two hooks that replace a kernel action rather than reacting to it. `\Nino\Mail::send()` fires the first after the per-ip cap and after every header value was cleaned - with the subject still raw, since how a subject is encoded is the transport's business - and calls `mail()` only where no handler set `sent`. A module or feature that delivers over SMTP or an API registers here in `init()`; `\Nino\Mail::TRANSPORT` is the name.
 

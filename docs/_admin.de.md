@@ -20,7 +20,7 @@ Ein Login, eine Navigation, jeder Bildschirm ein Panel. Die Panels sind danach g
 | **Inhalt** | Dashboard, Elemente (Elementtypen), Texte (Textschlüssel), Bilder (Bildplätze), Anfragen, Log | Redakteure und Entwickler |
 | **Struktur** | Routen, Navigationen | Entwickler |
 | **Features** | was die aktiven Features mitbringen | wer die eigene Berechtigung des Feature-Panels hält |
-| **System** | Nutzer (Nutzerrollen, Anmeldeschutz), Sprache (Übersetzungen), Backups, Konfiguration, Features, Wartung | Entwickler – und jedes Konto für sein eigenes Profil unter Nutzer |
+| **System** | Nutzer (Nutzerrollen, Anmeldeschutz, Recovery-Passwort), Sprache (Übersetzungen), Backups, Konfiguration, Features, Wartung | Entwickler – und jedes Konto für sein eigenes Profil unter Nutzer |
 
 Ein Bildschirm in Klammern ist ein **Tab** des Panels davor: Das Panel Elemente öffnet auf den Einträgen und trägt Elementtypen als zweiten Tab, sodass die Form der Inhalte direkt neben den Inhalten liegt. Ein Tab ist ein eigener Bildschirm – mit eigener Berechtigung, sodass ein Redakteur Elemente ohne Elementtypen sieht, und eigenem tiefen Link, `#types`.
 
@@ -68,6 +68,7 @@ Eine Berechtigung ist eine Zeichenkette pro Panel oder Tab; `/*` deckt jeden Pfa
 | Nutzer (eigenes Profil) | keine – jedes Konto |
 | Nutzer (andere Konten), Nutzerrollen (Tab von Nutzer) | `/_admin/users/manage` |
 | Anmeldeschutz (Tab von Nutzer) | `/_admin/lockout/manage` |
+| Recovery-Passwort (Tab von Nutzer) | `/_admin/recoverypw/manage` |
 | Sprache | `/_admin/language/manage` |
 | Übersetzungen (Tab von Sprache) | `/_admin/translations/manage` |
 | Backups | `/_admin/backups/manage` |
@@ -118,7 +119,7 @@ Wenn die Konten selbst das Problem sind – das letzte Entwicklerpasswort verges
 Die Leiste links trägt Marke, Konto, Zahnrad und Navigation; die Fläche rechts zeigt das gewählte Panel. Auf dem Telefon ist die Leiste eine Zeile am oberen Rand, und die Panels sind ein Menü darin: eine Auswahlliste mit den Gruppen als Abschnitten.
 
 - **Gruppen.** Die Navigation ist in Inhalt, Struktur, Features und System mit je einer Überschrift unterteilt; eine Gruppe ohne Inhalt - Features, in einem Projekt ohne aktiviertes Feature - trägt gar keine Überschrift. Ein Konto, das nur eine Gruppe sieht, bekommt eine schlichte Liste. Eine Überschrift ist ein Knopf: Er schließt seine Gruppe und öffnet sie wieder, und der Browser merkt sich, welche Gruppen geschlossen sind. Die Gruppe des offenen Panels ist immer offen, und in der zusammengeklappten Leiste (siehe *Einklappen*) sind die Überschriften nur Trennlinien und nichts ist verborgen. Auf dem Telefon zeigt die Auswahlliste die Überschriften als ihre Abschnitte.
-- **Tabs.** Ein Panel mit mehreren Bildschirmen trägt eine Tab-Leiste am Kopf seiner Fläche – Elemente und Elementtypen, Nutzer, Nutzerrollen und Anmeldeschutz – und kommt auf dem Tab zurück, auf dem du es verlassen hast. Jeder Tab ist ein eigener Bildschirm: seine Berechtigung, sein tiefer Link (`#roles`), sein Zustand.
+- **Tabs.** Ein Panel mit mehreren Bildschirmen trägt eine Tab-Leiste am Kopf seiner Fläche – Elemente und Elementtypen, Nutzer, Nutzerrollen, Anmeldeschutz und Recovery-Passwort – und kommt auf dem Tab zurück, auf dem du es verlassen hast. Jeder Tab ist ein eigener Bildschirm: seine Berechtigung, sein tiefer Link (`#roles`), sein Zustand.
 - **Einklappen.** Der kleine Doppelpfeil neben der Marke klappt die Leiste zu einer Spalte aus Symbolen zusammen. Ein Panel, das die ganze Breite braucht – der Template Builder – klappt sie von sich aus ein und nimmt der Fläche die Lesebreiten-Grenze; klappst du sie von Hand wieder auf, bleibt sie auf jedem Panel offen, bis du sie wieder einklappst. Die Wahl liegt im Browser, nicht auf dem Server.
 - **Tiefe Links.** Die Adresszeile folgt dir: `#elements/team/ada` ist das Element, das du gerade bearbeitest, `#types` der Tab Elementtypen. Ein Neuladen oder ein Lesezeichen öffnet genau diesen Stand, und die Zurück- und Vor-Knöpfe des Browsers gehen ihn ab: Jeder Schritt, den Du machst – ein Panel aus der Leiste, ein Tab, eine Zeile einer Liste, ein Zurück-Link, die Knöpfe für voriges und nächstes Element –, ist ein eigener Schritt, und was die Adresse nur mit dem Bildschirm in Einklang hält (die Adresse eines neuen Elements nach dem Speichern, die Pfeiltasten einer Tab-Leiste), ist keiner. Die Einträge der Leiste sind echte Links: Strg-Klick oder Mittelklick öffnet ein Panel in einem neuen Tab, und ein kopierter Link führt dorthin. Ein tiefer Link übersteht die Anmeldung – wer `#elements/team/ada` abgemeldet öffnet und sich anmeldet, landet im Element – und den Wechsel der Oberflächensprache.
 - **Zahnrad.** Oberflächensprache und helles oder dunkles Farbschema. Die Sprache bestimmt auch die Inhaltssprache, mit der die Formulare unter Texte und Elemente öffnen.
@@ -305,6 +306,8 @@ Die Liste nennt zu jedem Konto seine Rolle, ob es deaktiviert ist, bis wann es g
 
 **Anmeldeschutz**, der dritte Tab, hält die Drossel vor der Anmeldung: **Fehlversuche bis zur Sperre** (`/nino/auth/maxtries`, 1–100) und **Dauer der Sperre** (`/nino/auth/cooldown`, 60–604800 Sekunden). Beide waren eine Gruppe von Konfiguration und behalten dessen Prüfung. Darunter listet **Gesperrte Konten** jedes Konto auf, das gerade gesperrt ist, mit dem Zeitpunkt, zu dem die Sperre endet, und **Sperre aufheben** lässt es sofort wieder anmelden; der Zähler dieses Kontos beginnt bei null. Eine gesperrte Adresse ist kein Konto und steht nicht in der Liste – sie muss weiter ablaufen. Der Tab braucht `/_admin/lockout/manage`.
 
+**Recovery-Passwort**, der vierte Tab, ändert das Passwort, nach dem [`/_admin/recovery.php`](#recovery) fragt: das bisherige Recovery-Passwort, das neue – mindestens acht Zeichen – und das neue noch einmal. Eine abweichende Wiederholung sendet nichts, und nach einem Erfolg sind die drei Felder leer. Ein falsches bisheriges Passwort zählt auf dieselben fünf Versuche wie `recovery.php`; fünf falsche hier sperren also `recovery.php` eine Stunde. Das neue Passwort wird zuerst geprüft, eine fehlerhafte Anfrage verbraucht also keinen Versuch. Eine bereits offene Recovery-Sitzung bleibt offen. Ein erstes Passwort setzt der Tab nicht: Fehlt `private/.auth/pw.php`, sagt er das und verweist auf den Einzeiler unter [Recovery](#recovery). Der Tab braucht `/_admin/recoverypw/manage`, ein eigenes Recht, das die Rolle Entwickler über den Vollzugriff hält und die Rolle Redakteur nicht – wer es hält, kann `recovery.php` sperren und mit dem Recovery-Passwort eine Sicherung über das ganze Projekt legen.
+
 ### Sprache
 
 **Sprache** ist das Formular der beiden Sprach-Einstellungen der `config.php`, gemeinsam gespeichert, mit der Übersetzungsübergabe als zweitem Tab.
@@ -332,7 +335,7 @@ Der Import ergänzt nur: Passende Werte werden überschrieben, im Dokument fehle
 
 Mit eingeschalteten Sicherungen schreibt die erste angemeldete Anfrage eines Tages eine verschlüsselte Sicherung von allem, was die Workbench schreiben kann – Konfiguration, Texte, Elemente, Bilder, Daten – unter `private/.backups/`; tägliche Sicherungen bleiben 14 Tage erhalten. Die Archive sind mit AES-256-GCM verschlüsselt; der Schlüssel liegt unter `private/.auth/`, die Archive allein sind also unlesbar.
 
-**Backups** listet die verfügbaren Daten und stellt eines wieder her. Vor einer Wiederherstellung wird der aktuelle Stand noch einmal gesichert, sodass sich ein falscher Griff selbst rückgängig machen lässt. Prüfe danach mindestens das Frontend in jeder Sprache, Anmeldung und Rechte, Seiten, Texte, Elemente, Bilder sowie Formular- und Newsletter-Daten.
+**Backups** listet die verfügbaren Daten und stellt eines wieder her. **Jetzt sichern** schreibt sofort ein weiteres Archiv, benannt nach Datum und Uhrzeit – `2026-10-02-170512` – neben dem des Tages: Es ersetzt die tägliche Sicherung nicht, die der Stand vor der Arbeit des Tages ist, und es nimmt keinen Lock, die Workbench arbeitet also währenddessen weiter. Diese Archive bleiben wie die täglichen 14 Tage erhalten, höchstens aber die neuesten zehn; solange Sicherungen ausgeschaltet sind, gibt es die Schaltfläche nicht. Vor einer Wiederherstellung wird der aktuelle Stand noch einmal gesichert, sodass sich ein falscher Griff selbst rückgängig machen lässt. Prüfe danach mindestens das Frontend in jeder Sprache, Anmeldung und Rechte, Seiten, Texte, Elemente, Bilder sowie Formular- und Newsletter-Daten.
 
 Ein Modul, das eigene Dateien unter `data/` hält, führt sie bei einer Wiederherstellung über den Callback `/nino/admin/restore` zusammen (das Newsletter-Feature des Katalogs tut das). Die tägliche Sicherung ist ein Sicherheitsnetz für redaktionelle Fehler, kein Ersatz für eine externe Sicherung des gesamten Projekts.
 
@@ -380,12 +383,13 @@ Ein Panel, das ein Feature mitbringt, erscheint mit dem nächsten Laden der Work
 
 ## Recovery
 
-`/_admin/recovery.php` ist der Weg zurück, wenn die Konten selbst das Problem sind: jedes Entwicklerpasswort vergessen, oder eine Wiederherstellung misslungen. Die Seite fragt nach dem **Recovery-Passwort** aus dem letzten Schritt des Assistenten – kein Login, und nichts in der Workbench fragt je danach – und bietet genau zwei Dinge:
+`/_admin/recovery.php` ist der Weg zurück, wenn die Konten selbst das Problem sind: jedes Entwicklerpasswort vergessen, oder eine Wiederherstellung misslungen. Die Seite fragt nach dem **Recovery-Passwort** aus dem letzten Schritt des Assistenten – kein Login; die Workbench fragt nur an einer Stelle danach, im Tab **Recovery-Passwort** von Nutzer, der es ändert – und bietet drei Dinge:
 
 - **Eine Sicherung wiederherstellen**, aus der Liste der Daten, nach einer Sicherung des aktuellen Stands;
-- **Ein Konto zurücksetzen**: Eine vorhandene Adresse bekommt das neue Passwort und wird überall abgemeldet; eine Adresse ohne Konto wird eines mit Vollzugriff.
+- **Ein Passwort setzen** für ein Konto, das es gibt, ausgewählt aus einer Liste: Es bekommt das neue Passwort, wird überall abgemeldet und, falls es gesperrt oder deaktiviert war, entsperrt und wieder aktiviert – ein wiederhergestelltes Entwicklerkonto kommt also hinein. Ein Tippfehler kann kein Konto benennen, es gibt keines zu benennen;
+- **Ein Konto mit Vollzugriff anlegen** – für den Fall, dass kein Konto mehr übrig ist. Das ist eine eigene Aktion, sie fragt vor dem Schreiben nach einer Bestätigung und weist eine Adresse ab, die schon ein Konto hat.
 
-Fünf Fehlversuche sperren die Seite eine Stunde. Der Hash des Geheimnisses liegt in `private/.auth/pw.php` – außerhalb der `config.php`, damit eine Wiederherstellung ihn nicht zurückrollen kann, und außerhalb jedes Werkzeugverzeichnisses, damit ein Update ihn nicht mitnimmt. Außer dem letzten Schritt des Assistenten schreibt nichts in der Workbench diese Datei, ein neues Geheimnis wird also von Hand geschrieben – sie ist ein PHP-Stub, der sich nicht ausliefern lässt, mit dem Hash darin:
+Fünf Fehlversuche sperren die Seite eine Stunde, die falschen bisherigen Passwörter aus dem Tab Recovery-Passwort eingeschlossen. Der Hash des Geheimnisses liegt in `private/.auth/pw.php` – außerhalb der `config.php`, damit eine Wiederherstellung ihn nicht zurückrollen kann, und außerhalb jedes Werkzeugverzeichnisses, damit ein Update ihn nicht mitnimmt. Diese Datei schreiben nur der letzte Schritt des Assistenten und der Tab Recovery-Passwort. Ein vergessenes Geheimnis, bei dem der Tab kein bisheriges Passwort zum Abfragen hat, wird von Hand geschrieben – die Datei ist ein PHP-Stub, der sich nicht ausliefern lässt, mit dem Hash darin:
 
 ```bash
 php -r 'echo "<?php http_response_code(403); exit; return \x27", password_hash( $argv[1], PASSWORD_DEFAULT ), "\x27;\n";' -- '<passwort>' > private/.auth/pw.php
@@ -415,7 +419,7 @@ Tu das nur in einer geschützten lokalen Umgebung – ein Passwort auf der Komma
 | Template fehlt unter **Routen** | Angeboten werden nur vorhandene Dateien `templates/page-*.tpl`. |
 | Eine Seite lässt sich unter **Templates** nicht speichern | Nach einer externen Änderung neu laden, eindeutige Section-Ids und unpaarige `<section>`-Tags prüfen; siehe das [Handbuch](https://github.com/dapeio/nino-features/blob/main/features/Templates/docs/templates.de.md) des Template-Baukastens. |
 | Texte oder Bilder fehlen in einem Scan | Dynamische Schlüssel und Bilder sind statisch nicht erkennbar. |
-| Die Backup-Liste ist leer | Sicherungen sind ausgeschaltet, oder heute gab es noch keine angemeldete Anfrage. |
+| Die Backup-Liste ist leer | Sicherungen sind ausgeschaltet, oder heute gab es noch keine angemeldete Anfrage. **Jetzt sichern** schreibt sofort das erste Archiv. |
 | Die Suche liefert keine Elemente | Das Search-Feature des Katalogs in `features/` und im Panel Features eingeschaltet, `/nino/elements/index` in der `config.php`, dann **Suchindex erstellen**. |
 | Webseite nach **Konfiguration** kaputt | Letzten Git-Stand oder Sicherung wiederherstellen. |
 | Kein Entwicklerpasswort funktioniert mehr | `/_admin/recovery.php` mit dem Recovery-Passwort. |

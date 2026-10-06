@@ -235,6 +235,52 @@ fire( restoreButton('2024-05-03'), 'click' );
 answer( 200, { ok : true } );
 check( 'a restore that succeeded says so and reloads the page', alerts.length === 1 && reloaded === 1 );
 
+/*	"Back up now": one more archive on request. It is on the list screen
+	whatever the list holds, off while it runs, and says what it made once
+	the list shows it	*/
+function nowButton() {
+	return findAll( mount, function( el ) { return el.id === 'backups-now' } )[0] ?? null;
+}
+
+check( 'the list carries a Back up now button, the primary action', nowButton() !== null && nowButton().className === 'nino-admin-btn-primary'
+	&& nowButton().textContent === text('/_admin/backups/label/now') && text('/_admin/backups/label/now') === 'Back up now' );
+check( '...in the action bar the other panels put theirs in', findAll( mount, function( el ) { return el.className === 'nino-admin-actionbar nino-admin-list-actions' } ).length === 1 );
+
+requests.length = 0;
+fire( nowButton(), 'click' );
+check( 'a click sends backups/now, with the button off while it runs', requests.length === 1 && requests[0].action === 'backups/now' && nowButton().disabled === true );
+
+answer( 200, { id : '2024-05-03-101500' } );
+check( 'on 200 the list is requested again', requests.length === 2 && requests[1].action === 'backups/list' && nowButton().disabled === false );
+answer( 200, { dates : [ '2024-05-03-101500', '2024-05-03', '2024-05-02', '2024-05-01' ], enabled : true } );
+check( '...and shows the new archive first, and says what was made', dateRows().join(',') === '2024-05-03-101500,2024-05-03,2024-05-02,2024-05-01'
+	&& messageText() === 'Backup created: 2024-05-03-101500' );
+
+requests.length = 0;
+fire( nowButton(), 'click' );
+answer( 500, { error : 'backup encryption key is invalid' } );
+check( 'a refused backup keeps the list and shows the status and the reason', dateRows().length === 4 && messageText() === '(500) backup encryption key is invalid'
+	&& messageClass() === 'nino-admin-error' && requests.length === 1 );
+check( '...and gives the button back for another try', nowButton() !== null && nowButton().disabled === false );
+fire( nowButton(), 'click' );
+check( 'the next attempt clears the old error first', messageText() === '' && messageClass() === '' );
+answer( 409, { error : 'backups are switched off' } );
+check( 'a refusal with another status says that one', messageText() === '(409) backups are switched off' );
+
+// An empty list: still the way to make the first archive
+mount.innerHTML = '';
+requests.length = 0;
+panel.init();
+answer( 200, { dates : [], enabled : true } );
+check( 'an empty list has the button too, and the line under it', nowButton() !== null && dateRows().length === 0 && messageLine() !== null );
+
+// Backups switched off: the server would refuse, so there is nothing to press
+mount.innerHTML = '';
+requests.length = 0;
+panel.init();
+answer( 200, { dates : [ '2024-05-03' ], enabled : false } );
+check( 'while backups are switched off there is no button, and the list is as it was', nowButton() === null && dateRows().join(',') === '2024-05-03' );
+
 // The other failure, which is not this one: a list that could not be loaded
 // has nothing to keep, so the error takes the place of it
 mount.innerHTML = '';

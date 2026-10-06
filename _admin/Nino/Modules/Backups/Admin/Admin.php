@@ -12,7 +12,7 @@ namespace Nino\Modules\Backups {
 
 	/**
 	 *	Nino							A compact filesystembased php framework
-	 *	Backups						Disaster recovery: restore a daily backup.
+	 *	Backups						Disaster recovery: restore a daily backup, and back up now.
 	 *
 	 *											Deliberately independent of config.php's own backup keys:
 	 *											- the archives are found under private/.backups, never
@@ -53,6 +53,7 @@ namespace Nino\Modules\Backups {
 			return [
 				'backups/list' 		=> [ self::class, 'apiList' ],
 				'backups/restore' 	=> [ self::class, 'apiRestore' ],
+				'backups/now' 		=> [ self::class, 'apiNow' ],
 			];
 		}
 
@@ -110,7 +111,7 @@ namespace Nino\Modules\Backups {
 		 *	The directory one dated archive actually sits in
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		string		$date					"Y-m-d", already validated
+		 *	@param		string		$date					"Y-m-d" or "Y-m-d-His", already validated
 		 *
 		 *	@return 	string|false
 		 */
@@ -162,13 +163,14 @@ namespace Nino\Modules\Backups {
 			return openssl_decrypt( $cipher, 'aes-256-gcm', $key, OPENSSL_RAW_DATA, $iv, $tag );
 		}
 
-		// What an archive's id may look like: a dated backup, or the
+		// What an archive's id may look like: a dated backup, one made on
+		// request (dated and timed, see \Nino\Modules\Backups::now()), or the
 		// safety snapshot a restore writes before it overwrites anything.
 		// The snapshot used to match nothing here - not in this list, not in
 		// apiRestore(), not in recovery.php - so "a wrong pick can itself be
 		// undone", which the docblock, the panel's confirm text and both
 		// manuals all promise, was true of a file only ssh could reach
-		public const string ID_PATTERN = '/^(?:\d{4}-\d{2}-\d{2}|pre-restore-\d{4}-\d{2}-\d{2}-\d{6})$/';
+		public const string ID_PATTERN = '/^(?:\d{4}-\d{2}-\d{2}(?:-\d{6})?|pre-restore-\d{4}-\d{2}-\d{2}-\d{6})$/';
 
 		/**
 		 *	Available backup dates, most recent first - shared by
@@ -176,7 +178,7 @@ namespace Nino\Modules\Backups {
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *
-		 *	@return 	array										[ "Y-m-d" | "pre-restore-Y-m-d-His", ... ]
+		 *	@return 	array										[ "Y-m-d" | "Y-m-d-His" | "pre-restore-Y-m-d-His", ... ]
 		 */
 		public static function dates( array &$appData ): array {
 
@@ -190,7 +192,7 @@ namespace Nino\Modules\Backups {
 
 					$id = basename( $file, '.php' );
 
-					if( preg_match( '/^\d{4}-\d{2}-\d{2}$/', $id ) === 1 )
+					if( preg_match( '/^\d{4}-\d{2}-\d{2}(?:-\d{6})?$/', $id ) === 1 )
 						$dates[] = $id;
 					else if( preg_match( self::ID_PATTERN, $id ) === 1 )
 						$snapshots[] = $id;
@@ -211,6 +213,7 @@ namespace Nino\Modules\Backups {
 		public static function log( string $action, array $data ): string {
 			return match( $action ) {
 				'backups/restore'	=> 'Restore Backup '. ( $data['date'] ?? '' ),
+				'backups/now'			=> 'Create Backup',
 				default						=> '',
 			};
 		}
@@ -228,7 +231,35 @@ namespace Nino\Modules\Backups {
 			if( \Nino\Admin\Admin::guardPerm( $appData, $request, self::MANAGE_PERM ) === false )
 				return;
 
-			\Nino\Http::ok( $request, [ 'dates' => self::dates( $appData ) ] );
+			\Nino\Http::ok( $request, [
+				'dates' 	=> self::dates( $appData ),
+				'enabled' => ( $appData['/nino/admin/backups'] ?? true ) !== false,
+			] );
+		}
+
+		/**
+		 *	Back up now: one more archive, named by date and time (see
+		 *	\Nino\Modules\Backups::now()). The activity log line is written
+		 *	by the dispatcher through log(), not by that call
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		&$request			(reference) Current server request
+		 *
+		 *	@return 	void
+		 */
+		public static function apiNow( array &$appData, array &$request ): void {
+
+			if( \Nino\Admin\Admin::guardPerm( $appData, $request, self::MANAGE_PERM ) === false )
+				return;
+
+			$result = \Nino\Modules\Backups::now( $appData );
+
+			if( is_array( $result ) === true ) {
+				\Nino\Http::fail( $request, $result[0], $result[1] );
+				return;
+			}
+
+			\Nino\Http::ok( $request, [ 'id' => $result ] );
 		}
 
 		/**
@@ -269,7 +300,7 @@ namespace Nino\Modules\Backups {
 		 *	nobody can log in any more. The caller has validated the date
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		string		$date					"Y-m-d"
+		 *	@param		string		$date					"Y-m-d" or "Y-m-d-His"
 		 *
 		 *	@return 	true|array								True, or [ http status, message ]
 		 */

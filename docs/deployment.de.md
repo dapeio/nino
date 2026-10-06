@@ -281,7 +281,7 @@ Leer sind beide die Absenderadresse. Steht dort etwas, das keine Adresse ist, an
 Vor dem Go-live müssen die Konten funktionieren und starke Passwörter haben:
 
 - `/_admin` ist die eine Verwaltungsoberfläche – Entwickler und Redakteure melden sich mit eigenen Konten an. Ein Konto der Rolle **Developer** hält `/*`, eines der Rolle **Editor** nur die Inhalt-Berechtigungen; das [`/_admin`-Handbuch](_admin.de.md#anmeldung-konten-und-rollen) listet jede Berechtigung.
-- `/_admin/recovery.php` fragt nach dem Recovery-Passwort aus dem letzten Schritt des Assistenten und bietet eine Wiederherstellung und ein Zurücksetzen eines Passworts. Bewahre dieses Passwort dort auf, wo die Passwörter der Entwicklerkonten nicht liegen.
+- `/_admin/recovery.php` fragt nach dem Recovery-Passwort aus dem letzten Schritt des Assistenten und bietet eine Wiederherstellung, das Setzen des Passworts eines Kontos und das Anlegen eines Kontos mit Vollzugriff. Der Tab Recovery-Passwort von Nutzer ändert es. Bewahre dieses Passwort dort auf, wo die Passwörter der Entwicklerkonten nicht liegen.
 
 Vergib Redaktionsrechte so eng wie praktisch möglich; die Konten, die der Assistent anlegt, sind Entwickler, und weitere Konten brauchen diese Reichweite meist nicht. Halte die Zahl der Entwicklerkonten klein.
 
@@ -306,7 +306,7 @@ Eine unvollständige Installation wird durch das Löschen ihres Assistenten nich
 
 ## Backups und Wiederherstellung
 
-Bei aktivierten Backups legt die Workbench bei der ersten angemeldeten Anfrage des Tages automatisch ein verschlüsseltes Backup an. Die täglichen Sicherungen rotieren über 14 Tage und liegen unter `private/.backups/`; die Archive werden mit AES-256-GCM verschlüsselt, der Schlüssel liegt unter `private/.auth/`.
+Bei aktivierten Backups legt die Workbench bei der ersten angemeldeten Anfrage des Tages automatisch ein verschlüsseltes Backup an. Die täglichen Sicherungen rotieren über 14 Tage und liegen unter `private/.backups/`; **Jetzt sichern** im Panel Backups legt ein eigenes Archiv an, benannt nach Datum und Uhrzeit, das ebenso 14 Tage erhalten bleibt (höchstens die neuesten zehn); die Archive werden mit AES-256-GCM verschlüsselt, der Schlüssel liegt unter `private/.auth/`.
 
 Die Wiederherstellung erfolgt im Panel Backups oder – wenn kein Konto mehr funktioniert – auf `/_admin/recovery.php`. Vor dem Einspielen erzeugt Nino eine zusätzliche Sicherung des aktuellen Standes, damit eine versehentlich falsche Wiederherstellung nicht sofort den vorherigen Zustand vernichtet.
 

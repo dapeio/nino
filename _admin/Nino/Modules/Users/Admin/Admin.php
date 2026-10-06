@@ -23,7 +23,8 @@ namespace Nino\Modules\Users {
 	 *											The list says which accounts are disabled, which are locked
 	 *											out right now and when each logged in last. What a role
 	 *											grants is the Roles tab of this same pane (see Roles), the
-	 *											login throttle - and lifting a lock - the Lockout tab.
+	 *											login throttle - and lifting a lock - the Lockout tab, the
+	 *											password recovery.php asks for the RecoveryPassword tab.
 	 *											Every session an account holds is ended from here too
 	 *											(users/logoutall). The permissions an account may hold
 	 *											beside its role stay a developer-only, direct-json task
@@ -70,10 +71,11 @@ namespace Nino\Modules\Users {
 			return '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-users-round-icon lucide-users-round"><path d="M18 21a8 8 0 0 0-16 0"/><circle cx="10" cy="8" r="5"/><path d="M22 20c0-3.37-2-6.5-4-8a5 5 0 0 0-.45-8.3"/></svg>';
 		}
 
-		// The roles accounts hold and the login throttle sit on tabs of this
-		// pane, each with its own permission (see \Nino\Admin\Panels::collect())
+		// The roles accounts hold, the login throttle and the recovery password
+		// sit on tabs of this pane, each with its own permission (see
+		// \Nino\Admin\Panels::collect())
 		public static function tabs(): array {
-			return [ Roles::class, Lockout::class ];
+			return [ Roles::class, Lockout::class, RecoveryPassword::class ];
 		}
 
 		public static function panes(): array {

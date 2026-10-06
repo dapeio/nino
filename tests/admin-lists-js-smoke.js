@@ -996,11 +996,12 @@ localizedScripts.concat( [ [ 'Maintenance/admin.js', moduleAsset( 'Maintenance',
 	for( const m of e[1].matchAll( /(if\( typeof Nino\.admin\.dirty === 'object' \)\s*)?Nino\.admin\.dirty\.(register|watchForm)\( '([a-z]+)'/g ) )
 		registered.push( { file : e[0], name : m[3], guarded : m[1] !== undefined } );
 } );
-const EXPECTED_FORM_PANELS = [ 'config', 'elements', 'features', 'images', 'keys', 'language', 'lockout', 'maintenance', 'navs', 'roles', 'routes', 'slots', 'text', 'types', 'users' ];
+const EXPECTED_FORM_PANELS = [ 'config', 'elements', 'features', 'images', 'keys', 'language', 'lockout', 'maintenance', 'navs', 'recoverypw', 'roles', 'routes', 'slots', 'text', 'types', 'users' ];
 check( 'every form panel of the kernel registers with the shell, once'+ ( ' - registered: '+ registered.map( r => r.name ).sort().join(',') ),
 	registered.map( r => r.name ).sort().join(',') === EXPECTED_FORM_PANELS.join(',') );
 check( '...each behind a check that the shell has the registry', registered.every( r => r.guarded === true ) );
-const paneUris = new Set( [ 'navs', 'maintenance' ] );
+// A tab whose uri is not its directory's name (RecoveryPassword/ is the tab "recoverypw") is named here
+const paneUris = new Set( [ 'navs', 'maintenance', 'recoverypw' ] );
 ADMIN_MODULES.forEach( m => {
 	paneUris.add( m.toLowerCase() );
 	fs.readdirSync( path.join( __dirname, '../_admin/Nino/Modules', m ), { withFileTypes : true } )

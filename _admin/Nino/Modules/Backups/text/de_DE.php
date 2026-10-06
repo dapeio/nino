@@ -7,4 +7,6 @@ return [
 	'[[/_admin/backups/empty]]'					=> 'Noch kein Backup vorhanden.',
 	'[[/_admin/backups/confirm/restore]]'	=> 'Das Backup vom %s wiederherstellen? Der aktuelle Stand wird zuvor automatisch gesichert.',
 	'[[/_admin/backups/msg/restored]]'	=> 'Das Backup vom %s wurde wiederhergestellt.',
+	'[[/_admin/backups/label/now]]'			=> 'Jetzt sichern',
+	'[[/_admin/backups/msg/created]]'		=> 'Backup erstellt: %s',
 ];

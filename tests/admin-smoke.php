@@ -157,7 +157,7 @@ check( 'the module\'s panel is in the registry under its nav uri', isset( $regis
 $order = array_keys( $registry );
 check( 'nav order follows the weight within the group - the module panel (62) sits after images (40) and before logs (90)', array_search( 'dummy', $order, true ) > array_search( 'images', $order, true ) && array_search( 'dummy', $order, true ) < array_search( 'logs', $order, true ) );
 check( 'the content group leads, structure and system follow', array_search( 'logs', $order, true ) < array_search( 'routes', $order, true ) && array_search( 'routes', $order, true ) < array_search( 'users', $order, true ) && array_search( 'users', $order, true ) < array_search( 'backups', $order, true ) );
-check( 'a panel\'s tabs ride along in the registry, each a panel of its own with its parent named', array_keys( $registry['elements']['tabs'] ) === [ 'types' ] && $registry['elements']['tabs']['types']['parent'] === 'elements' && $registry['elements']['tabs']['types']['perm'] === \Nino\Modules\Elements\Types::MANAGE_PERM && array_keys( $registry['users']['tabs'] ) === [ 'roles', 'lockout' ] && array_keys( $registry['language']['tabs'] ) === [ 'translations' ] );
+check( 'a panel\'s tabs ride along in the registry, each a panel of its own with its parent named', array_keys( $registry['elements']['tabs'] ) === [ 'types' ] && $registry['elements']['tabs']['types']['parent'] === 'elements' && $registry['elements']['tabs']['types']['perm'] === \Nino\Modules\Elements\Types::MANAGE_PERM && array_keys( $registry['users']['tabs'] ) === [ 'roles', 'lockout', 'recoverypw' ] && array_keys( $registry['language']['tabs'] ) === [ 'translations' ] );
 check( 'a tab is not a rail entry, but allPanels() lists it right after its panel', isset( $registry['types'] ) === false && array_slice( array_keys( \Nino\Admin\Admin::allPanels( $withModule ) ), 1, 2 ) === [ 'elements', 'types' ] );
 check( 'a panel reusing a core uri is dropped, the core panel keeps it', $registry['text']['class'] === \Nino\Modules\Text\Admin::class );
 check( 'a class without actions()/nav() is dropped rather than breaking the tool', in_array( 'NoSuchClassAtAll', array_column( $registry, 'class' ), true ) === false );
@@ -215,6 +215,7 @@ $permOptions = \Nino\Modules\Users\Admin::permOptions( $withModule );
 check( 'the panel\'s perm() is assignable to a role, under its nav label and in its group', in_array( [ 'perm' => EditorSmokeDummyPanel::PERM, 'label' => 'Dummy <Panel>', 'group' => 'content', 'offered' => true ], $permOptions, true ) === true );
 check( 'a tab\'s perm() is assignable on its own, under its nav fill', in_array( [ 'perm' => \Nino\Modules\Elements\Types::MANAGE_PERM, 'label' => '/_admin/nav/types', 'group' => 'structure', 'offered' => true ], $permOptions, true ) === true );
 check( 'the users manage perm stays assignable too, once - the Roles tab shares it', count( array_filter( $permOptions, fn( array $option ): bool => $option['perm'] === \Nino\Modules\Users\Admin::MANAGE_PERM ) ) === 1 );
+check( 'the Recovery password tab is assignable on its own, once, in the system group', array_values( array_filter( $permOptions, fn( array $option ): bool => $option['perm'] === \Nino\Modules\Users\RecoveryPassword::MANAGE_PERM ) ) === [ [ 'perm' => '/_admin/recoverypw/manage', 'label' => '/_admin/nav/recoverypw', 'group' => 'system', 'offered' => true ] ] );
 
 /*	The scoped permissions a panel offers for the three lists of the Roles tab.
 	scopes() is optional: a panel without it - EditorSmokeDummyPanel, the
@@ -1632,7 +1633,7 @@ $getRequest = [ '/nino/http/response' => [ 'statusCode' => 200, 'body' => '[temp
 \Nino\Admin\Admin::handleGet( $appData, $getRequest );
 $visiblePanels = array_keys( \Nino\Admin\Admin::visiblePanels( $appData ) );
 check( 'a full-access account gets every panel in its navigation, content first, then structure, then system', $visiblePanels === [ 'dashboard', 'elements', 'text', 'images', 'submissions', 'logs', 'routes', 'users', 'language', 'backups', 'features', 'config' ] );
-check( '...with every tab on its pane', array_keys( \Nino\Admin\Admin::visiblePanels( $appData )['users']['tabs'] ) === [ 'roles', 'lockout' ] && substr_count( \Nino\Html::renderTextfill( $appData, '/_admin/panes' ), 'admin-panel-tabs' ) === 5 );
+check( '...with every tab on its pane', array_keys( \Nino\Admin\Admin::visiblePanels( $appData )['users']['tabs'] ) === [ 'roles', 'lockout', 'recoverypw' ] && substr_count( \Nino\Html::renderTextfill( $appData, '/_admin/panes' ), 'admin-panel-tabs' ) === 5 );
 /*	Every tab the shell renders is announced as a tab of a tablist, so every
 	one of them has to name the pane it opens and every pane has to be the
 	tabpanel that names it back. Counted rather than spot-checked: a strip

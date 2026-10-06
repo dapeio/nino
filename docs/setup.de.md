@@ -187,7 +187,7 @@ Beides lässt sich später unter **Nutzer** ändern. Die Konten liegen in der `c
 
 ## 6. Finish
 
-Der letzte Schritt setzt das **Recovery-Passwort** und sperrt den Assistenten. Es ist kein Login: `/_admin/recovery.php` fragt danach, wenn die Konten selbst das Problem sind – um eine Sicherung wiederherzustellen oder ein Passwort zurückzusetzen –, und nichts in der Workbench fragt je danach (siehe [Recovery](_admin.de.md#recovery)).
+Der letzte Schritt setzt das **Recovery-Passwort** und sperrt den Assistenten. Es ist kein Login: `/_admin/recovery.php` fragt danach, wenn die Konten selbst das Problem sind – um eine Sicherung wiederherzustellen, ein Passwort zu setzen oder ein Konto mit Vollzugriff anzulegen –, und die Workbench fragt nur an einer Stelle danach, im Tab Recovery-Passwort von Nutzer, der es ändert (siehe [Recovery](_admin.de.md#recovery)).
 
 Anzugeben ist:
 

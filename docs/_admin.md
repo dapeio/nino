@@ -20,7 +20,7 @@ One login, one navigation, every screen a panel. The panels are grouped by what 
 | **Content** | Dashboard, Elements (Element Types), Text (Text Keys), Images (Image Slots), Submissions, Log | editors and developers |
 | **Structure** | Routes, Navigations | developers |
 | **Features** | whatever the active features bring | whoever holds the feature panel's own permission |
-| **System** | Users (User roles, Login protection), Language (Translations), Backups, Config, Features, Maintenance | developers – and every account for its own profile under Users |
+| **System** | Users (User roles, Login protection, Recovery password), Language (Translations), Backups, Config, Features, Maintenance | developers – and every account for its own profile under Users |
 
 A screen in brackets is a **tab** of the panel before it: the Elements panel opens on the entries and carries Element Types as its second tab, so the shape of the content sits right beside the content. A tab is a screen of its own – with its own permission, so an editor sees Elements without Element Types, and its own deep link, `#types`.
 
@@ -68,6 +68,7 @@ A permission is one string per panel or tab; `/*` matches every path below it, s
 | Users (own profile) | none – every account |
 | Users (other accounts), User roles (tab of Users) | `/_admin/users/manage` |
 | Login protection (tab of Users) | `/_admin/lockout/manage` |
+| Recovery password (tab of Users) | `/_admin/recoverypw/manage` |
 | Language | `/_admin/language/manage` |
 | Translations (tab of Language) | `/_admin/translations/manage` |
 | Backups | `/_admin/backups/manage` |
@@ -305,6 +306,8 @@ The list says of each account its role, whether it is deactivated, until when it
 
 **Login protection**, the third tab, holds the throttle in front of the login: **Failed logins before lockout** (`/nino/auth/maxtries`, 1–100) and **Lockout duration** (`/nino/auth/cooldown`, 60–604800 seconds). Both used to be a group of Config and keep its validation. Below them, **Locked accounts** lists every account that is locked out right now, with the time the lock ends, and **Lift lock** lets it log in again at once; the counter of that account starts from zero. A locked address is not an account and is not listed - it still has to run out. The tab needs `/_admin/lockout/manage`.
 
+**Recovery password**, the fourth tab, changes the password [`/_admin/recovery.php`](#recovery) asks for: the current recovery password, the new one - at least eight characters - and the new one again. A repeat that differs sends nothing, and after a success the three fields are empty. A wrong current password counts against the same five attempts `recovery.php` has, so five wrong ones here lock `recovery.php` for an hour; the new password is checked first, so a request that is malformed uses none. A recovery session that is already open stays open. The tab cannot set a first password: where `private/.auth/pw.php` is missing, it says so and points here, to the one-liner under [Recovery](#recovery). The tab needs `/_admin/recoverypw/manage`, a permission of its own that the Developer role holds through full access and the Editor role does not - whoever holds it can lock `recovery.php`, and with the recovery password restore a backup over the whole project.
+
 ### Language
 
 **Language** is the two locale settings of `config.php` as one form, saved together, with the translation hand-off as its second tab.
@@ -332,7 +335,7 @@ Import is merge-only: matching values are overwritten, values absent from the do
 
 With backups switched on, the first authenticated request of a day writes an encrypted backup of everything the workbench can write – configuration, texts, elements, images, data – under `private/.backups/`, and daily backups are kept for 14 days. The archives are encrypted with AES-256-GCM; the key lives under `private/.auth/`, so the archives alone are unreadable.
 
-**Backups** lists the available dates and restores one. Before a restore, the current state is backed up once more, so a wrong pick can itself be undone. Afterwards test at least the frontend in every language, the login and the permissions, pages, texts, elements, images, and the form and newsletter data.
+**Backups** lists the available dates and restores one. **Back up now** writes one more archive right away, named by date and time - `2026-10-02-170512` - beside the day's own: it does not replace the daily backup, which is the state before the day's work, and it takes no lock, so the workbench keeps working while it runs. These archives are kept like the daily ones, for 14 days, and at most the newest ten; the button is not there while backups are switched off. Before a restore, the current state is backed up once more, so a wrong pick can itself be undone. Afterwards test at least the frontend in every language, the login and the permissions, pages, texts, elements, images, and the form and newsletter data.
 
 A module that keeps files of its own under `data/` merges them during a restore through the `/nino/admin/restore` callback (the catalogue's Newsletter feature does). The daily backup is a safety net for editorial mistakes, not a replacement for an external backup of the whole project.
 
@@ -380,12 +383,13 @@ A panel a feature brings appears with the next load of the workbench after activ
 
 ## Recovery
 
-`/_admin/recovery.php` is the way back in when the accounts themselves are what is broken: every developer password forgotten, or a restore gone wrong. It asks for the **recovery password** set in the wizard's last step – not a login, and nothing in the workbench ever asks for it – and offers exactly two things:
+`/_admin/recovery.php` is the way back in when the accounts themselves are what is broken: every developer password forgotten, or a restore gone wrong. It asks for the **recovery password** set in the wizard's last step – not a login; the workbench asks for it in one place only, the **Recovery password** tab of Users, which changes it – and offers three things:
 
 - **Restore a backup**, from the list of dates, after snapshotting the current state;
-- **Reset an account**: an existing address gets the new password and is logged out everywhere; an address without an account becomes one with full access.
+- **Set a password** for an account that exists, picked from a list: it gets the new password, is logged out everywhere, and is unlocked and activated again if it was locked or deactivated - so a recovered developer account gets in. A typo cannot name an account, there is none to name;
+- **Create a full-access account** - for when no account is left. It is its own action, asks to confirm before anything is written, and refuses an address that already has an account.
 
-Five wrong attempts lock it for an hour. The secret's hash lives in `private/.auth/pw.php` – outside `config.php`, so a restore cannot roll it back, and outside every tool directory, so an update cannot take it along. Nothing in the workbench writes that file except the wizard's last step, so a new secret is written by hand - it is a php stub that refuses to be served, with the hash inside it:
+Five wrong attempts lock it for an hour, the wrong current passwords typed into the Recovery password tab among them. The secret's hash lives in `private/.auth/pw.php` – outside `config.php`, so a restore cannot roll it back, and outside every tool directory, so an update cannot take it along. Only the wizard's last step and the Recovery password tab write that file. A secret that is forgotten, so that the tab has no current password to ask for, is written by hand - it is a php stub that refuses to be served, with the hash inside it:
 
 ```bash
 php -r 'echo "<?php http_response_code(403); exit; return \x27", password_hash( $argv[1], PASSWORD_DEFAULT ), "\x27;\n";' -- '<password>' > private/.auth/pw.php
@@ -415,7 +419,7 @@ Do this in a protected local environment only – a password on a command line m
 | Template missing in **Routes** | Only existing `templates/page-*.tpl` files are offered. |
 | A page cannot be saved in **Templates** | Reload after an external edit, check unique section ids and unmatched `<section>` tags; see the Template Builder's [manual](https://github.com/dapeio/nino-features/blob/main/features/Templates/docs/templates.md). |
 | Texts or images missing in a scan | Dynamic keys and images are not statically recognizable. |
-| Backup list is empty | Backups are switched off, or no authenticated request has happened today. |
+| Backup list is empty | Backups are switched off, or no authenticated request has happened today. **Back up now** writes the first archive at once. |
 | Search returns no elements | The catalogue's Search feature in `features/` and switched on in the Features panel, `/nino/elements/index` in `config.php`, then **Create searchindex**. |
 | Website broken after **Config** | Restore the last Git state or backup. |
 | No developer password works any more | `/_admin/recovery.php` with the recovery password. |

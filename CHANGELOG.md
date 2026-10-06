@@ -534,6 +534,45 @@ All notable changes to Nino are documented in this file.
   permission of the Elements and Text trees allows exactly that action, field or
   key.
 
+- **Workbench, Users:** the recovery password can be changed from the
+  workbench. A fourth tab of Users, **Recovery password** (`recoverypw/save`,
+  its own permission `/_admin/recoverypw/manage`, offered on the Roles tab and
+  held by the Developer role through full access), takes the current password,
+  the new one - at least eight characters - and the new one again; a repeat that
+  differs sends nothing, a success empties the fields and a failure keeps them.
+  `\Nino\Admin\Recovery::change( &$appData, $current, $new )` checks the new
+  password first, so a malformed request uses no attempt, then verifies the old
+  one on the counter `recovery.php` shares - five wrong ones, from either door,
+  lock it for an hour - and writes the hash through the one atomic writer; a
+  project without a hash is refused with `409` and told to write the first one
+  by hand. An open recovery session stays open. The activity log says *Change
+  Recovery Password* and nothing of the data. `Recovery::MIN_PW_LENGTH` is
+  public for it. `tests/admin-recoverypw-js-smoke.js` (new, 20 checks) holds
+  the repeat, the request and what each answer does to the fields,
+  `tests/admin-smoke.php` the permission offered once in the system group (403
+  → 404 checks, with the tab lists of three assertions now naming the tab) and
+  `tests/admin-system-smoke.php` the tab's guards, the attempt that is not used
+  up, the shared lock, the stub the file stays behind and the log line (869 →
+  926 together with the entries below).
+
+- **Workbench, Backups:** **Back up now**. A button on the Backups screen - there
+  for an empty list too, so it is how the first archive of a project is made, and
+  not while backups are switched off - writes one more archive, named by date
+  and time (`2026-10-02-170512`), beside the day's own and never in place of
+  it: today's `Y-m-d.php` is the state before the day's work. It is listed
+  before the daily archive, restored like any other and kept like the daily
+  ones - 14 days, and at most the newest ten of its kind
+  (`\Nino\Modules\Backups::now()`, `backups/now`, `Backups\Admin::ID_PATTERN`
+  takes the new name). It does not take the lock every workbench request takes
+  for the daily check, so the workbench keeps working while it runs; a failure
+  is a `500` with its reason and writes no file. `backups/list` carries
+  `enabled`. `tests/admin-backups-js-smoke.js` holds the button in all three
+  states, the disabled button while it runs, the id written into the line
+  and the list asked for again, and a refusal that keeps the list (16 → 27
+  checks), `tests/admin-system-smoke.php` the archive, the daily one left
+  byte for byte, retention, the refusals, and that restoring the archive of
+  the afternoon and the daily one give their own states.
+
 ### Changed
 
 - **Workbench:** what the panels print for a failure. A failure with a code is
@@ -746,6 +785,34 @@ All notable changes to Nino are documented in this file.
   `Auth::STATUS_ACTIVE`, so deleting, deactivating or taking the role from the
   last account that can log in is refused even where a disabled account holds
   full access on paper.
+
+- **Recovery:** setting a password no longer creates an account from a typo.
+  `recovery/reset` sets the password of an account that exists - picked from a
+  list on the page, which has no free address field any more - and answers
+  `404` for an address nobody holds. It also lifts the account's lock and
+  activates it again if it was deactivated, so a recovered developer account
+  gets in. Creating an account with full access is its own action,
+  `recovery/create`: it needs `confirm: true`, which the page sends only after
+  a question, refuses an address that already has an account (`409`) and
+  checks the address and the password like reset does. The page has its two
+  sections, *Set a password* and *Create a full-access account*, and re-reads the
+  accounts after a create. `tests/admin-recovery-js-smoke.js` (new, 18 checks)
+  holds the select, that a create sends nothing when the question is
+  answered no or the repeat differs, and the request after yes;
+  `tests/admin-system-smoke.php` the in-process actions of both, the new
+  password logging in, the sessions gone, the lock lifted and the session flag
+  that is unset.
+
+- **Workbench, Security:** the `/nino/admin/action` event no longer carries the
+  passwords of `users/create`, `users/save` and the new Recovery password tab.
+  `data` is still the posted payload, but its top-level `pw`, `current` and
+  `currentPassword` are blanked, so a listener sees that one was sent and never
+  which - the old and the new secret of the Recovery password tab would
+  otherwise have reached every listener in plain text. A secret posted under
+  another key is not blanked: a feature's `secret` setting in `features/settings`
+  (an SMTP password, an API key) still arrives as `data.fields.<name>`.
+  `tests/admin-system-smoke.php` posts through the dispatcher with a listener
+  registered.
 
 ### Fixed
 

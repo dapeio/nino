@@ -889,6 +889,98 @@ $listRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 $dates = $listRequest['/nino/http/response']['body']['dates'] ?? [];
 check( 'apiList finds today\'s backup without reading config.php\'s own copy of the dir/key', count( $dates ) === 1 && $dates[0] === date( 'Y-m-d' ) );
 
+/*	"Back up now": one more archive, named by date and time, beside the daily
+	one. Today's Y-m-d.php is the state before the day's work - the first
+	authenticated request wrote it - and a click in the afternoon must not
+	replace it. Done before the restores below, which write snapshots of their
+	own into the same directory and would change what the checks above count	*/
+$nowDir			= $sandbox. '/private/.backups';
+$timedFiles	= static fn(): array => array_map( 'basename', glob( $nowDir. '/[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]-[0-9][0-9][0-9][0-9][0-9][0-9].php' ) ?: [] );
+$dailyFile	= $nowDir. '/'. date( 'Y-m-d' ). '.php';
+$dailyBytes	= (string) file_get_contents( $dailyFile );
+
+$nowId = \Nino\Modules\Backups::now( $appData );
+check( 'Backups::now writes an archive named by date and time', is_string( $nowId ) === true && preg_match( '/^\d{4}-\d{2}-\d{2}-\d{6}$/', (string) $nowId ) === 1 && is_file( $nowDir. '/'. $nowId. '.php' ) === true );
+check( '...behind the same stub a daily archive has, and no temporary file beside it', str_starts_with( (string) file_get_contents( $nowDir. '/'. $nowId. '.php' ), \Nino\Admin\Recovery::STUB_PREFIX ) && glob( $nowDir. '/*.tmp' ) === [] );
+check( '...and leaves today\'s daily archive byte for byte as it was', (string) file_get_contents( $dailyFile ) === $dailyBytes );
+check( 'dates() lists it before today\'s date, and an archive of its own is not a snapshot', \Nino\Modules\Backups\Admin::dates( $appData ) === [ $nowId, date( 'Y-m-d' ) ] );
+
+$listRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Modules\Backups\Admin::apiList( $appData, $listRequest );
+check( 'apiList carries the dates and whether backups are on', ( $listRequest['/nino/http/response']['body']['dates'] ?? [] ) === [ $nowId, date( 'Y-m-d' ) ] && ( $listRequest['/nino/http/response']['body']['enabled'] ?? null ) === true );
+
+$idPattern = \Nino\Modules\Backups\Admin::ID_PATTERN;
+check( 'ID_PATTERN takes a date and time, and still turns away a time cut short and a path',
+	preg_match( $idPattern, '2026-10-02-170512' ) === 1 && preg_match( $idPattern, '2026-10-02' ) === 1 && preg_match( $idPattern, 'pre-restore-2026-10-02-170512' ) === 1
+	&& preg_match( $idPattern, '2026-10-02-1705' ) === 0 && preg_match( $idPattern, '../x' ) === 0 && preg_match( $idPattern, '2026-10-02-170512/../x' ) === 0 );
+
+// Retention: the days the daily archives have, and no more than ten of these.
+// A snapshot and a daily archive are not touched by it
+$staleTimed	= date( 'Y-m-d', strtotime( '-20 days' ) ). '-120000';
+$keptDaily	= date( 'Y-m-d', strtotime( '-3 days' ) );
+$oldSnap		= 'pre-restore-'. date( 'Y-m-d', strtotime( '-20 days' ) ). '-120000';
+foreach( [ $staleTimed, $keptDaily, $oldSnap ] as $name )
+	file_put_contents( $nowDir. '/'. $name. '.php', 'x' );
+for( $hour = 1; $hour <= 12; $hour++ )
+	file_put_contents( $nowDir. '/'. date( 'Y-m-d', strtotime( '-1 day' ) ). '-'. sprintf( '%02d', $hour ). '0000.php', 'x' );
+
+$pruneId = \Nino\Modules\Backups::now( $appData );
+$timedNow = $timedFiles();
+check( 'an archive of this kind older than the retention days is pruned', in_array( $staleTimed. '.php', $timedNow, true ) === false );
+check( '...and only the newest ten are kept - the new one among them', count( $timedNow ) === 10 && in_array( $pruneId. '.php', $timedNow, true ) === true && in_array( $nowId. '.php', $timedNow, true ) === true
+	&& in_array( date( 'Y-m-d', strtotime( '-1 day' ) ). '-010000.php', $timedNow, true ) === false && in_array( date( 'Y-m-d', strtotime( '-1 day' ) ). '-120000.php', $timedNow, true ) === true );
+check( '...the daily archives and the snapshots are left to their own sweeps', is_file( $nowDir. '/'. $keptDaily. '.php' ) === true && is_file( $dailyFile ) === true && is_file( $nowDir. '/'. $oldSnap. '.php' ) === true );
+
+// The panel's door
+$nowCall = static function( array &$appData ): array {
+	$request = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+	\Nino\Modules\Backups\Admin::apiNow( $appData, $request );
+	return [ $request['/nino/http/response']['statusCode'], $request['/nino/http/response']['body'] ?? null ];
+};
+$countBefore = count( $timedFiles() );
+[ $status, $body ] = $nowCall( $appData );
+check( 'apiNow answers the id of the archive it wrote', $status === 200 && is_string( $body['id'] ?? null ) === true && is_file( $nowDir. '/'. $body['id']. '.php' ) === true );
+check( '...and the activity log names the action without calling it twice', \Nino\Modules\Backups\Admin::log( 'backups/now', [] ) === 'Create Backup' && \Nino\Modules\Backups\Admin::log( 'backups/list', [] ) === '' );
+
+$appData['/nino/admin/backups'] = false;
+[ $status ] = $nowCall( $appData );
+$offFiles = count( $timedFiles() );
+$listRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Modules\Backups\Admin::apiList( $appData, $listRequest );
+check( 'apiNow is 409 while backups are switched off, and writes nothing', $status === 409 && $offFiles === count( $timedFiles() ) && ( $listRequest['/nino/http/response']['body']['enabled'] ?? null ) === false );
+unset( $appData['/nino/admin/backups'] );
+
+// An archive that cannot be written: an encryption key that is none
+$goodKey = $appData['/nino/backup/key'];
+$config = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
+\Nino\Filesystem::putFileContent( $appData, '/config.php', [ '/nino/backup/key' => 'not a key' ] + $config );
+$timedBefore = $timedFiles();
+$tempBefore = count( glob( sys_get_temp_dir(). '/ninobackup*' ) ?: [] );
+[ $status, $body ] = $nowCall( $appData );
+check( 'a failing run is a 500 with its reason, writes no archive and leaves no temporary file', $status === 500 && is_string( $body['error'] ?? null ) === true && $timedFiles() === $timedBefore
+	&& count( glob( sys_get_temp_dir(). '/ninobackup*' ) ?: [] ) === $tempBefore && glob( $nowDir. '/*.tmp' ) === [] );
+\Nino\Filesystem::putFileContent( $appData, '/config.php', [ '/nino/backup/key' => $goodKey ] + $config );
+$appData['/nino/backup/key'] = $goodKey;
+[ $status ] = $nowCall( $appData );
+check( '...and the next one, with the key back, is fine', $status === 200 );
+
+\Nino\Auth::logoutUser( $appData );
+$timedBefore = $timedFiles();
+[ $status ] = $nowCall( $appData );
+check( 'apiNow is 401 logged out', $status === 401 && $timedFiles() === $timedBefore );
+\Nino\Auth::insertUser( $appData, 'usersmanageonly@example.com', 'correct horse battery staple', [ \Nino\Modules\Users\Admin::MANAGE_PERM ] );
+\Nino\Auth::loginUser( $appData, 'usersmanageonly@example.com', 'correct horse battery staple' );
+[ $status ] = $nowCall( $appData );
+check( '...403 without the backups permission', $status === 403 && $timedFiles() === $timedBefore );
+\Nino\Auth::deleteUser( $appData, 'usersmanageonly@example.com' );
+\Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );
+
+// The restores below count the archives; theirs are the ones to count
+foreach( $timedFiles() as $name )
+	unlink( $nowDir. '/'. $name );
+foreach( [ $keptDaily, $oldSnap ] as $name )
+	unlink( $nowDir. '/'. $name. '.php' );
+
 // Simulate config.php DATA corruption (not a syntax error) - eg. a wrecked user record -
 // the scenario Restore exists for. A genuine syntax error is out of scope (see Admin.php docblock).
 $beforeCorruption = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
@@ -1077,6 +1169,27 @@ $_POST['data'] = json_encode( [ 'date' => 'not-a-date' ] );
 $badDateRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Modules\Backups\Admin::apiRestore( $appData, $badDateRequest );
 check( 'restoring a malformed date is rejected before touching the filesystem', $badDateRequest['/nino/http/response']['statusCode'] === 400 );
+
+/*	An archive made on request is one to restore like any other, and it holds
+	the state of its own moment: the daily one the state before the day's work
+	- which is what a click in the afternoon must not have replaced	*/
+$stateKey = '/nino/restore/state';
+\Nino\Filesystem::putFileContent( $appData, '/config.php', [ $stateKey => 'afternoon' ] + \Nino\Filesystem::getFileContent( $appData, '/config.php', [] ) );
+$afternoonId = \Nino\Modules\Backups::now( $appData );
+\Nino\Filesystem::putFileContent( $appData, '/config.php', [ $stateKey => 'evening' ] + \Nino\Filesystem::getFileContent( $appData, '/config.php', [] ) );
+
+$_POST['data'] = json_encode( [ 'date' => $afternoonId ] );
+$timedRestore = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Modules\Backups\Admin::apiRestore( $appData, $timedRestore );
+check( 'restoring an archive made on request gives the state of that moment', ( $timedRestore['/nino/http/response']['body']['ok'] ?? false ) === true
+	&& ( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )[$stateKey] ?? null ) === 'afternoon' );
+
+$_POST['data'] = json_encode( [ 'date' => date( 'Y-m-d' ) ] );
+$dailyRestore = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Modules\Backups\Admin::apiRestore( $appData, $dailyRestore );
+check( '...and the daily archive of today still gives the state before it', ( $dailyRestore['/nino/http/response']['body']['ok'] ?? false ) === true
+	&& array_key_exists( $stateKey, \Nino\Filesystem::getFileContent( $appData, '/config.php', [] ) ) === false );
+unlink( $backupDir. '/'. $afternoonId. '.php' );
 
 echo "\n";
 
@@ -1559,6 +1672,174 @@ check( 'Config actions require an authed _admin session too', $status === 401 );
 [ $status ] = callDev( $appData, \Nino\Modules\Config\Admin::class, 'apiSave', [ 'fields' => [ '/nino/error/log' => true ] ] );
 check( '...apiSave too', $status === 401 );
 \Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );
+
+// --- The Recovery password tab --------------------------------------------
+//
+// The secret recovery.php asks for, changed from the workbench with the old
+// one. The checks that matter: a malformed request costs no attempt, a wrong
+// old password counts on recovery.php's own five, and what is stored stays
+// behind its stub
+
+echo "Users\\RecoveryPassword - changing the recovery password\n";
+
+$lockoutPath	= \Nino\Filesystem::CONTENT_DIR. '/.auth/lockout.json';
+$resetLockout	= static function() use ( &$appData, $lockoutPath ): void {
+	\Nino\Filesystem::putFileContent( $appData, $lockoutPath, [ 'tries' => 0, 'until' => 0 ] );
+	unset( $appData['./nino/filesystem/cache'][$lockoutPath] );
+};
+$tries 				= static function() use ( &$appData, $lockoutPath ): int {
+	unset( $appData['./nino/filesystem/cache'][$lockoutPath] );
+	return (int) ( \Nino\Filesystem::getFileContent( $appData, $lockoutPath, [ 'tries' => 0 ] )['tries'] ?? 0 );
+};
+$resetLockout();
+$secretBefore	= \Nino\Admin\Recovery::hash( $appData );
+
+\Nino\Auth::logoutUser( $appData );
+[ $status ] = callDev( $appData, \Nino\Modules\Users\RecoveryPassword::class, 'apiSave', [ 'current' => 'the real password', 'pw' => 'a brand new secret' ] );
+check( 'RecoveryPassword::apiSave is 401 logged out', $status === 401 && \Nino\Admin\Recovery::hash( $appData ) === $secretBefore );
+
+\Nino\Auth::insertUser( $appData, 'usersmanageonly@example.com', 'correct horse battery staple', [ \Nino\Modules\Users\Admin::MANAGE_PERM ] );
+\Nino\Auth::loginUser( $appData, 'usersmanageonly@example.com', 'correct horse battery staple' );
+[ $status ] = callDev( $appData, \Nino\Modules\Users\RecoveryPassword::class, 'apiSave', [ 'current' => 'the real password', 'pw' => 'a brand new secret' ] );
+check( '...403 for an account that manages users but does not hold the recovery password permission', $status === 403 && \Nino\Admin\Recovery::hash( $appData ) === $secretBefore );
+\Nino\Auth::deleteUser( $appData, 'usersmanageonly@example.com' );
+\Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );
+
+check( 'the tab\'s permission is its own, under /_admin/<uri>/manage', \Nino\Modules\Users\RecoveryPassword::MANAGE_PERM === '/_admin/recoverypw/manage' && \Nino\Modules\Users\RecoveryPassword::perm() === '/_admin/recoverypw/manage' );
+
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Users\RecoveryPassword::class, 'apiSave', [ 'current' => 'not the password', 'pw' => 'short' ] );
+check( 'a new password under the minimum is 400, before the old one is looked at - no attempt is used up', $status === 400 && $tries() === 0 && \Nino\Admin\Recovery::hash( $appData ) === $secretBefore );
+check( '...named "recoverypw_password_short" with the minimum, for the field "pw"', ( $body['code'] ?? '' ) === 'recoverypw_password_short' && ( $body['params'] ?? [] ) === [ \Nino\Admin\Recovery::MIN_PW_LENGTH ] && ( $body['field'] ?? '' ) === 'pw' );
+[ $status ] = callDev( $appData, \Nino\Modules\Users\RecoveryPassword::class, 'apiSave', [ 'current' => 'the real password', 'pw' => [ 'a brand new secret' ] ] );
+check( '...and so is one that is no string', $status === 400 && $tries() === 0 );
+
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Users\RecoveryPassword::class, 'apiSave', [ 'current' => 'not the password', 'pw' => 'a brand new secret' ] );
+check( 'a wrong current password is 401, the secret is unchanged and the attempt counts', $status === 401 && \Nino\Admin\Recovery::hash( $appData ) === $secretBefore && $tries() === 1
+	&& str_contains( json_encode( $body ), 'a brand new secret' ) === false && str_contains( json_encode( $body ), 'not the password' ) === false );
+check( '...named "recoverypw_wrong" for the field "current"', ( $body['code'] ?? '' ) === 'recoverypw_wrong' && ( $body['field'] ?? '' ) === 'current' );
+
+$resetLockout();
+for( $i = 0; $i < 5; $i++ )
+	callDev( $appData, \Nino\Modules\Users\RecoveryPassword::class, 'apiSave', [ 'current' => 'not the password', 'pw' => 'a brand new secret' ] );
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Users\RecoveryPassword::class, 'apiSave', [ 'current' => 'the real password', 'pw' => 'a brand new secret' ] );
+check( 'five wrong attempts lock it - the right password is then 429 too, and nothing is stored', $status === 429 && \Nino\Admin\Recovery::hash( $appData ) === $secretBefore );
+check( '...named "recoverypw_locked"', ( $body['code'] ?? '' ) === 'recoverypw_locked' );
+check( '...the same lock recovery.php meets', \Nino\Admin\Recovery::verify( $appData, 'the real password' ) === 429 );
+$resetLockout();
+
+$secretFile	= \Nino\Admin\Recovery::path( $appData );
+$secretRaw	= (string) file_get_contents( $secretFile );
+unlink( $secretFile );
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Users\RecoveryPassword::class, 'apiSave', [ 'current' => 'the real password', 'pw' => 'a brand new secret' ] );
+check( 'a project without a recovery password is refused, 409 - there is no old one to compare with', $status === 409 && is_file( $secretFile ) === false && $tries() === 0 );
+check( '...named "recoverypw_unset"', ( $body['code'] ?? '' ) === 'recoverypw_unset' );
+file_put_contents( $secretFile, $secretRaw );
+
+[ $status ] = callDev( $appData, \Nino\Modules\Users\RecoveryPassword::class, 'apiSave', [ 'current' => 'the real password', 'pw' => 'a brand new secret' ] );
+check( 'the right current password changes it, 200', $status === 200 );
+check( '...the new one verifies and the old one does not', \Nino\Admin\Recovery::verify( $appData, 'a brand new secret' ) === 200 && \Nino\Admin\Recovery::verify( $appData, 'the real password' ) === 401 );
+$secretNow = (string) file_get_contents( $secretFile );
+check( '...and the file is still behind its stub', str_starts_with( $secretNow, \Nino\Admin\Recovery::STUB_PREFIX ) && str_ends_with( $secretNow, \Nino\Admin\Recovery::STUB_SUFFIX )
+	&& str_contains( $secretNow, 'a brand new secret' ) === false );
+check( '...the activity log names the action and nothing of the data', \Nino\Modules\Users\RecoveryPassword::log( 'recoverypw/save', [ 'current' => 'the real password', 'pw' => 'a brand new secret' ] ) === 'Change Recovery Password'
+	&& \Nino\Modules\Users\RecoveryPassword::log( 'recoverypw/other', [] ) === '' );
+
+\Nino\Auth::logoutUser( $appData );
+$secretRaw = (string) file_get_contents( $secretFile );
+[ $status ] = callDev( $appData, \Nino\Modules\Users\RecoveryPassword::class, 'apiSave', [ 'current' => 'a brand new secret', 'pw' => 'yet another secret' ] );
+check( 'logged out it changes nothing, even with the right current password', $status === 401 && (string) file_get_contents( $secretFile ) === $secretRaw );
+\Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );
+
+// The suite's own secret again, for everything after this
+check( 'the suite\'s secret is back for the rest of the file', \Nino\Admin\Recovery::set( $appData, 'the real password' ) === true && \Nino\Admin\Recovery::verify( $appData, 'the real password' ) === 200 );
+$resetLockout();
+
+echo "\n";
+
+// --- Recovery::handlePost - accounts ---------------------------------------
+//
+// recovery.php's two account actions, in-process with the session flag the
+// login sets (the child above does the same for restore): setting a password
+// is for an account that exists, and a typo must not make one - making one is
+// its own action and asks for a confirmation the page sends
+
+echo "Recovery::handlePost - set a password, create an account\n";
+
+$recoveryCall = static function( string $action, array $data, bool $open = true ) use ( &$appData ): array {
+	if( $open === true )
+		\Nino\Runtime::setSessionValue( $appData, \Nino\Admin\Recovery::SESSION_KEY, true );
+	else
+		\Nino\Runtime::unsetSessionValue( $appData, \Nino\Admin\Recovery::SESSION_KEY );
+	$_POST['action'] 	= $action;
+	$_POST['data'] 		= json_encode( $data );
+	$request = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+	\Nino\Admin\Recovery::handlePost( $appData, $request );
+	return [ $request['/nino/http/response']['statusCode'], $request['/nino/http/response']['body'] ?? null ];
+};
+
+\Nino\Auth::insertUser( $appData, 'resetme@example.com', 'the old password', [ '/_admin/text/manage' ] );
+\Nino\Auth::loginUser( $appData, 'resetme@example.com', 'the old password' );
+\Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );
+$accountsBefore = array_keys( $appData['/nino/auth/user'] );
+
+check( 'the account to reset has a session of its own', count( \Nino\Auth::getUser( $appData, 'resetme@example.com' )['sessions'] ) === 1 );
+
+[ $status, $body ] = $recoveryCall( 'recovery/reset', [ 'mail' => 'typo@example.com', 'pw' => 'a new password' ] );
+check( 'reset for an address that has no account is 404 and creates nothing', $status === 404 && array_keys( $appData['/nino/auth/user'] ) === $accountsBefore );
+[ $status ] = $recoveryCall( 'recovery/reset', [ 'mail' => 'not a mail', 'pw' => 'a new password' ] );
+check( '...400 for a bad address', $status === 400 );
+[ $status ] = $recoveryCall( 'recovery/reset', [ 'mail' => 'resetme@example.com', 'pw' => 'short' ] );
+check( '...400 for a password under the minimum, and the account keeps its own', $status === 400 && password_verify( 'the old password', $appData['/nino/auth/user']['resetme@example.com']['pw'] ) === true );
+
+[ $status, $body ] = $recoveryCall( 'recovery/reset', [ 'mail' => 'resetme@example.com', 'pw' => 'a new password' ] );
+check( 'reset for an account that exists is 200, created false', $status === 200 && ( $body['created'] ?? null ) === false && ( $body['mail'] ?? '' ) === 'resetme@example.com' );
+check( '...every session of it is gone', \Nino\Auth::getUser( $appData, 'resetme@example.com' )['sessions'] === [] );
+check( '...the new password logs in and the old one does not', \Nino\Auth::loginUser( $appData, 'resetme@example.com', 'the old password' ) === false
+	&& is_array( \Nino\Auth::loginUser( $appData, 'resetme@example.com', 'a new password' ) ) === true );
+\Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );
+
+// What a recovered password is for: the developer who cannot get in. A lock
+// or a deactivation would leave the new password as useless as the old one
+$lockTries( [ 'resetme@example.com' => 0 - time() - 3600 ] );
+\Nino\Auth::setStatus( $appData, 'resetme@example.com', false );
+check( 'an account that is locked and deactivated gets in with no password at all', isset( \Nino\Auth::lockedAccounts( $appData )['resetme@example.com'] ) === true
+	&& \Nino\Auth::getUser( $appData, 'resetme@example.com' )['status'] === \Nino\Auth::STATUS_DISABLED
+	&& \Nino\Auth::loginUser( $appData, 'resetme@example.com', 'a new password' ) === false );
+[ $status ] = $recoveryCall( 'recovery/reset', [ 'mail' => 'resetme@example.com', 'pw' => 'a second password' ] );
+check( 'reset lifts the lock and activates it again', $status === 200 && isset( \Nino\Auth::lockedAccounts( $appData )['resetme@example.com'] ) === false
+	&& \Nino\Auth::getUser( $appData, 'resetme@example.com' )['status'] === \Nino\Auth::STATUS_ACTIVE );
+check( '...and the new password logs in', is_array( \Nino\Auth::loginUser( $appData, 'resetme@example.com', 'a second password' ) ) === true );
+\Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );
+
+[ $status ] = $recoveryCall( 'recovery/create', [ 'mail' => 'fresh@example.com', 'pw' => 'a fresh password' ] );
+check( 'create without the confirmation is 400 and writes nothing', $status === 400 && \Nino\Auth::getUser( $appData, 'fresh@example.com' ) === false );
+[ $status ] = $recoveryCall( 'recovery/create', [ 'mail' => 'fresh@example.com', 'pw' => 'a fresh password', 'confirm' => 'yes' ] );
+check( '...and so is anything but true for it', $status === 400 && \Nino\Auth::getUser( $appData, 'fresh@example.com' ) === false );
+[ $status ] = $recoveryCall( 'recovery/create', [ 'mail' => 'not a mail', 'pw' => 'a fresh password', 'confirm' => true ] );
+check( 'a bad address is 400', $status === 400 && array_keys( $appData['/nino/auth/user'] ) === $accountsBefore );
+[ $status ] = $recoveryCall( 'recovery/create', [ 'mail' => 'fresh@example.com', 'pw' => 'short', 'confirm' => true ] );
+check( '...so is a password under the minimum', $status === 400 && \Nino\Auth::getUser( $appData, 'fresh@example.com' ) === false );
+[ $status ] = $recoveryCall( 'recovery/create', [ 'mail' => 'resetme@example.com', 'pw' => 'another password', 'confirm' => true ] );
+check( 'an address that has an account is 409 - and its password is untouched', $status === 409
+	&& password_verify( 'a second password', $appData['/nino/auth/user']['resetme@example.com']['pw'] ) === true );
+
+[ $status, $body ] = $recoveryCall( 'recovery/create', [ 'mail' => 'fresh@example.com', 'pw' => 'a fresh password', 'confirm' => true ] );
+$fresh = \Nino\Auth::getUser( $appData, 'fresh@example.com' );
+check( 'create with the confirmation is 200, created true', $status === 200 && ( $body['created'] ?? null ) === true && $fresh !== false );
+check( '...an account with full access and the Developer role', $fresh !== false && $fresh['perms'] === [ '/*' ] && $fresh['role'] === 'developer' && $fresh['status'] === \Nino\Auth::STATUS_ACTIVE );
+check( '...that can log in', is_array( \Nino\Auth::loginUser( $appData, 'fresh@example.com', 'a fresh password' ) ) === true );
+\Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );
+
+$accountsAfter = array_keys( $appData['/nino/auth/user'] );
+[ $status ] = $recoveryCall( 'recovery/reset', [ 'mail' => 'resetme@example.com', 'pw' => 'yet another password' ], false );
+check( 'with the session flag unset, reset is 401', $status === 401 && password_verify( 'a second password', $appData['/nino/auth/user']['resetme@example.com']['pw'] ) === true );
+[ $status ] = $recoveryCall( 'recovery/create', [ 'mail' => 'unlocked@example.com', 'pw' => 'yet another password', 'confirm' => true ], false );
+check( '...and so is create', $status === 401 && array_keys( $appData['/nino/auth/user'] ) === $accountsAfter );
+
+\Nino\Runtime::unsetSessionValue( $appData, \Nino\Admin\Recovery::SESSION_KEY );
+\Nino\Auth::deleteUser( $appData, 'resetme@example.com' );
+\Nino\Auth::deleteUser( $appData, 'fresh@example.com' );
+$lockTries( [ 'resetme@example.com' => null ] );
 
 echo "\n";
 
@@ -3481,7 +3762,7 @@ $registry = \Nino\Admin\Admin::panels( $withModule );
 $order 		= array_keys( $registry );
 check( 'the tool\'s own panels are all there, content first, then structure, then system, from nav() alone', array_values( array_diff( $order, [ 'dummy', 'navs' ] ) ) === [ 'dashboard', 'elements', 'text', 'images', 'logs', 'routes', 'users', 'language', 'backups', 'features', 'config' ] );
 check( 'the module panel sits where its weight puts it - in the content group, after images (40), before logs (90)', array_search( 'dummy', $order, true ) === array_search( 'images', $order, true ) + 1 && array_search( 'logs', $order, true ) === array_search( 'dummy', $order, true ) + 1 );
-check( 'the tool\'s own tabs sit on their panes', array_map( static fn( array $p ): array => array_keys( $p['tabs'] ), array_intersect_key( $registry, array_flip( [ 'elements', 'text', 'images', 'users', 'language' ] ) ) ) === [ 'elements' => [ 'types' ], 'text' => [ 'keys' ], 'images' => [ 'slots' ], 'users' => [ 'roles', 'lockout' ], 'language' => [ 'translations' ] ] );
+check( 'the tool\'s own tabs sit on their panes', array_map( static fn( array $p ): array => array_keys( $p['tabs'] ), array_intersect_key( $registry, array_flip( [ 'elements', 'text', 'images', 'users', 'language' ] ) ) ) === [ 'elements' => [ 'types' ], 'text' => [ 'keys' ], 'images' => [ 'slots' ], 'users' => [ 'roles', 'lockout', 'recoverypw' ], 'language' => [ 'translations' ] ] );
 check( 'the Navigations panel names the structure group and sits after routes (20)', array_search( 'navs', $order, true ) === array_search( 'routes', $order, true ) + 1 );
 check( 'the Navigations panel is the Navigation module\'s and comes with it', $registry['navs']['class'] === \Nino\Modules\Navigation\Admin::class );
 check( 'a panel reusing a core uri is dropped, the core panel keeps it', $registry['config']['class'] === \Nino\Modules\Config\Admin::class );
@@ -4028,6 +4309,38 @@ $loggedRequest 		= [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Admin\Admin::handlePost( $appData, $loggedRequest );
 check( 'the activity log still runs on its own, beside the event', count( \Nino\Modules\Logs\Admin::recentLines( $appData, 50 ) ) === $logBefore + 1 );
 
+// A password somebody posts is not for a listener: the event carries what was
+// done, and the three keys a secret travels under come out blank. The key
+// stays, so a listener still sees that one was sent
+unset( $appData['./nino/callbacks']['/nino/admin/action'] );
+$secretSeen = [];
+\Nino\Callbacks::registerCallback( $appData, '/nino/admin/action', function( array &$appData, array &$event ) use ( &$secretSeen ): void {
+	$secretSeen[] = $event;
+} );
+$resetLockout();
+
+$_POST['action'] 	= 'recoverypw/save';
+$_POST['data'] 		= json_encode( [ 'current' => 'a wrong old secret', 'pw' => 'a brand new secret' ] );
+$secretRequest 		= [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Admin\Admin::handlePost( $appData, $secretRequest );
+check( 'recoverypw/save reaches a listener with its passwords blank', count( $secretSeen ) === 1 && ( $secretSeen[0]['action'] ?? '' ) === 'recoverypw/save'
+	&& ( $secretSeen[0]['status'] ?? 0 ) === 401 && ( $secretSeen[0]['data'] ?? null ) === [ 'current' => '', 'pw' => '' ] );
+
+$_POST['action'] 	= 'users/save';
+$_POST['data'] 		= json_encode( [ 'username' => 'nobody-at-all@example.com', 'mail' => 'nobody-at-all@example.com', 'pw' => 'a password for a user', 'currentPassword' => 'the current one', 'role' => '' ] );
+$secretRequest 		= [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Admin\Admin::handlePost( $appData, $secretRequest );
+check( '...so do the users panel\'s, for every action', count( $secretSeen ) === 2 && ( $secretSeen[1]['data']['pw'] ?? null ) === '' && ( $secretSeen[1]['data']['currentPassword'] ?? null ) === ''
+	&& ( $secretSeen[1]['data']['mail'] ?? '' ) === 'nobody-at-all@example.com' && str_contains( json_encode( $secretSeen ), 'secret' ) === false && str_contains( json_encode( $secretSeen ), 'a password for a user' ) === false );
+
+$_POST['action'] 	= 'elements/list';
+$_POST['data'] 		= json_encode( [ 'type' => 'contenttype' ] );
+$secretRequest 		= [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Admin\Admin::handlePost( $appData, $secretRequest );
+check( '...and an action that posted none gets no blank key invented', array_keys( $secretSeen[2]['data'] ?? [] ) === [ 'type' ] );
+
+$resetLockout();
+
 unset( $appData['./nino/callbacks']['/nino/admin/action'] );
 
 echo "\n";
@@ -4363,6 +4676,8 @@ $described = [
 	[ \Nino\Modules\Images\Slots::class,						'slots/delete',				[ 'uri' => '/home/hero' ],					'/home/hero' ],
 	[ \Nino\Modules\Language\Translations::class,	'translations/import',	[ 'targetLocale' => 'fr_FR' ],			'fr_FR' ],
 	[ \Nino\Modules\Backups\Admin::class,					'backups/restore',		[ 'date' => '2026-09-05' ],				'2026-09-05' ],
+	[ \Nino\Modules\Backups\Admin::class,					'backups/now',				[],																	'Backup' ],
+	[ \Nino\Modules\Users\RecoveryPassword::class,		'recoverypw/save',		[],																	'Recovery Password' ],
 	[ \Nino\Modules\Navigation\Admin::class,				'navs/delete',				[ 'key' => 'main' ],								'main' ],
 	[ \Nino\Modules\Features\Admin::class,					'features/activate',	[ 'key' => 'sample' ],							'sample' ],
 ];
@@ -4499,6 +4814,9 @@ echo "Every module rejects an unauthed request\n";
 $unauthedListRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Modules\Backups\Admin::apiList( $appData, $unauthedListRequest );
 check( 'apiList requires an authed _admin session, same as every other module', $unauthedListRequest['/nino/http/response']['statusCode'] === 401 );
+$unauthedNowRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Modules\Backups\Admin::apiNow( $appData, $unauthedNowRequest );
+check( '...apiNow too', $unauthedNowRequest['/nino/http/response']['statusCode'] === 401 );
 
 echo "\n";
 

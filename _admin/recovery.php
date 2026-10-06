@@ -4,8 +4,9 @@ declare(strict_types=1);
  *	Nino							A compact filesystembased php framework
  *	Recovery					The way back in when the accounts are what is broken: asks
  *												for the recovery secret the wizard's last step set, then
- *												restores a backup or resets an account's password. Its own
- *												entry point, on purpose - it has to work when the workbench
+ *												restores a backup, sets the password of an account that
+ *												exists or creates one with full access. Its own entry
+ *												point, on purpose - it has to work when the workbench
  *												does not (see \Nino\Admin\Recovery)
  *
  *	@package					Dape/Nino

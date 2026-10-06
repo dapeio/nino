@@ -181,7 +181,7 @@ Both can be changed later under **Users**. The accounts live in `config.php` und
 
 ## 6. Finish
 
-The last step sets the **recovery password** and locks the wizard. It is not a login: `/_admin/recovery.php` asks for it when the accounts themselves are what is broken - to restore a backup or to reset a password - and nothing in the workbench ever asks for it (see [Recovery](_admin.md#recovery)).
+The last step sets the **recovery password** and locks the wizard. It is not a login: `/_admin/recovery.php` asks for it when the accounts themselves are what is broken - to restore a backup, set a password or create an account with full access - and the workbench asks for it in one place only, the Recovery password tab of Users, which changes it (see [Recovery](_admin.md#recovery)).
 
 Provide:
 

@@ -571,6 +571,15 @@ namespace Nino\Admin {
 
 			$user = \Nino\Auth::getCurrentUser( $appData );
 
+			// The posted payload without the secrets in it: a password of the
+			// Users panel, the one an account confirms with, the recovery
+			// password the Recovery tab changes. A listener sees that one was
+			// sent - the key stays - and never which
+			$data = self::postData();
+			foreach( [ 'pw', 'current', 'currentPassword' ] as $secret )
+				if( array_key_exists( $secret, $data ) === true )
+					$data[$secret] = '';
+
 			// A plain description rather than the request itself: handed the
 			// response by reference, a listener could rewrite an answer the
 			// panel has already given, which is a veto through the back door
@@ -579,7 +588,7 @@ namespace Nino\Admin {
 				'panel' 	=> $class,
 				'status' 	=> (int) ( $request['/nino/http/response']['statusCode'] ?? 0 ),
 				'user' 		=> ( $user !== false ) ? (string) $user['mail'] : '',
-				'data' 		=> self::postData(),
+				'data' 		=> $data,
 			];
 
 			\Nino\Callbacks::doCallbacks( $appData, '/nino/admin/action', $event );
@@ -1668,9 +1677,12 @@ namespace Nino\Admin {
 	 *											private/.auth/ - outside config.php, so a Restore cannot roll
 	 *											it back, and outside every tool folder, so an update cannot
 	 *											take it along. _admin/recovery.php verifies it (rate-limited,
-	 *											one shared counter) and offers exactly two things: restoring
-	 *											a backup and resetting an account's password. Nothing in the
-	 *											workbench itself ever asks for it.
+	 *											one shared counter) and offers three things: restoring a
+	 *											backup, setting the password of an account that exists, and
+	 *											creating an account with full access. The workbench asks
+	 *											for it in one place only: the Recovery password tab of the
+	 *											Users pane changes it, with the old one (see change()), on
+	 *											the same counter.
 	 *
 	 *	@package					Dape/Nino
 	 *	@author						David Perchermeier <mail@dape.io>
@@ -1721,7 +1733,7 @@ namespace Nino\Admin {
 		// The session flag recovery.php sets once the secret was verified
 		public const string SESSION_KEY = './nino/admin/recovery';
 
-		private const int MIN_PW_LENGTH = 8;
+		public const int MIN_PW_LENGTH = 8;
 
 		/**
 		 *	Register recovery.php's own route pair - the file is its own
@@ -1760,8 +1772,8 @@ namespace Nino\Admin {
 		}
 
 		/**
-		 *	Dispatch recovery.php's five actions: login opens the gate, the
-		 *	other four need it open. Same one-route/$_POST['action'] shape as
+		 *	Dispatch recovery.php's six actions: login opens the gate, the
+		 *	other five need it open. Same one-route/$_POST['action'] shape as
 		 *	Admin::handlePost(), deliberately without the panel registry -
 		 *	this runs when config.php may be the very thing that is broken
 		 *
@@ -1813,8 +1825,8 @@ namespace Nino\Admin {
 
 				case 'recovery/list':
 					// No Backups module, no backups to offer - the page then
-					// has the password reset alone, which is the half that
-					// needs nothing but this file (see \Nino\Admin\Admin::record())
+					// has the two account forms alone, which are the half that
+					// need nothing but this file (see \Nino\Admin\Admin::record())
 					\Nino\Http::ok( $request, [
 						'dates' => class_exists( '\\Nino\\Modules\\Backups\\Admin' ) === true ? \Nino\Modules\Backups\Admin::dates( $appData ) : [],
 						'users' => array_keys( $appData['/nino/auth/user'] ?? [] )
@@ -1849,6 +1861,10 @@ namespace Nino\Admin {
 				case 'recovery/reset':
 					self::_reset( $appData, $request, $data );
 					return;
+
+				case 'recovery/create':
+					self::_create( $appData, $request, $data );
+					return;
 			}
 
 			\Nino\Http::fail( $request, 404, 'unknown action' );
@@ -1866,12 +1882,15 @@ namespace Nino\Admin {
 		}
 
 		/**
-		 *	Give an account a new password - or, when no account of that
-		 *	name exists, create it with full access: the case where every
-		 *	developer account was deleted and there is nothing left to log
-		 *	in with. Logs every session of the account out on the way, the
-		 *	same as changing a password through the Users panel would not
-		 *	- a reset from here is a takeover by whoever holds the secret
+		 *	Give an account that exists a new password. An address nobody
+		 *	holds answers 404 and creates nothing - a typo must not become
+		 *	an account with full access; _create() is the way to one. Logs
+		 *	every session of the account out on the way, the same as changing
+		 *	a password through the Users panel would not - a reset from here
+		 *	is a takeover by whoever holds the secret - and lifts the lock
+		 *	and the deactivation the account may be in: a recovered password
+		 *	for a locked or deactivated developer that still does not get
+		 *	anyone in would be no recovery
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
@@ -1884,29 +1903,13 @@ namespace Nino\Admin {
 			$mail = trim( (string) ( $data['mail'] ?? '' ) );
 			$pw 	= (string) ( $data['pw'] ?? '' );
 
-			if( $mail === '' || filter_var( $mail, FILTER_VALIDATE_EMAIL ) === false ) {
-				\Nino\Http::fail( $request, 400, 'invalid mail' );
+			if( self::_validateMailPw( $request, $mail, $pw ) === false )
 				return;
-			}
 
-			if( strlen( $pw ) < self::MIN_PW_LENGTH ) {
-				\Nino\Http::fail( $request, 400, 'password must be at least '. self::MIN_PW_LENGTH. ' characters' );
-				return;
-			}
+			$user = \Nino\Auth::getUser( $appData, $mail );
 
-			if( \Nino\Auth::getUser( $appData, $mail ) === false ) {
-
-				// Full access of its own, whatever the roles say - this is
-				// the emergency path - and the Developer role beside it
-				// where there is one, so the account reads as what it is
-				$role = isset( $appData['/nino/auth/roles']['developer'] ) === true ? 'developer' : '';
-
-				if( \Nino\Auth::insertUser( $appData, $mail, $pw, [ '/*' ], $role ) === false ) {
-					\Nino\Http::fail( $request, 500, 'could not create the account' );
-					return;
-				}
-
-				\Nino\Http::ok( $request, [ 'mail' => $mail, 'created' => true ] );
+			if( $user === false ) {
+				\Nino\Http::fail( $request, 404, 'unknown account' );
 				return;
 			}
 
@@ -1917,7 +1920,84 @@ namespace Nino\Admin {
 
 			\Nino\Auth::logoutAllSessions( $appData, $mail );
 
+			if( \Nino\Auth::unlock( $appData, $mail ) === false ) {
+				\Nino\Http::fail( $request, 500, 'the password was set and every session ended, but the lock of the account could not be lifted' );
+				return;
+			}
+
+			if( $user['status'] !== \Nino\Auth::STATUS_ACTIVE )
+				\Nino\Auth::setStatus( $appData, $mail, true );
+
 			\Nino\Http::ok( $request, [ 'mail' => $mail, 'created' => false ] );
+		}
+
+		/**
+		 *	Create an account with full access: the case where every
+		 *	developer account was deleted and there is nothing left to log
+		 *	in with. Only on an explicit confirmation - the page asks before
+		 *	it sends one - and never for an address that has an account
+		 *	already, which _reset() is for
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		&$request			(reference) Current server request
+		 *	@param		array 		$data					The posted payload
+		 *
+		 *	@return 	void
+		 */
+		private static function _create( array &$appData, array &$request, array $data ): void {
+
+			$mail = trim( (string) ( $data['mail'] ?? '' ) );
+			$pw 	= (string) ( $data['pw'] ?? '' );
+
+			if( ( $data['confirm'] ?? false ) !== true ) {
+				\Nino\Http::fail( $request, 400, 'confirmation required' );
+				return;
+			}
+
+			if( self::_validateMailPw( $request, $mail, $pw ) === false )
+				return;
+
+			if( \Nino\Auth::getUser( $appData, $mail ) !== false ) {
+				\Nino\Http::fail( $request, 409, 'account exists - use reset' );
+				return;
+			}
+
+			// Full access of its own, whatever the roles say - this is the
+			// emergency path - and the Developer role beside it where there
+			// is one, so the account reads as what it is
+			$role = isset( $appData['/nino/auth/roles']['developer'] ) === true ? 'developer' : '';
+
+			if( \Nino\Auth::insertUser( $appData, $mail, $pw, [ '/*' ], $role ) === false ) {
+				\Nino\Http::fail( $request, 500, 'could not create the account' );
+				return;
+			}
+
+			\Nino\Http::ok( $request, [ 'mail' => $mail, 'created' => true ] );
+		}
+
+		/**
+		 *	The checks reset and create share: a valid address and a password
+		 *	of the minimum length. Answers 400 itself
+		 *
+		 *	@param		array 		&$request			(reference) Current server request
+		 *	@param		string		$mail
+		 *	@param		string		$pw
+		 *
+		 *	@return 	bool										False when it answered
+		 */
+		private static function _validateMailPw( array &$request, string $mail, string $pw ): bool {
+
+			if( $mail === '' || filter_var( $mail, FILTER_VALIDATE_EMAIL ) === false ) {
+				\Nino\Http::fail( $request, 400, 'invalid mail' );
+				return false;
+			}
+
+			if( strlen( $pw ) < self::MIN_PW_LENGTH ) {
+				\Nino\Http::fail( $request, 400, 'password must be at least '. self::MIN_PW_LENGTH. ' characters' );
+				return false;
+			}
+
+			return true;
 		}
 
 		/**
@@ -1987,10 +2067,42 @@ namespace Nino\Admin {
 		}
 
 		/**
+		 *	Change the secret: the old one is verified first, under the same
+		 *	counter recovery.php uses, so a wrong guess typed in the
+		 *	workbench is one of the five that lock recovery.php. The new one
+		 *	is checked before that - a malformed request must not use up an
+		 *	attempt. An installation without a hash has nothing to compare
+		 *	the old password with and is refused (409): the one-liner in
+		 *	docs/_admin.md sets the first one
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$current			The secret in effect
+		 *	@param		string		$new					The plaintext new secret
+		 *
+		 *	@return 	int											200 | 400 | 401 | 409 | 429 | 500
+		 */
+		public static function change( array &$appData, string $current, string $new ): int {
+
+			if( strlen( $new ) < self::MIN_PW_LENGTH )
+				return 400;
+
+			if( self::hash( $appData ) === null )
+				return 409;
+
+			$status = self::verify( $appData, $current );
+
+			if( $status !== 200 )
+				return $status;
+
+			return self::set( $appData, $new ) === true ? 200 : 500;
+		}
+
+		/**
 		 *	Hash a new secret and store it - the wizard's last step (see
-		 *	\Nino\Install\Install::setRecoverySecret()), and nothing else:
-		 *	recovery.php offers no way to change the secret, so a new one
-		 *	afterwards is the file written by hand (see docs/_admin.md)
+		 *	\Nino\Install\Install::setRecoverySecret()) and the Recovery
+		 *	password tab of the Users pane (see change(), which checks the old
+		 *	one first). recovery.php offers no way to change it; a forgotten
+		 *	secret is the file written by hand (see docs/_admin.md)
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		string		$password			The plaintext secret
