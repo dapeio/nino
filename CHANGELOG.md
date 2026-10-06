@@ -4,6 +4,8 @@ All notable changes to Nino are documented in this file.
 
 ## Unreleased
 
+## v1.4.0 - 2026-10-06
+
 ### Added
 
 - **Workbench:** one request helper for every panel, `Nino.adminUi.api`
@@ -1290,7 +1292,7 @@ All notable changes to Nino are documented in this file.
   keys of the project texts, the labels and pages named `/footer`, `/common` and
   `/2026-home`.
 
-- **Version:** `\Nino\VERSION` is `1.4.0-dev`. Features that read these keys
+- **Version:** `\Nino\VERSION` is `1.4.0`. Features that read these keys
   declare `nino ^1.4`; a feature that only reads its own keys is not
   concerned.
 
@@ -5151,7 +5153,7 @@ something it can add, or leave out, one directory at a time.
   theme picker's `preview.svg` was its one deliberate exception - so
   `router.php` and both `.htaccess` rules deny the tree whole, with no carve-out
   to get wrong.
-  
+
 ## 1.1.0-beta — 2026-09-07
 
 Features. An installable package is one directory below `features/` with a
