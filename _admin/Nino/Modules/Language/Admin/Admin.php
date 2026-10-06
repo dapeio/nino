@@ -182,7 +182,7 @@ namespace Nino\Modules\Language {
 				fn( mixed $locale ): bool => is_string( $locale ) === true && preg_match( self::LOCALE_PATTERN, $locale ) === 1
 			) );
 
-			$textDir 	= (string) ( $stored['/nino/locales/textfiles'] ?? '/text' );
+			$textDir 	= '/text';
 			$files 		= glob( \Nino\Filesystem::path( $appData, $textDir ). '/*.php' ) ?: [];
 
 			$onDisk = [];
@@ -276,7 +276,7 @@ namespace Nino\Modules\Language {
 			}
 
 			$stored 	= \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
-			$textDir	= (string) ( $stored['/nino/locales/textfiles'] ?? '/text' );
+			$textDir	= '/text';
 			$native 	= (string) ( $stored['/nino/locales/native'] ?? '' );
 
 			// Answered before the native locale is even looked at: this path

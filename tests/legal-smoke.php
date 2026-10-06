@@ -28,7 +28,6 @@ $appData = ninoSandbox( 'legal' );
 $sandbox = ninoSandboxDir( $appData );
 
 $appData['/nino/dir'] = '';
-$appData['/nino/locales/textfiles'] = '/text';
 foreach( [ 'private/templates', 'private/text', 'private/assets', 'public/images' ] as $directory )
 	mkdir( $sandbox. '/'. $directory, 0777, true );
 
@@ -467,7 +466,6 @@ check( 'a language the unit has no text for gets the names of the two pages in t
 $lone = ninoSandbox( 'legal-lone' );
 $loneDir = ninoSandboxDir( $lone );
 $lone['/nino/dir'] = '';
-$lone['/nino/locales/textfiles'] = '/text';
 $lone['/nino/locales/available'] = [ 'de_DE' ];
 foreach( [ 'private/templates', 'private/text', 'private/assets', 'public/images' ] as $directory )
 	mkdir( $loneDir. '/'. $directory, 0777, true );
@@ -561,7 +559,6 @@ function legalProject( string $name ): array {
 	$appData = ninoSandbox( $name );
 	$sandbox = ninoSandboxDir( $appData );
 	$appData['/nino/dir'] = '';
-	$appData['/nino/locales/textfiles'] = '/text';
 
 	foreach( [ 'private/templates', 'private/text', 'private/assets', 'public/images' ] as $directory )
 		mkdir( $sandbox. '/'. $directory, 0777, true );

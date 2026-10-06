@@ -6,6 +6,16 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **Text:** a site's words live in `/text`, and nothing follows
+  `/nino/locales/textfiles` any more. The renderer (`\Nino\Html::getFills()`),
+  the Language and Navigations panels, the Legal module and the Image Slots
+  tab read `/text`, as the Text panel, the Text Keys tab, the setup wizard,
+  backups and `Filesystem::PRIVATE_DIRS` always did. A project that set the
+  key by hand in config.php rendered from one directory and edited another;
+  it renders from `/text` now. A config.php that holds the key is not refused,
+  and `\Nino\AppData::DEFAULTS` keeps it (as `/text`) for catalogue features
+  that still read it, until 2.0.
+
 - **Docs:** section 2 of the base unit's `theme.css` no longer explains its
   colours and sizes through `/_design`, `assets/style.design.css` and a
   manifest's default knobs, all gone since the look left the core: the tokens

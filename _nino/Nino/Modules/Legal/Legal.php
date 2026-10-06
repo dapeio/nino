@@ -441,7 +441,7 @@ namespace Nino\Modules {
 			if( self::_active( $appData ) === false || preg_match( '/^[a-z]{2}_[A-Z]{2}$/', $locale ) !== 1 )
 				return true;
 
-			$textDir	= (string) ( $appData['/nino/locales/textfiles'] ?? '/text' );
+			$textDir	= '/text';
 			$path			= $textDir. '/'. $locale. '.php';
 			$unit			= __DIR__. '/install/text/'. $locale. '.php';
 			$words		= is_file( $unit ) === true ? (array) include $unit : [];
@@ -825,7 +825,7 @@ namespace Nino\Modules {
 		 */
 		private static function _pageText( array &$appData, string $uri, string $field, string $locale ): ?string {
 
-			$textDir	= (string) ( $appData['/nino/locales/textfiles'] ?? '/text' );
+			$textDir	= '/text';
 			$key			= '[[/_nino/webpage'. $uri. '/'. $field. ']]';
 			$value		= \Nino\Filesystem::getFileContent( $appData, $textDir. '/'. $locale. '.php', [] )[$key]
 				?? \Nino\Filesystem::getFileContent( $appData, $textDir. '/global.php', [] )[$key] ?? null;

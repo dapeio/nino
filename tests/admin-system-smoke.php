@@ -114,7 +114,6 @@ $appData['/nino/locales/available']	= [ 'de_DE', 'en_US' ];
 	'/nino/auth/cooldown'			=> 3600,
 	'/nino/locales/native'		=> $appData['/nino/locales/native'],
 	'/nino/locales/available'	=> $appData['/nino/locales/available'],
-	'/nino/locales/textfiles'	=> '/text',
 	'/nino/html/assets'				=> [],
 	'/nino/http/routes'				=> [],
 ] );
@@ -3472,7 +3471,6 @@ check( '...writes no uri key, so the feature\'s path is not copied and cannot go
 	&& array_filter( \Nino\Filesystem::getFileContent( $appData, '/text/blacklist.php', [] ), static fn( string $key ): bool => str_starts_with( $key, '/_nino/webpage/.newsletter' ) ) === [] );
 check( '...and no route into config.php', \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes'] === $configBeforeRuntime['/nino/http/routes'] );
 check( '...and answers with the list as it stands now', ( array_column( $body['runtime'], null, 'uri' )['/.newsletter']['text']['de_DE']['name'] ?? null ) === 'Newsletter' );
-$appData['/nino/locales/textfiles'] ??= '/text';
 check( 'the key is the one the menu and the page header read, so it renders', \Nino\Html::renderTextfill( $appData, '/_nino/webpage/.newsletter/name' ) === 'Newsletter' );
 
 // A directory where the language file's sidecar lock goes: lockFile() cannot open it, so the

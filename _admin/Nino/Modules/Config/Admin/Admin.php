@@ -16,7 +16,7 @@ namespace Nino\Modules\Config {
 	 *												error handling, the workbench features that can be
 	 *												switched off, and the page cache. Deliberately excludes
 	 *												"hard" values a wrong edit could brick the whole site
-	 *												over - modules, filesystem/dir, locales/textfiles - those
+	 *												over - modules, filesystem/dir - those
 	 *												stay a by-hand, deliberate-only task. Two groups this
 	 *												used to hold have moved next to what they are about: the
 	 *												login throttle to the Users panel (see Lockout) and the

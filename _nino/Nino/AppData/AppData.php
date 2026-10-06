@@ -79,6 +79,10 @@ namespace Nino {
 			'/nino/session/force-secure-cookie'	=> false,
 			'/nino/locales/native'		=> 'en_US',
 			'/nino/locales/available'	=> [ 'en_US' ],
+			// Read by nothing in the kernel: text lives in /text (see
+			// Filesystem::PRIVATE_DIRS), whatever this says. Kept for the
+			// catalogue features that still read it without a fallback - an
+			// undefined key is fatal - until 2.0
 			'/nino/locales/textfiles'	=> '/text',
 			'/nino/auth/maxtries'		=> 5,
 			'/nino/auth/cooldown'		=> 3600,

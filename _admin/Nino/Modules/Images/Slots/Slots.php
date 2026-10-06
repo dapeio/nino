@@ -421,7 +421,7 @@ namespace Nino\Modules\Images {
 			$names = static function( array &$appData, string $uri, string $httpUri ) use ( &$text ): string {
 
 				$locale = \Nino\Admin\Admin::sessionLocale( $appData );
-				$text[$locale] ??= \Nino\Filesystem::getFileContent( $appData, ( $appData['/nino/locales/textfiles'] ?? '/text' ). '/'. $locale. '.php', [] );
+				$text[$locale] ??= \Nino\Filesystem::getFileContent( $appData, '/text/'. $locale. '.php', [] );
 				$name = (string) ( $text[$locale]['[[/_nino/webpage'. $uri. '/name]]'] ?? '' );
 
 				return $name === '' ? $httpUri : $name;

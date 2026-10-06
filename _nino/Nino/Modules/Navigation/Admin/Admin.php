@@ -782,7 +782,7 @@ namespace Nino\Modules\Navigation {
 				nothing per-locale about it - so a route counts as named when
 				any locale the project offers has a name for it, and the label
 				is the native locale's wording wherever there is one.	*/
-			$textDir 	= (string) ( $appData['/nino/locales/textfiles'] ?? '/text' );
+			$textDir 	= '/text';
 			$global 	= \Nino\Filesystem::getFileContent( $appData, $textDir. '/global.php', [] );
 			$texts 		= [];
 

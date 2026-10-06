@@ -212,8 +212,8 @@ namespace Nino {
 			$locale = \Nino\Locales::getCurrentLocale( $appData );
 
 			return array_merge(
-				\Nino\Filesystem::getFileContent( $appData, $appData['/nino/locales/textfiles']. '/global.php', [] ),
-				\Nino\Filesystem::getFileContent( $appData, $appData['/nino/locales/textfiles']. '/'. $locale. '.php', [] ),
+				\Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] ),
+				\Nino\Filesystem::getFileContent( $appData, '/text/'. $locale. '.php', [] ),
 				( $appData['./nino/html/fills'][$locale] ?? [] ),
 				( $appData['./nino/html/fills']['*'] ?? [] )
 			);

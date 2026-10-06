@@ -1726,6 +1726,26 @@ check( 'the language is the current one', \Nino\Html::resolveTextfill( $appData,
 check( '[json] gives the strings it always gave, from the same rule', \Nino\Html::doJsonShortcode( $appData, [ '/seed/resolve/nested' ] ) === '"Dear Hello, see Hello again"'
 	&& \Nino\Html::doJsonShortcode( $appData, [ '/seed/resolve/nope' ] ) === '""' && \Nino\Html::doJsonShortcode( $appData, [] ) === '""' );
 
+// Text lives in /text, whatever '/nino/locales/textfiles' says. The key stays
+// in AppData::DEFAULTS for catalogue features that read it, and a config.php
+// may hold another value - the site must not render words the Text panel
+// does not edit
+$textDirApp = $appData;
+$textDirApp['./nino/filesystem/path']				= $sandbox. '/textdir';
+$textDirApp['./nino/filesystem/contentpath']	= $sandbox. '/textdir/private';
+$textDirApp['./nino/filesystem/cache']			= [];
+$textDirApp['/nino/locales/textfiles']			= '/text2';
+\Nino\Filesystem::putFileContent( $textDirApp, '/text/de_DE.php', [ '[[/seed/textdir/probe]]' => 'from /text' ] );
+\Nino\Filesystem::putFileContent( $textDirApp, '/text2/de_DE.php', [ '[[/seed/textdir/probe]]' => 'from /text2' ] );
+check( 'a page reads its words from /text, whatever /nino/locales/textfiles says', ( \Nino\Html::getFills( $textDirApp )['[[/seed/textdir/probe]]'] ?? null ) === 'from /text' );
+
+$textDirReaders = [];
+foreach( [ '/../_nino', '/../_admin' ] as $textDirRoot )
+	foreach( new \RecursiveIteratorIterator( new \RecursiveDirectoryIterator( __DIR__. $textDirRoot, \FilesystemIterator::SKIP_DOTS ) ) as $textDirFile )
+		if( $textDirFile->getExtension() === 'php' && str_contains( (string) file_get_contents( $textDirFile->getPathname() ), "'/nino/locales/textfiles'" ) === true )
+			$textDirReaders[] = basename( $textDirFile->getPathname() );
+check( '...and nothing in the kernel or the workbench reads the key but its own default', $textDirReaders === [ 'AppData.php' ] );
+
 echo "\n";
 
 // --- Html formats: line breaks, paragraphs and lists ---------------------
