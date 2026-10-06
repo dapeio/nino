@@ -736,6 +736,7 @@ Die eigenen Ansichten der Workbench sind dasselbe in einem anderen Root: `_admin
 | `text()` | ein Verzeichnis mit `<locale>.php`-Textfill-Dateien, die mit den eigenen der Workbench zusammengeführt werden |
 | `summary( &$appData )` | eine Dashboard-Kachel `[ 'value' => ..., 'label' => ... ]` |
 | `log( $action, $data )` | die Protokollzeile einer abgeschlossenen Aktion, `''` für keine |
+| `scopes( &$appData )` | die Einzelrechte, die das Panel kennt, für die drei Listen des Rollen-Tabs: `[ { scope, door, label, areas: [ { id, label, perm?, actions: [ { id, label, perm, fields?: [ { id, label, perm } ] } ] } ] } ]` - `scope` das Präfix, das `Admin::isScoped()` liest, `door` das Recht des Panels, jedes `perm` in der Form eines Rechts und unterhalb von `scope`; was das nicht ist, lässt `Users\Admin::scopeOptions()` weg. Ein Panel ohne diese Methode bietet keine an |
 
 Ein Modul benennt seine Dateien von dort aus, wo seine Klasse liegt, damit sie mit ihm umziehen:
 

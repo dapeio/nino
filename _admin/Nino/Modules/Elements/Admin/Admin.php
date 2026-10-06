@@ -576,6 +576,51 @@ namespace Nino\Modules\Elements {
 		}
 
 		/**
+		 *	The scoped permissions this panel knows, as the tree the roles
+		 *	form picks from (see \Nino\Modules\Users\Admin::scopeOptions()): per
+		 *	type - the area - "add", "change" with each of its fields, and
+		 *	"delete". An area's own permission is the whole type. A field whose
+		 *	name cannot be part of a permission (the model only trims a name,
+		 *	so a space or an umlaut gets in) is left out: no check could ever
+		 *	match it, and it stays under the type's blanket
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	array										[ { scope, door, label, areas } ] - see docs/recipes/admin-panel.md
+		 */
+		public static function scopes( array &$appData ): array {
+
+			$areas = [];
+
+			foreach( self::types( $appData ) as $type ) {
+
+				$typeData = self::typeData( $appData, $type );
+				$fields 	= [];
+
+				foreach( array_keys( is_array( $typeData['model'] ?? null ) === true ? $typeData['model'] : [] ) as $field ) {
+
+					$field = (string) $field;
+
+					if( preg_match( '/^[A-Za-z0-9_.-]+$/', $field ) === 1 )
+						$fields[] = [ 'id' => $field, 'label' => $field, 'perm' => self::SCOPE. $type. '/update/'. $field ];
+				}
+
+				$areas[] = [
+					'id' 			=> $type,
+					'label' 	=> (string) ( $typeData['title'] ?? $type ),
+					'perm' 		=> self::SCOPE. $type. '/*',
+					'actions' => [
+						[ 'id' => 'insert', 'label' => '/_admin/elements/scope/insert', 'perm' => self::SCOPE. $type. '/insert' ],
+						[ 'id' => 'update', 'label' => '/_admin/elements/scope/update', 'perm' => self::SCOPE. $type. '/update/*', 'fields' => $fields ],
+						[ 'id' => 'delete', 'label' => '/_admin/elements/scope/delete', 'perm' => self::SCOPE. $type. '/delete' ],
+					],
+				];
+			}
+
+			return [ [ 'scope' => self::SCOPE, 'door' => self::MANAGE_PERM, 'label' => '/_admin/nav/elements', 'areas' => $areas ] ];
+		}
+
+		/**
 		 *	What this account may do with one type, in the shape the form
 		 *	renders itself from: whether it may add and delete elements at
 		 *	all, and which fields it may change.

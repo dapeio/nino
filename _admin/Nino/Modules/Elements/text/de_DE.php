@@ -126,4 +126,7 @@ return [
 	'[[/_admin/error/types_rename_collision]]'	=> 'Der Name „%s“ ist vergeben: Zwei Felder würden eins. Benenne zuerst das andere Feld um oder wähle einen anderen Namen.',
 	'[[/_admin/error/types_rename_values]]'	=> 'Unter dem Namen „%s“ liegen noch die Werte eines früher entfernten Feldes; sie tauchten in Elementen auf, die sie nie hatten. Wähle einen anderen Namen.',
 	'[[/_admin/error/types_rename_image]]'	=> 'Bildfelder können die Namen der anderen nicht übernehmen („%s“): Die Bilddateien tragen den Feldnamen und würden sich überschreiben.',
+	'[[/_admin/elements/scope/insert]]'	=> 'Anlegen',
+	'[[/_admin/elements/scope/update]]'	=> 'Felder ändern',
+	'[[/_admin/elements/scope/delete]]'	=> 'Löschen',
 ];

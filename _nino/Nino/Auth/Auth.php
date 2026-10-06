@@ -21,6 +21,12 @@ namespace Nino {
 		// from that ip) is never removed on its own
 		private const int SESSION_TTL = 60 * 60 * 24 * 30;
 
+		// An account's 'status': active may log in, anything else may not. A
+		// record written by hand without one reads as disabled (see getUser()).
+		// The Users panel switches between the two (see setStatus())
+		public const int STATUS_ACTIVE = 2;
+		public const int STATUS_DISABLED = 0;
+
 		// Failed-attempt counters live here, not in config.php - a login
 		// storm from an unauthenticated attacker would otherwise force a
 		// config.php rewrite (routes, module wiring, every user's hash) on
@@ -147,16 +153,16 @@ namespace Nino {
 			// nat with it - after maxtries * IP_TRIES_FACTOR clicks. Those
 			// attempts also can't teach an attacker anything; the account is
 			// locked either way.
-			// '?? 0', the way _resumeSession() reads it: status, and any
-			// permission held beside a role, are a developer-only, direct-json
-			// task by this class's own account (the Users panel assigns a role
-			// and ends sessions, and writes nothing else), so a record written
-			// by hand can plainly be a hash and a permission list and nothing
-			// else - and reading a key that is not
+			// '?? 0', the way _resumeSession() reads it: any permission held
+			// beside a role is a developer-only, direct-json task by this
+			// class's own account (the Users panel switches an account on and
+			// off, assigns a role and ends sessions, and writes nothing
+			// else), so a record written by hand can plainly be a hash and a
+			// permission list and nothing else - and reading a key that is not
 			// there raises a warning this framework treats as fatal, ie. a 500
 			// on the login form rather than a refusal
-			$cooling	= ( $user !== false && ( $user['status'] ?? 0 ) === 2 && self::_inCooldown( $appData, $username ) === true );
-			$usable		= ( $user !== false && ( $user['status'] ?? 0 ) === 2 && $cooling === false );
+			$cooling	= ( $user !== false && ( $user['status'] ?? 0 ) === self::STATUS_ACTIVE && self::_inCooldown( $appData, $username ) === true );
+			$usable		= ( $user !== false && ( $user['status'] ?? 0 ) === self::STATUS_ACTIVE && $cooling === false );
 
 			// Exactly one password_verify() on every path. DUMMY_HASH is a
 			// bcrypt hash of a value nobody holds, at the cost PASSWORD_DEFAULT
@@ -249,7 +255,14 @@ namespace Nino {
 					unset( $user['sessions'][$sessionToken] );
 
 			// Every login mints a new token, so there is never an "already have
-			// a session for this key" case to skip the write for
+			// a session for this key" case to skip the write for. The time of
+			// the login stays on the record itself, beside the sessions: a
+			// session is pruned after SESSION_TTL and with its owner's
+			// logout, the last login is not. Not a file of its own - the
+			// record is what the Users panel reads, and what
+			// AppData::writeContentData()'s merge keeps apart from a change
+			// somebody else made to it in parallel (see _sessionless())
+			$user['lastLogin'] = $now;
 			$user['sessions'][$token] = [ 'time' => $now, 'ip' => \Nino\Http::getClientIp( $appData ) ];
 			$appData['/nino/auth/user'][$user['mail']] = $user;
 			\Nino\AppData::writeContentData( $appData, [ '/nino/auth/user' ] );
@@ -302,14 +315,13 @@ namespace Nino {
 			$user = $appData['/nino/auth/user'][$username] + [ 'mail' => $username ];
 
 			// The two keys every caller reads without asking whether they are
-			// there. Status, and any permission held beside a role, are a
-			// developer-only, direct-json task by this class's own account
-			// (the Users panel assigns a role and ends sessions, and writes
-			// nothing else), so a record written by hand can plainly be a hash
-			// and a permission list and nothing else - and reading a key that
-			// is not there raises a warning this
-			// framework treats as fatal, ie. a 500 on the login form rather
-			// than a refusal. Filled in on the way out, once, for everybody
+			// there. A record written by hand can plainly be a hash and a
+			// permission list and nothing else (the Users panel writes the
+			// status, a role and the sessions, never a permission list beside
+			// the role) - and reading a key that is not there raises a warning
+			// this framework treats as fatal, ie. a 500 on the login form
+			// rather than a refusal. Filled in on the way out, once, for
+			// everybody
 			$user['status']		= is_int( $user['status'] ?? null ) === true ? $user['status'] : 0;
 			$user['sessions']	= is_array( $user['sessions'] ?? null ) === true ? $user['sessions'] : [];
 
@@ -383,7 +395,7 @@ namespace Nino {
 
 			$appData['/nino/auth/user'][$username] = [
 				'pw'				=> password_hash( $pw, PASSWORD_DEFAULT ),
-				'status'		=> 2,
+				'status'		=> self::STATUS_ACTIVE,
 				'sessions'	=> [],
 				'perms'			=> $perms,
 				'role'			=> $role,
@@ -432,9 +444,9 @@ namespace Nino {
 
 
 		// Update a user's mail and/or password. Role, perms, sessions and
-		// status are left untouched: setRole() and logoutAllSessions() are
-		// the panel's way to the first and the third, the other two stay a
-		// developer-only, direct-json task.
+		// status are left untouched: setRole(), logoutAllSessions() and
+		// setStatus() are the panel's way to the first, the third and the
+		// last, the perms stay a developer-only, direct-json task.
 		// A tries counter (see TRIES_PATH) follows a mail change so an
 		// in-progress cooldown survives a rename.
 		public static function updateUser( array &$appData, string $username, string $newUsername, string $pw = '' ): array|false {
@@ -522,6 +534,145 @@ namespace Nino {
 		}
 
 
+		/**
+		 *	Switch an account on or off. A disabled account cannot log in and
+		 *	keeps no session: they are ended here, with the same revocation
+		 *	updateUser() and logoutAllSessions() make, so a login running in
+		 *	parallel cannot bring one back (see AppData::writeContentData()).
+		 *	Nothing else of the record changes, and its tries counter stays
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$username			The account's mail
+		 *	@param		bool			$active				True to enable, false to disable
+		 *
+		 *	@return 	bool										False for an unknown account
+		 */
+		public static function setStatus( array &$appData, string $username, bool $active ): bool {
+
+			if( self::getUser( $appData, $username ) === false )
+				return false;
+
+			$appData['/nino/auth/user'][$username]['status'] = ( $active === true ) ? self::STATUS_ACTIVE : self::STATUS_DISABLED;
+
+			if( $active === false ) {
+
+				$appData['/nino/auth/user'][$username]['sessions'] = [];
+				$appData['./nino/auth/revoked'][$username] = true;
+			}
+
+			\Nino\AppData::writeContentData( $appData, [ '/nino/auth/user' ] );
+
+			// The session of the account itself ends with it, as in
+			// logoutAllSessions() - the next request would find it gone anyway
+			// (see _resumeSession())
+			if( $active === false && ( $appData['./nino/auth/current']['mail'] ?? '' ) === $username ) {
+				\Nino\Runtime::unsetSessionValue( $appData, './nino/auth/current' );
+				\Nino\Runtime::unsetSessionValue( $appData, './nino/auth/token' );
+				\Nino\Csrf::rotateToken( $appData );
+				unset( $appData['./nino/auth/current'] );
+			}
+
+			// Run callback - see updateUser() for why this can't pass
+			// self::getUser(...) straight through
+			$updated = self::getUser( $appData, $username );
+			\Nino\Callbacks::doCallbacks( $appData, '/nino/auth/user/update', $updated );
+
+			return true;
+		}
+
+		/**
+		 *	When an account last logged in, as a timestamp: its 'lastLogin' (see
+		 *	loginUser()) or the newest of its sessions, whichever is later - an
+		 *	account that last logged in before the record carried the field
+		 *	still shows its newest session
+		 *
+		 *	@param		array			$user					A user record (see getUser())
+		 *
+		 *	@return 	int											0 when the account never logged in
+		 */
+		public static function lastLogin( array $user ): int {
+
+			$last = is_int( $user['lastLogin'] ?? null ) === true ? $user['lastLogin'] : 0;
+
+			foreach( is_array( $user['sessions'] ?? null ) === true ? $user['sessions'] : [] as $session )
+				if( is_array( $session ) === true && is_int( $session['time'] ?? null ) === true && $session['time'] > $last )
+					$last = $session['time'];
+
+			return $last;
+		}
+
+		/**
+		 *	The accounts that are locked out right now, and until when - the
+		 *	login throttle's account buckets (see _registerFailedAttemp()) that
+		 *	hold a lock still running. The ip buckets are not accounts and are
+		 *	not listed, and neither is a bucket whose account is gone
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	array										[ mail => timestamp the lock ends ]
+		 */
+		public static function lockedAccounts( array &$appData ): array {
+
+			$state = \Nino\Filesystem::getFileContent( $appData, self::TRIES_PATH, [] );
+
+			if( is_array( $state ) === false )
+				return [];
+
+			$locked = [];
+
+			foreach( $state as $key => $tries ) {
+
+				$key = (string) $key;
+
+				if( str_starts_with( $key, self::IP_KEY_PREFIX ) === true || (int) $tries >= 0 - time() )
+					continue;
+
+				if( self::getUser( $appData, $key ) !== false )
+					$locked[$key] = 0 - (int) $tries;
+			}
+
+			return $locked;
+		}
+
+		/**
+		 *	Lift an account's lock: its tries bucket goes, so the next login
+		 *	counts from zero. Only that account's - a locked client address
+		 *	is left alone, it is not an account and has to run out
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$username			The account's mail
+		 *
+		 *	@return 	bool										False for an unknown account, or when the lock or the write failed
+		 */
+		public static function unlock( array &$appData, string $username ): bool {
+
+			if( self::getUser( $appData, $username ) === false )
+				return false;
+
+			// mutate() answers false both for "nothing to change" and for a
+			// lock or write that failed - told apart here, since a lift that
+			// did not happen must not be reported as one
+			$ran			= false;
+			$changed	= false;
+
+			$written = \Nino\Filesystem::mutate( $appData, self::TRIES_PATH, function( mixed $state ) use ( $username, &$ran, &$changed ): ?array {
+
+				$ran = true;
+
+				$state = is_array( $state ) === true ? $state : [];
+
+				if( isset( $state[$username] ) === false )
+					return null;
+
+				unset( $state[$username] );
+				$changed = true;
+
+				return $state;
+			} );
+
+			return $written === true || ( $ran === true && $changed === false );
+		}
+
 		public static function checkPermission( array &$appData, string $perm, string $username = '' ): bool {
 
 			// Get current user data
@@ -580,10 +731,11 @@ namespace Nino {
 			// The same 'status' gate loginUser() applies, enforced on read as
 			// well as on write: an account that can no longer log in must not
 			// keep the sessions it was handed before it was disabled.
-			// Disabling one is a direct-json task (see updateUser()), and
-			// without this the account stays fully authorised in every browser
-			// still holding a listed token - up to SESSION_TTL later
-			if( ( $user['status'] ?? 0 ) !== 2
+			// setStatus() ends them; a record disabled by hand in config.php
+			// has no such step, and without this the account stays fully
+			// authorised in every browser still holding a listed token - up
+			// to SESSION_TTL later
+			if( ( $user['status'] ?? 0 ) !== self::STATUS_ACTIVE
 				|| ( $user['sessions'][$token]['time'] ?? 0 ) < time() - self::SESSION_TTL ) {
 
 				unset( $appData['/nino/auth/user'][$mail]['sessions'][$token] );

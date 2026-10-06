@@ -19,11 +19,13 @@ namespace Nino\Modules\Users {
 	 *											creates, edits and deletes them: full access as a switch,
 	 *											and below it the permissions in the shared picker, grouped
 	 *											the way the navigation is - one per panel or tab that
-	 *											exists right now (see \Nino\Modules\Users\Admin::permOptions()),
-	 *											plus whatever is typed into the field beneath it, which is
-	 *											how the scoped permissions get in (see
-	 *											\Nino\Admin\Admin::scoped() - there is one per action, per
-	 *											field and per text key, so no list could offer them). The two roles every project starts
+	 *											exists right now (see \Nino\Modules\Users\Admin::permOptions()).
+	 *											The scoped permissions (see \Nino\Admin\Admin::scoped() -
+	 *											one per action, per field and per text key) are added
+	 *											with three dependent lists - area, action, field - from
+	 *											the tree the panels answer in scopes() (see
+	 *											\Nino\Modules\Users\Admin::scopeOptions()), and the form
+	 *											says in plain words what the role may do. The two roles every project starts
 	 *											with, Editor and Developer, are written by the wizard's
 	 *											Setup step from defaults() and are ordinary roles from
 	 *											then on.
@@ -59,8 +61,9 @@ namespace Nino\Modules\Users {
 		 *	every panel offers, and no others. That worked while a permission
 		 *	was one string per panel and tab, and stopped working with the
 		 *	scoped ones (see \Nino\Admin\Admin::scoped()) - one per action, per
-		 *	field, per text key. There is no enumerating them, so the roles
-		 *	editor lets one be typed, and this is what it is checked against.
+		 *	field, per text key. There is no finite list of them, so this is
+		 *	what a permission is checked against, and what the panels' own
+		 *	scopes() are kept to (see isPermShape()).
 		 *
 		 *	No permission is gained by the change: reaching this endpoint at all
 		 *	means holding MANAGE_PERM, and the same request may set '/*'. What
@@ -69,6 +72,20 @@ namespace Nino\Modules\Users {
 		 */
 		private const string PERM_PATTERN = '#^/([A-Za-z0-9_.-]+|\*)(/([A-Za-z0-9_.-]+|\*))*$#';
 		private const int MAX_PERM_LENGTH = 200;
+
+		/**
+		 *	Whether a string is shaped like a permission: PERM_PATTERN and no
+		 *	longer than MAX_PERM_LENGTH - what apiSave() accepts, and what the
+		 *	scoped permissions a panel offers (see \Nino\Modules\Users\Admin::scopeOptions())
+		 *	are kept to
+		 *
+		 *	@param		string		$perm
+		 *
+		 *	@return 	bool
+		 */
+		public static function isPermShape( string $perm ): bool {
+			return strlen( $perm ) <= self::MAX_PERM_LENGTH && preg_match( self::PERM_PATTERN, $perm ) === 1;
+		}
 
 		public static function actions(): array {
 			return [
@@ -180,9 +197,12 @@ namespace Nino\Modules\Users {
 		}
 
 		/**
-		 *	Whether any account holds full access, its own or its role's -
-		 *	the state a delete or a role change must never end (see
-		 *	\Nino\Modules\Users\Admin::apiDelete(), \Nino\Modules\Users\Admin::apiSetRole() and apiSave())
+		 *	Whether any account that can log in holds full access, its own or
+		 *	its role's - the state a delete, a deactivation or a role change
+		 *	must never end (see \Nino\Modules\Users\Admin::apiDelete(),
+		 *	apiStatus(), apiSetRole() and apiSave() here). A disabled account
+		 *	holds it on paper only and does not count: the last full access
+		 *	there is, is the last active one
 		 *
 		 *	@param		array 		$appData			App data, or a copy with the change applied
 		 *	@param		string		$except				An account to leave out
@@ -192,7 +212,7 @@ namespace Nino\Modules\Users {
 		public static function fullAccessExists( array $appData, string $except = '' ): bool {
 
 			foreach( $appData['/nino/auth/user'] ?? [] as $mail => $user )
-				if( $mail !== $except && is_array( $user ) === true && in_array( '/*', \Nino\Auth::permissions( $appData, $user ), true ) === true )
+				if( $mail !== $except && is_array( $user ) === true && ( $user['status'] ?? 0 ) === \Nino\Auth::STATUS_ACTIVE && in_array( '/*', \Nino\Auth::permissions( $appData, $user ), true ) === true )
 					return true;
 
 			return false;
@@ -229,9 +249,11 @@ namespace Nino\Modules\Users {
 		}
 
 		/**
-		 *	Every role, how many accounts hold each, and the permissions the
-		 *	picker offers (see \Nino\Modules\Users\Admin::permOptions() - what a
-		 *	role may hold is wider than that, see apiSave())
+		 *	Every role, how many accounts hold each, the permissions the picker
+		 *	offers (see \Nino\Modules\Users\Admin::permOptions() - what a role may
+		 *	hold is wider than that, see apiSave()) and the scoped permissions
+		 *	the panels list for the three selects (see
+		 *	\Nino\Modules\Users\Admin::scopeOptions())
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
@@ -247,7 +269,11 @@ namespace Nino\Modules\Users {
 			foreach( self::all( $appData ) as $id => $role )
 				$roles[] = [ 'id' => $id, 'label' => $role['label'], 'perms' => $role['perms'], 'users' => self::holders( $appData, $id ) ];
 
-			\Nino\Http::ok( $request, [ 'roles' => $roles, 'permOptions' => \Nino\Modules\Users\Admin::permOptions( $appData ) ] );
+			\Nino\Http::ok( $request, [
+				'roles' 				=> $roles,
+				'permOptions' => \Nino\Modules\Users\Admin::permOptions( $appData ),
+				'scopes' 			=> \Nino\Modules\Users\Admin::scopeOptions( $appData ),
+			] );
 		}
 
 		/**
@@ -288,7 +314,7 @@ namespace Nino\Modules\Users {
 			}
 
 			$perms 		= array_values( array_unique( array_map( 'trim', $perms ) ) );
-			$malformed = array_values( array_filter( $perms, fn( string $perm ) => strlen( $perm ) > self::MAX_PERM_LENGTH || preg_match( self::PERM_PATTERN, $perm ) !== 1 ) );
+			$malformed = array_values( array_filter( $perms, fn( string $perm ) => self::isPermShape( $perm ) === false ) );
 
 			// Named rather than dropped: a permission silently removed from
 			// the request looks exactly like one the save accepted, and the

@@ -126,4 +126,7 @@ return [
 	'[[/_admin/error/types_rename_collision]]'	=> 'The name “%s” is taken: two fields would become one. Rename the other field first, or choose another name.',
 	'[[/_admin/error/types_rename_values]]'	=> 'The name “%s” still has the stored values of a field that was removed earlier, and they would turn up in elements that never had them. Choose another name.',
 	'[[/_admin/error/types_rename_image]]'	=> 'The image fields cannot take each other’s names (“%s”): their picture files are named after the field and would overwrite each other.',
+	'[[/_admin/elements/scope/insert]]'	=> 'Add',
+	'[[/_admin/elements/scope/update]]'	=> 'Change fields',
+	'[[/_admin/elements/scope/delete]]'	=> 'Delete',
 ];

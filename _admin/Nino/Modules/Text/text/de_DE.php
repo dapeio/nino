@@ -46,4 +46,5 @@ return [
 	'[[/_admin/error/keys_format]]'	=> 'Dieses Format gibt es nicht. Zur Wahl stehen automatisch, reiner Text, formatiert, Zeilenumbrüche sowie Absätze und Listen.',
 	'[[/_admin/error/keys_limit]]'	=> 'Das Limit muss eine ganze Zahl von 1 bis %d sein.',
 	'[[/_admin/error/keys_limit_short]]'	=> 'Der Schlüssel enthält schon einen Text mit %d Zeichen. Kürze ihn zuerst oder wähle ein höheres Limit.',
+	'[[/_admin/text/scope/update]]'	=> 'Werte ändern',
 ];

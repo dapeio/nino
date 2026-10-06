@@ -62,6 +62,7 @@ request:
 | `text()` | no | directory holding the panel's `<locale>.php` fill files |
 | `summary( &$appData )` | no | a Dashboard tile `[ 'value' => ..., 'label' => ... ]`, `null` for none |
 | `log( $action, $data )` | no | the activity-log line for a completed action, `''` for none |
+| `scopes( &$appData )` | no | the scoped permissions the panel knows, for the roles tab's three lists, see below: `[ { scope, door, label, areas } ]` |
 
 `nav()` rules:
 
@@ -178,8 +179,7 @@ picker only sends back the rows it could show and leaving one out would make
 the next save of the role that holds it drop it silently; nothing is invented
 that nobody holds. It is not the limit of what a role may hold, though:
 `Roles::apiSave()` checks each permission for shape (`PERM_PATTERN`) and
-refuses a malformed one by name, so a scoped permission can be typed into the
-roles form. What an account may do is `\Nino\Auth::permissions()`: its own
+refuses a malformed one by name. What an account may do is `\Nino\Auth::permissions()`: its own
 `perms` plus its role's (`/nino/auth/roles`), and every guard reads that.
 
 A panel's own permission is a door. What may be done once inside it can be
@@ -195,6 +195,41 @@ checks the specific string for an account that holds one. A panel that grows
 scoped permissions sends what the current account may do along with its data
 (see `Elements\Admin::rights()`, `Text\Admin::apiKeys()`) so its form can draw
 itself accordingly - the enforcement stays in the action methods.
+
+The roles tab does not ask anybody to type a scoped permission: a panel that has
+them lists them in an optional `scopes( &$appData )`, and the tab offers them as
+three lists that depend on each other - area, action, field - from what
+`\Nino\Modules\Users\Admin::scopeOptions()` collects from the registry's classes.
+The answer is an array of scopes, one per panel (or per part of a panel):
+
+```php
+public static function scopes( array &$appData ): array {
+	return [ [
+		'scope'	=> self::SCOPE,									// the prefix isScoped() reads
+		'door'	=> self::MANAGE_PERM,						// the panel's own permission
+		'label'	=> '/_admin/nav/catalog',				// a fill key or literal text
+		'areas'	=> [ [
+			'id'			=> 'books',
+			'label'		=> 'Books',								// literal text, shown as it is
+			'perm'		=> self::SCOPE. 'books/*',	// optional: "everything in this area"
+			'actions'	=> [
+				[ 'id' => 'insert', 'label' => '/_admin/catalog/scope/insert', 'perm' => self::SCOPE. 'books/insert' ],
+				[ 'id' => 'update', 'label' => '/_admin/catalog/scope/update', 'perm' => self::SCOPE. 'books/update/*',
+					'fields' => [ [ 'id' => 'title', 'label' => 'title', 'perm' => self::SCOPE. 'books/update/title' ] ] ],
+			],
+		] ],
+	] ];
+}
+```
+
+`scopeOptions()` keeps only what is shaped like a permission (`Roles::isPermShape()`,
+the shape `Roles::apiSave()` checks) and lies below its `scope`; an action without
+a valid `perm`, an area without an action and a scope without an area are dropped.
+A field whose name cannot be part of a permission - a space, an umlaut - has to be
+left out by the panel, and is covered by the area's `perm`. A panel without
+`scopes()` offers none: a role can still hold a scoped permission of it - one
+written by hand, or one a role held before - which the picker then shows under
+*Not offered*, but the form cannot add a new one.
 
 Choose one stable slug and use it everywhere:
 

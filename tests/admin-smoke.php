@@ -216,6 +216,80 @@ check( 'the panel\'s perm() is assignable to a role, under its nav label and in 
 check( 'a tab\'s perm() is assignable on its own, under its nav fill', in_array( [ 'perm' => \Nino\Modules\Elements\Types::MANAGE_PERM, 'label' => '/_admin/nav/types', 'group' => 'structure', 'offered' => true ], $permOptions, true ) === true );
 check( 'the users manage perm stays assignable too, once - the Roles tab shares it', count( array_filter( $permOptions, fn( array $option ): bool => $option['perm'] === \Nino\Modules\Users\Admin::MANAGE_PERM ) ) === 1 );
 
+/*	The scoped permissions a panel offers for the three lists of the Roles tab.
+	scopes() is optional: a panel without it - EditorSmokeDummyPanel, the
+	workbench's own Users - offers none, and an answer that is not the shape
+	loses what is wrong with it, never the rest. Whatever comes out is a
+	permission a role may hold and a check can match	*/
+class EditorSmokeScopedPanel {
+	public static function actions(): array { return [ 'scoped/list' => [ self::class, 'apiList' ] ]; }
+	public static function nav(): array { return [ 'scoped', 'Scoped', 63 ]; }
+	public static function perm(): string { return '/_admin/scoped/manage'; }
+	public static function scopes( array &$appData ): array {
+		return [
+			[ 'scope' => '/_admin/scoped/', 'door' => '/_admin/scoped/manage', 'label' => 'Scoped', 'areas' => [
+				[ 'id' => 'a', 'label' => 'Area A', 'perm' => '/_admin/scoped/a/*', 'actions' => [
+					[ 'id' => 'read', 'label' => 'Read', 'perm' => '/_admin/scoped/a/read' ],
+					[ 'id' => 'bad', 'label' => 'Bad', 'perm' => 'no slash' ],
+					[ 'id' => 'outside', 'label' => 'Outside', 'perm' => '/_admin/other/x' ],
+					[ 'id' => 'edit', 'label' => 'Edit', 'perm' => '/_admin/scoped/a/edit/*', 'fields' => [
+						[ 'id' => 'f1', 'label' => 'F 1', 'perm' => '/_admin/scoped/a/edit/f1' ],
+						[ 'id' => 'f2', 'label' => 'F 2', 'perm' => '/_admin/scoped/a/edit/has space' ],
+						[ 'id' => 'f3', 'label' => 'F 3', 'perm' => '/_admin/other/f3' ],
+						'junk',
+						[ 'id' => 5 ],
+					] ],
+				] ],
+				[ 'id' => 'b', 'label' => 'Area B', 'perm' => 'not below', 'actions' => [ [ 'id' => 'x', 'label' => 'X', 'perm' => '/_admin/scoped/b/x' ] ] ],
+				[ 'id' => 'empty', 'label' => 'Empty', 'actions' => [] ],
+				'junk',
+			] ],
+			[ 'scope' => 'broken', 'door' => '/_admin/scoped/manage', 'label' => 'Broken', 'areas' => [] ],
+			[ 'scope' => '/_admin/nothing/', 'door' => '/_admin/nothing/manage', 'label' => 'Nothing', 'areas' => [ [ 'id' => 'e', 'label' => 'E', 'actions' => [] ] ] ],
+			'junk',
+		];
+	}
+	public static function apiList( array &$appData, array &$request ): void { \Nino\Http::ok( $request, [] ); }
+}
+
+class EditorSmokeScopedModule {
+	public static function adminPanels( array &$appData ): array { return [ 'EditorSmokeScopedPanel', 'EditorSmokeDummyPanel' ]; }
+}
+
+$withScopes = $appData;
+$withScopes['/nino/modules'] = [ 'EditorSmokeScopedModule' ];
+$scopeTree = \Nino\Modules\Users\Admin::scopeOptions( $withScopes );
+$scopeById = array_column( $scopeTree, null, 'scope' );
+
+check( 'scopeOptions lists a panel that answers scopes()', isset( $scopeById['/_admin/scoped/'] ) === true );
+check( '...and skips a panel that has none - what is left besides is the workbench\'s own Elements and Text, which offer something once there is a type or a key', array_diff( array_keys( $scopeById ), [ '/_admin/scoped/', '/_admin/elements/', '/_admin/text/' ] ) === [] );
+$scoped = $scopeById['/_admin/scoped/'];
+check( 'a scope that is not the shape, and one with nothing left to offer, are dropped', isset( $scopeById['broken'] ) === false && isset( $scopeById['/_admin/nothing/'] ) === false );
+check( 'an area with nothing to do and one that is no array are dropped, the rest kept', array_column( $scoped['areas'], 'id' ) === [ 'a', 'b' ] );
+check( '...an action with a permission that is no permission, or lies outside the scope, is dropped', array_column( $scoped['areas'][0]['actions'], 'id' ) === [ 'read', 'edit' ] );
+check( '...so is a field whose permission cannot be matched or lies outside the scope', array_column( $scoped['areas'][0]['actions'][1]['fields'], 'id' ) === [ 'f1' ] );
+check( '...an area permission outside the scope is not carried', isset( $scoped['areas'][1]['perm'] ) === false && $scoped['areas'][0]['perm'] === '/_admin/scoped/a/*' );
+check( '...and the door and the label arrive as the panel said them', $scoped['door'] === '/_admin/scoped/manage' && $scoped['label'] === 'Scoped' );
+
+$treePerms = [];
+foreach( $scopeTree as $scope )
+	foreach( $scope['areas'] as $area ) {
+		isset( $area['perm'] ) === true && $treePerms[] = $area['perm'];
+		foreach( $area['actions'] as $action ) {
+			$treePerms[] = $action['perm'];
+			foreach( $action['fields'] ?? [] as $field )
+				$treePerms[] = $field['perm'];
+		}
+	}
+check( 'every permission anywhere in the tree is shaped like one a role may hold', count( $treePerms ) >= 4
+	&& array_filter( $treePerms, static fn( string $perm ): bool => \Nino\Modules\Users\Roles::isPermShape( $perm ) === false ) === [] );
+check( 'isPermShape is what apiSave checks: a string without a leading slash, a space and an overlong one are not', \Nino\Modules\Users\Roles::isPermShape( '/_admin/a/*' ) === true
+	&& \Nino\Modules\Users\Roles::isPermShape( 'no/slash' ) === false && \Nino\Modules\Users\Roles::isPermShape( '/with space' ) === false && \Nino\Modules\Users\Roles::isPermShape( '/'. str_repeat( 'a', 200 ) ) === false );
+
+$noScopes = $appData;
+$noScopes['/nino/modules'] = [ 'EditorSmokeDummyModule' ];
+check( 'a project panel that offers none leaves the tree to the workbench\'s own', array_diff( array_column( \Nino\Modules\Users\Admin::scopeOptions( $noScopes ), 'scope' ), [ '/_admin/elements/', '/_admin/text/' ] ) === [] );
+
 /*	Nothing says a request carries strings. Every one of these used to be
 	a 500: 'action[]=x' is an "Illegal offset type in isset" in the
 	dispatcher, 'data[]=x' a TypeError in json_decode(), and '?locale[]=x'
@@ -1269,12 +1343,143 @@ check( 'a manager can set the password of an account no wider than their own', $
 \Nino\Auth::deleteUser( $appData, 'wide2@example.com' );
 \Nino\Auth::deleteUser( $appData, 'narrow@example.com' );
 \Nino\Auth::deleteUser( $appData, 'usersonly@example.com' );
+
+// An account written by hand has a hash, a status and permissions and no
+// 'role' key (see kernel-smoke.php). Changing its own password must answer
+// ok: reading the missing key would raise a warning the framework makes fatal
+// on a real request - after the password was already stored. This file's
+// handler swallows warnings, so the ones of this call are recorded
+$appData['/nino/auth/user']['hand@example.com'] = [ 'pw' => password_hash( 'hand password', PASSWORD_DEFAULT ), 'status' => \Nino\Auth::STATUS_ACTIVE, 'perms' => [ '/*' ] ];
+\Nino\Auth::loginUser( $appData, 'hand@example.com', 'hand password' );
+$handWarnings = [];
+set_error_handler( function( int $level, string $message ) use ( &$handWarnings ): bool { $handWarnings[] = $message; return true; } );
+[ $status, $body ] = callUsers( $appData, 'apiSave', [ 'username' => 'hand@example.com', 'mail' => 'hand@example.com', 'pw' => 'a password of my choosing', 'currentPassword' => 'hand password' ] );
+restore_error_handler();
+check( 'a hand-written account without a role key changes its own password without a warning', $status === 200 && $body['mail'] === 'hand@example.com' && $body['role'] === '' && $handWarnings === [] );
+check( '...and the new password is the stored one', password_verify( 'a password of my choosing', \Nino\Auth::getUser( $appData, 'hand@example.com' )['pw'] ) === true );
+\Nino\Auth::deleteUser( $appData, 'hand@example.com' );
 \Nino\Auth::loginUser( $appData, 'manager@example.com', 'manager password' );
 
 $appData['/nino/auth/user']['plain3@example.com']['sessions'] = [ '127.0.0.1' => time(), '10.0.0.1' => time() ];
 [ $status, $body ] = callUsers( $appData, 'apiLogoutAll', [ 'username' => 'plain3@example.com' ] );
 check( 'a manager can log out another user everywhere', $status === 200 && $body['ok'] === true && $body['loggedOutSelf'] === false );
 check( 'that user\'s sessions are actually cleared', \Nino\Auth::getUser( $appData, 'plain3@example.com' )['sessions'] === [] );
+
+// --- Users: status, lock and last login in the list; deactivating; one save ---
+
+[ , $body ] = callUsers( $appData, 'apiList' );
+$managerRow = $body['users'][ array_search( 'manager@example.com', array_column( $body['users'], 'mail' ), true ) ];
+$plainRow 	= $body['users'][ array_search( 'plain3@example.com', array_column( $body['users'], 'mail' ), true ) ];
+check( 'apiList says per account whether it is active, locked and when it logged in', $managerRow['status'] === 'active' && $managerRow['locked'] === ''
+	&& preg_match( '/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/', $managerRow['lastLogin'] ) === 1 );
+check( '...an account that never logged in has no login, and an account that was not locked no lock', $plainRow['locked'] === '' && is_string( $plainRow['lastLogin'] ) === true );
+
+\Nino\Filesystem::mutate( $appData, '/data/auth-tries.php', static fn( mixed $state ): array => ( is_array( $state ) ? $state : [] ) + [ 'plain3@example.com' => 0 - time() - 3600 ] );
+[ , $body ] = callUsers( $appData, 'apiList' );
+$plainRow = $body['users'][ array_search( 'plain3@example.com', array_column( $body['users'], 'mail' ), true ) ];
+check( '...an account locked out shows until when', preg_match( '/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/', $plainRow['locked'] ) === 1 && $plainRow['locked'] > date( 'Y-m-d H:i' ) );
+\Nino\Auth::unlock( $appData, 'plain3@example.com' );
+
+// Deactivating: a manager's, never one's own, never the last active full access
+\Nino\Auth::insertUser( $appData, 'toggle@example.com', 'toggle password', [] );
+\Nino\Auth::loginUser( $appData, 'toggle@example.com', 'toggle password' );
+\Nino\Auth::loginUser( $appData, 'manager@example.com', 'manager password' );
+
+[ $status ] = callUsers( $appData, 'apiStatus', [ 'username' => 'manager@example.com', 'active' => false ] );
+check( 'apiStatus refuses your own account', $status === 400 && \Nino\Auth::getUser( $appData, 'manager@example.com' )['status'] === \Nino\Auth::STATUS_ACTIVE );
+[ $status ] = callUsers( $appData, 'apiStatus', [ 'username' => 'nobody-here@example.com', 'active' => false ] );
+check( '...404s for an unknown account', $status === 404 );
+[ $status ] = callUsers( $appData, 'apiStatus', [ 'username' => 'toggle@example.com' ] );
+check( '...and wants to be told which way', $status === 400 );
+[ $status ] = callUsers( $appData, 'apiStatus', [ 'username' => 'toggle@example.com', 'active' => 'no' ] );
+check( '...a word is not a bool', $status === 400 && \Nino\Auth::getUser( $appData, 'toggle@example.com' )['status'] === \Nino\Auth::STATUS_ACTIVE );
+
+[ $status, $body ] = callUsers( $appData, 'apiStatus', [ 'username' => 'toggle@example.com', 'active' => false ] );
+check( 'a manager deactivates another account', $status === 200 && $body['status'] === 'disabled' && \Nino\Auth::getUser( $appData, 'toggle@example.com' )['status'] === \Nino\Auth::STATUS_DISABLED );
+check( '...which ends its sessions and refuses its login', \Nino\Auth::getUser( $appData, 'toggle@example.com' )['sessions'] === [] && \Nino\Auth::loginUser( $appData, 'toggle@example.com', 'toggle password' ) === false );
+\Nino\Auth::loginUser( $appData, 'manager@example.com', 'manager password' );
+[ , $body ] = callUsers( $appData, 'apiList' );
+check( '...and the list says so', $body['users'][ array_search( 'toggle@example.com', array_column( $body['users'], 'mail' ), true ) ]['status'] === 'disabled' );
+[ $status, $body ] = callUsers( $appData, 'apiStatus', [ 'username' => 'toggle@example.com', 'active' => true ] );
+check( 'and activates it again', $status === 200 && $body['status'] === 'active' && is_array( \Nino\Auth::loginUser( $appData, 'toggle@example.com', 'toggle password' ) ) === true );
+\Nino\Auth::loginUser( $appData, 'manager@example.com', 'manager password' );
+
+// The last active account with full access. Every other account is switched
+// off in memory for the length of the check - the session of the manager
+// doing it is not touched by that
+\Nino\Auth::insertUser( $appData, 'lastadmin@example.com', 'last admin password', [ '/*' ] );
+$statuses = [];
+foreach( $appData['/nino/auth/user'] as $mail => $record )
+	if( $mail !== 'lastadmin@example.com' ) {
+		$statuses[$mail] = $record['status'] ?? null;
+		$appData['/nino/auth/user'][$mail]['status'] = \Nino\Auth::STATUS_DISABLED;
+	}
+[ $status ] = callUsers( $appData, 'apiStatus', [ 'username' => 'lastadmin@example.com', 'active' => false ] );
+check( 'the last active account with full access cannot be deactivated - other full access accounts being disabled do not count', $status === 409
+	&& \Nino\Auth::getUser( $appData, 'lastadmin@example.com' )['status'] === \Nino\Auth::STATUS_ACTIVE );
+check( '...fullAccessExists() counts active accounts only', \Nino\Modules\Users\Roles::fullAccessExists( $appData ) === true && \Nino\Modules\Users\Roles::fullAccessExists( $appData, 'lastadmin@example.com' ) === false );
+[ $status ] = callUsers( $appData, 'apiDelete', [ 'username' => 'lastadmin@example.com' ] );
+check( '...nor deleted', $status === 409 );
+foreach( $statuses as $mail => $was )
+	$appData['/nino/auth/user'][$mail]['status'] = $was;
+[ $status ] = callUsers( $appData, 'apiStatus', [ 'username' => 'lastadmin@example.com', 'active' => false ] );
+check( 'with another active full access in place it can be', $status === 200 );
+\Nino\Auth::deleteUser( $appData, 'lastadmin@example.com' );
+
+check( 'log() names the direction of the switch', \Nino\Modules\Users\Admin::log( 'users/status', [ 'username' => 'x@example.com', 'active' => false ] ) === 'Deactivate User x@example.com'
+	&& \Nino\Modules\Users\Admin::log( 'users/status', [ 'username' => 'x@example.com', 'active' => true ] ) === 'Activate User x@example.com' );
+
+// One save: address, password and role. Nothing is written unless all of it is allowed
+\Nino\Auth::insertUser( $appData, 'onesave@example.com', 'one save password', [] );
+[ $status, $body ] = callUsers( $appData, 'apiSave', [ 'username' => 'onesave@example.com', 'mail' => 'onesave2@example.com', 'pw' => 'a changed password', 'role' => 'editor' ] );
+check( 'a manager changes address, password and role in one save', $status === 200 && $body === [ 'mail' => 'onesave2@example.com', 'role' => 'editor' ] );
+$saved = \Nino\Auth::getUser( $appData, 'onesave2@example.com' );
+check( '...and all three are stored', $saved !== false && $saved['role'] === 'editor' && password_verify( 'a changed password', $saved['pw'] ) === true && \Nino\Auth::getUser( $appData, 'onesave@example.com' ) === false );
+check( 'log() puts the role into the line', \Nino\Modules\Users\Admin::log( 'users/save', [ 'username' => 'a@example.com', 'mail' => 'b@example.com', 'role' => 'editor' ] ) === 'Edit User b@example.com Role editor' );
+
+[ $status ] = callUsers( $appData, 'apiSave', [ 'username' => 'onesave2@example.com', 'mail' => 'onesave3@example.com', 'role' => 'editor' ] );
+check( 'a role posted unchanged is not a role change', $status === 200 && \Nino\Auth::getUser( $appData, 'onesave3@example.com' )['role'] === 'editor' );
+[ $status ] = callUsers( $appData, 'apiSave', [ 'username' => 'onesave3@example.com', 'mail' => 'onesave3@example.com', 'role' => 'no-such-role' ] );
+check( 'an unknown role is refused', $status === 400 && \Nino\Auth::getUser( $appData, 'onesave3@example.com' )['role'] === 'editor' );
+[ $status ] = callUsers( $appData, 'apiSave', [ 'username' => 'onesave3@example.com', 'mail' => 'onesave4@example.com', 'role' => [ 'editor' ] ] );
+check( '...and so is a role that is not a string, with nothing written', $status === 400 && \Nino\Auth::getUser( $appData, 'onesave3@example.com' ) !== false );
+[ $status ] = callUsers( $appData, 'apiSave', [ 'username' => 'manager@example.com', 'mail' => 'manager@example.com', 'currentPassword' => 'manager password', 'role' => 'editor' ] );
+check( 'changing your own role is refused', $status === 400 && ( \Nino\Auth::getUser( $appData, 'manager@example.com' )['role'] ?? '' ) === '' );
+[ $status ] = callUsers( $appData, 'apiSave', [ 'username' => 'onesave3@example.com', 'mail' => 'manager@example.com', 'role' => 'developer' ] );
+check( 'a refused address writes no role either: the checks come before the write', $status === 400 && \Nino\Auth::getUser( $appData, 'onesave3@example.com' )['role'] === 'editor' );
+[ $status, $body ] = callUsers( $appData, 'apiSave', [ 'username' => 'onesave3@example.com', 'mail' => 'onesave3@example.com', 'role' => '' ] );
+check( 'a role can be taken away in the same call', $status === 200 && $body['role'] === '' && \Nino\Auth::getUser( $appData, 'onesave3@example.com' )['role'] === '' );
+
+// A manager who is no developer: the address of a wider account stays theirs
+// to change with the role as it is, the role itself does not
+\Nino\Auth::insertUser( $appData, 'devacct@example.com', 'dev account password', [], 'developer' );
+\Nino\Auth::insertUser( $appData, 'usersonly@example.com', 'users only password', [ \Nino\Modules\Users\Admin::MANAGE_PERM, \Nino\Modules\Text\Admin::MANAGE_PERM ] );
+\Nino\Auth::loginUser( $appData, 'usersonly@example.com', 'users only password' );
+[ $status, $body ] = callUsers( $appData, 'apiSave', [ 'username' => 'devacct@example.com', 'mail' => 'devacct2@example.com', 'role' => 'developer' ] );
+check( 'a manager without full access renames a Developer account with the role as it is', $status === 200 && $body === [ 'mail' => 'devacct2@example.com', 'role' => 'developer' ] );
+[ $status ] = callUsers( $appData, 'apiSave', [ 'username' => 'onesave3@example.com', 'mail' => 'onesave5@example.com', 'role' => 'developer' ] );
+check( '...but may not hand out a role wider than their own - and nothing of that save is written', $status === 403
+	&& \Nino\Auth::getUser( $appData, 'onesave3@example.com' ) !== false && \Nino\Auth::getUser( $appData, 'onesave5@example.com' ) === false && \Nino\Auth::getUser( $appData, 'onesave3@example.com' )['role'] === '' );
+[ $status ] = callUsers( $appData, 'apiSave', [ 'username' => 'usersonly@example.com', 'mail' => 'usersonly@example.com', 'currentPassword' => 'users only password', 'role' => 'developer' ] );
+check( 'nor their own role', $status === 400 );
+
+\Nino\Auth::deleteUser( $appData, 'devacct2@example.com' );
+\Nino\Auth::deleteUser( $appData, 'usersonly@example.com' );
+\Nino\Auth::deleteUser( $appData, 'onesave3@example.com' );
+\Nino\Auth::deleteUser( $appData, 'toggle@example.com' );
+
+// A plain user: no manager, so no role of their own either, and no status
+\Nino\Auth::insertUser( $appData, 'selfsave@example.com', 'self save password', [] );
+\Nino\Auth::loginUser( $appData, 'selfsave@example.com', 'self save password' );
+[ $status ] = callUsers( $appData, 'apiSave', [ 'username' => 'selfsave@example.com', 'mail' => 'selfsave@example.com', 'currentPassword' => 'self save password', 'role' => 'developer' ] );
+check( 'an account that is no manager cannot post itself a role', $status === 403 && ( \Nino\Auth::getUser( $appData, 'selfsave@example.com' )['role'] ?? '' ) === '' );
+[ $status ] = callUsers( $appData, 'apiStatus', [ 'username' => 'plain3@example.com', 'active' => false ] );
+check( '...nor deactivate an account', $status === 403 );
+\Nino\Auth::logoutUser( $appData );
+[ $status ] = callUsers( $appData, 'apiStatus', [ 'username' => 'plain3@example.com', 'active' => false ] );
+check( 'and apiStatus wants a session at all', $status === 401 );
+\Nino\Auth::deleteUser( $appData, 'selfsave@example.com' );
+\Nino\Auth::loginUser( $appData, 'manager@example.com', 'manager password' );
 
 // --- Users::apiSetRole / Roles ---
 

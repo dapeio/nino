@@ -16,12 +16,17 @@ namespace Nino\Modules\Users {
 	 *	Users							User editor: lets a user change their own mail/password (with
 	 *											current-password confirmation), or - given the
 	 *											'/_admin/users/manage' permission - anyone's, plus (manage-only,
-	 *											no self-service) which role an account holds. What a role
+	 *											no self-service) which role an account holds and whether it
+	 *											is active: a disabled account cannot log in and keeps no
+	 *											session, and is never one's own nor the last active one
+	 *											with full access. Address, password and role are one save.
+	 *											The list says which accounts are disabled, which are locked
+	 *											out right now and when each logged in last. What a role
 	 *											grants is the Roles tab of this same pane (see Roles), the
-	 *											login throttle the Lockout tab. Every session an account
-	 *											holds is ended from here too (users/logoutall). Tries,
-	 *											status, and the permissions an account may hold beside its
-	 *											role, stay a developer-only, direct-json task
+	 *											login throttle - and lifting a lock - the Lockout tab.
+	 *											Every session an account holds is ended from here too
+	 *											(users/logoutall). The permissions an account may hold
+	 *											beside its role stay a developer-only, direct-json task
 	 *
 	 *	@package					Dape/Nino
 	 *	@author						David Perchermeier <mail@dape.io>
@@ -40,6 +45,7 @@ namespace Nino\Modules\Users {
 				'users/delete' 		=> [ self::class, 'apiDelete' ],
 				'users/logoutall' => [ self::class, 'apiLogoutAll' ],
 				'users/role' 			=> [ self::class, 'apiSetRole' ],
+				'users/status' 		=> [ self::class, 'apiStatus' ],
 			];
 		}
 
@@ -91,7 +97,8 @@ namespace Nino\Modules\Users {
 			return match( $action ) {
 				'users/create' 		=> 'Create User '. trim( (string) ( $data['mail'] ?? '' ) ),
 				'users/delete' 		=> 'Delete User '. ( $data['username'] ?? '' ),
-				'users/save' 			=> 'Edit User '. ( trim( (string) ( $data['mail'] ?? '' ) ) !== '' ? $data['mail'] : ( $data['username'] ?? '' ) ),
+				'users/save' 			=> 'Edit User '. ( trim( (string) ( $data['mail'] ?? '' ) ) !== '' ? $data['mail'] : ( $data['username'] ?? '' ) ). ( is_string( $data['role'] ?? null ) === true ? ' Role '. $data['role'] : '' ),
+				'users/status' 		=> ( ( $data['active'] ?? false ) === true ? 'Activate User ' : 'Deactivate User ' ). ( $data['username'] ?? '' ),
 				'users/logoutall' => 'Logout-All '. ( $data['username'] ?? '' ),
 				'users/role' 			=> 'Set Role '. ( $data['username'] ?? '' ). ' '. ( $data['role'] ?? '' ),
 				default 					=> '',
@@ -102,8 +109,8 @@ namespace Nino\Modules\Users {
 		 *	Every permission the Roles tab's picker offers, label and group
 		 *	included. Not the limit of what a role may hold - the scoped
 		 *	permissions are one string per action, field and text key, so
-		 *	there is no list of them and Roles::apiSave() checks a shape
-		 *	instead. This is what can be picked rather than typed. Two
+		 *	there is no finite list of them and Roles::apiSave() checks a shape
+		 *	instead; scopeOptions() is where a panel offers them. Two
 		 *	sources, in this order:
 		 *
 		 *	The panel registry. A panel or tab that gates itself with perm()
@@ -117,7 +124,7 @@ namespace Nino\Modules\Users {
 		 *	And then whatever is actually in force. A permission held by a
 		 *	role or by an account that no panel is offering right now - a
 		 *	module switched off, a module deleted, a permission written by
-		 *	hand, a scoped one typed into the roles form - joins the list under
+		 *	hand, a scoped one a panel no longer lists - joins the list under
 		 *	its own string, in the 'other' group and with offered => false. It
 		 *	has to: the picker only sends back the rows it could show, so a
 		 *	permission missing from here is one the next save of that role
@@ -154,6 +161,117 @@ namespace Nino\Modules\Users {
 		}
 
 		/**
+		 *	The scoped permissions the panels offer, for the three lists of the
+		 *	Roles tab - area, action, field. A panel that has any answers
+		 *	scopes() (a static method, optional: a panel without it simply
+		 *	offers none, and one whose answer is not what is described below
+		 *	loses what is wrong with it rather than the whole answer):
+		 *
+		 *	  [ { scope, door, label, areas: [ { id, label, perm?, actions: [
+		 *	    { id, label, perm, fields?: [ { id, label, perm } ] } ] } ] } ]
+		 *
+		 *	scope is the prefix \Nino\Admin\Admin::isScoped() reads, door the
+		 *	panel's own permission, label of a scope and of an action a fill key
+		 *	or literal text, those of an area and a field literal text. Every
+		 *	perm has to be shaped like a permission (Roles::isPermShape()) and
+		 *	lie below its scope, so what the form can add is always something
+		 *	apiSave() accepts and a check can match. An action without a valid
+		 *	perm, an area without an action and a scope without an area are
+		 *	dropped. Asked of the registry's classes only, which are not
+		 *	derived from a request
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	array										The tree, as above
+		 */
+		public static function scopeOptions( array &$appData ): array {
+
+			$scopes = [];
+
+			foreach( \Nino\Admin\Admin::allPanels( $appData ) as $panel ) {
+
+				$class = $panel['class'] ?? '';
+
+				if( is_string( $class ) === false || method_exists( $class, 'scopes' ) === false )
+					continue;
+
+				$offered = $class::scopes( $appData );
+
+				foreach( is_array( $offered ) === true ? $offered : [] as $scope ) {
+
+					$clean = is_array( $scope ) === true ? self::_cleanScope( $scope ) : null;
+
+					if( $clean !== null )
+						$scopes[] = $clean;
+				}
+			}
+
+			return $scopes;
+		}
+
+		/**
+		 *	One scope of scopeOptions(), with everything that is not the shape
+		 *	described there taken out
+		 *
+		 *	@param		array 		$scope
+		 *
+		 *	@return 	array|null								Null when nothing usable is left
+		 */
+		private static function _cleanScope( array $scope ): ?array {
+
+			$prefix = $scope['scope'] ?? null;
+			$door 	= $scope['door'] ?? null;
+			$label 	= $scope['label'] ?? null;
+
+			if( is_string( $prefix ) === false || is_string( $door ) === false || is_string( $label ) === false
+				|| str_ends_with( $prefix, '/' ) === false || Roles::isPermShape( rtrim( $prefix, '/' ) ) === false || Roles::isPermShape( $door ) === false )
+				return null;
+
+			$below = static fn( mixed $perm ): bool => is_string( $perm ) === true && Roles::isPermShape( $perm ) === true && str_starts_with( $perm, $prefix ) === true;
+
+			$areas = [];
+
+			foreach( is_array( $scope['areas'] ?? null ) === true ? $scope['areas'] : [] as $area ) {
+
+				if( is_array( $area ) === false || is_string( $area['id'] ?? null ) === false || is_string( $area['label'] ?? null ) === false )
+					continue;
+
+				$actions = [];
+
+				foreach( is_array( $area['actions'] ?? null ) === true ? $area['actions'] : [] as $action ) {
+
+					if( is_array( $action ) === false || is_string( $action['id'] ?? null ) === false || is_string( $action['label'] ?? null ) === false || $below( $action['perm'] ?? null ) === false )
+						continue;
+
+					$fields = [];
+
+					foreach( is_array( $action['fields'] ?? null ) === true ? $action['fields'] : [] as $field )
+						if( is_array( $field ) === true && is_string( $field['id'] ?? null ) === true && is_string( $field['label'] ?? null ) === true && $below( $field['perm'] ?? null ) === true )
+							$fields[] = [ 'id' => $field['id'], 'label' => $field['label'], 'perm' => $field['perm'] ];
+
+					$clean = [ 'id' => $action['id'], 'label' => $action['label'], 'perm' => $action['perm'] ];
+
+					if( $fields !== [] )
+						$clean['fields'] = $fields;
+
+					$actions[] = $clean;
+				}
+
+				if( $actions === [] )
+					continue;
+
+				$cleanArea = [ 'id' => $area['id'], 'label' => $area['label'], 'actions' => $actions ];
+
+				if( $below( $area['perm'] ?? null ) === true )
+					$cleanArea['perm'] = $area['perm'];
+
+				$areas[] = $cleanArea;
+			}
+
+			return $areas === [] ? null : [ 'scope' => $prefix, 'door' => $door, 'label' => $label, 'areas' => $areas ];
+		}
+
+		/**
 		 *	Every permission this installation actually holds somewhere -
 		 *	on a role or directly on an account - whether or not a panel is
 		 *	offering it. Full access is not one of them: '/*' is its own
@@ -187,7 +305,9 @@ namespace Nino\Modules\Users {
 		 *	MANAGE_PERM, otherwise just themselves. Includes each user's role
 		 *	and the roles there are (so a manager's forms can offer them),
 		 *	regardless of canManage - harmless to a non-manager since they
-		 *	only ever see their own row. Never a password hash
+		 *	only ever see their own row. Per account whether it is active, until
+		 *	when it is locked out (see \Nino\Auth::lockedAccounts()) and when it
+		 *	last logged in, as dates. Never a password hash
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
@@ -202,16 +322,23 @@ namespace Nino\Modules\Users {
 			$current 	= \Nino\Auth::getCurrentUser( $appData );
 			$canManage = \Nino\Auth::checkPermission( $appData, self::MANAGE_PERM );
 
+			$locked = \Nino\Auth::lockedAccounts( $appData );
+
 			$users = [];
 			foreach( $appData['/nino/auth/user'] ?? [] as $mail => $user ) {
 
 				if( $canManage === false && $mail !== $current['mail'] )
 					continue;
 
+				$lastLogin = is_array( $user ) === true ? \Nino\Auth::lastLogin( $user ) : 0;
+
 				$users[] = [
 					'mail' 		=> $mail,
 					'isSelf' 	=> $mail === $current['mail'],
 					'role' 		=> (string) ( $user['role'] ?? '' ),
+					'status' 	=> ( $user['status'] ?? 0 ) === \Nino\Auth::STATUS_ACTIVE ? 'active' : 'disabled',
+					'locked' 	=> isset( $locked[$mail] ) === true ? date( 'Y-m-d H:i', $locked[$mail] ) : '',
+					'lastLogin' => $lastLogin > 0 ? date( 'Y-m-d H:i', $lastLogin ) : '',
 					// The permissions the account holds beside its role - not
 					// editable here, but what tells a "no role" apart from a
 					// recovery-created account with full access of its own
@@ -323,7 +450,13 @@ namespace Nino\Modules\Users {
 		}
 
 		/**
-		 *	Update a user's mail and/or password
+		 *	Update a user's mail, password and - for a manager - role, in one
+		 *	save. Everything is checked before anything is written. The role
+		 *	counts only when it differs from the stored one: a manager who
+		 *	changes just the address of an account wider than their own role
+		 *	keeps being allowed to (a rename grants nothing, see below), and the
+		 *	checks of apiSetRole() - not your own, one that exists, not the last
+		 *	full access, not wider than yours - run for a change only
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
@@ -340,11 +473,17 @@ namespace Nino\Modules\Users {
 			$newUsername 	= trim( (string) ( $data['mail'] ?? '' ) );
 			$pw 					= (string) ( $data['pw'] ?? '' );
 			$currentPw 		= (string) ( $data['currentPassword'] ?? '' );
+			$postedRole 	= array_key_exists( 'role', $data ) === true ? $data['role'] : null;
 
 			[ $allowed, $isSelf ] = self::_authorize( $appData, $username );
 
 			if( $allowed === false ) {
 				\Nino\Http::fail( $request, 403, 'not allowed' );
+				return;
+			}
+
+			if( $postedRole !== null && is_string( $postedRole ) === false ) {
+				\Nino\Http::fail( $request, 400, 'unknown role', 'users_unknown_role', [], 'role' );
 				return;
 			}
 
@@ -384,14 +523,44 @@ namespace Nino\Modules\Users {
 				}
 			}
 
-			$result = \Nino\Auth::updateUser( $appData, $username, $newUsername, $pw );
+			// The role: only a real change is a change - and one only a manager
+			// may make, never on their own account
+			$stored			= \Nino\Auth::getUser( $appData, $username );
+			$roleChange	= $postedRole !== null && $stored !== false && $postedRole !== (string) ( $stored['role'] ?? '' );
 
-			if( $result === false ) {
-				\Nino\Http::fail( $request, 400, 'mail already in use', 'users_mail_in_use', [], 'mail' );
+			if( $roleChange === true ) {
+
+				if( \Nino\Auth::checkPermission( $appData, self::MANAGE_PERM ) === false ) {
+					\Nino\Http::fail( $request, 403, 'not allowed' );
+					return;
+				}
+
+				if( self::_refuseRoleChange( $appData, $request, $username, $postedRole ) === true )
+					return;
+			}
+
+			$mail = $username;
+
+			if( $newUsername !== $username || $pw !== '' ) {
+
+				$result = \Nino\Auth::updateUser( $appData, $username, $newUsername, $pw );
+
+				if( $result === false ) {
+					\Nino\Http::fail( $request, 400, 'mail already in use', 'users_mail_in_use', [], 'mail' );
+					return;
+				}
+
+				$mail = $result['mail'];
+			}
+
+			if( $roleChange === true && \Nino\Auth::setRole( $appData, $mail, $postedRole ) === false ) {
+				\Nino\Http::fail( $request, 500, 'could not save' );
 				return;
 			}
 
-			\Nino\Http::ok( $request, [ 'mail' => $result['mail'] ] );
+			$saved = \Nino\Auth::getUser( $appData, $mail );
+
+			\Nino\Http::ok( $request, [ 'mail' => $mail, 'role' => $saved === false ? '' : (string) ( $saved['role'] ?? '' ) ] );
 		}
 
 		/**
@@ -444,23 +613,105 @@ namespace Nino\Modules\Users {
 			$data 		= \Nino\Admin\Admin::postData();
 			$username = (string) ( $data['username'] ?? '' );
 			$role 		= (string) ( $data['role'] ?? '' );
-			$current 	= \Nino\Auth::getCurrentUser( $appData );
+
+			if( self::_refuseRoleChange( $appData, $request, $username, $role ) === true )
+				return;
+
+			if( \Nino\Auth::setRole( $appData, $username, $role ) === false ) {
+				\Nino\Http::fail( $request, 500, 'could not save' );
+				return;
+			}
+
+			\Nino\Http::ok( $request, [ 'role' => $role ] );
+		}
+
+		/**
+		 *	Switch an account on or off - manager-only, never your own (log out
+		 *	and ask another manager), and never the last active one holding
+		 *	full access, the same rule apiDelete() keeps: a project whose only
+		 *	full access cannot log in has only recovery.php to get back in.
+		 *	Disabling ends the account's sessions (see \Nino\Auth::setStatus())
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		&$request			(reference) Current server request
+		 *
+		 *	@return 	void
+		 */
+		public static function apiStatus( array &$appData, array &$request ): void {
+
+			if( \Nino\Admin\Admin::guardPerm( $appData, $request, self::MANAGE_PERM ) === false )
+				return;
+
+			$data 		= \Nino\Admin\Admin::postData();
+			$username = $data['username'] ?? null;
+			$active 	= $data['active'] ?? null;
+
+			if( is_string( $username ) === false || is_bool( $active ) === false ) {
+				\Nino\Http::fail( $request, 400, 'username and active are required' );
+				return;
+			}
+
+			$current = \Nino\Auth::getCurrentUser( $appData );
 
 			if( $current !== false && $current['mail'] === $username ) {
-				\Nino\Http::fail( $request, 400, 'cannot change your own role' );
+				\Nino\Http::fail( $request, 400, 'cannot change the status of your own account', 'users_status_self' );
 				return;
 			}
 
 			$user = \Nino\Auth::getUser( $appData, $username );
 
 			if( $user === false ) {
-				\Nino\Http::fail( $request, 404, 'unknown user' );
+				\Nino\Http::fail( $request, 404, 'unknown user', 'users_unknown' );
 				return;
+			}
+
+			if( $active === false && in_array( '/*', \Nino\Auth::permissions( $appData, $user ), true ) === true && Roles::fullAccessExists( $appData, $username ) === false ) {
+				\Nino\Http::fail( $request, 409, 'the last active account with full access cannot be deactivated', 'users_last_admin_status' );
+				return;
+			}
+
+			if( \Nino\Auth::setStatus( $appData, $username, $active ) === false ) {
+				\Nino\Http::fail( $request, 500, 'could not save' );
+				return;
+			}
+
+			\Nino\Http::ok( $request, [ 'status' => $active === true ? 'active' : 'disabled' ] );
+		}
+
+		/**
+		 *	Whether something stands in the way of giving $username the role
+		 *	$role - and if so, the response says what. Shared by apiSetRole()
+		 *	and apiSave(); the caller has checked MANAGE_PERM. Refused: your own
+		 *	account, an account or a role that does not exist, the last full
+		 *	access taken away, and a role wider than the signed-in account
+		 *	itself (see Roles::notHeld())
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		&$request			(reference) Current server request
+		 *	@param		string		$username			The account
+		 *	@param		string		$role					A role id, or '' for none
+		 *
+		 *	@return 	bool										True when the change is refused and the response set
+		 */
+		private static function _refuseRoleChange( array &$appData, array &$request, string $username, string $role ): bool {
+
+			$current = \Nino\Auth::getCurrentUser( $appData );
+
+			if( $current !== false && $current['mail'] === $username ) {
+				\Nino\Http::fail( $request, 400, 'cannot change your own role' );
+				return true;
+			}
+
+			$user = \Nino\Auth::getUser( $appData, $username );
+
+			if( $user === false ) {
+				\Nino\Http::fail( $request, 404, 'unknown user' );
+				return true;
 			}
 
 			if( $role !== '' && isset( Roles::all( $appData )[$role] ) === false ) {
 				\Nino\Http::fail( $request, 400, 'unknown role', 'users_unknown_role', [], 'role' );
-				return;
+				return true;
 			}
 
 			$next 				= $user;
@@ -470,7 +721,7 @@ namespace Nino\Modules\Users {
 				&& in_array( '/*', \Nino\Auth::permissions( $appData, $next ), true ) === false
 				&& Roles::fullAccessExists( $appData, $username ) === false ) {
 				\Nino\Http::fail( $request, 409, 'the last account with full access cannot lose it', 'users_last_admin_role' );
-				return;
+				return true;
 			}
 
 			// The same bound as on creating an account (see Roles::notHeld())
@@ -478,15 +729,10 @@ namespace Nino\Modules\Users {
 
 			if( $missing !== '' ) {
 				\Nino\Http::fail( $request, 403, 'cannot hand out a role holding a permission your own account does not: '. $missing, 'users_role_too_wide', [ $missing ], 'role' );
-				return;
+				return true;
 			}
 
-			if( \Nino\Auth::setRole( $appData, $username, $role ) === false ) {
-				\Nino\Http::fail( $request, 500, 'could not save' );
-				return;
-			}
-
-			\Nino\Http::ok( $request, [ 'role' => $role ] );
+			return false;
 		}
 
 		/**

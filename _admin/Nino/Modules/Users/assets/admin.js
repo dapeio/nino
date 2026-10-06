@@ -7,10 +7,13 @@
  *	admin.js								"Users" panel: change your own mail/password (with
  *													current-password confirmation), or - given the manage
  *													permission - anyone's, create accounts with a role,
- *													change which role an account holds (never your own)
- *													and delete accounts. What a role grants is the roles
- *													tab beside this one (roles.js); sessions/tries/status
- *													stay a developer-only, direct-json task.
+ *													change which role an account holds (never your own,
+ *													in the same save as the address and the password),
+ *													deactivate and activate accounts and delete them. The
+ *													list says which accounts are deactivated or locked and
+ *													when each logged in last. What a role grants is the
+ *													roles tab beside this one (roles.js), lifting a lock
+ *													the login protection tab (lockout.js).
  *
  *	@package								Dape/Nino
  *	@author									David Perchermeier <mail@dape.io>
@@ -25,11 +28,9 @@
 
 		_users				: [],
 		_currentUser	: null,
-		// The profile form's status line, and the role form's - see
-		// Nino.adminUi.status(). Drawn again with their forms, so always read
-		// from here rather than kept in a local
+		// The edit form's status line - see Nino.adminUi.status(). Drawn again
+		// with its form, so always read from here rather than kept in a local
 		_status				: null,
-		_roleStatus		: null,
 		// The open new-account form's save, set while that form is drawn: called
 		// with a function that is told how it ended
 		_create			: null,
@@ -253,9 +254,36 @@
 		},
 
 		/**
-		 *	Render the user list: every account with the role it holds
+		 *	What the list and the form say of an account beside its role, as
+		 *	words and never as colour alone: that it is deactivated, until when
+		 *	it is locked, and when it logged in last - or that it never did
 		 *
-		 *	@param		{Array}		users					[ { mail, isSelf, role, perms }, ... ]
+		 *	@param		{Object}	user					{ status, locked, lastLogin, ... }
+		 *
+		 *	@return		{Array}									Texts, in reading order
+		 */
+		_stateParts : function( user ) {
+
+			const parts = [];
+
+			if( user.status === 'disabled' )
+				parts.push( Nino.content.getText('/_admin/users/label/status-disabled') );
+
+			if( typeof user.locked === 'string' && user.locked !== '' )
+				parts.push( Nino.adminUi.format( Nino.content.getText('/_admin/users/label/locked-until'), user.locked ) );
+
+			parts.push( typeof user.lastLogin === 'string' && user.lastLogin !== ''
+				? Nino.adminUi.format( Nino.content.getText('/_admin/users/label/lastlogin'), user.lastLogin )
+				: Nino.content.getText('/_admin/users/label/never') );
+
+			return parts;
+		},
+
+		/**
+		 *	Render the user list: every account with the role it holds, whether
+		 *	it is deactivated or locked, and its last login
+		 *
+		 *	@param		{Array}		users					[ { mail, isSelf, role, perms, status, locked, lastLogin }, ... ]
 		 *
 		 *	@return		void
 		 */
@@ -276,7 +304,7 @@
 				const mail = dc.createElement('strong');
 				mail.textContent = user.mail + ( user.isSelf === true ? ' ('+ Nino.content.getText('/_admin/users/label/you')+ ')' : '' );
 				const role = dc.createElement('small');
-				role.textContent = Nino.admin.users._roleLabel( user );
+				role.textContent = [ Nino.admin.users._roleLabel( user ) ].concat( Nino.admin.users._stateParts( user ) ).join(' · ');
 				copy.appendChild( mail );
 				copy.appendChild( role );
 				link.appendChild( copy );
@@ -435,10 +463,12 @@
 		},
 
 		/**
-		 *	Render the edit form: mail, a new password (optional, leave blank
-		 *	to keep it unchanged), and - only when editing yourself - your
-		 *	current password to confirm the change. The role sits in its own
-		 *	fieldset below (see _renderRole)
+		 *	Render the edit form: mail, the role (a select for a manager editing
+		 *	somebody else, text for everyone else), a new password (optional,
+		 *	leave blank to keep it unchanged), and - only when editing yourself -
+		 *	your current password to confirm the change. One Save writes all of
+		 *	it. Beside it, for a manager and not on their own account, the button
+		 *	that deactivates or activates the account
 		 *
 		 *	@return		void
 		 */
@@ -467,6 +497,13 @@
 			usersWrap.appendChild( legend );
 			wrap.appendChild(usersWrap)
 
+			// Whether the account is deactivated or locked, and its last login
+			const state = dc.createElement('p');
+			state.id = 'users-form-state';
+			state.className = 'nino-admin-hint';
+			state.textContent = Nino.admin.users._stateParts( user ).join(' · ');
+			form.appendChild( state );
+
 			const mailLabel = dc.createElement('label');
 			mailLabel.className = 'nino-admin-field';
 			const mailSpan = dc.createElement('span');
@@ -480,6 +517,8 @@
 			mailInput.value = user.mail;
 			mailLabel.appendChild( mailInput );
 			form.appendChild( mailLabel );
+
+			form.appendChild( Nino.admin.users._roleField() );
 
 			const pwLabel = dc.createElement('label');
 			pwLabel.className = 'nino-admin-field';
@@ -526,6 +565,14 @@
 			actions.appendChild( logoutAllBtn );
 			// Never your own account: log out and let another manager do it
 			if( Nino.admin.users._canManage === true && user.isSelf !== true ) {
+
+				const statusBtn = dc.createElement('button');
+				statusBtn.type = 'button';
+				statusBtn.id = 'users-form-status-toggle';
+				statusBtn.textContent = Nino.content.getText( user.status === 'disabled' ? '/_admin/users/label/activate' : '/_admin/users/label/deactivate' );
+				statusBtn.addEventListener( 'click', function() { Nino.admin.users._toggleStatus() } );
+				actions.appendChild( statusBtn );
+
 				const delBtn = dc.createElement('button');
 				delBtn.type = 'button';
 				delBtn.className = 'nino-admin-btn-danger';
@@ -536,6 +583,7 @@
 
 			const msg = dc.createElement('p');
 			msg.id = 'users-form-msg';
+			msg.className = 'nino-admin-actionbar-status';
 			actions.appendChild( msg );
 
 			form.appendChild( actions );
@@ -547,18 +595,15 @@
 
 			usersWrap.appendChild( form );
 
-			wrap.appendChild( Nino.admin.users._renderRole() );
-
 			if( typeof Nino.admin.dirty === 'object' )
 				Nino.admin.dirty.snapshot( 'users' );
 		},
 
 		/**
-		 *	Take the account as it is stored for what is saved. The profile and
-		 *	the role save apart, and one saved while the other still holds a
-		 *	change must neither take that change for stored nor lose it: the
-		 *	baseline is the form with both halves at their stored values, and
-		 *	typing the other half back to them leaves the form clean
+		 *	Take the account as it is stored for what is saved: the baseline is
+		 *	the form with its fields at their stored values, and what was typed
+		 *	while the save was on its way is put back afterwards - it is not in
+		 *	what was sent, so the form stays unsaved for it
 		 *
 		 *	@return		void
 		 */
@@ -599,9 +644,9 @@
 
 		/**
 		 *	Save what the open form holds, whichever it is: a new account, or
-		 *	the profile and the role of an existing one, each only if it changed.
-		 *	What the shell's question about unsaved input saves through (see
-		 *	Nino.admin.dirty.guard())
+		 *	an existing one - address, password and role in one request, if any
+		 *	of them differs from what is stored. What the shell's question about
+		 *	unsaved input saves through (see Nino.admin.dirty.guard())
 		 *
 		 *	@param		{Function}	done				Called once with true when everything that changed was written, false otherwise
 		 *
@@ -613,58 +658,51 @@
 				return Nino.admin.users._create( done );
 
 			const user = Nino.admin.users._currentUser;
-			const role = dc.getElementById('users-form-role-select');
-			const steps = [];
 
-			if( dc.getElementById('users-form-mail').value.trim() !== user.mail || dc.getElementById('users-form-pw').value !== '' )
-				steps.push( function( next ) { Nino.admin.users._save( next ) } );
+			if( dc.getElementById('users-form-mail').value.trim() !== user.mail || dc.getElementById('users-form-pw').value !== '' || Nino.admin.users._roleChanged() === true )
+				return Nino.admin.users._save( done );
 
-			if( role !== null && role.value !== role.dataset.saved )
-				steps.push( function( next ) { Nino.admin.users._saveRole( role, next ) } );
+			// Nothing differed from what is stored (a blank around the mail, a
+			// field typed back): the form as it stands is what is saved
+			if( typeof Nino.admin.dirty === 'object' )
+				Nino.admin.dirty.snapshot( 'users' );
 
-			( function run( at ) {
-				if( at >= steps.length ) {
-					// Nothing differed from what is stored (a blank around the mail,
-					// a field typed back): the form as it stands is what is saved
-					if( steps.length === 0 && typeof Nino.admin.dirty === 'object' )
-						Nino.admin.dirty.snapshot( 'users' );
-					return done( true );
-				}
-				steps[at]( function( ok ) { return ok === true ? run( at + 1 ) : done( false ) } );
-			} )( 0 );
+			done( true );
 		},
 
 		/**
-		 *	The role fieldset under the profile form: which role the account
-		 *	holds, as a select a manager may change - never for their own
-		 *	account, same as the backend refuses (apiSetRole()): log out and
-		 *	ask another manager - and as plain text for everyone else. What a
-		 *	role grants is the roles tab beside this panel, not this form.
-		 *	Its own form with an in-flow actions row: the pinned action bar
-		 *	is the profile form's
+		 *	Whether the role select holds another role than the one stored.
+		 *	False where there is no select: for your own account, and for an
+		 *	account that is not a manager's to change
+		 *
+		 *	@return		{boolean}
+		 */
+		_roleChanged : function() {
+
+			const role = dc.getElementById('users-form-role-select');
+
+			return role !== null && role.value !== role.dataset.saved;
+		},
+
+		/**
+		 *	The role of the open account, as a field of the edit form: a select
+		 *	a manager may change - never for their own account, same as the
+		 *	backend refuses (see Users\Admin::apiSave()): log out and ask another
+		 *	manager - and as plain text for everyone else. What a role grants is
+		 *	the roles tab beside this panel, not this form
 		 *
 		 *	@return		{Element}
 		 */
-		_renderRole : function() {
+		_roleField : function() {
 
 			const user = Nino.admin.users._currentUser;
-
-			const wrap = dc.createElement('fieldset');
-			wrap.id = 'users-form-role';
-			const legend = dc.createElement('legend');
-			legend.textContent = Nino.content.getText('/_admin/users/label/role');
-			wrap.appendChild( legend );
 
 			if( Nino.admin.users._canManage !== true || user.isSelf === true ) {
 				const current = dc.createElement('p');
 				current.className = 'nino-admin-hint';
-				current.textContent = Nino.admin.users._roleLabel( user )+ ( Nino.admin.users._canManage === true ? ' – '+ Nino.content.getText('/_admin/users/label/role-self') : '' );
-				wrap.appendChild( current );
-				return wrap;
+				current.textContent = Nino.content.getText('/_admin/users/label/role')+ ': '+ Nino.admin.users._roleLabel( user )+ ( Nino.admin.users._canManage === true ? ' – '+ Nino.content.getText('/_admin/users/label/role-self') : '' );
+				return current;
 			}
-
-			const form = dc.createElement('form');
-			form.id = 'users-role-form';
 
 			const roleLabel = dc.createElement('label');
 			roleLabel.className = 'nino-admin-field';
@@ -675,68 +713,13 @@
 			// The role the account holds, to tell a change from what is stored
 			select.dataset.saved = select.value;
 			roleLabel.appendChild( select );
-			form.appendChild( roleLabel );
 
-			const actions = dc.createElement('div');
-			actions.className = 'admin-form-actions';
-
-			const saveBtn = dc.createElement('button');
-			saveBtn.type = 'submit';
-			saveBtn.textContent = Nino.content.getText('/_admin/users/label/save');
-			actions.appendChild( saveBtn );
-
-			const msg = dc.createElement('p');
-			msg.id = 'users-role-msg';
-			actions.appendChild( msg );
-
-			form.appendChild( actions );
-
-			// A line of its own: this form saves on its own, apart from the profile's
-			Nino.admin.users._roleStatus = Nino.adminUi.status( msg );
-			Nino.admin.users._roleStatus.bind( form );
-			form.addEventListener( 'submit', function( ev ) { ev.preventDefault(); Nino.admin.users._saveRole( select ) } );
-
-			wrap.appendChild( form );
-
-			return wrap;
+			return roleLabel;
 		},
 
 		/**
-		 *	Save the current user's role
-		 *
-		 *	@param		{Element}		select				The role select
-		 *	@param		{Function}	[done]				Called once with true when the role was written, false otherwise
-		 *
-		 *	@return		void
-		 */
-		_saveRole : function( select, done ) {
-
-			const user = Nino.admin.users._currentUser;
-			const line = Nino.admin.users._roleStatus;
-
-			line.saving();
-
-			Nino.admin.users._apiCall( 'role', { username : user.mail, role : select.value }, function( status, response ) {
-
-				if( status !== 200 ) {
-					line.error( status, response, '/_admin/users/error/save' );
-					if( typeof done === 'function' )
-						done( false );
-					return;
-				}
-
-				user.role = response.role;
-				select.dataset.saved = select.value;
-				line.saved();
-				Nino.admin.users._renderList( Nino.admin.users._users );
-				Nino.admin.users._snapshot();
-				if( typeof done === 'function' )
-					done( true );
-			} );
-		},
-
-		/**
-		 *	Save the current user's mail/password
+		 *	Save the current user's mail, password and - where it was changed -
+		 *	role, in one request
 		 *
 		 *	@param		{Function}	[done]				Called once with true when the account was written, false otherwise
 		 *
@@ -750,6 +733,13 @@
 			const line = Nino.admin.users._status;
 
 			const payload = { username : user.mail, mail : mail, pw : pw };
+
+			// Only a change is sent: a role posted unchanged would ask the
+			// server for the checks of a role change, which a manager editing
+			// just the address of a wider account must not meet
+			const role = dc.getElementById('users-form-role-select');
+			if( Nino.admin.users._roleChanged() === true )
+				payload.role = role.value;
 
 			if( user.isSelf === true )
 				payload.currentPassword = dc.getElementById('users-form-currentpw').value;
@@ -766,6 +756,17 @@
 				}
 
 				user.mail = response.mail;
+
+				if( typeof response.role === 'string' ) {
+					user.role = response.role;
+					// What the select shows is what counts as stored: a role id
+					// that is no longer in the config is not an option, and it
+					// would otherwise read as a change on the next save
+					if( role !== null ) {
+						role.value = response.role;
+						role.dataset.saved = role.value;
+					}
+				}
 
 				// The rail names the account the page is for - the api compares a
 				// session it finds later against it
@@ -788,9 +789,49 @@
 				Nino.admin.users._apiCall( 'list', {}, function( listStatus, listResponse ) {
 					if( listStatus === 200 && listResponse !== null ) {
 						Nino.admin.users._users = listResponse.users;
+						// The open account is the list's own entry again, so a change
+						// made to one (see _toggleStatus()) is the other's too
+						Nino.admin.users._currentUser = listResponse.users.find( function( u ) { return u.mail === user.mail } ) || user;
 						Nino.admin.users._renderList( listResponse.users );
 					}
 				} );
+			} );
+		},
+
+		/**
+		 *	Deactivate or activate the current user - a deactivation after
+		 *	confirmation, since it ends every session the account holds. The
+		 *	form keeps what was typed into it: only the button and the line
+		 *	about the account's state are drawn again
+		 *
+		 *	@return		void
+		 */
+		_toggleStatus : function() {
+
+			const user = Nino.admin.users._currentUser;
+			const active = user.status === 'disabled';
+
+			if( active === false && wn.confirm( Nino.content.getText('/_admin/users/confirm/deactivate') ) === false )
+				return;
+
+			const button = dc.getElementById('users-form-status-toggle');
+			button.disabled = true;
+
+			Nino.admin.users._apiCall( 'status', { username : user.mail, active : active }, function( status, response ) {
+
+				button.disabled = false;
+
+				if( status !== 200 || response === null ) {
+					Nino.admin.users._status.error( status, response, '/_admin/users/error/save' );
+					return;
+				}
+
+				user.status = response.status;
+
+				button.textContent = Nino.content.getText( active === true ? '/_admin/users/label/deactivate' : '/_admin/users/label/activate' );
+				dc.getElementById('users-form-state').textContent = Nino.admin.users._stateParts( user ).join(' · ');
+				Nino.admin.users._renderList( Nino.admin.users._users );
+				Nino.admin.users._status.idle( Nino.content.getText( active === true ? '/_admin/users/msg/activated' : '/_admin/users/msg/deactivated' ) );
 			} );
 		},
 

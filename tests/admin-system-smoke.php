@@ -1395,12 +1395,72 @@ check( 'Lockout::apiSave rejects an int above its maximum', $status === 400 );
 [ $status ] = callDev( $appData, \Nino\Modules\Users\Lockout::class, 'apiSave', [ 'fields' => [ '/nino/cache/ttl' => 60 ] ] );
 check( 'Lockout::apiSave knows its two keys and nothing else', $status === 400 );
 
+// The accounts locked out right now, and lifting one lock. The ip buckets are
+// not accounts: they stay out of the list and untouched by the lift
+$lockTries = static function( array $seed ) use ( &$appData ): void {
+	\Nino\Filesystem::mutate( $appData, '/data/auth-tries.php', static function( mixed $state ) use ( $seed ): array {
+		$state = is_array( $state ) ? $state : [];
+		foreach( $seed as $key => $value )
+			if( $value === null )
+				unset( $state[$key] );
+			else
+				$state[$key] = $value;
+		return $state;
+	} );
+};
+\Nino\Auth::insertUser( $appData, 'lockedone@example.com', 'correct horse battery staple' );
+\Nino\Auth::insertUser( $appData, 'lockedtwo@example.com', 'correct horse battery staple' );
+$lockTries( [ 'lockedtwo@example.com' => 0 - time() - 3600, 'lockedone@example.com' => 0 - time() - 7200, 'ip:203.0.113.9' => 0 - time() - 3600 ] );
+
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Users\Lockout::class, 'apiList' );
+check( 'Lockout::apiList carries the locked accounts, by mail, with the time the lock ends', $status === 200 && array_column( $body['locked'], 'mail' ) === [ 'lockedone@example.com', 'lockedtwo@example.com' ]
+	&& preg_match( '/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/', $body['locked'][0]['until'] ) === 1 && $body['locked'][0]['until'] > $body['locked'][1]['until'] );
+check( '...and no ip', str_contains( json_encode( $body['locked'] ), '203.0.113.9' ) === false );
+
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Users\Lockout::class, 'apiUnlock', [ 'username' => 'lockedone@example.com' ] );
+check( 'apiUnlock lifts the lock and answers with the accounts still locked', $status === 200 && array_column( $body['locked'], 'mail' ) === [ 'lockedtwo@example.com' ] );
+check( '...the right password logs the account in again, and the locked ip stays locked', ( \Nino\Filesystem::getFileContent( $appData, '/data/auth-tries.php', [] )['ip:203.0.113.9'] ?? 0 ) < 0
+	&& isset( \Nino\Filesystem::getFileContent( $appData, '/data/auth-tries.php', [] )['lockedone@example.com'] ) === false );
+check( '...and the activity log says so', \Nino\Modules\Users\Lockout::log( 'lockout/unlock', [ 'username' => 'lockedone@example.com' ] ) === 'Lift Lock lockedone@example.com'
+	&& \Nino\Modules\Users\Lockout::log( 'lockout/save', [] ) === 'Edit Login Protection' && \Nino\Modules\Users\Lockout::log( 'lockout/list', [] ) === '' );
+
+[ $status ] = callDev( $appData, \Nino\Modules\Users\Lockout::class, 'apiUnlock', [ 'username' => 'nobody-at-all@example.com' ] );
+check( 'apiUnlock 404s for an unknown mail', $status === 404 );
+[ $status ] = callDev( $appData, \Nino\Modules\Users\Lockout::class, 'apiUnlock', [ 'username' => [ 'lockedtwo@example.com' ] ] );
+check( '...and for a name that is not a string', $status === 404 );
+[ $status ] = callDev( $appData, \Nino\Modules\Users\Lockout::class, 'apiUnlock', [] );
+check( '...and for none', $status === 404 );
+
+// A tries file that cannot be written: the lock is still there and the answer says so
+$lockKey	= (string) ( new ReflectionMethod( '\Nino\Filesystem', '_canonicalPath' ) )->invokeArgs( null, [ &$appData, '/data/auth-tries.php' ] );
+$lockFile	= \Nino\Filesystem::path( $appData, '/data' ). '/.locks/'. sha1( $lockKey ). '.lock';
+unset( $appData['./nino/filesystem/locks'] );
+@unlink( $lockFile );
+@mkdir( $lockFile );
+[ $status ] = callDev( $appData, \Nino\Modules\Users\Lockout::class, 'apiUnlock', [ 'username' => 'lockedtwo@example.com' ] );
+@rmdir( $lockFile );
+unset( $appData['./nino/filesystem/locks'], $appData['./nino/filesystem/cache'] );
+check( 'apiUnlock answers 500 when the lock could not be lifted', $status === 500 && isset( \Nino\Auth::lockedAccounts( $appData )['lockedtwo@example.com'] ) === true );
+
+\Nino\Auth::insertUser( $appData, 'usersmanageonly@example.com', 'correct horse battery staple', [ \Nino\Modules\Users\Admin::MANAGE_PERM ] );
+\Nino\Auth::loginUser( $appData, 'usersmanageonly@example.com', 'correct horse battery staple' );
+[ $status ] = callDev( $appData, \Nino\Modules\Users\Lockout::class, 'apiUnlock', [ 'username' => 'lockedtwo@example.com' ] );
+check( 'apiUnlock is 403 for an account that holds users/manage but not the login protection permission', $status === 403 && isset( \Nino\Auth::lockedAccounts( $appData )['lockedtwo@example.com'] ) === true );
+\Nino\Auth::deleteUser( $appData, 'usersmanageonly@example.com' );
+\Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );
+
+$lockTries( [ 'ip:203.0.113.9' => null ] );
+\Nino\Auth::deleteUser( $appData, 'lockedone@example.com' );
+\Nino\Auth::deleteUser( $appData, 'lockedtwo@example.com' );
+
 [ $status ] = callDev( $appData, \Nino\Modules\Config\Admin::class, 'apiSave', [ 'fields' => [ '/nino/auth/maxtries' => 3 ] ] );
 check( 'and Config no longer writes them', $status === 400 && $appData['/nino/auth/maxtries'] === 8 );
 
 \Nino\Auth::logoutUser( $appData );
 [ $status ] = callDev( $appData, \Nino\Modules\Users\Lockout::class, 'apiSave', [ 'fields' => [ '/nino/auth/maxtries' => 3 ] ] );
 check( 'Lockout actions require an authed _admin session too', $status === 401 );
+[ $status ] = callDev( $appData, \Nino\Modules\Users\Lockout::class, 'apiUnlock', [ 'username' => 'dev@example.com' ] );
+check( '...apiUnlock too', $status === 401 );
 \Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );
 
 [ $status ] = callDev( $appData, \Nino\Modules\Config\Admin::class, 'apiSave', [ 'fields' => [ '/nino/modules' => [] ] ] );
@@ -4137,6 +4197,73 @@ check( '...and the refused key keeps its value', \Nino\Filesystem::getFileConten
 [ , $body ] = callDev( $appData, \Nino\Modules\Text\Admin::class, 'apiKeys' );
 $writableByKey = array_column( $body['keys'], 'writable', 'key' );
 check( 'apiKeys says per key whether the form may offer it', ( $writableByKey['/scoped/one'] ?? null ) === true && ( $writableByKey['/unscoped/one'] ?? null ) === false );
+
+// The tree the roles form picks from: what these two panels list is what
+// granting it does - nothing more, nothing less
+\Nino\Elements::insertElementType( $appData, '/spacetype', [
+	'title' => [ 'type' => 'string', 'locale' => false ],
+	'two words' => [ 'type' => 'string', 'locale' => false ],
+] );
+\Nino\Auth::insertUser( $appData, 'treeperm@example.com', 'correct horse battery staple', [] );
+
+$elementScope = \Nino\Modules\Elements\Admin::scopes( $appData )[0];
+$elementAreas = array_column( $elementScope['areas'], null, 'id' );
+check( 'Elements::scopes() lists a type as an area, with its title for a label', isset( $elementAreas['contenttype'] ) === true && $elementAreas['contenttype']['label'] === 'Content Type' && $elementScope['scope'] === \Nino\Modules\Elements\Admin::SCOPE && $elementScope['door'] === \Nino\Modules\Elements\Admin::MANAGE_PERM );
+check( '...with add, change (and each field) and delete as its actions', array_column( $elementAreas['contenttype']['actions'], 'id' ) === [ 'insert', 'update', 'delete' ]
+	&& array_column( $elementAreas['contenttype']['actions'][1]['fields'], 'id' ) === [ 'title', 'views' ] );
+check( '...a field whose name cannot be part of a permission is left out', array_column( $elementAreas['spacetype']['actions'][1]['fields'], 'id' ) === [ 'title' ] );
+
+$grants = static function( string $perm ) use ( &$appData ): array {
+	$appData['/nino/auth/user']['treeperm@example.com']['perms'] = [ \Nino\Modules\Elements\Admin::MANAGE_PERM, $perm ];
+	$appData['./nino/auth/current'] = \Nino\Auth::getUser( $appData, 'treeperm@example.com' );
+	return [
+		'insert' => \Nino\Modules\Elements\Admin::mayInsert( $appData, 'contenttype' ),
+		'delete' => \Nino\Modules\Elements\Admin::mayDelete( $appData, 'contenttype' ),
+		'title' 	=> \Nino\Modules\Elements\Admin::mayUpdate( $appData, 'contenttype', 'title' ),
+		'views' 	=> \Nino\Modules\Elements\Admin::mayUpdate( $appData, 'contenttype', 'views' ),
+		'other' 	=> \Nino\Modules\Elements\Admin::mayInsert( $appData, 'testtype' ),
+	];
+};
+
+$insert = $elementAreas['contenttype']['actions'][0]['perm'];
+$update = $elementAreas['contenttype']['actions'][1]['perm'];
+$delete = $elementAreas['contenttype']['actions'][2]['perm'];
+$title 	= $elementAreas['contenttype']['actions'][1]['fields'][0]['perm'];
+
+check( 'every permission the Elements tree lists is shaped like one', array_filter( array_merge( [ $elementScope['door'] ], array_column( $elementAreas['contenttype']['actions'], 'perm' ), array_column( $elementAreas['contenttype']['actions'][1]['fields'], 'perm' ), [ $elementAreas['contenttype']['perm'] ] ),
+	static fn( string $perm ): bool => preg_match( '#^/([A-Za-z0-9_.-]+|\*)(/([A-Za-z0-9_.-]+|\*))*$#', $perm ) !== 1 ) === [] );
+check( 'granting "add" lets an account add - and nothing else', $grants( $insert ) === [ 'insert' => true, 'delete' => false, 'title' => false, 'views' => false, 'other' => false ] );
+check( 'granting "delete" lets it delete - and nothing else', $grants( $delete ) === [ 'insert' => false, 'delete' => true, 'title' => false, 'views' => false, 'other' => false ] );
+check( 'granting "change" with all fields lets it change every field of the type', $grants( $update ) === [ 'insert' => false, 'delete' => false, 'title' => true, 'views' => true, 'other' => false ] );
+check( 'granting one field lets it change that field alone', $grants( $title ) === [ 'insert' => false, 'delete' => false, 'title' => true, 'views' => false, 'other' => false ] );
+check( 'granting the whole area is everything of that type and of no other', $grants( $elementAreas['contenttype']['perm'] ) === [ 'insert' => true, 'delete' => true, 'title' => true, 'views' => true, 'other' => false ] );
+
+// Text: groups by the first segment of a key, the keys by their path - and
+// never a value
+$textScope = \Nino\Modules\Text\Admin::scopes( $appData )[0];
+$textAreas = array_column( $textScope['areas'], null, 'id' );
+check( 'Text::scopes() lists the groups of the keys, one action each', isset( $textAreas['scoped'], $textAreas['unscoped'] ) === true && array_column( $textAreas['scoped']['actions'], 'id' ) === [ 'update' ]
+	&& $textScope['scope'] === \Nino\Modules\Text\Admin::SCOPE && $textScope['door'] === \Nino\Modules\Text\Admin::MANAGE_PERM );
+check( '...whose own permission is the group, and whose fields are the keys by their path', $textAreas['scoped']['actions'][0]['perm'] === '/_admin/text/update/scoped/*'
+	&& array_column( $textAreas['scoped']['actions'][0]['fields'], 'label' ) === [ '/scoped/one' ] && $textAreas['scoped']['actions'][0]['fields'][0]['perm'] === '/_admin/text/update/scoped/one' );
+check( '...without a single value', str_contains( json_encode( $textScope ), 'Eins' ) === false && str_contains( json_encode( $textScope ), 'Zwei' ) === false );
+
+$appData['/nino/auth/user']['treeperm@example.com']['perms'] = [ \Nino\Modules\Text\Admin::MANAGE_PERM, $textAreas['scoped']['actions'][0]['fields'][0]['perm'] ];
+$appData['./nino/auth/current'] = \Nino\Auth::getUser( $appData, 'treeperm@example.com' );
+check( 'granting a key lets an account change that key and not another', \Nino\Modules\Text\Admin::mayUpdate( $appData, '/scoped/one' ) === true && \Nino\Modules\Text\Admin::mayUpdate( $appData, '/unscoped/one' ) === false );
+$appData['/nino/auth/user']['treeperm@example.com']['perms'] = [ \Nino\Modules\Text\Admin::MANAGE_PERM, $textAreas['scoped']['actions'][0]['perm'] ];
+$appData['./nino/auth/current'] = \Nino\Auth::getUser( $appData, 'treeperm@example.com' );
+check( '...and granting the group every key of it', \Nino\Modules\Text\Admin::mayUpdate( $appData, '/scoped/one' ) === true && \Nino\Modules\Text\Admin::mayUpdate( $appData, '/unscoped/one' ) === false );
+
+// roles/list carries the tree; roles/save is what it was
+\Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Users\Roles::class, 'apiList' );
+check( 'roles/list carries the scopes beside the permission options', $status === 200 && array_column( $body['scopes'], 'scope' ) === [ '/_admin/elements/', '/_admin/text/' ] && is_array( $body['permOptions'] ) === true );
+[ $status ] = callDev( $appData, \Nino\Modules\Users\Roles::class, 'apiSave', [ 'id' => 'treerole', 'label' => 'Tree', 'perms' => [ \Nino\Modules\Elements\Admin::MANAGE_PERM, $update, $title ] ] );
+check( 'a role built from the tree is saved as before', $status === 200 && $appData['/nino/auth/roles']['treerole']['perms'] === [ \Nino\Modules\Elements\Admin::MANAGE_PERM, $update, $title ] );
+unset( $appData['/nino/auth/roles']['treerole'] );
+\Nino\Auth::deleteUser( $appData, 'treeperm@example.com' );
+@unlink( $sandbox. '/private/elements/spacetype.php' );
 
 \Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );
 \Nino\Auth::deleteUser( $appData, 'coarse@example.com' );

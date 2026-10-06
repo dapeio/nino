@@ -1885,9 +1885,59 @@ check( 'without a client ip there is no ip bucket at all', array_filter( array_k
 $seedTries( [ 'bucket@example.com' => null ] );
 \Nino\Auth::deleteUser( $appData, 'bucket@example.com' );
 
-// An account written by hand. The class says so itself: status, sessions and
-// perms are a developer-only, direct-json task - so a record that is a hash
-// and a permission list and nothing else is a thing a project has, and
+// Which accounts are locked out right now, and lifting one lock. Only the
+// account buckets are accounts: an ip bucket and a bucket whose account is
+// gone are never listed, and a lock that has run out is not one any more
+\Nino\Auth::insertUser( $appData, 'locked@example.com', 'correct horse battery staple' );
+$seedTries( [ 'ip:127.0.0.1' => null, 'locked@example.com' => null ] );
+
+for( $attempt = 0; $attempt < $appData['/nino/auth/maxtries']; $attempt++ )
+	\Nino\Auth::loginUser( $appData, 'locked@example.com', 'wrong' );
+
+$locked = \Nino\Auth::lockedAccounts( $appData );
+check( 'an account locked by maxtries failures is listed, until a time in the future', isset( $locked['locked@example.com'] ) === true && $locked['locked@example.com'] > time()
+	&& $locked['locked@example.com'] <= time() + $appData['/nino/auth/cooldown'] );
+check( '...and the right password no longer logs it in', \Nino\Auth::loginUser( $appData, 'locked@example.com', 'correct horse battery staple' ) === false );
+
+$seedTries( [ 'locked@example.com' => 0 - time() + 5, 'ip:127.0.0.1' => 0 - time() - 3600, 'ghost@example.com' => 0 - time() - 3600 ] );
+check( 'a lock that has run out is not listed', isset( \Nino\Auth::lockedAccounts( $appData )['locked@example.com'] ) === false );
+check( '...nor is an ip bucket, locked as it is', array_filter( array_keys( \Nino\Auth::lockedAccounts( $appData ) ), static fn( string $key ): bool => str_starts_with( $key, 'ip:' ) ) === [] );
+check( '...nor a locked bucket without an account', isset( \Nino\Auth::lockedAccounts( $appData )['ghost@example.com'] ) === false );
+check( 'a count that is no lock yet is not listed either', ( function() use ( $seedTries, &$appData ): bool {
+	$seedTries( [ 'locked@example.com' => 3 ] );
+	return \Nino\Auth::lockedAccounts( $appData ) === [];
+} )() === true );
+
+$seedTries( [ 'locked@example.com' => 0 - time() - 3600, 'ghost@example.com' => null ] );
+$ipBefore = $readTries( 'ip:127.0.0.1' );
+check( 'unlock clears the account\'s bucket', \Nino\Auth::unlock( $appData, 'locked@example.com' ) === true && $readTries( 'locked@example.com' ) === null
+	&& isset( \Nino\Auth::lockedAccounts( $appData )['locked@example.com'] ) === false );
+check( '...and leaves the locked ip as it was', $readTries( 'ip:127.0.0.1' ) === $ipBefore && $ipBefore < 0 );
+$seedTries( [ 'ip:127.0.0.1' => null ] );
+check( '...so the right password logs in again', is_array( \Nino\Auth::loginUser( $appData, 'locked@example.com', 'correct horse battery staple' ) ) === true );
+check( 'unlock of an account that is not locked is true and changes nothing', \Nino\Auth::unlock( $appData, 'locked@example.com' ) === true );
+check( 'unlock of an unknown account is false', \Nino\Auth::unlock( $appData, 'nobody-at-all@example.com' ) === false );
+
+// A tries file that cannot be locked: the lift did not happen and must not say
+// it did. A directory where the file's sidecar lock goes is that - the same
+// answer a read-only or full disk gives, without needing either
+$seedTries( [ 'locked@example.com' => 0 - time() - 3600 ] );
+$triesLockKey	= (string) ( new ReflectionMethod( '\Nino\Filesystem', '_canonicalPath' ) )->invokeArgs( null, [ &$appData, $triesFile ] );
+$triesLock		= \Nino\Filesystem::path( $appData, '/data' ). '/.locks/'. sha1( $triesLockKey ). '.lock';
+unset( $appData['./nino/filesystem/locks'] );
+@unlink( $triesLock );
+@mkdir( $triesLock );
+$blockedUnlock = \Nino\Auth::unlock( $appData, 'locked@example.com' );
+@rmdir( $triesLock );
+unset( $appData['./nino/filesystem/locks'], $appData['./nino/filesystem/cache'] );
+check( 'unlock is false when the tries file cannot be written', $blockedUnlock === false );
+check( '...and the lock is still there afterwards', $readTries( 'locked@example.com' ) < 0 );
+$seedTries( [ 'locked@example.com' => null ] );
+\Nino\Auth::deleteUser( $appData, 'locked@example.com' );
+
+// An account written by hand. Sessions and perms are a developer's direct-json
+// task, and status was until the workbench could set it - so a record that is
+// a hash and a permission list and nothing else is a thing a project has, and
 // reading a key that is not there is a warning this framework treats as
 // fatal: a 500 on the login form rather than a refusal
 $appData['/nino/auth/user']['handwritten@example.com'] = [ 'pw' => password_hash( 'correct horse battery staple', PASSWORD_DEFAULT ), 'perms' => [ '/*' ] ];
@@ -1922,6 +1972,49 @@ unset( $appData['./nino/auth/current'] );
 check( 'a disabled account is not resumed from that same token', \Nino\Auth::getCurrentUser( $appData ) === false );
 check( '...and the token is dropped rather than left to age out', \Nino\Auth::getUser( $appData, 'disabled@example.com' )['sessions'] === [] );
 \Nino\Auth::deleteUser( $appData, 'disabled@example.com' );
+
+// An account is switched off and on from the Users panel, and says when it
+// logged in last - in its own record, since a file of its own would be one
+// more thing a project keeps beside data/ (the catalogue's Hello test holds
+// data/ to the one file a feature writes)
+\Nino\Auth::insertUser( $appData, 'switch@example.com', 'correct horse battery staple' );
+check( 'a new account has never logged in', \Nino\Auth::lastLogin( \Nino\Auth::getUser( $appData, 'switch@example.com' ) ) === 0 );
+
+$beforeLogin = time();
+\Nino\Auth::loginUser( $appData, 'switch@example.com', 'correct horse battery staple' );
+$switchRecord = \Nino\Auth::getUser( $appData, 'switch@example.com' );
+check( 'a login stores the time on the account record', is_int( $switchRecord['lastLogin'] ?? null ) === true && $switchRecord['lastLogin'] >= $beforeLogin && $switchRecord['lastLogin'] <= time() );
+check( '...which lastLogin() reads', \Nino\Auth::lastLogin( $switchRecord ) === $switchRecord['lastLogin'] );
+check( '...in the record, not in a file of its own', array_filter( array_map( 'basename', glob( \Nino\Filesystem::path( $appData, '/data' ). '/*' ) ?: [] ), static fn( string $file ): bool => str_contains( $file, 'login' ) ) === [] );
+
+$legacy = [ 'sessions' => [ 'old' => [ 'time' => 1000, 'ip' => 'x' ], 'newer' => [ 'time' => 5000, 'ip' => 'y' ], 'broken' => 'not a session' ] ];
+check( 'lastLogin() falls back to the newest session for a record without the field', \Nino\Auth::lastLogin( $legacy ) === 5000 );
+check( '...takes the later of the field and the sessions', \Nino\Auth::lastLogin( $legacy + [ 'lastLogin' => 9000 ] ) === 9000 && \Nino\Auth::lastLogin( $legacy + [ 'lastLogin' => 100 ] ) === 5000 );
+check( '...and is 0 for a record with neither, or with junk in their place', \Nino\Auth::lastLogin( [] ) === 0 && \Nino\Auth::lastLogin( [ 'lastLogin' => 'yesterday', 'sessions' => 'none' ] ) === 0 );
+
+$updates = [];
+\Nino\Callbacks::registerCallback( $appData, '/nino/auth/user/update', static function( array &$appData, array &$user ) use ( &$updates ): void { $updates[] = $user['mail']. ':'. $user['status']; } );
+
+check( 'setStatus of an unknown account is false', \Nino\Auth::setStatus( $appData, 'nobody-at-all@example.com', false ) === false );
+check( 'setStatus(false) disables the account', \Nino\Auth::setStatus( $appData, 'switch@example.com', false ) === true && \Nino\Auth::getUser( $appData, 'switch@example.com' )['status'] === \Nino\Auth::STATUS_DISABLED );
+check( '...ends its sessions, the one this request holds included', \Nino\Auth::getUser( $appData, 'switch@example.com' )['sessions'] === [] && \Nino\Auth::getCurrentUser( $appData ) === false );
+check( '...and keeps its last login', \Nino\Auth::lastLogin( \Nino\Auth::getUser( $appData, 'switch@example.com' ) ) === $switchRecord['lastLogin'] );
+check( '...tells /nino/auth/user/update', $updates === [ 'switch@example.com:0' ] );
+check( 'a disabled account is refused at the login', \Nino\Auth::loginUser( $appData, 'switch@example.com', 'correct horse battery staple' ) === false );
+check( 'setStatus(true) lets it in again', \Nino\Auth::setStatus( $appData, 'switch@example.com', true ) === true && is_array( \Nino\Auth::loginUser( $appData, 'switch@example.com', 'correct horse battery staple' ) ) === true
+	&& $updates === [ 'switch@example.com:0', 'switch@example.com:2' ] );
+
+// A session resumed on a later request is dropped once the account is off
+unset( $appData['./nino/auth/current'] );
+\Nino\Auth::init( $appData );
+check( 'a session of the account is resumed while it is active', ( \Nino\Auth::getCurrentUser( $appData )['mail'] ?? null ) === 'switch@example.com' );
+\Nino\Auth::setStatus( $appData, 'switch@example.com', false );
+unset( $appData['./nino/auth/current'] );
+\Nino\Auth::init( $appData );
+check( '...and not once setStatus(false) has run', \Nino\Auth::getCurrentUser( $appData ) === false );
+
+unset( $appData['/nino/callbacks']['/nino/auth/user/update'] );
+\Nino\Auth::deleteUser( $appData, 'switch@example.com' );
 
 echo "\n";
 
@@ -2270,6 +2363,61 @@ $deleter['./nino/auth/baseline'] = $deleter['/nino/auth/user'] ?? [];
 unset( $deleter['/nino/auth/user']['brandnew@example.com'] );
 \Nino\AppData::writeContentData( $deleter, [ '/nino/auth/user' ] );
 check( 'a deleted account is not carried back in from the file', isset( $accounts()['brandnew@example.com'] ) === false );
+
+/*	A login writes its session and the time it happened into the account's own
+	record. The time is not a change of the record - or a login finishing
+	after an administrator had switched the account off would write the status
+	it booted with back over that, and one finishing before would lose its
+	timestamp to the administrator's copy. Both orders, with two copies booted
+	from the same file	*/
+\Nino\Auth::insertUser( $appData, 'merge@example.com', 'correct horse battery staple' );
+
+$loginAt		= 1790000000;
+$record 		= function() use ( $accounts ): array { return $accounts()['merge@example.com'] ?? []; };
+$bootBoth		= function() use ( $buildAppData ): array {
+	$admin = $buildAppData();
+	$login = $buildAppData();
+	foreach( [ &$admin, &$login ] as &$booted )
+		$booted['./nino/auth/baseline'] = $booted['/nino/auth/user'] ?? [];
+	unset( $booted );
+	return [ $admin, $login ];
+};
+$doLogin		= function( array &$booted, string $token ) use ( $loginAt ): void {
+	$booted['/nino/auth/user']['merge@example.com']['lastLogin'] = $loginAt;
+	$booted['/nino/auth/user']['merge@example.com']['sessions'][$token] = [ 'time' => $loginAt, 'ip' => '10.0.0.9' ];
+	\Nino\AppData::writeContentData( $booted, [ '/nino/auth/user' ] );
+};
+
+// The administrator first, the login finishing after
+[ $adminCopy, $loginCopy ] = $bootBoth();
+\Nino\Auth::setStatus( $adminCopy, 'merge@example.com', false );
+$doLogin( $loginCopy, 'tokenLate' );
+check( 'a login finishing after a deactivation does not bring the account back', ( $record()['status'] ?? null ) === \Nino\Auth::STATUS_DISABLED );
+check( '...and keeps its own login time', ( $record()['lastLogin'] ?? null ) === $loginAt );
+
+// The login first, the administrator's older copy writing after
+\Nino\Auth::setStatus( $appData, 'merge@example.com', true );
+[ $adminCopy, $loginCopy ] = $bootBoth();
+$doLogin( $loginCopy, 'tokenEarly' );
+\Nino\Auth::setStatus( $adminCopy, 'merge@example.com', false );
+check( 'a deactivation written after a login keeps the login time', ( $record()['status'] ?? null ) === \Nino\Auth::STATUS_DISABLED && ( $record()['lastLogin'] ?? null ) === $loginAt );
+check( '...and ends the session that login opened, as a revocation does', ( $record()['sessions'] ?? null ) === [] );
+
+// A password an administrator changed is not undone by a login in parallel
+\Nino\Auth::setStatus( $appData, 'merge@example.com', true );
+[ $adminCopy, $loginCopy ] = $bootBoth();
+\Nino\Auth::updateUser( $adminCopy, 'merge@example.com', 'merge@example.com', 'the administrator chose this one' );
+$doLogin( $loginCopy, 'tokenParallel' );
+check( 'an administrator\'s password change is not undone by a parallel login', password_verify( 'the administrator chose this one', (string) ( $record()['pw'] ?? '' ) ) === true );
+check( '...and the login keeps its time', ( $record()['lastLogin'] ?? null ) === $loginAt );
+
+// The later of two times wins, whichever copy holds it
+[ $adminCopy, $loginCopy ] = $bootBoth();
+$adminCopy['/nino/auth/user']['merge@example.com']['lastLogin'] = $loginAt - 500;
+$adminCopy['/nino/auth/user']['merge@example.com']['role'] = '';
+\Nino\AppData::writeContentData( $adminCopy, [ '/nino/auth/user' ] );
+check( 'a record written with an older login time does not turn the clock back', ( $record()['lastLogin'] ?? null ) === $loginAt );
+\Nino\Auth::deleteUser( $appData, 'merge@example.com' );
 
 // Regression: mutate()'s return value used to be silently discarded here -
 // a failed config.php write (disk full, permission denied, ...) had no

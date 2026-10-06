@@ -452,6 +452,88 @@ All notable changes to Nino are documented in this file.
   the malformed entries (907 → 915 checks); `tests/admin-system-smoke.php` the offer,
   the exclusions, the three keys and the live array.
 
+- **Auth:** `Auth::lockedAccounts( &$appData )` answers `[ mail => timestamp the
+  lock ends ]` for every account whose bucket in `data/auth-tries.php` holds a
+  lock still running - the ip buckets and a bucket whose account is gone are not
+  listed - and `Auth::unlock( &$appData, $username )` removes that one account's
+  bucket and nothing else, a locked client address included. It answers `false`
+  for an unknown account and when the file could not be locked or written (a
+  `Filesystem::mutate()` that finds nothing to remove is a lift that is already
+  done, and true). `tests/kernel-smoke.php` holds the list (an elapsed lock, an ip
+  bucket, a bucket without an account, a plain count), the lift, the ip left as it
+  was, the unknown account and a lock that cannot be taken (915 → 951 checks
+  together with the two entries below).
+
+- **Auth:** `Auth::setStatus( &$appData, $username, $active )` switches an
+  account on or off, `Auth::STATUS_ACTIVE` (2) and `Auth::STATUS_DISABLED` (0)
+  name the two values the code used as literals. Disabling ends every session of
+  the account, with the revocation `updateUser()` and `logoutAllSessions()` make,
+  and the request's own if it is that account's; both ways fire
+  `/nino/auth/user/update` like `updateUser()`. A login stores its time in the
+  account's own record as `lastLogin`, and `Auth::lastLogin( $user )` reads it -
+  or the newest session of a record without the field - as a timestamp, `0` when
+  the account never logged in. The time is not a file of its own: the
+  catalogue's Hello test holds `data/` to the one file a feature writes. The
+  merge in `AppData::writeContentData()` leaves it out of what makes a record
+  "changed by this request" (`_sessionless()`) and keeps the later of the two
+  times, so a login finishing after an administrator's change no longer writes
+  the status it booted with over it - a deactivation came back as active, and in
+  the other order the login time was lost - and an administrator's password
+  change is not undone by a login in parallel. Both orders are in
+  `tests/kernel-smoke.php` and red without the merge change.
+
+- **Workbench, Users:** the list says more of an account. Beside its role it
+  names, as words and not by colour, *Deactivated*, *locked until …* and *Last
+  login: …* - or *Never logged in*. A manager **deactivates** an account from its
+  form, after a question, and activates it again (`users/status`, `Auth::setStatus()`):
+  never their own, and never the last active account with full access - a
+  deactivated account does not count as one (`Roles::fullAccessExists()` looks at
+  active accounts only), so the guards of delete, role change and the Roles
+  tab's own save protect the last account that can log in. The Login protection
+  tab lists **Locked accounts**, with the time each lock ends and a **Lift lock**
+  button (`lockout/unlock`, `Auth::unlock()`); the lift redraws only that
+  fieldset and leaves a number typed into the form above it alone. A locked
+  address is not an account and is not listed. `tests/admin-users-js-smoke.js`
+  (new, 24 checks) holds the list texts, the one-save request and the button,
+  `tests/admin-lockout-js-smoke.js` (new, 19) the list, the lift that keeps a
+  typed number, a refusal that keeps the row and a list without any `data-key`;
+  `tests/admin-smoke.php` the list's new fields, `users/status` with its refusals
+  and the one save (359 → 403 checks), `tests/admin-system-smoke.php` the
+  Lockout tab's list and lift (842 → 869 together with the entry below).
+
+- **Workbench, Roles:** a finer permission is picked, not typed. Under the
+  picker, three lists that depend on each other - **Area**, **Action** and, for an
+  action with fields, **Field** - and **Add permission**; the only strings the
+  button can add are ones the panels list. A panel lists them with the new
+  optional `scopes( &$appData )` of the panel contract - a tree of `{ scope,
+  door, label, areas: [ { id, label, perm?, actions: [ { id, label, perm,
+  fields?: [ { id, label, perm } ] } ] } ] }` - and
+  `Users\Admin::scopeOptions()` asks the registry's classes for it and keeps only
+  what is shaped like a permission (`Roles::isPermShape()`) and lies below its
+  scope. `Elements\Admin::scopes()` offers each type with *add*, *change* (and
+  each field) and *delete*; a field whose name cannot be part of a permission - a
+  space, an umlaut - is left out and stays under the type's blanket.
+  `Text\Admin::scopes()` offers each group and each key by its path, never a value.
+  `roles/list` carries the tree as `scopes`. A permission a role holds that the
+  tree lists is named by its place in it; one it does not stays under *Not
+  offered*. Adding the first finer permission of a panel asks first - from then on
+  the panel allows only what the role names - and so does taking the last one
+  away with its ✕, which puts the panel back to everything (No keeps it); a line
+  under the picker names the panels a role has that for. A summary, *This role may …*, says in words
+  what the role does: full access, the areas it opens, what it may do in a panel
+  in detail, a panel with single permissions that is not opened (the door is
+  missing) and what nothing explains, by its string. The pure helpers
+  `Nino.admin.roles.covers()`, `scopeState()` and `summarize()` port
+  `Auth::checkPermission()` and `Admin::isScoped()`. The four `custom-*` fills and
+  the `.admin-perm-add` rules of the typed field are gone, as is the
+  `.admin-form-actions` row of the old role form.
+  `tests/admin-roles-js-smoke.js` (new, 51 checks) holds the helpers, the
+  transition warning in and out, that the lists only reach permissions of the tree and the
+  summary's cases; `tests/admin-smoke.php` the tree's shape rules with a panel
+  that offers a malformed one, `tests/admin-system-smoke.php` that granting each
+  permission of the Elements and Text trees allows exactly that action, field or
+  key.
+
 ### Changed
 
 - **Workbench:** what the panels print for a failure. A failure with a code is
@@ -646,6 +728,25 @@ All notable changes to Nino are documented in this file.
   the order, the dense priorities, the refusals and the rename (the old assign/move/unassign checks are rewritten as saves with
   entries).
 
+- **Workbench, Users:** an account has one Save. Address, password and role are
+  one `users/save` (`role` is optional) and one button; the separate role form
+  and its second status line are gone, and `users/role` stays for callers that
+  use it. Everything is checked before anything is written. The role counts only
+  when it differs from the stored one: it needs the manage permission, is refused
+  for your own account and runs the checks of `users/role` (an existing role, not
+  the last full access, not wider than the signed-in account) - so a manager
+  without full access who changes only the address of a Developer account keeps
+  being allowed to, as a rename grants nothing. `users/save` answers `{ mail,
+  role }`, and an unchanged account is not written. The activity log's line for
+  `users/save` names a posted role. The panel's comments no longer call the status
+  a developer-only, direct-JSON task.
+
+- **Workbench, Roles:** only an active account counts as the last full access.
+  `Roles::fullAccessExists()` skips an account whose `status` is not
+  `Auth::STATUS_ACTIVE`, so deleting, deactivating or taking the role from the
+  last account that can log in is refused even where a disabled account holds
+  full access on paper.
+
 ### Fixed
 
 - **Workbench, Elements:** a required field is marked and a refused save says
@@ -795,6 +896,10 @@ All notable changes to Nino are documented in this file.
   `tests/admin-system-smoke.php` the links as `href="#<panel>"`.
 
 ### Removed
+
+- **The typed permission field of the Roles form** and its four `custom-*`
+  text fills, with the `.admin-perm-add` rules: a finer permission is picked
+  from the panels' tree now (see Added).
 
 - **The THATSNINO logo and the photograph `demo.jpg`.** The base unit no longer
   ships `images/logo.png` and `images/logo-invert.png` and, with no file left,

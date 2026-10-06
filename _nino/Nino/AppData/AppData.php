@@ -357,8 +357,20 @@ namespace Nino {
 		// memory was deliberately removed and stays removed. $revoked
 		// (mail => true) overrides the "keep what we never saw" rule for a
 		// request that means to end every session - a password change or
-		// "log out everywhere" (Auth::updateUser()/logoutAllSessions()) must
-		// not resurrect a token a parallel login created in the meantime.
+		// "log out everywhere" (Auth::updateUser()/logoutAllSessions()/
+		// setStatus()) must not resurrect a token a parallel login created in
+		// the meantime.
+		//
+		// 'lastLogin' is the one field a login writes beside its session, and
+		// it is merged like the sessions rather than compared like the rest:
+		// it does not count as a change of the record (see _sessionless()), so
+		// a login running in parallel with an administrator's change - a
+		// deactivation, a new role - neither brings the account back to the
+		// state it booted with nor loses its own timestamp. The later of the
+		// two is kept, whichever record won. One window stays: a login that
+		// rehashes the password (password_needs_rehash) does change the record,
+		// so it writes its boot-time status over a deactivation that landed in
+		// the same moment.
 		private static function _mergeAuthUsers( array $baseline, array $onDisk, array $inMemory, array $revoked = [] ): array {
 
 			$merged = [];
@@ -395,21 +407,32 @@ namespace Nino {
 				if( is_array( $record ) === true && is_array( $sessions ) === true )
 					$record['sessions'] = $sessions;
 
+				if( is_array( $record ) === true ) {
+
+					$lastLogin = max(
+						is_int( $user['lastLogin'] ?? null ) === true ? $user['lastLogin'] : 0,
+						is_int( $disk['lastLogin'] ?? null ) === true ? $disk['lastLogin'] : 0
+					);
+
+					if( $lastLogin > 0 )
+						$record['lastLogin'] = $lastLogin;
+				}
+
 				$merged[$mail] = $record;
 			}
 
 			return $merged;
 		}
 
-		// One account record without its sessions - what "did this request
-		// change this account?" is decided on, since the sessions are merged
-		// separately either way
+		// One account record without its sessions and its last login - what
+		// "did this request change this account?" is decided on, since both
+		// are merged separately either way
 		private static function _sessionless( mixed $user ): mixed {
 
 			if( is_array( $user ) === false )
 				return $user;
 
-			unset( $user['sessions'] );
+			unset( $user['sessions'], $user['lastLogin'] );
 
 			return $user;
 		}

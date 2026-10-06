@@ -24,7 +24,13 @@ namespace Nino\Modules\Users {
 	 *											'min'/'max' are not cosmetic: a maxtries of 0 locks every
 	 *											account out permanently on the first failed attempt, and a
 	 *											cooldown of 0 removes the throttle entirely - both are
-	 *											reachable by typing a plausible-looking number
+	 *											reachable by typing a plausible-looking number.
+	 *											Below the numbers sit the accounts locked right now,
+	 *											each with a button that lifts its lock (see
+	 *											\Nino\Auth::lockedAccounts() and unlock()): somebody
+	 *											who mistyped five times need not wait out the cooldown.
+	 *											A locked client address is no account and is not
+	 *											listed - it still has to run out
 	 *
 	 *	@package					Dape/Nino
 	 *	@author						David Perchermeier <mail@dape.io>
@@ -65,6 +71,7 @@ namespace Nino\Modules\Users {
 			return [
 				'lockout/list' => [ self::class, 'apiList' ],
 				'lockout/save' => [ self::class, 'apiSave' ],
+				'lockout/unlock' => [ self::class, 'apiUnlock' ],
 			];
 		}
 
@@ -92,13 +99,18 @@ namespace Nino\Modules\Users {
 		}
 
 		public static function log( string $action, array $data ): string {
-			return $action === 'lockout/save' ? 'Edit Login Protection' : '';
+			return match( $action ) {
+				'lockout/save' 		=> 'Edit Login Protection',
+				'lockout/unlock' 	=> 'Lift Lock '. ( $data['username'] ?? '' ),
+				default 					=> '',
+			};
 		}
 
 		/**
 		 *	Both settings with their current value and the schema the form
-		 *	renders them with. Read from config.php fresh rather than from
-		 *	$appData, for the same reason \Nino\Modules\Config\Admin::apiList() does
+		 *	renders them with, and the accounts locked right now. Read from
+		 *	config.php fresh rather than from $appData, for the same reason
+		 *	\Nino\Modules\Config\Admin::apiList() does
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
@@ -119,7 +131,37 @@ namespace Nino\Modules\Users {
 					'value'	=> array_key_exists( $key, $stored ) === true ? $stored[$key] : self::DEFAULTS[$key],
 				];
 
-			\Nino\Http::ok( $request, [ 'fields' => $fields ] );
+			\Nino\Http::ok( $request, [ 'fields' => $fields, 'locked' => self::_locked( $appData ) ] );
+		}
+
+		/**
+		 *	Lift one account's lock - the account's counter starts from zero
+		 *	again. Answers with the accounts still locked, so the tab shows
+		 *	what the server now holds without rebuilding the number form
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		&$request			(reference) Current server request
+		 *
+		 *	@return 	void
+		 */
+		public static function apiUnlock( array &$appData, array &$request ): void {
+
+			if( \Nino\Admin\Admin::guardPerm( $appData, $request, self::MANAGE_PERM ) === false )
+				return;
+
+			$username = \Nino\Admin\Admin::postData()['username'] ?? null;
+
+			if( is_string( $username ) === false || \Nino\Auth::getUser( $appData, $username ) === false ) {
+				\Nino\Http::fail( $request, 404, 'unknown user', 'users_unknown' );
+				return;
+			}
+
+			if( \Nino\Auth::unlock( $appData, $username ) === false ) {
+				\Nino\Http::fail( $request, 500, 'could not lift the lock' );
+				return;
+			}
+
+			\Nino\Http::ok( $request, [ 'locked' => self::_locked( $appData ) ] );
 		}
 
 		/**
@@ -171,6 +213,25 @@ namespace Nino\Modules\Users {
 			\Nino\AppData::writeContentData( $appData, array_keys( $clean ) );
 
 			\Nino\Http::ok( $request, [ 'saved' => array_keys( $clean ) ] );
+		}
+
+		/**
+		 *	The accounts locked out right now, by mail
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	array										[ { mail, until }, ... ] - until as 'Y-m-d H:i'
+		 */
+		private static function _locked( array &$appData ): array {
+
+			$locked = \Nino\Auth::lockedAccounts( $appData );
+			ksort( $locked, SORT_STRING );
+
+			$rows = [];
+			foreach( $locked as $mail => $until )
+				$rows[] = [ 'mail' => (string) $mail, 'until' => date( 'Y-m-d H:i', $until ) ];
+
+			return $rows;
 		}
 	}
 }

@@ -187,6 +187,46 @@ namespace Nino\Modules\Text {
 		}
 
 		/**
+		 *	The scoped permissions this panel knows, as the tree the roles
+		 *	form picks from (see \Nino\Modules\Users\Admin::scopeOptions()): per
+		 *	group - the first segment of a key - one action, "change values",
+		 *	whose own permission is the whole group and whose fields are the
+		 *	group's keys, each by its key path. The values themselves are
+		 *	never part of it
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	array										[ { scope, door, label, areas } ] - see docs/recipes/admin-panel.md
+		 */
+		public static function scopes( array &$appData ): array {
+
+			$groups = [];
+
+			foreach( \Nino\Text::entries( $appData, false ) as $entry ) {
+
+				$parts = array_values( array_filter( explode( '/', $entry['key'] ) ) );
+
+				if( $parts === [] )
+					continue;
+
+				$groups[$parts[0]][] = [ 'id' => $entry['key'], 'label' => $entry['key'], 'perm' => self::UPDATE_PERM. $entry['key'] ];
+			}
+
+			ksort( $groups, SORT_STRING );
+
+			$areas = [];
+
+			foreach( $groups as $group => $fields )
+				$areas[] = [
+					'id' 			=> (string) $group,
+					'label' 	=> '/'. $group,
+					'actions' => [ [ 'id' => 'update', 'label' => '/_admin/text/scope/update', 'perm' => self::UPDATE_PERM. '/'. $group. '/*', 'fields' => $fields ] ],
+				];
+
+			return [ [ 'scope' => self::SCOPE, 'door' => self::MANAGE_PERM, 'label' => '/_admin/nav/text', 'areas' => $areas ] ];
+		}
+
+		/**
 		 *	Whether this account may change one key's value - see SCOPE
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data

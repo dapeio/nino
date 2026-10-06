@@ -4,13 +4,13 @@
  *	Nino										A compact filesystembased php framework
  *	Modules\Users			Accounts, roles and login protection
  *	admin.css								What the module's /_admin panel needs beyond the design
- *													system in _admin/assets/style.css: the in-flow button row
- *													of the role form, and the hand-typed permission field
- *													under the picker. Bundled while the module is there (see
- *													the panel's assets()), so the same layer rules apply -
- *													the shell's stylesheet fixes the layer order, this one
- *													only ever adds to nino.tool, and every selector in it
- *													starts at one of the panel's own ids (asserted by
+ *													system in _admin/assets/style.css: the three lists that
+ *													add a finer permission to a role, and the summary of
+ *													what the role may do. Bundled while the module is there
+ *													(see the panel's assets()), so the same layer rules
+ *													apply - the shell's stylesheet fixes the layer order,
+ *													this one only ever adds to nino.tool, and every selector
+ *													in it starts at one of the panel's own ids (asserted by
  *													tests/admin-lists-js-smoke.js).
  *
  *	@package								Dape/Nino
@@ -20,37 +20,32 @@
 
 @layer nino.tool {
 
-/* -------------------------------------------------------------------- Form */
+/* -------------------------------------------- Adding a finer permission ---- */
 
-/*	An in-flow row of form buttons, for a form that has no pinned bottom bar of
- *	its own (the role form inside a user's screen). A form that owns the
- *	screen uses the shared pinned action bar instead. */
-#users-role-form .admin-form-actions {
+/* Under the picker, in the same box: area, action and field are three lists
+   that depend on each other, and the button that adds what they stand on.
+   Each list takes the room it needs, the button stays its own size */
+#roles-form-permissions .admin-perm-scope {
 	display: flex;
 	flex-wrap: wrap;
-	align-items: center;
+	align-items: flex-end;
 	gap: .5rem;
-	margin: .75rem 0 0;
+	margin-top: .5rem;
 }
 
-/* ------------------------------------ Typing a permission by hand ---- */
+#roles-form-permissions .admin-perm-scope > label {
+	flex: 1 1 12rem;
+}
 
-/* Under the picker, in the same box: the finer permissions are a path per
-   action and field, so there is no list to offer and they are typed. The
-   field takes the room, the button stays its own size */
-#roles-form-permissions .admin-perm-add {
-	display: flex;
-	flex-wrap: wrap;
-	align-items: center;
-	gap: .5rem;
+/* ---------------------------------------------- What the role may do ---- */
+
+#roles-permissions-summary {
 	margin-top: .75rem;
 }
 
-#roles-form-permissions .admin-perm-add > input[type="text"] {
-	flex: 1 1 16rem;
-	width: auto;
-	font-family: var(--nino-admin-mono);
-	font-size: .78rem;
+#roles-permissions-summary > ul {
+	margin: 0;
+	padding-left: 1.2rem;
 }
 
 }

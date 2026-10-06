@@ -10,9 +10,12 @@
  *													and the permissions themselves in the shared
  *													multi-reference picker - every one a panel or tab
  *													offers right now, plus every one this installation
- *													holds without a panel behind it. Manager-only, same
- *													gate the backend enforces independently (see
- *													Roles/Roles.php beside it).
+ *													holds without a panel behind it. The finer ones, per
+ *													action and field, are added with three dependent
+ *													lists out of the tree the panels offer (scopes()),
+ *													and a summary says in plain words what the role may
+ *													do. Manager-only, same gate the backend enforces
+ *													independently (see Roles/Roles.php beside it).
  *
  *	@package								Dape/Nino
  *	@author									David Perchermeier <mail@dape.io>
@@ -27,6 +30,8 @@
 
 		_roles				: [],
 		_permOptions	: [],
+		// The scoped permissions the panels offer - see Users\Admin::scopeOptions()
+		_scopes				: [],
 		// The role on the form, null while a new one is being made
 		_current			: null,
 		// The controls the form's save reads, as _renderForm() made them
@@ -57,6 +62,7 @@
 
 				Nino.admin.roles._roles = response.roles;
 				Nino.admin.roles._permOptions = response.permOptions;
+				Nino.admin.roles._scopes = response.scopes || [];
 				Nino.admin.roles._renderList();
 				Nino.admin.roles._ready = true;
 
@@ -367,7 +373,8 @@
 		 *	all of them at once ('/*'), and below it the permissions themselves
 		 *	as the shared multi-reference picker (Nino.adminUi.elementList) -
 		 *	the chosen ones together at the top with a ✕ each, everything else
-		 *	behind one search field.
+		 *	behind one search field. Then the finer permissions, added with
+		 *	three dependent lists, and a summary of what the role may do.
 		 *
 		 *	A checkbox per permission was the first shape and does not survive
 		 *	the number: the list is one entry per panel and tab of every active
@@ -381,13 +388,19 @@
 		 *	offering right now included - see \Nino\Modules\Users\Admin::permOptions().
 		 *	Those carry the "other" group name instead of a panel label, so a
 		 *	permission from a switched-off module is visible, keepable and
-		 *	removable rather than silently dropped on the next save.
+		 *	removable rather than silently dropped on the next save. A scoped
+		 *	permission the panels list (see _treeLabels()) is named by its place
+		 *	in the tree instead.
 		 *
 		 *	@param		{Array}		perms					The role's current permissions
 		 *
 		 *	@return		{Object}								{ fieldset, fullCheck, perms() }
 		 */
 		_renderPermissions : function( perms ) {
+
+			const roles = Nino.admin.roles;
+			const scopes = roles._scopes;
+			const tree = roles._treeLabels( scopes );
 
 			const hasFullAccess = perms.indexOf('/*') !== -1;
 
@@ -415,13 +428,14 @@
 
 			const options = [];
 			GROUPS.forEach( function( group ) {
-				Nino.admin.roles._permOptions.filter( function( option ) { return option.group === group } ).forEach( function( option ) {
+				roles._permOptions.filter( function( option ) { return option.group === group } ).forEach( function( option ) {
 					options.push( {
 						value : option.perm,
-						// A fill key or literal text a module's panel chose, and
-						// the bare permission string for one no panel offers
-						// (see Users::permOptions())
-						label : Nino.admin.roles._groupName( group )+ ' · '+ Nino.adminUi.text( option.label ),
+						// A scoped permission by its place in the tree; otherwise a
+						// fill key or literal text a module's panel chose, and the bare
+						// permission string for one no panel offers (see
+						// Users::permOptions())
+						label : tree[option.perm] !== undefined ? tree[option.perm] : roles._groupName( group )+ ' · '+ Nino.adminUi.text( option.label ),
 					} );
 				} );
 			} );
@@ -430,20 +444,38 @@
 			// switch above, never a row in here
 			let chosen = perms.filter( function( perm ) { return perm !== '/*' } );
 
-			// Permissions typed in below. The picker is rebuilt from its
-			// options each time one arrives, so they have to outlive it
-			const typed = [];
-
+			// What the picker offers: the options, and whatever was added from
+			// the tree since. The picker is rebuilt from its options each time
+			// one arrives, so they have to be rebuilt with it
 			function permOptions() {
 
 				const list = options.slice();
 
-				typed.forEach( function( perm ) {
+				chosen.forEach( function( perm ) {
 					if( list.some( function( option ) { return option.value === perm } ) === false )
-						list.push( { value : perm, label : Nino.admin.roles._groupName('other')+ ' · '+ perm } );
+						list.push( { value : perm, label : tree[perm] !== undefined ? tree[perm] : roles._groupName('other')+ ' · '+ perm } );
 				} );
 
 				return list;
+			}
+
+			// The ✕ of the picker. Taking the last single permission of a panel
+			// away puts the panel back to everything - the transition addScoped()
+			// asks about, the other way round. On No the picker is drawn again
+			// from what the role holds, as the ✕ has already taken the row out
+			function removed( value ) {
+
+				const before = roles.scopeState( chosen, scopes );
+				const after = roles.scopeState( value, scopes );
+				const leaving = scopes.filter( function( scope ) { return before[scope.scope] === true && after[scope.scope] !== true } );
+
+				if( leaving.length > 0 && wn.confirm( Nino.adminUi.format( Nino.content.getText('/_admin/roles/scope/warning-leave'), Nino.adminUi.text( leaving[0].label ) ) ) === false ) {
+					rebuildPicker();
+					return;
+				}
+
+				chosen = value;
+				refresh();
 			}
 
 			function buildPicker() {
@@ -462,89 +494,157 @@
 						remove 		: Nino.content.getText('/_admin/common/label/remove'),
 						add 			: Nino.content.getText('/_admin/common/label/add'),
 					},
-					onChange 	: function( value ) { chosen = value },
+					onChange 	: removed,
 				} );
 			}
 
 			let picker = buildPicker();
 			fieldset.appendChild( picker );
 
-			// The scoped permissions (see \Nino\Admin\Admin::scoped()) are a
-			// path per action and per field - '/_admin/elements/services/update/
-			// title', '/_admin/text/update/page-home/*'. There is no finite list
-			// of them to offer: it grows with every type, field and text key a
-			// project has. So they are typed rather than picked, and once added
-			// they sit in the same list as everything else - removable with the
-			// same ✕, and offered again next time by permOptions() server-side,
-			// which lists every permission a role already holds
-			const addRow = dc.createElement('div');
-			addRow.className = 'admin-perm-add';
-
-			const addInput = dc.createElement('input');
-			addInput.type = 'text';
-			addInput.id = 'roles-permissions-custom';
-			addInput.autocomplete = 'off';
-			addInput.placeholder = Nino.content.getText('/_admin/roles/perms/custom-placeholder');
-			addRow.appendChild( addInput );
-
-			const addBtn = dc.createElement('button');
-			addBtn.type = 'button';
-			addBtn.className = 'nino-admin-btn-secondary';
-			addBtn.textContent = Nino.content.getText('/_admin/common/label/add');
-			addRow.appendChild( addBtn );
-
-			fieldset.appendChild( addRow );
-
-			const addHint = dc.createElement('p');
-			addHint.className = 'nino-admin-hint';
-			addHint.setAttribute( 'aria-live', 'polite' );
-			addHint.textContent = Nino.content.getText('/_admin/roles/perms/custom-hint');
-			fieldset.appendChild( addHint );
-
-			function addTypedPerm() {
-
-				const perm = addInput.value.trim();
-
-				if( perm === '' )
-					return;
-
-				// Full access is the switch at the top of this fieldset, and
-				// only that switch - a '/*' row would say the same thing in a
-				// second place, where turning it off again means finding it
-				if( perm === '/*' ) {
-					addHint.textContent = Nino.content.getText('/_admin/roles/perms/custom-full');
-					return;
-				}
-
-				if( Nino.admin.roles._isValidPerm( perm ) === false ) {
-					addHint.textContent = Nino.content.getText('/_admin/roles/perms/custom-invalid');
-					return;
-				}
-
-				addInput.value = '';
-				addHint.textContent = Nino.content.getText('/_admin/roles/perms/custom-hint');
-
-				if( typed.indexOf( perm ) === -1 )
-					typed.push( perm );
-
-				if( chosen.indexOf( perm ) === -1 )
-					chosen = chosen.concat( [ perm ] );
-
+			function rebuildPicker() {
 				const rebuilt = buildPicker();
 				picker.replaceWith( rebuilt );
 				picker = rebuilt;
 				applyFullAccess();
 			}
 
-			addBtn.addEventListener( 'click', addTypedPerm );
-			// Enter in a text input submits the form it sits in - here that
-			// would save the role instead of adding the permission just typed
-			addInput.addEventListener( 'keydown', function( ev ) {
-				if( ev.key !== 'Enter' )
+			// The finer permissions (see \Nino\Admin\Admin::scoped()) are a path
+			// per action and per field. The panels list them (scopes()), so they
+			// are picked - area, then action, then field - and never typed: the
+			// only strings the Add button can produce are ones out of the tree.
+			// Once added they sit in the same list as everything else, removable
+			// with the same ✕. A project panel that lists none cannot give a
+			// role a new one from here; the ones a role holds stay visible
+			const scopeBox = dc.createElement('div');
+			scopeBox.id = 'roles-permissions-scoped';
+
+			const scopeHint = dc.createElement('p');
+			scopeHint.className = 'nino-admin-hint';
+			scopeHint.textContent = Nino.content.getText('/_admin/roles/scope/hint');
+			scopeBox.appendChild( scopeHint );
+
+			const picks = dc.createElement('div');
+			picks.className = 'admin-perm-scope';
+			scopeBox.appendChild( picks );
+
+			const entries = roles._areaList( scopes );
+			let pick = { area : 0, action : 0, field : 0 };
+
+			function selectOf( field ) {
+				return field.querySelector('select');
+			}
+
+			// focus : the list the person just used, which is drawn again with the
+			// ones that depend on it - and keeps the keyboard where it was
+			function drawPicks( focus ) {
+
+				picks.innerHTML = '';
+
+				const entry = entries[pick.area];
+				const actions = roles._actionList( entry );
+				const action = actions[pick.action];
+				const fields = roles._fieldList( action );
+
+				const fieldOf = function( key, label, list, index, onChange ) {
+
+					const field = Nino.adminUi.selectField( {
+						key 			: key,
+						label 		: label,
+						options 	: list.map( function( item, at ) { return { value : at, label : item.label } } ),
+						value 		: index,
+						onChange 	: function( value ) { onChange( parseInt( value, 10 ) ) },
+					} );
+
+					// Choosing where to add something is not an edit of the role
+					selectOf( field ).dataset.dirty = 'ignore';
+
+					return field;
+				};
+
+				picks.appendChild( fieldOf( 'scope-area', Nino.content.getText('/_admin/roles/scope/area'), entries.map( function( item ) {
+					return { label : Nino.adminUi.text( item.scope.label )+ ' · '+ item.area.label };
+				} ), pick.area, function( value ) { pick = { area : value, action : 0, field : 0 }; drawPicks('scope-area') } ) );
+
+				picks.appendChild( fieldOf( 'scope-action', Nino.content.getText('/_admin/roles/scope/action'), actions, pick.action, function( value ) {
+					pick = { area : pick.area, action : value, field : 0 };
+					drawPicks('scope-action');
+				} ) );
+
+				if( fields.length > 0 )
+					picks.appendChild( fieldOf( 'scope-field', Nino.content.getText('/_admin/roles/scope/field'), fields, pick.field, function( value ) { pick.field = value } ) );
+
+				const addBtn = dc.createElement('button');
+				addBtn.type = 'button';
+				addBtn.className = 'nino-admin-btn-secondary';
+				addBtn.textContent = Nino.content.getText('/_admin/roles/scope/add');
+				addBtn.addEventListener( 'click', function() { addScoped( roles._permFor( entries, pick ) ) } );
+				picks.appendChild( addBtn );
+
+				const used = typeof focus === 'string' ? picks.querySelector( '[data-key="'+ focus+ '"]' ) : null;
+				if( used !== null )
+					used.focus();
+			}
+
+			if( entries.length > 0 ) {
+				drawPicks();
+				fieldset.appendChild( scopeBox );
+			}
+
+			// A panel in detail mode allows what the role names and nothing
+			// else - which is the one thing about these permissions that
+			// surprises: say which panels the role has that for already
+			const detailHint = dc.createElement('p');
+			detailHint.className = 'nino-admin-hint';
+			detailHint.setAttribute( 'aria-live', 'polite' );
+			fieldset.appendChild( detailHint );
+
+			const summary = dc.createElement('div');
+			summary.id = 'roles-permissions-summary';
+			const summaryTitle = dc.createElement('p');
+			summaryTitle.className = 'nino-admin-hint';
+			summary.appendChild( summaryTitle );
+			const summaryList = dc.createElement('ul');
+			summaryList.setAttribute( 'aria-live', 'polite' );
+			summary.appendChild( summaryList );
+			fieldset.appendChild( summary );
+
+			function addScoped( perm ) {
+
+				// Only what the tree lists, and only once
+				if( perm === '' || chosen.indexOf( perm ) !== -1 )
 					return;
-				ev.preventDefault();
-				addTypedPerm();
-			} );
+
+				// Adding the first single permission of a panel changes what the
+				// role may do there from everything to what it names
+				const before = roles.scopeState( chosen, scopes );
+				const after = roles.scopeState( chosen.concat( [ perm ] ), scopes );
+				const entering = scopes.filter( function( scope ) { return before[scope.scope] !== true && after[scope.scope] === true } );
+
+				if( entering.length > 0 && wn.confirm( Nino.adminUi.format( Nino.content.getText('/_admin/roles/scope/warning'), Nino.adminUi.text( entering[0].label ) ) ) === false )
+					return;
+
+				chosen = chosen.concat( [ perm ] );
+				rebuildPicker();
+			}
+
+			// What the role may do, in words, and which panels are in detail mode
+			function refresh() {
+
+				const state = roles.scopeState( chosen, scopes );
+				const detail = scopes.filter( function( scope ) { return state[scope.scope] === true } ).map( function( scope ) { return Nino.adminUi.text( scope.label ) } );
+
+				detailHint.textContent = detail.length === 0 ? '' : Nino.adminUi.format( Nino.content.getText('/_admin/roles/scope/detail-hint'), detail.join(', ') );
+				detailHint.classList.toggle( 'admin-hidden', detail.length === 0 || fullCheck.checked );
+
+				summaryTitle.textContent = Nino.content.getText('/_admin/roles/summary/title');
+				summaryList.innerHTML = '';
+
+				roles.summarize( fullCheck.checked ? [ '/*' ] : chosen, roles._permOptions, scopes ).forEach( function( line ) {
+					const item = dc.createElement('li');
+					item.textContent = line;
+					summaryList.appendChild( item );
+				} );
+			}
 
 			// Full access is every permission there is, so picking single ones
 			// beside it would say something the save does not do. The picker
@@ -557,9 +657,9 @@
 
 			function applyFullAccess() {
 				picker.classList.toggle( 'admin-hidden', fullCheck.checked );
-				addRow.classList.toggle( 'admin-hidden', fullCheck.checked );
-				addHint.classList.toggle( 'admin-hidden', fullCheck.checked );
+				scopeBox.classList.toggle( 'admin-hidden', fullCheck.checked );
 				fullHint.classList.toggle( 'admin-hidden', fullCheck.checked === false );
+				refresh();
 			}
 
 			fullCheck.addEventListener( 'change', applyFullAccess );
@@ -569,19 +669,282 @@
 		},
 
 		/**
-		 *	Whether a typed permission is shaped like one: slash-separated
-		 *	segments of letters, digits, '_', '-' and '.', with '*' allowed as
-		 *	a whole segment - the wildcard \Nino\Auth::checkPermission() reads
-		 *	as "and everything below". Nothing here says the permission exists;
-		 *	it says the string is one a check could ever match, which is the
-		 *	only thing this form can know
+		 *	Whether a permission string is held: the way \Nino\Auth::checkPermission()
+		 *	reads a list - the string itself, or '<ancestor>/*' for any of its
+		 *	ancestors, '/*' being the last. No DOM, so the rule can be checked
+		 *	against the PHP one
 		 *
-		 *	@param		{string}	perm
+		 *	@param		{Array}		perms					The permissions held
+		 *	@param		{string}	perm					The one asked about
 		 *
 		 *	@return		{boolean}
 		 */
-		_isValidPerm : function( perm ) {
-			return /^\/([A-Za-z0-9_.-]+|\*)(\/([A-Za-z0-9_.-]+|\*))*$/.test( perm );
+		covers : function( perms, perm ) {
+
+			if( perms.indexOf( perm ) !== -1 )
+				return true;
+
+			while( perm !== '' ) {
+
+				const at = perm.lastIndexOf('/');
+				if( at === -1 )
+					return false;
+
+				perm = perm.slice( 0, at );
+
+				if( perms.indexOf( perm+ '/*' ) !== -1 )
+					return true;
+			}
+
+			return false;
+		},
+
+		/**
+		 *	Which panels the permissions put in detail mode - \Nino\Admin\Admin::isScoped()'s
+		 *	rule: a permission below the panel's scope that is neither the
+		 *	blanket ('*') nor just one segment (the door) names a single action,
+		 *	and from then on the panel allows what the role names
+		 *
+		 *	@param		{Array}		perms					The permissions held
+		 *	@param		{Array}		scopes				The tree the panels offer
+		 *
+		 *	@return		{Object}								{ <scope prefix> : boolean }
+		 */
+		scopeState : function( perms, scopes ) {
+
+			const state = {};
+
+			scopes.forEach( function( scope ) {
+				state[scope.scope] = perms.some( function( held ) {
+
+					if( held.indexOf( scope.scope ) !== 0 )
+						return false;
+
+					const rest = held.slice( scope.scope.length );
+
+					return rest !== '*' && rest.indexOf('/') !== -1;
+				} );
+			} );
+
+			return state;
+		},
+
+		/**
+		 *	Every scoped permission the tree lists, by the place it has in it:
+		 *	panel, area, action and field, one after the other. What a
+		 *	permission the role holds is called in the picker
+		 *
+		 *	@param		{Array}		scopes				The tree the panels offer
+		 *
+		 *	@return		{Object}								{ permission : label }
+		 */
+		_treeLabels : function( scopes ) {
+
+			const labels = {};
+
+			scopes.forEach( function( scope ) {
+
+				const panel = Nino.adminUi.text( scope.label );
+
+				scope.areas.forEach( function( area ) {
+
+					const base = panel+ ' · '+ area.label;
+
+					if( typeof area.perm === 'string' && labels[area.perm] === undefined )
+						labels[area.perm] = base+ ' · '+ Nino.content.getText('/_admin/roles/scope/everything');
+
+					area.actions.forEach( function( action ) {
+
+						const name = base+ ' · '+ Nino.adminUi.text( action.label );
+						const fields = action.fields || [];
+
+						if( labels[action.perm] === undefined )
+							labels[action.perm] = fields.length > 0 ? name+ ' · '+ Nino.content.getText('/_admin/roles/scope/all-fields') : name;
+
+						fields.forEach( function( field ) {
+							if( labels[field.perm] === undefined )
+								labels[field.perm] = name+ ' · '+ field.label;
+						} );
+					} );
+				} );
+			} );
+
+			return labels;
+		},
+
+		/**
+		 *	The areas of every scope as one flat list, in the order the panels
+		 *	gave them - what the first of the three lists offers
+		 *
+		 *	@param		{Array}		scopes
+		 *
+		 *	@return		{Array}									[ { scope, area } ]
+		 */
+		_areaList : function( scopes ) {
+
+			const list = [];
+
+			scopes.forEach( function( scope ) {
+				scope.areas.forEach( function( area ) { list.push( { scope : scope, area : area } ) } );
+			} );
+
+			return list;
+		},
+
+		/**
+		 *	What the second list offers for an area: 'everything in this area'
+		 *	where the area has a permission of its own, then its actions. The
+		 *	first one has no action (action : null) - it stands for the area
+		 *
+		 *	@param		{Object}	entry					An entry of _areaList()
+		 *
+		 *	@return		{Array}									[ { label, action } ]
+		 */
+		_actionList : function( entry ) {
+
+			const list = [];
+
+			if( typeof entry.area.perm === 'string' )
+				list.push( { label : Nino.content.getText('/_admin/roles/scope/everything'), action : null } );
+
+			entry.area.actions.forEach( function( action ) {
+				list.push( { label : Nino.adminUi.text( action.label ), action : action } );
+			} );
+
+			return list;
+		},
+
+		/**
+		 *	What the third list offers for an action: 'all fields' - the
+		 *	action's own permission - and each field. Nothing for an action
+		 *	without fields, or for 'everything in this area'
+		 *
+		 *	@param		{Object}	item					An entry of _actionList()
+		 *
+		 *	@return		{Array}									[ { label, field } ], empty when there is no third list
+		 */
+		_fieldList : function( item ) {
+
+			if( item === undefined || item.action === null || Array.isArray( item.action.fields ) === false || item.action.fields.length === 0 )
+				return [];
+
+			return [ { label : Nino.content.getText('/_admin/roles/scope/all-fields'), field : null } ].concat( item.action.fields.map( function( field ) {
+				return { label : field.label, field : field };
+			} ) );
+		},
+
+		/**
+		 *	The permission the three lists stand on - always one the tree
+		 *	lists, never built from anything typed
+		 *
+		 *	@param		{Array}		entries				_areaList()
+		 *	@param		{Object}	pick					{ area, action, field } - the index in each list
+		 *
+		 *	@return		{string}								'' when the lists stand on nothing
+		 */
+		_permFor : function( entries, pick ) {
+
+			const entry = entries[pick.area];
+			if( entry === undefined )
+				return '';
+
+			const item = Nino.admin.roles._actionList( entry )[pick.action];
+			if( item === undefined )
+				return '';
+
+			if( item.action === null )
+				return entry.area.perm;
+
+			const field = Nino.admin.roles._fieldList( item )[pick.field];
+
+			return field !== undefined && field.field !== null ? field.field.perm : item.action.perm;
+		},
+
+		/**
+		 *	What a role may do, as lines to read after "This role may …". The
+		 *	whole of it: full access; the areas its permissions open; per panel
+		 *	in detail mode what it allows there; a panel it holds single
+		 *	permissions for but does not open; and every permission nothing
+		 *	explains, by its string. No DOM
+		 *
+		 *	@param		{Array}		perms					The permissions held ('/*' alone for full access)
+		 *	@param		{Array}		permOptions		What the panels offer - { perm, label, offered }
+		 *	@param		{Array}		scopes				The tree the panels offer
+		 *
+		 *	@return		{Array}									Lines of text, at least one
+		 */
+		summarize : function( perms, permOptions, scopes ) {
+
+			const roles = Nino.admin.roles;
+			const say = function( key, ...params ) { return Nino.adminUi.format( Nino.content.getText( key ), ...params ) };
+
+			if( perms.indexOf('/*') !== -1 )
+				return [ say('/_admin/roles/summary/full') ];
+
+			const lines = [];
+			const state = roles.scopeState( perms, scopes );
+			const tree = roles._treeLabels( scopes );
+			const offered = permOptions.filter( function( option ) { return option.offered === true } );
+
+			const doors = offered.filter( function( option ) { return roles.covers( perms, option.perm ) } ).map( function( option ) { return Nino.adminUi.text( option.label ) } );
+
+			if( doors.length > 0 )
+				lines.push( say( '/_admin/roles/summary/doors', doors.join(', ') ) );
+
+			scopes.forEach( function( scope ) {
+
+				if( state[scope.scope] !== true )
+					return;
+
+				const panel = Nino.adminUi.text( scope.label );
+				const allowed = [];
+
+				scope.areas.forEach( function( area ) {
+
+					if( typeof area.perm === 'string' && roles.covers( perms, area.perm ) === true ) {
+						allowed.push( say( '/_admin/roles/summary/area', area.label ) );
+						return;
+					}
+
+					area.actions.forEach( function( action ) {
+
+						const name = Nino.adminUi.text( action.label );
+
+						if( roles.covers( perms, action.perm ) === true ) {
+							allowed.push( say( '/_admin/roles/summary/action', area.label, name ) );
+							return;
+						}
+
+						const fields = ( action.fields || [] ).filter( function( field ) { return roles.covers( perms, field.perm ) } ).map( function( field ) { return field.label } );
+
+						if( fields.length > 0 )
+							allowed.push( say( '/_admin/roles/summary/fields', area.label, name, fields.join(', ') ) );
+					} );
+				} );
+
+				if( allowed.length > 0 )
+					lines.push( say( '/_admin/roles/summary/detail', panel, allowed.join('; ') ) );
+
+				// Single permissions without the door: the panel stays shut
+				if( roles.covers( perms, scope.door ) === false )
+					lines.push( say( '/_admin/roles/summary/nodoor', panel, scope.door ) );
+			} );
+
+			// What nothing above explains: not a door, not in the tree, and not
+			// a wildcard over either
+			perms.forEach( function( perm ) {
+
+				const wildcard = perm.slice( -2 ) === '/*';
+				const known = offered.some( function( option ) { return option.perm === perm } )
+					|| tree[perm] !== undefined
+					|| ( wildcard === true && ( offered.some( function( option ) { return roles.covers( [ perm ], option.perm ) } )
+						|| scopes.some( function( scope ) { return perm.indexOf( scope.scope ) === 0 } ) ) );
+
+				if( known === false )
+					lines.push( say( '/_admin/roles/summary/unknown', perm ) );
+			} );
+
+			return lines.length > 0 ? lines : [ say('/_admin/roles/summary/none') ];
 		},
 
 		/**
@@ -643,6 +1006,7 @@
 					}
 					Nino.admin.roles._roles = listResponse.roles;
 					Nino.admin.roles._permOptions = listResponse.permOptions;
+					Nino.admin.roles._scopes = listResponse.scopes || [];
 					Nino.admin.roles._renderList();
 					Nino.admin.roles._openRole( response.id );
 					dc.getElementById('roles-form-msg').textContent = Nino.content.getText('/_admin/roles/msg/saved');

@@ -429,7 +429,7 @@ check( 'every selector a module stylesheet adds starts at one of the panel\'s ow
 // used to do; the component is the design system's, so every list screen and
 // every module panel renders the same thing
 const emptyStateScripts = [ [ 'Elements', 'types.js' ], [ 'Text', 'keys.js' ], [ 'Images', 'slots.js' ], [ 'Routes', 'admin.js' ],
-	[ 'Users', 'roles.js' ], [ 'Backups', 'admin.js' ], [ 'Logs', 'admin.js' ], [ 'Dashboard', 'admin.js' ] ].map( e => adminAsset( e[0], e[1] ) )
+	[ 'Users', 'roles.js' ], [ 'Users', 'lockout.js' ], [ 'Backups', 'admin.js' ], [ 'Logs', 'admin.js' ], [ 'Dashboard', 'admin.js' ] ].map( e => adminAsset( e[0], e[1] ) )
 	.concat( [ 'Navigation', 'Form' ].map( m => moduleAsset( m, 'admin.js' ) ) )
 	.concat( FEATURES.map( m => moduleAsset( m, 'admin.js' ) ) );
 check( 'the empty state is one shared component with a class of its own',
@@ -442,13 +442,17 @@ check( 'the user and role forms expose real labels and live status text',
 	usersSource.includes("mailLabel.className = 'nino-admin-field'") &&
 	usersSource.includes("pwLabel.className = 'nino-admin-field'") &&
 	usersSource.includes("roleLabel.className = 'nino-admin-field'") &&
-	// Each of the three forms says whether it is saved through the shared status line
-	usersSource.split("Nino.adminUi.status( msg )").length >= 4 );
+	// Each of the two forms says whether it is saved through the shared status line
+	usersSource.split("Nino.adminUi.status( msg )").length >= 3 );
 // What a role grants is the roles tab's business: the user form only says
-// which role an account holds, through the one action the backend offers
-check( 'Users hands out roles and no longer edits permissions of its own',
-	usersSource.includes( "_apiCall( 'role'" ) && usersSource.includes( '_renderRole' ) &&
+// which role an account holds - and it is one form with one Save, address,
+// password and role together, not a second form beside it
+check( 'Users hands out roles in its one edit form and no longer edits permissions of its own',
+	usersSource.includes( "_apiCall( 'role'" ) === false && usersSource.includes( '_renderRole' ) === false && usersSource.includes( "'users-role-form'" ) === false &&
+	usersSource.includes( "'users-form-role-select'" ) && usersSource.includes( "form.appendChild( Nino.admin.users._roleField() )" ) &&
 	usersSource.includes( '_renderPermissions' ) === false && usersSource.includes( "'permissions'" ) === false );
+check( 'Users deactivates and activates through its own action, with a question before a deactivation',
+	usersSource.includes( "_apiCall( 'status'" ) && usersSource.includes( "/_admin/users/confirm/deactivate" ) );
 const rolesSource = adminAsset( 'Users', 'roles.js' );
 // The permissions are the shared multi-reference picker, not a checkbox per
 // permission: the list is one entry per panel and tab of every active module
@@ -478,22 +482,22 @@ check( 'the shared control carries that mode rather than the panel reimplementin
 	adminUiUnordered.includes( 'if( ordered === true ) {' ) );
 check( 'the roles tab uses the shared grouped-list component and the shared empty state',
 	rolesSource.includes( "ul.className = 'nino-admin-list'" ) && rolesSource.includes( 'Nino.adminUi.emptyState(' ) );
-// The scoped permissions are a path per action and per field, so there is no
-// finite list to offer - they are typed, and land in the same picker as
-// everything else rather than in a second control beside it
-check( 'a permission can be typed in as well as picked',
-	rolesSource.includes( "addInput.placeholder = Nino.content.getText('/_admin/roles/perms/custom-placeholder')" ) &&
+// The scoped permissions are a path per action and per field. The panels list
+// them (scopes()), so they are picked - area, action, field - and never typed:
+// what the Add button adds is a string out of that tree, and it lands in the
+// same picker as everything else rather than in a second control beside it
+check( 'a scoped permission is picked from three dependent lists and lands in the same picker',
+	rolesSource.includes( "Nino.adminUi.selectField(" ) && rolesSource.includes( "'scope-area'" ) && rolesSource.includes( "'scope-action'" ) && rolesSource.includes( "'scope-field'" ) &&
 	rolesSource.includes( 'picker.replaceWith( rebuilt )' ) );
-check( '...validated as a permission string before it is added',
-	rolesSource.includes( 'Nino.admin.roles._isValidPerm( perm ) === false' ) );
-// Enter in a text input submits the form it sits in - here that would save
-// the role instead of adding the permission just typed
-check( '...and Enter adds it instead of saving the role',
-	/addInput\.addEventListener\( 'keydown'[\s\S]{0,200}ev\.preventDefault\(\)/.test( rolesSource ) );
-// '/*' is the switch at the top of the same fieldset; a second way to say it
-// is a second place to have to find when it is turned off again
+check( '...and no permission is typed in any more',
+	rolesSource.includes( 'addInput' ) === false && rolesSource.includes( '_isValidPerm' ) === false && rolesSource.includes( 'custom-placeholder' ) === false );
+check( '...with a warning before a panel goes into detail mode, and a summary of what the role may do',
+	rolesSource.includes( "wn.confirm( Nino.adminUi.format( Nino.content.getText('/_admin/roles/scope/warning')" ) &&
+	rolesSource.includes( "summaryList.setAttribute( 'aria-live', 'polite' )" ) && rolesSource.includes( 'roles.summarize(' ) );
+// '/*' is the switch at the top of the same fieldset; the lists have no way to
+// add it, because nothing in the tree is it
 check( '...while full access stays the switch it already is',
-	rolesSource.includes( "if( perm === '/*' ) {" ) );
+	rolesSource.includes( "scopeBox.classList.toggle( 'admin-hidden', fullCheck.checked )" ) );
 
 // --- one language, one text system ---------------------------------------
 //

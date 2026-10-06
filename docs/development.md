@@ -746,6 +746,7 @@ The workbench's own screens are the same thing in a different root: `_admin` hol
 | `text()` | a directory of `<locale>.php` fill files, merged into the workbench's own |
 | `summary( &$appData )` | a Dashboard tile `[ 'value' => ..., 'label' => ... ]` |
 | `log( $action, $data )` | the activity-log line for a completed action, `''` for none |
+| `scopes( &$appData )` | the scoped permissions the panel knows, for the three lists of the roles tab: `[ { scope, door, label, areas: [ { id, label, perm?, actions: [ { id, label, perm, fields?: [ { id, label, perm } ] } ] } ] } ]` - `scope` the prefix `Admin::isScoped()` reads, `door` the panel's permission, every `perm` shaped like a permission and below `scope`; an entry that is not is dropped by `Users\Admin::scopeOptions()`. A panel without it offers none |
 
 A module names its files from where its class is, so they move with it:
 

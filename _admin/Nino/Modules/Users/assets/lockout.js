@@ -6,8 +6,10 @@
  *	Nino										Framework
  *	lockout.js							"Login protection" tab of the Users panel: the two
  *													numbers of the throttle in front of the login, as one
- *													form. See Lockout/Lockout.php beside it for the schema
- *													this renders and validates against.
+ *													form, and below them the accounts locked right now,
+ *													each with a button that lifts its lock. See
+ *													Lockout/Lockout.php beside it for the schema this
+ *													renders and validates against.
  *
  *	@package								Dape/Nino
  *	@author									David Perchermeier <mail@dape.io>
@@ -41,7 +43,7 @@
 				if( status !== 200 || response === null )
 					return Nino.admin.lockout._showError( wrap, status, response );
 
-				Nino.admin.lockout._render( response.fields );
+				Nino.admin.lockout._render( response.fields, response.locked || [] );
 				Nino.admin.lockout._ready = true;
 			} );
 		},
@@ -55,11 +57,21 @@
 			emptied and rebuilt from the server's values, and the edit was gone
 			without a word. Nothing to do once the form is up: the shell
 			un-hides the pane, the pane is where it was left. The actions that
-			change state (save above all) re-fetch on their own	*/
+			change state (save above all) re-fetch on their own. The one
+			thing that is not the form's - who is locked, which changes by
+			itself as cooldowns run out and others fail - is fetched again,
+			and replaces only its own fieldset: the numbers are never rebuilt	*/
 		showCurrent : function() {
 
-			if( Nino.admin.lockout._ready === false )
+			if( Nino.admin.lockout._ready === false ) {
 				Nino.admin.lockout.init();
+				return;
+			}
+
+			Nino.admin.lockout._apiCall( 'list', {}, function( status, response ) {
+				if( status === 200 && response !== null && Array.isArray( response.locked ) === true )
+					Nino.admin.lockout._renderLocked( response.locked, '' );
+			} );
 		},
 
 		/**
@@ -89,13 +101,15 @@
 		},
 
 		/**
-		 *	One fieldset with both numbers, and Save in the pinned action bar
+		 *	One fieldset with both numbers, the one with the locked accounts
+		 *	below it, and Save in the pinned action bar
 		 *
 		 *	@param		{Array}		fields			[ { key, min, max, unit, label, hint, value }, ... ]
+		 *	@param		{Array}		locked			[ { mail, until }, ... ]
 		 *
 		 *	@return		void
 		 */
-		_render : function( fields ) {
+		_render : function( fields, locked ) {
 
 			const wrap = dc.getElementById('lockout-form');
 			wrap.innerHTML = '';
@@ -118,6 +132,11 @@
 
 			form.appendChild( fieldset );
 
+			// No data-key anywhere in it: the save posts every [data-key] of this form
+			const lockedSet = dc.createElement('fieldset');
+			lockedSet.id = 'lockout-locked';
+			form.appendChild( lockedSet );
+
 			const actions = dc.createElement('div');
 			actions.className = 'nino-admin-actionbar';
 
@@ -137,6 +156,8 @@
 
 			wrap.appendChild( form );
 
+			Nino.admin.lockout._renderLocked( locked, '' );
+
 			if( Nino.admin.lockout._pendingMsg !== '' ) {
 				msg.textContent = Nino.admin.lockout._pendingMsg;
 				Nino.admin.lockout._pendingMsg = '';
@@ -145,6 +166,98 @@
 			// What the form holds now is what is saved
 			if( typeof Nino.admin.dirty === 'object' )
 				Nino.admin.dirty.snapshot( 'lockout' );
+		},
+
+		/**
+		 *	The locked accounts: who, until when, and a button that lifts the
+		 *	lock. Fills the fieldset _render() made and nothing else - the
+		 *	number form above it keeps what was typed into it
+		 *
+		 *	@param		{Array}		locked			[ { mail, until }, ... ]
+		 *	@param		{string}	message			What to say under the list, '' for nothing
+		 *
+		 *	@return		void
+		 */
+		_renderLocked : function( locked, message ) {
+
+			const fieldset = dc.getElementById('lockout-locked');
+			if( fieldset === null )
+				return;
+
+			fieldset.innerHTML = '';
+
+			const legend = dc.createElement('legend');
+			legend.textContent = Nino.content.getText('/_admin/lockout/locked/title');
+			fieldset.appendChild( legend );
+
+			const line = dc.createElement('p');
+			line.className = 'nino-admin-hint';
+			const status = Nino.adminUi.status( line );
+
+			if( locked.length === 0 )
+				fieldset.appendChild( Nino.adminUi.emptyState( Nino.content.getText('/_admin/lockout/locked/empty') ) );
+			else {
+
+				const ul = dc.createElement('ul');
+				ul.className = 'nino-admin-list nino-admin-list-dense';
+
+				locked.forEach( function( account ) {
+
+					const li = dc.createElement('li');
+
+					const copy = dc.createElement('span');
+					copy.className = 'nino-admin-list-copy';
+					const mail = dc.createElement('strong');
+					mail.textContent = account.mail;
+					const until = dc.createElement('small');
+					until.textContent = Nino.adminUi.format( Nino.content.getText('/_admin/lockout/locked/until'), account.until );
+					copy.appendChild( mail );
+					copy.appendChild( until );
+					li.appendChild( copy );
+
+					const button = dc.createElement('button');
+					button.type = 'button';
+					button.className = 'nino-admin-btn-secondary';
+					button.textContent = Nino.content.getText('/_admin/lockout/label/unlock');
+					button.addEventListener( 'click', function() { Nino.admin.lockout._unlock( account.mail, button, status ) } );
+					li.appendChild( button );
+
+					ul.appendChild( li );
+				} );
+
+				fieldset.appendChild( ul );
+			}
+
+			fieldset.appendChild( line );
+
+			if( message !== '' )
+				status.idle( message );
+		},
+
+		/**
+		 *	Lift one account's lock, then show what the server says is still
+		 *	locked. A refusal keeps the row and says why
+		 *
+		 *	@param		{string}		mail
+		 *	@param		{Element}		button				The row's button, off while the request is on its way
+		 *	@param		{Object}		status				The line under the list (see Nino.adminUi.status())
+		 *
+		 *	@return		void
+		 */
+		_unlock : function( mail, button, status ) {
+
+			button.disabled = true;
+
+			Nino.admin.lockout._apiCall( 'unlock', { username : mail }, function( code, response ) {
+
+				if( code !== 200 || response === null ) {
+					button.disabled = false;
+					status.error( code, response, '/_admin/lockout/error/unlock' );
+					return;
+				}
+
+				Nino.admin.lockout._renderLocked( response.locked || [], Nino.adminUi.format( Nino.content.getText('/_admin/lockout/msg/unlocked'), mail ) );
+			} );
 		},
 
 		/**

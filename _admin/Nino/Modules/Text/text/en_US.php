@@ -46,4 +46,5 @@ return [
 	'[[/_admin/error/keys_format]]'	=> 'This format does not exist. Choose automatic, plain text, formatted, line breaks, or paragraphs and lists.',
 	'[[/_admin/error/keys_limit]]'	=> 'The limit has to be a whole number from 1 to %d.',
 	'[[/_admin/error/keys_limit_short]]'	=> 'The key already holds a text of %d characters. Shorten it first, or choose a higher limit.',
+	'[[/_admin/text/scope/update]]'	=> 'Change values',
 ];
