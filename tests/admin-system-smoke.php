@@ -2420,6 +2420,29 @@ check( 'apiList succeeds', $status === 200 );
 check( 'starts with an empty page list', $body['pages'] === [] );
 check( 'lists only templates/page-*.tpl files, sorted, extension stripped', $body['templates'] === [ 'page-about', 'page-contact' ] );
 check( 'no navigations are offered - Navigation was never picked', $body['navs'] === [] );
+check( 'a project with only finished pages is proposed no template - the form asks for a choice', $body['defaultTemplate'] === '' );
+check( 'the list names the locale the workbench is on', $body['selectedLocale'] === \Nino\Admin\Admin::sessionLocale( $appData ) && in_array( $body['selectedLocale'], $body['locales'], true ) );
+
+// The proposal is the blank page and nothing else - not the template that sorts
+// first, which is the 404 here, and not any other finished page
+file_put_contents( $sandbox. '/private/templates/page-404.tpl', '<h1>Not found</h1>' );
+file_put_contents( $sandbox. '/private/templates/page-blank.tpl', '' );
+[ , $body ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiList' );
+check( 'page-blank is the proposed template when the project has it', $body['templates'][0] === 'page-404' && $body['defaultTemplate'] === 'page-blank' );
+unlink( $sandbox. '/private/templates/page-blank.tpl' );
+[ , $body ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiList' );
+check( '...and never page-404, even when that one sorts first and is all there is besides', $body['templates'][0] === 'page-404' && $body['defaultTemplate'] === '' );
+unlink( $sandbox. '/private/templates/page-404.tpl' );
+
+// What the save checks of a new route are written against: a name and a title
+// in every active language
+$pageText = static function( string $name ) use ( &$appData ): array {
+	$text = [];
+	foreach( \Nino\Locales::getAvailableLocales( $appData ) as $locale )
+		$text[$locale] = [ 'name' => $name, 'title' => $name. ' - '. $locale ];
+	return $text;
+};
+check( 'the fixture project has more than two active languages, so "every language" is more than a pair', count( $pageText('x') ) >= 3 );
 
 [ $status ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiSave', [
 	'originalHttpUri' => '', 'uri' => '../etc/passwd', 'httpUri' => '/about', 'template' => 'page-about', 'text' => [],
@@ -2458,6 +2481,8 @@ check( 'rejects a template outside the page-*.tpl whitelist with 400', $status =
 [ $status, $body ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiSave', [
 	'originalHttpUri' => '', 'uri' => '/site-about', 'httpUri' => '/about', 'template' => 'page-about', 'statusCode' => 200, 'text' => [
 		'de_DE' => [ 'name' => 'Über uns', 'title' => 'Über uns', 'description' => 'Über unser Unternehmen.' ],
+		'en_US' => [ 'name' => 'About us', 'title' => 'About us', 'description' => '' ],
+		'fr_FR' => [ 'name' => 'A propos', 'title' => 'A propos' ],
 	],
 ] );
 check( 'apiSave succeeds', $status === 200 );
@@ -2474,12 +2499,36 @@ $deAfterSave = \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', []
 check( 'writes the page\'s own de_DE meta, keyed by its Element-URI', $deAfterSave['[[/webpage/site-about/name]]'] === 'Über uns' && $deAfterSave['[[/webpage/site-about/title]]'] === 'Über uns' );
 
 $enAfterSave = \Nino\Filesystem::getFileContent( $appData, '/text/en_US.php', [] );
-check( 'a locale left entirely unposted still gets the generic placeholder, not left unset', $enAfterSave['[[/webpage/site-about/name]]'] === 'Page' );
+check( 'a blank description is stored as it is, empty - there is no filler text any more', $enAfterSave['[[/webpage/site-about/description]]'] === '' && $enAfterSave['[[/webpage/site-about/name]]'] === 'About us' );
+check( '...and no "Page" or "Page Title" placeholder is written anywhere', in_array( 'Page', $enAfterSave, true ) === false && in_array( 'Page Title', $deAfterSave + $enAfterSave, true ) === false );
 
 $globalAfterSave = \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] );
 check( 'writes the page\'s reachable Http-URI as one global fill a template can link to by name', ( $globalAfterSave['[[/webpage/site-about/uri]]'] ?? null ) === '/about'
 	&& isset( $deAfterSave['[[/webpage/site-about/uri]]'], $enAfterSave['[[/webpage/site-about/uri]]'] ) === false );
 check( 'that uri is blacklisted as a technical value, like every other route key', in_array( '/webpage/site-about/uri', \Nino\Filesystem::getFileContent( $appData, '/text/blacklist.php', [] ), true ) );
+
+// A name and a title are required in every active language, and a refusal
+// writes nothing: not the route, not one of the texts
+$configBeforeRefusal = file_get_contents( $sandbox. '/private/config.php' );
+$textBeforeRefusal 	= [ file_get_contents( $sandbox. '/private/text/de_DE.php' ), file_get_contents( $sandbox. '/private/text/en_US.php' ), file_get_contents( $sandbox. '/private/text/global.php' ) ];
+$complete = $pageText('Contact');
+$without 	= static fn( string $locale, string $field ): array => array_replace( $complete, [ $locale => array_diff_key( $complete[$locale], [ $field => 1 ] ) ] );
+$refusals = [
+	'a name missing in one language' 	=> [ array_diff_key( $complete, [ 'fr_FR' => 1 ] ), 'routes_missing_name', 'fr_FR' ],
+	'a blank name' 										=> [ array_replace( $complete, [ 'de_DE' => [ 'name' => '   ', 'title' => 'T' ] ] ), 'routes_missing_name', 'de_DE' ],
+	'a name that is not text' 				=> [ array_replace( $complete, [ 'en_US' => [ 'name' => [ 'x' ], 'title' => 'T' ] ] ), 'routes_missing_name', 'en_US' ],
+	'a title missing in one language' => [ $without( 'en_US', 'title' ), 'routes_missing_title', 'en_US' ],
+	'a blank title' 									=> [ array_replace( $complete, [ 'de_DE' => [ 'name' => 'Kontakt', 'title' => "\t" ] ] ), 'routes_missing_title', 'de_DE' ],
+	'no text at all' 									=> [ [], 'routes_missing_name', 'de_DE' ],
+];
+foreach( $refusals as $label => [ $refusedText, $refusedCode, $refusedLocale ] ) {
+	[ $status, $body ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiSave', [
+		'originalHttpUri' => '', 'uri' => '/site-contact', 'httpUri' => '/contact', 'template' => 'page-contact', 'text' => $refusedText,
+	] );
+	check( $label. ' is refused with 400, a code and the language', $status === 400 && ( $body['code'] ?? '' ) === $refusedCode && ( $body['params'] ?? [] ) === [ $refusedLocale ] );
+}
+check( '...and every one of them left config.php and the text files exactly as they were', file_get_contents( $sandbox. '/private/config.php' ) === $configBeforeRefusal
+	&& $textBeforeRefusal === [ file_get_contents( $sandbox. '/private/text/de_DE.php' ), file_get_contents( $sandbox. '/private/text/en_US.php' ), file_get_contents( $sandbox. '/private/text/global.php' ) ] );
 
 // Duplicate checks: a second entry may not reuse either uri
 [ $status ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiSave', [
@@ -2494,9 +2543,7 @@ check( 'rejects a duplicate Http-URI with 400', $status === 400 );
 
 // A real second entry, with a non-200 status code and explicit menu membership
 [ $status ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiSave', [
-	'originalHttpUri' => '', 'uri' => '/site-contact', 'httpUri' => '/contact', 'template' => 'page-contact', 'statusCode' => 404, 'navs' => [ 'main' ], 'text' => [
-		'de_DE' => [ 'name' => 'Kontakt' ],
-	],
+	'originalHttpUri' => '', 'uri' => '/site-contact', 'httpUri' => '/contact', 'template' => 'page-contact', 'statusCode' => 404, 'navs' => [ 'main' ], 'text' => $pageText('Kontakt'),
 ] );
 check( 'apiSave succeeds for the second entry too', $status === 200 );
 
@@ -2511,9 +2558,7 @@ $appData['/nino/modules'][] = '\\Nino\\Modules\\Navigation';
 $appData['/nino/html/navs'] = [ 'main' ];
 
 [ $status ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiSave', [
-	'originalHttpUri' => '/contact', 'uri' => '/site-contact', 'httpUri' => '/contact', 'template' => 'page-contact', 'navs' => [ 'main' ], 'text' => [
-		'de_DE' => [ 'name' => 'Kontakt' ],
-	],
+	'originalHttpUri' => '/contact', 'uri' => '/site-contact', 'httpUri' => '/contact', 'template' => 'page-contact', 'navs' => [ 'main' ], 'text' => $pageText('Kontakt'),
 ] );
 check( 'resaving an existing entry unchanged (identified by originalHttpUri) succeeds', $status === 200 );
 
@@ -2527,9 +2572,7 @@ check( 'nothing is generated into the text files anymore', isset( \Nino\Filesyst
 // Reordering: assign both entries to main so the generated menu actually
 // shows a reorder, not just the list itself
 [ $status ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiSave', [
-	'originalHttpUri' => '/about', 'uri' => '/site-about', 'httpUri' => '/about', 'template' => 'page-about', 'navs' => [ 'main' ], 'text' => [
-		'de_DE' => [ 'name' => 'About' ],
-	],
+	'originalHttpUri' => '/about', 'uri' => '/site-about', 'httpUri' => '/about', 'template' => 'page-about', 'navs' => [ 'main' ], 'text' => $pageText('About'),
 ] );
 check( 'assigning the first entry to main too succeeds', $status === 200 );
 
@@ -2564,9 +2607,7 @@ check( 'moving it back up succeeds', $status === 200 );
 // Renaming an entry's Http-URI: the old route key must disappear, the new
 // one appear, and the list must stay at 2 entries (replaced in place)
 [ $status ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiSave', [
-	'originalHttpUri' => '/about', 'uri' => '/site-about', 'httpUri' => '/ueber-uns', 'template' => 'page-about', 'text' => [
-		'de_DE' => [ 'name' => 'Über uns' ],
-	],
+	'originalHttpUri' => '/about', 'uri' => '/site-about', 'httpUri' => '/ueber-uns', 'template' => 'page-about', 'text' => $pageText('Über uns'),
 ] );
 check( 'renaming an entry\'s Http-URI succeeds', $status === 200 );
 
@@ -2624,6 +2665,8 @@ echo "Modules\\Navigation\\Admin - menus and their running order\n";
 	return $config;
 } );
 $appData['/nino/html/navs'] = [ 'main', 'footer' ];
+// The live routes are the persisted ones here: nothing registers a route of its own yet
+$appData['/nino/http/routes'] = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes'];
 \Nino\Filesystem::putFileContent( $appData, '/text/de_DE.php', array_merge(
 	\Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] ),
 	[ '[[/webpage/home/name]]' => 'Start', '[[/webpage/contact/name]]' => 'Kontakt', '[[/webpage/legal/name]]' => 'Impressum' ]
@@ -2644,58 +2687,60 @@ check( 'offers every GET route as a possible entry, not just the page ones', arr
 check( 'labels a route by the /webpage<uri>/name key the menu would render', $body['routes'][0]['label'] === 'Start' );
 check( '...and falls back to the path for one nobody named', $body['routes'][1]['label'] === '/robots.txt' );
 check( 'a route with no name is reported as such - routeLines() would skip it', $body['routes'][1]['named'] === false && $body['routes'][0]['named'] === true );
+check( 'a route that is in config.php is not marked as a runtime one', array_column( $body['routes'], 'runtime' ) === [ false, false, false, false ] );
 
-// Assign: joins at the end, never in the middle
-[ $status, $body ] = callDev( $appData, \Nino\Modules\Navigation\Admin::class, 'apiAssign', [ 'key' => 'main', 'httpUri' => '/legal' ] );
-check( 'apiAssign succeeds', $status === 200 );
-check( 'the new entry joins at the end', $entriesOf( $body, 'main' ) === [ '/', '/contact', '/legal' ] );
+// A menu is saved as a whole: Save posts the complete running order, there is no
+// action that adds, moves or removes one entry
+check( 'the three per-entry actions are gone', array_keys( \Nino\Modules\Navigation\Admin::actions() ) === [ 'navs/list', 'navs/save', 'navs/delete' ] );
 
-$routesAfterAssign = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes'];
-check( 'membership is written onto the route itself, densely numbered', [
-	$routesAfterAssign['GET://']['navs'], $routesAfterAssign['GET://contact']['navs'], $routesAfterAssign['GET://legal']['navs'],
+$configNow = static fn(): string => (string) file_get_contents( $sandbox. '/private/config.php' );
+
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Navigation\Admin::class, 'apiSave', [ 'originalKey' => 'main', 'key' => 'main', 'entries' => [ '/legal', '/', '/contact' ] ] );
+check( 'saving a menu with its entries succeeds', $status === 200 );
+check( 'the entries are the menu\'s running order, in the order they were posted', $entriesOf( $body, 'main' ) === [ '/legal', '/', '/contact' ] );
+
+$routesAfterOrder = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes'];
+check( 'membership is written onto the route itself, densely numbered 1..n', [
+	$routesAfterOrder['GET://legal']['navs'], $routesAfterOrder['GET://']['navs'], $routesAfterOrder['GET://contact']['navs'],
 ] === [ [ 'main' => 1 ], [ 'main' => 2 ], [ 'main' => 3 ] ] );
+check( 'the route array itself is not reordered by a menu save', array_keys( $routesAfterOrder ) === [ 'GET://', 'GET://robots.txt', 'GET://contact', 'GET://legal' ] );
+check( 'no runtime membership key is written while there are none', array_key_exists( '/nino/html/navroutes', \Nino\Filesystem::getFileContent( $appData, '/config.php', [] ) ) === false );
 
-[ $status ] = callDev( $appData, \Nino\Modules\Navigation\Admin::class, 'apiAssign', [ 'key' => 'main', 'httpUri' => '/legal' ] );
-check( 'assigning the same route twice 409s', $status === 409 );
+// A member that is left out loses its membership - and a route left in no menu
+// carries no "navs" at all rather than an empty one
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Navigation\Admin::class, 'apiSave', [ 'originalKey' => 'main', 'key' => 'main', 'entries' => [ '/contact', '/legal' ] ] );
+check( 'a save with fewer entries succeeds', $status === 200 && $entriesOf( $body, 'main' ) === [ '/contact', '/legal' ] );
 
-[ $status ] = callDev( $appData, \Nino\Modules\Navigation\Admin::class, 'apiAssign', [ 'key' => 'nope', 'httpUri' => '/legal' ] );
-check( 'assigning into an unknown menu 404s', $status === 404 );
+$routesAfterLeaveOut = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes'];
+check( 'the entries that stay are renumbered from 1', [ $routesAfterLeaveOut['GET://contact']['navs'], $routesAfterLeaveOut['GET://legal']['navs'] ] === [ [ 'main' => 1 ], [ 'main' => 2 ] ] );
+check( 'a route that was left out carries no "navs" key rather than an empty one, and survives', isset( $routesAfterLeaveOut['GET://'] ) === true && isset( $routesAfterLeaveOut['GET://']['navs'] ) === false );
 
-[ $status ] = callDev( $appData, \Nino\Modules\Navigation\Admin::class, 'apiAssign', [ 'key' => 'main', 'httpUri' => '/does-not-exist' ] );
-check( 'assigning an unknown route 404s', $status === 404 );
+// Refusals write nothing
+$configBeforeRefusals = $configNow();
+foreach( [
+	'a route listed twice' 					=> [ [ '/contact', '/legal', '/contact' ], 400, 'navs_duplicate_entry' ],
+	'the same route in two spellings' => [ [ '/contact', 'contact/' ], 400, 'navs_duplicate_entry' ],
+	'a route that does not exist' 	=> [ [ '/contact', '/does-not-exist' ], 404, 'navs_unknown_route' ],
+	'a workbench route' 							=> [ [ '/_admin' ], 404, 'navs_unknown_route' ],
+	'entries that are no list' 			=> [ 'contact', 400, 'navs_invalid_entries' ],
+	'an entry that is no uri' 			=> [ [ '/contact', 7 ], 400, 'navs_invalid_entries' ],
+] as $label => [ $refused, $refusedStatus, $refusedCode ] ) {
+	[ $status, $body ] = callDev( $appData, \Nino\Modules\Navigation\Admin::class, 'apiSave', [ 'originalKey' => 'main', 'key' => 'main', 'entries' => $refused ] );
+	check( $label. ' is refused with '. $refusedStatus. ' and its code', $status === $refusedStatus && ( $body['code'] ?? '' ) === $refusedCode );
+}
+[ $status ] = callDev( $appData, \Nino\Modules\Navigation\Admin::class, 'apiSave', [ 'originalKey' => 'nope', 'key' => 'nope', 'entries' => [ '/contact' ] ] );
+check( 'entries for an unknown menu 404 as well', $status === 404 );
+check( '...and none of the refusals wrote anything', $configNow() === $configBeforeRefusals );
 
-// Move
-[ $status, $body ] = callDev( $appData, \Nino\Modules\Navigation\Admin::class, 'apiMove', [ 'key' => 'main', 'httpUri' => '/legal', 'direction' => 'up' ] );
-check( 'apiMove succeeds', $status === 200 );
-check( 'the two entries swapped places', $entriesOf( $body, 'main' ) === [ '/', '/legal', '/contact' ] );
+// Entries stay optional: a save without them only creates or renames
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Navigation\Admin::class, 'apiSave', [ 'originalKey' => 'main', 'key' => 'main' ] );
+check( 'a save without entries leaves the running order alone', $status === 200 && $entriesOf( $body, 'main' ) === [ '/contact', '/legal' ] );
 
-$routesAfterMove = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes'];
-check( 'the swap is a swap of two priorities, still dense', [
-	$routesAfterMove['GET://']['navs'], $routesAfterMove['GET://legal']['navs'], $routesAfterMove['GET://contact']['navs'],
-] === [ [ 'main' => 1 ], [ 'main' => 2 ], [ 'main' => 3 ] ] );
-check( 'the route array itself is not reordered by a menu move', array_keys( $routesAfterMove ) === [ 'GET://', 'GET://robots.txt', 'GET://contact', 'GET://legal' ] );
-
-[ $status ] = callDev( $appData, \Nino\Modules\Navigation\Admin::class, 'apiMove', [ 'key' => 'main', 'httpUri' => '/', 'direction' => 'up' ] );
-check( 'moving the first entry up 400s', $status === 400 );
-
-[ $status ] = callDev( $appData, \Nino\Modules\Navigation\Admin::class, 'apiMove', [ 'key' => 'main', 'httpUri' => '/contact', 'direction' => 'sideways' ] );
-check( 'an invalid direction 400s', $status === 400 );
-
-[ $status ] = callDev( $appData, \Nino\Modules\Navigation\Admin::class, 'apiMove', [ 'key' => 'main', 'httpUri' => '/robots.txt', 'direction' => 'up' ] );
-check( 'moving a route that is not in this menu 404s', $status === 404 );
-
-// Unassign: closes the gap it leaves
-[ $status, $body ] = callDev( $appData, \Nino\Modules\Navigation\Admin::class, 'apiUnassign', [ 'key' => 'main', 'httpUri' => '/legal' ] );
-check( 'apiUnassign succeeds', $status === 200 );
-check( 'the entry is gone from the menu', $entriesOf( $body, 'main' ) === [ '/', '/contact' ] );
-
-$routesAfterUnassign = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes'];
-check( 'the gap it left is closed right away', [ $routesAfterUnassign['GET://']['navs'], $routesAfterUnassign['GET://contact']['navs'] ] === [ [ 'main' => 1 ], [ 'main' => 2 ] ] );
-check( 'a route in no menu at all carries no "navs" key rather than an empty one', isset( $routesAfterUnassign['GET://legal']['navs'] ) === false );
-check( 'the route itself survives losing its membership', isset( $routesAfterUnassign['GET://legal'] ) === true );
-
-[ $status ] = callDev( $appData, \Nino\Modules\Navigation\Admin::class, 'apiUnassign', [ 'key' => 'main', 'httpUri' => '/legal' ] );
-check( 'unassigning a route that is not in the menu 404s', $status === 404 );
+// Put the menu back the way the checks below were written against
+callDev( $appData, \Nino\Modules\Navigation\Admin::class, 'apiSave', [ 'originalKey' => 'main', 'key' => 'main', 'entries' => [ '/', '/contact' ] ] );
+$routesAfterRestore = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes'];
+check( 'a route that was left out comes back into the menu at the place it was given', [ $routesAfterRestore['GET://']['navs'], $routesAfterRestore['GET://contact']['navs'] ] === [ [ 'main' => 1 ], [ 'main' => 2 ] ] );
+check( '...and the one that was dropped is in no menu, and still a route', isset( $routesAfterRestore['GET://legal']['navs'] ) === false && isset( $routesAfterRestore['GET://legal'] ) === true );
 
 // Create
 [ $status, $body ] = callDev( $appData, \Nino\Modules\Navigation\Admin::class, 'apiSave', [ 'originalKey' => '', 'key' => 'meta' ] );
@@ -2736,6 +2781,14 @@ check( 'renaming onto an id only a hand-written route carries 409s too', $status
 [ $status ] = callDev( $appData, \Nino\Modules\Navigation\Admin::class, 'apiSave', [ 'originalKey' => 'nope', 'key' => 'whatever' ] );
 check( 'renaming an unknown menu 404s', $status === 404 );
 
+// Rename and entries in one call, one lock, one write
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Navigation\Admin::class, 'apiSave', [ 'originalKey' => 'meta', 'key' => 'metax', 'entries' => [ '/legal' ] ] );
+check( 'a rename and its entries go through in one save', $status === 200 && $navKeys( $body ) === [ 'primary', 'footer', 'metax' ] && $entriesOf( $body, 'metax' ) === [ '/legal' ] );
+check( '...and the route carries the new key only', \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes']['GET://legal']['navs'] === [ 'metax' => 1 ] );
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Navigation\Admin::class, 'apiSave', [ 'originalKey' => 'metax', 'key' => 'meta', 'entries' => [] ] );
+check( 'an empty list empties the menu, and the route it held carries no "navs" afterwards', $status === 200 && $entriesOf( $body, 'meta' ) === []
+	&& isset( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes']['GET://legal']['navs'] ) === false );
+
 // Delete: out of the registry, and off every route
 [ $status, $body ] = callDev( $appData, \Nino\Modules\Navigation\Admin::class, 'apiDelete', [ 'key' => 'primary' ] );
 check( 'deleting succeeds', $status === 200 );
@@ -2753,6 +2806,38 @@ check( 'deleting an unknown menu 404s', $status === 404 );
 callDev( $appData, \Nino\Modules\Navigation\Admin::class, 'apiDelete', [ 'key' => 'footer' ] );
 [ $status, $body ] = callDev( $appData, \Nino\Modules\Navigation\Admin::class, 'apiDelete', [ 'key' => 'meta' ] );
 check( 'the last menu can be deleted, and stays deleted', $navKeys( $body ) === [] );
+
+/*	The registry a save or a delete starts from is the one config.php holds
+	under the lock, not the copy this request loaded when it began: another
+	request may have changed the file since, and writing the old copy back
+	would lose its menus (or give back one it deleted). The copy is stale
+	here on purpose - it knows 'main' and a 'ghost' that is gone, the file
+	knows 'footer' and 'side'.	*/
+\Nino\Filesystem::mutate( $appData, '/config.php', function( array $config ): array {
+	$config['/nino/html/navs'] = [ 'main', 'footer', 'side' ];
+	return $config;
+} );
+$registryInFile = static fn(): array => \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/html/navs'];
+
+$appData['/nino/html/navs'] = [ 'main', 'ghost' ];
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Navigation\Admin::class, 'apiSave', [ 'originalKey' => '', 'key' => 'top' ] );
+check( 'a create keeps the menus that are only in config.php', $status === 200 && $registryInFile() === [ 'main', 'footer', 'side', 'top' ] && $navKeys( $body ) === [ 'main', 'footer', 'side', 'top' ] );
+
+[ $status ] = callDev( $appData, \Nino\Modules\Navigation\Admin::class, 'apiSave', [ 'originalKey' => '', 'key' => 'side' ] );
+check( '...and an id that only config.php knows is taken', $status === 409 );
+
+$appData['/nino/html/navs'] = [ 'main', 'ghost' ];
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Navigation\Admin::class, 'apiSave', [ 'originalKey' => 'side', 'key' => 'flank' ] );
+check( 'a rename finds a menu that is only in config.php, and keeps its place', $status === 200 && $registryInFile() === [ 'main', 'footer', 'flank', 'top' ] );
+
+$appData['/nino/html/navs'] = [ 'main', 'ghost' ];
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Navigation\Admin::class, 'apiDelete', [ 'key' => 'footer' ] );
+check( 'a delete removes one menu and keeps the others of config.php', $status === 200 && $registryInFile() === [ 'main', 'flank', 'top' ] && $navKeys( $body ) === [ 'main', 'flank', 'top' ] );
+
+\Nino\Filesystem::mutate( $appData, '/config.php', function( array $config ): array {
+	$config['/nino/html/navs'] = [];
+	return $config;
+} );
 
 unset( $appData['/nino/html/navs'] );
 check( 'a missing navigation registry exposes no implicit menu', \Nino\Modules\Navigation\Admin::registry( $appData ) === [] );
@@ -2795,6 +2880,81 @@ check( 'a name only a non-native locale carries is a name too - that menu render
 check( 'the locale file still beats global.php for the label, as the fill engine does', ( $byUri['/press']['label'] ?? null ) === 'Presse' );
 check( '...and a route no language named at all is still reported unnamed', ( $byUri['/robots.txt']['named'] ?? null ) === false
 	&& ( $byUri['/robots.txt']['label'] ?? null ) === '/robots.txt' );
+
+/*	Routes that exist only at runtime. A feature registers its routes in its
+	init(), so /blog is in the live route array and nowhere in config.php - it
+	has no route of its own to carry a "navs". The panel offers it all the same,
+	and what it joins lives in '/nino/html/navroutes', which the shortcode reads
+	for a live route (see kernel-smoke). Config.php never gets a stub route:	*/
+$persistedRoutes = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes'];
+$runtimeRoutes = [
+	'GET://blog' 								=> [ 'uri' => '/blog', 'body' => '' ],
+	'GET://blog/*' 							=> [ 'uri' => '/blog/*', 'body' => '' ],
+	'GET://.search' 						=> [ 'uri' => '/.search', 'body' => '' ],
+	'GET://_admin' 							=> [ 'uri' => '/_admin', 'body' => '' ],
+	'GET://_admin/recovery.php' => [ 'uri' => '/_admin/recovery.php', 'body' => '' ],
+	'POST://.newsletter' 				=> [ 'uri' => '/.newsletter', 'body' => '' ],
+];
+$appData['/nino/http/routes'] = $persistedRoutes + $runtimeRoutes;
+[ $status ] = callDev( $appData, \Nino\Modules\Navigation\Admin::class, 'apiSave', [ 'originalKey' => '', 'key' => 'main' ] );
+check( 'a menu for the runtime routes to join is created', $status === 200 );
+
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Navigation\Admin::class, 'apiList' );
+$offered = array_column( $body['routes'], null, 'httpUri' );
+check( 'a route registered only at runtime is offered, marked as one', ( $offered['/blog']['runtime'] ?? null ) === true && ( $offered['/blog']['named'] ?? null ) === false );
+check( '...a technical route that has no entry in config.php too: the menu\'s owner decides what a visitor should see', isset( $offered['/.search'] ) === true );
+check( '...but no wildcard route, no route of the workbench - the recovery page included - and no POST endpoint', isset( $offered['/blog/*'], $offered['/_admin'], $offered['/_admin/recovery.php'], $offered['/.newsletter'] ) === false );
+check( '...while the persisted technical route stays offered, and is not marked as a runtime one', ( $offered['/robots.txt']['runtime'] ?? null ) === false );
+
+$configBeforeRuntime = $configNow();
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Navigation\Admin::class, 'apiSave', [ 'originalKey' => 'main', 'key' => 'main', 'entries' => [ '/', '/blog', '/contact' ] ] );
+check( 'a runtime route can be put into the running order', $status === 200 && $entriesOf( $body, 'main' ) === [ '/', '/blog', '/contact' ] );
+
+$configAfterRuntime = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
+check( 'its membership is written under /nino/html/navroutes, at its position in the order', ( $configAfterRuntime['/nino/html/navroutes'] ?? null ) === [ 'GET://blog' => [ 'main' => 2 ] ] );
+check( '...the routes that are in config.php take the numbers around it', [ $configAfterRuntime['/nino/http/routes']['GET://']['navs']['main'], $configAfterRuntime['/nino/http/routes']['GET://contact']['navs']['main'] ] === [ 1, 3 ] );
+check( '...and no stub route for it is written into config.php - nor any other runtime route', array_keys( $configAfterRuntime['/nino/http/routes'] ) === array_keys( $persistedRoutes ) );
+check( 'the live route array still holds the runtime routes after the save', isset( $appData['/nino/http/routes']['GET://blog'], $appData['/nino/http/routes']['GET://_admin/recovery.php'] ) === true
+	&& array_keys( array_diff_key( $appData['/nino/http/routes'], $persistedRoutes ) ) === array_keys( $runtimeRoutes ) );
+
+// The shortcode's side of it, from the same config: the menu renders the
+// runtime route in its place once it is named
+$appData['/nino/html/navroutes'] = $configAfterRuntime['/nino/html/navroutes'];
+\Nino\Html::addFills( $appData, [ '/webpage/blog/name' => 'Blog', '/webpage/home/name' => 'Start', '/webpage/contact/name' => 'Kontakt' ], 'de_DE' );
+\Nino\Locales::setCurrentLocale( $appData, 'de_DE' );
+check( 'the Navigation shortcode draws the runtime route between the two pages', \Nino\Modules\Navigation::routeLines( $appData, 'main' ) === [ '/:Start', '/blog:Blog', '/contact:Kontakt' ] );
+
+// A runtime route that is gone - its feature switched off - is not offered, is
+// not rendered, and drops out with the next save of that menu
+$appData['/nino/http/routes'] = $persistedRoutes;
+[ , $body ] = callDev( $appData, \Nino\Modules\Navigation\Admin::class, 'apiList' );
+check( 'a runtime route that is not live any more is neither offered nor listed in its menu', isset( array_column( $body['routes'], null, 'httpUri' )['/blog'] ) === false && $entriesOf( $body, 'main' ) === [ '/', '/contact' ] );
+unset( $appData['/nino/html/navroutes'] );
+check( '...nor rendered', in_array( '/blog:Blog', \Nino\Modules\Navigation::routeLines( $appData, 'main' ), true ) === false );
+
+[ $status ] = callDev( $appData, \Nino\Modules\Navigation\Admin::class, 'apiSave', [ 'originalKey' => 'main', 'key' => 'main', 'entries' => [ '/', '/blog' ] ] );
+check( 'it cannot be saved into a menu while it is gone', $status === 404 );
+
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Navigation\Admin::class, 'apiSave', [ 'originalKey' => 'main', 'key' => 'main', 'entries' => [ '/', '/contact' ] ] );
+check( 'the next save of that menu drops what was stored for it', $status === 200 && array_key_exists( '/nino/html/navroutes', \Nino\Filesystem::getFileContent( $appData, '/config.php', [] ) ) === false );
+
+// Rename and delete follow a runtime membership too
+$appData['/nino/http/routes'] = $persistedRoutes + $runtimeRoutes;
+callDev( $appData, \Nino\Modules\Navigation\Admin::class, 'apiSave', [ 'originalKey' => 'main', 'key' => 'main', 'entries' => [ '/blog', '/', '/.search' ] ] );
+check( 'two runtime routes in one menu, one of them first', ( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/html/navroutes'] ?? null ) === [ 'GET://blog' => [ 'main' => 1 ], 'GET://.search' => [ 'main' => 3 ] ] );
+
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Navigation\Admin::class, 'apiSave', [ 'originalKey' => 'main', 'key' => 'primary' ] );
+check( 'a rename follows the key onto a runtime membership', $status === 200 && $entriesOf( $body, 'primary' ) === [ '/blog', '/', '/.search' ]
+	&& ( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/html/navroutes']['GET://blog'] ?? null ) === [ 'primary' => 1 ] );
+[ $status ] = callDev( $appData, \Nino\Modules\Navigation\Admin::class, 'apiSave', [ 'originalKey' => '', 'key' => 'primary' ] );
+check( 'a menu id a runtime membership carries is taken', $status === 409 );
+
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Navigation\Admin::class, 'apiDelete', [ 'key' => 'primary' ] );
+check( 'deleting a menu takes its runtime memberships away too, and the key with them when none is left', $status === 200
+	&& array_key_exists( '/nino/html/navroutes', \Nino\Filesystem::getFileContent( $appData, '/config.php', [] ) ) === false );
+check( '...and the runtime routes are still live afterwards', isset( $appData['/nino/http/routes']['GET://blog'] ) === true );
+$appData['/nino/http/routes'] = $persistedRoutes;
+unset( $appData['/nino/html/navroutes'] );
 
 \Nino\Auth::logoutUser( $appData );
 [ $status ] = callDev( $appData, \Nino\Modules\Navigation\Admin::class, 'apiList' );

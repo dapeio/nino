@@ -173,6 +173,14 @@ namespace Nino\Modules {
 		 *	nothing here ever writes: the menu is computed per request, so it
 		 *	cannot go stale against the routes it describes.
 		 *
+		 *	A route that exists only at runtime - a feature's /blog, registered
+		 *	in its init() - has no entry in config.php to carry a 'navs' of its
+		 *	own. Its memberships are the key '/nino/html/navroutes', the same
+		 *	shape one level up: [ 'GET://blog' =&gt; [ 'main' =&gt; 3 ] ]. It is read
+		 *	only for a route that is live right now, so a feature switched off
+		 *	takes its menu entry with it, and a membership the route's own 'navs'
+		 *	states for the same menu wins. Malformed entries are skipped.
+		 *
 		 *	The value is a priority, same rule Callbacks::registerCallback()
 		 *	uses - lower runs first, 5 is the middle - except it is a plain
 		 *	int rather than a fixed bucket. Equal priorities keep the order the
@@ -192,12 +200,16 @@ namespace Nino\Modules {
 
 			foreach( ( $appData['/nino/http/routes'] ?? [] ) as $routeKey => $route ) {
 
-				// Only a page a visitor can actually open: a POST endpoint or a
-				// module's own runtime route is not a menu entry
+				// Only a page a visitor can actually open: a POST endpoint is not a
+				// menu entry
 				if( str_starts_with( $routeKey, 'GET://' ) === false )
 					continue;
 
-				if( isset( $route['navs'][$nav] ) === false )
+				// The route's own membership first, then the one a runtime-only
+				// route keeps beside the routes (see above)
+				$prio = $route['navs'][$nav] ?? self::_runtimePriority( $appData, (string) $routeKey, $nav );
+
+				if( $prio === null )
 					continue;
 
 				// Same rule Http::findRouteUri() applies: a locale-gated route
@@ -219,12 +231,30 @@ namespace Nino\Modules {
 				// derivation Locales::callbackResponse() makes for its redirect,
 				// and the same uri space the request carries, so the "active"
 				// match in doShortcode() keeps comparing like for like
-				$buckets[ (int) $route['navs'][$nav] ][] = substr( $routeKey, strlen( 'GET:/' ) ). ':'. $title;
+				$buckets[ (int) $prio ][] = substr( $routeKey, strlen( 'GET:/' ) ). ':'. $title;
 			}
 
 			ksort( $buckets );
 
 			return count( $buckets ) === 0 ? [] : array_merge( ...array_values( $buckets ) );
+		}
+
+		/**
+		 *	The priority a runtime-only route holds in one navigation,
+		 *	from '/nino/html/navroutes' - null when there is none, or when the
+		 *	value is not a whole number
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$routeKey			Eg. 'GET://blog'
+		 *	@param		string		$nav					Navigation key, eg. "main"
+		 *
+		 *	@return 	int|null
+		 */
+		private static function _runtimePriority( array &$appData, string $routeKey, string $nav ): ?int {
+
+			$prio = $appData['/nino/html/navroutes'][$routeKey][$nav] ?? null;
+
+			return is_int( $prio ) === true ? $prio : null;
 		}
 	}
 

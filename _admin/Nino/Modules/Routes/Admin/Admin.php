@@ -54,14 +54,11 @@ namespace Nino\Modules\Routes {
 		// array used for the general collision check.
 		private const array RESERVED_HTTP_URIS = [ '/_admin' ];
 
-		// A fresh entry's text fields when none was posted (or a blank one) -
-		// same generic-by-design reasoning _admin/install/Install.php's
-		// Webpages::DEFAULT_TEXT docblock explains
-		private const array DEFAULT_TEXT = [
-			'name' 				=> 'Page',
-			'title' 			=> 'Page Title',
-			'description' => 'Page description.',
-		];
+		// The template a new route starts on, when the project has it: the
+		// wizard's blank page. Never another one - the templates a project has
+		// are finished pages (a contact page, the 404), and one of them
+		// preselected would publish a copy of it under the new path
+		private const string DEFAULT_TEMPLATE = 'page-blank';
 
 		/**
 		 *	This module's action map, merged into \Nino\Admin\Admin::handlePost()'s dispatch
@@ -144,9 +141,12 @@ namespace Nino\Modules\Routes {
 
 		/**
 		 *	List the page routes, every templates/page-*.tpl file available to
-		 *	pick from, the active locales and the navigations a page can be
-		 *	put into (empty while the Navigation module is inactive, which is
-		 *	what tells the frontend to offer no menu fields at all)
+		 *	pick from, the template a new route is proposed ('' when the project
+		 *	has no page-blank - then the form asks for a choice), the active
+		 *	locales with the one the workbench is on, and the navigations a
+		 *	page can be put into (empty while the Navigation module is
+		 *	inactive, which is what tells the frontend to offer no menu
+		 *	fields at all)
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
@@ -161,12 +161,15 @@ namespace Nino\Modules\Routes {
 			$config 	= \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
 			$navs 		= self::navKeys( $appData );
 			$locales 	= \Nino\Locales::getAvailableLocales( $appData );
+			$templates = self::_templates( $appData );
 
 			\Nino\Http::ok( $request, [
-				'pages' 			=> self::pages( $appData, $config['/nino/http/routes'] ?? [], $locales, $navs ),
-				'templates' 	=> self::_templates( $appData ),
-				'locales' 		=> $locales,
-				'navs' 				=> $navs,
+				'pages' 				=> self::pages( $appData, $config['/nino/http/routes'] ?? [], $locales, $navs ),
+				'templates' 		=> $templates,
+				'defaultTemplate' => in_array( self::DEFAULT_TEMPLATE, $templates, true ) === true ? self::DEFAULT_TEMPLATE : '',
+				'locales' 			=> $locales,
+				'selectedLocale' => \Nino\Admin\Admin::sessionLocale( $appData ),
+				'navs' 					=> $navs,
 			] );
 		}
 
@@ -342,17 +345,6 @@ namespace Nino\Modules\Routes {
 		}
 
 		/**
-		 *	@param		string		$value
-		 *	@param		string		$default
-		 *
-		 *	@return 	string
-		 */
-		private static function _orDefault( string $value, string $default ): string {
-			$value = trim( $value );
-			return $value !== '' ? $value : $default;
-		}
-
-		/**
 		 *	The /nino/http/routes array key one page entry occupies - always
 		 *	derived from its httpUri (the real, reachable path), never its
 		 *	uri (a stable identifier used only for the route's own 'uri'
@@ -400,7 +392,10 @@ namespace Nino\Modules\Routes {
 		 *	excluded from its own dedupe check, so re-saving an entry
 		 *	unchanged - or renaming only one of its two uris - never
 		 *	falsely collides with itself); template is checked against
-		 *	_templates()'s whitelist.
+		 *	_templates()'s whitelist. A name and a title are required for
+		 *	every active language - a key nobody wrote renders as the raw
+		 *	[[...]] - and refused before anything is written; the
+		 *	description is optional and may stay empty.
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
@@ -454,16 +449,6 @@ namespace Nino\Modules\Routes {
 					$statusCode = 200;
 
 				$locales = \Nino\Locales::getAvailableLocales( $appData );
-
-				$text = [];
-				foreach( $locales as $locale ) {
-					$row = (array) ( $data['text'][$locale] ?? [] );
-					$text[$locale] = [
-						'name' 				=> self::_orDefault( $row['name'] 				?? '', self::DEFAULT_TEXT['name'] ),
-						'title' 			=> self::_orDefault( $row['title'] 			?? '', self::DEFAULT_TEXT['title'] ),
-						'description' => self::_orDefault( $row['description'] ?? '', self::DEFAULT_TEXT['description'] ),
-					];
-				}
 
 				$config = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
 				$routes = $config['/nino/http/routes'] ?? [];
@@ -530,6 +515,33 @@ namespace Nino\Modules\Routes {
 					return;
 				}
 
+				// A name and a title in every active language, checked last of the
+				// refusals and before anything is written: a key nobody wrote renders
+				// as the raw [[...]] on the page and in the menu, so a route without
+				// them is not one to create. The description is optional - an empty
+				// one renders nothing, which is a valid description
+				$text = [];
+				foreach( $locales as $locale ) {
+
+					$row = is_array( $data['text'][$locale] ?? null ) ? $data['text'][$locale] : [];
+
+					if( trim( is_string( $row['name'] ?? null ) ? $row['name'] : '' ) === '' ) {
+						\Nino\Http::fail( $request, 400, 'missing name for '. $locale, 'routes_missing_name', [ $locale ], 'name' );
+						return;
+					}
+
+					if( trim( is_string( $row['title'] ?? null ) ? $row['title'] : '' ) === '' ) {
+						\Nino\Http::fail( $request, 400, 'missing title for '. $locale, 'routes_missing_title', [ $locale ], 'title' );
+						return;
+					}
+
+					$text[$locale] = [
+						'name' 				=> trim( $row['name'] ),
+						'title' 			=> trim( $row['title'] ),
+						'description' => trim( is_string( $row['description'] ?? null ) ? $row['description'] : '' ),
+					];
+				}
+
 				// Menu membership lives on the route and nowhere else - that is
 				// what Modules\Navigation::routeLines() reads, and the only copy
 				// that renders
@@ -577,7 +589,10 @@ namespace Nino\Modules\Routes {
 		/**
 		 *	Where a membership this save newly adds goes: behind everything
 		 *	already in that menu. Read across every route rather than just the
-		 *	page ones, so a hand-written route in the same menu is counted too
+		 *	page ones, so a hand-written route in the same menu is counted too.
+		 *	The runtime-only memberships ('/nino/html/navroutes') are not read:
+		 *	a route that shares the number falls back to the order the routes
+		 *	stand in, which the shortcode keeps for equal priorities
 		 *
 		 *	@param		array 		$routes				The persisted route array
 		 *	@param		string		$navKey				Eg. 'main'
@@ -631,7 +646,9 @@ namespace Nino\Modules\Routes {
 		 *	deliberately left in place - same additive-only philosophy every
 		 *	other apply/save in this codebase follows, deleting a file/key a
 		 *	developer may have since hand-edited is a much riskier "undo" than
-		 *	dropping one route
+		 *	dropping one route. The template file stays as well, whether or not
+		 *	another route uses it - the browser's confirmation names both (see
+		 *	assets/admin.js's _delete())
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request

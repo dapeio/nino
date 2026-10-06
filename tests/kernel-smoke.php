@@ -4080,6 +4080,44 @@ check( '...and its markup is still the author\'s own', str_contains( \Nino\Modul
 
 \Nino\Html::addFills( $appData, [ '/webpage/top/name' => 'Top' ], 'en_US' );
 
+// A route that exists only at runtime (a feature's /blog) has no entry in
+// config.php to carry 'navs'. Its memberships are '/nino/html/navroutes', read
+// for a live route and merged with the route's own, which wins for the same menu
+\Nino\Html::addFills( $appData, [ '/webpage/blog/name' => 'Blog' ], 'en_US' );
+$appData['/nino/http/routes']['GET://blog'] = [ 'uri' => '/blog', 'body' => '' ];
+$appData['/nino/html/navroutes'] = [
+	'GET://blog' 		=> [ 'main' => 3 ],
+	'GET://top' 		=> [ 'main' => 9, 'footer' => 1 ],
+];
+check( 'a runtime route stands in the menu at its priority, in order with the persisted members', \Nino\Modules\Navigation::routeLines( $appData, 'main' ) === [ '/top:Top', '/blog:Blog', '/:Home', '/kontakt:Contact' ] );
+check( 'the route\'s own membership wins for the same menu, the key adds the others', \Nino\Modules\Navigation::routeLines( $appData, 'footer' ) === [ '/top:Top', '/:Home', '/impressum:Legal' ] );
+check( 'a menu nobody is in through the key renders as before', \Nino\Modules\Navigation::routeLines( $appData, 'nope' ) === [] );
+
+$appData['/nino/html/navroutes']['GET://gone'] = [ 'main' => 1 ];
+\Nino\Html::addFills( $appData, [ '/webpage/gone/name' => 'Gone' ], 'en_US' );
+check( 'a membership of a route that is not live is skipped, though its name exists - the feature is off', in_array( '/gone:Gone', \Nino\Modules\Navigation::routeLines( $appData, 'main' ), true ) === false );
+
+\Nino\Html::addFills( $appData, [ '/webpage/blog/name' => '' ], 'en_US' );
+check( 'a runtime route nobody named stays out, like any other', str_contains( implode( '', \Nino\Modules\Navigation::routeLines( $appData, 'main' ) ), 'blog' ) === false );
+\Nino\Html::addFills( $appData, [ '/webpage/blog/name' => 'Blog' ], 'en_US' );
+
+// Whatever else is written there is not a priority
+$appData['/nino/html/navroutes'] = [
+	'GET://blog' 			=> [ 'main' => 3 ],
+	'GET://kontakt' 	=> [ 'footer' => '2', 'side' => 2.5, 'x' => [ 1 ], 'y' => null ],
+	'GET://impressum' => 'main',
+	'GET://intern' 		=> 7,
+	'POST://.form' 		=> [ 'main' => 1 ],
+];
+check( 'malformed entries are skipped: no menu is changed by them, and none of them throws',
+	\Nino\Modules\Navigation::routeLines( $appData, 'main' ) === [ '/top:Top', '/blog:Blog', '/:Home', '/kontakt:Contact' ]
+	&& \Nino\Modules\Navigation::routeLines( $appData, 'footer' ) === [ '/:Home', '/impressum:Legal' ]
+	&& \Nino\Modules\Navigation::routeLines( $appData, 'side' ) === [] );
+check( '...and a POST route is no menu entry through the key either', str_contains( implode( '', \Nino\Modules\Navigation::routeLines( $appData, 'main' ) ), '.form' ) === false );
+
+unset( $appData['/nino/html/navroutes'] );
+check( 'with no key at all nothing changes', \Nino\Modules\Navigation::routeLines( $appData, 'main' ) === [ '/top:Top', '/:Home', '/kontakt:Contact' ] );
+
 $appData['/nino/http/routes'] = $routesBeforeNav;
 
 // Http::output() itself exit()s, so the header-finalizing part it delegates

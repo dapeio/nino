@@ -28,10 +28,30 @@
 	justify-content: space-between;
 }
 
-#routes-list > .nino-admin-list > li > a {
+#routes-list .admin-page-row > a:not(.admin-page-open) {
 	flex: 1 1 auto;
 	min-width: 0;
-	font: .78rem/1.4 var(--nino-admin-mono);
+}
+
+#routes-list .admin-page-row .nino-admin-list-copy small {
+	font-family: var(--nino-admin-mono);
+}
+
+/* The link out of the panel sits beside the row's own link, not inside it:
+   the design system's `li > a` gives every link of a row its padding and a
+   chevron, and this one is a small control like the arrows next to it */
+#routes-list .admin-page-row > a.admin-page-open {
+	display: inline-grid;
+	flex: 0 0 auto;
+	place-items: center;
+	min-height: 0;
+	padding: .35rem .5rem;
+	font-size: .9rem;
+	line-height: 1;
+}
+
+#routes-list .admin-page-row > a.admin-page-open::after {
+	content: none;
 }
 
 #admin-page-wrap .admin-page-locale-row {

@@ -63,6 +63,8 @@ function classList() {
 	};
 }
 
+const focused = [];
+
 function findAll( root, predicate ) {
 	const found = [];
 	( function walk( node ) {
@@ -87,16 +89,36 @@ function element( tag ) {
 		disabled : false,
 		style : {},
 		attributes : {},
+		dataset : {},
 		children : [],
 		listeners : {},
+		value : '',
 		appendChild : function( child ) { el.children.push( child ); return child },
 		setAttribute : function( name, value ) { el.attributes[name] = String( value ) },
+		removeAttribute : function( name ) { delete el.attributes[name] },
+		focus : function() { focused.push( el ) },
+		insertBefore : function( child, ref ) { el.children.splice( Math.max( el.children.indexOf( ref ), 0 ), 0, child ); return child },
+		querySelector : function( selector ) { return el.querySelectorAll( selector )[0] ?? null },
+		querySelectorAll : function( selector ) {
+			// Only the attribute selectors the panel asks a row or the form for
+			const match = /^\[data-field="(\w+)"\]$/.exec( selector );
+			return findAll( el, function( child ) { return match !== null && child.dataset.field === match[1] } );
+		},
 		addEventListener : function( name, fn ) {
 			el.listeners[name] = el.listeners[name] || [];
 			el.listeners[name].push( fn );
 		},
 	};
 	el.classList = classList();
+	// A select's value is its selected option's, the way a browser reads it
+	if( el.tagName === 'SELECT' )
+		Object.defineProperty( el, 'value', {
+			get : function() {
+				const chosen = el.children.filter( function( option ) { return option.selected === true } ).pop() ?? el.children.find( function( option ) { return option.disabled !== true } );
+				return chosen === undefined ? '' : chosen.value;
+			},
+			set : function( value ) { el.children.forEach( function( option ) { option.selected = option.value === value } ) },
+		} );
 	Object.defineProperty( el, 'innerHTML', {
 		get : function() { return '' },
 		set : function() { el.children.length = 0 },
@@ -117,16 +139,26 @@ function rows() {
 	return findAll( mount, function( el ) { return el.className === 'admin-page-row' } );
 }
 
+/** A row is the page's name over its path (the link), then ↗ if it has one, then the arrows */
+function rowName( li ) { return li.children[0].children[0].children[0].textContent }
+function rowPath( li ) { return li.children[0].children[0].children[1].textContent }
+
 function rowLabels() {
-	return rows().map( function( li ) { return li.children[0].children[0].textContent.split(' ')[0] } );
+	return rows().map( rowPath );
 }
 
 /** One row's ↑ or ↓ button */
 function moveButton( httpUri, direction ) {
-	const row = rows().find( function( li ) { return li.children[0].children[0].textContent.split(' ')[0] === httpUri } );
+	const row = rows().find( function( li ) { return rowPath( li ) === httpUri } );
 	if( row === undefined )
 		return null;
-	return row.children[1].children[ direction === 'up' ? 0 : 1 ];
+	return row.children.find( function( child ) { return child.className === 'admin-page-move' } ).children[ direction === 'up' ? 0 : 1 ];
+}
+
+/** The ↗ link of a row, if it has one */
+function openLink( httpUri ) {
+	const row = rows().find( function( li ) { return rowPath( li ) === httpUri } );
+	return row === undefined ? null : ( row.children.find( function( child ) { return child.className === 'admin-page-open' } ) ?? null );
 }
 
 function messageText() {
@@ -159,8 +191,14 @@ form.id = 'routes-form';
 
 const requests = [];
 
+const confirms = [];
+let confirmAnswer = false;
+
 const Nino = {
-	admin : {},
+	admin : {
+		assetUrl : function( path ) { return '/site'+ path },
+		formToolbar : function( backLink ) { const bar = element('div'); bar.appendChild( backLink ); return bar },
+	},
 	events : { bindCallback : function() {} },
 	http : { sendRequest : function( uri, method, callback, data ) {
 		requests.push( { action : data.action, payload : JSON.parse( data.data ), callback : callback } );
@@ -174,14 +212,24 @@ const sandbox = {
 		getElementById : function( id ) {
 			if( id === 'routes-list' ) return mount;
 			if( id === 'routes-form' ) return form;
-			return findAll( mount, function( el ) { return el.id === id } )[0] ?? null;
+			return findAll( mount, function( el ) { return el.id === id } )[0] ?? findAll( form, function( el ) { return el.id === id } )[0] ?? null;
+		},
+		// Only the three selectors the panel asks the form for
+		querySelectorAll : function( selector ) {
+			if( selector === '#routes-form-locales [data-locale]' )
+				return findAll( form, function( el ) { return el.dataset.locale !== undefined } );
+			if( selector === '#routes-form [aria-invalid]' )
+				return findAll( form, function( el ) { return 'aria-invalid' in el.attributes } );
+			if( selector === '#routes-form [data-nav]' )
+				return findAll( form, function( el ) { return el.dataset.nav !== undefined } );
+			return [];
 		},
 		documentElement : null,
 		body : null,
 	},
 	Nino : Nino,
 };
-sandbox.window = { Nino : Nino, location : { hash : '' } };
+sandbox.window = { Nino : Nino, location : { hash : '' }, confirm : function( message ) { confirms.push( message ); return confirmAnswer } };
 
 const context = vm.createContext( sandbox );
 vm.runInContext( source('_admin/assets/Nino.admin.js'), context, { filename : 'Nino.admin.js' } );
@@ -194,13 +242,20 @@ function answer( status, body ) {
 	requests[requests.length - 1].callback( { status : status, responseJSON : body } );
 }
 
-function listing( order ) {
-	return {
-		pages 		: order.map( function( uri ) { return { httpUri : uri, uri : uri, template : 'page'+ uri.replace('/','-') } } ),
-		templates : [],
-		locales 	: [ 'de_DE' ],
-		navs 			: [],
-	};
+const NAMES = { '/' : 'Start', '/about' : 'Über uns', '/contact' : 'Kontakt' };
+
+function listing( order, extra ) {
+	return Object.assign( {
+		pages 		: order.map( function( uri ) {
+			return { httpUri : uri, uri : uri, template : 'page'+ uri.replace('/','-'), body : '[template /templates/page'+ uri.replace('/','-')+ ']',
+				text : { de_DE : { name : NAMES[uri] || '', title : '', description : '' }, en_US : { name : '', title : '', description : '' } } };
+		} ),
+		templates 			: [],
+		defaultTemplate : '',
+		locales 				: [ 'de_DE', 'en_US' ],
+		selectedLocale 	: 'de_DE',
+		navs 						: [],
+	}, extra || {} );
 }
 
 console.log('Admin Routes');
@@ -251,6 +306,184 @@ fire( moveButton( '/contact', 'up' ), 'click' );
 answer( 403, { error : 'no permission' } );
 answer( 403, null );
 check( 'a move error survives a reload that fails as well', messageText() === '(403) no permission' );
+
+/*	What a row says: the page's name over its path, and a way to the page
+	itself. The template and the Element URI are in the form, not on the row.	*/
+panel.init();
+answer( 200, listing( [ '/', '/about', '//evil.example', 'relative' ], { templates : [ 'page-about', 'page-blank', 'page-contact' ], defaultTemplate : 'page-blank' } ) );
+check( 'a row names the page in the language the workbench is on, and shows its path under it', rows().map( rowName ).slice( 0, 2 ).join() === 'Start,Über uns' && rowLabels().slice( 0, 2 ).join() === '/,/about' );
+check( '...and a page nobody named in any language is called by its path', rowName( rows()[2] ) === '//evil.example' );
+
+const withOpen = openLink( '/about' );
+check( 'the link to the page is a real link, in a tab of its own, under the project directory', withOpen !== null && withOpen.href === '/site/about' && withOpen.target === '_blank' && withOpen.rel === 'noopener'
+	&& withOpen.attributes['aria-label'] === text('/_admin/routes/label/open') && withOpen.textContent === '↗' );
+check( '...but none for a path that would leave the site or is no path', openLink( '//evil.example' ) === null && openLink( 'relative' ) === null );
+check( 'the ↑/↓ cluster is still on every row', rows().every( function( li ) { return li.children.some( function( child ) { return child.className === 'admin-page-move' } ) } ) );
+
+// A name is the language the workbench is on first, and then any other
+panel._selectedLocale = 'en_US';
+check( 'a page with a name only in another language is called by that one', rowName( rows()[0] ) === 'Start' );
+panel._selectedLocale = 'de_DE';
+
+// Markup in a name is text on the row
+const hostile = listing( [ '/x' ] );
+hostile.pages[0].text.de_DE.name = '<img src=x onerror=alert(1)>';
+panel._pages = hostile.pages;
+panel._renderList();
+check( 'a name is put on the row as text, whatever it holds', rowName( rows()[0] ) === '<img src=x onerror=alert(1)>' );
+panel._pages = listing( [ '/', '/about', '//evil.example', 'relative' ] ).pages;
+panel._renderList();
+
+/*	A new route starts empty. The one thing it is given is the blank page when
+	the project has one - and nothing otherwise, so the person has to choose.	*/
+function listActionButton() {
+	return findAll( mount, function( el ) { return el.className === 'nino-admin-btn-primary' } )[0];
+}
+function field( id ) {
+	return findAll( form, function( el ) { return el.id === id } )[0];
+}
+function localeInput( locale, name ) {
+	return findAll( form, function( el ) { return el.dataset.locale === locale } )[0].querySelector('[data-field="'+ name+ '"]');
+}
+function save() {
+	fire( findAll( form, function( el ) { return el.tagName === 'FORM' } )[0], 'submit' );
+}
+
+fire( listActionButton(), 'click' );
+check( 'a new route has no uri and no http uri filled in', field('routes-form-uri').value === '' && field('routes-form-http-uri').value === '' );
+check( '...and starts on the blank page the project has, nothing else', field('routes-form-template').value === 'page-blank' );
+check( '...with a name and a title field per language, and no filler in them', [ 'de_DE', 'en_US' ].every( function( locale ) {
+	return [ 'name', 'title', 'description' ].every( function( name ) { return localeInput( locale, name ).value === '' } );
+} ) );
+check( 'every field of a language says which one it is, for a screen reader', localeInput( 'de_DE', 'name' ).attributes['aria-label'] === 'Name (de_DE)'
+	&& localeInput( 'en_US', 'title' ).attributes['aria-label'] === 'HTML title (en_US)'
+	&& localeInput( 'en_US', 'description' ).attributes['aria-label'] === 'HTML description (en_US)' );
+check( '...the form is not left to the browser\'s own validation bubble', findAll( form, function( el ) { return el.tagName === 'FORM' } )[0].noValidate === true );
+
+// No blank page: no proposal, a placeholder that is a choice to make
+panel._defaultTemplate = '';
+fire( listActionButton(), 'click' );
+const chooser = field('routes-form-template');
+const placeholder = chooser.children[0];
+check( 'without a blank page the template select asks for a choice: a disabled, selected placeholder first', placeholder.value === '' && placeholder.disabled === true && placeholder.selected === true
+	&& placeholder.textContent === text('/_admin/routes/label/choose') && chooser.value === '' );
+check( '...and it is not the first template on offer in disguise', chooser.children.length === panel._templates.length + 1 );
+panel._defaultTemplate = 'page-blank';
+
+// Required fields: nothing is sent, the fields are marked, the first takes the focus
+fire( listActionButton(), 'click' );
+const before = requests.length;
+focused.length = 0;
+save();
+check( 'a save with the required fields empty sends no request', requests.length === before );
+check( '...marks every field that is missing: both uris and every name and title', [ 'routes-form-uri', 'routes-form-http-uri' ].every( function( id ) { return field( id ).attributes['aria-invalid'] === 'true' } )
+	&& [ 'de_DE', 'en_US' ].every( function( locale ) { return [ 'name', 'title' ].every( function( name ) { return localeInput( locale, name ).attributes['aria-invalid'] === 'true' } ) } )
+	&& localeInput( 'de_DE', 'description' ).attributes['aria-invalid'] === undefined && field('routes-form-template').attributes['aria-invalid'] === undefined );
+check( '...puts the focus on the first of them', focused.length === 1 && focused[0] === field('routes-form-uri') );
+check( '...and says it in the workbench\'s language, in the line of the form', field('routes-form-msg').textContent === text('/_admin/routes/error/required') && text('/_admin/routes/error/required') !== '' );
+
+field('routes-form-uri').value = '/new';
+field('routes-form-http-uri').value = '/new';
+localeInput( 'de_DE', 'name' ).value = 'Neu';
+localeInput( 'de_DE', 'title' ).value = 'Neu';
+localeInput( 'en_US', 'name' ).value = '   ';
+localeInput( 'en_US', 'title' ).value = 'New';
+focused.length = 0;
+save();
+check( 'only what is still missing stays marked, and a blank one counts as missing', requests.length === before
+	&& field('routes-form-uri').attributes['aria-invalid'] === undefined && localeInput( 'de_DE', 'name' ).attributes['aria-invalid'] === undefined
+	&& localeInput( 'en_US', 'name' ).attributes['aria-invalid'] === 'true' && localeInput( 'en_US', 'title' ).attributes['aria-invalid'] === undefined );
+check( '...with the focus on it', focused.length === 1 && focused[0] === localeInput( 'en_US', 'name' ) );
+
+// The template placeholder counts as missing too
+panel._defaultTemplate = '';
+fire( listActionButton(), 'click' );
+field('routes-form-uri').value = '/new';
+field('routes-form-http-uri').value = '/new';
+[ 'de_DE', 'en_US' ].forEach( function( locale ) { localeInput( locale, 'name' ).value = 'N'; localeInput( locale, 'title' ).value = 'T' } );
+save();
+check( 'a template nobody chose is refused as well', requests.length === before && field('routes-form-template').attributes['aria-invalid'] === 'true' );
+panel._defaultTemplate = 'page-blank';
+
+// Complete: one request, with the description allowed to stay empty
+fire( listActionButton(), 'click' );
+field('routes-form-uri').value = '/new';
+field('routes-form-http-uri').value = '/new';
+[ 'de_DE', 'en_US' ].forEach( function( locale ) { localeInput( locale, 'name' ).value = 'N'; localeInput( locale, 'title' ).value = 'T' } );
+save();
+check( 'a complete form is sent, an empty description with it', requests.length === before + 1 && requests[before].action === 'routes/save'
+	&& requests[before].payload.template === 'page-blank' && requests[before].payload.text.en_US.description === '' && requests[before].payload.originalHttpUri === '' );
+answer( 200, {} );
+answer( 200, listing( [ '/', '/about', '/contact' ], { templates : [ 'page-about', 'page-blank', 'page-contact' ] } ) );
+
+/*	The delete question names what stays: the texts and the template, and for
+	the template whether other routes use it.	*/
+function openRoute( httpUri ) {
+	rows().find( function( li ) { return rowPath( li ) === httpUri } ).children[0].listeners.click[0]( { preventDefault : function() {} } );
+}
+function deleteButton() {
+	return findAll( form, function( el ) { return el.className === 'nino-admin-btn-danger' } )[0];
+}
+
+const shared = listing( [ '/', '/about', '/contact' ], { templates : [ 'page-about', 'page-blank', 'page-contact' ] } );
+shared.pages[0].template = shared.pages[1].template = shared.pages[2].template = 'page-shared';
+shared.pages[1].uri = '/site-about';
+shared.pages[1].text.en_US.title = 'About';
+panel._pages = shared.pages;
+panel._renderList();
+openRoute( '/about' );
+confirms.length = 0;
+fire( deleteButton(), 'click' );
+check( 'the delete question names the path, the texts that stay with their languages, and the path fill', confirms.length === 1
+	&& confirms[0].includes('“/about”') && confirms[0].includes('/webpage/site-about/name|title (de_DE, en_US)') && confirms[0].includes('/webpage/site-about/uri') );
+check( '...and the template, with how many other routes use it', confirms[0].includes('“page-shared”') && confirms[0].includes('used by 2 other routes') );
+check( 'a refused question sends nothing', requests.length === before + 2 );
+
+shared.pages[2].template = 'page-contact';
+panel._pages = shared.pages;
+openRoute( '/about' );
+confirms.length = 0;
+fire( deleteButton(), 'click' );
+check( 'one other route is said in the singular', confirms[0].includes('used by one other route') );
+
+shared.pages[0].template = 'page-home';
+panel._pages = shared.pages;
+openRoute( '/about' );
+confirms.length = 0;
+fire( deleteButton(), 'click' );
+check( 'a template nobody else uses is said to be used by no other route', confirms[0].includes('“page-shared”') && confirms[0].includes('used by no other route') );
+
+shared.pages[1].template = '';
+shared.pages[1].body = '[template /templates/page-[[/nino/http/response/locale]]]';
+panel._pages = shared.pages;
+openRoute( '/about' );
+confirms.length = 0;
+fire( deleteButton(), 'click' );
+check( 'a route that picks its template at runtime names its body instead', confirms[0].includes('the body “[template /templates/page-[[/nino/http/response/locale]]]”') && confirms[0].includes('“page-') === false );
+
+confirmAnswer = true;
+confirms.length = 0;
+fire( deleteButton(), 'click' );
+check( 'a confirmed question deletes the route', requests[requests.length - 1].action === 'routes/delete' && requests[requests.length - 1].payload.httpUri === '/about' );
+confirmAnswer = false;
+answer( 200, {} );
+answer( 200, listing( [ '/', '/contact' ] ) );
+
+// A route that picks its template at runtime has no template to choose: the
+// disabled select is not a missing field
+const runtimeRoute = listing( [ '/legal' ], { templates : [ 'page-about' ] } );
+runtimeRoute.pages[0].template = '';
+runtimeRoute.pages[0].body = '[template /templates/page-legal.[[/nino/http/response/locale]]]';
+runtimeRoute.pages[0].text.de_DE.name = 'Rechtliches';
+panel._pages = runtimeRoute.pages;
+panel._renderList();
+openRoute( '/legal' );
+const sentBefore = requests.length;
+[ 'de_DE', 'en_US' ].forEach( function( locale ) { localeInput( locale, 'name' ).value = 'R'; localeInput( locale, 'title' ).value = 'T' } );
+save();
+check( 'a route with a runtime body saves without choosing a template', requests.length === sentBefore + 1 && requests[sentBefore].payload.template === '' );
+answer( 200, {} );
+answer( 200, listing( [ '/', '/contact' ] ) );
 
 /*	The open page's form is watched by the shell (Nino.admin.dirty), which asks
 	before anything throws what was typed into it away. A second context, with

@@ -765,7 +765,8 @@ work in the server's own words without sending it.
 Do not copy the skeleton blindly if an existing panel already solves the same
 list, locale, upload, rich-text, reorder, relationship, or confirmation
 problem. Reuse its exact public helper and adapt the nearest implementation.
-For a registry plus ordered route membership, inspect
+For a registry plus ordered route membership - a working copy that one Save
+writes as a whole, registered with the shell - inspect
 `\Nino\Modules\Navigation\Admin` and
 `_nino/Nino/Modules/Navigation/assets/admin.js`; for the smallest complete
 panel, `\Nino\Modules\Sample\Admin` in `tests/fixtures/features/Sample/Admin/Admin.php`,
@@ -822,7 +823,7 @@ Four rules follow:
   the discarded text stays in the controls and counts as saved. That is a
   known limitation, not a rule the exits keep: an exit that wants to avoid it
   redraws or reloads the form itself when its request fails (the Keys schema,
-  rename and delete exits, the Navigation entry actions and the feature,
+  rename and delete exits and the feature,
   backup and logout-all exits do not).
 
 The question is `Nino.adminUi.choiceDialog( { title, message, choices, onChoose } )`

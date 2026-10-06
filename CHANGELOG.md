@@ -430,6 +430,28 @@ All notable changes to Nino are documented in this file.
   `tests/admin-system-smoke.php` the heading as a button and every link under
   the heading of its own group.
 
+- **Workbench, Navigations:** a route that exists only at runtime can be in a
+  menu. A feature's route - Posts' `/blog` - is registered in `init()` and has no
+  entry in `config.php` to carry `'navs'`, so it could not be put in one. The
+  picker offers every live `GET` route that is not in `config.php` as well,
+  marked `runtime` in the answer; its membership is stored under the new key
+  `/nino/html/navroutes`, `[ 'GET://blog' => [ 'main' => 3 ] ]`, and
+  `\Nino\Modules\Navigation::routeLines()` merges it into the routes that are
+  live, the route's own `'navs'` winning for the same menu and a value that is
+  not a whole number ignored. A feature that is switched off takes its entry
+  with it - the route is not live, so nothing renders - and the next save of that
+  menu drops what was stored. A route without `/webpage<uri>/name` is offered
+  with the existing "not named yet" marker, and renders once it has one.
+  Of the runtime routes, wildcard routes (a key ending in `/*`) and the
+  workbench (`GET://_admin` and everything below it, `recovery.php` included)
+  are not offered; technical
+  routes - `robots.txt`, `/.search` - stay. The key is absent from `config.php`
+  while no route has a membership, nothing is written into `/nino/http/routes`
+  for a runtime route, and the live route array keeps its runtime routes after a
+  save. `tests/kernel-smoke.php` holds the merge, the skipped routes and
+  the malformed entries (907 → 915 checks); `tests/admin-system-smoke.php` the offer,
+  the exclusions, the three keys and the live array.
+
 ### Changed
 
 - **Workbench:** what the panels print for a failure. A failure with a code is
@@ -566,6 +588,63 @@ All notable changes to Nino are documented in this file.
   `Text::sanitizeValue()` also makes a line of every `<br>` and every end of a
   block before it strips the tags of a plain value (`Html::breaksToNewlines()`),
   where `Amtsgericht<br>Musterstadt` became `AmtsgerichtMusterstadt`.
+
+- **Workbench, Routes:** a new route starts empty and a delete says what stays.
+  The form for a new route has no Element URI and no HTTP URI, and the texts no
+  "Page" / "Page Title" / "Page description." filler (the server's `DEFAULT_TEXT`
+  and `_orDefault()` are gone; the wizard's own Webpages step keeps its own).
+  A **name** and a **title** are required in every active language, and so are
+  both URIs and the template: the form checks them before it sends anything,
+  marks each field `aria-invalid` with an asterisk after its name
+  (`.nino-admin-required`) and `aria-required`, puts the focus on the first and
+  says it in the status line - the browser's own validation bubble, in the
+  browser's language, is switched off for the form (`novalidate`). Every
+  name, title and description field says its language in an `aria-label`. The
+  server refuses a missing or blank name or title with a `400`, the codes
+  `routes_missing_name` and `routes_missing_title` and the language, after the
+  URI, collision and template refusals and before anything is written, so config.php
+  and the text files are untouched; a blank description is stored empty. The
+  template is proposed only as `page-blank`, when `templates/` has it - the
+  answer of `routes/list` carries `defaultTemplate` - and otherwise the select
+  starts on a disabled "Choose a template…", never on the template that sorts
+  first and never on another finished page (`page-404`, `page-contact`). The
+  delete question names what stays: the page's texts (`/webpage<uri>/name|title|description`
+  with the languages that hold a value, and `/webpage<uri>/uri`) and the
+  template file, with how many other routes use it, or the body for a route that
+  picks its template at runtime. A row of the list is the page's name - in the
+  content language last chosen in Elements or Text (the native one before that), else the first that has one, else the path - over
+  its path, and a **↗** that opens the page in a new tab, only for a path
+  below the site (`routes/list` answers `selectedLocale`). The German interface
+  says all of it. `tests/admin-routes-js-smoke.js` holds the empty form, the
+  proposal, the required fields, the question and the row (16 → 46 checks);
+  `tests/admin-system-smoke.php` the refusals that write nothing, the empty
+  description and the proposal; `tests/install-smoke.php` posts a name and a title.
+
+- **Workbench, Navigations:** a menu is saved as a whole. ↑, ↓, × and Add change
+  a working copy in the browser and write nothing; the status line says there
+  are unsaved changes, and **Save** posts the complete running order - `navs/save`
+  takes an optional `entries`, a list of HTTP URIs - which the server writes
+  under the lock on `config.php` in one write of the three keys it touches, the
+  priorities dense `1..n`; a route that is left out loses its membership (and a
+  route in no menu carries no `'navs'`), a rename and its entries are one save,
+  and a refused one - an entry listed twice (`navs_duplicate_entry`), a route
+  that does not exist (`navs_unknown_route`, `404`), entries that are no list
+  (`navs_invalid_entries`) - writes nothing. Without `entries` a save only creates
+  or renames, as before; `navs/delete` is under the lock too. `navs/assign`,
+  `navs/unassign` and `navs/move` are gone, and with them `navs_route_present`:
+  nothing but the panel and the tests called them. The picker starts on an empty
+  choice and Add waits for a route. An id typed above the entries survives a click
+  on an arrow - only the entries are drawn again. The panel registers its
+  working copy with the shell (`Nino.admin.dirty.register`), so the back link,
+  logout and the interface language ask Save, Discard or Cancel; a shell that
+  does not have the registry gets a `confirm()` on the back link instead.
+  Showing the panel again reads the menus and routes again - a copy with
+  unsaved changes is never replaced, only the routes it can pick from are.
+  The German interface says all of it. The new
+  `tests/admin-navs-js-smoke.js` (42 checks) holds the copy, the Save request, the
+  picker, the back link, the redraw and the registry; `tests/admin-system-smoke.php`
+  the order, the dense priorities, the refusals and the rename (the old assign/move/unassign checks are rewritten as saves with
+  entries).
 
 ### Fixed
 

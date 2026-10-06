@@ -21,16 +21,25 @@ namespace Nino\Modules\Navigation {
 	 *												order set - which is the only view in which "third entry
 	 *												in the footer" is a thing you can see, let alone move.
 	 *
-	 *												Two config keys, and no third copy of anything:
-	 *												'/nino/html/navs' is the plain list of menu keys both
-	 *												page editors offer a checkbox for, and each route's own
-	 *												'navs' =&gt; [ &lt;key&gt; =&gt; &lt;prio&gt; ] is the membership that
-	 *												actually renders (see \Nino\Modules\Navigation).
+	 *												Three config keys, and no copy of anything: the
+	 *												'/nino/html/navs' list of menu keys both page editors
+	 *												offer a checkbox for, each route's own 'navs' =&gt;
+	 *												[ &lt;key&gt; =&gt; &lt;prio&gt; ] - the membership that actually
+	 *												renders (see \Nino\Modules\Navigation) - and
+	 *												'/nino/html/navroutes', the same memberships for a
+	 *												route that exists only at runtime, such as a feature's
+	 *												/blog and so has no route in config.php to carry them.
 	 *												Priorities are kept dense, 1..n per menu, so a position
 	 *												in this list reads as the position in the menu rather
 	 *												than as an arbitrary number someone has to space out by
 	 *												hand. A hand-written route joins a menu exactly the same
 	 *												way and shows up here like any other.
+	 *
+	 *												A menu is saved as a whole: the panel keeps a working copy
+	 *												of the entries, and Save writes the complete running order
+	 *												in one request, under the config lock (see apiSave()).
+	 *												There is no action that moves, adds or removes a single
+	 *												entry.
 	 *
 	 *												No locale picker, deliberately: a menu has nothing
 	 *												per-locale about it. The wording it renders is each
@@ -60,9 +69,6 @@ namespace Nino\Modules\Navigation {
 				'navs/list' 			=> [ self::class, 'apiList' ],
 				'navs/save' 			=> [ self::class, 'apiSave' ],
 				'navs/delete' 		=> [ self::class, 'apiDelete' ],
-				'navs/assign' 		=> [ self::class, 'apiAssign' ],
-				'navs/unassign' 	=> [ self::class, 'apiUnassign' ],
-				'navs/move' 			=> [ self::class, 'apiMove' ],
 			];
 		}
 
@@ -110,9 +116,6 @@ namespace Nino\Modules\Navigation {
 			return match( $action ) {
 				'navs/save'			=> ( ( $data['originalKey'] ?? '' ) === '' ? 'Add Navigation ' : 'Edit Navigation ' ). ( $data['key'] ?? '' ),
 				'navs/delete'		=> 'Delete Navigation '. ( $data['key'] ?? '' ),
-				'navs/assign'		=> 'Assign Route '. ( $data['httpUri'] ?? '' ). ' to Navigation '. ( $data['key'] ?? '' ),
-				'navs/unassign'	=> 'Unassign Route '. ( $data['httpUri'] ?? '' ). ' from Navigation '. ( $data['key'] ?? '' ),
-				'navs/move'			=> 'Move Route '. ( $data['httpUri'] ?? '' ). ' '. ( $data['direction'] ?? '' ). ' in Navigation '. ( $data['key'] ?? '' ),
 				default	=> '',
 			};
 		}
@@ -121,7 +124,7 @@ namespace Nino\Modules\Navigation {
 		 *	Every menu, each with the routes standing in it in their running
 		 *	order, plus every route that could be added to one.
 		 *
-		 *	Also the whole response of every other action here: each of them
+		 *	Also the whole response of the other actions here: each of them
 		 *	changes what this returns, and the frontend simply re-renders from
 		 *	it rather than patching its own copy
 		 *
@@ -135,18 +138,34 @@ namespace Nino\Modules\Navigation {
 			if( \Nino\Admin\Admin::guardPerm( $appData, $request, self::MANAGE_PERM ) === false )
 				return;
 
-			\Nino\Http::ok( $request, self::_payload( $appData ) );
+			\Nino\Http::ok( $request, self::_payload( $appData, (array) ( $appData['/nino/http/routes'] ?? [] ) ) );
 		}
 
 		/**
-		 *	Create a menu, or rename one - identified by $data['originalKey']
-		 *	(empty for a new one). A rename follows the key everywhere it is
-		 *	used as a key: the registry, keeping its place in it, and every
-		 *	route that is a member, keeping its priority. Templates are
-		 *	deliberately not rewritten - a [navigation nav="..."] argument is
-		 *	content, and silently editing template files out from under a
-		 *	developer is not this dialog's business (the renamed menu simply
-		 *	renders nowhere until the template is updated too)
+		 *	Create a menu, rename one, and/or set its complete running order -
+		 *	identified by $data['originalKey'] (empty for a new one).
+		 *
+		 *	'entries', when posted, is the menu's whole order: a list of http
+		 *	uris, every one a route the panel offers (see _candidates()), none
+		 *	twice. It is the only way entries change. Every route of the menu
+		 *	that is not in it loses its membership, the ones in it get the dense
+		 *	priorities 1..n, and what is stored for a route that is gone
+		 *	(a feature switched off) goes with the first save of that menu.
+		 *	Without 'entries' a save only creates or renames, as it always did.
+		 *
+		 *	A rename follows the key everywhere it is used as a key: the
+		 *	registry, keeping its place in it, and every route that is a member,
+		 *	keeping its priority. Templates are deliberately not rewritten - a
+		 *	[navigation nav="..."] argument is content, and silently editing
+		 *	template files out from under a developer is not this dialog's
+		 *	business (the renamed menu simply renders nowhere until the template
+		 *	is updated too)
+		 *
+		 *	Read, checked and written under one lock, and written once: the
+		 *	registry, the routes and the runtime memberships are three keys of
+		 *	one file. The persisted routes alone are written back - the live
+		 *	array also holds the routes modules register at runtime, which are
+		 *	not config.php's to keep (they are put back into it afterwards)
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
@@ -158,76 +177,129 @@ namespace Nino\Modules\Navigation {
 			if( \Nino\Admin\Admin::guardPerm( $appData, $request, self::MANAGE_PERM ) === false )
 				return;
 
-			$data 				= \Nino\Admin\Admin::postData();
-			$key 					= trim( (string) ( $data['key'] ?? '' ) );
-			$originalKey 	= trim( (string) ( $data['originalKey'] ?? '' ) );
+			// Before anything below replaces a route: what is live right now
+			$live = (array) ( $appData['/nino/http/routes'] ?? [] );
 
-			if( self::isValidKey( $key ) === false ) {
-				\Nino\Http::fail( $request, 400, 'invalid navigation id: "'. $key. '"', 'navs_invalid_id', [ $key ], 'key' );
+			if( \Nino\Filesystem::lockFile( $appData, '/config.php' ) === false ) {
+				\Nino\Http::fail( $request, 500, 'could not lock config.php for writing' );
 				return;
 			}
 
-			$registry = self::registry( $appData );
-			$routes 	= \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes'] ?? [];
+			try {
 
-			// Free means free everywhere, not just in the registry: a route
-			// carrying an unregistered menu key by hand would otherwise have
-			// its two memberships silently collapsed into one by the rename
-			// below - and a "new" menu would start out with members nobody
-			// put in it
-			if( $key !== $originalKey && self::_isTaken( $key, $registry, $routes ) === true ) {
-				\Nino\Http::fail( $request, 409, 'navigation id already taken: "'. $key. '"', 'navs_id_taken', [ $key ], 'key' );
-				return;
+				$data 				= \Nino\Admin\Admin::postData();
+				$key 					= trim( (string) ( $data['key'] ?? '' ) );
+				$originalKey 	= trim( (string) ( $data['originalKey'] ?? '' ) );
+
+				if( self::isValidKey( $key ) === false ) {
+					\Nino\Http::fail( $request, 400, 'invalid navigation id: "'. $key. '"', 'navs_invalid_id', [ $key ], 'key' );
+					return;
+				}
+
+				$config 		= \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
+				$routes 		= (array) ( $config['/nino/http/routes'] ?? [] );
+				$navroutes 	= (array) ( $config['/nino/html/navroutes'] ?? [] );
+				$registry 	= self::_storedRegistry( $config );
+
+				// Free means free everywhere, not just in the registry: a route
+				// carrying an unregistered menu key by hand would otherwise have
+				// its two memberships silently collapsed into one by the rename
+				// below - and a "new" menu would start out with members nobody
+				// put in it
+				if( $key !== $originalKey && self::_isTaken( $key, $registry, $routes, $navroutes ) === true ) {
+					\Nino\Http::fail( $request, 409, 'navigation id already taken: "'. $key. '"', 'navs_id_taken', [ $key ], 'key' );
+					return;
+				}
+
+				$index = $originalKey === '' ? null : array_search( $originalKey, $registry, true );
+
+				if( $originalKey !== '' && $index === false ) {
+					\Nino\Http::fail( $request, 404, 'unknown navigation' );
+					return;
+				}
+
+				$candidates = self::_candidates( $routes, $live );
+				$order 			= null;
+
+				if( ( $data['entries'] ?? null ) !== null ) {
+
+					if( is_array( $data['entries'] ) === false ) {
+						\Nino\Http::fail( $request, 400, 'entries must be a list of http uris', 'navs_invalid_entries' );
+						return;
+					}
+
+					$order = [];
+
+					foreach( $data['entries'] as $httpUri ) {
+
+						if( is_string( $httpUri ) === false ) {
+							\Nino\Http::fail( $request, 400, 'entries must be a list of http uris', 'navs_invalid_entries' );
+							return;
+						}
+
+						$routeKey = self::_routeKey( $httpUri );
+
+						if( in_array( $routeKey, $order, true ) === true ) {
+							\Nino\Http::fail( $request, 400, 'route listed twice: "'. $httpUri. '"', 'navs_duplicate_entry', [ $httpUri ] );
+							return;
+						}
+
+						if( isset( $candidates[$routeKey] ) === false ) {
+							\Nino\Http::fail( $request, 404, 'unknown route: "'. $httpUri. '"', 'navs_unknown_route', [ $httpUri ] );
+							return;
+						}
+
+						$order[] = $routeKey;
+					}
+				}
+
+				if( $originalKey === '' ) {
+					$registry[] = $key;
+				} else {
+
+					$registry[$index] = $key;
+
+					foreach( $routes as $routeKey => $route )
+						if( isset( $route['navs'][$originalKey] ) === true )
+							$routes[$routeKey]['navs'] = self::_renamed( $route['navs'], $originalKey, $key );
+
+					foreach( $navroutes as $routeKey => $memberships )
+						if( isset( $memberships[$originalKey] ) === true )
+							$navroutes[$routeKey] = self::_renamed( $memberships, $originalKey, $key );
+				}
+
+				if( $order !== null )
+					self::_applyOrder( $routes, $navroutes, $candidates, $key, $order );
+
+				$appData['/nino/html/navs'] = array_values( $registry );
+
+				if( $originalKey === '' && $order === null ) {
+
+					// Nothing but the registry changed
+					if( \Nino\AppData::writeContentData( $appData, [ '/nino/html/navs' ] ) === false ) {
+						\Nino\Http::fail( $request, 500, 'could not write config.php' );
+						return;
+					}
+
+					\Nino\Http::ok( $request, self::_payload( $appData, $live ) );
+					return;
+				}
+
+				if( self::_persist( $appData, $request, $routes, $navroutes, $live ) === false )
+					return;
+
+				\Nino\Http::ok( $request, self::_payload( $appData, $live ) );
+			} finally {
+				\Nino\Filesystem::unlockFile( $appData, '/config.php' );
 			}
-
-			if( $originalKey === '' ) {
-
-				$registry[] = $key;
-
-				$appData['/nino/html/navs'] = $registry;
-
-				\Nino\AppData::writeContentData( $appData, [ '/nino/html/navs' ] );
-
-				\Nino\Http::ok( $request, self::_payload( $appData ) );
-				return;
-			}
-
-			$index = array_search( $originalKey, $registry, true );
-
-			if( $index === false ) {
-				\Nino\Http::fail( $request, 404, 'unknown navigation' );
-				return;
-			}
-
-			$registry[$index] = $key;
-
-			foreach( $routes as $routeKey => $route ) {
-
-				if( isset( $route['navs'][$originalKey] ) === false )
-					continue;
-
-				// Rebuilt rather than added-and-unset, so the renamed key keeps
-				// the place it had among this route's other memberships
-				$renamed = [];
-				foreach( $route['navs'] as $navKey => $prio )
-					$renamed[ $navKey === $originalKey ? $key : $navKey ] = $prio;
-
-				$routes[$routeKey]['navs'] = $renamed;
-			}
-
-			$appData['/nino/html/navs'] 	= $registry;
-			$appData['/nino/http/routes'] = $routes;
-
-			\Nino\AppData::writeContentData( $appData, [ '/nino/html/navs', '/nino/http/routes' ] );
-
-			\Nino\Http::ok( $request, self::_payload( $appData ) );
 		}
 
 		/**
 		 *	Remove a menu: out of the registry, and off every route that was
-		 *	a member. Templates asking for it by name are left alone, same
-		 *	reasoning as apiSave()'s rename - the menu they name simply
-		 *	renders empty afterwards
+		 *	a member - the persisted ones and the runtime-only ones alike.
+		 *	Templates asking for it by name are left alone, same reasoning as
+		 *	apiSave()'s rename - the menu they name simply renders empty
+		 *	afterwards
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
@@ -239,174 +311,64 @@ namespace Nino\Modules\Navigation {
 			if( \Nino\Admin\Admin::guardPerm( $appData, $request, self::MANAGE_PERM ) === false )
 				return;
 
-			$key 			= (string) ( \Nino\Admin\Admin::postData()['key'] ?? '' );
-			$registry = self::registry( $appData );
-			$index 		= array_search( $key, $registry, true );
+			$live = (array) ( $appData['/nino/http/routes'] ?? [] );
 
-			if( $index === false ) {
-				\Nino\Http::fail( $request, 404, 'unknown navigation' );
+			if( \Nino\Filesystem::lockFile( $appData, '/config.php' ) === false ) {
+				\Nino\Http::fail( $request, 500, 'could not lock config.php for writing' );
 				return;
 			}
 
-			unset( $registry[$index] );
+			try {
 
-			$routes = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes'] ?? [];
+				$key 			= (string) ( \Nino\Admin\Admin::postData()['key'] ?? '' );
+				$config 	= \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
+				$registry = self::_storedRegistry( $config );
+				$index 		= array_search( $key, $registry, true );
 
-			foreach( $routes as $routeKey => $route ) {
+				if( $index === false ) {
+					\Nino\Http::fail( $request, 404, 'unknown navigation' );
+					return;
+				}
 
-				if( isset( $route['navs'][$key] ) === false )
-					continue;
+				unset( $registry[$index] );
 
-				unset( $routes[$routeKey]['navs'][$key] );
+				$routes 		= (array) ( $config['/nino/http/routes'] ?? [] );
+				$navroutes 	= (array) ( $config['/nino/html/navroutes'] ?? [] );
 
-				// A route in no menu at all carries no 'navs' rather than an
-				// empty one - the same shape the setup wizard writes (see its
-				// _applyWebpage()), so a config.php stays readable by hand
-				if( count( $routes[$routeKey]['navs'] ) === 0 )
-					unset( $routes[$routeKey]['navs'] );
+				foreach( $routes as $routeKey => $route ) {
+
+					if( isset( $route['navs'][$key] ) === false )
+						continue;
+
+					unset( $routes[$routeKey]['navs'][$key] );
+
+					// A route in no menu at all carries no 'navs' rather than an
+					// empty one - the same shape the setup wizard writes (see its
+					// _applyWebpage()), so a config.php stays readable by hand
+					if( count( $routes[$routeKey]['navs'] ) === 0 )
+						unset( $routes[$routeKey]['navs'] );
+				}
+
+				foreach( $navroutes as $routeKey => $memberships ) {
+
+					if( isset( $memberships[$key] ) === false )
+						continue;
+
+					unset( $navroutes[$routeKey][$key] );
+
+					if( count( $navroutes[$routeKey] ) === 0 )
+						unset( $navroutes[$routeKey] );
+				}
+
+				$appData['/nino/html/navs'] = array_values( $registry );
+
+				if( self::_persist( $appData, $request, $routes, $navroutes, $live ) === false )
+					return;
+
+				\Nino\Http::ok( $request, self::_payload( $appData, $live ) );
+			} finally {
+				\Nino\Filesystem::unlockFile( $appData, '/config.php' );
 			}
-
-			$appData['/nino/html/navs'] 	= array_values( $registry );
-			$appData['/nino/http/routes'] = $routes;
-
-			\Nino\AppData::writeContentData( $appData, [ '/nino/html/navs', '/nino/http/routes' ] );
-
-			\Nino\Http::ok( $request, self::_payload( $appData ) );
-		}
-
-		/**
-		 *	Put one route into a menu, at the end of it - a menu is a running
-		 *	order, and "somewhere in the middle" is not something an add
-		 *	button can guess. Moving it up from there is one click per step
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		array 		&$request			(reference) Current server request
-		 *
-		 *	@return 	void
-		 */
-		public static function apiAssign( array &$appData, array &$request ): void {
-
-			if( \Nino\Admin\Admin::guardPerm( $appData, $request, self::MANAGE_PERM ) === false )
-				return;
-
-			$data 		= \Nino\Admin\Admin::postData();
-			$key 			= (string) ( $data['key'] ?? '' );
-			$routeKey = self::_routeKey( (string) ( $data['httpUri'] ?? '' ) );
-
-			$routes = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes'] ?? [];
-
-			if( in_array( $key, self::registry( $appData ), true ) === false ) {
-				\Nino\Http::fail( $request, 404, 'unknown navigation' );
-				return;
-			}
-
-			if( isset( $routes[$routeKey] ) === false ) {
-				\Nino\Http::fail( $request, 404, 'unknown route' );
-				return;
-			}
-
-			if( isset( $routes[$routeKey]['navs'][$key] ) === true ) {
-				\Nino\Http::fail( $request, 409, 'route is already in this navigation', 'navs_route_present' );
-				return;
-			}
-
-			$order 	 = self::_members( $routes, $key );
-			$order[] = $routeKey;
-
-			$appData['/nino/http/routes'] = self::_applyOrder( $routes, $key, $order );
-
-			\Nino\AppData::writeContentData( $appData, [ '/nino/http/routes' ] );
-
-			\Nino\Http::ok( $request, self::_payload( $appData ) );
-		}
-
-		/**
-		 *	Take one route back out of a menu. Only its membership goes - the
-		 *	route itself, and everything else about it, is the Routes module's
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		array 		&$request			(reference) Current server request
-		 *
-		 *	@return 	void
-		 */
-		public static function apiUnassign( array &$appData, array &$request ): void {
-
-			if( \Nino\Admin\Admin::guardPerm( $appData, $request, self::MANAGE_PERM ) === false )
-				return;
-
-			$data 		= \Nino\Admin\Admin::postData();
-			$key 			= (string) ( $data['key'] ?? '' );
-			$routeKey = self::_routeKey( (string) ( $data['httpUri'] ?? '' ) );
-
-			$routes = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes'] ?? [];
-
-			if( isset( $routes[$routeKey]['navs'][$key] ) === false ) {
-				\Nino\Http::fail( $request, 404, 'route is not in this navigation' );
-				return;
-			}
-
-			unset( $routes[$routeKey]['navs'][$key] );
-
-			if( count( $routes[$routeKey]['navs'] ) === 0 )
-				unset( $routes[$routeKey]['navs'] );
-
-			// The gap the removed entry left is closed right away, so the
-			// numbers in config.php keep reading as positions
-			$appData['/nino/http/routes'] = self::_applyOrder( $routes, $key, self::_members( $routes, $key ) );
-
-			\Nino\AppData::writeContentData( $appData, [ '/nino/http/routes' ] );
-
-			\Nino\Http::ok( $request, self::_payload( $appData ) );
-		}
-
-		/**
-		 *	Swap one entry with its neighbor inside one menu - the same ↑/↓
-		 *	reordering the Routes module's own list has, except that this one
-		 *	really is the menu's order rather than the route array's
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		array 		&$request			(reference) Current server request
-		 *
-		 *	@return 	void
-		 */
-		public static function apiMove( array &$appData, array &$request ): void {
-
-			if( \Nino\Admin\Admin::guardPerm( $appData, $request, self::MANAGE_PERM ) === false )
-				return;
-
-			$data 			= \Nino\Admin\Admin::postData();
-			$key 				= (string) ( $data['key'] ?? '' );
-			$routeKey 	= self::_routeKey( (string) ( $data['httpUri'] ?? '' ) );
-			$direction 	= (string) ( $data['direction'] ?? '' );
-
-			if( in_array( $direction, [ 'up', 'down' ], true ) === false ) {
-				\Nino\Http::fail( $request, 400, 'direction must be "up" or "down"' );
-				return;
-			}
-
-			$routes = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes'] ?? [];
-			$order 	= self::_members( $routes, $key );
-			$index 	= array_search( $routeKey, $order, true );
-
-			if( $index === false ) {
-				\Nino\Http::fail( $request, 404, 'route is not in this navigation' );
-				return;
-			}
-
-			$swapWith = $direction === 'up' ? $index - 1 : $index + 1;
-
-			if( $swapWith < 0 || $swapWith >= count( $order ) ) {
-				\Nino\Http::fail( $request, 400, 'already at the '. ( $direction === 'up' ? 'top' : 'bottom' ), $direction === 'up' ? 'already_top' : 'already_bottom' );
-				return;
-			}
-
-			[ $order[$index], $order[$swapWith] ] = [ $order[$swapWith], $order[$index] ];
-
-			$appData['/nino/http/routes'] = self::_applyOrder( $routes, $key, $order );
-
-			\Nino\AppData::writeContentData( $appData, [ '/nino/http/routes' ] );
-
-			\Nino\Http::ok( $request, self::_payload( $appData ) );
 		}
 
 		/**
@@ -424,9 +386,31 @@ namespace Nino\Modules\Navigation {
 		 */
 		public static function registry( array &$appData ): array {
 
-			$navs = $appData['/nino/html/navs'] ?? [];
+			return self::_normalised( $appData['/nino/html/navs'] ?? [] );
+		}
 
-			return array_values( array_unique( array_map( 'strval', $navs ) ) );
+		/**
+		 *	The registry as config.php holds it right now, which is what a
+		 *	save or a delete has to start from: $appData carries the copy that
+		 *	was loaded when the request began, and a concurrent request may
+		 *	have changed the file since. A config.php without the key means the
+		 *	framework default, as it does at boot
+		 *
+		 *	@param		array 		$config				The content of config.php, read under the lock
+		 *
+		 *	@return 	array										See registry()
+		 */
+		private static function _storedRegistry( array $config ): array {
+			return self::_normalised( $config['/nino/html/navs'] ?? \Nino\AppData::DEFAULTS['/nino/html/navs'] );
+		}
+
+		/**
+		 *	@param		mixed 		$navs					A '/nino/html/navs' value
+		 *
+		 *	@return 	array										Unique menu keys as strings, re-indexed
+		 */
+		private static function _normalised( mixed $navs ): array {
+			return array_values( array_unique( array_map( 'strval', (array) $navs ) ) );
 		}
 
 		/**
@@ -436,10 +420,11 @@ namespace Nino\Modules\Navigation {
 		 *	@param		string		$key
 		 *	@param		array 		$registry			See registry()
 		 *	@param		array 		$routes				The persisted route array
+		 *	@param		array 		$navroutes		The runtime-only memberships, route key =&gt; [ menu =&gt; prio ]
 		 *
 		 *	@return 	bool
 		 */
-		private static function _isTaken( string $key, array $registry, array $routes ): bool {
+		private static function _isTaken( string $key, array $registry, array $routes, array $navroutes ): bool {
 
 			if( in_array( $key, $registry, true ) === true )
 				return true;
@@ -448,25 +433,120 @@ namespace Nino\Modules\Navigation {
 				if( isset( $route['navs'][$key] ) === true )
 					return true;
 
+			foreach( $navroutes as $memberships )
+				if( isset( $memberships[$key] ) === true )
+					return true;
+
 			return false;
 		}
 
 		/**
-		 *	The route keys standing in one menu, in their running order -
-		 *	priority first, the route array's own order breaking a tie, which
-		 *	is exactly the order \Nino\Modules\Navigation::routeLines() renders
+		 *	A route's memberships with one menu key renamed, the others and
+		 *	their order left as they are
+		 *
+		 *	@param		array 		$memberships	menu =&gt; priority
+		 *	@param		string		$from
+		 *	@param		string		$to
+		 *
+		 *	@return 	array
+		 */
+		private static function _renamed( array $memberships, string $from, string $to ): array {
+
+			$renamed = [];
+			foreach( $memberships as $navKey => $prio )
+				$renamed[ $navKey === $from ? $to : $navKey ] = $prio;
+
+			return $renamed;
+		}
+
+		/**
+		 *	The routes a menu could contain: every persisted GET route, and
+		 *	every GET route that exists only at runtime - live, but not in
+		 *	config.php - which a feature or a module registers in its init()
+		 *	(Posts' /blog). Technical routes stay in: robots.txt, sitemap.xml,
+		 *	llms.txt and the dot-routes are routes like any other, and it is the
+		 *	menu's owner who knows what a visitor should see. Out are what no
+		 *	link can point at, among the runtime-only routes: a wildcard route
+		 *	(a key ending in /*), and the workbench itself, /_admin and
+		 *	everything below it, the recovery page included. A route persisted
+		 *	in config.php is offered as it always was
 		 *
 		 *	@param		array 		$routes				The persisted route array
+		 *	@param		array 		$live					The live route array, as it was before this request replaced anything
+		 *
+		 *	@return 	array										Route key =&gt; [ 'route' =&gt; the route, 'runtime' =&gt; whether it is runtime-only ]
+		 */
+		private static function _candidates( array $routes, array $live ): array {
+
+			$candidates = [];
+
+			foreach( $routes as $routeKey => $route )
+				if( str_starts_with( (string) $routeKey, 'GET://' ) === true && is_array( $route ) === true )
+					$candidates[$routeKey] = [ 'route' => $route, 'runtime' => false ];
+
+			foreach( $live as $routeKey => $route ) {
+
+				$routeKey = (string) $routeKey;
+
+				if( isset( $candidates[$routeKey] ) === true || isset( $routes[$routeKey] ) === true || is_array( $route ) === false )
+					continue;
+
+				if( str_starts_with( $routeKey, 'GET://' ) === false || str_ends_with( $routeKey, '/*' ) === true )
+					continue;
+
+				if( $routeKey === 'GET://_admin' || str_starts_with( $routeKey, 'GET://_admin/' ) === true )
+					continue;
+
+				$candidates[$routeKey] = [ 'route' => $route, 'runtime' => true ];
+			}
+
+			return $candidates;
+		}
+
+		/**
+		 *	The priority one route holds in one menu: its own 'navs' first,
+		 *	then what '/nino/html/navroutes' says for it - the order the
+		 *	\Nino\Modules\Navigation shortcode reads them in
+		 *
+		 *	@param		array 		$routes				The persisted route array
+		 *	@param		array 		$navroutes		The runtime-only memberships
+		 *	@param		string		$routeKey
+		 *	@param		string		$navKey
+		 *
+		 *	@return 	int|null								Null when the route is not in this menu
+		 */
+		private static function _priority( array $routes, array $navroutes, string $routeKey, string $navKey ): ?int {
+
+			$own = $routes[$routeKey]['navs'][$navKey] ?? null;
+
+			if( $own !== null )
+				return (int) $own;
+
+			// Only an int counts here, as \Nino\Modules\Navigation::_runtimePriority()
+			// reads it: a hand-written '3' never renders, so it is no member
+			$prio = $navroutes[$routeKey][$navKey] ?? null;
+
+			return is_int( $prio ) === true ? $prio : null;
+		}
+
+		/**
+		 *	The route keys standing in one menu, in their running order -
+		 *	priority first, the order the candidates stand in breaking a tie,
+		 *	which is the order \Nino\Modules\Navigation::routeLines() renders
+		 *
+		 *	@param		array 		$routes				The persisted route array
+		 *	@param		array 		$navroutes		The runtime-only memberships
+		 *	@param		array 		$candidates		See _candidates()
 		 *	@param		string		$navKey
 		 *
 		 *	@return 	array										Route keys, eg. [ 'GET://', 'GET://contact' ]
 		 */
-		private static function _members( array $routes, string $navKey ): array {
+		private static function _members( array $routes, array $navroutes, array $candidates, string $navKey ): array {
 
 			$members = [];
-			foreach( $routes as $routeKey => $route )
-				if( str_starts_with( $routeKey, 'GET://' ) === true && isset( $route['navs'][$navKey] ) === true )
-					$members[$routeKey] = (int) $route['navs'][$navKey];
+			foreach( $candidates as $routeKey => $candidate )
+				if( ( $prio = self::_priority( $routes, $navroutes, $routeKey, $navKey ) ) !== null )
+					$members[$routeKey] = $prio;
 
 			// asort() is stable as of php 8, so equal priorities keep the
 			// order the routes stand in rather than an arbitrary one
@@ -476,26 +556,96 @@ namespace Nino\Modules\Navigation {
 		}
 
 		/**
-		 *	Write one menu's running order back onto its routes as dense
-		 *	priorities, 1..n. Renumbering on every change is what keeps the
-		 *	numbers in config.php readable as positions - and what makes
-		 *	"move up" a swap of two adjacent numbers rather than arithmetic
-		 *	on whatever gaps a previous edit happened to leave
+		 *	Set one menu's running order: its routes in $order get the dense
+		 *	priorities 1..n, every other route of the menu - and whatever is
+		 *	stored for a runtime route that is not there any more - leaves it.
+		 *	Dense numbers keep config.php readable as positions. A persisted
+		 *	route keeps its membership on itself (and a route with none left
+		 *	carries no 'navs' at all, the shape the wizard writes), a
+		 *	runtime-only one in $navroutes
 		 *
-		 *	@param		array 		$routes				The persisted route array
+		 *	@param		array 		&$routes			(reference) The persisted route array
+		 *	@param		array 		&$navroutes		(reference) The runtime-only memberships
+		 *	@param		array 		$candidates		See _candidates()
 		 *	@param		string		$navKey
 		 *	@param		array 		$order				Route keys, in the intended order
 		 *
-		 *	@return 	array
+		 *	@return 	void
 		 */
-		private static function _applyOrder( array $routes, string $navKey, array $order ): array {
+		private static function _applyOrder( array &$routes, array &$navroutes, array $candidates, string $navKey, array $order ): void {
+
+			foreach( $routes as $routeKey => $route ) {
+
+				if( isset( $candidates[$routeKey] ) === false || isset( $route['navs'][$navKey] ) === false )
+					continue;
+
+				unset( $routes[$routeKey]['navs'][$navKey] );
+
+				if( count( $routes[$routeKey]['navs'] ) === 0 )
+					unset( $routes[$routeKey]['navs'] );
+			}
+
+			foreach( $navroutes as $routeKey => $memberships ) {
+
+				if( isset( $memberships[$navKey] ) === false )
+					continue;
+
+				unset( $navroutes[$routeKey][$navKey] );
+
+				if( count( $navroutes[$routeKey] ) === 0 )
+					unset( $navroutes[$routeKey] );
+			}
 
 			$prio = 1;
-			foreach( $order as $routeKey )
-				if( isset( $routes[$routeKey] ) === true )
-					$routes[$routeKey]['navs'][$navKey] = $prio++;
+			foreach( $order as $routeKey ) {
 
-			return $routes;
+				if( isset( $routes[$routeKey] ) === true )
+					$routes[$routeKey]['navs'][$navKey] = $prio;
+				else
+					$navroutes[$routeKey][$navKey] = $prio;
+
+				$prio++;
+			}
+		}
+
+		/**
+		 *	Write the three keys one save or delete changed, and put the live
+		 *	route array back as it was
+		 *
+		 *	writeContentData() serializes what $appData holds under a key, and
+		 *	the live '/nino/http/routes' also carries the routes modules
+		 *	registered at runtime - config.php must get the persisted ones
+		 *	only, so that is what is assigned for the write. It is not what is
+		 *	left behind: the rest of this request, and the response, still see
+		 *	the runtime routes
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		&$request			(reference) Current server request
+		 *	@param		array 		$routes				The persisted route array to write
+		 *	@param		array 		$navroutes		The runtime-only memberships to write
+		 *	@param		array 		$live					The live route array from before
+		 *
+		 *	@return 	bool										False when config.php could not be written, the response says so
+		 */
+		private static function _persist( array &$appData, array &$request, array $routes, array $navroutes, array $live ): bool {
+
+			$appData['/nino/http/routes'] = $routes;
+
+			// Absent rather than empty: a project with no runtime memberships
+			// has no such key in its config.php
+			if( count( $navroutes ) === 0 )
+				unset( $appData['/nino/html/navroutes'] );
+			else
+				$appData['/nino/html/navroutes'] = $navroutes;
+
+			$written = \Nino\AppData::writeContentData( $appData, [ '/nino/html/navs', '/nino/http/routes', '/nino/html/navroutes' ] );
+
+			$appData['/nino/http/routes'] = array_merge( $live, $routes );
+
+			if( $written === false )
+				\Nino\Http::fail( $request, 500, 'could not write config.php' );
+
+			return $written;
 		}
 
 		/**
@@ -517,19 +667,23 @@ namespace Nino\Modules\Navigation {
 		 *	the Navigation module that renders any of this is even active
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		$live					The live route array, as it was before this request replaced anything
 		 *
 		 *	@return 	array
 		 */
-		private static function _payload( array &$appData ): array {
+		private static function _payload( array &$appData, array $live ): array {
 
-			$routes = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes'] ?? [];
-			$labels = self::_labels( $appData, $routes );
+			$config 		= \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
+			$routes 		= (array) ( $config['/nino/http/routes'] ?? [] );
+			$navroutes 	= (array) ( $config['/nino/html/navroutes'] ?? [] );
+			$candidates = self::_candidates( $routes, $live );
+			$labels 		= self::_labels( $appData, $candidates );
 
 			$navs = [];
 			foreach( self::registry( $appData ) as $key ) {
 
 				$entries = [];
-				foreach( self::_members( $routes, $key ) as $routeKey )
+				foreach( self::_members( $routes, $navroutes, $candidates, $key ) as $routeKey )
 					$entries[] = $labels[$routeKey];
 
 				$navs[] = [ 'key' => $key, 'entries' => $entries ];
@@ -549,17 +703,18 @@ namespace Nino\Modules\Navigation {
 		 *	Every GET route qualifies, not just the page ones the Routes
 		 *	module manages - a menu entry is only ever "a path with a name",
 		 *	and a route a module or a developer owns is as good a target as
-		 *	any. 'named' reports whether the /webpage&lt;uri&gt;/name key the menu
+		 *	any, one that exists only at runtime included ('runtime').
+		 *	'named' reports whether the /webpage&lt;uri&gt;/name key the menu
 		 *	renders from resolves at all: a route without one is skipped by
 		 *	\Nino\Modules\Navigation::routeLines(), so offering it silently
 		 *	would be offering an entry that never shows up
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		array 		$routes				The persisted route array
+		 *	@param		array 		$candidates		See _candidates()
 		 *
-		 *	@return 	array										Route key => { httpUri, uri, label, named }
+		 *	@return 	array										Route key =&gt; { httpUri, uri, label, named, runtime }
 		 */
-		private static function _labels( array &$appData, array $routes ): array {
+		private static function _labels( array &$appData, array $candidates ): array {
 
 			/*	The menu resolves the name through the fill engine, and that
 				merges the locale-independent global.php under the file of the
@@ -583,13 +738,10 @@ namespace Nino\Modules\Navigation {
 
 			$labels = [];
 
-			foreach( $routes as $routeKey => $route ) {
-
-				if( str_starts_with( $routeKey, 'GET://' ) === false )
-					continue;
+			foreach( $candidates as $routeKey => $candidate ) {
 
 				$httpUri 	= substr( $routeKey, strlen( 'GET:/' ) );
-				$uri 			= (string) ( $route['uri'] ?? $httpUri );
+				$uri 			= (string) ( $candidate['route']['uri'] ?? $httpUri );
 				$name 		= '';
 
 				foreach( $texts as $fills )
@@ -601,6 +753,7 @@ namespace Nino\Modules\Navigation {
 					'uri' 		=> $uri,
 					'label' 	=> $name !== '' ? $name : $httpUri,
 					'named' 	=> $name !== '',
+					'runtime' => $candidate['runtime'],
 				];
 			}
 

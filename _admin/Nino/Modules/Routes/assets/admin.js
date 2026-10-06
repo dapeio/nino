@@ -6,7 +6,8 @@
  *													routes without hand-editing /nino/http/routes as raw json
  *													(Config still covers everything this doesn't). The
  *													template select only ever offers a templates/page-*.tpl
- *													file that already exists on disk - see the panel's own
+ *													file that already exists on disk, and a new route starts
+ *													with every field empty - see the panel's own
  *													Admin/Admin.php class docblock for the Element URI/Http
  *													URI split every entry carries. List + drill-down-form
  *													shape follows slots.js closely; the list's own ↑/↓ buttons
@@ -26,7 +27,9 @@
 
 		_pages 					: [],
 		_templates 			: [],
+		_defaultTemplate : '',
 		_locales 				: [],
+		_selectedLocale : '',
 		_navs 					: [],
 		_currentHttpUri : null,
 		_isNew 					: false,
@@ -46,10 +49,12 @@
 				if( status !== 200 || response === null )
 					return Nino.admin.routes._showError( dc.getElementById('routes-list'), status, response );
 
-				Nino.admin.routes._pages 			= response.pages;
-				Nino.admin.routes._templates 	= response.templates;
-				Nino.admin.routes._locales 		= response.locales;
-				Nino.admin.routes._navs 			= response.navs;
+				Nino.admin.routes._pages 						= response.pages;
+				Nino.admin.routes._templates 				= response.templates;
+				Nino.admin.routes._defaultTemplate 	= response.defaultTemplate || '';
+				Nino.admin.routes._locales 					= response.locales;
+				Nino.admin.routes._selectedLocale 	= response.selectedLocale || '';
+				Nino.admin.routes._navs 						= response.navs;
 				Nino.admin.routes._renderList();
 				Nino.admin.routes._showList();
 				Nino.admin.routes._ready = true;
@@ -109,9 +114,10 @@
 		},
 
 		/**
-		 *	Render the page list, plus a "New page" action below it. Each
-		 *	row's ↑/↓ buttons reorder the persisted list and the routes with
-		 *	it - equal menu priorities follow route order, so this is what
+		 *	Render the page list, plus a "New page" action below it. A row is
+		 *	the page's name over its path, and a link that opens the page
+		 *	itself; its ↑/↓ buttons reorder the persisted list and the routes
+		 *	with it - equal menu priorities follow route order, so this is what
 		 *	orders the menus (see Admin.php's apiMove())
 		 *
 		 *	@return		void
@@ -131,20 +137,35 @@
 				const li = dc.createElement('li');
 				li.className = 'admin-page-row';
 
-				// An entry whose body resolves its template at runtime has no
-				// single template name to show (see _renderForm()) - report
-				// the body it does have rather than an empty arrow
-				const target = entry.template || entry.body || '?';
-
+				// Names are editor content: textContent, never markup. The template
+				// and the Element URI are in the form, not on the row
 				const link = dc.createElement('a');
 				link.href = '#';
-				const label = dc.createElement('span');
-				label.className = 'admin-page-label';
-				label.textContent = entry.httpUri+ ' → '+ target+
-					( entry.uri !== entry.httpUri ? '  ('+ entry.uri+ ')' : '' );
-				link.appendChild( label );
+				const copy = dc.createElement('span');
+				copy.className = 'nino-admin-list-copy';
+				const name = dc.createElement('strong');
+				name.textContent = Nino.admin.routes._pageName( entry );
+				copy.appendChild( name );
+				const path = dc.createElement('small');
+				path.textContent = entry.httpUri;
+				copy.appendChild( path );
+				link.appendChild( copy );
 				link.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.routes._openForm( entry ) } );
 				li.appendChild( link );
+
+				// The page itself, in a tab of its own. Only for a path that is a
+				// path below this site: a '//host' would be read as another origin
+				if( entry.httpUri.charAt(0) === '/' && entry.httpUri.charAt(1) !== '/' ) {
+					const open = dc.createElement('a');
+					open.className = 'admin-page-open';
+					open.href = Nino.admin.assetUrl( entry.httpUri );
+					open.target = '_blank';
+					open.rel = 'noopener';
+					open.textContent = '↗';
+					open.title = Nino.content.getText('/_admin/routes/label/open');
+					open.setAttribute( 'aria-label', Nino.content.getText('/_admin/routes/label/open') );
+					li.appendChild( open );
+				}
 
 				const moveWrap = dc.createElement('span');
 				moveWrap.className = 'admin-page-move';
@@ -187,6 +208,30 @@
 			addBtn.textContent = Nino.content.getText('/_admin/routes/label/new');
 			addBtn.addEventListener( 'click', function() { Nino.admin.routes._openForm( null ) } );
 			wrap.appendChild( Nino.adminUi.listActions( [ addBtn ] ) );
+		},
+
+		/**
+		 *	What a page is called in the list: its name in the language the
+		 *	workbench is on, else in the first language that has one, else its
+		 *	path - a page with no name at all is still a row somebody can open
+		 *
+		 *	@param		{Object}	entry
+		 *
+		 *	@return		{string}
+		 */
+		_pageName : function( entry ) {
+
+			const nameIn = function( locale ) {
+				return String( ( ( entry.text || {} )[locale] || {} ).name || '' ).trim();
+			};
+
+			const locales = [ Nino.admin.routes._selectedLocale ].concat( Nino.admin.routes._locales );
+
+			for( let i = 0; i < locales.length; i++ )
+				if( locales[i] !== '' && nameIn( locales[i] ) !== '' )
+					return nameIn( locales[i] );
+
+			return entry.httpUri;
 		},
 
 		/**
@@ -264,8 +309,9 @@
 		},
 
 		/**
-		 *	Open the editor for an existing page, or a blank (uri-suggested)
-		 *	one for a new page
+		 *	Open the editor for an existing page, or an empty one for a new
+		 *	page - nothing is suggested but the template, and that only when
+		 *	the project has a blank page (see Admin.php's apiList())
 		 *
 		 *	@param		{Object|null}	entry		One entry from _pages, or null to create new
 		 *
@@ -276,49 +322,17 @@
 			Nino.admin.routes._isNew 					= entry === null;
 			Nino.admin.routes._currentHttpUri = entry ? entry.httpUri : null;
 
-			let initial = entry;
-			if( entry === null ) {
-				const freeUri = Nino.admin.routes._freeUri( function( e ) { return e.uri } );
-				initial = {
-					uri 			: freeUri,
-					httpUri 	: Nino.admin.routes._freeUri( function( e ) { return e.httpUri }, freeUri ),
-					template 	: Nino.admin.routes._templates[0] || '',
-				};
-			}
-
-			Nino.admin.routes._renderForm( initial );
+			Nino.admin.routes._renderForm( entry || { uri : '', httpUri : '', template : Nino.admin.routes._defaultTemplate } );
 			Nino.admin.routes._showForm();
-		},
-
-		/**
-		 *	@param		{Function}	pick				Reads the field to check for a collision off one entry
-		 *	@param		{string}		[preferred]	Tried first, as-is, before falling back to '/new-page[-N]'
-		 *
-		 *	@return		{string}		$preferred (if free), else '/new-page', '/new-page-2', ... -
-		 *												whichever isn't taken yet
-		 */
-		_freeUri : function( pick, preferred ) {
-
-			const taken = Nino.admin.routes._pages.map( pick );
-
-			if( preferred !== undefined && taken.indexOf( preferred ) === -1 )
-				return preferred;
-
-			let uri = '/new-page';
-			let n 	= 2;
-
-			while( taken.indexOf( uri ) !== -1 ) {
-				uri = '/new-page-'+ n;
-				n++;
-			}
-
-			return uri;
 		},
 
 		/**
 		 *	Render the page editor: back-link, Element/Http URI, template,
 		 *	status code, nav (only while the Navigation module is active),
-		 *	one name/title/description row per active locale, save/delete
+		 *	one name/title/description row per active locale, save/delete.
+		 *	The form checks its required fields itself (see _save()), so the
+		 *	browser's own bubble - in the browser's language, not the
+		 *	workbench's - never gets to speak
 		 *
 		 *	@param		{Object}	entry
 		 *
@@ -337,6 +351,7 @@
 			wrap.appendChild( Nino.admin.formToolbar( backLink ) );
 
 			const form = dc.createElement('form');
+			form.noValidate = true;
 
 			// Both fieldsets get their card/white-background look for free
 			// from the design system's generic `fieldset { ... }`
@@ -352,6 +367,7 @@
 			uriLabel.className = 'nino-admin-field';
 			const uriSpan = dc.createElement('span');
 			uriSpan.textContent = Nino.content.getText('/_admin/routes/label/uri');
+			uriSpan.appendChild( Nino.admin.routes._star() );
 			uriLabel.appendChild( uriSpan );
 			const uriInput = dc.createElement('input');
 			uriInput.type = 'text';
@@ -359,6 +375,7 @@
 			uriInput.placeholder = Nino.content.getText('/_admin/routes/placeholder/uri');
 			uriInput.value = entry.uri || '';
 			uriInput.required = true;
+			uriInput.setAttribute( 'aria-required', 'true' );
 			uriLabel.appendChild( uriInput );
 			pageFieldset.appendChild( uriLabel );
 
@@ -366,6 +383,7 @@
 			httpUriLabel.className = 'nino-admin-field';
 			const httpUriSpan = dc.createElement('span');
 			httpUriSpan.textContent = Nino.content.getText('/_admin/routes/label/httpuri');
+			httpUriSpan.appendChild( Nino.admin.routes._star() );
 			httpUriLabel.appendChild( httpUriSpan );
 			const httpUriInput = dc.createElement('input');
 			httpUriInput.type = 'text';
@@ -373,6 +391,7 @@
 			httpUriInput.placeholder = Nino.content.getText('/_admin/routes/placeholder/httpuri');
 			httpUriInput.value = entry.httpUri || '';
 			httpUriInput.required = true;
+			httpUriInput.setAttribute( 'aria-required', 'true' );
 			httpUriLabel.appendChild( httpUriInput );
 			pageFieldset.appendChild( httpUriLabel );
 
@@ -380,9 +399,27 @@
 			templateLabel.className = 'nino-admin-field';
 			const templateSpan = dc.createElement('span');
 			templateSpan.textContent = Nino.content.getText('/_admin/routes/label/template');
+			templateSpan.appendChild( Nino.admin.routes._star() );
 			templateLabel.appendChild( templateSpan );
 			const templateSelect = dc.createElement('select');
 			templateSelect.id = 'routes-form-template';
+			templateSelect.required = true;
+
+			// A route with no template of its own to start on - a new one in a
+			// project without a blank page, or one whose file is gone - makes
+			// the person choose: the first file in the list is not a proposal,
+			// it is the one that happens to sort first. A body that names its
+			// template at runtime has its own option below
+			const fixedBody = entry.body !== undefined && entry.body !== '' && Nino.admin.routes._templateFromBody( entry.body ) === null;
+
+			if( fixedBody === false && Nino.admin.routes._templates.indexOf( entry.template ) === -1 ) {
+				const choose = dc.createElement('option');
+				choose.value = '';
+				choose.textContent = Nino.content.getText('/_admin/routes/label/choose');
+				choose.disabled = true;
+				choose.selected = true;
+				templateSelect.appendChild( choose );
+			}
 			Nino.admin.routes._templates.forEach( function( name ) {
 				const option = dc.createElement('option');
 				option.value = name;
@@ -399,7 +436,7 @@
 			// keeps that body either way (see Admin.php's apiSave()),
 			// so the select is disabled rather than left looking as if it
 			// still decided anything
-			if( entry.body !== undefined && entry.body !== '' && Nino.admin.routes._templateFromBody( entry.body ) === null ) {
+			if( fixedBody === true ) {
 
 				// Its own, selected option - without one the browser falls back
 				// to the first real template in the list, leaving the (disabled)
@@ -456,6 +493,11 @@
 			contentLegend.textContent = Nino.content.getText('/_admin/routes/label/content');
 			contentFieldset.appendChild( contentLegend );
 
+			const contentHint = dc.createElement('p');
+			contentHint.className = 'nino-admin-hint';
+			contentHint.textContent = Nino.content.getText('/_admin/routes/hint/required');
+			contentFieldset.appendChild( contentHint );
+
 			const localesWrap = dc.createElement('div');
 			localesWrap.id = 'routes-form-locales';
 			Nino.admin.routes._locales.forEach( function( locale ) {
@@ -501,6 +543,20 @@
 		},
 
 		/**
+		 *	The mark after the name of a field that cannot be left empty - drawn
+		 *	aria-hidden, the control says it with aria-required
+		 *
+		 *	@return		{Element}
+		 */
+		_star : function() {
+			const star = dc.createElement('span');
+			star.className = 'nino-admin-required';
+			star.setAttribute( 'aria-hidden', 'true' );
+			star.textContent = ' *';
+			return star;
+		},
+
+		/**
 		 *	@param		{string}	locale
 		 *	@param		{Object}	values		{ name, title, description }
 		 *
@@ -520,6 +576,8 @@
 			const name = dc.createElement('input');
 			name.type = 'text';
 			name.placeholder = Nino.content.getText('/_admin/routes/placeholder/name');
+			name.setAttribute( 'aria-label', Nino.adminUi.format( Nino.content.getText('/_admin/routes/aria/name'), locale ) );
+			name.setAttribute( 'aria-required', 'true' );
 			name.dataset.field = 'name';
 			name.value = values.name || '';
 			row.appendChild( name );
@@ -527,6 +585,8 @@
 			const title = dc.createElement('input');
 			title.type = 'text';
 			title.placeholder = Nino.content.getText('/_admin/routes/placeholder/title');
+			title.setAttribute( 'aria-label', Nino.adminUi.format( Nino.content.getText('/_admin/routes/aria/title'), locale ) );
+			title.setAttribute( 'aria-required', 'true' );
 			title.dataset.field = 'title';
 			title.value = values.title || '';
 			row.appendChild( title );
@@ -534,6 +594,7 @@
 			const description = dc.createElement('textarea');
 			description.rows = 2;
 			description.placeholder = Nino.content.getText('/_admin/routes/placeholder/description');
+			description.setAttribute( 'aria-label', Nino.adminUi.format( Nino.content.getText('/_admin/routes/aria/description'), locale ) );
 			description.dataset.field = 'description';
 			description.value = values.description || '';
 			row.appendChild( description );
@@ -559,7 +620,6 @@
 			};
 
 			const msg = dc.getElementById('routes-form-msg');
-			msg.textContent = Nino.content.getText('/_admin/common/msg/saving');
 
 			const text = {};
 			dc.querySelectorAll('#routes-form-locales [data-locale]').forEach( function( row ) {
@@ -569,6 +629,41 @@
 					description : row.querySelector('[data-field="description"]').value,
 				};
 			} );
+
+			/*	The required fields are checked here, before a request: the
+				form is not validated by the browser (see _renderForm()), and
+				a name or a title nobody wrote would render as the raw
+				[[/webpage.../name]] on the page and in the menu. Every
+				attempt starts without the marks of the one before; the first
+				field that fails takes the focus, and the message is the
+				workbench's own	*/
+			dc.querySelectorAll('#routes-form [aria-invalid]').forEach( function( field ) {
+				field.removeAttribute('aria-invalid');
+			} );
+
+			const missing = [];
+			const need = function( field ) {
+				if( field !== null && field.disabled !== true && String( field.value ).trim() === '' )
+					missing.push( field );
+			};
+
+			need( dc.getElementById('routes-form-uri') );
+			need( dc.getElementById('routes-form-http-uri') );
+			need( dc.getElementById('routes-form-template') );
+			dc.querySelectorAll('#routes-form-locales [data-locale]').forEach( function( row ) {
+				need( row.querySelector('[data-field="name"]') );
+				need( row.querySelector('[data-field="title"]') );
+			} );
+
+			if( missing.length > 0 ) {
+				missing.forEach( function( field ) { field.setAttribute( 'aria-invalid', 'true' ) } );
+				missing[0].focus();
+				msg.textContent = Nino.content.getText('/_admin/routes/error/required');
+				report( false );
+				return;
+			}
+
+			msg.textContent = Nino.content.getText('/_admin/common/msg/saving');
 
 			const navs = [];
 			dc.querySelectorAll('#routes-form [data-nav]').forEach( function( input ) {
@@ -599,15 +694,77 @@
 		},
 
 		/**
+		 *	What a delete leaves behind, in words, built from what the list
+		 *	already holds: the page's texts (the keys of the languages that hold
+		 *	a value, and the path fill) and the template file - shared with how
+		 *	many other routes, or with none. A route that resolves its template
+		 *	at runtime names its body instead, there is no single file to name
+		 *
+		 *	@return		{string}
+		 */
+		_staysLine : function() {
+
+			const entry = Nino.admin.routes._pages.find( function( page ) { return page.httpUri === Nino.admin.routes._currentHttpUri } );
+
+			if( entry === undefined )
+				return '';
+
+			const fields = [];
+			const locales = [];
+
+			Nino.admin.routes._locales.forEach( function( locale ) {
+				const row = ( entry.text || {} )[locale] || {};
+				let held = false;
+
+				[ 'name', 'title', 'description' ].forEach( function( field ) {
+					if( String( row[field] || '' ).trim() === '' )
+						return;
+					held = true;
+					if( fields.indexOf( field ) === -1 )
+						fields.push( field );
+				} );
+
+				if( held === true )
+					locales.push( locale );
+			} );
+
+			const base = '/webpage'+ entry.uri;
+			const keys = [];
+			if( fields.length > 0 )
+				keys.push( base+ '/'+ fields.join('|')+ ' ('+ locales.join(', ')+ ')' );
+			keys.push( base+ '/uri' );
+
+			const stays = [ Nino.adminUi.format( Nino.content.getText('/_admin/routes/confirm/stays-texts'), keys.join(', ') ) ];
+
+			if( entry.template === '' ) {
+				stays.push( Nino.adminUi.format( Nino.content.getText('/_admin/routes/confirm/stays-body'), entry.body ) );
+				return stays.join('; ');
+			}
+
+			const others = Nino.admin.routes._pages.filter( function( page ) { return page.template === entry.template && page.httpUri !== entry.httpUri } ).length;
+
+			if( others === 0 )
+				stays.push( Nino.adminUi.format( Nino.content.getText('/_admin/routes/confirm/stays-template'), entry.template ) );
+			else if( others === 1 )
+				stays.push( Nino.adminUi.format( Nino.content.getText('/_admin/routes/confirm/stays-template-one'), entry.template ) );
+			else
+				stays.push( Nino.adminUi.format( Nino.content.getText('/_admin/routes/confirm/stays-template-shared'), entry.template, others ) );
+
+			return stays.join('; ');
+		},
+
+		/**
 		 *	Confirm, then delete the page currently open. Its route is
 		 *	removed; any /webpage.../name,title,description text meta is
-		 *	left in place, same additive-only rule the rest of Nino follows
+		 *	left in place, same additive-only rule the rest of Nino follows -
+		 *	and so is its template file, which is why the question says
+		 *	what stays (see _staysLine())
 		 *
 		 *	@return		void
 		 */
 		_delete : function() {
 
-			if( wn.confirm( Nino.content.getText('/_admin/routes/confirm/delete').replace( '%s', Nino.admin.routes._currentHttpUri ) ) === false )
+			if( wn.confirm( Nino.adminUi.format( Nino.content.getText('/_admin/routes/confirm/delete-left'), Nino.admin.routes._currentHttpUri, Nino.admin.routes._staysLine() ) ) === false )
 				return;
 
 			const msg = dc.getElementById('routes-form-msg');

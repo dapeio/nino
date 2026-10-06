@@ -1028,7 +1028,9 @@ check( '...and the derived list claims no template for it', ( \Nino\Install\Webp
 // it through its own replace rather than reject it as an unknown template
 $_POST['data'] = json_encode( [
 	'originalHttpUri' => '', 'uri' => '/dev-made', 'httpUri' => '/dev-made',
-	'template' => 'page-home', 'navs' => [], 'statusCode' => 201, 'text' => [],
+	'template' => 'page-home', 'navs' => [], 'statusCode' => 201,
+	// A name and a title in every active language are required there
+	'text' => array_fill_keys( \Nino\Locales::getAvailableLocales( $appData ), [ 'name' => 'Dev made', 'title' => 'Dev made' ] ),
 ] );
 $adminNewRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Modules\Routes\Admin::apiSave( $appData, $adminNewRequest );

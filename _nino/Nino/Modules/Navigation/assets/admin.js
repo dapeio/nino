@@ -9,11 +9,13 @@
  *													Routes module's per-page checkboxes can't give, since
  *													there a page only ever sees its own membership.
  *
- *													List + drill-down shape follows the Routes panel's admin.js closely; the
- *													detail level's ↑/↓ buttons reorder one menu, and every
- *													action re-renders from the response rather than patching
- *													a local copy (see Modules\Navigation\Admin,
- *													whose every action answers with the same payload).
+ *													List + drill-down shape follows the Routes panel's admin.js closely;
+ *													one menu is a working copy. The detail level's ↑/↓/× and Add
+ *													change that copy in the browser and write nothing; Save posts
+ *													the complete running order in one request (see
+ *													Modules\Navigation\Admin::apiSave()), whose answer is the
+ *													complete state, so nothing is patched locally afterwards and
+ *													no reload can disagree with the server.
  *
  *													No locale switch anywhere in here: a menu has nothing
  *													per-locale about it, and the wording it renders is each
@@ -37,6 +39,15 @@
 		_isNew 			: false,
 		_ready 			: false,
 
+		// The open menu's working copy: the entries as they stand on screen,
+		// a clone of what the server holds until somebody changes it. _dirty
+		// is whether they differ; _savedKey is the id the form was drawn with,
+		// to tell a typed one from it
+		_entries 		: [],
+		_dirty 			: false,
+		_savedKey 	: '',
+		_entriesHost : null,
+
 		/**
 		 *	Load the menus and render the list
 		 *
@@ -58,7 +69,12 @@
 		},
 
 		/**
-		 *	Re-show whichever level (list or one menu) is currently on
+		 *	Re-show whichever level (list or one menu) is currently on. The panel
+		 *	is shown again every time somebody comes back to it, and routes, names
+		 *	and menus may have changed in Routes or Text in the meantime - so the
+		 *	lists are read again, and the menu that is open is drawn again from
+		 *	them, unless it holds changes that were not saved: that working copy
+		 *	is never replaced (only the routes it can still pick from are)
 		 *
 		 *	@return		void
 		 */
@@ -68,9 +84,28 @@
 				return Nino.admin.navs.init();
 
 			if( dc.getElementById('navs-form').classList.contains('admin-hidden') === false )
-				return Nino.admin.navs._showForm();
+				Nino.admin.navs._showForm();
+			else
+				Nino.admin.navs._showList();
 
-			Nino.admin.navs._showList();
+			Nino.admin.navs._apiCall( 'list', {}, function( status, response ) {
+
+				// A read that fails leaves what is on screen as it is: the panel
+				// is not the place to lose a working copy over a flaky request
+				if( status !== 200 || response === null )
+					return;
+
+				if( Nino.admin.navs._isDirty() === true ) {
+					Nino.admin.navs._navs 		= response.navs;
+					Nino.admin.navs._routes 	= response.routes;
+					Nino.admin.navs._active 	= response.active;
+					Nino.admin.navs._renderList();
+					Nino.admin.navs._renderEntries();
+					return;
+				}
+
+				Nino.admin.navs._apply( response );
+			} );
 		},
 
 		/**
@@ -141,6 +176,8 @@
 
 		_showList : function() {
 			Nino.admin.navs._currentKey = null;
+			Nino.admin.navs._dirty 			= false;
+			Nino.admin.navs._entries 		= [];
 			dc.getElementById('navs-list').classList.remove('admin-hidden');
 			dc.getElementById('navs-form').classList.add('admin-hidden');
 		},
@@ -235,13 +272,18 @@
 
 		/**
 		 *	Render one menu: back-link, its id, its running order, an add
-		 *	picker, and save/delete
+		 *	picker, and save/delete. The working copy starts as a clone of the
+		 *	menu's entries
 		 *
 		 *	@param		{Object}	nav
 		 *
 		 *	@return		void
 		 */
 		_renderForm : function( nav ) {
+
+			Nino.admin.navs._entries 	= nav.entries.map( function( entry ) { return Object.assign( {}, entry ) } );
+			Nino.admin.navs._dirty 		= false;
+			Nino.admin.navs._savedKey = nav.key || '';
 
 			const wrap = dc.getElementById('navs-form');
 			wrap.innerHTML = '';
@@ -250,7 +292,7 @@
 			backLink.href = '#';
 			backLink.className = 'nino-admin-back-link';
 			backLink.textContent = Nino.content.getText('/_admin/common/label/back');
-			backLink.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.navs._showList() } );
+			backLink.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.navs._back() } );
 			wrap.appendChild( Nino.admin.formToolbar( backLink ) );
 
 			const form = dc.createElement('form');
@@ -287,9 +329,15 @@
 			form.appendChild( navFieldset );
 
 			// The running order only exists once the menu does: a new one has
-			// no key on the server to hang entries off yet
-			if( Nino.admin.navs._isNew === false )
-				form.appendChild( Nino.admin.navs._entriesFieldset( nav ) );
+			// no key on the server to hang entries off yet. Its host stays
+			// where it is while the entries inside it are drawn again, so a key
+			// typed above is not lost to a click on an arrow below
+			Nino.admin.navs._entriesHost = null;
+			if( Nino.admin.navs._isNew === false ) {
+				Nino.admin.navs._entriesHost = dc.createElement('div');
+				form.appendChild( Nino.admin.navs._entriesHost );
+				Nino.admin.navs._renderEntries();
+			}
 
 			const actions = dc.createElement('div');
 			actions.className = 'nino-admin-actionbar';
@@ -320,30 +368,38 @@
 
 			// What the form holds now is what is saved
 			if( typeof Nino.admin.dirty === 'object' )
-				Nino.admin.dirty.snapshot( 'navs' );
+				Nino.admin.dirty.refresh();
 		},
 
 		/**
 		 *	One menu's entries in their running order, each with ↑/↓ and a
-		 *	remove button, plus the picker that adds another one at the end
+		 *	remove button, plus the picker that adds another one at the end -
+		 *	drawn from the working copy, into the host that was made for it
 		 *
-		 *	@param		{Object}	nav
-		 *
-		 *	@return		{Element}
+		 *	@return		void
 		 */
-		_entriesFieldset : function( nav ) {
+		_renderEntries : function() {
+
+			const host = Nino.admin.navs._entriesHost;
+
+			if( host === null )
+				return;
+
+			host.innerHTML = '';
+
+			const entries = Nino.admin.navs._entries;
 
 			const fieldset = dc.createElement('fieldset');
 			const legend = dc.createElement('legend');
 			legend.textContent = Nino.content.getText('/_admin/navs/label/entries');
 			fieldset.appendChild( legend );
 
-			if( nav.entries.length === 0 )
+			if( entries.length === 0 )
 				fieldset.appendChild( Nino.adminUi.emptyState( Nino.content.getText('/_admin/navs/empty-entries') ) );
 
 			const ul = dc.createElement('ul');
 			ul.className = 'nino-admin-list';
-			nav.entries.forEach( function( entry, index ) {
+			entries.forEach( function( entry, index ) {
 
 				const li = dc.createElement('li');
 				li.className = 'admin-page-row';
@@ -364,7 +420,7 @@
 				// title is a hover hint, not a name - see Nino.adminUi.elementList()
 				upBtn.setAttribute( 'aria-label', Nino.content.getText('/_admin/navs/label/moveup') );
 				upBtn.disabled = index === 0;
-				upBtn.addEventListener( 'click', function() { Nino.admin.navs._move( entry.httpUri, 'up' ) } );
+				upBtn.addEventListener( 'click', function() { Nino.admin.navs._move( index, -1 ) } );
 				moveWrap.appendChild( upBtn );
 
 				const downBtn = dc.createElement('button');
@@ -372,8 +428,8 @@
 				downBtn.textContent = '↓';
 				downBtn.title = Nino.content.getText('/_admin/navs/label/movedown');
 				downBtn.setAttribute( 'aria-label', Nino.content.getText('/_admin/navs/label/movedown') );
-				downBtn.disabled = index === nav.entries.length - 1;
-				downBtn.addEventListener( 'click', function() { Nino.admin.navs._move( entry.httpUri, 'down' ) } );
+				downBtn.disabled = index === entries.length - 1;
+				downBtn.addEventListener( 'click', function() { Nino.admin.navs._move( index, 1 ) } );
 				moveWrap.appendChild( downBtn );
 
 				const removeBtn = dc.createElement('button');
@@ -381,7 +437,7 @@
 				removeBtn.textContent = '×';
 				removeBtn.title = Nino.content.getText('/_admin/navs/label/remove');
 				removeBtn.setAttribute( 'aria-label', Nino.content.getText('/_admin/navs/label/remove') );
-				removeBtn.addEventListener( 'click', function() { Nino.admin.navs._unassign( entry.httpUri ) } );
+				removeBtn.addEventListener( 'click', function() { Nino.admin.navs._remove( index ) } );
 				moveWrap.appendChild( removeBtn );
 
 				li.appendChild( moveWrap );
@@ -391,8 +447,9 @@
 
 			// Every GET route can join a menu, not just the pages the Routes
 			// module manages - one already in this menu is simply not offered
-			// again
-			const taken = nav.entries.map( function( entry ) { return entry.httpUri } );
+			// again. Nothing is preselected: the first route in the list is not
+			// a decision, and Add waits for one
+			const taken = entries.map( function( entry ) { return entry.httpUri } );
 			const free 	= Nino.admin.navs._routes.filter( function( route ) { return taken.indexOf( route.httpUri ) === -1 } );
 
 			const addLabel = dc.createElement('label');
@@ -401,20 +458,6 @@
 			addSpan.textContent = Nino.content.getText('/_admin/navs/label/add');
 			addLabel.appendChild( addSpan );
 
-			const addSelect = dc.createElement('select');
-			addSelect.id = 'navs-form-add';
-			// Which route the button below would add is a choice, not an edit
-			addSelect.dataset.dirty = 'ignore';
-			addSelect.disabled = free.length === 0;
-			free.forEach( function( route ) {
-				const option = dc.createElement('option');
-				option.value = route.httpUri;
-				option.textContent = route.label+ ' ('+ route.httpUri+ ')'+ ( route.named === false ? ' '+ Nino.content.getText('/_admin/navs/label/unnamed-short') : '' );
-				addSelect.appendChild( option );
-			} );
-			addLabel.appendChild( addSelect );
-			fieldset.appendChild( addLabel );
-
 			// A plain button, not an .nino-admin-btn-primary: that class is the
 			// full-width primary a *list* level carries (see _renderList()),
 			// and this one sits inside a form under a Save button it must not
@@ -422,77 +465,163 @@
 			const addBtn = dc.createElement('button');
 			addBtn.type = 'button';
 			addBtn.textContent = Nino.content.getText('/_admin/navs/label/addbtn');
-			addBtn.disabled = free.length === 0;
-			addBtn.addEventListener( 'click', function() { Nino.admin.navs._assign( addSelect.value ) } );
+			addBtn.disabled = true;
+
+			const addSelect = dc.createElement('select');
+			addSelect.id = 'navs-form-add';
+			addSelect.disabled = free.length === 0;
+
+			const choose = dc.createElement('option');
+			choose.value = '';
+			choose.textContent = Nino.content.getText('/_admin/navs/label/choose');
+			choose.selected = true;
+			addSelect.appendChild( choose );
+
+			free.forEach( function( route ) {
+				const option = dc.createElement('option');
+				option.value = route.httpUri;
+				option.textContent = route.label+ ' ('+ route.httpUri+ ')'+ ( route.named === false ? ' '+ Nino.content.getText('/_admin/navs/label/unnamed-short') : '' );
+				addSelect.appendChild( option );
+			} );
+			addSelect.addEventListener( 'change', function() { addBtn.disabled = addSelect.value === '' } );
+			addLabel.appendChild( addSelect );
+			fieldset.appendChild( addLabel );
+
+			addBtn.addEventListener( 'click', function() { Nino.admin.navs._add( addSelect.value ) } );
 			fieldset.appendChild( addBtn );
 
-			return fieldset;
+			host.appendChild( fieldset );
 		},
 
 		/**
-		 *	Run one entry-level action against the menu currently open
-		 *
-		 *	The menu is drawn again from the answer, which drops a key typed into
-		 *	its field and not saved yet - so that is asked about first (see
-		 *	Nino.admin.dirty.guard())
-		 *
-		 *	@param		{string}	endpoint			'assign' | 'unassign' | 'move'
-		 *	@param		{Object}	payload				Merged onto { key }
-		 *	@param		{boolean}	[guarded]			The unsaved input was asked about already
+		 *	A change to the working copy: remember that it differs from what is
+		 *	saved, say so in the status line, and draw the entries again - only
+		 *	them, so what was typed into the id field above survives. Under the
+		 *	shell the action bar says "unsaved" itself, so the panel's own line
+		 *	is for the shell-less case only
 		 *
 		 *	@return		void
 		 */
-		_entryAction : function( endpoint, payload, guarded ) {
+		_changed : function() {
 
-			if( guarded !== true && typeof Nino.admin.dirty === 'object' ) {
-				Nino.admin.dirty.guard( [ 'navs' ], function() { Nino.admin.navs._entryAction( endpoint, payload, true ) } );
-				return;
+			Nino.admin.navs._dirty = true;
+			Nino.admin.navs._renderEntries();
+
+			if( typeof Nino.admin.dirty === 'object' )
+				Nino.admin.dirty.refresh();
+			else {
+
+				const msg = dc.getElementById('navs-form-msg');
+				if( msg !== null )
+					msg.textContent = Nino.content.getText('/_admin/navs/msg/unsaved');
 			}
-
-			const msg = dc.getElementById('navs-form-msg');
-			msg.textContent = Nino.content.getText('/_admin/common/msg/saving');
-
-			payload.key = Nino.admin.navs._currentKey;
-
-			Nino.admin.navs._apiCall( endpoint, payload, function( status, response ) {
-				if( status !== 200 || response === null ) {
-					msg.textContent = Nino.adminUi.api.errorText( status, response, '/_admin/common/error/save' );
-					return;
-				}
-				Nino.admin.navs._apply( response );
-			} );
 		},
 
 		/**
-		 *	@param		{string}	httpUri
-		 *	@param		{string}	direction			'up' | 'down'
+		 *	Swap one entry of the working copy with its neighbor
+		 *
+		 *	@param		{number}	index
+		 *	@param		{number}	step					-1 up, 1 down
 		 *
 		 *	@return		void
 		 */
-		_move : function( httpUri, direction ) {
-			Nino.admin.navs._entryAction( 'move', { httpUri : httpUri, direction : direction } );
+		_move : function( index, step ) {
+
+			const entries = Nino.admin.navs._entries;
+			const other 	= index + step;
+
+			if( other < 0 || other >= entries.length )
+				return;
+
+			const held = entries[index];
+			entries[index] = entries[other];
+			entries[other] = held;
+
+			Nino.admin.navs._changed();
 		},
 
 		/**
-		 *	@param		{string}	httpUri
+		 *	Take one entry out of the working copy - the route itself stays
+		 *
+		 *	@param		{number}	index
 		 *
 		 *	@return		void
 		 */
-		_assign : function( httpUri ) {
-			Nino.admin.navs._entryAction( 'assign', { httpUri : httpUri } );
+		_remove : function( index ) {
+			Nino.admin.navs._entries.splice( index, 1 );
+			Nino.admin.navs._changed();
 		},
 
 		/**
-		 *	@param		{string}	httpUri
+		 *	Put a route at the end of the working copy
+		 *
+		 *	@param		{string}	httpUri				One of the routes the picker offered
 		 *
 		 *	@return		void
 		 */
-		_unassign : function( httpUri ) {
-			Nino.admin.navs._entryAction( 'unassign', { httpUri : httpUri } );
+		_add : function( httpUri ) {
+
+			const route = Nino.admin.navs._routes.find( function( candidate ) { return candidate.httpUri === httpUri } );
+
+			if( route === undefined || Nino.admin.navs._entries.some( function( entry ) { return entry.httpUri === httpUri } ) === true )
+				return;
+
+			Nino.admin.navs._entries.push( Object.assign( {}, route ) );
+			Nino.admin.navs._changed();
 		},
 
 		/**
-		 *	Create the menu currently open, or rename it
+		 *	Whether the open menu holds anything that is not saved: a changed
+		 *	working copy, or an id that was typed - on screen only, a menu that
+		 *	is drawn but not shown holds no input anybody is looking at
+		 *
+		 *	@return		{boolean}
+		 */
+		_isDirty : function() {
+
+			if( Nino.admin.navs._currentKey === null && Nino.admin.navs._isNew === false )
+				return false;
+
+			const form = dc.getElementById('navs-form');
+			if( form === null || form.classList.contains('admin-hidden') === true )
+				return false;
+
+			const key = dc.getElementById('navs-form-key');
+
+			return Nino.admin.navs._dirty === true || ( key !== null && key.value !== Nino.admin.navs._savedKey );
+		},
+
+		/**
+		 *	The shell's Discard: the menu is about to be left or drawn again, and
+		 *	whatever it held is let go
+		 *
+		 *	@return		void
+		 */
+		_discard : function() {
+			Nino.admin.navs._dirty 		= false;
+			Nino.admin.navs._savedKey = ( dc.getElementById('navs-form-key') || { value : '' } ).value;
+		},
+
+		/**
+		 *	The back link. A working copy is not saved anywhere and there is no
+		 *	undo, so leaving it asks first. A shell that has the registry has
+		 *	asked already, in its own dialog (Save, Discard or Cancel, see
+		 *	Nino.admin.dirty), before this runs; one that has not is asked here
+		 *
+		 *	@return		void
+		 */
+		_back : function() {
+
+			if( typeof Nino.admin.dirty !== 'object' && Nino.admin.navs._isDirty() === true && wn.confirm( Nino.content.getText('/_admin/navs/confirm/discard') ) === false )
+				return;
+
+			Nino.admin.navs._showList();
+		},
+
+		/**
+		 *	Create the menu currently open, rename it, and/or save its running
+		 *	order - one request, the whole order. The answer is the complete state
+		 *	and the menu is drawn from it
 		 *
 		 *	Every way this ends reports to done( ok ), if there is one (see
 		 *	Nino.admin.dirty.guard())
@@ -513,10 +642,16 @@
 
 			const key = dc.getElementById('navs-form-key').value;
 
-			Nino.admin.navs._apiCall( 'save', {
+			const payload = {
 				originalKey : Nino.admin.navs._isNew ? '' : Nino.admin.navs._currentKey,
 				key 				: key,
-			}, function( status, response ) {
+			};
+
+			// A new menu has no running order yet to post
+			if( Nino.admin.navs._isNew === false )
+				payload.entries = Nino.admin.navs._entries.map( function( entry ) { return entry.httpUri } );
+
+			Nino.admin.navs._apiCall( 'save', payload, function( status, response ) {
 
 				if( status !== 200 || response === null ) {
 					msg.textContent = Nino.adminUi.api.errorText( status, response, '/_admin/common/error/save' );
@@ -566,8 +701,15 @@
 	Nino.events.bindCallback( 'ready', Nino.admin.navs.init );
 
 	// The shell asks before anything throws the open menu's input away (see
-	// Nino.admin.dirty). A shell without the registry is simply not asking
+	// Nino.admin.dirty): the working copy of its entries and a typed id are not
+	// plain fields it could compare, so the panel answers for them itself. A
+	// shell without the registry is simply not asking
 	if( typeof Nino.admin.dirty === 'object' )
-		Nino.admin.dirty.watchForm( 'navs', function() { return dc.getElementById('navs-form') }, function( done ) { Nino.admin.navs._save( done ) } );
+		Nino.admin.dirty.register( 'navs', {
+			isDirty : function() { return Nino.admin.navs._isDirty() },
+			save 		: function( done ) { Nino.admin.navs._save( done ) },
+			discard : function() { Nino.admin.navs._discard() },
+			bar 		: function() { const wrap = dc.getElementById('navs-form'); return wrap === null ? null : wrap.querySelector('.nino-admin-actionbar') },
+		} );
 
 })(window, document, document.documentElement, document.body);

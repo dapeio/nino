@@ -381,6 +381,8 @@ The class is an ordinary runtime module in the `Nino\Modules` namespace: `init()
 
 The class reads its settings through `\Nino\Features::setting()` - with a default, so it keeps working when the schema does not know a setting yet.
 
+A route the class registers in `init()` is not in `config.php`, and can still be put into a navigation: the Navigations panel offers every live `GET` route and stores a runtime route's membership under `/nino/html/navroutes`, which `[navigation]` merges into the route while it is live. The menu shows it as soon as the route has a name, `/webpage<uri>/name` - create it in the Text Keys tab - and drops it silently when the feature is off.
+
 ### The Panel
 
 A panel is a class with `actions()`, `nav()` and `perm()`, like every panel of the workbench; the [Developer Manual](development.md#panels-of-the-workbench) lists the whole contract, the [panel recipe](recipes/admin-panel.md) walks through a complete panel including its frontend. A feature panel names its files from where its class is - `\Nino\Admin\Panels::relative( dirname( __DIR__ ). '/text' )` - so they move with the directory, and guards every action with `\Nino\Admin\Admin::guardPerm()`. A uri or an action name one of the workbench's own panels already owns is never handed to a feature. Whatever group its own `nav()` names, the registry places it in the rail's **Features** group - a panel's class file lying below `\Nino\Features::dir()` is what the registry checks, not the value the panel wrote - so an editor granted that one group sees every active feature's panel and nothing a kernel or `app/` module placed there instead.
